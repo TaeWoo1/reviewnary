@@ -2,6 +2,7 @@
 #
 # tools/demo-preset/demo-preset.sh — reproduce the two SellerOps demo states with one short command.
 #
+#   demo-preset.sh doctor      is everything ready to demo? (READ-ONLY)
 #   demo-preset.sh status      what the demo org's channel connection looks like right now (READ-ONLY)
 #   demo-preset.sh snapshot    capture the current state as the CONNECTED baseline
 #   demo-preset.sh fresh       put the channel back before its first connection (auto-snapshots first)
@@ -182,6 +183,130 @@ cmd_status() {
     fi
 }
 
+# ---- doctor (READ-ONLY) -------------------------------------------------------------------------------
+# One screen answering "can I demo right now?". It creates nothing — not even the archive schema — and
+# says CHECK MANUALLY for everything SellerOps genuinely cannot observe, rather than guessing.
+BACKEND_URL="${SELLEROPS_DEMO_BACKEND_URL:-http://127.0.0.1:8080}"
+FRONTEND_URL="${SELLEROPS_DEMO_FRONTEND_URL:-http://localhost:5173}"
+BRIDGE_URL="${SELLEROPS_DEMO_BRIDGE_URL:-http://127.0.0.1:47615}"     # collector local agent (VITE_BRIDGE_URL)
+RUNTIME_URL="${SELLEROPS_DEMO_AGENT_RUNTIME_URL:-http://127.0.0.1:8787}"  # /agent page only
+DOCTOR_FAILED="false"
+
+line()  { printf '  %-13s %-32s %-8s %s\n' "$1" "$2" "$3" "${4:-}"; }
+fail()  { DOCTOR_FAILED="true"; }
+
+# HTTP reachability only — no auth, no write, no marketplace call.
+probe() { curl -fsS -m 3 -o /dev/null "$1" 2>/dev/null; }
+
+cmd_doctor() {
+    say "SellerOps demo doctor — db: $PGDATABASE@$PGHOST:$PGPORT · org: $ORG_NAME"
+    say ""
+    say "services"
+    if probe "$BACKEND_URL/health"; then line backend "$BACKEND_URL" OK
+    else line backend "$BACKEND_URL" DOWN "백엔드가 없으면 아무 시나리오도 안 됩니다"; fail; fi
+    if probe "$FRONTEND_URL/"; then line frontend "$FRONTEND_URL" OK
+    else line frontend "$FRONTEND_URL" DOWN "UI 없음"; fail; fi
+    if probe "$BRIDGE_URL/bridge/health"; then line "local agent" "$BRIDGE_URL" OK "Coupang 최초 연결 워크스루용"
+    else line "local agent" "$BRIDGE_URL" DOWN "fresh 시나리오의 키 발급 워크스루가 페어링되지 않습니다"; fail; fi
+    if probe "$RUNTIME_URL/health"; then line "agent runtime" "$RUNTIME_URL" OK "/agent 페이지 전용"
+    else line "agent runtime" "$RUNTIME_URL" "-" "/agent 페이지 전용 · 오늘 시나리오에는 불필요"; fi
+
+    say ""
+    say "backend <-> this database"
+    doctor_backend_matches_db
+
+    say ""
+    say "demo state"
+    local acc cat cred
+    acc="$(q "select coalesce((select connection_status from seller_accounts
+               where org_id='$ORG_ID' and channel_id='$CHANNEL_ID' and is_file_upload=false),'none')")"
+    cat="$(q "select status from channels where id='$CHANNEL_ID'")"
+    cred="$(q "select count(*) from connector_credentials cc join seller_accounts sa on sa.id=cc.seller_account_id
+                where sa.org_id='$ORG_ID' and sa.channel_id='$CHANNEL_ID'")"
+    if [ "$acc" = "none" ] && [ "$cat" = "AVAILABLE" ] && [ "$cred" = "0" ]; then
+        line "$CHANNEL_CODE" "FRESH" OK "최초 연결 CTA로 진입 가능"
+    else
+        line "$CHANNEL_CODE" "account=$acc catalog=$cat cred=$cred" "-" "'fresh'로 최초 연결 상태 진입"
+    fi
+    if have_snapshot; then
+        line snapshot "account=$(archived_rows seller_accounts) credential=$(archived_rows connector_credentials)" OK "'connected'로 복원 가능"
+    else
+        line snapshot "none" WARN "지금 'connected'는 실패합니다 — 'snapshot'을 먼저 찍으세요"
+    fi
+
+    say ""
+    say "routine demo data (connected 시나리오)"
+    doctor_channel_data NAVER  reviews   reviews
+    doctor_channel_data CAFE24 inquiries inquiries
+
+    say ""
+    say "CHECK MANUALLY — SellerOps는 알 수 없는 항목 (사람이 눈으로 확인)"
+    say "  · WING 로그인 세션이 에이전트 브라우저 프로필에 살아 있는지 (CAPTCHA/2FA 우회는 없습니다)"
+    say "  · WING에 자체개발 Open API 키가 이미 있는지 — 있으면 '최초 발급' 화면이 나오지 않습니다"
+    say "  · 애플리케이션의 주문 API 그룹 권한"
+    say "  · API 호출 IP 허용목록에 이 머신의 공인 egress IP가 등록되어 있는지"
+    say "  · 라이브 Coupang 호출은 tools/coupang-local 하네스 + 단회 승인이 별도로 필요합니다"
+    say "  (자세한 내용: tools/demo-preset/README.md § 4)"
+
+    say ""
+    if [ "$DOCTOR_FAILED" = "true" ]; then
+        say "RESULT: 준비되지 않은 항목이 있습니다 (위 DOWN 확인)."
+        exit 1
+    fi
+    say "RESULT: 자동 확인 가능한 항목은 모두 통과. 위 CHECK MANUALLY 목록은 직접 확인하세요."
+}
+
+# Does the running backend actually serve THIS database? Compares the COUPANG card the API returns with
+# what the database says. Needs a login, so it is opt-in: without SELLEROPS_DEMO_PASSWORD it reports
+# CHECK MANUALLY rather than embedding a password in the tool.
+doctor_backend_matches_db() {
+    local pw="${SELLEROPS_DEMO_PASSWORD:-}" token api db_label
+    if [ -z "$pw" ]; then
+        line "/api/channels" "not checked" "MANUAL" "SELLEROPS_DEMO_PASSWORD 설정 시 자동 대조"
+        return 0
+    fi
+    command -v python3 >/dev/null 2>&1 || { line "/api/channels" "python3 없음" "MANUAL" ""; return 0; }
+    token="$(curl -fsS -m 5 -X POST "$BACKEND_URL/api/auth/login" -H 'Content-Type: application/json' \
+             -d "{\"email\":\"$DEMO_EMAIL\",\"password\":\"$pw\"}" 2>/dev/null \
+             | python3 -c 'import sys,json;print(json.load(sys.stdin).get("token",""))' 2>/dev/null || true)"
+    if [ -z "$token" ]; then line "/api/channels" "login failed" WARN "백엔드/계정 확인"; fail; return 0; fi
+    api="$(curl -fsS -m 5 "$BACKEND_URL/api/channels" -H "Authorization: Bearer $token" 2>/dev/null \
+           | python3 -c "
+import sys, json
+for c in json.load(sys.stdin):
+    if c['code'] == '$CHANNEL_CODE':
+        print(c['status'] + '/' + c['actionLabel'])
+        break
+" 2>/dev/null || true)"
+    db_label="$(q "select coalesce((select connection_status from seller_accounts
+                    where org_id='$ORG_ID' and channel_id='$CHANNEL_ID' and is_file_upload=false),
+                   (select status from channels where id='$CHANNEL_ID'))")"
+    if [ -z "$api" ]; then
+        line "/api/channels" "no answer" WARN "" ; fail
+    elif [ "${api%%/*}" = "$db_label" ]; then
+        line "/api/channels" "$CHANNEL_CODE = $api" OK "DB와 일치 — 같은 데이터베이스입니다"
+    else
+        line "/api/channels" "api=$api db=$db_label" FAIL "백엔드가 다른 DB를 보고 있습니다"; fail
+    fi
+}
+
+# Is the connected-scenario data actually there for a channel?
+doctor_channel_data() {
+    local code="$1" tbl_name="$2" label="$3" ch acc n
+    ch="$(q "select id from channels where code='$code'")"
+    if [ -z "$ch" ]; then line "$code" "채널 없음" FAIL ""; fail; return 0; fi
+    acc="$(q "select coalesce((select connection_status from seller_accounts
+               where org_id='$ORG_ID' and channel_id='$ch' and is_file_upload=false),'none')")"
+    n="$(q "select count(*) from $tbl_name where org_id='$ORG_ID' and channel_id='$ch'")"
+    if [ "$acc" = "CONNECTED" ] && [ "$n" -gt 0 ]; then
+        line "$code" "account $acc · $label $n" OK
+    elif [ "$n" -gt 0 ]; then
+        line "$code" "account $acc · $label $n" WARN "데이터는 있으나 계정이 연결 상태가 아닙니다"
+    else
+        line "$code" "account $acc · $label $n" FAIL "루틴 시연용 데이터가 없습니다"; fail
+    fi
+}
+
 cmd_snapshot() {
     local f="$TMPD/snap.sql" self acct chan_or_acct orders events
     if [ -n "$ACCOUNT_ID" ]; then
@@ -339,6 +464,7 @@ usage() {
     cat <<'USAGE'
 demo-preset.sh — reproduce the SellerOps demo states (local/dev only)
 
+  demo-preset.sh doctor      is everything ready to demo? services + state + data (READ-ONLY)
   demo-preset.sh status      what the demo org's channel connection looks like now (READ-ONLY)
   demo-preset.sh snapshot    capture the current state as the CONNECTED baseline
   demo-preset.sh fresh       put the channel back before its first connection (auto-snapshots first)
@@ -353,6 +479,9 @@ options
 environment
   SELLEROPS_DEMO_PGHOST/PGPORT/PGUSER/PGDATABASE/PGPASSWORD   database (loopback host only)
   SELLEROPS_DEMO_USER_EMAIL                                   demo login that identifies the org
+  SELLEROPS_DEMO_PASSWORD                                     doctor only, optional: log in and prove the
+                                                              running backend serves THIS database
+  SELLEROPS_DEMO_BACKEND_URL / _FRONTEND_URL / _BRIDGE_URL / _AGENT_RUNTIME_URL   doctor probe targets
 USAGE
 }
 
@@ -369,6 +498,7 @@ while [ $# -gt 0 ]; do
 done
 
 case "$CMD" in
+    doctor)    guard_environment; resolve_ids; cmd_doctor ;;
     status)    guard_environment; resolve_ids; cmd_status ;;
     snapshot)  guard_environment; resolve_ids; tx "$LIB_SQL" >/dev/null; cmd_snapshot ;;
     fresh)

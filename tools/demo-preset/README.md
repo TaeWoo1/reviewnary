@@ -3,6 +3,7 @@
 Two commands, so nobody has to touch the database during a demo:
 
 ```bash
+tools/demo-preset/demo-preset.sh doctor      # 지금 시연 가능한가? 서비스+상태+데이터 (읽기 전용)
 tools/demo-preset/demo-preset.sh fresh       # 채널 최초 연결 CTA로 다시 들어갈 수 있는 상태
 tools/demo-preset/demo-preset.sh connected   # 연결된 상태 — 리뷰/문의 루틴 시연
 tools/demo-preset/demo-preset.sh status      # 지금 어느 상태인지 (읽기 전용)
@@ -72,11 +73,25 @@ One archive slot per *(org, channel)*. `fresh` takes a snapshot automatically wh
 account, or a credential the archive lacks — exactly what a real live connection produces).
 `--resnapshot` is the deliberate "make the current state the new baseline" answer.
 
+## 2b. `doctor` — run it once, just before the demo
+
+Read-only; it does not even create the archive schema.
+
+| Section | What it checks |
+|---|---|
+| services | backend `/health`, frontend, **local agent bridge** (`/bridge/health` — the Coupang key-issuance walkthrough needs it), agent runtime (`/agent` page only, not needed today) |
+| backend ↔ this database | whether the running backend really serves **this** database, by comparing the channel card from `/api/channels` with the row in the DB. Needs a login, so it is opt-in: without `SELLEROPS_DEMO_PASSWORD` it reports `MANUAL` rather than embedding a password in the tool |
+| demo state | whether you are in `FRESH`, and whether a snapshot exists so `connected` can work |
+| routine demo data | NAVER account state + review count, Cafe24 account state + inquiry count |
+| CHECK MANUALLY | §4 below — the marketplace-side facts SellerOps genuinely cannot observe. They are printed as unknowns, never guessed |
+
+Exit code 1 if any automatically-checkable item fails.
+
 ## 3. Today's demo order
 
 ```bash
 # once, before the audience arrives
-tools/demo-preset/demo-preset.sh status          # confirm which state you are in
+tools/demo-preset/demo-preset.sh doctor          # services + demo state + routine data, one screen
 
 # A. 최초 연결 데모
 tools/demo-preset/demo-preset.sh fresh
@@ -142,4 +157,8 @@ a live connection test does.
 SELLEROPS_DEMO_PGHOST/PGPORT/PGUSER/PGDATABASE/PGPASSWORD   database (loopback host only)
 SELLEROPS_DEMO_USER_EMAIL                                   demo login that identifies the org
                                                             (default demo@sellerops.ai)
+SELLEROPS_DEMO_PASSWORD                                     doctor only, optional — log in and prove the
+                                                            running backend serves THIS database
+SELLEROPS_DEMO_BACKEND_URL / _FRONTEND_URL / _BRIDGE_URL / _AGENT_RUNTIME_URL
+                                                            doctor probe targets (loopback defaults)
 ```
