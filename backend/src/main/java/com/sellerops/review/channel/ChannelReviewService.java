@@ -500,9 +500,13 @@ public class ChannelReviewService {
         // answers a question about the CHANNEL. NAVER's capability says a reply flow exists whether or
         // not this seller has connected anything; handing out its ref with no account would put a
         // draft panel on screen that every account-addressed reply endpoint would then refuse.
+        //
+        // The account's EXECUTION capability is deliberately not passed: it decides whether an approved
+        // answer may be sent, never whether one may be written. It still reaches the screen — as
+        // `capability.executionKind` (see capabilityOf) — so the surface can say what the send lane is
+        // without that answer deciding whether the draft panel exists.
         ChannelReviewDetailView.ReplyWork work = account == null ? null
-                : replyWork.forReview(orgId, channelCode, review.getId(),
-                                execution.of(orgId, account.getId(), channelCode).kind())
+                : replyWork.forReview(orgId, channelCode, review.getId())
                         .map(r -> new ChannelReviewDetailView.ReplyWork(
                                 r.actionRef(), r.triageDisposition(), r.hasReplyPreparation(),
                                 // The channel's own statement, off the entity already read for this

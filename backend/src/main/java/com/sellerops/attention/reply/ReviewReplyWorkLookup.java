@@ -3,7 +3,6 @@ package com.sellerops.attention.reply;
 import com.sellerops.attention.VocItemRef;
 import com.sellerops.attention.triage.ReviewTriage;
 import com.sellerops.attention.triage.ReviewTriageRepository;
-import com.sellerops.review.publish.ReviewExecutionKind;
 import com.sellerops.review.triage.ReviewTriageChannelCapability;
 import java.util.List;
 import java.util.Optional;
@@ -21,11 +20,23 @@ import org.springframework.stereotype.Component;
  * ({@code OperatorVocItem.actionRef / triageDisposition / hasReplyPreparation}), computed here for one
  * review from the same repositories.
  *
- * <p><b>Capability-gated.</b> Empty for every channel whose {@link ReviewTriageChannelCapability} says
- * {@code replySupported = false} (Coupang, Cafe24) UNLESS the account's execution capability is
- * {@code API_EXECUTION} — a Cafe24 mall with the review lane on and the write grant recorded has a reply
- * flow, and it is this one. Otherwise the surface renders no reply control at all, and a client that
- * guessed the ref would still be refused by the reply endpoints' own checks.
+ * <p><b>Capability-gated on the reply FLOW, not on the send.</b> Empty for every channel with no seller
+ * reply flow at all ({@link ReviewTriageChannelCapability#replyFlowExists()} — Coupang, policy gate D8):
+ * that surface renders no reply control, and a client that guessed the ref would still be refused by the
+ * reply endpoints' own checks, which gate on the same predicate ({@code ReviewReplyService.requireReplyFlow}).
+ *
+ * <p><b>It used to ask a second question and that was the defect.</b> The gate read {@code replySupported}
+ * — the triage contract's older NAVER-only column — and opened Cafe24 only when the account's execution
+ * capability was already {@code API_EXECUTION}. So drafting, editing and approving a Cafe24 reply required
+ * the marketplace WRITE to be configured first: with the write lane off, 확인할 일 listed the review as
+ * 「초안 필요」 (that queue reads {@code replyFlowExists}) and the workspace refused to hand out a ref for
+ * it. Two surfaces, two columns, one contradiction the seller could see.
+ *
+ * <p>Preparation and sending are separate rights and are now separately gated. This class answers «may a
+ * draft, an edit and an approval exist for this review» — a question about the channel. Whether the
+ * approved text may then leave for the marketplace is {@code ReviewExecutionCapability}'s answer, checked
+ * where the send happens ({@code ReviewReplyExecutionService.execute} refuses anything that is not
+ * {@code API_EXECUTION}) and reported to the screen as its own field. Nothing here widens that.
  */
 @Component
 public class ReviewReplyWorkLookup {
@@ -45,16 +56,15 @@ public class ReviewReplyWorkLookup {
         this.approvals = approvals;
     }
 
-    /** The reply work one review can carry, or empty when its channel has no reply flow. */
+    /**
+     * The reply work one review can carry, or empty when its channel has no reply flow at all.
+     *
+     * <p>Takes no execution capability, and must not: a channel's send configuration is not what decides
+     * whether the seller may write and approve an answer. The overload that took one existed only to open
+     * Cafe24, which {@code replyFlowExists()} already answers for every caller.
+     */
     public Optional<ReplyWorkRef> forReview(UUID orgId, String channelCode, UUID reviewId) {
-        return forReview(orgId, channelCode, reviewId, ReviewExecutionKind.NOT_SUPPORTED);
-    }
-
-    /** As above, with the account's execution capability opening the flow where the §1 table does not. */
-    public Optional<ReplyWorkRef> forReview(UUID orgId, String channelCode, UUID reviewId,
-                                            ReviewExecutionKind executionKind) {
-        if (!ReviewTriageChannelCapability.of(channelCode).replySupported()
-                && executionKind != ReviewExecutionKind.API_EXECUTION) {
+        if (!ReviewTriageChannelCapability.of(channelCode).replyFlowExists()) {
             return Optional.empty();
         }
         String disposition = triages.findByOrgIdAndReviewId(orgId, reviewId)

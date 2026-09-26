@@ -87,6 +87,7 @@ function page(code: string): ChannelReviewPageView {
       aiTriage: true,
       originalLocate: code === "COUPANG" ? "LOCATE_RUN" : "NONE",
       replySupported: code === "NAVER",
+      replyFlowExists: code === "NAVER" || code === "CAFE24",
     },
     triageSummary: { needsAttention: 0, watch: 0, fyi: 0, aiAttention: 0, repeatedCategories: [] },
     items: [],

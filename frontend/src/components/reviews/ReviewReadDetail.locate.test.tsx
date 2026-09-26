@@ -29,7 +29,7 @@ const PAGE: ChannelReviewPageView = {
   lastImportAt: "2026-08-14T05:00:00Z",
   lastImportComplete: true,
   aiPilotEnabled: false,
-  channel: { channelCode: "COUPANG", aiTriage: true, originalLocate: "LOCATE_RUN", replySupported: false },
+  channel: { channelCode: "COUPANG", aiTriage: true, originalLocate: "LOCATE_RUN", replySupported: false, replyFlowExists: false },
   triageSummary: { needsAttention: 0, watch: 0, fyi: 1, aiAttention: 0, repeatedCategories: [] },
   items: [
     {
@@ -267,13 +267,51 @@ describe("[쿠팡에서 보기]", () => {
     for (const channelCode of ["NAVER", "CAFE24"]) {
       const { unmount } = renderPage(binding(), {
         ...PAGE,
-        channel: { channelCode, aiTriage: true, originalLocate: "NONE", replySupported: channelCode === "NAVER" },
+        channel: { channelCode, aiTriage: true, originalLocate: "NONE", replySupported: channelCode === "NAVER",
+          replyFlowExists: channelCode === "NAVER" || channelCode === "CAFE24" },
       });
       await selectTheReview();
       expect(screen.queryByRole("button", { name: "쿠팡에서 보기" })).not.toBeInTheDocument();
       expect(screen.getByText(/원문 화면으로 바로 이동할 수 없습니다/)).toBeInTheDocument();
       unmount();
     }
+  });
+
+  /**
+   * <b>Who writes the answer is the reply FLOW, not the triage event column.</b>
+   *
+   * This sentence read `replySupported` — the triage contract's NAVER-only column — so a Cafe24 review
+   * said 「이 채널에서는 reviewnary가 답변을 작성하지 않습니다」 while 확인할 일 listed the same review as
+   * 「초안 필요」 and the 리뷰 처리 workspace drafted, edited and approved an answer for it. Two surfaces,
+   * two columns, one contradiction. It now reads the fact the draft lane itself is gated on.
+   *
+   * Cafe24's marketplace WRITE lane is irrelevant here and is deliberately not part of the fixture: the
+   * seller pastes the approved answer into the mall's admin, which is what the sentence describes.
+   */
+  it("says reviewnary prepares the answer on every channel with a reply flow, Cafe24 included", async () => {
+    for (const channelCode of ["NAVER", "CAFE24"]) {
+      const { unmount } = renderPage(binding(), {
+        ...PAGE,
+        channel: { channelCode, aiTriage: true, originalLocate: "NONE",
+          replySupported: channelCode === "NAVER", replyFlowExists: true },
+      });
+      await selectTheReview();
+      expect(screen.getByText(/답변은 리뷰 처리에서 준비하고/)).toBeInTheDocument();
+      expect(screen.queryByText(/reviewnary가 답변을 작성하지 않습니다/)).not.toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  /** And Coupang — no reply flow at all (policy gate D8) — still says the opposite, once. */
+  it("says reviewnary does not write the answer where no reply flow exists", async () => {
+    renderPage(binding(), {
+      ...PAGE,
+      channel: { channelCode: "COUPANG", aiTriage: true, originalLocate: "LOCATE_RUN",
+        replySupported: false, replyFlowExists: false },
+    });
+    await selectTheReview();
+    expect(screen.getByText(/reviewnary가 답변을 작성하지 않습니다/)).toBeInTheDocument();
+    expect(screen.queryByText(/답변은 리뷰 처리에서 준비하고/)).not.toBeInTheDocument();
   });
 
   /**

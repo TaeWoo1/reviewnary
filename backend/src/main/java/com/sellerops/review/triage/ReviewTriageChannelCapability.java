@@ -23,6 +23,24 @@ import java.util.Map;
  * lane — the board-comment API adapter — which is what {@link #replyFlowExists()} answers. This
  * docblock used to say "Cafe24 has no reply flow built", contradicting the method two screens below
  * it; it was written before that lane existed and nobody came back.
+ *
+ * <p><b>Three questions, three answers, and they must not be traded for one another.</b> Every reader
+ * that had the wrong one produced a contradiction a seller could see:
+ *
+ * <ul>
+ *   <li><b>May this channel produce a reply triage EVENT?</b> {@link #replySupported} — the §1 column,
+ *       read only by {@link #permits(com.sellerops.review.triage.feedback.TriageActionKind)}. It is not a
+ *       statement about the product's reply lane and no surface may read it as one.</li>
+ *   <li><b>May a draft, an edit and an approval exist for this review?</b> {@link #replyFlowExists()} —
+ *       the platform fact. Gated once server-side ({@code ReviewReplyService.requireReplyFlow}), minted
+ *       once ({@code ReviewReplyWorkLookup}), listed once ({@code ReviewWorkController}), and said once on
+ *       the record. Those four disagreed while two of them read {@code replySupported}.</li>
+ *   <li><b>May an APPROVED answer leave for the marketplace?</b> Neither of these — that is
+ *       {@code ReviewExecutionCapability}, which is per account and per configuration, and it is checked
+ *       where the send happens. A channel whose send lane is off still has a reply flow; a seller with an
+ *       unconfigured Cafe24 write grant may still write and approve the answer they will paste in
+ *       themselves.</li>
+ * </ul>
  */
 public record ReviewTriageChannelCapability(String channelCode, boolean aiTriage, OriginalLocate originalLocate,
                                             boolean replySupported) {

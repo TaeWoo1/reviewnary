@@ -25,6 +25,7 @@ import com.sellerops.common.VocPreviewSanitizer;
 import com.sellerops.identity.ExecutableIdentity;
 import com.sellerops.identity.ExecutableIdentityResolver;
 import com.sellerops.channel.ChannelRepository;
+import com.sellerops.review.publish.ReviewExecutionCapability;
 import com.sellerops.review.triage.ReviewTriageChannelCapability;
 import com.sellerops.product.OperatorProductName;
 import com.sellerops.product.ProductRepository;
@@ -324,6 +325,12 @@ public class ReviewReplyService {
         if (review.getReplyState() == ReviewReplyState.ANSWERED) {
             throw ApiException.conflict("채널에 이미 답변이 등록된 리뷰입니다. 가이드형 답변을 시작할 수 없습니다.");
         }
+        // Enforced server-side for the same reason the line above is: the capability object renders
+        // affordances, and a client that ignores it must still not start a seller-center handoff for a
+        // channel whose approved reply does not travel that way.
+        if (!guidedLane(review.getChannelId())) {
+            throw ApiException.conflict("이 채널은 판매자센터에서 직접 답변하는 방식이 아닙니다. 승인한 답변을 복사해 사용하세요.");
+        }
         ReviewReplyApproval approval = approvals.current(orgId, reviewId)
                 .filter(a -> a.getState() == ReviewReplyApprovalState.APPROVED)
                 .orElseThrow(() -> ApiException.conflict("승인된 답변이 없습니다. 먼저 답변을 승인하세요."));
@@ -513,6 +520,30 @@ public class ReviewReplyService {
         }
     }
 
+    /**
+     * Whether the guided seller-center handoff is this channel's send lane at all.
+     *
+     * <p>A different question from {@link #requireReplyFlow(UUID)}, and separating the two is the point:
+     * a reply flow says the seller may WRITE and APPROVE an answer here; this says the approved text
+     * reaches the channel by the operator posting it in the seller center, which is what the handoff
+     * guides. Cafe24 has the first and not the second — its approved answer leaves through the
+     * board-comment adapter, under its own execution capability, or it is pasted by hand from 복사.
+     *
+     * <p>Before the two were separated, Cafe24 reached this lane only when the write grant was already
+     * recorded; now it reaches it whenever the seller can draft, so an ungated handoff would offer a mall
+     * owner 「네이버에서 직접 답변하기」 and a panel telling them to paste into 네이버 판매자센터.
+     *
+     * <p>Fails OPEN for a test seam with no channel repository, exactly as the reply-flow gate does and
+     * for the same reason: those fixtures are NAVER, and an unnameable channel is not evidence.
+     */
+    private boolean guidedLane(UUID channelId) {
+        if (channels == null || channelId == null) {
+            return true;
+        }
+        String code = channels.findById(channelId).map(c -> c.getCode()).orElse(null);
+        return code == null || ReviewExecutionCapability.guidedBrowserLane(code);
+    }
+
     private Optional<TriageDisposition> disposition(UUID orgId, UUID reviewId) {
         return triages.findByOrgIdAndReviewId(orgId, reviewId).map(ReviewTriage::getDisposition);
     }
@@ -610,6 +641,8 @@ public class ReviewReplyService {
         // that invited a retry which could never succeed. The provenance word itself does not leave the
         // server; what leaves is the consequence and the next step (copy).
         boolean sourceExecutable = identity.forReview(review) == ExecutableIdentity.MARKETPLACE;
+        // …and only for a channel whose approved reply actually travels through the seller center.
+        boolean guidedLane = guidedLane(review.getChannelId());
         ReviewReplyCapabilities capabilities = new ReviewReplyCapabilities(
                 responseNeeded && !approved && !channelAnswered,
                 responseNeeded && !approved && !channelAnswered && head != null,
@@ -618,11 +651,16 @@ public class ReviewReplyService {
                 // canStartSubmissionRun — the same rule as canCopy (a guided post is the copy step
                 // performed in the seller center); it never authorizes a send. Plus: never for a
                 // review the channel already reports as answered, and never for one no run can find.
-                responseNeeded && approved && !channelAnswered && sourceExecutable);
+                responseNeeded && approved && !channelAnswered && sourceExecutable && guidedLane);
         // Said only when the seller is otherwise ready to send — that is when the missing control is a
         // question. `null` while there is nothing approved yet: the panel is already showing them the
         // approve step, and answering an unasked question is how a screen gets noisy.
-        String guidedUnavailableReason = !capabilities.canCopy() || capabilities.canStartSubmissionRun() ? null
+        // …and said only about a channel that HAS the guided step. Both existing reasons explain why this
+        // review cannot use it; neither is true of a channel where it was never part of the flow, and
+        // 「수집 경로를 확인할 수 없어」 about a Cafe24 review would be an invented fault. Nothing is rendered,
+        // and 복사 — already on screen — remains the next step.
+        String guidedUnavailableReason = !capabilities.canCopy() || capabilities.canStartSubmissionRun()
+                || !guidedLane ? null
                 : channelAnswered ? "CHANNEL_ALREADY_ANSWERED" : "SOURCE_NOT_EXECUTABLE";
 
         // One indexed read; empty when the version was the template floor, written before V90, or

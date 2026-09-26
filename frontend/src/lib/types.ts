@@ -2481,7 +2481,20 @@ export interface ReviewChannelCapabilityView {
   channelCode: string;
   aiTriage: boolean;
   originalLocate: "NONE" | "LOCATE_RUN";
+  /**
+   * The triage contract's own §1 column — NAVER only. It says which triage behaviour events the channel
+   * may produce, and nothing about whether the seller may write an answer here. Reading it as the latter
+   * is what printed 「이 채널에서는 reviewnary가 답변을 작성하지 않습니다」 on a Cafe24 review the 리뷰 처리
+   * screen could draft, edit and approve.
+   */
   replySupported: boolean;
+  /**
+   * The product has a reply flow for this channel's reviews at all (false for Coupang). The server states
+   * it; this is what a surface reads to say who writes the answer, and it is the same predicate the
+   * draft/approve endpoints are gated on. Whether an approved answer may then be SENT is a different
+   * question with a different field (`executionKind`, which this view does not read).
+   */
+  replyFlowExists: boolean;
 }
 
 /**

@@ -53,12 +53,30 @@ public class ReviewExecutionCapability {
             return Decision.unsupported(ReviewExecutionReason.EXECUTION_DISABLED);
         }
         return switch (channelCode) {
-            case "NAVER" -> Decision.of(ReviewExecutionKind.GUIDED_BROWSER_EXECUTION);
             case "CAFE24" -> cafe24(orgId, sellerAccountId);
-            // Coupang (and any channel with no seller reply flow): a fact about the platform, not a switch that
-            // could be turned on — the conversation says so honestly and offers the next moves instead.
-            default -> Decision.unsupported(ReviewExecutionReason.CHANNEL_UNSUPPORTED);
+            // NAVER through the one predicate below, so «which channel posts through the seller center»
+            // is stated once. Coupang (and any channel with no seller reply flow): a fact about the
+            // platform, not a switch that could be turned on — the conversation says so honestly and
+            // offers the next moves instead.
+            default -> guidedBrowserLane(channelCode)
+                    ? Decision.of(ReviewExecutionKind.GUIDED_BROWSER_EXECUTION)
+                    : Decision.unsupported(ReviewExecutionReason.CHANNEL_UNSUPPORTED);
         };
+    }
+
+    /**
+     * Whether an APPROVED reply reaches this channel through the guided seller-center handoff.
+     *
+     * <p>A fact about the CHANNEL alone — no org, no account, no configuration — which is why it can be
+     * asked by the preparation lane, where the answer decides whether to offer 「네이버에서 직접 답변하기」
+     * at all. That control and the panel behind it name the seller center in every sentence they render;
+     * offered on a Cafe24 review (which the draft lane now reaches with the write lane off) they would
+     * instruct a mall owner to go and paste their answer into NAVER.
+     *
+     * <p>Read by {@link #of} as well, so the channel is named in exactly one place.
+     */
+    public static boolean guidedBrowserLane(String channelCode) {
+        return "NAVER".equals(channelCode);
     }
 
     /** The Cafe24 adapter when the lane is on, or null. */

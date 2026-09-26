@@ -44,7 +44,7 @@ const PAGE: ChannelReviewPageView = {
   lastImportAt: "2026-08-14T05:00:00Z",
   lastImportComplete: true,
   aiPilotEnabled: false,
-  channel: { channelCode: "COUPANG", aiTriage: true, originalLocate: "LOCATE_RUN", replySupported: false },
+  channel: { channelCode: "COUPANG", aiTriage: true, originalLocate: "LOCATE_RUN", replySupported: false, replyFlowExists: false },
   triageSummary: {
     needsAttention: 1,
     watch: 0,
@@ -222,7 +222,7 @@ beforeEach(() => {
 
 /**
  * Product assembly A6: review work starts on the 리뷰 screen. Where the server says the channel has a
- * reply flow (`replySupported`, and a server-minted `replyWork` on the detail), the detail carries the
+ * reply flow (`replyFlowExists`, and a server-minted `replyWork` on the detail), the detail carries the
  * product's one reply cluster and the page OPENS with 내 답변 작업. Where it does not, nothing of the kind
  * renders — no control the server would refuse.
  *
@@ -235,7 +235,7 @@ beforeEach(() => {
 describe("reply work on the 리뷰 screen (A6)", () => {
   const NAVER_PAGE: ChannelReviewPageView = {
     ...PAGE,
-    channel: { channelCode: "NAVER", aiTriage: true, originalLocate: "NONE", replySupported: true },
+    channel: { channelCode: "NAVER", aiTriage: true, originalLocate: "NONE", replySupported: true, replyFlowExists: true },
   };
   const NAVER_DETAIL: ChannelReviewDetailView = {
     ...DETAIL,
@@ -774,7 +774,7 @@ describe("the AI pilot's mark and the feedback spine (RUBRIC v2 §13.7)", () => 
     getChannelReviewsStrict.mockResolvedValue({
       ...PAGE,
       aiPilotEnabled: true,
-      channel: { channelCode: "GMARKET", aiTriage: false, originalLocate: "NONE", replySupported: false },
+      channel: { channelCode: "GMARKET", aiTriage: false, originalLocate: "NONE", replySupported: false, replyFlowExists: false },
       items: [{ ...PAGE.items[0], aiMark: MARK }, PAGE.items[1]],
     });
     renderPage();

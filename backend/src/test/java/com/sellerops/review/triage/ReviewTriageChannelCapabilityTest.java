@@ -64,6 +64,48 @@ class ReviewTriageChannelCapabilityTest {
     }
 
     @Test
+    @DisplayName("replyFlowExists is the platform fact and is NOT replySupported")
+    void replyFlowIsItsOwnColumn() {
+        // The two columns disagree for exactly one channel, and that disagreement is the point:
+        // Cafe24 has a built reply lane (board comments) and sits outside the triage contract's older
+        // NAVER-only event column. Reading the latter as «may the seller answer here» is what closed
+        // the Cafe24 draft/approve lane and printed 「reviewnary가 답변을 작성하지 않습니다」 next to a
+        // queue row that said 「초안 필요」.
+        assertThat(ReviewTriageChannelCapability.NAVER.replyFlowExists()).isTrue();
+        assertThat(ReviewTriageChannelCapability.CAFE24.replyFlowExists()).isTrue();
+        assertThat(ReviewTriageChannelCapability.CAFE24.replySupported()).isFalse();
+        assertThat(ReviewTriageChannelCapability.COUPANG.replyFlowExists()).isFalse();
+        for (String outside : List.of("GMARKET", "AUCTION", "ELEVENST", "SSG", "cafe24", "")) {
+            assertThat(ReviewTriageChannelCapability.of(outside).replyFlowExists()).as("%s", outside).isFalse();
+        }
+        assertThat(ReviewTriageChannelCapability.of(null).replyFlowExists()).isFalse();
+    }
+
+    @Test
+    @DisplayName("replySupported is read by the triage event rule and by the wire, and by nothing else")
+    void onlyTheEventRuleReadsReplySupported() throws Exception {
+        // A source scan, because the defect was a READER with the wrong column, not a wrong value.
+        // Two files may name it: this capability (where `permits` applies it to REPLY_DRAFTED /
+        // REPLY_SUBMITTED) and the view that puts the contract row on the wire. A third reader means
+        // some surface has started deciding who may write an answer from the triage event table again.
+        List<Path> readers = new java.util.ArrayList<>();
+        Path main = Path.of("src/main/java");
+        try (var walk = Files.walk(main)) {
+            for (Path f : walk.filter(f -> f.toString().endsWith(".java")).toList()) {
+                String code = Files.readString(f)
+                        .replaceAll("(?s)/\\*.*?\\*/", "")
+                        .replaceAll("(?m)//.*$", "");
+                if (code.contains("replySupported")) {
+                    readers.add(main.relativize(f));
+                }
+            }
+        }
+        assertThat(readers).extracting(Path::toString).containsExactlyInAnyOrder(
+                "com/sellerops/review/triage/ReviewTriageChannelCapability.java",
+                "com/sellerops/review/channel/dto/ReviewChannelCapabilityView.java");
+    }
+
+    @Test
     @DisplayName("the event vocabulary is the contract's, and has no IGNORED")
     void theVocabularyIsTheContracts() throws Exception {
         String contract = Files.readString(Path.of("..", "contracts", "review-triage-events", "v1", "CONTRACT.md"));

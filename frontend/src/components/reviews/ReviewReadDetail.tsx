@@ -136,8 +136,11 @@ export function ReviewReadDetail({
       */}
       <section aria-label="판단과 조치" className="space-y-3 border-t border-line pt-4">
         <p className="text-sm font-semibold text-ink">판단과 조치</p>
-        {/* WHO WRITES THE ANSWER — a capability fact of this review's channel, said once, where the door is. */}
-        {capability === null ? null : capability.replySupported ? (
+        {/* WHO WRITES THE ANSWER — a capability fact of this review's channel, said once, where the door is.
+            Reads `replyFlowExists`, the platform fact the draft lane itself is gated on, and NOT
+            `replySupported`, the triage contract's NAVER-only event column: that one said 「reviewnary가
+            답변을 작성하지 않습니다」 about Cafe24 while 리뷰 처리 was drafting and approving Cafe24 answers. */}
+        {capability === null ? null : capability.replyFlowExists ? (
           <p className="text-sm text-muted">답변은 리뷰 처리에서 준비하고, 올리는 일은 판매자센터에서 직접 합니다</p>
         ) : (
           <p className="text-sm text-muted">이 채널에서는 reviewnary가 답변을 작성하지 않습니다</p>
