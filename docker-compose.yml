@@ -128,6 +128,39 @@ services:
       SELLEROPS_REVIEW_MEDIA_VISION_API_KEY: ${SELLEROPS_REVIEW_MEDIA_VISION_API_KEY:-}
       SELLEROPS_REVIEW_MEDIA_VISION_ORG_IDS: ${SELLEROPS_REVIEW_MEDIA_VISION_ORG_IDS:-}
       SELLEROPS_KNOWLEDGE_BOOTSTRAP_AUTO_ENABLED: ${SELLEROPS_KNOWLEDGE_BOOTSTRAP_AUTO_ENABLED:-false}
+      # ── Inquiry AI capabilities: the same omission, three more times ────────────────────────
+      # These three are AgentCapabilityGate beans exactly like the five above — PilotConfigValidator
+      # iterates over them and refuses a boot that turned one on without a key — and not one of their
+      # names reached the container. So a demo path that needs goal interpretation, the answer
+      # decision plan/judge, or inquiry classification was unreachable from the host env file, and the
+      # symptom was a silently missing capability rather than an error.
+      #
+      # GOAL and DECISION decline SELLEROPS_AGENT_ACCESS_SCOPE widening (they carry a customer's own
+      # sentence), so each needs its organisation named in its own list; SIGNATURE takes the default.
+      SELLEROPS_INQUIRY_GOAL_ENABLED: ${SELLEROPS_INQUIRY_GOAL_ENABLED:-false}
+      SELLEROPS_INQUIRY_GOAL_API_KEY: ${SELLEROPS_INQUIRY_GOAL_API_KEY:-}
+      SELLEROPS_INQUIRY_GOAL_ORG_IDS: ${SELLEROPS_INQUIRY_GOAL_ORG_IDS:-}
+      SELLEROPS_INQUIRY_DECISION_ENABLED: ${SELLEROPS_INQUIRY_DECISION_ENABLED:-false}
+      SELLEROPS_INQUIRY_DECISION_API_KEY: ${SELLEROPS_INQUIRY_DECISION_API_KEY:-}
+      SELLEROPS_INQUIRY_DECISION_ORG_IDS: ${SELLEROPS_INQUIRY_DECISION_ORG_IDS:-}
+      SELLEROPS_INQUIRY_SIGNATURE_ENABLED: ${SELLEROPS_INQUIRY_SIGNATURE_ENABLED:-false}
+      SELLEROPS_INQUIRY_SIGNATURE_API_KEY: ${SELLEROPS_INQUIRY_SIGNATURE_API_KEY:-}
+      SELLEROPS_INQUIRY_SIGNATURE_ORG_IDS: ${SELLEROPS_INQUIRY_SIGNATURE_ORG_IDS:-}
+      # ── Review AI triage: the mark on a review row, and what makes it appear by itself ───────
+      # Not an AgentCapabilityGate (it predates that interface and carries its own three-way switch),
+      # so nothing refuses a boot that turns it on without a key — it simply never classifies, and the
+      # review list shows the rules-only tier with no mark and no explanation. deploy.sh checks the
+      # shape for that reason. The AUTO switch is the second half: with the pilot on and this off,
+      # triage happens only when an operator asks for it, never on collection.
+      SELLEROPS_AI_TRIAGE_PILOT_ENABLED: ${SELLEROPS_AI_TRIAGE_PILOT_ENABLED:-false}
+      SELLEROPS_AI_TRIAGE_PILOT_ORG_IDS: ${SELLEROPS_AI_TRIAGE_PILOT_ORG_IDS:-}
+      SELLEROPS_AI_TRIAGE_API_KEY: ${SELLEROPS_AI_TRIAGE_API_KEY:-}
+      SELLEROPS_SELF_PILOT_TRIAGE_AUTO_ENABLED: ${SELLEROPS_SELF_PILOT_TRIAGE_AUTO_ENABLED:-false}
+      # SELLEROPS_REVIEW_REPLY_PROVIDER is deliberately NOT passed through. Its property has a NON-BLANK
+      # default (`rule_based`) and any unknown value leaves no provider bean and fails the boot, loudly,
+      # by design. `${...:-}` would hand the container an empty string and break every deployment that
+      # said nothing; restating `rule_based` here would put the default in a second place. The only
+      # other value (`ai`) is reserved and unimplemented, so there is nothing an operator could set.
       SELLEROPS_SELF_PILOT_ENABLED: ${SELLEROPS_SELF_PILOT_ENABLED:-false}
       SELLEROPS_SELF_PILOT_SCOPE: ${SELLEROPS_SELF_PILOT_SCOPE:-ALLOW_LIST}
       SELLEROPS_SELF_PILOT_ORG_IDS: ${SELLEROPS_SELF_PILOT_ORG_IDS:-}

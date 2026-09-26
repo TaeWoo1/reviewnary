@@ -54,7 +54,8 @@ case "$ENV_FILE" in "$REPO"/*) fail "$ENV_FILE is inside the repository — keep
 case "$PILOT_PUBLIC_HOST" in localhost|127.0.0.1|*.local) fail "PILOT_PUBLIC_HOST is a development name ($PILOT_PUBLIC_HOST)";; esac
 # A model capability that is on but has no key fails the backend's own boot validator; failing here
 # names the variable instead of making an operator read a stack trace.
-for cap in AGENT_PLAN AGENT_DRAFT AGENT_JUDGE AGENT_CONVERSE AGENT_REPORT KNOWLEDGE_EMBEDDING KNOWLEDGE_INTENT KNOWLEDGE_ELIGIBILITY REVIEW_MEDIA_VISION; do
+for cap in AGENT_PLAN AGENT_DRAFT AGENT_JUDGE AGENT_CONVERSE AGENT_REPORT KNOWLEDGE_EMBEDDING KNOWLEDGE_INTENT KNOWLEDGE_ELIGIBILITY REVIEW_MEDIA_VISION \
+           INQUIRY_GOAL INQUIRY_DECISION INQUIRY_SIGNATURE; do
   e="SELLEROPS_${cap}_ENABLED"; k="SELLEROPS_${cap}_API_KEY"
   if [[ "${!e:-false}" == "true" && -z "${!k:-}" ]]; then fail "$e=true but $k is blank"; fi
 done
@@ -63,10 +64,18 @@ done
 # organisation list is not optional for them, and `*` is not a pilot answer. (The backend refuses the
 # same shape at boot; failing here names the variable instead of a stack trace.)
 # A customer's own review photo is the widest payload of all; it is held to the same named-org rule.
-for cap in KNOWLEDGE_EMBEDDING KNOWLEDGE_INTENT KNOWLEDGE_ELIGIBILITY REVIEW_MEDIA_VISION; do
+# INQUIRY_GOAL and INQUIRY_DECISION are in the same class and for the same reason — each carries a
+# customer's own sentence — and each says so itself (`admitsPolicyWidening() == false`).
+for cap in KNOWLEDGE_EMBEDDING KNOWLEDGE_INTENT KNOWLEDGE_ELIGIBILITY REVIEW_MEDIA_VISION \
+           INQUIRY_GOAL INQUIRY_DECISION; do
   e="SELLEROPS_${cap}_ENABLED"; o="SELLEROPS_${cap}_ORG_IDS"
   if [[ "${!e:-false}" == "true" ]]; then
-    [[ -n "${!o:-}" ]] || fail "$e=true but $o is blank — name the pilot organisation explicitly"
+    # The message names the ORDER as well as the variable, because the order is the trap. The pilot
+    # organisation's UUID does not exist until somebody signs up, and nobody can sign up until this
+    # host is serving — so «$e=true with $o blank» is not always carelessness; on a brand-new host it
+    # is the only state an operator could have been in. The way out is two deploys, and saying so here
+    # is cheaper than the operator discovering it from a refusal that reads like a missing value.
+    [[ -n "${!o:-}" ]] || fail "$e=true but $o is blank — name the pilot organisation explicitly. On a FIRST deploy that organisation does not exist yet: deploy once with $e=false, sign up in the browser, then set $o to the new organisation's UUID, set $e=true and deploy again (§7-0 step 3)."
     [[ "${!o}" != "*" ]] || fail "$o=* would send every organisation's customer questions to the vendor"
   fi
 done
@@ -75,10 +84,41 @@ done
 # multi-tenant pilot host a `*` here points one seller's paid capability at every other seller's data.
 # The same hole one level up is SELLEROPS_AGENT_ACCESS_SCOPE=ALL_ORGS, which application.yml itself
 # describes as the local single-user posture and warns against on a shared backend.
-for cap in AGENT_PLAN AGENT_DRAFT AGENT_JUDGE AGENT_CONVERSE AGENT_REPORT; do
+for cap in AGENT_PLAN AGENT_DRAFT AGENT_JUDGE AGENT_CONVERSE AGENT_REPORT INQUIRY_SIGNATURE; do
   o="SELLEROPS_${cap}_ORG_IDS"
   [[ "${!o:-}" != "*" ]] || fail "$o=* would admit every organisation on this host"
 done
+# Review AI triage is not an AgentCapabilityGate — it predates the interface and carries its own
+# enabled / key / org-list triple — so the backend's boot validator does not see it and nothing else
+# would notice a pilot that turned it on with no key. It does not fail: it classifies nothing, the
+# review list shows the rules-only tier, and no screen says why. `*` is its local single-user posture,
+# documented as such in AiTriagePilotProperties, and it is not a pilot answer here either.
+if [[ "${SELLEROPS_AI_TRIAGE_PILOT_ENABLED:-false}" == "true" ]]; then
+  [[ -n "${SELLEROPS_AI_TRIAGE_API_KEY:-}" ]] \
+    || fail "SELLEROPS_AI_TRIAGE_PILOT_ENABLED=true but SELLEROPS_AI_TRIAGE_API_KEY is blank — AI triage would classify nothing and say nothing"
+  [[ -n "${SELLEROPS_AI_TRIAGE_PILOT_ORG_IDS:-}" ]] \
+    || fail "SELLEROPS_AI_TRIAGE_PILOT_ENABLED=true but SELLEROPS_AI_TRIAGE_PILOT_ORG_IDS is blank — name the pilot organisation (the UUID exists after the first signup; deploy once with the pilot off, then set both and deploy again)"
+  [[ "${SELLEROPS_AI_TRIAGE_PILOT_ORG_IDS}" != "*" ]] \
+    || fail "SELLEROPS_AI_TRIAGE_PILOT_ORG_IDS=* would send every organisation's customer reviews to the vendor"
+fi
+# The second half of automatic triage. With the pilot on and this off, a review is classified only when
+# an operator asks for one — never on collection — so the demo's 「AI 확인 필요」 marks never appear by
+# themselves. Not a failure (an operator-driven pilot is a real posture), so it is said, not refused.
+if [[ "${SELLEROPS_AI_TRIAGE_PILOT_ENABLED:-false}" == "true" \
+   && "${SELLEROPS_SELF_PILOT_TRIAGE_AUTO_ENABLED:-false}" != "true" ]]; then
+  printf 'note: AI triage is ON but SELLEROPS_SELF_PILOT_TRIAGE_AUTO_ENABLED is not true — reviews are classified only when asked for, never on collection\n'
+fi
+# The first-deploy posture, said once so it is not mistaken for a broken deployment. The three
+# retrieval capabilities are the pilot's decision (pilot.env.example) and they cannot be turned on
+# until an organisation exists to name; a host that has one and still reads this note has skipped a step.
+knowledge_off=()
+for cap in KNOWLEDGE_EMBEDDING KNOWLEDGE_INTENT KNOWLEDGE_ELIGIBILITY; do
+  e="SELLEROPS_${cap}_ENABLED"
+  [[ "${!e:-false}" == "true" ]] || knowledge_off+=("SELLEROPS_${cap}_{ENABLED,API_KEY,ORG_IDS}")
+done
+if [[ ${#knowledge_off[@]} -gt 0 ]]; then
+  printf 'note: semantic knowledge retrieval is OFF — the pre-signup posture. After the pilot organisation exists, set: %s\n' "${knowledge_off[*]}"
+fi
 case "${SELLEROPS_AGENT_ACCESS_SCOPE:-ALLOW_LIST}" in
   ALLOW_LIST|CONNECTED_SELLERS) ;;
   ALL_ORGS) fail "SELLEROPS_AGENT_ACCESS_SCOPE=ALL_ORGS is the single-user posture — not a pilot answer" ;;
