@@ -24,6 +24,15 @@ import java.util.regex.Pattern;
  * whatever renders it (React escapes by construction; nothing here is ever set as HTML). Entity
  * decoding runs AFTER tag removal, so a body containing {@code &lt;script&gt;} becomes the literal
  * text {@code <script>} — visible characters, never an element.
+ *
+ * <p><b>That order also hid a defect, and {@link #DOCUMENT_METADATA} is the exception it needs.</b> A
+ * preamble that arrives ESCAPED survives the tag pass ({@code &lt;} is not {@code <}) and the decode
+ * pass then materializes it. Measured 2026-09-27 on the demo organisation: five Cafe24 inquiries —
+ * the two newest among them — carry {@code &lt;meta charset=&quot;utf-8&quot;&gt;} as their first
+ * characters, so the seller's screen, the retrieval query and the draft payload all began with
+ * {@code <meta charset="utf-8">}. It is removed once more after decoding. <b>Only the named element
+ * is</b>: a second generic pass over decoded text would delete a customer's own 「&lt;급함&gt;」 and
+ * would break the {@code &lt;script&gt;} sentence above.
  */
 public final class MarkupText {
 
@@ -42,6 +51,21 @@ public final class MarkupText {
 
     /** Any remaining tag, including an unterminated one at the scan boundary. */
     private static final Pattern TAG = Pattern.compile("<[^>]*>|<[^>]*$");
+
+    /**
+     * Document-preamble elements, re-checked after entity decoding.
+     *
+     * <p><b>A closed list of names that grows only on observation.</b> Measured across every stored
+     * inquiry and review body in this deployment, the only escaped tag name present at all is
+     * {@code meta} (five inquiries), and no body uses {@code &lt;} as a literal less-than. Adding
+     * {@code html}/{@code head}/{@code style} because the same editor paste could produce them would
+     * be inventing data; when one appears it is one word here and a fixture beside it.
+     *
+     * <p>{@code \b} is load-bearing: {@code <metallic>} is a word a customer could write, and this
+     * pattern must not touch it. The frontend's {@code lib/plainText.ts} states the same list for the
+     * same reason — the two ladders are different endpoints, so they share the rule, not the code.
+     */
+    private static final Pattern DOCUMENT_METADATA = Pattern.compile("(?i)<\\s*/?\\s*meta\\b[^>]*>");
 
     /** The named entities a Korean commerce board actually emits. Unknown names are left alone. */
     private static final Map<String, String> NAMED = Map.of(
@@ -69,7 +93,9 @@ public final class MarkupText {
         String broken = LINE_BREAKING.matcher(scanned).replaceAll("\n");
         String stripped = TAG.matcher(broken).replaceAll(" ");
         String decoded = decodeEntities(stripped);
-        String spaced = SPACES.matcher(decoded).replaceAll(" ");
+        // The one thing the decode can create: a preamble that reached us escaped is a tag only now.
+        String unwrapped = DOCUMENT_METADATA.matcher(decoded).replaceAll(" ");
+        String spaced = SPACES.matcher(unwrapped).replaceAll(" ");
         // Trim each line so " \n " does not leave a line of one space.
         StringBuilder out = new StringBuilder(spaced.length());
         for (String line : spaced.split("\n", -1)) {

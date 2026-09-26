@@ -47,6 +47,37 @@ class MarkupTextTest {
     }
 
     @Test
+    @DisplayName("an ESCAPED document preamble is removed — decoding used to materialize it")
+    void escapedPreambleIsRemoved() {
+        // The literal stored bodies of the two newest Cafe24 inquiries on the demo organisation. The tag
+        // pass cannot see this (`&lt;` is not `<`), so before the fix the decode pass turned it INTO
+        // `<meta charset="utf-8">` — the first characters of the seller's screen, of the retrieval query
+        // and of the draft payload.
+        assertThat(MarkupText.toPlainText("&lt;meta charset=&quot;utf-8&quot;&gt;교환 신청은 언제까지 가능한가요?"))
+                .isEqualTo("교환 신청은 언제까지 가능한가요?");
+        assertThat(MarkupText.toSingleLine(
+                "<p>&lt;meta charset=&quot;utf-8&quot;&gt;상품을 받은 뒤 교환이나 반품은 언제까지 가능한가요?</p>"))
+                .isEqualTo("상품을 받은 뒤 교환이나 반품은 언제까지 가능한가요?");
+        // Unescaped it was already handled; both spellings now land on the same text.
+        assertThat(MarkupText.toPlainText("<meta charset=\"utf-8\">교환 신청은 언제까지 가능한가요?"))
+                .isEqualTo("교환 신청은 언제까지 가능한가요?");
+    }
+
+    @Test
+    @DisplayName("only the NAMED preamble is removed — other escaped markup is still the author's text")
+    void onlyThePreambleIsRemoved() {
+        // The rule the fix had to keep. A generic second pass over decoded text would have deleted all
+        // of these, and the first one is the sentence escapedTagStaysText() above is about.
+        assertThat(MarkupText.toPlainText("&lt;b&gt;굵게&lt;/b&gt;")).isEqualTo("<b>굵게</b>");
+        assertThat(MarkupText.toPlainText("주문번호 &lt;20260923-0000001&gt; 확인해주세요"))
+                .isEqualTo("주문번호 <20260923-0000001> 확인해주세요");
+        assertThat(MarkupText.toPlainText("&lt;급함&gt; 답변 부탁드립니다")).isEqualTo("<급함> 답변 부탁드립니다");
+        // `\b` in the pattern: a word that merely starts with the name is not the preamble.
+        assertThat(MarkupText.toPlainText("&lt;metallic&gt; 마감이 좋아요")).isEqualTo("<metallic> 마감이 좋아요");
+        assertThat(MarkupText.toPlainText("metadata 항목이 비어 있어요")).isEqualTo("metadata 항목이 비어 있어요");
+    }
+
+    @Test
     @DisplayName("block tags become line breaks; everything else disappears")
     void blockStructureSurvives() {
         assertThat(MarkupText.toPlainText("<p>첫 줄</p><div>둘째 줄</div><span>같은 줄</span>"))

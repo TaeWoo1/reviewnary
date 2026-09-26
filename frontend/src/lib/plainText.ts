@@ -7,6 +7,13 @@
  * screen verbatim: the list preview, the detail body and the draft's own quoted question. A seller
  * reading their inbox should never have to read markup.
  *
+ * <b>Escaped markup is TEXT, with one named exception.</b> A channel that sent
+ * {@code &lt;b&gt;굵게&lt;/b&gt;} escaped it, so the author meant those characters to be read — this
+ * function decodes them and leaves them standing, and a test fixes that. The exception is
+ * {@link DOCUMENT_METADATA}: an editor's document preamble, which no customer types and which the
+ * first pass cannot reach because it arrives escaped. Removing it is not a second generic strip —
+ * a blanket pass over decoded text would also delete a customer's own 「<급함>」.
+ *
  * <b>What it does NOT do.</b> It does not render HTML and it does not touch what is stored. The
  * source row keeps exactly what the channel sent — this is a presentation step, applied where text
  * is displayed, so nothing here can change what an approved draft was checked against. Tags are
@@ -33,7 +40,24 @@ const NAMED: Record<string, string> = {
 };
 
 /**
+ * Document-preamble elements — removed after decoding as well as before it.
+ *
+ * <b>A closed list of names, and it grows only on observation.</b> `meta` is what this org's channel
+ * text actually carries: measured across every stored inquiry and review body, the only escaped tag
+ * name present at all is `meta` (5 inquiries), and no body uses `&lt;` as a literal less-than. Adding
+ * `html`/`head`/`style` because the same editor paste *could* produce them would be inventing data;
+ * when one appears, it is one word here and a fixture beside it.
+ */
+const DOCUMENT_METADATA = /<\/?(?:meta)\b[^>]*>/gi;
+
+/**
  * Strip channel markup and decode entities.
+ *
+ * <b>Order matters and it hid a defect.</b> Tags are removed BEFORE entities are decoded, which is
+ * what keeps `&lt;b&gt;` readable — but it also means a preamble that arrived escaped survived the
+ * tag pass and the decode pass then MATERIALIZED it: three Cafe24 inquiries, the two newest included,
+ * opened with a visible `<meta charset="utf-8">` on the seller's screen. So the named preamble is
+ * removed once more after decoding, and nothing else is.
  *
  * A closing block tag and a `<br>` become a newline, so a body that used tags for its
  * paragraphs keeps them; every other tag simply disappears. Runs of blank lines collapse to one, because a body built from
@@ -58,6 +82,8 @@ export function plainText(value: string | null | undefined): string {
     return named ?? whole;
   });
   return decoded
+    // The one thing the decode above can create: a preamble that reached us escaped is a tag only now.
+    .replace(DOCUMENT_METADATA, "")
     .replace(/[ \t ]+/g, " ")
     .replace(/[ \t]*\n[ \t]*/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
