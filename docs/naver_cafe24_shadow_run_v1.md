@@ -11,6 +11,62 @@
 > the responsibility runtime. The only new code is the narrow unattended-launch authority
 > (`sellerops.review-import.unattended.*`) and the agent in `tools/naver-review-cloud-agent/`.
 
+## 0-A. Status — `shadow-naver-cafe24-v1-rc3`
+
+> ### PRE-PRODUCTION 72h SHADOW CANDIDATE
+> **Not production-ready, and not on its way to becoming production by accident.** This tag is a
+> candidate for one bounded 72-hour observation run with one organisation on one host. **No structural
+> change is made at this stage** — the list below is a status record, not a plan, and nothing in this
+> section authorizes a refactor.
+
+### Contracts that hold from here to production
+
+These are properties of the product, not of this deployment. A production transition must keep every one
+of them; changing any of them is a separate decision with its own document.
+
+| contract | where it lives |
+|---|---|
+| **Official API and official Export Agent are separate lanes** | API connectors vs the browser agent; a channel's acquisition mode decides which, never convenience |
+| **`ExecutionProvider` seam** | `LOCAL_HELPER \| ASIDE \| future provider` — execution is replaceable, state is not (`docs/review_acquisition_aside_v2.md` §14) |
+| **Canonical XLSX importer, single source** | `UploadFormat → FileParser → ReviewRowMapper → IngestionService`, in backend memory. No second parser anywhere (PD-8) |
+| **Org- and device-scoped capabilities** | `sellerops.review-import.unattended.*` (org + device, `*` refused) · `sellerops.connector.coupang.inquiry-read-grant-*` (org, `*` refused) · the knowledge capabilities' named-org lists |
+| **Marketplace READ and WRITE are different gates** | `ensureLiveReadAllowed(baseUrl, approvalId, grant)` vs `ensureLiveWriteAllowed(baseUrl, approvalId)` — the write gate has **no grant parameter**, so no read grant can open a write |
+| **Responsibility / Investigation** | windows, sources, cases, and the investigator's own flag, key and named orgs |
+| **`AUTH_REQUIRED` fail-closed** | a login, re-verification or CAPTCHA screen stops the run; nothing is bypassed, for any provider |
+| **Dead-man + business-invariant monitoring** | missing metrics breach; `MarketplaceWriteDelta* > 0` is CRITICAL and `-1` (no baseline) breaches too |
+
+### Implemented for pre-production only
+
+Each is adequate for a bounded 72h run with one tenant and is **not** claimed to be adequate beyond it.
+
+| pre-production shape | what it is not |
+|---|---|
+| single EC2 + EIP | not redundant; a host loss is a run loss |
+| PostgreSQL in a container on the instance's EBS volume | no managed failover, no point-in-time recovery beyond the nightly dump |
+| local persistent browser profile on the instance disk | one tenant's session on one disk; no isolation between tenants |
+| 72h **in-process** export loop (`agent.run shadow`) | not a durable scheduler: a reboot or a kill ends the run, and `Restart=no` is deliberate |
+| secrets in `/etc/sellerops/pilot.env` (0600) | not a managed secret store; no rotation, no audit trail |
+| host-level systemd orchestration | not a scheduler with queue semantics, retries or at-least-once delivery |
+
+### Reviewed at the production transition
+
+Targets, not commitments. Each needs its own decision and its own document.
+
+- RDS PostgreSQL **Multi-AZ + PITR** in place of the container database
+- a **durable scheduler/queue** with a separate browser worker, replacing the in-process loop
+- **static egress decoupled from compute** (NAT gateway + EIP), so the advertised IP survives an instance
+- **Secrets Manager + IAM roles** in place of `pilot.env`
+- **tenant-isolated browser execution** — one profile per tenant, no shared disk
+- **centralized logs and metrics** beyond the custom-metric namespace
+- **Q-1 resolved**: the marketplace-policy standing of scheduled unattended NAVER export
+  (`docs/review_acquisition_aside_v2.md` §12 — still **OPEN**)
+
+### The gate
+
+This candidate may run the 72h observation. It may **not** be described as production, be given a second
+tenant, or have any of the pre-production shapes above presented as final. Promotion past this gate needs
+the production-transition review, not another tag.
+
 ## 0. Why Coupang needs no switch
 
 `ResponsibilityTemplate.CUSTOMER_OPERATIONS_V1` lists Coupang INQUIRY, but a template source is a
