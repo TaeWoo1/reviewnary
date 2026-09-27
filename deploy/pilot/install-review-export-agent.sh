@@ -15,7 +15,8 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 AGENT_DIR="$REPO/tools/naver-review-cloud-agent"
-UNIT=/etc/systemd/system/reviewnary-review-export.service
+UNIT_DIR="${PILOT_SYSTEMD_DIR:-/etc/systemd/system}"
+UNIT="$UNIT_DIR/reviewnary-review-export.service"
 RUN_USER="${AGENT_RUN_USER:-reviewnary-agent}"
 
 [[ -d "$AGENT_DIR" ]] || { echo "agent directory not found: $AGENT_DIR" >&2; exit 1; }
@@ -26,6 +27,32 @@ perm="$(stat -c '%a' "$AGENT_DIR/.env" 2>/dev/null || stat -f '%Lp' "$AGENT_DIR/
 # Xvfb: the browser runs with a real window (one consistent fingerprint across the sign-in leg and every
 # later cycle), so a headless host needs a virtual display. Chromium's own deps come with the package.
 command -v Xvfb >/dev/null || { echo "install Xvfb first: apt-get install -y xvfb" >&2; exit 1; }
+
+# A browser. browser-use resolves a SYSTEM binary by name and downloads nothing, so a host without one
+# installs this unit happily and fails at the first cycle — hours later, inside the 72h window, with a
+# verdict that looks like the agent rather than the host. These four names are the ones the library
+# actually looks for (browser_use.browser.chrome), so this guard admits exactly what will work.
+#
+# `google-chrome-stable` is the one to install on Ubuntu 24.04: the `chromium` apt package there is a
+# snap stub, and snap confinement plus this unit's ProtectSystem=strict is a second problem to have.
+BROWSER=""
+for b in google-chrome-stable google-chrome chromium chromium-browser; do
+  if command -v "$b" >/dev/null 2>&1; then BROWSER="$b"; break; fi
+done
+[[ -n "$BROWSER" ]] || {
+  cat >&2 <<'NOBROWSER'
+no browser on PATH — the agent needs one and does not download it.
+  install it first (Ubuntu 24.04, a real .deb rather than the snap stub):
+    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+      | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg
+    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
+      > /etc/apt/sources.list.d/google-chrome.list
+    apt-get update -y && apt-get install -y google-chrome-stable
+  accepted names: google-chrome-stable | google-chrome | chromium | chromium-browser
+NOBROWSER
+  exit 1
+}
+echo "browser: $BROWSER ($(command -v "$BROWSER"))"
 
 id -u "$RUN_USER" >/dev/null 2>&1 || useradd --system --create-home --shell /usr/sbin/nologin "$RUN_USER"
 chown -R "$RUN_USER":"$RUN_USER" "$AGENT_DIR"
