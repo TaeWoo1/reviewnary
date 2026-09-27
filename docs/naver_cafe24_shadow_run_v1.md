@@ -153,6 +153,103 @@ During the run, the honest readings are: responsibility windows worked vs window
 `.runs/*.json` verdict per cycle, and — because this is a shadow run — **zero** rows in
 `inquiry_execution`, `review_reply_execution` and any approval table.
 
+## 5-A. Shadow monitoring — fail-fast observation, not recovery
+
+`deploy/pilot/shadow-watch.sh` + a systemd **oneshot and 5-minute timer** +
+**CloudWatch custom metrics**. It reads, emits numbers and exits. Nothing in it restarts a service, rolls
+anything back, retries a marketplace call or touches a model — a red metric is a person's decision, and
+the alarms exist so a person is told.
+
+**No CloudWatch Agent.** The observer emits with `aws cloudwatch put-metric-data`, so the host needs one
+IAM action and no extra daemon.
+
+### The metrics
+
+| metric | meaning | alarm |
+|---|---|---|
+| `ShadowWatchHeartbeat` | emitted **first and unconditionally**, before any query | missing ⇒ the observer stopped |
+| `BackendHealthy` | `https://<host>/health` says `UP`, through the edge | `< 1` |
+| `DatabaseReachable` | a `select 1` answered | `< 1` |
+| `ResponsibilityMinutesSinceLastSettled` | age of the newest `SETTLED` window | `> 180` (2h windows + slack) |
+| `ResponsibilityRunsFailed` | `responsibility_run` rows in `FAILED` | `> 0` |
+| `ReviewExportMinutesSinceLastIngested` | age of the newest `SUCCEEDED` import attempt | `> 240` |
+| `SourceFailuresNAVER` / `SourceFailuresCAFE24` | source rows of the **newest** run carrying a `failure_reason` | `> 0` |
+| `MarketplaceWriteDeltaInquiry` / `...Review` | rows added since T0 | **`> 0` = CRITICAL** |
+
+**The write delta is the run's stop line.** A shadow run is defined by it being zero; no number of green
+heartbeats makes a non-zero acceptable. With no `SHADOW_WATCH_T0` the script emits **`-1`**, not a guessed
+`0` — it cannot tell new from pre-existing, and guessing zero is the one lie it must not tell.
+
+**A dead observer is indistinguishable from a failing system, on purpose.** Every alarm below uses
+`--treat-missing-data breaching`, so a watcher that stops emitting alarms exactly like one reporting a
+failure. That is why the heartbeat is emitted before the database is even touched.
+
+### Read-only, and enforced
+
+Every query is a `SELECT`, and the session is opened with `default_transaction_read_only = on` so a future
+edit cannot write. `deploy/pilot/shadow-watch-guard.test.sh` (16 assertions) pins that, the absence of any
+marketplace or model host, the absence of any recovery action, `Type=oneshot` + `Restart=no` + no
+`OnFailure=`, the heartbeat ordering, and the `-1`-without-T0 rule.
+
+### Install (host)
+
+```bash
+sudo SHADOW_WATCH_T0='2026-10-01T09:00:00+09:00' deploy/pilot/install-shadow-watch.sh
+systemctl list-timers reviewnary-shadow-watch.timer
+SHADOW_WATCH_DRY_RUN=1 deploy/pilot/shadow-watch.sh     # print without emitting
+```
+
+The installer refuses without `SHADOW_WATCH_T0` and without the AWS CLI, and writes no unit when it refuses.
+
+### Alarms + SNS (AWS resources — a separate step)
+
+```bash
+TOPIC=$(aws sns create-topic --name reviewnary-shadow --region ap-northeast-2 --query TopicArn --output text)
+aws sns subscribe --topic-arn "$TOPIC" --protocol email --notification-endpoint <ops-email> --region ap-northeast-2
+
+alarm() {  # alarm <name> <metric> <op> <threshold> <periods>
+  aws cloudwatch put-metric-alarm --region ap-northeast-2 \
+    --alarm-name "shadow-$1" --namespace Reviewnary/Shadow --metric-name "$2" \
+    --statistic Maximum --period 300 --evaluation-periods "$5" \
+    --comparison-operator "$3" --threshold "$4" \
+    --treat-missing-data breaching --alarm-actions "$TOPIC" --ok-actions "$TOPIC"
+}
+alarm heartbeat      ShadowWatchHeartbeat                    LessThanThreshold     1   2
+alarm backend        BackendHealthy                          LessThanThreshold     1   2
+alarm database       DatabaseReachable                       LessThanThreshold     1   2
+alarm resp-stalled   ResponsibilityMinutesSinceLastSettled   GreaterThanThreshold  180 1
+alarm resp-failed    ResponsibilityRunsFailed                GreaterThanThreshold  0   1
+alarm export-stalled ReviewExportMinutesSinceLastIngested    GreaterThanThreshold  240 1
+alarm src-naver      SourceFailuresNAVER                     GreaterThanThreshold  0   1
+alarm src-cafe24     SourceFailuresCAFE24                     GreaterThanThreshold  0   1
+# CRITICAL — one datapoint is enough, and -1 (no baseline) breaches too
+alarm write-inquiry  MarketplaceWriteDeltaInquiry            GreaterThanThreshold  0   1
+alarm write-review   MarketplaceWriteDeltaReview             GreaterThanThreshold  0   1
+```
+
+`Maximum` rather than `Average`: one bad datapoint in a period is the news, and averaging hides it.
+
+### IAM — minimum, and split in two
+
+**The instance role** needs exactly one action, scoped by namespace (`PutMetricData` has no resource ARN,
+so the namespace condition key is the scope):
+
+```json
+{ "Version": "2012-10-17", "Statement": [ {
+    "Sid": "EmitShadowMetricsOnly", "Effect": "Allow",
+    "Action": "cloudwatch:PutMetricData", "Resource": "*",
+    "Condition": { "StringEquals": { "cloudwatch:namespace": "Reviewnary/Shadow" } } } ] }
+```
+
+Nothing else. **Not** `PutMetricAlarm`, **not** any `sns:*`, **not** `DeleteAlarms` — a host that can create
+or silence its own alarms is a host that can hide its own failure.
+
+**The operator**, one time, from their own credentials (not the instance): `cloudwatch:PutMetricAlarm` ·
+`cloudwatch:DescribeAlarms` · `sns:CreateTopic` · `sns:Subscribe` · `sns:GetTopicAttributes`.
+
+The instance's other two grants stay as they are and are unrelated: `AmazonSSMManagedInstanceCore` for
+admin access, and the S3 backup keys, which belong to a separate `put-object`-only principal.
+
 ## 6. What stops the run, and what does not restart it
 
 The agent stops on the first non-`INGESTED` verdict and does not retry by relaxation: no stealth, no
