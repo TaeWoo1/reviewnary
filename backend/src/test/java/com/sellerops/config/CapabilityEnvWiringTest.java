@@ -53,6 +53,18 @@ class CapabilityEnvWiringTest {
             // marks itself, which is the half of 「AI 확인 필요」 a demo actually shows.
             "SELLEROPS_SELF_PILOT_TRIAGE_AUTO_ENABLED");
 
+    /**
+     * Unattended NAVER review export: the same three facts again, and again under names that do not share
+     * the triple's shape — it calls no vendor, so it has no API key, and it names a DEVICE as well as an
+     * organisation. Listed here for the reason this whole class exists: an unplumbed name means an
+     * operator writes the flag, the container never sees it, and the agent's every call is refused with
+     * nothing to read that says why.
+     */
+    private static final List<String> UNATTENDED_REVIEW_EXPORT = List.of(
+            "SELLEROPS_REVIEW_IMPORT_UNATTENDED_ENABLED",
+            "SELLEROPS_REVIEW_IMPORT_UNATTENDED_ORG_IDS",
+            "SELLEROPS_REVIEW_IMPORT_UNATTENDED_DEVICE_IDS");
+
     private static List<String> requiredNames() {
         List<String> names = new ArrayList<>();
         for (String cap : CAPABILITY_TRIPLES) {
@@ -61,6 +73,7 @@ class CapabilityEnvWiringTest {
             names.add(cap + "_ORG_IDS");
         }
         names.addAll(AI_TRIAGE);
+        names.addAll(UNATTENDED_REVIEW_EXPORT);
         return names;
     }
 
@@ -89,6 +102,9 @@ class CapabilityEnvWiringTest {
                     .containsPattern("(?m)^" + cap + "_API_KEY=");
         }
         for (String name : AI_TRIAGE) {
+            assertThat(env).as("pilot.env.example names %s", name).containsPattern("(?m)^" + name + "=");
+        }
+        for (String name : UNATTENDED_REVIEW_EXPORT) {
             assertThat(env).as("pilot.env.example names %s", name).containsPattern("(?m)^" + name + "=");
         }
         // The organisation list is required of the template only where the capability REQUIRES one:

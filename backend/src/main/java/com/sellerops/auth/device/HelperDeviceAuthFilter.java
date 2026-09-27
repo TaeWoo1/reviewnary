@@ -73,7 +73,13 @@ public class HelperDeviceAuthFilter extends OncePerRequestFilter {
             // name the work (the recipe is an allowlisted enum on the row), cannot name a target (no job column
             // holds a URL), cannot reach another device's job (the device id comes from its own validated token,
             // never from the request) and cannot run twice (the claim is single-use).
-            new Route(HttpMethod.POST, "/api/helper-devices/jobs"));
+            new Route(HttpMethod.POST, "/api/helper-devices/jobs"),
+            // Unattended review export (72h shadow run). The narrowest possible addition: ONE method on ONE
+            // exact path, and the route it reaches takes no body, no query and no path variable — so it cannot
+            // name an organisation, a channel, an account, a plan, a segment or a file. Deliberately NOT
+            // "/api/imports/reviews/plans", which would also carry range selection, plan creation, plan merge,
+            // segment split and per-segment FILE IMPORT for every channel the organisation has.
+            new Route(HttpMethod.POST, "/api/helper-devices/review-export/next-launch"));
 
     private final ObjectProvider<HelperDeviceService> devices;
     private final OrganizationRepository organizations;

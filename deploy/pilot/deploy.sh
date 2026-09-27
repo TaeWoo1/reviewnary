@@ -202,6 +202,30 @@ if [[ -n "$(printf '%s' "${RESPONSIBILITY_RUNTIME_ORG_IDS:-}" | tr -d '[:space:]
    && "${SELLEROPS_RESPONSIBILITY_SCHEDULER_ENABLED:-false}" != "true" ]]; then
   fail "RESPONSIBILITY_RUNTIME_ORG_IDS names an organisation but SELLEROPS_RESPONSIBILITY_SCHEDULER_ENABLED is not true — 고객 운영 관리 becomes visible and startable for that seller while no window is ever worked; set the scheduler true, or clear the rollout list"
 fi
+# ── Unattended NAVER review export (72h shadow run) ──────────────────────────────────────────────
+#
+# Normally a review-import launch is minted only by the seller's own session, and that press is the
+# human checkpoint for a bounded browser export. This capability removes it for one organisation and
+# one paired device. Three names, all required together, and `*` is refused on both lists: "every
+# organisation" and "every device" are not postures for driving a seller centre with nobody present.
+#
+# Enabled with a blank list is the failure this guard exists for — it would not crash, it would run
+# and refuse every call, which reads as «the agent is broken» rather than «nobody is named».
+if [[ "${SELLEROPS_REVIEW_IMPORT_UNATTENDED_ENABLED:-false}" == "true" ]]; then
+  for n in SELLEROPS_REVIEW_IMPORT_UNATTENDED_ORG_IDS SELLEROPS_REVIEW_IMPORT_UNATTENDED_DEVICE_IDS; do
+    [[ -n "$(printf '%s' "${!n:-}" | tr -d '[:space:],')" ]] \
+      || fail "SELLEROPS_REVIEW_IMPORT_UNATTENDED_ENABLED=true but $n is blank — name the organisation and the paired agent device explicitly. Both ids exist only after the fact: deploy once with the capability off, sign up and connect NAVER, pair the agent VM, read its id from GET /api/helper-devices, then set all three and deploy again."
+    [[ "${!n}" != *"*"* ]] \
+      || fail "$n contains * — this capability admits named ids only; a wildcard would authorize an unattended browser session against organisations and devices nobody chose"
+  done
+  # Acquisition only. If marketplace WRITE is on in the same deploy, say so out loud: the combination is
+  # not refused here (each has its own approval) but a shadow run is defined by not having it.
+  if [[ "${SELLEROPS_INQUIRY_PUBLISH_EXECUTION_ENABLED:-false}" == "true" ]]; then
+    printf 'note: unattended review export AND answer execution are both on — a shadow run normally has marketplace WRITE off\n'
+  fi
+  printf 'note: unattended review export ON for named org + named device (acquisition only; no publish path reads these)\n'
+fi
+
 # ── Off-host backup (blocker B5) — a PRECONDITION of a pilot deploy, not a recommendation ────────
 #
 # This used to print a note and carry on. A note is what a host prints on its way to believing it has

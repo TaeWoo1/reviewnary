@@ -29,6 +29,29 @@ class HelperDeviceRoutePolicyTest {
         assertThat(admitted("DELETE", "/api/helper-devices/me")).isTrue();
     }
 
+    /**
+     * The unattended review export (72h shadow run) is ONE exact POST. The assertion that matters is the
+     * second half: the plan surface it deliberately avoids stays closed, because that prefix also carries
+     * range selection, plan creation, plan merge, segment split and per-segment FILE IMPORT for every
+     * channel the organisation has.
+     */
+    @Test
+    void unattendedReviewExportIsOneExactPostAndThePlanSurfaceStaysClosed() {
+        assertThat(admitted("POST", "/api/helper-devices/review-export/next-launch")).isTrue();
+        assertThat(admitted("GET", "/api/helper-devices/review-export/next-launch")).isFalse();
+        assertThat(admitted("DELETE", "/api/helper-devices/review-export/next-launch")).isFalse();
+        // and it opens no sibling under its own prefix
+        assertThat(admitted("POST", "/api/helper-devices/review-export")).isFalse();
+        assertThat(admitted("POST", "/api/helper-devices/review-export/anything-else")).isFalse();
+        for (String plans : List.of("/api/imports/reviews/plans", "/api/imports/reviews/plans/next-launch",
+                "/api/imports/reviews/plans/x/extend", "/api/imports/reviews/plans/x/launches/next-segment",
+                "/api/imports/reviews/segments/x/launch", "/api/imports/reviews/segments/x/import",
+                "/api/imports/reviews/plans/selected-range")) {
+            assertThat(admitted("POST", plans)).as(plans).isFalse();
+            assertThat(admitted("GET", plans)).as(plans).isFalse();
+        }
+    }
+
     @Test
     void theSellersSurfacesAreNotAndAPrefixNeverOpensASibling() {
         for (String path : List.of("/api/helper-devices", "/api/helper-devices/approve",

@@ -788,6 +788,23 @@ sellerops:
   inquiry-authority:
     fence:
       enabled: ${SELLEROPS_INQUIRY_AUTHORITY_FENCE_ENABLED:false}
+  review-import:
+    unattended:
+      # Unattended NAVER review export for a shadow run (72h). OFF by default, and with it off this
+      # deployment behaves byte-for-byte as it did before the capability existed: the route answers 403
+      # and a review-import launch is minted only by a seller's own session, which is the human
+      # checkpoint PD-7 recognises (docs/review_acquisition_aside_v2.md §12).
+      #
+      # All three are required together and NEITHER LIST ACCEPTS `*`. The org list answers whose seller
+      # centre may be driven with nobody present; the device list answers which paired helper may do it
+      # (a seller may pair a laptop for guided work and a VM for the run — only the VM is the subject of
+      # an unattended authority). Both ids exist only after the organisation signs up and the device
+      # pairs, so naming them is a second deploy pass, the same shape the other org lists already have.
+      #
+      # This authorizes ACQUISITION only. No publish, approval or execution path reads these values.
+      enabled: ${SELLEROPS_REVIEW_IMPORT_UNATTENDED_ENABLED:false}
+      org-ids: ${SELLEROPS_REVIEW_IMPORT_UNATTENDED_ORG_IDS:}
+      device-ids: ${SELLEROPS_REVIEW_IMPORT_UNATTENDED_DEVICE_IDS:}
   inquiry-import:
     esm:
       # Manual ESM (G마켓/옥션) inquiry Excel-import bridge. Off by default — with this
