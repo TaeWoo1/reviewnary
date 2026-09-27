@@ -143,7 +143,7 @@ public class CoupangApiConnector implements PullConnector, ConnectionVerifier, B
                         credential.accessKey(), credential.secretKey(), credential.vendorId(),
                         request.cursorValue());
                 case INQUIRY -> inquiriesClient.fetchInquiryPage(
-                        credential.accessKey(), credential.secretKey(), credential.vendorId(),
+                        request.orgId(), credential.accessKey(), credential.secretKey(), credential.vendorId(),
                         request.cursorValue());
                 // The vendor's own catalogue. Read-only, small pages, and the option axis it uniquely
                 // provides is what finally resolves reviews.source_option_id (V37).
@@ -184,8 +184,9 @@ public class CoupangApiConnector implements PullConnector, ConnectionVerifier, B
         for (String type : CoupangInquiriesClient.ANSWERED_TYPES) {
             long started = System.currentTimeMillis();
             try {
-                CoupangInquiriesClient.FirstPage page = inquiriesClient.probeFirstPage(credential.accessKey(),
-                        credential.secretKey(), credential.vendorId(), type, from, to, pageSize);
+                CoupangInquiriesClient.FirstPage page = inquiriesClient.probeFirstPage(orgId,
+                        credential.accessKey(), credential.secretKey(), credential.vendorId(),
+                        type, from, to, pageSize);
                 pages.add(new SourcePage("INQUIRY_" + type, SourcePage.SUCCESS, page.records(), page.morePages(),
                         null, System.currentTimeMillis() - started));
             } catch (CoupangRateLimitedException e) {

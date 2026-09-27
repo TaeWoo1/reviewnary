@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -132,12 +133,32 @@ public class CoupangInquiriesClient {
     private final String baseUrl;
     /** The armed live-run approval id — see {@link CoupangOrdersClient}; blank ⇒ a real host is refused. */
     private final String liveApprovalId;
-    /** Self-Pilot standing READ grant — see {@link CoupangOrdersClient}; opens the READ gate only. */
-    private final String standingReadGrantId;
+    /**
+     * The standing READ grant for the organisation a call is for — see {@link CoupangOrdersClient}; opens
+     * the READ gate only. A resolver rather than a string because the grant this deployment holds may
+     * belong to named organisations ({@link CoupangInquiryReadGrant}) rather than to the process; the
+     * process-wide Self-Pilot grant is the same thing with the organisation ignored, which is what
+     * {@link #constantGrant} expresses.
+     */
+    private final ReadGrant readGrant;
     private final Pacer pacer;
     private final ObjectMapper mapper = new ObjectMapper();
     /** Epoch millis of the last signed call, or 0 before the first. Per-client, like the sweep itself. */
     private long lastCallAtMillis;
+
+    /**
+     * Resolves the standing READ grant for one organisation. {@code ""} means «no grant», which the read
+     * gate treats as an unarmed call and refuses against a real host.
+     */
+    public interface ReadGrant {
+        String forOrg(UUID orgId);
+    }
+
+    /** A grant that ignores the organisation — the pre-existing process-wide semantics, named. */
+    public static ReadGrant constantGrant(String grantId) {
+        String fixed = grantId == null ? "" : grantId;
+        return orgId -> fixed;
+    }
 
     public CoupangInquiriesClient(CoupangHttpClient http, CoupangSigner signer, Clock clock,
                                   String baseUrl, String liveApprovalId) {
@@ -156,12 +177,17 @@ public class CoupangInquiriesClient {
 
     CoupangInquiriesClient(CoupangHttpClient http, CoupangSigner signer, Clock clock,
                            String baseUrl, String liveApprovalId, String standingReadGrantId, Pacer pacer) {
+        this(http, signer, clock, baseUrl, liveApprovalId, constantGrant(standingReadGrantId), pacer);
+    }
+
+    CoupangInquiriesClient(CoupangHttpClient http, CoupangSigner signer, Clock clock,
+                           String baseUrl, String liveApprovalId, ReadGrant readGrant, Pacer pacer) {
         this.http = http;
         this.signer = signer;
         this.clock = clock;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.liveApprovalId = liveApprovalId;
-        this.standingReadGrantId = standingReadGrantId == null ? "" : standingReadGrantId;
+        this.readGrant = readGrant == null ? constantGrant("") : readGrant;
         this.pacer = pacer;
     }
 
@@ -174,7 +200,7 @@ public class CoupangInquiriesClient {
      *
      * @throws CoupangRateLimitedException on HTTP 429 from any onlineInquiries call
      */
-    public FetchPage fetchInquiryPage(String accessKey, String secretKey, String vendorId,
+    public FetchPage fetchInquiryPage(UUID orgId, String accessKey, String secretKey, String vendorId,
                                       String cursorValue) {
         LocalDate today = LocalDate.ofInstant(clock.instant(), KST);
         CoupangInquiryCursor cursor = parseCursor(cursorValue);
@@ -191,7 +217,7 @@ public class CoupangInquiriesClient {
             while (true) {
                 String query = inquiriesQuery(answeredType, window.fromParam(), window.toParam(),
                         pageNum, MAX_PAGE_SIZE);
-                InquiryEnvelope envelope = getInquiries(accessKey, secretKey, vendorId, path, query);
+                InquiryEnvelope envelope = getInquiries(orgId, accessKey, secretKey, vendorId, path, query);
                 List<OnlineInquiry> content = envelope.contentOrEmpty();
                 for (OnlineInquiry item : content) {
                     InquiryRow row = toRow(item, answeredType);
@@ -251,8 +277,8 @@ public class CoupangInquiriesClient {
      * more, and a full page means <i>unknown</i> ({@code null}) — the same ambiguity {@link #fetchInquiryPage} fails
      * closed on, reported here rather than resolved by asking again.
      */
-    public FirstPage probeFirstPage(String accessKey, String secretKey, String vendorId, String answeredType,
-                                    LocalDate from, LocalDate to, int pageSize) {
+    public FirstPage probeFirstPage(UUID orgId, String accessKey, String secretKey, String vendorId,
+                                    String answeredType, LocalDate from, LocalDate to, int pageSize) {
         if (!ANSWERED_TYPES.contains(answeredType)) {
             throw new IllegalArgumentException("unknown answeredType");
         }
@@ -262,7 +288,7 @@ public class CoupangInquiriesClient {
         CoupangInquiryCursor.DateWindow window = new CoupangInquiryCursor.DateWindow(start, to);
         String path = String.format(ONLINE_INQUIRIES_PATH_FMT, vendorId);
         String query = inquiriesQuery(answeredType, window.fromParam(), window.toParam(), 1, size);
-        InquiryEnvelope envelope = getInquiries(accessKey, secretKey, vendorId, path, query);
+        InquiryEnvelope envelope = getInquiries(orgId, accessKey, secretKey, vendorId, path, query);
         int count = envelope.contentOrEmpty().size();
         // Boxed on both arms: a primitive on one side would unbox the unknown (null) arm and throw.
         Boolean more = envelope.hasPagination()
@@ -271,9 +297,9 @@ public class CoupangInquiriesClient {
         return new FirstPage(count, more);
     }
 
-    private InquiryEnvelope getInquiries(String accessKey, String secretKey, String vendorId,
+    private InquiryEnvelope getInquiries(UUID orgId, String accessKey, String secretKey, String vendorId,
                                          String path, String query) {
-        CoupangHttpClient.Response response = signedGet(path, query, accessKey, secretKey, vendorId);
+        CoupangHttpClient.Response response = signedGet(orgId, path, query, accessKey, secretKey, vendorId);
         if (response.statusCode() == 429) {
             throw CoupangRateLimitedException.fromResponse(response);
         }
@@ -402,11 +428,12 @@ public class CoupangInquiriesClient {
 
     // --- signed transport -------------------------------------------------
 
-    private CoupangHttpClient.Response signedGet(String path, String query,
+    private CoupangHttpClient.Response signedGet(UUID orgId, String path, String query,
                                                  String accessKey, String secretKey, String vendorId) {
         // Live-run approval interlock — the same backend choke point every Coupang request passes. This
-        // client only ever GETs, so it is the READ gate: per-run approval OR the standing read grant.
-        CoupangLiveCallGuard.ensureLiveReadAllowed(baseUrl, liveApprovalId, standingReadGrantId);
+        // client only ever GETs, so it is the READ gate: per-run approval OR the standing read grant for
+        // THIS organisation. A call that lost the organisation resolves to no grant and is refused.
+        CoupangLiveCallGuard.ensureLiveReadAllowed(baseUrl, liveApprovalId, readGrant.forOrg(orgId));
         pace();
         String authorization = signer.authorization(accessKey, secretKey, "GET", path, query);
         Map<String, String> headers = new LinkedHashMap<>();

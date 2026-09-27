@@ -642,6 +642,19 @@ sellerops:
       # Official gateway host (verified 2026-06-12 from the PO-list endpoint
       # doc on developers.coupangcorp.com).
       base-url: ${SELLEROPS_CONNECTOR_COUPANG_BASE_URL:https://api-gateway.coupang.com}
+      # Organisation-scoped standing INQUIRY read grant (Coupang future-join, 2026-09-28). Blank by
+      # default: with either of these two unset nothing is admitted and the runtime is byte-identical.
+      #
+      # This exists because the grant that already existed — sellerops.self-pilot.read-grant-id — is
+      # disarmed unless the Self-Pilot Runtime is on, and deploy.sh refuses Self-Pilot on with the collect
+      # poller off. That coupling is right for one operator on one local backend and wrong for a cloud host
+      # whose only Coupang reader is the Responsibility runtime. So: no Self-Pilot, no collect scheduler,
+      # and the organisations named explicitly rather than inherited from what the process happens to do.
+      #
+      # READ only, and structurally: CoupangLiveCallGuard.ensureLiveWriteAllowed takes no grant parameter.
+      # `*` is refused (parsed as an empty list, which admits nobody); a malformed id refuses the boot.
+      inquiry-read-grant-id: ${SELLEROPS_CONNECTOR_COUPANG_INQUIRY_READ_GRANT_ID:}
+      inquiry-read-grant-org-ids: ${SELLEROPS_CONNECTOR_COUPANG_INQUIRY_READ_GRANT_ORG_IDS:}
       # Backend live-run approval interlock (docs/sellerops_live_approval_contract.md).
       # Empty by default: a live call to a REAL Coupang gateway host fail-closes
       # (CoupangLiveApprovalRequiredException) unless an operator-minted approval id is

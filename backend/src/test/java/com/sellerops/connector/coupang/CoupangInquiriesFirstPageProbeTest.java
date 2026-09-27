@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.UUID;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -20,6 +21,10 @@ import org.junit.jupiter.api.Test;
  * ({@code fetchInquiryPage}) is untouched and still sweeps.
  */
 class CoupangInquiriesFirstPageProbeTest {
+
+    /** The organisation a read is for. These clients hold a CONSTANT grant, so the value only has to
+     * be present — the resolver ignores it. Absent, the gate would refuse, which is the point. */
+    private static final UUID ORG = UUID.fromString("7146c50f-ff6d-4c83-ae96-18c930e6d8e0");
 
     private final Clock clock = Clock.fixed(Instant.parse("2026-09-22T03:00:00Z"), ZoneOffset.UTC);
     private final FakeCoupangHttpClient http = new FakeCoupangHttpClient();
@@ -44,7 +49,7 @@ class CoupangInquiriesFirstPageProbeTest {
     }
 
     private CoupangInquiriesClient.FirstPage probe(String type, LocalDate from, int size) {
-        return client.probeFirstPage("AK", "SK", "A00012345", type, from, LocalDate.of(2026, 9, 22), size);
+        return client.probeFirstPage(ORG, "AK", "SK", "A00012345", type, from, LocalDate.of(2026, 9, 22), size);
     }
 
     @Test
@@ -82,7 +87,7 @@ class CoupangInquiriesFirstPageProbeTest {
         assertThatThrownBy(() -> probe("ALL", LocalDate.of(2026, 9, 16), 10)).isInstanceOf(IllegalArgumentException.class);
         CoupangInquiriesClient unarmed = new CoupangInquiriesClient(
                 http, new CoupangSigner(clock), clock, "https://api-gateway.coupang.com", "", pauses::add);
-        assertThatThrownBy(() -> unarmed.probeFirstPage("AK", "SK", "A00012345", "NOANSWER",
+        assertThatThrownBy(() -> unarmed.probeFirstPage(ORG, "AK", "SK", "A00012345", "NOANSWER",
                 LocalDate.of(2026, 9, 16), LocalDate.of(2026, 9, 22), 10))
                 .isInstanceOf(CoupangLiveApprovalRequiredException.class);
         assertThat(http.sent).isEmpty();

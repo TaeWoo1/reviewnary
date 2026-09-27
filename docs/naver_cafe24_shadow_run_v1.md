@@ -168,81 +168,70 @@ CAPTCHA solving, no widened `allowed_domains`, no loosened fence.
 | `ARTIFACT_INVALID` | the bytes are neither OOXML nor delimited text |
 | `INGEST_REFUSED` | the server refused; the raw file stays for inspection and is **not** deleted |
 
-## 6-A. Coupang joining later — no code change, and one conflict to decide first
+## 6-A. Coupang joining later — account only, and the collect poller stays off
 
-The first run has **no Coupang seller account**, so Coupang is not a source at all (§0). This section is
-the path for adding it afterwards **without redeploying anything but the env file**.
+The first run has **no Coupang seller account**, so Coupang is not a source at all (§0). This is the path
+for adding it afterwards: **connect the account, and the next Responsibility window reads its inquiries.**
+No redeploy beyond an env file, no Self-Pilot, no collect scheduler.
 
-**Audit result: the wiring is already sufficient.** Every name this path needs binds in
-`application.yml` and is passed into the backend container by `docker-compose.yml`:
-`SELLEROPS_CONNECTOR_COUPANG_ENABLED` · `SELLEROPS_SELF_PILOT_ENABLED` · `..._SCOPE` · `..._ORG_IDS` ·
-`..._READ_GRANT_ID` · `SELLEROPS_COLLECT_SCHEDULER_ENABLED` · `..._TRIAGE_AUTO_ENABLED`. And the real
-Coupang connector already declares `INQUIRY` as `CONFIRMED` (`CoupangApiConnector.capabilities`), so
-`ResponsibilitySources.collectable("COUPANG", INQUIRY)` is true and the source appears the moment an
-account exists. **Nothing in this section required a line of Java.**
+### What had to change, and why nothing smaller would do
 
-### The conflict: the standing READ grant needs Self-Pilot ON, and Self-Pilot ON needs the collect poller
+The audit found the wiring sufficient for everything except one thing, and that one thing was a real
+coupling rather than a missing name. `CoupangConnectorConfiguration.effectiveReadGrant(selfPilotEnabled,
+grant)` returns `""` unless the Self-Pilot Runtime is on, and `deploy.sh` refuses Self-Pilot on with the
+collect poller off. So the pre-existing grant could not admit a Coupang read on a host whose only reader is
+the Responsibility runtime — and turning both on would start routine collection, which is a different
+posture than the one being measured.
 
-`CoupangConnectorConfiguration.effectiveReadGrant(selfPilotEnabled, grant)` returns `""` unless
-`sellerops.self-pilot.enabled` is true — a leftover grant with the runtime off must not stay a global
-READ key (independent review, 2026-08-18). It is applied to **both** the orders and the inquiries
-client. So a Coupang inquiry READ is admitted only by:
+The grant was also **process-scoped**. Its own docblock defends that as safe because there is one operator
+and one local backend; on a shared cloud host the defence fails, since a second organisation that connects
+Coupang and presses 「지금 동기화」 rides the same key.
 
-* the standing grant **with Self-Pilot enabled**, or
-* `SELLEROPS_CONNECTOR_COUPANG_LIVE_APPROVAL_ID`, which also opens the WRITE gate and is excluded here.
+So the seam is the smallest thing that fixes both: **the gate is now asked «for whom».**
 
-But `deploy/pilot/deploy.sh` **refuses** `SELLEROPS_SELF_PILOT_ENABLED=true` while
-`SELLEROPS_COLLECT_SCHEDULER_ENABLED` is not true: self-pilot creates the schedules and the collect
-poller runs them, and with only the first, schedules pile up due and nothing is ever collected.
+* `CoupangInquiryReadGrant` — `inquiry-read-grant-id` + `inquiry-read-grant-org-ids`, resolved per call
+  against the organisation the call is for. Not a Spring bean: it is constructed inside the one `@Bean`
+  method that needs it, so nothing else in the application can inject a Coupang read grant.
+* `CoupangInquiriesClient` takes a **resolver** instead of a constant string, and its two public reads take
+  the organisation, which the connector already had in hand (`request.orgId()`). A call that loses the
+  organisation resolves to no grant and is refused — forgetting it fails closed.
+* Precedence is **narrow first**, in one named place (`inquiryReadGrantOf`): the org-scoped grant answers
+  for the organisations this deployment named; where it says nothing the Self-Pilot grant answers exactly as
+  before, so a deployment that sets neither new property is byte-identical.
+* **ORDER_SUMMARY is deliberately not widened.** The orders client keeps the process-wide grant: it is not a
+  responsibility source and nothing here asks for it. A test pins the orders construction statement.
+* **WRITE is untouched and structurally closed.** `ensureLiveWriteAllowed(baseUrl, liveApprovalId)` has no
+  grant parameter, so no value this grant produces can open a write. A test asserts the reply client cannot
+  even name the grant.
 
-⇒ **«standing grant» + «no approval id» + «collect scheduler OFF» cannot all hold.** Two honest ways out,
-and this is a deployment decision rather than something to work around:
+### Order of operations
 
-| | what changes | consequence |
-|---|---|---|
-| **A** (recommended) | at Coupang-join time flip `SELF_PILOT_ENABLED=true` **and** `COLLECT_SCHEDULER_ENABLED=true` together, scope `ALLOW_LIST` + the cloud org | routine collection starts for that org's connected accounts — NAVER 문의, Cafe24 문의/리뷰 and Coupang 문의 — **in addition to** the responsibility windows. All READ. The extra runs are visible in `sync_jobs`, and a 72h measurement taken after this flip is measuring a different collection posture than one taken before it |
-| **B** | keep the collect poller off and do not arm the grant | Coupang INQUIRY is observed as `CONFIGURATION_REQUIRED` every window — truthful, `sellerActionable()` false, no gap case — and Coupang never actually joins. Choose this only if the run's point is NAVER + Cafe24 and Coupang is meant to stay visible-but-unread |
-
-There is no third option that keeps the poller off and still reads Coupang: the grant has exactly one
-producer, and the approval id is excluded by decision.
-
-### Order of operations (path A)
-
-1. **Before** the account is connected, `SELLEROPS_CONNECTOR_COUPANG_ENABLED=true`. This is safe with no
-   account: no account ⇒ no source ⇒ nothing is called. Doing it in the other order is what hurts —
-   `collectable()` returns true when a channel has **no** collector at all, so an account connected while
-   the connector is off keeps the source and records `CONNECTOR_UNAVAILABLE` in every window.
-2. `SELLEROPS_SELF_PILOT_READ_GRANT_ID=spr-<hex>` — shape `^spr-[0-9a-f]{8,32}$`, validated at boot by
-   `SelfPilotProperties`, which refuses to start on a malformed one. READ only.
-3. `SELLEROPS_SELF_PILOT_ENABLED=true` · `SELLEROPS_SELF_PILOT_SCOPE=ALLOW_LIST` ·
-   `SELLEROPS_SELF_PILOT_ORG_IDS=<cloud org uuid>` · `SELLEROPS_COLLECT_SCHEDULER_ENABLED=true`.
-   `SELLEROPS_SELF_PILOT_TRIAGE_AUTO_ENABLED` stays **unset** — it is a separate decision and its absence
-   means false.
-   *(`SELLEROPS_SELF_PILOT_ORG_IDS` is not in `pilot.env.example`; add the line. The name is bound in
-   `application.yml` and passed by compose, and deploy.sh's refusal message names it.)*
-4. `SELLEROPS_CONNECTOR_COUPANG_LIVE_APPROVAL_ID` stays **empty**, and
-   `SELLEROPS_INQUIRY_PUBLISH_EXECUTION_ENABLED` stays **false**. Two independent fences, and the first is
-   structural: `CoupangInquiryReplyClient` calls `ensureLiveWriteAllowed(baseUrl, liveApprovalId)` — the
-   standing READ grant **is not a parameter of the write gate**, so no configuration can make a write ride
-   on a read grant.
-5. `deploy/pilot/deploy.sh` (env-only change; the images do not rebuild), then the **seller enters the
-   Coupang credentials in the product** — they never live in `pilot.env`.
-6. The **next responsibility window** resolves Coupang INQUIRY as a source and observes it. No restart
-   beyond step 5, no migration, no new approval.
+1. **Before** the account is connected: `SELLEROPS_CONNECTOR_COUPANG_ENABLED=true`. Safe with no account —
+   no account ⇒ no source ⇒ nothing is called. The other order hurts: `collectable()` answers true when a
+   channel has **no** collector at all, so an account connected while the connector is off keeps the source
+   and records `CONNECTOR_UNAVAILABLE` in every window.
+2. `SELLEROPS_CONNECTOR_COUPANG_INQUIRY_READ_GRANT_ID=spr-<hex>` — shape `^spr-[0-9a-f]{8,32}$`; a malformed
+   id **refuses the boot** rather than disarming quietly.
+3. `SELLEROPS_CONNECTOR_COUPANG_INQUIRY_READ_GRANT_ORG_IDS=<cloud org uuid>`. `*` is refused (parsed as an
+   empty list, which admits nobody). Both blank ⇒ nothing admitted.
+4. **Unchanged and staying that way**: `SELLEROPS_SELF_PILOT_ENABLED=false` ·
+   `SELLEROPS_COLLECT_SCHEDULER_ENABLED=false` · `SELLEROPS_CONNECTOR_COUPANG_LIVE_APPROVAL_ID` empty ·
+   `SELLEROPS_INQUIRY_PUBLISH_EXECUTION_ENABLED=false`.
+5. `deploy/pilot/deploy.sh` (env-only; images do not rebuild), then the **seller enters the Coupang
+   credentials in the product** — they never live in `pilot.env`.
+6. The **next Responsibility window** resolves Coupang INQUIRY as a source and reads it.
 
 ### Register this host's EIP in Coupang's calling-IP list BEFORE step 5
 
-Coupang admits signed calls only from registered IPs. Get the value the same way NAVER's was obtained —
-`deploy/pilot/egress-check.sh`, which proves host and backend-container egress are the same address — and
-register **that** EIP in the Coupang app's calling-IP list. Do it before the first Coupang read, or the
-first window reports `AUTH_REQUIRED` / `EXECUTION_FAILED` (`GW.IP_NOT_ALLOWED`) instead of collecting.
+Coupang admits signed calls only from registered IPs. Get the value from `deploy/pilot/egress-check.sh`,
+which proves host and backend-container egress are the same address, and register **that** EIP in the
+Coupang app's calling-IP list. Do it before the first Coupang read, or the first window reports
+`AUTH_REQUIRED` / `EXECUTION_FAILED` (`GW.IP_NOT_ALLOWED`) instead of collecting.
 
 > **Reported, not fixed.** `sellerops.connector.coupang.advertised-egress-ips` (read by
-> `CoupangAdvertisedEgress`, shown on the Coupang connect screen so a seller knows which IP to register)
-> has **no environment binding** in `application.yml`, while NAVER's equivalent does (line 613). On this
-> host that screen will therefore show an empty list. It is display-only — it gates nothing, and a read
-> succeeds once the IP is registered in Coupang's console — so the value lives in this runbook instead.
-> Closing it would be a one-line `application.yml` + compose change, which this package did not make.
+> `CoupangAdvertisedEgress`, shown on the Coupang connect screen so a seller knows which IP to register) has
+> **no environment binding** in `application.yml`, while NAVER's equivalent does. On this host that screen
+> shows an empty list. It is display-only — it gates nothing — so the value lives in this runbook instead.
 
 ## 7. Not in this run
 

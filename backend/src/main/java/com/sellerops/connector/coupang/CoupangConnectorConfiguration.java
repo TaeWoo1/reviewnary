@@ -55,6 +55,23 @@ public class CoupangConnectorConfiguration {
      * design — one operator, one local backend — and {@code sellerops.self-pilot.org-ids} scopes what the
      * reconciler acts on, not which org's manual sync the gate accepts (docs/self_pilot_runtime_v1.md §7).
      */
+    /**
+     * The precedence between the two standing READ grants that can open the inquiry gate, in one named
+     * place: <b>narrow first</b>. The organisation-scoped grant answers for the organisations this
+     * deployment named; where it has nothing to say the process-wide Self-Pilot grant answers exactly as it
+     * did before this seam existed, so a deployment that sets neither new property is byte-identical.
+     *
+     * <p>Neither is a parameter of {@code ensureLiveWriteAllowed}, so neither can open a write.
+     */
+    static CoupangInquiriesClient.ReadGrant inquiryReadGrantOf(CoupangInquiryReadGrant scoped,
+                                                               String selfPilotGrant) {
+        String fallback = selfPilotGrant == null ? "" : selfPilotGrant;
+        return orgId -> {
+            String forOrg = scoped == null ? "" : scoped.forOrg(orgId);
+            return forOrg.isEmpty() ? fallback : forOrg;
+        };
+    }
+
     static String effectiveReadGrant(boolean selfPilotEnabled, String standingReadGrantId) {
         return selfPilotEnabled ? standingReadGrantId : "";
     }
@@ -65,12 +82,23 @@ public class CoupangConnectorConfiguration {
             @Value("${sellerops.connector.coupang.base-url:https://api-gateway.coupang.com}") String baseUrl,
             @Value("${sellerops.connector.coupang.live-approval-id:}") String liveApprovalId,
             @Value("${sellerops.self-pilot.enabled:false}") boolean selfPilotEnabled,
-            @Value("${sellerops.self-pilot.read-grant-id:}") String standingReadGrantId) {
-        // Same base URL and same live-call interlock as the order client — one armed approval (or the
+            @Value("${sellerops.self-pilot.read-grant-id:}") String standingReadGrantId,
+            @Value("${sellerops.connector.coupang.inquiry-read-grant-id:}") String inquiryGrantId,
+            @Value("${sellerops.connector.coupang.inquiry-read-grant-org-ids:}") String inquiryGrantOrgIds) {
+        // Same base URL and same live-call interlock as the order client — one armed approval (or a
         // standing READ grant) covers the account's read-only collection; neither stream can reach a real
         // host without one of them.
+        //
+        // TWO grants feed one gate parameter, and the order is narrow-first: the organisation-scoped grant
+        // (CoupangInquiryReadGrant) answers for the organisations a deployment named, and the process-wide
+        // Self-Pilot grant answers exactly as it did before — so a deployment that sets neither new
+        // property behaves byte-for-byte as it did. Both are READ; neither is a parameter of the write gate.
+        String selfPilot = effectiveReadGrant(selfPilotEnabled, standingReadGrantId);
+        // A malformed grant id throws here, which fails the bean and therefore the boot — the same
+        // fail-closed posture SelfPilotProperties has for the grant it owns.
+        CoupangInquiryReadGrant inquiryReadGrant = new CoupangInquiryReadGrant(inquiryGrantId, inquiryGrantOrgIds);
         return new CoupangInquiriesClient(http, signer, Clock.systemUTC(), baseUrl, liveApprovalId,
-                effectiveReadGrant(selfPilotEnabled, standingReadGrantId));
+                inquiryReadGrantOf(inquiryReadGrant, selfPilot), CoupangInquiriesClient.SLEEPING_PACER);
     }
 
     @Bean

@@ -7,6 +7,7 @@ import com.sellerops.connector.DataType;
 import com.sellerops.connector.FetchPage;
 import com.sellerops.ingest.canonical.CanonicalInquiry;
 import java.time.Clock;
+import java.util.UUID;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -26,6 +27,10 @@ import org.junit.jupiter.api.Test;
  */
 class CoupangInquiriesClientTest {
 
+    /** The organisation a read is for. These clients hold a CONSTANT grant, so the value only has to
+     * be present — the resolver ignores it. Absent, the gate would refuse, which is the point. */
+    private static final UUID ORG = UUID.fromString("7146c50f-ff6d-4c83-ae96-18c930e6d8e0");
+
     /** KST 2026-08-05 11:00 — the swept window is deterministic. */
     private final Clock clock = Clock.fixed(Instant.parse("2026-08-05T02:00:00Z"), ZoneOffset.UTC);
     private final FakeCoupangHttpClient http = new FakeCoupangHttpClient();
@@ -41,7 +46,7 @@ class CoupangInquiriesClientTest {
     private static final String VENDOR_ID = "A00012345";
 
     private FetchPage fetch(String cursorValue) {
-        return client.fetchInquiryPage(ACCESS_KEY, SECRET_KEY, VENDOR_ID, cursorValue);
+        return client.fetchInquiryPage(ORG, ACCESS_KEY, SECRET_KEY, VENDOR_ID, cursorValue);
     }
 
     @SuppressWarnings("unchecked")
