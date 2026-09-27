@@ -1,0 +1,18 @@
+# Runtime state for the cloud review-export agent. None of this is source.
+.venv/
+__pycache__/
+*.pyc
+
+# The agent's environment: the rvh_ device token and the LLM key. Only .env.example is committed.
+.env
+
+# The NAVER seller-centre session lives here (Chromium persistent profile). Same class of secret as
+# collector/.profile/ — NEVER committed, and it is the reason this directory has its own .gitignore.
+.profile/
+
+# Official XLSX exports, briefly. They hold REAL customer review text and are deleted after the server
+# ACKs the ingest (PD-5). A file left here is a failure to clean up, never a source artifact.
+.artifacts/
+
+# Sanitized run records (enums, counts, digests). Per-run local state.
+.runs/

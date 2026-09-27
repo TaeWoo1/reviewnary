@@ -1,0 +1,3 @@
+# Pinned. Shares no dependency graph with collector/ (TypeScript) or backend/ (Gradle):
+# this agent talks to the product over HTTP like any other paired helper would.
+browser-use==0.13.10
