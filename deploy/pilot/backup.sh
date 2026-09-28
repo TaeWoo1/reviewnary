@@ -72,9 +72,7 @@ if [[ "${SELLEROPS_BACKUP_S3_ENABLED:-false}" != "true" ]]; then
 fi
 
 missing=()
-for n in SELLEROPS_BACKUP_S3_BUCKET SELLEROPS_BACKUP_S3_ACCESS_KEY_ID SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY; do
-  [[ -n "${!n:-}" ]] || missing+=("$n")
-done
+[[ -n "${SELLEROPS_BACKUP_S3_BUCKET:-}" ]] || missing+=("SELLEROPS_BACKUP_S3_BUCKET")
 # Region is required by the AWS SigV4 signer. A third-party S3-compatible endpoint that does not use
 # regions still needs SOMETHING to sign with, so this is required rather than defaulted — a silent
 # default here is a signature mismatch discovered at 03:17 by nobody.
@@ -82,6 +80,28 @@ done
 if [[ ${#missing[@]} -gt 0 ]]; then
   printf 'backup FAILED off-host at=%s file=%s bytes=%s reason=config-incomplete missing=%s\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$out" "$bytes" "${missing[*]}" >&2
+  exit 1
+fi
+
+# ── which credential, and the one state that is not a choice ─────────────────────────────────────
+# Two ways to hold the PutObject grant, and the pair decides which:
+#   both set   — an explicit long-lived key pair, handed to the CLI through its own environment.
+#   both blank — nothing is handed over at all, and the CLI resolves the grant through its default
+#                provider chain. On this host that is the EC2 instance role: a credential that is
+#                issued to the instance, rotates on its own, and cannot be copied off the host by
+#                reading a file. That is why blank is a supported posture and not an oversight.
+#   one of two — refused. It is not a posture: it is a half-finished edit of one of the other two,
+#                and the failure it would otherwise produce is a SigV4 error at 03:17.
+# Deliberately the PAIR and not the bucket: the bucket and region are required either way, so they
+# say nothing about whose credential is being used.
+if [[ -n "${SELLEROPS_BACKUP_S3_ACCESS_KEY_ID:-}" && -n "${SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY:-}" ]]; then
+  cred_mode=explicit
+elif [[ -z "${SELLEROPS_BACKUP_S3_ACCESS_KEY_ID:-}" && -z "${SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY:-}" ]]; then
+  cred_mode=instance-role
+else
+  printf 'backup FAILED off-host at=%s file=%s bytes=%s reason=credential-half-configured detail=%s\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$out" "$bytes" \
+    'set BOTH SELLEROPS_BACKUP_S3_ACCESS_KEY_ID and SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY, or leave BOTH blank to use the instance role' >&2
   exit 1
 fi
 command -v aws >/dev/null 2>&1 || {
@@ -104,16 +124,27 @@ s3=(aws s3api put-object --bucket "$SELLEROPS_BACKUP_S3_BUCKET" --key "$key" --b
 
 # Credentials reach the AWS CLI through its own environment and are never written to a profile, a
 # command line (visible in `ps`), or this script's output.
-if etag="$(AWS_ACCESS_KEY_ID="$SELLEROPS_BACKUP_S3_ACCESS_KEY_ID" \
+#
+# In instance-role mode the prefix is EMPTY, and that is load-bearing in both directions. Passing
+# AWS_ACCESS_KEY_ID= / AWS_SECRET_ACCESS_KEY= as blank strings does not mean «no key» to the CLI —
+# a set-but-empty variable is still a credential the provider chain finds first, and the upload dies
+# with a signature error instead of falling through to the role. And AWS_EC2_METADATA_DISABLED=true
+# is exactly the switch that turns the instance role off: it belongs with an explicit key pair,
+# where reaching IMDS at all would be a fallback nobody asked for, and must never be set here.
+if [[ "$cred_mode" == explicit ]]; then
+  cli=(env AWS_ACCESS_KEY_ID="$SELLEROPS_BACKUP_S3_ACCESS_KEY_ID" \
            AWS_SECRET_ACCESS_KEY="$SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY" \
-           AWS_EC2_METADATA_DISABLED=true \
-           "${s3[@]}" --output text --query ETag 2>&1)"; then
-  printf 'backup OK at=%s file=%s bytes=%s offhost=uploaded bucket=%s key=%s etag=%s\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$out" "$bytes" "$SELLEROPS_BACKUP_S3_BUCKET" "$key" "$etag"
+           AWS_EC2_METADATA_DISABLED=true)
+else
+  cli=(env)
+fi
+if etag="$("${cli[@]}" "${s3[@]}" --output text --query ETag 2>&1)"; then
+  printf 'backup OK at=%s file=%s bytes=%s offhost=uploaded bucket=%s key=%s cred=%s etag=%s\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$out" "$bytes" "$SELLEROPS_BACKUP_S3_BUCKET" "$key" "$cred_mode" "$etag"
 else
   # The uploader's own message can carry the endpoint and the key, but never the secret — it is not
   # on the command line and not in the environment the CLI echoes back.
-  printf 'backup FAILED off-host at=%s file=%s bytes=%s bucket=%s key=%s reason=upload-failed detail=%s\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$out" "$bytes" "$SELLEROPS_BACKUP_S3_BUCKET" "$key" "${etag//$'\n'/ }" >&2
+  printf 'backup FAILED off-host at=%s file=%s bytes=%s bucket=%s key=%s cred=%s reason=upload-failed detail=%s\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$out" "$bytes" "$SELLEROPS_BACKUP_S3_BUCKET" "$key" "$cred_mode" "${etag//$'\n'/ }" >&2
   exit 1
 fi

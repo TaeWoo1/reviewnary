@@ -169,12 +169,21 @@ fi
 if [[ "${SELLEROPS_BACKUP_S3_ENABLED:-false}" == "true" ]]; then
   ok "off-host backup is ON"
   miss=()
-  for n in SELLEROPS_BACKUP_S3_BUCKET SELLEROPS_BACKUP_S3_REGION \
-           SELLEROPS_BACKUP_S3_ACCESS_KEY_ID SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY; do
+  for n in SELLEROPS_BACKUP_S3_BUCKET SELLEROPS_BACKUP_S3_REGION; do
     [[ -n "${!n:-}" ]] || miss+=("$n")
   done
-  [[ ${#miss[@]} -eq 0 ]] && ok "off-host backup: every required value is set" \
+  [[ ${#miss[@]} -eq 0 ]] && ok "off-host backup: the destination is set" \
     || bad "SELLEROPS_BACKUP_S3_ENABLED=true but these are blank: ${miss[*]}"
+  # The credential is a pair, and the pair is the posture — the same rule deploy.sh refuses on and
+  # backup.sh applies at 03:17. Blank/blank is the instance role and is reported as such, so that an
+  # operator who MEANT to paste a key pair sees which one this host is actually going to use.
+  if [[ -n "${SELLEROPS_BACKUP_S3_ACCESS_KEY_ID:-}" && -n "${SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY:-}" ]]; then
+    ok "off-host credential: an explicit key pair is set"
+  elif [[ -z "${SELLEROPS_BACKUP_S3_ACCESS_KEY_ID:-}" && -z "${SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY:-}" ]]; then
+    ok "off-host credential: none in the env — the uploader will use this instance's role (default provider chain)"
+  else
+    bad "SELLEROPS_BACKUP_S3_ACCESS_KEY_ID and SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY must be set together or left blank together — exactly one of them signs nothing"
+  fi
   # An endpoint is optional (AWS S3 needs none) but, when given, must be a URL the signer can use.
   if [[ -n "${SELLEROPS_BACKUP_S3_ENDPOINT:-}" ]]; then
     case "${SELLEROPS_BACKUP_S3_ENDPOINT}" in

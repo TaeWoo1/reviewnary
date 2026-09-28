@@ -245,13 +245,27 @@ fi
 # already refused a development host name (line ~54) and an env file inside the checkout (line ~53).
 # No value is printed — only which NAMES are blank.
 [[ "${SELLEROPS_BACKUP_S3_ENABLED:-false}" == "true" ]] || fail \
-  "SELLEROPS_BACKUP_S3_ENABLED is not true — a pilot host may not be deployed without an off-host copy of its dumps (blocker B5). The local dump alone does not survive this host. Set it true with the four names below, or do not deploy a host that will hold seller data it cannot recover."
+  "SELLEROPS_BACKUP_S3_ENABLED is not true — a pilot host may not be deployed without an off-host copy of its dumps (blocker B5). The local dump alone does not survive this host. Set it true with the destination below, or do not deploy a host that will hold seller data it cannot recover."
 bmiss=()
-for n in SELLEROPS_BACKUP_S3_BUCKET SELLEROPS_BACKUP_S3_REGION \
-         SELLEROPS_BACKUP_S3_ACCESS_KEY_ID SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY; do
+for n in SELLEROPS_BACKUP_S3_BUCKET SELLEROPS_BACKUP_S3_REGION; do
   [[ -n "${!n:-}" ]] || bmiss+=("$n")
 done
 [[ ${#bmiss[@]} -eq 0 ]] || fail "SELLEROPS_BACKUP_S3_ENABLED=true but these are blank: ${bmiss[*]}"
+# WHERE the dump goes is required; WHOSE credential carries it is a choice between exactly two
+# postures, and the pair is how the host says which (backup.sh applies the same rule at 03:17):
+#   both set   — an explicit long-lived key pair.
+#   both blank — the AWS CLI's default provider chain, which on this host is the EC2 instance role:
+#                issued to the instance, rotated for it, and not readable off it as a file.
+#   one of two — not a third posture. It is a half-finished edit of one of the other two, and the
+#                only thing it can produce is a signature failure in the middle of the night.
+bkid="${SELLEROPS_BACKUP_S3_ACCESS_KEY_ID:-}"; bksec="${SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY:-}"
+if [[ -n "$bkid" && -n "$bksec" ]]; then
+  bcred="explicit key pair"
+elif [[ -z "$bkid" && -z "$bksec" ]]; then
+  bcred="instance role (default credential provider chain)"
+else
+  fail "SELLEROPS_BACKUP_S3_ACCESS_KEY_ID and SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY must be set together or left blank together — set both for an explicit key pair, or leave both blank to use this instance's role. Exactly one of them is not a configuration."
+fi
 case "${SELLEROPS_BACKUP_S3_ENDPOINT:-https://placeholder}" in
   https://*) ;;
   *) fail "SELLEROPS_BACKUP_S3_ENDPOINT must be an absolute HTTPS URL when set (the dump carries sealed credentials and seller data)" ;;
@@ -261,7 +275,7 @@ esac
 # and the only reader of that log is the operator who already went to bed believing in B5.
 command -v aws >/dev/null 2>&1 || fail \
   "SELLEROPS_BACKUP_S3_ENABLED=true but the aws cli is not installed — nothing on this host can perform the upload (deploy/pilot/host-bootstrap.sh installs AWS CLI v2)"
-printf 'off-host backup: enabled, four names set, uploader present\n'
+printf 'off-host backup: enabled, destination set, credential=%s, uploader present\n' "$bcred"
 for flag in NAVER COUPANG CAFE24; do
   v="SELLEROPS_CONNECTOR_${flag}_ENABLED"
   if [[ "${!v:-false}" == "true" ]]; then

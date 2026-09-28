@@ -26,7 +26,7 @@ no(){ printf '  FAIL %s\n     %s\n' "$1" "${2:-}"; fail=$((fail+1)); }
 # ── a PATH with no aws on it, and everything these scripts actually call ─────────────────────────
 mkdir -p "$WORK/pure" "$WORK/stub" "$WORK/awsbin"
 for t in bash env git stat tr grep awk sed cmp install mktemp rm cat chmod chown uname dirname \
-         basename head tail sort cut printf ls find date id du free ss; do
+         basename head tail sort cut printf ls find date id du free ss mv mkdir; do
   p="$(command -v "$t" 2>/dev/null)" && ln -sf "$p" "$WORK/pure/$t"
 done
 # Refuses, rather than succeeds: a docker stub that exited 0 would let deploy.sh run on into the
@@ -77,12 +77,24 @@ $(printf '%s\n' "$@")
 ENV
   chmod 600 "$f"
 }
-S3_ON=(
+# The destination, which every posture needs.
+S3_DEST=(
   'SELLEROPS_BACKUP_S3_ENABLED=true'
   'SELLEROPS_BACKUP_S3_BUCKET=reviewnary-pilot-backups'
   'SELLEROPS_BACKUP_S3_REGION=ap-northeast-2'
+)
+# Posture 1: an explicit long-lived key pair.
+S3_ON=(
+  "${S3_DEST[@]}"
   'SELLEROPS_BACKUP_S3_ACCESS_KEY_ID=AKIAEXAMPLEEXAMPLE'
   "SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY=$SECRET"
+)
+# Posture 2: the EC2 instance role. Written as explicit blanks rather than as absent names, because
+# that is what an operator's edited pilot.env actually looks like — the names stay, the values go.
+S3_ROLE=(
+  "${S3_DEST[@]}"
+  'SELLEROPS_BACKUP_S3_ACCESS_KEY_ID='
+  'SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY='
 )
 
 deploy() { # deploy <PATH> <env-file>
@@ -104,7 +116,7 @@ has 'env: ok' "$out" && no "S3 off → stops IN step 2" "env validation reported
 # A2. The posture a pilot host is supposed to be in.
 mkenv "$WORK/on.env" "${S3_ON[@]}"
 out="$(deploy "$WITHAWS" "$WORK/on.env")"
-has 'env: ok' "$out" && ok "S3 on + four names + aws → passes env validation" || no "S3 on + four names + aws → passes env validation" "$(printf '%s' "$out" | tail -2)"
+has 'env: ok' "$out" && ok "S3 on + destination + explicit pair + aws → passes env validation" || no "S3 on + destination + explicit pair + aws → passes env validation" "$(printf '%s' "$out" | tail -2)"
 has 'off-host backup: enabled' "$out" && ok "S3 on → says so without printing a value" || no "S3 on → says so without printing a value" "confirmation line absent"
 
 # A3. The uploader. Same failure as A1, one layer down and one night later.
@@ -112,11 +124,32 @@ out="$(deploy "$NOAWS" "$WORK/on.env")"
 has 'aws cli is not installed' "$out" && ok "aws missing → refused" || no "aws missing → refused" "guard message absent"
 has 'env: ok' "$out" && no "aws missing → stops IN step 2" "env validation reported ok" || ok "aws missing → stops IN step 2"
 
-# A4. Half-configured is not configured — and the report names the NAME.
-mkenv "$WORK/partial.env" 'SELLEROPS_BACKUP_S3_ENABLED=true' 'SELLEROPS_BACKUP_S3_BUCKET=b' 'SELLEROPS_BACKUP_S3_REGION=r'
+# A4. The destination is still required of every posture, and the report names the NAME.
+mkenv "$WORK/partial.env" 'SELLEROPS_BACKUP_S3_ENABLED=true' 'SELLEROPS_BACKUP_S3_ACCESS_KEY_ID=AKIAEXAMPLEEXAMPLE' "SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY=$SECRET"
 out="$(deploy "$WITHAWS" "$WORK/partial.env")"
-has 'SELLEROPS_BACKUP_S3_ACCESS_KEY_ID' "$out" && has 'SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY' "$out" \
-  && ok "S3 on with blanks → refused, naming the blank names" || no "S3 on with blanks → refused, naming the blank names" "names absent"
+has 'SELLEROPS_BACKUP_S3_BUCKET' "$out" && has 'SELLEROPS_BACKUP_S3_REGION' "$out" \
+  && ok "S3 on with no destination → refused, naming the blank names" || no "S3 on with no destination → refused, naming the blank names" "names absent"
+
+# A4-a. The instance role. This is the posture the shadow-run host is in, and the whole point of the
+# three-state pair: a bucket and a region, no key anywhere, and a deploy that proceeds.
+mkenv "$WORK/role.env" "${S3_ROLE[@]}"
+out="$(deploy "$WITHAWS" "$WORK/role.env")"
+has 'env: ok' "$out" && ok "S3 on + destination + BOTH keys blank → passes env validation (instance role)" \
+  || no "S3 on + destination + both keys blank → passes env validation" "$(printf '%s' "$out" | tail -2)"
+has 'credential=instance role' "$out" && ok "deploy names the posture it is about to run under" \
+  || no "deploy names the posture it is about to run under" "confirmation line does not say which credential"
+
+# A4-b / A4-c. One half of a pair is not a posture. Both directions, because an operator who pasted
+# an id and lost the secret and one who did the reverse must hit the same wall.
+mkenv "$WORK/idonly.env" "${S3_DEST[@]}" 'SELLEROPS_BACKUP_S3_ACCESS_KEY_ID=AKIAEXAMPLEEXAMPLE' 'SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY='
+out="$(deploy "$WITHAWS" "$WORK/idonly.env")"
+has 'must be set together or left blank together' "$out" && ok "id without secret → refused" || no "id without secret → refused" "guard message absent"
+has 'env: ok' "$out" && no "id without secret → stops IN step 2" "env validation reported ok" || ok "id without secret → stops IN step 2"
+
+mkenv "$WORK/secretonly.env" "${S3_DEST[@]}" 'SELLEROPS_BACKUP_S3_ACCESS_KEY_ID=' "SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY=$SECRET"
+out="$(deploy "$WITHAWS" "$WORK/secretonly.env")"
+has 'must be set together or left blank together' "$out" && ok "secret without id → refused" || no "secret without id → refused" "guard message absent"
+has "$SECRET" "$out" && no "the half-configured refusal prints no secret value" "the secret appeared" || ok "the half-configured refusal prints no secret value"
 
 # A5. A plain-HTTP endpoint carries sealed credentials and seller data over the wire.
 mkenv "$WORK/http.env" "${S3_ON[@]}" 'SELLEROPS_BACKUP_S3_ENDPOINT=http://minio.example.com'
@@ -124,7 +157,7 @@ out="$(deploy "$WITHAWS" "$WORK/http.env")"
 has 'must be an absolute HTTPS URL' "$out" && ok "non-HTTPS endpoint → refused" || no "non-HTTPS endpoint → refused" "guard message absent"
 
 # A6. The rule every script in this directory keeps: names, never values.
-out="$(deploy "$WITHAWS" "$WORK/on.env"; deploy "$WITHAWS" "$WORK/partial.env")"
+out="$(deploy "$WITHAWS" "$WORK/on.env"; deploy "$WITHAWS" "$WORK/partial.env"; deploy "$WITHAWS" "$WORK/role.env"; deploy "$WITHAWS" "$WORK/secretonly.env")"
 has "$SECRET" "$out" && no "no secret value is ever printed" "the secret appeared in deploy output" || ok "no secret value is ever printed"
 
 echo
@@ -140,7 +173,22 @@ has 'aws cli present' "$out" && ok "aws present → ok" || no "aws present → o
 has 'FAIL  SELLEROPS_BACKUP_S3_ENABLED' "$out" && no "S3 on → no S3 failure line" "fired anyway" || ok "S3 on → no S3 failure line"
 # The schedule is what makes the nightly run exist; this host has no units, and that is a failure.
 has 'FAIL  sellerops-backup.service/.timer are NOT installed' "$out" && ok "no timer units → bad" || no "no timer units → bad" "not scored as a failure"
+has 'off-host credential: an explicit key pair is set' "$out" && ok "explicit pair → reported as such" || no "explicit pair → reported as such" "posture not named"
 has "$SECRET" "$out" && no "preflight prints no secret value" "the secret appeared" || ok "preflight prints no secret value"
+
+# The same three states preflight is supposed to be able to TELL APART, so that an operator who
+# meant to paste a key pair and did not sees which credential this host will really use.
+pre() { PILOT_BACKUP_DIR="$WORK/backups" PILOT_SYSTEMD_DIR="$WORK/units-empty" PILOT_CRON_DIR="$WORK/cron" preflight "$WITHAWS" "$1"; }
+out="$(pre "$WORK/role.env")"
+has "will use this instance's role" "$out" && ok "both blank → ok, and says «instance role»" || no "both blank → ok, and says «instance role»" "posture not named"
+has 'FAIL  SELLEROPS_BACKUP_S3_ACCESS_KEY_ID' "$out" && no "both blank → not scored a failure" "fired anyway" || ok "both blank → not scored a failure"
+out="$(pre "$WORK/idonly.env")"
+has 'FAIL  SELLEROPS_BACKUP_S3_ACCESS_KEY_ID and SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY must be set together' "$out" \
+  && ok "id only → bad" || no "id only → bad" "not scored as a failure"
+out="$(pre "$WORK/secretonly.env")"
+has 'FAIL  SELLEROPS_BACKUP_S3_ACCESS_KEY_ID and SELLEROPS_BACKUP_S3_SECRET_ACCESS_KEY must be set together' "$out" \
+  && ok "secret only → bad" || no "secret only → bad" "not scored as a failure"
+has "$SECRET" "$out" && no "preflight prints no secret value in the half-configured case" "the secret appeared" || ok "preflight prints no secret value in the half-configured case"
 
 echo
 echo "C. install-backup-job.sh — the schedule, and nothing else"
@@ -244,6 +292,79 @@ grep -q -- '--local-only' "$HERE/install-backup-job.sh" && \
 [[ -z "$(grep -n 'CRON_TZ' "$HERE/install-backup-job.sh" | grep -v '^[0-9]*:#')" ]] \
   && ok "CRON_TZ survives only as the note explaining why it was withdrawn" \
   || no "CRON_TZ survives only as a note" "a non-comment line still schedules with CRON_TZ"
+
+
+echo
+echo "D. backup.sh — which credential reaches the AWS CLI, and which never does"
+
+# The three sections above are about REFUSING a host. This one is about the upload itself, because
+# the contract that matters at 03:17 is not «deploy.sh let this through» but «what the CLI was
+# handed». So backup.sh is actually RUN here, against a docker that produces a dump and an aws that
+# reports, for each of the three AWS_* names, whether it was SET AT ALL — not whether it was
+# non-empty. A blank AWS_ACCESS_KEY_ID is not «no credential» to the provider chain: it is a
+# credential it finds first, and it shadows the instance role that was supposed to sign this.
+mkdir -p "$WORK/dumpbin" "$WORK/credbin" "$WORK/bkdir"
+printf '#!/usr/bin/env bash\necho PGDUMP-BYTES\n' > "$WORK/dumpbin/docker"
+cat > "$WORK/credbin/aws" <<'AWSENV'
+#!/usr/bin/env bash
+{ printf 'id=[%s] secret=[%s] imds=[%s]\n' \
+    "${AWS_ACCESS_KEY_ID+set}" "${AWS_SECRET_ACCESS_KEY+set}" "${AWS_EC2_METADATA_DISABLED+set}"
+} >> "${AWS_ENV_LOG:-/dev/null}"
+echo '"etag-from-stub"'
+AWSENV
+chmod +x "$WORK"/dumpbin/* "$WORK"/credbin/*
+UPLOADPATH="$WORK/credbin:$WORK/dumpbin:$WORK/pure"
+
+# -u, so that «set» in the log means backup.sh set it and not that this developer's shell did.
+backup() { # backup <env-file> <log>
+  AWS_ENV_LOG="$2" PATH="$UPLOADPATH" PILOT_ENV_FILE="$1" PILOT_BACKUP_DIR="$WORK/bkdir" \
+    env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_EC2_METADATA_DISABLED \
+    "$HERE/backup.sh" 2>&1
+}
+
+# D1. Explicit pair — unchanged behaviour, including the IMDS switch that belongs WITH a static key:
+# with a key pair in hand, a silent fallback to the instance's role is not a fallback anybody asked
+# for, so it stays turned off.
+L="$WORK/explicit.log"; : > "$L"
+out="$(backup "$WORK/on.env" "$L")"
+has 'offhost=uploaded' "$out" && ok "explicit pair → uploads" || no "explicit pair → uploads" "$out"
+has 'cred=explicit' "$out" && ok "explicit pair → receipt says cred=explicit" || no "explicit pair → receipt says cred=explicit" "$out"
+has 'id=[set] secret=[set] imds=[set]' "$(cat "$L")" && ok "explicit pair → the CLI is handed both keys and IMDS is disabled" \
+  || no "explicit pair → the CLI is handed both keys and IMDS is disabled" "$(cat "$L")"
+
+# D2. THE ONE THIS CHANGE EXISTS FOR. Nothing is handed over, so the default provider chain runs and
+# finds the instance role. Three assertions, and the third is the subtle one: setting
+# AWS_EC2_METADATA_DISABLED here would switch off the very thing being relied on.
+L="$WORK/role.log"; : > "$L"
+out="$(backup "$WORK/role.env" "$L")"
+has 'offhost=uploaded' "$out" && ok "both blank → uploads" || no "both blank → uploads" "$out"
+has 'cred=instance-role' "$out" && ok "both blank → receipt says cred=instance-role" || no "both blank → receipt says cred=instance-role" "$out"
+has 'id=[] secret=[] imds=[]' "$(cat "$L")" \
+  && ok "instance-role mode overrides NO AWS credential variable — not even as a blank" \
+  || no "instance-role mode overrides NO AWS credential variable" "the CLI saw: $(cat "$L")"
+
+# D3/D4. Half a pair, at the hour it would otherwise have become a signature error. The dump is
+# still written — losing that as well would help nobody — but the run exits non-zero and says why.
+for half in idonly secretonly; do
+  L="$WORK/$half.log"; : > "$L"
+  out="$(backup "$WORK/$half.env" "$L")"; rc=$?
+  [[ $rc -ne 0 ]] && has 'reason=credential-half-configured' "$out" \
+    && ok "$half → backup fails closed before contacting S3" || no "$half → backup fails closed" "rc=$rc $out"
+  [[ -z "$(cat "$L")" ]] && ok "$half → the AWS CLI was never invoked" || no "$half → the AWS CLI was never invoked" "$(cat "$L")"
+done
+ls "$WORK/bkdir"/sellerops-*.dump >/dev/null 2>&1 && ok "a failed upload still leaves the local dump on disk" || no "a failed upload still leaves the local dump" "no dump was written"
+
+# D5. The rule the whole directory keeps, on the one script that actually holds the secret.
+out="$(backup "$WORK/on.env" /dev/null; backup "$WORK/secretonly.env" /dev/null)"
+has "$SECRET" "$out" && no "backup.sh prints no secret value" "the secret appeared in backup output" || ok "backup.sh prints no secret value"
+
+# D6. And the mechanism, asserted on the code rather than on the prose that explains it: no line
+# outside a comment may hand the CLI a credential variable unconditionally.
+body="$(grep -v '^[[:space:]]*#' "$HERE/backup.sh")"
+case "$body" in
+  *'cli=(env)'*) ok "the instance-role branch builds an EMPTY credential prefix" ;;
+  *) no "the instance-role branch builds an empty credential prefix" "the branch is gone" ;;
+esac
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]
