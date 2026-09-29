@@ -41,6 +41,22 @@ spring:
 
 server:
   port: 8080
+  # The pilot terminates TLS at Caddy and speaks plain HTTP to this container, so the connection
+  # scheme seen here is always http. Spring Boot's default for this property is `none`, which
+  # DISCARDS X-Forwarded-*; Spring Security then builds the OAuth2 redirect_uri from the connection
+  # scheme and hands the provider http://host/login/oauth2/code/{provider}. Google and NAVER both
+  # answer redirect_uri_mismatch, because what is registered in their consoles is the https URI —
+  # and must stay the https URI. The edge was never the problem: Caddy does send
+  # X-Forwarded-Proto: https and X-Forwarded-Host (verified on the host). This is the line that
+  # makes the application believe them.
+  #
+  # `native` is Tomcat's RemoteIpValve, which honours those headers ONLY from a trusted proxy. Its
+  # default internalProxies covers 10/8, 172.16/12, 192.168/16 and 127/8; docker allocates compose
+  # networks from 172.17–172.31, so the edge qualifies and a header from anywhere else would not.
+  # `framework` (Spring's ForwardedHeaderFilter) trusts them unconditionally and is the right choice
+  # only where the proxy's address cannot be pinned. Port 8080 is never published, so the network is
+  # already the first lock — this is the second.
+  forward-headers-strategy: ${SELLEROPS_FORWARD_HEADERS_STRATEGY:native}
 
 sellerops:
   # The Local Agent credential handoff — the ONE path that reads a seller's API keys off their marketplace

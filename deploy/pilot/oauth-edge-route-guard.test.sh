@@ -77,9 +77,11 @@ if [[ "$code" == FAIL ]]; then
   [[ "$want" == '%{http_code}' ]] && printf '000'
   exit 7
 fi
+loc="$(printf '%s' "$row" | awk '{print $4}')"
 case "$want" in
   '%{http_code}')    printf '%s' "$code" ;;
   '%{content_type}') printf '%s' "${ct:-application/json}" ;;
+  '%{redirect_url}') printf '%s' "${loc:-}" ;;
   *)                 printf '%s' "${CURL_BODY:-}" ;;
 esac
 exit 0
@@ -141,6 +143,58 @@ out="$(run '' 404 '')"
 [[ "$(printf '%s\n' "$out" | grep -c '  ok')" -eq 2 ]] \
   && ok "both the authorize and the callback path are scored" \
   || no "both paths are scored" "got: $out"
+
+printf 'C. the redirect_uri handed to the provider is the registered HTTPS callback\n'
+
+# The application must read X-Forwarded-*. Caddy sends them (X-Forwarded-Proto: https,
+# X-Forwarded-Host), but Spring Boot's default for this property is `none`, which discards them —
+# and then Spring Security builds redirect_uri from the CONNECTION scheme, which behind a
+# TLS-terminating edge is always http. Both providers answer redirect_uri_mismatch.
+YML="$(cd "$HERE/../.." && pwd)/backend/src/main/resources/application.yml"
+fhs="$(grep -E '^[[:space:]]+forward-headers-strategy:' "$YML" | head -1 | sed -E 's/^[[:space:]]*forward-headers-strategy:[[:space:]]*//')"
+[[ -n "$fhs" ]] \
+  && ok "application.yml sets server.forward-headers-strategy" \
+  || no "application.yml sets server.forward-headers-strategy" "unset means Spring Boot's default 'none' — X-Forwarded-* is discarded"
+case "$fhs" in
+  *native*|*framework*) ok "the strategy is one that reads the headers ($fhs)" ;;
+  *none*)               no "the strategy reads the headers" "it is 'none' — the headers are discarded" ;;
+  "")                   ;;
+  *)                    no "the strategy reads the headers" "unrecognised value: $fhs" ;;
+esac
+# It must sit under server:, not somewhere Spring will never read.
+awk '/^server:/{f=1;next} /^[a-z]/{f=0} f&&/forward-headers-strategy:/{found=1} END{exit !found}' "$YML" \
+  && ok "it is under the server: block" \
+  || no "it is under the server: block" "Spring only reads server.forward-headers-strategy"
+
+# And smoke must actually catch a wrong scheme. Drive it with a stubbed authorize Location.
+AUTHZ_G=https://pilot.example.com/oauth2/authorization/google
+runloc() { # $1 = the redirect_uri the provider would be handed
+  cat > "$WORK/pilot.env" <<ENV
+PILOT_PUBLIC_HOST=pilot.example.com
+PILOT_ACME_EMAIL=ops@example.com
+POSTGRES_PASSWORD=not-a-real-password
+SELLEROPS_JWT_SECRET=0123456789abcdef0123456789abcdef0123
+SELLEROPS_OAUTH_GOOGLE_CLIENT_ID=a-client-id
+ENV
+  chmod 600 "$WORK/pilot.env"
+  enc="$(printf '%s' "$1" | sed -e 's|:|%3A|g' -e 's|/|%2F|g')"
+  printf '%s 302 - %s\n' "$AUTHZ_G" "https://accounts.google.com/o/oauth2/v2/auth?client_id=x&redirect_uri=$enc&scope=openid" > "$WORK/map"
+  printf '%s 302 -\n' "https://pilot.example.com/login/oauth2/code/google" >> "$WORK/map"
+  CURL_MAP="$WORK/map" PILOT_PUBLIC_HOST=pilot.example.com PILOT_ENV_FILE="$WORK/pilot.env" \
+    bash "$HERE/smoke.sh" 2>&1 | grep -i 'redirect_uri' | head -1
+}
+out="$(runloc 'https://pilot.example.com/login/oauth2/code/google')"
+[[ "$out" == *"  ok"* ]] \
+  && ok "smoke accepts the https redirect_uri" \
+  || no "smoke accepts the https redirect_uri" "got: ${out:-<no line>}"
+out="$(runloc 'http://pilot.example.com/login/oauth2/code/google')"
+[[ "$out" == *"  FAIL"* && "$out" == *"X-Forwarded-Proto"* ]] \
+  && ok "smoke REFUSES the http redirect_uri and names the cause" \
+  || no "smoke refuses the http redirect_uri" "got: ${out:-<no line>}"
+out="$(runloc 'https://someone-elses-host/login/oauth2/code/google')"
+[[ "$out" == *"  FAIL"* ]] \
+  && ok "smoke refuses a redirect_uri pointing at another host" \
+  || no "smoke refuses a foreign host" "got: ${out:-<no line>}"
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [[ $fail -eq 0 ]]

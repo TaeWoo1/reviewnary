@@ -78,6 +78,29 @@ for prov in google naver; do
     fi
   done
 done
+# And the redirect_uri handed to the provider must be the HTTPS callback registered in its console.
+# This is the value TLS termination silently breaks: Caddy speaks plain HTTP to the backend, so with
+# Spring's default forward-headers-strategy (none) the scheme comes from the CONNECTION and the
+# provider is handed http://…, which it answers with redirect_uri_mismatch. Nothing else on this host
+# builds a URL from the request, so this one line is the canary for that whole setting.
+for prov in google naver; do
+  case "$prov" in
+    google) conf="${SELLEROPS_OAUTH_GOOGLE_CLIENT_ID:-}" ;;
+    naver)  conf="${SELLEROPS_OAUTH_NAVER_CLIENT_ID:-}" ;;
+  esac
+  [[ -n "$conf" ]] || continue
+  loc="$(curl -sS -o /dev/null -w '%{redirect_url}' --max-time 15 "https://$H/oauth2/authorization/$prov" 2>/dev/null)"
+  if [[ "$loc" != *redirect_uri=* ]]; then
+    bad "$prov authorize response carries no redirect_uri (location: ${loc:-<none>})"
+  else
+    enc="${loc##*redirect_uri=}"; enc="${enc%%&*}"
+    ru="$(printf '%b' "${enc//%/\\x}")"
+    want="https://$H/login/oauth2/code/$prov"
+    [[ "$ru" == "$want" ]] \
+      && ok "$prov redirect_uri is the registered HTTPS callback" \
+      || bad "$prov redirect_uri is '$ru', not '$want' — X-Forwarded-Proto is not being honoured (server.forward-headers-strategy)"
+  fi
+done
 # Auth-gated API refuses anonymous reads (org isolation floor, not a login test).
 [[ "$(code "https://$H/api/inquiries")" =~ ^40[13]$ ]]       && ok "API refuses anonymous"          || bad "API anonymous access"
 # Raw ports are not public: from the host they must be closed on the public interface.
