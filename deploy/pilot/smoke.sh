@@ -33,6 +33,22 @@ echo "smoke: https://$H"
 [[ "$(code "https://$H/agent-runtime/health")" == "200" ]]   && ok "agent-runtime /health via edge" || bad "agent-runtime health"
 [[ "$(code "https://$H/agent-runtime/ready")" == "200" ]]    && ok "agent-runtime /ready (backend reachable)" || bad "agent-runtime ready"
 [[ "$(curl -sS --max-time 15 "https://$H/api/auth/demo/config")" == *'"enabled":false'* ]] && ok "demo entry OFF" || bad "demo entry must be OFF"
+# Every OTHER name the edge answers must answer the SAME way, with its OWN valid certificate. During
+# a hostname migration this is the check that says the new name is ready to become canonical, and
+# after one it is the check that says the retired name still serves the callbacks registered against
+# it. curl is deliberately NOT given -k: a name that resolves and routes but has no certificate yet
+# fails here as 000, which is exactly the state that must not be mistaken for ready.
+# Bound first, then expanded: `${PILOT_EXTRA_HOSTS//,/ }` on an UNSET name is fatal under `set -u`
+# (the rc9 shadow-watch failure, in a different file).
+_extra_hosts="${PILOT_EXTRA_HOSTS:-}"
+for x in ${_extra_hosts//,/ }; do
+  c="$(code "https://$x/")"
+  case "$c" in
+    200) ok "extra name $x: HTTPS 200 with a valid certificate" ;;
+    000) bad "extra name $x: no TLS transport — DNS, routing, or the certificate is not in place" ;;
+    *)   bad "extra name $x: HTTPS $c (expected 200)" ;;
+  esac
+done
 # The callback is a CONDITIONAL bean: Cafe24ConnectController is
 # @ConditionalOnProperty(sellerops.connector.cafe24.enabled, havingValue="true"). With the connector
 # OFF the route genuinely does not exist and 404 is the correct answer — demanding it be mapped

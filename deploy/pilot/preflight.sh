@@ -89,6 +89,48 @@ if [[ -n "$H" ]]; then
   note "reachability of :80 / :443 FROM THE INTERNET is a security-group/firewall fact this script cannot see; confirm it before the first deploy"
 fi
 
+# ── 3-A. extra names the edge also answers ───────────────────────────────────────────────────────
+# Empty is the steady state and the only thing checked then. When set, the value is substituted into
+# the Caddyfile's address list TEXTUALLY, so a wrong shape is not a misconfiguration the edge reports
+# — it is a Caddyfile that does not parse, and the edge then fails to start and takes the WHOLE site
+# down, including the name that was working a moment ago. That is why this is validated here, before
+# anything is recreated, rather than discovered from a restart loop.
+# Read from the FILE, not from the sourced variable. The two disagree, and only one of them is what
+# the edge gets. `PILOT_EXTRA_HOSTS=, second.example.com` is, to bash, a temporary assignment of ","
+# followed by an attempt to RUN `second.example.com` — so after sourcing, the variable is empty here
+# and this check would report a clean single-name deployment. docker compose --env-file does no such
+# parsing: it takes the text after the first `=` verbatim, spaces and all, and hands it to Caddy.
+# Validating the sourced value would therefore pass exactly the inputs where preflight's view of the
+# deployment and the edge's view of it have come apart.
+if grep -q '^PILOT_EXTRA_HOSTS=' "$ENV_FILE" 2>/dev/null; then
+  X="$(sed -n 's/^PILOT_EXTRA_HOSTS=//p' "$ENV_FILE" | head -1)"
+else
+  X="${PILOT_EXTRA_HOSTS:-}"
+fi
+if [[ -z "$X" ]]; then
+  ok "PILOT_EXTRA_HOSTS empty — the edge answers one name"
+elif [[ "$X" =~ [[:space:]] ]]; then
+  bad "PILOT_EXTRA_HOSTS contains whitespace — docker compose would pass it to Caddy verbatim while bash reads the line as a command; write it as ,name with no spaces"
+elif [[ "$X" =~ ^(,[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+)+$ ]]; then
+  ok "PILOT_EXTRA_HOSTS is a comma-led list of bare host names"
+  IFS=',' read -r -a _extra <<< "$X"
+  for x in "${_extra[@]}"; do
+    [[ -z "$x" ]] && continue
+    [[ "$x" == "$H" ]] && { bad "PILOT_EXTRA_HOSTS repeats PILOT_PUBLIC_HOST ($x) — Caddy refuses a duplicate address"; continue; }
+    d="$(getent hosts "$x" 2>/dev/null | awk '{print $1}' | head -1)"
+    [[ -z "$d" ]] && d="$(dig +short A "$x" 2>/dev/null | tail -1)"
+    if [[ -z "$d" ]]; then
+      bad "DNS does not resolve $x — ACME cannot issue for a name that does not point here (Let's Encrypt rate-limits failures)"
+    elif [[ -n "${mine:-}" && "$d" != "${mine:-}" ]]; then
+      bad "$x resolves to $d but this host leaves through ${mine} — that name would never get a certificate"
+    else
+      ok "DNS: $x → $d"
+    fi
+  done
+else
+  bad "PILOT_EXTRA_HOSTS must be empty or names each preceded by a comma and nothing else (e.g. ,old.example.com) — got: $X"
+fi
+
 # ── 4. Cafe24-only posture (2026-09-13 decision) ─────────────────────────────────────────────────
 if [[ "${SELLEROPS_CONNECTOR_NAVER_ENABLED:-false}" == "true" ]]; then
   note "NAVER is ON — this is no longer a Cafe24-only pilot; a fixed outbound IPv4 IS required (run egress-check.sh)"

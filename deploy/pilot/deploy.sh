@@ -39,6 +39,17 @@ for name in PILOT_PUBLIC_HOST PILOT_ACME_EMAIL POSTGRES_PASSWORD SELLEROPS_JWT_S
 done
 [[ ${#missing[@]} -eq 0 ]] || fail "required names are blank: ${missing[*]}"
 [[ "$PILOT_PUBLIC_HOST" != *"://"* && "$PILOT_PUBLIC_HOST" != *"/"* ]] || fail "PILOT_PUBLIC_HOST must be a bare host name"
+# Extra names are substituted TEXTUALLY into Caddy's address list, so a wrong shape is not a warning
+# — it is a file that does not parse, an edge that will not start, and a site that is down INCLUDING
+# the name that was working before this deploy. Read from the file, not the sourced variable: a value
+# containing a space is, to bash, an assignment followed by a command, so after sourcing it reads
+# empty here while docker compose --env-file still hands the whole string to Caddy.
+_extra_raw="$(sed -n 's/^PILOT_EXTRA_HOSTS=//p' "$ENV_FILE" | head -1)"
+if [[ -n "$_extra_raw" ]]; then
+  [[ "$_extra_raw" =~ [[:space:]] ]] && fail "PILOT_EXTRA_HOSTS contains whitespace — write it as ,name with no spaces"
+  [[ "$_extra_raw" =~ ^(,[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+)+$ ]] \
+    || fail "PILOT_EXTRA_HOSTS must be empty or names each preceded by a comma (e.g. ,old.example.com) — got: $_extra_raw"
+fi
 [[ "$SELLEROPS_JWT_SECRET" != change-me* ]] || fail "SELLEROPS_JWT_SECRET is the repository placeholder"
 [[ ${#SELLEROPS_JWT_SECRET} -ge 32 ]] || fail "SELLEROPS_JWT_SECRET is shorter than 32 characters"
 # Clean production data: nothing on this host may manufacture rows. SEED_ENABLED gates the demo

@@ -7,7 +7,21 @@
 	email {$PILOT_ACME_EMAIL}
 }
 
-{$PILOT_PUBLIC_HOST} {
+# One site, one or more names. PILOT_PUBLIC_HOST is the CANONICAL name — the one every URL the
+# product hands out is built from (OAuth redirect_uri, the Cafe24 callback, the helper package).
+# PILOT_EXTRA_HOSTS is empty in a steady deployment and carries additional names the SAME site also
+# answers, each written with its leading comma: `,old.example.com`. It exists because a hostname
+# migration has an overlap: the new name must already serve HTTPS before it is safe to make it
+# canonical, and the old name must keep serving after, because callbacks registered at third-party
+# consoles (Google, NAVER, Cafe24) still point at it and are not ours to retire on our own schedule.
+#
+# Substitution here is TEXTUAL — Caddy expands the placeholders before parsing the address list — so
+# the leading comma is part of the value, not something this file adds. That is the whole reason the
+# variable has that shape: an empty value must leave a single bare address and nothing else, and
+# `{$A}, {$B}` with B empty leaves a dangling comma that does not parse. preflight.sh rejects any
+# other shape, and Caddy issues a SEPARATE certificate per name, so a name whose DNS is not yet in
+# place cannot take the working one down with it.
+{$PILOT_PUBLIC_HOST}{$PILOT_EXTRA_HOSTS} {
 	encode gzip
 
 	header {

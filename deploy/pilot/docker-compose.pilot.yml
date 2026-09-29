@@ -64,6 +64,10 @@ services:
       - "443:443"
     environment:
       PILOT_PUBLIC_HOST: ${PILOT_PUBLIC_HOST}
+      # Additional names this same site answers, each with its leading comma (see the Caddyfile).
+      # Empty in a steady deployment; non-empty only while a hostname migration is in flight or an
+      # old name must keep working for callbacks registered elsewhere.
+      PILOT_EXTRA_HOSTS: ${PILOT_EXTRA_HOSTS:-}
       PILOT_ACME_EMAIL: ${PILOT_ACME_EMAIL:?PILOT_ACME_EMAIL is required for certificate issuance}
     volumes:
       - ./deploy/pilot/Caddyfile:/etc/caddy/Caddyfile:ro
