@@ -35,6 +35,30 @@ done
 [[ "${SELLEROPS_JWT_SECRET:-}" != change-me* ]] && ok "JWT secret is not the repository placeholder" || bad "JWT secret is the repository placeholder"
 [[ ${#SELLEROPS_JWT_SECRET} -ge 32 ]] && ok "JWT secret length ≥ 32" || bad "JWT secret shorter than 32 characters"
 
+# The ACME contact is not decoration: both issuers register an ACCOUNT with it before they will
+# issue anything, and both reject a non-ASCII address outright — Let's Encrypt with
+# `invalidContact: contact email contains non-ASCII characters`, ZeroSSL with `invalid_email
+# (code 2901)`. The failure surfaces far from its cause: the deploy succeeds, every container is
+# healthy, and the site simply has no certificate, so every HTTPS check times out. A single stray
+# IME character in front of the address is enough, and "is set" cannot see it.
+acme="${PILOT_ACME_EMAIL:-}"
+# LC_ALL=C + the printable-ASCII range is the portable test: [[:ascii:]] is not available in every
+# bash build (macOS ships 3.2) and `grep -P` is not in BSD grep. `[^ -~]` is space..tilde negated,
+# so it catches a stray control character as well as a Korean one.
+if printf '%s' "$acme" | LC_ALL=C grep -q '[^ -~]'; then
+  # Name the offending bytes rather than echoing a decorated address the terminal may re-render.
+  bad "PILOT_ACME_EMAIL contains non-ASCII bytes — ACME registration is refused by every issuer (Let's Encrypt: invalidContact; ZeroSSL: invalid_email 2901). Offending byte(s):$(printf '%s' "$acme" | LC_ALL=C grep -o '[^ -~]' | LC_ALL=C tr -d '\n' | LC_ALL=C od -An -tx1 | LC_ALL=C tr -s ' \n' ' ')"
+else
+  ok "PILOT_ACME_EMAIL is pure ASCII"
+fi
+# Deliberately loose: one @, no whitespace, a dot in the domain. This is a typo net, not an RFC 5322
+# parser — the issuer is the authority on what it will accept.
+if [[ "$acme" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]; then
+  ok "PILOT_ACME_EMAIL looks like an address"
+else
+  bad "PILOT_ACME_EMAIL is not shaped like an address (want local@domain.tld, no spaces)"
+fi
+
 # ── 3. the public name — DNS before ACME ─────────────────────────────────────────────────────────
 # Let's Encrypt rate-limits failures. Resolving the name first is the difference between "fix a typo"
 # and "wait an hour to try again".
