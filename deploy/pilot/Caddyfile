@@ -29,6 +29,21 @@
 		reverse_proxy backend:8080
 	}
 
+	# Social sign-in (Google · NAVER) is Spring Security's OAuth2 client, and its two endpoints are NOT
+	# under /api: the button is a full-page navigation to /oauth2/authorization/{provider}, and the
+	# provider redirects the browser back to /login/oauth2/code/{provider}. Without these two routes
+	# both fall through to the SPA below, so the button silently reloads the app instead of leaving for
+	# the provider, and the callback never reaches the backend. With the providers unconfigured that
+	# stays invisible — no credentials means no buttons — so it surfaces on the first deploy that fills
+	# them in. Both must stay ABOVE the catch-all: handle blocks match in written order.
+	handle /oauth2/* {
+		reverse_proxy backend:8080
+	}
+
+	handle /login/oauth2/* {
+		reverse_proxy backend:8080
+	}
+
 	handle {
 		reverse_proxy frontend:80
 	}

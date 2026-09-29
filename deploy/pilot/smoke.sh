@@ -22,6 +22,9 @@ code() {
   out="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$@" 2>/dev/null)"
   if [[ "$out" =~ ^[0-9]{3}$ ]]; then printf '%s' "$out"; else printf '000'; fi
 }
+# Content type of the same request. The SPA answers 200 text/html for ANY unrouted path, so on an
+# endpoint that must be served by the backend this is what tells "routed" from "fell through".
+ctype() { curl -sS -o /dev/null -w '%{content_type}' --max-time 15 "$@" 2>/dev/null; }
 
 echo "smoke: https://$H"
 [[ "$(code "https://$H/")" == "200" ]]                       && ok "HTTPS frontend 200"            || bad "HTTPS frontend"
@@ -50,6 +53,31 @@ else
     && ok "Cafe24 OFF: callback route correctly absent (404)" \
     || bad "Cafe24 OFF but the callback route answered $c — the controller registered despite the flag"
 fi
+# Social sign-in endpoints must reach the BACKEND. They are Spring Security's, and neither lives under
+# /api — the button navigates to /oauth2/authorization/{provider} and the provider redirects back to
+# /login/oauth2/code/{provider}. Caddy's catch-all serves the SPA for anything it does not route, and
+# the SPA answers 200 text/html to both, which LOOKS fine and is the bug: the button would reload the
+# app instead of leaving for the provider. A 200 text/html here is therefore always wrong, in every
+# posture. What a correctly routed backend answers depends on whether the provider is configured, so
+# the check only insists on the part that never varies.
+for prov in google naver; do
+  case "$prov" in
+    google) conf="${SELLEROPS_OAUTH_GOOGLE_CLIENT_ID:-}" ;;
+    naver)  conf="${SELLEROPS_OAUTH_NAVER_CLIENT_ID:-}" ;;
+  esac
+  for path in "/oauth2/authorization/$prov" "/login/oauth2/code/$prov"; do
+    sc="$(code "https://$H$path")"
+    if [[ "$sc" == "000" ]]; then
+      bad "$path: the edge did not answer (transport failed)"
+    elif [[ "$sc" == "200" && "$(ctype "https://$H$path")" == text/html* ]]; then
+      bad "$path: served the SPA (200 text/html) — Caddy is not routing it to the backend"
+    elif [[ -n "$conf" ]]; then
+      ok "$prov configured: $path reaches the backend (HTTP $sc)"
+    else
+      ok "$prov not configured: $path reaches the backend, no button offered (HTTP $sc)"
+    fi
+  done
+done
 # Auth-gated API refuses anonymous reads (org isolation floor, not a login test).
 [[ "$(code "https://$H/api/inquiries")" =~ ^40[13]$ ]]       && ok "API refuses anonymous"          || bad "API anonymous access"
 # Raw ports are not public: from the host they must be closed on the public interface.
