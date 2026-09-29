@@ -28,7 +28,17 @@ DRY="${SHADOW_WATCH_DRY_RUN:-0}"
 [[ -f "$ENV_FILE" ]] && { set -a; . "$ENV_FILE"; set +a; }
 
 COMPOSE=(docker compose --env-file "$ENV_FILE" -f "$REPO/docker-compose.yml" -f "$REPO/deploy/pilot/docker-compose.pilot.yml")
-ORG="${SHADOW_WATCH_ORG_ID:-${RESPONSIBILITY_RUNTIME_ORG_IDS%%,*}}"
+# The org to report on: SHADOW_WATCH_ORG_ID wins, else the FIRST id in the runtime's list, else
+# nothing. Written in two steps on purpose. Nesting the trim inside the default —
+# ${SHADOW_WATCH_ORG_ID:-${RESPONSIBILITY_RUNTIME_ORG_IDS%%,*}} — makes bash evaluate the inner
+# expansion whenever the outer default is taken, and under `set -u` an UNSET (not merely empty)
+# RESPONSIBILITY_RUNTIME_ORG_IDS is then a fatal error. bash 3.2 (macOS) tolerates it and bash 5
+# (every Linux host this runs on) does not, so it passed on a developer's laptop and killed the
+# script here — at line 31, before the heartbeat, which is exactly the metric whose whole job is to
+# be emitted when the environment is broken. Silence is this observer's alarm, so the one path that
+# must never die is this one.
+_org_ids="${RESPONSIBILITY_RUNTIME_ORG_IDS:-}"
+ORG="${SHADOW_WATCH_ORG_ID:-${_org_ids%%,*}}"
 T0="${SHADOW_WATCH_T0:-}"
 HOST="${PILOT_PUBLIC_HOST:-}"
 
