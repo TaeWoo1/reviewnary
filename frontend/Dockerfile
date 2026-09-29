@@ -3,6 +3,12 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install
 COPY . .
+# The shared, normative Action Window contract. The FE imports it from source rather than
+# redefining protocol types, and those imports climb out of frontend/ — from /app/src/... they
+# resolve to /contracts. It arrives as a NAMED BUILD CONTEXT (docker-compose.yml declares
+# `additional_contexts: contracts: ./contracts`) because it lives beside frontend/, not inside it.
+# Without it `npm run build` fails at tsc on contracts/action-window/{v1,v2,aw-carrier-kind}.
+COPY --from=contracts . /contracts
 ARG VITE_API_BASE_URL=http://localhost:8080
 ARG VITE_USE_MOCKS=false
 # The browser's URL for the agent runtime. It is baked into the bundle, so on any host that is

@@ -246,6 +246,14 @@ services:
   frontend:
     build:
       context: ./frontend
+      # The FE consumes the normative Action Window contract from its SOURCE and never keeps a
+      # local copy (frontend/src/lib/actionWindow/contract.ts). Those imports climb out of
+      # frontend/ to the repo-root `contracts/` sibling, so a build context of ./frontend alone
+      # cannot resolve them and `tsc --noEmit` fails on every action-window module. Name the
+      # contract tree as a second context; the Dockerfile lands it at /contracts, which is where
+      # `../../../../contracts/...` resolves to once WORKDIR is /app.
+      additional_contexts:
+        contracts: ./contracts
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
         VITE_USE_MOCKS: ${VITE_USE_MOCKS:-false}
