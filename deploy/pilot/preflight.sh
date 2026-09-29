@@ -91,32 +91,37 @@ fi
 
 # ── 3-A. extra names the edge also answers ───────────────────────────────────────────────────────
 # Empty is the steady state and the only thing checked then. When set, the value is substituted into
-# the Caddyfile's address list TEXTUALLY, so a wrong shape is not a misconfiguration the edge reports
-# — it is a Caddyfile that does not parse, and the edge then fails to start and takes the WHOLE site
-# down, including the name that was working a moment ago. That is why this is validated here, before
-# anything is recreated, rather than discovered from a restart loop.
-# Read from the FILE, not from the sourced variable. The two disagree, and only one of them is what
-# the edge gets. `PILOT_EXTRA_HOSTS=, second.example.com` is, to bash, a temporary assignment of ","
-# followed by an attempt to RUN `second.example.com` — so after sourcing, the variable is empty here
-# and this check would report a clean single-name deployment. docker compose --env-file does no such
-# parsing: it takes the text after the first `=` verbatim, spaces and all, and hands it to Caddy.
-# Validating the sourced value would therefore pass exactly the inputs where preflight's view of the
-# deployment and the edge's view of it have come apart.
-if grep -q '^PILOT_EXTRA_HOSTS=' "$ENV_FILE" 2>/dev/null; then
-  X="$(sed -n 's/^PILOT_EXTRA_HOSTS=//p' "$ENV_FILE" | head -1)"
-else
-  X="${PILOT_EXTRA_HOSTS:-}"
-fi
+# the Caddyfile's address list TEXTUALLY, and two of the three wrong shapes are not caught by Caddy:
+#   `, name`  correct — a comma must be followed by a space
+#   `,name`   Caddy REFUSES it, the edge will not start, and the site goes down INCLUDING the name
+#             that was working a minute ago
+#   `name`    Caddy parses it SILENTLY as one concatenated host that resolves to nothing
+# The last one is why this check exists. It is also read from the FILE rather than from the sourced
+# variable: the value contains a space, and unquoted, bash reads the line as an assignment followed
+# by a command, so the variable is EMPTY here while docker compose --env-file still hands the whole
+# string to Caddy. Validating the sourced value would pass exactly the inputs where preflight's view
+# of the deployment and the edge's view of it have come apart. Measured, not assumed.
+X_raw="$(sed -n 's/^PILOT_EXTRA_HOSTS=//p' "$ENV_FILE" 2>/dev/null | head -1)"
+X_quoted=0
+case "$X_raw" in
+  '"'*'"') X="${X_raw%\"}"; X="${X#\"}"; X_quoted=1 ;;
+  "'"*"'") X="${X_raw%\'}"; X="${X#\'}"; X_quoted=1 ;;
+  *)       X="$X_raw" ;;
+esac
 if [[ -z "$X" ]]; then
   ok "PILOT_EXTRA_HOSTS empty — the edge answers one name"
-elif [[ "$X" =~ [[:space:]] ]]; then
-  bad "PILOT_EXTRA_HOSTS contains whitespace — docker compose would pass it to Caddy verbatim while bash reads the line as a command; write it as ,name with no spaces"
-elif [[ "$X" =~ ^(,[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+)+$ ]]; then
-  ok "PILOT_EXTRA_HOSTS is a comma-led list of bare host names"
-  IFS=',' read -r -a _extra <<< "$X"
-  for x in "${_extra[@]}"; do
+elif [[ $X_quoted -eq 0 ]]; then
+  bad "PILOT_EXTRA_HOSTS must be QUOTED in the env file (it contains a space): PILOT_EXTRA_HOSTS=\", name\" — unquoted, bash reads it as empty while compose passes it to Caddy"
+elif [[ ! "$X" =~ ^(,\ [A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+)+$ ]]; then
+  bad "PILOT_EXTRA_HOSTS must be empty or names each preceded by a comma AND a space (e.g. \", old.example.com\") — got: $X"
+else
+  ok "PILOT_EXTRA_HOSTS is a comma-space separated list of bare host names"
+  for x in ${X//,/ }; do
     [[ -z "$x" ]] && continue
-    [[ "$x" == "$H" ]] && { bad "PILOT_EXTRA_HOSTS repeats PILOT_PUBLIC_HOST ($x) — Caddy refuses a duplicate address"; continue; }
+    if [[ "$x" == "$H" ]]; then
+      bad "PILOT_EXTRA_HOSTS repeats PILOT_PUBLIC_HOST ($x) — Caddy refuses a duplicate site address"
+      continue
+    fi
     d="$(getent hosts "$x" 2>/dev/null | awk '{print $1}' | head -1)"
     [[ -z "$d" ]] && d="$(dig +short A "$x" 2>/dev/null | tail -1)"
     if [[ -z "$d" ]]; then
@@ -127,8 +132,6 @@ elif [[ "$X" =~ ^(,[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0
       ok "DNS: $x → $d"
     fi
   done
-else
-  bad "PILOT_EXTRA_HOSTS must be empty or names each preceded by a comma and nothing else (e.g. ,old.example.com) — got: $X"
 fi
 
 # ── 4. Cafe24-only posture (2026-09-13 decision) ─────────────────────────────────────────────────

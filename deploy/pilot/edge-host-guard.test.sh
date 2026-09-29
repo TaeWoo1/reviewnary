@@ -57,8 +57,7 @@ grep -q 'PILOT_EXTRA_HOSTS' "$HERE/pilot.env.example" \
 printf 'B. Caddy parses the rendered file in both states\n'
 
 if ! command -v docker >/dev/null 2>&1; then
-  sk "caddy validate accepts the empty and the set case" "docker is not available here — run this guard on the pilot host"
-  sk "caddy validate REFUSES a dangling comma" "docker is not available here"
+  sk "caddy validate: the four address-list shapes" "docker is not available here — run this guard on the pilot host, where the claims in section C are actually measured"
 else
   validate() { # <extra-hosts-value> -> prints caddy's verdict, returns its exit code
     docker run --rm -i \
@@ -69,26 +68,33 @@ else
       caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1
   }
   if ! docker image inspect caddy:2-alpine >/dev/null 2>&1 && ! docker pull -q caddy:2-alpine >/dev/null 2>&1; then
-    sk "caddy validate accepts the empty and the set case" "caddy:2-alpine is not available and could not be pulled"
-    sk "caddy validate REFUSES a dangling comma" "caddy:2-alpine is not available"
+    sk "caddy validate: the four address-list shapes" "caddy:2-alpine is not available and could not be pulled"
   else
     out="$(validate "")"; rc=$?
-    [[ $rc -eq 0 ]] && ok "caddy validate: empty PILOT_EXTRA_HOSTS parses (one name)" \
-                    || no "caddy validate: empty PILOT_EXTRA_HOSTS parses" "$(printf '%s' "$out" | tail -3)"
-    out="$(validate ",second.example.com,third.example.com")"; rc=$?
-    [[ $rc -eq 0 ]] && ok "caddy validate: two extra names parse" \
-                    || no "caddy validate: two extra names parse" "$(printf '%s' "$out" | tail -3)"
-    # Falsification: the shape preflight refuses must ALSO be the shape Caddy refuses. If this ever
-    # passes, the validation above is guarding against nothing.
+    [[ $rc -eq 0 ]] && ok "caddy: empty PILOT_EXTRA_HOSTS parses (one name)" \
+                    || no "caddy: empty PILOT_EXTRA_HOSTS parses" "$(printf '%s' "$out" | tail -3)"
+    out="$(validate ", second.example.com, third.example.com")"; rc=$?
+    [[ $rc -eq 0 ]] && ok "caddy: two extra names, each written ', name', parse" \
+                    || no "caddy: two extra names parse" "$(printf '%s' "$out" | tail -3)"
+    # The separator is a comma AND a space. Caddy names this one itself, loudly.
+    out="$(validate ",second.example.com")"; rc=$?
+    [[ $rc -ne 0 && "$out" == *"cannot contain a comma"* ]] \
+      && ok "caddy: a comma with no space is REFUSED (the edge would not start)" \
+      || no "caddy: a comma with no space is REFUSED" "rc=$rc $(printf '%s' "$out" | tail -2)"
+    # And the one Caddy CANNOT catch — the reason preflight and deploy.sh check at all. A value with
+    # no comma is not an error: it concatenates onto the canonical name and produces a single host
+    # that resolves to nothing and serves nobody. If this assertion ever flips to "refused", the
+    # shape checks in section C are guarding against something Caddy already stops.
     out="$(validate "second.example.com")"; rc=$?
-    [[ $rc -ne 0 ]] && ok "caddy validate: a value without its leading comma is REFUSED" \
-                    || no "caddy validate: a value without its leading comma is REFUSED" "caddy accepted it — the contract is not what this guard assumes"
+    [[ $rc -eq 0 ]] \
+      && ok "caddy: a value with no comma parses SILENTLY into one wrong name — only preflight catches it" \
+      || no "caddy: a value with no comma parses silently" "caddy refused it (rc=$rc) — section C is now redundant, simplify it"
   fi
 fi
 
 printf 'C. preflight refuses a wrong shape before anything is recreated\n'
 
-mkenv() { # <extra value> -> path to a minimal env file
+mkenv() { # <raw env-file value, written verbatim> -> path to a minimal env file
   local f="$WORK/pilot.env"
   cat > "$f" <<ENV
 PILOT_PUBLIC_HOST=primary.example.invalid
@@ -106,32 +112,40 @@ o="$(pf "")"
   && ok "preflight: empty is the steady state and passes" \
   || no "preflight: empty is the steady state and passes" "got: ${o:-<nothing>}"
 
-o="$(pf ",second.example.invalid")"
-[[ "$o" == *"ok "*"comma-led list"* ]] \
-  && ok "preflight: a comma-led bare name is accepted" \
-  || no "preflight: a comma-led bare name is accepted" "got: ${o:-<nothing>}"
+o="$(pf '", second.example.invalid"')"
+[[ "$o" == *"ok "*"comma-space"* ]] \
+  && ok "preflight: a quoted ', name' is accepted" \
+  || no "preflight: a quoted ', name' is accepted" "got: ${o:-<nothing>}"
 
-for bad_value in "second.example.invalid" ", second.example.invalid" ",second.example.invalid," ",https://second.example.invalid" ",second.example.invalid/path"; do
+# Each of these reaches Caddy's address list verbatim through docker compose. The first two are the
+# ones that cost the whole site; the third is the one nothing downstream would ever report.
+declare -a bad_values=(
+  '", second.example.invalid'            # unbalanced quote
+  ', second.example.invalid'             # unquoted — bash reads it empty, compose does not
+  '",second.example.invalid"'            # no space — Caddy refuses, the edge will not start
+  '"second.example.invalid"'             # no comma — Caddy parses one concatenated host, silently
+  '", second.example.invalid,"'          # trailing comma
+  '", https://second.example.invalid"'   # scheme
+  '", second.example.invalid/path"'      # path
+)
+for bad_value in "${bad_values[@]}"; do
   o="$(pf "$bad_value")"
   [[ "$o" == *"FAIL"* ]] \
-    && ok "preflight: refuses '$bad_value'" \
-    || no "preflight: refuses '$bad_value'" "got: ${o:-<nothing>} — this value would reach Caddy's address list verbatim"
+    && ok "preflight: refuses ${bad_value}" \
+    || no "preflight: refuses ${bad_value}" "got: ${o:-<nothing>} — this value would reach Caddy's address list"
 done
 
-o="$(pf ",primary.example.invalid")"
+o="$(pf '", primary.example.invalid"')"
 [[ "$o" == *"FAIL"* ]] \
   && ok "preflight: refuses a duplicate of PILOT_PUBLIC_HOST" \
   || no "preflight: refuses a duplicate of PILOT_PUBLIC_HOST" "Caddy refuses a repeated site address; got: ${o:-<nothing>}"
 
-# deploy.sh is the gate that actually runs on the way to recreating the edge; preflight is advisory
-# and an operator can skip it. Both must refuse, or the failure mode this guard exists for is still
-# reachable by the shortest path anyone takes.
 grep -q 'PILOT_EXTRA_HOSTS' "$HERE/deploy.sh" \
   && ok "deploy.sh validates PILOT_EXTRA_HOSTS too (preflight is skippable)" \
   || no "deploy.sh validates PILOT_EXTRA_HOSTS too" "a bad value would reach Caddy through a deploy that never ran preflight"
 grep -q "sed -n 's/\^PILOT_EXTRA_HOSTS=//p' \"\$ENV_FILE\"" "$HERE/deploy.sh" \
   && ok "deploy.sh reads the raw line, not the sourced value" \
-  || no "deploy.sh reads the raw line, not the sourced value" "a value with a space reads empty after sourcing but still reaches compose"
+  || no "deploy.sh reads the raw line, not the sourced value" "an unquoted value reads empty after sourcing but still reaches compose"
 
 printf 'D. smoke checks each extra name over real TLS\n'
 

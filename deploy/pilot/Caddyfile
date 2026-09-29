@@ -10,17 +10,28 @@
 # One site, one or more names. PILOT_PUBLIC_HOST is the CANONICAL name — the one every URL the
 # product hands out is built from (OAuth redirect_uri, the Cafe24 callback, the helper package).
 # PILOT_EXTRA_HOSTS is empty in a steady deployment and carries additional names the SAME site also
-# answers, each written with its leading comma: `,old.example.com`. It exists because a hostname
-# migration has an overlap: the new name must already serve HTTPS before it is safe to make it
-# canonical, and the old name must keep serving after, because callbacks registered at third-party
+# answers, each written as a comma, a SPACE, then the name: `, old.example.com`. It exists because a
+# hostname migration has an overlap: the new name must already serve HTTPS before it is safe to make
+# it canonical, and the old name must keep serving after, because callbacks registered at third-party
 # consoles (Google, NAVER, Cafe24) still point at it and are not ours to retire on our own schedule.
 #
 # Substitution here is TEXTUAL — Caddy expands the placeholders before parsing the address list — so
-# the leading comma is part of the value, not something this file adds. That is the whole reason the
+# the separator is part of the value, not something this file adds. That is the whole reason the
 # variable has that shape: an empty value must leave a single bare address and nothing else, and
-# `{$A}, {$B}` with B empty leaves a dangling comma that does not parse. preflight.sh rejects any
-# other shape, and Caddy issues a SEPARATE certificate per name, so a name whose DNS is not yet in
-# place cannot take the working one down with it.
+# `{$A}, {$B}` with B empty leaves a dangling comma that does not parse.
+#
+# Three things were measured against `caddy validate` rather than assumed, because two of them are
+# not what you would guess:
+#   `, name`  parses — a comma MUST be followed by a space, which is why the space is in the value
+#   `,name`   is REFUSED outright ("Site addresses cannot contain a comma")
+#   `name`    parses SILENTLY into the single concatenated host `primarynameexample.com`, which
+#             resolves to nothing and serves nobody. Caddy cannot catch this one, so preflight.sh
+#             and deploy.sh do — and that, not the parse error, is the reason they check at all.
+# Because the value contains a space it MUST be quoted in the env file: unquoted, bash reads the line
+# as an assignment followed by a command and the variable comes out empty, while docker compose hands
+# Caddy the whole string. Quoted, both agree. preflight.sh refuses every other shape, and Caddy issues
+# a SEPARATE certificate per name, so a name whose DNS is not yet in place cannot take a working one
+# down with it.
 {$PILOT_PUBLIC_HOST}{$PILOT_EXTRA_HOSTS} {
 	encode gzip
 
