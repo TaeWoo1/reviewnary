@@ -12,7 +12,16 @@ set -a; [[ -f "$ENV_FILE" ]] && . "$ENV_FILE"; set +a
 pass=0; failn=0
 ok()   { printf '  ok    %s\n' "$*"; pass=$((pass+1)); }
 bad()  { printf '  FAIL  %s\n' "$*"; failn=$((failn+1)); }
-code() { curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$@" 2>/dev/null || echo 000; }
+# curl writes the -w template even when the transfer itself fails, and on a transport failure that
+# template IS "000" — so the old `|| echo 000` appended a SECOND one and the function returned
+# "000000". Nothing equals that, so every check written as `!= "000"` scored a dead connection as a
+# pass: an unreachable edge read as "route reachable (HTTP 000000)". Normalise to exactly three
+# digits, and let 000 mean precisely one thing — curl never completed a transfer.
+code() {
+  local out
+  out="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$@" 2>/dev/null)"
+  if [[ "$out" =~ ^[0-9]{3}$ ]]; then printf '%s' "$out"; else printf '000'; fi
+}
 
 echo "smoke: https://$H"
 [[ "$(code "https://$H/")" == "200" ]]                       && ok "HTTPS frontend 200"            || bad "HTTPS frontend"
@@ -21,8 +30,26 @@ echo "smoke: https://$H"
 [[ "$(code "https://$H/agent-runtime/health")" == "200" ]]   && ok "agent-runtime /health via edge" || bad "agent-runtime health"
 [[ "$(code "https://$H/agent-runtime/ready")" == "200" ]]    && ok "agent-runtime /ready (backend reachable)" || bad "agent-runtime ready"
 [[ "$(curl -sS --max-time 15 "https://$H/api/auth/demo/config")" == *'"enabled":false'* ]] && ok "demo entry OFF" || bad "demo entry must be OFF"
-# Cafe24 callback endpoint is routed (a GET with no code is refused by the backend, never 404/502 from the edge).
-c="$(code "https://$H/api/connect/cafe24/callback")"; [[ "$c" != "404" && "$c" != "502" && "$c" != "000" ]] && ok "Cafe24 callback route reachable (HTTP $c)" || bad "Cafe24 callback route ($c)"
+# The callback is a CONDITIONAL bean: Cafe24ConnectController is
+# @ConditionalOnProperty(sellerops.connector.cafe24.enabled, havingValue="true"). With the connector
+# OFF the route genuinely does not exist and 404 is the correct answer — demanding it be mapped
+# regardless contradicted the "Cafe24 connector OFF" check further down, in the same run.
+# What must hold in BOTH postures is that the edge answered at all: 000 (no transport) and 502
+# (edge up, nothing behind it) are failures either way. A 000 is what used to pass here as "000000".
+c="$(code "https://$H/api/connect/cafe24/callback")"
+if [[ "$c" == "000" ]]; then
+  bad "Cafe24 callback route: the edge did not answer (transport failed)"
+elif [[ "$c" == "502" ]]; then
+  bad "Cafe24 callback route: 502 — the edge is up but the backend is not answering it"
+elif [[ "${SELLEROPS_CONNECTOR_CAFE24_ENABLED:-false}" == "true" ]]; then
+  [[ "$c" != "404" ]] \
+    && ok "Cafe24 ON: callback route is mapped (HTTP $c)" \
+    || bad "Cafe24 ON but the callback route 404s — the connector's controller did not register"
+else
+  [[ "$c" == "404" ]] \
+    && ok "Cafe24 OFF: callback route correctly absent (404)" \
+    || bad "Cafe24 OFF but the callback route answered $c — the controller registered despite the flag"
+fi
 # Auth-gated API refuses anonymous reads (org isolation floor, not a login test).
 [[ "$(code "https://$H/api/inquiries")" =~ ^40[13]$ ]]       && ok "API refuses anonymous"          || bad "API anonymous access"
 # Raw ports are not public: from the host they must be closed on the public interface.
