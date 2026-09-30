@@ -1,5 +1,7 @@
 # Cafe24 First Live Baseline v1 — 2026-09-30
 
+**Verdict: `PASS` · CLOSED.**
+
 **What this is.** The first run in which a **real seller's Cafe24 store** was connected to the pilot
 host and read end to end: OAuth consent → credential in the vault → routine schedules → collection →
 canonical rows. It is the baseline every later Cafe24 number is compared against.
@@ -59,21 +61,26 @@ Self-pilot created three schedules at 03:48:01Z — `REVIEW`, `INQUIRY`, `ORDER_
 (`SelfPilotReconciler.ROUTINE_TYPES`) — all enabled, 60-minute interval, `next_run_at` immediate. The
 poller executed all three at 03:48:48Z.
 
-| Data type | Run | Rows | Outcome |
-|---|---|---|---|
-| ORDER_SUMMARY | 03:45:45Z (tutorial, manual) | 2 | SUCCESS |
-| REVIEW | 03:48:48Z (scheduled) | **0** | SUCCESS |
-| INQUIRY | 03:48:48Z (scheduled) | 2 | SUCCESS |
-| ORDER_SUMMARY | 03:48:48Z (scheduled) | 2 | SUCCESS |
+| # | Data type | Run | Rows | Outcome |
+|---|---|---|---|---|
+| 1 | ORDER_SUMMARY | 03:45:45Z tutorial, manual | success 2 | SUCCESS |
+| 2 | REVIEW | 03:48:48Z routine | 0 | SUCCESS — board 4, 14-day window, nothing received |
+| 3 | INQUIRY | 03:48:48Z routine | success 2 | SUCCESS — first store |
+| 4 | ORDER_SUMMARY | 03:48:48Z routine | success 2 | SUCCESS |
+| 5 | REVIEW | 04:12:24Z **backfill, 90 days** | success 2 | SUCCESS — first store |
+| 6 | REVIEW | 04:48:49Z routine | 0 | SUCCESS — 14-day window again, nothing received |
+| 7 | INQUIRY | 04:48:49Z routine | success 0 · **skipped 2** | SUCCESS — re-read, nothing inserted |
+| 8 | ORDER_SUMMARY | 04:48:50Z routine | success 2 | SUCCESS |
+| 9 | REVIEW | 04:58:49Z **backfill, 90 days (repeat)** | success 0 · **skipped 2** | SUCCESS — re-read, nothing inserted |
 
-**4 runs · 4 SUCCESS · 0 failures · `failed_rows` total 0.**
+**9 runs · 9 SUCCESS · 0 failures · `failed_rows` total 0.**
 
 ### Canonical rows
 
 | Table | Rows |
 |---|---|
 | `inquiries` | **2** — `thread_role` **ROOT 1 + REPLY 1** · `data_origin=REAL` · both `ANSWERED` |
-| `reviews` | **0** |
+| `reviews` | **2** — `data_origin=REAL` · both rating 5 · received **2026-08-16** and **2026-09-07** |
 | `order_daily_summaries` | **2** — one order on each of two dates |
 | `products` / `channel_products` | 0 — `PRODUCT` is not a routine type, so nothing scheduled it |
 
@@ -85,43 +92,73 @@ Derived rows that appeared as a consequence: `customer_memory_entries` 2, `home_
 one reply**, which is also what the connector's own accounting line reports (`스레드답글=1`). Both are
 `ANSWERED`, which is why `inquiry_work_item` is 0 — there is nothing outstanding to work.
 
-## 4. Why REVIEW is 0
+## 4. Why the routine window found no review, and where the reviews were
 
-The run succeeded and collected nothing, and those are two different facts. The connector's own
-accounting line names the query it made:
+The routine run succeeded and collected nothing, and those are two different facts. The connector's
+own accounting line names the query it made:
 
 ```
 board=4 창=[2026-09-16 ~ 2026-09-30] offset=0 수신=0 (해당 구간에 새 글 없음)
 board=6 수신=2 저장=2 비밀글제외=0 창밖제외=0 식별번호없음제외=0 스레드답글=1
 ```
 
-What this establishes:
+A bounded 90-day backfill (`2026-07-02 … 2026-09-30`) then found **two reviews**, and their dates
+settle it:
 
-- **Board 4 (구매후기) was queried successfully and returned zero articles.** A board that did not
-  exist, or a scope that did not cover it, would have failed the run; the run is SUCCESS.
+```
+cafe24:b4:a3671   rating 5   received 2026-08-16   media_count 1
+cafe24:b4:a3675   rating 5   received 2026-09-07   media_count 0
+board=4 수신=2 저장=2 비밀글제외=0 창밖제외=0 식별번호없음제외=0
+```
+
+**Both are older than 2026-09-16, so both sit outside the routine window by construction.** The
+14-day run was not failing to see them; it was not looking where they are.
+
+This is the fact to carry forward, and it is a property of the design, not of this store:
+
+> **`Cafe24ApiConnector.ROUTINE_WINDOW_DAYS = 14` is a compile-time constant.** Routine collection
+> deliberately re-reads a fixed recent window. A store whose reviews are older than two weeks shows
+> **zero reviews** after connecting, on a run that reports SUCCESS, until someone runs a windowed
+> backfill. Nothing in the product tells the seller this.
+
+What the run also established along the way, none of which needed the backfill to know:
+
+- **Board 4 (구매후기) was queried successfully and returned zero articles** in the routine window. A
+  board that did not exist, or a scope that did not cover it, would have failed the run.
 - **Board discovery itself succeeded.** The first-connection capability probe reads the mall's board
-  list, and it logs a sanitized line on *every* failure kind (rate-limited, insufficient scope,
-  auth-failed). No such line exists for this run, so the probe reached `OK` — the board list was read.
+  list and logs a sanitized line on *every* failure kind (rate-limited, insufficient scope,
+  auth-failed). No such line exists for this run, so the probe reached `OK`.
 - **The same credential, in the same window, read board 6 and found two articles.** Authorization,
-  transport, pagination and parsing all work. Nothing about the review path is untested except the
-  presence of data.
-- **The window is 14 days and it is not configurable.** `Cafe24ApiConnector.ROUTINE_WINDOW_DAYS = 14`
-  is a compile-time constant, deliberately a fixed recent window for routine re-reads. Looking further
-  back is the job of the windowed backfill path (`POST /api/seller-accounts/{id}/backfill`), not of a
-  routine run.
+  transport, pagination and parsing all worked before any review was ever seen.
 
-**Therefore:** the store has no 구매후기 board-4 article in 2026-09-16 … 2026-09-30. Whether it has
-any *older* review is a question a bounded backfill answers, and that question is OPEN as of this
-document — see §8.
+## 5. Duplicate check and idempotency
 
-## 5. Duplicate check
+Every collection path in this run was executed **at least twice** and none of them inserted a row the
+second time. This is measured, not inferred from the schema:
 
-Re-running the same collection must not duplicate a row, and the strongest available evidence is that
-it already happened: **`ORDER_SUMMARY` ran twice and `order_daily_summaries` still holds 2 rows**,
-with `created_at == updated_at` on both — the second run changed nothing. `success_rows` counts rows
-*processed*, not rows written, which is why the second run also reported 2.
+| Path | Repeat | Second-run accounting | Canonical count |
+|---|---|---|---|
+| INQUIRY, board 6, 14-day routine | 03:48:48Z → 04:48:49Z | `success 0 · skipped 2` | 2 → **2** |
+| REVIEW, board 4, 90-day backfill | 04:12:24Z → 04:58:49Z | `success 0 · skipped 2` | 2 → **2** |
+| ORDER_SUMMARY | three runs | `success 2` each time | 2 → **2** |
 
-The guarantees are structural, not incidental:
+**`skipped_rows` is the number that matters.** On both re-reads the connector received the articles
+again and the job recorded them as skipped, not stored — the rows were recognised as already present.
+Duplicate groups by external / natural key: **inquiries 0 · reviews 0 · order summaries 0**;
+2 inquiry rows with 2 distinct `external_id`, 2 review rows with 2 distinct `external_id`.
+
+**Two log layers report different numbers for the same event, and only one of them means "written".**
+The connector's line for the INQUIRY re-read says `수신=2 저장=2` while the job says
+`success_rows=0 skipped_rows=2`. The connector's 「저장」 counts rows handed to the store; the job's
+accounting is what distinguishes an insert from a skip. Reading the connector line alone would suggest
+two rows were written on a run that wrote none.
+
+Row timestamps agree with all of it: the two inquiries have `created_at ≠ updated_at` (re-read and
+upserted, not inserted), and the two reviews have `created_at == updated_at` after the *routine* tick
+(never re-read there — they are outside its window) and were likewise only skipped by the repeated
+backfill.
+
+The guarantees underneath are structural:
 
 | Index | Covers |
 |---|---|
@@ -131,18 +168,18 @@ The guarantees are structural, not incidental:
 | `uq_reviews_hash` | `(org_id, channel_id, content_hash)` where `content_hash IS NOT NULL` |
 | `uq_order_summary_natural` | `(org_id, channel_id, summary_date)` |
 
-Measured: 2 inquiry rows, 2 distinct `external_id`, **0 real duplicate groups**.
-
 **One result needs stating precisely, because read carelessly it looks like a defect.** A grouped
-count over `(org_id, channel_id, content_hash)` reports one group of size 2. That is not a duplicate:
-**both rows have `content_hash = NULL`**, SQL `GROUP BY` treats NULLs as one group, and the unique
-index excludes NULLs by its own `WHERE` clause. Restricting the same query to non-null hashes returns
-0 groups. Dedup for these rows is carried entirely by `external_id`, which is present and distinct on
-both.
+count over `(org_id, channel_id, content_hash)` reports one group of size 2, on both `inquiries` and
+`reviews`. Neither is a duplicate: **every row in both tables has `content_hash = NULL`** (non-null
+count 0), SQL `GROUP BY` treats NULLs as one group, and the unique index excludes NULLs by its own
+`WHERE` clause. Restricting the same query to non-null hashes returns 0 groups on both tables.
 
-**Recorded, not fixed:** Cafe24 inquiries land with no `content_hash`, so the hash-based second line of
-defence is inert for this channel. `external_id` alone is sufficient while the provider keeps issuing
-stable article numbers, and it did here. This is a gap in defence depth, not an observed failure.
+**Backlog fact — carried forward, not fixed.** Cafe24 inquiries **and** reviews land with no
+`content_hash`, so the hash-based second line of defence is **inert for this channel on both tables**
+(`reviews.dedup_key_version` is 1 while the hash it would key is absent). Dedup rests entirely on
+`external_id`. That held here across four re-reads, and it holds as long as the provider keeps issuing
+stable article numbers — but it is one mechanism where the schema provides two. This is a gap in
+defence depth, not an observed failure.
 
 ## 6. Marketplace WRITE
 
@@ -165,19 +202,41 @@ OAuth scope set contains no write scope at all.
 | Guard suite | 12/12 suites, 245 assertions, 0 failing |
 | Containers | backend · edge · agent-runtime · postgres healthy (frontend defines no healthcheck) |
 | `backup.sh` | **OK** 03:50:41Z · 353,660 bytes · off-host S3 upload confirmed by ETag · instance-role credential |
+| Seller-facing UI | **confirmed by the operator in the browser** — both reviews visible; the inquiry list carries both rows |
 
-## 8. Open, and why it is open
+**On the empty 「미답변 문의」 view.** It is empty and that is correct: both inquiries are `ANSWERED`,
+so `inquiry_work_item` is 0 and there is nothing outstanding to work. The rows are in the inquiry
+list, not in the queue of things to answer.
 
-**A bounded review backfill has not been run.** It is the one action that separates "this store has no
-recent reviews" from "this store has no reviews". It requires the authenticated backfill endpoint;
-widening the routine window instead would need a code change and a deploy, which was out of scope for
-this run. Until it runs, §4's conclusion is scoped to its 14-day window and no further.
+## 8. Verdict, and what is carried forward
 
-**Recorded, not fixed** (none of these blocked the baseline):
+**`PASS` · the Cafe24 first live baseline is CLOSED.** Every completion criterion was met on a real
+seller's store: account connected, credential stored and reused, first INQUIRY read, first REVIEW
+read, canonical rows with no duplicates, data visible in the product, **zero marketplace writes**,
+zero connector errors, one successful off-host backup.
 
-- Cafe24 has no per-data-type manual collection control in the UI; routine collection is the only
-  path to a first INQUIRY/REVIEW read. See §1.
-- Cafe24 inquiries carry no `content_hash`. See §5.
-- The same person signing in with Google and with NAVER produced **two separate organizations** with
-  the same display name. This baseline lives in the NAVER-identity org; the Google-identity org has no
-  connected channel. Account linking is a product-owner decision and was not touched.
+Nothing here promotes a capability. `docs/multi-channel-connector-roadmap.md` §4.1 remains the single
+capability declaration.
+
+### Backlog — recorded, not fixed
+
+None of these blocked the baseline, and each is a thing the next person needs to know.
+
+1. **A store with no review newer than 14 days shows zero reviews after connecting**, on a run that
+   reports SUCCESS, until a windowed backfill is run by hand.
+   `Cafe24ApiConnector.ROUTINE_WINDOW_DAYS = 14` is a compile-time constant and the product says
+   nothing about it. This is exactly what happened here (§4).
+2. **There is no per-data-type manual collection control in the Cafe24 UI.** The first-connection
+   tutorial fires one `ORDER_SUMMARY` run; `CollectionSettingsSection` (the per-type 「지금 수집」)
+   renders only in the Coupang view. Routine collection is the only path to a first INQUIRY or REVIEW
+   read, and the 90-day review backfill in this run could only be issued against the API directly —
+   a seller has no way to ask for it (§1, §4).
+3. **`content_hash` is NULL on every Cafe24 inquiry and review row**, so the hash-based second line
+   of dedup defence is inert for this channel on both tables. `external_id` alone carries it (§5).
+4. **The same person signing in with Google and with NAVER produced two separate organizations** with
+   the same display name. This baseline lives in the NAVER-identity org; the Google-identity org has
+   no connected channel. Anyone verifying this data must sign in with the NAVER identity. Account
+   linking is a product-owner decision and was not touched.
+5. **Two log layers report different numbers for one event.** The connector prints 「저장」 for rows
+   handed to the store; the job records `success_rows` / `skipped_rows`. Only the latter separates an
+   insert from a skip (§5).
