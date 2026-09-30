@@ -18,6 +18,7 @@ import { INQUIRY_NEEDS_REPLY_PATH } from "../../lib/todayInbox";
 import { OperationsAreas } from "../../components/home/OperationsAreas";
 import { CustomerOpsHome, TodayWorkspace, coHomeApplies } from "../../components/customerOperations/CustomerOpsHome";
 import { COPY } from "../../lib/copy/customerOps";
+import { UNANSWERED_WORD } from "../../lib/homeSummary";
 import type { CustomerOperationsHome } from "../../lib/customerOperationsTypes";
 import { hasAnythingToShow } from "../../lib/operationsHome";
 import type { InquiryListArtifact, InquiryListArtifact as InquiryList, ListArtifact } from "../../lib/conversation/types";
@@ -179,7 +180,7 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
   const beforeFirstConnection = firstUse?.kind === "NO_CHANNEL";
   // §5: when the brief names the waiting inquiries it also says how many — so the strip stops saying
   // it. Before this the seller read 「현재 미답변 문의 12건」 and 「…문의가 12건 있습니다」 one line apart.
-  const strip = data ? contextStrip(data, now, (queue?.content.length ?? 0) > 0, queue?.totalElements ?? null) : [];
+  const strip = data ? contextStrip(data, (queue?.content.length ?? 0) > 0, queue?.totalElements ?? null) : [];
   const anyUnproven = strip.some((kpi) => kpi.freshnessUnproven);
   const count = cases ? cases.items.length : null;
 
@@ -268,7 +269,11 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
   const briefed = leadingTurns.length > 0 && !beforeFirstConnection;
   const legacyLead = (
     <div className="space-y-2">
-      <h1 className="sr-only">오늘의 운영</h1>
+      {/* <b>A visible page title</b> (UI System v2). This was `sr-only`, so the branch of 오늘 that an org
+          without 고객 운영 관리 sees had no page title at all — the first visible thing was either a
+          greeting or a first-use headline, and neither names the screen. The other branch's title is the
+          same word at the same size, which is the point: both are 오늘. */}
+      <h1 className="break-keep text-xl font-bold leading-tight tracking-tight text-ink">{COPY.homeTitle}</h1>
       {beforeFirstConnection && firstUse ? (
         // §2 — nothing is connected. What is missing is not a briefing: it is the one thing that can be
         // done, plus what doing it hands over. The sentence names the data types the channels on this
@@ -309,7 +314,9 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
       {data && !beforeFirstConnection ? (
         // Reviewnary Visual System v1 §2 — the numbers are the smallest thing on the morning screen.
         // They qualify the briefing under them; a seller who wants them presses 「자세한 숫자 보기」.
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted" aria-label="오늘 상태">
+        // `sm`, like the other branch's context line: the two Homes state their context at one size.
+        // At `xs` this line was the smallest text on the morning screen and carried the only number on it.
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted" aria-label="오늘 상태">
           {briefed ? <span className="font-medium text-ink">{greetingLine(now.getHours(), null)}</span> : null}
           {strip.map((kpi, i) => (
             <span key={kpi.key} className="flex items-center gap-x-2">
@@ -359,8 +366,11 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
   const lead = coHome ? (
     <CustomerOpsHome co={coHome} ops={home} now={now} onChanged={() => void loadCo()} metrics={data?.metrics ?? null} />
   ) : co === undefined && firstUse?.kind === "WORKING" ? (
-    // The job's read has not landed: draw nothing in its place rather than the other Home for a moment.
-    <h1 className="sr-only">{COPY.homeTitle}</h1>
+    // The job's read has not landed. Draw nothing in its PLACE — rendering the other Home for a moment
+    // would flash a different screen — but the title is not in its place: it is the one thing both
+    // branches print, it is true before either read lands, and `sr-only` here meant a sighted seller
+    // watched a blank page while an invisible heading claimed the screen had one.
+    <h1 className="break-keep text-xl font-bold leading-tight tracking-tight text-ink">{COPY.homeTitle}</h1>
   ) : (
     legacyLead
   );
@@ -410,21 +420,29 @@ export function greetingLine(hour: number, count: number | null): string {
 
 const STRIP_ROUTE: Record<string, string> = {
   unansweredInquiries: "/inquiries",
-  ordersToday: "/orders",
-  orders: "/orders",
-  negativeReviews: "/reviews",
 };
 
 /**
- * Three numbers from the one overview read. 「오늘 주문」 is the series' last point only when that
- * point IS today; otherwise the 7-day KPI under its own honest label.
+ * <b>The Home's numbers are obligations, and obligations only</b> (product-owner decision, 2026-09-30).
  *
- * `briefNamesInquiries` = the opener turn below is naming the waiting inquiries and their count, so
- * this line drops that one number rather than printing it a second time six inches above (§5). The
- * other two are not in the brief and stay.
+ * <p>It used to return three: the waiting inquiries, 「오늘 주문」 (or the 7-day KPI), and 「최근 7일 부정
+ * 리뷰」. The last two are not obligations — nothing about them is waiting for the seller — and
+ * 주문량 · 매출 · 추이 · 채널별 수치 are owned by `/overview`, which this line still links to. Drawing them
+ * here was the Home quoting the dashboard, and the same number under two definitions in two places is the
+ * defect this repository has fixed several times (`docs/reviewnary_design.md` §8-A). Nothing was deleted:
+ * both numbers are one press away, unchanged, on the screen that owns them.
+ *
+ * <p><b>And it uses the other Home's nouns.</b> 확인할 일 and 현재 미답변 are what
+ * {@link CustomerOpsHome}'s band says, so a seller whose org opens the job and a seller whose org does not
+ * read the same two words for the same two facts. Two names twelve pixels apart on two variants of one
+ * screen is how one product starts reading as two.
+ *
+ * <p>`briefNamesInquiries` = the opener turn below is naming the waiting inquiries and their count, so
+ * this line drops that number rather than printing it a second time six inches above (§5). With the other
+ * two retired, that leaves nothing — and nothing is the correct render: the brief already said it.
  */
 export function contextStrip(
-  data: OverviewResponse, now: Date, briefNamesInquiries = false, actionable: number | null = null,
+  data: OverviewResponse, briefNamesInquiries = false, actionable: number | null = null,
 ): MetricKpi[] {
   const kpis = data.metrics.kpis;
   const find = (key: string) => kpis.find((k) => k.key === key);
@@ -443,30 +461,9 @@ export function contextStrip(
    */
   if (unanswered && !briefNamesInquiries) {
     out.push(actionable != null
-      ? { ...unanswered, label: "지금 처리할 일", value: actionable }
-      : { ...unanswered, label: "현재 미답변 문의" });
+      ? { ...unanswered, label: COPY.listTitle, value: actionable }
+      : { ...unanswered, label: UNANSWERED_WORD.lead });
   }
-  const orders = find("orders");
-  const series = data.metrics.series.find((s) => s.key === "orders");
-  const last = series?.points[series.points.length - 1];
-  const today = now.toISOString().slice(0, 10);
-  if (last && last.date === today) {
-    out.push({
-      key: "ordersToday",
-      label: "오늘 주문",
-      value: last.value,
-      unit: "건",
-      previousValue: null,
-      deltaPercent: null,
-      comparable: false,
-      excludedChannels: orders?.excludedChannels ?? 0,
-      freshnessUnproven: orders?.freshnessUnproven ?? false,
-    });
-  } else if (orders) {
-    out.push({ ...orders, label: `최근 ${data.metrics.period.days}일 주문` });
-  }
-  const negative = find("negativeReviews");
-  if (negative) out.push({ ...negative, label: `최근 ${data.metrics.period.days}일 부정 리뷰` });
   return out;
 }
 

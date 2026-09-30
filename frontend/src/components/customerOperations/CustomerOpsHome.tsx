@@ -13,7 +13,16 @@ import { problemLine } from "../../lib/operationsHome";
 import { RESPONSIBILITY_NAME, cadenceLabel, dataTypeKo, kstClock } from "../../lib/customerOperations";
 import { COPY, autoCheckWhat, channelShort, failureShort, kstLongDate } from "../../lib/copy/customerOps";
 import { mergeHomeWork, reasonCounts, sharedRowFacts, type HomeWork } from "../../lib/homeWork";
-import { INFLOW_WORD, RECENT_WORD, recentDay, todayInflow } from "../../lib/homeSummary";
+import {
+  INFLOW_WORD,
+  RECENT_WORD,
+  UNANSWERED_WORD,
+  freshnessUnproven,
+  recentDay,
+  todayInflow,
+  unansweredNow,
+  type InflowFact,
+} from "../../lib/homeSummary";
 import type { CustomerOperationsHome } from "../../lib/customerOperationsTypes";
 import type {
   HomePreparedItem,
@@ -179,10 +188,14 @@ export function CustomerOpsHome({
         already was. Product-owner decision, 2026-09-25.
       */}
       <header>
-        <h1 className="text-[17px] font-bold leading-tight tracking-tight text-ink">{COPY.homeTitle}</h1>
+        {/* §1: a page title is `xl` (22/700). This was 17px, and the 실행 대기 and 반복 문제 headings below it
+            were 17px too — so the page title was the same size as its own sections and SMALLER than the 18px
+            `h2` every other screen in the product uses. Size stopped carrying rank, and the seller had to read
+            the words to find the structure (docs/ui/reviewnary_ui_system_audit_v1.md §2). */}
+        <h1 className="break-keep text-xl font-bold leading-tight tracking-tight text-ink">{COPY.homeTitle}</h1>
         <p
           data-testid="today-status"
-          className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] leading-relaxed text-muted"
+          className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm leading-relaxed text-muted"
         >
           <span>{kstLongDate(now)}</span>
           <Sep />
@@ -208,11 +221,11 @@ export function CustomerOpsHome({
               each one stands beside the question it answers. */}
         </p>
         <OperationsSummary
-          inflow={todayInflow(metrics, now)}
           work={work}
           awaiting={co.status === "ACTIVE" ? awaiting.count : null}
-          recent={recentDay(co)}
+          unanswered={unansweredNow(metrics)}
         />
+        <ContextLine inflow={todayInflow(metrics, now)} recent={recentDay(co)} unproven={freshnessUnproven(metrics)} />
       </header>
 
       {running && co.status === "ACTIVE" ? (
@@ -274,26 +287,26 @@ export function CustomerOpsHome({
           {/* Count and order on the heading, the way out on the right, one hairline under it — the list header
               both references draw (Intercom: 「5 Open ⌄」 / 「Newest ⌄」). No box, no pill, no second number: the
               count lives on the heading of the thing it counts. */}
-          <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 border-b border-line pb-2">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b border-line pb-2">
             {/* The count is the Pulse's, one line up, under this same word (2026-09-26). It is the same
                 number from the same `work`, and drawing it in both places put the same fact 12px from
                 itself. The heading keeps what is only the list's: its order and its way out. */}
-            <h2 className="text-sm font-semibold tracking-tight text-ink">{COPY.listTitle}</h2>
-            <span className="break-keep text-[13px] text-muted">
+            <h2 className="text-base font-semibold tracking-tight text-ink">{COPY.listTitle}</h2>
+            <span className="break-keep text-sm text-muted">
               {COPY.listOrder}
               {/* What every row says identically, said once — instead of twice on each of them. */}
               {sharedSaid ? ` · ${sharedSaid}` : ""}
             </span>
             {/* More than one kind of work waiting: then the mix IS information and the rows keep their badges. */}
             {!shared.tag ? (
-              <span className="break-keep text-[13px] text-muted">
+              <span className="break-keep text-sm text-muted">
                 <Items parts={reasonCounts(work.rows)} />
               </span>
             ) : null}
             {hidden > 0 || work.truncated ? (
               <Link
                 to="/customer-operations/cases"
-                className="ml-auto shrink-0 text-[13px] font-semibold text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+                className="ml-auto shrink-0 text-sm font-semibold text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
               >
                 {/* <b>The link is a destination, not a count</b> (product-owner decision, 2026-09-26). It said
                     「전체 11건 보기」 while the Pulse two lines above said 확인할 일 11 — the same number twice on
@@ -513,123 +526,76 @@ function Sep() {
 }
 
 /**
- * <b>The band's own name, and the heading a seller reads above it.</b>
+ * <b>The band has no heading any more, and that is a consequence of what it now holds.</b>
  *
- * <p><b>현황, and not 오늘 현황</b> — a one-word deviation from the wire, for the reason this module already
- * gives twice. The three columns hold three different windows: 오늘 들어온 것 is a KST day, 확인할 일 is now,
- * 최근 24시간 is a rolling window on cases we opened. A heading that says 오늘 puts one window over all three
- * and makes the third one read as today's — which is the exact move `homeSummary.recentDay` refuses when it
- * keeps `monitoring`/`verifying` out of a windowed group. 운영 is the noun that is true of all three, and it
- * carries no window at all. It also stops the page from saying 오늘 twice in 60px; the tie to the title is
- * the heading's position under it, not a repeated word. <b>Flipping it back is one string</b> if the product
- * owner would rather have the repetition than the neutral noun.
+ * <p>It used to be 「운영 현황」 over three cells that were three different WINDOWS — 오늘 들어온 것 (a KST
+ * day), 확인할 일 (now), 최근 24시간 (a rolling window on cases we opened). Three windows genuinely need a
+ * frame, because no single heading is true of all three, and that is what the name was buying.
  *
- * <p>It is the surface's accessible name too (`aria-labelledby`), not a second string beside a visual one:
- * a surface with a visible heading and a different `aria-label` has two names, and only one of them is
- * the one people quote to each other.
+ * <p>Since UI System v2 the band holds three OBLIGATIONS and nothing else — 확인할 일 · 실행 대기 ·
+ * 현재 미답변 (product-owner decision, 2026-09-30) — and all three are 「now」. Each carries its own lead
+ * word, so a group name over them repeats what the cells already say and adds a fourth level between the
+ * page title and the work. The band keeps an accessible name; it no longer spends a line on a visible one.
+ *
+ * <p>Where the other two went: inflow and 최근 24시간 are not obligations. They are what CHANGED and what
+ * reviewnary DID, and §8-A has always said the automation's own report is 「약한 한 줄」 and not a number
+ * card. Both moved to {@link ContextLine} under the band, with channel freshness, which is where a fact
+ * that qualifies the work belongs. Nothing was deleted and no number changed its definition.
  */
-const PULSE_LABEL = "운영 현황";
-const PULSE_HEADING_ID = "today-pulse-heading";
+const PULSE_LABEL = "지금 해야 할 일";
 
 /**
- * <b>Operational Pulse — 오늘 들어온 것 · 확인할 일 · 최근 24시간</b>, one surface above the inbox.
+ * <b>세 개의 의무, 한 줄로.</b> 확인할 일 · 실행 대기 · 현재 미답변 — and nothing else
+ * (product-owner decision, 2026-09-30).
  *
- * <p>The data contract is `docs/pilot_usage_loop_v1.md` §8 and it does not move here: <b>no new read</b>
- * (every value comes from the five the Home already makes), no KPI card, no tile, no chart.
+ * <p>The data contract is `docs/pilot_usage_loop_v1.md` §8 and it does not move: <b>no new read</b>, no
+ * KPI card, no tile, no chart. 매출 · 주문량 · 추이 · 채널별 수치 stay owned by `/overview` — the defect
+ * this repository has fixed several times is the same number living in two places under two definitions
+ * (`docs/reviewnary_design.md` §8-A).
  *
- * <p><b>Why it stopped being a line</b> (product-owner decision, 2026-09-26). Measured, the 13px muted
- * line was the status line's second row — same font-size, same colour, same line-height, 4px under it —
- * so a seller read it as more date metadata and the screen answered 「오늘 운영이 어떻게 흐르고 있나」 in
- * the type of a caption.
+ * <p><b>Why these three and not others.</b> An obligation is something that is waiting for the seller.
+ * 확인할 일 is our queue of decisions; 실행 대기 is what they already decided and has not been posted;
+ * 현재 미답변 is the channel's own fact — a customer without an answer. 반복 문제 is NOT here: it is a
+ * pattern, not a customer waiting, and it has its own section below the work, which is where a pattern
+ * belongs.
  *
- * <p><b>And why the promotion was then re-cut</b> (product-owner decision, same day, from the rendered
- * screen). Four things were measured wrong on the first cut and all four have the same cause — <b>only a
- * number was treated as a value</b>. At 1440 the surface was 1,144px wide and carried 307px of ink: three
- * items at a 344px pitch, which is a row of three unrelated things, not one overview. The middle cell was a
- * bare 「11」 at 22px beside two cells whose value line was 13px text, so the screen had exactly one figure
- * and it read as a lone KPI. 「수집 상태 확인 필요」 and 「새로 확인한 일 없음」 sat in a 29px line box at
- * caption size — the two states a seller most needs to see at a glance were the quietest text in the band.
+ * <p><b>확인할 일 and 현재 미답변 are not a subset relation</b>, which is why both are drawn and neither is
+ * derived from the other — see {@link unansweredNow}. Each cell's note line carries its own qualification,
+ * so a figure that counts fewer channels than the seller has says so beside itself.
  *
- * <p>So the rule here is now one rule: <b>every cell has the same three tiers — 질문 / 지금 상태 / 그 상태를
- * 한정하는 사실 — and the middle tier is one type size whatever it holds.</b> A count and a withheld count are
- * both answers to 「오늘 들어온 것」; a band that grows to 20px only when the answer is a number is a band that
- * shrinks precisely when the seller needs to notice something. What still separates them is <b>ink</b>: a
- * measured figure is ink and semibold, and every other word on that line — the unit nouns and the state
- * sentences — is the ordinary muted weight. No warn colour, no icon, no tint: 「아직 확인하지 못했다」 is a
- * smaller claim than the numbers beside it, and a band that turns orange when a channel is quiet trains a
- * seller to stop reading the band.
+ * <p><b>Three tiers per cell, and the middle tier is one type size whatever it holds</b> — 질문 / 지금 상태 /
+ * 그 상태를 한정하는 사실. A count and a withheld count are both answers; a band that grows only when the
+ * answer is a number shrinks precisely when the seller needs to notice something. What separates them is
+ * <b>ink</b>: a measured figure is ink and semibold, every other word is the ordinary muted weight. No warn
+ * colour, no icon, no tint — a band that turns orange when a channel is quiet trains a seller to stop
+ * reading the band.
  *
- * <p><b>One surface, not three cards</b> — and the surface is now the width of what it holds (`max-w-3xl`)
- * rather than the width of the page. The columns are thirds of 768px, so the pitch is 240px against ~175px
- * of ink instead of 344px against 116px, and the two hairlines between them are the cheapest way to say
- * 「these three belong to one reading」. Zendesk's Agent Home statistics card does exactly this at exactly
- * this scale: a heading, a narrow container, even columns, and a hairline between each figure — and nobody
- * reads those three as three cards. No shadow, no gradient, no icon, no chart, and the cells themselves
- * carry no fill, border or radius of their own.
+ * <p><b>One surface, not three cards</b> (product-owner decision: compact summary strip). The surface is
+ * the width of what it holds (`max-w-3xl`) rather than of the page, the columns are thirds of it, and the
+ * two hairlines are the cheapest way to say 「these three belong to one reading」. No shadow, no gradient,
+ * and the cells carry no fill, border or radius of their own.
  *
- * <p><b>The three cells are not three counts of the same kind.</b> The first is a measured day, the second
- * is now, the third is a window on cases we opened — which is why each carries its own lead word instead of
- * one heading that would make a single window true of all three. Zendesk does this too, and for the same
- * reason: 「This week」 and 「60 days」 stand under each statistic's own name rather than over the group.
- *
- * <p>The second cell says <b>확인할 일</b> — the same canonical noun as the section heading below it,
- * because it is the same set counted once. A second name (「지금 확인할 것」) would have split one meaning
- * into two words twelve pixels apart, and the total now lives here alone: the list's way out says
- * 「전체 보기」 and names no number.
- *
- * <p>A cell with nothing true to say renders nothing, and when no cell has, neither does the surface.
- * That is not tidiness: an inflow read that failed, a job that is not running, and an org with no window
- * yet are three different silences, and none of them is 「0」.
+ * <p>A cell with nothing true to say renders nothing, and when no cell has, neither does the surface. That
+ * is not tidiness: a read that failed, a job that is not running and an org with no window yet are three
+ * different silences, and none of them is 「0」. The grid is sized to the cells it actually has, so two
+ * facts are two columns rather than two columns and a gap.
  */
 function OperationsSummary({
-  inflow,
   work,
   awaiting,
-  recent,
+  unanswered,
 }: {
-  inflow: ReturnType<typeof todayInflow>;
   work: HomeWork;
   /** `null` when the job is not running — 실행 대기 is a fact about a job that is looking. */
   awaiting: number | null;
-  recent: ReturnType<typeof recentDay>;
+  /** `null` when the metrics read did not land. */
+  unanswered: InflowFact | null;
 }) {
   const cells: ReactNode[] = [];
 
-  if (inflow) {
-    // Neither lane could be vouched for: one sentence in the state slot, not the same five syllables twice.
-    const blind = inflow.reviews.kind === "UNQUALIFIED" && inflow.inquiries.kind === "UNQUALIFIED";
-    // What we did measure is the state; what we could not measure qualifies it. With one lane current and
-    // one not, the seller's 「오늘 들어온 것」 is the number we actually have — and the lane we are missing is
-    // still named, on the line whose job is naming what limits the figure above it. It is never a 0.
-    const counted = [
-      inflow.reviews.kind === "COUNT" ? <Figure key="r" word={INFLOW_WORD.reviews} value={inflow.reviews.value} /> : null,
-      inflow.inquiries.kind === "COUNT" ? <Figure key="i" word={INFLOW_WORD.inquiries} value={inflow.inquiries.value} /> : null,
-    ];
-    const withheld = [
-      inflow.reviews.kind === "UNQUALIFIED" ? <span key="r">{INFLOW_WORD.reviewsUnqualified}</span> : null,
-      inflow.inquiries.kind === "UNQUALIFIED" ? <span key="i">{INFLOW_WORD.inquiriesUnqualified}</span> : null,
-    ];
-    // Real counts of rows the product manufactured about itself. Shown, never unlabelled — and the label
-    // only where there is a figure to label: with both lanes withheld it would qualify nothing.
-    const example = inflow.exampleData && !blind ? <span key="x">{INFLOW_WORD.exampleData}</span> : null;
+  if (work.rows.length > 0) {
     cells.push(
-      <Cell
-        key="inflow"
-        id="inflow"
-        label={INFLOW_WORD.lead}
-        note={blind ? null : dotted([...withheld, example])}
-      >
-        {blind ? <State>{INFLOW_WORD.bothUnqualified}</State> : dotted(counted)}
-      </Cell>,
-    );
-  }
-
-  // The canonical deduped count, and 실행 대기 under it — what the seller already decided and has not
-  // finished. With nothing waiting and nothing pending this cell has no fact of its own and is absent;
-  // it does not print a 0 assembled from reads that may not have landed.
-  if (work.rows.length > 0 || (awaiting ?? 0) > 0) {
-    cells.push(
-      <Cell key="work" id="work" label={COPY.listTitle} note={awaiting === null ? null : <AwaitingFact count={awaiting} />}>
+      <Cell key="work" id="work" label={COPY.listTitle}>
         {/* The server said there are more than it sent, so this total is a floor — 「11+」 건. The unit is
             what stops the state slot from being a naked number: every other cell answers its question in
             words, and 11 alone answered it in the vocabulary of a dashboard tile. */}
@@ -638,45 +604,160 @@ function OperationsSummary({
     );
   }
 
-  if (recent) {
+  if (awaiting !== null) {
+    cells.push(
+      <Cell key="awaiting" id="awaiting" label="실행 대기">
+        {/* A measured zero, not an unknown: the job is running and it found nothing pending. The label is
+            an anchor only when there is a section to land on. */}
+        {awaiting === 0 ? (
+          <State>없음</State>
+        ) : (
+          // The label above is a separate span, so without a name of its own this link announces a bare
+          // number. The noun rides with it — a link called 「2건」 tells a screen-reader user nothing about
+          // where it goes.
+          <a
+            href="#실행-대기"
+            aria-label={`실행 대기 ${awaiting.toLocaleString("ko-KR")}${COUNT_UNIT}`}
+            className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+          >
+            <Big value={awaiting} unit={COUNT_UNIT} />
+          </a>
+        )}
+      </Cell>,
+    );
+  }
+
+  if (unanswered) {
     cells.push(
       <Cell
-        key="recent"
-        id="recent"
-        label={RECENT_WORD.lead}
-        note={
-          recent.checked === 0 ? null : (
-            dotted([
-              <Figure key="a" word={RECENT_WORD.autoResolved} value={recent.autoResolved} small />,
-              <Figure key="d" word={RECENT_WORD.draftsPrepared} value={recent.draftsPrepared} small />,
-            ])
-          )
-        }
+        key="unanswered"
+        id="unanswered"
+        label={UNANSWERED_WORD.lead}
       >
-        {/* Nothing opened in the window is this cell's state, so it is stated at the size of a state — the
-            same size 「새로 확인 8」 would be. It says only what `RECENT_WORD.none` has always said. */}
-        {recent.checked === 0 ? <State>{RECENT_WORD.none}</State> : <Figure word={RECENT_WORD.checked} value={recent.checked} />}
+        {unanswered.kind === "COUNT" ? (
+          <Link
+            to="/inquiries"
+            aria-label={`${UNANSWERED_WORD.lead} ${unanswered.value.toLocaleString("ko-KR")}${COUNT_UNIT}`}
+            className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+          >
+            <Big value={unanswered.value} unit={COUNT_UNIT} />
+          </Link>
+        ) : (
+          // Some channel is missing from the population. Saying the number anyway would present a floor
+          // as a total, and 「0」 would be a claim about the seller's customers that no read supports.
+          <State>{UNANSWERED_WORD.unqualified}</State>
+        )}
       </Cell>,
     );
   }
 
   if (cells.length === 0) return null;
   return (
-    <div className="mt-2.5">
-      {/* Small, but ink and semibold against the muted labels below it: the band needs a name for the same
-          reason its columns do, and 13px is the size at which a name sits over a group without competing
-          with the page title. */}
-      <h2 id={PULSE_HEADING_ID} className="text-[13px] font-semibold leading-tight text-ink">
-        {PULSE_LABEL}
-      </h2>
-      <section
-        data-testid="today-summary"
-        aria-labelledby={PULSE_HEADING_ID}
-        className="mt-1.5 grid max-w-3xl grid-cols-3 divide-x divide-line rounded-xl bg-canvas px-6 py-3.5"
-      >
-        {cells}
-      </section>
-    </div>
+    <section
+      data-testid="today-summary"
+      aria-label={PULSE_LABEL}
+      className={`mt-3 grid max-w-3xl divide-x divide-line rounded-xl bg-canvas px-6 py-4 ${
+        cells.length === 3 ? "grid-cols-3" : cells.length === 2 ? "grid-cols-2" : "grid-cols-1"
+      }`}
+    >
+      {cells}
+    </section>
+  );
+}
+
+/**
+ * <b>The work's context, as one quiet line</b> — what changed, what reviewnary did, and whether the
+ * figures above can be trusted.
+ *
+ * <p>These are the facts that used to be two of the three summary cells. They are not obligations: nothing
+ * here is waiting for the seller. §8-A has said since v3.2 that the automation's own report is 「약한 한 줄」
+ * and not a number card, and inflow belongs with it — a day's arrivals qualify the work, they are not the
+ * work. Drawing them at the weight of an obligation was what made the band read as a dashboard.
+ *
+ * <p>Order is fixed and each fact is absent rather than zero: 오늘 들어온 것 → 최근 24시간 → 수집 상태 →
+ * the way to the numbers screen. 「자세한 숫자 보기」 stays because this line is deliberately NOT where
+ * 매출·주문·추이 live.
+ */
+function ContextLine({
+  inflow,
+  recent,
+  unproven,
+}: {
+  inflow: ReturnType<typeof todayInflow>;
+  recent: ReturnType<typeof recentDay>;
+  /** Any KPI in the population could not prove a collection — the same signal `/overview` shows. */
+  unproven: boolean;
+}) {
+  const facts: ReactNode[] = [];
+
+  if (inflow) {
+    const blind = inflow.reviews.kind === "UNQUALIFIED" && inflow.inquiries.kind === "UNQUALIFIED";
+    if (blind) {
+      facts.push(<span key="inflow">{INFLOW_WORD.bothUnqualified}</span>);
+    } else {
+      const counted = dotted([
+        inflow.reviews.kind === "COUNT" ? <Figure key="r" word={INFLOW_WORD.reviews} value={inflow.reviews.value} small /> : null,
+        inflow.inquiries.kind === "COUNT" ? <Figure key="i" word={INFLOW_WORD.inquiries} value={inflow.inquiries.value} small /> : null,
+      ]);
+      if (counted) {
+        facts.push(
+          <span key="inflow">
+            {INFLOW_WORD.lead} {counted}
+          </span>,
+        );
+      }
+      // The lane we could not vouch for is still named — on the line whose job is naming what limits the
+      // figures. It is never folded into a smaller number.
+      for (const withheld of [
+        inflow.reviews.kind === "UNQUALIFIED" ? INFLOW_WORD.reviewsUnqualified : null,
+        inflow.inquiries.kind === "UNQUALIFIED" ? INFLOW_WORD.inquiriesUnqualified : null,
+      ]) {
+        if (withheld) facts.push(<span key={withheld}>{withheld}</span>);
+      }
+      if (inflow.exampleData) facts.push(<span key="example">{INFLOW_WORD.exampleData}</span>);
+    }
+  }
+
+  if (recent) {
+    facts.push(
+      recent.checked === 0 ? (
+        <span key="recent">{RECENT_WORD.none}</span>
+      ) : (
+        <span key="recent">
+          {RECENT_WORD.lead} <Figure word={RECENT_WORD.checked} value={recent.checked} small />
+          {recent.autoResolved > 0 || recent.draftsPrepared > 0 ? (
+            <>
+              {" ("}
+              {dotted([
+                recent.autoResolved > 0 ? <Figure key="a" word={RECENT_WORD.autoResolved} value={recent.autoResolved} small /> : null,
+                recent.draftsPrepared > 0 ? <Figure key="d" word={RECENT_WORD.draftsPrepared} value={recent.draftsPrepared} small /> : null,
+              ])}
+              {")"}
+            </>
+          ) : null}
+        </span>
+      ),
+    );
+  }
+
+  // Channel freshness. `muted`, never `warn`: it qualifies the numbers above and it is read in the same
+  // breath as them (§8-B′ secondary disclosure). The warn colour was spending the page's strongest signal
+  // on machinery.
+  if (unproven) facts.push(<span key="unproven">일부 채널 최신 수집 확인 필요</span>);
+
+  if (facts.length === 0) return null;
+  return (
+    <p
+      data-testid="today-context"
+      aria-label="운영 상황"
+      className="mt-2 flex flex-wrap items-center gap-x-1 gap-y-1 break-keep text-sm text-muted"
+    >
+      {dotted(facts)}
+      <Dot />
+      <Link to="/overview" className="font-semibold text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700">
+        자세한 숫자 보기
+      </Link>
+    </p>
   );
 }
 
@@ -720,14 +801,14 @@ function Cell({ id, label, note, children }: { id: string; label: string; note?:
   return (
     <p
       data-testid={`pulse-${id}`}
-      className="min-w-0 break-keep px-6 text-[13px] text-muted first:pl-0 last:pr-0"
+      className="min-w-0 break-keep px-6 text-sm text-muted first:pl-0 last:pr-0"
     >
       <span className="block leading-[18px]">{label}</span>{" "}
-      <span className="mt-0.5 block text-[20px] leading-[26px]">{children}</span>
+      <span className="mt-0.5 block text-xl leading-[28px]">{children}</span>
       {note ? (
         <>
           {" "}
-          <span className="mt-0.5 block text-[13px] leading-[19px]">{note}</span>
+          <span className="mt-0.5 block text-xs leading-[19px]">{note}</span>
         </>
       ) : null}
     </p>
@@ -795,22 +876,6 @@ function Dot() {
   );
 }
 
-/**
- * <b>실행 대기</b> — the count, and nothing built around it.
- *
- * <p>It had a 571px cell and a 22px/800 value beside the work the seller has not decided yet; an obligation they
- * already decided and a number that is usually zero do not earn that. The emphasis for a non-zero count is the
- * 실행 대기 section further down existing at all — this is the pointer to it, and it is a link only when there
- * is something to point at. No pill, no fill, no colour.
- */
-function AwaitingFact({ count }: { count: number }) {
-  if (count === 0) return <span>실행 대기 없음</span>;
-  return (
-    <a href="#실행-대기" className="hover:text-ink hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700">
-      실행 대기 <span className="font-semibold tabular-nums text-ink">{count.toLocaleString("ko-KR")}</span>
-    </a>
-  );
-}
 /** The rows of 실행 대기 after the dedupe against 확인할 일, and how many the section stands for in total. */
 function awaitingRows(ops: OperationsHome | null | undefined, work: HomeWork) {
   const prepared = ops?.prepared;
@@ -868,7 +933,7 @@ function AwaitingExecution({
           PROPOSED and no approval anywhere. One badge cannot be true of both, so the state moved onto
           the rows, where each one can say its own (see lib/preparedState.ts). */}
       <div className="mb-3 mt-8 flex items-center gap-2">
-        <h2 className="text-[17px] font-bold tracking-tight text-ink">실행 대기</h2>
+        <h2 className="text-base font-semibold tracking-tight text-ink">실행 대기</h2>
       </div>
       <PreparedWorkList
         rows={rows}
@@ -1007,7 +1072,7 @@ function RepeatedProblems({ ops, selection }: { ops: OperationsHome | null | und
   return (
     <section aria-label="반복 문제">
       <div className="mb-3 mt-8 flex items-center gap-2">
-        <h2 className="text-[17px] font-bold tracking-tight text-ink">반복 문제</h2>
+        <h2 className="text-base font-semibold tracking-tight text-ink">반복 문제</h2>
       </div>
       <p className="break-keep px-1 leading-relaxed text-ink">{problemLine(problems)}</p>
       <RepeatedProblemList

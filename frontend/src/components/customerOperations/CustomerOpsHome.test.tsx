@@ -215,8 +215,9 @@ describe("CustomerOpsHome", () => {
     expect(status).not.toHaveTextContent("초안 9");
     expect(status).not.toHaveTextContent("다음 확인");
     expect(status).not.toHaveTextContent("주기");
-    // 실행 대기 stays a fact and a pointer — never a cell beside the work, and never a pill. It sits on the
-    // summary line now (with 「지금 볼 것」, which is what it qualifies), not on the date line.
+    // 실행 대기 is an obligation and stands as its own cell in the band (product-owner decision,
+    // 2026-09-30) — the seller already decided it and it is not finished. It is never a pill, and it is
+    // never on the date line, which answers 「자동 확인이 돌고 있나」 and nothing else.
     const summary = await screen.findByTestId("today-summary");
     expect(within(summary).getByRole("link", { name: /실행 대기/ })).toHaveAttribute("href", "#실행-대기");
     expect(within(status).queryByRole("link", { name: /실행 대기/ })).toBeNull();
@@ -581,7 +582,7 @@ describe("오늘 — an inbox, not a dashboard", () => {
     } as never;
   }
 
-  it("the summary is one surface of three cells, never the counter band that was removed", async () => {
+  it("the summary is one surface of obligation cells, never the counter band that was removed", async () => {
     const { container } = draw();
     await screen.findByTestId("today-status");
     // <b>The band stays gone</b> — what stands here is a Pulse, not the card it replaced (product-owner
@@ -589,22 +590,23 @@ describe("오늘 — an inbox, not a dashboard", () => {
     expect(screen.queryByLabelText("오늘 요약")).toBeNull();
     const summary = await screen.findByTestId("today-summary");
     // ONE object: the surface carries the fill, and no cell inside it carries a box of its own.
-    expect(summary.className).toContain("grid-cols-3");
+    // <b>The grid is sized to the cells it has</b> (UI System v2): this fixture makes no overview read, so
+    // 현재 미답변 is absent rather than 「0」 and two facts are two columns. Reserving a third would leave a
+    // gap where the row of figures is supposed to read as a row.
+    expect(summary.className).toContain("grid-cols-2");
     expect(summary.className).toContain("bg-canvas");
     expect(summary.className).not.toMatch(/border|shadow|gradient/);
-    // Whichever cells have a fact: this fixture makes no overview read, so 오늘 들어온 것 is absent rather
-    // than 「0」 — the grid still reserves its three columns, which is why the row of figures stays a row.
     const cells = [...summary.querySelectorAll("[data-testid^='pulse-']")] as HTMLElement[];
     expect(cells.length).toBeGreaterThan(0);
     for (const cell of cells) expect(cell.className).not.toMatch(/border|bg-|rounded|shadow/);
     expect(summary.querySelectorAll("[class*='rounded'],[class*='border'],[class*='shadow']")).toHaveLength(0);
-    // Every cell answers its question at the same 20px, number or sentence, and nothing on this surface is
+    // Every cell answers its question at the same `xl`, number or sentence, and nothing on this surface is
     // larger — the customers' sentences below stay the subject of the screen, and the band is read before
     // them, not instead of them. The band is also only as wide as what it holds: page-wide, the three
     // columns stood 344px apart and stopped reading as one summary.
     expect(summary.className).toContain("max-w-3xl");
-    for (const cell of cells) expect((cell.children[1] as HTMLElement).className).toContain("text-[20px]");
-    expect(summary.querySelectorAll("[class*='text-2xl'],[class*='text-3xl'],[class*='font-bold']")).toHaveLength(0);
+    for (const cell of cells) expect((cell.children[1] as HTMLElement).className).toContain("text-xl");
+    expect(summary.querySelectorAll("[class*='text-2xl'],[class*='text-3xl']")).toHaveLength(0);
     // And no chart, no icon, by construction: nothing is drawn.
     expect(container.querySelectorAll("svg")).toHaveLength(0);
   });
@@ -616,7 +618,7 @@ describe("오늘 — an inbox, not a dashboard", () => {
     expect(within(summary).queryByRole("link", { name: /실행 대기/ })).toBeNull();
   });
 
-  it("실행 대기 > 0 stays on the same line and becomes the pointer to its own section", async () => {
+  it("실행 대기 > 0 is its own obligation cell and the pointer to its section", async () => {
     draw();
     const summary = await screen.findByTestId("today-summary");
     expect(within(summary).getByRole("link", { name: /실행 대기/ })).toHaveAttribute("href", "#실행-대기");

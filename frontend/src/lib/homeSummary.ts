@@ -126,6 +126,59 @@ export const INFLOW_WORD = {
   exampleData: "예시 데이터",
 } as const;
 
+/**
+ * <b>현재 미답변 — 고객이 아직 답을 받지 못한 문의.</b>
+ *
+ * <p><b>Why it stands beside 확인할 일 rather than inside it</b> (product-owner decision, 2026-09-30).
+ * They are two different sets and they answer two different questions. 확인할 일 is OUR queue — what is
+ * waiting for the seller's decision, assembled by `mergeHomeWork`. 미답변 is the CHANNEL's fact — an
+ * inquiry with no answer posted against it, whether or not we ever opened a work item for it. An inquiry
+ * outside `InquiryRowsService.WORKABLE` is 미답변 and is not 확인할 일, which is exactly the gap the
+ * 문의 screen's 「답변을 기다리는 문의에만 초안을 씁니다」 exists to explain.
+ *
+ * <p>So neither number is a subset of the other and neither may be derived from the other. What this
+ * function must not do is hide the difference: the count is the freshness-qualified KPI, and when the KPI
+ * excluded channels or could not prove a collection, <b>the cell says so on its own note line</b> rather
+ * than printing a smaller number as if it were the whole. `contextStrip` learned this the hard way — it
+ * once showed the qualified KPI as 「현재 미답변 문의 0건」 directly above 「들어온 문의 3건」, and both were
+ * true under definitions the seller had no way to see.
+ *
+ * <p>`null` when the read did not land. A failed request says nothing; it does not say zero.
+ */
+export function unansweredNow(metrics: OperationsMetrics | null | undefined): InflowFact | null {
+  if (!metrics) return null;
+  const kpi = metrics.kpis.find((k) => k.key === "unansweredInquiries");
+  if (!kpi) return null;
+  // Unlike `todayInflow` there is no window to check: 미답변 is a present fact, not a day's arrivals.
+  // Only the population matters — whether every channel was counted and every collection proven.
+  if (kpi.excludedChannels !== 0 || kpi.freshnessUnproven) {
+    return { kind: "UNQUALIFIED" };
+  }
+  return { kind: "COUNT", value: kpi.value };
+}
+
+/**
+ * <b>Any channel in the population whose latest collection could not be proven.</b>
+ *
+ * <p>The same signal `/overview` shows and the same one 오늘's old numbers line carried, read from the
+ * KPIs rather than computed a second way — two screens deciding 「is the data fresh」 with two rules is
+ * how one of them ends up reassuring a seller the other is warning.
+ *
+ * <p>`muted` at the call site, never `warn`: it qualifies the figures beside it and is read in the same
+ * breath as them. The warn colour would spend the page's strongest signal on machinery.
+ */
+export function freshnessUnproven(metrics: OperationsMetrics | null | undefined): boolean {
+  if (!metrics) return false;
+  return metrics.kpis.some((kpi) => kpi.freshnessUnproven);
+}
+
+export const UNANSWERED_WORD = {
+  /** The noun the 문의 screen and `/overview` already use, so one number has one name. */
+  lead: "현재 미답변",
+  /** Some channel is missing from the population — the figure would be a floor presented as a total. */
+  unqualified: "수집 상태 확인 필요",
+} as const;
+
 export const RECENT_WORD = {
   lead: "최근 24시간",
   /** Nothing opened in the window — said once instead of three zeros in a row. */

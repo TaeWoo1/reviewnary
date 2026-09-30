@@ -28,9 +28,9 @@ import { resolve } from "node:path";
 /**
  * The screens and primitives brought onto the system by UI System v2. Append-only.
  *
- * <p>`customerOperations/CustomerOpsHome.tsx` is deliberately absent HERE and joins in the commit that
- * rebuilds the Home: its remaining literals are its heading scale, and normalising them in the
- * enforcement commit would be half of the Home rework done in the wrong commit.
+ * <p>`customerOperations/CustomerOpsHome.tsx` joined in the commit that rebuilt the Home — its remaining
+ * literals were its heading scale, and normalising them in the enforcement commit would have been half of
+ * the Home rework done in the wrong commit.
  */
 const ON_THE_SYSTEM = [
   "components/app/AppShellV2.tsx",
@@ -42,6 +42,8 @@ const ON_THE_SYSTEM = [
   "components/ui/WorkItem.tsx",
   "components/ui/DecisionRow.tsx",
   "components/ui/WorkFlowCard.tsx",
+  "components/customerOperations/CustomerOpsHome.tsx",
+  "pages/app/AgentHome.tsx",
   "components/home/OperationsAreas.tsx",
   "components/home/RepeatedProblemList.tsx",
   "components/home/PreparedWorkList.tsx",

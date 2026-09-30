@@ -191,13 +191,26 @@ describe("greeting — arithmetic, never a model", () => {
     expect(greetingLine(15, null)).toBe("안녕하세요.");
   });
 
-  it("the context strip says 「오늘 주문」 only when the last point IS today", () => {
-    const strip = contextStrip(overview(), MORNING);
-    expect(strip.map((k) => k.label)).toEqual(["현재 미답변 문의", "오늘 주문", "최근 7일 부정 리뷰"]);
-    expect(strip[1]!.value).toBe(4);
-    const stale = contextStrip(overview(), new Date("2026-08-30T09:00:00+09:00"));
-    expect(stale[1]!.label).toBe("최근 7일 주문");
-    expect(stale[1]!.value).toBe(12);
+  /**
+   * <b>Obligations only</b> (product-owner decision, 2026-09-30). This test used to pin three entries —
+   * 현재 미답변 문의 · 오늘 주문 · 최근 7일 부정 리뷰 — and the window rule that chose between 「오늘 주문」 and
+   * 「최근 7일 주문」. 주문량 and a record count are not things waiting for the seller, and 주문 · 매출 · 추이
+   * are owned by `/overview`, which the line still links to. Both numbers are one press away and unchanged;
+   * what the Home stopped doing is quoting the dashboard on the screen whose subject is the work.
+   */
+  it("the context strip carries the waiting work and nothing else", () => {
+    const strip = contextStrip(overview());
+    expect(strip.map((k) => k.label)).toEqual(["현재 미답변"]);
+    // The same noun the other Home's band uses for the same fact — one product, one word.
+    expect(strip.map((k) => k.label)).not.toContain("현재 미답변 문의");
+    expect(contextStrip(overview(), false, 22).map((k) => k.label)).toEqual(["확인할 일"]);
+    expect(contextStrip(overview(), false, 22)[0]!.value).toBe(22);
+    // 주문 and 부정 리뷰 are gone from the Home, in both readings.
+    for (const labels of [contextStrip(overview()).map((k) => k.label), contextStrip(overview(), false, 22).map((k) => k.label)]) {
+      expect(labels.join(" ")).not.toMatch(/주문|부정 리뷰/);
+    }
+    // The brief names the waiting inquiries: the line then has nothing left to say and says nothing.
+    expect(contextStrip(overview(), true)).toEqual([]);
   });
 });
 
@@ -211,8 +224,12 @@ describe("home — the Agent operating workspace", () => {
     expect(numbers.tagName).toBe("P");
     expect(numbers).toHaveTextContent("좋은 아침입니다.");
     expect(numbers).not.toHaveTextContent("먼저 확인한 일이");
-    // §2: the strip's inquiry number is the same 「처리할 일」 the rest of the screen means.
-    expect(numbers).toHaveTextContent("지금 처리할 일");
+    // §2: the strip's inquiry number is the same work the rest of the screen means — and it is now
+    // called what the other Home's band calls it (product-owner decision, 2026-09-30).
+    expect(numbers).toHaveTextContent("확인할 일");
+    // Obligations only: 주문 and 부정 리뷰 moved back to the screen that owns them.
+    expect(numbers).not.toHaveTextContent("주문");
+    expect(numbers).not.toHaveTextContent("부정 리뷰");
     expect(within(numbers).getByRole("link", { name: "자세한 숫자 보기" })).toHaveAttribute("href", "/overview");
     expect(screen.queryByText("새 대화")).toBeNull();
     expect(screen.queryByRole("button", { name: "지난 대화" })).toBeNull();
@@ -220,7 +237,10 @@ describe("home — the Agent operating workspace", () => {
     expect(within(turn).getByRole("link", { name: /배송은 언제 되나요/ })).toHaveAttribute("href", "/inquiries/i-1");
     expect(within(turn).getAllByText("답변 준비됨")).toHaveLength(2);
     expect(screen.getByRole("form", { name: "AI 담당자에게 요청" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 1, name: "오늘의 운영" })).toBeInTheDocument();
+    // A VISIBLE page title now, not `sr-only`: this branch of 오늘 had no page title on screen at all.
+    const title = screen.getByRole("heading", { level: 1, name: "오늘" });
+    expect(title.className).not.toContain("sr-only");
+    expect(title.className).toContain("text-xl");
     // Never our own vocabulary.
     expect(screen.queryByText(/proactive|PROPOSED|DRAFT_PREPARED|case/i)).toBeNull();
   });
@@ -269,9 +289,15 @@ describe("home — the Agent operating workspace", () => {
     // `?state=NEEDS_REPLY` — a parameter no screen reads — so the link opened the whole record and the
     // seller had to find the 22 among 94 (Secondary Workspaces UX Closure v1 §1).
     expect(screen.getByRole("link", { name: "처리할 일 22건 전체 보기" })).toHaveAttribute("href", "/inquiries");
-    // §5: the strip stops printing the number the brief is already saying one line below.
-    expect(screen.queryByText("현재 미답변 문의")).toBeNull();
-    expect(screen.getByText(/부정 리뷰/)).toBeInTheDocument();
+    // §5: the strip stops printing the number the brief is already saying one line below — and with
+    // 주문·부정 리뷰 retired there is no other obligation for it to carry. The line itself stays: the
+    // greeting and the way to the numbers screen are not obligations and were never the strip's.
+    const numbers = screen.getByLabelText("오늘 상태");
+    expect(numbers).not.toHaveTextContent("현재 미답변");
+    expect(numbers).not.toHaveTextContent("확인할 일");
+    expect(numbers).not.toHaveTextContent("주문");
+    expect(numbers).not.toHaveTextContent("부정 리뷰");
+    expect(within(numbers).getByRole("link", { name: "자세한 숫자 보기" })).toHaveAttribute("href", "/overview");
   });
 
   it("§2: when the queue read fails the brief names no work and claims none", async () => {
@@ -442,7 +468,7 @@ describe("Operations Home — 지금 확인할 것", () => {
   it("draws no area when the read failed, and leaves the conversation alone", async () => {
     getOperationsHomeStrict.mockRejectedValue(new Error("down"));
     renderHome();
-    await screen.findByRole("heading", { name: "오늘의 운영" });
+    await screen.findByRole("heading", { name: "오늘" });
     await waitFor(() => expect(screen.queryByLabelText("오늘 확인할 것")).toBeNull());
     expect(screen.queryByLabelText("지금 확인할 리뷰")).toBeNull();
   });
@@ -456,7 +482,7 @@ describe("Operations Home — 지금 확인할 것", () => {
       prepared: { reviewRepliesApproved: 0, inquiryDraftsReady: 0, rows: [] },
     });
     renderHome();
-    await screen.findByRole("heading", { name: "오늘의 운영" });
+    await screen.findByRole("heading", { name: "오늘" });
     await waitFor(() => expect(screen.queryByLabelText("오늘 확인할 것")).toBeNull());
   });
 });
@@ -468,7 +494,7 @@ describe("Operations Home — 지금 확인할 것", () => {
 describe("return-visit signal", () => {
   it("is sent once when 홈 opens, with nothing in it", async () => {
     renderHome();
-    await screen.findByRole("heading", { name: "오늘의 운영" });
+    await screen.findByRole("heading", { name: "오늘" });
     await waitFor(() => expect(recordHomeOpened).toHaveBeenCalledTimes(1));
     // No argument: the organisation is the token's and the day is the server's, so the page has no
     // way to claim who opened it or when — which is also why it has nothing to leak.
@@ -478,7 +504,7 @@ describe("return-visit signal", () => {
   it("renders the whole morning when the signal fails", async () => {
     recordHomeOpened.mockRejectedValue(new Error("measurement down"));
     renderHome();
-    await screen.findByRole("heading", { name: "오늘의 운영" });
+    await screen.findByRole("heading", { name: "오늘" });
     // The areas the seller came for are drawn exactly as they are when the signal succeeds.
     expect(await screen.findByLabelText("지금 확인할 리뷰")).toBeTruthy();
   });
