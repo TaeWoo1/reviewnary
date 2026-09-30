@@ -131,7 +131,7 @@ export function BackfillPanel({
 
   const body = (
     <>
-      <div className="space-y-5">
+      <div className="space-y-4">
         {/* 두 동작의 차이를 이 패널 안에서 한 번 말한다. 「지금 수집하기」를 눌러도 오래된 자료가 들어오지
             않는 이유를 판매자가 알 수 있는 자리는 여기뿐이다. */}
         <p className="break-keep text-sm leading-relaxed text-muted">
@@ -199,7 +199,7 @@ export function BackfillPanel({
           </div>
         </div>
 
-        {error ? <p className="rounded-xl bg-bad/5 px-4 py-3 text-base text-bad">{error}</p> : null}
+        {error ? <p className="rounded-xl bg-bad/10 px-4 py-3 text-base text-bad">{error}</p> : null}
 
         <button type="button" onClick={run} disabled={running} className="btn-primary">
           {running ? "수집 중…" : "이 기간 수집하기"}

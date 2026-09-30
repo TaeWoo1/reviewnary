@@ -154,7 +154,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       {(reviewWork?.committed ?? []).map((account) => {
         const uncertain = attentionUncertaintyCopy(account.coverage ?? "COVERED");
         return uncertain ? (
-          <div key={account.accountId} role="status" className="rounded-xl bg-warn/5 px-4 py-3" data-testid="reply-work-coverage-uncertain">
+          <div key={account.accountId} role="status" className="rounded-xl bg-warn/10 px-4 py-3" data-testid="reply-work-coverage-uncertain">
             <p className="text-sm font-semibold text-ink">
               {account.channelNameKo ?? account.channelCode}: {uncertain.headline}
             </p>

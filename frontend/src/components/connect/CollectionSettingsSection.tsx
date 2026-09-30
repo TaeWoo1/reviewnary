@@ -171,9 +171,9 @@ function ScheduleRow({
           // 자동 수집, not 이 채널: this row is about a cadence, and saying the CHANNEL does not
           // support the data type overstated it — Coupang 상품평 sat under this chip while the panel
           // one scroll above counted 22 of them, collected through the Action Window.
-          <span className="rounded-lg bg-ink/5 px-2.5 py-1 text-sm text-muted">자동 수집 미지원</span>
+          <span className="rounded-lg bg-canvas px-3 py-1 text-sm text-muted">자동 수집 미지원</span>
         ) : needsVerification ? (
-          <span className="rounded-lg bg-warn/10 px-2.5 py-1 text-sm text-warn">확인 필요</span>
+          <span className="rounded-lg bg-warn/10 px-3 py-1 text-sm text-warn">확인 필요</span>
         ) : null}
         {schedule?.pausedReason ? (
           <span className="text-sm text-warn">{schedule.pausedReason}</span>

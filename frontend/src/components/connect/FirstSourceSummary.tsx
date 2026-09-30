@@ -88,7 +88,7 @@ export function FirstSourceSummary({
 
   return (
     <section
-      className="space-y-4 rounded-2xl border border-line bg-surface p-5"
+      className="space-y-4 rounded-2xl border border-line bg-surface p-4"
       aria-label="첫 수집 결과"
       data-testid="first-source-summary"
     >

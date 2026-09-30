@@ -34,7 +34,7 @@ export function CollectionHistorySection({
       {loading ? (
         <p className="text-base text-muted">불러오는 중…</p>
       ) : error ? (
-        <p className="rounded-xl bg-bad/5 px-4 py-3 text-base text-bad">
+        <p className="rounded-xl bg-bad/10 px-4 py-3 text-base text-bad">
           수집 이력을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
         </p>
       ) : runs.length === 0 ? (
@@ -94,7 +94,7 @@ function RunRow({
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <TriggerChip trigger={run.trigger} />
-          <span className="rounded-lg bg-canvas px-2.5 py-1 text-sm font-semibold">
+          <span className="rounded-lg bg-canvas px-3 py-1 text-sm font-semibold">
             {dataTypeLabel(run.dataType ?? run.uploadType)}
           </span>
           <span className={`text-sm font-semibold ${statusColor(run.status)}`}>
@@ -197,12 +197,12 @@ function TriggerChip({ trigger }: { trigger: string }) {
     SCHEDULED: { label: "자동", cls: "bg-brand/10 text-brand-700" },
     // 「고객 운영 관리」가 정해진 시간에 수집한 실행. 판매자에게는 예약 수집과 같은 뜻이라 같은 낱말을 쓴다.
     RESPONSIBILITY: { label: "자동", cls: "bg-brand/10 text-brand-700" },
-    MANUAL: { label: "수동", cls: "bg-ink/5 text-ink" },
+    MANUAL: { label: "수동", cls: "bg-canvas text-ink" },
     RETRY: { label: "재시도", cls: "bg-warn/10 text-warn" },
     UPLOAD: { label: "업로드", cls: "bg-canvas text-muted" },
     // The seller pressed 「지금 동기화」 and reviewnary read the seller-center screen. It is a manual run,
     // but not the same manual as an API pull, and it has been on this screen as the raw token ACTION_WINDOW.
-    ACTION_WINDOW: { label: "화면에서 실행", cls: "bg-ink/5 text-ink" },
+    ACTION_WINDOW: { label: "화면에서 실행", cls: "bg-canvas text-ink" },
   };
   // An unmapped trigger renders as nothing rather than as its own token: an internal word on this screen is
   // the defect this map exists to prevent, and a missing chip costs the seller less than a raw enum.
@@ -210,7 +210,7 @@ function TriggerChip({ trigger }: { trigger: string }) {
   if (!known) return null;
   const { label, cls } = known;
   return (
-    <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-sm font-semibold ${cls}`}>
+    <span className={`inline-flex items-center rounded-lg px-3 py-1 text-sm font-semibold ${cls}`}>
       {label}
     </span>
   );

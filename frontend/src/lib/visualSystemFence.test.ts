@@ -52,6 +52,14 @@ const ON_THE_SYSTEM = [
   "pages/app/CustomerInbox.tsx",
   "components/inbox/InboxDetail.tsx",
   "pages/app/ConnectHub.tsx",
+  "components/connect/ChannelList.tsx",
+  "components/connect/ChannelStatusSection.tsx",
+  "components/connect/CollectionSettingsSection.tsx",
+  "components/connect/CollectionHistorySection.tsx",
+  "components/connect/FirstSourceSummary.tsx",
+  "components/connect/HelperStatusCard.tsx",
+  "components/connect/coupang/CapabilityCard.tsx",
+  "components/BackfillPanel.tsx",
 ];
 
 /** One file with its comments removed — the ban is on USING these values, not on explaining them. */
@@ -72,6 +80,16 @@ describe("the palette is the palette", () => {
     // §4: a resting surface has an edge and no elevation. A `0 0 0 1px` shadow is a border that does not
     // participate in layout, so a card drawn with one is 2px narrower than the card beside it.
     expect(code(rel)).not.toMatch(/shadow-\[0_0_0_1(\.\d+)?px/);
+  });
+
+  it.each(ON_THE_SYSTEM)("%s spends one tint strength per tone", (rel) => {
+    // §5 gives each tone one tint: `good/10` · `warn/10` · `bad/10` · `brand-50`, and `canvas` for
+    // neutral. The connect screens had grown a `bg-bad/5` and a `bg-warn/5` alongside them, so the same
+    // 「무언가 잘못됐다」 surface was two different strengths on two screens — and `bg-ink/5` was a
+    // neutral tint mixed by hand where the palette already has `canvas`.
+    for (const m of code(rel).matchAll(/bg-(good|warn|bad|brand|ink)\/(\d+)/g)) {
+      expect(`${m[1]}/${m[2]}`).toBe(`${m[1]}/10`);
+    }
   });
 
   it.each(ON_THE_SYSTEM)("%s uses no gradient except a scroll fade", (rel) => {

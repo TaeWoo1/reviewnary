@@ -37,7 +37,7 @@ export function CapabilityCard({
   testId?: string;
 }) {
   return (
-    <section className="rounded-2xl border border-line bg-surface p-5" data-testid={testId} aria-label={title}>
+    <section className="rounded-2xl border border-line bg-surface p-4" data-testid={testId} aria-label={title}>
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="break-keep text-base font-semibold text-ink">{title}</h2>
         <Status tone={status.tone} variant="word">

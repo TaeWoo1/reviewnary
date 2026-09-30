@@ -43,7 +43,7 @@ export function ChannelStatusSection({
       {loading ? (
         <p className="text-base text-muted">불러오는 중…</p>
       ) : error ? (
-        <p className="rounded-xl bg-bad/5 px-4 py-3 text-base text-bad">
+        <p className="rounded-xl bg-bad/10 px-4 py-3 text-base text-bad">
           연결 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
         </p>
       ) : (
@@ -73,7 +73,7 @@ export function ChannelStatusSection({
             </div>
           </div>
           {status?.lastError ? (
-            <p className="mt-4 rounded-xl bg-bad/5 px-4 py-3 text-base text-bad">
+            <p className="mt-4 rounded-xl bg-bad/10 px-4 py-3 text-base text-bad">
               {status.lastError}
             </p>
           ) : null}
@@ -101,7 +101,7 @@ export function NextActionPanel({
 }) {
   const { tone, title, guidance, detail, cta } = action;
   return (
-    <section aria-label="다음 조치" className="rounded-2xl border border-line bg-surface p-5">
+    <section aria-label="다음 조치" className="rounded-2xl border border-line bg-surface p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="space-y-2">
           <p className="text-sm font-semibold text-muted">다음 조치</p>
@@ -185,7 +185,7 @@ export function ConnectionInfoSection({
       {loading ? (
         <p className="text-base text-muted">불러오는 중…</p>
       ) : error ? (
-        <p className="rounded-xl bg-bad/5 px-4 py-3 text-base text-bad">
+        <p className="rounded-xl bg-bad/10 px-4 py-3 text-base text-bad">
           연결 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
         </p>
       ) : info === null ? (
@@ -238,7 +238,7 @@ function CredentialTemplateBlock({
     return (
       <div className="mt-6 border-t border-line pt-6">
         <h3 className="text-base font-bold text-ink">연결에 필요한 정보</h3>
-        <p className="mt-2 rounded-xl bg-bad/5 px-4 py-3 text-base text-bad">
+        <p className="mt-2 rounded-xl bg-bad/10 px-4 py-3 text-base text-bad">
           연결에 필요한 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
         </p>
       </div>
@@ -265,14 +265,14 @@ function CredentialFieldRow({ field }: { field: CredentialFieldView }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-base font-semibold text-ink">{field.label}</span>
         <span
-          className={`rounded-lg px-2.5 py-1 text-sm font-medium ${
-            field.required ? "bg-ink/5 text-ink" : "bg-canvas text-muted"
+          className={`rounded-lg px-3 py-1 text-sm font-medium ${
+            field.required ? "bg-canvas font-semibold text-ink" : "bg-canvas text-muted"
           }`}
         >
           {field.required ? "필수" : "선택"}
         </span>
         {field.secret ? (
-          <span className="rounded-lg bg-warn/10 px-2.5 py-1 text-sm font-medium text-warn">
+          <span className="rounded-lg bg-warn/10 px-3 py-1 text-sm font-medium text-warn">
             민감 정보
           </span>
         ) : null}
@@ -371,7 +371,7 @@ function ConnectionInfoDetail({
         ) : null}
       </div>
       {testErrored ? (
-        <div className="rounded-xl bg-bad/5 px-4 py-3">
+        <div className="rounded-xl bg-bad/10 px-4 py-3">
           <p className="text-base font-semibold text-bad">연결 확인에 실패했습니다.</p>
         </div>
       ) : testResult ? (
@@ -402,7 +402,7 @@ function ConnectionCheckResult({ result }: { result: ConnectionTestResultView })
   }
   if (result.status === "FAILED") {
     return (
-      <div className="rounded-xl bg-bad/5 px-4 py-3">
+      <div className="rounded-xl bg-bad/10 px-4 py-3">
         <p className="text-base font-semibold text-bad">연결 확인에 실패했습니다.</p>
         {result.message ? <p className="mt-1 text-sm text-muted">{result.message}</p> : null}
       </div>
@@ -500,7 +500,7 @@ function CredentialEntryForm({
             onChange={(e) => setValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
             required={field.required}
             autoComplete="off"
-            className="w-full rounded-xl border border-line px-4 py-2.5 text-base focus:border-brand focus:outline-none"
+            className="w-full rounded-xl border border-line px-4 py-2 text-base focus:border-brand focus:outline-none"
           />
           {field.helpText ? <p className="mt-1 text-sm text-muted">{field.helpText}</p> : null}
         </div>
