@@ -1,5 +1,11 @@
 import type { Config } from "tailwindcss";
 
+// The accent, named once. `boxShadow.selected` below is made of this exact value, and a token that
+// restates a colour is a token that drifts from it — that is how the app surface ended up with a
+// selection bar written as `shadow-[inset_3px_0_0_#1B64DA]` in four separate files
+// (docs/ui/reviewnary_ui_system_audit_v1.md §4).
+const BRAND_700 = "#1B64DA";
+
 // Toss-like clean foundation: large readable type, soft cards, calm palette.
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
@@ -10,7 +16,7 @@ export default {
           DEFAULT: "#3182F6",
           50: "#EAF2FE",
           600: "#2272EB",
-          700: "#1B64DA",
+          700: BRAND_700,
           // The HOVER value for a solid primary, and it is darker than the resting one on purpose.
           // `brand-600` was the hover, and white on #2272EB measures 4.49:1 — under AA by a hundredth,
           // on the most-pressed control in the product. A hover that lightens a solid button has to
@@ -101,6 +107,10 @@ export default {
         // ONE live element on the page. The conversation is paper and every object is set into it
         // with rules; the box the seller types in is the only thing that sits ON the paper.
         composer: "0 1px 2px rgba(25,31,40,0.04), 0 10px 28px rgba(25,31,40,0.07)",
+        // The selected row of a list, as an inset bar in the accent. A selected row is not elevated
+        // and takes no border — §4 allows no shadow on a resting surface — so this is the one
+        // `boxShadow` the app surface spends on state rather than on floating.
+        selected: `inset 3px 0 0 ${BRAND_700}`,
       },
     },
   },

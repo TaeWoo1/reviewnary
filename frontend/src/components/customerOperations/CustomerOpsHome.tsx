@@ -159,10 +159,10 @@ export function CustomerOpsHome({
 
   const pill =
     co.status === "ACTIVE"
-      ? { label: COPY.running, cls: "bg-[#E9F4EC] text-good", dot: "bg-[#1F9D55] shadow-[0_0_0_3px_rgba(31,157,85,0.18)]" }
+      ? { label: COPY.running, cls: "bg-good/10 text-good", dot: "bg-good ring-[3px] ring-good/15" }
       : co.status === "PAUSED"
-        ? { label: COPY.paused, cls: "bg-[#FFF3E4] text-warn", dot: "bg-[#D97706]" }
-        : { label: COPY.off, cls: "bg-[#F1F3F5] text-muted", dot: "bg-[#8B95A1]" };
+        ? { label: COPY.paused, cls: "bg-warn/10 text-warn", dot: "bg-warn" }
+        : { label: COPY.off, cls: "bg-canvas text-muted", dot: "bg-muted" };
 
   const warnings = [...lastRunLines(co, now), ...warningLines(co, now), ...failedReads(ops, queue)];
 
@@ -218,7 +218,7 @@ export function CustomerOpsHome({
       {running && co.status === "ACTIVE" ? (
         <>
           {warnings.length > 0 ? (
-            <ul className="space-y-1.5 rounded-xl bg-[#FFF8EF] px-4 py-3 text-sm text-warn" aria-label="집계에서 빠진 곳">
+            <ul className="space-y-2 rounded-xl bg-warn/10 px-4 py-3 text-sm text-warn" aria-label="집계에서 빠진 곳">
               {warnings.map((line, i) => (
                 <li key={i} className="flex flex-wrap items-center gap-x-2">
                   {line}
@@ -230,7 +230,7 @@ export function CustomerOpsHome({
       ) : (
         <section
           aria-label={pill.label}
-          className="flex flex-wrap items-center gap-3 rounded-[16px] bg-surface px-6 py-5 shadow-[0_0_0_1px_#E4E7EC]"
+          className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-6 py-4"
         >
           {/* <b>Before it is running, the card names what the seller is about to start — not the state again.</b>
               It used to print `COPY.off`, the same string as the badge two lines above, so the whole card was one
@@ -506,7 +506,7 @@ const PROBLEM = "problem:";
 /** The dot between two facts on the status line. Drawn, never typed, so a wrapped line never starts on one. */
 function Sep() {
   return (
-    <span aria-hidden="true" className="text-[#C9CFD8]">
+    <span aria-hidden="true" className="text-line">
       ·
     </span>
   );
@@ -788,7 +788,7 @@ function Dot() {
   return (
     <>
       {" "}
-      <span aria-hidden="true" className="text-[#C9CFD8]">
+      <span aria-hidden="true" className="text-line">
         &middot;
       </span>{" "}
     </>

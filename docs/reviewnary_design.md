@@ -70,8 +70,17 @@ One family: **Pretendard** → platform Korean sans. No monospace in product UI.
 | Sidebar | **232px**, `surface`, 1px `line` on the right; hidden below `md` |
 | Main padding | 32px horizontal, 24px top (desktop) |
 | Content width | **1120px** max, left-aligned inside the main column |
-| Two-pane work surface | `[340px list \| flexible detail]`, the list column scrolls inside itself |
+| Two-pane work surface | `[minmax(0,1fr) list \| 440px detail]`, each column scrolls inside itself; single-pane below 1200px (`WIDE_QUERY`) rather than a squeezed detail |
 | Grid maximum | 4 compact metrics or 3 cards across; never 6 equal cards |
+
+**The two-pane is ONE reading** (product-owner decision, 2026-09-30). This row said `[340px | flexible]`
+while §8-A v3.1 said `[flexible | 440px fixed]` and the code did the latter — a contract that says two
+things cannot be enforced, and the same pane was 440px on 오늘 and `46%` (min 440, max 620) on 확인할 일.
+Resolved to `[minmax(0,1fr) | 440px]` everywhere, with the list column at the ordinary `max-w-content`
+and left-aligned like every other page. `minmax(0,1fr)` and not `1fr`: a `1fr` track floors at its
+content's min-content width, so one long unbroken Korean line would push the pane off screen. A narrow
+viewport falls back to single-pane; it never squeezes the detail.
+(`docs/ui/reviewnary_ui_system_audit_v1.md` §7, §10.2.)
 
 Breakpoints: default (mobile) · `sm` 640 · `md` 768 (sidebar appears) · `lg` 1024 (two-pane) · `xl` 1280.
 No custom breakpoints. The page body never scrolls horizontally; wide tables scroll inside their own
@@ -179,7 +188,7 @@ count, explanation) are one folded line per row.
 **문의.** Work-state first: `초안 준비됨 · 답변 필요 · 답변함` as the row's first word, then the
 customer's sentence, then product/channel, then time. Rows older than a year sit under their own quiet
 divider in `muted` so a 2014 backlog never has the weight of this morning's question. A chosen row
-opens `[340px | detail]`; the detail is question → answer state card → draft → CTA on its own line.
+opens `[minmax(0,1fr) | 440px]`; the detail is question → answer state card → draft → CTA on its own line.
 
 **주문.** Filters (period + channel) at the top at full weight; four compact metrics (주문 · 매출 ·
 일평균 · 최다 채널); one trend chart; the channel share as a table with bars. No 「운영 인사이트」

@@ -350,7 +350,7 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
                       to={hrefFor(review.id)}
                       aria-current={selected ? "true" : undefined}
                       className={`block px-4 py-3 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
-                        selected ? "bg-brand-50 shadow-[inset_3px_0_0_#1B64DA]" : "hover:bg-canvas"
+                        selected ? "bg-brand-50 shadow-selected" : "hover:bg-canvas"
                       }`}
                     >
                       {/* Three lines: state · stars · where and when; what the buyer wrote; the product. The rule's

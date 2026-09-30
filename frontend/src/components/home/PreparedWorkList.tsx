@@ -43,7 +43,7 @@ export function PreparedWorkList({
             to={linkFor ? linkFor(row) : row.to}
             aria-current={selectedId === row.id ? "true" : undefined}
             className={`block break-keep px-4 py-3 text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
-              selectedId === row.id ? "bg-brand-50 shadow-[inset_3px_0_0_#1B64DA]" : "hover:bg-canvas"
+              selectedId === row.id ? "bg-brand-50 shadow-selected" : "hover:bg-canvas"
             }`}
           >
             {row.detail ? (

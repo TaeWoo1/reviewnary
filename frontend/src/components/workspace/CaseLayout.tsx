@@ -119,8 +119,8 @@ export function CaseLayout({
           className={
             titleHidden
               ? "sr-only"
-              : `break-keep font-extrabold leading-snug tracking-tight text-ink [overflow-wrap:anywhere] ${
-                  pane ? "text-xl" : "text-[24px] leading-tight"
+              : `break-keep font-bold leading-snug tracking-tight text-ink [overflow-wrap:anywhere] ${
+                  pane ? "text-xl" : "text-2xl leading-tight"
                 }`
           }
         >
@@ -148,7 +148,7 @@ export function CaseLayout({
           // a rule used to do. Measured at 20px the gap between 고객 원문 and 확인 필요 (41px) and the gap between
           // 확인 필요 and 근거 (44px) were the same distance, so the reader had no grouping at all; at 28px the
           // between-group air is four times the within-group air and the three questions read as three.
-          className={depth === "preview" ? "space-y-7" : "space-y-4"}
+          className={depth === "preview" ? "space-y-6" : "space-y-4"}
           data-case-variant="pane"
           data-pane-depth={depth}
         >
@@ -186,8 +186,8 @@ export function CaseLayout({
             {decisionBlock ? (
               <div className="self-start lg:sticky lg:top-4 lg:col-start-2 lg:row-span-3 lg:row-start-1">{decisionBlock}</div>
             ) : null}
-            {context ? <div className="min-w-0 space-y-3.5 self-start lg:col-start-1">{context}</div> : null}
-            {more ? <div className="min-w-0 space-y-3.5 self-start lg:col-start-1">{more}</div> : null}
+            {context ? <div className="min-w-0 space-y-3 self-start lg:col-start-1">{context}</div> : null}
+            {more ? <div className="min-w-0 space-y-3 self-start lg:col-start-1">{more}</div> : null}
           </div>
         </div>
       )}
@@ -231,7 +231,7 @@ export function CaseBlock({
     );
   }
   return (
-    <section aria-label={title} className="rounded-2xl border border-line bg-surface px-5 py-5 sm:px-6">
+    <section aria-label={title} className="rounded-2xl border border-line bg-surface px-4 py-4 sm:px-6">
       {heading}
       {children}
     </section>
@@ -250,13 +250,13 @@ export function CaseBlock({
  * reader by the heading not being drawn.
  */
 export function Eyebrow({ children }: { children: ReactNode }) {
-  return <p className="text-[12px] font-medium leading-none text-muted">{children}</p>;
+  return <p className="text-xs font-medium leading-none text-muted">{children}</p>;
 }
 
 /** The customer's own words — the largest body text on any case, on either variant. */
 export function CaseQuote({ children }: { children: ReactNode }) {
   return (
-    <p className="whitespace-pre-wrap break-keep text-[17px] font-medium leading-[1.8] text-ink [overflow-wrap:anywhere]">
+    <p className="whitespace-pre-wrap break-keep text-prose font-medium text-ink [overflow-wrap:anywhere]">
       {children}
     </p>
   );
@@ -273,7 +273,7 @@ export function DecisionCard({ children, primary = false }: { children: ReactNod
   return (
     <div
       className={`rounded-2xl bg-surface ${pad} ${
-        primary ? "shadow-[0_0_0_1.5px_#1B64DA,0_18px_36px_-22px_rgba(27,100,218,0.45)]" : "border border-line"
+        primary ? "ring-2 ring-brand-700" : "border border-line"
       }`}
     >
       {children}

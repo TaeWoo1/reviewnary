@@ -338,7 +338,7 @@ export function CustomerInbox() {
             aria-label="채널"
             value={channel ?? ""}
             onChange={(e) => setParam("channel", e.target.value || null)}
-            className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none"
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
           >
             <option value="">모든 채널</option>
             {channels.map(([code, name]) => (
@@ -349,7 +349,7 @@ export function CustomerInbox() {
             aria-label="답변 상태"
             value={status}
             onChange={(e) => setParam("status", e.target.value)}
-            className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm focus:border-brand-700 focus:outline-none"
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
           >
             {RECORD_STATUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>

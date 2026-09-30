@@ -25,8 +25,8 @@ function IssueRow({ issue, selected }: { issue: ReviewIssueView; selected: boole
       <Link
         to={`/memory/${issue.id}`}
         aria-current={selected ? "true" : undefined}
-        className={`block px-5 py-4 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
-          selected ? "bg-brand-50 shadow-[inset_3px_0_0_#1B64DA]" : "hover:bg-canvas"
+        className={`block px-4 py-4 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
+          selected ? "bg-brand-50 shadow-selected" : "hover:bg-canvas"
         }`}
       >
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 break-keep">
@@ -58,7 +58,7 @@ export function IssueList({
 }) {
   const groups = groupIssues(issues);
   return (
-    <div aria-label="반복 이슈 목록" role="region" className="space-y-5">
+    <div aria-label="반복 이슈 목록" role="region" className="space-y-6">
       {groups.map((group) => (
         <section key={group.key}>
           <div className="mb-2 flex items-baseline gap-2">

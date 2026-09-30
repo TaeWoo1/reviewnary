@@ -38,7 +38,7 @@ export function OperationsAreas({ home }: { home: OperationsHome }) {
   const channels = collectionLines(collection);
 
   return (
-    <div className="space-y-5" aria-label="오늘 확인할 것">
+    <div className="space-y-6" aria-label="오늘 확인할 것">
       {/* 1 — 지금 확인할 리뷰 */}
       <Area title="지금 확인할 리뷰" to="/reviews" linkLabel="리뷰 기록 열기">
         <p className="break-keep leading-relaxed text-ink">{reviewWorkLine(reviews)}</p>
@@ -85,13 +85,13 @@ export function OperationsAreas({ home }: { home: OperationsHome }) {
         prepared rows — and stacking them cost the page 250px that pushed them under the fold on every
         width. Below 1152 they stack, because two columns that narrow would wrap a channel name.
       */}
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
       {/* 3 — 최근 수집 상태 */}
       <Area title="최근 수집 상태" to="/connect" linkLabel="채널 연결 열기">
         {channels.length === 0 ? (
           <p className="break-keep leading-relaxed text-muted">아직 연결된 판매 채널이 없습니다.</p>
         ) : (
-          <ul className="space-y-1.5">
+          <ul className="space-y-2">
             {channels.map((line) => (
               <li key={line.channelCode} className="flex flex-wrap items-baseline gap-x-2">
                 <span className="break-keep font-medium text-ink">{line.channelNameKo}</span>

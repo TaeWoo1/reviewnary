@@ -239,7 +239,7 @@ export function ConnectHub() {
       <PageHead title="채널 연결" />
 
       {openCount > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn/5 px-4 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn/5 px-4 py-3">
           <span className="text-sm font-semibold text-warn">확인이 필요한 연결 알림 {openCount}건</span>
           <BtnLink to="/settings/alerts" size="sm" variant="outline">
             확인하기
@@ -247,10 +247,10 @@ export function ConnectHub() {
         </div>
       ) : null}
 
-      {notice ? <div className="rounded-xl bg-brand-50 px-4 py-2.5 text-sm text-brand-700">{notice}</div> : null}
+      {notice ? <div className="rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-700">{notice}</div> : null}
 
       {accountsError ? (
-        <div className="rounded-xl bg-bad/10 px-4 py-2.5 text-sm text-bad">연결 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>
+        <div className="rounded-xl bg-bad/10 px-4 py-3 text-sm text-bad">연결 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>
       ) : null}
 
       <Section title="채널">
@@ -312,7 +312,7 @@ export function ConnectHub() {
           에서 볼 수 있습니다.
         </p>
         <Disclosure label="파일로 넘기면 어떻게 진행되나요" className="mt-2">
-          <ol className="mt-2 space-y-1.5 text-sm text-muted">
+          <ol className="mt-2 space-y-2 text-sm text-muted">
             {[
               "가져올 자료를 고릅니다.",
               "형식과 기간이 맞는지 먼저 확인합니다.",

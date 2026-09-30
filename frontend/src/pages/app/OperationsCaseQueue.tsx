@@ -233,7 +233,6 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       detailLabel="선택한 확인할 일"
       detail={selected ? <WorkItemPane row={selected} now={now} /> : null}
       onClose={selected ? close : undefined}
-      fillWhenClosed
     />
   );
 }

@@ -11,15 +11,15 @@ import type { ReasonIcon, ReasonTone } from "../../lib/copy/customerOps";
  * A row with `action` instead of `to` (the 지식 inbox, whose editor opens in place) renders its controls there.
  */
 const TILE: Record<ReasonTone, string> = {
-  amber: "bg-[#FFF3E4] text-[#B45309]",
+  amber: "bg-warn/10 text-warn",
   blue: "bg-brand-50 text-brand-700",
-  gray: "bg-[#F1F3F5] text-muted",
+  gray: "bg-canvas text-muted",
 };
 
 const TAG: Record<ReasonTone, string> = {
-  amber: "bg-[#FFF3E4] text-warn",
+  amber: "bg-warn/10 text-warn",
   blue: "bg-brand-50 text-brand-700",
-  gray: "bg-[#F1F3F5] text-muted",
+  gray: "bg-canvas text-muted",
 };
 
 export function DecisionRow({
@@ -108,14 +108,14 @@ export function DecisionRow({
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             {badge}
-            <span className="min-w-0 max-w-[62ch] break-keep text-[15px] font-semibold leading-snug text-ink [overflow-wrap:anywhere]">
+            <span className="min-w-0 max-w-[62ch] break-keep text-sm font-semibold leading-snug text-ink [overflow-wrap:anywhere]">
               {title}
             </span>
           </span>
-          {meta ? <span className="mt-0.5 block truncate text-[13px] text-muted">{meta}</span> : null}
+          {meta ? <span className="mt-0.5 block truncate text-xs text-muted">{meta}</span> : null}
         </span>
         {rating != null || wait ? (
-          <span className="flex shrink-0 flex-col items-end gap-0.5 pt-px text-[13px] tabular-nums text-muted">
+          <span className="flex shrink-0 flex-col items-end gap-1 pt-px text-xs tabular-nums text-muted">
             {rating != null ? <span aria-label={`별점 ${rating}점`}>★{rating}</span> : null}
             {wait ? <span className="whitespace-nowrap">{wait}</span> : null}
           </span>
@@ -125,11 +125,11 @@ export function DecisionRow({
     );
     // The fill is the selection (Intercom draws it exactly this way: a soft rounded fill, no border and no left
     // bar), and the row that carries it drops the hairline above it so the two marks never stack.
-    const shape = `flex items-start gap-4 rounded-lg px-2.5 py-2.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
-      selected ? "!border-transparent bg-[#EFF3F9]" : "hover:bg-[#F7F8FA]"
+    const shape = `flex items-start gap-4 rounded-lg px-3 py-3 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
+      selected ? "!border-transparent bg-brand-50" : "hover:bg-canvas"
     }`;
     return (
-      <li className="px-1.5 [&+&>*]:border-t [&+&>*]:border-[#EEF0F3]">
+      <li className="px-1.5 [&+&>*]:border-t [&+&>*]:border-line">
         {to ? (
           <Link to={to} state={state} aria-current={selected ? "true" : undefined} className={`group ${shape}`}>
             {inner}
@@ -137,13 +137,13 @@ export function DecisionRow({
         ) : (
           <div className={shape}>{inner}</div>
         )}
-        {children ? <div className="px-2.5 pb-3">{children}</div> : null}
+        {children ? <div className="px-3 pb-3">{children}</div> : null}
       </li>
     );
   }
 
   const tile = (
-    <span aria-hidden="true" className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] ${TILE[tone]}`}>
+    <span aria-hidden="true" className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${TILE[tone]}`}>
       <Icon name={icon} />
     </span>
   );
@@ -164,7 +164,7 @@ export function DecisionRow({
         {wait ? <span className="whitespace-nowrap text-sm tabular-nums text-muted">{wait}</span> : null}
         {verb && to ? (
           <span
-            className={`inline-flex min-h-[36px] items-center rounded-lg px-3.5 text-sm font-semibold ${
+            className={`inline-flex min-h-[36px] items-center rounded-lg px-3 text-sm font-semibold ${
               primary ? "bg-brand-700 text-white group-hover:bg-brand-800" : "border border-line bg-surface text-ink group-hover:bg-canvas"
             }`}
           >
@@ -177,22 +177,22 @@ export function DecisionRow({
   );
 
   return (
-    <li className="[&+&]:border-t [&+&]:border-[#EEF0F3]">
+    <li className="[&+&]:border-t [&+&]:border-line">
       {to ? (
         <Link
           to={to}
           state={state}
           aria-current={selected ? "true" : undefined}
-          className={`group flex items-start gap-3.5 px-5 py-4 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
-            selected ? "bg-brand-50 shadow-[inset_3px_0_0_#1B64DA]" : "hover:bg-[#FAFBFC]"
+          className={`group flex items-start gap-3 px-4 py-4 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
+            selected ? "bg-brand-50 shadow-selected" : "hover:bg-canvas"
           }`}
         >
           {body}
         </Link>
       ) : (
-        <div className="flex items-start gap-3.5 px-5 py-4">{body}</div>
+        <div className="flex items-start gap-3 px-4 py-4">{body}</div>
       )}
-      {children ? <div className="px-5 pb-4 sm:pl-[74px]">{children}</div> : null}
+      {children ? <div className="px-4 pb-4 sm:pl-[68px]">{children}</div> : null}
     </li>
   );
 }
@@ -210,7 +210,7 @@ export function DecisionList({ children, ariaLabel, plain = false }: { children:
   return (
     <ul
       aria-label={ariaLabel}
-      className={plain ? "-mx-1.5" : "overflow-hidden rounded-[14px] bg-surface shadow-[0_0_0_1px_#E4E7EC]"}
+      className={plain ? "-mx-1.5" : "overflow-hidden rounded-2xl border border-line bg-surface"}
     >
       {children}
     </ul>

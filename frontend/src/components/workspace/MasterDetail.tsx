@@ -43,7 +43,6 @@ export function MasterDetail({
   footer,
   onClose,
   preview = false,
-  fillWhenClosed = false,
   paneFooter,
 }: {
   /** The page head, the actionable summary and the list — everything in the middle column. */
@@ -70,25 +69,15 @@ export function MasterDetail({
   /**
    * <b>The pane is a contextual preview, not the workspace</b> (Home v3.1).
    *
-   * <p>One claim about the screen, with two consequences for its geometry. A screen whose subject is the
-   * LIST — the morning's work — gives the list the room: closed, the column widens past the reading
-   * measure and uses the space the sidebar left it; open, the pane is a fixed <b>440px</b> preview
-   * rather than a 46% column that ends up the same weight as the work it describes. Measured at
-   * 1440×900 before this: the list was 760px centred inside 1208 (two ~224px dead gutters), and the
-   * open pane was 556px against a 652px list.
+   * <p>A claim about the screen, and since UI System v2 it no longer carries any WIDTH: both readings are
+   * a fixed 440px pane beside a `max-w-content` list, because the same pane being 440 on one screen and
+   * 46% of the viewport on another was one of the two page rhythms the audit found (§5, §10.2).
    *
-   * <p>A screen whose subject is the ITEM — a queue whose job is the one case in front of you — wants
-   * the opposite, so this is opt-in and leaving it out keeps exactly the layout that shipped.
+   * <p>What it still decides is the pane's INSIDE: a preview owns its own scroller and can dock a single
+   * primary action under it ({@link paneFooter}), so the thing to press does not scroll away with the
+   * case. Without it the pane scrolls as one column, which is what a full workspace wants.
    */
   preview?: boolean;
-  /**
-   * The list takes the column when nothing is selected — {@link preview}'s first consequence, on its own.
-   *
-   * <p>For a screen whose closed state is a list to look through but whose OPEN state is still the
-   * workspace (확인할 일: 45 rows and five filters, and the judgment happens in the pane). Implied by
-   * {@link preview}; passing it alone leaves the pane exactly as it shipped.
-   */
-  fillWhenClosed?: boolean;
   /**
    * Docked at the bottom of the pane, outside its scroll — the preview's single primary action.
    *
@@ -112,21 +101,33 @@ export function MasterDetail({
 
   return (
     <div className="flex h-full min-h-0 flex-1" data-layout="master-detail">
+      {/* `min-w-0 flex-1` is the flex spelling of the `minmax(0,1fr)` track the decision names: without
+          `min-w-0` a flex item floors at its content's min-content width, and one long unbroken Korean
+          line would push the 440px pane off screen. */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* `relative`: each scroller is the containing block of what it holds. Without it an absolutely positioned
             descendant (an sr-only label) is placed against the document and stretches the PAGE past the viewport. */}
-        <div className="relative min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-5 md:px-8 md:pb-10 md:pt-6" data-testid="master-list">
-          {/* Closed, a work table may use the width it was given; open, it goes back to the reading measure
-              so the row a seller is comparing against the pane does not run the whole screen. */}
-          <div className={`mx-auto w-full space-y-5 ${(preview || fillWhenClosed) && !open ? "max-w-[1160px]" : "max-w-[760px]"}`}>{list}</div>
+        <div className="relative min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 md:px-8 md:pb-8 md:pt-6" data-testid="master-list">
+          {/* <b>One width, one alignment, one rhythm — the same as every other page</b> (UI System v2 §10.2).
+              This column used to be `mx-auto` at 760px, widening to 1160 when the pane closed, while every
+              non-master-detail screen was 1120 and left-aligned. Moving from 문의 to 상품 therefore changed
+              the body width, the alignment AND the vertical rhythm at once, which is most of what read as
+              「여백이 제각각」 (audit §5). `max-w-content` is the contract's 1120 (§2). */}
+          <div className="w-full max-w-content space-y-6">{list}</div>
         </div>
         {footer}
       </div>
       {open ? (
+        /*
+          440px, fixed, in both readings (product-owner decision, 2026-09-30). The detail used to be
+          `w-[46%] min-w-[440px] max-w-[620px]` here and a fixed 440 in `preview`, so the same pane was a
+          different width on two screens and a percentage of the viewport on one of them. A narrow viewport
+          does not squeeze it — `wide` already falls back to single-pane below `WIDE_QUERY`.
+        */
         <aside
           aria-label={detailLabel}
-          className={`relative shrink-0 border-l border-line bg-surface ${
-            preview ? "flex w-[440px] min-w-[440px] flex-col" : `w-[46%] min-w-[440px] max-w-[620px] overflow-y-auto px-7 pb-10 ${onClose ? "pt-0" : "pt-6"}`
+          className={`relative w-[440px] min-w-[440px] shrink-0 border-l border-line bg-surface ${
+            preview ? "flex flex-col" : `overflow-y-auto px-6 pb-8 ${onClose ? "pt-0" : "pt-6"}`
           }`}
           data-testid="master-detail"
         >
@@ -135,9 +136,7 @@ export function MasterDetail({
               // Sticky, because the case below it is taller than the viewport: a close control that scrolls
               // away is a close control the seller has to scroll back up to find.
               <div
-                className={`sticky top-0 z-10 mb-2 flex justify-end border-b border-line bg-surface py-1.5 ${
-                  preview ? "-mx-6 px-6" : "-mx-7 px-7"
-                }`}
+                className="sticky top-0 z-10 mb-2 flex justify-end border-b border-line bg-surface py-2 -mx-6 px-6"
               >
                 <button
                   type="button"

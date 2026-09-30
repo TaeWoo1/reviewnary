@@ -45,7 +45,7 @@ export function WorkFlowCard({
   return (
     <section
       aria-label={ariaLabel ?? (mine ? `${done.label}, ${mine.label}` : done.label)}
-      className="overflow-hidden rounded-[16px] bg-surface shadow-[0_0_0_1px_#E4E7EC,0_8px_24px_-18px_rgba(15,25,45,0.35)]"
+      className="overflow-hidden rounded-2xl border border-line bg-surface"
       data-testid="work-flow-card"
     >
       <div className={mine ? "grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_36px_minmax(0,1fr)]" : ""}>
@@ -53,7 +53,7 @@ export function WorkFlowCard({
         {mine ? (
           <>
             <div aria-hidden="true" className="hidden items-center justify-center sm:flex">
-              <svg viewBox="0 0 24 24" className="h-[22px] w-[22px] fill-none stroke-[#B0B8C1] stroke-2">
+              <svg viewBox="0 0 24 24" className="h-[22px] w-[22px] fill-none stroke-line stroke-2">
                 <path d="M5 12h14 M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
@@ -62,11 +62,11 @@ export function WorkFlowCard({
         ) : null}
       </div>
       {hasFoot ? (
-        <ul className="border-t border-[#EEF0F3] bg-[#FFF8F1]">
+        <ul className="border-t border-line bg-warn/10">
           {warnings.map((warning, i) => (
             <li
               key={i}
-              className="flex flex-wrap items-center gap-x-2.5 gap-y-1 px-6 py-2.5 text-sm text-warn [&+&]:border-t [&+&]:border-[#F6E7D6]"
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 px-6 py-3 text-sm text-warn [&+&]:border-t [&+&]:border-warn/20"
             >
               <WarnIcon />
               {warning}
@@ -81,8 +81,8 @@ export function WorkFlowCard({
 function Cell({ cell, icon, mine = false }: { cell: FlowCell; icon: ReactNode; mine?: boolean }) {
   return (
     <div
-      className={`min-w-0 px-6 py-5 ${
-        mine ? "border-t border-[#EEF0F3] bg-gradient-to-b from-[#F5F9FF] to-surface sm:border-t-0" : ""
+      className={`min-w-0 px-6 py-4 ${
+        mine ? "border-t border-line bg-brand-50/40 sm:border-t-0" : ""
       }`}
     >
       <p className={`flex items-center gap-1.5 text-xs font-semibold ${mine ? "text-brand-700" : "text-muted"}`}>
@@ -90,7 +90,7 @@ function Cell({ cell, icon, mine = false }: { cell: FlowCell; icon: ReactNode; m
         {cell.label}
       </p>
       <p
-        className={`mt-2 break-keep font-extrabold tracking-tight tabular-nums ${
+        className={`mt-2 break-keep font-bold tracking-tight tabular-nums ${
           cell.phrase ? "text-xl leading-snug" : "text-3xl leading-none"
         } ${mine && !cell.phrase ? "text-brand-700" : "text-ink"}`}
       >
@@ -122,7 +122,7 @@ function PersonIcon() {
 
 function WarnIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0 fill-none stroke-[#B45309] stroke-[1.9]">
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0 fill-none stroke-warn stroke-[1.9]">
       <path d="M12 4l9 16H3z M12 10v4 M12 17h.01" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );

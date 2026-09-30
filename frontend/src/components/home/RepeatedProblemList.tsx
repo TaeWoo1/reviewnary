@@ -44,7 +44,7 @@ export function RepeatedProblemList({
         return (
           <li
             key={issue.id}
-            className={`space-y-1 px-4 py-3 ${selectedId === issue.id ? "bg-brand-50 shadow-[inset_3px_0_0_#1B64DA]" : ""}`}
+            className={`space-y-1 px-4 py-3 ${selectedId === issue.id ? "bg-brand-50 shadow-selected" : ""}`}
           >
             <Link
               to={linkFor ? linkFor(issue.id) : `/memory/${issue.id}`}
