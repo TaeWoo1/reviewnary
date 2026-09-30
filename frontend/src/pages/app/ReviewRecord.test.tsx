@@ -242,6 +242,39 @@ describe("reply work on the 리뷰 screen (A6)", () => {
     replyWork: { actionRef: "review:r1", triageDisposition: null, hasReplyPreparation: false, channelReplyState: "PENDING" },
   };
 
+  /**
+   * <b>한 사실은 한 번.</b> The pane's header owns which review this is — 채널 · 별점 · 날짜 · 상품 and the
+   * customer's own sentence — and {@code ReviewReadDetail} owns what is true ABOUT it. Measured on the
+   * rendered pane at 1600×1000 before this: the date stood twice, the product twice and 확인 필요 three
+   * times inside one 440px column.
+   */
+  it("the pane states each closed fact exactly once — the header owns them", async () => {
+    // The measured case: a 확인 필요 review with no seller correction, which is what the 리뷰 기록 pane
+    // opens on for this org.
+    getChannelReviewsStrict.mockResolvedValue(NAVER_PAGE);
+    getChannelReviewStrict.mockResolvedValue({
+      ...NAVER_DETAIL,
+      triage: { tier: "NEEDS_ATTENTION", reason: "낮은 별점", tags: [], recommendedAction: null },
+      sellerCorrection: null,
+    });
+    renderPage("/reviews?review=r1");
+
+    const pane = await screen.findByRole("region", { name: "판단과 조치" });
+    const column = pane.closest("aside") ?? pane.parentElement!;
+    const text = (column.textContent ?? "").replace(/\s+/g, " ");
+    const times = (needle: string) => text.split(needle).length - 1;
+
+    // 날짜: the header's, once.
+    expect(times("2026-08-11")).toBe(1);
+    // 판정: once, as the chip that answers 「왜 이게 올라왔나」 — never again as 「시스템 판단 …」.
+    expect(times("확인 필요")).toBe(1);
+    // 상품: the header's `sub`, with no definition-list row repeating it.
+    expect(within(pane).queryByText("상품")).toBeNull();
+    expect(times("무선 이어폰")).toBe(1);
+    // 별점: moved INTO the header, so it is still stated — just not in two places.
+    expect(text).toContain("★");
+  });
+
   it("NAVER: the detail READS the decision and offers the door — it no longer records one", async () => {
     getChannelReviewsStrict.mockResolvedValue(NAVER_PAGE);
     getChannelReviewStrict.mockResolvedValue(NAVER_DETAIL);
@@ -251,7 +284,12 @@ describe("reply work on the 리뷰 screen (A6)", () => {
     // Who writes the answer — the channel's capability, said where the door is.
     expect(within(block).getByText(/올리는 일은 판매자센터에서 직접 합니다/)).toBeInTheDocument();
     // What stands, as facts. No control that writes: the record is a record.
-    expect(within(block).getByText(/시스템 판단/)).toBeInTheDocument();
+    //
+    // <b>「시스템 판단」 is NOT here, and that is the rule</b> (2026-10-01). This line exists to put the two
+    // judgments side by side; with no seller correction there is one judgment, and it is already the
+    // verdict chip at the top of this same 440px column. The pairing renders the moment there is
+    // something to pair it WITH — asserted below, on a fixture that has a correction.
+    expect(within(block).queryByText(/시스템 판단/)).toBeNull();
     expect(within(block).getByText("처리 상태 판단 전")).toBeInTheDocument();
     expect(within(block).queryByRole("button", { name: "대응 필요" })).toBeNull();
     expect(within(block).queryByRole("button", { name: "확인 필요" })).toBeNull();

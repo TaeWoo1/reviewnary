@@ -343,7 +343,7 @@ export function ReviewCaseView({
         paneEvidenceFolded ? (
           <Disclosure label="왜 올라왔나요" summaryClassName="-ml-2">
             <div className="pt-2">
-              <ReviewProblemCard detail={detail} word={word} showBody={false} />
+              <ReviewProblemCard detail={detail} word={word} showBody={false} verdict="controls" />
             </div>
           </Disclosure>
         ) : preview ? (
@@ -353,7 +353,7 @@ export function ReviewCaseView({
           <ReviewProblemCard detail={detail} word={word} showBody={false} />
         ) : (
           <CaseBlock title="왜 올라왔나요" tone="plain" flat>
-            <ReviewProblemCard detail={detail} word={word} showBody={false} />
+            <ReviewProblemCard detail={detail} word={word} showBody={false} verdict="controls" />
           </CaseBlock>
         )
       }

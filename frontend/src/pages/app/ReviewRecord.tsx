@@ -14,7 +14,7 @@ import { OperationsCaseView } from "./OperationsCase";
 import { api } from "../../lib/apiClient";
 import { ratingLabel } from "../../lib/reviewRecord";
 import { plainText, previewText } from "../../lib/plainText";
-import { channelShort, COPY } from "../../lib/copy/customerOps";
+import { channelShort, COPY, sourceLabel } from "../../lib/copy/customerOps";
 import { TRIAGE_TAG_DISCLOSURE, TRIAGE_TIERS, TRIAGE_TIER_LABEL } from "../../lib/reviewTriage";
 import { Disclosure } from "../../components/ui/Disclosure";
 import { useReviewLocate } from "../../lib/actionWindow/locate/useReviewLocate";
@@ -490,7 +490,7 @@ function ReviewReadPane({
       decisionLabel="읽기"
       meta={
         <Facts>
-          <span>{channelShort(facts?.channelCode) ?? facts?.channelNameKo ?? "리뷰"}</span>
+          <span>{sourceLabel(facts?.channelCode ?? facts?.channelNameKo ?? null, "REVIEW", detail.rating)}</span>
           <span className="tabular-nums">{detail.writtenOn ?? "날짜 없음"}</span>
         </Facts>
       }
@@ -498,7 +498,7 @@ function ReviewReadPane({
       sub={detail.productName ?? undefined}
       decision={
         <ReviewReadDetail
-          showBody={false}
+          header="caller"
           pilotOn={pilotOn}
           capability={capability}
           word={WORD}

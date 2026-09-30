@@ -28,9 +28,27 @@ export function ReviewProblemCard({
   detail,
   word,
   showBody = true,
+  verdict = "self",
 }: {
   detail: ChannelReviewDetailView;
   word: string;
+  /**
+   * <b>Who owns the tier verdict on this surface.</b>
+   *
+   * <p><b>`"self"`</b> — nothing else on screen states it, so this block leads with it. That is the
+   * preview reading, where the judgment forms are left to the full screen.
+   *
+   * <p><b>`"controls"`</b> — {@code SellerCorrectionControls} is on screen, and there the verdict is not
+   * a label but the context for a choice: three tier buttons are the seller's, and 「시스템 판단 …」 is the
+   * only thing that tells them which one the machine picked. That line therefore stays unconditional
+   * THERE, and this block — which answers 「왜 올라왔나요」 — keeps the reason and drops the conclusion.
+   *
+   * <p>Measured at 1600×1000 (2026-10-01): 리뷰 처리 said 「확인 필요」 in 왜 올라왔나요, again in
+   * ① 이 리뷰의 중요도, and a third time as a button label — one verdict, three places, one screen.
+   * The rule that removes it without losing anything is ownership, not visibility: the block that can
+   * CHANGE a fact owns stating it.
+   */
+  verdict?: "self" | "controls";
   /**
    * False when the screen already prints the customer's sentence as its title (CaseLayout, UI/UX v2 Phase 1): a
    * one-line review would otherwise be read twice, one block apart, and the second copy is the one that is skipped.
@@ -45,7 +63,7 @@ export function ReviewProblemCard({
   return (
     <section aria-label="고객이 남긴 내용" className={preview ? "space-y-1.5" : "space-y-3"}>
       <div className="flex flex-wrap items-center gap-2">
-        <TriageTierChip tier={detail.triage.tier} />
+        {verdict === "self" ? <TriageTierChip tier={detail.triage.tier} /> : null}
         {detail.aiMark ? <AiMarkChip /> : null}
         {detail.isNew ? <Chip tone="accent">새 {word}</Chip> : null}
         {/* <b>State and criterion on one line.</b> Linear's Peek answers 「what state is this in」 with a mark,
