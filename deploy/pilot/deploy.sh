@@ -70,7 +70,7 @@ case "$PILOT_PUBLIC_HOST" in localhost|127.0.0.1|*.local) fail "PILOT_PUBLIC_HOS
 # A model capability that is on but has no key fails the backend's own boot validator; failing here
 # names the variable instead of making an operator read a stack trace.
 for cap in AGENT_PLAN AGENT_DRAFT AGENT_JUDGE AGENT_CONVERSE AGENT_REPORT KNOWLEDGE_EMBEDDING KNOWLEDGE_INTENT KNOWLEDGE_ELIGIBILITY REVIEW_MEDIA_VISION \
-           INQUIRY_GOAL INQUIRY_DECISION INQUIRY_SIGNATURE; do
+           INQUIRY_GOAL INQUIRY_DECISION INQUIRY_SIGNATURE RESPONSIBILITY_INVESTIGATION; do
   e="SELLEROPS_${cap}_ENABLED"; k="SELLEROPS_${cap}_API_KEY"
   if [[ "${!e:-false}" == "true" && -z "${!k:-}" ]]; then fail "$e=true but $k is blank"; fi
 done
@@ -81,8 +81,15 @@ done
 # A customer's own review photo is the widest payload of all; it is held to the same named-org rule.
 # INQUIRY_GOAL and INQUIRY_DECISION are in the same class and for the same reason — each carries a
 # customer's own sentence — and each says so itself (`admitsPolicyWidening() == false`).
+# RESPONSIBILITY_INVESTIGATION belongs in this loop and was missing from it. It is the same class of
+# payload as the five above — a REDACTED customer inquiry or review sent to a vendor — and it says so
+# itself (`admitsPolicyWidening() == false`), but it differs in the one way that makes the wildcard
+# worse: it is reached from a background window with nobody present. `*` is a real wildcard in
+# `AgentOperatorProperties` (`allOrgs`), so on a multi-tenant pilot host it would send EVERY
+# organisation's customer text unattended, and neither the boot validator (which asks only whether any
+# org is named) nor this script refused it.
 for cap in KNOWLEDGE_EMBEDDING KNOWLEDGE_INTENT KNOWLEDGE_ELIGIBILITY REVIEW_MEDIA_VISION \
-           INQUIRY_GOAL INQUIRY_DECISION; do
+           INQUIRY_GOAL INQUIRY_DECISION RESPONSIBILITY_INVESTIGATION; do
   e="SELLEROPS_${cap}_ENABLED"; o="SELLEROPS_${cap}_ORG_IDS"
   if [[ "${!e:-false}" == "true" ]]; then
     # The message names the ORDER as well as the variable, because the order is the trap. The pilot
@@ -216,6 +223,28 @@ fi
 if [[ -n "$(printf '%s' "${RESPONSIBILITY_RUNTIME_ORG_IDS:-}" | tr -d '[:space:],')" \
    && "${SELLEROPS_RESPONSIBILITY_SCHEDULER_ENABLED:-false}" != "true" ]]; then
   fail "RESPONSIBILITY_RUNTIME_ORG_IDS names an organisation but SELLEROPS_RESPONSIBILITY_SCHEDULER_ENABLED is not true — 고객 운영 관리 becomes visible and startable for that seller while no window is ever worked; set the scheduler true, or clear the rollout list"
+fi
+# How much ONE window may spend on the investigator. The cap is the only thing standing between an
+# unattended loop and an org's whole daily budget, so its VALUE has to be a number — and until this
+# name reached the container (docker-compose.yml) setting it here did nothing at all, which is the
+# worse half of the same bug: the operator writes 3, compose interpolates nothing, the container keeps
+# the application.yml default of 5, and the deploy reports success.
+#
+# Non-negative integer only. A blank or non-numeric value reaches `@Value` as an int bind and fails
+# the BOOT, after the deploy has already replaced the running container — naming it here costs one
+# line and turns a restart loop into a refused deploy.
+if [[ -n "${SELLEROPS_RESPONSIBILITY_INVESTIGATION_MAX_PER_RUN:-}" ]]; then
+  case "$SELLEROPS_RESPONSIBILITY_INVESTIGATION_MAX_PER_RUN" in
+    ''|*[!0-9]*) fail "SELLEROPS_RESPONSIBILITY_INVESTIGATION_MAX_PER_RUN must be a non-negative integer (the pilot answer is 3); it is read as an int at boot, so a non-numeric value fails the backend AFTER this deploy has replaced the container" ;;
+  esac
+  # 0 is legal and is not «off»: the capability stays enabled, every candidate is carried to the next
+  # window, and nothing is ever investigated. That reads on screen as «고객 운영 관리 found nothing»,
+  # which is a different sentence from «it is turned off». Said, not refused — a deliberate 0 is a real
+  # posture for a window one wants to observe without spend.
+  if [[ "$SELLEROPS_RESPONSIBILITY_INVESTIGATION_MAX_PER_RUN" == "0" \
+     && "${SELLEROPS_RESPONSIBILITY_INVESTIGATION_ENABLED:-false}" == "true" ]]; then
+    printf 'note: investigation is ON with MAX_PER_RUN=0 — every candidate waits for the next window and no case is ever investigated\n'
+  fi
 fi
 # ── Unattended NAVER review export (72h shadow run) ──────────────────────────────────────────────
 #

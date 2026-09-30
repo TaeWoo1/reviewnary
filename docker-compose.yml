@@ -187,6 +187,29 @@ services:
       SELLEROPS_RESPONSIBILITY_INVESTIGATION_ENABLED: ${SELLEROPS_RESPONSIBILITY_INVESTIGATION_ENABLED:-false}
       SELLEROPS_RESPONSIBILITY_INVESTIGATION_ORG_IDS: ${SELLEROPS_RESPONSIBILITY_INVESTIGATION_ORG_IDS:-}
       SELLEROPS_RESPONSIBILITY_INVESTIGATION_API_KEY: ${SELLEROPS_RESPONSIBILITY_INVESTIGATION_API_KEY:-}
+      # The three names above are the capability's SWITCH; the five below are how it SPENDS, and not
+      # one of them reached the container. `CaseInvestigationProperties` reads all eight from
+      # `sellerops.responsibility.investigation.*`, so a deployed host could turn the investigator on
+      # and then had no way to say which model, how many tokens, or — the one that costs money in a
+      # loop nobody is watching — how many investigations one run may perform. The application.yml
+      # default is 5 per run; the pilot answer is 3 and it is set in pilot.env.example, which is
+      # unreachable without this line. The failure was silent in the expensive direction: the operator
+      # writes MAX_PER_RUN=3 into the host env file, compose interpolates nothing, the container keeps
+      # 5, and the deploy reports success.
+      #
+      # Each fallback RESTATES application.yml's default, and that is deliberate rather than tidy.
+      # A bare `${...:-}` would hand the container a blank string on every host that says nothing —
+      # `@Value` would then bind "" over the default and `int` parsing would fail the boot — which is
+      # the trap the REVIEW_REPLY_PROVIDER note above refuses to walk into. Compose cannot omit a key
+      # conditionally, so the choice is «restate the default» or «break every silent host», and the
+      # two names above (SELF_PILOT_SCOPE, DEFAULT_INTERVAL_MINUTES) already settled it the same way.
+      # The cost is that a default now lives in two files; the static assertions in
+      # deploy/pilot/responsibility-guard.test.sh are what keep the two copies equal.
+      SELLEROPS_RESPONSIBILITY_INVESTIGATION_VENDOR: ${SELLEROPS_RESPONSIBILITY_INVESTIGATION_VENDOR:-OPENAI}
+      SELLEROPS_RESPONSIBILITY_INVESTIGATION_MODEL: ${SELLEROPS_RESPONSIBILITY_INVESTIGATION_MODEL:-gpt-5-2025-08-07}
+      SELLEROPS_RESPONSIBILITY_INVESTIGATION_MAX_OUTPUT_TOKENS: ${SELLEROPS_RESPONSIBILITY_INVESTIGATION_MAX_OUTPUT_TOKENS:-2500}
+      SELLEROPS_RESPONSIBILITY_INVESTIGATION_REASONING_EFFORT: ${SELLEROPS_RESPONSIBILITY_INVESTIGATION_REASONING_EFFORT:-low}
+      SELLEROPS_RESPONSIBILITY_INVESTIGATION_MAX_PER_RUN: ${SELLEROPS_RESPONSIBILITY_INVESTIGATION_MAX_PER_RUN:-5}
       SELLEROPS_INQUIRY_PUBLISH_EXECUTION_ENABLED: ${SELLEROPS_INQUIRY_PUBLISH_EXECUTION_ENABLED:-false}
       SELLEROPS_INQUIRY_PUBLISH_NAVER_LIVE_APPROVAL_ID: ${SELLEROPS_INQUIRY_PUBLISH_NAVER_LIVE_APPROVAL_ID:-}
       SELLEROPS_INQUIRY_PUBLISH_CAFE24_LIVE_APPROVAL_ID: ${SELLEROPS_INQUIRY_PUBLISH_CAFE24_LIVE_APPROVAL_ID:-}

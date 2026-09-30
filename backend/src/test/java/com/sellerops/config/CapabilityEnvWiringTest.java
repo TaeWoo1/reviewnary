@@ -22,10 +22,22 @@ import org.junit.jupiter.api.Test;
  * <p>Every one of them failed the same way — silently. The flag was true on the host, false in the
  * process, and the only symptom was a product that did less than it was configured to do.
  *
- * <p><b>Scope is deliberate.</b> This asserts the three names that TURN A CAPABILITY ON — flag, key,
- * organisation list — and not the model / vendor / effort overrides beside them. Those are excluded
- * from compose on purpose: written as {@code ${NAME:-}} they hand the container an empty string and
- * erase a configured default, and restating each default here would put it in a second place.
+ * <p><b>Scope, and the one place it now goes further.</b> This asserts the three names that TURN A
+ * CAPABILITY ON — flag, key, organisation list. The model / vendor / effort overrides beside them were
+ * excluded on the ground that {@code ${NAME:-}} hands the container an empty string and erases a
+ * configured default, which is true and is still the reason most of them stay out.
+ *
+ * <p>That reasoning had a gap: it treated the choice as «pass it blank or leave it out», and there is
+ * a third option — pass it with the SAME default, which compose already does for
+ * {@code SELLEROPS_SELF_PILOT_SCOPE} and {@code SELLEROPS_SELF_PILOT_DEFAULT_INTERVAL_MINUTES}. It
+ * matters for exactly one capability so far: the case investigator's
+ * {@code MAX_PER_RUN} is not an override, it is <b>how much one unattended window may spend</b>, and
+ * the pilot answer (3) is not the code default (5). Unreachable, it failed in the expensive
+ * direction — the operator writes 3, compose interpolates nothing, the container runs 5, and the
+ * deploy reports success.
+ *
+ * <p>The cost of restating a default is that it exists in two files, so {@link #composeAndApplicationYmlAgreeOnEveryInvestigationDefault()}
+ * compares the two by PARSING both rather than by holding a third copy of each value.
  */
 class CapabilityEnvWiringTest {
 
@@ -42,7 +54,11 @@ class CapabilityEnvWiringTest {
             // The three the audit found unplumbed. Each is an AgentCapabilityGate bean exactly like
             // the five above, and PilotConfigValidator already iterates over them — so a host could
             // not turn one on, and could not be told why.
-            "SELLEROPS_INQUIRY_GOAL", "SELLEROPS_INQUIRY_DECISION", "SELLEROPS_INQUIRY_SIGNATURE");
+            "SELLEROPS_INQUIRY_GOAL", "SELLEROPS_INQUIRY_DECISION", "SELLEROPS_INQUIRY_SIGNATURE",
+            // The fourth, found the same way one package later. `CaseInvestigationProperties` is an
+            // AgentCapabilityGate too — this list simply did not name it, which is the whole failure
+            // mode this class exists for, repeated on the capability that runs with nobody watching.
+            "SELLEROPS_RESPONSIBILITY_INVESTIGATION");
 
     /** Review AI triage: the same three facts under names that do not share the triple's shape. */
     private static final List<String> AI_TRIAGE = List.of(
@@ -116,7 +132,8 @@ class CapabilityEnvWiringTest {
         for (String cap : List.of("SELLEROPS_KNOWLEDGE_EMBEDDING", "SELLEROPS_KNOWLEDGE_INTENT",
                 "SELLEROPS_KNOWLEDGE_ELIGIBILITY", "SELLEROPS_REVIEW_MEDIA_VISION",
                 "SELLEROPS_INQUIRY_GOAL", "SELLEROPS_INQUIRY_DECISION",
-                "SELLEROPS_AGENT_REPORT", "SELLEROPS_INQUIRY_SIGNATURE")) {
+                "SELLEROPS_AGENT_REPORT", "SELLEROPS_INQUIRY_SIGNATURE",
+                "SELLEROPS_RESPONSIBILITY_INVESTIGATION")) {
             assertThat(env).as("pilot.env.example names %s_ORG_IDS", cap)
                     .containsPattern("(?m)^" + cap + "_ORG_IDS=");
         }
@@ -152,6 +169,57 @@ class CapabilityEnvWiringTest {
                 && values.getOrDefault("SELLEROPS_AI_TRIAGE_PILOT_ORG_IDS", "").isBlank())
                 .as("AI triage ships on with no organisation named")
                 .isFalse();
+    }
+
+    /** {@code sellerops.responsibility.investigation.*} names that are not the on-switch. */
+    private static final java.util.Map<String, String> INVESTIGATION_SPEND = java.util.Map.of(
+            "SELLEROPS_RESPONSIBILITY_INVESTIGATION_VENDOR", "vendor",
+            "SELLEROPS_RESPONSIBILITY_INVESTIGATION_MODEL", "model",
+            "SELLEROPS_RESPONSIBILITY_INVESTIGATION_MAX_OUTPUT_TOKENS", "max-output-tokens",
+            "SELLEROPS_RESPONSIBILITY_INVESTIGATION_REASONING_EFFORT", "reasoning-effort",
+            "SELLEROPS_RESPONSIBILITY_INVESTIGATION_MAX_PER_RUN", "max-per-run");
+
+    @Test
+    @DisplayName("how much one unattended window may spend is settable from the host env file")
+    void theInvestigatorsSpendIsReachable() throws Exception {
+        String compose = Files.readString(COMPOSE);
+        String yml = Files.readString(APPLICATION_YML);
+        for (String name : INVESTIGATION_SPEND.keySet()) {
+            assertThat(yml).as("application.yml binds %s", name).contains("${" + name + ":");
+            assertThat(compose).as("docker-compose.yml passes %s to the backend", name)
+                    .contains(name + ": ${" + name);
+        }
+        // And the pilot's own cap, which is NOT the code default. A product-owner answer for the first
+        // window; the template is where an operator gets it by copying rather than by remembering.
+        assertThat(Files.readString(PILOT_ENV))
+                .as("the shipped template caps the investigator at 3 per run")
+                .containsPattern("(?m)^SELLEROPS_RESPONSIBILITY_INVESTIGATION_MAX_PER_RUN=3$");
+    }
+
+    @Test
+    @DisplayName("a default restated in compose is the same default application.yml has")
+    void composeAndApplicationYmlAgreeOnEveryInvestigationDefault() throws Exception {
+        // Both sides are PARSED. Holding the expected values here would make this a third copy of the
+        // thing whose duplication it exists to police.
+        String compose = Files.readString(COMPOSE);
+        String yml = Files.readString(APPLICATION_YML);
+        for (var entry : INVESTIGATION_SPEND.entrySet()) {
+            String name = entry.getKey();
+            String inCompose = group(compose, "(?m)^\\s*" + name + ": \\$\\{" + name + ":-(.*)\\}$");
+            String inYml = group(yml, "(?m)^\\s*" + entry.getValue() + ": \\$\\{" + name + ":(.*)\\}$");
+            assertThat(inCompose).as("compose states a default for %s", name).isNotNull();
+            assertThat(inYml).as("application.yml states a default for %s", name).isNotNull();
+            assertThat(inCompose)
+                    .as("%s: a blank fallback would erase the default on every silent host, and a "
+                            + "DIFFERENT one would mean the container runs a value nobody wrote", name)
+                    .isNotEmpty()
+                    .isEqualTo(inYml);
+        }
+    }
+
+    private static String group(String text, String pattern) {
+        var m = java.util.regex.Pattern.compile(pattern).matcher(text);
+        return m.find() ? m.group(1) : null;
     }
 
     @Test
