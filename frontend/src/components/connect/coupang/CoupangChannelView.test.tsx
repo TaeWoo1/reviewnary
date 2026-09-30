@@ -187,7 +187,7 @@ describe("쿠팡 채널 화면 — 두 가지 방법, 그뿐", () => {
   it("될 수 없는 수집을 제안하지 않는다 — 기간 수집에 리뷰가 없다", async () => {
     view();
     await screen.findByTestId("coupang-api-card");
-    const fold = screen.getByText("기간 지정 수집").closest("details");
+    const fold = screen.getByText("지난 기간 가져오기").closest("details");
     expect(fold).not.toBeNull();
     // 쿠팡 리뷰에는 API 기간 수집 경로가 없다(`supported:false`). 예전 화면은 ✓리뷰를 켠 채로 제공했다.
     expect(within(fold as HTMLElement).queryByRole("button", { name: /리뷰/ })).toBeNull();

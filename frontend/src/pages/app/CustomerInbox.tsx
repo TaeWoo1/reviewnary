@@ -22,6 +22,7 @@ import {
   asFeedItem,
   recordRowState,
 } from "../../lib/inquiryWorkspace";
+import { inquiryHeadline } from "../../lib/inquiryNextAction";
 import type { InquiryQueueItem, InquiryRowItem, ItemAnalysis } from "../../lib/types";
 import { useAgentSurface } from "../../lib/agentPanel";
 
@@ -379,6 +380,13 @@ export function CustomerInbox() {
             <ul className="divide-y divide-line/70 overflow-hidden rounded-2xl border border-line bg-surface">
               {(record ?? []).map((row) => {
                 const state = recordRowState(row);
+                /*
+                  <b>제목이 제목 자리에 온다.</b> 이 줄은 `title={previewText(row.snippet) || row.title}`
+                  이었다 — 본문이 있으면 본문의 앞부분이 제목 자리를 차지하고, 문의의 실제 제목은 목록
+                  어디에도 나오지 않았다. 행은 원래 둘 다 갖고 있었다(`InquiryRowItem.title` /
+                  `.snippet`). 이제 네 단계로 읽힌다: 상태 → 제목 → 본문 → 채널·상품, 오른쪽에 시각.
+                */
+                const headline = inquiryHeadline(row, previewText);
                 return (
                   <li key={row.inquiryId}>
                     <WorkItem
@@ -389,7 +397,8 @@ export function CustomerInbox() {
                       dim={row.status === "ANSWERED"}
                       state={state.text}
                       tone={state.tone}
-                      title={previewText(row.snippet) || row.title || "문의"}
+                      title={headline.title}
+                      {...(headline.body ? { body: previewText(headline.body) } : {})}
                       meta={
                         <>
                           {row.channelNameKo}
@@ -465,6 +474,15 @@ export function CustomerInbox() {
  * One inquiry in the pane, in {@link CaseLayout}'s reading order: where and when, then the customer's words and the
  * answer (the response panel owns both, so the layout draws no second copy of the question), then the automatic
  * classification, folded.
+ *
+ * <b>한 사실을 한 번만 그린다.</b> work item이 없는 문의 — 실제 live NAVER 문의가 그렇다 — 에서 같은
+ * 문장이 한 화면에 <b>세 번</b> 나왔다: 이 layout의 제목, 그 아래 {@link InboxDetail}의 제목, 그 아래
+ * 「문의 발췌」의 본문. 셋 다 `previewText(item.snippet)`이거나 그 본문 자체였다. 원인은 둘이다 —
+ * `asFeedItem`이 제목과 본문을 한 칸으로 합쳤고(지금은 합치지 않는다), header를 그릴 사람이 둘이었다.
+ *
+ * <p>이제 <b>layout이 header의 유일한 주인</b>이다: meta(채널·상품·시각)와 제목은 여기서만 그리고,
+ * {@code InboxDetail}은 header를 아예 그리지 않는다. 답변 패널이 뜰 때는 패널이 제목과 본문을 자기
+ * 첫 블록으로 인쇄하므로 제목만 {@code titleHidden}으로 감춘다 — meta는 패널이 그리지 않으니 남는다.
  */
 function InquiryCasePane({
   item,
@@ -475,27 +493,33 @@ function InquiryCasePane({
   analysis: ItemAnalysis | undefined;
   workItemId: string | null;
 }) {
+  const headline = inquiryHeadline(item, previewText);
   return (
     <CaseLayout
       key={item.id}
       variant="pane"
       label="선택한 문의"
       decisionLabel="답변"
-      // When the response panel mounts it prints the question, the channel, the product and the time as its own
-      // first block — so the layout draws none of them a second time.
       meta={
-        workItemId === null ? (
-          <Facts>
-            <span>{item.channelNameKo}</span>
-            {item.productName ? <span className="break-keep">{item.productName}</span> : null}
-            <span>{relativeTime(item.receivedAt)}</span>
-          </Facts>
-        ) : undefined
+        <Facts>
+          <span>{item.channelNameKo}</span>
+          {item.productName ? <span className="break-keep">{item.productName}</span> : null}
+          <span>{relativeTime(item.receivedAt)}</span>
+        </Facts>
       }
-      title={previewText(item.snippet) || "문의"}
+      title={headline.title}
       titleHidden={workItemId !== null}
       // No 「전체 화면으로」: this route IS the inquiry's own screen, so the link would point at the page it is on.
-      decision={<InboxDetail item={item} analysis={analysis} workItemId={workItemId} />}
+      decision={
+        <InboxDetail
+          item={item}
+          analysis={analysis}
+          workItemId={workItemId}
+          // The layout above drew the meta line and the title. Whatever the panel does below, this
+          // block never draws either of them again.
+          bodyOnly={headline.body}
+        />
+      }
     />
   );
 }

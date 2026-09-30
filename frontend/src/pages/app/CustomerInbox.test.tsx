@@ -341,12 +341,93 @@ describe("deep link and the exact inquiry", () => {
   });
 });
 
+describe("제목·본문·채널·상태·날짜 — 한 행에서 네 단계로 읽힌다", () => {
+  it("목록은 제목을 제목 자리에, 본문을 그 아래에 그린다", async () => {
+    // 이 줄은 `title={previewText(row.snippet) || row.title}`이었다 — 본문이 있으면 본문의 앞부분이
+    // 제목 자리를 차지하고, 문의의 실제 제목은 목록 어디에도 나오지 않았다. 행은 원래 둘 다 갖고 있었다.
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [row({ inquiryId: "i9", status: "UNANSWERED", title: "세금계산서 발행 문의", snippet: "사업자등록증 첨부했습니다" })],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    renderInbox("/inquiries");
+    const link = await screen.findByRole("link", { name: /세금계산서 발행 문의/ });
+    expect(within(link).getByText("세금계산서 발행 문의")).toBeInTheDocument();
+    expect(within(link).getByText("사업자등록증 첨부했습니다")).toBeInTheDocument();
+    // 채널과 상태도 같은 행에, 제목보다 조용하게.
+    expect(within(link).getByText(/카페24 자사몰/)).toBeInTheDocument();
+    expect(within(link).getByText("답변 필요")).toBeInTheDocument();
+  });
+
+  it("제목이 없는 문의는 본문이 제목 자리를 대신하고, 본문을 두 번 그리지 않는다", async () => {
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [row({ inquiryId: "i9", status: "UNANSWERED", title: null, snippet: "폭이 몇 mm인가요" })],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    renderInbox("/inquiries");
+    const link = await screen.findByRole("link", { name: /폭이 몇 mm인가요/ });
+    expect(within(link).getAllByText("폭이 몇 mm인가요")).toHaveLength(1);
+  });
+
+  it("상세는 고객이 쓴 문장을 한 번만 그린다", async () => {
+    // 실제 live NAVER 문의(답변 대기 목록에 없는 문의)에서 같은 문장이 한 화면에 세 번 나왔다: pane의
+    // 제목, InboxDetail의 제목, 그리고 「문의 발췌」의 본문.
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [row({ inquiryId: "i9", status: "UNANSWERED", title: null, snippet: "폭이 몇 mm인가요" })],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    renderInbox("/inquiries/i9");
+    await screen.findByLabelText("선택한 항목");
+    expect(screen.getAllByText("폭이 몇 mm인가요")).toHaveLength(1);
+    // 채널 이름도 한 번뿐이다 — layout의 meta 줄이 유일한 주인이다.
+    expect(screen.getAllByText("카페24 자사몰")).toHaveLength(1);
+  });
+
+  it("제목과 본문이 둘 다 있으면 상세는 둘 다, 각각 한 번씩 그린다", async () => {
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [row({ inquiryId: "i9", status: "UNANSWERED", title: "세금계산서 발행 문의", snippet: "사업자등록증 첨부했습니다" })],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    renderInbox("/inquiries/i9");
+    await screen.findByLabelText("선택한 항목");
+    const pane = screen.getByLabelText("선택한 문의");
+    expect(within(pane).getAllByText("세금계산서 발행 문의")).toHaveLength(1);
+    expect(within(pane).getAllByText("사업자등록증 첨부했습니다")).toHaveLength(1);
+  });
+
+  it("이미 답변된 문의에는 초안이 없는 이유가 「이미 답변됨」이다", async () => {
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [row({ inquiryId: "i9", status: "ANSWERED", channelNameKo: "네이버 스마트스토어" })],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    renderInbox("/inquiries/i9");
+    await screen.findByLabelText("선택한 항목");
+    expect(screen.getByText(/이미 답변이 등록되어 있어/)).toBeInTheDocument();
+    expect(screen.getByText(/하실 일은 없습니다/)).toBeInTheDocument();
+    // 「답변을 기다리는 문의에만」은 이 경우의 이유가 아니다.
+    expect(screen.queryByText(/답변을 기다리는 문의에만/)).toBeNull();
+  });
+});
+
 describe("response workflow", () => {
   it("shows no response panel when no work item resolves", async () => {
     renderInbox("/inquiries/i1");
     await screen.findByLabelText("선택한 항목");
     expect(screen.queryByText("응답 제안")).toBeNull();
-    expect(screen.getByText(/답변 방향을 제안할 수 없습니다/)).toBeInTheDocument();
+    // 예전 문장은 「reviewnary가 답변 방향을 제안할 수 없습니다」였다 — 맞지만 이유가 없어서, 제품이
+    // 이 문의를 다루지 못한다는 뜻으로 읽힌다. 이유는 규칙이다: 초안은 답변을 기다리는 문의에만 쓴다.
+    expect(screen.getByText(/답변을 기다리는 문의에만 초안을 씁니다/)).toBeInTheDocument();
+    // 그리고 판매자가 실제로 어디서 답하면 되는지까지.
+    expect(screen.getByText(/판매자센터에서 직접 작성/)).toBeInTheDocument();
   });
 
   it("shows the customer's question and offers to draft an answer", async () => {

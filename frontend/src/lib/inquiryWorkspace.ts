@@ -85,10 +85,15 @@ export function asFeedItem(row: InquiryRowItem): FeedItem {
     // (`InboxService.UNATTRIBUTED_LABEL`), through the helper this repository already reads it by, so
     // the two paths cannot say different things about the same absence.
     productName: productLabel(row),
-    snippet: row.snippet ?? row.title ?? "",
+    // <b>제목과 본문을 합치지 않는다.</b> 예전에는 `row.snippet ?? row.title ?? ""` 한 칸이었고, 그래서
+    // 상세 화면이 둘을 구분할 방법이 없어 같은 문장을 제목으로도 본문으로도 그렸다. 두 칸은 원래 행에
+    // 따로 있었다 — 여기서 하나로 만든 것이 중복의 출처였다. 계산도, 기본값도, 추론도 없다.
+    title: row.title,
+    snippet: row.snippet ?? "",
     rating: null,
     status: row.status,
     receivedAt: row.receivedAt,
+    answeredAt: row.answeredAt,
   };
 }
 

@@ -239,10 +239,22 @@ export interface FeedItem {
   channelId?: string | null;
   channelNameKo: string;
   productName: string;
+  /**
+   * The inquiry's own subject line, when the channel gave one.
+   *
+   * <b>Optional because it was missing, not because it is unimportant.</b> `InquiryRowItem` has
+   * carried both `title` and `snippet` all along; this shape had only `snippet`, so `asFeedItem`
+   * collapsed the two into one string — and the detail pane, having nothing to tell apart, drew that
+   * one string as the heading AND as the body. A source that genuinely has no subject leaves it
+   * absent, which `inquiryHeadline` reads as 「본문의 앞부분이 제목 자리를 대신한다」.
+   */
+  title?: string | null;
   snippet: string;
   rating: number | null;
   status: string;
   receivedAt: string;
+  /** When the channel says this was answered. Present only for an answered row. */
+  answeredAt?: string | null;
 }
 
 // Mirrors com.sellerops.itemanalysis.dto.ItemAnalysisView. Derived metadata only

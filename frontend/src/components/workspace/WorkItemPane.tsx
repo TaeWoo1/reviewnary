@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Facts } from "../ui/ObjectRow";
 import { CaseLayout, type PaneDepth } from "./CaseLayout";
+import { draftRuleNotice } from "../../lib/inquiryNextAction";
 import { InquiryResponsePanel } from "../inbox/InquiryResponsePanel";
 import { OperationsCaseView } from "../../pages/app/OperationsCase";
 import { ReviewCaseView } from "../../pages/app/ReviewReplyTask";
@@ -62,9 +63,10 @@ export function WorkItemPane({ row, now, depth = "full" }: { row: HomeWorkRow; n
         row.workItemId ? (
           <InquiryResponsePanel workItemId={row.workItemId} />
         ) : (
-          <p className="break-keep text-sm leading-relaxed text-muted">
-            이 문의에는 reviewnary가 답변 방향을 제안할 수 없습니다. 답변은 해당 채널의 판매자센터에서 직접 작성합니다.
-          </p>
+          // 「제안할 수 없습니다」에는 이유가 없어서, 제품이 이 문의를 다루지 못한다는 뜻으로 읽혔다.
+          // 이유는 규칙이다. 이 행은 `status`를 들고 다니지 않으므로 「이미 답변됨」은 말할 수 없고,
+          // 말할 수 있는 규칙만 말한다 — 문장은 문의 상세와 같은 곳에서 온다.
+          <p className="break-keep text-sm leading-relaxed text-muted">{draftRuleNotice()}</p>
         )
       }
     />

@@ -245,7 +245,7 @@ export function CoupangChannelView({
                 없으므로 이 목록에 리뷰가 없고, 그래서 판매자가 될 수 없는 수집을 시작할 수 없다 — 예전
                 화면은 기본값으로 ✓리뷰를 켜 둔 채 [이 기간 수집하기]를 제공했다.
               */}
-              <Disclosure label="기간 지정 수집">
+              <Disclosure label="지난 기간 가져오기" note="기간을 직접 골라 한 번 읽기">
                 <div className="pt-3">
                   <BackfillPanel
                     accountId={accountId}

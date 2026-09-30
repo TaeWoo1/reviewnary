@@ -14,6 +14,18 @@ import {
 // one or more data types, then run a synchronous collection per type through the
 // existing backfill runtime path. Channel-generic — it offers whatever the channel
 // supports; the backend fails closed for anything it cannot serve.
+//
+// <b>「지난 기간 가져오기」, 예전 이름은 「기간 지정 수집」.</b> 판매자 화면에 수집 동작이 둘 있고, 이름만
+// 보면 둘 다 「수집」이라 무엇이 다른지 알 수 없었다 — 실제로 다른 것은 <b>어느 구간을 읽는가</b> 하나다:
+//
+//   · 「지금 수집하기」(CollectionSettingsSection) — 커넥터가 정한 최근 구간을 다시 읽는다. Cafe24는
+//     `Cafe24ApiConnector.LOOKBACK_DAYS = 14`, 다른 채널은 각자의 커서. 오래된 자료는 몇 번을 눌러도
+//     들어오지 않는다. 그게 고장이 아니라 그 동작의 정의다.
+//   · 이 패널 — 판매자가 <b>고른</b> 기간을 읽는다(`manualBackfill` → `BackfillWindow`). 오래된 자료를
+//     넣는 유일한 길.
+//
+// 그래서 이름이 「기간 지정」(무엇을 지정하는지가 아니라 지정한다는 사실만 말한다)에서 「지난 기간
+// 가져오기」(무엇을 하는지 말한다)로 바뀌었다.
 
 function backendMessage(e: unknown): string | null {
   if (isAxiosError(e)) {
@@ -120,6 +132,12 @@ export function BackfillPanel({
   const body = (
     <>
       <div className="space-y-5">
+        {/* 두 동작의 차이를 이 패널 안에서 한 번 말한다. 「지금 수집하기」를 눌러도 오래된 자료가 들어오지
+            않는 이유를 판매자가 알 수 있는 자리는 여기뿐이다. */}
+        <p className="break-keep text-sm leading-relaxed text-muted">
+          고른 기간을 한 번 읽어옵니다. 「지금 수집하기」는 최근 구간만 다시 확인하므로, 오래된 자료는
+          여기서 기간을 골라 가져오세요. 이미 가져온 자료는 중복으로 저장되지 않습니다.
+        </p>
         <div>
           <p className="mb-2 text-sm font-semibold text-muted">수집 기간</p>
           <div className="flex flex-wrap gap-2">
@@ -203,5 +221,5 @@ export function BackfillPanel({
     </>
   );
   if (heading === null) return <div className="space-y-3">{body}</div>;
-  return <Section title={heading ?? "기간 지정 수집"}>{body}</Section>;
+  return <Section title={heading ?? "지난 기간 가져오기"}>{body}</Section>;
 }

@@ -360,7 +360,7 @@ export function ChannelWorkspace() {
       </div>
 
       {accountId ? (
-        <Disclosure label="기간 지정 수집">
+        <Disclosure label="지난 기간 가져오기" note="기간을 직접 골라 한 번 읽기">
           <div className="mt-3">
             {/* 기간 수집 — the backfill panel, mounted unchanged. */}
             <BackfillPanel accountId={accountId} onCompleted={reload} />

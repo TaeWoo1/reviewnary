@@ -4,9 +4,10 @@ import { api } from "../../lib/apiClient";
 import {
   sourceSummaryHeadline,
   sourceSummaryLines,
+  sourceSummarySubtitle,
   type SourceSummaryLine,
 } from "../../lib/firstSourceSummary";
-import type { ChannelCoverageRowView, SyncRunView } from "../../lib/types";
+import type { AcquisitionPathView, ChannelCoverageRowView, SyncRunView } from "../../lib/types";
 
 /**
  * <b>「연결 완료」 is not the end of onboarding — this is.</b>
@@ -40,6 +41,28 @@ export function FirstSourceSummary({
   useEffect(() => {
     let live = true;
     void (async () => {
+      // <b>The route read has its OWN guard, and that is the whole point of it being separate.</b>
+      //
+      // It is the third read, and the reason for it is that a type the pull connector cannot serve
+      // still has a route: until this screen knew the route it printed 「제공하지 않습니다」 while the
+      // channel screen described the same type as 「판매자 센터에서 내려받은 파일을 올리는 방식이 정식
+      // 수집 경로」. Same endpoint as that screen, so the two cannot disagree.
+      //
+      // But it must never be able to take the lines down with it. Folded into the Promise.all below,
+      // one failed capability read left `lines = []` and the seller saw a completion screen that said
+      // nothing about their shop at all — strictly worse than the sentence this package set out to
+      // fix. An unknown route degrades to the weakest honest sentence; an unknown COLLECTION is the
+      // only thing worth being silent about.
+      let paths = new Map<string, readonly AcquisitionPathView[]>();
+      try {
+        const overview = await api.getChannelCapabilityOverview(channelCode);
+        for (const type of overview?.dataTypes ?? []) {
+          paths.set(type.dataType, type.acquisitionPaths ?? []);
+        }
+      } catch {
+        paths = new Map();
+      }
+      if (!live) return;
       // One guard for both reads, and it is deliberately wide: any way a read can fail to produce
       // rows ends in the same place — the handoff without lines. Saying nothing about what was
       // collected is a smaller lie than a number that came from nowhere.
@@ -51,7 +74,7 @@ export function FirstSourceSummary({
             : Promise.resolve<SyncRunView[]>([]),
         ]);
         if (!live) return;
-        setLines(sourceSummaryLines(coverage, runs, channelCode));
+        setLines(sourceSummaryLines(coverage, runs, channelCode, paths));
       } catch {
         if (live) setLines([]);
       }
@@ -73,9 +96,11 @@ export function FirstSourceSummary({
         <h2 className="break-keep text-xl font-semibold text-ink">
           {headline ?? `${channelNameKo} 연결이 완료되었습니다.`}
         </h2>
-        <p className="break-keep text-base text-muted">
-          앞으로는 새 주문·문의·리뷰를 알아서 확인해 정리해 드립니다.
-        </p>
+        {/* 채널마다 다른 약속. 고정 문장이었을 때, 리뷰를 자동으로 가져오지 않는 채널에서도 리뷰를
+            이름으로 부르며 알아서 해준다고 말했다 — 바로 아래 줄이 같은 리뷰를 두고 반대로 말하는 동안. */}
+        {lines ? (
+          <p className="break-keep text-base text-muted">{sourceSummarySubtitle(lines)}</p>
+        ) : null}
       </div>
 
       {lines && lines.length > 0 ? (

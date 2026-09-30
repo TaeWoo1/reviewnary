@@ -49,6 +49,16 @@ export function CollectionSettingsSection({
 
   const body = (
     <>
+      {/*
+        <b>두 수집 동작의 차이를 버튼 옆에서 말한다.</b> 이 화면에는 「지금 수집하기」가 있고 아래 접힌
+        영역에는 「지난 기간 가져오기」가 있다. 이름만 보면 둘 다 「수집」이라, 오래된 자료가 필요한 판매자가
+        「지금 수집하기」를 반복해서 누르고 아무 일도 일어나지 않는다고 읽는다 — 실제로는 그 동작의 정의대로
+        동작한 것이다(커넥터가 정한 최근 구간만 다시 읽는다. Cafe24는 14일).
+      */}
+      <p className="break-keep text-sm leading-relaxed text-muted">
+        「지금 수집하기」는 최근 구간만 다시 확인합니다. 오래된 자료는 아래 「지난 기간 가져오기」에서
+        기간을 골라 가져오세요.
+      </p>
       <ul className="divide-y divide-line">
         {DATA_TYPES.map((t) => (
           <ScheduleRow
