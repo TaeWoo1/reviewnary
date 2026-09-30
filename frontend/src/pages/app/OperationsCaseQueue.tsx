@@ -174,11 +174,21 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       {/* What 리뷰 counts in this list. It used to stand as a paragraph under the Home's five-row brief, where
           neither reference puts an explanatory sentence; the rule is about the whole queue, so it stands on the
           screen that owns the whole queue — beside the chips that count it. Nothing about the rule changed. */}
-      {work && allRows.some((r) => r.subject === "REVIEW") ? (
-        <p className="break-keep text-sm text-muted">
-          리뷰는 확인 필요 중 아직 판단하지 않은 것과, 답변하기로 정했지만 아직 승인하지 않은 것을 셉니다.
-        </p>
-      ) : null}
+      {/*
+        <b>Removed, not folded</b> (visual review, 1366×768, 2026-10-01).
+
+        <p>A sentence used to stand here: 「리뷰는 확인 필요 중 아직 판단하지 않은 것과, 답변하기로 정했지만
+        아직 승인하지 않은 것을 셉니다.」 Measured on the rendered screen, it and the scope line above it
+        pushed the first row to y=258 — a third of a 768px fold spent on explanation before any work.
+
+        <p>Folding it was tried first and made it WORSE: a disclosure summary row is taller than the one
+        line of text it replaced (y=258 → y=271). Then the real answer showed itself — <b>the sentence is
+        the chips</b>. It says 리뷰 counts 미판단 확인 필요 plus 답변 정함 미승인, and the chips two rows
+        below decompose exactly that: 리뷰 확인 12 · 승인 대기 4 · 초안 필요 4. §8-A-2 is explicit that the
+        population breakdown is the filter chips' alone, because a second decomposition in prose makes the
+        seller do arithmetic to confirm two lines describe one list. The prose was that second
+        decomposition, and it is gone. Nothing a seller can act on was in it.
+      */}
 
       {work && allRows.length > 0 ? (
         <div className="flex flex-wrap items-center gap-0.5 self-start rounded-lg bg-canvas p-0.5" role="group" aria-label="확인할 일 보기">

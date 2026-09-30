@@ -119,8 +119,15 @@ export function CaseLayout({
           className={
             titleHidden
               ? "sr-only"
+              /* <b>The customer's sentence is `lg` in the pane</b> (§1: 「the customer's sentence, the
+                 draft, an object's name in detail」). Measured on the rendered screen at 1440×900,
+                 2026-10-01: it was `xl` — 22px/700, the same size and weight as the page title `h1`
+                 two columns to its left. A 440px pane is not a page and its headline may not outrank
+                 the screen that contains it; the sentence is still the largest thing inside the pane,
+                 which is what §8-B′ asks for. The page reading keeps `2xl`, where the sentence really
+                 is the subject of the whole screen. */
               : `break-keep font-bold leading-snug tracking-tight text-ink [overflow-wrap:anywhere] ${
-                  pane ? "text-xl" : "text-2xl leading-tight"
+                  pane ? "text-lg" : "text-2xl leading-tight"
                 }`
           }
         >

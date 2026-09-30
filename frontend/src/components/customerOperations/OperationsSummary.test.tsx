@@ -315,15 +315,43 @@ describe("the band — obligations only", () => {
     expect(text.indexOf("실행 대기")).toBeLessThan(text.indexOf("현재 미답변"));
   });
 
-  it("현재 미답변 is withheld, not floored, when the population is incomplete", async () => {
-    // Printing the qualified figure as if it were the total is the defect `contextStrip` hit: it once
-    // showed 「현재 미답변 문의 0건」 above 「들어온 문의 3건」, both true under definitions nobody could see.
+  it("현재 미답변 leaves the band entirely when the population is incomplete", async () => {
+    /*
+      Two things must not happen, and the second was introduced and then caught by a visual review at
+      1440×900 (2026-10-01).
+
+      Printing the qualified figure as if it were the total is the defect `contextStrip` hit: it once showed
+      「현재 미답변 문의 0건」 above 「들어온 문의 3건」, both true under definitions nobody could see. So the
+      number is never floored.
+
+      But the first fix put 「수집 상태 확인 필요」 into an OBLIGATION slot — and the context line one row
+      below was already saying the same five syllables for the inflow, with 「일부 채널 최신 수집 확인 필요」
+      beside it. One cause, three sentences, at the top of the morning screen. A band slot holds something
+      that is waiting for the seller; a fact we could not measure is not waiting for anyone.
+    */
     withWork();
     draw(co(), metrics({ kpis: [kpi("reviews"), kpi("inquiries"), kpi("unansweredInquiries", { value: 4, freshnessUnproven: true })] }));
     const band = await summary();
-    await waitFor(() => expect(band).toHaveTextContent("현재 미답변"));
-    expect(band).toHaveTextContent("수집 상태 확인 필요");
-    expect(band).not.toHaveTextContent("현재 미답변 4");
+    await waitFor(() => expect(band).toHaveTextContent("확인할 일"));
+    expect(band).not.toHaveTextContent("현재 미답변");
+    expect(band).not.toHaveTextContent("수집 상태 확인 필요");
+    expect(band).not.toHaveTextContent("4건");
+    // And the fact is not lost — the line whose job is collection state carries it, exactly once. Which
+    // sentence it uses depends on WHICH lane is unproven (a withheld inflow lane names itself; otherwise
+    // the freshness clause speaks), so the assertion is on the count, not on the wording.
+    const ctx = await context();
+    expect(ctx.textContent!.match(/수집 (상태|확인) 확인 필요|최신 수집 확인 필요/g) ?? []).toHaveLength(1);
+  });
+
+  it("한 원인을 두 문장으로 말하지 않는다 — 유입이 이미 말했으면 freshness 절은 빠진다", async () => {
+    // Both lanes withheld because a collection could not be proven, and `freshnessUnproven` is that same
+    // cause. The inflow clause is the better of the two because it names which lane.
+    draw(co({ checked: 1 }), metrics({
+      kpis: [kpi("reviews", { freshnessUnproven: true }), kpi("inquiries", { freshnessUnproven: true })],
+    }));
+    const ctx = await context();
+    await waitFor(() => expect(ctx).toHaveTextContent("수집 상태 확인 필요"));
+    expect(ctx).not.toHaveTextContent("일부 채널 최신 수집 확인 필요");
   });
 
   it("draws no 현재 미답변 cell at all when the overview read did not land", async () => {

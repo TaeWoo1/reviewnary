@@ -627,14 +627,23 @@ function OperationsSummary({
     );
   }
 
-  if (unanswered) {
+  /**
+   * <b>An obligation slot holds a measured obligation or nothing</b> (visual review, 1440×900, 2026-10-01).
+   *
+   * <p>When the population is incomplete this cell used to stand in the band saying
+   * 「수집 상태 확인 필요」 — and the context line one row below said the same five syllables for the inflow,
+   * and then 「일부 채널 최신 수집 확인 필요」 beside it. One cause, three sentences, 40px apart, at the top
+   * of the screen a seller opens every morning. The band is for what is waiting for them; a fact we could
+   * not measure is not waiting for anyone, and the context line is where collection state already lives.
+   */
+  if (unanswered?.kind === "COUNT") {
     cells.push(
       <Cell
         key="unanswered"
         id="unanswered"
         label={UNANSWERED_WORD.lead}
       >
-        {unanswered.kind === "COUNT" ? (
+        {(
           <Link
             to="/inquiries"
             aria-label={`${UNANSWERED_WORD.lead} ${unanswered.value.toLocaleString("ko-KR")}${COUNT_UNIT}`}
@@ -642,10 +651,6 @@ function OperationsSummary({
           >
             <Big value={unanswered.value} unit={COUNT_UNIT} />
           </Link>
-        ) : (
-          // Some channel is missing from the population. Saying the number anyway would present a floor
-          // as a total, and 「0」 would be a claim about the seller's customers that no read supports.
-          <State>{UNANSWERED_WORD.unqualified}</State>
         )}
       </Cell>,
     );
@@ -740,10 +745,19 @@ function ContextLine({
     );
   }
 
-  // Channel freshness. `muted`, never `warn`: it qualifies the numbers above and it is read in the same
-  // breath as them (§8-B′ secondary disclosure). The warn colour was spending the page's strongest signal
-  // on machinery.
-  if (unproven) facts.push(<span key="unproven">일부 채널 최신 수집 확인 필요</span>);
+  /**
+   * Channel freshness. `muted`, never `warn`: it qualifies the numbers above and is read in the same breath
+   * as them (§8-B′ secondary disclosure). The warn colour would spend the page's strongest signal on
+   * machinery.
+   *
+   * <p><b>Only when the inflow has not already said it.</b> A withheld lane is withheld BECAUSE a collection
+   * could not be proven, so printing both is one cause stated twice — and the inflow clause is the better of
+   * the two because it names which lane. Measured on the demo org at 1440×900: 「수집 상태 확인 필요」 and
+   * 「일부 채널 최신 수집 확인 필요」 stood on the same line, 8px apart.
+   */
+  const inflowAlreadySaidIt =
+    !!inflow && (inflow.reviews.kind === "UNQUALIFIED" || inflow.inquiries.kind === "UNQUALIFIED");
+  if (unproven && !inflowAlreadySaidIt) facts.push(<span key="unproven">일부 채널 최신 수집 확인 필요</span>);
 
   if (facts.length === 0) return null;
   return (
