@@ -74,6 +74,7 @@ export function WorkRows({
         tone={row.reason.tone}
         icon={row.reason.icon}
         tag={row.reason.tag}
+        work={row.state}
         title={row.title}
         line={row.line}
         wait={waitLabel(row.since, now)}

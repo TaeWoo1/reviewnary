@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { ReasonIcon, ReasonTone } from "../../lib/copy/customerOps";
+import { WORK_STATE, type WorkStateKey } from "../../lib/workState";
+import { Status } from "./Status";
 
 /**
  * One thing waiting for the seller: why (tag + icon tile), where from, what, the one line Reviewnary adds, how long
@@ -26,6 +28,7 @@ export function DecisionRow({
   tone,
   icon,
   tag,
+  work,
   source,
   title,
   line,
@@ -44,6 +47,18 @@ export function DecisionRow({
   tone: ReasonTone;
   icon: ReasonIcon;
   tag: string;
+  /**
+   * <b>「내가 뭘 해야 하나」, first</b> (product-owner decision, 2026-09-30).
+   *
+   * <p>The leading slot of an operating queue is the state word — 답변 필요 / 확인 필요 / 초안 준비됨 /
+   * 승인 대기 — and {@link tag} is secondary. `WorkItem`, which every other queue in this product uses,
+   * has always put the state first for the reason §6 gives: the question a queue answers is what to do
+   * with each item. This row led with a category badge instead, so 확인할 일 named what each item was.
+   *
+   * <p>Optional because the 지식 받은함 is not an operating queue — its rows are things to fill in, not
+   * work in a lifecycle — and a state word invented for them would be a word naming no fact.
+   */
+  work?: WorkStateKey;
   source?: string | null;
   title: string;
   line?: string | null;
@@ -94,9 +109,23 @@ export function DecisionRow({
    */
   tagHidden?: boolean;
 }) {
-  const badge = tagHidden ? null : (
-    <span className={`shrink-0 rounded-md px-1.5 py-px text-xs font-semibold ${TAG[tone]}`}>{tag}</span>
-  );
+  const stateWord = work ? WORK_STATE[work] : null;
+  /**
+   * <b>The badge goes when it would repeat the state word.</b> `REASON` carries real categories
+   * (교환·환불 · 정보 부족 · 리뷰 · 판단 보류) and three entries that are states wearing a category badge
+   * (답변 필요 · 승인 대기 · 초안 필요). With the state word leading the row, those three would print the
+   * same word twice on one line — the defect this package exists to remove — so the badge is drawn only
+   * when it says something the state word does not.
+   */
+  const badge =
+    tagHidden || !tag || tag === stateWord?.text ? null : (
+      <span className={`shrink-0 rounded-md px-1.5 py-px text-xs font-semibold ${TAG[tone]}`}>{tag}</span>
+    );
+  const lead = stateWord ? (
+    <Status tone={stateWord.tone} variant="word">
+      {stateWord.text}
+    </Status>
+  ) : null;
 
   // <b>The inbox row.</b> Two columns, no tile, no verb. The customer's own sentence is the only thing that is
   // not muted, and its measure is capped so a 1,144px list never stretches one line of Korean across the screen
@@ -106,11 +135,17 @@ export function DecisionRow({
     const inner = (
       <>
         <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            {badge}
-            <span className="min-w-0 max-w-[62ch] break-keep text-sm font-semibold leading-snug text-ink [overflow-wrap:anywhere]">
-              {title}
+          {/* The state word owns the first line alone, the way `WorkItem` draws a row with a body: with
+              the sentence beside it the two competed for the first glance and the state lost, because the
+              sentence is longer and darker. A category badge that survived the dedupe rides with it. */}
+          {lead || badge ? (
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              {lead}
+              {badge}
             </span>
+          ) : null}
+          <span className="mt-0.5 block min-w-0 max-w-[62ch] break-keep text-sm font-semibold leading-snug text-ink [overflow-wrap:anywhere]">
+            {title}
           </span>
           {meta ? <span className="mt-0.5 block truncate text-xs text-muted">{meta}</span> : null}
         </span>
@@ -152,6 +187,7 @@ export function DecisionRow({
       {tile}
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+          {lead}
           {badge}
           {source ? <span>{source}</span> : null}
         </span>

@@ -4,6 +4,7 @@ import { TYPE_LABEL, needsCheck, needsReply } from "../../lib/inboxWorkspace";
 import { relativeTime } from "../../lib/format";
 import { elapsedSince } from "../../lib/elapsed";
 import { previewText } from "../../lib/plainText";
+import { inquiryHeadline } from "../../lib/inquiryNextAction";
 import { WorkItem } from "../ui/WorkItem";
 import type { StatusTone } from "../ui/Status";
 import { WORK_STATE } from "../../lib/workState";
@@ -79,6 +80,11 @@ export function InboxList({
   const render = (item: FeedItem, dim: boolean) => {
     const state = rowState(item, drafted?.has(item.id) ?? false);
     const selected = item.id === selectedId;
+    // <b>제목 칸에 본문을 넣지 않는다.</b> This drew `snippet` in the title slot, so an inquiry's own
+    // subject line never appeared and the body wore the subject's weight — the same defect the 문의
+    // record was fixed for. `inquiryHeadline` owns the choice and returns a null body rather than the
+    // same sentence twice, so the two list renderers cannot disagree about it.
+    const headline = inquiryHeadline(item, previewText);
     return (
       <li key={`${item.type}:${item.id}`}>
         <WorkItem
@@ -88,7 +94,8 @@ export function InboxList({
           dim={dim}
           state={state?.text ?? null}
           tone={state?.tone ?? "neutral"}
-          title={previewText(item.snippet) || (item.type === "INQUIRY" ? "문의" : "리뷰")}
+          title={headline.title}
+          {...(headline.body ? { body: previewText(headline.body) } : {})}
           meta={
             <>
               {showType ? `${TYPE_LABEL[item.type]} · ` : ""}

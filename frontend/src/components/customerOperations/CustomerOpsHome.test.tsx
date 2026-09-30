@@ -248,6 +248,8 @@ describe("CustomerOpsHome", () => {
     expect(first).toHaveTextContent("네이버 리뷰");
     expect(first).toHaveTextContent("★1");
     expect(second).toHaveAttribute("href", "/customer-operations/cases/c-2");
+    // The state word leads, and 정보 부족 is a genuine category so it keeps its badge beside it.
+    expect(second).toHaveTextContent("확인 필요");
     expect(second).toHaveTextContent("정보 부족");
     expect(second).toHaveTextContent("9oz 뚜껑 판매 여부 필요");
     expect(second).toHaveTextContent("5시간 대기");
@@ -255,7 +257,10 @@ describe("CustomerOpsHome", () => {
     expect(second).not.toHaveTextContent("정보 입력");
     const exchange = within(list).getByRole("link", { name: /뚜껑이 깨져서 왔어요/ });
     expect(exchange).toHaveTextContent("초안 있음 · 미발송");
-    expect(list.querySelectorAll(".bg-brand-700")).toHaveLength(0);
+    // No row carries a solid CTA. This used to assert 「no `.bg-brand-700` anywhere」, which became wrong
+    // when the row grew a state word: `Status` draws an `info` state's 6px dot in the accent, and a dot
+    // is not a control. The claim is about a BUTTON, so it is asserted as one.
+    expect(list.querySelectorAll(".bg-brand-700.text-white")).toHaveLength(0);
     expect(list).not.toHaveTextContent("검토");
   });
 

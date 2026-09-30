@@ -1,5 +1,6 @@
 import { REASON, channelShort, reasonOfCase, sourceLabel, waitSince, DRAFT_UNSENT, type Reason } from "./copy/customerOps";
 import { onlySharedWord } from "./sharedWord";
+import type { WorkStateKey } from "./workState";
 import { subjectFallback } from "./customerOperations";
 import { isOldBacklog as isOldInquiryBacklog } from "./inquiryWorkspace";
 import type { CustomerOperationsDecisionRow, CustomerOperationsHome } from "./customerOperationsTypes";
@@ -23,6 +24,22 @@ import type { InquiryQueueResponse, OperationsHome, ReviewWorkView } from "./typ
 export interface HomeWorkRow {
   key: string;
   reason: Reason;
+  /**
+   * <b>「내가 뭘 해야 하나」 — the row's leading word</b> (product-owner decision, 2026-09-30).
+   *
+   * <p>Taken from {@link WORK_STATE}, which is already this product's one table of work words, and set
+   * from the fact that proves it — never inferred, which is that table's own rule. Before this, the row's
+   * first element was {@link reason}'s category badge, so 확인할 일 — the list a seller opens every
+   * morning — told them what each item WAS and not what to DO with it, while every other queue in the
+   * product (문의 · 리뷰 · 리포트, all on `WorkItem`) led with the state word
+   * (`docs/ui/reviewnary_ui_system_audit_v1.md` §3).
+   *
+   * <p>It also unpicks a slot that was carrying two axes. `REASON` holds real categories (교환·환불 ·
+   * 정보 부족 · 리뷰 · 판단 보류) AND three words that are states wearing a category badge (답변 필요 ·
+   * 승인 대기 · 초안 필요). Those three now come from here, and the badge keeps only what is genuinely a
+   * category — which is why the row drops the badge when it would repeat this word.
+   */
+  state: WorkStateKey;
   source: string;
   title: string;
   line: string | null;
@@ -104,6 +121,10 @@ export function caseWorkRow(row: CustomerOperationsDecisionRow): HomeWorkRow {
   return {
     key: `case:${row.caseId}`,
     reason,
+    // `draftPrepared` is the stored fact, which is what `DRAFT_READY` requires — the row's own line
+    // already says 초안 있음 off the same field. Without one, a case is something reviewnary opened for
+    // the seller to look at, which is exactly what `NEEDS_LOOK` names.
+    state: row.draftPrepared ? "DRAFT_READY" : "NEEDS_LOOK",
     source: sourceLabel(row.channelNameKo, row.subjectKind),
     channel: channelShort(row.channelNameKo),
     rating: row.rating ?? null,
@@ -150,6 +171,9 @@ export function mergeHomeWork(
     byOwner.set(owner, {
       key: `review:${row.reviewId}`,
       reason: REASON.review,
+      // The triage tier said 「지금 확인」 and the seller has not decided yet. `NEEDS_LOOK`'s definition
+      // is that tier, read and never computed.
+      state: "NEEDS_LOOK",
       source: sourceLabel(row.channelCode, "REVIEW"),
       channel: channelShort(row.channelCode),
       rating: row.rating ?? null,
@@ -180,6 +204,10 @@ export function mergeHomeWork(
       byOwner.set(owner, {
         key: `review:${item.reviewId}`,
         reason: awaiting ? REASON.approve : REASON.draft,
+        // `replyWorkState` is the fact for both: a saved draft with no standing approval, or reply work
+        // the seller committed to and has not written anything for yet. These two are deliberately not
+        // merged with 답변 필요 — that one is about the customer, these are about the seller's own work.
+        state: awaiting ? "AWAITING_APPROVAL" : "DRAFT_NEEDED",
         source: sourceLabel(item.channelCode ?? account.channelCode, "REVIEW"),
         channel: channelShort(item.channelCode ?? account.channelCode),
         rating: item.rating ?? null,
@@ -206,6 +234,9 @@ export function mergeHomeWork(
     byOwner.set(owner, {
       key: `inquiry:${row.inquiryId}`,
       reason: REASON.reply,
+      // `hasDraft` is a draft VERSION, not a phase — the distinction that caught 「초안 준비됨」 being read
+      // off a work-item phase, where eight of the demo org's ten rows had no draft at all.
+      state: row.hasDraft ? "DRAFT_READY" : "REPLY_NEEDED",
       source: sourceLabel(row.channelCode ?? row.channelNameKo, "INQUIRY"),
       channel: channelShort(row.channelCode ?? row.channelNameKo),
       rating: null,
