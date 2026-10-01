@@ -222,6 +222,9 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
 
       {page ? (
         <Facts className="text-sm text-muted">
+          {/* This 「총 N개」 is the WHOLE record and stays. It is not the number on the pressed tier chip
+              below — filter to 확인 필요 and this still says 22 while the chip says 1 — and a seller must
+              not be told their record holds what their current filter holds. */}
           <span className="tabular-nums">{`총 ${recordTotal}개`}</span>
           {page.newCount > 0 ? <span className="font-semibold tabular-nums text-brand-700">{`새로 들어온 ${page.newCount}개`}</span> : null}
           {(page.outsideVisibleChannels ?? 0) > 0 && channel === null ? (
@@ -529,7 +532,10 @@ function tierCount(page: ReviewRecordPageView, tier: ReviewTriageTier): number {
 export function rangeLabel(page: ReviewRecordPageView | null): string {
   if (page === null || page.items.length === 0) return "0개 표시 중";
   const first = page.page * page.size + 1;
-  return `${first}–${first + page.items.length - 1}번째 · 총 ${page.total}개`;
+  // 「· 총 N개」 is gone (2026-10-01): the pressed tier chip above the list carries the total, and this
+  // hint is here to say WHERE IN IT the seller is. Repeating the denominator beside the window made the
+  // same number the loudest thing on a header the list had not started under yet.
+  return `${first}–${first + page.items.length - 1}번째`;
 }
 
 function normalizeChannel(value: string | null): string | null {
