@@ -7,6 +7,7 @@ import { ratingLabel } from "../../lib/reviewRecord";
 import { plainText } from "../../lib/plainText";
 import { triageDispositionLabel } from "../../lib/vocItems";
 import { AI_TRIAGE_DISCLOSURE, TRIAGE_TAG_DISCLOSURE } from "../../lib/reviewTriage";
+import { Disclosure } from "../ui/Disclosure";
 import type { ActionWindowRunView } from "../../../../contracts/action-window/v2/index";
 import { locateMessage, locateUnavailableText } from "../../lib/actionWindow/locate/locateCopy";
 import type { LocateUnavailable, ReviewLocateBinding } from "../../lib/actionWindow/locate/useReviewLocate";
@@ -112,7 +113,14 @@ export function ReviewReadDetail({
         <p className="text-sm leading-relaxed text-muted">{AI_TRIAGE_DISCLOSURE}</p>
       ) : null}
       {detail.triage.tags.length > 0 ? (
-        <p className="text-sm leading-relaxed text-muted">{TRIAGE_TAG_DISCLOSURE}</p>
+        // Folded (product-owner decision, 2026-10-01: secondary explanation belongs in a disclosure). It
+        // qualifies a tag that is already on screen and it is identical to the sentence the list's own
+        // 분류 기준 fold carries, so at 1600×1000 the two stood on the same screen, 900px apart. The
+        // caveat is not deleted and not shortened — a seller who wants to know how far to trust the tag
+        // is one press from the whole of it.
+        <Disclosure label="분류 기준">
+          <p className="pt-1 text-sm leading-relaxed text-muted">{TRIAGE_TAG_DISCLOSURE}</p>
+        </Disclosure>
       ) : null}
       {detail.textless ? (
         <p className="break-keep leading-relaxed text-muted">
@@ -172,11 +180,18 @@ export function ReviewReadDetail({
             Reads `replyFlowExists`, the platform fact the draft lane itself is gated on, and NOT
             `replySupported`, the triage contract's NAVER-only event column: that one said 「reviewnary가
             답변을 작성하지 않습니다」 about Cafe24 while 리뷰 처리 was drafting and approving Cafe24 answers. */}
-        {capability === null ? null : capability.replyFlowExists ? (
-          <p className="text-sm text-muted">답변은 리뷰 처리에서 준비하고, 올리는 일은 판매자센터에서 직접 합니다</p>
-        ) : (
+        {/* <b>A control is not explained by a sentence above it and the same sentence below it</b>
+            (product-owner decision, 2026-10-01). 「답변은 리뷰 처리에서 준비하고…」 stood here and
+            「판단·조치·답변 준비는 리뷰 처리 화면에서 합니다…」 stood under the button — two sentences,
+            40px apart, both saying what 「이 리뷰 처리하기」 says in five syllables.
+
+            <p>What survives is the branch that is NOT about the button: a channel with no reply flow is a
+            capability fact, and without it the door opens on a screen that cannot draft and says nothing
+            about why. The boundary 「올리는 일은 판매자센터에서」 is stated where the approval is, which is
+            through that door, not in front of it. */}
+        {capability !== null && !capability.replyFlowExists ? (
           <p className="text-sm text-muted">이 채널에서는 reviewnary가 답변을 작성하지 않습니다</p>
-        )}
+        ) : null}
         <Facts className="text-sm text-muted">
           {/* <b>Named only when there is something to name it AGAINST.</b> This line exists to show the two
               judgments side by side, and with no seller correction there is one judgment — already stated
@@ -209,9 +224,6 @@ export function ReviewReadDetail({
         <BtnLink to={`/reviews/reply/${detail.id}?from=record`} size="sm">
           이 리뷰 처리하기
         </BtnLink>
-        <p className="text-sm leading-relaxed text-muted">
-          판단·조치·답변 준비는 리뷰 처리 화면에서 합니다. 이 목록에서는 기록된 내용을 읽기만 합니다.
-        </p>
       </section>
 
       {/*
@@ -275,9 +287,13 @@ export function ReviewReadDetail({
         ) : null}
       </div>
       ) : (
-        <p className="border-t border-line pt-4 text-sm leading-relaxed text-muted">
-          이 채널의 {josa(word, "은", "는")} reviewnary에서 원문 화면으로 바로 이동할 수 없습니다. 판매자센터에서 직접 확인해 주세요.
-        </p>
+        // Folded for the same reason: this answers 「원문은 어디서 보나」, and a seller who has not asked
+        // it reads a 56-character apology for a control that is not there. The label is the question.
+        <Disclosure className="border-t border-line pt-4" label={`${word} 원문 보기`}>
+          <p className="pt-1 text-sm leading-relaxed text-muted">
+            이 채널의 {josa(word, "은", "는")} reviewnary에서 원문 화면으로 바로 이동할 수 없습니다. 판매자센터에서 직접 확인해 주세요.
+          </p>
+        </Disclosure>
       )}
     </div>
   );

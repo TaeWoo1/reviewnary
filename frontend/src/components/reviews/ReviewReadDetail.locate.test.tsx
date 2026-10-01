@@ -296,7 +296,12 @@ describe("[쿠팡에서 보기]", () => {
           replySupported: channelCode === "NAVER", replyFlowExists: true },
       });
       await selectTheReview();
-      expect(screen.getByText(/답변은 리뷰 처리에서 준비하고/)).toBeInTheDocument();
+      // <b>The guarantee is the ABSENCE</b> (2026-10-01). It used to be carried by an affirmative
+      // sentence — 「답변은 리뷰 처리에서 준비하고…」 — which was removed as one of two sentences
+      // explaining the button between them. What that sentence was protecting is unchanged and is
+      // exactly this: a channel with a reply flow must never be told reviewnary does not write for it,
+      // which is what `replySupported` (NAVER-only) produced for Cafe24.
+      expect(screen.queryByText(/reviewnary가 답변을 작성하지 않습니다/)).not.toBeInTheDocument();
       expect(screen.queryByText(/reviewnary가 답변을 작성하지 않습니다/)).not.toBeInTheDocument();
       unmount();
     }
@@ -311,7 +316,7 @@ describe("[쿠팡에서 보기]", () => {
     });
     await selectTheReview();
     expect(screen.getByText(/reviewnary가 답변을 작성하지 않습니다/)).toBeInTheDocument();
-    expect(screen.queryByText(/답변은 리뷰 처리에서 준비하고/)).not.toBeInTheDocument();
+    // The affirmative half of this pair no longer exists on any channel — see the test above.
   });
 
   /**

@@ -107,12 +107,12 @@ export function GroundingOnHand({
           ) : null}
         </Facts>
 
-        {/* The second sentence points at 「아래 초안」, and a preview has no draft below it — the same wrong
-            pointer the 처리 방법 note had. The first sentence is the one that matters (these are counts of
-            what is FILED, not of what a draft used), so the preview keeps it and drops the direction. */}
-        <p className="break-keep text-sm leading-relaxed text-muted">
-          {EVIDENCE_NOTE.countsAreFiled} 초안이 실제로 무엇을 근거로 썼는지는 아래 초안에 인용으로 나옵니다.
-        </p>
+        {/* <b>The direction is gone, the fact stays</b> (product-owner decision, 2026-10-01). 「초안이 실제로
+            무엇을 근거로 썼는지는 아래 초안에 인용으로 나옵니다」 pointed at 「아래 초안」 — which a preview
+            does not have below it, and which a seller reading the counts has not asked about yet. The
+            sentence that matters is the one that keeps the numbers honest: these count what is FILED, not
+            what a draft used. The citations still appear in the draft; they no longer need announcing. */}
+        <p className="break-keep text-sm leading-relaxed text-muted">{EVIDENCE_NOTE.countsAreFiled}</p>
       </div>
     </Section>
   );
