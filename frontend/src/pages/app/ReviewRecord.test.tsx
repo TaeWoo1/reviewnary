@@ -523,9 +523,13 @@ describe("a list longer than one screen can be walked", () => {
   const LONG = { ...PAGE, total: 42, size: 20 };
 
   it("says which slice of the list is on screen", () => {
-    expect(rangeLabelOf({ ...LONG, page: 1 })).toBe("21–22번째 · 총 42개");
+    // <b>The denominator left this label</b> (product-owner decision, 2026-10-01). It was the pressed tier
+    // chip's own number, ~40px above — 「전체 4599」 and then 「… · 총 4599개」 — so the one thing a seller
+    // reads this hint for, WHERE they are, was the quieter half of it. The total is not lost and did not
+    // move far: it is on the chip, where it is also a control.
+    expect(rangeLabelOf({ ...LONG, page: 1 })).toBe("21–22번째");
     // Derived from what the RESPONSE said, so a server that clamped the size cannot be misdescribed.
-    expect(rangeLabelOf({ ...LONG, page: 0, size: 2 })).toBe("1–2번째 · 총 42개");
+    expect(rangeLabelOf({ ...LONG, page: 0, size: 2 })).toBe("1–2번째");
     expect(rangeLabelOf(null)).toBe("0개 표시 중");
   });
 
@@ -584,7 +588,7 @@ describe("a list longer than one screen can be walked", () => {
   it("labels the page from the response, so the label cannot describe rows that are not there", () => {
     // The pager label and the range label are both read off the response; taken from local state the first
     // would advance the instant the button was pressed, over rows still describing the previous page.
-    expect(rangeLabelOf({ ...LONG, page: 2 })).toBe("41–42번째 · 총 42개");
+    expect(rangeLabelOf({ ...LONG, page: 2 })).toBe("41–42번째");
   });
 
   it("returns to the first page when the order changes, rather than keeping a position that no longer means the same thing", async () => {
@@ -734,10 +738,11 @@ describe("triage", () => {
     renderPage();
     await screen.findByText("생각보다 크기가 작아서 아쉬웠습니다");
 
+    // The WHOLE record, which is not the filtered count — that distinction is this test's point.
     expect(screen.getByText("총 22개")).toBeInTheDocument();
     expect(screen.queryByText("총 1개")).toBeNull();
     // …and the range label under the list still describes the slice actually on screen.
-    expect(screen.getByText("1–1번째 · 총 1개")).toBeInTheDocument();
+    expect(screen.getByText("1–1번째")).toBeInTheDocument();
   });
 
   it("renders the tier the backend sent, never one re-derived from the tags", async () => {
