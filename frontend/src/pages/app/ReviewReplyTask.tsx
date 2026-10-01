@@ -374,16 +374,21 @@ export function ReviewCaseView({
           {/* The channel's own statement, said BEFORE anyone decides anything. */}
           <ChannelAnsweredState state={replyWork?.channelReplyState ?? null} />
 
-          {/* <b>Two questions, one card</b> (Review Decision UX v3.2). They were a card each, and the
-              numbering — not the border — is what tells them apart: 「① 이 리뷰의 중요도」 and 「② 처리 방법」
-              are the seller's judgment of this review, asked in order, and they are answered in one
-              sitting. Two cards cost 40px of padding and a 14px gap for a separation the numerals already
-              made, and they pushed 「AI 초안 준비」 — the thing this screen exists for — outside the fold at
-              every width the product is used at. A hairline divides them now. Neither control changed. */}
+          {/* <b>Two questions, one card</b> (Review Decision UX v3.2). They were a card each, which cost
+              40px of padding and a 14px gap for a separation a hairline makes, and pushed 「AI 초안 준비」
+              — the thing this screen exists for — outside the fold at every width the product is used at.
+
+              <p><b>The numerals are gone</b> (product-owner decision, 2026-10-01). 「①」 and 「②」 claimed a
+              sequence of two, and the sequence is three: 중요도 → 처리 방법 → 답변 준비, 판단 → 결정 →
+              실행 준비. The third step never had a numeral, so the numbering was not describing the flow
+              it appeared to describe — it was labelling the two steps that happen to share a card. Order
+              and the card boundary say the same thing truthfully, and a structural device that encodes
+              nothing true is decoration (docs/ui/reviewnary_ui_system_audit_v1.md §10). Neither control
+              moved and neither heading changed its noun. */}
           <DecisionCard primary={decision === null}>
             <div className="space-y-3">
-              {/* ① — the seller's own judgment of the tier, which does not replace the system's.
-                  <b>Folded in the pane.</b> It is a different judgment from ② and a secondary one: the
+              {/* 판단 — the seller's own judgment of the tier, which does not replace the system's.
+                  <b>Folded in the pane.</b> It is a different judgment from 처리 방법 and a secondary one: the
                   triage contract §5-C says it stands BESIDE the system's and changes no ordering, so
                   nothing downstream waits on it. In a 556px column it was 160px standing between
                   확인한 사실 and the action; the page, which has a whole second column for it, keeps it
@@ -391,7 +396,7 @@ export function ReviewCaseView({
                   without opening it. */}
               {paneEvidenceFolded ? (
                 <Disclosure
-                  label="① 이 리뷰의 중요도"
+                  label="이 리뷰의 중요도"
                   note={<TriageTierChip tier={detail.sellerCorrection?.correctedTier ?? detail.triage.tier} />}
                   summaryClassName="-ml-2"
                 >
@@ -408,7 +413,7 @@ export function ReviewCaseView({
                   </div>
                 </Disclosure>
               ) : (
-                <Section title="① 이 리뷰의 중요도" ariaLabel="판매자 판단 영역">
+                <Section title="이 리뷰의 중요도" ariaLabel="판매자 판단 영역">
                   <SellerCorrectionControls
                     reviewId={detail.id}
                     word={word}
@@ -422,14 +427,14 @@ export function ReviewCaseView({
               )}
 
               <div className="border-t border-line pt-3">
-                {/* ② — what to do. Stands on every review the workspace can open: a channel with no reply
+                {/* 결정 — what to do. Stands on every review the workspace can open: a channel with no reply
                     flow, and a review no account acquired. */}
                 <DecisionActionStep
                   reviewId={detail.id}
                   decision={decision}
                   replySupported={replyWork !== null}
                   replyUnavailableReason={detail.replyUnavailableReason}
-                  title="② 처리 방법"
+                  title="처리 방법"
                   onDecided={(next) => {
                     setDecision(next);
                     bump();

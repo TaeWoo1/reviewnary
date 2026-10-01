@@ -2,6 +2,7 @@ import { useId, useRef, useState } from "react";
 import { api } from "../lib/apiClient";
 import { SecureRandomUnavailableError, newCommandId } from "../lib/commandId";
 import { TRIAGE_OPTIONS, asTriageDisposition } from "../lib/vocItems";
+import { Btn } from "./ui/Btn";
 import type { TriageDisposition } from "../lib/types";
 
 // Records what the operator concluded about one drill-down row. Nothing else: this
@@ -161,9 +162,10 @@ export function VocItemTriageControl({
             // this origin cannot mint a command id.
             const inert = busy || isRecorded || unavailable;
             return (
-              <button
+              <Btn
                 key={option.value}
-                type="button"
+                size="sm"
+                variant={isRecorded ? "selected" : "outline"}
                 aria-pressed={isRecorded}
                 // aria-disabled, NOT the native attribute. Disabling the element the
                 // operator just activated makes the browser blur it: focus drops to
@@ -174,11 +176,12 @@ export function VocItemTriageControl({
                 aria-disabled={inert}
                 aria-busy={isPending}
                 onClick={() => choose(option.value)}
-                className={`rounded-lg px-2.5 py-1 text-sm font-semibold ${
-                  isRecorded
-                    ? "bg-brand/10 text-brand-700"
-                    : `bg-canvas text-muted ${inert ? "opacity-40" : ""}`
-                }`}
+                /* <b>Hand-rolled until 2026-10-01</b>, and that is why one pane drew two segmented
+                   controls two ways: 이 리뷰의 중요도 used `Btn` (white box, hairline border) and this
+                   one used a borderless `bg-canvas` fill, for the same job one hairline apart. Same
+                   primitive now, same two states. Only the inert dimming is this control's own — it
+                   has a state `Btn` has no word for, 「already recorded, so pressing changes nothing」. */
+                className={!isRecorded && inert ? "opacity-40" : undefined}
               >
                 {option.label}
                 {/* aria-hidden, so the pending marker stays out of the accessible NAME.
@@ -187,7 +190,7 @@ export function VocItemTriageControl({
                     new control, and which makes the button unfindable by its own name. The
                     state belongs in aria-busy and the live region below; this is decoration. */}
                 {isPending ? <span aria-hidden="true">…</span> : null}
-              </button>
+              </Btn>
             );
           })}
         </div>

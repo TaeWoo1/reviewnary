@@ -44,7 +44,8 @@ export function ReviewProblemCard({
    * THERE, and this block — which answers 「왜 올라왔나요」 — keeps the reason and drops the conclusion.
    *
    * <p>Measured at 1600×1000 (2026-10-01): 리뷰 처리 said 「확인 필요」 in 왜 올라왔나요, again in
-   * ① 이 리뷰의 중요도, and a third time as a button label — one verdict, three places, one screen.
+   * 이 리뷰의 중요도 (the numerals were dropped 2026-10-01), and a third time as a button label —
+   * one verdict, three places, one screen.
    * The rule that removes it without losing anything is ownership, not visibility: the block that can
    * CHANGE a fact owns stating it.
    */
