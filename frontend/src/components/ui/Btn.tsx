@@ -25,13 +25,20 @@ import { Link } from "react-router-dom";
  * <p>The treatment is not new. `bg-brand/10 text-brand-700` is what the disposition control beside it
  * already used for exactly this meaning, so the two segmented controls in one pane stop answering the
  * same question two ways.
+ *
+ * <p><b>And it carries a border</b> (product-owner decision, 2026-10-01: 상태 chip · 선택 button ·
+ * navigation link must not look alike). A tint with no edge reads as a status chip — the same shape
+ * `Status` draws for 초안 준비됨 — so the one control on the pane that RECORDS something looked like a
+ * label reporting something. The border is what a segmented control has: every option in the group now
+ * has the same box, and the chosen one differs by fill and ink alone. Against `solid` the distance is
+ * unchanged and deliberate: an outlined tint is 「you chose this」, a filled accent is 「press this」.
  */
 export type BtnVariant = "solid" | "selected" | "outline" | "ghost";
 export type BtnSize = "md" | "sm";
 
 const VARIANT: Record<BtnVariant, string> = {
   solid: "bg-brand-700 text-white hover:bg-brand-800 disabled:opacity-50",
-  selected: "bg-brand/10 text-brand-700 hover:bg-brand/15 disabled:opacity-50",
+  selected: "border border-brand-700 bg-brand/10 text-brand-700 hover:bg-brand/10 disabled:opacity-50",
   outline: "border border-line bg-surface text-ink hover:bg-canvas disabled:opacity-50",
   ghost: "text-muted hover:text-ink hover:bg-canvas disabled:opacity-50",
 };

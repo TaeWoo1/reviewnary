@@ -101,7 +101,7 @@ export function SellerCorrectionControls({
 
   return (
     <div className="space-y-3" aria-label="판매자 판단">
-      {/* The caller's own heading — 「① 이 리뷰의 중요도」 — asks this question already, one line above
+      {/* The caller's own heading — 「이 리뷰의 중요도」 — asks this question already, one line above
           (Review Decision UX v3.2). Two headings for one control were 38px of the fold and the second
           one told the seller nothing the first had not. Kept for assistive technology, where the group
           still needs a name of its own. */}
