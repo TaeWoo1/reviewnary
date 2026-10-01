@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Btn, BtnLink } from "../ui/Btn";
+import { Empty } from "../ui/Empty";
 import { RepeatedProblemList } from "../home/RepeatedProblemList";
 import { MasterDetail, selectionHref, useWideLayout } from "../workspace/MasterDetail";
 import { WorkRows, sharedPhrase } from "../workspace/WorkRows";
@@ -12,7 +13,7 @@ import { api } from "../../lib/apiClient";
 import { problemLine } from "../../lib/operationsHome";
 import { RESPONSIBILITY_NAME, cadenceLabel, dataTypeKo, kstClock } from "../../lib/customerOperations";
 import { COPY, autoCheckWhat, channelShort, failureShort, kstLongDate } from "../../lib/copy/customerOps";
-import { mergeHomeWork, reasonCounts, sharedRowFacts, type HomeWork } from "../../lib/homeWork";
+import { mergeHomeWork, sharedRowFacts, type HomeWork } from "../../lib/homeWork";
 import {
   INFLOW_WORD,
   RECENT_WORD,
@@ -36,32 +37,30 @@ import type {
 /**
  * How many rows the list shows before 「+N」.
  *
- * <b>Seven is the smallest viewport's capacity, not this viewport's spare room</b> (product-owner decision,
- * 2026-09-26). Eight rows fit 1440 more snugly and push 실행 대기 · 반복 문제 below the fold at the other two,
- * and the emphasis those sections carry IS their being visible.
+ * <b>Seven rows made the Home an abbreviated copy of 확인할 일</b> (product-owner decision, 2026-10-01).
+ * The previous number was chosen to fill the column, and filling the column is exactly what was wrong with it:
+ * measured at 1600×1000, seven rows ran the list to y=982 against a scroller that ends at ~920, so the seventh
+ * was clipped <i>and</i> 실행 대기 (y=1001), 반복 문제 and the channel's own state were all below the fold.
+ * A Home whose only visible section is the queue answers one of the five questions it exists to answer.
  *
- * <p><b>Then the Pulse took the room seven depended on</b> (product-owner decision, 2026-09-26). Measured at
- * 1152×720: the list's own scroller ends at y=631 and seven rows used to end at 585 — 46px of slack. The Pulse
- * and its heading are 118px where the line they replaced was 21px, so the first row now starts at y=246 instead
- * of 145 and a seventh row would end at 687 — <b>56px past the bottom of the scroller that holds it</b>. Seven
- * and the Pulse are not both true there, so the narrow case shows six, ending at 624 with 7px to spare.
- * <b>A row is either whole or absent</b>: the alternative was leaving the seventh clipped, and a row you can
- * read the top of is a row the screen is pretending to show. At 1440×900 nothing changed — seven rows end at
- * 688 with 151px of clearance to the composer. The numbers above are re-measured against the band as shipped,
- * not against the first cut of it.
+ * <p>So the list is sized to <b>leave room for the other sections</b>, not to use up what is left. A dense
+ * row costs 117px measured, so four of them end at ~733 and the secondary band closes at ~881 with the
+ * channel row above the composer. 「+N」 and 「전체 보기」 are unchanged, and the screen that owns the whole
+ * queue still holds all of it: nothing is hidden, one screen stopped pretending to be another.
  *
- * <p>The constant below still means what it meant — the capacity of the widest case, and the number every
- * other surface reasons about. What is new is that the <i>visible</i> limit is its own named function of the
- * layout, not a second constant and not a measurement: {@link visibleHomeRows}. It reuses the side preview's
- * 1200 breakpoint rather than inventing one, because that is the width at which this column stops being the
- * whole page, and a row count that disagrees with the layout it sits in is the bug this replaces.
+ * <p><b>A row is either whole or absent.</b> That rule is why the narrow case drops one: a row you can read
+ * the top of is a row the screen is pretending to show.
+ *
+ * <p>The <i>visible</i> limit is its own named function of the layout, not a second constant and not a
+ * measurement: {@link visibleHomeRows}. It reuses the side preview's 1200 breakpoint rather than inventing
+ * one, because that is the width at which this column stops being the whole page.
  */
-export const HOME_ROWS = 7;
+export const HOME_ROWS = 4;
 /**
- * The visible limit below 1200 — where the Pulse leaves room for six whole rows and not a seventh.
- * It is not a second capacity: `HOME_ROWS` is still what 「+N」 counts against and what the queue screen holds.
+ * The visible limit below 1200. It is not a second capacity: `HOME_ROWS` is still what 「+N」 counts against
+ * and what the queue screen holds.
  */
-export const HOME_ROWS_NARROW = 6;
+export const HOME_ROWS_NARROW = 3;
 /**
  * How many rows this width can show whole. `wide` is the side preview's own answer ({@link useWideLayout}),
  * so the two never disagree; an environment that cannot measure says narrow, which is the safe direction —
@@ -225,22 +224,14 @@ export function CustomerOpsHome({
           awaiting={co.status === "ACTIVE" ? awaiting.count : null}
           unanswered={unansweredNow(metrics)}
         />
-        <ContextLine inflow={todayInflow(metrics, now)} recent={recentDay(co)} unproven={freshnessUnproven(metrics)} />
+        {/* <b>What CHANGED, and nothing about the machinery.</b> Channel state used to stand here too and it
+            was the wrong end of the screen for it: 「채널은 정상인가」 is the last of the morning's five
+            questions, not a caveat read before the work (product-owner decision, 2026-10-01). It is now its
+            own quiet row under the work, with the gap warnings that stood between the summary and the list. */}
+        <ContextLine inflow={todayInflow(metrics, now)} recent={recentDay(co)} />
       </header>
 
-      {running && co.status === "ACTIVE" ? (
-        <>
-          {warnings.length > 0 ? (
-            <ul className="space-y-2 rounded-xl bg-warn/10 px-4 py-3 text-sm text-warn" aria-label="집계에서 빠진 곳">
-              {warnings.map((line, i) => (
-                <li key={i} className="flex flex-wrap items-center gap-x-2">
-                  {line}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </>
-      ) : (
+      {running && co.status === "ACTIVE" ? null : (
         <section
           aria-label={pill.label}
           className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-6 py-4"
@@ -297,12 +288,11 @@ export function CustomerOpsHome({
               {/* What every row says identically, said once — instead of twice on each of them. */}
               {sharedSaid ? ` · ${sharedSaid}` : ""}
             </span>
-            {/* More than one kind of work waiting: then the mix IS information and the rows keep their badges. */}
-            {!shared.tag ? (
-              <span className="break-keep text-sm text-muted">
-                <Items parts={reasonCounts(work.rows)} />
-              </span>
-            ) : null}
+            {/* <b>The breakdown is the queue's, not the brief's</b> (product-owner decision, 2026-10-01).
+                Measured at 1600×1000 this heading read 「확인할 일 오래된 순 정보 부족 1 · 답변 필요 25 ·
+                리뷰 12 · 승인 대기 4 · 초안 필요 4」 — five tallies over a list showing five rows, and every
+                one of them is a filter chip on 확인할 일, drawn there as a control a seller can press. A
+                count the brief cannot act on is noise on the brief and a control on the queue. */}
             {hidden > 0 || work.truncated ? (
               <Link
                 to="/customer-operations/cases"
@@ -339,9 +329,74 @@ export function CustomerOpsHome({
         <p className="break-keep text-sm text-muted">지금 확인할 일이 없습니다.</p>
       ) : null}
 
-      <AwaitingExecution awaiting={awaiting} selection={selection} />
-      <RepeatedProblems ops={ops} selection={selection} />
+      {/*
+        <b>「Reviewnary가 무엇을 준비했나」 and 「무엇이 반복되나」 are one band, not two stacked sections</b>
+        (product-owner decision, 2026-10-01 — 「준비된 작업 / 반복 문제」).
+
+        <p>Stacked, they cost ~340px and the second of them never appeared on a 1000px-tall screen: measured
+        before this change, 실행 대기 began at y=1001 and 반복 문제 below it. Side by side they are one
+        ~150px band that closes above the composer, which is the difference between a question the Home
+        answers and a question it merely contains. Neither section changed inside; a section with nothing to
+        say still draws nothing, and then the other simply has the row to itself.
+      */}
+      <div className="grid gap-x-8 gap-y-6 pt-2 md:grid-cols-2">
+        <AwaitingExecution awaiting={awaiting} selection={selection} />
+        <RepeatedProblems ops={ops} selection={selection} />
+      </div>
+
+      <ChannelState warnings={warnings} unproven={freshnessUnproven(metrics)} />
     </div>
+  );
+}
+
+/**
+ * <b>「채널은 정상인가」 — the morning's last question, answered where it is asked.</b>
+ *
+ * <p>Every fact here was already on this screen and none of it is new or re-read. What changed is the end of
+ * the screen it stands at: the gap warnings were a warn-tinted block between the summary and the work, and
+ * the freshness clause was a fragment of the context line above it. Both are qualifications of collection,
+ * read AFTER the work rather than before it (product-owner decision, 2026-10-01).
+ *
+ * <p><b>It answers when the answer is yes.</b> Drawing nothing when nothing is wrong leaves the question
+ * open, and a seller cannot tell «no problem» from «we did not look». The affirmative is worded as exactly
+ * what the reads support — no gap row, no incomplete source, no unproven figure — and never as a claim that
+ * every channel is up to date, which nothing here measures.
+ */
+function ChannelState({ warnings, unproven }: { warnings: React.ReactNode[]; unproven: boolean }) {
+  return (
+    <section
+      aria-label="채널 상태"
+      className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line pt-3 text-sm"
+    >
+      {/* The question, named. Without it this row is an orange sentence floating under the work, and the
+          seller has to infer that it is about their channels. It is a label, not a heading: the two
+          sections above are work and this is the frame they were read inside. */}
+      <span className="shrink-0 font-semibold text-ink">채널</span>
+      {warnings.length > 0 ? (
+        // The row names the question; this list keeps the name it has always had, because what it holds is
+        // narrower than the question — the places a figure above does not cover.
+        <ul aria-label="집계에서 빠진 곳" className="min-w-0 flex-1 space-y-1.5 text-warn">
+          {warnings.map((line, i) => (
+            <li key={i} className="flex flex-wrap items-center gap-x-2">
+              {line}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 break-keep text-muted">
+          {/* Muted, never warn (§8-B′): it qualifies the figures above and is read in the same breath as
+              them. The warn colour is for a channel the seller can go and fix. */}
+          <span>{unproven ? "일부 채널 최신 수집 확인 필요" : "확인된 수집 문제 없음"}</span>
+          <Sep />
+          <Link
+            to="/connect"
+            className="font-semibold text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+          >
+            연결 상태 보기
+          </Link>
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -661,7 +716,7 @@ function OperationsSummary({
     <section
       data-testid="today-summary"
       aria-label={PULSE_LABEL}
-      className={`mt-3 grid max-w-3xl divide-x divide-line rounded-xl bg-canvas px-6 py-4 ${
+      className={`mt-3 grid max-w-3xl divide-x divide-line rounded-xl bg-canvas px-6 py-3 ${
         cells.length === 3 ? "grid-cols-3" : cells.length === 2 ? "grid-cols-2" : "grid-cols-1"
       }`}
     >
@@ -686,12 +741,9 @@ function OperationsSummary({
 function ContextLine({
   inflow,
   recent,
-  unproven,
 }: {
   inflow: ReturnType<typeof todayInflow>;
   recent: ReturnType<typeof recentDay>;
-  /** Any KPI in the population could not prove a collection — the same signal `/overview` shows. */
-  unproven: boolean;
 }) {
   const facts: ReactNode[] = [];
 
@@ -745,19 +797,16 @@ function ContextLine({
     );
   }
 
-  /**
-   * Channel freshness. `muted`, never `warn`: it qualifies the numbers above and is read in the same breath
-   * as them (§8-B′ secondary disclosure). The warn colour would spend the page's strongest signal on
-   * machinery.
-   *
-   * <p><b>Only when the inflow has not already said it.</b> A withheld lane is withheld BECAUSE a collection
-   * could not be proven, so printing both is one cause stated twice — and the inflow clause is the better of
-   * the two because it names which lane. Measured on the demo org at 1440×900: 「수집 상태 확인 필요」 and
-   * 「일부 채널 최신 수집 확인 필요」 stood on the same line, 8px apart.
-   */
-  const inflowAlreadySaidIt =
-    !!inflow && (inflow.reviews.kind === "UNQUALIFIED" || inflow.inquiries.kind === "UNQUALIFIED");
-  if (unproven && !inflowAlreadySaidIt) facts.push(<span key="unproven">일부 채널 최신 수집 확인 필요</span>);
+  /*
+    Channel freshness used to end this line. It is now {@link ChannelState}'s, at the foot of the screen,
+    because 「채널은 정상인가」 is its own question and not a trailing clause of 「무엇이 달라졌나」
+    (product-owner decision, 2026-10-01). The rule that produced it is unchanged and so is its colour.
+
+    <p>The one thing that had to travel with it: a withheld inflow lane above is withheld BECAUSE a
+    collection could not be proven, so both clauses are one cause stated twice. They no longer stand 8px
+    apart — they stand at opposite ends of the screen, each answering the question it was asked under —
+    and the inflow clause remains the better one here because it names which lane.
+  */
 
   if (facts.length === 0) return null;
   return (
@@ -890,10 +939,20 @@ function Dot() {
   );
 }
 
+/**
+ * How many rows 실행 대기 draws on the brief.
+ *
+ * <p>Two, because this section is one half of a band that has to close above the composer — measured, four
+ * rows ran it to y=1090 on a 1000px screen and took the channel row off the screen with it. The <b>total</b>
+ * is never the drawn count: it stays on the heading and in the summary band's own cell, so capping the list
+ * cannot quietly shrink the number the seller is told they owe.
+ */
+const HOME_AWAITING_ROWS = 2;
+
 /** The rows of 실행 대기 after the dedupe against 확인할 일, and how many the section stands for in total. */
 function awaitingRows(ops: OperationsHome | null | undefined, work: HomeWork) {
   const prepared = ops?.prepared;
-  if (!prepared) return { rows: [] as HomePreparedItem[], moreReplies: 0, count: 0 };
+  if (!prepared) return { rows: [] as HomePreparedItem[], shown: [] as HomePreparedItem[], moreReplies: 0, count: 0 };
   // Anything 확인할 일 is already offering is not offered again, by the same key that list deduped itself with.
   const claimed = new Set(work.rows.map((row) => row.owner));
   const rows = prepared.rows.filter((row) => !claimed.has(row.to));
@@ -901,7 +960,10 @@ function awaitingRows(ops: OperationsHome | null | undefined, work: HomeWork) {
   // expects to lose rows to the dedupe above.
   const drawnReplies = rows.filter((row) => row.kind === "REVIEW_REPLY").length;
   const moreReplies = Math.max(0, prepared.reviewRepliesApproved - drawnReplies);
-  return { rows, moreReplies, count: rows.length + moreReplies };
+  // `count` is what the section STANDS FOR and `shown` is what it draws. They were the same number until the
+  // brief had to make room for the questions below it, and keeping them one field would have made the cap a
+  // silent correction to an obligation.
+  return { rows, shown: rows.slice(0, HOME_AWAITING_ROWS), moreReplies, count: rows.length + moreReplies };
 }
 
 /**
@@ -934,7 +996,7 @@ function AwaitingExecution({
   awaiting: ReturnType<typeof awaitingRows>;
   selection?: HomeSelection;
 }) {
-  const { rows, moreReplies } = awaiting;
+  const { rows, shown, moreReplies, count } = awaiting;
   if (rows.length === 0 && moreReplies === 0) return null;
   const wide = selection?.wide ?? false;
   const search = selection?.search ?? "";
@@ -946,11 +1008,21 @@ function AwaitingExecution({
           review approval is, and what an inquiry row is not — those arrive with the work item still
           PROPOSED and no approval anywhere. One badge cannot be true of both, so the state moved onto
           the rows, where each one can say its own (see lib/preparedState.ts). */}
-      <div className="mb-3 mt-8 flex items-center gap-2">
+      {/* No `mt-8`: this section is one half of a two-column band now, and a top margin on one of two
+          grid children stops their headings sharing a baseline. The band's own `gap-y` owns the space. */}
+      {/* <b>The total rides on the heading, because the list below it is capped.</b> The brief draws the
+          first two and says so; the number the seller owes is the section's, not the list's, and it is the
+          same figure the summary band's own cell links down to. */}
+      <div className="mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <h2 className="text-base font-semibold tracking-tight text-ink">실행 대기</h2>
+        {count > shown.length ? (
+          <span className="break-keep text-sm tabular-nums text-muted">
+            {count.toLocaleString("ko-KR")}건 중 {shown.length.toLocaleString("ko-KR")}건
+          </span>
+        ) : null}
       </div>
       <PreparedWorkList
-        rows={rows}
+        rows={shown}
         selectedId={wide ? selectedId : null}
         // An approved review reply opens in the pane — the Review Case, where the approved text and its copy are.
         linkFor={(row) => (row.kind === "REVIEW_REPLY" ? selectionHref(wide, `${PREPARED}${row.id}`, row.to, search) : row.to)}
@@ -968,30 +1040,6 @@ function AwaitingExecution({
     </section>
   );
 }
-
-/**
- * Facts in a row, each kept whole with the separator in front of it — so a wrapped line starts with 「·」 or with a fact,
- * never ends on a dangling dot.
- */
-function Items({ parts }: { parts: React.ReactNode[] }) {
-  return (
-    <>
-      {/* A space between the unbreakable parts is the only place a long tally may wrap — without it a cell's line
-          runs under the next cell instead of onto its own second line. */}
-      {parts.map((part, i) => (
-        <Fragment key={i}>
-          {i > 0 ? " " : null}
-          <span className="whitespace-nowrap">
-            {i > 0 ? <span aria-hidden="true" className="mr-1.5">·</span> : null}
-            {part}
-          </span>
-        </Fragment>
-      ))}
-    </>
-  );
-}
-
-
 
 /** The latest run failed: the 24-hour tally above stands, and this names the check it does not include. */
 function lastRunLines(co: CustomerOperationsHome, now: Date): React.ReactNode[] {
@@ -1079,16 +1127,44 @@ function warningLines(co: CustomerOperationsHome, now: Date): React.ReactNode[] 
  */
 function RepeatedProblems({ ops, selection }: { ops: OperationsHome | null | undefined; selection?: HomeSelection }) {
   const problems = ops?.problems;
-  if (!problems || problems.rows.length === 0) return null;
+  // A read that did not land says nothing; a read that landed on nothing says so. The two were one branch
+  // until the Home was asked to answer 「반복되는 문제는 무엇인가」 on its first screen, and a section that
+  // renders nothing leaves that question open — a seller cannot tell 「없다」 from 「보지 않았다」
+  // (product-owner decision, 2026-10-01).
+  if (!problems) return null;
+  if (problems.rows.length === 0) {
+    return (
+      <section aria-label="반복 문제">
+        <h2 className="mb-1 text-base font-semibold tracking-tight text-ink">반복 문제</h2>
+        <Empty
+          compact
+          title="아직 없습니다"
+          body="같은 문제를 말한 리뷰가 쌓이면 여기 모입니다."
+          action={
+            <Link
+              to="/memory"
+              className="text-sm font-semibold text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+            >
+              지난 기록 보기
+            </Link>
+          }
+        />
+      </section>
+    );
+  }
   const wide = selection?.wide ?? false;
   const search = selection?.search ?? "";
   const selectedId = selection?.selectedKey?.startsWith(PROBLEM) ? selection.selectedKey.slice(PROBLEM.length) : null;
   return (
     <section aria-label="반복 문제">
-      <div className="mb-3 mt-8 flex items-center gap-2">
+      {/* The server's own two counts ride on the heading line instead of standing as a paragraph of ink
+          under it. They qualify the section — 「조치 필요 1 · 관찰 중 19」 — and a qualification set at the
+          weight of body text was a second headline between a heading and the rows it names. Same string,
+          same source ({@link problemLine}), one line fewer and one weight quieter. */}
+      <div className="mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <h2 className="text-base font-semibold tracking-tight text-ink">반복 문제</h2>
+        <span className="break-keep text-sm text-muted">{problemLine(problems)}</span>
       </div>
-      <p className="break-keep px-1 leading-relaxed text-ink">{problemLine(problems)}</p>
       <RepeatedProblemList
         rows={problems.rows}
         selectedId={wide ? selectedId : null}

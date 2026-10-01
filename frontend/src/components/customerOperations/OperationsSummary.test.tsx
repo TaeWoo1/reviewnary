@@ -85,6 +85,13 @@ function draw(home = co(), m: OperationsMetrics | null = metrics()) {
 const summary = () => screen.findByTestId("today-summary");
 /** The quiet line under the band: inflow, the 24-hour window, freshness. */
 const context = () => screen.findByTestId("today-context");
+/**
+ * The channel row at the foot of the screen (UI System v2.1, product-owner decision 2026-10-01). Collection
+ * state used to be a clause of the context line; 「채널은 정상인가」 is the morning's own last question, so it
+ * is asked where the morning ends. The guarantees that were pinned on the context line are pinned here now —
+ * re-pointed rather than rewritten, so the reorganisation cannot quietly drop one.
+ */
+const channels = () => screen.findByLabelText("채널 상태");
 
 beforeEach(() => {
   api.getInquiryQueueStrict.mockResolvedValue({ content: [], totalElements: 0, page: 0, size: 50 });
@@ -336,11 +343,12 @@ describe("the band — obligations only", () => {
     expect(band).not.toHaveTextContent("현재 미답변");
     expect(band).not.toHaveTextContent("수집 상태 확인 필요");
     expect(band).not.toHaveTextContent("4건");
-    // And the fact is not lost — the line whose job is collection state carries it, exactly once. Which
-    // sentence it uses depends on WHICH lane is unproven (a withheld inflow lane names itself; otherwise
-    // the freshness clause speaks), so the assertion is on the count, not on the wording.
-    const ctx = await context();
-    expect(ctx.textContent!.match(/수집 (상태|확인) 확인 필요|최신 수집 확인 필요/g) ?? []).toHaveLength(1);
+    // And the fact is not lost — the surfaces whose job is collection state carry it, exactly once between
+    // them. Which sentence it uses depends on WHICH lane is unproven (a withheld inflow lane names itself on
+    // the context line; otherwise the channel row's freshness clause speaks), so the assertion is on the
+    // count over both, not on the wording and not on which of the two said it.
+    const said = [(await context()).textContent, (await channels()).textContent].join(" ");
+    expect(said.match(/수집 (상태|확인) 확인 필요|최신 수집 확인 필요/g) ?? []).toHaveLength(1);
   });
 
   it("한 원인을 두 문장으로 말하지 않는다 — 유입이 이미 말했으면 freshness 절은 빠진다", async () => {
@@ -457,13 +465,37 @@ describe("the context line", () => {
     expect(line).not.toHaveTextContent("주문");
   });
 
-  it("names channel freshness in muted, never in warn", async () => {
+  it("never carries channel freshness itself — that question is asked at the foot of the screen", async () => {
     draw(co({ checked: 1 }), metrics({ kpis: [kpi("reviews"), kpi("inquiries"), kpi("unansweredInquiries", { freshnessUnproven: true })] }));
-    const line = await context();
-    await waitFor(() => expect(line).toHaveTextContent("일부 채널 최신 수집 확인 필요"));
+    const row = await channels();
+    await waitFor(() => expect(row).toHaveTextContent("일부 채널 최신 수집 확인 필요"));
+    expect(await context()).not.toHaveTextContent("일부 채널 최신 수집 확인 필요");
     // Secondary disclosure (§8-B'): it qualifies the figures above and is read in the same breath as
-    // them. The warn colour would spend the page's strongest signal on machinery.
-    expect(line.className).not.toMatch(/text-warn|text-bad/);
-    expect(line.querySelector("[class*='text-warn']")).toBeNull();
+    // them. The warn colour is for a channel the seller can go and fix, and would otherwise spend the
+    // page's strongest signal on machinery.
+    expect(row.querySelector("[class*='text-warn']")).toBeNull();
+  });
+});
+
+/**
+ * 「채널은 정상인가」 — the fifth question the Home exists to answer, and the one it used to leave open.
+ */
+describe("the channel row", () => {
+  it("answers when the answer is yes — silence cannot be told from «we did not look»", async () => {
+    draw(co({ checked: 1 }), metrics({ kpis: [kpi("reviews"), kpi("inquiries")] }));
+    const row = await channels();
+    await waitFor(() => expect(row).toHaveTextContent("확인된 수집 문제 없음"));
+    // It claims exactly what the reads support — no gap row, no incomplete source, no unproven figure —
+    // and never that every channel is up to date, which nothing on this screen measures.
+    expect(row).not.toHaveTextContent("최신");
+  });
+
+  it("stands below the work, not between the summary and it", async () => {
+    draw(co({ checked: 1 }), metrics({ kpis: [kpi("reviews"), kpi("inquiries")] }));
+    const row = await channels();
+    const band = await summary();
+    expect(band.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const list = screen.queryByRole("list", { name: "확인할 일" });
+    if (list) expect(list.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

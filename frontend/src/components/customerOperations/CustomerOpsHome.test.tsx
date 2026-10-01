@@ -231,15 +231,22 @@ describe("CustomerOpsHome", () => {
     await waitFor(() => expect(summary).toHaveTextContent("확인할 일 4"));
     const heading = await screen.findByRole("heading", { name: /확인할 일/ });
     expect(heading).not.toHaveTextContent("4");
-    // What is only the list's stays on the list: its order and its breakdown.
-    expect(heading.parentElement).toHaveTextContent(/교환·환불 1 ?·정보 부족 1 ?·답변 필요 1 ?·리뷰 1/);
+    // <b>The breakdown is the queue's, not the brief's</b> (product-owner decision, 2026-10-01). It used to
+    // stand here: 「교환·환불 1 · 정보 부족 1 · 답변 필요 1 · 리뷰 1」, four tallies over a list showing four
+    // rows. Every one of them is a filter chip on 확인할 일, where it is a control the seller can press; on a
+    // brief it is a number nothing can be done with. The ORDER stays, because the order is how to read the
+    // rows that are here.
+    expect(heading.parentElement).toHaveTextContent("오래된 순");
+    expect(heading.parentElement).not.toHaveTextContent(/교환·환불 1|정보 부족 1/);
     await expectNoAxeViolations(container);
   });
 
   it("each row says why, from where, how long — and no row carries a button of its own", async () => {
     draw();
     const list = await screen.findByRole("list", { name: "확인할 일" });
-    await waitFor(() => expect(within(list).getAllByRole("link")).toHaveLength(4));
+    // Four rows in the fixture, and jsdom cannot measure a width — so the brief draws its narrow count.
+    // Asserting the literal 4 only held while the narrow limit was larger than any fixture.
+    await waitFor(() => expect(within(list).getAllByRole("link")).toHaveLength(visibleHomeRows(false)));
     const [first, second] = within(list).getAllByRole("link");
     // A review carries the way back to the work list it was opened from.
     expect(first).toHaveAttribute("href", "/reviews/reply/r-1?from=work");
