@@ -121,6 +121,22 @@ export function DecisionRow({
     tagHidden || !tag || tag === stateWord?.text ? null : (
       <span className={`shrink-0 rounded-md px-1.5 py-px text-xs font-semibold ${TAG[tone]}`}>{tag}</span>
     );
+  /**
+   * <b>The category is not drawn at the weight of the state</b> (product-owner decision, 2026-10-01).
+   *
+   * <p>In the dense reading the row's first line held a coloured word with a dot and, beside it, a filled
+   * capsule — two marks of the same size competing for the one glance the row gets, when only one of them
+   * answers 「내가 뭘 해야 하나」. A fill is the strongest thing a 12px token can carry, and spending it on
+   * 「리뷰」 down twenty rows that are all reviews put the loudest mark on the least distinguishing fact.
+   *
+   * <p>So here the category is plain muted text. The tone survives where it means something: the state
+   * word keeps its colour, and the three-line reading — which draws a coloured tile as the row's left
+   * anchor — keeps the filled badge that belongs with it.
+   */
+  const quietBadge =
+    tagHidden || !tag || tag === stateWord?.text ? null : (
+      <span className="shrink-0 text-xs font-medium text-muted">{tag}</span>
+    );
   const lead = stateWord ? (
     <Status tone={stateWord.tone} variant="word">
       {stateWord.text}
@@ -141,7 +157,7 @@ export function DecisionRow({
           {lead || badge ? (
             <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
               {lead}
-              {badge}
+              {quietBadge}
             </span>
           ) : null}
           <span className="mt-0.5 block min-w-0 max-w-[62ch] break-keep text-sm font-semibold leading-snug text-ink [overflow-wrap:anywhere]">
@@ -158,10 +174,18 @@ export function DecisionRow({
         {action}
       </>
     );
-    // The fill is the selection (Intercom draws it exactly this way: a soft rounded fill, no border and no left
-    // bar), and the row that carries it drops the hairline above it so the two marks never stack.
+    /**
+     * <b>Subtle fill AND a left accent</b> (product-owner decision, 2026-10-01). The fill alone was what
+     * Intercom draws, and on their Inbox it is enough because the row and the pane touch. Here they are
+     * 440px apart across a hairline, and a soft tint on a white list did not read as 「this row is what the
+     * pane is showing」 — a seller had to compare the text to be sure. The accent is the same mark the
+     * three-line reading has always used (`shadow-selected`, one token, the brand at 3px), so the two
+     * readings of one component now say selection the same way.
+     *
+     * <p>The row that carries it drops the hairline above it so the two marks never stack.
+     */
     const shape = `flex items-start gap-4 rounded-lg px-3 py-3 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
-      selected ? "!border-transparent bg-brand-50" : "hover:bg-canvas"
+      selected ? "!border-transparent bg-brand-50 shadow-selected" : "hover:bg-canvas"
     }`;
     return (
       <li className="px-1.5 [&+&>*]:border-t [&+&>*]:border-line">
