@@ -16,8 +16,14 @@ import type { ReviewWorkView } from "../../lib/types";
 
 /** One name for one list: the nav entry, this page's title and the Home's section all say 확인할 일 (UI/UX v2). */
 const TITLE = COPY.listTitle;
-/** The scope label: what this count counts, so it is not read against the 리뷰 or 문의 screens' own numbers. */
-const DESCRIPTION = "판매자님의 결정을 기다리는 문의와 리뷰입니다. 오래 기다린 것부터 봅니다.";
+/**
+ * The scope label: what this count counts, so it is not read against the 리뷰 or 문의 screens' own numbers.
+ *
+ * <p>「오래 기다린 것부터 봅니다」 used to close it and is gone (product-owner decision, 2026-10-01): the
+ * heading two lines up reads 「확인할 일 46건 · 오래된 순」, so the sentence spent a line restating the sort
+ * word that is already beside the count. What is left is the half a heading cannot carry — WHICH records.
+ */
+const DESCRIPTION = "판매자님의 결정을 기다리는 문의와 리뷰입니다.";
 
 /**
  * <b>The queue</b> — everything waiting for the seller's decision, in one list.

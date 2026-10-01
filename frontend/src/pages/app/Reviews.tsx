@@ -127,7 +127,7 @@ export function Reviews() {
       head={
         <PageHead
           title="리뷰"
-          meta={<span className="text-sm text-muted">{REVIEWS_DESCRIPTION}</span>}
+          meta={REVIEWS_DESCRIPTION ? <span className="text-sm text-muted">{REVIEWS_DESCRIPTION}</span> : undefined}
           action={<AgentLaunch context={{ surface: "reviews" }} label="리뷰에 대해 물어보기" />}
         />
       }
@@ -136,4 +136,11 @@ export function Reviews() {
 }
 
 /** One line, and it answers 「이 화면은 무엇인가」. */
-export const REVIEWS_DESCRIPTION = "확인이 필요한 리뷰부터 봅니다.";
+/**
+ * <b>Empty since 2026-10-01</b> (product-owner decision). It said 「확인이 필요한 리뷰부터 봅니다」 — the
+ * default sort — while 「확인 필요순」 stood two rows below as a pressed chip the seller can change. A
+ * subtitle that narrates a control the screen already shows is a line of type for nothing.
+ *
+ * <p>The export stays because the page's own test names it; the page draws no `meta` when it is empty.
+ */
+export const REVIEWS_DESCRIPTION = "";

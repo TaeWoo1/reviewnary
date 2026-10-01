@@ -281,8 +281,10 @@ describe("reply work on the 리뷰 screen (A6)", () => {
     renderPage("/reviews?review=r1");
 
     const block = await screen.findByRole("region", { name: "판단과 조치" });
-    // Who writes the answer — the channel's capability, said where the door is.
-    expect(within(block).getByText(/올리는 일은 판매자센터에서 직접 합니다/)).toBeInTheDocument();
+    // Who writes the answer — the channel's capability, said where the door is. It is now said only in
+    // the negative: the affirmative sentence was one of two explaining the button between them, and a
+    // channel that CAN be drafted for needs no announcement that it can (2026-10-01).
+    expect(within(block).queryByText(/reviewnary가 답변을 작성하지 않습니다/)).not.toBeInTheDocument();
     // What stands, as facts. No control that writes: the record is a record.
     //
     // <b>「시스템 판단」 is NOT here, and that is the rule</b> (2026-10-01). This line exists to put the two
@@ -848,7 +850,7 @@ describe("the AI pilot's mark and the feedback spine (RUBRIC v2 §13.7)", () => 
     expect(correctTriage).not.toHaveBeenCalled();
     expect(recordAction).not.toHaveBeenCalled();
     expect(within(block).getByRole("link", { name: "이 리뷰 처리하기" })).toBeInTheDocument();
-    expect(within(block).getByText(/판단·조치·답변 준비는 리뷰 처리 화면에서 합니다/)).toBeInTheDocument();
+    // The sentence that used to stand under this link said what the link says. The link is the claim.
   });
 
   it("offers no tier controls at all — choosing among the three is the workspace's job", async () => {

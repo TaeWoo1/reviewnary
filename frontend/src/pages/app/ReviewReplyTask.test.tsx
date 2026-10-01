@@ -289,7 +289,10 @@ describe("리뷰 처리 — the decision workspace", () => {
     expect(screen.getByText("회사 운영 기준 5건")).toBeInTheDocument();
     expect(screen.getByText("부착 안내 · 규격표")).toBeInTheDocument();
     expect(screen.getByText(/확인 필요가 3건 있습니다/)).toBeInTheDocument();
-    expect(screen.getByText(/초안이 실제로 무엇을 근거로 썼는지는/)).toBeInTheDocument();
+    // The note that keeps these four numbers honest. Its second clause pointed at 「아래 초안」 — absent in
+    // a preview, and unasked-for by a seller still reading the counts — and was dropped (2026-10-01).
+    expect(screen.getByText(/여기 있는 숫자는 등록된 자료의 수입니다/)).toBeInTheDocument();
+    expect(screen.queryByText(/아래 초안에 인용으로 나옵니다/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "답변 기준 보기" })).toHaveAttribute("href", "/knowledge");
   });
 

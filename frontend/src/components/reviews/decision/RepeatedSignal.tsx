@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Disclosure } from "../../ui/Disclosure";
 import { Section, ListBox } from "../../ui/Section";
 import { usePaneDepth } from "../../workspace/CaseLayout";
 import { EVIDENCE_NOTE } from "../../../lib/reviewDecision";
@@ -48,9 +49,17 @@ export function RepeatedSignal({
   if (problems.length === 0) {
     return (
       <Section title={titled ? "반복 신호" : undefined} ariaLabel="반복 신호">
-        <p className="break-keep text-sm leading-relaxed text-muted">
-          이 리뷰는 아직 반복 문제의 근거로 기록되지 않았습니다. {EVIDENCE_NOTE.repeatCriterion}
-        </p>
+        {/* <b>The claim stays open, the criterion folds</b> (product-owner decision, 2026-10-01). Both
+            clauses are load-bearing and neither is deleted: the first is a statement about our RECORDS
+            (「아직 …않았습니다」, never 「반복된 적 없습니다」), and the second names the other mechanism so
+            the first does not read as a denial of the triage note a few centimetres above it. But only
+            the first answers 「이 리뷰는 반복인가」. The second answers 「그럼 무슨 기준인가」, which is a
+            question the seller asks second if at all, and at 77 characters it was the longest sentence
+            on the screen for a section whose content is empty. */}
+        <p className="break-keep text-sm leading-relaxed text-muted">아직 반복 문제의 근거로 기록되지 않았습니다.</p>
+        <Disclosure label="무엇을 반복으로 보나요">
+          <p className="break-keep pt-1 text-sm leading-relaxed text-muted">{EVIDENCE_NOTE.repeatCriterion}</p>
+        </Disclosure>
       </Section>
     );
   }
