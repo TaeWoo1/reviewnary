@@ -26,15 +26,25 @@ export function PreparedWorkList({
   rows,
   linkFor,
   selectedId,
+  bare = false,
 }: {
   rows: readonly HomePreparedItem[];
   /** Where a row points when the page can draw it in place (the 오늘 pane); the row's own screen otherwise. */
   linkFor?: (row: HomePreparedItem) => string;
   selectedId?: string | null;
+  /**
+   * <b>The caller is already a card</b> (Home visual target, 2026-10-01).
+   *
+   * <p>On 오늘 this list now stands inside a bordered section that carries the heading, the count and the
+   * way out, so its own border and radius drew a second edge 16px inside the first — the 「카드 안의
+   * 카드」 §4 spends exactly one boundary on. The rows keep their hairlines, which is what separates
+   * them; everything that said 「this is one object」 belongs to the object that now says it.
+   */
+  bare?: boolean;
 }) {
   if (rows.length === 0) return null;
   return (
-    <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
+    <ul className={`divide-y divide-line ${bare ? "mt-2" : "mt-3 overflow-hidden rounded-2xl border border-line bg-surface"}`}>
       {rows.map((row) => {
         const state = preparedStateWord(row);
         return (
@@ -42,20 +52,35 @@ export function PreparedWorkList({
           <Link
             to={linkFor ? linkFor(row) : row.to}
             aria-current={selectedId === row.id ? "true" : undefined}
-            className={`block break-keep px-4 py-3 text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
+            className={`block break-keep py-2 text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${bare ? "" : "px-4"} ${
               selectedId === row.id ? "bg-brand-50 shadow-selected" : "hover:bg-canvas"
             }`}
           >
-            {row.detail ? (
-              <>
-                <span className="break-keep">{row.detail}</span>
-                <span className="ml-2 text-sm text-muted">{row.label}</span>
-              </>
-            ) : (
-              <span className="break-keep">{row.label}</span>
-            )}
-            {state ? <span className="ml-2 text-sm text-muted">{state}</span> : null}
-            <span className="ml-1 text-brand-700" aria-hidden="true">›</span>
+            {/*
+              <b>What it is, then which one</b> (Home visual target, 2026-10-01).
+
+              <p>The row ran label, detail and state along one line, and on 오늘 that line is inside a
+              590px card: measured, every row wrapped, and the wrap fell between the product name and the
+              word that says what the row IS. The kind leads on its own line with the state right-aligned
+              beside it — the two facts a seller chooses between rows on — and the product and date stand
+              under them as the one that identifies WHICH. Same three strings, same order of importance.
+            */}
+            {/*
+              <b>One line: what it is, which one, what it waits for</b> (Home visual target, 2026-10-01).
+
+              <p>Measured at 1600×1000 the two-line reading made this card 246px tall inside a brief whose
+              whole budget to the composer is 911px, and the card is one of five things that budget has to
+              hold. The target draws these rows at ~40px, and all three facts fit on one: the kind leads,
+              the product and date identify WHICH (they take the elastic column and truncate, because they
+              are the longest and the least load-bearing at their tail), and the state is right-aligned
+              where the eye already goes for it on the work rows above.
+            */}
+            <span className="flex items-baseline gap-2">
+              <span className="shrink-0 break-keep font-semibold">{row.label}</span>
+              {row.detail ? <span className="min-w-0 flex-1 truncate text-sm text-muted">{row.detail}</span> : <span className="flex-1" />}
+              {state ? <span className="shrink-0 text-sm text-muted">{state}</span> : null}
+              <span className="shrink-0 text-muted" aria-hidden="true">›</span>
+            </span>
           </Link>
         </li>
         );

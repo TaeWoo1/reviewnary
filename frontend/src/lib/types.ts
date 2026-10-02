@@ -2953,6 +2953,34 @@ export interface OperationsInsight {
   to: string;
   actionLabel: string;
   agentGoal: string | null;
+  /**
+   * The window the claim is measured over — `2026-09-25`..`2026-10-01` — or BOTH null for a
+   * present-state fact (a backlog, a broken connection). Null is not 「unknown」: it means a window
+   * would be a fiction.
+   */
+  periodStart: string | null;
+  periodEnd: string | null;
+  /**
+   * The window it is compared AGAINST, or null when nothing was.
+   *
+   * <p><b>All four period fields present is what makes an insight a CHANGE</b> — it is the structural
+   * property `오늘 달라진 점` filters on (`lib/homeInsights.ts`). One window and no baseline is a
+   * level, not a movement: 「채널 매출의 72%」 and 「미답변 46건」 are both true and neither is news.
+   */
+  previousPeriodStart: string | null;
+  previousPeriodEnd: string | null;
+  /**
+   * The KST calendar date the fact behind this was last OBSERVED. Never null.
+   *
+   * <p><b>An observation time, never a change timestamp</b> (product-owner decision, 2026-10-01). A
+   * connector disconnected three weeks ago is observed to be disconnected again on every read, so
+   * `observedAt === today` says only that we looked today. <b>No surface may use it as evidence that
+   * something changed</b>; it exists so a reader can tell how stale a finding is.
+   *
+   * <p>A date rather than an instant, deliberately: the same granularity `recencyBucket` fixed for
+   * everything seller-facing.
+   */
+  observedAt: string;
 }
 
 export interface OverviewResponse {

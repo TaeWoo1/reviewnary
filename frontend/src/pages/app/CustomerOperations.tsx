@@ -313,7 +313,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 function Duty({ title, items }: { title: string; items: string[] }) {
   return (
     <div>
-      <h2 className="text-sm font-semibold text-ink">{title}</h2>
+      <h2 className="text-lg font-semibold text-ink">{title}</h2>
       <ul className="mt-1 space-y-0.5">
         {items.map((item) => (
           <li key={item} className="break-keep text-sm text-muted">

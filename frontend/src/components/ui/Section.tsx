@@ -37,7 +37,10 @@ export function Section({
       {title || action ? (
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-          <h2 className={`break-keep text-base font-semibold text-ink ${title ? "" : "sr-only"}`}>
+          {/* `section` (20/700) — see `tailwind.config.ts`. At `base font-semibold` an `h2` was the size
+              of the body text under it and separated from it by weight alone. */}
+          {/* 18/600 — the normal section rank; see Section.tsx for why it is not `section` (20/700). */}
+          <h2 className={`break-keep text-lg font-semibold tracking-tight text-ink ${title ? "" : "sr-only"}`}>
             {title ?? ariaLabel}
             {count !== undefined && count !== null ? (
               <span className="ml-1.5 font-semibold tabular-nums text-muted">{count}</span>

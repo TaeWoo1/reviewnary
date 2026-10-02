@@ -165,7 +165,10 @@ public class CaseKnowledgeService {
                         needLines(orgId, c, namedProduct, gap)),
                 draft(orgId, c), c.getSubjectKind() == OperationsSubjectKind.INQUIRY
                         ? "/inquiries/" + c.getSubjectId() : "/reviews/reply/" + c.getSubjectId(),
-                media(orgId, c));
+                media(orgId, c),
+                // The elapsed-time fallback, carried so the pane can apply the same contract the row applies.
+                // It is never preferred over `receivedOn`: see `elapsedSource` on the frontend.
+                c.getCreatedAt());
     }
 
     /** The review-photo lane. Optional: a context without it shows a case with no photos, as before. */

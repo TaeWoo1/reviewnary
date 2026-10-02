@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../lib/auth";
-import { NAV_GROUPS } from "../../lib/nav.v2";
+import { NAV_GROUPS, navGroupLabel } from "../../lib/nav.v2";
 import { NavIcon } from "../icons/NavIcon";
 
 /**
@@ -67,8 +67,8 @@ export function MoreDrawer({ open, onClose }: { open: boolean; onClose: () => vo
         <nav aria-label="전체 메뉴 항목">
           {NAV_GROUPS.map((group) => (
             <div key={group.heading} className="mb-5 last:mb-0">
-              {group.heading ? (
-                <p className="pb-2 text-xs font-semibold uppercase tracking-wide text-muted">{group.heading}</p>
+              {navGroupLabel(group) ? (
+                <p className="pb-2 text-xs font-semibold uppercase tracking-wide text-muted">{navGroupLabel(group)}</p>
               ) : null}
               <ul className="space-y-1">
                 {group.items.map((item) => (

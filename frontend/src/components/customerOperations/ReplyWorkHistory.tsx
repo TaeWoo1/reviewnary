@@ -33,7 +33,7 @@ export function ReplyWorkHistory({
           section heading — size carries structural RANK and ink carries emphasis, so a secondary fold
           stays quiet by being `muted` rather than by being small. At `sm` this was the last 15px `h2`
           in the product, and it sat on 확인할 일. */}
-      <Disclosure label={<h2 className="inline text-base font-semibold text-muted">지난 답변 작업</h2>} note="기록한 답변 · 제외한 작업">
+      <Disclosure label={<h2 className="inline text-lg font-semibold text-muted">지난 답변 작업</h2>} note="기록한 답변 · 제외한 작업">
       <div className="mt-3 space-y-4">
       {accounts.map((account) => (
         <div key={account.accountId} className="space-y-3">

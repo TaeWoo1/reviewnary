@@ -67,11 +67,31 @@ One family: **Pretendard** → platform Korean sans. No monospace in product UI.
 
 | Thing | Value |
 |---|---|
-| Sidebar | **232px**, `surface`, 1px `line` on the right; hidden below `md` |
+| Sidebar | **240px**, `surface`, 1px `line` on the right; hidden below `md` |
 | Main padding | 32px horizontal, 24px top (desktop) |
-| Content width | **1120px** max, left-aligned inside the main column |
+| Content width | **1280px** max, left-aligned inside the main column |
 | Two-pane work surface | `[minmax(0,1fr) list \| 440px detail]`, each column scrolls inside itself; single-pane below 1200px (`WIDE_QUERY`) rather than a squeezed detail |
 | Grid maximum | 4 compact metrics or 3 cards across; never 6 equal cards |
+
+**Content width is 1280, and the sidebar is 240** (product-owner decision, 2026-10-01). Both figures
+in this table were amended by that decision, and both were measured before being changed.
+
+Sidebar: 232 was this document's own number; the Home's canonical visual target measures 241, and 240 is
+the step on the 8px grid between them — so the rail now divides a 1600px screen where the target divides
+it (`tailwind.config.ts`, `width.sidebar`).
+
+Content: at 1600×1000 the rail takes 240, `main` is 1360, and `main`'s own 32px horizontal padding leaves
+**1296px** to spend. A 1120 column therefore ended at x=1392 and left 176px of the monitor carrying
+nothing — the visual QA finding that opened this change. 1280 is the next 8px step that keeps a 16px tail
+of slack rather than running content to the exact edge of the padding box.
+
+It stays **one token** (`maxWidth.content`). The three places that read it — the plain-page column
+(`AppShellV2`), the master-detail list column (`MasterDetail`) and the quiet composer dock
+(`ConversationWorkspace`) — are the three the UI System v2 audit (§5, §10.2) found disagreeing about
+width and alignment, and a Home-only override would restore exactly that: 오늘's list and 확인할 일's
+list are the same list at the same breakpoint. Measured blast radius: the plain pages, 오늘 and 확인할 일
+widen; **문의 and 리뷰 do not**, because with the 440px pane open their list column is already 856px,
+which is below either value.
 
 **The two-pane is ONE reading** (product-owner decision, 2026-09-30). This row said `[340px | flexible]`
 while §8-A v3.1 said `[flexible | 440px fixed]` and the code did the latter — a contract that says two

@@ -138,7 +138,7 @@ function Area({
   return (
     <section aria-label={title}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <h2 className="text-base font-bold text-ink">{title}</h2>
+        <h2 className="text-lg font-semibold text-ink">{title}</h2>
         {to && linkLabel ? (
           <Link
             to={to}

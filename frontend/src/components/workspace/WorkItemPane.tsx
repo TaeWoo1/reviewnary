@@ -5,7 +5,7 @@ import { draftRuleNotice } from "../../lib/inquiryNextAction";
 import { InquiryResponsePanel } from "../inbox/InquiryResponsePanel";
 import { OperationsCaseView } from "../../pages/app/OperationsCase";
 import { ReviewCaseView } from "../../pages/app/ReviewReplyTask";
-import { waitLabel } from "../../lib/copy/customerOps";
+import { elapsedLabel } from "../../lib/copy/customerOps";
 import type { HomeWorkRow } from "../../lib/homeWork";
 
 /**
@@ -24,12 +24,12 @@ import type { HomeWorkRow } from "../../lib/homeWork";
  */
 export function WorkItemPane({ row, now, depth = "full" }: { row: HomeWorkRow; now?: Date; depth?: PaneDepth }) {
   if (row.kind === "CASE") {
-    return <OperationsCaseView key={row.key} caseId={row.subjectId} variant="pane" depth={depth} />;
+    return <OperationsCaseView key={row.key} caseId={row.subjectId} variant="pane" depth={depth} now={now} />;
   }
   if (row.kind === "REVIEW") {
     return <ReviewCaseView key={row.key} reviewId={row.subjectId} variant="pane" depth={depth} />;
   }
-  const wait = waitLabel(row.since, now);
+  const wait = elapsedLabel(row.since, row.subject, now);
   return (
     <CaseLayout
       key={row.key}

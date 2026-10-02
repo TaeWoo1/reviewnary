@@ -17,7 +17,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CustomerOperationsHome } from "../../lib/customerOperationsTypes";
-import type { MetricKpi, MetricSeries, OperationsHome, OperationsMetrics } from "../../lib/types";
+import type { MetricKpi, MetricSeries, OperationsHome, OperationsInsight, OperationsMetrics } from "../../lib/types";
 
 const api = vi.hoisted(() => ({
   getInquiryQueueStrict: vi.fn(),
@@ -74,10 +74,15 @@ function ops(): OperationsHome {
   } as never;
 }
 
-function draw(home = co(), m: OperationsMetrics | null = metrics()) {
+/**
+ * `insights` defaults to `[]` — a read that LANDED and found nothing, which is the ordinary case and
+ * the one these fixtures are about. Passing nothing would be a read that did not land, and the
+ * 오늘 달라진 점 section says nothing at all then (a failed request is not 「변화 없음」).
+ */
+function draw(home = co(), m: OperationsMetrics | null = metrics(), insights: OperationsInsight[] | null = []) {
   return render(
     <MemoryRouter>
-      <CustomerOpsHome co={home} ops={ops()} now={NOW} onChanged={vi.fn()} metrics={m} />
+      <CustomerOpsHome co={home} ops={ops()} now={NOW} onChanged={vi.fn()} metrics={m} insights={insights} />
     </MemoryRouter>,
   );
 }
@@ -114,26 +119,40 @@ describe("오늘 들어온 것 — a number only when it is a measured fact", ()
     expect(line).not.toHaveTextContent("수집 확인 필요");
   });
 
+/**
+ * <b>Re-pointed: collection health is the channel row's, alone</b> (product-owner decision,
+ * 2026-10-01 — the last ownership leak).
+ *
+ * <p>These were written when this line carried BOTH halves — the figure and, when it was withheld,
+ * the reason. The reason is a fact about collection, and 「채널은 정상인가」 is the question the foot of
+ * the screen exists to answer; stating it here too made the Home answer one question in two voices,
+ * under a heading that asks a different one.
+ *
+ * <p><b>The rule being defended has not moved an inch: an unobserved figure is never printed.</b> That
+ * is still asserted on every case below, and it is the half that could become a lie. What is asserted
+ * elsewhere now is where the REASON is said — on the 채널 상태 row, which these check too, so nothing
+ * is merely deleted.
+ */
   it("review lane stale, inquiry fresh: the review number is withheld and the inquiry number is not", async () => {
-    draw(co(), metrics({ kpis: [kpi("reviews", { freshnessUnproven: true }), kpi("inquiries")] }));
+    draw(co({ checked: 1 }), metrics({ kpis: [kpi("reviews", { freshnessUnproven: true }), kpi("inquiries")] }));
     const line = await context();
-    await waitFor(() => expect(line).toHaveTextContent("리뷰 수집 확인 필요"));
-    expect(line).toHaveTextContent("문의 5");
+    await waitFor(() => expect(line).toHaveTextContent("문의 5"));
+    // The withheld lane prints no number — the rule, unchanged.
     expect(line).not.toHaveTextContent("리뷰 3");
-    // One lane qualifies, so the lanes differ and the line must say which — never the collapsed form.
-    expect(line).not.toHaveTextContent("수집 상태 확인 필요");
+    // And no reason either: that sentence belongs to the channel row at the foot of the screen.
+    expect(line).not.toHaveTextContent("수집 확인 필요");
+    expect(await channels()).toHaveTextContent("일부 채널 최신 수집 확인 필요");
   });
 
   it("inquiry lane stale, review fresh: the mirror case", async () => {
-    draw(co(), metrics({ kpis: [kpi("reviews"), kpi("inquiries", { excludedChannels: 1 })] }));
+    draw(co({ checked: 1 }), metrics({ kpis: [kpi("reviews"), kpi("inquiries", { excludedChannels: 1 })] }));
     const line = await context();
-    await waitFor(() => expect(line).toHaveTextContent("문의 수집 확인 필요"));
-    expect(line).toHaveTextContent("리뷰 3");
+    await waitFor(() => expect(line).toHaveTextContent("리뷰 3"));
     expect(line).not.toHaveTextContent("문의 5");
-    expect(line).not.toHaveTextContent("수집 상태 확인 필요");
+    expect(line).not.toHaveTextContent("수집 확인 필요");
   });
 
-  it("both stale: ONE state sentence, not the same five syllables twice", async () => {
+  it("both stale: the group disappears rather than printing a cause this line does not own", async () => {
     draw(
       co(),
       metrics({
@@ -141,13 +160,15 @@ describe("오늘 들어온 것 — a number only when it is a measured fact", ()
         series: [series("reviews", 0), series("inquiries", 0)],
       }),
     );
-    const line = await context();
-    await waitFor(() => expect(line).toHaveTextContent("수집 상태 확인 필요"));
-    // The per-lane sentences are the thing being replaced — neither may also appear.
-    expect(line).not.toHaveTextContent("리뷰 수집 확인 필요");
-    expect(line).not.toHaveTextContent("문의 수집 확인 필요");
-    // And still no digits: an unobserved zero never becomes 「0」.
-    expect(line.textContent).not.toMatch(/리뷰 \d|문의 \d/);
+    // Nothing measured and nothing opened, so the note has no facts and renders itself away. The
+    // section it belongs to then says the one sentence it exists for.
+    const section = await screen.findByLabelText("오늘 달라진 점");
+    await waitFor(() => expect(section).toHaveTextContent("오늘 새로 확인된 변화는 없습니다."));
+    expect(screen.queryByTestId("today-context")).toBeNull();
+    // Still no digits anywhere: an unobserved zero never becomes 「0」.
+    expect(section.textContent).not.toMatch(/리뷰 \d|문의 \d/);
+    // The cause is stated once, where the question is asked.
+    expect(await channels()).toHaveTextContent("일부 채널 최신 수집 확인 필요");
   });
 
   it("a measured zero IS printed — that is the difference the state words exist to keep", async () => {
@@ -159,19 +180,20 @@ describe("오늘 들어온 것 — a number only when it is a measured fact", ()
   });
 
   it("names no channel it was not given — the summary never invents where a gap is", async () => {
-    draw(co(), metrics({ kpis: [kpi("reviews", { excludedChannels: 1 }), kpi("inquiries")] }));
+    draw(co({ checked: 1 }), metrics({ kpis: [kpi("reviews", { excludedChannels: 1 }), kpi("inquiries")] }));
     const line = await context();
-    await waitFor(() => expect(line).toHaveTextContent("리뷰 수집 확인 필요"));
+    await waitFor(() => expect(line).toHaveTextContent("문의 5"));
     // `excludedChannels` is a COUNT; the response's `exclusions` name channels but this line is not
     // given them, so it must not print 쿠팡/네이버/카페24 from a number.
     expect(line.textContent).not.toMatch(/쿠팡|네이버|카페24|스마트스토어/);
   });
 
   it("a failed overview read draws no inflow group at all", async () => {
-    draw(co(), null);
+    draw(co({ checked: 1 }), null);
     const line = await context();
-    await waitFor(() => expect(line).toHaveTextContent("새로 확인한 일 없음"));
+    await waitFor(() => expect(line).toHaveTextContent("최근 24시간"));
     expect(line).not.toHaveTextContent("오늘 들어온 것");
+    // A failed read is not a collection finding, and this line would not be the place to say so anyway.
     expect(line).not.toHaveTextContent("수집 확인 필요");
   });
 
@@ -184,14 +206,17 @@ describe("오늘 들어온 것 — a number only when it is a measured fact", ()
 
   it("drops the example label when no figure survived the freshness gate — it would qualify nothing", async () => {
     draw(
-      co(),
+      co({ checked: 1 }),
       metrics({
         exampleDataIncluded: true,
         kpis: [kpi("reviews", { freshnessUnproven: true }), kpi("inquiries", { excludedChannels: 1 })],
       }),
     );
     const line = await context();
-    await waitFor(() => expect(line).toHaveTextContent("수집 상태 확인 필요"));
+    // The line still stands (최근 24시간 has something to say) and the inflow group is simply absent,
+    // so the label that would have qualified it has nothing left to qualify.
+    await waitFor(() => expect(line).toHaveTextContent("최근 24시간"));
+    expect(line).not.toHaveTextContent("오늘 들어온 것");
     expect(line).not.toHaveTextContent("예시 데이터");
   });
 
@@ -214,9 +239,17 @@ describe("최근 24시간 — what we opened, never what was completed", () => {
     // Nothing opened is a sentence, and a sentence takes no supporting figures: 「새로 확인 0」 would be
     // three zeros where one honest clause belongs. The cell's three stacked spans are gone with the cell —
     // this is one line now — so the claim is asserted on the line's own text.
-    await waitFor(() => expect(line).toHaveTextContent("새로 확인한 일 없음"));
-    expect(line).not.toHaveTextContent("최근 24시간 새로 확인");
+    /*
+      <b>Re-pointed: a quiet window is not a change either</b> (product-owner decision, 2026-10-01).
+      「새로 확인한 일 없음」 was the automation's report of a window in which nothing happened, printed
+      under a heading asking what changed. The rule it was protecting is intact and is what is asserted
+      here: <b>nothing opened never becomes 「새로 확인 0」</b> — three zeros where one honest clause
+      belonged, and now where no clause belongs at all.
+    */
+    await waitFor(() => expect(screen.getByLabelText("오늘 달라진 점")).toHaveTextContent("오늘 달라진 점"));
+    expect(line).not.toHaveTextContent("최근 24시간");
     expect(line.textContent).not.toMatch(/새로 확인 0/);
+    expect(line).not.toHaveTextContent("새로 확인한 일 없음");
   });
 
   it("something opened: the denominator and its two subsets, in that order", async () => {
@@ -322,63 +355,92 @@ describe("the band — obligations only", () => {
     expect(text.indexOf("실행 대기")).toBeLessThan(text.indexOf("현재 미답변"));
   });
 
-  it("현재 미답변 leaves the band entirely when the population is incomplete", async () => {
+  it("현재 미답변 says it is unknown rather than printing the qualified figure", async () => {
     /*
-      Two things must not happen, and the second was introduced and then caught by a visual review at
-      1440×900 (2026-10-01).
+      <b>The defect this test exists for is unchanged; the remedy is the opposite one</b> (product-owner
+      decision, 2026-10-01: 「unknown KPI를 빈 공간으로 두지 말 것. 값이 없으면 — + unknown임을 명시.
+      값은 절대 추정하지 말 것.」).
 
-      Printing the qualified figure as if it were the total is the defect `contextStrip` hit: it once showed
-      「현재 미답변 문의 0건」 above 「들어온 문의 3건」, both true under definitions nobody could see. So the
-      number is never floored.
+      <p>What must not happen is printing the qualified figure as if it were the total — the defect
+      `contextStrip` hit, where 「현재 미답변 문의 0건」 stood above 「들어온 문의 3건」, both true under
+      definitions nobody could see. That is still asserted below, and it is the whole point.
 
-      But the first fix put 「수집 상태 확인 필요」 into an OBLIGATION slot — and the context line one row
-      below was already saying the same five syllables for the inflow, with 「일부 채널 최신 수집 확인 필요」
-      beside it. One cause, three sentences, at the top of the morning screen. A band slot holds something
-      that is waiting for the seller; a fact we could not measure is not waiting for anyone.
+      <p>What changed is what stands in its place. Dropping the cell was the previous answer, and an
+      empty third of a ruled band reads as a value that has not loaded — the seller cannot tell it from a
+      zero or from a slot that was never there. So the cell stands, prints 「—」, and names the cause.
     */
     withWork();
     draw(co(), metrics({ kpis: [kpi("reviews"), kpi("inquiries"), kpi("unansweredInquiries", { value: 4, freshnessUnproven: true })] }));
     const band = await summary();
     await waitFor(() => expect(band).toHaveTextContent("확인할 일"));
-    expect(band).not.toHaveTextContent("현재 미답변");
-    expect(band).not.toHaveTextContent("수집 상태 확인 필요");
-    expect(band).not.toHaveTextContent("4건");
-    // And the fact is not lost — the surfaces whose job is collection state carry it, exactly once between
-    // them. Which sentence it uses depends on WHICH lane is unproven (a withheld inflow lane names itself on
-    // the context line; otherwise the channel row's freshness clause speaks), so the assertion is on the
+    const cell = band.querySelector("[data-testid='pulse-unanswered']")!;
+    expect(cell).toHaveTextContent("현재 미답변");
+    // <b>The figure is never floored.</b> 4 is what the qualified population counted, and printing it
+    // here would be the `contextStrip` defect again.
+    expect(cell).not.toHaveTextContent("4");
+    expect(cell).toHaveTextContent("—");
+    expect(cell).toHaveTextContent("수집 상태 확인 필요");
+    // And the cause is still carried by the surfaces whose job IS collection state, exactly once between
+    // them. Which sentence they use depends on WHICH lane is unproven (a withheld inflow lane names itself
+    // on the context line; otherwise the channel row's freshness clause speaks), so the assertion is on the
     // count over both, not on the wording and not on which of the two said it.
+    //
+    // <p>The band's own note is deliberately outside that count: it is not a third report of the cause, it
+    // is the qualification OF THIS FIGURE, in the slot that exists to qualify it. A seller reading 「—」
+    // without it would be looking at an unexplained blank.
     const said = [(await context()).textContent, (await channels()).textContent].join(" ");
     expect(said.match(/수집 (상태|확인) 확인 필요|최신 수집 확인 필요/g) ?? []).toHaveLength(1);
   });
 
-  it("한 원인을 두 문장으로 말하지 않는다 — 유입이 이미 말했으면 freshness 절은 빠진다", async () => {
-    // Both lanes withheld because a collection could not be proven, and `freshnessUnproven` is that same
-    // cause. The inflow clause is the better of the two because it names which lane.
+  /**
+   * <b>한 원인은 한 번만, 그리고 그 자리는 채널 상태다</b> (product-owner decision, 2026-10-01).
+   *
+   * <p>The rule is the one this test has always made — one cause, one sentence — and what the decision
+   * fixed is WHICH of the two surfaces keeps it. It used to be the inflow clause, on the argument that
+   * it names which lane; it is the channel row now, because 「채널은 정상인가」 is that row's whole
+   * question and 「무엇이 달라졌나」 is not.
+   */
+  it("한 원인을 두 문장으로 말하지 않는다 — 수집 상태는 채널 행만 말한다", async () => {
     draw(co({ checked: 1 }), metrics({
       kpis: [kpi("reviews", { freshnessUnproven: true }), kpi("inquiries", { freshnessUnproven: true })],
     }));
     const ctx = await context();
-    await waitFor(() => expect(ctx).toHaveTextContent("수집 상태 확인 필요"));
-    expect(ctx).not.toHaveTextContent("일부 채널 최신 수집 확인 필요");
+    await waitFor(() => expect(ctx).toHaveTextContent("최근 24시간"));
+    expect(ctx).not.toHaveTextContent("수집 확인 필요");
+    expect(await channels()).toHaveTextContent("일부 채널 최신 수집 확인 필요");
   });
 
-  it("draws no 현재 미답변 cell at all when the overview read did not land", async () => {
+  it("says 현재 미답변 could not be read, and says nothing about the channels", async () => {
     withWork();
     draw(co({ checked: 1 }), null);
     const band = await summary();
     await waitFor(() => expect(band).toHaveTextContent("확인할 일"));
-    // A failed request says nothing. It does not say zero, and it does not say 「확인 필요」 either —
-    // that sentence is a claim about the seller's channels, and no read supports it here.
-    expect(band).not.toHaveTextContent("현재 미답변");
+    const cell = band.querySelector("[data-testid='pulse-unanswered']")!;
+    // A failed request still does not say zero. What it now also does not do is vanish: the slot stands
+    // and names its own cause. <b>And the cause is OURS, not the seller's</b> — 「수집 상태 확인 필요」 is
+    // a claim about their channels and no read supports it here, so a failed request says only that the
+    // number was not read.
+    expect(cell).toHaveTextContent("—");
+    expect(cell).toHaveTextContent("숫자를 읽지 못했습니다");
+    expect(cell).not.toHaveTextContent("수집 상태 확인 필요");
+    expect(cell.textContent).not.toMatch(/\d/);
   });
 
   it("is ONE surface of labelled cells — never cards, a tile or a chart", async () => {
     withWork();
-    const { container } = draw(co({ checked: 12 }));
+    // Same reason as the sibling test: the «nothing is drawn» check is the band's, not the page's.
+    draw(co({ checked: 12 }));
     const band = await summary();
     await waitFor(() => expect(band).toHaveTextContent("확인할 일"));
-    expect(band.className).toContain("bg-canvas");
-    expect(band.className).not.toMatch(/border|shadow|gradient/);
+    // <b>The surface is ruled, not filled</b> (Home visual target, 2026-10-01). The guarantee has not
+    // changed — ONE surface, never three cards — only what draws it: the band was a `bg-canvas` box at
+    // `max-w-3xl`, which is the dashboard shape §8-A spends on nothing else on this screen, and the
+    // target rules it full-width between two hairlines instead. So the fill assertion becomes its
+    // opposite, and the «no boxes» assertion moves onto the two things that would restore one: a radius
+    // and a shadow. `border` is now what the band IS.
+    expect(band.className).not.toContain("bg-canvas");
+    expect(band.className).toContain("border-b");
+    expect(band.className).not.toMatch(/rounded|shadow|gradient/);
     const cells = [...band.querySelectorAll("[data-testid^='pulse-']")] as HTMLElement[];
     expect(cells.length).toBeGreaterThan(1);
     for (const c of cells) {
@@ -392,10 +454,16 @@ describe("the band — obligations only", () => {
     // number shrinks exactly when the seller needs to notice something. What separates them is ink.
     const states = cells.map((c) => c.children[1] as HTMLElement);
     expect(states.length).toBeGreaterThan(1);
-    for (const state of states) expect(state.className).toContain("text-xl");
-    expect(band.querySelectorAll(".font-semibold.tabular-nums.text-ink").length).toBeGreaterThan(0);
-    expect(band.querySelectorAll("[class*='text-2xl'],[class*='text-3xl']")).toHaveLength(0);
-    expect(container.querySelectorAll("svg,canvas")).toHaveLength(0);
+    // `title` (28/700) — the scale's own step for a page name AND for the one primary metric a screen
+    // may draw (product-owner decision, 2026-10-01). The assertion that matters is unchanged: every
+    // state slot is the SAME size, whether it holds a number, a dash or a sentence.
+    for (const state of states) expect(state.className).toContain("text-title");
+    expect(band.querySelectorAll(".font-bold.tabular-nums.text-ink").length).toBeGreaterThan(0);
+    expect(band.querySelectorAll("[class*='text-3xl']")).toHaveLength(0);
+    // No chart and no icon <b>in the band</b>. Scoped there rather than at the container, because the
+    // header above it now carries one control — 새로고침 — and its mark is an `svg`. The claim this
+    // assertion has always made is about the SURFACE: a summary that draws is a dashboard.
+    expect(band.querySelectorAll("svg,canvas")).toHaveLength(0);
   });
 
   it("the columns are ruled by the surface, never boxed one by one", async () => {
@@ -410,15 +478,27 @@ describe("the band — obligations only", () => {
     }
   });
 
-  it("the grid is sized to the cells it has — two facts are two columns, not two and a gap", async () => {
+  it("keeps the band's rhythm when a cell has nothing measured to say", async () => {
+    // <b>Re-pointed, not dropped</b> (Home visual target, 2026-10-01). The old guarantee — «two facts are
+    // two columns» — was about the band never drawing an empty slot, and it bought that with a track
+    // count that followed the cell count. Measured at 1600×1000 that is what it cost: an org whose
+    // 미답변 read came back unqualified got two 622px columns and a rule down the middle of the page,
+    // while an org one cell richer got thirds. Same band, two rhythms, for a reason no seller can see.
+    //
+    // <p>What the test still protects is the thing that mattered: a cell with nothing to say draws
+    // NOTHING. The tracks are the target's thirds, so the cells that do have something keep their width
+    // and their rule position whatever the read returned.
     withWork();
     // No metrics: 확인할 일 and 실행 대기 only.
     draw(co({ checked: 1 }), null);
     const band = await summary();
     await waitFor(() => expect(band).toHaveTextContent("확인할 일"));
-    expect(band.querySelectorAll("[data-testid^='pulse-']")).toHaveLength(2);
-    expect(band.className).toContain("grid-cols-2");
-    expect(band.className).not.toContain("grid-cols-3");
+    expect(band.querySelectorAll("[data-testid^='pulse-']")).toHaveLength(3);
+    // The third cell stands and says it was not read — see 「says 현재 미답변 could not be read」. What
+    // this test keeps is the rhythm: three tracks, so the two that DO have figures sit where they sit
+    // whatever the overview returned.
+    expect(band.querySelector("[data-testid='pulse-unanswered']")).toHaveTextContent("—");
+    expect(band.className).toContain("grid-cols-3");
   });
 
   it("carries an accessible name and spends no line on a visible one", async () => {
@@ -436,33 +516,66 @@ describe("the band — obligations only", () => {
     expect(band.querySelector("h1,h2,h3")).toBeNull();
   });
 
-  it("disappears entirely when nothing in it is true", async () => {
+  it("stands even when it can measure none of the three, and says so three times", async () => {
+    // <b>Re-pointed by decision</b> (2026-10-01). The band used to vanish when no cell had a figure, and
+    // the reason was sound: a read that failed, a job that is not running and an org with no window yet
+    // are three different silences and none of them is 「0」. That reasoning is intact — what changed is
+    // where it is served. A band that disappears answers the three questions with nothing at all, and the
+    // seller is left to work out whether they have no work or no answer. Each silence is now NAMED, in
+    // its own slot, and none of them is ever drawn as a number.
     draw({ ...co({ since: null }), status: "PAUSED" }, null);
-    await screen.findByTestId("today-status");
-    await waitFor(() => expect(screen.queryByTestId("today-summary")).toBeNull());
+    const band = await summary();
+    const cells = [...band.querySelectorAll("[data-testid^='pulse-']")] as HTMLElement[];
+    expect(cells).toHaveLength(3);
+    // 확인할 일 is a measured zero here — the list read landed and found nothing — so it alone is a figure.
+    expect(cells[0]).toHaveTextContent("0건");
+    for (const cell of cells.slice(1)) {
+      expect(cell).toHaveTextContent("—");
+      expect(cell.textContent).not.toMatch(/\d/);
+    }
   });
 
-  it("does not claim 실행 대기 while the job is not running", async () => {
+  it("does not claim a 실행 대기 count while the job is not running", async () => {
     withWork();
     draw({ ...co({ checked: 1 }), status: "PAUSED" });
     const band = await summary();
     await waitFor(() => expect(band).toHaveTextContent("확인할 일"));
-    expect(band).not.toHaveTextContent("실행 대기");
+    const cell = band.querySelector("[data-testid='pulse-awaiting']")!;
+    // The claim the test has always protected: 실행 대기 is a fact about a job that is LOOKING, and a
+    // paused job has not looked. So no number — and now the slot says that instead of leaving the
+    // seller to infer it from a gap in the row.
+    expect(cell.textContent).not.toMatch(/\d/);
+    expect(cell).toHaveTextContent("—");
+    expect(cell).toHaveTextContent("자동 확인이 멈춰 있어 확인하지 못했습니다");
   });
 });
 
 /** The quiet line's own shape — it is context, and it must never outrank the band above it. */
 describe("the context line", () => {
-  it("is one muted line at `sm`, with the way to the numbers screen and no numbers of its own", async () => {
+  /**
+   * <b>Re-pointed: the way to the numbers is the section's, not this line's</b> (product-owner
+   * decision, 2026-10-01 — 오늘 달라진 점 carries at most two CTAs). 「자세한 숫자 보기」 pointed at
+   * `/overview` while the heading this line is the note OF carries 「N건 전체 보기 →」 to the same
+   * screen, on the same row, plus the insight's own action: three competing links in one section.
+   *
+   * <p>The guarantee being made here was 「one muted line, and never a copy of the numbers screen」.
+   * Both halves are asserted below, and the second one — that `/overview` is still reachable from
+   * this section — is asserted on the section rather than on the line, which is where it moved.
+   */
+  it("is one muted line at `sm` with no numbers of its own, and no second way to the numbers screen", async () => {
     draw(co({ checked: 12, autoResolved: 3, draftsPrepared: 2 }));
     const line = await context();
     await waitFor(() => expect(line).toHaveTextContent("최근 24시간"));
     expect(line.className).toContain("text-sm");
     expect(line.className).toContain("text-muted");
-    expect(line).toHaveTextContent("자세한 숫자 보기");
-    // 매출 · 주문 · 추이 stay owned by `/overview`. This line is the way there, never a copy of it.
+    expect(line).not.toHaveTextContent("자세한 숫자 보기");
+    // 매출 · 주문 · 추이 stay owned by `/overview`. This line never copies them.
     expect(line).not.toHaveTextContent("매출");
     expect(line).not.toHaveTextContent("주문");
+    // The section is still the way there, and now it is the ONLY way there from here.
+    const section = line.closest("section")!;
+    const toOverview = [...section.querySelectorAll('a[href^="/overview"]')];
+    expect(toOverview.length).toBeLessThanOrEqual(1);
   });
 
   it("never carries channel freshness itself — that question is asked at the foot of the screen", async () => {

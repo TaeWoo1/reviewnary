@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
+import type { ReactNode } from "react";
 import { PageHead } from "../../components/ui/PageHead";
 import { Facts } from "../../components/ui/ObjectRow";
 import { MasterDetail, useWideLayout } from "../../components/workspace/MasterDetail";
 import { WorkRows } from "../../components/workspace/WorkRows";
 import { WorkItemPane } from "../../components/workspace/WorkItemPane";
 import { api } from "../../lib/apiClient";
-import { mergeHomeWork, WORK_FILTERS, workFilterOf, type HomeWork } from "../../lib/homeWork";
-import { SegmentBtn } from "../../components/reviews/recordParts";
+import { mergeHomeWork, WORK_FILTERS, workFilterOf, type HomeWork, type HomeWorkRow } from "../../lib/homeWork";
 import { HOME_QUEUE_SIZE } from "../../components/customerOperations/CustomerOpsHome";
 import { COPY } from "../../lib/copy/customerOps";
 import { ReplyWorkHistory } from "../../components/customerOperations/ReplyWorkHistory";
@@ -20,10 +20,54 @@ const TITLE = COPY.listTitle;
  * The scope label: what this count counts, so it is not read against the 리뷰 or 문의 screens' own numbers.
  *
  * <p>「오래 기다린 것부터 봅니다」 used to close it and is gone (product-owner decision, 2026-10-01): the
- * heading two lines up reads 「확인할 일 46건 · 오래된 순」, so the sentence spent a line restating the sort
- * word that is already beside the count. What is left is the half a heading cannot carry — WHICH records.
+ * heading two lines up reads 「확인할 일 46건」, so the sentence spent a line restating the sort word that
+ * is already beside the count. What is left is the half a heading cannot carry — WHICH records.
+ *
+ * <p>The canonical mockup's wording (2026-10-02). 「판매자님의 결정을 기다리는」 named the seller twice on
+ * one screen and said WHO the list is for; 「판매 후 운영이 필요한」 says what the records have in common,
+ * which is the half the heading cannot carry.
  */
-const DESCRIPTION = "판매자님의 결정을 기다리는 문의와 리뷰입니다.";
+const DESCRIPTION = "판매 후 운영이 필요한 문의와 리뷰를 모았습니다.";
+
+/**
+ * <b>확인할 일's action tabs</b> (canonical mockup, 2026-10-02) — a pill per bucket, the pressed one in the
+ * brand colour.
+ *
+ * <p>Drawn here rather than with {@code SegmentBtn}: a segmented control sits on one shared track and
+ * means 「one of these readings of the same thing」, which is what 리뷰's channel switcher is. These are
+ * views of ONE list that each carry their own count, and the mockup draws them as separate pills — a
+ * row of chips a seller presses, not a switch they throw.
+ */
+function TabBtn({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={`min-h-[36px] rounded-full border px-4 text-sm font-semibold tabular-nums transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
+        pressed
+          ? "border-brand-700 bg-brand-50 text-brand-700"
+          : "border-line bg-surface text-muted hover:text-ink"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * <b>Narrowing the list by what is written in it</b> (canonical mockup, 2026-10-02).
+ *
+ * <p>Over the rows this screen already holds, and over the three strings a row draws — the customer's
+ * sentence, the line reviewnary adds, and where it came from. It is not a server search: this screen
+ * reads a bounded slice (see {@code truncated}), and a box that searched beyond what the list holds
+ * would return rows the count above it does not cover.
+ */
+function matches(row: HomeWorkRow, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [row.title, row.line, row.source].some((v) => (v ?? "").toLowerCase().includes(q));
+}
 
 /**
  * <b>The queue</b> — everything waiting for the seller's decision, in one list.
@@ -69,6 +113,10 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
   const wide = useWideLayout();
   const location = useLocation();
   const [params, setParams] = useSearchParams();
+  // Transient, so it is not in the address: a narrowed list is a way of looking, not a place to come back to.
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchBox = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let live = true;
@@ -101,7 +149,10 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
     };
   }, [now, reloadKey]);
 
-  const allRows = work?.rows ?? [];
+  /* The search narrows the POPULATION, not just what is drawn: the count beside the title and the number on
+     every tab are claims about this list, and a list that draws three rows under 「46건」 is two answers to one
+     question. Same reason the tabs count what they will show. */
+  const allRows = (work?.rows ?? []).filter((r) => matches(r, query));
   // A view of the one list (UI/UX v2 Phase 4): the same rows in the same order, narrowed by a fact each row carries.
   const filter = workFilterOf(params.get("filter"));
   const rows = allRows.filter(WORK_FILTERS.find((f) => f.key === filter)!.test);
@@ -135,6 +186,44 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       <PageHead
         title={TITLE}
         description={DESCRIPTION}
+        action={
+          work && (work.rows.length > 0 || query) ? (
+            <div className="flex items-center gap-2">
+              {searching ? (
+                <input
+                  ref={searchBox}
+                  type="search"
+                  aria-label="확인할 일 검색"
+                  placeholder="고객이 쓴 내용으로 찾기"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Escape") return;
+                    setQuery("");
+                    setSearching(false);
+                  }}
+                  className="min-h-[40px] w-[260px] rounded-xl border border-line bg-surface px-3 text-sm text-ink placeholder:text-muted focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20"
+                />
+              ) : null}
+              <button
+                type="button"
+                aria-label={searching ? "검색 닫기" : "검색"}
+                aria-expanded={searching}
+                onClick={() => {
+                  if (searching) setQuery("");
+                  setSearching((open) => !open);
+                  if (!searching) window.requestAnimationFrame(() => searchBox.current?.focus());
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-surface text-muted transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+              >
+                <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
+                  <circle cx="11" cy="11" r="6.5" />
+                  <path d="M16 16l4 4" />
+                </svg>
+              </button>
+            </div>
+          ) : undefined
+        }
         meta={
           work && allRows.length > 0 ? (
             // The breakdown used to stand here too — 「정보 부족 1 · 답변 필요 25 · 리뷰 11 · 승인 대기 4 ·
@@ -147,7 +236,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
                 {allRows.length.toLocaleString("ko-KR")}
                 {work.truncated ? "+" : ""}건
               </span>
-              <span>{COPY.listOrder}</span>
+              {COPY.listOrder ? <span>{COPY.listOrder}</span> : null}
             </Facts>
           ) : undefined
         }
@@ -197,17 +286,19 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       */}
 
       {work && allRows.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-0.5 self-start rounded-lg bg-canvas p-0.5" role="group" aria-label="확인할 일 보기">
+        <div className="flex flex-wrap items-center gap-2 self-start" role="group" aria-label="확인할 일 보기">
           {WORK_FILTERS.map((f) => (
-            <SegmentBtn key={f.key} pressed={filter === f.key} onClick={() => setFilter(f.key)}>
+            <TabBtn key={f.key} pressed={filter === f.key} onClick={() => setFilter(f.key)}>
               {f.label} {allRows.filter(f.test).length.toLocaleString("ko-KR")}
-            </SegmentBtn>
+            </TabBtn>
           ))}
         </div>
       ) : null}
 
       {work && allRows.length === 0 ? (
-        <p className="break-keep leading-relaxed text-ink">지금 확인이 필요한 문의나 리뷰가 없습니다.</p>
+        <p className="break-keep leading-relaxed text-ink">
+          {query.trim() ? "찾으시는 내용이 있는 문의나 리뷰가 없습니다." : "지금 확인이 필요한 문의나 리뷰가 없습니다."}
+        </p>
       ) : null}
       {work && allRows.length > 0 && rows.length === 0 ? (
         <p className="break-keep text-sm text-muted">이 보기에 해당하는 일이 없습니다.</p>
@@ -223,6 +314,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
             now={now}
             ariaLabel={TITLE}
             dense
+            reading="queue"
           />
           {/* A read that reported more than it returned. The shortfall means this list is deeper than one read
               reaches — not that the rest is somewhere else — so it says so instead of passing its length off as
@@ -249,6 +341,12 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       detailLabel="선택한 확인할 일"
       detail={selected ? <WorkItemPane row={selected} now={now} /> : null}
       onClose={selected ? close : undefined}
+      /* <b>The Decision Workspace's own pane</b> (product-owner decision, 2026-10-02). This route only:
+         문의, 리뷰, 기억 and the Home's preview are untouched, because they do not pass this and the
+         layout's default is the pane they have always had. What it buys is read in the pane — the
+         prepared answer and its two controls stop being a 392px column inside a 440px panel, and the
+         flow ends with air under it rather than a scrollbar. */
+      pane="decision"
     />
   );
 }

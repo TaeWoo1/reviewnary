@@ -312,7 +312,13 @@ public class OperationsHomeService {
             String detail = product == null ? receivedOn
                     : (receivedOn == null ? product : product + " · " + receivedOn);
             rows.add(new OperationsHomeView.PreparedItem(
-                    "REVIEW_REPLY", review.getId(), "승인된 리뷰 답변", detail,
+                    // <b>Seller-facing object, not the state again</b> (product-owner decision,
+                    // 2026-10-01). 「승인된 리뷰 답변」 said 승인 and the row's own state word says
+                    // 「승인됨 · 등록 대기」 right beside it, so every row stated its approval twice
+                    // and neither half named the thing. The label is now the object the seller is
+                    // looking at; what it is waiting for is the state word's job (lib/preparedState.ts),
+                    // which reads the record rather than this string.
+                    "REVIEW_REPLY", review.getId(), "리뷰 답변", detail,
                     channelCodes.get(review.getChannelId()),
                     "/reviews/reply/" + review.getId(), null));
         }
@@ -322,7 +328,9 @@ public class OperationsHomeService {
             String subject = inquiryRepo.findById(item.getInquiryId())
                     .map(Inquiry::getTitle).filter(t -> !t.isBlank()).orElse(null);
             rows.add(new OperationsHomeView.PreparedItem(
-                    "INQUIRY_REPLY", item.getId(), "초안이 준비된 문의", subject, null,
+                    // Same rule: 「초안이 준비된 문의」 is 초안 준비됨 — the exact state word this row
+                    // already carries — wrapped around the noun. The noun is the label.
+                    "INQUIRY_REPLY", item.getId(), "문의 답변", subject, null,
                     "/inquiries/" + item.getInquiryId(), item.getPhase().name()));
         }
         // An improvement draft the seller asked for. Re-derived by the opportunity service before it

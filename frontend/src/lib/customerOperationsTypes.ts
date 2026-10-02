@@ -90,7 +90,10 @@ export interface CustomerOperationsDecisionRow {
   missingInformation: string[];
   draftPrepared: boolean;
   decidedBy: "RULE" | "AGENT" | null;
+  /** When reviewnary opened the case. The elapsed-time FALLBACK only — see `elapsedSource`. */
   openedAt: string;
+  /** When the customer's own event happened (KST date). The elapsed-time source wherever it exists. */
+  receivedOn: string | null;
   to: string;
 }
 
@@ -171,6 +174,8 @@ export interface OperationsCaseDetail {
   /** Whether 「이 상품에만」 is a real choice: an inquiry with no named product can only teach company-wide. */
   productScopeAvailable: boolean;
   receivedOn: string | null;
+  /** When reviewnary opened the case — the same fallback the list row carries, so both apply one contract. */
+  openedAt: string | null;
   rating: number | null;
   title: string | null;
   body: string | null;

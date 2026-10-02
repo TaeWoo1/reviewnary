@@ -60,9 +60,72 @@ describe("mergeHomeWork — the review half, whole", () => {
     const byId = Object.fromEntries(work.rows.map((r) => [r.subjectId, r]));
     expect(byId["r-draft"].reason.tag).toBe("초안 필요");
     expect(byId["r-approve"].reason.tag).toBe("승인 대기");
-    expect(byId["r-approve"].line).toContain("미발송");
+    /*
+      <b>Re-pointed to where 「미발송」 now stands</b> (product-owner decision, 2026-10-01: the row's
+      second line is customer context only). The guarantee has not moved — a prepared reply must not
+      read as a sent one — but the fact is the STATE's, not the line's: `AWAITING_APPROVAL` is the
+      row's lead word and `WORK_STATE` words it 「승인 대기」, with 미발송 said once on the surfaces that
+      own the draft. What the line may no longer do is restate it.
+    */
+    expect(byId["r-approve"].state).toBe("AWAITING_APPROVAL");
+    expect(byId["r-approve"].line).not.toContain("미발송");
+    expect(byId["r-approve"].line).toBe("선바로");
     expect(byId["r-draft"].to).toBe("/reviews/reply/r-draft");
     expect(byId["r-draft"].kind).toBe("REVIEW");
+  });
+
+  /**
+   * <b>The second line is the customer's words, and only when they are new words</b> (product-owner
+   * decision, 2026-10-01). Measured at 1600×1000: one live row drew 「전선 한가닥 2.5 3c 지름 10mm…」 as
+   * both its title and its line — the channel's own question cut at two lengths, which is two strings
+   * and one sentence.
+   */
+  it("draws the inquiry's own body, and drops it when it is the title again", () => {
+    const q = (over: Record<string, unknown>) => ({
+      content: [{
+        workItemId: "w", inquiryId: "i", sellerAccountId: "a", channelId: "c", channelCode: "CAFE24",
+        channelNameKo: "카페24", productId: null, productName: null, phase: "OPEN", status: "UNANSWERED",
+        receivedAt: "2026-09-20T00:00:00Z", hasDraft: false, ...over,
+      }],
+      page: 0, size: 50, totalElements: 1, totalPages: 1,
+    } as never);
+
+    // New words: the question's body, which the Home never drew before this.
+    expect(mergeHomeWork(null, null, q({ title: "환불 문의", snippet: "주문 취소 가능할까요?" }), NOW).rows[0].line)
+      .toBe("주문 취소 가능할까요?");
+    // <b>No title at all</b> — a NAVER product inquiry. `title` falls back to the snippet, so the
+    // comparison has to be against the title the ROW draws, not against the empty field. This is the
+    // live row that survived the first version of this guard.
+    expect(mergeHomeWork(null, null, q({ title: null, snippet: "전선 한가닥 2.5 3c 지름 10mm…" }), NOW).rows[0].line).toBeNull();
+    expect(mergeHomeWork(null, null, q({ title: null, snippet: "전선 한가닥 2.5 3c 지름 10mm…" }), NOW).rows[0].title)
+      .toBe("전선 한가닥 2.5 3c 지름 10mm…");
+    // The same sentence cut at two lengths — a prefix either way adds nothing to the row.
+    expect(mergeHomeWork(null, null, q({ title: "전선 한가닥 2.5 3c", snippet: "전선 한가닥 2.5 3c 지름 10mm" }), NOW).rows[0].line)
+      .toBeNull();
+    expect(mergeHomeWork(null, null, q({ title: "전선 한가닥 2.5 3c 지름 10mm", snippet: "전선 한가닥 2.5 3c" }), NOW).rows[0].line)
+      .toBeNull();
+    // And the state is never restated there — that is the lead badge's, off `hasDraft`.
+    const row = mergeHomeWork(null, null, q({ title: "환불 문의", snippet: "주문 취소 가능할까요?" }), NOW).rows[0];
+    expect(row.state).toBe("REPLY_NEEDED");
+    expect(row.line).not.toContain("초안");
+  });
+
+  it("drops a case's summary when it is the title again — the title falls back to it", () => {
+    // A subject with no title of its own: `title` becomes the summary, so printing the summary in the
+    // line would draw one sentence as both lines. Measured live at 1600×1000.
+    const co = (over: Record<string, unknown>) => ({
+      decisions: { total: 1, rows: [{
+        caseId: "c-9", subjectKind: "INQUIRY", channelNameKo: "네이버", rating: null, reasonNote: "",
+        recommendedActionType: "REPLY_TO_CUSTOMER", recommendedAction: null, missingInformation: [],
+        draftPrepared: false, decidedBy: "RULE", openedAt: "2026-09-20T00:00:00Z", to: "/inquiries/i-9",
+        ...over,
+      }] },
+      handled: { rows: [] },
+    } as unknown as CustomerOperationsHome);
+
+    expect(mergeHomeWork(co({ title: null, summary: "전선 한가닥 2.5 3c 지름 10mm" }), null, null, NOW).rows[0].line).toBeNull();
+    expect(mergeHomeWork(co({ title: "9oz 뚜껑도 파나요?", summary: "등록된 지식으로 답변할 수 있습니다." }), null, null, NOW).rows[0].line)
+      .toBe("등록된 지식으로 답변할 수 있습니다.");
   });
 
   it("a case about the same review wins — one review is one row", () => {

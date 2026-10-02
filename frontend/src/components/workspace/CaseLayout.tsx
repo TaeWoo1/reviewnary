@@ -209,11 +209,15 @@ export function CaseLayout({
  */
 export function CaseBlock({
   title,
+  ariaLabel,
   children,
   tone = "plain",
   flat = false,
 }: {
   title?: string;
+  /** The region's name when the block draws no heading — a section the eye reads from its content still
+      needs a name for anything that cannot see it. */
+  ariaLabel?: string;
   children: ReactNode;
   /** `subject` gives the customer's own words the reading size; everything else is plain. */
   tone?: "plain" | "subject";
@@ -231,14 +235,14 @@ export function CaseBlock({
   const heading = title ? <H className="mb-2.5 text-sm font-bold text-muted">{title}</H> : null;
   if (variant === "pane" || flat) {
     return (
-      <section aria-label={title} className={tone === "subject" ? "" : "border-t border-line pt-4"}>
+      <section aria-label={ariaLabel ?? title} className={tone === "subject" ? "" : "border-t border-line pt-4"}>
         {heading}
         {children}
       </section>
     );
   }
   return (
-    <section aria-label={title} className="rounded-2xl border border-line bg-surface px-4 py-4 sm:px-6">
+    <section aria-label={ariaLabel ?? title} className="rounded-2xl border border-line bg-surface px-4 py-4 sm:px-6">
       {heading}
       {children}
     </section>

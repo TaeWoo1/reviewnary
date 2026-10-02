@@ -18,6 +18,7 @@ const api = vi.hoisted(() => ({
 vi.mock("../../lib/apiClient", () => ({ api, getToken: () => null }));
 
 import { OperationsCaseQueue } from "./OperationsCaseQueue";
+import { REASON, reasonOfCase } from "../../lib/copy/customerOps";
 
 const NOW = new Date("2026-09-22T05:30:00Z"); // 14:30 KST
 
@@ -36,6 +37,7 @@ function row(over: Partial<CustomerOperationsDecisionRow> = {}): CustomerOperati
     draftPrepared: true,
     decidedBy: "RULE",
     openedAt: "2026-09-21T04:00:00Z",
+    receivedOn: null,
     to: "/inquiries/i-1",
     ...over,
   };
@@ -52,6 +54,7 @@ const REVIEW = row({
   recommendedActionType: null,
   draftPrepared: false,
   openedAt: "2026-09-20T04:00:00Z",
+  receivedOn: null,
   to: "/reviews/reply/r-2",
 });
 
@@ -89,16 +92,27 @@ function draw() {
 describe("OperationsCaseQueue", () => {
   beforeEach(() => vi.resetAllMocks());
 
-  it("문의와 리뷰가 한 목록에 함께, 기다린 순서대로 선다", async () => {
+  /**
+   * <b>Re-pointed: the order is each lane's own, not one wait across all of them</b> (product-owner
+   * decision, 2026-10-01). This asserted 「기다린 순서대로」, and that single comparator is what the
+   * Home's visual QA failed on — it inverted the review lane's server-declared order and ranked a
+   * review's authoring date against an inquiry's receipt time.
+   *
+   * <p>The guarantee that was being made here survives whole: an inquiry and a review stand in ONE
+   * list under one name, with each channel named. Both of these rows are cases, so the order they
+   * stand in is the case lane's, which is the server's own.
+   */
+  it("문의와 리뷰가 한 목록에 함께 선다 — 종류로 갈라지지 않는다", async () => {
     reads();
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 2, rows: [row(), REVIEW] });
     draw();
 
     const list = await screen.findByRole("list", { name: "확인할 일" });
     const items = within(list).getAllByRole("listitem");
-    // The review has waited a day longer, so it leads — the order is the wait, not the kind.
-    expect(items[0]).toHaveTextContent("배송이 너무 늦었어요");
-    expect(items[1]).toHaveTextContent("교환 신청은 언제까지 가능한가요?");
+    expect(items).toHaveLength(2);
+    // The case lane, in the order the server sent it.
+    expect(items[0]).toHaveTextContent("교환 신청은 언제까지 가능한가요?");
+    expect(items[1]).toHaveTextContent("배송이 너무 늦었어요");
     expect(list).toHaveTextContent("카페24");
     expect(list).toHaveTextContent("네이버");
   });
@@ -113,8 +127,8 @@ describe("OperationsCaseQueue", () => {
     // A case opens its case screen whatever its subject is — the investigation is what the seller came for, and
     // splitting cases by subject kind would be two queues wearing one name.
     expect(links.map((a) => a.getAttribute("href"))).toEqual([
-      "/customer-operations/cases/c-2",
       "/customer-operations/cases/c-1",
+      "/customer-operations/cases/c-2",
     ]);
   });
 
@@ -157,14 +171,25 @@ describe("OperationsCaseQueue", () => {
     expect(hrefs).toContain("/customer-operations/cases/c-1");
   });
 
+  /**
+   * <b>Re-pointed to the state word, which is where this fact now stands</b> (product-owner decision,
+   * 2026-10-01). It was 「초안 있음 · 미발송」 in the row's second line, 104px right of a lead badge
+   * reading 초안 준비됨 off the same `draftPrepared` field — the same claim twice, in the slot the eye
+   * reads as customer context. The guarantee is unchanged: <b>a prepared draft must never read as a
+   * sent one</b>, and `WORK_STATE.DRAFT_READY`'s own definition is 「reviewnary wrote something; the
+   * seller has not decided anything about it」.
+   */
   it("준비된 초안은 아직 보내지 않았다고 말한다", async () => {
     reads();
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 1, rows: [row()] });
     draw();
 
     const list = await screen.findByRole("list", { name: "확인할 일" });
-    expect(list).toHaveTextContent("초안 있음");
-    expect(list).toHaveTextContent("미발송");
+    expect(list).toHaveTextContent("초안 준비됨");
+    // Said once. Nothing on the row claims it went out, and nothing restates the badge.
+    expect(list).not.toHaveTextContent("초안 있음");
+    expect(list).not.toHaveTextContent("발송함");
+    expect(list).not.toHaveTextContent("답변함");
   });
 
   it("읽지 못한 목록과 빈 목록은 다른 문장이다", async () => {
@@ -217,9 +242,19 @@ describe("OperationsCaseQueue", () => {
     draw();
 
     const list = await screen.findByRole("list", { name: "확인할 일" });
-    expect(list).toHaveTextContent(/「포장 파손」 문제가 3건 확인됐습니다/);
+    /*
+      <b>Re-pointed: the sentence moved off the row, the TAG is what was being defended</b>
+      (product-owner decision, 2026-10-01 — 「내부 workflow metadata는 기본 행에서 제거」).
+
+      <p>This test was written against 「판단 보류」, a tag that described the row as emptier than it
+      was, and it proved the point by finding the recommendation sentence in the row. The tag is still
+      what it fixed — `reasonOfCase` reads `recommendedActionType`, untouched — and the row still says
+      what it is. What may no longer stand in the row's second line is reviewnary's own prose about
+      what to do; that is the case screen's, which the row opens.
+    */
     expect(list).toHaveTextContent("리뷰");
     expect(list).not.toHaveTextContent("판단 보류");
+    expect(list).not.toHaveTextContent(/「포장 파손」 문제가 3건 확인됐습니다/);
   });
 
   /**
@@ -235,10 +270,21 @@ describe("OperationsCaseQueue", () => {
     draw();
 
     const list = await screen.findByRole("list", { name: "확인할 일" });
-    expect(list).toHaveTextContent("답변 필요");
+    /*
+      <b>Re-pointed: the tag is the guarantee, and the row is no longer where it is read</b> (canonical
+      mockup semantic correction, 2026-10-02).
+
+      <p>What this test defends is `reasonOfCase` — a `REPLY_TO_CUSTOMER` case is 답변 필요 and not
+      판단 보류 — so it now asserts that function directly, where the fact lives. The row stopped
+      DRAWING the word for a reason this package exists for: 답변 필요 is a work-state word, the lead
+      column owns it, and this row's own state is 초안 준비됨. Printing both put two states on one row
+      and the false one first.
+    */
+    expect(reasonOfCase("REPLY_TO_CUSTOMER", [], "INQUIRY")).toBe(REASON.reply);
     expect(list).not.toHaveTextContent("판단 보류");
-    // The recommendation and the tag are the same fact, so the row still says what is ready.
-    expect(list).toHaveTextContent("초안 있음");
+    expect(list).toHaveTextContent("초안 준비됨");
+    // And the word the lead column owns is never ALSO drawn as this row's category.
+    expect(within(list).queryByText("답변 필요")).toBeNull();
   });
 
   it("준비된 것이 없는 리뷰는 없는 추천을 지어내지 않는다", async () => {
@@ -247,9 +293,17 @@ describe("OperationsCaseQueue", () => {
     draw();
 
     const list = await screen.findByRole("list", { name: "확인할 일" });
-    // Falls back to the rule's own line. A product with no issue memory yields no repeat claim rather than a
-    // hedged one, and the row says only what is true.
-    expect(list).toHaveTextContent("확인이 필요한 리뷰입니다");
+    /*
+      <b>Re-pointed to the stronger form of the same rule</b> (product-owner decision, 2026-10-01).
+      It asserted the fallback to `reasonNote` — 「확인이 필요한 리뷰입니다」, the same sentence on every
+      review case — because the point was that nothing is invented when there is no recommendation.
+      The second line is customer context now and this case carries no `summary`, so there is NO
+      second line, which is the strongest version of 「없는 추천을 지어내지 않는다」: the row says the
+      state, the customer's own words and where it came from, and stops.
+    */
+    expect(list).toHaveTextContent("확인 필요");
+    expect(list).toHaveTextContent("배송이 너무 늦었어요");
+    expect(list).not.toHaveTextContent("확인이 필요한 리뷰입니다");
   });
 
   it("행마다 버튼이 없다 — 넓은 화면에서 행은 선택이고, 한 가지 주 행동은 오른쪽 상세에 있다", async () => {
@@ -313,9 +367,74 @@ describe("OperationsCaseQueue", () => {
     const list = await screen.findByRole("list", { name: "확인할 일" });
     // Every row is a link to the screen that owns the decision; nothing here resolves, dismisses or sends.
     expect(within(list).queryAllByRole("button")).toHaveLength(0);
-    // The only buttons on the page choose a view of the list (Phase 4) — none of them decides anything.
+    /* The guarantee, where it now lives: every button on this screen only changes what is DRAWN. The
+       assertion used to be 「all of them are inside the view group」, and the canonical mockup adds a
+       second such control beside the title — the search toggle, which narrows the same rows. So the
+       check names both populations rather than the one container they used to share, and nothing that
+       resolves, dismisses or sends has a way onto this screen. */
     const views = screen.getByRole("group", { name: "확인할 일 보기" });
-    for (const button of screen.queryAllByRole("button")) expect(views).toContainElement(button);
+    const search = screen.getByRole("button", { name: "검색" });
+    for (const button of screen.queryAllByRole("button")) {
+      if (button === search) continue;
+      expect(views).toContainElement(button);
+    }
+  });
+
+  /**
+   * <b>One item, one elapsed time — on the row and in the pane beside it</b> (elapsed-time contract,
+   * 2026-10-02).
+   *
+   * <p>Rendered rather than computed, because the defect was never in the arithmetic: the two sides read
+   * two different timestamps. This stands the row and its own detail side by side, as the screen does at
+   * 1200px and up, and reads the string off both.
+   */
+  it("같은 item의 목록과 pane은 같은 경과 시간을 말한다", async () => {
+    const restore = stubWide(true);
+    try {
+      reads();
+      // The customer wrote on 09-18; reviewnary opened the case on 09-20. The list used to date it by
+      // the second and the pane by the first — two numbers for one item.
+      const subject = row({ receivedOn: "2026-09-18", openedAt: "2026-09-20T01:00:00Z" });
+      api.getCustomerOperationsDecisions.mockResolvedValue({ total: 1, rows: [subject] });
+      api.getOperationsCase.mockResolvedValue({
+        caseId: subject.caseId,
+        open: true,
+        subjectKind: "INQUIRY",
+        channelNameKo: "카페24",
+        productName: null,
+        productScopeAvailable: false,
+        receivedOn: subject.receivedOn,
+        openedAt: subject.openedAt,
+        rating: null,
+        title: subject.title,
+        body: "교환 신청은 언제까지 가능한가요?",
+        reasonNote: subject.reasonNote,
+        disposition: "NEEDS_DECISION",
+        decidedBy: "AGENT",
+        summary: null,
+        recommendedActionType: "REPLY_TO_CUSTOMER",
+        recommendedAction: null,
+        missingInformation: [],
+        whyDecisionNeeded: null,
+        investigated: [],
+        knowledgeUsed: [],
+        gap: null,
+        draft: null,
+        to: "/inquiries/i-1",
+      });
+      draw();
+
+      const list = await screen.findByRole("list", { name: "확인할 일" });
+      const rowText = within(list).getAllByRole("listitem")[0].textContent ?? "";
+      const elapsed = rowText.match(/\d+일 (대기|전)/)?.[0];
+      expect(elapsed).toBe("4일 대기"); // 09-18 → 09-22 KST, the CUSTOMER's clock
+
+      await userEvent.click(within(list).getAllByRole("link")[0]);
+      const pane = await screen.findByRole("article", { name: "선택한 항목" });
+      expect(within(pane).getByText(elapsed!)).toBeTruthy();
+    } finally {
+      restore();
+    }
   });
 
   it("접근성 위반 0", async () => {
@@ -414,17 +533,17 @@ describe("OperationsCaseQueue — views of the one list (UI/UX v2 Phase 4)", () 
     const views = await screen.findByRole("group", { name: "확인할 일 보기" });
     // Every view says how many rows it holds, out of the same four.
     expect(within(views).getByRole("button", { name: "전체 4" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(views).getByRole("button", { name: "문의 답변 1" })).toBeInTheDocument();
-    expect(within(views).getByRole("button", { name: "리뷰 확인 1" })).toBeInTheDocument();
-    expect(within(views).getByRole("button", { name: "승인 대기 1" })).toBeInTheDocument();
+    expect(within(views).getByRole("button", { name: "답변할 문의 1" })).toBeInTheDocument();
+    expect(within(views).getByRole("button", { name: "확인할 리뷰 1" })).toBeInTheDocument();
+    expect(within(views).getByRole("button", { name: "승인할 일 1" })).toBeInTheDocument();
     expect(within(views).getByRole("button", { name: "초안 필요 1" })).toBeInTheDocument();
 
-    await userEvent.click(within(views).getByRole("button", { name: "승인 대기 1" }));
+    await userEvent.click(within(views).getByRole("button", { name: "승인할 일 1" }));
     const list = screen.getByRole("list", { name: "확인할 일" });
     expect(within(list).getAllByRole("link")).toHaveLength(1);
     expect(within(list).getByRole("link", { name: /승인을 기다리는 답변/ })).toBeInTheDocument();
 
-    await userEvent.click(within(views).getByRole("button", { name: "문의 답변 1" }));
+    await userEvent.click(within(views).getByRole("button", { name: "답변할 문의 1" }));
     expect(within(screen.getByRole("list", { name: "확인할 일" })).getByRole("link", { name: /교환 신청/ })).toBeInTheDocument();
 
     // The header still counts the whole list: a view never passes itself off as the total.

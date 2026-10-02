@@ -26,15 +26,18 @@ export function RepeatedProblemList({
   rows,
   linkFor,
   selectedId,
+  bare = false,
 }: {
   rows: readonly HomeProblem[];
   /** Where a row points when the page can draw the problem in place (the 오늘 pane); its own workspace otherwise. */
   linkFor?: (issueId: string) => string;
   selectedId?: string | null;
+  /** The caller is already a card — see {@link PreparedWorkList}'s own `bare`, which this mirrors. */
+  bare?: boolean;
 }) {
   if (rows.length === 0) return null;
   return (
-    <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
+    <ul className={`divide-y divide-line ${bare ? "mt-2" : "mt-3 overflow-hidden rounded-2xl border border-line bg-surface"}`}>
       {rows.map(({ issue, context }) => {
         const badges = changeBadges(issue.change);
         const top = context?.evidence?.byProduct?.[0];
@@ -44,7 +47,7 @@ export function RepeatedProblemList({
         return (
           <li
             key={issue.id}
-            className={`space-y-1 px-4 py-3 ${selectedId === issue.id ? "bg-brand-50 shadow-selected" : ""}`}
+            className={`space-y-1 py-3 ${bare ? "" : "px-4"} ${selectedId === issue.id ? "bg-brand-50 shadow-selected" : ""}`}
           >
             <Link
               to={linkFor ? linkFor(issue.id) : `/memory/${issue.id}`}

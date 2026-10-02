@@ -24,7 +24,7 @@ export function HomeReviewOpsCard({ run }: { run: ActionWindowRunView | null }) 
   return (
     <section aria-label={HOME_REVIEW_OPS_COPY.sectionTitle} className="card">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-ink">{HOME_REVIEW_OPS_COPY.sectionTitle}</h2>
+        <h2 className="text-lg font-semibold text-ink">{HOME_REVIEW_OPS_COPY.sectionTitle}</h2>
         {run ? <RunStatusBadge status={run.status} /> : null}
       </div>
       {run ? <RunSummary run={run} /> : <EmptyReviewOps />}

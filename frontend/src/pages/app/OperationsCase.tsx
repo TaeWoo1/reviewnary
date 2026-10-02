@@ -8,7 +8,9 @@ import { Facts } from "../../components/ui/ObjectRow";
 import { CaseBlock, CaseLayout, CaseQuote, type CaseVariant, type PaneDepth } from "../../components/workspace/CaseLayout";
 import { api } from "../../lib/apiClient";
 import { actionKo, subjectFallback } from "../../lib/customerOperations";
-import { COPY, draftSendWord, decisionOf, photoWord, shortDate, sourceLabel, waitLabel } from "../../lib/copy/customerOps";
+import { COPY, draftSendWord, decisionOf, elapsedLabel, elapsedSource, photoWord, shortDate, sourceLabel, waitDays } from "../../lib/copy/customerOps";
+import { Status } from "../../components/ui/Status";
+import { WORK_STATE, type WorkStateKey } from "../../lib/workState";
 import { plainText } from "../../lib/plainText";
 import type { OperationsCaseDetail, OperationsCaseNeed } from "../../lib/customerOperationsTypes";
 
@@ -42,10 +44,17 @@ export function OperationsCaseView({
   caseId,
   variant,
   depth = "full",
+  now,
   queue = null,
 }: {
   caseId: string;
   variant: CaseVariant;
+  /**
+   * The clock this case is read against. Threaded from the list that opened it so one item cannot be
+   * dated by two 「now」s — the same reason {@code elapsedSource} exists one layer down. Omitted, it is
+   * the real one, which is what every page caller wants.
+   */
+  now?: Date;
   /**
    * {@link PaneDepth}. 「preview」 shows the recommended draft as TEXT and leaves every form — applying
    * it, correcting the case, teaching the missing fact — to the full case, which is unchanged.
@@ -90,11 +99,24 @@ export function OperationsCaseView({
 
   const body = plainText(detail.body);
   const title = detail.title?.trim() || firstLine(body) || subjectFallback(detail.subjectKind);
-  const wait = waitLabel(detail.receivedOn);
+  /* <b>The same source and the same word the list used</b> (elapsed-time contract, 2026-10-02). This
+     read `receivedOn` alone and the list read `openedAt` alone, so one case said 8일 대기 in the row and
+     9일 대기 in this pane. Both sides now hand both facts to `elapsedSource`, and a review says 전. */
+  const elapsedAt = elapsedSource(detail.receivedOn, detail.openedAt);
+  const wait = elapsedLabel(elapsedAt, detail.subjectKind, now);
   const index = queue ? queue.indexOf(caseId) : -1;
   const showTeach = Boolean(detail.gap) && !receipt;
   const pane = variant === "pane";
   const preview = pane && depth === "preview";
+  /**
+   * <b>확인할 일's canonical reading</b> (2026-10-02). The full pane is 확인할 일's detail and nothing else:
+   * the Home draws this component at {@code preview} depth and the case screen draws it as a page, so this
+   * flag changes exactly the surface the canonical mockup is the target for — and leaves the Home's frozen
+   * baseline and the full case page untouched.
+   */
+  const canonical = pane && depth === "full";
+  const workState = WORK_STATE[caseWorkState(detail)];
+  const why = canonical ? whyNow(detail, now) : [];
   // What 확인 항목 would actually draw — asked here so the block can decline to exist rather than drawing
   // a card around 「조사 기록 없음」. Same predicate `Checks` uses; no second definition of «empty».
   const hasChecks = detail.investigated.length > 0 || Boolean(showTeach && detail.gap?.missingSubject);
@@ -131,10 +153,31 @@ export function OperationsCaseView({
         )
       }
       meta={
-        <Facts>
-          <span>{sourceLabel(detail.channelNameKo, detail.subjectKind, detail.rating)}</span>
-          {wait ? <span className="tabular-nums">{wait}</span> : null}
-        </Facts>
+        canonical ? (
+          /* <b>The state leads, and it owns the word</b> (canonical mockup, 2026-10-02). The header used to
+             open with the channel, so the pane said what the item WAS where the row beside it said what to
+             do with it. Same badge, same table, same fact as the row's lead column — one object, one word.
+             The wait keeps its own mark because it is the other thing the mockup's header carries, and it
+             is a claim about urgency rather than about provenance. */
+          <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+            <Status tone={workState.tone} variant="badge" className="text-xs">
+              {workState.text}
+            </Status>
+            <span aria-hidden="true" className="h-3 w-px bg-line" />
+            <span>{sourceLabel(detail.channelNameKo, detail.subjectKind, detail.rating)}</span>
+            {wait ? (
+              <>
+                <span aria-hidden="true" className="h-3 w-px bg-line" />
+                <span className="font-semibold tabular-nums text-warn">{wait}</span>
+              </>
+            ) : null}
+          </span>
+        ) : (
+          <Facts>
+            <span>{sourceLabel(detail.channelNameKo, detail.subjectKind, detail.rating)}</span>
+            {wait ? <span className="tabular-nums">{wait}</span> : null}
+          </Facts>
+        )
       }
       sub={detail.productName ?? undefined}
       title={title}
@@ -155,7 +198,25 @@ export function OperationsCaseView({
           </Link>
         )
       }
-      summary={<WorkFlowCard ariaLabel="자동 확인과 내가 확인할 일" {...flowCells(detail, receipt !== null)} />}
+      summary={
+        canonical ? (
+          why.length > 0 ? (
+            <section aria-label="왜 지금 볼 일인가">
+              <h3 className="mb-2.5 text-sm font-bold text-ink">왜 지금 볼 일인가</h3>
+              <ul className="space-y-2">
+                {why.map((fact) => (
+                  <li key={fact.text} className="flex items-start gap-2.5">
+                    <WhyNowIcon name={fact.icon} />
+                    <span className="min-w-0 break-keep text-sm leading-relaxed text-ink">{fact.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null
+        ) : (
+          <WorkFlowCard ariaLabel="자동 확인과 내가 확인할 일" {...flowCells(detail, receipt !== null)} />
+        )
+      }
       notice={
         error ? (
           <p className="break-keep text-sm text-bad" role="alert">
@@ -165,7 +226,14 @@ export function OperationsCaseView({
       }
       subject={
         bodyAddsSomething || hasMedia ? (
-          <CaseBlock title={detail.subjectKind === "INQUIRY" ? COPY.inquiryBody : COPY.reviewBody} tone="subject">
+          /* In the canonical reading the customer's words sit directly under their own sentence, with no
+             heading between: the title IS the first line of this body, so a 「문의 내용」 rule between the two
+             was a boundary drawn through one quotation. The heading stays everywhere else. */
+          <CaseBlock
+            title={canonical ? undefined : detail.subjectKind === "INQUIRY" ? COPY.inquiryBody : COPY.reviewBody}
+            ariaLabel={detail.subjectKind === "INQUIRY" ? COPY.inquiryBody : COPY.reviewBody}
+            tone="subject"
+          >
             {/* The channel's own markup is stripped HERE and nowhere else — the stored row keeps what the channel
                 sent, and the same helper the 문의 화면 has used since Demo UX Polish v1 does the stripping, so the
                 two screens cannot show the same customer different words. */}
@@ -210,14 +278,28 @@ export function OperationsCaseView({
         // 「조사 기록 없음」 — a box drawn to say that nothing is in it. The sentence is not a finding and
         // not a failure; it is the ordinary state of a case the rules could answer from stored knowledge,
         // and the 자동 확인 line above already says what was done.
-        hasChecks || noteUnderChecks ? (
+        canonical ? (
+          detail.knowledgeUsed.length > 0 ? (
+            <CaseBlock title="확인한 내용" flat>
+              <CheckedTable detail={detail} />
+            </CaseBlock>
+          ) : hasChecks || noteUnderChecks ? (
+            <CaseBlock title="확인한 내용" flat>
+              <Checks detail={detail} gapOpen={showTeach} />
+              {noteUnderChecks ? <p className="mt-3 break-keep text-sm text-muted">{detail.reasonNote}</p> : null}
+            </CaseBlock>
+          ) : null
+        ) : hasChecks || noteUnderChecks ? (
           <CaseBlock title={COPY.checks} flat>
             <Checks detail={detail} gapOpen={showTeach} />
             {noteUnderChecks ? <p className="mt-3 break-keep text-sm text-muted">{detail.reasonNote}</p> : null}
           </CaseBlock>
         ) : null
       }
-      more={hasEvidence ? <Evidence detail={detail} /> : null}
+      /* The canonical reading already draws `knowledgeUsed` in full under 확인한 내용, so the folded copy of
+         the same list is not drawn under it — one list, once. Where there is no knowledge to draw the block
+         behaves exactly as it does everywhere else. */
+      more={hasEvidence && !(canonical && detail.knowledgeUsed.length > 0) ? <Evidence detail={detail} /> : null}
     />
   );
 }
@@ -323,6 +405,115 @@ function Missing({ children }: { children: string }) {
       <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full border-[1.5px] border-[#D97706]" />
       {children}
     </span>
+  );
+}
+
+/**
+ * <b>The leading status of one case — the same contract the row in the list wears</b> (canonical mockup
+ * semantic correction, 2026-10-02).
+ *
+ * <p>The correction it implements: <b>an item that already has a prepared answer is never 「답변 필요」.</b>
+ * 답변 필요 is a statement about the CUSTOMER (nobody has answered them) and it was being drawn over items
+ * reviewnary had already written an answer for, so the one word a seller reads first told them to start
+ * work that was done. The word comes from {@link WORK_STATE} and from the fact that proves it — a draft
+ * VERSION, the same {@code draft} this screen renders below — never from a phase and never inferred.
+ *
+ * <p>Deliberately the same expression as {@code caseWorkRow}'s: the list and the pane are one object seen
+ * twice, and a second derivation is how they come to disagree.
+ */
+function caseWorkState(detail: OperationsCaseDetail): WorkStateKey {
+  return detail.draft ? "DRAFT_READY" : "NEEDS_LOOK";
+}
+
+/**
+ * <b>왜 지금 볼 일인가</b> (canonical mockup, 2026-10-02) — why this item is in front of the seller, as
+ * facts rather than as reviewnary's own workflow vocabulary.
+ *
+ * <p>It replaces the two-cell 자동 확인 / 내가 확인할 일 strip in the full pane. The strip's left cell said
+ * 「답변 초안 작성」 — a stage name — above the sentence that actually carried the reason, and its right cell
+ * restated the lead badge.
+ *
+ * <p><b>Every line is optional and drawn only when the case holds it</b> (semantic correction 3). There is
+ * no filler line: a case with no summary and no recommendation draws the waiting line alone, and one with
+ * nothing at all draws no block. Nothing here is composed out of a number this screen does not have —
+ * which is why the mockup's third line (「최근 7일 동안 유사 문의 N건」) is absent: no read on this screen
+ * returns it.
+ */
+function whyNow(detail: OperationsCaseDetail, now?: Date): { icon: "clock" | "doc" | "chat"; text: string }[] {
+  const facts: { icon: "clock" | "doc" | "chat"; text: string }[] = [];
+  const days = waitDays(elapsedSource(detail.receivedOn, detail.openedAt), now);
+  if (days !== null && days > 0) {
+    facts.push({
+      icon: "clock",
+      // 대기 is a claim about somebody waiting for an answer, and it is not true of a review — the same
+      // distinction `sinceLabel` draws for the list's right-hand column.
+      text:
+        detail.subjectKind === "INQUIRY"
+          ? `${days.toLocaleString("ko-KR")}일 동안 답변이 등록되지 않았습니다.`
+          : `${days.toLocaleString("ko-KR")}일 전에 등록된 리뷰입니다.`,
+    });
+  }
+  if (detail.summary) facts.push({ icon: "doc", text: detail.summary });
+  /* <b>Not while an answer stands</b> — the same rule {@code flowCells} keeps for the cell this block
+     replaces. With a draft written, 「고객에게 무엇을 말하거나 약속할지는 판매자가 정합니다」 is a fact
+     about the product rather than about this customer, and the prepared answer below is already the
+     thing being decided. Measured at 1600×1000, 2026-10-02: it was the third line of 왜 지금 볼 일인가
+     on a case whose answer was already written. */
+  const why = detail.whyDecisionNeeded ?? detail.recommendedAction;
+  if (detail.open && !detail.draft && why && why !== detail.summary) facts.push({ icon: "chat", text: why });
+  return facts;
+}
+
+function WhyNowIcon({ name }: { name: "clock" | "doc" | "chat" }) {
+  const common = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="mt-px h-4 w-4 shrink-0 text-muted">
+      {name === "clock" ? (
+        <>
+          <circle {...common} cx="12" cy="12" r="8.5" />
+          <path {...common} d="M12 7.5V12l3 1.8" />
+        </>
+      ) : null}
+      {name === "doc" ? <path {...common} d="M6 3.5h7l5 5v12H6z M13 3.5v5h5 M9 13h6 M9 16.5h4" /> : null}
+      {name === "chat" ? <path {...common} d="M4 5.5h16v10H9l-5 4z" /> : null}
+    </svg>
+  );
+}
+
+/**
+ * <b>확인한 내용</b> (canonical mockup, 2026-10-02) — what reviewnary read before it wrote anything, as
+ * 「무엇을 · 어떻게」 pairs.
+ *
+ * <p>The pairs are {@code knowledgeUsed}'s own title and excerpt; nothing is summarised or rephrased here.
+ * Where the rule lane recorded no knowledge the block falls back to {@code investigated} — the chips this
+ * screen has always drawn — and where there is neither it is absent, which is the rule
+ * 「a card only when there is something in it」 this screen already keeps.
+ */
+function CheckedTable({ detail }: { detail: OperationsCaseDetail }) {
+  const used = detail.knowledgeUsed;
+  if (used.length === 0) return null;
+  // 「운영 정책 2개」 — the authority these came under, counted. Mixed authorities say 「확인한 내용 N개」
+  // rather than naming one of them for all.
+  const authorities = new Set(used.map((u) => u.authority).filter(Boolean));
+  const label = authorities.size === 1 ? [...authorities][0] : "확인한 내용";
+  return (
+    <>
+      <dl className="divide-y divide-line border-y border-line">
+        {used.map((u) => (
+          <div key={`${u.title}-${u.provenance}`} className="flex items-baseline gap-4 py-2.5">
+            <dt className="w-[108px] shrink-0 break-keep text-sm font-semibold text-ink">{u.title}</dt>
+            <dd className="min-w-0 flex-1 break-keep text-sm leading-relaxed text-muted">{u.excerpt}</dd>
+          </div>
+        ))}
+      </dl>
+      <Link
+        to="/knowledge"
+        className="mt-3 inline-flex items-center gap-1.5 rounded text-sm font-semibold text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+      >
+        <WhyNowIcon name="doc" />
+        {`${label} ${used.length.toLocaleString("ko-KR")}개 보기 →`}
+      </Link>
+    </>
   );
 }
 
@@ -610,7 +801,7 @@ function TeachCard({
 
   return (
     <ActionCard primary ariaLabel={COPY.needInfo}>
-      <h2 className="text-base font-extrabold text-ink">{COPY.needInfo}</h2>
+      <h2 className="text-lg font-semibold text-ink">{COPY.needInfo}</h2>
       <p className="mt-2 break-keep text-[17px] font-bold leading-snug tracking-tight text-ink">{gap.sentence}</p>
       {gap.needs && gap.needs.length > 0 ? <NeedLists needs={gap.needs} /> : null}
       {prefill ? (
@@ -721,12 +912,33 @@ function DraftCard({ caseId, detail, primary, onApplied, onFailed }: CardProps &
   };
 
   const cited = citeCounts(draft.evidence);
+  /**
+   * <b>Read-only is the default, and the basis is said once</b> (canonical mockup, 2026-10-02).
+   *
+   * <p>The citation used to stand as 「근거 · 운영 정책 2」 chips UNDER the answer, where it read as metadata
+   * about a text the seller had already finished reading. The mockup puts it on the heading line, as the
+   * sentence it actually is: this answer was prepared out of these. Same counts, same source
+   * ({@code draft.evidence}), drawn where it qualifies something.
+   *
+   * <p>Null when the draft cites nothing — the optional-fact rule: a note that said 「근거 0개」 would be a
+   * claim this card has no business making about the rule lane's bookkeeping.
+   */
+  const basis = cited.length > 0 ? cited.map(([label, n]) => `${label} ${n}개`).join(" · ") : null;
 
   return (
     <ActionCard primary={primary} ariaLabel={COPY.draftTitle}>
-      <div className="flex items-center gap-2">
-        <h2 className="text-base font-extrabold text-ink">{COPY.draftTitle}</h2>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <h2 className="text-lg font-semibold text-ink">{COPY.draftTitle}</h2>
         <Tag tone="line">{draftSendWord(draft.delivery)}</Tag>
+        {basis && !editing ? (
+          <span className="ml-auto flex items-center gap-1.5 break-keep text-xs text-muted">
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
+              <circle cx="12" cy="12" r="8.5" />
+              <path d="M12 11v5.5M12 7.8v.2" />
+            </svg>
+            {`${basis}를 근거로 준비한 답변입니다.`}
+          </span>
+        ) : null}
       </div>
       {editing ? (
         <>
@@ -762,19 +974,23 @@ function DraftCard({ caseId, detail, primary, onApplied, onFailed }: CardProps &
           <p className="mt-3 whitespace-pre-wrap break-keep rounded-xl bg-[#F7F8FA] px-4 py-3.5 text-[15px] leading-[1.8] text-ink [overflow-wrap:anywhere]">
             {draft.body}
           </p>
-          {cited.length > 0 ? (
-            <p className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
-              <span>{COPY.evidence}</span>
-              {cited.map(([label, n]) => (
-                <Tag key={label}>{`${label} ${n}`}</Tag>
-              ))}
-            </p>
-          ) : null}
-          <div className="mt-3.5 flex gap-2">
-            <Btn variant="outline" className="flex-1" onClick={() => setEditing(true)}>
+          {/* <b>Not 50:50</b> (product-owner decision, 2026-10-02). Both controls were `flex-1`, so the
+              seller's own detour — 수정하기 — was drawn exactly as wide as the thing this card exists
+              for. Two equal halves state no hierarchy, and the one on the left is read first.
+
+              <p>So the secondary takes the width its own words need and the primary takes what is left.
+              No ratio is pinned: it falls out of the two labels at whatever width the card has, which is
+              what keeps it true in the 440px pane, the 576px pane and the page column alike. */}
+          <div className="mt-3.5 flex items-center justify-between gap-2">
+            <Btn variant="outline" className="shrink-0" onClick={() => setEditing(true)}>
               {COPY.edit}
             </Btn>
-            <BtnLink to={detail.to} variant={primary ? "solid" : "outline"} className="flex-1">
+            {/* <b>Dominant, with a ceiling</b> (product-owner decision, 2026-10-02). Taking all the slack put
+                a 110px label inside a 390px bar in the 576 pane — the text floating in the middle of a
+                band rather than filling a button. The cap is a ceiling and not a ratio: below it the
+                primary still takes everything left, which is what the 440 pane gets (254px, untouched), so
+                one rule holds at both widths and `justify-between` keeps both edges flush either way. */}
+            <BtnLink to={detail.to} variant={primary ? "solid" : "outline"} className="min-w-0 max-w-[340px] flex-1">
               {COPY.toSend} ↗
             </BtnLink>
           </div>
@@ -847,7 +1063,7 @@ function CorrectionCard({ caseId, detail, onApplied, onFailed }: CardProps) {
 
   return (
     <section aria-label={COPY.changeHandling} className="space-y-3 rounded-[14px] bg-surface p-5 shadow-[0_0_0_1px_#E4E7EC]">
-      <h2 className="text-sm font-bold text-ink">{COPY.changeHandling}</h2>
+      <h2 className="text-lg font-semibold text-ink">{COPY.changeHandling}</h2>
       <div>
         <label className="block text-xs font-semibold text-muted" htmlFor="correction-action">
           {COPY.handlingMethod}

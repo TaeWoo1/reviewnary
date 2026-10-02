@@ -5,24 +5,36 @@ import {
   MOBILE_TAB_ROUTES,
   NAV_GROUPS,
   NAV_ITEMS,
+  navGroupLabel,
 } from "./nav.v2";
 import { isNavIconName } from "../components/icons/NavIcon";
 
 describe("nav.v2 — structure", () => {
-  it("declares the final IA — 오늘 alone, then 일 / 기록 / 준비 (UI/UX v2 Phase 4, product-owner decision)", () => {
-    // 오늘 is the answer, not a category, so its group has no heading and renders none.
-    expect(NAV_GROUPS.map((group) => group.heading)).toEqual(["", "일", "기록", "준비"]);
+  it("declares the IA — 운영 / 데이터 / Reviewnary / 설정 (product-owner decision, 2026-10-01)", () => {
+    // The names say what each group IS rather than what the seller came to do with it: 일 / 기록 / 준비
+    // was a good axis for the first group and a strained one for 리뷰·문의·상품·주문, which are the
+    // objects the product operates on and are opened to change as often as to read.
+    expect(NAV_GROUPS.map((group) => group.heading)).toEqual(["운영", "데이터", "Reviewnary", "설정"]);
   });
 
-  it("declares the destinations, in order — 오늘 / 확인할 일 · 반복 문제 / 리뷰 · 문의 · 상품 · 주문 · 리포트 / 지식 · 연결 · 설정", () => {
+  it("draws no group label that only repeats its own single destination", () => {
+    // 설정 is a group of one whose item carries the group's name, so the rail would print the word twice
+    // 4px apart. Every other group names something its items do not.
+    expect(NAV_GROUPS.map(navGroupLabel)).toEqual(["운영", "데이터", "Reviewnary", null]);
+  });
+
+  it("declares the destinations, in order — 오늘 · 확인할 일 · 반복 문제 / 리뷰 · 문의 · 상품 · 주문 · 리포트 / 지식 · 연결 / 설정", () => {
+    // <b>The destinations and their order did not move</b>; the grouping did. 오늘 joined 운영 because it
+    // is the answer to 운영's own question, and a heading-less group of one put the most-visited screen
+    // outside the structure that names it. 설정 left 준비 because it is not something reviewnary needs.
     expect(NAV_GROUPS.map((group) => group.items.map((item) => item.to))).toEqual([
-      ["/"],
-      // 일: work waiting for the seller's decision, and what keeps coming back.
-      ["/customer-operations/cases", "/memory"],
-      // 기록: where the seller finds what happened. 리포트 joined the menu here — a record of a period.
+      // 운영: the morning, the work waiting for a decision, and what keeps coming back.
+      ["/", "/customer-operations/cases", "/memory"],
+      // 데이터: the objects the product operates on. 리포트 is one too — a period, recorded.
       ["/reviews", "/inquiries", "/products", "/orders", "/reports"],
-      // 준비: what reviewnary needs from the seller.
-      ["/knowledge", "/connect", "/settings"],
+      // Reviewnary: what the product needs from the seller before it can do any of the above.
+      ["/knowledge", "/connect"],
+      ["/settings"],
     ]);
   });
 

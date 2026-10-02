@@ -37,13 +37,15 @@ function co(over: Partial<CustomerOperationsHome> = {}): CustomerOperationsHome 
           caseId: "c-1", subjectKind: "INQUIRY", channelNameKo: "카페24", title: "뚜껑이 깨져서 왔어요", rating: null,
           reasonNote: "고객이 답변을 기다립니다.", summary: "사진에서 균열이 보입니다.", recommendedActionType: "CANCEL_OR_EXCHANGE",
           recommendedAction: null, missingInformation: [], draftPrepared: true, decidedBy: "AGENT",
-          openedAt: "2026-09-16T02:30:00Z", to: "/inquiries/i-1",
+          openedAt: "2026-09-16T02:30:00Z",
+          receivedOn: null, to: "/inquiries/i-1",
         },
         {
           caseId: "c-2", subjectKind: "INQUIRY", channelNameKo: "네이버 스마트스토어", title: "9oz 뚜껑도 파나요?", rating: null,
           reasonNote: "고객이 답변을 기다립니다.", summary: null, recommendedActionType: "ADD_KNOWLEDGE",
           recommendedAction: null, missingInformation: ["9oz 뚜껑 판매 여부"], draftPrepared: false, decidedBy: "AGENT",
-          openedAt: "2026-09-16T00:30:00Z", to: "/inquiries/i-2",
+          openedAt: "2026-09-16T00:30:00Z",
+          receivedOn: null, to: "/inquiries/i-2",
         },
       ],
     },
@@ -150,14 +152,38 @@ describe("mergeHomeWork — one list from three reads", () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it("orders by how long it has waited, oldest first", () => {
+  /**
+   * <b>Re-pointed: there is no single age key across the lanes any more</b> (product-owner decision,
+   * 2026-10-01). This asserted 「oldest first」 over the merged list, and that comparator is exactly
+   * what the Home's visual QA failed on: it inverted the review lane's declared order (the server
+   * serves undecided 확인 필요 reviews `receivedAt desc`) and ranked a review's authoring date against
+   * an inquiry's receipt time, so four네이버 reviews written 212–339 days ago filled the brief.
+   *
+   * <p>The surviving guarantee is that the ORDER IS A LANE'S OWN, not this list's — and the one lane
+   * whose order has to be restated here is the inquiry lane, because its read arrives
+   * `createdAt desc` while `/inquiries` reads it oldest-first.
+   */
+  it("concatenates the lanes, each in its own order — case, review, inquiry", () => {
     const work = mergeHomeWork(co(), ops(), queue());
-    expect(work.rows.map((r) => r.key)).toEqual(["review:r-1", "case:c-2", "case:c-1", "inquiry:i-3"]);
+    expect(work.rows.map((r) => r.key)).toEqual(["case:c-1", "case:c-2", "review:r-1", "inquiry:i-3"]);
+  });
+
+  it("orders the inquiry lane oldest-first — the SLA reading, restated because the read is newest-first", () => {
+    const older = {
+      workItemId: "w-8", inquiryId: "i-older", sellerAccountId: "a", channelId: "ch", channelCode: "CAFE24",
+      channelNameKo: "카페24", productId: null, productName: null, phase: "OPEN" as const,
+      status: "UNANSWERED" as const, title: "배송 언제 오나요", snippet: null,
+      receivedAt: "2026-09-10T00:00:00Z", hasDraft: false,
+    };
+    // Handed in newest-first, which is how `InquiryQueueService` sorts it (`createdAt desc`).
+    const work = mergeHomeWork(null, null, queue({ content: [...queue().content, older] }), NOW);
+    const inquiries = work.rows.filter((r) => r.kind === "INQUIRY").map((r) => r.key);
+    expect(inquiries).toEqual(["inquiry:i-older", "inquiry:i-1", "inquiry:i-3"]);
   });
 
   it("a read that failed is absent, not zero — and the count is what was drawn", () => {
     const work = mergeHomeWork(co(), ops(), null);
-    expect(work.rows.map((r) => r.key)).toEqual(["review:r-1", "case:c-2", "case:c-1"]);
+    expect(work.rows.map((r) => r.key)).toEqual(["case:c-1", "case:c-2", "review:r-1"]);
     expect(work.truncated).toBe(false);
   });
 
@@ -169,6 +195,10 @@ describe("mergeHomeWork — one list from three reads", () => {
    * disagree about which rows are this morning's work.
    *
    * <p>Nothing is hidden or dropped: the old rows keep their place in the same single list, after the recent ones.
+   *
+   * <p><b>The year boundary survived the ordering change</b> (2026-10-01). What went is the comparator
+   * applied ACROSS the lanes; this split is `/inquiries`' own predicate, it is drawn as a divider
+   * rather than a sort, and it still decides which group a row stands in.
    */
   it("한 해 넘게 묵은 백로그는 뒤로 간다 — 숨기지 않고, 오늘 일 뒤에", () => {
     const old2016 = {
@@ -182,8 +212,8 @@ describe("mergeHomeWork — one list from three reads", () => {
     // It is still there, and it is last — the row that waited longest of all.
     expect(keys).toContain("inquiry:i-2016");
     expect(keys[keys.length - 1]).toBe("inquiry:i-2016");
-    // And this morning's work still leads, in its own oldest-first order.
-    expect(keys.slice(0, 4)).toEqual(["review:r-1", "case:c-2", "case:c-1", "inquiry:i-3"]);
+    // And this morning's work still leads, each lane in its own order.
+    expect(keys.slice(0, 4)).toEqual(["case:c-1", "case:c-2", "review:r-1", "inquiry:i-3"]);
   });
 
   it("says when a read knows of more than it returned", () => {
@@ -225,50 +255,114 @@ describe("CustomerOpsHome", () => {
     expect(status.querySelectorAll("[class*='rounded-full'][class*='px-']")).toHaveLength(0);
     // 반복 문제 is a pattern, not a customer waiting: not up here, and not hidden either.
     expect(within(status).queryByRole("link", { name: /반복 문제/ })).toBeNull();
-    expect(screen.getByRole("link", { name: /반복 문제 전체 보기/ })).toHaveAttribute("href", "/memory");
+    // <b>The same guarantee, on the control that now carries it</b> (Home visual target, 2026-10-01).
+    // 반복 문제 is a card with a three-slot header — name, note, way out — so its exit says 「전체 보기 →」
+    // like every other section's rather than repeating the section name inside the link. What is asserted
+    // is unchanged: the Home offers a way to the whole set, and it goes to `/memory`.
+    expect(
+      within(screen.getByRole("region", { name: "반복 문제" })).getByRole("link", { name: /전체 보기/ }),
+    ).toHaveAttribute("href", "/memory");
     // <b>The count moved up one line</b> (product-owner decision, 2026-09-26): it is 「지금 볼 것」 of the
     // summary, and the heading no longer repeats it 12px below. Same number, same `work`, one place.
     await waitFor(() => expect(summary).toHaveTextContent("확인할 일 4"));
-    const heading = await screen.findByRole("heading", { name: /확인할 일/ });
+    // The brief's heading is 「오늘 먼저 볼 일」 since the Home visual target: 확인할 일 names the QUEUE —
+    // the rail item, the screen it links to, and the summary cell above — and printing it here was the
+    // third copy. What is asserted is unchanged and is the point of the re-point: the count lives in the
+    // band, once, and the heading of the rows does not repeat it.
+    const heading = await screen.findByRole("heading", { name: /오늘 먼저 볼 일/ });
     expect(heading).not.toHaveTextContent("4");
     // <b>The breakdown is the queue's, not the brief's</b> (product-owner decision, 2026-10-01). It used to
     // stand here: 「교환·환불 1 · 정보 부족 1 · 답변 필요 1 · 리뷰 1」, four tallies over a list showing four
     // rows. Every one of them is a filter chip on 확인할 일, where it is a control the seller can press; on a
     // brief it is a number nothing can be done with. The ORDER stays, because the order is how to read the
     // rows that are here.
-    expect(heading.parentElement).toHaveTextContent("오래된 순");
+    // The order, in the sentence the target writes it as rather than as the two-syllable chip 「오래된
+    // 순」 — same fact, and it is still the brief's note slot, beside the heading.
+    /*
+      <b>Re-pointed: the note describes a selection, not a ranking</b> (product-owner decision,
+      2026-10-01). It asserted 「오래 기다린 … 부터」, which was the single age comparator this brief was
+      sliced from and which the lane quota replaced. The guarantee is that the heading SAYS WHAT THE
+      FOUR ROWS ARE — a seller must not have to guess why these four — and that is asserted on the
+      sentence the rows can prove.
+    */
+    expect(heading.parentElement).toHaveTextContent(/문의와 리뷰에서 먼저 볼 것/);
+    expect(heading.parentElement).not.toHaveTextContent(/오래 기다린 .*부터/);
     expect(heading.parentElement).not.toHaveTextContent(/교환·환불 1|정보 부족 1/);
     await expectNoAxeViolations(container);
   });
 
+  /**
+   * <b>Re-pointed to the brief's new composition</b> (product-owner decision, 2026-10-01). Every
+   * guarantee below is the one that was here — a review carries the way back, each row keeps the word
+   * that tells it from its neighbours, a prepared draft never reads as a sent one, and no row carries
+   * a solid CTA. What moved is WHICH rows are drawn and WHERE two of those facts stand:
+   *
+   * <ul>
+   *   <li>The four rows are no longer the first four of one age-sorted list — they are
+   *       {@code homeBriefRows}' lane quota (Review 2 / Inquiry 1 / Case 1), so the rows are looked
+   *       up by what they say rather than by index.</li>
+   *   <li>「초안 있음 · 미발송」 was in the row's second line, which is customer context only now. The
+   *       fact is the state word's, off the same {@code draftPrepared} field.</li>
+   *   <li>A review says 「N일 전」, not 「N일 대기」: nobody is waiting on a review. An inquiry and a
+   *       case still say 대기, which is the claim they can make.</li>
+   * </ul>
+   */
   it("each row says why, from where, how long — and no row carries a button of its own", async () => {
     draw();
     const list = await screen.findByRole("list", { name: "확인할 일" });
-    // Four rows in the fixture, and jsdom cannot measure a width — so the brief draws its narrow count.
-    // Asserting the literal 4 only held while the narrow limit was larger than any fixture.
+    // jsdom cannot measure a width, so the brief draws its narrow count.
     await waitFor(() => expect(within(list).getAllByRole("link")).toHaveLength(visibleHomeRows(false)));
-    const [first, second] = within(list).getAllByRole("link");
+
+    const review = within(list).getByRole("link", { name: /뚜껑이 컵에 잘 안 맞아요/ });
     // A review carries the way back to the work list it was opened from.
-    expect(first).toHaveAttribute("href", "/reviews/reply/r-1?from=work");
-    // Mixed reasons: every row keeps the word that tells it from its neighbours, and its own source.
-    expect(first).toHaveTextContent("리뷰");
-    expect(first).toHaveTextContent("네이버 리뷰");
-    expect(first).toHaveTextContent("★1");
-    expect(second).toHaveAttribute("href", "/customer-operations/cases/c-2");
-    // The state word leads, and 정보 부족 is a genuine category so it keeps its badge beside it.
-    expect(second).toHaveTextContent("확인 필요");
-    expect(second).toHaveTextContent("정보 부족");
-    expect(second).toHaveTextContent("9oz 뚜껑 판매 여부 필요");
-    expect(second).toHaveTextContent("5시간 대기");
+    expect(review).toHaveAttribute("href", "/reviews/reply/r-1?from=work");
+    expect(review).toHaveTextContent("리뷰");
+    expect(review).toHaveTextContent("네이버 리뷰");
+    expect(review).toHaveTextContent("★1");
+    // <b>대기 is a claim, and it is not true of a review.</b> The customer wrote it a day ago; nobody
+    // has been waiting on it.
+    expect(review).toHaveTextContent("1일 전");
+    expect(review).not.toHaveTextContent("대기");
+
+    const kase = within(list).getByRole("link", { name: /뚜껑이 깨져서 왔어요/ });
+    expect(kase).toHaveAttribute("href", "/customer-operations/cases/c-1");
+    // The state word leads, and it is where 「a draft exists and has not been sent」 is said — once.
+    expect(kase).toHaveTextContent("초안 준비됨");
+    expect(kase).not.toHaveTextContent("초안 있음 · 미발송");
+    // The second line is the case's own account of the subject — customer context, not our workflow.
+    expect(kase).toHaveTextContent("사진에서 균열이 보입니다.");
+    // A case IS waiting: reviewnary opened it and the customer has had no answer.
+    expect(kase).toHaveTextContent("3시간 대기");
     // The verb (「검토」, 「정보 입력」) is gone from the row: the one primary action lives in the item itself.
-    expect(second).not.toHaveTextContent("정보 입력");
-    const exchange = within(list).getByRole("link", { name: /뚜껑이 깨져서 왔어요/ });
-    expect(exchange).toHaveTextContent("초안 있음 · 미발송");
+    expect(kase).not.toHaveTextContent("정보 입력");
+
+    // The inquiry lane's row carries the customer's own words in the second line — the slot that used
+    // to read 「초안 없음」, which the badge beside it already said.
+    const inquiry = within(list).getByRole("link", { name: /주문 취소 가능할까요/ });
+    expect(inquiry).toHaveAttribute("href", "/inquiries/i-3");
+    expect(inquiry).not.toHaveTextContent("초안 없음");
+
     // No row carries a solid CTA. This used to assert 「no `.bg-brand-700` anywhere」, which became wrong
     // when the row grew a state word: `Status` draws an `info` state's 6px dot in the accent, and a dot
     // is not a control. The claim is about a BUTTON, so it is asserted as one.
     expect(list.querySelectorAll(".bg-brand-700.text-white")).toHaveLength(0);
     expect(list).not.toHaveTextContent("검토");
+  });
+
+  /**
+   * <b>Four slots, allotted by lane</b> (product-owner decision, 2026-10-01 — Review 2 / Inquiry 1 /
+   * Case 1). The regression this catches is the measured one: taking the first N of one order made
+   * the brief whichever lane happened to be longest, and on the live org that was four reviews with
+   * this month's inquiry nowhere on the screen.
+   */
+  it("briefs across the lanes rather than filling up from the longest one", async () => {
+    draw();
+    const list = await screen.findByRole("list", { name: "확인할 일" });
+    await waitFor(() => expect(within(list).getAllByRole("link")).toHaveLength(visibleHomeRows(false)));
+    // Three slots, three lanes — not three of whichever lane came first in the merged order.
+    expect(within(list).getByRole("link", { name: /뚜껑이 컵에 잘 안 맞아요/ })).toBeInTheDocument();
+    expect(within(list).getByRole("link", { name: /주문 취소 가능할까요/ })).toBeInTheDocument();
+    expect(within(list).getByRole("link", { name: /뚜껑이 깨져서 왔어요/ })).toBeInTheDocument();
   });
 
   it("a source that was not read is excluded from the count and says so, with its fix", async () => {
@@ -595,7 +689,9 @@ describe("오늘 — an inbox, not a dashboard", () => {
   }
 
   it("the summary is one surface of obligation cells, never the counter band that was removed", async () => {
-    const { container } = draw();
+    // `container` was destructured for the «no svg anywhere» check, which is now scoped to the band — the
+    // header above it carries one control, 새로고침, whose mark is an svg.
+    draw();
     await screen.findByTestId("today-status");
     // <b>The band stays gone</b> — what stands here is a Pulse, not the card it replaced (product-owner
     // decision, 2026-09-26). The band had this name and its own counter cells; nothing may take either back.
@@ -605,28 +701,42 @@ describe("오늘 — an inbox, not a dashboard", () => {
     // <b>The grid is sized to the cells it has</b> (UI System v2): this fixture makes no overview read, so
     // 현재 미답변 is absent rather than 「0」 and two facts are two columns. Reserving a third would leave a
     // gap where the row of figures is supposed to read as a row.
-    expect(summary.className).toContain("grid-cols-2");
-    expect(summary.className).toContain("bg-canvas");
-    expect(summary.className).not.toMatch(/border|shadow|gradient/);
+    // Thirds whatever the read returned, and ruled rather than filled — see the same two re-points in
+    // `OperationsSummary.test.tsx`. A cell with nothing measured to say still draws nothing.
+    expect(summary.className).toContain("grid-cols-3");
+    // The third slot stands and says it could not be measured, rather than leaving a third of a ruled
+    // band blank — see `OperationsSummary.test.tsx` for the per-cause wording.
+    expect(summary.querySelector("[data-testid='pulse-unanswered']")).toHaveTextContent("—");
+    expect(summary.className).not.toContain("bg-canvas");
+    expect(summary.className).not.toMatch(/rounded|shadow|gradient/);
     const cells = [...summary.querySelectorAll("[data-testid^='pulse-']")] as HTMLElement[];
     expect(cells.length).toBeGreaterThan(0);
     for (const cell of cells) expect(cell.className).not.toMatch(/border|bg-|rounded|shadow/);
     expect(summary.querySelectorAll("[class*='rounded'],[class*='border'],[class*='shadow']")).toHaveLength(0);
-    // Every cell answers its question at the same `xl`, number or sentence, and nothing on this surface is
-    // larger — the customers' sentences below stay the subject of the screen, and the band is read before
-    // them, not instead of them. The band is also only as wide as what it holds: page-wide, the three
-    // columns stood 344px apart and stopped reading as one summary.
-    expect(summary.className).toContain("max-w-3xl");
-    for (const cell of cells) expect((cell.children[1] as HTMLElement).className).toContain("text-xl");
-    expect(summary.querySelectorAll("[class*='text-2xl'],[class*='text-3xl']")).toHaveLength(0);
-    // And no chart, no icon, by construction: nothing is drawn.
-    expect(container.querySelectorAll("svg")).toHaveLength(0);
+    // Every cell answers its question at the same size, number or sentence, and nothing on this surface
+    // is larger — the customers' sentences below stay the subject of the screen, and the band is read
+    // before them, not instead of them.
+    //
+    // <p><b>`max-w-3xl` is gone and that is the change, not a loss</b> (Home visual target, 2026-10-01).
+    // The cap bought «the columns do not stand 344px apart», and it bought it by making the band a
+    // 768px object inside a 1120px column — which is what made it read as a card on the page rather than
+    // as a strip of it. The target rules it full-width at thirds, so the columns are a third apart by
+    // construction and the rules land where the page's own rules do.
+    for (const cell of cells) expect((cell.children[1] as HTMLElement).className).toContain("text-title");
+    expect(summary.querySelectorAll("[class*='text-3xl']")).toHaveLength(0);
+    // And no chart, no icon, by construction: nothing in the band is drawn.
+    expect(summary.querySelectorAll("svg")).toHaveLength(0);
   });
 
   it("실행 대기 0 is a quiet fact and not a control — there is nothing to point at", async () => {
     draw(co(), noAwaiting());
     const summary = await screen.findByTestId("today-summary");
-    expect(summary).toHaveTextContent("실행 대기 없음");
+    // <b>「0건」, not 「없음」</b> (product-owner decision, 2026-10-01). Every slot in this band now reads
+    // as either a counted figure or 「—」, and a measured zero belongs firmly on the figure side — the job
+    // IS running and it found nothing pending. Spelling it as a word put it in the same visual class as
+    // the unmeasured cells beside it, which is the one distinction this band exists to keep.
+    expect(summary).toHaveTextContent("실행 대기 0건");
+    expect(summary).not.toHaveTextContent("실행 대기 —");
     expect(within(summary).queryByRole("link", { name: /실행 대기/ })).toBeNull();
   });
 
@@ -652,7 +762,11 @@ describe("오늘 — an inbox, not a dashboard", () => {
     // <b>The link is a destination and names no number</b> (product-owner decision, 2026-09-26). The total is
     // the Pulse's, once, in one form including 「N+」; saying it again here put the same fact twice on one screen
     // and made the control change its wording for a reason no seller could see.
-    const more = await screen.findByRole("link", { name: "전체 보기 →" });
+    // Scoped to the brief: since the target gave 실행 대기 and 반복 문제 the same three-slot header, three
+    // sections on this screen carry a 「전체 보기 →」, and an unscoped query would be asking the page which
+    // one it meant. The assertion is the brief's and is unchanged.
+    const brief = await screen.findByRole("region", { name: "확인할 일" });
+    const more = within(brief).getByRole("link", { name: "전체 보기 →" });
     expect(more).toHaveAttribute("href", "/customer-operations/cases");
     expect(more.textContent).not.toMatch(/\d/);
     // The Pulse still owns it, and still marks a floor as a floor.
@@ -704,7 +818,8 @@ describe("visible rows — the Pulse's cost, paid in whole rows", () => {
     // so the same control changed its wording for a reason no seller could see.
     api.getInquiryQueueStrict.mockResolvedValue(queue({ totalElements: 80 }));
     draw();
-    const more = await screen.findByRole("link", { name: "전체 보기 →" });
+    const brief = await screen.findByRole("region", { name: "확인할 일" });
+    const more = within(brief).getByRole("link", { name: "전체 보기 →" });
     expect(more).toHaveAttribute("href", "/customer-operations/cases");
     expect(more.textContent).not.toMatch(/\d/);
     expect(screen.getByTestId("pulse-work")).toHaveTextContent("확인할 일 4+");

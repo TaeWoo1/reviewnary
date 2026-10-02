@@ -25,7 +25,11 @@ export function PageHead({
   return (
     <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h1 className={`break-keep font-bold tracking-tight text-ink ${compact ? "text-lg" : "text-xl"}`}>
+        {/* `title` (28/700) — the scale's own step for a page name since the Home visual target. It was
+            `xl`, which put every screen's `h1` 4px above its own `h2`s: size stopped carrying rank and
+            the seller had to read the words to find the structure. `compact` — a screen navigated INTO —
+            takes the section step, one below, for the same reason it always took one below. */}
+        <h1 className={`break-keep font-bold tracking-tight text-ink ${compact ? "text-section" : "text-title"}`}>
           {title}
         </h1>
         {meta ? <div className="flex flex-wrap items-center gap-2">{meta}</div> : null}

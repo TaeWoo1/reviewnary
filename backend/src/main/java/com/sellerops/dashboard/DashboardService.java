@@ -1,8 +1,13 @@
 package com.sellerops.dashboard;
 
+import com.sellerops.channel.Channel;
+import com.sellerops.channel.ChannelRepository;
+import com.sellerops.channel.ProductChannels;
 import com.sellerops.dashboard.dto.DashboardCards;
 import com.sellerops.dashboard.dto.DashboardSummaryResponse;
+import com.sellerops.dashboard.dto.RecentNegativeProduct;
 import com.sellerops.dashboard.dto.TopProductIssue;
+import com.sellerops.dashboard.metrics.dto.MetricPeriod;
 import com.sellerops.inbox.InboxService;
 import com.sellerops.inquiry.InquiryRepository;
 import com.sellerops.order.OrderDailySummaryRepository;
@@ -20,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -34,16 +40,23 @@ public class DashboardService {
     private final ProductRepository products;
     private final OrderService orderService;
     private final InboxService inboxService;
+    /**
+     * Only to answer 「does the product support this channel」 for {@link #recentNegativeProducts} —
+     * a review carries a channel id, and {@link ProductChannels} is declared in codes.
+     */
+    private final ChannelRepository channels;
 
     public DashboardService(InquiryRepository inquiries, ReviewRepository reviews,
                             OrderDailySummaryRepository orders, ProductRepository products,
-                            OrderService orderService, InboxService inboxService) {
+                            OrderService orderService, InboxService inboxService,
+                            ChannelRepository channels) {
         this.inquiries = inquiries;
         this.reviews = reviews;
         this.orders = orders;
         this.products = products;
         this.orderService = orderService;
         this.inboxService = inboxService;
+        this.channels = channels;
     }
 
     @Transactional(readOnly = true)
@@ -123,6 +136,78 @@ public class DashboardService {
     @Transactional(readOnly = true)
     public List<TopProductIssue> topProductIssues(UUID orgId) {
         return buildTopProductIssues(orgId);
+    }
+
+    /**
+     * The same population, <b>windowed and compared</b> — 최근 N일 vs 이전 N일.
+     *
+     * <p>{@link #topProductIssues} is a lifetime roll-up and stays one: the legacy summary card is
+     * about the shop's whole history. What a 「오늘 달라진 점」 heading needs is a CHANGE, and a change
+     * needs two windows — which this product already declares, in {@code MetricPeriod}, whose own
+     * docblock says 「최근 7일 vs 이전 7일」. No window is invented here and no cutoff is chosen: the
+     * period is handed in by the caller that already computed it for every other metric on the same
+     * screen (product-owner decision, 2026-10-01).
+     *
+     * <p>REAL only, negative only, product-bearing only — the same three filters
+     * {@link #buildTopProductIssues} applies, for the reasons stated there. A manufactured row may
+     * appear in a chart of what the shop did, never in a number that tells a seller they have a
+     * problem.
+     *
+     * <p>Ordered by the current window's count, descending. A product with nothing in the current
+     * window is left out: a row for it would be a claim about a period in which it did nothing.
+     */
+    @Transactional(readOnly = true)
+    public List<RecentNegativeProduct> recentNegativeProducts(UUID orgId, MetricPeriod period) {
+        Map<UUID, String> productNames = products.findAllByOrgId(orgId).stream()
+                .collect(Collectors.toMap(Product::getId, Product::getName, (a, b) -> a));
+        /*
+         * <b>Supported channels only</b> (product-owner decision, 2026-10-01).
+         *
+         * <p>The metrics population this period comes from is {@code OrgChannelVisibility}, which is
+         * deliberately WIDER than the connectable set: it adds any channel the org holds rows on, so
+         * the numbers screen can account for an uploaded GMARKET corpus. That is right for
+         * `/overview` and wrong for a Home finding, which is a thing the product asks the seller to
+         * act on — and there is nothing to act on for a channel this product does not connect
+         * ({@code ProductChannels}: NAVER / Coupang / Cafe24, `docs/product_assembly_ia_v1.md` §2).
+         *
+         * <p>Nothing is hidden by this: the reviews are still on the review screens, still in the
+         * org's totals, and still in `/overview`'s own lifetime roll-up.
+         */
+        Set<UUID> supported = channels.findAll().stream()
+                .filter(c -> ProductChannels.isVisible(c.getCode()))
+                .map(Channel::getId)
+                .collect(Collectors.toSet());
+        Map<UUID, List<Review>> negativeByProduct = reviews.findAllByOrgId(orgId).stream()
+                .filter(r -> r.getDataOrigin() == com.sellerops.common.DataOrigin.REAL)
+                .filter(Review::isNegative)
+                .filter(r -> r.getProductId() != null)
+                .filter(r -> r.getReceivedAt() != null)
+                .filter(r -> r.getChannelId() != null && supported.contains(r.getChannelId()))
+                .collect(Collectors.groupingBy(Review::getProductId));
+
+        List<RecentNegativeProduct> rows = new ArrayList<>();
+        for (Map.Entry<UUID, List<Review>> entry : negativeByProduct.entrySet()) {
+            List<LocalDate> dates = entry.getValue().stream().map(DashboardService::receivedOn).toList();
+            List<LocalDate> inCurrent = dates.stream()
+                    .filter(d -> inWindow(d, period.from(), period.to())).toList();
+            if (inCurrent.isEmpty()) {
+                continue;
+            }
+            long previous = dates.stream()
+                    .filter(d -> inWindow(d, period.previousFrom(), period.previousTo()))
+                    .count();
+            rows.add(new RecentNegativeProduct(entry.getKey(), productNames.get(entry.getKey()),
+                    inCurrent.size(), previous, period.from(), period.to(),
+                    period.previousFrom(), period.previousTo(),
+                    inCurrent.stream().max(Comparator.naturalOrder()).orElseThrow()));
+        }
+        rows.sort(Comparator.comparingLong(RecentNegativeProduct::current).reversed());
+        return rows;
+    }
+
+    /** Inclusive on both ends, which is what {@code MetricPeriod}'s own field names mean. */
+    private static boolean inWindow(LocalDate date, LocalDate from, LocalDate to) {
+        return !date.isBefore(from) && !date.isAfter(to);
     }
 
     private List<TopProductIssue> buildTopProductIssues(UUID orgId) {

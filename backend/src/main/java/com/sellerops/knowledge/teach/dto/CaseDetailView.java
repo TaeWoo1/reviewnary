@@ -19,7 +19,7 @@ public record CaseDetailView(UUID caseId, boolean open, String subjectKind, Stri
                              String recommendedActionType, String recommendedAction, List<String> missingInformation,
                              String whyDecisionNeeded, List<Investigated> investigated,
                              List<KnowledgeUsed> knowledgeUsed, Gap gap, Draft draft, String to,
-                             List<Media> media) {
+                             List<Media> media, java.time.Instant openedAt) {
 
     /** The shape every caller before review photos built. */
     public CaseDetailView(UUID caseId, boolean open, String subjectKind, String channelNameKo, String productName,
@@ -30,7 +30,19 @@ public record CaseDetailView(UUID caseId, boolean open, String subjectKind, Stri
                           List<KnowledgeUsed> knowledgeUsed, Gap gap, Draft draft, String to) {
         this(caseId, open, subjectKind, channelNameKo, productName, productScopeAvailable, receivedOn, rating, title,
                 body, reasonNote, disposition, decidedBy, summary, recommendedActionType, recommendedAction,
-                missingInformation, whyDecisionNeeded, investigated, knowledgeUsed, gap, draft, to, List.of());
+                missingInformation, whyDecisionNeeded, investigated, knowledgeUsed, gap, draft, to, List.of(), null);
+    }
+
+    /** The shape every caller before the elapsed-time contract built. */
+    public CaseDetailView(UUID caseId, boolean open, String subjectKind, String channelNameKo, String productName,
+                          boolean productScopeAvailable, LocalDate receivedOn, Integer rating, String title,
+                          String body, String reasonNote, String disposition, String decidedBy, String summary,
+                          String recommendedActionType, String recommendedAction, List<String> missingInformation,
+                          String whyDecisionNeeded, List<Investigated> investigated,
+                          List<KnowledgeUsed> knowledgeUsed, Gap gap, Draft draft, String to, List<Media> media) {
+        this(caseId, open, subjectKind, channelNameKo, productName, productScopeAvailable, receivedOn, rating, title,
+                body, reasonNote, disposition, decidedBy, summary, recommendedActionType, recommendedAction,
+                missingInformation, whyDecisionNeeded, investigated, knowledgeUsed, gap, draft, to, media, null);
     }
 
     /**

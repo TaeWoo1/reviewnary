@@ -35,6 +35,48 @@ export function useWideLayout(): boolean {
   return wide;
 }
 
+/**
+ * <b>The two panes this product has</b> (Decision Workspace pane, 2026-10-02).
+ *
+ * <p>440 is the layout's own width and stays the default: 문의, 리뷰 and the Home's preview all take it
+ * without asking, so none of them can move because another screen did.
+ *
+ * <p>576 is 확인할 일's — the Decision Workspace, where the pane is not a preview of an item but the place
+ * the seller reads the prepared answer and decides on it. Measured at 1600×1000 against the canonical
+ * mockup: the mockup gives that pane 574 of 1585 (36%) against our 440 of 1600 (27.5%), and the 134px is
+ * paid for in the one column the mockup has less of — a list that is already wider than its rows need.
+ *
+ * <p><b>A map of literals rather than a number.</b> Tailwind compiles the classes it can see in the source,
+ * so a width composed at runtime produces no CSS at all; and a closed set is the point anyway — this is a
+ * second declared width, not a per-caller free parameter.
+ */
+const PANE = {
+  default: "w-[440px] min-w-[440px] pb-8",
+  /**
+   * <b>576 from 1440 up, and the layout's own 440 below it</b> (product-owner decision, 2026-10-02).
+   *
+   * <p>Measured at 1366×768 with a flat 576: the list region fell to 550px and its column to 486, which
+   * is a 104px state column and ~340px of sentence. The tabs wrapped onto a second row, every row's
+   * second line was cut mid-word (「등록된 지식으로 답변할 수 있는 문의니…」) and every product name was
+   * an ellipsis. The pane was not too wide — the viewport was too narrow to spend 576 of it on one of
+   * two columns.
+   *
+   * <p>So the width is a contract and not a number: above 1440 the Decision Workspace takes its own
+   * pane, and below it the screen falls back to exactly the pane every other master-detail screen has.
+   * Nothing between is interpolated — a percentage pane is the thing the 2026-09-30 decision retired.
+   *
+   * <p><b>And a tighter floor</b> (product-owner decision, 2026-10-02). Measured at 1366×768: the
+   * decision flow ended at y=753, inside the fold, and the shell's own 32px of trailing air pushed the
+   * column's scroll height to 785 — so a pane whose content fitted still offered a scrollbar, which
+   * reads as 「there is more below」 about the one screen whose job is to end in a decision. 12px leaves
+   * the gap the flow wants and nothing to scroll. Every other pane keeps the 32 it has.
+   */
+  decision:
+    "w-[440px] min-w-[440px] pb-3 min-[1440px]:w-[576px] min-[1440px]:min-w-[576px]",
+} as const;
+
+export type PaneKind = keyof typeof PANE;
+
 export function MasterDetail({
   list,
   detail,
@@ -44,6 +86,7 @@ export function MasterDetail({
   onClose,
   preview = false,
   paneFooter,
+  pane = "default",
 }: {
   /** The page head, the actionable summary and the list — everything in the middle column. */
   list: ReactNode;
@@ -85,6 +128,11 @@ export function MasterDetail({
    * the case is an action the seller has to go looking for. Requires {@link preview}.
    */
   paneFooter?: ReactNode;
+  /**
+   * {@link PANE}. Defaults to the layout's own, so a screen that does not ask keeps exactly the pane it
+   * shipped with — which is what makes this an override on one route rather than a global change.
+   */
+  pane?: PaneKind;
 }) {
   const open = wide && detail !== null;
   useEffect(() => {
@@ -119,15 +167,19 @@ export function MasterDetail({
       </div>
       {open ? (
         /*
-          440px, fixed, in both readings (product-owner decision, 2026-09-30). The detail used to be
+          <b>Fixed, never a percentage</b> (product-owner decision, 2026-09-30). The detail used to be
           `w-[46%] min-w-[440px] max-w-[620px]` here and a fixed 440 in `preview`, so the same pane was a
           different width on two screens and a percentage of the viewport on one of them. A narrow viewport
           does not squeeze it — `wide` already falls back to single-pane below `WIDE_QUERY`.
+
+          <p><b>And it is still fixed with two of them</b> ({@link PANE_WIDTH}, 2026-10-02). What that
+          decision retired was a width that moved with the viewport; a screen declaring which of two
+          declared widths it takes is the opposite — 440 remains what every caller gets by default.
         */
         <aside
           aria-label={detailLabel}
-          className={`relative w-[440px] min-w-[440px] shrink-0 border-l border-line bg-surface ${
-            preview ? "flex flex-col" : `overflow-y-auto px-6 pb-8 ${onClose ? "pt-0" : "pt-6"}`
+          className={`relative ${PANE[pane]} shrink-0 border-l border-line bg-surface ${
+            preview ? "flex flex-col" : `overflow-y-auto px-6 ${onClose ? "pt-0" : "pt-6"}`
           }`}
           data-testid="master-detail"
         >

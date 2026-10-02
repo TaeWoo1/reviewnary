@@ -62,7 +62,7 @@ export function IssueList({
       {groups.map((group) => (
         <section key={group.key}>
           <div className="mb-2 flex items-baseline gap-2">
-            <h2 className="text-base font-bold text-ink">{group.heading}</h2>
+            <h2 className="text-lg font-semibold text-ink">{group.heading}</h2>
             <span className="text-sm font-semibold tabular-nums text-muted">{group.issues.length}</span>
           </div>
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">

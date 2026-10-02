@@ -61,7 +61,18 @@ export const COPY = {
   checkedLabel: "최근 24시간 자동 확인",
   mineLabel: "내가 확인할 일",
   listTitle: "확인할 일",
-  listOrder: "오래된 순",
+  /*
+    <b>The list no longer has ONE order to name</b> (product-owner decision, 2026-10-01). It said
+    「오래된 순」, which was true while one comparator ran across every lane — and that comparator is
+    what the visual QA removed: a case, a review and an inquiry each keep the order their own source
+    declares (`mergeHomeWork`). Three orders cannot be named in two words, and a caption that names
+    the wrong one is worse than no caption, so the heading states the count and stops.
+
+    <p>Kept as a key rather than deleted because the SHAPE of the heading — a count and a word about
+    the list — is the one both references draw, and the next thing that goes here will be a fact
+    about the list rather than a sort nobody chose.
+  */
+  listOrder: null,
   none: "없음",
   // <b>No check has FINISHED yet</b> — `lastCheckedAt` is the last finished run's `finishedAt`, and this cell is
   // what stands in for the count until there is one. It said 「첫 확인 중」, which asserts work in progress: the
@@ -83,7 +94,10 @@ export const COPY = {
   off: "자동 확인 꺼짐",
   start: "자동 확인 시작",
   resume: "재개",
-  composer: "질문이나 지시를 입력하세요",
+  // <b>What the box takes, in the seller's own nouns</b> (Home visual target, 2026-10-01). 「질문이나
+  // 지시」 names the two shapes of a sentence; it never says what the sentence may be ABOUT, and on a screen
+  // whose every row is a review or an inquiry that is the only thing a first-time seller needs told.
+  composer: "리뷰나 문의를 자연어로 요청해보세요",
   // What stays with the seller, in one sentence. It promises nothing new: `DUTIES_SELLER`'s first item
   // (「고객에게 실제 메시지 전송」) is the same contract, and the approval boundary is what actually enforces it.
   autoCheckFence: "답변이나 외부 조치는 승인 전 자동 실행하지 않습니다.",
@@ -96,8 +110,12 @@ export const COPY = {
   evidence: "근거",
   noEvidence: "사용한 근거 없음",
   noInvestigation: "조사 기록 없음",
-  draftTitle: "답변 초안",
-  edit: "수정",
+  /* <b>A seller-facing object, not a stage of our pipeline</b> (canonical mockup, 2026-10-02).
+     「답변 초안」 names where the text is in reviewnary's own workflow; 「준비된 답변」 names the thing the
+     seller is being handed. The object is identical and the 미발송 mark beside it still says it has not
+     gone anywhere. */
+  draftTitle: "준비된 답변",
+  edit: "수정하기",
   save: "저장",
   cancel: "취소",
   toSend: "발송 화면으로",
@@ -269,6 +287,72 @@ function kstDay(date: Date): number {
 }
 
 /**
+ * <b>The elapsed-time contract — one source, one word, for the list and the detail of one item</b>
+ * (product-owner decision, 2026-10-02).
+ *
+ * <p><b>The defect it closes.</b> The same case read 「8일 대기」 in 확인할 일's list and 「9일 대기」 in the
+ * pane beside it, because each side picked its own clock: the list had only the case's {@code openedAt}
+ * (when reviewnary opened OUR record) and the pane read the subject's {@code receivedOn} (when the
+ * customer actually wrote). Two timestamps, one item, two numbers on one screen.
+ *
+ * <p><b>The contract.</b> What a seller needs to know is how long the CUSTOMER has waited, so:
+ * <ul>
+ *   <li>the customer's own event time wins wherever there is one — an inquiry's or a review's
+ *       {@code receivedAt};</li>
+ *   <li>{@code openedAt} is a fallback and only that: an internal case whose subject record carries no
+ *       time at all still has to say something, and the time reviewnary opened it is the only other
+ *       fact in hand;</li>
+ *   <li>nothing is estimated, offset or reconstructed. When neither exists the label is null and the
+ *       screen draws nothing.</li>
+ * </ul>
+ *
+ * <p><b>Why two functions and not one.</b> The source is also this list's sort key and the input to
+ * {@code isOldBacklog}, so it is resolved once when the row is built; the WORD depends on the caller's
+ * {@code now}, so it is composed at render. Both sides of one item call both functions, which is what
+ * makes 「list and detail use the same source」 structural rather than a convention.
+ */
+export function elapsedSource(
+  customerAt: string | null | undefined,
+  openedAt: string | null | undefined,
+): string | null {
+  const customer = customerAt?.trim();
+  if (customer) return customer;
+  return openedAt?.trim() || null;
+}
+
+/**
+ * The word that source takes — see {@link elapsedSource} for the contract this completes.
+ *
+ * <p><b>대기 is a claim and 전 is not.</b> 대기 says somebody is waiting for an answer: true of an inquiry
+ * and of a case reviewnary opened about one, never of a review — nobody waited 339 days for anything,
+ * the customer simply wrote that sentence 339 days ago.
+ *
+ * <p>The axis is what the item is ABOUT, not which record carries it: a case opened about a review is
+ * review work and says 전. Reading the carrier instead was how 「N일 대기」 reached a review row at all.
+ */
+export function elapsedLabel(
+  source: string | null | undefined,
+  subject: "INQUIRY" | "REVIEW",
+  now: Date = new Date(),
+): string | null {
+  return subject === "REVIEW" ? sinceLabel(source, now) : waitLabel(source, now);
+}
+
+/**
+ * <b>How many whole days ago, in the seller's own calendar</b> — the number {@link waitLabel} composes its
+ * label out of, exposed so a sentence can be built around it rather than by slicing that label apart.
+ *
+ * <p>Null when there is no date or it cannot be read: a sentence that needs a number does not get to
+ * invent one, and the caller draws nothing instead.
+ */
+export function waitDays(value: string | null | undefined, now: Date = new Date()): number | null {
+  if (!value) return null;
+  const at = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00+09:00`) : new Date(value);
+  if (Number.isNaN(at.getTime())) return null;
+  return Math.max(0, kstDay(now) - kstDay(at));
+}
+
+/**
  * How long something has waited. An instant gives minutes, hours or days; a bare date (`2026-09-17`) can only give
  * days, and today is 「오늘 접수」 rather than a zero wait nobody measured. Null when the value cannot be read.
  */
@@ -288,6 +372,36 @@ export function waitLabel(value: string | null | undefined, now: Date = new Date
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}시간 대기`;
   return `${Math.floor(hours / 24)}일 대기`;
+}
+
+/**
+ * <b>How long ago something HAPPENED — not how long it has waited</b> (product-owner decision,
+ * 2026-10-01).
+ *
+ * <p>{@link waitLabel} says 「N일 대기」, and 대기 is a claim: somebody is waiting for an answer. It is
+ * true of an inquiry and of a case reviewnary opened; it is not true of a review. Measured on the
+ * live org the Home's first four rows read 「339일 대기」…「212일 대기」 over네이버 reviews — nobody had
+ * been waiting 339 days for anything, the customer simply wrote that sentence 339 days ago.
+ *
+ * <p>Same thresholds, same parsing, same null rule as {@link waitLabel}; only the claim differs. A
+ * date-only value can say no less than a day, so today is 「오늘」.
+ */
+export function sinceLabel(value: string | null | undefined, now: Date = new Date()): string | null {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const at = new Date(`${value}T00:00:00+09:00`);
+    if (Number.isNaN(at.getTime())) return null;
+    const days = Math.max(0, kstDay(now) - kstDay(at));
+    return days === 0 ? "오늘" : `${days}일 전`;
+  }
+  const at = new Date(value);
+  if (Number.isNaN(at.getTime())) return null;
+  const minutes = Math.max(0, Math.floor((now.getTime() - at.getTime()) / 60_000));
+  if (minutes < 1) return "방금";
+  if (minutes < 60) return `${minutes}분 전`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}시간 전`;
+  return `${Math.floor(hours / 24)}일 전`;
 }
 
 /** Milliseconds since the epoch for ordering — a date-only value is midnight in Korea. NaN sorts last. */
