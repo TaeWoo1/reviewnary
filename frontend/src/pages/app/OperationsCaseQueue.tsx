@@ -30,13 +30,17 @@ const TITLE = COPY.listTitle;
 const DESCRIPTION = "판매 후 운영이 필요한 문의와 리뷰를 모았습니다.";
 
 /**
- * <b>확인할 일's action tabs</b> (canonical mockup, 2026-10-02) — a pill per bucket, the pressed one in the
- * brand colour.
+ * <b>확인할 일's action tabs</b> (visual target, 2026-10-02) — the bucket's name with its count, the
+ * pressed one underlined in the brand colour.
+ *
+ * <p>They were five bordered pills, and five borders across the top of a list whose own container had
+ * just lost its border is the chrome the target spends its budget removing. One rule carries the whole
+ * group now and the pressed tab breaks it, so the row reads as 「five views of this list」 at a glance
+ * and the only ink spent is a 2px line.
  *
  * <p>Drawn here rather than with {@code SegmentBtn}: a segmented control sits on one shared track and
  * means 「one of these readings of the same thing」, which is what 리뷰's channel switcher is. These are
- * views of ONE list that each carry their own count, and the mockup draws them as separate pills — a
- * row of chips a seller presses, not a switch they throw.
+ * views of ONE list that each carry their own count.
  */
 function TabBtn({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: ReactNode }) {
   return (
@@ -44,10 +48,8 @@ function TabBtn({ pressed, onClick, children }: { pressed: boolean; onClick: () 
       type="button"
       aria-pressed={pressed}
       onClick={onClick}
-      className={`min-h-[36px] rounded-full border px-4 text-sm font-semibold tabular-nums transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
-        pressed
-          ? "border-brand-700 bg-brand-50 text-brand-700"
-          : "border-line bg-surface text-muted hover:text-ink"
+      className={`-mb-px min-h-[40px] border-b-2 px-1 pb-3 text-base tabular-nums transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
+        pressed ? "border-brand-700 font-semibold text-ink" : "border-transparent text-muted hover:text-ink"
       }`}
     >
       {children}
@@ -66,7 +68,7 @@ function TabBtn({ pressed, onClick, children }: { pressed: boolean; onClick: () 
 function matches(row: HomeWorkRow, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return [row.title, row.line, row.source].some((v) => (v ?? "").toLowerCase().includes(q));
+  return [row.title, row.said, row.line, row.source].some((v) => (v ?? "").toLowerCase().includes(q));
 }
 
 /**
@@ -286,7 +288,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       */}
 
       {work && allRows.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 self-start" role="group" aria-label="확인할 일 보기">
+        <div className="flex flex-wrap items-center gap-6 border-b border-line" role="group" aria-label="확인할 일 보기">
           {WORK_FILTERS.map((f) => (
             <TabBtn key={f.key} pressed={filter === f.key} onClick={() => setFilter(f.key)}>
               {f.label} {allRows.filter(f.test).length.toLocaleString("ko-KR")}

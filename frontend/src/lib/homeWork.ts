@@ -42,6 +42,18 @@ export interface HomeWorkRow {
   state: WorkStateKey;
   source: string;
   title: string;
+  /**
+   * <b>What the customer actually wrote</b> (product-owner decision, 2026-10-02), when it is not already
+   * {@link title}. An inquiry's `title` is its SUBJECT line — 「문의 드립니다」 on nearly all of them — so
+   * 확인할 일 drew two rows that were identical down to the word, and the seller had to open both to find
+   * out which was which.
+   *
+   * <p>It sits beside `title` rather than replacing it because <b>Home is frozen</b> (2026-10-01) and reads
+   * the same row: the queue reading leads with this, the Home reading leads with `title`, and the field a
+   * caller does not ask for changes nothing for it. Absent wherever the wire carries no body of its own —
+   * never filled in from a neighbouring field.
+   */
+  said?: string | null;
   line: string | null;
   since: string | null;
   /** Where the row opens: the case screen for a case, the owning screen otherwise. */
@@ -145,6 +157,9 @@ export function caseWorkRow(row: CustomerOperationsDecisionRow): HomeWorkRow {
     channel: channelShort(row.channelNameKo),
     rating: row.rating ?? null,
     title,
+    // Straight off the wire. The backend already suppressed it where it would echo the title, and the one
+    // thing this row must not do is invent the customer's words when the record does not carry them.
+    said: row.preview?.trim() || null,
     line,
     /* <b>The customer's clock, not ours</b> (elapsed-time contract, 2026-10-02). This was `openedAt` —
        when reviewnary opened the case — while the pane for the same case read the subject's

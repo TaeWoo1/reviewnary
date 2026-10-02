@@ -56,7 +56,7 @@ function home(over: Partial<CustomerOperationsHome> = {}): CustomerOperationsHom
       total: 1,
       rows: [
         {
-          caseId: "c-1", subjectKind: "INQUIRY", channelNameKo: "카페24", title: "환불 문의", rating: null,
+          caseId: "c-1", subjectKind: "INQUIRY", channelNameKo: "카페24", title: "환불 문의", rating: null, preview: null,
           reasonNote: "고객이 답변을 기다리는 새 문의입니다.", summary: "고객이 파손으로 환불을 요청했습니다.",
           recommendedActionType: "REFUND_OR_COMPENSATION", recommendedAction: "사진을 확인하고 환불 여부를 정해 주세요.",
           missingInformation: ["파손 사진"], draftPrepared: true, decidedBy: "AGENT", openedAt: "2026-09-16T05:02:00Z", receivedOn: null, to: "/inquiries/i-1",

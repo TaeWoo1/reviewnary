@@ -212,14 +212,21 @@ export function DecisionRow({
      * only when the row carries it, so a row with no rating and no product draws the channel alone
      * rather than a line of separators (canonical mockup, 2026-10-02).
      */
-    const hasProvenance = metaBelow && [source, category, star, product].some(Boolean);
+    const hasProvenance = metaBelow && [stateWord, source, category, star, product].some(Boolean);
     const inner = (
       <>
         {/* The one column whose width is fixed. A state badge that starts where the previous row's badge
-            started is read as a column; one that starts after a variable-width sibling is read as a word. */}
-        {leadBadge ? <span className="w-[104px] shrink-0">{leadBadge}</span> : null}
+            started is read as a column; one that starts after a variable-width sibling is read as a word.
+            <b>Only the Home's reading.</b> The queue's target demotes the state to the provenance line
+            below the sentence (2026-10-02): a 104px gutter of tinted marks is the first thing the eye
+            lands on down a list of 46, and what the seller came to read is the customers' sentences. */}
+        {leadBadge && !metaBelow ? <span className="w-[104px] shrink-0">{leadBadge}</span> : null}
         <span className="min-w-0 flex-1">
-          <span className="block min-w-0 max-w-[62ch] break-keep text-sm font-semibold leading-snug text-ink [overflow-wrap:anywhere]">
+          <span
+            className={`block min-w-0 max-w-[62ch] break-keep font-semibold leading-snug text-ink [overflow-wrap:anywhere] ${
+              metaBelow ? "text-lg" : "text-sm"
+            }`}
+          >
             {title}
           </span>
           {/* What reviewnary adds about this item. `xs`, which is the size the provenance beside it takes:
@@ -227,7 +234,9 @@ export function DecisionRow({
               giving this line `sm` made it the same size as the title it sits under while the metadata
               2px to its right was smaller than both. Measured, it is also the 6px per row that lands the
               four of them on the target's 70px pitch. */}
-          {line ? <span className="mt-0.5 block truncate text-xs text-muted">{line}</span> : null}
+          {line ? (
+            <span className={`block truncate text-muted ${metaBelow ? "mt-1 text-sm" : "mt-0.5 text-xs"}`}>{line}</span>
+          ) : null}
           {hasProvenance ? (
             /* <b>One line, truncated — never wrapped</b> (measured at 1600×1000 with the 576px pane,
                 2026-10-02). Wrapping put the separator at the START of the second line, with the product
@@ -240,7 +249,21 @@ export function DecisionRow({
                   syllables stand 6px to its right, which is a truncation rather than a mark. Latin initials
                   would have to be invented here (쿠팡 and 카페24 both start C) and the channels' own brand
                   colours are not in §5's five tones. The name itself is the mark. */}
-              {source ? <span className="shrink-0 whitespace-nowrap">{source}</span> : null}
+              {/* <b>The state, demoted but first.</b> It is still the word that decides whether this row is
+                  work for the seller or work already done, so it opens the line that qualifies the
+                  sentence — and `Status` is still the only thing that colours it. */}
+              {stateWord ? (
+                <Status tone={stateWord.tone} variant="quiet">
+                  {stateWord.text}
+                </Status>
+              ) : null}
+              {source ? (
+                stateWord ? (
+                  <Fact fixed>{source}</Fact>
+                ) : (
+                  <span className="shrink-0 whitespace-nowrap">{source}</span>
+                )
+              ) : null}
               {/* <b>Only the product gives way.</b> A truncated 「★3」 is 「★.」 — a mark with its own value
                   cut off, which is worse than not drawing it; same for a category word. They hold their
                   width and the product name, which is the longest and the one a prefix still identifies,
@@ -256,7 +279,7 @@ export function DecisionRow({
           ) : null}
         </span>
         {(metaBelow ? null : meta) || wait ? (
-          <span className="flex shrink-0 items-start gap-6 pt-px text-xs text-muted">
+          <span className={`flex shrink-0 items-start gap-6 text-muted ${metaBelow ? "pt-1 text-sm" : "pt-px text-xs"}`}>
             {meta && !metaBelow ? (
               <span className="whitespace-nowrap" aria-label={star ? `${meta.replace(star, `별점 ${rating}점`)}` : undefined}>
                 {meta}
@@ -267,7 +290,11 @@ export function DecisionRow({
             {wait ? <span className="w-[88px] shrink-0 whitespace-nowrap text-right tabular-nums">{wait}</span> : null}
           </span>
         ) : null}
-        {to ? (
+        {/* <b>No chevron in the queue reading</b> (2026-10-02). Forty-six identical ›, one per row, on a
+            list where the row IS the selection and the pane beside it already shows what opening does.
+            It is the mark that makes a work list read as an inbox. The Home's reading keeps it: there the
+            rows are a brief and they genuinely lead somewhere else. */}
+        {to && !metaBelow ? (
           <span aria-hidden="true" className="shrink-0 self-start pt-px text-muted">
             ›
           </span>
@@ -285,11 +312,16 @@ export function DecisionRow({
      *
      * <p>The row that carries it drops the hairline above it so the two marks never stack.
      */
-    const shape = `flex items-start gap-3 rounded-lg px-3 py-3 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
-      selected ? "!border-transparent bg-brand-50 shadow-selected" : "hover:bg-canvas"
-    }`;
+    /* <b>The queue's row is a band, the Home's is a card</b> (2026-10-02). A rounded tinted rectangle
+       inset from both edges is an object sitting ON the list; at 46 rows the target reads as one
+       continuous sheet with hairlines, so the selected row runs edge to edge and the accent bar is the
+       only thing that marks it. §4's 8px edge belongs to the Home's reading, where the row is one of
+       five on a page of cards. */
+    const shape = `flex items-start gap-3 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
+      metaBelow ? "px-4 py-4" : "rounded-lg px-3 py-3"
+    } ${selected ? "!border-transparent bg-brand-50 shadow-selected" : "hover:bg-canvas"}`;
     return (
-      <li className="px-1.5 [&+&>*]:border-t [&+&>*]:border-line">
+      <li className={`${metaBelow ? "" : "px-1.5"} [&+&>*]:border-t [&+&>*]:border-line`}>
         {to ? (
           <Link to={to} state={state} aria-current={selected ? "true" : undefined} className={`group ${shape}`}>
             {inner}

@@ -28,6 +28,7 @@ function row(over: Partial<CustomerOperationsDecisionRow> = {}): CustomerOperati
     subjectKind: "INQUIRY",
     channelNameKo: "카페24",
     title: "교환 신청은 언제까지 가능한가요?",
+    preview: null,
     rating: null,
     reasonNote: "고객이 답변을 기다리고 있습니다",
     summary: "등록된 지식으로 답변할 수 있는 문의입니다.",
@@ -48,6 +49,7 @@ const REVIEW = row({
   subjectKind: "REVIEW",
   channelNameKo: "네이버",
   title: "배송이 너무 늦었어요",
+  preview: null,
   rating: 2,
   reasonNote: "확인이 필요한 리뷰입니다",
   summary: null,
@@ -153,6 +155,7 @@ describe("OperationsCaseQueue", () => {
         totalElements: 1,
         content: [{ inquiryId: "i-9", workItemId: "w-9", channelCode: "CAFE24", channelNameKo: "카페24",
                     title: "배송 언제 되나요?", snippet: null, hasDraft: false, phase: "OPEN",
+                    preview: null,
                     receivedAt: "2026-09-18T04:00:00Z" }],
       },
     });
@@ -548,5 +551,71 @@ describe("OperationsCaseQueue — views of the one list (UI/UX v2 Phase 4)", () 
 
     // The header still counts the whole list: a view never passes itself off as the total.
     expect(screen.getByText("4건")).toBeInTheDocument();
+  });
+
+  /**
+   * <b>Two 「문의 드립니다」 are two different questions</b> (product-owner decision, 2026-10-02).
+   *
+   * <p>An inquiry's `title` is the SUBJECT line the customer typed, and nearly every one of them types
+   * the same four characters. Measured at 1600×1000 on the demo org, the first two rows of 확인할 일 were
+   * identical down to 「9일 대기」 — the only way to tell them apart was to open both. The row now leads
+   * with `preview`, the customer's own body off the wire, and falls back to the title where the record
+   * carries no body of its own.
+   */
+  it("두 문의가 같은 제목일 때, 줄은 고객이 쓴 문장으로 갈린다", async () => {
+    reads();
+    api.getCustomerOperationsDecisions.mockResolvedValue({
+      total: 2,
+      rows: [
+        row({ caseId: "c-1", title: "문의 드립니다", preview: "수령한 상품을 교환하려면 언제까지 신청해야 하나요?", to: "/inquiries/i-1" }),
+        row({ caseId: "c-2", title: "문의 드립니다", preview: "박스가 찌그러져 왔는데 교환이 되나요?", to: "/inquiries/i-2" }),
+      ],
+    });
+    draw();
+
+    const list = await screen.findByRole("list", { name: "확인할 일" });
+    expect(within(list).getByRole("link", { name: /수령한 상품을 교환하려면/ })).toBeInTheDocument();
+    expect(within(list).getByRole("link", { name: /박스가 찌그러져 왔는데/ })).toBeInTheDocument();
+    // The subject line is not drawn twice beside the sentence it was standing in for.
+    expect(within(list).queryByText("문의 드립니다")).toBeNull();
+  });
+
+  /**
+   * <b>The row says what the customer said; the detail says what we make of it</b> (product-owner
+   * decision, 2026-10-02).
+   *
+   * <p>A case's `summary` is reviewnary's own reading — 「등록된 지식으로 답변할 수 있는 문의입니다」 —
+   * and 46 rows each arguing their own case is 46 sentences the seller did not write and cannot check
+   * from the list. 왜 지금 볼 일인가 in the pane owns it. What the customer and the product contribute
+   * stays: an inquiry-lane row keeps its snippet and a review keeps its product name.
+   */
+  it("case row는 reviewnary의 판단 문장을 싣지 않는다 — 고객 발화와 provenance만", async () => {
+    reads();
+    api.getCustomerOperationsDecisions.mockResolvedValue({
+      total: 1,
+      rows: [row({ title: "문의 드립니다", preview: "박스가 찌그러져 왔는데 교환이 되나요?", summary: "등록된 지식으로 답변할 수 있는 문의입니다." })],
+    });
+    draw();
+
+    const list = await screen.findByRole("list", { name: "확인할 일" });
+    expect(within(list).getByRole("link", { name: /박스가 찌그러져 왔는데/ })).toBeInTheDocument();
+    expect(list).not.toHaveTextContent("등록된 지식으로 답변할 수 있는 문의입니다.");
+    // What the row keeps: where it came from and what state it is in.
+    expect(list).toHaveTextContent("카페24");
+    expect(list).toHaveTextContent("초안 준비됨");
+  });
+
+  /**
+   * <b>Nothing is filled in where the record is silent.</b> A review's body IS its title and the wire
+   * sends no preview for one; an inquiry with no body of its own sends none either. In both cases the
+   * row leads with what it has, and never with a neighbouring field dressed up as the customer's words.
+   */
+  it("preview가 없으면 제목이 그대로 줄의 첫 줄이다", async () => {
+    reads();
+    api.getCustomerOperationsDecisions.mockResolvedValue({ total: 1, rows: [REVIEW] });
+    draw();
+
+    const list = await screen.findByRole("list", { name: "확인할 일" });
+    expect(within(list).getByRole("link", { name: /배송이 너무 늦었어요/ })).toBeInTheDocument();
   });
 });

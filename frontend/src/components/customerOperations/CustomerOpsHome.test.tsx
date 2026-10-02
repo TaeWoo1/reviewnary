@@ -34,14 +34,14 @@ function co(over: Partial<CustomerOperationsHome> = {}): CustomerOperationsHome 
       total: 2,
       rows: [
         {
-          caseId: "c-1", subjectKind: "INQUIRY", channelNameKo: "카페24", title: "뚜껑이 깨져서 왔어요", rating: null,
+          caseId: "c-1", subjectKind: "INQUIRY", channelNameKo: "카페24", title: "뚜껑이 깨져서 왔어요", rating: null, preview: null,
           reasonNote: "고객이 답변을 기다립니다.", summary: "사진에서 균열이 보입니다.", recommendedActionType: "CANCEL_OR_EXCHANGE",
           recommendedAction: null, missingInformation: [], draftPrepared: true, decidedBy: "AGENT",
           openedAt: "2026-09-16T02:30:00Z",
           receivedOn: null, to: "/inquiries/i-1",
         },
         {
-          caseId: "c-2", subjectKind: "INQUIRY", channelNameKo: "네이버 스마트스토어", title: "9oz 뚜껑도 파나요?", rating: null,
+          caseId: "c-2", subjectKind: "INQUIRY", channelNameKo: "네이버 스마트스토어", title: "9oz 뚜껑도 파나요?", rating: null, preview: null,
           reasonNote: "고객이 답변을 기다립니다.", summary: null, recommendedActionType: "ADD_KNOWLEDGE",
           recommendedAction: null, missingInformation: ["9oz 뚜껑 판매 여부"], draftPrepared: false, decidedBy: "AGENT",
           openedAt: "2026-09-16T00:30:00Z",

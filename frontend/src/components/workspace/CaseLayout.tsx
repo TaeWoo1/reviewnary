@@ -58,9 +58,23 @@ export function usePaneDepth(): PaneDepth {
   return useContext(DepthContext);
 }
 
+/**
+ * <b>Which question the pane answers first</b> (product-owner decision, 2026-10-02).
+ *
+ * <p>`default` opens with {@code summary} — what reviewnary makes of this — and the customer's own words
+ * follow it. That is the reading every pane in the product has had.
+ *
+ * <p>`document` is 확인할 일's: the item leads, and everything that qualifies it comes after. A document
+ * puts its subject first and its justification second, and a pane whose whole purpose is one customer's
+ * request should not open by explaining why the request is on screen. Same blocks, same content, two
+ * swapped — so no screen that does not ask for it reads differently.
+ */
+export type CaseReading = "default" | "document";
+
 export function CaseLayout({
   variant,
   depth = "full",
+  reading = "default",
   nav,
   meta,
   title,
@@ -79,6 +93,8 @@ export function CaseLayout({
   variant: CaseVariant;
   /** {@link PaneDepth}. Only read in the pane — a page is never a preview. */
   depth?: PaneDepth;
+  /** {@link CaseReading}. Only read in the pane. */
+  reading?: CaseReading;
   /** Breadcrumb or back link. */
   nav?: ReactNode;
   /** One muted line: source · product · wait. */
@@ -161,9 +177,21 @@ export function CaseLayout({
         >
           {nav}
           {header}
-          {summary}
-          {notice}
-          {subject}
+          {/* {@link CaseReading}: `document` leads with the customer's words and puts 왜 지금 볼 일인가
+              under them; every other pane opens on the summary as it always has. */}
+          {reading === "document" ? (
+            <>
+              {notice}
+              {subject}
+              {summary}
+            </>
+          ) : (
+            <>
+              {summary}
+              {notice}
+              {subject}
+            </>
+          )}
           {/* 고객 요청 → 확인한 사실 → 판매자 판단 → primary action — at BOTH depths. See the docblock: the
               rule this replaces put the decision first and the measurement retired it. */}
           {context}

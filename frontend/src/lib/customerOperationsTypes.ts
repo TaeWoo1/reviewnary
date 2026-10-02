@@ -82,6 +82,12 @@ export interface CustomerOperationsDecisionRow {
   subjectKind: "INQUIRY" | "REVIEW";
   channelNameKo: string | null;
   title: string | null;
+  /**
+   * The customer's OWN words, one sanitized line. Null for a review (its `title` is already its body) and
+   * null for an inquiry whose title IS its body — a row must not print one sentence twice. Null when the
+   * body is absent; nothing is estimated.
+   */
+  preview: string | null;
   rating: number | null;
   reasonNote: string;
   summary: string | null;

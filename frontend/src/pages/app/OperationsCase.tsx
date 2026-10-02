@@ -159,8 +159,13 @@ export function OperationsCaseView({
              do with it. Same badge, same table, same fact as the row's lead column — one object, one word.
              The wait keeps its own mark because it is the other thing the mockup's header carries, and it
              is a claim about urgency rather than about provenance. */
+          /* <b>A line, not a badge</b> (visual target, 2026-10-02). The tinted mark was the loudest thing
+             in a 576px column whose subject is one customer's sentence, and it names the same state the
+             row 40px to its left already names. At metadata size the word still carries it — and the
+             wait drops its warn colour with it: 「9일 동안 답변이 등록되지 않았습니다」 stands spelled out
+             in 왜 지금 볼 일인가 two blocks below, so colouring the short form made one fact shout twice. */
           <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-            <Status tone={workState.tone} variant="badge" className="text-xs">
+            <Status tone={workState.tone} variant="quiet">
               {workState.text}
             </Status>
             <span aria-hidden="true" className="h-3 w-px bg-line" />
@@ -168,7 +173,7 @@ export function OperationsCaseView({
             {wait ? (
               <>
                 <span aria-hidden="true" className="h-3 w-px bg-line" />
-                <span className="font-semibold tabular-nums text-warn">{wait}</span>
+                <span className="tabular-nums">{wait}</span>
               </>
             ) : null}
           </span>
@@ -180,6 +185,18 @@ export function OperationsCaseView({
         )
       }
       sub={detail.productName ?? undefined}
+      reading={canonical ? "document" : "default"}
+      /* <b>One item, one name</b> (product-owner decision, 2026-10-02). An inquiry's `title` is the
+         SUBJECT line, and 확인할 일's row stopped leading with it in the same change that put the
+         customer's body on the wire — so a row named 「수령한 상품을 교환하려면…」 opened a pane
+         headlined 「문의 드립니다」, and a seller had to read the paragraph under it to be sure they had
+         opened what they clicked. In the document reading the customer's own words ARE the heading, so
+         the subject line is kept for assistive technology and not drawn a second time above them.
+
+         <p>Only where the body actually adds something: an inquiry whose body IS its title (and every
+         review, whose title is its body) keeps its heading, because there the sentence would otherwise
+         be drawn nowhere. */
+      titleHidden={canonical && bodyAddsSomething}
       title={title}
       headerAction={
         preview ? undefined : pane ? (
@@ -201,13 +218,20 @@ export function OperationsCaseView({
       summary={
         canonical ? (
           why.length > 0 ? (
-            <section aria-label="왜 지금 볼 일인가">
-              <h3 className="mb-2.5 text-sm font-bold text-ink">왜 지금 볼 일인가</h3>
-              <ul className="space-y-2">
-                {why.map((fact) => (
-                  <li key={fact.text} className="flex items-start gap-2.5">
-                    <WhyNowIcon name={fact.icon} />
-                    <span className="min-w-0 break-keep text-sm leading-relaxed text-ink">{fact.text}</span>
+            /* <b>Sentences under a label, with nothing drawn beside them</b> (visual target, 2026-10-02).
+               Each fact used to carry a clock/document/speech icon. They decorate: the facts are already
+               three short sentences in a named region, and a glyph that repeats what the sentence says is
+               the 「AI 기능처럼 보이는 장식」 the target rules out. The first fact — how long the customer
+               has waited — keeps the ink; the rest qualify it. */
+            <section aria-label="왜 지금 볼 일인가" className="border-t border-line pt-6">
+              <h3 className="text-xs font-semibold text-muted">왜 지금 볼 일인가</h3>
+              <ul className="mt-3 space-y-2">
+                {why.map((fact, i) => (
+                  <li
+                    key={fact.text}
+                    className={`min-w-0 break-keep text-sm leading-relaxed ${i === 0 ? "text-ink" : "text-muted"}`}
+                  >
+                    {fact.text}
                   </li>
                 ))}
               </ul>
@@ -266,9 +290,9 @@ export function OperationsCaseView({
             />
           ) : null}
           {detail.draft ? (
-            <DraftCard caseId={caseId} detail={detail} primary={!showTeach} onApplied={applied} onFailed={failed} />
+            <DraftCard caseId={caseId} detail={detail} primary={!showTeach} flat={canonical} onApplied={applied} onFailed={failed} />
           ) : null}
-          <CorrectionCard caseId={caseId} detail={detail} onApplied={applied} onFailed={failed} />
+          <CorrectionCard caseId={caseId} detail={detail} flat={canonical} onApplied={applied} onFailed={failed} />
         </>
         )
       }
@@ -439,6 +463,28 @@ function caseWorkState(detail: OperationsCaseDetail): WorkStateKey {
  * which is why the mockup's third line (「최근 7일 동안 유사 문의 N건」) is absent: no read on this screen
  * returns it.
  */
+/**
+ * <b>왜 지금 볼 일인가 states facts the seller can check, and nothing about our own ordering</b>
+ * (product-owner decision, 2026-10-02).
+ *
+ * <p>The case `summary` is composed by {@code CaseFromResolution.summaryFor}, which appends
+ * 「(확인한 요청 2건 중 가장 먼저 해결해야 하는 항목 기준입니다.)」 whenever a case resolved more than
+ * one of the customer's requests. That clause is bookkeeping about how reviewnary ranked the parts of
+ * one question — the seller cannot verify it, cannot act on it, and it is the longest thing in the
+ * block. The head sentence it qualifies is the fact.
+ *
+ * <p><b>Stripped here rather than at the composer.</b> The clause is already stored on every case the
+ * demo org holds, so stopping the composer would leave the screen unchanged and need a data
+ * correction to finish; and the same `summary` is read by 오늘 and the 문의 screens, which this
+ * change is not scoped to. A TRAILING parenthetical only — nothing mid-sentence is touched, and a
+ * summary without one is returned exactly as it arrived.
+ */
+function statedFact(summary: string | null | undefined): string | null {
+  const text = summary?.trim();
+  if (!text) return null;
+  return text.replace(/\s*\([^()]*\)\s*$/, "").trim() || null;
+}
+
 function whyNow(detail: OperationsCaseDetail, now?: Date): { icon: "clock" | "doc" | "chat"; text: string }[] {
   const facts: { icon: "clock" | "doc" | "chat"; text: string }[] = [];
   const days = waitDays(elapsedSource(detail.receivedOn, detail.openedAt), now);
@@ -453,14 +499,17 @@ function whyNow(detail: OperationsCaseDetail, now?: Date): { icon: "clock" | "do
           : `${days.toLocaleString("ko-KR")}일 전에 등록된 리뷰입니다.`,
     });
   }
-  if (detail.summary) facts.push({ icon: "doc", text: detail.summary });
+  const summary = statedFact(detail.summary);
+  if (summary) facts.push({ icon: "doc", text: summary });
   /* <b>Not while an answer stands</b> — the same rule {@code flowCells} keeps for the cell this block
      replaces. With a draft written, 「고객에게 무엇을 말하거나 약속할지는 판매자가 정합니다」 is a fact
      about the product rather than about this customer, and the prepared answer below is already the
      thing being decided. Measured at 1600×1000, 2026-10-02: it was the third line of 왜 지금 볼 일인가
      on a case whose answer was already written. */
   const why = detail.whyDecisionNeeded ?? detail.recommendedAction;
-  if (detail.open && !detail.draft && why && why !== detail.summary) facts.push({ icon: "chat", text: why });
+  if (detail.open && !detail.draft && why && why !== detail.summary && why !== summary) {
+    facts.push({ icon: "chat", text: why });
+  }
   return facts;
 }
 
@@ -669,13 +718,38 @@ function MediaItem({ caseId, media }: MediaProps) {
   );
 }
 
-function ActionCard({ primary, ariaLabel, children }: { primary: boolean; ariaLabel: string; children: React.ReactNode }) {
+/**
+ * <b>`flat` draws no card at all</b> (product-owner decision, 2026-10-02).
+ *
+ * <p>확인할 일's pane is a document, and the prepared answer is the document's own body — not an object
+ * set into it. The brand-outlined box was the loudest surface on the screen and it was outlining the
+ * thing the seller is most likely to simply read and send; §4's own rule says a card inside a panel
+ * inside a page is three borders saying one thing, and this was the third. The heading, the air above it
+ * and the hairline that starts the section carry the grouping now, and the accent is left to the button.
+ */
+function ActionCard({
+  primary,
+  ariaLabel,
+  flat = false,
+  children,
+}: {
+  primary: boolean;
+  ariaLabel: string;
+  flat?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <section
       aria-label={ariaLabel}
-      className={`rounded-[16px] bg-surface p-5 ${
-        primary ? "shadow-[0_0_0_1.5px_#1B64DA,0_18px_36px_-22px_rgba(27,100,218,0.55)]" : "shadow-[0_0_0_1px_#E4E7EC]"
-      }`}
+      className={
+        flat
+          ? "border-t border-line pt-6"
+          : `rounded-[16px] bg-surface p-5 ${
+              primary
+                ? "shadow-[0_0_0_1.5px_#1B64DA,0_18px_36px_-22px_rgba(27,100,218,0.55)]"
+                : "shadow-[0_0_0_1px_#E4E7EC]"
+            }`
+      }
     >
       {children}
     </section>
@@ -881,7 +955,14 @@ function TaughtReceipt({ receipt, redrafted }: { receipt: Receipt; redrafted: bo
 }
 
 /** The draft, read first; editing is one press away and is where 「유사 건에 재사용」 is offered. */
-function DraftCard({ caseId, detail, primary, onApplied, onFailed }: CardProps & { primary: boolean }) {
+function DraftCard({
+  caseId,
+  detail,
+  primary,
+  flat = false,
+  onApplied,
+  onFailed,
+}: CardProps & { primary: boolean; flat?: boolean }) {
   const draft = detail.draft;
   const [editing, setEditing] = useState(false);
   const [body, setBody] = useState(draft?.body ?? "");
@@ -926,17 +1007,31 @@ function DraftCard({ caseId, detail, primary, onApplied, onFailed }: CardProps &
   const basis = cited.length > 0 ? cited.map(([label, n]) => `${label} ${n}개`).join(" · ") : null;
 
   return (
-    <ActionCard primary={primary} ariaLabel={COPY.draftTitle}>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <h2 className="text-lg font-semibold text-ink">{COPY.draftTitle}</h2>
-        <Tag tone="line">{draftSendWord(draft.delivery)}</Tag>
-        {basis && !editing ? (
+    <ActionCard primary={primary} flat={flat} ariaLabel={COPY.draftTitle}>
+      {/* <b>The heading line is a label line in the document reading</b> (2026-10-02): the section name on
+          the left at the size of every other section name on this pane, and the two facts that qualify
+          it — whether it has been sent, and what it was written out of — as one muted line on the right.
+          The 「미발송」 outline tag and the ⓘ glyph both went: a tag is a mark for something that varies
+          against its neighbours and this one never does, and the circled i announced a sentence that is
+          plainer without it. */}
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        {flat ? (
+          <h2 className="text-xs font-semibold text-muted">{COPY.draftTitle}</h2>
+        ) : (
+          <h2 className="text-lg font-semibold text-ink">{COPY.draftTitle}</h2>
+        )}
+        {flat ? null : <Tag tone="line">{draftSendWord(draft.delivery)}</Tag>}
+        {!editing && (flat || basis) ? (
           <span className="ml-auto flex items-center gap-1.5 break-keep text-xs text-muted">
-            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
-              <circle cx="12" cy="12" r="8.5" />
-              <path d="M12 11v5.5M12 7.8v.2" />
-            </svg>
-            {`${basis}를 근거로 준비한 답변입니다.`}
+            {flat ? null : (
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
+                <circle cx="12" cy="12" r="8.5" />
+                <path d="M12 11v5.5M12 7.8v.2" />
+              </svg>
+            )}
+            {flat
+              ? [draftSendWord(draft.delivery), basis ? `${basis} 근거` : null].filter(Boolean).join(" · ")
+              : `${basis}를 근거로 준비한 답변입니다.`}
           </span>
         ) : null}
       </div>
@@ -971,26 +1066,42 @@ function DraftCard({ caseId, detail, primary, onApplied, onFailed }: CardProps &
         </>
       ) : (
         <>
-          <p className="mt-3 whitespace-pre-wrap break-keep rounded-xl bg-[#F7F8FA] px-4 py-3.5 text-[15px] leading-[1.8] text-ink [overflow-wrap:anywhere]">
+          {/* <b>Read, not a field</b> (visual target, 2026-10-02). The grey inset said 「textarea」 about a
+              paragraph that is read-only until 수정하기 is pressed, and it was the second filled surface
+              inside the outlined card around it. On the white canvas the answer is simply the body text —
+              `prose`, which §1 reserves for the one thing on a surface that is being read. */}
+          <p
+            className={
+              flat
+                ? "mt-3 whitespace-pre-wrap break-keep text-prose text-ink [overflow-wrap:anywhere]"
+                : "mt-3 whitespace-pre-wrap break-keep rounded-xl bg-[#F7F8FA] px-4 py-3.5 text-[15px] leading-[1.8] text-ink [overflow-wrap:anywhere]"
+            }
+          >
             {draft.body}
           </p>
-          {/* <b>Not 50:50</b> (product-owner decision, 2026-10-02). Both controls were `flex-1`, so the
-              seller's own detour — 수정하기 — was drawn exactly as wide as the thing this card exists
-              for. Two equal halves state no hierarchy, and the one on the left is read first.
+          {/* <b>Content-sized, primary first</b> (product-owner decision, 2026-10-02). The two controls
+              were a 50:50 split, then a minimum/remainder split with a ceiling — both of them ways of
+              deciding how to divide a width neither button asked for. In a document the actions sit at
+              the end of what they act on and take the room their own words need; the primary is marked
+              by its colour, which is the one thing the seller is scanning for, and it leads because it
+              is the ordinary ending of this pane. Nothing is pinned, so the same rule holds in the 576px
+              pane, the 440px pane and the page column.
 
-              <p>So the secondary takes the width its own words need and the primary takes what is left.
-              No ratio is pinned: it falls out of the two labels at whatever width the card has, which is
-              what keeps it true in the 440px pane, the 576px pane and the page column alike. */}
-          <div className="mt-3.5 flex items-center justify-between gap-2">
-            <Btn variant="outline" className="shrink-0" onClick={() => setEditing(true)}>
+              <p>The bordered reading keeps the old split: that card is a column of its own and its
+              buttons do have a width to divide. */}
+          {/* <b>수정하기 → 발송 화면으로, primary on the right</b> (product-owner decision, 2026-10-02).
+              A document's controls read left to right as the order they are considered in: the detour
+              first, the ending last. The primary was leading because it is the louder of the two, and
+              loudness is already its colour's job — it does not also need the first position. */}
+          <div className={`flex items-center gap-2 ${flat ? "mt-6" : "mt-3.5 justify-between"}`}>
+            <Btn variant="outline" className={flat ? "" : "shrink-0"} onClick={() => setEditing(true)}>
               {COPY.edit}
             </Btn>
-            {/* <b>Dominant, with a ceiling</b> (product-owner decision, 2026-10-02). Taking all the slack put
-                a 110px label inside a 390px bar in the 576 pane — the text floating in the middle of a
-                band rather than filling a button. The cap is a ceiling and not a ratio: below it the
-                primary still takes everything left, which is what the 440 pane gets (254px, untouched), so
-                one rule holds at both widths and `justify-between` keeps both edges flush either way. */}
-            <BtnLink to={detail.to} variant={primary ? "solid" : "outline"} className="min-w-0 max-w-[340px] flex-1">
+            <BtnLink
+              to={detail.to}
+              variant={primary ? "solid" : "outline"}
+              className={flat ? "" : "min-w-0 max-w-[340px] flex-1"}
+            >
               {COPY.toSend} ↗
             </BtnLink>
           </div>
@@ -1019,7 +1130,7 @@ const ACTIONS = [
 ];
 
 /** The seller saying a different action was right — recorded as their judgement, never as a rule change. */
-function CorrectionCard({ caseId, detail, onApplied, onFailed }: CardProps) {
+function CorrectionCard({ caseId, detail, flat = false, onApplied, onFailed }: CardProps & { flat?: boolean }) {
   const [open, setOpen] = useState(false);
   const [action, setAction] = useState("");
   const [note, setNote] = useState("");
@@ -1048,12 +1159,24 @@ function CorrectionCard({ caseId, detail, onApplied, onFailed }: CardProps) {
 
   if (!open) {
     return (
-      <div className="flex items-center gap-3 rounded-[14px] bg-surface px-5 py-3.5 text-sm text-muted shadow-[0_0_0_1px_#E4E7EC]">
+      /* <b>A line under a rule, not a box</b> (visual target, 2026-10-02). Its whole content is one muted
+         sentence and one text control; a bordered surface for that is a card drawn to hold nothing. The
+         control is the accent because it is a way out of this pane — §5 spends the brand on actions and
+         links — and it is the last thing on the document. */
+      <div
+        className={
+          flat
+            ? "mt-6 flex items-center gap-3 border-t border-line pt-4 text-sm text-muted"
+            : "flex items-center gap-3 rounded-[14px] bg-surface px-5 py-3.5 text-sm text-muted shadow-[0_0_0_1px_#E4E7EC]"
+        }
+      >
         <span className="break-keep">{COPY.otherHandling}</span>
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="ml-auto whitespace-nowrap rounded font-semibold text-ink hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+          className={`ml-auto whitespace-nowrap rounded font-semibold hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
+            flat ? "text-brand-700 hover:text-brand-800" : "text-ink"
+          }`}
         >
           {COPY.changeHandling}
         </button>

@@ -250,6 +250,37 @@ class StoredInquiryCaseFlowTest {
     }
 
     @Test
+    @DisplayName("문의 row는 고객이 쓴 제목과 고객이 쓴 본문을 둘 다 싣는다 — 제목만으로는 두 건이 구별되지 않으므로")
+    void anInquiryRowCarriesTheCustomersOwnBody() {
+        Inquiry inquiry = storedInquiry("문의 드립니다", null, null);
+        workItem(inquiry);
+        interpreted.set(set(goal("g1", RequestedOutcome.ANSWER, Referent.ORGANIZATION, "문의 드립니다")));
+
+        processor.process(run(Instant.now()), () -> false);
+
+        CustomerOperationsHomeView.DecisionRow row = decisionRow();
+        assertThat(row.title()).as("the customer's SUBJECT line, which every one of them writes the same way")
+                .isEqualTo("문의 드립니다");
+        assertThat(row.preview()).as("and the customer's own words, which is the only thing that tells two apart")
+                .isEqualTo("문의드립니다.");
+        assertThat(row.preview()).isNotEqualTo(row.title());
+    }
+
+    @Test
+    @DisplayName("제목이 곧 본문인 문의는 preview가 없다 — 한 문장을 두 번 쓰지 않는다")
+    void anInquiryWhoseTitleIsItsBodyCarriesNoPreview() {
+        Inquiry inquiry = storedInquiry("문의드립니다.", null, null);
+        workItem(inquiry);
+        interpreted.set(set(goal("g1", RequestedOutcome.ANSWER, Referent.ORGANIZATION, "문의드립니다.")));
+
+        processor.process(run(Instant.now()), () -> false);
+
+        CustomerOperationsHomeView.DecisionRow row = decisionRow();
+        assertThat(row.title()).isEqualTo("문의드립니다.");
+        assertThat(row.preview()).as("the row would otherwise print the same sentence twice").isNull();
+    }
+
+    @Test
     @DisplayName("답변할 수 있는 문의는 조사 없이도 초안까지 준비된다 — 초안 capability가 켜진 조직에서")
     void aResolvedReplyIsDraftedWithoutAnInvestigation() {
         when(drafts.enabledFor(org)).thenReturn(true);

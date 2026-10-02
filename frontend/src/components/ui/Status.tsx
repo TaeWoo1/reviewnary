@@ -26,6 +26,24 @@ const WORD: Record<StatusTone, string> = {
   neutral: "text-muted",
 };
 
+/**
+ * <b>The provenance line's reading</b> (확인할 일 visual target, 2026-10-02): the word alone, at the size
+ * of the metadata it sits in, with no dot and no tint.
+ *
+ * <p>Only `warn` and `bad` keep their colour. 확인할 일's direction reserves the accent for selection,
+ * links and the primary action, and `info` means 「reviewnary prepared something」 — which on this screen
+ * is not something to look at before acting, it is the absence of work. §5's rule is that colour is never
+ * the only carrier, never that every state must be coloured; the word is the carrier here and the two
+ * tones that mean 「stop」 are the two that are spent.
+ */
+const QUIET: Record<StatusTone, string> = {
+  good: "text-good",
+  warn: "text-warn",
+  bad: "text-bad",
+  info: "text-ink",
+  neutral: "text-ink",
+};
+
 const DOT: Record<StatusTone, string> = {
   good: "bg-good",
   warn: "bg-warn",
@@ -43,14 +61,15 @@ export function Status({
   tone?: StatusTone;
   /**
    * `chip` — tinted pill; `word` — the coloured word alone; `badge` — the tinted mark an inbox row's
-   * lead column carries (Home visual target, 2026-10-01).
+   * lead column carries (Home visual target, 2026-10-01); `quiet` — the word at metadata size, see
+   * {@link QUIET}.
    *
    * <p>`badge` is `chip` at the row's own type size and with §4's 8px edge instead of a stadium. It is a
    * variant rather than a `className` on `chip` because every one of those three values would have had to
    * be overridden, and two Tailwind utilities for one property resolve by stylesheet order, not by the
    * order they are written in.
    */
-  variant?: "chip" | "word" | "badge";
+  variant?: "chip" | "word" | "badge" | "quiet";
   children: ReactNode;
   className?: string;
 }) {
@@ -66,6 +85,11 @@ export function Status({
         <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${DOT[tone]}`} />
         {children}
       </span>
+    );
+  }
+  if (variant === "quiet") {
+    return (
+      <span className={`whitespace-nowrap text-xs font-semibold ${QUIET[tone]} ${className}`}>{children}</span>
     );
   }
   if (variant === "badge") {
