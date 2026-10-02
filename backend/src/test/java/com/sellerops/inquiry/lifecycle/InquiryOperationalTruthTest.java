@@ -125,7 +125,9 @@ class InquiryOperationalTruthTest {
         backfill = new InquiryOperationalStateBackfill(inquiries, workItems, projector);
         inbox = new InboxService(inquiries, reviews, channels, products);
         dashboard = new DashboardService(inquiries, reviews, orders, products,
-                new OrderService(orders, channels), inbox);
+                // The channel catalog, so the Home's negative-review finding can be held to the
+                // channels the product supports (`ProductChannels`).
+                new OrderService(orders, channels), inbox, channels);
     }
 
     // ------------------------------------------------------------------ 1. every current consumer

@@ -45,10 +45,32 @@ export interface WorkStateWord {
  * Tones follow `Status`: `warn` = 「행동하기 전에 보라」, `info` = 「reviewnary가 무언가 준비해 뒀다」,
  * `bad` = 부정·실패, `neutral` = 참고. Nothing here is `good`: none of these words is a proven-finished
  * state, and 승인됨 least of all.
+ *
+ * <b>No work state is `bad`</b> (product-owner decision, 2026-10-01). 확인 필요 carried it, and 답변 필요
+ * carried `warn`, which put the loudest tone in the palette on the most common row in the product: on the
+ * live org 확인할 일 drew 46 rows and 25 of them were red. Red stopped meaning anything, and the thing it
+ * is actually needed for — a collection that is blocked, an approval that failed, a channel that will not
+ * connect — had no tone left that a seller would look twice at.
+ *
+ * <p>So the axis is restated: <b>`bad` is reserved for 실패 · 차단 · 실제 위험</b>, none of which is a
+ * state a customer item passes through, and the two tones these words may take are
+ * 「판매자가 봐야 한다」 (`warn`, amber) and 「reviewnary가 뭔가 해 뒀다」 (`info`, blue).
+ *
+ * <p>Per word, and why each one:
+ * <ul>
+ *   <li><b>확인 필요</b> — `warn`. The stored triage tier says look at this. That is exactly
+ *       「행동하기 전에 보라」, which is what amber has always meant here.</li>
+ *   <li><b>답변 필요</b> — `info`. A customer is waiting and nothing has failed; it is the ordinary
+ *       state of an inbox row, and it is the state reviewnary's own queue put it in.</li>
+ *   <li><b>초안 필요</b> — `warn`. The seller committed to replying and has written nothing: their own
+ *       unfinished work, which is a 「봐야 한다」 and not a 「준비돼 있다」.</li>
+ *   <li><b>초안 준비됨 · 승인 대기</b> — `info`. Both are 「reviewnary가 준비해 뒀다」 verbatim.</li>
+ *   <li><b>승인됨 · 답변함</b> — `neutral`. Reference; neither is a thing waiting for anyone here.</li>
+ * </ul>
  */
 export const WORK_STATE: Record<WorkStateKey, WorkStateWord> = {
-  REPLY_NEEDED: { text: "답변 필요", tone: "warn" },
-  NEEDS_LOOK: { text: "확인 필요", tone: "bad" },
+  REPLY_NEEDED: { text: "답변 필요", tone: "info" },
+  NEEDS_LOOK: { text: "확인 필요", tone: "warn" },
   DRAFT_READY: { text: "초안 준비됨", tone: "info" },
   DRAFT_NEEDED: { text: "초안 필요", tone: "warn" },
   AWAITING_APPROVAL: { text: "승인 대기", tone: "info" },

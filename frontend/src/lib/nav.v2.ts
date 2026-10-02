@@ -49,22 +49,27 @@ export interface NavGroup {
 }
 
 export const NAV_GROUPS: NavGroup[] = [
-  // UI/UX v2 Phase 4 (product-owner decision): the final IA. 오늘 stands alone — it is the answer, not a category —
-  // and the rest is sorted by what the seller comes to do: 일 (work waiting for a decision), 기록 (find what happened),
-  // 준비 (what reviewnary needs from them). The heading-less group renders no label.
+  // <b>운영 / 데이터 / Reviewnary / 설정</b> (product-owner decision, 2026-10-01 — Home visual target).
+  //
+  // The destinations and their order are UI/UX v2 Phase 4's and do not move; the four GROUP NAMES do.
+  // 일 / 기록 / 준비 named what the seller comes to DO, which is a good axis for the first group and a
+  // strained one for the other three: 리뷰·문의·상품·주문·리포트 are not 「기록을 찾으러」 — they are the
+  // objects the product operates on, and a seller opens 상품 to change it as often as to read it. The
+  // names now say what each group IS. 지식·연결 are what reviewnary needs from the seller, so the group
+  // takes the product's own name, and 설정 stops being the odd third item under it.
+  //
+  // 오늘 joins 운영 rather than standing alone above the labels: it is the answer to 운영's question, and
+  // a heading-less group of one put the most-visited destination outside the structure that names it.
   {
-    heading: "",
-    items: [{ to: "/", label: "오늘", short: "오늘", icon: "home", end: true }],
-  },
-  {
-    heading: "일",
+    heading: "운영",
     items: [
+      { to: "/", label: "오늘", short: "오늘", icon: "home", end: true },
       { to: "/customer-operations/cases", label: "확인할 일", short: "확인", icon: "inbox" },
       { to: "/memory", label: "반복 문제", short: "반복", icon: "memory" },
     ],
   },
   {
-    heading: "기록",
+    heading: "데이터",
     items: [
       { to: "/reviews", label: "리뷰", short: "리뷰", icon: "review" },
       { to: "/inquiries", label: "문의", short: "문의", icon: "mail" },
@@ -75,17 +80,37 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    heading: "준비",
+    heading: "Reviewnary",
     items: [
       // Knowledge Sources & Acquisition v1: what reviewnary knows is SETUP, not a daily destination —
       // a seller visits it when they have material to hand over or something to confirm, and the rest
       // of the time the knowledge reaches them inside the draft that used it.
       { to: "/knowledge", label: "지식", short: "지식", icon: "list" },
       { to: "/connect", label: "연결", short: "연결", icon: "link" },
-      { to: "/settings", label: "설정", short: "설정", icon: "settings" },
     ],
   },
+  {
+    // 설정 is not something reviewnary needs from the seller, and it is not an object either. It is the
+    // one destination that belongs to no group, so it is its own — which is also where the target draws
+    // it, separated from the rest by the group gap rather than by a rule.
+    heading: "설정",
+    items: [{ to: "/settings", label: "설정", short: "설정", icon: "settings" }],
+  },
 ];
+
+/**
+ * The heading a renderer should DRAW for a group — null when drawing it would say nothing.
+ *
+ * <p>설정 is its own group and its only destination is also called 설정, so printing the heading puts the
+ * same word twice, 4px apart, in a 240px rail. A group name earns its line by naming something its items
+ * do not; one item that already carries the name is the case where it does not. Derived rather than
+ * written as an empty string so the group keeps an identity for the drawer, the keys and this file.
+ */
+export function navGroupLabel(group: NavGroup): string | null {
+  if (!group.heading) return null;
+  if (group.items.length === 1 && group.items[0]!.label === group.heading) return null;
+  return group.heading;
+}
 
 /** Every nav item, flattened. */
 export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);

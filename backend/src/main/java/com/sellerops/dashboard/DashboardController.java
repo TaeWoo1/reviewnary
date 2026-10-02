@@ -50,8 +50,11 @@ public class DashboardController {
                 // «does this seller have anything» from the connectable list alone cannot see it.
                 metricsService.metrics(principal.orgId(), visibleChannels.codesFor(principal.orgId()), days);
         return new OverviewResponse(metrics,
+                // The insights' negative-review finding is windowed on the SAME period every other
+                // number on this screen is (product-owner decision, 2026-10-01). It used to read the
+                // lifetime roll-up, which is how an all-time date range reached a 「오늘」 heading.
                 insightsService.insights(principal.orgId(), metrics,
-                        dashboardService.topProductIssues(principal.orgId())));
+                        dashboardService.recentNegativeProducts(principal.orgId(), metrics.period())));
     }
 
     @GetMapping("/summary")

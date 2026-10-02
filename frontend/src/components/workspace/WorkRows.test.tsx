@@ -76,10 +76,22 @@ describe("WorkRows — what every row says identically is a fact about the list"
       row(),
       row({ key: "inquiry:i-1", subjectId: "i-1", kind: "INQUIRY", subject: "INQUIRY", reason: REASON.reply, source: "카페24 문의", title: "주문 취소 가능할까요?", rating: null }),
     ]);
-    expect(screen.getByText("리뷰")).toBeTruthy();
-    expect(screen.getByText("답변 필요")).toBeTruthy();
-    expect(screen.getByText(/쿠팡 리뷰/)).toBeTruthy();
-    expect(screen.getByText("★1")).toBeTruthy();
+    // <b>Same facts, one carrier</b> (Home visual target, 2026-10-01). The provenance — category, source
+    // and rating — is one right-aligned group now rather than three separately queryable nodes, so the
+    // assertion reads the row's text instead of its nodes. What it protects is unchanged and is the whole
+    // point of the test: when the rows differ, every distinguishing fact stays ON the row.
+    const rows = within(screen.getByLabelText("확인할 일")).getAllByRole("listitem");
+    expect(rows[0]).toHaveTextContent("확인 필요");
+    expect(rows[0]).toHaveTextContent(/쿠팡 리뷰/);
+    expect(rows[0]).toHaveTextContent("★1");
+    /* <b>Re-pointed</b> (canonical mockup semantic correction, 2026-10-02). The second row's category
+       used to be asserted as 답변 필요, and 답변 필요 is a {@code WORK_STATE} word: the lead column owns
+       it, so a category slot drawing it put the same axis on one row twice — which is how an item with
+       a prepared answer came to wear 초안 준비됨 and 답변 필요 at once. What this test is for is
+       unchanged: when the rows differ, every DISTINGUISHING fact stays on the row. Its source is such a
+       fact; a state word never was one. */
+    expect(rows[1]).toHaveTextContent(/카페24 문의/);
+    expect(within(rows[1]).queryAllByText("답변 필요")).toHaveLength(0);
     expect(screen.queryByText(/^모두 /)).toBeNull();
   });
 
@@ -100,14 +112,17 @@ describe("WorkRows — what every row says identically is a fact about the list"
     draw([row({ reason: REASON.reply, source: "카페24 문의", rating: null })]);
     const item = within(screen.getByLabelText("확인할 일")).getAllByRole("listitem")[0];
     const title = within(item).getByText("사진이랑 색이 조금 달라요.");
-    const wait = within(item).getByText("12일 대기");
+    // <b>「12일 전」, not 「12일 대기」</b> (product-owner decision, 2026-10-01). The fixture row is a
+    // REVIEW and nobody is waiting on a review — the customer wrote it twelve days ago. This test is
+    // about WHERE the slot stands, which has not changed; only the claim it makes has.
+    const wait = within(item).getByText("12일 전");
     expect(title.compareDocumentPosition(wait) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("keeps the three-line reading exactly as it was — nothing about it moved", () => {
     draw([row()], { dense: false });
     const item = within(screen.getByLabelText("확인할 일")).getAllByRole("listitem")[0];
-    const wait = within(item).getByText("12일 대기");
+    const wait = within(item).getByText("12일 전");
     const title = within(item).getByText("사진이랑 색이 조금 달라요.");
     expect(title.compareDocumentPosition(wait) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // The tile and the badge are the row's own there, whatever the list shares.
@@ -162,15 +177,23 @@ describe("the leading slot — the state word, then the category", () => {
     draw([row({ reason: REASON.info, state: "NEEDS_LOOK", rating: null })]);
     const item = within(screen.getByLabelText("확인할 일")).getAllByRole("listitem")[0]!;
     expect(within(item).getByText("확인 필요")).toBeTruthy();
-    expect(within(item).getByText("정보 부족")).toBeTruthy();
+    // 정보 부족 is not in `source` (「쿠팡 리뷰」), so it survives the dedupe and rides in the provenance
+    // group — as part of its one string, which is why this reads the row rather than querying a node.
+    expect(item).toHaveTextContent("정보 부족");
   });
 
   it("색은 상태를 나르는 유일한 수단이 아니다 — 모든 상태에 단어가 붙는다", () => {
     draw([row({ state: "DRAFT_READY" })]);
     const item = within(screen.getByLabelText("확인할 일")).getAllByRole("listitem")[0]!;
     const state = within(item).getByText("초안 준비됨");
-    // The dot is decoration; the word is the fact. A seller who cannot tell the tones apart still reads it.
+    // The word is the fact. A seller who cannot tell the tones apart still reads it.
     expect(state.textContent).toContain("초안 준비됨");
-    expect(item.querySelector("[aria-hidden='true'].rounded-full")).toBeTruthy();
+    // <b>The carrier changed, the rule did not</b> (Home visual target, 2026-10-01). The state used to be
+    // a coloured word with a dot beside it, and the dot was what this line checked — a second,
+    // non-colour carrier. It is a tinted badge now, in the row's own lead column, so the word and its
+    // tint are one element: the check is that the tint is never ALONE, i.e. the box that carries the
+    // colour is the same box that carries the word.
+    expect(state.className).toMatch(/bg-(good|warn|bad|brand)/);
+    expect(state.textContent?.trim()).toBe("초안 준비됨");
   });
 });

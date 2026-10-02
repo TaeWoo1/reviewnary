@@ -26,6 +26,7 @@ function detail(over: Partial<OperationsCaseDetail> = {}): OperationsCaseDetail 
     productName: "선바로 일체형 전선몰딩",
     productScopeAvailable: true,
     receivedOn: "2026-09-17",
+    openedAt: null,
     rating: null,
     title: "방수 되나요?",
     body: "욕실에 붙이려는데 방수 되는지 궁금합니다.",
@@ -149,10 +150,13 @@ describe("OperationsCase", () => {
     expect(within(receipt).getByText("제품 표면은 생활 방수가 되어 욕실 벽면에도 부착하실 수 있습니다.")).toBeTruthy();
     expect(within(receipt).getByText(/초안 재작성 완료/)).toBeTruthy();
     expect(screen.queryByText("「방수」에 대해 고객에게 안내할 기준이 없습니다.")).toBeNull();
-    const draft = screen.getByRole("region", { name: "답변 초안" });
+    const draft = screen.getByRole("region", { name: "준비된 답변" });
     expect(within(draft).getByText(/생활 방수가 되어 욕실에도/)).toBeTruthy();
     expect(within(draft).getByText("미발송")).toBeTruthy();
-    expect(within(draft).getByText("상품 정보 1")).toBeTruthy();
+    /* The citation moved onto the heading line and became the sentence it always was (canonical mockup,
+       2026-10-02). Same source, same count — asserted where it now stands, because what this test
+       protects is that the seller is told what the answer was built out of. */
+    expect(within(draft).getByText("상품 정보 1개를 근거로 준비한 답변입니다.")).toBeTruthy();
     await user.click(evidenceToggle());
     expect(screen.getByText("판매자가 확정한 상품 지식")).toBeTruthy();
   });
@@ -358,10 +362,10 @@ describe("OperationsCase", () => {
 
     renderCase();
     // The draft is read first; 「유사 건에 재사용」 is offered only while editing.
-    const card = await screen.findByRole("region", { name: "답변 초안" });
+    const card = await screen.findByRole("region", { name: "준비된 답변" });
     expect(within(card).queryByLabelText("유사 건에 재사용")).toBeNull();
-    await user.click(within(card).getByRole("button", { name: "수정" }));
-    const editor = within(card).getByLabelText("답변 초안") as HTMLTextAreaElement;
+    await user.click(within(card).getByRole("button", { name: "수정하기" }));
+    const editor = within(card).getByLabelText("준비된 답변") as HTMLTextAreaElement;
     await user.clear(editor);
     await user.type(editor, "생활 방수가 되지만 물에 잠기는 곳은 피해 주세요.");
     await user.click(within(card).getByLabelText("유사 건에 재사용"));

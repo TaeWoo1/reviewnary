@@ -66,15 +66,21 @@ describe("the dense row — selection", () => {
 });
 
 describe("the dense row — what outweighs what", () => {
-  it("draws the state as a coloured word and the category as plain muted text", () => {
-    row();
+  it("draws the state as the row's one tinted mark and the category as plain muted text", () => {
+    // <b>Re-pointed to where the two facts now stand</b> (Home visual target, 2026-10-01). The rule has
+    // not moved: ONE of these two may carry a fill, and it is the one that answers 「내가 뭘 해야 하나」.
+    // What moved is the carrier — the state is a tinted badge alone in a fixed lead column, and the
+    // category joined the provenance group on the right, which is muted text throughout.
+    //
+    // <p>The fixture's tag is 교환·환불 rather than 리뷰 because a category the source already contains
+    // («쿠팡 리뷰» vs «리뷰») is dropped by design, and a test asserting the weight of something that is
+    // never drawn asserts nothing.
+    row({ tag: "교환·환불" });
     const state = screen.getByText("확인 필요");
-    const category = screen.getByText("리뷰");
-    // A fill is the strongest mark a 12px token carries. It belongs to the state or to nothing: spending it
-    // on 「리뷰」 down a list of reviews puts the loudest mark on the least distinguishing fact.
-    expect(category.className).not.toMatch(/bg-/);
-    expect(category.className).toContain("text-muted");
-    expect(state.className).toMatch(/text-(bad|warn|good|brand-700)/);
+    expect(state.className).toMatch(/bg-(bad|warn|good|brand)/);
+    const meta = screen.getByText(/교환·환불/);
+    expect(meta.className).not.toMatch(/bg-/);
+    expect(meta.closest("span.text-muted, span[class*='text-muted']")).toBeTruthy();
   });
 
   it("drops the category entirely when it would repeat the state word", () => {

@@ -83,6 +83,24 @@ export default {
         prose: ["17px", "1.75"],
         lg: ["18px", "1.5"],
         xl: ["22px", "1.35"],
+        /*
+          <b>Two steps the product did not have</b> (product-owner decision, 2026-10-01 — Home visual
+          target, final polish).
+
+          <p>The target asks for a 28px page title over a 20px section title, and the scale ran
+          18 → 22 → 26 → 32. Fitting the design to the nearest existing step was the wrong move twice over:
+          at `xl`/`lg` the page title stood 4px above its own sections, and at `2xl`/`lg` the figures in the
+          summary band were a step the rest of the product never spends. So the SCALE grows rather than the
+          design bending — these two are named for the role they carry, because that is what makes them
+          re-usable by the next screen brought onto the system instead of guessed at again.
+
+          <p>`title` is the page's `h1` AND the one primary metric a screen may draw (both 28/700): on this
+          product a Home's 「46건」 is a title — it is what the screen is about — and giving the two the same
+          step is what stops a band of figures from out-shouting the name of the page it sits under.
+          `section` is the `h2` every screen's regions take.
+        */
+        title: ["28px", "1.25"],
+        section: ["20px", "1.4"],
         "2xl": ["26px", "1.25"],
         "3xl": ["32px", "1.2"],
       },
@@ -93,10 +111,29 @@ export default {
         "2xl": "12px",
       },
       width: {
-        sidebar: "232px",
+        // 240 (UI System v2, Home visual target 2026-10-01). 232 was the contract's own figure and the
+        // target mockup measures 241 — one step on the 8px grid, and the rail now divides the 1600px
+        // screen where the mockup divides it.
+        sidebar: "240px",
       },
       maxWidth: {
-        content: "1120px",
+        /*
+          <b>1280, not 1120</b> (product-owner decision, 2026-10-01; `docs/reviewnary_design.md` §2
+          amended in the same change).
+
+          <p>Measured at 1600×1000: the rail takes 240, `main` is 1360 and its own `md:px-8` leaves
+          1296 to spend — so a 1120 column ended at x=1392 and left 176px of the monitor carrying
+          nothing. 1280 is the next 8px step that keeps a 16px tail of slack rather than running the
+          content to the exact edge of the padding box.
+
+          <p>It is one token on purpose. The three places that read it — the plain-page column
+          (`AppShellV2`), the master-detail list column (`MasterDetail`) and the quiet composer dock
+          (`ConversationWorkspace`) — are the three the audit (§5, §10.2) found disagreeing, and a
+          Home-only width would restore exactly that: 오늘's list and 확인할 일's list are the same
+          list at the same breakpoint. Measured blast radius: the plain pages, 오늘 and 확인할 일 widen;
+          문의 and 리뷰 do NOT, because with the 440px pane open their column is already 856.
+        */
+        content: "1280px",
         // The conversation's reading column. 840px ran to ~52 Korean characters a line; 720 lands
         // near 45, which is where Korean prose stops needing the eye to travel back (§2).
         thread: "720px",

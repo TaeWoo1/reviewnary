@@ -18,6 +18,22 @@ const TILE: Record<ReasonTone, string> = {
   gray: "bg-canvas text-muted",
 };
 
+/**
+ * <b>A category badge may never carry a work-state word</b> (canonical mockup semantic correction,
+ * 2026-10-02).
+ *
+ * <p>{@code REASON} holds real categories (교환·환불 · 정보 부족 · 리뷰 · 판단 보류) and three entries that
+ * are states wearing a category badge (답변 필요 · 승인 대기 · 초안 필요). The row already dropped the badge
+ * when it was the SAME word as the lead column's, and that was not the rule — it was one case of it.
+ * Measured at 1600×1000 on the live org, a case whose answer reviewnary had already written drew
+ * 「초안 준비됨」 in the lead column and 「답변 필요」 in its provenance line: one row, two states, and the
+ * one that was false was the one telling the seller to start work that was done.
+ *
+ * <p>So the test is the table, not the neighbour: a word that belongs to {@link WORK_STATE} is owned by
+ * the lead column wherever it appears, and this slot draws only what is genuinely a category.
+ */
+const STATE_WORDS: ReadonlySet<string> = new Set(Object.values(WORK_STATE).map((w) => w.text));
+
 const TAG: Record<ReasonTone, string> = {
   amber: "bg-warn/10 text-warn",
   blue: "bg-brand-50 text-brand-700",
@@ -43,6 +59,8 @@ export function DecisionRow({
   dense = false,
   rating = null,
   tagHidden = false,
+  metaBelow = false,
+  product = null,
 }: {
   tone: ReasonTone;
   icon: ReasonIcon;
@@ -108,6 +126,24 @@ export function DecisionRow({
    * left anchor and nothing else occupies that column.
    */
   tagHidden?: boolean;
+  /**
+   * <b>Provenance under the sentence instead of beside it</b> (확인할 일 canonical mockup, 2026-10-02).
+   *
+   * <p>The dense row's default reading right-aligns 「category · source · ★」 opposite the title, which is
+   * what the Home draws and what the Home's baseline froze on 2026-10-01. The queue's canonical mockup
+   * reads differently: three ranks stacked in one column — what the customer said, then the line
+   * reviewnary adds, then where it came from — with only the time on the right. Same facts, same row, a
+   * different column assignment; a prop rather than a second component, so neither list can drift from
+   * the other on anything but this.
+   *
+   * <p>Off by default, so the Home's frozen reading is the one a caller gets without asking.
+   */
+  metaBelow?: boolean;
+  /**
+   * The product the row is about, drawn last on the provenance line. Only read when {@link metaBelow}: in
+   * the default reading a review's product is the row's {@link line}, and moving it would change the Home.
+   */
+  product?: string | null;
 }) {
   const stateWord = work ? WORK_STATE[work] : null;
   /**
@@ -118,27 +154,26 @@ export function DecisionRow({
    * when it says something the state word does not.
    */
   const badge =
-    tagHidden || !tag || tag === stateWord?.text ? null : (
+    tagHidden || !tag || STATE_WORDS.has(tag) ? null : (
       <span className={`shrink-0 rounded-md px-1.5 py-px text-xs font-semibold ${TAG[tone]}`}>{tag}</span>
-    );
-  /**
-   * <b>The category is not drawn at the weight of the state</b> (product-owner decision, 2026-10-01).
-   *
-   * <p>In the dense reading the row's first line held a coloured word with a dot and, beside it, a filled
-   * capsule — two marks of the same size competing for the one glance the row gets, when only one of them
-   * answers 「내가 뭘 해야 하나」. A fill is the strongest thing a 12px token can carry, and spending it on
-   * 「리뷰」 down twenty rows that are all reviews put the loudest mark on the least distinguishing fact.
-   *
-   * <p>So here the category is plain muted text. The tone survives where it means something: the state
-   * word keeps its colour, and the three-line reading — which draws a coloured tile as the row's left
-   * anchor — keeps the filled badge that belongs with it.
-   */
-  const quietBadge =
-    tagHidden || !tag || tag === stateWord?.text ? null : (
-      <span className="shrink-0 text-xs font-medium text-muted">{tag}</span>
     );
   const lead = stateWord ? (
     <Status tone={stateWord.tone} variant="word">
+      {stateWord.text}
+    </Status>
+  ) : null;
+  /**
+   * <b>In the inbox reading the state is a tinted badge, not a dotted word</b> (Home visual target,
+   * 2026-10-01). A dot plus a coloured word is read as a sentence fragment, and it was sharing its line
+   * with a category at the same size; alone in a fixed lead column it has to be read as a mark, which is
+   * what a tinted box is. Same five words, same five tones, same table ({@link WORK_STATE}) — only the
+   * shape of the carrier changes, and `Status` is still the only thing that colours a state.
+   *
+   * <p>`rounded-lg px-2 py-1` rather than the chip's stadium: §4 gives controls and marks an edge at 8px,
+   * and a capsule at this size reads as something pressable.
+   */
+  const leadBadge = stateWord ? (
+    <Status tone={stateWord.tone} variant="badge">
       {stateWord.text}
     </Status>
   ) : null;
@@ -147,28 +182,94 @@ export function DecisionRow({
   // not muted, and its measure is capped so a 1,144px list never stretches one line of Korean across the screen
   // — a row whose text runs the full width of the page is a table cell however it is styled.
   if (dense) {
-    const meta = [source, line].filter(Boolean).join(" · ");
+    /**
+     * <b>Three columns: what to do, what was said, where it came from</b> (Home visual target, 2026-10-01).
+     *
+     * <p>The reading before this one stacked all four facts in the left column — state over title over
+     * 「source · line」 — and right-aligned the star above the wait. Measured at 1600×1000 that put the
+     * channel, the category and the product name in the SAME column as the customer's sentence and at the
+     * same left edge, so the eye had to re-read each row to find where one fact ended and the next began.
+     *
+     * <p>The target splits them: a fixed lead column the state badge is the only occupant of, the content
+     * column (sentence, then the line reviewnary adds), and the provenance right-aligned. Nothing is
+     * dropped and nothing is derived — the same five facts, re-columned.
+     */
+    const star = rating != null ? `★${rating}` : null;
+    /**
+     * <b>The category joins the provenance, and goes when the provenance already says it.</b>
+     *
+     * <p>It cannot stand beside the state any more — the lead column holds one badge — and the right-hand
+     * group is where it belongs: 「리뷰」 is what this row IS, which is the same axis as 「네이버」. The
+     * containment check is the rule `sharedPhrase` already states in words: `source` is composed as
+     * 「쿠팡 리뷰」, so a 「리뷰」 badge beside it prints the noun twice. This reads our own composed string
+     * rather than splitting it, which is the parse this file refuses everywhere else.
+     */
+    const category = tagHidden || !tag || STATE_WORDS.has(tag) || (source ?? "").includes(tag) ? null : tag;
+    const meta = [category, source, star].filter(Boolean).join(" · ");
+    /**
+     * The provenance line: where it came from, what kind it is, and what it is about — the facts that
+     * tell one row from the next once the state and the sentence have been read. Each piece is drawn
+     * only when the row carries it, so a row with no rating and no product draws the channel alone
+     * rather than a line of separators (canonical mockup, 2026-10-02).
+     */
+    const hasProvenance = metaBelow && [source, category, star, product].some(Boolean);
     const inner = (
       <>
+        {/* The one column whose width is fixed. A state badge that starts where the previous row's badge
+            started is read as a column; one that starts after a variable-width sibling is read as a word. */}
+        {leadBadge ? <span className="w-[104px] shrink-0">{leadBadge}</span> : null}
         <span className="min-w-0 flex-1">
-          {/* The state word owns the first line alone, the way `WorkItem` draws a row with a body: with
-              the sentence beside it the two competed for the first glance and the state lost, because the
-              sentence is longer and darker. A category badge that survived the dedupe rides with it. */}
-          {lead || badge ? (
-            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              {lead}
-              {quietBadge}
-            </span>
-          ) : null}
-          <span className="mt-0.5 block min-w-0 max-w-[62ch] break-keep text-sm font-semibold leading-snug text-ink [overflow-wrap:anywhere]">
+          <span className="block min-w-0 max-w-[62ch] break-keep text-sm font-semibold leading-snug text-ink [overflow-wrap:anywhere]">
             {title}
           </span>
-          {meta ? <span className="mt-0.5 block truncate text-xs text-muted">{meta}</span> : null}
+          {/* What reviewnary adds about this item. `xs`, which is the size the provenance beside it takes:
+              the row has three ranks — the customer's sentence, then everything that qualifies it — and
+              giving this line `sm` made it the same size as the title it sits under while the metadata
+              2px to its right was smaller than both. Measured, it is also the 6px per row that lands the
+              four of them on the target's 70px pitch. */}
+          {line ? <span className="mt-0.5 block truncate text-xs text-muted">{line}</span> : null}
+          {hasProvenance ? (
+            /* <b>One line, truncated — never wrapped</b> (measured at 1600×1000 with the 576px pane,
+                2026-10-02). Wrapping put the separator at the START of the second line, with the product
+                name under it: a divider divides two things and there was nothing to its left. The facts
+                are ordered most-identifying-last, so the product is the one that gives way. */
+            <span className="mt-1.5 flex min-w-0 flex-nowrap items-center gap-x-2 overflow-hidden text-xs text-muted">
+              {/* <b>No channel mark</b> (measured at 1600×1000, 2026-10-02). The canonical mockup opens this
+                  line with a lettered tile — C for Cafe24, N for NAVER — and the product's channel names are
+                  Korean, so the same tile rendered 「카」 and 「네」: one syllable of a word whose next two
+                  syllables stand 6px to its right, which is a truncation rather than a mark. Latin initials
+                  would have to be invented here (쿠팡 and 카페24 both start C) and the channels' own brand
+                  colours are not in §5's five tones. The name itself is the mark. */}
+              {source ? <span className="shrink-0 whitespace-nowrap">{source}</span> : null}
+              {/* <b>Only the product gives way.</b> A truncated 「★3」 is 「★.」 — a mark with its own value
+                  cut off, which is worse than not drawing it; same for a category word. They hold their
+                  width and the product name, which is the longest and the one a prefix still identifies,
+                  takes the ellipsis. */}
+              {category ? <Fact fixed>{category}</Fact> : null}
+              {star ? (
+                <Fact fixed>
+                  <span aria-label={`별점 ${rating}점`}>{star}</span>
+                </Fact>
+              ) : null}
+              {product ? <Fact>{product}</Fact> : null}
+            </span>
+          ) : null}
         </span>
-        {rating != null || wait ? (
-          <span className="flex shrink-0 flex-col items-end gap-1 pt-px text-xs tabular-nums text-muted">
-            {rating != null ? <span aria-label={`별점 ${rating}점`}>★{rating}</span> : null}
-            {wait ? <span className="whitespace-nowrap">{wait}</span> : null}
+        {(metaBelow ? null : meta) || wait ? (
+          <span className="flex shrink-0 items-start gap-6 pt-px text-xs text-muted">
+            {meta && !metaBelow ? (
+              <span className="whitespace-nowrap" aria-label={star ? `${meta.replace(star, `별점 ${rating}점`)}` : undefined}>
+                {meta}
+              </span>
+            ) : null}
+            {/* Fixed width and right-aligned, so the sort key this list is ordered by lines up down the
+                column instead of floating at the end of a variable string. */}
+            {wait ? <span className="w-[88px] shrink-0 whitespace-nowrap text-right tabular-nums">{wait}</span> : null}
+          </span>
+        ) : null}
+        {to ? (
+          <span aria-hidden="true" className="shrink-0 self-start pt-px text-muted">
+            ›
           </span>
         ) : null}
         {action}
@@ -184,7 +285,7 @@ export function DecisionRow({
      *
      * <p>The row that carries it drops the hairline above it so the two marks never stack.
      */
-    const shape = `flex items-start gap-4 rounded-lg px-3 py-3 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
+    const shape = `flex items-start gap-3 rounded-lg px-3 py-3 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
       selected ? "!border-transparent bg-brand-50 shadow-selected" : "hover:bg-canvas"
     }`;
     return (
@@ -266,6 +367,21 @@ export function DecisionRow({
  * single strongest reason a work list reads as a table. The bordered reading stays for the lists whose rows open
  * an editor in place, where the box is what says 「this is one object」.
  */
+/**
+ * One fact on the provenance line, with the hairline that separates it from the one before.
+ *
+ * <p>{@code fixed} keeps a fact at its own width — for the ones a truncation would falsify (a rating, a
+ * category). Everything else shares what is left and truncates.
+ */
+function Fact({ children, fixed = false }: { children: ReactNode; fixed?: boolean }) {
+  return (
+    <span className={`flex flex-nowrap items-center gap-2 ${fixed ? "shrink-0" : "min-w-0"}`}>
+      <span aria-hidden="true" className="h-3 w-px shrink-0 bg-line" />
+      <span className={fixed ? "whitespace-nowrap" : "truncate"}>{children}</span>
+    </span>
+  );
+}
+
 export function DecisionList({ children, ariaLabel, plain = false }: { children: ReactNode; ariaLabel?: string; plain?: boolean }) {
   return (
     <ul

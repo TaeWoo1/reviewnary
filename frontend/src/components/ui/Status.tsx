@@ -41,8 +41,16 @@ export function Status({
   className = "",
 }: {
   tone?: StatusTone;
-  /** `chip` — tinted pill; `word` — the coloured word alone, for the first slot of a dense row. */
-  variant?: "chip" | "word";
+  /**
+   * `chip` — tinted pill; `word` — the coloured word alone; `badge` — the tinted mark an inbox row's
+   * lead column carries (Home visual target, 2026-10-01).
+   *
+   * <p>`badge` is `chip` at the row's own type size and with §4's 8px edge instead of a stadium. It is a
+   * variant rather than a `className` on `chip` because every one of those three values would have had to
+   * be overridden, and two Tailwind utilities for one property resolve by stylesheet order, not by the
+   * order they are written in.
+   */
+  variant?: "chip" | "word" | "badge";
   children: ReactNode;
   className?: string;
 }) {
@@ -56,6 +64,15 @@ export function Status({
     return (
       <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium ${WORD[tone]} ${className}`}>
         <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${DOT[tone]}`} />
+        {children}
+      </span>
+    );
+  }
+  if (variant === "badge") {
+    return (
+      <span
+        className={`inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1 text-sm font-semibold ${CHIP[tone]} ${className}`}
+      >
         {children}
       </span>
     );

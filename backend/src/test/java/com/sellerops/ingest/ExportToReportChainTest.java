@@ -133,7 +133,7 @@ class ExportToReportChainTest {
                 new IngestFollowUp(analysis, null, null));
         dashboard = new DashboardService(inquiries, reviews, orders, products,
                 new OrderService(orders, channels),
-                new InboxService(inquiries, reviews, channels, products));
+                new InboxService(inquiries, reviews, channels, products), channels);
         channelId = seedNaverChannel();
     }
 

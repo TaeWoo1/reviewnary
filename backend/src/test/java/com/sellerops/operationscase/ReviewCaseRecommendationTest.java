@@ -31,6 +31,8 @@ class ReviewCaseRecommendationTest {
     private static final Path HOME_WORK = Paths.get("../frontend/src/lib/homeWork.ts");
     private static final Path COPY = Paths.get("../frontend/src/lib/copy/customerOps.ts");
     private static final Path NAV = Paths.get("../frontend/src/lib/nav.v2.ts");
+    /** Where the prepared recommendation is read now that the queue row carries customer context only. */
+    private static final Path CASE_SCREEN = Paths.get("../frontend/src/pages/app/OperationsCase.tsx");
 
     private static String code(Path path) throws IOException {
         return Files.readString(path).replaceAll("(?s)/\\*.*?\\*/", "").replaceAll("(?m)//.*$", "");
@@ -138,9 +140,37 @@ class ReviewCaseRecommendationTest {
         String homeWork = code(HOME_WORK);
         String copy = code(COPY);
 
+        /*
+         * <b>Re-pointed to where the prepared sentence now stands</b> (product-owner decision,
+         * 2026-10-01 — 「Home row line은 customer context만」).
+         *
+         * <p>This asserted the fall-through `missing ?? summary ?? recommendedAction ?? reasonNote` in
+         * the QUEUE ROW. The visual QA that ended it: a row carrying 「대응 필요로 정함」 or
+         * 「이 상품에서 「포장 파손」 문제가 3건 확인됐습니다」 is reviewnary's own workflow prose standing
+         * in the slot a seller reads as 「이 고객이 무슨 말을 했나」. The row's second line is the case's
+         * `summary` now, which is the one of the four that is about the customer.
+         *
+         * <p><b>The guarantee is unchanged: the seller still SEES the prepared step.</b> It is on the
+         * case screen the row opens — `OperationsCase` reads `recommendedAction` as the 「왜 판단이
+         * 필요한가」 line — so this asserts it there rather than deleting the claim. The 판단 보류
+         * half below never moved.
+         */
         assertThat(homeWork)
-                .as("the row's one line falls through to what the review lane prepared before the rule's own line")
-                .contains("missing ?? row.summary ?? row.recommendedAction ?? row.reasonNote");
+                .as("the queue row's second line is customer context — the case's own account of the subject")
+                // `preview` is the guard that drops it when it would be the title again; what matters
+                // to this fence is that `summary` is the only field feeding the line.
+                .contains("const line = preview(row.summary,");
+        assertThat(homeWork)
+                .as("and never reviewnary's own workflow prose about what to do")
+                // `recommendedActionType` is still read — it chooses the row's TAG, which is a closed
+                // token and not prose. What may not reach the row is the sentence.
+                .doesNotContain("row.recommendedAction ")
+                .doesNotContain("row.recommendedAction;")
+                .doesNotContain("row.recommendedAction)")
+                .doesNotContain("row.reasonNote");
+        assertThat(code(CASE_SCREEN))
+                .as("the prepared recommendation is still shown — on the screen the row opens")
+                .contains("detail.recommendedAction");
         assertThat(copy)
                 .as("a review that named no action type is tagged for what it is; subjectKind is a stored fact")
                 .contains("subjectKind === \"REVIEW\" ? REASON.review : REASON.withheld");

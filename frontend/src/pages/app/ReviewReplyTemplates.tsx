@@ -128,7 +128,7 @@ function TemplateEditor({
     <li>
       <section aria-label={label.name} className="px-5 py-5">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="break-keep text-base font-semibold text-ink">{label.name}</h2>
+        <h2 className="break-keep text-lg font-semibold text-ink">{label.name}</h2>
         <span className="text-sm text-muted">{template.customized ? "직접 정한 문구" : "기본 문구"}</span>
       </div>
       <p className="mb-1 break-keep text-sm text-muted">{label.when}</p>

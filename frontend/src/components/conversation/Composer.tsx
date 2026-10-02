@@ -27,6 +27,7 @@ export function Composer({
   compact = false,
   quiet = false,
   inputId = "conversation-input",
+  leading,
   attachedTop = false,
 }: {
   onSend: (text: string) => void;
@@ -55,6 +56,13 @@ export function Composer({
    * a gap between them said they were two (Frontend-first Agent Workspace Redesign v1).
    */
   attachedTop?: boolean;
+  /**
+   * A control that belongs to the conversation rather than to the sentence — 새 대화 and 지난 대화
+   * ({@link ConversationMenu}). It sits left of the field because it is about the thread, where the
+   * send control on the right is about what was typed (product-owner decision, 2026-10-01: the rail
+   * no longer carries these, and the composer is the command surface on every width).
+   */
+  leading?: ReactNode;
 }) {
   const [text, setText] = useState(initialText);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -112,6 +120,7 @@ export function Composer({
         } ${compact ? "px-3 py-2" : "px-4 py-3"} ${disabled ? "opacity-60" : ""}`}
         data-state={canStop ? "running" : disabled ? "disabled" : "idle"}
       >
+        {leading}
         <label htmlFor={inputId} className="sr-only">
           무엇이든 물어보세요
         </label>

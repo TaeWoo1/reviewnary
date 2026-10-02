@@ -42,7 +42,7 @@ export function ImportHistoryList() {
   return (
     <section aria-label="최근 가져오기 기록" className="space-y-3">
       <div className="flex flex-wrap items-baseline gap-x-2">
-        <h2 className="text-base font-semibold text-ink">최근 가져오기 기록</h2>
+        <h2 className="text-lg font-semibold text-ink">최근 가져오기 기록</h2>
         <span className="text-sm text-muted">파일 업로드와 셀러센터 내보내기로 가져온 리뷰 내역이에요.</span>
       </div>
       {loading ? (

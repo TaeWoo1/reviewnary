@@ -1,7 +1,7 @@
 import { DecisionList, DecisionRow } from "../ui/DecisionRow";
 import { selectionHref } from "./MasterDetail";
 import { isOldBacklog, sharedRowFacts, type HomeWorkRow } from "../../lib/homeWork";
-import { waitLabel } from "../../lib/copy/customerOps";
+import { elapsedLabel } from "../../lib/copy/customerOps";
 import type { CaseQueueState } from "../../pages/app/OperationsCase";
 
 /**
@@ -38,6 +38,7 @@ export function WorkRows({
   dense = false,
   captionSaysReason = false,
   sharedOver,
+  reading = "home",
 }: {
   rows: HomeWorkRow[];
   selectedKey: string | null;
@@ -59,15 +60,34 @@ export function WorkRows({
    * Defaults to the rows drawn, which is the whole list wherever there is no brief.
    */
   sharedOver?: HomeWorkRow[];
+  /**
+   * <b>Which of the two dense readings this list draws</b> (확인할 일 canonical mockup, 2026-10-02).
+   *
+   * <p>「home」 is the reading the Home's baseline was frozen on (product-owner decision, 2026-10-01):
+   * provenance right-aligned opposite the sentence. 「queue」 is the canonical mockup's: provenance on
+   * its own line under the sentence, with a review's product moved there off the second line, and only
+   * the time on the right.
+   *
+   * <p>The facts are identical in both — this chooses columns, never content — and the default is the
+   * frozen one, so a caller that does not ask gets the Home.
+   */
+  reading?: "home" | "queue";
 }) {
   const caseIds = rows.map((r) => r.caseId).filter((id): id is string => id !== null);
   const shared = sharedRowFacts(sharedOver ?? rows);
   const firstOld = showBacklogDivider ? rows.findIndex((r) => isOldBacklog(r, now ?? new Date())) : -1;
   const oldCount = firstOld >= 0 ? rows.length - firstOld : 0;
 
+  const queue = reading === "queue";
   const draw = (row: HomeWorkRow) => {
     // A review opened on its own page from here offers the way back to here.
     const fullScreen = row.kind === "REVIEW" ? `${row.to}?from=work` : row.to;
+    /* <b>A review's second line IS its product</b> (`mergeHomeWork`), and the queue reading draws the
+       product on the provenance line. So for a review the second line is handed over rather than
+       duplicated; for an inquiry and a case the second line is the customer's own words and stays
+       where it is. Nothing is dropped and no field is re-derived — this moves one string between two
+       slots of the same row. */
+    const product = queue && row.kind === "REVIEW" ? row.line : null;
     return (
       <DecisionRow
         key={row.key}
@@ -76,8 +96,12 @@ export function WorkRows({
         tag={row.reason.tag}
         work={row.state}
         title={row.title}
-        line={row.line}
-        wait={waitLabel(row.since, now)}
+        line={product === null ? row.line : null}
+        /* <b>One contract, and the pane applies the same one</b> (elapsed-time contract, 2026-10-02).
+           The branch was on `kind` — which record carries the row — so a CASE opened about a review
+           said 「N일 대기」 about a review nobody was waiting on. {@link elapsedLabel} reads `subject`,
+           which is what the item is ABOUT, and it is the only place the word is chosen. */
+        wait={elapsedLabel(row.since, row.subject, now)}
         rating={shared.rating === null ? row.rating : null}
         source={shared.source === null ? row.source : null}
         tagHidden={shared.tag !== null}
@@ -85,6 +109,8 @@ export function WorkRows({
         state={!wide && row.caseId ? ({ caseIds } satisfies CaseQueueState) : undefined}
         selected={wide && row.key === selectedKey}
         dense={dense}
+        metaBelow={queue}
+        product={product}
       />
     );
   };

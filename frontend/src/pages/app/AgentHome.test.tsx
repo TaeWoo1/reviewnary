@@ -8,6 +8,7 @@ import { ConversationProvider } from "../../lib/conversation/ConversationProvide
 import { AgentHome, greetingLine, contextStrip } from "./AgentHome";
 import { agentTurn } from "../../test/conversationFixtures";
 import type { MetricKpi, OverviewResponse } from "../../lib/types";
+import { COPY } from "../../lib/copy/customerOps";
 
 const getOverviewStrict = vi.fn();
 const getProactiveCases = vi.fn();
@@ -240,7 +241,9 @@ describe("home — the Agent operating workspace", () => {
     // A VISIBLE page title now, not `sr-only`: this branch of 오늘 had no page title on screen at all.
     const title = screen.getByRole("heading", { level: 1, name: "오늘" });
     expect(title.className).not.toContain("sr-only");
-    expect(title.className).toContain("text-xl");
+    // `title` (28/700) — the scale's own step for a page name, which both Homes take. The claim is that
+    // the `h1` is VISIBLE and at the page-title size, not that the size is spelled `xl`.
+    expect(title.className).toContain("text-title");
     // Never our own vocabulary.
     expect(screen.queryByText(/proactive|PROPOSED|DRAFT_PREPARED|case/i)).toBeNull();
   });
@@ -552,7 +555,10 @@ describe("Customer Operations v3.1 — the job's Home", () => {
     expect(screen.queryByRole("region", { name: "오늘 상태" })).toBeNull();
     expect(screen.queryByText("AI가 먼저 확인한 일")).toBeNull();
     expect(screen.queryByText("지금 확인할 리뷰")).toBeNull();
-    expect(screen.getByPlaceholderText("질문이나 지시를 입력하세요")).toBeInTheDocument();
+    // The composer's own string, not a copy of it: the placeholder changed with the Home visual target
+    // (「리뷰나 문의를 자연어로 요청해보세요」) and a second spelling of it here is exactly the kind of
+    // literal that makes a copy change look like a regression.
+    expect(screen.getByPlaceholderText(COPY.composer)).toBeInTheDocument();
   });
 });
 

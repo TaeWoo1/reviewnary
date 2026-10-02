@@ -273,7 +273,7 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
           without 고객 운영 관리 sees had no page title at all — the first visible thing was either a
           greeting or a first-use headline, and neither names the screen. The other branch's title is the
           same word at the same size, which is the point: both are 오늘. */}
-      <h1 className="break-keep text-xl font-bold leading-tight tracking-tight text-ink">{COPY.homeTitle}</h1>
+      <h1 className="break-keep text-title font-bold leading-tight tracking-tight text-ink">{COPY.homeTitle}</h1>
       {beforeFirstConnection && firstUse ? (
         // §2 — nothing is connected. What is missing is not a briefing: it is the one thing that can be
         // done, plus what doing it hands over. The sentence names the data types the channels on this
@@ -364,13 +364,13 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
   );
 
   const lead = coHome ? (
-    <CustomerOpsHome co={coHome} ops={home} now={now} onChanged={() => void loadCo()} metrics={data?.metrics ?? null} />
+    <CustomerOpsHome co={coHome} ops={home} now={now} onChanged={() => void loadCo()} metrics={data?.metrics ?? null} insights={data?.insights ?? null} />
   ) : co === undefined && firstUse?.kind === "WORKING" ? (
     // The job's read has not landed. Draw nothing in its PLACE — rendering the other Home for a moment
     // would flash a different screen — but the title is not in its place: it is the one thing both
     // branches print, it is true before either read lands, and `sr-only` here meant a sighted seller
     // watched a blank page while an invisible heading claimed the screen had one.
-    <h1 className="break-keep text-xl font-bold leading-tight tracking-tight text-ink">{COPY.homeTitle}</h1>
+    <h1 className="break-keep text-title font-bold leading-tight tracking-tight text-ink">{COPY.homeTitle}</h1>
   ) : (
     legacyLead
   );
@@ -398,6 +398,7 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
                 onChanged={() => void loadCo()}
                 onProblemChanged={onProblemChanged}
                 metrics={data?.metrics ?? null}
+                insights={data?.insights ?? null}
                 dock={dock}
               />
             )

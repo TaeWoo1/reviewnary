@@ -205,7 +205,8 @@ public class CustomerOperationsHomeService {
                     c.getRecommendedActionType() == null ? null : c.getRecommendedActionType().name(),
                     c.getRecommendedAction(), missing(c.getMissingInformation()),
                     c.getPreparedAction() == CasePreparedAction.DRAFT_PREPARED,
-                    c.getDecidedBy() == null ? null : c.getDecidedBy().name(), c.getCreatedAt(), linkOf(c));
+                    c.getDecidedBy() == null ? null : c.getDecidedBy().name(), c.getCreatedAt(),
+                    subject.receivedOn(), linkOf(c));
         }).toList();
     }
 
@@ -310,7 +311,12 @@ public class CustomerOperationsHomeService {
         return false;
     }
 
-    private record Subject(String title, Integer rating) {
+    /**
+     * @param receivedOn the customer's own event date in KST. Resolved HERE, off the subject record this method
+     *                   already loads, and by the same expression {@code CaseKnowledgeService.subject} uses — so
+     *                   the row and the detail of one case cannot date it differently.
+     */
+    private record Subject(String title, Integer rating, java.time.LocalDate receivedOn) {
     }
 
     private Subject subject(OperationsCase c) {
@@ -320,15 +326,21 @@ public class CustomerOperationsHomeService {
                         String title = MarkupText.toPlainText(i.getTitle());
                         String shown = preview(title == null || title.isBlank()
                                 ? MarkupText.toPlainText(i.getBody()) : title);
-                        return new Subject(shown, null);
-                    }).orElse(new Subject(null, null));
+                        return new Subject(shown, null, receivedOn(i.getReceivedAt()));
+                    }).orElse(new Subject(null, null, null));
         }
         if (c.getSubjectKind() == OperationsSubjectKind.REVIEW) {
             return reviews.findById(c.getSubjectId()).filter(x -> c.getOrgId().equals(x.getOrgId()))
-                    .map(x -> new Subject(preview(MarkupText.toPlainText(x.getBody())), x.getRating()))
-                    .orElse(new Subject(null, null));
+                    .map(x -> new Subject(preview(MarkupText.toPlainText(x.getBody())), x.getRating(),
+                            receivedOn(x.getReceivedAt())))
+                    .orElse(new Subject(null, null, null));
         }
-        return new Subject(null, null);
+        return new Subject(null, null, null);
+    }
+
+    /** KST, which is the zone {@code CaseDetailView.receivedOn} is in; no other conversion and no estimate. */
+    private static java.time.LocalDate receivedOn(Instant at) {
+        return at == null ? null : at.atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate();
     }
 
     private static String preview(String raw) {

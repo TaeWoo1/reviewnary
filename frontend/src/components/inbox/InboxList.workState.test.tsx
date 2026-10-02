@@ -4,6 +4,7 @@ import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { InboxList, isOldBacklog, rowState } from "./InboxList";
 import type { FeedItem } from "../../lib/types";
+import { WORK_STATE } from "../../lib/workState";
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
 const item = (id: string, over: Partial<FeedItem>): FeedItem => ({
@@ -16,15 +17,27 @@ describe("문의 목록 — work-state first (docs/reviewnary_design.md §7)", (
   // written when a proposal is recorded, a proposal stores no reply text, and eight of the demo org's
   // ten 「초안 준비됨」 rows had no draft. The word now needs the draft's own answer.
   it("초안 준비됨 needs a draft, not a phase", () => {
-    expect(rowState(item("a", {}), true)).toEqual({ text: "초안 준비됨", tone: "info" });
-    expect(rowState(item("a", {}), false)).toEqual({ text: "답변 필요", tone: "warn" });
-    expect(rowState(item("a", { status: "ANSWERED" }), false)).toEqual({ text: "답변함", tone: "neutral" });
-    expect(rowState(item("r", { type: "REVIEW", status: "NEGATIVE", rating: 1 }), false)).toEqual({ text: "확인 필요", tone: "bad" });
+    // <b>Compared against the table, not against copies of it</b> (2026-10-01). These four used to be
+    // written out as literals, so a review of the TONE contract — which is one decision, taken once, in
+    // `lib/workState.ts` — broke a test whose subject is which FACT selects which word. Reading the
+    // table here keeps the assertion on the selection and makes a tone review a one-file change.
+    expect(rowState(item("a", {}), true)).toEqual(WORK_STATE.DRAFT_READY);
+    expect(rowState(item("a", {}), false)).toEqual(WORK_STATE.REPLY_NEEDED);
+    expect(rowState(item("a", { status: "ANSWERED" }), false)).toEqual(WORK_STATE.ANSWERED);
+    expect(rowState(item("r", { type: "REVIEW", status: "NEGATIVE", rating: 1 }), false)).toEqual(WORK_STATE.NEEDS_LOOK);
+  });
+
+  it("no work state is drawn as 실패 — `bad` is reserved for 실패·차단·위험", () => {
+    // The tone review this test was written for (product-owner decision, 2026-10-01). A customer item
+    // waiting is never a failure, and red that means 「흔한 일」 is red that stops being read: on the live
+    // org 확인할 일 drew 46 rows and 25 of them carried it. `bad` now belongs to the surfaces that report
+    // a collection that is blocked or an approval that failed, and to nothing in this table.
+    for (const word of Object.values(WORK_STATE)) expect(word.tone).not.toBe("bad");
   });
 
   it("an answered inquiry never claims a draft is waiting", () => {
     // hasDraft is true and the customer already has their answer: the row is a record, not work.
-    expect(rowState(item("a", { status: "ANSWERED" }), true)).toEqual({ text: "답변함", tone: "neutral" });
+    expect(rowState(item("a", { status: "ANSWERED" }), true)).toEqual(WORK_STATE.ANSWERED);
   });
 
   it("old open work sits under its own divider, after recent open work and before settled rows", () => {

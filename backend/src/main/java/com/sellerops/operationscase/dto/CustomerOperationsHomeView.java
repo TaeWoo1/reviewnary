@@ -35,10 +35,20 @@ public record CustomerOperationsHomeView(
     public record Decisions(long total, List<DecisionRow> rows) {
     }
 
+    /**
+     * @param openedAt   when reviewnary opened the case — a fact about OUR record, and the elapsed-time fallback
+     *                   only (the elapsed-time contract, 2026-10-02).
+     * @param receivedOn when the customer's own event happened, in KST — the inquiry's or review's
+     *                   {@code receivedAt}, the same field {@code CaseDetailView.receivedOn} reads. It is here
+     *                   because the list and the detail of one item must say the same elapsed time, and the list
+     *                   could not: it had {@code openedAt} alone, so a case opened a day after the question
+     *                   arrived read 「8일 대기」 in the list and 「9일 대기」 in the pane. Null when the subject
+     *                   record is gone or carries no time — then the caller falls back, and nothing is estimated.
+     */
     public record DecisionRow(UUID caseId, String subjectKind, String channelNameKo, String title, Integer rating,
                               String reasonNote, String summary, String recommendedActionType,
                               String recommendedAction, List<String> missingInformation, boolean draftPrepared,
-                              String decidedBy, Instant openedAt, String to) {
+                              String decidedBy, Instant openedAt, java.time.LocalDate receivedOn, String to) {
     }
 
     /**

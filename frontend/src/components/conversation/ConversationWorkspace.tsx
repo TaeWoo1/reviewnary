@@ -3,6 +3,7 @@ import { AnimatePresence } from "motion/react";
 import { ConversationTimeline } from "./ConversationTimeline";
 import { ContextBar } from "./ContextBar";
 import { Composer } from "./Composer";
+import { ConversationMenu } from "./ConversationMenu";
 import { currentContext } from "../../lib/conversation/currentContext";
 import { placeholderFor, promptsFor } from "./surfacePrompts";
 import { useConversation, type DisplayTurn, type TurnHints } from "../../lib/conversation/ConversationProvider";
@@ -97,7 +98,11 @@ export function ConversationWorkspace({
           scroll. One fade, one place; it is the only gradient in the shell. */}
       <div className={`relative shrink-0 ${compact ? "border-t border-line bg-surface px-4 py-3" : quietDock ? "border-t border-line bg-surface px-4 pb-4 pt-3 md:px-8" : "bg-surface px-4 pb-5 pt-1 md:px-8"}`} data-testid="composer-dock">
         {!compact ? <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-surface to-transparent" /> : null}
-        <div className={compact ? "" : `mx-auto w-full ${quietDock ? "max-w-[1160px]" : "max-w-thread"}`}>
+        {/* <b>The quiet dock stands on the list's own left edge</b> (Home visual target, 2026-10-01). It was
+            `mx-auto` at 1160px while the list column above it is `max-w-content` left-aligned, so the box a
+            seller types into started 28px right of the rows it is about and ended past their right edge. One
+            token, one alignment: the composer is now exactly as wide as the work it sits under. */}
+        <div className={compact ? "" : quietDock ? "w-full max-w-content" : "mx-auto w-full max-w-thread"}>
           {conversation.plannerOff ? (
             <p className="mb-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn" role="status">
               이 계정에서는 자유 문장 요청이 아직 열려 있지 않습니다.
@@ -122,6 +127,10 @@ export function ConversationWorkspace({
             compact={compact}
             quiet={quietDock}
             inputId={compact ? "agent-panel-input" : "conversation-input"}
+            // 새 대화 · 지난 대화, on the box rather than in the rail (product-owner decision,
+            // 2026-10-01). Left out of the 400px contextual panel, which is a view of the SAME
+            // thread and has no business starting a different one.
+            leading={compact ? undefined : <ConversationMenu />}
             footer={footer}
           />
         </div>
