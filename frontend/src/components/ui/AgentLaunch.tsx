@@ -10,6 +10,11 @@ import { useAgentPanel } from "../../lib/agentPanel";
  * 물어보기」 — a context, not a feature button. The feature-shaped launchers (문제 있는 상품 찾기 …)
  * became example chips inside the panel composer for that surface.
  *
+ * <b>No mark on the button.</b> It carried a ✳︎ in brand blue (product-owner decision, 2026-10-03:
+ * removed). The glyph said 「여기는 AI입니다」 about a control whose label already says what it does, and a
+ * sparkle is the ornament this product's screens are being taken out of. The agent's own surface keeps
+ * its mark, where it names who is speaking rather than decorating a door.
+ *
  * <b>It opens; it does not ask.</b> Inside the app shell the sentence lands in the contextual panel's
  * box (Contextual Agent Workspace v1) and the seller sends it; outside a shell (tests, bare renders) it
  * is the `/agent` link it always was. Nothing here starts a run.
@@ -34,14 +39,12 @@ export function AgentLaunch({
   if (panel) {
     return (
       <button type="button" onClick={() => panel.openPanel(hint)} className={classes} data-testid="agent-launch">
-        <span aria-hidden="true" className="text-brand-700">✳︎</span>
         {label}
       </button>
     );
   }
   return (
     <Link to={agentHref(hint)} className={classes} data-testid="agent-launch">
-      <span aria-hidden="true" className="text-brand-700">✳︎</span>
       {label}
     </Link>
   );

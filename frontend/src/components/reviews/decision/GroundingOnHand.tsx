@@ -42,7 +42,11 @@ export function GroundingOnHand({
    * needed. It is the ordinary state of a seller who connected the browser and no product API.
    */
   const unlinked = context.productId == null && context.productName != null;
-  // Only the page reading prints the product name: the preview's header already does.
+  /**
+   * <b>Only the page reading prints the product name</b> — a preview is drawn under a header that has
+   * just said it, and 「한 사실은 한 번」 is the rule that header owns (`ReviewRecord.test.tsx`). The
+   * figures beside it are this block's own and are drawn at both depths.
+   */
   const productName =
     context.productId && context.productName ? (
       <Link to={`/products/${context.productId}`} className="break-keep font-medium text-ink hover:underline">
@@ -62,7 +66,7 @@ export function GroundingOnHand({
     <Section title={titled ? "이 상품에 대해 우리가 아는 것" : undefined} ariaLabel="이 상품에 대해 우리가 아는 것">
       <div className={preview ? "space-y-2" : "space-y-2 rounded-2xl border border-line bg-surface p-4"}>
         <Facts className="text-sm text-muted">
-          {productName}
+          {preview ? null : productName}
           {/* Null is not zero: a review bound to no product has no product to count for, and printing
               0건 would answer a question nobody could ask. */}
           {productSignal ? <span className="tabular-nums">리뷰 {productSignal.reviews}건</span> : null}
@@ -96,16 +100,22 @@ export function GroundingOnHand({
           </p>
         ) : null}
 
-        <Facts className="text-sm">
-          <Link to="/knowledge" className="font-semibold text-brand-700 hover:underline">
-            답변 기준 보기
-          </Link>
-          {context.productId ? (
-            <Link to={`/products/${context.productId}`} className="font-semibold text-brand-700 hover:underline">
-              상품 화면 열기
+        {/* <b>Two more blue links, in a column that already has its door</b> (리뷰 canonical redesign,
+            2026-10-03). On the full case these are where a seller goes next; in a preview the one thing the
+            column asks is whether to open the case, and 지식 and 상품 are both a click away from the rail.
+            Measured at 1600×1000 in the 리뷰 pane: dropping them is what puts 이 리뷰 처리하기 inside the fold. */}
+        {preview ? null : (
+          <Facts className="text-sm">
+            <Link to="/knowledge" className="font-semibold text-brand-700 hover:underline">
+              답변 기준 보기
             </Link>
-          ) : null}
-        </Facts>
+            {context.productId ? (
+              <Link to={`/products/${context.productId}`} className="font-semibold text-brand-700 hover:underline">
+                상품 화면 열기
+              </Link>
+            ) : null}
+          </Facts>
+        )}
 
         {/* <b>The direction is gone, the fact stays</b> (product-owner decision, 2026-10-01). 「초안이 실제로
             무엇을 근거로 썼는지는 아래 초안에 인용으로 나옵니다」 pointed at 「아래 초안」 — which a preview

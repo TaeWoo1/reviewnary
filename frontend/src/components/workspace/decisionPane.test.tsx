@@ -54,12 +54,24 @@ describe("master-detail pane", () => {
     expect(className).not.toContain("pb-8");
   });
 
-  it("exactly one screen overrides it — 확인할 일", () => {
+  /**
+   * <b>The width belongs to the reading, not to one screen</b> (리뷰 canonical redesign, 2026-10-03).
+   *
+   * <p>It was 확인할 일 alone, because 확인할 일 was the only screen whose pane asked the seller to decide
+   * something. 리뷰's pane now holds the same reading — 고객의 말 → 왜 올라왔나요 → 반복 신호 → 이 상품에
+   * 대해 아는 것 → 판단과 조치 — so it takes the same column, with the same 1440 breakpoint under it.
+   *
+   * <p>The list is still closed and still asserted: a third caller is a decision, not an import.
+   */
+  it("two screens override it — 확인할 일 and 리뷰, the two panes a decision is made in", () => {
     const callers = SRC.filter((f) => readFileSync(f, "utf8").includes('pane="decision"'));
-    expect(callers.map((f) => f.replace(/\\/g, "/"))).toEqual(["src/pages/app/OperationsCaseQueue.tsx"]);
+    expect(callers.map((f) => f.replace(/\\/g, "/")).sort()).toEqual([
+      "src/pages/app/OperationsCaseQueue.tsx",
+      "src/pages/app/ReviewRecord.tsx",
+    ]);
   });
 
-  it("문의 · 리뷰 · 오늘 keep the layout's own width", () => {
+  it("문의 · 오늘 keep the layout's own width", () => {
     for (const screenFile of [
       "src/pages/app/CustomerInbox.tsx",
       "src/components/customerOperations/CustomerOpsHome.tsx",

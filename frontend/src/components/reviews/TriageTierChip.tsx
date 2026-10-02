@@ -25,9 +25,9 @@ const TIER_TONE: Record<ReviewTriageTier, StatusTone> = {
   FYI: "neutral",
 };
 
-export function TriageTierChip({ tier }: { tier: ReviewTriageTier }) {
+export function TriageTierChip({ tier, quiet = false }: { tier: ReviewTriageTier; quiet?: boolean }) {
   return (
-    <Status tone={TIER_TONE[tier]} variant="word">
+    <Status tone={TIER_TONE[tier]} variant={quiet ? "quiet" : "word"}>
       {TRIAGE_TIER_LABEL[tier]}
     </Status>
   );
@@ -38,7 +38,17 @@ export function TriageTierChip({ tier }: { tier: ReviewTriageTier }) {
  * mechanism spoke. Same emphasis as 확인 필요 because it sorts with 확인 필요; the wording carries the
  * difference, and the title says it in one line.
  */
-export function AiMarkChip() {
+export function AiMarkChip({ quiet = false }: { quiet?: boolean } = {}) {
+  if (quiet) {
+    // The record's row reading: the mark is a word on the metadata line, not a capsule in front of the
+    // customer's sentence. Same word, same tone, same table — only the carrier changes, exactly as
+    // {@link TriageTierChip}'s quiet reading does for the tier it stands beside.
+    return (
+      <Status tone="warn" variant="quiet">
+        {AI_TRIAGE_MARK_LABEL}
+      </Status>
+    );
+  }
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${AI_TRIAGE_MARK_CLASS}`}
