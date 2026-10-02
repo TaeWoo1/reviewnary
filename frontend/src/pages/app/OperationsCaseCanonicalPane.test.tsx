@@ -23,6 +23,10 @@ import { OperationsCaseView } from "./OperationsCase";
  * Home draws the same component at {@code preview} depth and the case screen draws it as a page; neither
  * is this reading, and neither is asserted here.
  */
+/** `yyyy-MM-dd`, n days ago, read in KST — the day boundary the elapsed-time contract uses. */
+const kstDaysAgo = (n: number) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(Date.now() - n * 86_400_000));
+
 function detail(over: Partial<OperationsCaseDetail> = {}): OperationsCaseDetail {
   return {
     caseId: "case-1",
@@ -31,7 +35,9 @@ function detail(over: Partial<OperationsCaseDetail> = {}): OperationsCaseDetail 
     channelNameKo: "카페24 자사몰",
     productName: "선바로 일체형 전선몰딩",
     productScopeAvailable: true,
-    receivedOn: "2026-09-24",
+    // Eight days ago, in the timezone the elapsed contract counts in. It was a literal date, and a literal
+    // date makes 「8일 동안」 true on the day the test was written and false on every day after it.
+    receivedOn: kstDaysAgo(8),
     openedAt: null,
     rating: null,
     title: "문의 드립니다",
