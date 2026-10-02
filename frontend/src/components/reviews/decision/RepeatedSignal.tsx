@@ -33,12 +33,24 @@ export function RepeatedSignal({
   problems,
   failed,
   titled = true,
+  similarShown,
 }: {
   problems: ReviewDecisionProblem[];
   /** The context read did not return. Renders nothing — see above. */
   failed: boolean;
   /** False when the caller's own fold already prints this name — the count travels to that summary. */
   titled?: boolean;
+  /**
+   * <b>How many examples stand open</b> (product-owner decision, 2026-10-03).
+   *
+   * <p>The read's bound is unchanged — at most three evidence quotes per problem, as `decision-context`
+   * has always sent — and this says only how many of them are drawn before the rest is folded. The 리뷰
+   * record's pane opens two: measured at 1600×1000 the third pushed 기록 off the screen, and a seller
+   * deciding whether a complaint repeats has the answer at the second example.
+   *
+   * <p>Unset keeps each reading as it was: one in a preview, all of them on the full case.
+   */
+  similarShown?: number;
 }) {
   // <b>The preview no longer draws this.</b> Its count is one cell of `EvidencePreview`'s grid, where 「반복 문제
   // 기록」 carries the records claim in a word. This component is the full case's reading again, with the whole
@@ -98,31 +110,31 @@ export function RepeatedSignal({
               </div>
 
               {problem.similar.length > 0 ? (
-                <ul className="space-y-1.5">
-                  {/* A preview shows ONE example and keeps 「근거 N건 ›」 beside it, which is the whole set
-                      and the way to it. The number is not reduced and nothing is summarised — the list is
-                      bounded here the same way 왜 올라왔나요 is folded, so 추천 below it stays on screen. */}
-                  {(preview ? problem.similar.slice(0, 1) : problem.similar).map((similar) => (
-                    <li key={`${similar.reviewId}-${similar.occurredOn ?? ""}`} className="space-y-0.5">
-                      {/* The quote is masked at read time and is null when masking suppressed it — then
-                          the row says only when and how it was rated, rather than showing an empty
-                          bubble that reads as "the customer wrote nothing". */}
-                      {similar.quote ? (
-                        <p className="break-keep text-sm leading-relaxed text-ink">「{similar.quote}」</p>
+                (() => {
+                  /* A bounded reading shows the first examples and keeps 「근거 N건」 beside the title, which is
+                     the whole set and the way to it. The number is not reduced and nothing is summarised —
+                     what is not drawn is folded, under a label that says exactly how much it holds. */
+                  const open = similarShown ?? (preview ? 1 : problem.similar.length);
+                  const rest = problem.similar.slice(open);
+                  return (
+                    <>
+                      <ul className="space-y-1.5">
+                        {problem.similar.slice(0, open).map((similar) => (
+                          <SimilarReview key={`${similar.reviewId}-${similar.occurredOn ?? ""}`} similar={similar} />
+                        ))}
+                      </ul>
+                      {rest.length > 0 ? (
+                        <Disclosure label={`같은 문제를 말한 리뷰 ${rest.length}건 더`}>
+                          <ul className="space-y-1.5 pt-1.5">
+                            {rest.map((similar) => (
+                              <SimilarReview key={`${similar.reviewId}-${similar.occurredOn ?? ""}`} similar={similar} />
+                            ))}
+                          </ul>
+                        </Disclosure>
                       ) : null}
-                      <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted">
-                        <span className="tabular-nums">{similar.occurredOn ?? "날짜 없음"}</span>
-                        <span className="tabular-nums">{ratingLabel(similar.rating)}</span>
-                        {/* The product is named only when it is a DIFFERENT one: on this screen every
-                            row shares the product being decided, and repeating it once per line is the
-                            shape this product states once. A different product is new information. */}
-                        {!similar.sameProduct && similar.productName ? (
-                          <span className="break-keep">{similar.productName}</span>
-                        ) : null}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
+                    </>
+                  );
+                })()
               ) : (
                 <p className="break-keep text-sm text-muted">이 문제의 근거는 지금 보고 계신 리뷰뿐입니다.</p>
               )}
@@ -131,5 +143,27 @@ export function RepeatedSignal({
         })}
       </ListBox>
     </Section>
+  );
+}
+
+/**
+ * One review that the extractor filed as evidence for the same problem.
+ *
+ * <p>The quote is masked at read time and is null when masking suppressed it — then the row says only when
+ * and how it was rated, rather than showing an empty bubble that reads as "the customer wrote nothing".
+ */
+function SimilarReview({ similar }: { similar: ReviewDecisionProblem["similar"][number] }) {
+  return (
+    <li className="space-y-0.5">
+      {similar.quote ? <p className="break-keep text-sm leading-relaxed text-ink">「{similar.quote}」</p> : null}
+      <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted">
+        <span className="tabular-nums">{similar.occurredOn ?? "날짜 없음"}</span>
+        <span className="tabular-nums">{ratingLabel(similar.rating)}</span>
+        {/* The product is named only when it is a DIFFERENT one: on this screen every row shares the product
+            being decided, and repeating it once per line is the shape this product states once. A different
+            product is new information. */}
+        {!similar.sameProduct && similar.productName ? <span className="break-keep">{similar.productName}</span> : null}
+      </p>
+    </li>
   );
 }

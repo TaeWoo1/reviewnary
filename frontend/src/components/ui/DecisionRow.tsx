@@ -404,8 +404,11 @@ export function DecisionRow({
  *
  * <p>{@code fixed} keeps a fact at its own width — for the ones a truncation would falsify (a rating, a
  * category). Everything else shares what is left and truncates.
+ *
+ * <p>Exported because the 리뷰 record draws the same line under its own rows (canonical mockup, 2026-10-03)
+ * and two copies of a separator are two things that can stop matching.
  */
-function Fact({ children, fixed = false }: { children: ReactNode; fixed?: boolean }) {
+export function Fact({ children, fixed = false }: { children: ReactNode; fixed?: boolean }) {
   return (
     <span className={`flex flex-nowrap items-center gap-2 ${fixed ? "shrink-0" : "min-w-0"}`}>
       <span aria-hidden="true" className="h-3 w-px shrink-0 bg-line" />

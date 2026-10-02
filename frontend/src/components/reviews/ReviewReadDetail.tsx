@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Facts } from "../ui/ObjectRow";
 import { Chip } from "../ui/Chip";
 import { Btn, BtnLink } from "../ui/Btn";
@@ -14,10 +14,16 @@ import type { LocateUnavailable, ReviewLocateBinding } from "../../lib/actionWin
 import type {
   ChannelReviewDetailView,
   ReviewChannelCapabilityView,
+  ReviewDecisionContext,
+  ReviewDecisionLogEntry,
   ReviewTriageNote,
   TriageBehaviorEvent,
 } from "../../lib/types";
 import { josa } from "./recordParts";
+import { RepeatedSignal } from "./decision/RepeatedSignal";
+import { GroundingOnHand } from "./decision/GroundingOnHand";
+import { decisionLogSentence } from "../../lib/reviewDecision";
+import { kstDate } from "../../lib/format";
 
 /*
  * The read detail of one review in the 리뷰 record — moved whole from the old per-account record screen
@@ -33,6 +39,11 @@ export function ReviewReadDetail({
   word,
   recordBehavior,
   detail,
+  context = null,
+  contextFailed = false,
+  door = true,
+  log = null,
+  logFailed = false,
   locate,
   run,
   running,
@@ -61,6 +72,30 @@ export function ReviewReadDetail({
   word: string;
   recordBehavior: (events: TriageBehaviorEvent[]) => void;
   detail: ChannelReviewDetailView;
+  /**
+   * <b>리뷰 결정 맥락</b> — 반복 신호 and 이 상품에 대해 우리가 아는 것, from the same two GETs the
+   * workspace reads (리뷰 canonical mockup, 2026-10-03). The record is still a record: these are reads,
+   * nothing here writes, and the one door is unchanged.
+   *
+   * <p>Null while it is in flight and when the read failed — the two are told apart by
+   * {@link contextFailed}, because a screen that could not see the issue memory has nothing to say
+   * about it and must not say 「없습니다」.
+   */
+  context?: ReviewDecisionContext | null;
+  contextFailed?: boolean;
+  /**
+   * <b>Whether this block draws the one door, or whether the pane docks it</b> (product-owner decision,
+   * 2026-10-03: 1366 action visibility).
+   *
+   * <p>The record's pane docks it — at 1366×768 the five blocks are taller than the column, and an action
+   * that scrolls away is an action the seller has to go looking for. Nothing is removed or compressed to
+   * make room: the button leaves the flow and rides the floor of the pane instead. On every other reading
+   * of this block (no pane under it) the door stays where the facts it follows are.
+   */
+  door?: boolean;
+  /** The decision trail, newest first. Null while in flight or when the read failed. */
+  log?: ReviewDecisionLogEntry[] | null;
+  logFailed?: boolean;
   locate: ReviewLocateBinding;
   run: ActionWindowRunView | null;
   running: boolean;
@@ -86,27 +121,48 @@ export function ReviewReadDetail({
   // Offered only when the RUNTIME says it is allowed. A recheck the run would refuse is a button that does
   // nothing, and on a screen whose whole job is to be honest about what was found that is the wrong button.
   const canRecheck = run?.allowedCommands.includes("REQUEST_STEP_RECHECK") ?? false;
+  // An entry this build cannot name is not drawn — the server's vocabulary may grow ahead of the screen,
+  // and a row rendered as its own raw token is the internal-word leak this product removes everywhere else.
+  const entries =
+    logFailed || log === null
+      ? []
+      : log
+          .map((entry) => ({ entry, sentence: decisionLogSentence(entry) }))
+          .filter((row): row is { entry: ReviewDecisionLogEntry; sentence: string } => row.sentence !== null);
   const canRaise = run?.allowedCommands.includes("FIND_CURRENT_STEP") ?? false;
   /** No header above us: this block is then the only thing that can say which review this is. */
   const ownsIdentity = header === "self";
   return (
-    <div className="space-y-4">
-      {/* The verdict and the marks — never the identity facts when a header owns them. 별점 and 날짜 are
-          closed facts about WHICH review this is; 확인 필요 · AI · 새 리뷰 · 사진 are statements ABOUT it,
-          and they have no other home on either surface. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <TriageTierChip tier={detail.triage.tier} />
-        {detail.aiMark ? <AiMarkChip /> : null}
-        {ownsIdentity ? (
-          <>
-            <span className="font-semibold text-ink">{ratingLabel(detail.rating)}</span>
-            <span className="text-sm text-muted">{detail.writtenOn ?? "날짜 없음"}</span>
-          </>
+    <div className="space-y-6">
+      {/*
+        <b>왜 올라왔나요</b> — the first of the four questions the pane answers in order: 고객의 말(header)
+        → 왜 올라왔나요 → 반복 신호 → 이 상품에 대해 아는 것 → 판단과 조치 (리뷰 canonical mockup, 2026-10-03).
+
+        <p>The verdict and the marks, never the identity facts when a header owns them. 별점 and 날짜 are
+        closed facts about WHICH review this is; AI · 새 리뷰 · 사진 are statements ABOUT it. <b>The tier
+        goes with them</b> when a header owns the identity: it is the first word of that header's meta
+        line, and a 440px column must not print the verdict twice.
+      */}
+      <Block label="왜 올라왔나요">
+        {ownsIdentity || detail.isNew || detail.mediaCount > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {ownsIdentity ? <TriageTierChip tier={detail.triage.tier} /> : null}
+          {/* <b>The mark, where nothing else says it.</b> With a header above, the row carrying this review
+              already drew 「AI 확인 필요」 and the disclosure two lines below names the mechanism in a whole
+              sentence — a capsule between them is the third statement of one fact, and the 36px it costs is
+              paid by the door at the bottom of the column. */}
+          {detail.aiMark && ownsIdentity ? <AiMarkChip /> : null}
+          {ownsIdentity ? (
+            <>
+              <span className="font-semibold text-ink">{ratingLabel(detail.rating)}</span>
+              <span className="text-sm text-muted">{detail.writtenOn ?? "날짜 없음"}</span>
+            </>
+          ) : null}
+          {detail.isNew ? <Chip tone="accent">새 {word}</Chip> : null}
+          {detail.mediaCount > 0 ? <Chip>사진·영상 {detail.mediaCount}</Chip> : null}
+        </div>
         ) : null}
-        {detail.isNew ? <Chip tone="accent">새 {word}</Chip> : null}
-        {detail.mediaCount > 0 ? <Chip>사진·영상 {detail.mediaCount}</Chip> : null}
-      </div>
-      <TriageReason note={detail.triage} />
+        <TriageReason note={detail.triage} />
       {detail.aiMark ? (
         // The one sentence that keeps the mark honest: the rule did NOT call this 확인 필요, a frozen
         // classifier did, and the seller is asked to correct it if it is wrong.
@@ -160,6 +216,30 @@ export function ReviewReadDetail({
           </>
         ) : null}
       </dl>
+      </Block>
+
+      {/*
+        <b>반복 신호</b> — has anyone said this before, and who. The issue memory's own judgement, drawn by
+        the component the workspace draws it with, so the two surfaces cannot say different things about the
+        same problem. Two examples stand open and the rest is one press away: the full set of evidence is
+        measured on the problem's own record, which its title links to.
+
+        <p>Separate from the triage note above it on purpose — the keyword classification counts how many of
+        this channel's reviews share a stored category, and this counts what the extractor filed as evidence
+        for one problem. They are two mechanisms and the product never merges them.
+      */}
+      {context ? (
+        <Block label="반복 신호" plain>
+          <RepeatedSignal problems={context.repeatedProblems} failed={contextFailed} titled={false} similarShown={2} />
+        </Block>
+      ) : null}
+
+      {/* <b>이 상품에 대해 우리가 아는 것</b> — what is FILED, not what a draft used. */}
+      {context ? (
+        <Block label="이 상품에 대해 우리가 아는 것" plain>
+          <GroundingOnHand context={context} titled={false} />
+        </Block>
+      ) : null}
 
       {/*
         **판단과 조치는 여기서 하지 않는다 — 리뷰 처리 화면이 그 자리다.**
@@ -174,8 +254,7 @@ export function ReviewReadDetail({
         So the record stays a RECORD. It reads what stands — the system's tier, the seller's own answer,
         the decision, what the channel says — and offers one door. Nothing here writes.
       */}
-      <section aria-label="판단과 조치" className="space-y-3 border-t border-line pt-4">
-        <p className="text-sm font-semibold text-ink">판단과 조치</p>
+      <Block label="판단과 조치">
         {/* WHO WRITES THE ANSWER — a capability fact of this review's channel, said once, where the door is.
             Reads `replyFlowExists`, the platform fact the draft lane itself is gated on, and NOT
             `replySupported`, the triage contract's NAVER-only event column: that one said 「reviewnary가
@@ -204,13 +283,16 @@ export function ReviewReadDetail({
               them which one the machine chose. Nothing to contrast is a different situation from three
               buttons to choose between. */}
           {detail.sellerCorrection ? (
+            // <b>Quiet</b> (리뷰 canonical redesign, 2026-10-03). Two dotted status words and a capsule on one
+            // metadata line is the status-board reading this screen is being taken out of; the words, the
+            // tones and the table are unchanged. The mark is not repeated here either — 왜 올라왔나요 above
+            // says in a sentence which mechanism spoke.
             <>
               <span className="inline-flex items-center gap-1.5">
-                시스템 판단 <TriageTierChip tier={detail.triage.tier} />
-                {detail.aiMark ? <AiMarkChip /> : null}
+                시스템 판단 <TriageTierChip tier={detail.triage.tier} quiet />
               </span>
               <span className="inline-flex items-center gap-1.5">
-                판매자 수정 <TriageTierChip tier={detail.sellerCorrection.correctedTier} />
+                판매자 수정 <TriageTierChip tier={detail.sellerCorrection.correctedTier} quiet />
               </span>
             </>
           ) : null}
@@ -221,10 +303,12 @@ export function ReviewReadDetail({
               belongs where the controls it explains are — and they are not here any more. */}
           {detail.replyWork?.channelReplyState === "ANSWERED" ? <span>채널에 답변 등록됨</span> : null}
         </Facts>
-        <BtnLink to={`/reviews/reply/${detail.id}?from=record`} size="sm">
-          이 리뷰 처리하기
-        </BtnLink>
-      </section>
+        {door ? (
+          <BtnLink to={`/reviews/reply/${detail.id}?from=record`} size="sm">
+            이 리뷰 처리하기
+          </BtnLink>
+        ) : null}
+      </Block>
 
       {/*
         **[쿠팡에서 보기] — the one thing a seller can ask SellerOps to DO with a 상품평.**
@@ -237,7 +321,7 @@ export function ReviewReadDetail({
         is no "see the original" control at all, and the page says so once rather than offering a dead one.
       */}
       {canLocate ? (
-      <div className="space-y-2 border-t border-line pt-4">
+      <div className="space-y-2 border-t border-line pt-6">
         <Btn
           size="sm"
           variant="outline"
@@ -289,13 +373,67 @@ export function ReviewReadDetail({
       ) : (
         // Folded for the same reason: this answers 「원문은 어디서 보나」, and a seller who has not asked
         // it reads a 56-character apology for a control that is not there. The label is the question.
-        <Disclosure className="border-t border-line pt-4" label={`${word} 원문 보기`}>
+        <Disclosure className="border-t border-line pt-6" label={`${word} 원문 보기`}>
           <p className="pt-1 text-sm leading-relaxed text-muted">
             이 채널의 {josa(word, "은", "는")} reviewnary에서 원문 화면으로 바로 이동할 수 없습니다. 판매자센터에서 직접 확인해 주세요.
           </p>
         </Disclosure>
       )}
+
+      {/*
+        <b>기록</b> — where this review already stands, newest first.
+
+        <p>Every line comes from a trail this product has been writing for months, through
+        {@link decisionLogSentence}, which is the same composer the workspace's own 기록 uses — so the two
+        surfaces cannot word the same event differently. <b>Two lines, then a count.</b> This is the record's
+        reading of the trail, not the trail: the rest is through the one door above, and a second link to the
+        same place is a second thing to tab through.
+        <p><b>Nothing is drawn when there is nothing.</b> A review nobody has decided has no history, and a
+        heading over 「아직 없습니다」 is a block that exists to say it is empty — the workspace, where a
+        seller has just recorded something and may reasonably look for it, keeps that sentence.
+      */}
+      {entries.length > 0 ? (
+        <Block label="기록">
+          <ul className="space-y-2">
+            {entries.slice(0, 2).map(({ entry, sentence }, index) => (
+              <li key={`${entry.kind}-${entry.at}-${index}`} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                <span className="shrink-0 tabular-nums text-muted">{kstDate(entry.at)}</span>
+                <span className="break-keep text-ink">{sentence}</span>
+              </li>
+            ))}
+          </ul>
+          {entries.length > 2 ? (
+            <p className="text-sm tabular-nums text-muted">{`외 ${entries.length - 2}건`}</p>
+          ) : null}
+        </Block>
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * One block of the record's pane — a rule, a quiet label, and what is under it.
+ *
+ * <p>13px muted over a hairline: the reading 확인할 일's pane was closed on (2026-10-02). At this column
+ * width a section title at body size is the same weight as the facts it introduces, and five of them down
+ * one column read as five cards with the borders left off.
+ *
+ * <p>{@code plain} for a block whose content brings its own labelled region ({@link RepeatedSignal},
+ * {@link GroundingOnHand}) — two nested regions with one name is a name said twice.
+ */
+function Block({ label, plain = false, children }: { label: string; plain?: boolean; children: ReactNode }) {
+  const inner = (
+    <>
+      <h3 className="text-xs font-semibold text-muted">{label}</h3>
+      <div className="mt-3 space-y-3">{children}</div>
+    </>
+  );
+  return plain ? (
+    <div className="border-t border-line pt-6">{inner}</div>
+  ) : (
+    <section aria-label={label} className="border-t border-line pt-6">
+      {inner}
+    </section>
   );
 }
 

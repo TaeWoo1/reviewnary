@@ -49,6 +49,9 @@ const ON_THE_SYSTEM = [
   "components/home/PreparedWorkList.tsx",
   "components/memory/IssueList.tsx",
   "pages/app/OperationsCaseQueue.tsx",
+  // 리뷰, since its canonical redesign (2026-10-03): the same list reading and the same decision pane.
+  "pages/app/ReviewRecord.tsx",
+  "components/reviews/ReviewReadDetail.tsx",
   "pages/app/CustomerInbox.tsx",
   "components/inbox/InboxDetail.tsx",
   "pages/app/ConnectHub.tsx",

@@ -53,10 +53,33 @@ export const TRIAGE_TAG_DISCLOSURE =
  * review 확인 필요, a frozen classifier did, and the disclosure says so in one line. The chip uses
  * the same emphasis as 확인 필요 because it sorts with 확인 필요; the wording carries the difference.
  */
-export const AI_TRIAGE_MARK_LABEL = "AI 확인 필요";
+/**
+ * <b>판매자 확인 필요</b> — renamed from 「AI 확인 필요」 (product-owner decision, 2026-10-03).
+ *
+ * <p>The word named the MECHANISM that raised the row. What a seller needs from a mark on their own
+ * queue is what it asks of them, and 「AI」 is not that — it is a fact about how reviewnary is built.
+ *
+ * <p><b>It is still not the tier's word.</b> RUBRIC v2 §13.7 requires that the seller can always tell
+ * which judgement spoke, so this may not become plain 「확인 필요」: that is {@link TRIAGE_TIER_LABEL}'s,
+ * and a review can carry 지켜보기 from the rules and this mark at the same time — the state the demo org
+ * actually holds. The qualifier carries the difference without naming a model.
+ */
+export const AI_TRIAGE_MARK_LABEL = "판매자 확인 필요";
 export const AI_TRIAGE_MARK_CLASS = "bg-warn/10 text-warn ring-1 ring-warn/40";
+/**
+ * <b>무엇이 일어났는지를 판매자의 말로</b> (product-owner decision, 2026-10-03).
+ *
+ * <p>It was 「… AI 분류가 판매자가 확인할 내용이 있다고 판단한 상품평입니다」 — a sentence whose subject is the
+ * classifier. The seller's question is not which component spoke; it is why this review is in front of
+ * them when its rating says it should not be.
+ *
+ * <p><b>The two facts the old sentence carried both survive.</b> The rules did NOT raise this (별점과 본문만
+ * 보면 확인 대상이 아니지만), and something that READ the text did — which is the one thing that tells this
+ * mark apart from the tier beside it, said as what was done rather than as what ran. And the correction is
+ * still invited, because a mark the seller cannot contradict is a verdict.
+ */
 export const AI_TRIAGE_DISCLOSURE =
-  "별점·본문 유무 기준으로는 확인 필요가 아니지만, AI 분류가 판매자가 확인할 내용이 있다고 판단한 상품평입니다. 틀렸다면 아래에서 바로잡아 주세요.";
+  "별점과 본문만 보면 확인 대상이 아니지만, 내용을 읽어 보니 판매자님이 확인하실 만한 것이 있어 올렸습니다. 아니라면 바로잡아 주세요.";
 
 /**
  * The correction controls' words — the seller's own judgment, in the same three words the tier chips

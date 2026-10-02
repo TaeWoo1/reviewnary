@@ -226,16 +226,18 @@ describe("리뷰 — the workflow surface", () => {
     // UI/UX v2 Phase 2 (product-owner decision). It used to redirect into the FIRST account's record, so the
     // screen's first answer was a channel the seller never chose.
     renderAt("/reviews");
-    const filter = await screen.findByRole("group", { name: "채널 필터" });
+    // The channel is a setting on the list, not its axis: a quiet menu rather than a third row of pills
+    // (리뷰 canonical mockup, 2026-10-03). What it offers is unchanged — 전체 and the channels this org holds.
+    const filter = (await screen.findByLabelText("채널")) as HTMLSelectElement;
     expect(screen.getByRole("heading", { level: 1, name: "리뷰" })).toBeInTheDocument();
-    expect(within(filter).getByRole("button", { name: "전체" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(filter).getAllByRole("button").map((b) => b.textContent)).toEqual(["전체", "네이버", "쿠팡"]);
+    expect(filter.value).toBe("ALL");
+    expect(within(filter).getAllByRole("option").map((o) => o.textContent)).toEqual(["전체 채널", "네이버", "쿠팡"]);
     // One read, answered by the server over every channel — nothing merged on this side.
     expect(getReviewRecordStrict).toHaveBeenCalledWith(expect.objectContaining({ channel: undefined, sort: "attention" }));
     expect(screen.queryByRole("navigation", { name: "리뷰 채널" })).toBeNull();
 
     // A channel narrows the same read.
-    await userEvent.click(within(filter).getByRole("button", { name: "쿠팡" }));
+    await userEvent.selectOptions(filter, "COUPANG");
     await waitFor(() =>
       expect(getReviewRecordStrict).toHaveBeenLastCalledWith(expect.objectContaining({ channel: "COUPANG" })),
     );
@@ -243,7 +245,7 @@ describe("리뷰 — the workflow surface", () => {
 
   it("opens no work area first — the record is a record, and the work is 확인할 일's (UI/UX v2 Phase 3)", async () => {
     renderAt("/reviews");
-    await screen.findByRole("group", { name: "채널 필터" });
+    await screen.findByLabelText("채널");
     expect(screen.queryByRole("heading", { name: /내 답변 작업/ })).toBeNull();
     expect(screen.queryByText(/지금 확인이 필요한 리뷰/)).toBeNull();
   });
@@ -289,7 +291,7 @@ describe("리뷰 — the workflow surface", () => {
     getChannelsStrict.mockResolvedValue([...CHANNELS, channel("gm", "GMARKET", "G마켓")]);
     getSellerAccountsStrict.mockResolvedValue([account("acc-gm", "gm", "G마켓"), account("acc-cp", "cp", "쿠팡"), account("acc-nv", "nv", "네이버 스마트스토어")]);
     renderAt("/reviews");
-    const filter = await screen.findByRole("group", { name: "채널 필터" });
+    const filter = await screen.findByLabelText("채널");
     expect(within(filter).queryByText("G마켓")).toBeNull();
   });
 
