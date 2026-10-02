@@ -88,6 +88,26 @@ export function WorkRows({
        where it is. Nothing is dropped and no field is re-derived — this moves one string between two
        slots of the same row. */
     const product = queue && row.kind === "REVIEW" ? row.line : null;
+    /* <b>The queue leads with the customer's sentence</b> (product-owner decision, 2026-10-02). An
+       inquiry's `title` is the SUBJECT line the customer typed, and 「문의 드립니다」 is what nearly all
+       of them type — so the queue's first two rows were the same four characters and told the seller
+       nothing. {@link HomeWorkRow.said} is the body, off the wire, absent when the record has none.
+
+       <p>Only the queue. Home is frozen on `title` (2026-10-01) and asks for neither this nor
+       `metaBelow`, so the row it gets is the row it had. */
+    const lead = queue && row.said ? row.said : row.title;
+    /* <b>The queue row carries no judgement of ours</b> (product-owner decision, 2026-10-02).
+       {@link HomeWorkRow.line} is three different things depending on where the row came from: a
+       CASE's is the case `summary` — 「등록된 지식으로 답변할 수 있는 문의입니다…」, which is
+       reviewnary's own reading and its ranking of this item against the others — while an INQUIRY's
+       is the customer's own snippet and a REVIEW's is the product. The first is the only one the
+       seller did not write and cannot check from the row, and 왜 지금 볼 일인가 in the detail owns it
+       outright; printing it here made a 46-row list argue its case 46 times.
+
+       <p>So the kind decides, not the string: customer and product context stay, our account goes.
+       The prefix test still applies to what remains, because a snippet can still be its own title. */
+    const ours = queue && row.kind === "CASE";
+    const second = !ours && product === null && row.line && !echoes(row.line, lead) ? row.line : null;
     return (
       <DecisionRow
         key={row.key}
@@ -95,8 +115,8 @@ export function WorkRows({
         icon={row.reason.icon}
         tag={row.reason.tag}
         work={row.state}
-        title={row.title}
-        line={product === null ? row.line : null}
+        title={lead}
+        line={second}
         /* <b>One contract, and the pane applies the same one</b> (elapsed-time contract, 2026-10-02).
            The branch was on `kind` — which record carries the row — so a CASE opened about a review
            said 「N일 대기」 about a review nobody was waiting on. {@link elapsedLabel} reads `subject`,
@@ -143,6 +163,13 @@ export function WorkRows({
       </DecisionList>
     </div>
   );
+}
+
+/** True when the second line would only repeat the sentence already drawn above it. */
+function echoes(line: string, lead: string): boolean {
+  const a = line.trim();
+  const b = lead.trim().replace(/…$/, "");
+  return a === b || a.startsWith(b) || b.startsWith(a);
 }
 
 /**

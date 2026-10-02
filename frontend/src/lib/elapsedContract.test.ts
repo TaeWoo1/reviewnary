@@ -18,6 +18,7 @@ function decision(over: Partial<CustomerOperationsDecisionRow> = {}): CustomerOp
     subjectKind: "INQUIRY",
     channelNameKo: "카페24 자사몰",
     title: "문의 드립니다",
+    preview: null,
     rating: null,
     reasonNote: "고객이 답변을 기다리고 있습니다.",
     summary: null,

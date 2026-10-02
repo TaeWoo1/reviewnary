@@ -154,9 +154,98 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
     const answer = await screen.findByRole("region", { name: "준비된 답변" });
     expect(within(answer).getByText("수령 후 7일 이내, 미개봉 상태라면 교환이 가능합니다.")).toBeTruthy();
     expect(within(answer).queryByRole("textbox")).toBeNull();
-    expect(within(answer).getByText("운영 정책 2개를 근거로 준비한 답변입니다.")).toBeTruthy();
+    /* The basis is still said once, beside the heading, off `draft.evidence` — it is now the metadata
+       line 「미발송 · 운영 정책 2개 근거」 rather than the sentence 「…를 근거로 준비한 답변입니다」
+       (visual target, 2026-10-02: the document reading states what sent-state and basis ARE, and does
+       not narrate them). What is fenced here is unchanged: the count, its authority, and that the seller
+       is told what the answer was written out of before they send it. */
+    expect(within(answer).getByText(/운영 정책 2개 근거/)).toBeTruthy();
+    expect(within(answer).getByText(/미발송/)).toBeTruthy();
 
     await userEvent.click(within(answer).getByRole("button", { name: "수정하기" }));
     expect(within(answer).getByRole("textbox")).toBeTruthy();
+  });
+
+  /**
+   * <b>고객의 말 → 왜 지금 볼 일인가 → 확인한 내용 → 준비된 답변 → action</b> (product-owner decision,
+   * 2026-10-02).
+   *
+   * <p>The pane opened on 왜 지금 볼 일인가 and put the customer's request under it, which is a document
+   * explaining itself before it says what it is about. Asserted as an ORDER over the rendered regions
+   * rather than as five separate presence checks: every one of those five passed under the old order
+   * too, and the order is the whole of what changed.
+   */
+  it("the pane reads as a document: the customer's words first, the justification after", async () => {
+    api.getOperationsCase.mockResolvedValue(detail());
+    const { container } = drawPane();
+
+    const article = await screen.findByRole("article", { name: "선택한 항목" });
+    const named = ["문의 내용", "왜 지금 볼 일인가", "확인한 내용", "준비된 답변"];
+    const order = [...article.querySelectorAll("section[aria-label]")]
+      .map((el) => el.getAttribute("aria-label"))
+      .filter((label): label is string => named.includes(label!));
+    expect(order).toEqual(named);
+    // The action is the end of the document, after everything that justifies it.
+    const send = within(article).getByRole("link", { name: /발송 화면으로/ });
+    const said = within(article).getByText("포장을 뜯지 않은 경우도 교환이 가능한가요?");
+    expect(said.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector("textarea")).toBeNull();
+  });
+
+  /**
+   * <b>왜 지금 볼 일인가 carries only what the seller can check</b> (product-owner decision,
+   * 2026-10-02). The stored `summary` ends with reviewnary's own ranking of the parts of one question
+   * — 「(확인한 요청 2건 중 가장 먼저 해결해야 하는 항목 기준입니다.)」 — which is bookkeeping, not a
+   * fact about this customer. The head sentence stays whole.
+   */
+  it("왜 지금 볼 일인가 drops our own ranking clause and keeps the sentence it qualified", async () => {
+    api.getOperationsCase.mockResolvedValue(
+      detail({ summary: "등록된 지식으로 답변할 수 있는 문의입니다. (확인한 요청 2건 중 가장 먼저 해결해야 하는 항목 기준입니다.)" }),
+    );
+    drawPane();
+
+    const why = await screen.findByRole("region", { name: "왜 지금 볼 일인가" });
+    expect(within(why).getByText("등록된 지식으로 답변할 수 있는 문의입니다.")).toBeTruthy();
+    expect(why.textContent).not.toMatch(/확인한 요청|가장 먼저/);
+  });
+
+  /**
+   * <b>수정하기 → 발송 화면으로</b> (product-owner decision, 2026-10-02): the detour is considered
+   * first and the ending last, and the primary is marked by colour rather than by position.
+   */
+  it("the detour comes before the ending, and the primary is still the only solid control", async () => {
+    api.getOperationsCase.mockResolvedValue(detail());
+    drawPane();
+
+    const answer = await screen.findByRole("region", { name: "준비된 답변" });
+    const edit = within(answer).getByRole("button", { name: "수정하기" });
+    const send = within(answer).getByRole("link", { name: /발송 화면으로/ });
+    expect(edit.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(send.className).toMatch(/bg-brand-700/);
+    expect(edit.className).not.toMatch(/bg-brand-700/);
+    // Content-sized: neither control is told to fill or divide the row.
+    expect(send.className).not.toMatch(/flex-1|w-full/);
+    expect(edit.className).not.toMatch(/flex-1|w-full/);
+  });
+
+  /**
+   * <b>No card around the prepared answer</b> (visual target, 2026-10-02). 확인할 일's pane is a document:
+   * the answer is its body, not an object set into it, and the brand-outlined box around it was the
+   * loudest surface on a screen whose subject is one customer's sentence. Fenced because the ring is one
+   * class on a shared component — {@code ActionCard} still draws it for every other reading — so losing
+   * the flag would restore the box with nothing else failing.
+   */
+  it("the prepared answer is set in the page, not boxed in a brand outline", async () => {
+    api.getOperationsCase.mockResolvedValue(detail());
+    drawPane();
+
+    const answer = await screen.findByRole("region", { name: "준비된 답변" });
+    const box = answer.className;
+    expect(box).not.toMatch(/ring|rounded-\[16px\]|shadow-\[/);
+    expect(box).toMatch(/border-t/);
+    // And the answer itself is read, not a filled field waiting to be typed in.
+    const body = within(answer).getByText("수령 후 7일 이내, 미개봉 상태라면 교환이 가능합니다.");
+    expect(body.className).toMatch(/text-prose/);
+    expect(body.className).not.toMatch(/bg-/);
   });
 });

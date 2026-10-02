@@ -38,6 +38,13 @@ public record CustomerOperationsHomeView(
     /**
      * @param openedAt   when reviewnary opened the case — a fact about OUR record, and the elapsed-time fallback
      *                   only (the elapsed-time contract, 2026-10-02).
+     * @param preview    the customer's OWN words, one sanitized line — the inquiry's body. Null for a review,
+     *                   whose {@code title} is already its body, and null for an inquiry whose title IS the body
+     *                   (a titleless inquiry), because a row must not print one sentence twice. Null when the
+     *                   body is absent: nothing here is estimated. It exists because an inquiry's {@code title}
+     *                   is the customer's SUBJECT line — 「문의 드립니다」 on every one of them — so a queue
+     *                   ordered by urgency drew two indistinguishable rows and the seller could not tell which
+     *                   was which without opening both (product-owner decision, 2026-10-02).
      * @param receivedOn when the customer's own event happened, in KST — the inquiry's or review's
      *                   {@code receivedAt}, the same field {@code CaseDetailView.receivedOn} reads. It is here
      *                   because the list and the detail of one item must say the same elapsed time, and the list
@@ -45,7 +52,8 @@ public record CustomerOperationsHomeView(
      *                   arrived read 「8일 대기」 in the list and 「9일 대기」 in the pane. Null when the subject
      *                   record is gone or carries no time — then the caller falls back, and nothing is estimated.
      */
-    public record DecisionRow(UUID caseId, String subjectKind, String channelNameKo, String title, Integer rating,
+    public record DecisionRow(UUID caseId, String subjectKind, String channelNameKo, String title, String preview,
+                              Integer rating,
                               String reasonNote, String summary, String recommendedActionType,
                               String recommendedAction, List<String> missingInformation, boolean draftPrepared,
                               String decidedBy, Instant openedAt, java.time.LocalDate receivedOn, String to) {

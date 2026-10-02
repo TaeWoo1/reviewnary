@@ -205,3 +205,9 @@ were deleted rather than presented as before. Said plainly rather than quietly r
 here rather than folded into the visual changes.
 
 **마켓플레이스 호출 0 · WRITE 0 · 모델 호출 0 · 승인 0 · 마이그레이션 0 · DB 행 변경 0** ⇒ evidence 행 없음.
+
+## §10 Carried forward
+
+- `CaseFromResolution.summaryFor`가 내부 ranking 설명 괄호를 저장하고 있어, 현재 확인할 일 화면은
+  presentation 단계에서 trailing parenthetical만 숨긴다. 신규 case의 canonical summary 문구 자체를
+  정리하는 것은 별도 작업.

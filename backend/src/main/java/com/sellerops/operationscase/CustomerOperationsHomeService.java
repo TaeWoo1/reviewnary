@@ -200,7 +200,8 @@ public class CustomerOperationsHomeService {
         return waiting.stream().limit(size).map(c -> {
             Subject subject = subject(c);
             return new CustomerOperationsHomeView.DecisionRow(c.getId(), c.getSubjectKind().name(),
-                    channelName(channelById, c.getChannelId()), subject.title(), subject.rating(), CaseReason.noteFor(c),
+                    channelName(channelById, c.getChannelId()), subject.title(), subject.preview(), subject.rating(),
+                    CaseReason.noteFor(c),
                     c.getSummary(),
                     c.getRecommendedActionType() == null ? null : c.getRecommendedActionType().name(),
                     c.getRecommendedAction(), missing(c.getMissingInformation()),
@@ -316,7 +317,7 @@ public class CustomerOperationsHomeService {
      *                   already loads, and by the same expression {@code CaseKnowledgeService.subject} uses — so
      *                   the row and the detail of one case cannot date it differently.
      */
-    private record Subject(String title, Integer rating, java.time.LocalDate receivedOn) {
+    private record Subject(String title, String preview, Integer rating, java.time.LocalDate receivedOn) {
     }
 
     private Subject subject(OperationsCase c) {
@@ -324,18 +325,23 @@ public class CustomerOperationsHomeService {
             return inquiries.findById(c.getSubjectId()).filter(i -> c.getOrgId().equals(i.getOrgId()))
                     .map(i -> {
                         String title = MarkupText.toPlainText(i.getTitle());
+                        String body = preview(MarkupText.toPlainText(i.getBody()));
                         String shown = preview(title == null || title.isBlank()
                                 ? MarkupText.toPlainText(i.getBody()) : title);
-                        return new Subject(shown, null, receivedOn(i.getReceivedAt()));
-                    }).orElse(new Subject(null, null, null));
+                        // The body is the row's preview only when the title is not ALREADY the body. A titleless
+                        // inquiry falls back to its body above, and printing it twice is the defect, not the fix.
+                        return new Subject(shown, body == null || body.equals(shown) ? null : body, null,
+                                receivedOn(i.getReceivedAt()));
+                    }).orElse(new Subject(null, null, null, null));
         }
         if (c.getSubjectKind() == OperationsSubjectKind.REVIEW) {
             return reviews.findById(c.getSubjectId()).filter(x -> c.getOrgId().equals(x.getOrgId()))
-                    .map(x -> new Subject(preview(MarkupText.toPlainText(x.getBody())), x.getRating(),
+                    // No preview: a review's title IS its body, and the row would print the sentence twice.
+                    .map(x -> new Subject(preview(MarkupText.toPlainText(x.getBody())), null, x.getRating(),
                             receivedOn(x.getReceivedAt())))
-                    .orElse(new Subject(null, null, null));
+                    .orElse(new Subject(null, null, null, null));
         }
-        return new Subject(null, null, null);
+        return new Subject(null, null, null, null);
     }
 
     /** KST, which is the zone {@code CaseDetailView.receivedOn} is in; no other conversion and no estimate. */
