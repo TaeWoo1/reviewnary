@@ -142,10 +142,15 @@ describe("고객운영 메모리 — v1 scope fence", () => {
     expect(fields[0].getAttribute("placeholder") ?? "").not.toMatch(/검색|찾기|물어|질문/);
   });
 
-  it("describes what the surface holds without promising unbuilt capability", async () => {
+  it("names itself once and puts its caveat under the work, not over it", async () => {
     renderMemory();
     // One name since UI/UX v2 Phase 1: the nav entry, the Home section and this title all say 반복 문제.
     expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("반복 문제");
-    expect(screen.getByText(/반복해서 말한 문제와 그 근거/)).toBeInTheDocument();
+    // The screen's description paragraph is gone (canonical, 2026-10-03): a seller who reads the list
+    // learns the same thing from what is in it, and a sentence about the screen stood between the title
+    // and the problems. What a seller cannot infer — that these are candidates and not a diagnosis —
+    // stays, below the list where the counts are.
+    expect(screen.queryByText(/반복해서 말한 문제와 그 근거/)).toBeNull();
+    expect(await screen.findByText(/최종 진단이 아닙니다/)).toBeInTheDocument();
   });
 });

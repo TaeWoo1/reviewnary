@@ -1,4 +1,5 @@
 import type {
+  IssueEvidenceView,
   IssueKnowledgeOnHand,
   IssueProductEvidenceView,
   IssueRatingDistributionView,
@@ -137,4 +138,86 @@ export function ratingBands(distribution: IssueRatingDistributionView): RatingBa
  */
 export function hasRatingEvidence(distribution: IssueRatingDistributionView): boolean {
   return ratingBands(distribution).some((band) => band.count > 0);
+}
+
+/** One month of the evidence trend: the bucket and how many pieces of evidence fell in it. */
+export interface EvidenceMonth {
+  /** `YYYY-MM`. */
+  key: string;
+  count: number;
+}
+
+/** How many months the trend may show at once. */
+const TREND_WINDOW_MONTHS = 24;
+
+function monthKey(isoDate: string): string {
+  return isoDate.slice(0, 7);
+}
+
+function shiftMonth(key: string, by: number): string {
+  const year = Number(key.slice(0, 4));
+  const month = Number(key.slice(5, 7)) - 1 + by;
+  const y = year + Math.floor(month / 12);
+  const m = ((month % 12) + 12) % 12;
+  return `${String(y).padStart(4, "0")}-${String(m + 1).padStart(2, "0")}`;
+}
+
+/**
+ * <b>When this problem was said, month by month</b> — the one question a date pair cannot answer.
+ *
+ * <b>It counts, and it counts nothing new.</b> Each bucket is the number of evidence rows whose
+ * `occurredOn` falls in that month, from the rows the detail read already returned. There is no second
+ * read, no rate, no trend verdict: whether this problem is 급증 or 집중 is the server's judgement
+ * (`IssueChangeView`), and a chart that implied one would be a second opinion with no rule behind it.
+ *
+ * <b>The axis runs to `throughMonth`, which is today.</b> Stopping at the last piece of evidence would
+ * draw a chart that ends where the problem stopped being mentioned, which reads as 「still happening」
+ * for a problem last seen a year ago. The empty months after the final bar are the honest part.
+ *
+ * <b>Bounded at {@link TREND_WINDOW_MONTHS}.</b> This org holds a problem whose first evidence is from
+ * 2015; a bar per month since would be 137 bars three pixels wide. The window starts at the first
+ * evidence month or 24 months back, whichever is later — so a short-lived problem is drawn whole and a
+ * decade-old one is drawn recent. What falls outside is not hidden: see {@link evidenceBeforeTrend}.
+ */
+export function evidenceMonths(
+  evidence: readonly IssueEvidenceView[],
+  throughMonth: string,
+): EvidenceMonth[] {
+  if (evidence.length === 0) return [];
+  const months = evidence.map((row) => monthKey(row.occurredOn));
+  const earliest = months.reduce((a, b) => (a < b ? a : b));
+  const latest = months.reduce((a, b) => (a > b ? a : b));
+  const end = latest > throughMonth ? latest : throughMonth;
+  const floor = shiftMonth(end, -(TREND_WINDOW_MONTHS - 1));
+  const start = earliest > floor ? earliest : floor;
+  const counted = new Map<string, number>();
+  for (const key of months) {
+    if (key >= start) counted.set(key, (counted.get(key) ?? 0) + 1);
+  }
+  const out: EvidenceMonth[] = [];
+  for (let key = start; key <= end; key = shiftMonth(key, 1)) {
+    out.push({ key, count: counted.get(key) ?? 0 });
+  }
+  return out;
+}
+
+/**
+ * Evidence older than the drawn window, or 0 when the window holds all of it.
+ *
+ * Stated rather than dropped: the bars are a count of this problem's evidence, and a seller adding them
+ * up must be able to reach the issue's own total or learn why they cannot.
+ */
+export function evidenceBeforeTrend(
+  evidence: readonly IssueEvidenceView[],
+  months: readonly EvidenceMonth[],
+): number {
+  if (months.length === 0) return 0;
+  const start = months[0].key;
+  return evidence.filter((row) => monthKey(row.occurredOn) < start).length;
+}
+
+/** 「가장 많았던 달 4건」, or null when every month is empty. */
+export function trendPeakLine(months: readonly EvidenceMonth[]): string | null {
+  const peak = months.reduce((max, m) => (m.count > max ? m.count : max), 0);
+  return peak > 0 ? `가장 많았던 달 ${peak.toLocaleString("ko-KR")}건` : null;
 }

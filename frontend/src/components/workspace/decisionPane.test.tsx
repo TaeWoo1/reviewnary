@@ -61,11 +61,16 @@ describe("master-detail pane", () => {
    * something. 리뷰's pane now holds the same reading — 고객의 말 → 왜 올라왔나요 → 반복 신호 → 이 상품에
    * 대해 아는 것 → 판단과 조치 — so it takes the same column, with the same 1440 breakpoint under it.
    *
-   * <p>The list is still closed and still asserted: a third caller is a decision, not an import.
+   * <p>And 반복 문제 since its own canonical (2026-10-03): 변화와 신호 → 근거 → 우리가 써 둔 것 → 판단과
+   * 조치 → 기록, ending in a lifecycle transition the seller records in their own words. Three readings,
+   * one column.
+   *
+   * <p>The list is still closed and still asserted: a fourth caller is a decision, not an import.
    */
-  it("two screens override it — 확인할 일 and 리뷰, the two panes a decision is made in", () => {
+  it("three screens override it — 확인할 일 · 리뷰 · 반복 문제, the panes a decision is made in", () => {
     const callers = SRC.filter((f) => readFileSync(f, "utf8").includes('pane="decision"'));
     expect(callers.map((f) => f.replace(/\\/g, "/")).sort()).toEqual([
+      "src/pages/app/CustomerMemory.tsx",
       "src/pages/app/OperationsCaseQueue.tsx",
       "src/pages/app/ReviewRecord.tsx",
     ]);

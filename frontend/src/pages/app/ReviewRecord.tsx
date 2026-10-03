@@ -6,7 +6,9 @@ import { Btn, BtnLink } from "../../components/ui/Btn";
 import { Fact } from "../../components/ui/DecisionRow";
 import { AiMarkChip, TriageTierChip } from "../../components/reviews/TriageTierChip";
 import { ReviewReadDetail } from "../../components/reviews/ReviewReadDetail";
-import { QuietSelect, formatDateTime, josa, parseTierParam } from "../../components/reviews/recordParts";
+import { formatDateTime, josa, parseTierParam } from "../../components/reviews/recordParts";
+import { QuietSelect } from "../../components/ui/QuietSelect";
+import { FilterTab } from "../../components/ui/FilterTab";
 import { MasterDetail, useWideLayout } from "../../components/workspace/MasterDetail";
 import { CaseLayout } from "../../components/workspace/CaseLayout";
 import { OperationsCaseView } from "./OperationsCase";
@@ -220,7 +222,7 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-b border-line">
         <div className="flex flex-wrap items-center gap-6" role="group" aria-label="분류 필터">
           {TRIAGE_TIERS.map((value) => (
-            <TierTab
+            <FilterTab
               key={value}
               pressed={tier === value}
               onClick={() => {
@@ -229,9 +231,9 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
               }}
             >
               {TRIAGE_TIER_LABEL[value]} {page ? tierCount(page, value) : 0}
-            </TierTab>
+            </FilterTab>
           ))}
-          <TierTab
+          <FilterTab
             pressed={tier === null}
             onClick={() => {
               setParams({ tier: null, review: null });
@@ -239,7 +241,7 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
             }}
           >
             전체 {recordTotal}
-          </TierTab>
+          </FilterTab>
         </div>
         <div className="flex flex-wrap items-center gap-4 pb-2">
           {workCount && workCount > 0 ? (
@@ -676,24 +678,3 @@ function uniqueChannels(targets: ReviewAccount[]): string[] {
   return order.filter((c) => codes.has(c));
 }
 
-/**
- * One tab of the record's own axis.
- *
- * <p>The same underline reading 확인할 일's queue uses, and for the same reason: a filter whose values are
- * the thing the list is counted and ordered by is navigation, not a setting, and a row of filled pills
- * above a white list reads as a toolbar over a table.
- */
-function TierTab({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      onClick={onClick}
-      className={`-mb-px min-h-[40px] border-b-2 px-1 pb-3 text-base tabular-nums transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
-        pressed ? "border-brand-700 font-semibold text-ink" : "border-transparent text-muted hover:text-ink"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}

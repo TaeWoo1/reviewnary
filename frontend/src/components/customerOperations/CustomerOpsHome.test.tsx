@@ -11,10 +11,15 @@ const api = vi.hoisted(() => ({
   getInquiryQueueStrict: vi.fn(),
   activateCustomerOperations: vi.fn(),
   resumeCustomerOperations: vi.fn(),
+  // The repeated-problem pane's own two reads. 오늘 opens the same reading 반복 문제 does, so the Home's
+  // tests have to be able to stand it up — see the hierarchy test at the end of this file.
+  getReviewIssueDetailStrict: vi.fn(),
+  getRepeatedIssueContextStrict: vi.fn(),
+  getOpportunitiesStrict: vi.fn(),
 }));
 vi.mock("../../lib/apiClient", () => ({ api, getToken: () => null }));
 
-import { CustomerOpsHome, HOME_ROWS, HOME_ROWS_NARROW, coHomeApplies, visibleHomeRows } from "./CustomerOpsHome";
+import { CustomerOpsHome, HOME_ROWS, HOME_ROWS_NARROW, TodayWorkspace, coHomeApplies, visibleHomeRows } from "./CustomerOpsHome";
 import { mergeHomeWork } from "../../lib/homeWork";
 import { waitLabel } from "../../lib/copy/customerOps";
 
@@ -131,10 +136,10 @@ function queue(over: Partial<InquiryQueueResponse> = {}): InquiryQueueResponse {
   };
 }
 
-function draw(home = co(), operations: OperationsHome | null = ops()) {
+function draw(home = co(), operations: OperationsHome | null = ops(), path = "/") {
   const onChanged = vi.fn();
   const view = render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <CustomerOpsHome co={home} ops={operations} now={NOW} onChanged={onChanged} />
     </MemoryRouter>,
   );
@@ -825,3 +830,79 @@ describe("visible rows — the Pulse's cost, paid in whole rows", () => {
     expect(screen.getByTestId("pulse-work")).toHaveTextContent("확인할 일 4+");
   });
 });
+
+/**
+ * <b>오늘 shares the repeated-problem reading with 반복 문제</b> (canonical, 2026-10-03), which means a
+ * change made for that screen lands here. This asserts the only thing 오늘 owns about it: its own
+ * hierarchy. The page title outranks the pane's heading, the pane keeps the action it shipped with —
+ * inline, under the field, because 오늘 docks nothing — and nothing from the other screen's floor
+ * appears here.
+ *
+ * <b>Why it is a test and not a screenshot.</b> On this product's demo org every repeated problem is
+ * dormant (`HomeRepeatedProblems.dormant` — counted, never listed), so `problems.rows` is empty and the
+ * pane cannot be reached from a running 오늘 at all. A fixture is the only place the shared reading and
+ * the Home's hierarchy meet.
+ */
+describe("오늘 — the shared repeated-problem reading does not outrank the page", () => {
+  beforeEach(() => {
+    Object.values(api).forEach((fn) => fn.mockReset());
+    api.getInquiryQueueStrict.mockResolvedValue(queue());
+    api.getReviewIssueDetailStrict.mockRejectedValue(new Error("not needed"));
+    api.getRepeatedIssueContextStrict.mockRejectedValue(new Error("not needed"));
+    api.getOpportunitiesStrict.mockResolvedValue([]);
+  });
+
+  it("keeps 오늘's h1 above the pane's h2 and keeps the pane's own inline action", async () => {
+    const restore = stubWide(true);
+    try {
+      // The server sends a whole `ReviewIssueView` on every problem row; this file's older fixtures only
+      // fill what their own assertions read, so the row is completed here rather than everywhere.
+      const operations = ops();
+      operations.problems.rows = operations.problems.rows.map((row) => ({
+        ...row,
+        issue: {
+          ...row.issue,
+          aspect: row.context.aspect, problem: "부족", evidenceCount: 16,
+          firstEvidenceOn: "2025-07-29", lastEvidenceOn: "2026-08-19",
+          dominantProductId: null, dominantProductName: null, dismissed: false, extractorKind: "RULE_BASED",
+        },
+      }));
+      render(
+        <MemoryRouter initialEntries={["/?item=problem:iss-2"]}>
+          <TodayWorkspace co={co()} ops={operations} now={NOW} onChanged={() => undefined} dock={null} />
+        </MemoryRouter>,
+      );
+      const pane = await screen.findByLabelText("선택한 문제");
+      // The page still owns the only h1; the pane's object is an h2 under it.
+      expect(screen.getByRole("heading", { level: 1 })).not.toBe(within(pane).queryByRole("heading", { level: 2 }));
+      expect(within(pane).getByRole("heading", { level: 2 })).toHaveTextContent("접착 부족");
+      // 오늘's own dock is unchanged — it carries the way to the full screen, not a transition. The
+      // repeated problem's action stays inline, under the field it submits, exactly as this pane shipped.
+      const dock = screen.getByTestId("pane-footer");
+      expect(within(dock).getByRole("link", { name: /근거 전체 보기/ })).toBeInTheDocument();
+      expect(within(dock).queryByRole("button", { name: /조치/ })).toBeNull();
+      expect(within(pane).getByRole("button", { name: /조치/ })).toBeInTheDocument();
+      // And the five blocks read in the canonical order.
+      const blocks = within(pane)
+        .getAllByRole("heading", { level: 3 })
+        .map((h) => h.textContent?.trim());
+      expect(blocks).toEqual(["변화와 신호", "근거", "판단과 조치", "기록"]);
+    } finally {
+      restore();
+    }
+  });
+});
+
+/** Stands the list and the detail side by side, as the layout does at 1200px and up. Returns the restore. */
+function stubWide(matches: boolean): () => void {
+  const original = window.matchMedia;
+  window.matchMedia = ((query: string) => ({
+    matches, media: query, onchange: null,
+    addEventListener: () => undefined, removeEventListener: () => undefined,
+    addListener: () => undefined, removeListener: () => undefined,
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+  return () => {
+    window.matchMedia = original;
+  };
+}

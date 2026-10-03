@@ -11,54 +11,74 @@ import type { IssueEvidenceSummaryView } from "../../../lib/types";
  *
  * <b>A failed read renders nothing.</b> A screen that could not see where a problem repeats has
  * nothing to say about where it repeats — and 「0개 상품」 would be that screen saying it anyway.
+ *
+ * <b>No card.</b> It was a bordered, divided box inside a pane that is already a surface. The rows are
+ * now the same hairline-separated reading as everything else in the pane — see §4 on three borders
+ * saying one thing.
  */
 export function RepeatByProduct({
   evidence,
   failed,
+  /** Render only this many rows — the representative product, with the rest behind the block's disclosure. */
+  limit,
+  /** Skip this many rows — what the representative reading above already showed. */
+  skip = 0,
+  /**
+   * Draw the labelled region. False for the continuation behind a disclosure, which belongs to the
+   * region the representative reading already opened — two regions of the same name would be two
+   * answers to 「어디서 반복되나」 for one problem.
+   */
+  region = true,
 }: {
   evidence: IssueEvidenceSummaryView | null;
   failed: boolean;
+  limit?: number;
+  skip?: number;
+  region?: boolean;
 }) {
   if (failed || !evidence) return null;
 
-  const unattributed = unattributedLine(evidence.unattributedEvidence);
+  // Stated in the reading, not in the continuation behind the fold: it explains a total the seller is
+  // looking at, and a sentence about the total hidden under 「모두 보기」 is the total going unexplained.
+  const unattributed = skip === 0 ? unattributedLine(evidence.unattributedEvidence) : null;
+  const rows = evidence.byProduct.slice(skip, limit == null ? undefined : skip + limit);
+  if (rows.length === 0 && !unattributed) return null;
 
-  return (
-    <section aria-label="어디서 반복되나">
-      <h3 className="text-base font-bold text-ink">어디서 반복되나</h3>
+  const body = (
+    <>
       {evidence.byProduct.length === 0 ? (
-        <p className="mt-2 break-keep leading-relaxed text-muted">
+        <p className="break-keep leading-relaxed text-muted">
           이 문제의 근거가 어느 상품에도 연결되어 있지 않습니다.
         </p>
       ) : (
-        <ul className="mt-2 divide-y divide-line rounded-xl border border-line">
-          {evidence.byProduct.map((row) => {
+        <ul className="divide-y divide-line">
+          {rows.map((row) => {
             const span = productSpanLine(row);
             return (
-              <li key={row.productId} className="space-y-1 p-4">
-                <div className="flex flex-wrap items-baseline gap-x-2">
-                  {/* The product page is the other place this problem is already counted, so the
-                      name is the door to it rather than plain text beside a door. */}
-                  <Link
-                    to={`/products/${row.productId}`}
-                    className="break-keep font-semibold text-ink hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-                  >
-                    {row.productName ?? "이름이 확인되지 않은 상품"}
-                    <span className="ml-1 text-brand-700" aria-hidden="true">›</span>
-                  </Link>
-                </div>
-                <p className="break-keep text-sm tabular-nums text-muted">{repeatLine(row)}</p>
-                {span ? (
-                  <p className="text-sm tabular-nums text-muted">이 상품의 근거 기간 {span}</p>
-                ) : null}
+              <li key={row.productId} className="py-2 first:pt-0">
+                {/* The product page is the other place this problem is already counted, so the name is the
+                    door to it rather than plain text beside a door. */}
+                <Link
+                  to={`/products/${row.productId}`}
+                  className="block break-keep font-semibold text-ink hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+                >
+                  {row.productName ?? "이름이 확인되지 않은 상품"}
+                  <span className="ml-1 text-brand-700" aria-hidden="true">›</span>
+                </Link>
+                <p className="break-keep text-xs tabular-nums text-muted">
+                  {repeatLine(row)}
+                  {span ? ` · ${span}` : ""}
+                </p>
               </li>
             );
           })}
         </ul>
       )}
       {unattributed ? (
-        <p className="mt-3 break-keep text-sm leading-relaxed text-muted">{unattributed}</p>
+        <p className="mt-3 break-keep text-xs leading-relaxed text-muted">{unattributed}</p>
       ) : null}
-    </section>
+    </>
   );
+
+  return region ? <section aria-label="어디서 반복되나">{body}</section> : <div>{body}</div>;
 }

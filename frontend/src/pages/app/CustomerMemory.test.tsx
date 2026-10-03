@@ -180,9 +180,13 @@ describe("고객운영 메모리 — two panes", () => {
     try {
       renderMemory();
       const list = await screen.findByLabelText("반복 이슈 목록");
-      expect(within(list).getByRole("heading", { name: "확인 필요" })).toBeInTheDocument();
-      expect(within(list).getByRole("heading", { name: "개선됨" })).toBeInTheDocument();
-      expect(await screen.findByLabelText("선택한 이슈")).toBeInTheDocument();
+      // The three groups are the list's tabs since the canonical: a tab states its count even when it is
+      // empty, which a heading that simply does not appear cannot do.
+      const tabs = screen.getByRole("group", { name: "상태 필터" });
+      expect(within(tabs).getByRole("button", { name: "확인 필요 1" })).toBeInTheDocument();
+      expect(within(tabs).getByRole("button", { name: "개선됨 1" })).toBeInTheDocument();
+      expect(within(tabs).getByRole("button", { name: "지켜보는 중 0" })).toBeInTheDocument();
+      expect(await screen.findByLabelText("선택한 문제")).toBeInTheDocument();
       expect(screen.queryByText(/왼쪽에서 이슈를 고르면/)).toBeNull();
       expect(within(list).getAllByRole("link").filter((a) => a.getAttribute("aria-current") === "true")).toHaveLength(1);
     } finally {
@@ -193,25 +197,28 @@ describe("고객운영 메모리 — two panes", () => {
   it("on a narrow screen draws the list alone — a row opens the problem, there is no empty half", async () => {
     renderMemory();
     await screen.findByLabelText("반복 이슈 목록");
-    expect(screen.queryByLabelText("선택한 이슈")).toBeNull();
+    expect(screen.queryByLabelText("선택한 문제")).toBeNull();
     expect(screen.queryByText(/왼쪽에서 이슈를 고르면/)).toBeNull();
   });
 
   it("shows each issue's state, judgement and evidence count on one line — severity moved to the problem itself", async () => {
     renderMemory();
     const list = await screen.findByLabelText("반복 이슈 목록");
+    // The facts are columns now, named once at the head of the list rather than inside every row.
+    expect(within(list).getByText("근거")).toBeInTheDocument();
+    expect(within(list).getByText("마지막 발생")).toBeInTheDocument();
     const row = within(list).getByRole("link", { name: /접착력이 약하다는/ });
     expect(row).toHaveTextContent("확인 필요");
     expect(row).toHaveTextContent("증가 중");
-    expect(row).toHaveTextContent("근거 4건");
-    expect(row).toHaveTextContent("마지막 확인 2026-08-02");
+    expect(row).toHaveTextContent("4건");
+    expect(row).toHaveTextContent("2026-08-02");
     // Metadata no longer opens the row: the title is read before the facts about it.
     expect(row).not.toHaveTextContent("심각도");
   });
 
   it("names the severity in the problem's own header", async () => {
     renderMemory("/memory/issue-1");
-    const detail = await screen.findByLabelText("선택한 이슈");
+    const detail = await screen.findByLabelText("선택한 문제");
     expect(detail).toHaveTextContent("심각도 심각");
   });
 
@@ -228,7 +235,7 @@ describe("고객운영 메모리 — two panes", () => {
 describe("고객운영 메모리 — deep link", () => {
   it("opens the requested issue with its evidence and trend", async () => {
     renderMemory("/memory/issue-1");
-    const detail = await screen.findByLabelText("선택한 이슈");
+    const detail = await screen.findByLabelText("선택한 문제");
     expect(within(detail).getByRole("heading", { level: 2 })).toHaveTextContent("접착력이");
     expect(await within(detail).findByText(/부착 후 며칠 지나니 떨어졌어요/)).toBeInTheDocument();
     // The quantified surge line, from the server's own numbers.
@@ -243,13 +250,13 @@ describe("고객운영 메모리 — deep link", () => {
 
   it("surfaces suppressed evidence as a count rather than an empty quote", async () => {
     renderMemory("/memory/issue-1");
-    const detail = await screen.findByLabelText("선택한 이슈");
+    const detail = await screen.findByLabelText("선택한 문제");
     expect(await within(detail).findByText(/인용을 표시할 수 없는 근거가 1건/)).toBeInTheDocument();
   });
 
   it("shows the recorded state history", async () => {
     renderMemory("/memory/issue-1");
-    const detail = await screen.findByLabelText("선택한 이슈");
+    const detail = await screen.findByLabelText("선택한 문제");
     expect(await within(detail).findByText("기록")).toBeInTheDocument();
   });
 });
@@ -270,7 +277,7 @@ describe("고객운영 메모리 — deep link", () => {
 describe("고객운영 메모리 — evidence links back to the review", () => {
   it("links every rendered quote to that review's own processing surface", async () => {
     renderMemory("/memory/issue-1");
-    const detail = await screen.findByLabelText("선택한 이슈");
+    const detail = await screen.findByLabelText("선택한 문제");
     const links = await within(detail).findAllByRole("link", { name: "이 리뷰 처리하기" });
     // One per rendered quote — not one per quote the inbox happened to hold.
     expect(links).toHaveLength(2);
@@ -286,10 +293,14 @@ describe("고객운영 메모리 — evidence links back to the review", () => {
 describe("고객운영 메모리 — 어디서 얼마나 반복되나", () => {
   it("shows each product's evidence count beside that product's own review total", async () => {
     renderMemory("/memory/issue-1");
-    const detail = await screen.findByLabelText("선택한 이슈");
+    const detail = await screen.findByLabelText("선택한 문제");
     const section = await within(detail).findByLabelText("어디서 반복되나");
+    // The representative product stands in the reading; the rest are one disclosure away, and both
+    // still print the pair rather than a rate.
     expect(within(section).getByText(/리뷰 1,761건 중 16건이 이 문제를 말했습니다/)).toBeInTheDocument();
-    expect(within(section).getByText(/리뷰 416건 중 1건이 이 문제를 말했습니다/)).toBeInTheDocument();
+    expect(within(section).queryByText(/리뷰 416건 중 1건/)).toBeNull();
+    expect(within(detail).getByText(/리뷰 416건 중 1건이 이 문제를 말했습니다/)).toBeInTheDocument();
+    expect(within(detail).getByText(/근거 4건 · 상품 2곳 모두 보기/)).toBeInTheDocument();
   });
 
   /**
@@ -323,7 +334,7 @@ describe("고객운영 메모리 — 어디서 얼마나 반복되나", () => {
   it("renders nothing about repetition when that read failed", async () => {
     getRepeatedIssueContextStrict.mockRejectedValue(new Error("down"));
     renderMemory("/memory/issue-1");
-    const detail = await screen.findByLabelText("선택한 이슈");
+    const detail = await screen.findByLabelText("선택한 문제");
     // The problem and its evidence still render — the two reads fail apart.
     expect(within(detail).getByText("근거")).toBeInTheDocument();
     expect(within(detail).queryByLabelText("어디서 반복되나")).toBeNull();
@@ -372,7 +383,7 @@ describe("반복 문제 — the list follows the detail (UI/UX v2 Phase 2)", () 
           .toHaveTextContent("조치 중"),
       );
       // The pane still shows the same problem — acting on it must not swap the selection.
-      expect(screen.getByLabelText("선택한 이슈")).toHaveTextContent(SURGING.title);
+      expect(screen.getByLabelText("선택한 문제")).toHaveTextContent(SURGING.title);
     } finally {
       restore();
     }
@@ -388,7 +399,7 @@ describe("고객운영 메모리 — 판단과 조치", () => {
   it("sends the seller's own sentence with the transition", async () => {
     startReviewIssueAction.mockResolvedValue(SURGING);
     renderMemory("/memory/issue-1");
-    await screen.findByLabelText("선택한 이슈");
+    await screen.findByLabelText("선택한 문제");
 
     fireEvent.change(screen.getByLabelText(/무엇을 하기로 하셨나요/), {
       target: { value: "접착 테이프 공급처를 바꿉니다." },
@@ -407,7 +418,7 @@ describe("고객운영 메모리 — 판단과 조치", () => {
   it("records the decision with no note rather than blocking it", async () => {
     startReviewIssueAction.mockResolvedValue(SURGING);
     renderMemory("/memory/issue-1");
-    await screen.findByLabelText("선택한 이슈");
+    await screen.findByLabelText("선택한 문제");
 
     fireEvent.click(screen.getByRole("button", { name: "조치 시작" }));
 
@@ -487,7 +498,7 @@ describe("고객운영 메모리 — 어떤 별점에서 나왔나", () => {
       },
     });
     renderMemory("/memory/issue-1");
-    await screen.findByLabelText("선택한 이슈");
+    await screen.findByLabelText("선택한 문제");
     expect(screen.queryByLabelText("어떤 별점에서 나왔나")).toBeNull();
   });
 });
@@ -495,7 +506,7 @@ describe("고객운영 메모리 — 어떤 별점에서 나왔나", () => {
 describe("고객운영 메모리 — lifecycle actions", () => {
   it("offers only the transition the lifecycle allows", async () => {
     renderMemory("/memory/issue-1");
-    await screen.findByLabelText("선택한 이슈");
+    await screen.findByLabelText("선택한 문제");
     expect(screen.getByRole("button", { name: "조치 시작" })).toBeInTheDocument();
     // There is deliberately no 해결 처리 control at any state — 해결됨 rests on observed quiet
     // weeks, and a button would let an assertion stand in for that evidence.
@@ -505,7 +516,7 @@ describe("고객운영 메모리 — lifecycle actions", () => {
   it("offers no action where the next move belongs to reviewnary", async () => {
     getReviewIssueDetailStrict.mockResolvedValue({ ...DETAIL, issue: IMPROVED });
     renderMemory("/memory/issue-2");
-    const detail = await screen.findByLabelText("선택한 이슈");
+    const detail = await screen.findByLabelText("선택한 문제");
     expect(
       await within(detail).findByText(/조치 이후 리뷰 변화를 지켜보고 있어요/),
     ).toBeInTheDocument();
@@ -514,7 +525,7 @@ describe("고객운영 메모리 — lifecycle actions", () => {
 
   it("never describes the extraction as AI", async () => {
     renderMemory("/memory/issue-1");
-    const detail = await screen.findByLabelText("선택한 이슈");
+    const detail = await screen.findByLabelText("선택한 문제");
     expect(await within(detail).findByText(/규칙 기반 분석으로 모은 이슈 후보/)).toBeInTheDocument();
     expect(detail.textContent).not.toContain("AI");
   });
@@ -537,7 +548,7 @@ describe("고객운영 메모리 — empty and failed states", () => {
 describe("고객운영 메모리 — accessibility", () => {
   it("has no axe violations", async () => {
     const { container } = renderMemory("/memory/issue-1");
-    await screen.findByLabelText("선택한 이슈");
+    await screen.findByLabelText("선택한 문제");
     await expectNoAxeViolations(container);
   });
 });
@@ -567,6 +578,133 @@ describe("고객운영 메모리 — the issue's opportunities live beside its e
     renderMemory(`/memory/${SURGING.id}`);
     const section = await screen.findByRole("region", { name: "개선 기회" });
     expect(await within(section).findByText(/아직 제안할 개선 기회가 없습니다/)).toBeTruthy();
+  });
+});
+
+describe("반복 문제 — the canonical reading (2026-10-03)", () => {
+  /**
+   * <b>The one action is docked at the floor of the pane.</b> The reading is five blocks long and the
+   * decision is the last of them; a button inside that block is a button the seller scrolls past the
+   * evidence to reach, and then scrolls back to. It is outside the scroller, and it is the ONLY one —
+   * two buttons for one transition is two places to look.
+   */
+  it("docks the transition under the pane and leaves none inside 판단과 조치", async () => {
+    const restore = stubWide(true);
+    try {
+      renderMemory("/memory/issue-1");
+      const dock = await screen.findByTestId("pane-footer");
+      expect(within(dock).getByRole("button", { name: "조치 시작" })).toBeInTheDocument();
+      const decision = await screen.findByLabelText("판단과 조치");
+      expect(within(decision).queryByRole("button", { name: /조치/ })).toBeNull();
+      // And the field it submits stays where it is written.
+      expect(within(decision).getByLabelText(/무엇을 하기로 하셨나요/)).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it("sends the docked transition with the sentence written in the block above it", async () => {
+    const restore = stubWide(true);
+    try {
+      startReviewIssueAction.mockResolvedValue({ ...SURGING, lifecycleState: "ACTING", lifecycleLabelKo: "조치 중" });
+      renderMemory("/memory/issue-1");
+      const decision = await screen.findByLabelText("판단과 조치");
+      fireEvent.change(within(decision).getByLabelText(/무엇을 하기로 하셨나요/), {
+        target: { value: "접착 테이프 공급처를 바꿉니다." },
+      });
+      fireEvent.click(within(await screen.findByTestId("pane-footer")).getByRole("button", { name: "조치 시작" }));
+      await waitFor(() =>
+        expect(startReviewIssueAction).toHaveBeenCalledWith("issue-1", "접착 테이프 공급처를 바꿉니다."),
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  /** No dock where the next move is reviewnary's — the same three states `nextActionKo` returns null for. */
+  it("docks nothing where the seller has no move", async () => {
+    const restore = stubWide(true);
+    try {
+      getReviewIssueDetailStrict.mockResolvedValue({ ...DETAIL, issue: IMPROVED });
+      renderMemory("/memory/issue-2");
+      await screen.findByLabelText("선택한 문제");
+      expect(screen.queryByTestId("pane-footer")).toBeNull();
+      expect(await screen.findByText(/조치 이후 리뷰 변화를 지켜보고 있어요/)).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  /**
+   * The dock says which state the problem is in and when it entered it — read from the trail, never from
+   * now. A 「…부터」 with a date nothing recorded would be the screen inventing a history.
+   */
+  it("states the state and the day the trail says it began", async () => {
+    const restore = stubWide(true);
+    try {
+      renderMemory("/memory/issue-1");
+      const dock = await screen.findByTestId("pane-footer");
+      expect(dock).toHaveTextContent("확인 필요 · 2026-07-01부터");
+    } finally {
+      restore();
+    }
+  });
+
+  it("filters the list by the group a tab names, and counts every group including the empty one", async () => {
+    renderMemory();
+    const tabs = await screen.findByRole("group", { name: "상태 필터" });
+    expect(within(tabs).getByRole("button", { name: "지켜보는 중 0" })).toBeInTheDocument();
+    fireEvent.click(within(tabs).getByRole("button", { name: "개선됨 1" }));
+    const list = await screen.findByLabelText("반복 이슈 목록");
+    await waitFor(() => expect(within(list).getAllByRole("link")).toHaveLength(1));
+    expect(within(list).getByRole("link", { name: /재단 중 파손/ })).toBeInTheDocument();
+  });
+
+  /**
+   * <b>The 분류 menu reads the issue's own aspect.</b> `ReviewIssueView.aspect` is half the signature the
+   * memory groups by; `item_analyses.category` is the per-review keyword tally the 리뷰 screen stopped
+   * showing. A screen whose objects are issues may not be filtered by a review-level classifier's words.
+   */
+  it("offers the issues' own 분류 values and filters on them", async () => {
+    getReviewIssuesStrict.mockResolvedValue([SURGING, issue({ id: "issue-3", title: "포장이 찢어져 왔어요", aspect: "포장" })]);
+    renderMemory();
+    const menu = await screen.findByLabelText("분류");
+    expect(within(menu).getByRole("option", { name: "접착" })).toBeInTheDocument();
+    expect(within(menu).getByRole("option", { name: "포장" })).toBeInTheDocument();
+    fireEvent.change(menu, { target: { value: "포장" } });
+    const list = await screen.findByLabelText("반복 이슈 목록");
+    await waitFor(() => expect(within(list).getAllByRole("link")).toHaveLength(1));
+    expect(within(list).getByRole("link", { name: /포장이 찢어져/ })).toBeInTheDocument();
+  });
+
+  /**
+   * The trend is a count of the dates the detail read returned. It may not become a second opinion about
+   * the direction — that judgement is the server's, and this pane already prints it in words above.
+   */
+  it("draws the evidence month by month and claims no rate or direction", async () => {
+    renderMemory("/memory/issue-1");
+    const chart = await screen.findByRole("img", { name: /월별 근거 건수/ });
+    expect(chart.getAttribute("aria-label") ?? "").toContain("가장 많았던 달 2건");
+    // 평균 is allowed here and only here: 「이전 8주 평균」 is the server's own measured baseline for a
+    // surge it declared. What the chart may not add is a share of anything.
+    const signal = await screen.findByLabelText("변화와 신호");
+    expect(signal.textContent ?? "").not.toMatch(/%|퍼센트|비율/);
+  });
+
+  /** Representative evidence, not eighteen quotes above a decision. The rest is one disclosure away. */
+  it("stands two customer sentences in the reading and keeps the rest behind one disclosure", async () => {
+    getReviewIssueDetailStrict.mockResolvedValue({
+      ...DETAIL,
+      evidence: [
+        ...DETAIL.evidence,
+        { reviewId: "rev-4", unitOrdinal: 0, occurredOn: "2026-07-02", productId: null, productName: null, rating: 2, quote: "네 번째 이야기." },
+      ],
+    });
+    renderMemory("/memory/issue-1");
+    const evidence = await screen.findByLabelText("근거");
+    const quotes = within(evidence).getAllByText(/^“.*”$/);
+    expect(quotes).toHaveLength(3);
+    expect(within(evidence).getByText(/모두 보기/)).toBeInTheDocument();
   });
 });
 
