@@ -83,6 +83,11 @@ export function untilTime(iso: string | null): string {
   return `${Math.round(diffHr / 24)}일 후`;
 }
 
+/** Today in Asia/Seoul as `YYYY-MM-DD` — the seller's own day, never the browser's. */
+export function kstToday(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(now);
+}
+
 /**
  * A calendar date the seller would write, from an instant — in the seller's own day, not UTC's.
  *

@@ -48,6 +48,11 @@ const ON_THE_SYSTEM = [
   "components/home/RepeatedProblemList.tsx",
   "components/home/PreparedWorkList.tsx",
   "components/memory/IssueList.tsx",
+  // 반복 문제, since its canonical redesign (2026-10-03): the same list reading and the same decision pane.
+  "pages/app/CustomerMemory.tsx",
+  "components/memory/IssueReading.tsx",
+  "components/memory/repeat/PaneBlock.tsx",
+  "components/memory/repeat/EvidenceTrend.tsx",
   "pages/app/OperationsCaseQueue.tsx",
   // 리뷰, since its canonical redesign (2026-10-03): the same list reading and the same decision pane.
   "pages/app/ReviewRecord.tsx",

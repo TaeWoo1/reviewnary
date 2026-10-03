@@ -12,6 +12,11 @@ import type { IssueRatingDistributionView } from "../../../lib/types";
  * <b>Counts only.</b> No share, no average, no ranking. The bar widths below are drawn relative to
  * the largest band and carry no number of their own; they are a reading aid for the counts beside
  * them, which is why every row also states its figure.
+ *
+ * <b>Two columns, and the bars are grey</b> (canonical, 2026-10-03). Six full-width rows were the
+ * tallest thing in a pane that also has an evidence trend above it, and the bars were drawn in
+ * `brand-700` — the same blue as the button that records a decision. One rule now: a bar is data and
+ * takes `muted`; blue means something a seller can press.
  */
 export function RatingSpread({
   distribution,
@@ -24,26 +29,26 @@ export function RatingSpread({
 
   const bands = ratingBands(distribution);
   const largest = Math.max(...bands.map((band) => band.count), 1);
+  const total = bands.reduce((sum, band) => sum + band.count, 0);
 
   return (
     <section aria-label="어떤 별점에서 나왔나">
-      <h3 className="text-base font-bold text-ink">어떤 별점에서 나왔나</h3>
-      <ul className="mt-2 space-y-1.5">
+      <p className="text-xs text-muted">어떤 별점에서 나왔나 — 근거 {total.toLocaleString("ko-KR")}건</p>
+      {/* Column-major: 5·4·3 down the left, 2·1·별점 없음 down the right, so the scale still reads in order. */}
+      <ul className="mt-1 grid grid-flow-col grid-rows-3 gap-x-4 gap-y-1">
         {bands.map((band) => (
-          <li key={band.key} className="flex items-center gap-3">
-            <span className="w-16 shrink-0 text-sm text-muted">{band.labelKo}</span>
-            <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-canvas">
+          <li key={band.key} className="flex items-center gap-2">
+            <span className="w-14 shrink-0 text-xs text-muted">{band.labelKo}</span>
+            <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-canvas">
               {/* Decorative: the count beside it is the fact. Hidden from assistive tech so a
                   screen reader hears the number once, not a width it cannot check. */}
               <span
                 aria-hidden="true"
-                className="block h-full rounded-full bg-brand-700"
+                className="block h-full rounded-full bg-muted"
                 style={{ width: `${(band.count / largest) * 100}%` }}
               />
             </span>
-            <span className="w-16 shrink-0 text-right text-sm tabular-nums text-ink">
-              근거 {band.count}건
-            </span>
+            <span className="w-14 shrink-0 text-right text-xs tabular-nums text-ink">근거 {band.count}건</span>
           </li>
         ))}
       </ul>

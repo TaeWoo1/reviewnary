@@ -5,9 +5,10 @@ import {
   knowledgeScopeLine,
 } from "../../../lib/repeatedIssue";
 import type { IssueKnowledgeOnHand } from "../../../lib/types";
+import { PaneBlock } from "./PaneBlock";
 
 /**
- * <b>우리가 이 문제에 대해 써 둔 것</b> — what the company's own library already says.
+ * <b>우리가 써 둔 것</b> — what the company's own library already says.
  *
  * <b>It answers what exists, never whether it is good enough.</b> Whether a registered guidance
  * actually answers a customer is the drafting lane's question and costs model calls; opening a
@@ -31,34 +32,32 @@ export function IssueGrounding({
   const action = knowledgeGapAction(knowledge);
 
   return (
-    <section aria-label="우리가 써 둔 것">
-      <h3 className="text-base font-bold text-ink">우리가 써 둔 것</h3>
-      <p className="mt-2 break-keep leading-relaxed text-ink">{knowledgeLine(knowledge)}</p>
-      {scope ? <p className="mt-1 break-keep text-sm leading-relaxed text-muted">{scope}</p> : null}
-
+    <PaneBlock
+      label="우리가 써 둔 것"
+      side={
+        action ? (
+          <Link
+            to="/knowledge"
+            className="rounded font-semibold text-muted underline decoration-line underline-offset-4 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+          >
+            {action}
+          </Link>
+        ) : null
+      }
+    >
+      <p className="break-keep leading-relaxed text-ink">{knowledgeLine(knowledge)}</p>
+      {scope ? <p className="break-keep text-xs leading-relaxed text-muted">{scope}</p> : null}
       {knowledge.excerpts.length > 0 ? (
-        <ul className="mt-3 space-y-2">
+        <ul className="space-y-2 border-l-2 border-line pl-3">
           {knowledge.excerpts.map((excerpt) => (
             // The seller's own sentence, bounded by the read. Quoted so it is plainly theirs and not
             // something this screen composed.
-            <li key={excerpt} className="break-keep rounded-xl bg-canvas p-3 text-sm leading-relaxed text-ink">
+            <li key={excerpt} className="break-keep text-sm leading-relaxed text-ink">
               「{excerpt}」
             </li>
           ))}
         </ul>
       ) : null}
-
-      {action ? (
-        <p className="mt-3">
-          <Link
-            to="/knowledge"
-            className="rounded font-semibold text-brand-700 hover:text-brand-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-          >
-            {action}
-            <span className="ml-1" aria-hidden="true">›</span>
-          </Link>
-        </p>
-      ) : null}
-    </section>
+    </PaneBlock>
   );
 }

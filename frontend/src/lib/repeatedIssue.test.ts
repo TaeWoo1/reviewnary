@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  evidenceBeforeTrend,
+  evidenceMonths,
   hasRatingEvidence,
   knowledgeGapAction,
   knowledgeLine,
@@ -7,9 +9,11 @@ import {
   productSpanLine,
   ratingBands,
   repeatLine,
+  trendPeakLine,
   unattributedLine,
 } from "./repeatedIssue";
 import type {
+  IssueEvidenceView,
   IssueKnowledgeOnHand,
   IssueProductEvidenceView,
   IssueRatingDistributionView,
@@ -147,5 +151,66 @@ describe("어떤 별점에서 나왔나", () => {
   it("says there is nothing to spread rather than drawing six zeroes", () => {
     expect(hasRatingEvidence(spread())).toBe(true);
     expect(hasRatingEvidence(spread({ rating3: 0, rating4: 0, rating5: 0 }))).toBe(false);
+  });
+});
+
+describe("월별 근거 건수 — the shape of the repetition", () => {
+  const ev = (occurredOn: string): IssueEvidenceView => ({
+    reviewId: `r-${occurredOn}`,
+    unitOrdinal: 0,
+    occurredOn,
+    productId: null,
+    productName: null,
+    rating: null,
+    quote: "x",
+  });
+
+  it("counts the dates the read returned, and fills the months between them", () => {
+    const months = evidenceMonths([ev("2026-01-04"), ev("2026-01-20"), ev("2026-03-02")], "2026-03");
+    expect(months).toEqual([
+      { key: "2026-01", count: 2 },
+      { key: "2026-02", count: 0 },
+      { key: "2026-03", count: 1 },
+    ]);
+  });
+
+  /**
+   * The axis is the seller's calendar, not the problem's. Stopping at the last piece of evidence draws a
+   * chart that ends where the problem stopped being mentioned — which reads as 「still happening」 for a
+   * problem nobody has raised in half a year.
+   */
+  it("runs to today even when the last evidence is months old", () => {
+    const months = evidenceMonths([ev("2026-01-04")], "2026-04");
+    expect(months.map((m) => m.key)).toEqual(["2026-01", "2026-02", "2026-03", "2026-04"]);
+    expect(months.map((m) => m.count)).toEqual([1, 0, 0, 0]);
+  });
+
+  /**
+   * This org holds a problem whose first evidence is from 2015. A bar per month since would be 137 bars
+   * three pixels wide — and the window is only honest if what falls outside it is stated.
+   */
+  it("bounds the window at two years and reports what fell outside it", () => {
+    const old = [ev("2015-05-26"), ev("2018-11-13"), ev("2026-02-08")];
+    const months = evidenceMonths(old, "2026-10");
+    expect(months).toHaveLength(24);
+    expect(months[0].key).toBe("2024-11");
+    expect(evidenceBeforeTrend(old, months)).toBe(2);
+  });
+
+  it("says nothing at all when there is no evidence", () => {
+    expect(evidenceMonths([], "2026-10")).toEqual([]);
+    expect(evidenceBeforeTrend([], [])).toBe(0);
+  });
+
+  /**
+   * The whole rule this chart lives under. Whether a problem is 급증 or 집중 is the server's judgement
+   * (`IssueChangeView`); a chart that derived a second opinion would be an unmeasured verdict drawn in
+   * the same pane as the measured one.
+   */
+  it("states the peak as a count and derives no rate, average or direction", () => {
+    const months = evidenceMonths([ev("2026-01-04"), ev("2026-01-20"), ev("2026-02-02")], "2026-02");
+    expect(trendPeakLine(months)).toBe("가장 많았던 달 2건");
+    expect(trendPeakLine(months) ?? "").not.toMatch(/%|배|증가|감소|평균/);
+    expect(trendPeakLine([{ key: "2026-01", count: 0 }])).toBeNull();
   });
 });
