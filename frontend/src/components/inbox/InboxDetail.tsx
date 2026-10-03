@@ -76,6 +76,8 @@ export function InboxDetail({
    * 혼자 한 줄을 쓰면 pane 맨 위에 쓰임을 알 수 없는 파란 글자 하나가 떠 있게 된다.
    */
   const detailRow = workspace?.detail ?? null;
+  /** 바닥의 누름이 무엇을 할 수 있고 없는지 — {@code docked}일 때만, 그리고 이 블록의 맨 끝에서. */
+  const registration = docked && workspace && !workspace.publishable ? workspace.unavailableReason : null;
   const bind =
     docked && detailRow && canBindProduct(detailRow) && workspace ? (
       <button
@@ -188,6 +190,18 @@ export function InboxDetail({
           같은 문제가 반복되는지 보기
         </Link>
       </footer>
+
+      {/*
+        <b>등록 조건은 dock 바로 앞의 조용한 주석이다</b> (문의 redesign, 2026-10-04 — product-owner
+        decision). 「지금은 reviewnary가 답변을 대신 등록하지 않습니다」는 판매자가 바닥의 누름을 하기 전에
+        알아야 하는 조건이지, 준비된 답변과 근거 사이에서 본문 크기로 읽어야 하는 문단이 아니다. 그래서
+        흐름에서 빠져 나와 그 누름 바로 앞에 선다 — 같은 사실, 한 번만, 쓰이는 자리에서.
+      */}
+      {registration ? (
+        <p className="break-keep text-xs leading-relaxed text-muted" data-testid="registration-note">
+          {registration}
+        </p>
+      ) : null}
     </article>
   );
 }

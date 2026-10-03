@@ -64,16 +64,17 @@ describe("master-detail pane", () => {
    * <p>And 반복 문제 since its own canonical (2026-10-03): 변화와 신호 → 근거 → 우리가 써 둔 것 → 판단과
    * 조치 → 기록, ending in a lifecycle transition the seller records in their own words.
    *
-   * <p>And 문의 since its own (2026-10-03, product-owner decision): 고객의 질문 → 준비된 답변 → 답변에
-   * 사용한 근거 → 기록, ending in the one thing the seller presses — 답변 보내기 where SellerOps can
-   * register the answer, 초안 복사 where it cannot. Four readings, one column.
+   * <p><b>문의 left for the rail</b> (문의 redesign, 2026-10-04 — product-owner decision). It held this
+   * column for one day: 고객의 질문 → 준비된 답변 → 답변에 사용한 근거 → 기록 is the same reading, and 576
+   * turned out to be the wrong width for it — the customer's question is read in full and the prepared
+   * answer is the thing being judged, which is a page rather than a panel beside one. It takes
+   * {@link LayoutKind} 「rail」 now, the claim 확인할 일 already makes. Three readings here, one column.
    *
-   * <p>The list is still closed and still asserted: a fifth caller is a decision, not an import.
+   * <p>The list is still closed and still asserted: a fourth caller is a decision, not an import.
    */
-  it("four screens override it — 확인할 일 · 리뷰 · 반복 문제 · 문의, the panes a decision is made in", () => {
+  it("three screens override it — 리뷰 · 반복 문제 · 확인할 일, the panes a decision is made in", () => {
     const callers = SRC.filter((f) => readFileSync(f, "utf8").includes('pane="decision"'));
     expect(callers.map((f) => f.replace(/\\/g, "/")).sort()).toEqual([
-      "src/pages/app/CustomerInbox.tsx",
       "src/pages/app/CustomerMemory.tsx",
       "src/pages/app/OperationsCaseQueue.tsx",
       "src/pages/app/ReviewRecord.tsx",
@@ -92,12 +93,17 @@ describe("master-detail pane", () => {
  * 2026-10-03 — product-owner decision).
  *
  * <p>It inverts which column is the page: the list becomes a 316px rail and the selected item takes the
- * rest. That is a claim about one screen — 46 records a seller walks, where the one being read is the
- * page — and the same danger the pane override carries applies twice over here, because a second caller
- * would turn every list in the product into a rail. So the override is counted across the source tree,
- * and the 「only while open」 half is asserted on the component: with nothing chosen there is no page to
- * be beside, and a 316px column against 1,044px of nothing is the empty-pane state this screen's own
- * 2026-09-30 decision retired.
+ * rest. That is a claim about a screen whose job is to read ONE record at a time, and the same danger the
+ * pane override carries applies twice over here, because an unchecked caller would turn every list in the
+ * product into a rail. So the override is counted across the source tree, and the 「only while open」 half
+ * is asserted on the component: with nothing chosen there is no page to be beside, and a 316px column
+ * against 1,044px of nothing is the empty-pane state this screen's own 2026-09-30 decision retired.
+ *
+ * <p><b>And 문의 since its redesign</b> (2026-10-04 — product-owner decision, the 1600 mockup approved as
+ * the implementation target). Same job, same reading: the seller opens one inquiry, reads the whole
+ * question, reads the prepared answer and decides whether it goes out. 확인할 일's rail is where that
+ * reading already lives, so 문의 takes the same geometry — 240 rail / 316 목록 / 나머지 전부 — instead of a
+ * declared 576 beside a list it is not scanning.
  */
 describe("master-detail rail layout", () => {
   it("narrows the list only while an item is open", () => {
@@ -119,8 +125,11 @@ describe("master-detail rail layout", () => {
     expect(screen.getByTestId("master-list").parentElement!.className).not.toContain("w-[316px]");
   });
 
-  it("one screen overrides it — 확인할 일, the list a seller walks", () => {
+  it("two screens override it — 확인할 일 and 문의, the lists a seller reads one record out of", () => {
     const callers = SRC.filter((f) => readFileSync(f, "utf8").includes('layout="rail"'));
-    expect(callers.map((f) => f.replace(/\\/g, "/"))).toEqual(["src/pages/app/OperationsCaseQueue.tsx"]);
+    expect(callers.map((f) => f.replace(/\\/g, "/")).sort()).toEqual([
+      "src/pages/app/CustomerInbox.tsx",
+      "src/pages/app/OperationsCaseQueue.tsx",
+    ]);
   });
 });

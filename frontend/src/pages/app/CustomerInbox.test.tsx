@@ -649,3 +649,151 @@ describe("문의 — the canonical decision workspace (2026-10-03)", () => {
     expect(within(pane).queryByText(/문의 드립니다/)).toBeNull();
   });
 });
+
+/**
+ * <b>문의 redesign — the 1600 mockup as the implementation target</b> (2026-10-04, product-owner
+ * decision).
+ *
+ * <p>Front's Inbox was the composition reference and Reviewnary's own visual language was kept, so what
+ * changed is the shape of the reading, not the palette. Four of the seven targets are asserted here
+ * because each of them is a claim a later edit could quietly undo:
+ *
+ * <ol>
+ *   <li>the selected row is NEUTRAL — the blue fill and the accent bar said 「this row is special」 about
+ *       a row whose only job is to say which record the page beside it is showing;</li>
+ *   <li>the row says how long the customer has waited, and past a year it says the day it arrived
+ *       instead of a count nobody acts on;</li>
+ *   <li>준비된 답변 is ONE object — the draft and the evidence it stands on inside a single edge, rather
+ *       than a canvas surface and a separate block under it;</li>
+ *   <li>the registration condition is a quiet note on the dock's edge, not a paragraph in the middle of
+ *       the reading.</li>
+ * </ol>
+ *
+ * <p>The other three — the 240/316/remainder geometry, the body-first title rule and the single bottom
+ * primary — are fenced where they are owned: `decisionPane.test.tsx`, `inquiryReading`, and the dock
+ * test above.
+ */
+describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
+  const DRAFTED_WITH_CAPABILITY = {
+    workItemId: "w1",
+    inquiryId: "i1",
+    sellerAccountId: "s1",
+    channelId: "c1",
+    channelCode: "CAFE24",
+    channelNameKo: "카페24 자사몰",
+    isSecret: true,
+    phase: "PROPOSED",
+    status: "UNANSWERED",
+    informStatus: null,
+    title: "문의 드립니다",
+    details: "교환은 언제까지 신청해야 하나요?",
+    receivedAt: "2026-08-03T10:00:00Z",
+    proposal: null,
+    productId: null,
+    productName: null,
+    productBinding: null,
+    sourceSubtype: null,
+    answerStateProven: false,
+    answerStateNote: "이 문의에 이미 답변이 달렸는지 지금은 확인할 수 없습니다.",
+    draftEvidence: [
+      { kind: "ORG_POLICY", scopeLabel: "운영 정책", title: "교환·반품 기준", locator: null, sourceId: "s", chunkId: "c", snippet: "수령 후 7일 이내." },
+    ],
+    replyCapability: null,
+    orderContext: null,
+    delivery: null,
+    draft: {
+      version: 1,
+      answerStatus: 2,
+      title: "교환 신청 기한 안내",
+      comments: "수령 후 7일 이내, 개봉하지 않은 상품에 한해 교환이 가능합니다.",
+      contentFingerprint: "a".repeat(64),
+      fingerprintAlgorithm: "SHA-256",
+      createdAt: "2026-08-03T11:00:00Z",
+      authorKind: "MODEL",
+      modelVersion: "m/v1",
+      knowledgeState: "GROUNDED",
+      knowledgeNote: null,
+      answerBasis: null,
+      answerBasisNote: null,
+      answerBasisAction: null,
+    },
+  };
+
+  let restoreWide: () => void;
+  beforeEach(() => {
+    restoreWide = stubWide(true);
+    getInquiryQueueStrict.mockImplementation(queueOf([queued({ workItemId: "w1", inquiryId: "i1" })]));
+    getInquiryDetailStrict.mockResolvedValue(DRAFTED_WITH_CAPABILITY);
+  });
+  afterEach(() => restoreWide());
+
+  it("the selected row is neutral — no accent fill and no accent bar", async () => {
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", snippet: "교환은 언제까지 신청해야 하나요?" })],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    renderInbox("/inquiries/i1");
+    const chosen = await screen.findByRole("link", { current: true });
+    expect(chosen.className).toContain("bg-canvas");
+    expect(chosen.className).not.toContain("bg-brand-50");
+    expect(chosen.className).not.toContain("shadow-selected");
+  });
+
+  it("the row says how long the customer waited, and the day it arrived once that is a year", async () => {
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [
+        row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", snippet: "교환은 언제까지 신청해야 하나요?", receivedAt: "2026-08-03T10:00:00Z" }),
+        row({ inquiryId: "old", snippet: "세금계산서 발행 부탁드립니다", receivedAt: "2016-09-09T10:00:00Z" }),
+      ],
+      totalCount: 2,
+      limit: 50,
+      productId: null,
+    });
+    renderInbox("/inquiries/i1");
+    const list = await screen.findByLabelText("문의 목록");
+    // The recent one is a count — the exact number moves with the clock, the shape does not.
+    expect(within(list).getByText(/^\d+일 대기$/)).toBeInTheDocument();
+    // 2016 is a year past under any clock this product runs on.
+    expect(within(list).getByText("2016-09-09 접수")).toBeInTheDocument();
+    expect(within(list).queryByText(/^\d{3,}일 대기$/)).toBeNull();
+  });
+
+  it("준비된 답변 is one object — the evidence is inside its edge, not a block beside it", async () => {
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", snippet: "교환은 언제까지 신청해야 하나요?" })],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    renderInbox("/inquiries/i1");
+    const object = await screen.findByTestId("prepared-answer");
+    // Head, body and foot of one thing.
+    expect(within(object).getByText("준비된 답변")).toBeInTheDocument();
+    expect(within(object).getByText("교환 신청 기한 안내")).toBeInTheDocument();
+    expect(within(object).getByText(/개봉하지 않은 상품에 한해 교환이 가능합니다/)).toBeInTheDocument();
+    expect(within(object).getByText("답변에 사용한 근거")).toBeInTheDocument();
+    expect(within(object).getByText("교환·반품 기준")).toBeInTheDocument();
+    // And only one of it: a second copy outside the object is the shape this replaced.
+    const pane = screen.getByLabelText("선택한 문의");
+    expect(within(pane).getAllByText("답변에 사용한 근거")).toHaveLength(1);
+  });
+
+  it("the registration condition is the quiet note on the dock's edge, and the last thing in the reading", async () => {
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", snippet: "교환은 언제까지 신청해야 하나요?" })],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    renderInbox("/inquiries/i1");
+    const note = await screen.findByTestId("registration-note");
+    expect(note).toHaveTextContent(/답변을 대신 등록하지 않습니다/);
+    // Last in the reading, so it sits against the dock rather than inside the flow.
+    const article = screen.getByLabelText("선택한 항목");
+    expect(article.lastElementChild).toBe(note);
+    // Said once: the sentence left the answer block when it came here.
+    expect(screen.getAllByText(/답변을 대신 등록하지 않습니다/)).toHaveLength(1);
+  });
+});

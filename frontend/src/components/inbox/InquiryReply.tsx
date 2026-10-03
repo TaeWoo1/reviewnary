@@ -124,6 +124,12 @@ export function InquiryReply({
     onCopyDraft,
   } = workspace;
 
+  /**
+   * 준비된 답변이 자기 머리를 가진 한 물건으로 그려지는 경우 — dock을 쓰는 화면에서, 저장된 초안이 있고,
+   * 편집 중이 아닐 때. 편집 중에는 그 자리가 입력란이라 머리를 붙일 물건이 없다.
+   */
+  const objectHead = docked && Boolean(workspace.draft) && !workspace.editing;
+
   if (loading) {
     return <p className="text-base text-muted">문의 내용을 불러오는 중…</p>;
   }
@@ -208,9 +214,17 @@ export function InquiryReply({
           operational promise (「전화로 문의 주시면」) no registered knowledge supports. The ledger has
           always recorded `authorKind`; this screen simply did not read it.
         */}
-        <h3 className="text-sm font-semibold text-muted">
-          {draftSectionHeading(draft?.authorKind, Boolean(draft))}
-        </h3>
+        {/*
+          <b>준비된 답변은 면 하나다</b> (문의 redesign, 2026-10-04 — product-owner decision, 1600 mockup을
+          구현 target으로 승인). dock을 쓰는 화면에서는 제목줄·본문·근거가 테두리 하나 안에서 한 물건으로
+          읽힌다 — 그래서 그 제목은 물건의 머리가 들고, 여기서는 그리지 않는다. dock이 없는 호출부는
+          예전처럼 블록 위의 작은 제목으로 남는다.
+        */}
+        {objectHead ? null : (
+          <h3 className="text-sm font-semibold text-muted">
+            {draftSectionHeading(draft?.authorKind, Boolean(draft))}
+          </h3>
+        )}
 
         {/*
           Three states, not two. There was no draft and there was a draft; a generate that
@@ -356,7 +370,34 @@ export function InquiryReply({
                 </div>
               </div>
             ) : (
-              <div className="mt-3 rounded-2xl bg-canvas p-4">
+              /*
+                <b>초안과 그 근거는 테두리 하나 안에 있다</b> (문의 redesign, 2026-10-04 — product-owner
+                decision). dock을 쓰는 화면에서 이 면은 「준비된 답변」이라는 한 물건이다: 머리에 누가 쓴
+                무엇인지, 몸에 보낼 문장, 발에 그 문장이 선 근거. 전에는 초안이 canvas 면이고 근거는 그
+                아래 다른 블록이어서, 같은 하나를 두 물건으로 읽었다.
+
+                <p>dock이 없는 호출부는 예전 그대로 canvas 면이다 — 그 화면에서는 근거가 초안과 「그 초안으로
+                할 수 있는 일」 다음에 와야 하고, 그 순서가 그 화면의 질문 순서다.
+              */
+              <div
+                className={
+                  objectHead
+                    ? "mt-3 overflow-hidden rounded-2xl border border-line"
+                    : "mt-3 rounded-2xl bg-canvas p-4"
+                }
+                data-testid={objectHead ? "prepared-answer" : undefined}
+              >
+                {objectHead ? (
+                  <div className="flex items-baseline gap-3 border-b border-line bg-brand-50 px-4 py-3">
+                    <h3 className="shrink-0 text-sm font-bold text-ink">
+                      {draftSectionHeading(draft.authorKind, true)}
+                    </h3>
+                    <p className="min-w-0 flex-1 truncate break-keep text-sm text-muted">{draft.title}</p>
+                  </div>
+                ) : null}
+                <div className={objectHead ? "px-4 py-4" : "contents"}>
+                  {objectHead ? null : (
+                    <>
                 {/*
                   THE COPY BUTTON SITS WITH THE TEXT IT COPIES (Executive Readiness Fix v1).
 
@@ -395,9 +436,15 @@ export function InquiryReply({
                     </div>
                   ) : null}
                 </div>
-                <p className="mt-1.5 whitespace-pre-wrap break-keep text-lg leading-relaxed text-ink">
-                  {draft.comments}
-                </p>
+                    </>
+                  )}
+                  <p
+                    className={`whitespace-pre-wrap break-keep text-lg leading-relaxed text-ink ${
+                      objectHead ? "" : "mt-1.5"
+                    }`}
+                  >
+                    {draft.comments}
+                  </p>
                 {/* Which version this is and who wrote it — the ledger is append-only, so both are facts. */}
                 {draftProvenanceLine(draft.authorKind, draft.version) ? (
                   <p className="mt-2 break-keep text-sm text-muted" data-testid="draft-provenance">
@@ -409,6 +456,8 @@ export function InquiryReply({
                     회사 정보를 참고해 표현했습니다. 배송·환불·규격 같은 사실의 근거는 아닙니다.
                   </p>
                 ) : null}
+                </div>
+                {objectHead ? <DraftEvidence evidence={evidence} inset /> : null}
               </div>
             )}
 
@@ -533,9 +582,14 @@ export function InquiryReply({
                   </div>
                 ) : null}
 
-                {!publishable ? (
+                {!publishable && !docked ? (
                   /* The sentence that tells the seller what finishing this looks like. It was the
-                     smallest text on the screen while being the only instruction on it. */
+                     smallest text on the screen while being the only instruction on it.
+
+                     <p><b>dock을 쓰는 화면에서는 여기 서지 않는다</b> (문의 redesign, 2026-10-04 —
+                     product-owner decision). 이 문장은 「이 답을 어떻게 끝내는가」이고, 끝내는 누름은
+                     pane 바닥에 있다. 흐름 한가운데에서 본문 크기로 서 있는 동안에는 준비된 답변과 근거
+                     사이를 가르는 또 하나의 덩이였다. 호출부가 dock 바로 앞에 조용한 주석으로 둔다. */
                   <p className="mt-3 break-keep text-base leading-relaxed text-muted">
                     {unavailableReason}
                   </p>
@@ -554,7 +608,8 @@ export function InquiryReply({
               순서가 곧 질문의 순서다: 무엇이라 답할 것인가 → 그걸 어떻게 내보내는가 → 이 답이 무엇 위에
               서 있는가. 초안 면 안에 들어 있던 동안에는 근거가 보낼 문장의 일부처럼 읽혔다.
             */}
-            {editing || !draft ? null : <DraftEvidence evidence={evidence} />}
+            {/* 물건이 자기 발로 근거를 들고 있으면 여기서 또 그리지 않는다 ({@code objectHead}). */}
+            {editing || !draft || objectHead ? null : <DraftEvidence evidence={evidence} />}
 
             {/* The outcome of the one marketplace WRITE this product performs, read back from the rows
                 rather than remembered from the press. The local inquiry stays UNANSWERED until a
@@ -809,7 +864,7 @@ function InquiryMeta({
  * renders nothing at all — an empty "근거" heading would read as a failure rather than as a draft
  * that never claimed grounding (the sentence above it already said which).
  */
-function DraftEvidence({ evidence }: { evidence: DraftEvidenceView[] }) {
+function DraftEvidence({ evidence, inset = false }: { evidence: DraftEvidenceView[]; inset?: boolean }) {
   if (evidence.length === 0) return null;
   // Grouped by where it came from, in the order the retrieval returned it. A seller who disagrees
   // with the reply needs to know WHICH thing to go and fix — a wrong spec is fixed in 상품 지식, a
@@ -844,7 +899,8 @@ function DraftEvidence({ evidence }: { evidence: DraftEvidenceView[] }) {
       The locator stays off the screen entirely: it identified a chunk, and no seller acts on a
       chunk id.
     */
-    <div className="mt-4 border-t border-line pt-3">
+    /* `inset`: 준비된 답변이라는 한 물건의 발이라 자기 여백을 쓰지 않고 그 면의 안쪽 여백을 쓴다. */
+    <div className={inset ? "border-t border-line px-4 py-3" : "mt-4 border-t border-line pt-3"}>
       <p className="text-sm font-medium text-muted">답변에 사용한 근거</p>
       <div className="mt-1.5 border-l-2 border-line pl-3">
         <p className="text-sm text-muted">{leadLabel}</p>
