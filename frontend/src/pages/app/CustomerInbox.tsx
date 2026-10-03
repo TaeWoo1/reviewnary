@@ -459,8 +459,15 @@ export function CustomerInbox() {
                     >
                       <span className="flex items-start gap-6">
                         <span className="min-w-0 flex-1">
+                          {/*
+                            <b>316px rail의 행</b> (문의 redesign, 2026-10-04). 전에는 18px에 `max-w-[62ch]`
+                            였다 — 목록이 페이지이던 시절의 치수다. rail에서는 62ch가 닿지 않는 폭이고, 긴
+                            질문 하나가 다섯 줄을 먹어 한 화면에 다섯 행만 섰다. 확인할 일의 rail 행이 쓰는
+                            치수(16px bold)로 내리고 두 줄에서 끊는다 — 행이 하는 일은 어느 문의인지 알아보게
+                            하는 것이고, 전문은 바로 옆 pane의 제목이다.
+                          */}
                           <span
-                            className={`block max-w-[62ch] break-keep text-lg font-semibold leading-snug [overflow-wrap:anywhere] ${
+                            className={`line-clamp-2 break-keep text-base font-semibold leading-snug [overflow-wrap:anywhere] ${
                               row.status === "ANSWERED" ? "text-muted" : "text-ink"
                             }`}
                           >
