@@ -714,27 +714,10 @@ function AnswerStateCard({
   const good = answerStateIsGood(state.basis);
   const noBasis = state.basis === "NO_ANSWER_BASIS";
   if (quiet && good) {
-    return (
-      <p
-        data-testid="answer-state"
-        data-basis={state.basis}
-        className="mt-2 break-keep text-sm leading-relaxed text-muted"
-      >
-        {state.note}
-        {state.action ? ` ${state.action}` : ""}
-        {justSaved && state.productId ? (
-          <>
-            {" "}
-            <Link
-              className="rounded font-medium text-brand-700 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-              to={`/products/${state.productId}`}
-            >
-              이 상품에 등록된 답변 기준 보기
-            </Link>
-          </>
-        ) : null}
-      </p>
-    );
+    // 좋은 소식은 문장이 아니라 근거다. 「답변에 필요한 정보를 확인했습니다」는 바로 아래 「답변에 사용한
+    // 근거」가 출처와 문장까지 들고 같은 말을 하므로, 그 위에 한 줄 더 서면 같은 사실의 두 번째 사본이다.
+    // 판매자가 되짚을 길은 남는다 — 저장 직후의 안내는 {@code basisSaved} 줄이, 작성자와 버전은 기록이.
+    return null;
   }
   return (
     <div

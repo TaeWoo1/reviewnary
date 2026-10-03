@@ -6,10 +6,6 @@ import type { Config } from "tailwindcss";
 // (docs/ui/reviewnary_ui_system_audit_v1.md §4).
 const BRAND_700 = "#1B64DA";
 
-// The supporting-text colour, named once for the same reason: `boxShadow.chosen` below is made of this
-// exact value, and a token that restates a colour is a token that drifts from it.
-const MUTED = "#4E5968";
-
 // Toss-like clean foundation: large readable type, soft cards, calm palette.
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
@@ -35,7 +31,7 @@ export default {
         // 4.19:1 against `canvas` (#F2F4F6) — below WCAG AA 4.5:1 — and nearly every supporting
         // sentence in the product is muted-on-canvas. #4E5968 measures 7.0:1 on surface and
         // 6.3:1 on canvas, so the same words survive a 50-year-old pair of eyes.
-        muted: MUTED,
+        muted: "#4E5968",
         line: "#E5E8EB",
         // Darkened from #15803D for the same reason `warn` was (Executive Readiness Fix v1): the
         // green words in this product sit on a `good/10` tint — 「연결됨」, 「최신」, 「외부 발송 없음」
@@ -152,15 +148,6 @@ export default {
         // and takes no border — §4 allows no shadow on a resting surface — so this is the one
         // `boxShadow` the app surface spends on state rather than on floating.
         selected: `inset 3px 0 0 ${BRAND_700}`,
-        /**
-         * <b>The same mark, without the accent</b> (문의 redesign polish, 2026-10-04 — product-owner
-         * decision). A rail whose selected row is told in the brand colour claims the row is important;
-         * what it actually says is 「this is the record the page beside you is showing」, which is
-         * navigation, not emphasis. A neutral tint alone (`bg-canvas` on white) measures 4% and a seller
-         * had to compare the text to find their place, so the tint keeps a bar — in `muted`, the colour
-         * the row's own second line is already set in.
-         */
-        chosen: `inset 3px 0 0 ${MUTED}`,
       },
     },
   },
