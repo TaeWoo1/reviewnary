@@ -64,6 +64,8 @@ class ElapsedTimeSourceTest {
                 .contains("List<Media> media, java.time.Instant openedAt");
         assertThat(code(DETAIL_SERVICE))
                 .as("off the case itself — never estimated, never offset")
-                .contains("c.getCreatedAt());");
+                // The trailing «)» became a «,» when the answer-state note joined the view after it
+                // (2026-10-03). What is fenced is the SOURCE of the fallback, and that is unchanged.
+                .contains("c.getCreatedAt(),");
     }
 }

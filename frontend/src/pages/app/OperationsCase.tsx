@@ -346,6 +346,13 @@ export function OperationsCaseView({
       dock={
         canonical ? (
           <div className="border-t border-line pb-6 pt-4">
+            {/* <b>The warning stands immediately before the press</b> (product-owner decision,
+                2026-10-03). Whatever is true of this channel's collection is true of the send the
+                button opens, and the 문의 screen has said it beside its own primary since the publish
+                package. Quiet, one line, no surface of its own — the dock is already the surface. */}
+            {detail.answerStateNote ? (
+              <p className="mb-3 break-keep text-xs leading-snug text-warn">{detail.answerStateNote}</p>
+            ) : null}
             {detail.draft && !editingDraft ? (
               <div className="flex items-center gap-3">
                 <Btn variant="outline" onClick={() => setEditingDraft(true)}>
