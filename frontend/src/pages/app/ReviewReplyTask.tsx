@@ -4,7 +4,7 @@ import { PageHead } from "../../components/ui/PageHead";
 import { Empty } from "../../components/ui/Empty";
 import { Facts } from "../../components/ui/ObjectRow";
 import { Section } from "../../components/ui/Section";
-import { Btn } from "../../components/ui/Btn";
+import { Btn, BtnLink } from "../../components/ui/Btn";
 import { VocItemReplyPrep } from "../../components/VocItemReplyPrep";
 import { SellerCorrectionControls } from "../../components/reviews/SellerCorrectionControls";
 import { ChannelAnsweredState } from "../../components/reviews/ChannelAnsweredState";
@@ -113,6 +113,8 @@ export function ReviewCaseView({
 }) {
   const pane = variant === "pane";
   const preview = pane && depth === "preview";
+  /** 확인할 일's reading of this pane — the one that docks its primary at the column's floor. */
+  const docked = pane && depth === "full";
   const paneEvidenceFolded = pane && !preview;
 
   const [detail, setDetail] = useState<ChannelReviewDetailView | null>(null);
@@ -311,8 +313,25 @@ export function ReviewCaseView({
       }
       depth={depth}
       title={title}
+      /* <b>확인할 일's docked floor, for a review</b> (product-owner decision, 2026-10-03). The queue's
+         other two kinds end in a primary at the pane's floor; a review ended in nothing, because the
+         judgement this pane holds is recorded in several steps rather than pressed once.
+
+         <p>So the dock carries the way INTO the place those steps belong — the Review workspace this
+         same component draws as a page — and no new workflow is built beside it. It is the quiet
+         「전체 화면으로」 link this header used to carry, moved to the floor and given the weight of a
+         primary: one destination, one control, where the eye already is at the end of the column. */
+      dock={
+        docked ? (
+          <div className="flex items-center border-t border-line pb-6 pt-4">
+            <BtnLink to={`/reviews/reply/${detail.id}?from=work`} className="ml-auto">
+              {COPY.handleReview}
+            </BtnLink>
+          </div>
+        ) : undefined
+      }
       headerAction={
-        preview ? undefined : pane ? (
+        docked || preview ? undefined : pane ? (
           <Link to={`/reviews/reply/${detail.id}?from=work`} className="rounded font-semibold text-muted hover:text-ink hover:underline">
             전체 화면으로
           </Link>

@@ -1019,3 +1019,39 @@ describe("리뷰 미리보기 — 고객 원문 → 왜 → 근거 → 판단 �
     expect(within(evidence).queryByText("「이틀만에 떨어졌어요」")).toBeNull();
   });
 });
+
+/**
+ * <b>확인할 일's review pane ends in one way into the Review workspace</b> (product-owner decision,
+ * 2026-10-03).
+ *
+ * <p>The queue's other two kinds end in a primary at the pane's floor. A review ended in nothing,
+ * because the judgement this pane holds is recorded in several steps rather than pressed once — so the
+ * dock carries the way INTO the place those steps belong, and no new workflow is built beside it.
+ *
+ * <p>Fenced on both halves: the control exists at the floor, and the quiet header link to the same
+ * destination is gone with it. Two controls for one destination 400px apart is what this replaces.
+ */
+describe("리뷰 pane — 확인할 일's docked way in", () => {
+  it("docks 리뷰 처리하기 and drops the header link that went to the same screen", async () => {
+    getReviewWorkspace.mockResolvedValue(detail());
+    getReviewReplyPrep.mockResolvedValue(prep());
+    renderPreview("full");
+
+    const dock = await screen.findByTestId("pane-footer");
+    const cta = within(dock).getByRole("link", { name: "리뷰 처리하기" });
+    expect(cta.getAttribute("href")).toContain(`/reviews/reply/${REVIEW}`);
+    // The primary colour, like the queue's other two docks.
+    expect(cta.className).toMatch(/bg-brand-700/);
+    expect(screen.queryByRole("link", { name: "전체 화면으로" })).toBeNull();
+  });
+
+  it("the preview depth — 오늘's reading — is untouched", async () => {
+    getReviewWorkspace.mockResolvedValue(detail());
+    getReviewReplyPrep.mockResolvedValue(prep());
+    renderPreview("preview");
+
+    await waitFor(() => expect(screen.getByText("같은 분류가 늘어나는지 지켜보세요.")).toBeTruthy());
+    expect(screen.queryByTestId("pane-footer")).toBeNull();
+    expect(screen.queryByRole("link", { name: "리뷰 처리하기" })).toBeNull();
+  });
+});

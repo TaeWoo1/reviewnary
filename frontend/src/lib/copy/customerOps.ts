@@ -119,6 +119,10 @@ export const COPY = {
   save: "저장",
   cancel: "취소",
   toSend: "발송 화면으로",
+  /* 확인할 일's dock, for a review (product-owner decision, 2026-10-03). 「발송」 is the inquiry lane's
+     word and nothing is sent here: the Review workspace is where the seller records the judgement and
+     the reply work this pane is a reading of. */
+  handleReview: "리뷰 처리하기",
   reuse: "유사 건에 재사용",
   otherHandling: "다른 처리가 필요하면",
   changeHandling: "처리 변경",
