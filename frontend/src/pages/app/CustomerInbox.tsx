@@ -684,6 +684,7 @@ function InquiryCasePane({
         <AgentLaunch
           context={{ surface: "inquiries", ...(workItemId ? { workItemId } : {}) }}
           label="이 문의에 대해 물어보기"
+          variant="quiet"
         />
       }
       decision={

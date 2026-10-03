@@ -625,7 +625,12 @@ describe("문의 — the canonical decision workspace (2026-10-03)", () => {
     renderInbox("/inquiries/i1");
     const dock = await screen.findByTestId("pane-footer");
     expect(within(dock).getByText(/이미 답변이 달렸는지 지금은 확인할 수 없습니다/)).toBeInTheDocument();
-    expect(within(dock).getByText("고객에게 나가지 않습니다")).toBeInTheDocument();
+    const promise = within(dock).getByText("고객에게 나가지 않습니다");
+    expect(promise).toBeInTheDocument();
+    // An instruction about what the press does, not good news — it does not compete with the warning
+    // beside it for the eye (2026-10-04).
+    expect(promise.className).toContain("text-muted");
+    expect(promise.className).not.toContain("text-good");
   });
 
   it("does not advertise the machinery: 「AI」 is nowhere on the pane, and the author is in 기록", async () => {
@@ -773,7 +778,12 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
     expect(within(list).queryByTestId("agent-launch")).toBeNull();
     // Moved, not lost: it asks about the inquiry, so it stands beside that inquiry's own title.
     const pane = screen.getByLabelText("문의 상세");
-    expect(within(pane).getByTestId("agent-launch")).toHaveTextContent("이 문의에 대해 물어보기");
+    const launch = within(pane).getByTestId("agent-launch");
+    expect(launch).toHaveTextContent("이 문의에 대해 물어보기");
+    // Quiet, not a button: the pane's one surface is the prepared answer and its one button is the dock.
+    expect(launch.className).not.toContain("border-line");
+    expect(launch.className).not.toContain("bg-surface");
+    expect(launch.className).toContain("text-brand-700");
     // And the tabs row still holds nothing that competes for the rail's width.
     const tabRow = screen.getByTestId("record-tabs");
     expect(within(tabRow).queryByLabelText("채널")).toBeNull();

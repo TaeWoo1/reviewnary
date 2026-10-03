@@ -24,14 +24,25 @@ export function AgentLaunch({
   label = "물어보기",
   className,
   size = "sm",
+  variant = "button",
 }: {
   context?: AgentContext;
   label?: string;
   className?: string;
   size?: "sm" | "md";
+  /**
+   * <b>조용한 형태</b> (문의 redesign polish, 2026-10-04 — product-owner decision). 한 object의 머리
+   * 옆에 서는 자리에서는 테두리를 두른 단추가 그 object와 같은 무게로 읽힌다 — 문의 pane에서는 준비된
+   * 답변이 유일한 면이어야 하고, 바닥의 dock이 유일한 단추여야 한다. 「quiet」는 이 제품이 제목 옆에
+   * 두는 조용한 길(상품 바꾸기 · 전체 보기)과 같은 글자다. 기본값은 바뀌지 않으므로 다른 화면은 그대로다.
+   */
+  variant?: "button" | "quiet";
 }) {
   const sizing = size === "md" ? "min-h-[40px] px-4 text-base" : "min-h-[36px] px-3 text-sm";
-  const classes = `inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface font-semibold text-ink transition hover:border-brand/40 hover:bg-brand-50/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 focus-visible:ring-offset-2 ${sizing} ${className ?? ""}`;
+  const classes =
+    variant === "quiet"
+      ? `inline-flex items-center gap-1.5 rounded text-sm font-semibold text-brand-700 underline-offset-2 transition hover:text-brand-800 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${className ?? ""}`
+      : `inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface font-semibold text-ink transition hover:border-brand/40 hover:bg-brand-50/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 focus-visible:ring-offset-2 ${sizing} ${className ?? ""}`;
   const panel = useAgentPanel();
   // The launcher lands NO sentence (Agentic Operating Workspace v2 §3-D): it opens the conversation
   // with the surface hint only, and the box is empty for the seller's own words.
