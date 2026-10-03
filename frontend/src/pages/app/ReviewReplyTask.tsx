@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { PageHead } from "../../components/ui/PageHead";
 import { Empty } from "../../components/ui/Empty";
@@ -23,6 +23,8 @@ import { COPY, sourceLabel } from "../../lib/copy/customerOps";
 import { Disclosure } from "../../components/ui/Disclosure";
 import { CaseBlock, CaseLayout, DecisionCard, Eyebrow, type CaseVariant, type PaneDepth } from "../../components/workspace/CaseLayout";
 import { PREVIEW_SAFETY_LINE, previewJudgmentTokens } from "../../lib/reviewDecision";
+import { triageDispositionLabel } from "../../lib/vocItems";
+import { TRIAGE_TIER_LABEL } from "../../lib/reviewTriage";
 import type {
   ChannelReviewDetailView,
   ReviewDecisionContext,
@@ -115,7 +117,11 @@ export function ReviewCaseView({
   const preview = pane && depth === "preview";
   /** 확인할 일's reading of this pane — the one that docks its primary at the column's floor. */
   const docked = pane && depth === "full";
-  const paneEvidenceFolded = pane && !preview;
+  /* <b>확인할 일's pane does not fold its evidence</b> (canonical mockup, 2026-10-03). The folds were
+     bought with the decision forms' place on the first screen of a 556px column; this reading has no
+     forms — the judgement moved to the Review workspace the dock opens — so there is nothing to buy
+     and the evidence is simply read. The page and 오늘's preview are unchanged. */
+  const paneEvidenceFolded = pane && !preview && !docked;
 
   const [detail, setDetail] = useState<ChannelReviewDetailView | null>(null);
   const [failed, setFailed] = useState(false);
@@ -370,6 +376,14 @@ export function ReviewCaseView({
           // customer's sentence and then says 「확인 필요 · 1점」 and one line about it has already said 「왜
           // 확인해야 하는가」; a bold title and a rule over two lines is the weight of a page section.
           <ReviewProblemCard detail={detail} word={word} showBody={false} />
+        ) : docked ? (
+          /* `verdict="controls"` without the controls, and that is the same ownership rule reading
+             correctly: the block that STATES the tier is the one that can change it, and in this
+             reading nothing can — 판단과 조치 below prints what is stored. So this block keeps the
+             reason and drops the conclusion, exactly as it does beside the forms. */
+          <CaseBlock title="왜 올라왔나요" tone="plain" columns>
+            <ReviewProblemCard detail={detail} word={word} showBody={false} verdict="controls" flat />
+          </CaseBlock>
         ) : (
           <CaseBlock title="왜 올라왔나요" tone="plain" flat>
             <ReviewProblemCard detail={detail} word={word} showBody={false} verdict="controls" />
@@ -377,7 +391,41 @@ export function ReviewCaseView({
         )
       }
       decision={
-        preview ? (
+        docked ? (
+          /*
+            <b>확인할 일's reading records nothing</b> (product-owner decision, 2026-10-03).
+            <p>It carried the two judgement controls, the draft panel and 작업에서 제외 — four writes in a
+            pane whose own primary is a way out to the screen that owns them. What stands here now is
+            what is STORED, read-only, and the one control is the dock's: every change is made in the
+            Review workspace, which is this same component as a page and is unchanged.
+            <p>The channel's own statement stays. It is a fact about whether this review can be
+            answered at all, not a control, and a seller about to press 리뷰 처리하기 is entitled to it
+            before they go.
+          */
+          <>
+            <ChannelAnsweredState state={replyWork?.channelReplyState ?? null} />
+            <CaseBlock title="판단과 조치" ariaLabel="판단과 조치" columns>
+              <dl className="space-y-2">
+                <Recorded label="중요도">
+                  {TRIAGE_TIER_LABEL[detail.sellerCorrection?.correctedTier ?? detail.triage.tier]}
+                </Recorded>
+                {/* The stored value, and 판단 전 when nothing is stored — the same table the control
+                    offers, so the word a seller reads here is the word they pressed there. */}
+                <Recorded label="처리 상태">{triageDispositionLabel(decision)}</Recorded>
+                <Recorded label="시스템 판단" quiet>
+                  {[
+                    TRIAGE_TIER_LABEL[detail.triage.tier],
+                    detail.sellerCorrection
+                      ? `판매자 수정 ${TRIAGE_TIER_LABEL[detail.sellerCorrection.correctedTier]}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Recorded>
+              </dl>
+            </CaseBlock>
+          </>
+        ) : preview ? (
           <>
             <ChannelAnsweredState state={replyWork?.channelReplyState ?? null} />
             <section aria-label="현재 판단" className="space-y-1.5">
@@ -531,7 +579,7 @@ export function ReviewCaseView({
             {context ? (
               <Disclosure label="이 상품에 대해 우리가 아는 것" summaryClassName="-ml-2">
                 <div className="pt-1">
-                  <GroundingOnHand context={context} titled={false} />
+                  <GroundingOnHand context={context} titled={false} flat />
                 </div>
               </Disclosure>
             ) : null}
@@ -542,6 +590,25 @@ export function ReviewCaseView({
           // by two components is a grid whose columns can disagree. A failed context read renders nothing at
           // all: a panel that could not see the evidence has nothing to say about it.
           context ? <EvidencePreview context={context} /> : null
+        ) : docked ? (
+          <>
+            <CaseBlock title="반복 신호" columns>
+              <RepeatedSignal
+                problems={context?.repeatedProblems ?? []}
+                failed={contextFailed || context === null}
+                titled={false}
+                flat
+              />
+            </CaseBlock>
+            {context ? (
+              /* 「이 상품에 대해 우리가 아는 것」 is the page's heading for this block and it is a
+                 sentence; beside its own content in a label column it is 상품 맥락 — the same block,
+                 named for what it IS rather than for what we did. */
+              <CaseBlock title="상품 맥락" ariaLabel="이 상품에 대해 우리가 아는 것" columns>
+                <GroundingOnHand context={context} titled={false} flat />
+              </CaseBlock>
+            ) : null}
+          </>
         ) : (
           <>
             <RepeatedSignal problems={context?.repeatedProblems ?? []} failed={contextFailed || context === null} />
@@ -637,6 +704,24 @@ function SetAsideFromWork({ accountId, actionRef, onDone }: { accountId: string;
         </button>
       )}
       {state === "failed" ? <p className="mt-2 text-sm text-bad">제외하지 못했습니다. 잠시 후 다시 시도해 주세요.</p> : null}
+    </div>
+  );
+}
+
+
+/**
+ * One line of 확인할 일's read-only 판단과 조치 — the label, and the word that is stored under it.
+ *
+ * <p>A `dl`, because that is what it is: three terms and the values recorded against them. Nothing
+ * here is pressable, so nothing here is drawn as a control.
+ */
+function Recorded({ label, quiet = false, children }: { label: string; quiet?: boolean; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-4">
+      <dt className="w-24 shrink-0 text-sm text-muted">{label}</dt>
+      <dd className={`min-w-0 break-keep text-base leading-snug ${quiet ? "text-muted" : "font-semibold text-ink"}`}>
+        {children}
+      </dd>
     </div>
   );
 }

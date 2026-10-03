@@ -28,13 +28,16 @@ import type { ReviewDecisionContext } from "../../../lib/types";
 export function GroundingOnHand({
   context,
   titled = true,
+  flat = false,
 }: {
   context: ReviewDecisionContext;
   /** False when the caller's own fold already prints this name. */
   titled?: boolean;
+  /** No card edge — see {@code ReviewProblemCard.flat}. */
+  flat?: boolean;
 }) {
   const { knowledge, productSignal } = context;
-  const preview = usePaneDepth() === "preview";
+  const preview = usePaneDepth() === "preview" || flat;
   /**
    * <b>이름은 있는데 상품이 없다</b> — the review arrived with the channel's own product name and this
    * org holds no catalogue product for it yet. The only producer of a name without an id is that
