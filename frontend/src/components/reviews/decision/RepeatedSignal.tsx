@@ -34,7 +34,6 @@ export function RepeatedSignal({
   failed,
   titled = true,
   similarShown,
-  flat = false,
 }: {
   problems: ReviewDecisionProblem[];
   /** The context read did not return. Renders nothing — see above. */
@@ -52,8 +51,6 @@ export function RepeatedSignal({
    * <p>Unset keeps each reading as it was: one in a preview, all of them on the full case.
    */
   similarShown?: number;
-  /** No card edge — see {@code ReviewProblemCard.flat}. */
-  flat?: boolean;
 }) {
   // <b>The preview no longer draws this.</b> Its count is one cell of `EvidencePreview`'s grid, where 「반복 문제
   // 기록」 carries the records claim in a word. This component is the full case's reading again, with the whole
@@ -88,7 +85,7 @@ export function RepeatedSignal({
       {/* A preview is already inside a panel inside the page: the box around these rows is the third
           border saying one thing, and in a 440px column it also costs the padding twice over. The rows,
           the quotes and the links are unchanged. */}
-      <ListBox className={preview || flat ? "rounded-none border-0 bg-transparent" : ""}>
+      <ListBox className={preview ? "rounded-none border-0 bg-transparent" : ""}>
         {problems.map((problem) => {
           const severity =
             problem.severity && problem.severity in SEVERITY_LABEL_KO

@@ -22,13 +22,22 @@ import { plainText } from "../../lib/plainText";
 import { COPY, sourceLabel } from "../../lib/copy/customerOps";
 import { Disclosure } from "../../components/ui/Disclosure";
 import { CaseBlock, CaseLayout, DecisionCard, Eyebrow, type CaseVariant, type PaneDepth } from "../../components/workspace/CaseLayout";
-import { PREVIEW_SAFETY_LINE, previewJudgmentTokens } from "../../lib/reviewDecision";
+import {
+  DECISION_LOG_DISCLOSURE,
+  PREVIEW_SAFETY_LINE,
+  decisionLogSentence,
+  previewJudgmentTokens,
+} from "../../lib/reviewDecision";
+import { SEVERITY_LABEL_KO } from "../../lib/reviewIssuesView";
+import { kstDate } from "../../lib/format";
 import { triageDispositionLabel } from "../../lib/vocItems";
 import { TRIAGE_TIER_LABEL } from "../../lib/reviewTriage";
 import type {
   ChannelReviewDetailView,
+  IssueSeverity,
   ReviewDecisionContext,
   ReviewDecisionLogEntry,
+  ReviewDecisionProblem,
   TriageDisposition,
 } from "../../lib/types";
 
@@ -380,10 +389,16 @@ export function ReviewCaseView({
           /* `verdict="controls"` without the controls, and that is the same ownership rule reading
              correctly: the block that STATES the tier is the one that can change it, and in this
              reading nothing can — 판단과 조치 below prints what is stored. So this block keeps the
-             reason and drops the conclusion, exactly as it does beside the forms. */
-          <CaseBlock title="왜 올라왔나요" tone="plain" columns>
+             reason and drops the conclusion, exactly as it does beside the forms.
+
+             <p><b>And no label over it any more</b> (canonical mockup, 2026-10-03 — Linear issue
+             detail). 「왜 올라왔나요」 named two lines that sit directly under the customer's sentence
+             and answer it; a bold label in a 112px column was a step the eye took before the thing it
+             came for, and it made the pane's first object a question rather than the evidence. The
+             region keeps the name for anything that cannot see the layout. */
+          <section aria-label="왜 올라왔나요">
             <ReviewProblemCard detail={detail} word={word} showBody={false} verdict="controls" flat />
-          </CaseBlock>
+          </section>
         ) : (
           <CaseBlock title="왜 올라왔나요" tone="plain" flat>
             <ReviewProblemCard detail={detail} word={word} showBody={false} verdict="controls" />
@@ -404,26 +419,7 @@ export function ReviewCaseView({
           */
           <>
             <ChannelAnsweredState state={replyWork?.channelReplyState ?? null} />
-            <CaseBlock title="판단과 조치" ariaLabel="판단과 조치" columns>
-              <dl className="space-y-2">
-                <Recorded label="중요도">
-                  {TRIAGE_TIER_LABEL[detail.sellerCorrection?.correctedTier ?? detail.triage.tier]}
-                </Recorded>
-                {/* The stored value, and 판단 전 when nothing is stored — the same table the control
-                    offers, so the word a seller reads here is the word they pressed there. */}
-                <Recorded label="처리 상태">{triageDispositionLabel(decision)}</Recorded>
-                <Recorded label="시스템 판단" quiet>
-                  {[
-                    TRIAGE_TIER_LABEL[detail.triage.tier],
-                    detail.sellerCorrection
-                      ? `판매자 수정 ${TRIAGE_TIER_LABEL[detail.sellerCorrection.correctedTier]}`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </Recorded>
-              </dl>
-            </CaseBlock>
+            <RecordedStatus detail={detail} decision={decision} />
           </>
         ) : preview ? (
           <>
@@ -592,22 +588,11 @@ export function ReviewCaseView({
           context ? <EvidencePreview context={context} /> : null
         ) : docked ? (
           <>
-            <CaseBlock title="반복 신호" columns>
-              <RepeatedSignal
-                problems={context?.repeatedProblems ?? []}
-                failed={contextFailed || context === null}
-                titled={false}
-                flat
-              />
-            </CaseBlock>
-            {context ? (
-              /* 「이 상품에 대해 우리가 아는 것」 is the page's heading for this block and it is a
-                 sentence; beside its own content in a label column it is 상품 맥락 — the same block,
-                 named for what it IS rather than for what we did. */
-              <CaseBlock title="상품 맥락" ariaLabel="이 상품에 대해 우리가 아는 것" columns>
-                <GroundingOnHand context={context} titled={false} flat />
-              </CaseBlock>
-            ) : null}
+            <RepeatedSignalObject
+              problems={context?.repeatedProblems ?? []}
+              failed={contextFailed || context === null}
+            />
+            {context ? <ProductContextLines context={context} /> : null}
           </>
         ) : (
           <>
@@ -617,7 +602,13 @@ export function ReviewCaseView({
         )
       }
       // 기록 stands inside 지금 판단할 것 in a preview, so there is no trailing block for it here.
-      more={preview ? undefined : <DecisionLog entries={log ?? []} failed={logFailed || log === null} />}
+      more={
+        preview ? undefined : docked ? (
+          <RecordTrail entries={log ?? []} failed={logFailed || log === null} />
+        ) : (
+          <DecisionLog entries={log ?? []} failed={logFailed || log === null} />
+        )
+      }
     />
   );
 }
@@ -710,18 +701,226 @@ function SetAsideFromWork({ accountId, actionRef, onDone }: { accountId: string;
 
 
 /**
- * One line of 확인할 일's read-only 판단과 조치 — the label, and the word that is stored under it.
+ * <b>반복 신호 — the central object of 확인할 일's review pane</b> (canonical mockup, 2026-10-03;
+ * reference: Linear's issue detail).
  *
- * <p>A `dl`, because that is what it is: three terms and the values recorded against them. Nothing
- * here is pressable, so nothing here is drawn as a control.
+ * <p>The same problems, the same quotes and the same link this pane has always drawn — as ONE bounded
+ * object instead of a paragraph. Linear gives a sub-issue group a rule above and below, a header bar
+ * carrying the group's name, the thing it is about and its counts, and then one row per item with its
+ * metadata right-aligned; the reader takes the whole group in without reading a sentence. What this
+ * pane had instead was 「반복 신호」 in a label column beside three quotes stacked over three date lines
+ * — six lines of prose for what is, structurally, a list of three.
+ *
+ * <p><b>Nothing is summarised and no number is composed here.</b> `evidenceCount` is the issue memory's
+ * org-wide count, `similar` is the bounded set the context read sends, and the tail line states the
+ * relation between the two rather than implying the list is the whole of it. The lifecycle state is NOT
+ * drawn: its Korean label is the server's (`ReviewIssueView.lifecycleLabelKo`) and this payload does not
+ * carry it, so the alternative would be a raw enum or a map invented on the screen.
  */
-function Recorded({ label, quiet = false, children }: { label: string; quiet?: boolean; children: ReactNode }) {
+function RepeatedSignalObject({ problems, failed }: { problems: ReviewDecisionProblem[]; failed: boolean }) {
+  // A screen that could not see the issue memory has nothing to say about it — see {@link RepeatedSignal}.
+  if (failed) return null;
+
+  if (problems.length === 0) {
+    return (
+      <section aria-label="반복 신호" className="border-t border-line pt-4">
+        <h3 className="text-sm font-bold text-muted">반복 신호</h3>
+        {/* A statement about our RECORDS, never 「반복된 적 없습니다」. */}
+        <p className="mt-1 break-keep text-sm leading-relaxed text-muted">아직 반복 문제의 근거로 기록되지 않았습니다.</p>
+      </section>
+    );
+  }
+
   return (
-    <div className="flex items-baseline gap-4">
-      <dt className="w-24 shrink-0 text-sm text-muted">{label}</dt>
-      <dd className={`min-w-0 break-keep text-base leading-snug ${quiet ? "text-muted" : "font-semibold text-ink"}`}>
-        {children}
-      </dd>
-    </div>
+    <section aria-label="반복 신호" className="border-y border-line" data-testid="pane-repeated-signal">
+      {problems.map((problem, index) => {
+        const severity =
+          problem.severity && problem.severity in SEVERITY_LABEL_KO
+            ? SEVERITY_LABEL_KO[problem.severity as IssueSeverity]
+            : null;
+        // The span the issue memory actually recorded. One date when only one end is known, and nothing
+        // at all when neither is — a 「→」 with a missing side would be a range nobody measured.
+        const span =
+          problem.firstEvidenceOn && problem.lastEvidenceOn
+            ? `${problem.firstEvidenceOn} → ${problem.lastEvidenceOn}`
+            : (problem.lastEvidenceOn ?? problem.firstEvidenceOn);
+        return (
+          <div key={problem.issueId} className={index === 0 ? undefined : "border-t border-line"}>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line py-3">
+              {/* The group's name sits in the bar, once, so the object reads as one thing. */}
+              {index === 0 ? <h3 className="shrink-0 text-sm font-bold text-ink">반복 신호</h3> : null}
+              <Link
+                to={`/memory/${problem.issueId}`}
+                className="break-keep rounded text-sm font-bold text-ink hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+              >
+                {problem.title}
+                <span className="ml-1 text-brand-700" aria-hidden="true">›</span>
+              </Link>
+              {severity ? <SignalPill>심각도 {severity}</SignalPill> : null}
+              <SignalPill>근거 {problem.evidenceCount}건</SignalPill>
+              {problem.dismissed ? <SignalPill>보지 않기로 한 문제</SignalPill> : null}
+              {span ? <span className="ml-auto shrink-0 text-xs tabular-nums text-muted">{span}</span> : null}
+            </div>
+
+            {problem.similar.length === 0 ? (
+              <p className="break-keep py-3 text-sm text-muted">이 문제의 근거는 지금 보고 계신 리뷰뿐입니다.</p>
+            ) : (
+              <>
+                <ul>
+                  {problem.similar.map((similar) => (
+                    <li
+                      key={`${similar.reviewId}-${similar.occurredOn ?? ""}`}
+                      className="flex items-center gap-3 border-b border-line py-2"
+                    >
+                      <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-full border border-line" />
+                      {/* One line per review. The quote is masked at read time and null when masking took
+                          the whole of it — then the row says so rather than drawing an empty cell. */}
+                      <span className={`min-w-0 flex-1 truncate text-sm ${similar.quote ? "text-ink" : "text-muted"}`}>
+                        {similar.quote ?? "내용이 가려진 근거입니다"}
+                      </span>
+                      <span className="shrink-0 text-xs tabular-nums text-muted">
+                        {`${similar.rating === null ? "평점 없음" : `★${similar.rating}`} · ${similar.occurredOn ?? "날짜 없음"}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {/* What the rows are, against what the memory holds — so the list is never read as the set. */}
+                <p className="break-keep py-2 text-xs leading-relaxed text-muted">
+                  근거 {problem.evidenceCount}건 가운데 최근 {problem.similar.length}건입니다.
+                </p>
+              </>
+            )}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+/** One count or qualifier in the signal object's header bar. Quiet by design: the bar's subject is the problem. */
+function SignalPill({ children }: { children: ReactNode }) {
+  return (
+    <span className="shrink-0 whitespace-nowrap rounded-lg bg-canvas px-2 py-0.5 text-xs tabular-nums text-muted">
+      {children}
+    </span>
+  );
+}
+
+/**
+ * <b>상품 맥락 — secondary evidence, read as context rather than as a table</b> (canonical mockup,
+ * 2026-10-03).
+ *
+ * <p>The same figures {@link GroundingOnHand} prints, in sentences, at a reading measure, one step
+ * quieter than the object above: four label/value rows beside a 112px gutter made the pane's second
+ * half look like the specification of the first.
+ *
+ * <p><b>What this reading leaves to other surfaces.</b> The product's name is the header's (one fact,
+ * one place — the same rule the preview reading follows), and 답변 기준 보기 / 상품 화면 열기 are the
+ * full case's: this pane's one door is the dock, and 지식 and 상품 are both one press from the rail.
+ * 「여기 있는 숫자는 등록된 자료의 수입니다」 is not repeated because the sentence itself now says
+ * 등록된.
+ */
+function ProductContextLines({ context }: { context: ReviewDecisionContext }) {
+  const { knowledge, productSignal } = context;
+  // 이름은 있는데 상품이 없다 — see {@link GroundingOnHand}. Why the figures above are absent.
+  const unlinked = context.productId == null && context.productName != null;
+  return (
+    <section aria-label="이 상품에 대해 우리가 아는 것" className="border-t border-line pt-4">
+      <h3 className="text-sm font-bold text-muted">상품 맥락</h3>
+      <p className="mt-1 max-w-thread break-keep text-sm leading-relaxed text-muted">
+        {/* Null is not zero: a review bound to no product has no product to count for. */}
+        {productSignal ? (
+          <>
+            리뷰 <strong className="font-semibold tabular-nums text-ink">{productSignal.reviews}건</strong> 가운데 부정이{" "}
+            <strong className="font-semibold tabular-nums text-ink">{productSignal.negativeReviews}건</strong>입니다.{" "}
+          </>
+        ) : null}
+        답할 때 쓸 수 있는 자료로 등록된 상품 지식 {knowledge.productSources}건과 회사 운영 기준{" "}
+        {knowledge.orgSources}건이 있습니다.
+        {knowledge.productTitles.length > 0 ? ` ${knowledge.productTitles.join(" · ")}` : ""}
+      </p>
+      {unlinked ? (
+        <p className="mt-2 max-w-thread break-keep text-sm leading-relaxed text-muted">
+          판매 채널에서 읽은 상품명입니다. 아직 상품 목록의 상품과 연결되지 않아 상품별 수치는 표시하지 않습니다.
+        </p>
+      ) : null}
+      {/* The honest half: a thin draft usually has a reason, and it is one click from being fixed. */}
+      {knowledge.openAsks > 0 ? (
+        <p className="mt-2 max-w-thread break-keep text-sm leading-relaxed text-warn">
+          아직 답하지 않은 확인 필요가 {knowledge.openAsks}건 있습니다. 채우면 다음 초안이 더 말할 수 있습니다.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * <b>판단과 조치 — a short status summary, and nothing to press</b> (product-owner decision,
+ * 2026-10-03).
+ *
+ * <p>Three terms in a `dl` beside a 112px gutter were the same table 상품 맥락 was, directly under it;
+ * two lines say the same three stored values and read as a status rather than as a record sheet. The
+ * values are unchanged: the seller's corrected tier when there is one, the stored disposition with
+ * 판단 전 when there is none, and the system's own tier beside the correction that stands with it.
+ *
+ * <p>The channel's answered state is NOT part of this summary — it is {@link ChannelAnsweredState}'s,
+ * rendered for ANSWERED alone, and 「채널 답변은 아직 등록되지 않았습니다」 would be the channel's
+ * silence dressed as a statement.
+ */
+function RecordedStatus({
+  detail,
+  decision,
+}: {
+  detail: ChannelReviewDetailView;
+  decision: TriageDisposition | null;
+}) {
+  const correction = detail.sellerCorrection;
+  return (
+    <section aria-label="판단과 조치" className="border-t border-line pt-4">
+      <h3 className="text-sm font-bold text-muted">판단과 조치</h3>
+      <p className="mt-1 break-keep text-base leading-snug text-muted">
+        중요도 <strong className="font-bold text-ink">{TRIAGE_TIER_LABEL[correction?.correctedTier ?? detail.triage.tier]}</strong>
+        <span aria-hidden="true"> · </span>
+        처리 상태 <strong className="font-bold text-ink">{triageDispositionLabel(decision)}</strong>
+      </p>
+      <p className="mt-1 max-w-thread break-keep text-sm leading-relaxed text-muted">
+        시스템 판단은 {TRIAGE_TIER_LABEL[detail.triage.tier]}입니다.
+        {correction ? ` 판매자 수정으로 ${TRIAGE_TIER_LABEL[correction.correctedTier]}가 함께 기록돼 있습니다.` : ""}
+      </p>
+    </section>
+  );
+}
+
+/**
+ * <b>기록 — the trail as activity</b> (canonical mockup, 2026-10-03; reference: Linear's issue detail).
+ *
+ * <p>The same rows {@link DecisionLog} draws, from the same `decisionLogSentence`, without the box and
+ * the counted heading: an issue's history is the quietest thing on its screen and it closes the column.
+ * Newest first, an entry this build cannot name is not drawn, and empty is a real state that says so —
+ * all three are the log's rules and none of them changes here.
+ */
+function RecordTrail({ entries, failed }: { entries: ReviewDecisionLogEntry[]; failed: boolean }) {
+  if (failed) return null;
+  const rows = entries
+    .map((entry) => ({ entry, sentence: decisionLogSentence(entry) }))
+    .filter((row): row is { entry: ReviewDecisionLogEntry; sentence: string } => row.sentence !== null);
+
+  return (
+    <section aria-label="기록" className="border-t border-line pt-3">
+      {rows.length === 0 ? (
+        <p className="break-keep text-sm leading-relaxed text-muted">아직 이 리뷰에 기록된 판단이 없습니다.</p>
+      ) : (
+        <ul>
+          {rows.map(({ entry, sentence }, index) => (
+            <li key={`${entry.kind}-${entry.at}-${index}`} className="flex items-baseline gap-3 py-1">
+              <span aria-hidden="true" className="h-3 w-3 shrink-0 translate-y-0.5 rounded-full bg-canvas" />
+              <span className="min-w-0 flex-1 break-keep text-sm leading-relaxed text-muted">{sentence}</span>
+              <span className="shrink-0 text-xs tabular-nums text-muted">{kstDate(entry.at)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-2 max-w-thread break-keep text-xs leading-relaxed text-muted">{DECISION_LOG_DISCLOSURE}</p>
+    </section>
   );
 }
