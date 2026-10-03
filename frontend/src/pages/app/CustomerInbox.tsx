@@ -305,20 +305,29 @@ export function CustomerInbox() {
     return [...seen.entries()];
   }, [record]);
 
+  const agentLaunch = (
+    <AgentLaunch
+      context={{
+        surface: "inquiries",
+        ...(focused ? { workItemId } : {}),
+        ...(channel ? { channelCode: channel } : {}),
+      }}
+      label={focused ? "이 문의에 대해 물어보기" : "문의에 대해 물어보기"}
+    />
+  );
+
   const head = (
     <PageHead
       title="문의"
       compact={!!itemRef}
-      action={
-        <AgentLaunch
-          context={{
-            surface: "inquiries",
-            ...(focused ? { workItemId } : {}),
-            ...(channel ? { channelCode: channel } : {}),
-          }}
-          label={focused ? "이 문의에 대해 물어보기" : "문의에 대해 물어보기"}
-        />
-      }
+      /*
+        <b>316px rail의 머리는 화면 이름만 든다</b> (문의 redesign polish, 2026-10-04 — product-owner
+        decision). 「이 문의에 대해 물어보기」가 제목 옆에 서면 1366에서 머리가 두 줄로 깨졌다 — 가장 짧은
+        줄이어야 할 곳에서 가장 긴 레이블이 폭을 요구한 것이다. 그래서 rail일 때는 아래 조용한 줄로 내려
+        가고, rail이 아닌 좁은 화면에서는 머리에 그대로 남는다: 그 화면의 머리는 폭이 모자라지 않고,
+        문의 하나를 연 상태에서 목록으로 돌아가지 않고도 물어볼 수 있어야 한다.
+      */
+      action={wide ? undefined : agentLaunch}
       /* No meta: the section below is titled 「지금 처리할 일」 and carries the same count, and the two
          sat 80px apart saying the same words twice. The section owns it, because it owns the rows. */
     />
@@ -360,7 +369,9 @@ export function CustomerInbox() {
         탭은 세 숫자를 동시에 보여 주고, 누르는 것이 곧 그 숫자를 여는 것이다 — 확인할 일·리뷰·반복 문제가
         쓰는 바로 그 {@link FilterTab}이다.
       */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-line">
+      {/* 탭 줄은 탭만 든다 (2026-10-04). 316px rail에서 탭 셋과 채널 select가 한 줄을 다투면 세 번째 탭이
+          select 옆으로 내려가, 목록의 축이 두 줄로 쪼개진 채 읽힌다. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line" data-testid="record-tabs">
         {RECORD_STATUS_OPTIONS.map((option) => (
           <FilterTab key={option.value} pressed={status === option.value} onClick={() => setParam("status", option.value)}>
             {option.label}
@@ -369,23 +380,26 @@ export function CustomerInbox() {
             ) : null}
           </FilterTab>
         ))}
-        <span className="ml-auto">
-          <QuietSelect
-            label="채널"
-            value={channel ?? ""}
-            options={[{ value: "", label: "모든 채널" }, ...channels.map(([code, name]) => ({ value: code, label: name }))]}
-            onChange={(value) => setParam("channel", value || null)}
-          />
-        </span>
       </div>
 
-      {/* 두 번째 줄: 확인할 일로 가는 문(별개의 work-item 진입점), 그리고 이 화면의 본업인 찾기. */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+      {/* 조용한 줄: 채널 좁히기, 확인할 일로 가는 문(별개의 work-item 진입점), 그리고 물어보기. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <QuietSelect
+          label="채널"
+          value={channel ?? ""}
+          options={[{ value: "", label: "모든 채널" }, ...channels.map(([code, name]) => ({ value: code, label: name }))]}
+          onChange={(value) => setParam("channel", value || null)}
+        />
         {queueRows.length > 0 ? (
           <Link to="/customer-operations/cases" className="shrink-0 text-sm font-semibold text-brand-700 hover:underline">
             확인할 일에 문의 {(productId ? queueRows.length : queueTotal ?? queueRows.length).toLocaleString("ko-KR")}건 →
           </Link>
         ) : null}
+        {wide ? <span className="shrink-0">{agentLaunch}</span> : null}
+      </div>
+
+      {/* 이 화면의 본업인 찾기 — 행 바로 위에 선다. */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <form
           className="min-w-[16rem] flex-1"
           onSubmit={(e) => {
@@ -454,7 +468,7 @@ export function CustomerInbox() {
                       to={`/inquiries/${row.inquiryId}`}
                       aria-current={selected ? "true" : undefined}
                       className={`block px-4 py-4 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
-                        selected ? "bg-canvas" : "hover:bg-canvas"
+                        selected ? "bg-canvas shadow-chosen" : "hover:bg-canvas"
                       }`}
                     >
                       <span className="flex items-start gap-6">
