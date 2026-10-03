@@ -62,26 +62,27 @@ describe("master-detail pane", () => {
    * 대해 아는 것 → 판단과 조치 — so it takes the same column, with the same 1440 breakpoint under it.
    *
    * <p>And 반복 문제 since its own canonical (2026-10-03): 변화와 신호 → 근거 → 우리가 써 둔 것 → 판단과
-   * 조치 → 기록, ending in a lifecycle transition the seller records in their own words. Three readings,
-   * one column.
+   * 조치 → 기록, ending in a lifecycle transition the seller records in their own words.
    *
-   * <p>The list is still closed and still asserted: a fourth caller is a decision, not an import.
+   * <p>And 문의 since its own (2026-10-03, product-owner decision): 고객의 질문 → 준비된 답변 → 답변에
+   * 사용한 근거 → 기록, ending in the one thing the seller presses — 답변 보내기 where SellerOps can
+   * register the answer, 초안 복사 where it cannot. Four readings, one column.
+   *
+   * <p>The list is still closed and still asserted: a fifth caller is a decision, not an import.
    */
-  it("three screens override it — 확인할 일 · 리뷰 · 반복 문제, the panes a decision is made in", () => {
+  it("four screens override it — 확인할 일 · 리뷰 · 반복 문제 · 문의, the panes a decision is made in", () => {
     const callers = SRC.filter((f) => readFileSync(f, "utf8").includes('pane="decision"'));
     expect(callers.map((f) => f.replace(/\\/g, "/")).sort()).toEqual([
+      "src/pages/app/CustomerInbox.tsx",
       "src/pages/app/CustomerMemory.tsx",
       "src/pages/app/OperationsCaseQueue.tsx",
       "src/pages/app/ReviewRecord.tsx",
     ]);
   });
 
-  it("문의 · 오늘 keep the layout's own width", () => {
-    for (const screenFile of [
-      "src/pages/app/CustomerInbox.tsx",
-      "src/components/customerOperations/CustomerOpsHome.tsx",
-    ]) {
-      expect(readFileSync(screenFile, "utf8")).not.toContain('pane="decision"');
-    }
+  it("오늘 keeps the layout's own width — its pane is a preview, not a workspace", () => {
+    expect(readFileSync("src/components/customerOperations/CustomerOpsHome.tsx", "utf8")).not.toContain(
+      'pane="decision"',
+    );
   });
 });

@@ -1,28 +1,32 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { analytics } from "../../lib/analytics";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { PageHead } from "../../components/ui/PageHead";
-import { Section } from "../../components/ui/Section";
 import { Empty } from "../../components/ui/Empty";
 import { Btn, BtnLink } from "../../components/ui/Btn";
 import { Status } from "../../components/ui/Status";
-import { WorkItem } from "../../components/ui/WorkItem";
 import { AgentLaunch } from "../../components/ui/AgentLaunch";
+import { FilterTab } from "../../components/ui/FilterTab";
+import { QuietSelect } from "../../components/ui/QuietSelect";
+import { Fact } from "../../components/ui/DecisionRow";
 import { InboxDetail } from "../../components/inbox/InboxDetail";
+import { InquiryReplyDock } from "../../components/inbox/InquiryReply";
+import { useInquiryReply } from "../../components/inbox/useInquiryReply";
 import { Facts } from "../../components/ui/ObjectRow";
 import { MasterDetail, useWideLayout } from "../../components/workspace/MasterDetail";
 import { CaseLayout } from "../../components/workspace/CaseLayout";
 import { api } from "../../lib/apiClient";
 import { analysisKey, buildAnalysisIndex } from "../../lib/inboxView";
-import { previewText } from "../../lib/plainText";
-import { relativeTime } from "../../lib/format";
+import { plainText, previewText } from "../../lib/plainText";
+import { kstDate } from "../../lib/format";
+import { waitedLabel } from "../../lib/inquiryWorkflow";
 import { productChannelLabel } from "../../lib/productRows";
 import {
   RECORD_STATUS_OPTIONS,
   asFeedItem,
   recordRowState,
 } from "../../lib/inquiryWorkspace";
-import { inquiryHeadline } from "../../lib/inquiryNextAction";
+import { inquiryReading } from "../../lib/inquiryNextAction";
 import type { InquiryQueueItem, InquiryRowItem, ItemAnalysis } from "../../lib/types";
 import { useAgentSurface } from "../../lib/agentPanel";
 
@@ -81,6 +85,19 @@ export function CustomerInbox() {
   const [analyses, setAnalyses] = useState<ItemAnalysis[]>([]);
   /** The server's own total for the queue read — the page below it may be smaller. */
   const [queueTotal, setQueueTotal] = useState<number | null>(null);
+  /**
+   * <b>탭이 세는 것</b> — 같은 읽기, 같은 조건, 상태만 다르게 세 번.
+   *
+   * <p>탭은 목록의 축이므로 각 탭은 자기 숫자를 들고 있어야 한다(리뷰·반복 문제가 그렇다). 그 숫자는
+   * 지금 걸려 있는 <b>다른</b> 조건(검색어·채널·상품)을 그대로 통과해야 한다 — 「세금계산서」로 좁혀 놓고
+   * 탭이 조직 전체의 102를 말하면 탭이 거짓말을 하는 것이다. 그래서 세 번 모두 `limit=1`로, 행이 아니라
+   * 합계만 받는다. 실패한 읽기는 숫자를 비워 둔다: 틀린 숫자보다 없는 숫자가 낫다.
+   */
+  const [counts, setCounts] = useState<{ all: number | null; unanswered: number | null; answered: number | null }>({
+    all: null,
+    unanswered: null,
+    answered: null,
+  });
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -197,6 +214,27 @@ export function CustomerInbox() {
     };
   }, [itemRef, record]);
 
+  useEffect(() => {
+    let live = true;
+    const total = (forStatus?: string) =>
+      api
+        .getInquiryRowsStrict({
+          limit: 1,
+          ...(forStatus ? { status: forStatus } : {}),
+          ...(channel ? { channel } : {}),
+          ...(productId ? { productId } : {}),
+          ...(q.trim() ? { q: q.trim() } : {}),
+        })
+        .then((page) => page.totalCount)
+        .catch(() => null);
+    void Promise.all([total(), total("UNANSWERED"), total("ANSWERED")]).then(([all, unanswered, answered]) => {
+      if (live) setCounts({ all, unanswered, answered });
+    });
+    return () => {
+      live = false;
+    };
+  }, [channel, productId, q]);
+
   const analysisIndex = useMemo(() => buildAnalysisIndex(analyses), [analyses]);
   const wide = useWideLayout();
 
@@ -286,6 +324,13 @@ export function CustomerInbox() {
     />
   );
 
+  /**
+   * <b>탭이 이미 고정한 사실은 행에서 반복하지 않는다.</b> 「답변 필요」 탭에서 모든 행이 「답변 필요」라고
+   * 말하면 그 단어는 행을 구분하지 못하고 질문의 첫 글자 앞 자리만 차지한다. 전체 탭에서는 행마다 다르므로
+   * 그대로 선다 — 리뷰의 목록이 자기 상태 단어를 그리는 것과 같은 규칙이다.
+   */
+  const stateVaries = status === "ALL";
+
   const lists = (
     <>
       {/* The work is 확인할 일's (UI/UX v2 Phase 3): this screen is where inquiries are looked up. It used to open
@@ -294,145 +339,191 @@ export function CustomerInbox() {
         <p className="text-sm text-warn" role="status">
           처리할 문의 수를 불러오지 못했습니다. 아래 전체 문의는 그대로 보실 수 있습니다.
         </p>
-      ) : queueRows.length > 0 ? (
-        <p className="text-sm">
-          <Link to="/customer-operations/cases" className="font-semibold text-brand-700 hover:underline">
-            확인할 일에 문의 {(productId ? queueRows.length : queueTotal ?? queueRows.length).toLocaleString("ko-KR")}건 →
-          </Link>
-        </p>
       ) : null}
 
-      {/* ── 전체 문의 ────────────────────────────────────────────────── */}
-      <Section title="전체 문의" count={recordTotal ?? undefined} hint="답변한 문의까지 모두 여기 있습니다. 찾을 때 쓰세요.">
-        {productId ? (
-          <div className="mb-3 flex flex-wrap items-center gap-2" data-testid="record-product-scope">
-            <Status tone="info">{scopedProductName ?? "이 상품"}의 문의만 보고 있습니다</Status>
-            <button
-              type="button"
-              onClick={() => setParam("productId", null)}
-              className="rounded-md text-sm font-medium text-muted underline underline-offset-2 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-            >
-              전체 문의 보기
-            </button>
-          </div>
-        ) : null}
+      {productId ? (
+        <div className="flex flex-wrap items-center gap-2" data-testid="record-product-scope">
+          <Status tone="info">{scopedProductName ?? "이 상품"}의 문의만 보고 있습니다</Status>
+          <button
+            type="button"
+            onClick={() => setParam("productId", null)}
+            className="rounded-md text-sm font-medium text-muted underline underline-offset-2 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+          >
+            전체 문의 보기
+          </button>
+        </div>
+      ) : null}
 
+      {/*
+        <b>답변 상태는 설정이 아니라 목록의 축이다</b> (문의 canonical, 2026-10-03). 전에는 「모든 채널」
+        옆의 select 였고, 그래서 판매자는 지금 몇 건이 답변을 기다리는지 열어 보기 전에는 알 수 없었다.
+        탭은 세 숫자를 동시에 보여 주고, 누르는 것이 곧 그 숫자를 여는 것이다 — 확인할 일·리뷰·반복 문제가
+        쓰는 바로 그 {@link FilterTab}이다.
+      */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-line">
+        {RECORD_STATUS_OPTIONS.map((option) => (
+          <FilterTab key={option.value} pressed={status === option.value} onClick={() => setParam("status", option.value)}>
+            {option.label}
+            {COUNT_OF[option.value](counts) != null ? (
+              <span className="ml-1.5 tabular-nums">{COUNT_OF[option.value](counts)!.toLocaleString("ko-KR")}</span>
+            ) : null}
+          </FilterTab>
+        ))}
+        <span className="ml-auto">
+          <QuietSelect
+            label="채널"
+            value={channel ?? ""}
+            options={[{ value: "", label: "모든 채널" }, ...channels.map(([code, name]) => ({ value: code, label: name }))]}
+            onChange={(value) => setParam("channel", value || null)}
+          />
+        </span>
+      </div>
+
+      {/* 두 번째 줄: 확인할 일로 가는 문(별개의 work-item 진입점), 그리고 이 화면의 본업인 찾기. */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        {queueRows.length > 0 ? (
+          <Link to="/customer-operations/cases" className="shrink-0 text-sm font-semibold text-brand-700 hover:underline">
+            확인할 일에 문의 {(productId ? queueRows.length : queueTotal ?? queueRows.length).toLocaleString("ko-KR")}건 →
+          </Link>
+        ) : null}
         <form
-          className="mb-3 flex flex-wrap items-center gap-2"
+          className="min-w-[16rem] flex-1"
           onSubmit={(e) => {
             e.preventDefault();
             setParam("q", draftQuery.trim());
           }}
         >
-          <label className="min-w-0 flex-1">
+          <label className="block">
             <span className="sr-only">문의 내용 검색</span>
             <input
               type="search"
               value={draftQuery}
               onChange={(e) => setDraftQuery(e.target.value)}
               placeholder="고객이 쓴 말로 찾기 (예: 세금계산서)"
-              className="w-full min-w-[12rem] rounded-lg border border-line bg-surface px-3 py-1.5 text-base focus:border-brand-700 focus:outline-none"
+              className="w-full border-0 border-b border-line bg-transparent px-1 py-2 text-base text-ink placeholder:text-muted focus:border-brand-700 focus:outline-none focus:ring-0"
             />
           </label>
-          <select
-            aria-label="채널"
-            value={channel ?? ""}
-            onChange={(e) => setParam("channel", e.target.value || null)}
-            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-          >
-            <option value="">모든 채널</option>
-            {channels.map(([code, name]) => (
-              <option key={code} value={code}>{name}</option>
-            ))}
-          </select>
-          <select
-            aria-label="답변 상태"
-            value={status}
-            onChange={(e) => setParam("status", e.target.value)}
-            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-brand-700 focus:outline-none"
-          >
-            {RECORD_STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
         </form>
+      </div>
 
-        {loading ? (
-          <p className="px-1 py-6 text-sm text-muted">불러오는 중…</p>
-        ) : failed ? (
-          <Empty
-            title="문의를 불러오지 못했습니다"
-            body="연결 상태를 확인한 뒤 다시 시도해 주세요."
-            action={<BtnLink to="/connect">채널 연결 확인</BtnLink>}
-          />
-        ) : (record ?? []).length === 0 ? (
-          <Empty
-            title={hasNarrowing(q, channel, status, productId) ? "찾는 문의가 없습니다" : "아직 들어온 문의가 없습니다"}
-            body={
-              hasNarrowing(q, channel, status, productId)
-                ? "다른 말로 찾거나 조건을 넓혀 보세요."
-                : "채널을 연결하거나 정기 자료 가져오기로 자료를 넘겨주시면, 채널이 달라도 같은 형태로 모아 보여드립니다."
-            }
-            action={hasNarrowing(q, channel, status, productId) ? undefined : <BtnLink to="/connect">채널 연결하기</BtnLink>}
-          />
-        ) : (
-          <>
-            <ul className="divide-y divide-line/70 overflow-hidden rounded-2xl border border-line bg-surface">
+      {loading ? (
+        <p className="px-1 py-6 text-sm text-muted">불러오는 중…</p>
+      ) : failed ? (
+        <Empty
+          title="문의를 불러오지 못했습니다"
+          body="연결 상태를 확인한 뒤 다시 시도해 주세요."
+          action={<BtnLink to="/connect">채널 연결 확인</BtnLink>}
+        />
+      ) : (record ?? []).length === 0 ? (
+        <Empty
+          title={hasNarrowing(q, channel, status, productId) ? "찾는 문의가 없습니다" : "아직 들어온 문의가 없습니다"}
+          body={
+            hasNarrowing(q, channel, status, productId)
+              ? "다른 말로 찾거나 조건을 넓혀 보세요."
+              : "채널을 연결하거나 정기 자료 가져오기로 자료를 넘겨주시면, 채널이 달라도 같은 형태로 모아 보여드립니다."
+          }
+          action={hasNarrowing(q, channel, status, productId) ? undefined : <BtnLink to="/connect">채널 연결하기</BtnLink>}
+        />
+      ) : (
+        <>
+          {/*
+            <b>고객이 쓴 문장이 행의 첫 시선이다</b> (문의 canonical, 2026-10-03, product-owner decision).
+
+            <p>행은 「상태 → 제목 → 본문 → 채널·상품」이었다. 그 순서는 제목이 목록 어디에도 안 나오던
+            결함을 고치려고 정한 것인데, 실제 데이터에서 대가가 드러났다 — 데모 org 최신 11건 중 5건은
+            제목이 비었거나 「문의 드립니다」다. 게시판이 자동으로 채운 칸이 가장 큰 글씨를 가져가고,
+            고객이 실제로 물어본 문장은 그 아래 회색이었다. 이제 첫 줄은 언제나 고객의 말이고, 제목은
+            본문이 말하지 않는 것을 말할 때만 그 아래 사실 줄에 남는다({@link inquiryReading}).
+
+            <p>모양은 리뷰의 행 그대로다. 문의와 리뷰는 같은 종류의 기록이고, 두 목록이 서로 다른 방식으로
+            읽히면 판매자는 제품을 두 개 쓰는 셈이 된다. 목록을 감싸던 카드도 함께 사라졌다 — 행 사이에
+            선이 있으면 그것이 목록이고, 테두리 안의 테두리는 두 번째 경계였다.
+          */}
+          <section aria-label="문의 목록" className="-mx-4">
+            <ul className="divide-y divide-line">
               {(record ?? []).map((row) => {
                 const state = recordRowState(row);
-                /*
-                  <b>제목이 제목 자리에 온다.</b> 이 줄은 `title={previewText(row.snippet) || row.title}`
-                  이었다 — 본문이 있으면 본문의 앞부분이 제목 자리를 차지하고, 문의의 실제 제목은 목록
-                  어디에도 나오지 않았다. 행은 원래 둘 다 갖고 있었다(`InquiryRowItem.title` /
-                  `.snippet`). 이제 네 단계로 읽힌다: 상태 → 제목 → 본문 → 채널·상품, 오른쪽에 시각.
-                */
-                const headline = inquiryHeadline(row, previewText);
+                const reading = inquiryReading(row, previewText);
+                const selected = row.inquiryId === shownRef;
+                const rest: ReactNode[] = [];
+                if (reading.titleContext) rest.push(`제목 「${reading.titleContext}」`);
+                if (row.productName) rest.push(row.productName);
                 return (
                   <li key={row.inquiryId}>
-                    <WorkItem
+                    <Link
                       to={`/inquiries/${row.inquiryId}`}
-                      selected={row.inquiryId === shownRef}
-                      ariaCurrent={row.inquiryId === shownRef ? "true" : undefined}
-                      // The record is a place to look things up: a settled row is quieter than the work above.
-                      dim={row.status === "ANSWERED"}
-                      state={state.text}
-                      tone={state.tone}
-                      title={headline.title}
-                      {...(headline.body ? { body: previewText(headline.body) } : {})}
-                      meta={
-                        <>
-                          {row.channelNameKo}
-                          {row.productName ? ` · ${row.productName}` : ""}
-                        </>
-                      }
-                      time={relativeTime(row.receivedAt)}
-                    />
+                      aria-current={selected ? "true" : undefined}
+                      className={`block px-4 py-4 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
+                        selected ? "bg-brand-50 shadow-selected" : "hover:bg-canvas"
+                      }`}
+                    >
+                      <span className="flex items-start gap-6">
+                        <span className="min-w-0 flex-1">
+                          <span
+                            className={`block max-w-[62ch] break-keep text-lg font-semibold leading-snug [overflow-wrap:anywhere] ${
+                              row.status === "ANSWERED" ? "text-muted" : "text-ink"
+                            }`}
+                          >
+                            {reading.question}
+                          </span>
+                          {/* One line, truncated — never wrapped. 가장 많이 구별해 주는 사실이 마지막이라,
+                              잘려야 하는 것은 상품 이름이다. */}
+                          <span className="mt-1.5 flex min-w-0 flex-nowrap items-center gap-x-2 overflow-hidden text-xs text-muted">
+                            {stateVaries ? (
+                              <span className={`shrink-0 font-semibold ${row.status === "ANSWERED" ? "text-muted" : "text-brand-700"}`}>
+                                {state.text}
+                              </span>
+                            ) : null}
+                            {stateVaries ? (
+                              <Fact fixed>{row.channelNameKo ?? "채널 미상"}</Fact>
+                            ) : (
+                              <span className="shrink-0">{row.channelNameKo ?? "채널 미상"}</span>
+                            )}
+                            {rest.map((fact, index) => (
+                              <Fact key={index} fixed={index < rest.length - 1}>
+                                {fact}
+                              </Fact>
+                            ))}
+                          </span>
+                        </span>
+                        <span className="shrink-0 pt-1 text-sm tabular-nums text-muted">{kstDate(row.receivedAt)}</span>
+                      </span>
+                    </Link>
                   </li>
                 );
               })}
             </ul>
-            {/* Said only when there IS more — a page that holds everything says nothing. */}
-            {recordTotal != null && recordTotal > (record ?? []).length ? (
-              <div className="flex flex-wrap items-center gap-3 px-4 pt-3">
-                <Btn variant="outline" size="sm" disabled={loading} onClick={() => setRecordPages((n) => n + 1)}>
-                  {loading ? "불러오는 중…" : "더 보기"}
-                </Btn>
-                <span className="text-sm tabular-nums text-muted">
-                  {(record ?? []).length} / {recordTotal}건
-                </span>
-              </div>
-            ) : null}
-          </>
-        )}
-      </Section>
+          </section>
+          {/* Said only when there IS more — a page that holds everything says nothing. */}
+          {recordTotal != null && recordTotal > (record ?? []).length ? (
+            <div className="flex flex-wrap items-center gap-3 pt-3">
+              <Btn variant="outline" size="sm" disabled={loading} onClick={() => setRecordPages((n) => n + 1)}>
+                {loading ? "불러오는 중…" : "더 보기"}
+              </Btn>
+              <span className="text-sm tabular-nums text-muted">
+                {(record ?? []).length} / {recordTotal}건
+              </span>
+            </div>
+          ) : null}
+        </>
+      )}
     </>
   );
+
+  /*
+    <b>작업대는 화면이 쥔다</b> (문의 canonical, 2026-10-03). 초안·근거·등록 가능 여부는 전부 한 상태이고,
+    그것을 읽는 곳이 둘이다: pane 본문과 pane 바닥의 dock. 패널 안에 상태가 있던 동안에는 바닥에 둘 수 있는
+    것이 없었다. work item이 없는 문의 — 이미 답변됐거나 목록 밖 — 에서는 {@code null}을 받고 아무것도
+    읽지 않는다. hook은 조건부로 부를 수 없으므로 「없음」이 값이다.
+  */
+  const workspace = useInquiryReply(shownWorkItemId);
 
   const detail = shownItem ? (
     <InquiryCasePane
       item={shownItem}
       analysis={analysisIndex.get(analysisKey("INQUIRY", shownItem.id))}
       workItemId={shownWorkItemId}
+      workspace={workspace}
     />
   ) : itemRef && !loading ? (
     <div>
@@ -467,7 +558,19 @@ export function CustomerInbox() {
       </>
     );
 
-  return <MasterDetail wide={wide} list={list} detailLabel="문의 상세" detail={detail} />;
+  return (
+    <MasterDetail
+      wide={wide}
+      // 문의도 Decision Workspace다: 이 pane에서 판매자는 고객의 질문을 읽고, 준비된 답변을 읽고,
+      // 그것을 내보낼지 정한다 — 확인할 일·리뷰·반복 문제와 같은 읽기이므로 같은 폭을 쓴다.
+      pane="decision"
+      list={list}
+      detailLabel="문의 상세"
+      detail={detail}
+      preview
+      paneFooter={shownItem && shownWorkItemId ? <InquiryReplyDock workspace={workspace} /> : null}
+    />
+  );
 }
 
 /**
@@ -488,12 +591,29 @@ function InquiryCasePane({
   item,
   analysis,
   workItemId,
+  workspace,
 }: {
   item: ReturnType<typeof asFeedItem>;
   analysis: ItemAnalysis | undefined;
   workItemId: string | null;
+  workspace: ReturnType<typeof useInquiryReply>;
 }) {
-  const headline = inquiryHeadline(item, previewText);
+  /*
+    <b>pane의 제목은 고객이 쓴 질문 전체다</b> (문의 canonical, 2026-10-03). 목록의 행은 발췌를 보여 주지만
+    여기서는 자르지 않는다 — 판매자가 답을 쓰기 전에 읽어야 하는 것이 그 문장 전부이기 때문이고, 리뷰의
+    pane이 고객의 리뷰 전문을 제목으로 세우는 것과 같은 이유다. 그래서 {@code previewText}가 아니라
+    {@code plainText}로 읽고, 답변 블록은 같은 문장을 다시 그리지 않는다({@code docked}).
+
+    <p>상세 읽기가 도착하기 전에는 행이 가진 것으로 그린다. 둘은 같은 문의의 같은 두 칸이고, 늦게 오는 쪽이
+    더 길 뿐이다.
+  */
+  const detail = workspace.detail;
+  const reading = inquiryReading(
+    { title: detail?.title ?? item.title, snippet: detail?.details ?? item.snippet },
+    plainText,
+  );
+  const waited = waitedLabel(item.receivedAt);
+  const state = recordRowState(item);
   return (
     <CaseLayout
       key={item.id}
@@ -502,28 +622,39 @@ function InquiryCasePane({
       decisionLabel="답변"
       meta={
         <Facts>
+          <span className={`font-semibold ${item.status === "ANSWERED" ? "text-muted" : "text-brand-700"}`}>
+            {state.text}
+          </span>
           <span>{item.channelNameKo}</span>
-          {item.productName ? <span className="break-keep">{item.productName}</span> : null}
-          <span>{relativeTime(item.receivedAt)}</span>
+          <span className="tabular-nums">{kstDate(item.receivedAt)}</span>
+          {waited ? <span>{waited}</span> : null}
         </Facts>
       }
-      title={headline.title}
-      titleHidden={workItemId !== null}
+      title={reading.question}
+      sub={[item.productName, reading.titleContext ? `제목 「${reading.titleContext}」` : null]
+        .filter(Boolean)
+        .join(" · ")}
       // No 「전체 화면으로」: this route IS the inquiry's own screen, so the link would point at the page it is on.
       decision={
         <InboxDetail
           item={item}
           analysis={analysis}
           workItemId={workItemId}
-          // The layout above drew the meta line and the title. Whatever the panel does below, this
-          // block never draws either of them again.
-          bodyOnly={headline.body}
+          workspace={workspace}
+          docked
         />
       }
     />
   );
 }
 
+
+/** 어떤 탭이 어떤 숫자를 말하는가. 탭의 값과 숫자를 한 곳에서 묶어 둔다. */
+const COUNT_OF: Record<string, (c: { all: number | null; unanswered: number | null; answered: number | null }) => number | null> = {
+  ALL: (c) => c.all,
+  UNANSWERED: (c) => c.unanswered,
+  ANSWERED: (c) => c.answered,
+};
 
 /** One page of the record. The seller narrows rather than scrolls; the count says what is behind it. */
 const PAGE_SIZE = 50;

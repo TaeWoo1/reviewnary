@@ -57,8 +57,11 @@ const ON_THE_SYSTEM = [
   // 리뷰, since its canonical redesign (2026-10-03): the same list reading and the same decision pane.
   "pages/app/ReviewRecord.tsx",
   "components/reviews/ReviewReadDetail.tsx",
+  // 문의, since its canonical redesign (2026-10-03): the same list reading, the same decision pane,
+  // and one tinted surface in it — the draft the seller is about to send.
   "pages/app/CustomerInbox.tsx",
   "components/inbox/InboxDetail.tsx",
+  "components/inbox/InquiryReply.tsx",
   "pages/app/ConnectHub.tsx",
   "components/connect/ChannelList.tsx",
   "components/connect/ChannelStatusSection.tsx",

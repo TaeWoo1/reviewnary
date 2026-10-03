@@ -3,6 +3,7 @@ import {
   draftRuleNotice,
   draftUnavailableReason,
   inquiryHeadline,
+  inquiryReading,
   inquiryNextAction,
   isAnswered,
 } from "./inquiryNextAction";
@@ -130,5 +131,51 @@ describe("isAnswered", () => {
     expect(isAnswered({ status: "ANSWERED" })).toBe(true);
     expect(isAnswered({ status: "UNANSWERED" })).toBe(false);
     expect(isAnswered({ status: "OPEN" })).toBe(false);
+  });
+});
+
+/**
+ * <b>inquiryReading — 고객이 쓴 말이 먼저, 제목은 뭔가를 더해 줄 때만</b> (문의 canonical, 2026-10-03,
+ * product-owner decision).
+ *
+ * <p>{@link inquiryHeadline}의 규칙(「제목이 있으면 제목이 제목이다」)이 틀렸던 것은 아니다 — 그 규칙은
+ * 제목이 목록 어디에도 안 나오던 결함을 고쳤다. 바뀐 것은 어느 칸이 <b>첫 시선</b>을 갖느냐이고, 그 판단의
+ * 근거는 데이터다: 데모 org 최신 11건 중 5건이 빈 제목이거나 「문의 드립니다」다.
+ */
+describe("inquiryReading — 제목은 더해 줄 것이 있을 때만 남는다", () => {
+  it("본문이 첫 시선이고, 뜻 있는 제목은 그 옆에 남는다", () => {
+    expect(inquiryReading({ title: "배송 후 분실", snippet: "배송 완료 사진을 받았지만 물건이 없었습니다" }, preview)).toEqual({
+      question: "배송 완료 사진을 받았지만 물건이 없었습니다",
+      titleContext: "배송 후 분실",
+    });
+  });
+
+  it("게시판이 채운 제목은 그리지 않는다 — 공백과 마침표는 같은 제목이다", () => {
+    for (const title of ["문의 드립니다", "문의드립니다.", "문의", "질문 있습니다", "안녕하세요"]) {
+      expect(inquiryReading({ title, snippet: "교환은 언제까지 되나요" }, preview).titleContext).toBeNull();
+    }
+  });
+
+  it("본문이 이미 제목으로 시작하면 제목을 다시 그리지 않는다", () => {
+    expect(inquiryReading({ title: "교환 문의", snippet: "교환 문의드립니다. 언제까지 가능한가요" }, preview).titleContext).toBeNull();
+  });
+
+  it("목록에 없는 제목은 언제나 남는다 — 판매자의 자료를 숨기는 쪽으로 틀리지 않는다", () => {
+    expect(inquiryReading({ title: "선바로 길이 문의", snippet: "2호 2m짜리 있나요" }, preview).titleContext).toBe("선바로 길이 문의");
+  });
+
+  it("본문이 없으면 제목이 곧 질문이고, 같은 문장을 두 번 그리지 않는다", () => {
+    expect(inquiryReading({ title: "세금계산서 발행", snippet: null }, preview)).toEqual({
+      question: "세금계산서 발행",
+      titleContext: null,
+    });
+    expect(inquiryReading({ title: null, snippet: null }, preview)).toEqual({ question: "문의", titleContext: null });
+  });
+
+  it("제목이 없으면 본문뿐이다", () => {
+    expect(inquiryReading({ title: "", snippet: "난연소재인가요" }, preview)).toEqual({
+      question: "난연소재인가요",
+      titleContext: null,
+    });
   });
 });
