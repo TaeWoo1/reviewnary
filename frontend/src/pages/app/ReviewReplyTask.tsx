@@ -770,11 +770,14 @@ function RepeatedSignalObject({ problems, failed }: { problems: ReviewDecisionPr
                   {problem.similar.map((similar) => (
                     <li
                       key={`${similar.reviewId}-${similar.occurredOn ?? ""}`}
-                      className="flex items-center gap-3 border-b border-line py-2"
+                      className="flex items-center gap-3 border-b border-line py-2 pl-6"
                     >
-                      <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-full border border-line" />
-                      {/* One line per review. The quote is masked at read time and null when masking took
-                          the whole of it — then the row says so rather than drawing an empty cell. */}
+                      {/* <b>The rows carry no bullet</b> (product-owner decision, 2026-10-04). An empty
+                          ring in front of every row is the shape a radio or a checkbox has, and these
+                          rows select nothing — they are evidence. The indent that stood behind it does
+                          the aligning on its own, which is all it was ever doing.
+                          <p>One line per review. The quote is masked at read time and null when masking
+                          took the whole of it — then the row says so rather than drawing an empty cell. */}
                       <span className={`min-w-0 flex-1 truncate text-sm ${similar.quote ? "text-ink" : "text-muted"}`}>
                         {similar.quote ?? "내용이 가려진 근거입니다"}
                       </span>
