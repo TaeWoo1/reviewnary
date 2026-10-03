@@ -760,6 +760,29 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
     expect(within(list).queryByText(/^\d{3,}일 대기$/)).toBeNull();
   });
 
+  /**
+   * The geometry's own consequence. The row was typed for a list that WAS the page — 18px over
+   * `max-w-[62ch]`, wrapping as far as it liked. In a 316px rail one long question took five lines and
+   * five rows filled the screen, so the rail could not do the one thing a rail is for. `block` and
+   * `line-clamp-2` also both set `display`, and the clamp lost — which is invisible in a diff and
+   * obvious only in a capture, so it is asserted rather than remembered.
+   */
+  it("the rail's row is two clamped lines at the rail's own size", async () => {
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", snippet: "교환은 언제까지 신청해야 하나요?" })],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    renderInbox("/inquiries/i1");
+    const list = await screen.findByLabelText("문의 목록");
+    const headline = within(list).getByText("교환은 언제까지 신청해야 하나요?");
+    expect(headline.className).toContain("line-clamp-2");
+    expect(headline.className).not.toContain("block");
+    expect(headline.className).not.toContain("text-lg");
+    expect(headline.className).not.toContain("max-w-[62ch]");
+  });
+
   it("준비된 답변 is one object — the evidence is inside its edge, not a block beside it", async () => {
     getInquiryRowsStrict.mockResolvedValue({
       items: [row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", snippet: "교환은 언제까지 신청해야 하나요?" })],
