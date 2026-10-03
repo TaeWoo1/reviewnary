@@ -182,6 +182,15 @@ export interface OperationsCaseDetail {
   receivedOn: string | null;
   /** When reviewnary opened the case — the same fallback the list row carries, so both apply one contract. */
   openedAt: string | null;
+  /**
+   * <b>「이 문의에 이미 답변이 달렸는지 지금은 확인할 수 없습니다」</b> — null when the channel's inquiry
+   * collection was provably current, and null on every review.
+   *
+   * <p>The same sentence the 문의 screen has shown beside its send control since the publish package,
+   * off the same check. 확인할 일's pane carries the way to that send screen on its floor, so it warns
+   * where the press is.
+   */
+  answerStateNote: string | null;
   rating: number | null;
   title: string | null;
   body: string | null;

@@ -184,20 +184,9 @@ public class InquiryProposalService {
                 : products.findById(productId).map(OperatorProductName::displayNameOrNull).orElse(null);
     }
 
-    /**
-     * The sentence shown beside the send control when the answer state is stale.
-     *
-     * <p>Only the negative case produces text. "확인했습니다" on a fresh channel is a reassurance the
-     * seller did not ask for and would learn to skip, which is exactly how a warning stops working
-     * on the day it matters.
-     */
+    /** The sentence shown beside the send control when the answer state is stale — {@link PreSendCheck#noteKo()}. */
     private static String answerStateNote(PreSendCheck check) {
-        if (check.stateProven()) {
-            return null;
-        }
-        return PreSendCheck.STATE_NOT_FRESH.equals(check.note())
-                ? "이 채널의 문의 수집이 최신이 아니라, 이 문의에 이미 답변이 달렸는지 지금은 확인할 수 없습니다."
-                : "이 채널의 문의 수집 상태를 읽지 못해, 이 문의에 이미 답변이 달렸는지 확인할 수 없습니다.";
+        return check.noteKo();
     }
 
     /**

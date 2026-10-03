@@ -168,7 +168,50 @@ public class CaseKnowledgeService {
                 media(orgId, c),
                 // The elapsed-time fallback, carried so the pane can apply the same contract the row applies.
                 // It is never preferred over `receivedOn`: see `elapsedSource` on the frontend.
-                c.getCreatedAt());
+                c.getCreatedAt(),
+                answerStateNote(orgId, c));
+    }
+
+    /**
+     * The answer-state lane. Optional, exactly as the review-photo lane is: a context without it shows
+     * a case with no note, which is what every caller saw before 2026-10-03.
+     */
+    private com.sellerops.inquiry.publish.InquiryTargetStateReader targetState;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setTargetState(com.sellerops.inquiry.publish.InquiryTargetStateReader targetState) {
+        this.targetState = targetState;
+    }
+
+    /**
+     * <b>「이 문의에 이미 답변이 달렸는지 지금은 확인할 수 없습니다」 — on the case too</b> (product-owner
+     * decision, 2026-10-03).
+     *
+     * <p>확인할 일 opens an inquiry-origin case in a pane whose floor carries the way to the send
+     * screen, and the inquiry screen has warned beside that control since the publish package. The
+     * case did not, because the case read never asked — so the same seller, one press apart, was told
+     * on one screen and not on the other.
+     *
+     * <p><b>One read, and it reads what collection already recorded.</b> {@link
+     * com.sellerops.inquiry.publish.InquiryTargetStateReader} asks the coverage rows this channel
+     * already has; there is no new endpoint and no marketplace call, which is the contract that
+     * component was built under and is unchanged here. The sentence itself is {@link
+     * com.sellerops.inquiry.publish.PreSendCheck#noteKo()}, so the two screens cannot drift.
+     *
+     * <p>Null for a review (the question is about an inquiry's answer), for a case with no channel,
+     * and wherever the reader is absent.
+     */
+    private String answerStateNote(UUID orgId, OperationsCase c) {
+        return answerStateNote(targetState, orgId, c);
+    }
+
+    /** The rule itself, with the reader handed in so it can be asserted without a container. */
+    static String answerStateNote(com.sellerops.inquiry.publish.InquiryTargetStateReader reader,
+                                  UUID orgId, OperationsCase c) {
+        if (reader == null || c.getSubjectKind() != OperationsSubjectKind.INQUIRY || c.getChannelId() == null) {
+            return null;
+        }
+        return reader.read(orgId, c.getChannelId()).noteKo();
     }
 
     /** The review-photo lane. Optional: a context without it shows a case with no photos, as before. */

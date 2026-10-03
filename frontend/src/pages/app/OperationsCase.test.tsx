@@ -27,6 +27,7 @@ function detail(over: Partial<OperationsCaseDetail> = {}): OperationsCaseDetail 
     productScopeAvailable: true,
     receivedOn: "2026-09-17",
     openedAt: null,
+    answerStateNote: null,
     rating: null,
     title: "방수 되나요?",
     body: "욕실에 붙이려는데 방수 되는지 궁금합니다.",

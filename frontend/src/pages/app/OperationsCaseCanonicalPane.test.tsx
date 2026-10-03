@@ -39,6 +39,7 @@ function detail(over: Partial<OperationsCaseDetail> = {}): OperationsCaseDetail 
     // date makes 「8일 동안」 true on the day the test was written and false on every day after it.
     receivedOn: kstDaysAgo(8),
     openedAt: null,
+    answerStateNote: null,
     rating: null,
     title: "문의 드립니다",
     body: "포장을 뜯지 않은 경우도 교환이 가능한가요?",
@@ -267,5 +268,35 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
     const body = within(answer).getByText("수령 후 7일 이내, 미개봉 상태라면 교환이 가능합니다.");
     expect(body.className).toMatch(/text-prose/);
     expect(body.className).not.toMatch(/bg-/);
+  });
+
+  /**
+   * <b>The warning stands immediately before the press</b> (product-owner decision, 2026-10-03).
+   *
+   * <p>확인할 일 opens an inquiry-origin case in a pane whose floor carries the way to the send screen,
+   * and the 문의 screen has warned beside that control since the publish package. The case read now
+   * carries the same sentence off the same check, so the same seller is told on both screens.
+   *
+   * <p>Fenced on placement as well as presence: a warning that is true of the send and is drawn
+   * anywhere but beside the control that opens it is a warning the seller reads after deciding.
+   */
+  it("draws the answer-state warning in the dock, above the control it qualifies", async () => {
+    const note = "이 채널의 문의 수집이 최신이 아니라, 이 문의에 이미 답변이 달렸는지 지금은 확인할 수 없습니다.";
+    api.getOperationsCase.mockResolvedValue(detail({ answerStateNote: note }));
+    drawPane();
+
+    const dock = await screen.findByTestId("pane-footer");
+    const warning = within(dock).getByText(note);
+    expect(warning.className).toMatch(/text-warn/);
+    const send = within(dock).getByRole("link", { name: /발송 화면으로/ });
+    expect(warning.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("says nothing when the channel's state was proven — a reassurance nobody asked for", async () => {
+    api.getOperationsCase.mockResolvedValue(detail({ answerStateNote: null }));
+    drawPane();
+
+    const dock = await screen.findByTestId("pane-footer");
+    expect(dock.textContent).not.toMatch(/확인할 수 없습니다/);
   });
 });

@@ -41,6 +41,27 @@ public record PreSendCheck(boolean refused, String reason, boolean stateProven, 
         return new PreSendCheck(true, reason, false, null);
     }
 
+    /**
+     * The sentence a seller is shown beside the send control when the answer state is stale, or null
+     * when it was proven.
+     *
+     * <p>Only the negative case produces text. "확인했습니다" on a fresh channel is a reassurance the
+     * seller did not ask for and would learn to skip, which is exactly how a warning stops working on
+     * the day it matters.
+     *
+     * <p><b>It lives on the check rather than on one caller</b> (확인할 일, 2026-10-03). The inquiry
+     * screen and the case pane show the same sentence about the same fact; two private copies of it
+     * are two sentences that can stop matching while the fact they describe does not.
+     */
+    public String noteKo() {
+        if (stateProven) {
+            return null;
+        }
+        return STATE_NOT_FRESH.equals(note)
+                ? "이 채널의 문의 수집이 최신이 아니라, 이 문의에 이미 답변이 달렸는지 지금은 확인할 수 없습니다."
+                : "이 채널의 문의 수집 상태를 읽지 못해, 이 문의에 이미 답변이 달렸는지 확인할 수 없습니다.";
+    }
+
     // --- Closed vocabulary. Each value names ONE thing that moved, so an audit row says which. ---
 
     /** The approval carries no target snapshot (written before V66) — unprovable, so closed. */
