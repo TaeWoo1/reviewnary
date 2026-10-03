@@ -739,6 +739,64 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
     expect(chosen.className).toContain("bg-canvas");
     expect(chosen.className).not.toContain("bg-brand-50");
     expect(chosen.className).not.toContain("shadow-selected");
+    // Neutral, but findable: the tint alone measures 4% on white and a seller had to read the rows to
+    // find their place, so it keeps a bar — in `muted`, which is the row's own second-line colour.
+    expect(chosen.className).toContain("shadow-chosen");
+  });
+
+  /**
+   * <b>The 316px head carries the page name and nothing else</b> (polish, 2026-10-04). 「이 문의에 대해
+   * 물어보기」 beside the title was the longest label on the shortest line, and at 1366 the head broke in
+   * two. It drops to the quiet row under the tabs while the rail is open; on a narrow screen, where the
+   * head has the whole width and a chosen inquiry replaces the list, it stays in the head.
+   *
+   * <p>The tabs row also keeps only tabs: three tabs and a channel select could not share 316px, so the
+   * third tab wrapped down beside the select and the list's own axis read as two rows.
+   */
+  it("the rail head is the page name alone, and the tabs row is only tabs", async () => {
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", snippet: "교환은 언제까지 신청해야 하나요?" })],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    renderInbox("/inquiries/i1");
+    const heading = await screen.findByRole("heading", { level: 1, name: "문의" });
+    const head = heading.closest("header")!;
+    expect(within(head).queryByTestId("agent-launch")).toBeNull();
+    // Lowered, not lost.
+    expect(screen.getByTestId("agent-launch")).toBeInTheDocument();
+    // The tabs row is the list's axis and holds nothing that competes for its width.
+    const tabRow = screen.getByRole("button", { name: /^전체/ }).parentElement!;
+    expect(within(tabRow).queryByLabelText("채널")).toBeNull();
+    expect(within(tabRow).queryByTestId("agent-launch")).toBeNull();
+  });
+
+  /**
+   * <b>준비된 답변 is the only centre of the pane</b> (polish, 2026-10-04). 「답변에 필요한 정보를
+   * 확인했습니다」 stood in 17px bold behind a green rule, so the pane had two objects claiming the eye:
+   * the sentence the seller judges, and the sentence saying that sentence is fine. Good news is
+   * metadata. A state that asks the seller to DO something keeps its card and its way out.
+   */
+  it("the grounded basis note is muted metadata, not a second object", async () => {
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", snippet: "교환은 언제까지 신청해야 하나요?" })],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    getInquiryDetailStrict.mockResolvedValue({
+      ...DRAFTED_WITH_CAPABILITY,
+      draft: { ...DRAFTED_WITH_CAPABILITY.draft, answerBasis: "GROUNDED", answerBasisNote: "답변에 필요한 정보를 확인했습니다.", answerBasisAction: null },
+    });
+    renderInbox("/inquiries/i1");
+    const note = await screen.findByTestId("answer-state");
+    expect(note).toHaveAttribute("data-basis", "GROUNDED");
+    expect(note).toHaveTextContent("답변에 필요한 정보를 확인했습니다.");
+    expect(note.className).toContain("text-muted");
+    expect(note.className).not.toContain("border-good");
+    expect(note.className).not.toContain("border-l-2");
+    expect(note.className).not.toContain("font-semibold");
   });
 
   it("the row says how long the customer waited, and the day it arrived once that is a year", async () => {

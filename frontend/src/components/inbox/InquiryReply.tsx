@@ -286,6 +286,7 @@ export function InquiryReply({
               state={answerState}
               justSaved={basisSaved}
               onSavedBasis={onBasisSaved}
+              quiet={docked}
             />
 
             {/*
@@ -692,14 +693,49 @@ function AnswerStateCard({
   state,
   justSaved,
   onSavedBasis,
+  quiet = false,
 }: {
   state: AnswerStateView | null;
   justSaved: boolean;
   onSavedBasis: () => void | Promise<void>;
+  /**
+   * <b>좋은 소식은 강조가 아니라 metadata다</b> (문의 redesign polish, 2026-10-04 — product-owner
+   * decision). 「답변에 필요한 정보를 확인했습니다」가 초록 세로선에 17px bold로 서 있는 동안, 그 pane에는
+   * 중심 object가 둘이었다 — 준비된 답변과, 그 답변이 괜찮다는 말. 판매자가 판단하는 것은 문장이고, 그
+   * 문장이 무엇 위에 섰는지는 문장을 읽으며 곁눈으로 확인하는 사실이다. 그래서 dock을 쓰는 화면에서 GOOD
+   * 상태는 조용한 muted 한 줄이 된다.
+   *
+   * <p><b>경고는 조용해지지 않는다.</b> NO_ANSWER_BASIS와 NEEDS_CLARIFICATION은 판매자가 무언가 해야
+   * 한다는 말이고, 그 카드는 할 일(답변 기준 채우기)까지 들고 있다. 이 prop은 좋은 소식에만 닿는다.
+   */
+  quiet?: boolean;
 }) {
   if (!state) return null;
   const good = answerStateIsGood(state.basis);
   const noBasis = state.basis === "NO_ANSWER_BASIS";
+  if (quiet && good) {
+    return (
+      <p
+        data-testid="answer-state"
+        data-basis={state.basis}
+        className="mt-2 break-keep text-sm leading-relaxed text-muted"
+      >
+        {state.note}
+        {state.action ? ` ${state.action}` : ""}
+        {justSaved && state.productId ? (
+          <>
+            {" "}
+            <Link
+              className="rounded font-medium text-brand-700 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+              to={`/products/${state.productId}`}
+            >
+              이 상품에 등록된 답변 기준 보기
+            </Link>
+          </>
+        ) : null}
+      </p>
+    );
+  }
   return (
     <div
       data-testid="answer-state"
