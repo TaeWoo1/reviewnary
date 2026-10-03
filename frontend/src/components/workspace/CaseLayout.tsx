@@ -279,6 +279,7 @@ export function CaseBlock({
   children,
   tone = "plain",
   flat = false,
+  columns = false,
 }: {
   title?: string;
   /** The region's name when the block draws no heading — a section the eye reads from its content still
@@ -295,9 +296,29 @@ export function CaseBlock({
    * object」, and a near-empty card says it loudest about the thing with least in it.
    */
   flat?: boolean;
+  /**
+   * <b>Label beside the content, not above it</b> (확인할 일's review pane, 2026-10-03 — canonical
+   * mockup). A pane that answers four questions in a row reads as four questions when the four labels
+   * line up in one column and the four answers line up in another; stacked, each label is a step the
+   * eye takes before the thing it came for, four times down the column.
+   *
+   * <p>Pane only — a page block is a card with its heading inside it.
+   */
+  columns?: boolean;
 }) {
   const variant = useCaseVariant();
   const H = variant === "pane" ? "h3" : "h2";
+  if (variant === "pane" && columns) {
+    return (
+      <section
+        aria-label={ariaLabel ?? title}
+        className="grid grid-cols-[112px_minmax(0,1fr)] gap-4 border-t border-line pt-4"
+      >
+        {title ? <H className="text-sm font-bold text-muted">{title}</H> : <span />}
+        <div className="min-w-0">{children}</div>
+      </section>
+    );
+  }
   const heading = title ? <H className="mb-2.5 text-sm font-bold text-muted">{title}</H> : null;
   if (variant === "pane" || flat) {
     return (

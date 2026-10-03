@@ -29,6 +29,7 @@ export function ReviewProblemCard({
   word,
   showBody = true,
   verdict = "self",
+  flat = false,
 }: {
   detail: ChannelReviewDetailView;
   word: string;
@@ -55,12 +56,18 @@ export function ReviewProblemCard({
    * one-line review would otherwise be read twice, one block apart, and the second copy is the one that is skipped.
    */
   showBody?: boolean;
+  /**
+   * <b>No card edge, and the reason flows</b> (확인할 일's review pane, 2026-10-03). The left rule was a
+   * card's edge inside a band that already has a hairline above it and a label beside it — three
+   * boundaries for one group. Same content, same order; only the chrome goes.
+   */
+  flat?: boolean;
 }) {
   const body = detail.body ? plainText(detail.body) : "";
   // <b>In a preview the state and the reason are one line, and the reason has no rule beside it.</b> The left
   // border was a card's edge in a 440px column that is already a card; Linear's Peek answers 「what state is
   // this in」 with a coloured mark and a word flowing beside the rest, and nothing is drawn around it.
-  const preview = usePaneDepth() === "preview";
+  const preview = usePaneDepth() === "preview" || flat;
   return (
     <section aria-label="고객이 남긴 내용" className={preview ? "space-y-1.5" : "space-y-3"}>
       <div className="flex flex-wrap items-center gap-2">
@@ -107,6 +114,9 @@ export function ReviewProblemCard({
           ) : null}
         </div>
       )}
+      {flat && detail.triage.recommendedAction ? (
+        <p className="break-keep text-base leading-relaxed text-ink">{detail.triage.recommendedAction}</p>
+      ) : null}
 
       {detail.triage.tags.length > 0 ? (
         <Disclosure label="자동 분류" note={detail.triage.tags.join(" · ")}>

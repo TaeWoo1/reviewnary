@@ -847,13 +847,21 @@ describe("리뷰 미리보기 — 고객 원문 → 왜 → 근거 → 판단 �
     expect(screen.queryByText("왜 올라왔나요")).toBeNull();
   });
 
-  it("keeps the fold in the FULL pane, where it buys the decision forms their place", async () => {
+  /**
+   * <b>The full pane folded nothing any more</b> (확인할 일 canonical, 2026-10-03 — product-owner
+   * decision). The folds were bought with the decision forms' place on the first screen of a 556px
+   * column; this reading has no forms, because every write moved to the Review workspace the dock
+   * opens. So the evidence is simply read — which is the whole of what the fold was costing.
+   */
+  it("the FULL pane unfolds its evidence, because it no longer carries forms to make room for", async () => {
     getReviewWorkspace.mockResolvedValue(detail());
     getReviewReplyPrep.mockResolvedValue(prep());
     const { container } = renderPreview("full");
 
     await waitFor(() => expect(screen.getByText("왜 올라왔나요")).toBeTruthy());
-    expect(folds(container)).toContain("왜 올라왔나요");
+    expect(folds(container)).not.toContain("왜 올라왔나요");
+    expect(folds(container)).not.toContain("반복 신호");
+    expect(folds(container)).not.toContain("이 리뷰의 중요도");
   });
 
   it("draws no bold section heading, no rule and no label column", async () => {
@@ -1053,5 +1061,56 @@ describe("리뷰 pane — 확인할 일's docked way in", () => {
     await waitFor(() => expect(screen.getByText("같은 분류가 늘어나는지 지켜보세요.")).toBeTruthy());
     expect(screen.queryByTestId("pane-footer")).toBeNull();
     expect(screen.queryByRole("link", { name: "리뷰 처리하기" })).toBeNull();
+  });
+});
+
+/**
+ * <b>확인할 일's review pane records nothing</b> (product-owner decision, 2026-10-03).
+ *
+ * <p>It carried the two judgement controls, the draft panel and 작업에서 제외 — four writes in a pane
+ * whose own primary is a way out to the screen that owns them. What stands now is what is STORED,
+ * read-only; every change is made in the Review workspace the dock opens, which is this same
+ * component as a page and is unchanged.
+ */
+describe("리뷰 pane — 판단과 조치는 읽기 전용", () => {
+  it("prints what is recorded and offers nothing to press", async () => {
+    getReviewWorkspace.mockResolvedValue(detail());
+    getReviewReplyPrep.mockResolvedValue(prep());
+    renderPreview("full");
+
+    const recorded = await screen.findByRole("region", { name: "판단과 조치" });
+    expect(within(recorded).queryByRole("button")).toBeNull();
+    expect(within(recorded).getByText("중요도")).toBeTruthy();
+    expect(within(recorded).getByText("처리 상태")).toBeTruthy();
+    expect(within(recorded).getByText("시스템 판단")).toBeTruthy();
+  });
+
+  it("shows the stored handling word, and 판단 전 when nothing is stored", async () => {
+    getReviewWorkspace.mockResolvedValue(detail({ replyWork: null }));
+    getReviewDecisionContext.mockResolvedValue(context({ currentDecision: null }));
+    getReviewReplyPrep.mockResolvedValue(prep());
+    const { unmount } = renderPreview("full");
+
+    let recorded = await screen.findByRole("region", { name: "판단과 조치" });
+    await waitFor(() => expect(within(recorded).getByText("판단 전")).toBeTruthy());
+    unmount();
+
+    getReviewWorkspace.mockResolvedValue(detail());
+    getReviewDecisionContext.mockResolvedValue(context({ currentDecision: "RESPONSE_NEEDED" }));
+    renderPreview("full");
+    recorded = await screen.findByRole("region", { name: "판단과 조치" });
+    await waitFor(() => expect(within(recorded).getByText("대응 필요")).toBeTruthy());
+  });
+
+  it("the only primary in the column is the dock's way out", async () => {
+    getReviewWorkspace.mockResolvedValue(detail());
+    getReviewReplyPrep.mockResolvedValue(prep());
+    const { container } = renderPreview("full");
+
+    await screen.findByTestId("pane-footer");
+    const solid = [...container.querySelectorAll("a,button")].filter((el) =>
+      el.className.includes("bg-brand-700"),
+    );
+    expect(solid.map((el) => el.textContent?.trim())).toEqual(["리뷰 처리하기"]);
   });
 });
