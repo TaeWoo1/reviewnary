@@ -858,10 +858,15 @@ describe("리뷰 미리보기 — 고객 원문 → 왜 → 근거 → 판단 �
     getReviewReplyPrep.mockResolvedValue(prep());
     const { container } = renderPreview("full");
 
-    await waitFor(() => expect(screen.getByText("왜 올라왔나요")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("같은 분류가 늘어나는지 지켜보세요.")).toBeTruthy());
     expect(folds(container)).not.toContain("왜 올라왔나요");
     expect(folds(container)).not.toContain("반복 신호");
     expect(folds(container)).not.toContain("이 리뷰의 중요도");
+    /* <b>And the label over it is gone with the fold</b> (canonical mockup, 2026-10-03). Two lines
+       directly under the customer's sentence, answering it — a bold label in a 112px column was a step
+       the eye took before the thing it came for. The region keeps the name it always had. */
+    expect(screen.queryByText("왜 올라왔나요")).toBeNull();
+    expect(screen.getByRole("region", { name: "왜 올라왔나요" })).toBeTruthy();
   });
 
   it("draws no bold section heading, no rule and no label column", async () => {
@@ -1080,9 +1085,10 @@ describe("리뷰 pane — 판단과 조치는 읽기 전용", () => {
 
     const recorded = await screen.findByRole("region", { name: "판단과 조치" });
     expect(within(recorded).queryByRole("button")).toBeNull();
-    expect(within(recorded).getByText("중요도")).toBeTruthy();
-    expect(within(recorded).getByText("처리 상태")).toBeTruthy();
-    expect(within(recorded).getByText("시스템 판단")).toBeTruthy();
+    // Two lines, not a three-row table: the stored tier and disposition, then the system's own judgement.
+    expect(recorded.textContent).toContain("중요도 참고");
+    expect(recorded.textContent).toContain("처리 상태 대응 필요");
+    expect(recorded.textContent).toContain("시스템 판단은 참고입니다.");
   });
 
   it("shows the stored handling word, and 판단 전 when nothing is stored", async () => {
@@ -1102,6 +1108,34 @@ describe("리뷰 pane — 판단과 조치는 읽기 전용", () => {
     await waitFor(() => expect(within(recorded).getByText("대응 필요")).toBeTruthy());
   });
 
+  it("names the seller's own correction beside the system's, and only when one is stored", async () => {
+    getReviewWorkspace.mockResolvedValue(detail({
+      sellerCorrection: {
+        reviewId: REVIEW,
+        correctedTier: "NEEDS_ATTENTION",
+        reasonCode: null,
+        systemTier: "FYI",
+        systemSource: "RULES",
+        correctedAt: "2026-09-01T00:00:00Z",
+        changeCount: 1,
+      },
+    }));
+    getReviewReplyPrep.mockResolvedValue(prep());
+    const { unmount } = renderPreview("full");
+
+    let recorded = await screen.findByRole("region", { name: "판단과 조치" });
+    // The correction wins the headline value; the system's own tier is still said, under it.
+    await waitFor(() => expect(recorded.textContent).toContain("중요도 확인 필요"));
+    expect(recorded.textContent).toContain("시스템 판단은 참고입니다. 판매자 수정으로 확인 필요가 함께 기록돼 있습니다.");
+    unmount();
+
+    getReviewWorkspace.mockResolvedValue(detail());
+    renderPreview("full");
+    recorded = await screen.findByRole("region", { name: "판단과 조치" });
+    await waitFor(() => expect(recorded.textContent).toContain("시스템 판단은 참고입니다."));
+    expect(recorded.textContent).not.toContain("판매자 수정으로");
+  });
+
   it("the only primary in the column is the dock's way out", async () => {
     getReviewWorkspace.mockResolvedValue(detail());
     getReviewReplyPrep.mockResolvedValue(prep());
@@ -1112,5 +1146,139 @@ describe("리뷰 pane — 판단과 조치는 읽기 전용", () => {
       el.className.includes("bg-brand-700"),
     );
     expect(solid.map((el) => el.textContent?.trim())).toEqual(["리뷰 처리하기"]);
+  });
+});
+
+
+/**
+ * <b>확인할 일's review pane — 반복 신호 is the object, everything under it is secondary</b>
+ * (canonical mockup, 2026-10-03; reference: Linear's issue detail).
+ *
+ * <p>What these pin is the HIERARCHY, not new content: the same problems, quotes, counts and stored
+ * values the pane already read. The object is bounded and its rows are rows; 상품 맥락 and 판단과 조치
+ * are prose under it rather than two label/value tables beside a 112px gutter; and the one thing the
+ * payload cannot name in Korean — the issue's lifecycle state — is not drawn at all.
+ */
+describe("리뷰 pane — 반복 신호가 pane의 중심 object", () => {
+  const PROBLEM = {
+    issueId: "iss-1",
+    title: "접착 탈락",
+    severity: "NORMAL" as const,
+    lifecycleState: "OBSERVING",
+    evidenceCount: 7,
+    firstEvidenceOn: "2025-07-12",
+    lastEvidenceOn: "2026-08-18",
+    dismissed: false,
+    similar: [
+      {
+        reviewId: "r-2",
+        occurredOn: "2026-08-18",
+        rating: 5,
+        quote: "본드로 붙여버렸어요",
+        productName: "합성 전선몰딩",
+        sameProduct: true,
+      },
+      {
+        reviewId: "r-3",
+        occurredOn: "2026-04-26",
+        rating: null,
+        quote: null,
+        productName: "합성 전선몰딩",
+        sameProduct: true,
+      },
+    ],
+  };
+
+  it("bounds the problem, its counts and the span it was recorded over, with one row per example", async () => {
+    getReviewWorkspace.mockResolvedValue(detail());
+    getReviewReplyPrep.mockResolvedValue(prep());
+    getReviewDecisionContext.mockResolvedValue(context({ repeatedProblems: [PROBLEM] }));
+    renderPreview("full");
+
+    const object = await screen.findByTestId("pane-repeated-signal");
+    // The problem itself is the subject of the bar, and the way to the whole of it.
+    expect(within(object).getByRole("link", { name: /접착 탈락/ }).getAttribute("href")).toContain("/memory/iss-1");
+    expect(object.textContent).toContain("심각도 보통");
+    expect(object.textContent).toContain("근거 7건");
+    expect(object.textContent).toContain("2025-07-12 → 2026-08-18");
+
+    // One row per example, each a single line with its rating and date.
+    const rows = within(object).getAllByRole("listitem");
+    expect(rows).toHaveLength(2);
+    expect(rows[0].textContent).toContain("본드로 붙여버렸어요");
+    expect(rows[0].textContent).toContain("★5 · 2026-08-18");
+    // A quote masking took away says so, rather than leaving an empty cell.
+    expect(rows[1].textContent).toContain("내용이 가려진 근거입니다");
+    expect(rows[1].textContent).toContain("평점 없음 · 2026-04-26");
+
+    // …and the rows are never read as the whole set: the memory's count stands against them.
+    expect(object.textContent).toContain("근거 7건 가운데 최근 2건입니다.");
+  });
+
+  /**
+   * The Korean label for a lifecycle state is the SERVER's (`ReviewIssueView.lifecycleLabelKo`) and
+   * this payload does not carry it. Drawing `lifecycleState` would be a raw enum on screen; mapping it
+   * here would be a second vocabulary for a word the server already owns.
+   */
+  it("never prints the issue's lifecycle state, because this payload carries no word for it", async () => {
+    getReviewWorkspace.mockResolvedValue(detail());
+    getReviewReplyPrep.mockResolvedValue(prep());
+    getReviewDecisionContext.mockResolvedValue(context({ repeatedProblems: [PROBLEM] }));
+    const { container } = renderPreview("full");
+
+    await screen.findByTestId("pane-repeated-signal");
+    expect(container.textContent).not.toContain("OBSERVING");
+  });
+
+  it("says what our records hold, and never that the problem has not happened", async () => {
+    getReviewWorkspace.mockResolvedValue(detail());
+    getReviewReplyPrep.mockResolvedValue(prep());
+    renderPreview("full");
+
+    const empty = await screen.findByRole("region", { name: "반복 신호" });
+    expect(empty.textContent).toContain("아직 반복 문제의 근거로 기록되지 않았습니다.");
+    expect(empty.textContent).not.toContain("반복된 적 없습니다");
+  });
+
+  it("drops 상품 맥락 and 판단과 조치 to prose — no label column, no table", async () => {
+    getReviewWorkspace.mockResolvedValue(detail());
+    getReviewReplyPrep.mockResolvedValue(prep());
+    getReviewDecisionContext.mockResolvedValue(
+      context({
+        repeatedProblems: [PROBLEM],
+        knowledge: { productSources: 3, orgSources: 2, productTitles: ["부착이 잘 떨어질 때 안내"], openAsks: 1 },
+      }),
+    );
+    const { container } = renderPreview("full");
+
+    const grounding = await screen.findByRole("region", { name: "이 상품에 대해 우리가 아는 것" });
+    expect(grounding.textContent).toContain("리뷰 12건 가운데 부정이 3건입니다.");
+    expect(grounding.textContent).toContain("등록된 상품 지식 3건과 회사 운영 기준 2건이 있습니다.");
+    expect(grounding.textContent).toContain("부착이 잘 떨어질 때 안내");
+    expect(grounding.textContent).toContain("아직 답하지 않은 확인 필요가 1건 있습니다.");
+
+    // Neither secondary block is a table any more — that is the whole of this change.
+    expect(grounding.querySelectorAll("dl,dt,dd")).toHaveLength(0);
+    const recorded = screen.getByRole("region", { name: "판단과 조치" });
+    expect(recorded.querySelectorAll("dl,dt,dd")).toHaveLength(0);
+
+    // The product name stays the header's — one fact, one place.
+    expect(screen.getAllByText("합성 전선몰딩")).toHaveLength(1);
+    // And the pane's only remaining links are the problem's and the dock's.
+    const hrefs = [...container.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual(["/memory/iss-1", `/reviews/reply/${REVIEW}?from=work`]);
+  });
+
+  it("the record trail closes the column as activity, newest first and with its scope said", async () => {
+    getReviewWorkspace.mockResolvedValue(detail());
+    getReviewReplyPrep.mockResolvedValue(prep());
+    getReviewDecisionLog.mockResolvedValue([
+      { kind: "ACTION_CHOSEN", at: "2026-09-02T01:00:00Z", from: null, to: "RESPONSE_NEEDED" },
+    ] as never);
+    renderPreview("full");
+
+    const trail = await screen.findByRole("region", { name: "기록" });
+    expect(within(trail).getAllByRole("listitem")).toHaveLength(1);
+    expect(trail.textContent).toContain("마켓플레이스");
   });
 });
