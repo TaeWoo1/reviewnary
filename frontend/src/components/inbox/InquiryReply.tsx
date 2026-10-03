@@ -993,7 +993,10 @@ export function InquiryReplyDock({ workspace }: { workspace: InquiryReplyWorkspa
         {detail.answerStateNote ? (
           <p className="break-keep text-xs leading-snug text-warn">{detail.answerStateNote}</p>
         ) : null}
-        {!publishable ? <p className="break-keep text-xs text-good">고객에게 나가지 않습니다</p> : null}
+        {/* 초록이 아니다 (2026-10-04). 이 문장은 축하가 아니라 바닥의 누름이 무엇을 하는지 말하는
+            안내이고, 바로 위 경고와 색으로 겨루면 둘 다 덜 읽힌다. 초안 복사가 primary인 화면의
+            dock에서는 muted가 그 자리의 색이다. */}
+        {!publishable ? <p className="break-keep text-xs text-muted">고객에게 나가지 않습니다</p> : null}
       </div>
       <span className="shrink-0 whitespace-nowrap">
         {publishable ? (
