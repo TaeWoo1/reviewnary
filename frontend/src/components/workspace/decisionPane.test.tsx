@@ -86,3 +86,41 @@ describe("master-detail pane", () => {
     );
   });
 });
+
+/**
+ * <b>The rail layout is 확인할 일's, and only while something is open</b> (canonical redesign,
+ * 2026-10-03 — product-owner decision).
+ *
+ * <p>It inverts which column is the page: the list becomes a 316px rail and the selected item takes the
+ * rest. That is a claim about one screen — 46 records a seller walks, where the one being read is the
+ * page — and the same danger the pane override carries applies twice over here, because a second caller
+ * would turn every list in the product into a rail. So the override is counted across the source tree,
+ * and the 「only while open」 half is asserted on the component: with nothing chosen there is no page to
+ * be beside, and a 316px column against 1,044px of nothing is the empty-pane state this screen's own
+ * 2026-09-30 decision retired.
+ */
+describe("master-detail rail layout", () => {
+  it("narrows the list only while an item is open", () => {
+    const { rerender } = render(
+      <MasterDetail wide layout="rail" list={<p>list</p>} detail={null} detailLabel="상세" />,
+    );
+    expect(screen.getByTestId("master-list").parentElement!.className).not.toContain("w-[316px]");
+
+    rerender(<MasterDetail wide layout="rail" list={<p>list</p>} detail={<p>detail</p>} detailLabel="상세" />);
+    expect(screen.getByTestId("master-list").parentElement!.className).toContain("w-[316px]");
+    // And the pane takes what is left rather than a declared width.
+    const pane = screen.getByTestId("master-detail").className;
+    expect(pane).toContain("flex-1");
+    expect(pane).not.toContain("w-[440px]");
+  });
+
+  it("a caller that does not ask keeps the list-first layout it shipped with", () => {
+    render(<MasterDetail wide list={<p>list</p>} detail={<p>detail</p>} detailLabel="상세" />);
+    expect(screen.getByTestId("master-list").parentElement!.className).not.toContain("w-[316px]");
+  });
+
+  it("one screen overrides it — 확인할 일, the list a seller walks", () => {
+    const callers = SRC.filter((f) => readFileSync(f, "utf8").includes('layout="rail"'));
+    expect(callers.map((f) => f.replace(/\\/g, "/"))).toEqual(["src/pages/app/OperationsCaseQueue.tsx"]);
+  });
+});

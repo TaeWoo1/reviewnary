@@ -197,3 +197,57 @@ describe("the leading slot — the state word, then the category", () => {
     expect(state.textContent?.trim()).toBe("초안 준비됨");
   });
 });
+
+/**
+ * <b>확인할 일's rail reading</b> (canonical redesign, 2026-10-03 — product-owner decision).
+ *
+ * <p>Measured off Front's redesigned inbox: the row is the customer's own words with the wait beside
+ * them, and everything that qualifies them on one muted line under it. The state word used to be the
+ * row's bold lead; it is the first fact of that line now, because on a screen named 확인할 일 the thing
+ * read first should be what the customer wrote and not our word for it.
+ */
+describe("WorkRows — the rail reading", () => {
+  it("leads with the customer's words and puts the state in the line under them", () => {
+    draw([row({ said: "컵보관함은 좋은데 컵수거함은 안좋아요", title: "문의 드립니다" })], { reading: "rail" });
+
+    const list = screen.getByLabelText("확인할 일");
+    const link = within(list).getByRole("link");
+    const lines = (link.textContent ?? "").trim();
+    // The sentence is first in the document, and the state follows it rather than leading it.
+    expect(lines.indexOf("컵보관함은 좋은데 컵수거함은 안좋아요")).toBeLessThan(lines.indexOf(WORK_STATE.NEEDS_LOOK.text));
+  });
+
+  it("never draws a reason tag that is only the state word again", () => {
+    // REASON.reply's tag IS a state word («답변 필요»); the row's own state is 초안 준비됨. Drawn,
+    // the line read 「초안 준비됨 · 카페24 자사몰 문의 · 답변 필요」 — two of our words for one record.
+    draw(
+      [
+        row({
+          kind: "INQUIRY",
+          subject: "INQUIRY",
+          reason: REASON.reply,
+          state: "DRAFT_READY",
+          source: "카페24 자사몰 문의",
+          rating: null,
+          line: null,
+          said: "교환 신청은 언제까지 가능한가요?",
+        }),
+      ],
+      { reading: "rail" },
+    );
+
+    const link = within(screen.getByLabelText("확인할 일")).getByRole("link");
+    expect(link.textContent).toContain(WORK_STATE.DRAFT_READY.text);
+    expect(link.textContent).not.toContain(WORK_STATE.REPLY_NEEDED.text);
+  });
+
+  it("marks the open row with a neutral fill and no accent bar", () => {
+    draw([row()], { reading: "rail", wide: true, selectedKey: "review:r-1" });
+
+    const link = within(screen.getByLabelText("확인할 일")).getByRole("link");
+    expect(link.getAttribute("aria-current")).toBe("true");
+    // §5 spends the accent on what you can press; which row is open is a neutral fact about the list.
+    expect(link.className).toContain("bg-canvas");
+    expect(link.className).not.toMatch(/shadow-selected|bg-brand-50/);
+  });
+});

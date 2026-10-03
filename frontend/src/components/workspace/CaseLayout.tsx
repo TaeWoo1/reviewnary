@@ -88,6 +88,7 @@ export function CaseLayout({
   notice,
   titleHidden = false,
   sub,
+  dock,
   label = "선택한 항목",
 }: {
   variant: CaseVariant;
@@ -120,6 +121,22 @@ export function CaseLayout({
   /** One muted line under the title — the product the case is about. Its own line, so a long name never breaks the
    * meta line above into dangling separators. */
   sub?: ReactNode;
+  /**
+   * <b>Docked at the floor of the pane, under everything</b> (확인할 일 canonical, 2026-10-03 —
+   * product-owner decision). The warning that qualifies the answer and the two controls that act on it,
+   * plus the quiet way out under them.
+   *
+   * <p>Why the floor and not the end of the answer: measured at 1600×1000 against both mockups, the
+   * flow ends at y≈660 in a 1,000px pane, so an action that follows the content sits two-thirds up a
+   * column with 290px of nothing under it — the reader's eye leaves the screen past the thing to press.
+   * At the floor the pane reads as one surface with an edge, which is what the reference docks its own
+   * composer for.
+   *
+   * <p>Pane only, and `sticky`, so it is the floor of the COLUMN when the case is short and rides the
+   * bottom edge when the case is long. Nothing here decides anything a control in the body did not
+   * already decide — this moves two controls, it does not add one.
+   */
+  dock?: ReactNode;
   /** The pane's accessible name. */
   label?: string;
 }) {
@@ -142,8 +159,13 @@ export function CaseLayout({
                  the screen that contains it; the sentence is still the largest thing inside the pane,
                  which is what §8-B′ asks for. The page reading keeps `2xl`, where the sentence really
                  is the subject of the whole screen. */
+              /* <b>And `xl` again in the document reading</b> (확인할 일 canonical, 2026-10-03). The
+                 step down to `lg` was measured on a 440px pane and its reason was that a pane is not a
+                 page — 「its headline may not outrank the screen that contains it」. In the rail layout
+                 the pane IS the page: it takes 1,044 of 1,600 and the rail's own title is 19px, so the
+                 customer's sentence is no longer competing with anything. Every other pane keeps `lg`. */
               : `break-keep font-bold leading-snug tracking-tight text-ink [overflow-wrap:anywhere] ${
-                  pane ? "text-lg" : "text-2xl leading-tight"
+                  pane ? (reading === "document" ? "text-xl" : "text-lg") : "text-2xl leading-tight"
                 }`
           }
         >
@@ -171,7 +193,13 @@ export function CaseLayout({
           // a rule used to do. Measured at 20px the gap between 고객 원문 and 확인 필요 (41px) and the gap between
           // 확인 필요 and 근거 (44px) were the same distance, so the reader had no grouping at all; at 28px the
           // between-group air is four times the within-group air and the three questions read as three.
-          className={depth === "preview" ? "space-y-6" : "space-y-4"}
+          /* With a dock the article fills the column, so the floor the dock is pushed to is the
+             column's floor and not the end of a short case — `sticky` then keeps it there once the
+             case is long enough to scroll under it. */
+          /* `gap`, not `space-y`, once there is a dock: Tailwind's `space-y-*` sets a margin-top on every
+             sibling after the first and wins over the `mt-auto` that pushes the dock to the floor. The
+             spacing is the same 16px either way. */
+          className={dock ? "flex min-h-full flex-col gap-4" : depth === "preview" ? "space-y-6" : "space-y-4"}
           data-case-variant="pane"
           data-pane-depth={depth}
         >
@@ -197,6 +225,16 @@ export function CaseLayout({
           {context}
           {decisionBlock}
           {more}
+          {dock ? (
+            /* The negative margins reach the pane's own gutters, so the docked bar spans the column
+               rather than the article's text measure. The fade says content is passing underneath and
+               is invisible against plain surface, which is the state a short case is in — the same
+               treatment the preview pane's footer has carried since 2026-09-26. */
+            <div className="sticky bottom-0 -mx-8 mt-auto px-8 pb-6 pt-6" data-testid="pane-footer">
+              <div aria-hidden="true" className="pointer-events-none -mt-6 h-6 bg-gradient-to-t from-surface to-transparent" />
+              <div className="bg-surface pt-1">{dock}</div>
+            </div>
+          ) : null}
         </article>
       ) : (
         <div className="mx-auto w-full max-w-[1080px] space-y-4" data-case-variant="page">

@@ -53,7 +53,11 @@ const ON_THE_SYSTEM = [
   "components/memory/IssueReading.tsx",
   "components/memory/repeat/PaneBlock.tsx",
   "components/memory/repeat/EvidenceTrend.tsx",
+  // 확인할 일, since its canonical redesign (2026-10-03): the rail reading of the list, the pane that
+  // takes the rest of the window, and the docked floor the two controls stand on.
   "pages/app/OperationsCaseQueue.tsx",
+  "components/workspace/WorkRows.tsx",
+  "components/workspace/WorkItemPane.tsx",
   // 리뷰, since its canonical redesign (2026-10-03): the same list reading and the same decision pane.
   "pages/app/ReviewRecord.tsx",
   "components/reviews/ReviewReadDetail.tsx",
