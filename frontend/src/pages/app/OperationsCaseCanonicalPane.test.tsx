@@ -168,7 +168,10 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
     expect(within(answer).getByText(/운영 정책 2개 근거/)).toBeTruthy();
     expect(within(answer).getByText(/미발송/)).toBeTruthy();
 
-    await userEvent.click(within(answer).getByRole("button", { name: "수정하기" }));
+    /* <b>The control is on the pane's floor now</b> (product-owner decision, 2026-10-03), and the
+       editor it opens is still inside this section — which is the half the move had to preserve. */
+    const dock = screen.getByTestId("pane-footer");
+    await userEvent.click(within(dock).getByRole("button", { name: "수정하기" }));
     expect(within(answer).getByRole("textbox")).toBeTruthy();
   });
 
@@ -186,11 +189,16 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
     const { container } = drawPane();
 
     const article = await screen.findByRole("article", { name: "선택한 항목" });
-    const named = ["문의 내용", "왜 지금 볼 일인가", "확인한 내용", "준비된 답변"];
+    /* <b>문의 내용 is no longer a section</b> (확인할 일 canonical, 2026-10-03): the customer's words are
+       the pane's HEADING now, so a block repeating them under it would be the same sentence twice. The
+       order this test exists to fence is unchanged — the request, then what justifies it, then the
+       answer — and the first element of it is asserted below as the heading. */
+    const named = ["왜 지금 볼 일인가", "확인한 내용", "준비된 답변"];
     const order = [...article.querySelectorAll("section[aria-label]")]
       .map((el) => el.getAttribute("aria-label"))
       .filter((label): label is string => named.includes(label!));
     expect(order).toEqual(named);
+    expect(within(article).getAllByRole("heading", { level: 2 })[0].textContent).toBe("포장을 뜯지 않은 경우도 교환이 가능한가요?");
     // The action is the end of the document, after everything that justifies it.
     const send = within(article).getByRole("link", { name: /발송 화면으로/ });
     const said = within(article).getByText("포장을 뜯지 않은 경우도 교환이 가능한가요?");
@@ -218,12 +226,18 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
   /**
    * <b>수정하기 → 발송 화면으로</b> (product-owner decision, 2026-10-02): the detour is considered
    * first and the ending last, and the primary is marked by colour rather than by position.
+   *
+   * <p><b>Both of them on the pane's docked floor</b> (product-owner decision, 2026-10-03). Measured at
+   * 1600×1000 against the two mockups: the flow ends around y=660 in a 1,000px pane, so an action that
+   * follows the answer sits two-thirds up the column with nothing under it. The order, the colour and
+   * the sizing are unchanged — this fence now reads them where they stand.
    */
   it("the detour comes before the ending, and the primary is still the only solid control", async () => {
     api.getOperationsCase.mockResolvedValue(detail());
     drawPane();
 
-    const answer = await screen.findByRole("region", { name: "준비된 답변" });
+    await screen.findByRole("region", { name: "준비된 답변" });
+    const answer = screen.getByTestId("pane-footer");
     const edit = within(answer).getByRole("button", { name: "수정하기" });
     const send = within(answer).getByRole("link", { name: /발송 화면으로/ });
     expect(edit.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

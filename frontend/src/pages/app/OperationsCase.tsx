@@ -6,6 +6,7 @@ import { Disclosure } from "../../components/ui/Disclosure";
 import { WorkFlowCard } from "../../components/ui/WorkFlowCard";
 import { Facts } from "../../components/ui/ObjectRow";
 import { CaseBlock, CaseLayout, CaseQuote, type CaseVariant, type PaneDepth } from "../../components/workspace/CaseLayout";
+import { inquiryReading } from "../../lib/inquiryNextAction";
 import { api } from "../../lib/apiClient";
 import { actionKo, subjectFallback } from "../../lib/customerOperations";
 import { COPY, draftSendWord, decisionOf, elapsedLabel, elapsedSource, photoWord, shortDate, sourceLabel, waitDays } from "../../lib/copy/customerOps";
@@ -65,6 +66,12 @@ export function OperationsCaseView({
   const [detail, setDetail] = useState<OperationsCaseDetail | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  /* <b>Two pieces of state live here now</b> (확인할 일 canonical, 2026-10-03). The controls that open
+     the draft editor and the 처리 변경 form moved to the pane's docked floor, and the forms they open
+     stayed in the body where they are read. A control and the form it opens cannot both own the flag,
+     so the view holds it and hands it to both. Nothing else about either card changed. */
+  const [editingDraft, setEditingDraft] = useState(false);
+  const [correcting, setCorrecting] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -128,6 +135,13 @@ export function OperationsCaseView({
   // same sentence a second time one block below — measured on the demo org, 「교환 신청은 언제까지 가능한가요?」 was
   // both the h1 and the only line of 문의 내용. The block stays whenever it adds anything: more text, or photos.
   const bodyAddsSomething = Boolean(body) && body.trim() !== title.trim();
+  /* <b>The customer's words ARE the heading</b> (확인할 일 canonical, 2026-10-03). The pane drew the
+     subject line as its title and the body as a quotation under it, so a case named 「문의 드립니다」
+     opened under the row that had just said 「수령한 상품을 교환하려면…」. {@link inquiryReading} is the
+     rule 문의 already ships: the body leads, and the subject line is kept beside it only while it adds
+     something a generic 「문의 드립니다」 does not. One rule, two screens — not a second opinion about
+     which string is the question. */
+  const reading = canonical ? inquiryReading({ title: detail.title, snippet: body }, (t) => (t ?? "").trim()) : null;
   const hasMedia = Boolean(detail.media && detail.media.length > 0);
 
   return (
@@ -184,7 +198,13 @@ export function OperationsCaseView({
           </Facts>
         )
       }
-      sub={detail.productName ?? undefined}
+      sub={
+        reading
+          ? [detail.productName, reading.titleContext ? `제목 「${reading.titleContext}」` : null]
+              .filter(Boolean)
+              .join(" · ") || undefined
+          : (detail.productName ?? undefined)
+      }
       reading={canonical ? "document" : "default"}
       /* <b>One item, one name</b> (product-owner decision, 2026-10-02). An inquiry's `title` is the
          SUBJECT line, and 확인할 일's row stopped leading with it in the same change that put the
@@ -196,8 +216,8 @@ export function OperationsCaseView({
          <p>Only where the body actually adds something: an inquiry whose body IS its title (and every
          review, whose title is its body) keeps its heading, because there the sentence would otherwise
          be drawn nowhere. */
-      titleHidden={canonical && bodyAddsSomething}
-      title={title}
+      titleHidden={false}
+      title={reading ? reading.question : title}
       headerAction={
         preview ? undefined : pane ? (
           <Link
@@ -249,7 +269,9 @@ export function OperationsCaseView({
         ) : null
       }
       subject={
-        bodyAddsSomething || hasMedia ? (
+        /* In the canonical reading the body is the heading above, so the quotation block would be the
+           same sentence twice. Photos still need somewhere to stand. */
+        (canonical ? hasMedia : bodyAddsSomething || hasMedia) ? (
           /* In the canonical reading the customer's words sit directly under their own sentence, with no
              heading between: the title IS the first line of this body, so a 「문의 내용」 rule between the two
              was a boundary drawn through one quotation. The heading stays everywhere else. */
@@ -261,7 +283,7 @@ export function OperationsCaseView({
             {/* The channel's own markup is stripped HERE and nowhere else — the stored row keeps what the channel
                 sent, and the same helper the 문의 화면 has used since Demo UX Polish v1 does the stripping, so the
                 two screens cannot show the same customer different words. */}
-            {bodyAddsSomething ? <CaseQuote>{body}</CaseQuote> : null}
+            {bodyAddsSomething && !canonical ? <CaseQuote>{body}</CaseQuote> : null}
             {hasMedia ? (
               <ul className="mt-4 flex flex-wrap gap-3" aria-label="고객이 올린 사진">
                 {detail.media!.map((m) => (
@@ -290,11 +312,64 @@ export function OperationsCaseView({
             />
           ) : null}
           {detail.draft ? (
-            <DraftCard caseId={caseId} detail={detail} primary={!showTeach} flat={canonical} onApplied={applied} onFailed={failed} />
+            <DraftCard
+              caseId={caseId}
+              detail={detail}
+              primary={!showTeach}
+              flat={canonical}
+              docked={canonical}
+              editing={editingDraft}
+              setEditing={setEditingDraft}
+              onApplied={applied}
+              onFailed={failed}
+            />
           ) : null}
-          <CorrectionCard caseId={caseId} detail={detail} flat={canonical} onApplied={applied} onFailed={failed} />
+          <CorrectionCard
+            caseId={caseId}
+            detail={detail}
+            flat={canonical}
+            docked={canonical}
+            open={correcting}
+            setOpen={setCorrecting}
+            onApplied={applied}
+            onFailed={failed}
+          />
         </>
         )
+      }
+      /* <b>확인할 일's docked floor</b> (product-owner decision, 2026-10-03). The same two controls the
+         draft carried and the same way out the 처리 변경 line carried — moved, not added, and only on
+         this one reading. The full case page and the Home's preview are untouched.
+
+         <p>The warning slot the mockup drew is the inquiry pane's: {@code answerStateNote} comes from
+         the inquiry read, and the case read has no field for it. It is left out rather than invented. */
+      dock={
+        canonical ? (
+          <div className="border-t border-line pb-6 pt-4">
+            {detail.draft && !editingDraft ? (
+              <div className="flex items-center gap-3">
+                <Btn variant="outline" onClick={() => setEditingDraft(true)}>
+                  {COPY.edit}
+                </Btn>
+                <BtnLink to={detail.to} className="ml-auto">
+                  {COPY.toSend} ↗
+                </BtnLink>
+              </div>
+            ) : null}
+            {correcting ? null : (
+              <div className={`flex items-center gap-3 text-sm text-muted ${detail.draft && !editingDraft ? "mt-4" : ""}`}>
+                <span className="break-keep">{COPY.otherHandling}</span>
+                <button
+                  type="button"
+                  onClick={() => setCorrecting(true)}
+                  className="ml-auto whitespace-nowrap rounded font-semibold text-brand-700 hover:text-brand-800 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+                >
+                  {COPY.changeHandling}
+                </button>
+              </div>
+            )}
+          </div>
+        ) : undefined
       }
       context={
         // <b>A card only when there is something in it</b> (Review Decision UX v3.2). On a case with no
@@ -962,9 +1037,18 @@ function DraftCard({
   flat = false,
   onApplied,
   onFailed,
-}: CardProps & { primary: boolean; flat?: boolean }) {
+  docked = false,
+  editing,
+  setEditing,
+}: CardProps & {
+  primary: boolean;
+  flat?: boolean;
+  /** The two controls stand in the pane's dock; this card draws the editor and nothing else. */
+  docked?: boolean;
+  editing: boolean;
+  setEditing: (open: boolean) => void;
+}) {
   const draft = detail.draft;
-  const [editing, setEditing] = useState(false);
   const [body, setBody] = useState(draft?.body ?? "");
   const [remember, setRemember] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -1093,18 +1177,20 @@ function DraftCard({
               A document's controls read left to right as the order they are considered in: the detour
               first, the ending last. The primary was leading because it is the louder of the two, and
               loudness is already its colour's job — it does not also need the first position. */}
-          <div className={`flex items-center gap-2 ${flat ? "mt-6" : "mt-3.5 justify-between"}`}>
-            <Btn variant="outline" className={flat ? "" : "shrink-0"} onClick={() => setEditing(true)}>
-              {COPY.edit}
-            </Btn>
-            <BtnLink
-              to={detail.to}
-              variant={primary ? "solid" : "outline"}
-              className={flat ? "" : "min-w-0 max-w-[340px] flex-1"}
-            >
-              {COPY.toSend} ↗
-            </BtnLink>
-          </div>
+          {docked ? null : (
+            <div className={`flex items-center gap-2 ${flat ? "mt-6" : "mt-3.5 justify-between"}`}>
+              <Btn variant="outline" className={flat ? "" : "shrink-0"} onClick={() => setEditing(true)}>
+                {COPY.edit}
+              </Btn>
+              <BtnLink
+                to={detail.to}
+                variant={primary ? "solid" : "outline"}
+                className={flat ? "" : "min-w-0 max-w-[340px] flex-1"}
+              >
+                {COPY.toSend} ↗
+              </BtnLink>
+            </div>
+          )}
         </>
       )}
     </ActionCard>
@@ -1130,8 +1216,16 @@ const ACTIONS = [
 ];
 
 /** The seller saying a different action was right — recorded as their judgement, never as a rule change. */
-function CorrectionCard({ caseId, detail, flat = false, onApplied, onFailed }: CardProps & { flat?: boolean }) {
-  const [open, setOpen] = useState(false);
+function CorrectionCard({
+  caseId,
+  detail,
+  flat = false,
+  docked = false,
+  open,
+  setOpen,
+  onApplied,
+  onFailed,
+}: CardProps & { flat?: boolean; docked?: boolean; open: boolean; setOpen: (open: boolean) => void }) {
   const [action, setAction] = useState("");
   const [note, setNote] = useState("");
   const [remember, setRemember] = useState(true);
@@ -1158,6 +1252,8 @@ function CorrectionCard({ caseId, detail, flat = false, onApplied, onFailed }: C
   };
 
   if (!open) {
+    // Docked: the line stands on the pane's floor, drawn by the view beside the two controls it follows.
+    if (docked) return null;
     return (
       /* <b>A line under a rule, not a box</b> (visual target, 2026-10-02). Its whole content is one muted
          sentence and one text control; a bordered surface for that is a card drawn to hold nothing. The

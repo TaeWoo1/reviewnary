@@ -3,9 +3,13 @@ import { Facts } from "../ui/ObjectRow";
 import { CaseLayout, type PaneDepth } from "./CaseLayout";
 import { draftRuleNotice } from "../../lib/inquiryNextAction";
 import { InquiryResponsePanel } from "../inbox/InquiryResponsePanel";
+import { InquiryReply, InquiryReplyDock } from "../inbox/InquiryReply";
+import { useInquiryReply } from "../inbox/useInquiryReply";
 import { OperationsCaseView } from "../../pages/app/OperationsCase";
 import { ReviewCaseView } from "../../pages/app/ReviewReplyTask";
 import { elapsedLabel } from "../../lib/copy/customerOps";
+import { inquiryReading } from "../../lib/inquiryNextAction";
+import { plainText } from "../../lib/plainText";
 import type { HomeWorkRow } from "../../lib/homeWork";
 
 /**
@@ -23,6 +27,18 @@ import type { HomeWorkRow } from "../../lib/homeWork";
  * never what is true.
  */
 export function WorkItemPane({ row, now, depth = "full" }: { row: HomeWorkRow; now?: Date; depth?: PaneDepth }) {
+  /* <b>확인할 일's inquiry pane is 문의's, docked</b> (canonical, 2026-10-03). 문의 already lifted this
+     workflow out of its panel so a page could own the state and dock the one primary action
+     ({@link useInquiryReply}); this screen asks for exactly that and so it uses exactly that, rather
+     than a second dock built beside it.
+
+     <p>The hook stands above every branch because it is a hook — it is handed `null` for a row that is
+     not an inquiry and for the Home's preview depth, and reads nothing then. The Home keeps the panel
+     it was frozen on. */
+  const canonical = depth === "full";
+  const inquiryWorkItemId = canonical && row.kind === "INQUIRY" ? row.workItemId : null;
+  const workspace = useInquiryReply(inquiryWorkItemId);
+
   if (row.kind === "CASE") {
     return <OperationsCaseView key={row.key} caseId={row.subjectId} variant="pane" depth={depth} now={now} />;
   }
@@ -30,6 +46,55 @@ export function WorkItemPane({ row, now, depth = "full" }: { row: HomeWorkRow; n
     return <ReviewCaseView key={row.key} reviewId={row.subjectId} variant="pane" depth={depth} />;
   }
   const wait = elapsedLabel(row.since, row.subject, now);
+  if (inquiryWorkItemId) {
+    /* <b>The customer's sentence is the heading</b> (canonical, 2026-10-03). The panel used to print it
+       as its own first line, so the pane's title was hidden and the question sat a block down; docked,
+       the panel draws neither title nor meta and this header owns both — one question, drawn once, at
+       the top of the column that is answering it. */
+    return (
+      <CaseLayout
+        key={row.key}
+        variant="pane"
+        depth={depth}
+        reading="document"
+        decisionLabel="판매자의 결정"
+        label="선택한 확인할 일"
+        meta={
+          <Facts>
+            <span className="font-semibold text-ink">{row.source}</span>
+            {wait ? <span className="tabular-nums">{wait}</span> : null}
+          </Facts>
+        }
+        sub={(() => {
+          const context = inquiryReading(
+            { title: workspace.detail?.title ?? row.title, snippet: workspace.detail?.details ?? row.said },
+            plainText,
+          ).titleContext;
+          return [workspace.detail?.productName, context ? `제목 「${context}」` : null].filter(Boolean).join(" · ") || undefined;
+        })()}
+        /* The row carries a PREVIEW of the body — it is a row — and the pane is the place that read the
+           record, so the question is drawn whole from the detail and falls back to the row only while
+           that read is in flight. Same rule as 문의's own pane ({@link inquiryReading}): the body is the
+           question, and the subject line stands beside it only while it adds something. */
+        title={
+          inquiryReading(
+            {
+              title: workspace.detail?.title ?? row.title,
+              snippet: workspace.detail?.details ?? row.said,
+            },
+            plainText,
+          ).question
+        }
+        headerAction={
+          <Link to={`/inquiries/${row.subjectId}`} className="rounded font-semibold text-muted hover:text-ink hover:underline">
+            문의에서 보기
+          </Link>
+        }
+        decision={<InquiryReply workspace={workspace} docked />}
+        dock={<InquiryReplyDock workspace={workspace} />}
+      />
+    );
+  }
   return (
     <CaseLayout
       key={row.key}

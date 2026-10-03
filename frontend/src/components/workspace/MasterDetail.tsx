@@ -77,6 +77,24 @@ const PANE = {
 
 export type PaneKind = keyof typeof PANE;
 
+/**
+ * <b>Which column is the page</b> (확인할 일 canonical, 2026-10-03).
+ *
+ * <p>「list」 is what every master-detail screen has had: the list takes the width, and the selected item
+ * opens in a declared pane beside it ({@link PANE}). The list is the page and the pane qualifies it.
+ *
+ * <p>「rail」 inverts that. Measured off Front's redesigned inbox at the window scale (nav 264 · list 306 ·
+ * conversation 979 of 1600), the list is a <b>rail</b> — three truncated lines per row, no more — and the
+ * selected conversation is the page. 확인할 일 is the one screen in this product with the same job: 46
+ * records a seller walks, where the thing being read is always the one in front of them. The rail is 316
+ * because a Korean row needs the ten pixels an English one does not.
+ *
+ * <p><b>Only while something is selected.</b> With nothing chosen there is no page to be beside, and a
+ * 316px column against 1,044px of nothing is a screen waiting for a click — the state this screen's own
+ * 2026-09-30 decision retired. Closed, the list takes the width exactly as it does today.
+ */
+export type LayoutKind = "list" | "rail";
+
 export function MasterDetail({
   list,
   detail,
@@ -87,6 +105,7 @@ export function MasterDetail({
   preview = false,
   paneFooter,
   pane = "default",
+  layout = "list",
 }: {
   /** The page head, the actionable summary and the list — everything in the middle column. */
   list: ReactNode;
@@ -133,8 +152,12 @@ export function MasterDetail({
    * shipped with — which is what makes this an override on one route rather than a global change.
    */
   pane?: PaneKind;
+  /** {@link LayoutKind}. Defaults to the reading every screen shipped with. */
+  layout?: LayoutKind;
 }) {
   const open = wide && detail !== null;
+  // See {@link LayoutKind}: the rail is a rail only while there is a page beside it.
+  const rail = layout === "rail" && open;
   useEffect(() => {
     if (!open || !onClose) return;
     const onKey = (e: KeyboardEvent) => {
@@ -152,16 +175,24 @@ export function MasterDetail({
       {/* `min-w-0 flex-1` is the flex spelling of the `minmax(0,1fr)` track the decision names: without
           `min-w-0` a flex item floors at its content's min-content width, and one long unbroken Korean
           line would push the 440px pane off screen. */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className={rail ? "flex w-[316px] min-w-[316px] shrink-0 flex-col" : "flex min-w-0 flex-1 flex-col"}>
         {/* `relative`: each scroller is the containing block of what it holds. Without it an absolutely positioned
             descendant (an sr-only label) is placed against the document and stretches the PAGE past the viewport. */}
-        <div className="relative min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 md:px-8 md:pb-8 md:pt-6" data-testid="master-list">
+        <div
+          className={`relative min-h-0 flex-1 overflow-y-auto ${
+            rail ? "px-4 pb-8 pt-6" : "px-4 pb-28 pt-4 md:px-8 md:pb-8 md:pt-6"
+          }`}
+          data-testid="master-list"
+        >
           {/* <b>One width, one alignment, one rhythm — the same as every other page</b> (UI System v2 §10.2).
               This column used to be `mx-auto` at 760px, widening to 1160 when the pane closed, while every
               non-master-detail screen was 1120 and left-aligned. Moving from 문의 to 상품 therefore changed
               the body width, the alignment AND the vertical rhythm at once, which is most of what read as
               「여백이 제각각」 (audit §5). `max-w-content` is the contract's 1120 (§2). */}
-          <div className="w-full max-w-content space-y-6">{list}</div>
+          {/* The rail is one column of rows and its own head; `max-w-content` and the 24px rhythm are
+              the page's, and a page's rhythm inside a 316px rail is three steps of air between a title
+              and the first row. */}
+          <div className={rail ? "w-full" : "w-full max-w-content space-y-6"}>{list}</div>
         </div>
         {footer}
       </div>
@@ -178,17 +209,29 @@ export function MasterDetail({
         */
         <aside
           aria-label={detailLabel}
-          className={`relative ${PANE[pane]} shrink-0 border-l border-line bg-surface ${
-            preview ? "flex flex-col" : `overflow-y-auto px-6 ${onClose ? "pt-0" : "pt-6"}`
+          className={`relative border-l border-line bg-surface ${
+            rail ? "min-w-0 flex-1 flex flex-col" : `${PANE[pane]} shrink-0`
+          } ${
+            rail || preview ? "flex flex-col" : `overflow-y-auto px-6 ${onClose ? "pt-0" : "pt-6"}`
           }`}
           data-testid="master-detail"
         >
-          <div className={preview ? "flex min-h-0 flex-1 flex-col overflow-y-auto px-6 pb-0 pt-0" : "contents"}>
+          <div
+            className={
+              rail
+                ? "flex min-h-0 flex-1 flex-col overflow-y-auto px-8 pb-0 pt-0"
+                : preview
+                  ? "flex min-h-0 flex-1 flex-col overflow-y-auto px-6 pb-0 pt-0"
+                  : "contents"
+            }
+          >
             {onClose ? (
               // Sticky, because the case below it is taller than the viewport: a close control that scrolls
               // away is a close control the seller has to scroll back up to find.
               <div
-                className="sticky top-0 z-10 mb-2 flex justify-end border-b border-line bg-surface py-2 -mx-6 px-6"
+                className={`sticky top-0 z-10 mb-2 flex justify-end border-b border-line bg-surface py-2 ${
+                  rail ? "-mx-8 px-8" : "-mx-6 px-6"
+                }`}
               >
                 <button
                   type="button"
@@ -216,8 +259,11 @@ export function MasterDetail({
                 and a hairline above it so the content cannot read as sitting on top of the button, and it is
                 inside the scroller now, which is why the negative margins put it back out to the column edges.
                 One action, unchanged: the preview still carries no control that decides anything. */}
-            {preview && paneFooter ? (
-              <div className="sticky bottom-0 -mx-6 mt-7 px-6 pb-6" data-testid="pane-footer">
+            {(preview || rail) && paneFooter ? (
+              <div
+                className={`sticky bottom-0 mt-7 pb-6 ${rail ? "-mx-8 px-8" : "-mx-6 px-6"}`}
+                data-testid="pane-footer"
+              >
                 {/* No rule above it. A hairline is right for a bar bolted to the floor of the column and wrong
                     for one that follows the content: over a short preview it drew a divider with nothing under
                     it. The fade does the only job the rule did — saying that content is passing underneath —

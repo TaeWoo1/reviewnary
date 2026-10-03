@@ -1,4 +1,6 @@
+import { Link } from "react-router-dom";
 import { DecisionList, DecisionRow } from "../ui/DecisionRow";
+import { WORK_STATE } from "../../lib/workState";
 import { selectionHref } from "./MasterDetail";
 import { isOldBacklog, sharedRowFacts, type HomeWorkRow } from "../../lib/homeWork";
 import { elapsedLabel } from "../../lib/copy/customerOps";
@@ -70,8 +72,15 @@ export function WorkRows({
    *
    * <p>The facts are identical in both — this chooses columns, never content — and the default is the
    * frozen one, so a caller that does not ask gets the Home.
+   *
+   * <p>「rail」 is 확인할 일's, since its canonical redesign (2026-10-03) — the reading the 316px rail
+   * takes. Measured off Front's redesigned inbox: a row is the customer's own words clamped to two
+   * lines with the wait beside them, and ONE muted line under it carrying everything that qualifies
+   * them. What changed from 「queue」 is weight, not content: the state word was the row's bold lead and
+   * is now the first fact of the provenance line, because the thing a seller reads first on a screen
+   * named 확인할 일 should be what the customer wrote, not our word for it.
    */
-  reading?: "home" | "queue";
+  reading?: "home" | "queue" | "rail";
 }) {
   const caseIds = rows.map((r) => r.caseId).filter((id): id is string => id !== null);
   const shared = sharedRowFacts(sharedOver ?? rows);
@@ -79,6 +88,7 @@ export function WorkRows({
   const oldCount = firstOld >= 0 ? rows.length - firstOld : 0;
 
   const queue = reading === "queue";
+  const rail = reading === "rail";
   const draw = (row: HomeWorkRow) => {
     // A review opened on its own page from here offers the way back to here.
     const fullScreen = row.kind === "REVIEW" ? `${row.to}?from=work` : row.to;
@@ -134,6 +144,21 @@ export function WorkRows({
       />
     );
   };
+
+  if (rail) {
+    return (
+      <RailRows
+        rows={rows}
+        selectedKey={selectedKey}
+        wide={wide}
+        search={search}
+        now={now}
+        ariaLabel={ariaLabel}
+        firstOld={firstOld}
+        oldCount={oldCount}
+      />
+    );
+  }
 
   const said = sharedPhrase(shared);
   const caption = said && !captionSaysReason ? <p className="mb-2 px-1 text-sm text-muted">{said}</p> : null;
@@ -198,4 +223,122 @@ export function sharedPhrase(shared: {
   // already reads as one phrase. The source already contains the noun the tag repeats (「쿠팡 리뷰」 vs 「리뷰」).
   const parts = [shared.source ?? shared.tag, star].filter(Boolean);
   return parts.length > 0 ? `모두 ${parts.join(" ")}` : null;
+}
+
+
+/** Every word {@link WORK_STATE} owns, so a reason tag that is really a state is never drawn as one. */
+const STATE_WORDS: ReadonlySet<string> = new Set(Object.values(WORK_STATE).map((w) => w.text));
+
+function isStateWord(tag: string): boolean {
+  return STATE_WORDS.has(tag);
+}
+
+/**
+ * <b>확인할 일's rail row</b> (canonical mockup, 2026-10-03).
+ *
+ * <p>Two parts and no third: the customer's sentence clamped to two lines with the wait beside it, and
+ * one muted line under it — state · where it came from · what it is about. Drawn here rather than as a
+ * third shape of {@link DecisionRow}, because that component's two readings are the Home's and the old
+ * queue's and both are frozen; a third branch through 447 lines of row would put this screen's change
+ * inside theirs.
+ *
+ * <p><b>No icon tile.</b> The 40px tone square was the single largest thing in a row whose subject is a
+ * sentence, and in a 316px rail it is 13% of the width spent on a glyph that repeats the state word two
+ * lines below it.
+ *
+ * <p><b>The selection is a fill, not a bar.</b> `shadow-selected` paints the accent down the row's left
+ * edge, and §5 spends the accent on what you can press. Which row is open is a neutral fact about the
+ * list, so it is drawn with the neutral surface — the sentence takes the weight.
+ */
+function RailRows({
+  rows,
+  selectedKey,
+  wide,
+  search,
+  now,
+  ariaLabel,
+  firstOld,
+  oldCount,
+}: {
+  rows: HomeWorkRow[];
+  selectedKey: string | null;
+  wide: boolean;
+  search: string;
+  now?: Date;
+  ariaLabel: string;
+  firstOld: number;
+  oldCount: number;
+}) {
+  const list = (label: string, slice: HomeWorkRow[]) => (
+    <ul aria-label={label} className="-mx-2 divide-y divide-line">
+      {slice.map((row) => {
+        const fullScreen = row.kind === "REVIEW" ? `${row.to}?from=work` : row.to;
+        const state = WORK_STATE[row.state];
+        /* The customer's own words, and only ever theirs: `said` is the body off the wire and `title`
+           is what the record calls itself. An inquiry's title is 「문의 드립니다」 on nearly all of them,
+           which is why the queue stopped leading with it (2026-10-02); a review has no body field and
+           its title IS what the customer wrote. */
+        const lead = row.said ?? row.title;
+        /* What qualifies the sentence, in the order a seller asks it: what to do, where it came from,
+           how it was rated, what we called it, which product. `line` is the product only for a review —
+           for a case it is reviewnary's own summary, which 왜 지금 볼 일인가 owns in the pane. */
+        const facts = [
+          row.source,
+          row.rating === null ? null : `★${row.rating}`,
+          /* The tag only when it is a CATEGORY. `REASON` mixes real categories (교환·환불 · 정보 부족 ·
+             판단 보류) with three words that are states wearing a category badge — and the state word
+             already leads this very line, so a row read 「초안 준비됨 · 카페24 자사몰 문의 · 답변 필요」:
+             two of our words for one record, 20px apart. 「리뷰」 goes the same way, because `source`
+             already says 「네이버 리뷰」. Measured against the whole table rather than against this row's
+             own state, so 답변 필요 cannot come back on a row that is 초안 준비됨. */
+          isStateWord(row.reason.tag) || row.source.includes(row.reason.tag) ? null : row.reason.tag,
+          row.kind === "REVIEW" ? row.line : null,
+        ].filter((f): f is string => Boolean(f));
+        const selected = wide && row.key === selectedKey;
+        return (
+          <li key={row.key}>
+            <Link
+              to={selectionHref(wide, row.key, fullScreen, search)}
+              aria-current={selected ? "true" : undefined}
+              className={`block rounded-lg px-2 py-3 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
+                selected ? "bg-canvas" : "hover:bg-canvas"
+              }`}
+            >
+              <span className="flex items-start gap-3">
+                <span
+                  className={`line-clamp-2 min-w-0 flex-1 break-keep text-sm leading-snug text-ink [overflow-wrap:anywhere] ${
+                    selected ? "font-semibold" : ""
+                  }`}
+                >
+                  {lead}
+                </span>
+                {(() => {
+                  const wait = elapsedLabel(row.since, row.subject, now);
+                  return wait ? (
+                    <span className="shrink-0 whitespace-nowrap pt-0.5 text-xs tabular-nums text-muted">{wait}</span>
+                  ) : null;
+                })()}
+              </span>
+              <span className="mt-1.5 block truncate text-xs text-muted">
+                <span className="font-semibold">{state.text}</span>
+                {facts.map((fact) => ` · ${fact}`).join("")}
+              </span>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  if (firstOld <= 0) return list(ariaLabel, rows);
+  return (
+    <div className="space-y-4">
+      {list(ariaLabel, rows.slice(0, firstOld))}
+      <p className="flex items-center gap-3 text-xs font-semibold text-muted" role="separator">
+        <span>1년 넘게 기다린 것 {oldCount.toLocaleString("ko-KR")}건</span>
+        <span aria-hidden="true" className="h-px flex-1 bg-line" />
+      </p>
+      {list(`${ariaLabel} · 1년 넘게 기다린 것`, rows.slice(firstOld))}
+    </div>
+  );
 }

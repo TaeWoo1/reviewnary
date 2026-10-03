@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import type { ReactNode } from "react";
-import { PageHead } from "../../components/ui/PageHead";
-import { Facts } from "../../components/ui/ObjectRow";
 import { MasterDetail, useWideLayout } from "../../components/workspace/MasterDetail";
 import { WorkRows } from "../../components/workspace/WorkRows";
 import { WorkItemPane } from "../../components/workspace/WorkItemPane";
@@ -17,39 +15,22 @@ import type { ReviewWorkView } from "../../lib/types";
 /** One name for one list: the nav entry, this page's title and the Home's section all say 확인할 일 (UI/UX v2). */
 const TITLE = COPY.listTitle;
 /**
- * The scope label: what this count counts, so it is not read against the 리뷰 or 문의 screens' own numbers.
+ * <b>확인할 일's views</b> (canonical redesign, 2026-10-03) — the bucket's name with its count, the
+ * pressed one filled in the brand tint.
  *
- * <p>「오래 기다린 것부터 봅니다」 used to close it and is gone (product-owner decision, 2026-10-01): the
- * heading two lines up reads 「확인할 일 46건」, so the sentence spent a line restating the sort word that
- * is already beside the count. What is left is the half a heading cannot carry — WHICH records.
- *
- * <p>The canonical mockup's wording (2026-10-02). 「판매자님의 결정을 기다리는」 named the seller twice on
- * one screen and said WHO the list is for; 「판매 후 운영이 필요한」 says what the records have in common,
- * which is the half the heading cannot carry.
+ * <p>They were underline tabs sharing one rule, and a rule only works along a line: in a 316px rail the
+ * five of them take three rows, and a bottom border under the third row is a divider with two rows of
+ * tabs floating above it. The reference's own filter row is a row of small chips for the same reason —
+ * a chip carries its own edge, so the group wraps without the group's shape breaking.
  */
-const DESCRIPTION = "판매 후 운영이 필요한 문의와 리뷰를 모았습니다.";
-
-/**
- * <b>확인할 일's action tabs</b> (visual target, 2026-10-02) — the bucket's name with its count, the
- * pressed one underlined in the brand colour.
- *
- * <p>They were five bordered pills, and five borders across the top of a list whose own container had
- * just lost its border is the chrome the target spends its budget removing. One rule carries the whole
- * group now and the pressed tab breaks it, so the row reads as 「five views of this list」 at a glance
- * and the only ink spent is a 2px line.
- *
- * <p>Drawn here rather than with {@code SegmentBtn}: a segmented control sits on one shared track and
- * means 「one of these readings of the same thing」, which is what 리뷰's channel switcher is. These are
- * views of ONE list that each carry their own count.
- */
-function TabBtn({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: ReactNode }) {
+function Chip({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
       type="button"
       aria-pressed={pressed}
       onClick={onClick}
-      className={`-mb-px min-h-[40px] border-b-2 px-1 pb-3 text-base tabular-nums transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
-        pressed ? "border-brand-700 font-semibold text-ink" : "border-transparent text-muted hover:text-ink"
+      className={`whitespace-nowrap rounded-lg px-2 py-1 text-xs tabular-nums transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
+        pressed ? "bg-brand-50 font-semibold text-brand-700" : "text-muted hover:text-ink"
       }`}
     >
       {children}
@@ -184,65 +165,61 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
     );
 
   const list = (
-    <>
-      <PageHead
-        title={TITLE}
-        description={DESCRIPTION}
-        action={
-          work && (work.rows.length > 0 || query) ? (
-            <div className="flex items-center gap-2">
-              {searching ? (
-                <input
-                  ref={searchBox}
-                  type="search"
-                  aria-label="확인할 일 검색"
-                  placeholder="고객이 쓴 내용으로 찾기"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key !== "Escape") return;
-                    setQuery("");
-                    setSearching(false);
-                  }}
-                  className="min-h-[40px] w-[260px] rounded-xl border border-line bg-surface px-3 text-sm text-ink placeholder:text-muted focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20"
-                />
-              ) : null}
-              <button
-                type="button"
-                aria-label={searching ? "검색 닫기" : "검색"}
-                aria-expanded={searching}
-                onClick={() => {
-                  if (searching) setQuery("");
-                  setSearching((open) => !open);
-                  if (!searching) window.requestAnimationFrame(() => searchBox.current?.focus());
-                }}
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-surface text-muted transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-              >
-                <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
-                  <circle cx="11" cy="11" r="6.5" />
-                  <path d="M16 16l4 4" />
-                </svg>
-              </button>
-            </div>
-          ) : undefined
-        }
-        meta={
-          work && allRows.length > 0 ? (
-            // The breakdown used to stand here too — 「정보 부족 1 · 답변 필요 25 · 리뷰 11 · 승인 대기 4 ·
-            // 초안 필요 4」 — above filter chips that break the same 45 rows down again under different names
-            // (정보 부족 1 + 답변 필요 25 = 문의 답변 26). Twelve numbers for five populations in 166px, and the
-            // seller had to do that arithmetic to know the two lines were about the same list. The chips are the
-            // breakdown now, because they are the half you can press.
-            <Facts className="text-sm text-muted">
-              <span className="font-semibold text-ink">
-                {allRows.length.toLocaleString("ko-KR")}
-                {work.truncated ? "+" : ""}건
-              </span>
-              {COPY.listOrder ? <span>{COPY.listOrder}</span> : null}
-            </Facts>
-          ) : undefined
-        }
-      />
+    <div className="space-y-4">
+      {/*
+        <b>The rail's head</b> (canonical redesign, 2026-10-03). The name of the list, how many are in it,
+        and the way to narrow it — on one line, because the column under it is 316px of rows and this is
+        the chrome above them.
+
+        <p>The scope sentence 「판매 후 운영이 필요한 문의와 리뷰를 모았습니다」 and the order line are gone
+        with it. They were written for a page head over a full-width list; above a rail they are two lines
+        of explanation before any work, which is the measurement that removed the last sentence to stand
+        here (visual review, 1366×768, 2026-10-01). Nothing a seller acts on was in either.
+      */}
+      <div className="flex items-center gap-2">
+        <h1 className="text-section font-bold tracking-tight text-ink">{TITLE}</h1>
+        {work && allRows.length > 0 ? (
+          <span className="text-sm tabular-nums text-muted">
+            {allRows.length.toLocaleString("ko-KR")}
+            {work.truncated ? "+" : ""}건
+          </span>
+        ) : null}
+        {work && (work.rows.length > 0 || query) ? (
+          <button
+            type="button"
+            aria-label={searching ? "검색 닫기" : "검색"}
+            aria-expanded={searching}
+            onClick={() => {
+              if (searching) setQuery("");
+              setSearching((open) => !open);
+              if (!searching) window.requestAnimationFrame(() => searchBox.current?.focus());
+            }}
+            className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-canvas hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+          >
+            <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="M16 16l4 4" />
+            </svg>
+          </button>
+        ) : null}
+      </div>
+
+      {searching ? (
+        <input
+          ref={searchBox}
+          type="search"
+          aria-label="확인할 일 검색"
+          placeholder="고객이 쓴 내용으로 찾기"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Escape") return;
+            setQuery("");
+            setSearching(false);
+          }}
+          className="min-h-[40px] w-full max-w-[360px] rounded-xl border border-line bg-surface px-3 text-sm text-ink placeholder:text-muted focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20"
+        />
+      ) : null}
 
       {work === undefined ? <p className="text-sm text-muted">불러오는 중입니다.</p> : null}
 
@@ -288,11 +265,11 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       */}
 
       {work && allRows.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-6 border-b border-line" role="group" aria-label="확인할 일 보기">
+        <div className="-mx-2 flex flex-wrap items-center gap-1" role="group" aria-label="확인할 일 보기">
           {WORK_FILTERS.map((f) => (
-            <TabBtn key={f.key} pressed={filter === f.key} onClick={() => setFilter(f.key)}>
+            <Chip key={f.key} pressed={filter === f.key} onClick={() => setFilter(f.key)}>
               {f.label} {allRows.filter(f.test).length.toLocaleString("ko-KR")}
-            </TabBtn>
+            </Chip>
           ))}
         </div>
       ) : null}
@@ -316,7 +293,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
             now={now}
             ariaLabel={TITLE}
             dense
-            reading="queue"
+            reading="rail"
           />
           {/* A read that reported more than it returned. The shortfall means this list is deeper than one read
               reaches — not that the rest is somewhere else — so it says so instead of passing its length off as
@@ -333,7 +310,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       {reviewWork ? (
         <ReplyWorkHistory accounts={reviewWork.committed} onRestored={() => setReloadKey((n) => n + 1)} />
       ) : null}
-    </>
+    </div>
   );
 
   return (
@@ -349,6 +326,12 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
          prepared answer and its two controls stop being a 392px column inside a 440px panel, and the
          flow ends with air under it rather than a scrollbar. */
       pane="decision"
+      /* <b>The rail reading</b> ({@link LayoutKind}, 2026-10-03 — product-owner decision). This route
+         only: every other master-detail screen keeps the list-first layout it shipped with, because the
+         rail is a claim about THIS screen — 46 records a seller walks, where the one being read is the
+         page. The `pane` contract above still names the width the rail falls back to below 1200, where
+         there is only one column at all. */
+      layout="rail"
     />
   );
 }
