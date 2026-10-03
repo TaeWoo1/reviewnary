@@ -357,11 +357,46 @@ export function waitDays(value: string | null | undefined, now: Date = new Date(
 }
 
 /**
+ * <b>지난 1년을 넘으면 세는 것을 그만두고 날짜를 말한다</b> (문의 canonical, 2026-10-04 — product-owner
+ * decision).
+ *
+ * <p>데모 org의 Cafe24 백로그에는 2016년 글이 있고, 그 행은 「3,727일 대기」였다. 그 숫자는 산수이지 정보가
+ * 아니다 — 3,727일과 3,700일 사이에서 판매자가 다르게 할 수 있는 일은 없고, 자리만 크게 차지한 채 옆의 최근
+ * 문의가 며칠 기다렸는지를 읽기 어렵게 만든다. 1년이 넘은 문의에 남은 질문은 「언제 들어온 것인가」 하나이므로,
+ * 그때는 접수일 자체가 답이다.
+ *
+ * <p>왜 숨기지 않고 바꾸는가: 행의 그 자리는 이 문의가 언제 것인지 말하는 자리이고, 비워 두면 1년 넘은 문의만
+ * 시간을 말하지 않는 목록이 된다.
+ */
+const WAIT_DAYS_LIMIT = 365;
+
+/** Whether this wait is told as a date rather than a count — see {@link WAIT_DAYS_LIMIT}. */
+export function waitIsDated(value: string | null | undefined, now: Date = new Date()): boolean {
+  const days = waitDays(value, now);
+  return days != null && days > WAIT_DAYS_LIMIT;
+}
+
+/** `2016-09-09` in the seller's own calendar, for the label a year-old wait takes instead of a count. */
+function kstDateString(value: string): string | null {
+  const at = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00+09:00`) : new Date(value);
+  if (Number.isNaN(at.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: KST, year: "numeric", month: "2-digit", day: "2-digit" })
+    .format(at);
+  return parts;
+}
+
+/**
  * How long something has waited. An instant gives minutes, hours or days; a bare date (`2026-09-17`) can only give
  * days, and today is 「오늘 접수」 rather than a zero wait nobody measured. Null when the value cannot be read.
+ *
+ * <p>Past {@link WAIT_DAYS_LIMIT} it stops being a count and becomes the day it arrived.
  */
 export function waitLabel(value: string | null | undefined, now: Date = new Date()): string | null {
   if (!value) return null;
+  if (waitIsDated(value, now)) {
+    const on = kstDateString(value);
+    return on ? `${on} 접수` : null;
+  }
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     const at = new Date(`${value}T00:00:00+09:00`);
     if (Number.isNaN(at.getTime())) return null;

@@ -19,7 +19,7 @@ import { api } from "../../lib/apiClient";
 import { analysisKey, buildAnalysisIndex } from "../../lib/inboxView";
 import { plainText, previewText } from "../../lib/plainText";
 import { kstDate } from "../../lib/format";
-import { waitedLabel } from "../../lib/inquiryWorkflow";
+import { elapsedLabel, waitIsDated } from "../../lib/copy/customerOps";
 import { productChannelLabel } from "../../lib/productRows";
 import {
   RECORD_STATUS_OPTIONS,
@@ -454,7 +454,7 @@ export function CustomerInbox() {
                       to={`/inquiries/${row.inquiryId}`}
                       aria-current={selected ? "true" : undefined}
                       className={`block px-4 py-4 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
-                        selected ? "bg-brand-50 shadow-selected" : "hover:bg-canvas"
+                        selected ? "bg-canvas" : "hover:bg-canvas"
                       }`}
                     >
                       <span className="flex items-start gap-6">
@@ -486,7 +486,13 @@ export function CustomerInbox() {
                             ))}
                           </span>
                         </span>
-                        <span className="shrink-0 pt-1 text-sm tabular-nums text-muted">{kstDate(row.receivedAt)}</span>
+                        {/* <b>이 문의가 언제 것인가 — 기다린 날수로, 1년이 넘으면 접수일로</b> (문의
+                            redesign, 2026-10-04). 행이 날짜만 들고 있던 동안 11일 기다린 문의와 어제 들어온
+                            문의는 같은 모양이었다. 단어의 주인은 {@link elapsedLabel}이라 pane이 옆에서
+                            말하는 것과 같은 수가 나온다. */}
+                        <span className="shrink-0 pt-1 text-sm tabular-nums text-muted">
+                          {elapsedLabel(row.receivedAt, "INQUIRY") ?? kstDate(row.receivedAt)}
+                        </span>
                       </span>
                     </Link>
                   </li>
@@ -561,9 +567,20 @@ export function CustomerInbox() {
   return (
     <MasterDetail
       wide={wide}
-      // 문의도 Decision Workspace다: 이 pane에서 판매자는 고객의 질문을 읽고, 준비된 답변을 읽고,
-      // 그것을 내보낼지 정한다 — 확인할 일·리뷰·반복 문제와 같은 읽기이므로 같은 폭을 쓴다.
-      pane="decision"
+      /*
+        <b>목록은 rail이고, 읽고 있는 문의가 페이지다</b> (문의 redesign, 2026-10-04 — product-owner
+        decision, 1600 mockup을 구현 target으로 승인).
+
+        <p>전에는 선언된 decision pane이었다 — 목록이 페이지이고 선택한 문의가 576px로 옆에 섰다.
+        그런데 이 화면에서 판매자가 하는 일은 목록을 훑는 것이 아니라 <b>한 문의를 읽고 답할지 정하는
+        것</b>이고, 그 읽기는 고객의 질문 전문 · 준비된 답변 · 근거 · 기록으로 이어진다. 576px은 그것을
+        담는 폭이 아니다. 확인할 일이 같은 이유로 rail을 쓰므로 같은 geometry를 쓴다 — 240 rail / 316
+        목록 / 나머지 전부.
+
+        <p>선언된 pane 폭은 더 이상 주지 않는다. rail은 열려 있을 때만 rail이고, 닫혀 있으면 목록이 폭을
+        전부 가져가므로 그 폭이 쓰이는 경로가 없다. 쓰이지 않는 선언은 사실이 아니다.
+      */
+      layout="rail"
       list={list}
       detailLabel="문의 상세"
       detail={detail}
@@ -612,7 +629,11 @@ function InquiryCasePane({
     { title: detail?.title ?? item.title, snippet: detail?.details ?? item.snippet },
     plainText,
   );
-  const waited = waitedLabel(item.receivedAt);
+  /*
+    목록의 행과 같은 주인, 같은 단어 — 그것이 elapsed 계약이다. 1년이 넘은 문의에서 그 단어는 접수일 자체가
+    되므로, 바로 왼쪽의 날짜와 같은 사실을 두 번 말하게 된다. 그때는 날짜만 남긴다.
+  */
+  const waited = waitIsDated(item.receivedAt) ? null : elapsedLabel(item.receivedAt, "INQUIRY");
   const state = recordRowState(item);
   return (
     <CaseLayout

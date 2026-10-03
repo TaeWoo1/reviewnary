@@ -49,6 +49,24 @@ describe("elapsed time — one source", () => {
     expect(elapsedLabel(elapsedSource(null, "2026-09-24T02:00:00Z"), "INQUIRY", NOW)).toBe("7일 대기");
   });
 
+  /**
+   * <b>1년을 넘으면 세는 것을 그만둔다</b> (문의 redesign, 2026-10-04 — product-owner decision).
+   *
+   * <p>데모 org의 Cafe24 백로그는 2016년까지 내려가고, 그 행이 들고 있던 것은 「3,727일 대기」였다 —
+   * 산수이지 정보가 아니다. 1년이 넘은 문의에 남은 질문은 「언제 들어온 것인가」뿐이라, 그 자리는 접수일
+   * 자체가 가진다. 자리를 비우지는 않는다: 비우면 오래된 문의만 시간을 말하지 않는 목록이 된다.
+   */
+  it("past a year the wait is the day it arrived, not a count", () => {
+    expect(elapsedLabel("2016-09-09", "INQUIRY", NOW)).toBe("2016-09-09 접수");
+    // An instant is read in the seller's own calendar, so the label is the KST day it landed on.
+    expect(elapsedLabel("2016-07-20T22:00:00Z", "INQUIRY", NOW)).toBe("2016-07-21 접수");
+    // The boundary is 365 days of waiting: a year old still counts, a year and a day is dated.
+    expect(elapsedLabel("2025-10-02", "INQUIRY", NOW)).toBe("365일 대기");
+    expect(elapsedLabel("2025-10-01", "INQUIRY", NOW)).toBe("2025-10-01 접수");
+    // 리뷰는 기다리는 것이 아니라 일어난 것이라, 이 규칙은 리뷰의 단어에 닿지 않는다.
+    expect(elapsedLabel("2016-09-09", "REVIEW", NOW)).toMatch(/일 전$/);
+  });
+
   it("says nothing rather than inventing a time when it has neither", () => {
     expect(elapsedSource(null, null)).toBeNull();
     expect(elapsedLabel(elapsedSource(null, null), "INQUIRY", NOW)).toBeNull();
