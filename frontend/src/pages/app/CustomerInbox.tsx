@@ -321,11 +321,13 @@ export function CustomerInbox() {
       title="문의"
       compact={!!itemRef}
       /*
-        <b>316px rail의 머리는 화면 이름만 든다</b> (문의 redesign polish, 2026-10-04 — product-owner
-        decision). 「이 문의에 대해 물어보기」가 제목 옆에 서면 1366에서 머리가 두 줄로 깨졌다 — 가장 짧은
-        줄이어야 할 곳에서 가장 긴 레이블이 폭을 요구한 것이다. 그래서 rail일 때는 아래 조용한 줄로 내려
-        가고, rail이 아닌 좁은 화면에서는 머리에 그대로 남는다: 그 화면의 머리는 폭이 모자라지 않고,
-        문의 하나를 연 상태에서 목록으로 돌아가지 않고도 물어볼 수 있어야 한다.
+        <b>물어보기는 rail에 없다</b> (문의 redesign polish, 2026-10-04 — product-owner decision).
+        「이 문의에 대해 물어보기」는 316px 안에서 가장 긴 레이블이었고, 머리에 두면 1366에서 머리가 두 줄로
+        깨졌으며, 탭 아래로 내려도 목록이 쓸 수 있는 세로를 한 줄 더 먹었다. 묻는 대상은 어차피 옆에 열려
+        있는 그 문의이므로, 그 문의의 머리 우측으로 간다({@link InquiryCasePane}).
+
+        <p>rail이 아닌 좁은 화면에는 pane이 없다 — 목록만 보고 있을 때 물어볼 길이 사라지면 안 되므로
+        거기서는 머리에 그대로 남는다. 그 화면의 머리는 폭이 모자라지 않는다.
       */
       action={wide ? undefined : agentLaunch}
       /* No meta: the section below is titled 「지금 처리할 일」 and carries the same count, and the two
@@ -395,7 +397,6 @@ export function CustomerInbox() {
             확인할 일에 문의 {(productId ? queueRows.length : queueTotal ?? queueRows.length).toLocaleString("ko-KR")}건 →
           </Link>
         ) : null}
-        {wide ? <span className="shrink-0">{agentLaunch}</span> : null}
       </div>
 
       {/* 이 화면의 본업인 찾기 — 행 바로 위에 선다. */}
@@ -468,7 +469,7 @@ export function CustomerInbox() {
                       to={`/inquiries/${row.inquiryId}`}
                       aria-current={selected ? "true" : undefined}
                       className={`block px-4 py-4 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
-                        selected ? "bg-canvas shadow-chosen" : "hover:bg-canvas"
+                        selected ? "bg-canvas ring-1 ring-inset ring-line" : "hover:bg-canvas"
                       }`}
                     >
                       <span className="flex items-start gap-6">
@@ -677,6 +678,14 @@ function InquiryCasePane({
         .filter(Boolean)
         .join(" · ")}
       // No 「전체 화면으로」: this route IS the inquiry's own screen, so the link would point at the page it is on.
+      // 물어보기는 여기 — 묻는 대상이 바로 이 문의이고, {@link CaseLayout}의 headerAction은 제목 옆의
+      // 조용한 자리라 1차 행동(바닥의 dock)과 겨루지 않는다.
+      headerAction={
+        <AgentLaunch
+          context={{ surface: "inquiries", ...(workItemId ? { workItemId } : {}) }}
+          label="이 문의에 대해 물어보기"
+        />
+      }
       decision={
         <InboxDetail
           item={item}

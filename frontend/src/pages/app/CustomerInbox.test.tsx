@@ -739,9 +739,12 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
     expect(chosen.className).toContain("bg-canvas");
     expect(chosen.className).not.toContain("bg-brand-50");
     expect(chosen.className).not.toContain("shadow-selected");
-    // Neutral, but findable: the tint alone measures 4% on white and a seller had to read the rows to
-    // find their place, so it keeps a bar — in `muted`, which is the row's own second-line colour.
-    expect(chosen.className).toContain("shadow-chosen");
+    // Neutral, but findable: the tint alone measures 4% on white, so it carries a hairline outline —
+    // inset, so the row keeps the width every other row has. A 3px bar in any colour was a mark the
+    // list does not need; the row is saying 「the page beside you is showing this」, not 「look here」.
+    expect(chosen.className).toContain("ring-inset");
+    expect(chosen.className).toContain("ring-line");
+    expect(chosen.className).not.toContain("shadow-chosen");
   });
 
   /**
@@ -753,7 +756,7 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
    * <p>The tabs row also keeps only tabs: three tabs and a channel select could not share 316px, so the
    * third tab wrapped down beside the select and the list's own axis read as two rows.
    */
-  it("the rail head is the page name alone, and the tabs row is only tabs", async () => {
+  it("물어보기 is not in the rail at all — it belongs to the inquiry's own header", async () => {
     getInquiryRowsStrict.mockResolvedValue({
       items: [row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", snippet: "교환은 언제까지 신청해야 하나요?" })],
       totalCount: 1,
@@ -764,12 +767,16 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
     const heading = await screen.findByRole("heading", { level: 1, name: "문의" });
     const head = heading.closest("header")!;
     expect(within(head).queryByTestId("agent-launch")).toBeNull();
-    // Lowered, not lost.
-    expect(screen.getByTestId("agent-launch")).toBeInTheDocument();
-    // The tabs row is the list's axis and holds nothing that competes for its width.
-    const tabRow = screen.getByRole("button", { name: /^전체/ }).parentElement!;
+    // 316px is the list's own width and the longest label in the product was asking for it. Nothing in
+    // the rail carries it any more — not the head, not the quiet row under the tabs.
+    const list = screen.getByTestId("master-list");
+    expect(within(list).queryByTestId("agent-launch")).toBeNull();
+    // Moved, not lost: it asks about the inquiry, so it stands beside that inquiry's own title.
+    const pane = screen.getByLabelText("문의 상세");
+    expect(within(pane).getByTestId("agent-launch")).toHaveTextContent("이 문의에 대해 물어보기");
+    // And the tabs row still holds nothing that competes for the rail's width.
+    const tabRow = screen.getByTestId("record-tabs");
     expect(within(tabRow).queryByLabelText("채널")).toBeNull();
-    expect(within(tabRow).queryByTestId("agent-launch")).toBeNull();
   });
 
   /**
@@ -778,7 +785,7 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
    * the sentence the seller judges, and the sentence saying that sentence is fine. Good news is
    * metadata. A state that asks the seller to DO something keeps its card and its way out.
    */
-  it("the grounded basis note is muted metadata, not a second object", async () => {
+  it("a grounded draft says so with its 근거, not with a sentence above it", async () => {
     getInquiryRowsStrict.mockResolvedValue({
       items: [row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", snippet: "교환은 언제까지 신청해야 하나요?" })],
       totalCount: 1,
@@ -790,13 +797,13 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
       draft: { ...DRAFTED_WITH_CAPABILITY.draft, answerBasis: "GROUNDED", answerBasisNote: "답변에 필요한 정보를 확인했습니다.", answerBasisAction: null },
     });
     renderInbox("/inquiries/i1");
-    const note = await screen.findByTestId("answer-state");
-    expect(note).toHaveAttribute("data-basis", "GROUNDED");
-    expect(note).toHaveTextContent("답변에 필요한 정보를 확인했습니다.");
-    expect(note.className).toContain("text-muted");
-    expect(note.className).not.toContain("border-good");
-    expect(note.className).not.toContain("border-l-2");
-    expect(note.className).not.toContain("font-semibold");
+    const object = await screen.findByTestId("prepared-answer");
+    // The claim is made where it can be checked: the source and the sentence it stands on.
+    expect(within(object).getByText("답변에 사용한 근거")).toBeInTheDocument();
+    expect(within(object).getByText("교환·반품 기준")).toBeInTheDocument();
+    // And not a second time as a standalone sentence over the card.
+    expect(screen.queryByTestId("answer-state")).toBeNull();
+    expect(screen.queryByText("답변에 필요한 정보를 확인했습니다.")).toBeNull();
   });
 
   it("the row says how long the customer waited, and the day it arrived once that is a year", async () => {
