@@ -124,7 +124,7 @@ describe("InquiryResponsePanel — the generated draft", () => {
     // The excerpt is the point. A closed 「상품 정보 1개」 told the seller a source existed and
     // nothing about whether it answered the question — which is how a reply about 전선 가닥 수 came
     // to stand, invisibly, on a document titled 「자주 묻는 질문 - 접착과 재부착」.
-    expect(await screen.findByText("AI가 확인한 내용")).toBeInTheDocument();
+    expect(await screen.findByText("답변에 사용한 근거")).toBeInTheDocument();
     expect(screen.getByText("상품 정보")).toBeInTheDocument();
     expect(screen.getByText("사용법")).toBeInTheDocument();
     expect(screen.getByText("몰딩 뒷면 테이프를 벗기고 벽면에 눌러 붙입니다.")).toBeInTheDocument();
@@ -400,8 +400,9 @@ describe("InquiryResponsePanel — 초안 복사", () => {
     const copy = await screen.findByRole("button", { name: "초안 복사" });
     // Exactly one — it is not also repeated under the evidence fold.
     expect(screen.getAllByRole("button", { name: "초안 복사" })).toHaveLength(1);
-    // In the same card as the draft's own title and body.
-    const card = copy.closest("div.rounded-xl");
+    // In the same block as the draft's own title and body — the one tinted surface in the pane
+    // (문의 canonical, 2026-10-03: the draft's border and the canvas card around it are gone).
+    const card = copy.closest("div.rounded-2xl");
     expect(card).not.toBeNull();
     expect(within(card as HTMLElement).getByText("[답변] 사용 방법")).toBeInTheDocument();
     expect(
@@ -486,11 +487,13 @@ describe("draft provenance — the heading may not attribute a version to the wr
     );
     render(<InquiryResponsePanel workItemId="w1" />);
     expect(await screen.findByText("내가 쓴 답변")).toBeInTheDocument();
-    expect(screen.queryByText("AI가 준비한 답변")).toBeNull();
-    expect(screen.getByTestId("draft-provenance")).toHaveTextContent("버전 2 · 판매자 수정");
+    expect(screen.queryByText("준비된 답변")).toBeNull();
+    // 작성자는 초안 옆에서 빠졌다(문의 canonical, 2026-10-03) — 버전만 남고, 「판매자 수정」은 기록이 말한다.
+    expect(screen.getByTestId("draft-provenance")).toHaveTextContent("버전 2");
+    expect(screen.getByTestId("draft-provenance")).not.toHaveTextContent("판매자 수정");
   });
 
-  it("a MODEL version keeps the AI heading and says so on its own line", async () => {
+  it("a MODEL version is 「준비된 답변」 — the author is a fact for 기록, not a badge over the draft", async () => {
     getInquiryDetailStrict.mockResolvedValue(
       detail({
         draft: {
@@ -509,7 +512,8 @@ describe("draft provenance — the heading may not attribute a version to the wr
       }),
     );
     render(<InquiryResponsePanel workItemId="w1" />);
-    expect(await screen.findByText("AI가 준비한 답변")).toBeInTheDocument();
-    expect(screen.getByTestId("draft-provenance")).toHaveTextContent("버전 1 · AI 작성");
+    expect(await screen.findByText("준비된 답변")).toBeInTheDocument();
+    expect(screen.getByTestId("draft-provenance")).toHaveTextContent("버전 1");
+    expect(screen.getByTestId("draft-provenance")).not.toHaveTextContent("AI");
   });
 });

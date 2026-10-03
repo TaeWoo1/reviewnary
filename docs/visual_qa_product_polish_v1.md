@@ -211,3 +211,9 @@ here rather than folded into the visual changes.
 - `CaseFromResolution.summaryFor`가 내부 ranking 설명 괄호를 저장하고 있어, 현재 확인할 일 화면은
   presentation 단계에서 trailing parenthetical만 숨긴다. 신규 case의 canonical summary 문구 자체를
   정리하는 것은 별도 작업.
+
+- **Demo data sanitization (2026-10-03, 문의 canonical QA에서 관측).** 데모 org의 문의 본문 일부가
+  고객 이름과 사업자등록번호를 평문으로 담고 있다(2016–2018년 카페24 현금영수증·세금계산서 문의 계열).
+  QA / demo screenshot에서는 해당 문의를 쓰지 않는 것으로 처리했고, **production 데이터를 임의로 고치거나
+  일반 화면에 새 masking semantic을 넣지 않는다**(product-owner decision, 2026-10-03). 남은 일은
+  demo seed 자체의 sanitization이며, 화면 작업이 아니라 데이터 작업으로 별도로 다룬다.

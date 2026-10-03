@@ -143,3 +143,79 @@ export function inquiryHeadline(
   }
   return { title: "문의", body: null };
 }
+
+/**
+ * <b>고객이 쓴 말이 먼저 오고, 제목은 뭔가를 더해 줄 때만 옆에 선다</b> (문의 canonical redesign,
+ * 2026-10-03, product-owner decision).
+ *
+ * <p><b>왜 {@link inquiryHeadline}과 다른가.</b> 그 규칙은 「제목이 있으면 제목이 제목이다」였고, 제목이
+ * 목록 어디에도 안 나오던 결함을 고치려고 그렇게 정했다. 실제 데이터에서 그 규칙의 대가가 드러난다 —
+ * 데모 org의 최신 문의 11건 중 5건은 제목이 비었거나 「문의 드립니다」다. 게시판이 자동으로 채운 칸이
+ * 가장 큰 글씨를 가져가고, 고객이 실제로 물어본 문장은 그 아래 회색으로 내려앉았다.
+ *
+ * <p>그래서 두 칸의 <b>역할</b>을 바꾼다. 첫 시선은 언제나 고객이 쓴 본문이고, 제목은 <b>본문이 말하지 않는
+ * 것을 말할 때만</b> 남는다. 제목이 화면에서 사라지지는 않는다 — 자리가 바뀔 뿐이다.
+ *
+ * <p><b>제목을 숨기는 조건은 네 가지뿐이고, 전부 확인 가능한 사실이다:</b>
+ * <ol>
+ *   <li>비어 있다</li>
+ *   <li>본문이 없다 — 그러면 제목이 곧 질문이고, 같은 문장을 두 번 그리지 않는다</li>
+ *   <li>본문이 제목으로 시작한다 — 본문이 이미 그 말을 하고 있다</li>
+ *   <li>{@link GENERIC_TITLES}에 있다</li>
+ * </ol>
+ *
+ * <p>네 번째만이 판단이고, 그래서 <b>닫힌 목록</b>이다. 목록에 없는 제목은 언제나 남는다 — 판매자의 자료를
+ * 숨기는 쪽이 아니라 보여 주는 쪽으로 틀린다. 「배송 후 분실」이나 「선바로 길이 문의」처럼 본문에 없는
+ * 사실을 담은 제목은 그대로 남는다.
+ */
+export interface InquiryReading {
+  /** 첫 시선. 고객이 쓴 본문, 없으면 제목. 절대 비지 않는다. */
+  readonly question: string;
+  /** 질문 옆에 조용히 붙는 제목. 더해 주는 것이 없으면 null. */
+  readonly titleContext: string | null;
+}
+
+/**
+ * 게시판이 채웠거나 사람이 습관으로 적는, 문의 자체에 대해 아무것도 말하지 않는 제목들.
+ *
+ * <p>관측에서 나왔다(데모 org: 「문의 드립니다」 × 2, 빈 제목 × 3 / 상위 11건). 공백과 문장부호를 지운
+ * 형태로 비교하므로 「문의드립니다.」와 「문의 드립니다」는 같은 항목이다. <b>여기 없는 제목은 생략하지
+ * 않는다</b> — 목록을 넓히는 것은 제품 결정이지 이 함수의 추측이 아니다.
+ */
+const GENERIC_TITLES: ReadonlySet<string> = new Set([
+  "문의",
+  "문의드립니다",
+  "문의드려요",
+  "문의드림",
+  "문의합니다",
+  "문의요",
+  "질문",
+  "질문드립니다",
+  "질문있습니다",
+  "안녕하세요",
+]);
+
+/** 공백과 문장부호를 지운 비교형. 「문의 드립니다.」 → 「문의드립니다」 */
+function bare(text: string): string {
+  return text.replace(/[\s~!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?·ㆍ…]/g, "");
+}
+
+export function inquiryReading(
+  fields: { title?: string | null; snippet?: string | null },
+  preview: (text: string | null | undefined) => string,
+): InquiryReading {
+  const title = preview(fields.title ?? null).trim();
+  const body = preview(fields.snippet ?? null).trim();
+  if (!body) {
+    // 본문이 없다. 제목이 곧 질문이고, 그마저 없으면 이 화면이 아는 말이 없다.
+    return { question: title || "문의", titleContext: null };
+  }
+  if (!title) return { question: body, titleContext: null };
+  const bareTitle = bare(title);
+  const bareBody = bare(body);
+  const adds =
+    bareTitle.length > 0
+    && !bareBody.startsWith(bareTitle)
+    && !GENERIC_TITLES.has(bareTitle);
+  return { question: body, titleContext: adds ? title : null };
+}

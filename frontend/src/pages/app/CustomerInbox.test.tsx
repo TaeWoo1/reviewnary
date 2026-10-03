@@ -165,7 +165,7 @@ describe("확인할 일 — linked from the record, not drawn twice", () => {
 
   it("says nothing about 확인할 일 when nothing is waiting — never 「0건」", async () => {
     renderInbox();
-    await screen.findByLabelText("전체 문의");
+    await screen.findByLabelText("문의 목록");
     expect(screen.queryByRole("link", { name: /확인할 일에 문의/ })).toBeNull();
   });
 
@@ -174,7 +174,7 @@ describe("확인할 일 — linked from the record, not drawn twice", () => {
     renderInbox();
     expect(await screen.findByText(/처리할 문의 수를 불러오지 못했습니다/)).toBeInTheDocument();
     // The record is a separate read and is unaffected.
-    expect(screen.getByLabelText("전체 문의")).toBeInTheDocument();
+    expect(screen.getByLabelText("문의 목록")).toBeInTheDocument();
   });
 });
 
@@ -188,7 +188,7 @@ describe("전체 문의 — the record, filtered by the server", () => {
   it("is one bounded page with the whole set's count, and offers the way to the rest", async () => {
     getInquiryRowsStrict.mockResolvedValue({ items: RECORD, totalCount: 3120, limit: 50, productId: null });
     renderInbox();
-    await screen.findByLabelText("전체 문의");
+    await screen.findByLabelText("문의 목록");
     expect(screen.getByText(/2 \/ 3120건/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "더 보기" })).toBeInTheDocument();
     expect(getInquiryRowsStrict).toHaveBeenCalledWith(expect.objectContaining({ limit: 50, page: 0 }));
@@ -197,7 +197,7 @@ describe("전체 문의 — the record, filtered by the server", () => {
   it("더 보기 asks for the next page of the same question", async () => {
     getInquiryRowsStrict.mockResolvedValue({ items: RECORD, totalCount: 3120, limit: 50, productId: null });
     renderInbox();
-    await screen.findByLabelText("전체 문의");
+    await screen.findByLabelText("문의 목록");
     fireEvent.click(screen.getByRole("button", { name: "더 보기" }));
     await waitFor(() =>
       expect(getInquiryRowsStrict).toHaveBeenCalledWith(expect.objectContaining({ limit: 50, page: 1 })),
@@ -206,31 +206,39 @@ describe("전체 문의 — the record, filtered by the server", () => {
 
   it("a page that holds everything offers no way to more", async () => {
     renderInbox();
-    await screen.findByLabelText("전체 문의");
+    await screen.findByLabelText("문의 목록");
     expect(screen.queryByRole("button", { name: "더 보기" })).toBeNull();
   });
 
   it("the search box narrows the SERVER read, not the loaded rows", async () => {
     const user = userEvent.setup();
     renderInbox();
-    await screen.findByLabelText("전체 문의");
+    await screen.findByLabelText("문의 목록");
     await user.type(screen.getByLabelText("문의 내용 검색"), "세금계산서{Enter}");
     expect(getInquiryRowsStrict).toHaveBeenLastCalledWith(expect.objectContaining({ q: "세금계산서" }));
   });
 
-  it("답변 상태 and 채널 are the server's too", async () => {
+  /**
+   * 답변 상태는 설정이 아니라 목록의 축이므로 탭이다(문의 canonical, 2026-10-03) — 그리고 탭은 자기
+   * 숫자를 들고 있어야 한다. 채널은 축이 아니라 축 위의 설정이라 조용한 select로 남는다.
+   */
+  it("답변 상태 is a tab that carries its own count, and 채널 is still the server's", async () => {
     const user = userEvent.setup();
     renderInbox();
-    await screen.findByLabelText("전체 문의");
-    await user.selectOptions(screen.getByLabelText("답변 상태"), "UNANSWERED");
-    expect(getInquiryRowsStrict).toHaveBeenLastCalledWith(expect.objectContaining({ status: "UNANSWERED" }));
+    await screen.findByLabelText("문의 목록");
+    await user.click(screen.getByRole("button", { name: /답변 필요/ }));
+    await waitFor(() =>
+      expect(getInquiryRowsStrict).toHaveBeenLastCalledWith(expect.objectContaining({ status: "UNANSWERED" })),
+    );
     await user.selectOptions(screen.getByLabelText("채널"), "NAVER");
-    expect(getInquiryRowsStrict).toHaveBeenLastCalledWith(expect.objectContaining({ channel: "NAVER" }));
+    await waitFor(() =>
+      expect(getInquiryRowsStrict).toHaveBeenLastCalledWith(expect.objectContaining({ channel: "NAVER" })),
+    );
   });
 
   it("an answered row is quieter than the work above it, and still readable", async () => {
     renderInbox();
-    const record = await screen.findByLabelText("전체 문의");
+    const record = await screen.findByLabelText("문의 목록");
     expect(within(record).getByText("잘 받았습니다")).toBeInTheDocument();
   });
 
@@ -260,7 +268,7 @@ describe("상품 → 문의 doorway", () => {
       productId: "p1",
     });
     renderInbox("/inquiries?productId=p1&status=UNANSWERED");
-    await screen.findByLabelText("전체 문의");
+    await screen.findByLabelText("문의 목록");
 
     expect(getInquiryRowsStrict).toHaveBeenCalledWith(
       expect.objectContaining({ productId: "p1", status: "UNANSWERED" }),
@@ -309,9 +317,9 @@ describe("상품 → 문의 doorway", () => {
 describe("deep link and the exact inquiry", () => {
   it("opens the requested row from the page it is already on", async () => {
     renderInbox("/inquiries/i1");
-    const detail = await screen.findByLabelText("선택한 항목");
-    // The rail beside it shows the same row, so this asserts the DETAIL holds it, not that it is unique.
-    expect(within(detail).getAllByText("폭이 몇 mm인가요").length).toBeGreaterThan(0);
+    // 질문은 pane의 제목이다(문의 canonical, 2026-10-03) — 「선택한 항목」 아래가 아니라 그 위.
+    const pane = await screen.findByLabelText("선택한 문의");
+    expect(within(pane).getAllByText("폭이 몇 mm인가요").length).toBeGreaterThan(0);
   });
 
   it("a link naming a row the page does not hold is fetched by id — one exact read", async () => {
@@ -323,8 +331,8 @@ describe("deep link and the exact inquiry", () => {
       ),
     );
     renderInbox("/inquiries/elsewhere");
-    const detail = await screen.findByLabelText("선택한 항목");
-    expect(within(detail).getAllByText("다른 페이지의 문의").length).toBeGreaterThan(0);
+    const pane = await screen.findByLabelText("선택한 문의");
+    expect(within(pane).getAllByText("다른 페이지의 문의").length).toBeGreaterThan(0);
     expect(getInquiryRowsStrict).toHaveBeenCalledWith(expect.objectContaining({ inquiryId: "elsewhere" }));
   });
 
@@ -341,10 +349,14 @@ describe("deep link and the exact inquiry", () => {
   });
 });
 
-describe("제목·본문·채널·상태·날짜 — 한 행에서 네 단계로 읽힌다", () => {
-  it("목록은 제목을 제목 자리에, 본문을 그 아래에 그린다", async () => {
-    // 이 줄은 `title={previewText(row.snippet) || row.title}`이었다 — 본문이 있으면 본문의 앞부분이
-    // 제목 자리를 차지하고, 문의의 실제 제목은 목록 어디에도 나오지 않았다. 행은 원래 둘 다 갖고 있었다.
+/**
+ * <b>고객이 쓴 말이 먼저 오고, 제목은 뭔가를 더해 줄 때만 옆에 선다</b> (문의 canonical, 2026-10-03,
+ * product-owner decision). 이전 계약은 「제목이 제목 자리에 온다」였고 그 이유도 분명했다 — 제목이 목록
+ * 어디에도 안 나왔으니까. 실제 데이터가 그 대가를 보여 줬다: 데모 org 최신 11건 중 5건은 제목이 비었거나
+ * 「문의 드립니다」다. 두 칸 다 화면에 남고, 역할만 바뀐다.
+ */
+describe("문의의 첫 시선 — 고객이 쓴 말", () => {
+  it("목록은 본문을 첫 줄에, 제목은 사실 줄에 그린다", async () => {
     getInquiryRowsStrict.mockResolvedValue({
       items: [row({ inquiryId: "i9", status: "UNANSWERED", title: "세금계산서 발행 문의", snippet: "사업자등록증 첨부했습니다" })],
       totalCount: 1,
@@ -352,12 +364,24 @@ describe("제목·본문·채널·상태·날짜 — 한 행에서 네 단계로
       productId: null,
     });
     renderInbox("/inquiries");
-    const link = await screen.findByRole("link", { name: /세금계산서 발행 문의/ });
-    expect(within(link).getByText("세금계산서 발행 문의")).toBeInTheDocument();
+    const link = await screen.findByRole("link", { name: /사업자등록증 첨부했습니다/ });
+    // 두 칸 모두 행에 있다 — 제목은 사라지지 않고 자리를 옮겼다.
     expect(within(link).getByText("사업자등록증 첨부했습니다")).toBeInTheDocument();
-    // 채널과 상태도 같은 행에, 제목보다 조용하게.
+    expect(within(link).getByText("제목 「세금계산서 발행 문의」")).toBeInTheDocument();
     expect(within(link).getByText(/카페24 자사몰/)).toBeInTheDocument();
     expect(within(link).getByText("답변 필요")).toBeInTheDocument();
+  });
+
+  it("아무것도 더해 주지 않는 제목은 그리지 않는다 — 「문의 드립니다」", async () => {
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [row({ inquiryId: "i9", status: "UNANSWERED", title: "문의 드립니다", snippet: "교환은 언제까지 되나요" })],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    renderInbox("/inquiries");
+    const link = await screen.findByRole("link", { name: /교환은 언제까지 되나요/ });
+    expect(within(link).queryByText(/문의 드립니다/)).toBeNull();
   });
 
   it("제목이 없는 문의는 본문이 제목 자리를 대신하고, 본문을 두 번 그리지 않는다", async () => {
@@ -388,7 +412,7 @@ describe("제목·본문·채널·상태·날짜 — 한 행에서 네 단계로
     expect(screen.getAllByText("카페24 자사몰")).toHaveLength(1);
   });
 
-  it("제목과 본문이 둘 다 있으면 상세는 둘 다, 각각 한 번씩 그린다", async () => {
+  it("제목과 본문이 둘 다 있으면 pane은 본문을 제목으로 세우고 제목은 그 아래 한 번", async () => {
     getInquiryRowsStrict.mockResolvedValue({
       items: [row({ inquiryId: "i9", status: "UNANSWERED", title: "세금계산서 발행 문의", snippet: "사업자등록증 첨부했습니다" })],
       totalCount: 1,
@@ -398,8 +422,8 @@ describe("제목·본문·채널·상태·날짜 — 한 행에서 네 단계로
     renderInbox("/inquiries/i9");
     await screen.findByLabelText("선택한 항목");
     const pane = screen.getByLabelText("선택한 문의");
-    expect(within(pane).getAllByText("세금계산서 발행 문의")).toHaveLength(1);
-    expect(within(pane).getAllByText("사업자등록증 첨부했습니다")).toHaveLength(1);
+    expect(within(pane).getByRole("heading", { level: 2 })).toHaveTextContent("사업자등록증 첨부했습니다");
+    expect(within(pane).getAllByText(/제목 「세금계산서 발행 문의」/)).toHaveLength(1);
   });
 
   it("이미 답변된 문의에는 초안이 없는 이유가 「이미 답변됨」이다", async () => {
@@ -477,7 +501,7 @@ describe("master-detail (UI/UX v2 Phase 2) — the list and the chosen inquiry, 
       const pane = await screen.findByLabelText("선택한 문의");
       expect(pane).toBeInTheDocument();
       await waitFor(() => expect(getInquiryDetailStrict).toHaveBeenCalledWith("w1"));
-      const record = screen.getByLabelText("전체 문의");
+      const record = screen.getByLabelText("문의 목록");
       expect(within(record).getAllByRole("link")[0]).toHaveAttribute("aria-current", "true");
     } finally {
       restore();
@@ -487,7 +511,7 @@ describe("master-detail (UI/UX v2 Phase 2) — the list and the chosen inquiry, 
   it("on a narrow screen the chosen inquiry takes the column, with the way back to the list", async () => {
     renderInbox("/inquiries/i1");
     expect(await screen.findByRole("link", { name: "← 문의 목록" })).toHaveAttribute("href", "/inquiries");
-    expect(screen.queryByLabelText("전체 문의")).toBeNull();
+    expect(screen.queryByLabelText("문의 목록")).toBeNull();
   });
 });
 
@@ -508,3 +532,120 @@ function stubWide(matches: boolean): () => void {
     window.matchMedia = original;
   };
 }
+
+/**
+ * <b>문의 canonical — the decision workspace</b> (product-owner decision, 2026-10-03).
+ *
+ * <p>Four properties this redesign rests on, each of which was broken on purpose and observed failing
+ * before it was fenced:
+ *
+ * <ol>
+ *   <li>the one thing to press is at the pane floor, not inside the reading — a long draft used to
+ *       carry it below the fold;</li>
+ *   <li>what the seller must know before pressing is said right above it, and is said whether or not
+ *       SellerOps can register the answer itself: 중복 답변의 위험은 복사해서 손으로 등록할 때도 같다;</li>
+ *   <li>the screen does not advertise the machinery — 「AI가 준비한 답변」·「AI 작성」·「AI가 확인한 내용」은
+ *       기본 화면에서 사라지고, 작성자는 기록에 남는다;</li>
+ *   <li>and the irreversible press is still inside the block that restates what will be sent.</li>
+ * </ol>
+ */
+describe("문의 — the canonical decision workspace (2026-10-03)", () => {
+  const DRAFTED = {
+    workItemId: "w1",
+    inquiryId: "i1",
+    sellerAccountId: "s1",
+    channelId: "c1",
+    channelCode: "CAFE24",
+    channelNameKo: "카페24 자사몰",
+    isSecret: false,
+    phase: "PROPOSED",
+    status: "UNANSWERED",
+    informStatus: null,
+    title: "문의 드립니다",
+    details: "교환은 언제까지 신청해야 하나요?",
+    receivedAt: "2026-08-03T10:00:00Z",
+    proposal: null,
+    productId: null,
+    productName: null,
+    productBinding: null,
+    sourceSubtype: null,
+    answerStateProven: false,
+    answerStateNote: "이 채널의 문의 수집이 최신이 아니라, 이 문의에 이미 답변이 달렸는지 지금은 확인할 수 없습니다.",
+    draftEvidence: [
+      { kind: "ORG_POLICY", scopeLabel: "운영 정책", title: "교환·반품 기준", locator: null, sourceId: "s", chunkId: "c", snippet: "수령 후 7일 이내." },
+    ],
+    replyCapability: null,
+    orderContext: null,
+    delivery: null,
+    draft: {
+      version: 1,
+      answerStatus: 2,
+      title: "교환 신청 기한 안내",
+      comments: "수령 후 7일 이내, 개봉하지 않은 상품에 한해 교환이 가능합니다.",
+      contentFingerprint: "a".repeat(64),
+      fingerprintAlgorithm: "SHA-256",
+      createdAt: "2026-08-03T11:00:00Z",
+      authorKind: "MODEL",
+      modelVersion: "m/v1",
+      knowledgeState: "GROUNDED",
+      knowledgeNote: null,
+      answerBasis: null,
+      answerBasisNote: null,
+      answerBasisAction: null,
+    },
+  };
+
+  let restoreWide: () => void;
+  beforeEach(() => {
+    restoreWide = stubWide(true);
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", phase: "PROPOSED", title: "문의 드립니다", snippet: "교환은 언제까지 신청해야 하나요?" })],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    getInquiryQueueStrict.mockImplementation(queueOf([queued({ workItemId: "w1", inquiryId: "i1" })]));
+    getInquiryDetailStrict.mockResolvedValue(DRAFTED);
+  });
+  afterEach(() => restoreWide());
+
+  it("docks the one thing to press at the pane floor, and the body does not draw a second one", async () => {
+    renderInbox("/inquiries/i1");
+    const dock = await screen.findByTestId("pane-footer");
+    expect(within(dock).getByRole("button", { name: "초안 복사" })).toBeInTheDocument();
+    // Exactly one in the whole pane — the draft's own header control belongs to the callers that have
+    // no dock (확인할 일's pane), and two copies of one action is how a screen grows two behaviours.
+    expect(screen.getAllByRole("button", { name: /초안 복사/ })).toHaveLength(1);
+  });
+
+  it("says what is unproven immediately above the press — even where the send path is off", async () => {
+    // The capability read says executionEnabled:false, so copying is the action. The staleness note
+    // used to be drawn only when a SEND was offered, which left the seller pasting a reply by hand
+    // with no idea the channel might already carry one.
+    renderInbox("/inquiries/i1");
+    const dock = await screen.findByTestId("pane-footer");
+    expect(within(dock).getByText(/이미 답변이 달렸는지 지금은 확인할 수 없습니다/)).toBeInTheDocument();
+    expect(within(dock).getByText("고객에게 나가지 않습니다")).toBeInTheDocument();
+  });
+
+  it("does not advertise the machinery: 「AI」 is nowhere on the pane, and the author is in 기록", async () => {
+    const user = userEvent.setup();
+    renderInbox("/inquiries/i1");
+    const pane = await screen.findByLabelText("선택한 문의");
+    await within(pane).findByText("준비된 답변");
+    expect(within(pane).getByText("답변에 사용한 근거")).toBeInTheDocument();
+    // 기록은 `<details>`라 접혀 있어도 DOM에는 있다 — 그래서 묻는 것은 「있느냐」가 아니라 「보이느냐」다.
+    for (const node of within(pane).queryAllByText(/AI/)) expect(node).not.toBeVisible();
+    // 사라진 것이 아니라 자리를 옮겼다.
+    await user.click(within(pane).getByText(/^기록/));
+    expect(within(pane).getByText("AI 작성")).toBeVisible();
+  });
+
+  it("the question is the pane's own heading, and the boilerplate title is not", async () => {
+    renderInbox("/inquiries/i1");
+    const pane = await screen.findByLabelText("선택한 문의");
+    expect(within(pane).getByRole("heading", { level: 2 })).toHaveTextContent("교환은 언제까지 신청해야 하나요?");
+    // 「문의 드립니다」 adds nothing the body does not say, so it is not printed at all.
+    expect(within(pane).queryByText(/문의 드립니다/)).toBeNull();
+  });
+});
