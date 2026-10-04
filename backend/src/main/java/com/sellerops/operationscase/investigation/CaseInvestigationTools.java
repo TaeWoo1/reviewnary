@@ -2,7 +2,6 @@ package com.sellerops.operationscase.investigation;
 
 import com.sellerops.channel.Channel;
 import com.sellerops.channel.ChannelRepository;
-import com.sellerops.common.MarkupText;
 import com.sellerops.common.RedactedBody;
 import com.sellerops.common.VocPreviewSanitizer;
 import com.sellerops.inquiry.Inquiry;
@@ -346,7 +345,7 @@ public class CaseInvestigationTools {
             if (review.getProductId() == null) {
                 return KnowledgeAssessment.none();
             }
-            RedactedBody body = VocPreviewSanitizer.redactFullBody(MarkupText.toPlainText(review.getBody()));
+            RedactedBody body = VocPreviewSanitizer.redactFullBody(review.getBody());
             if (body.text() == null || body.text().isBlank()) {
                 return KnowledgeAssessment.none();
             }
@@ -457,8 +456,8 @@ public class CaseInvestigationTools {
         }
 
         private SubjectFacts inquiryFacts(Inquiry inquiry) {
-            RedactedBody body = VocPreviewSanitizer.redactFullBody(MarkupText.toPlainText(inquiry.getBody()));
-            RedactedBody title = VocPreviewSanitizer.redactFullBody(MarkupText.toPlainText(inquiry.getTitle()));
+            RedactedBody body = VocPreviewSanitizer.redactFullBody(inquiry.getBody());
+            RedactedBody title = VocPreviewSanitizer.redactFullBody(inquiry.getTitle());
             return new SubjectFacts(OperationsSubjectKind.INQUIRY, channelName(inquiry.getChannelId()),
                     inquiry.getReceivedAt() == null ? null : inquiry.getReceivedAt().atZone(KST).toLocalDate(),
                     null, inquiry.getStatus(), inquiry.getThreadRole(), cap(title.text(), 200), cap(body.text(), MAX_BODY),
@@ -467,7 +466,7 @@ public class CaseInvestigationTools {
         }
 
         private SubjectFacts reviewFacts(Review review) {
-            RedactedBody body = VocPreviewSanitizer.redactFullBody(MarkupText.toPlainText(review.getBody()));
+            RedactedBody body = VocPreviewSanitizer.redactFullBody(review.getBody());
             return new SubjectFacts(OperationsSubjectKind.REVIEW, channelName(review.getChannelId()),
                     review.getReceivedAt() == null ? null : review.getReceivedAt().atZone(KST).toLocalDate(),
                     review.getRating(), review.getReplyState() == null ? null : review.getReplyState().name(), null,

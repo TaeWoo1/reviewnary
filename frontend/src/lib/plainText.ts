@@ -1,6 +1,15 @@
 /**
  * Channel text, as a seller should read it.
  *
+ * <b>A defensive fallback as of 2026-10-05, not the boundary.</b> The backend's
+ * `VocPreviewSanitizer` now makes every VOC body plain BEFORE it redacts and before it cuts to 60
+ * characters, so what arrives here is already the sentence a person typed. This stays because it
+ * costs nothing on text that is already plain and because it is the only thing standing between a
+ * seller and a payload from a build that predates that change. It is NOT a place to fix a leak: a
+ * leak here means the backend let markup out, and that is where it gets fixed — this pass could not
+ * have repaired the one that prompted the change anyway, because `/<[^>]*>/g` does not match a tag
+ * whose closing `>` was already truncated away.
+ *
  * <b>Why this exists.</b> Cafe24's board carries the customer's message as HTML — the first inquiry
  * on this org's 문의 screen literally opens with {@code <meta charset="utf-8">}, and NAVER review
  * bodies arrive with {@code &ldquo;} where the customer typed a quotation mark. Both reached the

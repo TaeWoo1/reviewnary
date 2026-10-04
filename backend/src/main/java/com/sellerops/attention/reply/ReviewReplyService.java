@@ -20,7 +20,6 @@ import com.sellerops.review.draft.dto.GeneratedReviewDraftView;
 import com.sellerops.common.RedactedBody;
 import com.sellerops.common.ReviewBodyFingerprint;
 import com.sellerops.common.ReviewIdFingerprint;
-import com.sellerops.common.MarkupText;
 import com.sellerops.common.VocPreviewSanitizer;
 import com.sellerops.identity.ExecutableIdentity;
 import com.sellerops.identity.ExecutableIdentityResolver;
@@ -194,14 +193,14 @@ public class ReviewReplyService {
         if (composer == null) {
             throw ApiException.conflict("AI 초안 기능을 사용할 수 없습니다.");
         }
+        // Plain text AND redacted, in that order, from one call: the sanitizer strips the markup
+        // itself now (2026-10-05). Channels hand reviews over wrapped in it — measured on this
+        // deployment, a NAVER row arrives as «<p class="word">…</p>» — and every downstream reader is
+        // worse off for the tags: the retrieval counts them as content words, the model reads them as
+        // part of what the customer wrote, and a knowledge request that quotes them back is
+        // unreadable to the seller.
         RedactedBody body = VocPreviewSanitizer.redactFullBody(review.getBody());
-        // Plain text, the same way the inquiry composer takes its body. Channels hand reviews over
-        // wrapped in markup — measured on this deployment, a NAVER row arrives as
-        // «<p class="word">…</p>» — and every downstream reader of it is worse off for the tags: the
-        // retrieval counts them as content words, the model reads them as part of what the customer
-        // wrote, and a knowledge request that quotes them back is unreadable to the seller.
-        return composer.compose(orgId, review, MarkupText.toPlainText(body.text()),
-                ACTOR_PREFIX + actorUserId);
+        return composer.compose(orgId, review, body.text(), ACTOR_PREFIX + actorUserId);
     }
 
     /**

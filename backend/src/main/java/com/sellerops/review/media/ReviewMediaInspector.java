@@ -1,7 +1,6 @@
 package com.sellerops.review.media;
 
 import com.sellerops.agent.llm.AgentLlmTransport;
-import com.sellerops.common.MarkupText;
 import com.sellerops.common.VocPreviewSanitizer;
 import com.sellerops.product.detail.image.DetailImageFetcher;
 import com.sellerops.review.Review;
@@ -76,7 +75,7 @@ public class ReviewMediaInspector {
         if (review == null) {
             return new Inspection(0, 0, already, true);
         }
-        String text = VocPreviewSanitizer.redactFullBody(MarkupText.toPlainText(review.getBody())).text();
+        String text = VocPreviewSanitizer.redactFullBody(review.getBody()).text();
         int inspected = 0;
         int failed = 0;
         List<ReviewMedia> pending = new ArrayList<>();

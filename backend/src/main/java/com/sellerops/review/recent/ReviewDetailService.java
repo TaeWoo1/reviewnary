@@ -3,7 +3,6 @@ package com.sellerops.review.recent;
 import com.sellerops.channel.Channel;
 import com.sellerops.channel.ChannelRepository;
 import com.sellerops.common.ApiException;
-import com.sellerops.common.MarkupText;
 import com.sellerops.common.RedactedBody;
 import com.sellerops.common.VocPreviewSanitizer;
 import com.sellerops.identity.ExecutableIdentity;
@@ -80,7 +79,7 @@ public class ReviewDetailService {
                 : products.findAllByOrgIdAndIdIn(orgId, List.of(review.getProductId())).stream().findFirst().orElse(null);
         // The whole sentence, with volatile PII-shaped spans tokenized — the seller is reading what a
         // customer wrote, not recognising a row (`RedactedBody` explains why this is not the 60-char preview).
-        RedactedBody body = VocPreviewSanitizer.redactFullBody(MarkupText.toPlainText(review.getBody()));
+        RedactedBody body = VocPreviewSanitizer.redactFullBody(review.getBody());
         ExecutableIdentity executable = identity.forReviews(orgId, List.of(review))
                 .getOrDefault(review.getId(), ExecutableIdentity.NONE);
         return new ReviewDetailView(

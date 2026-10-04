@@ -87,7 +87,25 @@ class MarkupTextTest {
     @Test
     @DisplayName("an unaudited entity is left exactly as written rather than guessed at")
     void unknownEntityUntouched() {
-        assertThat(MarkupText.toSingleLine("&hellip; 확인 부탁드립니다")).isEqualTo("&hellip; 확인 부탁드립니다");
+        // `hellip` used to stand here. It is audited now: counted across every stored review and
+        // inquiry body on 2026-10-05 it appears 5 times, so it is real text this deployment carries
+        // and leaving it encoded was the defect, not the rule. `trade` has never appeared, and the
+        // rule it demonstrates is unchanged — a name nobody measured is left alone.
+        assertThat(MarkupText.toSingleLine("&trade; 확인 부탁드립니다")).isEqualTo("&trade; 확인 부탁드립니다");
+    }
+
+    @Test
+    @DisplayName("the entities this deployment actually carries become their characters")
+    void measuredEntitiesDecode() {
+        assertThat(MarkupText.toSingleLine("&ldquo;두 개씩&rdquo; 이라고 &hellip; 적혀 &amp; 있었어요"))
+                .isEqualTo("\u201C두 개씩\u201D 이라고 \u2026 적혀 & 있었어요");
+    }
+
+    @Test
+    @DisplayName("the scan bound is a parameter — the body a seller reads in full is not cut")
+    void scanBoundIsOverridable() {
+        String huge = "가".repeat(MarkupText.SCAN_LIMIT + 300);
+        assertThat(MarkupText.toPlainText(huge, Integer.MAX_VALUE)).hasSize(MarkupText.SCAN_LIMIT + 300);
     }
 
     @Test
