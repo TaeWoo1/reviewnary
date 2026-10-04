@@ -32,6 +32,13 @@ import java.util.regex.Pattern;
  * are sixty characters a person wrote, and it means the screen, the retrieval query, the model
  * payload and the draft all read the same letters.
  *
+ * <p><b>The channel's own sentence goes at the same boundary, right after.</b>
+ * {@link ChannelBoilerplate} removes the line an importer stamped onto the end of a row — on this
+ * deployment, Cafe24's {@code (… 에 등록된 네이버 페이 구매평)}. It is a separate class because it is a
+ * separate kind of thing: markup is a transport artefact every channel produces, that is one shop's
+ * wording. Both run here so that the screen, the retrieval query, the model payload and the draft
+ * read the same sentence rather than four cleanings of it.
+ *
  * <p><b>Stripping markup is not redacting.</b> {@code SafePreviewResult.status} and
  * {@code RedactedBody.redacted()} are both computed against the PLAIN text, so a body that merely
  * carried tags still reports SAFE / not-redacted. Only {@link #redact} can flip them.
@@ -181,8 +188,9 @@ public final class VocPreviewSanitizer {
         if (raw == null || raw.isBlank()) {
             return SafePreviewResult.suppressed();
         }
-        // Markup first — see the class note. A body that was ONLY markup has nothing to preview.
-        String plain = MarkupText.toPlainText(raw);
+        // Markup first, then the channel's own trailing line — see the class note. A body that was
+        // ONLY markup has nothing to preview.
+        String plain = ChannelBoilerplate.strip(MarkupText.toPlainText(raw));
         if (plain.isBlank()) {
             return SafePreviewResult.suppressed();
         }
@@ -223,8 +231,8 @@ public final class VocPreviewSanitizer {
         //
         // Then markup, unbounded: this is the body the seller reads in order to answer it, and
         // SCAN_LIMIT is a throughput bound for lists — MarkupText#toPlainText(String, int) says why.
-        String plain = MarkupText.toPlainText(
-                raw.replace("\r\n", "\n").replace("\r", "\n"), Integer.MAX_VALUE);
+        String plain = ChannelBoilerplate.strip(MarkupText.toPlainText(
+                raw.replace("\r\n", "\n").replace("\r", "\n"), Integer.MAX_VALUE));
         if (plain.isBlank()) {
             return RedactedBody.empty();
         }
