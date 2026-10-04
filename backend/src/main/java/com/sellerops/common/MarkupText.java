@@ -20,6 +20,15 @@ import java.util.regex.Pattern;
  * matters as much as the screen: a question wrapped in {@code <table>} attributes is a question the
  * model answers badly.
  *
+ * <p><b>Every VOC body reaches this through {@link VocPreviewSanitizer} (2026-10-05).</b> Both of
+ * that class's entry points call {@link #toPlainText} as their first step, so no caller has to
+ * remember to. They used to: of the fourteen places that sanitized a VOC body, seven wrapped it here
+ * first and seven did not, and the seven that did not are exactly where markup reached the screen —
+ * {@code /api/reviews/record} ended a Cafe24 row on {@code <span style='color:}, because
+ * {@code sanitize} truncates to 60 characters LAST, and sixty characters of an HTML body is sixty
+ * characters of attributes. Call it directly only for text that is NOT going through the sanitizer:
+ * a retrieval query, a draft payload, a knowledge import.
+ *
  * <p><b>Not a sanitizer, and not a renderer.</b> It produces plain text that is then escaped by
  * whatever renders it (React escapes by construction; nothing here is ever set as HTML). Entity
  * decoding runs AFTER tag removal, so a body containing {@code &lt;script&gt;} becomes the literal
@@ -67,10 +76,23 @@ public final class MarkupText {
      */
     private static final Pattern DOCUMENT_METADATA = Pattern.compile("(?i)<\\s*/?\\s*meta\\b[^>]*>");
 
-    /** The named entities a Korean commerce board actually emits. Unknown names are left alone. */
-    private static final Map<String, String> NAMED = Map.of(
-            "nbsp", " ", "amp", "&", "lt", "<", "gt", ">",
-            "quot", "\"", "apos", "'", "#39", "'", "#34", "\"");
+    /**
+     * The named entities a Korean commerce board actually emits. Unknown names are left alone.
+     *
+     * <p><b>Measured, not guessed.</b> Counted across every stored review and inquiry body/title in
+     * this deployment on 2026-10-05: {@code gt} 766, {@code nbsp} 165, {@code quot} 10, {@code lt} 6,
+     * {@code hellip} 5, {@code amp} 2, {@code ldquo} 1, {@code rdquo} 1, and no numeric entity at
+     * all. The last three were missing while this list was only reached by half the callers and the
+     * frontend's {@code lib/plainText.ts} decoded them on the way to the screen — so a seller saw
+     * {@code “패키지:} and the model, the retrieval query and the draft all read {@code &ldquo;패키지:}.
+     * {@code apos}/{@code #39}/{@code #34} predate the measurement and stay. Names the frontend lists
+     * but this deployment has never carried ({@code lsquo}, {@code rsquo}, {@code middot},
+     * {@code ndash}, {@code mdash}) are NOT added here: this list grows on observation.
+     */
+    private static final Map<String, String> NAMED = Map.ofEntries(
+            Map.entry("nbsp", " "), Map.entry("amp", "&"), Map.entry("lt", "<"), Map.entry("gt", ">"),
+            Map.entry("quot", "\""), Map.entry("apos", "'"), Map.entry("#39", "'"), Map.entry("#34", "\""),
+            Map.entry("hellip", "…"), Map.entry("ldquo", "\u201C"), Map.entry("rdquo", "\u201D"));
 
     private static final Pattern ENTITY = Pattern.compile("&(#x?[0-9a-fA-F]{1,6}|[a-zA-Z]{2,8});");
 
@@ -84,12 +106,30 @@ public final class MarkupText {
     /**
      * The plain text of {@code body}, or {@code ""} for null. Line structure survives (block tags
      * become newlines); every other tag disappears; entities become their characters.
+     *
+     * <p>Bounded by {@link #SCAN_LIMIT}, which is what a preview and a retrieval query want. The
+     * surface that must show the WHOLE body uses {@link #toPlainText(String, int)}.
      */
     public static String toPlainText(String body) {
+        return toPlainText(body, SCAN_LIMIT);
+    }
+
+    /**
+     * The same, examining at most {@code scanLimit} characters.
+     *
+     * <p><b>Why the bound is a parameter and not a constant.</b> {@link #SCAN_LIMIT} exists for
+     * throughput — three regex passes over a 30,000-character board post, 500 rows at a time, is what
+     * made a list take seconds. {@link VocPreviewSanitizer#redactFullBody} has the opposite shape:
+     * one body, which the seller is about to read in full in order to answer it. Cutting that at 4000
+     * characters to buy throughput nobody needs would silently truncate the complaint, and
+     * {@code redactFullBody}'s whole contract is that it does not truncate. So it passes
+     * {@link Integer#MAX_VALUE} and the preview path keeps the bound.
+     */
+    public static String toPlainText(String body, int scanLimit) {
         if (body == null || body.isEmpty()) {
             return "";
         }
-        String scanned = body.length() > SCAN_LIMIT ? body.substring(0, SCAN_LIMIT) : body;
+        String scanned = body.length() > scanLimit ? body.substring(0, scanLimit) : body;
         String broken = LINE_BREAKING.matcher(scanned).replaceAll("\n");
         String stripped = TAG.matcher(broken).replaceAll(" ");
         String decoded = decodeEntities(stripped);

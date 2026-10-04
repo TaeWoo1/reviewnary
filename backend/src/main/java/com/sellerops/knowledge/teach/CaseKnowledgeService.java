@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sellerops.channel.Channel;
 import com.sellerops.channel.ChannelRepository;
 import com.sellerops.common.ApiException;
-import com.sellerops.common.MarkupText;
 import com.sellerops.common.VocPreviewSanitizer;
 import com.sellerops.inquiry.Inquiry;
 import com.sellerops.inquiry.InquiryRepository;
@@ -424,8 +423,8 @@ public class CaseKnowledgeService {
             if (i == null) {
                 return new Subject(null, null, null, null);
             }
-            return new Subject(cap(VocPreviewSanitizer.redactFullBody(MarkupText.toPlainText(i.getTitle())).text()),
-                    cap(VocPreviewSanitizer.redactFullBody(MarkupText.toPlainText(i.getBody())).text()), null,
+            return new Subject(cap(VocPreviewSanitizer.redactFullBody(i.getTitle()).text()),
+                    cap(VocPreviewSanitizer.redactFullBody(i.getBody()).text()), null,
                     i.getReceivedAt() == null ? null : i.getReceivedAt().atZone(KST).toLocalDate());
         }
         if (c.getSubjectKind() == OperationsSubjectKind.REVIEW) {
@@ -433,7 +432,7 @@ public class CaseKnowledgeService {
             if (r == null) {
                 return new Subject(null, null, null, null);
             }
-            return new Subject(null, cap(VocPreviewSanitizer.redactFullBody(MarkupText.toPlainText(r.getBody())).text()),
+            return new Subject(null, cap(VocPreviewSanitizer.redactFullBody(r.getBody()).text()),
                     r.getRating(), r.getReceivedAt() == null ? null : r.getReceivedAt().atZone(KST).toLocalDate());
         }
         return new Subject(null, null, null, null);

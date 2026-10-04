@@ -2,7 +2,6 @@ package com.sellerops.knowledge.spine.adapter;
 
 import com.sellerops.attention.triage.ReviewTriage;
 import com.sellerops.attention.triage.TriageDisposition;
-import com.sellerops.common.MarkupText;
 import com.sellerops.common.VocPreviewSanitizer;
 import com.sellerops.knowledge.KnowledgeText;
 import com.sellerops.knowledge.spine.KnowledgeAuthority;
@@ -103,7 +102,7 @@ public class SellerDecisionAdapter implements KnowledgeSourceAdapter {
     }
 
     private static String searchable(Review review, String text) {
-        String body = VocPreviewSanitizer.redactFullBody(MarkupText.toPlainText(review.getBody())).text();
+        String body = VocPreviewSanitizer.redactFullBody(review.getBody()).text();
         return KnowledgeText.normalize(body == null ? "" : body) + KnowledgeText.normalize(text);
     }
 

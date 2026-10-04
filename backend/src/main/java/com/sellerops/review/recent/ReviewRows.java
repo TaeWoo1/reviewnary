@@ -1,7 +1,6 @@
 package com.sellerops.review.recent;
 
 import com.sellerops.channel.Channel;
-import com.sellerops.common.MarkupText;
 import com.sellerops.common.VocPreviewSanitizer;
 import com.sellerops.identity.ExecutableIdentity;
 import com.sellerops.review.Review;
@@ -32,7 +31,7 @@ public final class ReviewRows {
                                            String productName, ExecutableIdentity executableIdentity) {
         // A rating-only review has no sentence to preview; the sanitizer's text would be blank.
         String preview = ReviewTriageRules.isTextless(r.getBody())
-                ? null : VocPreviewSanitizer.sanitize(MarkupText.toPlainText(r.getBody())).text();
+                ? null : VocPreviewSanitizer.sanitize(r.getBody()).text();
         return new RecentReviewItemView(
                 r.getId(),
                 account == null ? null : account.getId(),

@@ -4,7 +4,6 @@ import com.sellerops.attention.reply.OperatorOutcome;
 import com.sellerops.attention.reply.ReviewReplyApproval;
 import com.sellerops.attention.reply.ReviewReplyApprovalState;
 import com.sellerops.attention.reply.ReviewReplyDraft;
-import com.sellerops.common.MarkupText;
 import com.sellerops.common.VocPreviewSanitizer;
 import com.sellerops.inquiry.draft.DraftAuthorKind;
 import com.sellerops.knowledge.KnowledgeText;
@@ -99,7 +98,7 @@ public class ReviewReplyAdapter implements KnowledgeSourceAdapter {
                 continue;
             }
             UUID bound = review.getProductId();
-            String question = VocPreviewSanitizer.redactFullBody(MarkupText.toPlainText(review.getBody())).text();
+            String question = VocPreviewSanitizer.redactFullBody(review.getBody()).text();
             out.add(new Indexed(new KnowledgeEntry(
                     SpineSourceType.REVIEW_REPLY + ":" + review.getId(),
                     SpineSourceType.REVIEW_REPLY,
@@ -126,7 +125,7 @@ public class ReviewReplyAdapter implements KnowledgeSourceAdapter {
         }
         boolean submitted = reported.contains(review.getId() + ":" + draft.getVersion());
         UUID productId = review.getProductId();
-        String question = VocPreviewSanitizer.redactFullBody(MarkupText.toPlainText(review.getBody())).text();
+        String question = VocPreviewSanitizer.redactFullBody(review.getBody()).text();
         return new Indexed(new KnowledgeEntry(
                 SpineSourceType.REVIEW_REPLY + ":" + approval.getId(),
                 SpineSourceType.REVIEW_REPLY,

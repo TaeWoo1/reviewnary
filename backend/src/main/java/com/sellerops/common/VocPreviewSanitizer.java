@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 
 /**
  * Deterministic, read-time redactor for raw VOC text (a review/inquiry title or body).
- * Channel-generic and fail-closed: it takes plain text only (no channel logic) and, when in
+ * Channel-generic and fail-closed: it MAKES the text plain itself (no channel logic) and, when in
  * doubt, redacts rather than emit risky content.
  *
  * <p>Conservative by design and <b>not</b> a guarantee of perfect PII removal. It
@@ -15,6 +15,26 @@ import java.util.regex.Pattern;
  * card / bank-like numbers, long numeric IDs, messenger handles, token/secret-like
  * blobs, file paths, and a narrow Korean-address heuristic. Each match becomes a
  * fixed {@code [...]} token. Pure: no DB, no clock, no logging of the input.
+ *
+ * <p><b>The markup boundary is here, and it is first (2026-10-05).</b> Both entry points begin with
+ * {@link MarkupText#toPlainText}, so a caller cannot forget it. That used to be the caller's job and
+ * half of them did not do it: seven of the fourteen sanitize sites wrapped the body first, seven did
+ * not, and the seven that did not are exactly the surfaces where markup reached a seller —
+ * {@code ChannelReviewService} ({@code /api/reviews/record}), {@code ReviewReplyService}'s
+ * {@code redactedBody}, the two attention sources, both home services, and the issue-evidence quote.
+ *
+ * <p><b>Order is the whole fix.</b> {@link #truncate} runs LAST, so on a body still carrying tags the
+ * 60-character preview spends its sixty characters on attributes and ends mid-tag — measured on this
+ * deployment, a Cafe24 row arrived as
+ * {@code 큰 컵이 안들어가 아쉬워요, 둘레가 넓은게 따로 있나요? <span style='color:}. Nothing downstream could
+ * repair that: the closing {@code >} had already been thrown away, and the frontend's defensive
+ * {@code lib/plainText.ts} matches {@code <[^>]*>} only. Plain text first means the sixty characters
+ * are sixty characters a person wrote, and it means the screen, the retrieval query, the model
+ * payload and the draft all read the same letters.
+ *
+ * <p><b>Stripping markup is not redacting.</b> {@code SafePreviewResult.status} and
+ * {@code RedactedBody.redacted()} are both computed against the PLAIN text, so a body that merely
+ * carried tags still reports SAFE / not-redacted. Only {@link #redact} can flip them.
  *
  * <p><b>Two entry points over one rule set</b>, differing only in what they do after
  * redacting:
@@ -161,7 +181,12 @@ public final class VocPreviewSanitizer {
         if (raw == null || raw.isBlank()) {
             return SafePreviewResult.suppressed();
         }
-        String normalized = normalizeForRedaction(raw, false);
+        // Markup first — see the class note. A body that was ONLY markup has nothing to preview.
+        String plain = MarkupText.toPlainText(raw);
+        if (plain.isBlank()) {
+            return SafePreviewResult.suppressed();
+        }
+        String normalized = normalizeForRedaction(plain, false);
 
         String redacted = redact(normalized);
 
@@ -193,11 +218,19 @@ public final class VocPreviewSanitizer {
         if (raw == null || raw.isBlank()) {
             return RedactedBody.empty();
         }
+        // CR/CRLF fold into \n BEFORE the markup pass, so a Windows line ending stays a line ending
+        // rather than becoming the space MarkupText turns a lone \r into.
+        //
+        // Then markup, unbounded: this is the body the seller reads in order to answer it, and
+        // SCAN_LIMIT is a throughput bound for lists — MarkupText#toPlainText(String, int) says why.
+        String plain = MarkupText.toPlainText(
+                raw.replace("\r\n", "\n").replace("\r", "\n"), Integer.MAX_VALUE);
+        if (plain.isBlank()) {
+            return RedactedBody.empty();
+        }
         // Same normalization as the preview, differing only in which single character a
-        // whitespace run collapses to — see normalizeForRedaction. CR/CRLF fold into \n first
-        // so a Windows line ending is one run, not a run plus a stray \r.
-        String normalized = normalizeForRedaction(
-                raw.replace("\r\n", "\n").replace("\r", "\n"), true);
+        // whitespace run collapses to — see normalizeForRedaction.
+        String normalized = normalizeForRedaction(plain, true);
         if (normalized.isEmpty()) {
             return RedactedBody.empty();
         }
