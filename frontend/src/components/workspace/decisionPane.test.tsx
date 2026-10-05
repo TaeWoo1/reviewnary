@@ -72,12 +72,11 @@ describe("master-detail pane", () => {
    *
    * <p>The list is still closed and still asserted: a fourth caller is a decision, not an import.
    */
-  it("three screens override it — 리뷰 · 반복 문제 · 확인할 일, the panes a decision is made in", () => {
+  it("two screens override it — 반복 문제 and 확인할 일, the panes a decision is made in", () => {
     const callers = SRC.filter((f) => readFileSync(f, "utf8").includes('pane="decision"'));
     expect(callers.map((f) => f.replace(/\\/g, "/")).sort()).toEqual([
       "src/pages/app/CustomerMemory.tsx",
       "src/pages/app/OperationsCaseQueue.tsx",
-      "src/pages/app/ReviewRecord.tsx",
     ]);
   });
 

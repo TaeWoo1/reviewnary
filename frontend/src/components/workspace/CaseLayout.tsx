@@ -83,6 +83,7 @@ export function CaseLayout({
   subject,
   decision,
   decisionLabel,
+  rail = "decision",
   context,
   more,
   notice,
@@ -137,6 +138,17 @@ export function CaseLayout({
    * already decide — this moves two controls, it does not add one.
    */
   dock?: ReactNode;
+  /**
+   * <b>How wide the second column is, and therefore what it is for</b> (리뷰 canonical mockup,
+   * 2026-10-05 — Linear issue detail).
+   *
+   * <p>`"decision"` (360, the default) is a column the seller WORKS in: 확인할 일's case page puts its
+   * forms there. `"properties"` (240) is Linear's property rail — the two or three closed facts about
+   * this record, beside a reading column wide enough to be the only place anything happens. A page
+   * whose one object is in the flow does not need 360px of chrome beside it, and at 1600 that 120px is
+   * the difference between a 720px reading column and a 600px one.
+   */
+  rail?: "decision" | "properties";
   /** The pane's accessible name. */
   label?: string;
 }) {
@@ -252,7 +264,11 @@ export function CaseLayout({
           {/* Extra height goes to the last row, so a tall decision column never opens a gap under a short story. */}
           <div
             className={`grid gap-3 ${
-              storyEmpty ? "max-w-[560px]" : "lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_auto_1fr] lg:gap-x-6"
+              storyEmpty
+                ? "max-w-[560px]"
+                : rail === "properties"
+                  ? "lg:grid-cols-[minmax(0,1fr)_240px] lg:grid-rows-[auto_auto_1fr] lg:gap-x-12"
+                  : "lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_auto_1fr] lg:gap-x-6"
             }`}
           >
             {subject ? <div className="min-w-0 space-y-3 lg:col-start-1">{subject}</div> : null}
