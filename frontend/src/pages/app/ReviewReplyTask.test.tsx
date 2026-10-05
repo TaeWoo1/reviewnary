@@ -1381,6 +1381,33 @@ describe("리뷰 상세 — the one object and the one column (2026-10-06)", () 
     expect(draft.compareDocumentPosition(decided) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  /**
+   * <b>이 상자는 답변인가, 관리 패널인가</b> (Front suggested reply, 2026-10-06).
+   *
+   * <p>Front의 제안된 답장 안에 있는 것은 답장과 답장에 대한 동작뿐이다. 우리 상자 안에는 이 리뷰를 할 일
+   * 목록에서 빼는 길까지 들어 있었고, 그것은 답변에 대한 동작이 아니다 — 들어 있는 동안 상자는 「답변」이
+   * 아니라 「이 리뷰를 다루는 패널」로 읽힌다. 길은 지워지지 않고 판단·처리와 같은 영역으로 나왔다.
+   */
+  it("keeps only the reply and the reply's own actions inside the card", async () => {
+    getReviewWorkspace.mockResolvedValue(detail({ whyNow: WHY }));
+    getReviewReplyPrep.mockResolvedValue(prep());
+    const { container } = renderTask();
+    await screen.findByLabelText("답변 초안");
+
+    const page = container.querySelector('[data-case-variant="page"]')!;
+    const card = [...page.querySelectorAll("div")].find(
+      (e) => /\brounded-2xl\b/.test(e.className) && !e.closest("button,a,summary"),
+    )!;
+    // 답변과 그 동작은 안에 있다 (이 fixture는 승인 전이라 저장·승인이 그 동작이다).
+    expect(within(card as HTMLElement).getByLabelText("답변 초안")).toBeTruthy();
+    expect(within(card as HTMLElement).getByRole("button", { name: "초안 저장" })).toBeTruthy();
+    expect(within(card as HTMLElement).getByRole("button", { name: "승인" })).toBeTruthy();
+    // 할 일에서 빼는 길은 밖에 있다 — 사라지지는 않았다.
+    const setAside = screen.getByRole("button", { name: "작업에서 제외" });
+    expect(card.contains(setAside)).toBe(false);
+    expect(screen.getByRole("region", { name: "판매자의 결정" }).contains(setAside)).toBe(true);
+  });
+
   it("has one column and one surfaced object", async () => {
     getReviewWorkspace.mockResolvedValue(detail({ whyNow: WHY }));
     getReviewReplyPrep.mockResolvedValue(prep());

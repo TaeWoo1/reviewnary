@@ -565,7 +565,9 @@ export function VocItemReplyPrep({
   const Heading = `h${headingLevel}` as "h2" | "h3" | "h4";
 
   return (
-    <section aria-labelledby={headingId} className={`flex flex-col gap-3 ${unboxed ? "" : "rounded-xl bg-canvas p-3"}`}>
+    /* <b>간격 한 칸</b> (리뷰 canonical, 2026-10-06). 1366에서 이 상자가 첫 화면을 과하게 먹지 않도록
+       블록 사이를 12 → 8로 좁힌다. 글도 컨트롤도 그대로이고 여백만 한 단계다. */
+    <section aria-labelledby={headingId} className={`flex flex-col gap-2 ${unboxed ? "" : "rounded-xl bg-canvas p-3"}`}>
       <Heading id={headingId} className="text-sm font-semibold text-ink">
         답변 준비
       </Heading>
@@ -767,18 +769,8 @@ export function VocItemReplyPrep({
             be looking for it. The reason is the SERVER's — the same rule that decides whether the run
             may start — so the screen stops re-deriving it from `channelReplyState` and stops offering
             a control the mint would refuse. Absent reason ⇒ nothing rendered. */}
-        {guidedUnavailable != null ? (
-          <span
-            className="text-sm text-muted"
-            data-testid={
-              prep.guidedUnavailableReason === "CHANNEL_ALREADY_ANSWERED"
-                ? "channel-answered-notice"
-                : "guided-unavailable-notice"
-            }
-          >
-            {guidedUnavailable}
-          </span>
-        ) : null}
+        {/* 컨트롤 줄에 섞여 있던 긴 설명 둘은 아래 각주 묶음으로 내려갔다. 여기 남는 것은 눌렀을 때
+            무엇이 막혔는지를 말하는 짧은 상태들뿐이다. */}
         {capabilities.canApprove && dirty ? (
           <span className="text-sm text-muted">
             저장하지 않은 변경이 있습니다. 먼저 초안을 저장하세요.
@@ -789,10 +781,28 @@ export function VocItemReplyPrep({
             '대응 필요'로 되돌리면 복사할 수 있습니다.
           </span>
         ) : null}
-        {approved ? (
-          <span className="text-sm text-muted">승인된 초안은 수정할 수 없습니다. 고치려면 승인을 해제하세요.</span>
-        ) : null}
       </div>
+
+      {/* <b>사실은 그대로, 무게만 한 단계 아래로</b> (리뷰 canonical, 2026-10-06). 둘은 바로 위 두 컨트롤이
+          각각 왜 그렇게 생겼는지를 말하는 각주다 — 복사뿐인 이유, 그리고 본문이 문장으로 서 있는 이유.
+          컨트롤과 같은 크기로 줄줄이 서 있으면 설명이 두 번 반복되는 것처럼 읽힌다. 문장은 한 글자도
+          바뀌지 않았고, 하나도 빠지지 않았다. */}
+      {guidedUnavailable != null || approved ? (
+        <div className="flex flex-col gap-0.5 text-xs leading-relaxed text-muted">
+          {guidedUnavailable != null ? (
+            <p
+              data-testid={
+                prep.guidedUnavailableReason === "CHANNEL_ALREADY_ANSWERED"
+                  ? "channel-answered-notice"
+                  : "guided-unavailable-notice"
+              }
+            >
+              {guidedUnavailable}
+            </p>
+          ) : null}
+          {approved ? <p>승인된 초안은 수정할 수 없습니다. 고치려면 승인을 해제하세요.</p> : null}
+        </div>
+      ) : null}
 
       {/* The guided run in progress. The operator posts the reply in the seller center themselves;
           reviewnary only guides and records what they report. Two reports, both honest: 답변함 /
