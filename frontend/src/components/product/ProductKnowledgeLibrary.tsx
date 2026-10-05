@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { Btn } from "../ui/Btn";
 import { Empty } from "../ui/Empty";
+import { SectionHeader } from "../ui/SectionHeader";
+import { RecordRow, RecordRows, RowMain, RowMeta, RowPreview, RowTag, RowTitle } from "./record/RecordRow";
 import { api } from "../../lib/apiClient";
 import type {
   KnowledgeSourceType,
   KnowledgeSourceView,
   ProductVariantView,
 } from "../../lib/types";
-import { kstDate } from "../../lib/format";
+import { count, kstDate } from "../../lib/format";
 
 /**
  * 상품 지식 — what the SELLER wrote about this product.
@@ -36,102 +38,123 @@ const TYPE_LABEL: Record<KnowledgeSourceType, string> = {
   LINK: "참고 자료",
 };
 
-export function ProductKnowledgeLibrary({ productId }: { productId: string }) {
-  const [sources, setSources] = useState<KnowledgeSourceView[] | null>(null);
-  const [loadError, setLoadError] = useState(false);
+/**
+ * 상품 지식 섹션 — 제목·행·편집기까지 한 덩어리.
+ *
+ * <b>목록은 읽는 곳이 아니라 고르는 곳이다</b> (상품 상세 canonical, 2026-10-05). 전에는 세 건이 본문을
+ * 통째로 펼쳐 화면의 3분의 1을 썼다. 여기 적힌 것을 끝까지 읽는 자리는 편집기이고, 목록은 어떤 지식이
+ * 있는지와 그것을 AI가 인용할 수 있는지만 말한다.
+ *
+ * <b>읽기는 화면이 한다.</b> 수를 머리말과 상단 띠에 적으려면 화면이 그 수를 알아야 하는데, 라이브러리가
+ * 제 읽기를 쥐고 있으면 같은 목록을 두 번 읽지 않고는 셀 수 없었다.
+ */
+export function ProductKnowledgeLibrary({
+  productId,
+  sources,
+  failed,
+  onChanged,
+}: {
+  productId: string;
+  /** null은 아직 읽는 중이라는 뜻이다 — 빈 목록이 아니다. */
+  sources: KnowledgeSourceView[] | null;
+  failed: boolean;
+  onChanged: () => Promise<void>;
+}) {
   const [editing, setEditing] = useState<KnowledgeSourceView | "new" | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    setSources(null);
-    setLoadError(false);
-    void api
-      .listProductKnowledgeSources(productId)
-      .then((list) => active && setSources(list))
-      .catch(() => active && setLoadError(true));
-    return () => {
-      active = false;
-    };
-  }, [productId]);
-
   const reload = async () => {
-    const list = await api.listProductKnowledgeSources(productId);
-    setSources(list);
+    await onChanged();
     setEditing(null);
   };
 
-  if (loadError) {
-    return <p className="text-warn">상품 지식을 불러오지 못했습니다.</p>;
-  }
-
   return (
-    <div className="space-y-4">
-      {sources === null ? (
-        <p className="text-muted">불러오는 중…</p>
+    <div>
+      <SectionHeader
+        title={
+          <>
+            상품 지식{" "}
+            {sources ? (
+              <span className="font-semibold tabular-nums text-muted">{count(sources.length)}</span>
+            ) : null}
+          </>
+        }
+        action={
+          editing === null && sources && sources.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setEditing("new")}
+              className="rounded text-sm font-semibold text-brand-700 underline-offset-4 hover:text-brand-800 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+            >
+              지식 추가
+            </button>
+          ) : null
+        }
+      />
+
+      {failed ? (
+        <p className="mt-3 text-warn">상품 지식을 불러오지 못했습니다.</p>
+      ) : sources === null ? (
+        <p className="mt-3 text-muted">불러오는 중…</p>
       ) : sources.length === 0 && editing === null ? (
+        <div className="mt-3">
         <Empty
           title="아직 등록된 상품 지식이 없습니다"
           body="상품 설명·자주 묻는 질문·사용법·정책을 적어 두면, AI가 답변을 만들 때 이 내용을 근거로 사용합니다. 여기에 없는 내용은 지어내지 않습니다."
           action={<Btn onClick={() => setEditing("new")}>지식 추가</Btn>}
         />
+        </div>
       ) : (
-        <>
-          <ul className="divide-y divide-line/70">
-            {(sources ?? []).map((source) => (
-              <li key={source.id} className="py-4 first:pt-0">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="break-keep font-semibold text-ink">
-                      <span className="mr-2 rounded-full bg-canvas px-2 py-0.5 text-sm font-medium text-muted">
-                        {TYPE_LABEL[source.sourceType]}
-                      </span>
-                      {source.title}
-                    </p>
-                    <p className="mt-1 break-keep text-sm text-muted">{preview(source.body)}</p>
-                    <p className="mt-1 text-sm text-muted">
-                      {source.variantId ? `${source.variantName ?? "특정 규격"} 전용 · ` : ""}
-                      {source.authorName ? `${source.authorName} · ` : ""}
-                      {/* The zero is the fact; 「인용 단위」 is our word for a chunk and the count is
-                          not something a seller can act on (pilot QA 2026-09-07). */}
-                      {kstDate(source.updatedAt)}
-                      {source.chunks === 0 ? " · AI가 인용할 수 없습니다" : ""}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setEditing(source)}
-                    className="shrink-0 rounded-lg text-sm font-medium text-muted hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 focus-visible:ring-offset-2"
-                  >
-                    수정
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-          {editing === null ? (
-            <Btn variant="outline" size="sm" onClick={() => setEditing("new")}>
-              지식 추가
-            </Btn>
-          ) : null}
-        </>
+        <RecordRows>
+          {(sources ?? []).map((source) => (
+            <RecordRow key={source.id} onClick={() => setEditing(source)}>
+              <RowMain>
+                <RowTag>{TYPE_LABEL[source.sourceType]}</RowTag>
+                {echoesBody(source) ? null : <RowTitle>{source.title}</RowTitle>}
+                <RowPreview>{flatten(source.body)}</RowPreview>
+              </RowMain>
+              <RowMeta>
+                {source.variantId ? <span>{source.variantName ?? "특정 규격"} 전용</span> : null}
+                {source.authorName ? <span>{source.authorName}</span> : null}
+                <time>{kstDate(source.updatedAt)}</time>
+                {/* 0은 사실이다 — 저장은 됐지만 AI가 끌어 쓸 수 없는 지식이 있다는 것을,
+                    답변이 조용히 그것을 쓰지 않는 쪽이 아니라 여기서 알아야 한다. */}
+                {source.chunks === 0 ? (
+                  <span className="text-warn">AI가 인용할 수 없습니다</span>
+                ) : null}
+              </RowMeta>
+            </RecordRow>
+          ))}
+        </RecordRows>
       )}
 
       {editing !== null ? (
+        <div className="mt-4">
         <KnowledgeEditor
           productId={productId}
           source={editing === "new" ? null : editing}
           onDone={reload}
           onCancel={() => setEditing(null)}
         />
+        </div>
       ) : null}
     </div>
   );
 }
 
-/** First two lines, so the list stays a list. The document itself is one click away. */
-function preview(body: string): string {
-  const flat = body.replace(/\s+/g, " ").trim();
-  return flat.length > 140 ? `${flat.slice(0, 140)}…` : flat;
+/**
+ * 제목이 본문의 첫 문장을 그대로 베낀 경우 — 한 줄을 두 번 쓰지 않는다.
+ *
+ * 채널에서 들어온 상품 설명은 제목 자리에 본문 앞머리가 그대로 들어 있어, 둘을 나란히 두면 같은 문장이
+ * 두 번 잘린 채로 선다.
+ */
+function echoesBody(source: KnowledgeSourceView): boolean {
+  const head = source.title.trim().slice(0, 18);
+  return head.length > 0 && source.body.trim().startsWith(head);
+}
+
+/** 한 줄로 편 본문. 자르는 일은 행이 제 너비를 보고 한다. */
+function flatten(body: string): string {
+  return body.replace(/\s+/g, " ").trim();
 }
 
 /**

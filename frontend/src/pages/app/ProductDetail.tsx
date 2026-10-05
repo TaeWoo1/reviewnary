@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { PageHead } from "../../components/ui/PageHead";
 import { SectionHeader } from "../../components/ui/SectionHeader";
-import { DataTable, Td, Th } from "../../components/ui/DataTable";
 import { Empty } from "../../components/ui/Empty";
 import { BtnLink } from "../../components/ui/Btn";
 import { AgentLaunch } from "../../components/ui/AgentLaunch";
@@ -13,33 +12,55 @@ import {
   KnowledgeDocumentList,
 } from "../../components/knowledge/KnowledgeDocuments";
 import { Disclosure } from "../../components/ui/Disclosure";
+import {
+  RecordRow,
+  RecordRows,
+  RowMain,
+  RowMeta,
+  RowPreview,
+  RowState,
+  RowTag,
+  RowTitle,
+} from "../../components/product/record/RecordRow";
+import { RelationCounts, type RelationCount } from "../../components/product/record/RelationCounts";
+import { ProductRail } from "../../components/product/record/ProductRail";
+import {
+  useProductRecord,
+  type ProductEvidenceQuote,
+} from "../../components/product/record/useProductRecord";
 import { useApiData } from "../../lib/useApiData";
 import { api } from "../../lib/apiClient";
-import { count } from "../../lib/format";
+import { count, kstDate } from "../../lib/format";
 import type {
+  InquiryRowItem,
   KnowledgeCandidateView,
-  KnowledgeCoverageView,
   KnowledgeDocumentView,
+  KnowledgeSourceView,
   ProductKnowledgeView,
+  ProductReviewItem,
   ReviewIssueView,
 } from "../../lib/types";
 import { priceLabel, sellingStatusLabel } from "../../lib/productVocabulary";
 import { useAgentSurface } from "../../lib/agentPanel";
 
 /**
- * 상품 상세 — Product Intelligence.
+ * 상품 상세 — record page (상품 상세 canonical, 2026-10-05).
  *
- * <b>Six sections in a fixed order</b> (`docs/frontend_ux_audit_v1.md` §6, Demo Core Experience §7):
- * 핵심 정보 → 신호 → 채널 리스팅 → 반복 문제 → 상품 지식 → Agent. Each is a heading with a rule, not
- * another card, so the page has an outline instead of a stack.
+ * <b>이 화면은 dashboard가 아니라 하나의 레코드다.</b> 전에는 숫자 상자 셋이 화면에서 제일 큰 물건이고
+ * 그 숫자가 가리키는 문장은 한 줄도 없었다. 가격·채널·브랜드·분류는 1,700px 아래 표 안에 있었고,
+ * 상품 지식 세 건이 본문을 통째로 펼쳐 화면의 3분의 1을 썼다. 레코드를 열었는데 그 레코드가 무엇인지는
+ * 스크롤해야 알 수 있는 화면이었다.
  *
- * <b>One primary action.</b> The audit found screens scattered with equal-weight outline buttons; the
- * only CTA here is "지식 추가" inside the library, because that is the one thing a seller does on this
- * page that changes what the product can answer.
+ * <b>구조는 둘로 나뉜다</b> — 본문은 이 상품이 거느린 객체들의 목록(기다리는 문의 · 반복되는 문제 ·
+ * 근거 문장 · 최근 리뷰 · 상품 지식 · 개선 기회)이고, 320px 레일은 상품 자체의 속성이다. 목록은 한 행에
+ * 한 객체, 한 줄 미리보기까지. 레퍼런스는 Attio의 record page와 Linear의 issue detail이고, 레일을
+ * 오른쪽에 둔 것은 제목이 읽는 열 맨 위에 서는 이 제품의 문법 때문이다.
  *
- * <b>Coverage is stated, not implied.</b> An empty spec list under `UNAVAILABLE` says
- * "갖고 있지 않습니다" — never "이 상품에는 없습니다". That distinction is enforced in the backend, in
- * the Agent, and here.
+ * <b>레일은 단일값만 갖는다.</b> 리스팅이 둘 이상이거나 옵션이 하나라도 있으면 그 데이터는 1:N이므로
+ * 본문 섹션으로 올라간다 — 320px 안에서 두 채널의 가격은 서로를 가린다.
+ *
+ * <b>읽기는 전부 이미 있던 것이다.</b> 새 endpoint·새 지표·새 workflow 없음. 모든 숫자는 서버가 세어
+ * 준 것이고, 모든 문은 그 숫자를 센 술어와 같은 술어로 좁혀진 목록을 연다.
  */
 export function ProductDetail() {
   const { productId = "" } = useParams();
@@ -58,6 +79,10 @@ export function ProductDetail() {
       : null,
   );
 
+  const issues = data?.signals.issues ?? EMPTY_ISSUES;
+  const record = useProductRecord(productId, issues);
+  const library = useProductLibrary(productId);
+
   if (loading) {
     return <p className="text-muted">불러오는 중…</p>;
   }
@@ -72,356 +97,409 @@ export function ProductDetail() {
   }
 
   const volume = data.signals.volume;
+  const { waiting, reviews, quotes } = record;
+  // 1:N이면 레일을 떠나 본문으로 올라간다 — ProductRail이 같은 조건을 본다.
+  const promotedListings = data.listings.length > 1;
+  const promotedVariants = data.variants.length > 0;
+
+  const relations: RelationCount[] = [
+    { label: "리뷰", value: volume.reviews, to: `/reviews?productId=${productId}` },
+    { label: "문의", value: volume.inquiries, to: `/inquiries?productId=${productId}` },
+    {
+      label: "답변 대기",
+      value: volume.unansweredInquiries,
+      to: `/inquiries?productId=${productId}&status=UNANSWERED`,
+      emphasis: true,
+    },
+    { label: "반복 문제", value: issues.length },
+    { label: "문제 근거", value: volume.issueEvidence },
+    // 읽지 못한 수는 0이 아니다 — 읽힌 것만 센다.
+    ...(library.sources ? [{ label: "상품 지식", value: library.sources.length }] : []),
+    ...(library.documents ? [{ label: "자료", value: library.documents.length }] : []),
+  ];
+
   return (
-    <div className="space-y-8">
-      <PageHead
-        title={data.name ?? "이름을 확인하지 못한 상품"}
-        description={[data.sku ? `상품코드 ${data.sku}` : null]
-          .filter(Boolean)
-          .join(" · ")}
-        action={
-          <AgentLaunch
-            context={{ productId, surface: "product" }}
-            label="이 상품에 대해 물어보기"
+    <div className="space-y-4">
+      <div>
+        <Link
+          to="/products"
+          className="rounded text-xs text-muted hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+        >
+          ← 상품
+        </Link>
+        <div className="mt-1.5">
+          <PageHead
+            title={data.name ?? "이름을 확인하지 못한 상품"}
+            description={data.sku ? `상품코드 ${data.sku}` : undefined}
+            action={
+              <AgentLaunch
+                context={{ productId, surface: "product" }}
+                label="이 상품에 대해 물어보기"
+              />
+            }
           />
-        }
-      />
+        </div>
+      </div>
 
-      {/*
-        PRIMARY — what is happening to this product, and every one of these numbers is a door.
+      <RelationCounts items={relations} />
 
-        Each destination reads through the SAME predicate its figure was counted with: the 문의 pair
-        through `/inquiries?productId=` (org, this product, ACTIVE, REAL, and the status the label
-        names) and 리뷰 through `/reviews?productId=`, whose total is literally the count printed here.
-        A figure and the list it opens that disagree about which rows they mean is worse than no door
-        at all. Zero is not a door: there is nothing behind it, and a control that opens an empty list
-        is a broken promise.
+      <div className="flex flex-col items-start gap-10 lg:flex-row">
+        <div className="min-w-0 flex-1 space-y-7">
+          {/*
+            지금 사람을 기다리는 것 — 이 화면에서 유일하게 시간이 흐르고 있는 목록이라 맨 위에 선다.
+            숫자는 서버가 센 미답변 수이고, 행은 그 숫자를 센 것과 같은 술어로 읽은 첫 세 줄이다.
+          */}
+          {waiting && waiting.length > 0 ? (
+            <section aria-label="답변을 기다리는 문의">
+              <SectionHeader
+                title={<Titled title="답변을 기다리는 문의" n={volume.unansweredInquiries} />}
+                action={
+                  <SectionDoor to={`/inquiries?productId=${productId}`}>
+                    문의 {count(volume.inquiries)}건 모두 보기
+                  </SectionDoor>
+                }
+              />
+              <RecordRows>
+                {waiting.map((row) => (
+                  <WaitingRow key={row.inquiryId} row={row} />
+                ))}
+              </RecordRows>
+              {volume.unansweredInquiries > waiting.length ? (
+                <MoreLine to={`/inquiries?productId=${productId}&status=UNANSWERED`}>
+                  답변 대기 {count(volume.unansweredInquiries - waiting.length)}건 더 보기
+                </MoreLine>
+              ) : null}
+            </section>
+          ) : null}
 
-        문제 근거 used to stand here as a fourth tile. It was never an independent number — it is the
-        sum of the evidence counts of the issues listed further down — and it was the one figure with
-        nowhere to go. It now lives on that section's own heading, where each contributing row is a
-        door of its own.
-      */}
-      {/* Sized to their content, not to a third of the page. As `grid-cols-3` each of these three
-          numbers sat in a ~500px box holding a label and one figure against the left edge — three wide
-          empty surfaces above the section that is actually this screen's subject (반복되는 문제).
-          They are still doors and still the same three facts; only the box stopped being the loudest
-          thing on the page. */}
-      <section className="flex flex-wrap gap-3" aria-label="이 상품의 신호">
-        <Figure
-          label="리뷰"
-          value={volume.reviews}
-          to={volume.reviews > 0 ? `/reviews?productId=${productId}` : undefined}
-        />
-        <Figure
-          label="문의"
-          value={volume.inquiries}
-          to={volume.inquiries > 0 ? `/inquiries?productId=${productId}` : undefined}
-        />
-        <Figure
-          label="미답변 문의"
-          value={volume.unansweredInquiries}
-          emphasis
-          to={
-            volume.unansweredInquiries > 0
-              ? `/inquiries?productId=${productId}&status=UNANSWERED`
-              : undefined
-          }
-        />
-      </section>
+          {/*
+            반복되는 문제 — 추출기가 묶은 것이지 리뷰 수를 센 것이 아니다.
 
-      {data.signals.coverage.some((c) => c.coverage !== "COVERED") ? (
-        <p className="break-keep rounded-xl bg-warn/10 px-4 py-3 text-sm text-warn">
-          일부 신호는 이 상품에 연결되지 않아 위 숫자에 포함되지 않았을 수 있습니다.
-          {" "}
-          {data.signals.coverage
-            .filter((c) => c.coverage !== "COVERED")
-            .map((c) => `${SIGNAL_KO[c.signal] ?? c.signal} ${c.unlinked}건 미연결`)
-            .join(" · ")}
-        </p>
-      ) : null}
-
-      {/*
-        SUPPORTING — repeated problems, from the extractor, never from raw review counts.
-
-        <b>Every row is now a door.</b> The evidence behind a repeated problem already had a surface —
-        고객운영 메모리's issue detail, which shows why the issue was raised, the masked customer
-        sentences behind it and the lifecycle history — and this list simply never linked to it. A
-        seller reading 「접착 탈락 · 근거 19건」 could not reach one of the nineteen.
-
-        <b>And the list no longer stops at five without saying so.</b> It showed `slice(0, 5)` of
-        fifteen with nothing to indicate the other ten existed, which is the same defect as a figure
-        with nowhere to go: a number the screen knows and does not tell.
-      */}
-      <section className="space-y-3">
-        {/*
-          The scope is said, because the number CHANGES when you follow the row.
-
-          Every count here is this product's own (`ProductSignalsService.issuesFor` asks the evidence
-          table for this product and `ReviewIssueView.scopedTo` replaces the org-wide total with it), and
-          the issue memory the rows link to counts the same problem across every product — 16 here, 18
-          there, both correct. Two right numbers one click apart read as one wrong number unless the
-          narrower one says what it is narrower BY.
-        */}
-        <SectionHeader
-          title="반복되는 문제"
-          hint={`리뷰에서 같은 문제가 반복해 나타난 것 · 이 상품에서 나온 근거 ${count(volume.issueEvidence)}건`}
-        />
-        {data.signals.issues.length === 0 ? (
-          <p className="text-muted">이 상품에서 반복 문제로 잡힌 것이 없습니다.</p>
-        ) : (
-          <>
-            <ul className="divide-y divide-line/70">
-              {data.signals.issues.slice(0, ISSUES_SHOWN).map((issue) => (
-                <IssueRow key={issue.id} issue={issue} />
-              ))}
-            </ul>
-            {data.signals.issues.length > ISSUES_SHOWN ? (
-              <Disclosure
-                label={`문제 ${count(data.signals.issues.length - ISSUES_SHOWN)}건 더 보기`}
-                summaryClassName="-ml-2"
-              >
-                <ul className="divide-y divide-line/70">
-                  {data.signals.issues.slice(ISSUES_SHOWN).map((issue) => (
+            <p>숫자가 바뀌는 문이라 범위를 말한다: 여기 숫자는 이 상품의 것이고, 행이 여는 문제 화면은
+            같은 문제를 모든 상품에서 센다 (16건 ↔ 18건, 둘 다 맞다). 한 번의 클릭 사이에 놓인 두 개의
+            옳은 숫자는, 좁은 쪽이 무엇으로 좁혀졌는지 말하지 않으면 하나의 틀린 숫자로 읽힌다.
+          */}
+          <section aria-label="반복되는 문제">
+            <SectionHeader
+              title={<Titled title="반복되는 문제" n={issues.length} />}
+              action={
+                <span className="text-xs text-muted">
+                  이 상품에서 나온 근거 {count(volume.issueEvidence)}건
+                </span>
+              }
+            />
+            {issues.length === 0 ? (
+              <p className="mt-3 text-muted">이 상품에서 반복 문제로 잡힌 것이 없습니다.</p>
+            ) : (
+              <>
+                <RecordRows>
+                  {issues.slice(0, ISSUES_SHOWN).map((issue) => (
                     <IssueRow key={issue.id} issue={issue} />
                   ))}
-                </ul>
-              </Disclosure>
-            ) : null}
-          </>
-        )}
-      </section>
-
-      {/* Opportunity Engine v1: the repeated problems above, continued into what can be done about them. */}
-      <ProductOpportunities productId={productId} />
-
-      {/* The one place a seller writes rather than reads. */}
-      <section className="space-y-3">
-        <SectionHeader
-          title="상품 지식"
-          hint="판매자가 직접 적어 두는 설명·FAQ·사용법·정책. AI가 답변의 근거로 사용합니다."
-          action={<KnowledgeLink />}
-        />
-        <ProductKnowledgeLibrary productId={productId} />
-        <ProductKnowledgeGaps productId={productId} />
-      </section>
-
-      {/*
-        자료 — the material the seller already had for THIS product (Knowledge Setup & Inbox UX v1 §5).
-
-        The API has taken a product-scoped document since Knowledge Sources & Acquisition v1 and no
-        screen ever offered one, so a manual could only be filed company-wide — and the 자료 list on
-        the knowledge screen showed product documents it had no way to create. Uploading from here
-        means the product is already chosen: a seller holding a manual for this listing is never
-        asked which listing it is for.
-      */}
-      <section className="space-y-3">
-        <SectionHeader
-          title="자료"
-          hint="이 상품의 사용설명서·FAQ 같은 파일. 올리면 답변 근거로 씁니다."
-          action={<KnowledgeLink />}
-        />
-        <ProductDocuments productId={productId} />
-      </section>
-
-      {/*
-        REFERENCE — where it is sold.
-
-        It moved below the operational sections: it is the product's own particulars, and it sat
-        directly under the figure row, so the two facts a seller comes to this page for — what
-        customers are saying and what reviewnary can answer with — began 300px lower than the price of
-        a listing they already know.
-      */}
-      <section className="space-y-3">
-        <SectionHeader title="채널 리스팅" hint="이 상품이 각 채널에 어떻게 올라가 있는지" />
-        {data.listings.length === 0 ? (
-          <p className="text-muted">
-            채널 리스팅 정보를 갖고 있지 않습니다. (이 상품이 어디에도 올라가 있지 않다는 뜻은 아닙니다.)
-          </p>
-        ) : (
-          <DataTable
-            caption="채널별 리스팅 이름, 가격, 판매 상태"
-            head={
-              <>
-                <Th>채널</Th>
-                <Th>리스팅 이름</Th>
-                <Th numeric>가격</Th>
-                <Th>판매 상태</Th>
+                </RecordRows>
+                {issues.length > ISSUES_SHOWN ? (
+                  <Disclosure
+                    label={`문제 ${count(issues.length - ISSUES_SHOWN)}건 더 보기`}
+                    summaryClassName="-ml-2"
+                  >
+                    <RecordRows>
+                      {issues.slice(ISSUES_SHOWN).map((issue) => (
+                        <IssueRow key={issue.id} issue={issue} />
+                      ))}
+                    </RecordRows>
+                  </Disclosure>
+                ) : null}
               </>
-            }
-          >
-            {data.listings.map((listing, i) => (
-              <tr key={`${listing.channelCode}-${listing.channelProductId ?? i}`}>
-                <Td>{listing.channelNameKo ?? listing.channelCode}</Td>
-                <Td>
-                  {listing.productUrl ? (
-                    <a
-                      href={listing.productUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-lg text-ink underline decoration-line underline-offset-4 hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-                    >
-                      {listing.listingName ?? "이름 없음"}
-                    </a>
-                  ) : (
-                    (listing.listingName ?? "이름 없음")
-                  )}
-                </Td>
-                <Td numeric muted={listing.price == null}>
-                  {listing.price == null ? "—" : priceLabel(count(listing.price), listing.currency)}
-                </Td>
-                <Td muted>{sellingStatusLabel(listing.sellingStatus)}</Td>
-              </tr>
-            ))}
-          </DataTable>
-        )}
-      </section>
+            )}
+          </section>
 
-      {/* REFERENCE — what we hold about this product, and what we do not. */}
-      <section className="space-y-3">
-        <SectionHeader title="우리가 갖고 있는 정보" />
-        <ul className="flex flex-wrap gap-2">
-          {data.knowledgeCoverage.map((row) => (
-            <li key={row.facet}>
-              <CoverageChip row={row} />
-            </li>
-          ))}
-        </ul>
-        <p className="break-keep text-sm text-muted">
-          "갖고 있지 않음"은 reviewnary가 그 정보를 보유하고 있지 않다는 뜻이며, 상품에 그런 정보가
-          없다는 뜻이 아닙니다.
-        </p>
-      </section>
+          {/*
+            근거가 된 문장 — 위의 제목들이 무엇을 세었는지, 고객의 말로.
+
+            상위 문제 셋의 가장 최근 문장 하나씩. 각 줄은 그 문장을 쓴 리뷰로 간다 — 리뷰를 판단하고
+            답하는 화면은 이 제품에 하나뿐이다.
+          */}
+          {quotes && quotes.length > 0 ? (
+            <section aria-label="문제의 근거가 된 문장">
+              <SectionHeader
+                title="문제의 근거가 된 문장"
+                action={
+                  <span className="text-xs text-muted">
+                    고객이 쓴 {count(volume.issueEvidence)}건 가운데 {KO_COUNT[quotes.length] ?? quotes.length}
+                  </span>
+                }
+              />
+              <ul className="divide-y divide-line/70">
+                {quotes.map((quote) => (
+                  <QuoteRow key={`${quote.issueId}:${quote.reviewId}:${quote.unitOrdinal}`} quote={quote} />
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {/* 최근 리뷰 — 1,761이라는 수가 무엇으로 이루어져 있는지 세 줄로. */}
+          {reviews && reviews.length > 0 ? (
+            <section aria-label="최근 리뷰">
+              <SectionHeader
+                title="최근 리뷰"
+                action={
+                  <SectionDoor to={`/reviews?productId=${productId}`}>
+                    리뷰 {count(volume.reviews)}건 모두 보기
+                  </SectionDoor>
+                }
+              />
+              <RecordRows>
+                {reviews.map((review) => (
+                  <ReviewRow key={review.id} review={review} />
+                ))}
+              </RecordRows>
+            </section>
+          ) : null}
+
+          {/* 판매자가 읽는 곳이 아니라 쓰는 곳 — 이 화면에서 유일하게 내용이 늘어나는 섹션. */}
+          <section aria-label="상품 지식">
+            <ProductKnowledgeLibrary
+              productId={productId}
+              sources={library.sources}
+              failed={library.sourcesFailed}
+              onChanged={library.reloadSources}
+            />
+            <ProductKnowledgeGaps productId={productId} />
+            {library.documents && library.documents.length > 0 ? (
+              <div className="mt-3">
+                <KnowledgeDocumentList documents={library.documents} onChanged={library.reloadDocuments} />
+              </div>
+            ) : null}
+            <ProductDocumentsLine
+              documents={library.documents}
+              productId={productId}
+              onImported={library.reloadDocuments}
+            />
+          </section>
+
+          {/* Opportunity Engine v1: 위의 문제들이 무엇으로 이어지는가. */}
+          <ProductOpportunities productId={productId} />
+
+          {/*
+            1:N인 것은 여기로 올라온다 — 레일이 값 하나를 말할 수 없을 때.
+          */}
+          {promotedListings ? (
+            <section aria-label="채널 리스팅">
+              <SectionHeader
+                title={<Titled title="채널 리스팅" n={data.listings.length} />}
+                action={<span className="text-xs text-muted">채널마다 다른 이름·가격·상태</span>}
+              />
+              <RecordRows>
+                {data.listings.map((listing, i) => (
+                  <RecordRow key={`${listing.channelCode}-${listing.channelProductId ?? i}`}>
+                    <RowMain>
+                      <RowTag>{listing.channelNameKo ?? listing.channelCode}</RowTag>
+                      <RowPreview strong>{listing.listingName ?? "이름 없음"}</RowPreview>
+                    </RowMain>
+                    <RowMeta>
+                      <span className="font-semibold text-ink">
+                        {listing.price == null ? "—" : priceLabel(count(listing.price), listing.currency)}
+                      </span>
+                      <span>{sellingStatusLabel(listing.sellingStatus)}</span>
+                      <time>{listing.observedAt?.slice(0, 10)}</time>
+                    </RowMeta>
+                  </RecordRow>
+                ))}
+              </RecordRows>
+            </section>
+          ) : null}
+
+          {promotedVariants ? (
+            <section aria-label="옵션">
+              <SectionHeader title={<Titled title="옵션" n={data.variants.length} />} />
+              <RecordRows>
+                {data.variants.map((variant) => (
+                  <RecordRow key={variant.id}>
+                    <RowMain>
+                      <RowTitle>{variant.optionName ?? "이름 없음"}</RowTitle>
+                      {variant.sku ? <RowPreview>{variant.sku}</RowPreview> : null}
+                    </RowMain>
+                    <RowMeta>
+                      <span>
+                        {variant.price == null ? "—" : priceLabel(count(variant.price), data.listings[0]?.currency)}
+                      </span>
+                    </RowMeta>
+                  </RecordRow>
+                ))}
+              </RecordRows>
+            </section>
+          ) : null}
+        </div>
+
+        <aside className="w-full shrink-0 lg:w-[320px]">
+          <ProductRail data={data} />
+        </aside>
+      </div>
     </div>
   );
 }
 
-/** How many repeated problems stand open on the page; the rest are one disclosure away, counted. */
+/** 열어 둔 채 보이는 문제 수. 나머지는 접힌 채로, 수까지 말하고 있다. */
 const ISSUES_SHOWN = 5;
 
+const EMPTY_ISSUES: ReviewIssueView[] = [];
+
+/** 「셋」 — 세 줄짜리 표본을 숫자로 적으면 수량처럼 읽힌다. */
+const KO_COUNT: Record<number, string> = { 1: "하나", 2: "둘", 3: "셋" };
+
+/** 제목 옆의 수 — 제목만큼 크지 않고, 제목과 떨어져 있지도 않다. */
+function Titled({ title, n }: { title: string; n: number }) {
+  return (
+    <>
+      {title}{" "}
+      <span className="font-semibold tabular-nums text-muted">{count(n)}</span>
+    </>
+  );
+}
+
+/** 섹션이 좁혀 보여 준 목록 전체로 가는 길 — 섹션마다 하나뿐이다. */
+function SectionDoor({ to, children }: { to: string; children: React.ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className="rounded text-sm font-semibold text-brand-700 underline-offset-4 hover:text-brand-800 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+    >
+      {children} ›
+    </Link>
+  );
+}
+
+function MoreLine({ to, children }: { to: string; children: React.ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className="mt-2.5 inline-block rounded text-sm text-muted hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+    >
+      {children}
+    </Link>
+  );
+}
+
+/** 답변을 기다리는 문의 한 줄. 제목이 없는 문의는 본문이 그 자리를 가진다. */
+function WaitingRow({ row }: { row: InquiryRowItem }) {
+  return (
+    <RecordRow to={`/inquiries/${row.inquiryId}`}>
+      <RowMain>
+        <RowTag>{row.channelNameKo ?? row.channelCode ?? "채널 미상"}</RowTag>
+        {row.title ? <RowTitle>{row.title}</RowTitle> : null}
+        <RowPreview>{row.snippet}</RowPreview>
+      </RowMain>
+      <RowMeta>
+        <time>{kstDate(row.receivedAt)}</time>
+        <span aria-hidden="true" className="text-brand-700">›</span>
+      </RowMeta>
+    </RecordRow>
+  );
+}
+
 /**
- * One repeated problem — and the way to the evidence behind it.
+ * 반복되는 문제 한 줄 — 상태와 기간까지.
  *
- * The destination is the issue surface that already exists (고객운영 메모리): why it was raised, the
- * masked customer sentences recorded as evidence, and the lifecycle history. Nothing new detects,
- * ranks or explains an issue here; this row only stops the number from being a dead end.
+ * 전에는 제목과 숫자뿐이었다. 같은 「16건」이라도 사람이 이미 손을 댄 문제인지, 작년에 끝난 일인지는
+ * 행이 말하지 않으면 열어 봐야만 알 수 있었다.
  */
 function IssueRow({ issue }: { issue: ReviewIssueView }) {
   return (
-    <li>
-      <Link
-        to={`/memory/${issue.id}`}
-        className="flex flex-wrap items-center justify-between gap-2 rounded-lg py-3 transition hover:bg-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-      >
-        <span className="break-keep font-medium text-ink">{issue.title}</span>
-        <span className="text-sm tabular-nums text-muted">
-          이 상품에서 {count(issue.evidenceCount)}건
-          <span className="ml-1 text-brand-700" aria-hidden="true">›</span>
-        </span>
-      </Link>
+    <RecordRow to={`/memory/${issue.id}`}>
+      <RowMain>
+        <RowTitle>{issue.title}</RowTitle>
+        <RowState acting={issue.lifecycleState === "ACTING"}>{issue.lifecycleLabelKo}</RowState>
+      </RowMain>
+      <RowMeta>
+        <span className="font-semibold text-ink">이 상품에서 {count(issue.evidenceCount)}건</span>
+        <time>
+          {month(issue.firstEvidenceOn)}~{month(issue.lastEvidenceOn)}
+        </time>
+        <span aria-hidden="true" className="text-brand-700">›</span>
+      </RowMeta>
+    </RecordRow>
+  );
+}
+
+/** 2025-07-29 → 2025.07. 날짜까지 적으면 행의 오른쪽이 날짜 두 개로 가득 찬다. */
+function month(day: string | null): string {
+  return day ? day.slice(0, 7).replace("-", ".") : "—";
+}
+
+/** 고객이 쓴 문장 한 줄과, 그 문장을 쓴 리뷰로 가는 문. */
+function QuoteRow({ quote }: { quote: ProductEvidenceQuote }) {
+  return (
+    <li className="py-3">
+      <p className="break-keep leading-relaxed text-ink">“{quote.quote}”</p>
+      <div className="mt-1 flex flex-wrap items-center gap-x-2.5 text-xs tabular-nums text-muted">
+        <time>{quote.occurredOn}</time>
+        {quote.rating != null ? <span>{quote.rating}점</span> : null}
+        <span className="rounded-md bg-canvas px-[7px] py-0.5">{quote.issueTitle}</span>
+        <Link
+          to={`/reviews/reply/${quote.reviewId}`}
+          className="ml-auto shrink-0 rounded font-semibold text-brand-700 transition hover:text-brand-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+        >
+          이 리뷰 처리하기 ›
+        </Link>
+      </div>
     </li>
   );
 }
 
-const SIGNAL_KO: Record<string, string> = {
-  REVIEW: "리뷰",
-  INQUIRY: "문의",
-  REVIEW_ISSUE: "리뷰 문제",
-  ITEM_ANALYSIS: "문의 분석",
-  CUSTOMER_MEMORY: "고객 기록",
-};
-
-const FACET_KO: Record<string, string> = {
-  IDENTITY: "이름·코드",
-  LISTING: "채널 리스팅",
-  PRICE: "가격",
-  VARIANT: "옵션",
-  TAXONOMY: "브랜드·분류",
-  DESCRIPTION: "상세 설명",
-  SPEC: "규격",
-  SIGNALS: "신호",
-};
-
-const COVERAGE_KO: Record<string, string> = {
-  AVAILABLE: "있음",
-  PARTIAL: "일부",
-  UNAVAILABLE: "갖고 있지 않음",
-  STALE: "오래됨",
-};
-
-function CoverageChip({ row }: { row: KnowledgeCoverageView }) {
-  const tone =
-    row.coverage === "AVAILABLE"
-      ? "bg-good/10 text-good"
-      : row.coverage === "UNAVAILABLE"
-        ? "bg-canvas text-muted"
-        : "bg-warn/10 text-warn";
+/** 최근 리뷰 한 줄. 별점은 이 제품의 표기 그대로 「N점」이다. */
+function ReviewRow({ review }: { review: ProductReviewItem }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${tone}`}>
-      <span className="font-normal">{FACET_KO[row.facet] ?? row.facet}</span>
-      {COVERAGE_KO[row.coverage] ?? row.coverage}
-    </span>
+    <RecordRow>
+      <RowMain>
+        <span className="shrink-0 text-sm tabular-nums text-muted">
+          {review.rating == null ? "평점 없음" : `${review.rating}점`}
+        </span>
+        <RowPreview strong>{review.preview ?? "본문이 없는 리뷰"}</RowPreview>
+      </RowMain>
+      <RowMeta>
+        <span>{review.channelNameKo ?? review.channelCode}</span>
+        <time>{review.writtenOn}</time>
+      </RowMeta>
+    </RecordRow>
   );
 }
 
 /**
- * One of this product's numbers — and, when there is something behind it, the way in.
+ * 이 상품의 지식과 자료를 읽어 두는 곳 — 수를 띠에 적으려면 화면이 그 수를 알아야 한다.
  *
- * `to` is given only for a figure whose list exists and is scoped to this exact product. Without it
- * the tile is what it always was: a fact, not a control.
+ * 라이브러리가 제 읽기를 갖고 있던 때에는 같은 목록을 두 번 읽지 않고는 「상품 지식 3」을 적을 수 없었다.
+ * 읽기는 여기 한 번, 쓰고 나서 다시 읽는 것도 여기 한 번이다.
  */
-function Figure({
-  label,
-  value,
-  emphasis,
-  to,
-}: {
-  label: string;
-  value: number;
-  emphasis?: boolean;
-  to?: string;
-}) {
-  const shell = `block min-w-[9.5rem] rounded-xl border px-4 py-2.5 ${
-    emphasis ? "border-brand/30 bg-brand-50/40" : "border-line bg-surface"
-  }`;
-  const body = (
-    <>
-      <p className="text-sm font-medium text-muted">
-        {label}
-        {to ? <span className="ml-1 text-brand-700" aria-hidden="true">›</span> : null}
-      </p>
-      <p className="mt-0.5 text-2xl font-bold tabular-nums text-ink">{count(value)}</p>
-    </>
-  );
-  if (!to) return <div className={shell}>{body}</div>;
-  return (
-    <Link
-      to={to}
-      aria-label={`${label} ${count(value)}건 보기`}
-      className={`${shell} transition hover:border-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700`}
-    >
-      {body}
-    </Link>
-  );
-}
+function useProductLibrary(productId: string) {
+  const [sources, setSources] = useState<KnowledgeSourceView[] | null>(null);
+  const [sourcesFailed, setSourcesFailed] = useState(false);
+  const [documents, setDocuments] = useState<KnowledgeDocumentView[] | null>(null);
 
-/**
- * Where the knowledge written here lives when the seller looks at the company's whole library.
- *
- * <b>It says 회사 전체, and that wording is the point.</b> A product knowledge source and a product
- * document really are the same objects on 알고 있는 정보 — the library lists product-scoped rows
- * beside company ones — but that screen has no product filter, so a link promising 「이 상품의 자료」
- * would land on a page showing every product's. The link says where it goes.
- */
-function KnowledgeLink() {
-  return (
-    <Link
-      to="/knowledge"
-      className="rounded text-sm font-semibold text-brand-700 underline-offset-4 hover:text-brand-800 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-    >
-      회사 전체 지식에서 보기
-    </Link>
-  );
+  const reloadSources = useCallback(async () => {
+    try {
+      setSources(await api.listProductKnowledgeSources(productId));
+      setSourcesFailed(false);
+    } catch {
+      setSourcesFailed(true);
+    }
+  }, [productId]);
+
+  const reloadDocuments = useCallback(async () => {
+    setDocuments(await api.getKnowledgeDocuments(productId).catch(() => []));
+  }, [productId]);
+
+  useEffect(() => {
+    setSources(null);
+    setSourcesFailed(false);
+    void reloadSources();
+  }, [reloadSources]);
+
+  useEffect(() => {
+    setDocuments(null);
+    void reloadDocuments();
+  }, [reloadDocuments]);
+
+  return { sources, sourcesFailed, documents, reloadSources, reloadDocuments };
 }
 
 /**
@@ -455,7 +533,7 @@ function ProductKnowledgeGaps({ productId }: { productId: string }) {
 
   if (open === null || open.length === 0) return null;
   return (
-    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+    <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
       <span className="break-keep text-ink">
         이 상품에 대해 확인이 필요한 항목이 {count(open.length)}건 있습니다.
       </span>
@@ -470,31 +548,27 @@ function ProductKnowledgeGaps({ productId }: { productId: string }) {
 }
 
 /**
- * This product's uploaded files, and the control that adds one.
+ * 자료 — 이 상품에 대해 판매자가 이미 갖고 있던 파일.
  *
- * <p>Its own read (`?productId=`) rather than a filter over the company's whole list: a shop with
- * three hundred products would read three hundred products' documents to show this one's two.
+ * 올라온 파일이 있으면 그 목록이 위에 서고, 이 줄은 수와 올리는 길만 말한다. 섹션 하나를 따로 세우던
+ * 자리였는데, 0건인 섹션 제목은 화면에서 제일 조용해야 할 것이 제일 큰 자리를 차지하는 일이었다.
  */
-function ProductDocuments({ productId }: { productId: string }) {
-  const [documents, setDocuments] = useState<KnowledgeDocumentView[] | null>(null);
-
-  const load = useCallback(async () => {
-    setDocuments(await api.getKnowledgeDocuments(productId).catch(() => []));
-  }, [productId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
+function ProductDocumentsLine({
+  documents,
+  productId,
+  onImported,
+}: {
+  documents: KnowledgeDocumentView[] | null;
+  productId: string;
+  onImported: () => Promise<void>;
+}) {
+  if (documents === null) return null;
   return (
-    <>
-      {documents === null ? (
-        <p className="text-sm text-muted">불러오는 중…</p>
-      ) : (
-        <KnowledgeDocumentList documents={documents} onChanged={load} />
-      )}
-      <KnowledgeDocumentAdd scope="PRODUCT" productId={productId} onImported={load} />
-    </>
+    <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+      <span className="break-keep">
+        자료 {count(documents.length)}건 — 사용설명서·FAQ 같은 파일을 올리면 답변 근거로 씁니다.
+      </span>
+      <KnowledgeDocumentAdd scope="PRODUCT" productId={productId} onImported={onImported} />
+    </div>
   );
 }
-
