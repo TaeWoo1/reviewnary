@@ -28,6 +28,7 @@ import { ReviewReplyTask, ReviewReplyTaskLegacyEntry } from "./pages/app/ReviewR
 import { CustomerInbox } from "./pages/app/CustomerInbox";
 import { InboxItemRedirect } from "./pages/app/InboxItemRedirect";
 import { CustomerMemory } from "./pages/app/CustomerMemory";
+import { RepeatedIssue } from "./pages/app/RepeatedIssue";
 import { ReportsV2 } from "./pages/app/ReportsV2";
 import { ConnectHelper } from "./pages/app/ConnectHelper";
 import { ConnectHub } from "./pages/app/ConnectHub";
@@ -150,7 +151,7 @@ export function App() {
         {/* Kept as routes, out of the primary nav (reached from 홈 and 설정) until the home unit
             decides their place. */}
         <Route path="/memory" element={<CustomerMemory />} />
-        <Route path="/memory/:issueId" element={<CustomerMemory />} />
+        <Route path="/memory/:issueId" element={<RepeatedIssue />} />
         <Route path="/reports" element={<ReportsV2 />} />
 
         {/* 연결·설정 — everything about getting data in and keeping it flowing */}

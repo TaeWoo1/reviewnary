@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /**
  * <b>Master-detail — the one layout the decision screens share</b> (UI/UX v2 Phase 1).
@@ -106,6 +106,7 @@ export function MasterDetail({
   paneFooter,
   pane = "default",
   layout = "list",
+  scrollKey,
 }: {
   /** The page head, the actionable summary and the list — everything in the middle column. */
   list: ReactNode;
@@ -154,8 +155,44 @@ export function MasterDetail({
   pane?: PaneKind;
   /** {@link LayoutKind}. Defaults to the reading every screen shipped with. */
   layout?: LayoutKind;
+  /**
+   * Remember how far this list is scrolled, under this key, for the length of the tab.
+   *
+   * <p>For a list whose rows LEAVE for another page: coming back from an item re-mounts the list at the
+   * top, which on a seventeen-row list is the third row the seller was reading disappearing. The browser
+   * cannot restore it on its own — the column that scrolls is this one, not the document.
+   *
+   * <p>Opt-in and off by default: a screen whose rows open a pane beside the list never unmounts it and
+   * has nothing to restore, and a remembered position that nothing wrote would be a position nobody
+   * meant. {@code sessionStorage}, so it dies with the tab rather than greeting the seller tomorrow at
+   * yesterday's row.
+   */
+  scrollKey?: string;
 }) {
   const open = wide && detail !== null;
+  const scroller = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!scrollKey || !el) return;
+    const store = `master-detail-scroll:${scrollKey}`;
+    try {
+      const saved = Number(window.sessionStorage.getItem(store) ?? "");
+      // After the list has rendered its rows: a column with nothing in it yet cannot be scrolled, and
+      // setting a top it will not accept is the same as not restoring it at all.
+      if (saved > 0) requestAnimationFrame(() => { if (scroller.current) scroller.current.scrollTop = saved; });
+    } catch {
+      // A browser that refuses session storage simply opens at the top.
+    }
+    const onScroll = () => {
+      try {
+        window.sessionStorage.setItem(store, String(el.scrollTop));
+      } catch {
+        // ignored — see above
+      }
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [scrollKey, list]);
   // See {@link LayoutKind}: the rail is a rail only while there is a page beside it.
   const rail = layout === "rail" && open;
   useEffect(() => {
@@ -179,6 +216,7 @@ export function MasterDetail({
         {/* `relative`: each scroller is the containing block of what it holds. Without it an absolutely positioned
             descendant (an sr-only label) is placed against the document and stretches the PAGE past the viewport. */}
         <div
+          ref={scroller}
           className={`relative min-h-0 flex-1 overflow-y-auto ${
             rail ? "px-4 pb-8 pt-6" : "px-4 pb-28 pt-4 md:px-8 md:pb-8 md:pt-6"
           }`}

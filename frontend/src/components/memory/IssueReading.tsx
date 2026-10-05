@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import {
   CHANGE_EXPLANATION_KO,
   SEVERITY_LABEL_KO,
@@ -9,10 +8,11 @@ import {
   surgeLine,
 } from "../../lib/reviewIssuesView";
 import { kstDate, kstToday } from "../../lib/format";
-import type { IssueEvidenceView, ReviewIssueView } from "../../lib/types";
+import type { ReviewIssueView } from "../../lib/types";
 import { Facts } from "../ui/ObjectRow";
 import { Disclosure } from "../ui/Disclosure";
 import { CaseLayout } from "../workspace/CaseLayout";
+import { EvidenceQuote } from "./repeat/EvidenceQuote";
 import { EvidenceTrend } from "./repeat/EvidenceTrend";
 import { IssueDecision } from "./repeat/IssueDecision";
 import { IssueGrounding } from "./repeat/IssueGrounding";
@@ -129,7 +129,7 @@ export function IssueReading({
             ) : shownQuotes.length > 0 ? (
               <ul className="space-y-2 border-l-2 border-line pl-3">
                 {shownQuotes.map((row) => (
-                  <Quote key={`${row.reviewId}-${row.unitOrdinal}`} row={row} />
+                  <EvidenceQuote key={`${row.reviewId}-${row.unitOrdinal}`} row={row} />
                 ))}
               </ul>
             ) : (
@@ -152,7 +152,7 @@ export function IssueReading({
                   {restQuotes.length > 0 ? (
                     <ul className="space-y-2 border-l-2 border-line pl-3">
                       {restQuotes.map((row) => (
-                        <Quote key={`${row.reviewId}-${row.unitOrdinal}`} row={row} />
+                        <EvidenceQuote key={`${row.reviewId}-${row.unitOrdinal}`} row={row} />
                       ))}
                     </ul>
                   ) : null}
@@ -197,27 +197,5 @@ export function IssueReading({
         </div>
       }
     />
-  );
-}
-
-/** One customer sentence, with the door back to the review that produced it. */
-function Quote({ row }: { row: IssueEvidenceView }) {
-  return (
-    <li>
-      <p className="break-keep leading-relaxed text-ink">“{row.quote}”</p>
-      <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs tabular-nums text-muted">
-        <span>{row.occurredOn}</span>
-        {row.rating != null ? <span>{row.rating}점</span> : null}
-        {row.productName ? <span className="min-w-0 truncate">{row.productName}</span> : null}
-        {/* Back to the review that produced this evidence — the ONE surface where a review is judged and
-            answered. Needs nothing but the review id. */}
-        <Link
-          to={`/reviews/reply/${row.reviewId}`}
-          className="ml-auto shrink-0 font-semibold text-brand-700 transition hover:text-brand-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 focus-visible:ring-offset-2"
-        >
-          이 리뷰 처리하기
-        </Link>
-      </div>
-    </li>
   );
 }
