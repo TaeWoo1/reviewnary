@@ -514,9 +514,9 @@ export function ReviewCaseView({
                   subjectShownAbove
                   unboxed
                 />
-                {detail.sellerAccountId ? (
-                  <SetAsideFromWork accountId={detail.sellerAccountId} actionRef={replyWork.actionRef} onDone={bump} />
-                ) : null}
+                {/* 작업에서 제외는 이 상자 밖으로 나갔다 — 아래 워크플로 영역. 답변에 대한 동작이 아니라
+                    이 리뷰를 할 일 목록에서 빼는 동작이고, 상자가 「이것이 답변이다」라고 말하려면 안에
+                    남는 것은 답변과 답변에 대한 동작뿐이어야 한다. */}
               </DecisionCard>
             ) : null}
           </>
@@ -609,6 +609,15 @@ export function ReviewCaseView({
                       onRecorded={bump}
                     />
                   </PropertyRow>
+                  {/* 이 리뷰를 할 일에서 빼는 길. 답변 상자에서 나와 판단·처리와 같은 영역에 선다 —
+                      셋 다 「이 리뷰를 어떻게 다룰 것인가」이지 「이 답변을 어떻게 할 것인가」가 아니다. */}
+                  {replyWork && detail.sellerAccountId ? (
+                    <SetAsideFromWork
+                      accountId={detail.sellerAccountId}
+                      actionRef={replyWork.actionRef}
+                      onDone={bump}
+                    />
+                  ) : null}
                 </>
               ) : paneEvidenceFolded ? (
                 <Disclosure
