@@ -250,7 +250,12 @@ describe("리뷰 — the workflow surface", () => {
     expect(screen.queryByText(/지금 확인이 필요한 리뷰/)).toBeNull();
   });
 
-  it("selects a row into the detail, which offers the door to the Review Case and the way back", async () => {
+  /**
+   * <b>행은 리뷰의 작업 화면으로 가는 문이다</b> (리뷰 canonical mockup, 2026-10-05). 행을 누르면 목록 옆에
+   * pane이 열리던 자리에 아무것도 열리지 않는다 — pane이 없기 때문이고, pane이 읽어 주던 것은 전부 그 문
+   * 너머에 더 넓게 있기 때문이다.
+   */
+  it("a row is the door to that review's workspace", async () => {
     getReviewWorkspace.mockResolvedValue({
       id: "rv-1", writtenOn: "2026-09-01", rating: 1, negative: true, body: "접착이 약해요", bodyRedacted: false,
       productName: "선바로 일체형 전선몰딩", mediaCount: 0, textless: false, isNew: false,
@@ -260,12 +265,9 @@ describe("리뷰 — the workflow surface", () => {
     });
     renderAt("/reviews");
     const row = await screen.findByRole("link", { name: /접착이 약해요/ });
-    expect(row.getAttribute("href")).toMatch(/[?&]review=rv-1$/);
+    expect(row).toHaveAttribute("href", "/reviews/reply/rv-1?from=record");
     expect(row).toHaveTextContent("쿠팡");
-    await userEvent.click(row);
-    expect(screen.getByTestId("location")).toHaveTextContent("/reviews?review=rv-1");
-    const door = await screen.findByRole("link", { name: "이 리뷰 처리하기" });
-    expect(door).toHaveAttribute("href", "/reviews/reply/rv-1?from=record");
+    expect(screen.queryByRole("link", { name: "이 리뷰 처리하기" })).toBeNull();
   });
 
   it("a per-account address lands on the one record screen, filtered to that account's channel", async () => {

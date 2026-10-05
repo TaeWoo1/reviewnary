@@ -22,6 +22,7 @@ import { plainText } from "../../lib/plainText";
 import { COPY, sourceLabel } from "../../lib/copy/customerOps";
 import { Disclosure } from "../../components/ui/Disclosure";
 import { CaseBlock, CaseLayout, DecisionCard, Eyebrow, type CaseVariant, type PaneDepth } from "../../components/workspace/CaseLayout";
+import { ReviewLocate } from "../../components/reviews/ReviewLocate";
 import {
   DECISION_LOG_DISCLOSURE,
   PREVIEW_SAFETY_LINE,
@@ -33,6 +34,8 @@ import { kstDate } from "../../lib/format";
 import { triageDispositionLabel } from "../../lib/vocItems";
 import { TRIAGE_TIER_LABEL } from "../../lib/reviewTriage";
 import type {
+  ReviewChannelCapabilityView,
+  TriageBehaviorEvent,
   ChannelReviewDetailView,
   IssueSeverity,
   ReviewDecisionContext,
@@ -148,6 +151,16 @@ export function ReviewCaseView({
   const [contextFailed, setContextFailed] = useState(false);
   const [log, setLog] = useState<ReviewDecisionLogEntry[] | null>(null);
   const [logFailed, setLogFailed] = useState(false);
+  /**
+   * <b>이 채널이 원문 화면을 열어 줄 수 있는가, 그리고 이 조직이 pilot인가</b> — 둘 다 서버가 말한다.
+   * 채널 코드에서 추론하지 않는다: 쿠팡만 locate를 가진다는 것은 오늘의 사실이지 계약이 아니고, 화면이
+   * 그것을 외워 두면 서버가 바뀐 날 눌러도 거절당하는 단추가 남는다. 조용히 실패한다 — 못 읽었으면
+   * 아무것도 그리지 않는다(`ReviewLocate`가 접힌 설명으로 떨어진다).
+   */
+  const [facts, setFacts] = useState<{ capability: ReviewChannelCapabilityView | null; pilot: boolean }>({
+    capability: null,
+    pilot: false,
+  });
 
   // The live decision. `context.currentDecision` is a snapshot from the last read; a choice made in
   // this session must open the draft step immediately rather than after a reload.
@@ -157,6 +170,38 @@ export function ReviewCaseView({
   // any approval withdrawable — after the seller moves it to 두고 보기.
   const [prepared, setPrepared] = useState(false);
   const [localWork, setLocalWork] = useState(false);
+
+  const channelCode = context?.channelCode ?? null;
+  /** Silver: never fails the screen, and never fires without the account the event is scoped to. */
+  const recordLocateBehavior = useCallback(
+    (events: TriageBehaviorEvent[]) => {
+      const account = detail?.sellerAccountId;
+      if (!account || events.length === 0) return;
+      try {
+        void Promise.resolve(api.recordChannelReviewTriageBehavior(account, events)).catch(() => undefined);
+      } catch {
+        // silver
+      }
+    },
+    [detail?.sellerAccountId],
+  );
+  useEffect(() => {
+    if (!channelCode) return;
+    let live = true;
+    Promise.resolve()
+      .then(() => api.getReviewRecordStrict({ channel: channelCode, size: 1 }))
+      .then((view) => {
+        if (!live) return;
+        setFacts({
+          capability: view.channelFacts?.find((f) => f.channelCode === channelCode)?.capability ?? null,
+          pilot: view.aiPilotEnabled,
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [channelCode]);
 
   useEffect(() => {
     // A pane that switches from one review to the next must not carry the last one's session state.
@@ -307,6 +352,10 @@ export function ReviewCaseView({
   return (
     <CaseLayout
       variant={variant}
+      /* <b>페이지의 둘째 열은 속성이지 작업대가 아니다</b> (리뷰 canonical mockup, 2026-10-05).
+         준비된 답변이 읽는 열 안의 유일한 물건이 되었으므로, 옆 열에 남는 것은 판매자가 정하는 두 가지
+         — 중요도와 처리 방법 — 뿐이다. 360은 그 둘에게 과하고, 읽는 열에서 가져간 120px이다. */
+      rail={variant === "page" ? "properties" : undefined}
       decisionLabel="판매자의 결정"
       nav={back}
       meta={
@@ -509,8 +558,12 @@ export function ReviewCaseView({
           </DecisionCard>
 
           {/* The draft that follows from 대응 필요. The same panel as every other reply surface: no second
-              reply flow, no write this page owns, and the approval boundary untouched. */}
-          {showDraft && replyWork ? (
+              reply flow, no write this page owns, and the approval boundary untouched.
+
+              <b>On the PAGE it is not here</b> (리뷰 canonical mockup, 2026-10-05): the prepared reply is
+              the one object the screen is about, so it stands in the reading column after the evidence it
+              was written from, where the eye arrives at it rather than beside it. See `more` below. */}
+          {showDraft && replyWork && pane ? (
             <DecisionCard primary>
               {/* The panel names itself 「답변 준비」 — a Section around it said the same word twice (Phase 4). */}
               <VocItemReplyPrep
@@ -597,6 +650,11 @@ export function ReviewCaseView({
         ) : (
           <>
             <RepeatedSignal problems={context?.repeatedProblems ?? []} failed={contextFailed || context === null} />
+            {/* <b>상자는 남는다, 그리고 그것은 선택이다</b> (리뷰 canonical mockup, 2026-10-05). mockup은
+                읽는 열에 면을 가진 물건을 준비된 답변 하나로 그렸고, 여기도 그렇게 해 보았다 — `flat`은
+                이 블록의 두 길(답변 기준 보기 · 상품 화면 열기)을 함께 지운다. 상자 하나를 위해 길 둘을
+                없앨 수는 없다. 준비된 답변만 brand 테두리를 가지므로 무엇이 이 화면의 물건인지는 여전히
+                한눈에 보인다. */}
             {context ? <GroundingOnHand context={context} /> : null}
           </>
         )
@@ -606,7 +664,44 @@ export function ReviewCaseView({
         preview ? undefined : docked ? (
           <RecordTrail entries={log ?? []} failed={logFailed || log === null} />
         ) : (
-          <DecisionLog entries={log ?? []} failed={logFailed || log === null} />
+          <>
+            {/* <b>읽는 열은 준비된 답변에서 끝난다</b> (리뷰 canonical mockup, 2026-10-05). 리뷰 → 왜
+                올라왔나요 → 반복 신호 · 이 상품에 대해 아는 것 → 준비된 답변. 근거를 읽고 나서 그 근거로
+                쓰인 답변을 보는 순서이고, 이 화면에서 면과 테두리를 가진 물건은 그것 하나다. */}
+            {showDraft && replyWork ? (
+              <DecisionCard primary>
+                <VocItemReplyPrep
+                  key={`prep-${replyWork.actionRef}`}
+                  accountId={replyAccountId}
+                  actionRef={replyWork.actionRef}
+                  disposition={decision}
+                  onPrepared={() => setPrepared(true)}
+                  onOutcomeRecorded={bump}
+                  onLocalWork={setLocalWork}
+                  headingLevel={2}
+                  subjectShownAbove
+                  unboxed
+                />
+                {detail.sellerAccountId ? (
+                  <SetAsideFromWork accountId={detail.sellerAccountId} actionRef={replyWork.actionRef} onDone={bump} />
+                ) : null}
+              </DecisionCard>
+            ) : null}
+            <DecisionLog entries={log ?? []} failed={logFailed || log === null} />
+            {/* <b>원문은 어디서 보나 — 리뷰 기록의 pane이 가지고 있던 것</b> (리뷰 canonical mockup,
+                2026-10-05). 그 pane은 없어졌고, 능력은 따라왔다. 읽는 흐름의 맨 끝인 이유는 순서가
+                그렇기 때문이다: 무엇인지 읽고, 판단하고, 답을 준비한 다음에야 「그런데 원문은」이 온다. */}
+            <ReviewLocate
+              className="border-t border-line pt-4"
+              reviewId={detail.id}
+              accountId={detail.sellerAccountId ?? null}
+              word={word}
+              capability={facts.capability}
+              pilotOn={facts.pilot && (facts.capability?.aiTriage ?? false)}
+              raised={detail.aiMark !== null || detail.triage.tier === "NEEDS_ATTENTION"}
+              recordBehavior={recordLocateBehavior}
+            />
+          </>
         )
       }
     />

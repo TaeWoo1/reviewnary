@@ -246,125 +246,16 @@ beforeEach(() => {
   });
 });
 
-/**
- * Product assembly A6: review work starts on the 리뷰 screen. Where the server says the channel has a
- * reply flow (`replyFlowExists`, and a server-minted `replyWork` on the detail), the detail carries the
- * product's one reply cluster and the page OPENS with 내 답변 작업. Where it does not, nothing of the kind
- * renders — no control the server would refuse.
- *
- * <b>The placement assertion was rewritten, not weakened</b> (Approval Path v1 §2). It used to pin
- * 내 답변 작업 at the END of the page, which was the deliberate arrangement at the time — the worklist is
- * the record's follow-through, not a second list of what needs a look. On the live NAVER account that
- * measured as the seller's own committed work sitting six screens below the fold behind 4,455 rows they
- * did not come for. What it IS did not change; where it goes did.
- */
-describe("reply work on the 리뷰 screen (A6)", () => {
-  const NAVER_PAGE: ChannelReviewPageView = {
-    ...PAGE,
-    channel: { channelCode: "NAVER", aiTriage: true, originalLocate: "NONE", replySupported: true, replyFlowExists: true },
-  };
-  const NAVER_DETAIL: ChannelReviewDetailView = {
-    ...DETAIL,
-    replyWork: { actionRef: "review:r1", triageDisposition: null, hasReplyPreparation: false, channelReplyState: "PENDING" },
-  };
+/*
+  <b>pane이 없어졌으므로 pane의 계약도 여기 있지 않다</b> (리뷰 canonical mockup, 2026-10-05).
 
-  /**
-   * <b>한 사실은 한 번.</b> The pane's header owns which review this is — 채널 · 별점 · 날짜 · 상품 and the
-   * customer's own sentence — and {@code ReviewReadDetail} owns what is true ABOUT it. Measured on the
-   * rendered pane at 1600×1000 before this: the date stood twice, the product twice and 확인 필요 three
-   * times inside one 440px column.
-   */
-  it("the pane states each closed fact exactly once — the header owns them", async () => {
-    // The measured case: a 확인 필요 review with no seller correction, which is what the 리뷰 기록 pane
-    // opens on for this org.
-    getChannelReviewsStrict.mockResolvedValue(NAVER_PAGE);
-    getChannelReviewStrict.mockResolvedValue({
-      ...NAVER_DETAIL,
-      triage: { tier: "NEEDS_ATTENTION", reason: "낮은 별점", tags: [], recommendedAction: null },
-      sellerCorrection: null,
-    });
-    renderPage("/reviews?review=r1");
-
-    const pane = await screen.findByRole("region", { name: "판단과 조치" });
-    const column = pane.closest("aside") ?? pane.parentElement!;
-    const text = (column.textContent ?? "").replace(/\s+/g, " ");
-    const times = (needle: string) => text.split(needle).length - 1;
-
-    // 날짜: the header's, once.
-    expect(times("2026-08-11")).toBe(1);
-    // 판정: once, as the chip that answers 「왜 이게 올라왔나」 — never again as 「시스템 판단 …」.
-    expect(times("확인 필요")).toBe(1);
-    // 상품: the header's `sub`, with no definition-list row repeating it.
-    expect(within(pane).queryByText("상품")).toBeNull();
-    expect(times("무선 이어폰")).toBe(1);
-    // 별점: moved INTO the header, so it is still stated — just not in two places.
-    expect(text).toContain("★");
-  });
-
-  it("NAVER: the detail READS the decision and offers the door — it no longer records one", async () => {
-    getChannelReviewsStrict.mockResolvedValue(NAVER_PAGE);
-    getChannelReviewStrict.mockResolvedValue(NAVER_DETAIL);
-    renderPage("/reviews?review=r1");
-
-    const block = await screen.findByRole("region", { name: "판단과 조치" });
-    // Who writes the answer — the channel's capability, said where the door is. It is now said only in
-    // the negative: the affirmative sentence was one of two explaining the button between them, and a
-    // channel that CAN be drafted for needs no announcement that it can (2026-10-01).
-    expect(within(block).queryByText(/reviewnary가 답변을 작성하지 않습니다/)).not.toBeInTheDocument();
-    // What stands, as facts. No control that writes: the record is a record.
-    //
-    // <b>「시스템 판단」 is NOT here, and that is the rule</b> (2026-10-01). This line exists to put the two
-    // judgments side by side; with no seller correction there is one judgment, and it is already the
-    // verdict chip at the top of this same 440px column. The pairing renders the moment there is
-    // something to pair it WITH — asserted below, on a fixture that has a correction.
-    expect(within(block).queryByText(/시스템 판단/)).toBeNull();
-    expect(within(block).getByText("처리 상태 판단 전")).toBeInTheDocument();
-    expect(within(block).queryByRole("button", { name: "대응 필요" })).toBeNull();
-    expect(within(block).queryByRole("button", { name: "확인 필요" })).toBeNull();
-    expect(within(block).queryByRole("heading", { name: "답변 준비" })).toBeNull();
-    expect(getReviewReplyPrep).not.toHaveBeenCalled();
-    // One door, to the one place the decision is made — and the way back to this record. It is docked at
-    // the floor of the pane (2026-10-03: at 1366×768 the blocks above it are taller than the column), and
-    // docked or not, there is exactly one of it.
-    const doors = screen.getAllByRole("link", { name: "이 리뷰 처리하기" });
-    expect(doors).toHaveLength(1);
-    expect(doors[0]).toHaveAttribute("href", "/reviews/reply/r1?from=record");
-    expect(doors[0].closest('[data-testid="pane-footer"]')).not.toBeNull();
-    expect(within(block).queryByRole("link", { name: "이 리뷰 처리하기" })).toBeNull();
-
-    // UI/UX v2 Phase 3 (product-owner decision): the reply to-do is 확인할 일's, not this record's. The
-    // 「내 답변 작업」 area this record used to open with is gone, and its read is not made here.
-    expect(screen.queryByRole("heading", { name: /내 답변 작업/ })).toBeNull();
-    expect(getReplyWork).not.toHaveBeenCalled();
-  });
-
-  it("NAVER: a review already marked 대응 필요 opens no draft here — the panel lives in 리뷰 처리", async () => {
-    getChannelReviewsStrict.mockResolvedValue(NAVER_PAGE);
-    getChannelReviewStrict.mockResolvedValue({
-      ...NAVER_DETAIL,
-      replyWork: { actionRef: "review:r1", triageDisposition: "RESPONSE_NEEDED", hasReplyPreparation: true, channelReplyState: "PENDING" },
-    });
-    renderPage("/reviews?review=r1");
-
-    const block = await screen.findByRole("region", { name: "판단과 조치" });
-    // The decision is READ back, so the record still says where the review stands.
-    expect(within(block).getByText("처리 상태 대응 필요")).toBeInTheDocument();
-    // …and the draft is not mounted here. Two rooms preparing one reply is how they drift apart.
-    expect(within(block).queryByRole("heading", { name: "답변 준비" })).toBeNull();
-    expect(getReviewReplyPrep).not.toHaveBeenCalled();
-  });
-
-  it("Coupang: no decision, no preparation, no 내 답변 작업 — the channel has no reply flow", async () => {
-    renderPage("/reviews?review=r1");
-    const block = await screen.findByRole("region", { name: "판단과 조치" });
-    expect(within(block).getByText(/reviewnary가 답변을 작성하지 않습니다/)).toBeInTheDocument();
-    await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요. 다음에도 구매할게요.");
-    expect(screen.queryByRole("region", { name: "답변" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "대응 필요" })).toBeNull();
-    expect(screen.queryByRole("heading", { name: /내 답변 작업/ })).toBeNull();
-    expect(getReplyWork).not.toHaveBeenCalled();
-  });
-});
+  <p>이 파일에 있던 두 describe — 「reply work on the 리뷰 screen (A6)」와 「the decision workspace in the
+  record's pane」 — 는 440px pane이 읽어 주던 것을 지켰다. 그 pane은 사라졌고, 같은 읽기를 같은 컴포넌트가
+  `/reviews/reply/:id`에서 더 넓게 한다. 반복 신호 · 이 상품에 대해 우리가 아는 것 · 기록 · 초안은 전부
+  {@code ReviewReplyTask.test.tsx}가 이미 지키고 있으므로 옮겨 적지 않았다. pane에만 있던 셋 —
+  채널의 답변 등록 상태, 「리뷰 원문 보기」, AI pilot의 REVIEW_OPENED silver — 은 그 화면으로 따라갔고,
+  계약도 거기 있다.
+*/
 
 describe("deep-link seams the home relies on", () => {
   it("?tier=NEEDS_ATTENTION opens the list under that filter — the same filter whose total the home tile shows", async () => {
@@ -376,40 +267,45 @@ describe("deep-link seams the home relies on", () => {
   it("ignores an unknown tier value rather than sending it to the server, and scrubs it from the URL", async () => {
     renderPage("/reviews?tier=WHATEVER");
     await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
-    expect(getChannelReviewsStrict).toHaveBeenCalledWith("acc-1", expect.objectContaining({ tier: undefined }));
+    expect(getChannelReviewsStrict).toHaveBeenCalledWith("acc-1", expect.objectContaining({ tier: "NEEDS_ATTENTION" }));
     expect(screen.getByTestId("location")).toHaveTextContent("/reviews");
     expect(screen.getByTestId("location").textContent).not.toContain("tier=");
   });
 
-  it("the URL is the filter, both ways: a tier press writes ?tier and drops ?review; 전체 clears it", async () => {
-    renderPage("/reviews?review=r1");
-    await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
-    await userEvent.click(screen.getByRole("button", { name: /^확인 필요 \d+$/ }));
-    expect(screen.getByTestId("location")).toHaveTextContent("/reviews?tier=NEEDS_ATTENTION");
-    expect(getChannelReviewsStrict).toHaveBeenLastCalledWith("acc-1", expect.objectContaining({ tier: "NEEDS_ATTENTION" }));
-    await userEvent.click(screen.getByRole("button", { name: /^전체 \d+$/ }));
-    expect(screen.getByTestId("location")).toHaveTextContent(/^\/reviews$/);
-  });
-
-  it("the URL is the selection, both ways: a row press writes ?review", async () => {
-    renderPage();
-    await userEvent.click((await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("a")!);
-    expect(screen.getByTestId("location")).toHaveTextContent("/reviews?review=r1");
-    expect(getChannelReviewStrict).toHaveBeenCalledWith("acc-1", "r1");
-  });
-
-  it("orders the filter as the workflow does — 확인 필요, 지켜보기, 참고, then 전체", async () => {
+  it("the URL is the open group, both ways: pressing a group header writes ?tier and asks for that tier", async () => {
     renderPage();
     await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
-    const group = screen.getByRole("group", { name: "분류 필터" });
-    const labels = within(group).getAllByRole("button").map((b) => b.textContent?.replace(/\s*\d+$/, ""));
-    expect(labels).toEqual(["확인 필요", "지켜보기", "참고", "전체"]);
+    await userEvent.click(screen.getByRole("button", { name: /^▸?\s*지켜보기/ }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/reviews?tier=WATCH");
+    expect(getChannelReviewsStrict).toHaveBeenLastCalledWith("acc-1", expect.objectContaining({ tier: "WATCH" }));
   });
 
-  it("?review=<id> opens that review's detail without a press", async () => {
-    renderPage("/reviews?review=r1");
-    await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요. 다음에도 구매할게요.");
-    expect(getChannelReviewStrict).toHaveBeenCalledWith("acc-1", "r1");
+  /**
+   * <b>행은 고르는 것이 아니라 가는 것이다</b> (리뷰 canonical mockup, 2026-10-05). The row used to write
+   * `?review` and open a 440px pane beside the list. There is no pane: the row is the way into the review's
+   * own workspace, which is where every one of those readings already lives and is the only place they can
+   * be changed.
+   */
+  it("a row leads to that review's workspace, not to a pane beside the list", async () => {
+    renderPage();
+    const row = (await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("a")!;
+    expect(row).toHaveAttribute("href", "/reviews/reply/r1?from=record");
+    expect(getChannelReviewStrict).not.toHaveBeenCalled();
+  });
+
+  it("orders the groups as the workflow does — 확인 필요, 지켜보기, 참고, and offers no 전체", async () => {
+    renderPage();
+    await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
+    const list = screen.getByRole("region", { name: "목록" });
+    const labels = within(list).getAllByRole("button").map((b) => b.textContent?.replace(/[▾▸]/g, "").replace(/\s*[\d,]+$/, "").trim());
+    expect(labels).toEqual(["확인 필요", "지켜보기", "참고"]);
+  });
+
+  /** 확인 필요 is where a seller's attention belongs, so it is what the screen opens on when nothing says otherwise. */
+  it("opens on 확인 필요 when the URL names no group", async () => {
+    renderPage();
+    await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
+    expect(getChannelReviewsStrict).toHaveBeenCalledWith("acc-1", expect.objectContaining({ tier: "NEEDS_ATTENTION" }));
   });
 });
 
@@ -447,25 +343,7 @@ describe("the channel review record", () => {
     );
   });
 
-  it("opens one review in full when it is chosen", async () => {
-    renderPage();
-    await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
 
-    await userEvent.click(screen.getByText("배송도 빠르고 포장도 꼼꼼했어요"));
-
-    expect(await screen.findByText(/다음에도 구매할게요/)).toBeInTheDocument();
-    expect(getChannelReviewStrict).toHaveBeenCalledWith("acc-1", "r1");
-  });
-
-  it("says so when the body it shows was redacted", async () => {
-    getChannelReviewStrict.mockResolvedValue({ ...DETAIL, bodyRedacted: true });
-    renderPage();
-    await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
-
-    await userEvent.click(screen.getByText("배송도 빠르고 포장도 꼼꼼했어요"));
-
-    expect(await screen.findByText(/가려서 표시했습니다/)).toBeInTheDocument();
-  });
 });
 
 describe("a review the buyer rated without writing", () => {
@@ -480,18 +358,6 @@ describe("a review the buyer rated without writing", () => {
     expect(screen.queryByText(/표시할 수 있는 본문이 없습니다/)).toBeNull();
   });
 
-  it("says the rating still counts, in the detail", async () => {
-    getChannelReviewsStrict.mockResolvedValue({
-      ...PAGE,
-      items: [{ ...PAGE.items[0]!, preview: null, textless: true }],
-    });
-    getChannelReviewStrict.mockResolvedValue({ ...DETAIL, body: "", textless: true });
-    renderPage();
-
-    await userEvent.click(await screen.findByText("별점만 남긴 리뷰"));
-
-    expect(await screen.findByText(/별점은 그대로 집계됩니다/)).toBeInTheDocument();
-  });
 });
 
 describe("the page refuses to imply what it does not know", () => {
@@ -519,7 +385,13 @@ describe("the page refuses to imply what it does not know", () => {
   });
 
   it("says the record is empty and how to fill it, rather than looking broken", async () => {
-    getChannelReviewsStrict.mockResolvedValue({ ...PAGE, total: 0, newCount: 0, items: [] });
+    getChannelReviewsStrict.mockResolvedValue({
+      ...PAGE,
+      total: 0,
+      newCount: 0,
+      items: [],
+      triageSummary: { needsAttention: 0, watch: 0, fyi: 0, repeatedCategories: [] },
+    });
     renderPage();
 
     expect(await screen.findByText("아직 수집된 리뷰가 없습니다")).toBeInTheDocument();
@@ -529,18 +401,13 @@ describe("the page refuses to imply what it does not know", () => {
 describe("no buyer appears, because none is stored", () => {
   it("renders nothing from a field it does not know about, even if one arrives", async () => {
     // The backend has no author field and refuses one on the wire; this is the last line of the same
-    // rule — a page that spread its response into the DOM would render whatever turned up. The word
-    // 구매자 in the page's own description is a descriptor, not a value, so the assertion is on the
-    // VALUE a buyer field would carry.
+    // rule — a page that spread its response into the DOM would render whatever turned up.
     getChannelReviewsStrict.mockResolvedValue({
       ...PAGE,
       items: [{ ...PAGE.items[0], author: "김서연" }, PAGE.items[1]],
     });
-    getChannelReviewStrict.mockResolvedValue({ ...DETAIL, author: "김서연" });
     renderPage();
     await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
-    await userEvent.click(screen.getByText("배송도 빠르고 포장도 꼼꼼했어요"));
-    await screen.findByText(/다음에도 구매할게요/);
 
     expect(document.body.textContent).not.toContain("김서연");
   });
@@ -576,7 +443,7 @@ describe("a list longer than one screen can be walked", () => {
         // 확인 필요 우선 is the default as of Review Triage v1 — the question the seller opens this
         // screen with is "what first", and the newest row was answering a different one.
         sort: "attention",
-        tier: undefined,
+        tier: "NEEDS_ATTENTION",
         page: 1,
         size: 20,
       }),
@@ -634,7 +501,7 @@ describe("a list longer than one screen can be walked", () => {
     await waitFor(() =>
       expect(getChannelReviewsStrict).toHaveBeenLastCalledWith("acc-1", {
         sort: "lowest",
-        tier: undefined,
+        tier: "NEEDS_ATTENTION",
         page: 0,
         size: 20,
       }),
@@ -652,31 +519,20 @@ describe("a list longer than one screen can be walked", () => {
  * check that bumps a row's colour reads like polish and is the gated thing.
  */
 describe("triage", () => {
-  it("says which tier a review is in on the row, and why in the review itself", async () => {
-    // UI/UX v2 Phase 2–3: the row is three lines (state · stars · where; the sentence; the product). The rule's
-    // reason and advice explain a decision, so they are read where the decision is looked at — in the detail.
-    getChannelReviewStrict.mockResolvedValue({
-      ...DETAIL,
-      id: "r2",
-      triage: PAGE.items[1].triage,
-    });
-    renderPage("/reviews?review=r2");
-    const row = (await screen.findByText("생각보다 크기가 작아서 아쉬웠습니다")).closest("li")!;
-    expect(within(row).getByText("확인 필요")).toBeInTheDocument();
-    expect(await screen.findByText("1점 · 설치 · 같은 분류 11건")).toBeInTheDocument();
-    expect(
-      screen.getByText("같은 분류의 상품평이 반복됩니다. 상품·포장 상태를 확인해 보세요."),
-    ).toBeInTheDocument();
+  /**
+   * <b>분류는 묶음이 말하고, 이유는 리뷰가 말한다</b> (리뷰 canonical mockup, 2026-10-05). The tier used to be
+   * a chip on every row inside a list already filtered to that tier — the same word, twenty times, under a
+   * tab that said it once. The group header says it once, with the record's own count beside it.
+   */
+  it("says which tier a review is in on the group header, not twenty times on the rows", async () => {
+    renderPage();
+    const list = await screen.findByRole("region", { name: "목록" });
+    expect(within(list).getByRole("button", { name: /확인 필요\s*1/ })).toBeInTheDocument();
+    const row = screen.getByText("배송도 빠르고 포장도 꼼꼼했어요").closest("li")!;
+    expect(within(row).queryByText("확인 필요")).toBeNull();
+    expect(within(row).queryByText("참고")).toBeNull();
   });
 
-  it("offers a well-rated review no action rather than a reassuring sentence", async () => {
-    // The 5★ review's detail carries its reason and its tier and NOTHING in the action slot.
-    renderPage("/reviews?review=r1");
-    const detail = await screen.findByLabelText("선택한 리뷰");
-    expect(await within(detail).findByText("5점")).toBeInTheDocument();
-    expect(within(detail).queryByText(/확인해 보세요/)).toBeNull();
-    expect(within((screen.getByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("li")!).getByText("참고")).toBeInTheDocument();
-  });
 
   /**
    * <b>조직 전체 자동분류 집계는 이 화면의 것이 아니다</b> (product-owner decision, 2026-10-03).
@@ -729,9 +585,9 @@ describe("triage", () => {
     renderPage();
     await waitFor(() => expect(getChannelReviewsStrict).toHaveBeenCalled());
 
-    await userEvent.click(screen.getByRole("button", { name: /^확인 필요 0$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /확인 필요\s*0/ }));
 
-    expect(await screen.findByText("확인 필요에 해당하는 리뷰가 없습니다")).toBeInTheDocument();
+    expect(await screen.findByText(/확인 필요에 해당하는 리뷰가 없습니다/)).toBeInTheDocument();
     expect(screen.queryByText("아직 수집된 리뷰가 없습니다")).toBeNull();
   });
 
@@ -783,9 +639,9 @@ describe("triage", () => {
     expect(screen.getByText("1–1번째")).toBeInTheDocument();
   });
 
-  it("renders the tier the backend sent, never one re-derived from the tags", async () => {
+  it("renders the counts the backend sent, never ones re-derived from the tags", async () => {
     // A 1★ row whose body-derived tags scream 파손, and whose tier says 참고. If the frontend ever
-    // re-ranks from tags, this renders 확인 필요 and fails — which is the whole point.
+    // re-ranks from tags, 확인 필요 stops reading 0 — which is the whole point.
     getChannelReviewsStrict.mockResolvedValue({
       ...PAGE,
       total: 1,
@@ -793,23 +649,18 @@ describe("triage", () => {
       items: [
         {
           ...PAGE.items[1],
-          triage: {
-            tier: "FYI" as const,
-            reason: "1점 · 품질",
-            tags: ["품질", "파손"],
-            recommendedAction: null,
-          },
-        aiMark: null,
-        sellerCorrection: null,
+          triage: { tier: "FYI" as const, reason: "1점 · 품질", tags: ["품질", "파손"], recommendedAction: null },
+          aiMark: null,
+          sellerCorrection: null,
         },
       ],
     });
-    renderPage();
+    renderPage("/reviews?tier=FYI");
     await screen.findByText("생각보다 크기가 작아서 아쉬웠습니다");
 
     const list = screen.getByRole("region", { name: "목록" });
-    expect(within(list).getByText("참고")).toBeInTheDocument();
-    expect(within(list).queryByText("확인 필요")).toBeNull();
+    expect(within(list).getByRole("button", { name: /참고\s*1/ })).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: /확인 필요\s*0/ })).toBeInTheDocument();
   });
 });
 
@@ -820,59 +671,35 @@ describe("the AI pilot's mark and the feedback spine (RUBRIC v2 §13.7)", () => 
     predictedAt: "2026-08-17T00:00:00Z",
   };
 
-  it("renders 판매자 확인 필요 BESIDE the rules tier, never in its place, and says what it is", async () => {
+  it("renders 판매자 확인 필요 on the row BESIDE the rules tier the group header carries", async () => {
     getChannelReviewsStrict.mockResolvedValue({
       ...PAGE,
       aiPilotEnabled: true,
       triageSummary: { ...PAGE.triageSummary, needsAttention: 2, aiAttention: 1 },
       items: [{ ...PAGE.items[0], aiMark: MARK }, PAGE.items[1]],
     });
-    getChannelReviewStrict.mockResolvedValue({ ...DETAIL, aiMark: MARK });
     renderPage();
     const row = (await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("li")!;
 
-    // Both marks on the same row: the rule's 참고 AND the second judgement, which is NOT the tier's word
-    // (RUBRIC v2 §13.7 — the seller must be able to tell the two apart). The mechanism is no longer named
-    // in either of them (2026-10-03): 「AI」 is a fact about how reviewnary is built, not about this review.
-    expect(within(row).getByText("참고")).toBeInTheDocument();
+    // The second judgement is NOT the tier's word (RUBRIC v2 §13.7 — the seller must be able to tell the
+    // two apart), and the mechanism is named in neither: 「AI」 is a fact about how reviewnary is built,
+    // not about this review. The rules tier is the group this row sits in, said once on its header.
     expect(within(row).getByText("판매자 확인 필요")).toBeInTheDocument();
     expect(within(row).queryByText(/AI/)).toBeNull();
-    // And the disclosure once the detail is open: the rules did not raise this, reading the text did, and
-    // the seller may contradict it. Said as what was done, not as what ran.
-    await userEvent.click(within(row).getByRole("link"));
-    expect(await screen.findByText(/별점과 본문만 보면 확인 대상이 아니지만, 내용을 읽어 보니/)).toBeInTheDocument();
-    expect(screen.queryByText(/AI 분류가/)).toBeNull();
+    const list = screen.getByRole("region", { name: "목록" });
+    expect(within(list).getByRole("button", { name: /확인 필요\s*2/ })).toBeInTheDocument();
   });
 
-  it("an org NOT opted in gets the pre-pilot screen: no controls, no silver — even if a mark arrived", async () => {
-    // The backend sends no marks for such an org; if one did arrive, the controls and the silver
-    // must still be absent, because aiPilotEnabled — not the presence of marks — is the switch.
-    getChannelReviewsStrict.mockResolvedValue({ ...PAGE, aiPilotEnabled: false });
+  it("an org NOT opted in gets the pre-pilot list: no silver, even if a mark arrived", async () => {
+    // The backend sends no marks for such an org; if one did arrive, the silver must still be absent,
+    // because aiPilotEnabled — not the presence of marks — is the switch.
+    getChannelReviewsStrict.mockResolvedValue({ ...PAGE, aiPilotEnabled: false, items: [{ ...PAGE.items[0], aiMark: MARK }, PAGE.items[1]] });
     renderPage();
-    await userEvent.click((await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("a")!);
-    await screen.findByText(/노출상품ID/);
-    expect(screen.queryByText("이 상품평, 확인이 필요한가요?")).toBeNull();
-    expect(screen.queryByLabelText("분류 피드백")).toBeNull();
+    await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
+
     expect(recordBehavior).not.toHaveBeenCalled();
   });
 
-  it("a channel outside the contract's three gets no controls and no silver, even with the org opted in", async () => {
-    // Contract §1: the server has no route for such a channel, so the page has no control. The switch is
-    // the channel row on the wire, not the channel's name and not the presence of marks.
-    getChannelReviewsStrict.mockResolvedValue({
-      ...PAGE,
-      aiPilotEnabled: true,
-      channel: { channelCode: "GMARKET", aiTriage: false, originalLocate: "NONE", replySupported: false, replyFlowExists: false },
-      items: [{ ...PAGE.items[0], aiMark: MARK }, PAGE.items[1]],
-    });
-    renderPage();
-    await userEvent.click((await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("a")!);
-    await screen.findByText(/원문 화면으로 바로 이동할 수 없습니다/);
-    expect(screen.queryByText(/이 (상품평|리뷰), 확인이 필요한가요\?/)).toBeNull();
-    expect(screen.queryByLabelText("분류 피드백")).toBeNull();
-    expect(screen.queryByRole("button", { name: "쿠팡에서 보기" })).toBeNull();
-    expect(recordBehavior).not.toHaveBeenCalled();
-  });
 
   it("shows nothing about AI on a row without a mark", async () => {
     renderPage();
@@ -881,65 +708,9 @@ describe("the AI pilot's mark and the feedback spine (RUBRIC v2 §13.7)", () => 
     expect(screen.queryByText(/내용을 읽어 보니/)).toBeNull();
   });
 
-  it("records nothing — the record reads the decision and hands the seller the door", async () => {
-    getChannelReviewsStrict.mockResolvedValue({ ...PAGE, aiPilotEnabled: true });
-    renderPage();
-    await userEvent.click((await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("a")!);
-    await screen.findByRole("region", { name: "판단과 조치" });
 
-    // Every mutation this panel used to own now lives on 리뷰 처리: the decision, the seller's own
-    // tier, the recorded act, the draft. Two rooms for one decision is how a product gets two answers
-    // — and it is also how ACTION_NOT_NEEDED and NO_ACTION both existed for the same sentence.
-    expect(screen.queryByText("이 상품평, 판매자님 판단은 어떠신가요?")).toBeNull();
-    expect(screen.queryByLabelText("판매자 판단")).toBeNull();
-    expect(screen.queryByLabelText("조치 기록")).toBeNull();
-    expect(screen.queryByRole("button", { name: "조치 완료" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "조치 불필요" })).toBeNull();
-    expect(correctTriage).not.toHaveBeenCalled();
-    expect(recordAction).not.toHaveBeenCalled();
-    expect(screen.getByRole("link", { name: "이 리뷰 처리하기" })).toBeInTheDocument();
-    // The sentence that used to stand under this link said what the link says. The link is the claim.
-  });
 
-  it("offers no tier controls at all — choosing among the three is the workspace's job", async () => {
-    // The three-way choice itself is unchanged and still pinned, on the surface that now owns it
-    // (`ReviewReplyTask.test.tsx`). What moved is WHERE it is offered, not WHAT it offers.
-    getChannelReviewsStrict.mockResolvedValue({ ...PAGE, aiPilotEnabled: true });
-    renderPage();
-    await userEvent.click((await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("a")!);
-    await screen.findByRole("region", { name: "판단과 조치" });
-    expect(screen.queryByRole("button", { name: "지켜보기" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "수정 되돌리기" })).toBeNull();
-  });
 
-  it("reads the seller's standing answer whether or not the pilot is on — reading is not the pilot's either", async () => {
-    getChannelReviewsStrict.mockResolvedValue({ ...PAGE, aiPilotEnabled: false });
-    getChannelReviewStrict.mockResolvedValue({ ...DETAIL, sellerCorrection: correctionView("FYI") });
-    renderPage();
-    await userEvent.click((await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("a")!);
-    const block = await screen.findByRole("region", { name: "판단과 조치" });
-    expect(within(block).getByText(/판매자 수정/)).toBeInTheDocument();
-    expect(screen.queryByLabelText("판매자 판단")).toBeNull();
-  });
-
-  it("shows BOTH judgments as facts — the system's is not overwritten and the seller's is not lost", async () => {
-    // Requirement 4, on the read side. The pressing half moved to 리뷰 처리; what the record owes the
-    // seller is that a correction they made is visible here too, from the READ rather than a session.
-    getChannelReviewStrict.mockResolvedValue({
-      ...DETAIL,
-      triage: { tier: "NEEDS_ATTENTION", reason: "낮은 별점", tags: [], recommendedAction: null },
-      sellerCorrection: correctionView("FYI"),
-    });
-    renderPage();
-    await userEvent.click((await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("a")!);
-    const block = await screen.findByRole("region", { name: "판단과 조치" });
-    expect(correctTriage).not.toHaveBeenCalled();
-    expect(within(block).getByText(/시스템 판단/)).toBeInTheDocument();
-    expect(within(block).getByText(/판매자 수정/)).toBeInTheDocument();
-    // Both words are on the line, and neither replaced the other.
-    expect(within(block).getByText("확인 필요")).toBeInTheDocument();
-    expect(within(block).getByText("참고")).toBeInTheDocument();
-  });
 
   it("a corrected row says so in the queue, and does not move", async () => {
     // Requirement 6, on the list side. The chip is quiet on purpose: 확인 필요 is emphasised because
@@ -956,14 +727,6 @@ describe("the AI pilot's mark and the feedback spine (RUBRIC v2 §13.7)", () => 
       .toBeLessThan(rows.findIndex((t) => t.includes(PAGE.items[1].preview ?? "")));
   });
 
-  it("offers no 되돌리기 — withdrawing is a write, and writes are the workspace's", async () => {
-    getChannelReviewStrict.mockResolvedValue({ ...DETAIL, sellerCorrection: correctionView("WATCH") });
-    renderPage();
-    await userEvent.click((await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("a")!);
-    await screen.findByRole("region", { name: "판단과 조치" });
-    expect(screen.queryByRole("button", { name: "수정 되돌리기" })).toBeNull();
-    expect(withdrawCorrection).not.toHaveBeenCalled();
-  });
 
   it("reports exposure and opening as silver, only for rows something raised, and never fails the list on it", async () => {
     recordBehavior.mockRejectedValue(new Error("down"));
@@ -986,148 +749,52 @@ describe("the AI pilot's mark and the feedback spine (RUBRIC v2 §13.7)", () => 
 });
 
 /**
- * <b>리뷰 canonical redesign — review → signal → context → action</b> (product-owner decision, 2026-10-03).
+ * <b>리뷰 canonical mockup — Linear Issues list</b> (product-owner decision, 2026-10-05).
  *
- * <p>The screen stopped being a review explorer: the list leads with what the customer wrote, and the pane
- * is where the decision is prepared — 왜 올라왔나요 → 반복 신호 → 이 상품에 대해 아는 것 → 판단과 조치. No
- * endpoint, no table and no write was added for it; the two reads are the ones 리뷰 처리 already makes.
+ * <p>목록의 계약은 네 줄이다. 행은 한 줄이고, 맨 앞이 고객의 문장이며, 그것만 잉크색이다. 나머지는
+ * 오른쪽 한 덩어리의 주석이고, 묶음 머리가 분류를 말한다. 행 사이의 선은 없다 — 한 줄짜리 문장들이
+ * 이미 목록이고, 선은 거기에 읽을 것이 하나 더 있다는 뜻이 아니었다.
  */
-describe("the decision workspace in the record's pane", () => {
-  const PROBLEM = {
-    issueId: "iss-1",
-    title: "접착 탈락",
-    severity: "NORMAL" as const,
-    lifecycleState: "OBSERVING",
-    evidenceCount: 7,
-    firstEvidenceOn: "2025-07-12",
-    lastEvidenceOn: "2026-08-18",
-    dismissed: false,
-    similar: [
-      { reviewId: "s1", occurredOn: "2026-08-18", rating: 5, quote: "본드로 붙여버렸어요", productName: "무선 이어폰", sameProduct: true },
-      { reviewId: "s2", occurredOn: "2026-04-26", rating: 4, quote: "다른 3M테이프 붙이고 씁니다", productName: "무선 이어폰", sameProduct: true },
-      { reviewId: "s3", occurredOn: "2026-03-17", rating: 4, quote: "글루건으로 붙였습니다", productName: "무선 이어폰", sameProduct: true },
-    ],
-  };
-
-  it("reads the decision context and the trail by the review's own id — and writes nothing", async () => {
-    renderPage("/reviews?review=r1");
-    await screen.findByRole("region", { name: "판단과 조치" });
-
-    expect(getDecisionContext).toHaveBeenCalledWith("r1");
-    expect(getDecisionLog).toHaveBeenCalledWith("r1");
-    expect(correctTriage).not.toHaveBeenCalled();
-    expect(recordAction).not.toHaveBeenCalled();
-    expect(withdrawCorrection).not.toHaveBeenCalled();
-  });
-
-  /**
-   * <b>기본 2건, 나머지는 접는다</b> (product-owner decision, 2026-10-03). The read's bound is unchanged —
-   * at most three quotes per problem — and the fold's label says exactly how many it holds, because a
-   * 「근거 7건」 label over one hidden quote would claim the whole evidence set is behind it.
-   */
-  it("반복 신호: two examples stand open, the rest folds under a label that counts it, and the problem keeps its record", async () => {
-    getDecisionContext.mockResolvedValue({ ...CONTEXT, repeatedProblems: [PROBLEM] });
-    renderPage("/reviews?review=r1");
-
-    const signal = await screen.findByRole("region", { name: "반복 신호" });
-    expect(within(signal).getByRole("link", { name: /접착 탈락/ })).toHaveAttribute("href", "/memory/iss-1");
-    expect(within(signal).getByText("근거 7건")).toBeInTheDocument();
-    expect(within(signal).getByText("「본드로 붙여버렸어요」")).toBeInTheDocument();
-    expect(within(signal).getByText("「다른 3M테이프 붙이고 씁니다」")).toBeInTheDocument();
-    // The third is not dropped — it is one press away, under a label that says it is one.
-    expect(within(signal).getByText("같은 문제를 말한 리뷰 1건 더")).toBeInTheDocument();
-  });
-
-  it("이 상품에 대해 우리가 아는 것: the counts, and not the product name the header already says", async () => {
-    getDecisionContext.mockResolvedValue({
-      ...CONTEXT,
-      knowledge: { productSources: 3, orgSources: 2, productTitles: ["부착이 잘 떨어질 때 안내"], openAsks: 0 },
-    });
-    renderPage("/reviews?review=r1");
-
-    const grounding = await screen.findByRole("region", { name: "이 상품에 대해 우리가 아는 것" });
-    expect(within(grounding).getByText("리뷰 416건")).toBeInTheDocument();
-    expect(within(grounding).getByText("등록된 상품 지식 3건")).toBeInTheDocument();
-    expect(within(grounding).getByText("회사 운영 기준 2건")).toBeInTheDocument();
-    expect(within(grounding).queryByText("무선 이어폰")).toBeNull();
-  });
-
-  it("기록: the trail in the words the workspace uses, newest first — and nothing at all when there is none", async () => {
-    getDecisionLog.mockResolvedValue([
-      { kind: "ACTION_RECORDED", from: null, to: "ACTION_STARTED", at: "2026-08-17T11:54:31Z" },
-      { kind: "SELLER_JUDGMENT_SET", from: null, to: "FYI", at: "2026-08-17T11:54:26Z" },
-    ]);
-    renderPage("/reviews?review=r1");
-
-    const log = await screen.findByRole("region", { name: "기록" });
-    const rows = within(log).getAllByRole("listitem").map((li) => li.textContent ?? "");
-    expect(rows).toHaveLength(2);
-    // Newest first, in the sentences `decisionLogSentence` composes — the workspace's own words, not a
-    // second vocabulary for the same five trails.
-    expect(rows[0]).toContain("조치를 시작했다고 기록");
-    expect(rows[0]).toContain("2026-08-17");
-    expect(rows[1]).toContain("판매자 판단을 참고(으)로 기록");
-  });
-
-  it("기록: draws no heading over an empty trail — a review nobody has decided has no history", async () => {
-    renderPage("/reviews?review=r1");
-    await screen.findByRole("region", { name: "판단과 조치" });
-
-    expect(screen.queryByRole("region", { name: "기록" })).toBeNull();
-  });
-
-  /**
-   * <b>고객이 쓴 문장이 행의 첫 시선</b>. The row used to open with the system's own vocabulary — a tier chip,
-   * then the stars, then the channel and the date — and what the customer said came third. This asserts the
-   * ORDER, not the presence: every one of those facts is still on the row, under the sentence.
-   */
-  it("the row leads with what the customer wrote, and the system's words follow it", async () => {
+describe("리뷰 목록 — the Linear grouping (2026-10-05)", () => {
+  it("the customer's sentence is the only ink on the row, and it comes first", async () => {
     renderPage();
-    const row = (await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("a")!;
-    const text = (row.textContent ?? "").replace(/\s+/g, " ").trim();
+    const sentence = await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
+    const row = sentence.closest("a")!;
 
-    expect(text.indexOf("배송도 빠르고 포장도 꼼꼼했어요")).toBe(0);
-    expect(text.indexOf("참고")).toBeGreaterThan(text.indexOf("배송도 빠르고 포장도 꼼꼼했어요"));
-    expect(text).toContain("★★★★★ 5점");
-    expect(text).toContain("쿠팡");
-    expect(text).toContain("무선 이어폰");
+    expect(sentence.className).toContain("text-ink");
+    expect(sentence.className).toContain("text-base");
+    // The sentence is the first child of the row; everything else trails it.
+    expect(row.firstElementChild).toBe(sentence);
+    // And the whole right-hand cluster is one weak block, not a column of competing ranks.
+    const meta = row.lastElementChild as HTMLElement;
+    expect(meta.className).toContain("text-xs");
+    expect(meta.className).toContain("text-muted");
+    // The rating is the compact glyph in the row; the sentence a screen reader hears is unchanged.
+    expect(meta.textContent).toContain("★5");
+    expect(within(meta).getByLabelText(/5점/)).toBeInTheDocument();
   });
 
-  /**
-   * <b>A review 확인할 일 already holds is shown AS that case</b>, and that reading carries its own action. A
-   * docked 이 리뷰 처리하기 under it would be a second primary verb in one column, for the same review.
-   */
-  it("docks no door under the case reading of the pane", async () => {
-    decisions.mockResolvedValue({
-      total: 1,
-      rows: [{ caseId: "case-9", subjectKind: "REVIEW", to: "/reviews/reply/r1" }],
-    });
-    renderPage("/reviews?review=r1");
+  it("draws no rule between rows — the list is the sentences", async () => {
+    renderPage();
     await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
-
-    await waitFor(() => expect(screen.queryByTestId("pane-footer")).toBeNull());
-    expect(screen.queryByRole("link", { name: "이 리뷰 처리하기" })).toBeNull();
+    const list = screen.getByRole("region", { name: "목록" });
+    expect(list.innerHTML).not.toContain("divide-y");
   });
 
-  /** The record's own axis, as tabs: the three tiers and the whole record, each with the count the server sent. */
-  it("the tier tabs carry the record's counts, and 전체 is the whole record — not the filtered page", async () => {
-    // `page.total` narrows with the filter and the tier counts do not. A 전체 tab reading the narrowed
-    // number would tell a seller their record holds what their current filter holds.
-    getChannelReviewsStrict.mockResolvedValue({
-      ...PAGE,
-      total: 1,
-      items: [PAGE.items[1]],
-      triageSummary: { needsAttention: 1, watch: 3, fyi: 18, repeatedCategories: [] },
-    });
+  it("keeps the open group's header in view while its rows scroll past", async () => {
     renderPage();
-    const filter = await screen.findByRole("group", { name: "분류 필터" });
+    await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
+    const header = screen.getByRole("button", { name: /확인 필요\s*1/ });
+    expect(header.className).toContain("sticky");
+  });
 
-    expect(within(filter).getAllByRole("button").map((b) => b.textContent?.replace(/\s+/g, " ").trim())).toEqual([
-      "확인 필요 1",
-      "지켜보기 3",
-      "참고 18",
-      "전체 22",
-    ]);
+  it("a closed group draws its name and its count, and no rows", async () => {
+    renderPage();
+    await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
+    const list = screen.getByRole("region", { name: "목록" });
+    const watch = within(list).getByRole("button", { name: /지켜보기/ });
+    expect(watch).toHaveAttribute("aria-expanded", "false");
+    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
   });
 });
 
