@@ -4,6 +4,7 @@ import com.sellerops.inquiry.InquiryRepository;
 import com.sellerops.product.dto.ProductCatalogView;
 import com.sellerops.product.dto.ProductSummaryView;
 import com.sellerops.review.ReviewRepository;
+import com.sellerops.reviewissue.ReviewIssueEvidenceRepository;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -23,12 +24,28 @@ import org.springframework.transaction.annotation.Transactional;
  * product carrying 1,761 reviews was not on the page, under a heading that read 「상품 10개」.
  * {@code search} is untouched; the screen simply stops asking it a question it was not built for.
  *
- * <p><b>Weight is what the seller owes, then what customers complained about.</b> Unanswered
- * inquiries, then negative reviews, then review volume, then name so the tail is stable — the same
- * order the screen already sorted the ten rows it happened to receive by. Moving it here is what lets
- * that rule see the whole catalogue.
+ * <p><b>Weight is what the seller owes, then what customers complained about: 답변 대기 → 문제 근거 →
+ * 리뷰, then name so the tail is stable.</b> This is the canonical ordering, and it is canonical
+ * because it is the ONLY one — the 상품 screen renders what this returns, in this order, and no longer
+ * re-sorts it. It used to, by its own rule, and the two rules disagreed on the second key: this one
+ * broke ties on NEGATIVE REVIEW COUNT while the screen broke them on 문제 근거. So which twenty
+ * products reached the page was decided by one quantity and the order they stood in by another, and
+ * neither was the number the row displayed. A seller comparing the 문제 근거 column down the page was
+ * reading a column that did not explain its own ordering, and a product with heavy evidence but few
+ * negative reviews could be kept off the page entirely by a key nothing on screen showed.
  *
- * <p><b>Three reads, never one per row.</b> Two grouped counts and the catalogue, then the ranking in
+ * <p><b>The keys are the quantities the row prints.</b> Every one of the three is a column on the 상품
+ * list and a relation on 상품 상세, counted here exactly as those screens count it — in particular
+ * 문제 근거 drops dismissed issues, because that is what the column shows
+ * ({@code ReviewIssueEvidenceRepository.activeEvidenceCountsByProduct}). An ordering key that cannot
+ * be read off the screen it orders is not a ranking, it is a secret.
+ *
+ * <p><b>Ingest's {@code (미지정 상품)} bucket sorts last whatever it holds.</b> It is an artifact of
+ * unattributed rows rather than a product ({@link OperatorProductName#UNSPECIFIED_PRODUCT_NAME}), and
+ * the screen used to push it down itself — the one piece of its own ordering that was not a tie-break.
+ * It moves here with the rest, so the rule survives the screen giving up sorting.
+ *
+ * <p><b>Four reads, never one per row.</b> Three grouped counts and the catalogue, then the ranking in
  * memory. Asking the per-product signals endpoint instead would be 308 requests to choose twenty.
  *
  * <p><b>Two different synthetic rules, on purpose.</b> WHICH products exist follows the auto-enabled
@@ -45,12 +62,14 @@ public class ProductCatalogService {
     private final ProductRepository products;
     private final InquiryRepository inquiries;
     private final ReviewRepository reviews;
+    private final ReviewIssueEvidenceRepository evidence;
 
     public ProductCatalogService(ProductRepository products, InquiryRepository inquiries,
-                                 ReviewRepository reviews) {
+                                 ReviewRepository reviews, ReviewIssueEvidenceRepository evidence) {
         this.products = products;
         this.inquiries = inquiries;
         this.reviews = reviews;
+        this.evidence = evidence;
     }
 
     @Transactional(readOnly = true)
@@ -63,16 +82,18 @@ public class ProductCatalogService {
             unanswered.put((UUID) row[0], ((Number) row[1]).longValue());
         }
         Map<UUID, Long> reviewCount = new HashMap<>();
-        Map<UUID, Long> negativeCount = new HashMap<>();
         for (Object[] row : reviews.countOperationalByProduct(orgId)) {
-            UUID id = (UUID) row[0];
-            reviewCount.put(id, ((Number) row[1]).longValue());
-            negativeCount.put(id, row[2] == null ? 0L : ((Number) row[2]).longValue());
+            reviewCount.put((UUID) row[0], ((Number) row[1]).longValue());
+        }
+        Map<UUID, Long> issueEvidence = new HashMap<>();
+        for (Object[] row : evidence.activeEvidenceCountsByProduct(orgId)) {
+            issueEvidence.put((UUID) row[0], ((Number) row[1]).longValue());
         }
 
         Comparator<Product> byWeight = Comparator
-                .comparingLong((Product p) -> -unanswered.getOrDefault(p.getId(), 0L))
-                .thenComparingLong(p -> -negativeCount.getOrDefault(p.getId(), 0L))
+                .comparingInt((Product p) -> isUnspecifiedBucket(p) ? 1 : 0)
+                .thenComparingLong(p -> -unanswered.getOrDefault(p.getId(), 0L))
+                .thenComparingLong(p -> -issueEvidence.getOrDefault(p.getId(), 0L))
                 .thenComparingLong(p -> -reviewCount.getOrDefault(p.getId(), 0L))
                 .thenComparing(Product::getName, Comparator.nullsLast(Comparator.naturalOrder()));
 
@@ -83,5 +104,11 @@ public class ProductCatalogService {
                         ProductMatchSurface.CATALOG_HEAD, null))
                 .toList();
         return new ProductCatalogView(all.size(), rows);
+    }
+
+    /** Ingest's shared bucket for rows it could not attribute — a row, not a product. */
+    private static boolean isUnspecifiedBucket(Product p) {
+        return p.getName() != null
+                && OperatorProductName.UNSPECIFIED_PRODUCT_NAME.equals(p.getName().trim());
     }
 }

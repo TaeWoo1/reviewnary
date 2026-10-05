@@ -80,6 +80,34 @@ public interface ReviewIssueEvidenceRepository extends JpaRepository<ReviewIssue
     List<Object[]> issueEvidenceCountsByProduct(@Param("orgId") UUID orgId,
                                                 @Param("productId") UUID productId);
 
+    /**
+     * 문제 근거 per product for the WHOLE catalogue — the 상품 screen's second ranking key, read once.
+     *
+     * <p><b>It must equal what the screen prints, row for row.</b> The 상품 list shows this quantity in
+     * a column and is ordered by it, and the number in that column comes from
+     * {@code ProductSignalsService.issuesFor}, which drops dismissed issues before summing. A ranking
+     * query that counted raw evidence rows would order the catalogue by a number no row displays —
+     * which is the whole defect this key was introduced to close, in a second form. Hence the join and
+     * the {@code dismissed = false}: same filter, same total, by construction.
+     *
+     * <p><b>Nothing synthetic can reach it</b>, and not because this query excludes it:
+     * {@code ReviewIssueExtractionService.extract} returns before writing anything for a review whose
+     * {@code dataOrigin} is synthetic, so an evidence row exists only for a real one. The property the
+     * review ranking states in its own {@code where} clause — a manufactured complaint must never
+     * decide which product a seller is told to look at first — therefore holds here at the source.
+     *
+     * <p>One grouped read for the catalogue, never one per row, for the same reason as its two
+     * siblings in {@code ProductCatalogService}: ranking 294 products must not cost 294 queries.
+     */
+    @Query("""
+            select e.productId, count(e)
+            from ReviewIssueEvidence e, ReviewIssue i
+            where i.id = e.issueId and i.orgId = e.orgId and i.dismissed = false
+              and e.orgId = :orgId and e.productId is not null
+            group by e.productId
+            """)
+    List<Object[]> activeEvidenceCountsByProduct(@Param("orgId") UUID orgId);
+
     /** Evidence rows this org holds that carry no product link — the unlinked coverage denominator. */
     long countByOrgIdAndProductIdIsNull(UUID orgId);
 
