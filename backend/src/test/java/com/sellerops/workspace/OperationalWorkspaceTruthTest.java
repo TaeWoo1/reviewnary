@@ -60,6 +60,7 @@ class OperationalWorkspaceTruthTest {
     @Autowired InquiryWorkItemRepository workItems;
     @Autowired InquiryReplyDraftRepository drafts;
     @Autowired ReviewRepository reviews;
+    @Autowired com.sellerops.reviewissue.ReviewIssueEvidenceRepository issueEvidence;
 
     private UUID org;
     private UUID channelId;
@@ -84,7 +85,7 @@ class OperationalWorkspaceTruthTest {
                 com.sellerops.identity.ExecutableIdentityResolver.unresolved(), drafts);
         rows = new InquiryRowsService(inquiries, workItems, channels, products,
                 com.sellerops.identity.ExecutableIdentityResolver.unresolved());
-        catalogue = new ProductCatalogService(products, inquiries, reviews);
+        catalogue = new ProductCatalogService(products, inquiries, reviews, issueEvidence);
     }
 
     private UUID inquiry(String title, UUID productId) {

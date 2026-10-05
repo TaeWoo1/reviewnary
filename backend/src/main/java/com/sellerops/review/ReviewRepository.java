@@ -491,14 +491,19 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
      * same-org ownership.
      */
     /**
-     * Reviews per product — total and negative — for the whole catalogue at once.
+     * Reviews per product for the whole catalogue at once — the 상품 screen's third ranking key and
+     * the 리뷰 column it prints, read the same way and for the same reason as
+     * {@code countUnansweredOperationalByProduct}: one query, not one per row. Synthetic rows are
+     * excluded — a manufactured complaint must never decide which product a seller is told to look
+     * at first.
      *
-     * <p>The second and third keys the 상품 screen ranks by, read the same way and for the same
-     * reason as {@code countUnansweredOperationalByProduct}: one query, not one per row. Synthetic
-     * rows are excluded — a manufactured complaint must never decide which product a seller is told
-     * to look at first.
+     * <p>It used to return a negative-review count beside the total, and that count was the
+     * catalogue's SECOND key. Nothing on the 상품 screen showed it, so the page was ranked by a
+     * quantity the seller could not read — see {@code ProductCatalogService} for why the second key
+     * is now 문제 근거, which is a column. The column is gone rather than left unread: a grouped
+     * query that still computes it would invite the next reader to rank by it again.
      */
-    @Query("select r.productId, count(r), sum(case when r.negative = true then 1 else 0 end)"
+    @Query("select r.productId, count(r)"
             + " from Review r where r.orgId = :orgId and r.productId is not null"
             + " and r.dataOrigin = com.sellerops.common.DataOrigin.REAL"
             + " group by r.productId")
