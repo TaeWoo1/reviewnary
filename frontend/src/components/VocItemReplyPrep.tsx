@@ -627,29 +627,42 @@ export function VocItemReplyPrep({
       ) : null}
 
       <div className="flex flex-col gap-1">
-        <label htmlFor={editorId} className="text-sm font-semibold text-muted">
-          답변 초안
-        </label>
+        {/* <b>승인된 답변은 읽을 것이지 고칠 것이 아니다</b> (Front conversation detail, 2026-10-06).
+            Front의 제안된 답장은 상자 안에서 그냥 문장으로 서 있다 — 편집기 테두리도, 회색 입력면도
+            없다. 우리 쪽도 승인이 서 있는 동안에는 저장할 수 없으므로 편집기를 그리는 것은 누를 수 없는
+            컨트롤을 그리는 것이고, 그 테두리가 화면에서 가장 먼저 보이는 모양이 된다. 승인을 해제하면
+            같은 자리에 같은 편집기가 돌아온다 — 아무 능력도 사라지지 않는다. */}
+        {/* <b>승인된 상태에서는 이름을 그리지 않는다.</b> 카드가 이미 「답변 준비」라고 말하고 바로 아래
+            출처 한 줄이 「아래 초안은 …」이라고 가리킨다. 편집기가 있을 때는 입력칸에 이름이 필요하므로
+            `<label>`이 그대로 선다. 읽어 주는 이름은 양쪽 다 「답변 초안」으로 남는다. */}
+        {approved ? null : (
+          <label htmlFor={editorId} className="text-sm font-semibold text-muted">
+            답변 초안
+          </label>
+        )}
         {draftProvenanceNote(prep.draftAuthorKind, approved) ? (
           <p className="text-sm text-muted">{draftProvenanceNote(prep.draftAuthorKind, approved)}</p>
         ) : null}
-        <textarea
-          id={editorId}
-          value={body}
-          onChange={(e) => {
-            setBody(e.target.value);
-            setDirty(true);
-          }}
-          readOnly={!canSave || working}
-          aria-describedby={approved ? `${headingId}-frozen` : undefined}
-          rows={5}
-          className="w-full rounded-lg border border-line bg-white p-2 text-sm text-ink"
-        />
         {approved ? (
-          <p id={`${headingId}-frozen`} className="text-sm text-muted">
-            승인된 초안은 수정할 수 없습니다. 고치려면 승인을 해제하세요.
+          <p
+            aria-label="답변 초안"
+            className="mt-1 whitespace-pre-wrap break-keep text-base leading-relaxed text-ink"
+          >
+            {body}
           </p>
-        ) : null}
+        ) : (
+          <textarea
+            id={editorId}
+            value={body}
+            onChange={(e) => {
+              setBody(e.target.value);
+              setDirty(true);
+            }}
+            readOnly={!canSave || working}
+            rows={5}
+            className="w-full rounded-lg border border-line bg-white p-2 text-sm text-ink"
+          />
+        )}
         {!approved && !canSave && prep.channelReplyState !== "ANSWERED" ? (
           // Why the editor is inert, rather than a dead control with no explanation. The operator's
           // own decision is what closed it, and they can reverse it.
@@ -667,17 +680,23 @@ export function VocItemReplyPrep({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          aria-disabled={!canSave || working}
-          aria-busy={busy === "saving"}
-          onClick={() => void save()}
-          className={`rounded-lg px-2.5 py-1 text-sm font-semibold ${
-            canSave && !working ? "bg-canvas text-ink" : "bg-canvas text-muted opacity-40"
-          }`}
-        >
-          초안 저장
-        </button>
+        {/* <b>승인된 동안에는 그리지 않는다.</b> 이 단추는 「지금은 못 누른다, 그러나 되돌릴 수 있다」를
+            말하려고 비활성으로 남아 있었고 그 이유는 지켜보기일 때 옳다. 승인일 때의 이유는 다르다 —
+            초안이 얼어 있는 것이고, 그 사실은 바로 아래 한 줄이 말하며 승인 해제가 되돌린다. 기본 화면에서
+            눌리지 않는 회색 단추 하나가 줄어든다. */}
+        {approved ? null : (
+          <button
+            type="button"
+            aria-disabled={!canSave || working}
+            aria-busy={busy === "saving"}
+            onClick={() => void save()}
+            className={`rounded-lg px-2.5 py-1 text-sm font-semibold ${
+              canSave && !working ? "bg-canvas text-ink" : "bg-canvas text-muted opacity-40"
+            }`}
+          >
+            초안 저장
+          </button>
+        )}
         {/* Rendered inert rather than removed once a draft exists. The card removes a
             control when the row can NEVER carry the action (no ref); here the truth is
             "not while this review is 지켜보기" — a reason, and one the operator can reverse.
@@ -704,12 +723,14 @@ export function VocItemReplyPrep({
           </button>
         ) : null}
         {approved ? (
+          /* 되돌리기이지 다음에 할 일이 아니다. 면을 가진 단추로 그리면 복사 옆에서 같은 무게를 갖고,
+             기본 화면의 「지금 할 일」이 둘로 읽힌다. 글자 단추로 내린다 — 같은 write, 같은 자리. */
           <button
             type="button"
             aria-disabled={!capabilities.canWithdraw || working || unavailable}
             aria-busy={busy === "withdrawing"}
             onClick={() => void decide("WITHDRAWN")}
-            className="rounded-lg bg-canvas px-2.5 py-1 text-sm font-semibold text-ink"
+            className="rounded px-1 py-1 text-sm font-semibold text-muted underline-offset-2 hover:text-ink hover:underline"
           >
             승인 해제
           </button>
@@ -767,6 +788,9 @@ export function VocItemReplyPrep({
           <span className="text-sm text-muted">
             '대응 필요'로 되돌리면 복사할 수 있습니다.
           </span>
+        ) : null}
+        {approved ? (
+          <span className="text-sm text-muted">승인된 초안은 수정할 수 없습니다. 고치려면 승인을 해제하세요.</span>
         ) : null}
       </div>
 

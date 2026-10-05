@@ -310,9 +310,18 @@ describe("VocItemReplyPrep", () => {
     expect(body.commandId).toBeTruthy();
   });
 
-  it("freezes the editor once approved and explains the way out", async () => {
+  /**
+   * <b>승인된 답변은 편집기가 아니라 읽을 것이다</b> (Front conversation detail, 2026-10-06).
+   *
+   * <p>지키는 것은 전과 같다 — 승인이 서 있는 동안 본문은 고칠 수 없고, 되돌리는 길이 말해져 있고,
+   * 그 길의 컨트롤이 있다. 달라진 것은 「고칠 수 없음」을 읽기 전용 입력칸으로 보여 주던 것을 그만두고
+   * 문장으로 그린다는 것뿐이다. 누를 수 없는 컨트롤을 그리면 그 테두리가 화면에서 가장 먼저 보인다.
+   */
+  it("shows the approved reply as text rather than an editor, and says the way out", async () => {
     await renderPanel(APPROVED);
-    expect(screen.getByLabelText("답변 초안")).toHaveAttribute("readonly");
+    const shown = screen.getByLabelText("답변 초안");
+    expect(shown.tagName).toBe("P");
+    expect(document.querySelector("textarea")).toBeNull();
     expect(screen.getByText(/승인을 해제하세요/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "승인 해제" })).toBeTruthy();
   });
@@ -379,8 +388,8 @@ describe("VocItemReplyPrep", () => {
         draft: { ...APPROVED.draft!, body: "합성-편집-버퍼" },
       }),
     );
-    // The editor seeds from the draft, so the buffer genuinely holds the other string.
-    expect(screen.getByLabelText("답변 초안")).toHaveValue("합성-편집-버퍼");
+    // 화면이 그리는 것은 저장된 draft의 본문이고, 그것은 승인된 본문과 다른 문자열이다.
+    expect(screen.getByLabelText("답변 초안").textContent).toBe("합성-편집-버퍼");
 
     await user.click(screen.getByRole("button", { name: "복사" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
