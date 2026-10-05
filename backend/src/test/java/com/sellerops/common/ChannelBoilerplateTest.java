@@ -125,6 +125,37 @@ class ChannelBoilerplateTest {
     }
 
     @Test
+    @DisplayName("날짜가 가려지고 꼬리가 잘린 꼴도 간다 — 이 경계가 생기기 전에 쓰인 글이 그 꼴이다")
+    void stripsTheRedactedAndTruncatedShape() {
+        // 지식 후보 하나가 실제로 들고 있는 문장 (데모 org, 2026-09-03 생성).
+        String stored = "'항상 만족하며 잘 사용하고있어요 ([번호] 12:36:41 에 등록된 네…'에 대해 고객에게 "
+                + "안내하는 공식 기준이 있나요? 이 상품에 저장된 지식에서 찾지 못했습니다.";
+        assertThat(ChannelBoilerplate.strip(stored))
+                .isEqualTo("'항상 만족하며 잘 사용하고있어요'에 대해 고객에게 안내하는 공식 기준이 있나요? "
+                        + "이 상품에 저장된 지식에서 찾지 못했습니다.");
+        // 인용부호 없이 글 끝에서 잘린 꼴도 같다.
+        assertThat(ChannelBoilerplate.strip("항상 만족하며 잘 사용하고있어요 ([번호] 12:36:41 에 등록된 네…"))
+                .isEqualTo("항상 만족하며 잘 사용하고있어요");
+    }
+
+    @Test
+    @DisplayName("고객이 제 손으로 쓴 괄호는 셋을 다 만족하지 못하므로 남는다")
+    void aCustomersOwnParenthesisSurvives() {
+        // 시각도 「에 등록된」도 없는 괄호 — 이 배포에서 네 명이 문의 끝에 직접 쓴 꼴.
+        assertThat(ChannelBoilerplate.strip("교육용으로 씁니다 (서울경희직업전문학교)"))
+                .isEqualTo("교육용으로 씁니다 (서울경희직업전문학교)");
+        // 시각은 있지만 「에 등록된」이 없다.
+        assertThat(ChannelBoilerplate.strip("12:36:41 쯤 전화 주세요 (급해요"))
+                .isEqualTo("12:36:41 쯤 전화 주세요 (급해요");
+        // 「에 등록된」은 있지만 시각이 없다.
+        assertThat(ChannelBoilerplate.strip("주소지에 등록된 번호로 (확인 부탁"))
+                .isEqualTo("주소지에 등록된 번호로 (확인 부탁");
+        // 괄호가 닫혀 있으면 그것은 고객이 끝낸 말이다.
+        assertThat(ChannelBoilerplate.strip("메모 (12:36:41 에 등록된 내용) 확인 부탁드립니다"))
+                .isEqualTo("메모 (12:36:41 에 등록된 내용) 확인 부탁드립니다");
+    }
+
+    @Test
     @DisplayName("redaction is unaffected — a phone number before the footer is still masked")
     void redactionIsUnaffected() {
         String raw = "연락처 010-1234-5678 로 주세요<br/>"

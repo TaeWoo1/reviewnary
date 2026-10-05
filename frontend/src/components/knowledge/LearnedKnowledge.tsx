@@ -56,31 +56,32 @@ export function LearnedKnowledge() {
   };
 
   if (learned === undefined) {
-    return <p className="px-5 py-6 text-sm text-muted">확인하는 중…</p>;
+    return <p className="px-1 py-2 text-sm text-muted">확인하는 중…</p>;
   }
   if (learned === null) {
-    return <p className="px-5 py-6 text-sm text-muted">배운 내용을 불러오지 못했습니다.</p>;
+    return <p className="px-1 py-2 text-sm text-muted">배운 내용을 불러오지 못했습니다.</p>;
   }
 
   return (
     <div data-testid="learned-knowledge">
-      {/* 지식 화면의 다른 표들과 같은 머리 — 여기 서는 것은 보유한 지식이 아니라 읽어 온 것이므로,
-          수는 같은 자리에 서되 「답변 근거」 열은 없다. aria-hidden: 각 줄이 제 이름을 달고 있다. */}
+      {/* 위의 표들과 같은 열 자리, 다른 무게 — 상자도 바탕색도 없이 가는 선 하나로만 나뉜다. 여기 서는
+          것은 보유한 지식이 아니라 읽어 온 것이므로 「답변 근거」 열도 없다.
+          aria-hidden: 각 줄이 제 이름을 달고 있다. */}
       <div
         aria-hidden="true"
-        className="flex items-center gap-4 border-b border-line bg-canvas/40 px-5 py-2 text-xs text-muted"
+        className="flex items-center gap-4 border-b border-line px-1 py-1.5 text-xs text-muted"
       >
         <span className="min-w-0 flex-1">읽어 온 것</span>
         <span className="w-[96px] shrink-0 text-right">건수</span>
         <span className="w-[96px] shrink-0 text-right">최근</span>
       </div>
-      <ul className="divide-y divide-line/70">
+      <ul className="divide-y divide-line/60">
         {learned.sources.map((source) => (
           <SourceRow key={source.key} source={source} lines={learned.channels.filter((l) => l.source === source.key)} />
         ))}
       </ul>
 
-      <div className="space-y-2 border-t border-line bg-canvas/40 px-5 py-3">
+      <div className="space-y-2 border-t border-line px-1 pt-3">
         {learned.historyReads.length > 0 ? (
           <ul className="space-y-0.5 text-xs text-muted">
             {learned.historyReads.map((read) => (
@@ -121,7 +122,7 @@ export function LearnedKnowledge() {
 function SourceRow({ source, lines }: { source: LearnedKnowledgeSource; lines: LearnedKnowledgeChannelLine[] }) {
   const missing = lines.filter((l) => l.availability !== "LEARNED" && l.availability !== "SCREEN_READ");
   return (
-    <li className="px-5 py-2">
+    <li className="px-1 py-2">
       <div className="flex items-center gap-4">
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{source.labelKo}</span>
         <span className="w-[96px] shrink-0 text-right text-sm tabular-nums text-ink">

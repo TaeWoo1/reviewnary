@@ -373,6 +373,16 @@ describe("지식", () => {
     );
   });
 
+  it("확인 필요 두 줄은 같은 상태이므로 같은 무게로 선다 — 한쪽이 골라져 있다고 말하지 않는다", async () => {
+    getKnowledgeCandidates.mockResolvedValue([GAP, { ...GAP, id: "c-3", subject: "두 번째" }]);
+    draw();
+    await screen.findByTestId("knowledge-inbox");
+    const enter = screen.getAllByRole("button", { name: "입력" });
+    expect(enter).toHaveLength(2);
+    // 생김새를 글자로 못 박지 않는다 — 둘이 서로 같다는 것만이 계약이다.
+    expect(enter[0].className).toBe(enter[1].className);
+  });
+
   it("「보류」 dismisses without writing anything", async () => {
     draw();
     await screen.findByTestId("knowledge-inbox");

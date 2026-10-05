@@ -2,6 +2,7 @@ package com.sellerops.knowledge.candidate;
 
 import com.sellerops.common.ApiException;
 import com.sellerops.knowledge.KnowledgeText;
+import com.sellerops.common.ChannelBoilerplate;
 import com.sellerops.knowledge.candidate.dto.KnowledgeCandidateView;
 import com.sellerops.knowledge.memory.AnswerMemory;
 import com.sellerops.knowledge.memory.AnswerMemoryRepository;
@@ -447,9 +448,22 @@ public class KnowledgeCandidateService {
                 .orElse(null);
     }
 
+    /**
+     * One stored candidate, on the way out.
+     *
+     * <p><b>The channel's own footer is removed here as well as at ingest.</b> A candidate's text is
+     * written once and read for as long as it stays open, so a row created before
+     * {@link com.sellerops.common.ChannelBoilerplate} existed still carries what the importer stamped
+     * onto the customer's review — on this deployment one open row quotes
+     * {@code 항상 만족하며 잘 사용하고있어요 ([번호] 12:36:41 에 등록된 네…} back to the seller as the thing
+     * they are being asked to write a standard about. The stored row is NOT rewritten: it is the
+     * record of what was generated, and the same rule that keeps the footer out of new rows takes it
+     * off this one on the way to the screen.
+     */
     private static KnowledgeCandidateView view(KnowledgeCandidate row, String productName) {
         return new KnowledgeCandidateView(row.getId(), row.getScope(), row.getProductId(), productName,
-                row.getSubject(), row.getContent(), row.getOrigin(), row.getEvidenceCount(),
+                ChannelBoilerplate.strip(row.getSubject()), ChannelBoilerplate.strip(row.getContent()),
+                row.getOrigin(), row.getEvidenceCount(),
                 row.getState(), row.getSourceId(), row.getCreatedAt());
     }
 

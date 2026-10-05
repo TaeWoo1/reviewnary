@@ -58,23 +58,13 @@ export function KnowledgeInbox({
       {/* 구역의 이름은 바깥 Section이 이미 달고 있다 — 같은 이름을 두 번 달면 읽어 주는 쪽에 상자가 둘로 들린다. */}
       <ListBox>
         <ul className="divide-y divide-line/70" data-testid="knowledge-inbox">
-          {gaps.map((candidate, i) => (
-            <CandidateRow
-              key={candidate.id}
-              candidate={candidate}
-              primary={i === 0}
-              onChanged={onChanged}
-              onError={setError}
-            />
+          {/* 두 줄은 같은 상태다 — 어느 쪽도 선택돼 있지 않고, 어느 쪽을 먼저 해야 한다는 근거도 없다.
+              한쪽만 solid로 그리면 그 줄이 골라져 있다는 뜻이 되므로, 위계는 같게 둔다. */}
+          {gaps.map((candidate) => (
+            <CandidateRow key={candidate.id} candidate={candidate} onChanged={onChanged} onError={setError} />
           ))}
           {repeats.map((candidate) => (
-            <CandidateRow
-              key={candidate.id}
-              candidate={candidate}
-              primary={false}
-              onChanged={onChanged}
-              onError={setError}
-            />
+            <CandidateRow key={candidate.id} candidate={candidate} onChanged={onChanged} onError={setError} />
           ))}
           {unusable.map((document) => (
             <li key={document.sourceId} className="flex items-center gap-3 px-5 py-2">
@@ -109,12 +99,10 @@ export function KnowledgeInbox({
 
 function CandidateRow({
   candidate,
-  primary,
   onChanged,
   onError,
 }: {
   candidate: KnowledgeCandidateView;
-  primary: boolean;
   onChanged: () => Promise<void> | void;
   onError: (message: string | null) => void;
 }) {
@@ -163,7 +151,7 @@ function CandidateRow({
             </Btn>
             <Btn
               size="sm"
-              variant={primary ? "solid" : "outline"}
+              variant="outline"
               onClick={() => {
                 onError(null);
                 setOpen(true);
