@@ -33,6 +33,34 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     Optional<Product> findByOrgIdAndSku(UUID orgId, String sku);
 
     /**
+     * <b>The names of these products, including the ones the {@code realDataOnly} filter hides.</b>
+     *
+     * <p>Native, which is how this repository's own contract says a read that must see everything is
+     * written ({@code RealDataOnly}: "reads that must see everything regardless use findById or a
+     * native query, neither of which a Hibernate filter touches"). The knowledge workspace needs it
+     * because a piece of knowledge the seller wrote is attached to a product, and a row that cannot
+     * name the product it applies to is unreadable — the 자료 list beside it already resolves names
+     * the same way, one {@code findById} per document, and one screen must not answer the same
+     * question two ways.
+     *
+     * <p><b>It names; it does not admit to a count.</b> Whether a product is part of 「상품 294개」 is
+     * still decided by the ordinary filtered read, so a manufactured product can be named on a row
+     * that exists without being counted into a denominator it is not in.
+     *
+     * <p>The id comes back as text and not as a {@code uuid}: a native select hands the driver's own
+     * representation straight through, which is a {@code byte[]} on one of the two databases this
+     * runs on, and a cast in Java would then be a cast that works in production and fails in the
+     * tests. Casting in SQL makes both ends the same thing.
+     *
+     * @param ids never empty — {@code in ()} is not valid SQL; the caller returns early instead
+     */
+    @org.springframework.data.jpa.repository.Query(
+            value = "select cast(id as varchar) as id, name from products where org_id = :orgId and id in (:ids)",
+            nativeQuery = true)
+    List<Object[]> namesOfAnyOrigin(@org.springframework.data.repository.query.Param("orgId") UUID orgId,
+                                    @org.springframework.data.repository.query.Param("ids") Collection<UUID> ids);
+
+    /**
      * How many products this org holds — the 「상품 정보」 line on the knowledge screen.
      *
      * <p>It is there so a seller who has just connected a channel is not told they have nothing.

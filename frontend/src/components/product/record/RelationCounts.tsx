@@ -24,11 +24,23 @@ export type RelationCount = {
   emphasis?: boolean;
 };
 
-export function RelationCounts({ items }: { items: RelationCount[] }) {
+export function RelationCounts({
+  items,
+  // 지식 화면이 같은 띠를 쓴다 — 거기서 세는 것은 한 상품이 가진 것이 아니라 회사가 가진 지식이므로,
+  // 읽어 주는 이름만 부를 수 있게 열어 둔다. 기본값은 이 컴포넌트가 처음 선 자리의 이름 그대로다.
+  ariaLabel = "이 상품이 가진 것",
+  // 제목 아래 제 줄에 설 때는 아래 선이 본문과의 경계가 된다. 제목과 같은 줄에 설 때는 그 선이 제목을
+  // 가로질러 긋는 선이 되므로 없다 — 띠의 일이 바뀐 것이 아니라 서 있는 자리가 다른 것이다.
+  bare = false,
+}: {
+  items: RelationCount[];
+  ariaLabel?: string;
+  bare?: boolean;
+}) {
   return (
     <nav
-      aria-label="이 상품이 가진 것"
-      className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line pb-3"
+      aria-label={ariaLabel}
+      className={`flex flex-wrap items-center gap-x-5 gap-y-2 ${bare ? "" : "border-b border-line pb-3"}`}
     >
       {items.map((item) => (
         <Relation key={item.label} item={item} />

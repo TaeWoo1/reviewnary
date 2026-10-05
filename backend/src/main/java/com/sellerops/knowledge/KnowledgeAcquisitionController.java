@@ -11,6 +11,8 @@ import com.sellerops.knowledge.document.KnowledgeDocumentService;
 import com.sellerops.knowledge.document.KnowledgeSummaryService;
 import com.sellerops.knowledge.document.dto.KnowledgeDocumentView;
 import com.sellerops.knowledge.document.dto.KnowledgeSummaryView;
+import com.sellerops.knowledge.inventory.KnowledgeInventoryService;
+import com.sellerops.knowledge.inventory.dto.KnowledgeInventoryView;
 import com.sellerops.knowledge.org.OrgKnowledgeType;
 import com.sellerops.product.library.KnowledgeSourceType;
 import java.io.IOException;
@@ -42,14 +44,17 @@ public class KnowledgeAcquisitionController {
     private final KnowledgeDocumentService documents;
     private final KnowledgeCandidateService candidates;
     private final KnowledgeSummaryService summary;
+    private final KnowledgeInventoryService inventory;
     private final UserRepository users;
 
     public KnowledgeAcquisitionController(KnowledgeDocumentService documents,
                                           KnowledgeCandidateService candidates,
-                                          KnowledgeSummaryService summary, UserRepository users) {
+                                          KnowledgeSummaryService summary,
+                                          KnowledgeInventoryService inventory, UserRepository users) {
         this.documents = documents;
         this.candidates = candidates;
         this.summary = summary;
+        this.inventory = inventory;
         this.users = users;
     }
 
@@ -63,6 +68,20 @@ public class KnowledgeAcquisitionController {
     @GetMapping("/summary")
     public KnowledgeSummaryView summary(@AuthenticationPrincipal AuthPrincipal principal) {
         return summary.of(principal.orgId());
+    }
+
+    /**
+     * <b>What this company knows, listed.</b>
+     *
+     * <p>Its own route rather than fields on {@code /summary}, because the two answer different
+     * questions and one of them is bounded by a page: the summary is five numbers a header prints,
+     * this is the corpus itself in the order the screen must draw it. See
+     * {@link KnowledgeInventoryView} for what each row carries and what {@code citations} does not
+     * mean.
+     */
+    @GetMapping("/inventory")
+    public KnowledgeInventoryView inventory(@AuthenticationPrincipal AuthPrincipal principal) {
+        return inventory.of(principal.orgId());
     }
 
     /* ─────────────────────────────── 자료 ─────────────────────────────── */

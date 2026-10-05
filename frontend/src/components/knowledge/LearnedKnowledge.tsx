@@ -7,15 +7,18 @@ import type {
 } from "../../lib/types";
 import { api } from "../../lib/apiClient";
 import { Btn } from "../ui/Btn";
-import { Status } from "../ui/Status";
 
 /**
  * <b>Reviewnary가 배운 것</b> — what the company's operating history has already taught, where each piece came from,
  * and, per connected channel, which history can and cannot be learned.
  *
- * <p>Counts and two examples per source, from the same tables a case retrieves — so a number here is something a case
- * can actually use. A source a channel does not provide is named with its reason rather than shown as 0, because 0
- * reads as «you have none» and the truth is «this channel does not give it to us».
+ * <p>Counts per source, from the same tables a case retrieves — so a number here is something a case can actually
+ * use. A source a channel does not provide is named with its reason rather than shown as 0, because 0 reads as
+ * «you have none» and the truth is «this channel does not give it to us».
+ *
+ * <p><b>예시 문장은 더 이상 싣지 않는다</b> (지식 canonical, 2026-10-05). 출처마다 고객의 글 두 토막을
+ * 펼치면 이 구역 하나가 1,000px을 넘었고, 그 길이가 말해 주는 것은 「무엇을 얼마나 읽어 왔는가」 하나뿐이다.
+ * 그 하나는 수와 날짜가 이미 말하고, 문장 자체는 그것을 인용한 답변 옆에서 읽는 것이 맞다.
  *
  * <p>The one control reads the seller's own channel history (READ only) and learns from it. It never writes to a
  * channel and never changes an answer; a case that could use the new knowledge picks it up on its next preparation.
@@ -53,106 +56,99 @@ export function LearnedKnowledge() {
   };
 
   if (learned === undefined) {
-    return <p className="text-sm text-muted">확인하는 중…</p>;
+    return <p className="px-5 py-6 text-sm text-muted">확인하는 중…</p>;
   }
   if (learned === null) {
-    return <p className="text-sm text-muted">배운 내용을 불러오지 못했습니다.</p>;
+    return <p className="px-5 py-6 text-sm text-muted">배운 내용을 불러오지 못했습니다.</p>;
   }
 
   return (
-    <div className="space-y-4" data-testid="learned-knowledge">
-      <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
+    <div data-testid="learned-knowledge">
+      {/* 지식 화면의 다른 표들과 같은 머리 — 여기 서는 것은 보유한 지식이 아니라 읽어 온 것이므로,
+          수는 같은 자리에 서되 「답변 근거」 열은 없다. aria-hidden: 각 줄이 제 이름을 달고 있다. */}
+      <div
+        aria-hidden="true"
+        className="flex items-center gap-4 border-b border-line bg-canvas/40 px-5 py-2 text-xs text-muted"
+      >
+        <span className="min-w-0 flex-1">읽어 온 것</span>
+        <span className="w-[96px] shrink-0 text-right">건수</span>
+        <span className="w-[96px] shrink-0 text-right">최근</span>
+      </div>
+      <ul className="divide-y divide-line/70">
         {learned.sources.map((source) => (
-          <SourceRow key={source.key} source={source} />
+          <SourceRow key={source.key} source={source} lines={learned.channels.filter((l) => l.source === source.key)} />
         ))}
       </ul>
 
-      {learned.channels.length > 0 ? <ChannelLines lines={learned.channels} /> : null}
-
-      {learned.historyReads.length > 0 ? (
-        <ul className="space-y-1 text-sm text-muted">
-          {learned.historyReads.map((read) => (
-            <li key={`${read.channelNameKo}-${read.readOn}`} className="break-keep">
-              {read.channelNameKo}의 과거 문의를 {read.readOn ?? "이전에"} 읽었습니다 · {read.rowsRead}건
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {learned.canLearnHistory ? (
-        <div className="space-y-2">
-          <Btn variant="outline" onClick={learn} disabled={busy}>
-            {busy ? "과거 기록을 읽는 중…" : "과거 운영 기록에서 배우기"}
-          </Btn>
-          <p className="break-keep text-sm text-muted">
-            연결된 채널의 지난 문의와 답변, 고객이 이야기한 상품의 상세 정보를 읽습니다. 채널에 아무것도 쓰거나
-            보내지 않습니다.
-          </p>
-          {failed ? <p className="text-sm text-bad">과거 기록을 읽지 못했습니다. 잠시 뒤 다시 시도해 주세요.</p> : null}
-          {lastRun ? <RunSummary run={lastRun} /> : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function SourceRow({ source }: { source: LearnedKnowledgeSource }) {
-  return (
-    <li className="space-y-2 p-3">
-      <p className="flex flex-wrap items-baseline gap-x-2">
-        <span className="font-medium text-ink">{source.labelKo}</span>
-        <span className="text-ink tabular-nums">
-          {source.key === "PRODUCT_DETAIL" ? `상품 ${source.count}개` : `${source.count}건`}
-        </span>
-        {source.latestOn ? <span className="text-sm text-muted">최근 {source.latestOn}</span> : null}
-      </p>
-      {source.examples.length > 0 ? (
-        <ul className="space-y-1">
-          {source.examples.map((example, i) => (
-            <li key={i} className="break-keep text-sm">
-              {example.title ? <span className="text-ink">{example.title} </span> : null}
-              {example.excerpt ? <span className="text-muted">「{example.excerpt}」</span> : null}
-              <span className="block text-xs text-muted">
-                {[example.provenance, example.productName, example.capturedOn].filter(Boolean).join(" · ")}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </li>
-  );
-}
-
-function ChannelLines({ lines }: { lines: LearnedKnowledgeChannelLine[] }) {
-  const channels = Array.from(new Set(lines.map((line) => line.channelNameKo)));
-  return (
-    <div className="space-y-3">
-      {channels.map((channel) => (
-        <div key={channel} className="space-y-1">
-          <p className="text-sm font-medium text-ink">{channel}</p>
-          <ul className="space-y-1">
-            {lines
-              .filter((line) => line.channelNameKo === channel)
-              .map((line) => (
-                <li key={line.source} className="flex flex-wrap items-start gap-2 text-sm">
-                  {/* Two ways of having it, one badge: an official path that needs nothing of the seller
-                      (LEARNED) and a bounded read of their own seller-center screen (SCREEN_READ). The
-                      sentence beside it says which. Drawing 「가져오지 못함」 for the second one contradicted
-                      its own sentence on the same line. */}
-                  {line.availability === "LEARNED" || line.availability === "SCREEN_READ" ? (
-                    <Status tone="info">가져옴</Status>
-                  ) : (
-                    <Status tone="neutral">가져오지 못함</Status>
-                  )}
-                  <span className="break-keep text-muted">
-                    {line.sourceLabelKo} · {line.sentenceKo}
-                  </span>
-                </li>
-              ))}
+      <div className="space-y-2 border-t border-line bg-canvas/40 px-5 py-3">
+        {learned.historyReads.length > 0 ? (
+          <ul className="space-y-0.5 text-xs text-muted">
+            {learned.historyReads.map((read) => (
+              <li key={`${read.channelNameKo}-${read.readOn}`} className="break-keep">
+                {read.channelNameKo}의 과거 문의를 {read.readOn ?? "이전에"} 읽었습니다 · {read.rowsRead}건
+              </li>
+            ))}
           </ul>
-        </div>
-      ))}
+        ) : null}
+        {learned.canLearnHistory ? (
+          <>
+            <div className="flex flex-wrap items-center gap-3">
+              <Btn size="sm" variant="outline" onClick={learn} disabled={busy}>
+                {busy ? "과거 기록을 읽는 중…" : "과거 운영 기록에서 배우기"}
+              </Btn>
+              <p className="min-w-0 flex-1 break-keep text-xs text-muted">
+                연결된 채널의 지난 문의와 답변, 고객이 이야기한 상품의 상세 정보를 읽습니다. 채널에 아무것도 쓰거나
+                보내지 않습니다.
+              </p>
+            </div>
+            {failed ? <p className="text-sm text-bad">과거 기록을 읽지 못했습니다. 잠시 뒤 다시 시도해 주세요.</p> : null}
+            {lastRun ? <RunSummary run={lastRun} /> : null}
+          </>
+        ) : null}
+      </div>
     </div>
+  );
+}
+
+/**
+ * 한 출처와, 채널마다 그것을 가져올 수 있는지.
+ *
+ * 채널 줄은 이 줄 아래에 붙는다 — 전에는 채널별로 다시 묶여 화면 아래쪽에 따로 서 있었고, 「과거 리뷰
+ * 답글 2건」과 「쿠팡은 판매자 리뷰 답글 기능이 없습니다」가 같은 것에 대한 두 문장이라는 사실을
+ * 읽으려면 두 구역을 오가야 했다. 가져오지 못하는 쪽의 사유는 서버가 쓴 문장 그대로 선다 — 두 채널의
+ * 서로 다른 이유를 한 구절로 합치면 그것은 아무도 쓰지 않은 주장이 된다.
+ */
+function SourceRow({ source, lines }: { source: LearnedKnowledgeSource; lines: LearnedKnowledgeChannelLine[] }) {
+  const missing = lines.filter((l) => l.availability !== "LEARNED" && l.availability !== "SCREEN_READ");
+  return (
+    <li className="px-5 py-2">
+      <div className="flex items-center gap-4">
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{source.labelKo}</span>
+        <span className="w-[96px] shrink-0 text-right text-sm tabular-nums text-ink">
+          {source.count > 0 ? (source.key === "PRODUCT_DETAIL" ? `상품 ${source.count}` : source.count) : ""}
+        </span>
+        <span className="w-[96px] shrink-0 text-right text-xs tabular-nums text-muted">{source.latestOn ?? ""}</span>
+      </div>
+      {lines.length > 0 ? (
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
+          {lines.map((line) => (
+            <span key={line.channelNameKo}>
+              {line.channelNameKo}{" "}
+              {/* 공식 경로(LEARNED)와 판매자센터 화면을 범위를 정해 읽는 것(SCREEN_READ)은 둘 다 가져온
+                  것이다. 두 번째를 「못 가져옴」으로 그리면 바로 옆 제 문장과 모순된다. */}
+              <b className={line.availability === "LEARNED" || line.availability === "SCREEN_READ" ? "font-semibold text-ink" : "font-normal"}>
+                {line.availability === "LEARNED" || line.availability === "SCREEN_READ" ? "가져옴" : "못 가져옴"}
+              </b>
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {missing.map((line) => (
+        <p key={`${line.channelNameKo}-why`} className="break-keep text-xs leading-relaxed text-muted">
+          {line.sentenceKo}
+        </p>
+      ))}
+    </li>
   );
 }
 
@@ -209,7 +205,7 @@ function RunSummary({ run }: { run: KnowledgeBootstrapReport }) {
     lines.push(line);
   }
   return (
-    <ul className="space-y-1 rounded-xl border border-line bg-surface p-3 text-sm text-ink" aria-live="polite">
+    <ul className="space-y-1 rounded-xl border border-line bg-surface p-3 text-xs text-ink" aria-live="polite">
       {lines.map((line) => (
         <li key={line} className="break-keep">
           {line}

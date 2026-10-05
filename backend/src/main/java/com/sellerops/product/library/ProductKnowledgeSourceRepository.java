@@ -9,6 +9,15 @@ public interface ProductKnowledgeSourceRepository extends JpaRepository<ProductK
 
     List<ProductKnowledgeSource> findAllByOrgIdAndProductIdOrderByCreatedAtAsc(UUID orgId, UUID productId);
 
+    /**
+     * Every product fact this company has written, across every product.
+     *
+     * <p>The knowledge workspace's read. It exists because the only org-wide view of this corpus was
+     * a COUNT: a seller could be told they had written ten product facts and had no screen that would
+     * show them the ten. Reading it per product would be one query per product in the catalogue.
+     */
+    List<ProductKnowledgeSource> findAllByOrgId(UUID orgId);
+
     /** Org-scoped by id — a knowledge document is never reachable across a tenant boundary. */
     Optional<ProductKnowledgeSource> findByIdAndOrgId(UUID id, UUID orgId);
 
