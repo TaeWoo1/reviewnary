@@ -244,10 +244,10 @@ export function KnowledgeHome() {
         </ListBox>
       </Section>
 
+      {/* 상자가 없다 — 위의 셋은 이 회사가 가진 지식이고 이것은 참고일 뿐이므로, 같은 테두리를 두르면
+          같은 무게로 읽힌다. 테두리를 걷고 가는 선만 남겨 한 단계 아래에 둔다. */}
       <Section title="채널에서 읽어 온 것" hint="공식 기준이 아니라, 답변을 만들 때 참고만 합니다.">
-        <ListBox>
-          <LearnedKnowledge />
-        </ListBox>
+        <LearnedKnowledge />
       </Section>
     </div>
   );

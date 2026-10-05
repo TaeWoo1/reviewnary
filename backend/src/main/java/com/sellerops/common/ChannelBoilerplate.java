@@ -27,6 +27,20 @@ import java.util.regex.Pattern;
  * who writes the same words inside their own sentence keeps them — the string is not what makes this
  * boilerplate; its position at the end of a row the importer wrote is.
  *
+ * <p><b>A second shape, for text that was cut and redacted before this class existed (2026-10-06).</b>
+ * Rows written before this boundary went through the redactor and an excerpt first, so what survives
+ * is the footer with its date masked and its tail cut — on this deployment,
+ * {@code ([번호] 12:36:41 에 등록된 네…} inside a 40-character quote of a customer's review. It is not
+ * a generalisation of the pattern above but a second observed shape, and it is held to the same
+ * evidence: measured 2026-10-06 across every stored review body, inquiry body and knowledge
+ * candidate, an unclosed {@code (} that carries a {@code HH:MM:SS} time AND the words 「에 등록된」
+ * occurs exactly once — the one stale candidate — and nothing a customer typed matches it. It ends at
+ * the text's end or at the closing quote the generated question put after the excerpt, because that
+ * is where an excerpt was cut off.
+ *
+ * <p>Both shapes are removed by the one {@link #strip} call, so no caller has to know which of them a
+ * given row carries.
+ *
  * <p><b>Fail-closed on emptiness.</b> If stripping would leave nothing, the original comes back.
  * Showing a seller a machine's footer is a blemish; showing them an empty review where a review
  * exists is a lie about their own data.
@@ -48,6 +62,17 @@ public final class ChannelBoilerplate {
     private static final Pattern NAVER_PAY_IMPORT_FOOTER = Pattern.compile(
             "\\s*\\(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} 에 등록된 네이버 페이 구매평\\)\\s*\\z");
 
+    /**
+     * The same footer after the redactor masked its date and an excerpt cut its tail.
+     *
+     * <p>Three things have to be true at once, and that is what keeps it off a customer's own
+     * parenthesis: an opening {@code (} that is never closed before the end, a {@code HH:MM:SS} time
+     * inside it, and the words 「에 등록된」 after that time. The end is either the text's end or the
+     * quote mark the generated question closes the excerpt with — the two places an excerpt stops.
+     */
+    private static final Pattern TRUNCATED_IMPORT_FOOTER = Pattern.compile(
+            "\\s*\\([^()'\u2018\u2019]*\\d{2}:\\d{2}:\\d{2} 에 등록된[^()'\u2018\u2019]*?(?=['\u2018\u2019]|\\z)");
+
     private ChannelBoilerplate() {
     }
 
@@ -61,6 +86,7 @@ public final class ChannelBoilerplate {
             return plain;
         }
         String stripped = NAVER_PAY_IMPORT_FOOTER.matcher(plain).replaceFirst("");
+        stripped = TRUNCATED_IMPORT_FOOTER.matcher(stripped).replaceFirst("");
         return stripped.isBlank() ? plain : stripped;
     }
 }
