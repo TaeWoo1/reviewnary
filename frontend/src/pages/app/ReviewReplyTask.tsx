@@ -495,8 +495,13 @@ export function ReviewCaseView({
                 초안이 없고, 그때는 아래 판단 컨트롤이 그 자리에 온다 — 둘 중 하나는 늘 거기 있다.
                 슬롯이 아니라 이 블록 안에 두는 이유: CaseLayout은 자리만 소유하므로(그 docblock) 한
                 화면을 위해 새 자리를 파기보다 이미 있는 자리의 순서를 쓰는 편이 가볍다. */}
+            {/* <b>면은 하나, 그러나 강한 테두리는 아니다</b> (Front conversation detail, 2026-10-06).
+                Front의 제안된 답장은 가는 회색 테두리 하나로 서 있고, 존재감은 테두리가 아니라 그 안의
+                문장이 화면에서 가장 큰 글이라는 데서 나온다. 브랜드 ring은 「다음에 누를 것」을 가리키는
+                표시인데, 승인이 이미 서 있는 리뷰에서 다음에 누를 것은 복사 하나이고 그것은 제 색을 가지고
+                있다. 확인할 일의 pane은 여러 물건 사이에서 이것을 가리켜야 하므로 ring을 유지한다. */}
             {showDraft && replyWork ? (
-              <DecisionCard primary>
+              <DecisionCard>
                 <VocItemReplyPrep
                   key={`prep-${replyWork.actionRef}`}
                   accountId={replyAccountId}
@@ -572,7 +577,40 @@ export function ReviewCaseView({
                   확인한 사실 and the action; the page, which has a whole second column for it, keeps it
                   open. The fold's own summary names the tier that stands, so what it holds is visible
                   without opening it. */}
-              {paneEvidenceFolded ? (
+              {!pane ? (
+                /* <b>워크플로 속성이지 작업 단계가 아니다</b> (리뷰 canonical mockup, 2026-10-06 —
+                   Front의 property strip). 두 가지는 페이지에서 각각 제 제목과 제 여백을 가진 큰 구역이었다.
+                   컨트롤도 글도 그대로이고 라벨만 왼쪽 112px로 옮겨 간다 — 확인할 일의 pane이 이미 쓰는
+                   모양(`CaseBlock columns`)이고, 새로 만든 것이 아니다. */
+                <>
+                  <PropertyRow label="중요도" ariaLabel="판매자 판단 영역">
+                    <SellerCorrectionControls
+                      reviewId={detail.id}
+                      word={word}
+                      systemTier={detail.triage.tier}
+                      aiMarked={detail.aiMark !== null}
+                      correction={detail.sellerCorrection}
+                      onCorrected={bump}
+                      headingLevel={2}
+                    />
+                  </PropertyRow>
+                  <PropertyRow label="처리 방법">
+                    <DecisionActionStep
+                      reviewId={detail.id}
+                      decision={decision}
+                      replySupported={replyWork !== null}
+                      replyUnavailableReason={detail.replyUnavailableReason}
+                      title="처리 방법"
+                      quiet
+                      onDecided={(next) => {
+                        setDecision(next);
+                        bump();
+                      }}
+                      onRecorded={bump}
+                    />
+                  </PropertyRow>
+                </>
+              ) : paneEvidenceFolded ? (
                 <Disclosure
                   label="이 리뷰의 중요도"
                   note={<TriageTierChip tier={detail.sellerCorrection?.correctedTier ?? detail.triage.tier} />}
@@ -604,9 +642,10 @@ export function ReviewCaseView({
                 </Section>
               )}
 
+              {pane ? (
               <div className="border-t border-line pt-3">
                 {/* 결정 — what to do. Stands on every review the workspace can open: a channel with no reply
-                    flow, and a review no account acquired. */}
+                    flow, and a review no account acquired. 페이지는 같은 컨트롤을 위의 속성 줄에서 그린다. */}
                 <DecisionActionStep
                   reviewId={detail.id}
                   decision={decision}
@@ -620,6 +659,7 @@ export function ReviewCaseView({
                   onRecorded={bump}
                 />
               </div>
+              ) : null}
             </div>
           </DecisionCard>
 
@@ -1044,6 +1084,35 @@ function RecordedStatus({
         시스템 판단은 {TRIAGE_TIER_LABEL[detail.triage.tier]}입니다.
         {correction ? ` 판매자 수정으로 ${TRIAGE_TIER_LABEL[correction.correctedTier]}가 함께 기록돼 있습니다.` : ""}
       </p>
+    </section>
+  );
+}
+
+/**
+ * <b>워크플로 속성 한 줄</b> — 왼쪽에 이름, 오른쪽에 그것을 정하는 것.
+ *
+ * <p>확인할 일의 pane이 쓰는 모양({@code CaseBlock columns})과 같은 112px 라벨 열이다. 리뷰 페이지가
+ * 이것을 쓰는 이유는 중요도와 처리 방법이 「작업 단계」가 아니라 이 리뷰에 붙은 <b>속성</b>이기 때문이다 —
+ * Front의 대화 상세에서 inbox·티켓 번호·담당자가 제목 아래 한 줄로 서 있는 것과 같은 자리.
+ *
+ * <p>컨트롤은 하나도 바뀌지 않는다. 이름이 위가 아니라 옆에 설 뿐이다.
+ */
+function PropertyRow({
+  label,
+  ariaLabel,
+  children,
+}: {
+  label: string;
+  ariaLabel?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      aria-label={ariaLabel ?? label}
+      className="grid gap-x-6 gap-y-2 border-t border-line py-4 sm:grid-cols-[112px_minmax(0,1fr)]"
+    >
+      <h2 className="text-sm font-bold text-muted">{label}</h2>
+      <div className="min-w-0">{children}</div>
     </section>
   );
 }

@@ -1407,7 +1407,11 @@ describe("리뷰 상세 — the one object and the one column (2026-10-06)", () 
       (e) => /\brounded-2xl\b/.test(e.className) && !e.closest("button,a,summary"),
     );
     expect(cards).toHaveLength(1);
-    expect(cards[0].className).toContain("ring-brand-700");
     expect(within(cards[0] as HTMLElement).getByLabelText("답변 초안")).toBeTruthy();
+    // <b>그 하나도 강한 테두리로 존재감을 만들지 않는다</b> (Front conversation detail, 2026-10-06).
+    // Front의 제안된 답장은 가는 회색 테두리 하나이고, 무게는 그 안의 문장이 화면에서 가장 큰 글이라는
+    // 데서 온다. 브랜드 ring은 「다음에 누를 것」의 표시이고, 여기서 다음에 누를 것은 복사 하나다.
+    expect(cards[0].className).not.toContain("ring-brand-700");
+    expect(cards[0].className).toContain("border-line");
   });
 });

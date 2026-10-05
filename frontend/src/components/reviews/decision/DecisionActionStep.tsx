@@ -40,6 +40,7 @@ export function DecisionActionStep({
   onDecided,
   onRecorded,
   title = "무엇을 하시겠어요?",
+  quiet = false,
 }: {
   reviewId: string;
   /** The decision that stands, as the last read saw it. */
@@ -57,6 +58,12 @@ export function DecisionActionStep({
   onRecorded: () => void;
   /** The step's heading — the Decision Workspace numbers its two judgments so they cannot be read as one. */
   title?: string;
+  /**
+   * <b>제목을 호출자가 왼쪽에 들고 있다</b> (리뷰 canonical mockup, 2026-10-06 — Front의 property strip).
+   * 리뷰 페이지는 이 단계를 「처리 방법」이라는 라벨 옆의 값으로 세운다. 그러면 `Section`의 페이지용 제목은
+   * 같은 단어를 두 번 그리는 것이 된다. 컨트롤도 글도 하나 바뀌지 않는다 — 제목만 호출자의 것이 된다.
+   */
+  quiet?: boolean;
 }) {
   const [done, setDone] = useState<DecisionDoneKind | null>(null);
   const [busy, setBusy] = useState(false);
@@ -81,9 +88,8 @@ export function DecisionActionStep({
     }
   };
 
-  return (
-    <Section title={title} ariaLabel="조치 선택">
-      <div className="space-y-3">
+  const body = (
+    <div className="space-y-3">
         <VocItemTriageControl
           key={`decide-${reviewId}`}
           reviewId={reviewId}
@@ -129,8 +135,20 @@ export function DecisionActionStep({
             </div>
             {failed ? <p className="text-sm text-bad">기록하지 못했습니다. 잠시 후 다시 시도해 주세요.</p> : null}
           </DoneRecord>
-        ) : null}
+      ) : null}
+    </div>
+  );
+
+  if (quiet) {
+    return (
+      <div role="group" aria-label="조치 선택">
+        {body}
       </div>
+    );
+  }
+  return (
+    <Section title={title} ariaLabel="조치 선택">
+      {body}
     </Section>
   );
 }
