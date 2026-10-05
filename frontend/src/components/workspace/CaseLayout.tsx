@@ -380,10 +380,26 @@ export function CaseQuote({ children }: { children: ReactNode }) {
  * One group of the seller's decision. The group that holds the next thing to press is outlined in the brand colour —
  * the only emphasis a case gives, so there is never more than one place that looks like the primary action.
  */
-export function DecisionCard({ children, primary = false }: { children: ReactNode; primary?: boolean }) {
+export function DecisionCard({
+  children,
+  primary = false,
+  boxed = true,
+}: {
+  children: ReactNode;
+  primary?: boolean;
+  /**
+   * <b>면을 가진 것이 하나뿐인 화면에서는 이것도 면이 아니다</b> (리뷰 canonical mockup, 2026-10-05).
+   *
+   * <p>카드는 「여기부터 여기까지가 한 덩어리」를 그린다. 그 덩어리가 240px 속성 rail의 전부이고 옆에는
+   * 읽는 열 하나뿐일 때, 테두리는 아무것도 구분하지 않으면서 준비된 답변과 같은 모양을 한 번 더 그린다.
+   * {@code boxed=false}는 묶음만 남기고 면을 뺀다 — 안의 것은 하나도 바뀌지 않는다.
+   */
+  boxed?: boolean;
+}) {
   // Less padding inside a pane: the card is already inside a 556px panel inside the page, and every
   // millimetre of its inset is one the primary action pays for on the one screen it has.
   const pad = useCaseVariant() === "pane" ? "p-3" : "p-4";
+  if (!boxed) return <div>{children}</div>;
   return (
     <div
       className={`rounded-2xl bg-surface ${pad} ${

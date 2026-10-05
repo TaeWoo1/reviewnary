@@ -497,7 +497,10 @@ export function ReviewCaseView({
               and the card boundary say the same thing truthfully, and a structural device that encodes
               nothing true is decoration (docs/ui/reviewnary_ui_system_audit_v1.md §10). Neither control
               moved and neither heading changed its noun. */}
-          <DecisionCard primary={decision === null}>
+          {/* <b>오른쪽 열은 속성이지 카드가 아니다</b> (리뷰 canonical mockup, 2026-10-05). 240px 열의
+              전부가 이 덩어리이므로 테두리는 아무것도 나누지 못하고, 준비된 답변과 같은 모양을 한 번 더
+              그릴 뿐이다. 확인할 일의 pane은 그 안에 다른 것들과 함께 서므로 상자를 유지한다. */}
+          <DecisionCard primary={decision === null} boxed={!!pane}>
             <div className="space-y-3">
               {/* 판단 — the seller's own judgment of the tier, which does not replace the system's.
                   <b>Folded in the pane.</b> It is a different judgment from 처리 방법 and a secondary one: the
@@ -650,12 +653,10 @@ export function ReviewCaseView({
         ) : (
           <>
             <RepeatedSignal problems={context?.repeatedProblems ?? []} failed={contextFailed || context === null} />
-            {/* <b>상자는 남는다, 그리고 그것은 선택이다</b> (리뷰 canonical mockup, 2026-10-05). mockup은
-                읽는 열에 면을 가진 물건을 준비된 답변 하나로 그렸고, 여기도 그렇게 해 보았다 — `flat`은
-                이 블록의 두 길(답변 기준 보기 · 상품 화면 열기)을 함께 지운다. 상자 하나를 위해 길 둘을
-                없앨 수는 없다. 준비된 답변만 brand 테두리를 가지므로 무엇이 이 화면의 물건인지는 여전히
-                한눈에 보인다. */}
-            {context ? <GroundingOnHand context={context} /> : null}
+            {/* <b>읽는 열에서 면을 가진 물건은 준비된 답변 하나다</b> (리뷰 canonical mockup, 2026-10-05).
+                이 블록은 카드였다. 카드가 둘이면 어느 쪽이 이 화면의 물건인지 눈이 고르지 못하고, 여기
+                있는 것은 근거이지 결정이 아니다. 숫자도 문장도 두 개의 길도 그대로다 — 상자만 없다. */}
+            {context ? <GroundingOnHand context={context} flat /> : null}
           </>
         )
       }
