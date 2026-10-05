@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { CustomerMemory } from "./CustomerMemory";
+import { RepeatedIssue } from "./RepeatedIssue";
 import type { ReviewIssueView } from "../../lib/types";
 
 const getReviewIssuesStrict = vi.fn();
@@ -49,7 +50,7 @@ function renderMemory(path = "/memory") {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/memory" element={<CustomerMemory />} />
-        <Route path="/memory/:issueId" element={<CustomerMemory />} />
+        <Route path="/memory/:issueId" element={<RepeatedIssue />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -92,7 +93,6 @@ describe("고객운영 메모리 — v1 scope fence", () => {
   ] as const) {
     it(`renders no search control in the ${label} state`, async () => {
       const { container } = renderMemory(path);
-      // The title appears in both panes on the detail route; wait for any of them.
       await screen.findAllByText(ISSUE.title);
       expect(screen.queryByRole("searchbox")).toBeNull();
       expect(container.querySelector('input[type="search"]')).toBeNull();
@@ -119,7 +119,9 @@ describe("고객운영 메모리 — v1 scope fence", () => {
   });
 
   it("offers the same Agent conversation every other screen does — and hands it no issue id", async () => {
-    const { container } = renderMemory("/memory/issue-1");
+    // 목록 화면의 것이다. 문제 하나는 제 페이지로 나갔고(canonical, 2026-10-05) 그 페이지는 머리말을
+    // 이 문제를 정의하는 수 둘에 쓴다 — 대화는 ← 반복 문제 한 걸음 뒤에 있다.
+    renderMemory("/memory");
     await screen.findAllByText(ISSUE.title);
     const launcher = screen.getByRole("link", { name: /이 내용으로 물어보기/ });
     // The panel is the destination when the shell provides one; bare (as here) it is the /agent route.
@@ -135,6 +137,8 @@ describe("고객운영 메모리 — v1 scope fence", () => {
     // more ask a question than the 기록 list below it can. Asserting the proxy would now forbid the
     // seller from writing anything at all on a screen whose purpose is deciding, so the claim is
     // made directly instead: the only writable field here is that record, and it is not a composer.
+    const { container } = renderMemory("/memory/issue-1");
+    await screen.findAllByText(ISSUE.title);
     const fields = Array.from(container.querySelectorAll("textarea"));
     expect(fields).toHaveLength(1);
     expect(fields[0].getAttribute("id")).toBe("issue-decision-note");

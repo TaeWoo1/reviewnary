@@ -22,7 +22,8 @@ const AGENT_PROJECTION_ENABLED = import.meta.env.VITE_ENABLE_AGENT_PROJECTION ==
 /** Pages drawn as a list beside a detail pane — each column scrolls on its own. */
 const MASTER_DETAIL_ROUTES = [
   /^\/customer-operations\/cases\/?$/,
-  /^\/memory(\/[^/]+)?\/?$/,
+  // 반복 문제의 목록만 — 문제 하나는 제 페이지이고 페이지 스크롤을 쓴다 (canonical, 2026-10-05).
+  /^\/memory\/?$/,
   /^\/inquiries(\/[^/]+)?\/?$/,
   /^\/reviews(\/[^/]+)?\/?$/,
 ];

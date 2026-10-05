@@ -11,6 +11,15 @@ import type { RepeatedIssueContext, ReviewIssueDetailView, ReviewIssueView } fro
 const ACTING_STATES = new Set<ReviewIssueView["lifecycleState"]>(["OBSERVING", "NEEDS_REVIEW"]);
 
 export interface RepeatedIssueWorkspace {
+  /**
+   * The problem itself — the detail read's copy once it lands, the caller's until then.
+   *
+   * <p>The pane is always opened from a list that already holds the view; the problem's own page is
+   * opened from a URL and has nothing but an id, and the detail read it makes carries the issue. So the
+   * screen that has it passes it and the screen that does not asks for it here, and after the first read
+   * both are looking at the same server copy.
+   */
+  issue: ReviewIssueView | null;
   detail: ReviewIssueDetailView | null;
   context: RepeatedIssueContext | null;
   loading: boolean;
@@ -41,10 +50,13 @@ export interface RepeatedIssueWorkspace {
  * transitions the API has always accepted. There is still no 해결 처리 at any state.
  */
 export function useRepeatedIssue(
-  issue: ReviewIssueView | null,
-  onIssueChanged: (next: ReviewIssueView) => void,
+  /** The problem, or just its id when the screen was opened by address. */
+  target: ReviewIssueView | string | null,
+  /** The list's copy follows a transition; a page with no list beside it passes nothing. */
+  onIssueChanged?: (next: ReviewIssueView) => void,
 ): RepeatedIssueWorkspace {
-  const issueId = issue?.id ?? null;
+  const seed = typeof target === "string" ? null : target;
+  const issueId = typeof target === "string" ? target : target?.id ?? null;
   const [detail, setDetail] = useState<ReviewIssueDetailView | null>(null);
   const [context, setContext] = useState<RepeatedIssueContext | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,6 +95,10 @@ export function useRepeatedIssue(
     setLoading(false);
   }, [issueId]);
 
+  // The server's copy wins as soon as there is one: a transition recorded here reloads the detail, and
+  // the state the next press reads must be the one that read returned.
+  const issue = detail?.issue ?? seed;
+
   useEffect(() => {
     // A different problem is a different note: carrying the sentence across would file one problem's
     // decision under another's record.
@@ -103,7 +119,7 @@ export function useRepeatedIssue(
       const next = ACTING_STATES.has(issue.lifecycleState)
         ? await api.startReviewIssueAction(issue.id, trimmed || undefined)
         : await api.markReviewIssueRemediated(issue.id, trimmed || undefined);
-      onIssueChanged(next);
+      onIssueChanged?.(next);
       setNote("");
       await load();
     } catch {
@@ -113,5 +129,5 @@ export function useRepeatedIssue(
     }
   }, [issue, note, onIssueChanged, load]);
 
-  return { detail, context, loading, failed, contextFailed, note, setNote, busy, error, submit };
+  return { issue, detail, context, loading, failed, contextFailed, note, setNote, busy, error, submit };
 }

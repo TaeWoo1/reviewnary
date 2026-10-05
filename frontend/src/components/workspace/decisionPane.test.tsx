@@ -61,10 +61,12 @@ describe("master-detail pane", () => {
    * something. 리뷰's pane now holds the same reading — 고객의 말 → 왜 올라왔나요 → 반복 신호 → 이 상품에
    * 대해 아는 것 → 판단과 조치 — so it takes the same column, with the same 1440 breakpoint under it.
    *
-   * <p>And 반복 문제 since its own canonical (2026-10-03): 변화와 신호 → 근거 → 우리가 써 둔 것 → 판단과
-   * 조치 → 기록, ending in a lifecycle transition the seller records in their own words.
-   *
-   * <p><b>문의 left for the rail</b> (문의 redesign, 2026-10-04 — product-owner decision). It held this
+   * <p><b>반복 문제도 떠났다</b> (canonical mockup, 2026-10-05 — product-owner decision). 그 pane도 이 열을
+ * 들고 있었다. 반복되는 문제 하나는 수·추이·분포·대표 증거·상태를 함께 봐야 판단되는 물건이고, 576px
+ * 안에서 그 다섯은 전부 세로로 쌓여 패널 안쪽 스크롤로만 읽혔다 — 결정 블록은 늘 접힌 아래에 있었다.
+ * 이제 제 페이지(`RepeatedIssue`)로 열리고, 목록은 pane 없이 목록 그대로 선다.
+ *
+ * <p><b>문의 left for the rail</b> (문의 redesign, 2026-10-04 — product-owner decision). It held this
    * column for one day: 고객의 질문 → 준비된 답변 → 답변에 사용한 근거 → 기록 is the same reading, and 576
    * turned out to be the wrong width for it — the customer's question is read in full and the prepared
    * answer is the thing being judged, which is a page rather than a panel beside one. It takes
@@ -72,10 +74,9 @@ describe("master-detail pane", () => {
    *
    * <p>The list is still closed and still asserted: a fourth caller is a decision, not an import.
    */
-  it("two screens override it — 반복 문제 and 확인할 일, the panes a decision is made in", () => {
+  it("one screen overrides it — 확인할 일, the pane a decision is made in", () => {
     const callers = SRC.filter((f) => readFileSync(f, "utf8").includes('pane="decision"'));
     expect(callers.map((f) => f.replace(/\\/g, "/")).sort()).toEqual([
-      "src/pages/app/CustomerMemory.tsx",
       "src/pages/app/OperationsCaseQueue.tsx",
     ]);
   });

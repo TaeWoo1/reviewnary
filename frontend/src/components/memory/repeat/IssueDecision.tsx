@@ -1,4 +1,5 @@
 import { Btn } from "../../ui/Btn";
+import { useCaseVariant } from "../../workspace/CaseLayout";
 import { nextActionKo, waitingNoteKo } from "../../../lib/reviewIssuesView";
 import type { IssueLifecycleState } from "../../../lib/types";
 import { OpportunityList } from "../../opportunity/OpportunityList";
@@ -34,6 +35,7 @@ export function IssueDecision({
   busy,
   error,
   onSubmit,
+  since,
 }: {
   issueId: string;
   state: IssueLifecycleState;
@@ -43,13 +45,25 @@ export function IssueDecision({
   error: string | null;
   /** null when the screen docks the action at the floor of the pane and this block draws the field only. */
   onSubmit: (() => void) | null;
+  /**
+   * 어떤 상태에 언제부터 있는가 — 그 상태를 바꾸려는 사람이 먼저 알아야 하는 한 줄.
+   *
+   * <p>pane에서는 바닥에 고정된 단추 옆이 그 자리였다. 페이지에는 그 바닥이 없으므로 결정 블록이 들고,
+   * pane은 아무것도 넘기지 않아 쓰던 그대로다. 문장도 계산도 {@code lifecycleSinceKo}의 것이고
+   * 기록이 말한 날 외에는 어떤 날짜도 쓰지 않는다.
+   */
+  since?: string | null;
 }) {
+  // 승인된 mockup: 페이지에서는 선택 입력과 그것을 보내는 단추가 한 줄이다. 440px pane에서는 그 줄이
+  // 들어가지 않으므로 pane은 쓰던 대로 세로로 쌓는다 — 같은 필드, 같은 단추, 같은 문장.
+  const page = useCaseVariant() === "page";
   const waiting = waitingNoteKo(state);
   const actionLabel = nextActionKo(state);
   const actionable = actionLabel !== null;
 
   return (
     <PaneBlock label="판단과 조치">
+      {since ? <p className="break-keep text-xs tabular-nums text-muted">{since}</p> : null}
       {/* Opportunity Engine v1 — what can be done about this. Always drawn, so the seller learns the
           product HAS this layer even on a problem that yields nothing. It keeps its own region name and
           loses its heading: 판단과 조치 is the block, and a second title inside it named the mechanism
@@ -65,22 +79,26 @@ export function IssueDecision({
           <label htmlFor="issue-decision-note" className="block text-xs font-semibold text-muted">
             무엇을 하기로 하셨나요 (선택)
           </label>
-          <textarea
-            id="issue-decision-note"
-            value={note}
-            onChange={(event) => onNoteChange(event.target.value)}
-            rows={2}
-            placeholder="예) 접착 테이프 공급처를 바꾸고 8월 출고분부터 적용합니다."
-            className="w-full break-keep rounded-xl border border-line bg-surface p-3 text-sm leading-relaxed text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-          />
+          <div className={page ? "flex items-start gap-3" : "space-y-2"}>
+            <textarea
+              id="issue-decision-note"
+              value={note}
+              onChange={(event) => onNoteChange(event.target.value)}
+              rows={2}
+              placeholder="예) 접착 테이프 공급처를 바꾸고 8월 출고분부터 적용합니다."
+              className={`break-keep rounded-xl border border-line bg-surface p-3 text-sm leading-relaxed text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
+                page ? "min-w-0 flex-1" : "w-full"
+              }`}
+            />
+            {onSubmit ? (
+              <Btn size="sm" onClick={onSubmit} disabled={busy} className={page ? "shrink-0" : undefined}>
+                {busy ? "기록 중…" : actionLabel}
+              </Btn>
+            ) : null}
+          </div>
           <p className="break-keep text-xs leading-relaxed text-muted">
             남기신 내용은 아래 기록에 그대로 남습니다.
           </p>
-          {onSubmit ? (
-            <Btn size="sm" onClick={onSubmit} disabled={busy}>
-              {busy ? "기록 중…" : actionLabel}
-            </Btn>
-          ) : null}
         </div>
       ) : null}
 
