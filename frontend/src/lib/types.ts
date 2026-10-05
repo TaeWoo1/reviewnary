@@ -2550,6 +2550,15 @@ export interface ChannelReviewDetailView {
   isNew: boolean;
   /** The same note the list row carried — opening a review never changes what it said. */
   triage: ReviewTriageNote;
+  /**
+   * <b>왜 지금 이 리뷰가 앞에 있는가</b> — one factual sentence for the workspace, or null for 참고.
+   *
+   * <p>The server writes it (`ReviewTriageWhyNow`). A screen may print it and may not build one: joining
+   * `triage.reason` (a citation — 「2점」) to `triage.recommendedAction` (the LIST's instruction — 「내용을
+   * 읽고 상품 상태를 확인해 보세요」) with a connective produces a claim neither string was written to
+   * make. Both of those are unchanged and still render wherever they already did.
+   */
+  whyNow: string | null;
   /** The same pilot mark the list row carried, or null. */
   aiMark: AiTriageMarkView | null;
   /** The seller's own standing judgment, read back on every open, or null when none stands. */

@@ -78,7 +78,10 @@ interface OutcomeAttempt {
  */
 export function draftProvenanceNote(authorKind: string | null, approved: boolean): string | null {
   const check = approved ? "" : " 내용을 확인하고 직접 고쳐 주세요.";
-  if (authorKind === "MODEL") return `아래 초안은 저장된 지식을 근거로 AI가 썼습니다.${check}`;
+  // <b>누가 썼는지가 아니라 무엇에 근거했는지</b> (리뷰 canonical mockup, 2026-10-06 — 승인된 copy).
+  // 판매자가 이 줄에서 확인할 것은 이 문장이 회사가 적어 둔 것 위에 서 있는가이지, 기계가 썼는가가 아니다.
+  // `draftAuthorKind`는 그대로 MODEL이고, 세 갈래가 네 갈래로 늘지도 줄지도 않았다 — 문구 하나만 바뀐다.
+  if (authorKind === "MODEL") return `아래 초안은 저장된 지식을 근거로 준비했습니다.${check}`;
   if (authorKind === "SELLER") return "아래 초안은 판매자가 직접 쓴 문장입니다.";
   if (authorKind === "RULE") return `아래 초안은 저장된 문구에서 시작합니다.${check}`;
   return null;

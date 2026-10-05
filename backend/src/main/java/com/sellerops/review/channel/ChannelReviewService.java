@@ -19,6 +19,7 @@ import com.sellerops.review.channel.dto.ChannelReviewPageView;
 import com.sellerops.review.channel.dto.ChannelReviewTriageSummaryView;
 import com.sellerops.review.channel.dto.ReviewRecordPageView;
 import com.sellerops.review.triage.ReviewTriageNote;
+import com.sellerops.review.triage.ReviewTriageWhyNow;
 import com.sellerops.review.triage.ReviewTriageRules;
 import com.sellerops.review.triage.ReviewTriageTier;
 import com.sellerops.review.triage.feedback.AiTriageCurrent;
@@ -515,6 +516,8 @@ public class ChannelReviewService {
                                 review.getReplyState().name()))
                         .orElse(null);
 
+        DetailTriage detailTriage = detailTriage(orgId, channelId, review);
+
         return new ChannelReviewDetailView(
                 review.getId(),
                 writtenOn(review),
@@ -533,7 +536,8 @@ public class ChannelReviewService {
                 //
                 // The count is for THIS review's category alone. Reusing the grouped breakdown made
                 // opening one review scan the channel's whole analysis join to read a single entry.
-                detailNote(orgId, channelId, review),
+                detailTriage.note(),
+                detailTriage.whyNow(),
                 marksOf(orgId, List.of(review)).get(review.getId()),
                 // The seller's own judgment, read back on every open — so a correction survives a
                 // refresh on the screen as well as in the database. Null when none stands.
@@ -614,10 +618,22 @@ public class ChannelReviewService {
      * what the list showed, so it uses the same predicate and the same org scoping; a cheaper count
      * that meant something slightly different would show the operator two answers for one review.
      */
-    private ReviewTriageNote detailNote(UUID orgId, UUID channelId, Review review) {
+    private DetailTriage detailTriage(UUID orgId, UUID channelId, Review review) {
         String category = categoriesOf(orgId, List.of(review)).get(review.getId());
-        return ReviewTriageNote.of(review.getRating(), review.getBody(), category,
-                category == null ? 0 : reviews.countByChannelAndCategory(orgId, channelId, category));
+        long count = category == null ? 0 : reviews.countByChannelAndCategory(orgId, channelId, category);
+        // ONE category read for both. They are two sentences about one review and they derive the tier
+        // through the same rules; reading the count twice is how they would eventually differ.
+        return new DetailTriage(
+                ReviewTriageNote.of(review.getRating(), review.getBody(), category, count),
+                ReviewTriageWhyNow.of(review.getRating(), review.getBody(), category, count));
+    }
+
+    /**
+     * What the detail says about why this review is in front of the operator: the row's own note, which the
+     * list already showed, and the workspace's own sentence — see {@link ReviewTriageWhyNow} for why the
+     * second exists rather than the screen joining two halves of the first.
+     */
+    private record DetailTriage(ReviewTriageNote note, String whyNow) {
     }
 
     /**

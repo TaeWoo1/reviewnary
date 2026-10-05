@@ -52,6 +52,7 @@ function detail(over: Partial<ChannelReviewDetailView> = {}): ChannelReviewDetai
     textless: false,
     isNew: false,
     triage: { tier: "FYI", reason: "같은 분류가 늘어나는지 지켜보세요.", tags: ["설치"], recommendedAction: null },
+    whyNow: "4점 리뷰이며, 같은 분류가 늘어나는지 볼 내용이 있습니다.",
     aiMark: null,
     sellerCorrection: null,
     locateTarget: { productId: null, vendorItemId: null, writtenOn: null, rating: null },
@@ -161,8 +162,10 @@ describe("리뷰 처리 — the decision workspace", () => {
     // The customer's sentence is on the page and NOT behind a fold — the defect this screen closes.
     const body = await screen.findByText("괜찮긴한데 자꾸 떨어져요");
     expect(body.closest("details")).toBeNull();
-    // And the reason the review is ranked stands with it rather than under 「자동 분류」.
-    expect(screen.getByText("같은 분류가 늘어나는지 지켜보세요.")).toBeInTheDocument();
+    // 그리고 왜 지금 앞에 있는지가 본문과 함께 서 있다 — 「자동 분류」 아래가 아니라.
+    // 2026-10-06부터 그 문장은 서버의 것(`ReviewTriageWhyNow`)이고, 목록이 쓰는 `triage.reason`·
+    // `recommendedAction`과 다른 문장이다. 상세가 두 조각을 이어 만들지 않는다는 것이 계약이다.
+    expect(screen.getByText("4점 리뷰이며, 같은 분류가 늘어나는지 볼 내용이 있습니다.")).toBeInTheDocument();
     // The tier chip is on the problem card; 판매자 판단 names it again on purpose, as the thing
     // the seller is agreeing or disagreeing with.
     expect(screen.getAllByText("참고").length).toBeGreaterThan(0);
@@ -173,7 +176,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     expect(approve.className).toContain("bg-brand-700");
   });
 
-  it("folds only the keyword classification, whose accuracy is unmeasured", async () => {
+  it("folds the keyword classification, whose accuracy is unmeasured", async () => {
     getReviewWorkspace.mockResolvedValue(detail());
     getReviewReplyPrep.mockResolvedValue(prep());
     const { container } = renderTask();
@@ -1280,5 +1283,131 @@ describe("리뷰 pane — 반복 신호가 pane의 중심 object", () => {
     const trail = await screen.findByRole("region", { name: "기록" });
     expect(within(trail).getAllByRole("listitem")).toHaveLength(1);
     expect(trail.textContent).toContain("마켓플레이스");
+  });
+});
+
+/**
+ * <b>리뷰 상세 — Front conversation detail (승인된 canonical mockup, 2026-10-06)</b>
+ *
+ * <p>무엇이 바뀌었나: 둘째 열이 없어지고(읽는 열 792 → 900), 거기 있던 두 사실은 머리말의 평문 속성이
+ * 되고, 준비된 답변이 왜-지금 한 줄 바로 아래로 올라오고, 그 아래 근거는 Front의 `Sources (2)`처럼 접힌다.
+ *
+ * <p>여기 걸어 두는 것은 모양이 아니라 <b>소유</b>다. 한 줄짜리 왜-지금은 서버가 쓴 문장이고 화면이
+ * 두 조각을 이어 만든 것이 아니라는 것, 접어도 사라지는 사실이 없다는 것, 그리고 이 화면에서 면을
+ * 가진 물건이 여전히 하나라는 것.
+ */
+describe("리뷰 상세 — the one object and the one column (2026-10-06)", () => {
+  const WHY = "4점 리뷰이며, 같은 분류가 늘어나는지 볼 내용이 있습니다.";
+
+  it("prints the server's own sentence, and never joins the list's two strings into one", async () => {
+    getReviewWorkspace.mockResolvedValue(
+      detail({
+        whyNow: WHY,
+        triage: { tier: "WATCH", reason: "4점", tags: [], recommendedAction: "같은 분류가 늘어나는지 지켜보세요." },
+      }),
+    );
+    getReviewReplyPrep.mockResolvedValue(prep());
+    renderTask();
+
+    const why = await screen.findByRole("region", { name: "왜 올라왔나요" });
+    expect(why.textContent).toContain(WHY);
+    // 목록의 권유는 목록의 것이다. 상세가 그 문장을 다시 말하지도, reason과 이어 붙이지도 않는다.
+    expect(why.textContent).not.toContain("지켜보세요");
+    expect(screen.queryByText(/같은 분류가 늘어나는지 지켜보세요/)).toBeNull();
+  });
+
+  it("says nothing rather than filling the line when the server has nothing to say", async () => {
+    getReviewWorkspace.mockResolvedValue(detail({ whyNow: null }));
+    getReviewReplyPrep.mockResolvedValue(prep());
+    renderTask();
+
+    const why = await screen.findByRole("region", { name: "왜 올라왔나요" });
+    // 참고 등급은 서버가 null을 준다. 빈 칸을 메우는 문장은 모든 리뷰를 일거리로 보이게 한다 —
+    // 그리고 비었다고 해서 목록의 문장이 대신 들어오지도 않는다. 자동 분류 접힘은 제 능력이라 남는다.
+    expect(why.textContent).not.toContain("같은 분류가 늘어나는지 지켜보세요");
+    // 자동 분류 접힘은 제 능력이라 남는다 — 비어 있어야 하는 것은 이 구역이 직접 거는 문장이다.
+    expect(why.querySelector(":scope > p")).toBeNull();
+  });
+
+  it("carries 중요도 and 처리 상태 as header properties, and the controls that change them stay", async () => {
+    getReviewWorkspace.mockResolvedValue(detail({ whyNow: WHY }));
+    getReviewReplyPrep.mockResolvedValue(prep());
+    renderTask();
+
+    await screen.findByRole("region", { name: "왜 올라왔나요" });
+    const header = document.querySelector("header");
+    expect(header?.textContent).toContain("중요도");
+    expect(header?.textContent).toContain("처리 상태");
+    // 머리말은 읽는 자리다. 바꾸는 두 컨트롤은 판매자의 결정 안에 그대로 있다 — 속성으로 옮겼다고
+    // 능력이 사라지면 그것은 정리가 아니라 삭제다.
+    const decided = screen.getByRole("region", { name: "판매자의 결정" });
+    expect(within(decided).getByRole("region", { name: "판매자 판단 영역" })).toBeTruthy();
+    expect(within(decided).getByText("처리 방법")).toBeTruthy();
+  });
+
+  it("folds 근거 but keeps the open ask outside it, because that one changes what to do now", async () => {
+    getReviewWorkspace.mockResolvedValue(detail({ whyNow: WHY }));
+    getReviewReplyPrep.mockResolvedValue(prep());
+    getReviewDecisionContext.mockResolvedValue(
+      context({ knowledge: { productSources: 3, orgSources: 2, productTitles: ["부착이 잘 떨어질 때 안내"], openAsks: 1 } }),
+    );
+    renderTask();
+
+    await screen.findByRole("region", { name: "왜 올라왔나요" });
+    // 이 화면의 접힘은 둘이다 — 자동 분류와 근거. 이름으로 집는다.
+    const fold = [...document.querySelectorAll("details")].find((d) =>
+      d.querySelector("summary")?.textContent?.includes("근거와 상품 정보"),
+    );
+    expect(fold).toBeTruthy();
+    expect(fold!.open).toBe(false);
+    expect(fold!.querySelector("summary")?.textContent).toContain("등록된 지식 5건");
+    // 접힌 안쪽에 실제로 블록이 들어 있다 — 라벨만 남기고 내용을 버린 접힘이 아니다.
+    expect(fold!.textContent).toContain("등록된 상품 지식 3건");
+    // 그리고 지금 할 일을 바꾸는 사실 하나는 접힘 바깥에 선다.
+    const ask = screen.getByText(/아직 답하지 않은 확인 필요가 1건 있습니다/);
+    expect(fold!.contains(ask)).toBe(false);
+  });
+
+  it("stands the prepared reply between the why-now line and the judgement controls", async () => {
+    getReviewWorkspace.mockResolvedValue(detail({ whyNow: WHY }));
+    getReviewReplyPrep.mockResolvedValue(prep());
+    renderTask();
+
+    const why = await screen.findByRole("region", { name: "왜 올라왔나요" });
+    const draft = await screen.findByLabelText("답변 초안");
+    const decided = screen.getByRole("region", { name: "판매자의 결정" });
+    const order = (el: Element) => (why.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(order(draft)).toBe(true);
+    expect(draft.compareDocumentPosition(decided) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("has one column and one surfaced object", async () => {
+    getReviewWorkspace.mockResolvedValue(detail({ whyNow: WHY }));
+    getReviewReplyPrep.mockResolvedValue(prep());
+    // 기록이 비어 있으면 그 블록은 상자를 그리지 않는다 — 빈 로그로 재면 둘째 상자를 놓친다.
+    // 데모 리뷰에는 두 줄이 있고, 실측에서 상자를 둘로 만든 것이 바로 그 두 줄이었다.
+    getReviewDecisionLog.mockResolvedValue([
+      { kind: "REPLY_APPROVAL", at: "2026-09-04T16:36:46Z", from: null, to: "APPROVED" },
+      { kind: "ACTION_CHOSEN", at: "2026-09-04T16:28:05Z", from: null, to: "RESPONSE_NEEDED" },
+    ] as never);
+    const { container } = renderTask();
+    await screen.findByRole("region", { name: "왜 올라왔나요" });
+    await screen.findByLabelText("답변 초안");
+
+    // 둘째 열이 없다 — rail="none".
+    expect(container.querySelector('[class*="lg:grid-cols-"]')).toBeNull();
+    expect(container.querySelector('[data-case-variant="page"]')?.className).toContain("max-w-[900px]");
+    // 그리고 면을 가진 물건은 준비된 답변 하나뿐이다.
+    //
+    // <b>왜 ring만 세면 안 되는가</b>: 실측(2026-10-06, 1600×1000)에서 이 화면의 상자는 둘이었다 —
+    // 브랜드 테두리를 두른 준비된 답변, 그리고 `DecisionLog`의 평범한 카드. ring만 세는 단언은 그것을
+    // 통과시켰다. 이 저장소에서 「카드」는 radius로 드러나므로 radius를 센다.
+    const page = container.querySelector('[data-case-variant="page"]')!;
+    const cards = [...page.querySelectorAll("div")].filter(
+      (e) => /\brounded-2xl\b/.test(e.className) && !e.closest("button,a,summary"),
+    );
+    expect(cards).toHaveLength(1);
+    expect(cards[0].className).toContain("ring-brand-700");
+    expect(within(cards[0] as HTMLElement).getByLabelText("답변 초안")).toBeTruthy();
   });
 });
