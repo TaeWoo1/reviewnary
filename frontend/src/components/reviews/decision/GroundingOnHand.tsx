@@ -29,6 +29,7 @@ export function GroundingOnHand({
   context,
   titled = true,
   flat = false,
+  showOpenAsk = true,
 }: {
   context: ReviewDecisionContext;
   /** False when the caller's own fold already prints this name. */
@@ -42,6 +43,12 @@ export function GroundingOnHand({
    * 그래서 지울 수 없었다.
    */
   flat?: boolean;
+  /**
+   * False when the caller prints {@link OpenAskNote} itself, outside a fold this block sits inside
+   * (리뷰 canonical mockup, 2026-10-06). 등록된 지식의 개수와 제목은 접어도 되지만 「아직 답하지 않은
+   * 확인 필요 N건」은 지금 행동을 바꾸는 사실이라 접힘 밖에 남는다.
+   */
+  showOpenAsk?: boolean;
 }) {
   const { knowledge, productSignal } = context;
   const preview = usePaneDepth() === "preview";
@@ -105,11 +112,7 @@ export function GroundingOnHand({
           <p className="break-keep text-sm text-ink">{knowledge.productTitles.join(" · ")}</p>
         ) : null}
 
-        {knowledge.openAsks > 0 ? (
-          <p className="break-keep text-sm leading-relaxed text-ink">
-            아직 답하지 않은 확인 필요가 {knowledge.openAsks}건 있습니다. 채우면 다음 초안이 더 말할 수 있습니다.
-          </p>
-        ) : null}
+        {showOpenAsk ? <OpenAskNote knowledge={knowledge} /> : null}
 
         {/* <b>Two more blue links, in a column that already has its door</b> (리뷰 canonical redesign,
             2026-10-03). On the full case these are where a seller goes next; in a preview the one thing the
@@ -136,5 +139,20 @@ export function GroundingOnHand({
         <p className="break-keep text-sm leading-relaxed text-muted">{EVIDENCE_NOTE.countsAreFiled}</p>
       </div>
     </Section>
+  );
+}
+
+/**
+ * <b>아직 답하지 않은 확인 필요</b> — 한 문장, 한 군데.
+ *
+ * <p>{@link GroundingOnHand} 안에 있기도 하고, 그 블록이 접힘 안으로 들어간 화면에서는 접힘 밖에 서기도
+ * 한다. 두 자리에 같은 문장을 두 번 쓰면 둘 중 하나만 고쳐지는 날이 온다.
+ */
+export function OpenAskNote({ knowledge }: { knowledge: ReviewDecisionContext["knowledge"] }) {
+  if (knowledge.openAsks <= 0) return null;
+  return (
+    <p className="break-keep text-sm leading-relaxed text-ink">
+      아직 답하지 않은 확인 필요가 {knowledge.openAsks}건 있습니다. 채우면 다음 초안이 더 말할 수 있습니다.
+    </p>
   );
 }

@@ -177,20 +177,26 @@ describe("VocItemReplyPrep", () => {
    * panel never calls a draft AI unless a model is recorded — is asserted here unchanged; what the
    * template sentence is now allowed to describe is asserted below, by author.
    */
-  it("never calls a draft AI unless the saved version records a model", async () => {
+  it("never claims a draft stands on stored knowledge unless the saved version records a model", async () => {
     await renderPanel();
-    expect(screen.queryByText(/AI가 썼습니다/)).toBeNull();
+    expect(screen.queryByText(/근거로 준비했습니다/)).toBeNull();
   });
 
-  it("says a model wrote it when the saved version says a model wrote it", async () => {
+  /**
+   * <b>무엇에 근거했는지를 말하고, 누가 썼는지는 말하지 않는다</b> (리뷰 canonical mockup, 2026-10-06 —
+   * 승인된 copy). 판매자가 이 줄에서 확인할 것은 이 문장이 회사가 적어 둔 것 위에 서 있는가이다.
+   * `draftAuthorKind`는 그대로 네 갈래이고, MODEL의 문구 하나만 바뀌었다.
+   */
+  it("says what the draft stands on, and does not name a writer, when a model is recorded", async () => {
     await renderPanel(prepView({ draftAuthorKind: "MODEL" }));
-    expect(screen.getByText(/저장된 지식을 근거로 AI가 썼습니다/)).toBeTruthy();
+    expect(screen.getByText(/저장된 지식을 근거로 준비했습니다/)).toBeTruthy();
+    expect(screen.queryByText(/AI가 썼습니다/)).toBeNull();
   });
 
   it("says the seller wrote it, and does not ask them to check their own sentence", async () => {
     await renderPanel(prepView({ draftAuthorKind: "SELLER" }));
     expect(screen.getByText(/판매자가 직접 쓴 문장입니다/)).toBeTruthy();
-    expect(screen.queryByText(/AI가 썼습니다/)).toBeNull();
+    expect(screen.queryByText(/근거로 준비했습니다/)).toBeNull();
     expect(screen.queryByText(/저장된 문구에서 시작합니다/)).toBeNull();
     expect(screen.queryByText(/내용을 확인하고 직접 고쳐 주세요/)).toBeNull();
   });
@@ -207,7 +213,7 @@ describe("VocItemReplyPrep", () => {
   it("claims no author at all when the saved version records none", async () => {
     await renderPanel(prepView({ draftAuthorKind: null }));
     expect(screen.queryByText(/저장된 문구에서 시작합니다/)).toBeNull();
-    expect(screen.queryByText(/AI가 썼습니다/)).toBeNull();
+    expect(screen.queryByText(/근거로 준비했습니다/)).toBeNull();
     expect(screen.queryByText(/판매자가 직접 쓴 문장입니다/)).toBeNull();
     expect(screen.getByLabelText("답변 초안")).toBeTruthy();
   });

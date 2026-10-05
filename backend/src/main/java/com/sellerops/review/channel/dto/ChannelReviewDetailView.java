@@ -51,6 +51,17 @@ public record ChannelReviewDetailView(
         boolean isNew,
         /** The same suggestion the list row carries, so opening a review cannot change what it said. */
         ReviewTriageNote triage,
+        /**
+         * <b>왜 지금 이 리뷰가 앞에 있는가</b> — one factual sentence for THIS screen, or null for 참고.
+         *
+         * <p>Its own field rather than a fifth component of {@link ReviewTriageNote}, because the note is
+         * what the LIST row carries and this sentence is not for a row: the list says 「2점」 and 「내용을
+         * 읽고 상품 상태를 확인해 보세요」 and both are unchanged. Keeping it here means the row's payload
+         * is untouched and nothing can start rendering a detail sentence in a list.
+         *
+         * <p>Composed by {@link com.sellerops.review.triage.ReviewTriageWhyNow} and never by a screen.
+         */
+        String whyNow,
         /** The same pilot mark the list row carried, or null — see {@link ChannelReviewItemView#aiMark()}. */
         AiTriageMarkView aiMark,
         /**

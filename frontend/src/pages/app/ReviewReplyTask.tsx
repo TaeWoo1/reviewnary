@@ -11,17 +11,16 @@ import { ChannelAnsweredState } from "../../components/reviews/ChannelAnsweredSt
 import { TriageTierChip } from "../../components/reviews/TriageTierChip";
 import { ReviewProblemCard } from "../../components/reviews/decision/ReviewProblemCard";
 import { RepeatedSignal } from "../../components/reviews/decision/RepeatedSignal";
-import { GroundingOnHand } from "../../components/reviews/decision/GroundingOnHand";
+import { GroundingOnHand, OpenAskNote } from "../../components/reviews/decision/GroundingOnHand";
 import { EvidencePreview } from "../../components/reviews/decision/EvidencePreview";
 import { DecisionActionStep } from "../../components/reviews/decision/DecisionActionStep";
-import { DecisionLog } from "../../components/reviews/decision/DecisionLog";
 import { api } from "../../lib/apiClient";
 import { reviewRecordPath } from "../../lib/reviewRecord";
 import { reviewWord } from "../../lib/channelVocabulary";
 import { plainText } from "../../lib/plainText";
 import { COPY, sourceLabel } from "../../lib/copy/customerOps";
 import { Disclosure } from "../../components/ui/Disclosure";
-import { CaseBlock, CaseLayout, DecisionCard, Eyebrow, type CaseVariant, type PaneDepth } from "../../components/workspace/CaseLayout";
+import { CaseLayout, DecisionCard, Eyebrow, type CaseVariant, type PaneDepth } from "../../components/workspace/CaseLayout";
 import { ReviewLocate } from "../../components/reviews/ReviewLocate";
 import {
   DECISION_LOG_DISCLOSURE,
@@ -56,7 +55,7 @@ import type {
  *   <li>what the SELLER thinks ({@link SellerCorrectionControls});</li>
  *   <li>what they will DO ({@link DecisionActionStep});</li>
  *   <li>the draft that follows from that choice, and only from 대응 필요;</li>
- *   <li>what has already been decided ({@link DecisionLog}).</li>
+ *   <li>what has already been decided — the page draws it as a flat trail ({@code RecordTrail}).</li>
  * </ol>
  *
  * <p><b>What this screen was before.</b> Review Approval Path v1 built it as 답변 작업 — an address for
@@ -352,28 +351,54 @@ export function ReviewCaseView({
   return (
     <CaseLayout
       variant={variant}
-      /* <b>페이지의 둘째 열은 속성이지 작업대가 아니다</b> (리뷰 canonical mockup, 2026-10-05).
-         준비된 답변이 읽는 열 안의 유일한 물건이 되었으므로, 옆 열에 남는 것은 판매자가 정하는 두 가지
-         — 중요도와 처리 방법 — 뿐이다. 360은 그 둘에게 과하고, 읽는 열에서 가져간 120px이다. */
-      rail={variant === "page" ? "properties" : undefined}
+      /* <b>페이지에 둘째 열은 없다</b> (리뷰 canonical mockup, 2026-10-06 — Front conversation detail).
+         240px rail에 남아 있던 것은 사실 두 개였다. 사실 두 개를 담으려고 페이지 높이만큼 세로줄을 긋는
+         것은, 제목 아래 한 줄이 할 일을 기둥으로 하는 것이고, 「면을 가진 물건은 하나」인 화면에 두 번째
+         모서리를 그리는 것이다. 두 사실은 머리말의 평문 속성으로 올라가고 읽는 열은 792 → 900을 되찾는다. */
+      rail={variant === "page" ? "none" : undefined}
       decisionLabel="판매자의 결정"
       nav={back}
+      /* <b>페이지에서는 제목 위에 아무것도 없다</b> (리뷰 canonical mockup, 2026-10-06). 고객이 쓴
+         문장이 먼저 오고, 그것이 어떤 리뷰인지는 바로 아래 한 줄이 말한다 — Front가 제목과 chip strip을
+         두는 순서다. pane은 그대로 위에 둔다: 440px 열에서는 무엇에 대한 pane인지가 먼저다. */
       meta={
-        <Facts>
-          <span>{sourceLabel(context?.channelCode ?? null, "REVIEW", detail.rating)}</span>
-          <span className="tabular-nums">{detail.writtenOn ?? "날짜 없음"}</span>
-        </Facts>
+        pane ? (
+          <Facts>
+            <span>{sourceLabel(context?.channelCode ?? null, "REVIEW", detail.rating)}</span>
+            <span className="tabular-nums">{detail.writtenOn ?? "날짜 없음"}</span>
+          </Facts>
+        ) : undefined
       }
       sub={
-        detail.productName ? (
-          context?.productId ? (
-            <Link to={`/products/${context.productId}`} className="hover:text-ink hover:underline">
-              {detail.productName}
-            </Link>
-          ) : (
-            detail.productName
-          )
-        ) : undefined
+        pane ? (
+          detail.productName ? (
+            context?.productId ? (
+              <Link to={`/products/${context.productId}`} className="hover:text-ink hover:underline">
+                {detail.productName}
+              </Link>
+            ) : (
+              detail.productName
+            )
+          ) : undefined
+        ) : (
+          <>
+            <Facts>
+              <span>{sourceLabel(context?.channelCode ?? null, "REVIEW", detail.rating)}</span>
+              <span className="tabular-nums">{detail.writtenOn ?? "날짜 없음"}</span>
+              {detail.productName ? (
+                context?.productId ? (
+                  <Link to={`/products/${context.productId}`} className="hover:text-ink hover:underline">
+                    {detail.productName}
+                  </Link>
+                ) : (
+                  <span>{detail.productName}</span>
+                )
+              ) : null}
+            </Facts>
+            {/* rail이 들고 있던 두 사실. 여기서는 읽는 것이고, 바꾸는 컨트롤은 아래 판매자의 결정에 있다. */}
+            <JudgementProperties detail={detail} decision={decision} className="mt-1.5" />
+          </>
+        )
       }
       depth={depth}
       title={title}
@@ -449,9 +474,47 @@ export function ReviewCaseView({
             <ReviewProblemCard detail={detail} word={word} showBody={false} verdict="controls" flat />
           </section>
         ) : (
-          <CaseBlock title="왜 올라왔나요" tone="plain" flat>
-            <ReviewProblemCard detail={detail} word={word} showBody={false} verdict="controls" />
-          </CaseBlock>
+          /* <b>왜 지금인가는 한 줄이고, 머리말을 갖지 않는다</b> (리뷰 canonical mockup, 2026-10-06).
+             문장은 서버가 쓴다 — `ReviewTriageWhyNow`. 화면이 `triage.reason`과 `recommendedAction`을
+             이어 붙이면 어느 쪽도 하려던 적 없는 주장이 생기고, 그 문장을 검사할 자리가 없다. 밑줄 하나로
+             여기까지가 「무엇이고 왜 지금인가」임을 닫고, 그 아래부터가 준비된 답변이다. */
+          <>
+            <section aria-label="왜 올라왔나요" className="border-b border-line pb-5">
+              <ReviewProblemCard
+                detail={detail}
+                word={word}
+                showBody={false}
+                verdict="controls"
+                whyNow={detail.whyNow}
+                flat
+              />
+            </section>
+            {/* <b>첫 화면의 중심 물건</b> (리뷰 canonical mockup, 2026-10-06 — Front conversation detail).
+                Front의 대화 상세에서 면을 가진 것은 제안된 답장 하나이고, 그것은 한 줄짜리 요약 바로 아래
+                선다. 같은 자리다: 리뷰 → 왜 지금 한 줄 → 준비된 답변. 아직 아무것도 정하지 않은 리뷰에는
+                초안이 없고, 그때는 아래 판단 컨트롤이 그 자리에 온다 — 둘 중 하나는 늘 거기 있다.
+                슬롯이 아니라 이 블록 안에 두는 이유: CaseLayout은 자리만 소유하므로(그 docblock) 한
+                화면을 위해 새 자리를 파기보다 이미 있는 자리의 순서를 쓰는 편이 가볍다. */}
+            {showDraft && replyWork ? (
+              <DecisionCard primary>
+                <VocItemReplyPrep
+                  key={`prep-${replyWork.actionRef}`}
+                  accountId={replyAccountId}
+                  actionRef={replyWork.actionRef}
+                  disposition={decision}
+                  onPrepared={() => setPrepared(true)}
+                  onOutcomeRecorded={bump}
+                  onLocalWork={setLocalWork}
+                  headingLevel={2}
+                  subjectShownAbove
+                  unboxed
+                />
+                {detail.sellerAccountId ? (
+                  <SetAsideFromWork accountId={detail.sellerAccountId} actionRef={replyWork.actionRef} onDone={bump} />
+                ) : null}
+              </DecisionCard>
+            ) : null}
+          </>
         )
       }
       decision={
@@ -651,13 +714,26 @@ export function ReviewCaseView({
             {context ? <ProductContextLines context={context} /> : null}
           </>
         ) : (
-          <>
-            <RepeatedSignal problems={context?.repeatedProblems ?? []} failed={contextFailed || context === null} />
-            {/* <b>읽는 열에서 면을 가진 물건은 준비된 답변 하나다</b> (리뷰 canonical mockup, 2026-10-05).
-                이 블록은 카드였다. 카드가 둘이면 어느 쪽이 이 화면의 물건인지 눈이 고르지 못하고, 여기
-                있는 것은 근거이지 결정이 아니다. 숫자도 문장도 두 개의 길도 그대로다 — 상자만 없다. */}
-            {context ? <GroundingOnHand context={context} flat /> : null}
-          </>
+          /* <b>근거는 접히고, 지금 중요한 사실만 밖에 남는다</b> (리뷰 canonical mockup, 2026-10-06 —
+              Front의 `Sources (2)`). 준비된 답변이 이미 「저장된 지식을 근거로 준비했습니다」라고 말하므로
+              그 아래 숫자·제목·반복 신호는 그 주장을 펼쳐 보는 것이다. 펼치면 전과 똑같은 블록이고, 접어도
+              사라지는 사실은 없다 — 단 하나, 「아직 답하지 않은 확인 필요」는 지금 할 일을 바꾸므로 밖에 선다. */
+          <div className="space-y-2">
+            <Disclosure
+              label="근거와 상품 정보"
+              note={context ? `등록된 지식 ${context.knowledge.productSources + context.knowledge.orgSources}건` : undefined}
+              summaryClassName="-ml-2"
+            >
+              <div className="space-y-3 pt-1">
+                <RepeatedSignal
+                  problems={context?.repeatedProblems ?? []}
+                  failed={contextFailed || context === null}
+                />
+                {context ? <GroundingOnHand context={context} flat showOpenAsk={false} /> : null}
+              </div>
+            </Disclosure>
+            {context ? <OpenAskNote knowledge={context.knowledge} /> : null}
+          </div>
         )
       }
       // 기록 stands inside 지금 판단할 것 in a preview, so there is no trailing block for it here.
@@ -666,29 +742,15 @@ export function ReviewCaseView({
           <RecordTrail entries={log ?? []} failed={logFailed || log === null} />
         ) : (
           <>
-            {/* <b>읽는 열은 준비된 답변에서 끝난다</b> (리뷰 canonical mockup, 2026-10-05). 리뷰 → 왜
-                올라왔나요 → 반복 신호 · 이 상품에 대해 아는 것 → 준비된 답변. 근거를 읽고 나서 그 근거로
-                쓰인 답변을 보는 순서이고, 이 화면에서 면과 테두리를 가진 물건은 그것 하나다. */}
-            {showDraft && replyWork ? (
-              <DecisionCard primary>
-                <VocItemReplyPrep
-                  key={`prep-${replyWork.actionRef}`}
-                  accountId={replyAccountId}
-                  actionRef={replyWork.actionRef}
-                  disposition={decision}
-                  onPrepared={() => setPrepared(true)}
-                  onOutcomeRecorded={bump}
-                  onLocalWork={setLocalWork}
-                  headingLevel={2}
-                  subjectShownAbove
-                  unboxed
-                />
-                {detail.sellerAccountId ? (
-                  <SetAsideFromWork accountId={detail.sellerAccountId} actionRef={replyWork.actionRef} onDone={bump} />
-                ) : null}
-              </DecisionCard>
-            ) : null}
-            <DecisionLog entries={log ?? []} failed={logFailed || log === null} />
+            {/* 준비된 답변은 위로 올라갔다 — 왜-지금 바로 아래가 그것의 자리다. 여기 남는 것은 조용한
+                꼬리다: 이미 일어난 일, 그리고 원문으로 가는 길.
+
+                <b>그리고 그것은 카드가 아니다</b> (리뷰 canonical mockup, 2026-10-06). 실측에서 이 화면의
+                「면을 가진 물건」은 둘이었다 — 준비된 답변, 그리고 `DecisionLog`의 상자. 기록은 이 리뷰에
+                대해 이미 일어난 일이지 결정할 것이 아니고, 상자가 둘이면 어느 쪽이 이 화면의 물건인지
+                눈이 고르지 못한다. 확인할 일의 pane이 쓰던 평평한 꼬리를 페이지도 쓴다 — 같은 행, 같은
+                문장(`decisionLogSentence`), 같은 보존 안내. 상자와 세어 붙인 제목만 빠진다. */}
+            <RecordTrail entries={log ?? []} failed={logFailed || log === null} titled />
             {/* <b>원문은 어디서 보나 — 리뷰 기록의 pane이 가지고 있던 것</b> (리뷰 canonical mockup,
                 2026-10-05). 그 pane은 없어졌고, 능력은 따라왔다. 읽는 흐름의 맨 끝인 이유는 순서가
                 그렇기 때문이다: 무엇인지 읽고, 판단하고, 답을 준비한 다음에야 「그런데 원문은」이 온다. */}
@@ -977,11 +1039,7 @@ function RecordedStatus({
   return (
     <section aria-label="판단과 조치" className="border-t border-line pt-4">
       <h3 className="text-sm font-bold text-muted">판단과 조치</h3>
-      <p className="mt-1 break-keep text-base leading-snug text-muted">
-        중요도 <strong className="font-bold text-ink">{TRIAGE_TIER_LABEL[correction?.correctedTier ?? detail.triage.tier]}</strong>
-        <span aria-hidden="true"> · </span>
-        처리 상태 <strong className="font-bold text-ink">{triageDispositionLabel(decision)}</strong>
-      </p>
+      <JudgementProperties detail={detail} decision={decision} className="mt-1 text-base leading-snug" />
       <p className="mt-1 max-w-thread break-keep text-sm leading-relaxed text-muted">
         시스템 판단은 {TRIAGE_TIER_LABEL[detail.triage.tier]}입니다.
         {correction ? ` 판매자 수정으로 ${TRIAGE_TIER_LABEL[correction.correctedTier]}가 함께 기록돼 있습니다.` : ""}
@@ -991,14 +1049,58 @@ function RecordedStatus({
 }
 
 /**
+ * <b>이 리뷰에 대해 서 있는 두 가지</b> — 중요도와 처리 상태, 한 줄.
+ *
+ * <p>두 자리에서 읽힌다. 리뷰 페이지의 머리말에서는 rail이 들고 있던 속성으로(리뷰 canonical mockup,
+ * 2026-10-06), 확인할 일의 pane에서는 「판단과 조치」의 첫 줄로. 한 문장을 두 벌로 쓰면 둘 중 하나만
+ * 고쳐지는 날이 오고, 같은 리뷰에 대해 두 화면이 다른 말을 한다.
+ *
+ * <p><b>읽는 것이지 바꾸는 것이 아니다.</b> 바꾸는 컨트롤은 {@code SellerCorrectionControls}와
+ * {@code DecisionActionStep}이고, 둘 다 「판매자의 결정」 안에 그대로 있다. 보이는 값이 판매자가 고친
+ * 것이면 그렇다고 말한다 — 시스템이 무엇이라고 했는지는 그 컨트롤이 제 자리에서 말한다.
+ */
+function JudgementProperties({
+  detail,
+  decision,
+  className = "",
+}: {
+  detail: ChannelReviewDetailView;
+  decision: TriageDisposition | null;
+  className?: string;
+}) {
+  const correction = detail.sellerCorrection;
+  return (
+    <p className={`break-keep text-sm leading-relaxed text-muted ${className}`}>
+      중요도 <strong className="font-bold text-ink">{TRIAGE_TIER_LABEL[correction?.correctedTier ?? detail.triage.tier]}</strong>{" "}
+      {correction ? "판매자 수정" : "시스템 판단"}
+      <span aria-hidden="true"> · </span>
+      처리 상태 <strong className="font-bold text-ink">{triageDispositionLabel(decision)}</strong>
+    </p>
+  );
+}
+
+/**
  * <b>기록 — the trail as activity</b> (canonical mockup, 2026-10-03; reference: Linear's issue detail).
  *
- * <p>The same rows {@link DecisionLog} draws, from the same `decisionLogSentence`, without the box and
+ * <p>The same rows {@code DecisionLog} draws, from the same `decisionLogSentence`, without the box and
  * the counted heading: an issue's history is the quietest thing on its screen and it closes the column.
  * Newest first, an entry this build cannot name is not drawn, and empty is a real state that says so —
  * all three are the log's rules and none of them changes here.
  */
-function RecordTrail({ entries, failed }: { entries: ReviewDecisionLogEntry[]; failed: boolean }) {
+function RecordTrail({
+  entries,
+  failed,
+  titled = false,
+}: {
+  entries: ReviewDecisionLogEntry[];
+  failed: boolean;
+  /**
+   * 이름을 그린다. pane에서는 이 블록이 열의 마지막이라 제목 없이도 무엇인지 읽히지만, 페이지에서는
+   * 위에 접힌 근거와 아래 원문 보기 사이에 서므로 이름이 있어야 활동 기록으로 읽힌다 — 승인된 mockup의
+   * 작은 「기록」 라벨이 그 자리다. 숫자는 붙이지 않는다: 개수는 행이 이미 말한다.
+   */
+  titled?: boolean;
+}) {
   if (failed) return null;
   const rows = entries
     .map((entry) => ({ entry, sentence: decisionLogSentence(entry) }))
@@ -1006,6 +1108,7 @@ function RecordTrail({ entries, failed }: { entries: ReviewDecisionLogEntry[]; f
 
   return (
     <section aria-label="기록" className="border-t border-line pt-3">
+      {titled ? <h2 className="mb-1 text-sm font-bold text-muted">기록</h2> : null}
       {rows.length === 0 ? (
         <p className="break-keep text-sm leading-relaxed text-muted">아직 이 리뷰에 기록된 판단이 없습니다.</p>
       ) : (

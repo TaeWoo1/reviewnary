@@ -147,8 +147,15 @@ export function CaseLayout({
    * this record, beside a reading column wide enough to be the only place anything happens. A page
    * whose one object is in the flow does not need 360px of chrome beside it, and at 1600 that 120px is
    * the difference between a 720px reading column and a 600px one.
+   *
+   * <p>`"none"` is one column, 900 wide (리뷰 canonical mockup, 2026-10-06 — Front conversation detail).
+   * The 240px rail held two facts. A rail that holds two facts is a vertical rule drawn the height of a
+   * page to carry what a line under the title carries — and it is a second edge on a screen whose whole
+   * point is that ONE object has an edge. The facts moved into the header as plain properties and the
+   * reading column took the width back: 792 → 900, the measure the draft is actually read at. Every
+   * block the caller passes then stacks in that one column, in the order it passes them.
    */
-  rail?: "decision" | "properties";
+  rail?: "decision" | "properties" | "none";
   /** The pane's accessible name. */
   label?: string;
 }) {
@@ -183,7 +190,10 @@ export function CaseLayout({
         >
           {title}
         </Heading>
-        {sub ? <p className="mt-1 break-keep text-sm text-muted">{sub}</p> : null}
+        {/* `div`, not `p` — the review page puts two lines here (the review's identity, then the two
+            properties that used to stand in a rail) and a paragraph may not hold them. How one line
+            draws is unchanged. */}
+        {sub ? <div className="mt-1 break-keep text-sm text-muted">{sub}</div> : null}
       </div>
       {headerAction ? <div className="shrink-0 pt-1 text-sm">{headerAction}</div> : null}
     </header>
@@ -249,7 +259,8 @@ export function CaseLayout({
           ) : null}
         </article>
       ) : (
-        <div className="mx-auto w-full max-w-[1080px] space-y-4" data-case-variant="page">
+        <div className={`mx-auto w-full space-y-4 ${rail === "none" ? "max-w-[900px]" : "max-w-[1080px]"}`}
+          data-case-variant="page">
           {nav}
           {header}
           {/* The strip follows the body's width. With one column it was a 1,500px band over a 560px card —
@@ -266,14 +277,22 @@ export function CaseLayout({
             className={`grid gap-3 ${
               storyEmpty
                 ? "max-w-[560px]"
-                : rail === "properties"
-                  ? "lg:grid-cols-[minmax(0,1fr)_240px] lg:grid-rows-[auto_auto_1fr] lg:gap-x-12"
-                  : "lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_auto_1fr] lg:gap-x-6"
+                : rail === "none"
+                  ? ""
+                  : rail === "properties"
+                    ? "lg:grid-cols-[minmax(0,1fr)_240px] lg:grid-rows-[auto_auto_1fr] lg:gap-x-12"
+                    : "lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_auto_1fr] lg:gap-x-6"
             }`}
           >
             {subject ? <div className="min-w-0 space-y-3 lg:col-start-1">{subject}</div> : null}
+            {/* With no rail the decision is not BESIDE the reading column — it is in it, and the order the
+                caller passes its blocks in is the order the eye meets them. */}
             {decisionBlock ? (
-              <div className="self-start lg:sticky lg:top-4 lg:col-start-2 lg:row-span-3 lg:row-start-1">{decisionBlock}</div>
+              rail === "none" ? (
+                <div className="min-w-0">{decisionBlock}</div>
+              ) : (
+                <div className="self-start lg:sticky lg:top-4 lg:col-start-2 lg:row-span-3 lg:row-start-1">{decisionBlock}</div>
+              )
             ) : null}
             {context ? <div className="min-w-0 space-y-3 self-start lg:col-start-1">{context}</div> : null}
             {more ? <div className="min-w-0 space-y-3 self-start lg:col-start-1">{more}</div> : null}

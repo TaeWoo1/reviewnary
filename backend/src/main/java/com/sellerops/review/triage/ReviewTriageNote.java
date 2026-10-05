@@ -84,8 +84,12 @@ public record ReviewTriageNote(
      * Today the only writer is the rule-based analyzer, so nothing unexpected is reachable; the point
      * is that "every string this class can emit is a fixed literal, a rating or a known category"
      * should be true by construction rather than by who happens to write the column.
+     *
+     * <p>Package-private rather than private so {@link ReviewTriageWhyNow} derives 「this category is one
+     * we count」 from this rule instead of keeping a second copy of it. Two derivations of the same
+     * sentence-worthy fact is how the detail and the row start disagreeing about one review.
      */
-    private static String tagOf(String category) {
+    static String tagOf(String category) {
         if (category == null || category.isBlank() || ItemAnalysisCategories.FALLBACK.equals(category)) {
             return null;
         }

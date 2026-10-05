@@ -142,6 +142,7 @@ const DETAIL: ChannelReviewDetailView = {
   textless: false,
   isNew: true,
   triage: { tier: "FYI", reason: "5점", tags: [], recommendedAction: null },
+  whyNow: null,
   aiMark: null,
   sellerCorrection: null,
   locateTarget: {
