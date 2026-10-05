@@ -33,11 +33,19 @@ export function GroundingOnHand({
   context: ReviewDecisionContext;
   /** False when the caller's own fold already prints this name. */
   titled?: boolean;
-  /** No card edge — see {@code ReviewProblemCard.flat}. */
+  /**
+   * No card edge.
+   *
+   * <p><b>상자와 내용은 다른 결정이고, 한동안 한 깃발이었다</b> (리뷰 canonical mockup, 2026-10-05).
+   * {@code flat}은 테두리만 지운다. 무엇을 그리느냐 — 상품명과 두 개의 길(답변 기준 보기 · 상품 화면
+   * 열기) — 은 깊이가 정한다. 둘이 붙어 있던 동안 페이지에서 상자를 지우면 길 둘이 같이 사라졌고,
+   * 그래서 지울 수 없었다.
+   */
   flat?: boolean;
 }) {
   const { knowledge, productSignal } = context;
-  const preview = usePaneDepth() === "preview" || flat;
+  const preview = usePaneDepth() === "preview";
+  const boxed = !preview && !flat;
   /**
    * <b>이름은 있는데 상품이 없다</b> — the review arrived with the channel's own product name and this
    * org holds no catalogue product for it yet. The only producer of a name without an id is that
@@ -67,7 +75,7 @@ export function GroundingOnHand({
    */
   return (
     <Section title={titled ? "이 상품에 대해 우리가 아는 것" : undefined} ariaLabel="이 상품에 대해 우리가 아는 것">
-      <div className={preview ? "space-y-2" : "space-y-2 rounded-2xl border border-line bg-surface p-4"}>
+      <div className={boxed ? "space-y-2 rounded-2xl border border-line bg-surface p-4" : "space-y-2"}>
         <Facts className="text-sm text-muted">
           {preview ? null : productName}
           {/* Null is not zero: a review bound to no product has no product to count for, and printing
