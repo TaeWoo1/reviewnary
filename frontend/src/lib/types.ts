@@ -1383,6 +1383,60 @@ export interface LearnedKnowledgeResponse {
   lastRun: KnowledgeBootstrapReport | null;
 }
 
+/**
+ * <b>이 회사가 무엇을 알고 있는가</b> — `GET /api/knowledge/inventory`.
+ *
+ * 숫자가 아니라 목록이다. 지식 화면은 「상품 지식 10 · 운영 기준 1」을 적어 놓고 그 열 건도 그 한 건도
+ * 보여 주지 않았다. 기준은 설정 안에, 상품 지식은 상품 열 곳에 흩어져 있었고, 지식이라는 이름의 화면이
+ * 목록으로 가진 것은 올린 파일뿐이었다.
+ *
+ * `citations`는 <b>저장된 근거 관계의 수</b>다. 발송도 승인도 고객 노출도 아니다 — 세 번 고쳐 쓴 초안은
+ * 세 판의 인용을 모두 남기고, 아무에게도 보내지 않은 초안의 인용도 남는다. `lastUsedAt`은 바로 그 행들
+ * 가운데 가장 나중의 시각이다.
+ */
+export interface KnowledgeInventoryView {
+  rules: OperatingRuleRow[];
+  productKnowledge: ProductFactRow[];
+  productKnowledgeTotal: number;
+  products: number;
+  /** 지식을 한 건이라도 가진 상품의 수 — 상품 한 곳에서는 끝내 보이지 않는 빈자리. */
+  productsWithKnowledge: number;
+  /**
+   * 지금 목록에 없는 운영 기준을 인용한 답변 근거의 수.
+   *
+   * 인용은 제 출처보다 오래 산다 — 기준이 고쳐지거나 지워져도 그것을 보고 쓴 초안의 기록은 남는다.
+   * 수일 뿐이고, 어떤 기준이었는지는 서버도 화면도 말하지 않는다.
+   */
+  orphanRuleCitations: number;
+}
+
+/** 회사가 답변의 기준으로 적어 둔 것 한 건. `documentName`이 있으면 파일에서 온 것이다. */
+export interface OperatingRuleRow {
+  id: string;
+  /** 저장된 `OrgKnowledgeType`. 화면은 이것을 `knowledgeWords`의 이름으로만 그린다. */
+  knowledgeType: string | null;
+  title: string;
+  documentName: string | null;
+  active: boolean;
+  citations: number;
+  lastUsedAt: string | null;
+}
+
+/** 판매자가 한 상품에 대해 쓴 지식 한 건. */
+export interface ProductFactRow {
+  id: string;
+  productId: string;
+  productName: string | null;
+  /** 그 상품에 열 화면이 있는지. 제조된 상품은 카탈로그가 내주지 않으므로 링크는 404가 된다. */
+  productReachable: boolean;
+  sourceType: string | null;
+  title: string;
+  documentName: string | null;
+  active: boolean;
+  citations: number;
+  lastUsedAt: string | null;
+}
+
 export interface KnowledgeCandidateView {
   id: string;
   scope: "PRODUCT" | "ORG" | string;

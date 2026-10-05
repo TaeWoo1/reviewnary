@@ -62,15 +62,18 @@ function response(over: Partial<LearnedKnowledgeResponse["learned"]> = {}): Lear
 describe("LearnedKnowledge", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("shows each source with its count and example, and names a source the channel cannot give", async () => {
+  it("shows each source with its count, and names a source the channel cannot give", async () => {
     api.getLearnedKnowledge.mockResolvedValue(response());
     const { container } = render(<LearnedKnowledge />);
 
-    expect(await screen.findByText("20건")).toBeTruthy();
-    expect(screen.getByText("「벽지에도 부착 가능합니다.」")).toBeTruthy();
-    expect(screen.getByText(/문의 답변 · 채널에 등록된 답변 · 선바로 일체형 전선몰딩/)).toBeTruthy();
+    // 수는 「건수」 열 아래의 숫자다 — 머리글이 단위를 말하므로 칸마다 되풀이하지 않는다.
+    expect(await screen.findByText("20")).toBeTruthy();
+    expect(screen.getByText("과거 문의 답변")).toBeTruthy();
+    // 가져오지 못하는 쪽은 채널이 쓴 사유 문장을 그대로 단다.
     expect(screen.getByText(/리뷰 답글 내용을 API나 내려받기 파일로 주지 않아/)).toBeTruthy();
-    expect(screen.getByText("가져오지 못함")).toBeTruthy();
+    expect(screen.getAllByText("못 가져옴").length).toBeGreaterThan(0);
+    // 고객이 쓴 글의 토막은 더 이상 싣지 않는다 — 그 문장은 그것을 인용한 답변 옆에서 읽는다.
+    expect(screen.queryByText("「벽지에도 부착 가능합니다.」")).toBeNull();
     await expectNoAxeViolations(container);
   });
 
@@ -105,7 +108,7 @@ describe("LearnedKnowledge", () => {
     api.getLearnedKnowledge.mockResolvedValue(response({ canLearnHistory: false, channels: [] }));
     render(<LearnedKnowledge />);
 
-    expect(await screen.findByText("20건")).toBeTruthy();
+    expect(await screen.findByText("20")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "과거 운영 기록에서 배우기" })).toBeNull();
   });
 });

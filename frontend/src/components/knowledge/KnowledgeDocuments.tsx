@@ -1,8 +1,6 @@
 import { useRef, useState } from "react";
 import { isAxiosError } from "axios";
 import { Btn } from "../ui/Btn";
-import { Status } from "../ui/Status";
-import { Facts } from "../ui/ObjectRow";
 import { api } from "../../lib/apiClient";
 import { ORG_TOPICS, PRODUCT_TOPICS, scopeLabel, topicLabel } from "../../lib/knowledgeWords";
 import type { KnowledgeDocumentView } from "../../lib/types";
@@ -19,6 +17,10 @@ import { kstDate } from "../../lib/format";
  *
  * <p><b>No chunks.</b> {@code passages} appears only as its one honest consequence: a document that
  * produced none cannot be quoted, and saying so beats letting the seller assume it works.
+ *
+ * <p><b>한 줄에 한 건, 열은 그 여섯 가지.</b> 지식 화면의 다른 두 표와 같은 문법으로 선다 — 자료가 기준과
+ * 지식의 출처로 그 표들에 이름이 적히므로, 같은 회사의 같은 물건이 두 가지 모양으로 그려지면 둘이 같은
+ * 것인지 읽히지 않는다.
  */
 export function KnowledgeDocumentList({
   documents,
@@ -32,7 +34,7 @@ export function KnowledgeDocumentList({
 
   if (documents.length === 0) {
     return (
-      <p className="break-keep text-sm text-muted">
+      <p className="break-keep px-5 py-6 text-sm text-muted">
         사용설명서·FAQ·배송/교환 정책처럼 이미 쓰고 계신 자료를 올리면 답변 근거로 씁니다.
       </p>
     );
@@ -40,22 +42,38 @@ export function KnowledgeDocumentList({
 
   return (
     <>
-      {error ? <p className="break-keep text-sm text-bad" role="alert">{error}</p> : null}
-      <ul className="flex flex-col divide-y divide-line" data-testid="knowledge-documents">
+      {error ? <p className="break-keep px-5 pt-3 text-sm text-bad" role="alert">{error}</p> : null}
+      {/* 위의 두 표와 같은 문법 — 한 줄에 한 건, 열은 그 자료에 대해 사람이 답할 수 있는 것들.
+          aria-hidden: 각 칸이 제 이름을 달고 있어 한 줄이 하나의 객체로 읽힌다. */}
+      <div
+        aria-hidden="true"
+        className="flex items-center gap-4 border-b border-line bg-canvas/40 px-5 py-2 text-xs text-muted"
+      >
+        <span className="min-w-0 flex-1">자료</span>
+        <span className="w-[110px] shrink-0">종류</span>
+        <span className="w-[230px] shrink-0">적용 범위</span>
+        <span className="w-[150px] shrink-0">올린 사람</span>
+        <span className="w-[96px] shrink-0 text-right">올린 날짜</span>
+        <span className="w-[88px] shrink-0 whitespace-nowrap" />
+      </div>
+      <ul className="divide-y divide-line/70" data-testid="knowledge-documents">
         {documents.map((document) => (
-          <li key={document.sourceId} className="flex flex-wrap items-center justify-between gap-2 py-3">
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <span className="break-keep text-base text-ink">{document.fileName ?? document.title}</span>
-              <Facts className="text-sm text-muted">
-                {topicLabel(document.kind) ? <span>{topicLabel(document.kind)}</span> : null}
-                <span>{scopeLabel(document.scope, document.productName)}</span>
-                <span>{kstDate(document.uploadedAt)}</span>
-                {document.uploadedBy ? <span>{document.uploadedBy}</span> : null}
-                {document.passages === 0 ? <span className="text-warn">내용 없음</span> : null}
-                {document.active ? null : <Status tone="neutral">사용 안 함</Status>}
-              </Facts>
-            </div>
+          <li key={document.sourceId} className="flex items-center gap-4 px-5 py-1.5">
+            <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
+              {document.fileName ?? document.title}
+              {document.passages === 0 ? <span className="ml-2 text-xs text-warn">내용 없음</span> : null}
+              {document.active ? null : <span className="ml-2 text-xs text-muted">사용 안 함</span>}
+            </span>
+            <span className="w-[110px] shrink-0 truncate text-xs text-muted">{topicLabel(document.kind) ?? ""}</span>
+            <span className="w-[230px] shrink-0 truncate text-xs text-muted">
+              {scopeLabel(document.scope, document.productName)}
+            </span>
+            <span className="w-[150px] shrink-0 truncate text-xs text-muted">{document.uploadedBy ?? ""}</span>
+            <span className="w-[96px] shrink-0 text-right text-xs tabular-nums text-muted">
+              {kstDate(document.uploadedAt)}
+            </span>
             <Btn
+              className="w-[88px] shrink-0 whitespace-nowrap"
               size="sm"
               variant="ghost"
               disabled={busy === document.sourceId}
@@ -82,6 +100,7 @@ export function KnowledgeDocumentList({
     </>
   );
 }
+
 
 /**
  * <b>자료 추가 — the seller hands over a file they already have.</b>

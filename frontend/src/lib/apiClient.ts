@@ -93,6 +93,7 @@ import type {
   KnowledgeCandidateView,
   KnowledgeDocumentView,
   KnowledgeSummaryView,
+  KnowledgeInventoryView,
   LearnedKnowledgeResponse,
   ReviewReplySubmissionRunResponse,
   ReviewExecutionView,
@@ -1505,6 +1506,17 @@ export const api = {
   },
 
   // What reviewnary knows, as numbers — the 「알고 있는 정보」 line.
+  /**
+   * What the company knows, as a list — one read for the whole knowledge workspace.
+   *
+   * Its own route rather than fields on the summary: the summary is the header's numbers, this is
+   * the corpus itself, bounded by a page and arriving in the order the screen must draw it.
+   */
+  async getKnowledgeInventory(): Promise<KnowledgeInventoryView> {
+    const { data } = await http.get<KnowledgeInventoryView>("/api/knowledge/inventory");
+    return data;
+  },
+
   async getKnowledgeSummary(): Promise<KnowledgeSummaryView> {
     const { data } = await http.get<KnowledgeSummaryView>("/api/knowledge/summary");
     return data;

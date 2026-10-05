@@ -3,46 +3,55 @@ import { Link } from "react-router-dom";
 import type {
   KnowledgeCandidateView,
   KnowledgeDocumentView,
+  KnowledgeInventoryView,
   KnowledgeSummaryView,
 } from "../../lib/types";
 import { api } from "../../lib/apiClient";
 import { useAgentSurface } from "../../lib/agentPanel";
 import { Btn } from "../../components/ui/Btn";
-import { WorkFlowCard } from "../../components/ui/WorkFlowCard";
+import { Empty } from "../../components/ui/Empty";
+import { ListBox, Section } from "../../components/ui/Section";
+import { RelationCounts } from "../../components/product/record/RelationCounts";
+import { count } from "../../lib/format";
 import { COPY } from "../../lib/copy/customerOps";
+import { KNOWLEDGE_NOUN, ORG_TOPICS } from "../../lib/knowledgeWords";
 import { KnowledgeInbox } from "../../components/knowledge/KnowledgeInbox";
 import { LearnedKnowledge } from "../../components/knowledge/LearnedKnowledge";
+import { OperatingRuleTable, ProductFactTable, topicsOf } from "../../components/knowledge/KnowledgeInventory";
 import {
   KnowledgeDocumentAdd,
   KnowledgeDocumentList,
 } from "../../components/knowledge/KnowledgeDocuments";
 
 /**
- * <b>reviewnary가 알고 있는 정보</b> — what the company has told reviewnary, what reviewnary already
- * read by itself, and what it is still asking. (Knowledge Setup &amp; Inbox UX v1 §2, §7, §10)
+ * <b>지식</b> — 이 회사가 무엇을 알고 있고, 무엇이 비어 있고, 그것이 어디에 쓰였는지.
  *
- * <p><b>The screen used not to keep its own title.</b> It listed the files the seller had handed
- * over and linked away for everything else, so a company holding 38 written product facts, 6
- * operating rules, 23 past answers and 308 collected products read as a company holding three
- * files — and a company holding none was told 「지금 확인하실 항목은 없습니다」 two minutes after
- * signing up, which is arithmetically true and reads as 「you have nothing; start typing」.
+ * <p><b>이 화면은 지식을 한 건도 보여 주지 않았다.</b> 「상품 지식 10 · 운영 기준 1 · 자료 3」이라고
+ * 적어 두고, 목록으로 그린 것은 올린 파일 셋뿐이었다. 기준 두 건은 설정 안에 있었고, 상품 지식 열두
+ * 건은 상품 다섯 곳에 흩어져 있었으며, 어느 화면도 다른 쪽이 있다고 말하지 않았다. 가장 큰 활자는
+ * 판매자가 가르친 적 없는 수(「294개 상품 정보」)였다. 그래서 이 화면이 하는 일을 세 질문으로 다시
+ * 정했고, 세 질문은 각각 표 하나를 가진다.
  *
- * <p><b>Order is the argument.</b> 확인 필요 first, because it is the only part with anything to
- * decide. Then 알고 있는 정보 — the numbers, including the one reviewnary was never told
- * (상품 정보), which is what makes 「이미 사용 중인 자료를 연결해 주세요」 a true sentence rather
- * than a slogan. Then 자료, then the two places a person writes.
+ * <p><b>무엇을 알고 있나</b> — 운영 기준과 상품 지식이 한 줄에 한 건씩. <b>무엇이 비어 있나</b> — 적히지
+ * 않은 주제가 빈 줄로 서고, 상품 몇 개에 지식이 있는지를 바닥이 말한다. <b>어디에 쓰였나</b> — 「답변
+ * 근거」 열. 그 수는 저장된 근거 관계의 수이지 발송도 승인도 아니며, 그 경계는 서버 쪽
+ * {@code KnowledgeInventoryContractTest}가 지킨다.
  *
- * <p><b>v3.1 layout</b> (Customer Operations v3.1): 「보유 정보 → 입력 필요」, then the 입력 필요 list, then one
- * 「출처」 surface whose two tabs are the files handed over and what was collected from the channels. The four-count
- * section and the 「직접 등록」 links are gone from the page — the counts are in the first card and the two writing
- * screens are under 「+ 추가」.
+ * <p><b>머리의 띠에는 지식만 선다.</b> 과거 응답 27건은 이 회사가 가진 지식이 아니라 해 온 일이고,
+ * 상태와 활동을 한 줄에 섞으면 둘 다 읽히지 않는다. 그것은 맨 아래 「채널에서 읽어 온 것」에 제 이름으로
+ * 서 있다 — 거기에는 참고용이라고 말할 자리가 있다.
  *
- * <p><b>Internal vocabulary stays out.</b> No chunk, no embedding, no source id, no score, no enum —
- * `lib/knowledgeWords.ts` owns every word, and a token it has no name for renders as nothing.
+ * <p><b>순서를 다시 해석하지 않는다.</b> 상품 지식은 서버가 답변 근거 → 마지막 사용 → 제목으로 줄
+ * 세워 보내고, 이 화면은 받은 순서를 그대로 그린다. 상품 목록에서 끝낸 그 결함 — 서버와 화면이 서로
+ * 다른 수량으로 줄을 세우던 것 — 이 여기서 되살아나지 않도록 화면 쪽 계약 테스트가 함께 선다.
+ *
+ * <p><b>내부 어휘는 끝까지 나오지 않는다.</b> chunk도, passage도, enum도 없다 —
+ * `lib/knowledgeWords.ts`가 판매자가 읽는 말을 전부 쥐고 있고, 이름이 없는 토큰은 아무것도 그리지 않는다.
  */
 export function KnowledgeHome() {
   const [documents, setDocuments] = useState<KnowledgeDocumentView[] | null>(null);
   const [candidates, setCandidates] = useState<KnowledgeCandidateView[] | null>(null);
+  const [inventory, setInventory] = useState<KnowledgeInventoryView | null>(null);
   const [summary, setSummary] = useState<KnowledgeSummaryView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,18 +59,19 @@ export function KnowledgeHome() {
 
   // The same conversation every other screen opens — the panel, not a second chat (Reports v1 §3).
   // WHAT TRAVELS IS THE SCREEN, and only the screen: there is no knowledge READ tool in the runtime's
-  // catalogue, so a document id would be a hint no tool could turn into a fact. Registered
-  // unconditionally so the header names this page while it is still loading.
+  // catalogue, so a document id would be a hint no tool could turn into a fact.
   useAgentSurface({ surface: "knowledge", label: COPY.knowledgeTitle });
 
   const load = useCallback(async () => {
-    const [docs, cands, sum] = await Promise.all([
+    const [docs, cands, inv, sum] = await Promise.all([
       api.getKnowledgeDocuments().catch(() => null),
       api.getKnowledgeCandidates().catch(() => null),
+      api.getKnowledgeInventory().catch(() => null),
       api.getKnowledgeSummary().catch(() => null),
     ]);
     setDocuments(docs ?? []);
     setCandidates(cands ?? []);
+    setInventory(inv);
     setSummary(sum);
   }, []);
 
@@ -76,12 +86,7 @@ export function KnowledgeHome() {
     try {
       const next = await api.proposeKnowledgeCandidates();
       setCandidates(next);
-      setNotice(
-        next.length === 0
-          ? "반복 문장 없음"
-          : `기준 후보 ${next.length}건`,
-      );
-      setSummary(await api.getKnowledgeSummary().catch(() => summary));
+      setNotice(next.length === 0 ? "반복 문장 없음" : `기준 후보 ${next.length}건`);
     } catch {
       setError("과거 답변 확인 실패 · 다시 시도");
     } finally {
@@ -89,112 +94,162 @@ export function KnowledgeHome() {
     }
   }
 
-  const loading = documents === null || candidates === null;
-  const pending = summary?.needsConfirmation ?? 0;
-  // What the 입력 필요 count is made of, from the rows this page actually drew — 「답변 근거 없음」 is only true of
-  // the drafting gaps, so the line names each kind instead of one sentence for all of them.
-  const pendingKinds: string[] = loading
-    ? []
-    : ([
-        ["정보 부족", candidates.filter((c) => c.origin === "DRAFT_GAP").length],
-        ["기준 후보", candidates.filter((c) => c.origin !== "DRAFT_GAP").length],
-        ["자료 문제", documents.filter((d) => d.active && d.passages === 0).length],
-      ] as const)
-        .filter(([, n]) => n > 0)
-        .map(([label, n]) => `${label} ${n}`);
+  const pending = candidates?.length ?? 0;
+  const rules = inventory?.rules ?? [];
+  const facts = inventory?.productKnowledge ?? [];
+  const writtenTopics = topicsOf(rules).filter((topic) => topic.rules.length > 0).length;
+  const showingAll = inventory !== null && facts.length >= inventory.productKnowledgeTotal;
+  const unused = facts.filter((fact) => fact.citations === 0).length;
 
   return (
-    <div className="mx-auto flex w-full max-w-[900px] flex-col gap-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-[25px] font-extrabold leading-tight tracking-tight text-ink">{COPY.knowledgeTitle}</h1>
-        <AddMenu />
+    <div className="mx-auto flex w-full max-w-content flex-col gap-3">
+      {/* 제목 옆에 이 화면이 다루는 것의 크기 — 상품 목록의 「전체 294개」가 선 그 자리이고, 띠 자체는
+          상품 상세의 관계 띠와 같은 물건, 같은 규칙이다(지금 사람을 기다리는 하나에만 색이 있다).
+          여기 서는 넷은 모두 이 회사가 가진 지식이고, 해 온 일은 한 칸도 섞이지 않는다 — 과거 응답은
+          이 회사가 가진 지식이 아니라 해 온 일이므로 맨 아래 제 이름으로 선다. */}
+      <header className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <h1 className="text-title font-extrabold leading-tight tracking-tight text-ink">{COPY.knowledgeTitle}</h1>
+        <RelationCounts
+          bare
+          ariaLabel="이 회사가 가진 지식"
+          items={[
+            { label: "운영 기준", value: rules.length },
+            { label: "상품 지식", value: inventory?.productKnowledgeTotal ?? 0 },
+            { label: COPY.documentsTab, value: documents?.length ?? 0 },
+            { label: KNOWLEDGE_NOUN.needsConfirmation, value: pending, emphasis: true },
+          ]}
+        />
+        <span className="ml-auto">
+          <AddMenu />
+        </span>
       </header>
 
       {error ? <p className="break-keep text-sm text-bad" role="alert">{error}</p> : null}
       {notice ? <p className="break-keep text-sm text-muted" role="status">{notice}</p> : null}
 
-      {summary ? (
-        <WorkFlowCard
-          ariaLabel={`${COPY.held}, ${COPY.toEnter}`}
-          done={
-            summary.products > 0
-              ? {
-                  label: COPY.held,
-                  value: summary.products.toLocaleString("ko-KR"),
-                  unit: "개 상품 정보",
-                  line: <HeldLine summary={summary} />,
-                }
-              : {
-                  label: COPY.held,
-                  value: COPY.nothingCollected,
-                  phrase: true,
-                  line: <HeldLine summary={summary} />,
-                  action:
-                    summary.pastAnswers === 0 ? (
-                      <Link to="/connect" className="text-sm font-semibold text-brand-700 hover:underline">
-                        {COPY.connectChannel}
-                      </Link>
-                    ) : undefined,
-                }
-          }
-          mine={
-            pending > 0
-              ? {
-                  label: COPY.toEnter,
-                  value: pending.toLocaleString("ko-KR"),
-                  unit: "건",
-                  line: pendingKinds.length > 0 ? <span>{pendingKinds.join(" · ")}</span> : undefined,
-                }
-              : { label: COPY.toEnter, value: COPY.none }
-          }
-        />
-      ) : null}
-
-      <section aria-label={COPY.toEnter} className="flex flex-col gap-3">
-        <div className="mt-3 flex items-center gap-2">
-          <h2 className="text-[17px] font-bold tracking-tight text-ink">{COPY.toEnter}</h2>
-          {summary && summary.pastAnswers > 0 ? (
-            // Offered only when there is something to look through: a control whose one outcome is 「없음」 is not
-            // an action, and on a first day it would be the loudest thing on the screen.
-            <Btn size="sm" variant="ghost" className="ml-auto" onClick={() => void propose()} disabled={busy}>
+      <Section
+        title={KNOWLEDGE_NOUN.needsConfirmation}
+        action={
+          summary && summary.pastAnswers > 0 ? (
+            // Offered only when there is something to look through: a control whose one outcome is
+            // 「없음」 is not an action, and on a first day it would be the loudest thing on the screen.
+            <Btn size="sm" variant="ghost" onClick={() => void propose()} disabled={busy}>
               {busy ? "확인 중…" : COPY.findInPastAnswers}
             </Btn>
-          ) : null}
-        </div>
-        {loading ? (
+          ) : undefined
+        }
+      >
+        {documents === null || candidates === null ? (
           <p className="text-sm text-muted">확인 중…</p>
         ) : (
           <KnowledgeInbox candidates={candidates} documents={documents} onChanged={load} />
         )}
-      </section>
+      </Section>
 
-      <Sources documents={documents} loading={loading} onChanged={load} />
+      <Section
+        title="운영 기준"
+        hint={
+          inventory ? (
+            <>
+              {ORG_TOPICS.length}가지 가운데 {writtenTopics}가지가 적혀 있습니다. 적혀 있지 않은 기준은 답변에
+              쓰이지 않습니다.
+              {/* 인용은 제 출처보다 오래 산다 — 기준이 지워져도 그것을 보고 쓴 초안의 기록은 남고, 존재하지
+                  않게 된 기준은 위의 표에 줄을 남기지 않으므로 판매자가 다른 어디에서도 볼 수 없다.
+                  어떤 기준이었는지는 말하지 않는다: evidence의 locator에서 이름을 되찾는 것은 외래 키가
+                  받쳐 주지 않는 주장이다. */}
+              {inventory.orphanRuleCitations > 0 ? (
+                <>
+                  {" · "}목록에 없는 기준을 인용한 답변 근거{" "}
+                  <b className="font-semibold text-ink">{count(inventory.orphanRuleCitations)}건</b>
+                </>
+              ) : null}
+            </>
+          ) : undefined
+        }
+        action={
+          <Link
+            to="/settings/policies"
+            className="rounded text-sm font-semibold text-brand-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+          >
+            기준 추가
+          </Link>
+        }
+      >
+        <ListBox>
+          {inventory === null ? (
+            <p className="px-5 py-6 text-sm text-muted">불러오는 중…</p>
+          ) : (
+            <OperatingRuleTable rules={rules} />
+          )}
+        </ListBox>
+      </Section>
+
+      <Section
+        title="상품 지식"
+        action={
+          <Link
+            to="/products"
+            className="rounded text-sm font-semibold text-brand-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+          >
+            상품에서 추가
+          </Link>
+        }
+      >
+        <ListBox>
+          {inventory === null ? (
+            <p className="px-5 py-6 text-sm text-muted">불러오는 중…</p>
+          ) : facts.length === 0 ? (
+            <div className="px-5 py-6">
+              <Empty
+                compact
+                title="아직 적어 둔 상품 지식이 없습니다"
+                body="상품 화면에서 설명·자주 묻는 질문·사용법·정책을 적어 두면, 답변이 그 내용을 근거로 씁니다."
+              />
+            </div>
+          ) : (
+            <>
+              <ProductFactTable facts={facts} />
+              <p className="border-t border-line bg-canvas/40 px-5 py-2.5 text-xs text-muted">
+                {showingAll ? null : (
+                  <>
+                    <b className="font-semibold text-ink">{count(inventory.productKnowledgeTotal)}건</b> 가운데{" "}
+                    <b className="font-semibold text-ink">{count(facts.length)}건</b>을 보고 있습니다.{" "}
+                  </>
+                )}
+                {showingAll && unused > 0 ? (
+                  <>
+                    <b className="font-semibold text-ink">{count(unused)}건</b>은 아직 답변 근거로 쓰인 적이 없고,{" "}
+                  </>
+                ) : null}
+                상품 <b className="font-semibold text-ink">{count(inventory.products)}개</b> 가운데{" "}
+                <b className="font-semibold text-ink">{count(inventory.productsWithKnowledge)}개</b>에 상품 지식이
+                있습니다.
+              </p>
+            </>
+          )}
+        </ListBox>
+      </Section>
+
+      <Section
+        title={COPY.documentsTab}
+        hint="회사가 이미 쓰고 있던 파일. 여기서 읽은 내용이 위의 기준과 지식이 됩니다."
+        action={<KnowledgeDocumentAdd scope="ORG" onImported={load} label={COPY.addDocument} />}
+      >
+        <ListBox>
+          {documents === null ? (
+            <p className="px-5 py-6 text-sm text-muted">불러오는 중…</p>
+          ) : (
+            <KnowledgeDocumentList documents={documents} onChanged={load} />
+          )}
+        </ListBox>
+      </Section>
+
+      <Section title="채널에서 읽어 온 것" hint="공식 기준이 아니라, 답변을 만들 때 참고만 합니다.">
+        <ListBox>
+          <LearnedKnowledge />
+        </ListBox>
+      </Section>
     </div>
-  );
-}
-
-/** 「상품 지식 12 · 운영 기준 5 · 자료 4 · 과거 응답 23 (참고용)」 — separate counts, never a sum. */
-function HeldLine({ summary }: { summary: KnowledgeSummaryView }) {
-  const parts: [string, number][] = [
-    ["상품 지식", summary.productKnowledge],
-    ["운영 기준", summary.operatingRules],
-    ["자료", summary.documents],
-  ];
-  return (
-    <>
-      {parts.map(([label, n], i) => (
-        <span key={label} className="flex items-center gap-1.5">
-          {i > 0 ? <span aria-hidden="true">·</span> : null}
-          {label} {n.toLocaleString("ko-KR")}
-        </span>
-      ))}
-      {summary.pastAnswers > 0 ? (
-        <span className="flex items-center gap-1.5 text-muted">
-          <span aria-hidden="true">·</span>
-          과거 응답 {summary.pastAnswers.toLocaleString("ko-KR")} (참고용)
-        </span>
-      ) : null}
-    </>
   );
 }
 
@@ -214,72 +269,5 @@ function AddMenu() {
         </Link>
       </div>
     </details>
-  );
-}
-
-/** 「출처」: the files handed over, and what was collected from the channels — the same question asked by source. */
-function Sources({
-  documents,
-  loading,
-  onChanged,
-}: {
-  documents: KnowledgeDocumentView[] | null;
-  loading: boolean;
-  onChanged: () => Promise<void>;
-}) {
-  const [tab, setTab] = useState<"DOCUMENTS" | "LEARNED">("DOCUMENTS");
-  const tabs: { key: "DOCUMENTS" | "LEARNED"; label: string }[] = [
-    { key: "DOCUMENTS", label: `${COPY.documentsTab}${documents ? ` ${documents.length}` : ""}` },
-    { key: "LEARNED", label: COPY.learnedTab },
-  ];
-  return (
-    <section aria-label={COPY.sources} className="flex flex-col gap-3">
-      <h2 className="mt-3 text-[17px] font-bold tracking-tight text-ink">{COPY.sources}</h2>
-      <div className="rounded-[14px] bg-surface shadow-[0_0_0_1px_#E4E7EC]">
-        <div className="flex flex-wrap items-center gap-1 border-b border-[#EEF0F3] p-1.5">
-          <div role="tablist" aria-label={COPY.sources} className="flex flex-wrap items-center gap-1">
-            {tabs.map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                role="tab"
-                id={`knowledge-tab-${t.key}`}
-                aria-selected={tab === t.key}
-                aria-controls={`knowledge-panel-${t.key}`}
-                onClick={() => setTab(t.key)}
-                className={`rounded-[9px] px-3 py-1.5 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
-                  tab === t.key ? "bg-[#F1F3F5] text-ink" : "text-muted hover:text-ink"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-          {tab === "DOCUMENTS" ? (
-            <span className="ml-auto pr-1">
-              <KnowledgeDocumentAdd scope="ORG" onImported={onChanged} label={COPY.addDocument} />
-            </span>
-          ) : null}
-        </div>
-        <div
-          role="tabpanel"
-          id={`knowledge-panel-${tab}`}
-          aria-labelledby={`knowledge-tab-${tab}`}
-          className="px-5 py-2"
-        >
-          {tab === "DOCUMENTS" ? (
-            loading || !documents ? (
-              <p className="py-2 text-sm text-muted">확인 중…</p>
-            ) : (
-              <KnowledgeDocumentList documents={documents} onChanged={onChanged} />
-            )
-          ) : (
-            <div className="py-3">
-              <LearnedKnowledge />
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
   );
 }
