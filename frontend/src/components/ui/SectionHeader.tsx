@@ -12,7 +12,8 @@ export function SectionHeader({
   hint,
   action,
 }: {
-  title: string;
+  /** 보통은 문장 하나. 숫자를 제목 옆에 조용히 붙이는 화면이 있어 노드도 받는다 (상품 상세). */
+  title: ReactNode;
   hint?: string;
   action?: ReactNode;
 }) {
