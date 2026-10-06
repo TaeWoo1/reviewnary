@@ -230,13 +230,18 @@ describe("§2 — three first-use mornings", () => {
     expect(screen.queryByText(/지금 먼저 확인할 일은 없습니다/)).toBeNull();
   });
 
-  it("with rows, neither first-use lead is drawn and the ordinary brief runs", async () => {
+  it("with rows, neither first-use lead is drawn and the ordinary Home runs", async () => {
     getOverviewStrict.mockResolvedValue(overview([row()]));
     renderHome();
 
-    await waitFor(() => expect(screen.queryByLabelText("오늘 상태")).toBeTruthy());
+    // 행이 있으면 첫 사용 문장이 아니라 그 일의 목록이 화면이다 (Home은 하나다, 2026-10-06):
+    // 전에는 여기서 대화 브리핑(「오늘 상태」 한 줄)이 돌았고, 지금은 같은 자리에 오늘의 골격이 선다.
+    // 이 블록의 읽기는 비어 있으므로 목록은 빈 상태로 서고, 그 사실을 문장으로 적는다.
+    await waitFor(() => expect(screen.queryByText("지금 확인할 일이 없습니다.")).toBeTruthy());
+    expect(screen.getByRole("heading", { level: 1, name: "오늘" })).toBeTruthy();
     expect(screen.queryByTestId("first-use-no-channel")).toBeNull();
     expect(screen.queryByTestId("first-use-no-data")).toBeNull();
+    expect(screen.queryByLabelText("오늘 상태")).toBeNull();
   });
 });
 

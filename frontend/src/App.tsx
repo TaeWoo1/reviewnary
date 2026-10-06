@@ -41,6 +41,7 @@ import { OperationsCaseQueue } from "./pages/app/OperationsCaseQueue";
 // Carried-over working surfaces. These keep their behaviour in Slice 3 and are re-homed under the
 // new IA; the ones scheduled for replacement are rebuilt in Slices 4-6.
 import { Orders } from "./pages/Orders";
+import { OrderRecord } from "./pages/OrderRecord";
 import { ChannelWorkspace } from "./pages/app/ChannelWorkspace";
 import { ReviewCollectionFlow } from "./pages/app/ReviewCollectionFlow";
 import { Upload } from "./pages/Upload";
@@ -148,6 +149,11 @@ export function App() {
         <Route path="/inbox" element={<Navigate to="/inquiries" replace />} />
         <Route path="/inbox/:itemRef" element={<InboxItemRedirect />} />
         <Route path="/orders" element={<Orders />} />
+        {/* 주문 상세 — 주소가 정체성의 네 조각을 그대로 가진다(§4d): 채널 · 계정 · 주문번호, 그리고
+            org은 인증 context. 주문번호 단독이나 `channel + 번호`로 가는 길은 만들지 않는다 — 번호는
+            채널 사이에서 유일하지 않고 한 org이 같은 채널에 계정을 둘 가질 수 있어, 좁히지 못한 조회는
+            「없음」이 아니라 다른 사람의 주문을 열 수 있는 조회다. */}
+        <Route path="/orders/:channelCode/:accountId/:parentOrderId" element={<OrderRecord />} />
         {/* Kept as routes, out of the primary nav (reached from 홈 and 설정) until the home unit
             decides their place. */}
         <Route path="/memory" element={<CustomerMemory />} />

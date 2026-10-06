@@ -22,10 +22,9 @@ describe("RepeatedProblemList — the row a Home draws for a repeated problem", 
     text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/^\s*\/\/.*$/gm, "");
 
   const LIST = "src/components/home/RepeatedProblemList.tsx";
-  const HOMES = [
-    "src/components/home/OperationsAreas.tsx",
-    "src/components/customerOperations/CustomerOpsHome.tsx",
-  ];
+  // Home은 하나다 (2026-10-06): 책임 런타임이 열려 있지 않은 배포가 보던 두 번째 Home(OperationsAreas)은
+  // 삭제됐고, 같은 골격이 비어 있는 채로 선다. 이 목록이 한 줄인 것은 그 통합의 결과다.
+  const HOMES = ["src/components/customerOperations/CustomerOpsHome.tsx"];
 
   it("is the only place a repeated problem is turned into a row", () => {
     for (const home of HOMES) {

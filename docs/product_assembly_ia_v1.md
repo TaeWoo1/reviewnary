@@ -179,6 +179,9 @@ row + 어휘 한 줄이 목표이며, 이를 깨는 설계는 이 문서를 먼�
 [1600](images/orders/01-order-detail-naver-1600.png) · [1366](images/orders/02-order-detail-naver-1366.png);
 쿠팡 `31971202913784`(raw 상태 이력 4단계, 채널이 변경 시각을 주지 않아 「—」):
 [1600](images/orders/03-order-detail-coupang-1600.png) · [1366](images/orders/04-order-detail-coupang-1366.png).
+**네 장은 같은 날 구현을 끝낸 뒤 실제 화면에서 다시 찍은 것이다** — 같은 두 레코드, 같은 비식별화 표, 그리고
+visual QA에서 정한 한 가지 수정(구역 제목이 상품 상세·홈과 같은 랭크 18/600에 그 아래 hairline)이 반영돼 있다.
+기준선이 손으로 그린 그림이면 구현과 조용히 갈라지므로, 이 자리의 그림은 언제나 **그 커밋의 화면**이다.
 이 기준은 임의 drift를 막기 위한 현재 구현 기준이며, 향후 product-owner visual QA 승인 시 문서·캡처·관련 테스트를
 함께 갱신해 교체할 수 있다. 목록 화면의 canonical 캡처는 아직 저장소에 없다.
 

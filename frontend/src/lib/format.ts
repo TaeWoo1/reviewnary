@@ -106,3 +106,80 @@ export function kstDate(iso: string | null | undefined): string {
   }
   return new Date(ms).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
 }
+
+/** KST 달력 조각 — 한 시각을 서울의 날짜·시각으로 나눈 것. 브라우저의 시간대가 아니다. */
+function kstParts(iso: string): { month: string; day: string; hour: string; minute: string } | null {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) {
+    return null;
+  }
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Seoul",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(ms));
+  const at = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return { month: at("month"), day: at("day"), hour: at("hour"), minute: at("minute") };
+}
+
+/** 「8월 16일」 — 날짜 하나를 사람이 말하는 모양으로. 연도는 말하지 않는다. */
+export function kstMonthDay(iso: string | null | undefined): string {
+  if (!iso) {
+    return "-";
+  }
+  const day = kstDate(iso);
+  const [, m, d] = day.split("-");
+  if (!m || !d) {
+    return day;
+  }
+  return `${Number(m)}월 ${Number(d)}일`;
+}
+
+/**
+ * 「9월 5일 20:30」 — 시각까지 말해야 하는 자리(마지막 수집)에서, 판매자의 시간대로.
+ *
+ * 같은 수집을 서울에서 보는 사람과 다른 곳에서 보는 사람이 다른 날짜로 읽으면, 「그때까지 읽은
+ * 것입니다」라는 문장이 두 가지 뜻이 된다.
+ */
+export function kstDayTime(iso: string | null | undefined): string {
+  if (!iso) {
+    return "-";
+  }
+  const p = kstParts(iso);
+  return p ? `${Number(p.month)}월 ${Number(p.day)}일 ${p.hour}:${p.minute}` : iso;
+}
+
+/** 「9/5 19:57」 — 한 열에 여럿이 세로로 서는 자리(결제 시각). */
+export function kstShortDateTime(iso: string | null | undefined): string {
+  if (!iso) {
+    return "-";
+  }
+  const p = kstParts(iso);
+  return p ? `${Number(p.month)}/${Number(p.day)} ${p.hour}:${p.minute}` : iso;
+}
+
+/** 「9/5」 — 날짜만으로 충분한 자리(마지막 확인). */
+export function kstShortDate(iso: string | null | undefined): string {
+  if (!iso) {
+    return "-";
+  }
+  const p = kstParts(iso);
+  return p ? `${Number(p.month)}/${Number(p.day)}` : iso;
+}
+
+/**
+ * 「2026-09-03 16:24」 — 레코드 한 장 안에서 시각을 적는 자리.
+ *
+ * 목록의 「9월 5일 20:30」과 달리 연도를 적는다. 상세는 한 주문의 이력이 세로로 서는 화면이고, 해를
+ * 넘긴 주문에서 월·일만으로는 어느 해인지 읽히지 않는다.
+ */
+export function kstDateTime(iso: string | null | undefined): string {
+  if (!iso) {
+    return "-";
+  }
+  const p = kstParts(iso);
+  return p ? `${kstDate(iso)} ${p.hour}:${p.minute}` : iso;
+}
