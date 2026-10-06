@@ -38,7 +38,7 @@ SellerOps는 **채널 중심 제품이 아니라 업무 중심 제품**이다. �
 ├─ 홈        /            Today Inbox — "오늘 확인하거나 조치할 일": 리뷰 · 문의 · 연결 (§4a)
 ├─ 리뷰      /reviews     연결된 채널의 리뷰 기록 — 확인 필요 순, 채널은 switcher (/reviews/:accountId); NAVER는 답변 준비까지 (§4c)
 ├─ 문의      /inquiries   들어온 문의 — 답변 필요 순, 답변 준비 workflow (/inquiries/:itemRef)
-└─ 주문      /orders      기간·채널 필터 집계
+└─ 주문      /orders      결제 단위 기록 — 목록에서 한 줄을 열면 상세 (/orders/:channelCode/:parentOrderId) (§4d)
 
 연결·설정 (데이터가 어디서 오는가)
 ├─ 채널 연결  /connect     세 채널의 연결·상태(연결됨/연결 필요/연결 중/재연결 필요/오류)·자료 가져오기
@@ -68,7 +68,7 @@ route는 있으나 1차 메뉴에 없음
 | 홈 | Today Inbox(§4a): 리뷰 · 문의 · 연결의 "지금 사람이 봐야 할 것"만, 각 count는 그 destination이 세는 수. 진행 중 Action Window run · "참고"(메모리·리포트) | 채널은 리뷰 항목의 채널별 share(각자 정확한 링크)로만 등장 |
 | 리뷰 | h1 "리뷰" + workflow 문장; 계정별 리뷰 기록(`ChannelReviews`)을 하나의 문 뒤에 모음(채널 = h2/switcher). 규칙 tier가 순서를 소유, AI는 `AI 확인 필요` suggestion(C2 pilot candidate, org opt-in, default OFF), 피드백·행동 기록은 학습 자산으로 축적. 필터·선택은 URL과 양방향. **리뷰 행동의 시작점**: 답변 flow가 있는 채널(NAVER)은 상세의 "답변" 절에서 대응 필요 → 답변 준비 → 승인 → 복사 → guided/manual handoff → 결과 기록, 페이지 끝에 내 답변 작업(§4c) | 서버의 `ReviewChannelCapabilityView`(aiTriage / originalLocate / replySupported)와 상세의 `replyWork`(서버 mint, 없으면 null)로 버튼·문구 결정 — Coupang/Cafe24에는 답변 control이 렌더되지 않는다. 채널 고유 어휘(쿠팡 상품평)는 `channelVocabulary` 한 곳 |
 | 문의 | 인박스 workflow를 문의로 scope: 답변 필요 → 답변함, 서버 count 헤더, 답변 방향 제안(발송 없음), 필터는 URL과 양방향 | 채널 filter는 로드된 행에서만; 제안 불가는 capability 문장으로 |
-| 주문 | 기간·채널 집계 | 채널 select = `/api/channels`(=세 채널) |
+| 주문 | 결제 단위 기록 workspace(§4d): 목록(결제 시각 역순) → 상세. 읽은 범위·마지막 확인이 숫자보다 먼저, 상태는 결제·취소·배송 세 축이고 확인한 코드만 우리 말, 주문 처리(WRITE) 없음, 기간·채널 매출은 보조 | 채널 select = `/api/channels`(=세 채널). 상태 어휘는 뜻을 확인한 코드만 번역하고 나머지는 채널이 보낸 raw 값 그대로 — 확인된 코드 목록은 코드 한 곳에만 둔다 |
 | 채널 연결 | 세 채널의 연결 진입(가이드 연결·OAuth·튜토리얼), 상태 한 단어(§4b), 자료 가져오기, 리뷰 기록 진입, 리뷰 수집 실행 workbench 진입(§4c) | 카드 액션·상태 단어는 계정 실제 상태(+health)에서만; 행의 support chip은 셀러가 얻는 것(수집 방식·검증된 업로드 양식)만, 커넥터 내부 사실(연결 확인 가능·연결 정보 저장 가능)은 렌더하지 않는다 |
 | 설정 | 사실과 링크만. 토글 없음 | — |
 
@@ -145,6 +145,38 @@ route는 있으나 1차 메뉴에 없음
 capability 정직성은 §15. **새 채널이 와도 FE 신규 화면이 최소가 되게** — 새 채널 = 목록 한 줄 + capability
 row + 어휘 한 줄이 목표이며, 이를 깨는 설계는 이 문서를 먼저 고친다.
 
+### 4d. 주문 기록 workspace 계약 (A8 — 2026-10-06)
+
+주문은 집계 화면이 아니라 **기록 화면**이다. 2026-08-17 조립의 「기간·채널 필터 집계」는 이 절로 대체된다.
+
+- **레코드 = 결제 단위.** 채널이 보낸 `parent_order_id` 하나가 한 줄이고, 그 아래에 상품주문 줄
+  (`external_order_id`)이 딸린다. 정체성은 `(org, seller_account, channel, parent_order_id)`이며 상세 route도
+  채널을 포함한다 — 주문번호만으로 라우팅하지 않는다.
+- **목록 → 상세.** 목록은 서버가 결제 시각 역순으로 세우고, 화면은 그 순서를 다시 정렬하지 않는다. 한 줄에서
+  그 결제 단위의 상세로 들어간다.
+- **읽은 범위가 숫자보다 먼저다.** 목록은 채널별로 무엇을 어디까지 읽었는지를 숫자 위에 두고, 상세는 그 레코드를
+  마지막으로 확인한 시점과 경과를 머리에 적는다. 읽지 못했거나 오래된 구간을 0으로 그리지 않는다.
+- **상태는 세 축이고, 확인한 것만 우리 말이다.** 결제·취소·배송을 따로 적으며 하나가 다른 하나를 증명하지 않는다.
+  뜻을 확인한 채널 코드만 한국어로 옮기고 raw 값을 옆에 함께 둔다. 확인하지 않은 코드는 **번역하지 않고 raw 그대로**,
+  증명되지 않은 축은 「확인되지 않음」이다. 상태 이력도 같은 규칙이며, 채널이 변경 시각을 주지 않으면 「—」다.
+- **주문 처리는 하지 않는다.** 상태 변경·취소·발송·송장 입력 같은 WRITE는 이 화면에 없다. 주문 처리는 각
+  판매자센터에서 한다. 상세의 액션은 읽기와 질문뿐이다.
+- **갖고 있지 않은 것을 칸으로 만들지 않는다.** 구매자·배송지·송장·수량·옵션·상품 연결·할인·세금은 읽지 않으므로
+  빈 열이 아니라 한 줄의 사실로 적는다. 줄마다 같은 값은 표에서 빼고 섹션 머리로 올린다.
+- **문의·상품 연결은 가진 사실만.** 문의가 주문을 지목한 경우(`inquiries.source_order_ref`)에만 연결을 보이고,
+  주문 줄 자체에는 상품 열이 없다.
+- **매출 집계는 보조 정보다.** 기간·채널 매출은 목록 아래에 기록보다 한 단계 약하게 남는다 — 상자 없이, 빈 기간은
+  큰 empty 카드가 아니라 한 문장으로.
+
+위 계약(데이터 의미)은 §8 freeze 대상이다. 아래는 그 계약을 그린 **canonical visual reference v1 — 구현 기준선**이다
+(2026-10-06 승인, 실제 데모 org 레코드 — 주문 식별자만 자릿수·형태를 유지한 채 비식별화). 구현은 이 네 장을 따른다 —
+네이버 `2026381795878643`(결제 단위 13줄 + 묶인 문의 1건):
+[1600](images/orders/01-order-detail-naver-1600.png) · [1366](images/orders/02-order-detail-naver-1366.png);
+쿠팡 `31971202913784`(raw 상태 이력 4단계, 채널이 변경 시각을 주지 않아 「—」):
+[1600](images/orders/03-order-detail-coupang-1600.png) · [1366](images/orders/04-order-detail-coupang-1366.png).
+이 기준은 임의 drift를 막기 위한 현재 구현 기준이며, 향후 product-owner visual QA 승인 시 문서·캡처·관련 테스트를
+함께 갱신해 교체할 수 있다. 목록 화면의 canonical 캡처는 아직 저장소에 없다.
+
 ## 5. 이 조립에서 하지 않는 것
 
 - 새 핵심 기능(Today Inbox·채널 횡단 리뷰 목록 endpoint·리뷰 답변 발송·자동 분류·silver weighting)
@@ -162,6 +194,7 @@ row + 어휘 한 줄이 목표이며, 이를 깨는 설계는 이 문서를 먼�
 | A5 (2026-08-18) | 채널 연결 hub cleanup(§4b): strict 카탈로그 read + 로딩/오류/빈 상태, 상태 단어·버튼 동사 통일, `/connect/imports` = 작업대로 명확화(유지), 도달 불가 문구·dead 컴포넌트 제거 | 완료 |
 | A6 (2026-08-18) | 리뷰 답변 준비를 workflow surface로(§4c): NAVER 리뷰 상세의 "답변" 절(결정 → 답변 준비, 서버 mint `replyWork`), 내 답변 작업을 `/reviews`로, `/connect/imports` = 수집 실행·run 이력 workbench(worklist 삭제, 완료 카드 → 리뷰 화면), 개발용 chrome opt-in(`VITE_AW_FIXTURE_PREVIEW`), 연결 행 support chip에서 커넥터 내부 사실 제거 | 완료 |
 | A7 (2026-08-18) | 전체 UI/UX polish + demo freeze(§8): 데모 경로(홈 → 확인 필요 리뷰 → NAVER 답변 준비 → 문의 → 채널 연결 → 주문·설정) 로컬 실사; 실제 결함 수정 — 문의 feed 500행 read 4.4s→<0.2s(`InboxService.snippet` 마스킹 창 + `PiiMasker` 사전 검사; 두 번 병렬 read 시 8s timeout으로 "목록을 불러오지 못했습니다"가 났다), 문의 상세에 발췌 없음, 상세의 분석기 이름·버전 노출; polish — 문의 행 "문의" chip 제거, 리뷰 상세 답변 절을 피드백 위로·결정 시 내 답변 작업 재읽기, 세 채널 표시 순서 통일(`visibleChannels` = 제품 순서), 주문 h1 "주문"; product surface에서 fixture run 노출 차단(`/connect/imports` 초기 상태 empty + 명령은 live bridge/preview에서만); `docs/demo_runbook_v1.md` 신설 | 완료 |
+| A8 (2026-10-06) | 주문을 기록 workspace로(§4d): `/orders`를 결제 단위 목록으로, `/orders/:channelCode/:parentOrderId` 상세 신설, 읽은 범위·마지막 확인을 숫자 위로, 상태 3축 + 확인된 코드만 번역(나머지 raw), 매출 집계를 보조로 강등 | 문서 확정 · 구현 전 |
 
 ## 7. 라우터
 
@@ -179,7 +212,8 @@ row + 어휘 한 줄이 목표이며, 이를 깨는 설계는 이 문서를 먼�
 
 이 조립으로 아래는 **freeze**한다. 바꾸려면 이 문서를 먼저 고친다(product-owner decision).
 
-- **1차 메뉴와 route**: 운영 = 홈 `/` · 리뷰 `/reviews[/:accountId]` · 문의 `/inquiries[/:itemRef]` · 주문 `/orders`;
+- **1차 메뉴와 route**: 운영 = 홈 `/` · 리뷰 `/reviews[/:accountId]` · 문의 `/inquiries[/:itemRef]` ·
+  주문 `/orders[/:channelCode/:parentOrderId]`(A8 — §4d);
   연결·설정 = 채널 연결 `/connect(…)` · 설정 `/settings`. off-menu route는 §3의 목록 그대로. 새 1차 메뉴 없음.
   (2026-08-18 Self-Pilot 첫 실행 UX: 인증 surface에 `/signup` 추가 — `/login`과 같은 public shell의 계정 화면이며
   1차 메뉴가 아니다. 가입 → `/connect` → 첫 수집 → 홈. `docs/self_pilot_runtime_v1.md` §8.
@@ -187,11 +221,12 @@ row + 어휘 한 줄이 목표이며, 이를 깨는 설계는 이 문서를 먼�
   landing)과 `/onboarding`(첫 소셜 가입의 상호명 단계) 추가 — `docs/auth_growth_instrumentation_v1.md` §4.
   2026-08-19 Service Readiness v1: 같은 auth shell에 `/forgot-password`, `/reset-password`; public shell에
   `/legal/terms`, `/legal/privacy`(확정 전 placeholder) — `docs/service_readiness_v1.md` §2-4·§2-6·§4.)
-- **화면 책임(§4)과 세 계약(§4a Today Inbox · §4b 채널 연결 hub · §4c 리뷰 답변 준비)**.
+- **화면 책임(§4)과 네 계약(§4a Today Inbox · §4b 채널 연결 hub · §4c 리뷰 답변 준비 · §4d 주문 기록 workspace)**.
 - **노출 채널 = NAVER / Coupang / Cafe24** (`ProductChannels.java`, `lib/productChannels.ts`), 표시 순서도 그 순서.
 - **새 채널의 기본값**: connector + capability proof(§4.1 승격) **뒤에** 기존 surface에 끼운다 —
   `/reviews`에는 계정 chip 하나 + `ReviewChannelCapabilityView` 행 하나 + 어휘 한 줄(`channelVocabulary`);
-  `/inquiries`에는 채널 filter 값 하나; `/orders`에는 select 항목 하나; `/connect`에는 행 하나 + wizard route.
+  `/inquiries`에는 채널 filter 값 하나; `/orders`에는 select 항목 하나와 같은 목록·상세에 그대로 서는 행
+  (새 화면 없음, 그 채널의 상태 코드는 뜻을 확인하기 전까지 raw로 남는다); `/connect`에는 행 하나 + wizard route.
   새 채널 때문에 IA·공통 화면·Today Inbox 계약을 새로 만들지 않는다. per-channel 화면은 wizard/OAuth/튜토리얼처럼
   연결 절차에만 허용된다.
 - **개발용 chrome**은 항상 `VITE_AW_FIXTURE_PREVIEW=1` 뒤에 있고, product surface는 live bridge 없이는 Action
