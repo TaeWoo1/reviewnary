@@ -131,7 +131,7 @@ class Cafe24ArticleBackfillFlowTest {
                 new Cafe24OrdersClient(http), new Cafe24BoardArticlesClient(http), Clock.systemUTC());
         ConnectorRegistry registry = new ConnectorRegistry(List.of(connector));
         com.sellerops.order.ChannelOrderIngestionService orderIngestion =
-                new com.sellerops.order.ChannelOrderIngestionService(channelOrders, channelOrderStatusEvents, txManager);
+                new com.sellerops.order.ChannelOrderIngestionService(channelOrders, channelOrderStatusEvents, channels, txManager);
         executor = new SyncRunExecutor(sellerAccounts, channels, registry, ingestion,
                 orderIngestion, syncJobs, cursors, connectionStatus);
     }

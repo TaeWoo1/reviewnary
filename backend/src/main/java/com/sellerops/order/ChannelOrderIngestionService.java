@@ -1,5 +1,7 @@
 package com.sellerops.order;
 
+import com.sellerops.channel.Channel;
+import com.sellerops.channel.ChannelRepository;
 import com.sellerops.ingest.IngestOutcome;
 import com.sellerops.ingest.canonical.CanonicalOrder;
 import com.sellerops.ingest.map.RowError;
@@ -41,13 +43,16 @@ public class ChannelOrderIngestionService {
 
     private final ChannelOrderRepository orders;
     private final ChannelOrderStatusEventRepository statusEvents;
+    private final ChannelRepository channels;
     private final TransactionTemplate tx;
 
     public ChannelOrderIngestionService(ChannelOrderRepository orders,
                                         ChannelOrderStatusEventRepository statusEvents,
+                                        ChannelRepository channels,
                                         PlatformTransactionManager transactionManager) {
         this.orders = orders;
         this.statusEvents = statusEvents;
+        this.channels = channels;
         this.tx = new TransactionTemplate(transactionManager);
     }
 
@@ -58,6 +63,10 @@ public class ChannelOrderIngestionService {
      */
     public IngestOutcome ingest(UUID orgId, UUID channelId, UUID sellerAccountId, List<CanonicalOrder> rows) {
         Tally tally = new Tally();
+        // Whose vocabulary these codes are written in. Resolved once per page, not per row, and
+        // never guessed: a status code means something only as THIS channel's word for it
+        // (ChannelOrderStatusVocabulary), so a channel we cannot name normalizes to UNKNOWN.
+        String channelCode = channels.findById(channelId).map(Channel::getCode).orElse(null);
         Set<String> seen = new HashSet<>();
         for (CanonicalOrder row : rows) {
             if (sellerAccountId == null) {
@@ -79,7 +88,7 @@ public class ChannelOrderIngestionService {
             boolean[] attemptedInsert = {false};
             try {
                 UpsertResult result = tx.execute(status ->
-                        upsertOne(orgId, channelId, sellerAccountId, row, attemptedInsert));
+                        upsertOne(orgId, channelId, channelCode, sellerAccountId, row, attemptedInsert));
                 switch (result.kind()) {
                     case INSERTED -> tally.success(result.id());
                     case UPDATED -> tally.update();
@@ -102,8 +111,8 @@ public class ChannelOrderIngestionService {
         return tally.toOutcome();
     }
 
-    private UpsertResult upsertOne(UUID orgId, UUID channelId, UUID sellerAccountId, CanonicalOrder row,
-                                   boolean[] attemptedInsert) {
+    private UpsertResult upsertOne(UUID orgId, UUID channelId, String channelCode, UUID sellerAccountId,
+                                   CanonicalOrder row, boolean[] attemptedInsert) {
         Instant now = Instant.now();
         ChannelOrder existing = orders
                 .findByOrgIdAndSellerAccountIdAndExternalOrderId(orgId, sellerAccountId, row.externalOrderId())
@@ -118,7 +127,7 @@ public class ChannelOrderIngestionService {
             entity.setExternalOrderId(row.externalOrderId());
             entity.setParentOrderId(row.parentOrderId());
             entity.setRawStatusCode(row.rawStatusCode());
-            entity.setNormalizedStatus(NormalizedOrderStatus.fromRaw(row.rawStatusCode()));
+            entity.setNormalizedStatus(NormalizedOrderStatus.fromRaw(channelCode, row.rawStatusCode()));
             entity.setPaymentAmount(row.paymentAmount());
             entity.setSummaryDate(row.summaryDate());
             entity.setPaidAt(row.paidAt());
@@ -135,7 +144,7 @@ public class ChannelOrderIngestionService {
         if (statusChanged) {
             String previous = existing.getRawStatusCode();
             existing.setRawStatusCode(row.rawStatusCode());
-            existing.setNormalizedStatus(NormalizedOrderStatus.fromRaw(row.rawStatusCode()));
+            existing.setNormalizedStatus(NormalizedOrderStatus.fromRaw(channelCode, row.rawStatusCode()));
             existing.setStatusChangedAt(row.statusChangedAt());
             existing.setPaymentAmount(row.paymentAmount());
             // Fill paidAt only when newly supplied — never overwrite a known value with null.

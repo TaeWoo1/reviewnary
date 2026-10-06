@@ -267,7 +267,7 @@ class ExactOrderCallTimingTest {
         order.setChannelId(channelId);
         order.setExternalOrderId(externalOrderId);
         order.setRawStatusCode(rawStatus);
-        order.setNormalizedStatus(NormalizedOrderStatus.fromRaw(rawStatus));
+        order.setNormalizedStatus(NormalizedOrderStatus.fromRaw("CAFE24", rawStatus));
         order.setPaymentAmount(10000L);
         order.setSummaryDate(LocalDate.parse("2026-08-21"));
         order.setPaidAt(Instant.parse("2026-08-21T01:00:00Z"));

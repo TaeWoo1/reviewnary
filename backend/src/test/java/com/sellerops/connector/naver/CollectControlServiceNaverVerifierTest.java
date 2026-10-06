@@ -107,7 +107,7 @@ class CollectControlServiceNaverVerifierTest {
         IngestionService ingestion =
                 new IngestionService(reviews, inquiries, orders, new ProductService(products), communityArticles, channels, new InquiryWorkItemWriter(inquiries, workItems, audits, txManager));
         com.sellerops.order.ChannelOrderIngestionService orderIngestion =
-                new com.sellerops.order.ChannelOrderIngestionService(channelOrders, channelOrderStatusEvents, txManager);
+                new com.sellerops.order.ChannelOrderIngestionService(channelOrders, channelOrderStatusEvents, channels, txManager);
         SyncRunExecutor executor = new SyncRunExecutor(
                 sellerAccounts, channels, registry, ingestion, orderIngestion, syncJobs, cursors, connectionStatus);
         return new CollectControlService(sellerAccounts, channels, schedules, syncJobs,

@@ -109,7 +109,7 @@ class CollectControlServiceTest {
         registry = new ConnectorRegistry(List.of(mock));
         IngestionService ingestion = new IngestionService(reviews, inquiries, orders, new ProductService(products), communityArticles, channels, new InquiryWorkItemWriter(inquiries, workItems, audits, txManager));
         com.sellerops.order.ChannelOrderIngestionService orderIngestion =
-                new com.sellerops.order.ChannelOrderIngestionService(channelOrders, channelOrderStatusEvents, txManager);
+                new com.sellerops.order.ChannelOrderIngestionService(channelOrders, channelOrderStatusEvents, channels, txManager);
         executor = new SyncRunExecutor(
                 sellerAccounts, channels, registry, ingestion, orderIngestion, syncJobs, cursors, connectionStatus);
         service = serviceWith(vaultWithKey(randomKeyBase64()));

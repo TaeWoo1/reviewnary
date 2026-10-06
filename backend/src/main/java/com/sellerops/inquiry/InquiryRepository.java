@@ -259,6 +259,28 @@ public interface InquiryRepository extends JpaRepository<Inquiry, UUID> {
     List<Inquiry> findRealUnansweredForCoverage(@Param("orgId") UUID orgId,
                                                 @Param("channelId") UUID channelId);
 
+    /**
+     * 주문 기록 목록 위에 적히는 하나의 수 — <b>채널이 주문번호를 함께 보냈고, 그 번호가 실제로 저장된
+     * 주문을 가리키는</b> 문의의 수.
+     *
+     * <p><b>세 가지 조건이 모두 필요하다.</b> 번호가 있는 것만으로는 부족하다 — 그 번호가 가리키는
+     * 주문을 우리가 들고 있지 않으면 목록의 어느 줄에도 걸리지 않는 연결이고, 그것을 세어 올리면 화면이
+     * 열 수 없는 관계의 수를 보여 준다. 그리고 번호의 출처는 채널이어야 한다
+     * ({@code order_binding = SOURCE_EXACT}): 본문에서 뽑은 번호는 {@link Inquiry#getSourceOrderRef}에
+     * 들어오지 않지만, 미래의 어떤 경로가 다른 binding으로 값을 넣더라도 이 수는 늘지 않아야 한다.
+     *
+     * <p>계정까지 맞춘다. {@code InquiryOrderFactReader}가 주문을 찾을 때 쓰는 울타리와 같아야, 여기서
+     * 센 수와 상세에서 열리는 관계가 같은 것을 뜻한다.
+     */
+    @Query("select count(q) from Inquiry q where q.orgId = :orgId"
+            + " and q.sourceOrderRef is not null and q.sourceOrderRef <> ''"
+            + " and q.orderBinding = 'SOURCE_EXACT'"
+            + " and q.dataOrigin = com.sellerops.common.DataOrigin.REAL" + ACTIVE
+            + " and exists (select 1 from ChannelOrder o where o.orgId = q.orgId"
+            + "   and o.sellerAccountId = q.sellerAccountId"
+            + "   and (o.externalOrderId = q.sourceOrderRef or o.parentOrderId = q.sourceOrderRef))")
+    long countLinkedToStoredOrders(@Param("orgId") UUID orgId);
+
     boolean existsByOrgIdAndChannelIdAndExternalId(UUID orgId, UUID channelId, String externalId);
 
     boolean existsByOrgIdAndChannelIdAndContentHash(UUID orgId, UUID channelId, String contentHash);

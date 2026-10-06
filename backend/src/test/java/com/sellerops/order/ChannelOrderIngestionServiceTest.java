@@ -33,16 +33,27 @@ class ChannelOrderIngestionServiceTest {
 
     @Autowired ChannelOrderRepository orders;
     @Autowired ChannelOrderStatusEventRepository statusEvents;
+    @Autowired com.sellerops.channel.ChannelRepository channels;
     @Autowired PlatformTransactionManager txManager;
 
     private ChannelOrderIngestionService service;
     private final UUID org = UUID.randomUUID();
-    private final UUID channel = UUID.randomUUID();
     private final UUID account = UUID.randomUUID();
+    /** 상태 코드의 뜻은 (채널, 코드)로 확인되므로, 채널은 이름을 가진 실재하는 행이어야 한다. */
+    private UUID channel;
 
     @BeforeEach
     void setUp() {
-        service = new ChannelOrderIngestionService(orders, statusEvents, txManager);
+        service = new ChannelOrderIngestionService(orders, statusEvents, channels, txManager);
+        channel = channelOf("NAVER", "네이버");
+    }
+
+    private UUID channelOf(String code, String nameKo) {
+        com.sellerops.channel.Channel c = new com.sellerops.channel.Channel();
+        c.setCode(code);
+        c.setNameKo(nameKo);
+        c.setStatus(com.sellerops.channel.ChannelStatus.CONNECTED);
+        return channels.save(c).getId();
     }
 
     private static Instant at(String date) {
@@ -53,6 +64,26 @@ class ChannelOrderIngestionServiceTest {
                                         String date, int row) {
         return new CanonicalOrder(extId, parentId, status, amount, LocalDate.parse(date),
                 at(date), at(date), row);
+    }
+
+    // 0 — the same five letters prove nothing when another channel sent them, and nothing when the
+    // channel cannot be named at all. The raw code is stored verbatim either way.
+    @Test
+    void payedOnlyNormalizesForTheChannelItWasConfirmedOn() {
+        UUID coupang = channelOf("COUPANG", "쿠팡");
+        service.ingest(org, coupang, account, List.of(order("CP1", "CO1", "PAYED", 12000, "2026-06-11", 1)));
+        service.ingest(org, UUID.randomUUID(), account,
+                List.of(order("XX1", "XO1", "PAYED", 12000, "2026-06-11", 1)));
+
+        ChannelOrder onCoupang = orders
+                .findByOrgIdAndSellerAccountIdAndExternalOrderId(org, account, "CP1").orElseThrow();
+        ChannelOrder onUnnamed = orders
+                .findByOrgIdAndSellerAccountIdAndExternalOrderId(org, account, "XX1").orElseThrow();
+
+        assertThat(onCoupang.getRawStatusCode()).isEqualTo("PAYED");
+        assertThat(onCoupang.getNormalizedStatus()).isEqualTo(NormalizedOrderStatus.UNKNOWN);
+        assertThat(onUnnamed.getRawStatusCode()).isEqualTo("PAYED");
+        assertThat(onUnnamed.getNormalizedStatus()).isEqualTo(NormalizedOrderStatus.UNKNOWN);
     }
 
     // 1 — several new orders land as rows plus an initial (null → raw) status event each.
@@ -195,7 +226,7 @@ class ChannelOrderIngestionServiceTest {
         service.ingest(org, channel, account, List.of(order("PO1", "O1", "PAYED", 12000, "2026-06-11", 1)));
 
         ChannelOrderIngestionService afterRestart =
-                new ChannelOrderIngestionService(orders, statusEvents, txManager);
+                new ChannelOrderIngestionService(orders, statusEvents, channels, txManager);
         IngestOutcome rerun = afterRestart.ingest(org, channel, account,
                 List.of(order("PO1", "O1", "PAYED", 12000, "2026-06-11", 1)));
 

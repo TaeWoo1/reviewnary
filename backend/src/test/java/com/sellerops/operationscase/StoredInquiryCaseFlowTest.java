@@ -683,7 +683,7 @@ class StoredInquiryCaseFlowTest {
         order.setChannelId(account.getChannelId());
         order.setExternalOrderId(externalOrderId);
         order.setRawStatusCode("PAYED");
-        order.setNormalizedStatus(NormalizedOrderStatus.fromRaw("PAYED"));
+        order.setNormalizedStatus(NormalizedOrderStatus.fromRaw("CAFE24", "PAYED"));
         order.setPaymentAmount(10000L);
         order.setSummaryDate(LocalDate.now());
         order.setPaidAt(Instant.now().minusSeconds(86400));

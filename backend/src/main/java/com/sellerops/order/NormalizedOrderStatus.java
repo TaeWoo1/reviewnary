@@ -20,14 +20,23 @@ import com.sellerops.order.fact.OrderPaymentState;
  * <p><b>Which code means what is not decided here.</b> It is decided in
  * {@link ChannelOrderStatusVocabulary}, the one table of confirmed codes, and this enum asks it — so
  * widening the vocabulary and widening ingestion's normalization are the same edit rather than two.
+ *
+ * <p><b>The channel is part of the question.</b> {@code PAYED} is NAVER's word, confirmed on NAVER;
+ * the same five letters arriving from another channel prove nothing, and a normalization that could
+ * not see the channel would write {@code PAID} for every future channel that happens to spell it the
+ * same way. A row whose channel cannot be named normalizes to {@link #UNKNOWN} — the raw code is
+ * stored verbatim either way, so nothing is lost but the claim.
  */
 public enum NormalizedOrderStatus {
     PAID,
     UNKNOWN;
 
-    /** Map a raw channel status code to a canonical status, failing closed on anything unobserved. */
-    public static NormalizedOrderStatus fromRaw(String rawStatusCode) {
-        return ChannelOrderStatusVocabulary.axesFromStored(rawStatusCode).payment()
+    /**
+     * Map one channel's raw status code to a canonical status, failing closed on anything unobserved
+     * — including a code whose letters we know from ANOTHER channel.
+     */
+    public static NormalizedOrderStatus fromRaw(String channelCode, String rawStatusCode) {
+        return ChannelOrderStatusVocabulary.axesFromStored(channelCode, rawStatusCode).payment()
                 == OrderPaymentState.PAID ? PAID : UNKNOWN;
     }
 }

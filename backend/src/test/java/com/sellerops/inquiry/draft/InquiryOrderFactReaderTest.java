@@ -66,7 +66,8 @@ class InquiryOrderFactReaderTest {
         org = organizations.save(o).getId();
 
         Channel channel = new Channel();
-        channel.setCode("NAVER-" + UUID.randomUUID().toString().substring(0, 8));
+        // 제품이 부르는 코드 그대로 — 상태 어휘는 (채널, 코드)로 확인되므로 코드가 사실의 일부다.
+        channel.setCode("NAVER");
         channel.setNameKo("네이버");
         channel.setStatus(ChannelStatus.CONNECTED);
         channelId = channels.save(channel).getId();
@@ -280,7 +281,7 @@ class InquiryOrderFactReaderTest {
         order.setExternalOrderId(externalOrderId);
         order.setParentOrderId(parentOrderId);
         order.setRawStatusCode(rawStatus);
-        order.setNormalizedStatus(NormalizedOrderStatus.fromRaw(rawStatus));
+        order.setNormalizedStatus(NormalizedOrderStatus.fromRaw("NAVER", rawStatus));
         order.setPaymentAmount(10000L);
         order.setSummaryDate(LocalDate.parse("2026-08-21"));
         order.setPaidAt(Instant.parse("2026-08-21T01:00:00Z"));

@@ -144,7 +144,7 @@ class ChannelOrderPostgresProofIT {
 
         // "Restart": a fresh service instance still sees the durable row and stays idempotent.
         ChannelOrderIngestionService afterRestart =
-                new ChannelOrderIngestionService(orders, statusEvents, txManager);
+                new ChannelOrderIngestionService(orders, statusEvents, channels, txManager);
         var afterRestartOutcome = afterRestart.ingest(org, channel, account,
                 List.of(order(po, "DELIVERED", 12000, "2026-06-11")));
         assertThat(afterRestartOutcome.skipped()).isEqualTo(1);
