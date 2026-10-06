@@ -38,7 +38,7 @@ SellerOps는 **채널 중심 제품이 아니라 업무 중심 제품**이다. �
 ├─ 홈        /            Today Inbox — "오늘 확인하거나 조치할 일": 리뷰 · 문의 · 연결 (§4a)
 ├─ 리뷰      /reviews     연결된 채널의 리뷰 기록 — 확인 필요 순, 채널은 switcher (/reviews/:accountId); NAVER는 답변 준비까지 (§4c)
 ├─ 문의      /inquiries   들어온 문의 — 답변 필요 순, 답변 준비 workflow (/inquiries/:itemRef)
-└─ 주문      /orders      결제 단위 기록 — 목록에서 한 줄을 열면 상세 (/orders/:channelCode/:parentOrderId) (§4d)
+└─ 주문      /orders      결제 단위 기록 — 목록에서 한 줄을 열면 상세 (/orders/:channelCode/:accountId/:parentOrderId) (§4d)
 
 연결·설정 (데이터가 어디서 오는가)
 ├─ 채널 연결  /connect     세 채널의 연결·상태(연결됨/연결 필요/연결 중/재연결 필요/오류)·자료 가져오기
@@ -150,8 +150,13 @@ row + 어휘 한 줄이 목표이며, 이를 깨는 설계는 이 문서를 먼�
 주문은 집계 화면이 아니라 **기록 화면**이다. 2026-08-17 조립의 「기간·채널 필터 집계」는 이 절로 대체된다.
 
 - **레코드 = 결제 단위.** 채널이 보낸 `parent_order_id` 하나가 한 줄이고, 그 아래에 상품주문 줄
-  (`external_order_id`)이 딸린다. 정체성은 `(org, seller_account, channel, parent_order_id)`이며 상세 route도
-  채널을 포함한다 — 주문번호만으로 라우팅하지 않는다.
+  (`external_order_id`)이 딸린다. 정체성은 `(org context, channelCode, accountId, parentOrderId)` 네 조각 전부이며,
+  route도 그 네 조각을 그대로 가진다 — UI `/orders/:channelCode/:accountId/:parentOrderId`,
+  API `GET /api/orders/{channelCode}/{accountId}/{parentOrderId}`. org는 route가 아니라 인증 context에서 온다.
+  **주문번호 단독으로도, `channel + parentOrderId`만으로도 조회하거나 추론하지 않는다** — 주문번호는 채널 사이에서
+  유일하지 않고, 한 org이 같은 채널에 계정을 둘 가질 수 있으므로 그 둘은 레코드를 하나로 좁히지 못한다. 좁히지 못한
+  조회는 「없음」이 아니라 **다른 사람의 주문**을 열 수 있는 조회다. 계정이 빠진 요청은 다른 계정의 행으로 보완되지
+  않고 그 자리에서 실패한다(fail closed).
 - **목록 → 상세.** 목록은 서버가 결제 시각 역순으로 세우고, 화면은 그 순서를 다시 정렬하지 않는다. 한 줄에서
   그 결제 단위의 상세로 들어간다.
 - **읽은 범위가 숫자보다 먼저다.** 목록은 채널별로 무엇을 어디까지 읽었는지를 숫자 위에 두고, 상세는 그 레코드를
@@ -194,7 +199,7 @@ row + 어휘 한 줄이 목표이며, 이를 깨는 설계는 이 문서를 먼�
 | A5 (2026-08-18) | 채널 연결 hub cleanup(§4b): strict 카탈로그 read + 로딩/오류/빈 상태, 상태 단어·버튼 동사 통일, `/connect/imports` = 작업대로 명확화(유지), 도달 불가 문구·dead 컴포넌트 제거 | 완료 |
 | A6 (2026-08-18) | 리뷰 답변 준비를 workflow surface로(§4c): NAVER 리뷰 상세의 "답변" 절(결정 → 답변 준비, 서버 mint `replyWork`), 내 답변 작업을 `/reviews`로, `/connect/imports` = 수집 실행·run 이력 workbench(worklist 삭제, 완료 카드 → 리뷰 화면), 개발용 chrome opt-in(`VITE_AW_FIXTURE_PREVIEW`), 연결 행 support chip에서 커넥터 내부 사실 제거 | 완료 |
 | A7 (2026-08-18) | 전체 UI/UX polish + demo freeze(§8): 데모 경로(홈 → 확인 필요 리뷰 → NAVER 답변 준비 → 문의 → 채널 연결 → 주문·설정) 로컬 실사; 실제 결함 수정 — 문의 feed 500행 read 4.4s→<0.2s(`InboxService.snippet` 마스킹 창 + `PiiMasker` 사전 검사; 두 번 병렬 read 시 8s timeout으로 "목록을 불러오지 못했습니다"가 났다), 문의 상세에 발췌 없음, 상세의 분석기 이름·버전 노출; polish — 문의 행 "문의" chip 제거, 리뷰 상세 답변 절을 피드백 위로·결정 시 내 답변 작업 재읽기, 세 채널 표시 순서 통일(`visibleChannels` = 제품 순서), 주문 h1 "주문"; product surface에서 fixture run 노출 차단(`/connect/imports` 초기 상태 empty + 명령은 live bridge/preview에서만); `docs/demo_runbook_v1.md` 신설 | 완료 |
-| A8 (2026-10-06) | 주문을 기록 workspace로(§4d): `/orders`를 결제 단위 목록으로, `/orders/:channelCode/:parentOrderId` 상세 신설, 읽은 범위·마지막 확인을 숫자 위로, 상태 3축 + 확인된 코드만 번역(나머지 raw), 매출 집계를 보조로 강등 | 문서 확정 · 구현 전 |
+| A8 (2026-10-06) | 주문을 기록 workspace로(§4d): `/orders`를 결제 단위 목록으로, `/orders/:channelCode/:accountId/:parentOrderId` 상세 신설(identity 네 조각 — §4d), 읽은 범위·마지막 확인을 숫자 위로, 상태 3축 + 확인된 코드만 번역(나머지 raw), 매출 집계를 보조로 강등 | 문서 확정 · 구현 전 |
 
 ## 7. 라우터
 
@@ -213,7 +218,7 @@ row + 어휘 한 줄이 목표이며, 이를 깨는 설계는 이 문서를 먼�
 이 조립으로 아래는 **freeze**한다. 바꾸려면 이 문서를 먼저 고친다(product-owner decision).
 
 - **1차 메뉴와 route**: 운영 = 홈 `/` · 리뷰 `/reviews[/:accountId]` · 문의 `/inquiries[/:itemRef]` ·
-  주문 `/orders[/:channelCode/:parentOrderId]`(A8 — §4d);
+  주문 `/orders[/:channelCode/:accountId/:parentOrderId]`(A8 — §4d);
   연결·설정 = 채널 연결 `/connect(…)` · 설정 `/settings`. off-menu route는 §3의 목록 그대로. 새 1차 메뉴 없음.
   (2026-08-18 Self-Pilot 첫 실행 UX: 인증 surface에 `/signup` 추가 — `/login`과 같은 public shell의 계정 화면이며
   1차 메뉴가 아니다. 가입 → `/connect` → 첫 수집 → 홈. `docs/self_pilot_runtime_v1.md` §8.
