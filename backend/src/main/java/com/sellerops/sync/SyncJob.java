@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
@@ -21,11 +22,48 @@ public class SyncJob extends BaseEntity {
      * The run ended at its own configuration gate: no pull connector for the channel, a data type that
      * connector cannot serve, or a backfill window it cannot seed.
      *
-     * <p><b>Nothing was asked of the channel.</b> Such a run is evidence about how this deployment is
-     * configured and never about whether the channel is answering — which is why the freshness reads
-     * look straight through it rather than letting it date, or erase, a collection.
+     * <p>One of {@link #FAILURE_CODES_BEFORE_CHANNEL_ATTEMPT} — nothing was asked of the channel.
      */
     public static final String FAILURE_CONNECTOR_UNAVAILABLE = "CONNECTOR_UNAVAILABLE";
+
+    /**
+     * The run was refused by a live-approval interlock: the process carries no approval id and no standing
+     * read grant for the channel it was about to call.
+     *
+     * <p>One of {@link #FAILURE_CODES_BEFORE_CHANNEL_ATTEMPT}. {@code SyncRunExecutor.failureCodeOf} sets
+     * this code for exactly one condition — {@code CoupangLiveApprovalRequiredException}, thrown by
+     * {@code CoupangLiveCallGuard} as the <b>first statement</b> of the signed-GET choke points, ahead of the
+     * signature and the socket. Keep that the only source: the code's meaning here is "no request left this
+     * process", and a second producer that had already called a channel would quietly make it a lie.
+     */
+    public static final String FAILURE_CONFIGURATION_REQUIRED = "CONFIGURATION_REQUIRED";
+
+    /**
+     * <b>The codes that mean the run ended before it asked the channel anything.</b>
+     *
+     * <p>This set is the <i>meaning</i> the freshness surfaces read by, and it is deliberately a statement
+     * about evidence rather than a list of uninteresting errors: a run in here opened no socket, so it is
+     * evidence about how this deployment is configured and says nothing at all about whether the channel is
+     * answering. {@code SyncJobRepository.findRunsReachingChannel} therefore looks straight through such a
+     * run — it may neither date a collection nor erase one.
+     *
+     * <p><b>Everything else stays visible, and that is the other half of the rule.</b> A failure that reached
+     * the marketplace — a rejected credential (AUTH_REQUIRED), a gateway that refused this egress
+     * (GW.IP_NOT_ALLOWED), a 4xx, a timeout, a rate limit — IS an answer from the channel and still stands as
+     * its latest word, because a failure that is evidence must never read as a success.
+     *
+     * <p><b>Why a FAILED run in here provably collected nothing.</b> {@code SyncRunExecutor.resolveStatus}
+     * returns PARTIAL, not FAILED, the moment any page landed. So a run carrying one of these codes AND the
+     * FAILED status got through zero pages; the paired PARTIAL case keeps its ordinary meaning and is not
+     * skipped anywhere.
+     *
+     * <p><b>Known boundary — credential resolution.</b> A run that cannot find or decrypt its stored
+     * credential also stops before any request, but it surfaces as the general EXECUTION_FAILED, which real
+     * attempt failures share. Widening the skip to that code would hide genuine failures, so those runs are
+     * NOT in here: they still date and still erase. Giving them a code of their own is a separate change.
+     */
+    public static final Set<String> FAILURE_CODES_BEFORE_CHANNEL_ATTEMPT =
+            Set.of(FAILURE_CONNECTOR_UNAVAILABLE, FAILURE_CONFIGURATION_REQUIRED);
 
     @Column(name = "org_id", nullable = false)
     private UUID orgId;

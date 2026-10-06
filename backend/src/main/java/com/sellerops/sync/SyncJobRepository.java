@@ -85,11 +85,20 @@ public interface SyncJobRepository extends JpaRepository<SyncJob, UUID> {
      * question — which run last spoke for this channel — asked by two services, so it is answered once here
      * rather than twice, differently, in them.
      *
-     * <p><b>The skip is narrow on purpose.</b> Only {@link SyncJob#FAILURE_CONNECTOR_UNAVAILABLE} is
-     * transparent. A run that reached the connector and was refused — a dead credential, a missing live
-     * approval, a timeout — is a real answer from the channel and still stands here as the latest word,
-     * because a failure that IS evidence must never read as a success. Rows written before V116 carry no
-     * code and are never skipped, so history keeps exactly the meaning it had.
+     * <p><b>What the skip is, and what it is not.</b> Transparent are exactly the runs that ended before the
+     * channel was asked anything — {@link SyncJob#FAILURE_CODES_BEFORE_CHANNEL_ATTEMPT}, which owns that
+     * definition and the reasoning for it. A run that DID reach the marketplace and was refused — a rejected
+     * credential, a gateway that refused this egress, a 4xx, a timeout — is a real answer and still stands
+     * here as the latest word, because a failure that IS evidence must never read as a success. Rows written
+     * before the codes existed carry none and are never skipped, so history keeps the meaning it had, except
+     * where a migration has identified a row's class exactly (V116, V117).
+     *
+     * <p>The first version of this skip named one code, {@code CONNECTOR_UNAVAILABLE}, and that was the
+     * defect's shape rather than its principle. On 2026-10-07 the narrower spelling was caught doing the same
+     * thing it had been written to stop: Coupang 문의 had collected successfully on 09-23, two later runs were
+     * refused by the live-approval interlock <i>before signing a request</i>, and coverage read 「확인된 적
+     * 없음」 for a channel it had read a week earlier. The rule is the absence of an attempt, not the name of
+     * one gate.
      *
      * <p>Bounded in SQL rather than filtered afterwards: a deployment whose connectors are off emits these
      * runs in streaks, and a fixed window fetched first would let a streak push the real collection out of
@@ -98,17 +107,17 @@ public interface SyncJobRepository extends JpaRepository<SyncJob, UUID> {
     @Query("""
             select j from SyncJob j
             where j.orgId = :orgId and j.channelId = :channelId and j.dataType = :dataType
-              and (j.failureCode is null or j.failureCode <> :skippedFailureCode)
+              and (j.failureCode is null or j.failureCode not in :skippedFailureCodes)
             order by j.createdAt desc, j.id desc
             """)
     List<SyncJob> findRunsReachingChannel(@Param("orgId") UUID orgId, @Param("channelId") UUID channelId,
                                           @Param("dataType") String dataType,
-                                          @Param("skippedFailureCode") String skippedFailureCode,
+                                          @Param("skippedFailureCodes") Collection<String> skippedFailureCodes,
                                           Pageable pageable);
 
     /** {@link #findRunsReachingChannel} narrowed to the latest one — the form both callers want. */
     default Optional<SyncJob> findLatestRunReachingChannel(UUID orgId, UUID channelId, String dataType) {
-        return findRunsReachingChannel(orgId, channelId, dataType, SyncJob.FAILURE_CONNECTOR_UNAVAILABLE,
+        return findRunsReachingChannel(orgId, channelId, dataType, SyncJob.FAILURE_CODES_BEFORE_CHANNEL_ATTEMPT,
                         PageRequest.of(0, 1))
                 .stream()
                 .findFirst();

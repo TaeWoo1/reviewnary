@@ -640,7 +640,7 @@ public class SyncRunExecutor {
             return "AUTH_REQUIRED";
         }
         if (approvalMissing) {
-            return "CONFIGURATION_REQUIRED";
+            return SyncJob.FAILURE_CONFIGURATION_REQUIRED;
         }
         if (rateLimited) {
             return "RATE_LIMITED";

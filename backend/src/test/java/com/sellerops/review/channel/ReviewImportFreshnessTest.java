@@ -124,6 +124,27 @@ class ReviewImportFreshnessTest {
     }
 
     @Test
+    @DisplayName("a live-approval refusal is not an import: it neither dates the record nor moves the line")
+    void approvalGateFailureDoesNotDateTheRecord() {
+        run("SUCCESS", null, IMPORTED);
+        run("FAILED", SyncJob.FAILURE_CONFIGURATION_REQUIRED, CONFIG_FAILURE);
+
+        ChannelReviewPageView page = page();
+        assertThat(page.lastImportAt()).isEqualTo(IMPORTED);
+        assertThat(page.lastImportComplete()).isTrue();
+    }
+
+    @Test
+    @DisplayName("approval refusals and nothing else: the record claims no import, so no sentence is drawn")
+    void approvalGateFailuresAloneDateNothing() {
+        run("FAILED", SyncJob.FAILURE_CONFIGURATION_REQUIRED, CONFIG_FAILURE);
+
+        ChannelReviewPageView page = page();
+        assertThat(page.lastImportAt()).isNull();
+        assertThat(page.lastImportComplete()).isFalse();
+    }
+
+    @Test
     @DisplayName("an import that really did stop early still warns — that contract is untouched")
     void aRealIncompleteImportStillWarns() {
         run("SUCCESS", null, Instant.parse("2026-09-20T00:00:00Z"));
