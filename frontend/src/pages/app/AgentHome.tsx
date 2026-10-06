@@ -4,25 +4,21 @@ import { BtnLink } from "../../components/ui/Btn";
 import { Dot } from "../../components/ui/ObjectRow";
 import { ConversationWorkspace } from "../../components/conversation/ConversationWorkspace";
 import { FIRST_USE_PROMPTS, HOME_PROMPTS } from "../../components/conversation/surfacePrompts";
-import { useConversation, type DisplayTurn } from "../../lib/conversation/ConversationProvider";
+import { useConversation } from "../../lib/conversation/ConversationProvider";
 import { useAgentSurface } from "../../lib/agentPanel";
 import { useApiData } from "../../lib/useApiData";
 import { api } from "../../lib/apiClient";
 import { analytics } from "../../lib/analytics";
 import { DISCONNECTED_HEADLINE } from "../../lib/briefing";
 import { delegableSentence, firstUseSteps, homeFirstUseState, noDataSentence } from "../../lib/homeFirstUse";
-import { caseTarget, preparedBadge } from "../../lib/proactive";
-import { previewText } from "../../lib/plainText";
 import { matchCommandIntent, INTENT_HEADING } from "../../lib/commandIntents";
 import { INQUIRY_NEEDS_REPLY_PATH } from "../../lib/todayInbox";
-import { OperationsAreas } from "../../components/home/OperationsAreas";
 import { CustomerOpsHome, TodayWorkspace, coHomeApplies } from "../../components/customerOperations/CustomerOpsHome";
 import { COPY } from "../../lib/copy/customerOps";
 import { UNANSWERED_WORD } from "../../lib/homeSummary";
 import type { CustomerOperationsHome } from "../../lib/customerOperationsTypes";
-import { hasAnythingToShow } from "../../lib/operationsHome";
-import type { InquiryListArtifact, InquiryListArtifact as InquiryList, ListArtifact } from "../../lib/conversation/types";
-import type { InquiryQueueResponse, MetricKpi, OperationsHome, OverviewResponse, ProactiveCaseListResponse, ReviewIssueView } from "../../lib/types";
+import type { InquiryListArtifact } from "../../lib/conversation/types";
+import type { InquiryQueueResponse, MetricKpi, OperationsHome, OverviewResponse, ReviewIssueView } from "../../lib/types";
 
 /**
  * 홈 — the Agent operating workspace (Agentic Operating Workspace v2 §3-C).
@@ -38,10 +34,15 @@ import type { InquiryQueueResponse, MetricKpi, OperationsHome, OverviewResponse,
  * is a pattern, not a customer waiting; KPI, trend and per-channel numbers stay at `/overview` and are not
  * copied here. Nothing is chosen until the seller chooses it, and what they chose can be closed.
  *
- * <p>For an org WITHOUT that job, this page is still the thread: an EMPTY thread opens with a greeting that
- * is arithmetic (hour + the count of prepared cases — no model writes it), ONE muted context line with the
- * three numbers, the first agent turn client-composed from 「AI가 먼저 확인한 일」 — a truthful zero when
- * there is nothing — and example prompts under the box.
+ * <p><b>그 일이 없는 org도 같은 화면을 본다</b> (product-owner decision, 2026-10-06). 전에는 여기서 갈라져
+ * 네 개의 성긴 영역(지금 확인할 리뷰 · 반복 문제 · 최근 수집 상태 · 준비된 작업)과 대화 턴 하나로 된 두 번째
+ * Home이 그려졌고, 어느 쪽이 보이는지는 판매자의 데이터가 아니라 배포 설정과 그 한 번의 읽기가 성공했는지가
+ * 정했다 — 같은 판매자가 backend가 잠깐 죽은 아침에 다른 제품을 열었다는 뜻이다. 이제 골격은 하나이고
+ * ({@link CustomerOpsHome}), 자동 확인에 <b>속한</b> 줄만 그 일이 있을 때 선다. 그 Home과 함께 대화 브리핑
+ * (opener turn · 작업량 문장 · 예시 칩)도 사라졌다 — 할 일 목록이 그것을 이미 말한다.
+ *
+ * <p>남은 대화형 화면은 <b>첫 연결 전</b>뿐이다: 연결할 것이 없으면 목록이 아니라 「무엇을 연결하면 무엇을
+ * 받는가」가 화면이고, 그때는 예시 칩이 서는 것이 맞다.
  *
  * <b>The palette is a shortcut, not a planner.</b> A typed sentence that is exactly one of three
  * labels answers locally with an object the page already has; every other sentence goes to the
@@ -60,7 +61,6 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
    * failure. The overview strip and the proactive turn are separate reads and keep working.
    */
   const [home, setHome] = useState<OperationsHome | null | undefined>(undefined);
-  const [cases, setCases] = useState<ProactiveCaseListResponse | null | undefined>(undefined);
 
   useMemo(() => analytics.track("today_inbox_viewed"), []);
 
@@ -131,21 +131,6 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
     void loadCo();
   }, [loadCo]);
 
-  useEffect(() => {
-    let live = true;
-    api
-      .getProactiveCases(5)
-      .then((r) => {
-        if (live) setCases(r);
-      })
-      .catch(() => {
-        if (live) setCases(null);
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
-
   /**
    * **What is waiting is the WORK QUEUE, not the inquiry feed** (Chat-first Outcome & Visual Closure v1
    * §1). The brief read `/api/inquiries/rows?status=UNANSWERED` — the customer's inquiries as records —
@@ -182,27 +167,22 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
   // it. Before this the seller read 「현재 미답변 문의 12건」 and 「…문의가 12건 있습니다」 one line apart.
   const strip = data ? contextStrip(data, (queue?.content.length ?? 0) > 0, queue?.totalElements ?? null) : [];
   const anyUnproven = strip.some((kpi) => kpi.freshnessUnproven);
-  const count = cases ? cases.items.length : null;
 
-  // §11 (Agent Interaction Model v2): the opener speaks the authenticated org's REAL operational truth
-  // — prepared cases when there are any, and the waiting workload (from the same strict overview the
-  // numbers line reads) when there are none. 「없습니다」 only when the same reads came back empty.
-  const workload = useMemo(() => (data ? workloadPriorities(data) : null), [data]);
-  // Customer Operations v3.1: the job's Home replaces the numbers line, the opener turn and the four areas —
-  // its 「확인 필요」 list already names what the opener used to, and drawing both would list the same inquiry twice.
+  // 고객 운영 관리가 열린 org에서는 그 일의 상태(자동 확인 · 마지막 확인 · 처리한 것)까지 말한다. 열려 있지
+  // 않으면 `null`이고, 화면의 골격은 그대로 서며 그 일에 속한 줄만 빠진다.
   const coHome = !beforeFirstConnection && coHomeApplies(co) ? co : null;
-  const leadingTurns = useMemo<DisplayTurn[]>(
-    // §2: the opener speaks only when there is something to speak about. Before the first connection,
-    // and on the morning after one when nothing has arrived, the lead sentence above IS the briefing —
-    // an opener saying 「지금 먼저 확인할 일은 없습니다」 under it would be the same morning explained twice,
-    // and the weaker explanation would be the one that sounds like a verdict on the store.
-    () =>
-      co !== undefined && !coHome && cases && firstUse?.kind === "WORKING" && queue !== undefined
-        ? [proactiveTurn(cases, workload, queue, storedInquiries(data))]
-        : [],
-    [co, coHome, cases, workload, queue, firstUse, data],
-  );
-
+  /**
+   * <b>연결된 org의 Home은 하나다</b> (product-owner decision, 2026-10-06).
+   *
+   * <p>전에는 고객 운영 관리가 열린 org만 이 화면(오늘 · 숫자 · 오늘 먼저 볼 일 · 오늘 달라진 점 · 실행 대기 ·
+   * 반복 문제 · 채널)을 보고, 나머지는 네 개의 성긴 영역과 대화 턴으로 된 <b>다른 Home</b>을 봤다. 어느 쪽이
+   * 보이는지를 정한 것은 판매자의 데이터가 아니라 배포 설정({@code RESPONSIBILITY_RUNTIME_ORG_IDS})과 그 한 번의
+   * 읽기가 성공했는지였다 — 즉 backend가 잠깐 죽은 아침에 같은 판매자가 다른 제품을 열었다. 골격은 이제 하나이고,
+   * 자동 확인에 <b>속한</b> 것만 그 일이 있을 때 말한다({@link CustomerOpsHome}).
+   *
+   * <p>첫 연결 전은 여전히 예외다 — 그때는 할 일 목록이 아니라 「무엇을 연결하면 무엇을 받는가」가 화면이다.
+   */
+  const workspace = !overview.loading && !beforeFirstConnection && co !== undefined && firstUse?.kind !== "NO_DATA";
   const onBeforeSend = useCallback(
     (text: string): boolean => {
       if (!conversation) return false;
@@ -266,7 +246,6 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
   // work attached — a hello, a numbers line and a brief, three layers before anything actionable. Once
   // there is a brief, the greeting joins the numbers as one quiet line and the brief is the headline.
   // Before the first connection there is no brief and nothing else to say, so the headline stays.
-  const briefed = leadingTurns.length > 0 && !beforeFirstConnection;
   const legacyLead = (
     <div className="space-y-2">
       {/* <b>A visible page title</b> (UI System v2). This was `sr-only`, so the branch of 오늘 that an org
@@ -306,10 +285,6 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
             <BtnLink to="/connect" variant="outline">채널 연결 상태 보기</BtnLink>
           </div>
         </section>
-      ) : !briefed ? (
-        <section aria-label="오늘의 브리핑">
-          <p className="break-keep text-xl font-bold leading-tight text-ink" aria-live="polite">{greetingLine(now.getHours(), count)}</p>
-        </section>
       ) : null}
       {data && !beforeFirstConnection ? (
         // Reviewnary Visual System v1 §2 — the numbers are the smallest thing on the morning screen.
@@ -317,12 +292,12 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
         // `sm`, like the other branch's context line: the two Homes state their context at one size.
         // At `xs` this line was the smallest text on the morning screen and carried the only number on it.
         <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted" aria-label="오늘 상태">
-          {briefed ? <span className="font-medium text-ink">{greetingLine(now.getHours(), null)}</span> : null}
-          {strip.map((kpi, i) => (
+          <span className="font-medium text-ink">{greetingLine(now.getHours(), null)}</span>
+          {strip.map((kpi) => (
             <span key={kpi.key} className="flex items-center gap-x-2">
               {/* A drawn dot, not a glyph: 「·」 in `line` colour is a text node and it measured 1.12:1
                   — the last two AA violations on this page were both this separator. */}
-              {briefed || i > 0 ? <Dot /> : null}
+              <Dot />
               <Link to={STRIP_ROUTE[kpi.key] ?? "/overview"} className="hover:text-ink hover:underline">
                 {kpi.label} <span className="font-semibold tabular-nums text-ink">{kpi.value.toLocaleString("ko-KR")}</span>{kpi.unit ?? "건"}
               </Link>
@@ -342,28 +317,10 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
         </p>
       ) : null}
 
-      {/*
-        Operations Home v1 — 지금 확인할 것, as objects rather than as a sentence to ask for.
-
-        Drawn under the greeting and the numbers and ABOVE the thread: the Home is chat-first and it is
-        not chat-only, so what needs looking at is on screen before anyone types. The conversation is
-        unchanged below it.
-
-        Not drawn at all when the read failed (`null`), when it has not landed (`undefined`), or when
-        the seller has nothing yet — four empty headings on a fresh account would be describing a
-        product they have not started using, and an area rendering 0 from a failed read would be
-        reporting a clear morning on the strength of an error.
-      */}
-      {home && !beforeFirstConnection
-        && hasAnythingToShow(home.reviews, home.problems, home.prepared, home.collection) ? (
-        <div className="pt-2">
-          <OperationsAreas home={home} />
-        </div>
-      ) : null}
     </div>
   );
 
-  const lead = coHome ? (
+  const lead = workspace ? (
     <CustomerOpsHome co={coHome} ops={home} now={now} onChanged={() => void loadCo()} metrics={data?.metrics ?? null} insights={data?.insights ?? null} />
   ) : co === undefined && firstUse?.kind === "WORKING" ? (
     // The job's read has not landed. Draw nothing in its PLACE — rendering the other Home for a moment
@@ -378,18 +335,17 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
   return (
     <ConversationWorkspace
       surface="home"
-      leadingTurns={leadingTurns}
       lead={lead}
-      chips={beforeFirstConnection ? FIRST_USE_PROMPTS : coHome ? [] : HOME_PROMPTS}
-      placeholder={coHome ? COPY.composer : "무엇이든 물어보세요"}
+      chips={beforeFirstConnection ? FIRST_USE_PROMPTS : workspace ? [] : HOME_PROMPTS}
+      placeholder={workspace ? COPY.composer : "무엇이든 물어보세요"}
       onBeforeSend={onBeforeSend}
       // 오늘 (Home v3.1): the list is the subject here, so the box gives up the shell's one elevation.
-      quietDock={Boolean(coHome)}
+      quietDock={workspace}
       // 오늘 (UI/UX v2 Phase 1): the job's Home is a work list with the selected item beside it, and the box sits
       // under the list. The first sentence turns it back into the transcript. Example prompts are left out here —
       // four chips under the box every morning were the same four sentences, and the box already says what it takes.
       emptyLayout={
-        coHome
+        workspace
           ? (dock) => (
               <TodayWorkspace
                 co={coHome}
@@ -468,194 +424,5 @@ export function contextStrip(
   return out;
 }
 
-/** One waiting-work line for the opener — a real number the strict overview answered, never invented. */
-export interface WorkloadPriority {
-  label: string;
-  count: number;
-  to: string;
-}
-
-/**
- * The org's waiting work, from the SAME strict overview read as the numbers line (§11): current
- * unanswered inquiries (windowless), then the window's negative reviews. At most three lines; only
- * counts the backend actually answered.
- */
-export function workloadPriorities(data: OverviewResponse): WorkloadPriority[] {
-  const kpis = data.metrics.kpis;
-  const out: WorkloadPriority[] = [];
-  const unanswered = kpis.find((k) => k.key === "unansweredInquiries");
-  if (unanswered && unanswered.value > 0) out.push({ label: "답변을 기다리는 문의", count: unanswered.value, to: INQUIRY_NEEDS_REPLY_PATH });
-  const negative = kpis.find((k) => k.key === "negativeReviews");
-  if (negative && negative.value > 0) out.push({ label: `최근 ${data.metrics.period.days}일 부정 리뷰`, count: negative.value, to: "/reviews" });
-  return out.slice(0, 3);
-}
-
-/** How many waiting inquiries the brief names. Three is a brief; ten is the queue with a sentence on top. */
+/** 브리핑 한 줄이 얼마나 깊게 읽는가 — 셋은 브리핑이고 열은 문장이 붙은 큐다. */
 export const BRIEF_ROWS = 3;
-
-/** Whole days a row has been waiting, from dates alone. `null` when the date cannot be read. */
-export function waitingDays(receivedAt: string | null | undefined, today = new Date()): number | null {
-  if (!receivedAt) return null;
-  const from = Date.parse(`${receivedAt.slice(0, 10)}T00:00:00Z`);
-  const to = Date.parse(`${today.toISOString().slice(0, 10)}T00:00:00Z`);
-  if (Number.isNaN(from) || Number.isNaN(to)) return null;
-  return Math.max(0, Math.round((to - from) / 86_400_000));
-}
-
-/**
- * The first agent turn: what reviewnary prepared before the seller asked — and, when it prepared
- * nothing, what is genuinely waiting (§11). 「없습니다」 is said only when both reads came back empty.
- * Client-composed, never persisted.
- *
- * <b>Working Context v1 §2 — a brief names things.</b> This turn used to end in a link that said
- * 「답변을 기다리는 문의 12건」 — the third printing of a number the greeting and the context line above
- * it had already given, and the seller still did not know what any of the twelve WERE. A brief that
- * ends in a count is a dashboard row wearing a chat bubble. It now ends in the actual rows, oldest
- * first, each clickable into the conversation: the decision point, not the total.
- *
- * `oldest` is `null` when that read failed — the count line stands in, because a brief that can only
- * say the number is still better than one that invents rows.
- */
-/**
- * How many inquiry RECORDS this org holds, as the overview's channel rows report them — the source
- * records the 문의 workspace is built on, never a count of work. `null` when the read is not in yet.
- *
- * It exists for exactly one sentence: when the queue is empty and records are not, the brief has to say
- * which of the two it means, or 「지금 처리할 일은 없습니다」 reads as a claim about the records too.
- */
-export function storedInquiries(data: OverviewResponse | null | undefined): number | null {
-  if (!data) return null;
-  return data.metrics.channels.reduce((n, c) => n + (c.unansweredInquiries ?? 0), 0);
-}
-
-export function proactiveTurn(
-  cases: ProactiveCaseListResponse,
-  workload: WorkloadPriority[] | null,
-  queue: InquiryQueueResponse | null,
-  storedRecords: number | null = null,
-): DisplayTurn {
-  const items = cases.items;
-  const list: ListArtifact = {
-    artifactId: "home-proactive",
-    type: "LIST",
-    title: "AI가 먼저 확인한 일",
-    items: items.map((view) => {
-      const badge = preparedBadge(view);
-      return {
-        id: view.id,
-        primary: previewText(view.snippet),
-        secondary: [view.channelNameKo, view.subjectKind === "INQUIRY" ? "문의" : "리뷰", view.rating != null ? `${view.rating}점` : null]
-          .filter(Boolean)
-          .join(" · "),
-        status: { label: badge.label, tone: badge.tone === "accent" ? "info" : "warn" },
-        to: caseTarget(view),
-      };
-    }),
-    totalCount: cases.total,
-    ...(cases.total > items.length ? { more: { label: `전체 ${cases.total}건 보기`, to: "/inquiries" } } : {}),
-  };
-  const waiting = workload ?? [];
-  // ONE number for 「지금 처리할 일」, and it is the queue's own total — the same set the rows below come
-  // from. The freshness-qualified KPI stays where it belongs, in the numbers line, saying a different
-  // thing about a different question (§1).
-  const actionable = queue?.totalElements ?? 0;
-  const rows = queue?.content ?? [];
-  // The rows the brief names, as the same object every other inquiry list in this product is — so a
-  // click here anchors the conversation exactly as a click on an answered list does.
-  const waitingRows: InquiryList = {
-    artifactId: "home-waiting-rows",
-    type: "INQUIRY_LIST",
-    title: "최근에 들어온 문의",
-    // The sentence above this card says 「최근에 들어온 것부터 보여드릴게요」 — the producer of BOTH
-    // declares the repeat, because no containment test can see it (Agent Object v1 §3).
-    titleSaid: true,
-    totalCount: actionable,
-    // The read this brief actually made. It is what the card uses to know the seller (or, here, the
-    // brief's own sentence) already said these are the waiting ones — so the list does not add
-    // 「모두 답변이 필요한 문의입니다」 under a sentence that just said exactly that.
-    // NEWEST, because that is what `getInquiryQueueStrict` returns (`Sort.DESC createdAt`). This field
-    // tells the card what the read was; declaring OLDEST here described a read nobody made.
-    scope: { period: null, channelCode: null, status: "UNANSWERED", order: "NEWEST", limit: BRIEF_ROWS, rank: null },
-    groups: [
-      {
-        key: "UNANSWERED",
-        label: "답변 필요",
-        items: rows.map((row) => ({
-          workItemId: row.workItemId,
-          inquiryId: row.inquiryId,
-          channelCode: row.channelCode,
-          channelNameKo: row.channelNameKo,
-          receivedAt: row.receivedAt,
-          phase: row.phase ?? "OPEN",
-          status: row.status,
-          title: row.title,
-          // The brief names a row by its title, shop and wait — not by the customer's sentence. But a
-          // NAVER product inquiry has no title, and 「제목 없는 문의」 as the largest text on the home
-          // screen names nothing (Full Pilot Walkthrough v1, 2026-09-05: the oldest waiting row was
-          // that string while the inquiries screen, one click away, showed the customer's words). So
-          // the masked preview the rows read already carries stands in ONLY when there is no title —
-          // the same fallback the inquiries list uses, from the same read.
-          snippet: row.title && row.title.trim() ? null : (row.snippet ?? null),
-          productId: row.productId,
-          productName: row.productName,
-          answerBasis: null,
-          // How long this customer has waited. The brief is ordered newest-first and says so; without the
-          // number beside each row 「1개월 전」 is a receipt date, not a reason — the same wait the
-          // ranked answer states, computed the same way (whole days, dates, never clock time).
-          waitingDays: waitingDays(row.receivedAt),
-          to: `/inquiries/${row.inquiryId}`,
-        })),
-      },
-    ],
-    ...(actionable > rows.length ? { more: { label: `처리할 일 ${actionable.toLocaleString("ko-KR")}건 전체 보기`, to: "/inquiries" } } : {}),
-  };
-  // The count read failed or the rows are empty while the count is not — then the brief still has one
-  // honest thing to say, and it says it as a line rather than a card.
-  const waitingList: ListArtifact = {
-    artifactId: "home-waiting",
-    type: "LIST",
-    title: "지금 기다리는 일",
-    items: waiting.map((w) => ({ id: w.to, primary: `${w.label} ${w.count.toLocaleString("ko-KR")}건`, to: w.to })),
-  };
-  const namedRows = rows.length > 0;
-  const message = items.length > 0
-    ? "제가 먼저 확인해 둔 일입니다. 확인하고 보내시면 됩니다 — 아직 아무 곳에도 보내지 않았습니다."
-    : namedRows
-      // The number is said ONCE, and it is said as the reason these particular rows are on top. It is the
-      // queue's own total, so it can never disagree with the rows underneath it.
-      // **The order this sentence names has to be the order the read made** (Pilot QA, 2026-09-06).
-      // It said 「가장 오래 기다린 것부터」 and the queue is `Sort.DESC createdAt` — newest first — so on
-      // the live org it named 2일·2일·4일 while twenty inquiries had waited since 2016. Sorting the
-      // read by the customer's wait instead would put three 2016 현금영수증 requests at the top of
-      // today's work, which is not what 「지금 처리할 일」 means either; the year-old backlog has its
-      // own divider on the 문의 screen. So the sentence says what the read did, and each row still
-      // carries its own wait so nothing about how long they waited is hidden.
-      ? `지금 처리할 일이 ${actionable.toLocaleString("ko-KR")}건 있습니다. 최근에 들어온 것부터 보여드릴게요 — 눌러서 바로 이어가시면 됩니다.`
-      // **An empty queue is not an empty shop** (§1). With records held and nothing actionable in them,
-      // 「지금 처리할 일은 없습니다」 alone reads as a claim about the records too — so the sentence names
-      // which of the two it is talking about, and where the other one lives.
-      : (storedRecords ?? 0) > 0
-        ? `지금 처리할 일은 없습니다. 지금까지 들어온 문의 ${storedRecords!.toLocaleString("ko-KR")}건은 문의 화면에서 볼 수 있습니다.`
-        : waiting.length > 0
-          ? "오늘 미리 준비해 둔 일은 없지만, 지금 확인이 필요한 일이 있습니다."
-          : "지금 먼저 확인할 일은 없습니다. 새로 들어온 문의나 리뷰가 생기면 여기에 먼저 정리해 두겠습니다.";
-  return {
-    turnId: "home-proactive",
-    conversationId: "local",
-    role: "AGENT",
-    message,
-    artifacts: [
-      ...(items.length > 0 ? [list] : []),
-      ...(namedRows ? [waitingRows] : waiting.length > 0 ? [waitingList] : []),
-    ],
-    // A named row IS the next action — a chip re-asking for the same list under it is the same move
-    // twice (Conversation UX v2 §D). The chip stands in only when nothing could be named.
-    suggestedActions: !namedRows && waiting.some((w) => w.to.startsWith("/inquiries"))
-      ? [{ label: "답변 안 한 문의 보여줘", kind: "PROMPT", prompt: "답변 안 한 문의만 보여줘" }]
-      : [],
-    continuation: { workingSet: null, pendingHumanAction: null, pendingPrepared: null },
-    status: "DONE",
-    createdAt: new Date(0).toISOString(),
-    local: true,
-  };
-}

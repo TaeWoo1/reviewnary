@@ -1,51 +1,17 @@
-import type {
-  ChannelCoverageRowView,
-  HomePreparedWork,
-  HomeRepeatedProblems,
-  HomeReviewAttention,
-} from "./types";
+import type { HomeRepeatedProblems } from "./types";
 
 /**
- * What Operations Home is allowed to say about numbers it did not compute.
+ * Home이 자기가 계산하지 않은 숫자에 대해 말할 수 있는 것.
  *
- * <b>The rule this module exists to hold: urgency is never invented.</b> Every sentence below names
- * one population and says what happened to it. None adds two counts, ranks one area against another,
- * or turns a small number into an alarm. The failure this screen is most likely to have is not a
- * wrong figure — it is a true figure presented as a demand.
+ * <b>이 모듈이 지키는 규칙: 급함을 지어내지 않는다.</b> 한 모집단을 이름으로 부르고 그것에 무슨 일이
+ * 있었는지만 말한다 — 두 수를 더하지 않고, 작은 수를 경보로 바꾸지 않는다.
+ *
+ * <p>2026-10-06에 이 모듈은 한 함수로 줄었다. 나머지 다섯은 책임 런타임이 열려 있지 않은 배포가 보던 두
+ * 번째 Home(「지금 확인할 리뷰 / 반복 문제 / 최근 수집 상태 / 준비된 작업」)의 문장이었고, Home이 하나가
+ * 되면서 그 화면과 함께 사라졌다. 같은 사실들은 canonical Home이 제 섹션에서 말한다.
  */
 
-/** 「지금 확인할 리뷰 N건」, or null when there is none and the area should stay quiet about work. */
-export function reviewWorkLine(reviews: HomeReviewAttention): string {
-  if (reviews.needsAttentionUndecided > 0) {
-    return `아직 판단하지 않은 리뷰가 ${reviews.needsAttentionUndecided.toLocaleString("ko-KR")}건 있습니다.`;
-  }
-  if (reviews.needsAttentionTotal > 0) {
-    // Everything in the tier has been decided. That is a finished state and it is worth saying so,
-    // because silence here reads as 「읽지 못했다」.
-    return "확인이 필요했던 리뷰는 모두 판단하셨습니다.";
-  }
-  return "지금 확인이 필요한 리뷰는 없습니다.";
-}
-
-/**
- * The observation line — 지켜보기, stated and never added to the work number.
- *
- * WATCH means 「if this keeps happening it is worth changing something」, which is the repeated-problem
- * lane's question rather than a request for a decision today. Returns null at zero: a 0 here is not a
- * finding, and a row saying 「지켜보는 리뷰 0건」 would be the screen filling space.
- */
-export function watchLine(reviews: HomeReviewAttention): string | null {
-  if (reviews.watchTotal <= 0) return null;
-  return `지켜보는 리뷰가 ${reviews.watchTotal.toLocaleString("ko-KR")}건 있습니다. 같은 이야기가 쌓이면 반복 문제로 모입니다.`;
-}
-
-/**
- * 반복 문제, with 「내 차례인 것」과 「관찰 중인 것」을 나눈 문장.
- *
- * <b>관찰 중 is never phrased as pending work.</b> Measured on this org: 20 observed problems against
- * one that is anybody's move. A line reading 「반복 문제 20건」 beside a list of tasks would make twenty
- * observations look like twenty jobs.
- */
+/** 반복 문제의 한 문장 — 결정이 필요한 것과 지켜보는 것은 다른 수이고, 더해지지 않는다. */
 export function problemLine(problems: HomeRepeatedProblems): string {
   if (problems.decidable > 0) {
     // The observing clause is not decoration: both populations are DRAWN below this sentence, so stating only the
@@ -73,126 +39,3 @@ export function problemLine(problems: HomeRepeatedProblems): string {
 }
 
 /** 준비된 작업, or null when nothing is prepared — this area never grows to fill the space. */
-export function preparedLine(prepared: HomePreparedWork): string | null {
-  const parts: string[] = [];
-  if (prepared.reviewRepliesApproved > 0) {
-    parts.push(`승인하신 리뷰 답변 ${prepared.reviewRepliesApproved.toLocaleString("ko-KR")}건`);
-  }
-  if (prepared.inquiryDraftsReady > 0) {
-    parts.push(`초안이 준비된 문의 ${prepared.inquiryDraftsReady.toLocaleString("ko-KR")}건`);
-  }
-  if (prepared.improvementDraftsReady > 0) {
-    parts.push(`준비하신 개선 초안 ${prepared.improvementDraftsReady.toLocaleString("ko-KR")}건`);
-  }
-  // Deliberately joined with 「과」 rather than summed: 「4건」과 「2건」은 사실 둘이고, 「6건」은
-  // 아무도 읽지 않은 셋째다.
-  return parts.length === 0 ? null : `${parts.join(" · ")}이 기다리고 있습니다.`;
-}
-
-/** One channel's collection state on the Home. */
-export interface CollectionLine {
-  channelCode: string;
-  channelNameKo: string;
-  /** Seller-facing sentence about what was last collected, or why nothing can be said. */
-  sentence: string;
-  /** true when this row is worth a warning tone — a channel that cannot currently report. */
-  warn: boolean;
-}
-
-const DATA_TYPE_ORDER = ["REVIEW", "INQUIRY", "ORDER_SUMMARY"];
-
-/**
- * Collapse the coverage rows — three per channel — into one line per channel.
- *
- * <b>The freshness verdict is the server's; this only chooses which of the three rows speaks.</b> A
- * channel is described by its worst state, because a seller asking 「수집이 잘 되고 있나」 needs to hear
- * about the type that is not, and averaging three states would produce a fourth that nobody computed.
- *
- * <b>No provider technical name reaches the sentence.</b> The state words, the channel's Korean name
- * and a date are all it carries — never a connector class, a data-type token or an error code.
- */
-export function collectionLines(rows: readonly ChannelCoverageRowView[]): CollectionLine[] {
-  const byChannel = new Map<string, ChannelCoverageRowView[]>();
-  for (const row of rows) {
-    const list = byChannel.get(row.channelCode) ?? [];
-    list.push(row);
-    byChannel.set(row.channelCode, list);
-  }
-
-  const out: CollectionLine[] = [];
-  for (const [channelCode, channelRows] of byChannel) {
-    const named = channelRows.filter((row) => row.supported);
-    if (named.length === 0) continue;
-    const nameKo = channelRows[0].channelNameKo;
-
-    if (named.every((row) => !row.connected)) {
-      out.push({ channelCode, channelNameKo: nameKo, sentence: "아직 연결되지 않았습니다.", warn: false });
-      continue;
-    }
-
-    const blocked = named.find((row) => row.state === "BLOCKED");
-    if (blocked) {
-      out.push({
-        channelCode,
-        channelNameKo: nameKo,
-        sentence: "지금은 수집하지 못하고 있습니다. 연결 상태를 확인해 주세요.",
-        warn: true,
-      });
-      continue;
-    }
-
-    // The newest successful collection across this channel's types. `lastSuccessfulSyncAt` is the
-    // server's own field; the Home does not compute freshness from it, only reports it.
-    const successes = named
-      .map((row) => row.lastSuccessfulSyncAt)
-      .filter((at): at is string => Boolean(at))
-      .sort();
-    const newest = successes.length > 0 ? successes[successes.length - 1] : undefined;
-
-    const unproven = named.some((row) => row.state === "OBSERVED_FRESHNESS_UNPROVEN");
-    if (!newest) {
-      // Connected and nothing ever collected. Not a failure — and not a claim that the channel is
-      // empty either, which only ZERO may say.
-      out.push({
-        channelCode,
-        channelNameKo: nameKo,
-        sentence: "아직 가져온 기록이 없습니다.",
-        warn: false,
-      });
-      continue;
-    }
-    out.push({
-      channelCode,
-      channelNameKo: nameKo,
-      sentence: unproven
-        ? `마지막 수집 ${newest.slice(0, 10)} · 그 뒤로 최신 여부를 확인하지 못했습니다.`
-        : `마지막 수집 ${newest.slice(0, 10)}`,
-      warn: unproven,
-    });
-  }
-  // Stable order so the list does not reshuffle between reads.
-  out.sort((a, b) => DATA_TYPE_ORDER.indexOf(a.channelCode) - DATA_TYPE_ORDER.indexOf(b.channelCode)
-    || a.channelNameKo.localeCompare(b.channelNameKo, "ko"));
-  return out;
-}
-
-/**
- * Whether the Home has anything at all to put in its areas.
- *
- * Used to decide whether to draw the areas or leave the conversation alone. A Home that drew four
- * empty headings on a fresh account would be describing a product the seller has not started using.
- */
-export function hasAnythingToShow(
-  reviews: HomeReviewAttention,
-  problems: HomeRepeatedProblems,
-  prepared: HomePreparedWork,
-  collection: readonly ChannelCoverageRowView[],
-): boolean {
-  return reviews.needsAttentionUndecided > 0
-    || reviews.watchTotal > 0
-    || problems.decidable > 0
-    || problems.observing > 0
-    || prepared.reviewRepliesApproved > 0
-    || prepared.inquiryDraftsReady > 0
-    || collection.some((row) => row.connected);
-}

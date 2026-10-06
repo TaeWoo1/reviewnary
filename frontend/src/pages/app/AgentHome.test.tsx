@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -215,116 +216,135 @@ describe("greeting — arithmetic, never a model", () => {
   });
 });
 
-describe("home — the Agent operating workspace", () => {
-  it("opens with the greeting, three numbers, and the prepared cases as the first agent turn", async () => {
+/**
+ * <b>연결된 org의 Home은 하나다</b> (product-owner decision, 2026-10-06).
+ *
+ * <p>이 블록은 두 개의 Home을 검사하던 두 블록(「the Agent operating workspace」의 브리핑 턴들과
+ * 「Operations Home — 지금 확인할 것」의 네 영역)을 대신한다. 어느 쪽이 보이는지를 정하던 것은 판매자의
+ * 데이터가 아니라 배포 설정과 한 번의 읽기 성공 여부였고, 그래서 같은 판매자가 아침마다 다른 제품을 열 수
+ * 있었다. 이제 골격은 하나이고, 자동 확인에 <b>속한</b> 줄만 그 일이 열려 있을 때 선다.
+ */
+describe("home — 연결된 org이 보는 하나의 Home", () => {
+  it("골격이 선다 — 오늘 · 숫자 · 오늘 먼저 볼 일 · 반복 문제 · 채널, 그리고 그 아래 한 줄 입력", async () => {
     renderHome();
-    // Agentic Experience v2 §4: once there IS a brief, the brief is the headline and the greeting
-    // joins the numbers as one quiet line — the hello no longer restates what the brief says with
-    // the work attached, and it never appears as the largest text on the page.
-    const numbers = await screen.findByLabelText("오늘 상태");
-    expect(numbers.tagName).toBe("P");
-    expect(numbers).toHaveTextContent("좋은 아침입니다.");
-    expect(numbers).not.toHaveTextContent("먼저 확인한 일이");
-    // §2: the strip's inquiry number is the same work the rest of the screen means — and it is now
-    // called what the other Home's band calls it (product-owner decision, 2026-09-30).
-    expect(numbers).toHaveTextContent("확인할 일");
-    // Obligations only: 주문 and 부정 리뷰 moved back to the screen that owns them.
-    expect(numbers).not.toHaveTextContent("주문");
-    expect(numbers).not.toHaveTextContent("부정 리뷰");
-    expect(within(numbers).getByRole("link", { name: "자세한 숫자 보기" })).toHaveAttribute("href", "/overview");
-    expect(screen.queryByText("새 대화")).toBeNull();
-    expect(screen.queryByRole("button", { name: "지난 대화" })).toBeNull();
-    const turn = screen.getAllByTestId("agent-turn")[0]!;
-    expect(within(turn).getByRole("link", { name: /배송은 언제 되나요/ })).toHaveAttribute("href", "/inquiries/i-1");
-    expect(within(turn).getAllByText("답변 준비됨")).toHaveLength(2);
-    expect(screen.getByRole("form", { name: "AI 담당자에게 요청" })).toBeInTheDocument();
-    // A VISIBLE page title now, not `sr-only`: this branch of 오늘 had no page title on screen at all.
-    const title = screen.getByRole("heading", { level: 1, name: "오늘" });
-    expect(title.className).not.toContain("sr-only");
-    // `title` (28/700) — the scale's own step for a page name, which both Homes take. The claim is that
-    // the `h1` is VISIBLE and at the page-title size, not that the size is spelled `xl`.
+    const title = await screen.findByRole("heading", { level: 1, name: "오늘" });
     expect(title.className).toContain("text-title");
-    // Never our own vocabulary.
+    expect(screen.getByText("오늘 먼저 볼 일")).toBeInTheDocument();
+    expect(screen.getByLabelText("오늘 달라진 점")).toBeInTheDocument();
+    expect(screen.getByLabelText("반복 문제")).toBeInTheDocument();
+    expect(screen.getByLabelText("채널 상태")).toBeInTheDocument();
+    expect(screen.getByRole("form", { name: "AI 담당자에게 요청" })).toBeInTheDocument();
+    // 두 번째 Home은 없다 — 같은 아침이 두 가지 모양을 갖지 않는다.
+    expect(screen.queryByLabelText("오늘 확인할 것")).toBeNull();
+    expect(screen.queryByLabelText("지금 확인할 리뷰")).toBeNull();
+    expect(screen.queryByLabelText("최근 수집 상태")).toBeNull();
+    // 우리 어휘는 화면에 없다.
     expect(screen.queryByText(/proactive|PROPOSED|DRAFT_PREPARED|case/i)).toBeNull();
   });
 
-  /**
-   * §1 — an empty QUEUE over held RECORDS is not an empty shop.
-   *
-   * The two are different questions with different answers (measured live: 10 actionable work items
-   * against 21 unanswered records), so a brief that says 「지금 처리할 일은 없습니다」 has to name which one
-   * it means or the sentence reads as a verdict on the records too.
-   */
-  it("no prepared cases + nothing actionable + records held ⇒ the brief names both, and confuses neither", async () => {
-    getProactiveCases.mockResolvedValue({ items: [], total: 0, high: 0 });
+  it("자동 확인에 속한 것은 그 일이 없으면 말하지 않는다 — 골격은 그대로", async () => {
     renderHome();
-    expect(await screen.findByText(/지금 처리할 일은 없습니다/)).toBeInTheDocument();
-    expect(screen.getByText(/문의 화면에서 볼 수 있습니다/)).toBeInTheDocument();
-    expect(screen.queryByText(/새로 들어온 문의나 리뷰가 생기면/)).toBeNull();
-    expect(screen.queryByText("AI가 먼저 확인한 일")).toBeNull();
+    await screen.findByRole("heading", { level: 1, name: "오늘" });
+    // 상태 점 · 마지막 확인 · 「시작」은 책임 런타임의 것이다. 열려 있지 않은 배포에서 그리면 켜 본 적도
+    // 없는 기능의 건강을 보고하고, 누를 수 없는 버튼을 첫 화면에 두는 일이 된다.
+    expect(screen.queryByText(/마지막 확인/)).toBeNull();
+    expect(screen.queryByRole("button", { name: COPY.start })).toBeNull();
+    expect(screen.getByTestId("today-status")).toBeInTheDocument();
   });
 
-  it("§2: with work to name, the brief NAMES it and says the QUEUE's own count once", async () => {
-    getProactiveCases.mockResolvedValue({ items: [], total: 0, high: 0 });
-    getInquiryQueueStrict.mockResolvedValue({
-      page: 0, size: 3, totalElements: 22, totalPages: 8,
-      content: [
-        { inquiryId: "i-1", workItemId: "w-1", sellerAccountId: "s", channelId: "c", channelCode: "NAVER", channelNameKo: "네이버 스마트스토어", productId: null, productName: null, phase: "OPEN", status: "UNANSWERED", title: "현금영수증 발행 부탁드립니다", receivedAt: "2026-07-22T00:00:00Z" },
-        { inquiryId: "i-2", workItemId: "w-2", sellerAccountId: "s", channelId: "c", channelCode: "CAFE24", channelNameKo: "카페24 자사몰", productId: null, productName: null, phase: "OPEN", status: "UNANSWERED", title: "배송이 너무 늦습니다", receivedAt: "2026-07-30T00:00:00Z" },
-      ],
+  it("브리핑 턴과 예시 칩은 없다 — 할 일 목록이 이미 그것을 말한다", async () => {
+    renderHome();
+    await screen.findByRole("heading", { level: 1, name: "오늘" });
+    expect(screen.queryAllByTestId("agent-turn")).toHaveLength(0);
+    expect(screen.queryByLabelText("예시 질문")).toBeNull();
+    expect(screen.queryByText(/지금 처리할 일이/)).toBeNull();
+    expect(screen.queryByLabelText("오늘 상태")).toBeNull();
+  });
+
+  it("먼저 볼 일의 리뷰 한 줄은 그 리뷰를 판단하는 화면을 연다", async () => {
+    renderHome();
+    await screen.findByText("오늘 먼저 볼 일");
+    const row = await screen.findByRole("link", { name: /상품페이지 설명에 혼선을 줍니다/ });
+    // `from=work` — 이 화면에서 들어왔다는 표시. 돌아올 곳을 리뷰 화면이 안다.
+    expect(row).toHaveAttribute("href", "/reviews/reply/rev-1?from=work");
+  });
+
+  it("반복 문제는 분모와 함께, 비율 없이 — 그리고 그 근거 화면으로", async () => {
+    renderHome();
+    const area = await screen.findByLabelText("반복 문제");
+    expect(within(area).getByRole("link", { name: /접착 부족/ })).toHaveAttribute("href", "/memory/iss-1");
+    expect(area.textContent ?? "").not.toMatch(/%|퍼센트|비율/);
+  });
+
+  it("실행 대기는 승인해 둔 것을 한 건씩 이름으로 부른다", async () => {
+    renderHome();
+    const area = await screen.findByLabelText("실행 대기");
+    const link = within(area).getByRole("link", { name: /선바로 전선몰딩/ });
+    expect(link).toHaveAttribute("href", "/reviews/reply/rev-9");
+    expect(area.textContent ?? "").not.toContain("6건");
+  });
+
+  it("채널 상태는 수집을 기술 이름 없이 말한다", async () => {
+    renderHome();
+    const area = await screen.findByLabelText("채널 상태");
+    expect(within(area).getByRole("link", { name: "연결 상태 보기" })).toHaveAttribute("href", "/connect");
+    expect(area.textContent ?? "").not.toMatch(/NAVER|ORDER_SUMMARY|REVIEW|GW\./);
+  });
+
+  /**
+   * <b>읽기가 실패해도 골격은 무너지지 않는다.</b> 전에는 이 상황에서 네 영역이 통째로 사라지고 화면이
+   * 대화 한 줄로 줄었다 — 같은 아침이 읽기 실패 하나로 다른 제품이 됐다. 이제 화면은 그대로 서고, 실패한
+   * 읽기가 소유한 줄만 비며, 어느 칸도 0을 지어내지 않는다.
+   */
+  it("보유 읽기가 실패해도 화면은 그대로 서고, 0을 지어내지 않는다", async () => {
+    getOperationsHomeStrict.mockRejectedValue(new Error("down"));
+    renderHome();
+    await screen.findByRole("heading", { level: 1, name: "오늘" });
+    expect(screen.getByLabelText("채널 상태")).toBeInTheDocument();
+    expect(screen.queryByLabelText("실행 대기")).toBeNull();
+    expect(screen.queryByText(/반복 문제 0건/)).toBeNull();
+  });
+
+  it("아무것도 기다리지 않는 아침은 그렇게 적는다", async () => {
+    getOperationsHomeStrict.mockResolvedValue({
+      reviews: { needsAttentionUndecided: 0, needsAttentionTotal: 0, watchTotal: 0, rows: [] },
+      problems: { decidable: 0, observing: 0, rows: [] },
+      collection: [],
+      prepared: { reviewRepliesApproved: 0, inquiryDraftsReady: 0, rows: [] },
     });
     renderHome();
-    // The work itself, not a link that says how much of it there is.
-    expect(await screen.findByText("현금영수증 발행 부탁드립니다")).toBeInTheDocument();
-    expect(screen.getByText("배송이 너무 늦습니다")).toBeInTheDocument();
-    // <b>The order the sentence names must be the order the read made</b> (Pilot QA, 2026-09-06).
-    // `getInquiryQueueStrict` returns the queue newest-first (`Sort.DESC createdAt`), and the brief
-    // used to promise 「가장 오래 기다린 것부터」 over it — on the live org that named three inquiries
-    // from the last four days while twenty had waited since 2016. The fixture keeps that shape: i-1
-    // waited LONGER than i-2, and the brief must not claim the rows are ordered by that.
-    expect(screen.getByText(/최근에 들어온 것부터/)).toBeInTheDocument();
-    expect(screen.queryByText(/가장 오래 기다린 것부터/)).toBeNull();
-    // The old card said the same number a third time; it is gone, and so is the chip re-asking for it.
-    expect(screen.queryByText("지금 기다리는 일")).toBeNull();
-    expect(screen.queryByRole("button", { name: "답변 안 한 문의 보여줘" })).toBeNull();
-    expect(screen.getByText(/지금 처리할 일이 22건 있습니다/)).toBeInTheDocument();
-    // The queue's own screen, whose first section IS this queue. It used to point at
-    // `?state=NEEDS_REPLY` — a parameter no screen reads — so the link opened the whole record and the
-    // seller had to find the 22 among 94 (Secondary Workspaces UX Closure v1 §1).
-    expect(screen.getByRole("link", { name: "처리할 일 22건 전체 보기" })).toHaveAttribute("href", "/inquiries");
-    // §5: the strip stops printing the number the brief is already saying one line below — and with
-    // 주문·부정 리뷰 retired there is no other obligation for it to carry. The line itself stays: the
-    // greeting and the way to the numbers screen are not obligations and were never the strip's.
-    const numbers = screen.getByLabelText("오늘 상태");
-    expect(numbers).not.toHaveTextContent("현재 미답변");
-    expect(numbers).not.toHaveTextContent("확인할 일");
-    expect(numbers).not.toHaveTextContent("주문");
-    expect(numbers).not.toHaveTextContent("부정 리뷰");
-    expect(within(numbers).getByRole("link", { name: "자세한 숫자 보기" })).toHaveAttribute("href", "/overview");
+    expect(await screen.findByText("지금 확인할 일이 없습니다.")).toBeInTheDocument();
   });
 
-  it("§2: when the queue read fails the brief names no work and claims none", async () => {
-    getProactiveCases.mockResolvedValue({ items: [], total: 0, high: 0 });
-    getInquiryQueueStrict.mockRejectedValue(new Error("nope"));
+  /**
+   * <b>돌아오지 않는다</b> (reviewnary_design §8-A v3.3). 두 번째 Home이 그려지던 조건은 둘이었고 —
+   * 배포가 책임 런타임을 열지 않았거나(`available: false`), 그 한 번의 읽기가 실패했거나 — 둘 다 판매자의
+   * 데이터가 아니다. 두 경우 모두 같은 골격이 서는지 여기서 검사한다.
+   */
+  it("고객 운영 관리 읽기가 실패해도 예전 Home으로 돌아가지 않는다", async () => {
+    getCustomerOperationsHome.mockRejectedValue(new Error("responsibility down"));
     renderHome();
-    // A failed read is not a zero: the brief says what it still knows (records are held) and never
-    // reports 「처리할 일 0건」, which would be a claim about work it could not look at.
-    expect(await screen.findByText(/지금 처리할 일은 없습니다/)).toBeInTheDocument();
-    expect(screen.queryByText(/지금 처리할 일이 0건/)).toBeNull();
+    await screen.findByRole("heading", { level: 1, name: "오늘" });
+    expect(screen.getByText("오늘 먼저 볼 일")).toBeInTheDocument();
+    expect(screen.getByLabelText("채널 상태")).toBeInTheDocument();
+    // 네 개의 성긴 영역도, 그 아래 「지금 처리할 일이 N건」 대화 턴도 없다.
+    expect(screen.queryByLabelText("오늘 확인할 것")).toBeNull();
+    expect(screen.queryByLabelText("지금 확인할 리뷰")).toBeNull();
+    expect(screen.queryByLabelText("최근 수집 상태")).toBeNull();
+    expect(screen.queryByText(/지금 처리할 일이/)).toBeNull();
+    expect(screen.queryAllByTestId("agent-turn")).toHaveLength(0);
   });
 
-  it("a genuinely quiet morning — no cases AND no waiting work — is the truthful zero", async () => {
-    getProactiveCases.mockResolvedValue({ items: [], total: 0, high: 0 });
-    const quiet = overview();
-    quiet.metrics.kpis = quiet.metrics.kpis.map((k) =>
-      k.key === "unansweredInquiries" || k.key === "negativeReviews" ? { ...k, value: 0 } : k,
-    );
-    // Truly quiet: no work AND no records held — otherwise the honest sentence is §1's, not this one.
-    quiet.metrics.channels = quiet.metrics.channels.map((c) => ({ ...c, unansweredInquiries: 0 }));
-    getOverviewStrict.mockResolvedValue(quiet);
-    renderHome();
-    expect(await screen.findByText(/새로 들어온 문의나 리뷰가 생기면/)).toBeInTheDocument();
-    expect(screen.queryByText(/확인이 필요한 일이 있습니다/)).toBeNull();
+  it("legacy Home 모듈은 저장소에 없고, 어디서도 import되지 않는다", () => {
+    // 화면 검사만으로는 「그 파일이 아직 있고 다른 조건에서 그려진다」를 잡지 못한다. 모듈 자체의 부재가
+    // 계약이다 — 되살리려면 이 테스트를 먼저 지워야 한다.
+    expect(existsSync("src/components/home/OperationsAreas.tsx")).toBe(false);
+    const home = readFileSync("src/pages/app/AgentHome.tsx", "utf-8");
+    expect(home).not.toContain("OperationsAreas");
+    // 대화 브리핑 기계도 함께 사라졌다 — 남아 있으면 「연결된 org의 Home이 대화로 열리는 길」이 남은 것이다.
+    for (const dead of ["proactiveTurn", "workloadPriorities", "storedInquiries", "leadingTurns"]) {
+      expect(home, `${dead} is dead with the conversational Home`).not.toContain(dead);
+    }
   });
 
   it("before the first connection the greeting stops counting and offers the one thing to do", async () => {
@@ -333,160 +353,37 @@ describe("home — the Agent operating workspace", () => {
     expect(await screen.findByText("판매 채널을 연결하면 시작할 수 있습니다.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "채널 연결하기" })).toHaveAttribute("href", "/connect");
     expect(screen.queryByLabelText("오늘 상태")).toBeNull();
+    // 첫 연결 전에는 목록이 아니라 「무엇을 연결하면 무엇을 받는가」가 화면이고, 예시 칩이 거기 선다.
+    expect(screen.getByLabelText("예시 질문")).toBeInTheDocument();
   });
 
   it("an exact shortcut answers locally with an object; no turn is sent", async () => {
     // 「답변이 필요한 문의」 is ONE question, so the heading, the count, the rows and the 전체 보기 all come
-    // from the read that answers it — the record under `status=UNANSWERED`. It used to title the answer
-    // with the overview KPI and fill it with the OPEN work queue: two different sets under one sentence.
+    // from the read that answers it — the record under `status=UNANSWERED`.
     getInquiryRowsStrict.mockResolvedValue({
       totalCount: 22, limit: 5, productId: null,
       items: [{ workItemId: "w1", inquiryId: "i1", sellerAccountId: "s", channelId: "c", channelCode: "CAFE24", channelNameKo: "카페24 자사몰", productId: null, productName: null, phase: "OPEN", status: "UNANSWERED", title: "배송 언제 되나요?", receivedAt: "2026-08-26T00:00:00Z" }],
     });
     renderHome();
-    await screen.findByText(/좋은 아침입니다/);
-    await userEvent.type(screen.getByLabelText("무엇이든 물어보세요"), "미답변 문의 보여줘");
+    await screen.findByRole("heading", { level: 1, name: "오늘" });
+    await userEvent.type(screen.getByPlaceholderText(COPY.composer), "미답변 문의 보여줘");
     await userEvent.keyboard("{Enter}");
-    // ONE control per row (Frontend-first v1): the row IS the control, and the workspace link lives
-    // inside the row it belongs to — opened by that press, not sitting beside every row as a third copy
-    // of the same action.
-    // Scoped to the shortcut's OWN turn: the home brief reads the same queue now (§1), so the row it
-    // named is legitimately on screen too — this test is about what the shortcut answers.
     await screen.findByText("답변이 필요한 문의 22건");
     const turns = screen.getAllByTestId("agent-turn");
     const answer = turns[turns.length - 1]!;
     expect(within(answer).getByRole("button", { name: /배송 언제 되나요/ })).toBeInTheDocument();
-    expect(within(answer).queryByRole("link", { name: "문의 화면에서 열기" })).toBeNull();
     expect(conversationClient.sendTurn).not.toHaveBeenCalled();
   });
 
-  it("every other sentence goes to the runtime — a chip is a prompt the seller sends", async () => {
+  it("every other sentence goes to the runtime", async () => {
     vi.mocked(conversationClient.sendTurn).mockResolvedValue(agentTurn());
     renderHome();
-    await screen.findByText(/좋은 아침입니다/);
-    await userEvent.click(screen.getByRole("button", { name: "오늘 리뷰 뭐 들어왔어?" }));
+    await screen.findByRole("heading", { level: 1, name: "오늘" });
+    await userEvent.type(screen.getByPlaceholderText(COPY.composer), "오늘 리뷰 뭐 들어왔어?");
+    await userEvent.keyboard("{Enter}");
     await waitFor(() => expect(conversationClient.sendTurn).toHaveBeenCalledTimes(1));
     expect(vi.mocked(conversationClient.sendTurn).mock.calls[0]![1].text).toBe("오늘 리뷰 뭐 들어왔어?");
     expect(await screen.findByText("이 상품에 미답변 문의는 없습니다.")).toBeInTheDocument();
-  });
-
-  it("example prompts show only while the thread is empty; after the first message the thread speaks", async () => {
-    vi.mocked(conversationClient.sendTurn).mockResolvedValue(agentTurn());
-    renderHome();
-    await screen.findByText(/좋은 아침입니다/);
-    expect(screen.getByLabelText("예시 질문")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "오늘 리뷰 뭐 들어왔어?" }));
-    await screen.findByText("이 상품에 미답변 문의는 없습니다.");
-    expect(screen.queryByLabelText("예시 질문")).toBeNull();
-    expect(screen.queryByLabelText("오늘의 브리핑")).toBeNull();
-  });
-});
-
-describe("Operations Home — 지금 확인할 것", () => {
-  it("draws the four areas above the conversation", async () => {
-    renderHome();
-    const areas = await screen.findByLabelText("오늘 확인할 것");
-    expect(within(areas).getByLabelText("지금 확인할 리뷰")).toBeInTheDocument();
-    expect(within(areas).getByLabelText("반복 문제")).toBeInTheDocument();
-    expect(within(areas).getByLabelText("최근 수집 상태")).toBeInTheDocument();
-    expect(within(areas).getByLabelText("준비된 작업")).toBeInTheDocument();
-  });
-
-  /**
-   * The distinction the whole screen turns on. 13 is what asks for work; 15 is the size of the tier;
-   * 122 is an observation. None of them is added to another — 13+122 and 15+122 describe nothing.
-   */
-  it("asks with the undecided count and keeps 지켜보기 as a separate observation", async () => {
-    renderHome();
-    const area = await screen.findByLabelText("지금 확인할 리뷰");
-    expect(within(area).getByText(/판단하지 않은 리뷰가 13건/)).toBeInTheDocument();
-    expect(within(area).getByText(/지켜보는 리뷰가 122건/)).toBeInTheDocument();
-    expect(area.textContent ?? "").not.toContain("135");
-    expect(area.textContent ?? "").not.toContain("137");
-  });
-
-  it("opens each review in the decision workspace", async () => {
-    renderHome();
-    const area = await screen.findByLabelText("지금 확인할 리뷰");
-    expect(within(area).getByText(/상품페이지 설명에 혼선을 줍니다/)).toBeInTheDocument();
-    expect(within(area).getByRole("link", { name: /상품페이지 설명에 혼선을 줍니다/ }))
-      .toHaveAttribute("href", "/reviews/reply/rev-1");
-  });
-
-  /**
-   * 관찰 중 problems are counted but never drawn as tasks: the sentence asks about the one that is
-   * somebody's move, not the nineteen that are not.
-   */
-  it("asks only about repeated problems that are somebody's move", async () => {
-    renderHome();
-    const area = await screen.findByLabelText("반복 문제");
-    expect(within(area).getByText(/판단이 필요한 반복 문제가 1건/)).toBeInTheDocument();
-    expect(area.textContent ?? "").not.toContain("20건");
-  });
-
-  it("carries the denominator into the Home as a pair, never a rate", async () => {
-    renderHome();
-    const area = await screen.findByLabelText("반복 문제");
-    expect(within(area).getByText(/리뷰 1,761건 중 16건이 이 문제를 말했습니다/)).toBeInTheDocument();
-    expect(area.textContent ?? "").not.toMatch(/%|퍼센트|비율/);
-    expect(within(area).getByRole("link", { name: /접착 부족/ })).toHaveAttribute("href", "/memory/iss-1");
-  });
-
-  /**
-   * The collection area may say when a channel last collected and never how — no connector class, no
-   * data-type token, no error code reaches a seller sentence.
-   */
-  it("reports collection without a provider technical name", async () => {
-    renderHome();
-    const area = await screen.findByLabelText("최근 수집 상태");
-    expect(within(area).getByText(/마지막 수집 2026-09-08/)).toBeInTheDocument();
-    expect(area.textContent ?? "").not.toMatch(/NAVER|ORDER_SUMMARY|REVIEW|GW\./);
-  });
-
-  it("names each prepared record separately and totals nothing", async () => {
-    renderHome();
-    const area = await screen.findByLabelText("준비된 작업");
-    expect(within(area).getByText(/승인하신 리뷰 답변 4건/)).toBeInTheDocument();
-    expect(within(area).getByText(/초안이 준비된 문의 2건/)).toBeInTheDocument();
-    expect(area.textContent ?? "").not.toContain("6건");
-  });
-
-  /**
-   * Four rows reading 「승인된 리뷰 답변」 are four links a seller cannot choose between — measured on
-   * the live org before the row carried what distinguishes it.
-   */
-  it("tells one prepared row from the next", async () => {
-    renderHome();
-    const area = await screen.findByLabelText("준비된 작업");
-    const link = within(area).getByRole("link", { name: /선바로 전선몰딩/ });
-    expect(link).toHaveAttribute("href", "/reviews/reply/rev-9");
-    expect(link.textContent ?? "").toContain("승인된 리뷰 답변");
-  });
-
-  /**
-   * <b>A failed read draws nothing.</b> Rendering 「확인 필요 0건」 because a query timed out would tell
-   * a seller their morning is clear on the strength of an error — and the conversation below, which is
-   * a different read, must keep working.
-   */
-  it("draws no area when the read failed, and leaves the conversation alone", async () => {
-    getOperationsHomeStrict.mockRejectedValue(new Error("down"));
-    renderHome();
-    await screen.findByRole("heading", { name: "오늘" });
-    await waitFor(() => expect(screen.queryByLabelText("오늘 확인할 것")).toBeNull());
-    expect(screen.queryByLabelText("지금 확인할 리뷰")).toBeNull();
-  });
-
-  /** Four empty headings would describe a product the seller has not started using. */
-  it("draws nothing for an account with no work and nothing connected", async () => {
-    getOperationsHomeStrict.mockResolvedValue({
-      reviews: { needsAttentionUndecided: 0, needsAttentionTotal: 0, watchTotal: 0, rows: [] },
-      problems: { decidable: 0, observing: 0, rows: [] },
-      collection: [],
-      prepared: { reviewRepliesApproved: 0, inquiryDraftsReady: 0, rows: [] },
-    });
-    renderHome();
-    await screen.findByRole("heading", { name: "오늘" });
-    await waitFor(() => expect(screen.queryByLabelText("오늘 확인할 것")).toBeNull());
   });
 });
 
@@ -508,8 +405,8 @@ describe("return-visit signal", () => {
     recordHomeOpened.mockRejectedValue(new Error("measurement down"));
     renderHome();
     await screen.findByRole("heading", { name: "오늘" });
-    // The areas the seller came for are drawn exactly as they are when the signal succeeds.
-    expect(await screen.findByLabelText("지금 확인할 리뷰")).toBeTruthy();
+    // The screen the seller came for is drawn exactly as it is when the signal succeeds.
+    expect(await screen.findByText("오늘 먼저 볼 일")).toBeTruthy();
   });
 });
 

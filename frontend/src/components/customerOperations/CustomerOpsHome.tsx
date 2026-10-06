@@ -143,7 +143,17 @@ export function CustomerOpsHome({
   sharedReviewWork,
   selection,
 }: {
-  co: CustomerOperationsHome;
+  /**
+   * 고객 운영 관리(책임 런타임)의 읽기, <b>또는 {@code null}</b> — 그 일이 이 배포에서 열려 있지 않거나
+   * 읽기가 실패한 경우.
+   *
+   * <p><b>{@code null}이어도 이 화면이 그려진다.</b> 전에는 그때 다른 Home(네 개의 성긴 영역 + 대화 턴)이
+   * 대신 그려졌고, 같은 제품의 첫 화면이 두 가지 모양을 가졌다 — 그리고 어느 쪽이 보이는지는 데이터가 아니라
+   * 배포 설정(rollout)과 읽기 성공 여부가 정했다. 자동 확인에 <b>속한</b> 것(상태 점 · 마지막 확인 · 주기 ·
+   * 자동이 처리한 것)만 그때 말하지 않고, 골격 — 오늘 · 숫자 · 오늘 먼저 볼 일 · 오늘 달라진 점 · 실행 대기 ·
+   * 반복 문제 · 채널 — 은 그대로 선다.
+   */
+  co: CustomerOperationsHome | null;
   ops: OperationsHome | null | undefined;
   now?: Date;
   onChanged: () => void;
@@ -185,7 +195,7 @@ export function CustomerOpsHome({
   */
   const shown = homeBriefRows(work.rows, visibleHomeRows(roomy));
   const hidden = work.rows.length - shown.length;
-  const running = co.status === "ACTIVE" || co.status === "PAUSED";
+  const running = co?.status === "ACTIVE" || co?.status === "PAUSED";
   const wide = selection?.wide ?? false;
   const search = selection?.search ?? "";
   const awaiting = awaitingRows(ops, work);
@@ -217,7 +227,7 @@ export function CustomerOpsHome({
     when it last succeeded are three facts, and green needs all three. This component only maps the
     tone it is handed onto marks — so the rule is testable and a future tint cannot restore it.
   */
-  const health = automationHealth(co, now);
+  const health = co ? automationHealth(co, now) : null;
   const DOT: Record<HealthTone, string> = {
     good: "bg-good ring-[3px] ring-good/15",
     warn: "bg-warn",
@@ -225,8 +235,10 @@ export function CustomerOpsHome({
     neutral: "bg-muted",
   };
 
-  const warnings = [...lastRunLines(co, now), ...warningLines(co, now), ...failedReads(ops, queue)];
-  const lastChecked = kstClock(co.lastCheckedAt, now);
+  const warnings = co
+    ? [...lastRunLines(co, now), ...warningLines(co, now), ...failedReads(ops, queue)]
+    : failedReads(ops, queue);
+  const lastChecked = co ? kstClock(co.lastCheckedAt, now) : null;
 
   return (
     /*
@@ -272,22 +284,28 @@ export function CustomerOpsHome({
               className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm leading-relaxed text-muted"
             >
               <span>{kstLongDate(now)}</span>
-              <Sep />
-              {/* The state is a dot and a word, not a filled pill: on a screen whose subject is what the
-                  customers wrote, a coloured capsule at the top is the loudest mark for the quietest fact. */}
-              <Link
-                to="/customer-operations"
-                className="inline-flex items-center gap-1.5 font-medium hover:text-ink hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-              >
-                <span aria-hidden="true" className={`h-[6px] w-[6px] rounded-full ${DOT[health.tone]}`} />
-                {health.label}
-              </Link>
-              {/* Why it is not green, when it is not. Null while it is — the 마지막 확인 beside this
-                  already carries the evidence and does not need a second sentence about it. */}
-              {health.note ? (
+              {/* 자동 확인의 상태는 자동 확인이 있을 때만 말한다. 그 일이 열려 있지 않은 배포에서 회색 점과
+                  상태어를 그리면, 켜 본 적도 없는 기능의 건강을 보고하는 줄이 된다. */}
+              {health ? (
                 <>
                   <Sep />
-                  <span>{health.note}</span>
+                  {/* The state is a dot and a word, not a filled pill: on a screen whose subject is what the
+                      customers wrote, a coloured capsule at the top is the loudest mark for the quietest fact. */}
+                  <Link
+                    to="/customer-operations"
+                    className="inline-flex items-center gap-1.5 font-medium hover:text-ink hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+                  >
+                    <span aria-hidden="true" className={`h-[6px] w-[6px] rounded-full ${DOT[health.tone]}`} />
+                    {health.label}
+                  </Link>
+                  {/* Why it is not green, when it is not. Null while it is — the 마지막 확인 beside this
+                      already carries the evidence and does not need a second sentence about it. */}
+                  {health.note ? (
+                    <>
+                      <Sep />
+                      <span>{health.note}</span>
+                    </>
+                  ) : null}
                 </>
               ) : null}
               {lastChecked ? (
@@ -304,16 +322,20 @@ export function CustomerOpsHome({
           </Btn>
         </div>
       </header>
+      {/* 실행 대기는 판매자가 승인해 둔 것이고 자동 확인의 소유가 아니다 — 그 일이 열려 있지 않아도 센다.
+          다만 보유 읽기가 실패했으면 0이 아니라 아무 말도 하지 않는다(null). */}
       <OperationsSummary
         work={work}
-        awaiting={co.status === "ACTIVE" ? awaiting.count : null}
+        awaiting={co ? (co.status === "ACTIVE" ? awaiting.count : null) : ops ? awaiting.count : null}
         unanswered={unansweredNow(metrics)}
       />
 
 
-      {running && co.status === "ACTIVE" ? null : (
+      {/* 이 일을 시작하는 카드는 시작할 수 있는 배포에서만 선다. 책임 런타임이 열려 있지 않은 곳에서
+          「시작」을 그리면 누를 수 없는 버튼을 첫 화면에 두는 것이다. */}
+      {!co || (running && co.status === "ACTIVE") ? null : (
         <section
-          aria-label={health.label}
+          aria-label={health?.label ?? RESPONSIBILITY_NAME}
           className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-6 py-4"
         >
           {/* <b>Before it is running, the card names what the seller is about to start — not the state again.</b>
@@ -400,9 +422,10 @@ export function CustomerOpsHome({
             captionSaysReason
           />
         </section>
-      ) : running && co.status === "ACTIVE" ? (
+      ) : !co || (running && co.status === "ACTIVE") ? (
         // Nothing waiting is a state, and the list's absence does not state it. 「다음 확인」 is on the status
-        // line above, where it was before this became one line.
+        // line above, where it was before this became one line. 자동 확인이 없는 배포에서도 같은 문장을
+        // 적는다 — 빈 자리는 「없다」와 「읽지 못했다」를 구분해 주지 않는다(읽기 실패는 채널 줄이 말한다).
         <p className="break-keep text-sm text-muted">지금 확인할 일이 없습니다.</p>
       ) : null}
 
@@ -433,7 +456,7 @@ export function CustomerOpsHome({
           dropped is the overview's, which is where this section's one navigational link goes. */}
       <WhatChanged
         insights={changeInsights(insights, now)}
-        context={<ContextLine inflow={todayInflow(metrics, now)} recent={recentDay(co)} />}
+        context={<ContextLine inflow={todayInflow(metrics, now)} recent={co ? recentDay(co) : null} />}
       />
 
       <div className="grid gap-x-6 gap-y-6 md:grid-cols-2">
@@ -751,7 +774,8 @@ export function TodayWorkspace({
   insights,
   dock,
 }: {
-  co: CustomerOperationsHome;
+  /** {@link CustomerOpsHome}와 같다 — 그 일이 열려 있지 않으면 {@code null}이고, 골격은 그대로 선다. */
+  co: CustomerOperationsHome | null;
   ops: OperationsHome | null | undefined;
   now?: Date;
   onChanged: () => void;

@@ -310,6 +310,108 @@ export interface OrderSummaryResponse {
   channelShare: ChannelSalesShare[];
 }
 
+/**
+ * 주문 기록 — 한 줄이 하나의 결제 단위(docs/product_assembly_ia_v1.md §4d).
+ *
+ * `rawStatusCode`는 채널이 보낸 값 그대로이고, `confirmedStatusLabelKo`는 뜻을 <b>확인한</b>
+ * (채널, 코드)에만 붙는다. 번역은 서버 한 곳(`ChannelOrderStatusVocabulary`)에서만 일어나므로,
+ * 화면은 라벨이 없으면 raw 값을 그대로 보여 준다 — 영어 토큰을 화면이 우리 말로 바꾸는 경로는 없다.
+ */
+export interface OrderRecordRow {
+  channelCode: string;
+  accountId: string;
+  parentOrderId: string;
+  lineCount: number;
+  totalAmount: number;
+  /** 줄마다 코드가 다르면 null이고 `statusVaries`가 참이다. */
+  rawStatusCode: string | null;
+  statusVaries: boolean;
+  confirmedStatusLabelKo: string | null;
+  paidAt: string | null;
+  lastSeenAt: string | null;
+}
+
+/** 목록 위에 먼저 오는 것 — 무엇을 얼마나 읽었는지. 0은 「없다」가 아니라 「읽은 것이 없다」이다. */
+export interface OrderRecordExtent {
+  paymentUnitCount: number;
+  orderLineCount: number;
+  totalAmount: number;
+  periodFrom: string | null;
+  periodTo: string | null;
+  linkedInquiryCount: number;
+}
+
+/** 연결 하나의 읽기 상태 — `state`는 서버의 `ChannelDataState` 이름 그대로. */
+export interface OrderReadState {
+  channelCode: string | null;
+  accountId: string;
+  state: string;
+  orderLineCount: number;
+  lastSeenAt: string | null;
+}
+
+export interface OrderRecordListResponse {
+  extent: OrderRecordExtent;
+  reads: OrderReadState[];
+  rows: OrderRecordRow[];
+  /** 참이면 `rows`는 앞부분이고 `extent`의 건수가 전수다. 화면이 두 수를 비교해 추론하지 않는다. */
+  hasMore: boolean;
+}
+
+/** 결제 단위 안의 상품주문 한 줄. 수량·옵션·배송지는 읽지 않으므로 칸이 없다. */
+export interface OrderLine {
+  externalOrderId: string;
+  paymentAmount: number;
+  rawStatusCode: string | null;
+  confirmedStatusLabelKo: string | null;
+  paidAt: string | null;
+}
+
+/** 상태 이력 한 줄 — `observedAt`이 null이면 채널이 변경 시각을 주지 않은 것이고 화면은 「—」다. */
+export interface OrderStatusEvent {
+  fromStatusCode: string | null;
+  fromLabelKo: string | null;
+  toStatusCode: string;
+  toLabelKo: string | null;
+  observedAt: string | null;
+  recordedAt: string;
+  lineCount: number;
+}
+
+/** 채널이 이 주문의 번호를 적어 보낸 문의. 본문에서 번호를 뽑아 잇는 경로는 없다. */
+export interface OrderLinkedInquiry {
+  inquiryId: string;
+  channelCode: string | null;
+  title: string | null;
+  body: string | null;
+  status: string | null;
+  receivedAt: string | null;
+  sourceOrderRef: string;
+  productId: string | null;
+  productName: string | null;
+}
+
+/** 결제 단위 하나 — 정체성은 org(인증) + channelCode + accountId + parentOrderId 네 조각이다. */
+export interface OrderRecordDetail {
+  channelCode: string;
+  accountId: string;
+  parentOrderId: string;
+  lineCount: number;
+  totalAmount: number;
+  rawStatusCode: string | null;
+  statusVaries: boolean;
+  /** 증명되지 않은 축은 null이고, 화면은 「확인되지 않음」으로 그린다 — 「취소되지 않음」이 아니다. */
+  paymentLabelKo: string | null;
+  cancellationLabelKo: string | null;
+  fulfillmentLabelKo: string | null;
+  paidAt: string | null;
+  lastSeenAt: string | null;
+  readState: string;
+  lines: OrderLine[];
+  statusHistory: OrderStatusEvent[];
+  inquiries: OrderLinkedInquiry[];
+}
+
 export type UploadType = "REVIEW" | "INQUIRY" | "ORDER_SUMMARY";
 
 export interface RowError {

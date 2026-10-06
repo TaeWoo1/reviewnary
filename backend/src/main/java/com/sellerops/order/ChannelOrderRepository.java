@@ -97,6 +97,31 @@ public interface ChannelOrderRepository extends JpaRepository<ChannelOrder, UUID
     List<Object[]> countLinesByConnection(
             @org.springframework.data.repository.query.Param("orgId") UUID orgId);
 
+    /**
+     * 결제 단위 하나의 상품주문 줄 전부 — 정체성 <b>네 조각이 모두 맞을 때만</b>.
+     *
+     * <p>org · 채널 · 계정 · 주문번호를 모두 {@code where}에 둔다. 셋만 맞는 요청이 남은 하나를 다른
+     * 값으로 보충하는 일은 여기서 일어날 수 없다 — 주문번호는 채널 사이에서 유일하지 않고, 한 org이 같은
+     * 채널에 계정을 둘 가질 수 있으므로, 계정이 빠진 조회는 「없음」이 아니라 다른 사람의 주문을 열 수
+     * 있는 조회다.
+     *
+     * <p>{@code coalesce}는 목록의 묶음 키와 같다 — 채널이 결제 단위를 주지 않은 행은 그 줄 자체가 결제
+     * 단위이고, 목록에서 그렇게 선 줄은 상세에서도 같은 키로 열려야 한다.
+     */
+    @org.springframework.data.jpa.repository.Query(
+            "select o from ChannelOrder o where o.orgId = :orgId and o.channelId = :channelId "
+            + "and o.sellerAccountId = :accountId "
+            + "and coalesce(o.parentOrderId, o.externalOrderId) = :parentOrderId "
+            + "order by o.externalOrderId asc")
+    List<ChannelOrder> findPaymentUnit(
+            @org.springframework.data.repository.query.Param("orgId") UUID orgId,
+            @org.springframework.data.repository.query.Param("channelId") UUID channelId,
+            @org.springframework.data.repository.query.Param("accountId") UUID accountId,
+            @org.springframework.data.repository.query.Param("parentOrderId") String parentOrderId);
+
+    /** 이 연결이 보유한 상품주문 행 수 — 신선도 판정의 입력. 행을 읽어 와 세지 않는다. */
+    long countByOrgIdAndSellerAccountId(UUID orgId, UUID sellerAccountId);
+
     /** Per-channel order counts and the newest summary date — {@code [channelId, count, max(summaryDate)]}. */
     @org.springframework.data.jpa.repository.Query(
             "select o.channelId, count(o), max(o.summaryDate) from ChannelOrder o "

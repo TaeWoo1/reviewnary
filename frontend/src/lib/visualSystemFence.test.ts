@@ -44,7 +44,6 @@ const ON_THE_SYSTEM = [
   "components/ui/WorkFlowCard.tsx",
   "components/customerOperations/CustomerOpsHome.tsx",
   "pages/app/AgentHome.tsx",
-  "components/home/OperationsAreas.tsx",
   "components/home/RepeatedProblemList.tsx",
   "components/home/PreparedWorkList.tsx",
   "components/memory/IssueList.tsx",

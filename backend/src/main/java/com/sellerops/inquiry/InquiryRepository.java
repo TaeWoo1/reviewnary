@@ -281,6 +281,26 @@ public interface InquiryRepository extends JpaRepository<Inquiry, UUID> {
             + "   and (o.externalOrderId = q.sourceOrderRef or o.parentOrderId = q.sourceOrderRef))")
     long countLinkedToStoredOrders(@Param("orgId") UUID orgId);
 
+    /**
+     * 주문 상세가 여는 관계 — 채널이 <b>이 주문의 번호를 적어 보낸</b> 문의들.
+     *
+     * <p>울타리는 {@link #countLinkedToStoredOrders}와 같다: 번호의 출처가 채널이어야 하고
+     * ({@code order_binding = SOURCE_EXACT}), 계정이 같아야 하며, 현재 살아 있는 실데이터여야 한다.
+     * 목록 위에 적힌 수와 상세에서 실제로 열리는 관계가 같은 것을 뜻하려면 조건이 하나라도 달라선 안 된다.
+     *
+     * <p>{@code refs}에는 결제 단위 번호와 그 아래 상품주문 번호가 함께 들어온다 — 채널은 주문을 두 가지
+     * 이름으로 부르고(네이버의 {@code orderId} / {@code productOrderId}), 문의가 어느 쪽을 적어 보낼지는
+     * 채널이 정한다. 한쪽만 맞춘 조회는 다른 쪽으로 적어 보낸 문의 전부에 대해 조용히 「없음」이 된다.
+     */
+    @Query("select q from Inquiry q where q.orgId = :orgId and q.sellerAccountId = :accountId"
+            + " and q.orderBinding = 'SOURCE_EXACT'"
+            + " and q.sourceOrderRef in :refs"
+            + " and q.dataOrigin = com.sellerops.common.DataOrigin.REAL" + ACTIVE
+            + " order by q.receivedAt desc, q.id asc")
+    List<Inquiry> findLinkedToOrderRefs(@Param("orgId") UUID orgId,
+                                        @Param("accountId") UUID accountId,
+                                        @Param("refs") List<String> refs);
+
     boolean existsByOrgIdAndChannelIdAndExternalId(UUID orgId, UUID channelId, String externalId);
 
     boolean existsByOrgIdAndChannelIdAndContentHash(UUID orgId, UUID channelId, String contentHash);

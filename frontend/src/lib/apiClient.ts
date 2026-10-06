@@ -82,6 +82,8 @@ import type {
   ReviewReplyWorkDismissalResponse,
   ReviewReplyWorkRestoreResponse,
   OperatorVocItemPage,
+  OrderRecordDetail,
+  OrderRecordListResponse,
   OrderSummaryResponse,
   OperatorOutcomeName,
   ReviewReplyApprovalResponse,
@@ -922,6 +924,34 @@ export const api = {
    */
   async resumeInquiryPublish(workItemId: string): Promise<PublishStatusView> {
     const { data } = await http.post<PublishStatusView>(`/api/inquiries/${workItemId}/resume`);
+    return data;
+  },
+
+  /**
+   * 주문 기록 목록 — 결제 단위 레코드와, 그 목록을 읽는 데 먼저 필요한 것들.
+   *
+   * mock fallback이 없다. 데모 숫자를 그려 주는 것보다 「읽지 못했습니다」가 낫다 — 이 화면의 결함은
+   * 정확히 그 반대였다(수집이 멈춘 채널을 「주문 0건 · 매출 0원」으로 그렸다).
+   */
+  async getOrderRecordsStrict(): Promise<OrderRecordListResponse> {
+    const { data } = await http.get<OrderRecordListResponse>("/api/orders");
+    return data;
+  },
+
+  /**
+   * 결제 단위 하나 — 주소의 네 조각이 모두 맞아야 열린다(§4d).
+   *
+   * 번호만으로도, `channel + 번호`만으로도 부르지 않는다. 주문번호는 채널 사이에서 유일하지 않고 한
+   * org이 같은 채널에 계정을 둘 가질 수 있어, 좁히지 못한 조회는 「없음」이 아니라 남의 주문이다.
+   */
+  async getOrderRecordStrict(
+    channelCode: string,
+    accountId: string,
+    parentOrderId: string,
+  ): Promise<OrderRecordDetail> {
+    const { data } = await http.get<OrderRecordDetail>(
+      `/api/orders/${encodeURIComponent(channelCode)}/${encodeURIComponent(accountId)}/${encodeURIComponent(parentOrderId)}`,
+    );
     return data;
   },
 
