@@ -1,7 +1,6 @@
 package com.sellerops.order.fact;
 
 import com.sellerops.coverage.ChannelDataState;
-import com.sellerops.order.NormalizedOrderStatus;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -172,11 +171,5 @@ public record OrderFact(OrderFactState state,
 
     private String observedOn() {
         return asOf == null ? "마지막" : asOf.atZone(ZoneId.of("Asia/Seoul")).toLocalDate() + "";
-    }
-
-    /** The stored-path mapping: one canonical status code becomes at most a payment claim. */
-    public static OrderPaymentState paymentFrom(NormalizedOrderStatus normalized) {
-        return normalized == NormalizedOrderStatus.PAID ? OrderPaymentState.PAID
-                : OrderPaymentState.UNKNOWN;
     }
 }

@@ -24,6 +24,7 @@ import com.sellerops.selleraccount.SellerAccount;
 import com.sellerops.selleraccount.SellerAccountRepository;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -208,6 +209,28 @@ class InquiryOrderFactReaderTest {
 
         assertThat(fact.cancellation()).isEqualTo(OrderCancellationState.UNKNOWN);
         assertThat(fact.messageKo()).doesNotContain("취소되지 않");
+    }
+
+    @Test
+    @DisplayName("every Coupang status in the store stays unproven on both silent axes")
+    void theSharedFenceHoldsForEveryStoredCode() {
+        List<String> coupang = List.of(
+                "ACCEPT", "INSTRUCT", "DEPARTURE", "DELIVERING", "FINAL_DELIVERY", "NONE_TRACKING");
+        for (int i = 0; i < coupang.size(); i++) {
+            String code = coupang.get(i);
+            seedOrder("CP-" + i, "CPORD-" + i, code);
+
+            OrderFact fact = read(inquiry("CP-" + i, InquiryOrderBinding.SOURCE_EXACT));
+
+            assertThat(fact.rawStatusCode()).as(code).isEqualTo(code);
+            assertThat(fact.payment()).as(code).isEqualTo(OrderPaymentState.UNKNOWN);
+            assertThat(fact.cancellation())
+                    .as("%s — the stored row cannot prove a cancellation either way", code)
+                    .isEqualTo(OrderCancellationState.UNKNOWN);
+            assertThat(fact.fulfillment())
+                    .as("%s — nor a dispatch", code)
+                    .isEqualTo(OrderFulfillmentState.UNKNOWN);
+        }
     }
 
     @Test

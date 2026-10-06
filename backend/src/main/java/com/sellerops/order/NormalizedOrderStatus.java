@@ -1,5 +1,7 @@
 package com.sellerops.order;
 
+import com.sellerops.order.fact.OrderPaymentState;
+
 /**
  * The deliberately minimal normalization of a channel's raw order status. Under the current NAVER
  * request scope ({@code lastChangedType=PAYED}) the only status actually observed is payment-completed,
@@ -14,6 +16,10 @@ package com.sellerops.order;
  * <p>The raw code is always stored verbatim beside this. Extending normalization (and observing real
  * status transitions) requires widening the request's {@code lastChangedType} and confirming the value
  * set against a real seller — {@code correct-IP live proof pending}.
+ *
+ * <p><b>Which code means what is not decided here.</b> It is decided in
+ * {@link ChannelOrderStatusVocabulary}, the one table of confirmed codes, and this enum asks it — so
+ * widening the vocabulary and widening ingestion's normalization are the same edit rather than two.
  */
 public enum NormalizedOrderStatus {
     PAID,
@@ -21,6 +27,7 @@ public enum NormalizedOrderStatus {
 
     /** Map a raw channel status code to a canonical status, failing closed on anything unobserved. */
     public static NormalizedOrderStatus fromRaw(String rawStatusCode) {
-        return "PAYED".equals(rawStatusCode) ? PAID : UNKNOWN;
+        return ChannelOrderStatusVocabulary.axesFromStored(rawStatusCode).payment()
+                == OrderPaymentState.PAID ? PAID : UNKNOWN;
     }
 }
