@@ -460,9 +460,18 @@ export function CustomerInbox() {
                 const state = recordRowState(row);
                 const reading = inquiryReading(row, previewText);
                 const selected = row.inquiryId === shownRef;
+                /*
+                  <b>316px 행에는 한정어가 하나만 선다</b> (UI audit, 2026-10-06).
+
+                  <p>상태 · 채널 · 제목 · 상품을 한 줄에 넣으면 마지막 것이 CSS 자르기에 걸려 「제」, 「선」,
+                  「종…」 한 글자로 남았다. 한 글자는 아무것도 구별해 주지 못하면서 자리는 그대로 쓴다.
+                  남기는 하나는 <b>제목이 있으면 제목</b>이다 — {@link inquiryReading}은 본문이 말하지 않는
+                  것을 말할 때만 제목을 내주므로, 같은 상품의 비슷한 질문 넷을 가르는 것은 제목 쪽이다.
+                  제목이 없을 때만 상품이 그 자리에 온다. 둘 다 pane에 그대로 있다.
+                */
                 const rest: ReactNode[] = [];
-                if (reading.titleContext) rest.push(`제목 「${reading.titleContext}」`);
-                if (row.productName) rest.push(row.productName);
+                if (reading.titleContext) rest.push(titleFact(reading.titleContext));
+                else if (row.productName) rest.push(row.productName);
                 return (
                   <li key={row.inquiryId}>
                     <Link
@@ -488,24 +497,36 @@ export function CustomerInbox() {
                           >
                             {reading.question}
                           </span>
-                          {/* One line, truncated — never wrapped. 가장 많이 구별해 주는 사실이 마지막이라,
-                              잘려야 하는 것은 상품 이름이다. */}
+                          {/*
+                            One line, truncated — never wrapped. <b>잘려야 하는 것은 채널 이름이다</b>
+                            (UI audit, 2026-10-06). 전에는 한정어가 마지막이라 거기서 잘렸고, 「제목
+                            「교환 가능 기간 문의」」는 316px에서 「제목 「교…」가 되어 여는 따옴표만
+                            남겼다 — 열고 닫지 않은 말. 채널 이름은 앞 글자만으로도 알아볼 수 있고
+                            (「네이버 스마트…」), 같은 채널의 행들 사이에서는 어차피 구별해 주지 않는다.
+                            그래서 구별해 주는 것을 먼저 세우고, 자르는 일은 채널에 맡긴다.
+                          */}
                           <span className="mt-1.5 flex min-w-0 flex-nowrap items-center gap-x-2 overflow-hidden text-xs text-muted">
                             {stateVaries ? (
                               <span className={`shrink-0 font-semibold ${row.status === "ANSWERED" ? "text-muted" : "text-brand-700"}`}>
                                 {state.text}
                               </span>
                             ) : null}
-                            {stateVaries ? (
-                              <Fact fixed>{row.channelNameKo ?? "채널 미상"}</Fact>
-                            ) : (
-                              <span className="shrink-0">{row.channelNameKo ?? "채널 미상"}</span>
+                            {rest.map((fact, index) =>
+                              index === 0 && !stateVaries ? (
+                                <span key={index} className="shrink-0 whitespace-nowrap">
+                                  {fact}
+                                </span>
+                              ) : (
+                                <Fact key={index} fixed>
+                                  {fact}
+                                </Fact>
+                              ),
                             )}
-                            {rest.map((fact, index) => (
-                              <Fact key={index} fixed={index < rest.length - 1}>
-                                {fact}
-                              </Fact>
-                            ))}
+                            {rest.length === 0 && !stateVaries ? (
+                              <span className="min-w-0 truncate">{row.channelNameKo ?? "채널 미상"}</span>
+                            ) : (
+                              <Fact>{row.channelNameKo ?? "채널 미상"}</Fact>
+                            )}
                           </span>
                         </span>
                         {/* <b>이 문의가 언제 것인가 — 기다린 날수로, 1년이 넘으면 접수일로</b> (문의
@@ -700,6 +721,21 @@ function InquiryCasePane({
   );
 }
 
+
+/**
+ * <b>316px rail의 제목 사실</b> (UI audit, 2026-10-06).
+ *
+ * <p>「제목 「교환 가능 기간 문의」」가 CSS 자르기에 걸리면 화면에 남는 것은 「제목 「교환」이다 — 여는
+ * 따옴표만 있고 닫는 것이 없는 말, 그리고 어디서 끝났는지 알 수 없는 제목. 자르는 일을 글자 수로 먼저
+ * 하면 닫는 따옴표는 언제나 남고, 잘렸다는 사실은 말줄임표가 말한다. CSS 자르기는 그대로 둔다 —
+ * 상품 이름과 함께 설 때의 마지막 안전장치다.
+ */
+const RAIL_TITLE_MAX = 12;
+
+function titleFact(context: string): string {
+  const text = context.length > RAIL_TITLE_MAX ? `${context.slice(0, RAIL_TITLE_MAX)}…` : context;
+  return `제목 「${text}」`;
+}
 
 /** 어떤 탭이 어떤 숫자를 말하는가. 탭의 값과 숫자를 한 곳에서 묶어 둔다. */
 const COUNT_OF: Record<string, (c: { all: number | null; unanswered: number | null; answered: number | null }) => number | null> = {

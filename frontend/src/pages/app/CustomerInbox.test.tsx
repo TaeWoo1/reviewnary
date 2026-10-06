@@ -372,6 +372,57 @@ describe("문의의 첫 시선 — 고객이 쓴 말", () => {
     expect(within(link).getByText("답변 필요")).toBeInTheDocument();
   });
 
+  /**
+   * <b>316px 행의 한정어</b> (Core Operations polish, 2026-10-06).
+   *
+   * <p>목록은 rail이다. 상태 · 채널 · 제목 · 상품을 한 줄에 넣으면 마지막 것이 CSS 자르기에 걸려
+   * 「제」 · 「선」 · 「종…」 한 글자로 남았고, 긴 제목은 「제목 「교환」처럼 여는 따옴표만 남겼다.
+   * 자르는 일을 글자 수로 먼저 하면 닫는 따옴표는 언제나 남고, 한정어는 하나만 선다.
+   */
+  it("긴 제목은 글자 수로 먼저 자르고, 따옴표를 닫는다", async () => {
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [
+        row({
+          inquiryId: "i9",
+          status: "UNANSWERED",
+          title: "교환 가능 기간과 개봉 여부 기준 문의",
+          snippet: "포장을 뜯지 않은 경우도 교환이 되나요",
+          productName: "[벌크] 신개념 일체형 전선몰딩 선바로",
+        }),
+      ],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    renderInbox("/inquiries");
+    const link = await screen.findByRole("link", { name: /포장을 뜯지 않은 경우도/ });
+    const fact = within(link).getByText(/^제목 「/);
+    expect(fact.textContent).toBe("제목 「교환 가능 기간과 개봉…」");
+    // 한정어는 하나다 — 상품 이름은 pane이 들고 있고, 행에서 한 글자로 남지 않는다.
+    expect(within(link).queryByText(/전선몰딩/)).toBeNull();
+  });
+
+  it("더해 주는 제목이 없으면 그 자리에 상품이 온다", async () => {
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [
+        row({
+          inquiryId: "i9",
+          status: "UNANSWERED",
+          title: "문의 드립니다",
+          snippet: "교환은 언제까지 되나요",
+          productName: "선바로 전선몰드",
+        }),
+      ],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    renderInbox("/inquiries");
+    const link = await screen.findByRole("link", { name: /교환은 언제까지 되나요/ });
+    expect(within(link).getByText("선바로 전선몰드")).toBeInTheDocument();
+    expect(within(link).queryByText(/제목 「/)).toBeNull();
+  });
+
   it("아무것도 더해 주지 않는 제목은 그리지 않는다 — 「문의 드립니다」", async () => {
     getInquiryRowsStrict.mockResolvedValue({
       items: [row({ inquiryId: "i9", status: "UNANSWERED", title: "문의 드립니다", snippet: "교환은 언제까지 되나요" })],
@@ -435,8 +486,11 @@ describe("문의의 첫 시선 — 고객이 쓴 말", () => {
     });
     renderInbox("/inquiries/i9");
     await screen.findByLabelText("선택한 항목");
-    expect(screen.getByText(/이미 답변이 등록되어 있어/)).toBeInTheDocument();
+    // 상태와 「할 일 없음」은 한 번만 (UI audit, 2026-10-06): 그 문장이 위에 서고, 아래 줄은
+    // 그 문장이 말할 수 없는 것 — 답변을 어디서 읽는지 — 만 말한다.
     expect(screen.getByText(/하실 일은 없습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/네이버 스마트스토어 판매자센터에서 확인하실 수 있습니다/)).toBeInTheDocument();
+    expect(screen.queryByText(/이미 답변이 등록되어 있어/)).toBeNull();
     // 「답변을 기다리는 문의에만」은 이 경우의 이유가 아니다.
     expect(screen.queryByText(/답변을 기다리는 문의에만/)).toBeNull();
   });

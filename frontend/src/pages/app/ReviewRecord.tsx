@@ -253,7 +253,11 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
 
             <p>그룹 머리는 sticky다. 스무 행을 내려가도 지금 읽는 것이 어느 묶음인지 남는다.
           */}
-          <section aria-label="목록" className="-mx-4">
+          {/* <b>목록은 페이지 열 안에 있다</b> (UI audit, 2026-10-06). `-mx-4`는 padding 없는
+              master-detail `main` 안에서 양쪽으로 16px씩 나갔고, 오른쪽에서는 그대로 뷰포트 밖이었다.
+              이제 기록은 {@code max-w-content} 열 안에 서고, 묶음은 12px만 바깥으로 물러난다 — 행의
+              글자가 제목과 같은 선에서 시작하면서 hover와 선택이 글자 바깥에서 끝나도록. */}
+          <section aria-label="목록" className="-mx-3">
             {TRIAGE_TIERS.map((value) => {
               const open = value === openTier;
               return (
@@ -266,18 +270,21 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
                         setParams({ tier: value });
                         setPageIndex(0);
                       }}
-                      className="sticky top-0 z-10 flex w-full items-center gap-2 border-b border-line bg-canvas px-4 py-2 text-left transition hover:bg-line/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700"
+                      /* <b>묶음 머리는 이 제품의 구역 제목이다</b> (UI audit, 2026-10-06 — 공통 규칙
+                         18/600 + hairline, {@code SectionHeader}가 쓰는 수). 12px bold는 행의 주석과
+                         같은 크기여서 묶음과 행이 한 층으로 읽혔다. 펼침 표시와 수는 그대로다. */
+                      className="sticky top-0 z-10 flex w-full items-center gap-2 border-b border-line bg-canvas px-3 py-3 text-left transition hover:bg-line/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700"
                     >
                       <span aria-hidden className="w-3 shrink-0 text-xs leading-none text-muted">{open ? "▾" : "▸"}</span>
                       <TierDot tier={value} />
-                      <span className="text-xs font-bold text-ink">{TRIAGE_TIER_LABEL[value]}</span>
-                      <span className="text-xs tabular-nums text-muted">{tierCount(page, value).toLocaleString("ko-KR")}</span>
+                      <span className="text-lg font-semibold text-ink">{TRIAGE_TIER_LABEL[value]}</span>
+                      <span className="text-sm tabular-nums text-muted">{tierCount(page, value).toLocaleString("ko-KR")}</span>
                     </button>
                   </h2>
                   {open && page.items.length === 0 ? (
                     /* <b>빈 묶음은 빈 기록이 아니다.</b> 그래서 이 말은 목록을 대신하지 않고 묶음 안에 선다 —
                        다른 두 묶음의 이름과 수가 바로 위아래에 그대로 있어야, 어디가 비었는지가 말이 된다. */
-                    <p className="px-4 py-6 pl-16 text-sm text-muted">
+                    <p className="px-3 py-6 pl-12 text-sm text-muted">
                       {`${TRIAGE_TIER_LABEL[value]}에 해당하는 ${josa(WORD, "이", "가")} 없습니다. 다른 묶음을 열어 보세요.`}
                     </p>
                   ) : open ? (
@@ -286,7 +293,7 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
                         <li key={review.id}>
                           <Link
                             to={`/reviews/reply/${review.id}?from=record`}
-                            className="flex items-center gap-8 py-3 pl-16 pr-4 transition hover:bg-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700"
+                            className="flex items-center gap-8 rounded-lg py-3 pl-12 pr-3 transition hover:bg-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700"
                           >
                             <span
                               className={`min-w-0 flex-1 truncate break-keep text-base leading-snug ${
@@ -298,7 +305,13 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
                             {/* 오른쪽은 한 덩어리의 주석이다 — 폭이 정해져 있고, 줄이 아니라 묶음으로 약하다. */}
                             <span className="flex shrink-0 items-center gap-3 text-xs text-muted">
                               <span className="flex max-w-[16rem] items-center gap-2 overflow-hidden">
-                                {review.aiMark ? <AiMarkChip quiet /> : null}
+                                {/* <b>한 행에 상태 단어는 하나다</b> (UI audit, 2026-10-06). 둘 다 선 행은
+                                    「판매자 확인 필요 판매자 수정 확인 필요」로 읽혔다 — 앞은 AI가 매긴
+                                    분류를 판매자가 확인해 달라는 표시이고, 뒤는 판매자가 이미 확인하고
+                                    고쳤다는 기록이다. 뒤가 있으면 앞이 요청한 일은 끝난 것이므로 행에서는
+                                    뒤만 선다. 두 사실 모두 상세에 그대로 있다 — 지우는 것이 아니라
+                                    목록에서 겹쳐 말하지 않는 것이다. */}
+                                {review.aiMark && !review.sellerCorrection ? <AiMarkChip quiet /> : null}
                                 {review.sellerCorrection ? (
                                   <span className="truncate">{`${TRIAGE_CORRECTION_COPY.sellerPrefix} ${TRIAGE_TIER_LABEL[review.sellerCorrection.correctedTier]}`}</span>
                                 ) : null}

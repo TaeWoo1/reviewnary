@@ -115,4 +115,37 @@ class RetrievalQueryTest {
         assertThat(RetrievalQuery.ofText("두께가 2 < 3 인가요?").full()).isEqualTo("두께가 2 < 3 인가요?");
         assertThat(RetrievalQuery.ofText("<3 처럼 보이는 기호").full()).isEqualTo("<3 처럼 보이는 기호");
     }
+    /**
+     * <b>A subject may be quoted back to the seller only if it is one</b> (2026-10-06).
+     *
+     * <p>Observed on the demo org: {@code proactive_case.knowledge_gap} held
+     * {@code "missingSubject":"드립니다"} — a row written before {@link RetrievalQuery#subjectNouns} learned
+     * the rule (2026-09-23) — and the case screen quoted it as the name of the company standard that was
+     * missing. The same word would then have titled the knowledge the seller wrote.
+     */
+    @Test
+    @DisplayName("generic titles and predicates can never be quoted as a subject")
+    void genericTitlesAreNotSubjects() {
+        for (String fragment : java.util.List.of("드립니다", "문의 드립니다", "문의드립니다", "질문드립니다",
+                "안녕하세요", "부탁드립니다", "알려주세요", "가능한가요")) {
+            assertThat(RetrievalQuery.quotableSubject(fragment)).as(fragment).isNull();
+        }
+    }
+
+    @Test
+    @DisplayName("a real noun phrase is returned exactly as it came — the word the seller would have written")
+    void nounPhrasesSurvive() {
+        assertThat(RetrievalQuery.quotableSubject("엘보 구간에 쓸 사이즈")).isEqualTo("엘보 구간에 쓸 사이즈");
+        assertThat(RetrievalQuery.quotableSubject("교환 가능 여부")).isEqualTo("교환 가능 여부");
+        assertThat(RetrievalQuery.quotableSubject("교환 가능 기간")).isEqualTo("교환 가능 기간");
+        assertThat(RetrievalQuery.quotableSubject("방수")).isEqualTo("방수");
+        assertThat(RetrievalQuery.quotableSubject("  가닥 ")).isEqualTo("가닥");
+    }
+
+    @Test
+    @DisplayName("nothing is a subject when there is nothing")
+    void nothingIsNotASubject() {
+        assertThat(RetrievalQuery.quotableSubject(null)).isNull();
+        assertThat(RetrievalQuery.quotableSubject("   ")).isNull();
+    }
 }

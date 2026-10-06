@@ -702,6 +702,42 @@ describe("the AI pilot's mark and the feedback spine (RUBRIC v2 §13.7)", () => 
   });
 
 
+  /**
+   * <b>Core Operations polish, 2026-10-06 — 한 행에 상태 단어는 하나다.</b>
+   *
+   * <p>둘 다 선 행은 「판매자 확인 필요  판매자 수정 확인 필요」로 읽혔다. 앞은 AI가 매긴 분류를 판매자가
+   * 확인해 달라는 <b>요청</b>이고, 뒤는 판매자가 이미 확인하고 고친 <b>기록</b>이다. 기록이 있으면 요청은
+   * 끝난 것이므로 행에서는 기록만 선다 — 두 사실 모두 리뷰 상세에 그대로 있다.
+   */
+  it("판매자가 이미 고친 행에서는 판매자 확인 필요를 한 번 더 말하지 않는다", async () => {
+    getChannelReviewsStrict.mockResolvedValue({
+      ...PAGE,
+      aiPilotEnabled: true,
+      triageSummary: { ...PAGE.triageSummary, needsAttention: 2, aiAttention: 1 },
+      items: [
+        {
+          ...PAGE.items[0],
+          aiMark: MARK,
+          sellerCorrection: {
+            reviewId: PAGE.items[0].id,
+            correctedTier: "NEEDS_ATTENTION" as const,
+            reasonCode: null,
+            systemTier: "WATCH" as const,
+            systemSource: "AI" as const,
+            correctedAt: "2026-08-18T00:00:00Z",
+            changeCount: 1,
+          },
+        },
+        PAGE.items[1],
+      ],
+    });
+    renderPage();
+    const row = (await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("li")!;
+
+    expect(within(row).getByText("판매자 수정 확인 필요")).toBeInTheDocument();
+    expect(within(row).queryByText("판매자 확인 필요")).toBeNull();
+  });
+
   it("shows nothing about AI on a row without a mark", async () => {
     renderPage();
     await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");

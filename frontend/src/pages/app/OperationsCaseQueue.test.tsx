@@ -362,6 +362,33 @@ describe("OperationsCaseQueue", () => {
     }
   });
 
+  /**
+   * <b>페이지일 때는 페이지의 제목</b> (Core Operations polish, 2026-10-06).
+   *
+   * <p>목록이 폭을 다 쥐고 있을 때 이 화면은 페이지이고, 제품의 페이지 제목은 28/700이다 —
+   * 주문·상품·문의가 쓰는 치수. 측정에서 이 화면만 20/700이었다. 오른쪽에 읽고 있는 건이 서면 이 열은
+   * 316px rail이 되고, 거기서는 한 단 낮은 치수를 쓴다 — 문의가 {@code compact}로 하는 바로 그 전환이다.
+   */
+  it("목록이 페이지일 때 제목은 페이지 제목이고, rail이 되면 한 단 내려간다", async () => {
+    const restore = stubWide(true);
+    try {
+      reads();
+      api.getCustomerOperationsDecisions.mockResolvedValue({ total: 2, rows: [row(), REVIEW] });
+      draw();
+      const title = await screen.findByRole("heading", { level: 1, name: "확인할 일" });
+      expect(title.className).toMatch(/text-title/);
+      expect(title.className).not.toMatch(/text-section/);
+
+      // 한 건을 열면 이 열은 rail이 된다.
+      const links = within(await screen.findByRole("list", { name: "확인할 일" })).getAllByRole("link");
+      await userEvent.click(links[0]);
+      await screen.findByLabelText("선택한 확인할 일");
+      expect(screen.getByRole("heading", { level: 1, name: "확인할 일" }).className).toMatch(/text-section/);
+    } finally {
+      restore();
+    }
+  });
+
   it("이 화면에는 결정하는 컨트롤이 없다", async () => {
     reads();
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 2, rows: [row(), REVIEW] });

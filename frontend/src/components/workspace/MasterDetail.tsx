@@ -257,7 +257,11 @@ export function MasterDetail({
           <div
             className={
               rail
-                ? "flex min-h-0 flex-1 flex-col overflow-y-auto px-8 pb-0 pt-0"
+                /* <b>머리가 화면 꼭대기에 붙어 있었다</b> (UI audit, 2026-10-06). `pt-0`은 닫기 줄이
+                   있는 pane의 치수다 — 그 줄이 자기 `py-2`로 여백을 만든다. 문의처럼 닫기가 없는
+                   pane에서는 첫 글자가 y=12에 섰고, 왼쪽 목록은 `pt-6`로 시작하므로 두 열의 머리가
+                   서로 다른 높이에서 출발했다. 닫기가 없으면 pane이 제 여백을 갖는다. */
+                ? `flex min-h-0 flex-1 flex-col overflow-y-auto px-8 pb-0 ${onClose ? "pt-0" : "pt-6"}`
                 : preview
                   ? "flex min-h-0 flex-1 flex-col overflow-y-auto px-6 pb-0 pt-0"
                   : "contents"
@@ -283,7 +287,11 @@ export function MasterDetail({
                 </button>
               </div>
             ) : null}
-            {detail}
+            {/* <b>읽는 폭은 900</b> (UI audit, 2026-10-06 — 리뷰 상세의 canonical reading column과 같은 수).
+                1600에서 rail의 pane은 1,044px이고, 그 폭을 그대로 쓰면 한 줄이 70자를 넘어 눈이 줄
+                끝에서 다음 줄 머리로 돌아오지 못한다. 페이지 읽기({@code CaseLayout}의 `rail="none"`)가
+                이미 900을 쓰므로 같은 수를 쓴다 — pane과 페이지가 같은 글을 다른 폭으로 읽히지 않게. */}
+            {rail ? <div className="flex w-full max-w-[900px] flex-1 flex-col">{detail}</div> : detail}
             {/* <b>The action follows the content, and pins only when the content runs past it</b> (product-owner
                 decision, 2026-09-26). It was a `shrink-0` footer outside the scroller, so it sat on the floor of
                 the column whatever was above it: measured at 1440×900 with the preview's content ending at y≈470,
@@ -299,15 +307,18 @@ export function MasterDetail({
                 One action, unchanged: the preview still carries no control that decides anything. */}
             {(preview || rail) && paneFooter ? (
               <div
-                className={`sticky bottom-0 mt-7 pb-6 ${rail ? "-mx-8 px-8" : "-mx-6 px-6"}`}
+                className={`sticky bottom-0 mt-7 ${rail ? "-mx-8 px-8" : "-mx-6 px-6"}`}
                 data-testid="pane-footer"
               >
                 {/* No rule above it. A hairline is right for a bar bolted to the floor of the column and wrong
                     for one that follows the content: over a short preview it drew a divider with nothing under
                     it. The fade does the only job the rule did — saying that content is passing underneath —
                     and it is invisible against plain surface, which is the state a short preview is in. */}
-                <div aria-hidden="true" className="pointer-events-none -mt-6 h-6 bg-gradient-to-t from-surface to-transparent" />
-                <div className="bg-surface pt-1">{paneFooter}</div>
+                {/* 불투명한 바닥 — fade 위로는 내용이 지나가고, 그 아래로는 덮인다 (UI audit, 2026-10-06). */}
+                <div aria-hidden="true" className="pointer-events-none h-6 bg-gradient-to-t from-surface to-transparent" />
+                <div className="bg-surface pb-6 pt-1">
+                  <div className={rail ? "w-full max-w-[900px]" : undefined}>{paneFooter}</div>
+                </div>
               </div>
             ) : null}
           </div>

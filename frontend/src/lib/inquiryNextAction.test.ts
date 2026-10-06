@@ -91,10 +91,16 @@ describe("draftUnavailableReason — 「할 수 없습니다」에 이유가 붙
     expect(draftUnavailableReason({ status: "UNANSWERED" }, "w1", "카페24 자사몰")).toBeNull();
   });
 
-  it("이미 답변된 문의에는 그 사실이 이유다", () => {
+  /*
+    UI audit, 2026-10-06 — 이 문장은 {@link inquiryNextAction}의 문장과 한 화면에 함께 서고, 「답변이
+    등록됐다」는 그쪽이 이미 말한다. 여기 남는 사실은 하나, 어디서 읽는가이다.
+  */
+  it("이미 답변된 문의에는 어디서 읽는지가 이유다", () => {
     const reason = draftUnavailableReason({ status: "ANSWERED" }, null, "네이버 스마트스토어");
-    expect(reason).toContain("이미 답변이 등록되어 있어");
     expect(reason).toContain("네이버 스마트스토어 판매자센터");
+    expect(reason).toContain("확인하실 수 있습니다");
+    // 바로 위 문장이 말하는 사실을 다른 말로 한 번 더 말하지 않는다.
+    expect(reason).not.toContain("이미 답변이 등록되어 있어");
   });
 
   it("그 밖에는 규칙을 말한다 — 가능성 목록이 아니라", () => {

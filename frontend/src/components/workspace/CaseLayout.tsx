@@ -252,9 +252,13 @@ export function CaseLayout({
                rather than the article's text measure. The fade says content is passing underneath and
                is invisible against plain surface, which is the state a short case is in — the same
                treatment the preview pane's footer has carried since 2026-09-26. */
-            <div className="sticky bottom-0 -mx-8 mt-auto px-8 pb-6 pt-6" data-testid="pane-footer">
-              <div aria-hidden="true" className="pointer-events-none -mt-6 h-6 bg-gradient-to-t from-surface to-transparent" />
-              <div className="bg-surface pt-1">{dock}</div>
+            /* <b>바닥은 불투명하다</b> (UI audit, 2026-10-06). 그 전에는 sticky 상자의 `pt-6`가 투명해서,
+               아래로 흘러가는 내용이 dock의 윗부분을 통과해 보였다 — 1366×900에서 「저장 후 초안 재작성」
+               버튼(y 782–828)과 수집 경고 문장(798–816)이 같은 18px 띠에 겹쳐 그려졌다. 24px의 fade가
+               「아래로 지나가고 있다」를 말하고, 그 아래부터는 면이 덮는다. 겹침은 사라지고 스크롤은 그대로다. */
+            <div className="sticky bottom-0 -mx-8 mt-auto px-8" data-testid="pane-footer">
+              <div aria-hidden="true" className="pointer-events-none h-6 bg-gradient-to-t from-surface to-transparent" />
+              <div className="bg-surface pb-6 pt-1">{dock}</div>
             </div>
           ) : null}
         </article>
