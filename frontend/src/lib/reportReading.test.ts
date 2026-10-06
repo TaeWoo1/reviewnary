@@ -7,6 +7,7 @@ import {
   noChangeReason,
   readChannels,
   readVerdict,
+  shownReadChannels,
   ungated,
   ungatedEdition,
 } from "./reportReading";
@@ -176,5 +177,59 @@ describe("readChannels — 센 채널과 빠진 채널을 한 줄로", () => {
     const excluded = { ...read().included[0], channelCode: "CAFE24", channelNameKo: "카페24 자사몰", reasonKo: "연결되어 있지 않습니다" };
     expect(readChannels(read({ excluded: [excluded] })).map((c) => c.channelCode)).toEqual(["NAVER", "CAFE24"]);
     expect(readChannels(null)).toEqual([]);
+  });
+});
+
+/**
+ * <b>이름으로 서는 것은 제품이 노출하는 채널뿐이다</b> (ship-fix, 2026-10-07).
+ *
+ * <p>관측: 데모 org의 주간 판은 세 종류 모두 {@code excluded}에 {@code [NAVER, GMARKET, CAFE24, COUPANG]}를
+ * 들고 있었고, 화면은 그 넷을 전부 이름으로 적었다. G마켓/옥션은 연결 화면에 없는 채널이다.
+ */
+describe("shownReadChannels — 노출 채널만 이름으로 선다", () => {
+  const hidden = (code: string, name: string) => ({
+    ...read().included[0],
+    channelCode: code,
+    channelNameKo: name,
+    reasonKo: "연결되어 있지 않습니다",
+  });
+
+  it("관측된 네 채널 가운데 제품이 가진 셋만 남고, 순서는 저장된 그대로다", () => {
+    const r = read({
+      included: [],
+      excluded: [
+        hidden("NAVER", "네이버 스마트스토어"),
+        hidden("GMARKET", "G마켓/옥션"),
+        hidden("CAFE24", "카페24 자사몰"),
+        hidden("COUPANG", "쿠팡"),
+      ],
+    });
+    expect(shownReadChannels(r).map((c) => c.channelCode)).toEqual(["NAVER", "CAFE24", "COUPANG"]);
+    expect(shownReadChannels(r).map((c) => c.channelNameKo)).not.toContain("G마켓/옥션");
+  });
+
+  it("센 채널도 같은 규칙을 받는다", () => {
+    const r = read({ included: [read().included[0], hidden("AUCTION", "옥션")], excluded: [] });
+    expect(shownReadChannels(r).map((c) => c.channelCode)).toEqual(["NAVER"]);
+  });
+
+  /**
+   * <b>거른 것은 이름뿐이다.</b> N을 같이 줄이면 그 판이 얼마나 불완전한지를 줄여 적는 것이 되고,
+   * {@code measured}를 뒤집으면 읽지 못한 기간이 읽은 것으로 바뀐다.
+   */
+  it("판정과 저장된 집합은 걸러지지 않는다 — 숨긴 채널이 빠짐에서 사라지지 않는다", () => {
+    const r = read({
+      measured: true,
+      included: [],
+      excluded: [hidden("NAVER", "네이버 스마트스토어"), hidden("GMARKET", "G마켓/옥션")],
+    });
+    expect(readChannels(r)).toHaveLength(2);
+    expect(readVerdict(r)).toEqual({ text: "채널 2곳 빠짐", warn: true });
+    expect(shownReadChannels(r)).toHaveLength(1);
+  });
+
+  it("노출 채널이 하나도 없으면 빈 목록이다 — 없는 이름을 지어내지 않는다", () => {
+    expect(shownReadChannels(read({ included: [], excluded: [hidden("GMARKET", "G마켓/옥션")] }))).toEqual([]);
+    expect(shownReadChannels(null)).toEqual([]);
   });
 });

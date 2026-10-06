@@ -58,10 +58,32 @@ const UNREAD_READS: ReportRead[] = ["REVIEW", "INQUIRY", "ORDER_SUMMARY"].map((d
   lastReadAt: dataType === "ORDER_SUMMARY" ? "2026-09-05T11:30:02Z" : "2026-09-26T18:31:17Z",
   measured: false,
   included: [],
+  // 2026-10-07 측정 그대로: 저장된 제외 집합에는 제품이 노출하지 않는 G마켓/옥션이 섞여 있다.
   excluded: [
     {
       channelCode: "NAVER",
       channelNameKo: "네이버 스마트스토어",
+      state: "OBSERVED_FRESHNESS_UNPROVEN",
+      lastReadAt: "2026-09-26T18:31:17Z",
+      reasonKo: "최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했습니다",
+    },
+    {
+      channelCode: "GMARKET",
+      channelNameKo: "G마켓/옥션",
+      state: "NOT_CONNECTED",
+      lastReadAt: null,
+      reasonKo: "연결되어 있지 않습니다",
+    },
+    {
+      channelCode: "CAFE24",
+      channelNameKo: "카페24 자사몰",
+      state: "OBSERVED_FRESHNESS_UNPROVEN",
+      lastReadAt: "2026-09-26T18:31:17Z",
+      reasonKo: "최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했습니다",
+    },
+    {
+      channelCode: "COUPANG",
+      channelNameKo: "쿠팡",
       state: "OBSERVED_FRESHNESS_UNPROVEN",
       lastReadAt: "2026-09-26T18:31:17Z",
       reasonKo: "최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했습니다",
@@ -329,6 +351,44 @@ describe("운영 리포트 — 읽은 범위가 숫자 위에 선다", () => {
     // 요약 문장은 저장된 것이고, 읽지 못한 창에 대해 「0건」을 말하지 않는다.
     expect(REPORT.summary.lines[0].text).toContain("무엇이 들어왔는지 알 수 없습니다");
     await expectNoAxeViolations(container);
+  });
+
+  /**
+   * <b>읽은 범위에는 제품이 가진 채널만 이름으로 선다</b> (ship-fix, 2026-10-07 — product-owner decision).
+   *
+   * <p>관측: 데모 org의 주간 판은 세 줄 모두 「… · <b>G마켓/옥션 연결 끊김</b> · …」을 그렸다. 판매자가 붙일
+   * 수도, 고칠 수도 없는 채널이 「무엇이 빠졌는가」의 목록에 서 있었다. 거르는 것은 <b>이름뿐</b>이고,
+   * 스냅샷이 저장한 판정과 숫자는 그대로 간다 — 아래 두 검사가 그 경계다.
+   */
+  it("노출 채널 셋만 이름으로 서고, 비노출 채널은 어디에도 나오지 않는다", async () => {
+    renderReports();
+    await screen.findByTestId("report-reviews");
+
+    const reads = screen.getByTestId("report-reads");
+    expect(reads).toHaveTextContent("네이버 스마트스토어");
+    expect(reads).toHaveTextContent("카페24 자사몰");
+    expect(reads).toHaveTextContent("쿠팡");
+
+    // 저장된 제외 집합에는 들어 있지만, 화면의 어느 글자에도 없다.
+    expect(UNREAD_READS[0].excluded.map((c) => c.channelCode)).toContain("GMARKET");
+    expect(reads).not.toHaveTextContent("G마켓");
+    expect(screen.queryByText(/G마켓|옥션|GMARKET|AUCTION/)).toBeNull();
+  });
+
+  it("거른 것은 이름뿐이다 — 기간 판정도, 숫자도, 비교도 그대로다", async () => {
+    renderReports();
+    await screen.findByTestId("report-reviews");
+
+    // 읽지 못한 기간은 여전히 읽지 못한 기간이다. 채널 하나를 가렸다고 「전부 포함」이 되지 않는다.
+    expect(screen.getAllByText("확인 못 함")).toHaveLength(3);
+    expect(screen.queryByText("전부 포함")).toBeNull();
+    expect(screen.getAllByText("확인되지 않음").length).toBeGreaterThanOrEqual(3);
+    expect(screen.queryByText(/채널 3곳 빠짐/)).toBeNull();
+
+    // 기간과 무관한 지금 수치, 비교가 서지 못한 이유 — 둘 다 이 변경 이전과 같다.
+    expect(screen.getByTestId("report-inquiries")).toHaveTextContent("27건");
+    expect(screen.getByTestId("report-no-change")).toHaveTextContent("이 기간의 수집 결과를 확인하지 못했습니다");
+    expect(screen.getByTestId("report-reads")).toHaveTextContent("9월 27일 03:31");
   });
 
   it("AI 운영 요약은 화면에 서지 않는다 — 스냅샷이 그 문장을 들고 와도", async () => {
