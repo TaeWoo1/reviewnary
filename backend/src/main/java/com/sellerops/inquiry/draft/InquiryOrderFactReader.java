@@ -7,7 +7,7 @@ import com.sellerops.inquiry.Inquiry;
 import com.sellerops.inquiry.InquiryOrderBinding;
 import com.sellerops.order.ChannelOrder;
 import com.sellerops.order.ChannelOrderRepository;
-import com.sellerops.order.NormalizedOrderStatus;
+import com.sellerops.order.ChannelOrderStatusVocabulary;
 import com.sellerops.order.fact.ExactOrderLookupCapability;
 import com.sellerops.order.fact.ExactOrderObservation;
 import com.sellerops.order.fact.ExactOrderReadAudit;
@@ -158,15 +158,16 @@ public class InquiryOrderFactReader {
         ChannelOrder order = matched.get(0);
         long held = orders.findAllByOrgIdAndSellerAccountId(orgId, accountId).size();
         ChannelDataState channelState = freshness.perOrderState(orgId, channelCode, accountId, held);
-        NormalizedOrderStatus normalized = order.getNormalizedStatus() == null
-                ? NormalizedOrderStatus.UNKNOWN : order.getNormalizedStatus();
-        // Cancellation and fulfillment are UNPROVEN from the store, not false. This repository has
-        // live-observed exactly one NAVER status token (PAYED) and has never confirmed what Coupang's
-        // DELIVERING or FINAL_DELIVERY mean, so no stored code proves a cancellation or a dispatch —
-        // and a FALSE here would let a draft write "취소되지 않았습니다", which nothing proves.
+        // What a stored row proves is not this class's opinion. Cancellation and fulfillment are
+        // UNPROVEN from the store, not false — no stored code proves a cancellation or a dispatch,
+        // and a FALSE here would let a draft write "취소되지 않았습니다", which nothing proves. That
+        // fence now lives in ChannelOrderStatusVocabulary, which the order screen reads too, so the
+        // two surfaces cannot drift into saying different things about the same code.
+        ChannelOrderStatusVocabulary.Axes axes =
+                ChannelOrderStatusVocabulary.axesFromStored(order.getRawStatusCode());
         return new OrderFact(OrderFactState.fromChannel(channelState),
                 OrderFactProvenance.STORED_CANONICAL, channelState, channelCode,
-                OrderFact.paymentFrom(normalized), null, null,
+                axes.payment(), axes.cancellation(), axes.fulfillment(),
                 order.getRawStatusCode(), order.getPaidAt(), null,
                 order.getStatusChangedAt(), order.getSummaryDate(), order.getLastSeenAt());
     }
