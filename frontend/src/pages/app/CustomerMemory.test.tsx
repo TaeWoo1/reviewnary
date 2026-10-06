@@ -774,6 +774,32 @@ describe("반복 문제 — the canonical reading (2026-10-05)", () => {
     expect(signal.textContent ?? "").not.toMatch(/%|퍼센트|비율/);
   });
 
+  /**
+   * <b>판정 옆에는 수가 서고, 그 판정을 풀어 쓴 문장은 서지 않는다</b> (2026-10-07).
+   *
+   * 「증가 중 — 기존 내용이 평소보다 빠르게 늘고 있어요」에서 뒤 절은 앞 낱말을 다시 말한 것일 뿐이고,
+   * 그 자리에 실제로 설 수 있는 사실(최근 7일 몇 건 · 이전 8주 평균 얼마)은 바로 아래에 이미 있다.
+   */
+  it("prints the judgement and its numbers, not a sentence that restates the judgement", async () => {
+    renderMemory("/memory/issue-1");
+    const signal = await screen.findByLabelText("변화와 신호");
+    expect(within(signal).getByText("증가 중")).toBeInTheDocument();
+    expect(within(signal).getByText(/최근 7일 4건 · 이전 8주 평균 주 0.6건/)).toBeInTheDocument();
+    expect(signal.textContent ?? "").not.toContain("평소보다 빠르게 늘고 있어요");
+  });
+
+  /** 판단된 변화가 없을 때도 한 문장이다 — 없다는 사실에 설명을 덧붙이지 않는다. */
+  it("says only that there is no judged change when there is none", async () => {
+    const quiet = { kinds: [], labelsKo: [], highSurge: false, surgeWindowCount: 0, surgeBaselineWeekly: 0 };
+    getReviewIssueDetailStrict.mockResolvedValue({
+      ...DETAIL,
+      issue: { ...SURGING, change: quiet as ReviewIssueView["change"] },
+    });
+    renderMemory("/memory/issue-1");
+    const signal = await screen.findByLabelText("변화와 신호");
+    expect(within(signal).getByText("최근 판단된 변화가 없습니다.")).toBeInTheDocument();
+  });
+
   /** Representative evidence, not eighteen quotes above a decision. The rest is one disclosure away. */
   it("stands two customer sentences in the reading and keeps the rest behind one disclosure", async () => {
     getReviewIssueDetailStrict.mockResolvedValue({

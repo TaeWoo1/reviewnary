@@ -12,7 +12,7 @@ import {
   type DeviceLinkWord,
   type HelperState,
 } from "../../lib/helper/helperStatus";
-import { relativeTime } from "../../lib/format";
+import { kstDayTime } from "../../lib/format";
 import type { ConnectionStatusView } from "../../lib/types";
 
 export const HELPER_GUIDE_PATH = "/connect/helper";
@@ -320,9 +320,10 @@ export function HelperStatusCard({
       setAttempt("none");
     }
   }, [device, attempt]);
+  // 「1개월 전 확인」은 어제 본 것과 여드레 전에 본 것을 같은 말로 덮는다 — 채널 행과 같은 시각 표기를 쓴다.
   const naver = naverSessionOf(
     naverHealth?.sessionReadiness ?? null,
-    naverHealth?.sessionObservedAt ? relativeTime(naverHealth.sessionObservedAt) : null,
+    naverHealth?.sessionObservedAt ? kstDayTime(naverHealth.sessionObservedAt) : null,
   );
 
   useEffect(() => {
@@ -383,13 +384,15 @@ export function HelperStatusCard({
   }
 
   return (
-    <ul className="divide-y divide-line/70" data-testid="helper-status">
-      <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 py-3">
+    <ul data-testid="helper-status">
+      <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-t border-line/70 py-2">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="break-keep text-base font-semibold text-ink">reviewnary 도우미</p>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <p className="break-keep font-medium text-ink">reviewnary 도우미</p>
             <span data-testid="helper-state">
-              <Status tone={tone(helper.tone)}>{helper.label}</Status>
+              <Status tone={tone(helper.tone)} variant="quiet">
+                {helper.label}
+              </Status>
             </span>
           </div>
           {helper.note ? <p className="mt-0.5 break-keep text-sm text-muted">{helper.note}</p> : null}
@@ -398,12 +401,14 @@ export function HelperStatusCard({
         <div className="flex shrink-0 items-center">{helperAction()}</div>
       </li>
       {naverHealth ? (
-        <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 py-3">
+        <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-t border-line/70 py-2">
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="break-keep text-base font-semibold text-ink">네이버</p>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <p className="break-keep font-medium text-ink">네이버</p>
               <span data-testid="naver-session-state">
-                <Status tone={naver.tone}>{naver.label}</Status>
+                <Status tone={naver.tone} variant="quiet">
+                  {naver.label}
+                </Status>
               </span>
             </div>
             {naver.note ? <p className="mt-0.5 break-keep text-sm text-muted">{naver.note}</p> : null}

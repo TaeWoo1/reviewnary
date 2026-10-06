@@ -19,14 +19,15 @@ import { RunStatusBadge } from "./RunStatusBadge";
  * job. `run === null` renders the calm empty state with a link to open the
  * workbench. A `WAITING_FOR_HUMAN` run surfaces the checkpoint prompt and points
  * the primary action at the run detail ("확인하러 가기").
+ *
+ * <p><b>상자도, 제 이름을 다시 부르는 머리말도 없다</b> (2026-10-07). 이것이 서는 자리는 「자료 가져오기」
+ * 구역 안이고, 거기에는 이미 이름과 그 아래 선이 있다 — 그 안에서 둥근 상자가 또 「네이버 리뷰 기간별
+ * 가져오기」라고 적는 것은 한 구역에 이름이 둘이라는 뜻이었다. 이름은 읽어 주는 쪽을 위해
+ * {@code aria-label}로 남는다.
  */
 export function HomeReviewOpsCard({ run }: { run: ActionWindowRunView | null }) {
   return (
-    <section aria-label={HOME_REVIEW_OPS_COPY.sectionTitle} className="card">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-ink">{HOME_REVIEW_OPS_COPY.sectionTitle}</h2>
-        {run ? <RunStatusBadge status={run.status} /> : null}
-      </div>
+    <section aria-label={HOME_REVIEW_OPS_COPY.sectionTitle} className="border-t border-line/70 py-2">
       {run ? <RunSummary run={run} /> : <EmptyReviewOps />}
     </section>
   );
@@ -35,45 +36,45 @@ export function HomeReviewOpsCard({ run }: { run: ActionWindowRunView | null }) 
 function RunSummary({ run }: { run: ActionWindowRunView }) {
   const needsHuman = run.status === "WAITING_FOR_HUMAN";
   return (
-    <div>
-      <p className="break-keep text-lg font-semibold text-ink">
-        {resolveCopy(run.runCopyKey, run.runCopyParams)}
-      </p>
-      <p className="mt-1 text-sm text-muted">
-        채널: {channelLabel(run.channelCode)} · 진행 {run.progress.completedSteps} /{" "}
-        {run.progress.totalSteps} 단계
-      </p>
-
-      {needsHuman ? (
-        <div className="mt-3 rounded-xl border border-warn/30 bg-warn/5 p-3">
-          <p className="font-medium text-ink">{CHECKPOINT_PROMPT_TITLE}</p>
-          {run.currentStep ? (
-            <p className="mt-0.5 text-sm text-muted">
-              {resolveCopy(run.currentStep.copyKey, run.currentStep.copyParams)}
-            </p>
-          ) : null}
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="break-keep font-medium text-ink">{resolveCopy(run.runCopyKey, run.runCopyParams)}</p>
+          <RunStatusBadge status={run.status} />
         </div>
-      ) : null}
-
-      <div className="mt-4">
-        <Link
-          to={needsHuman ? "/connect/imports/current" : "/connect/imports"}
-          className={needsHuman ? "btn-primary" : "btn-ghost"}
-        >
-          {needsHuman ? HOME_REVIEW_OPS_COPY.goToCheckpoint : HOME_REVIEW_OPS_COPY.open} →
-        </Link>
+        <p className="mt-0.5 text-sm text-muted">
+          {channelLabel(run.channelCode)} · 진행 {run.progress.completedSteps} / {run.progress.totalSteps} 단계
+        </p>
+        {needsHuman ? (
+          <p className="mt-0.5 break-keep text-sm text-warn">
+            <span className="font-semibold">{CHECKPOINT_PROMPT_TITLE}</span>
+            {run.currentStep ? ` · ${resolveCopy(run.currentStep.copyKey, run.currentStep.copyParams)}` : ""}
+          </p>
+        ) : null}
       </div>
+      <Open to={needsHuman ? "/connect/imports/current" : "/connect/imports"}>
+        {needsHuman ? HOME_REVIEW_OPS_COPY.goToCheckpoint : HOME_REVIEW_OPS_COPY.open}
+      </Open>
     </div>
   );
 }
 
 function EmptyReviewOps() {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
       <p className="text-sm text-muted">{HOME_REVIEW_OPS_COPY.emptyBody}</p>
-      <Link to="/connect/imports" className="btn-ghost">
-        {HOME_REVIEW_OPS_COPY.open} →
-      </Link>
+      <Open to="/connect/imports">{HOME_REVIEW_OPS_COPY.open}</Open>
     </div>
+  );
+}
+
+function Open({ to, children }: { to: string; children: string }) {
+  return (
+    <Link
+      to={to}
+      className="shrink-0 rounded text-sm font-semibold text-brand-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+    >
+      {children}
+    </Link>
   );
 }

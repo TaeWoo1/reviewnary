@@ -31,8 +31,13 @@ import type { OperatingRuleRow, ProductFactRow } from "../../lib/types";
 
 const USED = "w-[88px] shrink-0 text-right tabular-nums";
 const WHEN = "w-[96px] shrink-0 text-right tabular-nums text-xs text-muted";
-const HEAD = "flex items-center gap-4 border-b border-line bg-canvas/40 px-5 py-2 text-xs text-muted";
-const ROW = "flex items-center gap-4 px-5 py-1.5";
+/*
+ * 머리는 바탕색도 테두리도 갖지 않는다 — 첫 행의 윗선이 머리와 본문을 가른다. 전에는 표가 둥근 상자
+ * 안에 있었고 머리에 회색 바탕이 깔려 있어서, 격자를 세 번(상자 테두리 · 머리 바탕 · 행 구분선) 그렸다.
+ * 주문이 쓰는 그 문법이다: 열 이름 한 줄, 그 아래로 가는 선에 걸린 행들.
+ */
+const HEAD = "flex items-center gap-4 pb-1 text-xs text-muted";
+const ROW = "flex items-center gap-4 border-t border-line/70 py-2";
 
 /* ─────────────────────────────── 운영 기준 ─────────────────────────────── */
 
@@ -73,7 +78,7 @@ export function OperatingRuleTable({ rules }: { rules: OperatingRuleRow[] }) {
         <span className={USED}>답변 근거</span>
         <span className={WHEN}>마지막 사용</span>
       </div>
-      <ul className="divide-y divide-line/70">
+      <ul>
         {topics.map((topic) =>
           topic.rules.length === 0 ? (
             <li key={topic.value} className={ROW}>
@@ -125,7 +130,7 @@ export function ProductFactTable({ facts }: { facts: ProductFactRow[] }) {
         <span className={USED}>답변 근거</span>
         <span className={WHEN}>마지막 사용</span>
       </div>
-      <ul className="divide-y divide-line/70">
+      <ul>
         {facts.map((fact) => (
           <li key={fact.id} className={ROW}>
             {/* 상품 지식이 편집되는 자리는 그 상품의 화면 하나뿐이다 — 이 목록은 고르는 곳이다.

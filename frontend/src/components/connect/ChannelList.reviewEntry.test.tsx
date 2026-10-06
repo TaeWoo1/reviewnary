@@ -95,17 +95,46 @@ describe("ChannelList — the connection state word (A5)", () => {
   it("a failing row says what its timestamp IS — the last success, and that nothing has landed since", () => {
     // 「오류」 next to 「마지막 수집 1일 전」 were two sentences that cancel each other out: the time is the
     // last SUCCESS, and on the measured org there had been seven attempts since that produced nothing.
-    // No vendor message is surfaced — the connectors' own strings carry gateway codes and HTTP statuses.
+    // The column is now named for what is true of every row (「마지막 수집 성공」), so the row adds only the
+    // half the column cannot carry. No vendor message is surfaced — the connectors' own strings carry
+    // gateway codes and HTTP statuses.
     renderList({ health: health({ state: "DEGRADED", consecutiveFailures: 7, lastError: "…" }) });
     expect(screen.getByText(/마지막 성공 .*그 뒤로 수집되지 않았습니다/)).toBeInTheDocument();
-    expect(screen.queryByText(/마지막 수집/)).toBeNull();
+    expect(screen.queryByText("마지막 수집")).toBeNull();
     expect(screen.queryByText(/GW\.|HTTP/)).toBeNull();
   });
 
-  it("a healthy row keeps saying 마지막 수집 — nothing about it changed", () => {
+  it("a healthy row carries the time alone — nothing is said about a gap that is not there", () => {
     renderList();
-    expect(screen.getByText(/마지막 수집/)).toBeInTheDocument();
+    // 「1주 전」이 아니라 실제 시각(주문·리포트와 같은 표기).
+    expect(screen.getByText(/\d+월 \d+일 \d{2}:\d{2}/)).toBeInTheDocument();
     expect(screen.queryByText(/그 뒤로 수집되지 않았습니다/)).toBeNull();
+  });
+
+  /**
+   * <b>수집 시각은 실제 시각이다</b> (2026-10-07). 「마지막 수집 1주 전」은 어제 읽은 것과 여드레 전에
+   * 읽은 것을 같은 말로 덮는다 — 그 차이가 이 화면을 여는 이유인데도. 주문·리포트가 쓰는 그 표기다.
+   */
+  it("prints when collection last succeeded, not how long ago it feels", () => {
+    renderList();
+    expect(screen.getByText("8월 15일 09:00")).toBeInTheDocument();
+    expect(screen.queryByText(/주 전|일 전|시간 전|개월 전/)).toBeNull();
+  });
+
+  /**
+   * <b>세 가지 「없음」을 섞지 않는다.</b> 연결되지 않은 채널은 수집 시각 자리에 아무것도 적지 않고,
+   * 연결됐지만 한 번도 성공하지 못한 채널은 「수집 이력 없음」이다. 둘을 한 단어로 적으면 어느 쪽도
+   * 참이 아니다 — 연결한 적 없는 채널을 「수집 이력 없음」이라고 부르면 고칠 것이 있다는 뜻으로 읽힌다.
+   */
+  it("keeps 연결되지 않음 and 읽은 적 없음 apart in the collection column", () => {
+    // 계정이 없는 채널: 이 열에는 할 말이 없다.
+    renderList({ channels: [NAVER], accounts: [] });
+    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.queryByText("수집 이력 없음")).toBeNull();
+
+    // 연결은 됐고 한 번도 성공하지 못한 채널: 그 사실을 제 말로 적는다.
+    renderList({ health: health({ lastSyncedAt: null, lastSuccessAt: null }) });
+    expect(screen.getAllByText("수집 이력 없음").length).toBeGreaterThan(0);
   });
 
   it("shows 오류 with 확인하기 when collection is failing", () => {

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import type { ReactNode } from "react";
 import { PageHead } from "../../components/ui/PageHead";
-import { Section, ListBox } from "../../components/ui/Section";
+import { SectionHeader } from "../../components/ui/SectionHeader";
 import { Disclosure } from "../../components/ui/Disclosure";
 import { BtnLink } from "../../components/ui/Btn";
 import { ChannelList } from "../../components/connect/ChannelList";
@@ -36,6 +37,11 @@ import type {
  * The in-progress strip reuses the Action Window card unchanged, including its honesty gate: the
  * operations store seeds a demo run even in production, so a run is shown only when a live agent is
  * driving it or the dev fixture preview is on.
+ *
+ * <p><b>구역이 상자를 두르지 않는다</b> (2026-10-07). 세 구역이 각각 둥근 테두리 상자였고, 그 안의 세
+ * 채널 행도 각자 제 폭을 썼다 — 한 화면에 떠 있는 물건이 셋, 그 안에 또 셋. 기능도 연동 계약도 그대로이고
+ * 바뀐 것은 문법뿐이다: 구역의 이름과 그 아래 선 하나, 그리고 열이 제 자리를 지키는 행들 — 주문·지식·
+ * 설정·리포트가 쓰는 그것.
  */
 export function ConnectHub() {
   const [channels, setChannels] = useState<ChannelResponse[]>([]);
@@ -235,7 +241,7 @@ export function ConnectHub() {
   const naverHealth = naverAccount ? (health.get(naverAccount.id) ?? null) : null;
 
   return (
-    <>
+    <div className="space-y-6">
       <PageHead title="채널 연결" />
 
       {openCount > 0 ? (
@@ -253,9 +259,8 @@ export function ConnectHub() {
         <div className="rounded-xl bg-bad/10 px-4 py-3 text-sm text-bad">연결 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>
       ) : null}
 
-      <Section title="채널">
-        <ListBox>
-          <ChannelList
+      <Block title="채널">
+        <ChannelList
             channels={channels}
             accounts={accounts}
             health={health}
@@ -264,54 +269,41 @@ export function ConnectHub() {
             reviewLanes={reviewLanes}
             onNotice={setNotice}
             onStartReviewSetup={(channel, account) => void startReviewSetup(channel, account)}
-            channelsLoading={channelsLoading}
-            channelsError={channelsError}
-          />
-        </ListBox>
-      </Section>
+          channelsLoading={channelsLoading}
+          channelsError={channelsError}
+        />
+      </Block>
 
       {/* The helper is the second thing on this screen, after the channels it serves: the seller who
           arrives here from the installer sees the state and the one control that changes it, and never a
           port, a token or a pairing word (Local Helper Pilot Packaging v1). */}
-      <Section
+      <Block
         title="reviewnary 도우미"
-        hint="판매자센터 화면과 함께 일할 때 필요합니다"
+        note="판매자센터 화면과 함께 일할 때 필요합니다"
         action={
-          <BtnLink to="/connect/helper" size="sm" variant="ghost">
-            설치·업데이트 안내
-          </BtnLink>
+          <Go to="/connect/helper">설치·업데이트 안내</Go>
         }
       >
-        <ListBox ariaLabel="도우미 상태">
-          <HelperStatusCard naverHealth={naverHealth} />
-        </ListBox>
-      </Section>
+        <HelperStatusCard naverHealth={naverHealth} />
+      </Block>
       {/* One section for getting data in, with its two ways side by side. The old pair — 「정기 자료
           가져오기」 and 「리뷰 수집 실행」 — described the same job twice and pointed at a third screen it
           called 「작업대」, a word from our side of the desk. */}
-      <Section
+      <Block
         title="자료 가져오기"
-        hint="연결이 어려운 채널은 파일로, 네이버 리뷰는 판매자센터 화면에서 기간별로"
+        note="연결이 어려운 채널은 파일로, 네이버 리뷰는 판매자센터 화면에서 기간별로"
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            <BtnLink to="/connect/upload" size="sm" variant="outline">
-              자료 넘기기
-            </BtnLink>
-            <BtnLink to="/connect/review-history" size="sm" variant="outline">
-              기간별로 가져오기
-            </BtnLink>
+          <div className="flex flex-wrap items-center gap-3">
+            <Go to="/connect/upload">자료 넘기기</Go>
+            <Go to="/connect/review-history">기간별로 가져오기</Go>
           </div>
         }
       >
         <HomeReviewOpsCard run={liveRun} />
-        <p className="mt-3 break-keep text-sm text-muted">
-          지난 실행과 구간별 이력은{" "}
-          <BtnLink to="/connect/imports" size="sm" variant="ghost">
-            실행 기록
-          </BtnLink>
-          에서 볼 수 있습니다.
+        <p className="break-keep border-t border-line/70 py-2 text-sm text-muted">
+          지난 실행과 구간별 이력은 <Go to="/connect/imports">실행 기록</Go>에서 볼 수 있습니다.
         </p>
-        <Disclosure label="파일로 넘기면 어떻게 진행되나요" className="mt-2">
+        <Disclosure label="파일로 넘기면 어떻게 진행되나요">
           <ol className="mt-2 space-y-2 text-sm text-muted">
             {[
               "가져올 자료를 고릅니다.",
@@ -326,7 +318,41 @@ export function ConnectHub() {
             ))}
           </ol>
         </Disclosure>
-      </Section>
-    </>
+      </Block>
+    </div>
+  );
+}
+
+/** 한 구역 — 이름, 그 옆의 한 조각, 그 아래 선 하나. 상자가 아니다. */
+function Block({
+  title,
+  note,
+  action,
+  children,
+}: {
+  title: string;
+  note?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section aria-label={title} className="space-y-2">
+      {/* 머리말은 제목 안이 아니라 제목 아래에 선다 — 구역의 이름은 이름이고, 그 옆에 붙은 문장은 읽어
+          주는 쪽에서 이름의 일부가 된다. */}
+      <SectionHeader title={title} hint={note} action={action} />
+      {children}
+    </section>
+  );
+}
+
+/** 다른 화면으로 가는 길 — 글자이고, 단추가 아니다. 이 화면의 단추는 행마다의 primary 하나뿐이다. */
+function Go({ to, children }: { to: string; children: ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className="rounded text-sm font-semibold text-brand-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+    >
+      {children}
+    </Link>
   );
 }

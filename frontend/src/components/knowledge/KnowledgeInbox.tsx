@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { isAxiosError } from "axios";
 import { Btn } from "../ui/Btn";
-import { ListBox } from "../ui/Section";
 import { KnowledgeQuickAdd } from "./KnowledgeQuickAdd";
 import { api } from "../../lib/apiClient";
 import { KNOWLEDGE_NOUN, scopeLabel } from "../../lib/knowledgeWords";
@@ -55,9 +54,9 @@ export function KnowledgeInbox({
   return (
     <div className="flex flex-col gap-2">
       {error ? <p className="break-keep text-sm text-bad" role="alert">{error}</p> : null}
-      {/* 구역의 이름은 바깥 Section이 이미 달고 있다 — 같은 이름을 두 번 달면 읽어 주는 쪽에 상자가 둘로 들린다. */}
-      <ListBox>
-        <ul className="divide-y divide-line/70" data-testid="knowledge-inbox">
+      {/* 구역의 이름은 바깥 구역이 이미 달고 있다 — 같은 이름을 두 번 달면 읽어 주는 쪽에 상자가 둘로
+          들린다. 테두리도 같은 이유로 없다: 구역의 선이 이미 경계다. */}
+      <ul data-testid="knowledge-inbox">
           {/* 두 줄은 같은 상태다 — 어느 쪽도 선택돼 있지 않고, 어느 쪽을 먼저 해야 한다는 근거도 없다.
               한쪽만 solid로 그리면 그 줄이 골라져 있다는 뜻이 되므로, 위계는 같게 둔다. */}
           {gaps.map((candidate) => (
@@ -67,7 +66,7 @@ export function KnowledgeInbox({
             <CandidateRow key={candidate.id} candidate={candidate} onChanged={onChanged} onError={setError} />
           ))}
           {unusable.map((document) => (
-            <li key={document.sourceId} className="flex items-center gap-3 px-5 py-2">
+            <li key={document.sourceId} className="flex items-center gap-3 border-t border-line/70 py-2">
               <Tag tone="warn">자료 문제</Tag>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-ink">{document.fileName ?? document.title}</span>
@@ -91,8 +90,7 @@ export function KnowledgeInbox({
               </Btn>
             </li>
           ))}
-        </ul>
-      </ListBox>
+      </ul>
     </div>
   );
 }
@@ -115,7 +113,7 @@ function CandidateRow({
     .join(" · ");
 
   return (
-    <li className="px-5 py-2">
+    <li className="border-t border-line/70 py-2">
       <div className="flex items-start gap-3">
         <Tag tone={isGap ? "info" : "neutral"}>{isGap ? "정보 부족" : "기준 후보"}</Tag>
         <span className="min-w-0 flex-1">
