@@ -77,6 +77,16 @@ const ON_THE_SYSTEM = [
   "components/connect/HelperStatusCard.tsx",
   "components/connect/coupang/CapabilityCard.tsx",
   "components/BackfillPanel.tsx",
+  // 지식 · 설정, since System surfaces (2026-10-07): 표가 상자에서 나와 구분선 위에 서고, 설정의 네
+  // 상자가 이름을 가진 구역이 됐다. 상품 목록과 반복 문제 상세는 이번 패키지에서 구조를 건드리지
+  // 않았으므로(빈 칸의 뜻과 구역 이름만) 아직 이 목록에 없다 — 그 둘의 간격 부채는 그대로 기록돼 있다.
+  "pages/app/KnowledgeHome.tsx",
+  "pages/app/SettingsHome.tsx",
+  "components/knowledge/KnowledgeInventory.tsx",
+  "components/knowledge/KnowledgeInbox.tsx",
+  "components/knowledge/KnowledgeDocuments.tsx",
+  "components/knowledge/LearnedKnowledge.tsx",
+  "components/actionWindow/HomeReviewOpsCard.tsx",
 ];
 
 /** One file with its comments removed — the ban is on USING these values, not on explaining them. */

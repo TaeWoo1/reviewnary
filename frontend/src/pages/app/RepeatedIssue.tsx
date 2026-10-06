@@ -16,7 +16,6 @@ import { useAgentSurface } from "../../lib/agentPanel";
 import { kstDate, kstToday } from "../../lib/format";
 import { lifecycleSinceKo } from "../../lib/memoryView";
 import {
-  CHANGE_EXPLANATION_KO,
   SEVERITY_LABEL_KO,
   changeBadges,
   investigationHintKo,
@@ -143,22 +142,26 @@ export function RepeatedIssue() {
       subject={
         <>
           {/* <b>왜 지금인가는 머리말을 갖지 않는다</b> — 리뷰 상세와 같은 자리, 같은 한 줄. 판단된 변화가
-              없으면 없다고 말한다. 밑줄 하나로 「무엇이고 왜 지금인가」를 닫는다. */}
+              없으면 없다고 말한다. 밑줄 하나로 「무엇이고 왜 지금인가」를 닫는다.
+
+              <b>판정은 적고, 그 판정을 풀어 쓴 문장은 적지 않는다</b> (2026-10-07). 「급증 — 기존 내용이
+              평소보다 빠르게 늘고 있어요」에서 뒤 절은 앞 낱말을 다시 말한 것일 뿐이고, 그 자리에 실제로
+              설 수 있는 사실은 바로 아래에 이미 있다 — 「최근 7일 4건 · 이전 8주 평균 주 0.4건」. 설명을
+              걷어내면 판정 옆에 수가 선다. (풀어 쓴 문장 자체는 {@code CHANGE_EXPLANATION_KO}에 그대로
+              있고, 그것을 쓰는 pane은 바뀌지 않았다.) */}
           <section aria-label="변화와 신호" className="space-y-1.5 border-b border-line pb-5">
             {badges.length > 0 ? (
-              <ul className="space-y-1.5">
+              <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1 break-keep text-base leading-relaxed">
                 {badges.map((badge) => (
-                  <li key={badge.kind} className="break-keep text-base leading-relaxed text-muted">
-                    <span className="font-semibold text-ink">{badge.labelKo}</span> — {CHANGE_EXPLANATION_KO[badge.kind]}
-                  </li>
+                  <span key={badge.kind} className="font-semibold text-ink">
+                    {badge.labelKo}
+                  </span>
                 ))}
-              </ul>
-            ) : (
-              <p className="break-keep text-base leading-relaxed text-ink">
-                최근 판단된 변화는 없지만 관련 리뷰가 기록되어 있습니다.
+                {surge ? <span className="text-sm tabular-nums text-muted">{surge}</span> : null}
               </p>
+            ) : (
+              <p className="break-keep text-base leading-relaxed text-muted">최근 판단된 변화가 없습니다.</p>
             )}
-            {surge ? <p className="text-sm tabular-nums text-muted">{surge}</p> : null}
             {hint ? <p className="break-keep leading-relaxed text-ink">{hint}</p> : null}
           </section>
 
@@ -187,10 +190,12 @@ export function RepeatedIssue() {
           {/* <b>이 화면에서 제일 큰 읽을거리</b>. 인용 둘이 서고 나머지는 접힘 하나 뒤에 있다 — 결정 위에
               쌓인 열여덟 개의 인용은 더 많은 근거가 아니라 아무도 끝까지 읽지 않는 글이다. */}
           <section aria-label="근거" className="border-b border-line pb-5">
-            <div className="flex items-baseline gap-2.5">
-              <h2 className="text-base font-bold text-ink">근거</h2>
-              <p className="text-sm text-muted">
-                고객이 쓴 문장 {issue.evidenceCount.toLocaleString("ko-KR")}건 가운데 둘
+            {/* 구역 이름은 이 페이지의 다른 구역과 같은 단계다 — {@link PaneBlock}의 page 읽기와 같은
+                18/600. 옆의 한 줄은 설명이 아니라 범위다: 아래 인용 둘이 몇 건 가운데 둘인가. */}
+            <div className="flex items-baseline gap-3">
+              <h2 className="text-lg font-semibold text-ink">근거</h2>
+              <p className="text-sm tabular-nums text-muted">
+                {issue.evidenceCount.toLocaleString("ko-KR")}건 가운데 둘
               </p>
             </div>
             <div className="mt-3 space-y-2">

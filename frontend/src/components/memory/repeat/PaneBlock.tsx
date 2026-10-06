@@ -16,6 +16,11 @@ import { useCaseVariant } from "../../workspace/CaseLayout";
  * page they are the page's sections, and a 12px `h3` under an `h1` is both the wrong step and a heading
  * level that skips one. The caller does not choose — {@link useCaseVariant} already knows which reading
  * drew it.
+ *
+ * <b>그리고 페이지에서 그 단계는 제품 공통의 구역 단계다</b> (2026-10-07). `sm/700 muted`는 이 페이지만
+ * 쓰던 여섯 번째 `h2` 크기였고, 같은 열에 선 「근거」는 또 `base/700`이었다 — 한 화면 안에서도 구역의
+ * 이름이 두 크기였다. 18/600 ink는 주문·지식·설정·리포트의 `h2`가 쓰는 그 단계이고, 여기서만 다를
+ * 이유가 없다. pane 쪽은 한 글자도 바뀌지 않는다.
  */
 export function PaneBlock({
   label,
@@ -31,7 +36,7 @@ export function PaneBlock({
   return (
     <section aria-label={label} className={`border-t border-line ${page ? "pt-4" : "pt-3"}`}>
       <div className="flex items-baseline justify-between gap-3">
-        <H className={page ? "text-sm font-bold text-muted" : "text-xs font-semibold text-muted"}>{label}</H>
+        <H className={page ? "text-lg font-semibold text-ink" : "text-xs font-semibold text-muted"}>{label}</H>
         {side ? <div className={`shrink-0 ${page ? "text-sm" : "text-xs"}`}>{side}</div> : null}
       </div>
       <div className={page ? "mt-2.5 space-y-2" : "mt-2 space-y-2"}>{children}</div>

@@ -121,15 +121,22 @@ describe("상품 목록 — 한 상품을 여는 색인", () => {
     }
   });
 
-  it("0은 빈 칸이고, 읽지 못한 것은 0이 아니라 「—」다", async () => {
+  it("측정된 0은 0이라고 적고, 읽지 못한 것은 「—」다", async () => {
+    // 전에는 0이 빈 칸이었다. 빈 칸과 「—」가 한 표에 나란히 서면 빈 칸은 「값이 없다」로도 「아직
+    // 모른다」로도 읽히는데, 그 둘은 이 제품이 가장 분명히 갈라 놓기로 한 두 가지다.
     seed([product()], { p1: { sig: signals({ reviews: 416, issueEvidence: 2 }), sources: "fail" } });
     draw();
     const r = await row("선바로 전선몰딩");
 
-    // 답변 대기 0 · 문의 0 — 눈에는 빈 칸, 화면 낭독기에는 0건.
-    expect(within(r).queryByText("0")).toBeNull();
-    expect(within(r).getByText("답변 대기 0건")).toBeInTheDocument();
-    // 상품 지식은 읽지 못했다. 못 읽은 수량은 0이라고 적지 않는다.
+    // 답변 대기 0 · 문의 0 — 센 0이고, 그렇게 적힌다. 가장 약한 잉크로.
+    const zeros = within(r).getAllByText("0");
+    expect(zeros).toHaveLength(2);
+    for (const zero of zeros) {
+      expect(zero.className).toContain("text-muted");
+      expect(zero.className).not.toContain("text-ink");
+    }
+    expect(within(r).getByText("답변 대기")).toBeInTheDocument();
+    // 상품 지식은 읽지 못했다. 못 읽은 수량은 끝까지 0이라고 적지 않는다.
     expect(within(r).getByText("—")).toBeInTheDocument();
     expect(within(r).getByText("상품 지식 읽지 못했습니다")).toBeInTheDocument();
   });

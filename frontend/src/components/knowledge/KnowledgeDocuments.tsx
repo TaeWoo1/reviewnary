@@ -34,7 +34,7 @@ export function KnowledgeDocumentList({
 
   if (documents.length === 0) {
     return (
-      <p className="break-keep px-5 py-6 text-sm text-muted">
+      <p className="break-keep py-4 text-sm text-muted">
         사용설명서·FAQ·배송/교환 정책처럼 이미 쓰고 계신 자료를 올리면 답변 근거로 씁니다.
       </p>
     );
@@ -42,12 +42,12 @@ export function KnowledgeDocumentList({
 
   return (
     <>
-      {error ? <p className="break-keep px-5 pt-3 text-sm text-bad" role="alert">{error}</p> : null}
+      {error ? <p className="break-keep pt-2 text-sm text-bad" role="alert">{error}</p> : null}
       {/* 위의 두 표와 같은 문법 — 한 줄에 한 건, 열은 그 자료에 대해 사람이 답할 수 있는 것들.
           aria-hidden: 각 칸이 제 이름을 달고 있어 한 줄이 하나의 객체로 읽힌다. */}
       <div
         aria-hidden="true"
-        className="flex items-center gap-4 border-b border-line bg-canvas/40 px-5 py-2 text-xs text-muted"
+        className="flex items-center gap-4 pb-1 text-xs text-muted"
       >
         <span className="min-w-0 flex-1">자료</span>
         <span className="w-[110px] shrink-0">종류</span>
@@ -56,9 +56,9 @@ export function KnowledgeDocumentList({
         <span className="w-[96px] shrink-0 text-right">올린 날짜</span>
         <span className="w-[88px] shrink-0 whitespace-nowrap" />
       </div>
-      <ul className="divide-y divide-line/70" data-testid="knowledge-documents">
+      <ul data-testid="knowledge-documents">
         {documents.map((document) => (
-          <li key={document.sourceId} className="flex items-center gap-4 px-5 py-1.5">
+          <li key={document.sourceId} className="flex items-center gap-4 border-t border-line/70 py-2">
             <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
               {document.fileName ?? document.title}
               {document.passages === 0 ? <span className="ml-2 text-xs text-warn">내용 없음</span> : null}

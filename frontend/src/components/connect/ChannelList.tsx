@@ -1,22 +1,26 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { channelSupportDisplay } from "../../lib/channelSupport";
 import { channelCardAction, selectChannelAccount } from "../../lib/channelConnection";
 import { CAFE24_CONNECT_ROUTE } from "../../lib/cafe24Connect";
 import { frontendRunId, isWalkthroughMode, withWalkthroughRun } from "../../lib/guidedConnection/walkthrough";
-import { relativeTime } from "../../lib/format";
-import { expiryNeedsAttention, shouldOfferRenewal } from "../../lib/coupangExpiry";
+import { kstDayTime } from "../../lib/format";
+import {
+  EXPIRY_ATTENTION_SUMMARY,
+  expiryNeedsAttention,
+  expiryStateView,
+  shouldOfferRenewal,
+} from "../../lib/coupangExpiry";
 import { hasReviewRecord, reviewEntryLabel, reviewRecordPath } from "../../lib/reviewRecord";
 import { connectionState, type ConnectionState } from "../../lib/connectionState";
 import { channelRowOf } from "../../lib/connect/channelRow";
 import type { ScreenReadReadinessState } from "../../lib/acquisitionReadiness";
-import { ExpiryChip, RENEW_CTA_LABEL } from "../coupang/CoupangExpiryPanel";
+import { RENEW_CTA_LABEL } from "../coupang/CoupangExpiryPanel";
 import type {
   ChannelResponse,
   ConnectionStatusView,
   SellerAccountResponse,
 } from "../../lib/types";
-import { Btn, BtnLink } from "../ui/Btn";
-import { Chip } from "../ui/Chip";
+import { Btn } from "../ui/Btn";
 import { Status, type StatusTone } from "../ui/Status";
 import { Disclosure } from "../ui/Disclosure";
 import { Empty } from "../ui/Empty";
@@ -30,6 +34,22 @@ import { Empty } from "../ui/Empty";
  * describe any channel as automatically connected, and it does not present the catalogue as a list
  * of things that work. The row's action is decided by `channelCardAction` from the account's real
  * connection status, so a label can never get ahead of the account behind it.
+ *
+ * <p><b>한 연결은 레코드다</b> (2026-10-07). 세 줄이 각각 둥근 상자 안에서 자기 폭을 쓰고 있었고, 상태는
+ * 알약으로, 마지막 수집은 문장 속에 묻혀 있었다 — 세 채널을 세로로 비교하는 일이 되지 않았다. 주문의
+ * 「읽은 범위」와 같은 문법으로 선다: 열 이름 한 줄, 그 아래로 가는 선에 걸린 행들, 그리고 열마다 제 자리.
+ *
+ * <p><b>수집 시각은 실제 시각이다.</b> 「마지막 수집 1주 전」은 어제 읽은 것과 여드레 전에 읽은 것을 같은
+ * 말로 덮는다 — 그 차이가 이 화면을 여는 이유인데도. 주문·리포트가 쓰는 그 시각 표기를 그대로 쓴다.
+ *
+ * <p><b>열 이름은 모든 행에 대해 참이다</b> — 「마지막 수집 성공」. 전에는 행마다 문장이 달라서 성공한
+ * 행은 「마지막 수집 …」, 실패가 쌓인 행은 「마지막 성공 … · 그 뒤로 수집되지 않았습니다」라고 적었다.
+ * 열이 생기면 그 둘을 한 이름으로 불러야 하고, 둘 다에 대해 참인 이름은 「성공」이 붙은 쪽이다. 실패가
+ * 쌓였다는 사실은 사라지지 않고 그 칸 안에 한 줄로 남는다.
+ *
+ * <p><b>그리고 세 가지 「없음」을 섞지 않는다.</b> 연결되지 않은 채널에는 수집 시각 자리에 아무것도 적지
+ * 않고(「—」), 연결됐지만 한 번도 성공하지 못한 채널은 「수집 이력 없음」이며, 성공했는데 그 뒤로 실패가
+ * 쌓인 채널은 마지막 <b>성공</b> 시각과 함께 그 사실을 말한다. 셋을 한 단어로 적으면 어느 것도 참이 아니다.
  */
 function ChannelRow({
   channel,
@@ -136,84 +156,97 @@ function ChannelRow({
   ].filter((line): line is string => !!line);
   const diagnostic = failing && health?.lastError ? health.lastError : null;
 
+  /**
+   * 이름 아래 한 줄에 설 사실들. 연결되지 않은 채널에서는 이 채널이 무엇을 줄 수 있는지(지원 요약),
+   * 리뷰 lane이 따로 서 있으면 그 lane의 한 마디. 둘 다 상태가 아니므로 색도 테두리도 없다.
+   */
+  const sub = [
+    ...(account ? [] : [support.primaryLabel, ...support.chips]),
+    ...(account || !support.uploadQualifier ? [] : [support.uploadQualifier]),
+    ...(row.reviewLine ? [row.reviewLine] : []),
+  ];
+
+  // 연결되지 않음 · 읽은 적 없음 · 읽었음 — 셋은 서로 다른 사실이고, 이 열에서 서로 다르게 생겼다.
+  const read = (() => {
+    // 연결한 적 없는 채널에 「수집 이력 없음」은 고칠 것이 있다는 뜻으로 읽힌다. 아직 아무 약속도 하지
+    // 않은 채널이고, 이 열에는 할 말이 없다.
+    if (!account) {
+      return "—";
+    }
+    if (row.reviewLine) {
+      return reviewLane?.lastReadAt ? kstDayTime(reviewLane.lastReadAt) : "수집 이력 없음";
+    }
+    if (!row.showApiCollectionLine) {
+      return "—";
+    }
+    return lastCollected ? kstDayTime(lastCollected) : "수집 이력 없음";
+  })();
+
   return (
-    <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="break-keep text-base font-semibold text-ink">{channel.nameKo}</p>
-          <StatePill state={state} loading={statusLoading && !!account} />
+    <li className="flex flex-wrap items-center border-t border-line/70 py-2 text-sm">
+      <div className={COL.name}>
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <span className="break-keep font-medium text-ink">{channel.nameKo}</span>
           {expiryFlagged && expiry ? (
-            <span className="flex items-center gap-1.5" data-testid="channel-expiry">
-              <ExpiryChip state={expiry.state} />
-              <span className="text-xs font-semibold text-warn">만료 예정·조치 필요</span>
+            <span className="text-xs font-semibold text-warn" data-testid="channel-expiry">
+              {expiryStateView(expiry.state).label} · {EXPIRY_ATTENTION_SUMMARY}
             </span>
           ) : null}
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted">
-          {account ? null : (
-            <>
-              <Chip>{support.primaryLabel}</Chip>
-              {support.chips.map((chip) => (
-                <Chip key={chip}>{chip}</Chip>
-              ))}
-            </>
-          )}
-          {/* <b>「마지막 수집 1일 전」 beside 「오류」 was two sentences that cancel each other out.</b> The
-              timestamp is the last SUCCESS, and on a failing account there have been attempts since —
-              seven, on the measured org — that produced nothing. So a failing row names what the time
-              actually is and says the collection has not landed since. Both facts are already in this
-              response (`lastSuccessAt`, `consecutiveFailures`); no vendor message is surfaced, because
-              the strings the connectors write carry gateway codes and HTTP statuses, which is the
-              opposite of what this row is for. */}
-          {row.reviewLine ? (
-            <span data-testid="channel-review-lane">
-              {reviewLane?.lastReadAt
-                ? `${row.reviewLine} ${relativeTime(reviewLane.lastReadAt)}`
-                : row.reviewLine}
-            </span>
-          ) : null}
-          {row.showApiCollectionLine ? (
-            <span>
-              {lastCollected
-                ? failing
-                  ? `마지막 성공 ${relativeTime(lastCollected)} · 그 뒤로 수집되지 않았습니다`
-                  : `마지막 수집 ${relativeTime(lastCollected)}`
-                : "수집 이력 없음"}
-            </span>
-          ) : null}
-          {showReviewEntry && account ? (
-            <BtnLink
-              to={reviewRecordPath(account.id)}
-              size="sm"
-              variant="ghost"
-              className="!min-h-0 !px-1 !py-0 text-sm !font-semibold text-brand-700"
-              ariaLabel={`${channel.nameKo} ${reviewEntryLabel(reviewCount, channel.code)}`}
-            >
-              {reviewEntryLabel(reviewCount, channel.code)}
-            </BtnLink>
-          ) : null}
-        </div>
-        {account ? null : support.uploadQualifier ? (
-          <p className="mt-1 break-keep text-sm text-muted">{support.uploadQualifier}</p>
-        ) : null}
-        {detailLines.length > 0 ? (
-          <Disclosure label="자세히" className="mt-0.5" summaryClassName="px-0 text-xs">
-            <div className="mt-1 space-y-1">
-              {detailLines.map((line) => (
-                <p key={line} className="break-keep text-sm text-warn">{line}</p>
-              ))}
-              {diagnostic ? (
-                <Disclosure label="기술 정보" summaryClassName="px-0 text-xs">
-                  <p className="mt-1 break-all font-mono text-xs text-muted" data-testid="connection-diagnostic">
-                    {diagnostic}
-                  </p>
-                </Disclosure>
-              ) : null}
-            </div>
-          </Disclosure>
+        {/* 보조 줄 — 이 채널에 대해 더 할 말이 있을 때만. 알약이 아니라 글자다: 「문의 수집」과 「주문 요약」은
+            상태가 아니라 이 채널이 무엇을 줄 수 있는지에 대한 사실이고, 색이 필요한 자리가 아니다. */}
+        {sub.length > 0 || detailLines.length > 0 || (showReviewEntry && account) ? (
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
+            {sub.map((text) => (
+              <span key={text} className="break-keep">
+                {text}
+              </span>
+            ))}
+            {showReviewEntry && account ? (
+              <Link
+                to={reviewRecordPath(account.id)}
+                aria-label={`${channel.nameKo} ${reviewEntryLabel(reviewCount, channel.code)}`}
+                className="rounded font-semibold text-brand-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+              >
+                {reviewEntryLabel(reviewCount, channel.code)}
+              </Link>
+            ) : null}
+            {detailLines.length > 0 ? (
+              <Disclosure label="자세히" summaryClassName="px-0 text-xs">
+                <div className="mt-1 space-y-1">
+                  {detailLines.map((line) => (
+                    <p key={line} className="break-keep text-sm text-warn">
+                      {line}
+                    </p>
+                  ))}
+                  {diagnostic ? (
+                    <Disclosure label="기술 정보" summaryClassName="px-0 text-xs">
+                      <p className="mt-1 break-all font-mono text-xs text-muted" data-testid="connection-diagnostic">
+                        {diagnostic}
+                      </p>
+                    </Disclosure>
+                  ) : null}
+                </div>
+              </Disclosure>
+            ) : null}
+          </div>
         ) : null}
       </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
+      <div className={COL.state} data-testid="connection-state">
+        <Status tone={statusLoading && !!account ? "neutral" : TONE[state.tone]} variant="quiet">
+          {statusLoading && !!account ? "상태 확인 중" : state.label}
+        </Status>
+      </div>
+      <div className={COL.read}>
+        <span className={failing ? "text-warn" : "text-muted"}>{read}</span>
+        {/* 실패가 쌓인 연결에서 이 시각은 「마지막으로 읽은 때」가 아니라 「마지막으로 성공한 때」다.
+            그 뒤의 시도들은 아무것도 남기지 않았고, 그 사실이 시각 옆에 없으면 이 행은 어제 읽은 행처럼
+            읽힌다 — 실측 org에서 그 뒤의 시도는 일곱 번이었다. */}
+        {failing && lastCollected ? (
+          <span className="mt-0.5 block break-keep text-xs text-warn">마지막 성공 · 그 뒤로 수집되지 않았습니다</span>
+        ) : null}
+      </div>
+      <div className={COL.action}>
         {offerRenewal && account ? (
           <Btn size="sm" variant="outline" onClick={() => navigate(`/connect/coupang/renew/${account.id}`)}>
             {RENEW_CTA_LABEL}
@@ -252,18 +285,25 @@ function ChannelRow({
   );
 }
 
-/** The state chip. While the account's health is still loading it says so rather than guessing 연결됨. */
-function StatePill({ state, loading }: { state: ConnectionState; loading: boolean }) {
-  if (loading) {
-    return <Status tone="neutral">상태 확인 중</Status>;
-  }
-  const tone: StatusTone = state.tone === "muted" ? "neutral" : state.tone;
-  return (
-    <span data-testid="connection-state">
-      <Status tone={tone}>{state.label}</Status>
-    </span>
-  );
-}
+/** 한 열에 여럿이 서는 자리의 폭 — 세 채널이 세로로 비교되려면 열이 제 자리를 지켜야 한다(주문과 같다). */
+const COL = {
+  name: "min-w-0 flex-1 pr-4",
+  state: "w-[110px] shrink-0 pr-4",
+  read: "w-[220px] shrink-0 pr-4 text-right tabular-nums",
+  action: "flex w-[190px] shrink-0 flex-wrap items-center justify-end gap-2",
+};
+
+/**
+ * 상태 한 단어 — 알약이 아니라 글자다. 「연결됨」 셋이 나란히 선 화면에서 알약 셋은 상태가 아니라 장식이고,
+ * 그 셋이 가장 진한 물건이 되면 정작 하나뿐인 「연결 필요」가 그 안에 묻힌다. 이 제품에는 이 읽기를 위한
+ * 렌더러가 이미 있다({@code Status}의 `quiet` — 확인할 일이 쓰는 그것), 그래서 새로 만들지 않는다.
+ */
+const TONE: Record<ConnectionState["tone"], StatusTone> = {
+  good: "good",
+  muted: "neutral",
+  warn: "warn",
+  bad: "bad",
+};
 
 export function ChannelList({
   channels,
@@ -293,7 +333,7 @@ export function ChannelList({
   channelsError?: boolean;
 }) {
   if (channelsLoading && channels.length === 0) {
-    return <p className="px-4 py-3 text-sm text-muted">불러오는 중…</p>;
+    return <p className="py-2 text-sm text-muted">불러오는 중…</p>;
   }
   if (channels.length === 0) {
     return channelsError ? (
@@ -306,23 +346,32 @@ export function ChannelList({
     );
   }
   return (
-    <ul aria-label="채널 목록" className="divide-y divide-line/70">
-      {channels.map((channel) => {
-        const account = selectChannelAccount(accounts, channel.id);
-        return (
-          <ChannelRow
-            key={channel.id}
-            channel={channel}
-            account={account}
-            health={account ? health.get(account.id) ?? null : null}
-            statusLoading={statusLoading}
-            reviewCount={account ? reviewCounts?.get(account.id) ?? null : null}
-            reviewLane={account ? reviewLanes?.get(account.id) ?? null : null}
-            onNotice={onNotice}
-            onStartReviewSetup={onStartReviewSetup}
-          />
-        );
-      })}
-    </ul>
+    <>
+      {/* aria-hidden: 각 행이 제 이름을 달고 있다. 열 이름은 눈으로 비교하는 쪽을 위한 것이다. */}
+      <div aria-hidden="true" className="flex items-center pb-1 text-xs text-muted">
+        <span className={COL.name}>채널</span>
+        <span className={COL.state}>연결</span>
+        <span className={COL.read}>마지막 수집 성공</span>
+        <span className={COL.action} />
+      </div>
+      <ul aria-label="채널 목록">
+        {channels.map((channel) => {
+          const account = selectChannelAccount(accounts, channel.id);
+          return (
+            <ChannelRow
+              key={channel.id}
+              channel={channel}
+              account={account}
+              health={account ? health.get(account.id) ?? null : null}
+              statusLoading={statusLoading}
+              reviewCount={account ? reviewCounts?.get(account.id) ?? null : null}
+              reviewLane={account ? reviewLanes?.get(account.id) ?? null : null}
+              onNotice={onNotice}
+              onStartReviewSetup={onStartReviewSetup}
+            />
+          );
+        })}
+      </ul>
+    </>
   );
 }

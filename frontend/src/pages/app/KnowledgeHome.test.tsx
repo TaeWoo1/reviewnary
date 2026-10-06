@@ -217,7 +217,7 @@ describe("지식", () => {
     expect(tax).toBeDefined();
     expect(tax).toHaveTextContent("적혀 있는 기준 없음");
     expect(tax).not.toHaveTextContent("직접 작성");
-    expect(screen.getByText(/8가지 가운데 2가지가 적혀 있습니다/)).toBeInTheDocument();
+    expect(screen.getByText("주제 8가지 가운데 2가지")).toBeInTheDocument();
   });
 
   it("지금 목록에 없는 기준을 인용한 답변 근거는 수로만 적힌다 — 어떤 기준이었는지는 말하지 않는다", async () => {
@@ -232,7 +232,7 @@ describe("지식", () => {
   it("고아 인용이 없으면 그 문장은 아예 서지 않는다", async () => {
     getKnowledgeInventory.mockResolvedValue({ ...INVENTORY, orphanRuleCitations: 0 });
     draw();
-    await screen.findByText(/8가지 가운데 2가지가 적혀 있습니다/);
+    await screen.findByText("주제 8가지 가운데 2가지");
     expect(screen.queryByText(/목록에 없는 기준을 인용한/)).toBeNull();
   });
 
@@ -313,10 +313,11 @@ describe("지식", () => {
     await screen.findByLabelText("이 회사가 가진 지식");
     expect(screen.queryByRole("link", { name: /물어보기/ })).toBeNull();
     expect(container.querySelectorAll("textarea")).toHaveLength(0);
-    // The two writing screens are under one control, as links.
-    await userEvent.click(screen.getByText("+ 추가"));
-    expect(screen.getByRole("link", { name: "상품 지식" })).toHaveAttribute("href", "/products");
-    expect(screen.getByRole("link", { name: "운영 기준" })).toHaveAttribute("href", "/settings/policies");
+    // 적는 두 곳으로 가는 길은 각자의 구역 이름 옆에 제 이름으로 선다 — 머리의 「+ 추가」 메뉴는 같은 두
+    // 곳으로 가는 두 번째 문이었고, 한 화면에서 같은 곳으로 가는 문이 둘이면 둘 다 읽히지 않는다.
+    expect(screen.queryByText("+ 추가")).toBeNull();
+    expect(screen.getByRole("link", { name: "상품에서 추가" })).toHaveAttribute("href", "/products");
+    expect(screen.getByRole("link", { name: "기준 추가" })).toHaveAttribute("href", "/settings/policies");
   });
 
   it("shows what was noticed with the seller's own count, and never promotes it", async () => {
@@ -454,7 +455,7 @@ describe("지식", () => {
     expect(screen.getByText(/이미 쓰고 계신 자료를 올리면/)).toBeInTheDocument();
     // 운영 기준은 비어 있어도 여덟 줄이 선다 — 무엇을 적어야 하는지가 곧 그 표다.
     expect(within(screen.getByLabelText("운영 기준")).getAllByRole("listitem")).toHaveLength(8);
-    expect(screen.getByText(/8가지 가운데 0가지가 적혀 있습니다/)).toBeInTheDocument();
+    expect(screen.getByText("주제 8가지 가운데 0가지")).toBeInTheDocument();
   });
 
   it("a first day offers no control that can only find nothing", async () => {

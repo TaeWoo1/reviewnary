@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type {
   KnowledgeCandidateView,
@@ -8,10 +9,10 @@ import type {
 } from "../../lib/types";
 import { api } from "../../lib/apiClient";
 import { useAgentSurface } from "../../lib/agentPanel";
+import { PageHead } from "../../components/ui/PageHead";
+import { SectionHeader } from "../../components/ui/SectionHeader";
 import { Btn } from "../../components/ui/Btn";
 import { Empty } from "../../components/ui/Empty";
-import { ListBox, Section } from "../../components/ui/Section";
-import { RelationCounts } from "../../components/product/record/RelationCounts";
 import { count } from "../../lib/format";
 import { COPY } from "../../lib/copy/customerOps";
 import { KNOWLEDGE_NOUN, ORG_TOPICS } from "../../lib/knowledgeWords";
@@ -37,9 +38,21 @@ import {
  * 근거」 열. 그 수는 저장된 근거 관계의 수이지 발송도 승인도 아니며, 그 경계는 서버 쪽
  * {@code KnowledgeInventoryContractTest}가 지킨다.
  *
+ * <p><b>표가 상자 안에 들어 있지 않다</b> (2026-10-07). 네 구역이 각각 둥근 테두리 상자를 두르고 있어서
+ * 한 화면에 떠 있는 물건이 넷이었고, 그 상자들은 안의 표가 이미 가진 격자를 한 번 더 그린 것이었다 —
+ * 같은 줄을 두 번 긋는 데 가장 큰 잉크를 썼다. 구역의 이름과 그 아래 가는 선 하나, 그리고 열이 제
+ * 자리를 지키는 행들: 주문·상품 상세·리포트가 쓰는 그 문법이고 이 화면도 같은 제품이다.
+ *
+ * <p><b>설명은 정보 앞에 서지 않는다.</b> 「8가지 가운데 2가지가 적혀 있습니다. 적혀 있지 않은 기준은
+ * 답변에 쓰이지 않습니다」는 구역 이름 옆에서 표보다 먼저 읽히는 두 문장이었다. 앞의 수는 제목 옆
+ * 한 조각으로 남고, 뒤의 문장은 표 아래로 내려간다 — 표를 읽고 나서야 쓰이는 말이기 때문이다.
+ *
  * <p><b>머리의 띠에는 지식만 선다.</b> 과거 응답 27건은 이 회사가 가진 지식이 아니라 해 온 일이고,
  * 상태와 활동을 한 줄에 섞으면 둘 다 읽히지 않는다. 그것은 맨 아래 「채널에서 읽어 온 것」에 제 이름으로
  * 서 있다 — 거기에는 참고용이라고 말할 자리가 있다.
+ *
+ * <p><b>머리의 「+ 추가」는 없다.</b> 그 메뉴가 연 두 곳(상품 지식 · 운영 기준)은 각자의 구역 이름 옆에
+ * 제 이름으로 이미 서 있었고, 한 화면에서 같은 곳으로 가는 문이 둘이면 둘 다 읽히지 않는다.
  *
  * <p><b>순서를 다시 해석하지 않는다.</b> 상품 지식은 서버가 답변 근거 → 마지막 사용 → 제목으로 줄
  * 세워 보내고, 이 화면은 받은 순서를 그대로 그린다. 상품 목록에서 끝낸 그 결함 — 서버와 화면이 서로
@@ -102,32 +115,25 @@ export function KnowledgeHome() {
   const unused = facts.filter((fact) => fact.citations === 0).length;
 
   return (
-    <div className="mx-auto flex w-full max-w-content flex-col gap-3">
-      {/* 제목 옆에 이 화면이 다루는 것의 크기 — 상품 목록의 「전체 294개」가 선 그 자리이고, 띠 자체는
-          상품 상세의 관계 띠와 같은 물건, 같은 규칙이다(지금 사람을 기다리는 하나에만 색이 있다).
-          여기 서는 넷은 모두 이 회사가 가진 지식이고, 해 온 일은 한 칸도 섞이지 않는다 — 과거 응답은
-          이 회사가 가진 지식이 아니라 해 온 일이므로 맨 아래 제 이름으로 선다. */}
-      <header className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <h1 className="text-title font-extrabold leading-tight tracking-tight text-ink">{COPY.knowledgeTitle}</h1>
-        <RelationCounts
-          bare
-          ariaLabel="이 회사가 가진 지식"
-          items={[
-            { label: "운영 기준", value: rules.length },
-            { label: "상품 지식", value: inventory?.productKnowledgeTotal ?? 0 },
-            { label: COPY.documentsTab, value: documents?.length ?? 0 },
-            { label: KNOWLEDGE_NOUN.needsConfirmation, value: pending, emphasis: true },
-          ]}
-        />
-        <span className="ml-auto">
-          <AddMenu />
-        </span>
-      </header>
+    <div className="space-y-6">
+      {/* 제목 옆에 이 화면이 다루는 것의 크기 — 주문의 머리 숫자가 선 그 자리, 같은 모양이다. 여기 서는
+          넷은 모두 이 회사가 가진 지식이고, 해 온 일은 한 칸도 섞이지 않는다. */}
+      <PageHead
+        title={COPY.knowledgeTitle}
+        meta={
+          <span aria-label="이 회사가 가진 지식" className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
+            <Figure label="운영 기준" value={rules.length} />
+            <Figure label="상품 지식" value={inventory?.productKnowledgeTotal ?? 0} />
+            <Figure label={COPY.documentsTab} value={documents?.length ?? 0} />
+            <Figure label={KNOWLEDGE_NOUN.needsConfirmation} value={pending} warn />
+          </span>
+        }
+      />
 
       {error ? <p className="break-keep text-sm text-bad" role="alert">{error}</p> : null}
       {notice ? <p className="break-keep text-sm text-muted" role="status">{notice}</p> : null}
 
-      <Section
+      <Block
         title={KNOWLEDGE_NOUN.needsConfirmation}
         action={
           summary && summary.pastAnswers > 0 ? (
@@ -140,134 +146,140 @@ export function KnowledgeHome() {
         }
       >
         {documents === null || candidates === null ? (
-          <p className="text-sm text-muted">확인 중…</p>
+          <p className="py-2 text-sm text-muted">확인 중…</p>
         ) : (
           <KnowledgeInbox candidates={candidates} documents={documents} onChanged={load} />
         )}
-      </Section>
+      </Block>
 
-      <Section
+      <Block
         title="운영 기준"
-        hint={
-          inventory ? (
-            <>
-              {ORG_TOPICS.length}가지 가운데 {writtenTopics}가지가 적혀 있습니다. 적혀 있지 않은 기준은 답변에
-              쓰이지 않습니다.
-              {/* 인용은 제 출처보다 오래 산다 — 기준이 지워져도 그것을 보고 쓴 초안의 기록은 남고, 존재하지
-                  않게 된 기준은 위의 표에 줄을 남기지 않으므로 판매자가 다른 어디에서도 볼 수 없다.
-                  어떤 기준이었는지는 말하지 않는다: evidence의 locator에서 이름을 되찾는 것은 외래 키가
-                  받쳐 주지 않는 주장이다. */}
+        note={inventory ? `주제 ${ORG_TOPICS.length}가지 가운데 ${writtenTopics}가지` : undefined}
+        action={<Go to="/settings/policies">기준 추가</Go>}
+      >
+        {inventory === null ? (
+          <p className="py-2 text-sm text-muted">불러오는 중…</p>
+        ) : (
+          <>
+            <OperatingRuleTable rules={rules} />
+            {/* 표를 읽고 나서야 쓰이는 말이므로 표 아래에 선다. 인용은 제 출처보다 오래 산다 — 기준이
+                지워져도 그것을 보고 쓴 초안의 기록은 남고, 존재하지 않게 된 기준은 위의 표에 줄을 남기지
+                않으므로 판매자가 다른 어디에서도 볼 수 없다. 어떤 기준이었는지는 말하지 않는다:
+                evidence의 locator에서 이름을 되찾는 것은 외래 키가 받쳐 주지 않는 주장이다. */}
+            <Foot>
+              적혀 있지 않은 기준은 답변에 쓰이지 않습니다.
               {inventory.orphanRuleCitations > 0 ? (
                 <>
                   {" · "}목록에 없는 기준을 인용한 답변 근거{" "}
                   <b className="font-semibold text-ink">{count(inventory.orphanRuleCitations)}건</b>
                 </>
               ) : null}
-            </>
-          ) : undefined
-        }
-        action={
-          <Link
-            to="/settings/policies"
-            className="rounded text-sm font-semibold text-brand-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-          >
-            기준 추가
-          </Link>
-        }
-      >
-        <ListBox>
-          {inventory === null ? (
-            <p className="px-5 py-6 text-sm text-muted">불러오는 중…</p>
-          ) : (
-            <OperatingRuleTable rules={rules} />
-          )}
-        </ListBox>
-      </Section>
+            </Foot>
+          </>
+        )}
+      </Block>
 
-      <Section
-        title="상품 지식"
-        action={
-          <Link
-            to="/products"
-            className="rounded text-sm font-semibold text-brand-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-          >
-            상품에서 추가
-          </Link>
-        }
-      >
-        <ListBox>
-          {inventory === null ? (
-            <p className="px-5 py-6 text-sm text-muted">불러오는 중…</p>
-          ) : facts.length === 0 ? (
-            <div className="px-5 py-6">
-              <Empty
-                compact
-                title="아직 적어 둔 상품 지식이 없습니다"
-                body="상품 화면에서 설명·자주 묻는 질문·사용법·정책을 적어 두면, 답변이 그 내용을 근거로 씁니다."
-              />
-            </div>
-          ) : (
-            <>
-              <ProductFactTable facts={facts} />
-              <p className="border-t border-line bg-canvas/40 px-5 py-2.5 text-xs text-muted">
-                {showingAll ? null : (
-                  <>
-                    <b className="font-semibold text-ink">{count(inventory.productKnowledgeTotal)}건</b> 가운데{" "}
-                    <b className="font-semibold text-ink">{count(facts.length)}건</b>을 보고 있습니다.{" "}
-                  </>
-                )}
-                {showingAll && unused > 0 ? (
-                  <>
-                    <b className="font-semibold text-ink">{count(unused)}건</b>은 아직 답변 근거로 쓰인 적이 없고,{" "}
-                  </>
-                ) : null}
-                상품 <b className="font-semibold text-ink">{count(inventory.products)}개</b> 가운데{" "}
-                <b className="font-semibold text-ink">{count(inventory.productsWithKnowledge)}개</b>에 상품 지식이
-                있습니다.
-              </p>
-            </>
-          )}
-        </ListBox>
-      </Section>
+      <Block title="상품 지식" action={<Go to="/products">상품에서 추가</Go>}>
+        {inventory === null ? (
+          <p className="py-2 text-sm text-muted">불러오는 중…</p>
+        ) : facts.length === 0 ? (
+          <div className="py-4">
+            <Empty
+              compact
+              title="아직 적어 둔 상품 지식이 없습니다"
+              body="상품 화면에서 설명·자주 묻는 질문·사용법·정책을 적어 두면, 답변이 그 내용을 근거로 씁니다."
+            />
+          </div>
+        ) : (
+          <>
+            <ProductFactTable facts={facts} />
+            <Foot>
+              {showingAll ? null : (
+                <>
+                  <b className="font-semibold text-ink">{count(inventory.productKnowledgeTotal)}건</b> 가운데{" "}
+                  <b className="font-semibold text-ink">{count(facts.length)}건</b>을 보고 있습니다.{" "}
+                </>
+              )}
+              {showingAll && unused > 0 ? (
+                <>
+                  <b className="font-semibold text-ink">{count(unused)}건</b>은 아직 답변 근거로 쓰인 적이 없고,{" "}
+                </>
+              ) : null}
+              상품 <b className="font-semibold text-ink">{count(inventory.products)}개</b> 가운데{" "}
+              <b className="font-semibold text-ink">{count(inventory.productsWithKnowledge)}개</b>에 상품 지식이
+              있습니다.
+            </Foot>
+          </>
+        )}
+      </Block>
 
-      <Section
+      <Block
         title={COPY.documentsTab}
-        hint="회사가 이미 쓰고 있던 파일. 여기서 읽은 내용이 위의 기준과 지식이 됩니다."
+        note="여기서 읽은 내용이 위의 기준과 지식이 됩니다"
         action={<KnowledgeDocumentAdd scope="ORG" onImported={load} label={COPY.addDocument} />}
       >
-        <ListBox>
-          {documents === null ? (
-            <p className="px-5 py-6 text-sm text-muted">불러오는 중…</p>
-          ) : (
-            <KnowledgeDocumentList documents={documents} onChanged={load} />
-          )}
-        </ListBox>
-      </Section>
+        {documents === null ? (
+          <p className="py-2 text-sm text-muted">불러오는 중…</p>
+        ) : (
+          <KnowledgeDocumentList documents={documents} onChanged={load} />
+        )}
+      </Block>
 
-      {/* 상자가 없다 — 위의 셋은 이 회사가 가진 지식이고 이것은 참고일 뿐이므로, 같은 테두리를 두르면
-          같은 무게로 읽힌다. 테두리를 걷고 가는 선만 남겨 한 단계 아래에 둔다. */}
-      <Section title="채널에서 읽어 온 것" hint="공식 기준이 아니라, 답변을 만들 때 참고만 합니다.">
+      {/* 위의 셋은 이 회사가 가진 지식이고 이것은 참고일 뿐이다 — 같은 무게로 읽히지 않도록 이름만
+          한 단계 조용히 둔다. */}
+      <Block title="채널에서 읽어 온 것" note="공식 기준이 아니라, 답변을 만들 때 참고만 합니다">
         <LearnedKnowledge />
-      </Section>
+      </Block>
     </div>
   );
 }
 
-/** The two places a person writes knowledge, under one control. Links, not forms: each screen owns its list. */
-function AddMenu() {
+/** 한 구역 — 이름, 그 옆의 한 조각, 그 아래 선 하나. 주문·리포트와 같은 렌더러다. */
+function Block({
+  title,
+  note,
+  action,
+  children,
+}: {
+  title: string;
+  note?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <details className="group relative">
-      <summary className="inline-flex min-h-[36px] cursor-pointer list-none items-center rounded-lg border border-line bg-surface px-3 text-sm font-semibold text-ink hover:bg-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700">
-        {COPY.add}
-      </summary>
-      <div className="absolute right-0 z-10 mt-1.5 w-48 overflow-hidden rounded-xl bg-surface py-1 shadow-[0_0_0_1px_#E4E7EC,0_12px_28px_-12px_rgba(15,25,45,0.35)]">
-        <Link to="/products" className="block px-3.5 py-2.5 text-sm text-ink hover:bg-canvas focus:bg-canvas focus:outline-none">
-          상품 지식
-        </Link>
-        <Link to="/settings/policies" className="block px-3.5 py-2.5 text-sm text-ink hover:bg-canvas focus:bg-canvas focus:outline-none">
-          운영 기준
-        </Link>
-      </div>
-    </details>
+    <section aria-label={title} className="space-y-2">
+      {/* 머리말은 제목 안이 아니라 제목 아래에 선다 — 구역의 이름은 이름이고, 그 옆에 붙은 문장은 읽어
+          주는 쪽에서 이름의 일부가 된다. */}
+      <SectionHeader title={title} hint={note} action={action} />
+      {children}
+    </section>
+  );
+}
+
+/** 표가 끝난 뒤에 오는 한 줄 — 표를 읽고 나서야 쓰이는 말의 자리. */
+function Foot({ children }: { children: ReactNode }) {
+  return <p className="break-keep border-t border-line py-2 text-xs text-muted">{children}</p>;
+}
+
+/** 머리의 수 하나. 지금 사람을 기다리는 하나에만 색이 있다. */
+function Figure({ label, value, warn = false }: { label: string; value: number; warn?: boolean }) {
+  const on = warn && value > 0;
+  return (
+    <span className={`inline-flex items-baseline gap-1.5 ${on ? "font-semibold text-warn" : "text-muted"}`}>
+      <span>{label}</span>
+      <b className={`font-bold tabular-nums ${on ? "text-warn" : "text-ink"}`}>{count(value)}</b>
+    </span>
+  );
+}
+
+/** 다른 화면으로 가는 길 — 글자이고, 단추가 아니다. */
+function Go({ to, children }: { to: string; children: ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className="rounded text-sm font-semibold text-brand-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+    >
+      {children}
+    </Link>
   );
 }
