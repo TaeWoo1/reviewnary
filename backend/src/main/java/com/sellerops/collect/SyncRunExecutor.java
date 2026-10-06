@@ -711,7 +711,7 @@ public class SyncRunExecutor {
     private SyncJob recordConfigFailure(UUID orgId, SellerAccount account, DataType dataType,
                                         String trigger, String kind, String message) {
         SyncJob job = startJob(orgId, account, dataType, trigger, kind);
-        job.setFailureCode("CONNECTOR_UNAVAILABLE");
+        job.setFailureCode(SyncJob.FAILURE_CONNECTOR_UNAVAILABLE);
         finishJob(job, 0, 0, 0, "FAILED", message, false);
         return job;
     }

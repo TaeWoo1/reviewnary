@@ -17,6 +17,16 @@ import lombok.Setter;
 @Table(name = "sync_jobs")
 public class SyncJob extends BaseEntity {
 
+    /**
+     * The run ended at its own configuration gate: no pull connector for the channel, a data type that
+     * connector cannot serve, or a backfill window it cannot seed.
+     *
+     * <p><b>Nothing was asked of the channel.</b> Such a run is evidence about how this deployment is
+     * configured and never about whether the channel is answering — which is why the freshness reads
+     * look straight through it rather than letting it date, or erase, a collection.
+     */
+    public static final String FAILURE_CONNECTOR_UNAVAILABLE = "CONNECTOR_UNAVAILABLE";
+
     @Column(name = "org_id", nullable = false)
     private UUID orgId;
 
@@ -83,12 +93,16 @@ public class SyncJob extends BaseEntity {
     private String errorMessage;
 
     /**
-     * Closed classification of why the run that just finished was not clean — set by {@code SyncRunExecutor} on
-     * the instance it returns, <b>not persisted</b>. AUTH_REQUIRED / TIMEOUT / RATE_LIMITED / PAGE_LIMIT_REACHED /
-     * CONNECTOR_UNAVAILABLE / CONFIGURATION_REQUIRED / EXECUTION_FAILED; null for a clean run or a job read back
-     * from the database.
+     * Closed classification of why the run that just finished was not clean — set by {@code SyncRunExecutor}.
+     * AUTH_REQUIRED / TIMEOUT / RATE_LIMITED / PAGE_LIMIT_REACHED / {@link #FAILURE_CONNECTOR_UNAVAILABLE} /
+     * CONFIGURATION_REQUIRED / EXECUTION_FAILED; null for a clean run.
+     *
+     * <p><b>Persisted since V116, and it was transient before.</b> The code reached whoever held the returned
+     * instance and died there, so every reader that loads a run back from the database saw {@code FAILED} and
+     * nothing about why — which is how a run that never opened a socket came to overwrite the freshness
+     * surfaces. Rows written before V116 carry null, which reads as "says nothing special".
      */
-    @Transient
+    @Column(name = "failure_code", length = 40)
     private String failureCode;
 
     /**
