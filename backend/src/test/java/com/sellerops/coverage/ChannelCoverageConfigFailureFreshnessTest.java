@@ -145,6 +145,50 @@ class ChannelCoverageConfigFailureFreshnessTest {
     }
 
     @Test
+    @DisplayName("a live-approval refusal is not a collection either: the 09-23 success is still the last read")
+    void approvalGateFailureDoesNotEraseACollection() {
+        run("INQUIRY", "SUCCESS", null, COLLECTED);
+        run("INQUIRY", "FAILED", SyncJob.FAILURE_CONFIGURATION_REQUIRED, Instant.parse("2026-10-07T02:43:57Z"));
+
+        // The interlock throws as the first statement of the signed GET — no signature, no socket. Measured
+        // on the live org: Coupang 문의 had collected on 09-23 and coverage read 「확인된 적 없음」 anyway.
+        assertThat(lastSuccess("INQUIRY")).isEqualTo(COLLECTED);
+    }
+
+    @Test
+    @DisplayName("approval refusals and nothing else: no success is synthesised out of them")
+    void approvalGateFailuresAloneProveNothing() {
+        run("INQUIRY", "FAILED", SyncJob.FAILURE_CONFIGURATION_REQUIRED, Instant.parse("2026-10-07T02:43:57Z"));
+        run("INQUIRY", "FAILED", SyncJob.FAILURE_CONFIGURATION_REQUIRED, Instant.parse("2026-10-07T02:44:10Z"));
+
+        assertThat(lastSuccess("INQUIRY")).isNull();
+    }
+
+    @Test
+    @DisplayName("the two gates are transparent together, and an older collection survives both")
+    void bothPreAttemptGatesAreTransparent() {
+        run("INQUIRY", "SUCCESS", null, COLLECTED);
+        run("INQUIRY", "FAILED", SyncJob.FAILURE_CONNECTOR_UNAVAILABLE, Instant.parse("2026-10-07T02:43:57Z"));
+        run("INQUIRY", "FAILED", SyncJob.FAILURE_CONFIGURATION_REQUIRED, Instant.parse("2026-10-07T02:44:10Z"));
+
+        assertThat(lastSuccess("INQUIRY")).isEqualTo(COLLECTED);
+    }
+
+    @Test
+    @DisplayName("every failure that reached the marketplace still erases — the set did not widen")
+    void failuresThatReachedTheChannelStillSpeak() {
+        for (String reached : new String[] {"AUTH_REQUIRED", "RATE_LIMITED", "TIMEOUT", "EXECUTION_FAILED",
+                "PAGE_LIMIT_REACHED"}) {
+            syncJobs.deleteAll();
+            run("INQUIRY", "SUCCESS", null, COLLECTED);
+            run("INQUIRY", "FAILED", reached, Instant.parse("2026-10-07T02:43:57Z"));
+
+            assertThat(lastSuccess("INQUIRY")).as("%s reached the channel and is its latest word", reached)
+                    .isNull();
+        }
+    }
+
+    @Test
     @DisplayName("a failure that DID reach the channel still stands in front of an older success")
     void aRealFailureIsStillEvidence() {
         run("INQUIRY", "SUCCESS", null, COLLECTED);
