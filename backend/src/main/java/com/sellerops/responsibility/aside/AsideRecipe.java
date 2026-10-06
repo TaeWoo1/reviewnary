@@ -128,6 +128,40 @@ public enum AsideRecipe {
     }
 
     /**
+     * What this recipe is allowed to do to the surface it opens.
+     *
+     * <p>Every published recipe is {@link AsideRecipeMode#READ_ONLY} and the enum has no other value, so this
+     * method answers the same thing for all four today. It exists so the operator lane can REFUSE on the
+     * property rather than on the list: a future recipe that acts on a page would have to say so here, and
+     * saying so would make the seller-pressed dispatch reject it until someone decided otherwise on purpose.
+     */
+    public AsideRecipeMode mode() {
+        return AsideRecipeMode.READ_ONLY;
+    }
+
+    /**
+     * The recipe that reads this channel's screen for this kind of data, if one is published.
+     *
+     * <p><b>The operator lane names a data type, never a recipe.</b> That is the difference between a client
+     * that can ask for 「리뷰」 on an account it owns and a client that can name any value this enum happens to
+     * carry. Recipes with no channel — the loopback fixture — are unreachable through here by construction,
+     * because the lookup is keyed by a channel code and they have none.
+     */
+    public static Optional<AsideRecipe> forScreenRead(String channelCode, DataType dataType) {
+        if (channelCode == null || dataType == null) {
+            return Optional.empty();
+        }
+        for (AsideRecipe candidate : values()) {
+            if (candidate.readsMarketplace()
+                    && channelCode.equals(candidate.channelCode)
+                    && dataType == candidate.dataType) {
+                return Optional.of(candidate);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
      * A short, stable tag for this recipe inside a job's {@code clientJobId}.
      *
      * <p>Exists because {@code enqueue} is idempotent on {@code (device, clientJobId)}: a run that hands out two

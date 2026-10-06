@@ -48,7 +48,7 @@ class AsideMarketplaceObservationTest {
         job.setId(UUID.randomUUID());
         job.setOrgId(ORG);
         job.setRecipe(AsideRecipe.NAVER_REVIEW_OBSERVE_V1);
-        when(jobs.enqueue(any(), any(), any(), any(), any())).thenReturn(job);
+        when(jobs.dispatch(any())).thenReturn(job);
         when(jobs.byId(job.getId())).thenReturn(Optional.of(job));
         observer = new AsideSourceObserver(jobs, devices, Duration.ofMillis(50), Duration.ofMillis(5),
                 Clock.systemUTC());

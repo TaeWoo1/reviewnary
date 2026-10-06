@@ -138,10 +138,14 @@ public class AsideSourceObserver {
             // the whole point: an unattended lane with nobody home reports absence, never an empty surface.
             return none(recipe, SourceFailureReason.DEVICE_OFFLINE);
         }
-        UUID deviceId = device.get().getId();
         ScheduledAsideJob job;
         try {
-            job = jobs.enqueue(orgId, deviceId, runId, clientJobId, recipe);
+            // The common dispatch primitive, with this lane's trigger. The device is resolved inside it from the
+            // same grant the check above read, so the two cannot disagree about who is on this desk.
+            job = jobs.dispatch(AsideDispatch.responsibility(orgId, runId, clientJobId, recipe));
+        } catch (AsideHelperUnavailableException e) {
+            // The grant went away between the check and the dispatch. Still nothing read, still not a zero.
+            return none(recipe, SourceFailureReason.DEVICE_OFFLINE);
         } catch (RuntimeException e) {
             log.info("aside source: 작업을 맡기지 못했습니다 org={} 사유={}", orgId, e.getClass().getSimpleName());
             return none(recipe, SourceFailureReason.EXECUTION_FAILED);
