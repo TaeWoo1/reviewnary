@@ -71,4 +71,20 @@ class NarrativeClaimGuardTest {
         // the two vocabularies are meant to differ rather than accidentally agree.
         assertThat(NarrativeClaimGuard.unsupportedClaim("늘어난 원인은 리뷰가 말해주지 않습니다.")).isTrue();
     }
+
+    /**
+     * <b>측정된 매출은 주장이 아니라 사실이다</b> (2026-10-06). 「매출」은 스냅샷에 매출이 없던 동안 금지어였고,
+     * 이제 창·이전 창·coverage 관문을 모두 가진 fact({@code c-revenue})다. 금지된 채로 남는 것은 그 단어가
+     * 대신 서 있던 <b>주장의 모양</b>이다.
+     */
+    @Test
+    @DisplayName("the measured 매출 fact may be restated; a 매출 claim may not")
+    void revenueIsAFactNotAnOutcome() {
+        assertThat(NarrativeClaimGuard.unsupportedClaim(
+                "매출은(는) 이전 기간보다 1,836,512원 줄었습니다 (5,721,102원 → 3,884,590원).")).isFalse();
+        for (String claim : java.util.List.of("매출 향상에 기여했습니다", "매출 증가가 기대됩니다",
+                "매출이 늘어난 원인은 리뷰입니다", "매출이 좋아졌습니다", "전환율이 올랐습니다")) {
+            assertThat(NarrativeClaimGuard.unsupportedClaim(claim)).as(claim).isTrue();
+        }
+    }
 }

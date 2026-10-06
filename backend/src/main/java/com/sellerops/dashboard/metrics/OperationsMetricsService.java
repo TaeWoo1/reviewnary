@@ -254,7 +254,7 @@ public class OperationsMetricsService {
      * (disconnected, blocked, unsupported, or armed-but-unproven with nothing in the window) is
      * excluded and named, never quietly added as a zero.
      */
-    static boolean counted(ChannelDataState state, long rowsInWindow) {
+    public static boolean counted(ChannelDataState state, long rowsInWindow) {
         return state == ChannelDataState.OBSERVED_FRESH || state == ChannelDataState.ZERO
                 || rowsInWindow > 0;
     }
@@ -317,9 +317,17 @@ public class OperationsMetricsService {
         });
     }
 
-    private static MetricExclusion exclusion(String code, String nameKo, String dataType,
-                                             ChannelDataState state) {
-        String reason = switch (state) {
+    /**
+     * Why a channel was left out, in the seller's words — <b>one copy, because two screens say it</b>.
+     *
+     * <p>The operating report reuses this (and {@link #counted}) rather than deciding freshness again:
+     * the 2026-10-06 audit found the report had no coverage gate at all and published 「받은 문의 0건 ·
+     * 이전 기간보다 4건 줄음」 over a window whose last successful collection predated it by eight days,
+     * while this screen, on the same rows at the same moment, named all twelve exclusions. A second
+     * freshness rule is how the two came to disagree; there is now one.
+     */
+    public static String exclusionReasonKo(ChannelDataState state) {
+        return switch (state) {
             case NOT_CONNECTED -> "연결되어 있지 않습니다";
             case BLOCKED -> "연결이 끊겨 수집이 멈췄습니다";
             case NOT_SUPPORTED -> "이 채널에는 자동 수집 경로가 없습니다";
@@ -327,7 +335,11 @@ public class OperationsMetricsService {
             // OBSERVED_FRESH / ZERO are always counted, so reaching here would be a bug, not a state.
             default -> "이 기간의 수집 결과를 확인하지 못했습니다";
         };
-        return new MetricExclusion(code, nameKo, dataType, state, reason);
+    }
+
+    private static MetricExclusion exclusion(String code, String nameKo, String dataType,
+                                             ChannelDataState state) {
+        return new MetricExclusion(code, nameKo, dataType, state, exclusionReasonKo(state));
     }
 
     private static MetricKpi kpi(String key, String label, long value, String unit, Long previous,

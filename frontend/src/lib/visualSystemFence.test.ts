@@ -65,6 +65,9 @@ const ON_THE_SYSTEM = [
   "pages/app/CustomerInbox.tsx",
   "components/inbox/InboxDetail.tsx",
   "components/inbox/InquiryReply.tsx",
+  // 리포트, since its redesign (2026-10-06): the read range standing above the figures, and the figures
+  // drawn as rules and type instead of as cards.
+  "pages/app/ReportsV2.tsx",
   "pages/app/ConnectHub.tsx",
   "components/connect/ChannelList.tsx",
   "components/connect/ChannelStatusSection.tsx",

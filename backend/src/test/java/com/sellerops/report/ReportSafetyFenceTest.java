@@ -68,6 +68,25 @@ class ReportSafetyFenceTest {
         assertThat(offenders).isEmpty();
     }
 
+    /**
+     * <b>생성 경로는 모델에 닿지 않는다</b> (2026-10-06, product-owner decision). 리포트 화면이 narrative를
+     * 그리지 않게 된 뒤, 그 호출은 아무도 읽지 않는 산출물을 위해 GET 안에서 벤더를 동기로 기다리는 일이
+     * 됐다(한 기간의 첫 열기 25.5초). {@code NarrativeStatus}·{@code NarrativeClaimGuard}·저장 컬럼은
+     * 옛 행을 읽기 위해 남지만, 이 패키지는 그 문을 이름으로도 부르지 못한다.
+     */
+    @Test
+    @DisplayName("nothing in the report package can ask a model for anything")
+    void generationNamesNoModelDoor() throws IOException {
+        List<String> offenders = new ArrayList<>();
+        for (String[] s : sources()) {
+            if (s[1].contains("AgentReportNarrativeService") || s[1].contains("AgentReportProperties")
+                    || s[1].contains("AgentReportNarrativeGenerator")) {
+                offenders.add(s[0] + " names the narrative capability");
+            }
+        }
+        assertThat(offenders).isEmpty();
+    }
+
     @Test
     void theMigrationExists() {
         assertThat(Files.exists(Path.of("src", "main", "resources", "db", "migration", "V96__agent_report.sql")))
