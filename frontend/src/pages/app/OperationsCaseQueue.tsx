@@ -164,6 +164,9 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       { replace: true },
     );
 
+  // MasterDetail과 같은 술어다: rail은 옆에 페이지가 서 있을 때만 rail이다 ({@code LayoutKind}).
+  const rail = wide && selected !== null;
+
   const list = (
     <div className="space-y-4">
       {/*
@@ -177,7 +180,12 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
         here (visual review, 1366×768, 2026-10-01). Nothing a seller acts on was in either.
       */}
       <div className="flex items-center gap-2">
-        <h1 className="text-section font-bold tracking-tight text-ink">{TITLE}</h1>
+        {/* <b>페이지일 때는 페이지의 제목, rail일 때는 rail의 제목</b> (UI audit, 2026-10-06).
+            목록이 폭을 다 쥐고 있을 때 이 화면은 페이지이고, 제품의 페이지 제목은 28/700이다
+            (주문·상품·문의가 쓰는 {@code PageHead}의 수). 오른쪽에 읽고 있는 건이 서면 이 열은 316px
+            rail이 되고, 거기서 28px은 세 줄짜리 행 위의 현판이 된다 — 문의가 {@code compact}로 같은
+            전환을 이미 한다. 한 규칙이고, 두 치수가 아니다. */}
+        <h1 className={`font-bold tracking-tight text-ink ${rail ? "text-section" : "text-title"}`}>{TITLE}</h1>
         {work && allRows.length > 0 ? (
           <span className="text-sm tabular-nums text-muted">
             {allRows.length.toLocaleString("ko-KR")}

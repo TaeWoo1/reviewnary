@@ -38,6 +38,22 @@ public record CaseKnowledgeGap(String basis, String missingSubject, String sugge
         this(basis, missingSubject, suggestedScope, topic, candidateId, source, null);
     }
 
+    /**
+     * <b>The subject as it may be shown to the seller</b>, or null when the stored one cannot be quoted.
+     *
+     * <p>The rule is {@link com.sellerops.knowledge.RetrievalQuery#quotableSubject}'s and is applied HERE —
+     * at the record every screen reads — rather than at each screen, so a sentence, a title and a knowledge
+     * heading built from one gap cannot disagree about whether this gap has a subject.
+     *
+     * <p>Why a stored row can hold one that is not quotable: this JSON is written once, when the case is
+     * decided, and read for as long as the case is open. A row written before the extractor learned the rule
+     * (2026-09-23) still says what it said then.
+     */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public String quotableSubject() {
+        return com.sellerops.knowledge.RetrievalQuery.quotableSubject(missingSubject);
+    }
+
     public static CaseKnowledgeGap fromInvestigation(CaseInvestigationTools.KnowledgeAssessment knowledge) {
         return new CaseKnowledgeGap(knowledge.basis(), knowledge.missingSubject(), knowledge.suggestedScope(),
                 knowledge.topic(), null, "INVESTIGATION", knowledge.precedentMemoryId(), knowledge.needs());

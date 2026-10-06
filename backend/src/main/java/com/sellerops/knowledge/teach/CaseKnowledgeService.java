@@ -157,7 +157,7 @@ public class CaseKnowledgeService {
                 c.getRecommendedActionType() == null ? null : c.getRecommendedActionType().name(),
                 c.getRecommendedAction(), strings(c.getMissingInformation()), whyDecisionNeeded(c, gap),
                 investigated(orgId, c), knowledgeUsed(orgId, c, namedProduct),
-                gap == null ? null : new CaseDetailView.Gap(gap.missingSubject(), gapSentence(gap),
+                gap == null ? null : new CaseDetailView.Gap(gap.quotableSubject(), gapSentence(gap),
                         namedProduct == null ? "ORG" : gap.suggestedScope(),
                         gap.needs() == null ? prefillOf(orgId, c, namedProduct, gap)
                                 : combinedPrefill(needLines(orgId, c, namedProduct, gap)),
@@ -567,13 +567,45 @@ public class CaseKnowledgeService {
                 return asks.length() > 180 ? asks.substring(0, 180) : asks;
             }
         }
-        return gap.missingSubject();
+        /*
+          <b>And never a word that cannot be quoted</b> (2026-10-06). This string becomes the HEADING of the
+          company knowledge the seller is about to write — 「드립니다 안내」 would have been filed, permanently,
+          under a word from a greeting. Falling back to the topic's own label is the same fallback
+          {@link CaseKnowledgeGap} already makes when nothing named a subject; with no topic either, the sink
+          titles it 「고객 안내 기준」, which it has always done for a gap without a subject.
+        */
+        String subject = gap.quotableSubject();
+        if (subject != null) {
+            return subject;
+        }
+        return topicLabel(gap.topic());
     }
 
+    /** The stored topic's seller-facing label, or null — an unknown or absent topic names nothing. */
+    private static String topicLabel(String topic) {
+        if (topic == null || topic.isBlank()) {
+            return null;
+        }
+        try {
+            return com.sellerops.knowledge.KnowledgeTopic.valueOf(topic).labelKo();
+        } catch (IllegalArgumentException unknown) {
+            return null;
+        }
+    }
+
+    /**
+     * <b>A subject is quoted only when it is one</b> ({@link CaseKnowledgeGap#quotableSubject()}, 2026-10-06).
+     *
+     * <p>Measured on the demo org: a case from a post titled 「문의 드립니다」 held
+     * {@code missingSubject: "드립니다"} and this sentence read 「「드립니다」에 대해 고객에게 안내할 기준이
+     * 없습니다.」 — the customer's manners quoted to the seller as the name of their own company standard.
+     * The fact the sentence states does not change; what is dropped is a name we cannot stand behind.
+     */
     static String gapSentence(CaseKnowledgeGap gap) {
-        return gap.missingSubject() == null
+        String subject = gap.quotableSubject();
+        return subject == null
                 ? "이 문의에 답할 판매자 안내 기준이 없습니다."
-                : "「" + gap.missingSubject() + "」에 대해 고객에게 안내할 기준이 없습니다.";
+                : "「" + subject + "」에 대해 고객에게 안내할 기준이 없습니다.";
     }
 
     private static String whyDecisionNeeded(OperationsCase c, CaseKnowledgeGap gap) {

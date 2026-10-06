@@ -327,6 +327,30 @@ describe("리뷰 — the workflow surface", () => {
  * cleared, the account switcher is gone because a product's reviews are not one account's, and every
  * row opens the exact review rather than a filtered record the seller has to search again.
  */
+/**
+ * <b>기록도 페이지의 열 안에 선다</b> (Core Operations polish, 2026-10-06 — product-owner decision).
+ *
+ * <p>이 branch만 shell의 맨 {@code main}으로 직접 들어갔다. `/reviews`는 master-detail 경로라 그 main은
+ * padding도 폭 제한도 주지 않는다 — 측정된 결과는 1600·1366 양쪽에서 오른쪽으로 16px 넘침(날짜 열과
+ * 「확인할 일에 리뷰 N건 →」이 잘림)과 화면 꼭대기에 붙어 잘린 제목이었다. 다른 네 갈래는 처음부터
+ * {@code MasterDetail}의 목록 열을 지난다.
+ */
+describe("리뷰 목록의 자리", () => {
+  it("기록은 목록 열(max-w-content) 안에 그려지고, 그 밖으로 번지지 않는다", async () => {
+    renderAt("/reviews");
+    await screen.findByRole("heading", { level: 1, name: "리뷰" });
+
+    const column = screen.getByTestId("master-list");
+    // 제목도 목록도 같은 열 안에 있다 — shell이 주는 좌우 여백과 1280 폭을 함께 쓴다.
+    expect(column).toContainElement(screen.getByRole("heading", { level: 1, name: "리뷰" }));
+    const list = screen.getByRole("region", { name: "목록" });
+    expect(column).toContainElement(list);
+    expect(column.querySelector(".max-w-content")).not.toBeNull();
+    // `-mx-4`는 32px 여백을 가진 열에서도 16px을 더 나가 뷰포트 밖으로 나갔다.
+    expect(list.className).not.toMatch(/-mx-4/);
+  });
+});
+
 describe("리뷰 — narrowed to one product", () => {
   it("states the scope, offers the way out, and drops the channel switcher", async () => {
     renderAt("/reviews?productId=p-1");

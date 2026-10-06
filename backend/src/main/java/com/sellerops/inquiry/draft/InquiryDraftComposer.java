@@ -302,8 +302,17 @@ public class InquiryDraftComposer {
         // has been read and states nothing about it. The operating-rule lane has no say in that: a shipping policy
         // that did not mention a 9oz dispenser is not why the seller is being asked about one.
         boolean catalogue = gap.catalogueChecked() != null;
-        String subject = catalogue ? gap.askedSubject() : gap.missingSubject();
-        if (subject == null || subject.isBlank()) {
+        /*
+          <b>And the noun has to be one</b> (2026-10-06). The ask filed here is a row the seller reads and
+          answers later, titled with this word: 「「드립니다」에 대해 고객에게 안내할 공식 기준이 필요합니다.」
+          was reachable whenever a stored or classifier-supplied subject was a predicate. A subject that
+          cannot be quoted is treated exactly as an absent one has always been — no ask is filed, and the gap
+          is returned unchanged. {@link com.sellerops.knowledge.RetrievalQuery#quotableSubject} is the same
+          rule the extractor applies; nothing new is accepted by it.
+        */
+        String subject = com.sellerops.knowledge.RetrievalQuery.quotableSubject(
+                catalogue ? gap.askedSubject() : gap.missingSubject());
+        if (subject == null) {
             return gap;
         }
         if (!catalogue && (!ABSENT.equals(gap.productOutcome()) || !ABSENT.equals(gap.policyOutcome()))) {

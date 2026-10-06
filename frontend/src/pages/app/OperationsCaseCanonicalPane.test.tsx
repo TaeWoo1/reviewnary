@@ -299,4 +299,96 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
     const dock = await screen.findByTestId("pane-footer");
     expect(dock.textContent).not.toMatch(/확인할 수 없습니다/);
   });
+  /**
+   * <b>Core Operations polish, 2026-10-06 — 내부 조각이 회사의 기준 이름으로 나가지 않는다.</b>
+   *
+   * <p>데모 org의 한 건이 그대로 보여 주었다: 제목이 「문의 드립니다」이고, 서버의 주제 추출이 그 마지막
+   * 토막을 집어 {@code missingSubject: "드립니다"}를 보냈다. 화면은 그것을 따옴표에 넣어 「「드립니다」에
+   * 대해 고객에게 안내할 기준이 없습니다」로, 칩에서는 「드립니다 기준 없음」으로 내보냈다 — 회사가
+   * 기준을 적어 둘 수 있는 주제가 아니라 인사말의 서술어다. 추출은 서버의 일이고(보고함), 화면이 할 일은
+   * <b>못 믿을 이름을 인용하지 않는 것</b>이다. 사실(기준이 없다)은 그대로 남는다.
+   */
+  it("서술어로 끝나는 주제는 기준 이름으로 인용하지 않는다", async () => {
+    api.getOperationsCase.mockResolvedValue(
+      detail({
+        draft: null,
+        knowledgeUsed: [],
+        gap: {
+          missingSubject: "드립니다",
+          sentence: "「드립니다」에 대해 고객에게 안내할 기준이 없습니다.",
+          suggestedScope: "ORG",
+        },
+      }),
+    );
+    drawPane();
+
+    const need = await screen.findByRole("region", { name: "필요한 정보" });
+    expect(within(need).getByText("이 질문에 대해 고객에게 안내할 기준이 없습니다.")).toBeTruthy();
+    expect(screen.queryByText(/드립니다/)).toBeNull();
+    // 확인한 내용의 칩도 같은 규칙을 쓴다 — 주제가 없으면 사실만 말한다.
+    expect(screen.getByText("안내 기준 없음")).toBeTruthy();
+  });
+
+  it("쓸 수 있는 주제는 그대로 인용한다", async () => {
+    api.getOperationsCase.mockResolvedValue(
+      detail({
+        draft: null,
+        knowledgeUsed: [],
+        gap: {
+          missingSubject: "교환 가능 기간",
+          sentence: "「교환 가능 기간」에 대해 고객에게 안내할 기준이 없습니다.",
+          suggestedScope: "ORG",
+        },
+      }),
+    );
+    drawPane();
+
+    const need = await screen.findByRole("region", { name: "필요한 정보" });
+    expect(within(need).getByText("「교환 가능 기간」에 대해 고객에게 안내할 기준이 없습니다.")).toBeTruthy();
+    expect(screen.getByText("교환 가능 기간 기준 없음")).toBeTruthy();
+  });
+
+  /**
+   * <b>Core Operations polish, 2026-10-06</b> — 이 pane에서 면을 가진 것은 없다. 초안 카드와 처리 변경은
+   * 이미 그랬고, 「필요한 정보」만 브랜드 테두리와 그림자를 단 상자로 남아 1600에서 화면의 가장 큰 면이었다.
+   */
+  it("필요한 정보도 문서의 한 구역이지 상자가 아니다", async () => {
+    api.getOperationsCase.mockResolvedValue(
+      detail({
+        draft: null,
+        knowledgeUsed: [],
+        gap: { missingSubject: "교환 가능 기간", sentence: "「교환 가능 기간」에 대해 고객에게 안내할 기준이 없습니다.", suggestedScope: "ORG" },
+      }),
+    );
+    drawPane();
+
+    const need = await screen.findByRole("region", { name: "필요한 정보" });
+    expect(need.className).not.toMatch(/ring|rounded-\[16px\]|shadow-\[/);
+    expect(need.className).toMatch(/border-t/);
+    // 저장은 제 말의 폭만 쓴다 — 바닥 dock의 1차 행동과 같은 크기로 겨루지 않는다.
+    const save = within(need).getByRole("button", { name: /저장 후 초안 재작성/ });
+    expect(save.className).not.toMatch(/w-full/);
+  });
+
+  /**
+   * <b>Core Operations polish, 2026-10-06</b> — 「왜 지금 볼 일인가」는 바로 아래 블록이 입력란과 버튼으로
+   * 들고 있는 말을 한 번 더 하지 않는다. 측정된 세 줄 중 둘이 같은 사실이었다.
+   */
+  it("필요한 정보가 서 있으면 같은 말을 왜 지금 볼 일인가에서 반복하지 않는다", async () => {
+    const recommendation = "답변에 필요한 회사 정보가 없어 답을 만들 수 없습니다. 정보를 알려 주시면 다시 준비합니다.";
+    api.getOperationsCase.mockResolvedValue(
+      detail({
+        draft: null,
+        knowledgeUsed: [],
+        whyDecisionNeeded: recommendation,
+        gap: { missingSubject: "교환 가능 기간", sentence: "「교환 가능 기간」에 대해 고객에게 안내할 기준이 없습니다.", suggestedScope: "ORG" },
+      }),
+    );
+    drawPane();
+
+    const why = await screen.findByRole("region", { name: "왜 지금 볼 일인가" });
+    // 기다린 날수와 서버가 쓴 사실 한 줄은 그대로 선다.
+    expect(within(why).getByText(/8일 동안 답변이 등록되지 않았습니다/)).toBeTruthy();
+    expect(why.textContent).not.toContain(recommendation);
+  });
 });

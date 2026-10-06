@@ -88,7 +88,16 @@ export function draftUnavailableReason(
     return null;
   }
   if (isAnswered(item)) {
-    return `이미 답변이 등록되어 있어 새 초안을 만들지 않습니다. 답변 내용은 ${sellerCenter(channelNameKo)}에서 확인하실 수 있습니다.`;
+    /*
+      <b>같은 사실을 두 번 말하지 않는다</b> (UI audit, 2026-10-06 — product-owner decision).
+
+      <p>이 문장은 바로 위의 {@link inquiryNextAction} 문장과 한 화면에 함께 선다. 둘이 같이 그려진
+      모습은 「답변이 등록된 문의입니다. 따로 하실 일은 없습니다.」 / 「이미 답변이 등록되어 있어 새 초안을
+      만들지 않습니다. 답변 내용은 …에서 확인하실 수 있습니다.」였다 — 앞 문장이 이미 말한 상태와 「할 일
+      없음」을 뒤 문장이 다른 말로 한 번 더 말한다. 남기는 것은 앞 문장이 말할 수 없는 하나, <b>어디서
+      읽는가</b>이다.
+    */
+    return `답변 내용은 ${sellerCenter(channelNameKo)}에서 확인하실 수 있습니다.`;
   }
   return draftRuleNotice(channelNameKo);
 }

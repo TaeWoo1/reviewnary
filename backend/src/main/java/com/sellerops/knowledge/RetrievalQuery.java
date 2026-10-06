@@ -222,6 +222,30 @@ public final class RetrievalQuery {
         return List.copyOf(out);
     }
 
+    /**
+     * <b>A subject that may be QUOTED BACK to the seller</b> — the word itself, or null when it is not one.
+     *
+     * <p>{@link #subjectNouns} decides this already, at the moment a subject is EXTRACTED. This is the same
+     * decision at the moment one is USED: a subject arrives at the screen from a row written months ago, by a
+     * build older than that rule, or down a path that did not go through the extractor — and 「「드립니다」에
+     * 대해 고객에게 안내할 기준이 없습니다」 is produced by whichever of those is true. Observed 2026-10-06 on
+     * the demo org: {@code proactive_case.knowledge_gap} held {@code "missingSubject":"드립니다"} from a post
+     * titled 「문의 드립니다」, and the screen quoted it as the company's standard; the same word would have
+     * become the TITLE of the knowledge the seller then wrote (「드립니다 안내」).
+     *
+     * <p><b>No new word list, and nothing is rewritten.</b> The test is exactly the extractor's: a text that
+     * yields no subject noun — a greeting, a courtesy title, a predicate, a whole sentence — cannot name what
+     * the seller is missing. A real noun phrase (「엘보 구간에 쓸 사이즈」) yields nouns and is returned as it
+     * came, because a subject the seller reads must be the word they would have written.
+     */
+    public static String quotableSubject(String subject) {
+        if (subject == null || subject.isBlank()) {
+            return null;
+        }
+        String text = subject.strip();
+        return subjectNouns(text, null).isEmpty() ? null : text;
+    }
+
     private static void add(List<Candidate> out, Set<String> seen, String text, Origin origin) {
         if (text == null || text.isBlank() || out.size() >= MAX_CANDIDATES) {
             return;

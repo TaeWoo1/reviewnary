@@ -5,8 +5,9 @@ import { Btn, BtnLink } from "../../components/ui/Btn";
 import { Disclosure } from "../../components/ui/Disclosure";
 import { WorkFlowCard } from "../../components/ui/WorkFlowCard";
 import { Facts } from "../../components/ui/ObjectRow";
-import { CaseBlock, CaseLayout, CaseQuote, type CaseVariant, type PaneDepth } from "../../components/workspace/CaseLayout";
+import { CaseBlock, CaseLayout, CaseQuote, useCaseVariant, type CaseVariant, type PaneDepth } from "../../components/workspace/CaseLayout";
 import { inquiryReading } from "../../lib/inquiryNextAction";
+import { gapSentence, usableTopic } from "../../lib/caseTopic";
 import { api } from "../../lib/apiClient";
 import { actionKo, subjectFallback } from "../../lib/customerOperations";
 import { COPY, draftSendWord, decisionOf, elapsedLabel, elapsedSource, photoWord, shortDate, sourceLabel, waitDays } from "../../lib/copy/customerOps";
@@ -126,7 +127,7 @@ export function OperationsCaseView({
   const why = canonical ? whyNow(detail, now) : [];
   // What 확인 항목 would actually draw — asked here so the block can decline to exist rather than drawing
   // a card around 「조사 기록 없음」. Same predicate `Checks` uses; no second definition of «empty».
-  const hasChecks = detail.investigated.length > 0 || Boolean(showTeach && detail.gap?.missingSubject);
+  const hasChecks = detail.investigated.length > 0 || Boolean(showTeach && detail.gap);
   const noteUnderChecks = !detail.summary && Boolean(detail.reasonNote) && !settled(detail);
   // Same question for 근거, and for the same reason: `Evidence` renders nothing when the draft's own
   // citation is already on screen, and a node that renders nothing still holds a grid track open.
@@ -262,11 +263,19 @@ export function OperationsCaseView({
         )
       }
       notice={
-        error ? (
-          <p className="break-keep text-sm text-bad" role="alert">
-            {error}
-          </p>
-        ) : null
+        <>
+          {error ? (
+            <p className="break-keep text-sm text-bad" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {/* 바닥이 서지 않는 읽기에서는 이 사실이 갈 곳이 없어진다. 이것은 컨트롤에 붙는 경고이기 전에
+              이 기록에 대한 사실이므로 — 「이 문의에 이미 답변이 달렸는지 지금은 확인할 수 없다」 —
+              머리 바로 아래에 선다. 바닥이 서는 읽기에서는 그대로 누름 바로 앞이다. */}
+          {canonical && !detail.draft && detail.answerStateNote ? (
+            <p className="break-keep text-xs leading-snug text-warn">{detail.answerStateNote}</p>
+          ) : null}
+        </>
       }
       subject={
         /* In the canonical reading the body is the heading above, so the quotation block would be the
@@ -304,6 +313,7 @@ export function OperationsCaseView({
             <TeachCard
               caseId={caseId}
               detail={detail}
+              flat={canonical}
               onTaught={(next, r) => {
                 applied(next);
                 setReceipt(r);
@@ -328,7 +338,7 @@ export function OperationsCaseView({
             caseId={caseId}
             detail={detail}
             flat={canonical}
-            docked={canonical}
+            docked={canonical && Boolean(detail.draft)}
             open={correcting}
             setOpen={setCorrecting}
             onApplied={applied}
@@ -343,8 +353,13 @@ export function OperationsCaseView({
 
          <p>The warning slot the mockup drew is the inquiry pane's: {@code answerStateNote} comes from
          the inquiry read, and the case read has no field for it. It is left out rather than invented. */
+      /* <b>그리고 1차 행동을 들고 있을 때만 선다</b> (Core Operations polish, 2026-10-06 —
+         product-owner decision). 초안이 없는 건의 1차 행동은 문서 안의 「저장 후 초안 재작성」이고,
+         그때 바닥에 남는 것은 경고 한 줄과 「처리 변경」 — 둘 다 2차다. 1366×900에서 측정하면 그 바닥
+         (147px)이 바로 그 1차 행동을 덮었다: 버튼은 754–800, 바닥은 777부터. 2차를 고정하려고 1차를
+         가리는 것이므로, 초안이 없으면 바닥을 세우지 않고 둘은 문서의 흐름으로 돌아간다. */
       dock={
-        canonical ? (
+        canonical && detail.draft ? (
           <div className="border-t border-line pb-6 pt-4">
             {/* <b>The warning stands immediately before the press</b> (product-owner decision,
                 2026-10-03). Whatever is true of this channel's collection is true of the send the
@@ -465,7 +480,8 @@ function flowCells(detail: OperationsCaseDetail, taught: boolean) {
 /** The left cell's headline, from the state the case is in — never a sentence Reviewnary writes about itself. */
 function doneHeadline(detail: OperationsCaseDetail, taught: boolean): string {
   if (detail.draft) return taught ? COPY.redrafted : "답변 초안 작성";
-  if (detail.gap?.missingSubject) return `${detail.gap.missingSubject} 정보 없음`;
+  const topic = usableTopic(detail.gap?.missingSubject);
+  if (topic) return `${topic} 정보 없음`;
   if (detail.gap) return "답변 정보 없음";
   const found = detail.investigated.filter((i) => i.results > 0).length;
   return found > 0 ? `${detail.investigated.length}개 항목 확인` : "확인할 근거 없음";
@@ -478,8 +494,10 @@ function firstLine(body: string | null): string | null {
 }
 
 function Checks({ detail, gapOpen }: { detail: OperationsCaseDetail; gapOpen: boolean }) {
-  const missing = gapOpen && detail.gap?.missingSubject ? detail.gap.missingSubject : null;
-  if (detail.investigated.length === 0 && !missing) {
+  // 주제를 믿을 수 있을 때만 주제를 적는다 — 아니면 칩은 사실만 말한다 ({@link usableTopic}).
+  const missing = gapOpen && detail.gap ? usableTopic(detail.gap.missingSubject) : null;
+  const missingChip = gapOpen && detail.gap ? (missing ? `${missing} 기준 없음` : "안내 기준 없음") : null;
+  if (detail.investigated.length === 0 && !missingChip) {
     return <p className="text-sm text-muted">{COPY.noInvestigation}</p>;
   }
   return (
@@ -487,9 +505,9 @@ function Checks({ detail, gapOpen }: { detail: OperationsCaseDetail; gapOpen: bo
       {detail.investigated.map((item) => (
         <li key={item.label}>{item.results > 0 ? <Found>{`${item.label} ${item.results}`}</Found> : <Missing>{`${item.label} 없음`}</Missing>}</li>
       ))}
-      {missing ? (
+      {missingChip ? (
         <li>
-          <Missing>{`${missing} 기준 없음`}</Missing>
+          <Missing>{missingChip}</Missing>
         </li>
       ) : null}
     </ul>
@@ -588,8 +606,14 @@ function whyNow(detail: OperationsCaseDetail, now?: Date): { icon: "clock" | "do
      about the product rather than about this customer, and the prepared answer below is already the
      thing being decided. Measured at 1600×1000, 2026-10-02: it was the third line of 왜 지금 볼 일인가
      on a case whose answer was already written. */
+  /* <b>그리고 「필요한 정보」가 서 있는 동안에도 아니다</b> (UI audit, 2026-10-06 — product-owner
+     decision). 측정한 문장 셋은 「13일 동안 답변이 등록되지 않았습니다」 · 「등록된 지식에 이 질문을
+     결정하는 내용이 없어, 판매자님의 판단이 필요합니다」 · 「답변에 필요한 회사 정보가 없어 답을 만들
+     수 없습니다. 정보를 알려 주시면 다시 준비합니다」였다. 뒤의 둘은 같은 사실의 두 벌이고, 세 번째가
+     시키는 일은 바로 아래 「필요한 정보」 블록이 입력란과 버튼으로 이미 들고 있다. 문자열 동등 비교로는
+     이 중복을 잡을 수 없어서(두 문장은 다른 문자열이다) 블록의 유무로 판단한다. */
   const why = detail.whyDecisionNeeded ?? detail.recommendedAction;
-  if (detail.open && !detail.draft && why && why !== detail.summary && why !== summary) {
+  if (detail.open && !detail.draft && !detail.gap && why && why !== detail.summary && why !== summary) {
     facts.push({ icon: "chat", text: why });
   }
   return facts;
@@ -649,6 +673,10 @@ function CheckedTable({ detail }: { detail: OperationsCaseDetail }) {
 }
 
 function Evidence({ detail }: { detail: OperationsCaseDetail }) {
+  /* <b>pane 안에서는 면을 그리지 않는다</b> (UI audit, 2026-10-06). {@link CaseBlock}이 이미 그 규칙을
+     들고 있다 — 「page 안의 panel 안의 card는 한 가지를 말하는 테두리 셋」. 「사용한 근거 없음」은 그중
+     가장 나쁜 쪽이었다: 아무것도 없다는 말을 하려고 그린 상자. 문장도 목록도 그대로이고 면만 빠진다. */
+  const flat = useCaseVariant() === "pane";
   if (detail.knowledgeUsed.length === 0) {
     // 「사용한 근거 없음」 is a claim about this case, and the draft standing beside it can already disprove it:
     // measured on the demo org, a case whose draft cites 「운영 정책 · 교환·반품 기준」 rendered 「사용한 근거
@@ -658,11 +686,13 @@ function Evidence({ detail }: { detail: OperationsCaseDetail }) {
     // the draft card owns that and a second copy is the next thing to disagree.
     if ((detail.draft?.evidence.length ?? 0) > 0) return null;
     return (
-      <p className="rounded-[14px] bg-surface px-5 py-3.5 text-sm text-muted shadow-[0_0_0_1px_#E4E7EC]">{COPY.noEvidence}</p>
+      <p className={flat ? "border-t border-line pt-4 text-sm text-muted" : "rounded-[14px] bg-surface px-5 py-3.5 text-sm text-muted shadow-[0_0_0_1px_#E4E7EC]"}>
+        {COPY.noEvidence}
+      </p>
     );
   }
   return (
-    <div className="rounded-[14px] bg-surface shadow-[0_0_0_1px_#E4E7EC]">
+    <div className={flat ? "border-t border-line pt-2" : "rounded-[14px] bg-surface shadow-[0_0_0_1px_#E4E7EC]"}>
       <Disclosure
         label={COPY.evidence}
         note={<span className="rounded-md bg-[#F1F3F5] px-1.5 text-xs tabular-nums">{detail.knowledgeUsed.length}</span>}
@@ -919,11 +949,21 @@ function DraftPreview({ detail }: { detail: OperationsCaseDetail }) {
 function TeachCard({
   caseId,
   detail,
+  flat = false,
   onTaught,
   onFailed,
 }: {
   caseId: string;
   detail: OperationsCaseDetail;
+  /**
+   * <b>확인할 일의 pane에서는 면을 그리지 않는다</b> (UI audit, 2026-10-06 — product-owner decision).
+   *
+   * <p>초안 카드와 처리 변경은 이미 {@code flat}으로 그 pane에 서 있는데 이 블록만 브랜드 테두리와
+   * 그림자를 단 상자였다. 1600에서 그것이 화면에서 가장 큰 면이었고, 1366에서는 그 상자의 아래쪽이
+   * 바닥 dock에 잘려 「무엇이 어디까지인지」가 깨져 보였다. 같은 내용, 같은 컨트롤 — 머리글과 그 위의
+   * 여백, 구역을 여는 가는 선이 묶음을 말한다 ({@link ActionCard}).
+   */
+  flat?: boolean;
   onTaught: (next: OperationsCaseDetail, receipt: Receipt) => void;
   onFailed: (e: unknown) => void;
 }) {
@@ -956,9 +996,9 @@ function TeachCard({
   };
 
   return (
-    <ActionCard primary ariaLabel={COPY.needInfo}>
+    <ActionCard primary={!flat} flat={flat} ariaLabel={COPY.needInfo}>
       <h2 className="text-lg font-semibold text-ink">{COPY.needInfo}</h2>
-      <p className="mt-2 break-keep text-[17px] font-bold leading-snug tracking-tight text-ink">{gap.sentence}</p>
+      <p className="mt-2 break-keep text-[17px] font-bold leading-snug tracking-tight text-ink">{gapSentence(gap)}</p>
       {gap.needs && gap.needs.length > 0 ? <NeedLists needs={gap.needs} /> : null}
       {prefill ? (
         <div id="teach-prefill" className="mt-3 rounded-xl bg-[#F4F7FB] px-3.5 py-3 text-sm leading-relaxed text-ink">
@@ -989,11 +1029,13 @@ function TeachCard({
           <ScopeOption checked={scope === "ORG"} onChange={() => setScope("ORG")} label={COPY.wholeCompany} />
         </div>
       </fieldset>
-      <Btn className="mt-4 min-h-[46px] w-full" onClick={submit} disabled={busy || content.trim().length === 0}>
+      {/* 상자 안에서는 상자 폭을 다 쓰고, 문서 안에서는 제 말의 폭만 쓴다 — 바닥 dock의 1차 행동과
+          같은 크기로 겨루지 않게 (UI audit, 2026-10-06). */}
+      <Btn className={`mt-4 min-h-[46px] ${flat ? "" : "w-full"}`} onClick={submit} disabled={busy || content.trim().length === 0}>
         {busy ? "저장 중…" : COPY.saveAndRedraft}
       </Btn>
       {precedent && !prefill && !gap.needs ? (
-        <Btn variant="ghost" size="sm" className="mt-2 w-full" onClick={() => setContent(precedent.reusableText ?? "")}>
+        <Btn variant="ghost" size="sm" className={`mt-2 ${flat ? "" : "w-full"}`} onClick={() => setContent(precedent.reusableText ?? "")}>
           {COPY.loadPastAnswer}
         </Btn>
       ) : null}

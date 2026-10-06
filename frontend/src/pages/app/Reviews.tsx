@@ -121,7 +121,16 @@ export function Reviews() {
     return <Navigate replace to={`/reviews${params.toString() ? `?${params.toString()}` : ""}`} />;
   }
 
-  return (
+  /*
+    <b>기록도 이 화면의 다른 모든 갈래와 같은 열에 선다</b> (UI audit, 2026-10-06 — product-owner decision).
+
+    <p>이 branch만 {@code page()}를 지나지 않고 shell의 맨 `main`으로 바로 들어갔다. `/reviews`는
+    master-detail 경로라 그 `main`은 padding도 폭 제한도 주지 않는다 — 그래서 제목 「리뷰」와 우측
+    「리뷰에 대해 물어보기」가 화면 꼭대기에서 잘렸고, 목록은 좌우 여백 없이 1,360px을 다 썼으며,
+    그 안의 `-mx-4`가 뷰포트 오른쪽으로 16px 넘어가 날짜 열과 「확인할 일에 리뷰 N건 →」을 잘라냈다
+    (1600·1366 모두). 다른 네 갈래(로딩·실패·상품 범위·채널 없음)는 처음부터 {@code page()}를 지났다.
+  */
+  return page(
     <ReviewRecord
       targets={targets}
       head={
@@ -131,7 +140,7 @@ export function Reviews() {
           action={<AgentLaunch context={{ surface: "reviews" }} label="리뷰에 대해 물어보기" />}
         />
       }
-    />
+    />,
   );
 }
 
