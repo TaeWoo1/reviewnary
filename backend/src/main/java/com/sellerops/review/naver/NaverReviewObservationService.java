@@ -122,17 +122,39 @@ public class NaverReviewObservationService implements AsideMarketplaceTarget {
         if (orgId == null || recipe != AsideRecipe.NAVER_REVIEW_OBSERVE_V1 || !access.allows(recipe, orgId)) {
             return Optional.empty();
         }
-        Map<UUID, String> codeByChannel = channels.findAll().stream()
-                .collect(Collectors.toMap(Channel::getId, Channel::getCode, (a, b) -> a));
-        List<SellerAccount> named = accounts.findAllByOrgId(orgId).stream()
-                .filter(a -> !a.isFileUpload())
-                .filter(a -> NAVER.equals(codeByChannel.get(a.getChannelId())))
+        List<SellerAccount> named = screenAccounts(orgId).stream()
                 .filter(a -> access.allowsAccount(a.getId()))
                 .toList();
         if (named.size() != 1) {
             return Optional.empty();
         }
-        return Optional.of(new Target(named.get(0).getId(), null, null));
+        return resolveFor(orgId, named.get(0).getId(), recipe);
+    }
+
+    /**
+     * One named store, for a seller who pressed on it. The deployment allow-list is not asked here — see
+     * {@link AsideMarketplaceTarget#resolveFor}. What IS asked is everything that makes the read meaningful:
+     * this organisation's account, on NAVER, that has a screen at all.
+     */
+    @Override
+    public Optional<Target> resolveFor(UUID orgId, UUID sellerAccountId, AsideRecipe recipe) {
+        if (orgId == null || sellerAccountId == null || recipe != AsideRecipe.NAVER_REVIEW_OBSERVE_V1) {
+            return Optional.empty();
+        }
+        return screenAccounts(orgId).stream()
+                .filter(a -> sellerAccountId.equals(a.getId()))
+                .findFirst()
+                .map(a -> new Target(a.getId(), null, null));
+    }
+
+    /** This organisation's NAVER accounts that have a seller-centre screen to read (file-upload ones do not). */
+    private List<SellerAccount> screenAccounts(UUID orgId) {
+        Map<UUID, String> codeByChannel = channels.findAll().stream()
+                .collect(Collectors.toMap(Channel::getId, Channel::getCode, (a, b) -> a));
+        return accounts.findAllByOrgId(orgId).stream()
+                .filter(a -> !a.isFileUpload())
+                .filter(a -> NAVER.equals(codeByChannel.get(a.getChannelId())))
+                .toList();
     }
 
     /**
@@ -157,8 +179,13 @@ public class NaverReviewObservationService implements AsideMarketplaceTarget {
             // One claim, one delivery. A second one would be a second write of the same reading.
             throw ApiException.conflict("이미 결과를 전달한 작업입니다.");
         }
-        UUID accountId = resolve(orgId, job.getRecipe()).map(Target::sellerAccountId)
-                .orElseThrow(() -> ApiException.conflict("이 계정에서는 네이버 리뷰를 자동으로 확인하도록 설정되어 있지 않습니다."));
+        // The row named its store when it was queued; re-deriving it from the deployment allow-list here is what
+        // made a seller-pressed read impossible to deliver. Older rows carry no account and still re-derive.
+        UUID accountId = (job.getSellerAccountId() != null
+                ? resolveFor(orgId, job.getSellerAccountId(), job.getRecipe())
+                : resolve(orgId, job.getRecipe()))
+                .map(Target::sellerAccountId)
+                .orElseThrow(() -> ApiException.conflict("이 계정에서는 네이버 리뷰를 확인할 수 없습니다."));
         SellerAccount account = accounts.findByIdAndOrgId(accountId, orgId)
                 .orElseThrow(() -> ApiException.notFound("판매 계정을 찾을 수 없습니다."));
         Channel channel = channels.findById(account.getChannelId())

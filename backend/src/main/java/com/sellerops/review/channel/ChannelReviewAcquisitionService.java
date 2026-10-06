@@ -109,21 +109,53 @@ public class ChannelReviewAcquisitionService implements AsideMarketplaceTarget {
         if (!marketplaceAccess.allows(recipe, orgId)) {
             return Optional.empty();
         }
-        Map<UUID, String> codeByChannel = channels.findAll().stream()
-                .collect(Collectors.toMap(Channel::getId, Channel::getCode, (a, b) -> a));
-        List<SellerAccount> named = accounts.findAllByOrgId(orgId).stream()
-                .filter(a -> !a.isFileUpload())
-                .filter(a -> channelCode.equals(codeByChannel.get(a.getChannelId())))
+        List<SellerAccount> named = screenAccounts(orgId, channelCode).stream()
                 .filter(a -> marketplaceAccess.allowsAccount(a.getId()))
                 .toList();
         if (named.size() != 1) {
             return Optional.empty();
         }
-        SellerAccount account = named.get(0);
+        return resolveFor(orgId, named.get(0).getId(), recipe);
+    }
+
+    /**
+     * One named store, for a seller who pressed on it — see {@link AsideMarketplaceTarget#resolveFor}.
+     *
+     * <p>Mints the same two things the deployment-named path mints, because they are what make a reading
+     * deliverable rather than what authorise it: the session slot the handoff resolves the account by, and the
+     * digest the helper refuses a foreign store against.
+     */
+    @Override
+    @Transactional
+    public Optional<Target> resolveFor(UUID orgId, UUID sellerAccountId, AsideRecipe recipe) {
+        if (orgId == null || sellerAccountId == null || recipe == null || !recipe.readsMarketplace()) {
+            return Optional.empty();
+        }
+        String channelCode = recipe.channelCode().orElse(null);
+        if (!readsReviewsFromScreen(channelCode)) {
+            return Optional.empty();
+        }
+        Optional<SellerAccount> match = screenAccounts(orgId, channelCode).stream()
+                .filter(a -> sellerAccountId.equals(a.getId()))
+                .findFirst();
+        if (match.isEmpty()) {
+            return Optional.empty();
+        }
+        SellerAccount account = match.get();
         // Find-or-create, exactly as the pressed lane does at mint: the handoff resolves the account BY slot, so
         // a run whose account has never been given one would read a page and have no route to hand it back.
         String slot = slotService.resolveSlot(orgId, account.getId(), account.getChannelId());
         return Optional.of(new Target(account.getId(), slot, expectedStoreFingerprint(orgId, account)));
+    }
+
+    /** This organisation's accounts on that channel that have a seller-centre screen to read. */
+    private List<SellerAccount> screenAccounts(UUID orgId, String channelCode) {
+        Map<UUID, String> codeByChannel = channels.findAll().stream()
+                .collect(Collectors.toMap(Channel::getId, Channel::getCode, (a, b) -> a));
+        return accounts.findAllByOrgId(orgId).stream()
+                .filter(a -> !a.isFileUpload())
+                .filter(a -> channelCode.equals(codeByChannel.get(a.getChannelId())))
+                .toList();
     }
 
     /**

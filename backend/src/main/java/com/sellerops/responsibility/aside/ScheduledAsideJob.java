@@ -43,9 +43,36 @@ public class ScheduledAsideJob extends BaseEntity {
     @Column(name = "device_id", nullable = false)
     private UUID deviceId;
 
-    /** The run whose observation this job serves, when it has one. */
+    /** The run whose observation this job serves, when it has one. Null for a seller-pressed read. */
     @Column(name = "run_id")
     private UUID runId;
+
+    /**
+     * Who asked for this job. The row says it because the two lanes are authorised differently and an audit
+     * trail that could not tell them apart would be unable to answer «was a human looking at this?».
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "trigger_source", nullable = false, length = 16)
+    private AsideTrigger trigger;
+
+    /**
+     * Which of the organisation's stores this job reads.
+     *
+     * <p>Required for an operator press and resolved from the deployment's own naming for a responsibility run,
+     * so by the time a row exists the store is a FACT ON THE ROW rather than something re-derived later. It had
+     * been re-derived — at claim and again at delivery, each time through the deployment allow-list — which is
+     * precisely why a seller-pressed read of their own store was impossible to express: the account was never
+     * the caller's to state.
+     *
+     * <p>Null only on rows written before this column existed, and on the loopback recipe, which reads a
+     * surface this repository serves and has no store.
+     */
+    @Column(name = "seller_account_id")
+    private UUID sellerAccountId;
+
+    /** The bound this job carries — see {@link AsideJobLimits}. One page, and the schema refuses anything else. */
+    @Column(name = "max_pages", nullable = false)
+    private int maxPages = 1;
 
     /** The caller's own id for this hand-out — makes a retried enqueue find its job instead of making a second. */
     @Column(name = "client_job_id", nullable = false, length = 64)
@@ -87,14 +114,23 @@ public class ScheduledAsideJob extends BaseEntity {
     @Column(name = "content_digest", length = 64)
     private String contentDigest;
 
-    public static ScheduledAsideJob queued(UUID orgId, UUID deviceId, UUID runId, String clientJobId,
-                                           AsideRecipe recipe, Instant now) {
+    /**
+     * A queued job, from a dispatch and the store it was resolved to.
+     *
+     * <p>The account is a parameter rather than a lookup because the two lanes know it differently — a press
+     * states it, a run resolves it from what the deployment named — and this factory is downstream of both.
+     */
+    public static ScheduledAsideJob queued(AsideDispatch dispatch, UUID deviceId, UUID sellerAccountId,
+                                           Instant now) {
         ScheduledAsideJob job = new ScheduledAsideJob();
-        job.setOrgId(orgId);
+        job.setOrgId(dispatch.orgId());
         job.setDeviceId(deviceId);
-        job.setRunId(runId);
-        job.setClientJobId(clientJobId);
-        job.setRecipe(recipe);
+        job.setRunId(dispatch.runId());
+        job.setTrigger(dispatch.trigger());
+        job.setSellerAccountId(sellerAccountId);
+        job.setMaxPages(dispatch.limits().maxPages());
+        job.setClientJobId(dispatch.clientJobId());
+        job.setRecipe(dispatch.recipe());
         job.setStatus(ScheduledAsideJobStatus.QUEUED);
         job.setExpiresAt(now.plus(TTL));
         return job;

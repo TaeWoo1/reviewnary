@@ -93,17 +93,58 @@ class ScheduledAsideJobPostgresProofIT {
     /** Raw insert: the point is what the TABLE refuses, so nothing here goes through the entity's own guards. */
     private void insert(UUID orgId, UUID deviceId, String clientJobId, String recipe, String status,
                         String outcome, Integer count) {
+        insert(orgId, deviceId, clientJobId, recipe, status, outcome, count, "RESPONSIBILITY", null);
+    }
+
+    /** The same raw insert, with the dispatch columns V118 added, for the rules they carry. */
+    private void insert(UUID orgId, UUID deviceId, String clientJobId, String recipe, String status,
+                        String outcome, Integer count, String trigger, UUID sellerAccountId) {
         jdbc.update("""
                 insert into scheduled_aside_job
                     (id, org_id, device_id, client_job_id, recipe, status, expires_at, claimed_at, lease_until,
-                     settled_at, outcome, observed_count, created_at, updated_at)
+                     settled_at, outcome, observed_count, trigger_source, seller_account_id, created_at, updated_at)
                 values (?, ?, ?, ?, ?, ?, now() + interval '10 minutes',
                         case when ?::text = 'CLAIMED' then now() end,
                         case when ?::text = 'CLAIMED' then now() + interval '5 minutes' end,
                         case when ?::text = 'SETTLED' then now() end,
-                        ?, ?, now(), now())
+                        ?, ?, ?, ?, now(), now())
                 """, UUID.randomUUID(), orgId, deviceId, clientJobId, recipe, status, status, status, status,
-                outcome, count);
+                outcome, count, trigger, sellerAccountId);
+    }
+
+    @Test
+    void aTriggerOutsideTheTwoLanesCannotBeStored() {
+        UUID orgId = org();
+        UUID deviceId = device(orgId);
+        String recipe = AsideRecipe.CUSTOMER_OPERATIONS_FIXTURE_OBSERVE_V1.name();
+
+        assertThatThrownBy(() -> insert(orgId, deviceId, "j1", recipe, "QUEUED", null, null, "SCHEDULER", null))
+                .as("a lane the code does not publish cannot be recorded as one")
+                .isInstanceOf(Exception.class);
+    }
+
+    @Test
+    void anOperatorJobMustNameItsStoreAndNoRun() {
+        UUID orgId = org();
+        UUID deviceId = device(orgId);
+        String recipe = AsideRecipe.NAVER_REVIEW_OBSERVE_V1.name();
+
+        // A press is about a store the seller is looking at. Without one there is nothing to fence the reading
+        // against, and the table says so rather than trusting the service to have asked.
+        assertThatThrownBy(() -> insert(orgId, deviceId, "j1", recipe, "QUEUED", null, null, "OPERATOR", null))
+                .isInstanceOf(Exception.class);
+    }
+
+    @Test
+    void aPageBoundOtherThanOneCannotBeStored() {
+        UUID orgId = org();
+        UUID deviceId = device(orgId);
+        String recipe = AsideRecipe.CUSTOMER_OPERATIONS_FIXTURE_OBSERVE_V1.name();
+        insert(orgId, deviceId, "j1", recipe, "QUEUED", null, null);
+
+        assertThatThrownBy(() -> jdbc.update("update scheduled_aside_job set max_pages = 2"))
+                .as("no published recipe can turn a page, and the schema is where that is said")
+                .isInstanceOf(Exception.class);
     }
 
     @Test

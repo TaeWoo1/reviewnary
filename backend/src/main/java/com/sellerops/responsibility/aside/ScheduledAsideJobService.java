@@ -41,25 +41,35 @@ public class ScheduledAsideJobService {
     private final Clock clock;
     private final AsideMarketplaceAccess marketplaceAccess;
     private final AsideMarketplaceTarget marketplaceTargets;
+    private final AsideHelperDevices devices;
 
     @org.springframework.beans.factory.annotation.Autowired
     public ScheduledAsideJobService(ScheduledAsideJobRepository jobs, AsideMarketplaceAccess marketplaceAccess,
-                                    org.springframework.beans.factory.ObjectProvider<AsideMarketplaceTarget> targets) {
-        this(jobs, Clock.systemUTC(), marketplaceAccess, AsideMarketplaceTarget.firstOf(targets.orderedStream().toList()));
+                                    org.springframework.beans.factory.ObjectProvider<AsideMarketplaceTarget> targets,
+                                    AsideHelperDevices devices) {
+        this(jobs, Clock.systemUTC(), marketplaceAccess,
+                AsideMarketplaceTarget.firstOf(targets.orderedStream().toList()), devices);
     }
 
     public ScheduledAsideJobService(ScheduledAsideJobRepository jobs, Clock clock) {
         // A build with no marketplace lane at all: the gate refuses every marketplace recipe by construction and
         // there is nothing to resolve a store with. The loopback lane behaves exactly as it did before.
-        this(jobs, clock, new AsideMarketplaceAccess(false, java.util.Set.of(), java.util.Set.of()), null);
+        this(jobs, clock, new AsideMarketplaceAccess(false, java.util.Set.of(), java.util.Set.of()), null, null);
     }
 
     public ScheduledAsideJobService(ScheduledAsideJobRepository jobs, Clock clock,
                                     AsideMarketplaceAccess marketplaceAccess, AsideMarketplaceTarget targets) {
+        this(jobs, clock, marketplaceAccess, targets, null);
+    }
+
+    public ScheduledAsideJobService(ScheduledAsideJobRepository jobs, Clock clock,
+                                    AsideMarketplaceAccess marketplaceAccess, AsideMarketplaceTarget targets,
+                                    AsideHelperDevices devices) {
         this.jobs = jobs;
         this.clock = clock;
         this.marketplaceAccess = marketplaceAccess;
         this.marketplaceTargets = targets;
+        this.devices = devices;
     }
 
     /**
@@ -71,11 +81,77 @@ public class ScheduledAsideJobService {
     }
 
     /**
-     * Queue one job for one device. Idempotent: the same {@code clientJobId} returns the job already queued,
-     * which is what makes a retry safe without the caller having to know whether its first attempt landed.
+     * <b>The common dispatch primitive: one bounded recipe, one organisation's helper, whoever is asking.</b>
      *
-     * @throws ApiException when this device already has different live work — one helper is one desk, and a
-     *                      queue of browser jobs for someone's machine is the thing this design refuses to be
+     * <p>Both lanes land here, which is the whole point of its existence — the recipe, the workflow, the store
+     * fence, the lease, the single-use claim and the one-job-per-device rule are shared because there is one
+     * place that writes a job, not because two places were kept in step.
+     *
+     * <p>The device is resolved here rather than named by the caller: «this organisation's linked helper» is a
+     * fact the backend owns, and a caller that could name a device could queue work on a stranger's machine.
+     *
+     * <p>Authorisation is per {@link AsideTrigger} and the difference is not cosmetic:
+     * <ul>
+     *   <li>{@link AsideTrigger#OPERATOR} — the press is the authorisation. The service still checks what only
+     *   it can: that the recipe is {@link AsideRecipeMode#READ_ONLY}, and that the store named is one this
+     *   organisation owns on the recipe's own channel (the resolver answers empty otherwise). The deployment
+     *   allow-list is deliberately NOT consulted; it exists to vouch for unattended work.</li>
+     *   <li>{@link AsideTrigger#RESPONSIBILITY} — unchanged. The lane's flag, the organisation and the seller
+     *   account must all be named by the deployment, because no one is watching.</li>
+     * </ul>
+     *
+     * <p>Idempotent on {@code (device, clientJobId)}: the same ask re-finds its job instead of putting a second
+     * one on someone's desk.
+     *
+     * @throws AsideHelperUnavailableException when the organisation has no live helper grant
+     * @throws ApiException                    when the ask is not one this lane may make, or the desk is busy
+     */
+    @Transactional
+    public ScheduledAsideJob dispatch(AsideDispatch dispatch) {
+        AsideRecipe recipe = dispatch.recipe();
+        UUID orgId = dispatch.orgId();
+        if (recipe.mode() != AsideRecipeMode.READ_ONLY) {
+            // Nothing published is anything else today. This refuses the premise rather than the list, so a
+            // recipe that one day acts on a page cannot reach a seller's press by being added to an enum.
+            throw ApiException.conflict("이 작업은 화면을 읽기만 하는 작업이 아니어서 여기서 실행할 수 없습니다.");
+        }
+        // <b>The one choke point for «may a browser be pointed at a real store on this desk».</b> Every job in
+        // this system is created here, so asking here means code that forgot to ask cannot queue one anyway —
+        // the same reason the recipe allow-list is a schema CHECK and not a convention.
+        if (dispatch.trigger() == AsideTrigger.RESPONSIBILITY && !marketplaceAccess.allows(recipe, orgId)) {
+            throw ApiException.conflict("이 계정에서는 채널 화면을 자동으로 확인하도록 설정되어 있지 않습니다.");
+        }
+        UUID sellerAccountId = resolveStore(dispatch);
+        if (recipe.readsMarketplace() && sellerAccountId == null) {
+            // A marketplace read with no store resolved is a read of nothing in particular, and the fence
+            // downstream would have nothing to compare the page against.
+            throw ApiException.conflict("확인할 판매 계정을 찾지 못했습니다.");
+        }
+        if (devices == null) {
+            // A context built for the device-level `enqueue` alone. Saying so beats an NPE three frames down.
+            throw new IllegalStateException("이 컨텍스트에는 도우미 조회가 없어 dispatch를 쓸 수 없습니다.");
+        }
+        UUID deviceId = devices.linked(orgId)
+                .orElseThrow(AsideHelperUnavailableException::new)
+                .getId();
+        Instant now = clock.instant();
+        jobs.expireStale(now);
+        Optional<ScheduledAsideJob> existing = jobs.findByDeviceIdAndClientJobId(deviceId, dispatch.clientJobId())
+                .filter(j -> orgId.equals(j.getOrgId()));
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        if (hasLiveWork(deviceId, now)) {
+            throw ApiException.conflict("이 컴퓨터에서 이미 확인 작업이 진행 중입니다.");
+        }
+        return jobs.save(ScheduledAsideJob.queued(dispatch, deviceId, sellerAccountId, now));
+    }
+
+    /**
+     * The device-level write {@link #dispatch} is built on, kept because the device is the unit several
+     * schema-level rules are stated in (one live job per desk, idempotency per desk) and the tests that pin
+     * those rules drive it directly. Equivalent to a {@link AsideTrigger#RESPONSIBILITY} dispatch on an
+     * explicitly named device.
      */
     @Transactional
     public ScheduledAsideJob enqueue(UUID orgId, UUID deviceId, UUID runId, String clientJobId, AsideRecipe recipe) {
@@ -85,9 +161,6 @@ public class ScheduledAsideJobService {
         if (recipe == null) {
             throw ApiException.badRequest("실행할 수 있는 작업이 아닙니다.");
         }
-        // <b>The one choke point for «may a browser be pointed at a real store on this desk».</b> Every job in
-        // this system is created here, so asking here means code that forgot to ask cannot queue one anyway —
-        // the same reason the recipe allow-list is a schema CHECK and not a convention.
         if (!marketplaceAccess.allows(recipe, orgId)) {
             throw ApiException.conflict("이 계정에서는 채널 화면을 자동으로 확인하도록 설정되어 있지 않습니다.");
         }
@@ -101,7 +174,31 @@ public class ScheduledAsideJobService {
         if (hasLiveWork(deviceId, now)) {
             throw ApiException.conflict("이 컴퓨터에서 이미 확인 작업이 진행 중입니다.");
         }
-        return jobs.save(ScheduledAsideJob.queued(orgId, deviceId, runId, clientJobId, recipe, now));
+        AsideDispatch dispatch = new AsideDispatch(orgId, null, recipe, AsideTrigger.RESPONSIBILITY,
+                AsideJobLimits.ONE_PAGE, runId, clientJobId);
+        return jobs.save(ScheduledAsideJob.queued(dispatch, deviceId, resolveStore(dispatch), now));
+    }
+
+    /**
+     * Which store this dispatch reads, decided once and written on the row.
+     *
+     * <p>An operator press states it and the resolver is asked to confirm it belongs to this organisation on
+     * this recipe's channel; a responsibility run has the resolver name the store the deployment named. A
+     * loopback recipe has none, and that is not a failure.
+     */
+    private UUID resolveStore(AsideDispatch dispatch) {
+        AsideRecipe recipe = dispatch.recipe();
+        if (marketplaceTargets == null || !recipe.readsMarketplace()) {
+            return null;
+        }
+        if (dispatch.sellerAccountId() != null) {
+            return marketplaceTargets.resolveFor(dispatch.orgId(), dispatch.sellerAccountId(), recipe)
+                    .map(AsideMarketplaceTarget.Target::sellerAccountId)
+                    .orElse(null);
+        }
+        return marketplaceTargets.resolve(dispatch.orgId(), recipe)
+                .map(AsideMarketplaceTarget.Target::sellerAccountId)
+                .orElse(null);
     }
 
     /**
@@ -120,7 +217,7 @@ public class ScheduledAsideJobService {
             if (jobs.claim(candidate.getId(), deviceId, now, leaseUntil) == 1) {
                 log.info("aside job: claimed job={} recipe={}", candidate.getId(), candidate.getRecipe());
                 return Optional.of(new ClaimedJob(candidate.getId(), candidate.getRecipe(), leaseUntil,
-                        targetFor(orgId, candidate.getRecipe())));
+                        targetFor(orgId, candidate)));
             }
         }
         return Optional.empty();
@@ -180,9 +277,16 @@ public class ScheduledAsideJobService {
      * pass downstream: the helper's identity assertion answers UNRESOLVED without an expectation and drops the
      * page's rows unread.
      */
-    private AsideMarketplaceTarget.Target targetFor(UUID orgId, AsideRecipe recipe) {
+    private AsideMarketplaceTarget.Target targetFor(UUID orgId, ScheduledAsideJob job) {
+        AsideRecipe recipe = job.getRecipe();
         if (marketplaceTargets == null || recipe == null || !recipe.readsMarketplace()) {
             return null;
+        }
+        if (job.getSellerAccountId() != null) {
+            // The row named its store when it was queued. Resolving THAT account is what lets a seller-pressed
+            // read exist at all, and it also stops a responsibility job from silently following a changed
+            // allow-list to a different store between queue and claim.
+            return marketplaceTargets.resolveFor(orgId, job.getSellerAccountId(), recipe).orElse(null);
         }
         return marketplaceTargets.resolve(orgId, recipe).orElse(null);
     }

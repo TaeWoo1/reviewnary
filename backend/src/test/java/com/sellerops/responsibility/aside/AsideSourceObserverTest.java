@@ -84,7 +84,11 @@ class AsideSourceObserverTest {
         device.setExpiresAt(Instant.now().plus(180, ChronoUnit.DAYS));
         deviceId = devices.saveAndFlush(device).getId();
 
-        jobs = new ScheduledAsideJobService(jobRepository, Clock.systemUTC());
+        // The dispatch primitive resolves the device from the same grant the observer reads, so the test
+        // service is given the same lookup the container would inject.
+        jobs = new ScheduledAsideJobService(jobRepository, Clock.systemUTC(),
+                new AsideMarketplaceAccess(false, java.util.Set.of(), java.util.Set.of()), null,
+                new AsideHelperDevices(devices, Clock.systemUTC()));
         observer = new AsideSourceObserver(jobs, devices, Duration.ofSeconds(5), Duration.ofMillis(25),
                 Clock.systemUTC(), true, java.util.Set.of(org));
     }
