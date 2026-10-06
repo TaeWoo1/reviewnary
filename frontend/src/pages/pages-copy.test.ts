@@ -23,8 +23,27 @@ describe("리포트 — honest workspace copy", () => {
     }
   });
 
-  it("anchors the page to honest, data-grounded copy", () => {
-    expect(reports).toContain("수집된 문의·리뷰를 기준으로");
+  /**
+   * The anchor moved with the redesign (2026-10-06). It used to be the page's one-line description
+   * (「수집된 문의·리뷰를 기준으로…」), which named the corpus but claimed nothing about whether that
+   * corpus had been READ for the period on screen — and on 2026-10-06 the page under it was printing
+   * 「받은 문의 0건 · 이전 기간보다 4건 줄음」 over a window whose last successful collection predated
+   * it by eight days. The description is gone; what the guard holds the page to now is the sentence
+   * that does the work, and the fact that the page never writes a zero it cannot prove.
+   */
+  it("anchors the page to the read it can prove, not to the corpus it names", () => {
+    expect(reports).toContain("확인되지 않음");
+    expect(reports).toContain("읽은 범위");
+  });
+
+  it("never spells a zero as the answer for an unread window", () => {
+    // 「0건」 as a literal is how an unread period gets published as a measured one. The honest zero is
+    // rendered from a MEASURED figure through `Value`, never typed into the page. Comments are stripped
+    // first, the same way `visualSystemFence` does it: the ban is on WRITING the value, not on
+    // explaining the defect that made the rule necessary.
+    const code = reports.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^[ \t]*\/\/.*$/gm, " ");
+    expect(code).not.toContain("0건");
+    expect(code).not.toContain("0원");
   });
 
   it("no longer depends on the deleted ComingSoon placeholder component", () => {

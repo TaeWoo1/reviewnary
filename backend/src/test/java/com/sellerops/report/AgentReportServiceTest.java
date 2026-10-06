@@ -10,12 +10,10 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.sellerops.agent.llm.report.AgentReportNarrativeService;
 import com.sellerops.report.dto.AgentReportView;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,19 +22,18 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 /**
- * Snapshot semantics: open reads, first open generates once, regenerate appends a version, and the
- * narrative is optional at every step.
+ * Snapshot semantics: open reads, first open generates once, regenerate appends a version — and
+ * generation reaches no model.
  */
 class AgentReportServiceTest {
 
     private final AgentReportRepository reports = mock(AgentReportRepository.class);
     private final ReportFactsBuilder builder = mock(ReportFactsBuilder.class);
-    private final AgentReportNarrativeService narrative = mock(AgentReportNarrativeService.class);
     private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule())
             .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     // Friday 2026-09-04, Seoul: the latest completed week is 08-24 … 08-30.
     private final Clock clock = Clock.fixed(Instant.parse("2026-09-04T03:00:00Z"), ReportPeriod.CALENDAR);
-    private final AgentReportService service = new AgentReportService(reports, builder, narrative, mapper, clock);
+    private final AgentReportService service = new AgentReportService(reports, builder, mapper, clock);
     private final UUID org = UUID.randomUUID();
 
     @BeforeEach
@@ -54,13 +51,10 @@ class AgentReportServiceTest {
     void openGeneratesOnceThenReads() {
         when(reports.findTopByOrgIdAndKindAndPeriodStartOrderByVersionDesc(org, ReportKind.WEEKLY,
                 LocalDate.of(2026, 8, 24))).thenReturn(Optional.empty());
-        when(narrative.isEnabledFor(org)).thenReturn(false);
 
         AgentReportView first = service.current(org, ReportKind.WEEKLY);
         assertThat(first.version()).isEqualTo(1);
         assertThat(first.periodLabelKo()).isEqualTo("2026년 8월 24일 ~ 30일");
-        assertThat(first.narrativeStatus()).isEqualTo("UNAVAILABLE");
-        assertThat(first.narrativeNoteKo()).contains("정리된 사실만");
         assertThat(first.summary().lines()).isNotEmpty();
         assertThat(first.facts().issues()).hasSize(1);
 
@@ -74,7 +68,80 @@ class AgentReportServiceTest {
         assertThat(again.facts()).isEqualTo(first.facts());
         // One build, one save: the second open read the row.
         verify(builder).build(eq(org), any(), any());
-        verify(narrative, never()).narrate(any(), any());
+    }
+
+    /**
+     * <b>Generation reaches no vendor</b> (2026-10-06, product-owner decision). Measured before the
+     * change: a first open of the monthly period took 25.5s end to end, of which the facts build was
+     * under a second — the rest was a synchronous model call inside a GET, for a narrative the screen
+     * had stopped printing. The structural half of this proof is {@code ReportSafetyFenceTest}, which
+     * refuses the door by name; this is the behavioural half.
+     */
+    @Test
+    @DisplayName("a generated snapshot carries no narrative, and nothing in the path can ask for one")
+    void generationAsksNoModel() {
+        when(reports.findTopByOrgIdAndKindAndPeriodStartOrderByVersionDesc(any(), any(), any()))
+                .thenReturn(Optional.empty());
+
+        AgentReportView view = service.current(org, ReportKind.WEEKLY);
+
+        assertThat(view.narrativeStatus()).isEqualTo("NOT_GENERATED");
+        assertThat(view.narrative()).isNull();
+        assertThat(view.narrativeNoteKo()).isNull();
+        assertThat(view.summary().lines()).isNotEmpty();
+
+        ArgumentCaptor<AgentReport> saved = ArgumentCaptor.forClass(AgentReport.class);
+        verify(reports).save(saved.capture());
+        assertThat(saved.getValue().getNarrativeJson()).isNull();
+        assertThat(saved.getValue().getNarrativeVersion()).isNull();
+    }
+
+    /**
+     * Rows written by older builds still read: they carry a narrative, a {@code READY} status and
+     * counters that are plain numbers with no unit, no dataType and no exclusion list.
+     */
+    @Test
+    @DisplayName("a report stored by an older build is still readable, narrative and all")
+    void legacyRowsStillRead() throws Exception {
+        String legacyFacts = """
+                {"period":{"kind":"WEEKLY","kindLabelKo":"주간","start":"2026-08-24","end":"2026-08-30",
+                 "labelKo":"2026년 8월 24일 ~ 30일","previousStart":"2026-08-17","previousEnd":"2026-08-23"},
+                 "counters":[{"id":"c-reviews","labelKo":"받은 리뷰","periodic":true,"current":81,
+                              "previous":65,"delta":16,"to":null}],
+                 "issues":[],"opportunities":[],"nextSteps":[],"generatedAt":"2026-09-04T03:00:00Z"}
+                """;
+        AgentReport row = new AgentReport();
+        row.setId(UUID.randomUUID());
+        row.setOrgId(org);
+        row.setKind(ReportKind.WEEKLY);
+        row.setPeriodStart(LocalDate.of(2026, 8, 24));
+        row.setPeriodEnd(LocalDate.of(2026, 8, 30));
+        row.setVersion(1);
+        row.setFactsJson(legacyFacts);
+        row.setSummaryJson("{\"lines\":[{\"text\":\"리뷰 81건\",\"kind\":\"FACT\",\"factIds\":[\"c-reviews\"]}]}");
+        row.setNarrativeJson("{\"headline\":\"이번 주 요약\",\"lines\":[{\"text\":\"리뷰가 늘었습니다.\",\"factIds\":[\"c-reviews\"]}]}");
+        row.setNarrativeStatus(NarrativeStatus.READY);
+        row.setGeneratedAt(Instant.parse("2026-09-04T03:00:00Z"));
+        when(reports.findByOrgIdAndId(org, row.getId())).thenReturn(Optional.of(row));
+
+        AgentReportView view = service.get(org, row.getId());
+
+        assertThat(view.narrativeStatus()).isEqualTo("READY");
+        assertThat(view.narrative().headline()).isEqualTo("이번 주 요약");
+        assertThat(view.facts().counters()).singleElement().satisfies(c -> {
+            assertThat(c.current()).isEqualTo(81L);
+            // The fields that did not exist then read back as their absent values, not as claims.
+            assertThat(c.unit()).isNull();
+            assertThat(c.unitOrDefault()).isEqualTo("건");
+            assertThat(c.dataType()).isNull();
+            assertThat(c.excludedChannels()).isZero();
+        });
+        // Lists added later are empty, never null — no reader has to know how old a row is. An empty
+        // `reads` is exactly what makes a legacy edition recognisable: it recorded no read range, and
+        // the screen says so rather than borrowing today's.
+        assertThat(view.facts().reads()).isEmpty();
+        assertThat(view.facts().salesByChannel()).isEmpty();
+        assertThat(view.facts().nextSteps()).isEmpty();
     }
 
     @Test
@@ -83,45 +150,39 @@ class AgentReportServiceTest {
         v1.setVersion(1);
         when(reports.findTopByOrgIdAndKindAndPeriodStartOrderByVersionDesc(org, ReportKind.WEEKLY,
                 LocalDate.of(2026, 8, 24))).thenReturn(Optional.of(v1));
-        when(narrative.isEnabledFor(org)).thenReturn(false);
 
         AgentReportView v2 = service.regenerate(org, ReportKind.WEEKLY, null);
         assertThat(v2.version()).isEqualTo(2);
         verify(reports, never()).delete(any());
     }
 
+    /**
+     * <b>A stored edition is a frozen edition</b> — and that includes the evidence, not only the
+     * figures. Before 2026-10-06 the read range came from a live coverage call, so reopening a report
+     * cut on 9월 27일 would show whatever had been collected since; the numbers stood still while their
+     * justification moved.
+     */
     @Test
-    @DisplayName("the narrative's untraceable and causal lines are dropped before storage; the rest is READY")
-    void narrativeIsValidatedBeforeItIsStored() {
+    @DisplayName("reopening a stored report returns the same numbers, including 매출")
+    void storedFiguresDoNotMove() {
         when(reports.findTopByOrgIdAndKindAndPeriodStartOrderByVersionDesc(any(), any(), any()))
                 .thenReturn(Optional.empty());
-        when(narrative.isEnabledFor(org)).thenReturn(true);
-        when(narrative.versionFor(org)).thenReturn("agent-report/v1+test");
-        when(narrative.narrate(eq(org), any())).thenReturn(Optional.of(new ReportNarrative("이번 주 요약", List.of(
-                new ReportNarrative.Line("리뷰가 81건으로 이전 기간 65건보다 늘었습니다.", List.of("c-reviews")),
-                new ReportNarrative.Line("접착 부족 리뷰 증가는 생산 품질 저하 때문입니다.",
-                        List.of("i-" + ReportFixtures.ISSUE)),
-                new ReportNarrative.Line("배송 파손이 늘었습니다.", List.of("i-nope"))))));
+        AgentReportView first = service.current(org, ReportKind.WEEKLY);
 
-        AgentReportView view = service.current(org, ReportKind.WEEKLY);
-        assertThat(view.narrativeStatus()).isEqualTo("READY");
-        assertThat(view.narrative().headline()).isEqualTo("이번 주 요약");
-        assertThat(view.narrative().lines()).extracting(ReportNarrative.Line::text)
-                .containsExactly("리뷰가 81건으로 이전 기간 65건보다 늘었습니다.");
-        assertThat(view.narrativeNoteKo()).isNull();
-    }
+        ArgumentCaptor<AgentReport> saved = ArgumentCaptor.forClass(AgentReport.class);
+        verify(reports).save(saved.capture());
+        when(reports.findByOrgIdAndId(eq(org), any())).thenReturn(Optional.of(saved.getValue()));
+        // The builder would now answer differently; the stored row must not.
+        when(builder.build(eq(org), any(), any())).thenReturn(ReportFixtures.quiet());
 
-    @Test
-    void aFailedOrFullyRefusedNarrativeLeavesTheSummaryStanding() {
-        when(reports.findTopByOrgIdAndKindAndPeriodStartOrderByVersionDesc(any(), any(), any()))
-                .thenReturn(Optional.empty());
-        when(narrative.isEnabledFor(org)).thenReturn(true);
-        when(narrative.narrate(eq(org), any())).thenReturn(Optional.empty());
-
-        AgentReportView view = service.current(org, ReportKind.WEEKLY);
-        assertThat(view.narrativeStatus()).isEqualTo("FAILED");
-        assertThat(view.narrative()).isNull();
-        assertThat(view.summary().lines()).isNotEmpty();
-        assertThat(view.narrativeNoteKo()).contains("만들지 못해");
+        AgentReportView reopened = service.get(org, first.id());
+        assertThat(reopened.facts()).isEqualTo(first.facts());
+        assertThat(reopened.facts().reads()).isEqualTo(first.facts().reads());
+        assertThat(reopened.facts().reads()).extracting(ReportFacts.Read::lastReadAt).doesNotContainNull();
+        assertThat(reopened.facts().counters()).anySatisfy(c -> {
+            assertThat(c.id()).isEqualTo("c-revenue");
+            assertThat(c.current()).isEqualTo(3_884_590L);
+            assertThat(c.unit()).isEqualTo("원");
+        });
     }
 }

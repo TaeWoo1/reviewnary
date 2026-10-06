@@ -2,7 +2,6 @@ package com.sellerops.report;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sellerops.agent.llm.report.AgentReportNarrativeService;
 import com.sellerops.common.ApiException;
 import com.sellerops.report.dto.AgentReportListItem;
 import com.sellerops.report.dto.AgentReportView;
@@ -12,8 +11,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,33 +27,31 @@ import org.springframework.transaction.annotation.Transactional;
  * decision was made) asks for one explicitly and gets version N+1; version N stays. There is no
  * in-place update anywhere in this class.
  *
- * <p><b>The narrative is optional at every step.</b> Off for the org, failed at the vendor, or refused
- * by the guard in full — the snapshot is stored either way with a status that says which, and the
- * deterministic summary is always there.
+ * <p><b>Generation reaches no model</b> (2026-10-06, product-owner decision). The report screen stopped
+ * printing a narrative when it became a workspace of values with their read range, and this class is
+ * where the call used to be made: a synchronous vendor request inside a GET, measured at 25.5s on the
+ * first open of a period, for an artifact nothing rendered. {@code NarrativeStatus}, the stored columns
+ * and {@code NarrativeClaimGuard} stay so rows written by older builds still read; nothing here asks
+ * for a new one, and {@code ReportSafetyFenceTest} refuses the door by name.
  */
 @Service
 public class AgentReportService {
 
-    private static final Logger log = LoggerFactory.getLogger(AgentReportService.class);
     static final int LIST_LIMIT = 12;
 
     private final AgentReportRepository reports;
     private final ReportFactsBuilder facts;
-    private final AgentReportNarrativeService narrative;
     private final ObjectMapper mapper;
     private final Clock clock;
 
     @org.springframework.beans.factory.annotation.Autowired
-    public AgentReportService(AgentReportRepository reports, ReportFactsBuilder facts,
-                              AgentReportNarrativeService narrative, ObjectMapper mapper) {
-        this(reports, facts, narrative, mapper, Clock.system(ReportPeriod.CALENDAR));
+    public AgentReportService(AgentReportRepository reports, ReportFactsBuilder facts, ObjectMapper mapper) {
+        this(reports, facts, mapper, Clock.system(ReportPeriod.CALENDAR));
     }
 
-    AgentReportService(AgentReportRepository reports, ReportFactsBuilder facts,
-                       AgentReportNarrativeService narrative, ObjectMapper mapper, Clock clock) {
+    AgentReportService(AgentReportRepository reports, ReportFactsBuilder facts, ObjectMapper mapper, Clock clock) {
         this.reports = reports;
         this.facts = facts;
-        this.narrative = narrative;
         this.mapper = mapper;
         this.clock = clock;
     }
@@ -116,21 +111,8 @@ public class AgentReportService {
         row.setSummaryJson(write(summary));
         row.setGeneratedAt(now);
 
-        if (!narrative.isEnabledFor(orgId)) {
-            row.setNarrativeStatus(NarrativeStatus.UNAVAILABLE);
-        } else {
-            row.setNarrativeVersion(narrative.versionFor(orgId));
-            Optional<ReportNarrative> raw = narrative.narrate(orgId, factsJson);
-            NarrativeClaimGuard.Result checked = NarrativeClaimGuard.validate(raw.orElse(null), built.factIds());
-            if (checked.hasAnything()) {
-                row.setNarrativeJson(write(checked.narrative()));
-                row.setNarrativeStatus(NarrativeStatus.READY);
-            } else {
-                row.setNarrativeStatus(NarrativeStatus.FAILED);
-            }
-            log.info("agent_report_guard orgId={} kept={} refused={}", orgId,
-                    checked.narrative() == null ? 0 : checked.narrative().lines().size(), checked.refused());
-        }
+        row.setNarrativeStatus(NarrativeStatus.NOT_GENERATED);
+
         return reports.save(row);
     }
 

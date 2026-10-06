@@ -29,10 +29,20 @@ public final class NarrativeClaimGuard {
             "때문", "원인은", "원인이", "원인으로", "원인일", "탓", "로 인해", "으로 인해", "인해서", "탓에",
             "영향으로", "결과로", "이유는", "이유로");
 
-    /** Outcome markers — quality, sales, satisfaction: nothing in the facts measures them. */
+    /**
+     * Outcome markers — quality, satisfaction, effect: nothing in the facts measures them.
+     *
+     * <p><b>매출 left this list on 2026-10-06, and only 매출.</b> The bare word was here because the
+     * snapshot had no revenue in it, so any sentence naming it was reaching outside its input. The
+     * snapshot now carries 매출 as a fact with an id, a window, a previous window and the same coverage
+     * gate as every other figure ({@code c-revenue} · {@code s-<channel>}), which is exactly the
+     * condition this list exists to enforce. The CLAIM shapes it was standing in for stay refused —
+     * 「매출 향상」·「매출 증가」 below, plus 효과·성과·좋아졌·개선 and the whole causal list — so what became
+     * sayable is the measurement, not a story about it.
+     */
     static final List<String> OUTCOME = List.of(
             "나빠졌", "나빠지", "악화", "저하", "품질이 떨어", "품질 문제", "좋아졌", "개선됐", "개선되었", "개선됨",
-            "효과", "성과", "매출", "전환율", "만족도", "신뢰도", "이탈");
+            "효과", "성과", "매출 향상", "매출 증가", "매출 기여", "전환율", "만족도", "신뢰도", "이탈");
 
     /** Length caps: a report line is a line. */
     static final int MAX_LINES = 8;

@@ -3579,10 +3579,63 @@ export interface ReportCounter {
   id: string;
   labelKo: string;
   periodic: boolean;
-  current: number;
+  /**
+   * The figure, or `null` when the window was never read.
+   *
+   * <p><b>Null is not zero</b> (2026-10-06). `ReportFactsBuilder` stores a number only when at least one
+   * channel qualified to contribute under the Overview's own `counted()` rule; a sum over an empty set
+   * of qualifying channels is not a measurement. Before that gate existed this field was a plain number
+   * and the weekly report published 「받은 문의 0건 · 이전 기간보다 4건 줄음」 over a window whose last
+   * successful collection predated it by eight days.
+   */
+  current: number | null;
   previous: number | null;
+  /** Present only when BOTH windows were measured. */
   delta: number | null;
   to: string | null;
+  /** 건 / 원 — 매출 shares this record. Absent on rows stored before 2026-10-06; treat as 건. */
+  unit?: string | null;
+  /** REVIEW | INQUIRY | ORDER_SUMMARY — which collection this figure rests on. */
+  dataType?: string | null;
+  /** How many channels were left out of it, each named in `ReportFacts.exclusions`. */
+  excludedChannels?: number;
+  /** A counted channel's collection is not provably current, so the number may be short. */
+  unproven?: boolean;
+}
+
+/** One channel's share of the period's 매출 — a snapshot fact with its own citable id. */
+export interface ReportChannelSales {
+  id: string;
+  channelCode: string;
+  channelNameKo: string;
+  amount: number;
+}
+
+/** One channel's standing for one data type AT GENERATION TIME. `reasonKo` is null when it was counted. */
+export interface ReportReadChannel {
+  channelCode: string;
+  channelNameKo: string;
+  state: ChannelDataState;
+  lastReadAt: string | null;
+  reasonKo: string | null;
+}
+
+/**
+ * <b>이 판이 한 종류를 어디까지 읽고 세었는가</b> — 생성 시점의 coverage를 그대로 얼린 것.
+ *
+ * <p>숫자는 얼어 있는데 그 숫자의 근거가 라이브 읽기에서 오면, 같은 판을 내일 열었을 때 「읽은 범위」만
+ * 혼자 움직인다. 사실과 그 사실의 자격은 같은 시각에 얼어야 한다. 비어 있으면 그 판이 읽은 범위를
+ * 기록하지 않은 것이고, 오늘의 수집 상태로 보완하지 않는다.
+ */
+export interface ReportRead {
+  dataType: string;
+  labelKo: string;
+  /** 생성 시점에 이 종류에서 가장 최근에 성공한 수집. 하나도 없으면 null. */
+  lastReadAt: string | null;
+  /** 이 기간을 계산할 수 있었는가. */
+  measured: boolean;
+  included: ReportReadChannel[];
+  excluded: ReportReadChannel[];
 }
 
 export interface ReportIssueFact {
@@ -3598,6 +3651,11 @@ export interface ReportIssueFact {
   productId: string | null;
   productName: string | null;
   to: string;
+  /**
+   * Whether review collection covered this window. When false the counts are what we happen to hold,
+   * not what happened — no rise may be claimed from them. Absent on rows stored before 2026-10-06.
+   */
+  measured?: boolean;
 }
 
 export interface ReportOpportunityFact {
@@ -3637,6 +3695,9 @@ export interface ReportFacts {
     previousEnd: string;
   };
   counters: ReportCounter[];
+  salesByChannel: ReportChannelSales[];
+  /** 생성 시점의 읽은 범위. 옛 판에는 없다 — 그러면 비어 있고, 화면은 그렇게 적는다. */
+  reads: ReportRead[];
   issues: ReportIssueFact[];
   opportunities: ReportOpportunityFact[];
   nextSteps: ReportNextStep[];
@@ -3656,7 +3717,8 @@ export interface ReportNarrativeLine {
   factIds: string[];
 }
 
-export type NarrativeStatus = "READY" | "UNAVAILABLE" | "FAILED";
+/** `NOT_GENERATED` is what rows written from 2026-10-06 carry: the report asks no model. */
+export type NarrativeStatus = "READY" | "UNAVAILABLE" | "FAILED" | "NOT_GENERATED";
 
 /** Mirrors com.sellerops.report.dto.AgentReportView. */
 export interface AgentReportView {
