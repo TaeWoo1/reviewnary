@@ -16,8 +16,8 @@ import {
   figureOf,
   hasReadRange,
   noChangeReason,
-  readChannels,
   readVerdict,
+  shownReadChannels,
   ungatedEdition,
 } from "../../lib/reportReading";
 import type { Figure } from "../../lib/reportReading";
@@ -342,10 +342,13 @@ function ReadRange({
                 <span className={`${READ_COL.period} ${verdicts[i].warn ? "text-warn" : "text-muted"}`}>
                   {verdicts[i].text}
                 </span>
+                {/* 이름은 제품이 노출하는 채널만 — 판매자가 붙일 수도, 고칠 수도 없는 채널을
+                    「무엇이 빠졌는가」의 목록에 세우지 않는다 ({@link shownReadChannels}). 판정과
+                    숫자는 저장된 집합 그대로다. */}
                 <span className={`${READ_COL.channels} text-muted`}>
-                  {readChannels(read).length === 0
+                  {shownReadChannels(read).length === 0
                     ? "연결된 채널이 없습니다"
-                    : readChannels(read)
+                    : shownReadChannels(read)
                         .map((c) => `${c.channelNameKo} ${dataStateLabel(c.state)}`)
                         .join(" · ")}
                 </span>

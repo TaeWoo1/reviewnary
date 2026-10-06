@@ -1,3 +1,4 @@
+import { isProductChannel } from "./productChannels";
 import type { ReportCounter, ReportRead, ReportReadChannel } from "./types";
 
 /**
@@ -121,7 +122,29 @@ export function readVerdict(read: ReportRead | null | undefined): { text: string
   return { text: "전부 포함", warn: false };
 }
 
-/** 한 줄로 읽는 채널 상태 — 센 채널과 빠진 채널을 한 번에, 빠진 쪽은 이유와 함께. */
+/**
+ * 한 줄로 읽는 채널 상태 — 센 채널과 빠진 채널을 한 번에, 빠진 쪽은 이유와 함께.
+ *
+ * <p><b>저장된 그대로다.</b> {@link readVerdict}가 판정의 근거로 삼는 집합이 이것이므로 여기서는 아무것도
+ * 빼지 않는다. 화면에 이름으로 설 것은 {@link shownReadChannels}가 따로 고른다.
+ */
 export function readChannels(read: ReportRead | null | undefined): ReportReadChannel[] {
   return read ? [...read.included, ...read.excluded] : [];
+}
+
+/**
+ * 화면이 <b>이름으로</b> 적을 채널 — 제품이 노출하는 채널만 (ship-fix, 2026-10-07 — product-owner decision).
+ *
+ * <p>관측에서 나왔다. 데모 org의 주간 리포트 읽은 범위가 세 줄 모두 「네이버 스마트스토어 최신 여부 미확인 ·
+ * <b>G마켓/옥션 연결 끊김</b> · 카페24 자사몰 최신 여부 미확인 · 쿠팡 최신 여부 미확인」을 그렸다. G마켓/옥션은
+ * {@link PRODUCT_CHANNEL_CODES}에 없는 채널이다 — 연결 화면에도 없고, 붙일 방법도 화면에 없다. 판매자가 할 수
+ * 있는 일이 하나도 없는 채널의 이름이 「무엇이 빠졌는가」의 목록에 서 있었다.
+ *
+ * <p><b>거르는 것은 이름뿐이다.</b> {@code reads}에 저장된 included/excluded도, {@code excludedChannels}가 센
+ * 숫자도, {@code measured} 판정도 그대로다. 그래서 「채널 N곳 빠짐」의 N은 여전히 그 측정이 실제로 빠뜨린 수이고,
+ * 여기 적히는 이름보다 클 수 있다 — 숫자는 측정에 대한 말이고 이름은 판매자가 가진 채널에 대한 말이라, 둘을
+ * 맞추려고 N을 줄이면 그 판이 얼마나 불완전한지를 줄여 적는 것이 된다.
+ */
+export function shownReadChannels(read: ReportRead | null | undefined): ReportReadChannel[] {
+  return readChannels(read).filter((channel) => isProductChannel(channel.channelCode));
 }
