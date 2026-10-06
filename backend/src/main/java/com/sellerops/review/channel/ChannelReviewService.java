@@ -749,18 +749,28 @@ public class ChannelReviewService {
                 .collect(Collectors.toMap(Product::getId, Function.identity(), (a, b) -> a));
     }
 
-    /** The most recent REVIEW collection for this account, whatever produced it. */
     /**
-     * **Scoped by CHANNEL, because that is what the list is scoped by.**
+     * **The most recent REVIEW collection that actually reached this channel**, whatever produced it —
+     * scoped by CHANNEL, because that is what the list is scoped by.
      *
      * <p>The rows come from {@code findByOrgIdAndChannelId} — every review the org holds for this channel,
      * whichever of its seller accounts collected them. An import read per ACCOUNT would then date a list it
      * does not cover: on an org with two Coupang connections, reviews collected under the sibling account
      * would be marked new, or not new, against an import that never touched them. One scope for the rows and
      * their dates, or the numbers on the page describe two different sets.
+     *
+     * <p><b>A run that stopped at its own configuration gate is not an import</b> (2026-10-07). It is skipped
+     * here, because what this answer becomes on screen is a dated claim about a collection: {@code
+     * lastImportAt} is this run's end, {@code newCount} counts from its start, and when it did not finish
+     * clean the record says 「마지막 수집(…)이 목록 끝까지 확인되지 않은 상태로 끝났습니다」. Six manual syncs on
+     * a backend with no connector configured put exactly that sentence under all three channels, naming a
+     * minute in which nothing was collected and nothing was attempted — an acquisition the seller was told
+     * had stopped early had never started. What a run that DID reach the channel means is untouched: it still
+     * dates the import, and {@code lastImportComplete} is still SUCCESS and nothing else, so a genuinely
+     * partial or failed acquisition warns exactly as before.
      */
     private Optional<SyncJob> lastReviewImport(UUID orgId, UUID channelId) {
-        return syncJobs.findFirstByOrgIdAndChannelIdAndDataTypeOrderByCreatedAtDesc(orgId, channelId, "REVIEW");
+        return syncJobs.findLatestRunReachingChannel(orgId, channelId, "REVIEW");
     }
 
     /**

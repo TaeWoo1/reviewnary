@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -67,16 +68,51 @@ public interface SyncJobRepository extends JpaRepository<SyncJob, UUID> {
             UUID orgId, UUID sellerAccountId, String dataType);
 
     /**
-     * The most recent sync of one data type for one CHANNEL, newest first.
+     * <b>The most recent run of one data type for one CHANNEL that actually asked the channel something</b>
+     * — newest first, runs that stopped at their own configuration gate skipped.
      *
-     * <p>The channel-scoped twin of the read above, and the difference is not cosmetic. A surface that lists
-     * reviews by channel — every review the org holds for that channel, whichever seller account collected it
-     * — must date its "last import" and its "new since" by the same scope it listed by. Reading the import
-     * from one ACCOUNT instead would mark rows collected under a sibling account as new or not-new against a
-     * clock that never ran over them.
+     * <p>The channel scope is not cosmetic. A surface that lists reviews by channel — every review the org
+     * holds for that channel, whichever seller account collected it — must date its "last import" and its
+     * "new since" by the same scope it listed by. Reading the import from one ACCOUNT instead would mark rows
+     * collected under a sibling account as new or not-new against a clock that never ran over them.
+     *
+     * <p><b>Why the skip, and why it is the repository's job.</b> The two freshness surfaces used to take the
+     * single latest run and read its status, which let a run that never opened a socket speak for the
+     * channel. On 2026-10-07 six manual syncs against a backend started without connector configuration
+     * proved it twice over, in opposite directions: coverage dropped four real 09-26 collection times to
+     * 「확인된 적 없음」, while the 리뷰 record dated its last import to that same minute and told the seller
+     * 「마지막 수집이 목록 끝까지 확인되지 않은 상태로 끝났습니다」 about a collection nobody attempted. One
+     * question — which run last spoke for this channel — asked by two services, so it is answered once here
+     * rather than twice, differently, in them.
+     *
+     * <p><b>The skip is narrow on purpose.</b> Only {@link SyncJob#FAILURE_CONNECTOR_UNAVAILABLE} is
+     * transparent. A run that reached the connector and was refused — a dead credential, a missing live
+     * approval, a timeout — is a real answer from the channel and still stands here as the latest word,
+     * because a failure that IS evidence must never read as a success. Rows written before V116 carry no
+     * code and are never skipped, so history keeps exactly the meaning it had.
+     *
+     * <p>Bounded in SQL rather than filtered afterwards: a deployment whose connectors are off emits these
+     * runs in streaks, and a fixed window fetched first would let a streak push the real collection out of
+     * sight — the very fact this read exists to hold on to.
      */
-    Optional<SyncJob> findFirstByOrgIdAndChannelIdAndDataTypeOrderByCreatedAtDesc(
-            UUID orgId, UUID channelId, String dataType);
+    @Query("""
+            select j from SyncJob j
+            where j.orgId = :orgId and j.channelId = :channelId and j.dataType = :dataType
+              and (j.failureCode is null or j.failureCode <> :skippedFailureCode)
+            order by j.createdAt desc, j.id desc
+            """)
+    List<SyncJob> findRunsReachingChannel(@Param("orgId") UUID orgId, @Param("channelId") UUID channelId,
+                                          @Param("dataType") String dataType,
+                                          @Param("skippedFailureCode") String skippedFailureCode,
+                                          Pageable pageable);
+
+    /** {@link #findRunsReachingChannel} narrowed to the latest one — the form both callers want. */
+    default Optional<SyncJob> findLatestRunReachingChannel(UUID orgId, UUID channelId, String dataType) {
+        return findRunsReachingChannel(orgId, channelId, dataType, SyncJob.FAILURE_CONNECTOR_UNAVAILABLE,
+                        PageRequest.of(0, 1))
+                .stream()
+                .findFirst();
+    }
 
     /**
      * The in-flight ({@code RUNNING}) runs for one (seller account, data type) — the single-flight

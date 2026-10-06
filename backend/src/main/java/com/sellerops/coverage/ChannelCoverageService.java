@@ -307,12 +307,18 @@ public class ChannelCoverageService implements OrderStoreFreshness {
      * a channel that had been verifiably exported this morning report 「아직 확인한 적이 없어요」, because a
      * column that happens to be null decided the answer. The two records are the same claim in two shapes,
      * so the later of them is the fact — and neither row is edited to make the past look different.
+     *
+     * <p><b>A run that never asked the channel cannot answer for it</b> (2026-10-07). The latest run is
+     * taken from {@link SyncJobRepository#findLatestRunReachingChannel}, which looks through the runs that
+     * stopped at their own configuration gate. Before that, six manual syncs on a backend with no connector
+     * configured erased four real 09-26 collection times — the product forgot it had ever read a channel
+     * because of a run that never opened a socket. What did NOT change is the rule underneath: once a run
+     * that genuinely reached the channel is the latest word, a failure is still a failure here. A dead
+     * credential, a refused approval, a timeout — each leaves this null rather than handing back an older
+     * success, because a channel that has stopped answering must not read as fresh.
      */
     private Instant lastSuccessfulSync(UUID orgId, UUID channelId, String dataType) {
-        Optional<SyncJob> latest =
-                syncJobs.findFirstByOrgIdAndChannelIdAndDataTypeOrderByCreatedAtDesc(orgId, channelId, dataType);
-        // Only a run that actually landed rows counts. A FAILED run is evidence the channel is NOT
-        // answering, and letting it stand in for a success is how a broken credential reads as fresh.
+        Optional<SyncJob> latest = syncJobs.findLatestRunReachingChannel(orgId, channelId, dataType);
         Instant collected = latest.filter(j -> "SUCCESS".equals(j.getStatus()) || "PARTIAL".equals(j.getStatus()))
                 .map(SyncJob::getFinishedAt)
                 .orElse(null);
