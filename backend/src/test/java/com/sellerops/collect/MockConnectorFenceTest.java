@@ -138,7 +138,7 @@ class MockConnectorFenceTest {
                 new InquiryWorkItemWriter(inquiries, workItems, audits, txManager));
         return new SyncRunExecutor(sellerAccounts, channels, registry, ingestion,
                 new com.sellerops.order.ChannelOrderIngestionService(
-                        channelOrders, channelOrderStatusEvents, txManager),
+                        channelOrders, channelOrderStatusEvents, channels, txManager),
                 syncJobs, cursors, connectionStatus, null, null, null);
     }
 

@@ -84,7 +84,7 @@ class SyncRunExecutorTest {
     void setUp() {
         mock = new MockApiConnector();
         orderIngestion = new com.sellerops.order.ChannelOrderIngestionService(
-                channelOrders, channelOrderStatusEvents, txManager);
+                channelOrders, channelOrderStatusEvents, channels, txManager);
         ConnectorRegistry registry = new ConnectorRegistry(List.of(mock));
         IngestionService ingestion = new IngestionService(reviews, inquiries, orders, new ProductService(products), communityArticles, channels, new InquiryWorkItemWriter(inquiries, workItems, audits, txManager));
         // Wire the NAVER connection lifecycle so the runPages → onOrderSyncCollected hook is exercised. It

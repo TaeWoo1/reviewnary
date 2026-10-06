@@ -94,7 +94,7 @@ class SyncCursorLaneTest {
                 new ProductService(products), communityArticles, channels,
                 new InquiryWorkItemWriter(inquiries, workItems, audits, txManager));
         executor = new SyncRunExecutor(sellerAccounts, channels, new ConnectorRegistry(List.of(connector)),
-                ingestion, new ChannelOrderIngestionService(channelOrders, channelOrderStatusEvents, txManager),
+                ingestion, new ChannelOrderIngestionService(channelOrders, channelOrderStatusEvents, channels, txManager),
                 syncJobs, cursors, connectionStatus);
 
         Channel ch = new Channel();

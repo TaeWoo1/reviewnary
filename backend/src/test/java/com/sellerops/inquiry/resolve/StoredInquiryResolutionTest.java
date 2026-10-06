@@ -551,7 +551,7 @@ class StoredInquiryResolutionTest {
         order.setChannelId(channelId);
         order.setExternalOrderId(externalOrderId);
         order.setRawStatusCode("PAYED");
-        order.setNormalizedStatus(NormalizedOrderStatus.fromRaw("PAYED"));
+        order.setNormalizedStatus(NormalizedOrderStatus.fromRaw("NAVER", "PAYED"));
         order.setPaymentAmount(10000L);
         order.setSummaryDate(LocalDate.parse("2026-09-19"));
         order.setPaidAt(Instant.parse("2026-09-19T01:00:00Z"));

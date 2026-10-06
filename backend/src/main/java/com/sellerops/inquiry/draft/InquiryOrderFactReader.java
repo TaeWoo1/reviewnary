@@ -164,7 +164,7 @@ public class InquiryOrderFactReader {
         // fence now lives in ChannelOrderStatusVocabulary, which the order screen reads too, so the
         // two surfaces cannot drift into saying different things about the same code.
         ChannelOrderStatusVocabulary.Axes axes =
-                ChannelOrderStatusVocabulary.axesFromStored(order.getRawStatusCode());
+                ChannelOrderStatusVocabulary.axesFromStored(channelCode, order.getRawStatusCode());
         return new OrderFact(OrderFactState.fromChannel(channelState),
                 OrderFactProvenance.STORED_CANONICAL, channelState, channelCode,
                 axes.payment(), axes.cancellation(), axes.fulfillment(),
