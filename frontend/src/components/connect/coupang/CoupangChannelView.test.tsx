@@ -21,6 +21,20 @@ import type {
 const getReviewAcquisitionReadiness = vi.fn();
 const getChannelCapabilityOverview = vi.fn();
 const getChannelReviewsStrict = vi.fn();
+const collectNowReadiness = vi.fn();
+const onReport = vi.fn();
+const collectNow = vi.fn();
+const screenReadStatus = vi.fn();
+
+/**
+ * 서버가 이 채널에 실제로 답하는 모양: 리뷰는 판매자 센터 화면 읽기, 문의·주문은 공식 API.
+ * `desk`는 그 화면 읽기를 지금 할 수 있는지다.
+ */
+function readiness(desk: string | null = "READY") {
+  collectNowReadiness.mockImplementation(async (_acct: string, dataType: string) =>
+    dataType === "REVIEW" ? { path: "SCREEN_READ", localAgent: desk } : { path: "API", localAgent: null },
+  );
+}
 
 vi.mock("../../../lib/apiClient", () => ({
   api: {
@@ -28,11 +42,11 @@ vi.mock("../../../lib/apiClient", () => ({
     getChannelCapabilityOverview: (...a: unknown[]) => getChannelCapabilityOverview(...a),
     getChannelReviewsStrict: (...a: unknown[]) => getChannelReviewsStrict(...a),
     manualSync: vi.fn(),
-    // 모든 수집 줄이 그려지기 전에 「어느 경로냐」를 서버에 묻는다. 답하지 않으면 줄은 「확인 중…」에
-    // 머무르고, 이 파일의 단정들은 아무 컨트롤도 보지 못한다.
-    collectNowReadiness: vi.fn(async () => ({ path: "API", localAgent: null })),
-    collectNow: vi.fn(async () => ({ path: "API", dataType: "INQUIRY", run: { successRows: 0, skippedRows: 0, failedRows: 0, status: "SUCCESS" }, screenRead: null })),
-    screenReadStatus: vi.fn(),
+    // 모든 수집 줄과 리뷰 카드가 그려지기 전에 「어느 경로냐」를 서버에 묻는다. 답하지 않으면 줄은
+    // 「확인 중…」에 머무르고, 이 파일의 단정들은 아무 컨트롤도 보지 못한다.
+    collectNowReadiness: (...a: unknown[]) => collectNowReadiness(...a),
+    collectNow: (...a: unknown[]) => collectNow(...a),
+    screenReadStatus: (...a: unknown[]) => screenReadStatus(...a),
   },
 }));
 
@@ -93,7 +107,7 @@ function view(over: Partial<Parameters<typeof CoupangChannelView>[0]> = {}) {
         schedules={[]}
         capabilities={CAPABILITIES}
         runs={[screenRead()]}
-        onReport={() => undefined}
+        onReport={onReport}
         onChanged={() => undefined}
         {...over}
       />
@@ -105,6 +119,10 @@ beforeEach(() => {
   getReviewAcquisitionReadiness.mockResolvedValue({ state: "READY", channelCode: "COUPANG" });
   getChannelCapabilityOverview.mockResolvedValue(overview(true));
   getChannelReviewsStrict.mockResolvedValue({ total: 1204 });
+  collectNow.mockReset();
+  screenReadStatus.mockReset();
+  onReport.mockReset();
+  readiness("READY");
 });
 afterEach(() => vi.clearAllMocks());
 
@@ -124,21 +142,80 @@ describe("쿠팡 채널 화면 — 두 가지 방법, 그뿐", () => {
     expect(within(card).getByText(/API 키는 필요하지 않습니다/)).toBeInTheDocument();
   });
 
-  it("연결된 계정의 리뷰 카드는 상태·마지막 수집·컨트롤 하나다", async () => {
+  it("리뷰 카드의 수집 컨트롤은 「지금 수집하기」 하나이고, 그것이 /collect-now로 간다", async () => {
+    // 2026-10-07 라이브에서 고친 것. 이 카드의 가장 강한 컨트롤이 안내 carrier로 가는 링크였고, 리뷰를
+    // 가져오려던 판매자가 그것을 눌렀다. canonical 경로는 하나뿐이어야 한다.
+    collectNow.mockResolvedValue({
+      path: "SCREEN_READ",
+      dataType: "REVIEW",
+      run: null,
+      screenRead: { jobId: "j1", state: "RUNNING", observed: null, inserted: null, changed: null, complete: false, startedAt: null, finishedAt: null },
+    });
+    // 화면 읽기는 도우미가 받아 가는 일이라, 끝났는지는 되물어야 안다.
+    screenReadStatus.mockResolvedValue({
+      jobId: "j1", state: "SUCCESS", observed: 12, inserted: 3, changed: 1, complete: true, startedAt: null, finishedAt: null,
+    });
     view();
     const card = await screen.findByTestId("coupang-review-card");
     await waitFor(() => expect(within(card).getByText(/가져온 상품평 1,204개/)).toBeInTheDocument());
-    expect(within(card).getByRole("link", { name: "지금 가져오기" })).toHaveAttribute(
-      "href",
-      "/connect/channels/acc-1/review-collection",
-    );
+
+    const button = await waitFor(() => within(card).getByTestId("collect-now-REVIEW"));
+    expect(button).toHaveTextContent("지금 수집하기");
+    expect(button).not.toBeDisabled();
+    // 옛 입구는 이 상태에서 화면에 없다 — 고를 것이 없어야 고르지 않는다.
+    expect(within(card).queryByRole("link", { name: "리뷰 수집 연결하기" })).toBeNull();
+    expect(within(card).queryByRole("link", { name: "지금 가져오기" })).toBeNull();
+
+    fireEvent.click(button);
+    await waitFor(() => expect(collectNow).toHaveBeenCalled());
+    const [accountId, dataType] = collectNow.mock.calls[0] as [string, string];
+    expect(accountId).toBe("acc-1");
+    expect(dataType).toBe("REVIEW");
+    await waitFor(() => expect(onReport).toHaveBeenCalledWith("리뷰 수집 완료: 새로 저장 3 · 갱신 1", false));
   });
 
-  it("연결되지 않은 계정의 리뷰 카드는 셋업으로 보낸다 — 같은 주소로", async () => {
+  it("도우미가 없으면 누를 수 없고, 안내 흐름은 복구 동작으로만 남는다", async () => {
+    readiness("UNPAIRED");
     getReviewAcquisitionReadiness.mockResolvedValue({ state: "HELPER_NOT_LINKED", channelCode: "COUPANG" });
     view();
-    const cta = await screen.findByRole("link", { name: "리뷰 수집 연결하기" });
-    expect(cta).toHaveAttribute("href", "/connect/channels/acc-1/review-collection");
+    const card = await screen.findByTestId("coupang-review-card");
+
+    await waitFor(() => expect(within(card).getByTestId("collect-now-REVIEW")).toBeDisabled());
+    expect(within(card).getByText(/도우미를 한 번 연결하면/)).toBeInTheDocument();
+    // 복구 동작은 같은 주소로 가지만, 이름에 「수집」이 없고 가장 강한 컨트롤도 아니다.
+    const recovery = within(card).getByRole("link", { name: "이 Mac 연결하기" });
+    expect(recovery).toHaveAttribute("href", "/connect/channels/acc-1/review-collection");
+    expect(recovery.className).not.toContain("bg-brand-700");
+  });
+
+  it("판매자 센터 로그인이 풀리면 로그인 복구를 내밀고, 다시 누를 수는 있게 둔다", async () => {
+    readiness("AUTH_REQUIRED");
+    view();
+    const card = await screen.findByTestId("coupang-review-card");
+
+    await waitFor(() =>
+      expect(within(card).getByText("판매자 센터 로그인이 필요합니다. 로그인한 뒤 다시 수집해 주세요.")).toBeInTheDocument(),
+    );
+    // 로그인은 판매자가 자기 브라우저에서 방금 했을 수도 있다. 막아 두면 고친 뒤에도 누를 길이 없다.
+    expect(within(card).getByTestId("collect-now-REVIEW")).not.toBeDisabled();
+    expect(within(card).getByRole("link", { name: "판매자 센터 로그인" })).toBeInTheDocument();
+  });
+
+  it("이미 수집 중이면 기다리라고 하고, 연결하라고 하지 않는다", async () => {
+    readiness("BUSY");
+    view();
+    const card = await screen.findByTestId("coupang-review-card");
+
+    await waitFor(() => expect(within(card).getByTestId("collect-now-REVIEW")).toBeDisabled());
+    expect(within(card).getByText(/이미 수집이 진행 중입니다/)).toBeInTheDocument();
+    expect(within(card).queryByRole("link", { name: "이 Mac 연결하기" })).toBeNull();
+  });
+
+  it("같은 자료에 수집 버튼이 두 번 보이지 않는다", async () => {
+    // 카드가 리뷰의 primary를 들고 있으므로, 「수집 주기」 안의 리뷰 줄은 주기가 없는 이유만 말한다.
+    view();
+    await screen.findByTestId("coupang-review-card");
+    await waitFor(() => expect(screen.getAllByTestId("collect-now-REVIEW")).toHaveLength(1));
   });
 
   it("정상 상태에 도우미·실행 프로그램 같은 진단은 없다", async () => {
@@ -158,7 +235,7 @@ describe("쿠팡 채널 화면 — 두 가지 방법, 그뿐", () => {
     const review = await screen.findByTestId("coupang-review-card");
     const api = await screen.findByTestId("coupang-api-card");
     // 둘 다 연결된 화면에서 지금 할 일은 상품평을 한 번 더 가져오는 것뿐이고, 나머지는 보조다.
-    expect(solidIn(review).map((c) => c.textContent)).toEqual(["지금 가져오기"]);
+    await waitFor(() => expect(solidIn(review).map((c) => c.textContent)).toEqual(["지금 수집하기"]));
     expect(solidIn(api)).toHaveLength(0);
   });
 

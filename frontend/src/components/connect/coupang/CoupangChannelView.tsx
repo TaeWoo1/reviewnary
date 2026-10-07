@@ -14,7 +14,9 @@ import {
   apiCardOf,
   reviewCardOf,
   reviewCollectionPath,
+  reviewRecoveryLabel,
 } from "../../../lib/connect/coupangCapabilities";
+import { CollectNowAction, useCollectNowRoute } from "../CollectNowAction";
 import { lastScreenRead } from "../../../lib/connect/reviewCollection";
 import type { AcquisitionReadinessView } from "../../../lib/acquisitionReadiness";
 import type {
@@ -123,8 +125,25 @@ export function CoupangChannelView({
    * 고르게 된다. 규칙은 둘이다 — <b>끝나지 않은 연결이 있으면 그것이 이 화면의 다음 걸음이고</b>, 없으면
    * 이 화면이 존재하는 이유(상품평 가져오기)가 그 자리를 갖는다. 나머지는 보조 컨트롤이다.
    */
-  const lead: "REVIEW" | "API" =
-    review?.kind === "SETUP" ? "REVIEW" : apiCard && apiCard.kind !== "READY" ? "API" : "REVIEW";
+  // 리뷰의 수집 primary는 카드 안의 `CollectNowAction` 하나이므로, 이 값이 가리는 것은 API 카드의
+  // 미완료 연결뿐이다. 「끝나지 않은 연결이 있으면 그것이 이 화면의 다음 걸음」은 그대로다.
+  const lead: "REVIEW" | "API" = apiCard && apiCard.kind !== "READY" ? "API" : "REVIEW";
+
+  /**
+   * <b>리뷰를 지금 가져오는 길은 하나다.</b>
+   *
+   * 경로와 책상 상태는 서버가 답한다(`/collect-now/readiness`) — 이 화면이 채널 이름으로 고르지 않는다.
+   * 그 답이 화면 읽기일 때만 이 카드가 수집 primary를 들고, 안내 흐름은 책상이 막혔을 때의 복구 동작으로
+   * 내려간다. 2026-10-07 라이브에서 판매자가 누른 것이 바로 그 안내 흐름이었다.
+   */
+  // 이 화면이 이미 쓰는 「무언가 수집됐다」 신호를 그대로 쓴다 — 실행 기록이 한 줄 늘면 책상도 다시 묻는다.
+  const reviewRoute = useCollectNowRoute(accountId, "REVIEW", runs.length);
+  const recoveryLabel = reviewRecoveryLabel(reviewRoute.desk);
+  const reviewRecovery = recoveryLabel ? (
+    <BtnLink to={reviewCollectionPath(accountId)} size="sm" variant="ghost" state={{ start: true }}>
+      {recoveryLabel}
+    </BtnLink>
+  ) : null;
 
   const reviewFacts: string[] = [];
   if (lastRead?.finishedAt) reviewFacts.push(`마지막 수집 ${relativeTime(lastRead.finishedAt)}`);
@@ -153,17 +172,21 @@ export function CoupangChannelView({
           description="로그인된 쿠팡 판매자 화면에서 상품평을 가져옵니다. API 키는 필요하지 않습니다."
           facts={reviewFacts.length > 0 ? reviewFacts.join(" · ") : null}
           primary={
-            review.primaryLabel ? (
-              <BtnLink
-                to={reviewCollectionPath(accountId)}
-                variant={lead === "REVIEW" ? "solid" : "outline"}
-                // 이 press가 곧 시작이다. 도착한 화면은 이 표시를 읽자마자 지우므로, 같은 주소를 새로고침해도
-                // 수집이 다시 일어나지 않는다.
-                state={{ start: true }}
-              >
-                {review.primaryLabel}
-              </BtnLink>
-            ) : null
+            reviewRoute.loading || reviewRoute.path !== "SCREEN_READ" ? null : (
+              // 이 press가 곧 그 한 번의 수집 승인이다. 복구 동작은 책상이 막혔을 때만 이 아래에 붙는다.
+              <CollectNowAction
+                accountId={accountId}
+                dataType="REVIEW"
+                label="리뷰"
+                desk={reviewRoute.desk}
+                showSentence
+                emphasis={lead === "REVIEW" ? "primary" : "plain"}
+                recovery={reviewRecovery}
+                onReport={onReport}
+                onChanged={onChanged}
+                onSettled={onChanged}
+              />
+            )
           }
           secondary={
             reviewCount !== null && reviewCount > 0 ? (
@@ -237,6 +260,9 @@ export function CoupangChannelView({
                     onChanged={onChanged}
                     onReport={onReport}
                     heading={null}
+                    // 리뷰의 수집 primary는 위의 리뷰 카드가 들고 있다. 같은 자료에 같은 버튼이 두 번
+                    // 보이면, 판매자는 둘이 다른 일을 하는 줄로 읽는다 — 그 모양이 이번에 걷어낸 결함이다.
+                    hostOwnsScreenRead
                   />
                 </div>
               </Disclosure>

@@ -47,7 +47,7 @@ const REVIEW_NOT_PULLABLE = [
   },
 ] as never;
 
-function mount(onReport = vi.fn()) {
+function mount(onReport = vi.fn(), over: { hostOwnsScreenRead?: boolean } = {}) {
   render(
     <MemoryRouter>
       <CollectionSettingsSection
@@ -56,6 +56,7 @@ function mount(onReport = vi.fn()) {
         capabilities={REVIEW_NOT_PULLABLE}
         onChanged={vi.fn()}
         onReport={onReport}
+        {...over}
       />
     </MemoryRouter>,
   );
@@ -162,7 +163,7 @@ describe("지금 수집 — 서버가 경로를 고른다", () => {
 
     // 로그인은 판매자가 자기 브라우저에서 방금 했을 수도 있다. 막아 두면 고친 뒤에도 누를 길이 없다.
     expect(await reviewButton()).not.toBeDisabled();
-    expect(within(reviewRow()).getByText(/로그인이 풀렸습니다/)).toBeInTheDocument();
+    expect(within(reviewRow()).getByText(/판매자 센터 로그인이 필요합니다/)).toBeInTheDocument();
   });
 
   it("도우미 미연결·수집 중은 눌렀을 때도 서로 다른 안내가 된다", async () => {
@@ -222,9 +223,40 @@ describe("지금 수집 — 서버가 경로를 고른다", () => {
   });
 });
 
+describe("수집 입구는 자료마다 하나다", () => {
+  it("이 섹션이 화면의 수집 자리이면 버튼은 여기 있다 — 네이버·카페24가 쓰는 모양", async () => {
+    // 일반 채널 화면은 자료별 카드를 그리지 않으므로, 「수집 설정」이 그 자료의 수집 자리다. 기본값이
+    // 그대로여야 네이버 리뷰의 「지금 수집하기」가 사라지지 않는다.
+    readiness("READY");
+    mount();
+
+    await waitFor(() => expect(within(reviewRow()).getByTestId("collect-now-REVIEW")).toBeDefined());
+    expect(within(reviewRow()).getByText(/판매자 센터 화면에서 읽어옵니다/)).toBeInTheDocument();
+  });
+
+  it("호스트가 이미 그 자료의 수집을 들고 있으면, 이 줄은 주기가 없는 이유만 말한다", async () => {
+    // 쿠팡 화면이 쓰는 모양. 같은 자료에 같은 버튼이 두 번 보이면 판매자는 둘이 다른 일을 하는 줄로 읽고,
+    // 2026-10-07 라이브에서 실제로 다른 쪽을 눌렀다.
+    readiness("READY");
+    mount(vi.fn(), { hostOwnsScreenRead: true });
+
+    await waitFor(() =>
+      expect(within(reviewRow()).getByText(/판매자 센터 화면에서 읽어옵니다/)).toBeInTheDocument(),
+    );
+    expect(within(reviewRow()).queryByTestId("collect-now-REVIEW")).toBeNull();
+    // 그러나 API 경로인 줄의 버튼은 그대로다 — 이 선언은 화면 읽기 자료에 대한 것이다.
+    const section = screen.getByText("수집 설정").closest("section") as HTMLElement;
+    const inquiryRow = within(section).getByText("문의").closest("li") as HTMLElement;
+    expect(within(inquiryRow).getByTestId("collect-now-INQUIRY")).toBeDefined();
+  });
+});
+
 describe("경로 판단은 서버에만 있다", () => {
-  it("이 컴포넌트의 코드에는 채널 이름이 없다", () => {
-    const source = readFileSync(resolve(__dirname, "CollectionSettingsSection.tsx"), "utf8");
+  // 수집을 실행하는 코드 전부. primary가 하나로 합쳐졌으므로, 그 하나와 그것을 품은 줄을 같이 지킨다.
+  const ACQUISITION_SOURCES = ["CollectionSettingsSection.tsx", "CollectNowAction.tsx"];
+
+  it.each(ACQUISITION_SOURCES)("%s 의 코드에는 채널 이름이 없다", (file) => {
+    const source = readFileSync(resolve(__dirname, file), "utf8");
     // 주석은 뺀다 — 왜 이렇게 되어 있는지 적어 둔 문장에는 채널 이름이 나와야 하고(실측이 그 채널에서
     // 있었다), 그것은 분기가 아니다. 지키는 것은 「실행되는 코드가 채널 이름을 읽지 않는다」이다.
     const code = source
@@ -235,6 +267,19 @@ describe("경로 판단은 서버에만 있다", () => {
     // 네 번째 채널은 코드를 고쳐야 버튼이 생기는 채널이 되고, 우리는 그걸 두 번 겪었다.
     for (const name of ["NAVER", "COUPANG", "CAFE24", "GMARKET", "스마트스토어", "쿠팡", "자사몰"]) {
       expect(code).not.toContain(name);
+    }
+  });
+
+  it("수집을 시작하는 코드는 /collect-now 하나만 부른다", () => {
+    // 같은 자료에 입구가 둘 보였던 결함의 코드 쪽 모양: 수집처럼 보이는 컨트롤이 다른 엔드포인트를
+    // 불렀다. 이 두 파일에서 호출되는 수집 API는 collectNow 하나여야 한다.
+    for (const file of ACQUISITION_SOURCES) {
+      const code = readFileSync(resolve(__dirname, file), "utf8")
+        .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|[^:])\/\/.*$/gm, "$1");
+      expect(code).not.toContain("api.manualSync");
+      expect(code).not.toContain("api.startReviewImport");
     }
   });
 });

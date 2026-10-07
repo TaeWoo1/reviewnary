@@ -237,7 +237,9 @@ describe("첫 화면의 첫 걸음 — 두 종류의 판매자", () => {
   it("아무것도 연결하지 않은 판매자에게는 「연결」이 첫 걸음이다", () => {
     // 완전 신규: 도우미도 기기도 없고, 어느 스토어인지도 모르고, 가져온 상품평도 0이다.
     const card = reviewCardOf({ state: "HELPER_NOT_LINKED", channelCode: "COUPANG" });
-    expect(card).toMatchObject({ kind: "SETUP", primaryLabel: "리뷰 수집 연결하기" });
+    // 카드는 상태만 말한다. 수집 동작은 `CollectNowAction` 하나이고, 이 카드가 들고 있던 「리뷰 수집
+    // 연결하기」는 2026-10-07 라이브에서 canonical 경로 대신 눌린 그 컨트롤이다.
+    expect(card).toEqual({ status: { tone: "warn", label: "연결 필요" }, kind: "SETUP" });
     expect(card?.status.label).toBe("연결 필요");
 
     const first = reviewCollectionStateOf(
@@ -251,7 +253,7 @@ describe("첫 화면의 첫 걸음 — 두 종류의 판매자", () => {
     // 카드는 계정의 사실을 말한다 — 이 계정은 연결돼 있다. 브라우저가 처음이라는 것은 카드가 아는 일이
     // 아니고(그것은 이 PC의 사실이다), 눌렀을 때 흐름의 첫 걸음이 스스로 밝힌다.
     const card = reviewCardOf({ state: "READY", channelCode: "COUPANG" });
-    expect(card).toMatchObject({ kind: "READY", primaryLabel: "지금 가져오기" });
+    expect(card).toEqual({ status: { tone: "good", label: "연결됨" }, kind: "READY" });
 
     const afterPress = reviewCollectionStateOf(
       input({ readiness: { state: "READY", channelCode: "COUPANG" }, helperKey: "INSTALL", run: null }),

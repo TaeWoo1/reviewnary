@@ -6,14 +6,13 @@ import { Section } from "../Section";
 import { api } from "../../lib/apiClient";
 import { channelDataTypeLabel } from "../../lib/channelVocabulary";
 import { useApiData } from "../../lib/useApiData";
+import { CollectNowAction, deskSentence, useCollectNowRoute } from "./CollectNowAction";
 import type {
   AcquisitionPathView,
   CapabilityView,
-  LocalAgentRunState,
   ScheduleView,
-  ScreenReadView,
 } from "../../lib/types";
-import { DATA_TYPES, INTERVALS, backendCode, backendMessage } from "./channelShared";
+import { DATA_TYPES, INTERVALS, backendMessage } from "./channelShared";
 
 /** 수집 설정 — one row per data type, each owning its own cadence + manual run. */
 export function CollectionSettingsSection({
@@ -24,6 +23,7 @@ export function CollectionSettingsSection({
   onChanged,
   onReport,
   heading,
+  hostOwnsScreenRead = false,
 }: {
   accountId: string;
   /** Optional: without it the rows simply say less, never something untrue. */
@@ -32,6 +32,14 @@ export function CollectionSettingsSection({
   capabilities: CapabilityView[] | null;
   onChanged: () => void;
   onReport: (message: string, isError: boolean) => void;
+  /**
+   * 화면 읽기 자료의 수집 primary를 <b>이 화면을 품은 쪽</b>이 이미 그리고 있다는 선언.
+   *
+   * <p>채널이 아니라 <b>구성</b>이 정한다 — 이 값을 넘기는 것은 그 자료의 카드를 직접 그리는 화면이고,
+   * 채널 이름으로 분기하는 코드는 여기에도 저기에도 없다. 켜면 화면 읽기 줄은 주기가 없는 이유만 말하고
+   * 버튼을 그리지 않는다. 기본값은 예전과 바이트 동일하다.
+   */
+  hostOwnsScreenRead?: boolean;
   /**
    * `null`이면 제목 없이 본문만. 이 블록이 <b>이미 이름이 붙은 자리</b>(접힌 영역 · capability 카드) 안에서
    * 열릴 때를 위한 것이다 — 한 사실에 화면 위 이름이 둘이면 어느 쪽이 그것인지 말할 사람이 없다. 생략하면
@@ -78,6 +86,7 @@ export function CollectionSettingsSection({
             acquisitionPaths={
               overview?.dataTypes.find((d) => d.dataType === t.value)?.acquisitionPaths ?? []
             }
+            hostOwnsScreenRead={hostOwnsScreenRead}
             onChanged={onChanged}
             onReport={onReport}
           />
@@ -89,76 +98,6 @@ export function CollectionSettingsSection({
   return <Section title={heading ?? "수집 설정"}>{body}</Section>;
 }
 
-/**
- * <b>화면 읽기는 내 컴퓨터에서 벌어지므로, 끝났는지는 되물어야 안다.</b>
- *
- * 공식 API 수집은 응답이 돌아온 순간 이미 끝나 있다. 화면 읽기는 도우미가 받아 가는 일이라, 버튼을 누른
- * 사람에게 결과를 말하려면 상태를 다시 물어야 한다. 바로 한 번 묻고, 아직 진행 중일 때만 기다린다 —
- * 끝난 작업을 2초 기다렸다가 확인하는 화면은 멀쩡한 수집도 느리게 느껴지게 만든다.
- */
-const SCREEN_READ_POLL_MS = 2000;
-/** 90초. 작업 자체의 수명(10분)이 아니라, 버튼 앞에 서 있는 사람이 기다릴 만한 시간. */
-const SCREEN_READ_POLL_LIMIT = 45;
-
-async function awaitScreenRead(first: ScreenReadView): Promise<ScreenReadView> {
-  let latest = first;
-  for (let i = 0; i < SCREEN_READ_POLL_LIMIT; i += 1) {
-    let next: ScreenReadView | null = null;
-    try {
-      next = await api.screenReadStatus(latest.jobId);
-    } catch {
-      // 상태를 못 읽은 것은 수집이 실패한 것과 다르다. 마지막으로 아는 상태를 그대로 돌려준다.
-      return latest;
-    }
-    latest = next;
-    if (latest.state !== "RUNNING") return latest;
-    await new Promise((resolve) => setTimeout(resolve, SCREEN_READ_POLL_MS));
-  }
-  return latest;
-}
-
-/** 읽기 하나의 결과를 판매자의 문장으로. 구현 이름(recipe·provider·outcome)은 한 글자도 나오지 않는다. */
-function screenReadMessage(label: string, read: ScreenReadView): { text: string; isError: boolean } {
-  switch (read.state) {
-    case "SUCCESS":
-      return {
-        text: `${label} 수집 완료: 새로 저장 ${read.inserted ?? 0} · 갱신 ${read.changed ?? 0}`,
-        isError: false,
-      };
-    case "PARTIAL":
-      return {
-        text: `${label} 수집 완료: 새로 저장 ${read.inserted ?? 0} · 갱신 ${read.changed ?? 0}. 화면에 보이는 최근 구간만 확인했습니다.`,
-        isError: false,
-      };
-    case "AUTH_REQUIRED":
-      return { text: `판매자 센터 로그인이 필요합니다. 로그인한 뒤 ${label} 수집을 다시 눌러 주세요.`, isError: true };
-    case "RUNNING":
-      return { text: `${label} 수집이 아직 진행 중입니다. 잠시 뒤 다시 확인해 주세요.`, isError: false };
-    default:
-      return { text: `${label}을(를) 수집하지 못했습니다. 잠시 후 다시 시도해 주세요.`, isError: true };
-  }
-}
-
-/** 이 누름 하나의 식별자. 더블클릭·재요청·새로고침이 두 건이 아니라 한 건으로 모이게 하는 값. */
-function requestId(): string {
-  const uuid = globalThis.crypto?.randomUUID?.();
-  return uuid ?? `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-}
-
-/** 도우미가 필요한 줄에서, 지금 누를 수 있는지와 누를 수 없으면 무엇을 하면 되는지. */
-function deskSentence(desk: LocalAgentRunState | null): string {
-  switch (desk) {
-    case "UNPAIRED":
-      return "이 컴퓨터의 도우미를 한 번 연결하면 수집할 수 있습니다.";
-    case "BUSY":
-      return "이미 수집이 진행 중입니다.";
-    case "AUTH_REQUIRED":
-      return "판매자 센터 로그인이 풀렸습니다. 로그인한 뒤 다시 눌러 주세요.";
-    default:
-      return "누를 때마다 판매자 센터 화면에서 읽어옵니다. 자동 주기는 없습니다.";
-  }
-}
-
 function ScheduleRow({
   accountId,
   dataType,
@@ -167,6 +106,7 @@ function ScheduleRow({
   capability,
   capabilitiesReady,
   acquisitionPaths,
+  hostOwnsScreenRead,
   onChanged,
   onReport,
 }: {
@@ -177,12 +117,12 @@ function ScheduleRow({
   capability: CapabilityView | null;
   capabilitiesReady: boolean;
   acquisitionPaths: AcquisitionPathView[];
+  hostOwnsScreenRead?: boolean;
   onChanged: () => void;
   onReport: (message: string, isError: boolean) => void;
 }) {
   const [cadence, setCadence] = useState(schedule?.intervalMinutes ?? 360);
   const [saving, setSaving] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   // Bumped after a collection so the row re-asks what it can offer next: a desk that was BUSY is free again,
   // and a sign-in that was expired may have been renewed by the seller in the meantime.
   const [askedAgain, setAskedAgain] = useState(0);
@@ -199,16 +139,7 @@ function ScheduleRow({
    * 리뷰 API가 없는 두 채널에서는 버튼이 아예 그려지지 않았고(판매자에게는 「이 제품은 네이버 리뷰를 못
    * 가져온다」로 읽혔다) 그 사이 증명된 화면 읽기 경로가 손잡이 없는 문 뒤에 있었다.
    */
-  const readinessQuery = useApiData(
-    () => api.collectNowReadiness(accountId, dataType),
-    [accountId, dataType, askedAgain],
-  );
-  // `useApiData` keeps the last successful payload across a deps change, so on an account switch the PREVIOUS
-  // account's answer is still in `data` until the new one lands. Honouring `loading` is what stops one row
-  // being described by another row's route.
-  const readiness = readinessQuery.loading || readinessQuery.error ? null : readinessQuery.data;
-  const route = readiness?.path ?? null;
-  const desk: LocalAgentRunState | null = readiness?.localAgent ?? null;
+  const { loading: routeLoading, path: route, desk } = useCollectNowRoute(accountId, dataType, askedAgain);
 
   const unsupported = capability !== null && !capability.supported;
   const needsVerification = capability?.verificationStatus === "NEEDS_VERIFICATION";
@@ -220,8 +151,6 @@ function ScheduleRow({
   // org's 3,858 NAVER reviews all arrived this way while the screen said nothing about how.
   const sellerRepeatedPath = acquisitionPaths.find((p) => p.recurrence === "SELLER_REPEATED");
   const enabled = schedule?.enabled ?? false;
-  // One guard for the whole row: a save and a manual sync must not overlap.
-  const rowBusy = saving || syncing;
   // Cadence changed but not applied yet — saving is always an explicit action.
   const cadenceDirty = enabled && schedule?.intervalMinutes != null && cadence !== schedule.intervalMinutes;
 
@@ -243,46 +172,20 @@ function ScheduleRow({
     }
   }
 
-  /**
-   * 「지금 수집하기」 — 한 번 누르면 이 채널에 실제로 있는 경로로 수집한다.
-   *
-   * 공식 API면 예전과 같은 동기 pull 실행이고, 판매자 센터 화면 읽기면 내 컴퓨터의 도우미에게 한 건을
-   * 맡기고 끝날 때까지 되묻는다. 둘의 차이는 문장 하나뿐이고, 어느 쪽인지는 서버가 정한다.
-   */
-  async function syncNow() {
-    setSyncing(true);
-    try {
-      const started = await api.collectNow(accountId, dataType, requestId());
-      if (started.path === "SCREEN_READ" && started.screenRead) {
-        const finished = await awaitScreenRead(started.screenRead);
-        const message = screenReadMessage(label, finished);
-        onReport(message.text, message.isError);
-      } else if (started.run) {
-        const run = started.run;
-        onReport(
-          `${label} 수집 완료: 저장 ${run.successRows} · 건너뜀 ${run.skippedRows} · 실패 ${run.failedRows}`,
-          run.status === "FAILED",
-        );
-      } else {
-        onReport(`${label} 수집을 시작했습니다.`, false);
-      }
-      onChanged();
-    } catch (e) {
-      // `HELPER_NOT_LINKED`와 `HELPER_BUSY`는 같은 409이고 지시는 정반대다. 서버가 보낸 토큰으로 갈라야
-      // 한다 — 한국어 문장을 맞춰보는 화면은 누군가 문장을 고치는 순간 판매자에게 엉뚱한 안내를 한다.
-      const code = backendCode(e);
-      if (code === "HELPER_NOT_LINKED") {
-        onReport("이 컴퓨터의 도우미가 아직 연결되지 않았습니다. 도우미 카드에서 [이 기기 연결]을 한 번 눌러 주세요.", true);
-      } else if (code === "HELPER_BUSY") {
-        onReport("이미 수집이 진행 중입니다. 끝난 뒤 다시 눌러 주세요.", true);
-      } else {
-        onReport(backendMessage(e) ?? "수집 실행에 실패했습니다. 잠시 후 다시 시도해 주세요.", true);
-      }
-    } finally {
-      setSyncing(false);
-      setAskedAgain((n) => n + 1);
-    }
-  }
+  // 수집 primary는 하나다 — 두 분기가 각자 버튼을 만들면 둘은 언젠가 다르게 동작한다.
+  const collectNow = (
+    <CollectNowAction
+      accountId={accountId}
+      dataType={dataType}
+      label={label}
+      desk={desk}
+      disabled={saving}
+      showSentence={route === "SCREEN_READ"}
+      onReport={onReport}
+      onChanged={onChanged}
+      onSettled={() => setAskedAgain((n) => n + 1)}
+    />
+  );
 
   return (
     <li className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between">
@@ -304,25 +207,18 @@ function ScheduleRow({
         ) : null}
       </div>
 
-      {!capabilitiesReady || readinessQuery.loading ? (
+      {!capabilitiesReady || routeLoading ? (
         <p className="text-sm text-muted">수집 지원 정보 확인 중…</p>
       ) : route === "SCREEN_READ" ? (
         // 이 자료는 채널이 API로 내주지 않는다. 판매자 센터 화면을 내 컴퓨터의 도우미가 한 번 읽어 온다 —
-        // 주기 자동 수집은 없고, 누름이 곧 그 한 번의 승인이다.
-        <div className="flex flex-col items-start gap-2 md:items-end">
+        // 주기 자동 수집은 없고, 누름이 곧 그 한 번의 승인이다. 호스트 화면이 이미 이 자료의 카드를
+        // 그리고 있으면(`hostOwnsScreenRead`) 이 줄은 주기가 없는 이유만 말한다 — 같은 자료에 같은
+        // 버튼이 두 번 보이면, 판매자는 둘이 다른 일을 하는 줄로 읽는다.
+        hostOwnsScreenRead ? (
           <p className="break-keep text-sm text-muted">{deskSentence(desk)}</p>
-          <button
-            type="button"
-            disabled={rowBusy || desk === "UNPAIRED" || desk === "BUSY"}
-            onClick={syncNow}
-            // 이 줄의 버튼은 「저장 중」처럼 잠깐이 아니라, 도우미를 연결할 때까지 계속 꺼져 있을 수 있다.
-            // 눌리지 않는 버튼이 눌리는 버튼과 똑같이 생기면, 그 옆 문장을 읽지 않은 판매자는 고장난
-            // 화면을 본다.
-            className="btn-ghost px-4 py-2 text-base disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {syncing ? "수집 중…" : "지금 수집하기"}
-          </button>
-        </div>
+        ) : (
+          collectNow
+        )
       ) : route === "UNSUPPORTED" || unsupported ? (
         <p className="text-sm text-muted">
           {/*
@@ -343,7 +239,7 @@ function ScheduleRow({
             aria-label={`${label} 수집 주기`}
             value={cadence}
             onChange={(e) => setCadence(Number(e.target.value))}
-            disabled={rowBusy}
+            disabled={saving}
             className="rounded-xl border border-line px-3 py-2 text-base focus:border-brand focus:outline-none"
           >
             {INTERVALS.map((opt) => (
@@ -355,7 +251,7 @@ function ScheduleRow({
           {cadenceDirty ? (
             <button
               type="button"
-              disabled={rowBusy}
+              disabled={saving}
               onClick={() => save(true)}
               className="btn-primary px-4 py-2 text-base"
             >
@@ -364,7 +260,7 @@ function ScheduleRow({
           ) : null}
           <button
             type="button"
-            disabled={rowBusy}
+            disabled={saving}
             onClick={() => save(!enabled)}
             className={`rounded-xl px-4 py-2 text-base font-semibold ${
               enabled ? "bg-good/10 text-good" : "bg-canvas text-muted"
@@ -372,9 +268,7 @@ function ScheduleRow({
           >
             {saving ? "저장 중…" : enabled ? "자동 수집 켜짐" : "자동 수집 꺼짐"}
           </button>
-          <button type="button" disabled={rowBusy} onClick={syncNow} className="btn-ghost px-4 py-2 text-base">
-            {syncing ? "수집 중…" : "지금 수집하기"}
-          </button>
+          {collectNow}
         </div>
       )}
     </li>
