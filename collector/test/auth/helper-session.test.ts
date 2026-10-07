@@ -140,6 +140,41 @@ describe("DeviceLinker — start, poll, link, verify, revoke", () => {
     expect(b.calls.join(" ")).not.toContain("rvh_");
   });
 
+  it("tells its caller the moment the link lands, so the press is the seller's last step", async () => {
+    // What the link unlocks is decided at boot: the resident helper builds its claim loop only if it was
+    // already linked when it started. The seller's order is install → open 연결 → [이 기기 연결], so at boot
+    // there is no link — and a helper that was linked and then never asked the backend for work looked, on
+    // both screens, exactly like one that was working. This hook is what makes the press sufficient.
+    const h = home();
+    const b = fakeBackend({ approveAfterPolls: 1 });
+    const opened: string[] = [];
+    const linker = new DeviceLinker({
+      baseUrl: BASE, home: h, helperVersion: "0.2.0", fetchImpl: b.fetchImpl, schedule: b.schedule,
+      deviceName: "Mac (arm64)", onLinked: () => opened.push("lane"),
+    });
+    await linker.start();
+    expect(opened).toEqual([]);
+    b.scheduled.shift()!();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(readDeviceLink(h)?.token).toBe("rvh_granted");
+    expect(opened).toEqual(["lane"]);
+  });
+
+  it("a listener that throws does not cost the seller the link they just made", async () => {
+    const h = home();
+    const b = fakeBackend({ approveAfterPolls: 1 });
+    const linker = new DeviceLinker({
+      baseUrl: BASE, home: h, helperVersion: "0.2.0", fetchImpl: b.fetchImpl, schedule: b.schedule,
+      deviceName: "Mac (arm64)", onLinked: () => { throw new Error("lane refused"); },
+    });
+    await linker.start();
+    b.scheduled.shift()!();
+    await new Promise((r) => setTimeout(r, 5));
+    // The link is on disk and reported: whatever the listener wanted can be opened on the next start.
+    expect(readDeviceLink(h)?.token).toBe("rvh_granted");
+    expect(await linker.status()).toMatchObject({ linked: true, linking: null });
+  });
+
   it("a denied grant ends as denied with nothing stored", async () => {
     const h = home();
     const b = fakeBackend({ deny: true });

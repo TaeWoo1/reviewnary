@@ -28,6 +28,15 @@ public enum LocalAgentRunState {
     /** A helper is linked and idle: a read can be started right now, with no further approval. */
     READY,
 
+    /**
+     * A helper is linked and already reading something.
+     *
+     * <p>Its own word rather than {@link #RUNNING} because it answers a different question. RUNNING is «your
+     * read is in progress»; BUSY is «the desk is taken», which is what a screen needs before it offers a
+     * button, and the read that is holding the desk may not be the one this screen is about.
+     */
+    BUSY,
+
     /** Queued or claimed — the helper has work and has not reported yet. */
     RUNNING,
 
@@ -53,6 +62,29 @@ public enum LocalAgentRunState {
     /** The state of a desk with no job on it. */
     public static LocalAgentRunState idle(boolean helperLinked) {
         return helperLinked ? READY : UNPAIRED;
+    }
+
+    /**
+     * <b>What the seller's screen says about the desk, before anything is asked of it.</b>
+     *
+     * <p>The order is the order of what the seller can do about it, and it is the whole content of this
+     * method. Nothing can be asked of a desk with no helper, so UNPAIRED outranks everything. A desk that is
+     * already reading cannot take a second read whatever else is true of it, so BUSY outranks the sign-in
+     * answer — and the sign-in answer is about the LAST read, which the one in flight may be in the middle of
+     * disproving. Only a linked, idle desk whose last read was not turned away at a sign-in is READY.
+     *
+     * @param authExpired whether the most recent finished read of this screen ended at the channel's own
+     *                    sign-in wall. A fact about the last attempt, never a claim about the session now —
+     *                    nothing in this product inspects a marketplace session, and nothing in it may.
+     */
+    public static LocalAgentRunState desk(boolean helperLinked, boolean busy, boolean authExpired) {
+        if (!helperLinked) {
+            return UNPAIRED;
+        }
+        if (busy) {
+            return BUSY;
+        }
+        return authExpired ? AUTH_REQUIRED : READY;
     }
 
     /**

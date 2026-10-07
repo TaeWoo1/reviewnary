@@ -17,6 +17,21 @@ export function backendMessage(e: unknown): string | null {
   return null;
 }
 
+/**
+ * The backend's stable failure token, when it sent one.
+ *
+ * Matching Korean prose to tell two 409s apart is how a screen starts telling sellers the wrong thing the
+ * first time someone rewrites a sentence — `HELPER_NOT_LINKED` ("link it once, on this page") and
+ * `HELPER_BUSY` ("wait") are the same status and opposite instructions.
+ */
+export function backendCode(e: unknown): string | null {
+  if (isAxiosError(e)) {
+    const data = e.response?.data as { code?: string } | undefined;
+    return data?.code ?? null;
+  }
+  return null;
+}
+
 export const DATA_TYPES: Array<{ value: string; label: string }> = [
   { value: "REVIEW", label: "리뷰" },
   { value: "INQUIRY", label: "문의" },

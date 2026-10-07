@@ -287,6 +287,12 @@ function apiCollectableTypes(capabilities: CapabilityView[] | null): string[] {
   );
 }
 
+/** 이 누름 하나의 식별자 — 더블클릭·재요청이 두 건이 아니라 한 건으로 모이게 하는 값. */
+function requestId(): string {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  return uuid ?? `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
 /**
  * 지금 가져오기 — API lane.
  *
@@ -318,8 +324,11 @@ function ApiCollectNow({
           let stored = 0;
           try {
             for (const type of dataTypes) {
-              const run = await api.manualSync(accountId, type);
-              stored += run.successRows;
+              // 같은 문 하나로 간다. 쿠팡 문의·주문은 어느 쪽이든 공식 API가 canonical이라 동작은 예전과
+              // 같지만, 화면이 직접 pull 엔드포인트를 부르는 자리가 남아 있으면 그 자리가 다음에 또
+              // 「이 채널만 다르게」 분기하는 곳이 된다. 경로는 서버가 고른다.
+              const started = await api.collectNow(accountId, type, requestId());
+              stored += started.run?.successRows ?? 0;
             }
             onReport(`문의·주문을 가져왔습니다. 새로 저장 ${stored}건.`, false);
             onChanged();

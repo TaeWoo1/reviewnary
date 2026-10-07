@@ -92,11 +92,20 @@ public class ScreenReadService {
     /**
      * Whether a read can be started for this account at all, without starting one.
      *
-     * <p>The screen asks before drawing a 지금 수집 it cannot honour. Two separate reasons it may not be able
-     * to: no helper is linked ({@link LocalAgentRunState#UNPAIRED}), or this channel has no screen read for
-     * this kind of data (then {@code supported} is false and the state is irrelevant).
+     * <p>The screen asks before drawing a 지금 수집 it cannot honour, and the four answers are four different
+     * next moves for the seller — which is why they are four words and not one boolean:
+     *
+     * <ul>
+     *   <li>{@code supported == false} — this channel's screen is not one the product reads for this kind of
+     *   data. A capability fact; the state beside it means nothing.</li>
+     *   <li>{@link LocalAgentRunState#UNPAIRED} — link the helper once, on 연결.</li>
+     *   <li>{@link LocalAgentRunState#BUSY} — wait; the desk is already reading.</li>
+     *   <li>{@link LocalAgentRunState#AUTH_REQUIRED} — sign in at the channel's own seller centre, in their own
+     *   browser. Derived from the last finished read, never from inspecting a marketplace session.</li>
+     *   <li>{@link LocalAgentRunState#READY} — press it.</li>
+     * </ul>
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public ScreenReadReadinessView readiness(UUID orgId, UUID sellerAccountId, String dataTypeRaw) {
         SellerAccount account = accounts.findByIdAndOrgId(sellerAccountId, orgId)
                 .orElseThrow(() -> ApiException.notFound("판매 계정을 찾을 수 없습니다."));
@@ -104,7 +113,15 @@ public class ScreenReadService {
                 .orElseThrow(() -> ApiException.notFound("채널을 찾을 수 없습니다."));
         Optional<AsideRecipe> recipe = AsideRecipe.forScreenRead(channel.getCode(), parse(dataTypeRaw));
         boolean linked = devices.linked(orgId).isPresent();
-        return new ScreenReadReadinessView(recipe.isPresent(), LocalAgentRunState.idle(linked));
+        return new ScreenReadReadinessView(recipe.isPresent(),
+                LocalAgentRunState.desk(linked, linked && jobs.busy(orgId), authExpired(orgId, account, recipe)));
+    }
+
+    /** Whether the last finished read of this very screen was turned away at the channel's sign-in. */
+    private boolean authExpired(UUID orgId, SellerAccount account, Optional<AsideRecipe> recipe) {
+        return recipe.flatMap(r -> jobs.lastFinished(orgId, account.getId(), r))
+                .map(job -> LocalAgentRunState.of(job) == LocalAgentRunState.AUTH_REQUIRED)
+                .orElse(false);
     }
 
     private DataType parse(String raw) {

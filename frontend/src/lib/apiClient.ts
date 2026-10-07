@@ -120,6 +120,9 @@ import type {
   ChannelCoverageRowView,
   SyncRunFilters,
   SyncRunView,
+  CollectNowView,
+  CollectNowReadinessView,
+  ScreenReadView,
   UploadType,
   UserView,
   WalkthroughContextView,
@@ -1200,6 +1203,44 @@ export const api = {
 
   async manualSync(accountId: string, dataType: string): Promise<SyncRunView> {
     const { data } = await http.post<SyncRunView>(`/api/seller-accounts/${accountId}/sync`, { dataType });
+    return data;
+  },
+
+  /**
+   * 「지금 수집」 — one call for every channel and every kind of data.
+   *
+   * The server decides the route (`CollectNowRouter`): the channel's official API where the marketplace
+   * publishes one, the seller's own local agent reading their own screen where it does not. This client does
+   * NOT branch on the channel, and adding such a branch here would recreate the bug this endpoint replaced —
+   * a button that only appeared on the rows the pull connector happened to serve.
+   *
+   * `requestId` is this press's own id, so a double-click, a retried fetch or a reloaded page converge on one
+   * collection instead of queueing two.
+   */
+  async collectNow(
+    accountId: string,
+    dataType: string,
+    requestId: string,
+  ): Promise<CollectNowView> {
+    const { data } = await http.post<CollectNowView>(
+      `/api/seller-accounts/${accountId}/collect-now`,
+      { dataType, requestId },
+    );
+    return data;
+  },
+
+  /** Whether 지금 수집 can be offered for one row — asked before the button is drawn, collects nothing. */
+  async collectNowReadiness(accountId: string, dataType: string): Promise<CollectNowReadinessView> {
+    const { data } = await http.get<CollectNowReadinessView>(
+      `/api/seller-accounts/${accountId}/collect-now/readiness`,
+      { params: { dataType } },
+    );
+    return data;
+  },
+
+  /** Where one screen read got to. The screen asks again while the state is RUNNING. */
+  async screenReadStatus(jobId: string): Promise<ScreenReadView> {
+    const { data } = await http.get<ScreenReadView>(`/api/screen-reads/${jobId}`);
     return data;
   },
 

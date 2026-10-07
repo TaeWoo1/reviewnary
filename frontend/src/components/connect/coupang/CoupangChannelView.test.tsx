@@ -28,6 +28,11 @@ vi.mock("../../../lib/apiClient", () => ({
     getChannelCapabilityOverview: (...a: unknown[]) => getChannelCapabilityOverview(...a),
     getChannelReviewsStrict: (...a: unknown[]) => getChannelReviewsStrict(...a),
     manualSync: vi.fn(),
+    // 모든 수집 줄이 그려지기 전에 「어느 경로냐」를 서버에 묻는다. 답하지 않으면 줄은 「확인 중…」에
+    // 머무르고, 이 파일의 단정들은 아무 컨트롤도 보지 못한다.
+    collectNowReadiness: vi.fn(async () => ({ path: "API", localAgent: null })),
+    collectNow: vi.fn(async () => ({ path: "API", dataType: "INQUIRY", run: { successRows: 0, skippedRows: 0, failedRows: 0, status: "SUCCESS" }, screenRead: null })),
+    screenReadStatus: vi.fn(),
   },
 }));
 

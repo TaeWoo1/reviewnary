@@ -3747,3 +3747,57 @@ export interface AgentReportListItem {
   generatedAt: string;
   narrativeStatus: NarrativeStatus;
 }
+
+// --- 지금 수집 (unified operator collect) -----------------------------------------------------------------
+
+/**
+ * Which route the server chose to collect one data type for one account.
+ *
+ * The browser reads this; it never works it out. That is the whole correction: 지금 수집하기 used to call the
+ * pull-connector endpoint for every row and simply not render on the rows where that would not work, so on the
+ * two channels whose reviews have no API the product looked unable to collect reviews at all.
+ */
+export type CollectNowPath = "API" | "SCREEN_READ" | "UNSUPPORTED";
+
+/**
+ * The local agent's state in the words the seller can act on. The first four are about the desk and the rest
+ * about one read; `UNPAIRED` · `BUSY` · `AUTH_REQUIRED` · `READY` are four different next moves, which is why
+ * they are four words and not one boolean.
+ */
+export type LocalAgentRunState =
+  | "UNPAIRED"
+  | "READY"
+  | "BUSY"
+  | "RUNNING"
+  | "SUCCESS"
+  | "PARTIAL"
+  | "AUTH_REQUIRED"
+  | "FAILED";
+
+/** One screen read, as the seller's screen may see it. No URL, no store id, no device, no selector. */
+export interface ScreenReadView {
+  jobId: string;
+  state: LocalAgentRunState;
+  /** Rows the page printed, or `null` when nothing was read. `null` is not 0 and must never render as 0. */
+  observed: number | null;
+  inserted: number | null;
+  changed: number | null;
+  complete: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+/** What one press of 지금 수집 started — a finished pull run, or a job now on the seller's own desk. */
+export interface CollectNowView {
+  path: CollectNowPath;
+  dataType: string;
+  run: SyncRunView | null;
+  screenRead: ScreenReadView | null;
+}
+
+/** Whether 지금 수집 can be offered for one row, and what to say instead when it cannot. */
+export interface CollectNowReadinessView {
+  path: CollectNowPath;
+  /** `null` on the API route, where no local agent is involved. */
+  localAgent: LocalAgentRunState | null;
+}

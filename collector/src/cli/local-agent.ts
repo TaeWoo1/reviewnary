@@ -2334,10 +2334,15 @@ export async function runBridgeOnlyBoot(
   // Helper Device Authentication v1: the paired browser links THIS helper to the seller's account through the
   // bridge; the resulting token lives under the helper home and is the only backend credential this process has.
   const linkCfg = loadConfig(env);
+  // Set once the bridge is listening (the loop needs its port). The linker may fire before then only if a
+  // link completes during boot, which cannot happen: nothing can press 「이 기기 연결」 at a bridge that is
+  // not up yet.
+  let onDeviceLinked: () => void = () => {};
   const deviceLinker = deps.deviceLinker ?? new DeviceLinker({
     baseUrl: linkCfg.baseUrl,
     home: helperHome(env),
     helperVersion: helperVersion(env),
+    onLinked: () => onDeviceLinked(),
   });
   const bridge = createBridge({
     ...resolveAgentBridgeConfig(args, env),
@@ -2392,9 +2397,16 @@ export async function runBridgeOnlyBoot(
   // The marketplace lane additionally requires `REVIEWNARY_EXECUTION_PROVIDER=ASIDE` on THIS machine — the same
   // explicit per-machine opt-in the seller-pressed Coupang read already uses. Without it `reviewHandoff` is
   // absent and a marketplace recipe is refused here without opening anything.
+  //
+  // <b>And it starts when the link exists, not only when the process started.</b> The seller's order is
+  // install → open 연결 → [이 기기 연결], so at boot there is usually no link yet and `backendBearer` throws.
+  // Building the loop only at boot therefore produced a helper that was linked, idle, and silently not asking
+  // for work until someone restarted it — with nothing on either screen saying a restart was the missing
+  // step. `ensureFixtureLoop` is idempotent and is called again the moment a link lands.
   let fixtureLoop: FixtureObserveLoop | null = null;
   const marketplaceLane = linkCfg.executionProvider === "ASIDE";
-  if (linkCfg.customerOperationsFixture || marketplaceLane) {
+  const ensureFixtureLoop = async (reason: "boot" | "linked") => {
+    if (fixtureLoop || !(linkCfg.customerOperationsFixture || marketplaceLane)) return;
     try {
       const token = await backendBearer(linkCfg, env);
       // The same screen the credential handoff and the pressed acquisition apply, and for the same reason: a
@@ -2425,12 +2437,16 @@ export async function runBridgeOnlyBoot(
       log("aside_fixture_loop_started", {
         ...(linkCfg.customerOperationsFixture ? { dataset: linkCfg.customerOperationsFixture } : {}),
         marketplace: handoffOrigin !== null,
+        reason,
       });
     } catch {
       // Not linked to this backend: there is nobody to ask for work, and that is not an error to crash on.
-      log("aside_fixture_loop_skipped", { linked: false });
+      // The seller linking the helper is exactly what makes this succeed, and that is why it is retried there.
+      log("aside_fixture_loop_skipped", { linked: false, reason });
     }
-  }
+  };
+  await ensureFixtureLoop("boot");
+  onDeviceLinked = () => void ensureFixtureLoop("linked");
 
   let resolveStopped: () => void = () => {};
   const stopped = new Promise<void>((r) => (resolveStopped = r));

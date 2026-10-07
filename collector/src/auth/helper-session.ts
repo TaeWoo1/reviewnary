@@ -152,6 +152,18 @@ export interface DeviceLinkerDeps {
   /** Injectable scheduler so the poll loop can be driven deterministically in tests. */
   schedule?: (fn: () => void, ms: number) => unknown;
   deviceName?: string;
+  /**
+   * Called once, right after this helper becomes linked.
+   *
+   * <b>Why a hook and not a restart.</b> What the link unlocks is decided at boot: a resident helper only
+   * builds its claim loop if it was already linked when it started, so a seller who installed the helper and
+   * then pressed 「이 기기 연결」 — the normal order, and the only order the installer suggests — had a linked
+   * helper that would not ask the backend for work until something restarted it. Nothing on either screen said
+   * so. The press is supposed to be the last thing the seller does, so the process has to react to it.
+   *
+   * Never throws into the poll loop: a failure here means the lane did not open, not that the link failed.
+   */
+  onLinked?: () => void;
 }
 
 /** How long a "still honoured" answer is trusted before the backend is asked again — a revoke made in 설정
@@ -167,6 +179,7 @@ export class DeviceLinker {
   private readonly now: () => number;
   private readonly schedule: (fn: () => void, ms: number) => unknown;
   private readonly deviceName: string;
+  private readonly onLinked: (() => void) | null;
   private linking: DeviceLinking = null;
   private inFlight: { deviceCode: string; expiresAtMs: number; intervalMs: number } | null = null;
   private lastVerify: { atMs: number; verdict: DeviceVerification } | null = null;
@@ -180,6 +193,7 @@ export class DeviceLinker {
     this.now = deps.now ?? (() => Date.now());
     this.schedule = deps.schedule ?? ((fn, ms) => setTimeout(fn, ms));
     this.deviceName = deps.deviceName ?? deviceDisplayName();
+    this.onLinked = deps.onLinked ?? null;
   }
 
   /** Ask the backend for a grant and start polling for its approval. One in flight at a time. */
@@ -253,6 +267,12 @@ export class DeviceLinker {
         this.linking = null;
         this.lastVerify = { atMs: this.now(), verdict: "OK" };
         log("device_link_result", { outcome: "linked" });
+        try {
+          this.onLinked?.();
+        } catch {
+          // The link itself succeeded and is on disk. Whatever the listener wanted to open can be opened on
+          // the next start; losing the link over it would be strictly worse.
+        }
         return;
       }
       this.inFlight = null;

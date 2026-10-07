@@ -26,6 +26,16 @@ public interface ScheduledAsideJobRepository extends JpaRepository<ScheduledAsid
 
     List<ScheduledAsideJob> findByRunIdOrderByCreatedAtAsc(UUID runId);
 
+    /**
+     * The newest finished read of one account's one screen — how a readiness answer learns that the last
+     * attempt hit the channel's sign-in wall.
+     *
+     * <p>Derived rather than stored: {@code AUTH_REQUIRED} is already written on the job row that met it, and a
+     * second copy of it on the account would be the one that is wrong after the seller signs back in.
+     */
+    Optional<ScheduledAsideJob> findFirstByOrgIdAndSellerAccountIdAndRecipeAndStatusOrderBySettledAtDesc(
+            UUID orgId, UUID sellerAccountId, AsideRecipe recipe, ScheduledAsideJobStatus status);
+
     /** What this device may take right now: queued for it, and not yet expired. At most one exists by index. */
     @Query("""
             select j from ScheduledAsideJob j
