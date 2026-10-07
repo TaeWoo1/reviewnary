@@ -87,7 +87,7 @@ class ReportFactsBuilderCoverageTest {
     private void state(String code, String dataType, ChannelDataState state) {
         coverageRows.add(new ChannelCoverageRow(code, code.equals("NAVER") ? "네이버 스마트스토어" : "카페24 자사몰",
                 dataType, state, true, null, true, "CONNECTED", true, null,
-                java.time.Instant.parse("2026-09-26T18:31:17Z"), 0, null, null));
+                java.time.Instant.parse("2026-09-26T18:31:17Z"), null, null, 0, null, null));
     }
 
     private void allChannels(ChannelDataState state) {

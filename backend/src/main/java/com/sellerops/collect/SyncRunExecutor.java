@@ -637,7 +637,7 @@ public class SyncRunExecutor {
     static String failureCodeOf(boolean auth, boolean approvalMissing, boolean rateLimited, boolean pageLimited,
                                 boolean timedOut, boolean errored, int failedRows) {
         if (auth) {
-            return "AUTH_REQUIRED";
+            return SyncJob.FAILURE_AUTH_REQUIRED;
         }
         if (approvalMissing) {
             return SyncJob.FAILURE_CONFIGURATION_REQUIRED;

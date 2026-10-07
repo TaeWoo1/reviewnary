@@ -604,6 +604,14 @@ public class AgentReviewHandoffService {
         job.setFailedRows(0);
         job.setStatus("FAILED");
         job.setErrorMessage(request.failureCode());
+        // <b>And the closed classification goes in the column built for it</b> (2026-10-08). This lane put the
+        // channel's code only in `errorMessage`, a free-text column, so the one surface that needed to tell
+        // «로그인이 필요합니다» from «수집 실패» had to read prose to do it. Measured the day before: a Coupang
+        // read that hit the WING sign-in wall left `failure_code` null, and coverage — which can only look at
+        // codes — reported that a channel read on 09-14 had never been confirmed.
+        if ("LOGIN_REQUIRED".equals(request.failureCode())) {
+            job.setFailureCode(SyncJob.FAILURE_AUTH_REQUIRED);
+        }
         SyncJob saved = syncJobs.save(job);
         // A closed word and nothing else. The page, the store and the credential are not in this method's hands
         // and could not be logged from here even by mistake.

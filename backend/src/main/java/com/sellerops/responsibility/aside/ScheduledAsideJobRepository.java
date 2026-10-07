@@ -1,6 +1,7 @@
 package com.sellerops.responsibility.aside;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,6 +36,18 @@ public interface ScheduledAsideJobRepository extends JpaRepository<ScheduledAsid
      */
     Optional<ScheduledAsideJob> findFirstByOrgIdAndSellerAccountIdAndRecipeAndStatusOrderBySettledAtDesc(
             UUID orgId, UUID sellerAccountId, AsideRecipe recipe, ScheduledAsideJobStatus status);
+
+    /**
+     * The newest finished screen read among a set of recipes, for coverage's «latest attempt» field.
+     *
+     * <p>Taken by recipe set rather than by account because coverage speaks per channel × data type, and the
+     * recipes for one such pair are the set this takes. It exists because a screen read is an attempt that
+     * leaves <b>no sync run</b>: the 2026-10-08 NAVER 리뷰 OPERATOR read settled AUTH_REQUIRED and wrote
+     * nothing to {@code sync_jobs}, so a coverage field fed only from there would have reported nothing
+     * attempted for a channel that had been attempted four minutes earlier.
+     */
+    Optional<ScheduledAsideJob> findFirstByOrgIdAndRecipeInAndStatusOrderBySettledAtDesc(
+            UUID orgId, Collection<AsideRecipe> recipes, ScheduledAsideJobStatus status);
 
     /** What this device may take right now: queued for it, and not yet expired. At most one exists by index. */
     @Query("""

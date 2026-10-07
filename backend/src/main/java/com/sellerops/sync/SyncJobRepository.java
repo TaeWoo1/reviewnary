@@ -115,6 +115,35 @@ public interface SyncJobRepository extends JpaRepository<SyncJob, UUID> {
                                           @Param("skippedFailureCodes") Collection<String> skippedFailureCodes,
                                           Pageable pageable);
 
+    /**
+     * <b>The newest run that actually carried rows for this channel × type — success evidence, found directly.</b>
+     *
+     * <p>Why this exists beside {@link #findRunsReachingChannel}: the two answer different questions, and for a
+     * while one query was being asked both. «When did we last read this channel» was computed as «take the
+     * latest run, and if it succeeded, that is the date» — so any later failure erased a date that was true.
+     * Measured 2026-10-07: Coupang 리뷰 had been read on 09-14 (33 rows in hand) and a guided run that
+     * reached the WING sign-in wall on 10-07 made coverage answer 「확인된 적 없음」. Nothing about the login
+     * dying un-reads the earlier page.
+     *
+     * <p>So success is looked for where it is: SUCCESS or PARTIAL, newest first. A failed run is not in this
+     * answer at all, which also means no skip list is needed here — a run that never reached the channel
+     * cannot be a SUCCESS, so it was never a candidate. Whether the channel still answers TODAY is a
+     * different field ({@code latestAttemptOutcome}), and keeping them apart is the whole point.
+     */
+    @Query("""
+            select j from SyncJob j
+            where j.orgId = :orgId and j.channelId = :channelId and j.dataType = :dataType
+              and j.status in ('SUCCESS', 'PARTIAL')
+            order by j.finishedAt desc nulls last, j.createdAt desc, j.id desc
+            """)
+    List<SyncJob> findSuccessfulRuns(@Param("orgId") UUID orgId, @Param("channelId") UUID channelId,
+                                     @Param("dataType") String dataType, Pageable pageable);
+
+    /** {@link #findSuccessfulRuns} narrowed to the newest one. */
+    default Optional<SyncJob> findLatestSuccessfulRun(UUID orgId, UUID channelId, String dataType) {
+        return findSuccessfulRuns(orgId, channelId, dataType, PageRequest.of(0, 1)).stream().findFirst();
+    }
+
     /** {@link #findRunsReachingChannel} narrowed to the latest one — the form both callers want. */
     default Optional<SyncJob> findLatestRunReachingChannel(UUID orgId, UUID channelId, String dataType) {
         return findRunsReachingChannel(orgId, channelId, dataType, SyncJob.FAILURE_CODES_BEFORE_CHANNEL_ATTEMPT,
