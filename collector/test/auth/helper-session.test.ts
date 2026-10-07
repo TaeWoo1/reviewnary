@@ -175,6 +175,52 @@ describe("DeviceLinker — start, poll, link, verify, revoke", () => {
     expect(await linker.status()).toMatchObject({ linked: true, linking: null });
   });
 
+  it("tells its caller the moment the link is gone, so nothing keeps asking as the old account", async () => {
+    // The other half of the pair. Whatever `onLinked` opened was opened for one account's credential; when the
+    // backend stops honouring that credential the file is dropped here, and a lane that is not told keeps
+    // polling with a token nobody accepts — while the operator log reads as if it were working.
+    const h = home();
+    writeDeviceLink(h, LINK);
+    const b = fakeBackend({ me: 401 });
+    const lost: string[] = [];
+    const linker = new DeviceLinker({
+      baseUrl: BASE, home: h, helperVersion: "0.2.0", fetchImpl: b.fetchImpl, schedule: b.schedule,
+      deviceName: "Mac (arm64)", onUnlinked: () => lost.push("closed"),
+    });
+
+    expect(await linker.status()).toMatchObject({ linked: false, verified: "REVOKED" });
+    expect(readDeviceLink(h)).toBeNull();
+    expect(lost).toEqual(["closed"]);
+  });
+
+  it("a seller-initiated unlink tells the caller too", async () => {
+    const h = home();
+    writeDeviceLink(h, LINK);
+    const b = fakeBackend();
+    const lost: string[] = [];
+    const linker = new DeviceLinker({
+      baseUrl: BASE, home: h, helperVersion: "0.2.0", fetchImpl: b.fetchImpl, schedule: b.schedule,
+      deviceName: "Mac (arm64)", onUnlinked: () => lost.push("closed"),
+    });
+
+    await linker.unlink();
+    expect(readDeviceLink(h)).toBeNull();
+    expect(lost).toEqual(["closed"]);
+  });
+
+  it("an unlink listener that throws still leaves the link forgotten", async () => {
+    const h = home();
+    writeDeviceLink(h, LINK);
+    const b = fakeBackend();
+    const linker = new DeviceLinker({
+      baseUrl: BASE, home: h, helperVersion: "0.2.0", fetchImpl: b.fetchImpl, schedule: b.schedule,
+      deviceName: "Mac (arm64)", onUnlinked: () => { throw new Error("lane refused"); },
+    });
+
+    await linker.unlink();
+    expect(readDeviceLink(h)).toBeNull();
+  });
+
   it("a denied grant ends as denied with nothing stored", async () => {
     const h = home();
     const b = fakeBackend({ deny: true });

@@ -114,7 +114,8 @@ import type { ResolvedLaunchScope } from "../action-window/initial-import/import
 import { buildSegmentIngestUpload } from "../action-window/ingest-handoff";
 import { fetchLaunchScope, reportSessionReadiness } from "../upload";
 import { backendBearer, DeviceLinker } from "../auth/helper-session";
-import { startFixtureObserveLoop, type FixtureObserveLoop } from "../aside/fixture-observe-runner";
+import { startFixtureObserveLoop } from "../aside/fixture-observe-runner";
+import { ClaimLoopBinding } from "../aside/claim-loop-binding";
 import { AW_CARRIER_REPLY } from "../../../contracts/action-window/aw-carrier-kind";
 import { ReplySubmissionEndpoint } from "../bridge/reply-submission-endpoint";
 import { ResidentReplyCarrier } from "../action-window/reply-submission/resident-reply-carrier";
@@ -2338,11 +2339,13 @@ export async function runBridgeOnlyBoot(
   // link completes during boot, which cannot happen: nothing can press 「이 기기 연결」 at a bridge that is
   // not up yet.
   let onDeviceLinked: () => void = () => {};
+  let onDeviceUnlinked: () => void = () => {};
   const deviceLinker = deps.deviceLinker ?? new DeviceLinker({
     baseUrl: linkCfg.baseUrl,
     home: helperHome(env),
     helperVersion: helperVersion(env),
     onLinked: () => onDeviceLinked(),
+    onUnlinked: () => onDeviceUnlinked(),
   });
   const bridge = createBridge({
     ...resolveAgentBridgeConfig(args, env),
@@ -2398,17 +2401,28 @@ export async function runBridgeOnlyBoot(
   // explicit per-machine opt-in the seller-pressed Coupang read already uses. Without it `reviewHandoff` is
   // absent and a marketplace recipe is refused here without opening anything.
   //
-  // <b>And it starts when the link exists, not only when the process started.</b> The seller's order is
-  // install → open 연결 → [이 기기 연결], so at boot there is usually no link yet and `backendBearer` throws.
-  // Building the loop only at boot therefore produced a helper that was linked, idle, and silently not asking
-  // for work until someone restarted it — with nothing on either screen saying a restart was the missing
-  // step. `ensureFixtureLoop` is idempotent and is called again the moment a link lands.
-  let fixtureLoop: FixtureObserveLoop | null = null;
+  // <b>And what it holds is the credential on disk, at every moment — not the one that was there at boot.</b>
+  // The seller's order is install → open 연결 → [이 기기 연결], so at boot there is usually no link yet. A loop
+  // built only at boot therefore produced a helper that was linked, idle, and silently not asking for work; a
+  // loop built once and then kept produced the worse version of the same thing on a machine that had an OLDER
+  // link — polling as the previous account, so the job the seller just queued was claimed by nobody. Neither
+  // screen says «restart the helper», and it must not have to be said: `ClaimLoopBinding` re-reads the
+  // credential on every transition and keeps exactly one loop bound to it.
   const marketplaceLane = linkCfg.executionProvider === "ASIDE";
-  const ensureFixtureLoop = async (reason: "boot" | "linked") => {
-    if (fixtureLoop || !(linkCfg.customerOperationsFixture || marketplaceLane)) return;
-    try {
-      const token = await backendBearer(linkCfg, env);
+  const claimLoop = new ClaimLoopBinding({
+    // Re-read on every transition. `backendBearer` throwing is «this device is not linked», which the binding
+    // reads as «nothing to ask with» — not an error.
+    readToken: async () => {
+      if (!(linkCfg.customerOperationsFixture || marketplaceLane)) return null;
+      try {
+        return await backendBearer(linkCfg, env);
+      } catch {
+        return null;
+      }
+    },
+    onStopped: (reason) => log("aside_fixture_loop_stopped", { reason }),
+    onNoCredential: (reason) => log("aside_fixture_loop_skipped", { linked: false, reason }),
+    start: (token, reason) => {
       // The same screen the credential handoff and the pressed acquisition apply, and for the same reason: a
       // stale environment value must not be able to send a page of what customers wrote to an arbitrary host.
       const screened = screenCredentialBackendOrigin(linkCfg.baseUrl);
@@ -2416,7 +2430,7 @@ export async function runBridgeOnlyBoot(
       if (marketplaceLane && !screened.ok) {
         log("aside_marketplace_handoff_refused", { reason: screened.reason }, "warn");
       }
-      fixtureLoop = startFixtureObserveLoop({
+      const loop = startFixtureObserveLoop({
         baseUrl: linkCfg.baseUrl,
         token,
         bridgePort: listen.port,
@@ -2439,21 +2453,21 @@ export async function runBridgeOnlyBoot(
         marketplace: handoffOrigin !== null,
         reason,
       });
-    } catch {
-      // Not linked to this backend: there is nobody to ask for work, and that is not an error to crash on.
-      // The seller linking the helper is exactly what makes this succeed, and that is why it is retried there.
-      log("aside_fixture_loop_skipped", { linked: false, reason });
-    }
-  };
-  await ensureFixtureLoop("boot");
-  onDeviceLinked = () => void ensureFixtureLoop("linked");
+      return loop;
+    },
+  });
+  await claimLoop.rebind("boot");
+  // Both transitions, because either can make the running loop's credential the wrong one — and a seller must
+  // never have to restart the helper to finish what they pressed.
+  onDeviceLinked = () => void claimLoop.rebind("linked");
+  onDeviceUnlinked = () => void claimLoop.rebind("unlinked");
 
   let resolveStopped: () => void = () => {};
   const stopped = new Promise<void>((r) => (resolveStopped = r));
   const shutdown = createSignalShutdown(async () => {
     bridge.markAgentStopping();
     deviceLinker.stop();
-    fixtureLoop?.stop();
+    claimLoop.stop();
     // A window the on-demand walk opened must not outlive the helper that opened it.
     await carrierHost.disposeActive().catch(() => {});
     await bridge.close().catch(() => {});
