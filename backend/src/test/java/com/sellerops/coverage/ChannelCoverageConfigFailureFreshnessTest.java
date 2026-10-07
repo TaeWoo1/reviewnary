@@ -175,37 +175,93 @@ class ChannelCoverageConfigFailureFreshnessTest {
     }
 
     @Test
-    @DisplayName("every failure that reached the marketplace still erases — the set did not widen")
-    void failuresThatReachedTheChannelStillSpeak() {
+    @DisplayName("every failure that reached the marketplace is the channel's latest word — and erases no date")
+    void failuresThatReachedTheChannelSpeakForTodayOnly() {
+        // <b>What changed on 2026-10-08.</b> Each of these used to null the collection date, and the rule
+        // behind that — «a channel that has stopped answering must not read as fresh» — is still in force.
+        // It is just no longer enforced by deleting evidence: the failure is the latest ATTEMPT, the
+        // collection keeps its own date, and the state is the composed verdict.
         for (String reached : new String[] {"AUTH_REQUIRED", "RATE_LIMITED", "TIMEOUT", "EXECUTION_FAILED",
                 "PAGE_LIMIT_REACHED"}) {
             syncJobs.deleteAll();
             run("INQUIRY", "SUCCESS", null, COLLECTED);
             run("INQUIRY", "FAILED", reached, Instant.parse("2026-10-07T02:43:57Z"));
 
-            assertThat(lastSuccess("INQUIRY")).as("%s reached the channel and is its latest word", reached)
-                    .isNull();
+            assertThat(lastSuccess("INQUIRY")).as("%s says nothing about what was read in September", reached)
+                    .isEqualTo(COLLECTED);
+            assertThat(row("INQUIRY").latestAttemptAt()).isEqualTo(Instant.parse("2026-10-07T02:43:57Z"));
+            assertThat(row("INQUIRY").state()).isEqualTo(ChannelDataState.OBSERVED_FRESHNESS_UNPROVEN);
         }
     }
 
     @Test
-    @DisplayName("a failure that DID reach the channel still stands in front of an older success")
-    void aRealFailureIsStillEvidence() {
+    @DisplayName("a sign-in wall is told apart from a failure — the seller is sent to the right place")
+    void anAuthWallIsItsOwnWord() {
         run("INQUIRY", "SUCCESS", null, COLLECTED);
-        run("INQUIRY", "FAILED", "AUTH_REQUIRED", Instant.parse("2026-10-07T02:43:57Z"));
+        run("INQUIRY", "FAILED", SyncJob.FAILURE_AUTH_REQUIRED, Instant.parse("2026-10-07T02:43:57Z"));
 
-        // The credential died. A channel that has stopped answering must not read as freshly collected,
-        // which is the rule the config-failure skip is deliberately narrow enough to preserve.
-        assertThat(lastSuccess("INQUIRY")).isNull();
+        // 「로그인이 필요합니다」 and 「수집 실패」 send someone to two different places, and merging them sent
+        // one session to look at the helper when the store was simply signed out.
+        assertThat(row("INQUIRY").latestAttemptOutcome()).isEqualTo(AcquisitionAttemptOutcome.AUTH_REQUIRED);
+        assertThat(lastSuccess("INQUIRY")).isEqualTo(COLLECTED);
     }
 
     @Test
-    @DisplayName("a pre-V116 failure carries no code and is never skipped — history keeps its meaning")
+    @DisplayName("the guided lane's own code reaches the same answer, from either column")
+    void theGuidedLanesLoginCodeIsAnAuthWall() {
+        // That lane wrote the channel's code into `errorMessage` and left `failure_code` null until
+        // 2026-10-08, and rows of that shape are already stored — they are the rows this package exists to
+        // stop misreading, so both spellings are accepted.
+        run("INQUIRY", "SUCCESS", null, COLLECTED);
+        SyncJob legacy = run("INQUIRY", "FAILED", null, Instant.parse("2026-10-07T14:59:26Z"));
+        legacy.setErrorMessage("LOGIN_REQUIRED");
+        syncJobs.save(legacy);
+
+        assertThat(row("INQUIRY").latestAttemptOutcome()).isEqualTo(AcquisitionAttemptOutcome.AUTH_REQUIRED);
+        assertThat(lastSuccess("INQUIRY")).isEqualTo(COLLECTED);
+    }
+
+    @Test
+    @DisplayName("free text in the message column is not read as a code")
+    void prosExistsInThatColumnToo() {
+        // `errorMessage` also carries a walk's stop reason. A substring rule there would start reading
+        // sentences as classifications.
+        run("INQUIRY", "SUCCESS", null, COLLECTED);
+        SyncJob prose = run("INQUIRY", "FAILED", null, Instant.parse("2026-10-07T14:59:26Z"));
+        prose.setErrorMessage("the seller closed the window before LOGIN_REQUIRED could be confirmed");
+        syncJobs.save(prose);
+
+        assertThat(row("INQUIRY").latestAttemptOutcome()).isEqualTo(AcquisitionAttemptOutcome.FAILED);
+    }
+
+    @Test
+    @DisplayName("a pre-V116 failure carries no code and is never skipped — it is still the latest attempt")
     void anUncodedFailureIsNotSkipped() {
         run("INQUIRY", "SUCCESS", null, COLLECTED);
         run("INQUIRY", "FAILED", null, Instant.parse("2026-10-07T02:43:57Z"));
 
-        assertThat(lastSuccess("INQUIRY")).isNull();
+        assertThat(row("INQUIRY").latestAttemptOutcome()).isEqualTo(AcquisitionAttemptOutcome.FAILED);
+        assertThat(lastSuccess("INQUIRY")).isEqualTo(COLLECTED);
+    }
+
+    @Test
+    @DisplayName("a config failure is not an attempt on the channel, so it is not the latest one either")
+    void aConfigFailureIsNoAttempt() {
+        run("INQUIRY", "SUCCESS", null, COLLECTED);
+        run("INQUIRY", "FAILED", SyncJob.FAILURE_CONNECTOR_UNAVAILABLE, Instant.parse("2026-10-07T02:43:57Z"));
+
+        // The run opened no socket. Reporting it as «시도: 실패» would describe this deployment's wiring as
+        // the marketplace's answer.
+        assertThat(row("INQUIRY").latestAttemptAt()).isEqualTo(COLLECTED);
+        assertThat(row("INQUIRY").latestAttemptOutcome()).isEqualTo(AcquisitionAttemptOutcome.SUCCESS);
+    }
+
+    @Test
+    @DisplayName("a channel never attempted says so, rather than claiming a failure")
+    void neverAttemptedIsNotAFailure() {
+        assertThat(row("ORDER_SUMMARY").latestAttemptAt()).isNull();
+        assertThat(row("ORDER_SUMMARY").latestAttemptOutcome()).isNull();
+        assertThat(lastSuccess("ORDER_SUMMARY")).isNull();
     }
 
     @Test
@@ -231,9 +287,12 @@ class ChannelCoverageConfigFailureFreshnessTest {
     }
 
     private Instant lastSuccess(String dataType) {
+        return row(dataType).lastSuccessfulSyncAt();
+    }
+
+    private ChannelCoverageRow row(String dataType) {
         List<ChannelCoverageRow> rows = service.coverage(org, List.of("NAVER"));
-        return rows.stream().filter(r -> dataType.equals(r.dataType())).findFirst().orElseThrow()
-                .lastSuccessfulSyncAt();
+        return rows.stream().filter(r -> dataType.equals(r.dataType())).findFirst().orElseThrow();
     }
 
     /** One finished run. {@code createdAt} is pinned so "newest" is the test's statement, not the clock's. */

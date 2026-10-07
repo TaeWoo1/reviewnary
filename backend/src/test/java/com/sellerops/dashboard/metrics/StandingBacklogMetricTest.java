@@ -106,7 +106,7 @@ class StandingBacklogMetricTest {
     private static ChannelCoverageRow coverageRow(String dataType, Long openRows) {
         return new ChannelCoverageRow("CAFE24", "카페24 자사몰", dataType,
                 ChannelDataState.OBSERVED_FRESHNESS_UNPROVEN, true, "CONFIRMED", true, "CONNECTED",
-                true, null, null, openRows == null ? 0L : openRows, openRows, null);
+                true, null, null, null, null, openRows == null ? 0L : openRows, openRows, null);
     }
 
     private static MetricKpi kpi(OperationsMetricsResponse response, String key) {

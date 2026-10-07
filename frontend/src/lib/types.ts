@@ -685,11 +685,25 @@ export interface ChannelCoverageRowView {
   connectionStatus: string | null;
   routineEnabled: boolean;
   routinePausedBy: string | null;
+  /** 실제로 자료를 읽은 가장 최근 수집. 그 뒤에 무슨 일이 있었든 이 날짜는 지워지지 않는다. */
   lastSuccessfulSyncAt: string | null;
+  /** 이 채널·자료를 마지막으로 시도한 시각. 어느 lane이 시도했든. */
+  latestAttemptAt: string | null;
+  /** 그 시도가 어떻게 끝났는지 — 「지금 이 채널이 답하는가」를 말하는 쪽. */
+  latestAttemptOutcome: AcquisitionAttemptOutcome | null;
   rows: number;
   openRows: number | null;
   newestObservedAt: string | null;
 }
+
+/**
+ * 한 채널·자료의 마지막 시도가 끝난 방식.
+ *
+ * `AUTH_REQUIRED`가 `FAILED`와 따로 있는 이유: 판매자가 할 일이 다르다. 하나는 판매자 센터에 로그인하는
+ * 것이고 다른 하나는 우리 쪽을 들여다볼 일이다. 두 단어를 하나로 합친 화면은 2026-10-07에 로그인이 풀린
+ * 가게를 두고 도우미를 고치러 가게 만들었다.
+ */
+export type AcquisitionAttemptOutcome = "SUCCESS" | "PARTIAL" | "AUTH_REQUIRED" | "FAILED";
 
 export interface SyncRunFilters {
   sellerAccountId?: string;

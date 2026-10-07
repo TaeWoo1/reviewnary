@@ -20,6 +20,8 @@ function coverage(
     routineEnabled: true,
     routinePausedBy: null,
     lastSuccessfulSyncAt: null,
+    latestAttemptAt: null,
+    latestAttemptOutcome: null,
     rows,
     openRows: null,
     newestObservedAt: null,

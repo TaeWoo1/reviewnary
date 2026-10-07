@@ -1,6 +1,8 @@
 package com.sellerops.responsibility.aside;
 
 import com.sellerops.connector.DataType;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -159,6 +161,30 @@ public enum AsideRecipe {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Every marketplace recipe for one channel × data type, named the way coverage names them (a code and a
+     * data-type word).
+     *
+     * <p>Separate from {@link #forScreenRead} because the questions differ: that one picks <b>the</b> recipe a
+     * press should dispatch and must therefore be a single answer; this one gathers the recipes whose finished
+     * jobs are evidence about a channel, where a set is the honest shape — a pair can grow a second recipe
+     * (a sign-in check beside a read) without the reader having to learn about it.
+     *
+     * <p>Takes the data type as a string because its one caller holds coverage's vocabulary, where the type is
+     * a column value rather than an enum. An unknown word yields an empty list, which reads as «no screen-read
+     * lane for this pair» — the same answer as a channel that has none.
+     */
+    public static List<AsideRecipe> forChannelDataType(String channelCode, String dataType) {
+        if (channelCode == null || dataType == null) {
+            return List.of();
+        }
+        return Arrays.stream(values())
+                .filter(AsideRecipe::readsMarketplace)
+                .filter(r -> channelCode.equals(r.channelCode))
+                .filter(r -> r.dataType != null && r.dataType.name().equals(dataType))
+                .toList();
     }
 
     /**

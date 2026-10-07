@@ -39,6 +39,17 @@ public class SyncJob extends BaseEntity {
     public static final String FAILURE_CONFIGURATION_REQUIRED = "CONFIGURATION_REQUIRED";
 
     /**
+     * The channel's own sign-in wall stopped the run: it reached the marketplace and was turned away there.
+     *
+     * <p><b>Not</b> one of {@link #FAILURE_CODES_BEFORE_CHANNEL_ATTEMPT} — a request did leave this process,
+     * so this IS the channel's latest word and must stand as one. What it is not is evidence about the past:
+     * {@code AcquisitionAttemptOutcome} reads this code to say «로그인이 필요합니다» for today while the
+     * earlier successful read keeps its own date. The literal was already being written by
+     * {@code SyncRunExecutor.failureCodeOf}; naming it here is what let a second reader rely on it.
+     */
+    public static final String FAILURE_AUTH_REQUIRED = "AUTH_REQUIRED";
+
+    /**
      * <b>The codes that mean the run ended before it asked the channel anything.</b>
      *
      * <p>This set is the <i>meaning</i> the freshness surfaces read by, and it is deliberately a statement

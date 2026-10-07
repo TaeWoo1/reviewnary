@@ -44,6 +44,8 @@ function coverage(over: Partial<ChannelCoverageRowView> = {}): ChannelCoverageRo
     routineEnabled: true,
     routinePausedBy: null,
     lastSuccessfulSyncAt: "2026-09-26T18:31:17Z",
+    latestAttemptAt: "2026-09-26T18:31:17Z",
+    latestAttemptOutcome: "SUCCESS",
     rows: 25,
     openRows: 3,
     newestObservedAt: "2026-09-17T22:14:54Z",

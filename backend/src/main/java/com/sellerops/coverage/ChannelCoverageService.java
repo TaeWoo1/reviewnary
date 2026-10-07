@@ -10,6 +10,10 @@ import com.sellerops.inquiry.InquiryRepository;
 import com.sellerops.order.OrderDailySummaryRepository;
 import com.sellerops.order.fact.OrderStoreFreshness;
 import com.sellerops.review.ReviewRepository;
+import com.sellerops.responsibility.aside.AsideRecipe;
+import com.sellerops.responsibility.aside.ScheduledAsideJob;
+import com.sellerops.responsibility.aside.ScheduledAsideJobRepository;
+import com.sellerops.responsibility.aside.ScheduledAsideJobStatus;
 import com.sellerops.reviewimport.ReviewImportSegmentAttemptRepository;
 import com.sellerops.selleraccount.SellerAccount;
 import com.sellerops.selleraccount.SellerAccountRepository;
@@ -27,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,12 +80,29 @@ public class ChannelCoverageService implements OrderStoreFreshness {
     private final ReviewRepository reviews;
     private final OrderDailySummaryRepository orders;
     private final ReviewImportSegmentAttemptRepository acquisitions;
+    /**
+     * Screen reads, for «latest attempt». Optional so a context without the Aside substrate answers exactly as
+     * it did before this field existed — a null here means «this deployment has no screen-read lane», not
+     * «nothing was attempted», and the two must not be the same answer.
+     */
+    private final ScheduledAsideJobRepository screenReads;
 
     public ChannelCoverageService(ChannelRepository channels, ConnectorCapabilityRepository capabilities,
                                   SellerAccountRepository accounts, SyncScheduleRepository schedules,
                                   SyncJobRepository syncJobs, InquiryRepository inquiries,
                                   ReviewRepository reviews, OrderDailySummaryRepository orders,
                                   ReviewImportSegmentAttemptRepository acquisitions) {
+        this(channels, capabilities, accounts, schedules, syncJobs, inquiries, reviews, orders, acquisitions, null);
+    }
+
+    @Autowired
+    public ChannelCoverageService(ChannelRepository channels, ConnectorCapabilityRepository capabilities,
+                                  SellerAccountRepository accounts, SyncScheduleRepository schedules,
+                                  SyncJobRepository syncJobs, InquiryRepository inquiries,
+                                  ReviewRepository reviews, OrderDailySummaryRepository orders,
+                                  ReviewImportSegmentAttemptRepository acquisitions,
+                                  @Autowired(required = false) ScheduledAsideJobRepository screenReads) {
+        this.screenReads = screenReads;
         this.channels = channels;
         this.capabilities = capabilities;
         this.accounts = accounts;
@@ -191,8 +213,13 @@ public class ChannelCoverageService implements OrderStoreFreshness {
         boolean routineEnabled = schedule != null && schedule.isEnabled();
         Instant lastSuccess = account == null ? null
                 : lastSuccessfulSync(orgId, account.getChannelId(), "ORDER_SUMMARY");
-        return stateOf(support, connected, account, routineEnabled, lastSuccess, schedule, rowsHeld,
-                Instant.now());
+        // The same two reads this service makes for a coverage row: evidence of a past read, and whether the
+        // latest attempt said the channel still answers. Orders have no screen-read lane, so in practice the
+        // attempt here comes from a connector run — `latestAttempt` is asked anyway rather than assumed.
+        Attempt attempt = account == null ? null
+                : latestAttempt(orgId, account.getChannelId(), "ORDER_SUMMARY");
+        return stateOf(support, connected, account, routineEnabled, lastSuccess,
+                attempt == null ? null : attempt.outcome(), schedule, rowsHeld, Instant.now());
     }
 
     private ChannelCoverageRow row(UUID orgId, Channel channel, SellerAccount account, String dataType,
@@ -219,15 +246,18 @@ public class ChannelCoverageService implements OrderStoreFreshness {
                 : (schedule.getPausedReason() == null ? "OPERATOR" : "SYSTEM");
 
         Instant lastSuccess = lastSuccessfulSync(orgId, channel.getId(), dataType);
+        Attempt attempt = latestAttempt(orgId, channel.getId(), dataType);
         long[] count = counts.get(dataType).getOrDefault(channel.getId(), new long[] {0L, 0L});
         Long open = count[1] < 0 ? null : count[1];
         Instant newestObserved = newest.get(dataType).get(channel.getId());
 
         ChannelDataState state = stateOf(support, connected, account, routineEnabled,
-                lastSuccess, schedule, count[0], now);
+                lastSuccess, attempt == null ? null : attempt.outcome(), schedule, count[0], now);
         return new ChannelCoverageRow(channel.getCode(), channel.getNameKo(), dataType, state,
                 support != Support.UNSUPPORTED, verification, connected, connectionStatus,
-                routineEnabled, pausedBy, lastSuccess, count[0], open, newestObserved);
+                routineEnabled, pausedBy, lastSuccess,
+                attempt == null ? null : attempt.at(), attempt == null ? null : attempt.outcome(),
+                count[0], open, newestObserved);
     }
 
     /**
@@ -259,8 +289,22 @@ public class ChannelCoverageService implements OrderStoreFreshness {
      * saying the same thing about the same rows: an org that uploaded its reviews holds them whether
      * or not it ever connected anything.
      */
+    /**
+     * The same verdict with no attempt on record — «this channel × type has not been attempted».
+     *
+     * <p>Not a shortcut for «the attempt failed»: those are different inputs and only one of them may refuse
+     * freshness. It exists because most of this verdict does not depend on the attempt at all (capability,
+     * connection, rows held), and the cases that do say so by passing it.
+     */
     static ChannelDataState stateOf(Support support, boolean connected, SellerAccount account,
                                     boolean routineEnabled, Instant lastSuccess, SyncSchedule schedule,
+                                    long rows, Instant now) {
+        return stateOf(support, connected, account, routineEnabled, lastSuccess, null, schedule, rows, now);
+    }
+
+    static ChannelDataState stateOf(Support support, boolean connected, SellerAccount account,
+                                    boolean routineEnabled, Instant lastSuccess,
+                                    AcquisitionAttemptOutcome latestAttempt, SyncSchedule schedule,
                                     long rows, Instant now) {
         if (support == Support.UNSUPPORTED) {
             return rows > 0 ? ChannelDataState.OBSERVED_FRESHNESS_UNPROVEN
@@ -280,7 +324,13 @@ public class ChannelCoverageService implements OrderStoreFreshness {
         if (!connected) {
             return ChannelDataState.BLOCKED;
         }
-        boolean fresh = routineEnabled && isRecent(lastSuccess, schedule, now);
+        // <b>«A channel that has stopped answering must not read as fresh» — kept, as a judgement about the
+        // state rather than by deleting a date</b> (2026-10-08). That rule used to be enforced by nulling
+        // `lastSuccessfulSyncAt` whenever the latest reaching run failed, which also erased the true date of a
+        // read that did happen. The rule itself was never wrong; its implementation was in the wrong field. So
+        // the failure is read here, where a verdict belongs, and the date stays where evidence belongs.
+        boolean answering = latestAttempt == null || latestAttempt.readData();
+        boolean fresh = routineEnabled && answering && isRecent(lastSuccess, schedule, now);
         if (!fresh) {
             // Rows we hold are still real; what we cannot say is that they are today's picture. With no
             // rows at all this is NOT a zero — it is a channel we have never successfully read.
@@ -318,8 +368,7 @@ public class ChannelCoverageService implements OrderStoreFreshness {
      * success, because a channel that has stopped answering must not read as fresh.
      */
     private Instant lastSuccessfulSync(UUID orgId, UUID channelId, String dataType) {
-        Optional<SyncJob> latest = syncJobs.findLatestRunReachingChannel(orgId, channelId, dataType);
-        Instant collected = latest.filter(j -> "SUCCESS".equals(j.getStatus()) || "PARTIAL".equals(j.getStatus()))
+        Instant collected = syncJobs.findLatestSuccessfulRun(orgId, channelId, dataType)
                 .map(SyncJob::getFinishedAt)
                 .orElse(null);
         if (!"REVIEW".equals(dataType)) {
@@ -330,6 +379,58 @@ public class ChannelCoverageService implements OrderStoreFreshness {
             return acquired;
         }
         return acquired == null || acquired.isBefore(collected) ? collected : acquired;
+    }
+
+    /**
+     * <b>The most recent attempt on this channel × type, and how it ended</b> — the field that says whether the
+     * channel still answers, now that {@link #lastSuccessfulSync} no longer tries to say both.
+     *
+     * <p>Two lanes, two record shapes, and the later of the two wins. A connector pull leaves a
+     * {@link SyncJob}; a screen read leaves a {@code ScheduledAsideJob} and <b>no sync run at all</b>, so a
+     * field fed from one of them is blank exactly when the other lane is the one being used.
+     *
+     * <p>A run that never asked the channel is not an attempt on it ({@code findLatestRunReachingChannel}
+     * looks through those): a deployment with a connector switched off would otherwise report «시도: 실패»
+     * for every channel every time something touched the manual-sync endpoint, which is a fact about this
+     * process and not about the marketplace.
+     */
+    private Attempt latestAttempt(UUID orgId, UUID channelId, String dataType) {
+        Attempt pull = syncJobs.findLatestRunReachingChannel(orgId, channelId, dataType)
+                .map(j -> new Attempt(j.getFinishedAt() != null ? j.getFinishedAt() : j.getCreatedAt(),
+                        AcquisitionAttemptOutcome.of(j)))
+                .orElse(null);
+        Attempt screen = latestScreenRead(orgId, channelId, dataType);
+        if (pull == null) {
+            return screen;
+        }
+        if (screen == null || screen.at() == null || pull.at() == null) {
+            return pull.at() != null ? pull : screen;
+        }
+        return screen.at().isAfter(pull.at()) ? screen : pull;
+    }
+
+    /** The newest settled screen read for this channel × type, or null when this deployment has no such lane. */
+    private Attempt latestScreenRead(UUID orgId, UUID channelId, String dataType) {
+        if (screenReads == null) {
+            return null;
+        }
+        Channel channel = channels.findById(channelId).orElse(null);
+        if (channel == null) {
+            return null;
+        }
+        List<AsideRecipe> recipes = AsideRecipe.forChannelDataType(channel.getCode(), dataType);
+        if (recipes.isEmpty()) {
+            return null;
+        }
+        return screenReads
+                .findFirstByOrgIdAndRecipeInAndStatusOrderBySettledAtDesc(
+                        orgId, recipes, ScheduledAsideJobStatus.SETTLED)
+                .map(j -> new Attempt(j.getSettledAt(), AcquisitionAttemptOutcome.of(j.getOutcome())))
+                .orElse(null);
+    }
+
+    /** One attempt, reduced to what coverage says about it. */
+    private record Attempt(Instant at, AcquisitionAttemptOutcome outcome) {
     }
 
     private static Map<UUID, long[]> pairs(List<Object[]> rows) {
