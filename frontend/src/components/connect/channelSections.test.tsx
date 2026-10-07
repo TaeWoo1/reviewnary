@@ -10,11 +10,24 @@ import { expectNoAxeViolations } from "../../test/axe";
 import type { ConnectionStatusView, SyncRunView } from "../../lib/types";
 
 const getChannelCapabilityOverview = vi.fn(async (_code: string) => null as unknown);
+/**
+ * Which route the server says this row takes. Every row asks before it draws itself, so a test that did not
+ * answer would render the «확인 중…» state and assert nothing about the controls.
+ */
+const collectNowReadiness = vi.fn(async (_accountId: string, _dataType: string) => ({
+  path: "API",
+  localAgent: null,
+}) as unknown);
+const collectNow = vi.fn();
+const screenReadStatus = vi.fn();
 vi.mock("../../lib/apiClient", () => ({
   api: {
     putSchedule: vi.fn(),
     manualSync: vi.fn(),
     retryRun: vi.fn(),
+    collectNow: (...a: unknown[]) => collectNow(...a),
+    collectNowReadiness: (accountId: string, dataType: string) => collectNowReadiness(accountId, dataType),
+    screenReadStatus: (...a: unknown[]) => screenReadStatus(...a),
     getChannelCapabilityOverview: (code: string) => getChannelCapabilityOverview(code),
     // The status section asks why a failing credential is failing. Healthy here, so the diagnosis
     // panel renders nothing and these assertions stay about the figures they were written for.
@@ -49,6 +62,10 @@ function wrap(ui: React.ReactElement) {
 beforeEach(() => {
   getChannelCapabilityOverview.mockReset();
   getChannelCapabilityOverview.mockResolvedValue(null);
+  collectNowReadiness.mockReset();
+  collectNowReadiness.mockResolvedValue({ path: "API", localAgent: null });
+  collectNow.mockReset();
+  screenReadStatus.mockReset();
 });
 
 describe("연결 상태 섹션", () => {

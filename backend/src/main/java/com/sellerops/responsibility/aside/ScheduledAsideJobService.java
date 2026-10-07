@@ -142,7 +142,7 @@ public class ScheduledAsideJobService {
             return existing.get();
         }
         if (hasLiveWork(deviceId, now)) {
-            throw ApiException.conflict("이 컴퓨터에서 이미 확인 작업이 진행 중입니다.");
+            throw new AsideHelperBusyException();
         }
         return jobs.save(ScheduledAsideJob.queued(dispatch, deviceId, sellerAccountId, now));
     }
@@ -172,7 +172,7 @@ public class ScheduledAsideJobService {
             return existing.get();
         }
         if (hasLiveWork(deviceId, now)) {
-            throw ApiException.conflict("이 컴퓨터에서 이미 확인 작업이 진행 중입니다.");
+            throw new AsideHelperBusyException();
         }
         AsideDispatch dispatch = new AsideDispatch(orgId, null, recipe, AsideTrigger.RESPONSIBILITY,
                 AsideJobLimits.ONE_PAGE, runId, clientJobId);
@@ -264,6 +264,43 @@ public class ScheduledAsideJobService {
     /** The current state of one job, for a caller waiting on it. Read-only; no side effect on the row. */
     public Optional<ScheduledAsideJob> byId(UUID jobId) {
         return jobs.findById(jobId);
+    }
+
+    /**
+     * Whether this organisation's desk already has live work on it.
+     *
+     * <p>Asked before a screen draws 지금 수집, so that «이미 수집 중» is something the seller reads instead of
+     * something they discover by pressing. It expires what has timed out first: a desk is not busy because a
+     * helper died holding a lease.
+     *
+     * <p>False for an organisation with no linked helper. That is not «free» — it is a different answer
+     * ({@link AsideHelperDevices#linked}) and the caller asks for it separately.
+     */
+    @Transactional
+    public boolean busy(UUID orgId) {
+        if (devices == null) {
+            return false;
+        }
+        Instant now = clock.instant();
+        jobs.expireStale(now);
+        return devices.linked(orgId)
+                .map(device -> hasLiveWork(device.getId(), now))
+                .orElse(false);
+    }
+
+    /**
+     * The newest finished read of this account's screen for this recipe, if there has been one.
+     *
+     * <p>Only the outcome of the last attempt is a fact worth putting on a screen before the next one: a
+     * sign-in that expired is still expired, and a seller who is about to press deserves to be told to sign in
+     * first rather than to watch a read fail for the reason we already knew.
+     */
+    public Optional<ScheduledAsideJob> lastFinished(UUID orgId, UUID sellerAccountId, AsideRecipe recipe) {
+        if (orgId == null || sellerAccountId == null || recipe == null) {
+            return Optional.empty();
+        }
+        return jobs.findFirstByOrgIdAndSellerAccountIdAndRecipeAndStatusOrderBySettledAtDesc(
+                orgId, sellerAccountId, recipe, ScheduledAsideJobStatus.SETTLED);
     }
 
     /**
