@@ -164,6 +164,19 @@ export interface DeviceLinkerDeps {
    * Never throws into the poll loop: a failure here means the lane did not open, not that the link failed.
    */
   onLinked?: () => void;
+  /**
+   * Called once, right after this helper stops being linked — the seller unlinked it, or the backend answered
+   * 401 and the dead token was dropped.
+   *
+   * <b>Why the losing side needs a hook too.</b> Whatever {@link onLinked} opened was opened for a specific
+   * account's credential, and that credential is now gone. Without this, the lane keeps asking for work with a
+   * token the backend has stopped honouring: not a security hole (the backend refuses it) but a helper that is
+   * busy being wrong, and an operator log that reads as if it were working. The pair makes one rule statable —
+   * what the lane holds is what is on disk.
+   *
+   * Never throws into the caller: losing the link is not something to fail.
+   */
+  onUnlinked?: () => void;
 }
 
 /** How long a "still honoured" answer is trusted before the backend is asked again — a revoke made in 설정
@@ -180,6 +193,7 @@ export class DeviceLinker {
   private readonly schedule: (fn: () => void, ms: number) => unknown;
   private readonly deviceName: string;
   private readonly onLinked: (() => void) | null;
+  private readonly onUnlinked: (() => void) | null;
   private linking: DeviceLinking = null;
   private inFlight: { deviceCode: string; expiresAtMs: number; intervalMs: number } | null = null;
   private lastVerify: { atMs: number; verdict: DeviceVerification } | null = null;
@@ -194,6 +208,7 @@ export class DeviceLinker {
     this.schedule = deps.schedule ?? ((fn, ms) => setTimeout(fn, ms));
     this.deviceName = deps.deviceName ?? deviceDisplayName();
     this.onLinked = deps.onLinked ?? null;
+    this.onUnlinked = deps.onUnlinked ?? null;
   }
 
   /** Ask the backend for a grant and start polling for its approval. One in flight at a time. */
@@ -338,6 +353,7 @@ export class DeviceLinker {
         log("device_link_revoked", {});
         this.lastDeviceId = null;
         verdict = "REVOKED";
+        this.announceUnlinked();
       } else verdict = "UNREACHABLE";
     } catch {
       verdict = "UNREACHABLE";
@@ -361,6 +377,16 @@ export class DeviceLinker {
     }
     clearDeviceLink(this.home);
     this.lastVerify = null;
+    this.announceUnlinked();
+  }
+
+  /** Tell the listener the credential is gone. Swallows its failure for the same reason {@link start} does. */
+  private announceUnlinked(): void {
+    try {
+      this.onUnlinked?.();
+    } catch {
+      // The link is already forgotten on disk; a listener that refuses the news cannot bring it back.
+    }
   }
 
   stop(): void {
