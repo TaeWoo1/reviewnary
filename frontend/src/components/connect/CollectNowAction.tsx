@@ -77,7 +77,20 @@ export function stopSentence(failureCode: string | null | undefined): string | n
     case "QUERY_CONTROL_AMBIGUOUS":
     case "RANGE_ORDER_UNKNOWN":
     case "RANGE_NOT_SETTABLE":
+    case "CALENDAR_OPENER_NOT_FOUND":
+    case "CALENDAR_OPENER_AMBIGUOUS":
       return "판매자센터 화면에서 기간 선택 영역을 확인하지 못했습니다.";
+    // 달력은 열렸지만 그 안을 믿을 수 없었던 경우. 판매자가 지금 할 수 있는 일은 위와 같지만, 다음에 고치러
+    // 갈 자리는 전혀 다르다 — 그래서 화면 문장은 달력을 가리키고, 어느 시험에서 멈췄는지는 failureCode가
+    // 기록으로 남긴다. 화면에는 내부 용어를 쓰지 않는다.
+    case "PICKER_VIEW_UNREADABLE":
+    case "MONTH_NAV_NOT_FOUND":
+    case "MONTH_NAV_AMBIGUOUS":
+    case "MONTH_NAV_UNVERIFIED":
+    case "MONTH_NAV_EXHAUSTED":
+    case "DAY_CELL_NOT_FOUND":
+    case "DAY_CELL_AMBIGUOUS":
+      return "판매자센터 달력에서 날짜를 고르지 못했습니다.";
     case "RANGE_MISMATCH":
       // 기간을 바꿨지만 화면이 그 기간을 보여주지 않았다. 판매자가 할 수 있는 일은 같다 — 그 화면을 한 번
       // 열어 보는 것.

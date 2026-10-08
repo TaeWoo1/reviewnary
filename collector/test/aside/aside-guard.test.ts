@@ -102,13 +102,19 @@ const EVALUATE_FORWARDERS = [
  *
  * Every other forwarder above touches nothing: open, read, close. That property is worth keeping checkable by
  * reading one short file, which is why the historical window read is a separate file rather than a flag on the
- * plain one (2026-10-08). What this file may do instead is the three things a seller does with their own hands
- * to look at last month: put a date in the period's from field, put one in its to field, press 조회.
+ * plain one (2026-10-08). What this file may do instead is what a seller does with their own hands to look at
+ * last month: open the calendar bound to a period field, step it one month at a time, choose a day, press 조회.
  *
- * The widening is held narrow by the describe below: only `fill` and `click` exist, every call site sits on a
- * handle that was counted first, there are exactly three of them, and every token that would make it a
- * mutation — submit, delete, a reply, a row control, a second navigation, a key press, a file — is absent.
- * A fourth interaction cannot be added to this lane without this test failing.
+ * <p><b>`fill` is gone, and that is the finding rather than a tidy-up.</b> The period's two fields are
+ * `input[type=text]` with `readOnly = true`, so the first live catch-up typed into them and stopped at
+ * `RANGE_NOT_SETTABLE`, correctly. Typing was never a way into this period. The vocabulary is now four
+ * clicks — opener, month step, day cell, 조회 — and no `fill` at all, which is a strictly smaller set of
+ * things that can happen to the seller's page than the one it replaced.
+ *
+ * The widening is held narrow by the describe below: only `click` exists, every call site sits on a handle
+ * that was counted first, there are exactly four of them, and every token that would make it a mutation — a
+ * reply, a row control, a second navigation, a key press, a file — is absent. A fifth interaction cannot be
+ * added to this lane without this test failing.
  */
 const READ_NAVIGATORS = ["naver-review-window-runtime.ts"] as const;
 
@@ -127,16 +133,17 @@ describe("aside provider — forbidden capability tokens are absent from every s
 describe.each(READ_NAVIGATORS)("aside provider — %s navigates a READ, and only a READ", (NAVIGATOR) => {
   const code = codeOnly(resolve(SRC, NAVIGATOR));
 
-  it("the whole vocabulary is three interactions: two fills and one click", () => {
-    expect(code.split(".fill(").length - 1, "fill sites").toBe(2);
-    expect(code.split(".click(").length - 1, "click sites").toBe(1);
+  it("the whole vocabulary is four clicks, and nothing is ever typed into the seller's page", () => {
+    // The period's fields are readonly, so there is nothing to type into and no reason to keep the capability.
+    expect(code.split(".fill(").length - 1, "fill sites").toBe(0);
+    expect(code.split(".click(").length - 1, "click sites").toBe(4);
   });
 
   it("every interaction sits on a handle that was counted first", () => {
     // Aside's locators run with Playwright strict mode OFF (export discovery G-2): two matches means the
     // first is acted on, silently. So no locator here is ever acted on directly.
     for (const line of code.split("\n").filter((l) => l.includes(".fill(") || l.includes(".click("))) {
-      expect(line, line.trim()).toMatch(/\b(from|to|search)\b/);
+      expect(line, line.trim()).toMatch(/\b(opener|step|cell|search)\b/);
     }
     // And the exactness is really asserted — on the indices the page's own predicate accepted, which is the
     // single judge of what a control is (2026-10-08: it used to be judged here too, in a selector, and the

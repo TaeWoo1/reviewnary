@@ -3,6 +3,7 @@ package com.sellerops.coverage;
 import com.sellerops.channel.Channel;
 import com.sellerops.channel.ChannelRepository;
 import com.sellerops.responsibility.IdentityVerdict;
+import com.sellerops.responsibility.SourceCompleteness;
 import com.sellerops.responsibility.aside.AsideJobOutcome;
 import com.sellerops.responsibility.aside.AsideRecipe;
 import com.sellerops.responsibility.aside.ScheduledAsideJob;
@@ -98,13 +99,21 @@ public class ReviewCoverageCursor {
             return false;
         }
         Integer observed = job.getObservedCount();
-        Integer capacity = job.getObservedCapacity();
         if (observed == null) {
             return false;
         }
-        // No ceiling on the row means we cannot say the page was not truncated. Fail closed: the rows are kept,
-        // the boundary is not moved.
-        return capacity != null && observed < capacity;
+        // <b>The verdict the delivery took, not a comparison re-done here.</b>
+        //
+        // This used to be `observed < observedCapacity` — our own ceiling, and nothing else. That test is real
+        // and it survives, inside the verdict; but on its own it says only that one way of losing rows did not
+        // happen. It cannot see a list set to 50 rows per page, and it cannot see a row model that loaded 42 of
+        // 46. On 2026-10-08 it called seven days covered on exactly that basis.
+        //
+        // NaverReviewObservationService.incompleteReason is where the four facts are weighed, because that is
+        // where the screen's own statements arrive and can be stored beside the answer. A read whose
+        // completeness was never judged — a helper older than that evidence — leaves this null and moves no
+        // boundary. Fail closed: the rows are kept either way.
+        return job.getDeliveryCompleteness() == SourceCompleteness.COMPLETE;
     }
 
     private List<CoveredWindow> screenReadWindows(UUID orgId, UUID channelId) {

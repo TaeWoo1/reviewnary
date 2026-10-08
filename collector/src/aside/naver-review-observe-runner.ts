@@ -64,6 +64,15 @@ export const NAVER_OBSERVE_FAILURE_CODES = [
   "QUERY_CONTROL_NOT_FOUND",
   "QUERY_CONTROL_AMBIGUOUS",
   "RANGE_ORDER_UNKNOWN",
+  "CALENDAR_OPENER_NOT_FOUND",
+  "CALENDAR_OPENER_AMBIGUOUS",
+  "PICKER_VIEW_UNREADABLE",
+  "MONTH_NAV_NOT_FOUND",
+  "MONTH_NAV_AMBIGUOUS",
+  "MONTH_NAV_UNVERIFIED",
+  "MONTH_NAV_EXHAUSTED",
+  "DAY_CELL_NOT_FOUND",
+  "DAY_CELL_AMBIGUOUS",
   "RANGE_NOT_SETTABLE",
   "RANGE_MISMATCH",
   "READ_UNSETTLED",
@@ -122,6 +131,24 @@ export interface NaverDeliveryRequest {
    * the backend's to make, against values it stores and can re-check.
    */
   readonly rowCapacity: number;
+  /**
+   * **What the screen itself says it is showing, and how it was paged — evidence, not a verdict.**
+   *
+   * <p>`rowCapacity` used to be the whole story, and it was doing two jobs at once: this recipe's own ceiling,
+   * and a standing assumption that the list was showing 500 rows per page. Those are different facts, and a
+   * coverage boundary may only move on the one that was actually read. So the list's printed total
+   * (「리뷰목록 (총 N개)」) and its chosen page size (「N개씩」) travel as numbers beside the rows; `null` means
+   * the screen did not state it clearly, which is itself a reason not to claim the period was read whole.
+   *
+   * <p>The verdict is the backend's: it holds the coverage boundary, and it can re-check these against what it
+   * stored. Nothing here decides that a window was complete.
+   */
+  readonly labelledTotal: number | null;
+  readonly selectedPageSize: number | null;
+  /** How the rows were obtained. `MODEL` is the grid's own row model — every row of the period, no scrolling. */
+  readonly gridReadMode: string | null;
+  /** How many single-month calendar steps this read took to reach its period. Audit only. */
+  readonly monthMoves: number;
 }
 
 export interface NaverDeliveryResponse {
@@ -181,7 +208,17 @@ export function kstDaysBefore(createdAt: string, asOf: Date): number | null {
  * The page is untrusted input. Every row must be one this file fully understands, or none is kept: half a page
  * delivered is indistinguishable from a whole one once it is stored.
  */
-export function sanitizeNaverReading(raw: unknown): { ok: true; reviews: NaverObservedReview[] } | { ok: false; reason: string } {
+export interface NaverReadingEvidence {
+  /** The total the list printed for this period, or null when the screen did not state it unambiguously. */
+  readonly labelledTotal: number | null;
+  /** The page size the list was set to, or null when the chosen value could not be told from the options. */
+  readonly selectedPageSize: number | null;
+  /** How the rows were obtained — `MODEL` is the grid's own row model, which answers for the whole period. */
+  readonly gridReadMode: string | null;
+}
+
+export function sanitizeNaverReading(raw: unknown):
+  { ok: true; reviews: NaverObservedReview[]; evidence: NaverReadingEvidence } | { ok: false; reason: string } {
   if (raw === null || typeof raw !== "object") return { ok: false, reason: "READING_SHAPE" };
   const r = raw as Record<string, unknown>;
   const reason = r["reason"] as NaverReviewReadReason | undefined;
@@ -240,7 +277,20 @@ export function sanitizeNaverReading(raw: unknown): { ok: true; reviews: NaverOb
       ...(projected ? { attachments: projected } : {}),
     });
   }
-  return { ok: true, reviews: out };
+  // The screen's own two numbers travel with the rows. Anything but a finite non-negative integer is `null`:
+  // «the screen did not say» and «the screen said 0» are different facts and must stay different.
+  const count = (v: unknown): number | null =>
+    typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 10_000_000 ? v : null;
+  return {
+    ok: true,
+    reviews: out,
+    evidence: {
+      labelledTotal: count(r["labelledTotal"]),
+      selectedPageSize: count(r["selectedPageSize"]),
+      gridReadMode: typeof r["gridReadMode"] === "string" && r["gridReadMode"].length <= 16
+        ? r["gridReadMode"] : null,
+    },
+  };
 }
 
 /**
@@ -360,6 +410,10 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
       windowStart,
       windowEnd,
       rowCapacity: NAVER_REVIEW_MAX_ROWS,
+      labelledTotal: reading.evidence.labelledTotal,
+      selectedPageSize: reading.evidence.selectedPageSize,
+      gridReadMode: reading.evidence.gridReadMode,
+      monthMoves: typeof result["monthMoves"] === "number" ? result["monthMoves"] : 0,
     });
   } catch {
     delivered = null;
@@ -380,6 +434,10 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
     windowEnd,
     requested: askedFor,
     saturated: reading.reviews.length >= NAVER_REVIEW_MAX_ROWS,
+    labelledTotal: reading.evidence.labelledTotal,
+    selectedPageSize: reading.evidence.selectedPageSize,
+    gridReadMode: reading.evidence.gridReadMode,
+    monthMoves: typeof result["monthMoves"] === "number" ? result["monthMoves"] : 0,
     identity: delivered.identityVerdict,
     received: delivered.received,
     inserted: delivered.inserted,

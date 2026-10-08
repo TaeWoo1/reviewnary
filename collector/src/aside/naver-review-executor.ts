@@ -11,6 +11,7 @@ import {
   buildNaverReviewAuthScript,
   buildNaverReviewListReadScript,
   buildNaverReviewControlsScript,
+  buildNaverReviewPickerScript,
 } from "../naver/review-list-observe-inpage";
 import { inPageReviewListRange } from "../action-window/reply-submission/review-list-range-inpage";
 import { runAsideRepl, type AsideCliOptions } from "./aside-cli";
@@ -26,6 +27,8 @@ import {
 } from "./naver-review-window-runtime";
 import {
   NAVER_REVIEW_DATE_INPUT_SELECTOR,
+  NAVER_REVIEW_DAY_CELL_SELECTOR,
+  NAVER_REVIEW_MAX_MONTH_MOVES,
   NAVER_REVIEW_READ_WORKFLOW,
   NAVER_REVIEW_QUERY_CONTROL_SELECTOR,
   validateNaverReviewWorkflow,
@@ -63,6 +66,17 @@ export interface NaverReviewWindowRequest {
   readonly end: string;
 }
 
+/** `YYYY-MM-DD` as the three numbers a calendar is navigated by, or null when it is not a civil day. */
+export function civilDayOf(day: string): { year: number; month: number; day: number } | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(day || "").trim());
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const date = Number(m[3]);
+  if (month < 1 || month > 12 || date < 1 || date > 31) return null;
+  return { year, month, day: date };
+}
+
 /**
  * The plan for a historical window read.
  *
@@ -77,6 +91,9 @@ export function buildNaverReviewWindowRuntimePlan(
   const startDaysBefore = kstDaysBeforeDay(window.start, now);
   const endDaysBefore = kstDaysBeforeDay(window.end, now);
   if (startDaysBefore === null || endDaysBefore === null) return null;
+  const start = civilDayOf(window.start);
+  const end = civilDayOf(window.end);
+  if (start === null || end === null) return null;
   // A period that ends before it starts, or that reaches into the future, is not a period to go and look at.
   if (endDaysBefore < 0 || startDaysBefore < endDaysBefore || startDaysBefore > 365) return null;
   return {
@@ -88,14 +105,22 @@ export function buildNaverReviewWindowRuntimePlan(
     authScript: buildNaverReviewAuthScript(),
     readerScript: buildNaverReviewListReadScript(),
     rangeScript: inPageReviewListRange(kstCivilDate(now)),
+    // The open calendar, judged in the page against the component's own class words.
+    pickerScript: buildNaverReviewPickerScript(NAVER_REVIEW_DATE_INPUT_SELECTOR,
+      NAVER_REVIEW_QUERY_CONTROL_SELECTOR, NAVER_REVIEW_DAY_CELL_SELECTOR),
     dateInputSelector: NAVER_REVIEW_DATE_INPUT_SELECTOR,
     queryControlSelector: NAVER_REVIEW_QUERY_CONTROL_SELECTOR,
-    requestedStartValue: window.start,
-    requestedEndValue: window.end,
+    dayCellSelector: NAVER_REVIEW_DAY_CELL_SELECTOR,
+    // The two days as a calendar draws them. The period's fields are readonly, so the day is chosen on the
+    // calendar and never typed; what crosses to the program is the civil date, not a string to enter.
+    requestedStart: start,
+    requestedEnd: end,
     requestedStartDaysBefore: startDaysBefore,
     requestedEndDaysBefore: endDaysBefore,
+    maxMonthMoves: NAVER_REVIEW_MAX_MONTH_MOVES,
     settleTimeoutMs: workflow.settleTimeoutMs,
     pollMs: 1_500,
+    pickerSettleMs: 700,
     searchSettleMs: 2_000,
   };
 }
@@ -115,18 +140,23 @@ export function buildNaverReviewWindowRuntimeProgram(plan: NaverReviewWindowRunt
 const WINDOW_CODES = [
   "AUTH_REQUIRED", "SURFACE_UNEXPECTED", "DATE_CONTROL_CANDIDATES_UNREADABLE", "RANGE_CONTROLS_NOT_FOUND",
   "RANGE_CONTROLS_AMBIGUOUS", "QUERY_CONTROL_NOT_FOUND", "QUERY_CONTROL_AMBIGUOUS", "RANGE_ORDER_UNKNOWN",
+  "CALENDAR_OPENER_NOT_FOUND", "CALENDAR_OPENER_AMBIGUOUS", "PICKER_VIEW_UNREADABLE",
+  "MONTH_NAV_NOT_FOUND", "MONTH_NAV_AMBIGUOUS", "MONTH_NAV_UNVERIFIED", "MONTH_NAV_EXHAUSTED",
+  "DAY_CELL_NOT_FOUND", "DAY_CELL_AMBIGUOUS",
   "RANGE_NOT_SETTABLE", "RANGE_MISMATCH", "READ_UNSETTLED", "RUNTIME_FAULT",
 ] as const;
-const WINDOW_STAGES = ["PREPARE", "SURFACE", "AUTH", "CONTROLS", "NAVIGATE", "VERIFY", "READ"] as const;
+const WINDOW_STAGES = ["PREPARE", "SURFACE", "AUTH", "CONTROLS", "PICK_START", "PICK_END", "NAVIGATE",
+  "VERIFY", "READ"] as const;
 
 /** Shape-check the window program's answer. Off-shape is `null` — never a success with a missing half. */
 export function parseNaverReviewWindowRuntimeResult(raw: unknown): NaverWindowRuntimeResult | null {
   if (raw === null || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   const elapsedMs = typeof r["elapsedMs"] === "number" && Number.isFinite(r["elapsedMs"]) ? r["elapsedMs"] : 0;
+  const monthMoves = typeof r["monthMoves"] === "number" && Number.isFinite(r["monthMoves"]) ? r["monthMoves"] : 0;
   if (r["ok"] === true) {
     if (r["reading"] === undefined || r["range"] === undefined) return null;
-    return { ok: true, reading: r["reading"], range: r["range"], elapsedMs };
+    return { ok: true, reading: r["reading"], range: r["range"], monthMoves, elapsedMs };
   }
   if (r["ok"] !== false) return null;
   const code = r["code"];
@@ -139,6 +169,7 @@ export function parseNaverReviewWindowRuntimeResult(raw: unknown): NaverWindowRu
     stage: stage as (typeof WINDOW_STAGES)[number],
     candidates: typeof r["candidates"] === "number" ? r["candidates"] : null,
     labelled: typeof r["labelled"] === "number" ? r["labelled"] : null,
+    monthMoves,
     elapsedMs,
   };
 }
@@ -253,7 +284,8 @@ export class AsideNaverReviewExecutor {
     if (parsed === null) {
       return {
         kind: "RESULT",
-        result: { ok: false, code: "RUNTIME_FAULT", stage: "READ", candidates: null, labelled: null, elapsedMs: run.elapsedMs },
+        result: { ok: false, code: "RUNTIME_FAULT", stage: "READ", candidates: null, labelled: null,
+          monthMoves: 0, elapsedMs: run.elapsedMs },
         llmCalls: 0,
       };
     }

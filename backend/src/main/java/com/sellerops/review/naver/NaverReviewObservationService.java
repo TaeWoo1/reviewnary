@@ -460,9 +460,65 @@ public class NaverReviewObservationService implements AsideMarketplaceTarget {
         job.setWindowStart(start);
         job.setWindowEnd(end);
         job.setObservedCapacity(capacity);
-        job.setDeliveryCompleteness(capacity != null && rows < capacity
-                ? SourceCompleteness.COMPLETE
-                : SourceCompleteness.PARTIAL);
+        job.setLabelledTotal(request.labelledTotal());
+        job.setSelectedPageSize(request.selectedPageSize());
+        job.setGridReadMode(request.gridReadMode());
+        job.setMonthMoves(request.monthMoves());
+        String reason = incompleteReason(request, rows, capacity);
+        job.setCompletenessReason(reason == null ? "WHOLE_PERIOD_READ" : reason);
+        job.setDeliveryCompleteness(reason == null ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL);
+    }
+
+    /**
+     * <b>Why this reading may NOT be called the whole period — or null when every test passed.</b>
+     *
+     * <p>The rule it replaces was one comparison: {@code rows < rowCapacity}. That is a statement about our own
+     * ceiling and nothing else, and reading it as coverage is how «45 rows, capacity 500» became «those seven
+     * days are covered» on 2026-10-08 while twenty-nine days behind it were untouched. A ceiling that was not
+     * reached excludes one way of missing rows. It does not establish that the screen was showing the period.
+     *
+     * <p>So four facts have to agree, each from a different place, and any one of them being unavailable is
+     * itself a reason to leave the boundary where it is:
+     *
+     * <ol>
+     *   <li><b>the ceiling was not reached</b> — ours, as before;
+     *   <li><b>the rows came from the grid's own row model</b> — the list recycles about fifteen DOM rows, so
+     *       any reading that is not the model's is a reading of a viewport, however many times it scrolled;
+     *   <li><b>the screen's printed total equals what arrived</b> — the independent witness. A model that
+     *       loaded 42 of 46 is caught here and nowhere else;
+     *   <li><b>that total is within the page size the list was set to</b> — a total above it could not have
+     *       been on one page whatever loaded, and the page size is the seller's own setting, never changed by
+     *       a read.
+     * </ol>
+     *
+     * <p>A window that fails any of these keeps its rows — they were really read — and moves no boundary. That
+     * is the saturation rule the catch-up walk already relies on, applied to the one case it could not see.
+     */
+    static String incompleteReason(NaverReviewObservationRequest request, int rows, Integer capacity) {
+        if (capacity == null) {
+            return "CAPACITY_UNKNOWN";
+        }
+        if (rows >= capacity) {
+            return "CAPACITY_REACHED";
+        }
+        if (!"MODEL".equals(request.gridReadMode())) {
+            return "READ_MODE_UNPROVEN";
+        }
+        Integer total = request.labelledTotal();
+        if (total == null) {
+            return "TOTAL_UNREADABLE";
+        }
+        if (total != rows) {
+            return "TOTAL_DISAGREES";
+        }
+        Integer pageSize = request.selectedPageSize();
+        if (pageSize == null) {
+            return "PAGE_SIZE_UNREADABLE";
+        }
+        if (total > pageSize) {
+            return "TOTAL_ABOVE_PAGE_SIZE";
+        }
+        return null;
     }
 
     private static LocalDate parseDay(String raw) {

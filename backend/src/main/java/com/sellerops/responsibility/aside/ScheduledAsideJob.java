@@ -231,6 +231,45 @@ public class ScheduledAsideJob extends BaseEntity {
     @Column(name = "observed_capacity")
     private Integer observedCapacity;
 
+    /**
+     * <b>The total the source screen printed for the period it was showing.</b>
+     *
+     * <p>{@code observedCapacity} is OUR ceiling. This is the screen's own count, and the two answer different
+     * questions. 「리뷰목록 (총 42개)」 beside 42 delivered rows is the only pair that says the period was read
+     * whole; 42 rows under a ceiling of 500 says merely that the ceiling was not reached — which is what was
+     * being read as completeness until 2026-10-08. Null when the screen did not state a total.
+     */
+    @Column(name = "labelled_total")
+    private Integer labelledTotal;
+
+    /**
+     * The page size the source list was set to, read from the screen and never changed by the read.
+     *
+     * <p>A total above it means the screen could not have been showing the whole period whatever it loaded, so
+     * the boundary may not move — and that is a fact about the seller's own UI setting, not about this read.
+     */
+    @Column(name = "selected_page_size")
+    private Integer selectedPageSize;
+
+    /**
+     * How the rows were obtained. {@code MODEL} is the grid's own row model.
+     *
+     * <p>Worth a column because the alternative is the trap: the Seller Center list keeps about fifteen rows in
+     * the DOM at a time and recycles them, so a reader that walked the DOM and stopped when no new row appeared
+     * would record a third of a period as all of it. The lane reads the model and checks every node of it was
+     * loaded, which is why «scroll to the end» is not a step in this recipe at all.
+     */
+    @Column(name = "grid_read_mode", length = 16)
+    private String gridReadMode;
+
+    /** Single-month calendar steps the read took to reach its period. Audit only; a read of today's period is 0. */
+    @Column(name = "month_moves")
+    private Integer monthMoves;
+
+    /** Which test decided {@code deliveryCompleteness}. Kept so a PARTIAL window can be explained, not re-run. */
+    @Column(name = "completeness_reason", length = 48)
+    private String completenessReason;
+
     /** A read whose store could not be proved: the verdict is kept, and no delivery count may exist beside it. */
     public void refuseDelivery(com.sellerops.responsibility.IdentityVerdict verdict) {
         this.identityVerdict = verdict;

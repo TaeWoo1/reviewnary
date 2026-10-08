@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.sellerops.channel.Channel;
 import com.sellerops.channel.ChannelRepository;
 import com.sellerops.responsibility.IdentityVerdict;
+import com.sellerops.responsibility.SourceCompleteness;
 import com.sellerops.responsibility.aside.AsideJobOutcome;
 import com.sellerops.responsibility.aside.AsideRecipe;
 import com.sellerops.responsibility.aside.ScheduledAsideJob;
@@ -38,7 +39,8 @@ class ReviewCoverageCursorTest {
     private final ScheduledAsideJobRepository screenReads = mock(ScheduledAsideJobRepository.class);
 
     private static ScheduledAsideJob read(String start, String end, Integer observed, Integer capacity,
-                                          AsideJobOutcome outcome, IdentityVerdict verdict) {
+                                          AsideJobOutcome outcome, IdentityVerdict verdict,
+                                          SourceCompleteness completeness) {
         ScheduledAsideJob job = new ScheduledAsideJob();
         job.setOrgId(ORG);
         job.setRecipe(AsideRecipe.NAVER_REVIEW_OBSERVE_V1);
@@ -46,6 +48,7 @@ class ReviewCoverageCursorTest {
         job.setIdentityVerdict(verdict);
         job.setObservedCount(observed);
         job.setObservedCapacity(capacity);
+        job.setDeliveryCompleteness(completeness);
         if (start != null) {
             job.setWindowStart(LocalDate.parse(start));
             job.setWindowEnd(LocalDate.parse(end));
@@ -54,7 +57,8 @@ class ReviewCoverageCursorTest {
     }
 
     private static ScheduledAsideJob good(String start, String end) {
-        return read(start, end, 45, 500, AsideJobOutcome.OBSERVED, IdentityVerdict.MATCH);
+        return read(start, end, 45, 500, AsideJobOutcome.OBSERVED, IdentityVerdict.MATCH,
+                SourceCompleteness.COMPLETE);
     }
 
     @Test
@@ -64,14 +68,21 @@ class ReviewCoverageCursorTest {
     }
 
     @Test
-    @DisplayName("천장에 닿은 읽기는 밀지 못한다 — 45/500은 되고, 500/500은 안 된다")
-    void saturationRefusesToProve() {
+    @DisplayName("PARTIAL로 판정된 읽기는 밀지 못한다 — 행은 남고, 경계는 그대로다")
+    void aPartialDeliveryDoesNotMoveTheBoundary() {
         assertThat(ReviewCoverageCursor.provesItsWindow(
-                read("2026-10-02", "2026-10-08", 500, 500, AsideJobOutcome.OBSERVED, IdentityVerdict.MATCH)))
+                read("2026-10-02", "2026-10-08", 500, 500, AsideJobOutcome.OBSERVED, IdentityVerdict.MATCH,
+                        SourceCompleteness.PARTIAL)))
                 .isFalse();
-        // 천장을 모르면 잘렸는지도 알 수 없다. 모르는 것은 「완전함」이 아니다.
+    }
+
+    @Test
+    @DisplayName("완전함을 판정한 적이 없는 읽기도 밀지 못한다 — 모르는 것은 「완전함」이 아니다")
+    void anUnjudgedDeliveryDoesNotMoveTheBoundary() {
+        // 이 증거가 생기기 전에 만들어진 helper가 보낸 읽기가 여기에 해당한다. 그 읽기의 행은 진짜로 읽은
+        // 것이므로 보관되지만, 어느 기간을 전부 보았다는 주장은 성립하지 않는다.
         assertThat(ReviewCoverageCursor.provesItsWindow(
-                read("2026-10-02", "2026-10-08", 45, null, AsideJobOutcome.OBSERVED, IdentityVerdict.MATCH)))
+                read("2026-10-02", "2026-10-08", 45, 500, AsideJobOutcome.OBSERVED, IdentityVerdict.MATCH, null)))
                 .isFalse();
     }
 
@@ -79,12 +90,15 @@ class ReviewCoverageCursorTest {
     @DisplayName("읽지 않은 읽기, 가게를 증명하지 못한 읽기, 기간을 말하지 않은 읽기는 모두 밀지 못한다")
     void theOtherThreeWays() {
         assertThat(ReviewCoverageCursor.provesItsWindow(
-                read("2026-10-02", "2026-10-08", 0, 500, AsideJobOutcome.AUTH_REQUIRED, null))).isFalse();
+                read("2026-10-02", "2026-10-08", 0, 500, AsideJobOutcome.AUTH_REQUIRED, null,
+                        SourceCompleteness.COMPLETE))).isFalse();
         assertThat(ReviewCoverageCursor.provesItsWindow(
-                read("2026-10-02", "2026-10-08", 45, 500, AsideJobOutcome.OBSERVED, IdentityVerdict.MISMATCH)))
+                read("2026-10-02", "2026-10-08", 45, 500, AsideJobOutcome.OBSERVED, IdentityVerdict.MISMATCH,
+                        SourceCompleteness.COMPLETE)))
                 .isFalse();
         assertThat(ReviewCoverageCursor.provesItsWindow(
-                read(null, null, 45, 500, AsideJobOutcome.OBSERVED, IdentityVerdict.MATCH))).isFalse();
+                read(null, null, 45, 500, AsideJobOutcome.OBSERVED, IdentityVerdict.MATCH,
+                        SourceCompleteness.COMPLETE))).isFalse();
     }
 
     @Test
@@ -102,7 +116,8 @@ class ReviewCoverageCursorTest {
                 good("2026-10-02", "2026-10-08"),
                 // 로그인 벽에서 끝난 10-07 시도도 기간을 들고 있을 수 있다. 그것이 경계를 밀면 하루가 공짜로
                 // 메워진다.
-                read("2026-10-07", "2026-10-07", 0, 500, AsideJobOutcome.AUTH_REQUIRED, null)));
+                read("2026-10-07", "2026-10-07", 0, 500, AsideJobOutcome.AUTH_REQUIRED, null,
+                        SourceCompleteness.COMPLETE)));
 
         ReviewCoverage coverage = new ReviewCoverageCursor(segments, channels, screenReads)
                 .of(ORG, channelId, TODAY);

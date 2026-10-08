@@ -81,10 +81,16 @@ function pageWith(elements: Partial<{
   form: string;
 }>[], opts: { throwOn?: string; dateForm?: string | null } = {}) {
   // One node per named form, shared by identity — which is how the predicate compares them.
-  const forms: Record<string, { tagName: string; parentElement: null }> = {};
+  // `contains` as well as `parentElement`: the opener rule walks up from a date control asking each ancestor
+  // how much of the period it holds, so an ancestor that cannot answer that question is not a page.
+  const forms: Record<string, { tagName: string; parentElement: null; contains: (el: unknown) => boolean }> = {};
   const formNode = (name?: string) => {
     if (!name) return null;
-    forms[name] ??= { tagName: "FORM", parentElement: null };
+    forms[name] ??= {
+      tagName: "FORM",
+      parentElement: null,
+      contains: (el: unknown) => (el as { parentElement?: unknown } | null)?.parentElement === forms[name],
+    };
     return forms[name];
   };
   const dateForm = "dateForm" in opts ? opts.dateForm : "filter";

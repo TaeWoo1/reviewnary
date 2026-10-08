@@ -252,6 +252,7 @@ but not carrying current truth on its own (`docs/archive/` especially).
 - `docs/agentic_report_v1.md` — Issue Evidence Trust Closure + Agentic Report v1 (2026-09-04)
 - `docs/cafe24_comment_answer_observation_v1.md` — Cafe24 Comment Answer Observation v1
 - `docs/cafe24_review_comment_execution_v1.md` — Cafe24 Review Seller Comment Execution v1
+- `docs/naver_review_date_picker_capability_v1.md` — NAVER 리뷰 기간 선택 capability v1 — 측정, 규칙, 그리고 탐색 방식의 결정
 - `docs/opportunity_engine_v1.md` — Auth Entry Regression Closure + Opportunity Engine v1
 - `docs/repeated_issue_v1.md` — Repeated Issue v1 — 반복되는 문제 하나를 판단하고 추적하는 화면
 - `docs/review_approval_path_v1.md` — Review Approval Path v1 — 특정 리뷰 답변을 검토하고 승인하는 길
