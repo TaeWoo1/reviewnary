@@ -195,6 +195,35 @@ describe("claim loop binding — the loop asks as whoever this helper is now", (
     expect(binding.running).toBe(true);
   });
 
+  /** The same binding, with the stop reason recorded — the one thing the shared harness deliberately drops. */
+  function withStopReasons(initial: string) {
+    let token: string | null = initial;
+    const stops: ClaimLoopRebindReason[] = [];
+    const binding = new ClaimLoopBinding({
+      readToken: async () => token,
+      start: (t) => fakeLoop(t, []),
+      onStopped: (reason) => stops.push(reason),
+    });
+    return { binding, stops, forget: () => (token = null) };
+  }
+
+  it("종료는 해제가 아니다 — 두 사건이 같은 단어로 적히지 않는다", async () => {
+    // 2026-10-08 재설치: 평범한 종료가 `aside_fixture_loop_stopped {"reason":"unlinked"}`로 찍혔다. 이 축에서
+    // unlink는 「판매자의 grant가 사라졌고 디스크의 자격도 지워졌다」는 유일한 사건이라, 그 줄을 읽은 운영자는
+    // 아무것도 revoke되지 않았다는 것을 확인하려고 `.auth/device.json`을 직접 열어야 했다.
+    const h = withStopReasons("token-a");
+    await h.binding.rebind("boot");
+    h.binding.stop();
+    expect(h.stops).toEqual(["shutdown"]);
+
+    // 그리고 진짜 해제는 여전히 해제로 적힌다 — 구분이 생겼다는 것은 양쪽이 각자 제 이름을 갖는다는 뜻이다.
+    const g = withStopReasons("token-a");
+    await g.binding.rebind("boot");
+    g.forget();
+    await g.binding.rebind("unlinked");
+    expect(g.stops).toEqual(["unlinked"]);
+  });
+
   it("an empty credential is no credential", async () => {
     // `""` reaching the loop would be a bearer header with nothing in it: every poll 401s forever, and the
     // operator log says the lane is up.

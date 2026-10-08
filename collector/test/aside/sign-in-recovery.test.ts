@@ -56,6 +56,59 @@ const now = () => {
   return () => (t += 10);
 };
 
+describe("sign-in recovery — the window comes to the seller", () => {
+  /** A page that counts raises, and can refuse to be raised at all. */
+  function raisable(raises: string[], support = true): SignInRuntimeTabLike {
+    const tab = page(1);
+    return support
+      ? { ...tab, bringToFront: async () => void raises.push("raised") }
+      : tab;
+  }
+
+  it("raises the window once, before the page is even waited on", async () => {
+    // 2026-10-08 라이브: 판매자가 「판매자센터 로그인」을 눌렀고, 창은 열렸고, 화면은 그대로였다. Aside의
+    // openTab은 자기 브라우저 안에서 탭을 활성화하지만, 그 브라우저 창이 데스크톱에서 앞으로 나오는 것은
+    // 다른 일이다 — 그래서 「나를 거기로 데려가 줘」가 하는 일의 전부였던 컨트롤이 아무 데도 데려가지 않았다.
+    const raises: string[] = [];
+    const result = await asideSignInRuntime(
+      plan,
+      { openTab: async () => raisable(raises) },
+      async () => undefined,
+      now(),
+    );
+    expect(result).toMatchObject({ ok: true, state: "SIGNED_IN" });
+    // 한 번이다. poll마다 창을 앞으로 끌어오면 누군가 비밀번호를 치고 있는 입력란에서 포커스를 빼앗는다.
+    expect(raises).toEqual(["raised"]);
+  });
+
+  it("a host that cannot raise a window still runs the session", async () => {
+    const result = await asideSignInRuntime(
+      plan,
+      { openTab: async () => raisable([], false) },
+      async () => undefined,
+      now(),
+    );
+    expect(result).toMatchObject({ ok: true, state: "SIGNED_IN" });
+  });
+
+  it("a raise that throws is not a failed session", async () => {
+    const result = await asideSignInRuntime(
+      plan,
+      {
+        openTab: async () => ({
+          ...page(1),
+          bringToFront: async () => {
+            throw new Error("no window server");
+          },
+        }),
+      },
+      async () => undefined,
+      now(),
+    );
+    expect(result).toMatchObject({ ok: true, state: "SIGNED_IN" });
+  });
+});
+
 describe("sign-in recovery — the seller signs in, this watches", () => {
   it("answers SIGNED_IN as soon as the probe sees a signed-in store", async () => {
     const opened: string[] = [];

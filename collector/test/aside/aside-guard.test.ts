@@ -108,6 +108,15 @@ describe("aside provider — forbidden capability tokens are absent from every s
   });
 });
 
+describe("aside provider — focus belongs to the sign-in lane alone", () => {
+  it("no other source under src/aside names a window-raising primitive", () => {
+    for (const file of FILES) {
+      if (file === "sign-in-runtime.ts" || file === "sign-in-executor.ts") continue;
+      expect(codeOnly(resolve(SRC, file)), `${file} raises a window`).not.toContain("bringToFront");
+    }
+  });
+});
+
 describe("aside provider — the only CLI invocations are repl and --version", () => {
   it("the allow-list is exactly those two", () => {
     expect([...ASIDE_ALLOWED_INVOCATIONS]).toEqual(["repl", "--version"]);
@@ -223,6 +232,18 @@ describe.each(EVALUATE_FORWARDERS)("aside provider — the evaluate forwarder %s
     for (const token of [".click(", ".fill(", ".press(", ".goto(", ".type(", "setInputFiles", "waitForEvent",
       "nextPage", "pager"]) {
       expect(code, `${EVALUATE_FORWARDER} contains ${token}`).not.toContain(token);
+    }
+  });
+
+  it("raises a window only in the lane a person asked to be taken somewhere", () => {
+    // `bringToFront` is Playwright's own primitive and is legitimate for the sign-in recovery: the seller
+    // pressed a control that promised to open their seller center. An unattended read has nobody to take
+    // anywhere, and a read that pulled the desktop's focus mid-afternoon would be the product interrupting
+    // work it was supposed to carry quietly.
+    if (EVALUATE_FORWARDER === "sign-in-runtime.ts") {
+      expect(code).toContain("bringToFront");
+    } else {
+      expect(code, `${EVALUATE_FORWARDER} raises a window`).not.toContain("bringToFront");
     }
   });
 });

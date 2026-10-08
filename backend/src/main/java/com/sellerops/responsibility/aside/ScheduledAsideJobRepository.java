@@ -49,6 +49,23 @@ public interface ScheduledAsideJobRepository extends JpaRepository<ScheduledAsid
     Optional<ScheduledAsideJob> findFirstByOrgIdAndRecipeInAndStatusOrderBySettledAtDesc(
             UUID orgId, Collection<AsideRecipe> recipes, ScheduledAsideJobStatus status);
 
+    /**
+     * Every screen read for these recipes that <b>stated the period it covered</b>.
+     *
+     * <p>Only reads that named a window are candidates: a read with no period on it proves nothing about days,
+     * and the rows it stored are still in hand either way. Whether each one may advance the boundary is judged
+     * above ({@code ReviewCoverageCursor}) — observed, store proved, and not at its own row ceiling.
+     */
+    @Query("""
+            select j from ScheduledAsideJob j
+            where j.orgId = :orgId and j.recipe in :recipes
+              and j.status = com.sellerops.responsibility.aside.ScheduledAsideJobStatus.SETTLED
+              and j.windowStart is not null and j.windowEnd is not null
+            order by j.windowStart asc
+            """)
+    List<ScheduledAsideJob> findWindowedReads(@Param("orgId") UUID orgId,
+                                              @Param("recipes") Collection<AsideRecipe> recipes);
+
     /** What this device may take right now: queued for it, and not yet expired. At most one exists by index. */
     @Query("""
             select j from ScheduledAsideJob j

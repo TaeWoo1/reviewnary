@@ -99,7 +99,7 @@ describe("HelperStatusCard — the six words and their one control", () => {
     expect(retry).toHaveBeenCalled();
   });
 
-  it("연결 필요 → 도우미 연결 asks for the pairing — nothing is raised on its own", async () => {
+  it("연결 필요 → 이 Mac 연결 asks for the pairing — nothing is raised on its own", async () => {
     phase = "unpaired";
     healthBody = { ok: true, agentVersion: MIN_HELPER_VERSION };
     renderCard();
@@ -156,11 +156,11 @@ describe("HelperStatusCard — 이 기기 연결 (Helper Device Authentication v
     healthBody = { ok: true, agentVersion: MIN_HELPER_VERSION };
   });
 
-  it("a paired helper that is not linked to the account says 기기 연결 필요 with one control", async () => {
+  it("a paired helper that is not linked to the account says 연결 필요 with one control", async () => {
     deviceStatus = { linked: false, linking: null, verified: "UNVERIFIED" };
     const { container } = renderCard();
-    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("기기 연결 필요"));
-    expect(screen.getByTestId("helper-link")).toHaveTextContent("이 기기 연결");
+    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결 필요"));
+    expect(screen.getByTestId("helper-link")).toHaveTextContent("이 Mac 연결");
     expect(screen.getAllByRole("button")).toHaveLength(1);
     await expectNoAxeViolations(container);
   });
@@ -169,7 +169,7 @@ describe("HelperStatusCard — 이 기기 연결 (Helper Device Authentication v
     deviceStatus = { linked: false, linking: null, verified: "UNVERIFIED" };
     linkStart = { ok: true, userCode: "BCDFGHJK", expiresAt: "2026-09-05T00:05:00Z" };
     renderCard();
-    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("기기 연결 필요"));
+    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결 필요"));
     fireEvent.click(screen.getByTestId("helper-link"));
     await waitFor(() => expect(approve).toHaveBeenCalledWith("BCDFGHJK"));
     await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결 확인 중"));
@@ -187,7 +187,7 @@ describe("HelperStatusCard — 이 기기 연결 (Helper Device Authentication v
     linkStart = { ok: true, userCode: "BCDFGHJK", expiresAt: "2026-09-05T00:05:00Z" };
     approve.mockRejectedValueOnce(new Error("404"));
     const { unmount } = renderCard();
-    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("기기 연결 필요"));
+    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결 필요"));
     fireEvent.click(screen.getByTestId("helper-link"));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("승인하지 못했습니다"));
     // Two ways out, and neither of them is "watch this forever".
@@ -213,7 +213,7 @@ describe("HelperStatusCard — 이 기기 연결 (Helper Device Authentication v
     linkStart = { ok: true, userCode: "BCDFGHJK", expiresAt: "2026-09-05T00:05:00Z" };
     approve.mockRejectedValueOnce(new Error("403"));
     renderCard();
-    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("기기 연결 필요"));
+    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결 필요"));
     fireEvent.click(screen.getByTestId("helper-link"));
     // From here the helper legitimately reports a pending grant, exactly as it did live.
     deviceStatus = { linked: false, linking: "pending", verified: "UNVERIFIED" };
@@ -236,7 +236,7 @@ describe("HelperStatusCard — 이 기기 연결 (Helper Device Authentication v
     linkStart = { ok: true, userCode: "BCDFGHJK", expiresAt: "2026-09-05T00:05:00Z" };
     approve.mockRejectedValueOnce(new Error("403"));
     renderCard();
-    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("기기 연결 필요"));
+    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결 필요"));
     fireEvent.click(screen.getByTestId("helper-link"));
     deviceStatus = { linked: false, linking: "pending", verified: "UNVERIFIED" };
     await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결하지 못했습니다"));
@@ -244,7 +244,7 @@ describe("HelperStatusCard — 이 기기 연결 (Helper Device Authentication v
     fireEvent.click(screen.getByTestId("helper-link-cancel"));
     // Back to the ordinary state with its ordinary control — the helper's grant is left to expire, and
     // nothing here asks the bridge to withdraw one (it offers no such route and this package adds none).
-    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("기기 연결 필요"));
+    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결 필요"));
     expect(screen.getByTestId("helper-link")).toBeInTheDocument();
   });
 
@@ -258,8 +258,8 @@ describe("HelperStatusCard — 이 기기 연결 (Helper Device Authentication v
     deviceStatus = { linked: true, linking: null, verified: "OK", deviceId: "dev-elsewhere" };
     listHelperDevices.mockResolvedValue([{ id: "dev-1" }]);
     renderCard();
-    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("기기 연결 필요"));
-    expect(screen.getByText(/다른 Reviewnary 계정에 연결된 기기입니다/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결 필요"));
+    expect(screen.getByText(/이 Mac은 다른 계정에 연결되어 있습니다/)).toBeTruthy();
     expect(screen.getByTestId("helper-link")).toBeTruthy();
     // Seller words only: no org, no token, no device id anywhere on screen.
     expect(document.body.textContent ?? "").not.toMatch(/org|token|dev-elsewhere|조직/i);

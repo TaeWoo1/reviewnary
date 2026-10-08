@@ -168,6 +168,31 @@ public class ScheduledAsideJob extends BaseEntity {
     @Column(name = "delivery_completeness", length = 16)
     private com.sellerops.responsibility.SourceCompleteness deliveryCompleteness;
 
+    /**
+     * <b>The period this read actually covered</b> — the screen's own, as the helper measured it.
+     *
+     * <p>Null for every read that cannot state one. The 2026-10-08 NAVER read covered 10-02 … 10-08 and its
+     * success moved freshness to 10-08, which was true and was also read as 「9/2 이후가 메워졌다」 — a claim
+     * nothing supported. Freshness is when we last looked; this is how far the looking reached, and they are
+     * different facts about the same run ({@code coverage/ReviewCoverageCursor}).
+     */
+    @Column(name = "window_start")
+    private java.time.LocalDate windowStart;
+
+    /** The last day of that period. */
+    @Column(name = "window_end")
+    private java.time.LocalDate windowEnd;
+
+    /**
+     * The largest reading this one read could have carried.
+     *
+     * <p>Kept because {@code observedCount} alone cannot answer the only question coverage needs: 45 rows under a
+     * ceiling of 500 excludes 「더 있을 수 있음」, and 500 rows under a ceiling of 500 does not. Without this
+     * number a saturated page and a complete one are the same row.
+     */
+    @Column(name = "observed_capacity")
+    private Integer observedCapacity;
+
     /** A read whose store could not be proved: the verdict is kept, and no delivery count may exist beside it. */
     public void refuseDelivery(com.sellerops.responsibility.IdentityVerdict verdict) {
         this.identityVerdict = verdict;

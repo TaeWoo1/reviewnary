@@ -122,6 +122,7 @@ import type {
   SyncRunView,
   CollectNowView,
   CollectNowReadinessView,
+  ReviewCatchUpPlanView,
   ScreenReadView,
   UploadType,
   UserView,
@@ -1233,6 +1234,15 @@ export const api = {
   async collectNowReadiness(accountId: string, dataType: string): Promise<CollectNowReadinessView> {
     const { data } = await http.get<CollectNowReadinessView>(
       `/api/seller-accounts/${accountId}/collect-now/readiness`,
+      { params: { dataType } },
+    );
+    return data;
+  },
+
+  /** 아직 읽지 않은 기간의 계획 — 읽기 전에 본다. GET이고, 아무것도 수집하지 않는다. */
+  async reviewCatchUpPlan(accountId: string, dataType: string): Promise<ReviewCatchUpPlanView> {
+    const { data } = await http.get<ReviewCatchUpPlanView>(
+      `/api/seller-accounts/${accountId}/collect-now/catch-up-plan`,
       { params: { dataType } },
     );
     return data;

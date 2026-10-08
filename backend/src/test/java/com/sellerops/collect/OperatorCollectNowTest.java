@@ -16,6 +16,7 @@ import com.sellerops.channel.Channel;
 import com.sellerops.channel.ChannelRepository;
 import com.sellerops.channel.ChannelStatus;
 import com.sellerops.collect.dto.CollectNowReadinessView;
+import com.sellerops.collect.dto.ReviewCatchUpPlanView;
 import com.sellerops.collect.dto.CollectNowView;
 import com.sellerops.collect.dto.SyncRunView;
 import com.sellerops.common.ApiException;
@@ -41,6 +42,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.Set;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -82,6 +84,8 @@ class OperatorCollectNowTest {
     @Autowired SellerAccountRepository accounts;
     @Autowired ChannelRepository channels;
     @Autowired HelperDeviceRepository devices;
+    @Autowired com.sellerops.reviewimport.ReviewImportSegmentRepository segments;
+    @Autowired com.sellerops.reviewimport.ReviewImportPlanRepository plans;
 
     private static final Instant T0 = Instant.parse("2026-10-07T04:00:00Z");
 
@@ -127,7 +131,69 @@ class OperatorCollectNowTest {
         pulls = mock(CollectControlService.class);
         when(pulls.manualSync(any(), any(), any())).thenAnswer(call -> pullRun(call.getArgument(2)));
         service = new CollectNowService(accounts, channels,
-                pulls, new ScreenReadService(dispatcher, helpers, accounts, channels));
+                pulls, new ScreenReadService(dispatcher, helpers, accounts, channels), null,
+                new com.sellerops.coverage.ReviewCoverageCursor(segments, channels, jobs));
+    }
+
+    @Test
+    @DisplayName("the dry plan reads the gap out of real import evidence, oldest window first — and collects nothing")
+    void theDryPlanIsPlannedNotGuessed() {
+        // The evidence this organisation actually has: a period import that reconciled. Nothing else is seeded,
+        // so the plan has to come out of that row or out of nowhere — and «out of nowhere» is what this refuses.
+        UUID channelId = accounts.findByIdAndOrgId(naverAccount, org).orElseThrow().getChannelId();
+        covered(channelId, LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).minusDays(40),
+                LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).minusDays(21));
+
+        ReviewCatchUpPlanView plan = service.catchUpPlan(org, naverAccount, "REVIEW");
+
+        assertThat(plan.coverageThrough())
+                .isEqualTo(LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).minusDays(21));
+        // Oldest first: the days right after the boundary, not the last seven. The last seven are the ones a
+        // screen read already covers, and starting there reads the same week forever.
+        assertThat(plan.windows()).isNotEmpty();
+        assertThat(plan.windows().get(0).start())
+                .isEqualTo(LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).minusDays(20));
+        assertThat(plan.windows().get(0).days()).isEqualTo(7);
+        // Asking for the plan dispatches nothing. A plan a seller is allowed to look at and then not press.
+        assertThat(jobs.count()).isZero();
+        // And it says out loud that nothing can run it yet: no lane selects a past period.
+        assertThat(plan.executable()).isFalse();
+    }
+
+    @Test
+    @DisplayName("no evidence is not a date — and the API route has no period to be missing")
+    void noEvidenceAndNoPeriod() {
+        ReviewCatchUpPlanView naver = service.catchUpPlan(org, naverAccount, "REVIEW");
+        assertThat(naver.coverageThrough()).isNull();
+        assertThat(naver.windows()).isEmpty();
+        assertThat(naver.stopped()).isEqualTo(com.sellerops.coverage.ReviewCatchUpPlan.Stop.NO_BOUNDARY);
+
+        // Cafe24 리뷰 travels by API: the channel answers for the whole store, so a boundary would be a fact
+        // about nothing. The readiness row says so by leaving it null rather than by inventing a gap.
+        assertThat(service.readiness(org, cafe24Account, "REVIEW").coverageThrough()).isNull();
+        assertThat(service.readiness(org, cafe24Account, "REVIEW").coverageGapDays()).isNull();
+    }
+
+    /** One reconciled period import for this channel — the shape `review_import_segment` really holds. */
+    private void covered(UUID channelId, LocalDate start, LocalDate end) {
+        com.sellerops.reviewimport.ReviewImportPlan plan = new com.sellerops.reviewimport.ReviewImportPlan();
+        plan.setOrgId(org);
+        plan.setChannelId(channelId);
+        plan.setSellerAccountId(naverAccount);
+        plan.setRequestedStart(start);
+        plan.setRequestedEnd(end);
+        plan.setStatus(com.sellerops.reviewimport.ReviewImportPlanStatus.COMPLETED);
+        plans.save(plan);
+        com.sellerops.reviewimport.ReviewImportSegment segment = new com.sellerops.reviewimport.ReviewImportSegment();
+        segment.setPlanId(plan.getId());
+        segment.setOrgId(org);
+        segment.setOrdinal(0);
+        segment.setSegmentStart(start);
+        segment.setSegmentEnd(end);
+        segment.setExecutionState(com.sellerops.reviewimport.SegmentExecutionState.COMPLETED);
+        segment.setCoverageState(com.sellerops.reviewimport.SegmentCoverageState.COVERED);
+        segment.setCoveredRows(100);
+        segments.save(segment);
     }
 
     @Test

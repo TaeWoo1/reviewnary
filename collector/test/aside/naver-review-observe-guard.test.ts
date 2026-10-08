@@ -27,6 +27,7 @@ import {
   digestOfReviewIds,
   NAVER_REVIEW_OBSERVE_RECIPE_ID,
   runNaverReviewObservation,
+  kstDayString,
   sanitizeNaverReading,
   type NaverDeliveryRequest,
   type NaverDeliveryResponse,
@@ -34,6 +35,7 @@ import {
 import {
   buildNaverReviewAuthScript,
   buildNaverReviewListReadScript,
+  NAVER_REVIEW_MAX_ROWS,
 } from "../../src/naver/review-list-observe-inpage";
 
 const NOW = new Date("2026-09-17T03:00:00.000Z"); // 12:00 KST
@@ -242,6 +244,54 @@ describe("the NAVER review recipe — nothing read is never nothing there", () =
       ["answered", "attachCount", "body", "createdAt", "productName", "productNo", "rating", "reviewId"],
     );
     expect(JSON.stringify(sent)).not.toMatch(/abc\*\*\*|12345"|2026091700000001/);
+  });
+
+  it("names the period it read, as two KST days, and the ceiling it was under", async () => {
+    // 2026-10-08: the read sent `windowDays: 7`, which was true — and the record could then only say
+    // 「7일을 읽었다」 while the question being asked of it was 「어느 7일」. The length is not the period, and
+    // a backend computing the dates from its own clock would be inventing the evidence.
+    const deliver = deliverWith(MATCH);
+    await runNaverReviewObservation({
+      deliver,
+      executor: executorOf({ ok: true, reading: reading([row()]), range: CURRENT_WEEK, elapsedMs: 1 }),
+    });
+
+    const sent = deliver.mock.calls[0]![0];
+    // NOW is 12:00 KST on 09-17, and the screen's period is the six days before it plus today.
+    expect(sent.windowEnd).toBe("2026-09-17");
+    expect(sent.windowStart).toBe("2026-09-11");
+    expect(sent.windowDays).toBe(7);
+    // The ceiling travels as the number, not as a verdict: whether 「더 있을 수 있음」 is excluded is a
+    // comparison, and it belongs where the compared values are stored.
+    expect(sent.rowCapacity).toBe(NAVER_REVIEW_MAX_ROWS);
+  });
+
+  it("the period always ends on the as-of day, and the two ends agree with the length", async () => {
+    for (const startDaysBefore of [0, 6, 29, 364]) {
+      const deliver = deliverWith(MATCH);
+      await runNaverReviewObservation({
+        deliver,
+        executor: executorOf({
+          ok: true,
+          reading: reading([]),
+          range: { ...CURRENT_WEEK, startDaysBefore },
+          elapsedMs: 1,
+        }),
+      });
+      const sent = deliver.mock.calls[0]![0];
+      expect(sent.windowEnd).toBe("2026-09-17");
+      expect(sent.windowDays).toBe(startDaysBefore + 1);
+      const days = (Date.parse(sent.windowEnd) - Date.parse(sent.windowStart)) / 86_400_000 + 1;
+      expect(days).toBe(sent.windowDays);
+    }
+  });
+
+  it("a KST day is the seller's day, across the UTC seam", () => {
+    // 2026-09-17T15:30Z is already 09-18 in Seoul. A boundary kept in UTC moves by nine hours twice a day,
+    // and the days it moves across are exactly the ones a coverage claim is made of.
+    expect(kstDayString(new Date("2026-09-17T15:30:00.000Z"), 0)).toBe("2026-09-18");
+    expect(kstDayString(new Date("2026-09-17T14:30:00.000Z"), 0)).toBe("2026-09-17");
+    expect(kstDayString(new Date("2026-03-01T03:00:00.000Z"), 1)).toBe("2026-02-28");
   });
 
   it("refuses every row shape it does not fully understand", () => {

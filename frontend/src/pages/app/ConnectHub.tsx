@@ -274,37 +274,40 @@ export function ConnectHub() {
         />
       </Block>
 
-      {/* The helper is the second thing on this screen, after the channels it serves: the seller who
-          arrives here from the installer sees the state and the one control that changes it, and never a
-          port, a token or a pairing word (Local Helper Pilot Packaging v1). */}
-      <Block
-        title="reviewnary 도우미"
-        note="판매자센터 화면과 함께 일할 때 필요합니다"
-        action={
-          <Go to="/connect/helper">설치·업데이트 안내</Go>
-        }
-      >
+      {/*
+        <b>이 화면에는 두 가지가 있다 — 채널의 상태와, 이 Mac의 상태.</b> 그 둘이 판매자가 실제로 가진 것이고,
+        수집이 되는지 안 되는지는 둘의 조합으로 결정된다.
+
+        2026-10-08까지 세 번째 구역이 있었다: 「자료 가져오기」. 이름은 수집처럼 들렸지만 그 안에 있던 것은
+        파일 업로드, 기간별 안내 가져오기, 실행 기록, 그리고 「작업 화면 열기」 — 우리 쪽 작업의 이름들이었다.
+        같은 화면의 채널 행에는 이미 「지금 수집하기」가 있었고, 같은 자료를 가져오는 길이 둘로 보였다(그 결함은
+        리뷰 입구에서 한 번 라이브로 비용을 치렀다). 그래서 그 구역은 접힌 보조 영역이 되었다: 지우지 않고,
+        먼저 보이지 않게.
+      */}
+      <Block title="이 Mac" note="판매자센터 화면을 읽을 때 이 컴퓨터가 함께 일합니다">
         <HelperStatusCard naverHealth={naverHealth} />
-      </Block>
-      {/* One section for getting data in, with its two ways side by side. The old pair — 「정기 자료
-          가져오기」 and 「리뷰 수집 실행」 — described the same job twice and pointed at a third screen it
-          called 「작업대」, a word from our side of the desk. */}
-      <Block
-        title="자료 가져오기"
-        note="연결이 어려운 채널은 파일로, 네이버 리뷰는 판매자센터 화면에서 기간별로"
-        action={
-          <div className="flex flex-wrap items-center gap-3">
-            <Go to="/connect/upload">자료 넘기기</Go>
-            <Go to="/connect/review-history">기간별로 가져오기</Go>
-          </div>
-        }
-      >
+        {/* 지금 이 Mac이 하고 있는 일 — 있을 때만. 자기 상태 아래가 그 자리다. */}
         <HomeReviewOpsCard run={liveRun} />
-        <p className="break-keep border-t border-line/70 py-2 text-sm text-muted">
-          지난 실행과 구간별 이력은 <Go to="/connect/imports">실행 기록</Go>에서 볼 수 있습니다.
-        </p>
-        <Disclosure label="파일로 넘기면 어떻게 진행되나요">
-          <ol className="mt-2 space-y-2 text-sm text-muted">
+      </Block>
+
+      <section aria-label="잘 안 될 때" className="space-y-2">
+        <Disclosure label="잘 안 될 때">
+          <ul className="mt-2 space-y-2 text-sm text-muted">
+            <li className="break-keep border-t border-line/70 py-2">
+              <Go to="/connect/upload">파일로 넘기기</Go> — 연결이 어려운 채널은 파일로 받습니다.
+            </li>
+            <li className="break-keep border-t border-line/70 py-2">
+              <Go to="/connect/review-history">기간별로 가져오기</Go> — 지난 기간의 리뷰를 판매자센터에서 직접
+              내려받아 넘깁니다.
+            </li>
+            <li className="break-keep border-t border-line/70 py-2">
+              <Go to="/connect/imports">실행 기록</Go> — 지난 실행과 구간별 이력.
+            </li>
+            <li className="break-keep border-t border-line/70 py-2">
+              <Go to="/connect/helper">설치·업데이트 안내</Go> — 이 Mac의 도우미를 처음 설치하거나 새로 받습니다.
+            </li>
+          </ul>
+          <ol className="mt-3 space-y-2 border-t border-line/70 pt-3 text-sm text-muted">
             {[
               "가져올 자료를 고릅니다.",
               "형식과 기간이 맞는지 먼저 확인합니다.",
@@ -318,7 +321,7 @@ export function ConnectHub() {
             ))}
           </ol>
         </Disclosure>
-      </Block>
+      </section>
     </div>
   );
 }

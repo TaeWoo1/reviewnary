@@ -91,10 +91,12 @@ describe("helperStatusOf — the account link is its own axis (Helper Device Aut
   const paired = (device: Parameters<typeof helperStatusOf>[0]["device"]) =>
     helperStatusOf({ phase: "paired", pairedBefore: true, agentVersion: MIN_HELPER_VERSION, device });
 
-  it("paired + linked is 연결됨; paired + unlinked is 기기 연결 필요 with 이 기기 연결", () => {
+  it("paired + linked is 연결됨; paired + unlinked is 연결 필요 with 이 Mac 연결", () => {
     expect(paired("linked")).toMatchObject({ key: "CONNECTED", label: "연결됨", action: null });
     const s = paired("unlinked");
-    expect(s).toMatchObject({ key: "LINK", label: "기기 연결 필요", tone: "warn", action: { kind: "link", label: "이 기기 연결" } });
+    // 2026-10-08: 두 handshake(이 브라우저↔도우미, 도우미↔계정)는 화면에 한 번에 하나만 나오므로,
+    // 판매자에게는 한 가지 일이다 — 「이 Mac 연결」. 그 구분이 바로 새어 나가던 내부 개념이었다.
+    expect(s).toMatchObject({ key: "LINK", label: "연결 필요", tone: "warn", action: { kind: "link", label: "이 Mac 연결" } });
     noInternalWords(s.note, s.action?.label);
     // A surface that never asked about the link (undefined) is unchanged: pairing alone is 연결됨 there.
     expect(paired(undefined).key).toBe("CONNECTED");

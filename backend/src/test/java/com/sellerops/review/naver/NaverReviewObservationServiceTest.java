@@ -114,6 +114,91 @@ class NaverReviewObservationServiceTest {
         return new NaverReviewObservationRequest(List.of(rows), 7);
     }
 
+    /** A window ending today, as the helper states it — KST days, the same zone the service judges in. */
+    private static NaverReviewObservationRequest windowed(int days, Integer capacity,
+                                                          NaverReviewObservationRequest.Review... rows) {
+        java.time.LocalDate end = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        return new NaverReviewObservationRequest(List.of(rows), days,
+                end.minusDays(days - 1L).toString(), end.toString(), capacity);
+    }
+
+    private void provedStore() {
+        when(listings.countOwnedListings(eq(ORG), eq(naver.getId()), anyCollection())).thenReturn(1L);
+    }
+
+    @Test
+    @DisplayName("the import record names the trigger that actually authorised the read, not the autonomous lane")
+    void operatorProvenanceSurvivesIngest() {
+        // 2026-10-08: job 7bde2cb5 carried trigger_source=OPERATOR — a seller had pressed — and the sync run it
+        // wrote said RESPONSIBILITY, because that word was a constant in the recorder. Asking «who authorised
+        // this read» of sync_jobs then gave the one wrong answer that record exists to prevent.
+        provedStore();
+        job.setTrigger(com.sellerops.responsibility.aside.AsideTrigger.OPERATOR);
+
+        service.deliver(ORG, DEVICE, JOB, request(row("5066448224", "1234567890")));
+
+        ArgumentCaptor<com.sellerops.sync.SyncJob> run = ArgumentCaptor.forClass(com.sellerops.sync.SyncJob.class);
+        verify(syncJobs).save(run.capture());
+        assertThat(run.getValue().getTrigger()).isEqualTo("OPERATOR");
+        assertThat(run.getValue().getMethod()).isEqualTo("SELLER_CENTER_READ");
+        // The bound is still named: a read of a period is not a completed import of a store.
+        assertThat(run.getValue().getStatus()).isEqualTo("PARTIAL");
+        assertThat(run.getValue().getErrorMessage()).isEqualTo("BOUNDED_WINDOW_DAYS_7");
+    }
+
+    @Test
+    @DisplayName("a read that names its period records the period, and 45 rows under 500 is a complete window")
+    void aStatedPeriodBecomesCoverage() {
+        provedStore();
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+
+        service.deliver(ORG, DEVICE, JOB, windowed(7, 500, row("5066448224", "1234567890")));
+
+        assertThat(job.getWindowStart()).isEqualTo(today.minusDays(6));
+        assertThat(job.getWindowEnd()).isEqualTo(today);
+        assertThat(job.getObservedCapacity()).isEqualTo(500);
+        assertThat(job.getDeliveryCompleteness())
+                .isEqualTo(com.sellerops.responsibility.SourceCompleteness.COMPLETE);
+    }
+
+    @Test
+    @DisplayName("a reading at its own ceiling is stored and is NOT a complete window")
+    void saturationIsStoredButProvesNoDays() {
+        provedStore();
+        // One row, ceiling of one. The rows are real and they stay; what cannot be said is «there were no more».
+        service.deliver(ORG, DEVICE, JOB, windowed(7, 1, row("5066448224", "1234567890")));
+
+        assertThat(job.getWindowStart()).isNotNull();
+        assertThat(job.getDeliveryCompleteness())
+                .isEqualTo(com.sellerops.responsibility.SourceCompleteness.PARTIAL);
+        assertThat(job.getInsertedCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("a read that states no period records none — and a contradictory one is refused")
+    void unknownPeriodStaysUnknown() {
+        provedStore();
+        service.deliver(ORG, DEVICE, JOB, request(row("5066448224", "1234567890")));
+        assertThat(job.getWindowStart()).isNull();
+        assertThat(job.getWindowEnd()).isNull();
+        assertThat(job.getObservedCapacity()).isNull();
+
+        // A length that disagrees with its own dates means the reading of the screen's period is not one fact.
+        ScheduledAsideJob second = new ScheduledAsideJob();
+        second.setOrgId(ORG);
+        second.setDeviceId(DEVICE);
+        second.setRecipe(AsideRecipe.NAVER_REVIEW_OBSERVE_V1);
+        second.setStatus(ScheduledAsideJobStatus.CLAIMED);
+        second.setLeaseUntil(Instant.now().plusSeconds(120));
+        UUID secondId = UUID.randomUUID();
+        when(jobs.findByIdAndDeviceId(secondId, DEVICE)).thenReturn(Optional.of(second));
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        assertThatThrownBy(() -> service.deliver(ORG, DEVICE, secondId,
+                new NaverReviewObservationRequest(List.of(row("5066448225", "1234567890")), 7,
+                        today.toString(), today.toString(), 500)))
+                .isInstanceOf(ApiException.class);
+    }
+
     @Test
     @DisplayName("the target is the one named NAVER account — and nothing when the lane is off or the account unnamed")
     void resolvesOnlyTheNamedAccount() {

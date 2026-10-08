@@ -538,7 +538,9 @@ export const REVIEW_WORK_COPY = {
 export const HOME_REVIEW_OPS_COPY = {
   sectionTitle: "네이버 리뷰 기간별 가져오기",
   emptyBody: "진행 중인 네이버 리뷰 가져오기 작업이 없습니다.",
-  open: "작업 화면 열기",
+  // 「작업 화면」은 우리 쪽 책상의 이름이었다. 판매자에게 이것은 지금 진행 중인 그 일이고, 누르면 그
+  // 진행을 본다 (연결 화면 정리, 2026-10-08).
+  open: "진행 상황 보기",
   goToCheckpoint: "확인하러 가기",
 } as const;
 

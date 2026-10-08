@@ -62,6 +62,24 @@ export interface NaverObservedReview {
 export interface NaverDeliveryRequest {
   readonly reviews: readonly NaverObservedReview[];
   readonly windowDays: number;
+  /**
+   * The same period as two KST calendar dates (`YYYY-MM-DD`), inclusive.
+   *
+   * <p>`windowDays` is a length and a length is not a period: the 2026-10-08 read sent `7`, which was true, and
+   * the only thing the record could then say was 「7일을 읽었다」 — while the question being asked of it was
+   * 「어느 7일」. The backend keeps these two dates beside the read and will not compute them from its own clock.
+   */
+  readonly windowStart: string;
+  readonly windowEnd: string;
+  /**
+   * The ceiling this one reading was under.
+   *
+   * <p>The page's own model answers for the whole period, so a count below the ceiling excludes 「더 있을 수
+   * 있음」 — and a count AT the ceiling does not, which `rowCount === NAVER_REVIEW_MAX_ROWS` cannot be told apart
+   * from a truncated 500 by anything on this side. Sent as the number rather than a verdict: the comparison is
+   * the backend's to make, against values it stores and can re-check.
+   */
+  readonly rowCapacity: number;
 }
 
 export interface NaverDeliveryResponse {
@@ -88,6 +106,13 @@ const MAX_BODY = 5000;
 /** SHA-256 of the review ids read, sorted. Ids only — never a body, a product or a date. */
 export function digestOfReviewIds(reviews: readonly NaverObservedReview[]): string {
   return createHash("sha256").update(reviews.map((r) => r.reviewId).sort().join("\n"), "utf8").digest("hex");
+}
+
+/** A KST calendar day as `YYYY-MM-DD`, `daysBefore` days before the run's as-of. */
+export function kstDayString(asOf: Date, daysBefore: number): string {
+  const d = kstCivilDate(new Date(asOf.getTime() - daysBefore * 86_400_000));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.year}-${pad(d.month)}-${pad(d.day)}`;
 }
 
 /** Whole days between a row's KST calendar date and the run's KST calendar date, or null if unparseable. */
@@ -231,10 +256,21 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
     return none("SURFACE_UNREADABLE");
   }
   const windowDays = range.startDaysBefore + 1;
+  // The period as days, from the same as-of the rows were checked against. The screen's range was already
+  // required to end today (`endDaysBefore !== 0` is refused above), so «today» and «today minus the span» are
+  // the two ends of exactly what was on screen.
+  const windowEnd = kstDayString(asOf, 0);
+  const windowStart = kstDayString(asOf, range.startDaysBefore);
 
   let delivered: NaverDeliveryResponse | null;
   try {
-    delivered = await deps.deliver({ reviews: reading.reviews, windowDays });
+    delivered = await deps.deliver({
+      reviews: reading.reviews,
+      windowDays,
+      windowStart,
+      windowEnd,
+      rowCapacity: NAVER_REVIEW_MAX_ROWS,
+    });
   } catch {
     delivered = null;
   }
@@ -250,6 +286,9 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
     ok: true,
     rows: reading.reviews.length,
     windowDays,
+    windowStart,
+    windowEnd,
+    saturated: reading.reviews.length >= NAVER_REVIEW_MAX_ROWS,
     identity: delivered.identityVerdict,
     received: delivered.received,
     inserted: delivered.inserted,

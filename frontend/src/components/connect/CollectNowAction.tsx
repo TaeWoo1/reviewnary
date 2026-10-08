@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/apiClient";
 import { useApiData } from "../../lib/useApiData";
 import type { CollectNowPath, LocalAgentRunState, ScreenReadView } from "../../lib/types";
@@ -117,6 +117,10 @@ export interface CollectNowRoute {
   desk: LocalAgentRunState | null;
   /** 실제로 읽은 가장 최근 수집. 한 번의 호출로 같이 오므로 두 사실이 어긋날 수 없다. */
   lastSuccessAt: string | null;
+  /** 빠짐없이 확인한 마지막 날. 「언제 봤는가」가 아니라 「어디까지 봤는가」다. */
+  coverageThrough: string | null;
+  /** 그 경계와 오늘 사이의 미확인 날수. */
+  coverageGapDays: number | null;
 }
 
 /**
@@ -138,7 +142,22 @@ export function useCollectNowRoute(accountId: string, dataType: string, refreshK
     path: ready?.path ?? null,
     desk: ready?.localAgent ?? null,
     lastSuccessAt: ready?.lastSuccessAt ?? null,
+    coverageThrough: ready?.coverageThrough ?? null,
+    coverageGapDays: ready?.coverageGapDays ?? null,
   };
+}
+
+/**
+ * 「어디까지 빠짐없이 확인했는가」 — 한 줄.
+ *
+ * <p>경계가 없으면 아무 말도 하지 않는다. 「확인된 적 없음」은 근거가 아니라 빈칸이고, 빈칸을 문장으로 만들면
+ * 실제로 4,432건을 들고 있는 채널에 대해 거짓말이 된다.
+ */
+export function coverageSentence(coverageThrough: string | null, gapDays: number | null): string | null {
+  if (!coverageThrough) return null;
+  const head = `${kstMonthDay(coverageThrough)}까지 빠짐없이 확인`;
+  // 0일이면 굳이 「0일 미확인」이라고 쓰지 않는다 — 없는 공백을 세어 보여 주는 셈이다.
+  return gapDays && gapDays > 0 ? `${head} · 이후 ${gapDays}일은 아직` : head;
 }
 
 /**
@@ -154,6 +173,8 @@ export function CollectNowAction({
   desk = null,
   channelCode = null,
   lastSuccessAt = null,
+  coverageThrough = null,
+  coverageGapDays = null,
   disabled = false,
   showSentence = false,
   emphasis = "plain",
@@ -173,6 +194,9 @@ export function CollectNowAction({
   channelCode?: string | null;
   /** 실제로 읽은 가장 최근 수집. 로그인이 필요했다는 소식 옆에 이것이 같이 서야 과거를 잃지 않는다. */
   lastSuccessAt?: string | null;
+  /** 빠짐없이 확인한 마지막 날. 성공 시각과 나란히 서야 「최근 7일 45건」이 「공백이 메워졌다」로 읽히지 않는다. */
+  coverageThrough?: string | null;
+  coverageGapDays?: number | null;
   disabled?: boolean;
   showSentence?: boolean;
   /**
@@ -196,6 +220,23 @@ export function CollectNowAction({
    */
   const [signedInHere, setSignedInHere] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+  /**
+   * <b>로그인 벽에서 멈춘 그 수집 하나</b> — 아직 하지 못한 일로 들고 있는다.
+   *
+   * <p>첫 「지금 수집하기」가 그 bounded collection의 승인이었다. 그 수집이 로그인 벽에서 멈췄고 판매자가 같은
+   * 화면에서 로그인까지 이어왔다면, 승인은 이미 있었던 것이고 다시 받을 것이 없다 — 2026-10-08 라이브에서
+   * 판매자가 두 번 눌러야 했던 자리가 여기다.
+   *
+   * <p>하나뿐이고, 한 번만 쓰이고, 쓰이면 사라진다. ref인 것은 의도적이다: 이 값이 바뀌어서 다시 그려질 일이
+   * 없고, 그려지는 사이에 사라졌다 되살아나서도 안 된다.
+   */
+  const pendingCollect = useRef(false);
+  /** 언마운트 뒤에 도착한 답으로 수집을 시작하지 않기 위한 표식. 화면을 떠난 것은 취소다. */
+  const live = useRef(true);
+  useEffect(() => () => {
+    live.current = false;
+    pendingCollect.current = false;
+  }, []);
   // 연결되지 않은 도우미와 이미 일하는 중인 도우미는 누를 수 없다. 로그인이 풀린 경우는 누를 수 있게 둔다 —
   // 판매자가 방금 자기 브라우저에서 로그인했을 수 있고, 막아 두면 고친 뒤에도 누를 길이 없다.
   const blocked = desk === "UNPAIRED" || desk === "BUSY";
@@ -214,19 +255,41 @@ export function CollectNowAction({
     try {
       const started = await startSignIn(channelCode);
       if (!started.ok) {
+        // 시작하지 못했으면 기다리던 수집도 버린다 — 승인을 들고 있을 이유가 없다.
+        pendingCollect.current = false;
         onReport(signInStartMessage(started.reason), true);
         return;
       }
+      // <b>창이 열렸다는 말을 먼저 한다.</b> 2026-10-08 라이브에서 창은 열렸고 화면은 그대로였다 — 도우미의
+      // 브라우저가 앞으로 나오지 않아서, 「판매자센터 로그인」을 누른 판매자는 아무 일도 없었다고 읽었다.
+      // 창은 이제 앞으로 나오지만(`bringToFront`), 그것은 호스트가 해 주는 일이라 보장이 아니다. 찾을 창이
+      // 있다는 사실은 보장할 수 있고, 그 한 줄이 이 자리의 진짜 안내다.
+      onReport("판매자센터 로그인 창을 열었습니다. 그 창에서 로그인해 주세요.", false);
       const settled = await awaitSignIn();
+      if (!live.current) return;
+      if (settled !== "SIGNED_IN") {
+        // 시간이 다 됐거나 확인되지 않았다 — 실패가 아니고, 다만 들고 있던 승인은 여기서 버린다. 판매자가
+        // 자리를 떠난 뒤에 수집이 혼자 시작되는 쪽이 더 나쁘다.
+        pendingCollect.current = false;
+      }
       const message = signInMessage(settled);
       if (settled === "SIGNED_IN") {
         setSignedInHere(true);
       }
-      if (message) {
+      // 이어서 할 수집이 있으면, 그 사실을 먼저 말하고 바로 이어 간다. 「다시 수집해 주세요」는 할 일이 남은
+      // 사람에게 하는 말이고, 여기서는 할 일이 이미 우리 쪽에 있다.
+      const resume = settled === "SIGNED_IN" && pendingCollect.current;
+      if (resume) {
+        pendingCollect.current = false;
+      } else if (message) {
         onReport(message.text, message.isError);
       }
+      if (resume) {
+        onReport("로그인 확인됨. 멈췄던 수집을 이어서 진행합니다.", false);
+        await press();
+      }
     } finally {
-      setSigningIn(false);
+      if (live.current) setSigningIn(false);
     }
   }
 
@@ -235,7 +298,12 @@ export function CollectNowAction({
     try {
       const started = await api.collectNow(accountId, dataType, requestId());
       if (started.path === "SCREEN_READ" && started.screenRead) {
-        const message = screenReadMessage(label, await awaitScreenRead(started.screenRead));
+        const read = await awaitScreenRead(started.screenRead);
+        // 이 수집이 로그인 벽에서 멈췄다. 승인은 이미 받았으므로, 같은 화면에서 로그인까지 이어오면 다시
+        // 받을 것이 없다. 벽이 아닌 결말에서는 들고 있지 않는다 — 성공한 수집을 또 돌릴 이유가 없고, 실패한
+        // 수집을 로그인했다고 되살릴 이유도 없다.
+        pendingCollect.current = read.state === "AUTH_REQUIRED";
+        const message = screenReadMessage(label, read);
         onReport(message.text, message.isError);
       } else if (started.run) {
         const run = started.run;
@@ -278,6 +346,14 @@ export function CollectNowAction({
           </p>
           {lastSuccessAt ? (
             <p className="break-keep text-sm text-muted">마지막 성공 수집 {kstMonthDay(lastSuccessAt)}</p>
+          ) : null}
+          {/*
+            <b>세 번째 줄이 필요한 이유.</b> 10-08 읽기는 성공했고 45건을 가져왔다 — 그리고 그 45건은 최근
+            7일이었다. 「마지막 성공 수집 10월 8일」만 서 있으면 9/2 이후의 29일은 화면 어디에도 없고, 그
+            공백은 메워진 것처럼 읽힌다. 「언제 봤는가」와 「어디까지 봤는가」는 다른 사실이다.
+          */}
+          {coverageSentence(coverageThrough, coverageGapDays) ? (
+            <p className="break-keep text-sm text-muted">{coverageSentence(coverageThrough, coverageGapDays)}</p>
           ) : null}
         </div>
       ) : null}
