@@ -21,28 +21,31 @@ export const NAVER_REVIEW_SEARCH_ROUTE = "#/review/search";
 export const NAVER_REVIEW_LIST_URL = `https://${NAVER_SELLER_CENTER_HOST}/${NAVER_REVIEW_SEARCH_ROUTE}`;
 
 /**
- * **The two controls a historical window read is allowed to touch, as selectors.**
+ * **The candidate sets a historical window read may look through — pure CSS, and nothing else.**
  *
- * <p>They are PREDICATES, not addresses. `input[type=date]` plus a class naming date/calendar/picker is the
- * grounded predicate the live-proven range census already uses to find this list's period fields
- * (`review-list-range-inpage.ts`, 2026-09-05) — written here as CSS so a locator can act through it, and
- * narrowed to what a person could act on (`:visible`, not disabled). The 조회/검색 control is identified by the
- * word the list prints on it.
+ * <h2>What these are, and what they are deliberately not</h2>
  *
- * <p><b>Neither has been proved against the live surface.</b> The census has — it counted two date inputs on
- * this screen — but acting through a selector is a different claim from counting through a predicate, and the
- * only honest way to hold that gap is to refuse rather than guess: the runtime requires EXACTLY two date
- * inputs and EXACTLY one search control, and reports the count it saw when that is not what it found. A first
- * live catch-up therefore either works or stops with a number that says which predicate was wrong.
+ * They are <b>candidate sets</b>, not addresses, and they decide nothing. Whether a candidate is a control a
+ * person could actually use — visible, enabled, and carrying the meaning this read needs — is judged in one
+ * place only: {@code buildNaverReviewControlsScript}, which walks these same selectors inside the page and
+ * answers in indices. The runtime acts on exactly the indices that script accepted.
+ *
+ * <p><b>Why they are plain CSS.</b> The first live catch-up (2026-10-08) stopped in the CONTROLS stage with a
+ * `SyntaxError`, because these carried `:visible:not([disabled])` and Aside hands a selector straight to
+ * `document.querySelectorAll` — which has never heard of Playwright's `:visible`. Removing the pseudo-class is
+ * the trivial half of that fix. The half worth writing down: the same judgement was being made here AND in
+ * the page predicate, and a fact judged in two places can be judged two ways. The selector is now dumb on
+ * purpose. `:not([disabled])` is gone for that reason and not for the syntax — enabled is the census's call.
  */
 export const NAVER_REVIEW_DATE_INPUT_SELECTOR =
-  'input[type="date"]:visible:not([disabled]), input[class*="date" i]:visible:not([disabled]), '
-  + 'input[class*="calendar" i]:visible:not([disabled]), input[class*="picker" i]:visible:not([disabled])';
+  'input[type="date"], input[class*="date" i], input[class*="calendar" i], input[class*="picker" i]';
 
-/** 조회 or 검색 — the list's own «show me that period». One match, or the read stops. */
-export const NAVER_REVIEW_SEARCH_SELECTOR =
-  'button:visible:has-text("조회"), a:visible:has-text("조회"), '
-  + 'button:visible:has-text("검색"), a:visible:has-text("검색")';
+/**
+ * Everything a person could press. Broad on purpose: the narrowing is 조회/검색 as a whole label, and that is
+ * a judgement about text, which belongs in the page and not in a selector.
+ */
+export const NAVER_REVIEW_QUERY_CONTROL_SELECTOR =
+  'button, a, input[type="button"], input[type="submit"]';
 
 export const NAVER_REVIEW_READ_WORKFLOW: NaverReviewWorkflow = Object.freeze({
   id: "naver-seller-center-review-read",

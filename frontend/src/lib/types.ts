@@ -3813,6 +3813,14 @@ export interface ScreenReadView {
     /** 멈춘 이유. 다섯 중 넷은 실패가 아니고, 각각 판매자의 다음 행동이 다르다. */
     stopReason: string | null;
   } | null;
+  /**
+   * 어디서 막혔는지 — 닫힌 단어 하나, 아니면 `null`.
+   *
+   * <p>`state`가 무엇이 됐는지 말하고 이것은 어디서 멈췄는지 말한다. 2026-10-08 첫 historical catch-up이
+   * `SURFACE_UNREADABLE`로 끝났는데, 그 단어는 grid가 없는 것·읽기가 거절된 것·그날의 실제 원인인
+   * 「selector가 selector가 아니었던 것」을 모두 덮었다. 고치는 방법이 셋인데 이름이 하나였다.
+   */
+  failureCode: string | null;
 }
 
 /** What one press of 지금 수집 started — a finished pull run, or a job now on the seller's own desk. */

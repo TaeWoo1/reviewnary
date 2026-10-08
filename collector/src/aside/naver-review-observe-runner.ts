@@ -45,10 +45,46 @@ export type NaverObserveOutcome =
   | "AUTH_REQUIRED"
   | "STORE_UNRESOLVED";
 
+/**
+ * The closed words a stop may be reported by, beyond the outcome.
+ *
+ * <p>A <b>closed list</b>, not a message. The outcome says what happened to the job; this says where it
+ * stopped, and the difference matters to the one person who has to fix it: on 2026-10-08 the product could
+ * only say `SURFACE_UNREADABLE`, which covers a missing grid, a refused reading and — as it turned out — a
+ * selector that was not a selector. Three different fixes, one word.
+ *
+ * <p>Nothing outside this list crosses the boundary, so the field cannot become a channel for text from a
+ * helper. The backend validates against the same list and the screen maps it to one sentence.
+ */
+export const NAVER_OBSERVE_FAILURE_CODES = [
+  "SURFACE_UNEXPECTED",
+  "DATE_CONTROL_CANDIDATES_UNREADABLE",
+  "RANGE_CONTROLS_NOT_FOUND",
+  "RANGE_CONTROLS_AMBIGUOUS",
+  "QUERY_CONTROL_NOT_FOUND",
+  "QUERY_CONTROL_AMBIGUOUS",
+  "RANGE_ORDER_UNKNOWN",
+  "RANGE_NOT_SETTABLE",
+  "RANGE_MISMATCH",
+  "READ_UNSETTLED",
+  "READING_REFUSED",
+  "WINDOW_INVALID",
+  "RUNTIME_FAULT",
+] as const;
+export type NaverObserveFailureCode = (typeof NAVER_OBSERVE_FAILURE_CODES)[number];
+
+export function asFailureCode(raw: string): NaverObserveFailureCode | null {
+  return (NAVER_OBSERVE_FAILURE_CODES as readonly string[]).includes(raw)
+    ? (raw as NaverObserveFailureCode)
+    : null;
+}
+
 export interface NaverObserveResult {
   readonly outcome: NaverObserveOutcome;
   readonly observedCount: number | null;
   readonly contentDigest: string | null;
+  /** Where it stopped, as one of the closed words above. `null` on success and when there is nothing to add. */
+  readonly failureCode?: NaverObserveFailureCode | null;
 }
 
 /** One row exactly as the backend accepts it. Eight named fields; there is no field for the buyer. */
@@ -211,7 +247,8 @@ export function sanitizeNaverReading(raw: unknown): { ok: true; reviews: NaverOb
  * Run one unattended NAVER review observation. Never throws — an unattended loop that can throw is one that stops.
  */
 export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise<NaverObserveResult> {
-  const none = (outcome: NaverObserveOutcome): NaverObserveResult => ({ outcome, observedCount: null, contentDigest: null });
+  const none = (outcome: NaverObserveOutcome, failureCode: NaverObserveFailureCode | null = null):
+    NaverObserveResult => ({ outcome, observedCount: null, contentDigest: null, failureCode });
   if (validateNaverReviewWorkflow(NAVER_REVIEW_READ_WORKFLOW).length > 0) {
     log("aside_naver_review_refused", { reason: "WORKFLOW_INVALID" }, "warn");
     return none("REFUSED");
@@ -256,7 +293,7 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
     // A period this lane cannot look at. Refused rather than reduced to something nearby, because a window
     // quietly narrowed is a coverage claim about days nobody read.
     log("aside_naver_review_read", { ok: false, code: "WINDOW_INVALID", window: askedFor, llmCalls: 0 });
-    return none("REFUSED");
+    return none("REFUSED", "WINDOW_INVALID");
   }
   const result = execution.result;
   if (result["ok"] !== true) {
@@ -267,13 +304,13 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
       reason: result["reason"] ?? null, candidates: result["candidates"] ?? null,
       window: askedFor, llmCalls: 0, outcome,
     });
-    return none(outcome);
+    return none(outcome, asFailureCode(code));
   }
 
   const reading = sanitizeNaverReading(result["reading"]);
   if (!reading.ok) {
     log("aside_naver_review_read", { ok: false, code: "READING_REFUSED", reason: reading.reason, llmCalls: 0 });
-    return none("SURFACE_UNREADABLE");
+    return none("SURFACE_UNREADABLE", "READING_REFUSED");
   }
   const asOf = executor.asOf();
   // <b>The period, as the screen states it.</b> Both ends read, and — when a period was asked for — the ends
@@ -295,7 +332,7 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
       startDaysBefore: range.startDaysBefore, endDaysBefore: range.endDaysBefore,
       wantedStartDaysBefore: wantedStart, wantedEndDaysBefore: wantedEnd, llmCalls: 0,
     });
-    return none("SURFACE_UNREADABLE");
+    return none("SURFACE_UNREADABLE", "RANGE_MISMATCH");
   }
   // Rows outside the period the screen says it is showing. For a historical window that means on BOTH sides:
   // a row newer than the window's end is as much a sign of the wrong screen as one older than its start.

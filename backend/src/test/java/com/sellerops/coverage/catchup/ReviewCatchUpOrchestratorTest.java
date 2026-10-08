@@ -370,6 +370,66 @@ class ReviewCatchUpOrchestratorTest {
     }
 
     @Test
+    @DisplayName("the walk keeps the word for WHERE it stopped, not only the outcome")
+    void theStopReasonNamesThePlace() {
+        // 2026-10-08: the first live catch-up reported SURFACE_UNREADABLE — which is also what a missing grid
+        // and a refused reading report. Three different fixes, one word, and the operator had to read a helper
+        // log to tell them apart. The screen turns this word into one sentence.
+        coveredThrough(36);
+        ScheduledAsideJob child = press("press-1").orElseThrow().firstJob();
+        claim();
+        dispatcher.settle(org, deviceId, child.getId(), AsideJobOutcome.SURFACE_UNREADABLE, null, null,
+                "RANGE_CONTROLS_NOT_FOUND");
+
+        assertThat(jobs.findById(child.getId()).orElseThrow().getFailureCode())
+                .isEqualTo("RANGE_CONTROLS_NOT_FOUND");
+        ReviewCatchUpRun run = runs.findById(child.getCatchUpRunId()).orElseThrow();
+        assertThat(run.getState()).isEqualTo(ReviewCatchUpState.FAILED);
+        assertThat(run.getStopReason()).isEqualTo("RANGE_CONTROLS_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("a word this backend does not know is dropped, not refused — the report still lands")
+    void anUnknownWordIsDropped() {
+        coveredThrough(36);
+        ScheduledAsideJob child = press("press-1").orElseThrow().firstJob();
+        claim();
+        // A helper's vocabulary may grow a word before this backend knows it. Refusing the report would make
+        // the helper retry a job that really did finish.
+        dispatcher.settle(org, deviceId, child.getId(), AsideJobOutcome.SURFACE_UNREADABLE, null, null,
+                "SOMETHING_NEW_v2");
+        assertThat(jobs.findById(child.getId()).orElseThrow().getFailureCode()).isNull();
+        assertThat(runs.findById(child.getCatchUpRunId()).orElseThrow().getStopReason())
+                .isEqualTo("SURFACE_UNREADABLE");
+    }
+
+    @Test
+    @DisplayName("nothing moves before the controls are verified — no rows, no coverage, no WRITE")
+    void nothingMovesBeforeVerification() {
+        coveredThrough(36);
+        ScheduledAsideJob child = press("press-1").orElseThrow().firstJob();
+        claim();
+        // The helper stopped at the third gate: it never typed, never pressed, never read. The only thing that
+        // may exist afterwards is the record that it stopped.
+        dispatcher.settle(org, deviceId, child.getId(), AsideJobOutcome.SURFACE_UNREADABLE, null, null,
+                "DATE_CONTROL_CANDIDATES_UNREADABLE");
+
+        ScheduledAsideJob settled = jobs.findById(child.getId()).orElseThrow();
+        assertThat(settled.getWindowStart()).as("no period was covered").isNull();
+        assertThat(settled.getObservedCount()).isNull();
+        assertThat(settled.getInsertedCount()).isNull();
+        assertThat(settled.getDeliveryCompleteness()).isNull();
+        ReviewCatchUpRun run = runs.findById(child.getCatchUpRunId()).orElseThrow();
+        assertThat(run.getWindowsDone()).isZero();
+        assertThat(run.getDaysCovered()).isZero();
+        assertThat(run.getRowsObserved()).isZero();
+        // And the boundary is exactly where it was.
+        assertThat(new ReviewCoverageCursor(segments, channels, jobs)
+                .of(org, naver.getId(), today).coverageThrough())
+                .isEqualTo(today.minusDays(36));
+    }
+
+    @Test
     @DisplayName("a window that ended in a way this lane cannot continue from stops the walk, keeping what was read")
     void aFailedWindowStopsTheWalk() {
         coveredThrough(36);

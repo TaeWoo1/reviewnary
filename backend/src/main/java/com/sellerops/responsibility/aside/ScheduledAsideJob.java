@@ -172,6 +172,16 @@ public class ScheduledAsideJob extends BaseEntity {
     private com.sellerops.responsibility.SourceCompleteness deliveryCompleteness;
 
     /**
+     * Where this read stopped, when it stopped — one of {@link AsideJobFailureCode#KNOWN}, or null.
+     *
+     * <p>Beside the outcome and not instead of it. {@code SURFACE_UNREADABLE} with
+     * {@code RANGE_CONTROLS_NOT_FOUND} is a different afternoon's work from the same outcome with
+     * {@code READING_REFUSED}, and until 2026-10-08 the row could not tell them apart.
+     */
+    @Column(name = "failure_code", length = 48)
+    private String failureCode;
+
+    /**
      * The catch-up intent this job belongs to, or null for a stand-alone read.
      *
      * <p>Deliberately not {@code runId}: that column means «a Responsibility run asked for this», and a press

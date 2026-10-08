@@ -10,7 +10,7 @@
 import {
   buildNaverReviewAuthScript,
   buildNaverReviewListReadScript,
-  buildNaverReviewRouteScript,
+  buildNaverReviewControlsScript,
 } from "../naver/review-list-observe-inpage";
 import { inPageReviewListRange } from "../action-window/reply-submission/review-list-range-inpage";
 import { runAsideRepl, type AsideCliOptions } from "./aside-cli";
@@ -27,7 +27,7 @@ import {
 import {
   NAVER_REVIEW_DATE_INPUT_SELECTOR,
   NAVER_REVIEW_READ_WORKFLOW,
-  NAVER_REVIEW_SEARCH_SELECTOR,
+  NAVER_REVIEW_QUERY_CONTROL_SELECTOR,
   validateNaverReviewWorkflow,
   type NaverReviewWorkflow,
 } from "./naver-review-workflow";
@@ -81,12 +81,15 @@ export function buildNaverReviewWindowRuntimePlan(
   if (endDaysBefore < 0 || startDaysBefore < endDaysBefore || startDaysBefore > 365) return null;
   return {
     entryUrl: workflow.entryUrl,
-    routeScript: buildNaverReviewRouteScript(),
+    // One script, one judge: it walks the same two candidate sets the locators will, and says which of their
+    // members are controls a person could use.
+    controlsScript: buildNaverReviewControlsScript(NAVER_REVIEW_DATE_INPUT_SELECTOR,
+      NAVER_REVIEW_QUERY_CONTROL_SELECTOR),
     authScript: buildNaverReviewAuthScript(),
     readerScript: buildNaverReviewListReadScript(),
     rangeScript: inPageReviewListRange(kstCivilDate(now)),
     dateInputSelector: NAVER_REVIEW_DATE_INPUT_SELECTOR,
-    searchSelector: NAVER_REVIEW_SEARCH_SELECTOR,
+    queryControlSelector: NAVER_REVIEW_QUERY_CONTROL_SELECTOR,
     requestedStartValue: window.start,
     requestedEndValue: window.end,
     requestedStartDaysBefore: startDaysBefore,
@@ -110,8 +113,9 @@ export function buildNaverReviewWindowRuntimeProgram(plan: NaverReviewWindowRunt
 }
 
 const WINDOW_CODES = [
-  "AUTH_REQUIRED", "SURFACE_UNEXPECTED", "RANGE_CONTROLS_NOT_FOUND", "RANGE_CONTROLS_AMBIGUOUS",
-  "RANGE_ORDER_UNKNOWN", "RANGE_NOT_SETTABLE", "RANGE_MISMATCH", "READ_UNSETTLED", "RUNTIME_FAULT",
+  "AUTH_REQUIRED", "SURFACE_UNEXPECTED", "DATE_CONTROL_CANDIDATES_UNREADABLE", "RANGE_CONTROLS_NOT_FOUND",
+  "RANGE_CONTROLS_AMBIGUOUS", "QUERY_CONTROL_NOT_FOUND", "QUERY_CONTROL_AMBIGUOUS", "RANGE_ORDER_UNKNOWN",
+  "RANGE_NOT_SETTABLE", "RANGE_MISMATCH", "READ_UNSETTLED", "RUNTIME_FAULT",
 ] as const;
 const WINDOW_STAGES = ["PREPARE", "SURFACE", "AUTH", "CONTROLS", "NAVIGATE", "VERIFY", "READ"] as const;
 

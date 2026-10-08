@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { catchUpMessage, screenReadMessage } from "./CollectNowAction";
+import { catchUpMessage, objectParticle, screenReadMessage, stopSentence } from "./CollectNowAction";
 import type { ScreenReadView } from "../../lib/types";
 
 /**
@@ -23,13 +23,15 @@ function read(over: Partial<ScreenReadView> = {}): ScreenReadView {
     startedAt: null,
     finishedAt: null,
     catchUp: null,
+    failureCode: null,
     ...over,
   };
 }
 
 function walk(runState: NonNullable<ScreenReadView["catchUp"]>["runState"], windowsDone: number,
-              over: Partial<ScreenReadView> = {}): ScreenReadView {
-  return read({ catchUp: { windowsDone, rowsObserved: windowsDone * 45, runState, stopReason: null }, ...over });
+              over: Partial<ScreenReadView> & { stopReason?: string | null } = {}): ScreenReadView {
+  const { stopReason = null, ...rest } = over;
+  return read({ catchUp: { windowsDone, rowsObserved: windowsDone * 45, runState, stopReason }, ...rest });
 }
 
 describe("밀린 리뷰를 따라잡는 중", () => {
@@ -83,5 +85,57 @@ describe("밀린 리뷰를 따라잡는 중", () => {
     expect(screenReadMessage("리뷰", read({ state: "SUCCESS", inserted: 45, changed: 0 })).text)
       .toBe("리뷰 수집 완료: 새로 저장 45 · 갱신 0");
     expect(catchUpMessage(read())).toBeNull();
+  });
+});
+
+describe("막힌 자리를 말한다 — 2026-10-08 라이브가 가르친 것", () => {
+  it("기간 선택 영역을 확인하지 못한 일곱 가지가 한 문장으로 모인다", () => {
+    // 판매자가 할 수 있는 일은 일곱 경우 모두 같다: 그 화면을 한 번 열어 기간 영역이 있는지 보는 것.
+    for (const code of ["DATE_CONTROL_CANDIDATES_UNREADABLE", "RANGE_CONTROLS_NOT_FOUND",
+      "RANGE_CONTROLS_AMBIGUOUS", "QUERY_CONTROL_NOT_FOUND", "QUERY_CONTROL_AMBIGUOUS",
+      "RANGE_ORDER_UNKNOWN", "RANGE_NOT_SETTABLE"]) {
+      expect(stopSentence(code), code).toBe("판매자센터 화면에서 기간 선택 영역을 확인하지 못했습니다.");
+    }
+  });
+
+  it("모르는 단어는 지어내지 않고 일반 문장으로 돌아간다", () => {
+    for (const code of [null, undefined, "SOMETHING_NEW", "RUNTIME_FAULT", "READING_REFUSED", "AUTH_REQUIRED"]) {
+      expect(stopSentence(code), String(code)).toBeNull();
+    }
+  });
+
+  it("어느 문장에도 내부 용어가 없다", () => {
+    const said = ["DATE_CONTROL_CANDIDATES_UNREADABLE", "RANGE_MISMATCH", "SURFACE_UNEXPECTED"]
+      .map((c) => stopSentence(c)!)
+      .join(" ");
+    for (const term of ["selector", "locator", "candidate", "control", "CSS", "index", "DOM", "range",
+      "window", "SURFACE", "query"]) {
+      expect(said, term).not.toContain(term);
+    }
+  });
+
+  it("한 건 실패에도, 걸음 실패에도 같은 문장이 쓰인다", () => {
+    expect(screenReadMessage("리뷰", read({ state: "FAILED", failureCode: "RANGE_CONTROLS_NOT_FOUND" })).text)
+      .toBe("판매자센터 화면에서 기간 선택 영역을 확인하지 못했습니다.");
+    expect(catchUpMessage(walk("FAILED", 2, { stopReason: "RANGE_CONTROLS_NOT_FOUND" }))!.text)
+      .toBe("2개 기간을 확인했습니다. 판매자센터 화면에서 기간 선택 영역을 확인하지 못했습니다.");
+    // 아직 아무 기간도 확인하지 못했으면 0을 세어 보여 주지 않는다.
+    expect(catchUpMessage(walk("FAILED", 0, { stopReason: "RANGE_CONTROLS_NOT_FOUND" }))!.text)
+      .toBe("판매자센터 화면에서 기간 선택 영역을 확인하지 못했습니다.");
+  });
+
+  it("조사를 고른다 — 「리뷰을(를)」이 아니라", () => {
+    // 둘 다 적어 두는 것은 둘 중 어느 것도 고르지 않은 것이고, 판매자가 읽는 것은 고르지 않은 그 모양이다.
+    expect(screenReadMessage("리뷰", read({ state: "FAILED" })).text)
+      .toBe("리뷰를 수집하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    expect(screenReadMessage("문의", read({ state: "FAILED" })).text)
+      .toBe("문의를 수집하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    expect(screenReadMessage("주문", read({ state: "FAILED" })).text).toContain("주문을 수집하지 못했습니다");
+    expect(objectParticle("리뷰")).toBe("를");
+    expect(objectParticle("문의")).toBe("를");
+    expect(objectParticle("주문")).toBe("을");
+    expect(objectParticle("상품")).toBe("을");
+    // 한글이 아니면 「을」 — 「CSV을」이 「CSV를」보다 덜 어색하다.
+    expect(objectParticle("CSV")).toBe("을");
   });
 });

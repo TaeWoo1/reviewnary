@@ -56,10 +56,16 @@ public class ScheduledAsideJobController {
     }
 
     /**
-     * A closed outcome token, a count, and a digest of the surface's own item refs. No message, no page text,
-     * no target — and the digest is validated as 64 hex characters, so it cannot become a text channel.
+     * A closed outcome token, a count, a digest of the surface's own item refs, and — when it stopped — one
+     * closed word for where. No message, no page text, no target: the digest is validated as 64 hex characters
+     * and the failure code against {@link AsideJobFailureCode#KNOWN}, so neither can become a text channel.
      */
-    public record ReportRequest(String outcome, Integer observedCount, String contentDigest) {
+    public record ReportRequest(String outcome, Integer observedCount, String contentDigest, String failureCode) {
+
+        /** The shape before a stop could say where it stopped. */
+        public ReportRequest(String outcome, Integer observedCount, String contentDigest) {
+            this(outcome, observedCount, contentDigest, null);
+        }
     }
 
     public record ReportResponse(UUID jobId, String status, String outcome) {
@@ -81,7 +87,7 @@ public class ScheduledAsideJobController {
                                  @PathVariable UUID jobId, @RequestBody ReportRequest body) {
         UUID deviceId = deviceOf(request);
         ScheduledAsideJob settled = jobs.settle(principal.orgId(), deviceId, jobId, outcomeOf(body.outcome()),
-                body.observedCount(), body.contentDigest());
+                body.observedCount(), body.contentDigest(), body.failureCode());
         return new ReportResponse(settled.getId(), settled.getStatus().name(),
                 settled.getOutcome() == null ? null : settled.getOutcome().name());
     }

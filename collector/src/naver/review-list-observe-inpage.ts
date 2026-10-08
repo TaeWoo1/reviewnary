@@ -187,44 +187,81 @@ export function buildNaverReviewListReadScript(): string {
 }
 
 /**
- * **Is this the review grid, and is it drawn? — the smallest question worth asking before acting on a page.**
+ * **Is this the review grid, is it drawn, and which controls may be acted on? — one answer, from the page.**
  *
  * Authored here for the same reason as the reader: nothing under `src/aside/` writes page code. The historical
- * window read ({@link ../aside/naver-review-window-runtime}) runs this BEFORE it touches a control, because
- * typing a date into a page that is not this page is the one mistake no later verification can undo — the
- * range census would then be reading some other screen's inputs and agreeing with itself.
+ * window read runs this BEFORE it touches a control, because typing a date into a page that is not this page
+ * is the one mistake no later verification can undo.
  *
- * Returns `{ route, grid, inputs }`: whether the host and hash are the published review route, how many grid
- * rows are rendered, and how many actionable date inputs the grounded predicate finds. Three numbers and a
- * boolean. No page text, no selector, no attribute value crosses back.
+ * <h2>Why the predicate lives here and nowhere else</h2>
  *
- * It establishes the SURFACE, not the STORE. Which seller's store this is cannot be decided in the page — the
- * backend decides it at delivery, against listings collected by the official API, and refuses to store rows
- * from a page it cannot place ({@code NaverReviewObservationService}).
+ * It used to live in two places. The selector carried `:visible:not([disabled])` and this script carried the
+ * same judgement again — and on 2026-10-08 the first live catch-up stopped in the CONTROLS stage with a
+ * `SyntaxError`: Aside hands a selector to `document.querySelectorAll`, which has never heard of Playwright's
+ * `:visible`. Two things were wrong at once. The syntax, which is trivial. And the duplication, which is not:
+ * a fact judged in two places is a fact that can be judged two ways, and the copy that happened to run first
+ * was the one with no tests behind it.
+ *
+ * <p>So the selector is now a <b>pure-CSS candidate set</b> and this script is the <b>only</b> judge of
+ * whether a candidate is a control a person could use. It answers in <b>indices into that same candidate
+ * set</b>, in document order — which is the order a locator enumerates too, so the runtime can act on exactly
+ * the elements this script accepted without either side re-deciding anything.
+ *
+ * <p>Returns `{ route, grid, dateCandidates, dateAccepted, queryCandidates, queryAccepted }`. Booleans,
+ * counts and small integer indices. No page text, no selector, no attribute value crosses back.
+ *
+ * <p>It establishes the SURFACE, not the STORE. Which seller's store this is cannot be decided in the page —
+ * the backend decides it at delivery, against listings collected by the official API.
  */
-export function buildNaverReviewRouteScript(): string {
+export function buildNaverReviewControlsScript(dateSelector: string, querySelector: string): string {
   return `(function () {
   var route = String(location.host || '').toLowerCase() === 'sell.smartstore.naver.com'
     && String(location.hash || '').indexOf('#/review/search') === 0;
   var grid = document.querySelectorAll('.ag-center-cols-container .ag-row').length;
-  function visibleAndEnabled(el) {
-    if (el.disabled) { return false; }
+  function usable(el) {
+    if (el.disabled === true || String(el.getAttribute('aria-disabled') || '') === 'true') { return false; }
     var st = window.getComputedStyle(el);
-    if (st.display === 'none' || st.visibility === 'hidden') { return false; }
+    if (st.display === 'none' || st.visibility === 'hidden' || st.pointerEvents === 'none') { return false; }
     var r = el.getBoundingClientRect();
     return r.width > 0 || r.height > 0;
   }
-  function isDateInput(el) {
+  // The date predicate, unchanged in meaning from the live-proven census: type=date, or a class naming a
+  // date/calendar/picker widget. Readonly is NOT an exclusion — a calendar-backed field is almost always
+  // readonly, and treating that as unusable reported zero date inputs on a surface that had two.
+  function isDateControl(el) {
     var type = String(el.getAttribute('type') || '').toLowerCase();
     if (type === 'date') { return true; }
     var cls = typeof el.className === 'string' ? el.className.toLowerCase() : '';
     return cls.indexOf('date') >= 0 || cls.indexOf('calendar') >= 0 || cls.indexOf('picker') >= 0;
   }
-  var all = document.querySelectorAll('input');
-  var inputs = 0;
-  for (var i = 0; i < all.length; i++) {
-    if (isDateInput(all[i]) && visibleAndEnabled(all[i])) { inputs++; }
+  // The query predicate: the word this list prints on the control that shows a period. Compared as a whole
+  // label, so 「조회수」 or 「검색어 저장」 is not a 조회 button. The label is read and discarded here.
+  var WORDS = ['조회', '검색', '조회하기', '검색하기'];
+  function isQueryControl(el) {
+    var label = String((el.value !== undefined && el.value !== null && String(el.tagName).toLowerCase() === 'input')
+      ? el.value : (el.textContent || '')).replace(/\s+/g, '');
+    if (label.length === 0 || label.length > 8) { return false; }
+    for (var w = 0; w < WORDS.length; w++) { if (label === WORDS[w]) { return true; } }
+    return false;
   }
-  return { route: route, grid: grid, inputs: inputs };
+  function census(selector, accept) {
+    var found;
+    try { found = document.querySelectorAll(selector); } catch (e) { return null; }
+    var accepted = [];
+    for (var i = 0; i < found.length && i < 4000; i++) {
+      if (accept(found[i]) && usable(found[i])) { accepted.push(i); }
+    }
+    return { candidates: found.length, accepted: accepted };
+  }
+  var dates = census(${JSON.stringify(dateSelector)}, isDateControl);
+  var query = census(${JSON.stringify(querySelector)}, isQueryControl);
+  return {
+    route: route,
+    grid: grid,
+    dateCandidates: dates === null ? -1 : dates.candidates,
+    dateAccepted: dates === null ? null : dates.accepted,
+    queryCandidates: query === null ? -1 : query.candidates,
+    queryAccepted: query === null ? null : query.accepted
+  };
 })()`;
 }
