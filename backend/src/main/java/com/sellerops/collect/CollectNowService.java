@@ -159,10 +159,16 @@ public class CollectNowService {
         Routed routed = route(orgId, sellerAccountId, dataTypeRaw);
         ReviewCoverage held = reviewCoverage(orgId, routed.channel().getId(), routed.dataType().name());
         ReviewCatchUpPlan plan = ReviewCatchUpPlan.from(held, today(), ReviewCatchUpPlan.Limits.OPERATOR_PRESS);
-        // Whether a past period can be read at all is a property of the carrier, not of the plan. Today no lane
-        // selects a period: the screen read opens one route and reads whatever the page is showing. Saying so
-        // here keeps a plan from being read as a schedule.
-        return ReviewCatchUpPlanView.of(held, plan, false);
+        // <b>Whether a past period can be read at all is a property of the carrier, not of the plan.</b> Until
+        // 2026-10-08 no lane could select one — the screen read opened a route and read whatever period the
+        // page was showing — and a plan that did not say so would have read as a schedule. The screen-read
+        // route now has READ navigation for this list, so the answer is the route: a period this product can
+        // go and look at, or a row whose data arrives by API and has no period to be missing.
+        //
+        // It is a statement about this deployment, not about the seller's desk. A helper bundled before the
+        // navigation says so at run time by settling the window as «this desk could not do it» — there is no
+        // way to ask it from here, and guessing would make this field the least reliable thing on the screen.
+        return ReviewCatchUpPlanView.of(held, plan, routed.path() == CollectNowRouter.Path.SCREEN_READ);
     }
 
     private ReviewCoverage reviewCoverage(UUID orgId, UUID channelId, String dataType) {

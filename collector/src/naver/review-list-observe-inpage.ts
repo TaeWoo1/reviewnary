@@ -185,3 +185,46 @@ export function buildNaverReviewListReadScript(): string {
   return { reason: 'OK', modelType: modelType, rowCount: rowCount, loaded: rows.length, linkChecked: checked, rows: rows };
 })()`;
 }
+
+/**
+ * **Is this the review grid, and is it drawn? — the smallest question worth asking before acting on a page.**
+ *
+ * Authored here for the same reason as the reader: nothing under `src/aside/` writes page code. The historical
+ * window read ({@link ../aside/naver-review-window-runtime}) runs this BEFORE it touches a control, because
+ * typing a date into a page that is not this page is the one mistake no later verification can undo — the
+ * range census would then be reading some other screen's inputs and agreeing with itself.
+ *
+ * Returns `{ route, grid, inputs }`: whether the host and hash are the published review route, how many grid
+ * rows are rendered, and how many actionable date inputs the grounded predicate finds. Three numbers and a
+ * boolean. No page text, no selector, no attribute value crosses back.
+ *
+ * It establishes the SURFACE, not the STORE. Which seller's store this is cannot be decided in the page — the
+ * backend decides it at delivery, against listings collected by the official API, and refuses to store rows
+ * from a page it cannot place ({@code NaverReviewObservationService}).
+ */
+export function buildNaverReviewRouteScript(): string {
+  return `(function () {
+  var route = String(location.host || '').toLowerCase() === 'sell.smartstore.naver.com'
+    && String(location.hash || '').indexOf('#/review/search') === 0;
+  var grid = document.querySelectorAll('.ag-center-cols-container .ag-row').length;
+  function visibleAndEnabled(el) {
+    if (el.disabled) { return false; }
+    var st = window.getComputedStyle(el);
+    if (st.display === 'none' || st.visibility === 'hidden') { return false; }
+    var r = el.getBoundingClientRect();
+    return r.width > 0 || r.height > 0;
+  }
+  function isDateInput(el) {
+    var type = String(el.getAttribute('type') || '').toLowerCase();
+    if (type === 'date') { return true; }
+    var cls = typeof el.className === 'string' ? el.className.toLowerCase() : '';
+    return cls.indexOf('date') >= 0 || cls.indexOf('calendar') >= 0 || cls.indexOf('picker') >= 0;
+  }
+  var all = document.querySelectorAll('input');
+  var inputs = 0;
+  for (var i = 0; i < all.length; i++) {
+    if (isDateInput(all[i]) && visibleAndEnabled(all[i])) { inputs++; }
+  }
+  return { route: route, grid: grid, inputs: inputs };
+})()`;
+}

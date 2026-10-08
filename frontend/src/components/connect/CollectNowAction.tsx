@@ -33,10 +33,17 @@ import { kstMonthDay } from "../../lib/format";
 const SCREEN_READ_POLL_MS = 2000;
 /** 90초. 작업 자체의 수명(10분)이 아니라, 버튼 앞에 서 있는 사람이 기다릴 만한 시간. */
 const SCREEN_READ_POLL_LIMIT = 45;
+/**
+ * 6분. 밀린 기간을 차례로 읽는 중이면 한 건이 아니라 여러 건이고, 서버가 한 번의 누름에 허용하는 시간이
+ * 정확히 이만큼이다. 한 건짜리 기준으로 지켜보면 세 번째 기간쯤에서 보기를 그만두고, 끝난 적 없는 수집을
+ * 끝난 것처럼 말하게 된다.
+ */
+const CATCH_UP_POLL_LIMIT = 180;
 
 async function awaitScreenRead(first: ScreenReadView): Promise<ScreenReadView> {
   let latest = first;
-  for (let i = 0; i < SCREEN_READ_POLL_LIMIT; i += 1) {
+  const limit = first.catchUp ? CATCH_UP_POLL_LIMIT : SCREEN_READ_POLL_LIMIT;
+  for (let i = 0; i < limit; i += 1) {
     let next: ScreenReadView | null = null;
     try {
       next = await api.screenReadStatus(latest.jobId);
@@ -51,8 +58,50 @@ async function awaitScreenRead(first: ScreenReadView): Promise<ScreenReadView> {
   return latest;
 }
 
+/**
+ * <b>밀린 기간을 차례로 읽는 중이라는 말 — 기간의 날짜는 꺼내지 않는다.</b>
+ *
+ * <p>판매자가 쓸 수 있는 사실은 두 개다: 지금 밀린 것을 따라잡는 중이라는 것과, 얼마나 왔는지. 「09-03~09-09를
+ * 읽고 있습니다」는 우리 쪽 구현의 모양이고, 그걸 읽은 판매자가 할 수 있는 일은 없다.
+ */
+export function catchUpMessage(read: ScreenReadView): { text: string; isError: boolean } | null {
+  const walk = read.catchUp;
+  if (!walk) return null;
+  const done = walk.windowsDone;
+  switch (walk.runState) {
+    case "RUNNING":
+      return {
+        text: done > 0 ? `밀린 리뷰를 확인하고 있습니다. ${done}개 기간 확인됨` : "밀린 리뷰를 확인하고 있습니다.",
+        isError: false,
+      };
+    case "COMPLETE":
+      return { text: `밀린 리뷰를 모두 확인했습니다. 새로 저장 ${read.inserted ?? 0}건`, isError: false };
+    case "PAUSED_AUTH":
+      // 앞에서 끝낸 기간은 그대로 남는다 — 로그인하고 이어가면 멈춘 그 기간부터 다시 읽는다.
+      return {
+        text: `${done}개 기간을 확인했고, 그다음 기간에서 판매자 센터 로그인이 필요했습니다.`,
+        isError: true,
+      };
+    case "STOPPED_SATURATED":
+      return {
+        text: `${done}개 기간을 확인했습니다. 어떤 하루에는 한 번에 읽을 수 있는 양보다 많은 리뷰가 있어, 그 날짜 이후는 아직 확인하지 못했습니다.`,
+        isError: true,
+      };
+    case "STOPPED_LIMIT":
+      return {
+        text: `${done}개 기간을 확인했습니다. 한 번에 확인하는 양에 도달해서 여기서 멈췄습니다 — 다시 누르면 이어서 확인합니다.`,
+        isError: false,
+      };
+    default:
+      return { text: `${done}개 기간을 확인한 뒤 멈췄습니다. 잠시 후 다시 시도해 주세요.`, isError: true };
+  }
+}
+
 /** 읽기 하나의 결과를 판매자의 문장으로. 구현 이름(recipe·provider·outcome)은 한 글자도 나오지 않는다. */
 export function screenReadMessage(label: string, read: ScreenReadView): { text: string; isError: boolean } {
+  // 한 번의 누름이 여러 기간을 걷고 있으면, 할 말은 그 걸음에 대한 것이다.
+  const walk = catchUpMessage(read);
+  if (walk) return walk;
   switch (read.state) {
     case "SUCCESS":
       return {

@@ -26,7 +26,14 @@ import java.util.UUID;
  *                        job on someone's desk
  */
 public record AsideDispatch(UUID orgId, UUID sellerAccountId, AsideRecipe recipe, AsideTrigger trigger,
-                            AsideJobLimits limits, UUID runId, String clientJobId) {
+                            AsideJobLimits limits, UUID runId, String clientJobId, UUID catchUpRunId,
+                            java.time.LocalDate windowStart, java.time.LocalDate windowEnd) {
+
+    /** A dispatch with no catch-up parent and no requested period — the shape every lane but catch-up asks for. */
+    public AsideDispatch(UUID orgId, UUID sellerAccountId, AsideRecipe recipe, AsideTrigger trigger,
+                         AsideJobLimits limits, UUID runId, String clientJobId) {
+        this(orgId, sellerAccountId, recipe, trigger, limits, runId, clientJobId, null, null, null);
+    }
 
     public AsideDispatch {
         if (orgId == null) {
@@ -49,6 +56,18 @@ public record AsideDispatch(UUID orgId, UUID sellerAccountId, AsideRecipe recipe
             // nothing to fence the reading against.
             throw ApiException.badRequest("확인할 판매 계정이 필요합니다.");
         }
+        if ((windowStart == null) != (windowEnd == null)) {
+            // Half a period is not a period. Either the job knows which days to read or it reads the screen.
+            throw ApiException.badRequest("확인할 기간이 올바르지 않습니다.");
+        }
+        if (windowStart != null && windowEnd.isBefore(windowStart)) {
+            throw ApiException.badRequest("확인할 기간이 올바르지 않습니다.");
+        }
+        if (catchUpRunId != null && windowStart == null) {
+            // A catch-up child exists to read one named period. Without one it would read the screen's own
+            // and the parent would count a window it never covered.
+            throw ApiException.badRequest("확인할 기간이 필요합니다.");
+        }
         if (trigger == AsideTrigger.OPERATOR && runId != null) {
             // The row's shape says which lane produced it; a press that carried a run id would make the audit
             // trail claim a run asked for it.
@@ -60,6 +79,20 @@ public record AsideDispatch(UUID orgId, UUID sellerAccountId, AsideRecipe recipe
     public static AsideDispatch operator(UUID orgId, UUID sellerAccountId, AsideRecipe recipe, String clientJobId) {
         return new AsideDispatch(orgId, sellerAccountId, recipe, AsideTrigger.OPERATOR, AsideJobLimits.ONE_PAGE,
                 null, clientJobId);
+    }
+
+    /**
+     * One window of a catch-up a seller pressed for.
+     *
+     * <p>Still {@link AsideTrigger#OPERATOR}: a person authorised this read, and the intent it belongs to is
+     * theirs too. The period is named here because a child that read the screen's own period would have the
+     * parent counting days nobody looked at.
+     */
+    public static AsideDispatch catchUpWindow(UUID orgId, UUID sellerAccountId, AsideRecipe recipe,
+                                              String clientJobId, UUID catchUpRunId,
+                                              java.time.LocalDate windowStart, java.time.LocalDate windowEnd) {
+        return new AsideDispatch(orgId, sellerAccountId, recipe, AsideTrigger.OPERATOR, AsideJobLimits.ONE_PAGE,
+                null, clientJobId, catchUpRunId, windowStart, windowEnd);
     }
 
     /**

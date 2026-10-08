@@ -127,6 +127,67 @@ class NaverReviewObservationServiceTest {
     }
 
     @Test
+    @DisplayName("a catch-up window overlapping reviews already held stores no duplicate, and says so")
+    void anOverlappingWindowInsertsNothingAndIsStillASuccess() {
+        // The 10-02 … 10-08 reviews are already in hand (45 of them, read live on 2026-10-08). A catch-up
+        // window that reaches into those days must not store them twice — and must not be made to skip the
+        // days to avoid it, because then the gap it was walking stays open.
+        provedStore();
+        when(ingestion.ingestReviews(eq(ORG), eq(naver.getId()), anyList()))
+                .thenReturn(new IngestOutcome(0, 1, 0, List.of(), List.of()));
+        job.setTrigger(com.sellerops.responsibility.aside.AsideTrigger.OPERATOR);
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        job.setRequestedWindowStart(today.minusDays(6));
+        job.setRequestedWindowEnd(today);
+
+        NaverReviewObservationView view = service.deliver(ORG, DEVICE, JOB, windowed(7, 500,
+                row("5066448224", "1234567890")));
+
+        // Delivered, proved, counted honestly: nothing new, nothing lost, and the window still counts as read.
+        assertThat(view.identityVerdict()).isEqualTo("MATCH");
+        assertThat(view.inserted()).isZero();
+        assertThat(view.received()).isEqualTo(1);
+        assertThat(job.getInsertedCount()).isZero();
+        assertThat(job.getDeliveryCompleteness())
+                .isEqualTo(com.sellerops.responsibility.SourceCompleteness.COMPLETE);
+        // The key it dedups on is the review's own id, through the one ingestion spine.
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<CanonicalReview>> rows = ArgumentCaptor.forClass(List.class);
+        verify(ingestion).ingestReviews(eq(ORG), eq(naver.getId()), rows.capture());
+        assertThat(rows.getValue().get(0).externalId()).isEqualTo("5066448224");
+    }
+
+    @Test
+    @DisplayName("a delivery for a period nobody asked about is refused, and so is one that names no period")
+    void theWindowDeliveredMustBeTheWindowRequested() {
+        provedStore();
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        job.setRequestedWindowStart(today.minusDays(35));
+        job.setRequestedWindowEnd(today.minusDays(29));
+
+        // The helper proves the period against the screen before it reads; this is the second gate, and it
+        // catches a different thing — a reading arriving for a window the parent never requested. A catch-up
+        // counting a window it did not read is how a boundary gets ahead of the data.
+        assertThatThrownBy(() -> service.deliver(ORG, DEVICE, JOB, windowed(7, 500, row("5066448224", "1234567890"))))
+                .isInstanceOf(ApiException.class);
+
+        ScheduledAsideJob second = new ScheduledAsideJob();
+        second.setOrgId(ORG);
+        second.setDeviceId(DEVICE);
+        second.setRecipe(AsideRecipe.NAVER_REVIEW_OBSERVE_V1);
+        second.setStatus(ScheduledAsideJobStatus.CLAIMED);
+        second.setLeaseUntil(Instant.now().plusSeconds(120));
+        second.setRequestedWindowStart(today.minusDays(35));
+        second.setRequestedWindowEnd(today.minusDays(29));
+        UUID secondId = UUID.randomUUID();
+        when(jobs.findByIdAndDeviceId(secondId, DEVICE)).thenReturn(Optional.of(second));
+        // And a reading that cannot say which days it covered: storing it would leave the parent to assume
+        // the window it asked for.
+        assertThatThrownBy(() -> service.deliver(ORG, DEVICE, secondId, request(row("5066448225", "1234567890"))))
+                .isInstanceOf(ApiException.class);
+    }
+
+    @Test
     @DisplayName("the import record names the trigger that actually authorised the read, not the autonomous lane")
     void operatorProvenanceSurvivesIngest() {
         // 2026-10-08: job 7bde2cb5 carried trigger_source=OPERATOR — a seller had pressed — and the sync run it

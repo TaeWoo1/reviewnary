@@ -45,13 +45,52 @@ public class ScreenReadService {
     private final AsideHelperDevices devices;
     private final SellerAccountRepository accounts;
     private final ChannelRepository channels;
+    /**
+     * The review catch-up, when this deployment has one. Optional so every context assembled without it — and
+     * every data type that has no periods to be missing — answers exactly as it did before.
+     */
+    private final ReviewCatchUpReporter catchUp;
+    /** The same collaborator, named for the other thing it does — starting a walk rather than describing one. */
+    private final ReviewCatchUpReporter walk;
 
     public ScreenReadService(ScheduledAsideJobService jobs, AsideHelperDevices devices,
                              SellerAccountRepository accounts, ChannelRepository channels) {
+        this(jobs, devices, accounts, channels, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ScreenReadService(ScheduledAsideJobService jobs, AsideHelperDevices devices,
+                             SellerAccountRepository accounts, ChannelRepository channels,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false)
+                             ReviewCatchUpReporter catchUp) {
         this.jobs = jobs;
         this.devices = devices;
         this.accounts = accounts;
         this.channels = channels;
+        this.catchUp = catchUp;
+        this.walk = catchUp;
+    }
+
+    /**
+     * How a walk describes one of its children.
+     *
+     * <p>An interface declared here rather than a dependency on the catch-up package: this service is what
+     * every screen-read status goes through, and it has no business knowing how a catch-up works — only that
+     * a child's state may belong to something larger than itself.
+     */
+    public interface ReviewCatchUpReporter {
+
+        ScreenReadView describe(ScreenReadView jobLevel, ScheduledAsideJob job);
+
+        /**
+         * Start the walk this press authorises, or empty when this row has no gap to walk.
+         *
+         * <p>Empty is the ordinary answer, not an error: most rows on most days have nothing behind them.
+         */
+        java.util.Optional<ScreenReadView> start(java.util.UUID orgId, java.util.UUID sellerAccountId,
+                                                 java.util.UUID channelId, String dataType,
+                                                 com.sellerops.responsibility.aside.AsideRecipe recipe,
+                                                 String requestId);
     }
 
     /**
@@ -74,6 +113,17 @@ public class ScreenReadService {
                 // that kind of data, which is a capability fact and is said as one.
                 .orElseThrow(() -> ApiException.badRequest(
                         channel.getNameKo() + " 화면에서 이 자료를 읽는 방법은 아직 없습니다."));
+        // <b>A gap, if there is one, is what this press is for.</b> The seller pressed once; the days between
+        // the coverage boundary and today are what that press authorises, oldest first. Without a boundary —
+        // which is the state the 2026-10-08 live read ran in — there is nothing to walk and this is one read
+        // of the period the screen is showing, exactly as before.
+        if (walk != null) {
+            java.util.Optional<ScreenReadView> started =
+                    walk.start(orgId, account.getId(), channel.getId(), dataType.name(), recipe, requestId);
+            if (started.isPresent()) {
+                return started.get();
+            }
+        }
         AsideDispatch dispatch = AsideDispatch.operator(orgId, account.getId(), recipe,
                 clientJobId(recipe, account.getId(), requestId));
         ScheduledAsideJob job = jobs.dispatch(dispatch);
@@ -86,7 +136,7 @@ public class ScreenReadService {
         ScheduledAsideJob job = jobs.byId(jobId)
                 .filter(j -> orgId.equals(j.getOrgId()))
                 .orElseThrow(() -> ApiException.notFound("해당 확인 작업을 찾을 수 없습니다."));
-        return ScreenReadView.of(job, true);
+        return catchUp == null ? ScreenReadView.of(job, true) : catchUp.describe(ScreenReadView.of(job, true), job);
     }
 
     /**
