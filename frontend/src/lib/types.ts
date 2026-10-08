@@ -3799,6 +3799,20 @@ export interface ScreenReadView {
   complete: boolean;
   startedAt: string | null;
   finishedAt: string | null;
+  /**
+   * 한 번의 누름이 여러 기간을 차례로 읽는 중일 때, <b>그 전체</b>의 진행. 아니면 `null`.
+   *
+   * <p>자식 하나를 보고 있으면 첫 기간이 끝나는 순간 「수집 완료」라고 말하고 지켜보기를 멈춘다 — 남은
+   * 다섯 기간이 아직 있는데도. 그래서 `state`도 이 숫자들도 걸음 전체의 것이다. 기간의 날짜는 여기 없다:
+   * 판매자가 쓸 일이 없고, 실행 기록에 있다.
+   */
+  catchUp: {
+    windowsDone: number;
+    rowsObserved: number;
+    runState: "RUNNING" | "PAUSED_AUTH" | "COMPLETE" | "STOPPED_SATURATED" | "STOPPED_LIMIT" | "FAILED";
+    /** 멈춘 이유. 다섯 중 넷은 실패가 아니고, 각각 판매자의 다음 행동이 다르다. */
+    stopReason: string | null;
+  } | null;
 }
 
 /** What one press of 지금 수집 started — a finished pull run, or a job now on the seller's own desk. */

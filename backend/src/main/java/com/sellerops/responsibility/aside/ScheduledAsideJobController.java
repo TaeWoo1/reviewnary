@@ -43,10 +43,16 @@ public class ScheduledAsideJobController {
      * handoff is already keyed by (this same helper receives it on the seller-pressed lane), and the fingerprint
      * is a digest the helper compares the screen against so it can refuse to read the wrong store. The route
      * still comes from the recipe's own bound workflow on the helper side; nothing in this response can move it.
+     *
+     * <p>{@code windowStart} / {@code windowEnd} are the period this job was asked to read, present only for a
+     * catch-up child. Two dates are not a target either: they cannot move the route, and the helper refuses a
+     * period it cannot express as an offset from its own as-of day — and then proves, from the screen's own
+     * period controls, that the list really is showing those days before it reads a row.
      */
     public record ClaimResponse(UUID jobId, String recipe, Instant leaseUntil, String accountSlot,
-                                String expectedStoreFingerprint) {
-        static final ClaimResponse NONE = new ClaimResponse(null, null, null, null, null);
+                                String expectedStoreFingerprint, java.time.LocalDate windowStart,
+                                java.time.LocalDate windowEnd) {
+        static final ClaimResponse NONE = new ClaimResponse(null, null, null, null, null, null, null);
     }
 
     /**
@@ -65,7 +71,8 @@ public class ScheduledAsideJobController {
         return jobs.claim(principal.orgId(), deviceId)
                 .map(claimed -> new ClaimResponse(claimed.jobId(), claimed.recipe().name(), claimed.leaseUntil(),
                         claimed.target() == null ? null : claimed.target().accountSlot(),
-                        claimed.target() == null ? null : claimed.target().expectedStoreFingerprint()))
+                        claimed.target() == null ? null : claimed.target().expectedStoreFingerprint(),
+                        claimed.windowStart(), claimed.windowEnd()))
                 .orElse(ClaimResponse.NONE);
     }
 

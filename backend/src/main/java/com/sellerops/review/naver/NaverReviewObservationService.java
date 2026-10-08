@@ -424,6 +424,11 @@ public class NaverReviewObservationService implements AsideMarketplaceTarget {
         LocalDate start = parseDay(request.windowStart());
         LocalDate end = parseDay(request.windowEnd());
         if (start == null || end == null) {
+            if (job.getRequestedWindowStart() != null) {
+                // Asked for a named period and handed back a reading that cannot say which days it covered.
+                // Storing it would leave the parent to assume the window it requested.
+                throw ApiException.badRequest("확인한 기간을 알 수 없습니다.");
+            }
             return;
         }
         if (end.isBefore(start)) {
@@ -442,6 +447,15 @@ public class NaverReviewObservationService implements AsideMarketplaceTarget {
         Integer capacity = request.rowCapacity();
         if (capacity != null && (capacity < 1 || capacity < rows)) {
             throw ApiException.badRequest("확인한 기간이 올바르지 않습니다.");
+        }
+        // <b>The period asked for and the period read must be the same period.</b> The helper proves it against
+        // the screen's own controls before it reads a row; this proves it again against what was requested,
+        // because the two checks fail for different reasons — one catches a screen that did not move, the other
+        // catches a delivery arriving for a window nobody asked about. A catch-up counting a window it did not
+        // read is how a coverage boundary gets ahead of the data.
+        if (job.getRequestedWindowStart() != null
+                && (!job.getRequestedWindowStart().equals(start) || !job.getRequestedWindowEnd().equals(end))) {
+            throw ApiException.badRequest("확인한 기간이 요청한 기간과 다릅니다.");
         }
         job.setWindowStart(start);
         job.setWindowEnd(end);

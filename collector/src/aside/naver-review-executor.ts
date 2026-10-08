@@ -10,6 +10,7 @@
 import {
   buildNaverReviewAuthScript,
   buildNaverReviewListReadScript,
+  buildNaverReviewRouteScript,
 } from "../naver/review-list-observe-inpage";
 import { inPageReviewListRange } from "../action-window/reply-submission/review-list-range-inpage";
 import { runAsideRepl, type AsideCliOptions } from "./aside-cli";
@@ -19,7 +20,14 @@ import {
   type NaverReviewRuntimeResult,
 } from "./naver-review-runtime";
 import {
+  asideNaverReviewWindowRuntime,
+  type NaverReviewWindowRuntimePlan,
+  type NaverWindowRuntimeResult,
+} from "./naver-review-window-runtime";
+import {
+  NAVER_REVIEW_DATE_INPUT_SELECTOR,
   NAVER_REVIEW_READ_WORKFLOW,
+  NAVER_REVIEW_SEARCH_SELECTOR,
   validateNaverReviewWorkflow,
   type NaverReviewWorkflow,
 } from "./naver-review-workflow";
@@ -30,6 +38,104 @@ export const NAVER_REVIEW_RUNTIME_PREAMBLE = "const __name = (target, _value) =>
 export function kstCivilDate(now: Date): { year: number; month: number; day: number } {
   const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
   return { year: kst.getUTCFullYear(), month: kst.getUTCMonth() + 1, day: kst.getUTCDate() };
+}
+
+/** A KST calendar day as `YYYY-MM-DD`, `daysBefore` days before `asOf`. */
+export function kstDayString(asOf: Date, daysBefore: number): string {
+  const d = kstCivilDate(new Date(asOf.getTime() - daysBefore * 86_400_000));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.year}-${pad(d.month)}-${pad(d.day)}`;
+}
+
+/** Whole KST days between `day` (`YYYY-MM-DD`) and the run's as-of day. Negative means in the future. */
+export function kstDaysBeforeDay(day: string, asOf: Date): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(day || "").trim());
+  if (!m) return null;
+  const today = kstCivilDate(asOf);
+  const t = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (!Number.isFinite(t)) return null;
+  return Math.round((Date.UTC(today.year, today.month - 1, today.day) - t) / 86_400_000);
+}
+
+/** The period a historical read was asked for — two KST calendar days, inclusive. */
+export interface NaverReviewWindowRequest {
+  readonly start: string;
+  readonly end: string;
+}
+
+/**
+ * The plan for a historical window read.
+ *
+ * <p>The two offsets are computed here, from the same as-of the census will be given, so «what we asked for»
+ * and «what the screen shows» are expressed in one unit and compared without a second clock between them.
+ */
+export function buildNaverReviewWindowRuntimePlan(
+  workflow: NaverReviewWorkflow,
+  now: Date,
+  window: NaverReviewWindowRequest,
+): NaverReviewWindowRuntimePlan | null {
+  const startDaysBefore = kstDaysBeforeDay(window.start, now);
+  const endDaysBefore = kstDaysBeforeDay(window.end, now);
+  if (startDaysBefore === null || endDaysBefore === null) return null;
+  // A period that ends before it starts, or that reaches into the future, is not a period to go and look at.
+  if (endDaysBefore < 0 || startDaysBefore < endDaysBefore || startDaysBefore > 365) return null;
+  return {
+    entryUrl: workflow.entryUrl,
+    routeScript: buildNaverReviewRouteScript(),
+    authScript: buildNaverReviewAuthScript(),
+    readerScript: buildNaverReviewListReadScript(),
+    rangeScript: inPageReviewListRange(kstCivilDate(now)),
+    dateInputSelector: NAVER_REVIEW_DATE_INPUT_SELECTOR,
+    searchSelector: NAVER_REVIEW_SEARCH_SELECTOR,
+    requestedStartValue: window.start,
+    requestedEndValue: window.end,
+    requestedStartDaysBefore: startDaysBefore,
+    requestedEndDaysBefore: endDaysBefore,
+    settleTimeoutMs: workflow.settleTimeoutMs,
+    pollMs: 1_500,
+    searchSettleMs: 2_000,
+  };
+}
+
+export function buildNaverReviewWindowRuntimeProgram(plan: NaverReviewWindowRuntimePlan): string {
+  const fn = asideNaverReviewWindowRuntime.toString();
+  return [
+    NAVER_REVIEW_RUNTIME_PREAMBLE,
+    `const __plan = ${JSON.stringify(plan)};`,
+    `const __run = (${fn});`,
+    `const __wait = (ms) => new Promise((r) => setTimeout(r, ms));`,
+    `const __result = await __run(__plan, { openTab, closeTab, wait: __wait });`,
+    `console.log("ASIDE_RESULT " + JSON.stringify(__result));`,
+  ].join("\n");
+}
+
+const WINDOW_CODES = [
+  "AUTH_REQUIRED", "SURFACE_UNEXPECTED", "RANGE_CONTROLS_NOT_FOUND", "RANGE_CONTROLS_AMBIGUOUS",
+  "RANGE_ORDER_UNKNOWN", "RANGE_NOT_SETTABLE", "RANGE_MISMATCH", "READ_UNSETTLED", "RUNTIME_FAULT",
+] as const;
+const WINDOW_STAGES = ["PREPARE", "SURFACE", "AUTH", "CONTROLS", "NAVIGATE", "VERIFY", "READ"] as const;
+
+/** Shape-check the window program's answer. Off-shape is `null` — never a success with a missing half. */
+export function parseNaverReviewWindowRuntimeResult(raw: unknown): NaverWindowRuntimeResult | null {
+  if (raw === null || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const elapsedMs = typeof r["elapsedMs"] === "number" && Number.isFinite(r["elapsedMs"]) ? r["elapsedMs"] : 0;
+  if (r["ok"] === true) {
+    if (r["reading"] === undefined || r["range"] === undefined) return null;
+    return { ok: true, reading: r["reading"], range: r["range"], elapsedMs };
+  }
+  if (r["ok"] !== false) return null;
+  const code = r["code"];
+  const stage = r["stage"];
+  if (typeof code !== "string" || !(WINDOW_CODES as readonly string[]).includes(code)) return null;
+  if (typeof stage !== "string" || !(WINDOW_STAGES as readonly string[]).includes(stage)) return null;
+  return {
+    ok: false,
+    code: code as (typeof WINDOW_CODES)[number],
+    stage: stage as (typeof WINDOW_STAGES)[number],
+    candidates: typeof r["candidates"] === "number" ? r["candidates"] : null,
+    elapsedMs,
+  };
 }
 
 export function buildNaverReviewRuntimePlan(workflow: NaverReviewWorkflow, now: Date): NaverReviewRuntimePlan {
@@ -86,6 +192,12 @@ export type NaverReviewExecution =
   | { kind: "RESULT"; result: NaverReviewRuntimeResult; llmCalls: 0 }
   | { kind: "UNAVAILABLE"; llmCalls: 0 };
 
+export type NaverReviewWindowExecution =
+  | { kind: "RESULT"; result: NaverWindowRuntimeResult; llmCalls: 0 }
+  | { kind: "UNAVAILABLE"; llmCalls: 0 }
+  /** The period asked for is not one this lane can look at. Nothing was opened. */
+  | { kind: "WINDOW_INVALID"; llmCalls: 0 };
+
 export class AsideNaverReviewExecutor {
   private readonly workflow: NaverReviewWorkflow;
   private readonly cli: AsideCliOptions;
@@ -113,6 +225,32 @@ export class AsideNaverReviewExecutor {
     const parsed = parseNaverReviewRuntimeResult(run.result);
     if (parsed === null) {
       return { kind: "RESULT", result: { ok: false, code: "RUNTIME_FAULT", stage: "READ", reason: null, elapsedMs: run.elapsedMs }, llmCalls: 0 };
+    }
+    return { kind: "RESULT", result: parsed, llmCalls: 0 };
+  }
+
+  /**
+   * One bounded historical window — the same store, the same list, a period the seller is not looking at.
+   *
+   * <p>A separate program from {@link execute}, because the two have different permissions: that one touches
+   * nothing, this one may put a date in two fields and press 조회. Keeping them apart is what lets the first
+   * stay checkable by reading one file.
+   */
+  async executeWindow(window: NaverReviewWindowRequest): Promise<NaverReviewWindowExecution> {
+    const plan = buildNaverReviewWindowRuntimePlan(this.workflow, this.now(), window);
+    if (plan === null) return { kind: "WINDOW_INVALID", llmCalls: 0 };
+    const run = await runAsideRepl(buildNaverReviewWindowRuntimeProgram(plan), {
+      ...this.cli,
+      timeoutMs: this.workflow.settleTimeoutMs + 30_000,
+    });
+    if (run.kind === "NO_RESULT") return { kind: "UNAVAILABLE", llmCalls: 0 };
+    const parsed = parseNaverReviewWindowRuntimeResult(run.result);
+    if (parsed === null) {
+      return {
+        kind: "RESULT",
+        result: { ok: false, code: "RUNTIME_FAULT", stage: "READ", candidates: null, elapsedMs: run.elapsedMs },
+        llmCalls: 0,
+      };
     }
     return { kind: "RESULT", result: parsed, llmCalls: 0 };
   }

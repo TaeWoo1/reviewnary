@@ -60,6 +60,14 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // The test JVM keeps every Spring context it has built, for the whole run. Gradle's default heap was
+    // already one context from the edge — `OperatorCollectNowTest` carries the note about the nineteenth
+    // turning two unrelated full-context classes into OutOfMemoryError, which is why it deliberately shares a
+    // datasource URL with its sibling. Adding one entity to every JPA context was enough to cross it again
+    // (2026-10-08), and the failure does not name itself: four unrelated classes fail to load a context and
+    // the cause is three stack frames down. Raising the ceiling is the honest fix; sharing more contexts is
+    // still worth doing, but it is not a thing a reader should have to re-derive from an OOM.
+    maxHeapSize = '3g'
 }
 
 // Release identity for Sentry only (docs/service_readiness_v1.md §2-7): the short git SHA at build time lands in

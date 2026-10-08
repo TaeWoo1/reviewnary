@@ -132,6 +132,9 @@ public class ScheduledAsideJob extends BaseEntity {
         job.setClientJobId(dispatch.clientJobId());
         job.setRecipe(dispatch.recipe());
         job.setStatus(ScheduledAsideJobStatus.QUEUED);
+        job.setCatchUpRunId(dispatch.catchUpRunId());
+        job.setRequestedWindowStart(dispatch.windowStart());
+        job.setRequestedWindowEnd(dispatch.windowEnd());
         job.setExpiresAt(now.plus(TTL));
         return job;
     }
@@ -167,6 +170,31 @@ public class ScheduledAsideJob extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "delivery_completeness", length = 16)
     private com.sellerops.responsibility.SourceCompleteness deliveryCompleteness;
+
+    /**
+     * The catch-up intent this job belongs to, or null for a stand-alone read.
+     *
+     * <p>Deliberately not {@code runId}: that column means «a Responsibility run asked for this», and a press
+     * carrying one would make the audit trail name the autonomous lane as the requester. A child of a catch-up
+     * carries both facts honestly — {@code trigger = OPERATOR}, because a person pressed, and this, because
+     * that one press authorised several windows.
+     */
+    @Column(name = "catch_up_run_id")
+    private UUID catchUpRunId;
+
+    /**
+     * The period this job was <b>asked</b> to read, or null for «read whatever the screen is showing».
+     *
+     * <p>A different column from {@link #windowStart}, and the difference is the whole point: this is the
+     * request and that is what the screen was proved to be showing. One column for both would turn
+     * 「그 기간을 요청했다」 into 「그 기간을 읽었다」, which is the mistake a date typed into the wrong field
+     * makes look like a success.
+     */
+    @Column(name = "requested_window_start")
+    private java.time.LocalDate requestedWindowStart;
+
+    @Column(name = "requested_window_end")
+    private java.time.LocalDate requestedWindowEnd;
 
     /**
      * <b>The period this read actually covered</b> — the screen's own, as the helper measured it.

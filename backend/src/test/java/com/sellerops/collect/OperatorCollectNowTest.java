@@ -156,8 +156,10 @@ class OperatorCollectNowTest {
         assertThat(plan.windows().get(0).days()).isEqualTo(7);
         // Asking for the plan dispatches nothing. A plan a seller is allowed to look at and then not press.
         assertThat(jobs.count()).isZero();
-        // And it says out loud that nothing can run it yet: no lane selects a past period.
-        assertThat(plan.executable()).isFalse();
+        // And it says whether this deployment can actually read a past period. Since 2026-10-08 the
+        // screen-read route has READ navigation for this list, so a plan on this row is executable — a
+        // statement about the deployment, not about whether the seller's own helper is new enough.
+        assertThat(plan.executable()).isTrue();
     }
 
     @Test

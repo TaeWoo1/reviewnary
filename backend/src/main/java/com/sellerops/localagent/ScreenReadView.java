@@ -18,7 +18,24 @@ import java.util.UUID;
  * @param complete  whether the read can promise nothing newer was missed behind its one page
  */
 public record ScreenReadView(UUID jobId, LocalAgentRunState state, Integer observed, Integer inserted,
-                             Integer changed, boolean complete, Instant startedAt, Instant finishedAt) {
+                             Integer changed, boolean complete, Instant startedAt, Instant finishedAt,
+                             CatchUp catchUp) {
+
+    /**
+     * <b>When one press is walking several periods, the state belongs to the walk — not to whichever child
+     * settled a second ago.</b>
+     *
+     * <p>A screen polling one child would see it finish while five windows were still to come, say
+     * 「수집 완료」 and stop watching. So a child of a catch-up reports its parent's state, and these numbers
+     * are the parent's: how many periods are done, how many rows it has read, and — when it has stopped — the
+     * one word that says why. The window dates are deliberately absent: the seller has no use for them, and
+     * they belong in the run record.
+     *
+     * @param stopReason {@code AUTH_REQUIRED}, {@code DAY_SATURATED}, {@code MAX_*} — or null while running.
+     *                   Four of the five stops are not failures and the screen says a different thing for each
+     */
+    public record CatchUp(int windowsDone, int rowsObserved, String runState, String stopReason) {
+    }
 
     public static ScreenReadView of(ScheduledAsideJob job, boolean includeCounts) {
         LocalAgentRunState state = LocalAgentRunState.of(job);
@@ -28,6 +45,12 @@ public record ScreenReadView(UUID jobId, LocalAgentRunState state, Integer obser
                 delivered ? job.getInsertedCount() : null,
                 delivered ? job.getChangedCount() : null,
                 state == LocalAgentRunState.SUCCESS,
-                job.getCreatedAt(), job.getSettledAt());
+                job.getCreatedAt(), job.getSettledAt(), null);
+    }
+
+    /** The same job, answered at the level of the walk it belongs to. */
+    public ScreenReadView withCatchUp(LocalAgentRunState walkState, CatchUp catchUp) {
+        return new ScreenReadView(jobId, walkState, observed, inserted, changed,
+                walkState == LocalAgentRunState.SUCCESS, startedAt, finishedAt, catchUp);
     }
 }

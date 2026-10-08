@@ -39,6 +39,7 @@ public class ScheduledAsideJobService {
 
     private final ScheduledAsideJobRepository jobs;
     private final Clock clock;
+    private SettledListener settledListener;
     private final AsideMarketplaceAccess marketplaceAccess;
     private final AsideMarketplaceTarget marketplaceTargets;
     private final AsideHelperDevices devices;
@@ -77,7 +78,24 @@ public class ScheduledAsideJobService {
      * marketplace — which of this organisation's stores, as a slot and a digest. Null target for every loopback
      * recipe, which is the shape this record had when there was only one kind.
      */
-    public record ClaimedJob(UUID jobId, AsideRecipe recipe, Instant leaseUntil, AsideMarketplaceTarget.Target target) {
+    /**
+     * Something that wants to know a job settled — today, the review catch-up walking to its next window.
+     *
+     * <p>An interface rather than a dependency on that package, and optional, because this class is the one
+     * choke point every job in the system passes through and it must not acquire an opinion about any lane.
+     * A listener that throws cannot turn a helper's honest report into a 500 — see {@link #settle}.
+     */
+    public interface SettledListener {
+
+        void onSettled(ScheduledAsideJob job);
+    }
+
+    public record ClaimedJob(UUID jobId, AsideRecipe recipe, Instant leaseUntil, AsideMarketplaceTarget.Target target,
+                             java.time.LocalDate windowStart, java.time.LocalDate windowEnd) {
+
+        public ClaimedJob(UUID jobId, AsideRecipe recipe, Instant leaseUntil, AsideMarketplaceTarget.Target target) {
+            this(jobId, recipe, leaseUntil, target, null, null);
+        }
     }
 
     /**
@@ -217,7 +235,8 @@ public class ScheduledAsideJobService {
             if (jobs.claim(candidate.getId(), deviceId, now, leaseUntil) == 1) {
                 log.info("aside job: claimed job={} recipe={}", candidate.getId(), candidate.getRecipe());
                 return Optional.of(new ClaimedJob(candidate.getId(), candidate.getRecipe(), leaseUntil,
-                        targetFor(orgId, candidate)));
+                        targetFor(orgId, candidate), candidate.getRequestedWindowStart(),
+                        candidate.getRequestedWindowEnd()));
             }
         }
         return Optional.empty();
@@ -253,7 +272,23 @@ public class ScheduledAsideJobService {
         int observed = count == null || count < 0 ? 0 : count;
         job.settle(outcome, outcome == AsideJobOutcome.OBSERVED ? observed : null, digest, now);
         log.info("aside job: settled job={} outcome={}", job.getId(), outcome);
-        return jobs.save(job);
+        ScheduledAsideJob saved = jobs.save(job);
+        if (settledListener != null) {
+            try {
+                settledListener.onSettled(saved);
+            } catch (RuntimeException e) {
+                // The report landed. Whatever wanted to react to it failing is not the helper's problem, and
+                // failing the report would make the helper retry a job it has already finished.
+                log.warn("aside job: settle listener failed job={} type={}", saved.getId(),
+                        e.getClass().getSimpleName());
+            }
+        }
+        return saved;
+    }
+
+    /** Wired after construction: the listener's own collaborators include this service, so the cycle is broken here. */
+    public void setSettledListener(SettledListener listener) {
+        this.settledListener = listener;
     }
 
     /** The jobs one run handed out — how the observation later learns what became of its device work. */

@@ -26,7 +26,13 @@ import {
 } from "../naver/review-list-observe-inpage";
 import { parseRangeCensus } from "../action-window/reply-submission/review-list-range-inpage";
 import { log } from "../log";
-import { AsideNaverReviewExecutor, kstCivilDate } from "./naver-review-executor";
+import {
+  AsideNaverReviewExecutor,
+  kstCivilDate,
+  kstDaysBeforeDay,
+  kstDayString,
+  type NaverReviewWindowRequest,
+} from "./naver-review-executor";
 import { NAVER_REVIEW_READ_WORKFLOW, validateNaverReviewWorkflow } from "./naver-review-workflow";
 
 export const NAVER_REVIEW_OBSERVE_RECIPE_ID = "NAVER_REVIEW_OBSERVE_V1" as const;
@@ -91,10 +97,24 @@ export interface NaverDeliveryResponse {
   readonly failed: number;
 }
 
+/**
+ * What this runner needs of an executor. `executeWindow` is optional so a test double, and a deployment with
+ * no READ navigation, can still serve the lane that reads the screen as it stands.
+ */
+export type NaverObserveExecutorLike = Pick<AsideNaverReviewExecutor, "execute" | "asOf">
+  & Partial<Pick<AsideNaverReviewExecutor, "executeWindow">>;
+
 export interface NaverObserveDeps {
   /** Hand the reading in for the job this helper holds. `null` = the delivery did not land. */
   readonly deliver: (request: NaverDeliveryRequest) => Promise<NaverDeliveryResponse | null>;
-  readonly executor?: Pick<AsideNaverReviewExecutor, "execute" | "asOf">;
+  /**
+   * The period this job was asked to read, when it was asked for one.
+   *
+   * <p>Absent means what it has always meant: open the route and read whatever period the screen is showing.
+   * Present means a historical window — a different program, with the READ navigation this one does not have.
+   */
+  readonly window?: NaverReviewWindowRequest;
+  readonly executor?: NaverObserveExecutorLike;
   readonly asideCli?: string;
   readonly asideAccount?: string;
 }
@@ -108,12 +128,7 @@ export function digestOfReviewIds(reviews: readonly NaverObservedReview[]): stri
   return createHash("sha256").update(reviews.map((r) => r.reviewId).sort().join("\n"), "utf8").digest("hex");
 }
 
-/** A KST calendar day as `YYYY-MM-DD`, `daysBefore` days before the run's as-of. */
-export function kstDayString(asOf: Date, daysBefore: number): string {
-  const d = kstCivilDate(new Date(asOf.getTime() - daysBefore * 86_400_000));
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.year}-${pad(d.month)}-${pad(d.day)}`;
-}
+export { kstDayString } from "./naver-review-executor";
 
 /** Whole days between a row's KST calendar date and the run's KST calendar date, or null if unparseable. */
 export function kstDaysBefore(createdAt: string, asOf: Date): number | null {
@@ -201,7 +216,7 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
     log("aside_naver_review_refused", { reason: "WORKFLOW_INVALID" }, "warn");
     return none("REFUSED");
   }
-  let executor: Pick<AsideNaverReviewExecutor, "execute" | "asOf">;
+  let executor: NaverObserveExecutorLike;
   try {
     executor = deps.executor
       ?? new AsideNaverReviewExecutor({
@@ -214,52 +229,89 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
     return none("REFUSED");
   }
 
-  let execution;
+  const asked = deps.window ?? null;
+  // The period as one readable token: the log line is for an operator, and `[object]` is the serializer
+  // giving up on a fact that fits in twenty-one characters.
+  const askedFor = asked === null ? null : `${asked.start}~${asked.end}`;
+  type Settled = { kind: "RESULT"; result: Record<string, unknown> } | { kind: "UNAVAILABLE" | "WINDOW_INVALID" };
+  let execution: Settled;
   try {
-    execution = await executor.execute();
+    if (asked === null) {
+      execution = (await executor.execute()) as Settled;
+    } else if (!executor.executeWindow) {
+      // Asked for a period by a backend that has the lane, served by a helper that does not. Honest and
+      // bounded: nothing is opened, and the job settles as «this desk could not do it».
+      execution = { kind: "UNAVAILABLE" };
+    } else {
+      execution = (await executor.executeWindow(asked)) as Settled;
+    }
   } catch {
     return none("EXECUTOR_UNAVAILABLE");
   }
   if (execution.kind === "UNAVAILABLE") {
-    log("aside_naver_review_read", { ok: false, code: "EXECUTOR_UNAVAILABLE", llmCalls: 0 });
+    log("aside_naver_review_read", { ok: false, code: "EXECUTOR_UNAVAILABLE", window: askedFor, llmCalls: 0 });
     return none("EXECUTOR_UNAVAILABLE");
   }
+  if (execution.kind !== "RESULT") {
+    // A period this lane cannot look at. Refused rather than reduced to something nearby, because a window
+    // quietly narrowed is a coverage claim about days nobody read.
+    log("aside_naver_review_read", { ok: false, code: "WINDOW_INVALID", window: askedFor, llmCalls: 0 });
+    return none("REFUSED");
+  }
   const result = execution.result;
-  if (!result.ok) {
-    const outcome: NaverObserveOutcome = result.code === "AUTH_REQUIRED" ? "AUTH_REQUIRED" : "SURFACE_UNREADABLE";
-    log("aside_naver_review_read", { ok: false, code: result.code, stage: result.stage, reason: result.reason, llmCalls: 0, outcome });
+  if (result["ok"] !== true) {
+    const code = String(result["code"] ?? "RUNTIME_FAULT");
+    const outcome: NaverObserveOutcome = code === "AUTH_REQUIRED" ? "AUTH_REQUIRED" : "SURFACE_UNREADABLE";
+    log("aside_naver_review_read", {
+      ok: false, code, stage: result["stage"] ?? null,
+      reason: result["reason"] ?? null, candidates: result["candidates"] ?? null,
+      window: askedFor, llmCalls: 0, outcome,
+    });
     return none(outcome);
   }
 
-  const reading = sanitizeNaverReading(result.reading);
+  const reading = sanitizeNaverReading(result["reading"]);
   if (!reading.ok) {
     log("aside_naver_review_read", { ok: false, code: "READING_REFUSED", reason: reading.reason, llmCalls: 0 });
     return none("SURFACE_UNREADABLE");
   }
-  // The period. Accepted only when it ends today and both ends were read — a stale or unread period is a bound
-  // nobody could state, and a count under it would claim a coverage it does not have.
-  const range = parseRangeCensus(result.range);
-  if (range.valuesParsed < 2 || range.endDaysBefore !== 0 || range.startDaysBefore < 0 || range.startDaysBefore > 365) {
+  const asOf = executor.asOf();
+  // <b>The period, as the screen states it.</b> Both ends read, and — when a period was asked for — the ends
+  // the request named, to the day. A read that filled two fields and did not check is reporting an intention;
+  // the census is the only thing here that has seen the screen.
+  const range = parseRangeCensus(result["range"]);
+  const wantedEnd = asked === null ? 0 : (kstDaysBeforeDay(asked.end, asOf) ?? -1);
+  const wantedStart = asked === null ? null : (kstDaysBeforeDay(asked.start, asOf) ?? -1);
+  if (
+    range.valuesParsed < 2
+    || range.endDaysBefore !== wantedEnd
+    || range.startDaysBefore < 0
+    || range.startDaysBefore > 365
+    || (wantedStart !== null && range.startDaysBefore !== wantedStart)
+  ) {
     log("aside_naver_review_read", {
-      ok: false, code: "RANGE_NOT_CURRENT", valuesParsed: range.valuesParsed,
-      startDaysBefore: range.startDaysBefore, endDaysBefore: range.endDaysBefore, llmCalls: 0,
+      ok: false, code: asked === null ? "RANGE_NOT_CURRENT" : "RANGE_MISMATCH",
+      valuesParsed: range.valuesParsed,
+      startDaysBefore: range.startDaysBefore, endDaysBefore: range.endDaysBefore,
+      wantedStartDaysBefore: wantedStart, wantedEndDaysBefore: wantedEnd, llmCalls: 0,
     });
     return none("SURFACE_UNREADABLE");
   }
-  const asOf = executor.asOf();
+  // Rows outside the period the screen says it is showing. For a historical window that means on BOTH sides:
+  // a row newer than the window's end is as much a sign of the wrong screen as one older than its start.
   const outside = reading.reviews.filter((r) => {
     const d = kstDaysBefore(r.createdAt, asOf);
-    return d === null || d < 0 || d > range.startDaysBefore;
+    return d === null || d < range.endDaysBefore || d > range.startDaysBefore;
   }).length;
   if (outside > 0) {
     log("aside_naver_review_read", { ok: false, code: "ROWS_OUTSIDE_PERIOD", outside, llmCalls: 0 });
     return none("SURFACE_UNREADABLE");
   }
-  const windowDays = range.startDaysBefore + 1;
-  // The period as days, from the same as-of the rows were checked against. The screen's range was already
-  // required to end today (`endDaysBefore !== 0` is refused above), so «today» and «today minus the span» are
-  // the two ends of exactly what was on screen.
-  const windowEnd = kstDayString(asOf, 0);
+  // The period that was verified on screen, as days. Taken from the census's own offsets rather than from the
+  // request, so what is recorded is what was seen — the two agree by the gate above, and if they ever stop
+  // agreeing the recorded fact should be the screen's.
+  const windowDays = range.startDaysBefore - range.endDaysBefore + 1;
+  const windowEnd = kstDayString(asOf, range.endDaysBefore);
   const windowStart = kstDayString(asOf, range.startDaysBefore);
 
   let delivered: NaverDeliveryResponse | null;
@@ -288,6 +340,7 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
     windowDays,
     windowStart,
     windowEnd,
+    requested: askedFor,
     saturated: reading.reviews.length >= NAVER_REVIEW_MAX_ROWS,
     identity: delivered.identityVerdict,
     received: delivered.received,
@@ -296,7 +349,7 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
     skipped: delivered.skipped,
     failed: delivered.failed,
     llmCalls: 0,
-    durationMs: result.elapsedMs,
+    durationMs: result["elapsedMs"] ?? 0,
   });
   return {
     outcome: "OBSERVED",

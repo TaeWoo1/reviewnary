@@ -109,6 +109,25 @@ interface ClaimResponse {
    */
   accountSlot?: string | null;
   expectedStoreFingerprint?: string | null;
+  /**
+   * The period this job was asked to read — two KST calendar days, inclusive, or absent.
+   *
+   * <p>Absent means what it has always meant: read whatever period the screen is showing. Present means a
+   * historical window, and the runner then uses the lane that can navigate a read to it. <b>Still not a
+   * target:</b> two dates cannot move the route, which comes from the recipe's own bound workflow, and the
+   * helper refuses a period it cannot express as an offset from its own as-of day.
+   */
+  windowStart?: string | null;
+  windowEnd?: string | null;
+}
+
+/** The two dates as the runner wants them, or nothing when the backend asked for no particular period. */
+function windowOf(claimed: ClaimResponse): { start: string; end: string } | null {
+  const day = /^\d{4}-\d{2}-\d{2}$/;
+  const start = typeof claimed.windowStart === "string" ? claimed.windowStart.trim() : "";
+  const end = typeof claimed.windowEnd === "string" ? claimed.windowEnd.trim() : "";
+  if (!day.test(start) || !day.test(end)) return null;
+  return { start, end };
 }
 
 /** SHA-256 of the surface's own refs, sorted. Ids we published to ourselves — never a customer's words. */
@@ -243,8 +262,10 @@ export async function runFixtureObserveCycle(opts: FixtureObserveRunnerOptions):
       return { kind: "REPORTED", outcome: "REFUSED", observedCount: null };
     }
     const jobId = claimed.jobId;
+    const window = windowOf(claimed);
     const observed = await (opts.runNaverReview ?? runNaverReviewObservation)({
       deliver: (request) => deliverNaverReviews(opts, jobId, request),
+      ...(window ? { window } : {}),
       ...(opts.asideCli ? { asideCli: opts.asideCli } : {}),
       ...(opts.asideAccount ? { asideAccount: opts.asideAccount } : {}),
     });

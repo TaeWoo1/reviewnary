@@ -94,7 +94,23 @@ const EVALUATE_FORWARDERS = [
   "coupang-review-runtime.ts",
   "naver-review-runtime.ts",
   "sign-in-runtime.ts",
+  "naver-review-window-runtime.ts",
 ] as const;
+
+/**
+ * **The one file allowed to navigate a read — and the vocabulary it is allowed to do it with.**
+ *
+ * Every other forwarder above touches nothing: open, read, close. That property is worth keeping checkable by
+ * reading one short file, which is why the historical window read is a separate file rather than a flag on the
+ * plain one (2026-10-08). What this file may do instead is the three things a seller does with their own hands
+ * to look at last month: put a date in the period's from field, put one in its to field, press 조회.
+ *
+ * The widening is held narrow by the describe below: only `fill` and `click` exist, every call site sits on a
+ * handle that was counted first, there are exactly three of them, and every token that would make it a
+ * mutation — submit, delete, a reply, a row control, a second navigation, a key press, a file — is absent.
+ * A fourth interaction cannot be added to this lane without this test failing.
+ */
+const READ_NAVIGATORS = ["naver-review-window-runtime.ts"] as const;
 
 describe("aside provider — forbidden capability tokens are absent from every source file", () => {
   it.each(FILES)("%s", (file) => {
@@ -105,6 +121,48 @@ describe("aside provider — forbidden capability tokens are absent from every s
       // `host-file-handoff.ts` reads a file, but through `node:fs` named imports (`readFileSync`), not `fs.`.
       expect(code, `${file} contains ${token}`).not.toContain(token);
     }
+  });
+});
+
+describe.each(READ_NAVIGATORS)("aside provider — %s navigates a READ, and only a READ", (NAVIGATOR) => {
+  const code = codeOnly(resolve(SRC, NAVIGATOR));
+
+  it("the whole vocabulary is three interactions: two fills and one click", () => {
+    expect(code.split(".fill(").length - 1, "fill sites").toBe(2);
+    expect(code.split(".click(").length - 1, "click sites").toBe(1);
+  });
+
+  it("every interaction sits on a handle that was counted first", () => {
+    // Aside's locators run with Playwright strict mode OFF (export discovery G-2): two matches means the
+    // first is acted on, silently. So no locator here is ever acted on directly.
+    for (const line of code.split("\n").filter((l) => l.includes(".fill(") || l.includes(".click("))) {
+      expect(line, line.trim()).toMatch(/\b(from|to|search)\b/);
+    }
+    // And the counting is really there: both locators are counted, and the exactness is asserted.
+    expect(code).toContain("await dates.count()");
+    expect(code).toContain("await search.count()");
+    expect(code).toContain("RANGE_CONTROLS_AMBIGUOUS");
+  });
+
+  it("writes nothing to the seller's store — no reply, no state change, no submission", () => {
+    for (const token of ["submit", "reply", "답글", "답변", "delete", "삭제", "수정", "저장", "등록",
+      "hide", "report", "신고"]) {
+      expect(code.toLowerCase(), `${NAVIGATOR} names ${token}`).not.toContain(token.toLowerCase());
+    }
+  });
+
+  it("proves the screen moved before it reads — the fields are an intention, the census is the screen", () => {
+    const verify = code.indexOf("RANGE_MISMATCH");
+    const read = code.indexOf("plan.readerScript");
+    expect(verify).toBeGreaterThan(0);
+    expect(read).toBeGreaterThan(0);
+    // The verification is written before the read, and the read is unreachable without passing it.
+    expect(verify).toBeLessThan(read);
+  });
+
+  it("decides which field is the from from the page's own values, never from DOM order", () => {
+    expect(code).toContain("RANGE_ORDER_UNKNOWN");
+    expect(code).toContain("inputValue()");
   });
 });
 
@@ -229,9 +287,17 @@ describe.each(EVALUATE_FORWARDERS)("aside provider — the evaluate forwarder %s
   });
 
   it("cannot turn a page: no click, no pager, no second navigation", () => {
-    for (const token of [".click(", ".fill(", ".press(", ".goto(", ".type(", "setInputFiles", "waitForEvent",
-      "nextPage", "pager"]) {
+    const navigator = (READ_NAVIGATORS as readonly string[]).includes(EVALUATE_FORWARDER);
+    // Never, in any forwarder: a key press, a second navigation, a typed character, a file, a download, a
+    // pager. These are the ways a read becomes something else.
+    for (const token of [".press(", ".goto(", ".type(", "setInputFiles", "waitForEvent", "nextPage", "pager",
+      ".selectOption(", ".check(", ".setChecked(", ".dblclick(", ".tap(", ".dragTo(", ".uncheck("]) {
       expect(code, `${EVALUATE_FORWARDER} contains ${token}`).not.toContain(token);
+    }
+    if (!navigator) {
+      for (const token of [".click(", ".fill("]) {
+        expect(code, `${EVALUATE_FORWARDER} contains ${token}`).not.toContain(token);
+      }
     }
   });
 
