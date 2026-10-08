@@ -14,24 +14,31 @@
  *
  * <h2>READ navigation, and the whole of it</h2>
  *
- * Three interactions exist here and no fourth is reachable:
+ * Four interactions exist here and no fifth is reachable:
  *
- *  1. put a date in the period's **from** field,
- *  2. put a date in its **to** field,
- *  3. press the list's own 조회/검색.
+ *  1. open the calendar bound to the period's **from** field, and choose a day on it,
+ *  2. the same for its **to** field,
+ *  3. step the open calendar one month at a time,
+ *  4. press the list's own 조회/검색.
  *
  * That is navigation of a read — the same thing a seller does with their own hands to look at last month. It
- * is not a mutation: no reply is written, no review's state is changed, nothing is submitted, nothing is
- * deleted, no row-level control is touched, and no button the plan did not name is pressed. `aside-guard`
- * holds this file to `fill` and `click` on count-guarded handles and to a bounded number of sites, so a fourth
- * interaction cannot be added without that test failing.
+ * is not a mutation: nothing is written to a review, no review's state is changed, nothing is sent, nothing is
+ * removed, no row-level control is touched, and no control the page's own predicate did not name is pressed.
+ * `aside-guard` holds this file to `click` on count-guarded handles and to a bounded number of sites, so a
+ * fifth interaction cannot be added without that test failing.
+ *
+ * <p>**There is no `fill` here any more, and that is a finding rather than a tidy-up.** The period's two
+ * fields are `input[type=text]` with `readOnly = true`, inside the Seller Center's own range-picker component.
+ * The first live catch-up typed into them and stopped at `RANGE_NOT_SETTABLE`, correctly. Typing is not a way
+ * into this period; the calendar is the only way in, and so the calendar is what this lane learnt to use.
  *
  * <h2>One judge for «is this a control»</h2>
  *
- * The plan carries two <b>pure-CSS candidate sets</b> and the page script
- * ({@code buildNaverReviewControlsScript}) is the only thing that decides which candidates are controls a
- * person could use — visible, enabled, and carrying the right meaning. It answers in indices into those same
- * candidate sets, in document order, and this file acts on exactly those indices.
+ * The plan carries <b>pure-CSS candidate sets</b> and the page scripts
+ * ({@code buildNaverReviewControlsScript}, {@code buildNaverReviewPickerScript}) are the only things that
+ * decide which candidates are controls a person could use — visible, enabled, and carrying the right meaning.
+ * They answer in indices into those same candidate sets, in document order, and this file acts on exactly
+ * those indices.
  *
  * <p>That split is the lesson of 2026-10-08, not a refactor. The selectors then carried
  * `:visible:not([disabled])` while the page script made the same judgement again; Aside hands a selector to
@@ -39,14 +46,23 @@
  * gate. The syntax was the shallow half. The deep half is that one fact had two judges, and the one that ran
  * first had no test behind it.
  *
- * <h2>Fail closed on identification — four gates before a key is pressed</h2>
+ * <h2>Why the census is read again before every press</h2>
  *
- * Typing a date into the wrong page is the one mistake no later check can undo: the verification would then be
+ * An index is only true for the document that produced it, and **opening a calendar adds controls to the
+ * document**: the component is not in the page at all until its opener is pressed. So an opener index taken
+ * before the first calendar opened is not the opener index afterwards. Every press here is made against a
+ * census taken immediately before it, and each of those censuses re-asserts the gates — two date controls,
+ * one 조회 — rather than trusting the first one. A stale index is how «press the control the page accepted»
+ * silently becomes «press whatever is now in that position».
+ *
+ * <h2>Fail closed on identification — the gates, in order</h2>
+ *
+ * Choosing a day on the wrong page is the one mistake no later check can undo: the verification would then be
  * reading some other screen's inputs and agreeing with itself. So, in order:
  *
  *  1. **the surface** — the published host and hash, and a drawn grid. Anything else is `SURFACE_UNEXPECTED`.
  *  2. **the sign-in wall** — asked before anything, as everywhere else. A signed-out browser is a stop, never
- *     a thing to type into.
+ *     a thing to act on.
  *  3. **exactly two date controls and exactly one 조회** — as the page script accepted them. Zero, one or
  *     three dates is `RANGE_CONTROLS_NOT_FOUND` / `RANGE_CONTROLS_AMBIGUOUS` with the count it looked
  *     through; the query control has its own two codes. A candidate set this runtime could not even look
@@ -55,14 +71,31 @@
  *     were the same word. Never «take the first two».
  *  4. **which field is the from** — read from the values the page ARRIVED with. The list opens on its own
  *     default period, so the two fields already say which of them holds the earlier date. If their current
- *     values do not establish that order, this stops: a range typed into reversed fields reads as a valid
+ *     values do not establish that order, this stops: a range set into reversed fields reads as a valid
  *     range to every check that only looks at the two dates, and shows the seller's store an empty week.
+ *  5. **one opener, structurally bound to that field** — the smallest group holding that one date control and
+ *     exactly one pressable thing. Zero or several is a stop with the count.
+ *  6. **a day view, agreed by three independent facts** — a `YYYY.MM` title, seven weekday headings, and a
+ *     full grid of day cells. The probe that declared this calendar unusable had climbed from the readonly
+ *     input to the input's own 190x34 wrapper and counted another view's template there; requiring all three
+ *     is what makes that particular wrong answer impossible to reach.
+ *  7. **one month step, and proof that it stepped** — identification narrows the field; the re-read of the
+ *     title is what holds. There is no accessible label on this calendar's arrows (they are `<button>`s whose
+ *     only child is an `aria-hidden` `<i>` with no text, no `title`, no `aria-label`), so a step is
+ *     identified by two markers that must agree — an icon naming a single step, and a handler that moves
+ *     inside the view already shown — and then the month must have moved by exactly one, in the direction
+ *     asked for, or the read stops where it stands.
+ *  8. **one selectable cell for the day asked for** — among the cells the page accepted as days of the month
+ *     on show. `past` / `future` / `disabled` are the component's own words, and they are the whole reason a
+ *     cell is never chosen by the number printed on it: a September page prints 「3」 twice.
  *
  * <h2>And then it proves the screen moved</h2>
  *
- * After the search, the census runs again and the period on screen must be **the period that was asked for**,
- * to the day. Not «we filled the fields» — the fields are an intention; the census is the screen. A different
- * period, or an unreadable one, means nothing is read and nothing is delivered.
+ * Each field is checked against the day that was asked for as soon as its calendar closes — a calendar that
+ * did not take the day is `RANGE_NOT_SETTABLE` there and then. After the search, the census runs again and the
+ * period on screen must be **the period that was asked for**, to the day. Not «we set the fields» — the
+ * fields are an intention; the census is the screen. A different period, or an unreadable one, means nothing
+ * is read and nothing is delivered.
  *
  * <p>No closure. Serialized with {@code Function.prototype.toString}; nothing here may reference an import or
  * a module-level identifier.
@@ -71,7 +104,6 @@
 export interface NaverWindowLocatorLike {
   count(): Promise<number>;
   nth(index: number): NaverWindowLocatorLike;
-  fill(value: string): Promise<void>;
   click(): Promise<void>;
   inputValue(): Promise<string>;
 }
@@ -88,6 +120,13 @@ export interface NaverWindowRuntimeEnv {
   wait(ms: number): Promise<void>;
 }
 
+/** A KST civil day, as the calendar on screen draws it. */
+export interface NaverWindowDay {
+  year: number;
+  month: number;
+  day: number;
+}
+
 export interface NaverReviewWindowRuntimePlan {
   entryUrl: string;
   /** Forwarded page scripts, authored in `src/naver/`. This file composes none of them. */
@@ -95,23 +134,31 @@ export interface NaverReviewWindowRuntimePlan {
   authScript: string;
   readerScript: string;
   rangeScript: string;
+  /** The open calendar, read as structure: which cells are days of the month on show, and where the steps are. */
+  pickerScript: string;
   /** The pure-CSS candidate set the controls script walked for date controls. Decides nothing on its own. */
   dateInputSelector: string;
-  /** The pure-CSS candidate set it walked for the 조회/검색 control. */
+  /** The pure-CSS candidate set it walked for everything pressable — the 조회, the openers, the month steps. */
   queryControlSelector: string;
-  /** The period asked for: what to type, and the two day offsets the screen must then show. */
-  requestedStartValue: string;
-  requestedEndValue: string;
+  /** The pure-CSS candidate set the picker script walked for day cells. */
+  dayCellSelector: string;
+  /** The period asked for: the two days to choose, and the two offsets the screen must then show. */
+  requestedStart: NaverWindowDay;
+  requestedEnd: NaverWindowDay;
   requestedStartDaysBefore: number;
   requestedEndDaysBefore: number;
+  /** How many single-month steps one field may take before the read gives up. */
+  maxMonthMoves: number;
   settleTimeoutMs: number;
   pollMs: number;
+  /** How long a calendar may take to draw or redraw before it is read. */
+  pickerSettleMs: number;
   /** How long the list may take to redraw after the search before the census is asked. */
   searchSettleMs: number;
 }
 
 export type NaverWindowRuntimeResult =
-  | { ok: true; reading: unknown; range: unknown; elapsedMs: number }
+  | { ok: true; reading: unknown; range: unknown; monthMoves: number; elapsedMs: number }
   | {
       ok: false;
       code:
@@ -123,11 +170,20 @@ export type NaverWindowRuntimeResult =
         | "QUERY_CONTROL_NOT_FOUND"
         | "QUERY_CONTROL_AMBIGUOUS"
         | "RANGE_ORDER_UNKNOWN"
+        | "CALENDAR_OPENER_NOT_FOUND"
+        | "CALENDAR_OPENER_AMBIGUOUS"
+        | "PICKER_VIEW_UNREADABLE"
+        | "MONTH_NAV_NOT_FOUND"
+        | "MONTH_NAV_AMBIGUOUS"
+        | "MONTH_NAV_UNVERIFIED"
+        | "MONTH_NAV_EXHAUSTED"
+        | "DAY_CELL_NOT_FOUND"
+        | "DAY_CELL_AMBIGUOUS"
         | "RANGE_NOT_SETTABLE"
         | "RANGE_MISMATCH"
         | "READ_UNSETTLED"
         | "RUNTIME_FAULT";
-      stage: "PREPARE" | "SURFACE" | "AUTH" | "CONTROLS" | "NAVIGATE" | "VERIFY" | "READ";
+      stage: "PREPARE" | "SURFACE" | "AUTH" | "CONTROLS" | "PICK_START" | "PICK_END" | "NAVIGATE" | "VERIFY" | "READ";
       /** How many candidates were found, when the stop was about a count. */
       candidates: number | null;
       /**
@@ -138,6 +194,8 @@ export type NaverWindowRuntimeResult =
        * list does not print 조회 any more.
        */
       labelled: number | null;
+      /** How many month steps had been taken when it stopped — audit, and the bound's own witness. */
+      monthMoves: number;
       elapsedMs: number;
     };
 
@@ -147,6 +205,7 @@ export async function asideNaverReviewWindowRuntime(
 ): Promise<NaverWindowRuntimeResult> {
   const startedAt = Date.now();
   const elapsed = () => Date.now() - startedAt;
+  let monthMoves = 0;
   const fail = (
     code: Extract<NaverWindowRuntimeResult, { ok: false }>["code"],
     stage: Extract<NaverWindowRuntimeResult, { ok: false }>["stage"],
@@ -158,6 +217,7 @@ export async function asideNaverReviewWindowRuntime(
     stage,
     candidates: typeof candidates === "number" ? candidates : null,
     labelled: typeof labelled === "number" ? labelled : null,
+    monthMoves,
     elapsedMs: elapsed(),
   });
 
@@ -176,23 +236,96 @@ export async function asideNaverReviewWindowRuntime(
       }
     }
 
-    // 1. THE SURFACE. The published route, and a grid that is drawn.
-    let surface: unknown;
-    try {
-      surface = await tab.evaluate(plan.controlsScript);
-    } catch (e) {
-      return fail("RUNTIME_FAULT", "SURFACE");
-    }
-    const s = (surface ?? {}) as {
-      route?: unknown; grid?: unknown;
-      dateCandidates?: unknown; dateAccepted?: unknown; dateFormFound?: unknown;
-      queryCandidates?: unknown; queryLabelled?: unknown; queryAccepted?: unknown;
+    type Census = {
+      dateAccepted: number[];
+      queryAccepted: number[];
+      openers: { dateIndex: number; openerIndex: number; openerCandidates: number }[];
     };
-    if (s.route !== true) {
-      return fail("SURFACE_UNEXPECTED", "SURFACE");
-    }
 
-    // 2. THE SIGN-IN WALL. Before the controls, because a signed-out page can draw anything.
+    // Read the census and re-assert every gate. Called again before each press, because an index belongs to
+    // the document that produced it and an open calendar is a different document.
+    const readCensus = async (
+      stage: Extract<NaverWindowRuntimeResult, { ok: false }>["stage"],
+      requireGrid: boolean,
+    ): Promise<{ ok: true; census: Census } | { ok: false; result: NaverWindowRuntimeResult }> => {
+      let raw: unknown;
+      try {
+        raw = await tab.evaluate(plan.controlsScript);
+      } catch (e) {
+        return { ok: false, result: fail("RUNTIME_FAULT", stage) };
+      }
+      const s = (raw ?? {}) as {
+        route?: unknown; grid?: unknown;
+        dateCandidates?: unknown; dateAccepted?: unknown;
+        queryLabelled?: unknown; queryAccepted?: unknown; openers?: unknown;
+      };
+      if (s.route !== true) {
+        return { ok: false, result: fail("SURFACE_UNEXPECTED", "SURFACE") };
+      }
+      if (requireGrid && (typeof s.grid !== "number" || s.grid <= 0)) {
+        return {
+          ok: false,
+          result: fail("SURFACE_UNEXPECTED", "SURFACE", typeof s.grid === "number" ? s.grid : undefined),
+        };
+      }
+      const dateAccepted = s.dateAccepted;
+      const queryAccepted = s.queryAccepted;
+      if (!Array.isArray(dateAccepted) || !Array.isArray(queryAccepted)) {
+        return {
+          ok: false,
+          result: fail("DATE_CONTROL_CANDIDATES_UNREADABLE", "CONTROLS",
+            typeof s.dateCandidates === "number" ? s.dateCandidates : undefined),
+        };
+      }
+      if (dateAccepted.length < 2) {
+        return { ok: false, result: fail("RANGE_CONTROLS_NOT_FOUND", "CONTROLS", dateAccepted.length) };
+      }
+      if (dateAccepted.length > 2) {
+        return { ok: false, result: fail("RANGE_CONTROLS_AMBIGUOUS", "CONTROLS", dateAccepted.length) };
+      }
+      if (queryAccepted.length === 0) {
+        // `labelled` says which test excluded them: «two carried the word, none was in the period's form» and
+        // «nothing on the page says 조회» send the next person to different halves of the problem.
+        return {
+          ok: false,
+          result: fail("QUERY_CONTROL_NOT_FOUND", "CONTROLS", 0,
+            typeof s.queryLabelled === "number" ? s.queryLabelled : undefined),
+        };
+      }
+      if (queryAccepted.length > 1) {
+        return {
+          ok: false,
+          result: fail("QUERY_CONTROL_AMBIGUOUS", "CONTROLS", queryAccepted.length,
+            typeof s.queryLabelled === "number" ? s.queryLabelled : undefined),
+        };
+      }
+      const openers: Census["openers"] = [];
+      if (Array.isArray(s.openers)) {
+        for (const entry of s.openers as unknown[]) {
+          const o = (entry ?? {}) as { dateIndex?: unknown; openerIndex?: unknown; openerCandidates?: unknown };
+          openers.push({
+            dateIndex: typeof o.dateIndex === "number" ? o.dateIndex : -1,
+            openerIndex: typeof o.openerIndex === "number" ? o.openerIndex : -1,
+            openerCandidates: typeof o.openerCandidates === "number" ? o.openerCandidates : 0,
+          });
+        }
+      }
+      return {
+        ok: true,
+        census: {
+          dateAccepted: dateAccepted.map((v) => Number(v)),
+          queryAccepted: queryAccepted.map((v) => Number(v)),
+          openers,
+        },
+      };
+    };
+
+    // 1 & 2. THE SURFACE AND THE SIGN-IN WALL. The wall is asked between them, because a signed-out page can
+    // draw anything at all — including something that looks like a grid.
+    const firstPass = await readCensus("SURFACE", false);
+    if (!firstPass.ok) {
+      return firstPass.result;
+    }
     let auth: unknown;
     try {
       auth = await tab.evaluate(plan.authScript);
@@ -202,46 +335,22 @@ export async function asideNaverReviewWindowRuntime(
     if (!auth || typeof auth !== "object" || (auth as { signedIn?: unknown }).signedIn !== true) {
       return fail("AUTH_REQUIRED", "AUTH");
     }
-    if (typeof s.grid !== "number" || s.grid <= 0) {
-      // Signed in, the right route, and no rows drawn: the screen this would act on is not the one it expects.
-      return fail("SURFACE_UNEXPECTED", "SURFACE", typeof s.grid === "number" ? s.grid : undefined);
+
+    // 3. THE GATES, with the grid required this time.
+    const gated = await readCensus("CONTROLS", true);
+    if (!gated.ok) {
+      return gated.result;
     }
 
-    // 3. EXACTLY TWO DATE CONTROLS AND EXACTLY ONE 조회 — as the page's own predicate accepted them.
-    //
-    // A candidate set the script could not even look through (`null`) is its own stop: a selector that is not
-    // a selector and a browser that went away are different problems, and until 2026-10-08 they shared a word.
-    const dateAccepted = s.dateAccepted;
-    const queryAccepted = s.queryAccepted;
-    if (!Array.isArray(dateAccepted) || !Array.isArray(queryAccepted)) {
-      return fail("DATE_CONTROL_CANDIDATES_UNREADABLE", "CONTROLS",
-        typeof s.dateCandidates === "number" ? s.dateCandidates : undefined);
-    }
-    if (dateAccepted.length < 2) {
-      return fail("RANGE_CONTROLS_NOT_FOUND", "CONTROLS", dateAccepted.length);
-    }
-    if (dateAccepted.length > 2) {
-      return fail("RANGE_CONTROLS_AMBIGUOUS", "CONTROLS", dateAccepted.length);
-    }
-    if (queryAccepted.length === 0) {
-      // `labelled` says which test excluded them: «two carried the word, none was in the period's form» and
-      // «nothing on the page says 조회» send the next person to different halves of the problem.
-      return fail("QUERY_CONTROL_NOT_FOUND", "CONTROLS", 0,
-        typeof s.queryLabelled === "number" ? s.queryLabelled : undefined);
-    }
-    if (queryAccepted.length > 1) {
-      return fail("QUERY_CONTROL_AMBIGUOUS", "CONTROLS", queryAccepted.length,
-        typeof s.queryLabelled === "number" ? s.queryLabelled : undefined);
-    }
-
-    // The handles are the accepted indices, in the candidate set's own document order — which is the order a
-    // locator enumerates. Neither side re-decides what a control is.
     const dates = tab.locator(plan.dateInputSelector);
-    const search = tab.locator(plan.queryControlSelector).nth(Number(queryAccepted[0]));
+    const press = tab.locator(plan.queryControlSelector);
+    const cells = tab.locator(plan.dayCellSelector);
 
     // 4. WHICH ONE IS THE FROM. Read off the default period the page arrived with, never assumed from DOM order.
-    const first = dates.nth(Number(dateAccepted[0]));
-    const second = dates.nth(Number(dateAccepted[1]));
+    const firstIndex = Number(gated.census.dateAccepted[0]);
+    const secondIndex = Number(gated.census.dateAccepted[1]);
+    const first = dates.nth(firstIndex);
+    const second = dates.nth(secondIndex);
     let firstWas = "";
     let secondWas = "";
     try {
@@ -255,29 +364,184 @@ export async function asideNaverReviewWindowRuntime(
     if (firstDay === null || secondDay === null || firstDay === secondDay) {
       return fail("RANGE_ORDER_UNKNOWN", "CONTROLS");
     }
-    const from = firstDay < secondDay ? first : second;
-    const to = firstDay < secondDay ? second : first;
+    const earlierIsFirst = firstDay < secondDay;
+    const fromIndex = earlierIsFirst ? firstIndex : secondIndex;
+    const toIndex = earlierIsFirst ? secondIndex : firstIndex;
 
-    // NAVIGATE — the three interactions, and nothing else.
-    try {
-      await from.fill(plan.requestedStartValue);
-      await to.fill(plan.requestedEndValue);
-    } catch (e) {
-      // A calendar-backed field that refuses to be typed into is a real limit of this surface. It is not a
-      // reason to start clicking a date picker: that is «any button», which this lane does not have.
-      return fail("RANGE_NOT_SETTABLE", "NAVIGATE");
+    type SideState = {
+      open: boolean;
+      year: number | null;
+      month: number | null;
+      prev: number[];
+      next: number[];
+      days: [number, number][];
+    };
+
+    const readSide = async (dateIndex: number): Promise<SideState | null> => {
+      let raw: unknown;
+      try {
+        raw = await tab.evaluate(plan.pickerScript);
+      } catch (e) {
+        return null;
+      }
+      const r = (raw ?? {}) as { readable?: unknown; sides?: unknown };
+      if (r.readable !== true || !Array.isArray(r.sides)) {
+        return null;
+      }
+      for (const entry of r.sides as unknown[]) {
+        const s = (entry ?? {}) as {
+          dateIndex?: unknown; open?: unknown; year?: unknown; month?: unknown;
+          prev?: unknown; next?: unknown; days?: unknown;
+        };
+        if (typeof s.dateIndex !== "number" || s.dateIndex !== dateIndex) {
+          continue;
+        }
+        const days: [number, number][] = [];
+        if (Array.isArray(s.days)) {
+          for (const pair of s.days as unknown[]) {
+            if (Array.isArray(pair) && typeof pair[0] === "number" && typeof pair[1] === "number") {
+              days.push([pair[0], pair[1]]);
+            }
+          }
+        }
+        return {
+          open: s.open === true,
+          year: typeof s.year === "number" ? s.year : null,
+          month: typeof s.month === "number" ? s.month : null,
+          prev: Array.isArray(s.prev) ? (s.prev as unknown[]).map((v) => Number(v)) : [],
+          next: Array.isArray(s.next) ? (s.next as unknown[]).map((v) => Number(v)) : [],
+          days,
+        };
+      }
+      return null;
+    };
+
+    // 5 … 8 for one field: open its calendar, step to the month, choose the day, prove the field took it.
+    const pickDay = async (
+      dateIndex: number,
+      field: NaverWindowLocatorLike,
+      want: NaverWindowDay,
+      stage: "PICK_START" | "PICK_END",
+    ): Promise<NaverWindowRuntimeResult | null> => {
+      // The census is read HERE, not reused: the other field's calendar may have come and gone since, and
+      // every control it added or took away shifted the positions this press is about to use.
+      const fresh = await readCensus(stage, true);
+      if (!fresh.ok) {
+        return fresh.result;
+      }
+      let bound: { dateIndex: number; openerIndex: number; openerCandidates: number } | null = null;
+      for (const entry of fresh.census.openers) {
+        if (entry.dateIndex === dateIndex) {
+          bound = entry;
+        }
+      }
+      if (bound === null || bound.openerCandidates === 0) {
+        return fail("CALENDAR_OPENER_NOT_FOUND", stage, bound === null ? 0 : bound.openerCandidates);
+      }
+      if (bound.openerIndex < 0) {
+        return fail("CALENDAR_OPENER_AMBIGUOUS", stage, bound.openerCandidates);
+      }
+      const opener = press.nth(bound.openerIndex);
+      try {
+        await opener.click();
+      } catch (e) {
+        return fail("RUNTIME_FAULT", stage);
+      }
+      await env.wait(plan.pickerSettleMs);
+
+      let state = await readSide(dateIndex);
+      if (state === null || !state.open || state.year === null || state.month === null) {
+        return fail("PICKER_VIEW_UNREADABLE", stage);
+      }
+
+      const wantMonths = want.year * 12 + want.month;
+      // The bound is PER FIELD. Both calendars open on the list's current month, so a period a year back needs
+      // about twelve steps on each of them; a shared allowance would stop the second field halfway for no
+      // reason but the first one's distance. `monthMoves` still counts the whole read, for the audit.
+      let moves = 0;
+      for (;;) {
+        const haveMonths = state.year * 12 + state.month;
+        if (haveMonths === wantMonths) {
+          break;
+        }
+        if (moves >= plan.maxMonthMoves) {
+          return fail("MONTH_NAV_EXHAUSTED", stage, moves);
+        }
+        const back = haveMonths > wantMonths;
+        const steps = back ? state.prev : state.next;
+        if (steps.length === 0) {
+          return fail("MONTH_NAV_NOT_FOUND", stage, 0);
+        }
+        if (steps.length > 1) {
+          return fail("MONTH_NAV_AMBIGUOUS", stage, steps.length);
+        }
+        const step = press.nth(Number(steps[0]));
+        try {
+          await step.click();
+        } catch (e) {
+          return fail("RUNTIME_FAULT", stage);
+        }
+        moves += 1;
+        monthMoves += 1;
+        await env.wait(plan.pickerSettleMs);
+        state = await readSide(dateIndex);
+        if (state === null || !state.open || state.year === null || state.month === null) {
+          return fail("PICKER_VIEW_UNREADABLE", stage);
+        }
+        // The identification narrowed the field to one control; THIS is what holds. One month, in the
+        // direction asked for — anything else and the arrow was not the arrow we thought it was.
+        if (state.year * 12 + state.month - haveMonths !== (back ? -1 : 1)) {
+          return fail("MONTH_NAV_UNVERIFIED", stage, moves);
+        }
+      }
+
+      const matching: number[] = [];
+      for (const pair of state.days) {
+        if (pair[1] === want.day) {
+          matching.push(pair[0]);
+        }
+      }
+      if (matching.length === 0) {
+        return fail("DAY_CELL_NOT_FOUND", stage, state.days.length);
+      }
+      if (matching.length > 1) {
+        return fail("DAY_CELL_AMBIGUOUS", stage, matching.length);
+      }
+      const cell = cells.nth(Number(matching[0]));
+      try {
+        await cell.click();
+      } catch (e) {
+        return fail("RUNTIME_FAULT", stage);
+      }
+      await env.wait(plan.pickerSettleMs);
+
+      let took = "";
+      try {
+        took = await field.inputValue();
+      } catch (e) {
+        return fail("RUNTIME_FAULT", stage);
+      }
+      if (dayNumber(took) !== want.year * 10000 + want.month * 100 + want.day) {
+        return fail("RANGE_NOT_SETTABLE", stage);
+      }
+      return null;
+    };
+
+    const startStop = await pickDay(fromIndex, dates.nth(fromIndex), plan.requestedStart, "PICK_START");
+    if (startStop !== null) {
+      return startStop;
     }
-    let fromNow = "";
-    let toNow = "";
-    try {
-      fromNow = await from.inputValue();
-      toNow = await to.inputValue();
-    } catch (e) {
-      return fail("RUNTIME_FAULT", "NAVIGATE");
+    const endStop = await pickDay(toIndex, dates.nth(toIndex), plan.requestedEnd, "PICK_END");
+    if (endStop !== null) {
+      return endStop;
     }
-    if (dayNumber(fromNow) === null || dayNumber(toNow) === null) {
-      return fail("RANGE_NOT_SETTABLE", "NAVIGATE");
+
+    // NAVIGATE — the search, on an index read after both calendars are done with.
+    const ready = await readCensus("NAVIGATE", true);
+    if (!ready.ok) {
+      return ready.result;
     }
+    const search = press.nth(Number(ready.census.queryAccepted[0]));
     try {
       await search.click();
     } catch (e) {
@@ -322,7 +586,7 @@ export async function asideNaverReviewWindowRuntime(
       }
       await env.wait(plan.pollMs);
     }
-    return { ok: true, reading: settled, range, elapsedMs: elapsed() };
+    return { ok: true, reading: settled, range, monthMoves, elapsedMs: elapsed() };
   } finally {
     try {
       await env.closeTab(tab);

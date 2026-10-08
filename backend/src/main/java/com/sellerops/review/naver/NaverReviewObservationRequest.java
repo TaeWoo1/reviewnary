@@ -24,14 +24,34 @@ import java.util.List;
  * @param windowEnd   last day of it
  * @param rowCapacity the ceiling that reading was under — the backend compares the row count against it rather
  *                    than trusting a «complete» flag, so saturation is judged where the comparison can be checked
+ *
+ * <p><b>And what the screen itself said.</b> {@code rowCapacity} was carrying two facts at once: our ceiling,
+ * and an assumption that the list was showing 500 rows per page. {@code rows < capacity} was then read as «the
+ * whole period was seen», which it never proved — a list set to 50 per page and holding 300 reviews satisfies
+ * it and has shown the reader a sixth of the period. So the list's printed total ({@code labelledTotal}) and
+ * the page size it was set to ({@code selectedPageSize}) arrive as numbers, {@code gridReadMode} says how the
+ * rows were obtained, and {@code monthMoves} records how many calendar steps reaching the period took. All
+ * four are optional and all four are evidence: the verdict is taken here, where it can be re-checked.
+ *
+ * @param labelledTotal    the total the list printed for the period, or null when it did not state one
+ * @param selectedPageSize the page size the list was set to, read and never changed
+ * @param gridReadMode     {@code MODEL} when the rows came from the grid's own row model
+ * @param monthMoves       single-month calendar steps taken to reach the period
  */
 @JsonIgnoreProperties(ignoreUnknown = false)
 public record NaverReviewObservationRequest(List<Review> reviews, Integer windowDays, String windowStart,
-                                            String windowEnd, Integer rowCapacity) {
+                                            String windowEnd, Integer rowCapacity, Integer labelledTotal,
+                                            Integer selectedPageSize, String gridReadMode, Integer monthMoves) {
 
     /** The shape before the period and the ceiling existed. */
     public NaverReviewObservationRequest(List<Review> reviews, Integer windowDays) {
         this(reviews, windowDays, null, null, null);
+    }
+
+    /** The shape before the screen's own total and page size were read. */
+    public NaverReviewObservationRequest(List<Review> reviews, Integer windowDays, String windowStart,
+                                         String windowEnd, Integer rowCapacity) {
+        this(reviews, windowDays, windowStart, windowEnd, rowCapacity, null, null, null, null);
     }
 
     /**

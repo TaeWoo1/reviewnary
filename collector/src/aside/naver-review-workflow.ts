@@ -43,9 +43,34 @@ export const NAVER_REVIEW_DATE_INPUT_SELECTOR =
 /**
  * Everything a person could press. Broad on purpose: the narrowing is 조회/검색 as a whole label, and that is
  * a judgement about text, which belongs in the page and not in a selector.
+ *
+ * <p>The same set carries the calendar's controls — the opener bound to each date field and the two
+ * single-month steps — so one candidate set serves every press this lane makes, and the page's own predicate
+ * is the only thing that tells them apart.
  */
 export const NAVER_REVIEW_QUERY_CONTROL_SELECTOR =
   'button, a, input[type="button"], input[type="submit"]';
+
+/**
+ * **The day cells a calendar could be made of — table cells, and that is the whole of it.**
+ *
+ * The 리뷰 list itself is an ag-Grid built from `div`s, so a `td` on this route belongs to a calendar and not
+ * to the seller's rows. Which of these cells is a selectable day of the month on show is judged in the page
+ * ({@code buildNaverReviewPickerScript}) against the component's own class words — `past` / `future` for the
+ * neighbouring months' filler days, `disabled` for «not selectable». Never by the number printed on it: a
+ * September page prints 「3」 twice, and the second one is October.
+ */
+export const NAVER_REVIEW_DAY_CELL_SELECTOR = 'td';
+
+/**
+ * How many single-month steps a historical read may take before it gives up.
+ *
+ * <p>Thirteen covers the 365 days {@code buildNaverReviewWindowRuntimePlan} already accepts, with a step to
+ * spare for a calendar that opens on some other month. It is a bound, not a budget: every step is checked
+ * against the title afterwards, so a step that does not move the month by exactly one stops the read on the
+ * spot instead of spending the allowance.
+ */
+export const NAVER_REVIEW_MAX_MONTH_MOVES = 13;
 
 export const NAVER_REVIEW_READ_WORKFLOW: NaverReviewWorkflow = Object.freeze({
   id: "naver-seller-center-review-read",

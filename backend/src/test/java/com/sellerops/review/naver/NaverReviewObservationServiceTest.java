@@ -114,12 +114,24 @@ class NaverReviewObservationServiceTest {
         return new NaverReviewObservationRequest(List.of(rows), 7);
     }
 
-    /** A window ending today, as the helper states it — KST days, the same zone the service judges in. */
+    /**
+     * A window ending today, as the helper states it — KST days, the same zone the service judges in, and the
+     * evidence the screen itself stated: its printed total, its chosen page size, and that the rows came from
+     * the grid's own row model. Without those a window is PARTIAL however few rows it carried, which is the
+     * whole point of them.
+     */
     private static NaverReviewObservationRequest windowed(int days, Integer capacity,
+                                                          NaverReviewObservationRequest.Review... rows) {
+        return windowed(days, capacity, rows.length, 500, "MODEL", rows);
+    }
+
+    private static NaverReviewObservationRequest windowed(int days, Integer capacity, Integer labelledTotal,
+                                                          Integer pageSize, String mode,
                                                           NaverReviewObservationRequest.Review... rows) {
         java.time.LocalDate end = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
         return new NaverReviewObservationRequest(List.of(rows), days,
-                end.minusDays(days - 1L).toString(), end.toString(), capacity);
+                end.minusDays(days - 1L).toString(), end.toString(), capacity,
+                labelledTotal, pageSize, mode, 0);
     }
 
     private void provedStore() {
@@ -220,6 +232,41 @@ class NaverReviewObservationServiceTest {
         assertThat(job.getObservedCapacity()).isEqualTo(500);
         assertThat(job.getDeliveryCompleteness())
                 .isEqualTo(com.sellerops.responsibility.SourceCompleteness.COMPLETE);
+        // The evidence it was judged on is kept beside the verdict, so a later reader can re-check it instead
+        // of believing it.
+        assertThat(job.getLabelledTotal()).isEqualTo(1);
+        assertThat(job.getSelectedPageSize()).isEqualTo(500);
+        assertThat(job.getGridReadMode()).isEqualTo("MODEL");
+        assertThat(job.getCompletenessReason()).isEqualTo("WHOLE_PERIOD_READ");
+    }
+
+    @Test
+    @DisplayName("a window whose screen total disagrees with what arrived stores its rows and stays PARTIAL")
+    void aDisagreeingTotalStoresRowsAndMovesNoBoundary() {
+        provedStore();
+        // The list printed 「총 46개」 and 1 row arrived. The rows are real and they stay; what cannot be said is
+        // that this period was read whole. The old rule — 1 row under a ceiling of 500 — said it could.
+        service.deliver(ORG, DEVICE, JOB, windowed(7, 500, 46, 500, "MODEL", row("5066448224", "1234567890")));
+
+        assertThat(job.getInsertedCount()).isEqualTo(1);
+        assertThat(job.getDeliveryCompleteness())
+                .isEqualTo(com.sellerops.responsibility.SourceCompleteness.PARTIAL);
+        assertThat(job.getCompletenessReason()).isEqualTo("TOTAL_DISAGREES");
+    }
+
+    @Test
+    @DisplayName("a total above the page size the list was set to stays PARTIAL — the seller's own UI setting")
+    void aTotalAboveThePageSizeStaysPartial() {
+        provedStore();
+        service.deliver(ORG, DEVICE, JOB, windowed(7, 500, 1, 50, "MODEL", row("5066448224", "1234567890")));
+        assertThat(job.getDeliveryCompleteness())
+                .isEqualTo(com.sellerops.responsibility.SourceCompleteness.COMPLETE);
+
+        // 300 reviews on a list set to 「50개씩」: the screen could not have been showing the period, whatever
+        // the model loaded. The page size is read and never changed.
+        job.setDeliveryCompleteness(null);
+        assertThat(NaverReviewObservationService.incompleteReason(
+                windowed(7, 500, 300, 50, "MODEL"), 300, 500)).isEqualTo("TOTAL_ABOVE_PAGE_SIZE");
     }
 
     @Test

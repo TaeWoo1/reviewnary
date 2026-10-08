@@ -89,12 +89,22 @@ describe("밀린 리뷰를 따라잡는 중", () => {
 });
 
 describe("막힌 자리를 말한다 — 2026-10-08 라이브가 가르친 것", () => {
-  it("기간 선택 영역을 확인하지 못한 일곱 가지가 한 문장으로 모인다", () => {
-    // 판매자가 할 수 있는 일은 일곱 경우 모두 같다: 그 화면을 한 번 열어 기간 영역이 있는지 보는 것.
+  it("기간 선택 영역을 확인하지 못한 아홉 가지가 한 문장으로 모인다", () => {
+    // 판매자가 할 수 있는 일은 아홉 경우 모두 같다: 그 화면을 한 번 열어 기간 영역이 있는지 보는 것.
     for (const code of ["DATE_CONTROL_CANDIDATES_UNREADABLE", "RANGE_CONTROLS_NOT_FOUND",
       "RANGE_CONTROLS_AMBIGUOUS", "QUERY_CONTROL_NOT_FOUND", "QUERY_CONTROL_AMBIGUOUS",
-      "RANGE_ORDER_UNKNOWN", "RANGE_NOT_SETTABLE"]) {
+      "RANGE_ORDER_UNKNOWN", "RANGE_NOT_SETTABLE", "CALENDAR_OPENER_NOT_FOUND",
+      "CALENDAR_OPENER_AMBIGUOUS"]) {
       expect(stopSentence(code), code).toBe("판매자센터 화면에서 기간 선택 영역을 확인하지 못했습니다.");
+    }
+  });
+
+  it("달력을 열고 그 안에서 막힌 일곱 가지는 달력을 가리킨다 — 다음에 볼 자리가 다르다", () => {
+    // 「기간 영역을 못 찾았다」와 「달력에서 날짜를 못 골랐다」는 판매자가 지금 할 일은 비슷하지만, 고치러
+    // 갈 자리가 전혀 다르다. 화면 문장은 그 차이를 말하고, 어느 시험에서 멈췄는지는 기록이 들고 있는다.
+    for (const code of ["PICKER_VIEW_UNREADABLE", "MONTH_NAV_NOT_FOUND", "MONTH_NAV_AMBIGUOUS",
+      "MONTH_NAV_UNVERIFIED", "MONTH_NAV_EXHAUSTED", "DAY_CELL_NOT_FOUND", "DAY_CELL_AMBIGUOUS"]) {
+      expect(stopSentence(code), code).toBe("판매자센터 달력에서 날짜를 고르지 못했습니다.");
     }
   });
 
@@ -105,11 +115,12 @@ describe("막힌 자리를 말한다 — 2026-10-08 라이브가 가르친 것",
   });
 
   it("어느 문장에도 내부 용어가 없다", () => {
-    const said = ["DATE_CONTROL_CANDIDATES_UNREADABLE", "RANGE_MISMATCH", "SURFACE_UNEXPECTED"]
+    const said = ["DATE_CONTROL_CANDIDATES_UNREADABLE", "RANGE_MISMATCH", "SURFACE_UNEXPECTED",
+      "DAY_CELL_AMBIGUOUS", "MONTH_NAV_UNVERIFIED", "CALENDAR_OPENER_AMBIGUOUS"]
       .map((c) => stopSentence(c)!)
       .join(" ");
     for (const term of ["selector", "locator", "candidate", "control", "CSS", "index", "DOM", "range",
-      "window", "SURFACE", "query"]) {
+      "window", "SURFACE", "query", "cell", "picker", "nav", "opener"]) {
       expect(said, term).not.toContain(term);
     }
   });

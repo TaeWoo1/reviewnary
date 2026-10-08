@@ -19,7 +19,10 @@ function run(rowsData: Record<string, unknown>[]) {
     querySelectorAll: () => [{ getAttribute: () => `openReviewDetailModal(${(node.data as { id: number }).id}, 1)` }],
   }));
   const document = {
-    querySelectorAll: (sel: string) => (sel.indexOf("pinned") >= 0 ? [] : rendered),
+    // The reader also reads the two numbers the screen prints — the list's total and its chosen page size.
+    // A fake page answers every selector with a list, as a browser does; this one simply has neither label.
+    querySelectorAll: (sel: string) =>
+      sel.indexOf(".ag-") < 0 ? [] : sel.indexOf("pinned") >= 0 ? [] : rendered,
   };
   const window = {};
   const location = { host: "sell.smartstore.naver.com", hash: "#/review/search" };
