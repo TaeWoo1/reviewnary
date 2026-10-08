@@ -86,6 +86,7 @@ class OperatorCollectNowTest {
     @Autowired HelperDeviceRepository devices;
     @Autowired com.sellerops.reviewimport.ReviewImportSegmentRepository segments;
     @Autowired com.sellerops.reviewimport.ReviewImportPlanRepository plans;
+    @Autowired com.sellerops.coverage.catchup.ReviewCatchUpRunRepository catchUpRuns;
 
     private static final Instant T0 = Instant.parse("2026-10-07T04:00:00Z");
 
@@ -132,7 +133,7 @@ class OperatorCollectNowTest {
         when(pulls.manualSync(any(), any(), any())).thenAnswer(call -> pullRun(call.getArgument(2)));
         service = new CollectNowService(accounts, channels,
                 pulls, new ScreenReadService(dispatcher, helpers, accounts, channels), null,
-                new com.sellerops.coverage.ReviewCoverageCursor(segments, channels, jobs));
+                new com.sellerops.coverage.ReviewCoverageCursor(segments, channels, jobs), catchUpRuns);
     }
 
     @Test
@@ -278,6 +279,54 @@ class OperatorCollectNowTest {
                 .isInstanceOf(ApiException.class);
         assertThat(jobs.count()).isZero();
         verify(pulls, never()).manualSync(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("멈춘 catch-up은 화면이 볼 수 있는 사실이다 — 지난 시도의 결말이 아니라 지금의 의도")
+    void readinessShowsAPausedCatchUp() {
+        // 2026-10-09: 판매자가 로그인했고 「로그인 확인됨」까지 봤는데 아무것도 이어지지 않았다. 이어갈 의도는
+        // 이 row로 남아 있었고 화면이 그걸 볼 길이 없었다 — `localAgent`와 `latestAttemptOutcome`은 둘 다
+        // 지난 시도에 대한 말이고, 로그인한 뒤에도 계속 AUTH_REQUIRED라고 말한다.
+        assertThat(service.readiness(org, naverAccount, "REVIEW").pausedCatchUp())
+                .as("멈춘 의도가 없으면 거짓이다")
+                .isFalse();
+
+        catchUpRuns.save(pausedRun(naverAccount));
+        assertThat(service.readiness(org, naverAccount, "REVIEW").pausedCatchUp())
+                .as("로그인을 기다리는 catch-up이 있으면 참이다")
+                .isTrue();
+        // 다른 자료, 다른 가게의 것을 끌어오지 않는다.
+        assertThat(service.readiness(org, naverAccount, "INQUIRY").pausedCatchUp()).isFalse();
+        assertThat(service.readiness(org, coupangAccount, "REVIEW").pausedCatchUp()).isFalse();
+    }
+
+    @Test
+    @DisplayName("진행 중인 catch-up은 「로그인을 기다린다」가 아니다 — 그 둘은 다음에 할 일이 다르다")
+    void aRunningCatchUpIsNotPaused() {
+        com.sellerops.coverage.catchup.ReviewCatchUpRun run = pausedRun(naverAccount);
+        run.setState(com.sellerops.coverage.catchup.ReviewCatchUpState.RUNNING);
+        run.setPausedWindowStart(null);
+        catchUpRuns.save(run);
+        assertThat(service.readiness(org, naverAccount, "REVIEW").pausedCatchUp()).isFalse();
+    }
+
+    private com.sellerops.coverage.catchup.ReviewCatchUpRun pausedRun(java.util.UUID accountId) {
+        com.sellerops.coverage.catchup.ReviewCatchUpRun run =
+                new com.sellerops.coverage.catchup.ReviewCatchUpRun();
+        run.setOrgId(org);
+        run.setSellerAccountId(accountId);
+        run.setChannelId(channels.findAll().stream()
+                .filter(c -> "NAVER".equals(c.getCode())).findFirst().orElseThrow().getId());
+        run.setDataType("REVIEW");
+        run.setState(com.sellerops.coverage.catchup.ReviewCatchUpState.PAUSED_AUTH);
+        run.setRequestedFrom(java.time.LocalDate.of(2026, 9, 3));
+        run.setRequestedThrough(java.time.LocalDate.of(2026, 10, 9));
+        run.setCursorDay(java.time.LocalDate.of(2026, 9, 3));
+        run.setPausedWindowStart(java.time.LocalDate.of(2026, 9, 3));
+        run.setStartedAt(T0);
+        run.setUpdatedAt(T0);
+        run.setClientRequestId(java.util.UUID.randomUUID().toString());
+        return run;
     }
 
     @Test

@@ -87,6 +87,21 @@ public class ReviewCatchUpRun {
     @Column(name = "days_covered", nullable = false)
     private int daysCovered;
 
+    /**
+     * <b>Which resume attempt this run is on — part of every child's client id.</b>
+     *
+     * <p>A child's id is derived from the intent and the window so that pressing twice converges on one job
+     * instead of queueing a rival. That held, and it also meant a window could not be queued a SECOND time
+     * after it had settled: {@code dispatch} finds the existing row by that id and returns it, whatever state
+     * it is in. On 2026-10-09 a window walled by a sign-in was resumed, the run went RUNNING, the settled row
+     * came back, nothing reached the desk, and the run sat there with no work and no way to notice.
+     *
+     * <p>So the attempt joins the key. A resume makes a NEW child for the same window, the row that recorded
+     * the wall stays exactly as it was, and two presses inside one attempt still converge.
+     */
+    @Column(name = "attempt", nullable = false)
+    private int attempt = 1;
+
     /** The window that met the sign-in wall — so a resume starts there and not one window later. */
     @Column(name = "paused_window_start")
     private LocalDate pausedWindowStart;

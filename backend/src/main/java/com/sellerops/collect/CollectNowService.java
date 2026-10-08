@@ -62,6 +62,11 @@ public class CollectNowService {
      * absent the row says nothing about a boundary rather than claiming there is none.
      */
     private final ReviewCoverageCursor coverage;
+    /**
+     * The catch-up intents, read only to answer «is one of them waiting on a sign-in». Optional for the same
+     * reason the two above are: a deployment without the lane has none, and that is not a failure.
+     */
+    private final com.sellerops.coverage.catchup.ReviewCatchUpRunRepository catchUpRuns;
 
     public CollectNowService(SellerAccountRepository accounts, ChannelRepository channels,
                              CollectControlService pulls, ScreenReadService screenReads) {
@@ -71,7 +76,14 @@ public class CollectNowService {
     public CollectNowService(SellerAccountRepository accounts, ChannelRepository channels,
                              CollectControlService pulls, ScreenReadService screenReads,
                              AcquisitionHistory history) {
-        this(accounts, channels, pulls, screenReads, history, null);
+        this(accounts, channels, pulls, screenReads, history, null, null);
+    }
+
+    /** The shape before a paused catch-up was visible here. */
+    public CollectNowService(SellerAccountRepository accounts, ChannelRepository channels,
+                             CollectControlService pulls, ScreenReadService screenReads,
+                             AcquisitionHistory history, ReviewCoverageCursor coverage) {
+        this(accounts, channels, pulls, screenReads, history, coverage, null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -80,9 +92,12 @@ public class CollectNowService {
                              @org.springframework.beans.factory.annotation.Autowired(required = false)
                              AcquisitionHistory history,
                              @org.springframework.beans.factory.annotation.Autowired(required = false)
-                             ReviewCoverageCursor coverage) {
+                             ReviewCoverageCursor coverage,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false)
+                             com.sellerops.coverage.catchup.ReviewCatchUpRunRepository catchUpRuns) {
         this.history = history;
         this.coverage = coverage;
+        this.catchUpRuns = catchUpRuns;
         this.accounts = accounts;
         this.channels = channels;
         this.pulls = pulls;
@@ -117,12 +132,12 @@ public class CollectNowService {
     public CollectNowReadinessView readiness(UUID orgId, UUID sellerAccountId, String dataTypeRaw) {
         Routed routed = route(orgId, sellerAccountId, dataTypeRaw);
         return switch (routed.path()) {
-            case API -> withHistory(CollectNowRouter.Path.API, null, orgId, routed);
+            case API -> withHistory(CollectNowRouter.Path.API, null, orgId, sellerAccountId, routed);
             case SCREEN_READ -> {
                 ScreenReadReadinessView desk =
                         screenReads.readiness(orgId, sellerAccountId, routed.dataType().name());
                 yield desk.supported()
-                        ? withHistory(CollectNowRouter.Path.SCREEN_READ, desk.state(), orgId, routed)
+                        ? withHistory(CollectNowRouter.Path.SCREEN_READ, desk.state(), orgId, sellerAccountId, routed)
                         : CollectNowReadinessView.of(CollectNowRouter.Path.UNSUPPORTED, null);
             }
             case UNSUPPORTED -> CollectNowReadinessView.of(CollectNowRouter.Path.UNSUPPORTED, null);
@@ -134,17 +149,20 @@ public class CollectNowService {
      * 「최근 수집 시 로그인이 필요했습니다」 together instead of losing the first to the second.
      */
     private CollectNowReadinessView withHistory(CollectNowRouter.Path path, LocalAgentRunState desk,
-                                                UUID orgId, Routed routed) {
-        if (history == null) {
-            return CollectNowReadinessView.of(path, desk);
-        }
+                                                UUID orgId, UUID sellerAccountId, Routed routed) {
         String dataType = routed.dataType().name();
+        // <b>멈춘 의도는 acquisition history와 무관하다.</b> history가 없는 배포에서도 「로그인을 기다리는
+        // catch-up이 있다」는 사실은 참일 수 있고, 그 사실이 없으면 판매자는 로그인한 뒤에도 이어갈 길이 없다.
+        boolean paused = pausedCatchUp(sellerAccountId, dataType);
+        if (history == null) {
+            return new CollectNowReadinessView(path, desk, null, null, null, null, paused);
+        }
         UUID channelId = routed.channel().getId();
         ReviewCoverage held = reviewCoverage(orgId, channelId, dataType);
         return new CollectNowReadinessView(path, desk,
                 history.lastSuccessAt(orgId, channelId, dataType),
                 history.latestAttempt(orgId, channelId, dataType).outcome(),
-                held.coverageThrough(), gapDays(held));
+                held.coverageThrough(), gapDays(held), paused);
     }
 
     /**
@@ -169,6 +187,22 @@ public class CollectNowService {
         // navigation says so at run time by settling the window as «this desk could not do it» — there is no
         // way to ask it from here, and guessing would make this field the least reliable thing on the screen.
         return ReviewCatchUpPlanView.of(held, plan, routed.path() == CollectNowRouter.Path.SCREEN_READ);
+    }
+
+    /**
+     * <b>Is a catch-up for this row waiting on a sign-in, right now?</b>
+     *
+     * <p>Not «did the last attempt meet a sign-in wall» — that is {@code latestAttemptOutcome}, it is about the
+     * past, and it stays true after the seller has signed in. On 2026-10-09 a seller signed in, was told
+     * 「로그인 확인됨」, and nothing continued: the thing they were resuming was a row in this database and the
+     * screen had no way to see it. This is that row.
+     */
+    private boolean pausedCatchUp(UUID sellerAccountId, String dataType) {
+        if (catchUpRuns == null) {
+            return false;
+        }
+        return catchUpRuns.findFirstBySellerAccountIdAndDataTypeAndStateIn(sellerAccountId, dataType,
+                java.util.EnumSet.of(com.sellerops.coverage.catchup.ReviewCatchUpState.PAUSED_AUTH)).isPresent();
     }
 
     private ReviewCoverage reviewCoverage(UUID orgId, UUID channelId, String dataType) {

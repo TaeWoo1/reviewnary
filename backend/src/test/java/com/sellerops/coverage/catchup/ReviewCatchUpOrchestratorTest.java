@@ -344,14 +344,26 @@ class ReviewCatchUpOrchestratorTest {
         // 두 번째 발화는 같은 intent를 다시 찾을 뿐, 두 번째 창을 만들지 않는다.
         assertThat(second).isPresent();
         assertThat(second.orElseThrow().run().getId()).isEqualTo(resumed.getCatchUpRunId());
-        // 그 창에 대한 job은 **하나**다. 재개는 벽에 막힌 job을 다시 책상에 올리고, 두 번 발화해도 두 번째를
-        // 만들지 않는다 — 같은 창을 두 번 읽거나 창 하나를 건너뛸 길이 구조적으로 없다.
+        // <b>이 줄이 2026-10-09에 없었고, 그래서 live가 막혔다.</b>
+        //
+        // 어제 이 테스트는 「그 창의 job이 1개」와 「재개된 것이 벽에 막힌 그 job」을 확인하고 「재개는 막힌
+        // job을 다시 책상에 올린다」고 단정했다. 두 단정은 버그가 있을 때도 참이었다 — dispatch가 결정적
+        // 키로 SETTLED row를 그냥 돌려주고 있었으니까. 증상을 보고 기능이라고 적은 것이다.
+        //
+        // 물어야 했던 것은 바로 위 두 줄에서 벽 직후에 물었던 그 질문이다: 책상에 일이 있는가.
+        assertThat(onDesk()).as("재개한 뒤에는 그 창이 책상에 올라가 있어야 한다").isPresent();
+        assertThat(resumed.getStatus()).isEqualTo(ScheduledAsideJobStatus.QUEUED);
+        assertThat(resumed.getRequestedWindowStart()).isEqualTo(pausedAt);
+        // 벽을 기록한 row는 그대로 남는다 — 재개가 그 기록을 덮지 않는다.
+        assertThat(resumed.getId()).as("재개는 벽을 기록한 row를 덮지 않는다").isNotEqualTo(walled.getId());
+        assertThat(jobs.findById(walled.getId()).orElseThrow().getOutcome())
+                .isEqualTo(AsideJobOutcome.AUTH_REQUIRED);
+        // 그리고 두 번 발화해도 그 창의 job은 둘(벽 하나 + 재개 하나)에서 멈춘다 — 셋이 되지 않는다.
         assertThat(jobs.findAll().stream()
                 .filter(j -> pausedAt.equals(j.getRequestedWindowStart()))
                 .toList())
-                .as("벽에 막힌 그 창에 대한 job")
-                .hasSize(1);
-        assertThat(resumed.getId()).as("재개된 것은 그 창의 바로 그 job").isEqualTo(walled.getId());
+                .as("벽에 막힌 창의 job: 벽 1 + 재개 1")
+                .hasSize(2);
         ReviewCatchUpRun run = runs.findById(resumed.getCatchUpRunId()).orElseThrow();
         assertThat(run.getState()).isEqualTo(ReviewCatchUpState.RUNNING);
         assertThat(run.getPausedWindowStart()).isNull();
