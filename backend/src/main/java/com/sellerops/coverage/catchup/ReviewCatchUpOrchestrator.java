@@ -198,7 +198,7 @@ public class ReviewCatchUpOrchestrator {
                     : String.valueOf(child.getOutcome()));
             return;
         }
-        boolean complete = child.getDeliveryCompleteness() == SourceCompleteness.COMPLETE;
+        boolean complete = child.getDeliveryCompleteness() == SourceCompleteness.BOUNDED;
         if (!complete) {
             // Saturated: the rows are stored, the days are not proved. Narrow the period and look again.
             if (!run.split(start, end)) {

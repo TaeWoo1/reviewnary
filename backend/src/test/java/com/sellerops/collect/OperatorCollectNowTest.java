@@ -27,6 +27,7 @@ import com.sellerops.responsibility.aside.AsideHelperBusyException;
 import com.sellerops.responsibility.aside.AsideHelperDevices;
 import com.sellerops.responsibility.aside.AsideHelperUnavailableException;
 import com.sellerops.responsibility.aside.AsideJobOutcome;
+import com.sellerops.responsibility.aside.AsideDispatch;
 import com.sellerops.responsibility.aside.AsideMarketplaceAccess;
 import com.sellerops.responsibility.aside.AsideMarketplaceTarget;
 import com.sellerops.responsibility.aside.AsideRecipe;
@@ -279,6 +280,40 @@ class OperatorCollectNowTest {
                 .isInstanceOf(ApiException.class);
         assertThat(jobs.count()).isZero();
         verify(pulls, never()).manualSync(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("이 칼럼이 받아 주는 단어를 데이터베이스에 물어본다 — mock은 check constraint를 모른다")
+    void theCoverageVerdictIsWrittenToARealColumn() {
+        // <b>2026-10-09에 이 테스트가 없어서 라이브가 깨졌다.</b>
+        //
+        // 읽기는 성공했다 — 42건, 창 검증됨, 화면 총계 일치, month_moves 2. 그리고 저장이 commit 시점에
+        // 거부됐다: 판정을 COMPLETE로 썼고, 이 칼럼의 check constraint는 BOUNDED 또는 PARTIAL만 허용한다.
+        // 그 판정을 세우는 단위 테스트는 모두 mock repository를 썼으므로, 제약을 볼 수 있는 테스트가
+        // 하나도 없었다. 여기서는 진짜 칼럼에 쓴다.
+        ScheduledAsideJob job = jobs.save(dispatcher.dispatch(AsideDispatch.catchUpWindow(
+                org, naverAccount, AsideRecipe.NAVER_REVIEW_OBSERVE_V1, "verdict-probe",
+                java.util.UUID.randomUUID(), java.time.LocalDate.of(2026, 9, 3),
+                java.time.LocalDate.of(2026, 9, 9))));
+        job.recordDelivery(42, 0);
+
+        // 창 하나를 전부 읽은 것은 BOUNDED다 — 「기록된 경계에서 멈췄다」.
+        job.recordCoverageVerdict(com.sellerops.responsibility.SourceCompleteness.BOUNDED, "WHOLE_PERIOD_READ");
+        assertThat(jobs.saveAndFlush(job).getDeliveryCompleteness())
+                .isEqualTo(com.sellerops.responsibility.SourceCompleteness.BOUNDED);
+
+        job.recordCoverageVerdict(com.sellerops.responsibility.SourceCompleteness.PARTIAL, "TOTAL_DISAGREES");
+        assertThat(jobs.saveAndFlush(job).getDeliveryCompleteness())
+                .isEqualTo(com.sellerops.responsibility.SourceCompleteness.PARTIAL);
+
+        // 그 둘 밖의 단어는 말할 수 없다.
+        assertThatThrownBy(() -> job.recordCoverageVerdict(
+                com.sellerops.responsibility.SourceCompleteness.COMPLETE, "WHOLE_PERIOD_READ"))
+                .isInstanceOf(IllegalArgumentException.class);
+        // <b>그리고 이 테스트가 증명하지 못하는 것을 적어 둔다.</b> 이 스위트는 H2에서 Flyway를 끄고
+        // ddl-auto로 스키마를 만든다(`application-test.properties`). 그래서 운영 스키마의 check constraint는
+        // 어떤 테스트에도 존재하지 않고, 2026-10-09의 그 거부를 여기서 재현할 수 없다. 그 간격을 메우는 것은
+        // `SchemaVocabularyTest` — 마이그레이션 SQL이 허용하는 단어와 코드가 쓸 수 있는 단어를 맞춰 본다.
     }
 
     @Test
