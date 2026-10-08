@@ -207,8 +207,9 @@ export function buildNaverReviewListReadScript(): string {
  * set</b>, in document order — which is the order a locator enumerates too, so the runtime can act on exactly
  * the elements this script accepted without either side re-deciding anything.
  *
- * <p>Returns `{ route, grid, dateCandidates, dateAccepted, queryCandidates, queryAccepted }`. Booleans,
- * counts and small integer indices. No page text, no selector, no attribute value crosses back.
+ * <p>Returns `{ route, grid, dateCandidates, dateAccepted, dateFormFound, queryCandidates, queryLabelled,
+ * queryAccepted }`. Booleans, counts and small integer indices. No page text, no selector, no attribute value
+ * crosses back.
  *
  * <p>It establishes the SURFACE, not the STORE. Which seller's store this is cannot be decided in the page —
  * the backend decides it at delivery, against listings collected by the official API.
@@ -244,6 +245,11 @@ export function buildNaverReviewControlsScript(dateSelector: string, querySelect
     for (var w = 0; w < WORDS.length; w++) { if (label === WORDS[w]) { return true; } }
     return false;
   }
+  function formOf(el) {
+    var n = el;
+    while (n) { if (String(n.tagName).toLowerCase() === 'form') { return n; } n = n.parentElement; }
+    return null;
+  }
   function census(selector, accept) {
     var found;
     try { found = document.querySelectorAll(selector); } catch (e) { return null; }
@@ -251,17 +257,45 @@ export function buildNaverReviewControlsScript(dateSelector: string, querySelect
     for (var i = 0; i < found.length && i < 4000; i++) {
       if (accept(found[i]) && usable(found[i])) { accepted.push(i); }
     }
-    return { candidates: found.length, accepted: accepted };
+    return { candidates: found.length, accepted: accepted, nodes: found };
   }
   var dates = census(${JSON.stringify(dateSelector)}, isDateControl);
   var query = census(${JSON.stringify(querySelector)}, isQueryControl);
+
+  // <b>The 조회 that belongs to THIS period — the one in the period's own form.</b>
+  //
+  // Measured on the live surface, 2026-10-08: two controls carry the whole word. One is a 17x24 anchor at the
+  // far left of the page (the global search) in a DIFFERENT form, whose nearest common ancestor with the date
+  // inputs is five levels from <body> — «also on this page», and nothing more. The other is a 120x40 submit
+  // button in the SAME form as the two date inputs, three levels under a container holding those two dates
+  // and exactly one 조회. The form is what tells them apart, and it is what a page author would say too: the
+  // filter's submit button is in the filter's form.
+  //
+  // queryLabelled is kept beside the answer so a stop can say which test excluded them — the word or the
+  // form. «Two labelled, none in the form» and «none labelled at all» are different pages.
+  var dateForm = null;
+  if (dates !== null && dates.accepted.length === 2) {
+    var f0 = formOf(dates.nodes[dates.accepted[0]]);
+    var f1 = formOf(dates.nodes[dates.accepted[1]]);
+    if (f0 !== null && f0 === f1) { dateForm = f0; }
+  }
+  var queryInForm = [];
+  if (query !== null && dateForm !== null) {
+    for (var q = 0; q < query.accepted.length; q++) {
+      if (formOf(query.nodes[query.accepted[q]]) === dateForm) { queryInForm.push(query.accepted[q]); }
+    }
+  }
   return {
     route: route,
     grid: grid,
     dateCandidates: dates === null ? -1 : dates.candidates,
     dateAccepted: dates === null ? null : dates.accepted,
+    dateFormFound: dateForm !== null,
     queryCandidates: query === null ? -1 : query.candidates,
-    queryAccepted: query === null ? null : query.accepted
+    queryLabelled: query === null ? -1 : query.accepted.length,
+    // A 조회 with no period form to belong to is not this period's 조회. Empty fails closed, which is the
+    // honest answer for a page whose filter is not a form at all.
+    queryAccepted: query === null ? null : queryInForm
   };
 })()`;
 }

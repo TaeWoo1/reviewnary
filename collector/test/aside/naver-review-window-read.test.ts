@@ -61,6 +61,8 @@ interface Screen {
   dateCandidates?: number;
   queryAccepted?: number[] | null;
   queryCandidates?: number;
+  /** How many carried the word, before the form test. */
+  queryLabelled?: number;
   /** What the census answers AFTER the search. */
   showsAfterSearch?: { valuesParsed: number; startDaysBefore: number; endDaysBefore: number };
   fillThrows?: boolean;
@@ -118,7 +120,9 @@ function screen(over: Screen = {}) {
           grid: s.grid,
           dateCandidates: s.dateCandidates,
           dateAccepted: s.dateAccepted,
+          dateFormFound: s.dateAccepted !== null,
           queryCandidates: s.queryCandidates,
+          queryLabelled: s.queryLabelled ?? (s.queryAccepted ?? []).length,
           queryAccepted: s.queryAccepted,
         };
       }
@@ -191,6 +195,15 @@ describe("the historical window read — three interactions, and a proof that th
       expect(r).toMatchObject({ ok: false, code, stage: "CONTROLS", candidates: accepted.length });
       expect(h.acts.filter((a) => !a.startsWith("count:"))).toEqual([]);
     }
+  });
+
+  it("a stop says which test excluded the 조회 candidates — the word, or the period's form", async () => {
+    // Measured 2026-10-08: two controls carried the word and one was in the dates' form. «2 labelled, 0
+    // accepted» means the form is not what we think it is; «0 labelled» means the list stopped printing 조회.
+    // One number cannot say both.
+    const h = screen({ queryAccepted: [], queryLabelled: 2, queryCandidates: 246 });
+    const r = await asideNaverReviewWindowRuntime(plan, h.env);
+    expect(r).toMatchObject({ ok: false, code: "QUERY_CONTROL_NOT_FOUND", candidates: 0, labelled: 2 });
   });
 
   it("the 조회 control has its own two stops — zero and more than one", async () => {

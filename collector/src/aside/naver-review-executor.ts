@@ -138,6 +138,7 @@ export function parseNaverReviewWindowRuntimeResult(raw: unknown): NaverWindowRu
     code: code as (typeof WINDOW_CODES)[number],
     stage: stage as (typeof WINDOW_STAGES)[number],
     candidates: typeof r["candidates"] === "number" ? r["candidates"] : null,
+    labelled: typeof r["labelled"] === "number" ? r["labelled"] : null,
     elapsedMs,
   };
 }
@@ -252,7 +253,7 @@ export class AsideNaverReviewExecutor {
     if (parsed === null) {
       return {
         kind: "RESULT",
-        result: { ok: false, code: "RUNTIME_FAULT", stage: "READ", candidates: null, elapsedMs: run.elapsedMs },
+        result: { ok: false, code: "RUNTIME_FAULT", stage: "READ", candidates: null, labelled: null, elapsedMs: run.elapsedMs },
         llmCalls: 0,
       };
     }
