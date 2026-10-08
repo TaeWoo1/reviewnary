@@ -72,6 +72,20 @@ export const NAVER_REVIEW_DAY_CELL_SELECTOR = 'td';
  */
 export const NAVER_REVIEW_MAX_MONTH_MOVES = 13;
 
+/**
+ * **How long the seller centre's own router may take to draw the review route before the read gives up.**
+ *
+ * `openTab` returns when the page looks interactive, which for a hash-routed Angular app can be before the
+ * router has drawn anything. «The host is right and the hash is not, yet» is a page still arriving, not a
+ * page that is wrong — so it is waited on, with a stated ceiling, and only then refused.
+ *
+ * <p>This bound is defensive and says so: the 2026-10-09 live stop was a sign-in redirect
+ * (`accounts.commerce.naver.com`), not a late route. A seller-centre host that never reaches
+ * `#/review/search` has not been observed, and nothing here claims it has.
+ */
+export const NAVER_REVIEW_ROUTE_WAIT_MS = 8_000;
+export const NAVER_REVIEW_ROUTE_POLL_MS = 500;
+
 export const NAVER_REVIEW_READ_WORKFLOW: NaverReviewWorkflow = Object.freeze({
   id: "naver-seller-center-review-read",
   version: 1,

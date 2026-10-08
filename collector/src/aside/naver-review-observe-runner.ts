@@ -58,6 +58,9 @@ export type NaverObserveOutcome =
  */
 export const NAVER_OBSERVE_FAILURE_CODES = [
   "SURFACE_UNEXPECTED",
+  // The seller centre's own host, with its router still working after the stated ceiling. Distinct from
+  // SURFACE_UNEXPECTED because the page was ours and from AUTH_REQUIRED because no sign-in was asked for.
+  "ROUTE_NOT_READY",
   "DATE_CONTROL_CANDIDATES_UNREADABLE",
   "RANGE_CONTROLS_NOT_FOUND",
   "RANGE_CONTROLS_AMBIGUOUS",

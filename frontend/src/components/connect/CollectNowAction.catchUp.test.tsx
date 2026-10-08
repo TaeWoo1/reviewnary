@@ -114,6 +114,16 @@ describe("막힌 자리를 말한다 — 2026-10-08 라이브가 가르친 것",
     }
   });
 
+  it("로그인 redirect와 「아직 안 열렸다」와 「찾지 못했다」는 서로 다른 문장이다", () => {
+    // 2026-10-09: 세션이 끊긴 상태로 리뷰 주소를 열면 NAVER가 로그인 화면으로 보낸다. 그때 「리뷰 화면을
+    // 찾지 못했습니다」가 뜨면 판매자는 할 수 있는 일이 없다고 읽는다 — 실제로는 로그인하면 되는 상황이고,
+    // 그 복구 경로는 이미 있었다. 세 경우는 다음에 할 일이 다르므로 문장도 달라야 한다.
+    expect(stopSentence("AUTH_REQUIRED")).toBeNull();          // 로그인 안내는 별도 경로가 띄운다
+    expect(stopSentence("ROUTE_NOT_READY")).toBe("판매자센터 리뷰 화면이 아직 열리지 않았습니다.");
+    expect(stopSentence("SURFACE_UNEXPECTED")).toBe("판매자센터 리뷰 화면을 찾지 못했습니다.");
+    expect(stopSentence("ROUTE_NOT_READY")).not.toBe(stopSentence("SURFACE_UNEXPECTED"));
+  });
+
   it("도우미가 프로그램을 못 돌린 네 경우는 화면에 기술 용어를 내보내지 않는다", () => {
     // 이 넷은 판매자가 판매자센터에서 할 수 있는 일이 없는 멈춤이다 — 기다렸다 다시 누르는 것뿐. 그래서
     // 화면 문장은 기존 일반 복구 문구 그대로이고, 원인 구분은 기록(failureCode)이 들고 있는다.
@@ -130,11 +140,11 @@ describe("막힌 자리를 말한다 — 2026-10-08 라이브가 가르친 것",
 
   it("어느 문장에도 내부 용어가 없다", () => {
     const said = ["DATE_CONTROL_CANDIDATES_UNREADABLE", "RANGE_MISMATCH", "SURFACE_UNEXPECTED",
-      "DAY_CELL_AMBIGUOUS", "MONTH_NAV_UNVERIFIED", "CALENDAR_OPENER_AMBIGUOUS"]
+      "DAY_CELL_AMBIGUOUS", "MONTH_NAV_UNVERIFIED", "CALENDAR_OPENER_AMBIGUOUS", "ROUTE_NOT_READY"]
       .map((c) => stopSentence(c)!)
       .join(" ");
     for (const term of ["selector", "locator", "candidate", "control", "CSS", "index", "DOM", "range",
-      "window", "SURFACE", "query", "cell", "picker", "nav", "opener"]) {
+      "window", "SURFACE", "query", "cell", "picker", "nav", "opener", "route", "hash", "host"]) {
       expect(said, term).not.toContain(term);
     }
   });

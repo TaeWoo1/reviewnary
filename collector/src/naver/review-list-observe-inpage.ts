@@ -36,6 +36,18 @@ export type NaverReviewReadReason = (typeof NAVER_REVIEW_READ_REASONS)[number];
 export const NAVER_REVIEW_MAX_ROWS = 500;
 
 /**
+ * **The hosts NAVER signs a seller in on — a closed list, and only what this repository has evidence for.**
+ *
+ * `accounts.commerce.naver.com` was measured on 2026-10-09: opening the review route with no session lands
+ * there with a password field and no hash. `nid.naver.com` is the origin this file's own sign-in note and
+ * `cli/observe-api-center.ts` already record, subdomains included.
+ *
+ * <p>Deliberately NOT «any host that is not ours». A host nobody has seen is not a login page, and calling it
+ * one would tell a seller to sign in at a screen we cannot vouch for.
+ */
+export const NAVER_AUTH_HOSTS = ["accounts.commerce.naver.com", "nid.naver.com"] as const;
+
+/**
  * The property of one `reviewAttaches` entry that holds the attachment's own address.
  *
  * **Named by the READ-ONLY census of the live row model (M2, 2026-09-18, approved; 48 rows, 24 attachments).** Every
@@ -269,8 +281,28 @@ export function buildNaverReviewListReadScript(): string {
  */
 export function buildNaverReviewControlsScript(dateSelector: string, querySelector: string): string {
   return `(function () {
-  var route = String(location.host || '').toLowerCase() === 'sell.smartstore.naver.com'
-    && String(location.hash || '').indexOf('#/review/search') === 0;
+  var host = String(location.host || '').toLowerCase();
+  var hostOk = host === 'sell.smartstore.naver.com';
+  var hashOk = String(location.hash || '').indexOf('#/review/search') === 0;
+  var route = hostOk && hashOk;
+  // <b>A sign-in redirect is not «some other page».</b>
+  //
+  // Measured 2026-10-09, READ-ONLY: opening the review route with no session lands on
+  // accounts.commerce.naver.com/login — a password field, no hash, and our own address carried back as
+  // «url=…#/login-callback?returnUrl=…». Seven samples over fourteen seconds never moved. The lane reported
+  // SURFACE_UNEXPECTED, so the seller read 「리뷰 화면을 찾지 못했습니다」 — «nothing you can do» — when the
+  // honest answer was «sign in», and the recovery path for exactly that was already built and never reached.
+  //
+  // A closed list, and only hosts this repository has evidence for: accounts.commerce.naver.com (measured
+  // above) and nid.naver.com (recorded in this file's own sign-in note and in observe-api-center.ts, which
+  // also treats its subdomains as the auth origin). Any OTHER host stays «not this screen»: a host we have
+  // never seen is not a login page just because it is not ours.
+  function isAuthHost(h) {
+    if (h === ${JSON.stringify(NAVER_AUTH_HOSTS[0])} || h === ${JSON.stringify(NAVER_AUTH_HOSTS[1])}) { return true; }
+    var suffix = ${JSON.stringify("." + NAVER_AUTH_HOSTS[1])};
+    return h.length > suffix.length && h.slice(-suffix.length) === suffix;
+  }
+  var authHost = isAuthHost(host);
   var grid = document.querySelectorAll('.ag-center-cols-container .ag-row').length;
   function usable(el) {
     if (el.disabled === true || String(el.getAttribute('aria-disabled') || '') === 'true') { return false; }
@@ -380,6 +412,11 @@ export function buildNaverReviewControlsScript(dateSelector: string, querySelect
 
   return {
     route: route,
+    // The two halves of route, reported apart. Collapsed into one boolean they made a sign-in redirect, a
+    // route that had not drawn yet, and a genuinely different page into one indistinguishable word.
+    hostOk: hostOk,
+    hashOk: hashOk,
+    authHost: authHost,
     grid: grid,
     dateCandidates: dates === null ? -1 : dates.candidates,
     dateAccepted: dates === null ? null : dates.accepted,

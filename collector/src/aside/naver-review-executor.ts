@@ -36,6 +36,8 @@ import {
   NAVER_REVIEW_MAX_MONTH_MOVES,
   NAVER_REVIEW_READ_WORKFLOW,
   NAVER_REVIEW_QUERY_CONTROL_SELECTOR,
+  NAVER_REVIEW_ROUTE_POLL_MS,
+  NAVER_REVIEW_ROUTE_WAIT_MS,
   validateNaverReviewWorkflow,
   type NaverReviewWorkflow,
 } from "./naver-review-workflow";
@@ -123,6 +125,8 @@ export function buildNaverReviewWindowRuntimePlan(
     requestedStartDaysBefore: startDaysBefore,
     requestedEndDaysBefore: endDaysBefore,
     maxMonthMoves: NAVER_REVIEW_MAX_MONTH_MOVES,
+    routeWaitTimeoutMs: NAVER_REVIEW_ROUTE_WAIT_MS,
+    routePollMs: NAVER_REVIEW_ROUTE_POLL_MS,
     settleTimeoutMs: workflow.settleTimeoutMs,
     pollMs: 1_500,
     pickerSettleMs: 700,
@@ -144,6 +148,7 @@ export function buildNaverReviewWindowRuntimeProgram(plan: NaverReviewWindowRunt
 
 const WINDOW_CODES = [
   "AUTH_REQUIRED", "SURFACE_UNEXPECTED", "DATE_CONTROL_CANDIDATES_UNREADABLE", "RANGE_CONTROLS_NOT_FOUND",
+  "ROUTE_NOT_READY",
   "RANGE_CONTROLS_AMBIGUOUS", "QUERY_CONTROL_NOT_FOUND", "QUERY_CONTROL_AMBIGUOUS", "RANGE_ORDER_UNKNOWN",
   "CALENDAR_OPENER_NOT_FOUND", "CALENDAR_OPENER_AMBIGUOUS", "PICKER_VIEW_UNREADABLE",
   "MONTH_NAV_NOT_FOUND", "MONTH_NAV_AMBIGUOUS", "MONTH_NAV_UNVERIFIED", "MONTH_NAV_EXHAUSTED",

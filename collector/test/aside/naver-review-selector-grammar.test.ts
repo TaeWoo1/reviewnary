@@ -79,7 +79,7 @@ function pageWith(elements: Partial<{
   width: number;
   /** Which <form> this element sits in, by name. */
   form: string;
-}>[], opts: { throwOn?: string; dateForm?: string | null } = {}) {
+}>[], opts: { throwOn?: string; dateForm?: string | null; host?: string; hash?: string } = {}) {
   // One node per named form, shared by identity — which is how the predicate compares them.
   // `contains` as well as `parentElement`: the opener rule walks up from a date control asking each ancestor
   // how much of the period it holds, so an ancestor that cannot answer that question is not a page.
@@ -128,7 +128,10 @@ function pageWith(elements: Partial<{
       },
     },
     window: { getComputedStyle: (el: { __display: string }) => ({ display: el.__display, visibility: "visible", pointerEvents: "auto" }) },
-    location: { host: "sell.smartstore.naver.com", hash: "#/review/search" },
+    location: {
+      host: opts.host ?? "sell.smartstore.naver.com",
+      hash: opts.hash ?? "#/review/search",
+    },
     String,
     Number,
     RegExp,
@@ -138,11 +141,51 @@ function pageWith(elements: Partial<{
 function census(sandbox: Record<string, unknown>, dateSelector = NAVER_REVIEW_DATE_INPUT_SELECTOR) {
   const script = buildNaverReviewControlsScript(dateSelector, NAVER_REVIEW_QUERY_CONTROL_SELECTOR);
   return runInNewContext(script, sandbox) as {
-    route: boolean; grid: number;
+    route: boolean; hostOk: boolean; hashOk: boolean; authHost: boolean; grid: number;
     dateCandidates: number; dateAccepted: number[] | null;
     queryCandidates: number; queryAccepted: number[] | null;
   };
 }
+
+/**
+ * **Where the tab landed, told apart.**
+ *
+ * `route` was one boolean over host AND hash. On 2026-10-09 the first historical catch-up met a sign-in
+ * redirect — `accounts.commerce.naver.com/login`, password field, no hash, unchanged over fourteen seconds —
+ * and the lane reported «the review screen could not be found». The seller reads that as «nothing you can
+ * do», while the sign-in recovery built for exactly this case was never reached. These three booleans are
+ * what makes the difference sayable.
+ */
+describe("the landing, as the page reports it", () => {
+  const where = (host: string, hash: string) =>
+    census(pageWith([{ type: "date", className: "dateFrom" }], { host, hash }));
+
+  it("the review route is host and hash, both", () => {
+    const r = where("sell.smartstore.naver.com", "#/review/search");
+    expect(r).toMatchObject({ hostOk: true, hashOk: true, authHost: false, route: true });
+  });
+
+  it("the two NAVER sign-in origins this repository has evidence for are named as such", () => {
+    for (const host of ["accounts.commerce.naver.com", "nid.naver.com"]) {
+      expect(where(host, ""), host).toMatchObject({ hostOk: false, authHost: true, route: false });
+    }
+    // Subdomains of nid.naver.com too — the origin `cli/observe-api-center.ts` already treats as auth.
+    expect(where("x.nid.naver.com", "")).toMatchObject({ authHost: true });
+  });
+
+  it("any OTHER host is NOT called a login page — unseen is not auth", () => {
+    for (const host of ["example.test", "smartstore.naver.com", "naver.com",
+      "sell.smartstore.naver.com.evil.test", "nid.naver.com.evil.test", "notnid.naver.com"]) {
+      expect(where(host, "#/review/search"), host)
+        .toMatchObject({ hostOk: false, authHost: false, route: false });
+    }
+  });
+
+  it("the right host with another hash is ours, and not yet drawn", () => {
+    const r = where("sell.smartstore.naver.com", "#/home");
+    expect(r).toMatchObject({ hostOk: true, hashOk: false, authHost: false, route: false });
+  });
+});
 
 describe("the page predicate is the one judge, and it answers in indices", () => {
   it("accepts the two usable date controls out of a wider candidate set, by their position in it", () => {

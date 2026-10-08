@@ -62,6 +62,8 @@ const plan: NaverReviewWindowRuntimePlan = {
   requestedStartDaysBefore: 35,
   requestedEndDaysBefore: 29,
   maxMonthMoves: 13,
+  routeWaitTimeoutMs: 2_000,
+  routePollMs: 1,
   settleTimeoutMs: 5_000,
   pollMs: 1,
   pickerSettleMs: 0,
@@ -78,7 +80,12 @@ const SEARCH = 30;
 const CELL_BASE = 200;
 
 interface Screen {
-  route?: boolean;
+  /** Where the tab landed, as the census reports it apart. `route` is derived, never set. */
+  hostOk?: boolean;
+  hashOk?: boolean;
+  authHost?: boolean;
+  /** The router draws the review route only on the Nth census read — a page still arriving. */
+  hashOkFromRead?: number;
   grid?: number;
   signedIn?: boolean;
   /** The values the two date fields arrive with — the page's own default period. */
@@ -115,7 +122,9 @@ const DAYS_IN = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate
 
 function screen(over: Screen = {}) {
   const s: Screen = {
-    route: true,
+    hostOk: true,
+    hashOk: true,
+    authHost: false,
     grid: 15,
     signedIn: true,
     arrivesWith: ["2026.10.02.", "2026.10.08."],
@@ -142,6 +151,7 @@ function screen(over: Screen = {}) {
   let shown = { ...s.opensOn! };
   let firstPicked = false;
   let searched = false;
+  let censusReads = 0;
 
   /** What the census answers for the field at `position`, now. */
   const opener = (position: number): number => {
@@ -209,8 +219,15 @@ function screen(over: Screen = {}) {
   const tab: NaverWindowTabLike = {
     evaluate: async (script: string) => {
       if (script === "CONTROLS") {
+        censusReads += 1;
+        const hashOk = s.hashOkFromRead !== undefined
+          ? censusReads >= s.hashOkFromRead
+          : s.hashOk !== false;
         return {
-          route: s.route,
+          route: (s.hostOk !== false) && hashOk,
+          hostOk: s.hostOk !== false,
+          hashOk,
+          authHost: s.authHost === true,
           grid: s.grid,
           dateCandidates: s.dateCandidates,
           dateAccepted: s.dateAccepted,
@@ -310,7 +327,7 @@ describe("the historical window read — a calendar, and a proof that the screen
   });
 
   it("will not touch a page that is not the review list", async () => {
-    for (const over of [{ route: false }, { grid: 0 }]) {
+    for (const over of [{ hostOk: false }, { grid: 0 }]) {
       const h = screen(over);
       const r = await asideNaverReviewWindowRuntime(plan, h.env);
       expect(r).toMatchObject({ ok: false, code: "SURFACE_UNEXPECTED" });
@@ -371,6 +388,77 @@ describe("the historical window read — a calendar, and a proof that the screen
       "click:opener:0", "click:prev", "click:cell:9",
       "click:search",
     ]);
+  });
+});
+
+describe("where the tab landed — three answers that used to be one word", () => {
+  it("a NAVER sign-in host is AUTH_REQUIRED, not «screen not found»", async () => {
+    // 2026-10-09, measured: no session, and the review route lands on accounts.commerce.naver.com/login with
+    // a password field and no hash, stable for fourteen seconds. The lane said SURFACE_UNEXPECTED, so the
+    // seller read «nothing you can do» while the sign-in recovery for exactly this went unreached.
+    const h = screen({ hostOk: false, hashOk: false, authHost: true });
+    const r = await asideNaverReviewWindowRuntime(plan, h.env);
+    expect(r).toMatchObject({ ok: false, code: "AUTH_REQUIRED", stage: "SURFACE" });
+    expect(h.touched()).toEqual([]);
+  });
+
+  it("any OTHER host stays «not this screen» — an unseen host is not a login page", async () => {
+    const h = screen({ hostOk: false, hashOk: false, authHost: false });
+    const r = await asideNaverReviewWindowRuntime(plan, h.env);
+    expect(r).toMatchObject({ ok: false, code: "SURFACE_UNEXPECTED", stage: "SURFACE" });
+    expect(h.touched()).toEqual([]);
+  });
+
+  it("the seller centre with its router still working is waited on, then read", async () => {
+    // `openTab` returns when a page looks interactive, which for a hash-routed app can be before it draws.
+    const h = screen({ hashOkFromRead: 3 });
+    const r = await asideNaverReviewWindowRuntime(plan, h.env);
+    expect(r.ok).toBe(true);
+    expect(h.touched()).toEqual(HAPPY);
+  });
+
+  it("a route that never draws is ROUTE_NOT_READY — ours, and not a sign-in wall", async () => {
+    const h = screen({ hashOk: false });
+    const r = await asideNaverReviewWindowRuntime(plan, h.env);
+    expect(r).toMatchObject({ ok: false, code: "ROUTE_NOT_READY", stage: "SURFACE" });
+    expect(h.touched()).toEqual([]);
+  });
+
+  it("a sign-in redirect DURING the wait is still AUTH_REQUIRED", async () => {
+    let reads = 0;
+    const h = screen({ hashOk: false });
+    const inner = h.env.openTab;
+    h.env.openTab = async () => {
+      const tab = await inner();
+      const original = tab.evaluate;
+      tab.evaluate = async (script: string) => {
+        if (script === "CONTROLS") {
+          reads += 1;
+          // The session lapses mid-wait: the host becomes a sign-in origin.
+          return reads >= 2
+            ? { route: false, hostOk: false, hashOk: false, authHost: true, grid: 0 }
+            : { route: false, hostOk: true, hashOk: false, authHost: false, grid: 15 };
+        }
+        return original.call(tab, script);
+      };
+      return tab;
+    };
+    const r = await asideNaverReviewWindowRuntime(plan, h.env);
+    expect(r).toMatchObject({ ok: false, code: "AUTH_REQUIRED", stage: "SURFACE" });
+  });
+
+  it("the right route with no rows drawn is still SURFACE_UNEXPECTED, with the count", async () => {
+    const h = screen({ grid: 0 });
+    const r = await asideNaverReviewWindowRuntime(plan, h.env);
+    expect(r).toMatchObject({ ok: false, code: "SURFACE_UNEXPECTED", stage: "SURFACE", candidates: 0 });
+    expect(h.touched()).toEqual([]);
+  });
+
+  it("a signed-out page on the RIGHT host is still AUTH_REQUIRED, from the sign-in test", async () => {
+    const h = screen({ signedIn: false });
+    const r = await asideNaverReviewWindowRuntime(plan, h.env);
+    expect(r).toMatchObject({ ok: false, code: "AUTH_REQUIRED", stage: "AUTH" });
+    expect(h.touched()).toEqual([]);
   });
 });
 
