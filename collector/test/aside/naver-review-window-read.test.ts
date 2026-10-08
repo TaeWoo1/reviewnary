@@ -19,7 +19,12 @@ import {
   NAVER_REVIEW_QUERY_CONTROL_SELECTOR,
   NAVER_REVIEW_READ_WORKFLOW,
 } from "../../src/aside/naver-review-workflow";
-import { runNaverReviewObservation, type NaverDeliveryResponse } from "../../src/aside/naver-review-observe-runner";
+import {
+  executorFailureCode,
+  NAVER_OBSERVE_FAILURE_CODES,
+  runNaverReviewObservation,
+  type NaverDeliveryResponse,
+} from "../../src/aside/naver-review-observe-runner";
 
 /**
  * **Looking at last month, on a calendar, with a proof at every step.**
@@ -672,6 +677,81 @@ describe("the runner, given a period", () => {
     });
     expect(r.outcome).toBe("EXECUTOR_UNAVAILABLE");
     expect(deliver).not.toHaveBeenCalled();
+  });
+
+  it("a desk that could not be reached says WHICH way, and the record keeps it", async () => {
+    // 2026-10-09: the first historical catch-up settled EXECUTOR_UNAVAILABLE with a null failure code, so the
+    // row could not say whether Aside was unreachable, whether the program threw, or whether the ceiling
+    // elapsed. All three were one word, and telling them apart took an hour of probing a healthy chain.
+    for (const [reason, code] of [
+      ["UNAVAILABLE", "EXECUTOR_UNAVAILABLE"],
+      ["TIMEOUT", "EXECUTOR_TIMEOUT"],
+      ["REFUSED", "EXECUTOR_REFUSED"],
+      ["FAULT", "EXECUTOR_FAULT"],
+    ] as const) {
+      const deliver = vi.fn(async (_request: unknown) => MATCH);
+      const r = await runNaverReviewObservation({
+        deliver,
+        window: { start: "2026-09-03", end: "2026-09-09" },
+        executor: {
+          execute: vi.fn(),
+          executeWindow: vi.fn(async () => ({
+            kind: "UNAVAILABLE" as const,
+            stop: { reason, exitCode: 1, signal: null },
+            llmCalls: 0 as const,
+          })),
+          asOf: () => NOW,
+        } as never,
+      });
+      // The OUTCOME stays what it was — the desk failed. The CODE is what gained four ways to say so.
+      expect(r, reason).toMatchObject({ outcome: "EXECUTOR_UNAVAILABLE", failureCode: code });
+      expect(deliver).not.toHaveBeenCalled();
+    }
+  });
+
+  it("a word the CLI does not publish becomes the honest fallback, never itself", async () => {
+    const r = await runNaverReviewObservation({
+      deliver: vi.fn(async (_request: unknown) => MATCH),
+      window: { start: "2026-09-03", end: "2026-09-09" },
+      executor: {
+        execute: vi.fn(),
+        executeWindow: vi.fn(async () => ({
+          kind: "UNAVAILABLE" as const,
+          stop: { reason: "SOMETHING_NEW", exitCode: null, signal: null },
+          llmCalls: 0 as const,
+        })),
+        asOf: () => NOW,
+      } as never,
+    });
+    expect(r).toMatchObject({ outcome: "EXECUTOR_UNAVAILABLE", failureCode: "EXECUTOR_UNAVAILABLE" });
+    expect(executorFailureCode("SOMETHING_NEW")).toBe("EXECUTOR_UNAVAILABLE");
+    // And every word it maps to is one the closed set publishes, so nothing arbitrary can reach a record.
+    for (const reason of ["UNAVAILABLE", "TIMEOUT", "REFUSED", "FAULT", "", "nonsense"]) {
+      expect(NAVER_OBSERVE_FAILURE_CODES as readonly string[], reason)
+        .toContain(executorFailureCode(reason));
+    }
+  });
+
+  it("a helper without the window lane is still EXECUTOR_UNAVAILABLE — no process ran, so no exit code", async () => {
+    const r = await runNaverReviewObservation({
+      deliver: vi.fn(async (_request: unknown) => MATCH),
+      window: { start: "2026-09-03", end: "2026-09-09" },
+      executor: { execute: vi.fn(), asOf: () => NOW } as never,
+    });
+    expect(r).toMatchObject({ outcome: "EXECUTOR_UNAVAILABLE", failureCode: "EXECUTOR_UNAVAILABLE" });
+  });
+
+  it("an executor that THREW is a fault on our side, not an unreachable desk", async () => {
+    const r = await runNaverReviewObservation({
+      deliver: vi.fn(async (_request: unknown) => MATCH),
+      window: { start: "2026-09-03", end: "2026-09-09" },
+      executor: {
+        execute: vi.fn(),
+        executeWindow: vi.fn(async () => { throw new Error("boom"); }),
+        asOf: () => NOW,
+      } as never,
+    });
+    expect(r).toMatchObject({ outcome: "SURFACE_UNREADABLE", failureCode: "EXECUTOR_FAULT" });
   });
 
   it("a calendar stop reaches the report as its own word", async () => {

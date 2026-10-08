@@ -14,7 +14,12 @@ import {
   buildNaverReviewPickerScript,
 } from "../naver/review-list-observe-inpage";
 import { inPageReviewListRange } from "../action-window/reply-submission/review-list-range-inpage";
-import { runAsideRepl, type AsideCliOptions } from "./aside-cli";
+import {
+  runAsideRepl,
+  type AsideCliOptions,
+  type AsideNoResultKind,
+  type AsideReportableSignal,
+} from "./aside-cli";
 import {
   asideNaverReviewRuntime,
   type NaverReviewRuntimePlan,
@@ -224,13 +229,30 @@ export function parseNaverReviewRuntimeResult(raw: unknown): NaverReviewRuntimeR
   };
 }
 
+/**
+ * **Why a call produced no answer, kept as the word the CLI already decided.**
+ *
+ * `aside-cli` separates four of these and until 2026-10-09 every one of them arrived here as the single
+ * `UNAVAILABLE`. The first historical catch-up then stopped with that word, and «Aside was not reachable»,
+ * «the program threw» and «we ran out of time» were indistinguishable in the record — the same shape of
+ * defect this lane had just fixed for selectors, one word in front of three different things to go and fix.
+ *
+ * <p>So the reason travels, together with how the process ended. Nothing else does: the CLI's stdout and
+ * stderr still stop inside `aside-cli`, which is what keeps page text out of an operator record.
+ */
+export interface NaverReviewExecutorStop {
+  reason: AsideNoResultKind;
+  exitCode: number | null;
+  signal: AsideReportableSignal | null;
+}
+
 export type NaverReviewExecution =
   | { kind: "RESULT"; result: NaverReviewRuntimeResult; llmCalls: 0 }
-  | { kind: "UNAVAILABLE"; llmCalls: 0 };
+  | { kind: "UNAVAILABLE"; stop: NaverReviewExecutorStop; llmCalls: 0 };
 
 export type NaverReviewWindowExecution =
   | { kind: "RESULT"; result: NaverWindowRuntimeResult; llmCalls: 0 }
-  | { kind: "UNAVAILABLE"; llmCalls: 0 }
+  | { kind: "UNAVAILABLE"; stop: NaverReviewExecutorStop; llmCalls: 0 }
   /** The period asked for is not one this lane can look at. Nothing was opened. */
   | { kind: "WINDOW_INVALID"; llmCalls: 0 };
 
@@ -257,7 +279,13 @@ export class AsideNaverReviewExecutor {
       ...this.cli,
       timeoutMs: this.workflow.settleTimeoutMs + 30_000,
     });
-    if (run.kind === "NO_RESULT") return { kind: "UNAVAILABLE", llmCalls: 0 };
+    if (run.kind === "NO_RESULT") {
+      return {
+        kind: "UNAVAILABLE",
+        stop: { reason: run.reason, exitCode: run.exitCode, signal: run.signal },
+        llmCalls: 0,
+      };
+    }
     const parsed = parseNaverReviewRuntimeResult(run.result);
     if (parsed === null) {
       return { kind: "RESULT", result: { ok: false, code: "RUNTIME_FAULT", stage: "READ", reason: null, elapsedMs: run.elapsedMs }, llmCalls: 0 };
@@ -279,7 +307,13 @@ export class AsideNaverReviewExecutor {
       ...this.cli,
       timeoutMs: this.workflow.settleTimeoutMs + 30_000,
     });
-    if (run.kind === "NO_RESULT") return { kind: "UNAVAILABLE", llmCalls: 0 };
+    if (run.kind === "NO_RESULT") {
+      return {
+        kind: "UNAVAILABLE",
+        stop: { reason: run.reason, exitCode: run.exitCode, signal: run.signal },
+        llmCalls: 0,
+      };
+    }
     const parsed = parseNaverReviewWindowRuntimeResult(run.result);
     if (parsed === null) {
       return {

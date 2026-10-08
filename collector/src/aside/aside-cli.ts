@@ -52,9 +52,39 @@ export type AsideNoResultKind =
   /** The program ran but produced no parsable result (a thrown error, malformed output). */
   | "FAULT";
 
+/**
+ * The signals this file is willing to name. A closed list for the same reason the reason word is closed:
+ * whatever lands here is written to an operator record, and «bounded metadata» means a value from a set we
+ * chose, not a string the platform handed us.
+ */
+export const ASIDE_REPORTABLE_SIGNALS = ["SIGKILL", "SIGTERM", "SIGINT", "SIGSEGV", "SIGABRT"] as const;
+export type AsideReportableSignal = (typeof ASIDE_REPORTABLE_SIGNALS)[number];
+
+/** A signal name we publish, or null for «none, or one we do not name». Never the raw platform string. */
+export function reportableSignal(raw: string | null): AsideReportableSignal | null {
+  return raw !== null && (ASIDE_REPORTABLE_SIGNALS as readonly string[]).includes(raw)
+    ? (raw as AsideReportableSignal)
+    : null;
+}
+
 export type AsideReplRun =
   | { kind: "RESULT"; result: unknown; elapsedMs: number }
-  | { kind: "NO_RESULT"; reason: AsideNoResultKind; elapsedMs: number };
+  | {
+      kind: "NO_RESULT";
+      reason: AsideNoResultKind;
+      elapsedMs: number;
+      /**
+       * How the process ended, when it ended at all — bounded metadata beside the reason word.
+       *
+       * <p>Here because the reason alone could not answer the question an operator actually had on
+       * 2026-10-09: the first historical catch-up reported one word, and «Aside was not reachable», «the
+       * program threw» and «we ran out of time» were the same word. The exit code and the signal are two
+       * small integers-or-nothing that separate them further, and they are the whole of what crosses: the
+       * CLI's stdout and stderr still go nowhere, which is what keeps page text out of an operator record.
+       */
+      exitCode: number | null;
+      signal: AsideReportableSignal | null;
+    };
 
 /**
  * Pure: classify the CLI's stderr/stdout text when no result line came back. The text itself goes no further
@@ -97,6 +127,7 @@ interface SpawnCapture {
   stdout: string;
   stderr: string;
   exitCode: number | null;
+  signal: string | null;
   spawnError: NodeJS.ErrnoException | null;
   timedOut: boolean;
 }
@@ -124,8 +155,8 @@ function spawnCapture(command: string, args: readonly string[], timeoutMs: numbe
     child.stderr?.on("data", (chunk: Buffer) => {
       stderr += chunk.toString("utf8");
     });
-    child.on("error", (err: NodeJS.ErrnoException) => done({ exitCode: null, spawnError: err }));
-    child.on("close", (code) => done({ exitCode: code, spawnError: null }));
+    child.on("error", (err: NodeJS.ErrnoException) => done({ exitCode: null, signal: null, spawnError: err }));
+    child.on("close", (code, signal) => done({ exitCode: code, signal: signal ?? null, spawnError: null }));
   });
 }
 
@@ -139,15 +170,21 @@ export async function runAsideRepl(program: string, opts: AsideCliOptions = {}):
   const t0 = Date.now();
   const capture = await spawnCapture(command, argvFor("repl", opts, program), timeoutMs);
   const elapsedMs = Date.now() - t0;
+  const ended = { exitCode: capture.exitCode, signal: reportableSignal(capture.signal) };
   if (capture.spawnError) {
     // ENOENT / EACCES: the CLI itself is not there. Anything else spawn-level is still "cannot run it".
-    return { kind: "NO_RESULT", reason: "UNAVAILABLE", elapsedMs };
+    return { kind: "NO_RESULT", reason: "UNAVAILABLE", elapsedMs, exitCode: null, signal: null };
   }
-  if (capture.timedOut) return { kind: "NO_RESULT", reason: "TIMEOUT", elapsedMs };
+  if (capture.timedOut) return { kind: "NO_RESULT", reason: "TIMEOUT", elapsedMs, ...ended };
   const parsed = parseAsideResultLine(capture.stdout);
   if (parsed.found) return { kind: "RESULT", result: parsed.result, elapsedMs };
-  if (parsed.malformed) return { kind: "NO_RESULT", reason: "FAULT", elapsedMs };
-  return { kind: "NO_RESULT", reason: classifyAsideNoResult(`${capture.stderr}\n${capture.stdout}`, capture.exitCode), elapsedMs };
+  if (parsed.malformed) return { kind: "NO_RESULT", reason: "FAULT", elapsedMs, ...ended };
+  return {
+    kind: "NO_RESULT",
+    reason: classifyAsideNoResult(`${capture.stderr}\n${capture.stdout}`, capture.exitCode),
+    elapsedMs,
+    ...ended,
+  };
 }
 
 /** `aside --version`, or null when it cannot be read. The only other invocation this package makes. */

@@ -78,9 +78,43 @@ export const NAVER_OBSERVE_FAILURE_CODES = [
   "READ_UNSETTLED",
   "READING_REFUSED",
   "WINDOW_INVALID",
+  // <b>Why the desk could not run the program — four words, not one.</b>
+  //
+  // `aside-cli` has separated these four since it shipped, and until 2026-10-09 the runner flattened all of
+  // them into EXECUTOR_UNAVAILABLE. The first historical catch-up then stopped with that word and the record
+  // could not say whether Aside was unreachable, whether the program threw, or whether the ceiling elapsed —
+  // three different things to go and fix, behind one word. Diagnosing it took an hour of probing a chain that
+  // turned out to be healthy.
+  //
+  // `EXECUTOR_UNAVAILABLE` is also the job's OUTCOME, and it was only ever that — which is the mechanical
+  // reason the record held no reason at all: the outcome column said «this desk could not run it» and the
+  // failure-code column stayed null. It is a code as well now, so the four live in one place.
+  "EXECUTOR_UNAVAILABLE",
+  "EXECUTOR_TIMEOUT",
+  "EXECUTOR_REFUSED",
+  "EXECUTOR_FAULT",
   "RUNTIME_FAULT",
 ] as const;
 export type NaverObserveFailureCode = (typeof NAVER_OBSERVE_FAILURE_CODES)[number];
+
+/**
+ * The CLI's reason word as this lane's failure code. A closed map over a closed set: a word the CLI does not
+ * publish cannot reach a record, and nothing arbitrary passes through.
+ */
+export function executorFailureCode(reason: string): NaverObserveFailureCode {
+  switch (reason) {
+    case "TIMEOUT":
+      return "EXECUTOR_TIMEOUT";
+    case "REFUSED":
+      return "EXECUTOR_REFUSED";
+    case "FAULT":
+      return "EXECUTOR_FAULT";
+    default:
+      // Including "UNAVAILABLE" itself, and anything unrecognised: «we could not run it» is the honest
+      // fallback, and it is the one word that was never wrong before this map existed.
+      return "EXECUTOR_UNAVAILABLE";
+  }
+}
 
 export function asFailureCode(raw: string): NaverObserveFailureCode | null {
   return (NAVER_OBSERVE_FAILURE_CODES as readonly string[]).includes(raw)
@@ -320,24 +354,39 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
   // The period as one readable token: the log line is for an operator, and `[object]` is the serializer
   // giving up on a fact that fits in twenty-one characters.
   const askedFor = asked === null ? null : `${asked.start}~${asked.end}`;
-  type Settled = { kind: "RESULT"; result: Record<string, unknown> } | { kind: "UNAVAILABLE" | "WINDOW_INVALID" };
+  type Settled =
+    | { kind: "RESULT"; result: Record<string, unknown> }
+    | { kind: "UNAVAILABLE"; stop: { reason: string; exitCode: number | null; signal: string | null } }
+    | { kind: "WINDOW_INVALID" };
   let execution: Settled;
   try {
     if (asked === null) {
       execution = (await executor.execute()) as Settled;
     } else if (!executor.executeWindow) {
       // Asked for a period by a backend that has the lane, served by a helper that does not. Honest and
-      // bounded: nothing is opened, and the job settles as «this desk could not do it».
-      execution = { kind: "UNAVAILABLE" };
+      // bounded: nothing is opened, and the job settles as «this desk could not do it». No process ran, so
+      // there is no exit code to name.
+      execution = { kind: "UNAVAILABLE", stop: { reason: "UNAVAILABLE", exitCode: null, signal: null } };
     } else {
       execution = (await executor.executeWindow(asked)) as Settled;
     }
   } catch {
-    return none("EXECUTOR_UNAVAILABLE");
+    // `runAsideRepl` never throws by contract, so reaching here means something above it did. That is a
+    // fault on this side, which is a different thing from a desk that could not be reached.
+    log("aside_naver_review_read", { ok: false, code: "EXECUTOR_FAULT", window: askedFor, llmCalls: 0 });
+    return none("SURFACE_UNREADABLE", "EXECUTOR_FAULT");
   }
   if (execution.kind === "UNAVAILABLE") {
-    log("aside_naver_review_read", { ok: false, code: "EXECUTOR_UNAVAILABLE", window: askedFor, llmCalls: 0 });
-    return none("EXECUTOR_UNAVAILABLE");
+    const code = executorFailureCode(execution.stop.reason);
+    // The reason word, and how the process ended. Two small values beside it, and no page text: the CLI's
+    // stdout and stderr never left `aside-cli`.
+    log("aside_naver_review_read", {
+      ok: false, code, window: askedFor,
+      exitCode: execution.stop.exitCode,
+      signal: execution.stop.signal,
+      llmCalls: 0,
+    });
+    return none("EXECUTOR_UNAVAILABLE", code);
   }
   if (execution.kind !== "RESULT") {
     // A period this lane cannot look at. Refused rather than reduced to something nearby, because a window
