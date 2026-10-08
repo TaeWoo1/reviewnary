@@ -13,9 +13,26 @@ import java.util.List;
  * <p>{@code windowDays} is the screen's own period as the helper measured it. It is recorded as the bound this
  * read covered, and it is why a run of this recipe is {@code BOUNDED}: a read of a period is never a read of a
  * store's history.
+ *
+ * <p><b>The period, and the ceiling.</b> {@code windowStart} / {@code windowEnd} are that same period as two KST
+ * dates, and {@code rowCapacity} is the largest reading this one read could have carried. Together they are what
+ * lets a boundary move: 45 rows under a ceiling of 500 for 10-02 … 10-08 proves those seven days; the same 45 rows
+ * with no dates and no ceiling prove only that a read happened. All three are optional, because a helper built
+ * before them says nothing rather than something false — such a read stores its rows and moves no boundary.
+ *
+ * @param windowStart first day of the period the screen showed, {@code YYYY-MM-DD} in KST
+ * @param windowEnd   last day of it
+ * @param rowCapacity the ceiling that reading was under — the backend compares the row count against it rather
+ *                    than trusting a «complete» flag, so saturation is judged where the comparison can be checked
  */
 @JsonIgnoreProperties(ignoreUnknown = false)
-public record NaverReviewObservationRequest(List<Review> reviews, Integer windowDays) {
+public record NaverReviewObservationRequest(List<Review> reviews, Integer windowDays, String windowStart,
+                                            String windowEnd, Integer rowCapacity) {
+
+    /** The shape before the period and the ceiling existed. */
+    public NaverReviewObservationRequest(List<Review> reviews, Integer windowDays) {
+        this(reviews, windowDays, null, null, null);
+    }
 
     /**
      * One review as the list's row model held it.

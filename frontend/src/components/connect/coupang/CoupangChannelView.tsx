@@ -181,6 +181,8 @@ export function CoupangChannelView({
                 desk={reviewRoute.desk}
                 channelCode={channelCode}
                 lastSuccessAt={reviewRoute.lastSuccessAt}
+                coverageThrough={reviewRoute.coverageThrough}
+                coverageGapDays={reviewRoute.coverageGapDays}
                 showSentence
                 emphasis={lead === "REVIEW" ? "primary" : "plain"}
                 recovery={reviewRecovery}

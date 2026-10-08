@@ -3,7 +3,11 @@ package com.sellerops.collect;
 import com.sellerops.channel.Channel;
 import com.sellerops.channel.ChannelRepository;
 import com.sellerops.collect.dto.CollectNowReadinessView;
+import com.sellerops.collect.dto.ReviewCatchUpPlanView;
 import com.sellerops.coverage.AcquisitionHistory;
+import com.sellerops.coverage.ReviewCatchUpPlan;
+import com.sellerops.coverage.ReviewCoverage;
+import com.sellerops.coverage.ReviewCoverageCursor;
 import com.sellerops.collect.dto.CollectNowView;
 import com.sellerops.common.ApiException;
 import com.sellerops.connector.DataType;
@@ -12,6 +16,7 @@ import com.sellerops.localagent.ScreenReadReadinessView;
 import com.sellerops.localagent.ScreenReadService;
 import com.sellerops.selleraccount.SellerAccount;
 import com.sellerops.selleraccount.SellerAccountRepository;
+import java.time.LocalDate;
 import java.util.Locale;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -52,18 +57,32 @@ public class CollectNowService {
      * answers exactly as it did before — a row then simply says less, never something untrue.
      */
     private final AcquisitionHistory history;
+    /**
+     * Where this channel's reviews are read through. Optional for the same reason as above — and when it is
+     * absent the row says nothing about a boundary rather than claiming there is none.
+     */
+    private final ReviewCoverageCursor coverage;
 
     public CollectNowService(SellerAccountRepository accounts, ChannelRepository channels,
                              CollectControlService pulls, ScreenReadService screenReads) {
-        this(accounts, channels, pulls, screenReads, null);
+        this(accounts, channels, pulls, screenReads, null, null);
+    }
+
+    public CollectNowService(SellerAccountRepository accounts, ChannelRepository channels,
+                             CollectControlService pulls, ScreenReadService screenReads,
+                             AcquisitionHistory history) {
+        this(accounts, channels, pulls, screenReads, history, null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public CollectNowService(SellerAccountRepository accounts, ChannelRepository channels,
                              CollectControlService pulls, ScreenReadService screenReads,
                              @org.springframework.beans.factory.annotation.Autowired(required = false)
-                             AcquisitionHistory history) {
+                             AcquisitionHistory history,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false)
+                             ReviewCoverageCursor coverage) {
         this.history = history;
+        this.coverage = coverage;
         this.accounts = accounts;
         this.channels = channels;
         this.pulls = pulls;
@@ -121,9 +140,48 @@ public class CollectNowService {
         }
         String dataType = routed.dataType().name();
         UUID channelId = routed.channel().getId();
+        ReviewCoverage held = reviewCoverage(orgId, channelId, dataType);
         return new CollectNowReadinessView(path, desk,
                 history.lastSuccessAt(orgId, channelId, dataType),
-                history.latestAttempt(orgId, channelId, dataType).outcome());
+                history.latestAttempt(orgId, channelId, dataType).outcome(),
+                held.coverageThrough(), gapDays(held));
+    }
+
+    /**
+     * <b>The dry plan for this row — read-only.</b>
+     *
+     * <p>Only reviews have a boundary to plan against: an API pull asks the channel for everything newer than
+     * what it holds and the channel answers for the whole store, so there is no period for a seller to be
+     * missing. Asking for a plan on any other data type is therefore answered with an empty one rather than a
+     * fabricated gap.
+     */
+    public ReviewCatchUpPlanView catchUpPlan(UUID orgId, UUID sellerAccountId, String dataTypeRaw) {
+        Routed routed = route(orgId, sellerAccountId, dataTypeRaw);
+        ReviewCoverage held = reviewCoverage(orgId, routed.channel().getId(), routed.dataType().name());
+        ReviewCatchUpPlan plan = ReviewCatchUpPlan.from(held, today(), ReviewCatchUpPlan.Limits.OPERATOR_PRESS);
+        // Whether a past period can be read at all is a property of the carrier, not of the plan. Today no lane
+        // selects a period: the screen read opens one route and reads whatever the page is showing. Saying so
+        // here keeps a plan from being read as a schedule.
+        return ReviewCatchUpPlanView.of(held, plan, false);
+    }
+
+    private ReviewCoverage reviewCoverage(UUID orgId, UUID channelId, String dataType) {
+        if (coverage == null || !"REVIEW".equals(dataType)) {
+            return ReviewCoverage.NONE;
+        }
+        return coverage.of(orgId, channelId, today());
+    }
+
+    private static LocalDate today() {
+        return LocalDate.now(ReviewCoverageCursor.KST);
+    }
+
+    /** Days between the boundary and today that nothing has read. Null when there is no boundary to count from. */
+    private static Long gapDays(ReviewCoverage held) {
+        if (held.coverageThrough() == null) {
+            return null;
+        }
+        return held.gaps().stream().mapToLong(com.sellerops.coverage.CoveredWindow::days).sum();
     }
 
     /** The account, its channel, the parsed data type and the route — resolved once, the same way for both calls. */

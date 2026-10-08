@@ -156,19 +156,19 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
       case "foreign":
         return {
           key: "LINK",
-          label: "기기 연결 필요",
+          label: "연결 필요",
           tone: "warn",
           // The seller's words for it, and no further: which account, which token, which organisation are
           // all facts about our plumbing. What they can act on is the one button beside this sentence.
-          note: "다른 Reviewnary 계정에 연결된 기기입니다. 이 계정에 다시 연결해 주세요.",
-          action: { kind: "link", label: "이 기기 연결" },
+          note: "이 Mac은 다른 계정에 연결되어 있습니다. 이 계정에 다시 연결해 주세요.",
+          action: { kind: "link", label: "이 Mac 연결" },
         };
       case "unreachable":
         return {
           key: "LINK_SERVER",
           label: "서버 연결 확인 필요",
           tone: "warn",
-          note: "도우미가 reviewnary 서버에 닿지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
+          note: "이 Mac이 서버에 닿지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
           action: { kind: "link", label: "다시 시도" },
         };
       default: {
@@ -176,8 +176,8 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
           ? "연결이 거부됐습니다. 다시 연결해 주세요."
           : device === "expired"
             ? "연결 요청 시간이 지났습니다. 다시 연결해 주세요."
-            : "도우미가 아직 이 계정과 연결되지 않았습니다. 연결하면 도우미가 비밀번호 없이 이 계정으로 일합니다.";
-        return { key: "LINK", label: "기기 연결 필요", tone: "warn", note, action: { kind: "link", label: "이 기기 연결" } };
+            : "이 Mac이 아직 이 계정과 연결되지 않았습니다. 연결하면 비밀번호 없이 이 계정의 화면을 읽습니다.";
+        return { key: "LINK", label: "연결 필요", tone: "warn", note, action: { kind: "link", label: "이 Mac 연결" } };
       }
     }
   }
@@ -199,7 +199,7 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
         ? "연결이 거부됐습니다. 다시 연결하고, 내 PC에 열리는 창에서 허용을 눌러 주세요."
         : phase === "revoked"
           ? "연결이 해제됐습니다. 다시 연결해 주세요."
-          : "도우미가 실행 중입니다. 이 브라우저와 연결해 주세요.";
+          : "도우미가 실행 중입니다. 이 Mac을 연결해 주세요.";
     // 「다시」 only when there was a first time. A seller two minutes into the product, whose helper
     // has never been paired with any browser, read 「다시 연결 필요」 as an instruction about something
     // they had already done (Full Pilot Walkthrough v1, 2026-09-05). Same key, same action.
@@ -209,7 +209,7 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
       label: firstTime ? "연결 필요" : "다시 연결 필요",
       tone: "warn",
       note,
-      action: { kind: "connect", label: "도우미 연결" },
+      action: { kind: "connect", label: "이 Mac 연결" },
     };
   }
   if (phase === "connecting" || phase === "connecting_ws") {

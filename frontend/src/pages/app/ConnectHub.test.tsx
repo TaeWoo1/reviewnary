@@ -115,14 +115,19 @@ function renderHub() {
 }
 
 describe("채널 연결 — the hub", () => {
-  it("carries the four things this area is for", async () => {
+  it("carries two things: the channels, and this Mac", async () => {
     renderHub();
     expect(
       await screen.findByRole("heading", { level: 1, name: "채널 연결" }),
     ).toBeInTheDocument();
-    for (const section of ["채널", "reviewnary 도우미", "자료 가져오기"]) {
+    // 2026-10-08: 세 번째 구역 「자료 가져오기」가 접힌 보조 영역이 되었다. 그 이름은 수집처럼 들렸고 그 안에
+    // 있던 것은 파일 업로드·기간별 안내·실행 기록·「작업 화면 열기」 — 우리 쪽 작업의 이름들이었다. 같은
+    // 화면의 채널 행에는 이미 「지금 수집하기」가 있었으니, 같은 자료를 가져오는 길이 둘로 보였다.
+    for (const section of ["채널", "이 Mac"]) {
       expect(screen.getByRole("heading", { name: section })).toBeInTheDocument();
     }
+    expect(screen.queryByRole("heading", { name: "자료 가져오기" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "reviewnary 도우미" })).toBeNull();
   });
 
   it("holds the channel list itself rather than pointing at a separate page", async () => {
@@ -158,7 +163,7 @@ describe("채널 연결 — the hub", () => {
   it("routes into the import surfaces that already work", async () => {
     renderHub();
     await screen.findByLabelText("채널 목록");
-    expect(screen.getByRole("link", { name: "자료 넘기기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "파일로 넘기기" })).toHaveAttribute(
       "href",
       "/connect/upload",
     );
@@ -296,11 +301,28 @@ describe("채널 연결 — honesty", () => {
     }
   });
 
-  it("says 자료 넘기기, not 엑셀 업로드, for the seller-facing route", async () => {
+  it("says 파일로 넘기기, not 엑셀 업로드, for the seller-facing route", async () => {
     renderHub();
     await screen.findByLabelText("채널 목록");
-    expect(screen.getByRole("link", { name: "자료 넘기기" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "파일로 넘기기" })).toBeInTheDocument();
     expect(document.body.textContent).not.toContain("엑셀 업로드하기");
+  });
+
+  it("demoted is not hidden — the troubleshooting area names itself and its links stay reachable", async () => {
+    renderHub();
+    await screen.findByLabelText("채널 목록");
+    // 2026-09-02의 교훈은 「접지 말라」가 아니라 「다른 구역의 접힌 설명 안에 숨기지 말라」였다 — 그때
+    // /connect/upload는 파일 안내 disclosure 속의 유령이어서, 판매자는 주소를 직접 입력해 도달했다. 그래서
+    // 이 영역은 자기 이름을 가진 최상위 구역이고, 그 이름이 언제 열어야 하는지를 말한다.
+    expect(screen.getByLabelText("잘 안 될 때")).toBeInTheDocument();
+    for (const [name, href] of [
+      ["파일로 넘기기", "/connect/upload"],
+      ["기간별로 가져오기", "/connect/review-history"],
+      ["실행 기록", "/connect/imports"],
+      ["설치·업데이트 안내", "/connect/helper"],
+    ] as const) {
+      expect(screen.getByRole("link", { name })).toHaveAttribute("href", href);
+    }
   });
 
   it("shows the helper's state as a word with one control, and no internal concept", async () => {

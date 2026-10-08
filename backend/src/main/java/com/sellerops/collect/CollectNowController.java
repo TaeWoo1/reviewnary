@@ -4,6 +4,7 @@ import com.sellerops.auth.AuthPrincipal;
 import com.sellerops.auth.device.HelperDeviceAuthFilter;
 import com.sellerops.collect.dto.CollectNowReadinessView;
 import com.sellerops.collect.dto.CollectNowView;
+import com.sellerops.collect.dto.ReviewCatchUpPlanView;
 import com.sellerops.common.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
@@ -57,5 +58,18 @@ public class CollectNowController {
                                              @PathVariable UUID accountId,
                                              @RequestParam("dataType") String dataType) {
         return service.readiness(principal.orgId(), accountId, dataType);
+    }
+
+    /**
+     * <b>What a catch-up would read — without reading it.</b>
+     *
+     * <p>A GET, and the only endpoint on this controller that dispatches nothing: the plan is meant to be
+     * looked at before a press, including by a seller who then decides not to press.
+     */
+    @GetMapping("/api/seller-accounts/{accountId}/collect-now/catch-up-plan")
+    public ReviewCatchUpPlanView catchUpPlan(@AuthenticationPrincipal AuthPrincipal principal,
+                                             @PathVariable UUID accountId,
+                                             @RequestParam("dataType") String dataType) {
+        return service.catchUpPlan(principal.orgId(), accountId, dataType);
     }
 }

@@ -3824,4 +3824,28 @@ export interface CollectNowReadinessView {
    * 필요했다」이고, 이것을 「지금 로그인 필요」로 그리는 화면은 아무도 하지 않은 실시간 확인을 주장하는 것이다.
    */
   latestAttemptOutcome: AcquisitionAttemptOutcome | null;
+  /**
+   * 이 채널의 리뷰를 <b>빠짐없이</b> 확인한 마지막 날 (`YYYY-MM-DD`, KST). 근거가 없으면 `null`.
+   *
+   * <p>세 번째 사실이고, 앞의 둘을 다시 말하는 것이 아니다. 2026-10-08 네이버 읽기는 성공했고 10-02~10-08을
+   * 덮었다 — 마지막 성공은 10-08, 이 값은 9월 2일이었다. 성공 시각은 「언제 봤는가」이고 이 값은 「어디까지
+   * 봤는가」다. 공식 API 경로에서는 구조적으로 `null`이다(채널이 가게 전체를 답하므로 판매자가 놓칠 기간이 없다).
+   */
+  coverageThrough: string | null;
+  /** 그 경계와 오늘 사이에 아무도 읽지 않은 날수. 경계가 없으면 `null`. */
+  coverageGapDays: number | null;
+}
+
+/** 어느 기간을 아직 안 읽었는가 — 누르기 전에 보는 계획. 이 요청은 아무것도 수집하지 않는다. */
+export interface ReviewCatchUpPlanView {
+  coverageFrom: string | null;
+  coverageThrough: string | null;
+  windows: { start: string; end: string; days: number }[];
+  stopped: "COMPLETE" | "NOTHING_TO_DO" | "MAX_WINDOWS" | "MAX_ROWS" | "NO_BOUNDARY";
+  remainingDays: number;
+  /**
+   * 이 계획을 지금 실행할 수 있는가. <b>오늘은 false다</b> — 화면 읽기는 경로 하나를 열고 그 화면이 보여주는
+   * 기간을 읽으므로, 과거 기간을 고를 수 있는 운반 수단이 아직 없다. 계획이 예약으로 읽히지 않게 명시한다.
+   */
+  executable: boolean;
 }

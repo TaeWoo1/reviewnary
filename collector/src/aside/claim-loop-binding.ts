@@ -48,7 +48,19 @@ import type { FixtureObserveLoop } from "./fixture-observe-runner";
  * helper may ask the backend for work. Conflating the two has cost a session; they are two lifecycles and this
  * one is only the second.
  */
-export type ClaimLoopRebindReason = "boot" | "linked" | "unlinked";
+/**
+ * Why a rebind is happening. Three of them read the credential again; {@code shutdown} does not, because the
+ * process is going away.
+ *
+ * <p><b>{@code shutdown} is here because it was being told as {@code unlinked}.</b> {@link ClaimLoopBinding.stop}
+ * halted with that word, so every ordinary restart of the helper wrote
+ * {@code aside_fixture_loop_stopped {"reason":"unlinked"}} to the operator log — and an unlink is the one event
+ * on this axis that means the seller's grant is gone and the credential on disk was forgotten. An operator
+ * reading that line during the 2026-10-08 reinstall had to go and check `.auth/device.json` by hand to find out
+ * that nothing had been revoked. A log word that cannot distinguish «we are closing» from «your link is gone»
+ * is not carrying the fact it exists to carry.
+ */
+export type ClaimLoopRebindReason = "boot" | "linked" | "unlinked" | "shutdown";
 
 export interface ClaimLoopBindingDeps {
   /**
@@ -100,7 +112,7 @@ export class ClaimLoopBinding {
   /** Stop asking for work and stay stopped — the shutdown path. */
   stop(): void {
     this.disposed = true;
-    this.halt("unlinked");
+    this.halt("shutdown");
   }
 
   private async rebindOnce(reason: ClaimLoopRebindReason): Promise<void> {

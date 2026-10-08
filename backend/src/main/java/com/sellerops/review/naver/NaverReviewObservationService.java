@@ -10,10 +10,13 @@ import com.sellerops.ingest.IngestionService;
 import com.sellerops.ingest.canonical.CanonicalReview;
 import com.sellerops.ingest.canonical.ChannelProductRef;
 import com.sellerops.product.ChannelProductRepository;
+import com.sellerops.coverage.ReviewCoverageCursor;
 import com.sellerops.responsibility.IdentityVerdict;
+import com.sellerops.responsibility.SourceCompleteness;
 import com.sellerops.responsibility.aside.AsideMarketplaceAccess;
 import com.sellerops.responsibility.aside.AsideMarketplaceTarget;
 import com.sellerops.responsibility.aside.AsideRecipe;
+import com.sellerops.responsibility.aside.AsideTrigger;
 import com.sellerops.responsibility.aside.ScheduledAsideJob;
 import com.sellerops.responsibility.aside.ScheduledAsideJobRepository;
 import com.sellerops.responsibility.aside.ScheduledAsideJobStatus;
@@ -25,6 +28,7 @@ import com.sellerops.selleraccount.SellerAccountRepository;
 import com.sellerops.sync.SyncJob;
 import com.sellerops.sync.SyncJobRepository;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -73,6 +77,8 @@ public class NaverReviewObservationService implements AsideMarketplaceTarget {
     private static final Logger log = LoggerFactory.getLogger(NaverReviewObservationService.class);
 
     static final String NAVER = "NAVER";
+    /** The seller's days — the same zone the coverage cursor keeps its boundary in. */
+    private static final java.time.ZoneId KST = ReviewCoverageCursor.KST;
     /** The screen's model held 52 rows for 7 days on the measured store; this bounds a read, not a store. */
     static final int MAX_REVIEWS = 500;
     static final int MAX_BODY_CHARS = 5000;
@@ -207,13 +213,14 @@ public class NaverReviewObservationService implements AsideMarketplaceTarget {
         IngestOutcome outcome = ingestion.ingestReviews(orgId, channel.getId(), canonical);
         followUp.afterReviewIngest(orgId, channel.getId(), outcome.insertedIds());
         SyncJob record = recordRead(orgId, channel.getId(), accountId, rows.size(), outcome, request.windowDays(),
-                startedAt);
+                startedAt, job.getTrigger());
         if (record != null) {
             ingestion.stampAcquisition(orgId, outcome.insertedIds(), record.getId());
         }
         int mediaStored = recordMedia(orgId, channel.getId(), rows, now);
         int inserted = outcome.insertedIds().size();
         job.recordDelivery(inserted, changed);
+        recordCoverage(job, request, rows.size());
         jobs.save(job);
         // Counts and closed words only. The rows are in hand here, which is exactly why they are not in this line.
         log.info("naver review observation: job={} identity=MATCH received={} inserted={} changed={} skipped={} "
@@ -398,12 +405,76 @@ public class NaverReviewObservationService implements AsideMarketplaceTarget {
     }
 
     /**
+     * <b>What this read proved about days — written beside the read, judged here.</b>
+     *
+     * <p>Three things go on the row: the period the screen showed, the ceiling the reading was under, and whether
+     * the two together exclude 「이 기간에 더 있을 수 있음」. The judgement is a comparison rather than a flag the
+     * helper sets, so it can be re-checked against the stored numbers later — and so a helper cannot assert a
+     * completeness it has no way to know.
+     *
+     * <p><b>Saturation is not failure.</b> A read at its ceiling still stored real rows, and they stay. What it may
+     * not do is move a boundary: {@code PARTIAL} here is how the coverage cursor is told 「이 기간은 아직
+     * 빠짐없다고 말할 수 없다」, and the planner answers by splitting the period rather than retrying it whole.
+     *
+     * <p>A read that names no period writes nothing at all — the pre-2026-10-08 helper's shape. Null is 「모른다」,
+     * and a date computed from this process's clock for a period this process did not see would be exactly the
+     * invented evidence the cursor refuses.
+     */
+    private void recordCoverage(ScheduledAsideJob job, NaverReviewObservationRequest request, int rows) {
+        LocalDate start = parseDay(request.windowStart());
+        LocalDate end = parseDay(request.windowEnd());
+        if (start == null || end == null) {
+            return;
+        }
+        if (end.isBefore(start)) {
+            throw ApiException.badRequest("확인한 기간이 올바르지 않습니다.");
+        }
+        LocalDate today = LocalDate.now(KST);
+        if (end.isAfter(today)) {
+            // A period that ends in the future is not a period anyone read.
+            throw ApiException.badRequest("확인한 기간이 올바르지 않습니다.");
+        }
+        if (request.windowDays() != null && end.toEpochDay() - start.toEpochDay() + 1 != request.windowDays()) {
+            // The two statements of the same bound must agree; a length that contradicts its own dates means the
+            // reading of the screen's period is not one fact.
+            throw ApiException.badRequest("확인한 기간이 올바르지 않습니다.");
+        }
+        Integer capacity = request.rowCapacity();
+        if (capacity != null && (capacity < 1 || capacity < rows)) {
+            throw ApiException.badRequest("확인한 기간이 올바르지 않습니다.");
+        }
+        job.setWindowStart(start);
+        job.setWindowEnd(end);
+        job.setObservedCapacity(capacity);
+        job.setDeliveryCompleteness(capacity != null && rows < capacity
+                ? SourceCompleteness.COMPLETE
+                : SourceCompleteness.PARTIAL);
+    }
+
+    private static LocalDate parseDay(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(raw.trim());
+        } catch (DateTimeParseException e) {
+            throw ApiException.badRequest("확인한 기간이 올바르지 않습니다.");
+        }
+    }
+
+    /**
      * The read's own import record. {@code PARTIAL} with the bound named, because a read of the screen's period is
      * not a completed import of the store — the same rule the Coupang handoff applies to a walk that did not reach
      * the end of its list.
+     *
+     * <p><b>The trigger is the job's own.</b> It was the constant {@code "RESPONSIBILITY"} until 2026-10-08, so the
+     * import record of a read a seller pressed named the autonomous lane — measured on job {@code 7bde2cb5}, whose
+     * {@code trigger_source} was {@code OPERATOR} while the run it wrote said otherwise. Asking «who authorised
+     * this read» of {@code sync_jobs} then gave the wrong answer, which is the one question that record exists to
+     * answer.
      */
     private SyncJob recordRead(UUID orgId, UUID channelId, UUID accountId, int received, IngestOutcome outcome,
-                               Integer windowDays, Instant startedAt) {
+                               Integer windowDays, Instant startedAt, AsideTrigger trigger) {
         try {
             SyncJob job = new SyncJob();
             job.setOrgId(orgId);
@@ -413,7 +484,7 @@ public class NaverReviewObservationService implements AsideMarketplaceTarget {
             job.setUploadType("REVIEW");
             job.setJobType("SCHEDULED_ASIDE_READ");
             job.setMethod(CollectionMethod.SELLER_CENTER_READ.name());
-            job.setTrigger("RESPONSIBILITY");
+            job.setTrigger((trigger != null ? trigger : AsideTrigger.RESPONSIBILITY).name());
             job.setStartedAt(startedAt);
             job.setFinishedAt(Instant.now());
             job.setTotalRows(received);

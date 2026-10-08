@@ -146,7 +146,7 @@ function ScheduleRow({
    * 리뷰 API가 없는 두 채널에서는 버튼이 아예 그려지지 않았고(판매자에게는 「이 제품은 네이버 리뷰를 못
    * 가져온다」로 읽혔다) 그 사이 증명된 화면 읽기 경로가 손잡이 없는 문 뒤에 있었다.
    */
-  const { loading: routeLoading, path: route, desk, lastSuccessAt } =
+  const { loading: routeLoading, path: route, desk, lastSuccessAt, coverageThrough, coverageGapDays } =
       useCollectNowRoute(accountId, dataType, askedAgain);
 
   const unsupported = capability !== null && !capability.supported;
@@ -189,6 +189,8 @@ function ScheduleRow({
       desk={desk}
       channelCode={channelCode ?? null}
       lastSuccessAt={lastSuccessAt}
+      coverageThrough={coverageThrough}
+      coverageGapDays={coverageGapDays}
       disabled={saving}
       showSentence={route === "SCREEN_READ"}
       onReport={onReport}
