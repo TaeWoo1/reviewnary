@@ -3814,4 +3814,14 @@ export interface CollectNowReadinessView {
   path: CollectNowPath;
   /** `null` on the API route, where no local agent is involved. */
   localAgent: LocalAgentRunState | null;
+  /**
+   * 이 자료를 실제로 읽은 가장 최근 수집. 한 화면이 「마지막 성공 수집 9월 2일」과 「최근 수집 시 로그인이
+   * 필요했습니다」를 동시에 말할 수 있게, 버튼이 이미 하는 그 호출에 같이 실려 온다.
+   */
+  lastSuccessAt: string | null;
+  /**
+   * 가장 최근 시도가 끝난 방식. <b>지금의 인증 상태가 아니다</b> — `AUTH_REQUIRED`는 「그때 로그인이
+   * 필요했다」이고, 이것을 「지금 로그인 필요」로 그리는 화면은 아무도 하지 않은 실시간 확인을 주장하는 것이다.
+   */
+  latestAttemptOutcome: AcquisitionAttemptOutcome | null;
 }

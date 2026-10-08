@@ -116,6 +116,8 @@ import { fetchLaunchScope, reportSessionReadiness } from "../upload";
 import { backendBearer, DeviceLinker } from "../auth/helper-session";
 import { startFixtureObserveLoop } from "../aside/fixture-observe-runner";
 import { ClaimLoopBinding } from "../aside/claim-loop-binding";
+import { runSignInRecovery } from "../aside/sign-in-executor";
+import { SignInEndpoint } from "../bridge/sign-in-endpoint";
 import { AW_CARRIER_REPLY } from "../../../contracts/action-window/aw-carrier-kind";
 import { ReplySubmissionEndpoint } from "../bridge/reply-submission-endpoint";
 import { ResidentReplyCarrier } from "../action-window/reply-submission/resident-reply-carrier";
@@ -2335,6 +2337,18 @@ export async function runBridgeOnlyBoot(
   // Helper Device Authentication v1: the paired browser links THIS helper to the seller's account through the
   // bridge; the resulting token lives under the helper home and is the only backend credential this process has.
   const linkCfg = loadConfig(env);
+  const signInEndpoint = new SignInEndpoint({
+    ...(linkCfg.executionProvider === "ASIDE"
+      ? {
+          recover: (channel) =>
+            runSignInRecovery(channel, {
+              command: linkCfg.asideCli,
+              ...(linkCfg.asideAccount ? { account: linkCfg.asideAccount } : {}),
+            }),
+        }
+      : {}),
+    log: (event, fields) => log(event, fields),
+  });
   // Set once the bridge is listening (the loop needs its port). The linker may fire before then only if a
   // link completes during boot, which cannot happen: nothing can press 「이 기기 연결」 at a bridge that is
   // not up yet.
@@ -2353,6 +2367,11 @@ export async function runBridgeOnlyBoot(
     approvalPresenter: createApprovalPresenterFor(approvalKind),
     carrierEndpoint: carrierHost,
     deviceLink: deviceLinker,
+    // The seller's own sign-in recovery. Hosted only where there IS a marketplace browser to open — the
+    // Aside lane on this machine — so an ordinary install answers 404 rather than offering a door to a room
+    // it does not have. The CTA behind it is what makes 「로그인한 뒤 다시 수집해 주세요」 actionable instead of
+    // advice about a window the seller cannot reach.
+    signIn: signInEndpoint,
     storeIdentityBootstrap: {
       // The newest live candidate. The browser knows it just ran; it does not know the opaque account slot
       // the server resolved, so the helper answers with the most recent one rather than making the browser

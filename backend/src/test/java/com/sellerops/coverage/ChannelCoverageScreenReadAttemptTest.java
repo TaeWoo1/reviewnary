@@ -80,7 +80,8 @@ class ChannelCoverageScreenReadAttemptTest {
     @BeforeEach
     void setUp() {
         service = new ChannelCoverageService(channels, capabilities, accounts, schedules, syncJobs,
-                inquiries, reviews, orders, acquisitions, screenReads);
+                inquiries, reviews, orders, acquisitions,
+                new AcquisitionHistory(syncJobs, acquisitions, channels, screenReads));
         naver = new Channel();
         naver.setCode("NAVER");
         naver.setNameKo("네이버 스마트스토어");
@@ -207,7 +208,8 @@ class ChannelCoverageScreenReadAttemptTest {
     @DisplayName("a deployment with no screen-read lane answers exactly as it did before this field existed")
     void noLaneIsNotAFailedAttempt() {
         ChannelCoverageService withoutLane = new ChannelCoverageService(channels, capabilities, accounts,
-                schedules, syncJobs, inquiries, reviews, orders, acquisitions, null);
+                schedules, syncJobs, inquiries, reviews, orders, acquisitions,
+                new AcquisitionHistory(syncJobs, acquisitions, channels, null));
         screenRead(AsideJobOutcome.AUTH_REQUIRED, PRESSED_TODAY);
         successfulRun(READ_ON_09_02);
 

@@ -3,6 +3,7 @@ package com.sellerops.collect;
 import com.sellerops.channel.Channel;
 import com.sellerops.channel.ChannelRepository;
 import com.sellerops.collect.dto.CollectNowReadinessView;
+import com.sellerops.coverage.AcquisitionHistory;
 import com.sellerops.collect.dto.CollectNowView;
 import com.sellerops.common.ApiException;
 import com.sellerops.connector.DataType;
@@ -46,9 +47,23 @@ public class CollectNowService {
     private final ChannelRepository channels;
     private final CollectControlService pulls;
     private final ScreenReadService screenReads;
+    /**
+     * The two acquisition facts this row shows beside its button. Optional so a context assembled without it
+     * answers exactly as it did before — a row then simply says less, never something untrue.
+     */
+    private final AcquisitionHistory history;
 
     public CollectNowService(SellerAccountRepository accounts, ChannelRepository channels,
                              CollectControlService pulls, ScreenReadService screenReads) {
+        this(accounts, channels, pulls, screenReads, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public CollectNowService(SellerAccountRepository accounts, ChannelRepository channels,
+                             CollectControlService pulls, ScreenReadService screenReads,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false)
+                             AcquisitionHistory history) {
+        this.history = history;
         this.accounts = accounts;
         this.channels = channels;
         this.pulls = pulls;
@@ -83,16 +98,32 @@ public class CollectNowService {
     public CollectNowReadinessView readiness(UUID orgId, UUID sellerAccountId, String dataTypeRaw) {
         Routed routed = route(orgId, sellerAccountId, dataTypeRaw);
         return switch (routed.path()) {
-            case API -> CollectNowReadinessView.of(CollectNowRouter.Path.API, null);
+            case API -> withHistory(CollectNowRouter.Path.API, null, orgId, routed);
             case SCREEN_READ -> {
                 ScreenReadReadinessView desk =
                         screenReads.readiness(orgId, sellerAccountId, routed.dataType().name());
                 yield desk.supported()
-                        ? CollectNowReadinessView.of(CollectNowRouter.Path.SCREEN_READ, desk.state())
+                        ? withHistory(CollectNowRouter.Path.SCREEN_READ, desk.state(), orgId, routed)
                         : CollectNowReadinessView.of(CollectNowRouter.Path.UNSUPPORTED, null);
             }
             case UNSUPPORTED -> CollectNowReadinessView.of(CollectNowRouter.Path.UNSUPPORTED, null);
         };
+    }
+
+    /**
+     * The answer, plus what this channel × type holds — so one screen can say 「마지막 성공 수집 9월 2일」 and
+     * 「최근 수집 시 로그인이 필요했습니다」 together instead of losing the first to the second.
+     */
+    private CollectNowReadinessView withHistory(CollectNowRouter.Path path, LocalAgentRunState desk,
+                                                UUID orgId, Routed routed) {
+        if (history == null) {
+            return CollectNowReadinessView.of(path, desk);
+        }
+        String dataType = routed.dataType().name();
+        UUID channelId = routed.channel().getId();
+        return new CollectNowReadinessView(path, desk,
+                history.lastSuccessAt(orgId, channelId, dataType),
+                history.latestAttempt(orgId, channelId, dataType).outcome());
     }
 
     /** The account, its channel, the parsed data type and the route — resolved once, the same way for both calls. */
