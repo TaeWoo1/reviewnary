@@ -270,6 +270,29 @@ public class ScheduledAsideJob extends BaseEntity {
     @Column(name = "completeness_reason", length = 48)
     private String completenessReason;
 
+    /**
+     * <b>The verdict on the period this read covered, and the test that decided it.</b>
+     *
+     * <p>Guarded for the reason the live run of 2026-10-09 found the hard way: the verdict was written through
+     * the plain setter with {@code COMPLETE}, and the column's own check constraint allows only
+     * {@code BOUNDED} or {@code PARTIAL}. The read had worked — 42 rows, the window verified, the screen's own
+     * total agreeing — and the whole delivery was rejected at commit time by a word.
+     *
+     * <p>{@code COMPLETE} was also the wrong word. {@link com.sellerops.responsibility.SourceCompleteness}
+     * says it means «reached the end of what the source offered for this collection», which a window read
+     * never does for a store; {@code BOUNDED} means «stopped at an explicit, recorded bound», which is
+     * exactly what a window is. Going through a method instead of the field makes that unsayable rather than
+     * merely wrong.
+     */
+    public void recordCoverageVerdict(com.sellerops.responsibility.SourceCompleteness verdict, String reason) {
+        if (verdict != com.sellerops.responsibility.SourceCompleteness.BOUNDED
+                && verdict != com.sellerops.responsibility.SourceCompleteness.PARTIAL) {
+            throw new IllegalArgumentException("a marketplace read covers a BOUNDED period, or a PARTIAL one");
+        }
+        this.deliveryCompleteness = verdict;
+        this.completenessReason = reason;
+    }
+
     /** A read whose store could not be proved: the verdict is kept, and no delivery count may exist beside it. */
     public void refuseDelivery(com.sellerops.responsibility.IdentityVerdict verdict) {
         this.identityVerdict = verdict;

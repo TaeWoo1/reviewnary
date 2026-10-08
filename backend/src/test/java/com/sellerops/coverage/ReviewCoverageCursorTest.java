@@ -58,7 +58,20 @@ class ReviewCoverageCursorTest {
 
     private static ScheduledAsideJob good(String start, String end) {
         return read(start, end, 45, 500, AsideJobOutcome.OBSERVED, IdentityVerdict.MATCH,
-                SourceCompleteness.COMPLETE);
+                SourceCompleteness.BOUNDED);
+    }
+
+    @Test
+    @DisplayName("BOUNDED가 「그 창을 전부 읽었다」다 — COMPLETE는 이 칸에 쓸 수 없는 단어였다")
+    void theWordIsBounded() {
+        // 2026-10-09 라이브: 읽기는 성공했는데(42건, 창 검증됨, 화면 총계 일치) 저장이 거부됐다. 이 칼럼의
+        // check constraint는 BOUNDED 또는 PARTIAL만 허용하고, COMPLETE는 「이 수집에서 출처가 내준 것의 끝까지
+        // 갔다」는 뜻이라 창 읽기에는 애초에 맞지 않는 말이었다. BOUNDED가 「기록된 경계에서 멈췄다」다.
+        assertThat(ReviewCoverageCursor.provesItsWindow(
+                read("2026-10-02", "2026-10-08", 45, 500, AsideJobOutcome.OBSERVED, IdentityVerdict.MATCH,
+                        SourceCompleteness.COMPLETE)))
+                .as("COMPLETE는 이 칸에 저장될 수 없으므로 경계를 밀지도 않는다")
+                .isFalse();
     }
 
     @Test
@@ -91,14 +104,14 @@ class ReviewCoverageCursorTest {
     void theOtherThreeWays() {
         assertThat(ReviewCoverageCursor.provesItsWindow(
                 read("2026-10-02", "2026-10-08", 0, 500, AsideJobOutcome.AUTH_REQUIRED, null,
-                        SourceCompleteness.COMPLETE))).isFalse();
+                        SourceCompleteness.BOUNDED))).isFalse();
         assertThat(ReviewCoverageCursor.provesItsWindow(
                 read("2026-10-02", "2026-10-08", 45, 500, AsideJobOutcome.OBSERVED, IdentityVerdict.MISMATCH,
-                        SourceCompleteness.COMPLETE)))
+                        SourceCompleteness.BOUNDED)))
                 .isFalse();
         assertThat(ReviewCoverageCursor.provesItsWindow(
                 read(null, null, 45, 500, AsideJobOutcome.OBSERVED, IdentityVerdict.MATCH,
-                        SourceCompleteness.COMPLETE))).isFalse();
+                        SourceCompleteness.BOUNDED))).isFalse();
     }
 
     @Test
@@ -117,7 +130,7 @@ class ReviewCoverageCursorTest {
                 // 로그인 벽에서 끝난 10-07 시도도 기간을 들고 있을 수 있다. 그것이 경계를 밀면 하루가 공짜로
                 // 메워진다.
                 read("2026-10-07", "2026-10-07", 0, 500, AsideJobOutcome.AUTH_REQUIRED, null,
-                        SourceCompleteness.COMPLETE)));
+                        SourceCompleteness.BOUNDED)));
 
         ReviewCoverage coverage = new ReviewCoverageCursor(segments, channels, screenReads)
                 .of(ORG, channelId, TODAY);

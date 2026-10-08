@@ -465,8 +465,13 @@ public class NaverReviewObservationService implements AsideMarketplaceTarget {
         job.setGridReadMode(request.gridReadMode());
         job.setMonthMoves(request.monthMoves());
         String reason = incompleteReason(request, rows, capacity);
-        job.setCompletenessReason(reason == null ? "WHOLE_PERIOD_READ" : reason);
-        job.setDeliveryCompleteness(reason == null ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL);
+        // <b>BOUNDED, not COMPLETE.</b> A window read stops at a bound it recorded; it never reaches the end of
+        // what the store holds. The column's check constraint says the same thing, and on 2026-10-09 it said it
+        // by rejecting a read that had worked: 42 rows, the window verified against the screen, the screen's own
+        // total agreeing — and the delivery thrown away at commit time over a word.
+        job.recordCoverageVerdict(
+                reason == null ? SourceCompleteness.BOUNDED : SourceCompleteness.PARTIAL,
+                reason == null ? "WHOLE_PERIOD_READ" : reason);
     }
 
     /**

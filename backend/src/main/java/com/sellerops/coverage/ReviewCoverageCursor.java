@@ -113,7 +113,7 @@ public class ReviewCoverageCursor {
         // where the screen's own statements arrive and can be stored beside the answer. A read whose
         // completeness was never judged — a helper older than that evidence — leaves this null and moves no
         // boundary. Fail closed: the rows are kept either way.
-        return job.getDeliveryCompleteness() == SourceCompleteness.COMPLETE;
+        return job.getDeliveryCompleteness() == SourceCompleteness.BOUNDED;
     }
 
     private List<CoveredWindow> screenReadWindows(UUID orgId, UUID channelId) {

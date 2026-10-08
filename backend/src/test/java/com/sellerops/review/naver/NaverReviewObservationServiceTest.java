@@ -161,7 +161,7 @@ class NaverReviewObservationServiceTest {
         assertThat(view.received()).isEqualTo(1);
         assertThat(job.getInsertedCount()).isZero();
         assertThat(job.getDeliveryCompleteness())
-                .isEqualTo(com.sellerops.responsibility.SourceCompleteness.COMPLETE);
+                .isEqualTo(com.sellerops.responsibility.SourceCompleteness.BOUNDED);
         // The key it dedups on is the review's own id, through the one ingestion spine.
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CanonicalReview>> rows = ArgumentCaptor.forClass(List.class);
@@ -231,7 +231,7 @@ class NaverReviewObservationServiceTest {
         assertThat(job.getWindowEnd()).isEqualTo(today);
         assertThat(job.getObservedCapacity()).isEqualTo(500);
         assertThat(job.getDeliveryCompleteness())
-                .isEqualTo(com.sellerops.responsibility.SourceCompleteness.COMPLETE);
+                .isEqualTo(com.sellerops.responsibility.SourceCompleteness.BOUNDED);
         // The evidence it was judged on is kept beside the verdict, so a later reader can re-check it instead
         // of believing it.
         assertThat(job.getLabelledTotal()).isEqualTo(1);
@@ -260,7 +260,7 @@ class NaverReviewObservationServiceTest {
         provedStore();
         service.deliver(ORG, DEVICE, JOB, windowed(7, 500, 1, 50, "MODEL", row("5066448224", "1234567890")));
         assertThat(job.getDeliveryCompleteness())
-                .isEqualTo(com.sellerops.responsibility.SourceCompleteness.COMPLETE);
+                .isEqualTo(com.sellerops.responsibility.SourceCompleteness.BOUNDED);
 
         // 300 reviews on a list set to 「50개씩」: the screen could not have been showing the period, whatever
         // the model loaded. The page size is read and never changed.

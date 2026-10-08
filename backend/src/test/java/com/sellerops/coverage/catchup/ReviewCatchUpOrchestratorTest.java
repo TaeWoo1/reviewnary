@@ -180,8 +180,12 @@ class ReviewCatchUpOrchestratorTest {
             live.setWindowStart(live.getRequestedWindowStart());
             live.setWindowEnd(live.getRequestedWindowEnd());
             live.setObservedCapacity(capacity);
-            live.setDeliveryCompleteness(observed < capacity
-                    ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL);
+            // BOUNDED가 「요청한 그 창을 전부 읽었다」다. COMPLETE는 이 칼럼의 check constraint가 받지
+            // 않는 단어이고(운영에서 2026-10-09에 거부당했다), 뜻도 「출처가 내준 것의 끝까지」라서 창
+            // 읽기에 맞지 않는다.
+            live.recordCoverageVerdict(observed < capacity
+                    ? SourceCompleteness.BOUNDED : SourceCompleteness.PARTIAL,
+                    observed < capacity ? "WHOLE_PERIOD_READ" : "CAPACITY_REACHED");
             live.setInsertedCount(observed);
             live.setChangedCount(0);
             jobs.save(live);
