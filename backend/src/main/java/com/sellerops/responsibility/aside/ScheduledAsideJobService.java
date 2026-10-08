@@ -250,6 +250,18 @@ public class ScheduledAsideJobService {
     @Transactional
     public ScheduledAsideJob settle(UUID orgId, UUID deviceId, UUID jobId, AsideJobOutcome outcome, Integer count,
                                     String digest) {
+        return settle(orgId, deviceId, jobId, outcome, count, digest, null);
+    }
+
+    /**
+     * The same report, plus where it stopped.
+     *
+     * <p>{@code failureCode} is kept only if it is one of {@link AsideJobFailureCode#KNOWN} — an unrecognised
+     * word is dropped, not refused, because a job that really did stop must still be able to say so.
+     */
+    @Transactional
+    public ScheduledAsideJob settle(UUID orgId, UUID deviceId, UUID jobId, AsideJobOutcome outcome, Integer count,
+                                    String digest, String failureCode) {
         if (outcome == null) {
             throw ApiException.badRequest("작업 결과가 필요합니다.");
         }
@@ -271,6 +283,7 @@ public class ScheduledAsideJobService {
         }
         int observed = count == null || count < 0 ? 0 : count;
         job.settle(outcome, outcome == AsideJobOutcome.OBSERVED ? observed : null, digest, now);
+        job.setFailureCode(outcome == AsideJobOutcome.OBSERVED ? null : AsideJobFailureCode.of(failureCode));
         log.info("aside job: settled job={} outcome={}", job.getId(), outcome);
         ScheduledAsideJob saved = jobs.save(job);
         if (settledListener != null) {

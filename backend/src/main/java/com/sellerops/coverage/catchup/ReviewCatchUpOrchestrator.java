@@ -191,7 +191,11 @@ public class ReviewCatchUpOrchestrator {
             return;
         }
         if (child.getOutcome() != AsideJobOutcome.OBSERVED) {
-            stop(run, ReviewCatchUpState.FAILED, String.valueOf(child.getOutcome()));
+            // Where it stopped, when the child could say — the outcome alone covers three different fixes
+            // (2026-10-08), and the one word the seller's screen turns into a sentence is this one.
+            stop(run, ReviewCatchUpState.FAILED, child.getFailureCode() != null
+                    ? child.getFailureCode()
+                    : String.valueOf(child.getOutcome()));
             return;
         }
         boolean complete = child.getDeliveryCompleteness() == SourceCompleteness.COMPLETE;

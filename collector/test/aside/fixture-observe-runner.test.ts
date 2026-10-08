@@ -79,7 +79,9 @@ describe("the unattended loop — a recipe it does not publish is refused withou
     // Refused BEFORE anything is built: no program is ever serialized for a recipe we do not publish.
     expect(h.programs).toHaveLength(0);
     const report = h.sent.find((s) => s.url.includes("/report"));
-    expect(report?.body).toEqual({ outcome: "REFUSED", observedCount: null, contentDigest: null });
+    // `failureCode` is on every report and is null here: a recipe this helper does not publish has no
+    // PLACE it stopped at — it never started. Naming one would be the over-claiming this field exists to end.
+    expect(report?.body).toEqual({ outcome: "REFUSED", observedCount: null, contentDigest: null, failureCode: null });
   });
 });
 

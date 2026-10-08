@@ -157,13 +157,15 @@ async function report(
   outcome: FixtureJobOutcome,
   observedCount: number | null,
   contentDigest: string | null,
+  /** Where it stopped — one of a closed list the backend validates against. Never a message. */
+  failureCode: string | null = null,
 ): Promise<boolean> {
   const send = opts.fetchImpl ?? fetch;
   try {
     const res = await send(`${opts.baseUrl}/api/helper-devices/jobs/${jobId}/report`, {
       method: "POST",
       headers: { authorization: `Bearer ${opts.token}`, "content-type": "application/json" },
-      body: JSON.stringify({ outcome, observedCount, contentDigest }),
+      body: JSON.stringify({ outcome, observedCount, contentDigest, failureCode }),
     });
     return res.ok;
   } catch {
@@ -269,7 +271,8 @@ export async function runFixtureObserveCycle(opts: FixtureObserveRunnerOptions):
       ...(opts.asideCli ? { asideCli: opts.asideCli } : {}),
       ...(opts.asideAccount ? { asideAccount: opts.asideAccount } : {}),
     });
-    await report(opts, jobId, observed.outcome, observed.observedCount, observed.contentDigest);
+    await report(opts, jobId, observed.outcome, observed.observedCount, observed.contentDigest,
+      observed.failureCode ?? null);
     return { kind: "REPORTED", outcome: observed.outcome, observedCount: observed.observedCount };
   }
 

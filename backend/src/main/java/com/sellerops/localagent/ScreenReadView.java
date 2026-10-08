@@ -19,7 +19,7 @@ import java.util.UUID;
  */
 public record ScreenReadView(UUID jobId, LocalAgentRunState state, Integer observed, Integer inserted,
                              Integer changed, boolean complete, Instant startedAt, Instant finishedAt,
-                             CatchUp catchUp) {
+                             CatchUp catchUp, String failureCode) {
 
     /**
      * <b>When one press is walking several periods, the state belongs to the walk — not to whichever child
@@ -45,12 +45,12 @@ public record ScreenReadView(UUID jobId, LocalAgentRunState state, Integer obser
                 delivered ? job.getInsertedCount() : null,
                 delivered ? job.getChangedCount() : null,
                 state == LocalAgentRunState.SUCCESS,
-                job.getCreatedAt(), job.getSettledAt(), null);
+                job.getCreatedAt(), job.getSettledAt(), null, job.getFailureCode());
     }
 
     /** The same job, answered at the level of the walk it belongs to. */
     public ScreenReadView withCatchUp(LocalAgentRunState walkState, CatchUp catchUp) {
         return new ScreenReadView(jobId, walkState, observed, inserted, changed,
-                walkState == LocalAgentRunState.SUCCESS, startedAt, finishedAt, catchUp);
+                walkState == LocalAgentRunState.SUCCESS, startedAt, finishedAt, catchUp, failureCode);
     }
 }

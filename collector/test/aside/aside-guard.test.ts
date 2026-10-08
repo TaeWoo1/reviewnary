@@ -138,10 +138,14 @@ describe.each(READ_NAVIGATORS)("aside provider — %s navigates a READ, and only
     for (const line of code.split("\n").filter((l) => l.includes(".fill(") || l.includes(".click("))) {
       expect(line, line.trim()).toMatch(/\b(from|to|search)\b/);
     }
-    // And the counting is really there: both locators are counted, and the exactness is asserted.
-    expect(code).toContain("await dates.count()");
-    expect(code).toContain("await search.count()");
+    // And the exactness is really asserted — on the indices the page's own predicate accepted, which is the
+    // single judge of what a control is (2026-10-08: it used to be judged here too, in a selector, and the
+    // two judges disagreed in the only way that mattered).
+    expect(code).toContain("dateAccepted.length");
+    expect(code).toContain("queryAccepted.length");
     expect(code).toContain("RANGE_CONTROLS_AMBIGUOUS");
+    expect(code).toContain("QUERY_CONTROL_AMBIGUOUS");
+    expect(code).toContain("DATE_CONTROL_CANDIDATES_UNREADABLE");
   });
 
   it("writes nothing to the seller's store — no reply, no state change, no submission", () => {

@@ -26,18 +26,33 @@
  * holds this file to `fill` and `click` on count-guarded handles and to a bounded number of sites, so a fourth
  * interaction cannot be added without that test failing.
  *
+ * <h2>One judge for «is this a control»</h2>
+ *
+ * The plan carries two <b>pure-CSS candidate sets</b> and the page script
+ * ({@code buildNaverReviewControlsScript}) is the only thing that decides which candidates are controls a
+ * person could use — visible, enabled, and carrying the right meaning. It answers in indices into those same
+ * candidate sets, in document order, and this file acts on exactly those indices.
+ *
+ * <p>That split is the lesson of 2026-10-08, not a refactor. The selectors then carried
+ * `:visible:not([disabled])` while the page script made the same judgement again; Aside hands a selector to
+ * `document.querySelectorAll`, the pseudo-class threw a `SyntaxError`, and the whole lane stopped at its third
+ * gate. The syntax was the shallow half. The deep half is that one fact had two judges, and the one that ran
+ * first had no test behind it.
+ *
  * <h2>Fail closed on identification — four gates before a key is pressed</h2>
  *
  * Typing a date into the wrong page is the one mistake no later check can undo: the verification would then be
  * reading some other screen's inputs and agreeing with itself. So, in order:
  *
- *  1. **the surface** — the published host and hash, and a drawn grid (`routeScript`). Anything else is
- *     `SURFACE_UNEXPECTED`.
+ *  1. **the surface** — the published host and hash, and a drawn grid. Anything else is `SURFACE_UNEXPECTED`.
  *  2. **the sign-in wall** — asked before anything, as everywhere else. A signed-out browser is a stop, never
  *     a thing to type into.
- *  3. **exactly two date inputs** — found by the same grounded predicate the live-proven census uses
- *     (`type=date`, or a class naming date/calendar/picker; visible and enabled). Zero, one, or three is
- *     `RANGE_CONTROLS_NOT_FOUND` with the count. Never «take the first two».
+ *  3. **exactly two date controls and exactly one 조회** — as the page script accepted them. Zero, one or
+ *     three dates is `RANGE_CONTROLS_NOT_FOUND` / `RANGE_CONTROLS_AMBIGUOUS` with the count it looked
+ *     through; the query control has its own two codes. A candidate set this runtime could not even look
+ *     through is `DATE_CONTROL_CANDIDATES_UNREADABLE` — named apart from `RUNTIME_FAULT` because «the
+ *     selector was not a selector» and «the browser went away» need different fixes, and on 2026-10-08 they
+ *     were the same word. Never «take the first two».
  *  4. **which field is the from** — read from the values the page ARRIVED with. The list opens on its own
  *     default period, so the two fields already say which of them holds the earlier date. If their current
  *     values do not establish that order, this stops: a range typed into reversed fields reads as a valid
@@ -76,14 +91,14 @@ export interface NaverWindowRuntimeEnv {
 export interface NaverReviewWindowRuntimePlan {
   entryUrl: string;
   /** Forwarded page scripts, authored in `src/naver/`. This file composes none of them. */
-  routeScript: string;
+  controlsScript: string;
   authScript: string;
   readerScript: string;
   rangeScript: string;
-  /** The grounded date-input predicate, as a selector. Exactly two matches or this stops. */
+  /** The pure-CSS candidate set the controls script walked for date controls. Decides nothing on its own. */
   dateInputSelector: string;
-  /** The list's own 조회/검색. Exactly one match or this stops. */
-  searchSelector: string;
+  /** The pure-CSS candidate set it walked for the 조회/검색 control. */
+  queryControlSelector: string;
   /** The period asked for: what to type, and the two day offsets the screen must then show. */
   requestedStartValue: string;
   requestedEndValue: string;
@@ -102,8 +117,11 @@ export type NaverWindowRuntimeResult =
       code:
         | "AUTH_REQUIRED"
         | "SURFACE_UNEXPECTED"
+        | "DATE_CONTROL_CANDIDATES_UNREADABLE"
         | "RANGE_CONTROLS_NOT_FOUND"
         | "RANGE_CONTROLS_AMBIGUOUS"
+        | "QUERY_CONTROL_NOT_FOUND"
+        | "QUERY_CONTROL_AMBIGUOUS"
         | "RANGE_ORDER_UNKNOWN"
         | "RANGE_NOT_SETTABLE"
         | "RANGE_MISMATCH"
@@ -151,11 +169,15 @@ export async function asideNaverReviewWindowRuntime(
     // 1. THE SURFACE. The published route, and a grid that is drawn.
     let surface: unknown;
     try {
-      surface = await tab.evaluate(plan.routeScript);
+      surface = await tab.evaluate(plan.controlsScript);
     } catch (e) {
       return fail("RUNTIME_FAULT", "SURFACE");
     }
-    const s = (surface ?? {}) as { route?: unknown; grid?: unknown; inputs?: unknown };
+    const s = (surface ?? {}) as {
+      route?: unknown; grid?: unknown;
+      dateCandidates?: unknown; dateAccepted?: unknown;
+      queryCandidates?: unknown; queryAccepted?: unknown;
+    };
     if (s.route !== true) {
       return fail("SURFACE_UNEXPECTED", "SURFACE");
     }
@@ -175,37 +197,37 @@ export async function asideNaverReviewWindowRuntime(
       return fail("SURFACE_UNEXPECTED", "SURFACE", typeof s.grid === "number" ? s.grid : undefined);
     }
 
-    // 3. EXACTLY TWO DATE INPUTS. Never «the first two of however many».
-    const dates = tab.locator(plan.dateInputSelector);
-    let found = 0;
-    try {
-      found = await dates.count();
-    } catch (e) {
-      return fail("RUNTIME_FAULT", "CONTROLS");
+    // 3. EXACTLY TWO DATE CONTROLS AND EXACTLY ONE 조회 — as the page's own predicate accepted them.
+    //
+    // A candidate set the script could not even look through (`null`) is its own stop: a selector that is not
+    // a selector and a browser that went away are different problems, and until 2026-10-08 they shared a word.
+    const dateAccepted = s.dateAccepted;
+    const queryAccepted = s.queryAccepted;
+    if (!Array.isArray(dateAccepted) || !Array.isArray(queryAccepted)) {
+      return fail("DATE_CONTROL_CANDIDATES_UNREADABLE", "CONTROLS",
+        typeof s.dateCandidates === "number" ? s.dateCandidates : undefined);
     }
-    if (found < 2) {
-      return fail("RANGE_CONTROLS_NOT_FOUND", "CONTROLS", found);
+    if (dateAccepted.length < 2) {
+      return fail("RANGE_CONTROLS_NOT_FOUND", "CONTROLS", dateAccepted.length);
     }
-    if (found > 2) {
-      return fail("RANGE_CONTROLS_AMBIGUOUS", "CONTROLS", found);
+    if (dateAccepted.length > 2) {
+      return fail("RANGE_CONTROLS_AMBIGUOUS", "CONTROLS", dateAccepted.length);
     }
-    const search = tab.locator(plan.searchSelector);
-    let searches = 0;
-    try {
-      searches = await search.count();
-    } catch (e) {
-      return fail("RUNTIME_FAULT", "CONTROLS");
+    if (queryAccepted.length === 0) {
+      return fail("QUERY_CONTROL_NOT_FOUND", "CONTROLS", 0);
     }
-    if (searches === 0) {
-      return fail("RANGE_CONTROLS_NOT_FOUND", "CONTROLS", 0);
-    }
-    if (searches > 1) {
-      return fail("RANGE_CONTROLS_AMBIGUOUS", "CONTROLS", searches);
+    if (queryAccepted.length > 1) {
+      return fail("QUERY_CONTROL_AMBIGUOUS", "CONTROLS", queryAccepted.length);
     }
 
+    // The handles are the accepted indices, in the candidate set's own document order — which is the order a
+    // locator enumerates. Neither side re-decides what a control is.
+    const dates = tab.locator(plan.dateInputSelector);
+    const search = tab.locator(plan.queryControlSelector).nth(Number(queryAccepted[0]));
+
     // 4. WHICH ONE IS THE FROM. Read off the default period the page arrived with, never assumed from DOM order.
-    const first = dates.nth(0);
-    const second = dates.nth(1);
+    const first = dates.nth(Number(dateAccepted[0]));
+    const second = dates.nth(Number(dateAccepted[1]));
     let firstWas = "";
     let secondWas = "";
     try {

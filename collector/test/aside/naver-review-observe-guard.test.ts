@@ -177,7 +177,7 @@ describe("the NAVER review recipe — nothing read is never nothing there", () =
       deliver,
       executor: executorOf({ ok: false, code: "AUTH_REQUIRED", stage: "AUTH", reason: null, elapsedMs: 1 }),
     });
-    expect(r).toEqual({ outcome: "AUTH_REQUIRED", observedCount: null, contentDigest: null });
+    expect(r).toEqual({ outcome: "AUTH_REQUIRED", observedCount: null, contentDigest: null, failureCode: null });
     expect(deliver).not.toHaveBeenCalled();
   });
 
@@ -187,7 +187,7 @@ describe("the NAVER review recipe — nothing read is never nothing there", () =
       deliver,
       executor: executorOf({ ok: false, code: "READ_UNSETTLED", stage: "READ", reason: "GRID_NOT_FOUND", elapsedMs: 1 }),
     });
-    expect(r).toEqual({ outcome: "SURFACE_UNREADABLE", observedCount: null, contentDigest: null });
+    expect(r).toEqual({ outcome: "SURFACE_UNREADABLE", observedCount: null, contentDigest: null, failureCode: "READ_UNSETTLED" });
     expect(deliver).not.toHaveBeenCalled();
   });
 
@@ -217,7 +217,7 @@ describe("the NAVER review recipe — nothing read is never nothing there", () =
       deliver: deliverWith(null),
       executor: executorOf({ ok: true, reading: reading([row()]), range: CURRENT_WEEK, elapsedMs: 1 }),
     });
-    expect(r).toEqual({ outcome: "EXECUTOR_UNAVAILABLE", observedCount: null, contentDigest: null });
+    expect(r).toEqual({ outcome: "EXECUTOR_UNAVAILABLE", observedCount: null, contentDigest: null, failureCode: null });
   });
 
   it("a store the backend could not prove stores nothing and reports no count", async () => {
@@ -225,7 +225,7 @@ describe("the NAVER review recipe — nothing read is never nothing there", () =
       deliver: deliverWith({ ...MATCH, identityVerdict: "UNRESOLVED", inserted: 0 }),
       executor: executorOf({ ok: true, reading: reading([row()]), range: CURRENT_WEEK, elapsedMs: 1 }),
     });
-    expect(r).toEqual({ outcome: "STORE_UNRESOLVED", observedCount: null, contentDigest: null });
+    expect(r).toEqual({ outcome: "STORE_UNRESOLVED", observedCount: null, contentDigest: null, failureCode: null });
   });
 
   it("a proved read reports what it read, with an id digest, and delivers only the eight named fields", async () => {

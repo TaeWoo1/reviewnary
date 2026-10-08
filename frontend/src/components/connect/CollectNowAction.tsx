@@ -59,6 +59,37 @@ async function awaitScreenRead(first: ScreenReadView): Promise<ScreenReadView> {
 }
 
 /**
+ * <b>막힌 자리를 판매자의 문장으로 — 내부 단어는 한 글자도 나오지 않는다.</b>
+ *
+ * <p>2026-10-08 첫 historical catch-up이 기간 선택 컨트롤을 식별하지 못해 멈췄고, 화면이 할 수 있는 말은
+ * 「수집하지 못했습니다」뿐이었다. 그 문장은 참이지만 아무것도 알려주지 않는다 — 판매자가 그 다음에 할 수
+ * 있는 일이 있는지조차. 그래서 막힌 자리를 아는 경우에는 그 자리를 말한다.
+ *
+ * <p>모르는 단어는 지어내지 않고 일반 문장으로 돌아간다. 그리고 selector·locator·candidate 같은 말은
+ * 어느 분기에도 없다: 판매자에게 그것은 우리 쪽 책상의 이름이다.
+ */
+export function stopSentence(failureCode: string | null | undefined): string | null {
+  switch (failureCode) {
+    case "DATE_CONTROL_CANDIDATES_UNREADABLE":
+    case "RANGE_CONTROLS_NOT_FOUND":
+    case "RANGE_CONTROLS_AMBIGUOUS":
+    case "QUERY_CONTROL_NOT_FOUND":
+    case "QUERY_CONTROL_AMBIGUOUS":
+    case "RANGE_ORDER_UNKNOWN":
+    case "RANGE_NOT_SETTABLE":
+      return "판매자센터 화면에서 기간 선택 영역을 확인하지 못했습니다.";
+    case "RANGE_MISMATCH":
+      // 기간을 바꿨지만 화면이 그 기간을 보여주지 않았다. 판매자가 할 수 있는 일은 같다 — 그 화면을 한 번
+      // 열어 보는 것.
+      return "판매자센터 화면이 요청한 기간을 보여주지 않았습니다.";
+    case "SURFACE_UNEXPECTED":
+      return "판매자센터 리뷰 화면을 찾지 못했습니다.";
+    default:
+      return null;
+  }
+}
+
+/**
  * <b>밀린 기간을 차례로 읽는 중이라는 말 — 기간의 날짜는 꺼내지 않는다.</b>
  *
  * <p>판매자가 쓸 수 있는 사실은 두 개다: 지금 밀린 것을 따라잡는 중이라는 것과, 얼마나 왔는지. 「09-03~09-09를
@@ -92,8 +123,15 @@ export function catchUpMessage(read: ScreenReadView): { text: string; isError: b
         text: `${done}개 기간을 확인했습니다. 한 번에 확인하는 양에 도달해서 여기서 멈췄습니다 — 다시 누르면 이어서 확인합니다.`,
         isError: false,
       };
-    default:
-      return { text: `${done}개 기간을 확인한 뒤 멈췄습니다. 잠시 후 다시 시도해 주세요.`, isError: true };
+    default: {
+      const why = stopSentence(walk.stopReason);
+      return {
+        text: why
+          ? (done > 0 ? `${done}개 기간을 확인했습니다. ${why}` : why)
+          : `${done}개 기간을 확인한 뒤 멈췄습니다. 잠시 후 다시 시도해 주세요.`,
+        isError: true,
+      };
+    }
   }
 }
 
@@ -120,9 +158,22 @@ export function screenReadMessage(label: string, read: ScreenReadView): { text: 
       };
     case "RUNNING":
       return { text: `${label} 수집이 아직 진행 중입니다. 잠시 뒤 다시 확인해 주세요.`, isError: false };
-    default:
-      return { text: `${label}을(를) 수집하지 못했습니다. 잠시 후 다시 시도해 주세요.`, isError: true };
+    default: {
+      // 「리뷰을(를)」. 조사를 둘 다 적어 두는 것은 둘 중 어느 것도 고르지 않은 것이고, 판매자가 읽는 것은
+      // 고르지 않은 그 모양이다. 이 제품의 자료 이름은 받침으로 끝나지 않거나(리뷰) 끝나거나(문의·주문)
+      // 하므로, 마지막 글자로 고른다.
+      const why = stopSentence(read.failureCode);
+      return { text: why ?? `${label}${objectParticle(label)} 수집하지 못했습니다. 잠시 후 다시 시도해 주세요.`, isError: true };
+    }
   }
+}
+
+/** 을/를 — 받침으로 고른다. 한글이 아니면 「을」이 더 안전하다(「CSV을」보다 어색한 쪽이 적다). */
+export function objectParticle(word: string): "을" | "를" {
+  const last = word.trim().slice(-1);
+  const code = last.charCodeAt(0);
+  if (code < 0xac00 || code > 0xd7a3) return "을";
+  return (code - 0xac00) % 28 === 0 ? "를" : "을";
 }
 
 /** 이 누름 하나의 식별자. 더블클릭·재요청·새로고침이 두 건이 아니라 한 건으로 모이게 하는 값. */
