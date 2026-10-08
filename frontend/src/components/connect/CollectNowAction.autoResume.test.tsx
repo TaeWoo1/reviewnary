@@ -32,13 +32,23 @@ vi.mock("../../lib/apiClient", () => ({
   api: {
     collectNow: (...a: unknown[]) => collectNow(...a),
     screenReadStatus: (...a: unknown[]) => screenReadStatus(...a),
-    collectNowReadiness: vi.fn(),
+    collectNowReadiness: (...a: unknown[]) => collectNowReadiness(...a),
   },
   getToken: () => null,
 }));
 
+const collectNowReadiness = vi.fn();
 const onReport = vi.fn();
 const onChanged = vi.fn();
+
+/** 서버가 들고 있는 사실: 이 자료의 catch-up 하나가 로그인을 기다리는가. */
+function pausedOnServer(paused: boolean) {
+  collectNowReadiness.mockResolvedValue({
+    path: "SCREEN_READ", localAgent: "AUTH_REQUIRED", lastSuccessAt: null,
+    latestAttemptOutcome: "AUTH_REQUIRED", coverageThrough: "2026-09-02", coverageGapDays: 37,
+    pausedCatchUp: paused,
+  });
+}
 
 function mount(over: Record<string, unknown> = {}) {
   return render(
@@ -75,7 +85,81 @@ beforeEach(() => {
   screenReadStatus.mockReset();
   onReport.mockReset();
   onChanged.mockReset();
+  collectNowReadiness.mockReset();
   startSignIn.mockResolvedValue({ ok: true });
+  // 기본값은 「서버에 멈춘 의도가 없다」 — 그러면 이 탭의 기억만이 이어갈 근거다.
+  pausedOnServer(false);
+});
+
+/**
+ * <b>2026-10-09: 로그인했는데 아무것도 이어지지 않았다.</b>
+ *
+ * 첫 로그인 시도가 지켜보는 시간이 끝나 `NOT_SIGNED_IN`으로 끝나는 순간, 이어갈 승인은 이 탭의 메모리에서
+ * 버려졌다. 30초 뒤 두 번째 시도가 로그인을 확인했을 때는 이어갈 표식이 없었고, 판매자는 「로그인 확인됨」을
+ * 보고도 멈춘 화면 앞에 있었다. 새로고침하면 더 확실히 사라졌다.
+ *
+ * 이어갈 일이 있는지는 서버가 안다 — 멈춘 catch-up은 row이고, 그 row는 이 탭이 무엇을 기억하든 거기 있다.
+ */
+describe("이어갈 일이 있는지는 서버가 안다 — 이 탭의 기억이 아니라", () => {
+  it("이 탭이 잊었어도, 서버에 멈춘 catch-up이 있으면 로그인 확인 뒤 이어진다", async () => {
+    // 수집을 누른 적이 없는 탭(새로고침한 뒤) — 그래도 서버에는 멈춘 의도가 있다.
+    pausedOnServer(true);
+    awaitSignIn.mockResolvedValue("SIGNED_IN");
+    collectNow.mockResolvedValue({
+      path: "SCREEN_READ", dataType: "REVIEW", run: null,
+      screenRead: { jobId: "job-2", state: "RUNNING", inserted: null, changed: null },
+    });
+    screenReadStatus.mockResolvedValue({ jobId: "job-2", state: "OBSERVED", observed: 45, inserted: 45, changed: 0 });
+
+    mount();
+    await userEvent.click(screen.getByTestId("sign-in-REVIEW"));
+    await waitFor(() => expect(collectNow).toHaveBeenCalledTimes(1));
+    expect(onReport).toHaveBeenCalledWith("로그인 확인됨. 멈췄던 수집을 이어서 진행합니다.", false);
+  });
+
+  it("서버에 멈춘 의도가 없으면 혼자 로그인한 것으로 수집이 시작되지 않는다", async () => {
+    // 계약은 그대로다: standalone login은 수집을 시작하지 않는다.
+    pausedOnServer(false);
+    awaitSignIn.mockResolvedValue("SIGNED_IN");
+
+    mount();
+    await userEvent.click(screen.getByTestId("sign-in-REVIEW"));
+    await waitFor(() =>
+      expect(onReport).toHaveBeenCalledWith("로그인 확인됨. 다시 수집해 주세요.", false));
+    expect(collectNow).not.toHaveBeenCalled();
+  });
+
+  it("서버에 물어보지 못했으면 시작하지 않는다 — 모른다는 이유로 수집을 돌리지 않는다", async () => {
+    collectNowReadiness.mockRejectedValue(new Error("down"));
+    awaitSignIn.mockResolvedValue("SIGNED_IN");
+
+    mount();
+    await userEvent.click(screen.getByTestId("sign-in-REVIEW"));
+    await waitFor(() =>
+      expect(onReport).toHaveBeenCalledWith("로그인 확인됨. 다시 수집해 주세요.", false));
+    expect(collectNow).not.toHaveBeenCalled();
+  });
+
+  it("로그인이 확인되지 않았으면 서버에 멈춘 의도가 있어도 시작하지 않는다", async () => {
+    pausedOnServer(true);
+    awaitSignIn.mockResolvedValue("NOT_SIGNED_IN");
+
+    mount();
+    await userEvent.click(screen.getByTestId("sign-in-REVIEW"));
+    await waitFor(() => expect(onReport).toHaveBeenCalledWith(
+      "로그인 창을 지켜보는 시간이 끝났습니다. 로그인을 마친 뒤 [판매자센터 로그인]을 다시 눌러 주세요.", true));
+    expect(collectNow).not.toHaveBeenCalled();
+  });
+
+  it("회차가 바뀌면 그 사실을 말한다 — 몇 분을 말없이 기다리게 두지 않는다", async () => {
+    pausedOnServer(false);
+    awaitSignIn.mockResolvedValue("NOT_SIGNED_IN");
+
+    mount();
+    await userEvent.click(screen.getByTestId("sign-in-REVIEW"));
+    await waitFor(() => expect(onReport).toHaveBeenCalledWith(
+      expect.stringContaining("아직 기다리고 있습니다"), false));
+  });
 });
 
 describe("로그인 복구 뒤 멈췄던 수집을 이어간다 — 한 번만", () => {
@@ -160,7 +244,7 @@ describe("로그인 복구 뒤 멈췄던 수집을 이어간다 — 한 번만",
     await userEvent.click(screen.getByTestId("sign-in-REVIEW"));
     await waitFor(() =>
       expect(onReport).toHaveBeenCalledWith(
-        "아직 로그인이 확인되지 않았습니다. 로그인을 마친 뒤 다시 눌러 주세요.",
+        "로그인 창을 지켜보는 시간이 끝났습니다. 로그인을 마친 뒤 [판매자센터 로그인]을 다시 눌러 주세요.",
         true,
       ),
     );

@@ -241,6 +241,8 @@ public class ReviewCatchUpOrchestrator {
             run.setPausedWindowStart(null);
             run.setStopReason(null);
             run.setState(ReviewCatchUpState.RUNNING);
+            // A new attempt, so the walled window gets a NEW child instead of the settled one coming back.
+            run.setAttempt(run.getAttempt() + 1);
         }
         LocalDate[] next = run.nextWindow();
         if (next == null) {
@@ -255,7 +257,10 @@ public class ReviewCatchUpOrchestrator {
     private ScheduledAsideJob queue(ReviewCatchUpRun run, AsideRecipe recipe, LocalDate start, LocalDate end) {
         // The child's id is derived from the intent and the window, so a retry of the same window converges on
         // one job instead of queueing a second (`(device, clientJobId)` idempotency).
-        String clientJobId = "cu-" + run.getId().toString().substring(0, 8) + "-" + start + "-" + end;
+        // The attempt is in the key for the reason `ReviewCatchUpRun.attempt` records: without it, a window
+        // that has already settled can never be queued again, because `dispatch` returns the settled row.
+        String clientJobId = "cu-" + run.getId().toString().substring(0, 8) + "-" + start + "-" + end
+                + "-a" + run.getAttempt();
         return jobs.dispatch(AsideDispatch.catchUpWindow(run.getOrgId(), run.getSellerAccountId(), recipe,
                 clientJobId, run.getId(), start, end));
     }

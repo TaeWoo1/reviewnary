@@ -27,21 +27,30 @@ import com.sellerops.localagent.LocalAgentRunState;
  *                   this stayed 09-02. Only on the API route is it null by construction — a pull asks the channel
  *                   for the whole store and leaves no period for a seller to be missing
  * @param coverageGapDays how many days between that boundary and today nothing has read. Null with the boundary
+ * @param pausedCatchUp whether a catch-up for this row is waiting on a sign-in, right now.
+ *
+ *     <p><b>Why a screen needs this.</b> {@code localAgent} and {@code latestAttemptOutcome} are about the
+ *     LAST ATTEMPT, so {@code AUTH_REQUIRED} stays true after the seller has signed in — the product never
+ *     asked «are you signed in now», and on 2026-10-09 that left a seller pressing 「판매자센터 로그인」 a
+ *     second time, being told 「로그인 확인됨」, and nothing continuing. The intent they were trying to resume
+ *     is a row in this database, and this is that row being visible. It says nothing about the marketplace
+ *     session, which is deliberately stored nowhere ({@code SignInEndpoint}).
  */
 public record CollectNowReadinessView(CollectNowRouter.Path path, LocalAgentRunState localAgent,
                                       java.time.Instant lastSuccessAt,
                                       com.sellerops.coverage.AcquisitionAttemptOutcome latestAttemptOutcome,
-                                      java.time.LocalDate coverageThrough, Long coverageGapDays) {
+                                      java.time.LocalDate coverageThrough, Long coverageGapDays,
+                                      boolean pausedCatchUp) {
 
     /** The shape for a row with no history to report — the API route, and anything unsupported. */
     public static CollectNowReadinessView of(CollectNowRouter.Path path, LocalAgentRunState localAgent) {
-        return new CollectNowReadinessView(path, localAgent, null, null, null, null);
+        return new CollectNowReadinessView(path, localAgent, null, null, null, null, false);
     }
 
     /** The shape before coverage existed — kept so a caller that knows only the two acquisition facts still compiles. */
     public static CollectNowReadinessView of(CollectNowRouter.Path path, LocalAgentRunState localAgent,
                                              java.time.Instant lastSuccessAt,
                                              com.sellerops.coverage.AcquisitionAttemptOutcome latestAttemptOutcome) {
-        return new CollectNowReadinessView(path, localAgent, lastSuccessAt, latestAttemptOutcome, null, null);
+        return new CollectNowReadinessView(path, localAgent, lastSuccessAt, latestAttemptOutcome, null, null, false);
     }
 }

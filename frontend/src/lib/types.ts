@@ -3856,6 +3856,15 @@ export interface CollectNowReadinessView {
   coverageThrough: string | null;
   /** 그 경계와 오늘 사이에 아무도 읽지 않은 날수. 경계가 없으면 `null`. */
   coverageGapDays: number | null;
+  /**
+   * 지금 이 자료의 catch-up 하나가 로그인을 기다리고 있는가.
+   *
+   * <p>`latestAttemptOutcome`과 다르다 — 그건 지난 시도의 결말이고, 판매자가 로그인한 뒤에도 계속 참이다.
+   * 2026-10-09에 판매자가 로그인했고 「로그인 확인됨」까지 봤는데 아무것도 이어지지 않았다: 이어갈 의도는
+   * 서버의 row로 남아 있었고 화면이 그걸 볼 길이 없었다. 이 값이 그 row다. 마켓플레이스 세션에 대해서는
+   * 아무 말도 하지 않는다 — 그건 의도적으로 어디에도 저장하지 않는다.
+   */
+  pausedCatchUp: boolean;
 }
 
 /** 어느 기간을 아직 안 읽었는가 — 누르기 전에 보는 계획. 이 요청은 아무것도 수집하지 않는다. */

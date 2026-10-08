@@ -114,6 +114,20 @@ export const SIGN_IN_POLL_MS = 3000;
 export const SIGN_IN_POLL_LIMIT = 40;
 
 /**
+ * **몇 번까지 다시 지켜보는가.**
+ *
+ * 도우미 쪽 한 세션의 상한은 100초이고, 그건 올릴 수 없다 — Aside 자신의 호출 상한(120초)이 그 위에 있다.
+ * 2026-10-09에 그 100초가 실제로 터졌다: 로그인 창이 앞으로 나오지 않아 판매자가 창을 찾는 데 시간을 썼고,
+ * 98초에 `NOT_SIGNED_IN`으로 끝났다. 두 번째 시도는 창이 이미 앞에 있어서 34초에 끝났다. 즉 상한이 아니라
+ * 포커스가 병목이고, 한 번만 지켜보는 것이 그 병목에 걸린 것이다.
+ *
+ * <p>그래서 한 번 누름 안에서 세 번까지 이어서 지켜본다. 각 회차는 상한 안에 있고, 로그인이 확인되면 그
+ * 자리에서 끝난다. 회차가 바뀔 때 창을 다시 열어 앞으로 가져오는 것은 부수효과가 아니라 이득이다 —
+ * 포커스를 못 가져오는 그 문제에 대한 두 번째 기회다.
+ */
+export const SIGN_IN_ROUNDS = 3;
+
+/**
  * 세션이 끝날 때까지 기다린다. `WAITING`이 아닌 첫 답이 결론이다.
  *
  * @param delay 테스트 seam. 실제로는 타이머.
@@ -134,13 +148,54 @@ export async function awaitSignIn(
   return latest;
 }
 
+/**
+ * **한 번 누름으로 여러 회차를 지켜본다 — 로그인이 확인되면 그 자리에서 끝난다.**
+ *
+ * 한 세션의 상한은 도우미 쪽에 있고 올릴 수 없다({@link SIGN_IN_ROUNDS} 참고). 여기서 하는 일은 그 상한이
+ * 사람의 속도와 맞지 않을 때 **이어서 한 번 더 지켜보는 것**이고, 회차마다 창을 다시 열어 앞으로 가져온다.
+ *
+ * @param onRound 회차가 시작될 때 화면에 알릴 기회. 몇 분을 기다리게 하면서 아무 말도 하지 않으면, 판매자는
+ *                멈춘 것으로 읽는다 — 2026-10-09에 실제로 그렇게 읽혔다.
+ */
+export async function watchSignIn(
+  channel: string,
+  onRound: (round: number, rounds: number) => void,
+  rounds = SIGN_IN_ROUNDS,
+  start: (c: string) => Promise<SignInStartResult> = startSignIn,
+  watch: () => Promise<SignInSessionState> = awaitSignIn,
+): Promise<{ ok: true; state: SignInSessionState }
+  | { ok: false; reason: Exclude<SignInStartResult, { ok: true }>["reason"] }> {
+  let latest: SignInSessionState = "WAITING";
+  for (let round = 1; round <= rounds; round += 1) {
+    // 첫 회차는 호출한 쪽이 이미 열었을 수도 있다. 열기는 멱등이 아니므로 매 회차 새로 시작한다 —
+    // 「한 데스크에 한 세션」 규칙 때문에 앞 회차가 끝난 뒤에만 가능하고, 그게 지금 상태다.
+    const started = await start(channel);
+    if (!started.ok) {
+      // 첫 회차에서 열지 못하면 할 말이 그것뿐이다. 뒤 회차에서라면 앞서 본 답을 들고 끝낸다.
+      if (round === 1) return { ok: false, reason: started.reason };
+      return { ok: true, state: latest };
+    }
+    onRound(round, rounds);
+    latest = await watch();
+    if (latest === "SIGNED_IN" || latest === "UNAVAILABLE") {
+      return { ok: true, state: latest };
+    }
+  }
+  return { ok: true, state: latest };
+}
+
 /** 로그인 복구 한 번의 결과를 판매자 문장으로. 구현 용어는 한 글자도 나오지 않는다. */
 export function signInMessage(state: SignInSessionState): { text: string; isError: boolean } | null {
   switch (state) {
     case "SIGNED_IN":
       return { text: "로그인 확인됨. 다시 수집해 주세요.", isError: false };
     case "NOT_SIGNED_IN":
-      return { text: "아직 로그인이 확인되지 않았습니다. 로그인을 마친 뒤 다시 눌러 주세요.", isError: true };
+      // <b>왜 끝났는지 말한다.</b> 「아직 확인되지 않았습니다」만 있으면 판매자는 자기가 뭘 잘못했는지 찾는다.
+      // 끝난 이유는 지켜보는 시간이 다 된 것이고, 다음에 할 일은 로그인을 마친 뒤 그 버튼을 다시 누르는 것이다.
+      return {
+        text: "로그인 창을 지켜보는 시간이 끝났습니다. 로그인을 마친 뒤 [판매자센터 로그인]을 다시 눌러 주세요.",
+        isError: true,
+      };
     case "UNAVAILABLE":
       return { text: "판매자센터 로그인 창을 열지 못했습니다. 잠시 후 다시 시도해 주세요.", isError: true };
     default:

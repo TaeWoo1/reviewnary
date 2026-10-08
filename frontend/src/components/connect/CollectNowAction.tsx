@@ -8,6 +8,8 @@ import {
   signInMessage,
   signInStartMessage,
   startSignIn,
+  SIGN_IN_ROUNDS,
+  watchSignIn,
 } from "../../lib/connect/signInRecovery";
 import { kstMonthDay } from "../../lib/format";
 
@@ -370,35 +372,54 @@ export function CollectNowAction({
     if (!channelCode) return;
     setSigningIn(true);
     try {
-      const started = await startSignIn(channelCode);
-      if (!started.ok) {
+      // <b>여러 회차를 이어서 지켜본다.</b> 도우미 쪽 한 세션의 상한은 100초이고 올릴 수 없다 — Aside 자신의
+      // 호출 상한이 그 위에 있다. 2026-10-09에 그 100초가 터졌다: 창이 앞으로 나오지 않아 판매자가 창을 찾는
+      // 데 시간을 썼고 98초에 끝났다. 회차를 이어 붙이면 각 호출은 상한 안에 있으면서 사람에게는 시간이 생기고,
+      // 회차마다 창을 다시 앞으로 가져오는 것이 그 포커스 문제에 대한 두 번째 기회가 된다.
+      // 두 primitive를 여기서 건네는 이유: 이 화면이 쓰는 그 둘을 그대로 쓰게 하려는 것이다. 기본값으로
+      // 두면 모듈 내부 결합을 쓰게 되고, 이 화면의 동작을 그 둘로 세우는 테스트가 실제 호출을 비켜 간다.
+      const watched = await watchSignIn(channelCode, (round, rounds) => {
+        if (!live.current) return;
+        // <b>몇 분을 기다리게 하면서 아무 말도 하지 않으면 멈춘 것으로 읽힌다.</b> 2026-10-09에 그렇게 읽혔다.
+        onReport(round === 1
+          ? "판매자센터 로그인 창을 열었습니다. 그 창에서 로그인해 주세요."
+          : `아직 기다리고 있습니다. 로그인 창을 다시 앞으로 가져왔습니다. (${round}/${rounds})`, false);
+      }, SIGN_IN_ROUNDS, startSignIn, awaitSignIn);
+      if (!live.current) return;
+      if (!watched.ok) {
         // 시작하지 못했으면 기다리던 수집도 버린다 — 승인을 들고 있을 이유가 없다.
         pendingCollect.current = false;
-        onReport(signInStartMessage(started.reason), true);
+        onReport(signInStartMessage(watched.reason), true);
         return;
       }
-      // <b>창이 열렸다는 말을 먼저 한다.</b> 2026-10-08 라이브에서 창은 열렸고 화면은 그대로였다 — 도우미의
-      // 브라우저가 앞으로 나오지 않아서, 「판매자센터 로그인」을 누른 판매자는 아무 일도 없었다고 읽었다.
-      // 창은 이제 앞으로 나오지만(`bringToFront`), 그것은 호스트가 해 주는 일이라 보장이 아니다. 찾을 창이
-      // 있다는 사실은 보장할 수 있고, 그 한 줄이 이 자리의 진짜 안내다.
-      onReport("판매자센터 로그인 창을 열었습니다. 그 창에서 로그인해 주세요.", false);
-      const settled = await awaitSignIn();
-      if (!live.current) return;
-      if (settled !== "SIGNED_IN") {
-        // 시간이 다 됐거나 확인되지 않았다 — 실패가 아니고, 다만 들고 있던 승인은 여기서 버린다. 판매자가
-        // 자리를 떠난 뒤에 수집이 혼자 시작되는 쪽이 더 나쁘다.
-        pendingCollect.current = false;
-      }
-      const message = signInMessage(settled);
+      const settled = watched.state;
       if (settled === "SIGNED_IN") {
         setSignedInHere(true);
       }
-      // 이어서 할 수집이 있으면, 그 사실을 먼저 말하고 바로 이어 간다. 「다시 수집해 주세요」는 할 일이 남은
-      // 사람에게 하는 말이고, 여기서는 할 일이 이미 우리 쪽에 있다.
-      const resume = settled === "SIGNED_IN" && pendingCollect.current;
-      if (resume) {
-        pendingCollect.current = false;
-      } else if (message) {
+      // <b>이어갈 일이 있는지는 서버가 알고 있다.</b>
+      //
+      // `pendingCollect`는 이 탭의 메모리이고, 2026-10-09에 그것만으로는 부족했다: 첫 회차가 시간이 다 돼서
+      // 끝나는 순간 승인이 버려졌고, 두 번째 시도가 로그인을 확인했을 때는 이어갈 표식이 남아 있지 않았다.
+      // 판매자는 「로그인 확인됨」을 보고도 아무것도 이어지지 않는 화면 앞에 있었다. 멈춘 catch-up은 서버의
+      // row이므로, 그 row가 있으면 이 탭이 무엇을 기억하든 이어갈 일이 있는 것이다.
+      //
+      // 혼자 로그인한 것으로 수집이 시작되지 않는다는 계약은 그대로다 — 멈춘 의도가 없으면 둘 다 거짓이고,
+      // 그때 이 함수는 아무것도 시작하지 않는다.
+      let pausedThere = false;
+      if (settled === "SIGNED_IN") {
+        try {
+          const again = await api.collectNowReadiness(accountId, dataType);
+          pausedThere = again.pausedCatchUp === true;
+        } catch {
+          // 물어보지 못했으면 이 탭의 기억만 쓴다. 모른다는 이유로 수집을 시작하지는 않는다.
+          pausedThere = false;
+        }
+      }
+      if (!live.current) return;
+      const resume = settled === "SIGNED_IN" && (pendingCollect.current || pausedThere);
+      pendingCollect.current = false;
+      const message = signInMessage(settled);
+      if (!resume && message) {
         onReport(message.text, message.isError);
       }
       if (resume) {
