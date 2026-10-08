@@ -114,6 +114,20 @@ describe("막힌 자리를 말한다 — 2026-10-08 라이브가 가르친 것",
     }
   });
 
+  it("도우미가 프로그램을 못 돌린 네 경우는 화면에 기술 용어를 내보내지 않는다", () => {
+    // 이 넷은 판매자가 판매자센터에서 할 수 있는 일이 없는 멈춤이다 — 기다렸다 다시 누르는 것뿐. 그래서
+    // 화면 문장은 기존 일반 복구 문구 그대로이고, 원인 구분은 기록(failureCode)이 들고 있는다.
+    for (const code of ["EXECUTOR_UNAVAILABLE", "EXECUTOR_TIMEOUT", "EXECUTOR_REFUSED", "EXECUTOR_FAULT"]) {
+      expect(stopSentence(code), code).toBeNull();
+    }
+    // 그리고 그 일반 문구에 코드가 섞여 나오지 않는다.
+    const said = catchUpMessage(walk("FAILED", 0, { stopReason: "EXECUTOR_TIMEOUT" }))!.text;
+    expect(said).toBe("0개 기간을 확인한 뒤 멈췄습니다. 잠시 후 다시 시도해 주세요.");
+    for (const term of ["EXECUTOR", "TIMEOUT", "UNAVAILABLE", "FAULT", "REFUSED"]) {
+      expect(said, term).not.toContain(term);
+    }
+  });
+
   it("어느 문장에도 내부 용어가 없다", () => {
     const said = ["DATE_CONTROL_CANDIDATES_UNREADABLE", "RANGE_MISMATCH", "SURFACE_UNEXPECTED",
       "DAY_CELL_AMBIGUOUS", "MONTH_NAV_UNVERIFIED", "CALENDAR_OPENER_AMBIGUOUS"]

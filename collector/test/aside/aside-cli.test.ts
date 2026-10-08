@@ -9,9 +9,11 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   ASIDE_ALLOWED_INVOCATIONS,
+  ASIDE_REPORTABLE_SIGNALS,
   classifyAsideNoResult,
   parseAsideResultLine,
   readAsideCliVersion,
+  reportableSignal,
   runAsideRepl,
 } from "../../src/aside/aside-cli";
 
@@ -107,5 +109,50 @@ describe("runAsideRepl over the fake CLI", () => {
   it("reads the CLI version through the only other allowed invocation", async () => {
     expect(await readAsideCliVersion(cli)).toBe("9.9.9-fake");
     expect(await readAsideCliVersion({ command: "/nonexistent/aside-binary-for-test" })).toBeNull();
+  });
+});
+
+/**
+ * <b>How the process ended, beside the reason word.</b>
+ *
+ * The reason has always been classified here and the caller used to flatten all four into one. These two
+ * values exist so the record can go one step further than the word — and they are deliberately the only two,
+ * because stdout and stderr stop in this file and that is what keeps page text out of an operator record.
+ */
+describe("the bounded metadata a failed call carries", () => {
+  it("a refusal names its exit code", async () => {
+    process.env.FAKE_ASIDE_MODE = "account";
+    // The fake exits 1 on an unknown account, as the real CLI was observed to.
+    expect(await runAsideRepl("x", cli)).toMatchObject({
+      kind: "NO_RESULT", reason: "REFUSED", exitCode: 1, signal: null,
+    });
+  });
+
+  it("a clean exit with no result line names exit 0 — the shape of a program that threw", async () => {
+    process.env.FAKE_ASIDE_MODE = "silent";
+    expect(await runAsideRepl("x", cli)).toMatchObject({
+      kind: "NO_RESULT", reason: "FAULT", exitCode: 0, signal: null,
+    });
+  });
+
+  it("our own kill shows up as the signal we sent", async () => {
+    process.env.FAKE_ASIDE_MODE = "hang";
+    const run = await runAsideRepl("x", { ...cli, timeoutMs: 300 });
+    expect(run).toMatchObject({ kind: "NO_RESULT", reason: "TIMEOUT", signal: "SIGKILL" });
+  });
+
+  it("a process that never started has neither", async () => {
+    expect(await runAsideRepl("x", { command: "/nonexistent/aside-binary-for-test" })).toMatchObject({
+      kind: "NO_RESULT", reason: "UNAVAILABLE", exitCode: null, signal: null,
+    });
+  });
+
+  it("the signal name is from a set we chose, never a string the platform handed us", () => {
+    expect(reportableSignal("SIGKILL")).toBe("SIGKILL");
+    for (const unknown of ["SIGUSR2", "SIGWINCH", "", "whatever", "SIGKILL ", "sigkill"]) {
+      expect(reportableSignal(unknown), unknown).toBeNull();
+    }
+    expect(reportableSignal(null)).toBeNull();
+    expect([...ASIDE_REPORTABLE_SIGNALS]).toEqual(["SIGKILL", "SIGTERM", "SIGINT", "SIGSEGV", "SIGABRT"]);
   });
 });

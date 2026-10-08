@@ -63,7 +63,15 @@ export class AsideNaverProductInquiryExecutor {
       ...this.cli,
       timeoutMs: this.workflow.settleTimeoutMs + 30_000,
     });
-    if (run.kind === "NO_RESULT") return { kind: "UNAVAILABLE", llmCalls: 0 };
+    if (run.kind === "NO_RESULT") {
+      // The 문의 lane shares the review lane's execution type, so it carries the same stop. Its own runner
+      // does not read it yet; dropping it here would put the word back behind the single flattened one.
+      return {
+        kind: "UNAVAILABLE",
+        stop: { reason: run.reason, exitCode: run.exitCode, signal: run.signal },
+        llmCalls: 0,
+      };
+    }
     const parsed = parseNaverReviewRuntimeResult(run.result);
     if (parsed === null) {
       return { kind: "RESULT", result: { ok: false, code: "RUNTIME_FAULT", stage: "READ", reason: null, elapsedMs: run.elapsedMs }, llmCalls: 0 };

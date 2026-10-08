@@ -44,6 +44,17 @@ public final class AsideJobFailureCode {
             "READ_UNSETTLED",
             "READING_REFUSED",
             "WINDOW_INVALID",
+            // <b>Why the desk could not run the program at all — four words, not one.</b>
+            //
+            // The helper's CLI has separated these four since it shipped and the runner flattened them into
+            // the OUTCOME {@code EXECUTOR_UNAVAILABLE}, leaving this column null. On 2026-10-09 the first
+            // historical catch-up stopped there, and «Aside was unreachable», «the program threw» and «the
+            // ceiling elapsed» were one indistinguishable row. The outcome still says the desk failed; these
+            // say which way, so the next person reads the record instead of re-probing a healthy chain.
+            "EXECUTOR_UNAVAILABLE",
+            "EXECUTOR_TIMEOUT",
+            "EXECUTOR_REFUSED",
+            "EXECUTOR_FAULT",
             "RUNTIME_FAULT");
 
     private AsideJobFailureCode() {
