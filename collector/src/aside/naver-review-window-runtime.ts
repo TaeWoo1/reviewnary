@@ -130,6 +130,14 @@ export type NaverWindowRuntimeResult =
       stage: "PREPARE" | "SURFACE" | "AUTH" | "CONTROLS" | "NAVIGATE" | "VERIFY" | "READ";
       /** How many candidates were found, when the stop was about a count. */
       candidates: number | null;
+      /**
+       * For a query-control stop: how many candidates carried the word before the form test.
+       *
+       * <p>Two numbers because the two tests fail for different reasons and the fix is in a different place:
+       * «2 labelled, 0 accepted» means the period's form is not what we think it is; «0 labelled» means the
+       * list does not print 조회 any more.
+       */
+      labelled: number | null;
       elapsedMs: number;
     };
 
@@ -143,11 +151,13 @@ export async function asideNaverReviewWindowRuntime(
     code: Extract<NaverWindowRuntimeResult, { ok: false }>["code"],
     stage: Extract<NaverWindowRuntimeResult, { ok: false }>["stage"],
     candidates?: number,
+    labelled?: number,
   ): NaverWindowRuntimeResult => ({
     ok: false,
     code,
     stage,
     candidates: typeof candidates === "number" ? candidates : null,
+    labelled: typeof labelled === "number" ? labelled : null,
     elapsedMs: elapsed(),
   });
 
@@ -175,8 +185,8 @@ export async function asideNaverReviewWindowRuntime(
     }
     const s = (surface ?? {}) as {
       route?: unknown; grid?: unknown;
-      dateCandidates?: unknown; dateAccepted?: unknown;
-      queryCandidates?: unknown; queryAccepted?: unknown;
+      dateCandidates?: unknown; dateAccepted?: unknown; dateFormFound?: unknown;
+      queryCandidates?: unknown; queryLabelled?: unknown; queryAccepted?: unknown;
     };
     if (s.route !== true) {
       return fail("SURFACE_UNEXPECTED", "SURFACE");
@@ -214,10 +224,14 @@ export async function asideNaverReviewWindowRuntime(
       return fail("RANGE_CONTROLS_AMBIGUOUS", "CONTROLS", dateAccepted.length);
     }
     if (queryAccepted.length === 0) {
-      return fail("QUERY_CONTROL_NOT_FOUND", "CONTROLS", 0);
+      // `labelled` says which test excluded them: «two carried the word, none was in the period's form» and
+      // «nothing on the page says 조회» send the next person to different halves of the problem.
+      return fail("QUERY_CONTROL_NOT_FOUND", "CONTROLS", 0,
+        typeof s.queryLabelled === "number" ? s.queryLabelled : undefined);
     }
     if (queryAccepted.length > 1) {
-      return fail("QUERY_CONTROL_AMBIGUOUS", "CONTROLS", queryAccepted.length);
+      return fail("QUERY_CONTROL_AMBIGUOUS", "CONTROLS", queryAccepted.length,
+        typeof s.queryLabelled === "number" ? s.queryLabelled : undefined);
     }
 
     // The handles are the accepted indices, in the candidate set's own document order — which is the order a

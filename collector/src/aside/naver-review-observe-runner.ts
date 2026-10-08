@@ -302,6 +302,7 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
     log("aside_naver_review_read", {
       ok: false, code, stage: result["stage"] ?? null,
       reason: result["reason"] ?? null, candidates: result["candidates"] ?? null,
+      labelled: result["labelled"] ?? null,
       window: askedFor, llmCalls: 0, outcome,
     });
     return none(outcome, asFailureCode(code));
