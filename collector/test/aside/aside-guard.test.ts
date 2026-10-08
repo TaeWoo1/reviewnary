@@ -85,8 +85,16 @@ const FORBIDDEN_TOKENS = [
  *
  * The list is explicit and each entry is a decision: the NAVER Seller Center review runtime was added with the
  * operator's single-file approval (2026-09-17) for exactly this shape — wait for the grid, read rows, close the tab.
+ * `sign-in-runtime.ts` was added on 2026-10-08 with the narrowest shape of all — it forwards ONE script, the
+ * acquisition's own `signedIn` probe, and does nothing with the answer but return it. A read that met the
+ * channel's sign-in wall left the seller with nowhere to go, and this is the lane that opens that page; the
+ * reason it may evaluate is that asking «are you signed in yet» is the whole of what it does.
  */
-const EVALUATE_FORWARDERS = ["coupang-review-runtime.ts", "naver-review-runtime.ts"] as const;
+const EVALUATE_FORWARDERS = [
+  "coupang-review-runtime.ts",
+  "naver-review-runtime.ts",
+  "sign-in-runtime.ts",
+] as const;
 
 describe("aside provider — forbidden capability tokens are absent from every source file", () => {
   it.each(FILES)("%s", (file) => {

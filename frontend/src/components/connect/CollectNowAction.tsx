@@ -3,6 +3,13 @@ import { api } from "../../lib/apiClient";
 import { useApiData } from "../../lib/useApiData";
 import type { CollectNowPath, LocalAgentRunState, ScreenReadView } from "../../lib/types";
 import { backendCode, backendMessage } from "./channelShared";
+import {
+  awaitSignIn,
+  signInMessage,
+  signInStartMessage,
+  startSignIn,
+} from "../../lib/connect/signInRecovery";
+import { kstMonthDay } from "../../lib/format";
 
 /**
  * <b>「지금 수집하기」 — 이 제품에서 한 자료를 가져오는 사용자 동작은 이것 하나다.</b>
@@ -88,7 +95,10 @@ export function deskSentence(desk: LocalAgentRunState | null): string {
     case "BUSY":
       return "이미 수집이 진행 중입니다.";
     case "AUTH_REQUIRED":
-      return "판매자 센터 로그인이 필요합니다. 로그인한 뒤 다시 수집해 주세요.";
+      // <b>지난 시도에 대한 문장이고, 지금의 인증 상태가 아니다.</b> 서버가 아는 것은 「마지막 수집 시도가
+      // 로그인 벽에서 멈췄다」이지 「지금 로그아웃 상태다」가 아니다 — 후자는 아무도 하지 않은 실시간 확인을
+      // 주장하는 말이고, 판매자가 그사이 자기 브라우저에서 로그인했을 수도 있다.
+      return "최근 수집 시 로그인이 필요했습니다.";
     default:
       return "누를 때마다 판매자 센터 화면에서 읽어옵니다. 자동 주기는 없습니다.";
   }
@@ -105,6 +115,8 @@ export interface CollectNowRoute {
   path: CollectNowPath | null;
   /** 도우미가 필요한 경로에서의 책상 상태. API 경로에서는 `null`. */
   desk: LocalAgentRunState | null;
+  /** 실제로 읽은 가장 최근 수집. 한 번의 호출로 같이 오므로 두 사실이 어긋날 수 없다. */
+  lastSuccessAt: string | null;
 }
 
 /**
@@ -121,7 +133,12 @@ export function useCollectNowRoute(accountId: string, dataType: string, refreshK
   // `useApiData`는 deps가 바뀌어도 마지막 성공 payload를 들고 있다. `loading`을 존중하는 것이 한 줄이
   // 다른 계정의 답으로 설명되는 일을 막는다.
   const ready = !query.loading && !query.error ? query.data : null;
-  return { loading: query.loading, path: ready?.path ?? null, desk: ready?.localAgent ?? null };
+  return {
+    loading: query.loading,
+    path: ready?.path ?? null,
+    desk: ready?.localAgent ?? null,
+    lastSuccessAt: ready?.lastSuccessAt ?? null,
+  };
 }
 
 /**
@@ -135,6 +152,8 @@ export function CollectNowAction({
   dataType,
   label,
   desk = null,
+  channelCode = null,
+  lastSuccessAt = null,
   disabled = false,
   showSentence = false,
   emphasis = "plain",
@@ -147,6 +166,13 @@ export function CollectNowAction({
   dataType: string;
   label: string;
   desk?: LocalAgentRunState | null;
+  /**
+   * 로그인 복구를 어느 판매자센터로 열지. 도우미가 그 채널의 공개된 경로를 열므로 이 값이 필요하다 —
+   * 이 컴포넌트가 채널로 분기하는 것이 아니라, 서버가 준 값을 그대로 전달하기만 한다.
+   */
+  channelCode?: string | null;
+  /** 실제로 읽은 가장 최근 수집. 로그인이 필요했다는 소식 옆에 이것이 같이 서야 과거를 잃지 않는다. */
+  lastSuccessAt?: string | null;
   disabled?: boolean;
   showSentence?: boolean;
   /**
@@ -163,9 +189,46 @@ export function CollectNowAction({
   onSettled?: () => void;
 }) {
   const [syncing, setSyncing] = useState(false);
+  /**
+   * 이 탭에서 방금 확인한 로그인. <b>이 탭에서만, 지금만</b> 유효하다 — 서버에 저장하지 않고 freshness로도
+   * 쓰지 않는다(제품 결정 2026-10-08). 새로고침하면 사라지고 화면은 다시 「최근 수집 시 로그인이
+   * 필요했습니다」로 돌아가는데, 그 문장은 마지막 수집 시도에 대한 것이라 다음 수집까지 참이다.
+   */
+  const [signedInHere, setSignedInHere] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
   // 연결되지 않은 도우미와 이미 일하는 중인 도우미는 누를 수 없다. 로그인이 풀린 경우는 누를 수 있게 둔다 —
   // 판매자가 방금 자기 브라우저에서 로그인했을 수 있고, 막아 두면 고친 뒤에도 누를 길이 없다.
   const blocked = desk === "UNPAIRED" || desk === "BUSY";
+  const authWall = desk === "AUTH_REQUIRED" && !signedInHere;
+
+  /**
+   * 「판매자센터 로그인」 — 수집이 쓰는 그 프로필, 그 페이지를 도우미가 연다.
+   *
+   * 자격은 어디에도 넣지 않는다. 아이디·비밀번호·MFA·CAPTCHA는 전부 판매자가 직접 하고, 도우미는
+   * signed-in 여부만 본다. 그리고 <b>로그인되었다고 수집을 자동으로 다시 돌리지 않는다</b> — 다음 수집도
+   * 판매자가 누르는 것이고, 그 누름이 그 수집의 승인이다.
+   */
+  async function signIn() {
+    if (!channelCode) return;
+    setSigningIn(true);
+    try {
+      const started = await startSignIn(channelCode);
+      if (!started.ok) {
+        onReport(signInStartMessage(started.reason), true);
+        return;
+      }
+      const settled = await awaitSignIn();
+      const message = signInMessage(settled);
+      if (settled === "SIGNED_IN") {
+        setSignedInHere(true);
+      }
+      if (message) {
+        onReport(message.text, message.isError);
+      }
+    } finally {
+      setSigningIn(false);
+    }
+  }
 
   async function press() {
     setSyncing(true);
@@ -203,11 +266,36 @@ export function CollectNowAction({
 
   return (
     <div className="flex flex-col items-start gap-2 md:items-end">
-      {showSentence ? <p className="break-keep text-sm text-muted">{deskSentence(desk)}</p> : null}
+      {showSentence ? (
+        <div className="flex flex-col items-start gap-0.5 md:items-end">
+          {/*
+            <b>두 사실이 한 화면에 같이 선다.</b> 「최근 수집 시 로그인이 필요했습니다」가 「마지막 성공 수집
+            9월 2일」을 지우지 않는다 — 로그인이 만료됐다는 소식이 그 전에 읽은 4,432건을 없애지는 않기
+            때문이다. 한 칸으로 합쳐 두었을 때 제품은 실제로 읽은 채널을 「확인된 적 없음」이라고 말했다.
+          */}
+          <p className="break-keep text-sm text-muted">
+            {signedInHere ? "로그인 확인됨. 다시 수집해 주세요." : deskSentence(desk)}
+          </p>
+          {lastSuccessAt ? (
+            <p className="break-keep text-sm text-muted">마지막 성공 수집 {kstMonthDay(lastSuccessAt)}</p>
+          ) : null}
+        </div>
+      ) : null}
+      {authWall && channelCode ? (
+        <button
+          type="button"
+          data-testid={`sign-in-${dataType}`}
+          disabled={signingIn || syncing}
+          onClick={signIn}
+          className="rounded-xl bg-brand-700 px-4 py-2 text-base font-semibold text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {signingIn ? "로그인 창에서 로그인해 주세요…" : "판매자센터 로그인"}
+        </button>
+      ) : null}
       <button
         type="button"
         data-testid={`collect-now-${dataType}`}
-        disabled={disabled || syncing || blocked}
+        disabled={disabled || syncing || signingIn || blocked}
         onClick={press}
         // 이 버튼은 「저장 중」처럼 잠깐이 아니라, 도우미를 연결할 때까지 계속 꺼져 있을 수 있다. 눌리지 않는
         // 버튼이 눌리는 버튼과 똑같이 생기면, 그 옆 문장을 읽지 않은 판매자는 고장난 화면을 본다.
@@ -217,7 +305,7 @@ export function CollectNowAction({
             : "btn-ghost"
         } px-4 py-2 text-base disabled:cursor-not-allowed disabled:opacity-50`}
       >
-        {syncing ? "수집 중…" : "지금 수집하기"}
+        {syncing ? "수집 중…" : signedInHere ? "다시 수집하기" : "지금 수집하기"}
       </button>
       {recovery && needsRecovery(desk) ? recovery : null}
     </div>

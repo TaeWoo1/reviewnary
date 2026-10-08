@@ -194,7 +194,7 @@ describe("쿠팡 채널 화면 — 두 가지 방법, 그뿐", () => {
     const card = await screen.findByTestId("coupang-review-card");
 
     await waitFor(() =>
-      expect(within(card).getByText("판매자 센터 로그인이 필요합니다. 로그인한 뒤 다시 수집해 주세요.")).toBeInTheDocument(),
+      expect(within(card).getByText("최근 수집 시 로그인이 필요했습니다.")).toBeInTheDocument(),
     );
     // 로그인은 판매자가 자기 브라우저에서 방금 했을 수도 있다. 막아 두면 고친 뒤에도 누를 길이 없다.
     expect(within(card).getByTestId("collect-now-REVIEW")).not.toBeDisabled();

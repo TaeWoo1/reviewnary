@@ -217,7 +217,7 @@ class OperatorCollectNowTest {
     void readinessDistinguishesTheDeskStates() {
         // READY — a linked, idle helper and a published screen read.
         assertThat(service.readiness(org, naverAccount, "REVIEW"))
-                .isEqualTo(new CollectNowReadinessView(CollectNowRouter.Path.SCREEN_READ, LocalAgentRunState.READY));
+                .isEqualTo(CollectNowReadinessView.of(CollectNowRouter.Path.SCREEN_READ, LocalAgentRunState.READY));
 
         // BUSY — the desk is already reading something, which is not «go link a helper».
         service.collectNow(org, coupangAccount, "REVIEW", "press-1");
@@ -253,7 +253,7 @@ class OperatorCollectNowTest {
     @DisplayName("an API row has no desk state, because no desk is involved")
     void readinessSaysNothingAboutADeskItDoesNotUse() {
         assertThat(service.readiness(org, cafe24Account, "REVIEW"))
-                .isEqualTo(new CollectNowReadinessView(CollectNowRouter.Path.API, null));
+                .isEqualTo(CollectNowReadinessView.of(CollectNowRouter.Path.API, null));
         devices.deleteAll();
         // Still API, still available: an unlinked helper has nothing to do with a Cafe24 review.
         assertThat(service.readiness(org, cafe24Account, "REVIEW").path())

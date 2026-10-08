@@ -179,6 +179,8 @@ export function CoupangChannelView({
                 dataType="REVIEW"
                 label="리뷰"
                 desk={reviewRoute.desk}
+                channelCode={channelCode}
+                lastSuccessAt={reviewRoute.lastSuccessAt}
                 showSentence
                 emphasis={lead === "REVIEW" ? "primary" : "plain"}
                 recovery={reviewRecovery}

@@ -10,7 +10,8 @@
  */
 
 import { BridgeServer, type CustomerOperationsFixtureEndpoint, type DeviceLinkEndpoint,
-  type StoreIdentityBootstrapEndpoint } from "../bridge/bridge-server";
+  type StoreIdentityBootstrapEndpoint,
+  type SignInHttpEndpoint } from "../bridge/bridge-server";
 import { FilePairingStore } from "../bridge/pairing-store";
 import type { ApprovalPresenter } from "../bridge/approval-presenter";
 import { settleObserverToPort, refFor } from "../bridge/event-adapter";
@@ -279,6 +280,8 @@ export interface AgentBridgeConfig {
   deviceLink?: DeviceLinkEndpoint;
   /** See `StoreIdentityBootstrapEndpoint`. Absent ⇒ the loopback bootstrap route is 404. */
   storeIdentityBootstrap?: StoreIdentityBootstrapEndpoint;
+  /** The seller's own sign-in recovery, passed through to the bridge. Absent ⇒ both routes are 404. */
+  signIn?: SignInHttpEndpoint;
   /**
    * Scheduled Aside v1: the owned observation surface this helper hosts, if any. Absent ⇒ the route is 404,
    * so a helper hosts no such page unless it was configured to — see `CustomerOperationsFixtureEndpoint`.
@@ -516,6 +519,7 @@ export function createAgentBridge(cfg: AgentBridgeConfig): AgentBridge {
     ...(cfg.onSellerOpsConnected ? { onSellerOpsConnected: cfg.onSellerOpsConnected } : {}),
     ...(cfg.deviceLink ? { deviceLink: cfg.deviceLink } : {}),
     ...(cfg.storeIdentityBootstrap ? { storeIdentityBootstrap: cfg.storeIdentityBootstrap } : {}),
+    ...(cfg.signIn ? { signIn: cfg.signIn } : {}),
     ...(cfg.customerOperationsFixture ? { customerOperationsFixture: cfg.customerOperationsFixture } : {}),
   });
   const settle = settleObserverToPort(server.events, cfg.refSalt);

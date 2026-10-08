@@ -130,6 +130,13 @@ export interface BridgeServerDeps {
   /** See {@link StoreIdentityBootstrapEndpoint}. Absent ⇒ the route is 404. */
   storeIdentityBootstrap?: StoreIdentityBootstrapEndpoint;
   /**
+   * The seller's own sign-in recovery (`POST /bridge/sign-in/start`, `GET /bridge/sign-in/status`): the
+   * paired tab asks this helper to open the channel's page in the profile the acquisition drives, and then
+   * asks back until there is an answer. Same trust root as the device routes — allowed origin plus a valid
+   * pairing bearer. Absent ⇒ both routes are 404, which is what an install with no marketplace browser is.
+   */
+  signIn?: SignInHttpEndpoint;
+  /**
    * Scheduled Aside v1: the page an unattended recipe is allowed to open — one this repository authors and
    * serves, never a marketplace. Absent ⇒ the route is 404, so an ordinary install hosts no such surface and
    * hosting one is a deliberate act rather than a default. See {@link CustomerOperationsFixtureEndpoint}.
@@ -150,6 +157,18 @@ export interface CustomerOperationsFixtureEndpoint {
 export interface DeviceLinkEndpoint {
   start(): Promise<unknown>;
   status(): Promise<unknown>;
+}
+
+/**
+ * What the bridge needs from the sign-in recovery — see `bridge/sign-in-endpoint.ts`.
+ *
+ * `start` is synchronous on purpose: the press returns as soon as the page is being opened, and the tab
+ * learns the outcome by asking. A press that waited for a human to finish typing would hold an HTTP request
+ * open for the length of someone's MFA.
+ */
+export interface SignInHttpEndpoint {
+  start(channelCode: unknown): unknown;
+  status(): unknown;
 }
 
 /**
@@ -185,6 +204,7 @@ export class BridgeServer {
   private readonly actionWindow: AwCarrierEndpoint | undefined;
   private readonly onSellerOpsConnected: (() => void) | undefined;
   private readonly deviceLink: DeviceLinkEndpoint | undefined;
+  private readonly signIn: SignInHttpEndpoint | undefined;
   private readonly storeIdentityBootstrap: StoreIdentityBootstrapEndpoint | undefined;
   private readonly customerOperationsFixture: CustomerOperationsFixtureEndpoint | undefined;
   private readonly projectionWss: WebSocketServer | undefined;
@@ -209,6 +229,7 @@ export class BridgeServer {
     this.actionWindow = deps.actionWindow;
     this.onSellerOpsConnected = deps.onSellerOpsConnected;
     this.deviceLink = deps.deviceLink;
+    this.signIn = deps.signIn;
     this.storeIdentityBootstrap = deps.storeIdentityBootstrap;
     this.customerOperationsFixture = deps.customerOperationsFixture;
     if (this.autoApprovePairing) log("bridge_dev_auto_approve_active", { warning: true });
@@ -346,6 +367,8 @@ export class BridgeServer {
       if (method === "POST" && path === "/bridge/agent/revoke") return await this.handleAgentRevoke(req, res);
       if (method === "POST" && path === "/bridge/device/link") return await this.handleDeviceLink(req, res, "start");
       if (method === "GET" && path === "/bridge/device/status") return await this.handleDeviceLink(req, res, "status");
+      if (method === "POST" && path === "/bridge/sign-in/start") return await this.handleSignIn(req, res, "start");
+      if (method === "GET" && path === "/bridge/sign-in/status") return await this.handleSignIn(req, res, "status");
       if (method === "GET" && path === "/bridge/store-identity/bootstrap") return this.handleStoreIdentityBootstrap(req, res);
       if (method === "GET" && path === FIXTURE_OBSERVE_PATH) return this.handleCustomerOperationsFixture(url, res);
       sendJson(res, 404, { error: "not_found" });
@@ -646,6 +669,28 @@ export class BridgeServer {
     if (!pairing) { sendJson(res, 401, { error: "unpaired" }); return; }
     const body = op === "start" ? await this.deviceLink.start() : await this.deviceLink.status();
     sendJson(res, 200, body);
+  }
+
+  /**
+   * Sign-in recovery, gated exactly like the device routes: allowed origin + valid pairing bearer, else
+   * 403/401. The start body names a channel and nothing else; the endpoint refuses any other value itself.
+   */
+  private async handleSignIn(req: IncomingMessage, res: ServerResponse, op: "start" | "status"): Promise<void> {
+    if (!this.signIn) { sendJson(res, 404, { error: "not_found" }); return; }
+    const origin = header(req, "origin");
+    if (!isOriginAllowed(origin, this.allowedOrigins)) { sendJson(res, 403, { error: "bad_origin" }); return; }
+    const token = bearer(req);
+    const pairing = token ? this.store.registry.authenticate(token) : null;
+    if (!pairing) { sendJson(res, 401, { error: "unpaired" }); return; }
+    if (op === "status") { sendJson(res, 200, this.signIn.status()); return; }
+    let channelCode: unknown = null;
+    try {
+      const raw = await readJson(req);
+      channelCode = raw && typeof raw === "object" ? (raw as { channelCode?: unknown }).channelCode : null;
+    } catch {
+      channelCode = null;
+    }
+    sendJson(res, 200, this.signIn.start(channelCode));
   }
 
   /**

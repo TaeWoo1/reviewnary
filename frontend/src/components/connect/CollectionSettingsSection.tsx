@@ -78,6 +78,7 @@ export function CollectionSettingsSection({
           <ScheduleRow
             key={t.value}
             accountId={accountId}
+            channelCode={channelCode}
             dataType={t.value}
             label={channelDataTypeLabel(channelCode, t.value, t.label)}
             schedule={schedules.find((s) => s.dataType === t.value) ?? null}
@@ -100,6 +101,7 @@ export function CollectionSettingsSection({
 
 function ScheduleRow({
   accountId,
+  channelCode,
   dataType,
   label,
   schedule,
@@ -111,6 +113,11 @@ function ScheduleRow({
   onReport,
 }: {
   accountId: string;
+  /**
+   * 로그인 복구를 어느 판매자센터로 열지 — 값으로 전달되기만 한다. 이 줄은 이 값을 읽고 분기하지 않는다
+   * (경로는 서버가 답하고, 그 분기가 이번에 걷어낸 결함이었다).
+   */
+  channelCode?: string | null;
   dataType: string;
   label: string;
   schedule: ScheduleView | null;
@@ -139,7 +146,8 @@ function ScheduleRow({
    * 리뷰 API가 없는 두 채널에서는 버튼이 아예 그려지지 않았고(판매자에게는 「이 제품은 네이버 리뷰를 못
    * 가져온다」로 읽혔다) 그 사이 증명된 화면 읽기 경로가 손잡이 없는 문 뒤에 있었다.
    */
-  const { loading: routeLoading, path: route, desk } = useCollectNowRoute(accountId, dataType, askedAgain);
+  const { loading: routeLoading, path: route, desk, lastSuccessAt } =
+      useCollectNowRoute(accountId, dataType, askedAgain);
 
   const unsupported = capability !== null && !capability.supported;
   const needsVerification = capability?.verificationStatus === "NEEDS_VERIFICATION";
@@ -179,6 +187,8 @@ function ScheduleRow({
       dataType={dataType}
       label={label}
       desk={desk}
+      channelCode={channelCode ?? null}
+      lastSuccessAt={lastSuccessAt}
       disabled={saving}
       showSentence={route === "SCREEN_READ"}
       onReport={onReport}

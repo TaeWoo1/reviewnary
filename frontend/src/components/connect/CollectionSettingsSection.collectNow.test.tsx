@@ -157,13 +157,15 @@ describe("지금 수집 — 서버가 경로를 고른다", () => {
     expect(within(reviewRow()).queryByText(/연결하면/)).toBeNull();
   });
 
-  it("판매자 센터 로그인이 풀렸으면 로그인을 안내하고, 다시 누를 수는 있게 둔다", async () => {
+  it("로그인 벽은 「최근 수집 시」의 사실로 말한다 — 지금의 인증 상태를 주장하지 않는다", async () => {
     readiness("AUTH_REQUIRED");
     mount();
 
     // 로그인은 판매자가 자기 브라우저에서 방금 했을 수도 있다. 막아 두면 고친 뒤에도 누를 길이 없다.
     expect(await reviewButton()).not.toBeDisabled();
-    expect(within(reviewRow()).getByText(/판매자 센터 로그인이 필요합니다/)).toBeInTheDocument();
+    // 서버가 아는 것은 「마지막 시도가 로그인 벽에서 멈췄다」이고, 「지금 로그아웃 상태다」가 아니다.
+    expect(within(reviewRow()).getByText("최근 수집 시 로그인이 필요했습니다.")).toBeInTheDocument();
+    expect(within(reviewRow()).queryByText(/지금.*로그인/)).toBeNull();
   });
 
   it("도우미 미연결·수집 중은 눌렀을 때도 서로 다른 안내가 된다", async () => {
