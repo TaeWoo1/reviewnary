@@ -24,6 +24,10 @@ public final class AsideJobFailureCode {
     /** What the NAVER historical window lane can say. Each one is a different thing to go and fix. */
     public static final Set<String> KNOWN = Set.of(
             "SURFACE_UNEXPECTED",
+            // The seller centre's own host, with its router still working after the stated ceiling — ours,
+            // and not a sign-in wall. Separated on 2026-10-09, when one boolean over host AND hash made a
+            // sign-in redirect and a route that had not drawn yet the same word.
+            "ROUTE_NOT_READY",
             "DATE_CONTROL_CANDIDATES_UNREADABLE",
             "RANGE_CONTROLS_NOT_FOUND",
             "RANGE_CONTROLS_AMBIGUOUS",

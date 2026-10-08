@@ -97,6 +97,10 @@ export function stopSentence(failureCode: string | null | undefined): string | n
       return "판매자센터 화면이 요청한 기간을 보여주지 않았습니다.";
     case "SURFACE_UNEXPECTED":
       return "판매자센터 리뷰 화면을 찾지 못했습니다.";
+    case "ROUTE_NOT_READY":
+      // 판매자센터는 맞았고 리뷰 화면이 끝까지 그려지지 않았다. 판매자가 할 일은 기다렸다 다시 누르는 것뿐
+      // 이므로 「찾지 못했다」로 말하지 않는다 — 그건 화면을 확인하라는 뜻이 되고, 확인할 것이 없다.
+      return "판매자센터 리뷰 화면이 아직 열리지 않았습니다.";
     default:
       return null;
   }

@@ -149,6 +149,9 @@ export interface NaverReviewWindowRuntimePlan {
   requestedEndDaysBefore: number;
   /** How many single-month steps one field may take before the read gives up. */
   maxMonthMoves: number;
+  /** How long the list's own router may take to draw the review route before the read gives up. */
+  routeWaitTimeoutMs: number;
+  routePollMs: number;
   settleTimeoutMs: number;
   pollMs: number;
   /** How long a calendar may take to draw or redraw before it is read. */
@@ -164,6 +167,7 @@ export type NaverWindowRuntimeResult =
       code:
         | "AUTH_REQUIRED"
         | "SURFACE_UNEXPECTED"
+        | "ROUTE_NOT_READY"
         | "DATE_CONTROL_CANDIDATES_UNREADABLE"
         | "RANGE_CONTROLS_NOT_FOUND"
         | "RANGE_CONTROLS_AMBIGUOUS"
@@ -322,10 +326,53 @@ export async function asideNaverReviewWindowRuntime(
 
     // 1 & 2. THE SURFACE AND THE SIGN-IN WALL. The wall is asked between them, because a signed-out page can
     // draw anything at all — including something that looks like a grid.
-    const firstPass = await readCensus("SURFACE", false);
-    if (!firstPass.ok) {
-      return firstPass.result;
+    // 1. WHERE WE LANDED — and the three different answers that used to be one word.
+    //
+    // `route` was one boolean over host AND hash, so a sign-in redirect, a route that had not drawn yet, and
+    // a genuinely different page all read as SURFACE_UNEXPECTED. On 2026-10-09 the first of those happened:
+    // no session, NAVER sent the tab to accounts.commerce.naver.com, and the seller was told the review
+    // screen could not be found — «nothing you can do» — while the sign-in recovery built for exactly this
+    // sat unused. The census now reports the halves apart, and this reads them apart.
+    let landing: { hostOk: boolean; hashOk: boolean; authHost: boolean };
+    try {
+      landing = await readLanding();
+    } catch (e) {
+      return fail("RUNTIME_FAULT", "SURFACE");
     }
+    if (landing.authHost) {
+      // A host on the closed list of NAVER sign-in origins. The seller can act on this, so say so.
+      return fail("AUTH_REQUIRED", "SURFACE");
+    }
+    if (!landing.hostOk) {
+      // Any other host. A page nobody has seen is not a login page, and this lane will not say it is.
+      return fail("SURFACE_UNEXPECTED", "SURFACE");
+    }
+    if (!landing.hashOk) {
+      // The seller centre, with its router still working. Waited on rather than refused — `openTab` returns
+      // when a page looks interactive, which for a hash-routed app can be before it has drawn.
+      const deadline = Date.now() + plan.routeWaitTimeoutMs;
+      for (;;) {
+        if (Date.now() >= deadline) {
+          return fail("ROUTE_NOT_READY", "SURFACE");
+        }
+        await env.wait(plan.routePollMs);
+        try {
+          landing = await readLanding();
+        } catch (e) {
+          return fail("RUNTIME_FAULT", "SURFACE");
+        }
+        if (landing.authHost) {
+          return fail("AUTH_REQUIRED", "SURFACE");
+        }
+        if (!landing.hostOk) {
+          return fail("SURFACE_UNEXPECTED", "SURFACE");
+        }
+        if (landing.hashOk) {
+          break;
+        }
+      }
+    }
+
     let auth: unknown;
     try {
       auth = await tab.evaluate(plan.authScript);
@@ -593,6 +640,20 @@ export async function asideNaverReviewWindowRuntime(
     } catch (e) {
       /* a tab that will not close does not change what was read */
     }
+  }
+
+  /**
+   * Where the tab actually is, as three booleans from the page's own census. Throws only when the evaluate
+   * itself fails, which the caller reads as a runtime fault rather than a verdict about the page.
+   */
+  async function readLanding(): Promise<{ hostOk: boolean; hashOk: boolean; authHost: boolean }> {
+    const raw = await tab.evaluate(plan.controlsScript);
+    const r = (raw ?? {}) as { hostOk?: unknown; hashOk?: unknown; authHost?: unknown };
+    return {
+      hostOk: r.hostOk === true,
+      hashOk: r.hashOk === true,
+      authHost: r.authHost === true,
+    };
   }
 
   /** A calendar value reduced to a sortable day number, or null when it is not a date. Local to the program. */

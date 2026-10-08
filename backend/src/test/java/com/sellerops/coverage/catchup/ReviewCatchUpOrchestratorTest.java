@@ -323,6 +323,41 @@ class ReviewCatchUpOrchestratorTest {
     }
 
     @Test
+    @DisplayName("로그인 뒤 자동 재개는 정확히 한 번 — 두 번 눌려도 창은 하나만 책상에 올라간다")
+    void resumingFromAuthQueuesExactlyOneWindow() {
+        // 화면이 로그인 완료를 감지해 스스로 재개하는 경로다(판매자에게 다시 누르라고 하지 않는다). 그 자동
+        // 재개가 두 번 발화하는 것이 이 구조에서 가장 현실적인 사고이고, 그때 같은 창이 두 번 읽히거나 창
+        // 하나가 건너뛰어지면 coverage가 읽지 않은 날을 가지게 된다.
+        coveredThrough(36);
+        ScheduledAsideJob first = press("press-1").orElseThrow().firstJob();
+        settleAsRead(first, 45, 500);
+        ScheduledAsideJob walled = onDesk().orElseThrow();
+        LocalDate pausedAt = walled.getRequestedWindowStart();
+        settleAsAuthWall(walled);
+        assertThat(onDesk()).as("로그인 벽 뒤로는 아무것도 큐에 오르지 않는다").isEmpty();
+
+        // 자동 재개가 두 번 발화한다.
+        ScheduledAsideJob resumed = press("resume-1").orElseThrow().firstJob();
+        var second = press("resume-2");
+
+        assertThat(resumed.getRequestedWindowStart()).isEqualTo(pausedAt);
+        // 두 번째 발화는 같은 intent를 다시 찾을 뿐, 두 번째 창을 만들지 않는다.
+        assertThat(second).isPresent();
+        assertThat(second.orElseThrow().run().getId()).isEqualTo(resumed.getCatchUpRunId());
+        // 그 창에 대한 job은 **하나**다. 재개는 벽에 막힌 job을 다시 책상에 올리고, 두 번 발화해도 두 번째를
+        // 만들지 않는다 — 같은 창을 두 번 읽거나 창 하나를 건너뛸 길이 구조적으로 없다.
+        assertThat(jobs.findAll().stream()
+                .filter(j -> pausedAt.equals(j.getRequestedWindowStart()))
+                .toList())
+                .as("벽에 막힌 그 창에 대한 job")
+                .hasSize(1);
+        assertThat(resumed.getId()).as("재개된 것은 그 창의 바로 그 job").isEqualTo(walled.getId());
+        ReviewCatchUpRun run = runs.findById(resumed.getCatchUpRunId()).orElseThrow();
+        assertThat(run.getState()).isEqualTo(ReviewCatchUpState.RUNNING);
+        assertThat(run.getPausedWindowStart()).isNull();
+    }
+
+    @Test
     @DisplayName("the same press re-finds its own intent; a second press does not start a rival walk")
     void oneIntentPerRow() {
         coveredThrough(36);
