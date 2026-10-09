@@ -61,12 +61,26 @@ public class NaverConnectionLifecycle {
     private final SellerAccountRepository accounts;
     private final ChannelRepository channels;
     private final TransactionTemplate tx;
+    /**
+     * Announces the one transition other features care about. Optional so every context assembled without a
+     * publisher behaves exactly as it did before — the status still moves, and nothing listens.
+     */
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     public NaverConnectionLifecycle(SellerAccountRepository accounts, ChannelRepository channels,
                                     PlatformTransactionManager txManager) {
+        this(accounts, channels, txManager, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public NaverConnectionLifecycle(SellerAccountRepository accounts, ChannelRepository channels,
+                                    PlatformTransactionManager txManager,
+                                    @org.springframework.beans.factory.annotation.Autowired(required = false)
+                                    org.springframework.context.ApplicationEventPublisher events) {
         this.accounts = accounts;
         this.channels = channels;
         this.tx = new TransactionTemplate(txManager);
+        this.events = events;
     }
 
     /**
@@ -120,6 +134,12 @@ public class NaverConnectionLifecycle {
             if (target != null && target != account.getConnectionStatus()) {
                 account.setConnectionStatus(target);
                 accounts.save(account);
+                if (target == ChannelStatus.CONNECTED && events != null) {
+                    // Only on the move. A duplicate success event changes nothing and must announce nothing, or
+                    // a listener would see a connection happen every time a sync ran.
+                    events.publishEvent(new com.sellerops.selleraccount.SellerAccountConnectedEvent(
+                            account.getOrgId(), account.getId()));
+                }
             }
         });
     }

@@ -334,6 +334,63 @@ class ReviewAutoCheckTest {
     // ---------------------------------------------------------------- the tick
 
     @Test
+    @DisplayName("scheduler는 설정을 만들지 않는다 — 연결하지 않은 조직이 loop에 집히지 않는다")
+    void theTickNeverCreatesASetting() {
+        // 행이 없는 계정(= 이 기능 전에 연결했거나, 다른 조직의 계정). tick이 이것을 채택하면 「누구의 스토어를
+        // 읽는가」를 loop이 정하는 것이 되고, 그 다음에 필요한 것은 건너뛸 조직 목록이다 — 제품 코드가 들고
+        // 있을 수 없는 종류의 목록이다.
+        coveredThrough(1);
+        assertThat(settingRows.count()).isZero();
+
+        ReviewAutoCheckReconciler.TickReport report = reconciler.tick(now);
+
+        assertThat(settingRows.count()).isZero();
+        assertThat(report).isEqualTo(new ReviewAutoCheckReconciler.TickReport(0, 0, 0, 0, 0));
+        assertThat(jobs.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("연결을 마치면 켜져 있다 — 연결 이벤트 하나가 그 한 줄을 참으로 만든다")
+    void finishingAConnectionSwitchesItOn() {
+        SellerAccount fresh = accounts.save(connected(naver.getId()));
+        assertThat(settingRows.findBySellerAccountIdAndDataType(fresh.getId(), "REVIEW")).isEmpty();
+
+        new ReviewAutoCheckConnectionListener(settings)
+                .onConnected(new com.sellerops.selleraccount.SellerAccountConnectedEvent(org, fresh.getId()));
+
+        assertThat(settings.view(org, fresh.getId()).enabled()).isTrue();
+        // 두 번 와도 하나다 — 「다시 연결됨」은 연결이 아니다.
+        new ReviewAutoCheckConnectionListener(settings)
+                .onConnected(new com.sellerops.selleraccount.SellerAccountConnectedEvent(org, fresh.getId()));
+        assertThat(settingRows.findBySellerAccountIdAndDataType(fresh.getId(), "REVIEW")).isPresent();
+        assertThat(settingRows.findByOrgIdAndDataType(org, "REVIEW")).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("backfill은 내 조직의 계정만 켠다 — 그리고 껐던 것은 다시 켜지지 않는다")
+    void backfillIsScopedToOneOrgAndRespectsOff() {
+        UUID otherOrg = UUID.randomUUID();
+        SellerAccount theirs = new SellerAccount();
+        theirs.setOrgId(otherOrg);
+        theirs.setChannelId(naver.getId());
+        theirs.setConnectionStatus(ChannelStatus.CONNECTED);
+        theirs.setFileUpload(false);
+        theirs = accounts.save(theirs);
+
+        // 내 계정 하나는 이미 끄고 시작한다.
+        settings.view(org, account.getId());
+        settings.set(org, account.getId(), userId, false);
+
+        assertThat(settings.backfillForOrg(org)).isZero();
+        assertThat(settings.view(org, account.getId()).enabled()).isFalse();
+
+        // 다른 조직의 계정은 내 backfill이 건드리지 않는다.
+        assertThat(settingRows.findBySellerAccountIdAndDataType(theirs.getId(), "REVIEW")).isEmpty();
+        assertThat(settings.backfillForOrg(otherOrg)).isEqualTo(1);
+        assertThat(settingRows.findBySellerAccountIdAndDataType(theirs.getId(), "REVIEW")).isPresent();
+    }
+
+    @Test
     @DisplayName("빈 과거가 있으면 walk가 시작된다 — SCHEDULED로, 어제까지")
     void aGapStartsAWalk() {
         coveredThrough(20);
@@ -375,21 +432,52 @@ class ReviewAutoCheckTest {
     }
 
     @Test
-    @DisplayName("같은 하루를 두 번 읽지 않는다 — 한 시간 뒤 tick이 같은 작업을 다시 찾는다")
-    void todayIsReadOncePerDay() {
+    @DisplayName("한 시간 뒤의 차례는 다른 차례다 — 같은 날짜라도 새 읽기가 생긴다")
+    void thenextSlotIsANewRead() {
+        // <b>2026-10-09 proof에서 잡힌 결함.</b> job id가 날짜였을 때, 10:30 차례는 09:30 차례의 끝난 행을
+        // 다시 찾아 아무것도 보내지 않았다 — 자동 확인이 그날 첫 읽기 뒤로 조용히 멈췄다. 읽는 기간은 여전히
+        // 「오늘」이지만, 그것은 창이고 요청의 신원이 아니다.
         coveredThrough(1);
         settings.view(org, account.getId());
-        reconciler.tick(now);
+
+        assertThat(reconciler.tick(now).refreshedToday()).isEqualTo(1);
         ScheduledAsideJob first = onDesk().orElseThrow();
         settleAsRead(first, 3);
 
-        // 다음 tick: 같은 client job id로 수렴하므로 두 번째 작업이 책상에 올라가지 않는다.
+        // 한 시간 뒤, 같은 날. 주기가 돌아왔으므로 새 차례이고 새 작업이다.
         now = now.plus(Duration.ofHours(1));
-        settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW").ifPresent(row -> {
-            row.setNextCheckAt(now);
-            settingRows.save(row);
-        });
-        reconciler.tick(now);
+        assertThat(reconciler.tick(now).refreshedToday()).isEqualTo(1);
+        ScheduledAsideJob second = onDesk().orElseThrow();
+
+        assertThat(second.getId()).isNotEqualTo(first.getId());
+        assertThat(second.getClientJobId()).isNotEqualTo(first.getClientJobId());
+        // 둘 다 오늘 하루를 읽는다 — 창은 같고 차례는 다르다.
+        assertThat(second.getRequestedWindowStart()).isEqualTo(today);
+        assertThat(second.getRequestedWindowEnd()).isEqualTo(today);
+        assertThat(second.getTrigger()).isEqualTo(AsideTrigger.SCHEDULED);
+        assertThat(jobs.count()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("같은 차례를 다시 돌리면 작업은 하나다 — 재시도가 두 번째 읽기가 되지 않는다")
+    void theSameSlotRetriedConvergesOnOneJob() {
+        coveredThrough(1);
+        settings.view(org, account.getId());
+        ReviewAutoCheck row = settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW")
+                .orElseThrow();
+        java.time.Instant slot = row.getNextCheckAt();
+
+        // 같은 due slot을 두 번 수행한다 — claim 뒤에 그 차례가 다시 돌는 경우의 모양.
+        assertThat(reconciler.turn(row, slot)).isEqualTo(ReviewAutoCheckReconciler.Outcome.TODAY);
+        ScheduledAsideJob first = onDesk().orElseThrow();
+
+        // 아직 책상에 있는 동안: 두 번째 작업을 만들지 않는다(진행 중인 일을 건드리지 않는다는 규칙이 먼저 막는다).
+        assertThat(reconciler.turn(row, slot)).isEqualTo(ReviewAutoCheckReconciler.Outcome.SKIPPED);
+        assertThat(jobs.count()).isEqualTo(1);
+
+        // 끝난 뒤에도 같은 차례는 같은 요청이다 — client job id가 그 차례의 신원이므로 끝난 그 행으로 수렴한다.
+        settleAsRead(first, 3);
+        assertThat(reconciler.turn(row, slot)).isEqualTo(ReviewAutoCheckReconciler.Outcome.TODAY);
         assertThat(jobs.count()).isEqualTo(1);
         assertThat(onDesk()).isEmpty();
     }

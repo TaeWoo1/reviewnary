@@ -25,14 +25,32 @@ public class ReviewAutoCheckClaimer {
         this.rows = rows;
     }
 
+    /**
+     * One account's turn, and <b>which turn it is</b>.
+     *
+     * <p>{@code slot} is the instant this row was due for — the {@code next_check_at} that made it due, or the
+     * tick's own clock when the row had none yet (a setting just switched on). It is the identity of this
+     * execution, and the whole reason it is carried: the job's client id is derived from it, so a retry of
+     * <b>this</b> turn converges on one job while the next hour's turn is a different turn and gets its own,
+     * even though both read the same day.
+     *
+     * <p>A date would not do. 「ac-…-2026-10-09」 made every turn of one day the same ask, and the second turn
+     * re-found the first turn's settled row and dispatched nothing — an automatic check that silently stopped
+     * checking after its first read of the morning.
+     */
+    public record Claimed(ReviewAutoCheck row, Instant slot) {
+    }
+
     @Transactional
-    public List<ReviewAutoCheck> claimDue(Instant now, int limit) {
-        List<ReviewAutoCheck> claimed = new ArrayList<>();
+    public List<Claimed> claimDue(Instant now, int limit) {
+        List<Claimed> claimed = new ArrayList<>();
         for (ReviewAutoCheck row : rows.lockDue(now, limit)) {
+            // Read before advancing: the value that MADE this row due is this turn's identity.
+            Instant slot = row.getNextCheckAt() == null ? now : row.getNextCheckAt();
             int minutes = row.getIntervalMinutes() > 0
                     ? row.getIntervalMinutes() : ReviewAutoCheck.INTERVAL_MINUTES;
             row.setNextCheckAt(now.plus(Duration.ofMinutes(minutes)));
-            claimed.add(rows.save(row));
+            claimed.add(new Claimed(rows.save(row), slot));
         }
         return claimed;
     }
