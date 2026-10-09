@@ -35,22 +35,40 @@ import com.sellerops.localagent.LocalAgentRunState;
  *     second time, being told 「로그인 확인됨」, and nothing continuing. The intent they were trying to resume
  *     is a row in this database, and this is that row being visible. It says nothing about the marketplace
  *     session, which is deliberately stored nowhere ({@code SignInEndpoint}).
+ * @param pausedSignIn whether <b>anything</b> on this row is waiting for a sign-in — a walk paused at the wall,
+ *     or the seller's automatic check parked on one ({@code review_auto_check.paused_reason}).
+ *
+ *     <p><b>Why a second, wider field.</b> {@code pausedCatchUp} is about a walk, and once history is closed
+ *     the automatic check reads a single day with no walk behind it — so the thing most often waiting for a
+ *     sign-in is invisible to that field. This is what lets the screen do the one useful thing when the seller
+ *     comes back to Reviewnary: ask the helper, once, whether the channel is signed in now. Measured live on
+ *     2026-10-09 — the seller signed in in their own tab, nothing was watching, and the lane stayed parked.
  */
 public record CollectNowReadinessView(CollectNowRouter.Path path, LocalAgentRunState localAgent,
                                       java.time.Instant lastSuccessAt,
                                       com.sellerops.coverage.AcquisitionAttemptOutcome latestAttemptOutcome,
                                       java.time.LocalDate coverageThrough, Long coverageGapDays,
-                                      boolean pausedCatchUp) {
+                                      boolean pausedCatchUp, boolean pausedSignIn) {
+
+    public CollectNowReadinessView(CollectNowRouter.Path path, LocalAgentRunState localAgent,
+                                   java.time.Instant lastSuccessAt,
+                                   com.sellerops.coverage.AcquisitionAttemptOutcome latestAttemptOutcome,
+                                   java.time.LocalDate coverageThrough, Long coverageGapDays,
+                                   boolean pausedCatchUp) {
+        this(path, localAgent, lastSuccessAt, latestAttemptOutcome, coverageThrough, coverageGapDays,
+                pausedCatchUp, pausedCatchUp);
+    }
 
     /** The shape for a row with no history to report — the API route, and anything unsupported. */
     public static CollectNowReadinessView of(CollectNowRouter.Path path, LocalAgentRunState localAgent) {
-        return new CollectNowReadinessView(path, localAgent, null, null, null, null, false);
+        return new CollectNowReadinessView(path, localAgent, null, null, null, null, false, false);
     }
 
     /** The shape before coverage existed — kept so a caller that knows only the two acquisition facts still compiles. */
     public static CollectNowReadinessView of(CollectNowRouter.Path path, LocalAgentRunState localAgent,
                                              java.time.Instant lastSuccessAt,
                                              com.sellerops.coverage.AcquisitionAttemptOutcome latestAttemptOutcome) {
-        return new CollectNowReadinessView(path, localAgent, lastSuccessAt, latestAttemptOutcome, null, null, false);
+        return new CollectNowReadinessView(path, localAgent, lastSuccessAt, latestAttemptOutcome, null, null,
+                false, false);
     }
 }

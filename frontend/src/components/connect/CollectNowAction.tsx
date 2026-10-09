@@ -5,6 +5,7 @@ import type { CollectNowPath, LocalAgentRunState, ScreenReadView } from "../../l
 import { backendCode, backendMessage } from "./channelShared";
 import {
   awaitSignIn,
+  checkSignIn,
   signInMessage,
   signInStartMessage,
   startSignIn,
@@ -238,6 +239,8 @@ export interface CollectNowRoute {
   coverageThrough: string | null;
   /** 그 경계와 오늘 사이의 미확인 날수. */
   coverageGapDays: number | null;
+  /** 이 줄의 무엇인가가 로그인을 기다리고 있는가 — 멈춘 walk이거나, 자동 확인이 벽에 주차돼 있거나. */
+  pausedSignIn: boolean;
 }
 
 /**
@@ -261,6 +264,7 @@ export function useCollectNowRoute(accountId: string, dataType: string, refreshK
     lastSuccessAt: ready?.lastSuccessAt ?? null,
     coverageThrough: ready?.coverageThrough ?? null,
     coverageGapDays: ready?.coverageGapDays ?? null,
+    pausedSignIn: ready?.pausedSignIn === true,
   };
 }
 
@@ -314,6 +318,7 @@ export function CollectNowAction({
   lastSuccessAt = null,
   coverageThrough = null,
   coverageGapDays = null,
+  pausedSignIn = false,
   disabled = false,
   showSentence = false,
   emphasis = "plain",
@@ -336,6 +341,11 @@ export function CollectNowAction({
   /** 빠짐없이 확인한 마지막 날. 성공 시각과 나란히 서야 「최근 7일 45건」이 「공백이 메워졌다」로 읽히지 않는다. */
   coverageThrough?: string | null;
   coverageGapDays?: number | null;
+  /**
+   * 이 줄이 로그인을 기다리고 있는가. 참이면 이 화면이 살아날 때 **가벼운 로그인 확인 한 번**을 하고,
+   * 로그인되어 있으면 멈췄던 일을 이어간다. 수집을 시작하지는 않는다.
+   */
+  pausedSignIn?: boolean;
   disabled?: boolean;
   showSentence?: boolean;
   /**
@@ -376,6 +386,69 @@ export function CollectNowAction({
     live.current = false;
     pendingCollect.current = false;
   }, []);
+  /**
+   * <b>판매자가 Reviewnary로 돌아왔다 — 기다리던 일이 있으면 한 번 확인한다.</b>
+   *
+   * <p>2026-10-09 라이브에서 측정된 구멍을 메운다: 판매자가 2차 인증 때문에 제품 창을 닫고 자기 브라우저의
+   * 다른 탭에서 로그인했다. 세션은 돌아왔지만 지켜보던 탭이 없었으므로 아무도 그 사실을 몰랐고, 멈춘 일은
+   * 그대로 있었다.
+   *
+   * <p>세 가지를 하지 않는다. <b>수집을 시작하지 않는다</b> — 화면에 들어온 것만으로 리뷰를 읽기 시작하면
+   * 그건 아무도 요청하지 않은 수집이다. 기다리는 일이 없으면 <b>묻지도 않는다</b>. 그리고 한 번의 활성화에
+   * 대해 <b>한 번만</b> 묻는다.
+   *
+   * <p>하는 일은 가벼운 로그인 확인 하나이고, 로그인되어 있으면 서버에 「이어가 달라」고 말한다 — 무엇을
+   * 이어갈지와 그것이 누구 일인지는 서버의 row가 안다(원래 trigger 그대로).
+   */
+  const checkedForActivation = useRef(false);
+  useEffect(() => {
+    if (!pausedSignIn) {
+      // 기다리는 일이 사라졌다(이어졌거나, 판매자가 껐거나). 다음 번 기다림을 위해 표식을 비운다.
+      checkedForActivation.current = false;
+      return;
+    }
+    if (!channelCode) return;
+
+    async function askOnce() {
+      if (checkedForActivation.current || !live.current) return;
+      checkedForActivation.current = true;
+      const state = await checkSignIn(channelCode!);
+      if (!live.current) return;
+      if (state !== "SIGNED_IN") {
+        // 아직 로그아웃이거나(NOT_SIGNED_IN), 알 수 없거나(UNAVAILABLE), 데스크에 세션이 열려 있다(WAITING).
+        // 세 경우 모두 그대로 기다린다 — 시작하는 것은 없다.
+        return;
+      }
+      setSignedInHere(true);
+      let resumed: Awaited<ReturnType<typeof api.collectNowResume>> = null;
+      try {
+        resumed = await api.collectNowResume(accountId, dataType);
+      } catch {
+        resumed = null;
+      }
+      if (!live.current || !resumed) return;
+      onReport("로그인 확인됨. 멈췄던 확인을 이어서 진행합니다.", false);
+      await watchResumed(resumed);
+    }
+
+    void askOnce();
+    // 화면이 다시 살아나는 두 가지 길. 탭 전환은 visibilitychange, 창 전환은 focus다 — 판매자는 보통
+    // 브라우저를 갈아타면서 로그인하므로 둘 다 필요하다.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        checkedForActivation.current = false;
+        void askOnce();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pausedSignIn, channelCode, accountId, dataType]);
+
   // 연결되지 않은 도우미와 이미 일하는 중인 도우미는 누를 수 없다. 로그인이 풀린 경우는 누를 수 있게 둔다 —
   // 판매자가 방금 자기 브라우저에서 로그인했을 수 있고, 막아 두면 고친 뒤에도 누를 길이 없다.
   const blocked = desk === "UNPAIRED" || desk === "BUSY";

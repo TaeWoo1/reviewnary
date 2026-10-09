@@ -67,6 +67,16 @@ public class CollectNowService {
      * reason the two above are: a deployment without the lane has none, and that is not a failure.
      */
     private final com.sellerops.coverage.catchup.ReviewCatchUpRunRepository catchUpRuns;
+    /**
+     * The seller's automatic-check setting, read only to answer «is this row waiting for a sign-in». Optional
+     * for the same reason the two above are: a deployment without the lane has none, and that is not a failure.
+     */
+    private com.sellerops.autocheck.ReviewAutoCheckService autoCheck;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setAutoCheck(com.sellerops.autocheck.ReviewAutoCheckService autoCheck) {
+        this.autoCheck = autoCheck;
+    }
 
     public CollectNowService(SellerAccountRepository accounts, ChannelRepository channels,
                              CollectControlService pulls, ScreenReadService screenReads) {
@@ -176,15 +186,16 @@ public class CollectNowService {
         // <b>멈춘 의도는 acquisition history와 무관하다.</b> history가 없는 배포에서도 「로그인을 기다리는
         // catch-up이 있다」는 사실은 참일 수 있고, 그 사실이 없으면 판매자는 로그인한 뒤에도 이어갈 길이 없다.
         boolean paused = pausedCatchUp(sellerAccountId, dataType);
+        boolean pausedSignIn = paused || autoCheckParkedOnSignIn(sellerAccountId);
         if (history == null) {
-            return new CollectNowReadinessView(path, desk, null, null, null, null, paused);
+            return new CollectNowReadinessView(path, desk, null, null, null, null, paused, pausedSignIn);
         }
         UUID channelId = routed.channel().getId();
         ReviewCoverage held = reviewCoverage(orgId, channelId, dataType);
         return new CollectNowReadinessView(path, desk,
                 history.lastSuccessAt(orgId, channelId, dataType),
                 history.latestAttempt(orgId, channelId, dataType).outcome(),
-                held.coverageThrough(), gapDays(held), paused);
+                held.coverageThrough(), gapDays(held), paused, pausedSignIn);
     }
 
     /**
@@ -225,6 +236,23 @@ public class CollectNowService {
         }
         return catchUpRuns.findFirstBySellerAccountIdAndDataTypeAndStateIn(sellerAccountId, dataType,
                 java.util.EnumSet.of(com.sellerops.coverage.catchup.ReviewCatchUpState.PAUSED_AUTH)).isPresent();
+    }
+
+    /**
+     * Whether this account's automatic check is parked on a sign-in wall.
+     *
+     * <p>The widest true statement of 「이 줄이 로그인을 기다린다」, and the one a paused walk cannot make: once
+     * history is closed the check reads a single day with no walk behind it, so the row that holds the wall is
+     * the setting's. Optional dependency — a deployment without the lane answers false, which is correct there.
+     */
+    private boolean autoCheckParkedOnSignIn(UUID sellerAccountId) {
+        if (autoCheck == null) {
+            return false;
+        }
+        return autoCheck.find(sellerAccountId)
+                .map(row -> row.on()
+                        && row.getPausedReason() == com.sellerops.autocheck.AutoCheckPause.PAUSED_AUTH)
+                .orElse(false);
     }
 
     private ReviewCoverage reviewCoverage(UUID orgId, UUID channelId, String dataType) {

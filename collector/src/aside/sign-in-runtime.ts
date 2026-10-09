@@ -50,6 +50,15 @@ export const SIGN_IN_POLL_MS = 5_000;
  */
 export const SIGN_IN_BOUND_MS = 100_000;
 
+/**
+ * One probe and no waiting — the bound for the CHECK a returning seller triggers.
+ *
+ * <p>Any positive value shorter than one poll makes the loop below answer after its first probe, which is the
+ * whole of a check: 「지금 로그인되어 있나」 has an answer the moment the page is read, and there is nobody
+ * standing in this window to wait for.
+ */
+export const SIGN_IN_CHECK_BOUND_MS = 1;
+
 export interface SignInRuntimePlan {
   /** The channel's published entry route. Signed out, the channel itself redirects this to its login page. */
   entryUrl: string;
@@ -59,6 +68,16 @@ export interface SignInRuntimePlan {
   settleTimeoutMs: number;
   pollMs: number;
   boundMs: number;
+  /**
+   * Whether to bring the window forward. True for the recovery session a seller pressed for; <b>false for a
+   * check</b>.
+   *
+   * <p>The difference is who asked to be taken somewhere. A press promised «열어 드립니다», so the window
+   * belongs in front of them. A check happens because they came back to Reviewnary — pulling a marketplace
+   * window over the screen they just chose to look at would be the product taking over, and if they were
+   * already signed in it would raise a window for nothing at all.
+   */
+  raiseWindow?: boolean;
 }
 
 export interface SignInRuntimeTabLike {
@@ -102,8 +121,9 @@ export async function asideSignInRuntime(
     return { ok: false, state: "UNAVAILABLE", stage: "OPEN", elapsedMs: elapsed() };
   }
   // Raised before the page is waited on: the seller pressed a control that promised to take them here, and the
-  // window should be in front of them while it loads rather than after.
-  if (typeof tab.bringToFront === "function") {
+  // window should be in front of them while it loads rather than after. A CHECK never raises — nobody asked to
+  // be taken anywhere (`raiseWindow`).
+  if (plan.raiseWindow !== false && typeof tab.bringToFront === "function") {
     try {
       await tab.bringToFront();
     } catch {

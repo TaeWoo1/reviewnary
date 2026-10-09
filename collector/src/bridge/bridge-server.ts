@@ -169,6 +169,8 @@ export interface DeviceLinkEndpoint {
 export interface SignInHttpEndpoint {
   start(channelCode: unknown): unknown;
   status(): unknown;
+  /** One awaited probe — 「지금 로그인되어 있나」, for a tab that came back to a waiting read. */
+  check(channelCode: unknown): Promise<unknown>;
 }
 
 /**
@@ -367,6 +369,7 @@ export class BridgeServer {
       if (method === "POST" && path === "/bridge/agent/revoke") return await this.handleAgentRevoke(req, res);
       if (method === "POST" && path === "/bridge/device/link") return await this.handleDeviceLink(req, res, "start");
       if (method === "GET" && path === "/bridge/device/status") return await this.handleDeviceLink(req, res, "status");
+      if (method === "POST" && path === "/bridge/sign-in/check") return await this.handleSignIn(req, res, "check");
       if (method === "POST" && path === "/bridge/sign-in/start") return await this.handleSignIn(req, res, "start");
       if (method === "GET" && path === "/bridge/sign-in/status") return await this.handleSignIn(req, res, "status");
       if (method === "GET" && path === "/bridge/store-identity/bootstrap") return this.handleStoreIdentityBootstrap(req, res);
@@ -675,7 +678,8 @@ export class BridgeServer {
    * Sign-in recovery, gated exactly like the device routes: allowed origin + valid pairing bearer, else
    * 403/401. The start body names a channel and nothing else; the endpoint refuses any other value itself.
    */
-  private async handleSignIn(req: IncomingMessage, res: ServerResponse, op: "start" | "status"): Promise<void> {
+  private async handleSignIn(req: IncomingMessage, res: ServerResponse,
+                             op: "start" | "status" | "check"): Promise<void> {
     if (!this.signIn) { sendJson(res, 404, { error: "not_found" }); return; }
     const origin = header(req, "origin");
     if (!isOriginAllowed(origin, this.allowedOrigins)) { sendJson(res, 403, { error: "bad_origin" }); return; }
@@ -689,6 +693,11 @@ export class BridgeServer {
       channelCode = raw && typeof raw === "object" ? (raw as { channelCode?: unknown }).channelCode : null;
     } catch {
       channelCode = null;
+    }
+    if (op === "check") {
+      // Awaited: a check IS its answer. The tab asked one question and gets one word back.
+      sendJson(res, 200, await this.signIn.check(channelCode));
+      return;
     }
     sendJson(res, 200, this.signIn.start(channelCode));
   }

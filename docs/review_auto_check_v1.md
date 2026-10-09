@@ -125,7 +125,25 @@ lane은 영원히 PAUSED_AUTH였다 — 벽을 지우는 것은 성공한 읽기
 
 벽을 매시간 다시 때리는 lane은 판매자만 해결할 수 있는 일에 대해 소음을 만드는 제품이다.
 
-### 로그인 → resume, 정확히 한 번
+### 로그인 → resume — 세 가지 길, 그리고 마지막은 fallback
+
+| 언제 | 무엇이 일어나나 |
+|---|---|
+| ① 판매자가 「판매자센터 로그인」을 눌러 그 흐름 안에서 로그인 | 지켜보던 탭이 `SIGNED_IN`을 보는 즉시 resume. **재진입 가능** — 2차 인증처럼 지켜보기가 먼저 끝나면 버튼을 다시 눌러 같은 세션을 이어서 지켜본다(`busy`는 막다른 길이 아니라 「그 창을 계속 봐 줘」다) |
+| ② 지켜보기를 놓쳤고, 판매자가 **어디서든** 로그인한 뒤 Reviewnary로 돌아옴 | 화면이 살아날 때(`mount` · `visibilitychange` · `focus`) **가벼운 로그인 확인 한 번**. `SIGNED_IN`이면 resume, 아직 로그아웃이면 그대로 기다린다. **화면 진입이 리뷰 읽기를 시작하지 않는다** |
+| ③ 판매자가 제품에 돌아오지 않음 | **6시간 fallback**(`AUTH_RETRY`). 정상 UX는 ①②이고 이것은 교착 방지용이다 |
+
+**가벼운 확인이란:** 도우미가 그 채널의 published 경로를 열고 **읽기 전용 probe 하나**를 돌리고 끝낸다
+(`sign-in-executor` CHECK 모드). 리뷰를 읽지 않고, 사람을 기다리지 않고, **창을 앞으로 가져오지 않는다** —
+아무도 데려가 달라고 하지 않았으므로. 복구 세션과 **같은 페이지, 같은 probe**라서 「로그인됨」이 제품 안에서
+한 가지 뜻이다. 데스크에 세션이 열려 있으면 `busy`로 답하고 두 번째 창을 만들지 않는다.
+
+화면이 그 확인을 할지 아는 근거는 readiness의 `pausedSignIn` — 멈춘 walk **또는** 자동 확인이 벽에 주차된
+상태. `pausedCatchUp`보다 넓어야 하는 이유는 과거가 닫히면 기다리는 것이 부모 없는 오늘 읽기이기 때문이다.
+
+**추가 버튼은 없다.** 「지금 확인」·「다시 수집」 같은 클릭을 요구하지 않는다.
+
+### resume은 정확히 한 번
 
 - 엔드포인트 하나: `POST /api/seller-accounts/{id}/collect-now/resume`. 입력은 `dataType`뿐.
 - walk: `PAUSED_AUTH → RUNNING` **조건부 상태 전이**가 1회성을 보장한다. 두 번째 알림은 RUNNING을 보고 no-op.
@@ -204,6 +222,9 @@ SELLEROPS_REVIEW_AUTO_CHECK_POLL_INTERVAL_MS # 기본 300000 (런타임이 들�
 | `backend/.../coverage/ReviewCoverageTest.java` | 오늘은 경계가 될 수 없다 · 오늘만 읽은 증거는 경계를 못 만든다 · 창의 닫힌 부분은 남는다 |
 | `backend/.../coverage/ReviewCatchUpPlanTest.java` | 어제까지만 계획한다 |
 | `collector/test/aside/naver-review-window-read.test.ts` | `today..today`가 계획되고 실행된다 · 미래는 거절 · 화면이 좁혀지지 않으면 읽지 않는다 |
+| `frontend/.../CollectNowAction.returnCheck.test.tsx` (8) | 돌아오면 확인 1회 → resume · 아직 로그아웃이면 read/resume 0 · 모르면 아무것도 시작 안 함 · 데스크가 바쁘면 두 번째 창 없음 · 기다리는 일이 없으면 묻지도 않음 · 활성화당 한 번 · 탭 복귀 시 다시 물음 · watcher 경로는 그대로 |
+| `collector/test/aside/sign-in-recovery.test.ts` (+9) | CHECK는 probe 1회 · 창을 올리지 않음(RECOVER는 올림) · 복구와 같은 페이지·같은 probe · 세션 중에는 `busy` · 체크 없는 helper는 `no_executor` |
+| `frontend/.../signInRecovery.watch.test.ts` (+2) | 이미 열린 세션은 막다른 길이 아니다(재진입) |
 | `frontend/.../ReviewAutoCheckToggle.test.tsx` (6) | 스위치 하나 · 멈춤은 꺼짐이 아니다 · 읽을 화면이 없으면 안 그린다 |
 | `frontend/.../CollectNowAction.autoResume.test.tsx` | resume 한 번 · 새 수집을 시작하지 않는다 · 멈춘 것이 없으면 아무 일도 없다 |
 
