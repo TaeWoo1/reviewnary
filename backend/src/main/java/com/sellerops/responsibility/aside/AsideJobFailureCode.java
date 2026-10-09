@@ -46,7 +46,18 @@ public final class AsideJobFailureCode {
             "RANGE_NOT_SETTABLE",
             "RANGE_MISMATCH",
             "READ_UNSETTLED",
+            // <b>A refused reading, by the reason the page gave.</b> One word stood for eight page facts, and
+            // on 2026-10-10 that cost an hour: an automatic check reported SURFACE_UNREADABLE twice and the
+            // only way to learn the page had said GRID_NOT_FOUND was to read the helper's log on the seller's
+            // own Mac. READING_REFUSED stays for a reader whose vocabulary grew past this list.
             "READING_REFUSED",
+            "GRID_NOT_FOUND",
+            "MODEL_UNREADABLE",
+            "MODEL_SHAPE_CHANGED",
+            "ROWS_NOT_LOADED",
+            "ID_LINK_MISMATCH",
+            "TOO_MANY_ROWS",
+            "ROUTE_MISMATCH",
             "WINDOW_INVALID",
             // <b>Why the desk could not run the program at all — four words, not one.</b>
             //

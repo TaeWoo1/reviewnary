@@ -25,6 +25,6 @@ public class ReviewCatchUpWiring {
 
     @PostConstruct
     void attach() {
-        jobs.setSettledListener(orchestrator::advance);
+        jobs.addSettledListener(orchestrator::advance);
     }
 }

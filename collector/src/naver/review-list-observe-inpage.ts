@@ -151,8 +151,30 @@ export function buildNaverReviewListReadScript(): string {
       || String(location.hash || '').indexOf('#/review/search') !== 0) {
     return fail('ROUTE_MISMATCH');
   }
+  // 그리드가 스스로 「없다」고 말하는 상태. ag-Grid 자신의 no-rows 오버레이이고, 글자가 아니라 구조다 —
+  // 페이지의 글은 여기서 돌아가지 않는다. 2026-10-10 실측: 그려진 그리드 하나와, 보이는 no-rows 오버레이.
+  function explicitEmptyState() {
+    if (document.querySelectorAll('.ag-root-wrapper').length === 0) { return false; }
+    var panes = document.querySelectorAll('.ag-overlay-no-rows-wrapper');
+    for (var i = 0; i < panes.length; i++) {
+      var cs = window.getComputedStyle(panes[i]);
+      if (cs.display === 'none' || cs.visibility === 'hidden') { continue; }
+      return true;
+    }
+    return false;
+  }
   var rendered = document.querySelectorAll('.ag-center-cols-container .ag-row');
-  if (rendered.length === 0) { return fail('GRID_NOT_FOUND'); }
+  if (rendered.length === 0) {
+    // <b>「이 기간에 리뷰가 없다」는 읽기의 결과이지 읽기의 실패가 아니다.</b> 2026-10-10 새벽, 아직 아무
+    // 리뷰도 오지 않은 오늘을 읽은 자동 확인이 두 번 연속 「화면을 읽을 수 없다」로 끝났다. 하루가 시작될
+    // 때마다 lane이 고장 나 보이는 상태였고, 고장 난 것은 lane이 아니라 이 한 줄이었다.
+    if (explicitEmptyState()) {
+      return { reason: 'OK', modelType: null, rowCount: 0, loaded: 0, linkChecked: 0,
+        gridReadMode: 'EMPTY_STATE', emptyState: true,
+        labelledTotal: LABELLED, selectedPageSize: PAGE_SIZE, rows: [] };
+    }
+    return fail('GRID_NOT_FOUND');
+  }
   function nodeOf(el) {
     var names = Object.getOwnPropertyNames(el);
     for (var i = 0; i < names.length; i++) {

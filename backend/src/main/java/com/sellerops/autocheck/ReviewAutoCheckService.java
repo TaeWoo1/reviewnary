@@ -5,8 +5,10 @@ import com.sellerops.channel.ChannelRepository;
 import com.sellerops.channel.ChannelStatus;
 import com.sellerops.common.ApiException;
 import com.sellerops.connector.DataType;
+import com.sellerops.responsibility.aside.AsideJobOutcome;
 import com.sellerops.responsibility.aside.AsideRecipe;
 import com.sellerops.responsibility.aside.AutoCheckAuthority;
+import com.sellerops.responsibility.aside.ScheduledAsideJob;
 import com.sellerops.selleraccount.SellerAccount;
 import com.sellerops.selleraccount.SellerAccountRepository;
 import java.time.Clock;
@@ -239,5 +241,46 @@ public class ReviewAutoCheckService implements AutoCheckAuthority {
                 .map(Channel::getCode)
                 .flatMap(code -> AsideRecipe.forScreenRead(code, DataType.REVIEW))
                 .filter(AsideRecipe::readsNamedPeriod);
+    }
+
+    /**
+     * <b>A read landed. Whatever this row was parked on, it is not parked on it any more.</b>
+     *
+     * <p>Measured on 2026-10-09: the resumed read finished OBSERVED, the desk reported READY, the freshness line
+     * moved to 「오늘 23:49 확인」 — and the setting still said {@code PAUSED_AUTH}, because the only thing that
+     * cleared it was the claimer's next turn, six hours away. For those six hours the screen told the seller to
+     * sign in at a store they were already signed in to, and asked the helper again every time they came back.
+     *
+     * <p>So the pause is cleared by the event that disproves it rather than by the next tick. A successful read
+     * disproves <b>both</b> pauses at once and says nothing about who asked for it: a wall is a fact about the
+     * channel's session and a missing desk is a fact about this Mac, and neither becomes true again because the
+     * read that disproved it came from a press instead of the schedule.
+     *
+     * <p>The six-hour hold goes with it. {@link ReviewAutoCheckClaimer#AUTH_RETRY} is the backoff <b>for the
+     * wall</b>; leaving it in place after the wall is gone would skip five ordinary checks for no reason. The
+     * cadence is restored, never shortened — a row already due sooner than an interval from now stays that way.
+     */
+    @Transactional
+    public void noteSettled(ScheduledAsideJob job) {
+        if (job.getSellerAccountId() == null || job.getOutcome() != AsideJobOutcome.OBSERVED
+                || job.getRecipe() == null || !job.getRecipe().readsNamedPeriod()) {
+            return;
+        }
+        rows.findBySellerAccountIdAndDataType(job.getSellerAccountId(), DATA_TYPE)
+                .filter(row -> job.getOrgId().equals(row.getOrgId()))
+                .filter(row -> row.getPausedReason() != null)
+                .ifPresent(row -> {
+                    boolean wasAuth = row.getPausedReason() == AutoCheckPause.PAUSED_AUTH;
+                    row.setPausedReason(null);
+                    if (wasAuth) {
+                        int minutes = row.getIntervalMinutes() > 0
+                                ? row.getIntervalMinutes() : ReviewAutoCheck.INTERVAL_MINUTES;
+                        Instant ordinary = clock.instant().plus(java.time.Duration.ofMinutes(minutes));
+                        if (row.getNextCheckAt() == null || row.getNextCheckAt().isAfter(ordinary)) {
+                            row.setNextCheckAt(ordinary);
+                        }
+                    }
+                    rows.save(row);
+                });
     }
 }

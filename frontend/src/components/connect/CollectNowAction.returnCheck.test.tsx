@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { StrictMode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CollectNowAction } from "./CollectNowAction";
@@ -192,6 +193,45 @@ describe("지켜보는 중에 로그인하면 즉시 이어진다 — 기존 경
     await userEvent.click(screen.getByTestId("sign-in-REVIEW"));
 
     await waitFor(() => expect(collectNowResume).toHaveBeenCalledWith("acct-1", "REVIEW"));
+    expect(collectNow).not.toHaveBeenCalled();
+  });
+});
+
+describe("StrictMode가 한 번 더 마운트해도 답은 버려지지 않는다", () => {
+  /**
+   * <b>2026-10-09 라이브에서 이 화면이 조용히 죽어 있던 이유.</b>
+   *
+   * <p>`live`는 언마운트 표식인데 내리는 곳만 있고 올리는 곳이 없었다. dev의 StrictMode가 하는
+   * mount→cleanup→mount 한 번에 영원히 false가 되고, 그 뒤로 이 컴포넌트의 모든 `await` 이후 처리가
+   * 버려진다 — probe는 나가고(그건 await 앞이라) 답만 사라진다. 로그에도 화면에도 아무 말이 없어서,
+   * 「복귀 신호가 안 왔다」와 구별되지 않았다.
+   */
+  it("돌아오기 확인의 SIGNED_IN이 StrictMode 아래에서도 resume까지 간다", async () => {
+    checkSignIn.mockResolvedValue("SIGNED_IN");
+    serverHasSomethingWaiting();
+
+    render(
+      <StrictMode>
+        <CollectNowAction
+          accountId="acct-1"
+          dataType="REVIEW"
+          label="리뷰"
+          desk="AUTH_REQUIRED"
+          channelCode="NAVER"
+          pausedSignIn
+          showSentence
+          onReport={onReport}
+          onChanged={onChanged}
+        />
+      </StrictMode>,
+    );
+
+    await waitFor(() => expect(checkSignIn).toHaveBeenCalledWith("NAVER"));
+    await waitFor(() => expect(collectNowResume).toHaveBeenCalledWith("acct-1", "REVIEW"));
+    await waitFor(() =>
+      expect(onReport).toHaveBeenCalledWith("로그인 확인됨. 멈췄던 확인을 이어서 진행합니다.", false));
+    // 그리고 두 번 마운트됐다고 두 번 묻지 않는다.
+    expect(checkSignIn).toHaveBeenCalledTimes(1);
     expect(collectNow).not.toHaveBeenCalled();
   });
 });

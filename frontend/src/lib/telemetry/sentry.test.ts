@@ -77,18 +77,15 @@ describe("frontend CSP from env", () => {
     const csp = buildCsp({});
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("script-src 'self';");
-    expect(csp).toContain("connect-src 'self' http://127.0.0.1:8787;");
+    expect(csp).toContain("connect-src 'self' http://127.0.0.1:8787 http://127.0.0.1:47615 ws://127.0.0.1:47615;");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("object-src 'none'");
     expect(csp).not.toMatch(/googletagmanager|posthog|sentry/);
-    // The Agent Runtime default origin is always reachable; the bridge only when enabled.
+    // 두 로컬 런타임은 제품의 일부다 — Agent Runtime도, 판매자의 도우미도. 둘 다 플래그 없이 정책에 있다.
     expect(csp).toContain("http://127.0.0.1:8787");
-    expect(csp).not.toContain("47615");
-    expect(csp).not.toContain("blob:");
-    const bridged = buildCsp({ VITE_ENABLE_AGENT_BRIDGE: "true" });
-    expect(bridged).toContain("http://127.0.0.1:47615");
-    expect(bridged).toContain("ws://127.0.0.1:47615");
-    expect(bridged).toMatch(/img-src [^;]*blob:/);
+    expect(csp).toContain("http://127.0.0.1:47615");
+    expect(csp).toContain("ws://127.0.0.1:47615");
+    expect(csp).toMatch(/img-src [^;]*blob:/);
   });
 
   it("adds GTM/GA, PostHog, Sentry ingest and split-origin API/agent origins — each only when set", () => {

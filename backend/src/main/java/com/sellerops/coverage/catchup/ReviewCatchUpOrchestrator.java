@@ -269,6 +269,15 @@ public class ReviewCatchUpOrchestrator {
                     : String.valueOf(child.getOutcome()));
             return;
         }
+        // <b>읽었지만 어느 가게인지 댈 수 없는 창.</b> 행이 하나도 없는 기간에는 상품번호가 없고, 상품번호가
+        // 없으면 그 화면이 이 조직의 가게라는 증거가 없다 — 그래서 identity는 UNRESOLVED로 남는다. 읽기는
+        // 성공이지만 「이 날은 비어 있었다」는 coverage 주장은 사지 않는다. 그 창을 걸어 지났다고 적는 대신
+        // 거기서 멈추고, 그 사실을 이름으로 남긴다: 포화(DAY_SATURATED)는 전혀 다른 이야기였다.
+        if (child.getIdentityVerdict() != com.sellerops.responsibility.IdentityVerdict.MATCH) {
+            run.setPausedWindowStart(start);
+            stop(run, ReviewCatchUpState.STOPPED_SATURATED, "EMPTY_PERIOD_UNATTRIBUTED");
+            return;
+        }
         boolean complete = child.getDeliveryCompleteness() == SourceCompleteness.BOUNDED;
         if (!complete) {
             // Saturated: the rows are stored, the days are not proved. Narrow the period and look again.

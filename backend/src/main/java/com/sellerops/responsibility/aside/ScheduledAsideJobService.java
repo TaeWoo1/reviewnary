@@ -39,7 +39,7 @@ public class ScheduledAsideJobService {
 
     private final ScheduledAsideJobRepository jobs;
     private final Clock clock;
-    private SettledListener settledListener;
+    private final java.util.List<SettledListener> settledListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final AsideMarketplaceAccess marketplaceAccess;
     private final AsideMarketplaceTarget marketplaceTargets;
     private final AsideHelperDevices devices;
@@ -58,7 +58,7 @@ public class ScheduledAsideJobService {
     }
 
     /**
-     * Wired after construction, like {@link #setSettledListener}: the setting's own service reaches this class
+     * Wired after construction, like {@link #addSettledListener}: the setting's own service reaches this class
      * to dispatch, so a constructor dependency either way would be a cycle.
      */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -343,12 +343,13 @@ public class ScheduledAsideJobService {
         job.setFailureCode(outcome == AsideJobOutcome.OBSERVED ? null : AsideJobFailureCode.of(failureCode));
         log.info("aside job: settled job={} outcome={}", job.getId(), outcome);
         ScheduledAsideJob saved = jobs.save(job);
-        if (settledListener != null) {
+        for (SettledListener listener : settledListeners) {
             try {
-                settledListener.onSettled(saved);
+                listener.onSettled(saved);
             } catch (RuntimeException e) {
                 // The report landed. Whatever wanted to react to it failing is not the helper's problem, and
-                // failing the report would make the helper retry a job it has already finished.
+                // failing the report would make the helper retry a job it has already finished. One listener's
+                // bad day is not another's either: each is called inside its own guard.
                 log.warn("aside job: settle listener failed job={} type={}", saved.getId(),
                         e.getClass().getSimpleName());
             }
@@ -356,9 +357,16 @@ public class ScheduledAsideJobService {
         return saved;
     }
 
-    /** Wired after construction: the listener's own collaborators include this service, so the cycle is broken here. */
-    public void setSettledListener(SettledListener listener) {
-        this.settledListener = listener;
+    /**
+     * Wired after construction: the listener's own collaborators include this service, so the cycle is broken here.
+     *
+     * <p><b>Several, not one.</b> Two lanes now react to the same report and neither is the other's business: the
+     * catch-up walks to its next window, and the seller's automatic-check setting learns that the sign-in wall it
+     * was parked on is gone. A single slot made the second of those silently replace the first, which is a way to
+     * lose a lane without any code saying so.
+     */
+    public void addSettledListener(SettledListener listener) {
+        this.settledListeners.add(listener);
     }
 
     /** The jobs one run handed out — how the observation later learns what became of its device work. */

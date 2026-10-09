@@ -159,9 +159,11 @@ class ReviewAutoCheckTest {
         orchestrator = new ReviewCatchUpOrchestrator(runs,
                 new ReviewCoverageCursor(segments, channels, jobs), dispatcher, clock,
                 ReviewCatchUpOrchestrator.Limits.PRESS);
-        dispatcher.setSettledListener(orchestrator::advance);
+        dispatcher.addSettledListener(orchestrator::advance);
         settings = new ReviewAutoCheckService(settingRows, accounts, channels, clock);
         dispatcher.setAutoCheckAuthority(settings);
+        // 운영에서와 같은 매듭: 두 lane이 같은 보고를 듣는다 (ReviewAutoCheckWiring).
+        dispatcher.addSettledListener(settings::noteSettled);
         screenReads = new com.sellerops.localagent.ScreenReadService(dispatcher,
                 new AsideHelperDevices(devices, clock), accounts, channels,
                 new com.sellerops.coverage.catchup.ReviewCatchUpStatus(runs, orchestrator));
@@ -237,16 +239,23 @@ class ReviewAutoCheckTest {
                 .findFirst();
     }
 
+    /**
+     * 운영과 같은 순서로 끝낸다: <b>전달이 먼저, 보고가 나중</b>이다. 백엔드는 읽은 것을 받아 귀속과 기간을
+     * 적고(그 때 identity가 정해진다), helper는 그 다음에 작업을 보고한다 — settle이 두 lane에 알리는 순간에는
+     * 이미 그 사실들이 행에 있다. 이 도우미가 반대로 하고 있었고, 그래서 settle 시점의 행에는 아무 귀속도
+     * 없었다.
+     */
     private void settleAsRead(ScheduledAsideJob job, int rows) {
+        jobs.findById(job.getId()).ifPresent(live -> {
+            live.setWindowStart(job.getRequestedWindowStart());
+            live.setWindowEnd(job.getRequestedWindowEnd());
+            live.setIdentityVerdict(IdentityVerdict.MATCH);
+            live.recordDelivery(rows, 0);
+            live.recordCoverageVerdict(SourceCompleteness.BOUNDED, "WHOLE_PERIOD_READ");
+            jobs.save(live);
+        });
         dispatcher.claim(org, job.getDeviceId());
-        ScheduledAsideJob settled = dispatcher.settle(org, job.getDeviceId(), job.getId(),
-                AsideJobOutcome.OBSERVED, rows, null);
-        settled.setIdentityVerdict(IdentityVerdict.MATCH);
-        settled.setWindowStart(job.getRequestedWindowStart());
-        settled.setWindowEnd(job.getRequestedWindowEnd());
-        settled.recordDelivery(rows, 0);
-        settled.recordCoverageVerdict(SourceCompleteness.BOUNDED, "WHOLE_PERIOD_READ");
-        jobs.save(settled);
+        dispatcher.settle(org, job.getDeviceId(), job.getId(), AsideJobOutcome.OBSERVED, rows, null);
     }
 
     private void settleAsAuthWall(ScheduledAsideJob job) {
@@ -807,5 +816,100 @@ class ReviewAutoCheckTest {
         assertThat(orchestrator.resumeAfterSignIn(org, account.getId(), "REVIEW",
                 AsideRecipe.NAVER_REVIEW_OBSERVE_V1)).isEmpty();
         assertThat(jobs.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("읽기가 도착하면 그 자리에서 풀린다 — 다음 차례를 기다리지 않는다")
+    void aLandedReadClearsThePauseAtOnce() {
+        // <b>2026-10-09 라이브에서 측정된 것.</b> 이어진 읽기가 OBSERVED로 끝났고 데스크는 READY였고
+        // freshness는 「오늘 23:49 확인」으로 움직였는데, 설정만 여섯 시간 동안 PAUSED_AUTH였다 — 그것을
+        // 지우는 유일한 손이 claimer의 다음 차례였으므로. 그 여섯 시간 동안 화면은 이미 로그인한 가게에
+        // 로그인하라고 말했다.
+        coveredThrough(1);
+        connectionCompleted(account);
+        reconciler.tick(now);
+        settleAsAuthWall(onDesk().orElseThrow());
+        now = now.plus(Duration.ofHours(1));
+        reconciler.tick(now);
+        ReviewAutoCheck parked = settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW")
+                .orElseThrow();
+        assertThat(parked.getPausedReason()).isEqualTo(AutoCheckPause.PAUSED_AUTH);
+        assertThat(parked.getNextCheckAt()).isEqualTo(now.plus(ReviewAutoCheckClaimer.AUTH_RETRY));
+
+        // 판매자가 로그인하고, 이어진 읽기가 도착한다. tick은 한 번도 더 돌지 않는다.
+        ScreenReadView resumed = screenReads.resumeAfterSignIn(org, account.getId(), "REVIEW").orElseThrow();
+        tick(Duration.ofMinutes(1));
+        settleAsRead(jobs.findById(resumed.jobId()).orElseThrow(), 3);
+
+        ReviewAutoCheck row = settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW")
+                .orElseThrow();
+        assertThat(row.getPausedReason()).isNull();
+        // 그리고 여섯 시간짜리 유보도 함께 사라진다 — 그것은 벽에 대한 backoff였고, 벽이 없다.
+        assertThat(row.getNextCheckAt()).isEqualTo(now.plus(Duration.ofMinutes(ReviewAutoCheck.INTERVAL_MINUTES)));
+    }
+
+    @Test
+    @DisplayName("누가 읽었는지는 묻지 않는다 — 벽은 채널 세션에 대한 사실이고, 성공한 읽기 하나면 거짓이 된다")
+    void anyLandedReadClearsIt() {
+        coveredThrough(1);
+        connectionCompleted(account);
+        reconciler.tick(now);
+        settleAsAuthWall(onDesk().orElseThrow());
+        now = now.plus(Duration.ofHours(1));
+        reconciler.tick(now);
+
+        // 자동 확인이 아니라 판매자가 직접 누른 읽기다.
+        tick(Duration.ofMinutes(1));
+        ScreenReadView pressed = screenReads.start(org, account.getId(), "REVIEW", "press-1");
+        ScheduledAsideJob job = jobs.findById(pressed.jobId()).orElseThrow();
+        assertThat(job.getTrigger()).isEqualTo(AsideTrigger.OPERATOR);
+        settleAsRead(job, 2);
+
+        assertThat(settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW")
+                .orElseThrow().getPausedReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("끝나지 않은 벽은 그대로 둔다 — 또 하나의 AUTH_REQUIRED는 아무것도 증명하지 않는다")
+    void aSecondWallLeavesThePauseAlone() {
+        coveredThrough(1);
+        connectionCompleted(account);
+        reconciler.tick(now);
+        settleAsAuthWall(onDesk().orElseThrow());
+        now = now.plus(Duration.ofHours(1));
+        reconciler.tick(now);
+
+        tick(Duration.ofMinutes(1));
+        ScreenReadView pressed = screenReads.start(org, account.getId(), "REVIEW", "press-1");
+        settleAsAuthWall(jobs.findById(pressed.jobId()).orElseThrow());
+
+        assertThat(settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW")
+                .orElseThrow().getPausedReason()).isEqualTo(AutoCheckPause.PAUSED_AUTH);
+    }
+
+    @Test
+    @DisplayName("한 보고를 두 lane이 함께 듣는다 — walk는 다음 창으로 가고, 설정은 벽을 내려놓는다")
+    void bothLanesHearOneReport() {
+        // 목록이 아니라 자리 하나였을 때, 나중에 붙은 lane이 먼저 붙은 lane을 조용히 밀어냈다.
+        coveredThrough(40);
+        connectionCompleted(account);
+        reconciler.tick(now);
+        ScheduledAsideJob first = onDesk().orElseThrow();
+        assertThat(first.getCatchUpRunId()).isNotNull();
+
+        // 그 사이 이 줄은 벽에 주차돼 있었다고 하자 — 지금 책상 위의 읽기가 그것을 거짓으로 만든다.
+        settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW").ifPresent(row -> {
+            row.setPausedReason(AutoCheckPause.PAUSED_AUTH);
+            settingRows.save(row);
+        });
+        tick(Duration.ofMinutes(1));
+        settleAsRead(first, 5);
+
+        // walk: 다음 창이 책상에 올라왔다.
+        ScheduledAsideJob next = onDesk().orElseThrow();
+        assertThat(next.getId()).isNotEqualTo(first.getId());
+        // 설정: 벽이 사라졌다.
+        assertThat(settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW")
+                .orElseThrow().getPausedReason()).isNull();
     }
 }

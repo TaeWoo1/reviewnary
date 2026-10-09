@@ -247,3 +247,50 @@ partial unique는 insert probe로 동작을 확인했다 — 테스트 환경은
    - 과거에 gap이 있으면 walk가 시작되고, 없으면 `today..today` 읽기가 한 번 돈다.
    - 로그인 벽을 만나면 「판매자센터 로그인」을 눌러 **직접** 로그인한다 (id/pw/MFA/CAPTCHA 전부 사람).
 6. 라이브 마켓플레이스 실행은 `docs/sellerops_live_approval_contract.md`의 단일 사용 승인이 필요하다.
+
+## 11. 빈 기간 — 읽기의 결과이지 읽기의 실패가 아니다 (2026-10-10)
+
+하루가 막 시작된 시각에 「오늘」을 읽으면 리뷰가 한 건도 없을 수 있다. 그것은 **읽은 결과**이지 화면을
+읽지 못한 것이 아니다. 2026-10-10 01:44·01:48에 자동 확인이 두 번 연속 `SURFACE_UNREADABLE`로 끝났고,
+화면은 멀쩡했으며 ag-Grid는 자기 오버레이로 비어 있다고 말하고 있었다. 매일 새벽 lane이 고장 나 보이는
+상태였고, 고장 난 것은 「행이 0이면 그리드가 없는 것」이라는 한 줄이었다.
+
+**읽기 성공의 조건은 넷이고, 넷이 모두 참일 때만이다:**
+
+1. 예상한 route (`#/review/search`) — OPERATOR·SCHEDULED·로그인 세션이 모두 같은 deep link를 쓴다
+2. 요청한 기간과 화면이 말하는 기간의 일치 (range census, 기존 그대로)
+3. 그려진 그리드 (`.ag-root-wrapper`)
+4. NAVER 자신의 empty-state (`.ag-overlay-no-rows-wrapper`가 보임)
+
+**그 결과:**
+
+| | |
+|---|---|
+| outcome | `OBSERVED`, `observed_count = 0` |
+| `identity_verdict` | **`UNRESOLVED`** — 행이 없으면 상품번호가 없고, 상품번호가 없으면 그 화면이 이 조직의 가게라는 증거가 없다 |
+| 저장 | 0행 |
+| coverage | **전진하지 않는다** — `window_start/end`를 적지 않는다 |
+| AUTH pause | **해제된다** — 빈 읽기도 세션이 살아 있다는 증거다 |
+
+**store identity를 `MATCH`로 꾸미지 않는다.** 증거 없이 「이 가게가 맞다」고 적으면 그 기록을 믿는 다음
+사람이 확인할 방법이 없다. walk가 이런 창을 만나면 그 날을 걸었다고 적는 대신 거기서 멈추고 이름을
+남긴다 — `EMPTY_PERIOD_UNATTRIBUTED`.
+
+> 행과 무관한 store identity 증거는 화면에 **있다**(전역 내비의 판매자 계정 식별자, 좌측 내비의 스토어
+> 표시명 — 숨은 API가 아니다). 백엔드에도 대조할 자리가 있다(`seller_accounts.store_identity`). 다만 그
+> 칼럼이 비어 있는 동안에는 대조할 상대가 없으므로 위 계약을 유지한다. 연결 시점에 그 값을 채우면 빈
+> 기간도 귀속해 coverage까지 닫을 수 있다.
+
+**읽기가 도착하면 pause는 그 자리에서 풀린다.** settle listener는 목록이고 두 lane이 같은 보고를 듣는다 —
+catch-up은 다음 창으로 가고, 설정은 벽을 내려놓는다. 누가 읽었는지는 묻지 않는다: 벽은 채널 세션에 대한
+사실이고, 성공한 읽기 하나면 거짓이 된다. 6시간 유보(`AUTH_RETRY`)도 함께 사라진다 — 그것은 **벽에 대한**
+backoff였다. 되돌리기만 하고 당기지는 않는다.
+
+**거절은 자기 이름을 갖는다.** `READING_REFUSED` 한 단어가 여덟 개의 페이지 사실을 덮고 있었다. 이제
+`GRID_NOT_FOUND` · `MODEL_UNREADABLE` · `MODEL_SHAPE_CHANGED` · `ROWS_NOT_LOADED` · `ID_LINK_MISMATCH` ·
+`TOO_MANY_ROWS` · `ROUTE_MISMATCH`가 그대로 job의 `failure_code`에 남는다.
+
+## 12. 라이브 증명 — 기록된 곳
+
+`docs/review_auto_check_live_proof_v1.md` (2026-10-09 → 10-10) · `docs/evidence/INDEX.md`의 그 행.
+
