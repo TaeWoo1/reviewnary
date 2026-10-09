@@ -23,7 +23,9 @@ SellerOps는 판매자가 매번 「지금 수집하기」를 누르는 제품�
 |---|---|
 | 테이블 | `review_auto_check` (V126) |
 | 범위 | `org + sellerAccount + dataType(REVIEW) + mode(READ_ONLY)` |
-| 기본값 | 연결된, 읽을 화면이 있는 계정에 대해 **ON** |
+| 기본값 | **연결을 마치는 순간 ON** — `SellerAccountConnectedEvent` → `ReviewAutoCheckConnectionListener` |
+| 기존 계정 | 이 기능 전에 연결한 계정은 **그 조직이 한 번 요청**해서 켠다: `POST /api/seller-accounts/review-auto-check/backfill`(호출한 세션의 조직만, idempotent) |
+| 행을 만드는 경로 | 연결 완료 이벤트 · 판매자가 자기 설정 화면을 열 때 · 그 조직의 backfill. **셋 다 한 조직 안의 행위이고, scheduler는 행을 만들지 않는다** |
 | 끄는 길 | 판매자가 설정에서 끈다 → `enabled=false`, `revoked_at` |
 | 다시 켜지는 조건 | 판매자가 켤 때만. `revoked_at`은 **묘비**이고, 자동 채택 규칙이 이 행을 되살리지 않는다 |
 | READ_ONLY | **기능 불변조건.** 쓰기 recipe는 존재하지 않고 구조 테스트가 거절한다. 칸은 그 사실을 행이 말하게 하려고 있다 |
@@ -55,7 +57,25 @@ SellerOps는 판매자가 매번 「지금 수집하기」를 누르는 제품�
 
 1. **빈 과거가 있다** → catch-up walk (`startScheduled`). 기존 primitive 그대로, **어제까지**.
 2. **과거가 닫혀 있다** → `today … today` 단일 dispatch. 부모(`catch_up_run_id`)가 없다 — 전진시킬
-   경계가 없으므로 셀 것이 없다. `clientJobId = ac-<row8>-<today>`이므로 하루에 한 번으로 수렴한다.
+   경계가 없으므로 셀 것이 없다.
+
+### idempotency 단위는 창이 아니라 **차례**다
+
+`clientJobId = ac-<row8>-<slot>`, `slot`은 그 행을 due로 만든 `next_check_at`(없었으면 tick의 시각)이다.
+
+- 같은 차례를 다시 수행 → **작업 1개**. 진행 중이면 애초에 비켜서고, 끝났으면 그 행으로 수렴한다.
+- 같은 날짜의 **다음 60분 차례 → 새 작업**, 창은 다시 `today..today`.
+- 창(`today`)은 **읽는 기간**이고, 요청의 신원이 아니다.
+
+**날짜로 키를 만들었을 때 깨진 것**(2026-10-09 proof 직후 발견): 10:30 차례가 09:30 차례의 끝난 행을 다시
+찾아 아무것도 보내지 않았다 — 자동 확인이 그날 첫 읽기 뒤로 조용히 멈췄다.
+
+### scheduler는 설정을 만들지 않는다
+
+첫 구현은 tick이 「연결된 계정이면 채택」했다. 그러면 **누구의 스토어를 읽는가를 loop이 정하는 것**이 되고,
+조직이 둘 이상인 백엔드에서는 전부 집힌다 — 2026-10-09 로컬 proof에서 benchmark fixture org가 그렇게
+집혔다(읽지는 않았다: 도우미가 없어 PAUSED_DEVICE). 거기서 되돌아오는 유일한 길은 「건너뛸 조직 목록」이고,
+그것은 제품 코드가 들고 있을 수 없는 종류의 목록이다. 연결은 한 조직 안의 행위이고, 설정 생성도 그렇다.
 
 자동 lane은 **별도 수집 구현을 만들지 않는다.** recipe, workflow, store fence, lease, single-use claim,
 one-job-per-device는 전부 `ScheduledAsideJobService.dispatch` 하나를 지난다.
@@ -151,7 +171,7 @@ SELLEROPS_REVIEW_AUTO_CHECK_POLL_INTERVAL_MS # 기본 300000 (런타임이 들�
 
 | 어디 | 무엇 |
 |---|---|
-| `backend/.../autocheck/ReviewAutoCheckTest.java` (16) | 기본 ON · 끄면 꺼진 채 · API 채널엔 설정 없음 · **기간을 못 고르는 화면엔 설정 없음(쿠팡)** · 설정 없이 SCHEDULED 없음 · windowless 거절 · gap→walk · 닫힌 과거→오늘 · 하루 한 번 · 누름이 앞섬 · tick이 비켜섬 · PAUSED_DEVICE 자동 복구 · device 우선순위와 fallback · PAUSED_AUTH는 사람이 푼다(1회성) |
+| `backend/.../autocheck/ReviewAutoCheckTest.java` (20) | **scheduler가 설정을 만들지 않음** · **연결 완료가 켠다(두 번 와도 하나)** · **backfill은 내 조직만, 껐던 것은 유지** · **다음 60분 차례는 새 작업 / 같은 차례 재시도는 1개** · 기본 ON · 끄면 꺼진 채 · API 채널엔 설정 없음 · **기간을 못 고르는 화면엔 설정 없음(쿠팡)** · 설정 없이 SCHEDULED 없음 · windowless 거절 · gap→walk · 닫힌 과거→오늘 · 누름이 앞섬 · tick이 비켜섬 · PAUSED_DEVICE 자동 복구 · device 우선순위와 fallback · PAUSED_AUTH는 사람이 푼다(1회성) |
 | `backend/.../coverage/ReviewCoverageTest.java` | 오늘은 경계가 될 수 없다 · 오늘만 읽은 증거는 경계를 못 만든다 · 창의 닫힌 부분은 남는다 |
 | `backend/.../coverage/ReviewCatchUpPlanTest.java` | 어제까지만 계획한다 |
 | `collector/test/aside/naver-review-window-read.test.ts` | `today..today`가 계획되고 실행된다 · 미래는 거절 · 화면이 좁혀지지 않으면 읽지 않는다 |

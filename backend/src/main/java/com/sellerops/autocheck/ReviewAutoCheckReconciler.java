@@ -90,25 +90,34 @@ public class ReviewAutoCheckReconciler {
         this.clock = clock;
     }
 
+    /**
+     * One pass over the accounts that are due.
+     *
+     * <p><b>This never creates a setting.</b> A row exists because a seller connected the channel
+     * ({@code ReviewAutoCheckConnectionListener}), opened their own setting, or asked for their organisation to
+     * be backfilled — all three are acts inside one organisation. A background sweep that created rows would
+     * make this tick the thing that decides whose stores get read, which is the seller's decision and not a
+     * loop's; it would also mean every org that merely exists in a database gets picked up, and the only way
+     * back from that is a list of organisations to skip — a fixture blacklist in product code, which is not a
+     * thing this product may contain.
+     */
     public TickReport tick(Instant now) {
-        // Adopt first, so an account connected since the last tick is checked in this one rather than the next.
-        settings.adopt(BATCH_LIMIT);
         int walked = 0;
         int today = 0;
         int pausedDevice = 0;
         int pausedAuth = 0;
         int skipped = 0;
-        for (ReviewAutoCheck claimed : claimer.claimDue(now, BATCH_LIMIT)) {
+        for (ReviewAutoCheckClaimer.Claimed claimed : claimer.claimDue(now, BATCH_LIMIT)) {
             Outcome outcome;
             try {
-                outcome = turn(claimed, now);
+                outcome = turn(claimed.row(), claimed.slot());
             } catch (RuntimeException e) {
                 // One account's bad turn must not end the tick for the others. The next hour re-derives
                 // everything from the database, so there is nothing to repair here.
                 log.warn("review auto-check: turn failed type={}", e.getClass().getSimpleName());
                 outcome = Outcome.SKIPPED;
             }
-            claimer.settle(claimed, now, outcome.pause(), outcome.looked());
+            claimer.settle(claimed.row(), now, outcome.pause(), outcome.looked());
             switch (outcome) {
                 case WALKED -> walked++;
                 case TODAY -> today++;
@@ -143,7 +152,7 @@ public class ReviewAutoCheckReconciler {
         }
     }
 
-    Outcome turn(ReviewAutoCheck row, Instant now) {
+    Outcome turn(ReviewAutoCheck row, Instant slot) {
         UUID orgId = row.getOrgId();
         UUID accountId = row.getSellerAccountId();
         SellerAccount account = accounts.findByIdAndOrgId(accountId, orgId).orElse(null);
@@ -167,7 +176,7 @@ public class ReviewAutoCheckReconciler {
                     ReviewAutoCheckService.DATA_TYPE, recipe.get()).isPresent()) {
                 return Outcome.WALKED;
             }
-            return refreshToday(row, recipe.get(), now) ? Outcome.TODAY : Outcome.SKIPPED;
+            return refreshToday(row, recipe.get(), slot) ? Outcome.TODAY : Outcome.SKIPPED;
         } catch (AsideHelperUnavailableException e) {
             return Outcome.PAUSED_DEVICE;
         } catch (AsideHelperBusyException e) {
@@ -182,12 +191,18 @@ public class ReviewAutoCheckReconciler {
     /**
      * One read of the day that has not closed yet, with its period named.
      *
-     * <p>The job id carries the day, so a tick that runs twice in one hour converges on one read of today
-     * instead of two — and tomorrow's read gets its own id without anyone clearing anything.
+     * <p><b>The job's id is this turn, not this day.</b> {@code (permission, slot)} — the setting row and the
+     * instant it was due for. A retry of the same turn converges on one job
+     * ({@code (device, client_job_id)} idempotency); the next hour's turn is a different turn and asks for its
+     * own job, even though it reads the same day.
+     *
+     * <p>Keyed by the day, it dedupelicated the wrong thing: the 10:30 turn re-found the 09:30 turn's settled
+     * row, dispatched nothing, and the automatic check quietly stopped checking for the rest of the day. The
+     * day is still what gets READ — that is the window, and the window is not the identity of the asking.
      */
-    private boolean refreshToday(ReviewAutoCheck row, AsideRecipe recipe, Instant now) {
+    private boolean refreshToday(ReviewAutoCheck row, AsideRecipe recipe, Instant slot) {
         LocalDate today = LocalDate.now(ReviewCoverageCursor.KST);
-        String clientJobId = "ac-" + row.getId().toString().substring(0, 8) + "-" + today;
+        String clientJobId = "ac-" + row.getId().toString().substring(0, 8) + "-" + slot.getEpochSecond();
         jobs.dispatch(AsideDispatch.scheduled(row.getOrgId(), row.getSellerAccountId(), recipe, clientJobId,
                 today, today));
         return true;

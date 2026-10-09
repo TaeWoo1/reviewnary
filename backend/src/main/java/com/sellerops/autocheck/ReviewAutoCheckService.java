@@ -130,17 +130,25 @@ public class ReviewAutoCheckService implements AutoCheckAuthority {
     }
 
     /**
-     * Give every newly connected, screen-readable account its default-on row.
+     * <b>Switch automatic checking on for the accounts this organisation already has.</b>
      *
-     * <p>Bounded per call, and idempotent by the query it reads from — an account with a row, on or off, is not
-     * a candidate. Returns how many were adopted, which is a count for a log line and nothing else.
+     * <p>A one-time move for the accounts that were connected before this feature existed, and it is scoped to
+     * <b>one organisation</b> — the caller's own. That scope is the whole design: there is no sweep over every
+     * organisation in a database anywhere in this lane, so a backend that happens to hold a fixture or
+     * benchmark organisation never picks it up, and the alternative — a list of organisations for product code
+     * to skip — does not have to exist.
+     *
+     * <p>Idempotent: an account that already has a row, on or off, is not a candidate. A seller who switched
+     * the setting off and then asked for a backfill stays off, because the off row is the memory of that.
      */
     @Transactional
-    public int adopt(int limit) {
+    public int backfillForOrg(UUID orgId) {
+        if (orgId == null) {
+            return 0;
+        }
         int created = 0;
-        for (UUID accountId : rows.accountsWithoutRow(limit)) {
-            SellerAccount account = accounts.findById(accountId).orElse(null);
-            if (account != null && ensure(account.getOrgId(), accountId).isPresent()) {
+        for (UUID accountId : rows.accountsWithoutRow(orgId)) {
+            if (ensure(orgId, accountId).isPresent()) {
                 created++;
             }
         }
