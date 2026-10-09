@@ -913,3 +913,68 @@ describe("the one-day window — 오늘 하루를 이름을 붙여 읽는다", (
     expect(h.acts).not.toContain("evaluate:READER");
   });
 });
+
+describe("빈 기간 — 읽었고, 저장할 것이 없고, 귀속할 것도 없다", () => {
+  const UNRESOLVED: NaverDeliveryResponse =
+    { identityVerdict: "UNRESOLVED", received: 0, inserted: 0, changed: 0, skipped: 0, failed: 0 };
+
+  function windowExecutor(result: unknown) {
+    return {
+      execute: vi.fn(async () => ({ kind: "RESULT" as const, result: result as never, llmCalls: 0 as const })),
+      executeWindow: vi.fn(async () => ({ kind: "RESULT" as const, result: result as never, llmCalls: 0 as const })),
+      asOf: () => NOW,
+    };
+  }
+
+  const emptyReading = {
+    reason: "OK", modelType: null, rowCount: 0, loaded: 0, linkChecked: 0,
+    gridReadMode: "EMPTY_STATE", emptyState: true, labelledTotal: 0, selectedPageSize: 500, rows: [],
+  };
+  const range = { dateInputCount: 2, valuesParsed: 2, startDaysBefore: 0, endDaysBefore: 0,
+    pagerNumberCount: 0, highestPagerNumber: 0 };
+
+  it("그리드가 비었다고 말한 기간은 OBSERVED(0)이다 — identity는 UNRESOLVED 그대로", async () => {
+    const deliver = vi.fn(async (_request: unknown) => UNRESOLVED);
+    const r = await runNaverReviewObservation({
+      deliver,
+      window: { start: "2026-10-08", end: "2026-10-08" },
+      executor: windowExecutor({ ok: true, reading: emptyReading, range, monthMoves: 0, elapsedMs: 1 }),
+    });
+    expect(r.outcome).toBe("OBSERVED");
+    expect(r.observedCount).toBe(0);
+    const sent = deliver.mock.calls[0]![0] as unknown as { gridReadMode: string | null };
+    expect(sent.gridReadMode).toBe("EMPTY_STATE");
+  });
+
+  it("행이 있는데 UNRESOLVED면 예전처럼 거절한다 — 가게 확인을 건너뛰는 문이 열린 것이 아니다", async () => {
+    const withRow = {
+      ...emptyReading,
+      emptyState: false, gridReadMode: "MODEL", rowCount: 1, loaded: 1,
+      rows: [{ reviewId: "5100000001", createdAt: "2026-10-08T10:00:00.000+09:00", rating: 5,
+        body: "좋아요", productNo: "6473457702", productName: "상품", answered: false, attachCount: 0 }],
+    };
+    const deliver = vi.fn(async (_request: unknown) => ({ ...UNRESOLVED, received: 1 }));
+    const r = await runNaverReviewObservation({
+      deliver,
+      window: { start: "2026-10-08", end: "2026-10-08" },
+      executor: windowExecutor({ ok: true, reading: withRow, range, monthMoves: 0, elapsedMs: 1 }),
+    });
+    expect(r.outcome).toBe("STORE_UNRESOLVED");
+  });
+
+  it("비었다고 주장하면서 행을 건네면 그 주장은 버려진다 — 그리고 귀속 없이는 통과하지 못한다", async () => {
+    const contradictory = {
+      ...emptyReading,
+      emptyState: true, rowCount: 1, loaded: 1,
+      rows: [{ reviewId: "5100000002", createdAt: "2026-10-08T10:00:00.000+09:00", rating: 4,
+        body: "그럭저럭", productNo: "6473457702", productName: "상품", answered: false, attachCount: 0 }],
+    };
+    const deliver = vi.fn(async (_request: unknown) => ({ ...UNRESOLVED, received: 1 }));
+    const r = await runNaverReviewObservation({
+      deliver,
+      window: { start: "2026-10-08", end: "2026-10-08" },
+      executor: windowExecutor({ ok: true, reading: contradictory, range, monthMoves: 0, elapsedMs: 1 }),
+    });
+    expect(r.outcome).toBe("STORE_UNRESOLVED");
+  });
+});

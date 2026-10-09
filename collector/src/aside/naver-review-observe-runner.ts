@@ -79,7 +79,23 @@ export const NAVER_OBSERVE_FAILURE_CODES = [
   "RANGE_NOT_SETTABLE",
   "RANGE_MISMATCH",
   "READ_UNSETTLED",
+  // <b>A refused reading, by the reason the page gave.</b>
+  //
+  // `READING_REFUSED` was one word over eight different page facts, and on 2026-10-10 that cost an hour: an
+  // automatic check reported SURFACE_UNREADABLE at 01:44 and again at 01:48, and the only way to learn that
+  // the page had said GRID_NOT_FOUND was to read the helper's own log on the seller's Mac. The record now
+  // carries the word the reader used, so the next one names itself.
+  //
+  // `READING_REFUSED` stays for a shape this runner does not recognise — a reader whose vocabulary grew past
+  // this list still lands somewhere honest.
   "READING_REFUSED",
+  "GRID_NOT_FOUND",
+  "MODEL_UNREADABLE",
+  "MODEL_SHAPE_CHANGED",
+  "ROWS_NOT_LOADED",
+  "ID_LINK_MISMATCH",
+  "TOO_MANY_ROWS",
+  "ROUTE_MISMATCH",
   "WINDOW_INVALID",
   // <b>Why the desk could not run the program — four words, not one.</b>
   //
@@ -104,6 +120,27 @@ export type NaverObserveFailureCode = (typeof NAVER_OBSERVE_FAILURE_CODES)[numbe
  * The CLI's reason word as this lane's failure code. A closed map over a closed set: a word the CLI does not
  * publish cannot reach a record, and nothing arbitrary passes through.
  */
+/**
+ * The reader's own refusal word as this lane's failure code — a closed map over a closed set.
+ *
+ * <p>A word the reader does not publish cannot reach a record: anything unrecognised lands on
+ * `READING_REFUSED`, which is what the whole set used to collapse into.
+ */
+export function readingFailureCode(reason: string): NaverObserveFailureCode {
+  switch (reason) {
+    case "GRID_NOT_FOUND":
+    case "MODEL_UNREADABLE":
+    case "MODEL_SHAPE_CHANGED":
+    case "ROWS_NOT_LOADED":
+    case "ID_LINK_MISMATCH":
+    case "TOO_MANY_ROWS":
+    case "ROUTE_MISMATCH":
+      return reason;
+    default:
+      return "READING_REFUSED";
+  }
+}
+
 export function executorFailureCode(reason: string): NaverObserveFailureCode {
   switch (reason) {
     case "TIMEOUT":
@@ -252,6 +289,11 @@ export interface NaverReadingEvidence {
   readonly selectedPageSize: number | null;
   /** How the rows were obtained — `MODEL` is the grid's own row model, which answers for the whole period. */
   readonly gridReadMode: string | null;
+  /**
+   * <b>The grid itself said this period is empty.</b> ag-Grid's own no-rows overlay on a drawn grid, not an
+   * absence we inferred — «no rows» and «no grid» are two different facts and only one of them is a reading.
+   */
+  readonly emptyPeriod: boolean;
 }
 
 export function sanitizeNaverReading(raw: unknown):
@@ -326,6 +368,9 @@ export function sanitizeNaverReading(raw: unknown):
       selectedPageSize: count(r["selectedPageSize"]),
       gridReadMode: typeof r["gridReadMode"] === "string" && r["gridReadMode"].length <= 16
         ? r["gridReadMode"] : null,
+      // Only an actually-empty reading may carry it: a page that claims emptiness while handing back rows is
+      // contradicting itself, and the rows are what it is believed about.
+      emptyPeriod: r["emptyState"] === true && out.length === 0,
     },
   };
 }
@@ -412,8 +457,12 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
 
   const reading = sanitizeNaverReading(result["reading"]);
   if (!reading.ok) {
-    log("aside_naver_review_read", { ok: false, code: "READING_REFUSED", reason: reading.reason, llmCalls: 0 });
-    return none("SURFACE_UNREADABLE", "READING_REFUSED");
+    const code = readingFailureCode(reading.reason);
+    log("aside_naver_review_read", {
+      ok: false, code, reason: reading.reason, window: askedFor, llmCalls: 0,
+      outcome: "SURFACE_UNREADABLE",
+    });
+    return none("SURFACE_UNREADABLE", code);
   }
   const asOf = executor.asOf();
   // <b>The period, as the screen states it.</b> Both ends read, and — when a period was asked for — the ends
@@ -474,7 +523,18 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
     log("aside_naver_review_delivery", { ok: false, reason: "NOT_DELIVERED" }, "warn");
     return none("EXECUTOR_UNAVAILABLE");
   }
-  if (delivered.identityVerdict !== "MATCH") {
+  // <b>빈 기간은 귀속할 것이 없다 — 그래서 귀속을 꾸미지도 않는다.</b>
+  //
+  // 가게 확인은 페이지에 찍힌 상품번호가 이 조직의 것인지로 이뤄진다. 행이 하나도 없으면 그 증거가 없고,
+  // fence는 정직하게 UNRESOLVED를 답한다. 저장될 행이 없으니 잘못 귀속될 행도 없고, 백엔드는 이 경로에서
+  // coverage를 적지 않는다 — 읽었다는 사실만 남고, 그 날이 닫혔다는 주장은 남지 않는다.
+  //
+  // MATCH로 바꿔 적지 않는 이유는 그것이 거짓이기 때문이다. 증거 없이 「이 가게가 맞다」고 기록하면,
+  // 그 기록을 믿는 다음 사람이 확인할 방법이 없다.
+  const emptyUnattributed = reading.evidence.emptyPeriod
+    && delivered.received === 0
+    && delivered.identityVerdict === "UNRESOLVED";
+  if (delivered.identityVerdict !== "MATCH" && !emptyUnattributed) {
     log("aside_naver_review_delivery", { ok: false, identity: delivered.identityVerdict, received: delivered.received });
     return none("STORE_UNRESOLVED");
   }
@@ -489,6 +549,7 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
     labelledTotal: reading.evidence.labelledTotal,
     selectedPageSize: reading.evidence.selectedPageSize,
     gridReadMode: reading.evidence.gridReadMode,
+    emptyPeriod: reading.evidence.emptyPeriod,
     monthMoves: typeof result["monthMoves"] === "number" ? result["monthMoves"] : 0,
     identity: delivered.identityVerdict,
     received: delivered.received,

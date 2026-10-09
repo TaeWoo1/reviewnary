@@ -14,7 +14,6 @@ export interface CspEnv {
   VITE_SENTRY_DSN?: string;
   VITE_API_BASE_URL?: string;
   VITE_AGENT_RUNTIME_URL?: string;
-  VITE_ENABLE_AGENT_BRIDGE?: string;
   VITE_BRIDGE_URL?: string;
 }
 
@@ -66,13 +65,21 @@ export function buildCsp(env: CspEnv): string {
   if (api) connect.add(api);
   // The Agent Runtime is a separate local origin the app always talks to (`agentClient.ts` default 8787).
   connect.add(originOf(env.VITE_AGENT_RUNTIME_URL) ?? AGENT_RUNTIME_DEFAULT);
-  // The Local Agent Bridge (Action Window) — http + websocket on one origin, and blob: frames in <img>.
-  if (env.VITE_ENABLE_AGENT_BRIDGE?.trim() === "true") {
-    const bridge = originOf(env.VITE_BRIDGE_URL) ?? BRIDGE_DEFAULT;
-    connect.add(bridge);
-    connect.add(bridge.replace(/^http/, "ws"));
-    img.add("blob:");
-  }
+  // <b>The Local Agent Bridge (Action Window) — always, like the Agent Runtime above it.</b>
+  //
+  // It used to be gated on `VITE_ENABLE_AGENT_BRIDGE`, a flag whose real job is mounting the developer dock.
+  // That made one dev-only switch decide whether the SHIPPED app could reach the seller's own helper at all:
+  // without it the browser blocks the helper's http and websocket, and 수집·로그인 복구·sign-in check all fail
+  // as «도우미가 응답하지 않습니다» with nothing in any log to say why. Measured on 2026-10-09, when a
+  // production bundle built without the flag could not run the sign-in check the product depends on.
+  //
+  // The helper is a product capability, not a vendor the deployment opts into, so its origin belongs in the
+  // policy the same way the Agent Runtime's does. The flag still gates the dock — and only the dock.
+  const bridge = originOf(env.VITE_BRIDGE_URL) ?? BRIDGE_DEFAULT;
+  connect.add(bridge);
+  connect.add(bridge.replace(/^http/, "ws"));
+  // The Action Window's frames arrive as blob: URLs.
+  img.add("blob:");
   return [
     "default-src 'self'",
     `script-src ${[...script].join(" ")}`,

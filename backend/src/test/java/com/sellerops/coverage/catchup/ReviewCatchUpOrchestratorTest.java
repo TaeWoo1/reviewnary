@@ -156,9 +156,13 @@ class ReviewCatchUpOrchestratorTest {
         orchestrator = new ReviewCatchUpOrchestrator(runs,
                 new ReviewCoverageCursor(segments, channels, jobs), dispatcher, clock,
                 ReviewCatchUpOrchestrator.Limits.PRESS);
-        dispatcher.setSettledListener(orchestrator::advance);
+        // 한 개의 listener가 「지금 이 테스트가 돌리는 walk」로 넘긴다. 목록이 된 뒤로 add는 교체가 아니라
+        // 추가여서, 한계를 좁힌 walk를 쓰는 테스트가 기본 walk까지 같이 전진시키게 된다.
+        walker = orchestrator;
+        dispatcher.addSettledListener(job -> walker.advance(job));
     }
 
+    private ReviewCatchUpOrchestrator walker;
     private Instant now;
     private Clock clock;
 
@@ -455,7 +459,7 @@ class ReviewCatchUpOrchestratorTest {
                 new ReviewCoverageCursor(segments, channels, jobs), dispatcher,
                 Clock.fixed(Instant.now(), ZoneOffset.UTC),
                 new ReviewCatchUpOrchestrator.Limits(2, 70, 3_000, Duration.ofMinutes(6)));
-        dispatcher.setSettledListener(tight::advance);
+        walker = tight;
 
         ScheduledAsideJob child = tight.start(org, account.getId(), naver.getId(), "REVIEW",
                 AsideRecipe.NAVER_REVIEW_OBSERVE_V1, "press-1").orElseThrow().firstJob();
@@ -553,5 +557,33 @@ class ReviewCatchUpOrchestratorTest {
         assertThat(run.getState()).isEqualTo(ReviewCatchUpState.FAILED);
         assertThat(run.getWindowsDone()).as("the window that was read still counts").isEqualTo(1);
         assertThat(onDesk()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("비어 있어서 어느 가게인지 댈 수 없는 창에서는 걷기를 멈춘다 — 그 날을 걸었다고 적지 않는다")
+    void anUnattributedEmptyWindowStopsTheWalk() {
+        // 행이 하나도 없는 기간에는 상품번호가 없고, 상품번호가 없으면 그 화면이 이 조직의 가게라는 증거가
+        // 없다. 읽기는 성공이지만 「이 날은 비어 있었다」는 coverage 주장은 사지 않는다.
+        coveredThrough(40);
+        ScheduledAsideJob child = orchestrator.start(org, account.getId(), naver.getId(), "REVIEW",
+                AsideRecipe.NAVER_REVIEW_OBSERVE_V1, "press-1").orElseThrow().firstJob();
+        LocalDate walked = child.getRequestedWindowStart();
+
+        jobs.findById(child.getId()).ifPresent(live -> {
+            live.setIdentityVerdict(IdentityVerdict.UNRESOLVED);
+            live.setInsertedCount(0);
+            live.setChangedCount(0);
+            jobs.save(live);
+        });
+        dispatcher.claim(org, deviceId);
+        dispatcher.settle(org, deviceId, child.getId(), AsideJobOutcome.OBSERVED, 0, null);
+
+        ReviewCatchUpRun run = runs.findAll().get(0);
+        assertThat(run.getState()).isEqualTo(ReviewCatchUpState.STOPPED_SATURATED);
+        assertThat(run.getStopReason()).isEqualTo("EMPTY_PERIOD_UNATTRIBUTED");
+        // 다음 창을 책상에 올리지 않았고, 걸었다고 적지도 않았다.
+        assertThat(onDesk()).isEmpty();
+        assertThat(run.getWindowsDone()).isZero();
+        assertThat(run.getPausedWindowStart()).isEqualTo(walked);
     }
 }

@@ -105,6 +105,7 @@ import { StoreIdentityBootstrapStore } from "../action-window/coupang-review/sto
 const STORE_IDENTITY_BOOTSTRAP = new StoreIdentityBootstrapStore();
 import { AsideCoupangReviewExecutor } from "../aside/coupang-review-executor";
 import { COUPANG_REVIEW_READ_WORKFLOW } from "../aside/coupang-review-workflow";
+import { NAVER_REVIEW_LIST_URL } from "../aside/naver-review-workflow";
 import type { ReviewAcquisitionProbeDriver } from "../action-window/coupang-review/review-acquisition-driver";
 import { isSettledImportRunStatus } from "../action-window/initial-import/import-stages";
 import { InitialImportEndpoint } from "../bridge/initial-import-endpoint";
@@ -1436,7 +1437,14 @@ export function activateCoupangReviewAcquisition(
  * A changed route surfaces as a fail-closed `UNSUPPORTED_STATE` from the surface probe, never as a silent
  * wrong-page run (that doc's own "If a route changes" note).
  */
-export const NAVER_REVIEW_MANAGEMENT_LANDING_URL = "https://sell.smartstore.naver.com/#/review/search";
+/**
+ * <b>One route, one owner.</b> The literal lived here as well as in `naver-review-workflow.ts`, which meant the
+ * canonical entry for NAVER REVIEW was two strings that happened to agree. They are one now: the workflow
+ * publishes the route the read is bound to, and every lane that lands on 리뷰 관리 — the Aside read (OPERATOR
+ * and SCHEDULED alike, since both run the same recipe), the sign-in session and this legacy acquisition path —
+ * goes through it, so a changed route is changed once and fails closed everywhere.
+ */
+export const NAVER_REVIEW_MANAGEMENT_LANDING_URL: string = NAVER_REVIEW_LIST_URL;
 
 export interface NaverReplyLiveCarrier {
   runId: string;

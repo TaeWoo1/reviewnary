@@ -380,11 +380,22 @@ export function CollectNowAction({
    * 없고, 그려지는 사이에 사라졌다 되살아나서도 안 된다.
    */
   const pendingCollect = useRef(false);
-  /** 언마운트 뒤에 도착한 답으로 수집을 시작하지 않기 위한 표식. 화면을 떠난 것은 취소다. */
+  /**
+   * 언마운트 뒤에 도착한 답으로 수집을 시작하지 않기 위한 표식. 화면을 떠난 것은 취소다.
+   *
+   * <p><b>effect가 시작할 때마다 다시 세운다.</b> 내리는 곳만 있고 올리는 곳이 없으면, React StrictMode가
+   * dev에서 하는 mount→cleanup→mount 한 번에 영원히 false가 된다 — 그리고 이 컴포넌트의 모든 `await`
+   * 이후 처리가 조용히 버려진다. 2026-10-09 라이브에서 그 모습으로 드러났다: sign-in check는 나가서
+   * SIGNED_IN을 받아왔는데 resume은 호출되지 않았고, 화면도 로그도 아무 말을 하지 않았다. 마운트된
+   * 컴포넌트는 살아 있다는 것이 이 표식의 뜻이므로, 마운트가 그것을 참으로 만드는 것이 맞다.
+   */
   const live = useRef(true);
-  useEffect(() => () => {
-    live.current = false;
-    pendingCollect.current = false;
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+      pendingCollect.current = false;
+    };
   }, []);
   /**
    * <b>판매자가 Reviewnary로 돌아왔다 — 기다리던 일이 있으면 한 번 확인한다.</b>

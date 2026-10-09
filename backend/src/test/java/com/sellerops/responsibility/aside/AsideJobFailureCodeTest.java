@@ -53,4 +53,18 @@ class AsideJobFailureCodeTest {
         assertThat(AsideJobFailureCode.of("  EXECUTOR_FAULT  ")).isEqualTo("EXECUTOR_FAULT");
         assertThat(AsideJobFailureCode.of("  EXECUTOR_FAULTY  ")).isNull();
     }
+
+    @Test
+    @DisplayName("읽기 거절은 페이지가 쓴 단어로 기록에 닿는다 — 한 단어 뒤에 여덟 개의 사실이 숨지 않도록")
+    void aRefusedReadingArrivesWithItsOwnWord() {
+        // 2026-10-10 라이브: 자동 확인이 두 번 SURFACE_UNREADABLE로 끝났고 실패 코드는 READING_REFUSED
+        // 하나였다. 페이지가 한 말(GRID_NOT_FOUND)을 알려면 판매자 Mac의 helper 로그를 열어야 했다.
+        for (String word : new String[] {"GRID_NOT_FOUND", "MODEL_UNREADABLE",
+                                         "MODEL_SHAPE_CHANGED", "ROWS_NOT_LOADED", "ID_LINK_MISMATCH",
+                                         "TOO_MANY_ROWS", "ROUTE_MISMATCH"}) {
+            assertThat(AsideJobFailureCode.of(word)).as(word).isEqualTo(word);
+        }
+        // 그리고 예전 단어는 그대로 남는다 — reader의 어휘가 이 목록보다 앞서 자라도 갈 곳이 있다.
+        assertThat(AsideJobFailureCode.of("READING_REFUSED")).isEqualTo("READING_REFUSED");
+    }
 }

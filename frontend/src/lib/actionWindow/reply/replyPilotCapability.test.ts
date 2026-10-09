@@ -45,13 +45,18 @@ describe("the guided-reply runtime is not gated on the build mode", () => {
     });
   }
 
-  it("what a shipped build DOES need is the helper origin in its CSP — and that is one build flag", () => {
-    // Without it the browser blocks the helper's http and websocket, and the guided lane degrades to
-    // the manual handoff no matter what the runtime code does.
-    const off = buildCsp({});
-    expect(off).not.toContain("127.0.0.1:47615");
-    const on = buildCsp({ VITE_ENABLE_AGENT_BRIDGE: "true", VITE_BRIDGE_URL: "http://127.0.0.1:47615" });
-    expect(on).toContain("http://127.0.0.1:47615");
-    expect(on).toContain("ws://127.0.0.1:47615");
+  it("the helper origin is in the CSP of every shipped build — no flag decides whether the product can reach it", () => {
+    // 이 테스트는 반대를 주장하고 있었다: 「플래그가 없으면 helper origin도 없다」가 올바른 상태인 것처럼.
+    // 2026-10-09 라이브에서 그 결과를 봤다 — 플래그 없이 만든 production 번들은 sign-in check를 CSP에서
+    // 막혔고, 화면에는 「도우미가 응답하지 않습니다」만 남았다. 도우미는 판매자의 제품 기능이지 배포가
+    // 선택하는 vendor가 아니다.
+    const bare = buildCsp({});
+    expect(bare).toContain("http://127.0.0.1:47615");
+    expect(bare).toContain("ws://127.0.0.1:47615");
+    const named = buildCsp({ VITE_BRIDGE_URL: "http://127.0.0.1:47999" });
+    expect(named).toContain("http://127.0.0.1:47999");
+    expect(named).toContain("ws://127.0.0.1:47999");
+    // 그리고 dock 플래그는 정책을 더 이상 바꾸지 않는다.
+    expect(buildCsp({ VITE_ENABLE_AGENT_BRIDGE: "true" } as Record<string, string>)).toEqual(bare);
   });
 });
