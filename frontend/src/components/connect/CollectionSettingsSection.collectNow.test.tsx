@@ -99,7 +99,11 @@ describe("지금 수집 — 서버가 경로를 고른다", () => {
     expect(within(reviewRow()).queryByText("자동 수집 미지원")).toBeNull();
     // 주기는 여전히 없다: 돌릴 수 있는 스케줄이 생긴 것이 아니라, 누를 수 있는 경로가 보이게 된 것이다.
     expect(reviewRow().querySelector("select")).toBeNull();
-    expect(within(reviewRow()).getByText(/판매자 센터 화면에서 읽어옵니다/)).toBeInTheDocument();
+    // 그리고 정상 상태의 그 줄은 acquisition을 설명하지 않는다. 여기 있던 「누를 때마다 판매자 센터 화면에서
+    // 읽어옵니다. 자동 주기는 없습니다」는 구현 방식과 「매번 눌러야 한다」를 동시에 말했고, 둘 다 이 줄이
+    // 할 말이 아니다.
+    expect(within(reviewRow()).queryByText(/화면에서 읽어옵니다/)).toBeNull();
+    expect(within(reviewRow()).queryByText(/자동 주기는 없습니다/)).toBeNull();
   });
 
   it("누르면 화면 읽기가 돌고, 끝난 결과를 판매자 문장으로 말한다", async () => {
@@ -233,18 +237,16 @@ describe("수집 입구는 자료마다 하나다", () => {
     mount();
 
     await waitFor(() => expect(within(reviewRow()).getByTestId("collect-now-REVIEW")).toBeDefined());
-    expect(within(reviewRow()).getByText(/판매자 센터 화면에서 읽어옵니다/)).toBeInTheDocument();
+    expect(within(reviewRow()).queryByText(/화면에서 읽어옵니다/)).toBeNull();
   });
 
-  it("호스트가 이미 그 자료의 수집을 들고 있으면, 이 줄은 주기가 없는 이유만 말한다", async () => {
+  it("호스트가 이미 그 자료의 수집을 들고 있으면, 이 줄에는 버튼이 없다", async () => {
     // 쿠팡 화면이 쓰는 모양. 같은 자료에 같은 버튼이 두 번 보이면 판매자는 둘이 다른 일을 하는 줄로 읽고,
     // 2026-10-07 라이브에서 실제로 다른 쪽을 눌렀다.
     readiness("READY");
     mount(vi.fn(), { hostOwnsScreenRead: true });
 
-    await waitFor(() =>
-      expect(within(reviewRow()).getByText(/판매자 센터 화면에서 읽어옵니다/)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(within(reviewRow()).getByText("리뷰")).toBeInTheDocument());
     expect(within(reviewRow()).queryByTestId("collect-now-REVIEW")).toBeNull();
     // 그러나 API 경로인 줄의 버튼은 그대로다 — 이 선언은 화면 읽기 자료에 대한 것이다.
     const section = screen.getByText("수집 설정").closest("section") as HTMLElement;

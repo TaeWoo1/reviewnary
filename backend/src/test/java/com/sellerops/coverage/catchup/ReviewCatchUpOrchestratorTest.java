@@ -136,7 +136,20 @@ class ReviewCatchUpOrchestratorTest {
                 return Optional.of(new Target(sellerAccountId, "slot-1", "digest"));
             }
         };
-        Clock clock = Clock.fixed(Instant.now(), ZoneOffset.UTC);
+        // 움직이는 시계: 「사람이 기다린 시간」을 재는 테스트가 있으려면 시간이 흘러야 한다.
+        now = Instant.now();
+        Clock clock = new Clock() {
+            @Override public ZoneId getZone() {
+                return ZoneOffset.UTC;
+            }
+            @Override public Clock withZone(ZoneId zone) {
+                return this;
+            }
+            @Override public Instant instant() {
+                return now;
+            }
+        };
+        this.clock = clock;
         dispatcher = new ScheduledAsideJobService(jobs, clock,
                 new AsideMarketplaceAccess(false, Set.of(), Set.of()), resolver,
                 new AsideHelperDevices(devices, clock));
@@ -144,6 +157,14 @@ class ReviewCatchUpOrchestratorTest {
                 new ReviewCoverageCursor(segments, channels, jobs), dispatcher, clock,
                 ReviewCatchUpOrchestrator.Limits.PRESS);
         dispatcher.setSettledListener(orchestrator::advance);
+    }
+
+    private Instant now;
+    private Clock clock;
+
+    /** 시간을 앞으로 보낸다 — 사람이 로그인에 쓴 시간을 흉내 내는 유일한 방법. */
+    private void tick(Duration by) {
+        now = now.plus(by);
     }
 
     /** The boundary this organisation really has: a reconciled period import ending 36 days before today. */
@@ -324,6 +345,42 @@ class ReviewCatchUpOrchestratorTest {
         ScheduledAsideJob resumed = press("press-2").orElseThrow().firstJob();
         assertThat(resumed.getRequestedWindowStart()).isEqualTo(walled);
         assertThat(runs.findById(run.getId()).orElseThrow().getState()).isEqualTo(ReviewCatchUpState.RUNNING);
+    }
+
+    @Test
+    @DisplayName("로그인을 기다린 시간은 상한에 들어가지 않는다 — 상한은 기계가 쓴 시간이다")
+    void waitingOnAPersonDoesNotSpendTheBound() {
+        // 2026-10-09 조사: `exceeded()`가 started_at부터 쟀다. 로그인 벽에서 멈춘 intent는 살아남지만,
+        // 판매자가 로그인에 상한보다 오래 쓰면 재개 후 첫 창이 끝나는 순간 MAX_ELAPSED로 죽었다. 6분은
+        // 한 번의 누름이 기계를 얼마나 쓰는지를 묶는 상한이고, 사람의 시간은 그 둘 중 어느 것도 아니다.
+        coveredThrough(36);
+        ScheduledAsideJob first = press("press-1").orElseThrow().firstJob();
+        settleAsRead(first, 45, 500);
+        ScheduledAsideJob walled = onDesk().orElseThrow();
+        settleAsAuthWall(walled);
+
+        ReviewCatchUpRun paused = runs.findById(first.getCatchUpRunId()).orElseThrow();
+        assertThat(paused.getPausedSince()).as("기다림이 시작된 시각을 들고 있다").isNotNull();
+
+        // 사람이 상한보다 오래 걸린다.
+        Duration waited = ReviewCatchUpOrchestrator.Limits.PRESS.maxElapsed().plusMinutes(5);
+        tick(waited);
+
+        // 기다린 시간은 기계가 쓴 시간이 아니다.
+        assertThat(paused.machineElapsed(clock.instant()))
+                .as("기다리는 중에 물어도 사람의 시간은 빠진다")
+                .isLessThan(ReviewCatchUpOrchestrator.Limits.PRESS.maxElapsed());
+
+        // 재개하면 그 창이 책상에 올라가고, 다음 창도 이어진다 — 상한에 걸려 죽지 않는다.
+        ScheduledAsideJob resumed = press("resume-1").orElseThrow().firstJob();
+        settleAsRead(resumed, 45, 500);
+        ReviewCatchUpRun after = runs.findById(paused.getId()).orElseThrow();
+        assertThat(after.getPausedMs()).as("기다린 시간이 누적됐다").isGreaterThanOrEqualTo(waited.toMillis());
+        assertThat(after.getPausedSince()).as("기다림이 끝났다").isNull();
+        assertThat(after.getState())
+                .as("상한에 걸려 멈추지 않았다")
+                .isNotEqualTo(ReviewCatchUpState.STOPPED_LIMIT);
+        assertThat(onDesk()).as("다음 창이 이어졌다").isPresent();
     }
 
     @Test

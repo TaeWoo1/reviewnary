@@ -117,37 +117,31 @@ export function stopSentence(failureCode: string | null | undefined): string | n
 export function catchUpMessage(read: ScreenReadView): { text: string; isError: boolean } | null {
   const walk = read.catchUp;
   if (!walk) return null;
-  const done = walk.windowsDone;
   switch (walk.runState) {
     case "RUNNING":
-      return {
-        text: done > 0 ? `밀린 리뷰를 확인하고 있습니다. ${done}개 기간 확인됨` : "밀린 리뷰를 확인하고 있습니다.",
-        isError: false,
-      };
+      // 「N개 기간 확인됨」은 내부 창 나누기를 간접적으로 꺼내 보인다 — 판매자가 쓸 수 있는 수가 아니고,
+      // 그 수가 몇이든 할 일이 같다. 진행 중이라는 사실만 말한다.
+      return { text: "밀린 리뷰를 확인하고 있습니다.", isError: false };
     case "COMPLETE":
       return { text: `밀린 리뷰를 모두 확인했습니다. 새로 저장 ${read.inserted ?? 0}건`, isError: false };
     case "PAUSED_AUTH":
-      // 앞에서 끝낸 기간은 그대로 남는다 — 로그인하고 이어가면 멈춘 그 기간부터 다시 읽는다.
-      return {
-        text: `${done}개 기간을 확인했고, 그다음 기간에서 판매자 센터 로그인이 필요했습니다.`,
-        isError: true,
-      };
+      // 앞에서 끝낸 기간은 그대로 남는다 — 로그인하고 이어가면 멈춘 그 기간부터 다시 읽는다. 몇 개를
+      // 끝냈는지는 판매자가 할 일을 바꾸지 않는다: 로그인하면 이어진다.
+      return { text: "판매자센터 로그인이 필요합니다. 로그인하면 이어서 확인합니다.", isError: true };
     case "STOPPED_SATURATED":
       return {
-        text: `${done}개 기간을 확인했습니다. 어떤 하루에는 한 번에 읽을 수 있는 양보다 많은 리뷰가 있어, 그 날짜 이후는 아직 확인하지 못했습니다.`,
+        text: "일부 기간을 아직 확인하지 못했습니다. 하루에 리뷰가 아주 많은 날이 있어 그 뒤는 남겨 두었습니다.",
         isError: true,
       };
     case "STOPPED_LIMIT":
       return {
-        text: `${done}개 기간을 확인했습니다. 한 번에 확인하는 양에 도달해서 여기서 멈췄습니다 — 다시 누르면 이어서 확인합니다.`,
+        text: "일부 기간을 아직 확인하지 못했습니다. 다시 확인을 누르면 이어서 확인합니다.",
         isError: false,
       };
     default: {
       const why = stopSentence(walk.stopReason);
       return {
-        text: why
-          ? (done > 0 ? `${done}개 기간을 확인했습니다. ${why}` : why)
-          : `${done}개 기간을 확인한 뒤 멈췄습니다. 잠시 후 다시 시도해 주세요.`,
+        text: why ?? "일부 기간을 아직 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
         isError: true,
       };
     }
@@ -219,7 +213,11 @@ export function deskSentence(desk: LocalAgentRunState | null): string {
       // 주장하는 말이고, 판매자가 그사이 자기 브라우저에서 로그인했을 수도 있다.
       return "최근 수집 시 로그인이 필요했습니다.";
     default:
-      return "누를 때마다 판매자 센터 화면에서 읽어옵니다. 자동 주기는 없습니다.";
+      // <b>정상 상태에서는 acquisition 이야기를 하지 않는다.</b> 이 자리에 있던 문장은 「누를 때마다 판매자
+      // 센터 화면에서 읽어옵니다. 자동 주기는 없습니다」였다 — 판매자에게 (a) 구현 방식과 (b) 매번 눌러야
+      // 한다는 두 가지를 동시에 말했고, 둘 다 이 화면이 할 말이 아니다. 어디까지 확인됐는지는 바로 아래
+      // `coverageSentence`가 말하고, 그게 판매자가 쓸 수 있는 유일한 사실이다.
+      return "";
   }
 }
 
@@ -479,9 +477,11 @@ export function CollectNowAction({
             9월 2일」을 지우지 않는다 — 로그인이 만료됐다는 소식이 그 전에 읽은 4,432건을 없애지는 않기
             때문이다. 한 칸으로 합쳐 두었을 때 제품은 실제로 읽은 채널을 「확인된 적 없음」이라고 말했다.
           */}
-          <p className="break-keep text-sm text-muted">
-            {signedInHere ? "로그인 확인됨. 다시 수집해 주세요." : deskSentence(desk)}
-          </p>
+          {(signedInHere ? "로그인 확인됨. 다시 수집해 주세요." : deskSentence(desk)) ? (
+            <p className="break-keep text-sm text-muted">
+              {signedInHere ? "로그인 확인됨. 다시 수집해 주세요." : deskSentence(desk)}
+            </p>
+          ) : null}
           {lastSuccessAt ? (
             <p className="break-keep text-sm text-muted">마지막 성공 수집 {kstMonthDay(lastSuccessAt)}</p>
           ) : null}

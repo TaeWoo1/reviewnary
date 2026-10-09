@@ -174,6 +174,8 @@ export function CoupangChannelView({
           primary={
             reviewRoute.loading || reviewRoute.path !== "SCREEN_READ" ? null : (
               // 이 press가 곧 그 한 번의 수집 승인이다. 복구 동작은 책상이 막혔을 때만 이 아래에 붙는다.
+              // 그리고 primary가 아니다 — 정상 상태에서 눌러야 하는 버튼이 아니고, 최초 연결 직후·명시적
+              // refresh·문제 복구에만 쓰는 secondary 동작이다.
               <CollectNowAction
                 accountId={accountId}
                 dataType="REVIEW"
@@ -184,7 +186,7 @@ export function CoupangChannelView({
                 coverageThrough={reviewRoute.coverageThrough}
                 coverageGapDays={reviewRoute.coverageGapDays}
                 showSentence
-                emphasis={lead === "REVIEW" ? "primary" : "plain"}
+                emphasis="plain"
                 recovery={reviewRecovery}
                 onReport={onReport}
                 onChanged={onChanged}

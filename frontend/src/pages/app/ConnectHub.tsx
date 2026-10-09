@@ -44,6 +44,8 @@ import type {
  * 설정·리포트가 쓰는 그것.
  */
 export function ConnectHub() {
+  // 이 Mac이 할 일이 있는지 — 「연결됨」이면 이 구역은 설명하지 않는다.
+  const [helperState, setHelperState] = useState<string | null>(null);
   const [channels, setChannels] = useState<ChannelResponse[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(true);
   const [channelsError, setChannelsError] = useState(false);
@@ -284,8 +286,14 @@ export function ConnectHub() {
         리뷰 입구에서 한 번 라이브로 비용을 치렀다). 그래서 그 구역은 접힌 보조 영역이 되었다: 지우지 않고,
         먼저 보이지 않게.
       */}
-      <Block title="이 Mac" note="판매자센터 화면을 읽을 때 이 컴퓨터가 함께 일합니다">
-        <HelperStatusCard naverHealth={naverHealth} />
+      {/*
+        <b>정상일 때 이 구역은 설명하지 않는다.</b> 「판매자센터 화면을 읽을 때 이 컴퓨터가 함께 일합니다」는
+        acquisition이 어떻게 돌아가는지를 말하는 문장이고, 아무 문제가 없을 때 판매자가 그걸 알아야 할 이유가
+        없다. 할 일이 생겼을 때만(설치·연결·업데이트) 그 문장이 왜 이 컴퓨터가 관련되는지를 설명한다.
+        줄 자체는 남는다 — 상태 한 단어는 볼 수 있어야 하고, 지우면 문제가 생겼을 때 찾을 자리가 없다.
+      */}
+      <Block title="이 Mac" note={helperState === "CONNECTED" ? undefined : "판매자센터 화면을 읽을 때 이 컴퓨터가 함께 일합니다"}>
+        <HelperStatusCard naverHealth={naverHealth} onState={(s) => setHelperState(s.key)} />
         {/* 지금 이 Mac이 하고 있는 일 — 있을 때만. 자기 상태 아래가 그 자리다. */}
         <HomeReviewOpsCard run={liveRun} />
       </Block>
