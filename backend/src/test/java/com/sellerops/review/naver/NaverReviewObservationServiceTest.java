@@ -442,4 +442,108 @@ class NaverReviewObservationServiceTest {
                 .as("another organisation's caller finds no job").isInstanceOf(ApiException.class);
         verify(ingestion, never()).ingestReviews(any(), any(), anyList());
     }
+    // ------------------------------------------------- 빈 기간과 화면 지문
+
+    private static final String DIGEST_A =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    private static final String DIGEST_B =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    /** 그 기간을 읽었고 아무것도 없었다 — 그리고 화면이 어느 가게인지는 digest 하나로 말한다. */
+    private static NaverReviewObservationRequest emptyWindow(String digest) {
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        return new NaverReviewObservationRequest(List.of(), 1, today.toString(), today.toString(), 500,
+                0, 500, "EMPTY_STATE", 0, true, digest);
+    }
+
+    private static NaverReviewObservationRequest windowWithDigest(String digest,
+                                                                  NaverReviewObservationRequest.Review... rows) {
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        return new NaverReviewObservationRequest(List.of(rows), 1, today.toString(), today.toString(), 500,
+                rows.length, 500, "MODEL", 0, false, digest);
+    }
+
+    private void requestedToday() {
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        job.setRequestedWindowStart(today);
+        job.setRequestedWindowEnd(today);
+    }
+
+    @Test
+    @DisplayName("카탈로그가 증명한 읽기만이 화면 지문을 가르친다 — 그리고 그 지문은 스스로를 증명하지 않는다")
+    void aProvenReadTeachesTheScreenFingerprint() {
+        provedStore();
+        requestedToday();
+        service.deliver(ORG, DEVICE, JOB, windowWithDigest(DIGEST_A, row("5066448224", "1234567890")));
+        assertThat(account.getStoreIdentity()).isEqualTo(DIGEST_A);
+    }
+
+    @Test
+    @DisplayName("카탈로그가 증명하지 못한 읽기는 아무것도 가르치지 않는다")
+    void anUnprovenReadTeachesNothing() {
+        // countOwnedListings 기본값 0 — 이 조직의 상품이 아니다.
+        requestedToday();
+        service.deliver(ORG, DEVICE, JOB, windowWithDigest(DIGEST_A, row("5066448224", "1234567890")));
+        assertThat(account.getStoreIdentity()).isNull();
+    }
+
+    @Test
+    @DisplayName("빈 기간 + 저장된 지문과 일치 = MATCH — 읽었고, 그 날은 닫힌다")
+    void anAttributedEmptyPeriodIsAMatch() {
+        account.setStoreIdentity(DIGEST_A);
+        requestedToday();
+        var view = service.deliver(ORG, DEVICE, JOB, emptyWindow(DIGEST_A));
+        assertThat(view.identityVerdict()).isEqualTo("MATCH");
+        assertThat(view.received()).isZero();
+        // coverage가 적혔다 — 기간과, 그 기간을 전부 읽었다는 판정.
+        assertThat(job.getWindowStart()).isEqualTo(java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")));
+        assertThat(job.getDeliveryCompleteness())
+                .isEqualTo(com.sellerops.responsibility.SourceCompleteness.BOUNDED);
+        assertThat(job.getIdentityVerdict()).isEqualTo(com.sellerops.responsibility.IdentityVerdict.MATCH);
+    }
+
+    @Test
+    @DisplayName("저장된 지문이 없으면 빈 기간은 귀속되지 않는다 — 읽기는 성공, coverage는 그대로")
+    void anEmptyPeriodWithNoKnownFingerprintIsUnresolved() {
+        requestedToday();
+        var view = service.deliver(ORG, DEVICE, JOB, emptyWindow(DIGEST_A));
+        assertThat(view.identityVerdict()).isEqualTo("UNRESOLVED");
+        assertThat(job.getWindowStart()).isNull();
+        assertThat(account.getStoreIdentity()).isNull();
+    }
+
+    @Test
+    @DisplayName("지문이 달라졌다고 갱신하지 않는다 — 화면이 스스로를 승인하는 길은 없다")
+    void aChangedFingerprintIsNeverAdoptedByAnEmptyRead() {
+        account.setStoreIdentity(DIGEST_A);
+        requestedToday();
+        var view = service.deliver(ORG, DEVICE, JOB, emptyWindow(DIGEST_B));
+        assertThat(view.identityVerdict()).isEqualTo("UNRESOLVED");
+        assertThat(account.getStoreIdentity()).isEqualTo(DIGEST_A);
+        assertThat(job.getWindowStart()).isNull();
+    }
+
+    @Test
+    @DisplayName("화면이 「없다」고 말한 적 없는 0행은 예전과 같은 답이다")
+    void zeroRowsWithoutAnEmptyStateIsUnresolved() {
+        account.setStoreIdentity(DIGEST_A);
+        requestedToday();
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        var view = service.deliver(ORG, DEVICE, JOB, new NaverReviewObservationRequest(List.of(), 1,
+                today.toString(), today.toString(), 500, 0, 500, "MODEL", 0, null, DIGEST_A));
+        assertThat(view.identityVerdict()).isEqualTo("UNRESOLVED");
+    }
+
+    @Test
+    @DisplayName("digest 모양이 아닌 값은 없는 것으로 친다 — 비교 장치에 아무 문자열이나 들어오지 않는다")
+    void aMalformedDigestIsNoDigest() {
+        account.setStoreIdentity(DIGEST_A);
+        requestedToday();
+        assertThat(service.deliver(ORG, DEVICE, JOB, emptyWindow("NOT-A-DIGEST")).identityVerdict())
+                .isEqualTo("UNRESOLVED");
+        provedStore();
+        job.setIdentityVerdict(null);
+        service.deliver(ORG, DEVICE, JOB, windowWithDigest("NOT-A-DIGEST", row("5066448224", "1234567890")));
+        assertThat(account.getStoreIdentity()).isEqualTo(DIGEST_A);
+    }
 }

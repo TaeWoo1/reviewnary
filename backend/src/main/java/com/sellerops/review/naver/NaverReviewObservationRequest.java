@@ -37,11 +37,29 @@ import java.util.List;
  * @param selectedPageSize the page size the list was set to, read and never changed
  * @param gridReadMode     {@code MODEL} when the rows came from the grid's own row model
  * @param monthMoves       single-month calendar steps taken to reach the period
+ *
+ * <p><b>And when the period held nothing.</b> {@code emptyPeriod} is the grid saying so in its own words — its
+ * no-rows overlay on a drawn grid — which is the only thing that tells «this period is empty» apart from «this
+ * screen could not be read»; the row count alone cannot. {@code screenStoreDigest} is which store that screen
+ * is, as a digest of the seller-centre chrome that is there whether or not any row is: 64 lower-case hex, never
+ * the values themselves. Both optional, and a helper built before them says nothing rather than something false.
+ *
+ * @param emptyPeriod        true when the grid itself stated the period holds no reviews
+ * @param screenStoreDigest  domain-separated digest of the screen's own store identity, or null when unread
  */
 @JsonIgnoreProperties(ignoreUnknown = false)
 public record NaverReviewObservationRequest(List<Review> reviews, Integer windowDays, String windowStart,
                                             String windowEnd, Integer rowCapacity, Integer labelledTotal,
-                                            Integer selectedPageSize, String gridReadMode, Integer monthMoves) {
+                                            Integer selectedPageSize, String gridReadMode, Integer monthMoves,
+                                            Boolean emptyPeriod, String screenStoreDigest) {
+
+    /** The shape before a read could say «this period is empty» and «this screen is that store». */
+    public NaverReviewObservationRequest(List<Review> reviews, Integer windowDays, String windowStart,
+                                         String windowEnd, Integer rowCapacity, Integer labelledTotal,
+                                         Integer selectedPageSize, String gridReadMode, Integer monthMoves) {
+        this(reviews, windowDays, windowStart, windowEnd, rowCapacity, labelledTotal, selectedPageSize,
+                gridReadMode, monthMoves, null, null);
+    }
 
     /** The shape before the period and the ceiling existed. */
     public NaverReviewObservationRequest(List<Review> reviews, Integer windowDays) {
