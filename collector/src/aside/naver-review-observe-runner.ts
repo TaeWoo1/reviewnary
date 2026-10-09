@@ -20,6 +20,7 @@
  * length travels to the backend as the bound this read covered.
  */
 import { createHash } from "node:crypto";
+import { sanitizeStoreFingerprint } from "../naver/store-fingerprint-inpage";
 import {
   NAVER_REVIEW_MAX_ROWS,
   type NaverReviewReadReason,
@@ -223,6 +224,16 @@ export interface NaverDeliveryRequest {
   readonly gridReadMode: string | null;
   /** How many single-month calendar steps this read took to reach its period. Audit only. */
   readonly monthMoves: number;
+  /**
+   * <b>그리드가 스스로 「이 기간엔 없다」고 말했는가.</b> 0행이라는 사실만으로는 구분되지 않는 두 가지 —
+   * 비어 있는 기간과 읽지 못한 화면 — 중 앞의 것을 페이지의 말로 확정한다.
+   */
+  readonly emptyPeriod: boolean;
+  /**
+   * <b>이 화면이 어느 가게인가 — 64자 hex 하나.</b> 판매자 계정 식별자와 스토어 표시명을 페이지 안에서
+   * 합쳐 해싱한 값이고, 원문은 경계를 넘지 않는다. `null`은 「읽지 못했다」이지 「다르다」가 아니다.
+   */
+  readonly screenStoreDigest: string | null;
 }
 
 export interface NaverDeliveryResponse {
@@ -515,6 +526,8 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
       selectedPageSize: reading.evidence.selectedPageSize,
       gridReadMode: reading.evidence.gridReadMode,
       monthMoves: typeof result["monthMoves"] === "number" ? result["monthMoves"] : 0,
+      emptyPeriod: reading.evidence.emptyPeriod,
+      screenStoreDigest: sanitizeStoreFingerprint(result["storeFingerprint"]),
     });
   } catch {
     delivered = null;
@@ -523,18 +536,14 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
     log("aside_naver_review_delivery", { ok: false, reason: "NOT_DELIVERED" }, "warn");
     return none("EXECUTOR_UNAVAILABLE");
   }
-  // <b>빈 기간은 귀속할 것이 없다 — 그래서 귀속을 꾸미지도 않는다.</b>
+  // <b>빈 기간의 귀속은 백엔드가 정한다 — 여기서 꾸미지 않는다.</b>
   //
-  // 가게 확인은 페이지에 찍힌 상품번호가 이 조직의 것인지로 이뤄진다. 행이 하나도 없으면 그 증거가 없고,
-  // fence는 정직하게 UNRESOLVED를 답한다. 저장될 행이 없으니 잘못 귀속될 행도 없고, 백엔드는 이 경로에서
-  // coverage를 적지 않는다 — 읽었다는 사실만 남고, 그 날이 닫혔다는 주장은 남지 않는다.
-  //
-  // MATCH로 바꿔 적지 않는 이유는 그것이 거짓이기 때문이다. 증거 없이 「이 가게가 맞다」고 기록하면,
-  // 그 기록을 믿는 다음 사람이 확인할 방법이 없다.
-  const emptyUnattributed = reading.evidence.emptyPeriod
-    && delivered.received === 0
-    && delivered.identityVerdict === "UNRESOLVED";
-  if (delivered.identityVerdict !== "MATCH" && !emptyUnattributed) {
+  // 행이 있는 읽기의 가게 확인은 페이지의 상품번호가 이 조직의 것인지로 이뤄진다(카탈로그 fence). 행이
+  // 하나도 없으면 그 증거가 없고, 그때 쓰이는 것이 화면 지문이다 — 전에 fence가 MATCH를 낸 읽기에서
+  // 저장해 둔 값과 같은가. 같으면 MATCH, 저장된 것이 없거나 다르면 UNRESOLVED이고, 어느 쪽이든 읽기는
+  // 성공이다. 저장될 행이 없으니 잘못 귀속될 행도 없다.
+  const emptyRead = reading.evidence.emptyPeriod && delivered.received === 0;
+  if (delivered.identityVerdict !== "MATCH" && !emptyRead) {
     log("aside_naver_review_delivery", { ok: false, identity: delivered.identityVerdict, received: delivered.received });
     return none("STORE_UNRESOLVED");
   }
@@ -550,6 +559,7 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
     selectedPageSize: reading.evidence.selectedPageSize,
     gridReadMode: reading.evidence.gridReadMode,
     emptyPeriod: reading.evidence.emptyPeriod,
+    storeDigestRead: sanitizeStoreFingerprint(result["storeFingerprint"]) !== null,
     monthMoves: typeof result["monthMoves"] === "number" ? result["monthMoves"] : 0,
     identity: delivered.identityVerdict,
     received: delivered.received,

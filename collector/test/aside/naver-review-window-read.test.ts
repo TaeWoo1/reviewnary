@@ -933,7 +933,7 @@ describe("빈 기간 — 읽었고, 저장할 것이 없고, 귀속할 것도 �
   const range = { dateInputCount: 2, valuesParsed: 2, startDaysBefore: 0, endDaysBefore: 0,
     pagerNumberCount: 0, highestPagerNumber: 0 };
 
-  it("그리드가 비었다고 말한 기간은 OBSERVED(0)이다 — identity는 UNRESOLVED 그대로", async () => {
+  it("그리드가 비었다고 말한 기간은 OBSERVED(0)이다 — 귀속은 백엔드가 정한다", async () => {
     const deliver = vi.fn(async (_request: unknown) => UNRESOLVED);
     const r = await runNaverReviewObservation({
       deliver,
@@ -942,8 +942,41 @@ describe("빈 기간 — 읽었고, 저장할 것이 없고, 귀속할 것도 �
     });
     expect(r.outcome).toBe("OBSERVED");
     expect(r.observedCount).toBe(0);
-    const sent = deliver.mock.calls[0]![0] as unknown as { gridReadMode: string | null };
+    const sent = deliver.mock.calls[0]![0] as unknown as
+      { gridReadMode: string | null; emptyPeriod: boolean; screenStoreDigest: string | null };
     expect(sent.gridReadMode).toBe("EMPTY_STATE");
+    // 화면이 「없다」고 말했다는 사실이 그대로 건너간다 — 0행이라는 수만으로는 구분되지 않는다.
+    expect(sent.emptyPeriod).toBe(true);
+    expect(sent.screenStoreDigest).toBeNull();
+  });
+
+  it("귀속된 빈 기간(MATCH)도 그대로 OBSERVED(0) — 그리고 화면 지문이 함께 건너간다", async () => {
+    const digest = "a".repeat(64);
+    const deliver = vi.fn(async (_request: unknown) => ({ ...UNRESOLVED, identityVerdict: "MATCH" }));
+    const r = await runNaverReviewObservation({
+      deliver,
+      window: { start: "2026-10-08", end: "2026-10-08" },
+      executor: windowExecutor({
+        ok: true, reading: emptyReading, range, monthMoves: 0, storeFingerprint: digest, elapsedMs: 1,
+      }),
+    });
+    expect(r.outcome).toBe("OBSERVED");
+    expect(r.observedCount).toBe(0);
+    const sent = deliver.mock.calls[0]![0] as unknown as { screenStoreDigest: string | null };
+    expect(sent.screenStoreDigest).toBe(digest);
+  });
+
+  it("지문 모양이 아닌 값은 건너가지 않는다 — 비교 장치에 아무 문자열이나 들어오지 않는다", async () => {
+    const deliver = vi.fn(async (_request: unknown) => UNRESOLVED);
+    await runNaverReviewObservation({
+      deliver,
+      window: { start: "2026-10-08", end: "2026-10-08" },
+      executor: windowExecutor({
+        ok: true, reading: emptyReading, range, monthMoves: 0, storeFingerprint: "NOPE", elapsedMs: 1,
+      }),
+    });
+    const sent = deliver.mock.calls[0]![0] as unknown as { screenStoreDigest: string | null };
+    expect(sent.screenStoreDigest).toBeNull();
   });
 
   it("행이 있는데 UNRESOLVED면 예전처럼 거절한다 — 가게 확인을 건너뛰는 문이 열린 것이 아니다", async () => {

@@ -33,12 +33,14 @@ export interface NaverReviewRuntimePlan {
   authScript: string;
   readerScript: string;
   rangeScript: string;
+  /** 이 화면이 어느 가게인가 — digest 하나. 없는 플랜에서는 건너뛴다. */
+  storeFingerprintScript?: string;
   settleTimeoutMs: number;
   pollMs: number;
 }
 
 export type NaverReviewRuntimeResult =
-  | { ok: true; reading: unknown; range: unknown; elapsedMs: number }
+  | { ok: true; reading: unknown; range: unknown; storeFingerprint?: unknown; elapsedMs: number }
   | {
       ok: false;
       code: "AUTH_REQUIRED" | "UNSUPPORTED_STATE" | "READ_UNSETTLED" | "RUNTIME_FAULT";
@@ -121,7 +123,17 @@ export async function asideNaverReviewRuntime(
     } catch (e) {
       return fail("RUNTIME_FAULT", "RANGE", null);
     }
-    return { ok: true, reading: settled, range, elapsedMs: elapsed() };
+    // 가게 지문. 행이 있는 읽기에서만 의미가 있다 — 카탈로그가 증명한 그 순간이 이 값을 가르칠 수 있는
+    // 유일한 때이고, 판매자가 누르는 이 읽기가 그 순간인 경우가 가장 흔하다.
+    let storeFingerprint: unknown = null;
+    if (plan.storeFingerprintScript) {
+      try {
+        storeFingerprint = await opened.evaluate(plan.storeFingerprintScript);
+      } catch (e) {
+        storeFingerprint = null;
+      }
+    }
+    return { ok: true, reading: settled, range, storeFingerprint, elapsedMs: elapsed() };
   } finally {
     if (tab !== null) {
       try {

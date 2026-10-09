@@ -30,6 +30,7 @@ import {
   type NaverReviewWindowRuntimePlan,
   type NaverWindowRuntimeResult,
 } from "./naver-review-window-runtime";
+import { buildNaverStoreFingerprintScript } from "../naver/store-fingerprint-inpage";
 import {
   NAVER_REVIEW_DATE_INPUT_SELECTOR,
   NAVER_REVIEW_DAY_CELL_SELECTOR,
@@ -112,6 +113,7 @@ export function buildNaverReviewWindowRuntimePlan(
     authScript: buildNaverReviewAuthScript(),
     readerScript: buildNaverReviewListReadScript(),
     rangeScript: inPageReviewListRange(kstCivilDate(now)),
+    storeFingerprintScript: buildNaverStoreFingerprintScript(),
     // The open calendar, judged in the page against the component's own class words.
     pickerScript: buildNaverReviewPickerScript(NAVER_REVIEW_DATE_INPUT_SELECTOR,
       NAVER_REVIEW_QUERY_CONTROL_SELECTOR, NAVER_REVIEW_DAY_CELL_SELECTOR),
@@ -166,7 +168,8 @@ export function parseNaverReviewWindowRuntimeResult(raw: unknown): NaverWindowRu
   const monthMoves = typeof r["monthMoves"] === "number" && Number.isFinite(r["monthMoves"]) ? r["monthMoves"] : 0;
   if (r["ok"] === true) {
     if (r["reading"] === undefined || r["range"] === undefined) return null;
-    return { ok: true, reading: r["reading"], range: r["range"], monthMoves, elapsedMs };
+    return { ok: true, reading: r["reading"], range: r["range"], monthMoves,
+      storeFingerprint: r["storeFingerprint"], elapsedMs };
   }
   if (r["ok"] !== false) return null;
   const code = r["code"];
@@ -190,6 +193,7 @@ export function buildNaverReviewRuntimePlan(workflow: NaverReviewWorkflow, now: 
     authScript: buildNaverReviewAuthScript(),
     readerScript: buildNaverReviewListReadScript(),
     rangeScript: inPageReviewListRange(kstCivilDate(now)),
+    storeFingerprintScript: buildNaverStoreFingerprintScript(),
     settleTimeoutMs: workflow.settleTimeoutMs,
     pollMs: 1_500,
   };
@@ -217,7 +221,8 @@ export function parseNaverReviewRuntimeResult(raw: unknown): NaverReviewRuntimeR
   const elapsedMs = typeof r["elapsedMs"] === "number" && Number.isFinite(r["elapsedMs"]) ? r["elapsedMs"] : 0;
   if (r["ok"] === true) {
     if (r["reading"] === undefined || r["range"] === undefined) return null;
-    return { ok: true, reading: r["reading"], range: r["range"], elapsedMs };
+    return { ok: true, reading: r["reading"], range: r["range"],
+      storeFingerprint: r["storeFingerprint"], elapsedMs };
   }
   if (r["ok"] !== false) return null;
   const code = r["code"];

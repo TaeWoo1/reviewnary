@@ -149,9 +149,48 @@ helper    aside_naver_review_read {ok:true, rows:0, windowStart:"2026-10-10", wi
 귀속된 전달에서만 쓰이기 때문이고, 그것이 B의 직접적인 결과다. 화면은 「정상」이라고 말하지만 freshness
 문장은 어제의 시각을 가리킨다 — 빈 날이 이어지면 그 간격이 벌어진다. 고치지 않고 기록한다.
 
+## 4-1. 화면 지문 — bootstrap과 귀속된 빈 기간 (2026-10-10 03:43~03:49)
+
+B는 임시 안전 동작이었다. 저판매량 매장의 빈 하루가 영원히 gap으로 남지 않도록, 빈 기간을 귀속하는 두
+번째 증거를 실제 경로로 세웠다. 계약은 `docs/review_auto_check_v1.md` §11-1.
+
+**① 카탈로그가 증명한 읽기가 지문을 가르친다** — 판매자가 누르는 그 읽기로.
+
+```
+03:43:45  OPERATOR 「지금 확인」 → 03:44:31 OBSERVED
+          rows 45 · window 2026-10-04..2026-10-10 · gridReadMode MODEL
+          identity MATCH (카탈로그 fence — 45행의 상품번호가 전부 이 조직의 것)
+          → seller_accounts.store_identity = fe9d173a…87a5e   ← 처음으로 채워졌다
+```
+
+그 값이 옳다는 것은 **독립적으로 확인**했다: 같은 세션의 페이지에서 read-only로 같은 재료를 같은 방식으로
+해싱한 값이 `fe9d173a…87a5e`로 **정확히 일치**한다. 제품이 읽은 것과 사람이 본 것이 같은 화면이다.
+
+**② 그 다음 빈 기간은 귀속된다.**
+
+```
+03:48:36  SCHEDULED today..today → 03:48:5x OBSERVED
+          observed_count 0 · gridReadMode EMPTY_STATE · emptyPeriod true
+          identity MATCH · window_start/end 2026-10-10 · completeness BOUNDED
+          lastSuccessAt 03:44 → 03:48   ← freshness가 처음으로 빈 읽기에 반응했다
+          paused_reason null · next_check_at +60분 · store_identity 불변
+```
+
+`coverageThrough`는 2026-10-09 그대로다 — 오늘은 아직 닫힌 날이 아니고, 증거는 날이 닫힐 때 셈에
+들어간다. 달라진 것은 **그 증거가 기록됐다는 것**이다(`window_start/end`가 적혔고 `BOUNDED`로 판정됐다).
+§4의 같은 읽기는 그 자리가 비어 있었다.
+
+**③ 지문이 없을 때는 그대로 닫혀 있다** — 03:40:19의 읽기가 그 상태였다: `OBSERVED(0)` ·
+`identity UNRESOLVED` · `window (없음)` · `store_identity` 여전히 null. **빈 읽기는 가르치지 않는다**는
+규칙이 라이브에서 그대로 보였다.
+
+전 구간 WRITE **4 / 2 / 23** 불변. 리뷰는 4725 → 4726(10-09 23:57에 도착한 한 건이 ①에서 들어왔다 —
+마켓플레이스 쓰기가 아니라 우리 DB 적재다).
+
 ## 5. 남은 것
 
-- **2-3(settle 즉시 pause 해제)의 라이브 증명은 미완.** §4 시점의 행은 이미 pause가 없었다. 증명하려면
+- **2-3(settle 즉시 pause 해제)의 라이브 증명은 미완.** §4·§4-1 시점의 행은 이미 pause가 없었다. 증명하려면
   로그아웃 → 벽 → 로그인 → 복귀를 한 번 더 돌려야 한다. 단위 회귀는 있다.
+- 지문이 **바뀐 경우**(아이디·스토어명 변경)의 회복은 단위 회귀로만 있다 — 다음 번 증명된 읽기가 가져온다.
 - 벽이 아닌 실패로 멈춰 있을 때 복귀마다 probe를 한 번씩 쓴다(수집 0 · resume 0이라 해는 없다).
 - 10-09 22:49 tick이 park해 둔 것보다 5분 일찍 due가 된 건이 설명되지 않았다 — 별도 조사 메모로 남긴다.

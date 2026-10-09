@@ -158,7 +158,11 @@ describe("the NAVER review recipe — the serialized program only reads", () => 
     expect(parsed).toMatchObject({ ok: true });
     expect(calls).toEqual([`open:${NAVER_REVIEW_LIST_URL}`, "close"]);
     expect(evaluated.filter((s) => s === plan.readerScript)).toHaveLength(2);
-    expect(evaluated.every((s) => s === plan.authScript || s === plan.readerScript || s === plan.rangeScript)).toBe(true);
+    // 평가되는 것은 plan이 들고 있는 스크립트뿐이다 — 이제 넷이고, 넷째는 「이 화면이 어느 가게인가」를
+    // digest 하나로 답하는 것이다(원문은 경계를 넘지 않는다).
+    expect(evaluated.every((s) => s === plan.authScript || s === plan.readerScript || s === plan.rangeScript
+      || s === plan.storeFingerprintScript)).toBe(true);
+    expect(evaluated.filter((s) => s === plan.storeFingerprintScript)).toHaveLength(1);
   });
 
   it("a page whose meaning moved stops at once — it is not waited out", async () => {

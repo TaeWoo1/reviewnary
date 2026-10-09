@@ -199,7 +199,7 @@ public class NaverReviewObservationService implements AsideMarketplaceTarget {
                 .orElseThrow(() -> ApiException.badRequest("네이버 판매 계정이 아닙니다."));
 
         List<NaverReviewObservationRequest.Review> rows = validated(request);
-        IdentityVerdict verdict = storeVerdict(orgId, channel.getId(), rows);
+        IdentityVerdict verdict = storeVerdict(orgId, channel.getId(), rows, account, request);
         if (verdict != IdentityVerdict.MATCH) {
             job.refuseDelivery(verdict);
             jobs.save(job);
@@ -207,6 +207,7 @@ public class NaverReviewObservationService implements AsideMarketplaceTarget {
             return new NaverReviewObservationView(verdict.name(), rows.size(), 0, 0, 0, 0);
         }
 
+        rememberScreenStore(account, rows, request);
         int changed = replyStateAdvances(orgId, channel.getId(), rows);
         List<CanonicalReview> canonical = canonical(rows, catalogSkus(channel.getId(), rows));
         Instant startedAt = Instant.now();
@@ -324,6 +325,71 @@ public class NaverReviewObservationService implements AsideMarketplaceTarget {
     IdentityVerdict storeVerdict(UUID orgId, UUID channelId, List<NaverReviewObservationRequest.Review> rows) {
         return com.sellerops.responsibility.aside.AsideCatalogueFence.verdict(listings, orgId, channelId,
                 rows.stream().map(NaverReviewObservationRequest.Review::productNo).toList());
+    }
+
+    /**
+     * <b>행이 있으면 카탈로그가, 없으면 화면 지문이 답한다.</b>
+     *
+     * <p>가게 확인의 증거는 페이지의 상품번호다 — 전부 이 조직의 것이면 MATCH. 그런데 리뷰가 한 건도 없는
+     * 기간에는 그 증거가 존재하지 않고(2026-10-10 실측: 새벽에 「오늘」을 읽으면 늘 그렇다), 그 자리에서
+     * 멈추면 저판매량 매장의 빈 날은 영원히 닫히지 않는다.
+     *
+     * <p>그래서 두 번째 증거를 쓴다: 판매자 센터 chrome에 행과 무관하게 늘 찍혀 있는 것들의 digest.
+     * <b>그 값은 스스로를 증명하지 않는다</b> — 카탈로그가 MATCH를 낸 읽기에서만 저장되고
+     * ({@link #rememberScreenStore}), 여기서는 저장된 값과 <b>같은지</b>만 묻는다. 저장된 것이 없거나
+     * 다르면 UNRESOLVED이고, 그것은 실패가 아니라 「이 빈 기간은 귀속할 수 없다」이다.
+     */
+    private IdentityVerdict storeVerdict(UUID orgId, UUID channelId,
+                                         List<NaverReviewObservationRequest.Review> rows,
+                                         SellerAccount account, NaverReviewObservationRequest request) {
+        if (!rows.isEmpty()) {
+            return storeVerdict(orgId, channelId, rows);
+        }
+        if (!Boolean.TRUE.equals(request.emptyPeriod())) {
+            // 0행인데 화면이 「없다」고 말한 적은 없다. 예전과 같은 답을 준다.
+            return IdentityVerdict.UNRESOLVED;
+        }
+        String seen = screenStoreDigest(request);
+        String known = screenStoreDigest(account.getStoreIdentity());
+        return seen != null && seen.equals(known) ? IdentityVerdict.MATCH : IdentityVerdict.UNRESOLVED;
+    }
+
+    /**
+     * <b>증명된 읽기만이 이 계정의 화면이 어떻게 생겼는지 가르칠 수 있다.</b>
+     *
+     * <p>카탈로그가 MATCH를 낸 읽기 — 즉 그 화면의 모든 상품번호가 이 조직의 것이라고 독립적으로 확인된
+     * 순간 — 에서만 지문을 적는다. 화면이 달라졌다고 해서 갱신하지 않는 것이 이 설계의 전부다: 그러면
+     * 화면이 스스로를 승인하게 되고, 아이디나 스토어명이 바뀐 경우의 회복은 <b>다음 번 증명된 읽기</b>가
+     * 자연히 가져다준다.
+     *
+     * <p>원문은 저장하지 않는다. 들어오는 것도 digest이고 보관하는 것도 그 digest다.
+     */
+    private void rememberScreenStore(SellerAccount account, List<NaverReviewObservationRequest.Review> rows,
+                                     NaverReviewObservationRequest request) {
+        if (rows.isEmpty()) {
+            return;
+        }
+        String seen = screenStoreDigest(request);
+        if (seen == null || seen.equals(account.getStoreIdentity())) {
+            return;
+        }
+        account.setStoreIdentity(seen);
+        accounts.save(account);
+        log.info("naver review observation: screen store fingerprint recorded account={}", account.getId());
+    }
+
+    /** 64자 소문자 hex, 또는 null. 그 모양이 아닌 것은 없는 것으로 친다. */
+    private static String screenStoreDigest(NaverReviewObservationRequest request) {
+        return screenStoreDigest(request == null ? null : request.screenStoreDigest());
+    }
+
+    private static String screenStoreDigest(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String value = raw.strip();
+        return value.length() == 64 && value.chars().allMatch(c -> (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))
+                ? value : null;
     }
 
     /** Stored reviews whose reply state this reading moves forward — the only field a re-read may change. */
@@ -506,7 +572,11 @@ public class NaverReviewObservationService implements AsideMarketplaceTarget {
         if (rows >= capacity) {
             return "CAPACITY_REACHED";
         }
-        if (!"MODEL".equals(request.gridReadMode())) {
+        // <b>`MODEL`은 「그리드의 행 모델에서 전부 읽었다」이고, `EMPTY_STATE`는 「그리드가 없다고 말했다」다.</b>
+        // 둘 다 그 기간 전체에 대한 답이지만, 두 번째는 행이 0일 때만 그렇다 — 행을 건네면서 비었다고 하는
+        // 읽기는 자기 모순이고, 그 주장으로 경계를 옮길 수는 없다.
+        if (!"MODEL".equals(request.gridReadMode())
+                && !("EMPTY_STATE".equals(request.gridReadMode()) && rows == 0)) {
             return "READ_MODE_UNPROVEN";
         }
         Integer total = request.labelledTotal();

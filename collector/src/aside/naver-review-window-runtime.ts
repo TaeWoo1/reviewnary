@@ -134,6 +134,8 @@ export interface NaverReviewWindowRuntimePlan {
   authScript: string;
   readerScript: string;
   rangeScript: string;
+  /** 이 화면이 어느 가게인가 — digest 하나. 없는 플랜(옛 호출자)에서는 건너뛴다. */
+  storeFingerprintScript?: string;
   /** The open calendar, read as structure: which cells are days of the month on show, and where the steps are. */
   pickerScript: string;
   /** The pure-CSS candidate set the controls script walked for date controls. Decides nothing on its own. */
@@ -161,7 +163,8 @@ export interface NaverReviewWindowRuntimePlan {
 }
 
 export type NaverWindowRuntimeResult =
-  | { ok: true; reading: unknown; range: unknown; monthMoves: number; elapsedMs: number }
+  | { ok: true; reading: unknown; range: unknown; monthMoves: number; storeFingerprint?: unknown;
+      elapsedMs: number }
   | {
       ok: false;
       code:
@@ -633,7 +636,17 @@ export async function asideNaverReviewWindowRuntime(
       }
       await env.wait(plan.pollMs);
     }
-    return { ok: true, reading: settled, range, monthMoves, elapsedMs: elapsed() };
+    // 가게 지문: 읽기가 끝난 그 화면에서, 같은 탭으로. 실패는 결과를 바꾸지 않는다 — 없으면 없는 것이고,
+    // 없는 지문은 빈 기간을 귀속하지 못할 뿐 읽은 행을 잃게 하지는 않는다.
+    let storeFingerprint: unknown = null;
+    if (plan.storeFingerprintScript) {
+      try {
+        storeFingerprint = await tab.evaluate(plan.storeFingerprintScript);
+      } catch (e) {
+        storeFingerprint = null;
+      }
+    }
+    return { ok: true, reading: settled, range, monthMoves, storeFingerprint, elapsedMs: elapsed() };
   } finally {
     try {
       await env.closeTab(tab);
