@@ -105,8 +105,23 @@ one-job-per-device는 전부 `ScheduledAsideJobService.dispatch` 하나를 지�
 | | 언제 | 어떻게 풀리나 |
 |---|---|---|
 | `PAUSED_DEVICE` | live helper가 하나도 없다 | **다음 tick이 저절로** 복구. 설정 불변 |
-| `PAUSED_AUTH` (walk) | 자식이 `AUTH_REQUIRED`로 settle (멈춘 창을 기억) | **scheduler는 재시도하지 않는다.** 판매자가 로그인할 때 그 창부터 이어진다 |
-| `PAUSED_AUTH` (오늘 읽기) | 부모 없는 오늘 읽기가 `AUTH_REQUIRED`로 settle | 같다 — 다만 들고 있을 run이 없으므로 **permission 행이** 멈춤을 들고, 다음 차례는 벽을 다시 때리지 않는다. 로그인하면 그 읽기를 **한 번** 다시 올린다 |
+| `PAUSED_AUTH` (walk) | 자식이 `AUTH_REQUIRED`로 settle (멈춘 창을 기억) | 판매자가 **제품 화면에서** 로그인하면 그 창부터 이어진다(resume 1회). 그러지 않아도 **6시간에 한 번** 다시 본다 |
+| `PAUSED_AUTH` (오늘 읽기) | 부모 없는 오늘 읽기가 `AUTH_REQUIRED`로 settle | 같다 — 들고 있을 run이 없으므로 **permission 행이** 멈춤을 들고, `next_check_at`이 6시간 뒤로 밀린다 |
+
+#### 「벽은 사람이 푼다」를 너무 좁게 구현했었다 (2026-10-09 라이브)
+
+판매자가 2차 인증 문제로 제품 창을 닫고 **자기 브라우저의 다른 탭에서 직접** 로그인했다. 세션은 돌아왔고
+lane은 영원히 PAUSED_AUTH였다 — 벽을 지우는 것은 성공한 읽기 하나뿐인데, lane은 벽이 있다고 보는 동안
+읽지 않았으므로. 교착이었고, 빠져나오는 길은 판매자가 「지금 확인」을 누르는 것뿐이었다.
+
+**벽은 사람이 풀지만, 세션은 그 사람이 어디서 로그인해도 돌아온다.** 제품은 그것을 목격할 수 없고, 할 수
+있는 것은 드물게 다시 보는 것이다:
+
+- 읽기가 `AUTH_REQUIRED`로 끝나면 `next_check_at`을 **6시간** 뒤로 밀고(`ReviewAutoCheckClaimer.AUTH_RETRY`),
+- 「최근에 벽을 만났다」 판정도 그 6시간 안에서만 참이다 — 그 뒤의 차례는 그냥 읽는다. 읽기가 그 자체로
+  probe이므로 새로 생기는 동작은 없다.
+- 하루 네 번, 각 10초, 로그인 화면으로 redirect되는 읽기 하나. 매시간 때리는 것과는 다른 종류의 일이다.
+- `PAUSED_DEVICE`는 주기 그대로다 — 데스크를 찾는 일은 어떤 화면도 열지 않는다.
 
 벽을 매시간 다시 때리는 lane은 판매자만 해결할 수 있는 일에 대해 소음을 만드는 제품이다.
 
@@ -182,7 +197,8 @@ SELLEROPS_REVIEW_AUTO_CHECK_POLL_INTERVAL_MS # 기본 300000 (런타임이 들�
 
 | 어디 | 무엇 |
 |---|---|
-| `backend/.../autocheck/ReviewAutoCheckTest.java` (25) | **설정 조회가 행을 만들지 않음 · 판매자가 직접 켜면 행이 생김** · |
+| `backend/.../autocheck/ReviewAutoCheckTest.java` (27) | **벽은 6시간에 한 번 다시 본다(어디서 로그인했든 스스로 복구) · PAUSED_DEVICE는 주기 그대로** · |
+| 〃 | **설정 조회가 행을 만들지 않음 · 판매자가 직접 켜면 행이 생김** · |
 | 〃 | **부모 없는 오늘 읽기의 벽: lane이 멈추고 재시도 없음 · 로그인이 한 번만 재개 · 설정이 꺼지면 재개 없음** · |
 | 〃 | **scheduler가 설정을 만들지 않음** · **연결 완료가 켠다(두 번 와도 하나)** · **backfill은 내 조직만, 껐던 것은 유지** · **다음 60분 차례는 새 작업 / 같은 차례 재시도는 1개** · 기본 ON · 끄면 꺼진 채 · API 채널엔 설정 없음 · **기간을 못 고르는 화면엔 설정 없음(쿠팡)** · 설정 없이 SCHEDULED 없음 · windowless 거절 · gap→walk · 닫힌 과거→오늘 · 누름이 앞섬 · tick이 비켜섬 · PAUSED_DEVICE 자동 복구 · device 우선순위와 fallback · PAUSED_AUTH는 사람이 푼다(1회성) |
 | `backend/.../coverage/ReviewCoverageTest.java` | 오늘은 경계가 될 수 없다 · 오늘만 읽은 증거는 경계를 못 만든다 · 창의 닫힌 부분은 남는다 |
