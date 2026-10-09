@@ -70,19 +70,45 @@ public class ReviewAutoCheckService implements AutoCheckAuthority {
     }
 
     /**
-     * The setting as the screen should draw it, creating the default-on row if this account deserves one.
+     * The setting as the screen should draw it. <b>Read-only — looking at a setting never creates one.</b>
      *
-     * <p>A GET that writes, which is unusual and is the point: the default must not depend on a background tick
-     * having run, or a seller who connects NAVER and opens 설정 ten seconds later would be told automatic
-     * checking is off while the product's own connect screen just told them it is on.
+     * <p>It used to create the row if the account deserved one, so that a seller who connected and opened 설정
+     * ten seconds later was not told «off» while the connect screen had just said «on». That reasoning was
+     * about the window between connecting and the first background tick, and that window no longer exists:
+     * finishing a connection creates the row itself ({@link ReviewAutoCheckConnectionListener}).
+     *
+     * <p>What remained was a GET that wrote, and that is the wrong shape for two reasons. A read that turns
+     * something on cannot be told apart from a read that reports something already on — so nobody can answer
+     * «who switched this account's automatic checking on» by looking. And any path that reaches this method for
+     * an account — an admin view, a support tool, a listing that renders many rows — would be switching
+     * settings on as a side effect of being looked at.
+     *
+     * <p>An account with no row therefore reads as {@link ReviewAutoCheckView#UNSUPPORTED} when it has no
+     * readable screen, and as off-with-no-row when it was connected before this feature existed. The second
+     * one is what the explicit per-organisation backfill is for ({@link #backfillForOrg}); it is not something
+     * a screen fixes by being opened.
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public ReviewAutoCheckView view(UUID orgId, UUID sellerAccountId) {
-        return ensure(orgId, sellerAccountId).map(ReviewAutoCheckView::of)
-                .orElse(ReviewAutoCheckView.UNSUPPORTED);
+        Optional<SellerAccount> account = accounts.findByIdAndOrgId(sellerAccountId, orgId);
+        if (account.isEmpty() || recipeFor(account.get()).isEmpty()) {
+            return ReviewAutoCheckView.UNSUPPORTED;
+        }
+        return rows.findBySellerAccountIdAndDataType(sellerAccountId, DATA_TYPE)
+                .filter(row -> orgId.equals(row.getOrgId()))
+                .map(ReviewAutoCheckView::of)
+                // 읽을 화면은 있는데 행이 없다: 이 기능 전에 연결한 계정이다. 「꺼짐」으로 그리는 것이 맞고,
+                // 그것을 켜는 것은 그 조직의 명시적 backfill이지 화면을 열어 보는 일이 아니다.
+                .orElse(new ReviewAutoCheckView(true, false, null));
     }
 
-    /** The seller's switch. Off writes the tombstone; on clears it and makes the account due immediately. */
+    /**
+     * The seller's switch. Off writes the tombstone; on clears it and makes the account due immediately.
+     *
+     * <p>This is the one read-write path a seller drives, so it may create the row: turning the setting on for
+     * an account that never had one is the same decision as having it on, stated explicitly. {@link #view} may
+     * not, because looking is not deciding.
+     */
     @Transactional
     public ReviewAutoCheckView set(UUID orgId, UUID sellerAccountId, UUID userId, boolean on) {
         ReviewAutoCheck row = ensure(orgId, sellerAccountId)
@@ -163,6 +189,11 @@ public class ReviewAutoCheckService implements AutoCheckAuthority {
 
     /**
      * Create the default-on row when this account has a review screen and has finished connecting.
+     *
+     * <p><b>Three callers, all of them an explicit act inside one organisation:</b> the connection completing,
+     * the seller switching the setting on, and that organisation's own one-time backfill. Not a screen being
+     * looked at ({@link #view} is read-only), and not a background loop
+     * ({@code ReviewAutoCheckReconciler#tick} creates nothing).
      *
      * <p>Empty for every account that has no screen read for reviews — a Cafe24 store whose reviews arrive by
      * API has nothing for this lane to do and must not grow a setting that would read as «off». Empty too while

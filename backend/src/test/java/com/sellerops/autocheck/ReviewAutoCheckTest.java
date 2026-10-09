@@ -169,6 +169,13 @@ class ReviewAutoCheckTest {
                 orchestrator, dispatcher, clock);
     }
 
+    /** 연결이 완료된 순간 — 설정이 켜지는 유일한 자동 경로. */
+    private void connectionCompleted(SellerAccount target) {
+        new ReviewAutoCheckConnectionListener(settings)
+                .onConnected(new com.sellerops.selleraccount.SellerAccountConnectedEvent(
+                        target.getOrgId(), target.getId()));
+    }
+
     /** 시간을 앞으로 보낸다 — 두 읽기의 「마지막」을 가릴 수 있게. */
     private void tick(Duration by) {
         now = now.plus(by);
@@ -245,6 +252,7 @@ class ReviewAutoCheckTest {
     @Test
     @DisplayName("연결한 NAVER 계정은 묻지 않고 켜져 있다 — 동의 화면도, 기기 선택도, 주기 선택도 없다")
     void aConnectedNaverAccountIsOnByDefault() {
+        connectionCompleted(account);
         ReviewAutoCheckView view = settings.view(org, account.getId());
 
         assertThat(view.supported()).isTrue();
@@ -259,9 +267,37 @@ class ReviewAutoCheckTest {
     }
 
     @Test
+    @DisplayName("설정을 들여다보는 것은 설정을 만들지 않는다 — 읽기가 켜는 일이 되면 누가 켰는지 알 수 없다")
+    void lookingAtTheSettingNeverCreatesIt() {
+        // 이 기능 전에 연결한 계정: 읽을 화면은 있고 행은 없다. 화면은 「꺼짐」으로 그리고, 켜는 것은 그
+        // 조직의 명시적 backfill이다 — 화면을 열어 본 것이 켜는 일이 되면 「누가 이 계정의 자동 확인을
+        // 켰는가」에 아무도 답할 수 없고, 계정 목록을 그리는 화면 하나가 전부를 켜 버린다.
+        ReviewAutoCheckView view = settings.view(org, account.getId());
+
+        assertThat(view.supported()).isTrue();
+        assertThat(view.enabled()).isFalse();
+        assertThat(settingRows.count()).isZero();
+        // 그리고 행이 없으면 dispatch 게이트도 통과하지 못한다.
+        assertThat(settings.allows(org, account.getId(), AsideRecipe.NAVER_REVIEW_OBSERVE_V1)).isFalse();
+
+        // 켜는 길은 둘뿐이다: 그 조직의 backfill, 또는 판매자가 직접 켜기.
+        assertThat(settings.backfillForOrg(org)).isEqualTo(1);
+        assertThat(settings.view(org, account.getId()).enabled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("판매자가 직접 켜면 행이 없어도 켜진다 — 보는 것과 결정하는 것은 다르다")
+    void theSellerSwitchingItOnMayCreateTheRow() {
+        assertThat(settingRows.count()).isZero();
+
+        assertThat(settings.set(org, account.getId(), userId, true).enabled()).isTrue();
+        assertThat(settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW")).isPresent();
+    }
+
+    @Test
     @DisplayName("끄면 꺼진 채로 있다 — 다음 tick이 다시 켜지 않는다")
     void turningItOffSticks() {
-        settings.view(org, account.getId());
+        connectionCompleted(account);
         assertThat(settings.set(org, account.getId(), userId, false).enabled()).isFalse();
 
         // 「없으면 만든다」가 이 행을 되살리지 않는다: 꺼진 행이 그 결정의 기억이다.
@@ -388,7 +424,7 @@ class ReviewAutoCheckTest {
         theirs = accounts.save(theirs);
 
         // 내 계정 하나는 이미 끄고 시작한다.
-        settings.view(org, account.getId());
+        connectionCompleted(account);
         settings.set(org, account.getId(), userId, false);
 
         assertThat(settings.backfillForOrg(org)).isZero();
@@ -404,7 +440,7 @@ class ReviewAutoCheckTest {
     @DisplayName("빈 과거가 있으면 walk가 시작된다 — SCHEDULED로, 어제까지")
     void aGapStartsAWalk() {
         coveredThrough(20);
-        settings.view(org, account.getId());
+        connectionCompleted(account);
 
         ReviewAutoCheckReconciler.TickReport report = reconciler.tick(now);
 
@@ -425,7 +461,7 @@ class ReviewAutoCheckTest {
     @DisplayName("과거가 닫혀 있으면 오늘 하루를 이름 붙여 읽는다 — coverage는 오늘로 전진하지 않는다")
     void aClosedHistoryRefreshesToday() {
         coveredThrough(1);
-        settings.view(org, account.getId());
+        connectionCompleted(account);
 
         assertThat(reconciler.tick(now).refreshedToday()).isEqualTo(1);
         ScheduledAsideJob job = onDesk().orElseThrow();
@@ -448,7 +484,7 @@ class ReviewAutoCheckTest {
         // 다시 찾아 아무것도 보내지 않았다 — 자동 확인이 그날 첫 읽기 뒤로 조용히 멈췄다. 읽는 기간은 여전히
         // 「오늘」이지만, 그것은 창이고 요청의 신원이 아니다.
         coveredThrough(1);
-        settings.view(org, account.getId());
+        connectionCompleted(account);
 
         assertThat(reconciler.tick(now).refreshedToday()).isEqualTo(1);
         ScheduledAsideJob first = onDesk().orElseThrow();
@@ -472,7 +508,7 @@ class ReviewAutoCheckTest {
     @DisplayName("같은 차례를 다시 돌리면 작업은 하나다 — 재시도가 두 번째 읽기가 되지 않는다")
     void theSameSlotRetriedConvergesOnOneJob() {
         coveredThrough(1);
-        settings.view(org, account.getId());
+        connectionCompleted(account);
         ReviewAutoCheck row = settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW")
                 .orElseThrow();
         java.time.Instant slot = row.getNextCheckAt();
@@ -498,7 +534,7 @@ class ReviewAutoCheckTest {
     @DisplayName("자동 확인이 읽는 중에 누르면, 거절이 아니라 그 작업을 본다")
     void aPressJoinsTheWorkInFlight() {
         coveredThrough(20);
-        settings.view(org, account.getId());
+        connectionCompleted(account);
         reconciler.tick(now);
         ScheduledAsideJob scheduled = onDesk().orElseThrow();
 
@@ -517,7 +553,7 @@ class ReviewAutoCheckTest {
     @DisplayName("사람의 작업이 책상에 있으면 tick은 비켜선다 — scheduler는 사람보다 앞서지 않는다")
     void theTickYieldsToAPress() {
         coveredThrough(1);
-        settings.view(org, account.getId());
+        connectionCompleted(account);
         // 판매자가 누른 읽기 하나가 이미 책상에 있다.
         dispatcher.dispatch(com.sellerops.responsibility.aside.AsideDispatch.operator(org, account.getId(),
                 AsideRecipe.NAVER_REVIEW_OBSERVE_V1, "press-1"));
@@ -533,7 +569,7 @@ class ReviewAutoCheckTest {
     @DisplayName("도우미가 없으면 PAUSED_DEVICE — 설정은 그대로이고, 돌아오면 저절로 이어진다")
     void noHelperPausesWithoutRevoking() {
         coveredThrough(1);
-        settings.view(org, account.getId());
+        connectionCompleted(account);
         devices.deleteAll();
 
         assertThat(reconciler.tick(now).pausedDevice()).isEqualTo(1);
@@ -558,7 +594,7 @@ class ReviewAutoCheckTest {
     @DisplayName("그 계정을 마지막으로 읽어낸 데스크가 다음에도 쓰인다 — 가장 최근에 연결한 기기가 아니라")
     void theDeskThatReadThisStoreIsPreferred() {
         coveredThrough(20);
-        settings.view(org, account.getId());
+        connectionCompleted(account);
         reconciler.tick(now);
         ScheduledAsideJob first = onDesk().orElseThrow();
         assertThat(first.getDeviceId()).isEqualTo(deviceId);
@@ -578,7 +614,7 @@ class ReviewAutoCheckTest {
     @DisplayName("그 데스크가 사라지면 현재 살아 있는 도우미로 간다 — 멈추지 않는다")
     void aGoneDeskFallsBackToTheLiveOne() {
         coveredThrough(20);
-        settings.view(org, account.getId());
+        connectionCompleted(account);
         reconciler.tick(now);
         ScheduledAsideJob first = onDesk().orElseThrow();
 
@@ -600,7 +636,7 @@ class ReviewAutoCheckTest {
     @DisplayName("로그인 벽은 timer가 다시 때리지 않는다 — 판매자가 로그인할 때 그 창부터 이어진다")
     void anAuthWallWaitsForThePerson() {
         coveredThrough(20);
-        settings.view(org, account.getId());
+        connectionCompleted(account);
         reconciler.tick(now);
         ScheduledAsideJob walled = onDesk().orElseThrow();
         LocalDate stoppedOn = walled.getRequestedWindowStart();
@@ -640,7 +676,7 @@ class ReviewAutoCheckTest {
         // 과거가 닫혀 있으면 오늘 읽기는 catch-up run에 속하지 않는다 — 전진시킬 경계가 없으므로. 그래서
         // 벽에 막혔을 때 PAUSED_AUTH를 들고 있을 run이 없고, 그대로 두면 다음 시간이 같은 벽으로 걸어간다.
         coveredThrough(1);
-        settings.view(org, account.getId());
+        connectionCompleted(account);
         reconciler.tick(now);
         ScheduledAsideJob walled = onDesk().orElseThrow();
         assertThat(walled.getCatchUpRunId()).isNull();
@@ -662,7 +698,7 @@ class ReviewAutoCheckTest {
     @DisplayName("그 벽은 판매자가 로그인할 때 풀린다 — 한 번만, 그리고 설정이 켜져 있을 때만")
     void theParentlessWallIsResumedBySigningIn() {
         coveredThrough(1);
-        settings.view(org, account.getId());
+        connectionCompleted(account);
         reconciler.tick(now);
         settleAsAuthWall(onDesk().orElseThrow());
 
@@ -692,7 +728,7 @@ class ReviewAutoCheckTest {
     @DisplayName("자동 확인이 꺼진 계정에서는 로그인이 아무것도 시작하지 않는다 — 누름만이 그 승인이다")
     void signingInResumesNothingWhenTheSettingIsOff() {
         coveredThrough(1);
-        settings.view(org, account.getId());
+        connectionCompleted(account);
         reconciler.tick(now);
         settleAsAuthWall(onDesk().orElseThrow());
         settings.set(org, account.getId(), userId, false);
@@ -705,7 +741,7 @@ class ReviewAutoCheckTest {
     @DisplayName("멈춘 것이 없으면 로그인은 아무것도 시작하지 않는다")
     void signingInWithNothingPausedStartsNothing() {
         coveredThrough(1);
-        settings.view(org, account.getId());
+        connectionCompleted(account);
 
         assertThat(orchestrator.resumeAfterSignIn(org, account.getId(), "REVIEW",
                 AsideRecipe.NAVER_REVIEW_OBSERVE_V1)).isEmpty();

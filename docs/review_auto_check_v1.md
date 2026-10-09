@@ -25,7 +25,9 @@ SellerOps는 판매자가 매번 「지금 수집하기」를 누르는 제품�
 | 범위 | `org + sellerAccount + dataType(REVIEW) + mode(READ_ONLY)` |
 | 기본값 | **연결을 마치는 순간 ON** — `SellerAccountConnectedEvent` → `ReviewAutoCheckConnectionListener` |
 | 기존 계정 | 이 기능 전에 연결한 계정은 **그 조직이 한 번 요청**해서 켠다: `POST /api/seller-accounts/review-auto-check/backfill`(호출한 세션의 조직만, idempotent) |
-| 행을 만드는 경로 | 연결 완료 이벤트 · 판매자가 자기 설정 화면을 열 때 · 그 조직의 backfill. **셋 다 한 조직 안의 행위이고, scheduler는 행을 만들지 않는다** |
+| 행을 만드는 경로 | ① 연결 완료 이벤트 ② 그 조직의 명시적 backfill ③ 판매자가 직접 켜기. **이 셋뿐이다** |
+| 설정 조회 | **read-only.** 설정을 들여다보는 것은 설정을 만들지 않는다 — 읽기가 켜는 일이 되면 「누가 이 계정의 자동 확인을 켰는가」에 아무도 답할 수 없고, 계정 목록을 그리는 화면 하나가 전부를 켜 버린다. 행이 없는(이 기능 전에 연결한) 계정은 「꺼짐」으로 보이고, 켜는 것은 ②나 ③이다 |
+| scheduler | **행을 만들지 않는다** |
 | 끄는 길 | 판매자가 설정에서 끈다 → `enabled=false`, `revoked_at` |
 | 다시 켜지는 조건 | 판매자가 켤 때만. `revoked_at`은 **묘비**이고, 자동 채택 규칙이 이 행을 되살리지 않는다 |
 | READ_ONLY | **기능 불변조건.** 쓰기 recipe는 존재하지 않고 구조 테스트가 거절한다. 칸은 그 사실을 행이 말하게 하려고 있다 |
@@ -180,7 +182,8 @@ SELLEROPS_REVIEW_AUTO_CHECK_POLL_INTERVAL_MS # 기본 300000 (런타임이 들�
 
 | 어디 | 무엇 |
 |---|---|
-| `backend/.../autocheck/ReviewAutoCheckTest.java` (23) | **부모 없는 오늘 읽기의 벽: lane이 멈추고 재시도 없음 · 로그인이 한 번만 재개 · 설정이 꺼지면 재개 없음** · |
+| `backend/.../autocheck/ReviewAutoCheckTest.java` (25) | **설정 조회가 행을 만들지 않음 · 판매자가 직접 켜면 행이 생김** · |
+| 〃 | **부모 없는 오늘 읽기의 벽: lane이 멈추고 재시도 없음 · 로그인이 한 번만 재개 · 설정이 꺼지면 재개 없음** · |
 | 〃 | **scheduler가 설정을 만들지 않음** · **연결 완료가 켠다(두 번 와도 하나)** · **backfill은 내 조직만, 껐던 것은 유지** · **다음 60분 차례는 새 작업 / 같은 차례 재시도는 1개** · 기본 ON · 끄면 꺼진 채 · API 채널엔 설정 없음 · **기간을 못 고르는 화면엔 설정 없음(쿠팡)** · 설정 없이 SCHEDULED 없음 · windowless 거절 · gap→walk · 닫힌 과거→오늘 · 누름이 앞섬 · tick이 비켜섬 · PAUSED_DEVICE 자동 복구 · device 우선순위와 fallback · PAUSED_AUTH는 사람이 푼다(1회성) |
 | `backend/.../coverage/ReviewCoverageTest.java` | 오늘은 경계가 될 수 없다 · 오늘만 읽은 증거는 경계를 못 만든다 · 창의 닫힌 부분은 남는다 |
 | `backend/.../coverage/ReviewCatchUpPlanTest.java` | 어제까지만 계획한다 |
