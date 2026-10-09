@@ -55,6 +55,23 @@ public class ReviewAutoCheckClaimer {
         return claimed;
     }
 
+    /**
+     * <b>How long a sign-in wall is left alone before the product looks again.</b>
+     *
+     * <p>«A wall does not open with time» was right about the wall and wrong about the session. The wall is
+     * the marketplace asking a person to sign in, and only they can; but the <b>session</b> comes back the
+     * moment they sign in <em>anywhere</em> — in the product's own recovery window, in a tab they opened
+     * themselves, on another device — and this product has no way to be told. On 2026-10-09 that was measured:
+     * the seller signed in directly in their browser, the lane never learned, and it could not learn, because
+     * the only thing that clears the wall is a successful read and the lane was refusing to read.
+     *
+     * <p>So the way out is to look again — rarely. Six hours is chosen to be unmistakably not a retry loop:
+     * four attempts a day, each one a ten-second read that opens a page and is redirected to a login screen,
+     * against an hourly cadence that would be noise about the one thing only the seller can resolve. A read is
+     * its own probe, so nothing new happens on anyone's computer to support this.
+     */
+    public static final Duration AUTH_RETRY = Duration.ofHours(6);
+
     /** Record how this account's turn ended. Separate transaction: the read already happened either way. */
     @Transactional
     public void settle(ReviewAutoCheck claimed, Instant now, AutoCheckPause pause, boolean looked) {
@@ -65,6 +82,11 @@ public class ReviewAutoCheckClaimer {
                 row.setLastCheckAt(now);
             }
             row.setPausedReason(pause);
+            if (pause == AutoCheckPause.PAUSED_AUTH) {
+                // Hold off, but do not stop. PAUSED_DEVICE keeps the ordinary cadence on purpose: resolving a
+                // desk costs nothing and touches no marketplace, so looking every hour there is free.
+                row.setNextCheckAt(now.plus(AUTH_RETRY));
+            }
             rows.save(row);
         });
     }

@@ -171,7 +171,7 @@ public class ReviewAutoCheckReconciler {
             // Someone's work is on this desk — quite possibly a read the seller pressed for. Leave it.
             return Outcome.SKIPPED;
         }
-        if (metTheSignInWall(orgId, accountId, recipe.get())) {
+        if (metTheSignInWall(orgId, accountId, recipe.get(), slot)) {
             // <b>A wall with no walk behind it still has to be waited for.</b> Today's refresh belongs to no
             // catch-up run — a day that cannot be claimed as covered has no boundary to advance — so when it
             // ends at the channel's sign-in there is no run to hold PAUSED_AUTH for it. Without this, the next
@@ -198,16 +198,26 @@ public class ReviewAutoCheckReconciler {
     }
 
     /**
-     * Whether the last finished read of this very screen was turned away at the channel's sign-in.
+     * Whether the last finished read of this very screen was turned away at the channel's sign-in
+     * <b>recently enough that looking again would be noise</b>.
      *
      * <p>Derived from the job row that met it, never stored a second time: a copy of «this seller is signed
      * out» would be the thing that is wrong the moment they sign back in. Trigger-agnostic on purpose — a wall
      * is a fact about the marketplace session, not about which lane happened to find it, so a read the seller
      * pressed for that hit it also stops this lane from walking into it.
+     *
+     * <p><b>And it has to expire.</b> Without the time bound this question was a trap: the only thing that
+     * clears a wall is a successful read, and answering «yes, there is a wall» stopped the lane from ever
+     * performing one. On 2026-10-09 that was measured live — the seller signed in directly in their own
+     * browser, the session came back, and the lane stayed paused with no way out but a manual press. The
+     * product cannot witness a sign-in; what it can do is look again, rarely
+     * ({@link ReviewAutoCheckClaimer#AUTH_RETRY}).
      */
-    private boolean metTheSignInWall(UUID orgId, UUID accountId, AsideRecipe recipe) {
+    private boolean metTheSignInWall(UUID orgId, UUID accountId, AsideRecipe recipe, Instant now) {
         return jobs.lastFinished(orgId, accountId, recipe)
-                .map(job -> job.getOutcome() == com.sellerops.responsibility.aside.AsideJobOutcome.AUTH_REQUIRED)
+                .filter(job -> job.getOutcome() == com.sellerops.responsibility.aside.AsideJobOutcome.AUTH_REQUIRED)
+                .map(job -> job.getSettledAt() == null
+                        || job.getSettledAt().plus(ReviewAutoCheckClaimer.AUTH_RETRY).isAfter(now))
                 .orElse(false);
     }
 

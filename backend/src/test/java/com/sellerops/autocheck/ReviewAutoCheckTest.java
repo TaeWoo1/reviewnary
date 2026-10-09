@@ -169,6 +169,14 @@ class ReviewAutoCheckTest {
                 orchestrator, dispatcher, clock);
     }
 
+    /** 지금 due로 만든다 — tick이 이 계정을 이번 차례에 집도록. */
+    private void setDue() {
+        settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW").ifPresent(row -> {
+            row.setNextCheckAt(now);
+            settingRows.save(row);
+        });
+    }
+
     /** 연결이 완료된 순간 — 설정이 켜지는 유일한 자동 경로. */
     private void connectionCompleted(SellerAccount target) {
         new ReviewAutoCheckConnectionListener(settings)
@@ -692,6 +700,59 @@ class ReviewAutoCheckTest {
         assertThat(row.getPausedReason()).isEqualTo(AutoCheckPause.PAUSED_AUTH);
         // 끄지 않았다. 벽은 판매자의 의사가 아니다.
         assertThat(row.on()).isTrue();
+    }
+
+    @Test
+    @DisplayName("벽은 드물게 다시 본다 — 판매자가 어디서 로그인했든 lane이 스스로 돌아온다")
+    void theWallIsLookedAtAgainRarelyEnoughToNotBeNoise() {
+        // <b>2026-10-09 라이브에서 드러난 교착.</b> 판매자가 2차 인증 문제로 제품 창을 닫고 자기 브라우저의
+        // 다른 탭에서 직접 로그인했다. 세션은 돌아왔지만 lane은 영원히 PAUSED_AUTH였다 — 벽을 지우는 것은
+        // 성공한 읽기 하나뿐인데, lane은 벽이 있다고 보는 동안 읽지 않았으므로.
+        coveredThrough(1);
+        connectionCompleted(account);
+        reconciler.tick(now);
+        settleAsAuthWall(onDesk().orElseThrow());
+
+        // 다음 시간: 보지 않는다. 그리고 다시 볼 시각이 한 시간이 아니라 여섯 시간 뒤로 밀린다.
+        now = now.plus(Duration.ofHours(1));
+        setDue();
+        assertThat(reconciler.tick(now).pausedAuth()).isEqualTo(1);
+        assertThat(onDesk()).isEmpty();
+        ReviewAutoCheck paused = settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW")
+                .orElseThrow();
+        assertThat(paused.getPausedReason()).isEqualTo(AutoCheckPause.PAUSED_AUTH);
+        assertThat(paused.getNextCheckAt()).isEqualTo(now.plus(ReviewAutoCheckClaimer.AUTH_RETRY));
+
+        // 여섯 시간 뒤: 다시 본다. 판매자가 그사이 어디서든 로그인했다면 이번 읽기는 성공하고,
+        // 그 성공이 벽을 지운다 — 제품이 로그인을 목격할 필요가 없다.
+        now = now.plus(ReviewAutoCheckClaimer.AUTH_RETRY);
+        assertThat(reconciler.tick(now).refreshedToday()).isEqualTo(1);
+        ScheduledAsideJob retried = onDesk().orElseThrow();
+        assertThat(retried.getRequestedWindowStart()).isEqualTo(today);
+        settleAsRead(retried, 3);
+
+        // 성공한 뒤에는 멈춤이 풀리고 주기가 돌아온다.
+        now = now.plus(Duration.ofHours(1));
+        setDue();
+        assertThat(reconciler.tick(now).refreshedToday()).isEqualTo(1);
+        ReviewAutoCheck recovered = settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW")
+                .orElseThrow();
+        assertThat(recovered.getPausedReason()).isNull();
+        assertThat(recovered.getNextCheckAt()).isEqualTo(now.plus(Duration.ofMinutes(60)));
+    }
+
+    @Test
+    @DisplayName("도우미가 없는 멈춤은 주기 그대로다 — 데스크를 찾는 일은 아무 화면도 열지 않는다")
+    void theDevicePauseKeepsTheOrdinaryCadence() {
+        coveredThrough(1);
+        connectionCompleted(account);
+        devices.deleteAll();
+
+        assertThat(reconciler.tick(now).pausedDevice()).isEqualTo(1);
+        ReviewAutoCheck row = settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW")
+                .orElseThrow();
+        assertThat(row.getPausedReason()).isEqualTo(AutoCheckPause.PAUSED_DEVICE);
+        assertThat(row.getNextCheckAt()).isEqualTo(now.plus(Duration.ofMinutes(60)));
     }
 
     @Test
