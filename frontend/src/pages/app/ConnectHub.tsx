@@ -44,8 +44,6 @@ import type {
  * 설정·리포트가 쓰는 그것.
  */
 export function ConnectHub() {
-  // 이 Mac이 할 일이 있는지 — 「연결됨」이면 이 구역은 설명하지 않는다.
-  const [helperState, setHelperState] = useState<string | null>(null);
   const [channels, setChannels] = useState<ChannelResponse[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(true);
   const [channelsError, setChannelsError] = useState(false);
@@ -287,19 +285,17 @@ export function ConnectHub() {
         먼저 보이지 않게.
       */}
       {/*
-        <b>정상일 때 이 구역은 설명하지 않는다.</b> 「판매자센터 화면을 읽을 때 이 컴퓨터가 함께 일합니다」는
-        acquisition이 어떻게 돌아가는지를 말하는 문장이고, 아무 문제가 없을 때 판매자가 그걸 알아야 할 이유가
-        없다. 할 일이 생겼을 때만(설치·연결·업데이트) 그 문장이 왜 이 컴퓨터가 관련되는지를 설명한다.
-        줄 자체는 남는다 — 상태 한 단어는 볼 수 있어야 하고, 지우면 문제가 생겼을 때 찾을 자리가 없다.
+        <b>구역이 제 이름을 한 번만 적는다</b> (2026-10-09). 여기 있던 `Block`은 제목 「이 Mac」을 달았고,
+        그 아래 카드가 다시 「이 Mac」 행을 그렸고, 그 행의 버튼이 또 「이 Mac 연결」이었다 — 한 화면에 같은
+        이름 셋. 이제 카드가 제 구역이다: 상태와 버튼은 제목 줄에 서고, 아래에는 이름이 있는 행만 남는다.
+        지금 하고 있는 일은 그 구역 안, 자기 상태 아래가 자리다 — 그리고 있을 때만 그려진다.
       */}
-      <Block title="이 Mac" note={helperState === "CONNECTED" ? undefined : "판매자센터 화면을 읽을 때 이 컴퓨터가 함께 일합니다"}>
-        <HelperStatusCard naverHealth={naverHealth} onState={(s) => setHelperState(s.key)} />
-        {/* 지금 이 Mac이 하고 있는 일 — 있을 때만. 자기 상태 아래가 그 자리다. */}
+      <HelperStatusCard section naverHealth={naverHealth}>
         <HomeReviewOpsCard run={liveRun} />
-      </Block>
+      </HelperStatusCard>
 
       <section aria-label="잘 안 될 때" className="space-y-2">
-        <Disclosure label="잘 안 될 때">
+        <Disclosure label="잘 안 될 때" summaryClassName="-ml-2">
           <ul className="mt-2 space-y-2 text-sm text-muted">
             <li className="break-keep border-t border-line/70 py-2">
               <Go to="/connect/upload">파일로 넘기기</Go> — 연결이 어려운 채널은 파일로 받습니다.

@@ -160,15 +160,15 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
           tone: "warn",
           // The seller's words for it, and no further: which account, which token, which organisation are
           // all facts about our plumbing. What they can act on is the one button beside this sentence.
-          note: "이 Mac은 다른 계정에 연결되어 있습니다. 이 계정에 다시 연결해 주세요.",
-          action: { kind: "link", label: "이 Mac 연결" },
+          note: "다른 계정에 연결되어 있습니다. 이 계정에 다시 연결해 주세요.",
+          action: { kind: "link", label: "연결" },
         };
       case "unreachable":
         return {
           key: "LINK_SERVER",
           label: "서버 연결 확인 필요",
           tone: "warn",
-          note: "이 Mac이 서버에 닿지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
+          note: "서버에 닿지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
           action: { kind: "link", label: "다시 시도" },
         };
       default: {
@@ -176,8 +176,8 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
           ? "연결이 거부됐습니다. 다시 연결해 주세요."
           : device === "expired"
             ? "연결 요청 시간이 지났습니다. 다시 연결해 주세요."
-            : "이 Mac이 아직 이 계정과 연결되지 않았습니다. 연결하면 비밀번호 없이 이 계정의 화면을 읽습니다.";
-        return { key: "LINK", label: "연결 필요", tone: "warn", note, action: { kind: "link", label: "이 Mac 연결" } };
+            : "아직 이 계정과 연결되지 않았습니다. 연결하면 비밀번호 없이 쓸 수 있습니다.";
+        return { key: "LINK", label: "연결 필요", tone: "warn", note, action: { kind: "link", label: "연결" } };
       }
     }
   }
@@ -199,7 +199,7 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
         ? "연결이 거부됐습니다. 다시 연결하고, 내 PC에 열리는 창에서 허용을 눌러 주세요."
         : phase === "revoked"
           ? "연결이 해제됐습니다. 다시 연결해 주세요."
-          : "도우미가 실행 중입니다. 이 Mac을 연결해 주세요.";
+          : "도우미가 실행 중입니다. 연결해 주세요.";
     // 「다시」 only when there was a first time. A seller two minutes into the product, whose helper
     // has never been paired with any browser, read 「다시 연결 필요」 as an instruction about something
     // they had already done (Full Pilot Walkthrough v1, 2026-09-05). Same key, same action.
@@ -209,7 +209,7 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
       label: firstTime ? "연결 필요" : "다시 연결 필요",
       tone: "warn",
       note,
-      action: { kind: "connect", label: "이 Mac 연결" },
+      action: { kind: "connect", label: "연결" },
     };
   }
   if (phase === "connecting" || phase === "connecting_ws") {
@@ -232,7 +232,7 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
     key: "INSTALL",
     label: "설치 필요",
     tone: "neutral",
-    note: `이 PC에서 도우미를 찾지 못했습니다. 설치하면 판매자센터 화면과 함께 일할 수 있습니다.${lna}`,
+    note: `이 PC에서 도우미를 찾지 못했습니다. 설치하면 이어서 쓸 수 있습니다.${lna}`,
     action: { kind: "install", label: "설치 안내" },
   };
 }
@@ -253,19 +253,24 @@ export interface NaverSessionState {
  * `sessionReadiness` is `contracts/session-readiness/v1` verbatim: READY · LOGIN_REQUIRED · TWO_FACTOR_REQUIRED ·
  * ACCOUNT_AMBIGUOUS · EXPIRED · UNOBSERVED_EXTERNAL. Anything else (an older backend, a null) is UNOBSERVED —
  * the fail-closed word, never 로그인됨.
+ *
+ * <p><b>확인 시각은 문장 안에 있지 않다</b> (2026-10-09). 「네이버 로그인이 필요합니다 (1시간 전 확인).」은
+ * 바로 옆 채널 표가 열 하나로 말하는 것을 괄호에 넣어 되풀이한 것이었고, 그래서 이 구역만 시각이 왼쪽에
+ * 문장 속으로 숨었다. 시각은 호출하는 쪽이 「마지막 확인」 열에 그린다 — 채널 행과 같은 자리, 같은 표기.
+ * 이 함수는 상태와 그 상태에 대해 할 말만 돌려준다.
  */
-export function naverSessionOf(sessionReadiness: string | null | undefined, observedAgo: string | null): NaverSessionState {
-  const when = observedAgo ? ` (${observedAgo} 확인)` : "";
+export function naverSessionOf(sessionReadiness: string | null | undefined): NaverSessionState {
   switch (sessionReadiness) {
     case "READY":
-      return { key: "LOGGED_IN", label: "로그인됨", tone: "good", note: observedAgo ? `${observedAgo} 확인` : null, action: null };
+      // 정상이다. 한 단어로 충분하고, 설명할 것이 없다.
+      return { key: "LOGGED_IN", label: "로그인됨", tone: "good", note: null, action: null };
     case "LOGIN_REQUIRED":
     case "EXPIRED":
       return {
         key: "LOGIN_REQUIRED",
         label: "로그인 필요",
         tone: "warn",
-        note: `네이버 로그인이 필요합니다${when}. 도우미가 여는 창에서 한 번 로그인하면 이후에는 유지됩니다.`,
+        note: "도우미가 여는 창에서 한 번 로그인하면 이후에는 유지됩니다.",
         action: { label: "네이버 로그인" },
       };
     case "TWO_FACTOR_REQUIRED":
@@ -273,7 +278,7 @@ export function naverSessionOf(sessionReadiness: string | null | undefined, obse
         key: "AUTH_CHALLENGE",
         label: "추가 인증 필요",
         tone: "warn",
-        note: `네이버가 추가 인증을 요구합니다${when}. 도우미가 여는 창에서 인증을 마쳐 주세요.`,
+        note: "네이버가 추가 인증을 요구합니다. 도우미가 여는 창에서 인증을 마쳐 주세요.",
         action: { label: "네이버 로그인" },
       };
     case "ACCOUNT_AMBIGUOUS":
@@ -281,7 +286,7 @@ export function naverSessionOf(sessionReadiness: string | null | undefined, obse
         key: "ACCOUNT_AMBIGUOUS",
         label: "계정 선택 필요",
         tone: "warn",
-        note: `여러 계정 중 어느 스토어인지 정해지지 않았습니다${when}. 도우미가 여는 창에서 계정을 골라 주세요.`,
+        note: "여러 계정 중 어느 스토어인지 정해지지 않았습니다. 도우미가 여는 창에서 계정을 골라 주세요.",
         action: { label: "네이버 로그인" },
       };
     default:
@@ -289,7 +294,7 @@ export function naverSessionOf(sessionReadiness: string | null | undefined, obse
         key: "UNOBSERVED",
         label: "확인되지 않음",
         tone: "neutral",
-        note: "아직 도우미가 네이버 로그인 상태를 확인한 적이 없습니다. 첫 작업을 시작하면 확인합니다.",
+        note: null,
         action: null,
       };
   }

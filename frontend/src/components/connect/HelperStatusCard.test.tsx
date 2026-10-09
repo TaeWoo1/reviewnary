@@ -56,10 +56,13 @@ function naver(sessionReadiness: string | null, observedAt: string | null = null
   };
 }
 
-function renderCard(health: ConnectionStatusView | null = naver(null)) {
+function renderCard(
+  health: ConnectionStatusView | null = naver(null),
+  { section = false }: { section?: boolean } = {},
+) {
   return render(
     <MemoryRouter>
-      <HelperStatusCard naverHealth={health} />
+      <HelperStatusCard naverHealth={health} section={section} />
     </MemoryRouter>,
   );
 }
@@ -156,11 +159,34 @@ describe("HelperStatusCard — 이 기기 연결 (Helper Device Authentication v
     healthBody = { ok: true, agentVersion: MIN_HELPER_VERSION };
   });
 
+  /**
+   * <b>이름은 한 번만.</b> 2026-10-09 실측 화면에서 「이 Mac」은 세 번 적혀 있었다 — 구역 제목, 그 아래
+   * 행 이름, 그리고 그 행의 버튼. `section`에서는 제목 하나뿐이고, 상태와 버튼은 그 제목 줄에 선다.
+   */
+  it("section: 「이 Mac」은 화면에 한 번만 적힌다 — 상태와 버튼은 제목 줄에 선다", async () => {
+    deviceStatus = { linked: false, linking: null, verified: "UNVERIFIED" };
+    renderCard(naver(null), { section: true });
+    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결 필요"));
+    expect(screen.getAllByText("이 Mac")).toHaveLength(1);
+    expect(screen.getByTestId("helper-link")).toHaveTextContent("연결");
+    expect(screen.getByRole("region", { name: "이 Mac" })).toBeTruthy();
+  });
+
+  // 정상 상태의 이 구역은 설명하지 않는다 — 한 단어와, 누를 것 없음.
+  it("section: 연결됨이면 설명문도 버튼도 없다", async () => {
+    deviceStatus = { linked: true, linking: null, verified: "OK", deviceId: "dev-1" };
+    listHelperDevices.mockResolvedValue([{ id: "dev-1" }]);
+    renderCard(naver(null), { section: true });
+    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결됨"));
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+    expect(screen.queryByText(/판매자센터 화면/)).toBeNull();
+  });
+
   it("a paired helper that is not linked to the account says 연결 필요 with one control", async () => {
     deviceStatus = { linked: false, linking: null, verified: "UNVERIFIED" };
     const { container } = renderCard();
     await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결 필요"));
-    expect(screen.getByTestId("helper-link")).toHaveTextContent("이 Mac 연결");
+    expect(screen.getByTestId("helper-link")).toHaveTextContent("연결");
     expect(screen.getAllByRole("button")).toHaveLength(1);
     await expectNoAxeViolations(container);
   });
@@ -259,7 +285,7 @@ describe("HelperStatusCard — 이 기기 연결 (Helper Device Authentication v
     listHelperDevices.mockResolvedValue([{ id: "dev-1" }]);
     renderCard();
     await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결 필요"));
-    expect(screen.getByText(/이 Mac은 다른 계정에 연결되어 있습니다/)).toBeTruthy();
+    expect(screen.getByText(/다른 계정에 연결되어 있습니다/)).toBeTruthy();
     expect(screen.getByTestId("helper-link")).toBeTruthy();
     // Seller words only: no org, no token, no device id anywhere on screen.
     expect(document.body.textContent ?? "").not.toMatch(/org|token|dev-elsewhere|조직/i);

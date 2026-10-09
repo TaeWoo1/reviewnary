@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import type { ReactNode } from "react";
 import { Btn, BtnLink } from "../ui/Btn";
 import { Status, type StatusTone } from "../ui/Status";
+import { SectionHeader } from "../ui/SectionHeader";
+import { COL } from "./ChannelList";
 import { useBridge } from "../../hooks/useBridge";
 import { BRIDGE_TOKEN_KEY, bridgeHttpBase } from "../../lib/bridge/bridgeClient";
 import { api } from "../../lib/apiClient";
@@ -77,6 +80,8 @@ export function HelperStatusCard({
   naverHealth,
   enabled = true,
   onState,
+  section = false,
+  children,
 }: {
   /**
    * Report the helper word upward. There is exactly ONE derivation of this state — the probes and the
@@ -87,6 +92,19 @@ export function HelperStatusCard({
   /** The NAVER account's connection status (carries `sessionReadiness`), or null when there is none. */
   naverHealth: ConnectionStatusView | null;
   enabled?: boolean;
+  /**
+   * <b>이 카드가 제 구역의 이름을 갖는가.</b>
+   *
+   * 채널 연결 화면에서 이 구역의 이름은 「이 Mac」이고, 그 이름이 있는 한 그 아래 행이 다시 「이 Mac」이라고
+   * 적을 이유가 없다 — 제목·행 이름·버튼으로 세 번 적혀 있었다(2026-10-09 실측). `section`이면 이 Mac의
+   * 상태와 그 하나뿐인 버튼은 <b>제목 줄</b>에 서고, 아래에는 이름이 있는 행만 남는다.
+   *
+   * 기본값은 거짓이다 — 상품평 수집 흐름의 「도우미」 걸음은 제 설명을 이미 갖고 있고, 거기서는 이 카드가
+   * 예전처럼 행 하나로 선다.
+   */
+  section?: boolean;
+  /** 이 구역 안에 같이 서는 것(진행 중인 일). `section`일 때만 그려진다. */
+  children?: ReactNode;
 }) {
   const navigate = useNavigate();
   const bridge = useBridge(enabled, { autoPair: false });
@@ -320,11 +338,10 @@ export function HelperStatusCard({
       setAttempt("none");
     }
   }, [device, attempt]);
+  const naver = naverSessionOf(naverHealth?.sessionReadiness ?? null);
   // 「1개월 전 확인」은 어제 본 것과 여드레 전에 본 것을 같은 말로 덮는다 — 채널 행과 같은 시각 표기를 쓴다.
-  const naver = naverSessionOf(
-    naverHealth?.sessionReadiness ?? null,
-    naverHealth?.sessionObservedAt ? kstDayTime(naverHealth.sessionObservedAt) : null,
-  );
+  // 그 시각은 문장 속이 아니라 채널 표와 같은 「마지막 확인」 열에 선다.
+  const naverObservedAt = naverHealth?.sessionObservedAt ? kstDayTime(naverHealth.sessionObservedAt) : null;
 
   useEffect(() => {
     onState?.(helper);
@@ -338,26 +355,26 @@ export function HelperStatusCard({
       case "install":
       case "update":
         return (
-          <BtnLink to={HELPER_GUIDE_PATH} size="sm" variant={helper.action.kind === "install" ? "solid" : "outline"}>
+          <BtnLink to={HELPER_GUIDE_PATH} size="sm" variant="outline">
             {helper.action.label}
           </BtnLink>
         );
       case "connect":
         return (
-          <Btn size="sm" onClick={() => bridge.requestPairing()} data-testid="helper-connect">
+          <Btn size="sm" variant="outline" onClick={() => bridge.requestPairing()} data-testid="helper-connect">
             {helper.action.label}
           </Btn>
         );
       case "link":
         return (
-          <Btn size="sm" onClick={() => void linkThisDevice()} data-testid="helper-link">
+          <Btn size="sm" variant="outline" onClick={() => void linkThisDevice()} data-testid="helper-link">
             {helper.action.label}
           </Btn>
         );
       case "linkRetry":
         return (
           <div className="flex flex-wrap items-center gap-2">
-            <Btn size="sm" onClick={() => void retryLink()} data-testid="helper-link-retry">
+            <Btn size="sm" variant="outline" onClick={() => void retryLink()} data-testid="helper-link-retry">
               {helper.action.label}
             </Btn>
             {helper.secondary ? (
@@ -383,45 +400,82 @@ export function HelperStatusCard({
     }
   }
 
+  const helperWord = (
+    <span data-testid="helper-state">
+      <Status tone={tone(helper.tone)} variant="quiet">
+        {helper.label}
+      </Status>
+    </span>
+  );
+
+  /** 네이버 로그인 — 이 Mac이 마지막으로 본 대로. 채널 표와 같은 열에 선다. */
+  const naverRow = naverHealth ? (
+    <li className="flex flex-wrap items-center border-t border-line/70 py-2 text-sm">
+      <div className={COL.name}>
+        <p className="break-keep font-medium text-ink">네이버 로그인</p>
+        {naver.note ? <p className="mt-0.5 break-keep text-xs text-muted">{naver.note}</p> : null}
+      </div>
+      <div className={COL.state} data-testid="naver-session-state">
+        <Status tone={naver.tone} variant="quiet">
+          {naver.label}
+        </Status>
+      </div>
+      <div className={COL.read}>
+        <span className="text-muted">{naverObservedAt ?? "—"}</span>
+      </div>
+      <div className={COL.action}>
+        {naver.action ? (
+          <Btn size="sm" variant="outline" onClick={() => navigate(NAVER_LOGIN_PATH)} data-testid="naver-login">
+            {naver.action.label}
+          </Btn>
+        ) : null}
+      </div>
+    </li>
+  ) : null;
+
+  /*
+    <b>이름은 한 번만 적힌다.</b> 구역의 제목이 「이 Mac」이면 이 Mac의 상태와 버튼은 그 제목 줄에 선다 —
+    아래에 「이 Mac · 연결 필요 · [이 Mac 연결]」이라고 다시 적는 행을 만들지 않는다. 정상일 때 그 줄에
+    남는 것은 조용한 한 단어뿐이고, 설명문은 할 일이 있을 때만 제목 아래에 붙는다.
+  */
+  if (section) {
+    return (
+      <section aria-label="이 Mac" className="space-y-2" data-testid="helper-status">
+        <SectionHeader
+          title="이 Mac"
+          hint={helper.note ?? undefined}
+          action={
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {helperWord}
+              {helperAction()}
+            </div>
+          }
+        />
+        {linkError ? (
+          <p className="break-keep text-sm text-bad" role="alert">
+            {linkError}
+          </p>
+        ) : null}
+        {naverRow ? <ul>{naverRow}</ul> : null}
+        {children}
+      </section>
+    );
+  }
+
   return (
     <ul data-testid="helper-status">
       <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-t border-line/70 py-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <p className="break-keep font-medium text-ink">이 Mac</p>
-            <span data-testid="helper-state">
-              <Status tone={tone(helper.tone)} variant="quiet">
-                {helper.label}
-              </Status>
-            </span>
+            {helperWord}
           </div>
           {helper.note ? <p className="mt-0.5 break-keep text-sm text-muted">{helper.note}</p> : null}
           {linkError ? <p className="mt-0.5 break-keep text-sm text-bad" role="alert">{linkError}</p> : null}
         </div>
         <div className="flex shrink-0 items-center">{helperAction()}</div>
       </li>
-      {naverHealth ? (
-        <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-t border-line/70 py-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <p className="break-keep font-medium text-ink">네이버</p>
-              <span data-testid="naver-session-state">
-                <Status tone={naver.tone} variant="quiet">
-                  {naver.label}
-                </Status>
-              </span>
-            </div>
-            {naver.note ? <p className="mt-0.5 break-keep text-sm text-muted">{naver.note}</p> : null}
-          </div>
-          {naver.action ? (
-            <div className="flex shrink-0 items-center">
-              <Btn size="sm" onClick={() => navigate(NAVER_LOGIN_PATH)} data-testid="naver-login">
-                {naver.action.label}
-              </Btn>
-            </div>
-          ) : null}
-        </li>
-      ) : null}
+      {naverRow}
     </ul>
   );
 }

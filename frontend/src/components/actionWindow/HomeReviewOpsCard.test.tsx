@@ -14,14 +14,13 @@ const CHECKPOINT_RUN = UI_SCENARIOS["human-action-required"].run!;
 const RUNNING_RUN = UI_SCENARIOS["observing"].run!;
 
 describe("HomeReviewOpsCard", () => {
-  it("empty state (run=null): calm message + a link to open the workbench, no status", () => {
-    renderWithRouter(<HomeReviewOpsCard run={null} />);
-    const region = screen.getByRole("region", { name: HOME_REVIEW_OPS_COPY.sectionTitle });
-    expect(region).toHaveTextContent(HOME_REVIEW_OPS_COPY.emptyBody);
+  // 아무 일도 일어나지 않는 화면에 「아무 일도 일어나지 않습니다」라고 적지 않는다. 그 문장이 가르치는
+  // 것은 우리 쪽 작업의 이름뿐이었다 (연결 화면 정리, 2026-10-09).
+  it("진행 중인 일이 없으면 이 줄 자체가 없다", () => {
+    const { container } = renderWithRouter(<HomeReviewOpsCard run={null} />);
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole("region", { name: HOME_REVIEW_OPS_COPY.sectionTitle })).toBeNull();
     expect(screen.queryByText(CHECKPOINT_PROMPT_TITLE)).toBeNull();
-    expect(
-      screen.getByRole("link", { name: new RegExp(HOME_REVIEW_OPS_COPY.open) }),
-    ).toHaveAttribute("href", "/connect/imports");
   });
 
   it("checkpoint run: shows the run title, checkpoint prompt, and a link to the run detail", () => {
