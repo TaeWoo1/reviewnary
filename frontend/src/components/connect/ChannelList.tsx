@@ -163,7 +163,9 @@ function ChannelRow({
   const sub = [
     ...(account ? [] : [support.primaryLabel, ...support.chips]),
     ...(account || !support.uploadQualifier ? [] : [support.uploadQualifier]),
-    ...(row.reviewLine ? [row.reviewLine] : []),
+    // `row.reviewLine`은 여기 적히지 않는다. 「리뷰 수집 · 마지막 수집」은 바로 오른쪽 「마지막 수집 성공」
+    // 열이 이미 말하는 것이고, 그래서 세 행 중 한 행만 부제를 갖는 화면이 됐다. 그 사실은 사라지지 않고
+    // 아래 `read`에서 <b>어느 lane의 시각을 적을지</b>를 그대로 정한다 — 표시만 그만둔다.
   ];
 
   // 연결되지 않음 · 읽은 적 없음 · 읽었음 — 셋은 서로 다른 사실이고, 이 열에서 서로 다르게 생겼다.
@@ -285,8 +287,14 @@ function ChannelRow({
   );
 }
 
-/** 한 열에 여럿이 서는 자리의 폭 — 세 채널이 세로로 비교되려면 열이 제 자리를 지켜야 한다(주문과 같다). */
-const COL = {
+/**
+ * 한 열에 여럿이 서는 자리의 폭 — 세 채널이 세로로 비교되려면 열이 제 자리를 지켜야 한다(주문과 같다).
+ *
+ * <p><b>이 화면의 모든 행이 이 열을 쓴다</b> (2026-10-09). 아래 「이 Mac」 구역은 제 나름의 자유 배치였고,
+ * 그래서 같은 화면에서 상태가 두 군데, 시각이 두 군데에 있었다. 폭은 여기서만 정해지고 그 구역이 가져다
+ * 쓴다 — 두 벌이 생기면 두 벌이 어긋난다.
+ */
+export const COL = {
   name: "min-w-0 flex-1 pr-4",
   state: "w-[110px] shrink-0 pr-4",
   read: "w-[220px] shrink-0 pr-4 text-right tabular-nums",

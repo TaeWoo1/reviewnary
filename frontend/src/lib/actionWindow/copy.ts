@@ -537,7 +537,6 @@ export const REVIEW_WORK_COPY = {
 // 것을 보고 있는지 화면으로 알 수 없다. 이 lane은 <b>네이버의</b> 기간별 내려받기이므로 그렇게 부른다.
 export const HOME_REVIEW_OPS_COPY = {
   sectionTitle: "네이버 리뷰 기간별 가져오기",
-  emptyBody: "진행 중인 네이버 리뷰 가져오기 작업이 없습니다.",
   // 「작업 화면」은 우리 쪽 책상의 이름이었다. 판매자에게 이것은 지금 진행 중인 그 일이고, 누르면 그
   // 진행을 본다 (연결 화면 정리, 2026-10-08).
   open: "진행 상황 보기",

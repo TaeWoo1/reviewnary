@@ -71,19 +71,20 @@ describe("compareVersions", () => {
 });
 
 describe("naverSessionOf — only the helper's own last observation", () => {
-  it("READY is 로그인됨 with when; anything unknown is 확인되지 않음, never 로그인됨", () => {
-    expect(naverSessionOf("READY", "3분 전")).toMatchObject({ key: "LOGGED_IN", label: "로그인됨", note: "3분 전 확인" });
-    expect(naverSessionOf("UNOBSERVED_EXTERNAL", null).key).toBe("UNOBSERVED");
-    expect(naverSessionOf(null, null).key).toBe("UNOBSERVED");
-    expect(naverSessionOf("SOMETHING_NEW", "1분 전").key).toBe("UNOBSERVED");
+  // 확인 시각은 이 함수가 아니라 「마지막 확인」 열이 말한다 — 정상 상태의 이 줄에는 단어 하나뿐이다.
+  it("READY는 한 단어뿐이고, 모르는 값은 무엇이든 확인되지 않음이다 — 절대 로그인됨이 아니다", () => {
+    expect(naverSessionOf("READY")).toMatchObject({ key: "LOGGED_IN", label: "로그인됨", note: null });
+    expect(naverSessionOf("UNOBSERVED_EXTERNAL").key).toBe("UNOBSERVED");
+    expect(naverSessionOf(null).key).toBe("UNOBSERVED");
+    expect(naverSessionOf("SOMETHING_NEW").key).toBe("UNOBSERVED");
   });
 
   it("login, expiry and a challenge each get the one action that fixes them", () => {
-    expect(naverSessionOf("LOGIN_REQUIRED", "1시간 전")).toMatchObject({ key: "LOGIN_REQUIRED", label: "로그인 필요", action: { label: "네이버 로그인" } });
-    expect(naverSessionOf("EXPIRED", null).key).toBe("LOGIN_REQUIRED");
-    expect(naverSessionOf("TWO_FACTOR_REQUIRED", null).key).toBe("AUTH_CHALLENGE");
-    expect(naverSessionOf("ACCOUNT_AMBIGUOUS", null).key).toBe("ACCOUNT_AMBIGUOUS");
-    noInternalWords(naverSessionOf("LOGIN_REQUIRED", null).note);
+    expect(naverSessionOf("LOGIN_REQUIRED")).toMatchObject({ key: "LOGIN_REQUIRED", label: "로그인 필요", action: { label: "네이버 로그인" } });
+    expect(naverSessionOf("EXPIRED").key).toBe("LOGIN_REQUIRED");
+    expect(naverSessionOf("TWO_FACTOR_REQUIRED").key).toBe("AUTH_CHALLENGE");
+    expect(naverSessionOf("ACCOUNT_AMBIGUOUS").key).toBe("ACCOUNT_AMBIGUOUS");
+    noInternalWords(naverSessionOf("LOGIN_REQUIRED").note);
   });
 });
 
@@ -91,12 +92,13 @@ describe("helperStatusOf — the account link is its own axis (Helper Device Aut
   const paired = (device: Parameters<typeof helperStatusOf>[0]["device"]) =>
     helperStatusOf({ phase: "paired", pairedBefore: true, agentVersion: MIN_HELPER_VERSION, device });
 
-  it("paired + linked is 연결됨; paired + unlinked is 연결 필요 with 이 Mac 연결", () => {
+  it("paired + linked is 연결됨; paired + unlinked is 연결 필요 with 연결", () => {
     expect(paired("linked")).toMatchObject({ key: "CONNECTED", label: "연결됨", action: null });
     const s = paired("unlinked");
     // 2026-10-08: 두 handshake(이 브라우저↔도우미, 도우미↔계정)는 화면에 한 번에 하나만 나오므로,
-    // 판매자에게는 한 가지 일이다 — 「이 Mac 연결」. 그 구분이 바로 새어 나가던 내부 개념이었다.
-    expect(s).toMatchObject({ key: "LINK", label: "연결 필요", tone: "warn", action: { kind: "link", label: "이 Mac 연결" } });
+    // 판매자에게는 한 가지 일이다. 그 구분이 바로 새어 나가던 내부 개념이었다.
+    // 2026-10-09: 그 한 가지 일의 이름은 이제 「연결」이다 — 무엇을 연결하는지는 구역의 제목이 말한다.
+    expect(s).toMatchObject({ key: "LINK", label: "연결 필요", tone: "warn", action: { kind: "link", label: "연결" } });
     noInternalWords(s.note, s.action?.label);
     // A surface that never asked about the link (undefined) is unchanged: pairing alone is 연결됨 there.
     expect(paired(undefined).key).toBe("CONNECTED");
