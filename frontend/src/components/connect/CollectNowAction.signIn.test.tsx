@@ -176,18 +176,22 @@ describe("로그인 복구 — 판매자가 직접 로그인하고, 제품은 �
     }
   });
 
-  it("이미 로그인 창이 열려 있으면 두 번째 창을 열지 않는다", async () => {
+  it("이미 로그인 창이 열려 있으면 두 번째 창을 열지 않고 — 그 창을 이어서 지켜본다", async () => {
+    // <b>다시 누르는 것은 「처음부터 다시」가 아니라 「그거 계속 봐 줘」다.</b> 2차 인증처럼 사람이 오래
+    // 걸리는 경로에서는 지켜보기가 먼저 끝나고, 그때 판매자가 할 수 있는 일은 버튼을 다시 누르는 것뿐이다.
+    // 그 누름이 「이미 열려 있습니다」라는 오류로 끝나면 이어갈 길이 없다 — 멈춰 있는 의도는 서버의 row이고,
+    // 이 탭은 다시 지켜보기만 하면 된다.
     startSignIn.mockResolvedValue({ ok: false, reason: "busy" });
+    awaitSignIn.mockResolvedValue("SIGNED_IN");
     mount();
 
     await userEvent.click(screen.getByTestId("sign-in-REVIEW"));
-    await waitFor(() =>
-      expect(onReport).toHaveBeenCalledWith(
-        "이 컴퓨터에서 이미 로그인 창이 열려 있습니다. 그 창에서 로그인을 마쳐 주세요.",
-        true,
-      ),
+
+    await waitFor(() => expect(awaitSignIn).toHaveBeenCalled());
+    expect(onReport).not.toHaveBeenCalledWith(
+      "이 컴퓨터에서 이미 로그인 창이 열려 있습니다. 그 창에서 로그인을 마쳐 주세요.",
+      true,
     );
-    expect(awaitSignIn).not.toHaveBeenCalled();
   });
 
   it("로그인 창이 열려 있는 동안에는 수집을 누를 수 없다", async () => {

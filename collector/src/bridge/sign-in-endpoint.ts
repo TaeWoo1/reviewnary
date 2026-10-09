@@ -50,15 +50,23 @@ export type SignInStartResult =
   /** This helper has no way to drive a marketplace browser (the Aside lane is not configured here). */
   | { ok: false; reason: "no_executor" };
 
+/** What a check answers. `busy` means a session is already open on this desk — ask its status instead. */
+export type SignInCheckResult =
+  | { ok: true; state: SignInOutcome }
+  | { ok: false; reason: "busy" | "unsupported_channel" | "no_executor" };
+
 export interface SignInEndpointDeps {
   /** Run one bounded session. Injected so the endpoint's own rules are testable without a browser. */
   recover?: (channel: SignInChannel) => Promise<SignInOutcome>;
+  /** Ask once, without waiting and without raising a window. Absent in a helper built before checks existed. */
+  check?: (channel: SignInChannel) => Promise<SignInOutcome>;
   /** Operator log. Receives closed words only — never a URL and never a page. */
   log?: (event: string, fields: Record<string, unknown>) => void;
 }
 
 export class SignInEndpoint {
   private readonly recover: ((channel: SignInChannel) => Promise<SignInOutcome>) | null;
+  private readonly checkSession: ((channel: SignInChannel) => Promise<SignInOutcome>) | null;
   private readonly log: (event: string, fields: Record<string, unknown>) => void;
   private state: SignInSessionState = "IDLE";
   private channel: SignInChannel | null = null;
@@ -66,6 +74,7 @@ export class SignInEndpoint {
 
   constructor(deps: SignInEndpointDeps = {}) {
     this.recover = deps.recover ?? null;
+    this.checkSession = deps.check ?? null;
     this.log = deps.log ?? (() => undefined);
   }
 
@@ -98,6 +107,45 @@ export class SignInEndpoint {
         this.running = false;
       });
     return { ok: true, state: "WAITING" };
+  }
+
+  /**
+   * <b>Is this channel signed in right now?</b> One probe, awaited, nothing raised.
+   *
+   * <p>Asked when a seller comes back to Reviewnary with a read waiting on a sign-in. It answers and that is
+   * all: starting the waiting read is the backend's decision, made against the setting that authorised it, not
+   * this endpoint's.
+   *
+   * <p>Refuses while a recovery session is open — there is one browser and someone may be typing in it. The
+   * caller then asks {@link #status} instead, which is the answer that session is about to produce anyway.
+   */
+  async check(channelCode: unknown): Promise<SignInCheckResult> {
+    if (!this.checkSession) {
+      return { ok: false, reason: "no_executor" };
+    }
+    if (!isSignInChannel(channelCode)) {
+      return { ok: false, reason: "unsupported_channel" };
+    }
+    if (this.running) {
+      return { ok: false, reason: "busy" };
+    }
+    this.running = true;
+    this.log("aw_sign_in_check_started", { channelCode });
+    try {
+      const state = await this.checkSession(channelCode);
+      // A check tells the tab, and it also updates what `status` reports: the two must not disagree about a
+      // session that was just looked at. It never becomes WAITING — nothing is waiting.
+      this.channel = channelCode;
+      this.state = state;
+      this.log("aw_sign_in_check_settled", { channelCode, outcome: state });
+      return { ok: true, state };
+    } catch {
+      this.state = "UNAVAILABLE";
+      this.log("aw_sign_in_check_settled", { channelCode, outcome: "UNAVAILABLE" });
+      return { ok: true, state: "UNAVAILABLE" };
+    } finally {
+      this.running = false;
+    }
   }
 
   status(): SignInSessionStatus {

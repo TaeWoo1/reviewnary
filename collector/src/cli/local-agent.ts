@@ -116,7 +116,7 @@ import { fetchLaunchScope, reportSessionReadiness } from "../upload";
 import { backendBearer, DeviceLinker } from "../auth/helper-session";
 import { startFixtureObserveLoop } from "../aside/fixture-observe-runner";
 import { ClaimLoopBinding } from "../aside/claim-loop-binding";
-import { runSignInRecovery } from "../aside/sign-in-executor";
+import { runSignInCheck, runSignInRecovery } from "../aside/sign-in-executor";
 import { SignInEndpoint } from "../bridge/sign-in-endpoint";
 import { AW_CARRIER_REPLY } from "../../../contracts/action-window/aw-carrier-kind";
 import { ReplySubmissionEndpoint } from "../bridge/reply-submission-endpoint";
@@ -2342,6 +2342,13 @@ export async function runBridgeOnlyBoot(
       ? {
           recover: (channel) =>
             runSignInRecovery(channel, {
+              command: linkCfg.asideCli,
+              ...(linkCfg.asideAccount ? { account: linkCfg.asideAccount } : {}),
+            }),
+          // The same page and the same read-only probe, asked once and without raising a window — for a tab
+          // that came back to Reviewnary with a read waiting on a sign-in.
+          check: (channel) =>
+            runSignInCheck(channel, {
               command: linkCfg.asideCli,
               ...(linkCfg.asideAccount ? { account: linkCfg.asideAccount } : {}),
             }),

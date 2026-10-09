@@ -3865,6 +3865,14 @@ export interface CollectNowReadinessView {
    * 아무 말도 하지 않는다 — 그건 의도적으로 어디에도 저장하지 않는다.
    */
   pausedCatchUp: boolean;
+  /**
+   * 이 줄의 <b>무엇인가</b>가 로그인을 기다리고 있는가 — 멈춘 walk이거나, 자동 확인이 벽에 주차돼 있거나.
+   *
+   * <p>`pausedCatchUp`보다 넓다. 과거가 닫히면 자동 확인은 부모 없는 오늘 읽기 하나를 하므로, 로그인을
+   * 기다리는 가장 흔한 경우가 그 칸에는 보이지 않는다. 화면은 이 값이 참일 때 — 그리고 그때만 — 판매자가
+   * 돌아왔을 때 가벼운 로그인 확인을 한 번 한다.
+   */
+  pausedSignIn: boolean;
 }
 
 /**

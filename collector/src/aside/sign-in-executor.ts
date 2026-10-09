@@ -19,6 +19,7 @@ import { runAsideRepl, type AsideCliOptions } from "./aside-cli";
 import {
   asideSignInRuntime,
   SIGN_IN_BOUND_MS,
+  SIGN_IN_CHECK_BOUND_MS,
   SIGN_IN_POLL_MS,
   type SignInRuntimePlan,
   type SignInRuntimeResult,
@@ -37,15 +38,30 @@ export function isSignInChannel(raw: unknown): raw is SignInChannel {
   return typeof raw === "string" && (SIGN_IN_CHANNELS as readonly string[]).includes(raw);
 }
 
+/**
+ * What one session is for.
+ *
+ * <p><b>RECOVER</b> — the seller pressed 「판매자센터 로그인」. The window comes forward and the session waits
+ * out its bound while they sign in.
+ *
+ * <p><b>CHECK</b> — the seller came back to Reviewnary with a read waiting on a sign-in. One probe, no
+ * waiting, no window raised: this asks 「지금 로그인되어 있나」 and nothing else. It exists because a seller
+ * who signs in anywhere — another tab, another device, after the recovery window closed — has solved the
+ * thing the product was waiting for, and the product has no way to be told
+ * ({@code docs/review_auto_check_v1.md}, measured live 2026-10-09).
+ */
+export type SignInMode = "RECOVER" | "CHECK";
+
 /** The plan for one channel, assembled only from what that channel's read already publishes. */
-export function buildSignInRuntimePlan(channel: SignInChannel): SignInRuntimePlan {
+export function buildSignInRuntimePlan(channel: SignInChannel, mode: SignInMode = "RECOVER"): SignInRuntimePlan {
   const workflow = channel === "NAVER" ? NAVER_REVIEW_READ_WORKFLOW : COUPANG_REVIEW_READ_WORKFLOW;
   return {
     entryUrl: workflow.entryUrl,
     authScript: channel === "NAVER" ? buildNaverReviewAuthScript() : buildWingAuthScript(),
     settleTimeoutMs: workflow.settleTimeoutMs,
     pollMs: SIGN_IN_POLL_MS,
-    boundMs: SIGN_IN_BOUND_MS,
+    boundMs: mode === "CHECK" ? SIGN_IN_CHECK_BOUND_MS : SIGN_IN_BOUND_MS,
+    raiseWindow: mode === "RECOVER",
   };
 }
 
@@ -83,10 +99,34 @@ export async function runSignInRecovery(
   channel: SignInChannel,
   options: AsideCliOptions = {},
 ): Promise<SignInOutcome> {
-  const plan = buildSignInRuntimePlan(channel);
+  return runSignInSession(channel, "RECOVER", options);
+}
+
+/**
+ * Ask once whether this channel is signed in, and answer.
+ *
+ * <p>The same page and the same read-only probe the recovery session uses — so «signed in» means one thing
+ * across the product rather than two that could disagree. What it does not do is wait, and it does not raise
+ * the window: a seller who is already signed in sees nothing happen, which is the right amount of happening
+ * for a question nobody asked out loud.
+ */
+export async function runSignInCheck(
+  channel: SignInChannel,
+  options: AsideCliOptions = {},
+): Promise<SignInOutcome> {
+  return runSignInSession(channel, "CHECK", options);
+}
+
+async function runSignInSession(
+  channel: SignInChannel,
+  mode: SignInMode,
+  options: AsideCliOptions,
+): Promise<SignInOutcome> {
+  const plan = buildSignInRuntimePlan(channel, mode);
   const run = await runAsideRepl(buildSignInRuntimeProgram(plan), {
     ...options,
-    timeoutMs: options.timeoutMs ?? plan.boundMs + 15_000,
+    // A check's own bound is one probe, so its ceiling is the page opening, not the bound.
+    timeoutMs: options.timeoutMs ?? plan.boundMs + (mode === "CHECK" ? 45_000 : 15_000),
   });
   if (run.kind !== "RESULT") {
     return "UNAVAILABLE";

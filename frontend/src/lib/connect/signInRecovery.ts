@@ -108,6 +108,51 @@ export async function signInStatus(): Promise<SignInSessionState> {
   }
 }
 
+/**
+ * **지금 로그인되어 있나 — 한 번만 묻는다.**
+ *
+ * <p>판매자가 다른 탭에서, 다른 기기에서, 혹은 지켜보는 창이 닫힌 뒤에 로그인했을 수 있다. 그때 제품은
+ * 그것을 목격할 방법이 없고(2026-10-09 라이브에서 실측: 자동 확인이 그대로 멈춰 있었다), 할 수 있는 것은
+ * 돌아온 그 순간에 한 번 물어보는 것이다.
+ *
+ * <p>수집이 아니다. 도우미는 그 채널의 published 경로를 열고 **읽기 전용 probe 하나**를 돌리고 끝낸다 —
+ * 리뷰를 읽지 않고, 기다리지 않고, 창을 앞으로 가져오지도 않는다(아무도 데려가 달라고 하지 않았으므로).
+ *
+ * <p>`UNAVAILABLE`은 「모른다」다: 이 기능이 없는 도우미(404), 연결되지 않은 브라우저, 응답 없음이 모두
+ * 여기로 모이고, 그때 화면은 아무것도 시작하지 않고 그대로 기다린다.
+ */
+export async function checkSignIn(channelCode: string): Promise<SignInSessionState> {
+  const bearer = pairingBearer();
+  if (!bearer) {
+    return "UNAVAILABLE";
+  }
+  let res: Response;
+  try {
+    res = await fetch(`${bridgeHttpBase()}/bridge/sign-in/check`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${bearer}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ channelCode }),
+    });
+  } catch {
+    return "UNAVAILABLE";
+  }
+  if (!res.ok) {
+    return "UNAVAILABLE";
+  }
+  let body: { ok?: unknown; state?: unknown; reason?: unknown };
+  try {
+    body = (await res.json()) as { ok?: unknown; state?: unknown; reason?: unknown };
+  } catch {
+    return "UNAVAILABLE";
+  }
+  if (body.ok === true) {
+    const state = body.state;
+    return state === "SIGNED_IN" || state === "NOT_SIGNED_IN" ? state : "UNAVAILABLE";
+  }
+  // 데스크에 세션이 열려 있다(`busy`): 그 세션이 곧 답을 낸다. 두 번째 창을 열지 않는다.
+  return body.reason === "busy" ? "WAITING" : "UNAVAILABLE";
+}
+
 /** 상태를 물어보는 간격. 사람이 로그인하는 창을 1초마다 들여다볼 이유가 없다. */
 export const SIGN_IN_POLL_MS = 3000;
 /** 90초. 도우미 쪽 세션의 bound(100초)보다 짧지 않게, 그 답을 받을 수 있을 만큼. */
@@ -171,6 +216,17 @@ export async function watchSignIn(
     // 「한 데스크에 한 세션」 규칙 때문에 앞 회차가 끝난 뒤에만 가능하고, 그게 지금 상태다.
     const started = await start(channel);
     if (!started.ok) {
+      // <b>이미 열려 있는 세션은 보고할 실패가 아니라 지켜볼 세션이다.</b> 로그인 버튼을 다시 누르는 것은
+      // 「처음부터 다시」가 아니라 「그거 계속 봐 줘」이고, 멈춰 있는 의도는 서버의 row이므로 이 탭이 다시
+      // 지켜보기만 하면 로그인이 확인되는 순간 그 의도가 이어진다.
+      if (started.reason === "busy") {
+        onRound(round, rounds);
+        latest = await watch();
+        if (latest === "SIGNED_IN" || latest === "UNAVAILABLE") {
+          return { ok: true, state: latest };
+        }
+        continue;
+      }
       // 첫 회차에서 열지 못하면 할 말이 그것뿐이다. 뒤 회차에서라면 앞서 본 답을 들고 끝낸다.
       if (round === 1) return { ok: false, reason: started.reason };
       return { ok: true, state: latest };

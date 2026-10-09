@@ -346,3 +346,111 @@ describe("one browser, one person standing in it", () => {
     expect(JSON.stringify(lines)).not.toContain("http");
   });
 });
+
+/**
+ * <b>「지금 로그인되어 있나」 — 묻기만 하는 한 번.</b>
+ *
+ * <p>판매자가 다른 탭에서, 다른 기기에서, 혹은 지켜보는 창이 닫힌 뒤에 로그인했을 수 있다. 2026-10-09
+ * 라이브에서 정확히 그랬고, 제품은 그 사실을 알 길이 없었다 — 자동 확인은 멈춘 채로 남았다.
+ *
+ * <p>확인은 복구 세션과 같은 페이지, 같은 읽기 전용 probe를 쓴다(「로그인됨」이 제품 안에서 한 가지 뜻이어야
+ * 하므로). 다른 점은 둘이고, 둘 다 「아무도 데려가 달라고 하지 않았다」에서 나온다: <b>기다리지 않고</b>,
+ * <b>창을 앞으로 가져오지 않는다</b>.
+ */
+describe("the sign-in check — one probe, no waiting, no window raised", () => {
+  it("asks once and answers, even when the page says signed out", async () => {
+    const probes: string[] = [];
+    const checkPlan = buildSignInRuntimePlan("NAVER", "CHECK");
+    const result = await asideSignInRuntime(
+      { ...checkPlan, entryUrl: plan.entryUrl, authScript: plan.authScript, settleTimeoutMs: 10 },
+      { openTab: async () => page(null, probes) },
+      async () => undefined,
+      now(),
+    );
+
+    expect(result).toMatchObject({ ok: true, state: "NOT_SIGNED_IN" });
+    // 한 번. 사람을 기다리는 세션이 아니다.
+    expect(probes).toHaveLength(1);
+  });
+
+  it("says SIGNED_IN on that one probe when the seller already signed in elsewhere", async () => {
+    const checkPlan = buildSignInRuntimePlan("NAVER", "CHECK");
+    const result = await asideSignInRuntime(
+      { ...checkPlan, entryUrl: plan.entryUrl, authScript: plan.authScript, settleTimeoutMs: 10 },
+      { openTab: async () => page(1) },
+      async () => undefined,
+      now(),
+    );
+
+    expect(result).toMatchObject({ ok: true, state: "SIGNED_IN" });
+  });
+
+  it("never raises the window — nobody asked to be taken anywhere", async () => {
+    let raises = 0;
+    const tab: SignInRuntimeTabLike = {
+      evaluate: async () => ({ signedIn: false }),
+      waitForLoadState: async () => undefined,
+      bringToFront: async () => void (raises += 1),
+    };
+    const checkPlan = buildSignInRuntimePlan("NAVER", "CHECK");
+
+    await asideSignInRuntime(
+      { ...checkPlan, entryUrl: plan.entryUrl, authScript: plan.authScript, settleTimeoutMs: 10 },
+      { openTab: async () => tab },
+      async () => undefined,
+      now(),
+    );
+    expect(raises).toBe(0);
+
+    // 그리고 복구 세션은 여전히 가져온다 — 그쪽은 판매자가 눌러서 열린 창이다.
+    const recoverPlan = buildSignInRuntimePlan("NAVER", "RECOVER");
+    await asideSignInRuntime(
+      { ...recoverPlan, entryUrl: plan.entryUrl, authScript: plan.authScript, settleTimeoutMs: 10,
+        pollMs: 10, boundMs: 20 },
+      { openTab: async () => tab },
+      async () => undefined,
+      now(),
+    );
+    expect(raises).toBe(1);
+  });
+
+  it("is the same page and the same probe as the recovery session", () => {
+    const check = buildSignInRuntimePlan("NAVER", "CHECK");
+    const recover = buildSignInRuntimePlan("NAVER", "RECOVER");
+    expect(check.entryUrl).toBe(recover.entryUrl);
+    expect(check.authScript).toBe(recover.authScript);
+    expect(check.entryUrl).toBe(NAVER_REVIEW_LIST_URL);
+  });
+
+  it("refuses while a recovery session is open — one browser, one person in it", async () => {
+    const endpoint = new SignInEndpoint({
+      recover: () => new Promise(() => undefined),
+      check: async () => "SIGNED_IN",
+    });
+    endpoint.start("NAVER");
+
+    await expect(endpoint.check("NAVER")).resolves.toEqual({ ok: false, reason: "busy" });
+    // 그리고 열려 있는 세션을 다른 채널로 돌려놓지 않았다.
+    expect(endpoint.status().channelCode).toBe("NAVER");
+  });
+
+  it("a helper built before checks existed says so, and claims nothing", async () => {
+    const endpoint = new SignInEndpoint({ recover: async () => "SIGNED_IN" });
+    await expect(endpoint.check("NAVER")).resolves.toEqual({ ok: false, reason: "no_executor" });
+    expect(endpoint.status()).toEqual({ state: "IDLE", channelCode: null });
+  });
+
+  it("an answered check leaves the desk free and the status agreeing with it", async () => {
+    const endpoint = new SignInEndpoint({ recover: async () => "NOT_SIGNED_IN", check: async () => "SIGNED_IN" });
+
+    await expect(endpoint.check("NAVER")).resolves.toEqual({ ok: true, state: "SIGNED_IN" });
+    expect(endpoint.status()).toEqual({ state: "SIGNED_IN", channelCode: "NAVER" });
+    // 한 번의 확인이 데스크를 붙잡고 있지 않는다.
+    expect(endpoint.start("NAVER")).toEqual({ ok: true, state: "WAITING" });
+  });
+
+  it("a channel with no recovery has no check either", async () => {
+    const endpoint = new SignInEndpoint({ recover: async () => "SIGNED_IN", check: async () => "SIGNED_IN" });
+    await expect(endpoint.check("CAFE24")).resolves.toEqual({ ok: false, reason: "unsupported_channel" });
+  });
+});
