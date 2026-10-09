@@ -68,9 +68,29 @@ class ReviewCatchUpPlanTest {
         assertThat(plan.windows()).hasSize(3);
         assertThat(plan.windows().get(0).start()).isEqualTo(LocalDate.of(2026, 2, 1));
         assertThat(plan.stopped()).isEqualTo(Stop.MAX_WINDOWS);
-        // 2/22부터 10/8까지 — 끝나지 않았다는 사실이 숫자로 남는다.
-        assertThat(plan.remaining()).isEqualTo(LocalDate.of(2026, 10, 8).toEpochDay()
+        // 2/22부터 10/7까지 — 끝나지 않았다는 사실이 숫자로 남고, 그 끝은 어제다. 오늘은 catch-up의 대상이
+        // 아니다: 아직 쓰이고 있는 하루는 덮었다고 말할 수 없고, 계획에 넣으면 영원히 남은 날로 돌아온다.
+        assertThat(plan.remaining()).isEqualTo(LocalDate.of(2026, 10, 7).toEpochDay()
                 - LocalDate.of(2026, 2, 22).toEpochDay() + 1);
+    }
+
+    @Test
+    @DisplayName("어제까지만 계획한다 — 오늘 하루는 freshness의 일이고 계획의 일이 아니다")
+    void todayIsNeverPlanned() {
+        // 어제까지 전부 읽혀 있다: 메울 것이 없다. 과거가 닫혔다는 것이 「오늘도 봤다」는 뜻은 아니지만,
+        // 그것은 다른 질문이고 다른 읽기가 답한다.
+        ReviewCatchUpPlan closed = ReviewCatchUpPlan.from(
+                ReviewCoverage.of(List.of(w("2026-09-01", "2026-10-07")), TODAY), TODAY, Limits.OPERATOR_PRESS);
+        assertThat(closed.windows()).isEmpty();
+        assertThat(closed.stopped()).isEqualTo(Stop.NOTHING_TO_DO);
+
+        // 그제까지 읽혀 있으면 남은 것은 어제 하루다 — 오늘이 창에 들어오지 않는다.
+        ReviewCatchUpPlan oneDay = ReviewCatchUpPlan.from(
+                ReviewCoverage.of(List.of(w("2026-09-01", "2026-10-06")), TODAY), TODAY, Limits.OPERATOR_PRESS);
+        assertThat(oneDay.windows()).hasSize(1);
+        assertThat(oneDay.windows().get(0).start()).isEqualTo(LocalDate.of(2026, 10, 7));
+        assertThat(oneDay.windows().get(0).end()).isEqualTo(LocalDate.of(2026, 10, 7));
+        assertThat(oneDay.stopped()).isEqualTo(Stop.COMPLETE);
     }
 
     @Test

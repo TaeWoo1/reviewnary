@@ -71,12 +71,31 @@ class ReviewCoverageTest {
     }
 
     @Test
-    @DisplayName("오늘까지 이어지면 공백이 없다")
-    void contiguousToTodayHasNoGap() {
+    @DisplayName("오늘까지 읽어도 경계는 어제까지다 — 오늘은 아직 쓰이고 있는 하루다")
+    void todayIsNeverTheBoundary() {
+        // 아침 9시에 10-08까지 읽었다는 것은 사실이고, 「10-08까지 빠짐없이 확인」은 오후 2시에 거짓이 된다 —
+        // 그 사이에 들어온 리뷰는 그 페이지에 없었고 그 뒤로 아무것도 보지 않았다. 그래서 닫힌 날까지만 말한다.
         ReviewCoverage coverage = ReviewCoverage.of(List.of(w("2026-09-01", "2026-10-08")), D1008);
-        assertThat(coverage.coverageThrough()).isEqualTo(D1008);
+        assertThat(coverage.coverageThrough()).isEqualTo(LocalDate.of(2026, 10, 7));
+        // 오늘은 공백도 아니다. 메울 대상이 되면 catch-up이 영원히 끝나지 않는다.
         assertThat(coverage.gaps()).isEmpty();
         assertThat(coverage.completeThrough(D1008)).isTrue();
+    }
+
+    @Test
+    @DisplayName("오늘만 읽은 증거는 경계를 만들지 못한다 — 닫힌 날이 하나도 없다")
+    void aReadOfOnlyTodayProvesNoBoundary() {
+        ReviewCoverage coverage = ReviewCoverage.of(List.of(w("2026-10-08", "2026-10-08")), D1008);
+        assertThat(coverage).isEqualTo(ReviewCoverage.NONE);
+        assertThat(coverage.coverageThrough()).isNull();
+    }
+
+    @Test
+    @DisplayName("오늘로 끝나는 창의 앞부분은 그대로 남는다 — 잘라내는 것은 끝나지 않은 하루뿐이다")
+    void clampKeepsTheClosedPartOfAWindow() {
+        ReviewCoverage coverage = ReviewCoverage.of(List.of(w("2026-10-02", "2026-10-08")), D1008);
+        assertThat(coverage.coverageFrom()).isEqualTo(LocalDate.of(2026, 10, 2));
+        assertThat(coverage.coverageThrough()).isEqualTo(LocalDate.of(2026, 10, 7));
     }
 
     @Test

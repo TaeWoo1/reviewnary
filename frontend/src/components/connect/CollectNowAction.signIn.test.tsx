@@ -32,6 +32,8 @@ vi.mock("../../lib/apiClient", () => ({
     collectNow: (...a: unknown[]) => collectNow(...a),
     screenReadStatus: vi.fn(),
     collectNowReadiness: vi.fn(),
+    // 기본값은 「이어갈 것이 없다」. 이 파일은 혼자 로그인한 판매자를 다루고, 그때 서버에는 멈춘 일이 없다.
+    collectNowResume: () => Promise.resolve(null),
   },
   getToken: () => null,
 }));
@@ -70,7 +72,9 @@ describe("로그인 복구 — 판매자가 직접 로그인하고, 제품은 �
     // 로그인이 만료됐다는 소식이, 9월 2일에 읽은 것을 없애지는 않는다. 한 칸으로 합쳐 두었을 때 제품은
     // 실제로 읽은 채널을 「확인된 적 없음」이라고 말했다.
     expect(screen.getByText("최근 수집 시 로그인이 필요했습니다.")).toBeInTheDocument();
-    expect(screen.getByText("마지막 성공 수집 9월 2일")).toBeInTheDocument();
+    // 신선도 한 줄. 「언제 봤는가」는 로그인이 만료됐다는 소식에 지워지지 않는다 — 9월 2일에 읽은 것은
+    // 읽은 것이다. 한 칸으로 합쳐 두었을 때 제품은 실제로 읽은 채널을 「확인된 적 없음」이라고 말했다.
+    expect(screen.getByText("9월 2일 확인")).toBeInTheDocument();
   });
 
   it("로그인 벽에서는 「판매자센터 로그인」이 서 있고, 그게 그 채널의 창을 연다", async () => {
@@ -84,7 +88,7 @@ describe("로그인 복구 — 판매자가 직접 로그인하고, 제품은 �
     await waitFor(() => expect(onReport).toHaveBeenCalledWith("로그인 확인됨. 다시 수집해 주세요.", false));
   });
 
-  it("로그인 확인 뒤에도 수집을 자동으로 돌리지 않는다 — 다음 누름이 그 수집의 승인이다", async () => {
+  it("이어갈 것이 없으면 로그인 확인만 하고 끝난다 — 혼자 로그인한 것으로 수집이 시작되지 않는다", async () => {
     startSignIn.mockResolvedValue({ ok: true });
     awaitSignIn.mockResolvedValue("SIGNED_IN");
     mount();
@@ -95,7 +99,9 @@ describe("로그인 복구 — 판매자가 직접 로그인하고, 제품은 �
     expect(collectNow).not.toHaveBeenCalled();
     // 버튼이 「다시 수집하기」로 바뀌고, 누르는 것은 판매자다.
     await waitFor(() => expect(screen.getByTestId("collect-now-REVIEW")).toHaveTextContent("다시 수집하기"));
-    expect(screen.getByText("로그인 확인됨. 다시 수집해 주세요.")).toBeInTheDocument();
+    // 화면에 남는 줄은 사실 하나다. 「다시 수집해 주세요」는 toast로만 말한다 — 자동 확인이 켜진 계정에서
+    // 상시 문장이 판매자에게 할 일을 지시하면, 매번 눌러야 하는 제품처럼 읽힌다.
+    expect(screen.getByText("로그인 확인됨.")).toBeInTheDocument();
   });
 
   it("「다시 수집하기」는 같은 /collect-now 를 쓴다", async () => {
@@ -130,14 +136,14 @@ describe("로그인 복구 — 판매자가 직접 로그인하고, 제품은 �
       />,
     );
     await userEvent.click(screen.getByTestId("sign-in-REVIEW"));
-    await waitFor(() => expect(screen.getByText("로그인 확인됨. 다시 수집해 주세요.")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("로그인 확인됨.")).toBeInTheDocument());
     unmount();
 
     // 서버는 이것을 저장하지 않는다. 새로고침 뒤 화면은 마지막 수집 시도의 사실로 돌아가고, 그 문장은
     // 다음 수집까지 참이다 — 몇 분 전 probe를 근거로 「지금 로그인되어 있습니다」라고 하는 쪽이 거짓이다.
     mount();
     expect(screen.getByText("최근 수집 시 로그인이 필요했습니다.")).toBeInTheDocument();
-    expect(screen.queryByText("로그인 확인됨. 다시 수집해 주세요.")).toBeNull();
+    expect(screen.queryByText("로그인 확인됨.")).toBeNull();
   });
 
   it("로그인이 확인되지 않으면 실패가 아니라 「다시」라고 말한다", async () => {

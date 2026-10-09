@@ -122,6 +122,28 @@ public class CollectNowService {
     }
 
     /**
+     * <b>판매자가 로그인했다 — 그것을 기다리던 일만 이어간다.</b>
+     *
+     * <p>Empty means nothing was waiting, which is the normal answer and is not an error: signing in is not an
+     * instruction to collect. Only a run that stopped at the sign-in wall continues, and it continues as the
+     * run it already was — a walk the automatic check started stays that walk, and one a press started stays
+     * that one. Which it is, the backend knows; the client is not asked to decide.
+     *
+     * <p>Nothing about the marketplace session is stored by this call. It reads a row in this database that says
+     * 「이 의도는 로그인을 기다리고 있다」 and transitions it; the signed-in-ness itself remains, by product
+     * decision, something this product never records.
+     */
+    public java.util.Optional<com.sellerops.localagent.ScreenReadView> resumeAfterSignIn(
+            UUID orgId, UUID sellerAccountId, String dataTypeRaw) {
+        Routed routed = route(orgId, sellerAccountId, dataTypeRaw);
+        if (routed.path() != CollectNowRouter.Path.SCREEN_READ) {
+            // An API row has no walk and no sign-in wall; there is nothing a sign-in could continue.
+            return java.util.Optional.empty();
+        }
+        return screenReads.resumeAfterSignIn(orgId, sellerAccountId, routed.dataType().name());
+    }
+
+    /**
      * What this row can offer, without collecting anything.
      *
      * <p>On the screen-read route the desk state comes from {@link ScreenReadService#readiness}, which is the

@@ -854,3 +854,62 @@ describe("the runner, given a period", () => {
     expect(deliver).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * **오늘 하루만 — start와 end가 같은 날일 때.**
+ *
+ * 자동 확인은 닫힌 과거를 catch-up으로 메우고, 아직 쓰이고 있는 하루는 `today … today`로 따로 읽는다.
+ * 하루짜리 창은 추측이 아니라 이 lane이 이미 할 수 있어야 하는 일이다 — 포화된 창을 반으로 쪼개는 길이
+ * 하루까지 내려가므로(`ReviewCatchUpPlan.split`), 같은 날 두 번 고르는 것은 이미 표현 가능한 요청이다.
+ * 여기서 확인하는 것은 그것이 **실제로** 같은 프로그램을 통과한다는 것이다: 두 달력은 각자 열리고 각자
+ * 검증되므로 같은 날짜 셀을 두 번 고르는 데 서로에 대한 가정이 없고, 조회 뒤의 검증은 두 경계를 모두
+ * 본다. 미래는 여전히 거절된다 — 오늘은 경계이고, 내일은 아무도 읽을 수 없는 기간이다.
+ */
+describe("the one-day window — 오늘 하루를 이름을 붙여 읽는다", () => {
+  const sameDay: NaverReviewWindowRuntimePlan = {
+    ...plan,
+    requestedStart: { year: 2026, month: 10, day: 8 },
+    requestedEnd: { year: 2026, month: 10, day: 8 },
+    requestedStartDaysBefore: 0,
+    requestedEndDaysBefore: 0,
+  };
+
+  it("오늘~오늘은 계획이 된다 — 그리고 내일이 섞이면 계획이 아니다", () => {
+    const made = buildNaverReviewWindowRuntimePlan(NAVER_REVIEW_READ_WORKFLOW, NOW,
+      { start: "2026-10-08", end: "2026-10-08" });
+    expect(made).not.toBeNull();
+    expect(made!.requestedStart).toEqual({ year: 2026, month: 10, day: 8 });
+    expect(made!.requestedEnd).toEqual({ year: 2026, month: 10, day: 8 });
+    expect(made!.requestedStartDaysBefore).toBe(0);
+    expect(made!.requestedEndDaysBefore).toBe(0);
+
+    // 미래로 끝나는 기간은 아무도 읽은 기간이 아니다.
+    expect(buildNaverReviewWindowRuntimePlan(NAVER_REVIEW_READ_WORKFLOW, NOW,
+      { start: "2026-10-08", end: "2026-10-09" })).toBeNull();
+    // 거꾸로인 기간도 기간이 아니다.
+    expect(buildNaverReviewWindowRuntimePlan(NAVER_REVIEW_READ_WORKFLOW, NOW,
+      { start: "2026-10-08", end: "2026-10-07" })).toBeNull();
+  });
+
+  it("같은 날을 두 번 고르고, 달을 넘기지 않고, 조회하고, 읽는다", async () => {
+    const h = screen({ showsAfterSearch: { valuesParsed: 2, startDaysBefore: 0, endDaysBefore: 0 } });
+    const r = await asideNaverReviewWindowRuntime(sameDay, h.env);
+
+    expect(r).toMatchObject({ ok: true, monthMoves: 0 });
+    // 두 달력이 각자 열리고, 각자 같은 날을 받는다. 서로를 가정하는 단계는 없다.
+    expect(h.touched()).toEqual([
+      "click:opener:0", "click:cell:8",
+      "click:opener:1", "click:cell:8",
+      "click:search",
+    ]);
+    expect(h.touched().every((a) => a.startsWith("click:"))).toBe(true);
+  });
+
+  it("화면이 하루로 좁혀지지 않았으면 읽지 않는다 — 양쪽 경계를 모두 본다", async () => {
+    // 조회 뒤에도 7일 기간이 걸려 있다: 요청한 기간이 아니므로 이 읽기는 성립하지 않는다.
+    const h = screen({ showsAfterSearch: { valuesParsed: 2, startDaysBefore: 6, endDaysBefore: 0 } });
+    const r = await asideNaverReviewWindowRuntime(sameDay, h.env);
+    expect(r).toMatchObject({ ok: false, code: "RANGE_MISMATCH", stage: "VERIFY" });
+    expect(h.acts).not.toContain("evaluate:READER");
+  });
+});

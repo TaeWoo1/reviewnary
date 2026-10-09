@@ -72,13 +72,21 @@ public record ReviewCatchUpPlan(List<CoveredWindow> windows, Stop stopped, long 
         if (coverage == null || coverage.coverageThrough() == null) {
             return new ReviewCatchUpPlan(List.of(), Stop.NO_BOUNDARY, 0);
         }
+        // <b>A walk closes history, and history ends yesterday.</b> Planning as far as today would put a window
+        // on the one day coverage may never claim ({@link ReviewCoverage#lastClosedDay}), so that window would
+        // settle, prove nothing, and be planned again on the next pass — a walk that can never report COMPLETE.
+        // Today is refreshed by its own read instead, and that read is about freshness rather than coverage.
+        LocalDate through = ReviewCoverage.lastClosedDay(asOf);
+        if (through == null) {
+            return NOTHING_TO_DO;
+        }
         LocalDate cursor = coverage.coverageThrough().plusDays(1);
-        if (cursor.isAfter(asOf)) {
+        if (cursor.isAfter(through)) {
             return NOTHING_TO_DO;
         }
         List<CoveredWindow> windows = new ArrayList<>();
         Stop stop = Stop.COMPLETE;
-        while (!cursor.isAfter(asOf)) {
+        while (!cursor.isAfter(through)) {
             if (coverage.covers(cursor)) {
                 cursor = cursor.plusDays(1);
                 continue;
@@ -88,8 +96,8 @@ public record ReviewCatchUpPlan(List<CoveredWindow> windows, Stop stopped, long 
                 break;
             }
             LocalDate end = cursor.plusDays(limits.windowDays() - 1L);
-            if (end.isAfter(asOf)) {
-                end = asOf;
+            if (end.isAfter(through)) {
+                end = through;
             }
             // Never swallow a day already verified: a window that crosses the island would be delivered as one
             // period and recorded as covering days it did not re-read.
@@ -100,7 +108,7 @@ public record ReviewCatchUpPlan(List<CoveredWindow> windows, Stop stopped, long 
             cursor = end.plusDays(1);
         }
         long remaining = 0;
-        for (LocalDate d = cursor; !d.isAfter(asOf); d = d.plusDays(1)) {
+        for (LocalDate d = cursor; !d.isAfter(through); d = d.plusDays(1)) {
             if (!coverage.covers(d)) {
                 remaining++;
             }

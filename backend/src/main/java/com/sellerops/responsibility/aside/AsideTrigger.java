@@ -31,6 +31,28 @@ public enum AsideTrigger {
     OPERATOR,
 
     /**
+     * <b>The seller's own standing product setting asked, on a timer, for their own account.</b>
+     *
+     * <p>The authorisation is a setting the seller owns: 「새 리뷰를 자동으로 확인합니다」, on by default for a
+     * channel they connected, off the moment they turn it off ({@code review_auto_check}). No deployment
+     * allow-list is consulted, for the same reason {@link #OPERATOR} does not consult one — this is a seller's
+     * own store, read read-only, by a program on their own machine, because they asked for it to be kept
+     * current. What the deployment still owns is whether the lane runs at all (the scheduler's flag).
+     *
+     * <p>Two differences from {@link #OPERATOR}, and both are the reason this value exists rather than a press
+     * being simulated. First, <b>nobody is watching</b>: so a read on this lane must name the period it intends
+     * to read, and a windowless dispatch is refused ({@link AsideDispatch}) — a read that takes whatever period
+     * the screen happens to be showing is not a statement anyone can check afterwards. Second, <b>a person
+     * outranks it</b>: a seller pressing 지금 확인 is never refused because this lane was mid-read, and this lane
+     * never cancels or pre-empts work a person started.
+     *
+     * <p>Not {@link #RESPONSIBILITY}. That lane's conditions answer a different question — whether a deployment
+     * vouches for an organisation whose job makes model calls and sends mail — and they are neither widened nor
+     * reused here.
+     */
+    SCHEDULED,
+
+    /**
      * <b>A responsibility run asked, with nobody watching.</b>
      *
      * <p>Here a press does not exist, so the deployment has to vouch for the store in advance: the lane's flag,

@@ -123,6 +123,7 @@ import type {
   CollectNowView,
   CollectNowReadinessView,
   ReviewCatchUpPlanView,
+  ReviewAutoCheckView,
   ScreenReadView,
   UploadType,
   UserView,
@@ -1235,6 +1236,38 @@ export const api = {
     const { data } = await http.get<CollectNowReadinessView>(
       `/api/seller-accounts/${accountId}/collect-now/readiness`,
       { params: { dataType } },
+    );
+    return data;
+  },
+
+  /**
+   * <b>판매자가 로그인했다 — 그것을 기다리던 일만 이어간다.</b>
+   *
+   * 멈춘 일이 무엇이었는지, 그것이 누름이었는지 자동 확인이었는지는 <b>서버가 안다</b>. 화면이 그것을
+   * 판단하면 provenance를 밖에서 정하는 셈이고, 그렇게 해서 아무도 누르지 않은 읽기가 「눌렸다」로 기록됐다.
+   * 기다리던 것이 없으면 `null`이고, 그것은 실패가 아니라 「이어갈 것이 없다」다.
+   */
+  async collectNowResume(accountId: string, dataType: string): Promise<ScreenReadView | null> {
+    const { data } = await http.post<ScreenReadView | null>(
+      `/api/seller-accounts/${accountId}/collect-now/resume`,
+      { dataType },
+    );
+    return data ?? null;
+  },
+
+  /** 「새 리뷰를 자동으로 확인합니다」 — 이 계정의 설정. 기기도, 주기도, 범위도 묻지 않는다. */
+  async reviewAutoCheck(accountId: string): Promise<ReviewAutoCheckView> {
+    const { data } = await http.get<ReviewAutoCheckView>(
+      `/api/seller-accounts/${accountId}/review-auto-check`,
+    );
+    return data;
+  },
+
+  /** 끄거나 다시 켠다. 판매자만 보낼 수 있고, 도우미 토큰으로는 보낼 수 없다. */
+  async setReviewAutoCheck(accountId: string, enabled: boolean): Promise<ReviewAutoCheckView> {
+    const { data } = await http.put<ReviewAutoCheckView>(
+      `/api/seller-accounts/${accountId}/review-auto-check`,
+      { enabled },
     );
     return data;
   },

@@ -52,6 +52,24 @@ public class AsideHelperDevices {
      * They are one answer on purpose — what a caller does about it is the same in each case (ask the seller to
      * link the helper), and the row that says which it was is not this method's business.
      */
+    /**
+     * This one device, if it is still this organisation's and still live.
+     *
+     * <p>Asked when something remembers a desk — the one that last read a given store — and has to find out
+     * whether remembering it still means anything. Empty for revoked, expired, unknown, or belonging to another
+     * organisation, and those are one answer here for the same reason they are one in {@link #linked}: the
+     * caller's next move is the same.
+     */
+    public Optional<HelperDevice> live(UUID orgId, UUID deviceId) {
+        if (orgId == null || deviceId == null) {
+            return Optional.empty();
+        }
+        Instant now = clock.instant();
+        return devices.findByIdAndOrgId(deviceId, orgId)
+                .filter(d -> d.getRevokedAt() == null)
+                .filter(d -> d.getExpiresAt() != null && d.getExpiresAt().isAfter(now));
+    }
+
     public Optional<HelperDevice> linked(UUID orgId) {
         if (orgId == null) {
             return Optional.empty();

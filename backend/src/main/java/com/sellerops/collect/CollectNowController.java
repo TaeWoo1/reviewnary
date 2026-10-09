@@ -53,6 +53,24 @@ public class CollectNowController {
         return service.collectNow(principal.orgId(), accountId, body.dataType(), body.requestId());
     }
 
+    /**
+     * <b>로그인을 기다리던 수집을 이어간다.</b> 없으면 아무 일도 하지 않는다.
+     *
+     * <p>A POST because it may start work, and {@code null} in the body's place when nothing was waiting — the
+     * client renders that as «nothing to continue», never as a failure. No {@code requestId}: this does not
+     * start a collection, it continues one that already exists and already has an identity.
+     */
+    @PostMapping("/api/seller-accounts/{accountId}/collect-now/resume")
+    public com.sellerops.localagent.ScreenReadView resume(@AuthenticationPrincipal AuthPrincipal principal,
+                                                          HttpServletRequest request,
+                                                          @PathVariable UUID accountId,
+                                                          @RequestBody CollectNowRequest body) {
+        if (request.getAttribute(HelperDeviceAuthFilter.DEVICE_ID_ATTRIBUTE) != null) {
+            throw ApiException.forbidden("이 요청은 사용자만 보낼 수 있습니다.");
+        }
+        return service.resumeAfterSignIn(principal.orgId(), accountId, body.dataType()).orElse(null);
+    }
+
     @GetMapping("/api/seller-accounts/{accountId}/collect-now/readiness")
     public CollectNowReadinessView readiness(@AuthenticationPrincipal AuthPrincipal principal,
                                              @PathVariable UUID accountId,

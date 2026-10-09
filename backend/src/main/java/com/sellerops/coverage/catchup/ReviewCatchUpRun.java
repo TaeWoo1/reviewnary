@@ -59,6 +59,22 @@ public class ReviewCatchUpRun {
     @Column(name = "data_type", nullable = false, length = 16)
     private String dataType;
 
+    /**
+     * <b>Who started this walk — and therefore what every one of its children is authorised by.</b>
+     *
+     * <p>Stored rather than inferred. A walk is the same program whoever starts it, so the only way to know
+     * whether its next window is being read because a person pressed or because their automatic check came due
+     * is to have written it down when the walk began. The children carry it onto their own rows, which is what
+     * keeps {@code scheduled_aside_job.trigger_source} honest across a walk that spans hours and a resume.
+     *
+     * <p>It is also what a resume must not change: a run paused at a sign-in wall and continued after the seller
+     * signed in is still the run that was started by whoever started it.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "trigger_source", nullable = false, length = 16)
+    private com.sellerops.responsibility.aside.AsideTrigger triggerSource =
+            com.sellerops.responsibility.aside.AsideTrigger.OPERATOR;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "state", nullable = false, length = 24)
     private ReviewCatchUpState state;
@@ -134,7 +150,12 @@ public class ReviewCatchUpRun {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
-    @Column(name = "client_request_id", nullable = false, length = 64)
+    /**
+     * The press's own id, when a press started this walk. <b>Null for a walk the automatic check started</b> —
+     * there was no request, and a synthesised id would make 「같은 누름이 다시 찾아온 의도」 answer yes for two
+     * ticks that have nothing to do with each other.
+     */
+    @Column(name = "client_request_id", length = 64)
     private String clientRequestId;
 
     /** The next period to read, clamped to what this run set out to cover. Null when there is nothing left. */

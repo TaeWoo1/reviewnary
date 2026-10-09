@@ -292,7 +292,8 @@ class OperatorCollectNowTest {
         // 그 판정을 세우는 단위 테스트는 모두 mock repository를 썼으므로, 제약을 볼 수 있는 테스트가
         // 하나도 없었다. 여기서는 진짜 칼럼에 쓴다.
         ScheduledAsideJob job = jobs.save(dispatcher.dispatch(AsideDispatch.catchUpWindow(
-                org, naverAccount, AsideRecipe.NAVER_REVIEW_OBSERVE_V1, "verdict-probe",
+                org, naverAccount, AsideRecipe.NAVER_REVIEW_OBSERVE_V1,
+                com.sellerops.responsibility.aside.AsideTrigger.OPERATOR, "verdict-probe",
                 java.util.UUID.randomUUID(), java.time.LocalDate.of(2026, 9, 3),
                 java.time.LocalDate.of(2026, 9, 9))));
         job.recordDelivery(42, 0);

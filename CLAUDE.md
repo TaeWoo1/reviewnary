@@ -256,6 +256,7 @@ but not carrying current truth on its own (`docs/archive/` especially).
 - `docs/opportunity_engine_v1.md` — Auth Entry Regression Closure + Opportunity Engine v1
 - `docs/repeated_issue_v1.md` — Repeated Issue v1 — 반복되는 문제 하나를 판단하고 추적하는 화면
 - `docs/review_approval_path_v1.md` — Review Approval Path v1 — 특정 리뷰 답변을 검토하고 승인하는 길
+- `docs/review_auto_check_v1.md` — Review Auto-Check v1 — 자동 리뷰 확인 (제품 계약 · 구현 계약)
 - `docs/review_decision_workspace_v1.md` — Review Decision Workspace v1 — 한 리뷰를 한 화면에서 판단하고 기록한다
 - `docs/review_reply_template_settings_v1.md` — Review Reply Template Settings v1
 - `docs/review_triage_contract_v1.md` — Review Triage Contract v1 — 두 축을 분리한다

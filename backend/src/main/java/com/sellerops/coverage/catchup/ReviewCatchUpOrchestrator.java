@@ -8,6 +8,7 @@ import com.sellerops.responsibility.SourceCompleteness;
 import com.sellerops.responsibility.aside.AsideDispatch;
 import com.sellerops.responsibility.aside.AsideJobOutcome;
 import com.sellerops.responsibility.aside.AsideRecipe;
+import com.sellerops.responsibility.aside.AsideTrigger;
 import com.sellerops.responsibility.aside.ScheduledAsideJob;
 import com.sellerops.responsibility.aside.ScheduledAsideJobService;
 import java.time.Clock;
@@ -125,12 +126,46 @@ public class ReviewCatchUpOrchestrator {
         if (same.isPresent()) {
             return Optional.of(new Started(same.get(), null));
         }
-        // A live intent on this row is the one in charge; a second press does not start a rival walk.
+        // <b>A live intent on this row is the one in charge, and a person's press joins it rather than racing
+        // it.</b> A walk the automatic check started is doing exactly what the press is asking for, so the press
+        // is answered with the child that is already on the desk — never with a rival job, and never with a
+        // refusal. The child in flight is left alone: it is reading the seller's screen at this moment.
         Optional<ReviewCatchUpRun> live = runs.findFirstBySellerAccountIdAndDataTypeAndStateIn(
                 sellerAccountId, dataType, EnumSet.of(ReviewCatchUpState.RUNNING, ReviewCatchUpState.PAUSED_AUTH));
         if (live.isPresent()) {
-            return Optional.of(resume(live.get(), recipe, requestId));
+            ReviewCatchUpRun run = live.get();
+            if (run.getState() == ReviewCatchUpState.RUNNING) {
+                Optional<ScheduledAsideJob> inFlight = inFlightChild(run, recipe);
+                if (inFlight.isPresent()) {
+                    return Optional.of(new Started(run, inFlight.get()));
+                }
+            }
+            return Optional.of(resume(run, recipe));
         }
+        return begin(orgId, sellerAccountId, channelId, dataType, recipe, AsideTrigger.OPERATOR, requestId);
+    }
+
+    /**
+     * <b>The walk the seller's automatic check starts when it finds history unread.</b>
+     *
+     * <p>Same program, same windows, same bounds as a press — only the trigger differs, and it differs on every
+     * child's row. Empty means there is nothing to close: the ordinary answer, because most accounts on most
+     * days have no gap, and then the check reads today instead.
+     *
+     * <p>Deliberately <b>not</b> a resume. The press path continues a live intent because a person is standing
+     * in front of it; a tick that found a live intent has nothing to add and does not call this at all. A run
+     * paused at a sign-in wall is continued by the seller signing in ({@link #resumeAfterSignIn}), never by a
+     * timer — retrying a wall on a schedule is how a product teaches a seller that automatic means noisy.
+     */
+    @Transactional
+    public Optional<Started> startScheduled(UUID orgId, UUID sellerAccountId, UUID channelId, String dataType,
+                                            AsideRecipe recipe) {
+        return begin(orgId, sellerAccountId, channelId, dataType, recipe, AsideTrigger.SCHEDULED, null);
+    }
+
+    /** The walk itself, with its provenance as a parameter and nothing else different. */
+    private Optional<Started> begin(UUID orgId, UUID sellerAccountId, UUID channelId, String dataType,
+                                    AsideRecipe recipe, AsideTrigger trigger, String requestId) {
         LocalDate today = LocalDate.now(ReviewCoverageCursor.KST);
         ReviewCoverage held = coverage.of(orgId, channelId, today);
         ReviewCatchUpPlan plan = ReviewCatchUpPlan.from(held, today,
@@ -147,8 +182,12 @@ public class ReviewCatchUpOrchestrator {
         run.setChannelId(channelId);
         run.setDataType(dataType);
         run.setState(ReviewCatchUpState.RUNNING);
+        run.setTriggerSource(trigger);
         run.setRequestedFrom(first.start());
-        run.setRequestedThrough(today);
+        // <b>어제까지.</b> A walk closes history, and the day still being written is not history — it is read
+        // separately, as freshness. Setting this to today would leave a window on a day whose coverage can never
+        // be claimed, and the run would reach it and stop being able to finish.
+        run.setRequestedThrough(ReviewCoverage.lastClosedDay(today));
         run.setCursorDay(first.start());
         run.setStepDays(ReviewCatchUpRun.DEFAULT_STEP_DAYS);
         run.setStartedAt(now);
@@ -156,9 +195,40 @@ public class ReviewCatchUpOrchestrator {
         run.setClientRequestId(requestId);
         runs.save(run);
         ScheduledAsideJob child = queue(run, recipe, first.start(), first.end());
-        log.info("review catch-up: started run={} from={} through={} windows={}",
-                run.getId(), run.getRequestedFrom(), run.getRequestedThrough(), plan.windows().size());
+        log.info("review catch-up: started run={} trigger={} from={} through={} windows={}",
+                run.getId(), trigger, run.getRequestedFrom(), run.getRequestedThrough(), plan.windows().size());
         return Optional.of(new Started(run, child));
+    }
+
+    /**
+     * <b>The seller signed in. Continue whatever was waiting on exactly that.</b>
+     *
+     * <p>One move, and it is a conditional state transition: only a run in {@link ReviewCatchUpState#PAUSED_AUTH}
+     * may be resumed here, and resuming it makes it RUNNING. That is what makes the event <b>at most once</b>
+     * without a column to remember it by — a second sign-in notice finds a RUNNING run and does nothing, and
+     * nothing anywhere records that a person was signed in at some past moment (a product decision of
+     * 2026-10-08: a sign-in observed minutes ago is not a fact about now).
+     *
+     * <p><b>The trigger is the run's own.</b> A walk the automatic check started is continued as that walk, not
+     * converted into a press — otherwise signing in would silently re-label unattended work as something a
+     * person asked for, in the audit trail that exists to tell them apart.
+     */
+    @Transactional
+    public Optional<Started> resumeAfterSignIn(UUID orgId, UUID sellerAccountId, String dataType,
+                                               AsideRecipe recipe) {
+        Optional<ReviewCatchUpRun> paused = runs.findFirstBySellerAccountIdAndDataTypeAndStateIn(
+                sellerAccountId, dataType, EnumSet.of(ReviewCatchUpState.PAUSED_AUTH))
+                .filter(run -> orgId.equals(run.getOrgId()));
+        if (paused.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(resume(paused.get(), recipe));
+    }
+
+    /** The child a live run has on the desk right now, if any — the job a press is answered with. */
+    private Optional<ScheduledAsideJob> inFlightChild(ReviewCatchUpRun run, AsideRecipe recipe) {
+        return jobs.liveFor(run.getOrgId(), run.getSellerAccountId(), recipe)
+                .filter(j -> run.getId().equals(j.getCatchUpRunId()));
     }
 
     /**
@@ -233,7 +303,7 @@ public class ReviewCatchUpOrchestrator {
         }
     }
 
-    private Started resume(ReviewCatchUpRun run, AsideRecipe recipe, String requestId) {
+    private Started resume(ReviewCatchUpRun run, AsideRecipe recipe) {
         if (run.getState() == ReviewCatchUpState.PAUSED_AUTH) {
             // The paused window, not the one after it.
             if (run.getPausedWindowStart() != null) {
@@ -265,7 +335,7 @@ public class ReviewCatchUpOrchestrator {
         String clientJobId = "cu-" + run.getId().toString().substring(0, 8) + "-" + start + "-" + end
                 + "-a" + run.getAttempt();
         return jobs.dispatch(AsideDispatch.catchUpWindow(run.getOrgId(), run.getSellerAccountId(), recipe,
-                clientJobId, run.getId(), start, end));
+                run.getTriggerSource(), clientJobId, run.getId(), start, end));
     }
 
     /** Which bound this press has reached, if any. Named, because 「상한에 도달함」 needs to say which one. */

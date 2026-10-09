@@ -11,7 +11,7 @@ import {
   SIGN_IN_ROUNDS,
   watchSignIn,
 } from "../../lib/connect/signInRecovery";
-import { kstMonthDay } from "../../lib/format";
+import { kstDate, kstHourMinute, kstMonthDay } from "../../lib/format";
 
 /**
  * <b>「지금 수집하기」 — 이 제품에서 한 자료를 가져오는 사용자 동작은 이것 하나다.</b>
@@ -272,9 +272,31 @@ export function useCollectNowRoute(accountId: string, dataType: string, refreshK
  */
 export function coverageSentence(coverageThrough: string | null, gapDays: number | null): string | null {
   if (!coverageThrough) return null;
-  const head = `${kstMonthDay(coverageThrough)}까지 빠짐없이 확인`;
-  // 0일이면 굳이 「0일 미확인」이라고 쓰지 않는다 — 없는 공백을 세어 보여 주는 셈이다.
-  return gapDays && gapDays > 0 ? `${head} · 이후 ${gapDays}일은 아직` : head;
+  // <b>정상 상태에서는 아무 말도 하지 않는다.</b> 「10월 7일까지 빠짐없이 확인」은 내부 정확성 invariant이고,
+  // 모든 것이 제대로 돌아가는 화면에서 그것을 읽는 판매자는 「10월 8일은?」을 묻게 된다 — 오늘은 경계가 될 수
+  // 없는 하루이기 때문에 그 질문에는 답이 없다. 정상일 때 판매자가 알아야 하는 것은 「언제 봤는가」뿐이고,
+  // 그건 freshnessSentence가 말한다. 이 줄은 메울 것이 남아 있을 때만 선다.
+  if (!gapDays || gapDays <= 0) return null;
+  return `${kstMonthDay(coverageThrough)}까지 빠짐없이 확인 · 이후 ${gapDays}일은 아직`;
+}
+
+/**
+ * 「오늘 13:40 확인」 — <b>정상 상태의 한 줄.</b>
+ *
+ * <p>자동으로 확인하는 제품에서 판매자가 알고 싶은 것은 경계가 아니라 신선도다. 오늘은 아직 쓰이고 있는
+ * 하루여서 「오늘까지 빠짐없이」라고 말할 수 없고, 말할 수 있는 참인 문장은 「마지막으로 본 시각」이다.
+ *
+ * <p>오늘·어제는 그렇게 부른다. 그보다 오래되면 날짜로 — 「9월 2일 확인」은 「38일 전」보다 판매자가
+ * 자기 달력에 대고 읽을 수 있는 문장이다.
+ */
+export function freshnessSentence(lastSuccessAt: string | null, now: Date = new Date()): string | null {
+  if (!lastSuccessAt) return null;
+  const day = kstDate(lastSuccessAt);
+  const today = kstDate(now.toISOString());
+  const yesterday = kstDate(new Date(now.getTime() - 86_400_000).toISOString());
+  if (day === today) return `오늘 ${kstHourMinute(lastSuccessAt)} 확인`;
+  if (day === yesterday) return `어제 ${kstHourMinute(lastSuccessAt)} 확인`;
+  return `${kstMonthDay(lastSuccessAt)} 확인`;
 }
 
 /**
@@ -394,38 +416,65 @@ export function CollectNowAction({
       if (settled === "SIGNED_IN") {
         setSignedInHere(true);
       }
-      // <b>이어갈 일이 있는지는 서버가 알고 있다.</b>
+      // <b>이어갈 일이 있는지, 그리고 그게 누구 일인지는 서버가 안다.</b>
       //
-      // `pendingCollect`는 이 탭의 메모리이고, 2026-10-09에 그것만으로는 부족했다: 첫 회차가 시간이 다 돼서
-      // 끝나는 순간 승인이 버려졌고, 두 번째 시도가 로그인을 확인했을 때는 이어갈 표식이 남아 있지 않았다.
-      // 판매자는 「로그인 확인됨」을 보고도 아무것도 이어지지 않는 화면 앞에 있었다. 멈춘 catch-up은 서버의
-      // row이므로, 그 row가 있으면 이 탭이 무엇을 기억하든 이어갈 일이 있는 것이다.
+      // 이 탭은 「로그인이 확인됐다」만 전한다. 멈춰 있던 것이 판매자가 누른 수집인지 자동 확인인지는 서버의
+      // row가 들고 있고, 이어가기는 그 row를 <b>원래 trigger 그대로</b> 되살린다. 화면이 그 판단을 하면
+      // provenance를 밖에서 정하는 셈이고, 그래서 자동 확인을 이어가는 일이 「판매자가 눌렀다」로 기록된다.
       //
-      // 혼자 로그인한 것으로 수집이 시작되지 않는다는 계약은 그대로다 — 멈춘 의도가 없으면 둘 다 거짓이고,
-      // 그때 이 함수는 아무것도 시작하지 않는다.
-      let pausedThere = false;
-      if (settled === "SIGNED_IN") {
-        try {
-          const again = await api.collectNowReadiness(accountId, dataType);
-          pausedThere = again.pausedCatchUp === true;
-        } catch {
-          // 물어보지 못했으면 이 탭의 기억만 쓴다. 모른다는 이유로 수집을 시작하지는 않는다.
-          pausedThere = false;
+      // 또 하나: 이것은 press가 아니다. 2026-10-09에 이어가기가 「수집을 한 번 더 누르기」였고, 그것은
+      // 자동 확인이 멈춰 있는 경우에 새 누름을 하나 더 만드는 길이었다. 지금은 한 번의 resume이고, 멈춘 것이
+      // 없으면 아무 일도 일어나지 않는다 — 혼자 로그인한 판매자에게 수집이 저절로 시작되지 않는다는 계약은
+      // 그대로다.
+      pendingCollect.current = false;
+      if (settled !== "SIGNED_IN") {
+        const message = signInMessage(settled);
+        if (message) {
+          onReport(message.text, message.isError);
         }
+        return;
+      }
+      let resumed: Awaited<ReturnType<typeof api.collectNowResume>> = null;
+      try {
+        resumed = await api.collectNowResume(accountId, dataType);
+      } catch {
+        // 이어가기를 묻지 못했다. 로그인은 확인됐고, 그 사실만 말한다.
+        resumed = null;
       }
       if (!live.current) return;
-      const resume = settled === "SIGNED_IN" && (pendingCollect.current || pausedThere);
-      pendingCollect.current = false;
-      const message = signInMessage(settled);
-      if (!resume && message) {
-        onReport(message.text, message.isError);
+      if (!resumed) {
+        const message = signInMessage(settled);
+        if (message) {
+          onReport(message.text, message.isError);
+        }
+        onChanged?.();
+        return;
       }
-      if (resume) {
-        onReport("로그인 확인됨. 멈췄던 수집을 이어서 진행합니다.", false);
-        await press();
-      }
+      onReport("로그인 확인됨. 멈췄던 확인을 이어서 진행합니다.", false);
+      await watchResumed(resumed);
     } finally {
       if (live.current) setSigningIn(false);
+    }
+  }
+
+  /**
+   * 이어진 확인을 끝까지 지켜본다 — 누름과 같은 방식으로, 같은 문장으로.
+   *
+   * <p>press와 나뉘어 있는 이유는 하나다: 이쪽은 아무것도 시작하지 않았다. 시작은 서버가 되살린 run이
+   * 했고, 이 함수는 그것을 보고 판매자에게 말한다. 또 벽에 다시 막히면 그 사실을 들고 있는다 — 같은 화면에서
+   * 다시 로그인할 수 있고, 그 로그인이 또 한 번의 resume이 된다.
+   */
+  async function watchResumed(first: ScreenReadView) {
+    setSyncing(true);
+    try {
+      const read = await awaitScreenRead(first);
+      pendingCollect.current = read.state === "AUTH_REQUIRED";
+      const message = screenReadMessage(label, read);
+      onReport(message.text, message.isError);
+      onChanged();
+    } finally {
+      setSyncing(false);
+      onSettled?.();
     }
   }
 
@@ -477,13 +526,18 @@ export function CollectNowAction({
             9월 2일」을 지우지 않는다 — 로그인이 만료됐다는 소식이 그 전에 읽은 4,432건을 없애지는 않기
             때문이다. 한 칸으로 합쳐 두었을 때 제품은 실제로 읽은 채널을 「확인된 적 없음」이라고 말했다.
           */}
-          {(signedInHere ? "로그인 확인됨. 다시 수집해 주세요." : deskSentence(desk)) ? (
+          {(signedInHere ? "로그인 확인됨." : deskSentence(desk)) ? (
             <p className="break-keep text-sm text-muted">
-              {signedInHere ? "로그인 확인됨. 다시 수집해 주세요." : deskSentence(desk)}
+              {signedInHere ? "로그인 확인됨." : deskSentence(desk)}
             </p>
           ) : null}
-          {lastSuccessAt ? (
-            <p className="break-keep text-sm text-muted">마지막 성공 수집 {kstMonthDay(lastSuccessAt)}</p>
+          {/*
+            <b>정상 상태의 한 줄은 신선도다.</b> 자동으로 확인하는 제품에서 판매자가 알고 싶은 것은
+            「마지막으로 본 시각」이고, 「어디까지 빠짐없이」는 그 아래에서 돌아가는 정확성 규칙이다 —
+            메울 것이 남아 있을 때만 화면에 올라온다(coverageSentence).
+          */}
+          {freshnessSentence(lastSuccessAt) ? (
+            <p className="break-keep text-sm text-muted">{freshnessSentence(lastSuccessAt)}</p>
           ) : null}
           {/*
             <b>세 번째 줄이 필요한 이유.</b> 10-08 읽기는 성공했고 45건을 가져왔다 — 그리고 그 45건은 최근
