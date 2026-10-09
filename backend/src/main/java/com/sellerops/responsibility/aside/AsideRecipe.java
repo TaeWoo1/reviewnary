@@ -130,6 +130,33 @@ public enum AsideRecipe {
     }
 
     /**
+     * <b>Whether this recipe can be told WHICH days to read, and prove it read them.</b>
+     *
+     * <p>Not a preference — a measured property of the helper runtime bound to this name, and the fence that
+     * decides which channels may be read while nobody is watching. An unattended read must name its period
+     * ({@link AsideTrigger#SCHEDULED}), because the period a marketplace screen happens to be showing is a
+     * setting nobody here chose and can differ between two runs; a lane that read it anyway could not answer
+     * «what did last night's automatic check cover».
+     *
+     * <p>Measured, 2026-10-09:
+     * <ul>
+     *   <li><b>NAVER 리뷰 — yes.</b> {@code naver-review-observe-runner.ts} takes a window, moves the screen's
+     *   own calendar to it, verifies both ends against the list's own period before reading a row, and the
+     *   delivery refuses a reading whose period is not the one requested
+     *   ({@code NaverReviewObservationService.recordCoverage}). A one-day window
+     *   ({@code today … today}) is included — tested, not assumed.</li>
+     *   <li><b>Coupang 상품평 — no.</b> {@code coupang-observe-runner.ts} has no period navigation at all, and
+     *   nothing on the Coupang ingest side writes {@code window_start}. A scheduled read of it would open the
+     *   screen, read whatever period it was showing, and report — which is exactly the windowless unattended
+     *   read this product refuses. It stays the seller's own press until its runner can move the period.</li>
+     *   <li><b>The loopback fixture — no</b>, and it has no business on this lane either.</li>
+     * </ul>
+     */
+    public boolean readsNamedPeriod() {
+        return this == NAVER_REVIEW_OBSERVE_V1;
+    }
+
+    /**
      * What this recipe is allowed to do to the surface it opens.
      *
      * <p>Every published recipe is {@link AsideRecipeMode#READ_ONLY} and the enum has no other value, so this

@@ -110,16 +110,32 @@ one-job-per-device는 전부 `ScheduledAsideJobService.dispatch` 하나를 지�
 증거 행(`scheduled_aside_job.window_start/end`)은 실제로 읽은 기간을 계속 말한다. clamp는 순수 merge
 단계에서만 일어나므로 마이그레이션도, 저장된 증거의 재작성도 없다.
 
-## 7. 왜 NAVER REVIEW만인가
+## 7. 왜 NAVER REVIEW만인가 — 그리고 그 범위는 구조다
 
 「windowless 금지」가 범위를 정한다. 명시 window를 지킬 수 있는 실행기는 NAVER뿐이다:
 
-- `collector/src/aside/naver-review-observe-runner.ts` — window 처리 있음. `start = end`(하루)도
-  계획되고 실행된다 (`naver-review-window-read.test.ts`, 2026-10-09에 추가).
-- `collector/src/aside/coupang-observe-runner.ts` — 없음. 그리고 `setWindowStart` 호출자는
+- `collector/src/aside/naver-review-observe-runner.ts` — window 처리 있음. 화면의 달력을 요청한 기간으로
+  옮기고, 조회 뒤 **양쪽 경계를 화면에 대고 검증한** 다음에 읽는다. `start = end`(하루)도 계획되고
+  실행된다 (`naver-review-window-read.test.ts`, 2026-10-09에 추가).
+- `collector/src/aside/coupang-observe-runner.ts` — 기간 이동이 **없다**. 그리고 `setWindowStart` 호출자는
   `NaverReviewObservationService` 하나뿐이라 Coupang 읽기는 지금도 coverage를 전진시키지 못한다.
 
-Coupang 자동 확인은 runner의 기간 이동 + ingest의 requested/actual 검증이 먼저 필요한 **별개 패키지**다.
+**이것이 문서가 아니라 코드여야 하는 이유는 라이브 준비에서 드러났다** (2026-10-09). 데모 org에 설정
+엔드포인트를 물었을 때 쿠팡 계정이 `supported: true`로 답했다 — `AsideRecipe.forScreenRead("COUPANG",
+REVIEW)`가 존재하기 때문이다. 그대로 두면 자동 확인이 쿠팡 화면을 열고 **그때 보여주던 기간을 읽고**
+보고했을 것이고, 그것이 바로 이 lane이 거절하기로 한 windowless 무인 읽기다.
+
+그래서 능력을 recipe의 성질로 적었다:
+
+| | |
+|---|---|
+| `AsideRecipe.readsNamedPeriod()` | NAVER REVIEW만 true. 측정된 사실이고 선호가 아니다 |
+| `ReviewAutoCheckService.recipeFor` | 이 성질을 통과하지 못하면 **설정 자체가 없다** (꺼진 것이 아니다) |
+| `ScheduledAsideJobService.dispatch` | `SCHEDULED` + `!readsNamedPeriod()` → 거절. 설정이 어떻게든 켜져 있어도 choke point가 막는다 |
+
+채널이 이 lane에 합류하는 길은 **runner가 화면의 기간을 옮길 수 있게 되는 것**이고, 설정을 켜 주는 것이
+아니다. Coupang 자동 확인은 runner의 기간 이동 + ingest의 requested/actual 검증이 먼저 필요한 **별개
+패키지**다.
 
 ## 8. 배포 플래그
 
@@ -135,7 +151,7 @@ SELLEROPS_REVIEW_AUTO_CHECK_POLL_INTERVAL_MS # 기본 300000 (런타임이 들�
 
 | 어디 | 무엇 |
 |---|---|
-| `backend/.../autocheck/ReviewAutoCheckTest.java` (15) | 기본 ON · 끄면 꺼진 채 · API 채널엔 설정 없음 · 설정 없이 SCHEDULED 없음 · windowless 거절 · gap→walk · 닫힌 과거→오늘 · 하루 한 번 · 누름이 앞섬 · tick이 비켜섬 · PAUSED_DEVICE 자동 복구 · device 우선순위와 fallback · PAUSED_AUTH는 사람이 푼다(1회성) |
+| `backend/.../autocheck/ReviewAutoCheckTest.java` (16) | 기본 ON · 끄면 꺼진 채 · API 채널엔 설정 없음 · **기간을 못 고르는 화면엔 설정 없음(쿠팡)** · 설정 없이 SCHEDULED 없음 · windowless 거절 · gap→walk · 닫힌 과거→오늘 · 하루 한 번 · 누름이 앞섬 · tick이 비켜섬 · PAUSED_DEVICE 자동 복구 · device 우선순위와 fallback · PAUSED_AUTH는 사람이 푼다(1회성) |
 | `backend/.../coverage/ReviewCoverageTest.java` | 오늘은 경계가 될 수 없다 · 오늘만 읽은 증거는 경계를 못 만든다 · 창의 닫힌 부분은 남는다 |
 | `backend/.../coverage/ReviewCatchUpPlanTest.java` | 어제까지만 계획한다 |
 | `collector/test/aside/naver-review-window-read.test.ts` | `today..today`가 계획되고 실행된다 · 미래는 거절 · 화면이 좁혀지지 않으면 읽지 않는다 |
@@ -151,6 +167,9 @@ partial unique는 insert probe로 동작을 확인했다 — 테스트 환경은
 `docs/evidence/INDEX.md`에 행이 생기는 시점은 라이브 실행 뒤다. 필요한 것:
 
 1. 백엔드/프론트엔드를 이 브랜치에서 **재시작** (`bootRun`은 시작할 때의 클래스를 계속 서빙한다).
+   2026-10-09에 `tools/dev/local-stack.sh up`으로 재시작했고 V125~V127이 데모 DB(PostgreSQL 15.13)에
+   적용됐다. 설정 엔드포인트 실측: 네이버 `supported:true, enabled:true` · 카페24 `supported:false`
+   (리뷰가 공식 API로 들어온다) · 쿠팡 `supported:false` (기간을 고를 수 없는 화면).
 2. `SELLEROPS_REVIEW_AUTO_CHECK_ENABLED=true`.
 3. `demo@sellerops.ai`로 로그인 — NAVER 수집/catch-up을 가진 그 org.
 4. 도우미(helper)를 foreground로 띄워 pairing이 가능한 상태로 둔다.

@@ -284,6 +284,34 @@ class ReviewAutoCheckTest {
     }
 
     @Test
+    @DisplayName("기간을 지정해 읽을 수 없는 화면에는 설정이 없다 — 쿠팡 상품평은 판매자의 누름으로 남는다")
+    void aScreenThatCannotSelectAPeriodGetsNoSetting() {
+        // 쿠팡에는 리뷰 화면 읽기 recipe가 있다 — 그래서 이 테스트가 필요하다. 없는 것은 그 화면의 기간을
+        // 옮기는 능력이고(`coupang-observe-runner.ts`에 기간 이동이 없다), 아무도 보지 않는 읽기가 화면이
+        // 그때 보여주던 기간을 읽으면 나중에 무엇을 덮었는지 말할 수 없다.
+        Channel coupang = channels.findByCode("COUPANG").orElseGet(() -> {
+            Channel c = new Channel();
+            c.setCode("COUPANG");
+            c.setNameKo("쿠팡");
+            c.setStatus(ChannelStatus.AVAILABLE);
+            c.setSupportsReview(true);
+            c.setSortOrder(2);
+            return channels.save(c);
+        });
+        SellerAccount coupangAccount = accounts.save(connected(coupang.getId()));
+
+        assertThat(AsideRecipe.forScreenRead("COUPANG", com.sellerops.connector.DataType.REVIEW)).isPresent();
+        assertThat(settings.view(org, coupangAccount.getId())).isEqualTo(ReviewAutoCheckView.UNSUPPORTED);
+        assertThat(settingRows.findBySellerAccountIdAndDataType(coupangAccount.getId(), "REVIEW")).isEmpty();
+        // 그리고 설정이 어떻게든 켜져 있었더라도 choke point가 거절한다 — 범위는 문서가 아니라 구조다.
+        assertThatThrownBy(() -> dispatcher.dispatch(
+                com.sellerops.responsibility.aside.AsideDispatch.scheduled(org, coupangAccount.getId(),
+                        AsideRecipe.COUPANG_REVIEW_OBSERVE_V1, "ac-coupang", today, today)))
+                .isInstanceOf(ApiException.class);
+        assertThat(jobs.count()).isZero();
+    }
+
+    @Test
     @DisplayName("설정 없이는 SCHEDULED dispatch가 없다 — 아무도 요청하지 않은 읽기는 열리지 않는다")
     void noSettingNoScheduledRead() {
         // 행이 없는 상태(= 아직 채택되지 않음)에서 직접 dispatch를 시도한다.
