@@ -7,6 +7,7 @@ import com.sellerops.connector.DataType;
 import com.sellerops.responsibility.aside.AsideDispatch;
 import com.sellerops.responsibility.aside.AsideHelperDevices;
 import com.sellerops.responsibility.aside.AsideRecipe;
+import com.sellerops.responsibility.aside.AsideTrigger;
 import com.sellerops.responsibility.aside.ScheduledAsideJob;
 import com.sellerops.responsibility.aside.ScheduledAsideJobService;
 import com.sellerops.selleraccount.SellerAccount;
@@ -173,7 +174,56 @@ public class ScreenReadService {
         if (recipe.isEmpty()) {
             return Optional.empty();
         }
-        return walk.resumeAfterSignIn(orgId, account.getId(), dataType.name(), recipe.get());
+        Optional<ScreenReadView> resumedWalk =
+                walk.resumeAfterSignIn(orgId, account.getId(), dataType.name(), recipe.get());
+        if (resumedWalk.isPresent()) {
+            return resumedWalk;
+        }
+        return resumeParentlessRead(orgId, account.getId(), recipe.get());
+    }
+
+    /**
+     * <b>The read that was waiting had no walk behind it.</b>
+     *
+     * <p>Once history is closed, the automatic check reads one day — today — and that read belongs to no
+     * catch-up run, because a day still being written has no boundary to advance. So when it ends at the
+     * channel's sign-in there is no run to resume; what is waiting is the read itself, and the thing that
+     * authorised it is still true (the seller's standing setting).
+     *
+     * <p>Exactly once per wall, without a column to remember it by:
+     * <ul>
+     *   <li>a read already on the desk is <b>returned, not duplicated</b> — the resume already happened;</li>
+     *   <li>once the resumed read lands, the last finished read is no longer a wall, so a second sign-in
+     *   notice resumes nothing;</li>
+     *   <li>and it is dispatched on the {@link AsideTrigger#SCHEDULED} lane, so the one gate that matters is
+     *   asked again: an account whose setting is OFF resumes nothing at all. For that account a press is the
+     *   only authorisation there has ever been, and signing in is not a press.</li>
+     * </ul>
+     */
+    private Optional<ScreenReadView> resumeParentlessRead(UUID orgId, UUID sellerAccountId, AsideRecipe recipe) {
+        Optional<ScheduledAsideJob> inFlight = jobs.liveFor(orgId, sellerAccountId, recipe);
+        if (inFlight.isPresent()) {
+            return Optional.of(status(orgId, inFlight.get().getId()));
+        }
+        boolean wall = jobs.lastFinished(orgId, sellerAccountId, recipe)
+                .map(job -> job.getOutcome() == com.sellerops.responsibility.aside.AsideJobOutcome.AUTH_REQUIRED)
+                .orElse(false);
+        if (!wall) {
+            return Optional.empty();
+        }
+        java.time.LocalDate today = java.time.LocalDate.now(com.sellerops.coverage.ReviewCoverageCursor.KST);
+        String clientJobId = "ac-rs-" + sellerAccountId.toString().substring(0, 8) + "-"
+                + java.time.Instant.now().getEpochSecond();
+        try {
+            return Optional.of(ScreenReadView.of(
+                    jobs.dispatch(AsideDispatch.scheduled(orgId, sellerAccountId, recipe, clientJobId,
+                            today, today)),
+                    true));
+        } catch (RuntimeException e) {
+            // The setting is off, the desk is gone, or it is busy. None of those is an error for a sign-in:
+            // there was simply nothing this product could continue.
+            return Optional.empty();
+        }
     }
 
     /** Where one read got to. Org-scoped: another organisation's job reads as absent, not as forbidden. */

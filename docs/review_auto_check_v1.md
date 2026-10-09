@@ -103,14 +103,23 @@ one-job-per-device는 전부 `ScheduledAsideJobService.dispatch` 하나를 지�
 | | 언제 | 어떻게 풀리나 |
 |---|---|---|
 | `PAUSED_DEVICE` | live helper가 하나도 없다 | **다음 tick이 저절로** 복구. 설정 불변 |
-| `PAUSED_AUTH` | 자식이 `AUTH_REQUIRED`로 settle (멈춘 창을 기억) | **scheduler는 재시도하지 않는다.** 판매자가 로그인할 때 그 창부터 이어진다 |
+| `PAUSED_AUTH` (walk) | 자식이 `AUTH_REQUIRED`로 settle (멈춘 창을 기억) | **scheduler는 재시도하지 않는다.** 판매자가 로그인할 때 그 창부터 이어진다 |
+| `PAUSED_AUTH` (오늘 읽기) | 부모 없는 오늘 읽기가 `AUTH_REQUIRED`로 settle | 같다 — 다만 들고 있을 run이 없으므로 **permission 행이** 멈춤을 들고, 다음 차례는 벽을 다시 때리지 않는다. 로그인하면 그 읽기를 **한 번** 다시 올린다 |
 
 벽을 매시간 다시 때리는 lane은 판매자만 해결할 수 있는 일에 대해 소음을 만드는 제품이다.
 
 ### 로그인 → resume, 정확히 한 번
 
 - 엔드포인트 하나: `POST /api/seller-accounts/{id}/collect-now/resume`. 입력은 `dataType`뿐.
-- `PAUSED_AUTH → RUNNING` **조건부 상태 전이**가 1회성을 보장한다. 두 번째 알림은 RUNNING을 보고 no-op.
+- walk: `PAUSED_AUTH → RUNNING` **조건부 상태 전이**가 1회성을 보장한다. 두 번째 알림은 RUNNING을 보고 no-op.
+- 오늘 읽기: 진행 중인 읽기가 있으면 **그것을 돌려주고** 새로 만들지 않으며, 그 읽기가 끝나면 「마지막으로
+  끝난 읽기」가 더 이상 벽이 아니므로 또 한 번의 로그인은 아무것도 이어가지 않는다. 그리고 재개 dispatch는
+  `SCHEDULED` lane을 지나므로 **설정이 꺼진 계정에서는 로그인이 아무것도 시작하지 않는다** — 그 계정에서
+  승인은 처음부터 누름뿐이었고, 로그인은 누름이 아니다.
+
+  이 경로가 없었을 때의 모양(2026-10-09, proof part B 준비 중 발견): 과거가 닫힌 뒤의 오늘 읽기는 catch-up
+  run에 속하지 않으므로 벽에 막혀도 `PAUSED_AUTH`를 들고 있을 run이 없었다 — 다음 시간이 같은 벽으로 걸어가고,
+  판매자의 로그인은 이어갈 것을 찾지 못했다.
 - **로그인 상태는 저장하지 않는다** (2026-10-08 제품 결정 유지). 새 컬럼 없음.
 - 화면은 OPERATOR/SCHEDULED를 판단하지 않는다. 「로그인이 확인됐다」만 전하고, 서버가 그 row의 trigger
   그대로 이어간다.
@@ -171,7 +180,8 @@ SELLEROPS_REVIEW_AUTO_CHECK_POLL_INTERVAL_MS # 기본 300000 (런타임이 들�
 
 | 어디 | 무엇 |
 |---|---|
-| `backend/.../autocheck/ReviewAutoCheckTest.java` (20) | **scheduler가 설정을 만들지 않음** · **연결 완료가 켠다(두 번 와도 하나)** · **backfill은 내 조직만, 껐던 것은 유지** · **다음 60분 차례는 새 작업 / 같은 차례 재시도는 1개** · 기본 ON · 끄면 꺼진 채 · API 채널엔 설정 없음 · **기간을 못 고르는 화면엔 설정 없음(쿠팡)** · 설정 없이 SCHEDULED 없음 · windowless 거절 · gap→walk · 닫힌 과거→오늘 · 누름이 앞섬 · tick이 비켜섬 · PAUSED_DEVICE 자동 복구 · device 우선순위와 fallback · PAUSED_AUTH는 사람이 푼다(1회성) |
+| `backend/.../autocheck/ReviewAutoCheckTest.java` (23) | **부모 없는 오늘 읽기의 벽: lane이 멈추고 재시도 없음 · 로그인이 한 번만 재개 · 설정이 꺼지면 재개 없음** · |
+| 〃 | **scheduler가 설정을 만들지 않음** · **연결 완료가 켠다(두 번 와도 하나)** · **backfill은 내 조직만, 껐던 것은 유지** · **다음 60분 차례는 새 작업 / 같은 차례 재시도는 1개** · 기본 ON · 끄면 꺼진 채 · API 채널엔 설정 없음 · **기간을 못 고르는 화면엔 설정 없음(쿠팡)** · 설정 없이 SCHEDULED 없음 · windowless 거절 · gap→walk · 닫힌 과거→오늘 · 누름이 앞섬 · tick이 비켜섬 · PAUSED_DEVICE 자동 복구 · device 우선순위와 fallback · PAUSED_AUTH는 사람이 푼다(1회성) |
 | `backend/.../coverage/ReviewCoverageTest.java` | 오늘은 경계가 될 수 없다 · 오늘만 읽은 증거는 경계를 못 만든다 · 창의 닫힌 부분은 남는다 |
 | `backend/.../coverage/ReviewCatchUpPlanTest.java` | 어제까지만 계획한다 |
 | `collector/test/aside/naver-review-window-read.test.ts` | `today..today`가 계획되고 실행된다 · 미래는 거절 · 화면이 좁혀지지 않으면 읽지 않는다 |
