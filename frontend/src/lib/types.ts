@@ -3867,6 +3867,24 @@ export interface CollectNowReadinessView {
   pausedCatchUp: boolean;
 }
 
+/**
+ * 「새 리뷰를 자동으로 확인합니다」 — 판매자가 가진 설정 하나.
+ *
+ * <p>grant가 아니다. 기기도, 주기도, 범위도, 동의 토큰도 없다 — 화면이 물을 수 있는 것은 켜짐과 꺼짐뿐이다.
+ */
+export interface ReviewAutoCheckView {
+  /** 이 계정의 채널에 제품이 읽을 수 있는 리뷰 화면이 있는가. false면 설정을 그리지 않는다(꺼진 것과 다르다). */
+  supported: boolean;
+  enabled: boolean;
+  /**
+   * 지금 진척이 없는 이유, 또는 `null`.
+   *
+   * <p>`PAUSED_DEVICE` — 도우미가 없다. 다음 확인에서 저절로 풀린다.
+   * <p>`PAUSED_AUTH` — 판매자센터 로그인이 필요하다. 시간이 아니라 사람이 푼다.
+   */
+  paused: "PAUSED_DEVICE" | "PAUSED_AUTH" | null;
+}
+
 /** 어느 기간을 아직 안 읽었는가 — 누르기 전에 보는 계획. 이 요청은 아무것도 수집하지 않는다. */
 export interface ReviewCatchUpPlanView {
   coverageFrom: string | null;

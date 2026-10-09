@@ -51,9 +51,11 @@ public record AsideDispatch(UUID orgId, UUID sellerAccountId, AsideRecipe recipe
         if (limits == null) {
             limits = AsideJobLimits.ONE_PAGE;
         }
-        if (trigger == AsideTrigger.OPERATOR && sellerAccountId == null) {
-            // A press is about a store the seller is looking at. Without one there is nothing to read and
-            // nothing to fence the reading against.
+        if (trigger != AsideTrigger.RESPONSIBILITY && sellerAccountId == null) {
+            // A press is about a store the seller is looking at, and a scheduled check is about the store whose
+            // setting is on. Without one there is nothing to read and nothing to fence the reading against.
+            // Only the responsibility lane leaves the account to be resolved, because there the deployment — not
+            // the caller — is the one that named it.
             throw ApiException.badRequest("확인할 판매 계정이 필요합니다.");
         }
         if ((windowStart == null) != (windowEnd == null)) {
@@ -68,10 +70,17 @@ public record AsideDispatch(UUID orgId, UUID sellerAccountId, AsideRecipe recipe
             // and the parent would count a window it never covered.
             throw ApiException.badRequest("확인할 기간이 필요합니다.");
         }
-        if (trigger == AsideTrigger.OPERATOR && runId != null) {
-            // The row's shape says which lane produced it; a press that carried a run id would make the audit
-            // trail claim a run asked for it.
+        if (trigger != AsideTrigger.RESPONSIBILITY && runId != null) {
+            // The row's shape says which lane produced it; a press — or a scheduled check — that carried a run
+            // id would make the audit trail claim a responsibility run asked for it.
             throw ApiException.badRequest("판매자 요청 작업은 실행 기록에 묶이지 않습니다.");
+        }
+        if (trigger == AsideTrigger.SCHEDULED && windowStart == null) {
+            // <b>An unattended read names its period.</b> A windowless read takes whatever period the screen is
+            // showing, which is a setting on the marketplace that nobody here chose and that can change between
+            // two runs — so «what did the automatic check cover last night» would have no answer. A person
+            // pressing may still read the screen as it stands: they are looking at it.
+            throw ApiException.badRequest("자동 확인은 확인할 기간을 지정해야 합니다.");
         }
     }
 
@@ -82,17 +91,36 @@ public record AsideDispatch(UUID orgId, UUID sellerAccountId, AsideRecipe recipe
     }
 
     /**
-     * One window of a catch-up a seller pressed for.
+     * One window of a catch-up, carrying the trigger of whoever started the walk.
      *
-     * <p>Still {@link AsideTrigger#OPERATOR}: a person authorised this read, and the intent it belongs to is
-     * theirs too. The period is named here because a child that read the screen's own period would have the
+     * <p>The trigger is a parameter rather than a constant because the walk is the same program either way and
+     * its provenance is not: a window read because a seller pressed is {@link AsideTrigger#OPERATOR}, and one
+     * read because their automatic check found a gap is {@link AsideTrigger#SCHEDULED}. Deriving it here from
+     * anything other than the parent would make the audit trail of a child disagree with its own run.
+     *
+     * <p>The period is named in both cases, because a child that read the screen's own period would have the
      * parent counting days nobody looked at.
      */
     public static AsideDispatch catchUpWindow(UUID orgId, UUID sellerAccountId, AsideRecipe recipe,
-                                              String clientJobId, UUID catchUpRunId,
+                                              AsideTrigger trigger, String clientJobId, UUID catchUpRunId,
                                               java.time.LocalDate windowStart, java.time.LocalDate windowEnd) {
-        return new AsideDispatch(orgId, sellerAccountId, recipe, AsideTrigger.OPERATOR, AsideJobLimits.ONE_PAGE,
+        return new AsideDispatch(orgId, sellerAccountId, recipe, trigger, AsideJobLimits.ONE_PAGE,
                 null, clientJobId, catchUpRunId, windowStart, windowEnd);
+    }
+
+    /**
+     * <b>One named period, read because the seller's automatic check came due.</b>
+     *
+     * <p>Used for the day that has not closed yet — {@code today … today} — which is the whole of what an
+     * automatic check does once history is closed. It belongs to no walk: a day that cannot be claimed as
+     * covered has no boundary to advance, so there is nothing for a parent to count and the read is simply a
+     * read. What it produces is rows and a time we looked, which is what freshness is made of.
+     */
+    public static AsideDispatch scheduled(UUID orgId, UUID sellerAccountId, AsideRecipe recipe,
+                                          String clientJobId, java.time.LocalDate windowStart,
+                                          java.time.LocalDate windowEnd) {
+        return new AsideDispatch(orgId, sellerAccountId, recipe, AsideTrigger.SCHEDULED, AsideJobLimits.ONE_PAGE,
+                null, clientJobId, null, windowStart, windowEnd);
     }
 
     /**

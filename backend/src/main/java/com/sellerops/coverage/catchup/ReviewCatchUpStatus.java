@@ -51,6 +51,28 @@ public class ReviewCatchUpStatus implements ScreenReadService.ReviewCatchUpRepor
                 });
     }
 
+    /**
+     * The sign-in. Only a run that was waiting for one is continued, and it keeps its own trigger.
+     *
+     * <p>The child this returns is described at the walk's level like any other, so the screen that was already
+     * polling keeps polling and sees the walk resume rather than a new, unrelated job.
+     */
+    @Override
+    public java.util.Optional<ScreenReadView> resumeAfterSignIn(java.util.UUID orgId,
+                                                                java.util.UUID sellerAccountId, String dataType,
+                                                                com.sellerops.responsibility.aside.AsideRecipe recipe) {
+        return orchestrator.resumeAfterSignIn(orgId, sellerAccountId, dataType, recipe)
+                .flatMap(started -> {
+                    ScheduledAsideJob child = started.firstJob();
+                    if (child == null) {
+                        // Resumed with nothing left to read: the run finished on the spot. There is no job to
+                        // watch, and saying so beats handing back an id nobody queued.
+                        return java.util.Optional.empty();
+                    }
+                    return java.util.Optional.of(describe(ScreenReadView.of(child, true), child));
+                });
+    }
+
     @Override
     public ScreenReadView describe(ScreenReadView jobLevel, ScheduledAsideJob job) {
         if (job.getCatchUpRunId() == null) {

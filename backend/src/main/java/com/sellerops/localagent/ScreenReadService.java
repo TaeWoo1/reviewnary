@@ -91,6 +91,16 @@ public class ScreenReadService {
                                                  java.util.UUID channelId, String dataType,
                                                  com.sellerops.responsibility.aside.AsideRecipe recipe,
                                                  String requestId);
+
+        /**
+         * Continue the walk that is waiting on a sign-in, if one is. Empty when nothing was waiting.
+         *
+         * <p>Empty is the ordinary answer and must stay cheap: a seller who signed in of their own accord, with
+         * nothing paused, has authorised nothing and starts nothing.
+         */
+        java.util.Optional<ScreenReadView> resumeAfterSignIn(java.util.UUID orgId, java.util.UUID sellerAccountId,
+                                                             String dataType,
+                                                             com.sellerops.responsibility.aside.AsideRecipe recipe);
     }
 
     /**
@@ -124,10 +134,46 @@ public class ScreenReadService {
                 return started.get();
             }
         }
+        // <b>A person is never told «busy» about their own store.</b> If a read of this very screen is already
+        // on the desk — the automatic check's hourly look, most often — pressing 지금 확인 is asking for the
+        // thing that is happening. So the press is answered with that job, and the job is left to finish: it is
+        // reading the seller's screen at this moment, and cancelling it would lose the window it is on.
+        Optional<ScheduledAsideJob> inFlight = jobs.liveFor(orgId, account.getId(), recipe);
+        if (inFlight.isPresent()) {
+            return status(orgId, inFlight.get().getId());
+        }
         AsideDispatch dispatch = AsideDispatch.operator(orgId, account.getId(), recipe,
                 clientJobId(recipe, account.getId(), requestId));
         ScheduledAsideJob job = jobs.dispatch(dispatch);
         return ScreenReadView.of(job, true);
+    }
+
+    /**
+     * <b>The seller signed in. Continue whatever was waiting on exactly that — and nothing else.</b>
+     *
+     * <p>One endpoint for both lanes, and it is the backend that knows which: the paused run carries its own
+     * trigger and is resumed as itself. A client that had to decide 「이건 자동 확인이니 resume, 이건 누름이니 다시
+     * 누름」 would be deciding provenance from the outside, which is how a press came to be recorded for work
+     * nobody pressed for.
+     *
+     * <p>Empty-handed is the normal case: nothing paused, nothing starts. Signing in is not an instruction to
+     * collect.
+     */
+    @Transactional
+    public Optional<ScreenReadView> resumeAfterSignIn(UUID orgId, UUID sellerAccountId, String dataTypeRaw) {
+        if (walk == null) {
+            return Optional.empty();
+        }
+        SellerAccount account = accounts.findByIdAndOrgId(sellerAccountId, orgId)
+                .orElseThrow(() -> ApiException.notFound("판매 계정을 찾을 수 없습니다."));
+        Channel channel = channels.findById(account.getChannelId())
+                .orElseThrow(() -> ApiException.notFound("채널을 찾을 수 없습니다."));
+        DataType dataType = parse(dataTypeRaw);
+        Optional<AsideRecipe> recipe = AsideRecipe.forScreenRead(channel.getCode(), dataType);
+        if (recipe.isEmpty()) {
+            return Optional.empty();
+        }
+        return walk.resumeAfterSignIn(orgId, account.getId(), dataType.name(), recipe.get());
     }
 
     /** Where one read got to. Org-scoped: another organisation's job reads as absent, not as forbidden. */

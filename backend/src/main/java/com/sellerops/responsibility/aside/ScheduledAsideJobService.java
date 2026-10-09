@@ -43,6 +43,11 @@ public class ScheduledAsideJobService {
     private final AsideMarketplaceAccess marketplaceAccess;
     private final AsideMarketplaceTarget marketplaceTargets;
     private final AsideHelperDevices devices;
+    /**
+     * The seller's own automatic-check setting, when this deployment has the lane. Null — and therefore every
+     * {@link AsideTrigger#SCHEDULED} dispatch refused — in a context assembled without it.
+     */
+    private AutoCheckAuthority autoCheck;
 
     @org.springframework.beans.factory.annotation.Autowired
     public ScheduledAsideJobService(ScheduledAsideJobRepository jobs, AsideMarketplaceAccess marketplaceAccess,
@@ -50,6 +55,15 @@ public class ScheduledAsideJobService {
                                     AsideHelperDevices devices) {
         this(jobs, Clock.systemUTC(), marketplaceAccess,
                 AsideMarketplaceTarget.firstOf(targets.orderedStream().toList()), devices);
+    }
+
+    /**
+     * Wired after construction, like {@link #setSettledListener}: the setting's own service reaches this class
+     * to dispatch, so a constructor dependency either way would be a cycle.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setAutoCheckAuthority(AutoCheckAuthority autoCheck) {
+        this.autoCheck = autoCheck;
     }
 
     public ScheduledAsideJobService(ScheduledAsideJobRepository jobs, Clock clock) {
@@ -139,6 +153,13 @@ public class ScheduledAsideJobService {
         if (dispatch.trigger() == AsideTrigger.RESPONSIBILITY && !marketplaceAccess.allows(recipe, orgId)) {
             throw ApiException.conflict("이 계정에서는 채널 화면을 자동으로 확인하도록 설정되어 있지 않습니다.");
         }
+        if (dispatch.trigger() == AsideTrigger.SCHEDULED
+                && (autoCheck == null || !autoCheck.allows(orgId, dispatch.sellerAccountId(), recipe))) {
+            // The seller's setting is the whole of this lane's authorisation, so it is asked here — where a
+            // caller that forgot to ask still cannot queue the job — and asked again on every window of a walk,
+            // which is what makes turning it off take effect mid-walk rather than at the end of one.
+            throw ApiException.conflict("이 계정은 자동 확인이 켜져 있지 않습니다.");
+        }
         UUID sellerAccountId = resolveStore(dispatch);
         if (recipe.readsMarketplace() && sellerAccountId == null) {
             // A marketplace read with no store resolved is a read of nothing in particular, and the fence
@@ -149,9 +170,7 @@ public class ScheduledAsideJobService {
             // A context built for the device-level `enqueue` alone. Saying so beats an NPE three frames down.
             throw new IllegalStateException("이 컨텍스트에는 도우미 조회가 없어 dispatch를 쓸 수 없습니다.");
         }
-        UUID deviceId = devices.linked(orgId)
-                .orElseThrow(AsideHelperUnavailableException::new)
-                .getId();
+        UUID deviceId = resolveDevice(dispatch, sellerAccountId);
         Instant now = clock.instant();
         jobs.expireStale(now);
         Optional<ScheduledAsideJob> existing = jobs.findByDeviceIdAndClientJobId(deviceId, dispatch.clientJobId())
@@ -195,6 +214,38 @@ public class ScheduledAsideJobService {
         AsideDispatch dispatch = new AsideDispatch(orgId, null, recipe, AsideTrigger.RESPONSIBILITY,
                 AsideJobLimits.ONE_PAGE, runId, clientJobId);
         return jobs.save(ScheduledAsideJob.queued(dispatch, deviceId, resolveStore(dispatch), now));
+    }
+
+    /**
+     * <b>Which desk runs this job — a means, never a permission.</b>
+     *
+     * <p>The seller's standing setting is about a store, not about a computer: a helper token expiring after its
+     * 180 days, a re-install, a new Mac, each of which mints a <b>new</b> device row
+     * ({@code HelperDeviceService#redeem}), must not cost the seller their setting or make the product ask them
+     * to agree again. So the device is resolved at dispatch time, every time.
+     *
+     * <p>Preference, not a rule: the desk that last successfully read <b>this store's</b> screen. A seller with
+     * two linked helpers has one that is signed in to this marketplace, and it is almost always the one that
+     * read it last; «the organisation's newest grant» would send the work to whichever machine paired most
+     * recently and spend a window learning it is not signed in. When that desk is gone, the newest live grant is
+     * the honest fallback, and {@link AsideHelperUnavailableException} is what «no desk at all» means — the
+     * caller turns it into the one state a seller can act on.
+     */
+    private UUID resolveDevice(AsideDispatch dispatch, UUID sellerAccountId) {
+        UUID orgId = dispatch.orgId();
+        if (sellerAccountId != null) {
+            Optional<UUID> preferred = jobs
+                    .findFirstByOrgIdAndSellerAccountIdAndRecipeAndOutcomeOrderBySettledAtDesc(
+                            orgId, sellerAccountId, dispatch.recipe(), AsideJobOutcome.OBSERVED)
+                    .map(ScheduledAsideJob::getDeviceId)
+                    .filter(id -> devices.live(orgId, id).isPresent());
+            if (preferred.isPresent()) {
+                return preferred.get();
+            }
+        }
+        return devices.linked(orgId)
+                .orElseThrow(AsideHelperUnavailableException::new)
+                .getId();
     }
 
     /**
@@ -334,6 +385,27 @@ public class ScheduledAsideJobService {
         return devices.linked(orgId)
                 .map(device -> hasLiveWork(device.getId(), now))
                 .orElse(false);
+    }
+
+    /**
+     * <b>The read of this store's screen that is already happening, if one is.</b>
+     *
+     * <p>Exists so that a person is never told «busy» about their own store. A seller presses 지금 확인 while
+     * their automatic check is mid-read: there is nothing to start, because the thing they want is in flight, and
+     * a 409 would be the product refusing to show them their own work. The caller answers with this job instead.
+     *
+     * <p>Queued or claimed only. A claimed job is <b>not</b> cancelled to make room for the press: it is reading
+     * the seller's screen right now, and tearing it down would lose the window it is on and leave the desk in a
+     * state nobody asked for.
+     */
+    @Transactional
+    public Optional<ScheduledAsideJob> liveFor(UUID orgId, UUID sellerAccountId, AsideRecipe recipe) {
+        if (orgId == null || sellerAccountId == null || recipe == null) {
+            return Optional.empty();
+        }
+        Instant now = clock.instant();
+        jobs.expireStale(now);
+        return jobs.liveFor(orgId, sellerAccountId, recipe).stream().findFirst();
     }
 
     /**

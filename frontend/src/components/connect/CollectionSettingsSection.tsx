@@ -13,6 +13,7 @@ import type {
   ScheduleView,
 } from "../../lib/types";
 import { DATA_TYPES, INTERVALS, backendMessage } from "./channelShared";
+import { ReviewAutoCheckToggle } from "./ReviewAutoCheckToggle";
 
 /** 수집 설정 — one row per data type, each owning its own cadence + manual run. */
 export function CollectionSettingsSection({
@@ -229,7 +230,12 @@ function ScheduleRow({
         hostOwnsScreenRead ? (
           <p className="break-keep text-sm text-muted">{deskSentence(desk)}</p>
         ) : (
-          collectNow
+          // 자동 확인이 기본이고, 「지금 확인」은 수동 refresh다 — 그래서 토글이 먼저 서고 버튼이 그 옆에
+          // 선다. 매번 눌러야 하는 제품처럼 보이지 않게 하는 것이 이 순서의 전부다.
+          <div className="flex flex-wrap items-center gap-3">
+            <ReviewAutoCheckToggle accountId={accountId} onReport={onReport} />
+            {collectNow}
+          </div>
         )
       ) : route === "UNSUPPORTED" || unsupported ? (
         <p className="text-sm text-muted">

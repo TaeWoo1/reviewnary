@@ -38,6 +38,33 @@ public interface ScheduledAsideJobRepository extends JpaRepository<ScheduledAsid
             UUID orgId, UUID sellerAccountId, AsideRecipe recipe, ScheduledAsideJobStatus status);
 
     /**
+     * The newest read of one account's one screen that actually <b>observed</b> something.
+     *
+     * <p>Asked for the desk that read it: a settled job may have settled as AUTH_REQUIRED or
+     * EXECUTOR_UNAVAILABLE, and a desk that could not read this store is the opposite of the one to prefer for
+     * the next attempt. OBSERVED is the only outcome that proves this device reached this store's screen.
+     */
+    Optional<ScheduledAsideJob> findFirstByOrgIdAndSellerAccountIdAndRecipeAndOutcomeOrderBySettledAtDesc(
+            UUID orgId, UUID sellerAccountId, AsideRecipe recipe, AsideJobOutcome outcome);
+
+    /**
+     * The job already on a desk for this account's screen, if any — queued or claimed, newest first.
+     *
+     * <p>What a seller's press is answered with when a read of this very store is already in flight. Pressing
+     * 지금 확인 while the automatic check is mid-read is not an error and must not be refused: there is nothing
+     * to start that is not already happening, and the honest answer is the job that is happening.
+     */
+    @Query("""
+            select j from ScheduledAsideJob j
+            where j.orgId = :orgId and j.sellerAccountId = :sellerAccountId and j.recipe = :recipe
+              and (j.status = com.sellerops.responsibility.aside.ScheduledAsideJobStatus.QUEUED
+                   or j.status = com.sellerops.responsibility.aside.ScheduledAsideJobStatus.CLAIMED)
+            order by j.createdAt desc
+            """)
+    List<ScheduledAsideJob> liveFor(@Param("orgId") UUID orgId, @Param("sellerAccountId") UUID sellerAccountId,
+                                    @Param("recipe") AsideRecipe recipe);
+
+    /**
      * The newest finished screen read among a set of recipes, for coverage's «latest attempt» field.
      *
      * <p>Taken by recipe set rather than by account because coverage speaks per channel × data type, and the

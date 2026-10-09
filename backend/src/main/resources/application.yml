@@ -499,6 +499,18 @@ sellerops:
       reasoning-effort: ${SELLEROPS_RESPONSIBILITY_INVESTIGATION_REASONING_EFFORT:low}
       # At most this many investigations per run; further candidates wait for the next run with nothing written.
       max-per-run: ${SELLEROPS_RESPONSIBILITY_INVESTIGATION_MAX_PER_RUN:5}
+  review-auto-check:
+    # 「새 리뷰를 자동으로 확인합니다」 (docs/review_auto_check_v1.md). 이 lane은 판매자의 제품 설정
+    # (review_auto_check)이 승인하고, 배포가 정하는 것은 「여기서 이 lane이 도는가」 하나뿐이다 — 그래서
+    # 조직 목록도, 계정 목록도 없다. Self-Pilot / Responsibility의 배포 허용 목록과는 다른 질문이며,
+    # 그 둘을 넓히지도 않는다.
+    #
+    # 끄면 아무것도 돌지 않는다. 설정 행은 그대로 남고(판매자가 끈 것이 아니므로), 다시 켜면 이어진다.
+    enabled: ${SELLEROPS_REVIEW_AUTO_CHECK_ENABLED:false}
+    # 런타임이 「due한 계정이 있는지」 들여다보는 간격. 확인 주기가 아니다 — 그것은 계정의
+    # interval_minutes(60분)이고, 판매자가 고르지 않는다.
+    poll-interval-ms: ${SELLEROPS_REVIEW_AUTO_CHECK_POLL_INTERVAL_MS:300000}
+    initial-delay-ms: ${SELLEROPS_REVIEW_AUTO_CHECK_INITIAL_DELAY_MS:20000}
   collect:
     # Scheduled collection poller (Phase 3B Slice 4). Off by default — nothing
     # polls until ops flips this; the file-upload path is unaffected either way.

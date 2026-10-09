@@ -152,6 +152,20 @@ export function kstDayTime(iso: string | null | undefined): string {
   return p ? `${Number(p.month)}월 ${Number(p.day)}일 ${p.hour}:${p.minute}` : iso;
 }
 
+/**
+ * 「13:40」 — 날짜를 이미 말한 문장 안에서 시각만.
+ *
+ * <p>「오늘 13:40 확인」을 위해 존재한다. 오늘·어제라는 말이 날짜를 이미 다 말했으므로 그 뒤에 9월 2일을
+ * 한 번 더 붙이면 두 번 말하는 문장이 된다.
+ */
+export function kstHourMinute(iso: string | null | undefined): string {
+  if (!iso) {
+    return "-";
+  }
+  const p = kstParts(iso);
+  return p ? `${p.hour}:${p.minute}` : iso;
+}
+
 /** 「9/5 19:57」 — 한 열에 여럿이 세로로 서는 자리(결제 시각). */
 export function kstShortDateTime(iso: string | null | undefined): string {
   if (!iso) {

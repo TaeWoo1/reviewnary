@@ -233,13 +233,16 @@ class ReviewCatchUpOrchestratorTest {
     }
 
     @Test
-    @DisplayName("one press walks the whole gap: six windows, oldest first, nobody pressing again")
+    @DisplayName("one press walks the whole gap: five windows to yesterday, oldest first, nobody pressing again")
     void onePressWalksTheGap() {
         coveredThrough(36);
 
         ReviewCatchUpOrchestrator.Started started = press("press-1").orElseThrow();
         assertThat(started.run().getRequestedFrom()).isEqualTo(today.minusDays(35));
-        assertThat(started.run().getRequestedThrough()).isEqualTo(today);
+        // <b>어제까지.</b> A walk closes history, and today is the day still being written: a window on it would
+        // settle, prove no coverage, and be planned again — a walk that can never say COMPLETE. Today is read by
+        // its own refresh, and what that produces is freshness rather than a boundary.
+        assertThat(started.run().getRequestedThrough()).isEqualTo(today.minusDays(1));
         // The first window is the oldest missing one, not the last seven days.
         assertThat(started.firstJob().getRequestedWindowStart()).isEqualTo(today.minusDays(35));
         assertThat(started.firstJob().getRequestedWindowEnd()).isEqualTo(today.minusDays(29));
@@ -266,13 +269,12 @@ class ReviewCatchUpOrchestratorTest {
                 today.minusDays(28) + "~" + today.minusDays(22),
                 today.minusDays(21) + "~" + today.minusDays(15),
                 today.minusDays(14) + "~" + today.minusDays(8),
-                today.minusDays(7) + "~" + today.minusDays(1),
-                today + "~" + today);
+                today.minusDays(7) + "~" + today.minusDays(1));
         ReviewCatchUpRun run = runs.findById(started.run().getId()).orElseThrow();
         assertThat(run.getState()).isEqualTo(ReviewCatchUpState.COMPLETE);
-        assertThat(run.getWindowsDone()).isEqualTo(6);
-        assertThat(run.getDaysCovered()).isEqualTo(36);
-        assertThat(run.getRowsObserved()).isEqualTo(270);
+        assertThat(run.getWindowsDone()).isEqualTo(5);
+        assertThat(run.getDaysCovered()).isEqualTo(35);
+        assertThat(run.getRowsObserved()).isEqualTo(225);
     }
 
     @Test

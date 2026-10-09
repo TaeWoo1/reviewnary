@@ -29,6 +29,10 @@ vi.mock("../../lib/apiClient", () => ({
     collectNow: (...a: unknown[]) => collectNow(...a),
     collectNowReadiness: (...a: unknown[]) => collectNowReadiness(...a),
     screenReadStatus: (...a: unknown[]) => screenReadStatus(...a),
+    // 자동 확인 설정 — 이 줄이 「지금 확인」 옆에 서므로 이 섹션을 그리는 테스트는 이것도 답해야 한다.
+    reviewAutoCheck: () => Promise.resolve({ supported: true, enabled: true, paused: null }),
+    setReviewAutoCheck: (_id: string, enabled: boolean) =>
+      Promise.resolve({ supported: true, enabled, paused: null }),
     getChannelCapabilityOverview: () => Promise.resolve(null),
     getCredentialDiagnosis: () => Promise.resolve({ status: "OK", remedy: null }),
   },
