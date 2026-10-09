@@ -153,6 +153,12 @@ public class ScheduledAsideJobService {
         if (dispatch.trigger() == AsideTrigger.RESPONSIBILITY && !marketplaceAccess.allows(recipe, orgId)) {
             throw ApiException.conflict("이 계정에서는 채널 화면을 자동으로 확인하도록 설정되어 있지 않습니다.");
         }
+        if (dispatch.trigger() == AsideTrigger.SCHEDULED && !recipe.readsNamedPeriod()) {
+            // The row may carry a window and the recipe still be unable to honour it: the two statements live in
+            // different processes. Refusing here means a channel joins this lane by its runner learning to move
+            // the screen's period, never by a setting being switched on for it.
+            throw ApiException.conflict("이 화면은 기간을 지정해 읽을 수 없어 자동 확인 대상이 아닙니다.");
+        }
         if (dispatch.trigger() == AsideTrigger.SCHEDULED
                 && (autoCheck == null || !autoCheck.allows(orgId, dispatch.sellerAccountId(), recipe))) {
             // The seller's setting is the whole of this lane's authorisation, so it is asked here — where a

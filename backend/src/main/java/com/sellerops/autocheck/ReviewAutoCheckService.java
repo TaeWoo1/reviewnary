@@ -187,10 +187,18 @@ public class ReviewAutoCheckService implements AutoCheckAuthority {
         return Optional.of(rows.save(row));
     }
 
-    /** Which recipe reads this account's reviews off a screen, if any. */
+    /**
+     * Which recipe reads this account's reviews off a screen <b>for a period we name</b>, if any.
+     *
+     * <p>The second half is the scope of this whole lane. A channel whose runner cannot move the screen's
+     * period gets no setting — not an off one — because an unattended read of «whatever the screen is showing»
+     * cannot say afterwards what it covered ({@link AsideRecipe#readsNamedPeriod()}). Today that is Coupang
+     * 상품평, which stays the seller's own press until its runner can select a period.
+     */
     public Optional<AsideRecipe> recipeFor(SellerAccount account) {
         return channels.findById(account.getChannelId())
                 .map(Channel::getCode)
-                .flatMap(code -> AsideRecipe.forScreenRead(code, DataType.REVIEW));
+                .flatMap(code -> AsideRecipe.forScreenRead(code, DataType.REVIEW))
+                .filter(AsideRecipe::readsNamedPeriod);
     }
 }
