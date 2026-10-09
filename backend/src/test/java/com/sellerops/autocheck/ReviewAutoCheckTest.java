@@ -14,6 +14,7 @@ import com.sellerops.coverage.catchup.ReviewCatchUpOrchestrator;
 import com.sellerops.coverage.catchup.ReviewCatchUpRun;
 import com.sellerops.coverage.catchup.ReviewCatchUpRunRepository;
 import com.sellerops.coverage.catchup.ReviewCatchUpState;
+import com.sellerops.localagent.ScreenReadView;
 import com.sellerops.responsibility.IdentityVerdict;
 import com.sellerops.responsibility.SourceCompleteness;
 import com.sellerops.responsibility.aside.AsideHelperDevices;
@@ -97,6 +98,7 @@ class ReviewAutoCheckTest {
     private ScheduledAsideJobService dispatcher;
     private ReviewCatchUpOrchestrator orchestrator;
     private ReviewAutoCheckService settings;
+    private com.sellerops.localagent.ScreenReadService screenReads;
     private ReviewAutoCheckReconciler reconciler;
 
     @BeforeEach
@@ -160,8 +162,16 @@ class ReviewAutoCheckTest {
         dispatcher.setSettledListener(orchestrator::advance);
         settings = new ReviewAutoCheckService(settingRows, accounts, channels, clock);
         dispatcher.setAutoCheckAuthority(settings);
+        screenReads = new com.sellerops.localagent.ScreenReadService(dispatcher,
+                new AsideHelperDevices(devices, clock), accounts, channels,
+                new com.sellerops.coverage.catchup.ReviewCatchUpStatus(runs, orchestrator));
         reconciler = new ReviewAutoCheckReconciler(new ReviewAutoCheckClaimer(settingRows), settings, accounts,
                 orchestrator, dispatcher, clock);
+    }
+
+    /** 시간을 앞으로 보낸다 — 두 읽기의 「마지막」을 가릴 수 있게. */
+    private void tick(Duration by) {
+        now = now.plus(by);
     }
 
     private SellerAccount connected(UUID channelId) {
@@ -622,6 +632,73 @@ class ReviewAutoCheckTest {
         assertThat(orchestrator.resumeAfterSignIn(org, account.getId(), "REVIEW",
                 AsideRecipe.NAVER_REVIEW_OBSERVE_V1)).isEmpty();
         assertThat(jobs.findAll().stream().filter(j -> j.getStatus() == ScheduledAsideJobStatus.QUEUED)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("부모 없는 오늘 읽기가 벽에 막히면 lane이 멈춘다 — timer가 같은 벽을 다시 때리지 않는다")
+    void aWallOnTheParentlessReadPausesTheLane() {
+        // 과거가 닫혀 있으면 오늘 읽기는 catch-up run에 속하지 않는다 — 전진시킬 경계가 없으므로. 그래서
+        // 벽에 막혔을 때 PAUSED_AUTH를 들고 있을 run이 없고, 그대로 두면 다음 시간이 같은 벽으로 걸어간다.
+        coveredThrough(1);
+        settings.view(org, account.getId());
+        reconciler.tick(now);
+        ScheduledAsideJob walled = onDesk().orElseThrow();
+        assertThat(walled.getCatchUpRunId()).isNull();
+        settleAsAuthWall(walled);
+
+        // 다음 차례: 아무것도 책상에 올리지 않고, 왜 멈췄는지만 적는다.
+        now = now.plus(Duration.ofHours(1));
+        assertThat(reconciler.tick(now).pausedAuth()).isEqualTo(1);
+        assertThat(onDesk()).isEmpty();
+        assertThat(jobs.count()).isEqualTo(1);
+        ReviewAutoCheck row = settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW")
+                .orElseThrow();
+        assertThat(row.getPausedReason()).isEqualTo(AutoCheckPause.PAUSED_AUTH);
+        // 끄지 않았다. 벽은 판매자의 의사가 아니다.
+        assertThat(row.on()).isTrue();
+    }
+
+    @Test
+    @DisplayName("그 벽은 판매자가 로그인할 때 풀린다 — 한 번만, 그리고 설정이 켜져 있을 때만")
+    void theParentlessWallIsResumedBySigningIn() {
+        coveredThrough(1);
+        settings.view(org, account.getId());
+        reconciler.tick(now);
+        settleAsAuthWall(onDesk().orElseThrow());
+
+        // 판매자가 로그인한다. 기다리던 것은 그 읽기 자체이고, 승인은 여전히 그 설정이다.
+        ScreenReadView resumed = screenReads.resumeAfterSignIn(org, account.getId(), "REVIEW").orElseThrow();
+        assertThat(jobs.count()).isEqualTo(2);
+        ScheduledAsideJob second = jobs.findById(resumed.jobId()).orElseThrow();
+        assertThat(second.getTrigger()).isEqualTo(AsideTrigger.SCHEDULED);
+        assertThat(second.getRequestedWindowStart()).isEqualTo(today);
+        assertThat(second.getRequestedWindowEnd()).isEqualTo(today);
+
+        // 두 번째 알림은 진행 중인 그 작업을 돌려주고, 세 번째 작업을 만들지 않는다.
+        ScreenReadView again = screenReads.resumeAfterSignIn(org, account.getId(), "REVIEW").orElseThrow();
+        assertThat(again.jobId()).isEqualTo(second.getId());
+        assertThat(jobs.count()).isEqualTo(2);
+
+        // 그 읽기가 끝나면 더 이상 벽이 아니므로, 또 한 번의 로그인은 아무것도 이어가지 않는다.
+        // 시계를 앞으로 보낸다: 「마지막으로 끝난 읽기」는 settled_at 순서로 정해지고, 두 읽기가 같은 순간에
+        // 끝나면 그 순서가 없다. 진짜 시계에서는 늘 다르지만, 여기서는 가짜 시계가 멈춰 있다.
+        tick(Duration.ofMinutes(1));
+        settleAsRead(second, 3);
+        assertThat(screenReads.resumeAfterSignIn(org, account.getId(), "REVIEW")).isEmpty();
+        assertThat(jobs.count()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("자동 확인이 꺼진 계정에서는 로그인이 아무것도 시작하지 않는다 — 누름만이 그 승인이다")
+    void signingInResumesNothingWhenTheSettingIsOff() {
+        coveredThrough(1);
+        settings.view(org, account.getId());
+        reconciler.tick(now);
+        settleAsAuthWall(onDesk().orElseThrow());
+        settings.set(org, account.getId(), userId, false);
+
+        assertThat(screenReads.resumeAfterSignIn(org, account.getId(), "REVIEW")).isEmpty();
+        assertThat(jobs.count()).isEqualTo(1);
     }
 
     @Test

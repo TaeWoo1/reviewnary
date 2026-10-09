@@ -171,6 +171,15 @@ public class ReviewAutoCheckReconciler {
             // Someone's work is on this desk — quite possibly a read the seller pressed for. Leave it.
             return Outcome.SKIPPED;
         }
+        if (metTheSignInWall(orgId, accountId, recipe.get())) {
+            // <b>A wall with no walk behind it still has to be waited for.</b> Today's refresh belongs to no
+            // catch-up run — a day that cannot be claimed as covered has no boundary to advance — so when it
+            // ends at the channel's sign-in there is no run to hold PAUSED_AUTH for it. Without this, the next
+            // hour would walk into the same wall, and the hour after that: a product generating noise about the
+            // one thing only the seller can resolve. It is their sign-in that continues this
+            // ({@code ScreenReadService#resumeAfterSignIn}), not a timer.
+            return Outcome.PAUSED_AUTH;
+        }
         try {
             if (catchUp.startScheduled(orgId, accountId, account.getChannelId(),
                     ReviewAutoCheckService.DATA_TYPE, recipe.get()).isPresent()) {
@@ -186,6 +195,20 @@ public class ReviewAutoCheckReconciler {
             // Both are «nothing to do», and both are re-asked next hour.
             return Outcome.SKIPPED;
         }
+    }
+
+    /**
+     * Whether the last finished read of this very screen was turned away at the channel's sign-in.
+     *
+     * <p>Derived from the job row that met it, never stored a second time: a copy of «this seller is signed
+     * out» would be the thing that is wrong the moment they sign back in. Trigger-agnostic on purpose — a wall
+     * is a fact about the marketplace session, not about which lane happened to find it, so a read the seller
+     * pressed for that hit it also stops this lane from walking into it.
+     */
+    private boolean metTheSignInWall(UUID orgId, UUID accountId, AsideRecipe recipe) {
+        return jobs.lastFinished(orgId, accountId, recipe)
+                .map(job -> job.getOutcome() == com.sellerops.responsibility.aside.AsideJobOutcome.AUTH_REQUIRED)
+                .orElse(false);
     }
 
     /**
