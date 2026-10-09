@@ -187,6 +187,7 @@ public class ReviewCatchUpOrchestrator {
             // The window is remembered, not skipped. A catch-up that stepped over a login wall would leave a
             // hole it had already counted as walked.
             run.setPausedWindowStart(start);
+            run.beginWaiting(clock.instant());
             stop(run, ReviewCatchUpState.PAUSED_AUTH, "AUTH_REQUIRED");
             return;
         }
@@ -241,6 +242,8 @@ public class ReviewCatchUpOrchestrator {
             run.setPausedWindowStart(null);
             run.setStopReason(null);
             run.setState(ReviewCatchUpState.RUNNING);
+            // What the wait cost goes to the paused total, not to the bound.
+            run.endWaiting(clock.instant());
             // A new attempt, so the walled window gets a NEW child instead of the settled one coming back.
             run.setAttempt(run.getAttempt() + 1);
         }
@@ -276,7 +279,10 @@ public class ReviewCatchUpOrchestrator {
         if (run.getRowsObserved() >= limits.maxRows()) {
             return Optional.of("MAX_ROWS");
         }
-        if (Duration.between(run.getStartedAt(), clock.instant()).compareTo(limits.maxElapsed()) >= 0) {
+        // <b>기계가 일한 시간만 센다.</b> 이 상한은 한 번의 누름이 기계를 얼마나 오래 쓰는지를 묶는 것이고,
+        // 사람이 로그인하는 시간은 그 둘 중 어느 것도 아니다. started_at부터 재던 동안에는, 로그인에 10분을
+        // 쓴 판매자가 벽을 넘겨 살아난 intent를 다음 창에서 잃었다.
+        if (run.machineElapsed(clock.instant()).compareTo(limits.maxElapsed()) >= 0) {
             return Optional.of("MAX_ELAPSED");
         }
         return Optional.empty();

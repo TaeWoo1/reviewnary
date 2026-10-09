@@ -35,13 +35,14 @@ function walk(runState: NonNullable<ScreenReadView["catchUp"]>["runState"], wind
 }
 
 describe("밀린 리뷰를 따라잡는 중", () => {
-  it("진행 중에는 진행 중이라고만 말하고, 몇 개까지 왔는지 더한다", () => {
-    expect(catchUpMessage(walk("RUNNING", 0))).toEqual({
-      text: "밀린 리뷰를 확인하고 있습니다.", isError: false,
-    });
-    expect(catchUpMessage(walk("RUNNING", 3))).toEqual({
-      text: "밀린 리뷰를 확인하고 있습니다. 3개 기간 확인됨", isError: false,
-    });
+  it("진행 중에는 진행 중이라고만 말한다 — 몇 개 기간인지는 구현 단위다", () => {
+    // 「N개 기간 확인됨」은 내부 창 나누기를 간접적으로 보여 준다. 판매자가 쓸 수 있는 수가 아니고, 그 수가
+    // 몇이든 할 일이 같다 — 기다리는 것. 그래서 걸음 수와 무관하게 한 문장이다.
+    for (const done of [0, 1, 3, 6]) {
+      expect(catchUpMessage(walk("RUNNING", done)), String(done)).toEqual({
+        text: "밀린 리뷰를 확인하고 있습니다.", isError: false,
+      });
+    }
   });
 
   it("끝나면 끝났다고 말한다", () => {
@@ -52,16 +53,17 @@ describe("밀린 리뷰를 따라잡는 중", () => {
 
   it("멈춤 넷이 각자 다른 말을 한다", () => {
     expect(catchUpMessage(walk("PAUSED_AUTH", 2))!.text)
-      .toBe("2개 기간을 확인했고, 그다음 기간에서 판매자 센터 로그인이 필요했습니다.");
+      .toBe("판매자센터 로그인이 필요합니다. 로그인하면 이어서 확인합니다.");
     expect(catchUpMessage(walk("STOPPED_SATURATED", 4))!.text)
-      .toContain("한 번에 읽을 수 있는 양보다 많은 리뷰가 있어");
-    expect(catchUpMessage(walk("STOPPED_LIMIT", 8))!.text).toContain("다시 누르면 이어서 확인합니다");
-    expect(catchUpMessage(walk("FAILED", 1))!.text).toContain("멈췄습니다");
+      .toContain("하루에 리뷰가 아주 많은 날이 있어");
+    expect(catchUpMessage(walk("STOPPED_LIMIT", 8))!.text).toContain("이어서 확인합니다");
     // 상한에 도달한 것은 실패가 아니다 — 다시 누르면 이어진다.
     expect(catchUpMessage(walk("STOPPED_LIMIT", 8))!.isError).toBe(false);
-    // 앞에서 확인한 기간의 수는 어느 멈춤에서도 사라지지 않는다.
+    // <b>그리고 어느 멈춤도 걸음 수를 꺼내지 않는다.</b> 「2개 기간을 확인했고…」는 내부 창 나누기이고,
+    // 판매자가 다음에 할 일을 바꾸지 않는다 — 로그인하거나, 다시 확인을 누르거나, 기다리는 것뿐이다.
     for (const state of ["PAUSED_AUTH", "STOPPED_SATURATED", "STOPPED_LIMIT", "FAILED"] as const) {
-      expect(catchUpMessage(walk(state, 2))!.text).toContain("2개 기간");
+      expect(catchUpMessage(walk(state, 2))!.text, state).not.toContain("2개");
+      expect(catchUpMessage(walk(state, 2))!.text, state).not.toContain("기간을 확인했");
     }
   });
 
@@ -80,7 +82,7 @@ describe("밀린 리뷰를 따라잡는 중", () => {
     // 자식 하나가 끝났어도 걸음이 돌고 있으면 「수집 완료」라고 말하지 않는다. 그게 바로 이 패키지가 한
     // 단계 위에서 고친 결함과 같은 모양이다.
     expect(screenReadMessage("리뷰", walk("RUNNING", 1, { state: "SUCCESS", inserted: 45 })).text)
-      .toBe("밀린 리뷰를 확인하고 있습니다. 1개 기간 확인됨");
+      .toBe("밀린 리뷰를 확인하고 있습니다.");
     // 걸음이 없으면 지금까지의 문장 그대로.
     expect(screenReadMessage("리뷰", read({ state: "SUCCESS", inserted: 45, changed: 0 })).text)
       .toBe("리뷰 수집 완료: 새로 저장 45 · 갱신 0");
@@ -132,7 +134,7 @@ describe("막힌 자리를 말한다 — 2026-10-08 라이브가 가르친 것",
     }
     // 그리고 그 일반 문구에 코드가 섞여 나오지 않는다.
     const said = catchUpMessage(walk("FAILED", 0, { stopReason: "EXECUTOR_TIMEOUT" }))!.text;
-    expect(said).toBe("0개 기간을 확인한 뒤 멈췄습니다. 잠시 후 다시 시도해 주세요.");
+    expect(said).toBe("일부 기간을 아직 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.");
     for (const term of ["EXECUTOR", "TIMEOUT", "UNAVAILABLE", "FAULT", "REFUSED"]) {
       expect(said, term).not.toContain(term);
     }
@@ -149,14 +151,16 @@ describe("막힌 자리를 말한다 — 2026-10-08 라이브가 가르친 것",
     }
   });
 
-  it("한 건 실패에도, 걸음 실패에도 같은 문장이 쓰인다", () => {
+  it("한 건 실패에도, 걸음 실패에도 같은 문장이 쓰인다 — 걸음 수와 무관하게 같다", () => {
+    const one = "판매자센터 화면에서 기간 선택 영역을 확인하지 못했습니다.";
     expect(screenReadMessage("리뷰", read({ state: "FAILED", failureCode: "RANGE_CONTROLS_NOT_FOUND" })).text)
-      .toBe("판매자센터 화면에서 기간 선택 영역을 확인하지 못했습니다.");
-    expect(catchUpMessage(walk("FAILED", 2, { stopReason: "RANGE_CONTROLS_NOT_FOUND" }))!.text)
-      .toBe("2개 기간을 확인했습니다. 판매자센터 화면에서 기간 선택 영역을 확인하지 못했습니다.");
-    // 아직 아무 기간도 확인하지 못했으면 0을 세어 보여 주지 않는다.
-    expect(catchUpMessage(walk("FAILED", 0, { stopReason: "RANGE_CONTROLS_NOT_FOUND" }))!.text)
-      .toBe("판매자센터 화면에서 기간 선택 영역을 확인하지 못했습니다.");
+      .toBe(one);
+    // 몇 걸음을 걸었든 같은 문장이다. 앞에 「N개 기간을 확인했습니다」를 붙이던 것은 내부 창 나누기를
+    // 꺼내 보이는 일이었고, 판매자가 그 수로 할 수 있는 일은 없다.
+    for (const done of [0, 2, 5]) {
+      expect(catchUpMessage(walk("FAILED", done, { stopReason: "RANGE_CONTROLS_NOT_FOUND" }))!.text, String(done))
+        .toBe(one);
+    }
   });
 
   it("조사를 고른다 — 「리뷰을(를)」이 아니라", () => {

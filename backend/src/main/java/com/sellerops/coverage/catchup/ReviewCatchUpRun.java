@@ -102,6 +102,22 @@ public class ReviewCatchUpRun {
     @Column(name = "attempt", nullable = false)
     private int attempt = 1;
 
+    /**
+     * <b>How long this intent has spent waiting on a person, in total.</b>
+     *
+     * <p>The press bound ({@code maxElapsed}) exists to stop one press from using the machine for too long.
+     * It was measured from {@code startedAt}, which meant a seller who took ten minutes to sign in came back
+     * to an intent that survived the wall and then died on the next window — the bound had been spent by a
+     * human, not by any work. {@code startedAt} stays what it says it is; this is subtracted before the bound
+     * is applied.
+     */
+    @Column(name = "paused_ms", nullable = false)
+    private long pausedMs;
+
+    /** When the current wait began, or null when nothing is being waited on. Folded into {@link #pausedMs}. */
+    @Column(name = "paused_since")
+    private Instant pausedSince;
+
     /** The window that met the sign-in wall — so a resume starts there and not one window later. */
     @Column(name = "paused_window_start")
     private LocalDate pausedWindowStart;
@@ -134,6 +150,36 @@ public class ReviewCatchUpRun {
     }
 
     /** A window came back whole: step past it, and go back to the default stride. */
+    /** The intent starts waiting on a person. Idempotent: a second call does not restart the clock. */
+    public void beginWaiting(Instant now) {
+        if (pausedSince == null) {
+            pausedSince = now;
+        }
+    }
+
+    /** The wait is over. What it cost is added to the total, and nothing else about the run moves. */
+    public void endWaiting(Instant now) {
+        if (pausedSince != null) {
+            long waited = now.toEpochMilli() - pausedSince.toEpochMilli();
+            if (waited > 0) {
+                pausedMs += waited;
+            }
+            pausedSince = null;
+        }
+    }
+
+    /**
+     * How long the machine has actually been working on this intent.
+     *
+     * <p>Wall-clock since the press, minus every wait on a person — including one still in progress, so the
+     * answer is the same whether it is asked during a wait or after it.
+     */
+    public java.time.Duration machineElapsed(Instant now) {
+        long waiting = pausedSince == null ? 0L : Math.max(0L, now.toEpochMilli() - pausedSince.toEpochMilli());
+        long total = now.toEpochMilli() - startedAt.toEpochMilli();
+        return java.time.Duration.ofMillis(Math.max(0L, total - pausedMs - waiting));
+    }
+
     public void completed(LocalDate windowStart, LocalDate windowEnd, int observed) {
         windowsDone += 1;
         rowsObserved += Math.max(observed, 0);

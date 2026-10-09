@@ -230,12 +230,15 @@ describe("쿠팡 채널 화면 — 두 가지 방법, 그뿐", () => {
       (c) => c.className.includes("bg-brand-700") && !c.closest("details"),
     );
 
-  it("한 시점에 가장 강한 컨트롤은 하나다", async () => {
+  it("둘 다 연결됐으면 가장 강한 컨트롤은 없다 — 할 일이 없는 화면이다", async () => {
     view();
     const review = await screen.findByTestId("coupang-review-card");
     const api = await screen.findByTestId("coupang-api-card");
-    // 둘 다 연결된 화면에서 지금 할 일은 상품평을 한 번 더 가져오는 것뿐이고, 나머지는 보조다.
-    await waitFor(() => expect(solidIn(review).map((c) => c.textContent)).toEqual(["지금 수집하기"]));
+    // 2026-10-09: 수집은 primary가 아니다. 연결이 끝난 화면에서 판매자가 눌러야 하는 것은 없고, 수집은
+    // 최초 연결 직후·명시적 refresh·문제 복구에만 쓰는 보조 동작이다. 「지금 할 일은 한 번 더 가져오는
+    // 것」이라는 전제가 제품 계약과 어긋났다 — 정상 상태는 Reviewnary가 알아서 확인해 둔 상태다.
+    await waitFor(() => expect(within(review).getByTestId("collect-now-REVIEW")).toBeDefined());
+    expect(solidIn(review)).toHaveLength(0);
     expect(solidIn(api)).toHaveLength(0);
   });
 
