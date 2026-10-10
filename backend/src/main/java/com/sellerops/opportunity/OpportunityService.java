@@ -145,10 +145,20 @@ public class OpportunityService {
         for (ReviewIssueView issue : qualifying) {
             for (Derived d : derive(orgId, issue)) {
                 ImprovementOpportunity row = decided.get(key(issue.id(), d.candidate().kind()));
+                Derived shown = d;
+                if (row == null) {
+                    // The derived NAME of the product-guidance slot moves when the seller's library gains a
+                    // sentence about the aspect — which is exactly what applying this suggestion does. A card
+                    // bound only by today's name would lose its own decision at the moment it was carried out.
+                    row = sameSlot(decided, issue.id(), d.candidate().kind());
+                    if (row != null) {
+                        shown = d.named(row.getKind());
+                    }
+                }
                 if (row != null && row.getStatus() == OpportunityStatus.DISMISSED && !includeDismissed) {
                     continue;
                 }
-                out.add(view(issue, d, row, row == null ? List.of()
+                out.add(view(issue, shown, row, row == null ? List.of()
                         : history.getOrDefault(row.getId(), List.of()), standingResult(results, row)));
             }
         }
@@ -184,9 +194,9 @@ public class OpportunityService {
                 continue;
             }
             derive(orgId, issue).stream()
-                    .filter(d -> d.candidate().kind() == row.getKind())
+                    .filter(d -> d.candidate().kind().namesSameSlotAs(row.getKind()))
                     .findFirst()
-                    .ifPresent(d -> out.add(new PreparedDraft(row.getId(), view(issue, d, row,
+                    .ifPresent(d -> out.add(new PreparedDraft(row.getId(), view(issue, d.named(row.getKind()), row,
                             history.getOrDefault(row.getId(), List.of()), null))));
         }
         return List.copyOf(out);
@@ -496,6 +506,20 @@ public class OpportunityService {
 
     /** A candidate with the knowledge check it was derived against. */
     record Derived(OpportunityRules.Candidate candidate, KnowledgeMention mention) {
+
+        /**
+         * The same derivation under the name a standing decision carries.
+         *
+         * <p>Only the name changes: the lane, the target and the knowledge check are the ones just derived, so
+         * the card's reason and its prepared action still describe today's facts. Renaming here rather than at
+         * the view is what keeps them agreeing with the label — a card titled FAQ 보완 whose sentences were
+         * composed for 상세·안내 보완 would be two suggestions printed as one.
+         */
+        Derived named(OpportunityKind kind) {
+            return kind == candidate.kind() ? this
+                    : new Derived(new OpportunityRules.Candidate(kind, candidate.lane(), candidate.target()),
+                            mention);
+        }
     }
 
     private List<Derived> derive(UUID orgId, ReviewIssueView issue) {
@@ -517,12 +541,25 @@ public class OpportunityService {
     }
 
     private Derived requireDerived(UUID orgId, ReviewIssueView issue, OpportunityKind kind) {
-        return derive(orgId, issue).stream()
-                .filter(d -> d.candidate().kind() == kind)
-                .findFirst()
-                // Same sentence whether the issue is gone, another org's, or no longer yields this kind:
-                // a decision about an opportunity the evidence no longer supports is not a decision.
-                .orElseThrow(() -> ApiException.notFound("이 개선 기회는 지금 제안되지 않습니다."));
+        List<Derived> derived = derive(orgId, issue);
+        for (Derived d : derived) {
+            if (d.candidate().kind() == kind) {
+                return d;
+            }
+        }
+        // A decision the seller ALREADY took may still be addressed by its own name after the slot's derived
+        // name moved — otherwise 적용 and 보류 on a card the product itself relabelled would answer 「이 개선
+        // 기회는 지금 제안되지 않습니다」 about the thing on their screen. The existence check is the whole
+        // narrowing: no row, no renaming, so a first decision can still only be taken on what is derived now.
+        for (Derived d : derived) {
+            if (d.candidate().kind().namesSameSlotAs(kind)
+                    && decisions.existsByOrgIdAndIssueIdAndKind(orgId, issue.id(), kind)) {
+                return d.named(kind);
+            }
+        }
+        // Same sentence whether the issue is gone, another org's, or no longer yields this kind:
+        // a decision about an opportunity the evidence no longer supports is not a decision.
+        throw ApiException.notFound("이 개선 기회는 지금 제안되지 않습니다.");
     }
 
     private static ImprovementOpportunity newRow(UUID orgId, UUID issueId, OpportunityKind kind) {
@@ -535,6 +572,20 @@ public class OpportunityService {
 
     private static String key(UUID issueId, OpportunityKind kind) {
         return issueId + ":" + kind.name();
+    }
+
+    /** A decision stored under the OTHER name of this slot, or null — see {@link OpportunityKind#namesSameSlotAs}. */
+    private static ImprovementOpportunity sameSlot(Map<String, ImprovementOpportunity> decided, UUID issueId,
+                                                   OpportunityKind derived) {
+        for (OpportunityKind k : OpportunityKind.values()) {
+            if (k != derived && k.namesSameSlotAs(derived)) {
+                ImprovementOpportunity row = decided.get(key(issueId, k));
+                if (row != null) {
+                    return row;
+                }
+            }
+        }
+        return null;
     }
 
     private static OpportunityView view(ReviewIssueView issue, Derived d, ImprovementOpportunity row,

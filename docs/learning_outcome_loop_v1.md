@@ -219,16 +219,39 @@ Postgres 확인이 별도 단계이고, fence test는 migration 텍스트에서 
 
 ## 7. 보고 — 바꾸지 않고 보고하는 것
 
-### 7.1 제품에 남아 있는 결함 하나 (이번에 만든 것이 아니다)
+### 7.1 제품에 남아 있던 결함 하나 — 보고했고, 그 다음에 고쳤다 (2026-10-10)
 
 `FAQ_SUPPLEMENT`를 상품 서가에 저장하면 `KnowledgeMentionCheck`가 그 aspect를 언급한다고 답하기 시작하고,
 `OpportunityRules.guidanceKindOf`가 같은 이슈에서 `PRODUCT_GUIDE_SUPPLEMENT`를 유도한다. 그러면 저장했던
-`FAQ_SUPPLEMENT` row는 **다시 join되지 않고**, 카드는 다른 kind · 검토 전으로 돌아온다. **이 동작은 오늘도
-있었다** — 채택 배지가 사라지는 형태로. 패키지 B가 그것을 더 눈에 띄게 만든다(적용이 이제 의미 있는 기록이므로).
+`FAQ_SUPPLEMENT` row는 **다시 join되지 않고**, 카드는 다른 kind · 검토 전으로 돌아왔다. 이 동작은 패키지 B
+이전에도 있었고(채택 배지가 사라지는 형태), 패키지 B가 그것을 더 눈에 띄게 만들었다 — 적용이 이제 의미 있는
+기록이기 때문이다.
 
-고치지 않은 이유: `list`의 의미를 바꾸는 일이고 Home의 `preparedDrafts` 집계까지 닿는다. 대신 **기록이 사라질 수
-없는 곳에** 두었다 — `GET /api/opportunities/outcomes?issueId=`는 제안이 아니라 **문제**를 주소로 읽으므로
-derivation과 무관하다. 카드의 kind 뒤집힘 자체는 제품 결정이다.
+이 문서는 처음에 그것을 **보고만** 했다. 제품 소유자가 최소 수정을 지시해(2026-10-10) 다음과 같이 닫았다.
+
+**kind는 slot의 이름이고, 그 이름 중 둘은 판매자의 행동이 움직인다.** `FAQ_SUPPLEMENT`와
+`PRODUCT_GUIDE_SUPPLEMENT`는 하나의 product-guidance slot이고, 둘 중 어느 이름을 쓰는지는 `aspectMentioned`
+하나로 갈린다 — 그리고 그 문장을 쓰는 행위가 바로 적용이다. 그러므로 **저장된 결정은 그 slot의 두 이름 중
+어느 것으로 유도되어도 같은 제안에 응답한다**(`OpportunityKind.namesSameSlotAs`).
+
+- 테이블 identity는 **바뀌지 않았다** — `uq_improvement_opportunity_identity`는 여전히 `(org, issue, kind)`,
+  이름당 결정 하나다. 바뀐 것은 join이다.
+- `list`는 정확한 이름으로 먼저 찾고, 없으면 같은 slot의 다른 이름으로 찾는다. 찾으면 카드는 **저장된 이름**을
+  달고 나온다 — 그리고 `Derived.named`로 이유 문장과 준비된 행동까지 같은 이름으로 다시 쓴다. FAQ 보완이라고
+  적힌 카드가 상세·안내 보완의 문장으로 자신을 설명하면 두 제안을 하나로 인쇄한 것이다.
+- `requireDerived`는 **이미 있는 결정만** 자기 이름으로 주소지정할 수 있게 한다
+  (`existsByOrgIdAndIssueIdAndKind`). 이 존재 확인이 좁힘의 전부다 — row가 없으면 개명도 없으므로, **첫
+  결정은 여전히 지금 유도되는 것에만** 내릴 수 있다. `undeliverableKindIsRefused`가 그대로 통과한다.
+- Home의 `preparedDrafts` 재유도 필터도 같은 비교를 쓴다. 적용한 제안이 준비된 작업으로 다시 세어지는 일은
+  없다 — `APPLIED`는 `ACCEPTED`가 아니기 때문이다.
+- 다른 모든 kind 쌍은 **서로 다른 행동 장소**이므로 이 느슨함을 공유하지 않는다. slot이 하나이고 그 이름이
+  판매자의 손 아래에서 움직이는 쌍은 이 하나뿐이다.
+
+회귀 테스트: `OpportunityServiceTest.appliedCardSurvivesTheNameMoving`,
+`.standingDecisionStaysAddressable`.
+
+**그대로 둔 것:** `GET /api/opportunities/outcomes?issueId=`는 여전히 제안이 아니라 **문제**를 주소로 읽는다.
+그 설계는 이 수정에 의존하지 않고, 결과 기록이 derivation과 무관하게 남는다는 성질은 그 자체로 값지다.
 
 ### 7.2 열려 있는 항목이 닫혔다고 적지 않았다
 
