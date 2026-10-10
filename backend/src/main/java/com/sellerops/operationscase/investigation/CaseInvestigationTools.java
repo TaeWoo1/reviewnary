@@ -129,6 +129,21 @@ public class CaseInvestigationTools {
     public record ReviewMediaFacts(int attachCount, boolean attachCountObserved, List<MediaFact> media) {
     }
 
+    /**
+     * The improvement-outcome lane. Optional: a context without it investigates exactly as before, and
+     * {@code getPastOutcomes} returns nothing rather than failing.
+     *
+     * <p>Set rather than constructor-injected for the same reason the review-photo lane above is — this class
+     * is built by hand in a good number of tests, and a sixth collaborator in the signature would be churn in
+     * every one of them to add a tool most of them do not exercise.
+     */
+    private com.sellerops.opportunity.ImprovementOutcomeService improvementOutcomes;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setImprovementOutcomes(com.sellerops.opportunity.ImprovementOutcomeService improvementOutcomes) {
+        this.improvementOutcomes = improvementOutcomes;
+    }
+
     /** The tools, bound to one organisation. The binding is final and no method can change it. */
     public OrgTools forOrg(UUID orgId) {
         if (orgId == null) {
@@ -200,7 +215,41 @@ public class CaseInvestigationTools {
     public record OrderContext(boolean available, String sentence) {
     }
 
-    public record RelatedIssue(String title, long evidenceCount, boolean citesThisReview) {
+    /**
+     * @param lifecycleLabelKo where the seller has taken this problem — 관찰 중 / 확인 필요 / 조치 중 /
+     *                         개선 확인 중 / 해결됨. Carried because «this repeats 18 times» and «this repeats 18
+     *                         times and the seller is already fixing it» call for different recommendations, and
+     *                         before this the investigator could not tell them apart
+     */
+    public record RelatedIssue(String title, long evidenceCount, boolean citesThisReview,
+                               String lifecycleLabelKo) {
+
+        /** Every caller before the lifecycle word was carried. */
+        public RelatedIssue(String title, long evidenceCount, boolean citesThisReview) {
+            this(title, evidenceCount, citesThisReview, null);
+        }
+    }
+
+    /**
+     * One thing this company actually DID about a repeated problem, and what the reviews did afterwards.
+     *
+     * <p><b>The piece the chain was missing.</b> {@code getPastSellerDecisions} has always carried decisions —
+     * what was approved, triaged, corrected — and never a result, so an investigation could see that this seller
+     * replies to 접착 complaints and never that they changed the adhesive in August and complaints fell by four
+     * fifths. A decision without its outcome teaches an investigation the seller's habits; a decision with its
+     * outcome teaches it what works here.
+     *
+     * <p><b>Bounded and settled only.</b> {@code MAX_FOR_INVESTIGATION} rows, newest first, and nothing still
+     * 확인 중: an unread window says nothing yet, and handing it over would let 「아직 모릅니다」 be cited as a
+     * finding. {@code verdictKo} is about the evidence, never about the act — the vocabulary refuses a causal
+     * word ({@code OutcomeVerdict}), so an investigation cannot quote this as «그 조치가 문제를 해결했다».
+     *
+     * @param what  the kind of thing the seller did, from the closed {@code OpportunityKind} vocabulary
+     * @param problem the repeated problem's own title. The seller's words about their own catalogue, not a
+     *                customer's — safe to send, and the only thing that makes the row legible
+     */
+    public record PastOutcome(String problem, String what, LocalDate appliedOn, String verdictKo,
+                              String reasonKo, int evidenceBefore, Integer evidenceAfter) {
     }
 
     public record SimilarCase(String kind, String disposition, String recommendedActionType, String resolution) {
@@ -385,7 +434,8 @@ public class CaseInvestigationTools {
                 ReviewIssue issue = open.get(issueId);
                 if (issue != null) {
                     related.put(issueId, new RelatedIssue(issue.getTitle(),
-                            issueEvidence.countByOrgIdAndIssueId(orgId, issueId), true));
+                            issueEvidence.countByOrgIdAndIssueId(orgId, issueId), true,
+                            issue.getLifecycleState() == null ? null : issue.getLifecycleState().labelKo()));
                 }
             }
             if (productId != null) {
@@ -394,7 +444,8 @@ public class CaseInvestigationTools {
                     long count = ((Number) row[1]).longValue();
                     ReviewIssue issue = open.get(issueId);
                     if (issue != null && count >= 2 && !related.containsKey(issueId) && related.size() < 3) {
-                        related.put(issueId, new RelatedIssue(issue.getTitle(), count, false));
+                        related.put(issueId, new RelatedIssue(issue.getTitle(), count, false,
+                                issue.getLifecycleState() == null ? null : issue.getLifecycleState().labelKo()));
                     }
                 }
             }
@@ -445,6 +496,36 @@ public class CaseInvestigationTools {
             record("getPastSellerDecisions", String.valueOf(productId),
                     reviewDispositions.size() + draftAuthors.size() + made.size());
             return decisions;
+        }
+
+        /**
+         * What this company did about repeated problems that could have reached this product, and what the
+         * reviews did afterwards.
+         *
+         * <p>Empty is the common answer and the honest one: a seller who has applied no improvement has no
+         * outcome, and a window still open says nothing. An ORG-scoped remediation counts for every product
+         * (a shipping rule the seller rewrote is as much a fact about this product's August as any other's); a
+         * PRODUCT-scoped one counts only for its own — the same no-widening rule the policy overlay holds.
+         */
+        public List<PastOutcome> getPastOutcomes(UUID productId) {
+            List<PastOutcome> out = new ArrayList<>();
+            if (improvementOutcomes != null && productId != null) {
+                for (com.sellerops.opportunity.ImprovementOutcomeService.Settled row
+                        : improvementOutcomes.settledSummaryForProduct(orgId, productId)) {
+                    ReviewIssue issue = issues.findById(row.issueId())
+                            .filter(i -> orgId.equals(i.getOrgId())).orElse(null);
+                    if (issue == null) {
+                        continue;
+                    }
+                    out.add(new PastOutcome(issue.getTitle(),
+                            row.kind() == null ? null : row.kind().labelKo(), row.appliedOn(),
+                            row.verdict().labelKo(), row.reason().labelKo(),
+                            row.evidenceBefore(), row.evidenceAfter()));
+                }
+            }
+            List<PastOutcome> result = List.copyOf(out);
+            record("getPastOutcomes", String.valueOf(productId), result.size());
+            return result;
         }
 
         private static String nullSafeToken(Object token) {
