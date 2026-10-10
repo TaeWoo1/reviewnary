@@ -11,6 +11,7 @@ const api = vi.hoisted(() => ({
   teachOperationsCase: vi.fn(),
   editOperationsCaseDraft: vi.fn(),
   correctOperationsCase: vi.fn(),
+  stopOperationsPolicy: vi.fn(),
   getOperationsCaseMedia: vi.fn(),
 }));
 vi.mock("../../lib/apiClient", () => ({ api, getToken: () => null }));
@@ -33,6 +34,9 @@ function detail(over: Partial<OperationsCaseDetail> = {}): OperationsCaseDetail 
     body: "욕실에 붙이려는데 방수 되는지 궁금합니다.",
     reasonNote: "고객이 답변을 기다리고 있습니다.",
     disposition: "NEEDS_DECISION",
+    // 기본은 「판매자 기준이 적용되지 않은 건」 — 정책이 테스트 주제인 케이스만 override한다.
+    appliedPolicy: null,
+    policyProblemKo: null,
     decidedBy: "AGENT",
     summary: "고객이 욕실 사용 가능 여부를 묻고 있습니다.",
     recommendedActionType: "REPLY_TO_CUSTOMER",
@@ -404,8 +408,102 @@ describe("OperationsCase", () => {
         note: "이런 건은 환불로 처리합니다.",
         remember: true,
         scope: "PRODUCT",
+        // <b>The separation, pinned on the wire.</b> 「다음에도 참고」 is on and the standing rule is NOT —
+        // a seller who wanted context remembered has declared no rule, and the payload says so.
+        applyToFuture: false,
+        policyScope: null,
       }),
     );
+  });
+
+  /* ───────────── Seller-declared Operations Policy v1 — the second decision on the same form ───────────── */
+
+  it("the standing-rule tick is not offered on a case with no recorded problem", async () => {
+    api.getOperationsCase.mockResolvedValue(detail({ policyProblemKo: null }));
+    const user = userEvent.setup();
+
+    renderCase();
+    await user.click(await screen.findByRole("button", { name: "처리 변경" }));
+    const form = screen.getByRole("region", { name: "처리 변경" });
+
+    // 「같은 문제」가 무엇인지 말할 수 없는 건에는 체크박스를 그리지 않는다 — 서버가 거부할 선택지를 보여주는
+    // 폼은 판매자에게 제품이 고장났다고 가르친다.
+    expect(within(form).queryByLabelText("앞으로 같은 문제도 이렇게 처리")).toBeNull();
+    // 「유사 건에 재사용」은 그대로 있다 — 두 선택은 서로 독립이다.
+    expect(within(form).getByLabelText("유사 건에 재사용")).toBeTruthy();
+  });
+
+  it("the standing-rule tick needs an action, and sends its own scope separately from the guidance's", async () => {
+    api.getOperationsCase.mockResolvedValue(detail({ policyProblemKo: "배송 지연" }));
+    api.correctOperationsCase.mockResolvedValue(detail());
+    const user = userEvent.setup();
+
+    renderCase();
+    await user.click(await screen.findByRole("button", { name: "처리 변경" }));
+    const form = screen.getByRole("region", { name: "처리 변경" });
+
+    // 처리 방법을 고르기 전에는 비활성 — 처리 없는 기준은 기준이 아니다.
+    const tick = within(form).getByLabelText("앞으로 같은 문제도 이렇게 처리") as HTMLInputElement;
+    expect(tick.disabled).toBe(true);
+    expect(tick.checked).toBe(false);
+
+    await user.selectOptions(within(form).getByLabelText("처리 방법"), "REFUND_OR_COMPENSATION");
+    expect((within(form).getByLabelText("앞으로 같은 문제도 이렇게 처리") as HTMLInputElement).disabled).toBe(false);
+    await user.click(within(form).getByLabelText("앞으로 같은 문제도 이렇게 처리"));
+
+    // 체크한 뒤에야 범위와 무엇이 「같은 문제」인지가 나타난다.
+    expect(screen.getByText(/앞으로 「배송 지연」 건은 이 처리로 추천됩니다/)).toBeTruthy();
+    await user.click(within(form).getByLabelText("회사 전체"));
+    // 「유사 건에 재사용」의 scope는 PRODUCT 그대로 — 두 범위는 같은 값을 쓰지 않는다.
+    await user.click(within(form).getByRole("button", { name: "저장" }));
+
+    await waitFor(() =>
+      expect(api.correctOperationsCase).toHaveBeenCalledWith("case-1", {
+        correctedActionType: "REFUND_OR_COMPENSATION",
+        note: "",
+        remember: true,
+        scope: "PRODUCT",
+        applyToFuture: true,
+        policyScope: "ORG",
+      }),
+    );
+  });
+
+  it("a policy-decided case shows where the recommendation came from, and one way to stop it", async () => {
+    const applied = detail({
+      decidedBy: "SELLER",
+      recommendedActionType: "REFUND_OR_COMPENSATION",
+      appliedPolicy: {
+        policyId: "policy-1",
+        version: 2,
+        scope: "PRODUCT",
+        problemKo: "배송 지연",
+        actionType: "REFUND_OR_COMPENSATION",
+      },
+    });
+    api.getOperationsCase.mockResolvedValue(applied);
+    api.stopOperationsPolicy.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+
+    renderCase();
+
+    // provenance 한 줄: 어디서 나왔는지 + 무슨 문제 + 어느 범위. 기준의 문장은 여기 없다.
+    expect(await screen.findByText(/판매자님이 정한 처리 기준이 적용됐습니다 · 배송 지연 · 이 상품/)).toBeTruthy();
+    // 중단 경로는 하나이고, 기존 retire 라우트다.
+    await user.click(screen.getByRole("button", { name: "이 기준 사용 중단" }));
+    await waitFor(() => expect(api.stopOperationsPolicy).toHaveBeenCalledWith("policy-1"));
+    // 중단이 이 카드에 무엇을 했는지가 누른 이유이므로 다시 읽는다.
+    await waitFor(() => expect(api.getOperationsCase).toHaveBeenCalledTimes(2));
+  });
+
+  it("a case no rule decided shows no provenance line and no stop control", async () => {
+    api.getOperationsCase.mockResolvedValue(detail({ decidedBy: "AGENT", appliedPolicy: null }));
+
+    renderCase();
+
+    await screen.findByRole("button", { name: "처리 변경" });
+    expect(screen.queryByText(/판매자님이 정한 처리 기준/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "이 기준 사용 중단" })).toBeNull();
   });
 
   it("a case the Agent closed shows its final state and the Agent's judgement — not the rule's detection or the model's advice", async () => {

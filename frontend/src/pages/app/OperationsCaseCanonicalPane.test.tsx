@@ -45,6 +45,9 @@ function detail(over: Partial<OperationsCaseDetail> = {}): OperationsCaseDetail 
     body: "포장을 뜯지 않은 경우도 교환이 가능한가요?",
     reasonNote: "고객이 답변을 기다리고 있습니다.",
     disposition: "NEEDS_DECISION",
+    // 기본은 「판매자 기준이 적용되지 않은 건」 — 정책이 테스트 주제인 케이스만 override한다.
+    appliedPolicy: null,
+    policyProblemKo: null,
     decidedBy: "AGENT",
     summary: "등록된 운영 정책으로 답변할 수 있는 문의입니다.",
     recommendedActionType: "REPLY_TO_CUSTOMER",

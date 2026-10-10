@@ -202,6 +202,12 @@ class CaseTeachToReplyFlowTest {
     @Autowired ReviewRepository reviews;
     @Autowired com.sellerops.review.publish.ReviewReplyExecutionRepository replyExecutions;
     @Autowired com.sellerops.attention.reply.ReviewReplyOutcomeRepository replyOutcomes;
+    @Autowired com.sellerops.reviewissue.ReviewIssueRepository issues;
+    @Autowired com.sellerops.reviewissue.ReviewIssueEvidenceRepository issueEvidence;
+    @Autowired com.sellerops.reviewissue.ReviewIssueUnknownUnitRepository issueUnknowns;
+    @Autowired com.sellerops.reviewissue.ReviewIssueStateEventRepository issueStateEvents;
+    @Autowired com.sellerops.operationspolicy.SellerOperationsPolicyRepository policyRows;
+    @Autowired com.sellerops.operationspolicy.SellerOperationsPolicyAuditRepository policyAudits;
     @Autowired SellerAccountRepository accounts;
     @Autowired ChannelRepository channels;
     @Autowired UserRepository users;
@@ -237,6 +243,9 @@ class CaseTeachToReplyFlowTest {
 
     private OperationsCaseProcessor processor;
     private CustomerOperationsHomeService home;
+    private com.sellerops.reviewissue.ReviewIssueExtractionService extraction;
+    private com.sellerops.operationspolicy.SellerPolicyOverlay policyOverlay;
+    private com.sellerops.operationspolicy.SellerOperationsPolicyService policyService;
     private CaseKnowledgeService service;
     private SellerOperationsKnowledgeService orgKnowledge;
     private MockMvc mvc;
@@ -319,6 +328,18 @@ class CaseTeachToReplyFlowTest {
                 draftService, composer, memories,
                 new com.sellerops.inquiry.publish.AnswerDeliveryTruthReader(executions, verifications));
         service.setResolutions(resolutions);
+
+        // Seller-declared Operations Policy v1, wired exactly as the container wires it, so the HTTP path under
+        // test is the one a seller's press runs.
+        extraction = new com.sellerops.reviewissue.ReviewIssueExtractionService(
+                new com.sellerops.reviewissue.RuleBasedIssueSignatureExtractor(false), issues, issueEvidence,
+                issueUnknowns, issueStateEvents);
+        policyOverlay = new com.sellerops.operationspolicy.SellerPolicyOverlay(policyRows, issueEvidence);
+        policyService = new com.sellerops.operationspolicy.SellerOperationsPolicyService(
+                policyRows, policyAudits, products);
+        processor.setPolicyOverlay(policyOverlay);
+        service.setPolicies(policyService, policyOverlay,
+                new com.sellerops.operationspolicy.OperationsPolicyRedecider(cases, events, processor));
 
         mvc = MockMvcBuilders.standaloneSetup(new CaseKnowledgeController(service, users))
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -499,6 +520,177 @@ class CaseTeachToReplyFlowTest {
 
         processor.process(run(Instant.now()), () -> false);
         return only();
+    }
+
+    /* ───────── Seller-declared Operations Policy v1 — the correction form's second decision, over HTTP ───────── */
+
+    @Test
+    @DisplayName("「앞으로 같은 문제도 이렇게 처리」 declares a rule from this case, and the card says where its "
+            + "recommendation came from")
+    void aCorrectionCanDeclareAStandingRule() throws Exception {
+        OperationsCase c = reviewCase("배송이 너무 늦게 왔어요");
+
+        // The seller's press: a different action, and this time it is the rule from now on. 「다음에도 참고」 is
+        // deliberately OFF — the two decisions must be reachable separately or they are not two decisions.
+        mvc.perform(post(casePath(c) + "/correction").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correctedActionType\":\"REFUND_OR_COMPENSATION\",\"note\":\"파손 건은 바로 "
+                                + "환불합니다.\",\"remember\":false,\"scope\":\"ORG\","
+                                + "\"applyToFuture\":true,\"policyScope\":\"PRODUCT\"}"))
+                .andExpect(status().isOk())
+                // The handling moved, and the pane is told which layer decided it.
+                .andExpect(jsonPath("$.recommendedActionType").value("REFUND_OR_COMPENSATION"))
+                .andExpect(jsonPath("$.decidedBy").value("SELLER"))
+                // The provenance line's three facts, and nothing else about the rule.
+                .andExpect(jsonPath("$.appliedPolicy.problemKo").value("배송 지연"))
+                .andExpect(jsonPath("$.appliedPolicy.scope").value("PRODUCT"))
+                .andExpect(jsonPath("$.appliedPolicy.version").value(1))
+                .andExpect(jsonPath("$.appliedPolicy.policyId").exists())
+                // Every fence still where it was: the seller's move, open, nothing resolved.
+                .andExpect(jsonPath("$.disposition").value("NEEDS_DECISION"))
+                .andExpect(jsonPath("$.open").value(true));
+
+        assertThat(policyRows.findByOrgIdAndActiveTrueOrderByDeclaredAtDesc(org)).singleElement()
+                .satisfies(policy -> {
+                    assertThat(policy.getSignatureKey()).isEqualTo("배송:지연");
+                    assertThat(policy.getScope().name()).isEqualTo("PRODUCT");
+                    assertThat(policy.getAction()).isEqualTo(RecommendedActionType.REFUND_OR_COMPENSATION);
+                    assertThat(policy.getNote()).isEqualTo("파손 건은 바로 환불합니다.");
+                    assertThat(policy.getVersion()).isEqualTo(1);
+                });
+        // <b>The separation, over HTTP.</b> 「다음에도 참고」 was off, so no guidance row exists — a rule is not a
+        // guidance and declaring one does not write the other.
+        assertThat(guidanceRows.findAll().stream().filter(g -> org.equals(g.getOrgId())).toList()).isEmpty();
+        assertThat(kinds(c.getId())).contains(CaseEventKind.SELLER_CORRECTED, CaseEventKind.POLICY_APPLIED);
+        assertThat(policyAudits.findByPolicyIdOrderByDecidedAtAsc(
+                policyRows.findByOrgIdAndActiveTrueOrderByDeclaredAtDesc(org).get(0).getId()))
+                .singleElement().satisfies(row -> assertThat(row.getKind().name()).isEqualTo("DECLARED"));
+    }
+
+    @Test
+    @DisplayName("the two ticks are independent — 「다음에도 참고」 alone writes a guidance and no rule")
+    void guidanceAloneDeclaresNoRule() throws Exception {
+        OperationsCase c = reviewCase("배송이 너무 늦게 왔어요");
+
+        mvc.perform(post(casePath(c) + "/correction").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correctedActionType\":\"CONTACT_CUSTOMER\",\"note\":\"전화로 먼저 "
+                                + "연락합니다.\",\"remember\":true,\"scope\":\"ORG\"}"))
+                .andExpect(status().isOk())
+                // The correction is recorded as the seller's judgement about THIS case and nothing more.
+                .andExpect(jsonPath("$.decidedBy").value("RULE"))
+                .andExpect(jsonPath("$.appliedPolicy").doesNotExist());
+
+        assertThat(guidanceRows.findAll().stream().filter(g -> org.equals(g.getOrgId())).toList()).hasSize(1);
+        assertThat(policyRows.findByOrgIdOrderByDeclaredAtDesc(org)).isEmpty();
+        assertThat(kinds(c.getId())).contains(CaseEventKind.SELLER_GUIDANCE_RECORDED)
+                .doesNotContain(CaseEventKind.POLICY_APPLIED);
+    }
+
+    @Test
+    @DisplayName("a rule needs a handling, and a case with no recorded problem cannot carry one")
+    void whatCannotBecomeARule() throws Exception {
+        OperationsCase withProblem = reviewCase("배송이 너무 늦게 왔어요");
+        mvc.perform(post(casePath(withProblem) + "/correction").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correctedActionType\":null,\"note\":\"메모만 남깁니다.\","
+                                + "\"remember\":false,\"scope\":\"ORG\",\"applyToFuture\":true,"
+                                + "\"policyScope\":\"ORG\"}"))
+                .andExpect(status().isBadRequest());
+
+        OperationsCase quiet = reviewCase("잘 받았습니다");
+        mvc.perform(post(casePath(quiet) + "/correction").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correctedActionType\":\"CONTACT_CUSTOMER\",\"note\":\"\","
+                                + "\"remember\":false,\"scope\":\"ORG\",\"applyToFuture\":true,"
+                                + "\"policyScope\":\"ORG\"}"))
+                .andExpect(status().isBadRequest());
+
+        assertThat(policyRows.findByOrgIdOrderByDeclaredAtDesc(org)).isEmpty();
+        // The correction that was refused for the rule did not take the case's own record with it: the first call
+        // still recorded what the seller said about THIS case.
+        assertThat(kinds(withProblem.getId())).contains(CaseEventKind.SELLER_CORRECTED);
+    }
+
+    @Test
+    @DisplayName("a case with no recorded problem is not offered the tick either — policyProblemKo is null")
+    void theFormIsNotOfferedWhereItWouldBeRefused() throws Exception {
+        OperationsCase quiet = reviewCase("잘 받았습니다");
+        mvc.perform(get(casePath(quiet)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.policyProblemKo").doesNotExist());
+
+        OperationsCase withProblem = reviewCase("배송이 너무 늦게 왔어요");
+        mvc.perform(get(casePath(withProblem)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.policyProblemKo").value("배송 지연"));
+    }
+
+    @Test
+    @DisplayName("stopping the rule takes its answer off this card and leaves the card the seller's")
+    void stoppingTheRuleClearsTheCard() throws Exception {
+        OperationsCase c = reviewCase("배송이 너무 늦게 왔어요");
+        mvc.perform(post(casePath(c) + "/correction").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correctedActionType\":\"REFUND_OR_COMPENSATION\",\"note\":\"\","
+                                + "\"remember\":false,\"scope\":\"ORG\",\"applyToFuture\":true,"
+                                + "\"policyScope\":\"PRODUCT\"}"))
+                .andExpect(status().isOk());
+        UUID policyId = policyRows.findByOrgIdAndActiveTrueOrderByDeclaredAtDesc(org).get(0).getId();
+
+        // The stop control: the existing retire route, then the redecision it triggers.
+        var retired = policyService.retire(org, policyId, userId);
+        new com.sellerops.operationspolicy.OperationsPolicyRedecider(cases, events, processor)
+                .redecide(retired.policy());
+
+        mvc.perform(get(casePath(c)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.appliedPolicy").doesNotExist())
+                .andExpect(jsonPath("$.recommendedActionType").doesNotExist())
+                .andExpect(jsonPath("$.decidedBy").value("RULE"))
+                // Still open, still the seller's move. A retirement closes nothing.
+                .andExpect(jsonPath("$.disposition").value("NEEDS_DECISION"))
+                .andExpect(jsonPath("$.open").value(true));
+        assertThat(kinds(c.getId())).contains(CaseEventKind.POLICY_REDECIDED);
+    }
+
+    /**
+     * A review case in the shape the rules leave one in when they could not settle it, with its issue memory
+     * written by the real extraction — the key under test is the one production writes.
+     */
+    private OperationsCase reviewCase(String body) {
+        com.sellerops.product.Product product = new com.sellerops.product.Product();
+        product.setOrgId(org);
+        product.setName("선바로 일체형 전선몰딩");
+        product.setStatus("ACTIVE");
+        UUID productId = products.save(product).getId();
+
+        com.sellerops.review.Review review = new com.sellerops.review.Review();
+        review.setOrgId(org);
+        review.setChannelId(account.getChannelId());
+        review.setProductId(productId);
+        review.setBody(body);
+        review.setRating(2);
+        review.setReceivedAt(Instant.now());
+        review = reviews.save(review);
+        extraction.extract(review);
+
+        OperationsCase c = new OperationsCase();
+        c.setOrgId(org);
+        c.setResponsibilityId(responsibility.getId());
+        c.setCaseKind(com.sellerops.operationscase.OperationsCaseKind.CUSTOMER_WORK);
+        c.setSubjectKind(com.sellerops.operationscase.OperationsSubjectKind.REVIEW);
+        c.setSubjectId(review.getId());
+        c.setProductId(productId);
+        c.setChannelId(account.getChannelId());
+        c.setSignature(UUID.randomUUID().toString().replace("-", ""));
+        c.setSourceState("rr:review;e2e");
+        c.setStatus(com.sellerops.operationscase.OperationsCaseStatus.PREPARED);
+        c.setPriority(com.sellerops.operationscase.CasePriority.NORMAL);
+        c.setReason(com.sellerops.operationscase.CaseReason.REVIEW_NEEDS_ATTENTION);
+        c.setReasonNote(com.sellerops.operationscase.CaseReason.REVIEW_NEEDS_ATTENTION.noteKo());
+        c.setPreparedAction(CasePreparedAction.NONE);
+        c.setDisposition(com.sellerops.operationscase.CaseDisposition.NEEDS_DECISION);
+        c.setRequiredAuthority(com.sellerops.operationscase.RequiredAuthority.HUMAN);
+        c.setDecidedBy(com.sellerops.operationscase.CaseDecider.RULE);
+        c.setOriginRunId(null);
+        c.setSurfacedAt(Instant.now());
+        return cases.saveAndFlush(c);
     }
 
     private OperationsCase only() {

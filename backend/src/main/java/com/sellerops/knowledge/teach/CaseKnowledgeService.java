@@ -99,6 +99,9 @@ public class CaseKnowledgeService {
     /** What the answer lifecycle observed for this case's work item — quoted, never re-derived. */
     private final com.sellerops.inquiry.publish.AnswerDeliveryTruthReader deliveries;
     private CaseResolutionReader resolutions;
+    private com.sellerops.operationspolicy.SellerOperationsPolicyService policies;
+    private com.sellerops.operationspolicy.SellerPolicyOverlay policyOverlay;
+    private com.sellerops.operationspolicy.OperationsPolicyRedecider redecider;
 
     public CaseKnowledgeService(OperationsCaseRepository cases, OperationsCaseEventRepository events,
                                 OperationsCaseProcessor processor, CaseInvestigator investigator,
@@ -126,6 +129,22 @@ public class CaseKnowledgeService {
         this.drafts = drafts;
         this.composer = composer;
         this.memories = memories;
+    }
+
+    /**
+     * <b>Seller-declared Operations Policy v1's three collaborators</b>, or null in a context that has none.
+     *
+     * <p>Optional together and used together: without them 「앞으로 같은 문제도 이렇게 처리」 is refused with a
+     * sentence rather than silently ignored ({@code declarePolicy}), and every other path on this screen — the
+     * correction itself, 「다음에도 참고하기」, teach, the draft edit — behaves exactly as it did before.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setPolicies(com.sellerops.operationspolicy.SellerOperationsPolicyService policies,
+                            com.sellerops.operationspolicy.SellerPolicyOverlay policyOverlay,
+                            com.sellerops.operationspolicy.OperationsPolicyRedecider redecider) {
+        this.policies = policies;
+        this.policyOverlay = policyOverlay;
+        this.redecider = redecider;
     }
 
     /**
@@ -168,7 +187,42 @@ public class CaseKnowledgeService {
                 // The elapsed-time fallback, carried so the pane can apply the same contract the row applies.
                 // It is never preferred over `receivedOn`: see `elapsedSource` on the frontend.
                 c.getCreatedAt(),
-                answerStateNote(orgId, c));
+                answerStateNote(orgId, c),
+                appliedPolicy(orgId, c),
+                // The problem a NEW rule from this case would be keyed on, or null when there is none. The form
+                // offers 「앞으로 같은 문제도 이렇게 처리」 only where this is present, so a seller is never shown a
+                // tick the server would refuse.
+                policyOverlay == null || c.getSubjectKind() != OperationsSubjectKind.REVIEW ? null
+                        : policyOverlay.candidate(orgId, c.getSubjectId())
+                                .map(com.sellerops.operationspolicy.SellerPolicyOverlay.ProblemKey::titleKo)
+                                .orElse(null));
+    }
+
+    /**
+     * The standing rule that decided this case, or null.
+     *
+     * <p>Read from the overlay rather than from the {@code POLICY_APPLIED} event, and gated on
+     * {@code decidedBy == SELLER}: the event says a rule decided it at some past moment, and the overlay says
+     * which rule stands NOW. A seller who retired the rule and reopened the pane must see the card as it is, not
+     * as it was — and the {@code clear} path has already taken the recommendation off it.
+     */
+    private CaseDetailView.AppliedPolicy appliedPolicy(UUID orgId, OperationsCase c) {
+        if (policyOverlay == null || c.getDecidedBy() != com.sellerops.operationscase.CaseDecider.SELLER
+                || c.getSubjectKind() != OperationsSubjectKind.REVIEW) {
+            return null;
+        }
+        return policyOverlay.forReview(orgId, c.getSubjectId(), c.getProductId())
+                .map(applied -> new CaseDetailView.AppliedPolicy(applied.policyId(), applied.version(),
+                        applied.scope().name(), titleKoOf(applied.problem()),
+                        applied.action() == null ? null : applied.action().name()))
+                .orElse(null);
+    }
+
+    /** {@code 배송:지연} → {@code 배송 지연}. Vocabulary only; a key that no longer parses reads as itself. */
+    private static String titleKoOf(String signatureKey) {
+        int split = signatureKey == null ? -1 : signatureKey.indexOf(':');
+        return split <= 0 ? signatureKey
+                : signatureKey.substring(0, split) + " " + signatureKey.substring(split + 1);
     }
 
     /**
@@ -390,7 +444,65 @@ public class CaseKnowledgeService {
             remember(orgId, c, SellerGuidance.Kind.DECISION_CORRECTION, corrected == null ? null : corrected.name(),
                     text, request.scope(), userId, userName);
         }
+        // <b>A second, independent act on the same form.</b> 「다음에도 참고하기」 above wrote context a later
+        // judgement may be shown; this writes a RULE that decides future cases. Neither implies the other and the
+        // request carries two separate ticks and two separate scopes, so a seller cannot reach one by choosing the
+        // other. Ordered after the guidance only so that a refused policy leaves the correction and the guidance
+        // standing — the seller's statement about THIS case is never lost to a rule they could not declare.
+        if (request.applyToFuture()) {
+            declarePolicy(orgId, c, corrected, note, request.policyScope(), userId);
+        }
         return detail(orgId, caseId);
+    }
+
+    /**
+     * Declare 「앞으로 같은 문제도 이렇게 처리」 from this case, and re-decide the open work it reaches.
+     *
+     * <p>Everything about WHAT may be declared is the policy package's — the vocabulary key, the HUMAN-authority
+     * fence, the no-silent-widening refusal, the versioning. This method only supplies what the case knows: which
+     * problem it is about. Three things are refused here because they are about the CASE rather than the policy,
+     * and each says so in the seller's language:
+     *
+     * <ul>
+     *   <li><b>No action chosen.</b> A rule with no handling is not a rule. The note alone is still recorded as
+     *   the correction above.</li>
+     *   <li><b>No recognised problem.</b> A review the extractor found nothing in, an inquiry, or a review whose
+     *   problems the seller dismissed — there is no key, so there is nothing «같은 문제» could mean.</li>
+     *   <li><b>No policy capability.</b> Said rather than silently skipped: a tick that appears accepted and does
+     *   nothing is the failure {@code AnswerStyleSafetyFloor} exists to avoid on the other screen.</li>
+     * </ul>
+     *
+     * <p>The seller's note travels as the policy's note — their own sentence, data, displayed and never prompted
+     * with. The redecision is {@code OperationsPolicyRedecider}'s, with its four fences; nothing here closes a
+     * case, approves anything or reaches a marketplace.
+     */
+    private void declarePolicy(UUID orgId, OperationsCase c, RecommendedActionType action, String note,
+                               String requestedScope, UUID userId) {
+        if (policies == null || policyOverlay == null || redecider == null) {
+            throw ApiException.badRequest("처리 기준을 저장하는 기능이 켜져 있지 않습니다.");
+        }
+        if (action == null) {
+            throw ApiException.badRequest("앞으로의 기준으로 삼으려면 처리 방법을 선택해 주세요.");
+        }
+        if (c.getSubjectKind() != OperationsSubjectKind.REVIEW) {
+            throw ApiException.badRequest("이 건은 반복되는 문제로 기록된 것이 없어 기준으로 삼을 수 없습니다.");
+        }
+        com.sellerops.operationspolicy.SellerPolicyOverlay.ProblemKey key =
+                policyOverlay.candidate(orgId, c.getSubjectId())
+                        .orElseThrow(() -> ApiException.badRequest(
+                                "이 건은 반복되는 문제로 기록된 것이 없어 기준으로 삼을 수 없습니다."));
+        com.sellerops.operationspolicy.OperationsPolicyScope scope =
+                com.sellerops.operationspolicy.OperationsPolicyScope.parse(requestedScope);
+        // The product comes from the CASE, and only for a PRODUCT request. A null here is what makes the policy
+        // service refuse rather than widen — the case's own product is not substituted for a missing choice.
+        UUID productId = scope == com.sellerops.operationspolicy.OperationsPolicyScope.PRODUCT
+                ? c.getProductId() : null;
+        com.sellerops.operationspolicy.SellerOperationsPolicyService.Declared declared = policies.declare(
+                new com.sellerops.operationspolicy.SellerOperationsPolicyService.Declaration(orgId, scope, productId,
+                        key.aspect(), key.problem(), action, note.isEmpty() ? null : note, userId));
+        if (declared.changed()) {
+            redecider.redecide(declared.policy());
+        }
     }
 
     private void remember(UUID orgId, OperationsCase c, SellerGuidance.Kind kind, String correctedAction, String text,

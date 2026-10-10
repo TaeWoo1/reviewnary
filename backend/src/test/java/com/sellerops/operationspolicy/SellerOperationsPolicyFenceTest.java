@@ -112,13 +112,18 @@ class SellerOperationsPolicyFenceTest {
         List<String> writers = new ArrayList<>();
         for (Path source : sources(main)) {
             String code = stripComments(Files.readString(source));
-            if (code.contains("CaseDecider.SELLER")) {
+            // <b>Stamping, not reading.</b> The first version of this check matched the token itself and failed on
+            // `CaseKnowledgeService`, which COMPARES against SELLER to decide whether to draw the provenance
+            // line. Reading the value is not claiming it: a screen that asks «did a rule decide this» is exactly
+            // what the third decider value was added for, and a fence that forbade the question would have forced
+            // the answer to be derived some less honest way.
+            if (code.contains("setDecidedBy(CaseDecider.SELLER)")) {
                 writers.add(source.getFileName().toString());
             }
         }
         assertThat(writers)
-                .as("the processor applies it; the redecider clears it; nothing else may stamp a case SELLER")
-                .containsExactlyInAnyOrder("OperationsCaseProcessor.java", "OperationsPolicyRedecider.java");
+                .as("the processor applies it; nothing else may stamp a case SELLER")
+                .containsExactly("OperationsCaseProcessor.java");
 
         // The method body itself: one handling field and the provenance, and none of the words that end work.
         String processor = Files.readString(

@@ -197,6 +197,29 @@ export interface OperationsCaseDetail {
   reasonNote: string;
   disposition: string | null;
   decidedBy: string | null;
+  /**
+   * <b>The seller's own standing rule decided this case</b> — present only when `decidedBy` is `SELLER`
+   * (Seller-declared Operations Policy v1).
+   *
+   * Five fields: what the pane needs to say «이 추천은 판매자님이 정한 기준에서 나왔습니다» and the one id the
+   * stop control sends. The rule's own sentence is not here — a case pane is not a settings screen.
+   */
+  appliedPolicy: {
+    policyId: string;
+    version: number;
+    scope: "ORG" | "PRODUCT";
+    /** The problem it matched, from the closed vocabulary (「배송 지연」). Never a review's words. */
+    problemKo: string;
+    actionType: string | null;
+  } | null;
+  /**
+   * The problem a NEW rule declared from this case would be keyed on, or null when there is none.
+   *
+   * 「앞으로 같은 문제도 이렇게 처리」 is offered only where this is present, so the form never shows a tick the
+   * server would refuse: an inquiry, a review the extractor recognised nothing in, and a review whose problems the
+   * seller dismissed all read null.
+   */
+  policyProblemKo: string | null;
   summary: string | null;
   recommendedActionType: string | null;
   recommendedAction: string | null;
