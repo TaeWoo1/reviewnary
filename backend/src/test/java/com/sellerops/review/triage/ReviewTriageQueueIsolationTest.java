@@ -52,7 +52,7 @@ class ReviewTriageQueueIsolationTest {
      * check for them with the property that actually matters, and the tier rule itself stays
      * store-nothing.
      */
-    private static final List<String> PERSISTING_SUBPACKAGES = List.of("llm", "feedback", "pilot");
+    private static final List<String> PERSISTING_SUBPACKAGES = List.of("llm", "feedback", "pilot", "corpus");
 
     /**
      * Mechanisms that decide the needs-a-look queue, or that record a human's decision about a review.
@@ -140,6 +140,12 @@ class ReviewTriageQueueIsolationTest {
      * — the attention queue does not read it, and neither does the channel review ordering, which is
      * the point of requirement 3: a correction is displayed beside the system's tier and moves nothing.
      * The list is a whitelist and grows one NAMED table at a time; that is what makes it a gate.
+     *
+     * <p><b>Eight since Learning &amp; Outcome Loop v1</b> (2026-10-10): {@code triage_feedback_snapshot}, the
+     * manifest of a frozen offline evaluation cut. It is the furthest thing in this tree from the attention
+     * queue — it is read by nothing at classification time at all, only by an operator asking what has been cut
+     * — and {@code SellerFeedbackCorpusFenceTest} asserts separately that the package writing it cannot reach a
+     * classifier, a prompt or a stored tier.
      */
     @Test
     void theClassifierWritesOnlyItsOwnTables() throws IOException {
@@ -158,7 +164,7 @@ class ReviewTriageQueueIsolationTest {
                 .containsOnly("review_triage_predictions", "review_triage_corrections",
                         "review_correction_dispositions", "review_triage_ai_current",
                         "review_triage_actions", "review_triage_behavior_events",
-                        "review_triage_correction_audit");
+                        "review_triage_correction_audit", "triage_feedback_snapshot");
     }
 
     /** Only the tier rule's own files — the subpackages are covered by the two tests above. */

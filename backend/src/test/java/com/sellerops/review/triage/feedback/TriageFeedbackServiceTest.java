@@ -509,6 +509,12 @@ class TriageFeedbackServiceTest {
             org.mockito.Mockito.when(repo.findByReviewIdForUpdate(org.mockito.ArgumentMatchers.any()))
                     .thenAnswer(i -> rows.stream()
                             .filter(r -> i.getArgument(0).equals(r.getReviewId())).findFirst());
+            // `cuttable` asks which of the dispositioned corrections still STAND, in one batched read.
+            org.mockito.Mockito.when(repo.findAllById(org.mockito.ArgumentMatchers.any()))
+                    .thenAnswer(i -> {
+                        java.util.Collection<?> ids = i.getArgument(0);
+                        return rows.stream().filter(r -> ids.contains(r.getId())).toList();
+                    });
         }
     }
 

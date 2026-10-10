@@ -11,7 +11,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -384,13 +386,67 @@ public class TriageFeedbackService {
      */
     @Transactional
     public int freezeSnapshot(UUID orgId, String snapshotVersion) {
-        List<CorrectionDisposition> loose = dispositions.findByOrgIdAndDispositionAndSnapshotVersionIsNull(
-                orgId, CorrectionDispositionKind.CLASSIFIER_ERROR);
+        List<CorrectionDisposition> loose = cuttable(orgId);
         for (CorrectionDisposition row : loose) {
             row.setSnapshotVersion(snapshotVersion);
         }
         dispositions.saveAll(loose);
         return loose.size();
+    }
+
+    /**
+     * The loose {@code CLASSIFIER_ERROR} dispositions whose correction <b>still stands</b>.
+     *
+     * <p><b>The state filter is the whole of this method.</b> Everywhere else in this package a withdrawn
+     * correction is «not a weaker answer, it is the absence of one» — {@code TriageCorrectionRepository} says so
+     * on three read methods. A cut that ignored {@link SellerCorrectionState} would be the one place the rule did
+     * not hold, and it would hold it in the direction that matters least and costs most: the rows would be frozen
+     * into a numbered set, and {@link #disposition} then refuses to re-read them forever.
+     *
+     * <p>Exposed so a caller can report how many rows a cut would leave behind before taking it. A count that
+     * only appears after the freeze is a count nobody can act on.
+     */
+    @Transactional(readOnly = true)
+    public List<CorrectionDisposition> cuttable(UUID orgId) {
+        List<CorrectionDisposition> loose = dispositions.findByOrgIdAndDispositionAndSnapshotVersionIsNull(
+                orgId, CorrectionDispositionKind.CLASSIFIER_ERROR);
+        if (loose.isEmpty()) {
+            return List.of();
+        }
+        Set<UUID> standing = corrections.findAllById(
+                        loose.stream().map(CorrectionDisposition::getCorrectionId).toList()).stream()
+                .filter(TriageCorrection::stands)
+                .map(TriageCorrection::getId)
+                .collect(Collectors.toSet());
+        return loose.stream().filter(d -> standing.contains(d.getCorrectionId())).toList();
+    }
+
+    /**
+     * Every loose {@code CLASSIFIER_ERROR} row, standing or withdrawn.
+     *
+     * <p>Beside {@link #cuttable} so the difference between the two is reportable. A surface that only had the
+     * cuttable count would say «3 rows ready» where there were five dispositioned, and the two the seller took
+     * back would be invisible rather than explained.
+     */
+    @Transactional(readOnly = true)
+    public int looseErrorCount(UUID orgId) {
+        return dispositions.findByOrgIdAndDispositionAndSnapshotVersionIsNull(
+                orgId, CorrectionDispositionKind.CLASSIFIER_ERROR).size();
+    }
+
+    /** Loose {@code SELLER_PREFERENCE} rows — counted so a surface can say they exist and will never be stamped. */
+    @Transactional(readOnly = true)
+    public int loosePreferenceCount(UUID orgId) {
+        return dispositions.findByOrgIdAndDispositionAndSnapshotVersionIsNull(
+                orgId, CorrectionDispositionKind.SELLER_PREFERENCE).size();
+    }
+
+    /** Loose action rows and behaviour rows — the two halves of what a SILVER cut would take. */
+    @Transactional(readOnly = true)
+    public int[] looseSilverCounts(UUID orgId) {
+        return new int[] {
+                actions.findByOrgIdAndSnapshotVersionIsNull(orgId).size(),
+                behavior.findByOrgIdAndSnapshotVersionIsNull(orgId).size()};
     }
 
     /**
