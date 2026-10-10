@@ -1,0 +1,3 @@
+[mcp_servers.aside]
+command = "/Users/taewookang/.local/bin/aside"
+args = ["mcp"]

@@ -28,7 +28,13 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private String name;
 
-    /** Free-form role string (e.g. OWNER, OPERATOR). */
+    /**
+     * The account's role. <b>Every account this product creates is {@code OWNER}</b> — both sign-up
+     * paths set it and nothing else writes it, so any other value exists only if a row was inserted by
+     * hand. It is a free-form string rather than an enum because no role model has been designed yet;
+     * naming a second value here would read as one that exists (multi-user roles are out of v1 scope,
+     * `docs/product-scope-v1.md`).
+     */
     @Column(nullable = false)
     private String role;
 

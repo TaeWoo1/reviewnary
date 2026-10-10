@@ -39,6 +39,12 @@ import org.springframework.web.bind.annotation.RestController;
  * combined with the disabled-by-default flag and authenticated org ownership — not a
  * declarative {@code hasRole} rule. There is no separate, finer-grained "admin" role
  * to require; {@code OWNER} is the strongest role that exists.
+ *
+ * <p><b>And today the check cannot refuse anyone.</b> Both sign-up paths set {@code OWNER} and nothing
+ * else writes the column, so every account this product creates passes it. The check stays because the
+ * flag and the org ownership beside it are what actually gate this route, and because a role model, if
+ * one is ever designed, would land here — but it must not be read as evidence that this product has
+ * roles. It does not.
  */
 @RestController
 @RequestMapping("/api/admin/inquiry-dismissals")

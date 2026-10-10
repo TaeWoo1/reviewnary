@@ -1985,6 +1985,13 @@ export interface ChannelReviewItemView {
    * both rather than merging them.
    */
   aiMark: AiTriageMarkView | null;
+  /**
+   * The seller's own standing judgment for this row, or null when they have not corrected it.
+   *
+   * Shown beside `triage` and `aiMark`, never in place of either, and it does not move the row: the
+   * server's ordering does not read the correction table.
+   */
+  sellerCorrection: TriageCorrectionView | null;
 }
 
 /**
@@ -2129,6 +2136,8 @@ export interface ChannelReviewDetailView {
   triage: ReviewTriageNote;
   /** The same pilot mark the list row carried, or null. */
   aiMark: AiTriageMarkView | null;
+  /** The seller's own standing judgment, read back on every open, or null when none stands. */
+  sellerCorrection: TriageCorrectionView | null;
   locateTarget: ChannelReviewLocateTarget;
   /**
    * The reply work this review can carry, or null when the channel has no reply flow (capability
@@ -2163,19 +2172,138 @@ export interface ChannelReviewReplyWork {
 // Three shapes of decreasing evidential weight. None carries free text, and none asserts what the
 // seller was SHOWN — the backend computes that from its own store.
 
-/** The seller's binary answer to the product question — 확인 필요, or not. */
+/**
+ * The seller's own judgment for one review — one of the three tiers the screen shows them.
+ *
+ * Three since 2026-09-11 (T-07). It was a boolean, and 필요 없음 was stored as whatever the RULE
+ * would have said, so a seller who meant 참고 had 지켜보기 recorded under their name.
+ */
 export interface TriageCorrectionRequest {
-  needsAttention: boolean;
+  tier: ReviewTriageTier;
   /** An optional closed-vocabulary reason, or null. */
   reasonCode: string | null;
 }
 
+/**
+ * The seller's STANDING correction, carried on every read of the review — not just echoed back on
+ * write. Before T-07 it lived in one React state variable, so the write reached the database and a
+ * refresh erased it from the screen.
+ *
+ * `systemTier`/`systemSource` are what the system was saying when the seller disagreed. What it says
+ * NOW is `triage.tier` plus `aiMark` on the same object, unchanged: two judgments, side by side.
+ */
 export interface TriageCorrectionView {
   reviewId: string;
-  needsAttention: boolean;
+  correctedTier: ReviewTriageTier;
   reasonCode: string | null;
+  systemTier: ReviewTriageTier | null;
   /** RULES or AI — which mechanism produced the tier the seller corrected. */
-  shownSource: "RULES" | "AI" | null;
+  systemSource: "RULES" | "AI" | null;
+  correctedAt: string;
+  /** How many times the seller has set or withdrawn this correction. 0 on list rows, which do not ask. */
+  changeCount: number;
+}
+
+// ── Review Decision Workspace v1 ─────────────────────────────────────────────────────────────
+//
+// Two reads, both GET, both bounded, both org-scoped. Nothing here is a new store: the context is
+// assembled from the issue memory, the product's own counts and the knowledge library, and the log is
+// read from audit trails this product has been writing for months and nobody was reading.
+
+/**
+ * What stands behind one review — the four things a seller had to leave the review to find.
+ *
+ * `productSignal` is null when the review is bound to no product, and that is not the same as zeros:
+ * one says «this product has no other reviews», the other says «nobody knows which product this is».
+ */
+export interface ReviewDecisionContext {
+  reviewId: string;
+  /**
+   * The server-minted address of this review's DECISION (`review:<uuid>`), round-tripped to the triage
+   * endpoint and never minted here.
+   *
+   * Handed out for every review the workspace can open — including channels with no reply flow, where
+   * the only other source of a ref (`ChannelReviewDetailView.replyWork`) is null. Deciding and
+   * replying are different things, and only the address was ever gated on the second.
+   */
+  decisionRef: string;
+  /** The decision that currently stands, or null when nobody has made one. */
+  currentDecision: TriageDisposition | null;
+  /** The channel this review arrived on — so the workspace uses its word for it without a second read. */
+  channelCode: string | null;
+  productId: string | null;
+  productName: string | null;
+  repeatedProblems: ReviewDecisionProblem[];
+  productSignal: { reviews: number; negativeReviews: number } | null;
+  knowledge: ReviewDecisionKnowledge;
+}
+
+/**
+ * One repeated problem this review is recorded evidence FOR, with what else said the same.
+ *
+ * `evidenceCount` is org-wide and all-time — the same number 고객운영 메모리 means by it. `similar`
+ * never contains the review being decided, and it is capped: the issue page is where they all live.
+ */
+export interface ReviewDecisionProblem {
+  issueId: string;
+  title: string;
+  severity: IssueSeverity | null;
+  lifecycleState: string | null;
+  evidenceCount: number;
+  firstEvidenceOn: string | null;
+  lastEvidenceOn: string | null;
+  dismissed: boolean;
+  similar: ReviewDecisionSimilarReview[];
+}
+
+/** Another review that backs the same problem. `quote` is masked, and null when masking suppressed it. */
+export interface ReviewDecisionSimilarReview {
+  reviewId: string;
+  occurredOn: string | null;
+  rating: number | null;
+  quote: string | null;
+  productName: string | null;
+  sameProduct: boolean;
+}
+
+/**
+ * What this company has written down that a reply could stand on — counts and titles, never bodies.
+ *
+ * Bodies are deliberately absent: this answers «is there anything registered about this», while what a
+ * DRAFT actually stood on is the draft's own citations (`ReviewReplyPrep.draftEvidence`).
+ */
+export interface ReviewDecisionKnowledge {
+  productSources: number;
+  orgSources: number;
+  productTitles: string[];
+  /** 확인 필요 rows still waiting for this product — why a draft may say less than expected. */
+  openAsks: number;
+}
+
+/** One thing that was decided about this review. Closed vocabulary; the Korean is chosen on screen. */
+export interface ReviewDecisionLogEntry {
+  kind: ReviewDecisionLogKind;
+  from: string | null;
+  to: string | null;
+  at: string;
+}
+
+export type ReviewDecisionLogKind =
+  | "SELLER_JUDGMENT_SET"
+  | "SELLER_JUDGMENT_WITHDRAWN"
+  | "ACTION_CHOSEN"
+  | "ACTION_RECORDED"
+  | "REPLY_APPROVAL"
+  | "REPLY_OUTCOME";
+
+/** One entry in a review's correction trail. Closed vocabulary; no actor name, no prose. */
+export interface TriageCorrectionHistoryView {
+  kind: "SET" | "WITHDRAWN";
+  tierFrom: ReviewTriageTier | null;
+  tierTo: ReviewTriageTier | null;
+  systemTier: ReviewTriageTier | null;
+  systemSource: "RULES" | "AI" | null;
+  at: string;
 }
 
 /**

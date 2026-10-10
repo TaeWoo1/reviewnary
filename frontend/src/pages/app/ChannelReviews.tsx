@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { analytics } from "../../lib/analytics";
 import { useParams, useSearchParams } from "react-router-dom";
-import { channelDataTypeLabel } from "../../lib/channelVocabulary";
-import { ratingLabel } from "../../lib/reviewRecord";
+import { reviewWord } from "../../lib/channelVocabulary";
+import { ratingLabel, reviewRecordPath } from "../../lib/reviewRecord";
 import { Section, ListBox } from "../../components/ui/Section";
-import { Status, type StatusTone } from "../../components/ui/Status";
 import { Facts } from "../../components/ui/ObjectRow";
 import { Disclosure } from "../../components/ui/Disclosure";
 import { Empty } from "../../components/ui/Empty";
@@ -17,14 +16,12 @@ import type {
   ReviewChannelCapabilityView,
   ReviewTriageNote,
   ReviewTriageTier,
-  TriageActionKind,
   TriageBehaviorEvent,
 } from "../../lib/types";
 import {
   AI_TRIAGE_DISCLOSURE,
-  AI_TRIAGE_MARK_CLASS,
-  AI_TRIAGE_MARK_LABEL,
-  TRIAGE_FEEDBACK_LABEL,
+  TRIAGE_CORRECTION_COPY,
+  TRIAGE_CORRECTION_LABEL,
   TRIAGE_TAG_DISCLOSURE,
   TRIAGE_TIERS,
   TRIAGE_TIER_LABEL,
@@ -36,8 +33,9 @@ import {
   type LocateUnavailable,
   type ReviewLocateBinding,
 } from "../../lib/actionWindow/locate/useReviewLocate";
-import { ReplyWorkControls } from "../../components/ReplyWorkControls";
 import { MyReplyWork } from "../../components/MyReplyWork";
+import { AiMarkChip, TriageTierChip } from "../../components/reviews/TriageTierChip";
+import { triageDispositionLabel } from "../../lib/vocItems";
 import { plainText, previewText } from "../../lib/plainText";
 
 /**
@@ -45,7 +43,7 @@ import { plainText, previewText } from "../../lib/plainText";
  *
  * It is a record first, and a work surface only where the channel allows one. On a channel whose
  * capability says `replySupported` (NAVER), the detail panel carries the product's one reply flow
- * (`ReplyWorkControls`: 대응 필요 → 답변 준비 → 승인 → 복사 → guided/manual handoff → outcome record) and
+ * (리뷰 처리 화면: 대응 필요 → 답변 준비 → 승인 → 복사 → guided/manual handoff → outcome record) and
  * the page ends with 내 답변 작업 — moved here from the 채널 연결 workbench in product assembly A6, so
  * review work starts on the 리뷰 screen. Elsewhere there is no reply control, no draft, no "답변하기":
  * Coupang gives sellers no way to answer a 상품평, Cafe24 has no reply flow built, and an affordance
@@ -82,16 +80,6 @@ export function shownRangeLabel(page: ChannelReviewPageView | null): string {
   if (page === null || page.items.length === 0) return "0개 표시 중";
   const first = page.page * page.size + 1;
   return `${first}–${first + page.items.length - 1}번째 · 총 ${page.total}개`;
-}
-
-/**
- * What this screen calls one review. The product's word is 리뷰 (the nav item, the workflow); a
- * channel with its own word for the same thing (Coupang: 상품평) keeps it here, from
- * `channelVocabulary`, so the record reads in the channel's terms without the screen owning a
- * per-channel branch. Before the page has loaded there is no channel yet, so the generic word.
- */
-function reviewWord(channelCode: string | null | undefined): string {
-  return channelDataTypeLabel(channelCode, "REVIEW", "리뷰");
 }
 
 /**
@@ -191,8 +179,6 @@ export function ChannelReviews({
   const [detailError, setDetailError] = useState(false);
   // Bumped when the detail records a reply-work decision or outcome, so 내 답변 작업 below re-reads
   // instead of showing the list as it was before the operator's own action on this page.
-  const [replyWorkVersion, setReplyWorkVersion] = useState(0);
-  const noteReplyWorkChanged = useCallback(() => setReplyWorkVersion((v) => v + 1), []);
 
   /**
    * **Only the newest request may write.** Two controls now change the query — the order and the page — so
@@ -348,7 +334,7 @@ export function ChannelReviews({
         below the fold, behind a list ordered by a triage tier that says nothing about whether they owe
         anyone an answer. What the seller is being asked to do comes before the material they might read.
       */}
-      {capability?.replySupported ? <MyReplyWork accountId={accountId} refreshKey={replyWorkVersion} /> : null}
+      {capability?.replySupported ? <MyReplyWork accountId={accountId} /> : null}
 
       {/*
         **What to look at first, before the list itself.** The counts are of the WHOLE record, not the
@@ -498,6 +484,11 @@ export function ChannelReviews({
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       <TriageTierChip tier={item.triage.tier} />
                       {item.aiMark ? <AiMarkChip /> : null}
+                      {/* The seller's own judgment, beside the system's and never in place of it. The
+                          row does not move: the server's ordering does not read the correction. */}
+                      {item.sellerCorrection ? (
+                        <SellerCorrectionChip tier={item.sellerCorrection.correctedTier} />
+                      ) : null}
                       <span className="text-sm font-semibold tabular-nums text-ink">{ratingLabel(item.rating)}</span>
                       <span className="text-sm text-muted">{item.writtenOn ?? "날짜 없음"}</span>
                       {item.isNew ? <Chip tone="accent">새 {word}</Chip> : null}
@@ -578,7 +569,6 @@ export function ChannelReviews({
                 word={word}
                 recordBehavior={recordBehavior}
                 detail={detail}
-                onReplyWorkChanged={noteReplyWorkChanged}
                 locate={locate}
                 // The run belongs to whichever review was last pressed. Showing its state under a DIFFERENT
                 // review would tell the seller SellerOps found the one they are now looking at.
@@ -605,7 +595,6 @@ function ReviewDetail({
   word,
   recordBehavior,
   detail,
-  onReplyWorkChanged,
   locate,
   run,
   running,
@@ -617,7 +606,6 @@ function ReviewDetail({
   word: string;
   recordBehavior: (events: TriageBehaviorEvent[]) => void;
   detail: ChannelReviewDetailView;
-  onReplyWorkChanged: () => void;
   locate: ReviewLocateBinding;
   run: ActionWindowRunView | null;
   running: boolean;
@@ -696,36 +684,44 @@ function ReviewDetail({
       </dl>
 
       {/*
-        **답변 — the one thing a seller can DO with a NAVER review from here.**
+        **판단과 조치는 여기서 하지 않는다 — 리뷰 처리 화면이 그 자리다.**
 
-        Rendered only when the server minted `replyWork` for this review, which it does exactly on the
-        channels whose capability says `replySupported` (contract §1). The cluster is the same
-        `ReplyWorkControls` the 내 답변 작업 rows use — decision, then draft → approve → copy → guided or
-        manual handoff, then the operator's own outcome record — keyed by review so one review's unsaved
-        edit never leaks into the next. Nothing is posted from here: the reply is pasted by the seller in
-        their own SmartStore window, and the guided step only finds the row.
+        This panel used to carry the whole mutation cluster: the response decision, the reply draft and
+        approval, the seller's own tier, and the pilot's action buttons. All of it worked, and all of it
+        was a SECOND room doing the same job as `/reviews/{account}/reply/{review}` — with one set of
+        controls able to see what repeats, what else said the same and what this company has written
+        down, and this one not. Two rooms for one decision is how a product ends up with two answers,
+        and it is also how `ACTION_NOT_NEEDED` and `NO_ACTION` both existed for the same sentence.
+
+        So the record stays a RECORD. It reads what stands — the system's tier, the seller's own answer,
+        the decision, what the channel says — and offers one door. Nothing here writes.
       */}
-      {detail.replyWork ? (
-        <section aria-label="답변" className="space-y-3 border-t border-line pt-4">
-          <p className="text-sm font-semibold text-ink">답변</p>
-          <p className="text-sm leading-relaxed text-muted">
-            대응 필요로 표시하면 답변을 준비할 수 있습니다. 승인한 답변은 판매자센터에서 직접 올리고, 여기에는 올렸다는 기록만
-            남깁니다.
-          </p>
-          <ReplyWorkControls
-            key={detail.id}
-            accountId={accountId}
-            actionRef={detail.replyWork.actionRef}
-            disposition={detail.replyWork.triageDisposition}
-            hasReplyPreparation={detail.replyWork.hasReplyPreparation}
-            channelReplyState={detail.replyWork.channelReplyState}
-            onDecided={onReplyWorkChanged}
-            onOutcomeRecorded={onReplyWorkChanged}
-          />
-        </section>
-      ) : null}
-
-      {pilotOn ? <TriageFeedbackControls accountId={accountId} detail={detail} word={word} /> : null}
+      <section aria-label="판단과 조치" className="space-y-3 border-t border-line pt-4">
+        <p className="text-sm font-semibold text-ink">판단과 조치</p>
+        <Facts className="text-sm text-muted">
+          <span className="inline-flex items-center gap-1.5">
+            시스템 판단 <TriageTierChip tier={detail.triage.tier} />
+            {detail.aiMark ? <AiMarkChip /> : null}
+          </span>
+          {detail.sellerCorrection ? (
+            <span className="inline-flex items-center gap-1.5">
+              판매자 수정 <TriageTierChip tier={detail.sellerCorrection.correctedTier} />
+            </span>
+          ) : null}
+          {detail.replyWork ? (
+            <span>처리 상태 {triageDispositionLabel(detail.replyWork.triageDisposition)}</span>
+          ) : null}
+          {/* The channel's own statement, as a fact on the same line. The explanatory version of it
+              belongs where the controls it explains are — and they are not here any more. */}
+          {detail.replyWork?.channelReplyState === "ANSWERED" ? <span>채널에 답변 등록됨</span> : null}
+        </Facts>
+        <BtnLink to={`${reviewRecordPath(accountId)}/reply/${detail.id}`} size="sm">
+          이 리뷰 처리하기
+        </BtnLink>
+        <p className="text-sm leading-relaxed text-muted">
+          판단·조치·답변 준비는 리뷰 처리 화면에서 합니다. 이 목록에서는 기록된 내용을 읽기만 합니다.
+        </p>
+      </section>
 
       {/*
         **[쿠팡에서 보기] — the one thing a seller can ask SellerOps to DO with a 상품평.**
@@ -797,149 +793,19 @@ function ReviewDetail({
 }
 
 /** The pilot's mark — beside the rules tier, never in its place. */
-function AiMarkChip() {
+/**
+ * The seller's own tier on a queue row — quiet, and prefixed so it cannot be mistaken for the
+ * system's chip beside it.
+ *
+ * Deliberately not `TRIAGE_TIER_CLASS`: 확인 필요 is emphasised there because it is what the worklist
+ * is ordered by, and a correction does not reorder anything. Emphasising it would make the row look
+ * like it had moved.
+ */
+function SellerCorrectionChip({ tier }: { tier: ReviewTriageTier }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${AI_TRIAGE_MARK_CLASS}`}
-      title={AI_TRIAGE_DISCLOSURE}
-    >
-      {AI_TRIAGE_MARK_LABEL}
+    <span className="inline-flex items-center rounded-full bg-canvas px-2 py-0.5 text-xs font-medium text-muted">
+      {TRIAGE_CORRECTION_COPY.sellerPrefix} {TRIAGE_CORRECTION_LABEL[tier]}
     </span>
-  );
-}
-
-/**
- * The feedback spine's controls — RUBRIC v2 §13.7, feedback draft §7–§8.
- *
- * **What these do: record.** A correction changes no tier on this screen, hides no row, and trains
- * nothing; it becomes evidence a person later reads as CLASSIFIER_ERROR or SELLER_PREFERENCE, and a
- * frozen snapshot the NEXT classifier version is measured against. The copy says so, once, because a
- * seller pressing "확인할 필요 없어요" and watching the row stay put deserves to know why.
- *
- * **Binary on purpose.** 확인 필요, or not. The seller is not asked to pick 지켜보기 vs 참고 — that
- * split is the rule's and the pilot does not own it.
- *
- * **Actions are three, and none of them submits anything anywhere.** 조치 시작 / 조치 완료 / 조치 불필요
- * are statements about what the seller did off this screen; the marketplace is not touched.
- */
-function TriageFeedbackControls({
-  accountId,
-  detail,
-  word,
-}: {
-  accountId: string;
-  detail: ChannelReviewDetailView;
-  word: string;
-}) {
-  const [answer, setAnswer] = useState<boolean | null>(null);
-  const [lastAction, setLastAction] = useState<TriageActionKind | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  // A new review, a clean slate — the previous review's answer must not appear pressed on this one.
-  useEffect(() => {
-    setAnswer(null);
-    setLastAction(null);
-    setFailed(false);
-  }, [detail.id]);
-
-  const correct = async (needsAttention: boolean) => {
-    setBusy(true);
-    setFailed(false);
-    try {
-      const view = await api.correctChannelReviewTriage(accountId, detail.id, { needsAttention, reasonCode: null });
-      setAnswer(view.needsAttention);
-    } catch {
-      setFailed(true);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const act = async (kind: TriageActionKind) => {
-    setBusy(true);
-    setFailed(false);
-    try {
-      await api.recordChannelReviewTriageAction(accountId, detail.id, kind);
-      setLastAction(kind);
-    } catch {
-      setFailed(true);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="space-y-3 border-t border-line pt-4" aria-label="분류 피드백">
-      <p className="text-sm font-semibold text-ink">이 {word}, 확인이 필요한가요?</p>
-      <div className="flex flex-wrap gap-2">
-        <Btn
-          size="sm"
-          variant={answer === true ? "solid" : "outline"}
-          aria-pressed={answer === true}
-          disabled={busy}
-          onClick={() => void correct(true)}
-        >
-          {TRIAGE_FEEDBACK_LABEL.needsAttention}
-        </Btn>
-        <Btn
-          size="sm"
-          variant={answer === false ? "solid" : "outline"}
-          aria-pressed={answer === false}
-          disabled={busy}
-          onClick={() => void correct(false)}
-        >
-          {TRIAGE_FEEDBACK_LABEL.notNeeded}
-        </Btn>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {(["ACTION_STARTED", "ACTION_COMPLETED", "ACTION_NOT_NEEDED"] as const).map((kind) => (
-          <Btn
-            key={kind}
-            size="sm"
-            variant={lastAction === kind ? "solid" : "ghost"}
-            aria-pressed={lastAction === kind}
-            disabled={busy}
-            onClick={() => void act(kind)}
-          >
-            {kind === "ACTION_STARTED"
-              ? TRIAGE_FEEDBACK_LABEL.started
-              : kind === "ACTION_COMPLETED"
-                ? TRIAGE_FEEDBACK_LABEL.completed
-                : TRIAGE_FEEDBACK_LABEL.actionNotNeeded}
-          </Btn>
-        ))}
-      </div>
-      <p className="text-sm leading-relaxed text-muted">
-        답변은 기록만 됩니다. 이 화면의 분류가 바로 바뀌거나 {josa(word, "이", "가")} 숨겨지지는 않으며, 다음 분류 기준을 검토할 때
-        근거로 씁니다. 마켓플레이스에는 아무것도 전송되지 않습니다.
-      </p>
-      {failed ? (
-        <p className="text-sm text-ink" role="status">
-          기록하지 못했습니다. 잠시 후 다시 눌러 주세요.
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * The tier, as the one emphasised thing on the row.
- *
- * A `span` rather than a `Chip`: `Chip`'s palette is deliberately two-tone so that no chip can imply
- * a status claim, and widening it to give 확인 필요 its colour would remove that fence for every
- * other surface.
- */
-const TIER_TONE: Record<ReviewTriageTier, StatusTone> = {
-  NEEDS_ATTENTION: "warn",
-  WATCH: "neutral",
-  FYI: "neutral",
-};
-
-function TriageTierChip({ tier }: { tier: ReviewTriageTier }) {
-  return (
-    <Status tone={TIER_TONE[tier]} variant="word">
-      {TRIAGE_TIER_LABEL[tier]}
-    </Status>
   );
 }
 

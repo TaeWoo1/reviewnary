@@ -1,0 +1,20 @@
+# This whole POC is an isolated experiment. Nothing generated here is source.
+# Belt-and-braces: even a careless `git add -A` must not stage runtime state.
+
+.venv/
+__pycache__/
+*.pyc
+
+# Environment (Steel + LLM keys). Only .env.example is ever committed.
+.env
+
+# Captured official export artifacts. These hold REAL customer review text (PII).
+# Never committed, never copied out of this directory.
+.artifacts/
+
+# Saved Steel session context (holds the seller's NAVER session cookies/storage).
+# This is the same class of secret as collector/.profile/ — NEVER committed.
+.profile/
+
+# Run logs and SDK introspection output (sanitized by design, but per-run local state).
+.runs/

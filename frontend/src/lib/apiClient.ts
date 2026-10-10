@@ -40,6 +40,9 @@ import type {
   ChannelReviewDetailView,
   TriageActionKind,
   TriageBehaviorEvent,
+  TriageCorrectionHistoryView,
+  ReviewDecisionContext,
+  ReviewDecisionLogEntry,
   TriageCorrectionRequest,
   TriageCorrectionView,
   TriageEventView,
@@ -1945,6 +1948,48 @@ export const api = {
     const { data } = await http.post<TriageCorrectionView>(
       `/api/seller-accounts/${encodeURIComponent(accountId)}/channel-reviews/${encodeURIComponent(reviewId)}/triage-feedback/correction`,
       request,
+    );
+    return data;
+  },
+
+  /**
+   * 되돌리기 — the seller takes their correction back. The review reads as the system's judgment
+   * alone again; the row and its trail are kept server-side.
+   */
+  async withdrawChannelReviewTriageCorrection(accountId: string, reviewId: string): Promise<void> {
+    await http.delete(
+      `/api/seller-accounts/${encodeURIComponent(accountId)}/channel-reviews/${encodeURIComponent(reviewId)}/triage-feedback/correction`,
+    );
+  },
+
+  /**
+   * What stands behind one review — repeated problems, what else said the same, what is written down.
+   *
+   * A SECOND read, deliberately separate from the one that opens the screen: none of it is needed to
+   * answer a customer, so it must not be able to delay or fail the panel that does.
+   */
+  async getReviewDecisionContext(accountId: string, reviewId: string): Promise<ReviewDecisionContext> {
+    const { data } = await http.get<ReviewDecisionContext>(
+      `/api/seller-accounts/${encodeURIComponent(accountId)}/channel-reviews/${encodeURIComponent(reviewId)}/decision-context`,
+    );
+    return data;
+  },
+
+  /** What has already been decided about this review, newest first. Read from existing trails only. */
+  async getReviewDecisionLog(accountId: string, reviewId: string): Promise<ReviewDecisionLogEntry[]> {
+    const { data } = await http.get<ReviewDecisionLogEntry[]>(
+      `/api/seller-accounts/${encodeURIComponent(accountId)}/channel-reviews/${encodeURIComponent(reviewId)}/decision-log`,
+    );
+    return data;
+  },
+
+  /** The review's correction trail, oldest first — what the seller said and when they changed it. */
+  async getChannelReviewCorrectionHistory(
+    accountId: string,
+    reviewId: string,
+  ): Promise<TriageCorrectionHistoryView[]> {
+    const { data } = await http.get<TriageCorrectionHistoryView[]>(
+      `/api/seller-accounts/${encodeURIComponent(accountId)}/channel-reviews/${encodeURIComponent(reviewId)}/triage-feedback/correction/history`,
     );
     return data;
   },
