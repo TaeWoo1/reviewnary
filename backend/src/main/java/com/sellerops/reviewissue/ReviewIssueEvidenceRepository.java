@@ -138,6 +138,22 @@ public interface ReviewIssueEvidenceRepository extends JpaRepository<ReviewIssue
     List<ReviewIssueEvidence> findByOrgIdAndReviewId(UUID orgId, UUID reviewId);
 
     /**
+     * The issue keys this review is evidence for — {@code aspect:problem}, the issue memory's own identity.
+     *
+     * <p>One indexed join instead of «evidence rows, then issues by id»: the Seller-declared Operations Policy
+     * overlay asks this once per case and the answer is a handful of closed vocabulary strings, never a row the
+     * caller then has to fetch. Dismissed issues are left out — 「중요하지 않음」 is the seller saying this problem
+     * is not one they are managing, and a standing rule about a problem they dismissed would reopen it by the
+     * back door.
+     */
+    @Query("""
+            select distinct i.signatureKey from ReviewIssueEvidence e, ReviewIssue i
+            where e.orgId = :orgId and e.reviewId = :reviewId
+              and i.id = e.issueId and i.orgId = :orgId and i.dismissed = false
+            """)
+    List<String> signatureKeysOfReview(@Param("orgId") UUID orgId, @Param("reviewId") UUID reviewId);
+
+    /**
      * {@code [min, max]} of the issue's remaining evidence dates, or an empty list when it has none —
      * re-derived after a retraction, because the issue's stored span only ever widened while nothing
      * could be deleted (Issue Evidence Trust Closure v1).

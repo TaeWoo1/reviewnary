@@ -158,6 +158,49 @@ public interface OperationsCaseRepository extends JpaRepository<OperationsCase, 
     List<Object[]> recentTriageCorrectionsForProduct(@Param("orgId") UUID orgId, @Param("productId") UUID productId,
                                                      Pageable page);
 
+    /**
+     * Open REVIEW cases whose review is evidence for one {@code aspect:problem} — the only cases a policy change
+     * may re-decide (Seller-declared Operations Policy v1).
+     *
+     * <p>Joined through the issue memory the extraction after every ingest already wrote, on the key
+     * {@code review_issues} is indexed by, and bounded by status: a closed case is not reopened by a rule change.
+     * Dismissed issues are excluded for the same reason {@code signatureKeysOfReview} excludes them — 「중요하지
+     * 않음」 is the seller saying this is not a problem they are managing.
+     */
+    @Query("""
+            select c from OperationsCase c, ReviewIssueEvidence e, ReviewIssue i
+            where c.orgId = :orgId and c.status = :status
+              and c.subjectKind = com.sellerops.operationscase.OperationsSubjectKind.REVIEW
+              and e.orgId = :orgId and e.reviewId = c.subjectId
+              and i.id = e.issueId and i.orgId = :orgId and i.dismissed = false
+              and i.signatureKey = :signatureKey
+            order by c.createdAt asc
+            """)
+    List<OperationsCase> findOpenReviewCasesForIssueKey(@Param("orgId") UUID orgId,
+                                                        @Param("status") OperationsCaseStatus status,
+                                                        @Param("signatureKey") String signatureKey);
+
+    /**
+     * The same, narrowed to one product — what a PRODUCT-scope policy reaches and nothing more.
+     *
+     * <p>Narrowed in SQL rather than filtered in Java so a product rule on a busy key cannot read a page of other
+     * products' cards to discard them. The case's own {@code product_id} is the binding the overlay also tests.
+     */
+    @Query("""
+            select c from OperationsCase c, ReviewIssueEvidence e, ReviewIssue i
+            where c.orgId = :orgId and c.status = :status
+              and c.subjectKind = com.sellerops.operationscase.OperationsSubjectKind.REVIEW
+              and c.productId = :productId
+              and e.orgId = :orgId and e.reviewId = c.subjectId
+              and i.id = e.issueId and i.orgId = :orgId and i.dismissed = false
+              and i.signatureKey = :signatureKey
+            order by c.createdAt asc
+            """)
+    List<OperationsCase> findOpenReviewCasesForIssueKeyAndProduct(@Param("orgId") UUID orgId,
+                                                                  @Param("status") OperationsCaseStatus status,
+                                                                  @Param("signatureKey") String signatureKey,
+                                                                  @Param("productId") UUID productId);
+
     @Query("""
             select c from OperationsCase c
             where c.orgId = :orgId and c.responsibilityId in :responsibilityIds and c.status = :status
