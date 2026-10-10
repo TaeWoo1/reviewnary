@@ -134,6 +134,8 @@ class InquiryQualitySetTest {
     static final int MAX_FALSE_GROUNDING = 3;
 
     @Autowired EntityManager em;
+    @Autowired com.sellerops.review.publish.ReviewReplyExecutionRepository replyExecutions;
+    @Autowired com.sellerops.attention.reply.ReviewReplyOutcomeRepository replyOutcomes;
     @Autowired OrganizationRepository organizations;
     @Autowired ProductRepository products;
     @Autowired ProductVariantRepository variants;
@@ -467,7 +469,9 @@ class InquiryQualitySetTest {
     private List<KnowledgeSourceAdapter> adapters() {
         return List.of(
                 new SellerKnowledgeAdapter(orgSources, orgChunks, productSources, productChunks),
-                new ProductFactAdapter(facts), new InquiryAnswerAdapter(memories), new ReviewReplyAdapter(em),
+                new ProductFactAdapter(facts), new InquiryAnswerAdapter(memories), new ReviewReplyAdapter(em,
+                        new com.sellerops.review.publish.ReviewDeliveryTruthReader(
+                                replyExecutions, replyOutcomes)),
                 new SellerDecisionAdapter(em), new SellerGuidanceAdapter(guidanceRows));
     }
 

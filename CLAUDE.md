@@ -259,6 +259,7 @@ but not carrying current truth on its own (`docs/archive/` especially).
 - `docs/review_auto_check_v1.md` — Review Auto-Check v1 — 자동 리뷰 확인 (제품 계약 · 구현 계약)
 - `docs/review_auto_check_live_proof_v1.md` — Review Auto-Check — Live Proof v1 (2026-10-09 → 10-10)
 - `docs/review_decision_workspace_v1.md` — Review Decision Workspace v1 — 한 리뷰를 한 화면에서 판단하고 기록한다
+- `docs/review_delivery_truth_spine_v1.md` — Review Delivery Truth Spine v1 — 리뷰 답변이 어디까지 갔는지, 한 곳에서 말한다
 - `docs/review_reply_template_settings_v1.md` — Review Reply Template Settings v1
 - `docs/review_triage_contract_v1.md` — Review Triage Contract v1 — 두 축을 분리한다
 - `docs/workstreams/review_ai_triage_demo.md` — Review AI Triage — Demo Home (canonical entry point)

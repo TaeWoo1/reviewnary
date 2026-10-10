@@ -26,5 +26,24 @@ public enum ReviewDecisionLogKind {
     REPLY_APPROVAL,
 
     /** The seller reported what happened to the approved reply ({@code OperatorOutcome}). */
-    REPLY_OUTCOME
+    REPLY_OUTCOME,
+
+    /**
+     * What reviewnary itself did with the approved reply, and what it could confirm —
+     * {@code review_reply_execution} (Review Delivery Truth Spine v1).
+     *
+     * <p><b>Not a duplicate of {@link #REPLY_OUTCOME}.</b> That one is the seller's report about their own manual
+     * post; this one is reviewnary's record of its own act — the Cafe24 POST and its hash read-back, the guided
+     * composer fill, the collector's sighting of the seller's submit. The log carried only the first, so a reply
+     * reviewnary posted and verified left no entry at all on the one screen that answers «what has already been
+     * decided about this review».
+     *
+     * <p><b>{@code from} is what was done and {@code to} is what was confirmed</b> —
+     * {@code ReviewExecutionStatus} then {@code ReviewExecutionVerification}. That is a real progression and not
+     * an abuse of the pair: «POSTED, and the read-back hashes» is two different facts and the screen must be able
+     * to say the first without the second. An execution with nothing to confirm (a {@code REFUSED} row — a gate
+     * stopped it, or the channel rejected the body) carries {@code from} null and the status in {@code to}, so
+     * that a reader who only ever looks at {@code to} can never mistake a refusal for a delivery.
+     */
+    REPLY_EXECUTION
 }

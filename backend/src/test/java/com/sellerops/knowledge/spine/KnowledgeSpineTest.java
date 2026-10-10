@@ -97,6 +97,8 @@ class KnowledgeSpineTest {
     static final String CUSTOMER_SENTENCE = "벽에 붙였는데 이틀 만에 접착이 떨어졌어요 너무 속상하네요";
 
     @Autowired jakarta.persistence.EntityManager em;
+    @Autowired com.sellerops.review.publish.ReviewReplyExecutionRepository replyExecutions;
+    @Autowired com.sellerops.attention.reply.ReviewReplyOutcomeRepository replyOutcomes;
     @Autowired com.sellerops.knowledge.guidance.SellerGuidanceRepository guidanceRows;
     KnowledgeSpineService spine;
     SourceRefResolver resolver;
@@ -130,7 +132,9 @@ class KnowledgeSpineTest {
     @BeforeEach
     void seed() {
         adapters = List.of(new SellerKnowledgeAdapter(orgSources, orgChunks, productSources, productChunks),
-                new ProductFactAdapter(facts), new InquiryAnswerAdapter(memories), new ReviewReplyAdapter(em),
+                new ProductFactAdapter(facts), new InquiryAnswerAdapter(memories), new ReviewReplyAdapter(em,
+                        new com.sellerops.review.publish.ReviewDeliveryTruthReader(
+                                replyExecutions, replyOutcomes)),
                 new SellerDecisionAdapter(em), new com.sellerops.knowledge.spine.adapter.SellerGuidanceAdapter(guidanceRows));
         resolver = new SourceRefResolver(em);
         com.sellerops.inquiry.draft.InquiryEvidenceRetriever retriever = new com.sellerops.inquiry.draft.InquiryEvidenceRetriever(
@@ -237,7 +241,7 @@ class KnowledgeSpineTest {
         assertThat(answer.provenance()).contains(AnswerMemoryStrength.IMPORTED_SELLER_ANSWER.labelKo());
         KnowledgeEntry reply = entryOf(found, SpineSourceType.REVIEW_REPLY);
         assertThat(reply.authority()).isEqualTo(KnowledgeAuthority.PAST_SELLER_ANSWER);
-        assertThat(reply.provenance()).contains("등록했다고 기록한");
+        assertThat(reply.provenance()).contains("채널에 등록된 것으로 기록된");
         assertThat(reply.sourceRefs()).extracting(SourceRef::kind).contains(SourceRef.Kind.REVIEW,
                 SourceRef.Kind.REVIEW_REPLY_APPROVAL, SourceRef.Kind.REVIEW_REPLY_DRAFT);
     }

@@ -2905,7 +2905,14 @@ export type ReviewDecisionLogKind =
   | "ACTION_CHOSEN"
   | "ACTION_RECORDED"
   | "REPLY_APPROVAL"
-  | "REPLY_OUTCOME";
+  | "REPLY_OUTCOME"
+  /**
+   * What reviewnary itself did with the approved reply (`review_reply_execution`). `from` is the
+   * `ReviewExecutionStatus` and `to` is the `ReviewExecutionVerification` — or, where there was nothing to
+   * confirm, `from` is null and `to` carries the status. Distinct from `REPLY_OUTCOME`, which is the seller's
+   * own report about their own manual post.
+   */
+  | "REPLY_EXECUTION";
 
 /** One entry in a review's correction trail. Closed vocabulary; no actor name, no prose. */
 export interface TriageCorrectionHistoryView {

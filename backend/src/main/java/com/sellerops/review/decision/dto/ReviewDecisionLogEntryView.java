@@ -9,8 +9,9 @@ import java.time.Instant;
  * keeps and already treats as append-only: the seller's triage corrections
  * ({@code review_triage_correction_audit}), the response decision
  * ({@code review_triage_audit}), the explicit acts ({@code review_triage_actions}), the reply
- * approval ({@code review_reply_approval_audit}) and the reported outcome
- * ({@code review_reply_outcomes}). A fourth "decision" store would be a second copy of facts that
+ * approval ({@code review_reply_approval_audit}), the reported outcome
+ * ({@code review_reply_outcome}) and what reviewnary itself did with the approved reply
+ * ({@code review_reply_execution}). A further "decision" store would be a second copy of facts that
  * are already answerable, and the copy is what drifts.
  *
  * <p><b>Closed vocabulary, no prose, no actor name.</b> {@code kind}, {@code from} and {@code to} are

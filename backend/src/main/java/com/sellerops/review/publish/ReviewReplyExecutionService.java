@@ -59,6 +59,9 @@ import org.springframework.stereotype.Service;
 @Service
 public class ReviewReplyExecutionService {
 
+    private static final org.slf4j.Logger LOG =
+            org.slf4j.LoggerFactory.getLogger(ReviewReplyExecutionService.class);
+
     static final String ACTOR_PREFIX = "SELLER:";
     static final java.util.List<ReviewExecutionStatus> SENT_STATUSES =
             java.util.List.of(ReviewExecutionStatus.POSTED, ReviewExecutionStatus.DELIVERY_UNKNOWN);
@@ -74,7 +77,30 @@ public class ReviewReplyExecutionService {
     private final ExecutableIdentityResolver identity;
     private final ReviewExecutionCapability capability;
 
+    /**
+     * Answer Memory's review-lane hook, or null in a context that has none.
+     *
+     * <p>Null in the test seam below and null-checked at its one call site, because remembering a verified
+     * delivery is not part of performing one: this service's whole correctness story is about what leaves for a
+     * channel exactly once, and a memory write must not be able to affect it.
+     */
+    private com.sellerops.review.memory.ReviewAnswerMemoryHook answerMemory;
+
+    @org.springframework.beans.factory.annotation.Autowired
     public ReviewReplyExecutionService(ReviewRepository reviews, SellerAccountRepository accounts,
+                                       ChannelRepository channels, ReviewReplyApprovalRepository approvals,
+                                       ReviewReplyDraftService drafts,
+                                       ReviewReplySubmissionRefRepository submissionRefs,
+                                       ReviewReplyExecutionRepository executions,
+                                       ExecutableIdentityResolver identity,
+                                       ReviewExecutionCapability capability,
+                                       com.sellerops.review.memory.ReviewAnswerMemoryHook answerMemory) {
+        this(reviews, accounts, channels, approvals, drafts, submissionRefs, executions, identity, capability);
+        this.answerMemory = answerMemory;
+    }
+
+    /** Test seam without the memory hook: a verified delivery executes and records, and remembers nothing. */
+    ReviewReplyExecutionService(ReviewRepository reviews, SellerAccountRepository accounts,
                                        ChannelRepository channels, ReviewReplyApprovalRepository approvals,
                                        ReviewReplyDraftService drafts,
                                        ReviewReplySubmissionRefRepository submissionRefs,
@@ -157,11 +183,53 @@ public class ReviewReplyExecutionService {
                 // The read-back is the verification; a 2xx is only "the channel took the request".
                 ReviewExecutionVerification verification = adapter.verify(scope.review().getOrgId(),
                         scope.account().getId(), scope.review().getExternalId(), body, posted.commentNo());
-                yield record(scope, approval, command, ReviewExecutionLane.API, ReviewExecutionStatus.POSTED,
+                ReviewExecutionView recorded = record(scope, approval, command, ReviewExecutionLane.API,
+                        ReviewExecutionStatus.POSTED,
                         posted.commentNo() == null ? null : String.valueOf(posted.commentNo()), null,
                         verification, Instant.now(), actor);
+                rememberVerified(scope, approval, verification, actorUserId);
+                yield recorded;
             }
         };
+    }
+
+    /**
+     * <b>The one point at which a review reply becomes Answer Memory at full strength</b> (Review Delivery Truth
+     * Spine v1).
+     *
+     * <p>Gated on {@link ReviewExecutionVerification#memoryEligible()}, which is true for {@code VERIFIED} alone:
+     * the posted comment exists, is the shop's, and hashes to the approved draft. That is the only state in this
+     * lane's vocabulary that proves WHAT the customer received, and Answer Memory's
+     * {@code EXECUTOR_SENT_VERIFIED} is a claim about exactly that. {@code DELIVERY_UNKNOWN},
+     * {@code STATUS_UNRESOLVED} and {@code UNVERIFIABLE} write nothing — a reply that may have landed is not a
+     * sentence the company can be shown to have said.
+     *
+     * <p><b>The guided lane never reaches here, and that is the design.</b> Its ceiling is «a reply exists on this
+     * review, content unknown»; the seller's own report that they posted the approved text is recorded, trusted
+     * and displayed, but it cannot be distinguished from a sentence they edited in the composer first. Promoting
+     * it would let unverified text come back as precedent under the strongest strength the product has.
+     *
+     * <p><b>Best-effort, and the try/catch is load-bearing.</b> The hook swallows its own failures, but the
+     * lookup that feeds it does not, and this runs AFTER a public reply has already been posted and recorded.
+     * A draft read that threw here would turn a successful, irreversible send into an error response — the
+     * seller would be told their reply failed and would post it again by hand. So nothing in this method is
+     * allowed to escape it. A null hook (test seam) is a no-op.
+     */
+    private void rememberVerified(Scope scope, ReviewReplyApproval approval,
+                                   ReviewExecutionVerification verification, UUID actorUserId) {
+        if (answerMemory == null || verification == null || !verification.memoryEligible()) {
+            return;
+        }
+        try {
+            drafts.version(scope.review().getId(), approval.getApprovedVersion())
+                    // The same binding check `approvedBody` makes: a version whose fingerprint is not the one
+                    // the approval bound is not the text that was sent, whatever its number says.
+                    .filter(draft -> approval.getApprovedFingerprint().equals(draft.getContentFingerprint()))
+                    .ifPresent(draft -> answerMemory.rememberVerified(scope.review(), draft, actorUserId));
+        } catch (RuntimeException e) {
+            LOG.warn("review answer-memory skipped after a verified send org={} review={}: {}",
+                    scope.review().getOrgId(), scope.review().getId(), e.getClass().getSimpleName());
+        }
     }
 
     // ── guided lane ──────────────────────────────────────────────────────────────────────────

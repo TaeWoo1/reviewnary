@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { DECISION_ACTION_WORD, DECISION_DONE_LABEL, decisionLogSentence } from "./reviewDecision";
+import {
+  DECISION_ACTION_WORD,
+  DECISION_DONE_LABEL,
+  DECISION_LOG_DISCLOSURE,
+  DECISION_LOG_DISCLOSURE_EXECUTED,
+  decisionLogDisclosure,
+  decisionLogSentence,
+} from "./reviewDecision";
 import { TRIAGE_OPTIONS } from "./vocItems";
 import type { ReviewDecisionLogEntry } from "./types";
 
@@ -31,6 +38,47 @@ describe("decisionLogSentence", () => {
       .toBe("답변을 승인");
     expect(decisionLogSentence(entry({ kind: "REPLY_OUTCOME", to: "OPERATOR_REPORTED_SUBMITTED" })))
       .toBe("판매자센터에 올렸다고 기록");
+  });
+
+  /**
+   * Review Delivery Truth Spine v1 — what reviewnary itself did, said at exactly the strength it was proven.
+   *
+   * The pair that matters is the last two: a hash read-back may say the channel holds the approved text, and the
+   * guided lane's ceiling may not. A screen that said 등록 완료 for both would be claiming NAVER's content was
+   * verified, which nothing in the product can check.
+   */
+  it("says how much of a delivery was actually proven, and no more", () => {
+    expect(decisionLogSentence(entry({ kind: "REPLY_EXECUTION", from: "POSTED", to: "VERIFIED" })))
+      .toBe("채널에 답변을 등록하고 내용까지 확인함");
+    expect(decisionLogSentence(entry({ kind: "REPLY_EXECUTION", from: "POSTED", to: "DELIVERY_UNKNOWN" })))
+      .toBe("채널에 답변을 보냈지만 등록됐는지 확인하지 못함");
+    expect(decisionLogSentence(entry({ kind: "REPLY_EXECUTION", from: null, to: "REFUSED" })))
+      .toBe("답변을 보내지 않음");
+    expect(decisionLogSentence(entry({
+      kind: "REPLY_EXECUTION",
+      from: "SELLER_SUBMISSION_OBSERVED",
+      to: "SUBMISSION_OBSERVED_CONTENT_UNVERIFIED",
+    }))).toBe("채널에 답변이 생긴 것을 확인함 — 내용은 확인하지 못함");
+    expect(decisionLogSentence(entry({ kind: "REPLY_EXECUTION", to: "SOMETHING_NEW" }))).toBeNull();
+  });
+
+  /**
+   * The safety line has to follow the record.
+   *
+   * 「마켓플레이스에는 아무것도 전송되지 않습니다」 was true of every screen that only ever recorded decisions.
+   * It stops being true the moment the log shows an execution reviewnary performed, and a disclosure that is
+   * false on one review is worth nothing on the others.
+   */
+  it("stops promising nothing was sent once something was", () => {
+    expect(decisionLogDisclosure([])).toBe(DECISION_LOG_DISCLOSURE);
+    expect(decisionLogDisclosure([entry({ kind: "REPLY_APPROVAL", to: "APPROVED" })]))
+      .toBe(DECISION_LOG_DISCLOSURE);
+    // A refused execution sent nothing, so the original promise still holds.
+    expect(decisionLogDisclosure([entry({ kind: "REPLY_EXECUTION", to: "REFUSED" })]))
+      .toBe(DECISION_LOG_DISCLOSURE);
+    expect(decisionLogDisclosure([entry({ kind: "REPLY_EXECUTION", from: "POSTED", to: "VERIFIED" })]))
+      .toBe(DECISION_LOG_DISCLOSURE_EXECUTED);
+    expect(DECISION_LOG_DISCLOSURE_EXECUTED).not.toContain("아무것도 전송되지 않습니다");
   });
 
   it("renders nothing for a value it cannot name — never the raw token", () => {

@@ -1,6 +1,6 @@
 import { Section, ListBox } from "../../ui/Section";
 import { usePaneDepth } from "../../workspace/CaseLayout";
-import { DECISION_LOG_DISCLOSURE, decisionLogSentence } from "../../../lib/reviewDecision";
+import { decisionLogDisclosure, decisionLogSentence } from "../../../lib/reviewDecision";
 import { kstDate } from "../../../lib/format";
 import type { ReviewDecisionLogEntry } from "../../../lib/types";
 
@@ -9,7 +9,8 @@ import type { ReviewDecisionLogEntry } from "../../../lib/types";
  *
  * <b>No new table stands behind it.</b> Every line is read from a trail this product has been writing
  * for months and nobody was reading: the seller's corrections, the response decision, the explicit
- * acts, the reply approval, the reported outcome. That is why a refresh does not lose anything on this
+ * acts, the reply approval, the reported outcome and — since Review Delivery Truth Spine v1 — what
+ * reviewnary itself did with the approved reply. That is why a refresh does not lose anything on this
  * screen — none of it ever lived in the browser.
  *
  * <b>Newest first.</b> The question the log answers HERE is «where does this stand», and the answer is
@@ -55,7 +56,12 @@ export function DecisionLog({ entries, failed }: { entries: ReviewDecisionLogEnt
           </ul>
         </ListBox>
       )}
-      <p className="break-keep text-sm leading-relaxed text-muted">{DECISION_LOG_DISCLOSURE}</p>
+      {/*
+        The safety line depends on what the log actually shows. A review whose reply reviewnary executed at the
+        channel cannot be captioned 「마켓플레이스에는 아무것도 전송되지 않습니다」, and `decisionLogDisclosure`
+        is where that one decision lives — read from the entries, never from a channel capability flag.
+      */}
+      <p className="break-keep text-sm leading-relaxed text-muted">{decisionLogDisclosure(entries)}</p>
     </Section>
   );
 }

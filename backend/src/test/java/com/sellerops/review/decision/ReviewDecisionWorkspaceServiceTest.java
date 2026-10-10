@@ -94,6 +94,7 @@ class ReviewDecisionWorkspaceServiceTest {
     @Autowired ReviewReplyApprovalRepository approvals;
     @Autowired ReviewReplyApprovalAuditRepository approvalAudit;
     @Autowired ReviewReplyOutcomeRepository outcomes;
+    @Autowired com.sellerops.review.publish.ReviewReplyExecutionRepository replyExecutions;
 
     private ReviewDecisionWorkspaceService service;
     private final UUID org = UUID.randomUUID();
@@ -105,7 +106,8 @@ class ReviewDecisionWorkspaceServiceTest {
     void setUp() {
         service = new ReviewDecisionWorkspaceService(reviews, channels, products, evidence, issues,
                 productKnowledge, orgKnowledge, candidates, correctionAudit, actions, triages,
-                triageAudit, approvals, approvalAudit, outcomes);
+                triageAudit, approvals, approvalAudit, outcomes,
+                new com.sellerops.review.publish.ReviewDeliveryTruthReader(replyExecutions, outcomes));
         account = account(org);
         channelId = account.getChannelId();
     }

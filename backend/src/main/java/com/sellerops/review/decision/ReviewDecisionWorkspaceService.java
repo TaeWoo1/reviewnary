@@ -28,6 +28,7 @@ import com.sellerops.review.ReviewRepository;
 import com.sellerops.review.decision.dto.ReviewDecisionContextView;
 import com.sellerops.review.decision.dto.ReviewDecisionLogEntryView;
 import com.sellerops.review.decision.dto.ReviewDecisionLogKind;
+import com.sellerops.review.publish.ReviewDeliveryTruthReader;
 import com.sellerops.review.triage.feedback.TriageAction;
 import com.sellerops.review.triage.feedback.TriageActionRepository;
 import com.sellerops.review.triage.feedback.TriageCorrectionAudit;
@@ -64,8 +65,10 @@ import org.springframework.transaction.annotation.Transactional;
  * reads. There is no decision table here: the workspace's writes are the ones the product already
  * has — the response decision ({@code review_triage}), the seller's own tier
  * ({@code review_triage_corrections}), the explicit act ({@code review_triage_actions}), the reply
- * approval and the reported outcome. A fifth store for «what the seller decided» would be a second
- * copy of answers that are already answerable, and the copy is what drifts.
+ * approval, the reported outcome and, since Review Delivery Truth Spine v1, the reply lane's own
+ * execution record ({@code review_reply_execution}, read through {@code ReviewDeliveryTruthReader}).
+ * A further store for «what the seller decided» would be a second copy of answers that are already
+ * answerable, and the copy is what drifts.
  *
  * <p><b>Every read is bounded by construction</b> and none of them grows with the seller's data: one
  * review, one product, this review's own evidence links, at most {@link #MAX_PROBLEMS} issues with at
@@ -116,6 +119,14 @@ public class ReviewDecisionWorkspaceService {
     private final ReviewReplyApprovalRepository approvals;
     private final ReviewReplyApprovalAuditRepository approvalAudit;
     private final ReviewReplyOutcomeRepository outcomes;
+    /**
+     * The reply lane's own record, merged ({@code review_reply_execution} + {@code review_reply_outcome}).
+     *
+     * <p>A reader, not a sixth decision store: the workspace still stores nothing and computes nothing with a
+     * model. It is here because the execution table had no reader on this screen and the screen's claim is that
+     * everything already answerable is answered in one place.
+     */
+    private final ReviewDeliveryTruthReader replyDeliveries;
 
     public ReviewDecisionWorkspaceService(ReviewRepository reviews, ChannelRepository channels,
                                           ProductRepository products,
@@ -130,7 +141,8 @@ public class ReviewDecisionWorkspaceService {
                                           ReviewTriageAuditRepository triageAudit,
                                           ReviewReplyApprovalRepository approvals,
                                           ReviewReplyApprovalAuditRepository approvalAudit,
-                                          ReviewReplyOutcomeRepository outcomes) {
+                                          ReviewReplyOutcomeRepository outcomes,
+                                          ReviewDeliveryTruthReader replyDeliveries) {
         this.reviews = reviews;
         this.channels = channels;
         this.products = products;
@@ -146,6 +158,7 @@ public class ReviewDecisionWorkspaceService {
         this.approvals = approvals;
         this.approvalAudit = approvalAudit;
         this.outcomes = outcomes;
+        this.replyDeliveries = replyDeliveries;
     }
 
     /** What stands behind this review — repeated problems, what else said the same, and what is written down. */
@@ -230,6 +243,25 @@ public class ReviewDecisionWorkspaceService {
             entries.add(new ReviewDecisionLogEntryView(
                     ReviewDecisionLogKind.REPLY_OUTCOME.name(), null,
                     outcomeName(row.getOperatorOutcome()), row.getCreatedAt()));
+        }
+
+        // <b>The half this log was missing</b> (Review Delivery Truth Spine v1). The five trails above are all
+        // things the SELLER recorded; `review_reply_execution` is what reviewnary itself did — the Cafe24 POST and
+        // its hash read-back, the composer fill, the collector's sighting of the submit — and it had no reader
+        // here at all. On the one screen whose whole purpose is «what have I already decided about this review», a
+        // reply the product posted and verified showed nothing, and the seller's own self-report about a different
+        // channel showed as the only record of a reply ever existing.
+        //
+        // Still no sixth store: the rows are read through the delivery truth, which is the two append-only tables
+        // this lane already writes and no third copy of them. Execution rows only — the operator's reports are
+        // read directly above, and quoting them twice would make one act look like two.
+        for (ReviewDeliveryTruthReader.ReviewDeliveryTruth truth
+                : replyDeliveries.executionTrail(orgId, review.getId())) {
+            entries.add(new ReviewDecisionLogEntryView(
+                    ReviewDecisionLogKind.REPLY_EXECUTION.name(),
+                    truth.verification() == null ? null : truth.status(),
+                    truth.verification() == null ? truth.status() : truth.verification(),
+                    truth.observedAt()));
         }
 
         entries.sort(Comparator.comparing(ReviewDecisionLogEntryView::at,

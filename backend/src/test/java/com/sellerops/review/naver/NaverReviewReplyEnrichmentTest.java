@@ -51,6 +51,8 @@ import org.springframework.test.context.ActiveProfiles;
 class NaverReviewReplyEnrichmentTest {
 
     @Autowired EntityManager em;
+    @Autowired com.sellerops.review.publish.ReviewReplyExecutionRepository replyExecutions;
+    @Autowired com.sellerops.attention.reply.ReviewReplyOutcomeRepository replyOutcomes;
     @Autowired ReviewRepository reviews;
     @Autowired ChannelRepository channels;
     @Autowired ProductRepository products;
@@ -93,7 +95,9 @@ class NaverReviewReplyEnrichmentTest {
         service = new NaverReviewReplyEnrichmentService(reviews, channels, em, products);
         spine = new KnowledgeSpineService(List.of(
                 new SellerKnowledgeAdapter(orgSources, orgChunks, productSources, productChunks),
-                new ProductFactAdapter(facts), new InquiryAnswerAdapter(memories), new ReviewReplyAdapter(em),
+                new ProductFactAdapter(facts), new InquiryAnswerAdapter(memories), new ReviewReplyAdapter(em,
+                        new com.sellerops.review.publish.ReviewDeliveryTruthReader(
+                                replyExecutions, replyOutcomes)),
                 new SellerDecisionAdapter(em), new SellerGuidanceAdapter(guidanceRows)),
                 products, new SourceRefResolver(em), new com.sellerops.inquiry.draft.InquiryEvidenceRetriever(products,
                         new com.sellerops.product.library.ProductKnowledgeLibraryService(products, productSources,

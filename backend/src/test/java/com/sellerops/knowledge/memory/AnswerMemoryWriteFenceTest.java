@@ -23,9 +23,15 @@ import org.junit.jupiter.api.Test;
  * citation still says "판매자의 과거 답변", so nothing looks wrong — which is exactly why this is a
  * fence and not a code review note.
  *
- * <p>Two writers exist and both record a completed human act: the importer, for an answer the channel
- * says the seller published, and the publish hook, for an approval and a verified send. The draft
- * composer is not on the list and adding it must fail here.
+ * <p>Three writers exist and every one records a completed human act: the importer, for an answer the
+ * channel says the seller published; the inquiry publish hook, for an approval and a verified send;
+ * and — since Review Delivery Truth Spine v1 — the review lane's hook, for the same two acts on a
+ * review reply. The draft composer is not on the list and adding it must fail here.
+ *
+ * <p><b>Adding the third was a deliberate widening, and the fence is what made it deliberate.</b> The
+ * property being protected is not «two writers»; it is that every writer records something a person
+ * actually did. A fourth entry still has to earn its line in {@link #ALLOWED} with a sentence naming
+ * which human act it remembers.
  */
 class AnswerMemoryWriteFenceTest {
 
@@ -35,12 +41,16 @@ class AnswerMemoryWriteFenceTest {
             "InquiryAnswerMemoryImporter.java",
             // The seller approved this exact draft version, or the send was verified.
             "InquiryAnswerMemoryHook.java",
+            // The same two acts on a review reply: an approval, and a delivery the channel read-back
+            // proved. VERIFIED is the only verification it accepts, so the guided lane — which can
+            // never prove WHAT was submitted — cannot write one.
+            "ReviewAnswerMemoryHook.java",
             // The service itself.
             "AnswerMemoryService.java");
 
     @Test
-    @DisplayName("only the importer and the publish hook record a memory")
-    void onlyTwoWritersExist() throws IOException {
+    @DisplayName("only the importer and the two publish hooks record a memory")
+    void onlyTheAllowedWritersExist() throws IOException {
         Path main = Paths.get("src/main/java/com/sellerops");
         List<String> offenders = new ArrayList<>();
         try (Stream<Path> walk = Files.walk(main)) {
@@ -58,7 +68,7 @@ class AnswerMemoryWriteFenceTest {
             }
         }
         assertThat(offenders)
-                .as("a third writer means something other than a seller's own act is being remembered")
+                .as("a writer outside ALLOWED means something other than a seller's own act is being remembered")
                 .isEmpty();
     }
 
@@ -103,8 +113,10 @@ class AnswerMemoryWriteFenceTest {
                 "src/main/java/com/sellerops/inquiry/memory/InquiryAnswerMemoryHook.java"));
         String importer = Files.readString(Paths.get(
                 "src/main/java/com/sellerops/inquiry/memory/InquiryAnswerMemoryImporter.java"));
+        String reviewHook = Files.readString(Paths.get(
+                "src/main/java/com/sellerops/review/memory/ReviewAnswerMemoryHook.java"));
 
-        for (String code : List.of(entity, service, hook, importer)) {
+        for (String code : List.of(entity, service, hook, importer, reviewHook)) {
             assertThat(code)
                     .as("a raw order identifier in long-term memory outlives the order it describes")
                     .doesNotContain("sourceOrderRef")
