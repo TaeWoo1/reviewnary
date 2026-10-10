@@ -148,6 +148,78 @@ class OpportunityServiceTest {
         verify(decisions, never()).delete(any());
     }
 
+    /**
+     * The seller's own act moved the derived name of the slot. Applying a prepared FAQ writes a sentence
+     * about 접착 into the product's library, so the next read's knowledge check says 「언급됨」 and the
+     * guidance candidate is derived as 상세·안내 보완 instead of FAQ 보완.
+     */
+    private void libraryNowMentionsAdhesion() {
+        when(knowledge.product(ORG, PRODUCT, "접착"))
+                .thenReturn(new KnowledgeMention(2, 1, List.of("접착면을 30초 이상 눌러 주세요.")));
+    }
+
+    @Test
+    @DisplayName("a card the seller applied keeps its own name and its decision after the library gains the sentence")
+    void appliedCardSurvivesTheNameMoving() {
+        // The defect this closes: the decision row is stored under (issue, FAQ_SUPPLEMENT) and the join bound it
+        // by today's derived name only — so the moment the seller applied the FAQ, the derived name became
+        // PRODUCT_GUIDE_SUPPLEMENT, the row stopped matching, and the card came back 검토 전 with 적용 undone on
+        // screen. Nothing was lost in the table; the join could not find it.
+        libraryNowMentionsAdhesion();
+        ImprovementOpportunity row = new ImprovementOpportunity();
+        row.setOrgId(ORG);
+        row.setIssueId(adhesion.id());
+        row.setKind(OpportunityKind.FAQ_SUPPLEMENT);
+        row.setStatus(OpportunityStatus.APPLIED);
+        row.setDraftTitle("t");
+        row.setDraftBody("b");
+        row.setDecidedAt(Instant.now());
+        row.setAppliedAt(Instant.now());
+        when(decisions.findByOrgIdAndIssueIdIn(eq(ORG), anyCollection())).thenReturn(List.of(row));
+
+        List<OpportunityView> out = service.list(ORG, TODAY, null, null, false);
+        // Two cards, not three: the stored decision ANSWERS the derived candidate rather than sitting beside it.
+        assertThat(out).extracting(OpportunityView::kind)
+                .containsExactly("FAQ_SUPPLEMENT", "PRODUCT_IMPROVEMENT_REVIEW");
+        OpportunityView faq = out.get(0);
+        assertThat(faq.status()).isEqualTo("APPLIED");
+        assertThat(faq.kindLabelKo()).isEqualTo("FAQ 보완");
+        assertThat(faq.appliedAt()).isNotNull();
+        // The reason and the prepared action are composed for the name the card carries, so a card titled
+        // FAQ 보완 never explains itself as 상세·안내 보완.
+        assertThat(faq.nextActionKo()).isEqualTo("FAQ 초안 준비");
+        // And the knowledge block is today's check, not the one the decision was taken against.
+        assertThat(faq.knowledge().mentions()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("a standing decision can still be addressed by its own name; a first decision still cannot")
+    void standingDecisionStaysAddressable() {
+        libraryNowMentionsAdhesion();
+        ImprovementOpportunity row = new ImprovementOpportunity();
+        row.setOrgId(ORG);
+        row.setIssueId(adhesion.id());
+        row.setKind(OpportunityKind.FAQ_SUPPLEMENT);
+        row.setStatus(OpportunityStatus.ACCEPTED);
+        row.setDraftTitle("t");
+        row.setDraftBody("b");
+        row.setDecidedAt(Instant.now());
+
+        // No row yet ⇒ the renaming does not apply, and the refusal is the one it always was: a FIRST decision
+        // may only be taken on what the evidence derives now.
+        assertThatThrownBy(() -> service.accept(ORG, ACTOR, adhesion.id(), OpportunityKind.FAQ_SUPPLEMENT, TODAY))
+                .isInstanceOf(ApiException.class).hasMessageContaining("지금 제안되지 않습니다");
+
+        when(decisions.existsByOrgIdAndIssueIdAndKind(ORG, adhesion.id(), OpportunityKind.FAQ_SUPPLEMENT))
+                .thenReturn(true);
+        when(decisions.findWithLockByOrgIdAndIssueIdAndKind(ORG, adhesion.id(), OpportunityKind.FAQ_SUPPLEMENT))
+                .thenReturn(Optional.of(row));
+        OpportunityView dismissed =
+                service.dismiss(ORG, ACTOR, adhesion.id(), OpportunityKind.FAQ_SUPPLEMENT, TODAY);
+        assertThat(dismissed.kind()).isEqualTo("FAQ_SUPPLEMENT");
+        assertThat(dismissed.status()).isEqualTo("DISMISSED");
+    }
+
     @Test
     @DisplayName("a decision about a kind the evidence does not yield right now is refused, not recorded")
     void undeliverableKindIsRefused() {

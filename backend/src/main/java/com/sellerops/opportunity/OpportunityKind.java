@@ -40,4 +40,28 @@ public enum OpportunityKind {
     public String actionLabelKo() {
         return actionLabelKo;
     }
+
+    /**
+     * Whether two kinds are two NAMES for one suggestion — the same slot on the same repeated problem.
+     *
+     * <p><b>Why this exists.</b> {@link #FAQ_SUPPLEMENT} and {@link #PRODUCT_GUIDE_SUPPLEMENT} are the one
+     * product-guidance slot, and which of the two names it carries is decided by a single derived fact:
+     * whether the seller's library already says anything about the aspect
+     * ({@code OpportunityRules.guidanceKindOf}). Applying the suggestion is what writes that sentence — so the
+     * seller's own act flipped the name, the stored decision stopped matching the derived candidate, and the
+     * card they had just applied came back as a different kind with no decision on it: 검토 전, as if nothing
+     * had happened. The decision was never lost; the join could not find it.
+     *
+     * <p>The table's identity is unchanged — {@code (org, issue, kind)}, one decision per name
+     * ({@code uq_improvement_opportunity_identity}). This is about which derived candidate a STORED decision
+     * answers to, and it is deliberately not a general looseness: every other pair of kinds is a different
+     * place to act, and only this pair is one slot whose name moves under the seller's hand.
+     */
+    public boolean namesSameSlotAs(OpportunityKind other) {
+        return this == other || (productGuidance() && other.productGuidance());
+    }
+
+    private boolean productGuidance() {
+        return this == FAQ_SUPPLEMENT || this == PRODUCT_GUIDE_SUPPLEMENT;
+    }
 }

@@ -25,6 +25,13 @@ public interface ImprovementOpportunityRepository extends JpaRepository<Improvem
     List<ImprovementOpportunity> findByOrgIdAndIssueIdIn(UUID orgId, Collection<UUID> issueIds);
 
     /**
+     * Whether a decision already stands under this exact name. Asked only to let a STANDING decision be
+     * addressed after the product-guidance slot's derived name moved ({@link OpportunityKind#namesSameSlotAs});
+     * a first decision is still gated on what the evidence derives today.
+     */
+    boolean existsByOrgIdAndIssueIdAndKind(UUID orgId, UUID issueId, OpportunityKind kind);
+
+    /**
      * Every decision in one state. Used to answer 「무엇이 준비돼 있나」 without deriving over the whole
      * issue list first: the decided rows are few, and only those can possibly be prepared work.
      */
