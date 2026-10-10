@@ -95,6 +95,23 @@ sellerops:
       max-output-tokens: ${SELLEROPS_AI_TRIAGE_MAX_OUTPUT_TOKENS:4000}
       reasoning-effort: ${SELLEROPS_AI_TRIAGE_REASONING_EFFORT:low}
       max-per-run: ${SELLEROPS_AI_TRIAGE_MAX_PER_RUN:100}
+  # The offline correction corpus (Learning & Outcome Loop v1 package A) — docs/slices/
+  # production-triage-feedback-draft-v1.md §3 / §7.4.
+  #
+  # OFF by default, and this is the only product surface in the repository that is off because of WHO may use
+  # it rather than what it costs. `CorrectionDispositionKind` settled that question when the spine shipped:
+  # «Assigned by a person holding the rubric. That is a cost, and it is the cost of the guarantee.» A seller
+  # reading their own correction as CLASSIFIER_ERROR is precisely the drift the disposition exists to prevent —
+  # one org's taste becoming the global classifier's definition of accuracy — and there is no role column in
+  # this product to express that with (every account is OWNER). So the routes exist only where the rubric
+  # holder operates, and nowhere else.
+  #
+  # Nothing here is automatic: no scheduler, no startup runner, no hook on ingestion. Every route is a press.
+  # Nothing here can change what any screen shows — the strongest thing it does is stamp a version string onto
+  # rows that already existed. And nothing here can reach a classifier or a prompt, which
+  # SellerFeedbackCorpusFenceTest asserts on the source rather than trusting this comment.
+  triage-corpus:
+    enabled: ${SELLEROPS_TRIAGE_CORPUS_ENABLED:false}
   # The Agent Runtime's model seam — the LLM behind the LangGraph inquiry reply-draft node.
   #
   # A SEPARATE switch and a SEPARATE key from the triage pilot above, deliberately: they are different
