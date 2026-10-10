@@ -27,8 +27,16 @@ case "$KIND" in
     KIND_WHAT="상품별 고객문의 acquisition + routine (starts from a CONNECTED account with a stored credential)" ;;
   inquiries-dedupe)
     KIND_WHAT="re-sweep the SAME window to prove idempotency (starts from an account that has already collected)" ;;
+  orders-resync)
+    # Order Context Foundation v1 §8.1 gate 1. The ONLY READ_ONLY kind here, and it is read-only
+    # because it does exactly one thing: re-collect ORDER_SUMMARY on an account that is ALREADY
+    # connected. The credential is somebody else's job — it is handed over by its own bootstrap
+    # (wing-credential-bootstrap.sh handoff), under its own manifest, on its own day. Bundling a
+    # credential write into this run is what made the `orders` kind mode=WRITE, and a WRITE needs its
+    # own explicit grant; splitting them is what lets one line approve a read.
+    KIND_WHAT="ORDER_SUMMARY 1회 재수집 — orderItems[].sellerProductId 유무·충전율과 channel_order_products 생성까지 (이미 연결된 계정에서 시작, 자격증명은 다루지 않는다)" ;;
   *)
-    echo "BOOTSTRAP FAIL — unknown run kind '$KIND'. Use 'orders', 'inquiries' or 'inquiries-dedupe'."
+    echo "BOOTSTRAP FAIL — unknown run kind '$KIND'. Use 'orders', 'orders-resync', 'inquiries' or 'inquiries-dedupe'."
     exit 1 ;;
 esac
 

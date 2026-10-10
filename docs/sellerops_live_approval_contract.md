@@ -619,6 +619,42 @@ Both phases are `READ_ONLY`. A WRITE step (guided reply submission; credential e
 test + first sync) is a **different manifest with `mode: WRITE`** and always needs its own explicit
 approval (§3). Switching phase/tool `REVOKED`s the current manifest (§4).
 
+### 7.1 What `mode` is about — marketplace posture, not our own tables
+
+**Product-owner decision, 2026-10-11.** The sentence above bundles "credential entry + connection test
++ first sync" and calls the bundle WRITE-class, and a reader could take from it that **any** collecting
+run is WRITE because a sync writes rows into our own database. That reading makes `mode` carry no
+information: every live run collects something, so every manifest would be WRITE, and the field the
+contract calls "the single most load-bearing" would always say the same word.
+
+`mode` is a claim about **what the run does to the marketplace and to the things a mistake cannot take
+back**:
+
+- **`WRITE`** — the run mutates the marketplace (a posted reply, a submitted form, an order action), or
+  it takes a **credential** (§5c), or it creates the connection itself. Always needs its own explicit
+  mode-`WRITE` grant; the one-line default of §3 never covers it.
+- **`READ_ONLY`** — every marketplace call is a GET, no credential is read or stored, no connection is
+  created or tested. **Collection rows written by a read-only GET do not make a run WRITE.** They are
+  the point of reading.
+
+The bundle in §7 is still WRITE and for the stated reason: it is a *first connection*, and a credential
+enters the vault. What changes is that a run which only **re-collects on an already-connected account**
+is `READ_ONLY`, and the harness now derives the mode from the run kind instead of hardcoding it
+(`tools/coupang-local/preflight.sh`; `WRITE` remains the default, so a kind added without a considered
+mode is WRITE).
+
+**The READ_ONLY claim has to be earned structurally, not asserted.** The first kind to carry it,
+`orders-resync`, earns it by **refusing to start** unless the credential is already stored — so the
+handoff cannot happen inside it even by accident — and by declaring `credential=0, test=0, re-sync=0`
+in its own `maxActions`. A kind that claimed `READ_ONLY` while being *able* to enter a credential would
+be the failure this subsection exists to prevent.
+
+**Two gates, not one.** `orders-resync` also shows why a manifest's scope is its own half of the
+contract: it proves that an order line names a product and that the reference row is created, and it
+explicitly does **not** prove the canonical product binding, because that needs a *second* marketplace
+surface (the product catalogue). One surface, one manifest, one grant — a gate that reached for the
+second would be two approvals spent on one line.
+
 ### Phase B-FE — `API_ISSUANCE_FE_LIVE_PROOF` (READ_ONLY, FE-run-host live proof)
 
 The same existing-app highlight capability as Phase B, but **driven by the SellerOps FE run-host**

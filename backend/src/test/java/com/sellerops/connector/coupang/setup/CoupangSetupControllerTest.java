@@ -11,10 +11,39 @@ import org.junit.jupiter.api.Test;
 class CoupangSetupControllerTest {
 
     private static CoupangSetupController controller(String ips, boolean enabled, String approvalId) {
+        return controller(ips, enabled, approvalId, false);
+    }
+
+    private static CoupangSetupController controller(String ips, boolean enabled, String approvalId,
+                                                     boolean orderWireShape) {
         // The credential-handoff interlock is a SEPARATE arming from the live-call approval id, so this
         // controller test hands it an unarmed one: a live-call grant must not read as a credential grant.
         return new CoupangSetupController(new CoupangAdvertisedEgress(ips),
-                new com.sellerops.collect.CredentialHandoffArming("", "", "", "", 0), enabled, approvalId);
+                new com.sellerops.collect.CredentialHandoffArming("", "", "", "", 0), enabled, approvalId,
+                orderWireShape);
+    }
+
+    /**
+     * The ordersheets wire-shape observation, surfaced so a preflight can refuse a backend that would not
+     * record the answer its gate exists to get.
+     *
+     * <p>A boolean is all it can ever be: the observation records key names, kinds and counts, so there is
+     * nothing here that could carry a value even if the field grew.
+     */
+    @Test
+    void orderWireShapeObservationIsSurfacedAndDefaultsToOff() {
+        assertThat(controller("", true, "apr-abcdef123456").setup().orderWireShapeObserved())
+                .as("off unless a deployment armed it for a specific observation")
+                .isFalse();
+        assertThat(controller("", true, "apr-abcdef123456", true).setup().orderWireShapeObserved())
+                .isTrue();
+        // Absent reads as off, never as unknown — the same rule the credential readiness follows.
+        assertThat(new CoupangSetupView(null, null, null).orderWireShapeObserved()).isFalse();
+        // And it is independent of the two interlocks: an armed observation is not an armed approval.
+        CoupangSetupView observingButUnarmed = controller("", false, "", true).setup();
+        assertThat(observingButUnarmed.orderWireShapeObserved()).isTrue();
+        assertThat(observingButUnarmed.liveApproval().approvalArmed()).isFalse();
+        assertThat(observingButUnarmed.credentialHandoff().armed()).isFalse();
     }
 
     @Test

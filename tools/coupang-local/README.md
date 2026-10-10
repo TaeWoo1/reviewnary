@@ -24,6 +24,16 @@ operator-present step taken only after preflight PASSes and the operator answers
   credential + account + sync state written to *our* system (contract §7), not any marketplace mutation.
 - **The real credential is entered only in the frontend masked form** — never in a script, env, log, or git.
 - **Disposable DB only** (`:55432`, never the real sellerops `:5432`); the scripts refuse a `:5432/sellerops` URL.
+- **Run kinds** — `bootstrap.sh <kind>`: `orders` (first connection, pristine DB, `mode: WRITE`),
+  **`orders-resync`** (Order Context Foundation v1 §8.1 gate 1 — one ORDER_SUMMARY re-collect on an
+  ALREADY-connected account, `mode: READ_ONLY`, `sync=1 credential=0 test=0 re-sync=0`; needs
+  `SELLEROPS_CONNECTOR_COUPANG_ORDER_WIRE_SHAPE=true` and refuses to start unless the credential is
+  already stored), `inquiries`, `inquiries-dedupe`. The mode is derived from the kind and **WRITE is the
+  default** — see `docs/sellerops_live_approval_contract.md` §7.1 for what `mode` claims.
+- **A live-proof backend wants the demo login without the fixture's placeholder accounts**:
+  `SELLEROPS_SEED_ENABLED=true SELLEROPS_SEED_SELLER_ACCOUNTS=false`. The two were one flag until
+  2026-10-11, so asking for the login handed you two CONNECTED accounts with no credential and the
+  pristine-baseline check failed on rows nobody had decided to create.
 - **Fail closed / armed-binding proof.** Default config has no approval id → any real-gateway call throws
   `CoupangLiveApprovalRequiredException`. run-backend arms *this run's* id; preflight proves the running
   backend reports that id's prefix via `/api/connect/coupang/setup` before anything live happens.

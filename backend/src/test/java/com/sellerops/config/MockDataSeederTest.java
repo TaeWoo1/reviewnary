@@ -44,9 +44,47 @@ class MockDataSeederTest {
     }
 
     private MockDataSeeder seeder(boolean enabled, boolean catalogue, boolean seedDemoContent) {
-        return new MockDataSeeder(enabled, catalogue, seedDemoContent, organizations, users,
-                channels, sellerAccounts, products, inquiries, reviews,
+        return seeder(enabled, catalogue, seedDemoContent, true);
+    }
+
+    private MockDataSeeder seeder(boolean enabled, boolean catalogue, boolean seedDemoContent,
+                                  boolean sellerAccountsEnabled) {
+        return new MockDataSeeder(enabled, catalogue, seedDemoContent, sellerAccountsEnabled,
+                organizations, users, channels, sellerAccounts, products, inquiries, reviews,
                 orderSummaries, passwordEncoder);
+    }
+
+    /**
+     * The demo LOGIN without the two placeholder seller accounts — the shape a live proof needs.
+     *
+     * <p>A live-proof backend reads an authenticated {@code /setup}, so it needs the demo user; and its
+     * baseline must be pristine, so that every seller account appearing in the run came from the run.
+     * Those two were one flag, so asking for the login handed you two accounts and the {@code orders}
+     * baseline check failed on rows nobody had decided to create (measured 2026-10-11 on a fresh
+     * disposable DB: {@code coupang_accounts=1}, {@code credentials=0}).
+     *
+     * <p>The rows are also a claim the vault cannot back — {@code connectionStatus = CONNECTED} with no
+     * credential anywhere. Fine as demo set dressing, wrong as a baseline, and the reason this is a
+     * switch rather than a deletion.
+     */
+    @Test
+    void sellerAccountsCanBeSuppressedWhileKeepingTheDemoLogin() {
+        seeder(true, true, false, false).run(null);
+
+        assertThat(organizations.count()).as("the org is still there").isEqualTo(1);
+        assertThat(users.count()).as("the demo login is still there — preflight reads /setup with it")
+                .isGreaterThan(0);
+        assertThat(channels.count()).as("the channel catalogue is untouched").isGreaterThan(0);
+        assertThat(sellerAccounts.count())
+                .as("no placeholder account — the live-proof baseline is pristine")
+                .isZero();
+    }
+
+    @Test
+    void sellerAccountsDefaultOnSoTheFixtureIsUnchanged() {
+        // Default true: «set this true on a clean DB and it seeds exactly as it always did» stays true.
+        seeder(true, true, false).run(null);
+        assertThat(sellerAccounts.count()).isEqualTo(2);
     }
 
     @Test

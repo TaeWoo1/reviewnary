@@ -941,6 +941,14 @@ sellerops:
     #
     # The 13-channel CATALOGUE is NOT gated by this — see `channel-catalogue` below.
     enabled: ${SELLEROPS_SEED_ENABLED:false}
+    # The fixture's two placeholder seller accounts (쿠팡 / 네이버), split out of `enabled` on
+    # 2026-10-11. A live-proof backend needs the demo LOGIN but a PRISTINE baseline — no seller
+    # account — so that every account appearing in the run came from the run. Those two were one
+    # flag, so asking for the login got you the accounts and the live-proof baseline check failed
+    # on rows nobody decided to create. Default true: the fixture is byte-identical unless this is
+    # turned off. Note the rows claim CONNECTED with no credential in the vault; that is demo set
+    # dressing, and the reason a baseline must be able to refuse it.
+    seller-accounts: ${SELLEROPS_SEED_SELLER_ACCOUNTS:true}
     # The 13-channel catalogue: product reference data, not a fixture. Default ON and idempotent
     # (written only into an empty table), because without it the 채널 연결 screen has nothing to
     # offer — on a pilot deployment as much as a dev one. Its own switch so a test that must own

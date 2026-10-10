@@ -27,16 +27,20 @@ public class CoupangSetupController {
     private final boolean connectorEnabled;
     private final String liveApprovalId;
     private final CredentialHandoffArming credentialHandoffArming;
+    /** Read from the same property the orders client reads, so the two cannot disagree. */
+    private final boolean orderWireShapeObserved;
 
     public CoupangSetupController(
             CoupangAdvertisedEgress advertisedEgress,
             CredentialHandoffArming credentialHandoffArming,
             @Value("${sellerops.connector.coupang.enabled:false}") boolean connectorEnabled,
-            @Value("${sellerops.connector.coupang.live-approval-id:}") String liveApprovalId) {
+            @Value("${sellerops.connector.coupang.live-approval-id:}") String liveApprovalId,
+            @Value("${sellerops.connector.coupang.order-wire-shape:false}") boolean orderWireShapeObserved) {
         this.advertisedEgress = advertisedEgress;
         this.credentialHandoffArming = credentialHandoffArming;
         this.connectorEnabled = connectorEnabled;
         this.liveApprovalId = liveApprovalId;
+        this.orderWireShapeObserved = orderWireShapeObserved;
     }
 
     /** The setup facts the Coupang connection surface needs: advertised calling IP(s) + live-run readiness. */
@@ -45,6 +49,7 @@ public class CoupangSetupController {
         return new CoupangSetupView(
                 advertisedEgress.ips(),
                 LiveApprovalReadiness.of(connectorEnabled, liveApprovalId),
-                credentialHandoffArming.readiness());
+                credentialHandoffArming.readiness(),
+                orderWireShapeObserved);
     }
 }

@@ -41,7 +41,7 @@ DB_ALIAS="$COUPANG_DB_ALIAS"
 # The run kind the bootstrap minted. A run env without one predates the split and is `orders`.
 RUN_KIND="${COUPANG_RUN_KIND:-orders}"
 case "$RUN_KIND" in
-  orders|inquiries|inquiries-dedupe) ;;
+  orders|orders-resync|inquiries|inquiries-dedupe) ;;
   *) echo "PREFLIGHT FAIL — run env carries an unknown kind '$RUN_KIND'. Re-bootstrap."; exit 1 ;;
 esac
 # The prefix length the backend surfaces (must match CoupangSetupView.LiveApprovalReadiness.PREFIX_LENGTH).
@@ -88,6 +88,21 @@ else
   fail "armed approval id ('$BACKEND_PREFIX') != this run's ('$EXPECTED_PREFIX') — wrong/stale backend; re-bootstrap + re-run backend"
 fi
 
+# 3b. The observation this gate exists for must be ARMED on the running backend.
+#
+# A manifest may only declare capability the run can actually execute (contract §2). `orders-resync`
+# exists to answer «is orderItems[].sellerProductId on the wire, and how often is it filled» — and a
+# backend with the observer off would collect, store nothing, and leave us unable to tell «the key was
+# absent» from «the value was empty». That spends the one approval without the answer it was asked for,
+# which is the failure this check exists to prevent. Not required for the other kinds: they are not
+# asking this question, and arming instrumentation nobody reads costs a parse per page.
+WIRE_SHAPE="$(printf '%s' "$SETUP" | jget "['orderWireShapeObserved']")"
+if [ "$RUN_KIND" = "orders-resync" ]; then
+  [ "$WIRE_SHAPE" = "True" ] \
+    && pass "ordersheets wire-shape observation ARMED (키 이름·종류·충전율만, 값 기록 0)" \
+    || fail "wire-shape observation OFF — set SELLEROPS_CONNECTOR_COUPANG_ORDER_WIRE_SHAPE=true and reboot the backend; this gate cannot record its own answer without it"
+fi
+
 # 4. Advertised calling IP(s) — surfaced for the operator to eyeball-match against what they registered.
 ADVERTISED="$(printf '%s' "$SETUP" | python3 -c "import json,sys;print(','.join(json.load(sys.stdin).get('advertisedEgressIps',[])) or '<none set>')" 2>/dev/null || echo '<parse error>')"
 echo "  advertised calling IP(s): $ADVERTISED"
@@ -131,6 +146,19 @@ elif [ "$RUN_KIND" = "inquiries-dedupe" ]; then
   [ "${CURSOR:-0}" -gt 0 ] 2>/dev/null \
     && pass "an INQUIRY cursor exists (the run's first action clears it to re-sweep the same window)" \
     || fail "no INQUIRY cursor — the previous acquisition run did not complete"
+elif [ "$RUN_KIND" = "orders-resync" ]; then
+  # Gate 1 of Order Context Foundation v1 §8.1. The baseline is the INVERSE of `orders`: the account and
+  # its credential must ALREADY be there, because this run creates neither. That is the whole separation —
+  # the credential is handed over by its own bootstrap, under its own WRITE manifest, on its own day, and
+  # this run refuses to be the place that happens.
+  REFS="$(q 'select count(*) from channel_order_products')"
+  echo "  baseline: credentials=$CREDS coupang_accounts=$COUPANG_ACCTS channel_orders=$ORDERS channel_order_products=${REFS:-?}"
+  { [ "$CREDS" = 1 ] && [ "$COUPANG_ACCTS" = 1 ]; } \
+    && pass "exactly one connected Coupang account with a stored credential" \
+    || fail "needs exactly ONE Coupang account with ONE stored credential — run the credential handoff first (wing-credential-bootstrap.sh handoff); this run does not enter one"
+  [ "${REFS:-1}" = 0 ] \
+    && pass "no order product reference yet (every row this run records is its own)" \
+    || fail "channel_order_products already has rows — reset the disposable DB so the count is unambiguous"
 elif [ "$RUN_KIND" = "inquiries" ]; then
   echo "  baseline: credentials=$CREDS coupang_accounts=$COUPANG_ACCTS inquiries=$INQUIRIES work_items=$WORKITEMS"
   { [ "$CREDS" = 1 ] && [ "$COUPANG_ACCTS" = 1 ]; } \
@@ -166,11 +194,29 @@ elif [ "$RUN_KIND" = "inquiries" ]; then
   # its own day.
   APPROVAL_OPERATION="${SELLEROPS_APPROVAL_OPERATION:-상품별 고객문의 acquisition + routine proof (first INQUIRY sync + idempotent re-sync + work queue/proposal/draft + guided reply ENTRY, no reply posted)}"
   APPROVAL_MAX="${SELLEROPS_APPROVAL_MAX:-sync=1, re-sync=1, guided-entry=1, replies posted=0 (cancelled at the submit barrier)}"
+elif [ "$RUN_KIND" = "orders-resync" ]; then
+  # What this gate proves, and — just as load-bearing — what it does NOT. The canonical product_id
+  # binding needs the Coupang product catalogue, which is a SECOND marketplace surface
+  # (SELLER_PRODUCTS) and therefore a second manifest and a second grant. A gate that quietly reached
+  # for it would be two approvals spent on one line.
+  APPROVAL_OPERATION="${SELLEROPS_APPROVAL_OPERATION:-Order Context Foundation v1 §8.1 gate 1 — ORDER_SUMMARY 1회 재수집: orderItems[].sellerProductId 유무·충전율과 channel_order_products 생성까지 증명 (자격증명 입력 0, 연결 테스트 0, 재동기화 0; canonical product_id 연결은 gate 2의 몫)}"
+  APPROVAL_MAX="${SELLEROPS_APPROVAL_MAX:-sync=1, credential=0, test=0, re-sync=0}"
 else
   APPROVAL_OPERATION="${SELLEROPS_APPROVAL_OPERATION:-guided first-connection + order-routine read-only proof (credential + connect-test + first ORDER_SUMMARY sync + idempotent re-sync)}"
   APPROVAL_MAX="${SELLEROPS_APPROVAL_MAX:-credential=1, test=1, sync=1, re-sync=1}"
 fi
 APPROVAL_ACCOUNT="${SELLEROPS_APPROVAL_ACCOUNT:-operator-owned Coupang WING vendor (test)}"
+# The mode is DERIVED from the run kind, and WRITE is the default — a kind added later without a
+# considered mode is WRITE, which is the safe direction to be wrong in. Only `orders-resync` is
+# READ_ONLY, and it earns that structurally: no credential is entered (its baseline REFUSES to start
+# without one already stored), no account is created, no connection test runs, and every marketplace
+# call is a read-only GET. The collection rows a read-only GET writes into OUR database do not make a
+# run WRITE — if they did, no collecting run could ever be READ_ONLY and the field would carry no
+# information. See docs/sellerops_live_approval_contract.md §7.1.
+case "$RUN_KIND" in
+  orders-resync) APPROVAL_MODE="READ_ONLY" ;;
+  *)             APPROVAL_MODE="WRITE" ;;
+esac
 # Sanitized account binding only — fail closed if an override looks like a raw id/token (contract §2).
 if printf '%s' "$APPROVAL_ACCOUNT" | grep -Eq '^[0-9]{4,}$|^[0-9a-fA-F]{16,}$'; then
   echo "PREFLIGHT FAIL: SELLEROPS_APPROVAL_ACCOUNT looks like a raw id/token — the manifest carries only a sanitized description."
@@ -190,7 +236,7 @@ if [ "$FAILED" = "0" ]; then
   "runKind": "$RUN_KIND",
   "surface": "$( [ "$RUN_KIND" = "inquiries" ] && echo "operations inbox + guided WING inquiry window" || echo "connect/coupang" )",
   "operation": "$APPROVAL_OPERATION",
-  "mode": "WRITE",
+  "mode": "$APPROVAL_MODE",
   "accountBinding": "$APPROVAL_ACCOUNT",
   "backendOrigin": "$BACKEND_ORIGIN",
   "frontendOrigin": "$FRONTEND_ORIGIN",
@@ -214,7 +260,7 @@ JSON
   echo
   echo "  ── APPROVAL MANIFEST (sanitized) ──"
   echo "  COUPANG · $APPROVAL_OPERATION"
-  echo "  WRITE · run ${RUN_ID:0:8}… · approval ${APPROVAL_ID:0:8}… · max: $APPROVAL_MAX"
+  echo "  $APPROVAL_MODE · run ${RUN_ID:0:8}… · approval ${APPROVAL_ID:0:8}… · max: $APPROVAL_MAX"
   echo "  account: $APPROVAL_ACCOUNT · operator presence: required · expires: process-lifetime · git $CUR_GIT"
   echo "  interlock: ARMED · advertised calling IP(s): $ADVERTISED"
   echo "  Standing Safety Contract + full scope: docs/sellerops_live_approval_contract.md"
@@ -230,6 +276,15 @@ JSON
     echo "  The inquiry stream calls onlineInquiries ONLY. The PII-bearing callCenterInquiries endpoint"
     echo "  (buyerEmail / buyerPhone) is never called, and no buyer identity is stored or displayed."
     echo "  NO reply is posted: the guided run stops at the submit barrier and is cancelled there."
+  fi
+  if [ "$RUN_KIND" = "orders-resync" ]; then
+    echo "  NO credential is entered and NO connection test runs: this baseline REFUSES to start unless"
+    echo "  the credential is already stored, so the handoff is a different run under a WRITE manifest."
+    echo "  One ORDER_SUMMARY sync, read-only GETs. PASS = channel_order_products > 0, and the"
+    echo "  wire-shape report naming sellerProductId present=N/N nonNull=M (키·종류·충전율만, 값 0)."
+    echo "  It does NOT prove the canonical product_id binding — that needs the Coupang product"
+    echo "  catalogue (SELLER_PRODUCTS), a SECOND surface under its own manifest and its own grant."
+    echo "  A reference landing UNBOUND here is the expected result, not a failure."
   fi
   echo "  If this manifest is correct and displayed, the operator's entire single-use grant is one line:"
   echo "    Seated and ready."
