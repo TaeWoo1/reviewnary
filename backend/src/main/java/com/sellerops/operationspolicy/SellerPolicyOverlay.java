@@ -50,6 +50,15 @@ public class SellerPolicyOverlay {
                           OperationsPolicyScope scope, String problem) {
     }
 
+    /**
+     * The problem a NEW rule declared from one case would be keyed on, as the fields a policy stores.
+     *
+     * @param titleKo the operator-facing label — {@code IssueSignature.titleKo()}, e.g. 「배송 지연」. Derived from
+     *                the vocabulary only, never from a review body, so it is safe on any screen
+     */
+    public record ProblemKey(String aspect, String problem, String signatureKey, String titleKo) {
+    }
+
     private final SellerOperationsPolicyRepository policies;
     private final ReviewIssueEvidenceRepository evidence;
 
@@ -93,6 +102,41 @@ public class SellerPolicyOverlay {
     }
 
     /**
+     * <b>The problem this case could carry a rule about</b>, or empty when it could not.
+     *
+     * <p>What «앞으로 같은 문제도 이렇게 처리» means for one case, answered once and here: the severest
+     * non-dismissed problem the extraction recorded this review as evidence for. Empty is common and is the
+     * honest answer — a review the extractor recognised nothing in, or one whose problems the seller has
+     * dismissed, is not a case a rule can be keyed on, and the screen must not offer one.
+     *
+     * <p><b>Same ordering as {@link #forReview}</b>, and that is the point: the problem a new rule is keyed on is
+     * the problem an existing rule would have matched. Two orderings here would let a seller declare a rule about
+     * one problem and watch it never fire because the overlay reads a different one.
+     */
+    @Transactional(readOnly = true)
+    public Optional<ProblemKey> candidate(UUID orgId, UUID reviewId) {
+        if (orgId == null || reviewId == null) {
+            return Optional.empty();
+        }
+        return evidence.issueVocabularyOfReview(orgId, reviewId).stream()
+                .map(row -> key(String.valueOf(row[0]), String.valueOf(row[1])))
+                .filter(java.util.Objects::nonNull)
+                .max(Comparator.comparingInt(k -> severityRankOf(k.problem())));
+    }
+
+    private static ProblemKey key(String aspect, String problem) {
+        try {
+            com.sellerops.reviewissue.IssueSignature signature =
+                    com.sellerops.reviewissue.IssueSignature.of(aspect, problem);
+            return new ProblemKey(aspect, problem, signature.signatureKey(), signature.titleKo());
+        } catch (IllegalArgumentException outsideVocabulary) {
+            // A stored issue whose problem the vocabulary no longer defines cannot be the key of a NEW rule: the
+            // seller would be declaring a rule the service itself would refuse. Left out rather than offered.
+            return null;
+        }
+    }
+
+    /**
      * Whether a rule's scope covers this case.
      *
      * <p>A PRODUCT rule matches only its own product, and a review with no product matches no PRODUCT rule at
@@ -114,8 +158,13 @@ public class SellerPolicyOverlay {
      * issue screen would come to disagree about which problem is worse.
      */
     private static int severityRank(SellerOperationsPolicy policy) {
+        return severityRankOf(policy.getProblem());
+    }
+
+    /** The same order for a bare problem token, so the candidate and the match agree by construction. */
+    private static int severityRankOf(String problem) {
         try {
-            return -com.sellerops.reviewissue.IssueVocabulary.severityOf(policy.getProblem()).rank();
+            return -com.sellerops.reviewissue.IssueVocabulary.severityOf(problem).rank();
         } catch (IllegalArgumentException unknownProblem) {
             // A vocabulary edit removed the problem this rule was written for. The rule still stands — the seller
             // declared it — but it cannot claim a severity the vocabulary no longer defines, so it sorts below

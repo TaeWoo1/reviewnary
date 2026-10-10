@@ -2026,15 +2026,42 @@ export const api = {
     );
     return data;
   },
+  /**
+   * The seller saying a different action was right — and, as a separate decision on the same form, whether that
+   * becomes a standing rule.
+   *
+   * `remember`/`scope` are 「다음에도 참고하기」 (context a later judgement may be shown).
+   * `applyToFuture`/`policyScope` are 「앞으로 같은 문제도 이렇게 처리」 (a rule that decides future cases).
+   * Four fields rather than two reused ones, because the two acts have different consequences and a seller must
+   * not be able to reach one by choosing the other.
+   */
   async correctOperationsCase(
     caseId: string,
-    input: { correctedActionType: string | null; note: string; remember: boolean; scope: string },
+    input: {
+      correctedActionType: string | null;
+      note: string;
+      remember: boolean;
+      scope: string;
+      applyToFuture: boolean;
+      policyScope: string | null;
+    },
   ): Promise<OperationsCaseDetail> {
     const { data } = await http.post<OperationsCaseDetail>(
       `/api/responsibilities/customer-operations/cases/${caseId}/correction`,
       input,
     );
     return data;
+  },
+
+  /**
+   * 「이 기준 사용 중단」 — retire a standing rule from the case it decided.
+   *
+   * The existing retire route, nothing new: it stops the rule deciding future cases and takes its answer off the
+   * open cards it had decided. The case screen refetches afterwards, because what the retirement did to THIS card
+   * is the thing the seller pressed it to see.
+   */
+  async stopOperationsPolicy(policyId: string): Promise<void> {
+    await http.delete(`/api/operations-policies/${encodeURIComponent(policyId)}`);
   },
 
   /** The Home's three exception areas. A failed read draws nothing — never a clear morning. */

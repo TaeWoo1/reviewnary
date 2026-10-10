@@ -124,6 +124,16 @@ export const COPY = {
      the reply work this pane is a reading of. */
   handleReview: "리뷰 처리하기",
   reuse: "유사 건에 재사용",
+  /* <b>Seller-declared Operations Policy v1 — 두 번째 선택이고, 첫 번째와 다른 일이다.</b>
+     「유사 건에 재사용」은 다음 판단이 **참고할** 맥락을 남긴다. 아래는 다음 판단을 **정한다**. 같은 폼에
+     나란히 서므로 문장이 그 차이를 말해야 한다: 하나는 참고, 하나는 기준. */
+  applyToFuture: "앞으로 같은 문제도 이렇게 처리",
+  /** 체크했을 때만 보이는 한 줄. 무엇이 「같은 문제」인지 어휘로 말한다 — 리뷰 문장이 아니라. */
+  applyToFutureNote: (problem: string) => `앞으로 「${problem}」 건은 이 처리로 추천됩니다. 실행은 그때 직접 하십니다.`,
+  /** 적용된 Case에 남는 provenance 한 줄. */
+  policyApplied: "판매자님이 정한 처리 기준이 적용됐습니다",
+  policyStop: "이 기준 사용 중단",
+  policyStopping: "중단 중…",
   otherHandling: "다른 처리가 필요하면",
   changeHandling: "처리 변경",
   handlingMethod: "처리 방법",

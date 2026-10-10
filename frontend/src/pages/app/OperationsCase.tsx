@@ -334,6 +334,15 @@ export function OperationsCaseView({
               onFailed={failed}
             />
           ) : null}
+          <PolicyProvenance
+            detail={detail}
+            flat={canonical}
+            onChanged={() => {
+              setError(null);
+              void load();
+            }}
+            onFailed={failed}
+          />
           <CorrectionCard
             caseId={caseId}
             detail={detail}
@@ -1264,6 +1273,76 @@ const ACTIONS = [
   "NO_ACTION",
 ];
 
+/**
+ * <b>운영 기준 적용</b> — one muted line, and the one way out.
+ *
+ * <p>Drawn only on a case the seller's own standing rule decided ({@code appliedPolicy}), and deliberately the
+ * smallest thing that answers the two questions such a card raises: 「이 추천이 어디서 나왔나」 and
+ * 「어떻게 그만두나」. The same line family as 「다른 처리가 필요하면 … 처리 변경」 directly below it — a muted
+ * sentence with one text control on the right — because it is the same kind of statement about the same thing and
+ * a bordered card for it would outweigh the recommendation it is a footnote to.
+ *
+ * <p><b>What it does not show.</b> Not the rule's own sentence, not its revision, not a link to a settings screen
+ * (there is none). A case pane reads one case; the rule is named by the problem it matched, in the closed
+ * vocabulary, which is also the only form of it that carries no customer words.
+ *
+ * <p><b>The stop is the existing retire route.</b> It stops the rule deciding future cases and takes its answer
+ * off the open cards it had decided — including this one — so the case is reloaded afterwards rather than patched
+ * locally: what the retirement did to this card is what the seller pressed it to see.
+ */
+function PolicyProvenance({
+  detail,
+  flat,
+  onChanged,
+  onFailed,
+}: {
+  detail: OperationsCaseDetail;
+  flat: boolean;
+  onChanged: () => void;
+  onFailed: (e: unknown) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const policy = detail.appliedPolicy;
+  if (!policy) return null;
+
+  const stop = async () => {
+    setBusy(true);
+    try {
+      await api.stopOperationsPolicy(policy.policyId);
+      onChanged();
+    } catch (e) {
+      onFailed(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      className={
+        flat
+          ? "mt-6 flex items-center gap-3 border-t border-line pt-4 text-sm text-muted"
+          : "flex items-center gap-3 rounded-[14px] bg-surface px-5 py-3.5 text-sm text-muted shadow-[0_0_0_1px_#E4E7EC]"
+      }
+    >
+      <span className="break-keep">
+        {COPY.policyApplied} · {policy.problemKo} ·{" "}
+        {policy.scope === "PRODUCT" ? COPY.thisProduct : COPY.wholeCompany}
+      </span>
+      <button
+        type="button"
+        onClick={stop}
+        disabled={busy}
+        className={`ml-auto whitespace-nowrap rounded font-semibold hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 disabled:opacity-60 ${
+          flat ? "text-brand-700 hover:text-brand-800" : "text-ink"
+        }`}
+      >
+        {busy ? COPY.policyStopping : COPY.policyStop}
+      </button>
+    </div>
+  );
+}
+
 /** The seller saying a different action was right — recorded as their judgement, never as a rule change. */
 function CorrectionCard({
   caseId,
@@ -1278,7 +1357,23 @@ function CorrectionCard({
   const [action, setAction] = useState("");
   const [note, setNote] = useState("");
   const [remember, setRemember] = useState(true);
+  /* <b>A second, independent tick, and it defaults OFF.</b> 「유사 건에 재사용」 defaults on because remembering
+     context costs the seller nothing. Declaring a rule decides work they have not seen yet, so it is a choice
+     they make rather than one they forget to undo. */
+  const [applyToFuture, setApplyToFuture] = useState(false);
+  /* The rule's own scope, separate from the guidance's. 「이 상품」 is a real choice only where the case has a
+     named product; the server refuses an unbindable PRODUCT rule rather than widening it, so the form does not
+     offer one it would refuse. */
+  const [policyScope, setPolicyScope] = useState<"PRODUCT" | "ORG">(
+    detail.productScopeAvailable ? "PRODUCT" : "ORG",
+  );
   const [busy, setBusy] = useState(false);
+
+  /* 「같은 문제」 has to be a problem the issue memory actually recorded, and the server says which. Null means
+     this case cannot carry a rule — an inquiry, or a review nothing was extracted from — and the tick is not
+     drawn at all rather than drawn and refused. */
+  const policyProblem = detail.policyProblemKo;
+  const canApplyToFuture = policyProblem !== null && action !== "";
 
   const submit = async () => {
     setBusy(true);
@@ -1289,9 +1384,14 @@ function CorrectionCard({
           note,
           remember,
           scope: detail.productScopeAvailable ? "PRODUCT" : "ORG",
+          // Only ever sent true when the form could legitimately offer it: an action was chosen and the case has
+          // a problem to key on. A stale tick left behind by a changed action must not travel.
+          applyToFuture: applyToFuture && canApplyToFuture,
+          policyScope: applyToFuture && canApplyToFuture ? policyScope : null,
         }),
       );
       setNote("");
+      setApplyToFuture(false);
       setOpen(false);
     } catch (e) {
       onFailed(e);
@@ -1365,6 +1465,58 @@ function CorrectionCard({
         <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4" />
         {COPY.reuse}
       </label>
+      {/* <b>The second decision, separated by a rule and not by a heading.</b> It sits under 「유사 건에 재사용」
+          because it is read after it, and a line between them is what says they are two things — a heading would
+          make this a section and a section would outweigh the correction it qualifies. Only drawn where the case
+          has a problem to key on, and only enabled once an action is chosen: a rule with no handling is not one. */}
+      {policyProblem === null ? null : (
+        <div className="space-y-2 border-t border-line pt-3">
+          <label className={`flex items-center gap-2 text-sm ${canApplyToFuture ? "text-ink" : "text-muted"}`}>
+            <input
+              type="checkbox"
+              checked={applyToFuture && canApplyToFuture}
+              disabled={!canApplyToFuture}
+              onChange={(e) => setApplyToFuture(e.target.checked)}
+              className="h-4 w-4"
+            />
+            {COPY.applyToFuture}
+          </label>
+          {applyToFuture && canApplyToFuture ? (
+            <>
+              <p className="break-keep text-xs leading-relaxed text-muted">
+                {COPY.applyToFutureNote(policyProblem)}
+              </p>
+              <fieldset className="flex items-center gap-4">
+                <legend className="sr-only">{COPY.applyScope}</legend>
+                {detail.productScopeAvailable ? (
+                  <label className="flex items-center gap-1.5 text-sm text-ink">
+                    <input
+                      type="radio"
+                      name="policy-scope"
+                      value="PRODUCT"
+                      checked={policyScope === "PRODUCT"}
+                      onChange={() => setPolicyScope("PRODUCT")}
+                      className="h-4 w-4"
+                    />
+                    {COPY.thisProduct}
+                  </label>
+                ) : null}
+                <label className="flex items-center gap-1.5 text-sm text-ink">
+                  <input
+                    type="radio"
+                    name="policy-scope"
+                    value="ORG"
+                    checked={policyScope === "ORG"}
+                    onChange={() => setPolicyScope("ORG")}
+                    className="h-4 w-4"
+                  />
+                  {COPY.wholeCompany}
+                </label>
+              </fieldset>
+            </>
+          ) : null}
+        </div>
+      )}
       <div className="flex gap-2">
         <Btn variant="outline" className="flex-1" onClick={() => setOpen(false)} disabled={busy}>
           {COPY.cancel}

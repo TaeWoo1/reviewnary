@@ -19,7 +19,37 @@ public record CaseDetailView(UUID caseId, boolean open, String subjectKind, Stri
                              String recommendedActionType, String recommendedAction, List<String> missingInformation,
                              String whyDecisionNeeded, List<Investigated> investigated,
                              List<KnowledgeUsed> knowledgeUsed, Gap gap, Draft draft, String to,
-                             List<Media> media, java.time.Instant openedAt, String answerStateNote) {
+                             List<Media> media, java.time.Instant openedAt, String answerStateNote,
+                             AppliedPolicy appliedPolicy, String policyProblemKo) {
+
+    /** The shape every caller before Seller-declared Operations Policy v1 built. */
+    public CaseDetailView(UUID caseId, boolean open, String subjectKind, String channelNameKo, String productName,
+                          boolean productScopeAvailable, LocalDate receivedOn, Integer rating, String title,
+                          String body, String reasonNote, String disposition, String decidedBy, String summary,
+                          String recommendedActionType, String recommendedAction, List<String> missingInformation,
+                          String whyDecisionNeeded, List<Investigated> investigated,
+                          List<KnowledgeUsed> knowledgeUsed, Gap gap, Draft draft, String to, List<Media> media,
+                          java.time.Instant openedAt, String answerStateNote) {
+        this(caseId, open, subjectKind, channelNameKo, productName, productScopeAvailable, receivedOn, rating, title,
+                body, reasonNote, disposition, decidedBy, summary, recommendedActionType, recommendedAction,
+                missingInformation, whyDecisionNeeded, investigated, knowledgeUsed, gap, draft, to, media, openedAt,
+                answerStateNote, null, null);
+    }
+
+    /**
+     * <b>The seller's own standing rule decided this case</b> — present only when {@code decidedBy} is
+     * {@code SELLER} (Seller-declared Operations Policy v1).
+     *
+     * <p>Deliberately five fields: what the screen needs to say «이 추천은 판매자님이 정한 기준에서 나왔습니다»
+     * and to offer the one way out. The rule's own words are NOT here — a case pane is not the settings screen,
+     * and the note the seller wrote travels with the policy rather than being reprinted on every card it decides.
+     *
+     * @param policyId the id the stop control sends — the existing retire route, nothing new
+     * @param problemKo the problem it matched, from the vocabulary ({@code 배송 지연}); never a review's words
+     * @param scope    {@code ORG} or {@code PRODUCT} — which rule of theirs this was
+     */
+    public record AppliedPolicy(UUID policyId, int version, String scope, String problemKo, String actionType) {
+    }
 
     /** The shape every caller before the answer-state note built. */
     public CaseDetailView(UUID caseId, boolean open, String subjectKind, String channelNameKo, String productName,

@@ -142,7 +142,10 @@ CaseDecider = { RULE, SELLER, AGENT }        ← V129가 세 번째 값을 추�
 
 | 항목 | 결과 |
 |---|---|
-| backend 전체 | **5,232 tests · 0 failures** (657 suites, 58 skipped) |
+| backend 전체 | **5,237 tests · 0 failures** (657 suites, 58 skipped) |
+| frontend 전체 | **3,908 tests · 0 failures** (286 files) · `tsc` 통과 |
+| E2E (`CaseTeachToReplyFlowTest`, MockMvc + 실 Postgres) | 5 — 선언·provenance 3 fact · 두 체크의 독립(guidance 0행) · 처리 없음/문제 없음 거부 · `policyProblemKo` 유무 · 중단 후 카드 정리 |
+| 화면 (`OperationsCase.test.tsx`) | 4 — 문제 없는 건엔 체크박스 없음 · 처리 선택 전 비활성 + 독립 scope 전송 · provenance 한 줄 + 중단 · 규칙 없는 건엔 둘 다 없음 |
 | `SellerOperationsPolicyTest` (실 Postgres · 실 추출) | 16 — key 동일성 2 · 쓰기 fence 3 · revision/은퇴 2 · overlay precedence 4 · case 영향 3 · 재판정 4 |
 | `SellerOperationsPolicyFenceTest` | 9 — 승격 경로 0건 · 실행 협력자 0건 · generic override 0건 · `CaseDecider.SELLER` writer 정확히 2개 · `applyPolicy` 본문에 종료 필드 0 · allowed action 전부 HUMAN |
 | `V129` | 실 Postgres 15에서 제약 **전수 확인** — scope shape(PRODUCT 무상품 / ORG 유상품 모두 거부) · 라이브 ORG 규칙 1개 제한 · PRODUCT 규칙 공존 · 은퇴 후 key 해방 · `active=false` ⇒ `retired_at` 필수 · audit UPDATE/DELETE 거부 · `RETIRED` + action 거부 · `decided_by='SELLER'` 허용 / `'ROBOT'` 거부 |
@@ -152,11 +155,51 @@ CaseDecider = { RULE, SELLER, AGENT }        ← V129가 세 번째 값을 추�
 주장의 전부이기 때문이다. 단, 테스트 스키마는 Hibernate가 만들므로 **partial unique index는 테스트에서
 강제되지 않는다**; 위 수동 검증이 그 절반을 담당한다.
 
-## §9 남은 것
+## §9 제품 연결 — 기존 「다른 처리가 맞다」 흐름에만 (2026-10-10, 2차)
 
-**판매자용 화면이 없다.** API는 완성됐다(`/api/operations-policies` — list · options · declare · retire ·
-history, `options`가 닫힌 어휘와 허용 action을 **파생해서** 내려주므로 폼이 서버가 거부할 선택지를 보여줄 수
-없다). 설정 화면을 새로 만드는 것은 **`docs/product_assembly_ia_v1.md` §8의 FE/IA freeze(A7, 2026-08-18)를
-건드리는 일**이라 하지 않았다 — 제품 소유자 결정이다.
+**새 설정 페이지는 만들지 않았다.** 판매자가 이미 쓰는 Case의 처리 변경 폼에 **두 번째 선택**을 더했다.
+
+```
+POST .../cases/{caseId}/correction
+  correctedActionType, note
+  remember,       scope          ← 「다음에도 참고하기」   (seller_guidance — 참고할 맥락)
+  applyToFuture,  policyScope    ← 「앞으로 같은 문제도 이렇게 처리」 (정책 — 다음 판단을 정한다)
+```
+
+**네 필드이고 둘을 재사용하지 않는다.** 두 행위는 결과·저장소·수명주기·fence가 다르다 — 맥락을 남기고 싶었던
+판매자가 같은 체크로 규칙을 선언할 수 없어야 하고, scope를 공유하면 「이 상품 지침 + 회사 전체 규칙」을 한 번에
+말할 수 없다. 체크박스 기본값도 다르다: 「유사 건에 재사용」은 ON(맥락을 남기는 건 비용이 없다),
+「앞으로 같은 문제도 이렇게 처리」는 **OFF**(아직 보지 않은 일을 정하는 선택이므로 하는 것이지 잊고 안 끄는 게
+아니다).
+
+**서버가 거부할 선택지는 그리지 않는다.** `policyProblemKo`가 null이면 체크박스 자체가 없고(문의 ·
+추출된 문제가 없는 리뷰 · 판매자가 「중요하지 않음」 한 문제), 처리 방법을 고르기 전에는 비활성이다
+(처리 없는 기준은 기준이 아니다). 체크한 뒤에야 범위와 「무엇이 같은 문제인가」가 나타난다 —
+어휘 라벨(`배송 지연`)로, 리뷰 문장이 아니라.
+
+**적용된 Case에는 한 줄과 하나의 출구만.**
+
+```
+판매자님이 정한 처리 기준이 적용됐습니다 · 배송 지연 · 이 상품        [이 기준 사용 중단]
+```
+
+바로 아래 「다른 처리가 필요하면 … 처리 변경」과 **같은 줄 계열**(muted 문장 + 오른쪽 텍스트 컨트롤)이다 —
+같은 대상에 대한 같은 종류의 진술이고, 테두리 있는 카드는 각주가 본문보다 무거워지는 일이다. 규칙의 문장도,
+개정 번호도, 설정 화면 링크도(없다) 없다. 중단은 **기존 retire 라우트**이고, 누른 뒤 case를 다시 읽는다 —
+그 중단이 이 카드에 무엇을 했는지가 누른 이유다.
+
+`appliedPolicy`는 `POLICY_APPLIED` 이벤트가 아니라 **overlay에서** 읽는다: 이벤트는 「과거 어느 순간 규칙이
+결정했다」를 말하고 overlay는 「지금 어느 규칙이 서 있는가」를 말한다. 규칙을 은퇴시킨 뒤 pane을 다시 연
+판매자는 **지금 상태**를 봐야 한다.
+
+**IA 변화 0.** 새 페이지·새 라우트·새 메뉴 항목 없음. `applyScope`·`thisProduct`·`wholeCompany`는 teach 흐름이
+쓰던 라벨을 **그대로** 재사용했다(두 번째 taxonomy를 만들지 않는다).
+
+## §10 남은 것
 
 **문의 레인은 비어 있다.** §6 참조 — 닫힌 problem 서명을 고객 질문에서 추출하는 것이 없는 한 열 수 없다.
+
+**`/api/operations-policies`의 list·options·history는 호출자가 없다.** declare는 correction 흐름이, retire는
+provenance 줄이 쓴다. 「내가 정한 기준 전체」를 한 화면에서 보는 것은 설정 페이지의 일이고, 그걸 새로 만드는
+것은 `docs/product_assembly_ia_v1.md` §8의 FE/IA freeze(A7, 2026-08-18)를 건드린다 — 제품 소유자 결정이다.
+API는 그 결정을 기다리는 상태로 완성돼 있다.

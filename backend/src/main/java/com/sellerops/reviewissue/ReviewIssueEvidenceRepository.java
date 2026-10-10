@@ -154,6 +154,21 @@ public interface ReviewIssueEvidenceRepository extends JpaRepository<ReviewIssue
     List<String> signatureKeysOfReview(@Param("orgId") UUID orgId, @Param("reviewId") UUID reviewId);
 
     /**
+     * The same issues, as the vocabulary pair rather than the joined key.
+     *
+     * <p>Asked separately rather than split out of {@code signatureKeysOfReview} because a caller that needs the
+     * aspect and the problem as fields — the policy declaration does, it stores both — would otherwise have to
+     * split a string on {@code ':'} and trust that no vocabulary member ever contains one. Returning the two
+     * columns is the same read and removes the assumption entirely.
+     */
+    @Query("""
+            select distinct i.aspect, i.problem from ReviewIssueEvidence e, ReviewIssue i
+            where e.orgId = :orgId and e.reviewId = :reviewId
+              and i.id = e.issueId and i.orgId = :orgId and i.dismissed = false
+            """)
+    List<Object[]> issueVocabularyOfReview(@Param("orgId") UUID orgId, @Param("reviewId") UUID reviewId);
+
+    /**
      * {@code [min, max]} of the issue's remaining evidence dates, or an empty list when it has none —
      * re-derived after a retraction, because the issue's stored span only ever widened while nothing
      * could be deleted (Issue Evidence Trust Closure v1).
