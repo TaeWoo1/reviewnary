@@ -131,13 +131,42 @@ public class CoupangOrdersClient {
 
     public CoupangOrdersClient(CoupangHttpClient http, CoupangSigner signer, Clock clock, String baseUrl,
                                String liveApprovalId, String standingReadGrantId) {
+        this(http, signer, clock, baseUrl, liveApprovalId, standingReadGrantId, false);
+    }
+
+    public CoupangOrdersClient(CoupangHttpClient http, CoupangSigner signer, Clock clock, String baseUrl,
+                               String liveApprovalId, String standingReadGrantId,
+                               boolean observeWireShape) {
         this.http = http;
         this.signer = signer;
         this.clock = clock;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.liveApprovalId = liveApprovalId;
         this.standingReadGrantId = standingReadGrantId == null ? "" : standingReadGrantId;
+        this.observeWireShape = observeWireShape;
     }
+
+    /**
+     * Whether to record the ordersheets response SCHEMA for one approved observation — off by default.
+     *
+     * <p><b>What it answers.</b> {@code channel_order_products} is fed by
+     * {@code orderItems[].sellerProductId}, and this repository has never seen an ordersheets body
+     * beyond {@code orderPrice}. Without this, a single approved run that yields zero product references
+     * cannot tell «키가 없었다» from «값이 비어 있었다» — and those lead to different work (widen the
+     * request, or ask why the seller's lines carry no product). The approval would be spent without the
+     * answer it was asked for.
+     *
+     * <p><b>What it may record.</b> Object KEY names, JSON node kinds, array cardinalities and
+     * present/non-null counts — the platform's API schema. <b>Never a value</b>: not a product title, not
+     * a price, not an identifier, not one character of the body
+     * ({@link CoupangWireShapeObserver}). That is what makes the output safe to put in an evidence
+     * document, and it is asserted on an order-shaped body in {@code CoupangWireShapeObserverTest}.
+     *
+     * <p><b>Why off by default.</b> Instrumentation that stays armed is instrumentation nobody decided to
+     * run. It also costs a second parse of every page, which a collection path should not pay to answer a
+     * question that has already been answered once.
+     */
+    private final boolean observeWireShape;
 
     // --- order collection -------------------------------------------------
 
@@ -158,13 +187,18 @@ public class CoupangOrdersClient {
 
         // shipmentBoxId -> row; de-dup across the six status queries (defensive) and pages.
         Map<String, OrderRow> collected = new LinkedHashMap<>();
+        // One observer for the whole sweep, so the counts have the whole sweep as their denominator —
+        // per-page reports would make a key present in 1 of 6 statuses look present in everything.
+        CoupangWireShapeObserver observer =
+                observeWireShape ? new CoupangWireShapeObserver(CoupangWireShapeObserver.ORDER_WATCHED_KEYS) : null;
         for (String status : STATUSES) {
             String nextToken = null;
             int pages = 0;
             do {
                 String query = ordersheetsQuery(window.fromParam(), window.toParam(), status,
                         MAX_PER_PAGE, nextToken);
-                OrdersheetEnvelope envelope = getOrdersheets(accessKey, secretKey, vendorId, path, query);
+                OrdersheetEnvelope envelope =
+                        getOrdersheets(accessKey, secretKey, vendorId, path, query, observer);
                 for (Ordersheet item : envelope.dataOrEmpty()) {
                     OrderRow row = toRow(item);
                     collected.putIfAbsent(row.externalOrderId(), row);
@@ -177,6 +211,12 @@ public class CoupangOrdersClient {
             } while (nextToken != null && !nextToken.isBlank());
         }
 
+        if (observer != null && !observer.isEmpty()) {
+            // Aggregated schema only — key names, kinds and counts. Never a value; see the observer.
+            for (String line : observer.summaryLines()) {
+                log.info("쿠팡 주문 wire-shape {}", line);
+            }
+        }
         List<OrderRow> rows = new ArrayList<>(collected.values());
         CoupangOrdersCursor next = cursor.sweptThrough(today);
         return FetchPage.ofWithOrders(DataType.ORDER_SUMMARY,
@@ -185,7 +225,8 @@ public class CoupangOrdersClient {
     }
 
     private OrdersheetEnvelope getOrdersheets(String accessKey, String secretKey, String vendorId,
-                                              String path, String query) {
+                                              String path, String query,
+                                              CoupangWireShapeObserver observer) {
         CoupangHttpClient.Response response = signedGet(path, query, accessKey, secretKey, vendorId);
         if (response.statusCode() == 429) {
             throw CoupangRateLimitedException.fromResponse(response);
@@ -209,6 +250,11 @@ public class CoupangOrdersClient {
             throw new IllegalStateException("쿠팡 주문 목록 응답이 비어 있습니다.");
         }
         try {
+            if (observer != null) {
+                // Observed BEFORE binding, so a body that the envelope cannot bind is still measured —
+                // "the key was there and we could not read it" is exactly one of the answers worth having.
+                observer.observe("ordersheets", mapper.readTree(body));
+            }
             return mapper.readValue(body, OrdersheetEnvelope.class);
         } catch (JsonProcessingException e) {
             // A 200 whose body doesn't fit the envelope. Emit a SHAPE-ONLY diagnostic — JSON node

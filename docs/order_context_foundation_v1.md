@@ -264,9 +264,24 @@ endpoint 하나를 같은 scope로 한 번 더 읽으면 답이 나온다.
 | operation | 승인된 창에 대한 1회 sync |
 | mode | **READ** |
 | 허용 행동 | 목록 조회뿐. WRITE 0 · 주문 처리 0 · 송장 0 |
-| 추가로 켜는 것 | `CoupangWireShapeObserver`를 orders 경로에 flag로 — **키 이름과 충전율만**, 값은 한 글자도 기록하지 않는다 |
+| 추가로 켜는 것 | `sellerops.connector.coupang.order-wire-shape=true` (기본 OFF) — `CoupangWireShapeObserver`가 **키 이름·종류·충전율만**, 값은 한 글자도 기록하지 않는다 |
 | 답하는 질문 | `orderItems[]`에 `sellerProductId`가 있는가, 몇 %가 채워져 있는가 |
 | 성공 기준 | `channel_order_products` 행 > 0, 그리고 `product_id` 연결 > 0 |
+
+**관측기를 왜 같이 켜는가.** 승인은 1회이고, 참조가 0건 나왔을 때 **「키가 없었다」와 「값이 비어 있었다」를
+구별할 수 없으면** 그 승인은 답 없이 소비된다. 둘은 서로 다른 작업으로 이어진다 — 요청을 넓히는 일과,
+이 판매자의 줄에 왜 상품이 없는지 묻는 일. 관측기는 그 구별을 `present=2/2 nonNull=1` 형태로 돌려준다.
+
+관측 범위(`ORDER_WATCHED_KEYS`)는 세 묶음이고 순서가 질문의 순서다 — (1) 줄이 상품을 지목하는가
+(`sellerProductId` 외), (2) 없을 때의 대체 식별자, (3) **이 응답에 배송 시각이 있는가**
+(`deliveredDate` · `inTransitDateTime` · `invoiceNumber` · `deliveryCompanyName`). (3)이 하나라도
+있으면 §8.2의 per-order history 호출(과 그 N번 비용)이 필요 없다.
+
+**값이 나가지 않는 것은 테스트가 단정한다.** 구매자 이름·수령인·주소·이메일을 **일부러 포함한**
+주문 본문으로 `summaryLines()`에 그 어느 것도, 식별자도, 금액도, 상태 값도, 페이징 토큰도 나타나지 않음을
+확인한다(`CoupangWireShapeObserverTest`). 그리고 관측을 켠 수집 결과가 끈 것과 **동일**하며 요청 수도
+같다 — 관측기는 이미 손에 있는 본문을 한 번 더 파싱할 뿐이다. 두 flag(상품·주문)는 분리되어 있고 둘 다
+기본 OFF이며, 그 기본값을 fence test가 고정한다.
 
 NAVER도 같은 성질이다 — `POST /product-orders/query`를 이미 호출하므로 **추가 호출 0**이고, 다음
 routine tick이 새 mapper로 읽으면 `productId`가 있는지 그 자리에서 드러난다.

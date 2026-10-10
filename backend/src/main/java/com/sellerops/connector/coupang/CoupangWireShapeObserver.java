@@ -40,6 +40,36 @@ final class CoupangWireShapeObserver {
             "externalVendorSku", "itemName", "salePrice", "displayCategoryCode", "brand",
             "manufacture", "attributes", "notices", "contents", "images", "statusName");
 
+    /**
+     * The keys the ORDER observation sets out to settle (Order Context Foundation v1 §8.1).
+     *
+     * <p><b>Why a second list rather than more entries in the first.</b> A watched key that is absent is
+     * reported as {@code ABSENT}, which is the measurement — so a list carrying another surface's keys
+     * would fill an order report with a dozen confident ABSENT lines about product-catalogue fields that
+     * were never expected here. The two surfaces answer two questions and each names its own.
+     *
+     * <p>Three groups, and the order of them is the order of the questions. First, <b>does the order
+     * line name a product</b> — the one fact {@code channel_order_products} needs and the reason this
+     * observation exists. Second, the identifiers that would be a fallback if the first is absent.
+     * Third, <b>is there a delivery timestamp anywhere in this response</b> — because if there is, the
+     * per-order history call (and its N-calls-per-N-orders cost) is not needed to answer D3.
+     */
+    static final List<String> ORDER_WATCHED_KEYS = List.of(
+            "sellerProductId", "vendorItemId", "productId", "externalVendorSku", "sellerProductItemId",
+            "vendorItemName", "sellerProductName", "orderItems", "shipmentBoxId", "orderId", "status",
+            "orderedAt", "paidAt", "deliveredDate", "inTransitDateTime", "deliveryCompanyName",
+            "invoiceNumber", "estimatedShippingDate");
+
+    private final List<String> watchedKeys;
+
+    CoupangWireShapeObserver() {
+        this(WATCHED_KEYS);
+    }
+
+    CoupangWireShapeObserver(List<String> watchedKeys) {
+        this.watchedKeys = List.copyOf(watchedKeys);
+    }
+
     /** A body deep or wide beyond this stops being recorded. A runaway schema map is still a leak risk. */
     private static final int MAX_PATHS = 500;
     private static final int MAX_DEPTH = 12;
@@ -174,7 +204,7 @@ final class CoupangWireShapeObserver {
     /** Every watched key, present or not — an absent one is a measurement, not a gap in the report. */
     List<String> watchedKeyLines() {
         List<String> out = new ArrayList<>();
-        for (String key : WATCHED_KEYS) {
+        for (String key : watchedKeys) {
             List<String> hits = new ArrayList<>();
             for (Map.Entry<String, Map<String, Field>> stream : fields.entrySet()) {
                 for (Map.Entry<String, Field> field : stream.getValue().entrySet()) {
