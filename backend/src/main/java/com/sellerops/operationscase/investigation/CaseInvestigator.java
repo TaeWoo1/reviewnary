@@ -238,8 +238,13 @@ public class CaseInvestigator {
             String ref = "i" + n++;
             refs.add(ref);
             text.append('[').append(ref).append("] 반복 문제 「").append(issue.title()).append("」: 근거 ")
-                    .append(issue.evidenceCount()).append("건").append(issue.citesThisReview() ? " (이 리뷰도 근거)" : "")
-                    .append('\n');
+                    .append(issue.evidenceCount()).append("건").append(issue.citesThisReview() ? " (이 리뷰도 근거)" : "");
+            // Where the seller has taken it. «18 times» and «18 times, and they are fixing it» are different
+            // facts and want different recommendations; before this the line could not tell them apart.
+            if (issue.lifecycleLabelKo() != null) {
+                text.append(" · 판매자 상태: ").append(issue.lifecycleLabelKo());
+            }
+            text.append('\n');
         }
         int c = 1;
         for (CaseInvestigationTools.SimilarCase similar
@@ -267,7 +272,40 @@ public class CaseInvestigator {
                     .append(decisionKo(decision.kind())).append(": ").append(decision.what())
                     .append(decision.on() == null ? "" : " (" + decision.on() + ")").append('\n');
         }
+        appendOutcomes(text, refs, t.getPastOutcomes(subject.productId()));
         return new Context(text.toString(), refs, knowledge, knowledgeRefs);
+    }
+
+    /**
+     * What this company actually DID about a repeated problem, and what the reviews did afterwards.
+     *
+     * <p>The {@code [d]} lines above say what the seller DECIDES; these say what came of it — the difference
+     * between teaching an investigation this seller's habits and teaching it what has worked here. Settled
+     * windows only and bounded, so an unread window cannot be cited as a finding.
+     *
+     * <p><b>Both counts are printed even when the verdict is 판단 보류</b>, and the reason is printed beside
+     * them. That is the line's most important shape: «판단 보류» alone invites a model to read a withheld
+     * judgement as a weak yes, while «판단 보류 … (그 기간에 들어온 리뷰가 없어 비교할 수 없습니다)» cannot be read
+     * as anything but a refusal.
+     */
+    static void appendOutcomes(StringBuilder text, Set<String> refs,
+                               List<CaseInvestigationTools.PastOutcome> outcomes) {
+        int n = 1;
+        for (CaseInvestigationTools.PastOutcome outcome : outcomes) {
+            String ref = "o" + n++;
+            refs.add(ref);
+            text.append('[').append(ref).append("] 이 회사가 「").append(outcome.problem()).append("」에 한 조치");
+            if (outcome.what() != null) {
+                text.append('(').append(outcome.what()).append(')');
+            }
+            text.append(outcome.appliedOn() == null ? "" : " " + outcome.appliedOn())
+                    .append(" 뒤 결과: ").append(outcome.verdictKo())
+                    .append(" — 적용 전 4주 ").append(outcome.evidenceBefore()).append("건");
+            if (outcome.evidenceAfter() != null) {
+                text.append(" → 뒤 4주 ").append(outcome.evidenceAfter()).append("건");
+            }
+            text.append(" (").append(outcome.reasonKo()).append(")\n");
+        }
     }
 
     /**

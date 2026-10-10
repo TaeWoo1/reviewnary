@@ -25,10 +25,21 @@ public final class CaseInvestigationPrompt {
      * v4 (2026-09-18, Customer Ops Demo Closure v1): a review's photos arrive as [m] lines — what a vision model saw,
      * or that the photo was not seen. One rule added (10); nothing else changed.
      */
-    public static final String PROMPT_VERSION = "case-investigation-prompt/v4";
+    /**
+     * v5 (2026-10-10, Learning &amp; Outcome Loop v1): two kinds of line the context could not carry before — a
+     * repeated problem's own 판매자 상태 ({@code [i]}) and what came of a remediation the seller actually applied
+     * ({@code [o]}). v1–v4's rules are unchanged; one rule is added (11) and it is mostly a restraint: an
+     * outcome is what the EVIDENCE did in a named window, so it may be weighed and may not be read as proof that
+     * the act worked. The second half of the rule matters more than the first — «판단 보류» is the most common
+     * verdict by design, and a model told only to use outcomes would be tempted to read a withheld judgement as
+     * a weak yes.
+     */
+    public static final String PROMPT_VERSION = "case-investigation-prompt/v5";
     public static final String SCHEMA_VERSION = "case-investigation-schema/v1";
-    public static final String TOOL_VERSION = "case-tools/v2";
-    public static final String EVIDENCE_VERSION = "case-evidence/v2";
+    /** v3: one tool added — {@code getPastOutcomes}. Nothing existing changed its arguments or its result. */
+    public static final String TOOL_VERSION = "case-tools/v3";
+    /** v3: the {@code [o]} line family, and 판매자 상태 on the {@code [i]} lines. */
+    public static final String EVIDENCE_VERSION = "case-evidence/v3";
 
     private CaseInvestigationPrompt() {
     }
@@ -60,6 +71,7 @@ public final class CaseInvestigationPrompt {
                9. [basis]가 「부족합니다」이면 근거 없이 답하라고 권하지 않습니다. 판매자에게 그 안내 기준을 알려 달라고 하고, \
                그 항목을 missingInformation에 적습니다. [g] 판매자 지침은 처리 방향을 알려 주지만 사실의 근거는 아닙니다.
                10. [m] 줄은 리뷰에 첨부된 사진입니다. 「보지 못했습니다」인 사진은 내용을 추측하지 않습니다. 사진에 문제가                「보임」이면 그 사실을 판단에 쓰고 evidenceRefs에 그 [m]을 적습니다. [media]는 사진이 있다는 사실뿐입니다.
+               11. [o] 줄은 이 회사가 같은 문제로 실제로 한 조치와 그 뒤 리뷰가 어떻게 변했는지입니다. 참고하되,                그 조치가 문제를 해결했다고 단정하지 않습니다. 「판단 보류」는 아직 모른다는 뜻이고 효과가 있었다는                뜻이 아닙니다. 「근거 늘었습니다」이면 같은 조치를 다시 권하기 전에 판매자 판단이 필요합니다.                [i] 줄의 「판매자 상태」가 조치 중·개선 확인 중이면 이미 진행 중인 일을 새로 시작하라고 권하지 않습니다.
 
                recommendedActionType: NO_ACTION, MONITOR_REPEAT_ISSUE, REPLY_TO_CUSTOMER, CONTACT_CUSTOMER, \
                REFUND_OR_COMPENSATION, CANCEL_OR_EXCHANGE, ADD_KNOWLEDGE, REVIEW_PRODUCT_LISTING 중 하나.

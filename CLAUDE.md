@@ -227,6 +227,7 @@ but not carrying current truth on its own (`docs/archive/` especially).
 - `docs/auth_growth_instrumentation_v1.md` — Auth + Growth Instrumentation v1 — contract
 - `docs/coupang_review_policy_gate_v1.md` — Coupang WING Review — Policy Gate v1
 - `docs/decisions/agent-runtime-langgraph-llm-split.md` — ADR — the LangGraph runtime and the LLM are two disjoint subsystems
+- `docs/learning_outcome_loop_v1.md` — Learning & Outcome Loop v1 — 한 일과 그 결과가 다음 판단에 들어간다
 - `docs/operational_knowledge_direction_v1.md` — Operational Knowledge Direction v1 — 방향만, 구현 없음
 - `docs/proactive_operations_agent_v1.md` — Proactive Operations Agent v1
 - `docs/responsibility_runtime_v1.md` — Responsibility Runtime v1
