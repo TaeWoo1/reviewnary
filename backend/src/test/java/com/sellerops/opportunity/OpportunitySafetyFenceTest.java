@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,17 +57,30 @@ class OpportunitySafetyFenceTest {
                 "ProductKnowledgeLibraryService", "SellerOperationsKnowledgeService", "KnowledgeCandidate",
                 "ProductKnowledgeIndexer", "KnowledgeSourceRequest", "OrgKnowledgeRequest", "AnswerMemory");
         assertAbsent(forbidden, "the draft reaches the library only through the quick-add the seller presses");
-        // And the only repositories this package may SAVE to are its own two: the seller's decision
-        // and the trail of how it got there. Both are named, and the counts must add up — a third
-        // writer would show as a `.save(` this arithmetic cannot account for.
+        // And the only repositories this package may SAVE to are its OWN. Each writer is named with the
+        // expressions it is allowed to use, and the counts must add up — a save this arithmetic cannot
+        // account for is a fourth store, or one of these two files reaching a repository that is not its own.
+        //
+        // Three writers since Learning & Outcome Loop v1 (2026-10-10). The third is the anchored outcome, and
+        // it is this package's own table on the same terms as the other two: the seller's decision, the trail
+        // of how it got there, and the measurement of what came of it. It is named here one store at a time,
+        // which is what makes this a gate rather than a count.
+        Map<String, List<String>> allowed = Map.of(
+                "OpportunityService.java", List.of("decisions.save(", "trail.save("),
+                "ImprovementOutcomeService.java", List.of("outcomes.save(", "outcomes.saveAll("));
         for (Path source : javaFiles()) {
             String text = code(source);
-            if (text.contains(".save(")) {
-                assertThat(source.getFileName().toString()).isEqualTo("OpportunityService.java");
-                assertThat(text).contains("decisions.save(").contains("trail.save(");
-                assertThat(occurrences(text, ".save("))
-                        .isEqualTo(occurrences(text, "decisions.save(") + occurrences(text, "trail.save("));
+            String name = source.getFileName().toString();
+            int saves = occurrences(text, ".save(") + occurrences(text, ".saveAll(");
+            if (saves == 0) {
+                continue;
             }
+            assertThat(allowed).as("%s writes, and is not a named writer", name).containsKey(name);
+            List<String> expressions = allowed.get(name);
+            int accounted = expressions.stream().mapToInt(e -> occurrences(text, e)).sum();
+            assertThat(accounted)
+                    .as("%s saves through something other than %s", name, expressions)
+                    .isEqualTo(saves);
         }
     }
 

@@ -3231,7 +3231,64 @@ export type OpportunityKind =
   | "OPERATING_POLICY_SUPPLEMENT"
   | "PRODUCT_IMPROVEMENT_REVIEW";
 
-export type OpportunityStatus = "OPEN" | "ACCEPTED" | "DISMISSED";
+export type OpportunityStatus = "OPEN" | "ACCEPTED" | "APPLIED" | "DISMISSED";
+
+/**
+ * What the applied draft landed in. `SELLER_DECLARED` is the seller's own word that they acted on it —
+ * recorded as that, and never drawn as a saved document.
+ */
+export type AppliedArtifact = "ORG_KNOWLEDGE" | "PRODUCT_KNOWLEDGE" | "SELLER_DECLARED";
+
+/**
+ * Mirrors com.sellerops.opportunity.dto.OpportunityOutcomeView — what the reviews did in a named window after
+ * the seller applied one improvement (Learning & Outcome Loop v1).
+ *
+ * Both counts and the reason are present even when the verdict is 판단 보류, and that is the shape that matters:
+ * 「판단 보류」 beside nothing reads as a product that lost the measurement, while 「판단 보류 · 전 4주 11건 →
+ * 후 4주 0건 · 그 기간에 들어온 리뷰가 없어 비교할 수 없습니다」 reads as one that measured and refused to
+ * overclaim.
+ *
+ * No label here says the act caused anything — `verdictLabelKo` is about the evidence («근거 줄었습니다»), the
+ * same discipline 해결됨 holds on the issue lifecycle.
+ */
+export interface OpportunityOutcomeView {
+  kind: OpportunityKind | null;
+  kindLabelKo: string | null;
+  scope: "PRODUCT" | "ORG";
+  appliedOn: string;
+  /** While the window is open this is the day it WILL close — the one date a seller asks for. */
+  observedThrough: string;
+  evidenceBefore: number;
+  /** The denominator. Present so a withheld verdict can say why it was withheld. */
+  reviewsBefore: number;
+  evidenceAfter: number | null;
+  reviewsAfter: number | null;
+  verdict: "OBSERVING" | "IMPROVED" | "UNCHANGED" | "WORSENED" | "INCONCLUSIVE";
+  verdictLabelKo: string;
+  reasonLabelKo: string;
+  settled: boolean;
+}
+
+/**
+ * Mirrors com.sellerops.opportunity.OpportunityService.Applied — what one application recorded and what it
+ * started watching.
+ *
+ * `remediationRecorded` is false when applying was the seller's own word rather than a change standing in their
+ * records, and when the problem was already 개선 확인 중. The act is recorded either way; only the problem's
+ * state is left alone.
+ */
+export interface OpportunityAppliedView {
+  issueId: string;
+  kind: OpportunityKind;
+  kindLabelKo: string;
+  status: OpportunityStatus;
+  statusLabelKo: string;
+  appliedAt: string;
+  artifact: AppliedArtifact;
+  artifactLabelKo: string;
+  remediationRecorded: boolean;
+  outcome: OpportunityOutcomeView | null;
+}
 
 export interface OpportunityKnowledgeView {
   scope: "PRODUCT" | "ORG";
@@ -3262,7 +3319,7 @@ export interface OpportunityDraftView {
  * before the trail existed — then the row says when, not on what.
  */
 export interface OpportunityEventView {
-  event: "ACCEPTED" | "EDITED" | "DISMISSED" | "REOPENED";
+  event: "ACCEPTED" | "EDITED" | "APPLIED" | "DISMISSED" | "REOPENED";
   eventLabelKo: string;
   statusFrom: OpportunityStatus | null;
   statusTo: OpportunityStatus;
@@ -3299,6 +3356,10 @@ export interface OpportunityView {
   history: OpportunityEventView[];
   /** Null while OPEN — whether nothing was ever decided, or a decision was taken back. */
   decidedAt: string | null;
+  /** When the seller carried it out, or null. The day the outcome window is anchored on. */
+  appliedAt: string | null;
+  /** What came of it, or null while nothing has been applied. */
+  outcome: OpportunityOutcomeView | null;
 }
 
 export interface AgentQuotaStatus {

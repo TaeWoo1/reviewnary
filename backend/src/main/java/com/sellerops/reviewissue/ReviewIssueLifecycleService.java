@@ -113,6 +113,30 @@ public class ReviewIssueLifecycleService {
     }
 
     /**
+     * <b>조치 완료를 한 번에 기록한다</b> — the seam an applied improvement uses, and the only caller it has.
+     *
+     * <p>Returns {@code false} and writes nothing when the issue is already {@link IssueLifecycleState#VERIFYING}
+     * or {@link IssueLifecycleState#RESOLVED}. That is not a failure: remediation is recorded in both, and a
+     * second application of a second suggestion on the same problem does not make the first one unhappen. The
+     * caller records its own 적용 either way, so the act is never lost — only the state is left alone.
+     *
+     * <p>Actor is {@link IssueStateActor#OPERATOR}, because a person pressed something. Reason is
+     * {@link IssueStateReason#IMPROVEMENT_APPLIED} so a reader months later can tell this from somebody typing a
+     * note on the problem itself; {@link #systemMayTransitionTo} is not consulted and could not be satisfied —
+     * the automated pass may still not declare work done.
+     */
+    @Transactional
+    public boolean recordRemediation(UUID orgId, UUID issueId, String note) {
+        ReviewIssue issue = require(orgId, issueId);
+        if (!issue.getLifecycleState().sellerMayRecordRemediation()) {
+            return false;
+        }
+        transition(issue, IssueLifecycleState.VERIFYING, IssueStateActor.OPERATOR,
+                IssueStateReason.IMPROVEMENT_APPLIED, note);
+        return true;
+    }
+
+    /**
      * 중요하지 않음. Sets a flag rather than deleting the row: a deleted issue would be recreated by
      * the next extraction pass and announced as new, which turns one dismissal into a recurring nag.
      * The lifecycle state is left untouched so restoring returns the operator to where they were.

@@ -26,6 +26,18 @@ public interface ReviewIssueEvidenceRepository extends JpaRepository<ReviewIssue
     long countByOrgIdAndIssueId(UUID orgId, UUID issueId);
 
     /**
+     * The same window count, narrowed to one product.
+     *
+     * <p>Needed because an improvement's result has to be measured in the population the improvement could
+     * reach: a detail-page note on one product is measured against that product's reviews, and counting it
+     * against the whole company dilutes a real change into 변화 없음. {@code product_id} is already denormalised
+     * onto this row for exactly this class of read ({@code ReviewIssueEvidence#productId}), so this is the same
+     * indexed scan with one more predicate.
+     */
+    long countByOrgIdAndIssueIdAndProductIdAndOccurredOnBetween(
+            UUID orgId, UUID issueId, UUID productId, LocalDate fromInclusive, LocalDate toInclusive);
+
+    /**
      * Whether any evidence predates a date. This is the fact the NEW judgement rests on: without it,
      * an old issue returning after a quiet spell would be announced as one the seller has never seen.
      */

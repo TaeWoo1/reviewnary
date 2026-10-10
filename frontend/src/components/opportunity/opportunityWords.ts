@@ -1,5 +1,5 @@
 import type { KnowledgeTopicValue } from "../../lib/knowledgeWords";
-import type { OpportunityKind, OpportunityStatus, OpportunityView } from "../../lib/types";
+import type { AppliedArtifact, OpportunityKind, OpportunityStatus, OpportunityView } from "../../lib/types";
 import type { StatusTone } from "../ui/Status";
 
 /**
@@ -21,6 +21,10 @@ export const KIND_TONE: Record<OpportunityKind, StatusTone> = {
 export const STATUS_TONE: Record<OpportunityStatus, StatusTone> = {
   OPEN: "neutral",
   ACCEPTED: "info",
+  // 적용했습니다 — the seller did it. `good` and not `info`: this is the only status on the card that reports
+  // something finished rather than something prepared. It still says nothing about whether it worked; that is
+  // the outcome line, and it has its own words.
+  APPLIED: "good",
   DISMISSED: "neutral",
 };
 
@@ -48,7 +52,23 @@ export function destinationOf(o: OpportunityView): DraftDestination {
   }
 }
 
-/** Opportunities a seller can still act on — what a count on a product page may say. */
+/**
+ * Opportunities a seller can still act on — what a count on a product page may say.
+ *
+ * `APPLIED` is excluded since Learning & Outcome Loop v1, for the same reason `DISMISSED` always was: a count
+ * that included it would keep asking for work the seller has already done. The record of having done it is on
+ * the problem's own surface (한 일과 그 결과), which is where a finished thing belongs.
+ */
 export function actionable(list: readonly OpportunityView[]): OpportunityView[] {
-  return list.filter((o) => o.status !== "DISMISSED");
+  return list.filter((o) => o.status !== "DISMISSED" && o.status !== "APPLIED");
+}
+
+/** The artifact a draft landed in, read off where the draft was going. */
+export function artifactOf(destination: DraftDestination): AppliedArtifact {
+  if (destination.kind === "KNOWLEDGE") {
+    return destination.scope === "ORG" ? "ORG_KNOWLEDGE" : "PRODUCT_KNOWLEDGE";
+  }
+  // A draft the seller carries off has no artifact here, so applying it is their own word — recorded as that
+  // rather than as a document this product can point at.
+  return "SELLER_DECLARED";
 }

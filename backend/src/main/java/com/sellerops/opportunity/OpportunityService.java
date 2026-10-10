@@ -2,6 +2,7 @@ package com.sellerops.opportunity;
 
 import com.sellerops.common.ApiException;
 import com.sellerops.opportunity.dto.OpportunityDraftRequest;
+import com.sellerops.opportunity.dto.OpportunityOutcomeView;
 import com.sellerops.opportunity.dto.OpportunityDraftView;
 import com.sellerops.opportunity.dto.OpportunityEventView;
 import com.sellerops.opportunity.dto.OpportunityKnowledgeView;
@@ -65,6 +66,49 @@ public class OpportunityService {
     }
 
     /**
+     * The two collaborators 적용 needs, optional so the five-argument constructor two unit tests already use is
+     * untouched.
+     *
+     * <p>Optional rather than required is also the honest shape: {@link #list}, {@link #accept},
+     * {@link #dismiss}, {@link #restore} and {@link #updateDraft} were all complete without them and still are.
+     * A context that wires neither is the product before this package existed, and it behaves exactly as it did.
+     */
+    private ImprovementOutcomeService outcomes;
+    private com.sellerops.reviewissue.ReviewIssueLifecycleService lifecycle;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setOutcomeLane(ImprovementOutcomeService outcomes,
+                        com.sellerops.reviewissue.ReviewIssueLifecycleService lifecycle) {
+        this.outcomes = outcomes;
+        this.lifecycle = lifecycle;
+    }
+
+    /** Settle every closed window. 0 when the outcome lane is not wired, which is the product before it existed. */
+    @Transactional
+    public int readOutcomes(UUID orgId, LocalDate referenceDate) {
+        return outcomes == null ? 0 : outcomes.read(orgId, referenceDate);
+    }
+
+    /** The anchored results of this issue's applied improvements, newest first. Empty when nothing was applied. */
+    @Transactional(readOnly = true)
+    public List<OpportunityOutcomeView> outcomes(UUID orgId, UUID issueId) {
+        if (outcomes == null) {
+            return List.of();
+        }
+        List<ImprovementOutcome> rows = outcomes.forIssue(orgId, issueId);
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, OpportunityKind> kinds = new HashMap<>();
+        for (ImprovementOpportunity row : decisions.findByOrgIdAndIssueIdIn(orgId, List.of(issueId))) {
+            kinds.put(row.getId(), row.getKind());
+        }
+        return rows.stream()
+                .map(row -> OpportunityOutcomeViews.of(row, kinds.get(row.getOpportunityId())))
+                .toList();
+    }
+
+    /**
      * Every opportunity for the org, or for one product, or for one issue — open and accepted, plus the
      * dismissed ones when asked. Ordered as the issue list is (severity, change, recency), guidance
      * before product review within an issue.
@@ -92,6 +136,11 @@ public class OpportunityService {
         // on a screen that already costs one per issue; loading it lazily would let a card render a
         // decision badge above an empty history for as long as the second request took.
         Map<UUID, List<OpportunityEventView>> history = historyOf(orgId, decided.values());
+        // One read for every result on the page, for the same reason the trail is batched: an outcome per card
+        // would be a query per card on a screen that already costs one per issue.
+        Map<UUID, ImprovementOutcome> results = outcomes == null || decided.isEmpty() ? Map.of()
+                : outcomes.byOpportunity(orgId, decided.values().stream()
+                        .map(ImprovementOpportunity::getId).toList());
         List<OpportunityView> out = new ArrayList<>();
         for (ReviewIssueView issue : qualifying) {
             for (Derived d : derive(orgId, issue)) {
@@ -100,7 +149,7 @@ public class OpportunityService {
                     continue;
                 }
                 out.add(view(issue, d, row, row == null ? List.of()
-                        : history.getOrDefault(row.getId(), List.of())));
+                        : history.getOrDefault(row.getId(), List.of()), standingResult(results, row)));
             }
         }
         return List.copyOf(out);
@@ -138,7 +187,7 @@ public class OpportunityService {
                     .filter(d -> d.candidate().kind() == row.getKind())
                     .findFirst()
                     .ifPresent(d -> out.add(new PreparedDraft(row.getId(), view(issue, d, row,
-                            history.getOrDefault(row.getId(), List.of())))));
+                            history.getOrDefault(row.getId(), List.of()), null))));
         }
         return List.copyOf(out);
     }
@@ -237,10 +286,108 @@ public class OpportunityService {
         ImprovementOpportunity row = locked(orgId, issueId, kind);
         if (row == null) {
             // Nothing was decided, so nothing is taken back and nothing is appended.
-            return view(issue, d, null, List.of());
+            return view(issue, d, null, List.of(), null);
         }
         return settle(orgId, actorId, issue, d, row, row.getStatus(), OpportunityStatus.OPEN,
                 OpportunityEvent.REOPENED);
+    }
+
+    /**
+     * <b>적용 — the seller carried it out.</b> The step the chain was missing.
+     *
+     * <p>Until now the draft went into the seller's library through two frontend calls
+     * ({@code createOrgKnowledge} / {@code createProductKnowledgeSource}) and this row never learned it, so
+     * «채택했다» and «실제로 했다» were one word and «did it work» had no first date to measure from. This records
+     * the act, freezes the measurement's premise, and — when the application was itself a change in the seller's
+     * own records — records the remediation on the problem too.
+     *
+     * <p><b>It does not re-derive.</b> Every other mutation here checks that the rules still yield this kind;
+     * this one deliberately checks the stored row instead, because saving the draft into the product's library
+     * is exactly what flips {@code aspectMentioned} and therefore flips {@code FAQ_SUPPLEMENT} to
+     * {@code PRODUCT_GUIDE_SUPPLEMENT}. A re-derivation here would refuse the application of the very draft that
+     * had just succeeded. The gate is {@code ACCEPTED}: you can only carry out what was prepared.
+     *
+     * <p><b>Idempotent.</b> Applying twice appends nothing and re-anchors nothing — {@link #settle} suppresses a
+     * no-change decision, and {@code ImprovementOutcomeService.anchor} returns the standing anchor rather than
+     * measuring a baseline against a later day.
+     *
+     * @param artifact  what it landed in. {@code SELLER_DECLARED} is the seller's own word, recorded as that and
+     *                  not dressed up as a saved document
+     * @param appliedRef the id of that artifact, or null
+     */
+    @Transactional
+    public Applied apply(UUID orgId, UUID actorId, UUID issueId, OpportunityKind kind, LocalDate referenceDate,
+                         AppliedArtifact artifact, UUID appliedRef) {
+        if (artifact == null) {
+            throw ApiException.badRequest("무엇으로 적용했는지 알려 주세요.");
+        }
+        ReviewIssueView issue = issues.issueView(orgId, issueId, referenceDate);
+        ImprovementOpportunity row = decisions.findWithLockByOrgIdAndIssueIdAndKind(orgId, issueId, kind)
+                .filter(r -> r.getStatus() == OpportunityStatus.ACCEPTED
+                        || r.getStatus() == OpportunityStatus.APPLIED)
+                .orElseThrow(() -> ApiException.conflict("초안이 준비된 기회에서만 적용을 기록할 수 있습니다."));
+        OpportunityRules.Scope scope = scopeOf(artifact, issue);
+        UUID productId = scope == OpportunityRules.Scope.PRODUCT ? issue.dominantProductId() : null;
+        if (scope == OpportunityRules.Scope.PRODUCT && productId == null) {
+            // No silent widening: an application the product cannot bind to a product is not recorded as one
+            // that covers the whole company. Same refusal shape as SellerOperationsPolicyService.
+            throw ApiException.badRequest("이 문제는 상품이 특정되지 않아 상품 적용으로 기록할 수 없습니다.");
+        }
+
+        OpportunityStatus from = row.getStatus();
+        boolean first = from != OpportunityStatus.APPLIED;
+        if (first) {
+            row.setAppliedAt(Instant.now());
+            row.setAppliedBy(actorId);
+            row.setAppliedRef(appliedRef);
+            row.setAppliedRefKind(artifact);
+        }
+        // `from` is the status actually left, read under the lock. Passing ACCEPTED unconditionally would make a
+        // second press look like a decision (ACCEPTED → APPLIED) and append a second trail row for one act.
+        settle(orgId, actorId, issue, null, row, from, OpportunityStatus.APPLIED, OpportunityEvent.APPLIED);
+
+        // <b>The window is anchored on the reference date, not on the clock.</b> `referenceDate` is the
+        // parameter every other route in this controller already takes, and it is what lets a demo or a test
+        // place an application on a day other than today; `appliedAt` above records the instant of the press.
+        // Only the first application's date is kept — `anchor` returns the standing anchor unchanged, so a
+        // second press cannot re-measure a baseline against a later day.
+        ImprovementOutcome outcome = outcomes == null ? null
+                : outcomes.anchor(orgId, row.getId(), issueId, scope, productId, referenceDate);
+        // A change standing in the seller's own records IS the remediation; their word that they acted on a memo
+        // is not, so only the first moves the problem. Either way the application above is recorded.
+        boolean remediationRecorded = first && artifact.isRecordedChange() && lifecycle != null
+                && lifecycle.recordRemediation(orgId, issueId, appliedNote(row, artifact));
+        return new Applied(issueId, kind.name(), kind.labelKo(), OpportunityStatus.APPLIED.name(),
+                OpportunityStatus.APPLIED.labelKo(), row.getAppliedAt(), artifact.name(), artifact.labelKo(),
+                remediationRecorded, outcome == null ? null : OpportunityOutcomeViews.of(outcome, kind));
+    }
+
+    /** What one application recorded, and what it started watching. */
+    public record Applied(UUID issueId, String kind, String kindLabelKo, String status, String statusLabelKo,
+                          Instant appliedAt, String artifact, String artifactLabelKo,
+                          boolean remediationRecorded, OpportunityOutcomeView outcome) {
+    }
+
+    /**
+     * The population the result will be counted in.
+     *
+     * <p>Read off the artifact where the artifact says it — a company rule reaches the company, a product source
+     * reaches that product — and off the issue only for {@code SELLER_DECLARED}, where there is no artifact to
+     * ask. An issue whose evidence resolves to no product can only be an ORG measurement; that is the same fence
+     * {@code SellerPolicyOverlay.applies} and {@code KnowledgeSpineScope} hold.
+     */
+    private static OpportunityRules.Scope scopeOf(AppliedArtifact artifact, ReviewIssueView issue) {
+        return switch (artifact) {
+            case ORG_KNOWLEDGE -> OpportunityRules.Scope.ORG;
+            case PRODUCT_KNOWLEDGE -> OpportunityRules.Scope.PRODUCT;
+            case SELLER_DECLARED -> issue.dominantProductId() == null
+                    ? OpportunityRules.Scope.ORG : OpportunityRules.Scope.PRODUCT;
+        };
+    }
+
+    /** The note the lifecycle trail carries. Operator-facing, derived from closed vocabulary only. */
+    private static String appliedNote(ImprovementOpportunity row, AppliedArtifact artifact) {
+        return row.getKind().labelKo() + "을 " + artifact.labelKo() + "으로 적용했습니다.";
     }
 
     /** The seller's edit of a prepared draft. Only an ACCEPTED opportunity has one to edit. */
@@ -266,7 +413,8 @@ public class OpportunityService {
         if (!changed) {
             // Saving the same text is not an edit. A trail that recorded it would grow a row every
             // time a seller pressed 저장 to close the editor.
-            return view(issue, d, decisions.save(row), historyFor(orgId, row));
+            ImprovementOpportunity kept = decisions.save(row);
+            return view(issue, d, kept, historyFor(orgId, kept), outcomeOf(orgId, kept));
         }
         return settle(orgId, actorId, issue, d, row, OpportunityStatus.ACCEPTED, OpportunityStatus.ACCEPTED,
                 OpportunityEvent.EDITED);
@@ -307,7 +455,28 @@ public class OpportunityService {
             e.setDecidedAt(saved.getDecidedAt());
             trail.save(e);
         }
-        return view(issue, d, saved, historyFor(orgId, saved));
+        // The apply path has no derived candidate and wants no view — see apply's javadoc for why re-deriving
+        // there would refuse the application of the draft that had just succeeded.
+        return d == null ? null : view(issue, d, saved, historyFor(orgId, saved), outcomeOf(orgId, saved));
+    }
+
+    /** The anchored result of one opportunity, or null — including when the outcome lane is not wired. */
+    private ImprovementOutcome outcomeOf(UUID orgId, ImprovementOpportunity row) {
+        if (outcomes == null || row == null || row.getId() == null) {
+            return null;
+        }
+        return outcomes.byOpportunity(orgId, List.of(row.getId())).get(row.getId());
+    }
+
+    /**
+     * The batched result for one row, tolerating a row with no id yet.
+     *
+     * <p>Not defensive noise: a decision this transaction has only just created has no generated id until it is
+     * flushed, and {@code Map.of()} rejects a null lookup outright. An unsaved row has no outcome by definition.
+     */
+    private static ImprovementOutcome standingResult(Map<UUID, ImprovementOutcome> results,
+                                                     ImprovementOpportunity row) {
+        return row == null || row.getId() == null ? null : results.get(row.getId());
     }
 
     private List<OpportunityEventView> historyFor(UUID orgId, ImprovementOpportunity row) {
@@ -369,7 +538,7 @@ public class OpportunityService {
     }
 
     private static OpportunityView view(ReviewIssueView issue, Derived d, ImprovementOpportunity row,
-                                        List<OpportunityEventView> history) {
+                                        List<OpportunityEventView> history, ImprovementOutcome outcome) {
         OpportunityRules.Candidate c = d.candidate();
         OpportunityStatus status = row == null ? OpportunityStatus.OPEN : row.getStatus();
         OpportunityKnowledgeView knowledgeView = null;
@@ -402,6 +571,8 @@ public class OpportunityService {
                 // An opportunity that is open has no decision date, whether that is because nothing
                 // was ever decided or because the seller took a decision back. Reporting the restore
                 // instant beside 「검토 전」 would put a date on a decision that no longer stands.
-                row == null || status == OpportunityStatus.OPEN ? null : row.getDecidedAt());
+                row == null || status == OpportunityStatus.OPEN ? null : row.getDecidedAt(),
+                row == null ? null : row.getAppliedAt(),
+                outcome == null ? null : OpportunityOutcomeViews.of(outcome, c.kind()));
     }
 }

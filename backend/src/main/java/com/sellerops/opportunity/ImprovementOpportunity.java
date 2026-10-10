@@ -46,4 +46,29 @@ public class ImprovementOpportunity extends BaseEntity {
 
     @Column(name = "decided_at", nullable = false)
     private Instant decidedAt;
+
+    /**
+     * When the seller carried it out. Set iff {@link #status} is {@link OpportunityStatus#APPLIED} — V131's
+     * {@code ck_improvement_opportunity_applied} makes the two inseparable, so a claim with no moment and a
+     * leftover moment under a withdrawn decision are both impossible.
+     */
+    @Column(name = "applied_at")
+    private Instant appliedAt;
+
+    @Column(name = "applied_by")
+    private UUID appliedBy;
+
+    /**
+     * The row the applied text landed in, when this product can name one — the org rule or the product source
+     * the seller saved. Null when the seller carried the draft away themselves.
+     *
+     * <p>No foreign key, deliberately: the memory of what was applied has to outlive the thing being retired,
+     * the same reason {@code answer_memory.origin_review_id} carries none.
+     */
+    @Column(name = "applied_ref")
+    private UUID appliedRef;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "applied_ref_kind", length = 24)
+    private AppliedArtifact appliedRefKind;
 }

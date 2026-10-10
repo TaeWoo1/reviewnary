@@ -135,6 +135,9 @@ import type {
   OperationsHome,
   OpportunityView,
   OpportunityKind,
+  OpportunityAppliedView,
+  OpportunityOutcomeView,
+  AppliedArtifact,
 } from "./types";
 import {
   mockAccountArticles,
@@ -2191,6 +2194,39 @@ export const api = {
     draft: { title: string; body: string },
   ): Promise<OpportunityView> {
     const { data } = await http.put<OpportunityView>(opportunityPath(issueId, kind, "draft"), draft);
+    return data;
+  },
+
+  /**
+   * 적용했습니다 — the seller carried the prepared action out (Learning & Outcome Loop v1).
+   *
+   * Called right after the save that put the text in the seller's own library, with the id of the row it landed
+   * in; `SELLER_DECLARED` with no ref is the seller's own word for a draft they carried off themselves. It
+   * records the act, anchors the window the result will be read in, and sends nothing anywhere.
+   */
+  async applyOpportunity(
+    issueId: string,
+    kind: OpportunityKind,
+    applied: { artifact: AppliedArtifact; ref?: string | null },
+  ): Promise<OpportunityAppliedView> {
+    const { data } = await http.post<OpportunityAppliedView>(opportunityPath(issueId, kind, "apply"), {
+      artifact: applied.artifact,
+      ref: applied.ref ?? null,
+    });
+    return data;
+  },
+
+  /**
+   * 한 일과 그 결과 for one repeated problem, newest first.
+   *
+   * A read of its own rather than a field on the opportunity list, because the two have different lifetimes: an
+   * opportunity stops being derived once the issue resolves or the library starts mentioning the aspect, and the
+   * record of what the seller did has to outlive that.
+   */
+  async getOpportunityOutcomes(issueId: string): Promise<OpportunityOutcomeView[]> {
+    const { data } = await http.get<OpportunityOutcomeView[]>(
+      `/api/opportunities/outcomes?issueId=${encodeURIComponent(issueId)}`,
+    );
     return data;
   },
 

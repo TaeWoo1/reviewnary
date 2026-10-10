@@ -3,11 +3,12 @@ import { Link } from "react-router-dom";
 import { api } from "../../lib/apiClient";
 import { copyText } from "../../lib/clipboard";
 import { count, kstDate } from "../../lib/format";
-import type { OpportunityView } from "../../lib/types";
+import type { AppliedArtifact, OpportunityView } from "../../lib/types";
 import { KnowledgeQuickAdd } from "../knowledge/KnowledgeQuickAdd";
+import { OpportunityOutcome } from "./OpportunityOutcome";
 import { Btn } from "../ui/Btn";
 import { Status } from "../ui/Status";
-import { KIND_TONE, STATUS_TONE, destinationOf } from "./opportunityWords";
+import { KIND_TONE, STATUS_TONE, artifactOf, destinationOf } from "./opportunityWords";
 
 /**
  * One improvement opportunity: what repeated, why this is suggested, the evidence, and the next action.
@@ -20,10 +21,20 @@ import { KIND_TONE, STATUS_TONE, destinationOf } from "./opportunityWords";
 export function OpportunityCard({
   opportunity,
   onChanged,
+  onApplied,
   showEvidenceLink = true,
 }: {
   opportunity: OpportunityView;
   onChanged: (next: OpportunityView) => void;
+  /**
+   * Called after 적용 instead of `onChanged`, and the difference is load-bearing.
+   *
+   * Saving an FAQ draft into the product's library is exactly what makes the library mention the aspect, which
+   * is what the backend reads to choose between FAQ 보완 and 상품 상세·안내 보완 — so after applying, the rules
+   * may derive a DIFFERENT kind for this issue. Patching one row by `(issueId, kind)` would leave a card
+   * describing a suggestion that no longer exists, so the list re-reads instead.
+   */
+  onApplied?: () => void;
   /** Off on the issue's own evidence surface, where the link would point at the page it is on. */
   showEvidenceLink?: boolean;
 }) {
@@ -49,6 +60,27 @@ export function OpportunityCard({
       onChanged(next);
     } catch {
       setError(failure);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Record that the seller carried it out.
+   *
+   * Never claimed on the strength of the press alone: `recordApply` runs only after the save (or the copy) it
+   * follows actually resolved, so a failed save can never leave a 적용했습니다 behind. A failure here is said
+   * out loud rather than swallowed — the text IS in the seller's library, and a silent failure would make the
+   * screen disagree with it.
+   */
+  async function recordApply(artifact: AppliedArtifact, ref: string | null) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.applyOpportunity(o.issueId, o.kind, { artifact, ref });
+      onApplied?.();
+    } catch {
+      setError("적용을 기록하지 못했습니다. 저장된 내용은 그대로 있습니다.");
     } finally {
       setBusy(false);
     }
@@ -138,6 +170,21 @@ export function OpportunityCard({
         </div>
       ) : null}
 
+      {/* 적용된 기회 — the one card state that reports something finished. The draft editor is gone: what the
+          seller wrote is now a row in their own library, and an editable copy of it here would be a second
+          version of the same sentences. What is drawn instead is the measurement the application anchored. */}
+      {o.status === "APPLIED" ? (
+        <div className="mt-4 space-y-3 border-t border-line pt-3">
+          {o.outcome ? (
+            <OpportunityOutcome outcome={o.outcome} />
+          ) : (
+            <p className="break-keep text-sm leading-relaxed text-muted">
+              적용했습니다{o.appliedAt ? ` · ${kstDate(o.appliedAt)}` : ""}.
+            </p>
+          )}
+        </div>
+      ) : null}
+
       {o.status === "ACCEPTED" && o.draft ? (
         <section className="mt-4 space-y-3" aria-label="준비된 초안">
           <div>
@@ -175,9 +222,23 @@ export function OpportunityCard({
               </Btn>
             ) : null}
             {destination.kind === "COPY" ? (
-              <Btn size="sm" disabled={dirty} onClick={copyDraft}>
-                {destination.label}
-              </Btn>
+              <>
+                <Btn size="sm" disabled={dirty} onClick={copyDraft}>
+                  {destination.label}
+                </Btn>
+                {/* A draft that leaves as text has no artifact this product can point at, so the only honest
+                    way to learn it was used is to be told. Separate from 복사 on purpose: copying is not
+                    doing, and a button that recorded 적용 on the copy would be claiming the seller's work for
+                    them. */}
+                <Btn
+                  size="sm"
+                  variant="outline"
+                  disabled={busy || dirty}
+                  onClick={() => recordApply("SELLER_DECLARED", null)}
+                >
+                  {busy ? "기록 중…" : "적용했습니다"}
+                </Btn>
+              </>
             ) : savedTo ? null : (
               <Btn size="sm" disabled={dirty} onClick={() => setSaving(true)}>
                 {destination.label}
@@ -214,24 +275,30 @@ export function OpportunityCard({
               body={body}
               saveLabel={destination.label}
               onSave={async (value) => {
+                let saved: string;
                 if (destination.scope === "PRODUCT" && o.productId) {
-                  await api.createProductKnowledgeSource(o.productId, {
+                  const row = await api.createProductKnowledgeSource(o.productId, {
                     sourceType: value.topic as import("../../lib/types").KnowledgeSourceType,
                     title: title.trim() || value.title,
                     body: value.body,
                     variantId: value.variantId,
                   });
+                  saved = row.id;
                   setSavedTo(`/products/${o.productId}`);
                 } else {
-                  await api.createOrgKnowledge({
+                  const row = await api.createOrgKnowledge({
                     knowledgeType: value.topic as import("../../lib/types").OrgKnowledgeType,
                     title: title.trim() || value.title,
                     body: value.body,
                     sourceUrl: null,
                   });
+                  saved = row.id;
                   setSavedTo("/settings/policies");
                 }
                 setSaving(false);
+                // The save IS the application: the draft is now a rule standing in the seller's own records,
+                // and the id says which one. Nothing is asked of the seller twice.
+                await recordApply(artifactOf(destination), saved);
               }}
               onCancel={() => setSaving(false)}
             />
