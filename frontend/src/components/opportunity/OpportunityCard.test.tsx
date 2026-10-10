@@ -11,6 +11,7 @@ const restoreOpportunity = vi.fn();
 const updateOpportunityDraft = vi.fn();
 const createProductKnowledgeSource = vi.fn();
 const getProductKnowledgeStrict = vi.fn();
+const applyOpportunity = vi.fn();
 
 vi.mock("../../lib/apiClient", () => ({
   api: {
@@ -20,6 +21,7 @@ vi.mock("../../lib/apiClient", () => ({
     updateOpportunityDraft: (i: string, k: string, d: unknown) => updateOpportunityDraft(i, k, d),
     createProductKnowledgeSource: (p: string, r: unknown) => createProductKnowledgeSource(p, r),
     createOrgKnowledge: vi.fn(),
+    applyOpportunity: (i: string, k: string, a: unknown) => applyOpportunity(i, k, a),
     getProductKnowledgeStrict: (id: string) => getProductKnowledgeStrict(id),
   },
   getToken: () => "token",
@@ -36,14 +38,16 @@ function opportunity(over: Partial<OpportunityView> = {}): OpportunityView {
     evidenceTo: "/memory/issue-1",
     knowledge: { scope: "PRODUCT", scopeLabelKo: "이 상품의 상품 지식", type: "USAGE", topicLabelKo: "접착", sources: 2, mentions: 0, excerpts: [] },
     nextActionKo: "FAQ 초안 준비", draft: null, history: [], decidedAt: null,
+    // Learning & Outcome Loop v1: nothing has been applied, so both are null — the honest default.
+    appliedAt: null, outcome: null,
     ...over,
   };
 }
 
-function renderCard(o: OpportunityView, onChanged = vi.fn()) {
+function renderCard(o: OpportunityView, onChanged = vi.fn(), onApplied = vi.fn()) {
   render(
     <MemoryRouter>
-      <OpportunityCard opportunity={o} onChanged={onChanged} />
+      <OpportunityCard opportunity={o} onChanged={onChanged} onApplied={onApplied} />
     </MemoryRouter>,
   );
   return onChanged;
@@ -156,5 +160,95 @@ describe("개선 기회 카드 — what repeated, why, the evidence, the next ac
   it("an opportunity nobody has decided about draws no record at all", () => {
     renderCard(opportunity());
     expect(screen.queryByLabelText("결정 기록")).toBeNull();
+  });
+});
+
+describe("적용 — the step the chain was missing (Learning & Outcome Loop v1)", () => {
+  const accepted = {
+    status: "ACCEPTED" as const, statusLabelKo: "초안 준비됨",
+    draft: { title: "접착 안내", body: "먼지를 닦고 붙이세요.", updatedAt: "2026-09-04T00:00:00Z" },
+  };
+
+  it("saving a draft into the product's library IS the application, and it names the row it landed in", async () => {
+    getProductKnowledgeStrict.mockResolvedValue({ variants: [] });
+    createProductKnowledgeSource.mockResolvedValue({ id: "ks-9" });
+    applyOpportunity.mockResolvedValue({ status: "APPLIED" });
+    const onApplied = vi.fn();
+    renderCard(opportunity(accepted), vi.fn(), onApplied);
+
+    fireEvent.click(screen.getByRole("button", { name: "답변 기준으로 저장" }));
+    const save = await screen.findAllByRole("button", { name: "답변 기준으로 저장" });
+    fireEvent.click(save[save.length - 1]!);
+
+    await waitFor(() => expect(applyOpportunity).toHaveBeenCalled());
+    expect(applyOpportunity).toHaveBeenCalledWith("issue-1", "FAQ_SUPPLEMENT", {
+      artifact: "PRODUCT_KNOWLEDGE",
+      ref: "ks-9",
+    });
+    // The list re-reads rather than patching one row: saving this draft is exactly what can change which kind
+    // the rules derive for this issue.
+    await waitFor(() => expect(onApplied).toHaveBeenCalled());
+  });
+
+  it("a draft that leaves as text is applied only when the seller says so — copying is not doing", async () => {
+    applyOpportunity.mockResolvedValue({ status: "APPLIED" });
+    renderCard(opportunity({
+      ...accepted,
+      kind: "PRODUCT_IMPROVEMENT_REVIEW", kindLabelKo: "제품 개선 검토", knowledge: null,
+      nextActionKo: "제품 개선 검토 메모 준비",
+    }));
+
+    expect(screen.getByRole("button", { name: "메모 복사" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "적용했습니다" }));
+    await waitFor(() => expect(applyOpportunity).toHaveBeenCalledWith("issue-1", "PRODUCT_IMPROVEMENT_REVIEW", {
+      artifact: "SELLER_DECLARED",
+      ref: null,
+    }));
+  });
+
+  it("a failed application says so, and does not claim the save did not happen", async () => {
+    applyOpportunity.mockRejectedValue(new Error("boom"));
+    renderCard(opportunity({ ...accepted, kind: "PRODUCT_IMPROVEMENT_REVIEW", knowledge: null }));
+    fireEvent.click(screen.getByRole("button", { name: "적용했습니다" }));
+    expect(await screen.findByText(/적용을 기록하지 못했습니다. 저장된 내용은 그대로 있습니다./)).toBeTruthy();
+  });
+
+  it("an applied card shows what came of it, loses the draft editor, and claims no cause", () => {
+    renderCard(opportunity({
+      status: "APPLIED", statusLabelKo: "적용했습니다",
+      appliedAt: "2026-09-01T00:00:00Z",
+      draft: null,
+      outcome: {
+        kind: "FAQ_SUPPLEMENT", kindLabelKo: "FAQ 보완", scope: "PRODUCT",
+        appliedOn: "2026-09-01", observedThrough: "2026-09-28",
+        evidenceBefore: 12, reviewsBefore: 72, evidenceAfter: 2, reviewsAfter: 57,
+        verdict: "IMPROVED", verdictLabelKo: "근거 줄었습니다",
+        reasonLabelKo: "같은 문제가 적게 들어왔습니다", settled: true,
+      },
+    }));
+
+    expect(screen.getByText("근거 줄었습니다")).toBeTruthy();
+    expect(screen.getByText(/적용 전 4주 12건 → 뒤 4주 2건/)).toBeTruthy();
+    expect(screen.getByText(/같은 문제가 적게 들어왔습니다/)).toBeTruthy();
+    expect(screen.queryByLabelText("초안 내용")).toBeNull();
+    expect(screen.queryByRole("button", { name: /저장|복사|적용했습니다/ })).toBeNull();
+    // Nothing on the card says the action caused the fall.
+    expect(screen.queryByText(/해결|효과/)).toBeNull();
+  });
+
+  it("an applied card whose window is open says when it closes, not nothing", () => {
+    renderCard(opportunity({
+      status: "APPLIED", statusLabelKo: "적용했습니다", draft: null, appliedAt: "2026-09-01T00:00:00Z",
+      outcome: {
+        kind: "FAQ_SUPPLEMENT", kindLabelKo: "FAQ 보완", scope: "PRODUCT",
+        appliedOn: "2026-09-01", observedThrough: "2026-09-28",
+        evidenceBefore: 12, reviewsBefore: 72, evidenceAfter: null, reviewsAfter: null,
+        verdict: "OBSERVING", verdictLabelKo: "확인 중",
+        reasonLabelKo: "관찰 기간이 아직 끝나지 않았습니다", settled: false,
+      },
+    }));
+    expect(screen.getByText("확인 중")).toBeTruthy();
+    expect(screen.getByText(/2026-09-28/)).toBeTruthy();
+    expect(screen.getByText(/까지 리뷰를 지켜봅니다/)).toBeTruthy();
   });
 });

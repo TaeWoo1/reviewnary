@@ -75,4 +75,30 @@ public enum IssueLifecycleState {
     public boolean sellerMayStartActing() {
         return this == OBSERVING || this == NEEDS_REVIEW;
     }
+
+    /**
+     * Whether a SELLER may record, in one act, that remediation is done (Learning &amp; Outcome Loop v1,
+     * 2026-10-10).
+     *
+     * <p><b>What this is for.</b> Applying an accepted improvement — saving the prepared FAQ into the product's
+     * shelf, the prepared rule into the company's — is the seller telling us the work is finished, not started.
+     * Routing that through {@link #sellerMayStartActing} and then {@code markRemediated} would make one press
+     * into two, and would stamp 조치 중 and 개선 확인 중 onto the trail at the same instant: a record that says
+     * the work began and ended in the same second answers neither question it exists for.
+     *
+     * <p><b>{@link #OBSERVING} is included for the same reason the 2026-09-13 decision included it in
+     * {@link #sellerMayStartActing}</b>: a seller looking at a problem with eighteen occurrences can fix it
+     * whether or not an automatic rule agreed it was worth raising, and a product that refuses to record that is
+     * telling them they may only act on problems it noticed.
+     *
+     * <p><b>What did NOT change.</b> {@link #systemMayTransitionTo} is untouched, so the automated pass still
+     * cannot declare work done — this widens what a PERSON may say and nothing else, and the two actors' powers
+     * sit side by side in this file precisely so widening one cannot silently widen the other. {@link #RESOLVED}
+     * is still reachable only from {@link #VERIFYING} after quiet weeks, and {@link #VERIFYING} and
+     * {@link #RESOLVED} are absent here: remediation is already recorded in both, and re-entering from them
+     * would overwrite an evidence-backed conclusion with an assertion.
+     */
+    public boolean sellerMayRecordRemediation() {
+        return this == OBSERVING || this == NEEDS_REVIEW || this == ACTING;
+    }
 }

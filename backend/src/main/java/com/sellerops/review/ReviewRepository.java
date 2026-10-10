@@ -31,6 +31,25 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
     long countByOrgIdAndReceivedAtAfter(UUID orgId, Instant after);
 
     /**
+     * How many reviews arrived in a half-open instant range — <b>the denominator</b>.
+     *
+     * <p>It exists for one reader, {@code ImprovementOutcomeService}, and for one reason: a fall in complaints
+     * about a problem means nothing without knowing whether reviews were still arriving. «0 complaints» and «0
+     * reviews» are the same number, and only this count tells them apart
+     * ({@code docs/slices/attention-coverage-false-calm-v1.md}).
+     *
+     * <p>Half-open, and the caller derives the bounds from the same UTC day arithmetic
+     * {@code ReviewIssueEvidence#occurredOn} is bucketed by — so the numerator and the denominator cover the
+     * same calendar days rather than two interpretations of one.
+     */
+    long countByOrgIdAndReceivedAtGreaterThanEqualAndReceivedAtLessThan(
+            UUID orgId, Instant fromInclusive, Instant toExclusive);
+
+    /** The same count for one product. */
+    long countByOrgIdAndProductIdAndReceivedAtGreaterThanEqualAndReceivedAtLessThan(
+            UUID orgId, UUID productId, Instant fromInclusive, Instant toExclusive);
+
+    /**
      * Per-channel counts of this org's reviews — {@code [channelId, total, negative]}.
      *
      * Same shape and same reason as {@code InquiryRepository.countActiveByChannel}: one grouped read

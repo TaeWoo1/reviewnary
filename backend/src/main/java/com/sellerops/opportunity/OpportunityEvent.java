@@ -9,6 +9,11 @@ package com.sellerops.opportunity;
  * FAQ was written. What happened to the problem itself is the issue lifecycle's to say, and this
  * vocabulary deliberately has no word that could be mistaken for it.
  *
+ * <p><b>{@code APPLIED} is on the decision side of that line, and it took some care to keep it there.</b> It
+ * says the seller wrote the FAQ — an act, dated, with the artifact named where there is one. It says nothing
+ * about whether complaints fell, and it cannot: that answer does not exist for another four weeks, and when it
+ * does it is an {@code ImprovementOutcome} and not an event here.
+ *
  * <p>{@code EDITED} is the odd one: it leaves the status where it was. It is here because the seller
  * rewriting the prepared text is a thing they did, and a trail that recorded only status changes
  * would say a draft was «준비됨» on a date and never that the seller made it theirs.
@@ -16,6 +21,8 @@ package com.sellerops.opportunity;
 public enum OpportunityEvent {
     /** The seller asked for this action to be prepared. */
     ACCEPTED("채택"),
+    /** The seller carried the prepared action out. An act with a date, never a result. */
+    APPLIED("적용"),
     /** The seller rewrote the prepared text. Status unchanged. */
     EDITED("수정"),
     /** 지금은 보류 — not now. */

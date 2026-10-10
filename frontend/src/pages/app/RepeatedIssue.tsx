@@ -8,6 +8,7 @@ import { EvidenceQuote } from "../../components/memory/repeat/EvidenceQuote";
 import { EvidenceTrend } from "../../components/memory/repeat/EvidenceTrend";
 import { IssueDecision } from "../../components/memory/repeat/IssueDecision";
 import { IssueGrounding } from "../../components/memory/repeat/IssueGrounding";
+import { IssueOutcomes } from "../../components/memory/repeat/IssueOutcomes";
 import { PaneBlock } from "../../components/memory/repeat/PaneBlock";
 import { RatingSpread } from "../../components/memory/repeat/RatingSpread";
 import { RepeatByProduct } from "../../components/memory/repeat/RepeatByProduct";
@@ -37,7 +38,11 @@ import {
  *
  * <p><b>읽기 둘, 쓰기 하나 — 전부 쓰던 것이다.</b> {@link useRepeatedIssue}가 하던 그대로:
  * detail과 repeat-context를 함께 띄워 따로 정착시키고, 결정은 issue lifecycle의 두 transition이다.
- * 새 endpoint 0 · 새 workflow 0 · 새 숫자 0. 이 페이지가 세는 것은 하나도 없다.
+ * 새 workflow 0 · 새 숫자 0. 이 페이지가 세는 것은 하나도 없다.
+ *
+ * <p><b>Learning &amp; Outcome Loop v1에서 읽기 하나가 늘었다</b> — {@link IssueOutcomes}. 판매자가 이 문제에
+ * 적용한 개선과 그 뒤 리뷰가 어떻게 됐는지는 제안(derived)보다 오래 살아야 하고, 그래서 제안이 아니라 문제를
+ * 주소로 읽는다. 스스로 불러오므로 실패해도 이 페이지의 다른 블록은 그대로다.
  *
  * <p><b>열 하나, 900px</b> — 리뷰 상세의 canonical baseline과 같은 {@link CaseLayout} page 읽기이고,
  * 안쪽 스크롤은 없다. 페이지가 스크롤된다.
@@ -246,6 +251,10 @@ export function RepeatedIssue() {
         </>
       }
       more={
+        <>
+          {/* 한 일과 그 결과 — 기록 위에. 기록은 「상태가 언제 움직였나」이고 이것은 「무엇을 했고 그래서
+              어떻게 됐나」다. 적용한 것이 없으면 블록 자체가 없다. */}
+          <IssueOutcomes issueId={issue.id} />
         <PaneBlock label="기록">
           {detail && detail.history.length > 0 ? (
             <ul className="space-y-2">
@@ -267,6 +276,7 @@ export function RepeatedIssue() {
           )}
           <p className="break-keep text-xs leading-relaxed text-muted">{provenanceKo(issue)}</p>
         </PaneBlock>
+        </>
       }
     />
   );

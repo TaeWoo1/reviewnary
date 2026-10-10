@@ -52,6 +52,10 @@ export function OpportunityList({ issueId, onCount }: { issueId: string; onCount
           <OpportunityCard
             opportunity={o}
             showEvidenceLink={false}
+            /* Applying can change which kind the rules derive for this issue — see OpportunityCard's
+               `onApplied`. A patch by (issueId, kind) would leave a card describing a suggestion that no
+               longer exists, so the list re-reads. */
+            onApplied={() => void load()}
             onChanged={(next) =>
               setItems((current) =>
                 current ? current.map((c) => (c.issueId === next.issueId && c.kind === next.kind ? next : c)) : current,
