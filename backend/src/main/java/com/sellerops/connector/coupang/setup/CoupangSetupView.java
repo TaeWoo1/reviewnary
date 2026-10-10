@@ -20,9 +20,24 @@ import java.util.List;
  *                            proof's preflight confirm the running backend is armed with the approved run's
  *                            approval id (binding proof), the gap a green health check cannot close. Never
  *                            null.
+ * @param orderWireShapeObserved whether the ordersheets wire-shape observation is armed on this backend
+ *                            ({@code sellerops.connector.coupang.order-wire-shape}). A boolean, and that is
+ *                            all it can be: the observation itself records key names, kinds and counts and
+ *                            never a value. It is here because a manifest may only declare capability the
+ *                            run can actually execute (approval contract §2) — a gate whose whole purpose is
+ *                            «is {@code sellerProductId} on the wire, and how often is it filled» must be
+ *                            able to refuse a backend that would not record the answer, rather than spend
+ *                            the one approval and find out afterwards.
  */
 public record CoupangSetupView(List<String> advertisedEgressIps, LiveApprovalReadiness liveApproval,
-                              CredentialHandoffArming.Readiness credentialHandoff) {
+                              CredentialHandoffArming.Readiness credentialHandoff,
+                              boolean orderWireShapeObserved) {
+
+    /** The shape before the wire-shape gate — observation absent reads as off, never as unknown. */
+    public CoupangSetupView(List<String> advertisedEgressIps, LiveApprovalReadiness liveApproval,
+                            CredentialHandoffArming.Readiness credentialHandoff) {
+        this(advertisedEgressIps, liveApproval, credentialHandoff, false);
+    }
 
     public CoupangSetupView {
         advertisedEgressIps = advertisedEgressIps == null ? List.of() : List.copyOf(advertisedEgressIps);

@@ -252,21 +252,49 @@ NAVER/쿠팡 connector 투영 +4 · `PostPurchaseLinkageFenceTest`(5, 재작성)
 
 ## 8. 다음 — 준비했고 실행하지 않은 것
 
-### 8.1 Product leg의 라이브 증명 (read-only, 승인 1회)
+### 8.1 Gate 1 — Product leg의 라이브 증명 (READ_ONLY, 승인 1회)
 
 식별자를 **한 번도 수집한 적이 없으므로** 기존 180행으로는 증명할 수 없다. 기존에 이미 호출하는
 endpoint 하나를 같은 scope로 한 번 더 읽으면 답이 나온다.
 
+**2026-10-11 — 전용 run kind를 만들었다: `orders-resync`.** 그 전에 준비해 본 manifest는 기존
+`orders` kind였고 `mode: WRITE`로 찍혔다 — pristine DB에서 시작하므로 **운영자가 자격증명을 입력**해야
+했고, 그건 로컬 vault WRITE이며 CLAUDE.md에 따라 자기 몫의 명시적 WRITE 승인이 필요하다. 그 manifest는
+실행하지 않고 revoke했다(prepared process 종료 · run env 제거 · DB drop).
+
+**분리가 핵심이다.** 자격증명 handoff는 **자기 bootstrap, 자기 WRITE manifest, 자기 날**의 일이고
+(`wing-credential-bootstrap.sh handoff`), `orders-resync`는 **그 일이 자기 안에서 일어나는 것을
+거부한다** — baseline이 「자격증명이 이미 저장되어 있지 않으면 시작하지 않는다」이다. 그 거부가
+`READ_ONLY` 주장을 **구조적으로 벌어 오는** 방법이고, 주장만 하는 것과 다르다.
+
 | 항목 | 값 |
 |---|---|
-| 채널 / 계정 | COUPANG / 데모 제조사의 기존 연결 |
-| surface | **기존** `ORDER_SUMMARY` 수집 (`GET .../ordersheets`) — 새 surface 없음 |
-| operation | 승인된 창에 대한 1회 sync |
-| mode | **READ** |
-| 허용 행동 | 목록 조회뿐. WRITE 0 · 주문 처리 0 · 송장 0 |
-| 추가로 켜는 것 | `sellerops.connector.coupang.order-wire-shape=true` (기본 OFF) — `CoupangWireShapeObserver`가 **키 이름·종류·충전율만**, 값은 한 글자도 기록하지 않는다 |
+| run kind | `orders-resync` |
+| 채널 / 계정 | COUPANG / **이미 연결된** 계정 (자격증명 저장됨) |
+| surface | **기존** `ORDER_SUMMARY` 수집 (`GET .../ordersheets`) — 새 surface 0 |
+| mode | **READ_ONLY** (run kind에서 파생. 기본값은 WRITE) |
+| maxActions | `sync=1, credential=0, test=0, re-sync=0` |
+| baseline | Coupang 계정 1 · 자격증명 1 · `channel_order_products` **0** |
+| 전제 조건 | `order-wire-shape=true`가 백엔드에 **armed** — 아니면 preflight가 거부한다 |
 | 답하는 질문 | `orderItems[]`에 `sellerProductId`가 있는가, 몇 %가 채워져 있는가 |
-| 성공 기준 | `channel_order_products` 행 > 0, 그리고 `product_id` 연결 > 0 |
+| **성공 기준** | `channel_order_products` 행 > 0, 그리고 `sellerProductId present=N/N nonNull=M` |
+| **증명하지 않는 것** | canonical `product_id` 연결 — §8.1b |
+
+**관측기가 armed인지 preflight가 확인한다.** manifest는 run이 실제로 실행할 수 있는 capability만 적을 수
+있다(승인 계약 §2). 관측기가 꺼진 백엔드는 수집하고 아무것도 기록하지 않으므로, 참조가 0건일 때
+「키가 없었다」와 「값이 비었다」를 구별할 수 없다 — 승인 한 번을 답 없이 쓰는 것이고, 그 실패를 막기
+위한 검사다.
+
+### 8.1b Gate 2 — canonical 연결 (SELLER_PRODUCTS READ, 별도 승인)
+
+Gate 1의 참조는 **unbound로 떨어지는 것이 정상이다.** 정확 일치의 다른 한쪽인
+`channel_products`가 비어 있기 때문이고, 그것을 채우는 것은 **두 번째 마켓플레이스 surface**
+(`SELLER_PRODUCTS`)다. 한 surface, 한 manifest, 한 승인 — gate 1이 조용히 두 번째로 손을 뻗으면 한 줄로
+두 승인을 쓰는 것이 된다.
+
+Gate 2가 증명할 것: 상품 카탈로그 1회 READ 뒤 `ChannelOrderProductBinder.bindPending`이 같은 정확
+일치를 다시 시도해 `product_id`가 채워지는 것. 코드는 이미 있고(해소는 다시 돌릴 수 있다, §3) 필요한
+것은 승인뿐이다.
 
 **관측기를 왜 같이 켜는가.** 승인은 1회이고, 참조가 0건 나왔을 때 **「키가 없었다」와 「값이 비어 있었다」를
 구별할 수 없으면** 그 승인은 답 없이 소비된다. 둘은 서로 다른 작업으로 이어진다 — 요청을 넓히는 일과,

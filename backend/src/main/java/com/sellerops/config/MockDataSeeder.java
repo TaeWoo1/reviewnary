@@ -61,6 +61,27 @@ public class MockDataSeeder implements ApplicationRunner {
     private final boolean enabled;
     private final boolean seedChannelCatalogue;
     private final boolean seedDemoContent;
+
+    /**
+     * Whether the fixture's two placeholder seller accounts are created (default {@code true} — the
+     * fixture as documented).
+     *
+     * <p><b>Why this is its own switch.</b> A live-proof backend needs the demo LOGIN (its preflight reads
+     * an authenticated {@code /setup}) and needs a PRISTINE baseline — no Coupang account, so that every
+     * account which appears came from the approved run. {@code sellerops.seed.enabled} coupled the two:
+     * asking for the login got you two accounts, and the {@code orders} live-proof baseline check failed on
+     * a row nobody had decided to create. Measured 2026-10-11 on a fresh disposable DB:
+     * {@code coupang_accounts=1} with {@code credentials=0}.
+     *
+     * <p><b>And the rows are a claim the vault cannot back.</b> {@link #seedAccount} writes
+     * {@code connectionStatus = CONNECTED} while no credential exists, so the fixture says two channels are
+     * connected and not one call can be made. That is fine as demo set dressing and wrong as a baseline —
+     * which is exactly why it needed a switch rather than a deletion.
+     *
+     * <p>Default {@code true} keeps the documented fixture byte-identical: «set this true on a clean DB and
+     * it seeds exactly as it always did» stays true. A live proof turns this one off.
+     */
+    private final boolean seedSellerAccounts;
     private final OrganizationRepository organizations;
     private final UserRepository users;
     private final ChannelRepository channels;
@@ -75,6 +96,7 @@ public class MockDataSeeder implements ApplicationRunner {
             @Value("${sellerops.seed.enabled:false}") boolean enabled,
             @Value("${sellerops.seed.channel-catalogue:true}") boolean seedChannelCatalogue,
             @Value("${sellerops.seed.demo-content:false}") boolean seedDemoContent,
+            @Value("${sellerops.seed.seller-accounts:true}") boolean seedSellerAccounts,
             OrganizationRepository organizations, UserRepository users,
             ChannelRepository channels, SellerAccountRepository sellerAccounts,
             ProductRepository products, InquiryRepository inquiries,
@@ -83,6 +105,7 @@ public class MockDataSeeder implements ApplicationRunner {
         this.enabled = enabled;
         this.seedChannelCatalogue = seedChannelCatalogue;
         this.seedDemoContent = seedDemoContent;
+        this.seedSellerAccounts = seedSellerAccounts;
         this.organizations = organizations;
         this.users = users;
         this.channels = channels;
@@ -120,8 +143,10 @@ public class MockDataSeeder implements ApplicationRunner {
         Channel coupang = byCode(catalogue, "COUPANG");
         Channel naver = byCode(catalogue, "NAVER");
 
-        seedAccount(org.getId(), coupang, Instant.now().minus(Duration.ofHours(1)));
-        seedAccount(org.getId(), naver, Instant.now().minus(Duration.ofHours(3)));
+        if (seedSellerAccounts) {
+            seedAccount(org.getId(), coupang, Instant.now().minus(Duration.ofHours(1)));
+            seedAccount(org.getId(), naver, Instant.now().minus(Duration.ofHours(3)));
+        }
 
         // Demo content (products/reviews/inquiries/order-summaries) is opt-in. When
         // off, the inbox and orders dashboard stay honestly empty until real data
