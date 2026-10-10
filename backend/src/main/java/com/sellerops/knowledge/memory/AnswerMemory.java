@@ -81,6 +81,16 @@ public class AnswerMemory extends BaseEntity {
     @Column(name = "origin_work_item_id")
     private UUID originWorkItemId;
 
+    /**
+     * The review this remembered reply answered — V128. Null on an inquiry answer and on a collected channel
+     * answer, and the one field that tells a review reply apart from the two without parsing {@link #originRef}.
+     *
+     * <p>Not a foreign key, for the reason the two inquiry origins are not either: this memory is what the company
+     * said, and that stays true after the row that prompted it is re-acquired under a new id or deleted.
+     */
+    @Column(name = "origin_review_id")
+    private UUID originReviewId;
+
     @Column(name = "origin_draft_version")
     private Integer originDraftVersion;
 

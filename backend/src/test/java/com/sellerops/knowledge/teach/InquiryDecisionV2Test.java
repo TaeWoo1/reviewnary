@@ -98,6 +98,8 @@ import org.springframework.test.context.ActiveProfiles;
 class InquiryDecisionV2Test {
 
     @Autowired EntityManager em;
+    @Autowired com.sellerops.review.publish.ReviewReplyExecutionRepository replyExecutions;
+    @Autowired com.sellerops.attention.reply.ReviewReplyOutcomeRepository replyOutcomes;
     @Autowired OrganizationRepository organizations;
     @Autowired ProductRepository products;
     @Autowired ProductVariantRepository variants;
@@ -146,7 +148,9 @@ class InquiryDecisionV2Test {
                         (orgId, channelCode, accountId, rows) -> com.sellerops.coverage.ChannelDataState.OBSERVED_FRESH));
         List<KnowledgeSourceAdapter> adapters = List.of(
                 new SellerKnowledgeAdapter(orgSources, orgChunks, productSources, productChunks),
-                new ProductFactAdapter(facts), new InquiryAnswerAdapter(memories), new ReviewReplyAdapter(em),
+                new ProductFactAdapter(facts), new InquiryAnswerAdapter(memories), new ReviewReplyAdapter(em,
+                        new com.sellerops.review.publish.ReviewDeliveryTruthReader(
+                                replyExecutions, replyOutcomes)),
                 new SellerDecisionAdapter(em), new SellerGuidanceAdapter(guidanceRows));
         KnowledgeSpineService spine = new KnowledgeSpineService(adapters, products, new SourceRefResolver(em), retriever);
         assessor = new InquiryKnowledgeAssessor(retriever, spine, variants, products);

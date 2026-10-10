@@ -75,6 +75,30 @@ const OUTCOME_WORD: Record<string, string> = {
   SUBMISSION_ABORTED: "올리지 않고 중단했다고 기록",
 };
 
+/**
+ * What reviewnary itself did, and what it could confirm — `review_reply_execution` (Review Delivery Truth
+ * Spine v1). The `to` token of a `REPLY_EXECUTION` entry: the verification where there was one to make, and the
+ * status where there was not.
+ *
+ * <b>Every sentence here says exactly how much was proven, and no more.</b> `VERIFIED` is the only one that
+ * claims the channel holds the approved text, because a hash read-back is the only thing that shows it. The two
+ * guided-lane words stop at what the collector saw — a composer that holds the text, a submit that was pressed —
+ * and `SUBMISSION_OBSERVED_CONTENT_UNVERIFIED` names the gap out loud rather than rounding it up to 등록 완료,
+ * which is the whole reason NAVER's lane has a ceiling.
+ */
+const EXECUTION_WORD: Record<string, string> = {
+  // Verifications (`to`, where reviewnary could confirm something)
+  VERIFIED: "채널에 답변을 등록하고 내용까지 확인함",
+  STATUS_UNRESOLVED: "채널에 답변을 등록했지만 내용이 일치하는지 확인하지 못함",
+  DELIVERY_UNKNOWN: "채널에 답변을 보냈지만 등록됐는지 확인하지 못함",
+  UNVERIFIABLE: "채널에 답변을 보냈지만 확인 자체를 하지 못함",
+  COMPOSER_FILLED: "판매자센터 답변창에 승인한 답변을 넣음",
+  SELLER_SUBMISSION_OBSERVED: "판매자센터에서 판매자가 등록을 누른 것을 확인함",
+  SUBMISSION_OBSERVED_CONTENT_UNVERIFIED: "채널에 답변이 생긴 것을 확인함 — 내용은 확인하지 못함",
+  // Statuses (`to`, where there was nothing to confirm)
+  REFUSED: "답변을 보내지 않음",
+};
+
 function tierWord(value: string | null): string | null {
   if (!value) return null;
   return TRIAGE_TIER_LABEL[value as ReviewTriageTier] ?? null;
@@ -108,6 +132,8 @@ export function decisionLogSentence(entry: ReviewDecisionLogEntry): string | nul
       return entry.to ? (APPROVAL_WORD[entry.to] ?? null) : null;
     case "REPLY_OUTCOME":
       return entry.to ? (OUTCOME_WORD[entry.to] ?? null) : null;
+    case "REPLY_EXECUTION":
+      return entry.to ? (EXECUTION_WORD[entry.to] ?? null) : null;
     default:
       return null;
   }
@@ -160,9 +186,32 @@ export function previewJudgmentTokens(
  * The one sentence the whole workspace rests on, said once at the bottom.
  *
  * A seller who has just recorded four things is entitled to know that none of them left the building.
+ *
+ * <b>It is not unconditional, and pretending it is would be the only lie on this screen.</b> On a channel with
+ * API execution (Cafe24) reviewnary does post the approved reply, and a log that now shows that act
+ * (`REPLY_EXECUTION`) cannot be captioned "마켓플레이스에는 아무것도 전송되지 않습니다". Use
+ * {@link decisionLogDisclosure} and let the entries decide which sentence is true; this constant stays as the
+ * no-execution wording it has always been.
  */
 export const DECISION_LOG_DISCLOSURE =
   "여기 기록한 판단과 조치는 reviewnary 안에만 남습니다. 마켓플레이스에는 아무것도 전송되지 않습니다.";
+
+/** Said instead, once a reply has actually been executed at the channel from this screen's own record. */
+export const DECISION_LOG_DISCLOSURE_EXECUTED =
+  "여기 기록한 판단은 reviewnary 안에만 남습니다. 채널로 전송된 것은 아래에 기록된 답변뿐입니다.";
+
+/**
+ * Which of the two sentences is true for this review.
+ *
+ * <p>Decided from the log rather than from a channel capability flag, because the claim is about what HAPPENED
+ * on this review and not about what the channel can do: a Cafe24 review nobody replied to has had nothing sent,
+ * and saying otherwise would make the safety line vaguer for every review in order to be accurate for a few.
+ */
+export function decisionLogDisclosure(entries: ReviewDecisionLogEntry[]): string {
+  return entries.some((entry) => entry.kind === "REPLY_EXECUTION" && entry.to !== "REFUSED")
+    ? DECISION_LOG_DISCLOSURE_EXECUTED
+    : DECISION_LOG_DISCLOSURE;
+}
 
 /**
  * <b>The preview's one safety line</b> — the claim the whole workspace rests on, and only that.

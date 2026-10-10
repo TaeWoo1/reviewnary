@@ -1,6 +1,5 @@
 package com.sellerops.knowledge.spine.adapter;
 
-import com.sellerops.attention.reply.OperatorOutcome;
 import com.sellerops.attention.reply.ReviewReplyApproval;
 import com.sellerops.attention.reply.ReviewReplyApprovalState;
 import com.sellerops.attention.reply.ReviewReplyDraft;
@@ -13,6 +12,7 @@ import com.sellerops.knowledge.spine.KnowledgeSpineScope;
 import com.sellerops.knowledge.spine.SourceRef;
 import com.sellerops.knowledge.spine.SpineSourceType;
 import com.sellerops.review.Review;
+import com.sellerops.review.publish.ReviewDeliveryTruthReader;
 import jakarta.persistence.EntityManager;
 import java.util.HashSet;
 import java.util.List;
@@ -41,9 +41,19 @@ public class ReviewReplyAdapter implements KnowledgeSourceAdapter {
     static final int MAX_REPLIES = 200;
 
     private final EntityManager em;
+    /**
+     * The merge of what reviewnary did and what the operator reported (Review Delivery Truth Spine v1).
+     *
+     * <p>This adapter used to answer «was this version registered?» from {@code review_reply_outcome} alone, which
+     * made it blind to its own product's API lane: a Cafe24 reply reviewnary posted and verified by hash read back
+     * to the seller as merely 「판매자가 승인한 답글」. The question is the same; the record that answers it is now
+     * both halves.
+     */
+    private final ReviewDeliveryTruthReader deliveries;
 
-    public ReviewReplyAdapter(EntityManager em) {
+    public ReviewReplyAdapter(EntityManager em, ReviewDeliveryTruthReader deliveries) {
         this.em = em;
+        this.deliveries = deliveries;
     }
 
     @Override
@@ -62,7 +72,7 @@ public class ReviewReplyAdapter implements KnowledgeSourceAdapter {
                 .setParameter("productId", productId == null ? UUID.randomUUID() : productId)
                 .setMaxResults(MAX_REPLIES)
                 .getResultList();
-        Set<String> reported = reportedVersions(orgId, rows);
+        Set<String> reported = deliveredVersions(orgId, rows);
         List<Indexed> out = new java.util.ArrayList<>(rows.stream()
                 .map(row -> indexed((ReviewReplyApproval) row[0], (ReviewReplyDraft) row[1], (Review) row[2],
                         reported))
@@ -133,30 +143,29 @@ public class ReviewReplyAdapter implements KnowledgeSourceAdapter {
                 KnowledgeAuthority.PAST_SELLER_ANSWER,
                 review.getRating() == null ? "리뷰 답글" : "리뷰 답글 · 별점 " + review.getRating() + "점",
                 draft.getBody(), approval.getDecidedAt(),
-                submitted ? "리뷰 답글 · 판매자가 등록했다고 기록한 답글" : "리뷰 답글 · 판매자가 승인한 답글",
+                // Reworded with the record that now answers it: before Review Delivery Truth Spine v1 the only
+                // registration this adapter could see was the operator's own report, so the sentence named the
+                // operator. It now also covers a reply reviewnary posted itself, and 「기록된」 is doing real work
+                // — the API lane's read-back can prove the channel holds the approved text, the guided lane's
+                // cannot, and neither claim belongs in a provenance line that has to be true of both.
+                submitted ? "리뷰 답글 · 채널에 등록된 것으로 기록된 답글" : "리뷰 답글 · 판매자가 승인한 답글",
                 List.of(SourceRef.of(SourceRef.Kind.REVIEW_REPLY_APPROVAL, approval.getId()),
                         new SourceRef(SourceRef.Kind.REVIEW_REPLY_DRAFT, draft.getId(), "v" + draft.getVersion()),
                         SourceRef.of(SourceRef.Kind.REVIEW, review.getId()))),
                 KnowledgeText.normalize(question == null ? "" : question) + KnowledgeText.normalize(draft.getBody()));
     }
 
-    /** {@code reviewId:version} for every approved version the seller reported registering. */
-    private Set<String> reportedVersions(UUID orgId, List<Object[]> rows) {
+    /**
+     * {@code reviewId:version} for every approved version the record says actually went to the channel.
+     *
+     * <p>One batch for the whole page, as before. What changed is which record answers: both halves of the
+     * delivery truth rather than the operator's self-report alone, so an API-lane POST counts as the registration
+     * it is. The predicate is the truth's own {@code sellerActed()} — a refused execution and a filled-but-not-
+     * submitted composer are not registrations, and this adapter does not restate that judgement.
+     */
+    private Set<String> deliveredVersions(UUID orgId, List<Object[]> rows) {
         List<UUID> reviewIds = rows.stream().map(row -> ((Review) row[2]).getId()).toList();
-        if (reviewIds.isEmpty()) {
-            return Set.of();
-        }
-        Set<String> reported = new HashSet<>();
-        em.createQuery("""
-                        select o.reviewId, o.recordedVersion from ReviewReplyOutcome o
-                        where o.orgId = :orgId and o.operatorOutcome = :submitted and o.reviewId in :reviewIds
-                        """, Object[].class)
-                .setParameter("orgId", orgId)
-                .setParameter("submitted", OperatorOutcome.OPERATOR_REPORTED_SUBMITTED)
-                .setParameter("reviewIds", reviewIds)
-                .getResultList()
-                .forEach(row -> reported.add(row[0] + ":" + row[1]));
-        return reported;
+        return deliveries.deliveredVersions(orgId, reviewIds);
     }
 
     /** A sentence the seller wrote or a model wrote from evidence — never a template. Null is a manual save. */

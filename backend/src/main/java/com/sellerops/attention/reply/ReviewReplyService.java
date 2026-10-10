@@ -104,10 +104,12 @@ public class ReviewReplyService {
                               ReviewReplyOutcomeService outcomes,
                               ReviewReplyProposalProvider provider,
                               ExecutableIdentityResolver identity, ChannelRepository channels,
-                              ReviewDraftComposer composer) {
+                              ReviewDraftComposer composer,
+                              com.sellerops.review.memory.ReviewAnswerMemoryHook answerMemory) {
         this(reviews, products, sellerAccounts, triages, drafts, approvals, outcomes, provider,
                 Clock.systemUTC(), identity, channels);
         this.composer = composer;
+        this.answerMemory = answerMemory;
     }
 
     /** Test seam without a resolver: every minted intent records {@code NONE}, which the target route refuses. */
@@ -151,6 +153,16 @@ public class ReviewReplyService {
      * unaffected by it.
      */
     private ReviewDraftComposer composer;
+
+    /**
+     * Answer Memory's review-lane hook, or null in a context that has none.
+     *
+     * <p>Set by the Spring constructor only, exactly like {@link #composer}, and for the same reason: every test
+     * seam below leaves it null and the approval must still work. Remembering an approval is not part of
+     * approving it — {@link #decideApproval} null-checks and moves on, which is also what makes the hook's own
+     * best-effort contract honest rather than merely documented.
+     */
+    private com.sellerops.review.memory.ReviewAnswerMemoryHook answerMemory;
 
     /** Everything the preparation surface needs for one review, in one read. */
     public ReviewReplyPrepView view(UUID orgId, UUID accountId, String actionRef) {
@@ -280,8 +292,22 @@ public class ReviewReplyService {
                 throw ApiException.conflict("이미 최신 초안이 있습니다. 새로고침 후 다시 시도하세요.");
             }
         });
-        return approvals.decide(orgId, reviewId, actionRef, target, bound.getVersion(),
-                bound.getContentFingerprint(), command, actor);
+        ReviewReplyApprovalResponse decided = approvals.decide(orgId, reviewId, actionRef, target,
+                bound.getVersion(), bound.getContentFingerprint(), command, actor);
+        // <b>The approval is the operation; remembering it is not.</b> Review Delivery Truth Spine v1: an
+        // approval is the seller saying «this is what we say», which is the same act the inquiry lane records as
+        // USER_APPROVED, so it is recorded with the same strength in the same table. After the decision and
+        // outside its gates on purpose — a memory write must never be able to refuse an approval, and
+        // `approvals.decide` is documented as hermetic and must stay that way.
+        //
+        // Replays land here too, and must: `decide` is idempotent on the command id and so is `remember` on the
+        // act id (`review-approved:<review>:<version>`), so a retried approval re-records the same row rather
+        // than a second one. A WITHDRAWN returns above and writes nothing — a withdrawal does not delete what
+        // the seller once stood behind, exactly as it does not delete the approval audit row.
+        if (answerMemory != null) {
+            answerMemory.rememberApproved(review, bound, actorUserId);
+        }
+        return decided;
     }
 
     /**

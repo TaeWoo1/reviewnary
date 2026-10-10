@@ -529,7 +529,10 @@ class ReviewReplyApprovalConcurrencyTest {
                         new ReviewReplyApprovalWriter(approvals, audits, txManager)),
                 new ReviewReplyOutcomeService(submissionRefRepo, outcomeRepo,
                         new ReviewReplyOutcomeWriter(outcomeRepo, txManager)),
-                new RuleBasedReviewReplyProvider(), com.sellerops.identity.ExecutableIdentityResolver.unresolved(), channels, null);
+                new RuleBasedReviewReplyProvider(), com.sellerops.identity.ExecutableIdentityResolver.unresolved(),
+                // No composer and no Answer Memory hook: this test is about two concurrent approvals landing on
+                // one row, and neither collaborator participates in that. Both are optional by construction.
+                channels, null, null);
     }
 
     // --- helpers ---------------------------------------------------------------------

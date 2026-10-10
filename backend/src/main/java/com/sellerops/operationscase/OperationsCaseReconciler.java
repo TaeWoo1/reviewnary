@@ -10,6 +10,7 @@ import com.sellerops.inquiry.workitem.InquiryWorkItemRepository;
 import com.sellerops.review.Review;
 import com.sellerops.review.ReviewReplyState;
 import com.sellerops.review.ReviewRepository;
+import com.sellerops.review.publish.ReviewDeliveryTruthReader;
 import com.sellerops.selleraccount.SellerAccountRepository;
 import java.time.Clock;
 import java.time.Duration;
@@ -33,7 +34,10 @@ import org.springframework.stereotype.Component;
  *   a word of its own; where an execution exists, the answer lifecycle's own tokens are quoted into the event); an
  *   excluded or answered inquiry closes the case.</li>
  *   <li>A review case follows the review: a reply on the channel or a seller triage decision after the case opened is
- *   the seller acting; a watched review stops being watched after {@link #MONITORING_WINDOW}.</li>
+ *   the seller acting; a watched review stops being watched after {@link #MONITORING_WINDOW}. Since Review
+ *   Delivery Truth Spine v1 the reply lane's own record counts as a third — an approved reply reviewnary executed,
+ *   or one the seller reported submitting — with that lane's tokens quoted into the event exactly as the inquiry
+ *   lane's are, and without writing {@code review.replyState}, which only ingestion may write.</li>
  *   <li>A gap case closes only when the source is READ completely again — that is decided by the run that reads it,
  *   not here — or when its account is gone.</li>
  * </ul>
@@ -58,20 +62,29 @@ public class OperationsCaseReconciler {
     private final ReviewRepository reviews;
     private final SellerAccountRepository accounts;
     private final AnswerDeliveryTruthReader deliveries;
+    /**
+     * The review lane's equivalent of {@link #deliveries} — the merge of {@code review_reply_execution} and
+     * {@code review_reply_outcome}. Two readers rather than one because the two lanes own two different
+     * vocabularies for «sent», and a single reader would have to flatten them into a third.
+     */
+    private final ReviewDeliveryTruthReader replyDeliveries;
     private final Clock clock;
 
     @Autowired
     public OperationsCaseReconciler(OperationsCaseRepository cases, OperationsCaseEventRepository events,
                                     InquiryRepository inquiries, InquiryWorkItemRepository workItems,
                                     ReviewRepository reviews, SellerAccountRepository accounts,
-                                    AnswerDeliveryTruthReader deliveries) {
-        this(cases, events, inquiries, workItems, reviews, accounts, deliveries, Clock.systemUTC());
+                                    AnswerDeliveryTruthReader deliveries,
+                                    ReviewDeliveryTruthReader replyDeliveries) {
+        this(cases, events, inquiries, workItems, reviews, accounts, deliveries, replyDeliveries,
+                Clock.systemUTC());
     }
 
     public OperationsCaseReconciler(OperationsCaseRepository cases, OperationsCaseEventRepository events,
                                     InquiryRepository inquiries, InquiryWorkItemRepository workItems,
                                     ReviewRepository reviews, SellerAccountRepository accounts,
-                                    AnswerDeliveryTruthReader deliveries, Clock clock) {
+                                    AnswerDeliveryTruthReader deliveries,
+                                    ReviewDeliveryTruthReader replyDeliveries, Clock clock) {
         this.cases = cases;
         this.events = events;
         this.inquiries = inquiries;
@@ -79,7 +92,20 @@ public class OperationsCaseReconciler {
         this.reviews = reviews;
         this.accounts = accounts;
         this.deliveries = deliveries;
+        this.replyDeliveries = replyDeliveries;
         this.clock = clock;
+    }
+
+    /**
+     * Test seam with a pinned clock and no review-reply truth: a review case then closes on the two things that
+     * closed it before Review Delivery Truth Spine v1 — the channel's word and the triage decision. Used by the
+     * inquiry-lane and monitoring-window tests, which assert nothing about a reply execution.
+     */
+    OperationsCaseReconciler(OperationsCaseRepository cases, OperationsCaseEventRepository events,
+                             InquiryRepository inquiries, InquiryWorkItemRepository workItems,
+                             ReviewRepository reviews, SellerAccountRepository accounts,
+                             AnswerDeliveryTruthReader deliveries, Clock clock) {
+        this(cases, events, inquiries, workItems, reviews, accounts, deliveries, null, clock);
     }
 
     public record Report(int checked, int acted, int closed) {
@@ -262,6 +288,26 @@ public class OperationsCaseReconciler {
         if (cases.reviewDecidedSince(c.getOrgId(), review.getId(), c.getCreatedAt())) {
             return new Derived(OperationsCaseStatus.ACTED, CaseResolution.SELLER_ACTED, CaseEventActor.SELLER,
                     "REVIEW_TRIAGE_DECIDED");
+        }
+        // <b>The reply lane's own record is the third thing that means the seller acted</b> (Review Delivery Truth
+        // Spine v1). Before this, only the channel's word (`replyState`, written by ingestion alone) and the
+        // triage decision closed a review card — so a seller who approved a reply and let reviewnary post it on
+        // Cafe24, verified by hash, kept looking at 「확인 필요」 until the next acquisition read the reply back.
+        // The case already quotes the inquiry lane's execution tokens for exactly this reason; this asks the
+        // review lane the same question through the same kind of seam.
+        //
+        // <b>It does not touch `replyState`.</b> That column is a marketplace observation and an execution is
+        // reviewnary's own act; a product that let one overwrite the other would lose the ability to notice them
+        // disagreeing. So the case closes and the review keeps saying what the channel last said.
+        //
+        // The resolution stays SELLER_ACTED rather than ANSWERED_ON_CHANNEL: the seller approved the text and
+        // pressed the button, and whether the channel holds it is in the quoted tokens, not in this vocabulary —
+        // which is why CaseResolution still has no word for sent, executed or verified.
+        Optional<ReviewDeliveryTruthReader.ReviewDeliveryTruth> truth = replyDeliveries == null
+                ? Optional.empty() : replyDeliveries.observe(c.getOrgId(), review.getId());
+        if (truth.isPresent() && truth.get().sellerActed()) {
+            return new Derived(OperationsCaseStatus.ACTED, CaseResolution.SELLER_ACTED, CaseEventActor.SELLER,
+                    "REVIEW_REPLY_EXECUTED" + truth.get().quoted());
         }
         if (c.getDisposition() == CaseDisposition.MONITORING && c.getUpdatedAt() != null
                 && c.getUpdatedAt().isBefore(clock.instant().minus(MONITORING_WINDOW))) {

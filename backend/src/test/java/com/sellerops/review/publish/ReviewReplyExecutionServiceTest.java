@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -292,6 +293,62 @@ class ReviewReplyExecutionServiceTest {
                 "COMPOSER_FILLED", user)).isInstanceOf(ApiException.class)
                 .hasMessageContaining("승인 상태가 바뀌었습니다");
         assertThat(ledger).isEmpty();
+    }
+
+    /* ─────────── Review Delivery Truth Spine v1 — the memory hook may not break a send ─────────── */
+
+    @Test
+    @DisplayName("a VERIFIED send remembers the approved text as the company's answer")
+    void aVerifiedSendBecomesAnswerMemory() {
+        com.sellerops.review.memory.ReviewAnswerMemoryHook hook =
+                mock(com.sellerops.review.memory.ReviewAnswerMemoryHook.class);
+        service = new ReviewReplyExecutionService(reviews, accounts, channels, approvals, drafts, refs, executions,
+                identity, capability, hook);
+        when(adapter.post(org, accountId, review.getExternalId(), BODY)).thenReturn(
+                new Cafe24ReviewCommentAdapter.PostResult(Cafe24ReviewCommentAdapter.PostResult.Kind.ACCEPTED, 9L, null));
+        when(adapter.verify(any(), any(), any(), any(), any())).thenReturn(ReviewExecutionVerification.VERIFIED);
+
+        assertThat(execute("cmd-m1", FP).verification()).isEqualTo("VERIFIED");
+
+        verify(hook).rememberVerified(eq(review), any(), eq(user));
+    }
+
+    @Test
+    @DisplayName("an UNVERIFIABLE send remembers nothing — a reply that may have landed is not a proven sentence")
+    void anUnverifiedSendRemembersNothing() {
+        com.sellerops.review.memory.ReviewAnswerMemoryHook hook =
+                mock(com.sellerops.review.memory.ReviewAnswerMemoryHook.class);
+        service = new ReviewReplyExecutionService(reviews, accounts, channels, approvals, drafts, refs, executions,
+                identity, capability, hook);
+        when(adapter.post(org, accountId, review.getExternalId(), BODY)).thenReturn(
+                new Cafe24ReviewCommentAdapter.PostResult(Cafe24ReviewCommentAdapter.PostResult.Kind.ACCEPTED, 9L, null));
+        when(adapter.verify(any(), any(), any(), any(), any()))
+                .thenReturn(ReviewExecutionVerification.UNVERIFIABLE);
+
+        assertThat(execute("cmd-m2", FP).verification()).isEqualTo("UNVERIFIABLE");
+
+        verify(hook, never()).rememberVerified(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("a memory failure cannot fail the send — the reply is already public and cannot be taken back")
+    void aMemoryFailureDoesNotFailTheSend() {
+        com.sellerops.review.memory.ReviewAnswerMemoryHook hook =
+                mock(com.sellerops.review.memory.ReviewAnswerMemoryHook.class);
+        doThrow(new IllegalStateException("index down")).when(hook).rememberVerified(any(), any(), any());
+        service = new ReviewReplyExecutionService(reviews, accounts, channels, approvals, drafts, refs, executions,
+                identity, capability, hook);
+        when(adapter.post(org, accountId, review.getExternalId(), BODY)).thenReturn(
+                new Cafe24ReviewCommentAdapter.PostResult(Cafe24ReviewCommentAdapter.PostResult.Kind.ACCEPTED, 9L, null));
+        when(adapter.verify(any(), any(), any(), any(), any())).thenReturn(ReviewExecutionVerification.VERIFIED);
+
+        // The seller must be told the reply was posted. Told otherwise, they would post it again by hand.
+        ReviewExecutionView view = execute("cmd-m3", FP);
+
+        assertThat(view.status()).isEqualTo("POSTED");
+        assertThat(view.verification()).isEqualTo("VERIFIED");
+        assertThat(ledger).hasSize(1);
+        verify(adapter, times(1)).post(any(), any(), any(), any());
     }
 
     @Test

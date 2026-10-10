@@ -200,6 +200,8 @@ class CaseTeachToReplyFlowTest {
     @Autowired InquiryReplyDraftRepository draftRows;
     @Autowired InquiryDraftEvidenceRepository evidenceRows;
     @Autowired ReviewRepository reviews;
+    @Autowired com.sellerops.review.publish.ReviewReplyExecutionRepository replyExecutions;
+    @Autowired com.sellerops.attention.reply.ReviewReplyOutcomeRepository replyOutcomes;
     @Autowired SellerAccountRepository accounts;
     @Autowired ChannelRepository channels;
     @Autowired UserRepository users;
@@ -271,7 +273,9 @@ class CaseTeachToReplyFlowTest {
         InquiryKnowledgeAssessor assessor = InquiryKnowledgeAssessor.withoutContext(retriever, variants);
         List<KnowledgeSourceAdapter> adapters = List.of(
                 new SellerKnowledgeAdapter(orgSources, orgChunks, productSources, productChunks),
-                new ProductFactAdapter(facts), new InquiryAnswerAdapter(memories), new ReviewReplyAdapter(em),
+                new ProductFactAdapter(facts), new InquiryAnswerAdapter(memories), new ReviewReplyAdapter(em,
+                        new com.sellerops.review.publish.ReviewDeliveryTruthReader(
+                                replyExecutions, replyOutcomes)),
                 new SellerDecisionAdapter(em), new SellerGuidanceAdapter(guidanceRows));
         KnowledgeSpineService spine =
                 new KnowledgeSpineService(adapters, products, new SourceRefResolver(em), retriever);
@@ -299,6 +303,7 @@ class CaseTeachToReplyFlowTest {
                 new ResponsibilitySources(accounts, channels), rollout, cases, events,
                 new OperationsCaseReconciler(cases, events, inquiries, workItems, reviews, accounts,
                         new com.sellerops.inquiry.publish.AnswerDeliveryTruthReader(executions, verifications),
+                        new com.sellerops.review.publish.ReviewDeliveryTruthReader(replyExecutions, replyOutcomes),
                         Clock.systemUTC()),
                 investigator, investigationService, preparer, workItems, channels, Clock.systemUTC());
         CaseResolutionReader resolutions = new CaseResolutionReader(() -> new Supplied(interpreted), inquiries,

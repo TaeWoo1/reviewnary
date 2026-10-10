@@ -28,7 +28,16 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Customer Operations Memory — what this company has actually answered before.
  *
- * <p><b>Only the seller's own acts get in.</b> {@link #remember} is called from three places and no
+ * <p><b>Two lanes, the same three acts</b> (Review Delivery Truth Spine v1). {@code
+ * InquiryAnswerMemoryHook} writes the inquiry lane's approval and verified send; {@code
+ * com.sellerops.review.memory.ReviewAnswerMemoryHook} writes the review lane's, and
+ * {@code origin_review_id} is which. The acts and their strengths are identical because they are the
+ * same acts — a seller approving an exact version, and a channel read-back proving that version is
+ * what the customer received. What differs is only how much can be proven: a review reply reaches
+ * {@code EXECUTOR_SENT_VERIFIED} on the API lane alone, because the guided lane has no read-back that
+ * can compare a body.
+ *
+ * <p><b>Only the seller's own acts get in.</b> {@link #remember} is called for those acts and no
  * others: a collected marketplace answer, an approval, and a verified send. Nothing writes an AI
  * draft here, and nothing writes a draft a person was still editing. That is the whole safety
  * property of this class — a memory that accepted unapproved model output would be a model reading
@@ -78,17 +87,22 @@ public class AnswerMemoryService {
      * One act of the seller's, in the form this memory can hold.
      *
      * @param originRef the identity of the ACT, not of the text — {@code inquiry-answer:<uuid>},
-     *                  {@code approved:<workItem>:<version>}, {@code verified:<workItem>}. Re-running
-     *                  the same act updates its row; a different act is a different row.
+     *                  {@code approved:<workItem>:<version>}, {@code verified:<workItem>},
+     *                  {@code review-approved:<review>:<version>}, {@code review-verified:<review>:<version>}.
+     *                  Re-running the same act updates its row; a different act is a different row.
      * @param question  the customer's question. Read to build the signature and then discarded — it
      *                  is never stored.
+     * @param originReviewId the review this reply answered, for the review lane. Null for an inquiry answer and
+     *                  for a collected channel answer — the three origins are three different acts, and this is
+     *                  what tells the review one apart without parsing {@code originRef}.
      */
     public record RememberCommand(UUID orgId, String originRef, AnswerMemoryStrength strength,
                                   String question, String answerTitle, String answerBody,
                                   UUID productId, String channelCode, String sourceSubtype,
                                   String topicCategory, UUID originInquiryId, UUID originWorkItemId,
                                   Integer originDraftVersion, UUID authorUserId, String authorName,
-                                  DataOrigin dataOrigin, AnswerMemoryReuseScope reuseScope) {
+                                  DataOrigin dataOrigin, AnswerMemoryReuseScope reuseScope,
+                                  UUID originReviewId) {
 
         /** Without a declaration: a new row is UNKNOWN, an existing row keeps what a person said. */
         public RememberCommand(UUID orgId, String originRef, AnswerMemoryStrength strength,
@@ -99,7 +113,25 @@ public class AnswerMemoryService {
                                DataOrigin dataOrigin) {
             this(orgId, originRef, strength, question, answerTitle, answerBody, productId, channelCode, sourceSubtype,
                     topicCategory, originInquiryId, originWorkItemId, originDraftVersion, authorUserId, authorName,
-                    dataOrigin, null);
+                    dataOrigin, null, null);
+        }
+
+        /**
+         * The inquiry lane's full form — every origin it has, and no review.
+         *
+         * <p>Kept as its own constructor rather than making callers pass {@code null} for a column that lane can
+         * never fill: an inquiry answer is not a review reply whose review is unknown, and a signature that made
+         * the two look alike is how a later reader starts treating them as one kind of row.
+         */
+        public RememberCommand(UUID orgId, String originRef, AnswerMemoryStrength strength,
+                               String question, String answerTitle, String answerBody,
+                               UUID productId, String channelCode, String sourceSubtype,
+                               String topicCategory, UUID originInquiryId, UUID originWorkItemId,
+                               Integer originDraftVersion, UUID authorUserId, String authorName,
+                               DataOrigin dataOrigin, AnswerMemoryReuseScope reuseScope) {
+            this(orgId, originRef, strength, question, answerTitle, answerBody, productId, channelCode, sourceSubtype,
+                    topicCategory, originInquiryId, originWorkItemId, originDraftVersion, authorUserId, authorName,
+                    dataOrigin, reuseScope, null);
         }
     }
 
@@ -146,6 +178,7 @@ public class AnswerMemoryService {
         row.setSourceSubtype(command.sourceSubtype());
         row.setOriginInquiryId(command.originInquiryId());
         row.setOriginWorkItemId(command.originWorkItemId());
+        row.setOriginReviewId(command.originReviewId());
         row.setOriginDraftVersion(command.originDraftVersion());
         row.setAuthorUserId(command.authorUserId());
         row.setAuthorName(command.authorName());

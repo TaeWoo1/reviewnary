@@ -101,6 +101,7 @@ class AccountIndependentReviewCoreIT {
     @Autowired ReviewReplyApprovalRepository approvals;
     @Autowired ReviewReplyApprovalAuditRepository approvalAudit;
     @Autowired ReviewReplyOutcomeRepository outcomes;
+    @Autowired com.sellerops.review.publish.ReviewReplyExecutionRepository replyExecutions;
     @Autowired ReviewIssueRepository issues;
     @Autowired ReviewIssueEvidenceRepository issueEvidence;
     @Autowired ProductKnowledgeSourceRepository productKnowledge;
@@ -147,7 +148,8 @@ class AccountIndependentReviewCoreIT {
                 new ReviewTriageWriter(triages, triageAudit, txManager));
         workspace = new ReviewDecisionWorkspaceService(reviews, channels, products, issueEvidence, issues,
                 productKnowledge, orgKnowledge, candidates, correctionAudit, actions, triages,
-                triageAudit, approvals, approvalAudit, outcomes);
+                triageAudit, approvals, approvalAudit, outcomes,
+                new com.sellerops.review.publish.ReviewDeliveryTruthReader(replyExecutions, outcomes));
     }
 
     // ── the whole loop, on a review no account acquired ──────────────────────────────────────────

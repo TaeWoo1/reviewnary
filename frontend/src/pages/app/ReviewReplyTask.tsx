@@ -23,8 +23,8 @@ import { Disclosure } from "../../components/ui/Disclosure";
 import { CaseLayout, DecisionCard, Eyebrow, type CaseVariant, type PaneDepth } from "../../components/workspace/CaseLayout";
 import { ReviewLocate } from "../../components/reviews/ReviewLocate";
 import {
-  DECISION_LOG_DISCLOSURE,
   PREVIEW_SAFETY_LINE,
+  decisionLogDisclosure,
   decisionLogSentence,
   previewJudgmentTokens,
 } from "../../lib/reviewDecision";
@@ -1200,7 +1200,10 @@ function RecordTrail({
           ))}
         </ul>
       )}
-      <p className="mt-2 max-w-thread break-keep text-xs leading-relaxed text-muted">{DECISION_LOG_DISCLOSURE}</p>
+      {/* 전송된 것이 있으면 문장이 달라진다 — `decisionLogDisclosure`가 기록을 보고 고른다. */}
+      <p className="mt-2 max-w-thread break-keep text-xs leading-relaxed text-muted">
+        {decisionLogDisclosure(entries)}
+      </p>
     </section>
   );
 }

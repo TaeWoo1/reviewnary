@@ -42,6 +42,38 @@ public interface ReviewReplyOutcomeRepository extends JpaRepository<ReviewReplyO
     List<ReviewReplyOutcome> findAllByOrgIdAndReviewIdOrderByCreatedAtDesc(UUID orgId, UUID reviewId);
 
     /**
+     * The operator's most recent report about this review, whichever version it was about — the half
+     * {@code ReviewDeliveryTruthReader} merges with the execution record.
+     *
+     * <p>Unversioned on purpose, like the trail above and unlike the prep panel's lookup: the delivery truth's
+     * unversioned question is «has anything ever been reported for this review», which is what an OperationsCase
+     * asks before it calls a card closed.
+     */
+    Optional<ReviewReplyOutcome> findTopByOrgIdAndReviewIdOrderByCreatedAtDesc(UUID orgId, UUID reviewId);
+
+    /**
+     * The {@code (reviewId, recordedVersion)} pairs among these reviews the operator reported SUBMITTING — one
+     * org-scoped batch per page.
+     *
+     * <p>Sibling of {@link #findReviewIdsWithReportedSubmission}, and the difference is the version: that one
+     * answers «does this review carry a reported submission for the text that STANDS» and joins the approval to
+     * find out, which is the worklist's question. This one answers «which exact versions were reported», because
+     * the knowledge spine's provenance sentence is about a version of a sentence rather than about a review — an
+     * operator who edits and re-approves after posting has new text that was never submitted, and labelling it
+     * 「등록했다고 기록」 would attribute a post to words nobody posted.
+     *
+     * <p>{@code OPERATOR_REPORTED_SUBMITTED} only. {@code SUBMISSION_ABORTED} means "I did not post it".
+     */
+    @Query("""
+            select distinct o.reviewId, o.recordedVersion from ReviewReplyOutcome o
+            where o.orgId = :orgId and o.reviewId in :reviewIds
+              and o.operatorOutcome
+                  = com.sellerops.attention.reply.OperatorOutcome.OPERATOR_REPORTED_SUBMITTED
+            """)
+    List<Object[]> findReportedSubmissionVersions(@Param("orgId") UUID orgId,
+                                                  @Param("reviewIds") Collection<UUID> reviewIds);
+
+    /**
      * Which of these reviews carry a REPORTED submission for the reply version that currently
      * stands — one org-scoped batch query per drill-down page, never a per-row lookup (same shape as
      * {@code ReviewReplyDraftRepository.findReviewIdsWithDraft}).

@@ -38,6 +38,13 @@ public class InquiryAnswerAdapter implements KnowledgeSourceAdapter {
     public List<Indexed> read(UUID orgId, UUID productId) {
         return memories.findAllByOrgId(orgId).stream()
                 .filter(m -> orgId.equals(m.getOrgId()))
+                // <b>A review reply is not an inquiry answer</b> (Review Delivery Truth Spine v1). Since V128 the
+                // review lane writes its approvals and verified deliveries into this same table, with
+                // `origin_review_id` set. Reading them here would title them 「과거 문의 답변」 and — worse —
+                // cite them twice, because {@code ReviewReplyAdapter} already reads every approved review reply
+                // from the approval it is bound to. One answer under two source types is how a retrieval starts
+                // looking better-grounded than it is.
+                .filter(m -> m.getOriginReviewId() == null)
                 // An unbound answer is ORG knowledge; a bound one belongs to its product and to no other.
                 .filter(m -> m.getProductId() == null || m.getProductId().equals(productId))
                 .sorted(Comparator.comparing(AnswerMemory::getOriginRef))

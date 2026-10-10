@@ -102,6 +102,8 @@ class KnowledgeBootstrapTest {
     private static final Instant NOW = Instant.parse("2026-09-18T03:00:00Z");
 
     @Autowired EntityManager em;
+    @Autowired com.sellerops.review.publish.ReviewReplyExecutionRepository replyExecutions;
+    @Autowired com.sellerops.attention.reply.ReviewReplyOutcomeRepository replyOutcomes;
     @Autowired OrganizationRepository organizations;
     @Autowired ChannelRepository channels;
     @Autowired SellerAccountRepository sellerAccounts;
@@ -148,7 +150,9 @@ class KnowledgeBootstrapTest {
                         (orgId, code, accountId, rows) -> com.sellerops.coverage.ChannelDataState.OBSERVED_FRESH));
         KnowledgeSpineService spine = new KnowledgeSpineService(List.of(
                 new SellerKnowledgeAdapter(orgSources, orgChunks, productSources, productChunks),
-                new ProductFactAdapter(facts), new InquiryAnswerAdapter(memories), new ReviewReplyAdapter(em),
+                new ProductFactAdapter(facts), new InquiryAnswerAdapter(memories), new ReviewReplyAdapter(em,
+                        new com.sellerops.review.publish.ReviewDeliveryTruthReader(
+                                replyExecutions, replyOutcomes)),
                 new SellerDecisionAdapter(em), new SellerGuidanceAdapter(guidanceRows)),
                 products, new SourceRefResolver(em), retriever);
         assessor = new InquiryKnowledgeAssessor(retriever, spine, variants, products);
