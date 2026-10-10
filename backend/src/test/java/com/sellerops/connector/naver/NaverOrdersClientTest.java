@@ -52,8 +52,14 @@ class NaverOrdersClientTest {
     }
 
     private static String detailItem(String productOrderId, Long amount) {
+        return detailItem(productOrderId, amount, null);
+    }
+
+    /** {@code productId} is the channel product number — see ChannelProductRefSource. */
+    private static String detailItem(String productOrderId, Long amount, String productId) {
         return "{\"productOrder\":{\"productOrderId\":\"" + productOrderId + "\""
-                + (amount != null ? ",\"initialPaymentAmount\":" + amount : "") + "}}";
+                + (amount != null ? ",\"initialPaymentAmount\":" + amount : "")
+                + (productId != null ? ",\"productId\":" + productId : "") + "}}";
     }
 
     private static String detailBody(String... items) {
@@ -926,5 +932,47 @@ class NaverOrdersClientTest {
         FetchPage page = client.fetchOrderSummaryPage(TOKEN, null);
 
         assertThat(page.records()).isEmpty(); // normal empty page, no throw, no leak
+    }
+
+    @Test
+    void projectsTheChannelProductNumberWithoutAnExtraRequest() {
+        // The detail response was already being fetched for the amount and the rest of it discarded, so
+        // the product identity costs no request — the assertion on the call count is the point.
+        http.enqueue(FakeNaverHttpClient.ok(lcsBody(null,
+                lcsItem("PO1", "O1", "2026-06-11T22:00:00+09:00"))));
+        http.enqueue(FakeNaverHttpClient.ok(detailBody(detailItem("PO1", 10000L, "12120576694"))));
+
+        FetchPage page = client.fetchOrderSummaryPage(TOKEN, null);
+
+        List<CanonicalOrder> orders = page.orders().stream().map(CanonicalOrder.class::cast).toList();
+        assertThat(orders).singleElement().satisfies(order -> {
+            // At most one: a NAVER row IS one product order.
+            assertThat(order.productRefs()).hasSize(1);
+            assertThat(order.productRefs().get(0).externalProductId())
+                    .as("verbatim — the identifier is compared, never computed on")
+                    .isEqualTo("12120576694");
+        });
+        assertThat(http.sent).as("two calls, exactly as before this field was read").hasSize(2);
+    }
+
+    @Test
+    void anAbsentProductNumberIsNoReferenceRatherThanAFailure() {
+        // Whether the field is in the response is unconfirmed (this environment cannot reach the official
+        // document). So the honest behaviour is the one that is right either way: an absent or blank
+        // identifier yields no reference, which ingestion reads as "the channel named no product" — the
+        // thing every order said before this arc. The amount still fails the page when missing; the
+        // asymmetry is deliberate.
+        http.enqueue(FakeNaverHttpClient.ok(lcsBody(null,
+                lcsItem("PO1", "O1", "2026-06-11T22:00:00+09:00"),
+                lcsItem("PO2", "O2", "2026-06-11T22:00:00+09:00"))));
+        http.enqueue(FakeNaverHttpClient.ok(detailBody(
+                detailItem("PO1", 10000L),
+                "{\"productOrder\":{\"productOrderId\":\"PO2\",\"initialPaymentAmount\":1,"
+                        + "\"productId\":\"   \"}}")));
+
+        FetchPage page = client.fetchOrderSummaryPage(TOKEN, null);
+
+        assertThat(page.orders().stream().map(CanonicalOrder.class::cast))
+                .allSatisfy(order -> assertThat(order.productRefs()).isEmpty());
     }
 }

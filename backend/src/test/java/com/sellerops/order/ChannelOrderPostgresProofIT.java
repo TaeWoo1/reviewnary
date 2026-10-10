@@ -1,6 +1,7 @@
 package com.sellerops.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sellerops.channel.Channel;
@@ -94,13 +95,24 @@ class ChannelOrderPostgresProofIT {
     @Autowired com.sellerops.organization.OrganizationRepository organizations;
     @Autowired PlatformTransactionManager txManager;
     @Autowired JdbcTemplate jdbc;
+    @Autowired ChannelOrderProductRepository orderProducts;
+    @Autowired com.sellerops.product.ChannelProductRepository channelProducts;
+    @Autowired com.sellerops.product.ProductRepository products;
+    @Autowired OrderRecordDetailService orderDetail;
+    @Autowired com.sellerops.selleraccount.SellerAccountRepository accountsForDetail;
 
     // 1 — real Flyway applied the whole chain up to V32, and the two tables + identity index exist.
     @Test
     void flywayAppliedV32AndSchemaExists() {
+        // Was {@code isEqualTo(32)} when written, when V32 was the top of the chain. An equality here
+        // fails on every migration landed since for a reason that has nothing to do with per-order
+        // acquisition, so it asserts what it actually means: the whole chain applied, and the version
+        // this class proves is in it.
         Integer maxVersion = jdbc.queryForObject(
                 "select max(cast(version as integer)) from flyway_schema_history where success", Integer.class);
-        assertThat(maxVersion).isEqualTo(32);
+        assertThat(maxVersion).isGreaterThanOrEqualTo(32);
+        assertThat(jdbc.queryForObject("select count(*) from flyway_schema_history "
+                + "where success and version = '32'", Integer.class)).isEqualTo(1);
 
         assertThat(tableExists("channel_orders")).isTrue();
         assertThat(tableExists("channel_order_status_events")).isTrue();
@@ -224,9 +236,128 @@ class ChannelOrderPostgresProofIT {
         return n != null && n == 1;
     }
 
+    // V132 — the order learns its product, and only by an exact match on the channel's own identifier.
+    @Test
+    void anOrderLearnsItsProductOnlyByAnExactIdentifierMatch() {
+        UUID org = seedOrg();
+        // COUPANG, not an invented test code: the provenance vocabulary is keyed by channel, so a channel
+        // with no ChannelProductRefSource stores no reference at all. Writing this test against
+        // "CPROOF-xxxx" first is how that was confirmed — the fence refused, as it should.
+        Channel ch = seedChannel("COUPANG");
+        UUID channel = ch.getId();
+        UUID account = seedAccount(org, ch).getId();
+        String po = "PO-" + UUID.randomUUID();
+        String listingId = "154785" + (int) (Math.random() * 100000);
+
+        // The order arrives BEFORE the product catalogue, which is the common order of events: the order
+        // routine runs hourly and product collection is rarer.
+        var first = orderIngestion.ingest(org, channel, account, List.of(order(po, "FINAL_DELIVERY", 12000,
+                "2026-06-11", List.of(com.sellerops.ingest.canonical.ChannelProductRef.of(listingId)))));
+        assertThat(first.success()).isEqualTo(1);
+        ChannelOrder row = orders.findByOrgIdAndSellerAccountIdAndExternalOrderId(org, account, po)
+                .orElseThrow();
+
+        List<ChannelOrderProduct> refs = orderProducts.findByChannelOrderId(row.getId());
+        assertThat(refs).singleElement().satisfies(ref -> {
+            assertThat(ref.getExternalProductId()).isEqualTo(listingId);
+            assertThat(ref.isUnbound())
+                    .as("식별자는 받았고 일치하는 canonical 상품이 없다 — 「채널이 안 줬다」와 다른 상태다")
+                    .isTrue();
+        });
+
+        // The product catalogue catches up.
+        com.sellerops.product.Product product = new com.sellerops.product.Product();
+        product.setOrgId(org);
+        product.setName("pg-proof 상품");
+        product.setSku("SKU-" + UUID.randomUUID().toString().substring(0, 8));
+        product.setStatus("ACTIVE");
+        UUID productId = products.save(product).getId();
+        com.sellerops.product.ChannelProduct listing = new com.sellerops.product.ChannelProduct();
+        listing.setOrgId(org);
+        listing.setChannelId(channel);
+        listing.setProductId(productId);
+        listing.setExternalProductId(listingId);
+        channelProducts.save(listing);
+
+        // A re-sync with the same status resolves it — the identifier arriving and the status changing
+        // are independent events, so an unchanged re-collection must still be able to bind.
+        orderIngestion.ingest(org, channel, account, List.of(order(po, "FINAL_DELIVERY", 12000,
+                "2026-06-11", List.of(com.sellerops.ingest.canonical.ChannelProductRef.of(listingId)))));
+        ChannelOrderProduct bound = orderProducts.findByChannelOrderId(row.getId()).get(0);
+        assertThat(bound.getProductId()).isEqualTo(productId);
+        assertThat(bound.getBoundAt()).isNotNull();
+
+        // And the DB refuses to let that binding become a different product — asserted here rather than
+        // trusted, because the Java path simply never tries it and a future path might.
+        assertThatThrownBy(() -> jdbc.update(
+                "update channel_order_products set product_id = ? where id = ?",
+                UUID.randomUUID(), bound.getId()))
+                .hasMessageContaining("이미 연결된 상품은 바꿀 수 없습니다");
+        assertThatThrownBy(() -> jdbc.update(
+                "update channel_order_products set external_product_id = '0' where id = ?", bound.getId()))
+                .hasMessageContaining("상품 식별자는 수정할 수 없습니다");
+    }
+
+    // V132 + D2 — the whole post-purchase context of one real-shaped order, through the canonical read.
+    @Test
+    void thePostPurchaseContextReadsProductOrderFulfillmentAndProvenance() {
+        UUID org = seedOrg();
+        Channel ch = seedChannel("COUPANG");
+        UUID channel = ch.getId();
+        SellerAccount account = seedAccount(org, ch);
+        String box = "BOX-" + UUID.randomUUID();
+        String listingId = "154216" + (int) (Math.random() * 100000);
+
+        com.sellerops.product.Product product = new com.sellerops.product.Product();
+        product.setOrgId(org);
+        product.setName("선바로 일체형 전선몰딩");
+        product.setSku("SKU-" + UUID.randomUUID().toString().substring(0, 8));
+        product.setStatus("ACTIVE");
+        UUID productId = products.save(product).getId();
+        com.sellerops.product.ChannelProduct listing = new com.sellerops.product.ChannelProduct();
+        listing.setOrgId(org);
+        listing.setChannelId(channel);
+        listing.setProductId(productId);
+        listing.setExternalProductId(listingId);
+        channelProducts.save(listing);
+
+        orderIngestion.ingest(org, channel, account.getId(), List.of(order(box, "FINAL_DELIVERY", 12000,
+                "2026-06-11", List.of(com.sellerops.ingest.canonical.ChannelProductRef.of(listingId)))));
+
+        var detail = orderDetail.detail(org, "COUPANG", account.getId(), "O1");
+
+        // Fulfillment — from the vocabulary widened under D2, on a stored row, with no marketplace call.
+        assertThat(detail.fulfillmentLabelKo()).isEqualTo("배송 완료");
+        assertThat(detail.paymentLabelKo())
+                .as("배송 코드가 결제를 증명하지 않는다 — 세 축이 따로 적히는 것이 이 화면의 계약이다")
+                .isNull();
+        // Product — bound, named from the canonical product, with its provenance.
+        assertThat(detail.lines()).singleElement().satisfies(line -> {
+            assertThat(line.confirmedStatusLabelKo()).isEqualTo("배송 완료");
+            assertThat(line.products()).singleElement().satisfies(ref -> {
+                assertThat(ref.productId()).isEqualTo(productId);
+                assertThat(ref.productName()).isEqualTo("선바로 일체형 전선몰딩");
+                assertThat(ref.externalProductId()).isEqualTo(listingId);
+                assertThat(ref.refSource()).isEqualTo("COUPANG_ORDERSHEETS");
+                assertThat(ref.boundAt()).as("우리가 연결한 시각 — 채널이 말한 시각이 아니다 (D3)")
+                        .isNotNull();
+                assertThat(ref.isBound()).isTrue();
+            });
+        });
+        // Time — the status history carries OUR record time and the channel's, kept apart. The synthetic
+        // fixture supplies a statusChangedAt; a real Coupang row has none and this stays null (D3).
+        assertThat(detail.statusHistory()).isNotEmpty();
+        assertThat(detail.lastSeenAt()).isNotNull();
+    }
+
     private static CanonicalOrder order(String extId, String status, long amount, String date) {
+        return order(extId, status, amount, date, List.of());
+    }
+
+    private static CanonicalOrder order(String extId, String status, long amount, String date,
+                                        List<com.sellerops.ingest.canonical.ChannelProductRef> refs) {
         Instant at = LocalDate.parse(date).atStartOfDay(ZoneOffset.UTC).toInstant();
-        return new CanonicalOrder(extId, "O1", status, amount, LocalDate.parse(date), at, at, 1);
+        return new CanonicalOrder(extId, "O1", status, amount, LocalDate.parse(date), at, at, 1, refs);
     }
 
     private SellerAccount naverAccount(UUID org) {

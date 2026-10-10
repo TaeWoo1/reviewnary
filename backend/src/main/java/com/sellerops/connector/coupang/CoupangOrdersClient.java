@@ -12,6 +12,7 @@ import com.sellerops.connector.ConnectorAuthException;
 import com.sellerops.connector.DataType;
 import com.sellerops.connector.FetchPage;
 import com.sellerops.ingest.canonical.CanonicalOrder;
+import com.sellerops.ingest.canonical.ChannelProductRef;
 import com.sellerops.ingest.canonical.CanonicalOrderSummary;
 import java.io.IOException;
 import java.net.URI;
@@ -404,7 +405,31 @@ public class CoupangOrdersClient {
                 item.status(),
                 orderAmount(item),
                 LocalDate.ofInstant(basis, KST),
-                paidAt);
+                paidAt,
+                productRefs(item));
+    }
+
+    /**
+     * The product identifiers this shipment box names, in wire order and without duplicates.
+     *
+     * <p><b>A missing identifier is not a failure here, unlike a missing amount.</b> The amount check
+     * below fails the page because a wrong daily total is a wrong number on a screen; an absent
+     * product identifier makes the order say nothing about its product, which is what it said before
+     * this arc. Failing the page on it would turn a collection that works into a collection that
+     * stops, over a field whose presence this repository has never observed.
+     */
+    private static List<ChannelProductRef> productRefs(Ordersheet item) {
+        List<OrderItem> items = item.orderItems();
+        if (items == null) {
+            return List.of();
+        }
+        List<ChannelProductRef> refs = new ArrayList<>(items.size());
+        for (OrderItem line : items) {
+            if (line != null && line.sellerProductId() != null && !line.sellerProductId().isBlank()) {
+                refs.add(ChannelProductRef.of(line.sellerProductId()));
+            }
+        }
+        return refs;
     }
 
     /** Σ orderItems[].orderPrice — the official "price to be paid". Fails closed on a missing amount. */
@@ -457,7 +482,10 @@ public class CoupangOrdersClient {
                     // Coupang's basic ordersheet carries no status-change timestamp; left null
                     // rather than mislabeling paidAt as a status change.
                     null,
-                    sourceRow++));
+                    sourceRow++,
+                    // A shipment box may name several products, so this is the list its length
+                    // argues for — see CanonicalOrder's javadoc on why one reference would lie here.
+                    row.productRefs()));
         }
         return out;
     }
@@ -465,7 +493,8 @@ public class CoupangOrdersClient {
     /** Internal projection of one shipment box, PII-free. */
     private record OrderRow(
             String externalOrderId, String parentOrderId, String rawStatusCode,
-            long paymentAmount, LocalDate summaryDate, Instant paidAt) {
+            long paymentAmount, LocalDate summaryDate, Instant paidAt,
+            List<ChannelProductRef> productRefs) {
     }
 
     // --- signed transport -------------------------------------------------
@@ -579,9 +608,20 @@ public class CoupangOrdersClient {
      * Amount basis: {@code orderPrice} (= {@code salesPrice} × {@code shippingCount}, "price to be
      * paid"). Bound through {@link MoneyAmountDeserializer} so it tolerates both the plain-number form
      * and a {@code {currencyCode, units, nanos}} money object, canonicalized to a KRW-won {@code Long}.
+     *
+     * <p><b>{@code sellerProductId} is the product identity</b> (Order Context Foundation v1, D1) — the
+     * same value {@code channel_products.external_product_id} holds for Coupang
+     * ({@code COUPANG:SELLER_PRODUCTS:v1}), so the two sides of the exact match are one identifier
+     * space. Typed {@code String} for the reason the NAVER side is: it is an identifier, not a number.
+     *
+     * <p><b>Unobserved, and safe either way.</b> This repository has never seen an ordersheets body's
+     * {@code orderItems} beyond {@code orderPrice}, so the key may not be there — in which case it is
+     * null, null is no identifier, and no identifier is no attribution. It is read here rather than
+     * guessed at later because {@code @JsonIgnoreProperties} means an unread key is a discarded key.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record OrderItem(@JsonDeserialize(using = MoneyAmountDeserializer.class) Long orderPrice) {
+    record OrderItem(@JsonDeserialize(using = MoneyAmountDeserializer.class) Long orderPrice,
+                     String sellerProductId) {
     }
 
     /**

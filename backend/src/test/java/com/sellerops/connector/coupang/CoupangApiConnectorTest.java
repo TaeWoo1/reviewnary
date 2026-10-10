@@ -301,6 +301,56 @@ class CoupangApiConnectorTest {
     }
 
     @Test
+    void projectsEverySellerProductIdInTheShipmentBox() {
+        // A shipment box may name several products, and sellerProductId is the identifier
+        // channel_products.external_product_id already holds for Coupang — so the two sides of the
+        // exact match are one identifier space. Several products in one box means several references:
+        // lifting one of them onto the order row would make it the product of the whole order.
+        storeCoupangCredential();
+        String data = "{\"shipmentBoxId\":100001,\"orderId\":5001,\"status\":\"FINAL_DELIVERY\""
+                + ",\"orderedAt\":\"2026-08-05T10:00:00+09:00\",\"paidAt\":\"2026-08-05T10:01:00+09:00\""
+                + ",\"orderItems\":["
+                + "{\"orderPrice\":12000,\"sellerProductId\":\"15478536542\"},"
+                + "{\"orderPrice\":3000,\"sellerProductId\":\"15421607591\"},"
+                // The same product twice is normal (a quantity split). The reference is one; this
+                // record counts products, not quantities.
+                + "{\"orderPrice\":3000,\"sellerProductId\":\"15478536542\"}]}";
+        http.enqueue(json(200, "{\"code\":200,\"message\":\"OK\",\"data\":[" + data + "],\"nextToken\":null}"));
+        enqueueRemainingStatusesEmpty(1);
+
+        FetchPage page = connector.fetch(request(DataType.ORDER_SUMMARY));
+
+        List<CanonicalOrder> orders = page.orders().stream().map(CanonicalOrder.class::cast).toList();
+        assertThat(orders).singleElement().satisfies(o -> {
+            assertThat(o.paymentAmount()).as("the amount still sums every line").isEqualTo(18000L);
+            assertThat(o.productRefs()).extracting(ref -> ref.externalProductId())
+                    .containsExactly("15478536542", "15421607591", "15478536542");
+        });
+    }
+
+    @Test
+    void anAbsentSellerProductIdIsNoReferenceAndDoesNotFailThePage() {
+        // This repository has never observed an ordersheets orderItems beyond orderPrice, so the key may
+        // not be there. Failing the page over it would stop a collection that works today, over a field
+        // whose presence was never confirmed — unlike the amount, where a missing value would put a wrong
+        // number on a screen. The asymmetry is the decision.
+        storeCoupangCredential();
+        String data = "{\"shipmentBoxId\":100001,\"orderId\":5001,\"status\":\"ACCEPT\""
+                + ",\"orderedAt\":\"2026-08-05T10:00:00+09:00\",\"paidAt\":\"2026-08-05T10:01:00+09:00\""
+                + ",\"orderItems\":[{\"orderPrice\":12000},{\"orderPrice\":3000,\"sellerProductId\":\"  \"}]}";
+        http.enqueue(json(200, "{\"code\":200,\"message\":\"OK\",\"data\":[" + data + "],\"nextToken\":null}"));
+        enqueueRemainingStatusesEmpty(1);
+
+        FetchPage page = connector.fetch(request(DataType.ORDER_SUMMARY));
+
+        List<CanonicalOrder> orders = page.orders().stream().map(CanonicalOrder.class::cast).toList();
+        assertThat(orders).singleElement().satisfies(o -> {
+            assertThat(o.paymentAmount()).isEqualTo(15000L);
+            assertThat(o.productRefs()).isEmpty();
+        });
+    }
+
+    @Test
     void fetchParsesOrderPriceRenderedAsAUnitsNanosMoneyObject() {
         // The official contract can present a monetary field as a {currencyCode, units, nanos} object.
         // The money-tolerant deserializer canonicalizes units(+nanos) to a KRW-won Long: 12000 + 3000.

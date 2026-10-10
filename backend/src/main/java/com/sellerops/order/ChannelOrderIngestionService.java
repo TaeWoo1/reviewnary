@@ -41,6 +41,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class ChannelOrderIngestionService {
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(ChannelOrderIngestionService.class);
+
     private final ChannelOrderRepository orders;
     private final ChannelOrderStatusEventRepository statusEvents;
     private final ChannelRepository channels;
@@ -54,6 +57,39 @@ public class ChannelOrderIngestionService {
         this.statusEvents = statusEvents;
         this.channels = channels;
         this.tx = new TransactionTemplate(transactionManager);
+    }
+
+    /**
+     * 주문의 상품 참조를 보관·해소하는 협력자 (Order Context Foundation v1, D1).
+     *
+     * <p>optional인 것이 정직한 모양이다 — 주문 수집은 이것 없이 완전했고 여전히 완전하다. binder를
+     * 배선하지 않은 context는 이 패키지가 상품을 모르던 때의 제품이고, 정확히 그때처럼 동작한다.
+     */
+    private ChannelOrderProductBinder productBinder;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setProductBinder(ChannelOrderProductBinder productBinder) {
+        this.productBinder = productBinder;
+    }
+
+    /**
+     * 채널이 이 주문에 준 상품 식별자를 보관하고 가능하면 연결한다 — <b>best-effort</b>.
+     *
+     * <p>실패가 주문 수집을 멈추지 않는다. 상품 참조는 주문 행에 덧붙는 사실이고, 그것 때문에 주문이
+     * 저장되지 않으면 오늘 동작하는 수집이 관측된 적 없는 필드 하나 때문에 멈춘다. 대신 로그에 남는다 —
+     * 조용히 사라지는 실패는 「채널이 식별자를 주지 않았다」와 구별되지 않는다.
+     */
+    private void recordProductRefs(UUID orgId, UUID channelId, String channelCode, UUID channelOrderId,
+                                   CanonicalOrder row) {
+        if (productBinder == null || row.productRefs().isEmpty()) {
+            return;
+        }
+        try {
+            productBinder.record(orgId, channelId, channelCode, channelOrderId, row.productRefs(),
+                    ChannelProductRefSource.forChannel(channelCode));
+        } catch (Exception e) {
+            log.warn("주문 상품 참조를 기록하지 못했습니다 (채널={}): {}", channelCode, e.getMessage());
+        }
     }
 
     /**
@@ -136,6 +172,7 @@ public class ChannelOrderIngestionService {
             entity.setLastSeenAt(now);
             ChannelOrder saved = orders.save(entity);
             appendEvent(orgId, saved.getId(), null, row.rawStatusCode(), row.statusChangedAt(), now);
+            recordProductRefs(orgId, channelId, channelCode, saved.getId(), row);
             return UpsertResult.inserted(saved.getId());
         }
 
@@ -153,9 +190,13 @@ public class ChannelOrderIngestionService {
             }
             orders.save(existing);
             appendEvent(orgId, existing.getId(), previous, row.rawStatusCode(), row.statusChangedAt(), now);
+            recordProductRefs(orgId, channelId, channelCode, existing.getId(), row);
             return UpsertResult.updated(existing.getId());
         }
         orders.save(existing);
+        // 상태가 그대로인 재동기화에서도 참조는 기록한다 — 식별자가 처음 도착하는 것은 상태 변화와
+        // 무관한 사건이고(수집이 넓어진 날이 그렇다), 그때 저장하지 않으면 다음 상태 변화까지 기다린다.
+        recordProductRefs(orgId, channelId, channelCode, existing.getId(), row);
         return UpsertResult.unchanged(existing.getId());
     }
 
