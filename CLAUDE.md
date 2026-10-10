@@ -352,6 +352,7 @@ but not carrying current truth on its own (`docs/archive/` especially).
 - `docs/channel-capability-registration-matrix.md` — Channel Capability & Registration Matrix
 - `docs/channel_capability_ledger.md` — SellerOps — Channel Capability Ledger
 - `docs/channel_integration_completeness_audit_v1.md` — Channel integration completeness audit v1 (2026-08-19)
+- `docs/post_purchase_timeline_audit_v1.md` — Post-purchase Timeline + Review Opportunity v1 — 감사 (2026-10-10)
 
 ### Evidence and workstream homes
 
