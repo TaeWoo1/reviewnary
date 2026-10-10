@@ -206,7 +206,7 @@ cmd_doctor() {
     else line backend "$BACKEND_URL" DOWN "백엔드가 없으면 아무 시나리오도 안 됩니다"; fail; fi
     if probe "$FRONTEND_URL/"; then line frontend "$FRONTEND_URL" OK
     else line frontend "$FRONTEND_URL" DOWN "UI 없음"; fail; fi
-    if probe "$BRIDGE_URL/bridge/health"; then line "local agent" "$BRIDGE_URL" OK "Coupang 최초 연결 워크스루용"
+    if probe "$BRIDGE_URL/bridge/health"; then line "local agent" "$BRIDGE_URL" OK "fixture walk 반복 가능 (완주 후 자동 재무장)"
     else line "local agent" "$BRIDGE_URL" DOWN "fresh 시나리오의 키 발급 워크스루가 페어링되지 않습니다"; fail; fi
     if probe "$RUNTIME_URL/health"; then line "agent runtime" "$RUNTIME_URL" OK "/agent 페이지 전용"
     else line "agent runtime" "$RUNTIME_URL" "-" "/agent 페이지 전용 · 오늘 시나리오에는 불필요"; fi
