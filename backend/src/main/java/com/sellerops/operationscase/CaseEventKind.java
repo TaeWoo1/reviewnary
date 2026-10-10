@@ -33,5 +33,22 @@ public enum CaseEventKind {
     /** The seller said a different action was right for this case. */
     SELLER_CORRECTED,
     /** The seller asked Reviewnary to keep a correction in mind for similar cases («다음에도 참고»). */
-    SELLER_GUIDANCE_RECORDED
+    SELLER_GUIDANCE_RECORDED,
+    /**
+     * The seller's own standing rule for this problem decided the recommendation, so no model was asked
+     * (Seller-declared Operations Policy v1). Provenance names the policy, its revision, its scope and the
+     * {@code aspect:problem} key it matched — never the seller's sentence and never the customer's.
+     *
+     * <p>Distinct from {@link #SELLER_CORRECTED}, which is the seller disagreeing with ONE case after the fact.
+     * This is a rule they declared in advance, applied before the fact.
+     */
+    POLICY_APPLIED,
+    /**
+     * The seller changed or retired a standing rule, and this open case was re-decided under it.
+     *
+     * <p>Only matching open cases are re-decided and only deterministically: see
+     * {@code OperationsPolicyRedecider}. A closed case is never reopened by a rule change — what was decided was
+     * decided under the revision the trail records.
+     */
+    POLICY_REDECIDED
 }

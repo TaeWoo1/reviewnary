@@ -107,6 +107,9 @@ public class OperationsCaseProcessor {
 
     private com.sellerops.proactive.ProactiveReviewInvestigator reviewInvestigator;
 
+    /** The seller's own standing rules, or null in a context that has none. See {@link #setPolicyOverlay}. */
+    private com.sellerops.operationspolicy.SellerPolicyOverlay policyOverlay;
+
     private ProactiveCaseRepository legacyCases;
 
     /**
@@ -157,6 +160,21 @@ public class OperationsCaseProcessor {
         this.resolutions = resolutions;
     }
 
+    /**
+     * <b>The seller's own standing rules</b> — Seller-declared Operations Policy v1.
+     *
+     * <p>Consulted in exactly one place ({@link #applyPolicy}) and only for work the RULE could not settle, so it
+     * can never contradict a rule: a case the rating already closed never reaches the overlay. Where it matches,
+     * the seller's rule takes the place of the model's recommendation — the same slot, decided deterministically
+     * and with no vendor call.
+     *
+     * <p>Optional like the two collaborators above: absent, every case is decided exactly as it was before.
+     */
+    @Autowired(required = false)
+    public void setPolicyOverlay(com.sellerops.operationspolicy.SellerPolicyOverlay policyOverlay) {
+        this.policyOverlay = policyOverlay;
+    }
+
     @Autowired(required = false)
     void setMarketplaceTargets(List<com.sellerops.responsibility.aside.AsideMarketplaceTarget> resolvers) {
         this.marketplaceTargets = com.sellerops.responsibility.aside.AsideMarketplaceTarget.firstOf(resolvers);
@@ -198,10 +216,14 @@ public class OperationsCaseProcessor {
     }
 
     /** What one pass did. Counts only. */
+    /**
+     * @param policyDecided cases the seller's own standing rule decided, so no model was asked
+     *                      (Seller-declared Operations Policy v1)
+     */
     public record Report(int reconciledActed, int reconciledClosed, int unchanged, int opened, int updated,
-                         int ruleDecided, int investigated, int investigationFailed, int investigationSkipped,
-                         int deferred, int draftsPrepared, int gapsOpened, int gapsRepeated, int gapsRecovered,
-                         int blocked) {
+                         int ruleDecided, int policyDecided, int investigated, int investigationFailed,
+                         int investigationSkipped, int deferred, int draftsPrepared, int gapsOpened,
+                         int gapsRepeated, int gapsRecovered, int blocked) {
     }
 
     private static final class Counters {
@@ -211,6 +233,7 @@ public class OperationsCaseProcessor {
         int opened;
         int updated;
         int ruleDecided;
+        int policyDecided;
         int investigated;
         int failed;
         int skipped;
@@ -225,8 +248,8 @@ public class OperationsCaseProcessor {
         int investigationsStarted;
 
         Report report() {
-            return new Report(acted, closed, unchanged, opened, updated, ruleDecided, investigated, failed, skipped,
-                    deferred, drafts, gapsOpened, gapsRepeated, gapsRecovered, blocked);
+            return new Report(acted, closed, unchanged, opened, updated, ruleDecided, policyDecided, investigated,
+                    failed, skipped, deferred, drafts, gapsOpened, gapsRepeated, gapsRecovered, blocked);
         }
     }
 
@@ -247,12 +270,14 @@ public class OperationsCaseProcessor {
         observeGaps(run, k);
         discover(run, responsibility, stop, k);
         Report report = k.report();
-        log.info("responsibility cases run={} 재확인(판매자조치/종료)={}/{} 변화없음={} 새Case={} 갱신={} 규칙={} 조사={} "
-                        + "조사실패={} 조사생략={} 다음run으로={} 초안={} 장애열림={} 장애반복={} 장애복구={} 인계받음={}",
+        log.info("responsibility cases run={} 재확인(판매자조치/종료)={}/{} 변화없음={} 새Case={} 갱신={} 규칙={} "
+                        + "판매자기준={} 조사={} 조사실패={} 조사생략={} 다음run으로={} 초안={} 장애열림={} 장애반복={} "
+                        + "장애복구={} 인계받음={}",
                 runId, report.reconciledActed(), report.reconciledClosed(), report.unchanged(), report.opened(),
-                report.updated(), report.ruleDecided(), report.investigated(), report.investigationFailed(),
-                report.investigationSkipped(), report.deferred(), report.draftsPrepared(), report.gapsOpened(),
-                report.gapsRepeated(), report.gapsRecovered(), k.handedOff);
+                report.updated(), report.ruleDecided(), report.policyDecided(), report.investigated(),
+                report.investigationFailed(), report.investigationSkipped(), report.deferred(),
+                report.draftsPrepared(), report.gapsOpened(), report.gapsRepeated(), report.gapsRecovered(),
+                k.handedOff);
         return report;
     }
 
@@ -555,6 +580,14 @@ public class OperationsCaseProcessor {
             k.ruleDecided++;
             return;
         }
+        // <b>The seller's own standing rule, after the rule and before any model</b> (Seller-declared Operations
+        // Policy v1). It is asked here and nowhere else: only work the rating could not settle reaches this line,
+        // so a policy can never contradict a rule — and where it answers, the model is not asked at all.
+        if (applyPolicy(saved, run.getId())) {
+            k.policyDecided++;
+            cases.saveAndFlush(saved);
+            return;
+        }
         if (!investigate) {
             event(saved, run.getId(), CaseEventActor.SYSTEM, CaseEventKind.INVESTIGATION_SKIPPED,
                     Map.of("outcome", "CAPABILITY_OFF"));
@@ -689,6 +722,65 @@ public class OperationsCaseProcessor {
      * <p>{@code summary} is left alone for the same reason. It is where the investigation puts what it concluded,
      * and duplicating the recommendation's first clause into it would show the seller one fact twice.
      */
+    /**
+     * <b>Apply the seller's own standing rule to one case, or leave it untouched.</b>
+     *
+     * <p>Seller-declared Operations Policy v1, and the ONLY place a policy touches a case. Called after the rules
+     * handed the case off and before the model is asked, so:
+     *
+     * <ul>
+     *   <li><b>It cannot contradict a rule.</b> A case the rating settled ({@code AUTO_RESOLVED} /
+     *   {@code MONITORING}) returned from {@link #handle} before this line. Only work the rule could not settle
+     *   is offered to the overlay.</li>
+     *   <li><b>It cannot weaken a fence.</b> The disposition stays {@code NEEDS_DECISION} and the authority stays
+     *   {@code HUMAN} — both were set above and neither is written here. {@code OperationsPolicyFence} refuses an
+     *   AUTO action at write time, so there is no stored policy whose action could want them lowered, and this
+     *   method does not have the code to lower them if there were. It closes nothing, approves nothing, mints
+     *   nothing and sends nothing.</li>
+     *   <li><b>It changes handling only.</b> One field: {@code recommendedActionType}. The triage tier, the
+     *   queue's ordering, {@code review.reply_state} and the {@code KnowledgeAuthority} ranks are not reachable
+     *   from here — this class has no caller for any of them.</li>
+     * </ul>
+     *
+     * <p><b>{@code decidedBy} becomes {@code SELLER}</b>, which is what V129 added the third value for: a case
+     * the seller pre-decided used to read as {@code RULE}, indistinguishable from one the rating settled. The
+     * {@code POLICY_APPLIED} event carries the policy id, its revision, its scope and the problem key it matched,
+     * so «왜 이렇게 추천됐나» is answerable a year later even after the rule has been revised twice.
+     *
+     * <p><b>No evidence count, no confidence, no draft.</b> The seller's rule is not an investigation and must not
+     * borrow its furniture: a confidence on a case nobody investigated would be a number with no measurement
+     * behind it, and {@code evidenceCount} stays whatever the repeat-issue reading already put there.
+     *
+     * <p><b>Public for one caller.</b> {@code OperationsPolicyRedecider} runs the same method when a rule changes,
+     * so a card re-decided from the settings screen and one decided during a run are decided by the same code.
+     * A second expression of «what does this rule do to a case» is how the two would come to disagree.
+     *
+     * @return true when a policy decided this case, so the caller skips the investigation
+     */
+    public boolean applyPolicy(OperationsCase c, UUID runId) {
+        if (policyOverlay == null || c.getSubjectKind() != OperationsSubjectKind.REVIEW) {
+            return false;
+        }
+        Optional<com.sellerops.operationspolicy.SellerPolicyOverlay.Applied> found =
+                policyOverlay.forReview(c.getOrgId(), c.getSubjectId(), c.getProductId());
+        if (found.isEmpty()) {
+            return false;
+        }
+        com.sellerops.operationspolicy.SellerPolicyOverlay.Applied policy = found.get();
+        c.setRecommendedActionType(policy.action());
+        c.setRequiredAuthority(policy.action().authority());
+        c.setDecidedBy(CaseDecider.SELLER);
+        c.setPreparedAction(CasePreparedAction.RECOMMENDATION_ONLY);
+        Map<String, Object> provenance = new LinkedHashMap<>();
+        provenance.put("policyId", policy.policyId());
+        provenance.put("policyVersion", policy.version());
+        provenance.put("scope", policy.scope().name());
+        provenance.put("problem", policy.problem());
+        provenance.put("action", policy.action().name());
+        event(c, runId, CaseEventActor.SELLER, CaseEventKind.POLICY_APPLIED, provenance);
+        return true;
+    }
+
     private void prepareReviewRecommendation(OperationsCase c, OperationsSubjectKind kind,
                                              OperationsCaseRules.Conclusion conclusion, Review review, UUID orgId) {
         if (kind != OperationsSubjectKind.REVIEW || review == null || reviewInvestigator == null

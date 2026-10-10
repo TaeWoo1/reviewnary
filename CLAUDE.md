@@ -236,6 +236,7 @@ but not carrying current truth on its own (`docs/archive/` especially).
 - `docs/sellerops_local_to_pilot_connectivity_decision.md` — Decision — SellerOps Local-to-Pilot Connectivity (NAVER egress IP · Cafe24 callback)
 - `docs/sellerops_operator_graph_v1.md` — SellerOps Operator Graph v1 — 구현 계약 (정본)
 - `docs/sellerops_operator_graph_v2.md` — SellerOps Operator Graph v2 — 제품 행동 계약 · 구현 계약 (정본)
+- `docs/seller_declared_operations_policy_v1.md` — Seller-declared Operations Policy v1 — 판매자가 정한 처리 기준이 다음 판단에 들어간다
 - `docs/service_readiness_v1.md` — Service Readiness v1 — contract
 
 ### Inquiry lane
