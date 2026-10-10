@@ -7,6 +7,7 @@ import com.sellerops.connector.DataType;
 import com.sellerops.connector.FetchPage;
 import com.sellerops.ingest.canonical.CanonicalOrder;
 import com.sellerops.ingest.canonical.CanonicalOrderSummary;
+import com.sellerops.ingest.canonical.ChannelProductRef;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -157,9 +158,9 @@ public class NaverOrdersClient {
 
         LastChangedData page = lastChangedStatuses(accessToken, cursor);
         CountablePage countable = selectCountable(cursor, page.items(), page.more());
-        Map<String, Long> amounts = countable.items().isEmpty()
+        Map<String, OrderDetail> amounts = countable.items().isEmpty()
                 ? Map.of()
-                : detailAmounts(accessToken, countable.productOrderIds());
+                : details(accessToken, countable.productOrderIds());
 
         Map<String, NaverOrdersCursor.DayTotal> merged =
                 mergeTotals(cursor.dayTotals(), countable.items(), amounts);
@@ -323,6 +324,11 @@ public class NaverOrdersClient {
         return new ArrayList<>(union);
     }
 
+    /** An identifier that arrived empty is an identifier the channel did not give. */
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
     private static Instant parseInstantOrNull(String timestamp) {
         if (timestamp == null || timestamp.isBlank()) {
             return null;
@@ -375,8 +381,18 @@ public class NaverOrdersClient {
 
     // --- call 2: product-orders/query (batched) ---
 
-    private Map<String, Long> detailAmounts(String accessToken, List<String> productOrderIds) {
-        Map<String, Long> amounts = new LinkedHashMap<>();
+    /**
+     * What one product order's detail response tells us — the amount, and the channel product number
+     * when the response carries one.
+     *
+     * <p>Two values rather than two maps so a caller cannot have the amount of one product order and
+     * the product of another; the pair is keyed once, by {@code productOrderId}.
+     */
+    record OrderDetail(long paymentAmount, String channelProductNo) {
+    }
+
+    private Map<String, OrderDetail> details(String accessToken, List<String> productOrderIds) {
+        Map<String, OrderDetail> amounts = new LinkedHashMap<>();
         for (int from = 0; from < productOrderIds.size(); from += detailBatchSize) {
             List<String> batch = productOrderIds.subList(from,
                     Math.min(from + detailBatchSize, productOrderIds.size()));
@@ -400,7 +416,8 @@ public class NaverOrdersClient {
                     throw new IllegalStateException(
                             "네이버 주문 상세 응답에 결제 금액(initialPaymentAmount)이 없습니다.");
                 }
-                amounts.put(po.productOrderId(), po.initialPaymentAmount());
+                amounts.put(po.productOrderId(),
+                        new OrderDetail(po.initialPaymentAmount(), blankToNull(po.productId())));
             }
         }
         return amounts;
@@ -418,14 +435,14 @@ public class NaverOrdersClient {
 
     private Map<String, NaverOrdersCursor.DayTotal> mergeTotals(
             Map<String, NaverOrdersCursor.DayTotal> carried,
-            List<LastChangeStatus> countableItems, Map<String, Long> amounts) {
+            List<LastChangeStatus> countableItems, Map<String, OrderDetail> amounts) {
         Map<String, NaverOrdersCursor.DayTotal> merged = new TreeMap<>(carried);
         for (LastChangeStatus item : countableItems) {
-            Long amount = amounts.get(item.productOrderId());
-            if (amount == null) {
+            OrderDetail detail = amounts.get(item.productOrderId());
+            if (detail == null) {
                 throw new IllegalStateException("네이버 주문 상세 응답에 누락된 상품주문이 있습니다.");
             }
-            merged.merge(summaryDate(item), new NaverOrdersCursor.DayTotal(1, amount),
+            merged.merge(summaryDate(item), new NaverOrdersCursor.DayTotal(1, detail.paymentAmount()),
                     (total, one) -> total.plus(one.orders(), one.amount()));
         }
         return merged;
@@ -467,12 +484,13 @@ public class NaverOrdersClient {
      * product order carries only fields the API returns (id, parent id, raw status, amount, payment
      * and status-change times) keyed to the same KST summary date; buyer PII is never read here.
      */
-    private static List<CanonicalOrder> perOrderRecords(List<LastChangeStatus> items, Map<String, Long> amounts) {
+    private static List<CanonicalOrder> perOrderRecords(List<LastChangeStatus> items,
+                                                        Map<String, OrderDetail> amounts) {
         List<CanonicalOrder> out = new ArrayList<>();
         int row = 1;
         for (LastChangeStatus item : items) {
-            Long amount = amounts.get(item.productOrderId());
-            if (amount == null) {
+            OrderDetail detail = amounts.get(item.productOrderId());
+            if (detail == null) {
                 // Same invariant the daily merge enforces: no truthful record without the amount.
                 throw new IllegalStateException("네이버 주문 상세 응답에 누락된 상품주문이 있습니다.");
             }
@@ -486,11 +504,15 @@ public class NaverOrdersClient {
                     item.productOrderId(),
                     item.orderId(),
                     rawStatus,
-                    amount,
+                    detail.paymentAmount(),
                     LocalDate.parse(summaryDate(item)),
                     parseInstantOrNull(item.paymentDate()),
                     parseInstantOrNull(item.lastChangedDate()),
-                    row++));
+                    row++,
+                    // At most one — a NAVER row IS one product order. An absent field yields an empty
+                    // list, which ingestion reads as "the channel named no product", not as an error.
+                    detail.channelProductNo() == null ? List.of()
+                            : List.of(ChannelProductRef.of(detail.channelProductNo()))));
         }
         return out;
     }
@@ -666,9 +688,26 @@ public class NaverOrdersClient {
     record DetailItem(DetailProductOrder productOrder) {
     }
 
-    /** Amount basis: initialPaymentAmount (totalPaymentAmount is deprecated — do not add). */
+    /**
+     * Amount basis: initialPaymentAmount (totalPaymentAmount is deprecated — do not add).
+     *
+     * <p><b>{@code productId} is the channel product number</b> (Order Context Foundation v1, D1) —
+     * the same identifier space {@code channel_products.external_product_id} holds for NAVER, which is
+     * {@code channelProductNo} from {@code GET /v2/products/search}. Projecting it costs no extra
+     * request: this response is already fetched for the amount and the rest of it was discarded.
+     *
+     * <p>It is {@code String} rather than {@code Long} because it is an identifier, not a number — no
+     * arithmetic is done on it, it is compared verbatim, and a channel that pads or prefixes one day
+     * would silently lose information through a numeric binding. Jackson coerces a JSON number to
+     * String, so both wire forms bind.
+     *
+     * <p><b>If the field is not there, this is null — and null is safe here.</b> Null means no
+     * identifier, no identifier means no reference, no reference means no attribution
+     * ({@code ChannelProductRef}). See {@code ChannelProductRefSource.NAVER_PRODUCT_ORDER_QUERY} for
+     * what is and is not confirmed about the field's presence.
+     */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record DetailProductOrder(String productOrderId, Long initialPaymentAmount) {
+    record DetailProductOrder(String productOrderId, Long initialPaymentAmount, String productId) {
     }
 
     /** Internal pair: one page of changed orders plus its continuation block. */

@@ -6,6 +6,7 @@ import com.sellerops.common.ApiException;
 import com.sellerops.coverage.ChannelDataState;
 import com.sellerops.inquiry.Inquiry;
 import com.sellerops.inquiry.InquiryRepository;
+import com.sellerops.order.dto.OrderLineProductView;
 import com.sellerops.order.dto.OrderLineView;
 import com.sellerops.order.dto.OrderLinkedInquiryView;
 import com.sellerops.order.dto.OrderRecordDetailResponse;
@@ -66,6 +67,54 @@ public class OrderRecordDetailService {
         this.freshness = freshness;
     }
 
+    /**
+     * 주문의 상품 참조 저장소 (Order Context Foundation v1, D1).
+     *
+     * <p>optional인 것이 정직한 모양이다 — 이 상세는 상품 참조 없이 완전했고, 배선하지 않은 context는
+     * 모든 줄의 상품 목록이 비어 있는 제품, 즉 이 arc 이전의 제품이다.
+     */
+    private ChannelOrderProductRepository orderProducts;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setOrderProducts(ChannelOrderProductRepository orderProducts) {
+        this.orderProducts = orderProducts;
+    }
+
+    /**
+     * 이 결제 단위의 모든 줄에 대한 상품 참조 — 줄 id로 묶어서 <b>쿼리 두 번</b>.
+     *
+     * <p>줄마다 읽으면 열세 줄짜리 주문이 열세 번(+이름 열세 번) 읽는다. 상태 이력과 문의가 같은 이유로
+     * 이미 배치로 읽고 있고, 세 번째가 혼자 다른 규칙을 쓸 이유가 없다.
+     */
+    private Map<UUID, List<OrderLineProductView>> productsOf(UUID orgId, List<ChannelOrder> lines) {
+        if (orderProducts == null) {
+            return Map.of();
+        }
+        List<ChannelOrderProduct> refs = orderProducts.findByOrgIdAndChannelOrderIdIn(
+                orgId, lines.stream().map(ChannelOrder::getId).toList());
+        if (refs.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> bound = refs.stream().map(ChannelOrderProduct::getProductId)
+                .filter(java.util.Objects::nonNull).distinct().toList();
+        Map<UUID, String> names = new HashMap<>();
+        if (!bound.isEmpty()) {
+            // 이름은 canonical 상품의 것이다. org를 조건에 두는 것은 이 service의 다른 읽기와 같은
+            // 규칙이고, 연결이 다른 org의 상품을 가리킬 수 없다는 두 번째 울타리다.
+            for (Product product : products.findAllByOrgIdAndIdIn(orgId, bound)) {
+                names.put(product.getId(), product.getName());
+            }
+        }
+        Map<UUID, List<OrderLineProductView>> out = new HashMap<>();
+        for (ChannelOrderProduct ref : refs) {
+            out.computeIfAbsent(ref.getChannelOrderId(), k -> new ArrayList<>())
+                    .add(new OrderLineProductView(ref.getExternalProductId(), ref.getProductId(),
+                            ref.getProductId() == null ? null : names.get(ref.getProductId()),
+                            ref.getRefSource().name(), ref.getBoundAt()));
+        }
+        return out;
+    }
+
     /** 이 org의, 이 채널의, 이 계정의, 이 번호의 결제 단위. 넷 중 하나라도 어긋나면 404. */
     @Transactional(readOnly = true)
     public OrderRecordDetailResponse detail(UUID orgId, String channelCode, UUID accountId,
@@ -88,6 +137,7 @@ public class OrderRecordDetailService {
         Instant lastSeenAt = null;
         LinkedHashSet<String> codes = new LinkedHashSet<>();
         List<OrderLineView> lineViews = new ArrayList<>(lines.size());
+        Map<UUID, List<OrderLineProductView>> lineProducts = productsOf(orgId, lines);
         for (ChannelOrder line : lines) {
             total += line.getPaymentAmount();
             paidAt = later(paidAt, line.getPaidAt());
@@ -96,7 +146,8 @@ public class OrderRecordDetailService {
             lineViews.add(new OrderLineView(line.getExternalOrderId(), line.getPaymentAmount(),
                     line.getRawStatusCode(),
                     ChannelOrderStatusVocabulary.labelKo(channelCode, line.getRawStatusCode()),
-                    line.getPaidAt()));
+                    line.getPaidAt(),
+                    lineProducts.getOrDefault(line.getId(), List.of())));
         }
         // 줄마다 코드가 다르면 결제 단위에는 하나의 상태가 없다 — 한 줄의 코드를 올려 적으면 일부만
         // 취소된 주문이 취소되지 않은 주문으로 읽힌다. 목록이 같은 규칙을 쓴다.

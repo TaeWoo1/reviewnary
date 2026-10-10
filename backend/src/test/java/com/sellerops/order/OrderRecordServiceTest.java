@@ -19,7 +19,9 @@ import com.sellerops.selleraccount.SellerAccount;
 import com.sellerops.selleraccount.SellerAccountRepository;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -138,13 +140,24 @@ class OrderRecordServiceTest {
     }
 
     @Test
-    @DisplayName("PAYED만 우리 말이 붙고, 쿠팡 raw 코드는 번역되지 않는다")
+    @DisplayName("뜻을 확인한 코드에만 우리 말이 붙는다 — 쿠팡 여섯 중 넷")
     void onlyConfirmedCodesAreTranslated() {
+        // 2026-10-10(Order Context Foundation v1, D2)에 이 테스트가 다시 쓰였다. 그 전에는 「쿠팡 raw
+        // 코드는 번역되지 않는다」를 고정했고, 어휘표가 관측과 계약을 둘 다 얻는 날 깨지도록 되어
+        // 있었다 — 그리고 깨졌다. 규율은 그대로다: 번역되는 것은 확인된 것뿐이고, 확인되지 않은 둘은
+        // 여전히 raw로 남는다. 어느 코드가 왜 확인되었는지는 ChannelOrderStatusVocabularyTest의 것이고,
+        // 여기서는 목록 화면이 그 표를 지나간다는 것만 본다.
         seed(org, naverChannel, naverAccount, "N-1", "PAY-N", "PAYED", 1000L, "2026-09-30T01:00:00Z");
-        List<String> coupang = List.of(
-                "ACCEPT", "INSTRUCT", "DEPARTURE", "DELIVERING", "FINAL_DELIVERY", "NONE_TRACKING");
-        for (int i = 0; i < coupang.size(); i++) {
-            seed(org, coupangChannel, coupangAccount, "C-" + i, "PAY-C-" + i, coupang.get(i), 1000L,
+        Map<String, String> coupang = new LinkedHashMap<>();
+        coupang.put("ACCEPT", "결제 완료");
+        coupang.put("INSTRUCT", "발송 준비 중");
+        coupang.put("DELIVERING", "배송 중");
+        coupang.put("FINAL_DELIVERY", "배송 완료");
+        coupang.put("DEPARTURE", null);
+        coupang.put("NONE_TRACKING", null);
+        List<String> codes = List.copyOf(coupang.keySet());
+        for (int i = 0; i < codes.size(); i++) {
+            seed(org, coupangChannel, coupangAccount, "C-" + i, "PAY-C-" + i, codes.get(i), 1000L,
                     "2026-09-0" + (i + 1) + "T01:00:00Z");
         }
 
@@ -156,10 +169,10 @@ class OrderRecordServiceTest {
         assertThat(naver.confirmedStatusLabelKo()).isEqualTo("결제 완료");
         for (OrderRecordRow row : rows.stream().filter(r -> coupangCode.equals(r.channelCode())).toList()) {
             assertThat(row.confirmedStatusLabelKo())
-                    .as("%s — 뜻을 확인하지 않은 코드는 번역되지 않고 화면이 raw 값을 그대로 쓴다",
+                    .as("%s — 확인되지 않은 코드는 번역되지 않고 화면이 raw 값을 그대로 쓴다",
                             row.rawStatusCode())
-                    .isNull();
-            assertThat(row.rawStatusCode()).isIn(coupang);
+                    .isEqualTo(coupang.get(row.rawStatusCode()));
+            assertThat(row.rawStatusCode()).isIn(codes);
             assertThat(row.statusVaries()).isFalse();
         }
     }

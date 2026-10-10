@@ -117,24 +117,37 @@ class OrderRecordDetailServiceTest {
     }
 
     @Test
-    @DisplayName("쿠팡이 보낸 코드는 번역되지 않는다 — 같은 PAYED라도")
-    void coupangCodesAreNeverTranslated() {
+    @DisplayName("확인된 쿠팡 코드는 자기 축만 말하고, 확인되지 않은 코드와 남의 채널 글자는 아무 말도 하지 않는다")
+    void coupangCodesSpeakOnlyForTheirOwnAxis() {
+        // 2026-10-10(D2)에 다시 쓰였다. 그 전에는 「쿠팡이 보낸 코드는 번역되지 않는다」였다.
         seed(org, coupangChannel, coupangAccount, "C-1", "CPAY-1", "DELIVERING", 11000L,
                 "2026-08-21T15:53:00Z");
         seed(org, coupangChannel, coupangAccount, "C-2", "CPAY-2", "PAYED", 11000L,
                 "2026-08-21T15:53:00Z");
+        seed(org, coupangChannel, coupangAccount, "C-3", "CPAY-3", "DEPARTURE", 11000L,
+                "2026-08-21T15:53:00Z");
 
         OrderRecordDetailResponse delivering = service().detail(org, "COUPANG", coupangAccount, "CPAY-1");
         assertThat(delivering.rawStatusCode()).isEqualTo("DELIVERING");
-        assertThat(delivering.paymentLabelKo()).isNull();
-        assertThat(delivering.cancellationLabelKo()).isNull();
-        assertThat(delivering.fulfillmentLabelKo()).isNull();
-        assertThat(delivering.lines().get(0).confirmedStatusLabelKo()).isNull();
+        assertThat(delivering.fulfillmentLabelKo()).isEqualTo("배송 중");
+        assertThat(delivering.paymentLabelKo())
+                .as("발송 코드가 결제를 증명하지 않는다 — 세 축을 나눠 둔 이유가 여기서 보인다")
+                .isNull();
+        assertThat(delivering.cancellationLabelKo())
+                .as("저장된 어떤 코드도 「취소되지 않았습니다」를 증명하지 못한다")
+                .isNull();
+        assertThat(delivering.lines().get(0).confirmedStatusLabelKo()).isEqualTo("배송 중");
 
         OrderRecordDetailResponse payed = service().detail(org, "COUPANG", coupangAccount, "CPAY-2");
         assertThat(payed.paymentLabelKo())
-                .as("글자가 같다는 것은 확인이 아니다 — 확인의 단위는 (채널, 코드)다")
+                .as("글자가 같다는 것은 확인이 아니다 — PAYED는 NAVER의 말이다")
                 .isNull();
+
+        OrderRecordDetailResponse departure = service().detail(org, "COUPANG", coupangAccount, "CPAY-3");
+        assertThat(departure.fulfillmentLabelKo())
+                .as("공식 문서의 영문판과 한국어판이 다르게 말하는 코드는 확인된 것이 아니다")
+                .isNull();
+        assertThat(departure.lines().get(0).confirmedStatusLabelKo()).isNull();
     }
 
     @Test
@@ -186,12 +199,13 @@ class OrderRecordDetailServiceTest {
         assertThat(coupang).extracting(OrderStatusEventView::toStatusCode)
                 .as("오래된 순")
                 .containsExactly("ACCEPT", "INSTRUCT");
-        assertThat(coupang).allSatisfy(e -> {
-            assertThat(e.observedAt())
-                    .as("채널이 변경 시각을 주지 않았다 — 기록한 시각을 그 자리에 적지 않는다")
-                    .isNull();
-            assertThat(e.toLabelKo()).isNull();
-        });
+        assertThat(coupang).allSatisfy(e -> assertThat(e.observedAt())
+                .as("채널이 변경 시각을 주지 않았다 — 기록한 시각을 그 자리에 적지 않는다 (D3)")
+                .isNull());
+        // 뜻이 확인된 뒤에도 시각은 생기지 않는다. 이 둘이 독립이라는 것이 D2와 D3이 다른 결정인
+        // 이유다 — 코드의 뜻을 알게 된 것과 그 일이 언제 일어났는지를 아는 것은 다른 사실이다.
+        assertThat(coupang).extracting(OrderStatusEventView::toLabelKo)
+                .containsExactly("결제 완료", "발송 준비 중");
     }
 
     @Test
