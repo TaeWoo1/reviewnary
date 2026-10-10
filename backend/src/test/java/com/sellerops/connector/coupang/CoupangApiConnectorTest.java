@@ -301,6 +301,46 @@ class CoupangApiConnectorTest {
     }
 
     @Test
+    void theWireShapeObserverIsOffByDefaultAndChangesNothingWhenOn() throws Exception {
+        // Two claims. First, the default-off one: the constructor the configuration uses without the flag
+        // is the one every other test in this file uses, so "off" is simply the whole suite. Second, and
+        // the one worth a test: with the flag ON the collected orders are identical. An observation that
+        // can change what is collected is not an observation — and this path parses the body a second
+        // time, so "identical" is a claim about more than a boolean.
+        storeCoupangCredential();
+        String data = "{\"shipmentBoxId\":100001,\"orderId\":5001,\"status\":\"FINAL_DELIVERY\""
+                + ",\"orderedAt\":\"2026-08-05T10:00:00+09:00\",\"paidAt\":\"2026-08-05T10:01:00+09:00\""
+                + ",\"orderItems\":[{\"orderPrice\":12000,\"sellerProductId\":\"15478536542\"}]}";
+        String body = "{\"code\":200,\"message\":\"OK\",\"data\":[" + data + "],\"nextToken\":null}";
+
+        http.enqueue(json(200, body));
+        enqueueRemainingStatusesEmpty(1);
+        List<CanonicalOrder> withoutObserver = connector.fetch(request(DataType.ORDER_SUMMARY))
+                .orders().stream().map(CanonicalOrder.class::cast).toList();
+
+        FakeCoupangHttpClient observedHttp = new FakeCoupangHttpClient();
+        CoupangOrdersClient observing = new CoupangOrdersClient(
+                observedHttp, new CoupangSigner(clock), clock, "https://api-gateway.coupang.com",
+                TEST_APPROVAL_ID, "", true);
+        CoupangApiConnector observingConnector = new CoupangApiConnector(
+                observing,
+                new CoupangInquiriesClient(observedHttp, new CoupangSigner(clock), clock,
+                        "https://api-gateway.coupang.com", TEST_APPROVAL_ID, millis -> { }),
+                vault);
+        observedHttp.enqueue(json(200, body));
+        for (int i = 1; i < CoupangOrdersClient.STATUSES.size(); i++) {
+            observedHttp.enqueue(json(200, emptyPage()));
+        }
+        List<CanonicalOrder> withObserver = observingConnector.fetch(request(DataType.ORDER_SUMMARY))
+                .orders().stream().map(CanonicalOrder.class::cast).toList();
+
+        assertThat(withObserver).isEqualTo(withoutObserver);
+        assertThat(observedHttp.sent)
+                .as("observing costs no extra request — it reads the body already in hand")
+                .hasSameSizeAs(http.sent);
+    }
+
+    @Test
     void projectsEverySellerProductIdInTheShipmentBox() {
         // A shipment box may name several products, and sellerProductId is the identifier
         // channel_products.external_product_id already holds for Coupang — so the two sides of the

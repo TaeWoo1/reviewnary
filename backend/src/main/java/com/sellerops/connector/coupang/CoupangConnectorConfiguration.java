@@ -40,13 +40,24 @@ public class CoupangConnectorConfiguration {
             @Value("${sellerops.connector.coupang.base-url:https://api-gateway.coupang.com}") String baseUrl,
             @Value("${sellerops.connector.coupang.live-approval-id:}") String liveApprovalId,
             @Value("${sellerops.self-pilot.enabled:false}") boolean selfPilotEnabled,
-            @Value("${sellerops.self-pilot.read-grant-id:}") String standingReadGrantId) {
+            @Value("${sellerops.self-pilot.read-grant-id:}") String standingReadGrantId,
+            @Value("${sellerops.connector.coupang.order-wire-shape:false}") boolean observeWireShape) {
         // liveApprovalId arms the backend live-call interlock (CoupangLiveCallGuard). Empty by default →
         // a real-gateway call fails closed; an operator-approved run injects the bootstrapped id. The
         // Self-Pilot standing READ grant is the second key for this READ-only client (never for a write);
         // its shape is validated at boot by SelfPilotProperties, read here as the same property.
+        //
+        // The order wire-shape observer is its own flag, separate from the product one, because the two
+        // are two observations with two key lists and turning on the one you are not running costs a
+        // parse per page for nothing. It records key names, kinds and counts — never a value
+        // (CoupangWireShapeObserver). Off unless a deployment turns it on for a specific observation:
+        // instrumentation that stays armed by default is instrumentation nobody decided to run.
+        if (observeWireShape) {
+            LoggerFactory.getLogger(CoupangConnectorConfiguration.class)
+                    .warn("Coupang 주문 wire-shape 관측이 켜져 있습니다 (키 이름·종류·개수만 기록, 값 없음).");
+        }
         return new CoupangOrdersClient(http, signer, Clock.systemUTC(), baseUrl, liveApprovalId,
-                effectiveReadGrant(selfPilotEnabled, standingReadGrantId));
+                effectiveReadGrant(selfPilotEnabled, standingReadGrantId), observeWireShape);
     }
 
     /**
