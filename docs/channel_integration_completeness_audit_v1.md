@@ -203,7 +203,7 @@ only (`returnShippingCenters`, `ordersheets`), no secret/PII/provider-body leaka
 ### 5.3 Why the audit missed it
 
 The audit deferred to §4.1 for capability truth, exactly as its own rules require. But §4.1's Coupang
-`ORDER_SUMMARY` row cited **`docs/sellerops_phase3d_completion_summary.md` §3** — an *archived* phase
+`ORDER_SUMMARY` row cited **`docs/archive/sellerops_phase3d_completion_summary.md` §3** — an *archived* phase
 document from the connector-skeleton era — and had never been updated. Deferring to a canonical row is
 correct; the row was stale.
 

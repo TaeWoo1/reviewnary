@@ -2,7 +2,7 @@
 
 > **Status: IMPLEMENTED 2026-08-21 — product runtime semantics SUPERSEDED by
 > `docs/sellerops_operator_graph_v2.md` (2026-08-21).** 이 문서는 **삭제되지 않는다**: 여기 기록된
-> 구현·라이브 통합 증명(§14a·§17, `docs/operator_graph_v1_local_integration_proof.md`)은 계속 유효한
+> 구현·라이브 통합 증명(§14a·§17, `docs/archive/2026-q3/operator_graph_v1_local_integration_proof.md`)은 계속 유효한
 > 증거이고, Evidence·Judge·budget·READ-only tool 계약도 v2가 그대로 승계한다. **다만 아래 다섯 문장은
 > v2에서 무효다** — §4.1 "planner 실패 시 keyword router가 답한다", §8의 catalogue 전량 인가,
 > §13 층2의 결정론 planner 층, §14 "데모 4문항 = 완료 조건", §16 blocker #3(v2 §13.2-B에서 닫혔다).
@@ -572,7 +572,7 @@ half를 port 뒤에 남겨 둔 것과 정확히 같은 방식이다.
 
 ### 라이브 통합 증명 (2026-08-21) — 실제 데이터에서 찾은 5건
 
-정본: `docs/operator_graph_v1_local_integration_proof.md`. 마켓 접속 없음, 자격증명 접근 없음, WRITE 없음.
+정본: `docs/archive/2026-q3/operator_graph_v1_local_integration_proof.md`. 마켓 접속 없음, 자격증명 접근 없음, WRITE 없음.
 실제 org 하나(고객 발화 7,136건)에서 전 체인을 돌렸고 **구조적 결함 5건**이 드러나 최소 수정 + 회귀로 닫았다.
 
 | # | 결함 | 왜 실데이터에서만 보였나 | 패치 |

@@ -1,6 +1,6 @@
 # Customer Ops Product Quality Closure v1
 
-2026-09-18 · branch `feat/review-decision-workspace-v1` · follows `docs/knowledge_intelligence_closure_v1.md`
+2026-09-18 · branch `feat/review-decision-workspace-v1` · follows `docs/archive/2026-q3/knowledge_intelligence_closure_v1.md`
 
 The gap this package closes: the Knowledge Spine worked on knowledge that already sat in the database. A **new**
 production seller had almost none — so Reviewnary understood them only after they typed everything in. This package

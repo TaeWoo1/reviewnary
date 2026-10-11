@@ -37,7 +37,7 @@ topology는 `docs/pilot_host_provisioning_v1.md`와 `docs/pilot_runtime_foundati
 
 **lane 결정은 이 문서가 정정한다.** 감사 시점에 저장소는 서로 다른 두 답을 들고 있었다 —
 `deploy/pilot/pilot.env.example` 헤더 · `preflight.sh` §4 · `smoke.sh`는 **Cafe24 only(2026-09-13 결정)**,
-`docs/pilot_host_handoff_v1.md`와 `docs/pilot_first_external_seller_v1.md`(둘 다 2026-09-14)는
+`docs/archive/2026-q3/pilot_host_handoff_v1.md`와 `docs/archive/2026-q3/pilot_first_external_seller_v1.md`(둘 다 2026-09-14)는
 **Coupang 브라우저 상품평 only**. §3의 product-owner 결정이 이것을 닫는다: **Cafe24 only, Inquiry lane.**
 09-14 두 문서는 그 lane에 대해서는 더 이상 현재 계획이 아니며, 도우미 패키징·배포 절차 기술은 유효하다.
 
@@ -225,7 +225,7 @@ TLS · CORS · Cafe24 redirect URI · 번들 CSP · 도우미 패키지 스탬�
 7. **off-host backup은 첫 외부 판매자 전에 필수**(B5).
 8. **안정적인 HTTPS pilot host 하나를 canonical public host로 사용.**
 
-이 결정이 `docs/pilot_host_handoff_v1.md` · `docs/pilot_first_external_seller_v1.md`의 Coupang-first
+이 결정이 `docs/archive/2026-q3/pilot_host_handoff_v1.md` · `docs/archive/2026-q3/pilot_first_external_seller_v1.md`의 Coupang-first
 lane 선택을 대체한다. 두 문서의 도우미 패키징·전달·롤백 절차는 계속 유효하다.
 
 **결정 4·5·6의 근거**: `docs/product_truth_matrix.md`에서 **CAFE24 INQUIRY는 수집·읽기·초안·실행

@@ -79,7 +79,7 @@ The two sentences stay apart: the GMARKET workspace says 「이 채널에서는 
 «what can this org connect», the overview's channel table is built from the union, and
 `ChannelCoverageService.stateOf` stopped erasing held rows at the connection branch. A GMARKET-only
 org renders its work, keeps its connect CTA, and is told nothing about connecting GMARKET. See
-`docs/agent_native_text_first_pilot_scope_v1.md` §2 for the four questions this separated.
+`docs/archive/2026-q3/agent_native_text_first_pilot_scope_v1.md` §2 for the four questions this separated.
 
 The original finding, for the record:
 

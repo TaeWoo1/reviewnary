@@ -1,6 +1,6 @@
 # SellerOps Phase 0 — ESM+/GMARKET Gate 0 오프라인 데이터 도메인 체크리스트 (findings)
 
-`docs/sellerops_phase0_esm_live_discovery_protocol.md`(이하 Discovery Protocol)의 **Gate 0만 실행한 결과**다.
+`docs/archive/sellerops_phase0_esm_live_discovery_protocol.md`(이하 Discovery Protocol)의 **Gate 0만 실행한 결과**다.
 Gate 0은 **오프라인 공개 문서 검토**이며, ORDER_SUMMARY / REVIEW / INQUIRY 각 도메인을 `UNKNOWN`/`미확인`에서
 **문서 레벨 증거 라벨**로 끌어올린다. 라이브 접속·로그인·자격증명·브라우저·클릭·다운로드·업로드·credentialed API 호출은
 **전혀 하지 않았다.**
@@ -10,8 +10,8 @@ Gate 0은 **오프라인 공개 문서 검토**이며, ORDER_SUMMARY / REVIEW / 
 
 관련 문서(본 문서는 이들 **위에 얹는다** — 중복 정의하지 않고 참조):
 - 게이트·체크리스트 템플릿·증거 사다리: Discovery Protocol §3/§4/§7.
-- 채널별 공식 API 현황·자격증명·rate limit: `docs/sellerops_phase3d_multi_channel_adapters.md`(이하 Phase 3D) §2.3.
-- ESM+↔GMARKET 카탈로그 정합·status deferral: `docs/sellerops_phase0_esm_discovery.md`(이하 ESM Discovery) §1/§4/§9.
+- 채널별 공식 API 현황·자격증명·rate limit: `docs/archive/sellerops_phase3d_multi_channel_adapters.md`(이하 Phase 3D) §2.3.
+- ESM+↔GMARKET 카탈로그 정합·status deferral: `docs/archive/sellerops_phase0_esm_discovery.md`(이하 ESM Discovery) §1/§4/§9.
 - sanitized 출력·status 어휘: `docs/multi-channel-connector-roadmap.md`(이하 Connector Roadmap) §9/§10.
 - 약속 규칙·UI 정직성·drift guard: `docs/product-scope-v1.md`(이하 Product Scope) §5/§6/§9.
 
@@ -87,7 +87,7 @@ Discovery Protocol §4 템플릿의 셀을 **공개 문서 증거로 채운 결�
 - **미래 Gate 1/2에서 먼저 볼 도메인**: **INQUIRY 추천.** 이유 — (1) 공식 API가 문서화돼 있고, (2) `status`가
   replyStatus 신호에 직결돼 SellerOps attention 루프에 **즉시 가치**가 있으며, (3) 주문 대비 **PII 표면이 낮다.**
   그 INQUIRY Gate 1 사전 준비(허용 sanitized 관측·중단 조건·복붙 관측 양식)는
-  `docs/sellerops_phase0_esm_inquiry_gate1_readiness.md`에 정의돼 있다(Gate 1 미실행).
+  `docs/archive/sellerops_phase0_esm_inquiry_gate1_readiness.md`에 정의돼 있다(Gate 1 미실행).
 - **Gate 0에서 추론하면 안 되는 것**:
   - 어떤 도메인도 **CONFIRMED 아님** — 라이브 end-to-end 미통과.
   - 라이브 스키마·정확한 페이지네이션·날짜필터·볼륨·PII 구성을 **단정 금지**.

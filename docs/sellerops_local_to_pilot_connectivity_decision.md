@@ -33,7 +33,7 @@
   `tools/cafe24-callback`은 `/cafe24/callback`을 쓰며 — 이는 코드를 교환하지 않는 dev 수신기이므로
   **의도적으로 제품 경로와 다르다**(README에 명시; `docs/sellerops_canonical_reference.md` D18 참고).
 - **현행 라이브 증거:** Cafe24 first-connection·inquiry live proof는 **운영자의 공개 터널**로 callback을
-  수신하고 redirect_uri를 등록값과 byte-match했다(`docs/sellerops_cafe24_first_connection_tutorial_live_proof.md:13`).
+  수신하고 redirect_uri를 등록값과 byte-match했다(`docs/archive/2026-q3/sellerops_cafe24_first_connection_tutorial_live_proof.md:13`).
   NAVER 라이브 증거는 모두 **운영자 로컬 backend egress**를 테스트 앱에 수동 allow-list한 것이다.
   → 둘 다 **개발·검증 전용**이며 pilot 정본이 아니다.
 

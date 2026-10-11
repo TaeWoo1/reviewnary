@@ -717,7 +717,7 @@ writes → 409; errors/logs never echo snapshot values or tokens), and the body/
 
 ## 12. Operator pilot v1 — product/operability validation of the three intents
 
-Full report: `docs/sellerops_agent_runtime_operator_pilot_v1.md`.
+Full report: `docs/archive/2026-q3/sellerops_agent_runtime_operator_pilot_v1.md`.
 
 The three intents (inquiry / review / issue) were exercised repeatedly against the real Spring
 backend on a disposable DB, driving the exact HTTP contract the frontend `/agent` page calls (no new

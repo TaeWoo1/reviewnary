@@ -3,7 +3,7 @@
 **Status:** landed · offline unit · no live run
 **Lands:** the READ-ONLY live measurement taken on 2026-08-09 at `e8e62981`
 **Predecessors:** `docs/coupang_wing_issue_selector_calibration_landing_v2.md` (the withdrawal this closes) ·
-`docs/coupang_wing_issuance_form_reveal_v1.md` (the record it falsified)
+`docs/archive/2026-q3/coupang_wing_issuance_form_reveal_v1.md` (the record it falsified)
 
 ## What this unit is, and what it is not
 

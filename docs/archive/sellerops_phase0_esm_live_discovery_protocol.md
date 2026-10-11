@@ -8,11 +8,11 @@ ESM+/GMARKET이 SellerOps 제품 루프(주문/매출 요약·리뷰·문의)에
 > capability도 CONFIRMED로 표기하지 않는다. 컬렉터·라이브 수집·브라우저 자동화 PR이 **아니다.**
 
 관련 문서(본 문서는 이들 **위에 얹는다** — 중복 정의하지 않고 참조):
-- ESM+ 표면 검증·카탈로그 정합: `docs/sellerops_phase0_esm_discovery.md` (이하 ESM Discovery). 본 문서는 그 §8의
+- ESM+ 표면 검증·카탈로그 정합: `docs/archive/sellerops_phase0_esm_discovery.md` (이하 ESM Discovery). 본 문서는 그 §8의
   "후속 라이브 디스커버리"를 구체화한 절차다.
 - 라이브 승인 등급·sanitized 출력·status 어휘: `docs/multi-channel-connector-roadmap.md` (이하 Connector Roadmap)
   §8/§9/§10.
-- 채널별 공식 API 현황·자격증명 형상: `docs/sellerops_phase3d_multi_channel_adapters.md` (이하 Phase 3D) §2.3/§5.
+- 채널별 공식 API 현황·자격증명 형상: `docs/archive/sellerops_phase3d_multi_channel_adapters.md` (이하 Phase 3D) §2.3/§5.
 - 제품 범위·약속 규칙·drift guard: `docs/product-scope-v1.md` (이하 Product Scope) §5/§6/§9.
 - 표준 안전 모델·금지 데이터: `CLAUDE.md` §4, `collector/CLAUDE.md`.
 
@@ -95,7 +95,7 @@ Gate 0–2에서 도메인별로 다음을 sanitized로 채운다(빈칸 = 미�
 API 부재 가능성이 높아 **manual/EXPERIMENTAL부터** 출발한다(Product Scope §6).
 
 > 실행된 **Gate 0 오프라인 검토 결과**(이 표의 셀을 공개 문서 증거로 채운 버전)는
-> `docs/sellerops_phase0_esm_gate0_findings.md`에 있다. 본 §4 표는 재사용 가능한 템플릿으로 유지한다.
+> `docs/archive/sellerops_phase0_esm_gate0_findings.md`에 있다. 본 §4 표는 재사용 가능한 템플릿으로 유지한다.
 
 ## 5. 증거 로깅 정책
 
@@ -153,7 +153,7 @@ EXPORT_DATE_RANGE_REQUIRED / RECONNECT_REQUIRED 등, `collector/src/status.ts`)�
 가정한다. **행이 PII·문의 본문을 직접 노출**하는 표면(예: ESM+/GMARKET **INQUIRY 리스트** — Gate 1에서 data-bearing
 으로 확인됨)은 §6를 그대로 쓸 수 없다. 이런 표면은 **제약된 변형**을 따른다: 행 내용 스캔·스크린샷·raw HTML·값
 복사·식별자·본문 금지, **안전한 컨테이너/컨트롤의 존재 여부만** 관측(행은 개수 버킷까지만). 전체 제약 절차는
-`docs/sellerops_phase0_esm_inquiry_gate1_findings.md` §3을 참조한다(여기서 복제하지 않는다).
+`docs/archive/sellerops_phase0_esm_inquiry_gate1_findings.md` §3을 참조한다(여기서 복제하지 않는다).
 
 ## 7. 상태 모델 (evidence ladder — 문서 레벨 전용)
 

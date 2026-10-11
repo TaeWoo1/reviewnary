@@ -191,7 +191,7 @@ v2에서 추가된 규칙:
 | `channel-knowledge/naver.yaml` `naver-ops-what-api-cannot-tell` | "리뷰, **문의**, 리뷰 답변 여부를 알 수 없습니다" — 문의는 2026-08-24 라이브 검증 |
 | `InquiryReplyCapabilityRegistry` ROWS | Cafe24·NAVER 상품문의 evidence 문자열 "(구현됨, 라이브 미실행)" — **주석이 아니라 프론트로 나가는 DTO 값**이다 |
 | `ReviewTriageChannelCapability` 클래스 docblock | "Cafe24 has no reply flow built" — 같은 파일의 `replyFlowExists()`가 CAFE24에 `true`를 준다 |
-| 죽은 경로 · 잘못된 FQCN | `docs/sellerops_phase3c_live_smoke.md` → `docs/archive/…` · `Cafe24ScopeContract`는 `…cafe24.onboarding` · `CoupangChannelReplyAdapter`는 `com.sellerops.inquiry.publish` |
+| 죽은 경로 · 잘못된 FQCN | `docs/archive/sellerops_phase3c_live_smoke.md` → `docs/archive/…` · `Cafe24ScopeContract`는 `…cafe24.onboarding` · `CoupangChannelReplyAdapter`는 `com.sellerops.inquiry.publish` |
 
 ## 5-3. Grounded Conversation wiring (2026-09-08)
 

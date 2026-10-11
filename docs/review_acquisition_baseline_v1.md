@@ -89,7 +89,7 @@ NAVER·Coupang 리뷰에는 **공식 API가 없다**(`NaverApiConnector` · `Cou
 - 방식 `EXPORT(감독형) + MANUAL`. 공식 API **없음**. 구현됨 ✅. 라이브 검증 ✅
   (2026-07-15 Run 4 · 2026-07-25/26 세그먼트 · 2026-08-23 refresh PARTIAL→hardening ·
   **2026-09-02 E2E LIVE PASS**: `rows_new 115 · rows_duplicate 33 · scope MACHINE_MATCHED`,
-  `docs/naver_guided_acquisition_e2e_v1.md`). 운영 지원 ❌ (스케줄 없음, 판매자 착석 run).
+  `docs/archive/2026-q3/naver_guided_acquisition_e2e_v1.md`). 운영 지원 ❌ (스케줄 없음, 판매자 착석 run).
 - 저장 리뷰: canonical Demo Org NAVER `REAL` 4,455 (2026-09-02 기준).
 
 ### 2.2 호출 흐름 (실제 code path)

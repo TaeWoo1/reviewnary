@@ -43,7 +43,7 @@ WRITE tool은 없고, `operatorToolRegistry.test.ts`가 등록 자체를 거부�
 NAVER 두 subtype이 여전히 미구현인 이유는 결정이 아니라 **문서**다: vendored `llms.txt`는 세 답변
 엔드포인트의 method와 path**만** 싣고, 요청 본문·필요 권한·응답 의미를 담은 개별 문서는 저장소에 없으며
 이 환경에서 벤더 호스트에 접근할 수 없었다. **path만 알고 본문을 추측한 adapter는 구현이 아니므로 쓰지
-않았다.** 상세: `docs/inquiry_product_attribution_action_coverage_v1.md` §3.
+않았다.** 상세: `docs/archive/2026-q3/inquiry_product_attribution_action_coverage_v1.md` §3.
 
 **adapter 등록과 이 표는 이제 한 사실이다** — `everyRegisteredAdapterHasAnImplementedCapabilityRow`가
 둘의 불일치를 빌드에서 거부한다. 그리고 adapter 해석 자체가 채널이 아니라 **채널 × source subtype**으로
@@ -206,7 +206,7 @@ Agent 다섯 화면. 이전 패키지의 `VISUAL_QA_BLOCKED`는 해소됐다.
 `VERIFY_FIXTURE` provenance에서 수행했고, 증명 뒤 만든 행은 전부 지웠다(§8.4). **이것이 남은 가장 큰 데모
 blocker다** — 경로는 동작하고, 이 조직의 데이터가 거기 닿지 않는다.
 
-> **⚠ 2026-08-24 부분 해소 — `docs/inquiry_product_attribution_action_coverage_v1.md`.** 위 문단의
+> **⚠ 2026-08-24 부분 해소 — `docs/archive/2026-q3/inquiry_product_attribution_action_coverage_v1.md`.** 위 문단의
 > "0건"은 관측으로는 맞았지만 **원인 진단이 반쪽이었다.** ingest가 Cafe24 `product_no`를 canonical
 > `sku`로 넘겨 resolve-or-create 했고, 그 둘은 다른 키 공간이라 어긋나면 **번호로 이름 붙은 상품을
 > 만들어 냈다**(`91`·`94`·`170` — 세 번호 전부 `channel_products`에 실재하는 리스팅이었다). 정확

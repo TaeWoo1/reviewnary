@@ -72,7 +72,7 @@ Reviewnary는 그 확인과 판단 **사이의 작업**을 대신합니다. 판�
 
 실행 날짜 · 승인 id · 요청 수 · DB 델타 · 잔여 한계까지의 감사 기록:
 [`docs/evidence/INDEX.md`](docs/evidence/INDEX.md) ·
-[`docs/full_mvp_production_e2e_v1.md`](docs/full_mvp_production_e2e_v1.md).
+[`docs/archive/2026-q3/full_mvp_production_e2e_v1.md`](docs/archive/2026-q3/full_mvp_production_e2e_v1.md).
 채널 × 데이터 종류 × 방식의 단일 선언:
 [`docs/multi-channel-connector-roadmap.md`](docs/multi-channel-connector-roadmap.md) §4.1
 

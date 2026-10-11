@@ -1,6 +1,6 @@
 # Customer Ops Demo Closure v1
 
-2026-09-18 · branch `feat/review-decision-workspace-v1` · follows `docs/customer_ops_product_quality_closure_v1.md`
+2026-09-18 · branch `feat/review-decision-workspace-v1` · follows `docs/archive/2026-q3/customer_ops_product_quality_closure_v1.md`
 
 Goal: «Reviewnary knows the seller, observes customer operations, handles most work, asks only when needed, and can
 act after approval.» This document records what is built and proven offline, and the four live runs that remain —
@@ -33,7 +33,7 @@ each needs its own approval under `docs/sellerops_live_approval_contract.md`.
 | | Scenario | Offline proof | Live |
 |---|---|---|---|
 | A | positive routine review → AUTO_RESOLVED | textless 4–5★ auto-resolve; worded praise → MONITORING (policy 0-2) — `OperationsCaseReviewRulesTest`, processor test | — |
-| B | repeated/problem review → MONITORING or Issue | 3★/4–5★ with an asserted problem → investigated; issue extractor + agent leg 31/31 non-false (`docs/customer_ops_product_quality_closure_v1.md` §3-1) | — |
+| B | repeated/problem review → MONITORING or Issue | 3★/4–5★ with an asserted problem → investigated; issue extractor + agent leg 31/31 non-false (`docs/archive/2026-q3/customer_ops_product_quality_closure_v1.md` §3-1) | — |
 | C | grounded inquiry → draft | `KnowledgeIntelligenceClosureTest`; quality set F5 live: drafts 23/27, unsupported 0 | — |
 | D | missing knowledge → ASK → Teach → regenerate | `KnowledgeIntelligenceClosureTest` | — |
 | E | later similar case reuses taught/decision context | `KnowledgeIntelligenceClosureTest`, `KnowledgeBootstrapTest` | **M1** (real NAVER history) |

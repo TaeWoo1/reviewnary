@@ -6,7 +6,7 @@
 관련 문서(본 문서는 이들 **위에 얹는다** — 중복 정의하지 않고 참조):
 - 수집 전략·채널별 계약: `docs/multi-channel-connector-roadmap.md` (이하 Connector Roadmap)
 - 제품 범위 경계: `docs/product-scope-v1.md`
-- ESM 어댑터 아키텍처: `docs/sellerops_phase3d_multi_channel_adapters.md`
+- ESM 어댑터 아키텍처: `docs/archive/sellerops_phase3d_multi_channel_adapters.md`
 
 > Status: DISCOVERY (planning + 가드레일 테스트). 본 슬라이스는 ESM+ 라이브 접속을 수행하지 않으며,
 > 어떤 ESM+ capability도 CONFIRMED로 표기하지 않는다.
@@ -89,7 +89,7 @@ ESM+에서 어떤 데이터든 수집하려면 최소한:
 2. attention/drill-down/preview가 의미를 가지려면 **GMARKET `VocItemSource` 어댑터**(PR #135의 seam에 연결)
    또는 ESM 전용 소스 테이블. read-side seam(`VocItemSource`/registry)은 PR #135에서 이미 준비됨. 이를 위한
    감독형 라이브 디스커버리 절차(승인 게이트·증거 로깅·candidate-index 진단)는
-   `docs/sellerops_phase0_esm_live_discovery_protocol.md`에 정의돼 있다.
+   `docs/archive/sellerops_phase0_esm_live_discovery_protocol.md`에 정의돼 있다.
 3. (선택) credential template/route 조정 — 현재 GMARKET 형상으로 충분.
 
 `DataType` enum, `ConnectorCapability`/`connector_capabilities` 구조, `ChannelCapabilityOverview` DTO,

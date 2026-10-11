@@ -696,7 +696,7 @@ Documents that previously restated the rule now point here:
 - `docs/action-window-runtime/` runbooks, `r4-gate-record.md` (G6), `HANDOFF.md` — point here for
   the contract; keep their run-specific evidence.
 - `docs/slices/naver-guided-connection.md`, `docs/product-scope-v1.md`,
-  `docs/sellerops_completion_checkpoint_v1.md`, `docs/workstreams/review_operations_mvp.md` —
+  `docs/archive/2026-q3/sellerops_completion_checkpoint_v1.md`, `docs/workstreams/review_operations_mvp.md` —
   point here.
 
 **Historical live-proof / dispatch records keep their long, filled approval text as evidence of

@@ -51,7 +51,7 @@ PR #394 changed **only** `frontend/**`, `tools/naver-local/**`, and docs — **z
 `collector/`, or `contracts/` change, no migration (Flyway top unchanged at V36). The connection/test/sync
 engine at `a9f8e08` is therefore byte-identical to the one that **LIVE-PASSED** first-connection + first
 sync (13 orders, all PAID) + same-window idempotency (0 duplicates) at `2c9ecac` — see
-`docs/naver_live_first_connection_proof_v2.md`. Because `a9f8e08 = 2c9ecac + only FE/tools/docs`, this
+`docs/archive/2026-q3/naver_live_first_connection_proof_v2.md`. Because `a9f8e08 = 2c9ecac + only FE/tools/docs`, this
 change touches nothing in that engine, so an **engine-level** regression is **unlikely**. This is **not**
 an end-to-end proof, though: credential → test → first sync → same-window re-sync was **not exercised at
 `a9f8e08`**, so the integrated onboarding → connection → sync path remains **E2E-unverified** at this

@@ -353,5 +353,5 @@ standing read grant 아래 60분 주기로 **이미 켜져 있고**, 재시작�
 
 - `docs/seller_operations_knowledge_and_answer_memory_v1.md` — 세 검색 lane, scope 모델
 - `docs/inquiry_workflow_completion_v2.md` — RAG correctness, `USER_CONFIRMED` 상품 결합
-- `docs/cross_channel_operational_reasoning_v1.md` — `ChannelDataState`(freshness 축)
+- `docs/archive/2026-q3/cross_channel_operational_reasoning_v1.md` — `ChannelDataState`(freshness 축)
 - `docs/multi-channel-connector-roadmap.md` §4.1 — capability 선언(이 package는 어떤 상태도 옮기지 않는다)

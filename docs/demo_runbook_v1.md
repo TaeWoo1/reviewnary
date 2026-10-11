@@ -277,7 +277,7 @@ free-form sentence outside them answers "이 요청은 아직 지원하지 않�
 > **What to show instead.** Ask the same product three different questions — a spec question, an
 > exchange-policy question, and "전에 산 것과 색이 달라요" — and show that the 확인한 항목 list differs
 > each time. Then turn the planner off and show the honest failure. Evidence:
-> `docs/operator_graph_v2_local_integration_proof.md` §3.
+> `docs/archive/2026-q3/operator_graph_v2_local_integration_proof.md` §3.
 
 ## 4. Proof levels (say only what the row says)
 
@@ -292,8 +292,8 @@ free-form sentence outside them answers "이 요청은 아직 지원하지 않�
 | 문의 답변 방향 제안 (response workflow) | test-proven; **not demonstrable in the demo org** — work items exist only for connector-ingested inquiries and the demo org's one OPEN item is outside the 500-row feed window | this file |
 | 리뷰 수집 (Action Window export run) | live-proven (NAVER, 2026-07); needs collector agent + `dev:bridge`; the plain demo shows the workbench read-only with persisted import history | `docs/action-window-runtime/HANDOFF.md`, `docs/workstreams/action-window-frontend/live-verification-protocol.md` |
 | 주문 · 매출 | test-proven; no demo data | — |
-| 운영 에이전트 `/agent` — Operator 답변 (§3.1) | **integration-proven on real SellerOps data 2026-08-21** (one org, 7,136 real utterances, local PG; scenarios ①②④ with traceable evidence, planner/judge OFF **and** ON); **no marketplace run** — nothing here contacted a channel | `docs/operator_graph_v1_local_integration_proof.md` |
-| 반복 문의 detection · customer memory recall | **integration-proven 2026-08-21** — 7,136 rows indexed, 7 real repeat candidates (품질 523 · 사이즈 473 · 배송 240 …). An org whose data predates the index needs one `POST /api/customer-memory/backfill` pass; until then recall reports 판단 불가, not "처음 있는 일". **Recall is topic-level on real inquiries**: 0 of 3,220 produced an aspect:problem signature (the documented rule-extractor gap, not the index) | `docs/operator_graph_v1_local_integration_proof.md` §3, §8 |
+| 운영 에이전트 `/agent` — Operator 답변 (§3.1) | **integration-proven on real SellerOps data 2026-08-21** (one org, 7,136 real utterances, local PG; scenarios ①②④ with traceable evidence, planner/judge OFF **and** ON); **no marketplace run** — nothing here contacted a channel | `docs/archive/2026-q3/operator_graph_v1_local_integration_proof.md` |
+| 반복 문의 detection · customer memory recall | **integration-proven 2026-08-21** — 7,136 rows indexed, 7 real repeat candidates (품질 523 · 사이즈 473 · 배송 240 …). An org whose data predates the index needs one `POST /api/customer-memory/backfill` pass; until then recall reports 판단 불가, not "처음 있는 일". **Recall is topic-level on real inquiries**: 0 of 3,220 produced an aspect:problem signature (the documented rule-extractor gap, not the index) | `docs/archive/2026-q3/operator_graph_v1_local_integration_proof.md` §3, §8 |
 | Cafe24 / Coupang connect wizards, OAuth | live-proven earlier (own workstreams); not part of the 10-minute path | `docs/slices/*`, roadmap §4.1 |
 
 ## 5. Segments that need the local agent (not in the plain demo)
@@ -324,7 +324,7 @@ free-form sentence outside them answers "이 요청은 아직 지원하지 않�
   a defect to route around: **the official walkthrough on a clean seed is the review lane**, which is
   complete end to end (확인할 일 → 리뷰 Case → 판단·조치 기록). The inquiry lifecycle is proven where
   it is real — the Cafe24 production evidence in `docs/evidence/INDEX.md` (2026-08-25 첫 답변 게시,
-  2026-09-23 `PASS (VERIFIED)`) and `docs/full_mvp_production_e2e_v1.md`. Measured 2026-09-24 on
+  2026-09-23 `PASS (VERIFIED)`) and `docs/archive/2026-q3/full_mvp_production_e2e_v1.md`. Measured 2026-09-24 on
   `37736ff8`.
 - 문의 demo data on the operator's local PG is dominated by Cafe24 board spam; the response-proposal
   workflow has no reachable demo row there either (§4).

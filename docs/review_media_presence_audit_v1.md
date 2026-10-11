@@ -9,7 +9,7 @@ prepared manifest; the measurement has since been approved and run (§2-A), and 
 landed (§6-A). **Media Presence Projection v1 then acted on it**: Cafe24's `attach_file_urls` LENGTH
 is now projected on the sweep the connector already runs, so a Cafe24 review acquired from here on
 carries a real `media_count` and `media_count_observed = true` (§2-B). **The media track is frozen at
-that point** — see `docs/agent_native_text_first_pilot_scope_v1.md`.
+that point** — see `docs/archive/2026-q3/agent_native_text_first_pilot_scope_v1.md`.
 
 Companion to `docs/review_acquisition_capability_matrix_v1.md`, which separated media into five
 stages (source → parser → canonical → DB → Attention) and found each channel blocked at a different

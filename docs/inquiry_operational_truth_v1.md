@@ -4,7 +4,7 @@
 org `7146c50f…d8e0` · **No marketplace contact, no credential read, no WRITE.**
 
 **What this is.** The audit that preceded it
-(`docs/cafe24_inquiry_source_reconciliation_audit_2026-08-22.md`) and the package that acts on it.
+(`docs/archive/2026-q3/cafe24_inquiry_source_reconciliation_audit_2026-08-22.md`) and the package that acts on it.
 Three separate defects, one package, because they share one corpus:
 
 1. the seller's spam decisions were recorded and then ignored by every current-truth read;

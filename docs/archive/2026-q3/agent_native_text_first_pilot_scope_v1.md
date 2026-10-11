@@ -64,12 +64,12 @@ where.
 
 | | state | owner |
 |---|---|---|
-| **Provider-independent Core** | reading, judging, deciding and recording an act on a review are scoped by `(reviewId, orgId)` — no seller account, no channel gate | `docs/core_channel_boundary_v1.md` |
+| **Provider-independent Core** | reading, judging, deciding and recording an act on a review are scoped by `(reviewId, orgId)` — no seller account, no channel gate | `docs/archive/2026-q3/core_channel_boundary_v1.md` |
 | **Cafe24 official API** | board articles via the Admin API; reviews promoted from board 4; inquiry answer execution `VERIFIED` | `docs/inquiry_answer_execution_v1.md` |
 | **Coupang Aside** | optional execution provider behind the same driver interface; acquisition `IMPLEMENTED / LIVE_UNPROVEN` | `docs/agentic_operating_workspace_v2.md` |
 | **Media presence awareness** | `reviews.media_count` + `media_count_observed`; Cafe24 projects `attach_file_urls.length` on the sweep it already runs | `docs/review_media_presence_audit_v1.md` |
 | **Core data presence ≠ connector availability** | a channel this org holds rows on is accounted for on the operations figures whether or not it can be connected | §2 below |
-| **Issue → ActionCandidate** | a repeated problem yields derived action candidates; the seller accepts, edits or defers one, and that decision is recorded as an append-only trail | `docs/issue_action_candidate_v0.md` |
+| **Issue → ActionCandidate** | a repeated problem yields derived action candidates; the seller accepts, edits or defers one, and that decision is recorded as an append-only trail | `docs/archive/2026-q3/issue_action_candidate_v0.md` |
 
 ## NOT implemented, and deliberately so
 

@@ -108,7 +108,7 @@ even pattern-matches `NO_KEY|NOT_ISSUED|SAFE|CLEAN`.
 > component library emits `<button type="button">`; the live reveal run's own baseline reported `false` on a page
 > that visibly contained the `API Key 발급 받기` button. It returned `SURFACE_UNCHANGED` for a Stage-2 surface the
 > operator was looking at. Replaced by `stage2SurfaceRevealed` — see
-> `docs/coupang_wing_reveal_live_v3_evidence_landing.md`. The paragraph below is retained because the
+> `docs/archive/2026-q3/coupang_wing_reveal_live_v3_evidence_landing.md`. The paragraph below is retained because the
 > reasoning it contains ("that is the only delta the current census could plausibly show") is exactly the step
 > that was wrong.
 
@@ -142,7 +142,7 @@ typecheck + full collector suite green. New tests: 39 (driver) + 21 (gate) + 12 
 
 **Two coverage gaps were stated here rather than glossed** — the shell harness had no `*-selfcheck.sh`, and
 `main()` was unexported, so the sentinel flow and the abort paths were unverified. Both are closed by
-`docs/coupang_wing_reveal_live_v3_evidence_landing.md`. That unit changed no selector, stage structure, or
+`docs/archive/2026-q3/coupang_wing_reveal_live_v3_evidence_landing.md`. That unit changed no selector, stage structure, or
 guided-tutorial step; it did change operator-visible CLI behaviour, in the ways its own "Behaviour that changed"
 section records — a STOP block on every unexpected outcome, exit codes that distinguish the outcome classes, and
 a failed overlay clear reported on every path.

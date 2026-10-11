@@ -402,7 +402,7 @@ nobody agrees about is a distinction that will be scored one day and mean nothin
 
 ### 14-E. What this changes for WP-3
 
-> **Done in `docs/inquiry_architecture_v3_wp3.md` (2026-09-20, no model call).** All five items below were taken up.
+> **Done in `docs/archive/2026-q3/inquiry_architecture_v3_wp3.md` (2026-09-20, no model call).** All five items below were taken up.
 > That package also corrects three figures on this page, from the same frozen observations: the contract-violation
 > total is **39 across 20 rows**, not 34; seller-closing needs are **31 distinct (case, need) pairs**, not 8 of 43
 > (which was rep 1, matched needs only); and `procedure_for_read` is **not 0** — `R:4181864b.n1` fails it in all

@@ -9,11 +9,11 @@
 > 변경하지 않는다. INQUIRY는 `NEEDS_VERIFICATION`로 유지된다.
 
 관련 문서(본 문서는 이들 **위에 얹는다** — 중복 정의하지 않고 참조):
-- Gate 1 준비·허용/금지 관측·관측 양식: `docs/sellerops_phase0_esm_inquiry_gate1_readiness.md`(이하 Readiness Packet)
+- Gate 1 준비·허용/금지 관측·관측 양식: `docs/archive/sellerops_phase0_esm_inquiry_gate1_readiness.md`(이하 Readiness Packet)
   §4/§6/§7/§8.
-- 게이트 정의·candidate-index(Gate 2–3)·증거 사다리: `docs/sellerops_phase0_esm_live_discovery_protocol.md`
+- 게이트 정의·candidate-index(Gate 2–3)·증거 사다리: `docs/archive/sellerops_phase0_esm_live_discovery_protocol.md`
   (이하 Discovery Protocol) §5/§6/§6.1/§7.
-- Gate 0 결과·INQUIRY 우선 근거: `docs/sellerops_phase0_esm_gate0_findings.md`(이하 Gate 0 Findings) §3/§4.
+- Gate 0 결과·INQUIRY 우선 근거: `docs/archive/sellerops_phase0_esm_gate0_findings.md`(이하 Gate 0 Findings) §3/§4.
 - sanitized 출력 규칙·로드맵 상태: `docs/multi-channel-connector-roadmap.md`(이하 Connector Roadmap) §4.1/§9.
 
 ---

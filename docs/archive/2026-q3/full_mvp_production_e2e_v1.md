@@ -2,7 +2,7 @@
 
 세 채널의 automatic source가 **하나의 실제 `CUSTOMER_OPERATIONS_V1` production run** 안에서 함께 수집·관측되는지를
 단계별로 증명한다. 각 단계는 자기 승인 하나로 실행되고, 결과는 `docs/evidence/INDEX.md`에 행으로 남는다.
-선행 기록: `docs/full_mvp_real_api_preflight_v1.md`(공식 API READ preflight, `LIVE_PASS`).
+선행 기록: `docs/archive/2026-q3/full_mvp_real_api_preflight_v1.md`(공식 API READ preflight, `LIVE_PASS`).
 
 ## Stage 1 — 네 source가 한 run에서 관측되는가 (2026-09-23 00:17 KST) · `PASS`
 

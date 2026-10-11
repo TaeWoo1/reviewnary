@@ -18,7 +18,7 @@ integers out, nothing stored) found **1 of 7 board-4 articles in the last 365 da
 attachment** — so Cafe24 is `MEDIA_PRESENT`, not unknown, and this document's «contract says YES,
 nobody has looked» is closed. Coupang and NAVER are unchanged. `reviews.media_count` also gained
 `media_count_observed` (V101) so a zero can be told apart from a silence; the account/channel half of
-the same milestone is `docs/core_channel_boundary_v1.md`.
+the same milestone is `docs/archive/2026-q3/core_channel_boundary_v1.md`.
 
 ## 0. Method — what counts as evidence here
 

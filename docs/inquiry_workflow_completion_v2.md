@@ -7,7 +7,7 @@
 `operatorToolRegistry.test.ts`가 등록 자체를 거부한다.
 
 `docs/inquiry_action_flow_v1.md`(초안→승인→실행)과
-`docs/inquiry_product_attribution_action_coverage_v1.md`(귀속·synthetic fence)를 덮어쓰지 않고 그 위에
+`docs/archive/2026-q3/inquiry_product_attribution_action_coverage_v1.md`(귀속·synthetic fence)를 덮어쓰지 않고 그 위에
 쌓는다. 이 문서가 소유하는 것은 **retrieval correctness**, **사람이 정하는 상품 연결**,
 **NAVER 두 subtype의 실제 계약**, 그리고 그로부터 나온 **전송 직전 규칙 하나**다.
 

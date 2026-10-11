@@ -27,7 +27,7 @@
 `docs/multi-channel-connector-roadmap.md` §4.1 (capability truth) ·
 `docs/channel_capability_ledger.md` (lessons) ·
 `docs/action-window-runtime/HANDOFF.md` (NAVER Action Window status-of-record) ·
-`docs/sellerops_agent_runtime_migration.md` (agent-runtime).
+`docs/archive/2026-q3/sellerops_agent_runtime_migration.md` (agent-runtime).
 
 ---
 
@@ -138,8 +138,8 @@ never unattended. **운영 지원 (production-supported) is still file-upload-on
 ### Cafe24 (seller's own mall only — never a proxy/hub)
 | Capability | Method | Proof level | Evidence / notes |
 |---|---|---|---|
-| ORDER_SUMMARY | API (OAuth) | **live-proven** | C1/C2 (#374): token rotation + amount reconciliation + idempotent replay (전선몰딩, disposable). `docs/sellerops_cafe24_c2_order_summary_live_verification.md`. |
-| REVIEW read (board 4 구매후기) | API | **live-proven** | #375: public fresh-insert + idempotent replay; 비밀글 fail-closed excluded. Live-observed reply_status = **UNKNOWN only** (raw not N/P/C → fail-closed; PENDING expectation withdrawn). **N/P/C tokens = tests-only; secret-exclusion count + raw_received/missing-drop counts = unobserved (uninstrumented).** `docs/sellerops_cafe24_review_read_live_verification.md`. |
+| ORDER_SUMMARY | API (OAuth) | **live-proven** | C1/C2 (#374): token rotation + amount reconciliation + idempotent replay (전선몰딩, disposable). `docs/archive/2026-q3/sellerops_cafe24_c2_order_summary_live_verification.md`. |
+| REVIEW read (board 4 구매후기) | API | **live-proven** | #375: public fresh-insert + idempotent replay; 비밀글 fail-closed excluded. Live-observed reply_status = **UNKNOWN only** (raw not N/P/C → fail-closed; PENDING expectation withdrawn). **N/P/C tokens = tests-only; secret-exclusion count + raw_received/missing-drop counts = unobserved (uninstrumented).** `docs/archive/2026-q3/sellerops_cafe24_review_read_live_verification.md`. |
 | INQUIRY read (board 6 문의사항) | API | **live-proven** | #382 (exact-window contract): 1 in-window emitted, out-of-window excluded pre-mapper, C→ANSWERED, `is_secret=true`, secret boundary live (Inbox includes / dashboard+analysis exclude), idempotent replay. **public/N/P/UNKNOWN tokens + N→C transition = tests-only.** board 9 (1:1) excluded, never called. `docs/sellerops_cafe24_inquiry_read_live_proof.md`. |
 | First-connection tutorial | read-only capability check | **live-proven** | #383: 7-step wizard + capability endpoint on real 전선몰딩. |
 | Inquiry answer draft | agent-runtime `INQUIRY_DRAFT` | **synthetic-proven** | #384: read-only draft → human checkpoint, no send/mutation. |

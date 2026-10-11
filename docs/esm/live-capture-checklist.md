@@ -222,7 +222,7 @@ Legend: `[x]` done · `[~]` partial/in-progress · `[ ]` not started.
   **visual** navigation confirmed the inquiry surface + controls (sanitized booleans only).
   API side is an offline seam.
   - next single action: constrained Gate-2 read-only probe (per
-    `docs/sellerops_phase0_esm_inquiry_gate1_findings.md §3`) — separate approval.
+    `docs/archive/sellerops_phase0_esm_inquiry_gate1_findings.md §3`) — separate approval.
 - `[ ]` G2 · `[ ]` G3 · `[ ]` G4 identity · `[ ]` G4 mapping · `[ ]` G5 · `[ ]` G6 ·
   `[ ]` G7 · `[ ]` G8
 

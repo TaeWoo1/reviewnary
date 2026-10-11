@@ -3,7 +3,7 @@
 > **Status: CANONICAL product-behaviour + implementation contract — IMPLEMENTED 2026-08-21**
 > (`feat/operator-graph-v2`). 계획으로 작성돼 같은 날 구현·라이브 통합 증명까지 랜딩했다. 구현이
 > 계획과 달라진 곳은 **§22**에, 실데이터가 드러낸 것은
-> `docs/operator_graph_v2_local_integration_proof.md`에 있다.
+> `docs/archive/2026-q3/operator_graph_v2_local_integration_proof.md`에 있다.
 >
 > **이 문서가 소유하는 것** — 제품 정의와 4개 invariant, Dashboard/Agent 두 레인의 구분, Planner 계약
 > (`InvestigationPlan`), Product Knowledge 계층, specialist 역할 경계, Evidence·Judge·budget·tool 계약,
@@ -15,13 +15,13 @@
 > 충돌 시 그 문서들이 이긴다.
 >
 > **v1과의 관계.** `docs/sellerops_operator_graph_v1.md`는 **삭제하지 않는다.** v1은 2026-08-21에 구현·
-> 라이브 통합 증명까지 끝난 실제 기록이고, 그 §14a·§17과 `docs/operator_graph_v1_local_integration_proof.md`
+> 라이브 통합 증명까지 끝난 실제 기록이고, 그 §14a·§17과 `docs/archive/2026-q3/operator_graph_v1_local_integration_proof.md`
 > 는 계속 유효한 증거다. 다만 **product runtime semantics는 이 문서로 superseded 된다** — 구체적으로
 > v1 §4.1의 "planner 실패 시 keyword router가 답한다", §8의 catalogue 전량 인가, §13 층2의 결정론적
 > planner 층, §14의 "데모 4문항이 완료 조건"이 **v2에서 전부 무효**다. v1 문서 상단에 그 표시를 넣었다.
 >
 > **현재 상태의 근거.** "지금 무엇이 있는가"는 `docs/demo_baseline_recovery_audit_2026-08-21.md`,
-> `docs/operator_graph_v1_local_integration_proof.md`, `docs/slices/product-context-diagnosis-groundwork.md`
+> `docs/archive/2026-q3/operator_graph_v1_local_integration_proof.md`, `docs/slices/product-context-diagnosis-groundwork.md`
 > 를 인용한다. 이 문서는 그 감사를 다시 수행하지 않는다. 코드 인용(파일:심볼)은 현재 브랜치에서 재확인했다.
 
 ---
@@ -734,7 +734,7 @@ Action Window 명령, 모든 수집 트리거. `privilegedPlaneFence.test.ts`가
 |---|---|---|
 | C1 | `docs/sellerops_operator_graph_v1.md` §0·§4.1·§8·§13 층2·§14 | **MODIFY** — 상단에 v2 supersede 표시(이번 턴 반영) |
 | C2 | `docs/decisions/agent-runtime-langgraph-llm-split.md` L10·L41–42·L154 | **MODIFY** — "planner off면 keyword table이 답한다"는 v2에서 거짓 |
-| C3 | `docs/sellerops_agent_runtime_migration.md` L41·L77·L272·L385·L445 | **MODIFY** — 역사 문서이므로 **정정하지 않고** 상단에 "v2에서 대체됨" 한 줄 |
+| C3 | `docs/archive/2026-q3/sellerops_agent_runtime_migration.md` L41·L77·L272·L385·L445 | **MODIFY** — 역사 문서이므로 **정정하지 않고** 상단에 "v2에서 대체됨" 한 줄 |
 | C4 | `docs/demo_runbook_v1.md` L211 | **MODIFY** (X4와 동일 건) |
 | C5 | `CLAUDE.md` agent-runtime 소유 문단 · canonical reading path 4행 | **MODIFY** (이번 턴 반영) |
 | C6 | `docs/architecture.md` 런타임 표 4행 | **MODIFY** (이번 턴 반영) |
@@ -1040,7 +1040,7 @@ I2에 따라 planner 없이는 Agent chat이 동작하지 않는다. 제안 기�
 ### 22.3 라이브가 드러낸 결함 9건
 
 전부 최소 변경으로 고치고 회귀를 붙였다. 목록과 증거는
-`docs/operator_graph_v2_local_integration_proof.md` §6. 이 중 **V50**은 새 마이그레이션이다.
+`docs/archive/2026-q3/operator_graph_v2_local_integration_proof.md` §6. 이 중 **V50**은 새 마이그레이션이다.
 
 ---
 

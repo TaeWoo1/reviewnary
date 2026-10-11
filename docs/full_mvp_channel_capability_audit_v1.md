@@ -16,7 +16,7 @@ path로 이어져 있는가**만 적는다. 재구현 0 · 새 제품 로직 0 �
 > 원장 수정은 product-owner 결정이다.
 
 > **이 문서는 `e7530e05` 시점의 스냅샷이다.** 같은 날 **G1**(고객 운영 관리의 Cafe24 종속)과
-> **G6**(NAVER 리뷰 답글 문구)이 결정·구현돼 닫혔다 — `docs/customer_operations_channel_reach_v1.md`.
+> **G6**(NAVER 리뷰 답글 문구)이 결정·구현돼 닫혔다 — `docs/archive/2026-q3/customer_operations_channel_reach_v1.md`.
 > 아래 §0의 마지막 문장과 §1의 4행(OperationsCase)은 그 결정 **이전**의 상태를 적은 것이고,
 > 기록으로 남기려고 고치지 않았다. 현재 상태는 각 gap 절의 닫힘 표시를 따른다.
 
@@ -71,7 +71,7 @@ Cafe24)뿐이며, 리뷰 lane은 세 채널 어디에서도 「보냈다」를 �
 
 ### G1 — 고객 운영 관리가 Cafe24 전용이다 · **2026-09-22 닫힘**
 
-> **결정되고 구현됐다** — `docs/customer_operations_channel_reach_v1.md`. 의무의 기준이 채널 목록에서
+> **결정되고 구현됐다** — `docs/archive/2026-q3/customer_operations_channel_reach_v1.md`. 의무의 기준이 채널 목록에서
 > **acquisition mode**로 돌아갔다: AUTOMATIC이면 의무(Cafe24 문의·리뷰 · NAVER 문의 · 쿠팡 문의),
 > SELLER_GUIDED면 아니다(NAVER·쿠팡 리뷰는 그대로 device recipe). 관측만 넓어졌고 초안·승인·전송·
 > 완료 확인의 천장은 기존 capability truth 그대로다. 아래 문단은 결정 이전의 상태 기록이다.

@@ -21,7 +21,7 @@
 >
 > This ADR owns **one question**. Capability truth stays `docs/multi-channel-connector-roadmap.md` §4.1;
 > the AI triage pilot's canonical home stays `docs/workstreams/review_ai_triage_demo.md`; the migration
-> narrative stays `docs/sellerops_agent_runtime_migration.md`.
+> narrative stays `docs/archive/2026-q3/sellerops_agent_runtime_migration.md`.
 
 ## Context — what is actually in the repo
 

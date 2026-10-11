@@ -13,7 +13,7 @@ Date: 2026-06-12. Planned at HEAD `d40e2d9`, branch `feature/review-ops-industri
 
 ## 1. Why now, while Naver permission is pending
 
-The Naver live smoke (runbook: `docs/sellerops_phase3c_live_smoke.md`) is
+The Naver live smoke (runbook: `docs/archive/sellerops_phase3c_live_smoke.md`) is
 blocked on startup-side permissions (API Center registration / credential
 issuance). The blocked work is the *live* verification only — the connector
 architecture proven in Phase 3C (feature-flagged bean, channel-aware registry
@@ -574,7 +574,7 @@ connector changes, Python review-ops changes.
 
 Before coding:
 1. git status --short clean; confirm HEAD.
-2. Re-read docs/sellerops_phase3d_multi_channel_adapters.md §2.1/§3–§6/§9,
+2. Re-read docs/archive/sellerops_phase3d_multi_channel_adapters.md §2.1/§3–§6/§9,
    PullConnector, ConnectorRegistry, NaverApiConnector,
    NaverConnectorConfiguration, NaverHttpClient/FakeNaverHttpClient,
    CredentialVault.open.

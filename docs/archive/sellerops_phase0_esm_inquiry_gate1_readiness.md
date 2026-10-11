@@ -8,9 +8,9 @@
 > 표기하지 않는다. production status 문자열·코드·프론트·테스트를 변경하지 않는다. INQUIRY는 `NEEDS_VERIFICATION`로 유지된다.
 
 관련 문서(본 문서는 이들 **위에 얹는다** — 중복 정의하지 않고 참조):
-- 게이트 정의·증거 로깅·candidate-index(Gate 2–3)·증거 사다리: `docs/sellerops_phase0_esm_live_discovery_protocol.md`
+- 게이트 정의·증거 로깅·candidate-index(Gate 2–3)·증거 사다리: `docs/archive/sellerops_phase0_esm_live_discovery_protocol.md`
   (이하 Discovery Protocol) §3/§5/§6/§7.
-- Gate 0 결과·INQUIRY 우선 근거: `docs/sellerops_phase0_esm_gate0_findings.md`(이하 Gate 0 Findings) §3/§4.
+- Gate 0 결과·INQUIRY 우선 근거: `docs/archive/sellerops_phase0_esm_gate0_findings.md`(이하 Gate 0 Findings) §3/§4.
 - sanitized 출력 규칙: `docs/multi-channel-connector-roadmap.md`(이하 Connector Roadmap) §9; `CLAUDE.md` §4.
 - 약속 규칙·drift guard: `docs/product-scope-v1.md`(이하 Product Scope) §9.
 
@@ -160,7 +160,7 @@ INQUIRY 전용. 각 항목은 **`yes` / `no` / `unknown`** 또는 **일반 카�
 - INQUIRY 메뉴가 존재하고 **status/date 컨트롤이 안전하게 관측**되면 → Discovery Protocol §6의 **Gate 2
   candidate-index 진단**으로 진행할 근거가 된다(여전히 별도 승인).
 - **데이터가 보이는 행만** 보이고 컨트롤을 안전하게 관측할 수 없으면 → **멈추고**, 더 제약된 Gate 2 계획을 요구한다.
-  (그 제약된 Gate 2 프로토콜과 실제 Gate 1 관측 결과는 `docs/sellerops_phase0_esm_inquiry_gate1_findings.md` §1/§3에
+  (그 제약된 Gate 2 프로토콜과 실제 Gate 1 관측 결과는 `docs/archive/sellerops_phase0_esm_inquiry_gate1_findings.md` §1/§3에
   기록됨 — Gate 1은 1회 완료, 리스트가 data-bearing으로 확인됨.)
 - export/download 컨트롤이 보이면 → **존재만 기록**, 클릭하지 않는다(Gate 4/5 경계).
 - reply/write 컨트롤이 보이면 → **존재만 기록**, 클릭하지 않는다.

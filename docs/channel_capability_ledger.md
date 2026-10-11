@@ -14,7 +14,7 @@
 >
 > **Snapshot basis.** The `status` column mirrors §4.1 **as of 2026-07-31** (Cafe24 REVIEW live-verify
 > #375 / Cafe24 INQUIRY live-verify #382; NAVER REVIEW as of 2026-07-15; all other rows as of
-> 2026-07-07). Recovery baseline: `docs/sellerops_completion_checkpoint_v1.md` (`026c113`). Re-derive
+> 2026-07-07). Recovery baseline: `docs/archive/2026-q3/sellerops_completion_checkpoint_v1.md` (`026c113`). Re-derive
 > from §4.1 before citing at a later date — a recorded snapshot is not a standing fact.
 
 ---

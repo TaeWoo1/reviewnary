@@ -4,8 +4,8 @@ Written at HEAD `2356a62`. Phase 3D is complete: all planned multi-channel
 connector **auth skeleton** slices have landed. This document is the record of
 what exists, what deliberately does not, and what comes next. Detailed
 per-channel verification facts live in
-`docs/sellerops_phase3d_multi_channel_adapters.md` (§2, per-slice records in
-§8); the Naver live-smoke runbook is `docs/sellerops_phase3c_live_smoke.md`.
+`docs/archive/sellerops_phase3d_multi_channel_adapters.md` (§2, per-slice records in
+§8); the Naver live-smoke runbook is `docs/archive/sellerops_phase3c_live_smoke.md`.
 
 ---
 
@@ -160,7 +160,7 @@ all passing, every slice Codex-reviewed before commit.
 ## 7. Recommended next steps (ranked)
 
 1. **Naver live smoke** — when seller credentials / app registration / IP
-   allowlist are ready; runbook `docs/sellerops_phase3c_live_smoke.md`;
+   allowlist are ready; runbook `docs/archive/sellerops_phase3c_live_smoke.md`;
    requires separate explicit operator authorization. This converts the
    only real collection path from fixture-verified to live-verified.
 2. **Coupang order schema preflight** — the only non-Naver channel whose

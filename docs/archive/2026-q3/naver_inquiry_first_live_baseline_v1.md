@@ -6,7 +6,7 @@
 각각** 읽어 canonical에 저장하고, 같은 범위를 다시 읽어 중복이 생기지 않는 것까지 확인한 기록이다.
 marketplace WRITE는 0이고, 수집은 전부 READ다.
 
-이 문서는 Cafe24 first live baseline(`docs/cafe24_first_live_baseline_v1.md`, `PASS`·CLOSED)에
+이 문서는 Cafe24 first live baseline(`docs/archive/2026-q3/cafe24_first_live_baseline_v1.md`, `PASS`·CLOSED)에
 이어지는 두 번째 채널 baseline이며, 그 판정을 바꾸지 않는다.
 
 ---

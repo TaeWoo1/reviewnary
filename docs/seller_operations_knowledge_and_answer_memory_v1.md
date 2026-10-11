@@ -4,7 +4,7 @@
 **판정** 구조 완료 · **마켓플레이스 접촉 0 · WRITE 0 · Agent tool catalogue 무변경**
 
 이 문서는 Daily Loop의 **"정책 / 과거 답변 / Memory" 축**을 소유한다. 상품 지식(`docs/inquiry_workflow_completion_v2.md`)
-과 문의 귀속(`docs/inquiry_product_attribution_action_coverage_v1.md`)이 닫힌 뒤 남아 있던 자리다.
+과 문의 귀속(`docs/archive/2026-q3/inquiry_product_attribution_action_coverage_v1.md`)이 닫힌 뒤 남아 있던 자리다.
 새 connector는 없고, §4.1 capability 표는 한 행도 움직이지 않는다.
 
 ---

@@ -88,7 +88,7 @@ that. Where they overlap (수집), this one defers to it.
 |---|---|---|
 | Cafe24 REVIEW (board 4) | 2026-07-30 / 07-31 | `docs/sellerops_cafe24_review_acquisition_completion_live_proof.md` |
 | Cafe24 INQUIRY (board 6) | 2026-07-31 | `docs/sellerops_cafe24_inquiry_read_live_proof.md` |
-| Cafe24 ORDER_SUMMARY | 2026-06-25 → 06-29 | `docs/sellerops_cafe24_c2_order_summary_live_verification.md` |
+| Cafe24 ORDER_SUMMARY | 2026-06-25 → 06-29 | `docs/archive/2026-q3/sellerops_cafe24_c2_order_summary_live_verification.md` |
 | Coupang ORDER_SUMMARY | 2026-08-06 (`apr-01212e2da29a`) | `docs/coupang_final_main_first_connection_order_routine_proof_v1.md` |
 | Coupang INQUIRY (`onlineInquiries`) | 2026-08-14 | `docs/coupang_inquiry_live_proof_v1.md` |
 | Coupang REVIEW (WING 취득) | 2026-08-15 — 22건 저장, 재수집 stored=0 | `docs/coupang_review_acquisition_v1.md` §6.6 |
