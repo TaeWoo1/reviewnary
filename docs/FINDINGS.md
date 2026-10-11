@@ -171,6 +171,25 @@
   `tools/docs-link-check.py`가 이제 이 파일들을 본다.
 - **출처** — 2026-10-12 세션, `8d9a2310` 직후 감사에서 발견. 관련: B4 · B6 · B7.
 
+### B9. 선언된 게이트가 red인 채로 커밋이 쌓일 수 있다
+
+- **했던 것** — `collector/`에 문서 변경을 커밋하기 전에, `collector/CLAUDE.md` §2가
+  요구하는 대로 `npm run typecheck`를 돌렸다.
+- **사실** — **HEAD부터 이미 red였다.** 오류 9개 — `src/`는 0개, 전부 테스트 파일이다:
+  `test/aside/naver-review-selector-grammar.test.ts` 5개(TS2339 — 테스트가 기대하는
+  `queryLabelled` 필드가 구현 반환 타입에 없다) · `test/naver/review-list-attachments.test.ts`
+  3개 + `test/action-window/reply-submission/reply-session.test.ts` 1개
+  (TS2532/TS18048 — `noUncheckedIndexedAccess` 인덱스 접근). `collector/CLAUDE.md` §2는
+  "`typecheck`와 `test`가 커밋 전 green이어야 한다"고 적고 있고
+  `.github/workflows/collector-ci.yml`도 `npm run typecheck`를 돌린다. 규칙과 CI가 둘 다
+  있는데도 red인 채로 지나갔다.
+- **다음에** — ① 패키지에 커밋하기 전 그 패키지의 게이트를 **먼저** 돌린다. 내 변경이
+  깨뜨린 것인지 기존 상태인지는 `git stash` 후 HEAD에서 같은 명령을 돌려 가른다.
+  ② red를 발견하면 **트리비얼한 것만 고치고 나머지를 보고한다** — 위 TS2339 5개는
+  테스트가 맞는지 구현이 맞는지에 대한 판단이 필요하고, 그것은 조용히 정할 일이 아니다
+  (`CLAUDE.md` § Assumption rule). 부분 수정을 문서 정리 커밋에 섞지 않는다.
+- **출처** — 2026-10-12 세션. `collector/CLAUDE.md` §2 · `.github/workflows/collector-ci.yml`.
+
 ---
 
 ## C. 증거 · 계약

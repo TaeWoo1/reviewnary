@@ -88,7 +88,7 @@ sits behind a **policy-clarification gate**.
 - **2026-07-15 — NAVER REVIEW (Action Window reference precedent).** Full export→ingest verified
   once under supervision (Run 4, dev seller, local dev backend). The Action Window pattern *works*
   end-to-end. Remaining barrier is **not** technical — it's market-terms clarification before any
-  seller-facing / production step. Evidence: `docs/action-window-runtime/r4-evidence-pack.md` §8–17.
+  seller-facing / production step. Evidence: `docs/action-window-runtime/r4/r4-evidence-pack.md` §8–17.
 - **2026-07-07 — Coupang REVIEW.** Confirmed there is **no official review API**. This is the
   clearest case that "the product is not a scraper": we do not scrape the missing API — we decide
   between a verified official route and an Action Window, honestly.

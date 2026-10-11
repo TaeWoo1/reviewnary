@@ -319,7 +319,7 @@ All of the following are **human-driven / operator-supervised**, on the **dev se
 
 - **Review export, end-to-end — Run 4 (2026-07-15).** Real human click → download →
   quarantine validation (OOXML sniff) → real `/api/uploads` ingest. Backend `SUCCESS 55/55/0/0`.
-  Evidence: `docs/action-window-runtime/r4-evidence-pack.md` §8-17.
+  Evidence: `docs/action-window-runtime/r4/r4-evidence-pack.md` §8-17.
 - **`USER_ACTION_OBSERVED` fires on a real human click** — Run 5 (2026-07-16), non-mutating.
 - **CLI session-recovery loop, live-proven** — Run 6 (2026-07-17), zero clicks.
 - **Overlay operator label, live-verified** — §8-24 (2026-07-18).

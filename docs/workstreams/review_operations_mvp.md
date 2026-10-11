@@ -85,7 +85,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done + evidence linked �
       (`docs/slices/import-outcome-history-v1.md`). ⚠ Covers file uploads and seller-center exports
       only; API-collected reviews are a different acquisition path and do not appear.
 - [ ] Result validated (shape, channel, non-empty, sanitized) — **fail closed** on ambiguity
-- [ ] Evidence linked: _[e.g. `docs/action-window-runtime/r4-evidence-pack.md` §8–17]_
+- [ ] Evidence linked: _[e.g. `docs/action-window-runtime/r4/r4-evidence-pack.md` §8–17]_
 
 ### NORMALIZE
 - [~] Ingested to canonical `review` model + dedup — **offline, over the committed golden export**

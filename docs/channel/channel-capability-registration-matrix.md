@@ -134,7 +134,7 @@ NAVER 가이드 연결 `docs/slices/naver-guided-connection.md`.
 - NAVER 리뷰 감독형 캡처 → 다운로드 저장 — 1회(2026-06-22).
 - NAVER 리뷰 감독형 **export→ingest 전 구간**(자동 업로드 브리지 포함) — 1회(2026-07-15, Run 4). 범위:
   **감독형**(사람이 실제 클릭)·**개발 셀러**·**로컬 dev 백엔드**(프로덕션 아님). **셀러 대면 출시·무인 자동
-  수집·운영 지원 아님.** 상태 정본 = §4.1(운영 지원 ❌ 유지); 근거 = `docs/action-window-runtime/r4-evidence-pack.md` §8-17.
+  수집·운영 지원 아님.** 상태 정본 = §4.1(운영 지원 ❌ 유지); 근거 = `docs/action-window-runtime/r4/r4-evidence-pack.md` §8-17.
 - Cafe24 게시판(리뷰/문의) 열람 discovery — 1회 CONFIRMED(아티클 수집 아님).
 - Browser Projection V0(채널-중립, 로컬 픽스처) — **하니스 E2E 검증**(마켓 사용 미승인, **비-기본 렌더러**,
   **production-runtime 미배선 State B** — 정상 부팅이 프로젝션 소스를 생성·주입하지 않음, `slices/browser-projection-v0.md` §22.8).

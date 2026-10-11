@@ -146,4 +146,4 @@ prior carrier set.
   change between attempts, so re-attach must re-read the announcement rather than assume the prior
   carrier. *(Superseded by the §6 decision: the switch is rejected; this note now governs option 2.)*
 - **Run 7 — EXECUTED and COMPLETED 2026-07-24** (attempt 3: real export → ingest SUCCESS). See
-  `docs/action-window-runtime/r4-run7-reply-state-live-proof-dispatch-record.md` §18.
+  `docs/action-window-runtime/r4/r4-run7-reply-state-live-proof-dispatch-record.md` §18.

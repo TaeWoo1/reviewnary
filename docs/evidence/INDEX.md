@@ -155,6 +155,9 @@ on their own — the precondition (rule 3) for retiring anything in that directo
 (`G3`, `G6`) is the r4-era approval ceremony, superseded by
 `docs/standing/sellerops_live_approval_contract.md`; it is kept verbatim because that is what the records say.
 
+**Evidence 열의 파일은 모두 `docs/action-window-runtime/r4/` 안에 있다** (2026-10-12에 그 하위로
+묶었다 — 2026-07의 r4 시기 기록 17개가 workstream home 최상위를 절반 넘게 차지하고 있었다).
+
 | Date | Run | Outcome | Evidence |
 |---|---|---|---|
 | 2026-07-13 | Read-only frame-aware surface probe | read-only surface observed; G6 consumed | `r4-probe-dispatch-record.md` |
@@ -359,7 +362,11 @@ A row here records **what was true of the code at one commit**. It never moves a
 
 - Rows before 2026-08 carry no approval id, because the Approval Manifest ceremony
   (`docs/standing/sellerops_live_approval_contract.md`) postdates them. Their evidence files are still authoritative.
-- The Action Window R4 dispatch records (§3) are indexed as a group rather than per run; their individual
-  outcomes live in `docs/action-window-runtime/r4-evidence-pack.md`. Splitting them out is a prerequisite
-  before any of those files is retired.
-- `docs/sellerops_cafe24_*` records that predate dated headers are indexed by capability, not by date.
+- ~~The Action Window R4 dispatch records (§3) are indexed as a group rather than per run.~~
+  **Closed.** §3.1 now carries one row per run — date, outcome and evidence file each stand on their own.
+  Assembled context remains in `docs/action-window-runtime/r4/r4-evidence-pack.md`. The files were moved
+  into `docs/action-window-runtime/r4/` on 2026-10-12 and **not retired**: rule 3 asks that a row carry a
+  file's whole unique claim before it is removed, and the rows summarise outcomes without carrying every
+  finding's detail (the body-link finding in Run 3 is the clearest example).
+- `docs/lineage/sellerops_cafe24_*` and `docs/archive/2026-q3/sellerops_cafe24_*` records that predate
+  dated headers are indexed by capability, not by date.

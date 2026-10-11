@@ -32,7 +32,10 @@ Two halves:
 
 `docs/` holds the design spec for each slice (one `*-model.md` per layer); read
 the relevant doc before changing a layer — it usually states the contract the
-tests lock.
+tests lock. **The map of those 29 documents is `docs/INDEX.md`** (채널 접속 · ESM+ ·
+문의 · attention · recency · 제품 구조), and it also says which files in here no longer
+carry current truth. Paths inside this subtree are relative to it: a document that
+writes `docs/<이름>.md` means `collector/docs/<이름>.md`, not the repository root.
 
 ---
 

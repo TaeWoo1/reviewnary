@@ -94,7 +94,7 @@
 - §S는 복구 가능하다 — `git show e1550892^:docs/review_acquisition.md` (372줄, §S는 126행부터).
   보존된 runtime worktree에만 남아 있다는 기존 설명은 부정확하다.
 - trace 문서는 복구할 것이 없다. 한 번도 쓰이지 않았다. 실제로 존재하는 가장 가까운 기록은
-  `docs/action-window-runtime/r4-review-id-reconciliation-run-record.md`와
+  `docs/action-window-runtime/r4/r4-review-id-reconciliation-run-record.md`와
   `…-reconciliation-scope.md`이고, 둘 다 같은 주장을 덮지 않는다.
 
 §S의 schema·민감도 분석을 저장소로 다시 들여올지는 **제품 오너 결정**이며 이 정리에서
