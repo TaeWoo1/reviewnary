@@ -11,7 +11,7 @@ import { PreparedWorkList } from "../home/PreparedWorkList";
 import { api } from "../../lib/apiClient";
 import { problemLine } from "../../lib/operationsHome";
 import { RESPONSIBILITY_NAME, cadenceLabel, dataTypeKo, kstClock } from "../../lib/customerOperations";
-import { COPY, autoCheckWhat, channelShort, failureShort, kstLongDate } from "../../lib/copy/customerOps";
+import { COPY, autoCheckWhat, channelShort, failureShort, gapActionKo, kstLongDate } from "../../lib/copy/customerOps";
 import { homeBriefRows, mergeHomeWork, sharedRowFacts, type HomeWork } from "../../lib/homeWork";
 import { automationHealth, type HealthTone } from "../../lib/automationHealth";
 import { NO_CHANGE_TODAY, changeInsights } from "../../lib/homeInsights";
@@ -1424,7 +1424,7 @@ function warningLines(co: CustomerOperationsHome, now: Date): React.ReactNode[] 
           {since ? ` · ${since}부터` : ""} 집계 제외
         </span>
         <Link to={gap.to} className="ml-auto font-bold text-warn hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700">
-          {COPY.reconnect}
+          {gapActionKo(gap.reason)}
         </Link>
       </>,
     );

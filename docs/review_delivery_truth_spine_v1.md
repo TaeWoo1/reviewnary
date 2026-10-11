@@ -130,3 +130,15 @@ Cafe24 댓글은 다시 읽어 승인 초안과 해시를 비교할 수 있고, 
 | `V128` | 실제 Postgres 15에 적용 → 컬럼·부분 인덱스·comment 확인, **재실행 멱등** 확인, scratch DB 삭제 |
 
 라이브 실행은 없다. 마켓플레이스 호출 0, 승인 0 ⇒ `docs/evidence/INDEX.md` 행 없음.
+
+## §6 시점 — 규칙 다음에 남아 있던 절반 (2026-10-11)
+
+§1이 적은 결함의 문장은 두 부분이었다: 「reviewnary가 올리고 확인한 답변이 어느 화면에도 보냈다로 나타나지
+않았다」와 「판매자는 **다음 수집이 돌 때까지** 확인 필요 카드를 계속 봤다」. 이 문서는 첫 부분을 닫았고
+(`deriveReview`가 `sellerActed()`를 본다), 두 번째는 **판정의 시점**이라 남아 있었다 — 그 판정은
+responsibility run 안에서만, 2시간 창마다 돌았다.
+
+`ReviewReplySettledEvent` → `ReviewReplyCaseConvergence`가 그 절반을 닫는다: 같은 `derive`/`apply`를 그
+리뷰 하나에 즉시 적용하고, 움직여서는 안 되는 기록(거절·composer 채움·제출 중단)은 그대로 둔다.
+문의 레인의 `InquiryAnswerSettledEvent`와 같은 모양이며, 이 문서의 판정 규칙·`replyState` 불가침·memory
+강도는 한 줄도 바뀌지 않았다. 기록: `docs/operations_daily_loop_v1.md` §4.

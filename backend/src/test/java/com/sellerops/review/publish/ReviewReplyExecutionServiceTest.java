@@ -70,6 +70,7 @@ class ReviewReplyExecutionServiceTest {
     private Review review;
     private String actionRef;
     private final List<ReviewReplyExecution> ledger = new ArrayList<>();
+    private final List<ReviewReplySettledEvent> announced = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
@@ -85,6 +86,12 @@ class ReviewReplyExecutionServiceTest {
         adapter = mock(Cafe24ReviewCommentAdapter.class);
         service = new ReviewReplyExecutionService(reviews, accounts, channels, approvals, drafts, refs, executions,
                 identity, capability);
+        announced.clear();
+        service.setSettledEvents(event -> {
+            if (event instanceof ReviewReplySettledEvent settled) {
+                announced.add(settled);
+            }
+        });
 
         review = new Review();
         ReflectionTestUtils.setField(review, "id", UUID.randomUUID());
@@ -369,6 +376,54 @@ class ReviewReplyExecutionServiceTest {
         ReviewExecutionView same = service.observe(org, accountId, actionRef, "cmd-o3", "0123456789abcdef",
                 "COMPOSER_FILLED", user);
         assertThat(same.replayed()).isTrue();
+        assertThat(ledger).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("a written execution announces that this review's reply record moved — once, and a replay announces nothing")
+    void aWrittenRowIsAnnouncedOnce() {
+        when(adapter.post(org, accountId, review.getExternalId(), BODY))
+                .thenReturn(new Cafe24ReviewCommentAdapter.PostResult(
+                        Cafe24ReviewCommentAdapter.PostResult.Kind.ACCEPTED, 77L, null));
+        when(adapter.verify(any(), any(), any(), any(), any())).thenReturn(ReviewExecutionVerification.VERIFIED);
+
+        execute("cmd-1", FP);
+        assertThat(announced).singleElement().satisfies(event -> {
+            assertThat(event.orgId()).isEqualTo(org);
+            assertThat(event.reviewId()).isEqualTo(review.getId());
+        });
+
+        execute("cmd-1", FP);
+        assertThat(announced).as("a replay wrote no row, so no record moved").hasSize(1);
+    }
+
+    @Test
+    @DisplayName("a refused execution is announced too — what it MEANS is the delivery reader's to say, not this event's")
+    void aRefusalIsAnnouncedAndCarriesNoConclusion() {
+        when(capability.of(org, accountId, "CAFE24")).thenReturn(
+                ReviewExecutionCapability.Decision.unsupported(ReviewExecutionReason.EXECUTION_DISABLED));
+
+        ReviewExecutionView view = execute("cmd-1", FP);
+
+        assertThat(view.status()).isEqualTo("REFUSED");
+        assertThat(announced).hasSize(1);
+        verify(adapter, never()).post(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("a listener that throws cannot fail a reply that is already public")
+    void aFailingListenerCannotFailTheSend() {
+        service.setSettledEvents(event -> {
+            throw new IllegalStateException("a surface failed to catch up");
+        });
+        when(adapter.post(org, accountId, review.getExternalId(), BODY))
+                .thenReturn(new Cafe24ReviewCommentAdapter.PostResult(
+                        Cafe24ReviewCommentAdapter.PostResult.Kind.ACCEPTED, 77L, null));
+        when(adapter.verify(any(), any(), any(), any(), any())).thenReturn(ReviewExecutionVerification.VERIFIED);
+
+        ReviewExecutionView view = execute("cmd-1", FP);
+
+        assertThat(view.status()).isEqualTo("POSTED");
         assertThat(ledger).hasSize(1);
     }
 }

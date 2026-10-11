@@ -3,8 +3,11 @@ package com.sellerops.operationscase;
 import com.sellerops.inquiry.publish.InquiryAnswerSettledEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * <b>Close the gap between «the seller sent it» and «the card stops asking».</b>
@@ -24,6 +27,13 @@ import org.springframework.stereotype.Component;
  * <p><b>It cannot affect the send.</b> The publish path has committed before this runs, and a failure
  * here is logged and dropped: a case card that is late is a smaller defect than an answer whose
  * recorded outcome depends on a screen's bookkeeping succeeding.
+ *
+ * <p><b>AFTER_COMMIT with the fallback on</b>, stated the same way as {@link ReviewReplyCaseConvergence}'s and
+ * for the same reason. {@code InquiryPublishService} holds no transaction, so the event is raised after the
+ * writes are durable and this runs immediately — the fallback is what keeps that path alive, because an event
+ * raised outside a transaction is otherwise dropped. The phase is the invariant for the day a caller wraps the
+ * confirm in one: a card may only move after the record that moved it is durable, and a rollback leaves the card
+ * where it was.
  */
 @Component
 public class InquiryAnswerCaseConvergence {
@@ -36,7 +46,8 @@ public class InquiryAnswerCaseConvergence {
         this.reconciler = reconciler;
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onAnswerSettled(InquiryAnswerSettledEvent event) {
         try {
             reconciler.converge(event.orgId(), OperationsSubjectKind.INQUIRY, event.inquiryId());

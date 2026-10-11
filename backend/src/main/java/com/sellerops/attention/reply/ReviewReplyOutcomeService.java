@@ -27,10 +27,26 @@ import org.springframework.stereotype.Service;
 public class ReviewReplyOutcomeService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final org.slf4j.Logger LOG =
+            org.slf4j.LoggerFactory.getLogger(ReviewReplyOutcomeService.class);
 
     private final ReviewReplySubmissionRefRepository refs;
     private final ReviewReplyOutcomeRepository outcomes;
     private final ReviewReplyOutcomeWriter writer;
+
+    /**
+     * Where «the reply record for this review moved» is announced, or null in a context that has none.
+     *
+     * <p>Optional and failure-swallowed at its one call site: the outcome row is this class's whole
+     * capability, and it is already written — and the seller has already posted by hand — by the time
+     * anything is told. See {@link com.sellerops.review.publish.ReviewReplySettledEvent}.
+     */
+    private org.springframework.context.ApplicationEventPublisher settledEvents;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSettledEvents(org.springframework.context.ApplicationEventPublisher settledEvents) {
+        this.settledEvents = settledEvents;
+    }
 
     public ReviewReplyOutcomeService(ReviewReplySubmissionRefRepository refs,
                                      ReviewReplyOutcomeRepository outcomes,
@@ -132,9 +148,28 @@ public class ReviewReplyOutcomeService {
         try {
             writer.appendOutcome(orgId, reviewId, submissionRef, recordedVersion, recordedFingerprint,
                     fingerprintAlgorithm, operatorOutcome, runRef, command, actor);
+            settled(orgId, reviewId);
             return new ReviewReplyOutcomeResponse(actionRef, true, false);
         } catch (DataIntegrityViolationException race) {
             return resolveRace(race, orgId, reviewId, actionRef, submissionRef, operatorOutcome, command);
+        }
+    }
+
+    /**
+     * Say that this review's reply record moved. Only for a row this call actually wrote — a replay wrote nothing,
+     * and a binding someone else spent is refused before here — and never able to fail the append: the outcome is
+     * recorded and the seller has already posted by hand, so a late card beats a 500 they would answer by posting
+     * it again.
+     */
+    private void settled(UUID orgId, UUID reviewId) {
+        if (settledEvents == null) {
+            return;
+        }
+        try {
+            settledEvents.publishEvent(new com.sellerops.review.publish.ReviewReplySettledEvent(orgId, reviewId));
+        } catch (RuntimeException e) {
+            LOG.warn("review reply outcome: 알림 실패 org={} review={} 사유={}", orgId, reviewId,
+                    e.getClass().getSimpleName());
         }
     }
 

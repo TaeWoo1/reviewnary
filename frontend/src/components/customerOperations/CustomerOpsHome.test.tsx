@@ -385,6 +385,23 @@ describe("CustomerOpsHome", () => {
     expect(gaps).toHaveTextContent("네이버 문의 일부만 확인 · 응답 지연");
   });
 
+  /**
+   * The standing automatic check reads the seller centre with the seller's own session. When that session is
+   * signed out the API connection beside it is untouched, so 「연결 만료 · 재연결」 would send them to re-authorise
+   * something that never broke. Same row, same link, different words.
+   */
+  it("a signed-out seller centre asks for a login, not a reconnection", async () => {
+    draw(
+      co({
+        gaps: { total: 1, rows: [{ caseId: "g-2", channelCode: "NAVER", channelNameKo: "네이버 스마트스토어", reason: "SOURCE_SIGN_IN_REQUIRED", dataTypes: ["REVIEW"], since: "2026-09-15T13:00:00Z", lastSeenAt: "", to: "/connect/naver" }] },
+      }),
+    );
+    const gaps = await screen.findByLabelText("집계에서 빠진 곳");
+    expect(gaps).toHaveTextContent("네이버 리뷰 로그인 필요 · 어제 22:00부터 집계 제외");
+    expect(gaps).not.toHaveTextContent("연결 만료");
+    expect(within(gaps).getByRole("link", { name: "로그인" })).toHaveAttribute("href", "/connect/naver");
+  });
+
   it("a list read that failed counts what loaded and says the count is partial — never 「N+」", async () => {
     api.getInquiryQueueStrict.mockRejectedValue(new Error("down"));
     draw();

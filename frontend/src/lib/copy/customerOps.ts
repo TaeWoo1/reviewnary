@@ -492,11 +492,28 @@ const FAILURE_SHORT: Record<string, string> = {
   CONFIGURATION_REQUIRED: "설정 필요",
   CANCELLED: "확인 중단",
   SOURCE_AUTH_REQUIRED: "연결 만료",
+  // The standing automatic check reads a seller-centre screen with the seller's own signed-in browser, so its
+  // wall is a sign-in page — the channel's API connection beside it may be perfectly good. 「연결 만료」 would
+  // send them to re-authorise a connection that never broke.
+  SOURCE_SIGN_IN_REQUIRED: "로그인 필요",
   SOURCE_NOT_CONNECTED: "연결 끊김",
 };
 
 export function failureShort(reason: string | null | undefined): string {
   return (reason && FAILURE_SHORT[reason]) || "확인 못함";
+}
+
+/**
+ * The verb on a gap's own link. 「재연결」 is right for a connection that broke and wrong for a store whose
+ * connection is fine and whose browser is signed out — the seller presses a different button on the same screen.
+ * Two forms because the two places differ: a tight inline line, and a button with room for the full phrase.
+ */
+export function gapActionKo(reason: string | null | undefined): string {
+  return reason === "SOURCE_SIGN_IN_REQUIRED" ? "로그인" : COPY.reconnect;
+}
+
+export function gapActionFullKo(reason: string | null | undefined): string {
+  return reason === "SOURCE_SIGN_IN_REQUIRED" ? "판매자센터 로그인하기" : "다시 연결하기";
 }
 
 /* ─────────────────────────── photos ─────────────────────────── */

@@ -136,7 +136,7 @@ export interface CustomerOperationsGapRow {
   caseId: string;
   channelCode: string | null;
   channelNameKo: string | null;
-  reason: "SOURCE_AUTH_REQUIRED" | "SOURCE_NOT_CONNECTED" | string;
+  reason: "SOURCE_AUTH_REQUIRED" | "SOURCE_SIGN_IN_REQUIRED" | "SOURCE_NOT_CONNECTED" | string;
   dataTypes: string[];
   since: string;
   lastSeenAt: string;
