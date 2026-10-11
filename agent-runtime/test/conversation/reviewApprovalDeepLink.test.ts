@@ -42,10 +42,26 @@ describe("review action artifacts deep-link to the exact review", () => {
     }
   });
 
+  const APPROVE_OR_SEND = [
+    "decideReviewReplyApproval", "decideReviewApproval", "publishReviewReply",
+    "executeReviewReply", "recordReviewReplyOutcome", "startReviewSubmissionRun",
+  ];
+
+  // The file, not one method's body. The assertion below slices `routeSend` because that is where the
+  // handoff is decided and the slice says so plainly — but a slice ends at the next `private `, so
+  // splitting `routeSend` into helpers would leave the fence green while reading a fraction of what it
+  // used to. This whole-file pass is what survives that refactor. See `docs/FINDINGS.md` §B10.
+  it("no part of the service reaches an approve or send path, however it is later split up", () => {
+    for (const forbidden of APPROVE_OR_SEND) {
+      expect(SOURCE, `ConversationService.ts names ${forbidden}`).not.toContain(forbidden);
+    }
+  });
+
   it("carries no approve or send path of its own — the link is the whole handoff", () => {
     const start = SOURCE.indexOf("private async routeSend(");
+    expect(start, "routeSend was renamed — this fence is no longer reading it").toBeGreaterThan(-1);
     const block = SOURCE.slice(start, SOURCE.indexOf("\n  private ", start + 10));
-    for (const forbidden of ["decideReviewReplyApproval", "decideReviewApproval", "publishReviewReply", "executeReviewReply", "recordReviewReplyOutcome", "startReviewSubmissionRun"]) {
+    for (const forbidden of APPROVE_OR_SEND) {
       expect(block, `routeSend must not reach ${forbidden}`).not.toContain(forbidden);
     }
     // Guided Reply UX Smoothing v1 §1: the runtime COMPOSES the approval card and never approves. The

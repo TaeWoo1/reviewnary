@@ -252,6 +252,34 @@
 - **출처** — 2026-10-12 세션. `test/conversation/conversationWriteFence.test.ts` ·
   `test/operator/plannerFence.test.ts`.
 
+### B11. 큰 파일이 "그냥 큰" 것인지 **계약으로 고정된** 것인지 먼저 본다
+
+- **했던 것** — `ConversationService.ts`(4,710줄)를 쪼개려 했다. 가장 큰 메서드
+  `routeSend()`가 혼자 1,321줄(파일의 28%)이니 거기부터가 당연해 보였다.
+- **사실** — 그 파일은 **네 개의 fence가 심볼 단위로 고정**하고 있었다.
+  `semanticOwnership`은 `countIn("conversation/ConversationService.ts", "answer.axis") === 1`,
+  `procedureLayer`는 `honestZero(` 1회 · `inquiryDraftPrecondition(` 3회 ·
+  `reviewDraftPrecondition(` 2회, `turnGraphOwnership`은 phase별 `this.<phase>(` 호출 수와
+  `selectProcedure(` 3회를 센다. 즉 **"이 개념은 이 파일이 소유한다"가 테스트로 선언돼
+  있다.** 파일이 큰 것은 사고가 아니라 부분적으로 설계다.
+  그리고 `reviewApprovalDeepLink`는 `routeSend`의 **본문을 잘라내어**
+  (`SOURCE.slice(start, indexOf("\n  private ", …))`) 승인·전송 경로가 없음을 검사한다 —
+  쪼개면 slice가 첫 조각에서 끝나므로 **fence는 green인 채로 일부만 읽는다**(§B10과 같은
+  실패 모드).
+- **다음에** — ① 큰 파일을 쪼개기 전에 그 파일을 **소스로 읽는 테스트를 모두 찾고**, 무엇을
+  몇 번 세는지 적어 둔다. ② 고정된 심볼을 옮기는 것은 **소유권 재선언**이므로 제품·구조
+  판단이다 — 조용히 하지 않는다(`CLAUDE.md` § Assumption rule). ③ 어느 fence도 이름을
+  대지 않는 **순수 심볼부터** 옮긴다. ④ 본문을 잘라 읽는 fence는 옮기기 전에
+  **파일 전체 스캔으로 보강**한다 — 그것이 분해 후에도 살아남는 쪽이다.
+- **이번에 한 것** — ④를 먼저 했다(`reviewApprovalDeepLink`에 승인·전송 토큰의 파일 전체
+  단정을 추가; slice 단정은 의도를 적어 두므로 남겼다). 그다음 ③으로 **셀러가 읽는 문구
+  전체**를 `src/conversation/sellerSentences.ts`로 옮겼다 — 144줄, 상수와 순수 함수만,
+  어느 fence도 이름을 대지 않는 것들이다. 문구 하나를 고치려고 4,580줄 파일을 열 필요가
+  없어졌다. `routeSend` 분해는 **열린 결정**으로 남겼다.
+- **출처** — 2026-10-12 세션. `test/conversation/reviewApprovalDeepLink.test.ts` ·
+  `test/operator/semanticOwnership.test.ts` · `test/operator/procedureLayer.test.ts` ·
+  `test/conversation/turnGraphOwnership.test.ts`.
+
 ---
 
 ## C. 증거 · 계약
