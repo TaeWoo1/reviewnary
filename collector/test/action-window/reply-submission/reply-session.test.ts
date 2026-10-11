@@ -102,7 +102,7 @@ describe("reply session — 「창 앞으로」 raises the surface the run alrea
     const { revision: _r, updatedAt: _u, ...after } = latestView()!;
     const { revision: _br, updatedAt: _bu, ...was } = before!;
     expect(after).toEqual(was);
-    expect(after.currentStep.status).toBe("AWAITING_USER");
+    expect(after.currentStep!.status).toBe("AWAITING_USER");
     assertFramesValid(frames);
   });
 

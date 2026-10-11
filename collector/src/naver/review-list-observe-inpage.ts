@@ -301,6 +301,34 @@ export function buildNaverReviewListReadScript(): string {
  * <p>It establishes the SURFACE, not the STORE. Which seller's store this is cannot be decided in the page —
  * the backend decides it at delivery, against listings collected by the official API.
  */
+/**
+ * **What the in-page census answers with.**
+ *
+ * The script below is built as a STRING and evaluated in the page, so TypeScript cannot derive this
+ * shape from it — the two must be kept in step by hand. This type is the one place that says what the
+ * shape is, so a caller or a test never re-declares it. On 2026-10-08/09 the script grew
+ * `dateFormFound` and `queryLabelled` while a test kept its own inline `as {…}` cast; the cast went
+ * stale and `npm run typecheck` went red on HEAD. Add a field here in the same edit that adds it to
+ * the returned object below. See `docs/FINDINGS.md` §B9.
+ *
+ * `-1` in a count means the candidate set could not be queried at all; `null` in an index list means
+ * the same for that list. «unreadable» and «none» are different answers.
+ */
+export type NaverReviewControlsCensus = {
+  route: boolean;
+  hostOk: boolean;
+  hashOk: boolean;
+  authHost: boolean;
+  grid: number;
+  dateCandidates: number;
+  dateAccepted: number[] | null;
+  dateFormFound: boolean;
+  queryCandidates: number;
+  queryLabelled: number;
+  queryAccepted: number[] | null;
+  openers: { dateIndex: number; openerIndex: number; openerCandidates: number }[];
+};
+
 export function buildNaverReviewControlsScript(dateSelector: string, querySelector: string): string {
   return `(function () {
   var host = String(location.host || '').toLowerCase();

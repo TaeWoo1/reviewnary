@@ -45,20 +45,20 @@ describe("NAVER review attachments — census-confirmed projection", () => {
       attachDirectoryName: "dir",
     }] }]);
     expect(out.reason).toBe("OK");
-    expect(out.rows[0].attachCount).toBe(1);
-    expect(out.rows[0].attachments).toEqual([{ url: "https://phinf.pstatic.net/checkout/a/b.jpg", kind: "IMAGE" }]);
+    expect(out.rows[0]!.attachCount).toBe(1);
+    expect(out.rows[0]!.attachments).toEqual([{ url: "https://phinf.pstatic.net/checkout/a/b.jpg", kind: "IMAGE" }]);
     expect(JSON.stringify(out)).not.toMatch(/IMG_0001|사진 설명|attachDirectoryName|dir"/);
   });
 
   it("an unobserved attachment type is UNKNOWN, never a guessed video", () => {
     const out = run([{ ...base, id: 5100000002, reviewAttaches: [{
       reviewAttachmentType: "V", attachUrl: "https://phinf.pstatic.net/checkout/a/c.mp4" }] }]);
-    expect(out.rows[0].attachments).toEqual([{ url: "https://phinf.pstatic.net/checkout/a/c.mp4", kind: "UNKNOWN" }]);
+    expect(out.rows[0]!.attachments).toEqual([{ url: "https://phinf.pstatic.net/checkout/a/c.mp4", kind: "UNKNOWN" }]);
   });
 
   it("an entry without an https attachUrl projects no addresses for that row — the count still travels", () => {
     const out = run([{ ...base, id: 5100000003, reviewAttaches: [{ reviewAttachmentType: "I", attachPath: "x" }] }]);
-    expect(out.rows[0].attachCount).toBe(1);
-    expect(out.rows[0].attachments).toBeNull();
+    expect(out.rows[0]!.attachCount).toBe(1);
+    expect(out.rows[0]!.attachments).toBeNull();
   });
 });

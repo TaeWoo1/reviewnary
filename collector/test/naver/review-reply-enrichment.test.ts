@@ -50,7 +50,7 @@ describe("NAVER review reply enrichment — runtime", () => {
     const result = await enrichNaverReviewReplies(page, ["1000001", "1000002", "1000003", "1000004", "1000005"], {
       settleMs: 0,
     });
-    expect(result.steps[0].locate).toBe("NOT_RENDERED");
+    expect(result.steps[0]!.locate).toBe("NOT_RENDERED");
     expect(result.clicks).toBe(DEFAULT_MAX_CLICKS);
     expect(clicks.length).toBe(6);
     expect(result.observations.map((o) => o.replyText)).toEqual(["a", "b", "c"]);

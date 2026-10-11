@@ -4,7 +4,10 @@ import {
   NAVER_REVIEW_DATE_INPUT_SELECTOR,
   NAVER_REVIEW_QUERY_CONTROL_SELECTOR,
 } from "../../src/aside/naver-review-workflow";
-import { buildNaverReviewControlsScript } from "../../src/naver/review-list-observe-inpage";
+import {
+  buildNaverReviewControlsScript,
+  type NaverReviewControlsCensus,
+} from "../../src/naver/review-list-observe-inpage";
 
 /**
  * **The test that was missing on 2026-10-08.**
@@ -140,11 +143,9 @@ function pageWith(elements: Partial<{
 
 function census(sandbox: Record<string, unknown>, dateSelector = NAVER_REVIEW_DATE_INPUT_SELECTOR) {
   const script = buildNaverReviewControlsScript(dateSelector, NAVER_REVIEW_QUERY_CONTROL_SELECTOR);
-  return runInNewContext(script, sandbox) as {
-    route: boolean; hostOk: boolean; hashOk: boolean; authHost: boolean; grid: number;
-    dateCandidates: number; dateAccepted: number[] | null;
-    queryCandidates: number; queryAccepted: number[] | null;
-  };
+  // The shape is owned by the module that builds the script, not re-declared here — that is what went
+  // stale and turned HEAD red (`docs/FINDINGS.md` §B9).
+  return runInNewContext(script, sandbox) as NaverReviewControlsCensus;
 }
 
 /**
