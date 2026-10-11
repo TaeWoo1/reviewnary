@@ -186,7 +186,7 @@ public class CollectNowService {
         // <b>멈춘 의도는 acquisition history와 무관하다.</b> history가 없는 배포에서도 「로그인을 기다리는
         // catch-up이 있다」는 사실은 참일 수 있고, 그 사실이 없으면 판매자는 로그인한 뒤에도 이어갈 길이 없다.
         boolean paused = pausedCatchUp(sellerAccountId, dataType);
-        boolean pausedSignIn = paused || autoCheckParkedOnSignIn(sellerAccountId);
+        boolean pausedSignIn = paused || autoCheckParkedOnSignIn(sellerAccountId, dataType);
         if (history == null) {
             return new CollectNowReadinessView(path, desk, null, null, null, null, paused, pausedSignIn);
         }
@@ -239,17 +239,27 @@ public class CollectNowService {
     }
 
     /**
-     * Whether this account's automatic check is parked on a sign-in wall.
+     * Whether <b>this row's</b> automatic check is parked on a sign-in wall.
      *
      * <p>The widest true statement of 「이 줄이 로그인을 기다린다」, and the one a paused walk cannot make: once
      * history is closed the check reads a single day with no walk behind it, so the row that holds the wall is
      * the setting's. Optional dependency — a deployment without the lane answers false, which is correct there.
+     *
+     * <p><b>And it stops at the data type that is actually waiting.</b> The setting row is per
+     * {@code (account, data_type)}; asking it without one made a paused REVIEW check say 「로그인을
+     * 기다린다」 on the same account's INQUIRY and ORDER rows, which are an API pull with no screen, no
+     * helper and no wall to clear. That was not only a wrong sentence. The screen gives every waiting row a
+     * return-check, and each one resumes <b>its own</b> data type: on 2026-10-11 the seller signed in, came
+     * back, and the three rows raced — INQUIRY won all three activations, resumed nothing (an API pull has no
+     * parked screen read to continue), and the REVIEW lane that had actually met the wall stayed paused with
+     * no resume ever sent for it. A row may only claim a pause it can itself end.
      */
-    private boolean autoCheckParkedOnSignIn(UUID sellerAccountId) {
-        if (autoCheck == null) {
+    private boolean autoCheckParkedOnSignIn(UUID sellerAccountId, String dataType) {
+        if (autoCheck == null || dataType == null) {
             return false;
         }
         return autoCheck.find(sellerAccountId)
+                .filter(row -> dataType.equals(row.getDataType()))
                 .map(row -> row.on()
                         && row.getPausedReason() == com.sellerops.autocheck.AutoCheckPause.PAUSED_AUTH)
                 .orElse(false);
