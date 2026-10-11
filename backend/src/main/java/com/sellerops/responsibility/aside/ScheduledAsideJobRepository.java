@@ -103,6 +103,46 @@ public interface ScheduledAsideJobRepository extends JpaRepository<ScheduledAsid
     List<ScheduledAsideJob> claimableFor(@Param("deviceId") UUID deviceId, @Param("now") Instant now);
 
     /**
+     * <b>Whether this desk is holding a job under a live lease right now.</b>
+     *
+     * <p>Half of the «one live job per desk» question, and it exists because the other half used to be answered
+     * in Java: {@code hasLiveWork} read {@code findAll()} and scanned every job this deployment had ever handed
+     * out, hydrated as entities, on every dispatch and on every 지금 수집 screen poll. The table only grows —
+     * one row per hour per account for the standing lane alone — so the cost of asking «is this desk busy» grew
+     * with the age of the installation, which is the shape of defect a long unattended run finds and a short
+     * test never does.
+     *
+     * <p>Served by {@code uq_scheduled_aside_job_active}, whose own predicate is {@code status in (QUEUED,
+     * CLAIMED)}: the index holds only live jobs, so this reads a handful of rows no matter how many have
+     * settled. The lease bound is here rather than in the caller because an expired lease is not live work —
+     * {@code expireStale} will relabel it, and the answer must not depend on having run first.
+     */
+    @Query("""
+            select count(j) from ScheduledAsideJob j
+            where j.deviceId = :deviceId
+              and j.status = com.sellerops.responsibility.aside.ScheduledAsideJobStatus.CLAIMED
+              and j.leaseUntil > :now
+            """)
+    long countClaimedLive(@Param("deviceId") UUID deviceId, @Param("now") Instant now);
+
+    /**
+     * <b>How many children one catch-up walk still has on a desk.</b>
+     *
+     * <p>Asked by {@code ReviewCatchUpOrchestrator} to tell a walk that is working from a walk whose child died
+     * without reporting. Keyed by the walk rather than by (org, account, recipe) on purpose: the one-live-job
+     * rule is per DEVICE, so an organisation with two linked helpers can have another lane's job live for the
+     * same account, and a walk that asked «is anything live for my store» would read that as its own child and
+     * conclude it was still working. The run id is the only thing that cannot be mistaken for someone else's.
+     */
+    @Query("""
+            select count(j) from ScheduledAsideJob j
+            where j.catchUpRunId = :catchUpRunId
+              and (j.status = com.sellerops.responsibility.aside.ScheduledAsideJobStatus.QUEUED
+                   or j.status = com.sellerops.responsibility.aside.ScheduledAsideJobStatus.CLAIMED)
+            """)
+    long countLiveChildren(@Param("catchUpRunId") UUID catchUpRunId);
+
+    /**
      * The single-use claim, mirroring the run lease: a conditional UPDATE that moves the row out of QUEUED.
      * Returns 0 when someone already took it, which is the fence a duplicate claim hits — the check and the
      * transition are one statement, so two helpers racing cannot both be told yes.

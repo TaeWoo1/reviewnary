@@ -42,14 +42,18 @@ import org.springframework.stereotype.Service;
  *
  * <ul>
  *   <li><b>a walk is already running</b> — it advances on its own children settling; a tick that queued a
- *   second window would be racing itself;</li>
+ *   second window would be racing itself. Unless it is running with <b>no child on any desk</b>, which is not
+ *   a walk at all: nothing will ever advance it, and it is stood down here so a fresh one can be planned
+ *   ({@code ReviewCatchUpOrchestrator#stopIfStranded});</li>
  *   <li><b>a job is on the desk</b> — possibly one the seller pressed for. It is left alone. This lane never
  *   cancels, never pre-empts, and never takes a desk away from a person;</li>
  *   <li><b>no usable helper</b> → {@link AutoCheckPause#PAUSED_DEVICE}, which the next turn clears by itself the
  *   moment a helper is back. The seller's setting is untouched;</li>
- *   <li><b>a walk is waiting at the sign-in wall</b> → {@link AutoCheckPause#PAUSED_AUTH}, and this lane does
- *   <b>not</b> retry it. A wall does not open with time. It opens when the seller signs in, and that is what
- *   continues the very window it stopped on.</li>
+ *   <li><b>a walk is waiting at the sign-in wall</b> → {@link AutoCheckPause#PAUSED_AUTH}. A wall does not open
+ *   with time; it opens when the seller signs in, and that is what continues the very window it stopped on.
+ *   But the <b>session</b> comes back the moment they sign in anywhere, and this product has no way to be told
+ *   — so after {@link ReviewAutoCheckClaimer#AUTH_RETRY} the lane looks once, rather than waiting for an event
+ *   it may never observe. Four times a day, and a read is its own probe.</li>
  * </ul>
  */
 @Service
@@ -165,7 +169,12 @@ public class ReviewAutoCheckReconciler {
         }
         Optional<ReviewCatchUpRun> live = catchUp.liveFor(accountId, ReviewAutoCheckService.DATA_TYPE);
         if (live.isPresent()) {
-            return live.get().getState() == ReviewCatchUpState.PAUSED_AUTH ? Outcome.PAUSED_AUTH : Outcome.SKIPPED;
+            Outcome held = heldByWalk(live.get(), orgId, accountId, recipe.get(), slot);
+            if (held != null) {
+                return held;
+            }
+            // The walk was stranded and has been stood down. Fall through and plan again from the real
+            // boundary, which is what the next hour would have done anyway.
         }
         if (jobs.liveFor(orgId, accountId, recipe.get()).isPresent()) {
             // Someone's work is on this desk — quite possibly a read the seller pressed for. Leave it.
@@ -195,6 +204,52 @@ public class ReviewAutoCheckReconciler {
             // Both are «nothing to do», and both are re-asked next hour.
             return Outcome.SKIPPED;
         }
+    }
+
+    /**
+     * <b>What a live walk means for this turn — or null when the walk turns out not to be live after all.</b>
+     *
+     * <p>Three answers, and the third one is the whole reason this method exists:
+     *
+     * <ul>
+     *   <li><b>Parked at a sign-in wall, recently</b> → {@link Outcome#PAUSED_AUTH}. Unchanged.</li>
+     *   <li><b>Parked at a wall longer than {@link ReviewAutoCheckClaimer#AUTH_RETRY}</b> → look once. The
+     *   six-hour probe exists because this product <b>cannot witness a sign-in</b>
+     *   ({@link ReviewAutoCheckClaimer#AUTH_RETRY} records the 2026-10-09 measurement), and it used to apply
+     *   only to a refresh with no walk behind it — a paused walk returned above, before the probe was ever
+     *   reached. A new one-day window opens at every KST midnight, so a seller who is signed out parks a walk
+     *   within a day, and from then on this lane read every hour, decided there was nothing it could do, and
+     *   wrote nothing. That is the one state a stopped observation must never look like.</li>
+     *   <li><b>RUNNING with no child on any desk</b> → the walk is stranded and is stood down here
+     *   ({@code stopIfStranded}), and this returns null so the turn plans a fresh walk. A child that expires
+     *   unclaimed never reports, so nothing advances the walk; {@code uq_review_catch_up_live} then refuses any
+     *   replacement, and this lane stood down politely every hour for as long as the installation lived.</li>
+     * </ul>
+     *
+     * <p>Nothing here cancels work. A walk with a child on a desk is left exactly alone — that child is reading
+     * the seller's screen at this moment — and so is a RUNNING walk whose child is merely queued.
+     */
+    private Outcome heldByWalk(ReviewCatchUpRun walk, UUID orgId, UUID accountId, AsideRecipe recipe, Instant slot) {
+        if (walk.getState() == ReviewCatchUpState.PAUSED_AUTH) {
+            if (metTheSignInWall(orgId, accountId, recipe, slot)) {
+                return Outcome.PAUSED_AUTH;
+            }
+            try {
+                return catchUp.resumeAfterWait(orgId, accountId, ReviewAutoCheckService.DATA_TYPE, recipe)
+                        .isPresent() ? Outcome.WALKED : Outcome.PAUSED_AUTH;
+            } catch (AsideHelperUnavailableException e) {
+                // No desk to look from. The resume is transactional, so the walk is still parked where it was —
+                // and a desk costs nothing to resolve, so this keeps the ordinary cadence (see settle).
+                return Outcome.PAUSED_DEVICE;
+            } catch (AsideHelperBusyException e) {
+                return Outcome.SKIPPED;
+            } catch (ApiException e) {
+                // The setting went off, or the store stopped resolving, between the claim and the dispatch.
+                // The wall is still the truth about this lane, so it is what the row keeps saying.
+                return Outcome.PAUSED_AUTH;
+            }
+        }
+        return catchUp.stopIfStranded(walk.getId()) ? null : Outcome.SKIPPED;
     }
 
     /**

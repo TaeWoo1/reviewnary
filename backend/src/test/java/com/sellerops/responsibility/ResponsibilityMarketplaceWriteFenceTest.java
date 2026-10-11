@@ -40,6 +40,18 @@ class ResponsibilityMarketplaceWriteFenceTest {
     private static final Path RUNTIME = Path.of("src/main/java/com/sellerops/responsibility");
     private static final Path INVESTIGATION =
             Path.of("src/main/java/com/sellerops/operationscase/investigation");
+    /**
+     * <b>The lane that actually runs unattended in an ordinary installation</b> — the seller's own standing
+     * 「새 리뷰를 자동으로 확인합니다」 setting and the walk it starts.
+     *
+     * <p>Added 2026-10-11 (Pilot Reliability v1) because the fence above measured the wrong deployment. The
+     * responsibility runtime's marketplace lane needs a deployment to name an organisation AND an account; the
+     * standing lane needs neither, because its authorisation is the seller's own setting — so in an ordinary
+     * install the code reading a marketplace screen every hour with nobody watching was these two packages, and
+     * they were outside every fence in this file.
+     */
+    private static final Path AUTO_CHECK = Path.of("src/main/java/com/sellerops/autocheck");
+    private static final Path CATCH_UP = Path.of("src/main/java/com/sellerops/coverage/catchup");
 
     /**
      * Every symbol by which something in this codebase actually sends to a marketplace.
@@ -86,6 +98,45 @@ class ResponsibilityMarketplaceWriteFenceTest {
                                 + "would be a marketplace WRITE performed while nobody is present, on an "
                                 + "approval nobody gave.", source)
                         .doesNotContain(symbol);
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("nothing in the seller's standing automatic-check lane can reach a marketplace write")
+    void theStandingLaneHoldsNoSendPath() throws IOException {
+        assertNoSendPath(AUTO_CHECK);
+        assertNoSendPath(CATCH_UP);
+    }
+
+    /**
+     * <b>A 72-hour unattended run makes the cost of every repeated question visible, and a whole-table read is
+     * the one whose cost grows with the age of the installation rather than with the work.</b>
+     *
+     * <p>Measured rather than imagined: {@code ScheduledAsideJobService.hasLiveWork} answered «is this one desk
+     * busy» by loading every job the deployment had ever handed out as entities, and it is asked on every
+     * dispatch and every 지금 수집 screen poll. The standing lane alone adds a row per account per hour, so the
+     * table only grows — nothing deletes from it — and a short test cannot tell the difference.
+     *
+     * <p>{@code channels.findAll()} is the one allowed read and the exception explains the rule: {@code channels}
+     * is a fixed reference list this product ships (three rows, and the visible channel set is frozen), not a
+     * ledger that one more unattended read makes longer.
+     */
+    @Test
+    @DisplayName("nothing on the unattended path reads a growing table whole")
+    void theUnattendedPathHoldsNoWholeTableRead() throws IOException {
+        for (Path pkg : List.of(RUNTIME, AUTO_CHECK, CATCH_UP)) {
+            for (Path source : javaFiles(pkg)) {
+                String text = code(source);
+                int at = text.indexOf("findAll()");
+                while (at >= 0) {
+                    assertThat(text.substring(Math.max(0, at - 9), at))
+                            .as("%s: a loop that runs for days must not ask a question whose cost is the size "
+                                    + "of a table nothing deletes from. Add a repository query scoped to what "
+                                    + "is being asked about.", source)
+                            .endsWith("channels.");
+                    at = text.indexOf("findAll()", at + 1);
+                }
             }
         }
     }
@@ -142,7 +193,10 @@ class ResponsibilityMarketplaceWriteFenceTest {
                 "${SELLEROPS_RESPONSIBILITY_ASIDE_MARKETPLACE_ORG_IDS:}",
                 "${SELLEROPS_RESPONSIBILITY_ASIDE_MARKETPLACE_ACCOUNT_IDS:}",
                 "${SELLEROPS_RESPONSIBILITY_SCHEDULER_ENABLED:false}",
-                "${RESPONSIBILITY_RUNTIME_ORG_IDS:}")) {
+                "${RESPONSIBILITY_RUNTIME_ORG_IDS:}",
+                // The standing lane's one deployment decision — «does this lane run here at all». A shipped
+                // build whose default was true would read a seller's store on its own on first boot.
+                "${SELLEROPS_REVIEW_AUTO_CHECK_ENABLED:false}")) {
             assertThat(yml).as("fail-closed default: %s", expected).contains(expected);
         }
     }
