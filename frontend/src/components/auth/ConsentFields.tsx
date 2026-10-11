@@ -3,7 +3,7 @@ import { PRIVACY_PATH, TERMS_PATH } from "../../lib/legal";
 import { authLink } from "./AuthCard";
 
 /**
- * The account-consent checkboxes shared by `/signup` and `/onboarding` (docs/service_readiness_v1.md §2-4):
+ * The account-consent checkboxes shared by `/signup` and `/onboarding` (docs/standing/service_readiness_v1.md §2-4):
  * 필수 (이용약관 · 개인정보처리방침 — the backend refuses without it) and 선택 (마케팅 수신). The linked pages
  * are placeholders until the documents are confirmed (§7); the structure is what this prepares.
  */

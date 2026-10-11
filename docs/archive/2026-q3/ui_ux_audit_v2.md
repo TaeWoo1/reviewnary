@@ -32,7 +32,7 @@ Demo Core freeze 계약(`docs/demo_core_experience_v1.md` §12)은 하나도 건
 ## 1. 원칙을 합격선으로 옮긴다
 
 「모두의 창업」 여섯 원칙은 그대로 두면 누구나 지켰다고 말할 수 있다. 그래서 각 원칙을 **화면에서 잴 수 있는
-기준**으로 바꿨다. 기존 `docs/reviewnary_design.md`(v3)의 타입 스케일(base 16), 간격, 색은 바꾸지 않는다.
+기준**으로 바꿨다. 기존 `docs/frontend/reviewnary_design.md`(v3)의 타입 스케일(base 16), 간격, 색은 바꾸지 않는다.
 
 | 원칙 | 합격선 (화면마다) |
 |---|---|

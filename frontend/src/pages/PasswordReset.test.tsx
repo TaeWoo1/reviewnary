@@ -39,7 +39,7 @@ function renderAt(path: string) {
 
 afterEach(() => vi.clearAllMocks());
 
-/** docs/service_readiness_v1.md §6 — the reset lifecycle as the seller sees it. */
+/** docs/standing/service_readiness_v1.md §6 — the reset lifecycle as the seller sees it. */
 describe("password reset", () => {
   it("/login shows the reset entry only when a mailed link can reach someone", async () => {
     passwordResetConfig.mockResolvedValue({ enabled: false, devOutbox: false });
@@ -118,7 +118,7 @@ describe("password reset", () => {
   });
 });
 
-/** docs/service_readiness_v1.md §2-4 / §7: the legal pages are placeholders — no invented legal wording. */
+/** docs/standing/service_readiness_v1.md §2-4 / §7: the legal pages are placeholders — no invented legal wording. */
 describe("legal placeholders", () => {
   it("say the document is not confirmed and carry the draft version", () => {
     renderAt("/legal/privacy");

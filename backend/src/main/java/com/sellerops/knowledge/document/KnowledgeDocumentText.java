@@ -35,7 +35,7 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
  *
  * <p><b>A document with no text layer is refused, not accepted empty.</b> A scanned PDF is a stack of
  * pictures; reading it would need the image lane, which is a separate product decision with its own
- * payload floor ({@code docs/image_product_knowledge_v1.md}). Accepting it as an empty source would put
+ * payload floor ({@code docs/knowledge/image_product_knowledge_v1.md}). Accepting it as an empty source would put
  * a document on the seller's screen that can never grounding anything and never say why.
  */
 public final class KnowledgeDocumentText {

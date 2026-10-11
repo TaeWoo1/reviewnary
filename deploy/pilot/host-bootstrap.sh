@@ -59,7 +59,7 @@ else
   case "$(uname -m)" in
     x86_64)  awsarch=x86_64 ;;
     aarch64) awsarch=aarch64 ;;
-    # The pilot host contract recommends x86_64 (docs/pilot_host_provisioning_v1.md §3), and the Docker
+    # The pilot host contract recommends x86_64 (docs/pilot/pilot_host_provisioning_v1.md §3), and the Docker
     # step above is architecture-neutral (it asks dpkg). So this handles both of AWS's Linux builds and
     # refuses anything else rather than installing a bundle that cannot run — a guess here would be an
     # uploader that exists on PATH and fails at 03:17.

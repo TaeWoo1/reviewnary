@@ -34,8 +34,8 @@ narratives:
       가져오지 않은 자료로 우선순위를 매기지 않고, 근거 없이 초안을 쓰지 않고, 승인 없이
       실행하지 않는다.
     sourceRefs:
-      - docs/proactive_operations_agent_v1.md
-      - docs/core_daily_loop_ux_v1.md
+      - docs/standing/proactive_operations_agent_v1.md
+      - docs/frontend/core_daily_loop_ux_v1.md
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -47,8 +47,8 @@ narratives:
       지금 상황과 문제와 내가 누를 것을 먼저 보여야 하고, 답변은 판매자가 그대로 쓸 수 있는
       문장이어야 한다.
     sourceRefs:
-      - docs/executive_ux_redesign_v1.md
-      - docs/reviewnary_design.md
+      - docs/frontend/executive_ux_redesign_v1.md
+      - docs/frontend/reviewnary_design.md
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -72,7 +72,7 @@ narratives:
       근거로 썼는지 보여 주지만, 승인은 사람이 한다. 판매자가 초안을 고쳐 쓰면 나가는 것은 고쳐
       쓴 문장이고, 승인 전에는 어떤 문장도 화면 밖으로 나가지 않는다.
     sourceRefs:
-      - docs/pilot_runtime_foundation_v1.md §0-A
+      - docs/pilot/pilot_runtime_foundation_v1.md §0-A
       - INVARIANT.APPROVAL_BOUNDARY
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
@@ -86,6 +86,6 @@ narratives:
       때문에 답이 짧아지는 경우가 있고, 그것이 옳은 결과다.
     sourceRefs:
       - INVARIANT.ABSENCE
-      - docs/answer_applicability_v1.md
+      - docs/knowledge/answer_applicability_v1.md
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"

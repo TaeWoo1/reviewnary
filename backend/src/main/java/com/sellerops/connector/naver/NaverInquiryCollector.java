@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
  * The NAVER INQUIRY lane driver: two official resources, one cursor slot, one data type.
  *
  * <p>NAVER publishes 상품 문의 and 고객 문의 as separate resources with separate contracts
- * ({@code docs/naver_inquiry_api_audit_v1.md}). The runtime gives a connector one cursor per
+ * ({@code docs/lineage/naver_inquiry_api_audit_v1.md}). The runtime gives a connector one cursor per
  * (account × data type), so a run sweeps one source to its documented end, then the other, and the
  * cursor remembers each lane's own position. A source whose client is not wired is skipped entirely —
  * which is also how a live proof measures ONE source: enable only that source's flag.

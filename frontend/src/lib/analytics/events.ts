@@ -1,5 +1,5 @@
 /**
- * The analytics vocabulary — docs/auth_growth_instrumentation_v1.md §5, §2-9.
+ * The analytics vocabulary — docs/standing/auth_growth_instrumentation_v1.md §5, §2-9.
  *
  * Every event has a FIXED prop key set, and every prop value must be one of an enum. That is the whole PII
  * story: a page cannot put an email, a name, a 상호, a review sentence, or a marketplace id into an event

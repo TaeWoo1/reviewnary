@@ -11,7 +11,7 @@ import lombok.Setter;
 
 /**
  * A social identity bound to a SellerOps user. The identity is {@code (provider, providerSubject)} — never
- * the email (docs/auth_growth_instrumentation_v1.md §2-2). {@code email} is what the provider reported at
+ * the email (docs/standing/auth_growth_instrumentation_v1.md §2-2). {@code email} is what the provider reported at
  * link time, kept for display only.
  */
 @Getter

@@ -27,7 +27,7 @@ public class ReviewPublishExecutionWiring {
 
     /**
      * The comment write client. {@code live-approval-id} is the environment-binding token of
-     * {@code docs/sellerops_live_approval_contract.md}; blank (the default) refuses every real host
+     * {@code docs/standing/sellerops_live_approval_contract.md}; blank (the default) refuses every real host
      * before a request is built.
      */
     @Bean

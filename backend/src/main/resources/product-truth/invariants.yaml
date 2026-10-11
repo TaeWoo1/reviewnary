@@ -21,7 +21,7 @@ invariants:
       - 판매자가 아직 연결하지 않았다는 이유로 채널의 capability를 UNKNOWN으로 낮추지 않는다.
       - 내부 설정 키 이름을 판매자에게 말하지 않는다.
     sourceRefs:
-      - docs/grounded_conversation_lane_v1.md
+      - docs/agent/grounded_conversation_lane_v1.md
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -59,7 +59,7 @@ invariants:
       - 반대로 "승인하시면 다 보내 드립니다"라고도 말하지 않는다. 네이버 리뷰는 마지막 등록 버튼을
         판매자가 누르고, 쿠팡 리뷰는 답을 남길 기능 자체가 없다.
     sourceRefs:
-      - docs/sellerops_live_approval_contract.md
+      - docs/standing/sellerops_live_approval_contract.md
       - capabilities.yaml (각 채널×객체의 EXECUTION 행)
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
@@ -78,7 +78,7 @@ invariants:
       - 반대로 대화에서 승인이나 전송이 일어난다고 말하지 않는다. 승인은 그 일을 소유한 화면의 것이다.
     sourceRefs:
       - agent-runtime/src/operator/capability/AssistantCapability.ts
-      - docs/grounded_conversation_lane_v1.md §4 (대화 turn은 어떤 procedure도 진행시키지 않는다)
+      - docs/agent/grounded_conversation_lane_v1.md §4 (대화 turn은 어떤 procedure도 진행시키지 않는다)
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -108,8 +108,8 @@ invariants:
       - 주문 수정·취소·발송 처리는 하지 않는다.
       - 집계의 최신성만으로 개별 주문의 최신 상태를 말하지 않는다.
     sourceRefs:
-      - docs/operational_fact_binding_v1.md
-      - docs/exact_operational_context_v1.md
+      - docs/knowledge/operational_fact_binding_v1.md
+      - docs/knowledge/exact_operational_context_v1.md
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -127,7 +127,7 @@ invariants:
       - 반대로 "채널 데이터는 근거로 쓰지 않는다"고도 말하지 않는다. 경로가 다를 뿐 둘 다 근거다.
       - AI가 만든 초안이 과거 답변 기억에 들어간다고 말하지 않는다. 구조적으로 들어가지 않는다.
     sourceRefs:
-      - docs/seller_operations_knowledge_and_answer_memory_v1.md
+      - docs/knowledge/seller_operations_knowledge_and_answer_memory_v1.md
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -141,7 +141,7 @@ invariants:
         "채널 밖의 자료는 아무것도 보지 못한다"고 말하지 않는다. 판매자님이 직접 등록하신 운영
         기준·FAQ·회사 정보는 채널에서 온 것이 아니지만 쓸 수 있다.
     sourceRefs:
-      - docs/seller_operations_knowledge_and_answer_memory_v1.md (KnowledgeScope)
+      - docs/knowledge/seller_operations_knowledge_and_answer_memory_v1.md (KnowledgeScope)
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -154,7 +154,7 @@ invariants:
       - 응답에서 사라진 것을 삭제로 판정하지 않는다.
       - 알아보지 못한 값을 그럴듯한 값으로 바꾸지 않는다.
     sourceRefs:
-      - docs/agent_procedure_layer_v1.md (AbsenceReason · ZERO_MEASURED)
+      - docs/agent/agent_procedure_layer_v1.md (AbsenceReason · ZERO_MEASURED)
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 

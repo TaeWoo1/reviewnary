@@ -17,7 +17,7 @@
  *  - **It is LINEAR — no branch.** A fixed 8-step line.
  *
  * **THE FLOW, MEASURED (2026-08-10, five granted READ_ONLY runs). This replaces a plan that was wrong in three
- * places and fail-open in one.** See `docs/coupang_wing_openapi_issuance_flow_discovery_v1.md`.
+ * places and fail-open in one.** See `docs/lineage/coupang_wing_openapi_issuance_flow_discovery_v1.md`.
  *
  * ```
  * open-API page → 발급 → PURPOSE → 확인 → TERMS → 약관 동의 및 Key 발급받기 → VENDOR METHOD → 확인 → keys

@@ -6,7 +6,7 @@ import { resolve } from "node:path";
  * <b>The visual system, asserted on the source — because the last three times it was only written down,
  * the next screens were built beside it.</b>
  *
- * <p>`docs/reviewnary_design.md` v3 has fixed the palette, the spacing scale, the radii and the type
+ * <p>`docs/frontend/reviewnary_design.md` v3 has fixed the palette, the spacing scale, the radii and the type
  * scale since 2026-09-01, with measurements. It was never enforced, and by 2026-09-30 the app surface
  * carried 73 raw hex values, 17 greys where the contract has three, 11 card borders drawn as
  * `shadow-[0_0_0_1px_…]`, six sizes of `h1` and six of `h2`

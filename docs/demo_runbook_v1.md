@@ -18,7 +18,7 @@ collection → routine operation, done by the seller themself) changes only thes
 
 - **Clean org.** Do NOT log in as `demo@sellerops.ai`. Create a fresh org once with `POST /api/auth/signup`
   (fields: `email`, `password` ≥ 6 chars, `name`, `orgName`, `termsAccepted: true` — 2026-08-19,
-  `docs/service_readiness_v1.md` §2-4) and log in with it at `/login` (replace the
+  `docs/standing/service_readiness_v1.md` §2-4) and log in with it at `/login` (replace the
   pre-filled demo credentials). Nothing from the demo/fixture data is visible from that org.
 - **Real channels only.** Connect only the channels the seller actually uses, from `/connect`; the visible
   set stays NAVER / Coupang / Cafe24 and no seller account is seeded.
@@ -35,7 +35,7 @@ collection → routine operation, done by the seller themself) changes only thes
   `--action-window-initial-review-import --i-understand-this-opens-live-naver`.
 - **Marketplace WRITE is forbidden until the product owner's explicit in-turn approval.** Import,
   locate and reply *preparation* are read-only; posting a reply or any other seller-center submission needs
-  its own mode-`WRITE` approval (`docs/sellerops_live_approval_contract.md`).
+  its own mode-`WRITE` approval (`docs/standing/sellerops_live_approval_contract.md`).
 
 ### 0.1 Three-channel order and the command per channel (2026-08-18)
 
@@ -60,7 +60,7 @@ error/retry/reconnect UX, missing feedback/action events. Marketplace WRITE stay
 
 ### 0.2 Self-Pilot Runtime v1 — days of routine with only the UI open (2026-08-18)
 
-Design and honest state: `docs/self_pilot_runtime_v1.md`; scope decision `product-scope-v1.md` v1.9;
+Design and honest state: `docs/standing/self_pilot_runtime_v1.md`; scope decision `product-scope-v1.md` v1.9;
 approval consequence `sellerops_live_approval_contract.md` §6a. What it changes for this runbook:
 
 - **Backend once, before channel 1** (`backend/.env.local`, names only; then restart `bootRun`):
@@ -91,16 +91,16 @@ approval consequence `sellerops_live_approval_contract.md` §6a. What it changes
 
 ### 0.3 Browser-only new user (2026-08-18) — the seller's path, and the deployer's one-time prep
 
-`docs/self_pilot_runtime_v1.md` §8. Two roles, deliberately separated:
+`docs/standing/self_pilot_runtime_v1.md` §8. Two roles, deliberately separated:
 
 **Deployer, once, before the service starts** (backend `.env.local`, names only): everything in §0.2's
 backend list **plus** `SELLEROPS_SELF_PILOT_SCOPE=LOCAL_SINGLE_USER` (instead of `SELLEROPS_SELF_PILOT_ORG_IDS`)
 and, if AI triage is wanted, `SELLEROPS_AI_TRIAGE_PILOT_ORG_IDS=*`. Optional (2026-08-19,
-`docs/auth_growth_instrumentation_v1.md` §8): Google / NAVER 소셜 로그인 = `SELLEROPS_OAUTH_GOOGLE_CLIENT_ID/SECRET`,
+`docs/standing/auth_growth_instrumentation_v1.md` §8): Google / NAVER 소셜 로그인 = `SELLEROPS_OAUTH_GOOGLE_CLIENT_ID/SECRET`,
 `SELLEROPS_OAUTH_NAVER_CLIENT_ID/SECRET` (redirect URI at the provider console:
 `http://localhost:5173/login/oauth2/code/{google|naver}`); growth analytics = frontend `VITE_GTM_ID`,
 `VITE_POSTHOG_KEY` — all absent by default, and absent means the buttons / sinks do not exist. Optional (2026-08-19,
-`docs/service_readiness_v1.md` §5): password reset mail — local without SMTP: `SELLEROPS_MAIL_MODE=dev-outbox` (the
+`docs/standing/service_readiness_v1.md` §5): password reset mail — local without SMTP: `SELLEROPS_MAIL_MODE=dev-outbox` (the
 reset link is printed in the backend log under `[DEV MAIL OUTBOX]`; without it the "비밀번호를 잊으셨나요?" entry does
 not exist); error monitoring `SENTRY_DSN` / `VITE_SENTRY_DSN` (absent = OFF); the consent banner appears only when
 `VITE_GTM_ID` / `VITE_POSTHOG_KEY` is set. Start backend
@@ -218,7 +218,7 @@ npm run serve                         # http://127.0.0.1:8787
   approved dismissal batches; until this date no current-truth read honoured that decision, so 홈 and
   Today Inbox counted work the seller had already decided not to do. The rows are all still there —
   nothing was deleted — they are marked `EXCLUDED_SPAM` and excluded from current reads only. Record:
-  `docs/inquiry_operational_truth_v1.md`. If a walkthrough on an older snapshot shows 3,208, that
+  `docs/inquiry/inquiry_operational_truth_v1.md`. If a walkthrough on an older snapshot shows 3,208, that
   snapshot predates the projection; run `POST /api/inquiries/operational-state/backfill` (idempotent).
 
 ## 3. Screen order (the walkthrough)
@@ -226,7 +226,7 @@ npm run serve                         # http://127.0.0.1:8787
 > **This table is the A7 (2026-08-18) product assembly's walkthrough, and it is not the only one.**
 > Demo Core froze a different seven-screen order on 2026-09-22 (홈 → 확인할 일 → Inquiry Case → Review
 > Case → 실행 대기 → 반복 문제 → Memory): `docs/demo_core_experience_v1.md` §12 owns it, and
-> `docs/demo_seller_validation_v1.md` §2 is the script for showing it to an outside seller. Which of the
+> `docs/pilot/demo_seller_validation_v1.md` §2 is the script for showing it to an outside seller. Which of the
 > two a session shows is a **product-owner decision**; neither table is deleted here. Everything else in
 > this runbook — start, env, demo org, proof levels, failures — serves both.
 
@@ -267,7 +267,7 @@ judge, and the card labels itself 규칙 해석 accordingly. The four asks above
 free-form sentence outside them answers "이 요청은 아직 지원하지 않습니다".
 
 > ⚠ **v2 landed 2026-08-21 and this paragraph is now HISTORICAL.**
-> `docs/sellerops_operator_graph_v2.md` removed the deterministic planner: with the planner capability
+> `docs/standing/sellerops_operator_graph_v2.md` removed the deterministic planner: with the planner capability
 > off, Agent chat does **not** degrade to keyword routing — the run **fails** and the screen says so
 > (proven live: 5/5 free-text asks FAILED, while the button-driven intent lane still ran). A v2 demo
 > therefore needs the planner capability enabled for the demo org, and **"the four asks" is no longer a
@@ -287,7 +287,7 @@ free-form sentence outside them answers "이 요청은 아직 지원하지 않�
 | 리뷰 tier list, filters, URL sync, detail | test-proven + live-checked (A3, A7 walkthrough) | same |
 | NAVER 답변 준비 from the 리뷰 detail (decision → draft → approve → copy → manual handoff → outcome record) | **test-proven; entry point re-hosted in A6, exercised live against local PG in the A7 walkthrough**; the underlying flow was live-proven on the old worklist surface (2026-07) | `docs/workstreams/review_operations_mvp.md` |
 | NAVER guided reply (agent finds the row; seller submits) | live-proven once on the old surface (bridge + REPLY carrier); **not exercised since the move**; needs `npm run dev:bridge` + paired agent | `docs/action-window-runtime/HANDOFF.md` |
-| `[쿠팡에서 보기]` locate run | live-proven 2026-08-15 (re-proved on merged main); needs paired agent + WING tab | `docs/coupang_review_locate_ux_v1.md` §5 |
+| `[쿠팡에서 보기]` locate run | live-proven 2026-08-15 (re-proved on merged main); needs paired agent + WING tab | `docs/lineage/coupang_review_locate_ux_v1.md` §5 |
 | AI 확인 필요 mark (C2 pilot) | live-proven on the first pilot org (2026-08-17); org opt-in only | `review_ai_triage_demo.md` §8 |
 | 문의 답변 방향 제안 (response workflow) | test-proven; **not demonstrable in the demo org** — work items exist only for connector-ingested inquiries and the demo org's one OPEN item is outside the 500-row feed window | this file |
 | 리뷰 수집 (Action Window export run) | live-proven (NAVER, 2026-07); needs collector agent + `dev:bridge`; the plain demo shows the workbench read-only with persisted import history | `docs/action-window-runtime/HANDOFF.md`, `docs/workstreams/action-window-frontend/live-verification-protocol.md` |
@@ -299,7 +299,7 @@ free-form sentence outside them answers "이 요청은 아직 지원하지 않�
 ## 5. Segments that need the local agent (not in the plain demo)
 
 - 리뷰 수집 실행 (`/connect/imports`): collector agent + `cd frontend && npm run dev:bridge`, pair via
-  the dock, hard-reload. Live marketplace runs need a fresh approval (`docs/sellerops_live_approval_contract.md`).
+  the dock, hard-reload. Live marketplace runs need a fresh approval (`docs/standing/sellerops_live_approval_contract.md`).
 - NAVER guided reply (agent hosting the REPLY carrier) and `[쿠팡에서 보기]`: same bridge; otherwise the
   panel offers the manual handoff and the locate button reports unavailability.
 - Developer chrome (`VITE_AW_FIXTURE_PREVIEW=1`) is for the FE verification protocol only, never for a

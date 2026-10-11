@@ -29,7 +29,7 @@ import java.util.Set;
  *
  * <p>The replacement interprets the request and stops there: {@link com.sellerops.inquiry.goal.CustomerGoal}, with
  * {@link com.sellerops.inquiry.goal.ResolutionPolicy} dispatching one resolver at a time and looking at the result
- * before choosing the next. See {@code docs/inquiry_architecture_v35.md}.
+ * before choosing the next. See {@code docs/lineage/inquiry_architecture_v35.md}.
  */
 /**
  * <b>The Plan Validator</b> (Inquiry v3 WP-2, narrowed in WP-3, closing semantics made explicit in WP-3.1) — code, not
@@ -110,7 +110,7 @@ public final class ResolutionPlanValidator {
          * <p><b>What it does NOT catch, stated so it is not mistaken for a fix:</b> a planner that invents a SECOND
          * NEED for the follow-up. Each need then satisfies this rule on its own. That is the {@code C6} residual of
          * the Candidate C smoke, it is over-splitting rather than a mis-shaped need, and no per-need rule can see it —
-         * see docs/inquiry_architecture_v3_wp32.md §1.3.
+         * see docs/lineage/inquiry_architecture_v3_wp32.md §1.3.
          */
         PROCEDURE_NOT_CLOSING,
         /** Identity asked of the customer — refused on every surface in v3.0 (public Q&A by product-owner decision). */

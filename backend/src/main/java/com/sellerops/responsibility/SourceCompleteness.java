@@ -1,7 +1,7 @@
 package com.sellerops.responsibility;
 
 /**
- * How far one source was observed (docs/responsibility_runtime_v1.md §6-2).
+ * How far one source was observed (docs/standing/responsibility_runtime_v1.md §6-2).
  *
  * <p>The distinction this enum exists for: {@link #COMPLETE} with {@code observedCount = 0} is «확인했고 새로 없음»,
  * and {@link #NONE} is «확인하지 못함» and carries no count at all (the schema refuses one).

@@ -14,7 +14,7 @@ import lombok.Setter;
 /**
  * A one-time handoff minted by the OAuth success handler. The browser only ever carries the random code;
  * the row stores its SHA-256 and is spent by {@code consumed_at} — a JWT is never in a URL
- * (docs/auth_growth_instrumentation_v1.md §2-1, §2-3).
+ * (docs/standing/auth_growth_instrumentation_v1.md §2-1, §2-3).
  */
 @Getter
 @Setter

@@ -28,7 +28,7 @@ const METHOD_LABEL: Record<string, string> = {
  * than a connector capability that is merely unverified, so it borrows the same warn tone the
  * connector axis uses for `NEEDS_VERIFICATION`.
  *
- * **No 지원 here, deliberately.** `docs/channel-capability-registration-matrix.md` §0 reserves the word
+ * **No 지원 here, deliberately.** `docs/channel/channel-capability-registration-matrix.md` §0 reserves the word
  * a seller reads as 지원 for the last rung of the roadmap's 4-stage ladder — 운영 지원, an always-on
  * promise, which today only 파일 업로드 has reached. An acquisition path is a route with evidence behind
  * it, not a standing commitment, so it says what it is: which route, and how far it has been proven.

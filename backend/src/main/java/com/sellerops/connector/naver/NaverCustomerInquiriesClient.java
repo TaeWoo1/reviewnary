@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
  * <pre>GET /external/v1/pay-user/inquiries?startSearchDate=..&amp;endSearchDate=..&amp;page=n&amp;size=m</pre>
  *
  * <p>Official contract: {@code docs/vendor/naver-commerce-api/get-v1-pay-user-inquiries.md};
- * audit: {@code docs/naver_inquiry_api_audit_v1.md} §2.
+ * audit: {@code docs/lineage/naver_inquiry_api_audit_v1.md} §2.
  *
  * <p><b>This is not the same thing as 상품 문의, and the two must not be merged.</b> A 고객 문의 hangs
  * off an ORDER ({@code orderId} is a required response field) and is categorised

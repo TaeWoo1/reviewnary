@@ -28,7 +28,7 @@ import java.util.List;
  *
  * <p>The replacement interprets the request and stops there: {@link com.sellerops.inquiry.goal.CustomerGoal}, with
  * {@link com.sellerops.inquiry.goal.ResolutionPolicy} dispatching one resolver at a time and looking at the result
- * before choosing the next. See {@code docs/inquiry_architecture_v35.md}.
+ * before choosing the next. See {@code docs/lineage/inquiry_architecture_v35.md}.
  */
 /**
  * Reads a planner answer strictly (Inquiry v3 WP-2; per-capability shapes in WP-3; the declared ending in WP-3.1).

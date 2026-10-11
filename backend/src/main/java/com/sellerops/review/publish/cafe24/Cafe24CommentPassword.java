@@ -4,7 +4,7 @@ import java.security.SecureRandom;
 
 /**
  * The per-comment {@code password} the Cafe24 comments POST requires — outcome <b>A</b> of the audit
- * in {@code docs/cafe24_review_comment_execution_v1.md}: an author-chosen per-object secret, not an
+ * in {@code docs/review/cafe24_review_comment_execution_v1.md}: an author-chosen per-object secret, not an
  * account credential.
  *
  * <p>So it is generated fresh for the ONE request that needs it, used once, and discarded. It is never

@@ -11,13 +11,13 @@ import { captureUrlSecrets } from "./lib/urlSecrets";
 import "./index.css";
 
 // FIRST: a one-time code / reset token in the URL leaves the address bar before any vendor can see it
-// (docs/service_readiness_v1.md §2-1). The page reads it back from sessionStorage.
+// (docs/standing/service_readiness_v1.md §2-1). The page reads it back from sessionStorage.
 captureUrlSecrets();
 // Error monitoring first, env-gated: no VITE_SENTRY_DSN (local/dev) → nothing initialises
-// (docs/service_readiness_v1.md §2-1).
+// (docs/standing/service_readiness_v1.md §2-1).
 initSentryFromEnv();
 // One abstraction, env-gated: with no VITE_GTM_ID / VITE_POSTHOG_KEY (local/dev) nothing loads and every
-// `analytics.track` is a no-op — docs/auth_growth_instrumentation_v1.md §2-8. Sinks start only under 분석 consent.
+// `analytics.track` is a no-op — docs/standing/auth_growth_instrumentation_v1.md §2-8. Sinks start only under 분석 consent.
 initAnalyticsFromEnv();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

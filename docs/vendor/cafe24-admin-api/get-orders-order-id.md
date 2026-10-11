@@ -3,7 +3,7 @@
 > **Vendor copy.** Transcribed from the official Cafe24 Developers Admin API reference
 > (`https://developers.cafe24.com/docs/en/api/admin/`, resource *Orders*), retrieved
 > **2026-08-25**. This file records what the PLATFORM publishes. It carries no SellerOps
-> conclusion — those live in `docs/exact_operational_context_v1.md`, in
+> conclusion — those live in `docs/knowledge/exact_operational_context_v1.md`, in
 > `ExactOrderLookupCapability`, and in `docs/multi-channel-connector-roadmap.md` §4.1.
 
 ## Why this file exists

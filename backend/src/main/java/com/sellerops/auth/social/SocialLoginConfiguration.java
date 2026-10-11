@@ -24,7 +24,7 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
  * <p>Redirect URI template is Spring's default {@code {baseUrl}/login/oauth2/code/{registrationId}}; the base
  * URL is the public origin the browser used (through the dev proxy that is {@code http://localhost:5173}),
  * which is what must be registered at the Google / NAVER developer console
- * (docs/auth_growth_instrumentation_v1.md §3).
+ * (docs/standing/auth_growth_instrumentation_v1.md §3).
  */
 @Configuration
 @Conditional(SocialLoginConfiguration.AnyProviderConfigured.class)

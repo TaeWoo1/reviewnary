@@ -10,7 +10,7 @@
  * This module decides one thing: whether the sentence IS that instruction. It never widens what may be
  * done. A guided acquisition is a READ the seller performs in their own window, nothing is clicked or
  * downloaded for them, and every marketplace WRITE, composer fill and submission keeps the approval it
- * has (`docs/sellerops_live_approval_contract.md` — none of those paths reads this file).
+ * has (`docs/standing/sellerops_live_approval_contract.md` — none of those paths reads this file).
  *
  * <b>Closed vocabulary, and a question is never an instruction.</b> The reader wants an action word AND
  * the object it acts on, and refuses anything shaped like a question — 「가져올 수 있어?」 is asking what

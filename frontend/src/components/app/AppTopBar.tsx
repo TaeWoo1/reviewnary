@@ -2,7 +2,7 @@ import { useAuth } from "../../lib/auth";
 import { ConnectionSignal } from "./ConnectionSignal";
 
 /**
- * Mobile-only utility bar. On desktop there is no top bar at all (docs/reviewnary_design.md §7): the
+ * Mobile-only utility bar. On desktop there is no top bar at all (docs/frontend/reviewnary_design.md §7): the
  * page title starts the page, and the connection status lives in the sidebar's status area. Below
  * `md` the sidebar is hidden, so the workspace name and that status appear here instead.
  */

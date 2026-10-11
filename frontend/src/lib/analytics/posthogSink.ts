@@ -5,7 +5,7 @@ import type { AnalyticsSink } from "./sink";
  * PostHog sink (product funnel / retention) — optional, same abstraction. Loaded from the PostHog host's own
  * `array.js` when a key is present; **session replay OFF**, autocapture OFF, automatic pageview OFF, so
  * exactly the events in `events.ts` (and nothing typed on a page) leave the browser
- * (docs/auth_growth_instrumentation_v1.md §2-8).
+ * (docs/standing/auth_growth_instrumentation_v1.md §2-8).
  */
 export interface PosthogLike {
   init(key: string, options: Record<string, unknown>): void;
@@ -72,7 +72,7 @@ export function createPosthogSink(
       };
       doc.head.appendChild(script);
     },
-    // 분석 consent withdrawn/regranted after start (docs/service_readiness_v1.md §2-4). Loaded only after grant.
+    // 분석 consent withdrawn/regranted after start (docs/standing/service_readiness_v1.md §2-4). Loaded only after grant.
     consent(grant) {
       withPosthog((ph) => (grant.analytics ? ph.opt_in_capturing?.() : ph.opt_out_capturing?.()));
     },

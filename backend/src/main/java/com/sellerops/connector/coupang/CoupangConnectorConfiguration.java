@@ -64,7 +64,7 @@ public class CoupangConnectorConfiguration {
      * The grant arms nothing unless the Self-Pilot Runtime itself is on (independent review, 2026-08-18: a
      * leftover grant with the runtime disabled must not stay a global READ key). It is process-scoped by
      * design — one operator, one local backend — and {@code sellerops.self-pilot.org-ids} scopes what the
-     * reconciler acts on, not which org's manual sync the gate accepts (docs/self_pilot_runtime_v1.md §7).
+     * reconciler acts on, not which org's manual sync the gate accepts (docs/standing/self_pilot_runtime_v1.md §7).
      */
     /**
      * The precedence between the two standing READ grants that can open the inquiry gate, in one named

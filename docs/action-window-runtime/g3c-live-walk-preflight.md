@@ -64,7 +64,7 @@ journey model.
 
 1. **Gates:** fresh **G3** (env + live-work pause lift, scoped *read-only*) **+ G6** (per-run approval)
    affirmed by the PO in the dispatching turn, per the canonical contract
-   `docs/sellerops_live_approval_contract.md` (single-use; READ_ONLY manifest here). G1 (channel),
+   `docs/standing/sellerops_live_approval_contract.md` (single-use; READ_ONLY manifest here). G1 (channel),
    G2 (seller consent, own account/own screen), G4 (synthetic ladder green — the guided-connection
    wizard is offline-green, 634 FE tests), G5 (policy track) already stand or are non-blocking for a
    read-only probe.
@@ -169,6 +169,6 @@ the probe has no click, capture, upload, or backend path to enable.
 ## 13. G6 request (to be made AFTER this report, per instruction)
 
 I will ask the PO for a **fresh single-use G3 (read-only scope) + G6** for **G3-C.1 only** per the
-canonical contract `docs/sellerops_live_approval_contract.md` (default one-line `Seated and ready.`
+canonical contract `docs/standing/sellerops_live_approval_contract.md` (default one-line `Seated and ready.`
 against a prepared Approval Manifest), with the operator seated & ready and `NAVER_REVIEW_URL` set by
 the operator. I will **not** launch any browser until that is granted in the dispatching turn.

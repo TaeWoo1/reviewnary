@@ -95,7 +95,7 @@ class NaverTokenClientTest {
 
     /**
      * The fork the 2026-08-24 recurrence proof stopped at with no way to see which side it was on
-     * (`docs/naver_inquiry_api_audit_v1.md` §12): a 403 that names the caller, not the credential.
+     * (`docs/lineage/naver_inquiry_api_audit_v1.md` §12): a 403 that names the caller, not the credential.
      * Re-entering a credential the gateway never objected to fixes nothing, so this may not answer
      * with the verdict that asks for exactly that.
      */

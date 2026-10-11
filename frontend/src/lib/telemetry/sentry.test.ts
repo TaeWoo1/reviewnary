@@ -3,7 +3,7 @@ import { scrubEvent, scrubText, stripQuery } from "./sentryScrub";
 import { pathTemplate, sentryOptionsFromEnv } from "./sentry";
 import { buildCsp, sentryIngestOrigin } from "../security/csp";
 
-/** docs/service_readiness_v1.md §2-1: OFF without a DSN, replay never loaded, PII/secrets scrubbed before send. */
+/** docs/standing/service_readiness_v1.md §2-1: OFF without a DSN, replay never loaded, PII/secrets scrubbed before send. */
 describe("Sentry — env-gated, scrubbed", () => {
   it("has no options (nothing initialises) without VITE_SENTRY_DSN", () => {
     expect(sentryOptionsFromEnv({})).toBeNull();
@@ -71,7 +71,7 @@ describe("Sentry — env-gated, scrubbed", () => {
   });
 });
 
-/** docs/service_readiness_v1.md §2-5: the CSP names exactly the vendors the build enabled. */
+/** docs/standing/service_readiness_v1.md §2-5: the CSP names exactly the vendors the build enabled. */
 describe("frontend CSP from env", () => {
   it("is self-only with nothing configured", () => {
     const csp = buildCsp({});

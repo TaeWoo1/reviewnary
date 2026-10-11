@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mail.javamail.JavaMailSender;
 
-/** docs/service_readiness_v1.md §2-3: the mode switch, and that `smtp` without a host is a refusal, not `off`. */
+/** docs/standing/service_readiness_v1.md §2-3: the mode switch, and that `smtp` without a host is a refusal, not `off`. */
 class MailerConfigurationTest {
 
     private final MailerConfiguration config = new MailerConfiguration();

@@ -25,7 +25,7 @@ import org.springframework.test.context.ActiveProfiles;
  * — the title on their own Coupang listing — and the run ended "해당하는 상품을 찾지 못했습니다", twice.
  * The product existed, carried seven real reviews, and was named {@code 15223228019} in
  * {@code products.name}, because that is what a Coupang-derived catalogue stores there
- * ({@code docs/agent_real_validation_v1.md} §9.5, defect C1).
+ * ({@code docs/lineage/agent_real_validation_v1.md} §9.5, defect C1).
  *
  * <p><b>What is NOT being added.</b> No similarity score, no model, no merging of products. An alias
  * finds a LISTING and returns the canonical product that listing is already attached to; when one

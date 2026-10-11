@@ -14,7 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The comment POST, checked on the bytes it would send — never against a mall (docs/cafe24_review_comment_execution_v1.md).
+ * The comment POST, checked on the bytes it would send — never against a mall (docs/review/cafe24_review_comment_execution_v1.md).
  */
 class Cafe24ReviewCommentClientTest {
 

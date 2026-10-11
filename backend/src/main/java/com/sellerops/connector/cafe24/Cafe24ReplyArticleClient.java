@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
  * <p><b>Two interlocks before a byte leaves.</b> The scope grant is checked by the caller (a mall
  * that never consented to {@code mall.write_community} must not be sent a write at all), and this
  * class refuses any non-offline host without an armed live-run approval id — the code half of
- * {@code docs/sellerops_live_approval_contract.md}, restated for this transport the way the NAVER and
+ * {@code docs/standing/sellerops_live_approval_contract.md}, restated for this transport the way the NAVER and
  * Coupang writes each restate it.
  *
  * <p><b>Nothing person-shaped is invented.</b> The body's actor fields come from the caller and are

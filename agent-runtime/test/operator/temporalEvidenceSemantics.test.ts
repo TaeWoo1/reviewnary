@@ -5,7 +5,7 @@
  * sentence was run twice against the same data. Once the planner named no entity and the Operator
  * reported the unanswered total; once it named "오늘" as a `PERIOD` and the scope gate withheld the same
  * true number, because the inbox count carried no date of any kind. Same data, same question, two
- * answers — decided by a word the planner picked (`docs/agent_real_validation_v1.md` §10.4).
+ * answers — decided by a word the planner picked (`docs/lineage/agent_real_validation_v1.md` §10.4).
  *
  * <b>What "fixed" does NOT mean.</b> It does not mean stamping today onto the count. A queue depth read
  * today says nothing about when the things in it arrived, and a date that implied otherwise would trade

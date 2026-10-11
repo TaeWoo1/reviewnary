@@ -197,7 +197,7 @@ public class InquiryKnowledgeAssessor {
     /**
      * <b>Inquiry Decision v2</b>: the basis is derived from every need the customer's message carries, not from whether
      * a current passage exists. Relevant evidence for one need no longer completes a Case with three
-     * (docs/inquiry_decision_v2.md). The legacy lanes still run and are still what the draft cites; what changes is who
+     * (docs/lineage/inquiry_decision_v2.md). The legacy lanes still run and are still what the draft cites; what changes is who
      * decides whether there is a basis.
      */
     private Assessment decide(UUID orgId, Inquiry inquiry, String title, String details, UUID productId,

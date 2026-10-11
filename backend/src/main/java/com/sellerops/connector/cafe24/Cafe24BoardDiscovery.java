@@ -26,7 +26,7 @@ import java.util.Map;
  * VOC-bearing boards correctly identified, and {@code board_type} shown to be
  * insufficient on its own (one type spanned REVIEW/INQUIRY/OTHER), which is why
  * classification keys off {@code board_name} (see
- * docs/sellerops_cafe24_community_board_discovery.md). The connector ships
+ * docs/lineage/sellerops_cafe24_community_board_discovery.md). The connector ships
  * flag-off by default, so nothing here runs until the flag is deliberately set.
  */
 public class Cafe24BoardDiscovery {

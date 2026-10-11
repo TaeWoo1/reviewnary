@@ -113,7 +113,7 @@ public class CoupangOrdersClient {
     /**
      * The armed live-run approval id (env-binding token, never a credential). Blank ⇒ a live call to a
      * real Coupang gateway host is refused fail-closed by {@link CoupangLiveCallGuard}; an offline/loopback
-     * base URL never consults it. See {@code docs/sellerops_live_approval_contract.md}.
+     * base URL never consults it. See {@code docs/standing/sellerops_live_approval_contract.md}.
      */
     private final String liveApprovalId;
     /**
@@ -549,7 +549,7 @@ public class CoupangOrdersClient {
                                                  String accessKey, String secretKey, String vendorId) {
         // Live-run approval interlock — the single backend choke point for EVERY Coupang request. A real
         // gateway host without an armed approval id fails closed here, before any signing or socket
-        // (docs/sellerops_live_approval_contract.md). Offline/loopback base URLs are exempt. Every call
+        // (docs/standing/sellerops_live_approval_contract.md). Offline/loopback base URLs are exempt. Every call
         // through here is a read-only GET, so it is the READ gate: per-run approval OR standing read grant.
         CoupangLiveCallGuard.ensureLiveReadAllowed(baseUrl, liveApprovalId, standingReadGrantId);
         // The signer stamps a single signed-date and signs signedDate+method+path+query; the SAME

@@ -1,7 +1,7 @@
 /**
  * **The macOS AgentLifecycle autostart adapter — the Local Agent as an installed background service.**
  *
- * The ADR (`docs/sellerops_local_agent_runtime_adr.md` §3.3) names 기동/종료/자동시작 as the AgentLifecycle
+ * The ADR (`docs/standing/sellerops_local_agent_runtime_adr.md` §3.3) names 기동/종료/자동시작 as the AgentLifecycle
  * boundary and records its adapters as 미구현: no tray, no installer, no OS autostart. That gap is what forces
  * an operator to start the agent in a terminal — and a terminal-started agent is not the product path, because
  * the seller then reads their pairing code off a developer console instead of the product's own approval

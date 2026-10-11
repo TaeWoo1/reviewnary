@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Status, type StatusTone } from "./Status";
 
 /**
- * A row of work (docs/reviewnary_design.md §6, §7).
+ * A row of work (docs/frontend/reviewnary_design.md §6, §7).
  *
  * The shape of every queue: state word → the sentence the seller recognises the work by → a meta line
  * (channel · product) → time on the right, and optionally one action. The state is the FIRST thing in

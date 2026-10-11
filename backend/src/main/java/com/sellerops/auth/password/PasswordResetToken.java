@@ -11,7 +11,7 @@ import lombok.Setter;
 
 /**
  * A mailed one-time password-reset link's server half: only the SHA-256 of the token is stored, and the row is
- * spent by {@code consumed_at} (docs/service_readiness_v1.md §2-2, §6).
+ * spent by {@code consumed_at} (docs/standing/service_readiness_v1.md §2-2, §6).
  */
 @Getter
 @Setter

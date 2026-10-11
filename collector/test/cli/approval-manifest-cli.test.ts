@@ -4,7 +4,7 @@
  *
  * This file exists because of a gap the calibration-landing review found: the gate could reach PREPARED for the
  * destructive WING key-deletion phase while the CLI that *displays* the manifest still could not, so there would
- * have been nothing for a one-line grant to bind to (`docs/sellerops_live_approval_contract.md` §2/§3). The
+ * have been nothing for a one-line grant to bind to (`docs/standing/sellerops_live_approval_contract.md` §2/§3). The
  * runtime CLI and this display CLI must agree, and they must agree by reading the SAME calibration constant —
  * not by one of them hardcoding `true`.
  */

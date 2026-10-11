@@ -141,7 +141,7 @@
   }
  },
  "harness": "backend/src/test/java/com/sellerops/knowledge/teach/InquiryNeedEvalIT.java",
- "role": "DEV/CALIBRATION — the designer wrote the labels and every v2/v2.1 choice was made looking at them; it may never be cited as a holdout or as production readiness (docs/inquiry_decision_v2_1.md §1)",
+ "role": "DEV/CALIBRATION — the designer wrote the labels and every v2/v2.1 choice was made looking at them; it may never be cited as a holdout or as production readiness (docs/lineage/inquiry_decision_v2_1.md §1)",
  "calibration": {
   "description": "CoverageJudge calibration (Inquiry Decision v2.1): frozen judge inputs = gold needs as the plan + the production collector's candidates, F5 OFF, captured by InquiryNeedEvalIT EVAL_DECISION=capture with no model. The files hold the customer's message and the seller's texts — outside the repository; only hashes here.",
   "inputs": {

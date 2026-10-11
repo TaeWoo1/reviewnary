@@ -1,6 +1,6 @@
 // node --test tools/inquiry-need-eval/test/
 // The synthetic fixture walks every judgment once; the numbers below are worked out by hand in
-// docs/inquiry_need_eval_v1.md §8, not copied from a run.
+// docs/lineage/inquiry_need_eval_v1.md §8, not copied from a run.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

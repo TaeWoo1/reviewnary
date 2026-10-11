@@ -28,7 +28,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * <b>Inquiry Need Eval v1 — the L3 observation</b> ({@code docs/inquiry_need_eval_v1.md}). Not a product test.
+ * <b>Inquiry Need Eval v1 — the L3 observation</b> ({@code docs/lineage/inquiry_need_eval_v1.md}). Not a product test.
  *
  * <p>For every question of an eval dataset it runs the production {@link InquiryKnowledgeAssessor} — the one assessment
  * the investigation and the draft both read — with {@link OrderFactLookup#STORED_ONLY}, and writes what it observed:

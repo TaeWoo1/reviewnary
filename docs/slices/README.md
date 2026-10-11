@@ -7,7 +7,7 @@
 
 > **Why this index exists.** R5 found slice contracts that nothing in the repository linked to. An
 > unreferenced document is one nobody can find and everybody re-derives; the same failure mode cost us a
-> live-proven capability (`docs/channel_integration_completeness_audit_v1.md` §5).
+> live-proven capability (`docs/channel/channel_integration_completeness_audit_v1.md` §5).
 
 | Slice | What it contracts | Status as written |
 |---|---|---|

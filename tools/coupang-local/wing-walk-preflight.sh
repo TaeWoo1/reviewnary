@@ -3,7 +3,7 @@
 # Coupang WING GUIDED ISSUANCE WALK preflight (browser-only: no backend, no DB, no frontend).
 #
 # Run AFTER wing-walk-bootstrap.sh and BEFORE the live run. It proves the run is IMMEDIATELY EXECUTABLE
-# (docs/sellerops_live_approval_contract.md §2), then prepares + displays the sanitized Approval Manifest. On any
+# (docs/standing/sellerops_live_approval_contract.md §2), then prepares + displays the sanitized Approval Manifest. On any
 # check failing it prints NO manifest and requests NO approval.
 #
 # This phase deletes nothing, but it is no longer harmless: the walk now runs through to the vendor screen's
@@ -197,7 +197,7 @@ echo "  $M_CHANNEL · $M_OPERATION"
 echo "  $M_MODE (agent) · run ${RUN_ID:0:8}… · approval ${APPROVAL_ID:0:8}… · max: $M_MAX"
 echo "  phase: $M_PHASE · selectors calibrated: $M_CALIBRATED"
 echo "  account: $M_ACCOUNT · host: $M_HOST · operator presence: required · expires: process-lifetime · git $CUR_GIT"
-echo "  Standing Safety Contract + full scope: docs/sellerops_live_approval_contract.md"
+echo "  Standing Safety Contract + full scope: docs/standing/sellerops_live_approval_contract.md"
 echo
 echo "  operator action ($M_ENTRY_TYPE):"
 echo "    $M_OPERATOR_ACTION"

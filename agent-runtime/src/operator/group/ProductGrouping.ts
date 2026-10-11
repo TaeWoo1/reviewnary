@@ -6,7 +6,7 @@
  * "최근 부정적인 리뷰가 있는 상품을 알려줘", the Operator still read the org's issue list and answered
  * with issues — "접착 탈락에 리뷰 근거가 19건" — while the seller had asked WHICH PRODUCTS. Every number
  * in that answer was true and none of them was about a product
- * (`docs/agent_real_validation_v1.md` §16.7, defect B1).
+ * (`docs/lineage/agent_real_validation_v1.md` §16.7, defect B1).
  *
  * <b>A category mention says the axis; it does not narrow the scope.</b> That is the line this module
  * holds. `PRODUCT: INSTANCE` ⇒ the run is about one product and there is nothing to group. `PRODUCT:

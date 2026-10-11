@@ -626,7 +626,7 @@ export class ImportSegmentSession {
    *    apply control there is nothing to wait for and the timer is the whole story.
    *
    * Everything here is a read. No branch presses, submits, downloads or consents — that is what allows a
-   * watcher at all (`docs/sellerops_live_approval_contract.md` §5b: AUTO_READ may advance guidance, never an
+   * watcher at all (`docs/standing/sellerops_live_approval_contract.md` §5b: AUTO_READ may advance guidance, never an
    * action barrier).
    */
   private async watchPark(stage: string): Promise<void> {

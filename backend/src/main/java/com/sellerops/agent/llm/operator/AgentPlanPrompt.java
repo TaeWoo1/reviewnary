@@ -63,7 +63,7 @@ import java.util.List;
  * the turns v15 fails. The reason it was adopted is not the 1.4 points — the blind holdout did not
  * reproduce those — but that v15 intermittently lost the first-morning question (two flakes in three
  * passes) and v16 lost nothing in six. It costs 120 more input tokens per call and, because it emits
- * slightly fewer, the same money. See {@code docs/planner_model_prompt_benchmark_v1.md}.
+ * slightly fewer, the same money. See {@code docs/agent/planner_model_prompt_benchmark_v1.md}.
  */
 public final class AgentPlanPrompt {
 

@@ -6,7 +6,7 @@
  * PRESENT and not `"unknown"` (`UNBOUND_IDENTITY`) — but nothing compared `gitSha` to the actual HEAD or looked
  * at the working tree. So a leftover `.env` from a consumed approval reached PREPARED carrying a SHA that does
  * not describe the running code, which the approval contract treats as `REVOKED`
- * (`docs/sellerops_live_approval_contract.md` §1.6). The read-only WING probe had this protection in
+ * (`docs/standing/sellerops_live_approval_contract.md` §1.6). The read-only WING probe had this protection in
  * `wing-probe-preflight.sh`; the destructive deletion entrypoint had no preflight at all.
  *
  * Why it lives in TypeScript rather than only in the harness script: the shell preflight is something an

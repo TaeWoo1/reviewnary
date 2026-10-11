@@ -9,7 +9,7 @@ import { analytics } from "../analytics";
 
 afterEach(() => clearConsent());
 
-/** docs/service_readiness_v1.md §2-4: policy, storage, and the banner → analytics link. */
+/** docs/standing/service_readiness_v1.md §2-4: policy, storage, and the banner → analytics link. */
 describe("consent", () => {
   it("policy: banner only when an analytics vendor is configured (or forced)", () => {
     expect(consentPolicy({})).toBe("not-applicable");

@@ -13,7 +13,7 @@ RUN_DIR="$HERE/.run"
 RUN_ENV="$RUN_DIR/current.env"
 
 RUN_ID="wt-$(openssl rand -hex 6)"
-# Opaque approval binding id (see docs/sellerops_live_approval_contract.md §2). Not a credential/token —
+# Opaque approval binding id (see docs/standing/sellerops_live_approval_contract.md §2). Not a credential/token —
 # it is the id the operator's single-use "Seated and ready." grant binds to. A fresh bootstrap mints a new
 # one, so a stale approval can never be reused.
 APPROVAL_ID="apr-$(openssl rand -hex 6)"
@@ -23,7 +23,7 @@ FRONTEND_ORIGIN="${SELLEROPS_WALKTHROUGH_FRONTEND_ORIGIN:-http://localhost:5173}
 BACKEND_ORIGIN="${SELLEROPS_WALKTHROUGH_BACKEND_ORIGIN:-http://127.0.0.1:18090}"
 
 # API-center URL: the official public base is the SAME for every account, so it is a verified constant here
-# and needs NO per-run operator input (docs/sellerops_live_approval_contract.md §7). Only an account-specific
+# and needs NO per-run operator input (docs/standing/sellerops_live_approval_contract.md §7). Only an account-specific
 # deep link needs the operator to `export NAVER_API_CENTER_URL=...` BEFORE bootstrap. Host-screened now
 # against the allow-list; the raw URL is written only to the gitignored run env (never committed/logged) and
 # the manifest carries only its host category.

@@ -21,7 +21,7 @@ entries:
     capabilities: [ORDER_SUMMARY]
     tags: [주문, 수집, api, ordersheets]
     source: LIVE_OBSERVATION
-    sourceRef: docs/coupang_final_main_first_connection_order_routine_proof_v1.md
+    sourceRef: docs/lineage/coupang_final_main_first_connection_order_routine_proof_v1.md
     verifiedAt: "2026-08-06"
 
   - id: coupang-cap-review-no-api
@@ -38,7 +38,7 @@ entries:
     capabilities: [REVIEW]
     tags: [리뷰, api없음, 답글불가, 한계]
     source: SELLEROPS_EVIDENCE
-    sourceRef: docs/coupang_review_feasibility_v1.md · ChannelApiGapRegistry (REVIEW_API)
+    sourceRef: docs/lineage/coupang_review_feasibility_v1.md · ChannelApiGapRegistry (REVIEW_API)
     verifiedAt: "2026-08-14"
 
   - id: coupang-cap-review-action-window
@@ -56,7 +56,7 @@ entries:
     capabilities: [REVIEW]
     tags: [리뷰, 상품평, action window, 취득]
     source: LIVE_OBSERVATION
-    sourceRef: docs/coupang_review_acquisition_v1.md §6.6
+    sourceRef: docs/lineage/coupang_review_acquisition_v1.md §6.6
     verifiedAt: "2026-08-15"
 
   - id: coupang-cap-inquiry
@@ -72,7 +72,7 @@ entries:
     capabilities: [INQUIRY]
     tags: [문의, 수집, api, onlineInquiries]
     source: LIVE_OBSERVATION
-    sourceRef: docs/coupang_inquiry_live_proof_v1.md
+    sourceRef: docs/lineage/coupang_inquiry_live_proof_v1.md
     verifiedAt: "2026-08-14"
 
   - id: coupang-cap-product
@@ -183,7 +183,7 @@ entries:
     capabilities: [REVIEW]
     tags: [리뷰, 별점, 본문없음, 중복]
     source: LIVE_OBSERVATION
-    sourceRef: docs/coupang_review_acquisition_v1.md §6.6
+    sourceRef: docs/lineage/coupang_review_acquisition_v1.md §6.6
     verifiedAt: "2026-08-15"
 
   # ------------------------------------------------------------------ GLOSSARY
@@ -262,7 +262,7 @@ entries:
     capabilities: [INQUIRY, REVIEW]
     tags: [문의, 답변, 리뷰, 워크플로]
     source: SELLEROPS_EVIDENCE
-    sourceRef: com.sellerops.inquiry.publish.CoupangChannelReplyAdapter · docs/coupang_review_feasibility_v1.md
+    sourceRef: com.sellerops.inquiry.publish.CoupangChannelReplyAdapter · docs/lineage/coupang_review_feasibility_v1.md
     verifiedAt: "2026-08-14"
 
   # ---------------------------------------------------------------- OPERATIONS
@@ -279,7 +279,7 @@ entries:
     capabilities: [REVIEW]
     tags: [정책, 파일럿, 제한, 운영]
     source: PRODUCT_DECISION
-    sourceRef: docs/coupang_review_policy_gate_v1.md
+    sourceRef: docs/standing/coupang_review_policy_gate_v1.md
     verifiedAt: "2026-08-17"
 
   - id: coupang-ops-what-api-cannot-tell

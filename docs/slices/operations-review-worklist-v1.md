@@ -1,7 +1,7 @@
 # Slice — Operations Review Worklist v1
 
 > **Status:** IMPLEMENTED, offline. **Consumes no gate, promotes no capability.** §4.1 and
-> `docs/channel_capability_ledger.md` are untouched — this changes *where a seller finds their work*,
+> `docs/channel/channel_capability_ledger.md` are untouched — this changes *where a seller finds their work*,
 > not what a channel supports. Frontend only: **no backend, collector, contract, or migration change.**
 
 - **Workstream:** Review Operations (`docs/workstreams/review_operations_mvp.md`)

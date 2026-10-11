@@ -3,7 +3,7 @@
  *
  * ## What was still made of text
  *
- * `docs/sellerops_live_approval_contract.md` §3 says a prepared Approval Manifest is granted by one line:
+ * `docs/standing/sellerops_live_approval_contract.md` §3 says a prepared Approval Manifest is granted by one line:
  * `Seated and ready.` The operator types it into a chat window, and the assistant then starts the run by
  * passing the CLI's approval flag. Both halves of that are things a language model can produce — the same
  * defect the per-checkpoint sentinel had, one level up. The checkpoints inside a run were closed on

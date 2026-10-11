@@ -1,6 +1,6 @@
 // node --test tools/inquiry-need-eval/test/
 // CoverageJudge calibration scorer. Every number below is worked out by hand from
-// contracts/inquiry-need-eval/v1/synthetic/judge-observations.jsonl (docs/inquiry_decision_v2_1.md §5), not copied from a run.
+// contracts/inquiry-need-eval/v1/synthetic/judge-observations.jsonl (docs/lineage/inquiry_decision_v2_1.md §5), not copied from a run.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';

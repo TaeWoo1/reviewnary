@@ -4,7 +4,7 @@ import { useOptionalConsent } from "./ConsentProvider";
 import { PRIVACY_PATH } from "../legal";
 
 /**
- * The cookie / analytics consent banner (docs/service_readiness_v1.md §2-4). Rendered only while a decision is
+ * The cookie / analytics consent banner (docs/standing/service_readiness_v1.md §2-4). Rendered only while a decision is
  * pending under the banner policy. 필수 is not a choice; 분석 and 마케팅 are separate. The wording is structural
  * — the confirmed cookie list / legal sentence is a launch item (§7).
  */

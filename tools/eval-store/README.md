@@ -7,7 +7,7 @@ counts, schema and provenance (`contracts/<dataset>/<version>/dataset.meta.json`
 
 Why: on 2026-09-20 the operating system deleted Eval v1's three files and both judge-input captures from the session
 scratchpad they had been kept in. They came back byte-identical only because every build step had been recorded
-(`docs/inquiry_architecture_v3_wp1.md` §1).
+(`docs/lineage/inquiry_architecture_v3_wp1.md` §1).
 
 | | where | what |
 |---|---|---|

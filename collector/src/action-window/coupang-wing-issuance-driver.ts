@@ -659,7 +659,7 @@ export interface WingIssueCalibrationRefutation {
  * or may be inferred**, and the already-issued surface has NOT been re-measured under the corrected spec.
  *
  * **The observed `id` / `className` are NOT adopted, and are not kept here at all.** The operator's 2026-08-09
- * sighting reported them; they are written down in `docs/coupang_wing_issue_selector_calibration_landing_v2.md`
+ * sighting reported them; they are written down in `docs/lineage/coupang_wing_issue_selector_calibration_landing_v2.md`
  * and named in the test that forbids them, and deliberately nowhere in this file. Promoting either to a
  * production anchor would be a stability guess about markup nobody has watched over time, and a constant sitting
  * beside the selector is a standing invitation to reach for one. The anchor stays the visible Korean label,

@@ -15,7 +15,7 @@ import { useAgentSurface } from "../../lib/agentPanel";
 
 /**
  * 리뷰 — the workflow surface for reviews (`docs/product_assembly_ia_v1.md` §3), issue-first
- * (docs/reviewnary_design.md §7).
+ * (docs/frontend/reviewnary_design.md §7).
  *
  * The data behind it is per account; this page answers only "which channel's reviews?" with a
  * segmented switcher and renders the record for the chosen one. A channel is a filter, never a

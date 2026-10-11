@@ -5,7 +5,7 @@
  * v2 it also held a keyword table that mapped a free sentence onto one of the closed intents. That
  * table is gone: under invariant I2 the interpretation of a seller's own words is done by an LLM
  * planner or not at all, and a keyword table kept "for tests" or "for emergencies" is exactly the
- * escape hatch that would make the invariant a comment (see `docs/sellerops_operator_graph_v2.md` §12.2).
+ * escape hatch that would make the invariant a comment (see `docs/standing/sellerops_operator_graph_v2.md` §12.2).
  *
  * <b>What remains is not interpretation.</b> An explicit `intent` is a closed enum a BUTTON sent — a
  * value the frontend chose from `/capabilities`, not a sentence a person typed. Validating it against

@@ -34,7 +34,7 @@ package com.sellerops.knowledge;
  * Coupang or Cafe24 do; {@link #ORG_OPERATIONS} is what this seller does. "이 채널은 판매자 답변
  * API가 없다" and "저희는 교환을 7일 안에 받습니다" are both true and neither substitutes for the
  * other, which is exactly the confusion a single "정책" bucket would create
- * ({@code docs/demo_org_and_channel_knowledge_v1.md}).
+ * ({@code docs/knowledge/demo_org_and_channel_knowledge_v1.md}).
  */
 public enum KnowledgeScope {
 

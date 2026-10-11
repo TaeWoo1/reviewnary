@@ -18,7 +18,7 @@ import { previewText } from "../../lib/plainText";
  *
  * <b>A failure here never takes the page down.</b>
  *
- * Rows, not cards (docs/reviewnary_design.md §4): what reviewnary did is the status word in the first
+ * Rows, not cards (docs/frontend/reviewnary_design.md §4): what reviewnary did is the status word in the first
  * slot, the customer's sentence is the row, and the one control is 확인하기.
  */
 export function ProactiveCases({ limit = 5, heading = "AI가 먼저 확인한 일", onLoaded, bare = false }: {

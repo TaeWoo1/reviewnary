@@ -27,7 +27,7 @@ import type { InquiryQueueResponse, MetricKpi, OperationsHome, OverviewResponse,
  * is the page」 and had been wrong for some time: for an org with 고객 운영 관리 open, Home is
  * {@link TodayWorkspace} — the 확인할 일 list with the selected item beside it — and the conversation is a
  * one-line dock under the list. The design contract said the same stale thing and was corrected with this
- * (`docs/reviewnary_design.md` §8-A v3.2).
+ * (`docs/frontend/reviewnary_design.md` §8-A v3.2).
  *
  * <p>What the screen answers is unchanged — 「오늘 무엇을 해야 하지?」 — and the answer is the LIST. The top
  * carries only obligations (확인할 일 · 실행 대기); 반복 문제 keeps its own section below the work because it
@@ -386,7 +386,7 @@ const STRIP_ROUTE: Record<string, string> = {
  * 리뷰」. The last two are not obligations — nothing about them is waiting for the seller — and
  * 주문량 · 매출 · 추이 · 채널별 수치 are owned by `/overview`, which this line still links to. Drawing them
  * here was the Home quoting the dashboard, and the same number under two definitions in two places is the
- * defect this repository has fixed several times (`docs/reviewnary_design.md` §8-A). Nothing was deleted:
+ * defect this repository has fixed several times (`docs/frontend/reviewnary_design.md` §8-A). Nothing was deleted:
  * both numbers are one press away, unchanged, on the screen that owns them.
  *
  * <p><b>And it uses the other Home's nouns.</b> 확인할 일 and 현재 미답변 are what

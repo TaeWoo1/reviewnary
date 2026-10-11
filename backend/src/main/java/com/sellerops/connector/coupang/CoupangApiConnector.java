@@ -98,7 +98,7 @@ public class CoupangApiConnector implements PullConnector, ConnectionVerifier, B
                 // INQUIRY was promoted to CONFIRMED by the live proof of 2026-08-14, not by the code
                 // being written: a real account collected real inquiries through the official v5 path,
                 // and a re-sweep of the same window inserted nothing and skipped every row.
-                // See docs/coupang_inquiry_live_proof_v1.md.
+                // See docs/lineage/coupang_inquiry_live_proof_v1.md.
                 sellerProductsClient == null
                         ? Map.of(DataType.ORDER_SUMMARY, "CONFIRMED", DataType.INQUIRY, "CONFIRMED")
                         // Implemented and offline-verified; wire shape not observed live from this

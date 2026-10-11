@@ -3,7 +3,7 @@
 # Turn browser collection on (or off) for an INSTALLED reviewnary 도우미 — operator only.
 #
 # Why this exists and why it is not in the package: the pilot decision is that a seller never chooses an
-# execution provider and never sees one named (docs/execution_strategy_v1.md §5). Browser collection is
+# execution provider and never sees one named (docs/lineage/execution_strategy_v1.md §5). Browser collection is
 # therefore provisioned for them, by whoever is standing up their pilot, and this is that step — two
 # declared keys in the helper's own closed-key config file, plus a restart.
 #

@@ -14,7 +14,7 @@ import { SocialSignInButtons } from "../components/auth/SocialSignInButtons";
  * Why a social sign-in came back here instead of signing in — the backend's outcome
  * (`SocialLoginOutcome`), in the seller's words. Keyed by `?social=`; unknown values show nothing.
  * `email_taken` is the fail-closed rule: an email that already has a SellerOps account is never auto-linked
- * (docs/auth_growth_instrumentation_v1.md §2-2).
+ * (docs/standing/auth_growth_instrumentation_v1.md §2-2).
  */
 export const SOCIAL_NOTICE: Record<string, { title: string; body: string }> = {
   email_taken: {
@@ -43,7 +43,7 @@ export function Login() {
   // nothing is broken and the one thing to do is sign in again.
   const sessionExpired = searchParams.get("expired") === "1";
   const socialNotice = SOCIAL_NOTICE[searchParams.get("social") ?? ""] ?? null;
-  // `?reset=1` — the seller just set a new password on /reset-password (docs/service_readiness_v1.md §6).
+  // `?reset=1` — the seller just set a new password on /reset-password (docs/standing/service_readiness_v1.md §6).
   const passwordReset = searchParams.get("reset") === "1";
   // The reset entry exists only when a mailed link can reach someone (SMTP or the dev outbox) — a link to a
   // form whose mail is dropped would be a lie. Until the answer arrives, no link (never a flicker of a dead one).

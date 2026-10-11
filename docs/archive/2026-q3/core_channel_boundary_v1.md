@@ -1,6 +1,6 @@
 # Core Channel Boundary v1
 
-2026-09-13. Companion to `docs/review_media_presence_audit_v1.md` (the media half of the same
+2026-09-13. Companion to `docs/lineage/review_media_presence_audit_v1.md` (the media half of the same
 milestone). Migration **0** for this half · marketplace calls **0** · WRITE **0** · model calls **0**.
 
 **The question.** Agent-native Core Boundary v1 removed the seller ACCOUNT from the review decision

@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Repeated-inquiry detection — the third capability the audit found missing entirely
- * ({@code docs/demo_baseline_recovery_audit_2026-08-21.md} §2.3(c), gap I: "반복 문의"는 미착수,
+ * ({@code docs/lineage/demo_baseline_recovery_audit_2026-08-21.md} §2.3(c), gap I: "반복 문의"는 미착수,
  * {@code reviewissue} references inquiries zero times).
  *
  * <p><b>It is an aggregate, not a pipeline.</b> There is no second extraction, no second table, and no

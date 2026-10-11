@@ -2,7 +2,7 @@
  * **What a credential handoff is allowed to say about the values it moved.** Every export here takes a secret and
  * returns something that is not one.
  *
- * The rule this implements is `docs/coupang_credential_handoff_v1.md` §8: a run's record carries a status, a
+ * The rule this implements is `docs/lineage/coupang_credential_handoff_v1.md` §8: a run's record carries a status, a
  * coarse shape, and a salted digest — never a value, and never a substring of one.
  *
  * Imports `node:crypto` and nothing else, so it is testable without a browser, a backend, or a network.

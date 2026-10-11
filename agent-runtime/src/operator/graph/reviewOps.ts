@@ -290,7 +290,7 @@ async function runReviewSignal(input: SpecialistInput): Promise<ReviewOpsResult>
   // for a product question it is a candidate list and nothing else — never the evidence. What is
   // evidence is which of each issue's review rows belong to THIS product, and only
   // `get_review_issue_evidence_summary` can say. It sat in the catalogue with no caller until 2026-08-23
-  // (`docs/agent_real_validation_v1.md` §5 P4, A5/B1), which is why Q4 read the whole org, had every row
+  // (`docs/lineage/agent_real_validation_v1.md` §5 P4, A5/B1), which is why Q4 read the whole org, had every row
   // refused by the scope gate, and told the seller nothing.
   const product = input.resolved.find((e) => e.kind === "PRODUCT");
   if (product) {

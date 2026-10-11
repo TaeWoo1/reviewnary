@@ -3,7 +3,7 @@
  * *supposed* to return text.
  *
  * Every earlier Coupang probe here counted. This one collects: the seller's own reviews are the product, and
- * `docs/sellerops_live_approval_contract.md` §5d states the principle it works under — the rule is **not**
+ * `docs/standing/sellerops_live_approval_contract.md` §5d states the principle it works under — the rule is **not**
  * `do not read`, it is `do not unnecessarily persist or expose`. So the shape of the safety here is different
  * from a census's. It is not "no text may cross"; it is **"the buyer's identity has no field to cross in"**.
  *

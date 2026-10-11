@@ -153,7 +153,7 @@ fi
 
 # ---- Approval Manifest ---------------------------------------------------------
 # PREPARED means the approved run is IMMEDIATELY executable with no further operator input
-# (docs/sellerops_live_approval_contract.md §2/§3). Two paths:
+# (docs/standing/sellerops_live_approval_contract.md §2/§3). Two paths:
 #   * Calibration run (SELLEROPS_APPROVAL_PHASE set) → the tested prerequisite gate
 #     `collector/src/cli/approval-manifest-cli.ts` is the SOLE manifest source. It confirms the exact
 #     CLI+driver for the phase, screens the API-center URL, checks actions match the driver's real
@@ -234,7 +234,7 @@ echo "runtime + approval manifest (sanitized) → $MANIFEST_OUT"; cat "$MANIFEST
 echo
 if [ "$FAILED" = "0" ]; then
   echo "PREFLIGHT PASS"
-  # The operator performs exactly ONE action, and it differs by phase (docs/sellerops_live_approval_contract.md
+  # The operator performs exactly ONE action, and it differs by phase (docs/standing/sellerops_live_approval_contract.md
   # §3/§6). A calibration phase is a CLI-launched dedicated Chrome window with NO frontend URL; only the guided
   # connection phase hands the operator a bound frontend URL. Print the one true action for THIS phase — never both.
   if [ "$APPROVAL_ENTRYPOINT_TYPE" = "FRONTEND_URL" ]; then
@@ -276,7 +276,7 @@ if [ "$FAILED" = "0" ]; then
     echo "  FE run-host proof: sole START_RUN owner=$FE_OWNER (max $FE_MAX) · credential/test/sync=0 · host sends NO START_RUN · no standalone proof client"
     echo "  supporting surface: $FE_SURFACE (CLI-launched host; NOT a run client) · bound FE path: $FE_PATH"
   fi
-  echo "  Standing Safety Contract + full scope: docs/sellerops_live_approval_contract.md"
+  echo "  Standing Safety Contract + full scope: docs/standing/sellerops_live_approval_contract.md"
   echo
   if [ "$APPROVAL_ENTRYPOINT_TYPE" = "FRONTEND_URL" ]; then
     echo "  Open EXACTLY that URL in a fresh window. If this manifest is correct and displayed, the operator's"

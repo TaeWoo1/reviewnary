@@ -635,7 +635,7 @@ export function buildCoupangIssuanceLiveConfig(): CoupangIssuanceLiveCarrier {
  * {@link CoupangIssuanceGuidanceSession} — with a fresh run identity per activation. Nothing is re-implemented
  * and no capability is added: the runtime still never logs in, clicks, types, submits, issues a key, or reads
  * a value; the seller presses every WING control, and SellerOps only highlights and observes. The WRITE
- * boundary is untouched (this is a READ-only guidance walk; `docs/sellerops_live_approval_contract.md` §3 —
+ * boundary is untouched (this is a READ-only guidance walk; `docs/standing/sellerops_live_approval_contract.md` §3 —
  * the walk begins on the seller's own 시작 press in SellerOps, §6a — browser READ carriers stay
  * seller-performed).
  *
@@ -819,7 +819,7 @@ export function buildNaverIssuanceLiveConfig(): NaverIssuanceLiveCarrier {
  * agent that ever mounted them was `run-api-issuance-live-naver.ts`, behind an operator-owned env var. Nothing
  * is added here: the runtime still never logs in, clicks, types, submits, creates an application, selects a
  * group, or reads a credential value — the seller performs every step and SellerOps highlights and observes.
- * READ-only guidance, so the WRITE boundary is untouched (`docs/sellerops_live_approval_contract.md` §3/§6a).
+ * READ-only guidance, so the WRITE boundary is untouched (`docs/standing/sellerops_live_approval_contract.md` §3/§6a).
  */
 export function activateNaverGuidedWalk(
   request: AwAttachRequest,
@@ -974,7 +974,7 @@ export function buildCoupangRenewalLiveConfig(): CoupangRenewalLiveCarrier {
  *
  * Nothing is added here. The runtime still never logs in, clicks, types, submits, selects, or re-issues — the
  * seller presses `재발급` themselves — and it reads no Access Key, Secret Key, or 업체코드. READ-only guidance,
- * so the WRITE boundary is untouched (`docs/sellerops_live_approval_contract.md` §3/§6a).
+ * so the WRITE boundary is untouched (`docs/standing/sellerops_live_approval_contract.md` §3/§6a).
  */
 export function activateCoupangRenewalWalk(
   request: AwAttachRequest,
@@ -1367,7 +1367,7 @@ export function buildCoupangReviewAcquisitionLiveConfig(): CoupangReviewAcquisit
  * live-proven (`COUPANG_WING_REVIEW_ACQUISITION`, 2026-08-15) but ONLY the seated CLI hosted it, behind an
  * approval manifest and a run grant pressed in a CLI-owned tab — so a seller asked from a conversation to
  * check their Coupang reviews had no way to. The product path's authorization is the seller's own START_RUN
- * from a SellerOps surface (the same posture every other resident carrier runs in — `docs/sellerops_live_approval_contract.md`
+ * from a SellerOps surface (the same posture every other resident carrier runs in — `docs/standing/sellerops_live_approval_contract.md`
  * §3); the per-page press replaces the CLI's per-page confirm tab, and the seller still turns every page.
  */
 export function activateCoupangReviewAcquisition(

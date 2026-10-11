@@ -17,7 +17,7 @@
  * <b>The choice comes from the plan, because the plan already made it.</b> The two senses name two
  * different reads, and both are in the catalogue the planner is shown with descriptions that tell them
  * apart ("리뷰 자체의 수" vs "반복 리뷰 문제의 근거 건수"). Traced live against the real
- * planner on eight sentences (2026-09-06, `docs/agent_semantic_ownership_v1.md` §2), the plan agreed
+ * planner on eight sentences (2026-09-06, `docs/agent/agent_semantic_ownership_v1.md` §2), the plan agreed
  * with the word table on seven and was RIGHT on the eighth — 「리뷰가 안 좋은 상품 뭐야?」 names no word
  * in either list and the table fell to its default. So the table was not the authority; it was a
  * second, weaker planner for a question the first one had already answered, and it lost.
@@ -66,7 +66,7 @@ export function senseDeclaration(sense: ReviewEvidenceSense): ReviewSenseDeclara
  * Which sense this question is asking for — read from the reads the plan named.
  *
  * <b>The ladder, and the trace it was fitted to</b> (real planner, Demo Org, 2026-09-06 — eight
- * sentences, `docs/agent_semantic_ownership_v1.md` §2):
+ * sentences, `docs/agent/agent_semantic_ownership_v1.md` §2):
  *
  * 1. `get_review_issue_evidence_summary` — this sense's own declared read. Naming it is naming it.
  * 2. `search_review_issues` — the issue list every repeated-problem answer is built from. A plan that

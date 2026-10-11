@@ -22,7 +22,7 @@ Cafe24 문의에 canonical product attribution이 사실상 없다는 진단은 
    냈다.** canonical Demo Org의 `91`·`94`·`170` 세 개가 그것이고, **세 번호 전부 `channel_products`에
    실재하는 연결된 리스팅이다** — 정확한 귀속이 가능한데 조작된 값이 대신 저장돼 있었다.
 2. **그런데 board 6에는 애초에 식별자가 거의 없다.** `product_no`는 board 6 응답에 **존재하는 필드**로
-   라이브 확인돼 있지만(`docs/sellerops_cafe24_review_inquiry_capture.md`), 실제 값은
+   라이브 확인돼 있지만(`docs/lineage/sellerops_cafe24_review_inquiry_capture.md`), 실제 값은
    `cafe24_community_articles` board 6 **905행 중 0행**, `inquiries` 3,425행 중 **10행**뿐이다
    (board 4 리뷰는 269/269 전부 보유). 상품 페이지가 아니라 게시판에서 쓴 일반 문의가 압도적이다.
 

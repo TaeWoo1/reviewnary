@@ -7,7 +7,7 @@
 // 리뷰 미지원 on a page whose next panel counted 22 collected 상품평.
 //
 // The words matter as much as the split. 지원 is reserved by
-// `docs/channel-capability-registration-matrix.md` §4.1 for 운영 지원 — the always-on rung only 파일
+// `docs/channel/channel-capability-registration-matrix.md` §4.1 for 운영 지원 — the always-on rung only 파일
 // 업로드 has reached — so the acquisition axis says which route and how far it is proven, never 지원.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";

@@ -1,6 +1,6 @@
 /**
  * **Execution Provider — the seam at which HOW a server-authorized review-export segment is carried becomes
- * replaceable** (Aside Acquisition Track M1, `docs/aside_execution_provider_v1.md`).
+ * replaceable** (Aside Acquisition Track M1, `docs/lineage/aside_execution_provider_v1.md`).
  *
  * ## Where the seam is, and why it is not lower
  *
@@ -98,7 +98,7 @@ export interface SegmentExecutionContext {
 
 /**
  * Failure codes a provider may report — the engine's existing taxonomy (reused, not copied) plus the
- * provider-neutral additions `docs/review_acquisition_aside_v2.md` §10 names. Raw messages, URLs, selectors and
+ * provider-neutral additions `docs/lineage/review_acquisition_aside_v2.md` §10 names. Raw messages, URLs, selectors and
  * paths never ride on a code.
  */
 export type ExecutionFailureCode =

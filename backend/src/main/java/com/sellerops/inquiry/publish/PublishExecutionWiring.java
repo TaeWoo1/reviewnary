@@ -179,7 +179,7 @@ public class PublishExecutionWiring {
      * The Cafe24 reply-article write client — its own object, not the collection client.
      *
      * <p>{@code live-approval-id} is the environment-binding token from
-     * {@code docs/sellerops_live_approval_contract.md}. Blank (the default) means every non-offline
+     * {@code docs/standing/sellerops_live_approval_contract.md}. Blank (the default) means every non-offline
      * host is refused before the request is built, which is what keeps an offline-implemented adapter
      * from becoming a live one by someone flipping two flags.
      */

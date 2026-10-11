@@ -18,7 +18,7 @@
  * <b>What it must never do is promote silence to calm.</b> Nothing here turns a PENDING into a
  * SATISFIED, and nothing invents a coverage value: a need whose read never happened stays the weakest
  * thing in the room. "문제 없음" survives a merge only when some specialist actually proved it under
- * `COVERED`, which is the rule `docs/sellerops_operator_graph_v2.md` §2.1 already applies to evidence.
+ * `COVERED`, which is the rule `docs/standing/sellerops_operator_graph_v2.md` §2.1 already applies to evidence.
  */
 import type { NeedState } from "./InvestigationPlan";
 

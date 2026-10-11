@@ -3,7 +3,7 @@
 # Coupang first-connection + order-routine live-proof BOOTSTRAP. Mints a single opaque run id and a single
 # opaque approval id for this run, and writes the shared run env that run-backend-local.sh and preflight.sh
 # both read. The approval id is what the backend live-call interlock (CoupangLiveCallGuard) is armed with and
-# what the operator's single-use "Seated and ready." grant binds to (docs/sellerops_live_approval_contract.md).
+# what the operator's single-use "Seated and ready." grant binds to (docs/standing/sellerops_live_approval_contract.md).
 #
 # Both ids are ENVIRONMENT identifiers, never a credential or auth token. Re-run this to start a fresh run —
 # a new approval id invalidates the old one, so a stale approval can never be reused. NO Coupang call, no

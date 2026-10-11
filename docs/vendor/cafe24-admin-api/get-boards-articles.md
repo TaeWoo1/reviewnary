@@ -4,8 +4,8 @@
 > (`https://developers.cafe24.com/docs/en/api/admin/`, resource *Boards articles*), first retrieved
 > **2026-08-25**, **re-retrieved and corrected the same day** against both the English and the
 > Korean (`.../docs/ko/api/admin/`) editions. This file records what the PLATFORM publishes.
-> SellerOps conclusions live in `docs/inquiry_action_flow_v1.md`,
-> `docs/inquiry_answer_execution_v1.md`, and `InquiryReplyCapabilityRegistry`.
+> SellerOps conclusions live in `docs/inquiry/inquiry_action_flow_v1.md`,
+> `docs/inquiry/inquiry_answer_execution_v1.md`, and `InquiryReplyCapabilityRegistry`.
 
 ## Corrections made at the 2026-08-25 re-retrieval
 
@@ -257,4 +257,4 @@ What the reference does not state, for any of them:
 
 Which of A1 / A2 / B this mall actually uses is answerable by READ alone, because 43 board-6
 articles in the Demo Org are already `reply_status=C`. That proof is designed, and stops before
-execution, in `docs/inquiry_answer_execution_v1.md`.
+execution, in `docs/inquiry/inquiry_answer_execution_v1.md`.

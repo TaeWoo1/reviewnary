@@ -62,7 +62,7 @@ Three rules that keep this from collapsing:
 3. **"Named" ≠ "supported."** A channel appearing here is a *destination*, not a claim of live
    capability. What is actually available / verified / operational is **only** what
    `docs/multi-channel-connector-roadmap.md` §4.1 says, mirrored as lessons in
-   `docs/channel_capability_ledger.md`. Never promote status here.
+   `docs/channel/channel_capability_ledger.md`. Never promote status here.
 
 > **Product surface (2026-08-17, product-owner decision — `docs/product_assembly_ia_v1.md` §2).**
 > Channel expansion is **paused**. The seller-visible channel set is exactly **NAVER / Coupang / Cafe24**;
@@ -127,7 +127,7 @@ scraper output. It surfaces, unified and cross-channel:
   health).
 
 The five data types are fixed: **주문 · 문의 · 리뷰 · 상품 · 운영 리포트**. Settlement is out of
-scope (`docs/product-scope-v1.md` §1). Frontend source of truth: `docs/sellerops_frontend_spec.md`.
+scope (`docs/product-scope-v1.md` §1). Frontend source of truth: `docs/frontend/sellerops_frontend_spec.md`.
 
 ## 7. User journey (wedge → full operating model)
 
@@ -192,12 +192,12 @@ From `CLAUDE.md` safety fences and `docs/product-scope-v1.md`:
 | Product identity / strategy / honest state | `docs/sellerops_canonical_reference.md` |
 | Scope contract (what's in / out, autonomy modes, the loop) | `docs/product-scope-v1.md` |
 | Capability truth (channel × DataType × method × status) | `docs/multi-channel-connector-roadmap.md` §4.1 |
-| Channel lessons (available / blocked / verified / pending / policy-limited) | `docs/channel_capability_ledger.md` |
-| Business / registration / credential view | `docs/channel-capability-registration-matrix.md` |
+| Channel lessons (available / blocked / verified / pending / policy-limited) | `docs/channel/channel_capability_ledger.md` |
+| Business / registration / credential view | `docs/channel/channel-capability-registration-matrix.md` |
 | Connection & setup modes | `docs/multi-channel-connector-roadmap.md` §11 |
 | Action Window contract | `docs/slices/action-window-v1.md` |
 | Action Window runtime status | `docs/action-window-runtime/HANDOFF.md` |
 | Product IA · screen responsibility · visible channels | `docs/product_assembly_ia_v1.md` |
-| Frontend principles (states, language, a11y, guided connection, AW screens) | `docs/sellerops_frontend_spec.md` |
+| Frontend principles (states, language, a11y, guided connection, AW screens) | `docs/frontend/sellerops_frontend_spec.md` |
 | Review AI triage demo / pilot state | `docs/workstreams/review_ai_triage_demo.md` |
 | Review operations wedge (this MVP) | `docs/workstreams/review_operations_mvp.md` |

@@ -26,7 +26,7 @@ import java.util.Map;
  * <p>No expiry field: v1 stores {@code null} (unknown), because no expiry has been measured on the issued
  * screen and an inferred one would be a fabricated date in front of a renewal alert. The operator path for an
  * exact date already exists at {@code POST /credentials/expiry}. See
- * {@code docs/coupang_credential_handoff_v1.md} §7.
+ * {@code docs/lineage/coupang_credential_handoff_v1.md} §7.
  */
 public record AgentCredentialHandoffRequest(
         @NotBlank @Pattern(regexp = "^[0-9a-f]{24}$", message = "계정 슬롯 형식이 올바르지 않습니다.")

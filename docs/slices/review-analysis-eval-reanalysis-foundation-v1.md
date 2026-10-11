@@ -1,7 +1,7 @@
 # Slice — Review Analysis Evaluation & Reanalysis Foundation v1
 
 > **Status:** IMPLEMENTED, offline. **Consumes no gate, promotes no capability.** §4.1 and
-> `docs/channel_capability_ledger.md` are untouched. **No detector was built**, and no re-analysis
+> `docs/channel/channel_capability_ledger.md` are untouched. **No detector was built**, and no re-analysis
 > has been run against real data.
 
 - **Workstream:** Review Operations (`docs/workstreams/review_operations_mvp.md`)

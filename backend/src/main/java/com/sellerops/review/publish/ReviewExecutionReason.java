@@ -24,7 +24,7 @@ public enum ReviewExecutionReason {
     /** The channel refused the body (4xx). Re-sending it unchanged would be refused again. */
     REJECTED_BY_CHANNEL(false),
     /**
-     * Reserved by the audit in {@code docs/cafe24_review_comment_execution_v1.md}: the value the
+     * Reserved by the audit in {@code docs/review/cafe24_review_comment_execution_v1.md}: the value the
      * adapter would refuse with if the comment {@code password} turned out to be a seller secret with
      * no legitimate source (outcome C). The audit settled on outcome A, so no production path emits it;
      * a test pins that.

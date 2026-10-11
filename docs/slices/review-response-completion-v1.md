@@ -7,7 +7,7 @@
 > 커밋되지 않음.
 >
 > 상위 계약: 범위 `docs/product-scope-v1.md` §5·§9(**v1.6** 잠금), 안전 경계 `docs/action-window-runtime/
-> r4-preparation.md` §4.1 + ADR `docs/sellerops_local_agent_runtime_adr.md` §4, 능력표 roadmap §4.1,
+> r4-preparation.md` §4.1 + ADR `docs/standing/sellerops_local_agent_runtime_adr.md` §4, 능력표 roadmap §4.1,
 > 거버넌스 `docs/action-window-runtime/decisions.md` D-032 + `r4-gate-record.md`(6번째 G3 스코프 + G6 템플릿),
 > 계약 `contracts/action-window/v2/`. 본 문서는 **프로그램 실행 계약**을 소유하며 그들의 결정을 중복 선언하지
 > 않는다.

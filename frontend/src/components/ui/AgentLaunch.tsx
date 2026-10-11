@@ -4,7 +4,7 @@ import { agentHref } from "../../lib/agentContext";
 import { useAgentPanel } from "../../lib/agentPanel";
 
 /**
- * The Agent, entered from the context that owns the object (docs/reviewnary_design.md §6, §8).
+ * The Agent, entered from the context that owns the object (docs/frontend/reviewnary_design.md §6, §8).
  *
  * <b>The label names the object in view, open-ended.</b> 「이 상품에 대해 물어보기」, 「이 문의에 대해
  * 물어보기」 — a context, not a feature button. The feature-shaped launchers (문제 있는 상품 찾기 …)

@@ -3,7 +3,7 @@ import { PRODUCT_PATH } from "../lib/public/publicCta";
 import { PRIVACY_PATH, TERMS_PATH, TERMS_VERSION } from "../lib/legal";
 
 /**
- * `/legal/terms` and `/legal/privacy` — PLACEHOLDERS (docs/service_readiness_v1.md §2-4, §7). No legal wording
+ * `/legal/terms` and `/legal/privacy` — PLACEHOLDERS (docs/standing/service_readiness_v1.md §2-4, §7). No legal wording
  * is generated here: the page names the document, says plainly that it is not yet confirmed, and gives the
  * version marker the consent record carries. Replaced by the confirmed documents before public launch.
  */

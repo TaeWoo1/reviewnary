@@ -30,7 +30,7 @@ import org.springframework.test.context.ActiveProfiles;
  * empty and the attention layer <b>fails closed into an empty state by explicit
  * registry policy</b> — no throw, no fabricated signals, no Cafe24 assumption
  * leaking. (The data-source gap and its partial closure are documented in
- * {@code docs/sellerops_phase0_esm_discovery.md} §7.)
+ * {@code docs/archive/sellerops_phase0_esm_discovery.md} §7.)
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

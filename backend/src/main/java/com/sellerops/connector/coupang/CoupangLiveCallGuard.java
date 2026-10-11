@@ -12,7 +12,7 @@ import java.util.Set;
  * {@code collector/src/cli/live-run-approval.ts} — the Coupang connector calls the marketplace directly
  * from the backend (an HMAC-signed GET). So the interlock must sit at the backend HTTP choke point that
  * every Coupang request flows through: {@link CoupangOrdersClient#signedGet}. This is the code half of
- * {@code docs/sellerops_live_approval_contract.md}; the manifest/approval half is prepared by
+ * {@code docs/standing/sellerops_live_approval_contract.md}; the manifest/approval half is prepared by
  * {@code tools/coupang-local/} (bootstrap → preflight).
  *
  * <p><b>Fail closed.</b> A request whose base-URL host is a real (non-loopback, non-test) host is allowed

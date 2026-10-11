@@ -565,7 +565,7 @@ export async function runInquiryOps(input: SpecialistInput): Promise<InquiryOpsR
       // refuses the rest — correctly: without an anchor the "past cases" lookup is a whole-org trawl,
       // which is a different and much wider read than the one this need asked for. Live 2026-08-23 this
       // specialist asked anyway, with `{limit: 5}`, and the backend's correct refusal took the whole
-      // specialist down with it (`docs/agent_real_validation_v1.md` §3 Q5).
+      // specialist down with it (`docs/lineage/agent_real_validation_v1.md` §3 Q5).
       //
       // A resolved product is the only anchor reachable here today. The seller's own words are NOT an
       // anchor: a customer sentence is never a query string, which is why the endpoint has no free-text

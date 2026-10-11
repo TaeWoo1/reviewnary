@@ -14,7 +14,7 @@
  *
  * **The values reach nothing else.** Not stdout, not the log, not a file, not the clipboard, not a fixture, and
  * not any assistant's context. The record this prints carries a shape and a per-run salted digest per field —
- * see `docs/coupang_credential_handoff_v1.md` §6 and §8, including what is NOT claimed about erasing plaintext.
+ * see `docs/lineage/coupang_credential_handoff_v1.md` §6 and §8, including what is NOT claimed about erasing plaintext.
  *
  * `main()` runs ONLY when invoked directly, so an offline build or import launches nothing.
  */

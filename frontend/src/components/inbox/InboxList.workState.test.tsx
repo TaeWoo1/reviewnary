@@ -11,7 +11,7 @@ const item = (id: string, over: Partial<FeedItem>): FeedItem => ({
   id, type: "INQUIRY", channelNameKo: "카페24 자사몰", productName: "상품 미지정", snippet: `문의 ${id}`, rating: null, status: "UNANSWERED", receivedAt: daysAgo(1), ...over,
 });
 
-describe("문의 목록 — work-state first (docs/reviewnary_design.md §7)", () => {
+describe("문의 목록 — work-state first (docs/frontend/reviewnary_design.md §7)", () => {
   // CONTRACT CHANGED (Operational Workspace UX System v1). This used to read "the state word comes
   // from the work item's PHASE before the feed's status", and that was the defect: `PROPOSED` is
   // written when a proposal is recorded, a proposal stores no reply text, and eight of the demo org's

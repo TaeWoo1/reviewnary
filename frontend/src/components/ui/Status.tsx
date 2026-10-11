@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * The only way a state is coloured (docs/reviewnary_design.md §5).
+ * The only way a state is coloured (docs/frontend/reviewnary_design.md §5).
  *
  * Five tones and each means exactly one thing: `good` is a PROVEN state (connected, grounded, verified),
  * `warn` is "look before acting", `bad` is failed / negative / disconnected, `info` is "reviewnary

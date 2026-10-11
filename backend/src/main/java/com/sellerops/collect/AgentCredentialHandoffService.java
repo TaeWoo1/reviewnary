@@ -30,7 +30,7 @@ import org.springframework.stereotype.Service;
  *
  * <p>No encryption, no storage, no key handling and no connector call happens here. That is deliberate: a second
  * place that knows how to persist a credential is a second place that can persist one wrongly. See
- * {@code docs/coupang_credential_handoff_v1.md} §1 for the full reuse map.
+ * {@code docs/lineage/coupang_credential_handoff_v1.md} §1 for the full reuse map.
  *
  * <p><b>Fail-closed order.</b> Run interlock → slot → org → account → channel guard → channel supports API
  * credentials → no credential already on file → store → verify. Nothing privileged happens before the org

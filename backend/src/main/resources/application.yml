@@ -283,13 +283,13 @@ sellerops:
       execution-enabled: ${SELLEROPS_INQUIRY_PUBLISH_EXECUTION_ENABLED:false}
       naver:
         # The live-run approval id a NAVER answer must be armed with, per
-        # docs/sellerops_live_approval_contract.md. Blank = no live NAVER answer can leave this
+        # docs/standing/sellerops_live_approval_contract.md. Blank = no live NAVER answer can leave this
         # process (NaverAnswerLiveGuard throws before the request is built). An ENVIRONMENT-binding
         # token, never a credential.
         live-approval-id: ${SELLEROPS_INQUIRY_PUBLISH_NAVER_LIVE_APPROVAL_ID:}
       cafe24:
         # The live-run approval id a Cafe24 answer POST must be armed with, per
-        # docs/sellerops_live_approval_contract.md. Blank = no live Cafe24 answer can leave this
+        # docs/standing/sellerops_live_approval_contract.md. Blank = no live Cafe24 answer can leave this
         # process (Cafe24ReplyArticleClient throws Cafe24WriteApprovalRequired before the request is
         # built). An ENVIRONMENT-binding token, never a credential.
         live-approval-id: ${SELLEROPS_INQUIRY_PUBLISH_CAFE24_LIVE_APPROVAL_ID:}
@@ -456,7 +456,7 @@ sellerops:
     # runtime writes with today. Empty by default.
     key-ring: ${SELLEROPS_VAULT_KEY_RING:}
   responsibility:
-    # Responsibility Runtime v1 (docs/responsibility_runtime_v1.md). Off by default — no window is materialized
+    # Responsibility Runtime v1 (docs/standing/responsibility_runtime_v1.md). Off by default — no window is materialized
     # and no run executes until ops flips this. The cadence is NOT here: CUSTOMER_OPERATIONS_V1 works fixed 2-hour
     # Asia/Seoul windows, and this interval is only how often the runtime looks.
     scheduler-enabled: ${SELLEROPS_RESPONSIBILITY_SCHEDULER_ENABLED:false}
@@ -517,7 +517,7 @@ sellerops:
       # At most this many investigations per run; further candidates wait for the next run with nothing written.
       max-per-run: ${SELLEROPS_RESPONSIBILITY_INVESTIGATION_MAX_PER_RUN:5}
   review-auto-check:
-    # 「새 리뷰를 자동으로 확인합니다」 (docs/review_auto_check_v1.md). 이 lane은 판매자의 제품 설정
+    # 「새 리뷰를 자동으로 확인합니다」 (docs/review/review_auto_check_v1.md). 이 lane은 판매자의 제품 설정
     # (review_auto_check)이 승인하고, 배포가 정하는 것은 「여기서 이 lane이 도는가」 하나뿐이다 — 그래서
     # 조직 목록도, 계정 목록도 없다. Self-Pilot / Responsibility의 배포 허용 목록과는 다른 질문이며,
     # 그 둘을 넓히지도 않는다.
@@ -543,7 +543,7 @@ sellerops:
     # Raise it for stores whose syncs legitimately run longer.
     sync-stale-after-minutes: ${SELLEROPS_COLLECT_SYNC_STALE_AFTER_MINUTES:60}
   self-pilot:
-    # Self-Pilot Runtime v1 (product-owner decision 2026-08-18; docs/self_pilot_runtime_v1.md).
+    # Self-Pilot Runtime v1 (product-owner decision 2026-08-18; docs/standing/self_pilot_runtime_v1.md).
     # The operator runs SellerOps on their own seller accounts for days: routine READ work —
     # official-API collection on the scheduler + bounded AI triage — runs without a per-run
     # approval ceremony; marketplace WRITE is untouched. Off by default; with it off nothing
@@ -669,7 +669,7 @@ sellerops:
         # calls to exactly one endpoint, which is how a live proof measures one source.
         #
         # NAVER TalkTalk has no Commerce API and has no flag here; it is a coverage
-        # limitation, not a switch. docs/naver_inquiry_api_audit_v1.md
+        # limitation, not a switch. docs/lineage/naver_inquiry_api_audit_v1.md
         product-qna:
           # GET /v1/contents/qnas — 상품 문의 (스마트스토어 Q&A)
           enabled: ${SELLEROPS_CONNECTOR_NAVER_INQUIRY_PRODUCT_QNA_ENABLED:false}
@@ -700,7 +700,7 @@ sellerops:
       # `*` is refused (parsed as an empty list, which admits nobody); a malformed id refuses the boot.
       inquiry-read-grant-id: ${SELLEROPS_CONNECTOR_COUPANG_INQUIRY_READ_GRANT_ID:}
       inquiry-read-grant-org-ids: ${SELLEROPS_CONNECTOR_COUPANG_INQUIRY_READ_GRANT_ORG_IDS:}
-      # Backend live-run approval interlock (docs/sellerops_live_approval_contract.md).
+      # Backend live-run approval interlock (docs/standing/sellerops_live_approval_contract.md).
       # Empty by default: a live call to a REAL Coupang gateway host fail-closes
       # (CoupangLiveApprovalRequiredException) unless an operator-minted approval id is
       # armed by tools/coupang-local/run-backend-local.sh. Loopback / *.test / *.local
@@ -823,7 +823,7 @@ sellerops:
   # Splits a customer's inquiry into the independent needs it carries (one call), gathers current evidence for all
   # of them (no model), and has ONE judge say how far the evidence closes each need (one call). Code then derives
   # the basis: every need covered → a draft; any need partial, missing or unreadable → the Case goes to the seller.
-  # That is what removes partial-coverage leakage (docs/inquiry_decision_v2.md). Its payload is the customer's
+  # That is what removes partial-coverage leakage (docs/lineage/inquiry_decision_v2.md). Its payload is the customer's
   # inquiry, the seller's candidate evidence and past answers, by position — so it is its own capability, admitted
   # only by its own org list. OFF by default; off, the assessment is exactly what it was.
   inquiry-decision:
@@ -835,14 +835,14 @@ sellerops:
     judge-max-output-tokens: ${SELLEROPS_INQUIRY_DECISION_JUDGE_MAX_OUTPUT_TOKENS:2400}
     reasoning-effort: ${SELLEROPS_INQUIRY_DECISION_REASONING_EFFORT:minimal}
     # CoverageJudge instruction (coverage-judge/v1 | coverage-judge/v2) and the judge's own effort (blank = the plan's).
-    # Separate knobs so a calibration can change the judge and nothing else (docs/inquiry_decision_v2_1.md).
+    # Separate knobs so a calibration can change the judge and nothing else (docs/lineage/inquiry_decision_v2_1.md).
     judge-prompt: ${SELLEROPS_INQUIRY_DECISION_JUDGE_PROMPT:coverage-judge/v2}
     judge-reasoning-effort: ${SELLEROPS_INQUIRY_DECISION_JUDGE_REASONING_EFFORT:}
     # json_schema = Structured Outputs, strict (need ids an enum of the ids sent); json_object = the pre-audit JSON mode.
     output-format: ${SELLEROPS_INQUIRY_DECISION_OUTPUT_FORMAT:json_schema}
   # Inquiry v3 WP-1 — the deterministic authority layer: hold every v2 verdict to its own authority (an order need only by
   # this order's fresh fact, an action never, a seller decision never). No model, no channel — deliberately NOT under the
-  # inquiry-decision (LLM capability) prefix. Default OFF; docs/inquiry_architecture_v3_wp1.md.
+  # inquiry-decision (LLM capability) prefix. Default OFF; docs/lineage/inquiry_architecture_v3_wp1.md.
   inquiry-authority:
     fence:
       enabled: ${SELLEROPS_INQUIRY_AUTHORITY_FENCE_ENABLED:false}
@@ -851,7 +851,7 @@ sellerops:
       # Unattended NAVER review export for a shadow run (72h). OFF by default, and with it off this
       # deployment behaves byte-for-byte as it did before the capability existed: the route answers 403
       # and a review-import launch is minted only by a seller's own session, which is the human
-      # checkpoint PD-7 recognises (docs/review_acquisition_aside_v2.md §12).
+      # checkpoint PD-7 recognises (docs/lineage/review_acquisition_aside_v2.md §12).
       #
       # All three are required together and NEITHER LIST ACCEPTS `*`. The org list answers whose seller
       # centre may be driven with nobody present; the device list answers which paired helper may do it
@@ -890,7 +890,7 @@ sellerops:
     exp-minutes: ${SELLEROPS_JWT_EXP_MINUTES:720}
   cors:
     origin: ${SELLEROPS_CORS_ORIGIN:http://localhost:5173}
-  # Social login (Google OIDC · NAVER OAuth2) — docs/auth_growth_instrumentation_v1.md. Deployer values,
+  # Social login (Google OIDC · NAVER OAuth2) — docs/standing/auth_growth_instrumentation_v1.md. Deployer values,
   # prepared before service start; a provider without BOTH id and secret does not exist (no bean, no
   # endpoint, no button). Success mints a one-time code (never a JWT in a URL); identity is
   # (provider, subject); an email collision is refused, never auto-linked; a first-time identity creates
@@ -909,7 +909,7 @@ sellerops:
     # Expired handoff rows (they carry the provider email/display name) are deleted on this cadence.
     purge-initial-delay-ms: 300000
     purge-interval-ms: 900000
-  # Service Readiness v1 — docs/service_readiness_v1.md §5. Public origin of the frontend, used to build links
+  # Service Readiness v1 — docs/standing/service_readiness_v1.md §5. Public origin of the frontend, used to build links
   # that leave the product (password-reset mail). Not a secret.
   public-base-url: ${SELLEROPS_PUBLIC_BASE_URL:http://localhost:5173}
   # Password reset by mailed one-time link (§2-2): SHA-256 at rest, single use, this TTL. Needs a mailer (below).
@@ -991,7 +991,7 @@ sellerops:
       execution-enabled: ${SELLEROPS_REVIEW_PUBLISH_EXECUTION_ENABLED:false}
       cafe24:
         # The live-run approval id a Cafe24 comment POST must be armed with, per
-        # docs/sellerops_live_approval_contract.md. Blank = no live comment can leave this process
+        # docs/standing/sellerops_live_approval_contract.md. Blank = no live comment can leave this process
         # (Cafe24ReviewCommentClient throws Cafe24WriteApprovalRequired before the request is built).
         # An ENVIRONMENT-binding token, never a credential.
         live-approval-id: ${SELLEROPS_REVIEW_PUBLISH_CAFE24_LIVE_APPROVAL_ID:}
@@ -1020,7 +1020,7 @@ logging:
   level:
     org.springframework.security: INFO
 
-# Error monitoring (docs/service_readiness_v1.md §2-1). `sentry.dsn` is deliberately NOT declared here: Sentry's
+# Error monitoring (docs/standing/service_readiness_v1.md §2-1). `sentry.dsn` is deliberately NOT declared here: Sentry's
 # auto-configuration exists only when the SENTRY_DSN environment variable (relaxed-bound to sentry.dsn) is set —
 # local/dev default = OFF, nothing initialises. The knobs below apply when it is on. Every event passes
 # com.sellerops.telemetry.SentryScrub (no query strings, auth headers, cookies, bodies, users). Log→Sentry

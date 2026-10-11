@@ -9,7 +9,7 @@
  * question, and ended with nothing to say about 69 inquiries it had counted correctly. Nothing was
  * wrong with the count, the tool, the gate or the goal. "미답변 문의" is not an inquiry — it is a
  * category of inquiries, and no id exists that could ever resolve it. Full record:
- * `docs/agent_real_validation_v1.md` §15.8 (A9) and the same defect on the product axis (C5), where
+ * `docs/lineage/agent_real_validation_v1.md` §15.8 (A9) and the same defect on the product axis (C5), where
  * "상품별 최근 문제" sent `resolve_product("상품")` to look up a product called "상품".
  *
  * <b>The rule.</b> A mention is CATEGORY only when EVERY token in it is category vocabulary and at

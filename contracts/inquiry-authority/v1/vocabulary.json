@@ -1,6 +1,6 @@
 {
  "version": "inquiry-authority/v1",
- "adopted": "product-owner decision 2026-09-20 (docs/inquiry_architecture_v3.md, docs/inquiry_architecture_v3_wp1.md)",
+ "adopted": "product-owner decision 2026-09-20 (docs/lineage/inquiry_architecture_v3.md, docs/lineage/inquiry_architecture_v3_wp1.md)",
  "authorities": [
   "KNOWLEDGE",
   "ENTITY_STATE",

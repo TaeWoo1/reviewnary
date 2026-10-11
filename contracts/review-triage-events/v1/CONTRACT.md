@@ -26,7 +26,7 @@ refuses it as `UNCLASSIFIED` (never a tier, never an exception, RUBRIC v2 §8.5)
 |---|---|---|---|---|
 | `NAVER` | yes | **none** — NAVER publishes no per-review URL and SellerOps has no locate surface for it | guided, unverified — the attention surface's copy-and-paste flow; SellerOps never confirms a post | roadmap §4.1 NAVER/REVIEW; ledger `:55` |
 | `CAFE24` | yes | **none** — no admin deep-link is verified; none is invented | **no** — no reply flow is built | roadmap §4.1 Cafe24/REVIEW |
-| `COUPANG` | yes | **locate run** — `[쿠팡에서 보기]`, an Action Window run that draws a border on the seller's own WING screen | **no — the channel has no reply feature (D8).** No reply event may ever be written for a Coupang review, by any path | `docs/coupang_review_policy_gate_v1.md` §6.1 D8, §7 |
+| `COUPANG` | yes | **locate run** — `[쿠팡에서 보기]`, an Action Window run that draws a border on the seller's own WING screen | **no — the channel has no reply feature (D8).** No reply event may ever be written for a Coupang review, by any path | `docs/standing/coupang_review_policy_gate_v1.md` §6.1 D8, §7 |
 
 The table is code: one class states it, the endpoints and the UI read it, and a test pins the three
 rows. A capability that is `no` here is not "hidden" — it is refused server-side, so a client that

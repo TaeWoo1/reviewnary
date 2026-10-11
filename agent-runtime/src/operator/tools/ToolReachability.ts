@@ -5,7 +5,7 @@
  * invoked by any line of code. `get_review_issue_evidence_summary` — the ONLY read in the system that
  * can say how many of an issue's review rows belong to one product — was among the eleven, which is
  * why a seller asking about their own product by name got org-wide issue rows, watched the scope gate
- * refuse every one of them, and was told nothing (`docs/agent_real_validation_v1.md` §5 P4, A5, B1).
+ * refuse every one of them, and was told nothing (`docs/lineage/agent_real_validation_v1.md` §5 P4, A5, B1).
  * A catalogue that advertises a capability nothing can perform is not a catalogue, it is a promise;
  * the planner spent model budget choosing tools that could never run.
  *

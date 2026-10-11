@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
  * <p>Two arms over one fixture: the lexical scorer exactly as it shipped, and the production path
  * exactly as a lane now runs it. It is a regression guard rather than a leaderboard — the sweep that
  * chose the thresholds (six margins, four embedding arms, passage versus sentence units, semantic
- * alone versus a union with lexical) is recorded in {@code docs/knowledge_retrieval_quality_v1.md}
+ * alone versus a union with lexical) is recorded in {@code docs/knowledge/knowledge_retrieval_quality_v1.md}
  * and is not re-run here, because a test that calls a vendor is a test that does not run.
  */
 class RetrievalBenchmarkTest {

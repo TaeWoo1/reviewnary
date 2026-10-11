@@ -142,7 +142,7 @@ rendered live — this DB has no investigated Customer Ops case — and is cover
 - NAVER review reply text — no official source; Aside observation needs a live approval (§1).
 - Cafe24 review comments — API exists, not wired; Cafe24/Coupang inquiry answers not promotable without authorship.
 - First live NAVER history read and the automatic lane — `LIVE_UNPROVEN`, both switches default OFF.
-- Semantic F5 remains a deployment decision (vendor payload, cost, latency — `docs/knowledge_retrieval_quality_v2.md`);
+- Semantic F5 remains a deployment decision (vendor payload, cost, latency — `docs/knowledge/knowledge_retrieval_quality_v2.md`);
   deployments without it keep the lexical numbers (false grounding 3).
 - Worded 4–5★ reviews now wait 14 days in MONITORING; whether to spend agent calls on all of them instead is a cost
   decision, not taken.

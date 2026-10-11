@@ -2,7 +2,7 @@
  * **The offline half of the WING seller-identity assertion** — digest the code the page printed, compare it
  * to the one the backend says this binding belongs to, and answer in three words.
  *
- * PD-4 (`docs/review_acquisition_aside_v2.md` §6): before a single review is read, the run must establish
+ * PD-4 (`docs/lineage/review_acquisition_aside_v2.md` §6): before a single review is read, the run must establish
  * that the authenticated browser is the store the seller connected. Not "probably" — the two must agree on a
  * **channel-native identifier**, and every other outcome is a stop.
  *

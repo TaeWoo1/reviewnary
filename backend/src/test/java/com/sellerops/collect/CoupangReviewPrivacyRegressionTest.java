@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
  * **The buyer has nowhere to land.**
  *
  * Coupang's 상품평 screen prints the buyer's name beside every review. The acquisition path is allowed to see
- * it — `docs/sellerops_live_approval_contract.md` §5d says the rule is *do not persist*, not *do not read* — so
+ * it — `docs/standing/sellerops_live_approval_contract.md` §5d says the rule is *do not persist*, not *do not read* — so
  * the guarantee has to be structural rather than behavioural: at every layer the value passes, there is no
  * field for it to be assigned to.
  *

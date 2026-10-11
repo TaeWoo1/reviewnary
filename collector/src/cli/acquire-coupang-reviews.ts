@@ -7,7 +7,7 @@
  *
  * **This is the first Coupang review run that takes text out of the page**, and the reason it may is stated
  * rather than assumed: the reviews are the seller's own, read under their own connection, and
- * `docs/sellerops_live_approval_contract.md` §5d holds that the rule is *do not persist unnecessarily*, not
+ * `docs/standing/sellerops_live_approval_contract.md` §5d holds that the rule is *do not persist unnecessarily*, not
  * *do not read*. What that makes load-bearing is the BUYER — whose column the reader resolves precisely so it
  * can refuse to read it, and for whom no field exists on the wire, in the canonical record, or in the database.
  *

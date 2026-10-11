@@ -7,7 +7,7 @@ import { useAuth } from "../../lib/auth";
 import { KNOWLEDGE_NOUN } from "../../lib/knowledgeWords";
 
 /**
- * 설정 — 네 구역, 한 줄에 한 항목 (docs/reviewnary_design.md §7).
+ * 설정 — 네 구역, 한 줄에 한 항목 (docs/frontend/reviewnary_design.md §7).
  *
  * <p><b>전에는 이름 없는 상자 넷이었다.</b> 화면에 `h2`가 하나도 없었고 — 구역의 이름은 전부
  * `aria-label`에만 있었다 — 눈으로 읽는 사람에게 이 화면의 구조는 상자의 간격뿐이었다. 그래서 「연결

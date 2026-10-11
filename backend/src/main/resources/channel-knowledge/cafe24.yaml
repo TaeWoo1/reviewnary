@@ -18,7 +18,7 @@ entries:
     capabilities: [ORDER_SUMMARY]
     tags: [주문, 수집, api, oauth]
     source: LIVE_OBSERVATION
-    sourceRef: docs/sellerops_cafe24_live_verification.md
+    sourceRef: docs/lineage/sellerops_cafe24_live_verification.md
     verifiedAt: "2026-06-25"
 
   - id: cafe24-cap-review-board4
@@ -35,7 +35,7 @@ entries:
     capabilities: [REVIEW]
     tags: [리뷰, 게시판, board4, 구매후기]
     source: LIVE_OBSERVATION
-    sourceRef: docs/sellerops_cafe24_review_acquisition_completion_live_proof.md
+    sourceRef: docs/lineage/sellerops_cafe24_review_acquisition_completion_live_proof.md
     verifiedAt: "2026-07-31"
 
   - id: cafe24-cap-inquiry-board6
@@ -50,7 +50,7 @@ entries:
     capabilities: [INQUIRY]
     tags: [문의, 게시판, board6, 비밀글]
     source: LIVE_OBSERVATION
-    sourceRef: docs/sellerops_cafe24_inquiry_read_live_proof.md
+    sourceRef: docs/lineage/sellerops_cafe24_inquiry_read_live_proof.md
     verifiedAt: "2026-07-31"
 
   - id: cafe24-cap-product
@@ -167,7 +167,7 @@ entries:
     capabilities: [REVIEW, INQUIRY]
     tags: [상태, 답변, unknown, 토큰]
     source: LIVE_OBSERVATION
-    sourceRef: docs/sellerops_cafe24_review_acquisition_completion_live_proof.md
+    sourceRef: docs/lineage/sellerops_cafe24_review_acquisition_completion_live_proof.md
     verifiedAt: "2026-07-30"
 
   - id: cafe24-status-absence-not-deletion
@@ -183,7 +183,7 @@ entries:
     capabilities: [INQUIRY]
     tags: [문의, 삭제, 부재, 판정]
     source: PRODUCT_DECISION
-    sourceRef: docs/inquiry_operational_truth_v1.md
+    sourceRef: docs/inquiry/inquiry_operational_truth_v1.md
     verifiedAt: "2026-08-22"
 
   # ------------------------------------------------------------------ GLOSSARY
@@ -279,7 +279,7 @@ entries:
     capabilities: [INQUIRY]
     tags: [문의, 답변, 승인, 워크플로]
     source: LIVE_OBSERVATION
-    sourceRef: docs/inquiry_answer_execution_v1.md §30 (VERIFIED 2026-08-25, commit b0bfb022)
+    sourceRef: docs/inquiry/inquiry_answer_execution_v1.md §30 (VERIFIED 2026-08-25, commit b0bfb022)
     verifiedAt: "2026-08-25"
 
   # ---------------------------------------------------------------- OPERATIONS
@@ -297,5 +297,5 @@ entries:
     capabilities: [ORDER_SUMMARY, INQUIRY, REVIEW, PRODUCT]
     tags: [운영, 재동의, 판단, 순서]
     source: LIVE_OBSERVATION
-    sourceRef: docs/demo_org_and_channel_knowledge_v1.md (vault 진단, 2026-08-22)
+    sourceRef: docs/knowledge/demo_org_and_channel_knowledge_v1.md (vault 진단, 2026-08-22)
     verifiedAt: "2026-08-22"

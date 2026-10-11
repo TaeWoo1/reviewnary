@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/** docs/service_readiness_v1.md §2-1: nothing that identifies a person or authorizes a call leaves the JVM. */
+/** docs/standing/service_readiness_v1.md §2-1: nothing that identifies a person or authorizes a call leaves the JVM. */
 class SentryScrubTest {
 
     @Test

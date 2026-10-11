@@ -100,10 +100,10 @@ export function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         {/* Social login (Google · NAVER): the one-time-code landing and the 상호명 step for a first-time
-            identity — auth surface, not menu (docs/auth_growth_instrumentation_v1.md §4). */}
+            identity — auth surface, not menu (docs/standing/auth_growth_instrumentation_v1.md §4). */}
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/onboarding" element={<Onboarding />} />
-        {/* Service Readiness v1 (docs/service_readiness_v1.md): password reset on the same auth shell; legal
+        {/* Service Readiness v1 (docs/standing/service_readiness_v1.md): password reset on the same auth shell; legal
             placeholders behind the footer / consent links. */}
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -216,7 +216,7 @@ export function App() {
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
-    {/* Browser consent (docs/service_readiness_v1.md §2-4): exists only while a decision is pending under the
+    {/* Browser consent (docs/standing/service_readiness_v1.md §2-4): exists only while a decision is pending under the
         banner policy (an analytics vendor is configured). Outside both shells so it needs no app state. */}
     <ConsentBanner />
     </>

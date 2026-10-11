@@ -18,49 +18,49 @@
 
 | 문서 | 소스 인용 | 마지막 커밋 | 줄 | 제목 |
 |---|---|---|---|---|
-| `docs/agent_real_validation_v1.md` | 24 | 2026-08-24 | 1872 | 3-Channel REAL Agent Validation v1 — baseline (2026-08-23) |
-| `docs/naver_inquiry_api_audit_v1.md` | 14 | 2026-08-24 | 947 | NAVER 문의 API 감사 v1 — 공식 계약과 저장소 사실 |
-| `docs/inquiry_architecture_v35.md` | 8 | 2026-09-21 | 2349 | Inquiry Architecture v3.5 — Customer Goal Interpreter + Deterministic Resolution Loop |
-| `docs/coupang_credential_handoff_v1.md` | 8 | 2026-08-13 | 220 | Coupang Credential Handoff v1 — the contract |
-| `docs/review_acquisition_aside_v2.md` | 7 | 2026-09-12 | 376 | Review Acquisition — Aside v2 — TARGET DESIGN |
-| `docs/coupang_review_acquisition_v1.md` | 7 | 2026-08-15 | 388 | Coupang Review Acquisition + Locate v1 |
-| `docs/inquiry_decision_v2_1.md` | 5 | 2026-09-20 | 323 | Inquiry Decision v2.1 — Judge Calibration & Memory Scope Hardening |
-| `docs/sellerops_cafe24_review_acquisition_completion_live_proof.md` | 4 | 2026-07-31 | 107 | Cafe24 REVIEW Acquisition Completion v1 — live proof (sanitized) |
-| `docs/demo_baseline_recovery_audit_2026-08-21.md` | 4 | 2026-08-21 | 380 | Demo Baseline Recovery Audit — `main @ 2491f1ab` (2026-08-21) |
-| `docs/coupang_inquiry_live_proof_v1.md` | 4 | 2026-08-14 | 161 | Coupang 고객문의 — Live Proof v1 |
-| `docs/sellerops_cafe24_live_verification.md` | 3 | 2026-06-25 | 70 | Cafe24 ORDER_SUMMARY — Gated live verification record |
-| `docs/inquiry_need_eval_v1.md` | 3 | 2026-09-19 | 214 | Inquiry Need Eval v1 — Knowledge Coverage → Retrieval → Sufficiency → Decision, need 단위로 |
-| `docs/coupang_review_feasibility_v1.md` | 3 | 2026-08-14 | 459 | Coupang Review Integration — Feasibility v1 |
-| `docs/coupang_final_main_first_connection_order_routine_proof_v1.md` | 3 | 2026-08-06 | 122 | Coupang Final Main First-Connection + Idempotent Order Routine Proof v1 |
-| `docs/sellerops_cafe24_inquiry_read_live_proof.md` | 2 | 2026-08-19 | 159 | Cafe24 INQUIRY_READ Live Proof v1 — SUCCESS (exact-window contract) |
-| `docs/sellerops_cafe24_community_board_discovery.md` | 2 | 2026-06-25 | 106 | Cafe24 Community Board Discovery — design + verification plan |
-| `docs/review_media_presence_audit_v1.md` | 2 | 2026-09-13 | 369 | Review Media Presence Audit v1 |
-| `docs/product_truth_matrix.md` | 2 | 2026-09-22 | 672 | Product Truth v2 — 렌더된 요약 |
-| `docs/inquiry_decision_v2.md` | 2 | 2026-09-19 | 177 | Inquiry Decision v2 — 「관련 근거가 있다」와 「고객 요청 전체를 답할 수 있다」를 가른다 |
-| `docs/inquiry_architecture_v3_wp31.md` | 2 | 2026-09-20 | 890 | Inquiry Architecture v3 — WP-3.1: Closing Authority Semantics & Replay Diagnostics |
-| `docs/inquiry_architecture_v3_wp1.md` | 2 | 2026-09-20 | 399 | Inquiry v3 WP-1 — Eval Asset Recovery + Deterministic Authority Layer |
-| `docs/coupang_review_locate_ux_v1.md` | 2 | 2026-08-16 | 343 | Coupang Review Locate UX v1 — `[쿠팡에서 보기]` |
-| `docs/ci-coverage.md` | 2 | 2026-07-27 | 103 | CI coverage — what is verified automatically, and what deliberately is not |
-| `docs/trusted_operator_confirmation_proof_v1.md` | 1 | 2026-08-13 | 113 | Trusted Operator Confirmation v1 — live proof record |
-| `docs/sellerops_cafe24_review_inquiry_capture.md` | 1 | 2026-08-22 | 506 | Cafe24 Review/Inquiry Article Capture — storage foundation (PR A) |
-| `docs/resident_helper_on_demand_carrier_v1.md` | 1 | 2026-08-28 | 264 | Resident helper — the guided walks on demand (2026-08-19, v1.1; extended 2026-08-20, v1.2) |
-| `docs/pilot_launch_readiness_v1.md` | 1 | 2026-09-26 | 437 | Pilot Launch Readiness v1 |
-| `docs/naver_cafe24_shadow_run_v1.md` | 1 | 2026-09-28 | 395 | NAVER + Cafe24 Cloud Shadow Run v1 — procedure |
-| `docs/inquiry_decision_v2_2.md` | 1 | 2026-09-20 | 142 | Inquiry Decision v2.2 — Evidence Integrity & Aggregation Calibration |
-| `docs/inquiry_architecture_v3.md` | 1 | 2026-09-20 | 965 | Inquiry Architecture v3 — Capability-Oriented Resolution (설계 · 구현 0) |
-| `docs/inquiry_architecture_v3_wp32.md` | 1 | 2026-09-20 | 357 | Inquiry Architecture v3 — WP-3.2: Planner Boundary & Scope Hardening |
-| `docs/full_mvp_channel_capability_audit_v1.md` | 1 | 2026-09-22 | 219 | Full MVP — 3채널 Production Capability 감사 v1 |
-| `docs/execution_strategy_v1.md` | 1 | 2026-09-12 | 207 | Reviewnary Execution Strategy v1 |
-| `docs/coupang_wing_openapi_issuance_flow_discovery_v1.md` | 1 | 2026-08-10 | 163 | Coupang WING OPEN-API Issuance Flow Discovery v1 — evidence landing |
-| `docs/coupang_wing_key_deletion_live_v1.md` | 1 | 2026-08-08 | 217 | Coupang WING Key Deletion — Live v1 |
-| `docs/coupang_wing_issue_selector_calibration_landing_v2.md` | 1 | 2026-08-19 | 210 | Coupang WING Issue Selector Calibration Landing v2 |
-| `docs/coupang_routine_operations_v1.md` | 1 | 2026-08-14 | 335 | Coupang Routine Operations v1 — 고객문의 |
-| `docs/coupang_ordersheets_response_contract_hardening_v1.md` | 1 | 2026-08-06 | 109 | Coupang Ordersheets Response Contract Hardening v1 |
-| `docs/coupang_credential_expiry_audit_v1.md` | 1 | 2026-08-07 | 74 | Coupang Credential Expiry + Guided Renewal — Audit & Policy Basis v1 |
-| `docs/coupang_aside_review_acquisition_poc_v1.md` | 1 | 2026-09-12 | 341 | Coupang WING Review Acquisition over Aside — PoC v1 |
-| `docs/cafe24_live_e2e_runbook.md` | 1 | 2026-09-22 | 290 | Cafe24 Live E2E Runbook (2026-09-21) |
-| `docs/aside_execution_provider_v1.md` | 1 | 2026-09-12 | 243 | Aside Execution Provider v1 — M1 (Execution Provider Foundation) + M2 (Aside Execution Adapter) |
-| `docs/aside_capability_discovery_v1.md` | 1 | 2026-09-12 | 477 | Aside Capability Discovery v1 — read-only |
+| `docs/lineage/agent_real_validation_v1.md` | 24 | 2026-08-24 | 1872 | 3-Channel REAL Agent Validation v1 — baseline (2026-08-23) |
+| `docs/lineage/naver_inquiry_api_audit_v1.md` | 14 | 2026-08-24 | 947 | NAVER 문의 API 감사 v1 — 공식 계약과 저장소 사실 |
+| `docs/lineage/inquiry_architecture_v35.md` | 8 | 2026-09-21 | 2349 | Inquiry Architecture v3.5 — Customer Goal Interpreter + Deterministic Resolution Loop |
+| `docs/lineage/coupang_credential_handoff_v1.md` | 8 | 2026-08-13 | 220 | Coupang Credential Handoff v1 — the contract |
+| `docs/lineage/review_acquisition_aside_v2.md` | 7 | 2026-09-12 | 376 | Review Acquisition — Aside v2 — TARGET DESIGN |
+| `docs/lineage/coupang_review_acquisition_v1.md` | 7 | 2026-08-15 | 388 | Coupang Review Acquisition + Locate v1 |
+| `docs/lineage/inquiry_decision_v2_1.md` | 5 | 2026-09-20 | 323 | Inquiry Decision v2.1 — Judge Calibration & Memory Scope Hardening |
+| `docs/lineage/sellerops_cafe24_review_acquisition_completion_live_proof.md` | 4 | 2026-07-31 | 107 | Cafe24 REVIEW Acquisition Completion v1 — live proof (sanitized) |
+| `docs/lineage/demo_baseline_recovery_audit_2026-08-21.md` | 4 | 2026-08-21 | 380 | Demo Baseline Recovery Audit — `main @ 2491f1ab` (2026-08-21) |
+| `docs/lineage/coupang_inquiry_live_proof_v1.md` | 4 | 2026-08-14 | 161 | Coupang 고객문의 — Live Proof v1 |
+| `docs/lineage/sellerops_cafe24_live_verification.md` | 3 | 2026-06-25 | 70 | Cafe24 ORDER_SUMMARY — Gated live verification record |
+| `docs/lineage/inquiry_need_eval_v1.md` | 3 | 2026-09-19 | 214 | Inquiry Need Eval v1 — Knowledge Coverage → Retrieval → Sufficiency → Decision, need 단위로 |
+| `docs/lineage/coupang_review_feasibility_v1.md` | 3 | 2026-08-14 | 459 | Coupang Review Integration — Feasibility v1 |
+| `docs/lineage/coupang_final_main_first_connection_order_routine_proof_v1.md` | 3 | 2026-08-06 | 122 | Coupang Final Main First-Connection + Idempotent Order Routine Proof v1 |
+| `docs/lineage/sellerops_cafe24_inquiry_read_live_proof.md` | 2 | 2026-08-19 | 159 | Cafe24 INQUIRY_READ Live Proof v1 — SUCCESS (exact-window contract) |
+| `docs/lineage/sellerops_cafe24_community_board_discovery.md` | 2 | 2026-06-25 | 106 | Cafe24 Community Board Discovery — design + verification plan |
+| `docs/lineage/review_media_presence_audit_v1.md` | 2 | 2026-09-13 | 369 | Review Media Presence Audit v1 |
+| `docs/lineage/product_truth_matrix.md` | 2 | 2026-09-22 | 672 | Product Truth v2 — 렌더된 요약 |
+| `docs/lineage/inquiry_decision_v2.md` | 2 | 2026-09-19 | 177 | Inquiry Decision v2 — 「관련 근거가 있다」와 「고객 요청 전체를 답할 수 있다」를 가른다 |
+| `docs/lineage/inquiry_architecture_v3_wp31.md` | 2 | 2026-09-20 | 890 | Inquiry Architecture v3 — WP-3.1: Closing Authority Semantics & Replay Diagnostics |
+| `docs/lineage/inquiry_architecture_v3_wp1.md` | 2 | 2026-09-20 | 399 | Inquiry v3 WP-1 — Eval Asset Recovery + Deterministic Authority Layer |
+| `docs/lineage/coupang_review_locate_ux_v1.md` | 2 | 2026-08-16 | 343 | Coupang Review Locate UX v1 — `[쿠팡에서 보기]` |
+| `docs/lineage/ci-coverage.md` | 2 | 2026-07-27 | 103 | CI coverage — what is verified automatically, and what deliberately is not |
+| `docs/lineage/trusted_operator_confirmation_proof_v1.md` | 1 | 2026-08-13 | 113 | Trusted Operator Confirmation v1 — live proof record |
+| `docs/lineage/sellerops_cafe24_review_inquiry_capture.md` | 1 | 2026-08-22 | 506 | Cafe24 Review/Inquiry Article Capture — storage foundation (PR A) |
+| `docs/lineage/resident_helper_on_demand_carrier_v1.md` | 1 | 2026-08-28 | 264 | Resident helper — the guided walks on demand (2026-08-19, v1.1; extended 2026-08-20, v1.2) |
+| `docs/lineage/pilot_launch_readiness_v1.md` | 1 | 2026-09-26 | 437 | Pilot Launch Readiness v1 |
+| `docs/lineage/naver_cafe24_shadow_run_v1.md` | 1 | 2026-09-28 | 395 | NAVER + Cafe24 Cloud Shadow Run v1 — procedure |
+| `docs/lineage/inquiry_decision_v2_2.md` | 1 | 2026-09-20 | 142 | Inquiry Decision v2.2 — Evidence Integrity & Aggregation Calibration |
+| `docs/lineage/inquiry_architecture_v3.md` | 1 | 2026-09-20 | 965 | Inquiry Architecture v3 — Capability-Oriented Resolution (설계 · 구현 0) |
+| `docs/lineage/inquiry_architecture_v3_wp32.md` | 1 | 2026-09-20 | 357 | Inquiry Architecture v3 — WP-3.2: Planner Boundary & Scope Hardening |
+| `docs/lineage/full_mvp_channel_capability_audit_v1.md` | 1 | 2026-09-22 | 219 | Full MVP — 3채널 Production Capability 감사 v1 |
+| `docs/lineage/execution_strategy_v1.md` | 1 | 2026-09-12 | 207 | Reviewnary Execution Strategy v1 |
+| `docs/lineage/coupang_wing_openapi_issuance_flow_discovery_v1.md` | 1 | 2026-08-10 | 163 | Coupang WING OPEN-API Issuance Flow Discovery v1 — evidence landing |
+| `docs/lineage/coupang_wing_key_deletion_live_v1.md` | 1 | 2026-08-08 | 217 | Coupang WING Key Deletion — Live v1 |
+| `docs/lineage/coupang_wing_issue_selector_calibration_landing_v2.md` | 1 | 2026-08-19 | 210 | Coupang WING Issue Selector Calibration Landing v2 |
+| `docs/lineage/coupang_routine_operations_v1.md` | 1 | 2026-08-14 | 335 | Coupang Routine Operations v1 — 고객문의 |
+| `docs/lineage/coupang_ordersheets_response_contract_hardening_v1.md` | 1 | 2026-08-06 | 109 | Coupang Ordersheets Response Contract Hardening v1 |
+| `docs/lineage/coupang_credential_expiry_audit_v1.md` | 1 | 2026-08-07 | 74 | Coupang Credential Expiry + Guided Renewal — Audit & Policy Basis v1 |
+| `docs/lineage/coupang_aside_review_acquisition_poc_v1.md` | 1 | 2026-09-12 | 341 | Coupang WING Review Acquisition over Aside — PoC v1 |
+| `docs/lineage/cafe24_live_e2e_runbook.md` | 1 | 2026-09-22 | 290 | Cafe24 Live E2E Runbook (2026-09-21) |
+| `docs/lineage/aside_execution_provider_v1.md` | 1 | 2026-09-12 | 243 | Aside Execution Provider v1 — M1 (Execution Provider Foundation) + M2 (Aside Execution Adapter) |
+| `docs/lineage/aside_capability_discovery_v1.md` | 1 | 2026-09-12 | 477 | Aside Capability Discovery v1 — read-only |
 
 ## 저장소에 없는 문서 이름 (2026-10-12)
 

@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>The official contract this client is written against is vendored at
  * {@code docs/vendor/naver-commerce-api/get-v1-contents-qnas.md} and audited in
- * {@code docs/naver_inquiry_api_audit_v1.md} §1. Everything below is read from it; nothing is
+ * {@code docs/lineage/naver_inquiry_api_audit_v1.md} §1. Everything below is read from it; nothing is
  * inferred from a sibling endpoint.
  *
  * <p><b>What this resource does NOT publish, and is therefore not claimed:</b>

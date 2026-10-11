@@ -62,7 +62,7 @@ describe("회원가입", () => {
     });
   });
 
-  it("refuses to submit without the 필수 consent and passes the 선택 one through (docs/service_readiness_v1.md §2-4)", async () => {
+  it("refuses to submit without the 필수 consent and passes the 선택 one through (docs/standing/service_readiness_v1.md §2-4)", async () => {
     signup.mockResolvedValue(undefined);
     renderSignup();
     fill();

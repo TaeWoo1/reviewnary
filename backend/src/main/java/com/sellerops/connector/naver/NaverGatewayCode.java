@@ -17,7 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * opposite actions: <em>this credential is wrong</em> (re-enter it) and <em>this caller's IP is not
  * registered</em> (the credential is fine; the environment is not). On 2026-08-24 the NAVER inquiry
  * recurrence proof stopped at exactly that fork with no way to tell which side it was on
- * (`docs/naver_inquiry_api_audit_v1.md` §12).
+ * (`docs/lineage/naver_inquiry_api_audit_v1.md` §12).
  *
  * <p>It is deliberately not an error taxonomy. One constant is recognised — the one the official table
  * names — and every other code is returned verbatim for diagnostics but classified as nothing.

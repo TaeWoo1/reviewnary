@@ -32,7 +32,7 @@ export function sinksFromEnv(env: AnalyticsEnv): AnalyticsSink[] {
 }
 
 /**
- * The consent the analytics layer starts with (docs/service_readiness_v1.md §2-4): under the banner policy the
+ * The consent the analytics layer starts with (docs/standing/service_readiness_v1.md §2-4): under the banner policy the
  * stored decision (or none yet → buffer); with no vendor configured there is nothing to consent to and the layer
  * is simply "allowed" (it has no sinks anyway).
  */
@@ -44,6 +44,6 @@ export function initialConsent(env: ConsentEnv, stored = readConsent()): Consent
 export function initAnalyticsFromEnv(env: AnalyticsEnv = import.meta.env as unknown as AnalyticsEnv): void {
   analytics.init(sinksFromEnv(env));
   // Eager start (once allowed): GTM must be on the LANDING page for the landing page_view — the UTM carrier of
-  // the whole funnel — not on the first tracked event (docs/service_readiness_v1.md §1, §8).
+  // the whole funnel — not on the first tracked event (docs/standing/service_readiness_v1.md §1, §8).
   analytics.setConsent(initialConsent(env));
 }

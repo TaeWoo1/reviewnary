@@ -28,7 +28,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 
 /**
- * The three product-owner amendments of docs/auth_growth_instrumentation_v1.md §2, as behaviour:
+ * The three product-owner amendments of docs/standing/auth_growth_instrumentation_v1.md §2, as behaviour:
  * (1) no JWT in a URL — a one-time code, hashed at rest, spent once; (2) identity = (provider, subject), an
  * email match is a refusal, never a link; (3) no user without an org — nothing is created until 상호명, then
  * org + user + identity together with the collision checks repeated.
@@ -210,7 +210,7 @@ class SocialAuthServiceTest {
         verify(users).save(user.capture());
         assertThat(user.getValue().getPasswordHash()).isNull();
         assertThat(user.getValue().getEmail()).isEqualTo("a@x.io");
-        // Account consent record (docs/service_readiness_v1.md §2-4): 필수 stamped with the draft version, 선택 as given.
+        // Account consent record (docs/standing/service_readiness_v1.md §2-4): 필수 stamped with the draft version, 선택 as given.
         assertThat(user.getValue().getTermsAcceptedAt()).isEqualTo(now);
         assertThat(user.getValue().getTermsVersion()).isEqualTo(com.sellerops.auth.consent.AccountConsent.TERMS_VERSION);
         assertThat(user.getValue().getMarketingConsentAt()).isEqualTo(now);

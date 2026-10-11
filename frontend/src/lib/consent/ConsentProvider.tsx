@@ -11,7 +11,7 @@ import {
 } from "./consent";
 
 /**
- * Consent for the browser (docs/service_readiness_v1.md §2-4). Holds the stored decision, exposes the policy
+ * Consent for the browser (docs/standing/service_readiness_v1.md §2-4). Holds the stored decision, exposes the policy
  * (`banner` | `not-applicable`), and pushes every change into the analytics layer — which is the only thing a
  * decision changes right now (Sentry is 필수 and does not wait).
  */

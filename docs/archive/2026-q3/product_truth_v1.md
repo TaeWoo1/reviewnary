@@ -243,7 +243,7 @@ runtime  getProductTruth() → planSelection(closed tokens) → selectCanonicalF
 
 ## 7. 리뷰해야 하는 파일
 
-렌더된 요약: **`docs/product_truth_matrix.md`** (생성 파일 — 손으로 고치지 말 것)
+렌더된 요약: **`docs/lineage/product_truth_matrix.md`** (생성 파일 — 손으로 고치지 말 것)
 
 원본:
 

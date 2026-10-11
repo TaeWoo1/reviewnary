@@ -10,7 +10,7 @@
  * stop paths stay files and are excluded here by name. Only ADVANCING needs a channel a model cannot reach.
  *
  * The un-migrated list is written down rather than inferred, for two reasons: an inferred list would shrink
- * silently when someone deleted a CLI instead of fixing it, and `docs/sellerops_live_approval_contract.md` §5a
+ * silently when someone deleted a CLI instead of fixing it, and `docs/standing/sellerops_live_approval_contract.md` §5a
  * quotes this list to operators. It is a debt register, and it may only get shorter.
  */
 import { describe, expect, it } from "vitest";

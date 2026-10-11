@@ -4,7 +4,7 @@
 # Stops the backend and runtime first (no writers), drops and recreates the schema from the dump,
 # then starts them again (Flyway then sees the restored version table and applies nothing or only
 # what is newer). The vault master key must be the one that sealed the credentials in the dump —
-# a different key opens nothing (KEY_MISMATCH by fingerprint, docs/demo_org_and_channel_knowledge_v1.md).
+# a different key opens nothing (KEY_MISMATCH by fingerprint, docs/knowledge/demo_org_and_channel_knowledge_v1.md).
 set -euo pipefail
 [[ $# -eq 1 && -f "$1" ]] || { echo "usage: restore.sh <dump-file>"; exit 2; }
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

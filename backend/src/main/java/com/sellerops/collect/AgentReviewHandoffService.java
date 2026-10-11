@@ -47,7 +47,7 @@ import org.springframework.stereotype.Service;
  * and stored.
  *
  * <p>There is deliberately no second dedup rule here. The screen carries no per-review identifier
- * ({@code docs/coupang_review_policy_gate_v1.md} §9.2), so these rows arrive with {@code externalId = null} and
+ * ({@code docs/standing/coupang_review_policy_gate_v1.md} §9.2), so these rows arrive with {@code externalId = null} and
  * fall to the ingestion spine's content hash — which is the fallback it has always had, reached for the reason
  * it exists rather than a Coupang special case. What Coupang changes is only the FORMULA version
  * ({@code ReviewDedupKey.versionFor} → v2, folding rating), and that lives with the other formulas.

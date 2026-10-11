@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "sellerops/inquiry-need-eval/v1",
   "title": "Inquiry Need Eval v1 — row shapes of the three layers",
-  "description": "L1 human gold (questions, needs, precedents) · L2 snapshot state (census) · L3 runtime observation. The validator (tools/inquiry-need-eval/validate.mjs) enforces the cross-row rules this schema cannot express; a test keeps every enum here equal to tools/inquiry-need-eval/vocabulary.mjs. Canonical definitions: docs/inquiry_need_eval_v1.md.",
+  "description": "L1 human gold (questions, needs, precedents) · L2 snapshot state (census) · L3 runtime observation. The validator (tools/inquiry-need-eval/validate.mjs) enforces the cross-row rules this schema cannot express; a test keeps every enum here equal to tools/inquiry-need-eval/vocabulary.mjs. Canonical definitions: docs/lineage/inquiry_need_eval_v1.md.",
   "$defs": {
     "hex8": { "type": "string", "pattern": "^[0-9a-f]{8}$" },
     "ref": {

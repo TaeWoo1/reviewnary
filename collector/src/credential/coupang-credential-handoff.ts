@@ -22,7 +22,7 @@
  * whether `confirm` had already resolved true, which is the one invariant that matters and the one that a
  * call-site could otherwise quietly invert.
  *
- * See `docs/coupang_credential_handoff_v1.md` for the contract this implements.
+ * See `docs/lineage/coupang_credential_handoff_v1.md` for the contract this implements.
  */
 import { log } from "../log";
 import type { CredentialCellRefusal } from "../action-window/coupang-wing-credential-cells";

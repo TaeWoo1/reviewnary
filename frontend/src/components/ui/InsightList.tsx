@@ -3,7 +3,7 @@ import type { OperationsInsight } from "../../lib/types";
 import { Status, type StatusTone } from "./Status";
 
 /**
- * Findings, as rows (docs/reviewnary_design.md §7 홈).
+ * Findings, as rows (docs/frontend/reviewnary_design.md §7 홈).
  *
  * <b>The whole row is the target, and it is the ONLY target.</b> No per-row 「AI에게 묻기」: three
  * identical calls to action are zero calls to action.

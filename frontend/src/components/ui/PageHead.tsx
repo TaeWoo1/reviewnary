@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * Page header (docs/reviewnary_design.md §6). The page owns its `h1`; there is no desktop top bar.
+ * Page header (docs/frontend/reviewnary_design.md §6). The page owns its `h1`; there is no desktop top bar.
  *
  * <b>No description paragraph by default.</b> Every screen used to open with a sentence about itself —
  * 「판매 중인 상품과 그 상품에 대해 reviewnary가 아는 것을 봅니다」 — and a seller who reads the first

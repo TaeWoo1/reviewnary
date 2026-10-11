@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 class ProductTruthReportTest {
 
     private static final Path REPO = Path.of("..").toAbsolutePath().normalize();
-    private static final Path REPORT = REPO.resolve("docs/product_truth_matrix.md");
+    private static final Path REPORT = REPO.resolve("docs/lineage/product_truth_matrix.md");
 
     @Test
     void theCommittedSummaryMatchesTheLedger() throws Exception {
@@ -28,7 +28,7 @@ class ProductTruthReportTest {
                 : "";
         if (!rendered.equals(committed)) {
             Files.writeString(REPORT, rendered, StandardCharsets.UTF_8);
-            fail("docs/product_truth_matrix.md 가 원장과 달라 다시 생성했습니다. "
+            fail("docs/lineage/product_truth_matrix.md 가 원장과 달라 다시 생성했습니다. "
                     + "변경을 확인하고 커밋한 뒤 다시 실행하세요.");
         }
     }

@@ -224,7 +224,7 @@ action; live is governed by G3 + G6.
 
 ## G6 — Per-run approval · ☐ TEMPLATE (filled in the dispatching turn — a blank template grants nothing)
 
-> **Canonical contract:** `docs/sellerops_live_approval_contract.md` now formalizes this G6 as the
+> **Canonical contract:** `docs/standing/sellerops_live_approval_contract.md` now formalizes this G6 as the
 > **Approval Manifest** (§2). When a manifest is **prepared + displayed** (by `bootstrap`/`preflight`),
 > the operator grant is the single line **`Seated and ready.`** (§3) — the manifest already carries the
 > fields below, so they are not re-typed. This template stays as the manifest's **field reference**
@@ -254,7 +254,7 @@ R4 live-run approval
 marketplace **write**, so its G6 carries the `max live window:` field ([D-030](decisions.md)) AND a double-post
 precondition, and its `run scope` must be exactly `reply submission`. A blank template grants nothing. This is
 the `mode: WRITE` Approval Manifest reference under the canonical contract
-`docs/sellerops_live_approval_contract.md` (§2/§3): a WRITE always needs its own explicit approval and is
+`docs/standing/sellerops_live_approval_contract.md` (§2/§3): a WRITE always needs its own explicit approval and is
 never covered by a READ manifest's one-line grant.
 
 ```

@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Social login on top of the existing users/org/JWT model — docs/auth_growth_instrumentation_v1.md §2.
+ * Social login on top of the existing users/org/JWT model — docs/standing/auth_growth_instrumentation_v1.md §2.
  *
  * <ul>
  *   <li>Identity is {@code (provider, subject)}. An email that already belongs to a user is a refusal, never an

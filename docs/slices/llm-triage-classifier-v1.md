@@ -95,7 +95,7 @@ decision changes one adapter and one config value, not the design.
    send passes forever after the code starts sending more.
 3. **Channel is enforced at the boundary.** The classification entry point takes a review whose
    channel it verifies, and a non-`NAVER` review cannot reach the transport. Coupang's prohibition
-   (`docs/coupang_review_policy_gate_v1.md`) is thereby structural rather than remembered.
+   (`docs/standing/coupang_review_policy_gate_v1.md`) is thereby structural rather than remembered.
 
 ## 4. The output schema
 

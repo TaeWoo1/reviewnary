@@ -35,7 +35,7 @@ export interface SocialProvidersView {
   naver: boolean;
 }
 
-/** `GET /api/auth/password/config` — whether a mailed reset link can reach anyone (docs/service_readiness_v1.md §2-3). */
+/** `GET /api/auth/password/config` — whether a mailed reset link can reach anyone (docs/standing/service_readiness_v1.md §2-3). */
 export interface PasswordResetConfigView {
   enabled: boolean;
   /** Dev outbox: the mail lands in the local backend log — the UI may say so. */
@@ -3649,7 +3649,7 @@ export interface ReviewDetailResponse {
   issues: Array<{ issueId: string; title: string; severity: string | null; occurredOn: string | null }>;
 }
 
-// ---- Agentic Report v1 (docs/agentic_report_v1.md) -------------------------------------------------
+// ---- Agentic Report v1 (docs/review/agentic_report_v1.md) -------------------------------------------------
 
 export type ReportKind = "WEEKLY" | "MONTHLY";
 

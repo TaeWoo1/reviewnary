@@ -1,7 +1,7 @@
 /**
  * **`[쿠팡에서 보기]` — finding one stored review on the live WING screen.**
  *
- * The screen carries no per-review identifier (`docs/coupang_review_policy_gate_v1.md` §9.2), so locate cannot
+ * The screen carries no per-review identifier (`docs/standing/coupang_review_policy_gate_v1.md` §9.2), so locate cannot
  * ask "which row is review 12345". It has to ask "which row IS this review", and the only honest answer is the
  * one every field agrees on: same product, same day, same score, same body.
  *

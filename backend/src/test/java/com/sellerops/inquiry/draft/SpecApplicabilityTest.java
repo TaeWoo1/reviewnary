@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
  * what the drafter is TOLD. They do not assert the sentence a model writes, because that is not a
  * deterministic function of anything in this repository — every other prompt in the backend is under
  * the same limit, and pretending otherwise would turn a vendor's sampling into a red build. The
- * behaviour those two halves buy is recorded in {@code docs/answer_applicability_v1.md}.
+ * behaviour those two halves buy is recorded in {@code docs/knowledge/answer_applicability_v1.md}.
  */
 class SpecApplicabilityTest {
 

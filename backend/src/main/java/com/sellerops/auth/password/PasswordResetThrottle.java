@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * At most N reset mails per email address per window (in-memory, per JVM). Being throttled changes nothing the
- * caller can see — the endpoint's answer is the same sentence either way (docs/service_readiness_v1.md §2-2).
+ * caller can see — the endpoint's answer is the same sentence either way (docs/standing/service_readiness_v1.md §2-2).
  */
 public class PasswordResetThrottle {
 

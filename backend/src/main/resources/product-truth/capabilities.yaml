@@ -50,7 +50,7 @@ capabilities:
     mode: AUTOMATIC
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/naver_inquiry_api_audit_v1.md §8·§9·§16 · docs/evidence/INDEX.md (2026-08-24 —
+      docs/lineage/naver_inquiry_api_audit_v1.md §8·§9·§16 · docs/evidence/INDEX.md (2026-08-24 —
       source 획득 + routine recurrence 둘 다 CONFIRMED)
     sellerFacingNotes:
       - 네이버 상품 문의와 고객 문의(네이버페이)를 공식 API로 가져올 수 있습니다.
@@ -70,7 +70,7 @@ capabilities:
         mode: AUTOMATIC
         evidence: LIVE_PROVEN
         evidenceRef: >-
-          docs/naver_inquiry_api_audit_v1.md §8·§16 (2026-08-24 — 13건 수집 · 오류 0 ·
+          docs/lineage/naver_inquiry_api_audit_v1.md §8·§16 (2026-08-24 — 13건 수집 · 오류 0 ·
           채널상품번호 13/13 일치) · routine recurrence CONFIRMED
         sellerFacingNotes:
           - 상품 문의는 공식 API로 가져오고 정기 수집도 가능합니다.
@@ -79,7 +79,7 @@ capabilities:
         status: SUPPORTED
         mode: AUTOMATIC
         evidence: LIVE_PROVEN
-        evidenceRef: docs/naver_inquiry_api_audit_v1.md §9 (2026-08-24 — 5건 수집 · 오류 0)
+        evidenceRef: docs/lineage/naver_inquiry_api_audit_v1.md §9 (2026-08-24 — 5건 수집 · 오류 0)
         sellerFacingNotes:
           - 네이버페이 고객 문의도 공식 API로 가져옵니다.
         limitations:
@@ -107,7 +107,7 @@ capabilities:
     status: PARTIAL
     mode: LIMITED_READ
     evidence: LIVE_PROVEN
-    evidenceRef: docs/naver_inquiry_api_audit_v1.md §8·§9 (2026-08-24, 18건 · 오류 0)
+    evidenceRef: docs/lineage/naver_inquiry_api_audit_v1.md §8·§9 (2026-08-24, 18건 · 오류 0)
     sellerFacingNotes:
       - 문의 내용과 등록일, 답변 여부, 어떤 상품에 대한 문의인지를 읽습니다.
       - 문의는 채널상품번호로 판매자님의 상품에 정확히 연결됩니다(라이브 18/18 일치).
@@ -123,7 +123,7 @@ capabilities:
         status: SUPPORTED
         mode: LIMITED_READ
         evidence: LIVE_PROVEN
-        evidenceRef: docs/naver_inquiry_api_audit_v1.md §8 (13건 · 채널상품번호 13/13)
+        evidenceRef: docs/lineage/naver_inquiry_api_audit_v1.md §8 (13건 · 채널상품번호 13/13)
         sellerFacingNotes:
           - 상품 문의는 어떤 상품에 대한 문의인지 정확히 연결됩니다.
       - key: CUSTOMER_INQUIRY
@@ -131,7 +131,7 @@ capabilities:
         status: SUPPORTED
         mode: LIMITED_READ
         evidence: LIVE_PROVEN
-        evidenceRef: docs/naver_inquiry_api_audit_v1.md §9 (5건)
+        evidenceRef: docs/lineage/naver_inquiry_api_audit_v1.md §9 (5건)
         sellerFacingNotes:
           - 고객 문의의 본문과 답변 여부를 읽습니다.
         limitations:
@@ -145,7 +145,7 @@ capabilities:
         sellerFacingNotes:
           - 톡톡 문의는 읽지 않습니다.
     sourceRefs:
-      - docs/operational_fact_binding_v1.md (주문 참조는 채널이 지목한 것만 저장)
+      - docs/knowledge/operational_fact_binding_v1.md (주문 참조는 채널이 지목한 것만 저장)
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -195,7 +195,7 @@ capabilities:
         sellerFacingNotes:
           - 톡톡 문의에는 초안을 준비하지 않습니다.
     sourceRefs:
-      - docs/answer_applicability_v1.md §9 (GROUNDED / NEEDS_CLARIFICATION / NO_ANSWER_BASIS)
+      - docs/knowledge/answer_applicability_v1.md §9 (GROUNDED / NEEDS_CLARIFICATION / NO_ANSWER_BASIS)
       - com.sellerops.inquiry.draft.InquiryDraftComposer
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
@@ -210,7 +210,7 @@ capabilities:
     evidenceRef: >-
       상품 문의: `LIVE_VERIFIED` 2026-08-26, commit 692c5a78, 승인 `apr-ce092e823017`
       (PUT /external/v1/contents/qnas/{questionId} 1회 · 재시도 0 · 판정은 NaverAnsweredStateReader
-      의 read-back) · docs/pilot_runtime_foundation_v1.md §0-A
+      의 read-back) · docs/pilot/pilot_runtime_foundation_v1.md §0-A
     sellerFacingNotes:
       - 판매자님이 승인하시면 reviewnary가 네이버에 답변을 직접 등록하고 등록됐는지 다시 읽어
         확인합니다.
@@ -266,7 +266,7 @@ capabilities:
           - 톡톡 문의에는 답변을 등록하지 않습니다.
     sourceRefs:
       - com.sellerops.inquiry.publish.InquiryReplyCapabilityRegistry
-      - docs/inquiry_workflow_completion_v2.md (OVERWRITE_WITHOUT_PROOF)
+      - docs/inquiry/inquiry_workflow_completion_v2.md (OVERWRITE_WITHOUT_PROOF)
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -312,7 +312,7 @@ capabilities:
       - 읽을 수 있는 것은 가져온 구간의 리뷰뿐입니다. 판매자센터에 있는데 아직 가져오지 않은
         리뷰는 "없다"가 아니라 "아직 안 봤다"입니다.
     sourceRefs:
-      - docs/agent_procedure_layer_v1.md (AbsenceReason — ZERO_MEASURED만이 부재를 주장한다)
+      - docs/agent/agent_procedure_layer_v1.md (AbsenceReason — ZERO_MEASURED만이 부재를 주장한다)
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -325,10 +325,10 @@ capabilities:
     evidence: IMPLEMENTED
     evidenceRef: >-
       템플릿 lane 은 라이브 관측됨 — canonical Demo Org 리뷰 c329471c 초안 v3 `44627df4`
-      (provider `templates-v1+org`, 회사가 정한 문구, 승인 0건 · docs/review_approval_path_v1.md §6 ·
-      docs/review_reply_template_settings_v1.md §8). 등록된 지식을 근거로 쓰는 grounded lane 은
+      (provider `templates-v1+org`, 회사가 정한 문구, 승인 0건 · docs/review/review_approval_path_v1.md §6 ·
+      docs/review/review_reply_template_settings_v1.md §8). 등록된 지식을 근거로 쓰는 grounded lane 은
       일회용 QA org before/after 만 있고 실제 판매자 계정에서 관측된 적이 없다
-      (docs/knowledge_retrieval_quality_v1.md)
+      (docs/knowledge/knowledge_retrieval_quality_v1.md)
     sellerFacingNotes:
       - 리뷰 답변 초안을 준비합니다. 회사가 정한 답변 문구를 시작점으로 씁니다.
       - 등록된 지식에서 근거를 찾으면 그 근거를 인용해 초안을 씁니다.
@@ -339,7 +339,7 @@ capabilities:
       - 근거를 찾지 못하면 지어내지 않고 회사가 정한 기본 문구로 남습니다.
     sourceRefs:
       - com.sellerops.review.draft.ReviewDraftComposer
-      - docs/review_reply_template_settings_v1.md
+      - docs/review/review_reply_template_settings_v1.md
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -378,7 +378,7 @@ capabilities:
           없습니다.
     sourceRefs:
       - com.sellerops.review.publish.ReviewExecutionCapability (NAVER → GUIDED_BROWSER_EXECUTION)
-      - docs/full_pilot_walkthrough_v1.md §5
+      - docs/pilot/full_pilot_walkthrough_v1.md §5
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -390,7 +390,7 @@ capabilities:
     mode: AUTOMATIC
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/demo_org_and_channel_knowledge_v1.md §4c (2026-08-22 라이브 1회 — 69 리스팅 · 2페이지 ·
+      docs/knowledge/demo_org_and_channel_knowledge_v1.md §4c (2026-08-22 라이브 1회 — 69 리스팅 · 2페이지 ·
       오류 0)
     sellerFacingNotes:
       - 등록하신 상품 목록을 공식 API로 가져올 수 있습니다.
@@ -412,7 +412,7 @@ capabilities:
     status: SUPPORTED
     mode: LIMITED_READ
     evidence: LIVE_PROVEN
-    evidenceRef: docs/demo_org_and_channel_knowledge_v1.md §4c (필드 범위 실측)
+    evidenceRef: docs/knowledge/demo_org_and_channel_knowledge_v1.md §4c (필드 범위 실측)
     sellerFacingNotes:
       - 상품 이름·판매가·판매상태·카테고리·최종수정일을 읽습니다.
     limitations:
@@ -421,7 +421,7 @@ capabilities:
       - 상세페이지의 글과 그림에서 규격 지식을 읽는 것은 현재 제품 기능이 아닙니다
         (ROADMAP.PRODUCT_DETAIL_KNOWLEDGE — 판매자 화면에 반영된 것이 0건입니다).
     sourceRefs:
-      - docs/demo_org_and_channel_knowledge_v1.md §4c
+      - docs/knowledge/demo_org_and_channel_knowledge_v1.md §4c
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -473,7 +473,7 @@ capabilities:
     limitations:
       - 정기 수집 커서가 14일 넘게 뒤처지면 이어서 따라잡지 않고 최근 14일에서 다시 시작합니다.
     sourceRefs:
-      - docs/demo_org_and_channel_knowledge_v1.md §4d (routine semantics)
+      - docs/knowledge/demo_org_and_channel_knowledge_v1.md §4d (routine semantics)
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -540,7 +540,7 @@ capabilities:
     mode: AUTOMATIC
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/sellerops_cafe24_inquiry_read_live_proof.md (2026-07-31, PR #382 — 게시판 6 exact-window
+      docs/lineage/sellerops_cafe24_inquiry_read_live_proof.md (2026-07-31, PR #382 — 게시판 6 exact-window
       계약 · 멱등 replay)
     sellerFacingNotes:
       - 쇼핑몰 문의 게시판의 글을 공식 API로 가져올 수 있습니다.
@@ -551,8 +551,8 @@ capabilities:
       - 비밀글도 가져오지만 대시보드 집계와 분석에서는 제외합니다. 누락이 아니라 의도된 경계입니다.
       - 응답에서 사라진 글을 삭제로 판정하지 않습니다.
     sourceRefs:
-      - docs/inquiry_thread_semantics_v1.md
-      - docs/inquiry_operational_truth_v1.md
+      - docs/inquiry/inquiry_thread_semantics_v1.md
+      - docs/inquiry/inquiry_operational_truth_v1.md
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -564,7 +564,7 @@ capabilities:
     mode: FULL_READ
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/cafe24_comment_answer_observation_v1.md (2026-08-26 `apr-c24-a3674-reproof` —
+      docs/review/cafe24_comment_answer_observation_v1.md (2026-08-26 `apr-c24-a3674-reproof` —
       판매자 댓글 답변을 읽어 부모를 ANSWERED로 옮김)
     sellerFacingNotes:
       - 문의 본문과 등록일, 답변 여부를 읽습니다.
@@ -586,7 +586,7 @@ capabilities:
     mode: DRAFT_PREPARED
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/inquiry_answer_execution_v1.md §30 (2026-08-25 — 초안 v1 MODEL 보존, 판매자가 고친
+      docs/inquiry/inquiry_answer_execution_v1.md §30 (2026-08-25 — 초안 v1 MODEL 보존, 판매자가 고친
       v2 SELLER가 승인·전송·검증 대상)
     sellerFacingNotes:
       - 등록된 상품 정보·운영 기준·과거 답변을 근거로 답변 초안을 준비합니다.
@@ -594,7 +594,7 @@ capabilities:
     limitations:
       - 초안은 답변이 아닙니다. 승인 전에는 아무 데도 가지 않습니다.
     sourceRefs:
-      - docs/answer_applicability_v1.md §9
+      - docs/knowledge/answer_applicability_v1.md §9
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -606,7 +606,7 @@ capabilities:
     mode: DIRECT_WITH_APPROVAL
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      `VERIFIED` 2026-08-25, commit b0bfb022, docs/inquiry_answer_execution_v1.md §30 —
+      `VERIFIED` 2026-08-25, commit b0bfb022, docs/inquiry/inquiry_answer_execution_v1.md §30 —
       POST /boards/6/articles 1회 · 재시도 0 · 판정은 2xx가 아니라 exact READ(자식 존재 · 부모 일치 ·
       답글 구조 · 본문 해시 == 승인 초안 · 부모 reply_status=C)
     sellerFacingNotes:
@@ -647,7 +647,7 @@ capabilities:
     mode: AUTOMATIC
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/sellerops_cafe24_review_acquisition_completion_live_proof.md (2026-07-30, PR #375 —
+      docs/lineage/sellerops_cafe24_review_acquisition_completion_live_proof.md (2026-07-30, PR #375 —
       게시판 4 공개 리뷰 fresh insert + 동일창 replay 멱등)
     sellerFacingNotes:
       - 카페24 구매후기는 공식 API로 자동으로 가져올 수 있습니다.
@@ -669,7 +669,7 @@ capabilities:
     status: SUPPORTED
     mode: FULL_READ
     evidence: LIVE_PROVEN
-    evidenceRef: docs/sellerops_cafe24_review_acquisition_completion_live_proof.md (2026-07-31 완료 v1)
+    evidenceRef: docs/lineage/sellerops_cafe24_review_acquisition_completion_live_proof.md (2026-07-31 완료 v1)
     sellerFacingNotes:
       - 별점과 후기 본문을 읽고 반복되는 문제를 찾습니다.
     limitations:
@@ -687,7 +687,7 @@ capabilities:
     evidence: TEST_PROVEN
     evidenceRef: >-
       com.sellerops.review.draft.ReviewDraftComposer · ReviewReplyTemplateDefaultsTest ·
-      docs/review_reply_template_settings_v1.md (회사가 정한 문구 → 초안)
+      docs/review/review_reply_template_settings_v1.md (회사가 정한 문구 → 초안)
     sellerFacingNotes:
       - 리뷰 답변 초안을 준비합니다. 회사가 정한 답변 문구와 등록된 지식을 근거로 씁니다.
     limitations:
@@ -705,7 +705,7 @@ capabilities:
     mode: DIRECT_WITH_APPROVAL
     evidence: IMPLEMENTED
     evidenceRef: >-
-      docs/cafe24_review_comment_execution_v1.md (`IMPLEMENTED` · `LOCAL_PROVEN` ·
+      docs/review/cafe24_review_comment_execution_v1.md (`IMPLEMENTED` · `LOCAL_PROVEN` ·
       **`LIVE_UNPROVEN`** — 어떤 몰에도 댓글을 게시한 적 없음, 마켓플레이스 WRITE 0)
     sellerFacingNotes:
       - 판매자님이 승인하시면 reviewnary가 카페24 후기에 답글을 직접 등록할 수 있습니다.
@@ -817,7 +817,7 @@ capabilities:
     mode: AUTOMATIC
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/sellerops_cafe24_live_verification.md (E2E PASS — 토큰 회전과 금액 대사 포함, 2026-06-25)
+      docs/lineage/sellerops_cafe24_live_verification.md (E2E PASS — 토큰 회전과 금액 대사 포함, 2026-06-25)
     sellerFacingNotes:
       - 주문을 공식 API로 자동으로 가져올 수 있습니다.
     limitations:
@@ -835,7 +835,7 @@ capabilities:
     status: SUPPORTED
     mode: LIMITED_READ
     evidence: LIVE_PROVEN
-    evidenceRef: docs/sellerops_cafe24_live_verification.md · docs/exact_operational_context_v1.md
+    evidenceRef: docs/lineage/sellerops_cafe24_live_verification.md · docs/knowledge/exact_operational_context_v1.md
     sellerFacingNotes:
       - 기간별·채널별 주문 건수와 매출 흐름을 읽습니다.
       - 고객이 문의에서 주문을 지목한 경우에 한해, 그 주문 하나를 정확히 조회하는 경로가 있습니다.
@@ -897,7 +897,7 @@ capabilities:
     mode: AUTOMATIC
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/coupang_inquiry_live_proof_v1.md (2026-08-14 — 실계정 수집 2건, 동일 창 재수집
+      docs/lineage/coupang_inquiry_live_proof_v1.md (2026-08-14 — 실계정 수집 2건, 동일 창 재수집
       insert 0 / skip 2 / 중복 0)
     sellerFacingNotes:
       - 상품별 고객문의를 공식 API로 가져올 수 있습니다.
@@ -906,7 +906,7 @@ capabilities:
       - 고객센터 문의는 개인정보를 담고 있어 호출하지 않습니다. 수집 대상이 아닙니다.
     sourceRefs:
       - com.sellerops.connector.coupang.CoupangApiConnector
-      - docs/coupang_routine_operations_v1.md
+      - docs/lineage/coupang_routine_operations_v1.md
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -917,7 +917,7 @@ capabilities:
     status: SUPPORTED
     mode: FULL_READ
     evidence: LIVE_PROVEN
-    evidenceRef: docs/coupang_inquiry_live_proof_v1.md (2026-08-14)
+    evidenceRef: docs/lineage/coupang_inquiry_live_proof_v1.md (2026-08-14)
     sellerFacingNotes:
       - 문의 본문과 등록일, 답변 여부, 어떤 상품에 대한 문의인지를 읽습니다.
     limitations: []
@@ -938,7 +938,7 @@ capabilities:
     limitations:
       - 쿠팡 문의에 대한 초안 생성은 실제 계정에서 관측된 적이 없습니다.
     sourceRefs:
-      - docs/answer_applicability_v1.md §9
+      - docs/knowledge/answer_applicability_v1.md §9
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -951,7 +951,7 @@ capabilities:
     evidence: IMPLEMENTED
     evidenceRef: >-
       com.sellerops.inquiry.publish.CoupangChannelReplyAdapter →
-      POST .../onlineInquiries/{id}/replies · docs/pilot_runtime_foundation_v1.md §9
+      POST .../onlineInquiries/{id}/replies · docs/pilot/pilot_runtime_foundation_v1.md §9
       (`OPERATOR_ASSISTED` — 구현됨, 라이브 미실행)
     sellerFacingNotes:
       - 판매자님이 승인하시면 reviewnary가 쿠팡에 문의 답변을 직접 등록할 수 있습니다.
@@ -979,7 +979,7 @@ capabilities:
     mode: SELLER_GUIDED
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/coupang_review_acquisition_v1.md §6.6 (2026-08-15, commit 533cafc2 — 3페이지 · 24행 ·
+      docs/lineage/coupang_review_acquisition_v1.md §6.6 (2026-08-15, commit 533cafc2 — 3페이지 · 24행 ·
       빈 DB에 22건 저장 → 동일 범위 재수집 stored=0 / skipped=22) · docs/evidence/INDEX.md
       (2026-08-23 재증명)
     sellerFacingNotes:
@@ -996,7 +996,7 @@ capabilities:
       - 같은 옵션·같은 날·같은 별점의 별점만 리뷰는 하나로 합쳐집니다.
     sourceRefs:
       - com.sellerops.collect.AcquisitionPathRegistry (COUPANG/REVIEW = ACTION_WINDOW · LIVE_PROVEN · SELLER_REPEATED)
-      - docs/coupang_review_policy_gate_v1.md (D1~D8)
+      - docs/standing/coupang_review_policy_gate_v1.md (D1~D8)
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -1007,7 +1007,7 @@ capabilities:
     status: SUPPORTED
     mode: LIMITED_READ
     evidence: LIVE_PROVEN
-    evidenceRef: docs/coupang_review_locate_ux_v1.md §5.1 (저장된 리뷰를 실화면에서 다시 찾음)
+    evidenceRef: docs/lineage/coupang_review_locate_ux_v1.md §5.1 (저장된 리뷰를 실화면에서 다시 찾음)
     sellerFacingNotes:
       - 별점과 후기 본문을 읽고 반복되는 문제를 찾습니다.
       - 저장된 리뷰를 쿠팡 화면에서 다시 찾아 보여 드릴 수 있습니다.
@@ -1028,7 +1028,7 @@ capabilities:
     evidence: DECLARED
     evidenceRef: >-
       com.sellerops.connector.ChannelApiGapRegistry (COUPANG `REVIEW_REPLY` — 판매자 리뷰 답글 기능
-      없음) · docs/coupang_review_policy_gate_v1.md (operator 확인, 2026-08-14)
+      없음) · docs/standing/coupang_review_policy_gate_v1.md (operator 확인, 2026-08-14)
     sellerFacingNotes:
       - 쿠팡은 판매자가 리뷰에 답을 남기는 기능이 없어, 답변 초안도 준비하지 않습니다.
     limitations:
@@ -1066,7 +1066,7 @@ capabilities:
     mode: AUTOMATIC
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/demo_org_and_channel_knowledge_v1.md §5h·§5j (2026-08-23 라이브 2회 — 68상품 · 405옵션 ·
+      docs/knowledge/demo_org_and_channel_knowledge_v1.md §5h·§5j (2026-08-23 라이브 2회 — 68상품 · 405옵션 ·
       69요청, 동일 범위 재수집 SUCCESS 68/68/0/0 · 신규 0)
     sellerFacingNotes:
       - 등록하신 상품과 옵션을 공식 API로 가져올 수 있습니다.
@@ -1084,7 +1084,7 @@ capabilities:
     status: PARTIAL
     mode: LIMITED_READ
     evidence: LIVE_PROVEN
-    evidenceRef: docs/demo_org_and_channel_knowledge_v1.md §5h (wire shape 실측 2026-08-23)
+    evidenceRef: docs/knowledge/demo_org_and_channel_knowledge_v1.md §5h (wire shape 실측 2026-08-23)
     sellerFacingNotes:
       - 상품 이름과 옵션 구성을 읽습니다.
     limitations:
@@ -1135,7 +1135,7 @@ capabilities:
     mode: AUTOMATIC
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/coupang_final_main_first_connection_order_routine_proof_v1.md (2026-08-06, 승인
+      docs/lineage/coupang_final_main_first_connection_order_routine_proof_v1.md (2026-08-06, 승인
       `apr-01212e2da29a`) · docs/evidence/INDEX.md (2026-08-23 canonical Demo Org 첫 연결 + 첫
       automatic cycle)
     sellerFacingNotes:
@@ -1154,7 +1154,7 @@ capabilities:
     status: SUPPORTED
     mode: LIMITED_READ
     evidence: LIVE_PROVEN
-    evidenceRef: docs/coupang_final_main_first_connection_order_routine_proof_v1.md
+    evidenceRef: docs/lineage/coupang_final_main_first_connection_order_routine_proof_v1.md
     sellerFacingNotes:
       - 기간별·채널별 주문 건수와 매출 흐름을 읽습니다.
     limitations:

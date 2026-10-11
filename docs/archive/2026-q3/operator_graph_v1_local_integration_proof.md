@@ -10,8 +10,8 @@
 > executed or added. Every read went to a local backend over already-stored rows.
 >
 > **It moves no capability status.** `docs/multi-channel-connector-roadmap.md` §4.1 keeps 운영 지원 truth.
-> Contract: `docs/sellerops_operator_graph_v1.md`. Recovery baseline:
-> `docs/demo_baseline_recovery_audit_2026-08-21.md`.
+> Contract: `docs/standing/sellerops_operator_graph_v1.md`. Recovery baseline:
+> `docs/lineage/demo_baseline_recovery_audit_2026-08-21.md`.
 
 ## 0. Environment
 
@@ -26,7 +26,7 @@
 
 ## 1. V47 — Flyway applied against real PostgreSQL
 
-CI does not validate migrations (`docs/ci-coverage.md`), so this is the first real execution.
+CI does not validate migrations (`docs/lineage/ci-coverage.md`), so this is the first real execution.
 
 ```
 Successfully validated 45 migrations

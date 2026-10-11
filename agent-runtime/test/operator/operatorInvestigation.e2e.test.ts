@@ -144,7 +144,7 @@ describe("paraphrase — the same goal in different words reaches the same needs
   it("what this can and cannot prove is stated, not implied", () => {
     // A replayed plan proves the CONTRACT holds for a paraphrase the recording covers. It cannot prove
     // the model generalizes to a sentence nobody recorded — that is a live-model property and it is
-    // measured in docs/sellerops_operator_graph_v2.md §18.3, not here.
+    // measured in docs/standing/sellerops_operator_graph_v2.md §18.3, not here.
     expect(RECORDED_PLANS["폭이 몇 mm인가요?"]!.providerVersion).toBeTruthy();
   });
 });

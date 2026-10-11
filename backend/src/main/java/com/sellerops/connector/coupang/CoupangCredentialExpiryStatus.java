@@ -14,7 +14,7 @@ import java.time.Instant;
  * non-secret WING field), a computed {@code daysRemaining}, a coarse {@code state}
  * bucket, and two booleans — nothing decrypted, no Access/Secret Key, no vendor id.
  *
- * <p><b>State rules</b> (see {@code docs/coupang_credential_expiry_audit_v1.md} and
+ * <p><b>State rules</b> (see {@code docs/lineage/coupang_credential_expiry_audit_v1.md} and
  * the pinned design):
  * <ul>
  *   <li>{@code expiresAt == null} → {@link State#UNKNOWN} (offer an operator-confirm

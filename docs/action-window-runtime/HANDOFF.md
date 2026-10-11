@@ -700,7 +700,7 @@ findings for the FE workstream, both **pre-existing and neither caused by A2-B**
 ## Forbidden without explicit, in-turn operator approval
 
 - **Any live NAVER contact** — no browser launch, no login, no export, no marketplace page. Every live run
-  is authorized only per the canonical contract `docs/sellerops_live_approval_contract.md` (default one-line
+  is authorized only per the canonical contract `docs/standing/sellerops_live_approval_contract.md` (default one-line
   `Seated and ready.` against a prepared Approval Manifest; single-use; §1.5 — a plan, prior approval, or a
   restored environment is never authorization). **R4 evidence: every G6 to date is consumed.**
 - **Any commit, branch, PR, merge, or push.** No force-push. Stage exact files; **never `git add .`**.
@@ -747,7 +747,7 @@ findings for the FE workstream, both **pre-existing and neither caused by A2-B**
   call-sequence lock was **updated, not added**) and **+1 skipped** (31 → 32) — the `RUN_INTEGRATION`-only IDL
   discriminator in the gated browser suite, **written but not run; file count unchanged at 179**. **A docs-only
   or backend-only change that moves this number is a red flag, not drift.**
-- Live approval follows the canonical contract `docs/sellerops_live_approval_contract.md` (§3: the
+- Live approval follows the canonical contract `docs/standing/sellerops_live_approval_contract.md` (§3: the
   default grant for a prepared/displayed manifest is the one line `Seated and ready.`) before any
   headed/human-in-the-loop run. A no-click failure means **operator-absent first**, not a code bug.
 - Source-guard tests read module source and grep forbidden tokens — **strip comment lines first**

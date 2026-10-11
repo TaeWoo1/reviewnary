@@ -120,7 +120,7 @@ cmd_up() {
     fi
   fi
   # Cafe24's OAuth callback must be an externally reachable HTTPS URL — the connectivity decision
-  # (docs/sellerops_local_to_pilot_connectivity_decision.md §2.2) settled that, which is why a public
+  # (docs/standing/sellerops_local_to_pilot_connectivity_decision.md §2.2) settled that, which is why a public
   # tunnel exists at all. The consequence is that the application.yml default
   # (http://localhost:8080/...) is WRONG for this deployment, and the symptom is not a local error: the
   # seller gets as far as Cafe24 and is told "The redirect_uri added by Cafe24 Developers is invalid",

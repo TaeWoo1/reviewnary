@@ -4,7 +4,7 @@ import { captureUrlSecrets, takeUrlSecret } from "./urlSecrets";
 
 afterEach(() => sessionStorage.clear());
 
-/** docs/service_readiness_v1.md §2-1 (review B1): a URL-borne one-time secret leaves the address bar before any vendor starts. */
+/** docs/standing/service_readiness_v1.md §2-1 (review B1): a URL-borne one-time secret leaves the address bar before any vendor starts. */
 describe("captureUrlSecrets", () => {
   it("moves ?token= / ?code= into sessionStorage and rewrites the URL, keeping the other params", () => {
     history.replaceState(null, "", "/reset-password?token=ONE-TIME&x=1#frag");

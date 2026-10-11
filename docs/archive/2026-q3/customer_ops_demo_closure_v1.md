@@ -4,7 +4,7 @@
 
 Goal: «Reviewnary knows the seller, observes customer operations, handles most work, asks only when needed, and can
 act after approval.» This document records what is built and proven offline, and the four live runs that remain —
-each needs its own approval under `docs/sellerops_live_approval_contract.md`.
+each needs its own approval under `docs/standing/sellerops_live_approval_contract.md`.
 
 ## 0. Product decisions applied
 

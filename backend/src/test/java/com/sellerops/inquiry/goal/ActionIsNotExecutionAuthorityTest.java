@@ -151,7 +151,7 @@ class ActionIsNotExecutionAuthorityTest {
                     for (CapabilityId c : effectful) {
                         assertThat(snapshot.status(c))
                                 .as("%s changes state outside this system. If it now has an executor, the execution "
-                                        + "approval seam of docs/inquiry_architecture_v35.md §25.10 has to exist "
+                                        + "approval seam of docs/lineage/inquiry_architecture_v35.md §25.10 has to exist "
                                         + "FIRST — an ACTION goal is a model's reading of a sentence and is not "
                                         + "authorization. Do not simply update this expectation.", c)
                                 .isEqualTo(CapabilityStatus.DECLARED_NO_EXECUTOR);
@@ -253,7 +253,7 @@ class ActionIsNotExecutionAuthorityTest {
                         + "supplies no resolver and constructs one that cannot act — a new caller inherits neither. "
                         + "Route it through InquiryGoalResolutionService, or give it the same guards FIRST: an "
                         + "ACTION goal is a model's reading of a sentence and is not authorization to act on an "
-                        + "object. See docs/inquiry_architecture_v35.md §25.10 and InquiryResolutionSafetyTest.")
+                        + "object. See docs/lineage/inquiry_architecture_v35.md §25.10 and InquiryResolutionSafetyTest.")
                 .containsExactly("InquiryGoalResolutionService.java");
     }
 

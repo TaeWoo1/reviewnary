@@ -25,7 +25,7 @@ export const MAX_ANSWER_CHARS = 1200;
  *
  * <b>The screaming-snake pattern is the load-bearing one</b> — every closed token in this runtime is
  * shaped that way ({@code NOT_SUPPORTED}, {@code EXPLAIN_CAPABILITY}, {@code API_EXECUTION}), and a
- * seller reading one is the defect `docs/reviewnary_design.md` names about raw enum exposure. It
+ * seller reading one is the defect `docs/frontend/reviewnary_design.md` names about raw enum exposure. It
  * deliberately does not match {@code AI}, {@code API} or {@code URL}, which are ordinary Korean-business
  * loanwords.
  */

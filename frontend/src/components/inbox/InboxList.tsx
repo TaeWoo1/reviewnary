@@ -10,7 +10,7 @@ import type { StatusTone } from "../ui/Status";
 import { WORK_STATE } from "../../lib/workState";
 
 /**
- * The one state word a row carries — work-state first (docs/reviewnary_design.md §7 문의).
+ * The one state word a row carries — work-state first (docs/frontend/reviewnary_design.md §7 문의).
  *
  * Every word comes from `lib/workState.ts`, the product's single work vocabulary, and every one of
  * them names a fact this row was actually told.

@@ -1,7 +1,7 @@
 # Inquiry v3 WP-2 — Resolution Planner: Contract to Shadow
 
-2026-09-20 · branch `feat/review-decision-workspace-v1` · design `docs/inquiry_architecture_v3.md` · previous
-`docs/inquiry_architecture_v3_wp1.md`
+2026-09-20 · branch `feat/review-decision-workspace-v1` · design `docs/lineage/inquiry_architecture_v3.md` · previous
+`docs/lineage/inquiry_architecture_v3_wp1.md`
 
 **Steps 1 and 2 are done; step 3 (shadow) is not started** — it begins with the first model call, and that needs the
 approval manifest in §9.

@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-/** docs/service_readiness_v1.md §2-2 / §6 — the account-existence silence and the one-time link, against mocks. */
+/** docs/standing/service_readiness_v1.md §2-2 / §6 — the account-existence silence and the one-time link, against mocks. */
 class PasswordResetServiceTest {
 
     private final Instant now = Instant.parse("2026-08-19T09:00:00Z");

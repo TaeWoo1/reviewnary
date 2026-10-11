@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>What is under test is what CODE does: how a v2 verdict is read, how it is held to its own words, which listing's
  * evidence may support which need, and which past answers may reach a Case. Whether the model's words are right is the
- * calibration harness's question (docs/inquiry_decision_v2_1.md), never a unit test's.
+ * calibration harness's question (docs/lineage/inquiry_decision_v2_1.md), never a unit test's.
  */
 class CoverageJudgeV2Test {
 

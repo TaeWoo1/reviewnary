@@ -35,7 +35,7 @@ import org.springframework.test.context.ActiveProfiles;
  * of the same follow-up, and the differences were invisible because each path's own tests passed:
  * upload triggered item-analysis and published no issue-memory event; API sync published the event for
  * Cafe24 board-4 only and never analysed; the Coupang handoff did neither. The audit
- * ({@code docs/demo_baseline_recovery_audit_2026-08-21.md}, defects B and C) traced two shipped
+ * ({@code docs/lineage/demo_baseline_recovery_audit_2026-08-21.md}, defects B and C) traced two shipped
  * consequences to exactly that — FAQ/상세 후보 structurally always 0 for a connector org, and the
  * repeated-issue memory permanently blind to Coupang and upload reviews.
  *

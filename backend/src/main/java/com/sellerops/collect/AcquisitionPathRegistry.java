@@ -30,10 +30,10 @@ import java.util.Map;
  * <p>Code-level and deliberately narrow: an entry belongs here only once a path is real, and its
  * status names the evidence. {@code LIVE_PROVEN} means a live sitting on a real seller account, on the
  * merged code, is written down — and it must be the sitting that proves THIS claim. For Coupang REVIEW
- * the claim is acquisition, so the evidence is {@code docs/coupang_review_acquisition_v1.md} §6.6
+ * the claim is acquisition, so the evidence is {@code docs/lineage/coupang_review_acquisition_v1.md} §6.6
  * (2026-08-15, at {@code 533cafc2}: 3 pages / 24 rows / 22 stored into an empty database, then a
  * same-range re-sync storing 0 and skipping 22). The locate re-proof in
- * {@code docs/coupang_review_locate_ux_v1.md} §5.1 stored nothing by design and proves a different
+ * {@code docs/lineage/coupang_review_locate_ux_v1.md} §5.1 stored nothing by design and proves a different
  * claim — that a stored review can be found again on the seller's screen.
  */
 public final class AcquisitionPathRegistry {
@@ -95,7 +95,7 @@ public final class AcquisitionPathRegistry {
     private static final Map<String, List<AcquisitionPath>> PATHS = Map.of(
             // Coupang publishes no seller review API. The Action Window is not a workaround for a
             // missing integration — it IS the channel's acquisition path, and the seller opens it.
-            // Evidence: docs/coupang_review_acquisition_v1.md §6.6 (2026-08-15, 533cafc2).
+            // Evidence: docs/lineage/coupang_review_acquisition_v1.md §6.6 (2026-08-15, 533cafc2).
             key("COUPANG", DataType.REVIEW),
             List.of(path(Method.ACTION_WINDOW, Verification.LIVE_PROVEN, Recurrence.SELLER_REPEATED)),
 

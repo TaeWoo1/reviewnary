@@ -9,7 +9,7 @@
  *   Procedure → precondition / absence / next step
  *   Composer  → how it is said
  *
- * A census (`docs/agent_semantic_ownership_v1.md` §1) classified every post-planner read of the goal
+ * A census (`docs/agent/agent_semantic_ownership_v1.md` §1) classified every post-planner read of the goal
  * text as A (a deterministic lane BEFORE the planner), B (a boundary, or a meaning the planner provably
  * does not carry) or C (a second judgement of something the plan already decided). Only C was removed.
  * These are source scans and call-site counts because "the same question answered twice" is a shape no
@@ -60,7 +60,7 @@ const POST_PLANNER = CODE.filter((f) =>
 describe("§A — which review evidence a question is about is the plan's answer", () => {
   it("the sense is decided from the plan's own reads, and nothing about it reads a sentence", () => {
     // Measured against the real planner on 2026-09-06; each list is what it returned for the sentence
-    // in the comment (`docs/agent_semantic_ownership_v1.md` §2).
+    // in the comment (`docs/agent/agent_semantic_ownership_v1.md` §2).
     expect(senseOf(["list_recent_reviews", "get_dashboard_product_issues"])).toBe("NEGATIVE_REVIEW");
     expect(senseOf(["search_review_issues", "get_dashboard_product_issues"])).toBe("ISSUE_EVIDENCE");
     expect(senseOf([])).toBe("ISSUE_EVIDENCE");

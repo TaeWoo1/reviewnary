@@ -89,7 +89,7 @@ export function AppShellV2() {
               tabIndex={-1}
               className="relative flex-1 overflow-y-auto px-4 pb-28 pt-4 outline-none md:px-8 md:pb-8 md:pt-6"
             >
-              {/* Left-aligned content column, 1120px (docs/reviewnary_design.md §2): a work surface reads
+              {/* Left-aligned content column, 1120px (docs/frontend/reviewnary_design.md §2): a work surface reads
                   from the top-left, and a centred column on a wide monitor floats the page away from the
                   navigation that names it. */}
               <div className="max-w-content space-y-6">

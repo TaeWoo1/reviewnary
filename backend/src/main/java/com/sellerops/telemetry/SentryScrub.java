@@ -17,7 +17,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Sentry PII / secret scrubbing — docs/service_readiness_v1.md §2-1. Applied to every event and transaction
+ * Sentry PII / secret scrubbing — docs/standing/service_readiness_v1.md §2-1. Applied to every event and transaction
  * before it leaves the JVM (Sentry's Spring starter picks these beans up). Removes: request query strings and
  * bodies, cookies, `Authorization`/`Cookie`/`Set-Cookie` headers, the user (entirely — not even the id),
  * breadcrumb URLs' query parts, and bearer / `code=` / `token=` shaped fragments in messages. Nothing here

@@ -2,7 +2,7 @@
  * <b>What is true about this seller, decided once per turn, before anything is planned.</b>
  *
  * Agent Procedure Layer v1 — the first of the two seams the architecture audit
- * (`docs/agent_runtime_architecture_audit_v1.md`) found missing. The audit's measurement, in one line:
+ * (`docs/agent/agent_runtime_architecture_audit_v1.md`) found missing. The audit's measurement, in one line:
  * the planner could not see whether this seller had connected anything, and the answer layer read the
  * same coverage table in FOUR places, each deriving its own verdict.
  *

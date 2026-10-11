@@ -44,11 +44,11 @@ in the unit that has the real Stage-2 DOM.
 
 > **⚠ WITHDRAWN 2026-08-09 — the `issue` calibration described below was REFUTED by a live run.** The claim in
 > this section was wrong. It is left in place, struck through, because the *shape* of the mistake is the useful
-> part of this record. See `docs/coupang_wing_issue_selector_calibration_landing_v2.md` for the refutation and the fix.
+> part of this record. See `docs/lineage/coupang_wing_issue_selector_calibration_landing_v2.md` for the refutation and the fix.
 >
 > `WING_ISSUE_SELECTOR_CALIBRATED` went to `false` and `WING_ISSUE_CALIBRATION_EVIDENCE.status` to
 > `LIVE_DOM_CALIBRATION_REFUTED`. That probe has since been run: the flag is `true` again on **one** live capture
-> of a corrected spec (`docs/coupang_wing_issue_selector_calibration_landing_v2.md`), and the withdrawal is
+> of a corrected spec (`docs/lineage/coupang_wing_issue_selector_calibration_landing_v2.md`), and the withdrawal is
 > retained on the record as `supersedes`. The claim struck through below is still wrong; the current claim is a
 > different, narrower one.
 

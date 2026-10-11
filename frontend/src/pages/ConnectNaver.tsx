@@ -84,7 +84,7 @@ export function ConnectNaver() {
   const agentBridgeEnabled = import.meta.env.VITE_ENABLE_AGENT_BRIDGE === "true";
   const bridge = useBridge(agentBridgeEnabled);
   const [state, dispatch] = useReducer(guidedConnectionReducer, undefined, () => loadGuidedInitialState());
-  // Growth funnel (docs/auth_growth_instrumentation_v1.md §5): wizard opened; connection test passed; first
+  // Growth funnel (docs/standing/auth_growth_instrumentation_v1.md §5): wizard opened; connection test passed; first
   // sync done. Transitions only — a wizard re-opened in a state that was already reached fires nothing.
   useEffect(() => {
     analytics.track("channel_connect_started", { channel: "naver" });

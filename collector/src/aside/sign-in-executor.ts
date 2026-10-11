@@ -48,7 +48,7 @@ export function isSignInChannel(raw: unknown): raw is SignInChannel {
  * waiting, no window raised: this asks 「지금 로그인되어 있나」 and nothing else. It exists because a seller
  * who signs in anywhere — another tab, another device, after the recovery window closed — has solved the
  * thing the product was waiting for, and the product has no way to be told
- * ({@code docs/review_auto_check_v1.md}, measured live 2026-10-09).
+ * ({@code docs/review/review_auto_check_v1.md}, measured live 2026-10-09).
  */
 export type SignInMode = "RECOVER" | "CHECK";
 

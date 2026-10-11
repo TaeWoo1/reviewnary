@@ -224,7 +224,7 @@ guidelines.
    User-owned **test** seller account only. **Current standing state: NAVER live
    work is paused** — do not launch a browser, log in, or run discovery until the
    operator approves a specific run in a stable environment.
-   Approval contract: `docs/sellerops_live_approval_contract.md` (default
+   Approval contract: `docs/standing/sellerops_live_approval_contract.md` (default
    one-line `Seated and ready.` against a prepared Approval Manifest; READ vs
    WRITE flags are non-substitutable — this READ flag never authorizes the
    `--i-understand-this-posts-a-live-naver-reply` WRITE path).

@@ -26,7 +26,7 @@
  *      refuses a non-unique 삭제 match, and refuses the operator-action step before the irreversible checkpoint.
  *
  * A calibrated selector is NOT an approval. Running this requires a fresh, single-use operator grant against a
- * displayed destructive Approval Manifest (`docs/sellerops_live_approval_contract.md`).
+ * displayed destructive Approval Manifest (`docs/standing/sellerops_live_approval_contract.md`).
  *
  * **INTERNAL DIAGNOSTIC TOOLING — NOT A PRODUCT FEATURE, AND FEATURE-FROZEN** (product-owner decision,
  * 2026-08-08; `docs/product-scope-v1.md` §7.19). This entrypoint exists to put an OPERATOR-OWNED test account

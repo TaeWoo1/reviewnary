@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 /**
  * The Cafe24 review-reply adapter: an approved reply to a 구매후기 becomes a shop COMMENT under the
  * review article — the representation the seller's own admin screen produces
- * ({@code docs/cafe24_comment_answer_observation_v1.md}, verdict {@code STANDARD_BOARD_COMMENT}).
+ * ({@code docs/review/cafe24_comment_answer_observation_v1.md}, verdict {@code STANDARD_BOARD_COMMENT}).
  *
  * <p><b>One POST, then a READ.</b> A 2xx is not a verified send. Verification re-reads the article's
  * comments ({@code Cafe24BoardCommentsClient}, which now carries a content hash and still no content)

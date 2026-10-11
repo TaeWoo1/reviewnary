@@ -5,7 +5,7 @@ Scope lock 위치: `docs/product-scope-v1.md` v1.14 항목 · IA: `docs/product_
 
 이 문서는 **데모로 보여줄 SellerOps가 무엇인가**를 고정한다. 기존 canonical technical
 문서(`docs/sellerops_canonical_reference.md`, `docs/architecture.md`,
-`docs/multi-channel-connector-roadmap.md` §4.1, `docs/sellerops_operator_graph_v2.md`)를
+`docs/multi-channel-connector-roadmap.md` §4.1, `docs/standing/sellerops_operator_graph_v2.md`)를
 **덮어쓰지 않는다.** 저 문서들이 계속 각자의 진실을 소유하고, 이 문서는 그 위에서 **화면과
 경험의 순서**만 정한다. 충돌하면 `CLAUDE.md`의 conflict priority가 이긴다.
 
@@ -134,7 +134,7 @@ repeated inquiry product schema · 20 vs 69 product 결정 · marketplace answer
 full autonomous agent · weekly report automation.
 
 NAVER routine `BLOCKED_EXTERNAL`은 기록된 상태 그대로 둔다
-(`docs/naver_inquiry_api_audit_v1.md` §13–§14).
+(`docs/lineage/naver_inquiry_api_audit_v1.md` §13–§14).
 
 ## 10. 다음 package
 
@@ -265,6 +265,6 @@ frontend **161 files / 2,244 tests** · `tsc` clean (frontend·agent-runtime).
 - 미결정 리뷰의 `investigated`·`knowledgeUsed`를 rule lane이 기록하지 않는다 — 화면은 초안이
   인용하는 동안 침묵할 뿐, 빈 칸 자체는 backend의 것이다.
 
-**외부 판매자 검증 준비는 `docs/demo_seller_validation_v1.md`가 소유한다** — preflight, 10~15분 시나리오,
+**외부 판매자 검증 준비는 `docs/pilot/demo_seller_validation_v1.md`가 소유한다** — preflight, 10~15분 시나리오,
 장면별 가치 한 줄, 관찰 항목, 장애 runbook 링크. 그 문서는 제품을 정의하지 않고 이 §12를 보이는 방법만
 적는다.

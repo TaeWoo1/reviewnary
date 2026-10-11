@@ -12,7 +12,7 @@
 >
 > 상위 계약: 제품 원칙 `docs/product-scope-v1.md` §1.2·§1.4·§1.6, 수집 전략
 > `docs/multi-channel-connector-roadmap.md` §5·§5.1·§11, 런타임 경계·인증 불변식
-> `docs/sellerops_local_agent_runtime_adr.md` §3·§4·§6, 브리지 `docs/slices/local-agent-bridge.md`(G1),
+> `docs/standing/sellerops_local_agent_runtime_adr.md` §3·§4·§6, 브리지 `docs/slices/local-agent-bridge.md`(G1),
 > 프로젝션 `docs/slices/browser-projection-v0.md`(G2), 가이드 상태 엔진 `docs/slices/naver-guided-connection.md`(G3).
 >
 > **방향 pointer (2026-07-26).** 이 슬라이스는 **리뷰 수집 모드**로 좁게 스코프된다(범위 확장 아님). Action
@@ -148,7 +148,7 @@ Action Window는 "브라우저 클릭 봇"이 아니다 — **한 사용자 행�
 
 ## 12. UI 요구 (Required Action Window UX)
 
-`docs/sellerops_frontend_spec.md` §16(가이드 연결)·§18(신설)의 프론트 정본을 따르되, Action Window 필수 요소:
+`docs/frontend/sellerops_frontend_spec.md` §16(가이드 연결)·§18(신설)의 프론트 정본을 따르되, Action Window 필수 요소:
 - 올바른 Chrome 탭/창을 앞으로 가져오기 · 현재 단계 / 총 단계 · 실제 대상 위 스포트라이트/배지 · 간결한 지시 ·
   **안내 on/off** · **현재 단계 다시 찾기** · **수동 모드** · **일시정지·재개** · **"이 단계를 완료했어요"
   폴백** · **recoverable UI-drift 상태** · **다운로드 완료 감지 표시** · **SellerOps로 안전 핸드오프**.
@@ -220,9 +220,9 @@ Action Window는 "브라우저 클릭 봇"이 아니다 — **한 사용자 행�
 ### 부록 — 근거 문서·파일
 - 제품 방향·자율 모드·운영 루프: `docs/product-scope-v1.md` §1.2·§1.4·§1.6
 - 수집 전략(Action Window 기본): `docs/multi-channel-connector-roadmap.md` §5·§5.1·§11
-- 런타임·인증 불변식: `docs/sellerops_local_agent_runtime_adr.md` §3·§4·§6
+- 런타임·인증 불변식: `docs/standing/sellerops_local_agent_runtime_adr.md` §3·§4·§6
 - 가이드 상태 엔진·감독형 프리미티브 재사용: `docs/slices/naver-guided-connection.md` §8·§9,
   `collector/src/naver/{account-store-resolver,review-usage-confirm}.ts`, `collector/src/esm/esm-candidate-signature.ts`
 - Projection 인프라(비-기본 렌더러): `docs/slices/browser-projection-v0.md`
 - 인입 경계: `backend/.../uploads/*`, `IngestionService`, `SyncJob`
-- capability·등록 매트릭스: `docs/channel-capability-registration-matrix.md`
+- capability·등록 매트릭스: `docs/channel/channel-capability-registration-matrix.md`

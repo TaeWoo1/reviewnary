@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Self-Pilot Runtime v1 — mint the operator's STANDING READ GRANT (docs/sellerops_live_approval_contract.md §6a).
+# Self-Pilot Runtime v1 — mint the operator's STANDING READ GRANT (docs/standing/sellerops_live_approval_contract.md §6a).
 #
 # Prints one opaque id of the shape the backend requires (`spr-` + 16 hex). It is an ENVIRONMENT-binding
 # token, never a credential: putting it in the backend env is the operator's act of arming routine

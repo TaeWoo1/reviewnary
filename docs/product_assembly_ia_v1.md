@@ -3,7 +3,7 @@
 > **Status: CANONICAL (product IA & screen responsibility).** 2026-08-17, 제품 오너 결정.
 > SellerOps는 이 시점에 **"기능 개발" 단계에서 "제품 조립" 단계로 전환**한다. 이 문서는 사용자에게 보이는
 > 제품의 **정보 구조(IA)·화면 책임·노출 채널**의 단일 정본이다. 프론트 상세 원칙(상태 규칙·언어 사전·
-> 접근성·가이드 연결·Action Window 화면)은 `docs/sellerops_frontend_spec.md`가 계속 소유하며, 그 문서의
+> 접근성·가이드 연결·Action Window 화면)은 `docs/frontend/sellerops_frontend_spec.md`가 계속 소유하며, 그 문서의
 > §5·§6·§7·§17-A(IA·내비·라우트·슬라이스)는 이 문서로 대체된다. 범위 계약은 `docs/product-scope-v1.md`,
 > 채널 capability 진실은 `docs/multi-channel-connector-roadmap.md` §4.1이 그대로 정본이다.
 >
@@ -208,7 +208,7 @@ visual QA에서 정한 한 가지 수정(구역 제목이 상품 상세·홈과 
 
 | 필요한 것 | 문서 |
 |---|---|
-| 프론트 상세 원칙(상태·언어·접근성·가이드 연결·AW 화면) | `docs/sellerops_frontend_spec.md` |
+| 프론트 상세 원칙(상태·언어·접근성·가이드 연결·AW 화면) | `docs/frontend/sellerops_frontend_spec.md` |
 | 로컬 데모 실행 절차·proof level·residual | `docs/demo_runbook_v1.md` |
 | 범위 계약 | `docs/product-scope-v1.md` |
 | capability 진실 | `docs/multi-channel-connector-roadmap.md` §4.1 |
@@ -224,11 +224,11 @@ visual QA에서 정한 한 가지 수정(구역 제목이 상품 상세·홈과 
   주문 `/orders[/:channelCode/:accountId/:parentOrderId]`(A8 — §4d);
   연결·설정 = 채널 연결 `/connect(…)` · 설정 `/settings`. off-menu route는 §3의 목록 그대로. 새 1차 메뉴 없음.
   (2026-08-18 Self-Pilot 첫 실행 UX: 인증 surface에 `/signup` 추가 — `/login`과 같은 public shell의 계정 화면이며
-  1차 메뉴가 아니다. 가입 → `/connect` → 첫 수집 → 홈. `docs/self_pilot_runtime_v1.md` §8.
+  1차 메뉴가 아니다. 가입 → `/connect` → 첫 수집 → 홈. `docs/standing/self_pilot_runtime_v1.md` §8.
   2026-08-19 Auth + Growth Instrumentation v1: 같은 auth surface에 `/auth/callback`(소셜 로그인 one-time code
-  landing)과 `/onboarding`(첫 소셜 가입의 상호명 단계) 추가 — `docs/auth_growth_instrumentation_v1.md` §4.
+  landing)과 `/onboarding`(첫 소셜 가입의 상호명 단계) 추가 — `docs/standing/auth_growth_instrumentation_v1.md` §4.
   2026-08-19 Service Readiness v1: 같은 auth shell에 `/forgot-password`, `/reset-password`; public shell에
-  `/legal/terms`, `/legal/privacy`(확정 전 placeholder) — `docs/service_readiness_v1.md` §2-4·§2-6·§4.)
+  `/legal/terms`, `/legal/privacy`(확정 전 placeholder) — `docs/standing/service_readiness_v1.md` §2-4·§2-6·§4.)
 - **화면 책임(§4)과 네 계약(§4a Today Inbox · §4b 채널 연결 hub · §4c 리뷰 답변 준비 · §4d 주문 기록 workspace)**.
 - **노출 채널 = NAVER / Coupang / Cafe24** (`ProductChannels.java`, `lib/productChannels.ts`), 표시 순서도 그 순서.
 - **새 채널의 기본값**: connector + capability proof(§4.1 승격) **뒤에** 기존 surface에 끼운다 —

@@ -1,5 +1,5 @@
 // L1 + L2 → the truth for one snapshot: per need, what the snapshot can answer, what should happen next, and how it
-// ends once everything acquirable is acquired. Pure: no I/O. Definitions: docs/inquiry_need_eval_v1.md §4.
+// ends once everything acquirable is acquired. Pure: no I/O. Definitions: docs/lineage/inquiry_need_eval_v1.md §4.
 import { parseRef } from './io.mjs';
 import { RANK, bestOf } from './vocabulary.mjs';
 

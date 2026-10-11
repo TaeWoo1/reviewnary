@@ -332,7 +332,7 @@ export const BLOCKER_CODES = [
   "HANDOFF_REJECTED",
   /**
    * The authenticated browser is a DIFFERENT seller/store than the binding this run was minted for
-   * (`docs/review_acquisition_aside_v2.md` §6, PD-4). Recoverable in the only way that matters: sign the
+   * (`docs/lineage/review_acquisition_aside_v2.md` §6, PD-4). Recoverable in the only way that matters: sign the
    * browser into the store that was connected and start again. Deliberately not `UNSUPPORTED_STATE`, which
    * reads as "this screen is not supported" and would send the seller to fix a page that is fine.
    */

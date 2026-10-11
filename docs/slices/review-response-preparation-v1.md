@@ -4,7 +4,7 @@
 > seam · redaction 확장 · draft/approval 서비스 · 컨트롤러 · 테스트)와 scope v1.4 문서가 작업 트리에
 > 있으며 **커밋되지 않았다**. 프론트엔드 노출은 **이 슬라이스에 없다**(별도 PR).
 >
-> 상위 계약: 범위 `docs/product-scope-v1.md` §1.6·§5·§9(v1.4 잠금), 화면·카피 `docs/sellerops_frontend_spec.md`
+> 상위 계약: 범위 `docs/product-scope-v1.md` §1.6·§5·§9(v1.4 잠금), 화면·카피 `docs/frontend/sellerops_frontend_spec.md`
 > §10.2·§10.3·§10.4·§15·§17, 트리아지 선행 계약은 product-scope §5의 "리뷰 트리아지(로컬 기록)" 항목.
 > 본 문서는 **답변 준비의 실행 계약**을 소유하며 그들의 결정을 중복 선언하지 않는다.
 >

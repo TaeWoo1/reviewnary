@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-/** Sign-up writes the account consent record (docs/service_readiness_v1.md §2-4). */
+/** Sign-up writes the account consent record (docs/standing/service_readiness_v1.md §2-4). */
 class AuthServiceTest {
 
     @Test

@@ -4,7 +4,7 @@ import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/** `sellerops.password-reset.*` + the public base URL the mailed link is built from (docs/service_readiness_v1.md §5). */
+/** `sellerops.password-reset.*` + the public base URL the mailed link is built from (docs/standing/service_readiness_v1.md §5). */
 @Component
 public class PasswordResetProperties {
 

@@ -2,7 +2,7 @@
  * <b>The palette shortcuts — and exactly what they are.</b>
  *
  * <p>Agentic Operating Workspace v2 §3-C. The home is a CONVERSATION now: a sentence goes to the
- * runtime, where the LLM planner plans it or the turn fails ({@code docs/sellerops_operator_graph_v2.md}
+ * runtime, where the LLM planner plans it or the turn fails ({@code docs/standing/sellerops_operator_graph_v2.md}
  * — there is no keyword planner, not even as a fallback). What is left of the command palette is an
  * optional LOCAL shortcut: when a typed sentence is exactly one of these labels (tolerating spacing,
  * trailing punctuation and a polite ending), the home shows the object it already has instead of

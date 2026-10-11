@@ -2,7 +2,7 @@
 // L1 + L2 + L3 → need- and case-level outcomes and the headline metrics. Pure apart from reading the three inputs.
 //   node tools/inquiry-need-eval/score.mjs --dataset <dir> --snapshot <S.json> --obs <run.jsonl>
 //        [--baseline <run.jsonl>] [--json <out.json>]
-// Definitions: docs/inquiry_need_eval_v1.md §5–§6.
+// Definitions: docs/lineage/inquiry_need_eval_v1.md §5–§6.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { loadDataset, readJsonl, parseRef, likeToRegExp } from './io.mjs';
 import { RANK, bestOf, SYSTEM_ACTION } from './vocabulary.mjs';

@@ -43,7 +43,7 @@ const sorted = (s) => [...s].sort();
  *
  * WP-3.1 onwards a need DECLARES `closing_authority`, so there is one answer and it cannot be two. Older gold and
  * older recorded runs said it with step roles, and this scorer still reads them — the WP-2 comparison in
- * docs/inquiry_architecture_v3_wp31.md §6 depends on scoring both representations with one scorer. `declared` says
+ * docs/lineage/inquiry_architecture_v3_wp31.md §6 depends on scoring both representations with one scorer. `declared` says
  * which representation was read, and `ambiguous` can only ever be true of the older one: a plan that marked two
  * different authorities CLOSES offered two endings and said nothing about which was the answer.
  */
@@ -301,7 +301,7 @@ export function scoreGoals(plans, gold, vocab = loadVocabulary()) {
     ...out,
     goal_coverage: rate(out.goal_covered, scored),
     required_authority_recall_rate: rate(out.required_authority_recall, scored),
-    // WP-3.1 headline (docs/inquiry_architecture_v3_wp31.md §6). `authority_presence_rate` is deliberately reported
+    // WP-3.1 headline (docs/lineage/inquiry_architecture_v3_wp31.md §6). `authority_presence_rate` is deliberately reported
     // beside `correct_closer_rate`: the first is the old claim, the second is the one the customer experiences, and
     // the distance between them is the size of the overestimate.
     authority_presence_rate: rate(out.required_authority_present, scored),

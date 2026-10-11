@@ -25,8 +25,8 @@ roadmap:
       착수는 제품 오너 결정이다.
     qualifier: 현재 판매자님 화면에 반영되는 기능이 아니며 아직 검토 단계입니다.
     sourceRefs:
-      - docs/image_product_knowledge_v1.md §10·§11
-      - docs/knowledge_gap_resolution_v1.md (rollout DEFERRED)
+      - docs/knowledge/image_product_knowledge_v1.md §10·§11
+      - docs/knowledge/knowledge_gap_resolution_v1.md (rollout DEFERRED)
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -39,7 +39,7 @@ roadmap:
       판단하지 못한다. 조건을 구분해서 담고 그 질문에 맞는 기준만 골라 쓰는 방향이다.
     qualifier: 현재 제공되는 기능이 아니며 아직 구현하지 않은 방향입니다.
     sourceRefs:
-      - docs/operational_knowledge_direction_v1.md
+      - docs/standing/operational_knowledge_direction_v1.md
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -52,7 +52,7 @@ roadmap:
       lastChangedType 확대와 주문↔상품 연결이 선행되어야 한다.
     qualifier: 현재 제공되는 기능이 아니며 아직 결정되지 않은 방향입니다.
     sourceRefs:
-      - docs/secondary_workspaces_ux_closure_v1.md §2
+      - docs/frontend/secondary_workspaces_ux_closure_v1.md §2
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -65,7 +65,7 @@ roadmap:
       것뿐이고, 판매자가 예시를 직접 고르는 형태로 도입할지는 정해지지 않았다.
     qualifier: 현재 제공되는 기능이 아니며 도입하기로 확정된 항목도 아닙니다.
     sourceRefs:
-      - docs/organization_answer_style_v1.md (usableAsExemplar — caller 0)
+      - docs/knowledge/organization_answer_style_v1.md (usableAsExemplar — caller 0)
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -79,7 +79,7 @@ roadmap:
       행에 아예 없고, 고객 식별을 어디까지 저장할 것인가도 먼저 정해져야 해서 결정된 것이 없다.
     qualifier: 현재 제공되는 기능이 아니며 아직 결정되지 않은 방향입니다.
     sourceRefs:
-      - docs/operational_fact_binding_v1.md
+      - docs/knowledge/operational_fact_binding_v1.md
       - INVARIANT.ORDER_SCOPE
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
@@ -95,7 +95,7 @@ roadmap:
       않는다.
     qualifier: 현재 제공되는 기능이 아니며 아직 결정되지 않은 확장 방향입니다.
     sourceRefs:
-      - docs/opportunity_engine_v1.md
+      - docs/review/opportunity_engine_v1.md
       - FEATURE.IMPROVEMENT_OPPORTUNITY
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"

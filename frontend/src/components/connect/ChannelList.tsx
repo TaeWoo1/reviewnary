@@ -146,7 +146,7 @@ function ChannelRow({
     }
   }
 
-  // ONE primary action per row (docs/reviewnary_design.md §7 채널 연결): the state decides what it is.
+  // ONE primary action per row (docs/frontend/reviewnary_design.md §7 채널 연결): the state decides what it is.
   // The record link is a text link; the health detail folds.
   // The seller's sentence for the failure (backend `ConnectorErrorWording`), and the raw connector string
   // one fold deeper for whoever is helping them — the seller never reads a gateway code, support never

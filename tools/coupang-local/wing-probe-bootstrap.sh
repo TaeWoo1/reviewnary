@@ -6,7 +6,7 @@
 # Chrome window and MEASURES fixed-label match counts on the page the seller navigated to themselves. It needs
 # none of the backend/DB/frontend environment the order-routine proof needs, so it gets its own two-step
 # harness: this bootstrap mints the run identity, and `wing-probe-preflight.sh` prepares + displays the
-# sanitized Approval Manifest (docs/sellerops_live_approval_contract.md §2).
+# sanitized Approval Manifest (docs/standing/sellerops_live_approval_contract.md §2).
 #
 # The identity is written under the EXACT variable names the tested manifest gate
 # (`collector/src/cli/approval-manifest-cli.ts`) reads — WALKTHROUGH_RUN_ID / WALKTHROUGH_APPROVAL_ID /

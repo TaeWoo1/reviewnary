@@ -7,7 +7,7 @@
 > **What this is NOT.** It does **not** redefine product intent, capability truth, or strategy.
 > - Capability truth stays `docs/multi-channel-connector-roadmap.md` §4.1.
 > - Product identity / strategy / scope-fence authority stays `docs/sellerops_canonical_reference.md`.
-> - Channel lessons stay `docs/channel_capability_ledger.md`.
+> - Channel lessons stay `docs/channel/channel_capability_ledger.md`.
 > This document *derives* from those and links them; if it ever disagrees, they win and this file is
 > stale. Re-derive from git + §4.1 before citing at a later commit.
 
@@ -25,7 +25,7 @@
 **Authority pointers (read these for truth, not this file):**
 `docs/sellerops_canonical_reference.md` (identity/strategy/fences) ·
 `docs/multi-channel-connector-roadmap.md` §4.1 (capability truth) ·
-`docs/channel_capability_ledger.md` (lessons) ·
+`docs/channel/channel_capability_ledger.md` (lessons) ·
 `docs/action-window-runtime/HANDOFF.md` (NAVER Action Window status-of-record) ·
 `docs/archive/2026-q3/sellerops_agent_runtime_migration.md` (agent-runtime).
 
@@ -115,7 +115,7 @@ idempotency, policy, and audit.
 **Connectors** (`backend/.../connector/`): `naver` (implemented), `cafe24` (implemented),
 `esm` + `esm/inquiry` (skeleton/unwired), **`coupang` (implemented — ORDER_SUMMARY + INQUIRY, both
 live-verified; the "auth skeleton" wording here was corrected 2026-08-19, see
-`docs/channel_integration_completeness_audit_v1.md` §5)**, `elevenst` / `ssg` (auth skeleton only),
+`docs/channel/channel_integration_completeness_audit_v1.md` §5)**, `elevenst` / `ssg` (auth skeleton only),
 `FileUploadConnector` (production), `MockApiConnector` (test). Connector flags default **off**; the
 scheduler defaults off; credentials live in an AES-256-GCM vault.
 
@@ -140,7 +140,7 @@ never unattended. **운영 지원 (production-supported) is still file-upload-on
 |---|---|---|---|
 | ORDER_SUMMARY | API (OAuth) | **live-proven** | C1/C2 (#374): token rotation + amount reconciliation + idempotent replay (전선몰딩, disposable). `docs/archive/2026-q3/sellerops_cafe24_c2_order_summary_live_verification.md`. |
 | REVIEW read (board 4 구매후기) | API | **live-proven** | #375: public fresh-insert + idempotent replay; 비밀글 fail-closed excluded. Live-observed reply_status = **UNKNOWN only** (raw not N/P/C → fail-closed; PENDING expectation withdrawn). **N/P/C tokens = tests-only; secret-exclusion count + raw_received/missing-drop counts = unobserved (uninstrumented).** `docs/archive/2026-q3/sellerops_cafe24_review_read_live_verification.md`. |
-| INQUIRY read (board 6 문의사항) | API | **live-proven** | #382 (exact-window contract): 1 in-window emitted, out-of-window excluded pre-mapper, C→ANSWERED, `is_secret=true`, secret boundary live (Inbox includes / dashboard+analysis exclude), idempotent replay. **public/N/P/UNKNOWN tokens + N→C transition = tests-only.** board 9 (1:1) excluded, never called. `docs/sellerops_cafe24_inquiry_read_live_proof.md`. |
+| INQUIRY read (board 6 문의사항) | API | **live-proven** | #382 (exact-window contract): 1 in-window emitted, out-of-window excluded pre-mapper, C→ANSWERED, `is_secret=true`, secret boundary live (Inbox includes / dashboard+analysis exclude), idempotent replay. **public/N/P/UNKNOWN tokens + N→C transition = tests-only.** board 9 (1:1) excluded, never called. `docs/lineage/sellerops_cafe24_inquiry_read_live_proof.md`. |
 | First-connection tutorial | read-only capability check | **live-proven** | #383: 7-step wizard + capability endpoint on real 전선몰딩. |
 | Inquiry answer draft | agent-runtime `INQUIRY_DRAFT` | **synthetic-proven** | #384: read-only draft → human checkpoint, no send/mutation. |
 | REVIEW/INQUIRY **reply write** | comment/reply API | **not implemented** | Isolated spike + guided-handoff backend preserved on branches only (see §7). No `mall.write_community`, no comment POST performed. |
@@ -149,7 +149,7 @@ never unattended. **운영 지원 (production-supported) is still file-upload-on
 > `backend/.../community/CommunityReplyStatus.java` still reads *"Only N has been observed on a live
 > Cafe24 response so far … every board-4/6 row sampled live to date was unanswered."* That is stale:
 > #382 live-observed raw `C → ANSWERED` on board-6 INQUIRY (evidence
-> `docs/sellerops_cafe24_inquiry_read_live_proof.md`), and #375 live-observed `UNKNOWN` (not N) on
+> `docs/lineage/sellerops_cafe24_inquiry_read_live_proof.md`), and #375 live-observed `UNKNOWN` (not N) on
 > board-4 REVIEW. The frozen evidence docs are authoritative; the javadoc should be corrected in a
 > later code change.
 
@@ -233,7 +233,7 @@ not touch #371 at this checkpoint.**
 ## 9. Priorities (next work order)
 
 Direction only; **each step needs its own fresh approval**, and any live channel call is governed by
-the canonical contract `docs/sellerops_live_approval_contract.md` (§3: default one-line
+the canonical contract `docs/standing/sellerops_live_approval_contract.md` (§3: default one-line
 `Seated and ready.` against a prepared, displayed Approval Manifest; single-use).
 
 > **UPDATE 2026-07-31 (`97ad192`) — Cafe24 pilot channel v1 is COMPLETE.** Priority 1 below (Cafe24
@@ -265,7 +265,7 @@ the canonical contract `docs/sellerops_live_approval_contract.md` (§3: default 
 > exposure (`NEW_REVIEW=1`), zero analysis on community articles. **`reply_status` observed = UNKNOWN
 > only**; `N`/`P`/`C` tokens and the secret-exclusion boundary **stayed tests-only** (this window carried
 > neither) — a wider window from operator knowledge of the mall's history is required to advance those.
-> Evidence: `docs/sellerops_cafe24_review_acquisition_completion_live_proof.md`.
+> Evidence: `docs/lineage/sellerops_cafe24_review_acquisition_completion_live_proof.md`.
 
 **Precondition state (already true):** Cafe24 REVIEW read (board 4) is live-proven for public fresh-insert
 + idempotent replay + 비밀글 fail-closed exclusion (#375). ORDER_SUMMARY is live-proven (#374). Both use
@@ -279,7 +279,7 @@ the same OAuth; connector flags default off.
 - `raw_received` vs ingested vs missing-drop counts observed (the #375 code does not instrument them).
 
 **Start conditions (all required):** _(historical record; the current standard for the approval itself
-is the canonical contract `docs/sellerops_live_approval_contract.md` — a prepared/displayed Approval
+is the canonical contract `docs/standing/sellerops_live_approval_contract.md` — a prepared/displayed Approval
 Manifest + the one-line `Seated and ready.` grant, §3.)_
 1. A **fresh single-use in-turn approval** naming channel = Cafe24, account (the disposable mall,
    e.g. 전선몰딩), date = the run day, operator = the seated user. A plan or prior approval is never

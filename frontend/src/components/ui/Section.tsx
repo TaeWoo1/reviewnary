@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * A titled region of a page (docs/reviewnary_design.md §6).
+ * A titled region of a page (docs/frontend/reviewnary_design.md §6).
  *
  * The title is an `h2` at body size, semibold, short and functional — 「먼저 볼 일」, 「숫자」 — with an
  * optional count and one action on the same line. It is NOT a card: the body decides whether it is a

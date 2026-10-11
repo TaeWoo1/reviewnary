@@ -131,7 +131,7 @@ public class InquiryReplyCapabilityRegistry {
      *             answerable by READ alone — 43 board-6 articles in the canonical Demo Org already
      *             carry {@code reply_status=C}, so the seller's own past answers are on the platform
      *             to be observed, and no unanswered customer inquiry need be touched. The bounded
-     *             READ manifest is {@code docs/inquiry_answer_execution_v1.md} §7 and it stops in
+     *             READ manifest is {@code docs/inquiry/inquiry_answer_execution_v1.md} §7 and it stops in
      *             front of approval.</li>
      *         <li>The actor values differ per path and SellerOps holds none of them: the stored
      *             Cafe24 connection is exactly {@code mall_id} + {@code refresh_token}

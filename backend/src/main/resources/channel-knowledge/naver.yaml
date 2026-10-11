@@ -146,7 +146,7 @@ entries:
     capabilities: [ORDER_SUMMARY, PRODUCT]
     tags: [ip, 호출ip, 연결오류, 방화벽]
     source: SELLEROPS_EVIDENCE
-    sourceRef: docs/sellerops_local_to_pilot_connectivity_decision.md
+    sourceRef: docs/standing/sellerops_local_to_pilot_connectivity_decision.md
     verifiedAt: "2026-08-22"
 
   # ---------------------------------------------------------------- NAVIGATION
@@ -285,7 +285,7 @@ entries:
     capabilities: [REVIEW, INQUIRY]
     tags: [운영, 판단, 한계, 확인]
     source: LIVE_OBSERVATION
-    sourceRef: docs/naver_inquiry_api_audit_v1.md §8·§9·§16 · docs/evidence/INDEX.md (2026-08-24)
+    sourceRef: docs/lineage/naver_inquiry_api_audit_v1.md §8·§9·§16 · docs/evidence/INDEX.md (2026-08-24)
     verifiedAt: "2026-08-24"
 
   # ------------------------------------------------------------------ WORKFLOW

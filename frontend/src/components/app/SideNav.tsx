@@ -14,7 +14,7 @@ function itemClass({ isActive }: { isActive: boolean }): string {
 }
 
 /**
- * Desktop navigation rail (docs/reviewnary_design.md §2, §7).
+ * Desktop navigation rail (docs/frontend/reviewnary_design.md §2, §7).
  *
  * 232px, one surface, one rule on the right. The wordmark and the workspace are the top; the two nav
  * groups are the middle; the bottom is the operator and the one piece of chrome that reads data —

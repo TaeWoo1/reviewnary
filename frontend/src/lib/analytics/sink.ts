@@ -1,6 +1,6 @@
 import type { AnalyticsEventName } from "./events";
 
-/** What the visitor allowed (docs/service_readiness_v1.md §2-4). A sink is only started once `analytics` is true. */
+/** What the visitor allowed (docs/standing/service_readiness_v1.md §2-4). A sink is only started once `analytics` is true. */
 export interface ConsentGrant {
   analytics: boolean;
   marketing: boolean;
@@ -8,7 +8,7 @@ export interface ConsentGrant {
 
 /**
  * A destination for already-sanitized events. Sinks are the ONLY code that knows a vendor exists; pages call
- * `analytics.track` and nothing else (docs/auth_growth_instrumentation_v1.md §2-8).
+ * `analytics.track` and nothing else (docs/standing/auth_growth_instrumentation_v1.md §2-8).
  */
 export interface AnalyticsSink {
   readonly name: string;

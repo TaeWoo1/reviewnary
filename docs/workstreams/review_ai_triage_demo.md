@@ -122,5 +122,5 @@ yet** — a second real seller's corpus is the next gate; the spent v2 holdout i
 
 `docs/slices/llm-triage-classifier-v1.md` (§14–§16) · `contracts/review-eval/naver/v2/RUBRIC.md`
 (§2.3, §8.3/§8.3.1, §12–§13) · `contracts/review-triage-events/v1/CONTRACT.md` ·
-`docs/slices/production-triage-feedback-draft-v1.md` §7–§8 · `docs/coupang_review_policy_gate_v1.md`
+`docs/slices/production-triage-feedback-draft-v1.md` §7–§8 · `docs/standing/coupang_review_policy_gate_v1.md`
 §6.1.2.

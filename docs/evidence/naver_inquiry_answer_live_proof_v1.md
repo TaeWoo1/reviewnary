@@ -117,4 +117,4 @@ SELLEROPS_INQUIRY_PUBLISH_NAVER_LIVE_APPROVAL_ID     ← 환경에서 제거됨
    삭제로 판정하는 경로를 여는 것이 이 증명의 범위가 아니고, 그 판단은 product-owner의 것이다.
 2. **`proactive_case`는 `PREPARED`에 멈춰 있다.** 파생 규칙은 이미 옳다 —
    `phase ∉ {OPEN, PROPOSED}` ⇒ `ACTED`. 그저 tick이 필요하고, §4대로 proactive를 껐다.
-3. 초안 품질 결함은 이 실행이 드러낸 **별개의 문제**이며 `docs/answer_applicability_v1.md`가 소유한다.
+3. 초안 품질 결함은 이 실행이 드러낸 **별개의 문제**이며 `docs/knowledge/answer_applicability_v1.md`가 소유한다.

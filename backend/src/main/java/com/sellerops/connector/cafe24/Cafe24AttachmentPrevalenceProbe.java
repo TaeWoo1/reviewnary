@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
  * <p>This is a DIAGNOSTIC. It collects nothing, stores nothing, and is not reachable from any
  * runtime path — see {@link Cafe24AttachmentPrevalenceRunner} for the double gate.
  *
- * <p><b>Why it exists.</b> `docs/review_media_presence_audit_v1.md` §2 established that the vendored
+ * <p><b>Why it exists.</b> `docs/lineage/review_media_presence_audit_v1.md` §2 established that the vendored
  * reference publishes {@code attach_file_urls} on the exact endpoint the connector already calls, and
  * that {@link Cafe24BoardArticleRow} does not project it — so it is parsed and discarded on every
  * sweep. What nobody knew was whether the field is ever populated for this mall. That is not a

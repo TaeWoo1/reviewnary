@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Inquiry Decision v2 — the engine and the case policy, with the model replaced by a script.
  *
- * <p>The shapes are the real regression cases of Inquiry Need Eval v1 (docs/inquiry_need_eval_v1.md §9): the needs and
+ * <p>The shapes are the real regression cases of Inquiry Need Eval v1 (docs/lineage/inquiry_need_eval_v1.md §9): the needs and
  * the verdicts are what a correct judge says about them. What is under test is what CODE does with those verdicts —
  * the model's accuracy is measured by the eval, not asserted here.
  */

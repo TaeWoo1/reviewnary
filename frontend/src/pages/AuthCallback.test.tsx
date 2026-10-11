@@ -35,7 +35,7 @@ const user = { id: "u-1", email: "a@x.io", name: "A", role: "OWNER", orgId: "o-1
 
 /**
  * The URL carries only a one-time code; the JWT arrives in the exchange body and is accepted through the auth
- * context (docs/auth_growth_instrumentation_v1.md §2-1). A first-time identity is parked as a pending
+ * context (docs/standing/auth_growth_instrumentation_v1.md §2-1). A first-time identity is parked as a pending
  * onboarding — nothing about it in the URL — and sent to 상호명.
  */
 describe("/auth/callback", () => {

@@ -4,7 +4,7 @@
 > (`https://developers.cafe24.com/docs/en/api/admin/`, section *Boards articles comments →
 > Create a comment for a board post`), retrieved **2026-08-24**. This file records what the
 > PLATFORM publishes. It carries no SellerOps conclusion — those live in
-> `docs/inquiry_action_flow_v1.md` and in `InquiryReplyCapabilityRegistry`, and as of this
+> `docs/inquiry/inquiry_action_flow_v1.md` and in `InquiryReplyCapabilityRegistry`, and as of this
 > retrieval they still say NEEDS_VERIFICATION.
 
 ## Specification

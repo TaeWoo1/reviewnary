@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Helper Device Authentication v1 — the device grant on top of the existing session
- * (docs/helper_device_authentication_v1.md).
+ * (docs/pilot/helper_device_authentication_v1.md).
  *
  * <p>Three moves and one lookup: a helper {@link #start starts} a grant (no credential — it is a public client
  * on the seller's own machine), the seller's browser session {@link #approve approves} the user code, the helper

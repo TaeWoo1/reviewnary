@@ -413,7 +413,7 @@ export class ImportSegmentEngine {
    *
    * The safety line is unchanged and is the reason this is allowed at all: re-probing and re-reading are
    * `AUTO_READ`, which may advance GUIDANCE and may never cross an action barrier
-   * (`docs/sellerops_live_approval_contract.md` §5b). Nothing here presses anything.
+   * (`docs/standing/sellerops_live_approval_contract.md` §5b). Nothing here presses anything.
    *
    * Returns `NONE` when the run is not resting on a park with an automatic repair, so a watcher that fires
    * one tick late cannot move a run that has already moved.

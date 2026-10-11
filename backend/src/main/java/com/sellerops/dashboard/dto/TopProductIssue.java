@@ -10,7 +10,7 @@ import java.util.UUID;
  * computed by grouping {@code reviews.product_id} — a canonical product row — and then thrown that
  * id away at the DTO boundary, leaving the name as the only handle a consumer had. The demo org
  * holds ten duplicated titles and one name shared by four products
- * ({@code docs/demo_org_and_channel_knowledge_v1.md}), so a consumer keying on the name merges
+ * ({@code docs/knowledge/demo_org_and_channel_knowledge_v1.md}), so a consumer keying on the name merges
  * different products into one row. The id is carried so nobody has to.
  *
  * <p><b>{@code productName} may be null</b> — never a placeholder. A review can point at a product

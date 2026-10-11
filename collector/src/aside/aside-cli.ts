@@ -1,7 +1,7 @@
 /**
  * **The one way this package talks to Aside: `aside repl <program>`.**
  *
- * Aside (`docs/aside_capability_discovery_v1.md`) exposes two ways to drive its browser — `exec`, which hands a
+ * Aside (`docs/lineage/aside_capability_discovery_v1.md`) exposes two ways to drive its browser — `exec`, which hands a
  * prompt to an LLM agent, and `repl`, which runs Playwright-style JavaScript deterministically with no model
  * call. Reviewnary uses `repl` and nothing else. That is not a preference recorded in a comment; it is the
  * shape of this module: {@link ASIDE_ALLOWED_INVOCATIONS} is the closed list of argv heads this wrapper will

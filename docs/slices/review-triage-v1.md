@@ -1,7 +1,7 @@
 # Slice — Review Triage v1
 
 > **Status:** IMPLEMENTED, offline + local product proof. **Consumes no gate, promotes no
-> capability.** §4.1 and `docs/channel_capability_ledger.md` are untouched — this changes what an
+> capability.** §4.1 and `docs/channel/channel_capability_ledger.md` are untouched — this changes what an
 > operator *sees* on the channel review record and in what *order*, not what a channel supports.
 
 - **Workstream:** Review Operations (`docs/workstreams/review_operations_mvp.md`)

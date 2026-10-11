@@ -29,7 +29,7 @@ import java.util.Set;
  *
  * <p>The replacement interprets the request and stops there: {@link com.sellerops.inquiry.goal.CustomerGoal}, with
  * {@link com.sellerops.inquiry.goal.ResolutionPolicy} dispatching one resolver at a time and looking at the result
- * before choosing the next. See {@code docs/inquiry_architecture_v35.md}.
+ * before choosing the next. See {@code docs/lineage/inquiry_architecture_v35.md}.
  */
 /**
  * <b>A resolution plan</b> (Inquiry v3; contract hardened in WP-3, closing semantics made explicit in WP-3.1): the

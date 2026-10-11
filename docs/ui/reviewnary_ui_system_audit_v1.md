@@ -3,7 +3,7 @@
 **Status:** 2026-09-30 · `frontend/` only · measured on `1e23487c` (worktree `decision-workspace`) ·
 **this document records what was measured and what was decided, not a new design system**
 
-The system already exists: `docs/reviewnary_design.md` v3 fixes typography, spacing, colour, radius,
+The system already exists: `docs/frontend/reviewnary_design.md` v3 fixes typography, spacing, colour, radius,
 the primitives and the per-surface hierarchy, with measurements. `components/ui/` holds 15 primitives
 built to it. So this audit does not propose a second system — writing one would be the fourth
 vocabulary in this frontend. It measures the distance between the contract and the code, and records

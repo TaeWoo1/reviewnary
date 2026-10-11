@@ -12,7 +12,7 @@ import type { ProductRowFacts } from "../../lib/productRows";
 import { useAgentSurface } from "../../lib/agentPanel";
 
 /**
- * 상품 — an object list, not a SKU table (docs/reviewnary_design.md §7).
+ * 상품 — an object list, not a SKU table (docs/frontend/reviewnary_design.md §7).
  *
  * <b>A product is "what reviewnary knows about this product's operations" — and this screen is the
  * index of the page that reads one.</b> The counts are one aligned column each, named exactly as 상품

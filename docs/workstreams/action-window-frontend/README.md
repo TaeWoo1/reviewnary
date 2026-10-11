@@ -30,7 +30,7 @@ only at genuine human checkpoints, and sees the operation resume and complete.
 ## Source-of-truth order
 
 1. shared Action Window contract (`contracts/action-window/v1/`) — protocol semantics;
-2. `docs/sellerops_frontend_spec.md`;
+2. `docs/frontend/sellerops_frontend_spec.md`;
 3. `docs/slices/action-window-v1.md`;
 4. this workstream plan.
 

@@ -26,7 +26,7 @@ import type { Artifact, WorkingSetView } from "../../conversation/contract";
  *
  * `WRITE` exists in this type and in no tool. Naming it is the point: a class that cannot be spelled
  * is a class nobody can check for, and {@link OperatorToolRegistry} refuses at construction time any
- * tool declaring it. See `docs/sellerops_operator_graph_v1.md` §3.
+ * tool declaring it. See `docs/standing/sellerops_operator_graph_v1.md` §3.
  */
 export type ActionClass = "READ" | "PREPARE" | "WRITE";
 

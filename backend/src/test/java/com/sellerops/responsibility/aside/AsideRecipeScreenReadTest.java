@@ -22,7 +22,7 @@ class AsideRecipeScreenReadTest {
             assertThat(recipe.mode()).as("%s", recipe).isEqualTo(AsideRecipeMode.READ_ONLY);
         }
         // If this ever fails it is not a test to fix. A recipe that acts on a marketplace needs its own
-        // decision about who may ask for it — see docs/sellerops_live_approval_contract.md on WRITE.
+        // decision about who may ask for it — see docs/standing/sellerops_live_approval_contract.md on WRITE.
     }
 
     @Test

@@ -20,7 +20,7 @@ import java.util.Map;
  * message under a different registry is a different observation.
  *
  * @param variantCount the listing's option count — the structured fact a knowledge step needs to tell a product-level
- *                     sentence from an answer for the customer's size (docs/inquiry_decision_v2_2.md §7). Not the names:
+ *                     sentence from an answer for the customer's size (docs/lineage/inquiry_decision_v2_2.md §7). Not the names:
  *                     the snapshot is about what can act, and it is fingerprinted.
  */
 public record CapabilitySnapshot(String version, String channelCode, InquirySurface surface, boolean orderBound,

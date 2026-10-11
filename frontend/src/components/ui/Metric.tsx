@@ -3,7 +3,7 @@ import type { MetricKpi } from "../../lib/types";
 import { count, wonShort } from "../../lib/format";
 
 /**
- * One number, sized to be read second (docs/reviewnary_design.md §6, §7).
+ * One number, sized to be read second (docs/frontend/reviewnary_design.md §6, §7).
  *
  * <b>Compact by default.</b> The home used to open with three large cards, each with its own orange
  * caveat sentence; the redesign puts the work first and the numbers under it as one row of compact

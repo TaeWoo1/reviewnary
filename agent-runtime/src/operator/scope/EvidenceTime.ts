@@ -6,7 +6,7 @@
  * Operator reported the unanswered total; in the other it named "오늘" as a `PERIOD` mention and the
  * scope gate withheld the SAME true number as `TEMPORAL_UNPROVEN`, because the inbox count carried no
  * date. A seller therefore got a fact or an apology depending on a word the planner chose. Record:
- * `docs/agent_real_validation_v1.md` §10.4.
+ * `docs/lineage/agent_real_validation_v1.md` §10.4.
  *
  * <b>The fix is not a date stamp.</b> Writing today onto the inbox count would have made both runs
  * answer — and would have made the count assert something it does not know. `unansweredInquiries` is
@@ -31,7 +31,7 @@
  * from an event claim when a finding has no need attached, and it never sees the sentence. So the rule
  * judge carries {@link assertsEventOccurrence}, which reads the CLAIM: a sentence that says something
  * happened in a period, resting only on evidence with no event range, is refused whatever the need
- * said. Same vocabulary, same module, two places — the shape `docs/sellerops_operator_graph_v2.md`
+ * said. Same vocabulary, same module, two places — the shape `docs/standing/sellerops_operator_graph_v2.md`
  * §2.1 established.
  */
 import type { NeedKind } from "../plan/InvestigationPlan";

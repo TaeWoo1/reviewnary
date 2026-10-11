@@ -159,7 +159,7 @@ describe("analytics — one abstraction, env-gated, PII impossible by constructi
   });
 });
 
-describe("analytics — consent (docs/service_readiness_v1.md §2-4)", () => {
+describe("analytics — consent (docs/standing/service_readiness_v1.md §2-4)", () => {
   it("buffers before a decision, then starts the sinks and flushes in order on grant", () => {
     const a = createAnalytics(() => {});
     const s = recordingSink();

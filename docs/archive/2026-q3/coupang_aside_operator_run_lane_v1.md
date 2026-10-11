@@ -11,7 +11,7 @@ configuration on one machine.
 > **Superseded, 2026-09-17 — «unattended / scheduled: NOT APPROVED» was the right line and it has now been
 > answered, not ignored.** That row said this lane would not become scheduled *without a separate decision*.
 > The separate decision was taken (product-owner, Marketplace Scheduled Operations Proof) and it is recorded in
-> `docs/responsibility_runtime_v1.md` §24, which owns the scheduled lane's status from here. **Nothing in §1–§7
+> `docs/standing/responsibility_runtime_v1.md` §24, which owns the scheduled lane's status from here. **Nothing in §1–§7
 > below changed**: the read is the same bounded one-page read, by the same frozen runtime, through the same
 > store-identity fence, with the same zero clicks and zero writes. What moved is *who authorises a run* — a
 > seller's press, or the seller's activated responsibility plus a deployment naming this organisation AND this

@@ -31,7 +31,7 @@ import java.util.Set;
  *
  * <ol>
  *   <li><b>코드가 실제 셀러 계정에 도착하는 것을 보았다</b> — 2026-08-06 승인된 read-only run
- *       ({@code docs/coupang_ordersheets_response_contract_hardening_v1.md}: FINAL_DELIVERY 30 ·
+ *       ({@code docs/lineage/coupang_ordersheets_response_contract_hardening_v1.md}: FINAL_DELIVERY 30 ·
  *       DELIVERING 13 · ACCEPT 7).</li>
  *   <li><b>그 코드가 무엇을 뜻하는지 플랫폼이 문서로 말한다</b> —
  *       {@code docs/vendor/coupang-openapi/get-ordersheet-history.md}의 {@code deliveryStatus} 표.</li>

@@ -5,7 +5,7 @@ package com.sellerops.ingest.canonical;
  *
  * <p><b>이것은 "누가 썼는가"가 아니다.</b> 두 질문은 다르고, 하나만 증명됐다. Cafe24 board 6에서
  * 답변은 질문에 달린 <em>자식 글</em>이라는 것은 승인된 bounded READ proof로 확정됐지만
- * ({@code docs/inquiry_answer_execution_v1.md} — 검증된 관계는 {@code parent_article_no == 부모}),
+ * ({@code docs/inquiry/inquiry_answer_execution_v1.md} — 검증된 관계는 {@code parent_article_no == 부모}),
  * 그 자식을 <em>판매자가</em> 썼다는 것은 확정되지 않았다. 자식 글에는 {@code reply_user_id}가 없었고,
  * 작성자를 말하는 나머지 필드({@code writer}, {@code member_id})는 고객 PII를 함께 나르기 때문에
  * 이 저장소가 투영하지 않는다. 그래서 이 어휘는 행위자에 대해 아무 말도 하지 않는다.

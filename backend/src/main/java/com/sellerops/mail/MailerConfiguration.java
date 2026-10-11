@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.mail.javamail.JavaMailSender;
 
 /**
- * Picks the one {@link Mailer} for this deployment from `SELLEROPS_MAIL_MODE` (docs/service_readiness_v1.md §2-3):
+ * Picks the one {@link Mailer} for this deployment from `SELLEROPS_MAIL_MODE` (docs/standing/service_readiness_v1.md §2-3):
  * `smtp` needs `spring.mail.host` (Spring's JavaMailSender) and refuses to boot without it — a misconfigured
  * production must not silently become "off"; `dev-outbox` logs mails; `off` (default) drops them.
  */

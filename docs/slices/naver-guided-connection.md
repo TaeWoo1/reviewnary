@@ -7,9 +7,9 @@
 > 흐름**(type=SELF)이며, **미래 SellerOps 솔루션-제공자 OAuth 연동 모델로 문서화하지 않는다**
 > (`docs/product-scope-v1.md` §6.1). **실제 NAVER 사용은 마켓 정책 게이트 뒤에 유지**된다(§14).
 >
-> 상위 계약: 제품 원칙 `docs/product-scope-v1.md` §1.2·§6.1, 프론트 여정·완료기준 `docs/sellerops_frontend_spec.md`
+> 상위 계약: 제품 원칙 `docs/product-scope-v1.md` §1.2·§6.1, 프론트 여정·완료기준 `docs/frontend/sellerops_frontend_spec.md`
 > §16.7·§16.9·§16.10·§16.11·§17-B G3, capability 진실 `docs/multi-channel-connector-roadmap.md` §4.1·§11,
-> 런타임 경계·인증 불변식 `docs/sellerops_local_agent_runtime_adr.md` §3·§4, 브리지 `docs/slices/local-agent-bridge.md`(G1),
+> 런타임 경계·인증 불변식 `docs/standing/sellerops_local_agent_runtime_adr.md` §3·§4, 브리지 `docs/slices/local-agent-bridge.md`(G1),
 > 프로젝션 `docs/slices/browser-projection-v0.md`(G2). 본 문서는 그 위에 **가이드 상태 엔진 + 안전 자격증명
 > 등록 + 첫 수집 합성** 계약을 소유한다.
 
@@ -107,7 +107,7 @@ preflight-selfcheck.sh}`. **향후 라이브는 코드/프로세스 재시작으
 manifest 생성 후 새 단일-사용 승인 필요.**
 
 > **승인 규칙 정본:** live-run 승인(Standing Safety Contract · Approval Manifest · 한 줄 `Seated and ready.` ·
-> lifecycle · READ_ONLY vs WRITE)은 이제 [`docs/sellerops_live_approval_contract.md`](../sellerops_live_approval_contract.md)
+> lifecycle · READ_ONLY vs WRITE)은 이제 [`docs/standing/sellerops_live_approval_contract.md`](../sellerops_live_approval_contract.md)
 > 에 한 번만 정의된다. 이 슬라이스는 그 계약을 참조하며 승인 규칙을 재기술하지 않는다. bootstrap/preflight가
 > Approval Manifest를 준비·표시하면 기본 승인은 한 줄이고, 상세 승인이 필요한 예외는 정본 §3에 있다. 아래
 > §0.1.1의 과거 walkthrough 기록에 남은 긴 승인문은 **당시 기록**이며 현재 표준이 아니다.
@@ -155,7 +155,7 @@ manifest 생성 후 새 단일-사용 승인 필요.**
   진입점** `cli/run-api-issuance-live-naver.ts`(`--i-understand-this-opens-live-naver` 필수 + `screenApiCenterUrl`
   사전 fail-closed + import 시 inert; **이번 유닛에서 실행하지 않음**). 오프라인 fake-Page 테스트가 실제
   엔진·세션을 구동해 Secret-read=0·click=0를 증명. **다음 = read-only 라이브 관찰로 위 candidate selector
-  보정** — 승인은 정본 계약(`docs/sellerops_live_approval_contract.md`)의 READ_ONLY Approval Manifest +
+  보정** — 승인은 정본 계약(`docs/standing/sellerops_live_approval_contract.md`)의 READ_ONLY Approval Manifest +
   한 줄 `Seated and ready.`. 보정은 **2단계로 분리**됐다: **Phase A `API_CENTER_STRUCTURE_OBSERVATION`**
   (`observe-api-center.ts`, 관찰·census·구조 힌트만 — highlight 0) → 결과를 selector adapter에 반영하고
   `SELECTORS_CALIBRATED=true`로 만든 뒤에야 **Phase B `API_ISSUANCE_HIGHLIGHT_PROOF`**
@@ -1472,9 +1472,9 @@ PR #317/#357이 남긴 갭 중 **오프라인으로 채울 수 있는 것만** �
 
 ### 부록 — 근거 문서·파일·출처
 - 제품 원칙: `docs/product-scope-v1.md` §1.2·§6.1(셀러 소유 파일럿 ≠ 솔루션-제공자)
-- 프론트 여정·완료: `docs/sellerops_frontend_spec.md` §16.10·§16.11·§17-B G3
+- 프론트 여정·완료: `docs/frontend/sellerops_frontend_spec.md` §16.10·§16.11·§17-B G3
 - capability 진실: `docs/multi-channel-connector-roadmap.md` §4.1(NAVER ORDER_SUMMARY 라이브 1회)·§11
-- 런타임·인증 불변식: `docs/sellerops_local_agent_runtime_adr.md` §3·§4
+- 런타임·인증 불변식: `docs/standing/sellerops_local_agent_runtime_adr.md` §3·§4
 - G1/G2: `docs/slices/local-agent-bridge.md`, `docs/slices/browser-projection-v0.md`
 - 현행 코드: `backend/.../connector/naver/{NaverTokenClient,NaverApiConnector,NaverOrdersClient}.java`,
   `.../collect/{SellerAccountCollectController,CollectControlService}.java`, `.../credential/{CredentialVault,

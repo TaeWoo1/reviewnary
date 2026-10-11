@@ -2,7 +2,7 @@
  * **The in-page half of the WING seller-identity assertion** — the one thing acquisition must know before it
  * reads a single review: *whose store is this browser logged into?*
  *
- * `docs/review_acquisition_aside_v2.md` §6 (PD-4) is the rule this implements: a display name alone is not
+ * `docs/lineage/review_acquisition_aside_v2.md` §6 (PD-4) is the rule this implements: a display name alone is not
  * proof, so what is read here is the channel-native **업체코드** — Coupang's own vendor code, the same value a
  * seller types into SellerOps when they issue API credentials (`CredentialTemplates` `vendor_id`). Observed
  * 2026-09-12 in the WING shell chrome on both the front door and the review list, rendered as one span whose

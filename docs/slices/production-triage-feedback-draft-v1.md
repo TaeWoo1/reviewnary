@@ -188,7 +188,7 @@ Repository-verifiable facts are settled above. These are not, and each is named 
 - **Product-owner decision** — whether `SELLER_PREFERENCE` becomes a real per-seller policy layer or
   is only recorded and excluded. Recording it is required either way; acting on it is a product.
 - **External research required** — whether Coupang and NAVER terms permit storing review media
-  metadata, and separately the media itself. `docs/coupang_review_policy_gate_v1.md` is the precedent
+  metadata, and separately the media itself. `docs/standing/coupang_review_policy_gate_v1.md` is the precedent
   for how that question gets answered before anything is built.
 - **Repository-verifiable, not yet checked** — whether `channel_products` can carry the product
   identity a `SELLER_PREFERENCE` policy would have to be scoped to. That is step 3 of the Product

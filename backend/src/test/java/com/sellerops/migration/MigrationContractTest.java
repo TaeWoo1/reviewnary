@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>1. Forward-only, and no undo script written after the fact.</b> This repository has never had an
  * undo migration and does not gain one retroactively; rollback is {@code pg_dump} + restore
- * ({@code deploy/pilot/backup.sh}, {@code restore.sh}, runbook in {@code docs/pilot_launch_readiness_v1.md}).
+ * ({@code deploy/pilot/backup.sh}, {@code restore.sh}, runbook in {@code docs/lineage/pilot_launch_readiness_v1.md}).
  * A stray {@code U<n>__} file would be read by a later operator as "this is reversible" — and Flyway
  * Community cannot run one, so the promise would be unkeepable as well as untrue.
  *

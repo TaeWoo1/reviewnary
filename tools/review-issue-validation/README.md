@@ -76,7 +76,7 @@ than becoming a recurring nag.
   persistent one is visibly intact.
 - Teardown runs from an `EXIT` trap, so a failed assertion still drops the database and kills the
   backend.
-- Nothing here is in CI. See `docs/ci-coverage.md` — a CI job that could create and drop databases and
+- Nothing here is in CI. See `docs/lineage/ci-coverage.md` — a CI job that could create and drop databases and
   boot a backend is operator-run by design, and its name-guarded teardown assumes a human is watching.
 
 ## Fixed reference date

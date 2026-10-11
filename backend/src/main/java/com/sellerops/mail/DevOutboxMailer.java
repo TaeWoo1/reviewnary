@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
  * `SELLEROPS_MAIL_MODE=dev-outbox` — the local / self-pilot path when no SMTP exists: the mail is kept in a
  * bounded in-memory outbox and written in full (including a reset link) to the backend log under a
  * `[DEV MAIL OUTBOX]` prefix, so the local seller copies the link from the terminal. This is the ONLY mailer
- * that ever logs a body; it is a separate mode that production never sets (docs/service_readiness_v1.md §2-3).
+ * that ever logs a body; it is a separate mode that production never sets (docs/standing/service_readiness_v1.md §2-3).
  */
 public final class DevOutboxMailer implements Mailer {
 

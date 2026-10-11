@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Public (permitAll under /api/auth/**) endpoints of the social login flow — docs/auth_growth_instrumentation_v1.md §3. */
+/** Public (permitAll under /api/auth/**) endpoints of the social login flow — docs/standing/auth_growth_instrumentation_v1.md §3. */
 @RestController
 @RequestMapping("/api/auth/social")
 public class SocialAuthController {

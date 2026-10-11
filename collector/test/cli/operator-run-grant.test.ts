@@ -247,7 +247,7 @@ describe("the CLIs that hold a manifest bind their grant to it", () => {
   });
 
   it("**the account is the manifest's own value**, not a second copy of it", () => {
-    // Observed live on 2026-08-13 (docs/trusted_operator_confirmation_proof_v1.md): the grant screen read
+    // Observed live on 2026-08-13 (docs/lineage/trusted_operator_confirmation_proof_v1.md): the grant screen read
     // "operator-owned Coupang WING test account" while the Approval Manifest above it read the two-account
     // sentence. One string, one place, or they drift again.
     for (const b of [revealRunGrantBinding(), issuanceRunGrantBinding(ENV as unknown as NodeJS.ProcessEnv)]) {

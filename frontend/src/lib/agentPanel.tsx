@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { AgentContext } from "./agentContext";
 
 /**
- * The contextual Agent panel — one per app, closed by default (docs/reviewnary_design.md §8-A).
+ * The contextual Agent panel — one per app, closed by default (docs/frontend/reviewnary_design.md §8-A).
  *
  * <b>Two things are held here and they are different.</b> `surface` is WHAT THE SELLER IS LOOKING AT:
  * the page registers it on mount (`useAgentSurface`) and clears it on unmount, so the panel can say

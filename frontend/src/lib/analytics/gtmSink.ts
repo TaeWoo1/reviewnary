@@ -4,9 +4,9 @@ import type { AnalyticsSink, ConsentGrant } from "./sink";
 /**
  * Google Tag Manager sink — the one place `dataLayer` is touched. GA4 (and later Google Ads / Meta / NAVER
  * conversion tags) are configured INSIDE the container on these event names; the app never loads gtag or an ad
- * SDK itself (docs/auth_growth_instrumentation_v1.md §3, §7).
+ * SDK itself (docs/standing/auth_growth_instrumentation_v1.md §3, §7).
  *
- * Consent Mode v2 (docs/service_readiness_v1.md §2-4): before `gtm.js` a `consent default` with everything
+ * Consent Mode v2 (docs/standing/service_readiness_v1.md §2-4): before `gtm.js` a `consent default` with everything
  * denied, then `consent update` from the visitor's grant (분석 → analytics_storage; 마케팅 → ad_storage,
  * ad_user_data, ad_personalization) — and again on every later change. `gtag` here is the standard shim
  * (`dataLayer.push(arguments)`), the only form the container reads consent commands in.

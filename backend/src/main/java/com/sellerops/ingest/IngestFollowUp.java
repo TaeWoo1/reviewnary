@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
  * follow-ups. The upload path triggered item-analysis and published no issue-memory event; the API
  * sync published the event for Cafe24 board-4 only and never triggered item-analysis; the Coupang
  * handoff did neither. The consequences were real and were audited
- * ({@code docs/demo_baseline_recovery_audit_2026-08-21.md} defects B and C): FAQ/상세페이지 후보 were
+ * ({@code docs/lineage/demo_baseline_recovery_audit_2026-08-21.md} defects B and C): FAQ/상세페이지 후보 were
  * structurally always 0 for any org that collects over an API, and the repeated-issue memory could
  * never see reviews acquired through Coupang or uploaded from a file.
  *

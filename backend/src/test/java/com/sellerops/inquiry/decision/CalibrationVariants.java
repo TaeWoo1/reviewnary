@@ -10,7 +10,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * <b>The CoverageJudge calibration set</b> (Inquiry Decision v2.1, docs/inquiry_decision_v2_1.md §4) — the original
+ * <b>The CoverageJudge calibration set</b> (Inquiry Decision v2.1, docs/lineage/inquiry_decision_v2_1.md §4) — the original
  * judge inputs and their counterfactual variants, built deterministically from a frozen capture and the human gold.
  * Pure: no database, no model, no clock. Test support only.
  *

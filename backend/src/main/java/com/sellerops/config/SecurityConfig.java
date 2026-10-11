@@ -62,7 +62,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // Security headers (docs/service_readiness_v1.md §2-5) on top of Spring's defaults (nosniff,
+                // Security headers (docs/standing/service_readiness_v1.md §2-5) on top of Spring's defaults (nosniff,
                 // X-Frame-Options DENY, Cache-Control no-store, HSTS on https, X-XSS-Protection 0). This service
                 // answers JSON and OAuth redirects only — nothing here may load a script, be framed, or leak a
                 // referrer (an OAuth callback URL carries a one-time code) to anyone.
@@ -105,7 +105,7 @@ public class SecurityConfig {
         }
         // Also before the JWT filter, and it owns every bearer that carries the device-token prefix: a helper token
         // is admitted on the helper's routes or the request ends 401 — it never reaches a filter that might read it
-        // as something else (docs/helper_device_authentication_v1.md §4). Absent (sliced context) ⇒ a device token
+        // as something else (docs/pilot/helper_device_authentication_v1.md §4). Absent (sliced context) ⇒ a device token
         // authenticates nothing, which is the safe direction to be missing in.
         HelperDeviceAuthFilter deviceFilter = helperDeviceAuthFilter.getIfAvailable();
         if (deviceFilter != null) {
@@ -113,7 +113,7 @@ public class SecurityConfig {
         }
         // oauth2Login only when the deployer configured a provider — the existing email/password/JWT system
         // is untouched either way; success mints a one-time code, never a session or a JWT in a URL
-        // (docs/auth_growth_instrumentation_v1.md §2-1).
+        // (docs/standing/auth_growth_instrumentation_v1.md §2-1).
         ClientRegistrationRepository registrations = clientRegistrations.getIfAvailable();
         SocialLoginSuccessHandler success = socialSuccess.getIfAvailable();
         SocialLoginFailureHandler failure = socialFailure.getIfAvailable();

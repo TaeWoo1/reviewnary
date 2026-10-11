@@ -32,8 +32,8 @@ import java.util.Locale;
  *       its answers as text. The 상품정보제공고시 sub-structure is not in the vendored contract and is not projected.</li>
  *   <li><b>Cafe24 inquiry answers — NOT_PROMOTED.</b> The answer is a child article or a board comment. The child
  *       article's author is not projected, so the stored row cannot prove the seller wrote it
- *       ({@code docs/inquiry_thread_semantics_v1.md}); the comment observer proves a seller comment but stores no
- *       body ({@code docs/cafe24_comment_answer_observation_v1.md}).</li>
+ *       ({@code docs/inquiry/inquiry_thread_semantics_v1.md}); the comment observer proves a seller comment but stores no
+ *       body ({@code docs/review/cafe24_comment_answer_observation_v1.md}).</li>
  *   <li><b>Cafe24 review replies — NOT_WIRED.</b> Board comments are the same documented resource the inquiry
  *       observer reads; no review path reads them.</li>
  *   <li><b>Cafe24 product detail — LEARNED.</b> The catalogue sweep stores the description and spec facts.</li>

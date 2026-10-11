@@ -1,5 +1,5 @@
 /**
- * Browser consent state — docs/service_readiness_v1.md §2-4. Categories: 필수 (always on, not stored), 분석
+ * Browser consent state — docs/standing/service_readiness_v1.md §2-4. Categories: 필수 (always on, not stored), 분석
  * (analytics vendors: GTM/GA4, PostHog), 마케팅 (ad-related storage — Consent Mode `ad_*`; no ad tag exists yet).
  * Pure functions over `localStorage`; the React side is `ConsentProvider`.
  *

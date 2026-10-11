@@ -3,7 +3,7 @@
 #
 # Usage:
 #   api-read-preflight.sh <approvalId> <orgId> <outputJson> [envFile]
-#     approvalId  apr-api-read-<8–32 hex>, from the displayed READ_ONLY manifest (docs/sellerops_live_approval_contract.md)
+#     approvalId  apr-api-read-<8–32 hex>, from the displayed READ_ONLY manifest (docs/standing/sellerops_live_approval_contract.md)
 #     envFile     defaults to backend/.env.local of the canonical checkout; never printed
 #
 # What it guarantees (and where):
@@ -28,7 +28,7 @@ set -a; . "$ENV_FILE"; set +a
 # The Cafe24 callback must be the one registered on the Cafe24 app (runbook §1.4); the validator refuses the loopback
 # default and this script does not invent one.
 [[ -n ${SELLEROPS_CONNECTOR_CAFE24_REDIRECT_URI:-} ]] || {
-  print -u2 "SELLEROPS_CONNECTOR_CAFE24_REDIRECT_URI missing — set the registered callback (docs/cafe24_live_e2e_runbook.md §1.4)"; exit 2; }
+  print -u2 "SELLEROPS_CONNECTOR_CAFE24_REDIRECT_URI missing — set the registered callback (docs/lineage/cafe24_live_e2e_runbook.md §1.4)"; exit 2; }
 
 export SELLEROPS_COLLECT_SCHEDULER_ENABLED=false SELLEROPS_SELF_PILOT_ENABLED=false \
   SELLEROPS_RESPONSIBILITY_SCHEDULER_ENABLED=false SELLEROPS_PROACTIVE_ENABLED=false \

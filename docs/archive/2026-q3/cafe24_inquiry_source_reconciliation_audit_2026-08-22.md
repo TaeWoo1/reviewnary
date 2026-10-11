@@ -4,7 +4,7 @@
 that an inquiry is no longer valid at the source — and what is polluting current operational truth in
 the meantime. Read on `feat/operator-graph-v2` + the local `sellerops` database (PG 15.13), org
 `7146c50f…d8e0`. **Code change 0; this document is the audit only.** The package that acts on it is
-`docs/inquiry_operational_truth_v1.md`.
+`docs/inquiry/inquiry_operational_truth_v1.md`.
 
 **Nothing here was established against a marketplace.** No Cafe24 call was made, no credential was read.
 
@@ -101,7 +101,7 @@ INQUIRY 경로에 유리한 점 하나: `excludeSecret=false`이므로 board 6�
 되돌릴 수 있게 만드는 쪽이 훨씬 싸고 확실하다.
 
 이 조건 전체는 **현재 충족 불가능**하다. 자격 증명 복호화 실패로 sweep 자체가 불가능하고, 재연결은
-셀러 동의 사항이다(`docs/sellerops_live_approval_contract.md`).
+셀러 동의 사항이다(`docs/standing/sellerops_live_approval_contract.md`).
 
 ## 6. 현재 DB가 lifecycle/status/tombstone을 표현할 수 있는가 — **없다**
 

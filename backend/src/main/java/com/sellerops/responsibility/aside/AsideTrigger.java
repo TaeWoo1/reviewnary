@@ -25,7 +25,7 @@ public enum AsideTrigger {
      *
      * <p>No chat phrase, no manifest and no second confirmation belongs on this path. A development proof-run
      * driven by an assistant keeps its own, separate ceremony
-     * ({@code docs/sellerops_live_approval_contract.md} §3); the two must not be mixed, because a product
+     * ({@code docs/standing/sellerops_live_approval_contract.md} §3); the two must not be mixed, because a product
      * button that asked for a ceremony would be teaching sellers to perform one.
      */
     OPERATOR,

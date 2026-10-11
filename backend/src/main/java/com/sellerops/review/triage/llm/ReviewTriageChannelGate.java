@@ -11,7 +11,7 @@ import com.sellerops.review.triage.llm.ReviewTriageClassifier.Result;
  * decision, 2026-08-17) widened it to the three channels of
  * {@code contracts/review-triage-events/v1/CONTRACT.md} §1 — NAVER, Cafe24, Coupang — for the §13.7
  * pilot's additive suggestion and nothing else. The Coupang half of that decision is
- * {@code docs/coupang_review_policy_gate_v1.md} §6.1.2 (D6 amended); every other D-limit stands.
+ * {@code docs/standing/coupang_review_policy_gate_v1.md} §6.1.2 (D6 amended); every other D-limit stands.
  * <i>This class was {@code NaverOnlyClassifierGate} until that amendment; the rename is the point —
  * a class named for one channel that admitted three would be a comment that lies.</i>
  *

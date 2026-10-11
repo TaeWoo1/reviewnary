@@ -8,7 +8,7 @@ import { takeUrlSecret } from "../lib/urlSecrets";
 export const RESET_DONE_PATH = "/login?reset=1";
 
 /**
- * `/reset-password?token=…` (docs/service_readiness_v1.md §6). `main.tsx` already lifted the token out of the
+ * `/reset-password?token=…` (docs/standing/service_readiness_v1.md §6). `main.tsx` already lifted the token out of the
  * URL before Sentry/analytics started (`captureUrlSecrets`); this page takes it from there (falling back to the
  * query for a direct render) and keeps it only in component state until the form is sent. 401 = the link is
  * spent or expired → "다시 요청".

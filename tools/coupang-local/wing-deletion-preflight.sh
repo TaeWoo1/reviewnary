@@ -3,7 +3,7 @@
 # Coupang WING open-API KEY-DELETION PREFLIGHT — the DESTRUCTIVE sibling of wing-probe-preflight.sh.
 #
 # Run AFTER wing-deletion-bootstrap.sh and BEFORE any live WING run. It proves the run is IMMEDIATELY
-# EXECUTABLE (docs/sellerops_live_approval_contract.md §2), then prepares + displays the sanitized destructive
+# EXECUTABLE (docs/standing/sellerops_live_approval_contract.md §2), then prepares + displays the sanitized destructive
 # Approval Manifest together with the irreversibility disclosure the operator must read before granting. On any
 # check failing it prints NO manifest and requests NO approval.
 #
@@ -186,7 +186,7 @@ echo "  $M_CHANNEL · $M_OPERATION"
 echo "  agent mode: $M_MODE · run ${RUN_ID:0:8}… · approval ${APPROVAL_ID:0:8}… · max: $M_MAX"
 echo "  phase: $M_PHASE · selectors calibrated: $M_CALIBRATED"
 echo "  account: $M_ACCOUNT · host: $M_HOST · operator presence: required · expires: process-lifetime · git $CUR_GIT"
-echo "  Standing Safety Contract + full scope: docs/sellerops_live_approval_contract.md"
+echo "  Standing Safety Contract + full scope: docs/standing/sellerops_live_approval_contract.md"
 echo
 echo "  ⚠⚠  READ THIS BEFORE GRANTING — THIS RUN LEADS TO AN IRREVERSIBLE DELETION  ⚠⚠"
 echo

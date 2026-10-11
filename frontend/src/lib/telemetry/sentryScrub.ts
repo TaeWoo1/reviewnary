@@ -1,5 +1,5 @@
 /**
- * Sentry PII / secret scrubbing (docs/service_readiness_v1.md §2-1) — pure functions over the event shape, so
+ * Sentry PII / secret scrubbing (docs/standing/service_readiness_v1.md §2-1) — pure functions over the event shape, so
  * the rule is testable without the SDK. Removes: request query strings, `Authorization` / `Cookie` headers,
  * the user (entirely), breadcrumb URLs' query parts, and bearer / `code=` / `token=` shaped fragments in text.
  * The seller's email, name, 상호, review / inquiry text and marketplace ids never appear in a Sentry event

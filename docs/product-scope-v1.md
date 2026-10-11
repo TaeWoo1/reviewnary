@@ -8,7 +8,7 @@ SellerOps 제품 범위를 **하나의 합의된 정의로 고정**하기 위한
 > DB 변경을 지시하지 않는다. 범위 변경은 이 문서를 고쳐 합의한 뒤에만 이뤄진다.
 >
 > v1.13 변경 (2026-08-21, 제품 오너 결정 반영): **SellerOps Operator Graph v2.** 정본:
-> `docs/sellerops_operator_graph_v2.md`. v1.12를 **대체하지 않고 조인다** — v1.12의 ①③④⑤는 그대로이고,
+> `docs/standing/sellerops_operator_graph_v2.md`. v1.12를 **대체하지 않고 조인다** — v1.12의 ①③④⑤는 그대로이고,
 > 아래 다섯 항이 추가된다.
 >
 > ⑥ **LLM-first Planning을 invariant로 못 박는다.** Agent chat(자연어 입력)의 목표 해석과 조사 계획은
@@ -40,7 +40,7 @@ SellerOps 제품 범위를 **하나의 합의된 정의로 고정**하기 위한
 > v2는 investigate / reason / recommend / prepare 까지만 한다. A7 FE freeze(새 라우트·새 메뉴 0)도 그대로.
 >
 > v1.12 변경 (2026-08-21, 제품 오너 결정 반영): **SellerOps Operator Graph v1.** 정본:
-> `docs/sellerops_operator_graph_v1.md`. LangGraph를 **AI Operator 실행 구조**로 채택한다 —
+> `docs/standing/sellerops_operator_graph_v1.md`. LangGraph를 **AI Operator 실행 구조**로 채택한다 —
 > `OperatorGraph` + `ProductOpsGraph` / `ReviewOpsGraph` / `InquiryOpsGraph` / `ReportOpsNode`.
 > Spring Backend는 사실·규칙·데이터·트랜잭션의 source of truth로 남고, Graph는 목표 해석·planning·
 > tool 선택·specialist orchestration·evidence 판단·다음 행동 결정만 한다(기존 business logic 재구현 금지,
@@ -69,7 +69,7 @@ SellerOps 제품 범위를 **하나의 합의된 정의로 고정**하기 위한
 >
 > ⑤ 마켓 WRITE 승인 경계, 채널 집합(NAVER/Coupang/Cafe24), A7 FE freeze, capability 표기 규율은 그대로.
 >
-> v1.11 변경 (2026-08-19, 제품 오너 결정 반영): **Service Readiness v1.** 정본: `docs/service_readiness_v1.md`.
+> v1.11 변경 (2026-08-19, 제품 오너 결정 반영): **Service Readiness v1.** 정본: `docs/standing/service_readiness_v1.md`.
 > 새 핵심 기능·채널 없음. 일반 SaaS 수준의 가입/운영/계측 기반 마무리: Sentry(frontend+backend, env 있을 때만,
 > replay OFF, PII·secret scrub), 비밀번호 찾기/재설정(`/forgot-password` → 메일 one-time link, SHA-256 at rest,
 > replay 불가, 계정 존재 비노출, mailer abstraction: smtp | dev-outbox | off), consent 구조(필수 약관 동의 기록 +
@@ -78,7 +78,7 @@ SellerOps 제품 범위를 **하나의 합의된 정의로 고정**하기 위한
 > 멈추고 신규 사용자 self-pilot을 시작한다. 마켓 WRITE 승인 경계는 그대로.
 >
 > v1.10 변경 (2026-08-19, 제품 오너 결정 반영): **Auth + Growth Instrumentation v1.** 정본:
-> `docs/auth_growth_instrumentation_v1.md`. Google · NAVER 소셜 로그인을 **기존 email/password/JWT 위에** 추가(인증
+> `docs/standing/auth_growth_instrumentation_v1.md`. Google · NAVER 소셜 로그인을 **기존 email/password/JWT 위에** 추가(인증
 > 시스템 교체 없음): OAuth 성공은 JWT가 아니라 **one-time code** → `/auth/callback` → backend exchange → 기존 JWT;
 > 소셜 identity = `(provider, provider_subject)`, **같은 email 자동 연결 금지**(충돌은 fail closed → 명시적 linking은
 > 후속); org 없는 user는 만들지 않는다 — pending onboarding → 상호명 → org + user + identity를 한 transaction으로.
@@ -86,8 +86,8 @@ SellerOps 제품 범위를 **하나의 합의된 정의로 고정**하기 위한
 > email/이름/상호/리뷰·문의 본문/마켓 id는 payload에 들어갈 수 없음, session replay OFF). 광고 conversion 태그는 GTM에서
 > 붙일 수 있게만 준비(이번 unit에서 firing 없음). 마켓 WRITE 승인 경계는 그대로.
 >
-> v1.9 변경 (2026-08-18, 제품 오너 결정 반영): **Self-Pilot Runtime v1.** 정본: `docs/self_pilot_runtime_v1.md`
-> (설계·구현·복구 매트릭스), 승인 계약 §6a (`docs/sellerops_live_approval_contract.md`). 아래는 이전 서술 중 상충
+> v1.9 변경 (2026-08-18, 제품 오너 결정 반영): **Self-Pilot Runtime v1.** 정본: `docs/standing/self_pilot_runtime_v1.md`
+> (설계·구현·복구 매트릭스), 승인 계약 §6a (`docs/standing/sellerops_live_approval_contract.md`). 아래는 이전 서술 중 상충
 > 부분을 **명시적으로 대체**한다(삭제 없음).
 > ① **운영자 자기 org의 routine READ는 자동.** 공식 API 수집(NAVER ORDER · Coupang INQUIRY/ORDER · Cafe24
 >   REVIEW/INQUIRY/ORDER)은 기존 스케줄러로 실행되고, CONNECTED 계정의 수집 설정 행은 reconciler가 기본값으로
@@ -207,17 +207,17 @@ SellerOps 제품 범위를 **하나의 합의된 정의로 고정**하기 위한
 > (§1.4: AUTOMATIC_OPERATION/ACTION_WINDOW/FILE_IMPORT/INTEGRATION_PENDING) — 마켓 전체가 아니라 (채널×
 > DataType×조작) 단위 배정. ④ **기본 production 리뷰 수집 모드 = ACTION_WINDOW**(§1.5, 실제 창 직접 행동;
 > Projection은 비-기본 렌더러로 유지). ⑤ **OperationRun 도메인 방향 기록**(§1.7, 구현 금지). 신규 정본
-> 파생 문서: `docs/channel-capability-registration-matrix.md`, `docs/slices/action-window-v1.md`.
+> 파생 문서: `docs/channel/channel-capability-registration-matrix.md`, `docs/slices/action-window-v1.md`.
 >
 > v1.1 변경 (2026-07-07, 제품 결정 반영): ① 통합 셀러센터 정의·frontstage/backstage 구분 신설,
 > ② Seller Track을 현재 우선순위로 확정하고 대상 사용자 갱신, ③ Manufacturer Track을 장기 방향으로
 > 경계 지정(현 리디자인 혼입 금지), ④ 셀프서비스 온보딩을 목표 여정으로 명시(파일럿은 assisted 허용),
 > ⑤ 낡은 채널 검증 서술 제거 — capability 현행은 Connector Roadmap §4.1로 전면 위임,
 > ⑥ standalone AI 검색 제외·mock 분리·모바일 1급 범위 반영. 프론트 화면·IA의 정본은
-> `docs/sellerops_frontend_spec.md`.
+> `docs/frontend/sellerops_frontend_spec.md`.
 
 관련 문서: 수집 방식·채널별 전략·capability 현행표는 `docs/multi-channel-connector-roadmap.md`(이하
-"Connector Roadmap")가 정본이다. 프론트 IA·화면·여정은 `docs/sellerops_frontend_spec.md`(이하 "Frontend
+"Connector Roadmap")가 정본이다. 프론트 IA·화면·여정은 `docs/frontend/sellerops_frontend_spec.md`(이하 "Frontend
 Spec")가 정본이다. 본 문서는 그 위의 **제품 범위 계약**이며, 용어(method/status/canonical record 등)는
 Connector Roadmap 부록 A를 따른다.
 
@@ -270,7 +270,7 @@ SellerOps는 **수집 + 통합 + 운영 보조** 제품이다. 다음이 아니�
 채널 연결은 비기술 오너·운영자에게 가장 큰 진입 장벽이다. 이를 낮추기 위한 제품 원칙을 범위
 계약으로 고정한다. **아래는 방향·원칙이며, 어느 것도 "현재 구현됨"을 뜻하지 않는다** — 구현 현황은
 §6(현재/미래 경계)과 Connector Roadmap §4.1을 따른다. 화면·상호작용 정본은 Frontend Spec의
-"가이드 연결" 절, 런타임 경계 정본은 `docs/sellerops_local_agent_runtime_adr.md`(이하 Runtime ADR).
+"가이드 연결" 절, 런타임 경계 정본은 `docs/standing/sellerops_local_agent_runtime_adr.md`(이하 Runtime ADR).
 
 - **가이드 연결(Guided Connection)이 핵심 온보딩 원칙**이다. 각 채널 연결은 셀러가 스스로 밟을 수
   있도록 단계별로 안내하며, 목표 경험은 실제 커머스 플랫폼/API 센터 화면을 **SellerOps 안에서**
@@ -315,7 +315,7 @@ SellerOps는 **수집 + 통합 + 운영 보조** 제품이다. 다음이 아니�
 
 각 **(채널 × DataType × 조작)** capability를 아래 4개 모드 중 하나로 셀러에게 표기한다. **마켓 전체에 한
 자율 수준을 배정하지 않는다** — 같은 채널이 주문=AUTOMATIC, 리뷰=ACTION_WINDOW, 문의=INTEGRATION_PENDING
-처럼 갈릴 수 있다. 모드 배정 진실은 `docs/channel-capability-registration-matrix.md`(§4.1 파생)를 따른다.
+처럼 갈릴 수 있다. 모드 배정 진실은 `docs/channel/channel-capability-registration-matrix.md`(§4.1 파생)를 따른다.
 
 1. **AUTOMATIC_OPERATION** — 공식 API/웹훅/승인된 파트너 경로. 반복 사용자 조작 0. 백그라운드·스케줄 실행 허용.
 2. **ACTION_WINDOW** — SellerOps가 실제 마켓 페이지 + 튜토리얼 오버레이를 준비, **사용자가 실제 마켓에서
@@ -403,7 +403,7 @@ VOC 감지 · 긴급/위험 점수 · **답변 초안(draft) 제안** · 지연 
   §4.7), **자동 로그인·마켓플레이스 클릭·2FA·CAPTCHA 없음**, **신규 FE 화면 없음**(기존 `GuidedImportCard` 완료
   박스 + `ReviewIssueSection` + `ConnectionStatusView` projection만 확장), **두 번째 채널 어댑터·프로필 업로드/동기화
   없음**. issue-memory 판정은 THRESHOLDS **DRAFT**이므로 언제나 "검증되지 않은 이슈 후보·운영 신호"로만 표현한다.
-  라이브 승인은 정본 계약 `docs/sellerops_live_approval_contract.md` (Approval Manifest 표시 시 기본 한 줄
+  라이브 승인은 정본 계약 `docs/standing/sellerops_live_approval_contract.md` (Approval Manifest 표시 시 기본 한 줄
   `Seated and ready.`; READ_ONLY vs WRITE 구분)에 따른다 — 이 문서는 라이브 승인을 부여하지 않는다.
 - **carve-out 확장 (2026-07-27, 제품 오너 승인 — Guided Acquisition Reliability):** 위 "NAVER 리뷰 운영 루프"
   carve-out이 허용한 ④ 복구를, 이미 라이브 검증된 guided-import 세로 스택의 **신뢰성 하드닝**으로 구체화한다 —
@@ -420,7 +420,7 @@ VOC 감지 · 긴급/위험 점수 · **답변 초안(draft) 제안** · 지연 
   마켓플레이스 클릭·2FA·CAPTCHA 없음**(export는 §4.7 human-driven 유지), **두 번째 채널 없음**. 라이브 원인
   분석은 controlled adversarial loop(계정·프로필·pack·진입점 고정, run당 변수 하나, runId+sessionId+surfaceId
   격리, 동시 1개 run, 종료 상태 필수, 단일 축 귀속 실패 시 폐기)로 수행하며, 라이브 검증 승인은 정본 계약
-  `docs/sellerops_live_approval_contract.md` (Approval Manifest 표시 시 기본 한 줄 `Seated and ready.`;
+  `docs/standing/sellerops_live_approval_contract.md` (Approval Manifest 표시 시 기본 한 줄 `Seated and ready.`;
   READ_ONLY vs WRITE 구분)에 따른다.
 
 ### 1.8 기본 일상 경험 · 알림 · Session Readiness (v1.7 신설)
@@ -580,7 +580,7 @@ Seller Track의 1차 surface. **"판매자센터를 대체"가 아니라 "여러
 - **standalone "AI 검색" 페이지** — 1차 내비게이션에서 제외. 향후 RAG는 각 화면에 맥락으로 붙는
   **"운영 메모리" 패널**로만 설계한다(별도 승인 전 구현 금지).
   **(v1.12, 2026-08-21 — 조건부 해제)** 그 "별도 승인"이 내려졌다: retrieval은 **Operator 실행 경로와 문의
-  답변 초안의 컨텍스트**로 구현한다(`docs/sellerops_operator_graph_v1.md` §10). **standalone "AI 검색"
+  답변 초안의 컨텍스트**로 구현한다(`docs/standing/sellerops_operator_graph_v1.md` §10). **standalone "AI 검색"
   페이지 금지와 `/memory` 검색창 부재 계약은 그대로 유지된다.**
 - 실시간 스트리밍 업데이트(배치/새로고침 기반 유지).
 - 임의 차트 빌더/커스텀 리포트 디자이너.
@@ -672,7 +672,7 @@ method는 "미지원"으로 표기하거나 숨김(`no_roadmap_language_in_ui`, 
     **이 금지는 유지된다.** (v1.12, 2026-08-21) 뒤따르던 *"향후 RAG는 맥락형 운영 메모리 패널로만,
     별도 승인 전 구현 금지"*는 **조건부로 해제됐다** — retrieval-backed customer memory와 반복 문의
     detection은 **Operator 실행 경로·문의 초안 컨텍스트**로 구현한다
-    (`docs/sellerops_operator_graph_v1.md`). 새 화면도, 새 1차 메뉴도, `/memory`의 검색창도 만들지 않는다.
+    (`docs/standing/sellerops_operator_graph_v1.md`). 새 화면도, 새 1차 메뉴도, `/memory`의 검색창도 만들지 않는다.
     **임베딩 기반 retrieval은 별도 결정 전 계속 금지.**
 11. **production 읽기의 mock 강등** — mock/시드 데이터는 명시적으로 분리된 데모/개발 모드 전용.
     production을 향하는 화면이 백엔드 장애 시 mock으로 조용히 강등되는 경로를 새로 만들지 않고,
@@ -704,7 +704,7 @@ method는 "미지원"으로 표기하거나 숨김(`no_roadmap_language_in_ui`, 
     **(d)** deletion tooling의 **추가 기능 개발을 중단**한다(기존 도구는 진단용으로 유지·회귀 보호만).
     정상 사용자 흐름은 네 가지뿐이다: key 없음 ⇒ 신규 발급 guided tutorial · key 있음 ⇒ 기존 credential 연결 ·
     expiry/renewal ⇒ 재발급·갱신 guided flow · credential invalid ⇒ re-auth/reissue recovery
-    (`docs/coupang_guided_issuance_credential_lifecycle_scope_v1.md`).
+    (`docs/standing/coupang_guided_issuance_credential_lifecycle_scope_v1.md`).
 
 ---
 

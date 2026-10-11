@@ -4,7 +4,7 @@
 //   node tools/inquiry-need-eval/judge.mjs --obs <arm.jsonl> [--needs <needs.jsonl> --precedents <precedents.jsonl>]
 //        [--json <out.json>]
 //   node tools/inquiry-need-eval/judge.mjs --parity <armA.jsonl>,<armB.jsonl> --may-differ system_fp,schema_fp
-// Definitions: docs/inquiry_decision_v2_1.md §5. Pure apart from reading its inputs.
+// Definitions: docs/lineage/inquiry_decision_v2_1.md §5. Pure apart from reading its inputs.
 import { writeFileSync } from 'node:fs';
 import { readJsonl } from './io.mjs';
 

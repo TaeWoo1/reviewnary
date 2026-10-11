@@ -5,7 +5,7 @@
  * "판도리 일체형 종이컵 수거함" — the title on their own Coupang listing — and both runs ended
  * "해당하는 상품을 찾지 못했습니다". The product existed and carried seven real reviews; its
  * `products.name` was the number 15223228019, because that is what a Coupang-derived catalogue stores
- * there, and `resolve_product` read only that field (`docs/agent_real_validation_v1.md` §9.5, C1).
+ * there, and `resolve_product` read only that field (`docs/lineage/agent_real_validation_v1.md` §9.5, C1).
  *
  * <b>What this does NOT loosen.</b> The alias is matched whole and nothing else is: no similarity, no
  * model, no merging of products. When one title belongs to two products the run refuses instead of

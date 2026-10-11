@@ -15,8 +15,8 @@
 > **채널별 정책·제품 리뷰 후 이후에 활성화될 수 있다.** **같은 가이드 상태 엔진이 두 렌더러(Action Window·
 > Projection)를 지탱**한다(마켓 로직 중복 금지, §17).
 >
-> 상위 계약: 제품 원칙 `docs/product-scope-v1.md` §1.2·§6.1, 프론트 화면·보안 `docs/sellerops_frontend_spec.md`
-> §16.8·§16.9·§17-B G2, 런타임 경계 `docs/sellerops_local_agent_runtime_adr.md`(Runtime ADR)
+> 상위 계약: 제품 원칙 `docs/product-scope-v1.md` §1.2·§6.1, 프론트 화면·보안 `docs/frontend/sellerops_frontend_spec.md`
+> §16.8·§16.9·§17-B G2, 런타임 경계 `docs/standing/sellerops_local_agent_runtime_adr.md`(Runtime ADR)
 > §3.1·§3.4·§6, 브리지 계약 `docs/slices/local-agent-bridge.md`(G1). 본 문서는 그들이 참조하는
 > **프로젝션(프레임·입력·제어) 계약**을 소유하며 그들의 결정을 중복 선언하지 않는다.
 >
@@ -833,8 +833,8 @@ V0가 **이후** 지탱하는 것(지금 끌어오지 않음):
 
 ### 부록 — 근거 문서·파일
 - 제품 원칙·현재/미래 경계: `docs/product-scope-v1.md` §1.2·§6.1
-- 프론트 상태·보안·슬라이스: `docs/sellerops_frontend_spec.md` §16.8·§16.9·§17-B G2
-- 런타임 경계·BrowserRuntime·프로젝션 방향: `docs/sellerops_local_agent_runtime_adr.md` §3.1·§3.4·§6·§7
+- 프론트 상태·보안·슬라이스: `docs/frontend/sellerops_frontend_spec.md` §16.8·§16.9·§17-B G2
+- 런타임 경계·BrowserRuntime·프로젝션 방향: `docs/standing/sellerops_local_agent_runtime_adr.md` §3.1·§3.4·§6·§7
 - G1 브리지 계약: `docs/slices/local-agent-bridge.md`(전송·페어링·능력·이벤트)
 - 현행 CDP 코드: `collector/src/agent/progressive-reconnect-chrome.ts`(CDPSession·spawn·connectOverCDP·
   `newCDPSession`·`Page.enable`), `collector/src/agent/local-agent-launch.ts`, `collector/src/profile.ts`,

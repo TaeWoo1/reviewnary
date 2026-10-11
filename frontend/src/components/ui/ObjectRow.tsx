@@ -2,7 +2,7 @@ import { Children, Fragment, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 /**
- * A row of an object list (docs/reviewnary_design.md §6, §7): name → facet line → one action.
+ * A row of an object list (docs/frontend/reviewnary_design.md §6, §7): name → facet line → one action.
  *
  * Products, channels and settings entries are objects, not records: the seller recognises them by name
  * and decides by the facets (`NAVER · 문의 12 · 리뷰 133`), so the name is the largest text and the

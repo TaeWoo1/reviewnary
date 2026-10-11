@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * <b>What a post-purchase timeline cannot be joined on today</b> — the six absences
- * {@code docs/post_purchase_timeline_audit_v1.md} measured, asserted so they cannot rot quietly.
+ * {@code docs/channel/post_purchase_timeline_audit_v1.md} measured, asserted so they cannot rot quietly.
  *
  * <p><b>This is a nameplate, not a wall — and it has already done its job once.</b> On 2026-10-10 the two
  * decisions it was waiting on were approved (Order Context Foundation v1: D1, a product identifier on an

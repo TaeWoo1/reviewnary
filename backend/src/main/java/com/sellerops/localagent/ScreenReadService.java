@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
  * no scheduler, no Self-Pilot, no responsibility activation, no deployment allow-list, and — explicitly — no
  * typed phrase. A product button that demanded a ceremony would be training sellers to perform one.
  *
- * <p>The assistant-driven proof-run ceremony in {@code docs/sellerops_live_approval_contract.md} §3 is
+ * <p>The assistant-driven proof-run ceremony in {@code docs/standing/sellerops_live_approval_contract.md} §3 is
  * untouched and separate. It governs a developer pointing this product at a live marketplace to measure
  * something; it was never the contract for a seller using the product they bought.
  *

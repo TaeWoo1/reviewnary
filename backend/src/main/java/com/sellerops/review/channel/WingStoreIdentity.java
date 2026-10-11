@@ -7,7 +7,7 @@ import java.util.HexFormat;
 
 /**
  * The expected-store digest a deterministic acquisition run compares the screen against
- * ({@code docs/review_acquisition_aside_v2.md} §6, PD-4).
+ * ({@code docs/lineage/review_acquisition_aside_v2.md} §6, PD-4).
  *
  * <p>A Coupang seller's channel-native identity is their <b>업체코드</b> — the {@code vendor_id} this product
  * already seals with their API credentials, and the same code WING prints in its own shell chrome. So the

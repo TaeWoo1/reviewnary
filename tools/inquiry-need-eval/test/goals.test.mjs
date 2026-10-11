@@ -372,7 +372,7 @@ test('a genuine two-authority resolution still scores as correct — the rule is
 
 test('two endings in one need is never a correct close, however right one of them is', () => {
   // the shape RECORDED before WP-3.1 — two endings in one need. It cannot be written now, and the scorer still
-  // reads it, because the WP-2 comparison in docs/inquiry_architecture_v3_wp31.md §6 is scored from rows like this.
+  // reads it, because the WP-2 comparison in docs/lineage/inquiry_architecture_v3_wp31.md §6 is scored from rows like this.
   const both = { q: 'C', needs: [legacyNeed([{ capability: 'KNOWLEDGE.CATALOGUE', role: 'CLOSES', scope: 'SELLER_CATALOGUE' },
     { capability: 'SELLER', role: 'CLOSES' }])] };
   const r = scoreGoals([both], [CATALOGUE_CLOSES]);

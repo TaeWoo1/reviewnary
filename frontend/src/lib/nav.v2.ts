@@ -13,7 +13,7 @@
 // sense the others are — a product is what a review, an inquiry and an order are ABOUT, and it is
 // where the seller's own product knowledge is written. Its absence was not a decision: the backend
 // has served `/api/products` throughout and no screen ever reached it
-// (`docs/frontend_ux_audit_v1.md` §1).
+// (`docs/frontend/frontend_ux_audit_v1.md` §1).
 //
 // 확인할 일 joined 운영 with the unified case queue. It is the today-inbox this file has been parking since
 // Demo Core Experience v1, and it answers 운영's own question — "오늘 내가 확인하거나 조치할 일은 무엇인가?" —

@@ -3,7 +3,7 @@
 # Coupang WING READ-ONLY selector-probe PREFLIGHT (browser-only: no backend, no DB, no frontend).
 #
 # Run AFTER wing-probe-bootstrap.sh and BEFORE any live WING run. It proves the probe is IMMEDIATELY
-# EXECUTABLE (docs/sellerops_live_approval_contract.md §2) and then prepares + displays the sanitized
+# EXECUTABLE (docs/standing/sellerops_live_approval_contract.md §2) and then prepares + displays the sanitized
 # Approval Manifest. On any check failing it prints NO manifest and requests NO approval.
 #
 # It launches NO browser, makes NO Coupang call, reads no credential/.env value, and mutates nothing except
@@ -246,7 +246,7 @@ else
   echo "  phase: $M_PHASE · probe targets: $M_TARGETS · selectors calibrated: $M_CALIBRATED"
 fi
 echo "  account: $M_ACCOUNT · host: $M_HOST · operator presence: required · expires: process-lifetime · git $CUR_GIT"
-echo "  Standing Safety Contract + full scope: docs/sellerops_live_approval_contract.md"
+echo "  Standing Safety Contract + full scope: docs/standing/sellerops_live_approval_contract.md"
 echo
 echo "  operator action ($M_ENTRY_TYPE):"
 echo "    $M_OPERATOR_ACTION"

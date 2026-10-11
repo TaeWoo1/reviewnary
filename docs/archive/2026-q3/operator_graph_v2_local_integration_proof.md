@@ -8,7 +8,7 @@
 > `NEEDS_VERIFICATION`이다. 따라서 `docs/multi-channel-connector-roadmap.md` §4.1의 **어떤 칸도 옮기지
 > 않는다.** 이 문서는 마켓 라이브 증명이 아니다.
 >
-> **승인 상태.** 마켓 접속 0회이므로 `docs/sellerops_live_approval_contract.md`의 1회성 마켓 승인은
+> **승인 상태.** 마켓 접속 0회이므로 `docs/standing/sellerops_live_approval_contract.md`의 1회성 마켓 승인은
 > 필요하지 않았다. 이번 실행의 유일한 노출은 **plan / judge / inquiry-signature capability를 데모 org
 > 하나에만 켠 것**이다(`*` 아님). 키는 draft capability에 이미 설정돼 있던 값을 in-process로 전달했고
 > 읽거나 출력하지 않았다.

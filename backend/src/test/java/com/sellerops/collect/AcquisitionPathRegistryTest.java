@@ -19,7 +19,7 @@ class AcquisitionPathRegistryTest {
                 .satisfies(path -> {
                     assertThat(path.method()).isEqualTo("ACTION_WINDOW");
                     // LIVE_PROVEN is a claim about evidence, and about the evidence for THIS claim:
-                    // docs/coupang_review_acquisition_v1.md §6.6 (22 stored), not the locate re-proof,
+                    // docs/lineage/coupang_review_acquisition_v1.md §6.6 (22 stored), not the locate re-proof,
                     // which deliberately stored nothing.
                     assertThat(path.verificationStatus()).isEqualTo("LIVE_PROVEN");
                     // Not SCHEDULED, and never will be: Coupang publishes no seller review API, so

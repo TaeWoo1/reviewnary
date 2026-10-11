@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><b>{@code products.name} is not always a name.</b> For a Coupang- or Cafe24-derived catalogue it
  * is the seller's product code, so the demo org holds "15223228019" as the name of a product whose
  * listing is titled "판도리 일체형 종이컵 수거함". A seller who typed the title they can actually see
- * got nothing back — measured live on 2026-08-23 ({@code docs/agent_real_validation_v1.md} §9.5, C1).
+ * got nothing back — measured live on 2026-08-23 ({@code docs/lineage/agent_real_validation_v1.md} §9.5, C1).
  * So {@code channel_products.channel_product_name} is a resolution ALIAS here: the listing is found,
  * and the canonical product it is <i>already linked to</i> is returned. Nothing is created, nothing is
  * merged, and a listing is never returned in a product's place.

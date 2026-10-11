@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
  * knowledge, operating policy, past answers) with the same question, and paying a vendor three times
  * for the same sentence is a defect rather than a price. It is NOT where the product's consistency
  * comes from — a saved draft version's evidence is fixed because it is written down beside that
- * version and read back on reopen ({@code docs/retrieval_runtime_closure_v1.md} §1).
+ * version and read back on reopen ({@code docs/knowledge/retrieval_runtime_closure_v1.md} §1).
  *
  * <p><b>The organisation question is asked once, by the policy.</b> Retrieval Runtime Closure v1 §5:
  * this used to read its own allow-list directly, so a pilot host running

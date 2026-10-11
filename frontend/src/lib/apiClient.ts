@@ -259,7 +259,7 @@ http.interceptors.response.use(
         window.location.assign(SESSION_EXPIRED_PATH);
       }
     }
-    // Error monitoring (docs/service_readiness_v1.md §2-1): ≥ 500 / no answer is an incident; a no-op without Sentry.
+    // Error monitoring (docs/standing/service_readiness_v1.md §2-1): ≥ 500 / no answer is an incident; a no-op without Sentry.
     captureApiError(error);
     return Promise.reject(error);
   },
@@ -313,7 +313,7 @@ export const api = {
     password: string;
     name: string;
     orgName: string;
-    /** 필수 동의 — the backend refuses without it (docs/service_readiness_v1.md §2-4). */
+    /** 필수 동의 — the backend refuses without it (docs/standing/service_readiness_v1.md §2-4). */
     termsAccepted: boolean;
     marketingConsent: boolean;
   }): Promise<AuthResponse> {
@@ -324,7 +324,7 @@ export const api = {
     return data;
   },
 
-  // ── Social login (docs/auth_growth_instrumentation_v1.md §3). No mock fallback: with VITE_USE_MOCKS the
+  // ── Social login (docs/standing/auth_growth_instrumentation_v1.md §3). No mock fallback: with VITE_USE_MOCKS the
   // providers read answers "none", so the buttons simply do not render, and the code paths are unreachable.
   async socialProviders(): Promise<SocialProvidersView> {
     if (USE_MOCKS) {
@@ -363,7 +363,7 @@ export const api = {
     return data;
   },
 
-  // ── Password reset (docs/service_readiness_v1.md §2-2, §6). `config` decides whether the entry exists at all.
+  // ── Password reset (docs/standing/service_readiness_v1.md §2-2, §6). `config` decides whether the entry exists at all.
   async passwordResetConfig(): Promise<PasswordResetConfigView> {
     if (USE_MOCKS) {
       return { enabled: false, devOutbox: false };

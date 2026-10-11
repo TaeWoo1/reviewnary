@@ -33,7 +33,7 @@ public class AuthHandoffJanitor {
         if (removed > 0) {
             log.info("auth handoffs purged: {}", removed);
         }
-        // Expired password-reset rows (docs/service_readiness_v1.md §2-2) — same cadence, same reason.
+        // Expired password-reset rows (docs/standing/service_readiness_v1.md §2-2) — same cadence, same reason.
         int resets = passwordReset.purgeExpired();
         if (resets > 0) {
             log.info("password reset tokens purged: {}", resets);

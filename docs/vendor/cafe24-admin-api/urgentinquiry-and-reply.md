@@ -7,7 +7,7 @@
 >
 > This file records what the PLATFORM publishes. It carries **no** SellerOps conclusion — in
 > particular it does **not** say that this resource is where the Demo Org's board-6 문의사항
-> articles live. That is an unproven question owned by `docs/inquiry_answer_execution_v1.md`.
+> articles live. That is an unproven question owned by `docs/inquiry/inquiry_answer_execution_v1.md`.
 
 ## Why this file exists
 

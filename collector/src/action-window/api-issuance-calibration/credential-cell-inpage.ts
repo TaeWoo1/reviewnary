@@ -295,7 +295,7 @@ ${RESOLVER_FRAGMENT}
  * make the gate stricter.
  *
  * **There is exactly one of these calls in a run.** Not a poll, not a retry, not a per-field sequence — see
- * `docs/coupang_credential_handoff_v1.md` §4 for why that is a safety property rather than an optimization.
+ * `docs/lineage/coupang_credential_handoff_v1.md` §4 for why that is a safety property rather than an optimization.
  */
 export function buildCredentialCellReadScript(requests: readonly CredentialCellRequest[]): string {
   return `(function () {

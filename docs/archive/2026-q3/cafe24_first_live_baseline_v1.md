@@ -88,7 +88,7 @@ Derived rows that appeared as a consequence: `customer_memory_entries` 2, `home_
 `sync_cursors` 3.
 
 **On the inquiry count.** Two rows, but one of them is a reply to the other. Under
-`docs/inquiry_thread_semantics_v1.md` (「답글은 문의가 아니다」) the honest reading is **one inquiry and
+`docs/inquiry/inquiry_thread_semantics_v1.md` (「답글은 문의가 아니다」) the honest reading is **one inquiry and
 one reply**, which is also what the connector's own accounting line reports (`스레드답글=1`). Both are
 `ANSWERED`, which is why `inquiry_work_item` is 0 — there is nothing outstanding to work.
 

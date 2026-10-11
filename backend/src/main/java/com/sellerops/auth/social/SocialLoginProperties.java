@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Which social providers this deployment offers. A provider exists only when the deployer configured its
- * client id + secret before service start (docs/auth_growth_instrumentation_v1.md §2-4, §8); the seller never
+ * client id + secret before service start (docs/standing/auth_growth_instrumentation_v1.md §2-4, §8); the seller never
  * sees these values, and the frontend renders a button only for a provider that is here.
  */
 @Component

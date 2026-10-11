@@ -4,7 +4,7 @@
  * <b>The red cases are three of the six baseline runs.</b> Q2, Q3 and Q6 each came back as a question
  * about a period, and each had a period available: `list_repeated_inquiries` declares a 28-day window,
  * and `/api/review-issues` declares that it has none at all and returns the open list. Zero tools ran in
- * all three (`docs/agent_real_validation_v1.md` §3, defect A4).
+ * all three (`docs/lineage/agent_real_validation_v1.md` §3, defect A4).
  *
  * <b>What is NOT being added.</b> No global "최근 = 28일". The 28 comes from the capability that owns it
  * and is read back from the rows it returns; where no capability declares anything — `ORDER_HISTORY` has

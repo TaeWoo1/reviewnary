@@ -22,9 +22,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
-    // Social login (Google OIDC · NAVER OAuth2) on top of the existing JWT — docs/auth_growth_instrumentation_v1.md
+    // Social login (Google OIDC · NAVER OAuth2) on top of the existing JWT — docs/standing/auth_growth_instrumentation_v1.md
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
-    // Service Readiness v1 (docs/service_readiness_v1.md): error monitoring (OFF without SENTRY_DSN) and the
+    // Service Readiness v1 (docs/standing/service_readiness_v1.md): error monitoring (OFF without SENTRY_DSN) and the
     // password-reset mailer (OFF without SELLEROPS_MAIL_MODE).
     implementation 'io.sentry:sentry-spring-boot-starter-jakarta:8.53.0'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
@@ -32,7 +32,7 @@ dependencies {
     implementation 'org.flywaydb:flyway-database-postgresql'
 
     // Channel Knowledge packs ship as versioned YAML resources reviewed beside the code they describe
-    // (docs/demo_org_and_channel_knowledge_v1.md). Spring Boot manages the version.
+    // (docs/knowledge/demo_org_and_channel_knowledge_v1.md). Spring Boot manages the version.
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
 
     // File ingestion: CSV (Commons CSV) + XLSX (Apache POI)
@@ -70,7 +70,7 @@ tasks.named('test') {
     maxHeapSize = '3g'
 }
 
-// Release identity for Sentry only (docs/service_readiness_v1.md §2-7): the short git SHA at build time lands in
+// Release identity for Sentry only (docs/standing/service_readiness_v1.md §2-7): the short git SHA at build time lands in
 // META-INF/build-info.properties as `build.git`; SELLEROPS_RELEASE overrides it at run time. Never shown to a seller.
 def gitShortSha = {
     try {

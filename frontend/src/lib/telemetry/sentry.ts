@@ -2,7 +2,7 @@ import * as Sentry from "@sentry/react";
 import { scrubBreadcrumbData, scrubEvent, scrubText, stripQuery } from "./sentryScrub";
 
 /**
- * Error monitoring — docs/service_readiness_v1.md §2-1. Env-gated: no `VITE_SENTRY_DSN` (the local/dev
+ * Error monitoring — docs/standing/service_readiness_v1.md §2-1. Env-gated: no `VITE_SENTRY_DSN` (the local/dev
  * default) → nothing initialises and every helper here is a no-op. Session replay is not imported. PII off,
  * every event scrubbed (`sentryScrub.ts`), traces only to same-origin `/api/`.
  */

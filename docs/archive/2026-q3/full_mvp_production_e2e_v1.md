@@ -107,7 +107,7 @@ manifest가 예상한 것:
 - **CAFE24 문의 0건 (a3676)** — 직전 run(09-22 00:34, 구간 09-08~09-22)은 a3676(09-21 수신)을 관측했고 이번 구간에도
   들어가지만 board-6 목록이 돌려주지 않았다. 원인: **remote deletion after previous observation; local row
   intentionally preserved** — operator가 marketplace에서 테스트 문의를 직접 삭제했다. 로컬 행은 그대로(UNANSWERED,
-  `updated_at` 무변경)이며, 이는 「absence는 삭제로 자동 판정되지 않는다」(`docs/inquiry_operational_truth_v1.md`)는
+  `updated_at` 무변경)이며, 이는 「absence는 삭제로 자동 판정되지 않는다」(`docs/inquiry/inquiry_operational_truth_v1.md`)는
   계약대로의 동작이다.
 - **빠진 구간이 cursor상 지나간 것이 됐다** — NAVER cursor는 09-09부터 재시작(09-05 20:29 ~ 09-09 미관측, WARN 로그
   1줄), COUPANG `throughDate` 09-05 → 09-23(09-06 ~ 09-16 미관측, 7일 상한). 두 구간은 routine 수집이 다시 보지 않으며
@@ -507,7 +507,7 @@ article 번호만, 쓰기 없음).
 
 **목표 `3678`의 부재는 설명된다.** 같은 날 04:00 수집은 이 글을 실제로 관측했고(§3-3, CAFE24 문의
 `COMPLETE` **관측 1 / 새 1**, 같은 자격·같은 board 6), 그 사이에 operator가 마켓플레이스에서 지웠다. 로컬 행은
-계약대로 보존돼 있다 — 「absence는 삭제로 자동 판정되지 않는다」(`docs/inquiry_operational_truth_v1.md`)는
+계약대로 보존돼 있다 — 「absence는 삭제로 자동 판정되지 않는다」(`docs/inquiry/inquiry_operational_truth_v1.md`)는
 여전히 지켜졌고, 여기서 삭제는 **추론이 아니라 operator의 진술**로 확정됐다. §1-7의 `a3676`과 같은 종류의
 사건이며, 테스트 문의를 쓰는 stage에서는 이것이 반복되는 조건임을 기록해 둔다.
 

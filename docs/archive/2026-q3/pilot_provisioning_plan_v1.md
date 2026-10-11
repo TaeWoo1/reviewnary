@@ -8,7 +8,7 @@ billable 리소스 **0**.
 > **여전히 만들지 않은 것**: 버킷 · 자격 · 호스트 · DNS. B5가 CLOSED가 되려면 §6-B의 리허설이
 > 필요하고, 그중 B5-7은 **새 호스트**에서 돈다.
 
-`docs/pilot_readiness_v3.md`가 남긴 blocker 둘 — **B4 canonical public HTTPS host**와
+`docs/pilot/pilot_readiness_v3.md`가 남긴 blocker 둘 — **B4 canonical public HTTPS host**와
 **B5 off-host backup** — 을 닫기 위해 **무엇을 만들고, 어떤 순서로, 무엇이 있어야 CLOSED인가**를
 확정한다. 배포 후보는 **`release/pilot-cafe24-v1`**(RC1 = `pilot-cafe24-v1-rc1` → `7a0b6749`)이고
 이 문서는 그것을 바꾸지 않는다.
@@ -16,7 +16,7 @@ billable 리소스 **0**.
 ## 0. 소유 경계
 
 **topology · host sizing · port map · TLS · Cafe24 callback · secrets 목록 · DB persistence ·
-startup/restart · deploy 절차 · smoke 계획**은 `docs/pilot_host_provisioning_v1.md`가 계속 소유한다.
+startup/restart · deploy 절차 · smoke 계획**은 `docs/pilot/pilot_host_provisioning_v1.md`가 계속 소유한다.
 여기서 다시 쓰지 않고 필요한 곳에서 인용만 한다.
 
 **이 문서가 소유하는 것**: 외부 리소스 목록 · DNS를 포함한 실행 순서 · secrets/env 인벤토리 ·
@@ -309,7 +309,7 @@ B5-9는 그 제어 흐름이 실제 postgres와 실제 덤프에 대해서도 �
 
 ## 7. 그 다음 — clean-org rehearsal R1–R15 실행 순서
 
-`docs/pilot_readiness_v3.md` §6의 합격 기준을 **어떤 순서로** 돌릴지 정한다. 기준 자체는 그 문서가
+`docs/pilot/pilot_readiness_v3.md` §6의 합격 기준을 **어떤 순서로** 돌릴지 정한다. 기준 자체는 그 문서가
 소유하고 여기서 바꾸지 않는다.
 
 **전제**: B4 CLOSED · B5-1~B5-6 확인. (B5-7은 §7-D에서 R12·R13과 함께 돈다.)

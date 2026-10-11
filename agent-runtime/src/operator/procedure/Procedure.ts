@@ -9,7 +9,7 @@
  * judgement that was being made in several places at once.
  *
  * <b>Why it exists, from the audit's measurement.</b>
- * `docs/agent_runtime_architecture_audit_v1.md` found the same three judgements duplicated:
+ * `docs/agent/agent_runtime_architecture_audit_v1.md` found the same three judgements duplicated:
  *
  * <ul>
  *   <li><b>readiness</b> — the coverage table was read and interpreted in four places;</li>

@@ -5,7 +5,7 @@
  * `get_review_issue_evidence_summary` — the only read that can say how many of an issue's review rows
  * belong to ONE product — was one of the eleven with none, which is why a seller asking about their own
  * product by name got the org's issue list, watched the scope gate refuse every row of it, and was told
- * nothing (`docs/agent_real_validation_v1.md` §5 P4 · A5 · B1).
+ * nothing (`docs/lineage/agent_real_validation_v1.md` §5 P4 · A5 · B1).
  *
  * Two properties are pinned here, and they are not the same property:
  *

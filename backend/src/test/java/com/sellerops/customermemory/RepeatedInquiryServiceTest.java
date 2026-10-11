@@ -16,7 +16,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 /**
  * 반복 문의 detection — the capability the audit found had no implementation at all
- * ({@code docs/demo_baseline_recovery_audit_2026-08-21.md} §2.3(c), gap I).
+ * ({@code docs/lineage/demo_baseline_recovery_audit_2026-08-21.md} §2.3(c), gap I).
  *
  * <p>The properties worth pinning are the ones that stop this from manufacturing a pattern: a single
  * occurrence is not a repeat; an unclassifiable inquiry does not group with other unclassifiable ones;

@@ -39,7 +39,7 @@ import org.springframework.stereotype.Service;
  * <p><b>The authorisation is the press.</b> An authenticated seller, their own organisation, an account that
  * organisation owns, a data type, and a route the server chose. No scheduler, no Self-Pilot, no responsibility
  * activation, no deployment allow-list, and no typed phrase — the §3 approval ceremony in
- * {@code docs/sellerops_live_approval_contract.md} governs an assistant pointing this product at a live
+ * {@code docs/standing/sellerops_live_approval_contract.md} governs an assistant pointing this product at a live
  * marketplace to measure something, and it was never the contract for a seller using the product they bought.
  */
 @Service

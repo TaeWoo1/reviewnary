@@ -1,5 +1,5 @@
 /**
- * The Home's two summary surfaces as they render — `docs/pilot_usage_loop_v1.md` §8.
+ * The Home's two summary surfaces as they render — `docs/pilot/pilot_usage_loop_v1.md` §8.
  *
  * <p>Pinned here rather than in `homeSummary.test.ts` because the thing under test is the SENTENCE:
  * §8-4b allows 「새로 확인」 and forbids 「처리 완료」, and only rendered text can be held to that.

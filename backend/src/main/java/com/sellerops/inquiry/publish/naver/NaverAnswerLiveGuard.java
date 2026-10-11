@@ -11,7 +11,7 @@ import java.util.Set;
  * <p>The same rule the Coupang write already runs under ({@code CoupangLiveCallGuard}), restated for
  * this transport rather than shared, because the two read their approval id from different
  * configuration keys and a shared class would need to know both. It is the code half of
- * {@code docs/sellerops_live_approval_contract.md}: an approval id is an ENVIRONMENT-binding token,
+ * {@code docs/standing/sellerops_live_approval_contract.md}: an approval id is an ENVIRONMENT-binding token,
  * never a credential, and its absence must look like an unarmed deployment rather than like NAVER
  * refusing the seller.
  *

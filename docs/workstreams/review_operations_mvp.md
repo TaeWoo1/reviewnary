@@ -54,10 +54,10 @@
 ## 0. Honesty preface (read before editing status)
 
 - This doc **tracks** progress; it does not **grant** capability status. Capability truth is
-  `docs/multi-channel-connector-roadmap.md` §4.1; lessons are `docs/channel_capability_ledger.md`.
+  `docs/multi-channel-connector-roadmap.md` §4.1; lessons are `docs/channel/channel_capability_ledger.md`.
 - Never check a box to a level higher than §4.1 supports. "Live-verified once" ≠ "operational."
 - Action Window review paths sit behind a **market-policy-clarification gate** and a live-run gate
-  governed by the canonical contract `docs/sellerops_live_approval_contract.md` (default one-line
+  governed by the canonical contract `docs/standing/sellerops_live_approval_contract.md` (default one-line
   `Seated and ready.` against a prepared Approval Manifest; single-use; §1.5 — a plan or a restored
   environment is never authorization).
 - No auto export/download/submit. The seller performs the platform action; SellerOps detects,
@@ -116,7 +116,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done + evidence linked �
       stays in the queue with no chip; 기타 (a verdict) and 분류 전 (a coverage gap) never collapse
       (`docs/slices/review-classification-queue-v1.md`).
 - [ ] Urgency + operational-risk signals computed (recencyBucket only; no internal timing surfaced)
-- [x] Surfaced in the seller center with alerts (`docs/sellerops_frontend_spec.md`) — proven against a
+- [x] Surfaced in the seller center with alerts (`docs/frontend/sellerops_frontend_spec.md`) — proven against a
       **running backend** 2026-07-23: a synthetic Action Window run reached a disposable local backend
       over HTTP and the attention API returned the contract's declared signals; the FE renders the
       honest headline **"현재 확인이 필요한 리뷰 N건"** from that same declaration. ⚠ Local dev backend
@@ -167,7 +167,7 @@ Append a dated entry; never rewrite prior entries — correct forward.
 - **Did:** <what changed, 1–3 lines>
 - **Evidence:** <file/PR/run-id, or "none — offline">
 - **§4.1 impact:** <"none" | "updated NAVER REVIEW live-verify col" — status changes go to §4.1 FIRST>
-- **Ledger impact:** <"none" | new dated lesson in docs/channel_capability_ledger.md §2>
+- **Ledger impact:** <"none" | new dated lesson in docs/channel/channel_capability_ledger.md §2>
 - **Gate state:** <policy gate / live-run approval — open or closed, why>
 - **Blockers:** <named, or "none">
 - **Next:** <single next verifiable step; each live/production step needs its own approval>
@@ -366,7 +366,7 @@ Append a dated entry; never rewrite prior entries — correct forward.
   it can be without live evidence; the next step that changes capability truth is a **bounded,
   human-in-the-loop NAVER live proof** (real export → ingest → reply state → guided handoff,
   submitting no public reply). With the operator environment restored (2026-07-24) that proof is now
-  eligible, but only under the canonical contract `docs/sellerops_live_approval_contract.md`
+  eligible, but only under the canonical contract `docs/standing/sellerops_live_approval_contract.md`
   (single-use approval against a prepared Approval Manifest; §1.5 — a plan or a restored environment
   is never authorization). The
   standing alternatives that need no live contact are **GENERALIZE** (select the second channel) and
@@ -807,7 +807,7 @@ Append a dated entry; never rewrite prior entries — correct forward.
 | Gate | What it blocks | Current state |
 |---|---|---|
 | Market-policy clarification | Any seller-facing / production review acquisition via Action Window | _[open — see §4.1 note]_ |
-| Live-run approval | Any live marketplace run | Per canonical contract `docs/sellerops_live_approval_contract.md` (single-use; default one-line `Seated and ready.` against a prepared Approval Manifest) |
+| Live-run approval | Any live marketplace run | Per canonical contract `docs/standing/sellerops_live_approval_contract.md` (single-use; default one-line `Seated and ready.` against a prepared Approval Manifest) |
 | Reply-submission gate (v1.6) | Guided review-reply going live | Offline; gate-locked (`contracts/action-window/v2/`) |
 
 ---
@@ -816,10 +816,10 @@ Append a dated entry; never rewrite prior entries — correct forward.
 
 - Operating model + user journey: `docs/product_operating_model.md`
 - Capability truth: `docs/multi-channel-connector-roadmap.md` §4.1
-- Channel lessons ledger: `docs/channel_capability_ledger.md`
+- Channel lessons ledger: `docs/channel/channel_capability_ledger.md`
 - Action Window contract: `docs/slices/action-window-v1.md`
 - Action Window runtime status: `docs/action-window-runtime/HANDOFF.md`
 - Review acquisition spine slice: `docs/slices/review-acquisition-spine-v1.md`
 - Shared golden export contract: `contracts/review-export/naver/v1/SPEC.md`
 - Review response slices: `docs/slices/review-response-preparation-v1.md`, `docs/slices/review-response-completion-v1.md`
-- Frontend source of truth: `docs/sellerops_frontend_spec.md`
+- Frontend source of truth: `docs/frontend/sellerops_frontend_spec.md`

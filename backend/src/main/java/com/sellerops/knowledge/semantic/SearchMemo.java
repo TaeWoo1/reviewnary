@@ -27,7 +27,7 @@ import java.util.function.Supplier;
  * <p><b>What this is NOT.</b> It is not where the product's consistency comes from. A draft version's
  * evidence is fixed because it is WRITTEN DOWN beside that version ({@code review_draft_evidence},
  * {@code inquiry_draft_evidence}) and read back on every reopen — see
- * {@code docs/retrieval_runtime_closure_v1.md} §1. This only stops one unit of work from paying a
+ * {@code docs/knowledge/retrieval_runtime_closure_v1.md} §1. This only stops one unit of work from paying a
  * vendor three times for the same sentence, which is a defect rather than a price.
  */
 final class SearchMemo<V> {

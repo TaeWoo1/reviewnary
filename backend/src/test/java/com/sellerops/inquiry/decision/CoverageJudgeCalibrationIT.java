@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 /**
- * <b>CoverageJudge calibration</b> (Inquiry Decision v2.1, docs/inquiry_decision_v2_1.md) — the judge as a component,
+ * <b>CoverageJudge calibration</b> (Inquiry Decision v2.1, docs/lineage/inquiry_decision_v2_1.md) — the judge as a component,
  * held to the human gold on the EXACT inputs production would send it. Not a product test.
  *
  * <p>Input: a frozen capture ({@code InquiryNeedEvalIT} with {@code EVAL_DECISION=capture}: the gold needs as the plan,

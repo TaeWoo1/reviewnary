@@ -138,7 +138,7 @@ export interface CoupangReviewPageReading {
  *
  * **A rating-only review is one of these too**, carried by {@link CoupangAcquiredReview.textless} rather than
  * by a body. Coupang lets a buyer rate without writing, and the screen carries no per-review identifier
- * (`docs/coupang_review_policy_gate_v1.md` §9.2) — so what tells two of them apart is the option each was left
+ * (`docs/standing/coupang_review_policy_gate_v1.md` §9.2) — so what tells two of them apart is the option each was left
  * on, and nothing tells apart two on ONE option, one day, one rating. That residue is recorded, not papered
  * over: see the field's own note.
  */
@@ -575,7 +575,7 @@ export function localBoundaryKey(review: CoupangAcquiredReview): string {
  * how a diagnostic ends up contradicting the ingest it was written to explain.
  *
  * <p>Counts, never text — a log line has no business holding a customer's words
- * (`docs/coupang_review_policy_gate_v1.md` D3/D4). It reads a reading and touches nothing.
+ * (`docs/standing/coupang_review_policy_gate_v1.md` D3/D4). It reads a reading and touches nothing.
  */
 export interface ReviewBodyEvidence {
   /** Rows whose body cell printed nothing. */

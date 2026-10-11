@@ -16,7 +16,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * <p>Field names are the Cafe24 admin board-row names, confirmed against a real
  * mall by the supervised Board Discovery live run (see the connector's
  * {@code CONFIRMED} Board Discovery status,
- * docs/sellerops_cafe24_community_board_discovery.md). {@code board_type} arrives
+ * docs/lineage/sellerops_cafe24_community_board_discovery.md). {@code board_type} arrives
  * as a numeric code and is captured as metadata only — classification keys off
  * {@code board_name}, since one {@code board_type} spans multiple board kinds.
  */

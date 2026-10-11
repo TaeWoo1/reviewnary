@@ -1,7 +1,7 @@
 # Slice — Reported Replies Leave the Queue v1
 
 > **Status:** IMPLEMENTED, offline. **Consumes no gate, promotes no capability.** §4.1 and
-> `docs/channel_capability_ledger.md` are untouched. **No migration** — the tables already carried
+> `docs/channel/channel_capability_ledger.md` are untouched. **No migration** — the tables already carried
 > everything the rule needs. Collector untouched.
 
 - **Workstream:** Review Operations (`docs/workstreams/review_operations_mvp.md`)

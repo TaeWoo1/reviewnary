@@ -6,7 +6,7 @@
  * A vocabulary richer than the work would be the generic browser-automation platform this track refuses to
  * build.
  *
- * **The route is observed, not invented.** `docs/coupang_aside_review_acquisition_poc_v1.md` records the
+ * **The route is observed, not invented.** `docs/lineage/coupang_aside_review_acquisition_poc_v1.md` records the
  * sitting: WING's own navigation anchor (리뷰 목록) resolved to exactly one path, read from the shell under
  * approval `apr-cp-aside-obs-64cdf0` — the same discipline `COUPANG_WING_LOCATE_LANDING_URL` states when it
  * refuses to deep-link to a page nobody has seen. The screen calls it 리뷰; this repository's older constants

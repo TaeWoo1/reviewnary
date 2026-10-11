@@ -18,7 +18,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * be stored without.
  *
  * <p><b>{@code order_id} (2026-08-25).</b> The board-article response was live-observed to carry an
- * {@code order_id} key alongside the buyer keys ({@code docs/sellerops_cafe24_review_inquiry_capture.md}
+ * {@code order_id} key alongside the buyer keys ({@code docs/lineage/sellerops_cafe24_review_inquiry_capture.md}
  * §"PII-bearing keys"). It is projected here for the INQUIRY (board 6) path only — see
  * {@code Cafe24InquiryArticleMapper} — because "which order is this about" is an operational fact and
  * the buyer keys beside it are not. {@code writer}, {@code writer_email}, {@code member_id} and
@@ -34,7 +34,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * <p><b>Thread structure (2026-08-25).</b> {@code parent_article_no}, {@code reply_depth} and
  * {@code reply_sequence} are projected because a Cafe24 board answer <em>is itself an article</em>,
  * hanging off the question — proven by an approved bounded READ
- * ({@code docs/inquiry_answer_execution_v1.md}). They were already in every response this connector
+ * ({@code docs/inquiry/inquiry_answer_execution_v1.md}). They were already in every response this connector
  * has ever received and were being discarded, which is why a seller's own answer was stored as a
  * customer inquiry still waiting for one. Reading them costs no new request, no new endpoint and no
  * new scope.
@@ -57,7 +57,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * <p><b>{@code attachmentCount} is a LENGTH, and the array it came from has no field here.</b>
  * {@code attach_file_urls} has ridden on every response this connector has ever received and was
  * being discarded; an approved bounded READ measured 1 of 7 board-4 articles carrying 1 file
- * ({@code docs/review_media_presence_audit_v1.md} §2-A), so the field is real and populated. What is
+ * ({@code docs/lineage/review_media_presence_audit_v1.md} §2-A), so the field is real and populated. What is
  * projected is {@code size()} and nothing else — the {@code name} and {@code url} inside each element
  * reach the {@link #fromJson} factory's parameter and die there, exactly as this file's own rule
  * requires: <em>a field that is not projected cannot be persisted later by accident.</em>

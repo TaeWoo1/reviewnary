@@ -10,7 +10,7 @@
  * <b>What they can and cannot prove.</b> They pin the CONTRACT (validation, refusal, divergence of
  * shape) and they make CI runnable with no vendor key. They do NOT prove generalization: a replayed
  * plan is what one model said about one sentence. Paraphrase generalization is provable only against a
- * live model, and `docs/sellerops_operator_graph_v2.md` §18.3 is where that happens.
+ * live model, and `docs/standing/sellerops_operator_graph_v2.md` §18.3 is where that happens.
  *
  * <b>Provenance.</b> Each entry records the goal it answers. Entries marked `AUTHORED` were written to
  * the wire schema by hand and are pending replacement with a live recording; entries marked with a
@@ -297,7 +297,7 @@ export const CLARIFY_PLAN: AgentPlanView = {
  * and asked whether it had complaints. The model planned two product-scoped needs and then dispatched
  * REVIEW_OPS and INQUIRY_OPS — **not PRODUCT_OPS**, the only specialist that resolves a product. Both
  * specialists read org-wide, and the run reported three HIGH-severity issues belonging to other
- * products as this product's. Full record: `docs/agent_real_validation_v1.md` §3 Q4.
+ * products as this product's. Full record: `docs/lineage/agent_real_validation_v1.md` §3 Q4.
  *
  * It is kept exactly as the model produced it. The fix is not a better plan — a planner will make this
  * mistake again — it is that evidence about the whole org can no longer answer a need about one
@@ -337,7 +337,7 @@ export const PRODUCT_COMPLAINT_ORGWIDE_PLAN: AgentPlanView = {
  * need asked "가장 오래된 미답변 문의는 무엇인가? (첫 페이지 목록)" and was marked SATISFIED by an
  * `INBOX_COUNT` of 69 — a total, not a list, and the same total that answered the first need. The
  * declaration is what makes that checkable: `acceptableKinds: ["INQUIRY"]` says a row, and a count is
- * not a row. See `docs/agent_real_validation_v1.md` §3 Q1.
+ * not a row. See `docs/lineage/agent_real_validation_v1.md` §3 Q1.
  */
 export const INBOX_LIST_NEEDS_ROWS_PLAN: AgentPlanView = {
   available: true,
@@ -377,7 +377,7 @@ export const INBOX_LIST_NEEDS_ROWS_PLAN: AgentPlanView = {
  * and INQUIRY_OPS — a reasonable decomposition. INQUIRY_OPS read the inbox, read the repeats, and then
  * reached `search_customer_memory` with no anchor of any kind; the backend correctly answered `400
  * 조회 기준이 필요합니다`, and the exception discarded the two reads that had already worked. The run
- * ended `DONE`, findings 0. Record: `docs/agent_real_validation_v1.md` §3 Q5.
+ * ended `DONE`, findings 0. Record: `docs/lineage/agent_real_validation_v1.md` §3 Q5.
  *
  * Trimmed to the three needs that carry the mechanism (volume → repeats → history, in the live order);
  * the product and draft needs are represented by the PRODUCT_OPS target and the goal text. The plan is
@@ -418,7 +418,7 @@ export const PRIORITIZE_AND_DRAFT_PLAN: AgentPlanView = {
  *
  * <b>Both live runs of Q5 on 2026-08-23 used the same sentence and got different plans</b>: one named
  * no entity, the other named "오늘" as a `PERIOD`. That single difference decided whether the seller was
- * told their unanswered total or told it could not be proven (`docs/agent_real_validation_v1.md`
+ * told their unanswered total or told it could not be proven (`docs/lineage/agent_real_validation_v1.md`
  * §10.4). This entry is {@link PRIORITIZE_AND_DRAFT_PLAN} with exactly that one difference added, so a
  * test can run the pair and hold the answer steady across it. The needs are the recorded plan's; only
  * the mention is the variant.
@@ -453,7 +453,7 @@ export const PRIORITIZE_WITH_CATEGORY_PLAN: AgentPlanView = {
 /**
  * The three plans that answered a question with a question.
  *
- * <b>Reconstructed from the recorded runs, not byte-for-byte.</b> `docs/agent_real_validation_v1.md` §3
+ * <b>Reconstructed from the recorded runs, not byte-for-byte.</b> `docs/lineage/agent_real_validation_v1.md` §3
  * records each run's needs and its clarification text; the specialist lists here are the ones those
  * needs imply. What matters for the regression is exact in all three: `clarificationNeeded: true`, the
  * need KINDS, and whether a period was named — those are what the capability audit reads.
@@ -568,7 +568,7 @@ export const ORDER_HISTORY_CLARIFY_PLAN: AgentPlanView = {
  * The Q4 sentence again, planned the way the live model planned it AFTER A1 landed.
  *
  * <b>openai:gpt-5-2025-08-07, 2026-08-23 live, both re-runs identical</b>
- * (`docs/agent_real_validation_v1.md` §9.3). This time PRODUCT_OPS IS dispatched and
+ * (`docs/lineage/agent_real_validation_v1.md` §9.3). This time PRODUCT_OPS IS dispatched and
  * `resolve_product` runs first — and the run still ended "상품을 찾지 못했습니다", because the
  * seller had typed the title on their own Coupang listing and the resolver only read
  * `products.name`, which for that product is the number 15223228019 (defect C1).

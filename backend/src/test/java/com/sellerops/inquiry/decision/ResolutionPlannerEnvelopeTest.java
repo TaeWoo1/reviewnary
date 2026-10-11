@@ -185,6 +185,6 @@ class ResolutionPlannerEnvelopeTest {
         assertThat(step.get("unavailable_fields")).singleElement()
                 .satisfies(f -> assertThat(f.asText()).isEqualTo("ORDER_TRACKING"));
         // ORDER_FULFILLMENT is available on this snapshot; the step is a gap anyway, and that is the all-or-nothing
-        // rule in ResolutionPlanValidator.gapOf — measured in docs/inquiry_architecture_v3_wp31.md §2, not changed here.
+        // rule in ResolutionPlanValidator.gapOf — measured in docs/lineage/inquiry_architecture_v3_wp31.md §2, not changed here.
     }
 }

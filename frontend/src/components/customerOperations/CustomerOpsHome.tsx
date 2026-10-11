@@ -914,10 +914,10 @@ const PULSE_LABEL = "지금 해야 할 일";
  * <b>세 개의 의무, 한 줄로.</b> 확인할 일 · 실행 대기 · 현재 미답변 — and nothing else
  * (product-owner decision, 2026-09-30).
  *
- * <p>The data contract is `docs/pilot_usage_loop_v1.md` §8 and it does not move: <b>no new read</b>, no
+ * <p>The data contract is `docs/pilot/pilot_usage_loop_v1.md` §8 and it does not move: <b>no new read</b>, no
  * KPI card, no tile, no chart. 매출 · 주문량 · 추이 · 채널별 수치 stay owned by `/overview` — the defect
  * this repository has fixed several times is the same number living in two places under two definitions
- * (`docs/reviewnary_design.md` §8-A).
+ * (`docs/frontend/reviewnary_design.md` §8-A).
  *
  * <p><b>Why these three and not others.</b> An obligation is something that is waiting for the seller.
  * 확인할 일 is our queue of decisions; 실행 대기 is what they already decided and has not been posted;

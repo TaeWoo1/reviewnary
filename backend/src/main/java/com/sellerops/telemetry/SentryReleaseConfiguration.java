@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Sentry `release` = `SELLEROPS_RELEASE` when set, else the git SHA the build recorded (`build.git`,
- * build.gradle), else `unknown` (docs/service_readiness_v1.md §2-7). Applied only when Sentry initialises (a DSN
+ * build.gradle), else `unknown` (docs/standing/service_readiness_v1.md §2-7). Applied only when Sentry initialises (a DSN
  * exists); the bean itself is inert otherwise.
  */
 @Configuration

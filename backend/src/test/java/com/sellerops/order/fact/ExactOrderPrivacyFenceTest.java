@@ -42,7 +42,7 @@ class ExactOrderPrivacyFenceTest {
      *
      * <p>{@code Cafe24AnswerSemanticProbe} and {@code Cafe24BoardCommentsClient} joined the list on
      * 2026-08-26, when an approved bounded READ found that a Cafe24 shop answer can live in a COMMENT
-     * whose only actor signal is that id ({@code docs/cafe24_comment_answer_observation_v1.md}).
+     * whose only actor signal is that id ({@code docs/review/cafe24_comment_answer_observation_v1.md}).
      */
     private static final List<String> RESPONSE_BINDERS = List.of(
             ACTOR_PROBE, "Cafe24AnswerSemanticProbe.java", "Cafe24BoardCommentsClient.java");

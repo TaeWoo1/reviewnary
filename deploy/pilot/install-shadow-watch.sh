@@ -74,4 +74,4 @@ systemctl daemon-reload
 systemctl enable --now reviewnary-shadow-watch.timer
 printf 'installed %s and %s; next firing:\n' "$SVC" "$TMR"
 systemctl list-timers reviewnary-shadow-watch.timer --no-pager 2>/dev/null || true
-printf '\nalarms are a SEPARATE step (they are AWS resources, not host state): docs/naver_cafe24_shadow_run_v1.md §5-A\n'
+printf '\nalarms are a SEPARATE step (they are AWS resources, not host state): docs/lineage/naver_cafe24_shadow_run_v1.md §5-A\n'

@@ -11,7 +11,7 @@
 > moved behind a graph; no graph was added, removed, or restructured.
 >
 > **AMENDED twice, 2026-08-21.** (a) The open `parseGoal` item was CLOSED by Operator Graph v1, which
-> added an LLM planner **above** the keyword table. (b) **`docs/sellerops_operator_graph_v2.md` then
+> added an LLM planner **above** the keyword table. (b) **`docs/standing/sellerops_operator_graph_v2.md` then
 > removed the table itself**: in v2 the Agent-chat planner is LLM-only, there is no deterministic
 > planner in product, test or emergency use, and a run whose plan cannot be made **fails** instead of
 > being routed by keywords. Every sentence below that says the keyword table answers when the planner
@@ -132,7 +132,7 @@ So the model lives where the other one already does:
   interface and calls that endpoint with the operator's forwarded bearer. `DraftModelProvider.draft`
   widened from `DraftCandidate` to `Promise<DraftCandidate>`; nothing else about the seam moved.
 
-> **Superseded on 2026-08-30 (Knowledge Context v1-A closure, `docs/agentic_operating_workspace_v2.md`
+> **Superseded on 2026-08-30 (Knowledge Context v1-A closure, `docs/agent/agentic_operating_workspace_v2.md`
 > §30).** The title/body-only endpoint `POST /api/agent/inquiry-draft` and `SpringDraftProvider` were
 > removed: a draft they wrote was a model reply grounded in nothing, while the product's own
 > `InquiryDraftComposer` already had retrieval, applicability, answer-basis and answer-style. The
@@ -161,7 +161,7 @@ unchanged, which is why the fix had to go here.
 ### Still open, and deliberately
 
 > **Partially superseded 2026-08-21 — see the `parseGoal` row below.** The Operator Graph v1 decision
-> (`docs/sellerops_operator_graph_v1.md`) closes the first of these three. The other two stay open,
+> (`docs/standing/sellerops_operator_graph_v1.md`) closes the first of these three. The other two stay open,
 > and this ADR keeps owning them.
 
 - **`parseGoal`** — ~~untouched~~ **DECIDED 2026-08-21 (Operator Graph v1).** A planner now goes behind
@@ -171,7 +171,7 @@ unchanged, which is why the fix had to go here.
   forwarded bearer, so `agent-runtime/` still holds no vendor key and the backend is still the only LLM
   egress. And the fail-closed half is unchanged: **with the planner off, the deterministic keyword table
   is still what answers**, and an unrecognized request is still refused rather than guessed. Contract:
-  `docs/sellerops_operator_graph_v1.md` §4.1, §9.
+  `docs/standing/sellerops_operator_graph_v1.md` §4.1, §9.
 - **Review triage** — untouched. Option 4 stays rejected for the reason recorded above: the
   classifier's value is its narrowness, and a graph would have to preserve all of it.
 - **`reviewGraph`'s draft body** — still the backend's own rule-based suggestion, not this seam.

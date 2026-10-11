@@ -7,7 +7,7 @@
  * and their evidence predated the product's entire review window. Nothing warned, because every check
  * in the chain asked the same insufficient question — *does this finding have evidence attached?* —
  * and the answer was yes. It was the wrong evidence. Full record:
- * `docs/agent_real_validation_v1.md` §3 Q4.
+ * `docs/lineage/agent_real_validation_v1.md` §3 Q4.
  *
  * <b>What it adds.</b> One question, asked before a finding is assembled into a run: is the scope the
  * evidence PROVES the same as the scope the need ASKED about? Four axes, each explicit rather than
@@ -48,7 +48,7 @@ export type EntityScope = "ORG" | "PRODUCT" | "ITEM";
  * signature as well as a tally, so it answers a "반복되는 문제가 있는가" need that a bare count does
  * not — and it does NOT answer a "그 근거가 이 상품의 것인가" need. That second question is
  * `ISSUE_EVIDENCE`, and it was named here before anything could produce it: the tool that answers it
- * sat in the catalogue with no caller for as long as the gap existed (`docs/agent_real_validation_v1.md`
+ * sat in the catalogue with no caller for as long as the gap existed (`docs/lineage/agent_real_validation_v1.md`
  * §5 P4). Since A5 (2026-08-23) `ReviewOps` reaches `get_review_issue_evidence_summary` for a resolved
  * product and the value is emitted — the vocabulary did not change, the reachability did.
  */

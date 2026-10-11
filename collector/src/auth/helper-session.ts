@@ -1,5 +1,5 @@
 /**
- * **Helper Device Authentication v1 — the helper's own credential** (docs/helper_device_authentication_v1.md).
+ * **Helper Device Authentication v1 — the helper's own credential** (docs/pilot/helper_device_authentication_v1.md).
  *
  * The helper used to log in to the reviewnary backend as the seller: `SELLEROPS_EMAIL` + `SELLEROPS_PASSWORD`,
  * kept in a 0600 file and POSTed to `/api/auth/login` at every run. This module replaces that with a token the

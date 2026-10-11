@@ -2,7 +2,7 @@
  * The resident `reply/naver` carrier — a reviewnary conversation starts a NAVER review reply run through the paired
  * local agent with one `START_RUN {intent: "REPLY_SUBMISSION", submissionRef}`, exactly the seated CLI's run
  * shape, minus the seat (Agentic Operating Workspace v2 §13; product-owner decision 2026-08-28 —
- * `docs/resident_helper_on_demand_carrier_v1.md`).
+ * `docs/lineage/resident_helper_on_demand_carrier_v1.md`).
  *
  * <p>The engine binds its target at construction, but a resident helper learns the target only when the seller
  * presses: so this carrier buffers the client's frames, spends the single-use `submissionRef` at the backend to

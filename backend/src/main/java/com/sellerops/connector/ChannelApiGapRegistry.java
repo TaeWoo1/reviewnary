@@ -39,7 +39,7 @@ public final class ChannelApiGapRegistry {
     /**
      * The whole registry. {@code REVIEW_API} for Coupang: the documentation catalogue was counted in
      * full on 2026-08-14 (11 categories, no review endpoint), so this is "not in the list" rather
-     * than "not found" — see {@code docs/coupang_review_feasibility_v1.md}.
+     * than "not found" — see {@code docs/lineage/coupang_review_feasibility_v1.md}.
      *
      * <p>The label is the one {@code CoupangApiConnector} has always shown; it is defined here so the
      * two surfaces cannot drift apart into two slightly different sentences about one fact.

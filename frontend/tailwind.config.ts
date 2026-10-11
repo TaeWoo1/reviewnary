@@ -70,7 +70,7 @@ export default {
         // raised to 17px — so the gap between a headline and the line under it grew instead of the
         // whole scale moving. Metadata is where this product says what it does NOT know, and 12px
         // is where that stops being read.
-        // Reviewnary Product UI Redesign v1 (docs/reviewnary_design.md §1). `base` 16 is the floor for
+        // Reviewnary Product UI Redesign v1 (docs/frontend/reviewnary_design.md §1). `base` 16 is the floor for
         // 40-50대 eyes; the steps above it are tighter than before so a page title no longer competes
         // with the briefing sentence, and metadata (`sm`) is still a size that is read.
         xs: ["13px", "1.5"],
@@ -118,7 +118,7 @@ export default {
       },
       maxWidth: {
         /*
-          <b>1280, not 1120</b> (product-owner decision, 2026-10-01; `docs/reviewnary_design.md` §2
+          <b>1280, not 1120</b> (product-owner decision, 2026-10-01; `docs/frontend/reviewnary_design.md` §2
           amended in the same change).
 
           <p>Measured at 1600×1000: the rail takes 240, `main` is 1360 and its own `md:px-8` leaves

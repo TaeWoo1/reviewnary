@@ -6,7 +6,7 @@
  * "반복해서 비슷한 문의가 들어오는 상품이 있어?" came back as "어떤 기간(예: 지난 7일/30일/분기)을
  * 기준으로 볼지 확인이 필요하다" — while `list_repeated_inquiries` has had a declared 28-day window all
  * along. Zero tools ran. The seller was asked to supply a parameter the backend was about to supply
- * itself (`docs/agent_real_validation_v1.md` §3 Q2·Q3·Q6, defect A4).
+ * itself (`docs/lineage/agent_real_validation_v1.md` §3 Q2·Q3·Q6, defect A4).
  *
  * <b>The fix is an audit, not a policy.</b> Nothing here decides that "최근" means 28 days. It reads what
  * each capability ALREADY declares about its own scope and writes that down where the run can see it.
@@ -32,7 +32,7 @@
  * scope, and `scope/EvidenceTime.ts` is about EVIDENCE time. Asking the backend for 28 days does not
  * date a single row; only the rows' own `firstSeenOn`/`lastSeenOn` do, and a period claim still rests on
  * those. The two must never be confused — that is exactly the substitution §2.3 of
- * `docs/sellerops_operator_graph_v2.md` forbids, and the reason no value here is ever written into an
+ * `docs/standing/sellerops_operator_graph_v2.md` forbids, and the reason no value here is ever written into an
  * `EvidenceRef`.
  */
 import type { InformationNeed, InvestigationPlan, NeedKind } from "../plan/InvestigationPlan";

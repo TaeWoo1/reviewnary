@@ -85,7 +85,7 @@ perm="$(stat -c '%a' "$ENV_FILE" 2>/dev/null || stat -f '%Lp' "$ENV_FILE")"
 command -v aws >/dev/null 2>&1 || fail "the aws cli is not installed — the nightly run would write a local dump and fail the off-host upload (deploy/pilot/host-bootstrap.sh installs AWS CLI v2)"
 [[ -d "$BACKUP_DIR" ]] || fail "backup directory $BACKUP_DIR does not exist (deploy/pilot/host-bootstrap.sh creates it 0700)"
 [[ -d "$(dirname "$LOG")" ]] || fail "$(dirname "$LOG") does not exist — the unit cannot append the backup log"
-command -v systemctl >/dev/null 2>&1 || fail "systemctl not found — the pilot host contract is Ubuntu 24.04 with systemd (docs/pilot_host_provisioning_v1.md §3)"
+command -v systemctl >/dev/null 2>&1 || fail "systemctl not found — the pilot host contract is Ubuntu 24.04 with systemd (docs/pilot/pilot_host_provisioning_v1.md §3)"
 [[ -d "$UNIT_DIR" ]] || fail "$UNIT_DIR does not exist"
 [[ -w "$UNIT_DIR" ]] || fail "$UNIT_DIR is not writable (run as root)"
 

@@ -13,7 +13,7 @@ export const ONBOARDING_PATH = "/onboarding";
  * `/auth/callback?code=…` — where the backend sends the browser after Google/NAVER said yes. The URL carries
  * only a one-time code (never a JWT); this page spends it once (`POST /api/auth/social/exchange`) and either
  * accepts the session (→ 홈) or stores the pending onboarding (→ `/onboarding`). A code that is spent, expired
- * or unknown is "다시 로그인", not an error screen (docs/auth_growth_instrumentation_v1.md §2-1, §2-3).
+ * or unknown is "다시 로그인", not an error screen (docs/standing/auth_growth_instrumentation_v1.md §2-1, §2-3).
  */
 export function AuthCallback() {
   const [searchParams] = useSearchParams();
@@ -22,7 +22,7 @@ export function AuthCallback() {
   const [failed, setFailed] = useState(false);
   const spent = useRef(false);
 
-  // `main.tsx` lifted the code out of the URL before any vendor started (docs/service_readiness_v1.md §2-1);
+  // `main.tsx` lifted the code out of the URL before any vendor started (docs/standing/service_readiness_v1.md §2-1);
   // the query is the fallback for a direct render (tests). Read once, synchronously, so StrictMode's second
   // effect run sees the same value.
   const initialCode = useRef<string | null>(null);

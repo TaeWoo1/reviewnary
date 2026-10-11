@@ -40,7 +40,7 @@ services:
       # Reachable by name only so an existing pre-Flyway database can be adopted deliberately.
       SELLEROPS_FLYWAY_BASELINE_ON_MIGRATE: ${SELLEROPS_FLYWAY_BASELINE_ON_MIGRATE:-false}
       SELLEROPS_CORS_ORIGIN: ${SELLEROPS_CORS_ORIGIN:-http://localhost:5173}
-      # Social sign-in (Google OIDC · NAVER OAuth2) — docs/auth_growth_instrumentation_v1.md.
+      # Social sign-in (Google OIDC · NAVER OAuth2) — docs/standing/auth_growth_instrumentation_v1.md.
       # These are the SELLER'S LOGIN, and have nothing to do with the NAVER COMMERCE connector
       # (SELLEROPS_CONNECTOR_NAVER_*) that reads the store's reviews and inquiries: different
       # console, different credential, different callback. A provider without BOTH id and secret

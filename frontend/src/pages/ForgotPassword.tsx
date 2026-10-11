@@ -7,7 +7,7 @@ import { AuthNotice } from "../components/auth/AuthNotice";
 export const FORGOT_SENT_TITLE = "가입된 이메일이면 재설정 안내를 보냈어요";
 
 /**
- * `/forgot-password` (docs/service_readiness_v1.md §6). Whatever the address, the answer is the same sentence —
+ * `/forgot-password` (docs/standing/service_readiness_v1.md §6). Whatever the address, the answer is the same sentence —
  * the server never says whether an account exists or how it signs in. Under the dev outbox (local/self-pilot)
  * the page says where the mail actually went, because there is no inbox to check.
  */

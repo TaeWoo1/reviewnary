@@ -1,7 +1,7 @@
 /**
  * Conversation Contract Correctness v2 (2026-09-01).
  *
- * The 53-turn regression corpus of `docs/planner_model_benchmark_v1.md` had ten turns that EVERY
+ * The 53-turn regression corpus of `docs/agent/planner_model_benchmark_v1.md` had ten turns that EVERY
  * planner model got wrong. A shared failure is not a model failure — it is this repository's contract.
  * The audit found five causes, and each section below is one of them:
  *

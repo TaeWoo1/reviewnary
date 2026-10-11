@@ -4,7 +4,7 @@
  * <b>The red test is real.</b> `PRODUCT_COMPLAINT_ORGWIDE_PLAN` is the plan a live model produced on
  * 2026-08-23 for a seller who named one product and asked whether it had complaints. Under that plan
  * the Operator reported three HIGH-severity issues that belonged to other products, with no warning,
- * about a product that had none (`docs/agent_real_validation_v1.md` §3 Q4). The plan is replayed here
+ * about a product that had none (`docs/lineage/agent_real_validation_v1.md` §3 Q4). The plan is replayed here
  * unchanged: the fix must hold with the planner still making that mistake, because a planner will.
  *
  * <b>What "fixed" means here.</b> Not that the run answers better — it answers LESS, and says so. The

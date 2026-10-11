@@ -260,7 +260,7 @@ export function NaverIssuanceGuidedWalkthrough({
         <AdvertisedCallIpPanel ips={advertisedEgressIps} />
       </section>
 
-      {/* **The way forward goes ABOVE the thing that stopped** (`docs/reviewnary_design.md` §10 · Pilot
+      {/* **The way forward goes ABOVE the thing that stopped** (`docs/frontend/reviewnary_design.md` §10 · Pilot
           Readiness Gate v1 §3). When guidance cannot run, the seller's next control is the manual path —
           not a retry for a helper they may have no way to obtain. It was previously the last and smallest
           control on the screen, under 다시 찾기. It is the same `toText` as the start gate's primary. */}

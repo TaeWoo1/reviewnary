@@ -81,7 +81,7 @@ public record ApprovalManifest(String approvalId, String runId, String preparedA
 
     public ObjectNode toJson() {
         ObjectNode root = JSON.createObjectNode();
-        root.put("kind", "APPROVAL_MANIFEST").put("contract", "docs/sellerops_live_approval_contract.md");
+        root.put("kind", "APPROVAL_MANIFEST").put("contract", "docs/standing/sellerops_live_approval_contract.md");
         root.put("approval_id", approvalId).put("run_id", runId).put("prepared_at", preparedAt);
         ObjectNode b = root.putObject("bound");
         bound().forEach(b::put);

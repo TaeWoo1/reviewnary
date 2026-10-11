@@ -17,10 +17,10 @@
 
 | # | Runtime | What it is | Owns | Canonical document |
 |---|---|---|---|---|
-| 1 | **`backend/`** | Spring Boot (Java 17, Gradle, Postgres/Flyway, JWT) | The system of record: connectors, ingest, dedupe, work queues, scheduling, auth — **and the only LLM egress in the repository** | `docs/multi-channel-connector-roadmap.md` (connectors) · `docs/self_pilot_runtime_v1.md` (scheduling) · `docs/workstreams/review_ai_triage_demo.md` (AI triage) · `docs/service_readiness_v1.md` |
-| 2 | **`frontend/`** | React + Vite operations UI | 홈 · 리뷰 · 문의 · 주문 · 채널 연결 (+ `/settings`, `/agent`, `/memory`, `/reports`) | `docs/product_assembly_ia_v1.md` (IA, screens, visible channels) · `docs/sellerops_frontend_spec.md` (states, language, a11y) |
-| 3 | **`collector/`** | TypeScript local agent (Node + Playwright), run on the seller's own machine | Channel acquisition and the **Action Window**: the resident helper, the bridge, and the per-carrier guided walks | `docs/sellerops_local_agent_runtime_adr.md` (boundaries) · `docs/resident_helper_on_demand_carrier_v1.md` (the on-demand carrier seam) |
-| 4 | **`agent-runtime/`** | Standalone Node/TypeScript LangGraph orchestration service (port 8787) — **SellerOps의 AI Operator 실행 구조** (2026-08-21) | The `OperatorGraph` (goal → **LLM plan** → plan validation → specialists → evidence judge → answer, bounded) over the four checkpointed `StateGraph`s; tools are thin adapters onto Spring, and the Operator's own catalogue is READ-only. **Agent chat has no deterministic planner** — no plan, no run; a button's `intent` runs without one | **`docs/sellerops_operator_graph_v2.md`** (제품 행동 계약 · Planner · Product Knowledge) · `docs/sellerops_operator_graph_v1.md` (구성·tool·evidence 계약 · 구현 기록) · `docs/archive/2026-q3/sellerops_agent_runtime_migration.md` · `docs/decisions/agent-runtime-langgraph-llm-split.md` |
+| 1 | **`backend/`** | Spring Boot (Java 17, Gradle, Postgres/Flyway, JWT) | The system of record: connectors, ingest, dedupe, work queues, scheduling, auth — **and the only LLM egress in the repository** | `docs/multi-channel-connector-roadmap.md` (connectors) · `docs/standing/self_pilot_runtime_v1.md` (scheduling) · `docs/workstreams/review_ai_triage_demo.md` (AI triage) · `docs/standing/service_readiness_v1.md` |
+| 2 | **`frontend/`** | React + Vite operations UI | 홈 · 리뷰 · 문의 · 주문 · 채널 연결 (+ `/settings`, `/agent`, `/memory`, `/reports`) | `docs/product_assembly_ia_v1.md` (IA, screens, visible channels) · `docs/frontend/sellerops_frontend_spec.md` (states, language, a11y) |
+| 3 | **`collector/`** | TypeScript local agent (Node + Playwright), run on the seller's own machine | Channel acquisition and the **Action Window**: the resident helper, the bridge, and the per-carrier guided walks | `docs/standing/sellerops_local_agent_runtime_adr.md` (boundaries) · `docs/lineage/resident_helper_on_demand_carrier_v1.md` (the on-demand carrier seam) |
+| 4 | **`agent-runtime/`** | Standalone Node/TypeScript LangGraph orchestration service (port 8787) — **SellerOps의 AI Operator 실행 구조** (2026-08-21) | The `OperatorGraph` (goal → **LLM plan** → plan validation → specialists → evidence judge → answer, bounded) over the four checkpointed `StateGraph`s; tools are thin adapters onto Spring, and the Operator's own catalogue is READ-only. **Agent chat has no deterministic planner** — no plan, no run; a button's `intent` runs without one | **`docs/standing/sellerops_operator_graph_v2.md`** (제품 행동 계약 · Planner · Product Knowledge) · `docs/standing/sellerops_operator_graph_v1.md` (구성·tool·evidence 계약 · 구현 기록) · `docs/archive/2026-q3/sellerops_agent_runtime_migration.md` · `docs/decisions/agent-runtime-langgraph-llm-split.md` |
 | 5 | **`contracts/`** | Hand-written ESM TypeScript + JSON fixtures + golden vectors | The shared shapes: Action Window v1/v2, acquisition, session readiness, review-import journey, fingerprints, triage rubrics | the per-family `README.md` / `SPEC.md` / `CONTRACT.md` beside each |
 
 Plus `tools/` — operator harnesses, validation scripts, and calibration instruments — and `docs/`.
@@ -49,7 +49,7 @@ Plus `tools/` — operator harnesses, validation scripts, and calibration instru
 - **frontend → collector**: an authenticated WebSocket (`/bridge/ws`) carrying opaque Action Window
   frames. Origin allow-list + single-use ticket + human-approved pairing, all three, before any frame.
 - **frontend → agent-runtime**: REST on a *different* origin (`VITE_AGENT_RUNTIME_URL`, default
-  `127.0.0.1:8787`); the CSP must allow it (`docs/service_readiness_v1.md`).
+  `127.0.0.1:8787`); the CSP must allow it (`docs/standing/service_readiness_v1.md`).
 - **agent-runtime → backend**: its LangChain tools are HTTP adapters onto Spring; durable run state is
   backend-owned (`V33__agent_run_store.sql`).
 - **collector → backend**: ingest and session/readiness reporting over REST.
@@ -69,7 +69,7 @@ Plus `tools/` — operator harnesses, validation scripts, and calibration instru
    retrieval and the payload floor all live in Spring (`agent/llm/**`, `inquiry/draft/**`), and this
    service still holds no vendor key of any kind. That — not "no model is involved" — is the property to check
    when reading it. `docs/decisions/agent-runtime-langgraph-llm-split.md` records the decision;
-   `docs/sellerops_operator_graph_v1.md` (and v2) extends the same rule to the Operator planner and evidence
+   `docs/standing/sellerops_operator_graph_v1.md` (and v2) extends the same rule to the Operator planner and evidence
    judge (their own flags, their own prompts, their own payload floors, all in Spring).
 2. **A channel in the connector layer is not a channel on screen.** The seller-visible set is exactly
    NAVER / Coupang / Cafe24 (`ProductChannels.java`, `frontend/src/lib/productChannels.ts`). ESM/Gmarket,
@@ -79,7 +79,7 @@ Plus `tools/` — operator harnesses, validation scripts, and calibration instru
 ## Safety architecture
 
 Not a layer — a set of gates, each in code, each fail-closed. The fences themselves are stated once, in
-`CLAUDE.md`; the approval lifecycle is `docs/sellerops_live_approval_contract.md`.
+`CLAUDE.md`; the approval lifecycle is `docs/standing/sellerops_live_approval_contract.md`.
 
 | Gate | Where | What it refuses |
 |---|---|---|
@@ -101,4 +101,4 @@ Not a layer — a set of gates, each in code, each fail-closed. The fences thems
 Four hermetic CI workflows — no database, no Docker, no browser, **no secrets** — so every one runs
 identically on a fork PR. Live suites are gated on an env var being exactly `"1"`, and CI pins those
 blank rather than merely leaving them unset. Full detail, including what is deliberately *not* covered
-(notably: **CI does not validate Flyway migrations**): `docs/ci-coverage.md`.
+(notably: **CI does not validate Flyway migrations**): `docs/lineage/ci-coverage.md`.

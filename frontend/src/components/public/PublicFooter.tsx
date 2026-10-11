@@ -31,7 +31,7 @@ export function PublicFooter() {
           >
             로그인
           </Link>
-          {/* Legal surface (docs/service_readiness_v1.md §2-4): placeholders until the documents are confirmed. */}
+          {/* Legal surface (docs/standing/service_readiness_v1.md §2-4): placeholders until the documents are confirmed. */}
           <Link
             to={TERMS_PATH}
             className="rounded transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 focus-visible:ring-offset-2"

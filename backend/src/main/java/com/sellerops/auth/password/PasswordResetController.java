@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** `/api/auth/password/*` — public (docs/service_readiness_v1.md §3). */
+/** `/api/auth/password/*` — public (docs/standing/service_readiness_v1.md §3). */
 @RestController
 @RequestMapping("/api/auth/password")
 public class PasswordResetController {

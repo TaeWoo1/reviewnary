@@ -39,7 +39,7 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private String role;
 
-    // Account consent record (docs/service_readiness_v1.md §2-4): 필수 이용약관·개인정보처리방침 동의 시각 + 문서
+    // Account consent record (docs/standing/service_readiness_v1.md §2-4): 필수 이용약관·개인정보처리방침 동의 시각 + 문서
     // 버전, 선택 마케팅 수신 동의 시각 (null = 동의 안 함). Null on rows created before the record existed.
     @Column(name = "terms_accepted_at")
     private Instant termsAcceptedAt;

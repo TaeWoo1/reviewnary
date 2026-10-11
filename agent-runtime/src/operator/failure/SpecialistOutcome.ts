@@ -7,7 +7,7 @@
  * 필요합니다`. That one exception unwound the whole specialist, taking the successful inbox read with
  * it, and the run ended **`DONE` with zero findings**: the shape the v2 contract calls worse than a
  * failure, because a seller cannot tell it apart from "I looked and there was nothing".
- * Record: `docs/agent_real_validation_v1.md` §3 Q5.
+ * Record: `docs/lineage/agent_real_validation_v1.md` §3 Q5.
  *
  * <b>Three rules, and they are separable.</b>
  *

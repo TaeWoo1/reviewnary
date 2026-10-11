@@ -13,7 +13,7 @@ import { KIND_TONE, STATUS_TONE, artifactOf, destinationOf } from "./opportunity
 /**
  * One improvement opportunity: what repeated, why this is suggested, the evidence, and the next action.
  *
- * <b>Framed, because it asks for the seller's hand</b> (docs/reviewnary_design.md §3). Everything a seller
+ * <b>Framed, because it asks for the seller's hand</b> (docs/frontend/reviewnary_design.md §3). Everything a seller
  * reads here is the backend's sentence — the why-lines, the recommendation, the draft — and this card
  * only decides order and controls. The draft is editable text; where it goes is decided by
  * {@link destinationOf}, and both destinations are seams that already exist.

@@ -8,7 +8,7 @@ package com.sellerops.connector.coupang;
  *
  * <p>An operator-approved run arms the id via {@code SELLEROPS_CONNECTOR_COUPANG_LIVE_APPROVAL_ID}
  * (minted by {@code tools/coupang-local/bootstrap.sh}); offline/loopback base URLs never require it.
- * See {@code docs/sellerops_live_approval_contract.md}.
+ * See {@code docs/standing/sellerops_live_approval_contract.md}.
  *
  * <p>Extends {@link RuntimeException} — NOT {@link IllegalStateException} — deliberately: the credential
  * and order-access probes convert an {@code IllegalStateException} transport failure into an inconclusive

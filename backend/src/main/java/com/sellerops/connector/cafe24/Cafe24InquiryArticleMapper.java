@@ -45,7 +45,7 @@ import com.sellerops.ingest.canonical.SourceThreadRole;
  * <p><b>An answer on this board is itself an article.</b> Cafe24 publishes a seller's answer as a
  * CHILD article hanging off the question ({@code parent_article_no}), proven by an approved bounded
  * READ on 2026-08-25 — verdict {@code STANDARD_BOARD_REPLY_ARTICLE},
- * {@code docs/inquiry_answer_execution_v1.md}. Until that proof this mapper read every board-6 row as
+ * {@code docs/inquiry/inquiry_answer_execution_v1.md}. Until that proof this mapper read every board-6 row as
  * an independent customer inquiry, so the shop's own answers entered the seller's 미답변 queue as
  * customers still waiting. The row's structural role now travels with it as {@link SourceThreadRole},
  * and a {@code REPLY} carries the parent's external id so the relation survives without a second

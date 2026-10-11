@@ -36,7 +36,7 @@ public final class ReviewDedupKey {
      * <p>Folding the option id is what the screen actually supports: the live reading found 옵션ID present on
      * every row. It does not close the gap, and is not pretended to — two textless reviews of the same OPTION
      * on the same day at the same rating still merge. That residue is a recorded v1 limitation
-     * ({@code docs/coupang_review_acquisition_v1.md}); closing it would need a per-review identifier the
+     * ({@code docs/lineage/coupang_review_acquisition_v1.md}); closing it would need a per-review identifier the
      * screen does not publish, and a row position or a buyer's name is not one.
      *
      * <p>It applies PER ROW, not per channel — which is what {@code reviews.dedup_key_version} was always for.
@@ -54,7 +54,7 @@ public final class ReviewDedupKey {
      * <p><b>Coupang is v2 for the same reason ESM+ is, arrived at the other way round.</b> ESM+ exports carry
      * no review id; the Coupang WING 상품평 screen was measured and carries no per-review-unique value at all —
      * two of the operator's own ten reviews were identical in every number the page prints
-     * ({@code docs/coupang_review_policy_gate_v1.md} §9.2). So Coupang reviews always dedup by content hash,
+     * ({@code docs/standing/coupang_review_policy_gate_v1.md} §9.2). So Coupang reviews always dedup by content hash,
      * and rating has to be in it: short bodies repeat ("좋아요"), and v1 would fold a 5-star and a 1-star
      * review of one product on one day into a single row — the false merge that looks exactly like dedup
      * working.

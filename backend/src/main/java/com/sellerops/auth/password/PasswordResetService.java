@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Password reset by mailed one-time link — docs/service_readiness_v1.md §2-2, §6.
+ * Password reset by mailed one-time link — docs/standing/service_readiness_v1.md §2-2, §6.
  *
  * <ul>
  *   <li>{@link #requestReset} never reveals whether the email exists or how the account signs in: unknown email,

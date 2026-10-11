@@ -18,8 +18,8 @@ directions:
       소유한 구조화된 화면이 보여 준다. 모든 화면에 채팅을 복제하지 않고, 반대로 목록·초안·승인을
       대화 안으로 끌어들이지도 않는다.
     sourceRefs:
-      - docs/agent_command_center_v1.md
-      - docs/chat_first_agent_shell_v1.md
+      - docs/agent/agent_command_center_v1.md
+      - docs/agent/chat_first_agent_shell_v1.md
       - INVARIANT.CONVERSATION_LANE
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
@@ -31,8 +31,8 @@ directions:
       준다. 인사말이 아니라 브리핑이 헤드라인이고, 숫자는 그 아래에 있다. 처음 들어온 판매자에게는
       기다리는 일의 수가 아직 사실이 아니므로 세지 않고 다음 걸음 하나를 말한다.
     sourceRefs:
-      - docs/agent_command_center_v1.md
-      - docs/disconnected_channel_onboarding_v1.md
+      - docs/agent/agent_command_center_v1.md
+      - docs/frontend/disconnected_channel_onboarding_v1.md
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -43,9 +43,9 @@ directions:
       그대로 쓴다. 숫자는 그것을 센 한 곳에서만 오고, 화면이 같은 사실을 두 번 말하지 않으며,
       0은 문이 되지 않는다. 판매자가 누를 수 있는 것과 볼 수 있는 것이 같은 객체를 가리킨다.
     sourceRefs:
-      - docs/reviewnary_design.md
-      - docs/operational_workspace_ux_v1.md
-      - docs/product_operations_continuity_v1.md
+      - docs/frontend/reviewnary_design.md
+      - docs/frontend/operational_workspace_ux_v1.md
+      - docs/frontend/product_operations_continuity_v1.md
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -56,8 +56,8 @@ directions:
       행동까지 준비해 두는 담당자로 발전한다. 각 단계는 앞 단계가 실제로 일어났을 때만 다음으로
       간다. 실행은 이 축의 끝이 아니라 승인 뒤에 오는 별도 경로다.
     sourceRefs:
-      - docs/proactive_operations_agent_v1.md
-      - docs/agent_procedure_layer_v1.md
+      - docs/standing/proactive_operations_agent_v1.md
+      - docs/agent/agent_procedure_layer_v1.md
       - INVARIANT.APPROVAL_BOUNDARY
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"

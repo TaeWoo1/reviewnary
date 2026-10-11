@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
  * <p><b>What this widens, stated plainly.</b> Today a review-import launch is minted only by a seller's
  * own session: {@code POST /api/imports/reviews/plans/**} is not on {@code HelperDeviceAuthFilter.ALLOWED},
  * so an installed helper can ingest into a launch it was given but cannot create one. That is the human
- * checkpoint PD-7 recognises (docs/review_acquisition_aside_v2.md §12), and this capability removes it for
+ * checkpoint PD-7 recognises (docs/lineage/review_acquisition_aside_v2.md §12), and this capability removes it for
  * a named organisation and a named device, for one shadow run, and for nothing else.
  *
  * <p><b>Why three names and not one.</b> Each closes a different question that the other two cannot:

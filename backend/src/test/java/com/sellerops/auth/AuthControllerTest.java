@@ -21,7 +21,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** Sign-up requires the 필수 consent (docs/service_readiness_v1.md §2-4); the optional one is optional. */
+/** Sign-up requires the 필수 consent (docs/standing/service_readiness_v1.md §2-4); the optional one is optional. */
 @WebMvcTest(AuthController.class)
 @Import(SecurityConfig.class)
 @ActiveProfiles("test")

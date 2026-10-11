@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Self-Pilot Runtime v1 — persistent LOCAL AGENT supervisor (docs/self_pilot_runtime_v1.md §4).
+# Self-Pilot Runtime v1 — persistent LOCAL AGENT supervisor (docs/standing/self_pilot_runtime_v1.md §4).
 #
 # Keeps ONE routine READ carrier of the collector resident for days: restarts it on a crash (exit 9 from
 # the agent's own crash handlers, or any other non-zero exit), backs off on a crash loop, logs one sanitized
@@ -29,7 +29,7 @@
 #      SELLEROPS_EMAIL SELLEROPS_PASSWORD. naver-import: NAVER_REVIEW_URL. coupang-locate: COUPANG_WING_URL.
 # Product gap, CLOSED: the seller no longer chooses a carrier here. `start` defaults to `resident`, one
 #      `--bridge-only` helper that hosts every guided READ carrier on demand and takes work only from the
-#      SellerOps UI — the target docs/self_pilot_runtime_v1.md §7 recorded. The two fixed-carrier modes
+#      SellerOps UI — the target docs/standing/self_pilot_runtime_v1.md §7 recorded. The two fixed-carrier modes
 #      stay selectable for a seated operator reproducing a live proof; they are not the product path.
 #
 set -euo pipefail

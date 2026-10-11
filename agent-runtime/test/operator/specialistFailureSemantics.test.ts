@@ -5,7 +5,7 @@
  * 2026-08-23 for "답변이 필요한 문의를 우선순위대로 정리하고 답변 초안을 만들어줘". Under it INQUIRY_OPS
  * read the inbox, read the repeats, then called `search_customer_memory` with no anchor; the backend's
  * correct `400` unwound the specialist and took both successful reads with it, and the run reported
- * `DONE` with zero findings (`docs/agent_real_validation_v1.md` §3 Q5).
+ * `DONE` with zero findings (`docs/lineage/agent_real_validation_v1.md` §3 Q5).
  *
  * <b>The fake enforces the same precondition the backend does</b> (`FakeOperatorSpringClient`), so this
  * suite would have gone red on the old code for the same reason the live run did — not because a

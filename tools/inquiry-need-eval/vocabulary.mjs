@@ -1,5 +1,5 @@
 // Inquiry Need Eval v1 — the closed vocabularies. One place, so the validator, the truth derivation and the scorer
-// cannot disagree about what a word means. Canonical definitions: docs/inquiry_need_eval_v1.md.
+// cannot disagree about what a word means. Canonical definitions: docs/lineage/inquiry_need_eval_v1.md.
 
 /** What a need is ABOUT. A need is one independent piece of information or action without which the customer's
  *  request is not resolved; prerequisites and background facts are evidence, never a need of their own. */

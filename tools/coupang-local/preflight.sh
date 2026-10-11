@@ -7,7 +7,7 @@
 # Its crux is the ARMED-BINDING proof that a green /health alone can never give: the running backend must
 # report (via /api/connect/coupang/setup) that the Coupang connector is enabled AND the live-call interlock
 # is armed with THIS run's approval id prefix. That proves the operator's "Seated and ready." will bind to the
-# exact backend we prepared — not a stale/other process (docs/sellerops_live_approval_contract.md §2).
+# exact backend we prepared — not a stale/other process (docs/standing/sellerops_live_approval_contract.md §2).
 #
 # On any check failing it exits non-zero and prints NO Approval Manifest / requests NO approval.
 #
@@ -174,7 +174,7 @@ else
 fi
 
 # ---- Approval Manifest (sanitized) --------------------------------------------
-# mode=WRITE per docs/sellerops_live_approval_contract.md §7: credential entry + connection test + first sync
+# mode=WRITE per docs/standing/sellerops_live_approval_contract.md §7: credential entry + connection test + first sync
 # is a WRITE-class step (it writes a credential + account + sync state to OUR system). Every Coupang
 # MARKETPLACE call in this run is a read-only GET — no order/shipping/product mutation.
 if [ "$RUN_KIND" = "inquiries-dedupe" ]; then
@@ -212,7 +212,7 @@ APPROVAL_ACCOUNT="${SELLEROPS_APPROVAL_ACCOUNT:-operator-owned Coupang WING vend
 # without one already stored), no account is created, no connection test runs, and every marketplace
 # call is a read-only GET. The collection rows a read-only GET writes into OUR database do not make a
 # run WRITE — if they did, no collecting run could ever be READ_ONLY and the field would carry no
-# information. See docs/sellerops_live_approval_contract.md §7.1.
+# information. See docs/standing/sellerops_live_approval_contract.md §7.1.
 case "$RUN_KIND" in
   orders-resync) APPROVAL_MODE="READ_ONLY" ;;
   *)             APPROVAL_MODE="WRITE" ;;
@@ -263,7 +263,7 @@ JSON
   echo "  $APPROVAL_MODE · run ${RUN_ID:0:8}… · approval ${APPROVAL_ID:0:8}… · max: $APPROVAL_MAX"
   echo "  account: $APPROVAL_ACCOUNT · operator presence: required · expires: process-lifetime · git $CUR_GIT"
   echo "  interlock: ARMED · advertised calling IP(s): $ADVERTISED"
-  echo "  Standing Safety Contract + full scope: docs/sellerops_live_approval_contract.md"
+  echo "  Standing Safety Contract + full scope: docs/standing/sellerops_live_approval_contract.md"
   echo
   echo "  All Coupang MARKETPLACE calls in this run are read-only GETs — no order/shipping/product write."
   if [ "$RUN_KIND" = "inquiries-dedupe" ]; then

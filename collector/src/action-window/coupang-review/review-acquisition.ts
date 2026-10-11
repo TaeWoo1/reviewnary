@@ -14,7 +14,7 @@
  * An earlier draft stopped a walk at the first page that brought nothing new, on the reasoning that
  * everything behind it must already be held. **That reasoning is only sound on a newest-first list, and this
  * screen's sort order has never been proven live** — the same screen's four dropdowns already turned out not
- * to be the period filters they looked like (`docs/coupang_review_policy_gate_v1.md` §9.4). On a list sorted
+ * to be the period filters they looked like (`docs/standing/coupang_review_policy_gate_v1.md` §9.4). On a list sorted
  * any other way, a page of familiar reviews says nothing whatever about the pages behind it, and the walk
  * would stop early while reporting that it had covered everything. That is the worst failure this design can
  * have: silent, and indistinguishable from success.

@@ -1,6 +1,6 @@
 # Customer Operations — Channel Reach v1 (G1 closure)
 
-2026-09-22 · branch `feat/review-decision-workspace-v1` · follows `docs/full_mvp_channel_capability_audit_v1.md` §2 G1
+2026-09-22 · branch `feat/review-decision-workspace-v1` · follows `docs/lineage/full_mvp_channel_capability_audit_v1.md` §2 G1
 
 **Product-owner decision (current task, conflict priority 1).** 고객 운영 관리(`CUSTOMER_OPERATIONS_V1`)는
 Cafe24 계정에 종속되지 않는다. 새 AI 로직 0 · 새 Agent architecture 0 · Demo Core UI 0 ·
@@ -161,7 +161,7 @@ source가 한 채널의 것이 아니게 되자 새 경우가 생긴다: 판매�
 지원 · 커넥터 부재 · 커넥터가 우리가 묻는 것을 하나도 지원하지 않음. 이 테스트는 옛 코드에서
 컴파일되지 않는다(3-인자 생성자가 없었다) — 「옛 코드에서 빨개지는 것을 확인했다」고 적지 않는다.
 
-**재생성된 산출물 3건**: `docs/product_truth_matrix.md` · `contracts/product-truth/v1/ledger.json` ·
+**재생성된 산출물 3건**: `docs/lineage/product_truth_matrix.md` · `contracts/product-truth/v1/ledger.json` ·
 `contracts/product-truth/v1/converse-facts.json`(각각의 regenerate-and-fail 테스트가 다시 썼다).
 
 ---

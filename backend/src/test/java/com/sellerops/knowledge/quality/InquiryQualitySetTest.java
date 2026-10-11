@@ -116,7 +116,7 @@ class InquiryQualitySetTest {
      *
      * <p>They are the lexical scorer's real numbers on this corpus with the semantic lanes off — the posture every
      * deployment has until an organisation is given them. A deployment with the semantic lanes reaches more; that is
-     * measured elsewhere ({@code docs/knowledge_retrieval_quality_v2.md}) and is not what this set defends.
+     * measured elsewhere ({@code docs/knowledge/knowledge_retrieval_quality_v2.md}) and is not what this set defends.
      */
     static final double MIN_RETRIEVAL_HIT = 0.88;
     static final double MIN_BASIS_ACCURACY = 0.86;
@@ -298,7 +298,7 @@ class InquiryQualitySetTest {
 
     /**
      * The same axes with the production-candidate retrieval: the semantic lane, the question-intent restatement and
-     * the rejection-only eligibility judge ({@code docs/knowledge_retrieval_quality_v2.md}, arm F5) — the configuration
+     * the rejection-only eligibility judge ({@code docs/knowledge/knowledge_retrieval_quality_v2.md}, arm F5) — the configuration
      * a pilot organisation is given. Needs the three capabilities' own keys and calls their vendor, so it is gated:
      * {@code RUN_INQUIRY_QUALITY_SEMANTIC=true} with {@code SELLEROPS_KNOWLEDGE_EMBEDDING_API_KEY},
      * {@code SELLEROPS_KNOWLEDGE_INTENT_API_KEY} and {@code SELLEROPS_KNOWLEDGE_ELIGIBILITY_API_KEY}.

@@ -50,8 +50,8 @@ one place on disk and are **not** recoverable from git.
 - `collector/` — TypeScript local agent: channel acquisition + Action Window (NAVER, ESM, Cafe24).
 - `agent-runtime/` — standalone Node/TS **LangGraph** orchestration service: the `OperatorGraph`
   over four compiled graphs with human `interrupt`/resume, whose contracts are unchanged. What it is
-  and how it connects: `docs/architecture.md`, then **`docs/sellerops_operator_graph_v2.md`** (정본
-  제품 행동 계약) · `docs/sellerops_operator_graph_v1.md` (구현·라이브 증명 기록; runtime semantics는
+  and how it connects: `docs/architecture.md`, then **`docs/standing/sellerops_operator_graph_v2.md`** (정본
+  제품 행동 계약) · `docs/standing/sellerops_operator_graph_v1.md` (구현·라이브 증명 기록; runtime semantics는
   v2가 대체) · `docs/decisions/agent-runtime-langgraph-llm-split.md`. Four fences live here:
   - It **holds no credential of any kind.** The draft, planner and judge models are all BACKEND
     capabilities reached with the operator's forwarded bearer, so "the backend is the only LLM
@@ -89,7 +89,7 @@ Map of how these connect, and which document owns each part: `docs/architecture.
 - **No force-push** unless explicitly approved.
 - **No live marketplace runs** without a fresh, single-use, in-turn approval. A plan, a prior
   approval, or a restored environment is never authorization. **Canonical contract:
-  `docs/sellerops_live_approval_contract.md`** — the single source for the Standing Safety Contract,
+  `docs/standing/sellerops_live_approval_contract.md`** — the single source for the Standing Safety Contract,
   the Approval Manifest, and the approval lifecycle. Do not restate the rule elsewhere; link there.
   - **Default = one line.** When `bootstrap`/`preflight` has prepared and displayed a valid
     **Approval Manifest** (channel / account / surface / operation / mode / allowed actions on the
@@ -163,12 +163,12 @@ document is not on this path and nothing here links to it, it does not carry cur
 **Demo 제품 정의:** `docs/demo_core_experience_v1.md` owns **데모로 보여줄 SellerOps** — 화면과 경험의 순서를
 정하고 기존 canonical technical 문서를 덮어쓰지 않는다. 로컬 데모 절차는 `docs/demo_runbook_v1.md`.
 **FE/IA는 A7(2026-08-18) 기준으로 frozen** — `docs/product_assembly_ia_v1.md` §8. `frontend/` 디자인 계약은
-`docs/reviewnary_design.md`이고, 거기 없는 색·서체·컴포넌트 라이브러리는 허가되지 않는다.
+`docs/frontend/reviewnary_design.md`이고, 거기 없는 색·서체·컴포넌트 라이브러리는 허가되지 않는다.
 
 **Evidence rule.** Every live run gets a row in `docs/evidence/INDEX.md` in the same PR that lands its
 proof. **Landing a proof document without a row there is a defect** — an unlinked proof is how Coupang
 `ORDER_SUMMARY` stayed recorded as "인증 골격만" for two weeks after it was live-proven
-(`docs/channel_integration_completeness_audit_v1.md` §5). A proof file may only be retired once its row
+(`docs/channel/channel_integration_completeness_audit_v1.md` §5). A proof file may only be retired once its row
 carries its whole unique claim.
 
 **Status lives in workstream homes, not here:** Action Window runtime → `docs/action-window-runtime/`
@@ -181,9 +181,9 @@ ESM live capture → `docs/esm/` (`live-capture-checklist.md`); review operation
 
 1. explicit product-owner decisions from the current task
 2. `docs/product-scope-v1.md`
-3. `docs/product_assembly_ia_v1.md` (IA / screens / visible channels), then `docs/sellerops_frontend_spec.md`
+3. `docs/product_assembly_ia_v1.md` (IA / screens / visible channels), then `docs/frontend/sellerops_frontend_spec.md`
    (frontend principles)
-4. `docs/sellerops_local_agent_runtime_adr.md`
+4. `docs/standing/sellerops_local_agent_runtime_adr.md`
 5. `docs/multi-channel-connector-roadmap.md` §4.1 (living capability table)
 6. the active slice document (`docs/slices/*` — index: `docs/slices/README.md`)
 7. current implementation evidence
@@ -192,6 +192,33 @@ ESM live capture → `docs/esm/` (`live-capture-checklist.md`); review operation
 Implementation evidence may reveal docs are stale, but must not silently redefine product intent —
 **report the conflict** instead. That is exactly how the Coupang `ORDER_SUMMARY` correction happened.
 For Action Window *status*, `docs/action-window-runtime/HANDOFF.md` wins.
+
+### 기능은 사라지지 않는다 (정리 · 리팩터 게이트)
+
+애써 만든 기능이 정리 과정에서 조용히 없어지는 것이 가장 비싼 사고다. 그래서 문서 정리든
+코드 리팩터든 **범위가 저장소 전체에 닿는 작업**은 다음을 지킨다.
+
+1. **시작 전에 기능 기준선을 측정하고 숫자를 적는다** — backend endpoint 수 · Flyway
+   migration 수 · frontend route 수 · collector CLI 수 · 소스 파일 수. 숫자 없이 시작하면
+   무엇이 사라졌는지 말할 방법이 없다.
+2. **끝나고 같은 숫자를 다시 측정해 델타 0을 증명한다.** 보고에 두 숫자를 나란히 적는다.
+3. **일괄 치환은 역변환으로 증명한다** — 치환 결과에 역매핑을 적용해 원본과 **바이트 단위로
+   같은지** 확인한다. 같다면 그 치환이 경로 문자열만 바꿨다는 증명이다.
+4. **`backend/src/main/resources/db/migration/`은 어떤 일괄 작업의 대상도 아니다.** 적용된
+   마이그레이션은 주석조차 불변이다 — 체크섬이 달라지면 기존 DB의 `validate`가 깨진다
+   (`docs/FINDINGS.md` §B7).
+5. 삭제는 **확인된 목록에 한정**한다. 위험한 통합은 분리해 따로 승인받고, 범위가 커지면
+   멈추고 보고한다.
+
+### 틀린 것은 기록한다
+
+라이브 런 · 리팩터 · 디버그에서 **시간을 썼거나 틀렸던 것**을 발견하면
+**`docs/FINDINGS.md`에 한 행을 추가한다.** 네 가지가 다 있어야 한 행이 된다 — 무엇을 했나 ·
+무엇이 사실이었나 · 다음에 지킬 것 · 출처(커밋·문서·날짜). 그 장부는 append만 한다. 행이
+규칙으로 굳으면 이 파일로 승격시키고 거기엔 포인터를 남긴다.
+
+**읽는 때는 쓰는 때보다 중요하다** — 라이브 런 전, 리팩터 전, "왜 안 바뀌지" 싶을 때
+`docs/FINDINGS.md`를 먼저 읽는다.
 
 ### Assumption rule
 
@@ -207,13 +234,15 @@ When uncertain, stop and report rather than guess.
 
 | 찾는 것 | 가는 곳 |
 |---|---|
-| 현역 문서 전체 (묶음별) | `docs/INDEX.md` |
+| 현역 문서 전체 (묶음별) + 폴더 지도 | `docs/INDEX.md` |
+| **과거 finding — 같은 시행착오를 두 번 하지 않기 위한 장부** | `docs/FINDINGS.md` |
 | 라이브 실행 이력 — 모든 라이브 런의 한 행 | `docs/evidence/INDEX.md` |
 | 소스가 주석으로 인용하는 과거 기록 | `docs/lineage_index.md` |
 | 2026 Q3 1회성 기록 | `docs/archive/2026-q3/MANIFEST.md` |
 | 그 이전 lineage | `docs/archive/` |
 | 채널 API 원문 사본 | `docs/vendor/` |
 | slice 색인 | `docs/slices/README.md` |
+| 문서 링크 검사 | `python3 tools/docs-link-check.py` |
 
 `docs/INDEX.md`에 등록되지 않은 `docs/` 파일은 **lineage 아니면 evidence**다: 위 경로에서
 도달할 수는 있어도 그 자체로 현재 진실을 싣지 않는다.

@@ -1,6 +1,6 @@
 # Review Acquisition — Legacy vs Aside — 사실 중심 비교
 
-> **문서 성격.** `docs/review_acquisition_baseline_v1.md`(CURRENT FACT)와 `docs/review_acquisition_aside_v2.md`
+> **문서 성격.** `docs/review/review_acquisition_baseline_v1.md`(CURRENT FACT)와 `docs/lineage/review_acquisition_aside_v2.md`
 > (TARGET DESIGN)를 축별로 나란히 놓는다. **좋다/나쁘다를 결론 내리지 않는다.** Legacy 열은 코드에서 확인된
 > 사실, Aside 열은 목표 설계이거나 가정이며 표기로 구분한다: `[FACT]` · `[TARGET]` · `[HYP]`(미확인 가정).
 > 범위는 NAVER SmartStore 리뷰 export 경로다(Cafe24 API·Coupang READ·수동 업로드는 어느 쪽에서도 변하지 않는다).

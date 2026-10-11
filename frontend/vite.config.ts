@@ -10,7 +10,7 @@ import { buildCsp } from "./src/lib/security/csp";
 // the localhost/127.0.0.1 CORS mismatch that broke a past login.
 const BACKEND_ORIGIN = process.env.SELLEROPS_BACKEND_ORIGIN ?? "http://127.0.0.1:8080";
 
-/** Release identity for Sentry only (docs/service_readiness_v1.md §2-7): SELLEROPS_RELEASE, else the git SHA. */
+/** Release identity for Sentry only (docs/standing/service_readiness_v1.md §2-7): SELLEROPS_RELEASE, else the git SHA. */
 function releaseId(): string {
   const fromEnv = process.env.SELLEROPS_RELEASE?.trim();
   if (fromEnv) return fromEnv;
@@ -22,7 +22,7 @@ function releaseId(): string {
 }
 
 /**
- * Production-build CSP `<meta>` (docs/service_readiness_v1.md §2-5) from the same env that enables each vendor.
+ * Production-build CSP `<meta>` (docs/standing/service_readiness_v1.md §2-5) from the same env that enables each vendor.
  * Build only: the dev server injects inline scripts (React refresh) and needs its websocket.
  */
 function cspMetaPlugin(env: Record<string, string>): Plugin {
@@ -63,7 +63,7 @@ export default defineConfig(({ mode }) => {
         // Social login (Google · NAVER) is a top-level browser navigation to the backend's Spring Security
         // OAuth2 endpoints. Proxied WITHOUT changeOrigin so the backend computes the redirect URI from the
         // origin the browser used (http://localhost:5173/login/oauth2/code/<provider>) — the one registered
-        // at the provider console. docs/auth_growth_instrumentation_v1.md §3.
+        // at the provider console. docs/standing/auth_growth_instrumentation_v1.md §3.
         "/oauth2": { target: BACKEND_ORIGIN, changeOrigin: false },
         "/login/oauth2": { target: BACKEND_ORIGIN, changeOrigin: false },
       },

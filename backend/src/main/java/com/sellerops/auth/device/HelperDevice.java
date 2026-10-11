@@ -11,7 +11,7 @@ import lombok.Setter;
 
 /**
  * One installed reviewnary 도우미, linked to one seller account by a browser session (Helper Device
- * Authentication v1, docs/helper_device_authentication_v1.md).
+ * Authentication v1, docs/pilot/helper_device_authentication_v1.md).
  *
  * <p>The helper presents an opaque token ({@code rvh_…}); only its SHA-256 lives here, exactly as
  * {@code auth_handoffs} keeps social one-time codes. The row IS the seller's standing grant: revoking it

@@ -3,8 +3,8 @@
 > Status: **APPROVED FOR IMPLEMENTATION — 2026-07-08 (제품 오너 결정 반영, §0).** 이 문서는 프론트↔로컬
 > 에이전트 **안전 브리지**의 G1 실행 계약이다. §0의 승인된 결정이 §5·§6·§9·§15의 이전 "PO 결정 대기"
 > 항목을 대체한다. 커밋은 별도 지시로만.
-> 상위 계약: 제품 원칙 `docs/product-scope-v1.md` §1.2·§6.1, 프론트 화면 `docs/sellerops_frontend_spec.md`
-> §16.7·§17-B G1, 런타임 경계 `docs/sellerops_local_agent_runtime_adr.md`(Runtime ADR) §3.4·§7,
+> 상위 계약: 제품 원칙 `docs/product-scope-v1.md` §1.2·§6.1, 프론트 화면 `docs/frontend/sellerops_frontend_spec.md`
+> §16.7·§17-B G1, 런타임 경계 `docs/standing/sellerops_local_agent_runtime_adr.md`(Runtime ADR) §3.4·§7,
 > 커넥터 레벨 규칙 `docs/multi-channel-connector-roadmap.md` §11. 본 문서는 그들이 참조하는
 > **브리지(전송·페어링·이벤트) 계약**을 소유하며 그들의 결정을 중복 선언하지 않는다.
 >
@@ -700,8 +700,8 @@ Runtime ADR §4 불변식). 명령은 **관측·페어링·이미-승인된 워�
 
 ### 부록 — 근거 문서·파일
 - 제품 원칙·현재/미래 경계: `docs/product-scope-v1.md` §1.2·§6.1·§7
-- 프론트 상태·슬라이스: `docs/sellerops_frontend_spec.md` §16.7·§16.9·§17-B G1
-- 런타임 경계·프론트↔에이전트 계약·미해결 과제: `docs/sellerops_local_agent_runtime_adr.md` §3.4·§4·§7
+- 프론트 상태·슬라이스: `docs/frontend/sellerops_frontend_spec.md` §16.7·§16.9·§17-B G1
+- 런타임 경계·프론트↔에이전트 계약·미해결 과제: `docs/standing/sellerops_local_agent_runtime_adr.md` §3.4·§4·§7
 - 커넥터 레벨 연결 모드·정직성: `docs/multi-channel-connector-roadmap.md` §11·부록 A
 - 현행 코드: `collector/src/cli/local-agent.ts`, `collector/src/agent/local-agent-runtime.ts`,
   `progressive-reconnect-runtime.ts`, `progressive-reconnect-chrome.ts`, `collector/src/profile.ts`,

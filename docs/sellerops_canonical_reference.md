@@ -205,7 +205,7 @@ Recorded direction, **implementation forbidden until execution modes and checkpo
   view-layer divergence only (`docs/product-scope-v1.md` §3).
 - **Runtime expansion** — Windows / company-PC deployment, cloud-managed runtime, Device Vault +
   auto re-login, Projected Direct Action (`docs/product-scope-v1.md` §6.1 future-scope column;
-  `docs/sellerops_local_agent_runtime_adr.md` §2.2 / §3.5 / §6).
+  `docs/standing/sellerops_local_agent_runtime_adr.md` §2.2 / §3.5 / §6).
 - **Registration paths** — sole-proprietor registration done; official seller-tool / API-partner
   registration runs in parallel. **NAVER 커머스 솔루션 마켓 is long-term and is NOT a prerequisite**
   for the first paid pilot (`docs/product-scope-v1.md` §1.3).
@@ -361,7 +361,7 @@ All of the following are **human-driven / operator-supervised**, on the **dev se
   collection.」 In this section it recorded what the NAVER v1 **Action Window (browser) runtime** did not
   prove; it never described official-API collection, which Self-Pilot Runtime v1 made routine on
   2026-08-18 and Responsibility Runtime v1 schedules as fixed windows. Record of the correction:
-  `docs/responsibility_runtime_v1.md` §20.*
+  `docs/standing/responsibility_runtime_v1.md` §20.*
 
 ### 4.3 Epistemics worth preserving
 
@@ -462,7 +462,7 @@ partner access is verified. See §4.1 and §5.2.
 
 - **Every live marketplace run** requires a **fresh, single-use, in-turn approval**. The mechanism,
   the Standing Safety Contract, the Approval Manifest, and the lifecycle are defined once in the
-  **canonical Live-Run Approval Contract — [`docs/sellerops_live_approval_contract.md`](sellerops_live_approval_contract.md)**;
+  **canonical Live-Run Approval Contract — [`docs/standing/sellerops_live_approval_contract.md`](sellerops_live_approval_contract.md)**;
   this section does not restate them. In short: the operator approves a prepared, displayed manifest
   (channel / account / surface / operation / mode / allowed actions), so the default grant is the one
   line **"Seated and ready."**
@@ -481,7 +481,7 @@ partner access is verified. See §4.1 and §5.2.
   *Narrowed 2026-09-15 from 「Unattended / scheduled collection — supervised only」. The fence sits among
   browser-runtime deferrals (Projection, auto-relogin, Device Vault, managed runtime) and held browser runs;
   scheduled official-API collection (Self-Pilot routine READ, Responsibility Runtime runs) is not a browser
-  run and was never what it held. Record: `docs/responsibility_runtime_v1.md` §20.*
+  run and was never what it held. Record: `docs/standing/responsibility_runtime_v1.md` §20.*
 - **Auto-relogin, Device Vault, credential autofill** — deferred.
 - **Windows / cloud managed runtime** — macOS pilot only.
 
@@ -567,8 +567,8 @@ When sources conflict, this order wins:
 
 1. explicit product-owner decisions from the current task
 2. `docs/product-scope-v1.md` — product scope contract, **scope lock v1.7**
-3. `docs/sellerops_frontend_spec.md` — frontend source of truth
-4. `docs/sellerops_local_agent_runtime_adr.md` — runtime boundary ADR
+3. `docs/frontend/sellerops_frontend_spec.md` — frontend source of truth
+4. `docs/standing/sellerops_local_agent_runtime_adr.md` — runtime boundary ADR
 5. `docs/multi-channel-connector-roadmap.md` §4.1 — the living capability table
 6. the active slice document (`docs/slices/*`)
 7. current implementation evidence
@@ -588,11 +588,11 @@ router.**
 | Document | Owns |
 |---|---|
 | **this document** | Product identity, strategy, honest state, authority map, standing fences |
-| `docs/product-scope-v1.md` (lock **v1.11**; Self-Pilot Runtime → `docs/self_pilot_runtime_v1.md`; Auth + Growth Instrumentation → `docs/auth_growth_instrumentation_v1.md`; Service Readiness → `docs/service_readiness_v1.md`) | Product scope contract, operating loop, autonomy modes, pull-first/exception-push, Session Readiness, Company Voice, registration decisions, Manufacturer Track, visible-channel set |
+| `docs/product-scope-v1.md` (lock **v1.11**; Self-Pilot Runtime → `docs/standing/self_pilot_runtime_v1.md`; Auth + Growth Instrumentation → `docs/standing/auth_growth_instrumentation_v1.md`; Service Readiness → `docs/standing/service_readiness_v1.md`) | Product scope contract, operating loop, autonomy modes, pull-first/exception-push, Session Readiness, Company Voice, registration decisions, Manufacturer Track, visible-channel set |
 | `docs/product_assembly_ia_v1.md` (2026-08-17) | **Product IA, screen responsibility, seller-visible channel set** — supersedes `frontend_spec` §5–§8·§17-A |
-| `docs/sellerops_frontend_spec.md` | Frontend principles: states, seller language, a11y, capability honesty, guided connection, Action Window screens |
+| `docs/frontend/sellerops_frontend_spec.md` | Frontend principles: states, seller language, a11y, capability honesty, guided connection, Action Window screens |
 | `docs/multi-channel-connector-roadmap.md` | Collection strategy; **§4.1 = capability truth**; §5.1, §5.2, §11 |
-| `docs/sellerops_local_agent_runtime_adr.md` | Local-agent runtime boundary, projection direction |
+| `docs/standing/sellerops_local_agent_runtime_adr.md` | Local-agent runtime boundary, projection direction |
 
 ### 9.3 Status-of-record (workstream homes — status lives here, never in a router)
 
@@ -609,7 +609,7 @@ router.**
 ### 9.4 Subordinate (own their domain; not identity or strategy authorities)
 
 `docs/action-window-runtime/HANDOFF.md` (self-declares it does not outrank the
-canonical product docs) · `docs/channel-capability-registration-matrix.md` (derived view of §4.1) ·
+canonical product docs) · `docs/channel/channel-capability-registration-matrix.md` (derived view of §4.1) ·
 `docs/archive/2026-q3/sellerops_completion_checkpoint_v1.md` (point-in-time recovery baseline at `026c113`; derived
 from §4.1 + this document, never redefines them) ·
 `docs/evidence/INDEX.md` (Cafe24 pilot-v1 completion baseline at `97ad192`;
@@ -680,9 +680,9 @@ in this section is fixed by this document.
 | D4 | root `CLAUDE.md`, required reading order | Cites `product-scope-v1.md` as **v1.1**; the actual lock is **v1.7** (2026-07-26). The doc title itself is now v1.7; `CLAUDE.md` still lags. |
 | D5 | `docs/sellerops_canonical_reference.md` §1, §9, §10 | Baseline 2026-07-08 with two stacked partial-update banners; §10 predates #316–#319; §9 "Truth snapshot" still says the Action Window is not implemented. **Deliberately not rebased** (§0). |
 | D6 | `docs/product-scope-v1.md` §1.5, §6.1, §7-15 | ~~Still states Action Window is 미구현~~ — **RESOLVED (v1.7, 2026-07-26):** corrected to "NAVER 리뷰 라이브 검증됨(1계정·disposable·운영 지원 아님), 그 외 미구현", consistent with §4.1. |
-| D7 | `docs/sellerops_frontend_spec.md` §18 | Same 미구현 claim for the Action Window review screen. Also cites product-scope as v1.2 in its appendix. |
+| D7 | `docs/frontend/sellerops_frontend_spec.md` §18 | Same 미구현 claim for the Action Window review screen. Also cites product-scope as v1.2 in its appendix. |
 | D8 | `docs/multi-channel-connector-roadmap.md` §4.1 | Header reads "그 외 행·열은 2026-07-07 기준"; rows not refreshed for #316–#318. Note: `HANDOFF.md` instructs that this staleness be **reported, not edited** from a runtime branch. |
-| D9 | `docs/channel-capability-registration-matrix.md` | Dated 2026-07-08; **no row exists for the reply-submission (write) axis** despite scope lock v1.7. Still open — the matrix is derived from §4.1, and reply submission stays guided/observe-only/`UNVERIFIED`/gate-locked (not a supported capability), so this is a registration-tracking gap, not a promotion. |
+| D9 | `docs/channel/channel-capability-registration-matrix.md` | Dated 2026-07-08; **no row exists for the reply-submission (write) axis** despite scope lock v1.7. Still open — the matrix is derived from §4.1, and reply submission stays guided/observe-only/`UNVERIFIED`/gate-locked (not a supported capability), so this is a registration-tracking gap, not a promotion. |
 | D10 | `docs/esm/decisions.md` D2, `live-capture-plan.md` §1/§3-G2 | Still encode the **tablist** model (index 0 = GMARKET, 1 = AUCTION) that #318 disproved. |
 | D11 | `collector/src/esm/esm-marketplace-verify.ts` | Ships `MARKETPLACE_VERIFICATION_METHOD = "selected-tab-label"` — a code-level name for a contract the same PR states is unknown. **Code-level drift, not doc-level.** |
 | D12 | `docs/esm/live-capture-checklist.md` | G1/G2 marked `[x]` PASSED on a signal later shown to be non-discriminating; a "Next single action" line contradicts the "not currently runnable" blocker 60 lines below. |
@@ -692,8 +692,8 @@ in this section is fixed by this document.
 | D16 | `docs/action-window-runtime/decisions.md` D-012 | "The parked ESM marketplace-attribution experiment is neither completed nor merged" — merged as #318. Retire by forward-pointer (append-only). |
 | D17 | root `README.md` | Lede frames the product for a "manufacturing CEO" and says "Real channel APIs … are not implemented yet". Links `docs/PROJECT.md` as the architecture doc — a different product. |
 | D18 | `tools/cafe24-callback/README.md` | Specifies `/cafe24/callback`; the product backend uses `/api/connect/cafe24/callback`. Cites "§P5"/"§P7" of a protocol document that **does not exist in the repo**. — **Reconciled (Cafe24 Routine + Connection Reliability Hardening v1):** the README now documents the two paths as different **by design** (the dev receiver never exchanges the code; the product endpoint does) and the dangling "§P5/§P7" citations were removed. The tool is **git-tracked**, not "미추적" (the connectivity-decision doc was corrected to match). |
-| D19 | `docs/sellerops_cafe24_review_inquiry_capture.md` | Header still says "PR A is the offline storage foundation only, no Cafe24 client, no live call" while its own body documents PR B–E and promotion to `CONFIRMED`. |
-| D20 | `docs/sellerops_local_agent_runtime_adr.md` §7(1) vs §3.4 | `LocalAgentState` "12상태" vs the §3.4 correction to "11상태". |
+| D19 | `docs/lineage/sellerops_cafe24_review_inquiry_capture.md` | Header still says "PR A is the offline storage foundation only, no Cafe24 client, no live call" while its own body documents PR B–E and promotion to `CONFIRMED`. |
+| D20 | `docs/standing/sellerops_local_agent_runtime_adr.md` §7(1) vs §3.4 | `LocalAgentState` "12상태" vs the §3.4 correction to "11상태". |
 | D21 | — | **~18 of 42 `docs/*.md` files are legacy lineage** with no quarantine marker (§9.8). |
 
 ### Sequencing note

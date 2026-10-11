@@ -170,7 +170,7 @@ public final class GoalRunLauncher {
         node.put("commit", approval.commit()).put("transport", transport);
         node.put("planned_calls", planned).put("hard_cap", approval.hardCap());
         node.put("approval_state", "CONSUMED — the first permitted live action began "
-                + "(docs/sellerops_live_approval_contract.md §4)");
+                + "(docs/standing/sellerops_live_approval_contract.md §4)");
         write(args.out().resolve(STARTED), node);
     }
 

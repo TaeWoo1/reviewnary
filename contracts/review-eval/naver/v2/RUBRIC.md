@@ -484,7 +484,7 @@ because a permission this shape is only safe if its edges are exact.
 
 - the review id or its fingerprint; the author; the seller, channel, product, or date; any other
   identifying metadata;
-- **any Coupang review**, under any circumstances — `docs/coupang_review_policy_gate_v1.md`'s
+- **any Coupang review**, under any circumstances — `docs/standing/coupang_review_policy_gate_v1.md`'s
   D-limits are untouched by this;
 - showing a model the human gold labels, the heuristic's prediction, or any other candidate's answer;
 - reading this as permission for **production** external-LLM transmission, for an API integration, or
@@ -532,7 +532,7 @@ before anyone knew what would be convenient to send.
   it**;
 - the human gold label, any stored prediction, and any other arm's answer, in any form, including as
   an example inside a prompt;
-- **any Coupang review.** `docs/coupang_review_policy_gate_v1.md`'s D-limits are untouched and this
+- **any Coupang review.** `docs/standing/coupang_review_policy_gate_v1.md`'s D-limits are untouched and this
   section does not reach them. A classifier that would happily accept a Coupang row must be prevented
   from receiving one by construction, not by a caller remembering;
 - **Product Context** — product title, option, attribute or description. Out of scope here, and
@@ -555,7 +555,7 @@ conservative pilot and the same purpose only**: the additive `AI 확인 필요` 
   11번가, anything future — is outside until this list changes in writing.
 - **Payload floor unchanged.** Rating and body, nothing else, on every channel — §8.4's closed input
   record has nowhere to put a channel, and the channel is not sent.
-- **Coupang.** §8.3's "any Coupang review" prohibition and `docs/coupang_review_policy_gate_v1.md`
+- **Coupang.** §8.3's "any Coupang review" prohibition and `docs/standing/coupang_review_policy_gate_v1.md`
   D6 ("no transmission to external LLMs in this unit") said the same thing from two documents. Both
   are amended today, by the same decision, and the Coupang document records its half as §6.1.2 in the
   same shape as the D5 lifting: **a product decision, not a legal determination**, made with the
@@ -1078,7 +1078,7 @@ computed over the high-rated `NO_ACTION` rows in the sample, as before.
 ### 13.4 Frame requirements
 
 1. **Real NAVER review rows**, acquired through the ordinary path — an export the seller produced.
-   No live marketplace run happens without the fresh, single-use approval `docs/sellerops_live_approval_contract.md`
+   No live marketplace run happens without the fresh, single-use approval `docs/standing/sellerops_live_approval_contract.md`
    requires; this section is not that approval and cannot become one.
 2. **Disjoint from the 3,858.** Enforced by `reviewIdFingerprint`: any row whose fingerprint appears
    in the existing frame is dropped from the fresh frame before the draw. A fresh **seller** or a

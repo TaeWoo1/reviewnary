@@ -42,9 +42,9 @@ features:
     status: SUPPORTED
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/knowledge_setup_inbox_ux_v1.md (라이브 QA A~J — 상품 자료가 PRODUCT 범위로 저장돼
+      docs/knowledge/knowledge_setup_inbox_ux_v1.md (라이브 QA A~J — 상품 자료가 PRODUCT 범위로 저장돼
       검색되고, 사용 중지하면 근거에서 빠지고, 복구하면 다시 찾힌다) ·
-      docs/knowledge_gap_resolution_v1.md · docs/knowledge_retrieval_quality_v2.md §12
+      docs/knowledge/knowledge_gap_resolution_v1.md · docs/knowledge/knowledge_retrieval_quality_v2.md §12
       (한 번도 보지 않은 44문항 holdout — 근거 검색 97.2% · 엉뚱한 출처 0)
     sellerFacingNotes:
       - 회사의 운영 기준과 상품 지식을 등록해 두시면 답변의 근거로 씁니다.
@@ -56,7 +56,7 @@ features:
         내용이어야 합니다.
       - 판매자님이 직접 쓰신 답변이 자동으로 회사 지식이 되지는 않습니다. 별도 결정입니다.
     sourceRefs:
-      - docs/seller_operations_knowledge_and_answer_memory_v1.md
+      - docs/knowledge/seller_operations_knowledge_and_answer_memory_v1.md
       - INVARIANT.KNOWLEDGE_SCOPE
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
@@ -66,10 +66,10 @@ features:
     status: SUPPORTED
     evidence: IMPLEMENTED
     evidenceRef: >-
-      docs/seller_operations_knowledge_and_answer_memory_v1.md (3-lane retrieval 의 한 lane) ·
+      docs/knowledge/seller_operations_knowledge_and_answer_memory_v1.md (3-lane retrieval 의 한 lane) ·
       com.sellerops.inquiry.memory.InquiryAnswerMemoryHook — 실제 org 에 과거 답변 행이 쌓여 있으나,
       그 lane 이 근거로 인용된 GROUNDED 초안은 라이브에서 관측된 적이 없다
-      (docs/retrieval_runtime_closure_v1.md 「고치지 않고 보고」)
+      (docs/knowledge/retrieval_runtime_closure_v1.md 「고치지 않고 보고」)
     sellerFacingNotes:
       - 판매자님이 예전에 실제로 하신 답변을 참고해 비슷한 질문의 초안을 준비할 수 있습니다.
     limitations:
@@ -86,9 +86,9 @@ features:
     status: SUPPORTED
     evidence: TEST_PROVEN
     evidenceRef: >-
-      docs/organization_answer_style_v1.md (V80 · /settings/style · 같은 근거에 두 스타일을 넣어
+      docs/knowledge/organization_answer_style_v1.md (V80 · /settings/style · 같은 근거에 두 스타일을 넣어
       사실 부분이 바이트 단위로 같고 스타일 절만 달라짐을 payload 로 검증) ·
-      docs/core_daily_loop_ux_v1.md (bounded model proof 2회 — 합성 fixture)
+      docs/frontend/core_daily_loop_ux_v1.md (bounded model proof 2회 — 합성 fixture)
     sellerFacingNotes:
       - 인사말·호칭·길이·말투를 회사가 정하면 그 말투를 답변 초안에 반영할 수 있습니다.
       - 아무것도 설정하지 않으셔도 기본 말투로 답변합니다.
@@ -106,7 +106,7 @@ features:
     status: SUPPORTED
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/review_reply_template_settings_v1.md §8 (V89 · /settings/review-templates ·
+      docs/review/review_reply_template_settings_v1.md §8 (V89 · /settings/review-templates ·
       canonical Demo Org 라이브 — 회사가 저장한 문구가 다음 초안의 시작 문장이 되고, 다른 조직은
       기본값 그대로이며 승인된 초안은 움직이지 않는다)
     sellerFacingNotes:
@@ -125,7 +125,7 @@ features:
     status: SUPPORTED
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/agentic_report_v1.md (V96 `agent_report` · 라이브 canonical Demo Org 주간 23.8s ·
+      docs/review/agentic_report_v1.md (V96 `agent_report` · 라이브 canonical Demo Org 주간 23.8s ·
       월간 19.3s · 12줄 전부 fact id 를 인용 · 근거 없는 문장 0 · 재열람 byte-identical)
     sellerFacingNotes:
       - 끝난 기간에 대해 무엇이 반복됐는지, 무엇이 달라졌는지 리포트를 만듭니다.
@@ -144,8 +144,8 @@ features:
     status: SUPPORTED
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/opportunity_engine_v1.md (V94 · 라이브 canonical Demo Org 이슈 19 → 기회 7 ·
-      근거 없는 행 0 · 판매자의 결정과 초안만 저장) · docs/agentic_report_v1.md
+      docs/review/opportunity_engine_v1.md (V94 · 라이브 canonical Demo Org 이슈 19 → 기회 7 ·
+      근거 없는 행 0 · 판매자의 결정과 초안만 저장) · docs/review/agentic_report_v1.md
       (부정문 오탐 수정 후 기회 7 → 5)
     sellerFacingNotes:
       - 리뷰에서 같은 문제가 반복되면, 무엇을 보완하면 좋을지와 그 근거를 함께 제안합니다.
@@ -164,9 +164,9 @@ features:
     status: SUPPORTED
     evidence: IMPLEMENTED
     evidenceRef: >-
-      docs/proactive_operations_agent_v1.md (V75/V76 `proactive_case` — 기본값 OFF · 라이브
-      미실행으로 기록됨) · 다만 docs/agent_command_center_v1.md 와
-      docs/executive_readiness_fix_v1.md 는 canonical Demo Org 의 실제 문의로 만들어진 케이스를
+      docs/standing/proactive_operations_agent_v1.md (V75/V76 `proactive_case` — 기본값 OFF · 라이브
+      미실행으로 기록됨) · 다만 docs/agent/agent_command_center_v1.md 와
+      docs/frontend/executive_readiness_fix_v1.md 는 canonical Demo Org 의 실제 문의로 만들어진 케이스를
       화면에서 관측했다고 적는다. 두 기록이 어긋나므로 evidence 를 올리지 않는다.
     sellerFacingNotes:
       - 판매자님이 찾아보시기 전에 오늘 확인할 일을 미리 조사해서 준비해 두는 기능이 있습니다.
@@ -237,7 +237,7 @@ features:
     status: SUPPORTED
     evidence: LIVE_PROVEN
     evidenceRef: >-
-      docs/helper_device_authentication_v1.md (실제 설치된 도우미로 연결·요청·해제까지 라이브
+      docs/pilot/helper_device_authentication_v1.md (실제 설치된 도우미로 연결·요청·해제까지 라이브
       확인) · helper_devices 는 연결 값의 해시만 보관하고 만료·해제 시각을 가진다 ·
       com.sellerops.auth.device.HelperDeviceAuthFilter 가 도우미가 실제로 부르는 경로 목록만
       통과시키고 그 밖은 거절한다
@@ -250,7 +250,7 @@ features:
       - 이 연결은 판매자님이 도우미를 설치하고 브라우저에서 허용하셔야 만들어집니다.
     sourceRefs:
       - com.sellerops.auth.device.HelperDeviceAuthFilter
-      - docs/helper_device_authentication_v1.md
+      - docs/pilot/helper_device_authentication_v1.md
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-08"
 
@@ -260,13 +260,13 @@ features:
   #
   # 이 행이 담지 못하는 것을 적어 둔다: 주문 결합 · 확인할 일 생성 · 지식 활용 · 승인 · 완료 확인은
   # 이 기능의 단계이지 각자의 축이 아니다. 축으로 만들려면 격자가 채널×객체×축 전부를 요구하므로
-  # 60행이 늘고 mode 어휘와 렌더러가 함께 열린다 — 근거는 docs/full_mvp_channel_capability_audit_v1.md.
+  # 60행이 늘고 mode 어휘와 렌더러가 함께 열린다 — 근거는 docs/lineage/full_mvp_channel_capability_audit_v1.md.
   - id: FEATURE.CUSTOMER_OPERATIONS
     title: 고객 운영 관리 — 맡기면 스스로 확인하고 판단할 일만 가져오기
     status: SUPPORTED
     evidence: IMPLEMENTED
     evidenceRef: >-
-      docs/responsibility_runtime_v1.md (§21 런타임 · §22 확인할 일과 조사 · §24·§25 실제 스케줄러가
+      docs/standing/responsibility_runtime_v1.md (§21 런타임 · §22 확인할 일과 조사 · §24·§25 실제 스케줄러가
       만든 창에서 새 리뷰·문의가 확인할 일이 되기까지 라이브) ·
       com.sellerops.responsibility.ResponsibilityTemplate 가 사람 없이 가져올 수 있는 source 만
       의무로 둔다 · com.sellerops.operationscase.OperationsCaseProcessor 가 규칙으로 판단하고
@@ -282,6 +282,6 @@ features:
       - 고객에게 보내는 마지막 결정은 판매자님이 하십니다. 준비까지가 이 기능의 몫입니다.
     sourceRefs:
       - com.sellerops.operationscase.OperationsCaseSafetyFenceTest
-      - docs/responsibility_runtime_v1.md
+      - docs/standing/responsibility_runtime_v1.md
     review: HUMAN_REVIEWED
     lastReviewed: "2026-09-22"

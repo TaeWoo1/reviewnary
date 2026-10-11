@@ -2,7 +2,7 @@
  * The planner. There is exactly one, and it reaches a model.
  *
  * <b>There is no deterministic sibling, no fallback and no test double at this seam.</b> The keyword
- * planner that used to sit underneath this one is deleted (`docs/sellerops_operator_graph_v2.md` §12.1):
+ * planner that used to sit underneath this one is deleted (`docs/standing/sellerops_operator_graph_v2.md` §12.1):
  * with it present, every property this class is supposed to have could be satisfied by it instead, and
  * a deployment could believe it was running an agent while a table answered. `plannerFence.test.ts`
  * asserts that {@link Planner} has exactly one implementation and that its `kind` is `LLM`.

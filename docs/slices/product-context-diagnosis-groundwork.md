@@ -84,7 +84,7 @@ would have to come from an **official seller-product API**, under the `Official 
 not from reading a listing page. Whether such an endpoint exists and what it returns is
 **external-research required** for every channel here; the roadmap's §4.1 records no product-API fact
 for any of them, and this document does not assume one. Raw HTML, DOM dumps and screenshots are out
-regardless: they are already forbidden for Coupang by `docs/coupang_review_policy_gate_v1.md`'s
+regardless: they are already forbidden for Coupang by `docs/standing/coupang_review_policy_gate_v1.md`'s
 D-limits, and only a **normalized** product context — title, options, attributes, description text —
 should ever be stored or reasoned over.
 

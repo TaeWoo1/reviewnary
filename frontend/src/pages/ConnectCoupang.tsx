@@ -71,7 +71,7 @@ type SyncWatch = { startedAt: number; observeStartedAt: number; polling: boolean
 export function ConnectCoupang() {
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(coupangTutorialReducer, INITIAL_COUPANG_STATE);
-  // Growth funnel (docs/auth_growth_instrumentation_v1.md §5). `preparing` is reached only by a passing
+  // Growth funnel (docs/standing/auth_growth_instrumentation_v1.md §5). `preparing` is reached only by a passing
   // connection test from `submitting`; `connected` only by a finished first sync from `syncing` — the initial
   // server read (`resolving` → any phase) is a returning seller, not a new connection, and fires nothing.
   const previousPhase = useRef(state.phase);

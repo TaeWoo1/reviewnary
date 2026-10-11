@@ -39,7 +39,7 @@ beforeEach(() => sessionStorage.clear());
 afterEach(() => vi.clearAllMocks());
 
 /**
- * No user without an org (docs/auth_growth_instrumentation_v1.md §2-3): the only thing this screen asks is
+ * No user without an org (docs/standing/auth_growth_instrumentation_v1.md §2-3): the only thing this screen asks is
  * 상호명; the backend creates org + user + identity together and answers a session; the first-run journey
  * continues at 채널 연결.
  */
@@ -52,7 +52,7 @@ describe("/onboarding", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Google 계정 · a@gmail.com");
     expect(screen.getByLabelText("이름")).toHaveValue("A");
     fireEvent.change(screen.getByLabelText(/상호/), { target: { value: " 우리 스토어 " } });
-    // 필수 consent first (docs/service_readiness_v1.md §2-4): the checkbox is `required` (browser-blocked) and the
+    // 필수 consent first (docs/standing/service_readiness_v1.md §2-4): the checkbox is `required` (browser-blocked) and the
     // form's own guard says the same thing.
     fireEvent.submit(screen.getByRole("form", { name: "가입 마무리" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("동의");

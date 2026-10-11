@@ -6,7 +6,7 @@ import { useConversation } from "../../lib/conversation/ConversationProvider";
 import { ConversationWorkspace } from "../conversation/ConversationWorkspace";
 
 /**
- * The contextual Agent panel (docs/reviewnary_design.md §8-A) — since Agentic Operating Workspace v2
+ * The contextual Agent panel (docs/frontend/reviewnary_design.md §8-A) — since Agentic Operating Workspace v2
  * the SAME conversation as the home, beside the workspace.
  *
  * <b>The workspace stays primary.</b> 400px on the right, closed by default, opened by a launcher that

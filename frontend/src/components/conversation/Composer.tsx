@@ -5,7 +5,7 @@ import { NavIcon } from "../icons/NavIcon";
 import { asksToSend, SEND_FENCE_COPY } from "../../lib/agentSendFence";
 
 /**
- * The one box (docs/reviewnary_design.md §8-A), docked at the bottom of the transcript (Chat UI v1).
+ * The one box (docs/frontend/reviewnary_design.md §8-A), docked at the bottom of the transcript (Chat UI v1).
  *
  * Enter sends, Shift+Enter breaks a line; the box grows with the text up to ~8 lines and then scrolls.
  * ONE round control at the right edge: ArrowUp to send while idle, Stop while a turn is running — the

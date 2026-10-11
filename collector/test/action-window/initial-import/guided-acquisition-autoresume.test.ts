@@ -14,7 +14,7 @@
  *
  * The safety line is unchanged and is why the first two are allowed at all: re-probing and re-reading are
  * reads, and a read may advance GUIDANCE but never an action barrier
- * (`docs/sellerops_live_approval_contract.md` §5b). Nothing here presses, exports, downloads or consents —
+ * (`docs/standing/sellerops_live_approval_contract.md` §5b). Nothing here presses, exports, downloads or consents —
  * the third fix rings both candidates and still waits for the seller's own press.
  */
 import { describe, expect, it } from "vitest";

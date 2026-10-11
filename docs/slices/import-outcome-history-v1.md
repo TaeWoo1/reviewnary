@@ -1,7 +1,7 @@
 # Slice — Import Outcome & History v1
 
 > **Status:** IMPLEMENTED, offline. **Consumes no gate, promotes no capability.** §4.1 and
-> `docs/channel_capability_ledger.md` are untouched — this changes what a seller *sees*, not what a
+> `docs/channel/channel_capability_ledger.md` are untouched — this changes what a seller *sees*, not what a
 > channel supports.
 
 - **Workstream:** Review Operations (`docs/workstreams/review_operations_mvp.md`)

@@ -191,7 +191,7 @@ describe("ChannelList — the 상품평 entry", () => {
 
   it("is a text link beside the row's facts — one primary control per row, and it is the state's", () => {
     renderList({ reviewCounts: new Map([["acc-cp", 22]]) });
-    // Reviewnary Product UI Redesign v1 (docs/reviewnary_design.md §7 채널 연결): a row carries ONE
+    // Reviewnary Product UI Redesign v1 (docs/frontend/reviewnary_design.md §7 채널 연결): a row carries ONE
     // primary action, decided by the connection state. The record's way in stays, with its count,
     // as a link — never solid, never hidden.
     const link = screen.getByRole("link", { name: "쿠팡 상품평 22개 보기" });

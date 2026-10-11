@@ -23,7 +23,7 @@ export class WriteToolRefusedError extends Error {
   constructor(name: string) {
     super(
       `refused to register WRITE tool "${name}": the Operator has no external write capability in v1 `
-        + `(docs/sellerops_operator_graph_v1.md §3)`,
+        + `(docs/standing/sellerops_operator_graph_v1.md §3)`,
     );
     this.name = "WriteToolRefusedError";
   }

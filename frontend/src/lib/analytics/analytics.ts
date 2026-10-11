@@ -2,11 +2,11 @@ import { type AnalyticsEventName, type AnalyticsEvents, isAnalyticsEvent, saniti
 import type { AnalyticsSink, ConsentGrant } from "./sink";
 
 /**
- * The single analytics abstraction (docs/auth_growth_instrumentation_v1.md §2-8). Pages call
+ * The single analytics abstraction (docs/standing/auth_growth_instrumentation_v1.md §2-8). Pages call
  * `analytics.track("sign_up", { method: "email" })`; the sinks (GTM, PostHog) are decided once at init from
  * env, and with no env there are no sinks — local/dev is OFF and `track` is a no-op.
  *
- * Consent (docs/service_readiness_v1.md §2-4): a sink starts only once 분석 consent is granted. Before a decision
+ * Consent (docs/standing/service_readiness_v1.md §2-4): a sink starts only once 분석 consent is granted. Before a decision
  * events are buffered (≤ MAX_BUFFER, this page load) and flushed on grant; a refusal drops them. Withdrawing
  * consent later tells the sinks to stop.
  *

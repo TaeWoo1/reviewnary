@@ -1,7 +1,7 @@
 # tools/self-pilot — Self-Pilot Runtime v1 operator tools
 
-Canonical: `docs/self_pilot_runtime_v1.md` (design, recovery matrix, honest gaps) ·
-`docs/demo_runbook_v1.md` §0.2 (the procedure) · `docs/sellerops_live_approval_contract.md` §6a (the
+Canonical: `docs/standing/self_pilot_runtime_v1.md` (design, recovery matrix, honest gaps) ·
+`docs/demo_runbook_v1.md` §0.2 (the procedure) · `docs/standing/sellerops_live_approval_contract.md` §6a (the
 standing READ grant) · `docs/product-scope-v1.md` v1.9 (the decision).
 
 | File | Purpose |

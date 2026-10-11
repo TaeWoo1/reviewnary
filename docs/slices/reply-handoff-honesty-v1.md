@@ -1,7 +1,7 @@
 # Slice — Reply Handoff Honesty v1
 
 > **Status:** IMPLEMENTED, offline. **Consumes no gate, promotes no capability.** §4.1 and
-> `docs/channel_capability_ledger.md` untouched. Collector untouched. **Migration V24** relaxes one
+> `docs/channel/channel_capability_ledger.md` untouched. Collector untouched. **Migration V24** relaxes one
 > NOT NULL; no data is rewritten.
 
 - **Workstream:** Review Operations (`docs/workstreams/review_operations_mvp.md`)

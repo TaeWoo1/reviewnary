@@ -1,0 +1,230 @@
+# Channel integration completeness audit v1 (2026-08-19)
+
+**What this is.** A capability-by-capability audit of NAVER / Coupang / Cafe24 connection + local-agent
+features, tracing each one along the FULL chain — user entry → frontend → bridge/backend request → resident
+or flag-selected carrier activation → real driver/connector → result back to the UI — and classifying it as
+`IMPLEMENTED_AND_WIRED` / `IMPLEMENTED_BUT_UNWIRED` / `ONLY_PROBE_OR_FIXTURE` / `NEVER_IMPLEMENTED`.
+
+**Rules the audit held itself to.** A file existing, or a test passing, is not `WIRED`. `WIRED` means the
+chain closes from a control the seller can press. Fixture / synthetic / selector-calibration paths are counted
+separately from product runtime. **Past live proof** and **current reachability on merged `main`** are two
+columns, never one — several capabilities are live-proven AND currently unreachable from the resident helper.
+
+Capability truth for channel × DataType stays in `docs/multi-channel-connector-roadmap.md` §4.1. This document
+audits **reachability**, and does not redefine any capability §4.1 declares.
+
+---
+
+## 1. The table
+
+Legend — *Live proof level*: `LIVE_PROVEN` = run on a real seller account; `LIVE_CALIBRATED` = the selectors /
+readings were measured live, the end-to-end walk was not; `OFFLINE_ONLY` = tests and fixtures only.
+
+| Capability | Past state | Current wiring (merged main + this PR) | Live proof level | Action taken | Residual |
+|---|---|---|---|---|---|
+| **NAVER — 신규 API issuance guided walk** | driver + engine + session complete since the issuance phase; the ONLY host was `run-api-issuance-live-naver.ts`, gated on an operator-owned `NAVER_API_CENTER_URL` | was `IMPLEMENTED_BUT_UNWIRED` in the resident runtime → **`IMPLEMENTED_AND_WIRED`**: `/connect/naver` → `aw_attach{issuance,naver}` → `activateNaverGuidedWalk` → `LazyNaverIssuanceDriver` → `NaverIssuanceDriver` → run view back to the FE | `LIVE_PROVEN` (2026-08-19, this PR: landing `api_center_host`, probe `app_list`, 0/7 timeline, release back to idle) | **wired** — existing driver/engine/session reused verbatim; only a lazy opener + a landing constant + the activator list added | the walk was proven to step 1; steps 2–7 need a seller who actually issues an app |
+| **NAVER — existing app / credential path** | reducer path + `NAVER_EXISTING_APP_TUTORIAL` + runtime-observed `appBranch` | `IMPLEMENTED_AND_WIRED` — the runtime reads the application list and publishes `appBranch`; the FE dispatches `ISSUANCE_APP_BRANCH_OBSERVED` and the reducer routes to `existing_credential_entry` | `LIVE_CALIBRATED` (the `open_app` transition-observe target was measured live; the existing-app completion was not run end to end) | none needed | no live run of the existing-app branch to completion |
+| **NAVER — issuance selector probe / highlight** | `probe-issuance-selectors.ts` (read-only recorder) + `visual-recon-adopted` | `IMPLEMENTED_AND_WIRED` — four fixed-label locators (`create_app`, `api_group`, `application_id`, `application_secret`) derived from the adopted set, re-scored through the frozen adoption gate | `LIVE_CALIBRATED` — `matchCount === 1` on the real API center, runs #4/#5/#6 | none needed | `open_app` is deliberately NOT a highlight target (a live row anchor measured 44 matches) — it is navigation guidance + an observed transition; `return` is text only |
+| **NAVER — credential / permission / IP probe** | advertised call IP from the backend setup view; order-access probed by the connection test | `IMPLEMENTED_AND_WIRED` | `LIVE_PROVEN` (order-access, 2026-06-14) | none | **this machine's env has `SELLEROPS_CONNECTOR_NAVER_ADVERTISED_EGRESS_IPS` unset**, so the guided screen honestly says "고정 호출 IP가 아직 설정되지 않았습니다" while Coupang's is set. Config, not code |
+| **NAVER — first ORDER sync** | backend API connector | `IMPLEMENTED_AND_WIRED` | `LIVE_PROVEN` once (2026-06-14) | none | scheduling flag off; not production-supported (§4.1) |
+| **NAVER — review import (guided segment)** | Action Window import carrier, reachable only from its own flag boot | **`IMPLEMENTED_AND_WIRED` to the resident helper (2026-08-20)** — `/connect/review-history` → `aw_attach{import,naver}` → `activateNaverReviewImport` → `buildNaverImportCarrierCore` (extracted from the flag boot unchanged) → `ImportSegmentHost`. The FLAG boot and its gate are untouched: it still refuses production, refuses a scheduled host, and still demands `--i-understand-this-opens-live-naver`, because THAT boot opens a browser at startup on nobody's request | `LIVE_PROVEN` (2026-07-25 / 07-26, 1 account · 1 segment · disposable backend) for the carrier itself; the on-demand ACTIVATION is offline-proven (`local-agent-bridge-only.test.ts`) and the resident boot line advertises `import/naver` | **wired** — product-owner decision, Full Product Integration v1 | the seller-center URL now falls back to the value `docs/action-window-runtime/naver-surface-urls.md` records when `NAVER_REVIEW_URL` is unset (the operator's env still wins); no on-demand import has been driven end-to-end on a live account yet |
+| **NAVER — guided review reply (submission)** | `reply-submission` carrier; a DEV-only build gate made the FE path unreachable in every shipped build | **FE gate removed (2026-08-20)** — `connectGuidedReplyRuntime` no longer short-circuits on `VITE_AW_BRIDGE`, so a shipped build attaches when an agent hosts the `reply` carrier. It still reaches ONLY that: the resident helper refuses `reply` by construction, and the sole host that announces it is `run-guided-reply-session-live-naver.ts`, which performs the account-fingerprint, chrome-identity and selector-store preflights first | `OFFLINE_ONLY` — still never run live | **FE un-gated; the carrier is deliberately NOT put on the resident helper** — its preflights are the safety, and reproducing them as an on-demand carrier would be the rewrite the integration brief forbids | §4.1 still forbids "답변 등록 지원" wording. The runtime never types or submits; the only terminal it can reach alone is `SUBMISSION_ABORTED` |
+| **Coupang — issuance guided walk** | #468 put it on the resident helper | `IMPLEMENTED_AND_WIRED` | `LIVE_PROVEN` (2026-08-19 ×2, re-verified in this PR on the same helper as the NAVER walk) | regression-checked only | — |
+| **Coupang — credential RENEWAL guided walk** | five-step engine + session + stage plan + live driver shipped with the renewal slice; FE screen complete | **was BROKEN, now `IMPLEMENTED_AND_WIRED` (2026-08-20).** Not merely unwired: `/connect/coupang/renew/:accountId` asked for `issuance`/`coupang` — byte-identical to what the FIRST-TIME walk asks for — so the resident helper answered with the eight-step NEW-KEY engine underneath a page rendering 갱신 copy, and every step arrived under an `actionWindow.coupangIssuance.*` key `renewalStepDetail` has no mapping for (it rendered no detail at all). `renewal` is now its own carrier kind; asking for the wrong one fails CLOSED with `carrier-mismatch` | `OFFLINE_ONLY` | **wired** — the dedicated carrier + the mis-routing fix | ⚠ `WING_RENEWAL_HIGHLIGHT_LABELS` are `LIVE_DOM_CALIBRATION_PENDING` (proposed, not measured). It degrades HONESTLY — a label that resolves 0 or 2 fails the uniqueness check, the run parks on `TARGET_NOT_FOUND`, and the screen offers its text checklist — which is strictly better than answering a renewal request with the first-time walk. Latent in the demo either way: the CTA needs backend `renewRecommended` |
+| **Coupang — `COUPANG_WING_SELECTOR_PROBE` / RECORD** | `probe-wing-issuance-selectors.ts` | `ONLY_PROBE_OR_FIXTURE` **by design** — a read-only calibration recorder CLI with no promotion path; it is not, and was never meant to be, product runtime | `LIVE_PROVEN` as an instrument (2026-08-08 / 08-11 / 08-12 sittings) | none | see §2.1 — what it measured, and what the shipped walk actually uses |
+| **Coupang — 기존 키가 있는 사용자 경로** | `KEY_PRESENT` → hand-off branch in the issuance engine | `IMPLEMENTED_AND_WIRED` — engine publishes `credentialState`; `CoupangIssuanceGuidedWalkthrough` reads it (`alreadyHadKey`) and the walk guides ONLY the hand-off, never 발급 | `OFFLINE_ONLY` for the branch itself | none needed | never exercised live on an account that already holds a key |
+| **Coupang — 키 있음/없음 자동 detection** | `coupang-credential-state.ts` | `IMPLEMENTED_AND_WIRED` — three-valued (`NO_KEY` / `KEY_PRESENT` / `UNKNOWN`); `NO_KEY` requires a POSITIVE non-empty-cell reading, `UNKNOWN` parks rather than issuing | `OFFLINE_ONLY` | none needed | yes, it was really implemented — but its live proof is the cell calibration, not a two-account A/B |
+| **Coupang — credential handoff / order-access probe** | `run-coupang-credential-handoff-live.ts` + `CoupangWingCredentialDriver` | handoff: `IMPLEMENTED_BUT_UNWIRED` in the resident runtime; order-access: **`IMPLEMENTED_AND_WIRED`** — ~~`NEVER_IMPLEMENTED` (the Coupang API connector is an auth skeleton, §4.1)~~ **corrected 2026-08-19, see §5**: `CoupangApiConnector.verifyConnection` runs a two-stage probe (credential → `CoupangOrdersClient.probeOrderAccess`), reached from the 연결 테스트 button | handoff `LIVE_PROVEN` under its own gate | **not wired** — the handoff moves a real Access/Secret key (secret write); the stop rule applies | — |
+| **Coupang — first ORDER sync** | backend API connector (`CoupangOrdersClient`, 657 L, official v5 `ordersheets` day-paging) | **`IMPLEMENTED_AND_WIRED`** — ~~`NEVER_IMPLEMENTED` (인증 골격만, §4.1)~~ **corrected 2026-08-19, see §5** | `LIVE_PROVEN` (2026-08-06, `main` `59c2e6c`, approval `apr-01212e2da29a`, preflight 9/9): first connection → first `ORDER_SUMMARY` sync → `PREPARING→CONNECTED` → same-window idempotent re-sync | none — the row was wrong, not the code | scheduling flag off; not production-supported (§4.1 운영 지원 ❌, 셀러 표기 unchanged) |
+| **Coupang — locate (`[쿠팡에서 보기]`)** | `run-coupang-review-locate-live.ts` only; the FE's `locateSession` sent no `aw_attach` at all | **`IMPLEMENTED_AND_WIRED` (2026-08-20)** — both halves: `locateSession` now names `locate`/`coupang`, and `activateCoupangReviewLocate` serves it on the resident helper. Both §3.2 blockers are answered rather than removed: the agent spends the binding under its OWN SellerOps session (fetched lazily on the first press, never at activation), and the window lands on WING's front door — the seller still reaches 상품평 목록 themselves, exactly as the proven run requires | `LIVE_PROVEN` (2026-08-15, `matches=1` ×2, 0 stored) for the carrier; the on-demand activation is offline-proven and advertised in the resident boot line | **wired** — product-owner decision, Full Product Integration v1 | no live press has been driven through the resident helper yet (browser↔helper pairing needs the operator's own approval) |
+| **Cafe24 — OAuth** | FE `/connect/cafe24` → `api.startCafe24Connect` → `Cafe24Authorizer` / `Cafe24TokenClient` | `IMPLEMENTED_AND_WIRED` (no local agent on this channel at all) | `LIVE_PROVEN` (token rotation included) | none | — |
+| **Cafe24 — order sync** | `Cafe24OrdersClient` + aggregator | `IMPLEMENTED_AND_WIRED` | `LIVE_PROVEN` (E2E PASS incl. amount reconciliation) | none | scheduling flag off |
+| **Cafe24 — review sync (board 4)** | `Cafe24BoardArticlesClient` → `CanonicalCommunityArticle` | `IMPLEMENTED_AND_WIRED` | `LIVE_PROVEN` (2026-07-30 / 07-31) | none | `reply_status` only ever observed as `UNKNOWN` live |
+| **Cafe24 — inquiry sync (board 6)** | `Cafe24InquiryArticleMapper` → 문의 + OPEN 작업항목 | `IMPLEMENTED_AND_WIRED` | `LIVE_PROVEN` (2026-07-31, exact-window contract) | none | board 9 not collected; flag off |
+
+---
+
+## 2. What the audit corrected about our own memory
+
+### 2.1 Coupang has TWO WING label sets, and only one of them is calibrated
+`WING_HIGHLIGHT_LABELS` in `coupang-wing-issuance-driver.ts` are still marked
+`WING_HIGHLIGHT_CALIBRATION = LIVE_DOM_CALIBRATION_PENDING` — proposed labels, never proven. The guided walk
+does **not** point with those. It points with `WING_GUIDED_HIGHLIGHT_PROMOTIONS`, whose every entry cites a
+reading taken live (2026-08-11 / 08-12), each promotable reading taken twice on the same screen and agreeing
+integer for integer. Reading "calibration pending" as "the walk is uncalibrated" is wrong; reading the
+promotions as "every WING label is calibrated" is also wrong.
+
+### 2.2 Three WING fields were never resolved, and the flow does not contain them
+`자체개발` and `호출 IP` matched **0**, `업체명` matched **8**, on the real no-key form. The issuance engine
+records this directly: 업체명 / 호출 IP "have no screen in this flow". Any memory of the guided walk pointing
+at every field of the 발급 화면 is a memory of the plan, not of the shipped walk.
+
+### 2.3 The consent pairing rests on an aggregate, not a per-row census
+`WING_CONSENT_PAIRING_LIVE_BASIS = AGGREGATE_CONJUNCTION_TRUE_2026_08_11_PER_ROW_CENSUS_NEVER_RUN`. The
+per-row consent-block census has never been run live.
+
+### 2.4 The literal-`**` rendering defect is not in any product-rendered string
+Grepped again across `frontend/src`, `collector/src` and `backend/src/main` for `**` inside quoted strings, and
+scanned the rendered text of both connect surfaces during today's live proof (NAVER guided, Coupang guided, and
+the Coupang text checklist with an IP present: `121.170.254.188`). Zero occurrences. The only `**` in Korean
+prose lives in **doc comments** and in the collector's **operator-confirm terminal banner**
+(`locateRunGrantBinding().agentDoesNot`), neither of which is product UI.
+
+---
+
+## 3. What was deliberately NOT wired, and why
+
+> **Resolved 2026-08-20 (Full Product Integration v1).** All three below said the same thing — *"product-owner
+> decision required"* — and the product owner made it: wire every capability with a real implementation onto
+> the resident helper, without weakening a gate or rewriting a live-proven path. §3.1 and §3.2 are now wired;
+> §3.3 is deliberately still not, and the reason changed. The original text is kept below the line because
+> what each decision was ABOUT is still what a future reader needs.
+
+### 3.1 NAVER review import — **now wired (on demand)**
+The premise the original blocker rested on turns out to belong to the FLAG boot alone. That boot opens a
+browser at startup so a seated operator can log in before anything runs, and its gate exists because of that
+— it is untouched. The RESIDENT path opens nothing at activation: the marketplace window comes up on the
+seller's own segment START_RUN, after the SERVER has resolved their launch ref into an account slot, in that
+account's own persistent profile. The single-window premise is preserved from the other side — the seller
+already has SellerOps open in their own browser, so the helper opening a second one was the thing to avoid.
+`NAVER_REVIEW_URL` still wins when set; when it is not, the landing is the value
+`docs/action-window-runtime/naver-surface-urls.md` records, which that document committed deliberately.
+
+### 3.2 Coupang review locate — **now wired (on demand)**
+Both blockers are answered rather than waived. (a) The helper spends the `locateRef` under its OWN SellerOps
+session, fetched lazily on the first press and never at activation — which is the same posture the import
+carrier's ingest already had, so it is not a new class of secret for the helper to hold. (b) The window lands
+on WING's front door and no deeper: the seller reaches 상품평 목록 themselves, exactly as the live-proven run
+has always required ("SellerOps does not navigate for you and presses nothing, not even the pager"). No
+상품평 deep link was invented, because this repository has never observed one.
+
+### 3.3 NAVER guided review reply — **still not on the resident helper, for a better-stated reason**
+The FE half was un-gated (see the table): `connectGuidedReplyRuntime` no longer refuses in shipped builds, so
+the product screen can drive the carrier when an agent hosts it. The CARRIER stays off the resident helper,
+and this is now a considered exclusion rather than the stop rule alone: the live host performs an account
+fingerprint check against the connection registry, a chrome-identity verification, and a selector-store load
+BEFORE it will host a run at all. Those preflights are the safety of that path. Reproducing them inside an
+on-demand activator would be exactly the rewrite of a live-proven implementation the integration brief
+forbids, and dropping them would be weakening a WRITE-adjacent guard. So: the screen is connected, the
+carrier is hosted only by the harness that can satisfy its preconditions.
+
+---
+
+<details>
+<summary>Original §3 text (2026-08-19), superseded above</summary>
+
+The instruction was to re-wire everything `IMPLEMENTED_BUT_UNWIRED` by reusing what exists, and to invent
+nothing. Three capabilities are unwired in the resident runtime and stay that way, because closing each one
+requires a decision rather than a connection.
+
+**3.1 NAVER review import.** Its boot launches a browser AT BOOT and opens SellerOps in it — an explicit
+product-owner decision (2026-07-25) so the seller works in one window with one session — and it refuses to
+start without `NAVER_REVIEW_URL`. An on-demand version would either drop that single-window premise or need
+the seller to supply a marketplace URL. **Product-owner decision required.**
+
+**3.2 Coupang review locate.** Two blockers, neither of them wiring: (a) the run resolves its one-time
+`locateRef` against the backend with a session the CLI establishes from operator credentials — a resident
+helper holding a seller's backend session is a security decision; (b) the run reads *the 상품평 목록 page the
+seller already has up*, which the CLI's operator arranges before pressing. Activating on demand would open a
+WING window that is not on that page, so every locate would answer `NOT_ON_PAGE`. **Product-owner decision
+required.**
+
+**3.3 NAVER guided review reply.** A marketplace WRITE path, never run live. Out of scope by the stop rule.
+
+</details>
+
+---
+
+## 4. The three buckets, separated
+
+### 4.1 What was actually a regression / genuinely unwired
+- **NAVER guided issuance never had a resident runtime.** Not a regression inside the walk — the walk is
+  intact and its selectors are live-calibrated. The gap is that its only host was ever a gated CLI; #466 made
+  `--bridge-only` the resident shape and #468 connected Coupang, and NAVER was left behind. The FE had been
+  asking for it (`aw_attach{issuance,naver}`) the whole time and getting `NOT_SERVABLE`. **Fixed in this PR.**
+- **The NAVER walkthrough's CANCELLED/FAILED dead end** — the identical defect #468 fixed on the Coupang side
+  and left in its sibling: the timeline stayed on screen beside an empty control panel. **Fixed in this PR.**
+- **`IssuanceGuidanceSession` had no teardown latch** — the same shape that, in the Coupang session, brought a
+  released walk's marketplace window back one second after the host closed it. Latent here, fixed before it
+  could be observed. **Fixed in this PR.**
+- **Both issuance sessions floated the detached `watchBarrier` promise** — a driver retired mid-await would
+  reject it unhandled. **Fixed in this PR.**
+
+### 4.2 What we mis-remembered as finished
+- Coupang WING highlight labels "calibrated" (§2.1) — two sets, one calibrated.
+- The guided walk covering 자체개발 / 업체명 / 호출 IP (§2.2) — those screens are not in the flow.
+- Consent pairing proven per row (§2.3) — it is an aggregate boolean.
+- ~~Coupang ORDER_SUMMARY sync — auth skeleton only; there has never been a working first sync.~~ **This bullet was itself the mis-memory — withdrawn 2026-08-19, see §5.**
+- NAVER review reply — offline only, never live.
+- The `**` rendering defect (§2.4) — not reproducible; nothing to fix.
+
+### 4.3 What was used in a way the product did not support
+Nothing here is a user error. Two honest asymmetries that read like one:
+- **A long-running helper is a version pin.** A `--bridge-only` helper started before a code change keeps
+  serving the code it started with, so re-testing after a merge needs a restart. Today's NAVER failure was
+  reproducible on merged `main`, so this was not its cause — but it is why the boot line now prints
+  `onDemandCarriers`, which is the fastest way to tell which helper you are talking to.
+- **`/connect/naver` still offers guided and text as a FORK** at the `application_issuance` phase
+  (`NaverIssuanceModeChoice`: "화면을 보며 안내받기" beside "텍스트로 직접 진행하기"), while the walkthrough
+  behind it is guided-first and the Coupang screen is guided-first. That is a screen that disagrees with the
+  stated product intent — **recorded, not changed**, because it is a journey/UX decision, not a wiring gap.
+  In today's live run the journey entered the guided walkthrough directly, so the fork was not on the path.
+
+---
+
+## 5. Correction (2026-08-19) — the audit understated Coupang ORDER_SUMMARY
+
+A repo-wide simplification audit re-derived §1 from code at `4b84bf2e` and found that **three rows above
+were wrong in the same direction**: they recorded a live-proven, currently-reachable capability as
+non-existent. The rows are struck through and corrected in place; this section records why, because the
+*cause* matters more than the cells.
+
+### 5.1 What the code says
+
+- `CoupangApiConnector.capabilities()` (`:78-90`) returns `Set.of(DataType.ORDER_SUMMARY,
+  DataType.INQUIRY)` with **both marked `"CONFIRMED"`** — not an empty capability set.
+- `CoupangOrdersClient` is **657 lines** implementing the official v5 `ordersheets` PO-list flow: day
+  paging, `nextToken` continuation, per-status sweep, `shipmentBoxId` dedup, `dailySummaries()` (`:429`)
+  and `CanonicalOrder` emission (`:450`). `CoupangSigner` (85 L) is a real CEA HMAC-SHA256 signer.
+- `verifyConnection` runs two *distinct* probes — a low-privilege credential check and then a read-only
+  `ordersheets` order-access probe (`:217-219`) — so a bad credential is never misreported as an IP
+  problem, and an ungranted order scope returns the hedged `ORDER_ACCESS_DENIED`.
+- 14 test files under `backend/src/test/java/com/sellerops/connector/coupang/` cover it.
+
+### 5.2 What the live record says
+
+`docs/lineage/coupang_final_main_first_connection_order_routine_proof_v1.md` — **COMPLETE, live-proven
+2026-08-06** on `main` `59c2e6c` in a disposable environment, approval `apr-01212e2da29a` / run
+`cp-781c4c7a2484`, mode WRITE (credential=1, test=1, sync=1, re-sync=1), preflight **9/9 PASS**: on a
+pristine database a real WING credential achieved first connection, first `ORDER_SUMMARY` sync,
+`PREPARING → CONNECTED`, and a same-window idempotent re-sync — zero code modification, read-only GETs
+only (`returnShippingCenters`, `ordersheets`), no secret/PII/provider-body leakage.
+
+### 5.3 Why the audit missed it
+
+The audit deferred to §4.1 for capability truth, exactly as its own rules require. But §4.1's Coupang
+`ORDER_SUMMARY` row cited **`docs/archive/sellerops_phase3d_completion_summary.md` §3** — an *archived* phase
+document from the connector-skeleton era — and had never been updated. Deferring to a canonical row is
+correct; the row was stale.
+
+The root cause is upstream of both: **the 2026-08-06 proof document had zero inbound references
+anywhere in the repository.** Nothing linked it, so no canonical row was ever prompted to move, and
+three documents went on repeating a claim the code had already outgrown.
+
+### 5.4 What changed, and what deliberately did not
+
+- **Changed (the record):** §4.1's `구현됨` and `라이브 검증` columns, §1's connector-status table,
+  `docs/channel/channel_capability_ledger.md`'s Coupang `ORDER_SUMMARY` cell, and the three rows above.
+- **Not changed (the product):** `운영 지원` stays **❌** (flag off, schedule off) and the seller-facing
+  label stays **표기하지 않음**. Promoting a channel×type to 운영 지원, or showing it to a seller, is a
+  **product-owner decision** and is out of scope for a correction of the record.
+- **Added, so this cannot recur:** `docs/evidence/INDEX.md` — every live-proof document indexed with its
+  date, channel, capability, commit, approval id and outcome. An unlinked proof is how this happened.
+
+### 5.5 The general lesson
+
+The audit's own §2 was titled "what the audit corrected about our own memory", and every entry there
+corrected an **over**-claim. This correction runs the other way. Both directions are drift, but they fail
+differently: an over-claim gets caught the first time someone tries to use the feature, while an
+under-claim is silent — the capability simply stops being counted, and eventually stops being maintained.
+A capability ledger needs a mechanical link from evidence to row, not only a rule about who wins.

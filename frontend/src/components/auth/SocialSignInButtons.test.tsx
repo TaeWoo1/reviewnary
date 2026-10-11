@@ -18,7 +18,7 @@ afterEach(() => vi.clearAllMocks());
 
 /**
  * A button exists only for a provider the backend says is configured, and it is a plain full-page link to
- * Spring Security's authorize endpoint on the same origin (docs/auth_growth_instrumentation_v1.md §4).
+ * Spring Security's authorize endpoint on the same origin (docs/standing/auth_growth_instrumentation_v1.md §4).
  */
 describe("SocialSignInButtons", () => {
   it("renders Google and NAVER as authorize links when both are configured", async () => {

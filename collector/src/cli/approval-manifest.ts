@@ -1,7 +1,7 @@
 /**
  * **Approval Manifest prerequisites + calibration phase specs (pure, testable).**
  *
- * The canonical live-run approval contract (`docs/sellerops_live_approval_contract.md`) says a manifest may
+ * The canonical live-run approval contract (`docs/standing/sellerops_live_approval_contract.md`) says a manifest may
  * only reach **PREPARED** when the approved run is **immediately executable with no further operator input**.
  * This module is where that is enforced: `validateApprovalPrerequisites` refuses to build a manifest unless
  * every execution value the run needs is present, host-screened, phase-consistent, and matches the driver's
@@ -158,7 +158,7 @@ export const CALIBRATION_PHASES = [
   // is the only one whose mode is not `READ_ONLY`. After a trusted operator confirmation it takes ONE read of
   // 업체코드 / Access Key / Secret Key and hands them to the SellerOps backend vault, which verifies them with a
   // read-only Coupang API call. It still clicks, types, submits and issues NOTHING on the marketplace: the key
-  // exists because the seller created it. See `docs/coupang_credential_handoff_v1.md`.
+  // exists because the seller created it. See `docs/lineage/coupang_credential_handoff_v1.md`.
   "COUPANG_WING_CREDENTIAL_HANDOFF",
   // Not a calibration phase — the FE-run-host live proof of the existing-app guided issuance tutorial. It is
   // listed here because this is the set of phases the approval gate can emit + prerequisite-check. Unlike the
@@ -693,7 +693,7 @@ export const COUPANG_WING_ISSUANCE_REVEAL_ACTION: OperatorRevealAction = {
  * **The immutable run SCOPE a destructive phase's grant binds to.** The descriptor above pins *what* the
  * operator does; this pins *what run they are approving*. Both matter, because the operator's one-line
  * `Seated and ready.` binds to the manifest's channel / surface / operation / action budget
- * (`docs/sellerops_live_approval_contract.md` §2–3).
+ * (`docs/standing/sellerops_live_approval_contract.md` §2–3).
  *
  * The gap this closes: those four fields reached the manifest as unvalidated caller/env passthrough, so a stale
  * `SELLEROPS_APPROVAL_CHANNEL=NAVER` (left over from another run) would print a destructive manifest reading

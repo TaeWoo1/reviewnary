@@ -16,7 +16,7 @@ package com.sellerops.inquiry.goal;
  * <p>The frozen gold contains five goals that exist only by inference — a customer describing a broken item, a wrong
  * quantity, a wish to receive something sooner, with no outcome named. The plan representation could not show that,
  * because a plan has no place to say "this goal was added by the reader". Those five are listed in
- * {@code docs/inquiry_architecture_v35.md} §4 class A.
+ * {@code docs/lineage/inquiry_architecture_v35.md} §4 class A.
  */
 public enum RequestBasis {
 

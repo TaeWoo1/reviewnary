@@ -2,7 +2,7 @@
 
 **2026-09-14 · `11ff6cfd` · `frontend/` 전용**(backend · collector · contracts · acquisition 계약 변경 0 ·
 마이그레이션 0). 선행: `docs/archive/2026-q3/catalogue_independent_review_ingest_v1.md`(카탈로그 독립 ingest) ·
-`docs/local_helper_pilot_packaging_v1.md`(도우미) · `docs/sellerops_live_approval_contract.md`.
+`docs/pilot/local_helper_pilot_packaging_v1.md`(도우미) · `docs/standing/sellerops_live_approval_contract.md`.
 
 ## 0. 왜 다시 그렸나 — 실측 먼저
 

@@ -542,7 +542,7 @@ export type ObjectKind = "INQUIRY" | "REVIEW";
  */
 export type ExecutableIdentity = "MARKETPLACE" | "NONE";
 
-/** The closed capability vocabulary the runtime reasons with (docs/agentic_operating_workspace_v2.md §Capability). */
+/** The closed capability vocabulary the runtime reasons with (docs/agent/agentic_operating_workspace_v2.md §Capability). */
 export type AcquisitionCapability = "AUTOMATIC" | "GUIDED_HUMAN_ACTION" | "UNSUPPORTED";
 export type ExecutionCapability = "API_EXECUTION" | "GUIDED_BROWSER_EXECUTION" | "NOT_SUPPORTED";
 

@@ -5,7 +5,7 @@
  * run that polls the page itself, decides the page looks ready, and clicks — no sentinel, no chat text, and no
  * person. The reading is real; the inference from it is not the seller's.
  *
- * So this sweeps for the ACTS (`docs/sellerops_live_approval_contract.md` §5b) and requires a verified press in
+ * So this sweeps for the ACTS (`docs/standing/sellerops_live_approval_contract.md` §5b) and requires a verified press in
  * front of each one. It deliberately does NOT require one in front of a read: a confirmation the operator
  * presses forty times is one they stop reading, and that would cost more than it buys.
  */

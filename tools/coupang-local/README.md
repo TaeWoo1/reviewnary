@@ -10,7 +10,7 @@ gaps a raw flag-on backend leaves open:
 2. **bootstrap → run-backend → preflight** tooling that mints the approval id, arms the backend, and prints
    a **sanitized Approval Manifest** the operator approves in one line — bound to *this* backend/run.
 
-Canonical rules: [`docs/sellerops_live_approval_contract.md`](../../docs/sellerops_live_approval_contract.md).
+Canonical rules: [`docs/standing/sellerops_live_approval_contract.md`](../../docs/standing/sellerops_live_approval_contract.md).
 This harness prepares and displays a manifest; **it never authorizes itself**. The live proof is a separate,
 operator-present step taken only after preflight PASSes and the operator answers `Seated and ready.`
 
@@ -29,7 +29,7 @@ operator-present step taken only after preflight PASSes and the operator answers
   ALREADY-connected account, `mode: READ_ONLY`, `sync=1 credential=0 test=0 re-sync=0`; needs
   `SELLEROPS_CONNECTOR_COUPANG_ORDER_WIRE_SHAPE=true` and refuses to start unless the credential is
   already stored), `inquiries`, `inquiries-dedupe`. The mode is derived from the kind and **WRITE is the
-  default** — see `docs/sellerops_live_approval_contract.md` §7.1 for what `mode` claims.
+  default** — see `docs/standing/sellerops_live_approval_contract.md` §7.1 for what `mode` claims.
 - **A live-proof backend wants the demo login without the fixture's placeholder accounts**:
   `SELLEROPS_SEED_ENABLED=true SELLEROPS_SEED_SELLER_ACCOUNTS=false`. The two were one flag until
   2026-10-11, so asking for the login handed you two CONNECTED accounts with no credential and the

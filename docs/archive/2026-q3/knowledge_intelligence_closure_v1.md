@@ -1,7 +1,7 @@
 # Knowledge & Intelligence Closure v1 — Customer Operations Manager Demo v1 · Q2
 
-> 작성 2026-09-18. 앞 단계: `docs/knowledge_spine_v1.md`(Q1). 제품 목표는
-> `docs/responsibility_runtime_v1.md` §26 — **Customer Operations Manager Demo v1**.
+> 작성 2026-09-18. 앞 단계: `docs/knowledge/knowledge_spine_v1.md`(Q1). 제품 목표는
+> `docs/standing/responsibility_runtime_v1.md` §26 — **Customer Operations Manager Demo v1**.
 >
 > 이 패키지의 질문: **Reviewnary가 판매자를 아는 직원처럼 굴 수 있는가.** 모르면 묻고, 가르쳐 준 것을 기억하고,
 > Case 판단과 초안이 서로 어긋나지 않아야 한다.
@@ -218,7 +218,7 @@ OFF 그대로다.
 
 ### 2-E. Inquiry Need Eval v1 (2026-09-19) — §2-D를 need 단위로 다시 채점
 
-§2-D의 Case 단일 라벨은 인용이 맞으면 TP로 셌다. need 단위 평가 체계 **`docs/inquiry_need_eval_v1.md`**(L1 gold · L2 snapshot ·
+§2-D의 Case 단일 라벨은 인용이 맞으면 TP로 셌다. need 단위 평가 체계 **`docs/lineage/inquiry_need_eval_v1.md`**(L1 gold · L2 snapshot ·
 L3 관측, schema·validator·scorer는 `tools/inquiry-need-eval/`, 실제 데이터는 저장소 밖)로 다시 재면 F5는 retrieval을 개선했지만
 (매칭 8 → 13/14 · 과거 답변 recall 0.30 → 0.67/0.60 · 무관한 인용 0.20 → 0) 새로 찾은 근거의 대부분이 **일부 need만 덮은 채 묻지
 않는** partial-coverage leakage로 흘렀다(PCL 3 → 7/8, strict safe no-ask precision 0.40 → 0.38/0.36). 원인은 retrieval이 아니라

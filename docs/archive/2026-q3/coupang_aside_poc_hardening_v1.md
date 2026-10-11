@@ -2,7 +2,7 @@
 
 **Status — DONE.** Offline proofs landed first; five live bounded reads and one deployed-backend ingest
 proof followed under approval `apr-cp-aside-m4-f767f6` (2026-09-12). §7 is the live record. M3-C proved the spine once
-(`docs/coupang_aside_review_acquisition_poc_v1.md`): one Coupang WING page read by a deterministic executor,
+(`docs/lineage/coupang_aside_review_acquisition_poc_v1.md`): one Coupang WING page read by a deterministic executor,
 handed to the existing ingestion, deduped, visible in Review Core, with 0 marketplace clicks, 0 writes, 0 LLM
 calls inside the execution. M4 does not extend that reach. It asks whether the three things M3 left standing —
 two defects fixed but under-proven, one open question about review bodies, and one run's worth of evidence —

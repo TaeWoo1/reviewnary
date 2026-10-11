@@ -1,5 +1,5 @@
 /**
- * The frontend Content-Security-Policy (docs/service_readiness_v1.md §2-5), computed at BUILD time from the same
+ * The frontend Content-Security-Policy (docs/standing/service_readiness_v1.md §2-5), computed at BUILD time from the same
  * env that turns each vendor on, and injected as a `<meta http-equiv>` by vite.config.ts (production build only:
  * the dev server needs inline scripts for React refresh). Pure, so it is unit-tested. Every origin here answers
  * "why": nothing else may load a script into, or receive a request from, the app.

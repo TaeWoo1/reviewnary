@@ -21,7 +21,7 @@
 # Env: DATABASE_URL (default postgresql://localhost:5432/sellerops).
 #
 # The soak procedure itself — what to arm, in what order, and what each count proves — is
-# docs/pilot_reliability_v1.md §3-§4. This file is the counting, not the contract.
+# docs/standing/pilot_reliability_v1.md §3-§4. This file is the counting, not the contract.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -2,7 +2,7 @@
  * One-time secrets that arrive in a URL — the social one-time code (`/auth/callback?code=`) and the mailed
  * password-reset token (`/reset-password?token=`) — are lifted out of the address bar BEFORE anything else runs
  * (`main.tsx`, ahead of Sentry and analytics), so no vendor `page_view`, breadcrumb, referrer or history entry
- * ever sees them (docs/service_readiness_v1.md §2-1, review B1). The page reads the value back once via
+ * ever sees them (docs/standing/service_readiness_v1.md §2-1, review B1). The page reads the value back once via
  * {@link takeUrlSecret}; sessionStorage keeps it across React StrictMode's double render but not across tabs.
  */
 export const URL_SECRET_KEYS = ["code", "token"] as const;

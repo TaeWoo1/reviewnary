@@ -2,7 +2,7 @@
  * Query Accuracy v1 (2026-08-28) — the typed QuerySpec, end to end: Planner filters → tool args → result.
  *
  * Each case replays a v4 plan (the closed tokens a live planner emits for the sentence — see
- * `docs/agentic_operating_workspace_v2.md` §25 for the live recordings this shape was taken from) through
+ * `docs/agent/agentic_operating_workspace_v2.md` §25 for the live recordings this shape was taken from) through
  * the real graph over fakes that RECORD every request, and asserts three things at once: the tool was
  * called with exactly the spec's axes, the rows the seller sees are the rows that spec selects, and the
  * working set carries the spec forward so the next sentence refines it. No sentence is parsed anywhere.

@@ -80,7 +80,7 @@ unclassified remainder is reported, never folded away.
 Every run records: date, org, corpus size, model + prompt version (`InquirySignalPrompt.PROMPT_VERSION`),
 gold set id and seed, annotator count, G1–G4 results, and the resulting decision (PASS / LIMITATION).
 A LIMITATION result is reported in the package's completion report and in
-`docs/sellerops_operator_graph_v2.md` §16 — it does not block the rest of the package, and it does not
+`docs/standing/sellerops_operator_graph_v2.md` §16 — it does not block the rest of the package, and it does not
 get rounded up to "done".
 
 ## 5a. Measurements taken
@@ -93,7 +93,7 @@ get rounded up to "done".
 **The two rows are kept side by side on purpose.** A measurement whose denominator changed is not the
 same measurement, and replacing the first with the second would hide that the *corpus* moved, not the
 classifier. What happened between them is
-`docs/inquiry_operational_truth_v1.md`: 3,199 of this org's inquiries were seller-dismissed spam that
+`docs/inquiry/inquiry_operational_truth_v1.md`: 3,199 of this org's inquiries were seller-dismissed spam that
 every current-truth read was still counting.
 
 **G1 moved from 0.006 to 0.905 without a single classification changing.** The 3,201 spam posts were

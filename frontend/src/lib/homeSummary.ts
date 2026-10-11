@@ -1,7 +1,7 @@
 /**
  * <b>Home Operations Summary — 오늘 들어온 것 → 지금 볼 것 → 최근 24시간.</b>
  *
- * <p>The contract this implements is `docs/pilot_usage_loop_v1.md` §8. It adds <b>no read</b>: every
+ * <p>The contract this implements is `docs/pilot/pilot_usage_loop_v1.md` §8. It adds <b>no read</b>: every
  * value here comes from the five the Home already makes. What it adds is the one thing that decides
  * whether a number may be spoken at all — <b>a measured zero and an unobserved zero are different
  * facts</b>, and only the first one is allowed to print as 「0」.
