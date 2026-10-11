@@ -35,6 +35,15 @@ LINEAGE = "docs/lineage_index.md"
 SCAN_EXT = {
     ".md", ".java", ".ts", ".tsx", ".yml", ".yaml",
     ".json", ".sh", ".sql", ".mjs", ".cjs", ".properties",
+    ".conf", ".toml", ".gradle", ".example", ".txt",
+}
+
+# 확장자가 없거나 점으로 시작하는 파일도 문서 경로를 적는다. 확장자 allowlist만 보면
+# `.gitignore` 와 `Dockerfile` 안의 낡은 경로를 놓친다 — 2026-10-12에 실제로 놓쳤다.
+# 내력: docs/FINDINGS.md §B8.
+SCAN_NAMES = {
+    ".gitignore", ".gitattributes", ".dockerignore", ".env.example",
+    "Makefile", "Dockerfile", "nginx.conf",
 }
 SKIP_DIRS = {
     "node_modules", ".git", "build", "dist", ".gradle", ".run",
@@ -68,7 +77,8 @@ def walk() -> list[str]:
     for root, dirs, files in os.walk(REPO):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         for f in files:
-            if os.path.splitext(f)[1] in SCAN_EXT:
+            if os.path.splitext(f)[1] in SCAN_EXT or f in SCAN_NAMES \
+                    or f.startswith("Dockerfile"):
                 out.append(os.path.relpath(os.path.join(root, f), REPO))
     return sorted(out)
 

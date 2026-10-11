@@ -155,6 +155,22 @@
   `git diff --name-only -- '*.sql'`로 반드시 확인한다.
 - **출처** — 2026-10-12 세션. 관련: B4 · B6.
 
+### B8. 확장자 allowlist만 보면 `.gitignore`와 `Dockerfile`을 놓친다
+
+- **했던 것** — 문서 레인 재배치 후 링크 검사기로 "끊김 0건"을 확인하고 커밋했다.
+- **사실** — 검사기와 치환 스크립트 둘 다 **확장자 allowlist**로 파일을 골랐다. 그래서
+  확장자가 없거나 점으로 시작하는 파일을 보지 않았고, 그 안의 경로 4건이 낡은 채
+  남았다 — `.gitignore`(`design_skills_bootstrap.md` 2곳 + 지워진
+  `agent_orchestration_playbook.md`를 지키려는 규칙), `frontend/Dockerfile`,
+  `frontend/nginx.conf`(둘 다 `service_readiness_v1.md`). `.gitignore`의 경우는 더
+  나빴다 — 방금 삭제한 `.claude/agents/*`와 `orchestrate.md`를 **추적하라는 예외**가
+  그대로 남아 있었다.
+- **다음에** — 저장소 전체 경로 작업은 **확장자 없는 파일을 명시적으로 포함**한다
+  (`.gitignore` · `.dockerignore` · `Dockerfile*` · `Makefile` · `*.conf` · `*.env.example`).
+  파일을 지웠으면 **`.gitignore`의 그 파일 예외도 같이 지운다.**
+  `tools/docs-link-check.py`가 이제 이 파일들을 본다.
+- **출처** — 2026-10-12 세션, `8d9a2310` 직후 감사에서 발견. 관련: B4 · B6 · B7.
+
 ---
 
 ## C. 증거 · 계약
