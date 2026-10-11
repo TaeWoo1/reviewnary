@@ -1,4 +1,4 @@
-# Review Auto-Check — Live Proof v1 (2026-10-09 → 10-10)
+# Review Auto-Check — Live Proof v1 (2026-10-09 → 10-11)
 
 > **무엇을 증명한 문서인가.** 「자동 리뷰 확인」 lane이 실제 NAVER 스마트스토어센터에서 끝까지 도는지를
 > 라이브로 확인한 기록이고, 그 과정에서 드러난 결함 네 개와 그 수정을 함께 담는다. 계약은
@@ -190,7 +190,72 @@ B는 임시 안전 동작이었다. 저판매량 매장의 빈 하루가 영원�
 ## 5. 남은 것
 
 - **2-3(settle 즉시 pause 해제)의 라이브 증명은 미완.** §4·§4-1 시점의 행은 이미 pause가 없었다. 증명하려면
-  로그아웃 → 벽 → 로그인 → 복귀를 한 번 더 돌려야 한다. 단위 회귀는 있다.
+  로그아웃 → 벽 → 로그인 → 복귀를 한 번 더 돌려야 한다. 단위 회귀는 있다. — **2026-10-11에 ①번 길
+  (리뷰 행의 「판매자센터 로그인」)로는 관측됐고, ②번 길(복귀만)은 아직이다. §6을 보라.**
 - 지문이 **바뀐 경우**(아이디·스토어명 변경)의 회복은 단위 회귀로만 있다 — 다음 번 증명된 읽기가 가져온다.
 - 벽이 아닌 실패로 멈춰 있을 때 복귀마다 probe를 한 번씩 쓴다(수집 0 · resume 0이라 해는 없다).
 - 10-09 22:49 tick이 park해 둔 것보다 5분 일찍 due가 된 건이 설명되지 않았다 — 별도 조사 메모로 남긴다.
+
+## 6. 2026-10-11 — AUTH 복구 구간, 그리고 그 과정에서 드러난 결함 (진행 중)
+
+> **이 절은 PASS를 선언하지 않는다.** 결함 하나를 측정하고 고쳤고, 그 수정이 라이브 배포에서 보이는
+> 것까지 확인했다. 계약이 약속하는 복구 경로 ②(「어디서든 로그인하고 **복귀만** 한다」)의 라이브 재현은
+> **아직 남아 있다** — 그 한 칸이 닫히기 전에는 이 lane을 「증명됐다」고 적지 않는다.
+
+**상태: code complete · final live recovery proof pending.**
+
+### 6-1. 측정된 결함 — 복귀 확인이 엉뚱한 lane으로 나간다
+
+`CollectNowService`의 `pausedSignIn`은 `pausedCatchUp(account, dataType) ||
+autoCheckParkedOnSignIn(account)`였고, 두 번째 항이 **계정 단위**였다. 자동 확인(REVIEW) 행 하나가 벽에
+막히면 같은 계정의 `INQUIRY`·`ORDER_SUMMARY`까지 「로그인을 기다린다」가 된다 — 그 둘은 API pull이라
+화면도, 도우미도, 풀어야 할 벽도 없다.
+
+틀린 문장인 것으로 끝나지 않았다. 연결 화면은 기다리는 줄마다 복귀 확인을 하나씩 돌리고 각자 **자기
+dataType으로** 이어가기를 요청한다. 라이브 기록(backend DEBUG, 요청 본문 포함):
+
+```
+14:07:30 / 14:07:37 / 14:08:00   POST collect-now/resume   dataType=INQUIRY   → 200, null body
+                                 리뷰 resume: 0건.  lane은 PAUSED_AUTH 그대로.
+```
+
+세 번의 활성화를 모두 INQUIRY가 가져갔고, API pull에는 이어갈 화면 읽기가 없으므로 backend는 정직하게
+`null`을 돌려줬다. 정작 벽에 막힌 REVIEW lane은 **resume 요청을 한 번도 받지 못했다**. 같은 날 04:04에도
+같은 모양이었다(CHECK `SIGNED_IN` 4회 · 리뷰 resume 0). §1이 ②번 길로 통과했던 것은 그날 REVIEW가
+경쟁에서 이겼기 때문이고, 그것을 재현 가능하게 만드는 장치는 없었다.
+
+### 6-2. 수정 — `84e88b00`
+
+설정 행은 `(account, data_type)` 단위다. 그래서 **자기 데이터 타입의 멈춤만** 주장하게 하는 필터 하나가
+전부다: 스스로 끝낼 수 없는 멈춤은 들지 않는다. `PAUSED_DEVICE`는 종전대로 false(기다릴 사람이 없다).
+회귀는 `OperatorCollectNowTest`에 있고, **수정 전 식으로 되돌리면 실제로 실패**하는 것까지 확인했다.
+전체 테스트 backend 5312 / frontend 3919, 실패 0.
+
+### 6-3. 라이브에서 확인된 것 / 아직 아닌 것
+
+수정 커밋으로 올린 배포에서 진짜 벽을 세우고(14:58:53 `AUTH_REQUIRED`) 행을 멈춘 뒤(15:18:47
+`PAUSED_AUTH`, `next_check_at +6h`) 세 줄을 읽었다:
+
+| 행 | path | 수정 전 | 수정 후 |
+|---|---|---|---|
+| 리뷰 | `SCREEN_READ` | `pausedSignIn` true | **true** |
+| 문의 | `API` | `pausedSignIn` **true** | **false** |
+| 주문 | `API` | `pausedSignIn` **true** | **false** |
+
+경쟁 자체가 사라졌으므로 복귀 확인은 리뷰 행 하나만 돌리고 resume도 `dataType=REVIEW`로만 나간다.
+
+같은 날 ①번 길(리뷰 행의 「판매자센터 로그인」)로는 체인이 끝까지 돌았다 —
+`POST resume {dataType:REVIEW}` 14:19:39 → `ac-rs-bdccb7a7-1791695980` **1건** ·
+`trigger_source SCHEDULED`(원래 trigger 보존) · `OBSERVED · obs 1 · identity MATCH · BOUNDED` ·
+settle 즉시 `paused_reason` → null · `next_check_at`이 settle+**60분**(6시간 유보 소멸) ·
+freshness `2026-10-10 03:48:51` → `2026-10-11 14:19:58`. 동시에 날아온 INQUIRY resume 2건은 `null`이었고
+중복 읽기는 0이었다.
+
+**남은 한 칸: ②번 길의 라이브 재현** — 로그아웃 → 벽 → 로그인 → **복귀만**으로 REVIEW resume 1회.
+2026-10-11 재현 시도는 판매자 네트워크의 IP 제한으로 NAVER 로그인 자체가 되지 않아 중단했다(접속 제한·
+2차 인증은 우회 대상이 아니다). 벽은 세워진 채로 남아 있고, 로그인 가능한 네트워크에서 한 번의 복귀로
+닫힌다.
+
+전 구간 marketplace WRITE **0**(`review_reply_outcome|execution|submission_ref` = 4 / 2 / 23 불변).
+부수 관측: 밤사이 호스트가 잠든 동안 6시간 fallback(`AUTH_RETRY`)이 11:53에 먼저 발동해 pause를 스스로
+풀었다 — 계약 §4의 ③번 길(교착 방지)이 라이브에서 동작하는 것을 본 셈이다.
