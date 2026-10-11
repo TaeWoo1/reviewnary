@@ -7,7 +7,7 @@
  * `DraftPreparer.ts`. (2) The Operator tool catalogue is byte-for-byte the declared table and still
  * 100% READ — the lane added three READ tools and no other class.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildOperatorTools, OPERATOR_TOOL } from "../../src/operator/tools/OperatorTools";
@@ -19,7 +19,29 @@ import { twoInquiries } from "../support/fixtures";
 import { fourIssues } from "../support/issueFixtures";
 
 const DIR = join(__dirname, "../../src/conversation");
-const FILES = readdirSync(DIR).filter((f) => f.endsWith(".ts")).map((f) => ({ name: f, text: readFileSync(join(DIR, f), "utf8") }));
+
+/**
+ * **Recursive, and that is the point.** This walk was a flat `readdirSync` until 2026-10-12, so
+ * `src/conversation/graph/` — the turn graph and its state — was never scanned. The fence read as
+ * covering the lane while two files sat outside it: a fence with a blind spot is worse than no fence,
+ * because the green tick is read as proof. Same shape as `plannerFence` / `privilegedPlaneFence`.
+ * `name` is the path relative to the lane root, so an exception can be granted to one file in a
+ * subdirectory without widening it to a basename. See `docs/FINDINGS.md` §B10.
+ */
+function laneFiles(dir: string, prefix = ""): { name: string; text: string }[] {
+  const out: { name: string; text: string }[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      out.push(...laneFiles(full, `${prefix}${entry}/`));
+    } else if (entry.endsWith(".ts")) {
+      out.push({ name: `${prefix}${entry}`, text: readFileSync(full, "utf8") });
+    }
+  }
+  return out;
+}
+
+const FILES = laneFiles(DIR);
 
 /** Backend methods / capabilities the lane must never name. Method-call shapes, so a doc word cannot trip it. */
 const FORBIDDEN = [
@@ -41,6 +63,12 @@ describe("conversation write fence", () => {
     "Refresher.ts": [/\bmanualSync\b/],
     // Knowledge Capture v1: the seller's own knowledge seams, written only after a fingerprint-bound 「저장하고 계속」.
     "KnowledgeCaptureWriter.ts": [/\bcreateOrgKnowledge\b/, /\bcreateProductKnowledgeSource\b/],
+    // NOT a backend call. `phases.resume(...)` is the turn graph dispatching its OWN resume phase —
+    // the node table calling into the service, which is the opposite direction from the privileged
+    // plane. The `/\.resume\s*\(/` pattern exists to catch the backend's publish resume, and it has
+    // no way to tell the two apart by shape. The narrow grant is this one path, this one pattern:
+    // a real `spring.resume(` anywhere else in the lane — including elsewhere in `graph/` — still fails.
+    "graph/turnGraph.ts": [/\.resume\s*\(/],
   };
 
   it("no conversation file references a write, approval, verification, collection or credential method", () => {

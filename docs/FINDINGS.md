@@ -222,6 +222,36 @@
 - **출처** — 2026-10-12 세션. `collector/CLAUDE.md` §2·§5 ·
   `.github/workflows/collector-ci.yml` · `src/naver/review-list-observe-inpage.ts`.
 
+### B10. fence가 디렉터리를 평면으로 읽으면 하위 폴더는 무방비다
+
+- **했던 것** — `ConversationService.ts`(4,710줄)를 쪼개기 전에, 그 파일의 **소스를 읽는**
+  테스트가 있는지 확인했다. 다섯 개가 있었고 그중 `conversationWriteFence`가 레인 전체를
+  검사한다고 적혀 있었다 — "No file under `src/conversation/` references a backend method that
+  writes toward a channel or the privileged plane."
+- **사실** — 그 테스트의 파일 수집은 `readdirSync(DIR)` 한 줄, **재귀가 아니었다.**
+  그래서 `src/conversation/graph/`의 두 파일(`turnGraph.ts` · `TurnState.ts`, 12KB)은
+  **한 번도 검사된 적이 없다.** 실제로 `turnGraph.ts:84`의 `phases.resume(` 는 FORBIDDEN
+  패턴 `/\.resume\s*\(/`와 일치하는데 아무 일도 일어나지 않았다.
+  확인 방법: `graph/TurnState.ts`에 `spring.confirmPublish(1)`을 한 줄 넣고 fence를 돌렸다 —
+  **green이었다.** 재귀로 고친 뒤 같은 줄을 넣으니
+  `graph/TurnState.ts matches /\bconfirmPublish\b/`로 실패했다.
+- **왜 이게 가장 나쁜 종류인가** — fence가 없는 것보다 나쁘다. 없으면 아무도 보호받는다고
+  믿지 않는다. 있고 green이면 **그 초록 표시가 증거로 읽힌다.** 이 fence는 문서 주석에
+  "레인 전체"라고 적어 두기까지 했다.
+- **다음에** — ① 소스를 스캔하는 fence는 **반드시 재귀**로 수집한다. 같은 저장소의
+  `plannerFence`/`privilegedPlaneFence`는 `statSync`로 재귀 순회하는 관용구를 이미 쓰고
+  있었다 — 셋이 같은 일을 하면서 하나만 평면이었다. ② fence를 고치면 **일부러 위반을
+  주입해 실패하는 것을 확인한다.** 통과는 fence가 일한다는 증거가 아니다.
+  ③ 코드를 옮기기 전에 그 파일을 **소스로 읽는** 테스트를 먼저 찾는다 — 옮기면 fence가
+  green인 채로 아무것도 검사하지 않게 될 수 있다.
+- **남은 예외 하나** — `graph/turnGraph.ts`의 `/\.resume\s*\(/`는 명시적으로 허용했다.
+  `phases.resume(...)`는 그래프가 **자기 phase**를 부르는 것이고(노드 표 → 서비스),
+  백엔드의 publish resume과 방향이 반대다. 패턴은 모양으로 둘을 구분할 수 없으므로 그
+  **한 경로 · 한 패턴**만 좁게 허용했다 — `graph/` 안 다른 곳의 진짜 `spring.resume(`는
+  여전히 실패한다.
+- **출처** — 2026-10-12 세션. `test/conversation/conversationWriteFence.test.ts` ·
+  `test/operator/plannerFence.test.ts`.
+
 ---
 
 ## C. 증거 · 계약
