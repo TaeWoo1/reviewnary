@@ -230,6 +230,7 @@ but not carrying current truth on its own (`docs/archive/` especially).
 - `docs/learning_outcome_loop_v1.md` — Learning & Outcome Loop v1 — 한 일과 그 결과가 다음 판단에 들어간다
 - `docs/operational_knowledge_direction_v1.md` — Operational Knowledge Direction v1 — 방향만, 구현 없음
 - `docs/operations_daily_loop_v1.md` — Operations Daily Loop v1 — 감사, 그리고 이은 세 자리
+- `docs/pilot_reliability_v1.md` — Pilot Reliability v1 — 72시간 무인 read-only 운전을 위한 감사
 - `docs/order_context_foundation_v1.md` — Order Context Foundation v1 — 주문이 자기 상품과 도착을 알게 된다
 - `docs/proactive_operations_agent_v1.md` — Proactive Operations Agent v1
 - `docs/responsibility_runtime_v1.md` — Responsibility Runtime v1

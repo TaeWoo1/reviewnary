@@ -172,6 +172,9 @@ tools/dev/.run/
 # schedule-guard's record of what IT paused for a live proof. Deployment state, not source — restoring
 # from a committed file would re-enable schedules on a machine that never had them on.
 tools/live-proof/.run/
+# Soak snapshots (tools/soak/soak-snapshot.sh). One machine's row counts at one moment — evidence for
+# a run, not source. A snapshot that reached the repo would be another installation's numbers.
+tools/soak/.run/
 
 # Calibration worksheet — real customer review text, generated locally by
 # tools/review-triage-calibration/draw-sample.mjs. Never committed; see that

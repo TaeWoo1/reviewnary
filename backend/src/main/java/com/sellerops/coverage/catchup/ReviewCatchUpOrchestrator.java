@@ -42,6 +42,11 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>One job per desk at a time is already a schema rule ({@code one-live-job}); this queues the next child
  * only after the previous one has settled, so that rule is never even approached.
  *
+ * <p><b>And a child that never reports is the one case that needs asking about.</b> «The walk stops the moment
+ * the helper does» was written as a safety property and is also a liveness bug: a child that expires unclaimed
+ * or is abandoned mid-lease never reaches {@code settle}, so nothing calls {@link #advance} and the walk waits
+ * for it forever — see {@link #stopIfStranded}.
+ *
  * <h2>How it ends</h2>
  *
  * Five ways, four of which are not failures:
@@ -154,8 +159,11 @@ public class ReviewCatchUpOrchestrator {
      *
      * <p>Deliberately <b>not</b> a resume. The press path continues a live intent because a person is standing
      * in front of it; a tick that found a live intent has nothing to add and does not call this at all. A run
-     * paused at a sign-in wall is continued by the seller signing in ({@link #resumeAfterSignIn}), never by a
-     * timer — retrying a wall on a schedule is how a product teaches a seller that automatic means noisy.
+     * paused at a sign-in wall is continued by {@link #resumeAfterSignIn} when the product sees the seller sign
+     * in, and otherwise — rarely, six hours on — by {@link #resumeAfterWait}, because the product usually
+     * CANNOT see it. Retrying a wall every hour is how a product teaches a seller that automatic means noisy;
+     * waiting for an event that may never be observable is how it teaches them that automatic means nothing
+     * happens.
      */
     @Transactional
     public Optional<Started> startScheduled(UUID orgId, UUID sellerAccountId, UUID channelId, String dataType,
@@ -216,13 +224,80 @@ public class ReviewCatchUpOrchestrator {
     @Transactional
     public Optional<Started> resumeAfterSignIn(UUID orgId, UUID sellerAccountId, String dataType,
                                                AsideRecipe recipe) {
+        return resumePaused(orgId, sellerAccountId, dataType, recipe, "SIGN_IN");
+    }
+
+    /**
+     * <b>The same window again, because enough time has passed that looking is cheaper than waiting.</b>
+     *
+     * <p>Same transition as {@link #resumeAfterSignIn} — PAUSED_AUTH → RUNNING, cursor back on the walled
+     * window, a fresh attempt — and that is deliberate: there is one way to continue a walled walk, and two
+     * names for who decided to. What differs is only the decider, and the audit trail keeps them apart because
+     * the child's trigger is still the walk's own.
+     *
+     * <p><b>Why a timer may ask at all, when this class says it must not.</b> The paragraph on
+     * {@link #resumeAfterSignIn} is right about the wall and wrong about the session, and
+     * {@code ReviewAutoCheckClaimer#AUTH_RETRY} already records the measurement that showed it: on 2026-10-09
+     * the seller signed in directly in their own browser, the session came back, and the lane had no way to be
+     * told — because the only thing that clears a wall is a successful read, and the lane was refusing to
+     * perform one. That argument was applied to the walk-less refresh and <b>not</b> to a paused walk, which
+     * short-circuits the turn before the probe is reached. A walk is the half with more to lose: a new one-day
+     * window opens at every KST midnight, so a signed-out seller parks a walk within a day and the whole
+     * standing lane then produces nothing until a person presses something.
+     *
+     * <p>So the caller — not this class — holds the interval, and it is the same six hours the walk-less path
+     * uses. Nothing new runs on anyone's computer to support this: the read is its own probe.
+     */
+    @Transactional
+    public Optional<Started> resumeAfterWait(UUID orgId, UUID sellerAccountId, String dataType,
+                                             AsideRecipe recipe) {
+        return resumePaused(orgId, sellerAccountId, dataType, recipe, "WAIT");
+    }
+
+    private Optional<Started> resumePaused(UUID orgId, UUID sellerAccountId, String dataType, AsideRecipe recipe,
+                                           String asker) {
         Optional<ReviewCatchUpRun> paused = runs.findFirstBySellerAccountIdAndDataTypeAndStateIn(
                 sellerAccountId, dataType, EnumSet.of(ReviewCatchUpState.PAUSED_AUTH))
                 .filter(run -> orgId.equals(run.getOrgId()));
         if (paused.isEmpty()) {
             return Optional.empty();
         }
+        log.info("review catch-up: resuming a walled walk run={} asked-by={}", paused.get().getId(), asker);
         return Optional.of(resume(paused.get(), recipe));
+    }
+
+    /**
+     * <b>A walk that is waiting for a child nobody will ever report on.</b>
+     *
+     * <p>{@link #advance} is reachable from exactly one place — {@link ScheduledAsideJobService#settle} — and a
+     * child that was never claimed, or claimed and then abandoned, does not settle: it is relabelled EXPIRED by
+     * a bulk UPDATE, and the walk is left RUNNING with nothing on any desk. Nothing in this runtime notices,
+     * and three things then conspire to make it permanent: {@code uq_review_catch_up_live} refuses a second
+     * live walk for the row, so no fresh walk can ever be started; the automatic check reads «a walk is already
+     * running» and stands down every hour, exactly as it should; and the seller's queue simply goes quiet. Over
+     * one 10-minute absence of a helper — a sleep, a restart, a dropped network — the standing lane is over,
+     * and nothing anywhere says so.
+     *
+     * <p><b>Stopped, not resumed.</b> The windows this walk completed still stand, because coverage is read from
+     * the evidence those windows left, so the honest move is to say where it stopped and let the next turn plan
+     * again from the real boundary. Resuming would mean this method deciding how many times a walk may lose its
+     * child, which is a bound nothing has measured; a fresh plan needs no such number and re-derives everything
+     * from the database, like the rest of this runtime.
+     *
+     * @return whether a stranded walk was stopped — false both for a walk that is genuinely working and for one
+     *         that is not RUNNING at all, so a caller may treat false as «leave this alone»
+     */
+    @Transactional
+    public boolean stopIfStranded(UUID catchUpRunId) {
+        ReviewCatchUpRun run = runs.findById(catchUpRunId).orElse(null);
+        if (run == null || run.getState() != ReviewCatchUpState.RUNNING) {
+            return false;
+        }
+        if (jobs.hasLiveChild(run.getId())) {
+            return false;
+        }
+        stop(run, ReviewCatchUpState.FAILED, "CHILD_LOST");
+        return true;
     }
 
     /** The child a live run has on the desk right now, if any — the job a press is answered with. */

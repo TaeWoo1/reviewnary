@@ -462,10 +462,31 @@ public class ScheduledAsideJobService {
         return marketplaceTargets.resolve(orgId, recipe).orElse(null);
     }
 
+    /**
+     * <b>Whether one catch-up walk still has a child on a desk.</b>
+     *
+     * <p>Exists because {@link #settle} is the only thing that tells a lane its child finished, and a child that
+     * was never claimed, or was claimed and abandoned, <b>never settles</b> — it is relabelled EXPIRED by a bulk
+     * UPDATE with no listener behind it. So «the walk has no live child» is the only evidence available that a
+     * walk is waiting for something that is not coming, and the caller is the one that decides what to do about
+     * it (see {@code ReviewCatchUpOrchestrator#stopIfStranded}).
+     *
+     * <p>Expires first, like every other reader here: a desk is not holding work because a helper died holding a
+     * lease, and a walk must not be called live on the strength of a row nobody will ever report on.
+     */
+    @Transactional
+    public boolean hasLiveChild(UUID catchUpRunId) {
+        if (catchUpRunId == null) {
+            return false;
+        }
+        jobs.expireStale(clock.instant());
+        return jobs.countLiveChildren(catchUpRunId) > 0;
+    }
+
     private boolean hasLiveWork(UUID deviceId, Instant now) {
-        return !jobs.claimableFor(deviceId, now).isEmpty()
-                || jobs.findAll().stream().anyMatch(j -> deviceId.equals(j.getDeviceId())
-                        && j.getStatus() == ScheduledAsideJobStatus.CLAIMED
-                        && j.getLeaseUntil() != null && j.getLeaseUntil().isAfter(now));
+        // Two index-served questions. This used to be the second half of a `findAll()` scan — every job this
+        // deployment had ever handed out, hydrated as entities, to answer «is this one desk busy». See
+        // ScheduledAsideJobRepository#countClaimedLive for why that is a problem only a long run finds.
+        return !jobs.claimableFor(deviceId, now).isEmpty() || jobs.countClaimedLive(deviceId, now) > 0;
     }
 }

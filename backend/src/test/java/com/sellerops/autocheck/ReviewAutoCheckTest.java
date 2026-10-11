@@ -912,4 +912,134 @@ class ReviewAutoCheckTest {
         assertThat(settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW")
                 .orElseThrow().getPausedReason()).isNull();
     }
+
+    // ------------------------------------------- 72시간 무인 운전이 찾아내는 것들 (Pilot Reliability v1)
+
+    @Test
+    @DisplayName("벽에 주차된 walk도 드물게 다시 본다 — 여섯 시간은 걷던 줄에도 똑같이 적용된다")
+    void aWalledWalkIsAlsoLookedAtAgainAfterSixHours() {
+        // <b>2026-10-09의 교착이 절반만 닫혀 있었다.</b> 「제품은 로그인을 목격할 수 없으니 드물게 다시
+        // 본다」는 결론은 walk가 없는 오늘 읽기에만 적용됐고, 벽에 주차된 walk는 turn()의 첫 줄에서
+        // 돌아나가 probe에 닿지 못했다. KST 자정마다 하루치 창이 새로 열리므로 로그아웃된 판매자는 하루
+        // 안에 walk를 주차시키고, 그때부터 이 줄은 72시간 동안 아무것도 만들지 않는다.
+        coveredThrough(20);
+        connectionCompleted(account);
+        assertThat(reconciler.tick(now).walked()).isEqualTo(1);
+        ScheduledAsideJob walled = onDesk().orElseThrow();
+        UUID walkId = walled.getCatchUpRunId();
+        assertThat(walkId).isNotNull();
+        LocalDate walledWindow = walled.getRequestedWindowStart();
+        settleAsAuthWall(walled);
+        assertThat(runs.findById(walkId).orElseThrow().getState()).isEqualTo(ReviewCatchUpState.PAUSED_AUTH);
+
+        // 한 시간 뒤: 아직 보지 않는다. 그리고 다음 차례가 여섯 시간 뒤로 밀린다.
+        now = now.plus(Duration.ofHours(1));
+        setDue();
+        assertThat(reconciler.tick(now).pausedAuth()).isEqualTo(1);
+        assertThat(onDesk()).isEmpty();
+        assertThat(settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW").orElseThrow()
+                .getNextCheckAt()).isEqualTo(now.plus(ReviewAutoCheckClaimer.AUTH_RETRY));
+        assertThat(runs.findById(walkId).orElseThrow().getState()).isEqualTo(ReviewCatchUpState.PAUSED_AUTH);
+
+        // 여섯 시간 뒤: 같은 창을 다시 본다. 같은 walk, 새 attempt — 끝난 행으로 수렴하지 않는다.
+        now = now.plus(ReviewAutoCheckClaimer.AUTH_RETRY);
+        assertThat(reconciler.tick(now).walked()).isEqualTo(1);
+        ScheduledAsideJob probe = onDesk().orElseThrow();
+        assertThat(probe.getId()).isNotEqualTo(walled.getId());
+        assertThat(probe.getCatchUpRunId()).isEqualTo(walkId);
+        assertThat(probe.getRequestedWindowStart()).isEqualTo(walledWindow);
+        assertThat(probe.getTrigger()).isEqualTo(AsideTrigger.SCHEDULED);
+        ReviewCatchUpRun resumed = runs.findById(walkId).orElseThrow();
+        assertThat(resumed.getState()).isEqualTo(ReviewCatchUpState.RUNNING);
+        assertThat(resumed.getAttempt()).isEqualTo(2);
+
+        // 그리고 그 읽기가 성공하면 벽은 지워지고 walk는 다음 창으로 간다 — 로그인을 목격하지 않고서.
+        tick(Duration.ofMinutes(1));
+        settleAsRead(probe, 4);
+        assertThat(settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW").orElseThrow()
+                .getPausedReason()).isNull();
+        assertThat(onDesk().orElseThrow().getRequestedWindowStart()).isAfter(walledWindow);
+    }
+
+    @Test
+    @DisplayName("보고하지 않고 죽은 자식은 walk를 영원히 묶는다 — 그 walk는 내려놓고 다시 계획한다")
+    void aWalkWhoseChildDiedIsStoodDownSoAFreshOneCanBePlanned() {
+        // <b>advance()에 닿는 길은 settle() 하나뿐이다.</b> 아무도 집지 않아 TTL이 지난 자식은 bulk
+        // UPDATE로 EXPIRED가 될 뿐 보고하지 않으므로, walk는 RUNNING인 채 아무 책상에도 일이 없다.
+        // 그러면 uq_review_catch_up_live가 새 walk를 막고, 이 줄은 매시간 「이미 걷고 있다」며 물러난다 —
+        // 도우미가 10분 자리를 비운 대가로 자동 확인이 영구히 끝난다. 72시간이면 반드시 한 번은 온다.
+        coveredThrough(20);
+        connectionCompleted(account);
+        assertThat(reconciler.tick(now).walked()).isEqualTo(1);
+        ScheduledAsideJob lost = onDesk().orElseThrow();
+        UUID strandedWalk = lost.getCatchUpRunId();
+
+        // 도우미가 자리를 비운다. 아무도 집지 않고 TTL이 지난다 — settle은 영원히 오지 않는다.
+        now = now.plus(ScheduledAsideJob.TTL).plus(Duration.ofMinutes(1));
+        setDue();
+
+        ReviewAutoCheckReconciler.TickReport report = reconciler.tick(now);
+
+        // 묶인 walk는 왜 멈췄는지를 이름으로 남기고 내려온다. 걸어 지난 창은 그대로 서 있다 —
+        // coverage는 그 창들이 남긴 증거에서 읽히므로.
+        ReviewCatchUpRun stranded = runs.findById(strandedWalk).orElseThrow();
+        assertThat(stranded.getState()).isEqualTo(ReviewCatchUpState.FAILED);
+        assertThat(stranded.getStopReason()).isEqualTo("CHILD_LOST");
+
+        // 그리고 같은 차례가 실제 경계에서 새 walk를 계획했다 — 다음 시간을 기다리지 않는다.
+        assertThat(report.walked()).isEqualTo(1);
+        ScheduledAsideJob fresh = onDesk().orElseThrow();
+        assertThat(fresh.getCatchUpRunId()).isNotNull().isNotEqualTo(strandedWalk);
+        assertThat(fresh.getRequestedWindowStart()).isEqualTo(lost.getRequestedWindowStart());
+    }
+
+    @Test
+    @DisplayName("책상에 자식이 있는 walk는 건드리지 않는다 — 지금 판매자의 화면을 읽고 있다")
+    void aWalkWithAChildOnTheDeskIsLeftAlone() {
+        // 묶임 판정이 「이 계정에 살아 있는 작업이 있나」였다면, 다른 lane의 작업 하나가 멀쩡한 walk를
+        // 내려놓게 만들 수 있다. 판정은 walk의 id로만 내린다.
+        coveredThrough(20);
+        connectionCompleted(account);
+        reconciler.tick(now);
+        ScheduledAsideJob child = onDesk().orElseThrow();
+        UUID walkId = child.getCatchUpRunId();
+
+        // 아직 QUEUED: 집히지 않았을 뿐 살아 있다.
+        now = now.plus(Duration.ofMinutes(1));
+        setDue();
+        assertThat(reconciler.tick(now).skipped()).isEqualTo(1);
+        assertThat(runs.findById(walkId).orElseThrow().getState()).isEqualTo(ReviewCatchUpState.RUNNING);
+
+        // 집혀서 읽는 중: 더욱 건드리지 않는다. lease가 살아 있는 동안 이 walk는 일하는 중이다.
+        dispatcher.claim(org, child.getDeviceId());
+        now = now.plus(Duration.ofMinutes(1));
+        setDue();
+        assertThat(reconciler.tick(now).skipped()).isEqualTo(1);
+        assertThat(runs.findById(walkId).orElseThrow().getState()).isEqualTo(ReviewCatchUpState.RUNNING);
+        assertThat(jobs.count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("끝난 작업이 쌓여도 그 책상은 비어 있다 — 「바쁜가」는 끝난 일을 세지 않는다")
+    void settledWorkNeverMakesTheDeskBusy() {
+        // 이 질문은 findAll()로 답해지고 있었다 — 이 배포가 여태 넘겨준 모든 작업을 엔티티로 읽어서. 표는
+        // 줄어들지 않으므로 「이 책상이 바쁜가」의 값이 설치의 나이와 함께 자랐다. 72시간 무인 운전이
+        // 찾아내고 짧은 테스트가 못 찾는 모양.
+        coveredThrough(1);
+        connectionCompleted(account);
+        for (int hour = 0; hour < 5; hour++) {
+            setDue();
+            assertThat(reconciler.tick(now).refreshedToday()).isEqualTo(1);
+            settleAsRead(onDesk().orElseThrow(), 1);
+            now = now.plus(Duration.ofHours(1));
+        }
+
+        assertThat(jobs.count()).isEqualTo(5);
+        assertThat(onDesk()).isEmpty();
+        assertThat(dispatcher.busy(org)).isFalse();
+        // 그리고 여섯 번째 차례는 거절되지 않는다 — 다섯 개의 끝난 행은 아무것도 막지 않는다.
+        setDue();
+        assertThat(reconciler.tick(now).refreshedToday()).isEqualTo(1);
+        assertThat(dispatcher.busy(org)).isTrue();
+    }
 }
