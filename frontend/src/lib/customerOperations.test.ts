@@ -9,6 +9,7 @@ import {
   sourceHealthLine,
   unobservedLine,
 } from "./customerOperations";
+import { failureShort, gapActionFullKo, gapActionKo } from "./copy/customerOps";
 import type { CustomerOperationsSourceHealth } from "./customerOperationsTypes";
 
 function source(over: Partial<CustomerOperationsSourceHealth>): CustomerOperationsSourceHealth {
@@ -90,6 +91,32 @@ describe("고객 운영 관리 — copy invariants", () => {
     expect(
       gapRowLine({ caseId: "g", channelCode: "CAFE24", channelNameKo: "카페24", reason: "SOURCE_AUTH_REQUIRED", dataTypes: ["INQUIRY", "REVIEW"], since: "x", lastSeenAt: "x", to: "/connect/cafe24" }),
     ).toBe("Cafe24 문의·리뷰 — 연결이 만료되어 확인하지 못했습니다.");
+  });
+
+  it("a signed-out browser is not an expired connection", () => {
+    // The standing automatic check reads the seller centre with the seller's own session; the API connection
+    // beside it may be fine. Telling them to re-authorise it would be the wrong repair.
+    const signedOut = {
+      caseId: "g",
+      channelCode: "NAVER",
+      channelNameKo: "네이버 스마트스토어",
+      reason: "SOURCE_SIGN_IN_REQUIRED",
+      dataTypes: ["REVIEW"],
+      since: "x",
+      lastSeenAt: "x",
+      to: "/connect/naver",
+    };
+    expect(gapRowLine(signedOut)).toBe("네이버 리뷰 — 판매자센터에 로그인이 필요해 확인하지 못했습니다.");
+    expect(gapRowLine(signedOut)).not.toContain("연결");
+    expect(failureShort("SOURCE_SIGN_IN_REQUIRED")).toBe("로그인 필요");
+    expect(gapActionKo("SOURCE_SIGN_IN_REQUIRED")).toBe("로그인");
+    expect(gapActionFullKo("SOURCE_SIGN_IN_REQUIRED")).toBe("판매자센터 로그인하기");
+    // The connection words stay exactly where they were true.
+    expect(failureShort("SOURCE_AUTH_REQUIRED")).toBe("연결 만료");
+    expect(gapActionKo("SOURCE_AUTH_REQUIRED")).toBe("재연결");
+    expect(gapActionFullKo("SOURCE_NOT_CONNECTED")).toBe("다시 연결하기");
+    // An unknown token guesses no repair.
+    expect(gapRowLine({ ...signedOut, reason: "SOMETHING_NEW" })).toContain("확인하지 못해");
   });
 
   it("scope, cadence and Korea time", () => {

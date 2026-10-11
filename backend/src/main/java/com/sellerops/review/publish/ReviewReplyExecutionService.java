@@ -86,6 +86,20 @@ public class ReviewReplyExecutionService {
      */
     private com.sellerops.review.memory.ReviewAnswerMemoryHook answerMemory;
 
+    /**
+     * Where «the reply record for this review moved» is announced, or null in the test seam below.
+     *
+     * <p>Optional and null-checked at its one call site for the same reason {@link #answerMemory} is: this
+     * service's correctness story is about what leaves for a channel exactly once, and a notification must not be
+     * able to affect it. See {@link ReviewReplySettledEvent}.
+     */
+    private org.springframework.context.ApplicationEventPublisher settledEvents;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSettledEvents(org.springframework.context.ApplicationEventPublisher settledEvents) {
+        this.settledEvents = settledEvents;
+    }
+
     @org.springframework.beans.factory.annotation.Autowired
     public ReviewReplyExecutionService(ReviewRepository reviews, SellerAccountRepository accounts,
                                        ChannelRepository channels, ReviewReplyApprovalRepository approvals,
@@ -327,7 +341,9 @@ public class ReviewReplyExecutionService {
                 ReviewExecutionVerification.SUBMISSION_OBSERVED_CONTENT_UNVERIFIED, Instant.now(), "SYSTEM");
         promoted.setSubmissionRef(latest.getSubmissionRef());
         try {
-            return executions.save(promoted);
+            ReviewReplyExecution saved = executions.save(promoted);
+            settled(saved.getOrgId(), saved.getReviewId());
+            return saved;
         } catch (DataIntegrityViolationException raced) {
             return executions.findByOrgIdAndCommandId(scope.review().getOrgId(), promoted.getCommandId())
                     .orElse(latest);
@@ -367,9 +383,32 @@ public class ReviewReplyExecutionService {
         return row;
     }
 
+    /**
+     * Say that this review's reply record moved, and let nothing that listens change what just happened.
+     *
+     * <p>Raised only for a row this call actually wrote — a replay wrote nothing, and announcing it would ask every
+     * listener to re-derive a record that has not moved since the last time they did. Best-effort by construction:
+     * the publish runs after the row is committed (this service holds no transaction) and after a public reply has
+     * already left for the channel on the API lane, so a listener that throws must not turn an irreversible send
+     * into an error the seller would answer by posting again by hand.
+     */
+    private void settled(UUID orgId, UUID reviewId) {
+        if (settledEvents == null || orgId == null || reviewId == null) {
+            return;
+        }
+        try {
+            settledEvents.publishEvent(new ReviewReplySettledEvent(orgId, reviewId));
+        } catch (RuntimeException e) {
+            LOG.warn("review reply settled notification failed org={} review={}: {}", orgId, reviewId,
+                    e.getClass().getSimpleName());
+        }
+    }
+
     private ReviewExecutionView persist(ReviewReplyExecution row, UUID reviewId, boolean replayed) {
         try {
-            return ReviewExecutionView.of(executions.save(row), replayed);
+            ReviewExecutionView view = ReviewExecutionView.of(executions.save(row), replayed);
+            settled(row.getOrgId(), reviewId);
+            return view;
         } catch (DataIntegrityViolationException race) {
             // Our own command landed concurrently — answer as the replay it is.
             ReviewReplyExecution raced = executions.findByOrgIdAndCommandId(row.getOrgId(), row.getCommandId())

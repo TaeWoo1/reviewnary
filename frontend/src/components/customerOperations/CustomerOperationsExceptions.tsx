@@ -15,6 +15,7 @@ import {
   unobservedLine,
   VERIFYING_WORD,
 } from "../../lib/customerOperations";
+import { gapActionFullKo } from "../../lib/copy/customerOps";
 import type { CustomerOperationsDecisionRow, CustomerOperationsHome } from "../../lib/customerOperationsTypes";
 
 const TONE_TEXT: Record<StatusTone, string> = {
@@ -125,7 +126,7 @@ export function CustomerOperationsExceptions({
                   <p className="text-sm text-muted">{kstClock(row.since, now) ?? "최근"}부터</p>
                 </div>
                 <BtnLink to={row.to} size="sm" variant="outline">
-                  다시 연결하기
+                  {gapActionFullKo(row.reason)}
                 </BtnLink>
               </li>
             ))}

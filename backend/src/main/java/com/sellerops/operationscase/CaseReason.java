@@ -28,6 +28,15 @@ public enum CaseReason {
     REVIEW_TEXTLESS_HIGH_RATING("글 없이 별점 4~5점만 남긴 리뷰라 따로 대응할 일이 없습니다.", "글 없이 별점 4~5점만 남긴 리뷰입니다."),
     REVIEW_ALREADY_ANSWERED("이미 답글이 달린 리뷰라 따로 할 일이 없습니다.", "이미 답글이 달린 리뷰입니다."),
     SOURCE_AUTH_REQUIRED("연결이 만료되어 확인하지 못했습니다. 다시 연결해 주세요.", null),
+    /**
+     * <b>The browser session, not the connection.</b> The standing automatic check reads a seller-centre screen
+     * with the seller's own signed-in browser (Review Auto-Check v1), and the wall it meets is a sign-in page —
+     * the channel's API credential beside it may be perfectly good. {@link #SOURCE_AUTH_REQUIRED} says 「연결이
+     * 만료되어」, which is true of an expired credential and false of this: it would send a seller to re-authorise
+     * a connection that never broke. Two repairs, two sentences; both start on the same channel screen, which is
+     * where the 「판매자센터 로그인」 button is.
+     */
+    SOURCE_SIGN_IN_REQUIRED("판매자센터에 로그인이 필요해 확인하지 못했습니다. 로그인해 주세요.", null),
     SOURCE_NOT_CONNECTED("연결이 끊겨 확인하지 못했습니다. 다시 연결해 주세요.", null);
 
     private final String noteKo;

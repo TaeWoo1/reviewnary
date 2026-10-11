@@ -1315,3 +1315,19 @@ evidence 보존. dev `sellerops` 무접촉(migration 105; 지식 12행·봉인 c
 | 단계 | 문서 | 상태 |
 |---|---|---|
 | Q1 Knowledge Spine v1 | `docs/knowledge_spine_v1.md` | 구현 · 테스트 증명(라이브 0) — 판매자 운영 흔적 6종을 scope·authority·freshness·provenance·원천 ref와 함께 **하나의 scoped 읽기**로; 저장 0 · 기존 초안/검색 경로 변경 0 |
+
+## 27. 하루의 고리 감사 — Case 앞뒤 세 이음새 (2026-10-11)
+
+이 런타임의 단계들(§21–§22)은 증명돼 있었고, **그 바깥과 맞닿는 세 자리**가 끊겨 있었다. 전부 기존 객체 안에서
+이었고 새 테이블·새 상태·새 화면·마이그레이션은 0이다 — `docs/operations_daily_loop_v1.md`가 감사와 수정을
+소유한다.
+
+1. **관찰 → Case.** `discoverDeviceReviews`가 「이 스토어를 무인으로 읽어도 되는가」를 **배포 허용목록**에만
+   물었다. 제품은 그 결정을 판매자 설정(`review_auto_check`)으로 옮겼으므로, 평범한 배포에서 제품이 스스로
+   읽은 NAVER 리뷰는 Case가 되지 않았다. 이제 두 권한의 합집합을 묻고, 경계는 그 lane의 첫 settled 읽기에서
+   온다. 후보 질의에 **나이 fence**(`received_at`)가 더해졌다 — catch-up walk가 오늘 채워 넣은 작년 행이
+   「지금 확인할 일」이 되는 것을 막는다.
+2. **관찰 중단 → 판매자.** 자동 확인의 `PAUSED_AUTH`가 `observeGaps`에서 채널 source의 AUTH 실패와 같은
+   자리에서 읽혀 기존 `OBSERVATION_GAP` 카드가 된다. `PAUSED_DEVICE`는 스스로 복구하므로 카드가 아니다.
+3. **실행/결과 → Case.** 리뷰 답변 기록이 움직이면 `ReviewReplySettledEvent`로 그 Case 하나가 즉시 수렴한다
+   (문의 레인이 이미 하던 것). scheduler semantics·창·lease·reconciler 권위는 변화 0.

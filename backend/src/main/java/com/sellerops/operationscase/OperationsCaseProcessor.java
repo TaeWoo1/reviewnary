@@ -180,6 +180,32 @@ public class OperationsCaseProcessor {
         this.marketplaceTargets = com.sellerops.responsibility.aside.AsideMarketplaceTarget.firstOf(resolvers);
     }
 
+    /** The seller's own standing automatic-check rows, or null. See {@link #setAutoChecks}. */
+    private com.sellerops.autocheck.ReviewAutoCheckRepository autoChecks;
+
+    /**
+     * <b>The seller's own standing 「새 리뷰를 자동으로 확인합니다」 rows</b> (Review Auto-Check v1), or null in wiring
+     * that predates them — and absent means this lane behaves exactly as it did.
+     *
+     * <p>Held for one question, asked in two places: <em>which of this organisation's stores does the product read
+     * while nobody is watching.</em> Until this was asked here, only one answer existed in the case lane — the
+     * deployment's allow-list ({@code AsideMarketplaceAccess}, via {@code AsideMarketplaceTarget#resolve}) — and
+     * the product had meanwhile moved that decision to the seller: a connected NAVER store is read every 60
+     * minutes because its own {@code review_auto_check} row says so, with no operator naming it anywhere. So the
+     * reviews the product itself had just read could not become cases, and the whole daily loop stood still one
+     * step before it began. The row is not a second authority over the read; it is the <b>same</b> authority the
+     * dispatch already obeys, finally visible to the lane that turns a reading into work.
+     *
+     * <p>It cannot widen anything else. It names accounts and nothing more — never a period, a recipe, a device or
+     * a boundary — and every account it names is still put to
+     * {@code AsideMarketplaceTarget#resolveFor}, which answers only for this organisation's own account on that
+     * recipe's channel with a screen to read.
+     */
+    @Autowired(required = false)
+    public void setAutoChecks(com.sellerops.autocheck.ReviewAutoCheckRepository autoChecks) {
+        this.autoChecks = autoChecks;
+    }
+
     @Autowired
     public OperationsCaseProcessor(ResponsibilityRunRepository runs, ResponsibilityRepository responsibilities,
                                    ResponsibilityRunSourceRepository sourceRows, ResponsibilitySources sources,
@@ -303,11 +329,15 @@ public class OperationsCaseProcessor {
                     .filter(r -> !r.getCompleteness().settled() && r.getFailureReason() != null
                             && SELLER_ACTIONABLE.contains(r.getFailureReason()))
                     .toList();
-            if (!blocked.isEmpty()) {
-                String family = blocked.stream().anyMatch(r -> r.getFailureReason() == SourceFailureReason.AUTH_REQUIRED)
-                        ? "AUTH" : "CONNECTION";
-                String types = blocked.stream().map(ResponsibilityRunSource::getDataType).distinct().sorted()
-                        .collect(Collectors.joining(","));
+            Set<String> standingWalls = standingSignInWalls(accountId);
+            if (!blocked.isEmpty() || !standingWalls.isEmpty()) {
+                boolean credentialExpired = blocked.stream()
+                        .anyMatch(r -> r.getFailureReason() == SourceFailureReason.AUTH_REQUIRED);
+                String family = credentialExpired || !standingWalls.isEmpty() ? "AUTH" : "CONNECTION";
+                String types = java.util.stream.Stream.concat(
+                                blocked.stream().map(ResponsibilityRunSource::getDataType),
+                                standingWalls.stream())
+                        .distinct().sorted().collect(Collectors.joining(","));
                 String state = OperationsSignal.truncate(OperationsSignal.gapState(family, types));
                 if (open.isPresent() && open.get().getSourceState().startsWith("rr:gap;family=" + family + ";")) {
                     OperationsCase gap = open.get();
@@ -323,9 +353,23 @@ public class OperationsCaseProcessor {
                 }
                 open.ifPresent(stale -> close(stale, run.getId(), CaseResolution.SUPERSEDED,
                         CaseEventKind.RECONCILED_CLOSED, Map.of("observed", "GAP_FAMILY_CHANGED")));
-                Channel channel = channelByCode.get(blocked.get(0).getChannelCode());
-                CaseReason reason = "AUTH".equals(family) ? CaseReason.SOURCE_AUTH_REQUIRED
-                        : CaseReason.SOURCE_NOT_CONNECTED;
+                Channel channel = channelByCode.get(
+                        (blocked.isEmpty() ? latest.get(0) : blocked.get(0)).getChannelCode());
+                // <b>Three repairs, three sentences.</b> A channel source that failed on auth is an expired
+                // credential («연결이 만료되어»); a standing read with no failed source beside it met a sign-in
+                // page with the credential intact («판매자센터에 로그인이 필요해»). Where both are true the
+                // channel's own failure is named, because it is the source this responsibility owes the seller
+                // and the sign-in is visible on the very screen that card links to. The reason is written once,
+                // when the episode opens, and a repeat leaves it alone — a stored code keeps meaning what it
+                // meant when it was written (see {@link CaseReason#REVIEW_ROUTINE}).
+                CaseReason reason;
+                if (credentialExpired) {
+                    reason = CaseReason.SOURCE_AUTH_REQUIRED;
+                } else if (!standingWalls.isEmpty()) {
+                    reason = CaseReason.SOURCE_SIGN_IN_REQUIRED;
+                } else {
+                    reason = CaseReason.SOURCE_NOT_CONNECTED;
+                }
                 OperationsCase gap = newCase(run, OperationsCaseKind.OBSERVATION_GAP, OperationsSubjectKind.SOURCE,
                         accountId, state, OperationsSignal.signature(run.getOrgId(), OperationsSubjectKind.SOURCE,
                                 accountId, state, run.getId()));
@@ -335,7 +379,8 @@ public class OperationsCaseProcessor {
                 gap.setPriority(CasePriority.HIGH);
                 gap.setRequiredAuthority(RequiredAuthority.HUMAN);
                 gap.setDecidedBy(CaseDecider.RULE);
-                gap.setRecommendedAction((channel == null ? "채널" : channel.getNameKo()) + " 다시 연결하기");
+                gap.setRecommendedAction((channel == null ? "채널" : channel.getNameKo())
+                        + (reason == CaseReason.SOURCE_SIGN_IN_REQUIRED ? " 판매자센터 로그인하기" : " 다시 연결하기"));
                 try {
                     OperationsCase saved = cases.saveAndFlush(gap);
                     event(saved, run.getId(), CaseEventActor.SYSTEM, CaseEventKind.OPENED,
@@ -350,6 +395,39 @@ public class OperationsCaseProcessor {
                 k.gapsRecovered++;
             }
         }
+    }
+
+    /**
+     * <b>The data types this account's standing read is waiting for a person on.</b>
+     *
+     * <p>A {@code PAUSED_AUTH} standing lane is an observation gap in every sense this runtime means by the word:
+     * the product promised to keep that store current, it cannot, and only the seller can end it — which is
+     * exactly what an {@code OBSERVATION_GAP} and the Home's 「확인하지 못한 것」 row already say, with a link to
+     * the screen that holds the sign-in. The sentence is its own ({@link CaseReason#SOURCE_SIGN_IN_REQUIRED}):
+     * this wall is a signed-out browser, not an expired credential, and sending a seller to re-authorise a
+     * connection that never broke is the wrong repair. Until this was asked, that pause lived on
+     * one account's settings panel and the operations Home said nothing: the queue simply went quiet, which is the
+     * one thing a stopped observation must never look like.
+     *
+     * <p><b>Only the wall a person can clear.</b> {@code PAUSED_DEVICE} is not here — the next tick recovers it
+     * by itself (Review Auto-Check v1 §5), and a card that asks for nothing and clears itself teaches a seller to
+     * read past the ones that do. Same discipline as {@link #SELLER_ACTIONABLE} for a channel source.
+     *
+     * <p>No second state: the row IS the state, read each run and cached nowhere, so the gap closes by the
+     * ordinary recovery path the moment the seller signs in and the lane drops its pause.
+     */
+    private Set<String> standingSignInWalls(UUID accountId) {
+        if (autoChecks == null) {
+            return Set.of();
+        }
+        Set<String> walls = new java.util.LinkedHashSet<>();
+        for (DataType type : List.of(DataType.REVIEW, DataType.INQUIRY)) {
+            autoChecks.findBySellerAccountIdAndDataType(accountId, type.name())
+                    .filter(com.sellerops.autocheck.ReviewAutoCheck::on)
+                    .filter(row -> row.getPausedReason() == com.sellerops.autocheck.AutoCheckPause.PAUSED_AUTH)
+                    .ifPresent(row -> walls.add(type.name()));
+        }
+        return walls;
     }
 
     // ── discover ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -395,9 +473,18 @@ public class OperationsCaseProcessor {
      * <p>A marketplace device read (NAVER Seller Center 리뷰) is deliberately NOT one of the template's sources: it
      * must not fail a run or report 「확인하지 못함」 about the seller's owed data. What it stores, though, is ordinary
      * canonical reviews, and a new one deserves the same case as a new review from any other source. So discovery
-     * asks the same two questions of it: has this responsibility settled a read of that store yet (its first
-     * {@code BOUNDED} observation is the hand-over boundary — reviews stored by that first read were already there
-     * and belong to the existing screens), and what arrived after. Same candidate query, same rules, same dedup.
+     * asks the same two questions of it: has the product settled a read of that store yet (the first {@code BOUNDED}
+     * reading is the hand-over boundary — rows stored by that first read were already there and belong to the
+     * existing screens), and what arrived after. Same candidate query, same rules, same dedup.
+     *
+     * <p><b>Two lanes read a store unattended, and this used to see only one of them.</b> A responsibility run
+     * reads it when the deployment names the organisation and the account; the standing lane reads it every 60
+     * minutes because the seller's own setting says so (Review Auto-Check v1), which is what an ordinary
+     * installation actually has — the row is created when the seller finishes connecting. The target resolver
+     * asked only the first question ({@code resolve}, which consults the deployment allow-list), so in that
+     * ordinary installation this method returned at its first line, and <b>no review the product read on its own
+     * ever became a case.</b> Now both are asked, each with its own boundary, and a store that both lanes read
+     * appears once.
      */
     private void discoverDeviceReviews(ResponsibilityRun run, Responsibility responsibility, BooleanSupplier stop,
                                        Counters k, Instant reach, Set<UUID> reviewChannels) {
@@ -416,27 +503,27 @@ public class OperationsCaseProcessor {
             if (!recipe.readsMarketplace() || (recipeType != DataType.REVIEW && recipeType != DataType.INQUIRY)) {
                 continue;
             }
-            Optional<com.sellerops.responsibility.aside.AsideMarketplaceTarget.Target> target =
-                    marketplaceTargets.resolve(orgId, recipe);
-            if (target.isEmpty()) {
+            List<UUID> stores = unattendedStores(orgId, recipe, recipeType);
+            if (stores.isEmpty()) {
                 continue;
             }
             if (recipeType == DataType.INQUIRY) {
                 // Inquiries are scoped by the ACCOUNT they were read for (the same candidate query the template's
-                // inquiry sources use), and the boundary is this account's first settled inquiry read.
-                UUID accountId = target.get().sellerAccountId();
-                Instant inquiryBaseline = cases.firstSettledObservation(orgId, responsibility.getId(), accountId,
-                        DataType.INQUIRY.name());
-                if (inquiryBaseline == null) {
-                    continue;
-                }
-                Instant inquirySince = inquiryBaseline.isAfter(reach) ? inquiryBaseline : reach;
-                for (Inquiry inquiry : cases.inquiryCandidates(orgId, accountId, inquirySince,
-                        PageRequest.of(0, CANDIDATE_SCAN))) {
-                    if (stop.getAsBoolean()) {
-                        return;
+                // inquiry sources use), and the boundary is that account's own first settled inquiry read.
+                for (UUID accountId : stores) {
+                    Instant inquiryBaseline = unattendedBaseline(orgId, responsibility, accountId, recipe,
+                            DataType.INQUIRY);
+                    if (inquiryBaseline == null) {
+                        continue;
                     }
-                    handleInquiry(run, responsibility, inquiry, k);
+                    Instant inquirySince = inquiryBaseline.isAfter(reach) ? inquiryBaseline : reach;
+                    for (Inquiry inquiry : cases.inquiryCandidates(orgId, accountId, inquirySince,
+                            PageRequest.of(0, CANDIDATE_SCAN))) {
+                        if (stop.getAsBoolean()) {
+                            return;
+                        }
+                        handleInquiry(run, responsibility, inquiry, k);
+                    }
                 }
                 continue;
             }
@@ -444,8 +531,17 @@ public class OperationsCaseProcessor {
             if (channelId == null || !reviewChannels.add(channelId)) {
                 continue;
             }
-            Instant baseline = cases.firstSettledObservation(orgId, responsibility.getId(),
-                    target.get().sellerAccountId(), DataType.REVIEW.name());
+            // <b>A review knows its channel and not its store</b> — {@code reviews} has no seller account — so the
+            // boundary for this channel is the EARLIEST of its read stores'. Watching began when the first of them
+            // began; a later store's own boundary cannot un-watch what was already being watched, and the age fence
+            // in {@code reviewCandidates} is what keeps «earliest» from meaning «everything».
+            Instant baseline = null;
+            for (UUID accountId : stores) {
+                Instant seen = unattendedBaseline(orgId, responsibility, accountId, recipe, DataType.REVIEW);
+                if (seen != null && (baseline == null || seen.isBefore(baseline))) {
+                    baseline = seen;
+                }
+            }
             if (baseline == null) {
                 continue;
             }
@@ -457,6 +553,55 @@ public class OperationsCaseProcessor {
                 handleReview(run, responsibility, review, k);
             }
         }
+    }
+
+    /**
+     * <b>Which of this organisation's stores the product reads for this recipe while nobody is watching.</b>
+     *
+     * <p>The union of the two authorities, and neither is invented here: the deployment's named store
+     * ({@code resolve}) and every store whose own standing setting says to read it. A seller-authorised account is
+     * still put to {@code resolveFor}, so the resolver — not this method — decides it is this organisation's
+     * account, on this recipe's channel, with a screen that can be read; an account it will not name is not read.
+     *
+     * <p>The setting is keyed by data type, so an {@code INQUIRY} recipe asks about {@code INQUIRY} rows and finds
+     * none today (the standing lane is REVIEW-scoped). That is deliberate: the inquiry device lane keeps exactly
+     * the behaviour it has, and the day the setting covers inquiries this method needs no edit.
+     */
+    private List<UUID> unattendedStores(UUID orgId, com.sellerops.responsibility.aside.AsideRecipe recipe,
+                                        DataType recipeType) {
+        java.util.LinkedHashSet<UUID> stores = new java.util.LinkedHashSet<>();
+        marketplaceTargets.resolve(orgId, recipe)
+                .map(com.sellerops.responsibility.aside.AsideMarketplaceTarget.Target::sellerAccountId)
+                .ifPresent(stores::add);
+        if (autoChecks != null) {
+            for (com.sellerops.autocheck.ReviewAutoCheck standing
+                    : autoChecks.findByOrgIdAndDataType(orgId, recipeType.name())) {
+                // A paused row is still the seller wanting this: the wall it is waiting on is theirs to clear, and
+                // the readings it already delivered are still this responsibility's work.
+                if (!standing.on()) {
+                    continue;
+                }
+                marketplaceTargets.resolveFor(orgId, standing.getSellerAccountId(), recipe)
+                        .map(com.sellerops.responsibility.aside.AsideMarketplaceTarget.Target::sellerAccountId)
+                        .ifPresent(stores::add);
+            }
+        }
+        return List.copyOf(stores);
+    }
+
+    /**
+     * The hand-over boundary for one store, from whichever lane actually read it.
+     *
+     * <p>This responsibility's own settled observation first — a run that read the store has said, in its own
+     * record, when it took the job over. Only when it has none does the standing lane's first settled reading
+     * answer, which is the ordinary case: a deployment that never named this store in its allow-list has no
+     * responsibility reading of it to point at, and «we have been watching since the product first read this
+     * store» is then the honest boundary rather than a missing one.
+     */
+    private Instant unattendedBaseline(UUID orgId, Responsibility responsibility, UUID accountId,
+                                       com.sellerops.responsibility.aside.AsideRecipe recipe, DataType dataType) {
+        Instant own = cases.firstSettledObservation(orgId, responsibility.getId(), accountId, dataType.name());
+        return own != null ? own : cases.firstSettledStandingRead(orgId, accountId, recipe);
     }
 
     private void handleInquiry(ResponsibilityRun run, Responsibility responsibility, Inquiry inquiry, Counters k) {

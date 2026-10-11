@@ -162,4 +162,39 @@ class OperationsCaseSafetyFenceTest {
             }
         }
     }
+
+    @Test
+    @DisplayName("the deployment allow-list is not a second approval gate on a store the seller's own setting authorises")
+    void theStandingSettingIsNotGatedTwice() throws IOException {
+        String processor = code(PACKAGE.resolve("OperationsCaseProcessor.java"));
+        // The lane that dispatches the read asks exactly one authority per trigger: the deployment for a
+        // RESPONSIBILITY run, the seller's own row for the standing lane (ScheduledAsideJobService.dispatch).
+        // If THIS class asked the deployment gate as well, a store the seller authorised would need an operator
+        // to name it too — a second approval the product never asked anyone for, on work it is already doing.
+        assertThat(processor).as("the case lane must not re-ask the deployment gate")
+                .doesNotContain("AsideMarketplaceAccess").doesNotContain("marketplaceAccess")
+                .doesNotContain("allows(recipe");
+        // And it reads the setting, never writes it: a loop that could create or revive a row would be deciding
+        // whose store is read — the one thing Review Auto-Check v1 took away from every loop.
+        assertThat(processor).as("the setting is the seller's; this lane only reads it")
+                .contains("autoChecks.findByOrgIdAndDataType").contains("autoChecks.findBySellerAccountIdAndDataType")
+                .doesNotContain("autoChecks.save").doesNotContain("autoChecks.delete")
+                .doesNotContain("setEnabled").doesNotContain("setPausedReason").doesNotContain("setNextCheckAt");
+    }
+
+    @Test
+    @DisplayName("both convergence listeners run after the commit, and neither may be dropped for want of a transaction")
+    void convergenceWaitsForDurability() throws IOException {
+        for (String file : List.of("InquiryAnswerCaseConvergence.java", "ReviewReplyCaseConvergence.java")) {
+            String listener = code(PACKAGE.resolve(file));
+            assertThat(listener).as("%s: a card may only move after the record that moved it is durable — a "
+                            + "derivation that runs inside the writer's transaction reads the state it is "
+                            + "replacing, and a rollback would leave a conclusion about a record that never "
+                            + "landed", file)
+                    .contains("@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, "
+                            + "fallbackExecution = true)")
+                    .contains("@Transactional(propagation = Propagation.REQUIRES_NEW)")
+                    .doesNotContain("@EventListener");
+        }
+    }
 }

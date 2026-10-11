@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.sellerops.attention.triage.ReviewTriage;
+import com.sellerops.autocheck.ReviewAutoCheck;
 import com.sellerops.attention.triage.ReviewTriageRepository;
 import com.sellerops.attention.triage.TriageDisposition;
 import com.sellerops.channel.Channel;
@@ -67,6 +68,7 @@ import com.sellerops.responsibility.RunStatus;
 import com.sellerops.responsibility.RunTrigger;
 import com.sellerops.responsibility.SourceCompleteness;
 import com.sellerops.responsibility.SourceFailureReason;
+import com.sellerops.responsibility.aside.ScheduledAsideJob;
 import com.sellerops.review.Review;
 import com.sellerops.review.ReviewReplyState;
 import com.sellerops.review.ReviewRepository;
@@ -136,6 +138,8 @@ class OperationsCaseProcessorTest {
     @Autowired com.sellerops.reviewimport.ReviewImportSegmentRepository segments;
     @Autowired com.sellerops.reviewimport.ReviewImportPlanRepository plans;
     @Autowired org.springframework.transaction.PlatformTransactionManager txManager;
+    @Autowired com.sellerops.autocheck.ReviewAutoCheckRepository autoChecks;
+    @Autowired com.sellerops.responsibility.aside.ScheduledAsideJobRepository asideJobs;
 
     private final CaseInvestigator investigator = mock(CaseInvestigator.class);
     private final CaseInvestigationService investigation = mock(CaseInvestigationService.class);
@@ -1252,6 +1256,263 @@ class OperationsCaseProcessorTest {
                 workItems, reviews, channels).home(org).available()).isFalse();
     }
 
+    // ── the lane the seller's own setting runs (Review Auto-Check v1) ─────────────────────────────────────────
+
+    /**
+     * <b>The ordinary installation: nobody named this store in a deployment list, and the product reads it anyway
+     * because the seller's own setting says so.</b> Until the case lane asked that second authority, a review the
+     * product had just read on its own could not become work — {@code resolve()} answered «no store» and discovery
+     * returned at its first line.
+     *
+     * <p>Three reviews pin the two fences apart. The one that was already stored when the standing read first
+     * covered its window belongs to the existing screens; the one a catch-up walk filled in from months ago
+     * arrived today and is still not today's work; only the one that both arrived after the boundary AND was
+     * written recently is a case.
+     */
+    @Test
+    void reviewsTheSellersOwnSettingHadTheProductReadBecomeCases_andAFilledPastIsStillNotTodaysWork() {
+        Channel naver = naverChannel();
+        SellerAccount store = naverStore(naver);
+        Instant firstRead = Instant.now().minus(Duration.ofMinutes(30));
+        standingRead(store.getId(), firstRead);
+        // The deployment named nobody: only the per-account question is answered, which is what the dispatch of
+        // this lane asks too.
+        processor.setMarketplaceTargets(List.of(sellerAuthorised(store.getId())));
+
+        naverReview(naver, 1, "첫 확인 때 이미 있던 리뷰", firstRead.minus(Duration.ofDays(2)),
+                firstRead.minus(Duration.ofSeconds(5)));
+        naverReview(naver, 1, "작년에 쓴 리뷰인데 이제야 들어왔어요. 금방 떨어졌어요.",
+                Instant.now().minus(Duration.ofDays(200)), Instant.now());
+        Review arrived = naverReview(naver, 1, "한 달 만에 떨어졌어요. 교환 원합니다.", Instant.now(), Instant.now());
+
+        assertThat(processor.process(run(Instant.now(), null, null), () -> false).opened())
+                .as("no setting, no standing authority: this lane opens nothing")
+                .isZero();
+        assertThat(casesOf()).isEmpty();
+
+        ReviewAutoCheck setting = autoCheck(store.getId(), null);
+
+        OperationsCaseProcessor.Report first = processor.process(run(Instant.now(), null, null), () -> false);
+
+        assertThat(first.opened()).isEqualTo(1);
+        assertThat(only().getSubjectId()).as("only what arrived after the boundary and is recent")
+                .isEqualTo(arrived.getId());
+
+        OperationsCaseProcessor.Report rerun = processor.process(run(Instant.now(), null, null), () -> false);
+        assertThat(rerun.opened() + rerun.updated()).isZero();
+        assertThat(rerun.unchanged()).isEqualTo(1);
+        assertThat(setting.on()).isTrue();
+    }
+
+    /**
+     * <b>The two authorities are an OR, and that is the point.</b> The seller's setting is a standing
+     * authorisation in its own right — a store it names is read and its reviews become work with no operator
+     * naming it anywhere ({@code …SellersOwnSetting…} above) — and the deployment allow-list that predates it is
+     * not a second gate in front of it. This is the other half: a store the deployment named still becomes work
+     * with <b>no setting row at all</b>, so neither authority is required and neither can take the other's work
+     * away. {@code OperationsCaseSafetyFenceTest} pins the same property on the source.
+     */
+    @Test
+    void aStoreTheDeploymentNamedStillBecomesWorkWithNoSellerSetting() {
+        Channel naver = naverChannel();
+        SellerAccount store = naverStore(naver);
+        Instant firstRead = Instant.now().minus(Duration.ofMinutes(30));
+        standingRead(store.getId(), firstRead);
+        UUID storeId = store.getId();
+        // The deployment named this store, exactly as it did before the setting existed.
+        processor.setMarketplaceTargets(List.of((orgId, recipe) ->
+                recipe == com.sellerops.responsibility.aside.AsideRecipe.NAVER_REVIEW_OBSERVE_V1 && org.equals(orgId)
+                        ? java.util.Optional.of(new com.sellerops.responsibility.aside.AsideMarketplaceTarget.Target(
+                                storeId, null, null))
+                        : java.util.Optional.empty()));
+        Review arrived = naverReview(naver, 1, "한 달 만에 떨어졌어요. 교환 원합니다.", Instant.now(), Instant.now());
+
+        OperationsCaseProcessor.Report report = processor.process(run(Instant.now(), null, null), () -> false);
+
+        assertThat(autoChecks.findBySellerAccountIdAndDataType(storeId, "REVIEW"))
+                .as("no setting row exists, and this lane never creates one").isEmpty();
+        assertThat(report.opened()).isEqualTo(1);
+        assertThat(only().getSubjectId()).isEqualTo(arrived.getId());
+    }
+
+    /**
+     * <b>A standing read waiting for a person is an observation gap, and the Home already knows how to say that.</b>
+     * The seller's own panel showed 「로그인이 필요합니다」 and the operations Home said nothing at all — the queue
+     * just went quiet, which is the one thing a stopped observation must never look like.
+     *
+     * <p>Signing in drops the pause and the ordinary recovery path closes the card: nothing new decides it.
+     */
+    @Test
+    void aStandingReadWaitingForSignInBecomesAGap_andSigningInRecoversIt() {
+        Channel naver = naverChannel();
+        SellerAccount store = naverStore(naver);
+        ReviewAutoCheck setting = autoCheck(store.getId(), com.sellerops.autocheck.AutoCheckPause.PAUSED_AUTH);
+
+        UUID runId = run(Instant.now(), null, null);
+        naverInquirySource(runId, store.getId(), Instant.now());
+        OperationsCaseProcessor.Report report = processor.process(runId, () -> false);
+
+        assertThat(report.gapsOpened()).isEqualTo(1);
+        OperationsCase gap = openGap();
+        assertThat(gap.getSubjectKind()).isEqualTo(OperationsSubjectKind.SOURCE);
+        assertThat(gap.getSubjectId()).isEqualTo(store.getId());
+        assertThat(gap.getReason())
+                .as("a signed-out browser, not an expired credential — two repairs, two sentences")
+                .isEqualTo(CaseReason.SOURCE_SIGN_IN_REQUIRED);
+        assertThat(gap.getReasonNote()).contains("로그인");
+        assertThat(gap.getRecommendedAction()).isEqualTo("네이버 스마트스토어 판매자센터 로그인하기");
+        assertThat(gap.getChannelId()).isEqualTo(naver.getId());
+        assertThat(gap.getSourceState()).isEqualTo("rr:gap;family=AUTH;types=REVIEW");
+        assertThat(gap.getPriority()).isEqualTo(CasePriority.HIGH);
+        assertThat(gap.getRequiredAuthority()).isEqualTo(RequiredAuthority.HUMAN);
+
+        UUID again = run(Instant.now(), null, null);
+        naverInquirySource(again, store.getId(), Instant.now());
+        assertThat(processor.process(again, () -> false).gapsRepeated())
+                .as("the same wall in a later run updates that card; it never opens a second")
+                .isEqualTo(1);
+        assertThat(gaps()).hasSize(1);
+
+        // 「판매자센터 로그인」 — the lane drops its pause, and nothing else is told anything.
+        setting.setPausedReason(null);
+        autoChecks.save(setting);
+        UUID after = run(Instant.now(), null, null);
+        naverInquirySource(after, store.getId(), Instant.now());
+
+        assertThat(processor.process(after, () -> false).gapsRecovered()).isEqualTo(1);
+        assertThat(gaps()).singleElement().satisfies(closed -> {
+            assertThat(closed.getStatus()).isEqualTo(OperationsCaseStatus.CLOSED);
+            assertThat(closed.getResolutionReason()).isEqualTo(CaseResolution.OBSERVED_AGAIN);
+        });
+    }
+
+    /** A {@code PAUSED_DEVICE} lane recovers by itself next tick, so it is nobody's card. */
+    @Test
+    void aPausedHelperIsNotAGap() {
+        Channel naver = naverChannel();
+        SellerAccount store = naverStore(naver);
+        autoCheck(store.getId(), com.sellerops.autocheck.AutoCheckPause.PAUSED_DEVICE);
+
+        UUID runId = run(Instant.now(), null, null);
+        naverInquirySource(runId, store.getId(), Instant.now());
+
+        assertThat(processor.process(runId, () -> false).gapsOpened()).isZero();
+        assertThat(gaps()).isEmpty();
+    }
+
+    private Channel naverChannel() {
+        return channels.findByCode("NAVER").orElseGet(() -> {
+            Channel c = new Channel();
+            c.setCode("NAVER");
+            c.setNameKo("네이버 스마트스토어");
+            c.setStatus(ChannelStatus.AVAILABLE);
+            c.setSupportsInquiry(true);
+            c.setSupportsReview(true);
+            c.setSupportsOrder(true);
+            c.setSupportsSales(true);
+            c.setSupportsProduct(true);
+            c.setSortOrder(1);
+            return channels.save(c);
+        });
+    }
+
+    private SellerAccount naverStore(Channel naver) {
+        SellerAccount store = new SellerAccount();
+        store.setOrgId(org);
+        store.setChannelId(naver.getId());
+        store.setConnectionStatus(ChannelStatus.CONNECTED);
+        store.setFileUpload(false);
+        return accounts.save(store);
+    }
+
+    /** The seller's own setting for one store: on, with or without a pause it is waiting on. */
+    private ReviewAutoCheck autoCheck(UUID accountId, com.sellerops.autocheck.AutoCheckPause paused) {
+        ReviewAutoCheck row = new ReviewAutoCheck();
+        row.setOrgId(org);
+        row.setSellerAccountId(accountId);
+        row.setDataType("REVIEW");
+        row.setMode("READ_ONLY");
+        row.setEnabled(true);
+        row.setConsentedAt(Instant.now().minus(Duration.ofHours(2)));
+        row.setPausedReason(paused);
+        return autoChecks.save(row);
+    }
+
+    /** One settled reading by the lane the seller's setting runs — the hand-over boundary for that store. */
+    private ScheduledAsideJob standingRead(UUID accountId, Instant settledAt) {
+        ScheduledAsideJob job = new ScheduledAsideJob();
+        job.setOrgId(org);
+        job.setDeviceId(UUID.randomUUID());
+        job.setTrigger(com.sellerops.responsibility.aside.AsideTrigger.SCHEDULED);
+        job.setSellerAccountId(accountId);
+        job.setClientJobId("ac-" + UUID.randomUUID().toString().substring(0, 8) + "-" + settledAt.toEpochMilli());
+        job.setRecipe(com.sellerops.responsibility.aside.AsideRecipe.NAVER_REVIEW_OBSERVE_V1);
+        job.setExpiresAt(settledAt.plus(Duration.ofMinutes(10)));
+        job.setClaimedAt(settledAt.minus(Duration.ofSeconds(30)));
+        job.recordDelivery(52, 0, SourceCompleteness.BOUNDED);
+        job.settle(com.sellerops.responsibility.aside.AsideJobOutcome.OBSERVED, 52, null, settledAt);
+        return asideJobs.save(job);
+    }
+
+    /**
+     * A resolver shaped like production with the deployment allow-list off: it will not name a store for an
+     * unattended run, and it answers for this organisation's own account on the recipe's channel.
+     */
+    private com.sellerops.responsibility.aside.AsideMarketplaceTarget sellerAuthorised(UUID storeId) {
+        return new com.sellerops.responsibility.aside.AsideMarketplaceTarget() {
+            @Override
+            public java.util.Optional<Target> resolve(UUID orgId,
+                                                      com.sellerops.responsibility.aside.AsideRecipe recipe) {
+                return java.util.Optional.empty();
+            }
+
+            @Override
+            public java.util.Optional<Target> resolveFor(UUID orgId, UUID sellerAccountId,
+                                                         com.sellerops.responsibility.aside.AsideRecipe recipe) {
+                return recipe == com.sellerops.responsibility.aside.AsideRecipe.NAVER_REVIEW_OBSERVE_V1
+                        && org.equals(orgId) && storeId.equals(sellerAccountId)
+                        ? java.util.Optional.of(new Target(storeId, null, null))
+                        : java.util.Optional.empty();
+            }
+        };
+    }
+
+    private Review naverReview(Channel naver, int rating, String body, Instant receivedAt, Instant createdAt) {
+        Review review = new Review();
+        review.setOrgId(org);
+        review.setChannelId(naver.getId());
+        review.setRating(rating);
+        review.setBody(body);
+        review.setNegative(rating <= 2);
+        review.setReceivedAt(receivedAt);
+        review.setReplyState(ReviewReplyState.PENDING);
+        review.setCreatedAt(createdAt);
+        return reviews.save(review);
+    }
+
+    /** This store's official inquiry read, settled — so the account is one the run observed. */
+    private void naverInquirySource(UUID runId, UUID accountId, Instant observedAt) {
+        ResponsibilityRunSource row = new ResponsibilityRunSource();
+        row.setOrgId(org);
+        row.setRunId(runId);
+        row.setAttempt(1);
+        row.setSellerAccountId(accountId);
+        row.setChannelCode("NAVER");
+        row.setDataType("INQUIRY");
+        row.setMethod("API");
+        ResponsibilityRun owner = runs.findById(runId).orElseThrow();
+        row.setWindowFrom(owner.getWindowStart());
+        row.setWindowTo(owner.getWindowEnd());
+        row.setStartedAt(observedAt);
+        row.setObservedAt(observedAt);
+        row.setCompleteness(SourceCompleteness.COMPLETE);
+        row.setObservedCount(3);
+        row.setNewCount(0);
+        row.setChangedCount(0);
+        row.setIdentityVerdict(IdentityVerdict.NOT_APPLICABLE);
+        sourceRows.save(row);
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────────────────────────────────────
 
     private OperationsCaseProcessor processor(ResponsibilityRollout rollout) {
@@ -1263,6 +1524,7 @@ class OperationsCaseProcessorTest {
         // What the container injects. Both are optional setters, so leaving them out here would test a wiring no
         // deployment runs — and the takeover below is precisely a collaboration between the two lanes.
         built.setLegacyCases(proactive);
+        built.setAutoChecks(autoChecks);
         return built;
     }
 

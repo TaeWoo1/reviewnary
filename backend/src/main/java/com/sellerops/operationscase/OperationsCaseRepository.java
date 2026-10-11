@@ -61,21 +61,38 @@ public interface OperationsCaseRepository extends JpaRepository<OperationsCase, 
 
     // ── candidates: rows already collected, in this responsibility's scope ────────────────────────────────────
 
+    /**
+     * <b>Two dates, and both of them are a fence.</b>
+     *
+     * <p>{@code createdAt} is when the row reached us and answers «is this this responsibility's, or was it already
+     * there when the job was handed over». {@code receivedAt} is when the customer wrote it and answers «is this the
+     * work of now». Neither question is the other, and a candidate rule that asks only the first one was floodable
+     * by design: a catch-up walk that fills a store's missing past stores months-old rows with today's
+     * {@code createdAt}, and every one of them would arrive as 「지금 확인할 일」. That is the shape the proactive
+     * bootstrap audit measured in 2026-08-25 (「고객이 4,300일째 기다립니다」) — and {@code receivedAt} alone is no
+     * fence either, which the same audit measured, because a backfill run after the boundary pours the same backlog
+     * through the other door. So both are asked, against the same instant, which the caller has already clamped to
+     * {@link OperationsCaseProcessor#ACQUISITION_REACH}.
+     *
+     * <p>Nothing is hidden from the seller by this: the inquiry queue and the review ledger still hold every row.
+     * What it decides is only whether the <em>scheduled</em> responsibility opens a case about it.
+     */
     @Query("""
             select i from Inquiry i
             where i.orgId = :orgId and i.sellerAccountId = :accountId
               and i.dataOrigin = com.sellerops.common.DataOrigin.REAL
-              and i.createdAt > :since
+              and i.createdAt > :since and i.receivedAt > :since
             order by i.createdAt asc, i.id asc
             """)
     List<Inquiry> inquiryCandidates(@Param("orgId") UUID orgId, @Param("accountId") UUID accountId,
                                     @Param("since") Instant since, Pageable page);
 
+    /** The review half of {@link #inquiryCandidates} — same two dates, same reason. */
     @Query("""
             select r from Review r
             where r.orgId = :orgId and r.channelId = :channelId
               and r.dataOrigin = com.sellerops.common.DataOrigin.REAL
-              and r.createdAt > :since
+              and r.createdAt > :since and r.receivedAt > :since
             order by r.createdAt asc, r.id asc
             """)
     List<Review> reviewCandidates(@Param("orgId") UUID orgId, @Param("channelId") UUID channelId,
@@ -94,6 +111,37 @@ public interface OperationsCaseRepository extends JpaRepository<OperationsCase, 
             """)
     Instant firstSettledObservation(@Param("orgId") UUID orgId, @Param("responsibilityId") UUID responsibilityId,
                                     @Param("accountId") UUID accountId, @Param("dataType") String dataType);
+
+    /**
+     * <b>When the product's own standing read of that store first covered its whole window</b> — the same boundary
+     * {@link #firstSettledObservation} states, for the lane that reads a marketplace screen on the seller's own
+     * authority instead of inside a responsibility window (Review Auto-Check v1).
+     *
+     * <p>It exists because the two lanes answer «may this store be read while nobody is watching» from two
+     * different places: a responsibility run asks the deployment ({@code AsideMarketplaceAccess}), and the standing
+     * lane asks the seller's own product setting ({@code review_auto_check}). The second is the one the product
+     * turns on when a seller connects, so in an ordinary deployment it is the ONLY lane reading NAVER reviews — and
+     * a case lane that could only see the first simply never opened a case about a review the product itself had
+     * just read.
+     *
+     * <p><b>Only a SCHEDULED read counts.</b> An operator's press is a person looking at their own screen, not a
+     * standing promise to keep that store current, and a boundary drawn at a press would make months of rows
+     * «new since» an afternoon someone was curious. <b>Only a BOUNDED delivery counts</b>, for the reason
+     * {@link #firstSettledObservation} takes only settled completeness: a PARTIAL page could not rule out a gap
+     * behind it, so nothing can be «new since» it. And {@code settledAt} is used rather than the claim or the
+     * dispatch because a delivery is recorded while the job is still CLAIMED — so this instant is after that
+     * read's own rows were stored, which is what keeps the boundary read from opening cases about its own reading.
+     */
+    @Query("""
+            select min(j.settledAt) from ScheduledAsideJob j
+            where j.orgId = :orgId and j.sellerAccountId = :accountId and j.recipe = :recipe
+              and j.trigger = com.sellerops.responsibility.aside.AsideTrigger.SCHEDULED
+              and j.outcome = com.sellerops.responsibility.aside.AsideJobOutcome.OBSERVED
+              and j.identityVerdict = com.sellerops.responsibility.IdentityVerdict.MATCH
+              and j.deliveryCompleteness = com.sellerops.responsibility.SourceCompleteness.BOUNDED
+            """)
+    Instant firstSettledStandingRead(@Param("orgId") UUID orgId, @Param("accountId") UUID accountId,
+                                     @Param("recipe") com.sellerops.responsibility.aside.AsideRecipe recipe);
 
     // ── canonical truth the reconciler and the investigator read ────────────────────────────────────────────
 

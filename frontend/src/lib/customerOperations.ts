@@ -212,10 +212,21 @@ export function unobservedLine(home: Pick<CustomerOperationsHome, "gaps" | "sour
   return "지난 확인에서 모든 대상을 끝까지 확인했습니다.";
 }
 
+/**
+ * Why a source was not read, in the seller's words — one sentence per repair, because the repairs differ.
+ * 「연결이 만료되어」 is an expired API credential; 「판매자센터에 로그인이 필요해」 is a signed-out browser with
+ * the credential intact. An unknown token says only that it was not read rather than guessing which.
+ */
+const GAP_WHY: Record<string, string> = {
+  SOURCE_AUTH_REQUIRED: "연결이 만료되어",
+  SOURCE_SIGN_IN_REQUIRED: "판매자센터에 로그인이 필요해",
+  SOURCE_NOT_CONNECTED: "연결이 끊겨",
+};
+
 export function gapRowLine(row: CustomerOperationsGapRow): string {
   const channel = row.channelCode ? CHANNEL_LABEL[row.channelCode] ?? row.channelNameKo : row.channelNameKo;
   const types = row.dataTypes.map(dataTypeKo).join("·") || "자료";
-  const why = row.reason === "SOURCE_AUTH_REQUIRED" ? "연결이 만료되어" : "연결이 끊겨";
+  const why = GAP_WHY[row.reason] ?? "확인하지 못해";
   return `${channel ?? "채널"} ${types} — ${why} 확인하지 못했습니다.`;
 }
 
