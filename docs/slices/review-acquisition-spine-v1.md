@@ -248,9 +248,11 @@ dropping the text loses no distinct customer feedback. `관련리뷰글번호` +
   product-owner wording approval; `decisions.md` is append-only and PO-ratified.
 - **Doc drift, reported not fixed:** `contracts/review-id-fingerprint/v1/SPEC.md` cites
   `docs/review_acquisition.md` §S and `docs/action-window-runtime/r4-review-id-trace.md`; neither
-  exists in the active repo (the former survives only in the preserved runtime worktrees). Porting
-  §S's schema and sensitivity analysis into the repo deserves a PO decision — it is the provenance the
-  review-export contract rests on.
+  exists in the active repo. §S **is recoverable from git** — deleted in `e1550892` (2026-07-22);
+  `git show e1550892^:docs/review_acquisition.md` (§S from line 126). The trace document has
+  **never existed in any git ref**. Porting §S's schema and sensitivity analysis into the repo
+  deserves a PO decision — it is the provenance the review-export contract rests on. Catalogued in
+  `docs/lineage_index.md`.
 
 ## 9. Related
 

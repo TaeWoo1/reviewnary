@@ -570,5 +570,5 @@ Backstage (2차 위계 — "연결·설정")
 - 런타임 경계(BrowserRuntime/CredentialVault/AgentLifecycle·프론트-에이전트 페어링·프로젝션):
   `docs/sellerops_local_agent_runtime_adr.md` (Runtime ADR)
 - 검증 기록: `docs/archive/sellerops_phase3c_live_smoke.md`, `docs/sellerops_cafe24_live_verification.md`
-- 흡수된 UI 원칙 원문: `docs/sellerops_ui_reference.md` (reference-only)
+- 흡수된 UI 원칙 원문: `docs/sellerops_ui_reference.md` (reference-only) — 파일은 `e1550892`(2026-07-22)에서 삭제됐다; `git show e1550892^:docs/sellerops_ui_reference.md`
 - 현행(as-is) 상세 근거: 2026-07-07 프론트 정찰·문서 감사·로컬 에이전트 아키텍처 세션 보고

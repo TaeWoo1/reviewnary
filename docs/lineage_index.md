@@ -61,3 +61,42 @@
 | `docs/cafe24_live_e2e_runbook.md` | 1 | 2026-09-22 | 290 | Cafe24 Live E2E Runbook (2026-09-21) |
 | `docs/aside_execution_provider_v1.md` | 1 | 2026-09-12 | 243 | Aside Execution Provider v1 — M1 (Execution Provider Foundation) + M2 (Aside Execution Adapter) |
 | `docs/aside_capability_discovery_v1.md` | 1 | 2026-09-12 | 477 | Aside Capability Discovery v1 — read-only |
+
+## 저장소에 없는 문서 이름 (2026-10-12)
+
+`docs/` 아래 여러 문서가 **이 저장소에 더는 존재하지 않는 파일**을 이름으로 언급한다. 대부분
+의도된 언급이다 — "이 틀은 폐기됐다"고 적으면서 폐기된 문서를 지목하는 것이고, 지목 자체가
+뜻을 싣는다. 문제는 읽는 사람이 그 파일을 찾으러 나선다는 것뿐이다. 그래서 지우지 않고
+여기에 어디로 갔는지만 적는다.
+
+**이 표에 있는 이름이 본문에 보이면, 파일이 없는 것이 정상이다.** 원문이 필요하면
+`git show <커밋>^:<경로>`로 꺼낸다.
+
+| 삭제 커밋 | 날짜 | 없어진 문서 |
+|---|---|---|
+| `e1550892` — chore(repo): separate legacy VOC stack from SellerOps | 2026-07-22 | `docs/PROJECT.md` · `docs/review_acquisition.md` · `docs/review_ops_architecture.md` · `docs/review_ops_brand20_pipeline.md` · `docs/review_ops_brand20_manual_mapping_guide.md` · `docs/detail_page_snapshot_design.md` · `docs/agent_harness_design.md` · `docs/agent_orchestration_playbook.md` · `docs/instagram_voc_brand_strategy.md` · `docs/instagram_voc_dm_response_script.md` · `docs/instagram_voc_dm_conversion_ledger.md` · `docs/instagram_voc_publishing_checklist.md` · `docs/public_instagram_cardnews_spec.md` · `docs/sellerops_product_roadmap.md` · `docs/sellerops_ceo_connector_status_onepager.md` · `docs/sellerops_ui_reference.md` · `docs/sellerops_phase2.md` · `docs/sellerops_phase3a.md` · `docs/sellerops_phase3b_completion.md` · `docs/sellerops_phase3c.md` |
+| `39186802` — docs: retire 49 superseded documents | 2026-08-19 | `docs/sellerops_current_state.md` |
+| — | — | `docs/action-window-runtime/r4-review-id-trace.md` · `docs/phase_b_public_education_planner_plan.md` — **git의 어느 ref에도 존재한 적이 없다.** 쓰겠다고 적히고 쓰이지 않았다. |
+
+**예외 두 가지 — 이것들은 깨진 게 아니다.**
+
+- `collector/` 안의 문서가 적는 `docs/<이름>.md`는 **그 서브트리 기준 상대경로**다
+  (`collector/docs/<이름>.md`). 저장소 루트에서 읽으면 없는 것처럼 보이지만 정상이다.
+- `aiagent/docs/phase2e_detector_design.md`는 이 저장소가 아니라 **공유 git host의 부모
+  저장소**를 가리키는 의도된 교차 참조다.
+
+### 하나는 아직 열려 있다 — PO 결정 필요
+
+`contracts/review-id-fingerprint/v1/SPEC.md`는 식별자의 근거로 `docs/review_acquisition.md`
+§S(= "Sample-file schema analysis", 2026-06-16)와 `docs/action-window-runtime/r4-review-id-trace.md`를
+인용한다. **계약이 자기 provenance로 삼는 문서 둘이 저장소에 없다.**
+
+- §S는 복구 가능하다 — `git show e1550892^:docs/review_acquisition.md` (372줄, §S는 126행부터).
+  보존된 runtime worktree에만 남아 있다는 기존 설명은 부정확하다.
+- trace 문서는 복구할 것이 없다. 한 번도 쓰이지 않았다. 실제로 존재하는 가장 가까운 기록은
+  `docs/action-window-runtime/r4-review-id-reconciliation-run-record.md`와
+  `…-reconciliation-scope.md`이고, 둘 다 같은 주장을 덮지 않는다.
+
+§S의 schema·민감도 분석을 저장소로 다시 들여올지는 **제품 오너 결정**이며 이 정리에서
+해결하지 않았다. `contracts/review-export/naver/v1/SPEC.md`와
+`docs/slices/review-acquisition-spine-v1.md`가 이미 같은 드리프트를 보고하고 있다.

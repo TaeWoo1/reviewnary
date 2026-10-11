@@ -18,6 +18,13 @@ For NAVER SmartStore it is the review export's **`리뷰글번호`** column: a 1
 for every row of the analysed export (`docs/review_acquisition.md` §S). It is carried **untransformed** into
 `reviews.external_id` — see `docs/action-window-runtime/r4-review-id-trace.md`.
 
+> **Both citations above name documents that are not in this repository**, and this contract rests on
+> them. `docs/review_acquisition.md` §S is recoverable —
+> `git show e1550892^:docs/review_acquisition.md` (deleted 2026-07-22, §S from line 126).
+> `r4-review-id-trace.md` has never existed in any git ref. Re-importing §S is an open product-owner
+> decision; see `docs/lineage_index.md` and the drift notes in
+> `contracts/review-export/naver/v1/SPEC.md` and `docs/slices/review-acquisition-spine-v1.md`.
+
 ## Algorithm
 
 1. **Canonicalize** (`canonicalize` / `__awCanonicalizeReviewId`):

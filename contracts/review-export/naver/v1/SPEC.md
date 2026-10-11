@@ -98,6 +98,9 @@ Slice: `docs/slices/review-acquisition-spine-v1.md`.
 
 > **Drift note (reported, not fixed here):** `contracts/review-id-fingerprint/v1/SPEC.md` cites
 > `docs/review_acquisition.md` §S and `docs/action-window-runtime/r4-review-id-trace.md`. Neither
-> exists in the active repository — the former survives only in the preserved runtime worktrees.
-> Porting §S's schema and sensitivity analysis into the repo deserves a product-owner decision; it is
-> the provenance this contract rests on.
+> exists in the active repository. **§S is recoverable from git** — it was deleted in `e1550892`
+> (2026-07-22, legacy VOC separation); read it with
+> `git show e1550892^:docs/review_acquisition.md` (372 lines; §S "Sample-file schema analysis",
+> 2026-06-16, from line 126). **The trace document has nothing to recover — it has never existed in
+> any git ref.** Porting §S's schema and sensitivity analysis into the repo deserves a product-owner
+> decision; it is the provenance this contract rests on. Catalogued in `docs/lineage_index.md`.

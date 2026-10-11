@@ -48,24 +48,21 @@ one place on disk and are **not** recoverable from git.
   runtime's draft seam).
 - `frontend/` — React/Vite operations UI.
 - `collector/` — TypeScript local agent: channel acquisition + Action Window (NAVER, ESM, Cafe24).
-- `agent-runtime/` — standalone Node/TS **LangGraph** orchestration service (port 8787), and since
-  2026-08-21 SellerOps's **AI Operator 실행 구조**: an `OperatorGraph` that interprets a goal **with an
-  LLM planner and no deterministic fallback** (v2 — no plan, no run), chooses
-  specialists (ProductOps · ReviewOps · InquiryOps · ReportOpsNode) and tools, keeps **evidence as
-  first-class state**, judges what may be said, and stops on a bounded budget — over the four existing
-  compiled graphs with human `interrupt`/resume, whose contracts are unchanged. Tools adapt onto Spring.
-  A docker-compose service with its own CI status check and a live `/agent` route. It **holds no
-  credential of any kind**: the draft, planner and judge models are all BACKEND capabilities reached
-  with the operator's forwarded bearer, so "the backend is the only LLM egress" is still the property to
-  check here. **The Operator's tool catalogue is 100% READ — there is no WRITE tool and a structural
-  test refuses one** (`OperatorToolRegistry`, `operatorToolRegistry.test.ts`); credential handoff, Action
-  Window commands and guided-submission mints are deliberately absent from it (`privilegedPlaneFence`).
-  **Two lanes, and they are not the same product:** a button sends a closed `intent` and runs
-  deterministically; a typed sentence is planned by the LLM or the run **fails**. Canonical:
-  **`docs/sellerops_operator_graph_v2.md`** (제품 행동 계약 — Agent chat의 계획은 **반드시 LLM Planner**가
-  세우고, 세울 수 없으면 run은 실패한다; 결정론 goal/keyword planner는 test·fallback 용도로도 존재하지
-  않는다) · `docs/sellerops_operator_graph_v1.md`(구현·라이브 증명 기록, runtime semantics는 v2가 대체) ·
-  `docs/decisions/agent-runtime-langgraph-llm-split.md`.
+- `agent-runtime/` — standalone Node/TS **LangGraph** orchestration service: the `OperatorGraph`
+  over four compiled graphs with human `interrupt`/resume, whose contracts are unchanged. What it is
+  and how it connects: `docs/architecture.md`, then **`docs/sellerops_operator_graph_v2.md`** (정본
+  제품 행동 계약) · `docs/sellerops_operator_graph_v1.md` (구현·라이브 증명 기록; runtime semantics는
+  v2가 대체) · `docs/decisions/agent-runtime-langgraph-llm-split.md`. Four fences live here:
+  - It **holds no credential of any kind.** The draft, planner and judge models are all BACKEND
+    capabilities reached with the operator's forwarded bearer, so "the backend is the only LLM
+    egress" is still the property to check here.
+  - **The Operator's tool catalogue is 100% READ — there is no WRITE tool and a structural test
+    refuses one** (`OperatorToolRegistry`, `operatorToolRegistry.test.ts`). Credential handoff,
+    Action Window commands and guided-submission mints are deliberately absent (`privilegedPlaneFence`).
+  - A goal is interpreted **with an LLM planner and no deterministic fallback** — no plan, no run.
+    결정론 goal/keyword planner는 test·fallback 용도로도 존재하지 않는다.
+  - **Two lanes, and they are not the same product:** a button sends a closed `intent` and runs
+    deterministically; a typed sentence is planned by the LLM or the run **fails**.
 - `contracts/` — shared contracts (Action Window, review fingerprint).
 - `tools/` — dev/support tooling.
 - `docs/` — current SellerOps docs; `docs/archive/` holds historical material.
@@ -220,3 +217,23 @@ When uncertain, stop and report rather than guess.
 
 `docs/INDEX.md`에 등록되지 않은 `docs/` 파일은 **lineage 아니면 evidence**다: 위 경로에서
 도달할 수는 있어도 그 자체로 현재 진실을 싣지 않는다.
+
+### 새 문서를 만들기 전에
+
+**1회성 기록은 새 파일이 아니다.** 라이브 런 · live proof · selector calibration · 세션 handoff ·
+감사 결과 · closure record는 **`docs/evidence/INDEX.md`의 한 행**이 제자리다. 한 행에 날짜 ·
+채널 · capability · 커밋 · approval id · 결과를 적고 끝낸다. 그 행이 담지 못할 분량이면,
+담지 못하는 부분만 그 레인의 **현역 문서**에 붙인다.
+
+**새 파일은 마지막 수단이다.** 만들기 전에 세 가지를 순서대로 확인한다.
+
+1. `docs/evidence/INDEX.md`의 한 행으로 끝나는가 → 끝난다면 행만 적는다.
+2. 그 레인의 현역 문서(`docs/INDEX.md`)를 고쳐서 담기는가 → 담긴다면 고친다.
+3. 둘 다 아니라면 — 새 계약이나 새 레인이라면 — 파일을 만들고 **같은 PR에서
+   `docs/INDEX.md`에 등재한다.** 등재하지 않은 파일은 정의상 현재 진실을 싣지 않으므로,
+   만들자마자 lineage가 된다.
+
+**버전을 올리기 전에.** `_v2`는 `_v1`이 그대로 옳고 그 위에 얹을 때만 만든다. v1이 틀렸으면
+v1을 고친다. 새 파일을 만들었으면 v1의 어느 절을 승계하고 어느 절을 개정하는지 그 문서
+§0에 줄 단위로 적고, `docs/INDEX.md`의 v1 항목에 그 사실을 적는다 — 인덱스가 구판만
+가리키는 상태로 두지 않는다.

@@ -633,6 +633,11 @@ root `README.md` lede · `docs/sellerops_product_roadmap.md` (self-banners 2026-
 `docs/sellerops_ui_reference.md` (already SUPERSEDED) · `docs/sellerops_phase{0,1,2,3a,3b,3c,3d}*.md`
 (historical evidence).
 
+> **2026-10-12.** 이 목록의 파일 대부분은 그 뒤 저장소에서 삭제됐다 — `e1550892`(2026-07-22,
+> legacy VOC 분리)와 `39186802`(2026-08-19, 49개 폐기). 이름이 여기 남은 것은 "이 틀이 폐기됐다"는
+> 뜻을 싣기 때문이고, 파일이 없는 것이 정상이다. 삭제 커밋별 전체 목록과 복구 방법:
+> `docs/lineage_index.md` § 저장소에 없는 문서 이름.
+
 ### 9.7 Stale *by decision* — must be reported, never silently edited
 
 `docs/slices/action-window-v1.md` (DRAFT; still describes overlay / download-detection seams as
@@ -643,8 +648,13 @@ re-derive from `git log`).
 ### 9.8 Legacy lineage — not product, do not delete
 
 Pre-SellerOps VOC / OliveYoung / industrial-review-ops era. Retained for lineage; **not citable for
-product state**. Note that several retain live code at repo root (`app_industrial_review_ops.py`,
-`src/voc/`, `cardnews/`).
+product state**.
+
+> **2026-10-12 교정.** 이 절은 "several retain live code at repo root
+> (`app_industrial_review_ops.py`, `src/voc/`, `cardnews/`)"라고 적고 있었다. **그 코드는 이 저장소에
+> 없다** — `e1550892`(2026-07-22, legacy VOC 분리)에서 문서와 함께 분리됐고, 세 경로 모두 현재
+> 존재하지 않는다. 아래 문서 이름들도 같은 커밋에서 삭제됐다; 복구 방법은
+> `docs/lineage_index.md` § 저장소에 없는 문서 이름.
 
 `docs/PROJECT.md` · `docs/instagram_voc_brand_strategy.md` ·
 `docs/instagram_public_education_post_{001,002}.md` · `docs/instagram_voc_publishing_checklist.md` ·
