@@ -232,8 +232,28 @@
   세션 간 남는지, 도쿄 egress IP가 추가 인증을 유발하는지, export 컨트롤이 셀렉터 없이
   닿는지, 다운로드가 Files API에 떨어지는지, 비용.
 - **출처** — `tools/naver-cloud-export-poc/FINDINGS.md` · `README.md`.
-  이 디렉터리는 2026-09-29 백업 tarball 안에만 있었고 git에 없었다 — 2026-10-12에 들였다.
   `tools/`는 모든 build·test 그래프 밖이고, 이 POC는 저장소 코드를 import하지 않는다.
+  2026-10-12에 작업 브랜치로 들였다.
+
+> **교정 (2026-10-12).** 위 행과 커밋 `eaccdcee`는 이 디렉터리가 "저장소 밖 백업 tarball
+> 안에만 있었고 git에 없었다"고 적었다. **틀렸다.** 같은 12개 파일이 git 브랜치
+> `preserve/repo-wip-2026-10-10`(`6b96862c`)에 들어 있었다 — 내용은 백업본과 동일하고,
+> 백업이 이름만으로 withheld했던 `.env.example`은 거기에만 있었다(값 없는 이름 선언이라
+> 함께 들였다). 작업이 사라질 위험은 없었다. 다음 행이 그 교훈이다.
+
+### D2. 저장소 밖 백업보다 git ref를 먼저 본다
+
+- **했던 것** — 상위 폴더 `sellerops-backup/`을 감사하면서 tarball 목록을 현재 작업 트리와
+  대조해 "이 11개는 백업에만 있다"고 판정했다.
+- **사실** — `git ls-files`와 작업 트리만 봤고 **브랜치·태그를 보지 않았다.** 그 파일들은
+  `preserve/*` 브랜치 7개 중 하나에 들어 있었다. `sellerops/_preserved/2026-10-10/README.md`가
+  그 ref 목록을 표로 싣고 있었는데, 그것도 나중에 읽었다.
+- **다음에** — 저장소 밖 백업을 지울지 판단할 때는 순서가 있다. ① 보존 아카이브의
+  `README`를 먼저 읽는다 — 무엇이 git에 있고 무엇이 git에 담을 수 없는지 적혀 있다.
+  ② `git for-each-ref 'refs/heads/preserve/*' 'refs/tags/preserve/*'`로 ref를 센다.
+  ③ `git ls-tree -r --name-only <ref>`로 대조한다. 작업 트리만 보고 "git에 없다"고
+  말하지 않는다.
+- **출처** — 2026-10-12 세션. `sellerops/_preserved/2026-10-10/README.md`.
 
 ---
 
