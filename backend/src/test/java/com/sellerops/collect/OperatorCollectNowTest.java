@@ -88,6 +88,7 @@ class OperatorCollectNowTest {
     @Autowired com.sellerops.reviewimport.ReviewImportSegmentRepository segments;
     @Autowired com.sellerops.reviewimport.ReviewImportPlanRepository plans;
     @Autowired com.sellerops.coverage.catchup.ReviewCatchUpRunRepository catchUpRuns;
+    @Autowired com.sellerops.autocheck.ReviewAutoCheckRepository autoChecks;
 
     private static final Instant T0 = Instant.parse("2026-10-07T04:00:00Z");
 
@@ -344,6 +345,49 @@ class OperatorCollectNowTest {
         run.setPausedWindowStart(null);
         catchUpRuns.save(run);
         assertThat(service.readiness(org, naverAccount, "REVIEW").pausedCatchUp()).isFalse();
+    }
+
+    @Test
+    @DisplayName("로그인 대기는 멈춘 그 줄의 것이다 — 같은 가게의 다른 자료로 번지지 않는다")
+    void aSignInPauseStaysOnTheRowThatIsWaiting() {
+        // 2026-10-11 라이브에서 측정된 결함. 자동 확인(REVIEW) 행 하나가 벽에 막히자 같은 계정의
+        // INQUIRY·ORDER_SUMMARY까지 「로그인을 기다린다」가 됐다 — 그 둘은 API pull이라 화면도, 도우미도,
+        // 풀어야 할 벽도 없다. 틀린 문장인 것으로 끝나지 않았다: 화면은 기다리는 줄마다 복귀 확인을 하나씩
+        // 돌리고 각자 **자기 dataType으로** 이어가기를 요청하는데, 그날 세 번 모두 INQUIRY가 데스크를
+        // 차지해 아무것도 이어가지 못했고(이어갈 화면 읽기가 애초에 없다) 정작 벽에 막힌 REVIEW lane은
+        // resume 요청을 한 번도 받지 못한 채 멈춰 있었다.
+        com.sellerops.autocheck.ReviewAutoCheckService lane =
+                new com.sellerops.autocheck.ReviewAutoCheckService(autoChecks, accounts, channels);
+        service.setAutoCheck(lane);
+
+        com.sellerops.autocheck.ReviewAutoCheck row = new com.sellerops.autocheck.ReviewAutoCheck();
+        row.setOrgId(org);
+        row.setSellerAccountId(naverAccount);
+        row.setDataType("REVIEW");
+        row.setEnabled(true);
+        row.setPausedReason(com.sellerops.autocheck.AutoCheckPause.PAUSED_AUTH);
+        row.setCreatedAt(T0);
+        row.setUpdatedAt(T0);
+        autoChecks.saveAndFlush(row);
+
+        assertThat(service.readiness(org, naverAccount, "REVIEW").pausedSignIn())
+                .as("벽에 막힌 그 줄은 로그인을 기다린다")
+                .isTrue();
+        assertThat(service.readiness(org, naverAccount, "INQUIRY").pausedSignIn())
+                .as("같은 가게의 문의는 기다리는 것이 없다")
+                .isFalse();
+        assertThat(service.readiness(org, naverAccount, "ORDER_SUMMARY").pausedSignIn())
+                .as("주문도 마찬가지다")
+                .isFalse();
+
+        // 그리고 멈춤이 아닌 이유로 서 있는 행은 로그인을 기다리지 않는다 — PAUSED_DEVICE는 사람이 풀 일이
+        // 아니고, 다음 tick이 데스크를 찾으면 저절로 이어진다.
+        row.setPausedReason(com.sellerops.autocheck.AutoCheckPause.PAUSED_DEVICE);
+        autoChecks.saveAndFlush(row);
+        assertThat(service.readiness(org, naverAccount, "REVIEW").pausedSignIn()).isFalse();
+
+        autoChecks.deleteAll();
+        service.setAutoCheck(null);
     }
 
     private com.sellerops.coverage.catchup.ReviewCatchUpRun pausedRun(java.util.UUID accountId) {
