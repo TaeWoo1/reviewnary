@@ -213,6 +213,30 @@
 
 ---
 
+## D. 다른 곳에 있는 finding
+
+같은 성격의 장부가 저장소 안 다른 곳에도 있다. 여기에 베껴 적지 않고 가리킨다.
+
+### D1. NAVER Review Cloud Export POC — provider capability survey
+
+- **무엇** — Steel(`steel-sdk 0.19.0`) + `browser-use 0.13.10`로 "클라우드 브라우저에서
+  NAVER 셀러센터 로그인을 세션 간 유지하고 **공식** 리뷰 Excel export를 셀렉터 없이
+  수행할 수 있는가"를 묻는 격리된 실험. **offline 검증만 끝났고 NAVER 접촉·라이브 런은
+  0이다.**
+- **왜 중요** — SDK를 코드로 실측해 가설 셋을 부분적으로 답했다: `region`에 **한국이 없다**
+  (`nrt`/`ap-northeast`만) · Steel은 **인증 상태 신호를 노출하지 않아** `AUTH_REQUIRED`와
+  `UNSUPPORTED_STATE`를 provider API로 구분할 수 없다(H-2 열림) · 기본 action 24개 중
+  `evaluate`/`search`/`read_file` 등 7개를 빼 17개로 좁혔다 · PostHog 텔레메트리가
+  **기본 ON**이어서 모듈 로드 전에 끈다.
+- **라이브 런만 측정할 수 있는 것 5가지**를 문서가 명시한다 — 로그인이 Steel 프로필에
+  세션 간 남는지, 도쿄 egress IP가 추가 인증을 유발하는지, export 컨트롤이 셀렉터 없이
+  닿는지, 다운로드가 Files API에 떨어지는지, 비용.
+- **출처** — `tools/naver-cloud-export-poc/FINDINGS.md` · `README.md`.
+  이 디렉터리는 2026-09-29 백업 tarball 안에만 있었고 git에 없었다 — 2026-10-12에 들였다.
+  `tools/`는 모든 build·test 그래프 밖이고, 이 POC는 저장소 코드를 import하지 않는다.
+
+---
+
 ## 어디에 무엇이 있나
 
 | 찾는 것 | 가는 곳 |
