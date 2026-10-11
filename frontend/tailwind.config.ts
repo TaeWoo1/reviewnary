@@ -3,7 +3,7 @@ import type { Config } from "tailwindcss";
 // The accent, named once. `boxShadow.selected` below is made of this exact value, and a token that
 // restates a colour is a token that drifts from it — that is how the app surface ended up with a
 // selection bar written as `shadow-[inset_3px_0_0_#1B64DA]` in four separate files
-// (docs/ui/reviewnary_ui_system_audit_v1.md §4).
+// (docs/frontend/reviewnary_ui_system_audit_v1.md §4).
 const BRAND_700 = "#1B64DA";
 
 // Toss-like clean foundation: large readable type, soft cards, calm palette.

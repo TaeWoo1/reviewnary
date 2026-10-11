@@ -10,7 +10,7 @@ import { resolve } from "node:path";
  * scale since 2026-09-01, with measurements. It was never enforced, and by 2026-09-30 the app surface
  * carried 73 raw hex values, 17 greys where the contract has three, 11 card borders drawn as
  * `shadow-[0_0_0_1px_…]`, six sizes of `h1` and six of `h2`
- * (`docs/ui/reviewnary_ui_system_audit_v1.md` §2, §4, §5). None of that is a styling slip: it is what a
+ * (`docs/frontend/reviewnary_ui_system_audit_v1.md` §2, §4, §5). None of that is a styling slip: it is what a
  * contract with no test becomes.
  *
  * <p><b>Scope is the enforcement scope, and that is deliberate</b> (audit §10.4). The debt on the other

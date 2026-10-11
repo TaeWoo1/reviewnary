@@ -8,7 +8,7 @@
 | 폴더 | 무엇이 있나 |
 |---|---|
 | `docs/` (루트 12개) | `CLAUDE.md`가 이름으로 부르는 문서 — reading path 6정점 · 이 색인 · `FINDINGS.md` · `lineage_index.md` |
-| `docs/standing/` | standing contracts · ADR |
+| `docs/standing/` | standing contracts · ADR (`docs/decisions/`를 2026-10-12에 흡수) |
 | `docs/inquiry/` `docs/review/` | 문의 · 리뷰 레인 |
 | `docs/agent/` | agent runtime · conversation |
 | `docs/knowledge/` | 지식 · retrieval |
@@ -18,7 +18,7 @@
 | `docs/lineage/` | 소스가 주석으로 인용해 제자리에 남은 과거 기록 — 현재 진실이 아니다 |
 | `docs/archive/` | 그 이전 lineage |
 | `docs/evidence/` | 라이브 실행 이력 (한 런 = 한 행) |
-| `docs/slices/` `docs/decisions/` `docs/workstreams/` `docs/action-window-runtime/` `docs/esm/` `docs/vendor/` | 기존 구조 그대로 |
+| `docs/slices/` `docs/workstreams/` `docs/action-window-runtime/` `docs/esm/` `docs/vendor/` | 기존 구조 그대로 |
 
 여기 적힌 문서만 **현재 진실을 싣는다.** `docs/` 아래 나머지는 lineage 아니면 evidence다:
 
@@ -51,7 +51,8 @@ live proof · selector calibration · audit · closure record는 여기 올라�
 - `docs/standing/auth_growth_instrumentation_v1.md` — Auth + Growth Instrumentation v1 — contract
 - `docs/standing/coupang_review_policy_gate_v1.md` — Coupang WING Review — Policy Gate v1
 - `docs/standing/coupang_guided_issuance_credential_lifecycle_scope_v1.md` — Coupang Guided Issuance + Credential Lifecycle — Canonical Scope v1
-- `docs/decisions/agent-runtime-langgraph-llm-split.md` — ADR — the LangGraph runtime and the LLM are two disjoint subsystems
+- `docs/standing/agent-runtime-langgraph-llm-split.md` — ADR — the LangGraph runtime and the LLM are two disjoint subsystems
+- `docs/standing/pairing-native-approval.md` — ADR — pairing native approval
 - `docs/standing/learning_outcome_loop_v1.md` — Learning & Outcome Loop v1 — 한 일과 그 결과가 다음 판단에 들어간다
 - `docs/standing/operational_knowledge_direction_v1.md` — Operational Knowledge Direction v1 — 방향만, 구현 없음
 - `docs/standing/operations_daily_loop_v1.md` — Operations Daily Loop v1 — 감사, 그리고 이은 세 자리
@@ -88,6 +89,7 @@ live proof · selector calibration · audit · closure record는 여기 올라�
 - `docs/review/review_approval_path_v1.md` — Review Approval Path v1 — 특정 리뷰 답변을 검토하고 승인하는 길
 - `docs/review/review_auto_check_v1.md` — Review Auto-Check v1 — 자동 리뷰 확인 (제품 계약 · 구현 계약)
 - `docs/review/review_auto_check_live_proof_v1.md` — Review Auto-Check — Live Proof v1 (2026-10-09 → 10-10)
+- `docs/review/review-auto-check-next-check-at-early-due.md` — Review Auto-Check — `nextCheckAt` early-due 조사
 - `docs/review/review_decision_workspace_v1.md` — Review Decision Workspace v1 — 한 리뷰를 한 화면에서 판단하고 기록한다
 - `docs/review/review_acquisition_baseline_v1.md` — Review Acquisition Baseline v1 — CURRENT FACT (현행 취득 구현)
 - `docs/review/review_delivery_truth_spine_v1.md` — Review Delivery Truth Spine v1 — 리뷰 답변이 어디까지 갔는지, 한 곳에서 말한다
@@ -157,6 +159,7 @@ live proof · selector calibration · audit · closure record는 여기 올라�
 - `docs/frontend/outcome_artifact_visual_closure_v1.md` — Outcome Artifact + Visual Final Closure v1
 - `docs/frontend/product_operations_continuity_v1.md` — Product Operations Continuity v1
 - `docs/frontend/reviewnary_design.md` — reviewnary Design Contract v3
+- `docs/frontend/reviewnary_ui_system_audit_v1.md` — Reviewnary UI System Audit v1 (`tailwind.config.ts` 등 FE 6곳이 인용)
 - `docs/frontend/reviewnary_visual_system_v1.md` — Reviewnary Visual System + Conversation Shell v1
 - `docs/frontend/secondary_workspaces_ux_closure_v1.md` — Secondary Workspaces UX Closure v1
 - `docs/frontend/visual_qa_product_polish_v1.md` — Visual QA & Product Polish Closure v1

@@ -733,7 +733,7 @@ Action Window 명령, 모든 수집 트리거. `privilegedPlaneFence.test.ts`가
 | # | 위치 | 판정 |
 |---|---|---|
 | C1 | `docs/standing/sellerops_operator_graph_v1.md` §0·§4.1·§8·§13 층2·§14 | **MODIFY** — 상단에 v2 supersede 표시(이번 턴 반영) |
-| C2 | `docs/decisions/agent-runtime-langgraph-llm-split.md` L10·L41–42·L154 | **MODIFY** — "planner off면 keyword table이 답한다"는 v2에서 거짓 |
+| C2 | `docs/standing/agent-runtime-langgraph-llm-split.md` L10·L41–42·L154 | **MODIFY** — "planner off면 keyword table이 답한다"는 v2에서 거짓 |
 | C3 | `docs/archive/2026-q3/sellerops_agent_runtime_migration.md` L41·L77·L272·L385·L445 | **MODIFY** — 역사 문서이므로 **정정하지 않고** 상단에 "v2에서 대체됨" 한 줄 |
 | C4 | `docs/demo_runbook_v1.md` L211 | **MODIFY** (X4와 동일 건) |
 | C5 | `CLAUDE.md` agent-runtime 소유 문단 · canonical reading path 4행 | **MODIFY** (이번 턴 반영) |

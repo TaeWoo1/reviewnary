@@ -33,7 +33,7 @@
 
 지금 저장소에는 **모델 없는 orchestration**(`agent-runtime/`의 네 StateGraph, 결정론적 keyword
 router)과 **orchestration 없는 모델**(backend `agent/llm`, `review/triage/llm`)이 각각 살아 있다
-(`docs/decisions/agent-runtime-langgraph-llm-split.md`). Operator Graph v1은 그 둘을 **하나의
+(`docs/standing/agent-runtime-langgraph-llm-split.md`). Operator Graph v1은 그 둘을 **하나의
 실행 구조**로 묶는다: 셀러가 평범한 문장으로 목표를 말하면 **OperatorGraph**가 그것을 해석하고,
 어떤 specialist(ProductOps / ReviewOps / InquiryOps / ReportOps)와 어떤 tool이 필요한지 스스로
 고르고, 읽은 것을 **Evidence로 남기고**, Evidence Judge가 "근거가 있는가·어디서 왔는가·위험한
@@ -428,7 +428,7 @@ half를 port 뒤에 남겨 둔 것과 정확히 같은 방식이다.
 | 2 | `docs/architecture.md` 런타임 표: *“Four compiled StateGraphs”* | v1에서 Operator + ProductOps가 늘어난다 | **수정**(이번 턴, 문구를 구성 정본 링크로) |
 | 3 | `docs/product-scope-v1.md` §5.1 · §7.10: *RAG는 맥락형 “운영 메모리” 패널로만, **별도 승인 전 구현 금지*** | 이번 결정이 바로 그 **별도 승인**이다. 다만 “standalone AI 검색 페이지 금지”는 계속 유효 | **개정 v1.12**(이번 턴) — 금지의 **조건부 해제**를 기록. 해제 범위: Operator/문의 초안 컨텍스트로서의 retrieval. **1차 내비의 독립 AI 검색 페이지는 계속 금지** |
 | 4 | `docs/product-scope-v1.md` §7.18: *OperationRun 도메인 조기 구현 금지* | 혼동 위험 — Operator Graph는 backend의 OperationRun 도메인이 아니다 | **문구 추가**(이번 턴) — 두 가지가 다른 것임을 명시. OperationRun은 계속 금지 |
-| 5 | `docs/decisions/agent-runtime-langgraph-llm-split.md` §“Still open”: *`parseGoal` 미결* | 이번 결정이 그 항목을 닫는다(planner 도입) | **부분 supersede 표기**(이번 턴) — ADR은 유지하고 상태 줄만 추가. 나머지 두 미결(triage 미이관, reviewGraph 초안)은 **계속 열린 채** |
+| 5 | `docs/standing/agent-runtime-langgraph-llm-split.md` §“Still open”: *`parseGoal` 미결* | 이번 결정이 그 항목을 닫는다(planner 도입) | **부분 supersede 표기**(이번 턴) — ADR은 유지하고 상태 줄만 추가. 나머지 두 미결(triage 미이관, reviewGraph 초안)은 **계속 열린 채** |
 | 6 | `backend/src/test/.../AgentDraftBoundaryTest.theServiceIsTheOnlyDoor` | planner/judge가 `AgentLlmTransport`를 쓰는 순간 이 테스트가 깨진다 | **일반화**(구현 시) — “AgentDraftService가 유일한 문” → “**capability마다 정확히 하나의 문**” 표. 삭제 금지. 약화 아님 — 검사 대상이 1개에서 3개로 늘어난다 |
 | 7 | `frontend/src/pages/app/CustomerMemory.tsx:15` scope fence + `pages/app/memoryScope.test.tsx` | 겉보기엔 “RAG 금지”로 읽히지만 **그 fence는 `/memory` 화면에 검색창을 두지 않는다**는 화면 계약이다 | **유지. 건드리지 않는다.** v1의 retrieval은 `/agent`(Operator)와 문의 초안 컨텍스트에만 붙고 `/memory`에는 검색창이 생기지 않는다. `memoryScope.test.tsx`는 **수정 없이 계속 통과해야 한다** — 이 package의 DoD 항목이다 |
 | 8 | `CLAUDE.md` “Active source ownership”의 agent-runtime 문단(“four compiled graphs”, “one node of two graphs”) | 구현 후 사실이 달라진다 | **구현 PR에서 수정**(이번 턴에는 canonical reading path에 이 문서만 추가) |

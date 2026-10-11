@@ -14,7 +14,7 @@ import type { ReactNode } from "react";
  * nothing waiting in it. There, the full reading cost ~120px of vertical space and drew a dashed
  * box and a centred paragraph beside left-aligned work, so the quietest fact on the screen was
  * taking the most room and the only centred block in the product
- * (docs/ui/reviewnary_ui_system_audit_v1.md §5). The compact reading is one left-aligned line at
+ * (docs/frontend/reviewnary_ui_system_audit_v1.md §5). The compact reading is one left-aligned line at
  * the same measure as the rows it replaces, with the action as a text link beside it.
  *
  * Both readings say the same two things. Compact does not abbreviate the truth, only the frame.

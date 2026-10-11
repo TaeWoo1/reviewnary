@@ -32,7 +32,7 @@ export interface HomeWorkRow {
    * first element was {@link reason}'s category badge, so 확인할 일 — the list a seller opens every
    * morning — told them what each item WAS and not what to DO with it, while every other queue in the
    * product (문의 · 리뷰 · 리포트, all on `WorkItem`) led with the state word
-   * (`docs/ui/reviewnary_ui_system_audit_v1.md` §3).
+   * (`docs/frontend/reviewnary_ui_system_audit_v1.md` §3).
    *
    * <p>It also unpicks a slot that was carrying two axes. `REASON` holds real categories (교환·환불 ·
    * 정보 부족 · 리뷰 · 판단 보류) AND three words that are states wearing a category badge (답변 필요 ·

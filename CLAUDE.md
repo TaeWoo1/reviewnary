@@ -52,7 +52,7 @@ one place on disk and are **not** recoverable from git.
   over four compiled graphs with human `interrupt`/resume, whose contracts are unchanged. What it is
   and how it connects: `docs/architecture.md`, then **`docs/standing/sellerops_operator_graph_v2.md`** (정본
   제품 행동 계약) · `docs/standing/sellerops_operator_graph_v1.md` (구현·라이브 증명 기록; runtime semantics는
-  v2가 대체) · `docs/decisions/agent-runtime-langgraph-llm-split.md`. Four fences live here:
+  v2가 대체) · `docs/standing/agent-runtime-langgraph-llm-split.md`. Four fences live here:
   - It **holds no credential of any kind.** The draft, planner and judge models are all BACKEND
     capabilities reached with the operator's forwarded bearer, so "the backend is the only LLM
     egress" is still the property to check here.
@@ -157,7 +157,7 @@ document is not on this path and nothing here links to it, it does not carry cur
 | 1 | **product scope / journeys** | identity, strategy, honest state, authority · the scope contract | `docs/sellerops_canonical_reference.md` · `docs/product-scope-v1.md` (**scope lock v1.13**) |
 | 2 | **architecture** | the five runtimes, how they connect, the fail-closed gates — **a pointer page** | `docs/architecture.md` |
 | 3 | **capability truth** | channel × DataType × method × status — **the single declaration** | `docs/multi-channel-connector-roadmap.md` §4.1 |
-| 4 | **decisions** | ADRs and standing contracts | `docs/decisions/` · the contracts in `docs/INDEX.md` — the *Standing contracts and ADRs* group, plus the lane documents under *Inquiry* / *Review* / *Knowledge and retrieval*, which are contracts rather than history |
+| 4 | **decisions** | ADRs and standing contracts | `docs/standing/` · the contracts in `docs/INDEX.md` — the *Standing contracts and ADRs* group, plus the lane documents under *Inquiry* / *Review* / *Knowledge and retrieval*, which are contracts rather than history |
 | 5 | **evidence** | every live run: date, channel, capability, commit, approval id, outcome | `docs/evidence/INDEX.md` |
 
 **Demo 제품 정의:** `docs/demo_core_experience_v1.md` owns **데모로 보여줄 SellerOps** — 화면과 경험의 순서를

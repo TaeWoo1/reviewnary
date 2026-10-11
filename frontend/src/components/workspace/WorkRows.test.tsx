@@ -135,7 +135,7 @@ describe("WorkRows — what every row says identically is a fact about the list"
  *
  * <p>이 목록은 판매자가 매일 아침 여는 화면이고, 그 전에는 행의 첫 요소가 분류 태그였다 — 무엇인지는
  * 말하고 무엇을 하면 되는지는 말하지 않았다. 제품의 다른 모든 queue(문의 · 리뷰 · 리포트, 전부
- * `WorkItem`)는 처음부터 상태어로 시작한다(`docs/ui/reviewnary_ui_system_audit_v1.md` §3).
+ * `WorkItem`)는 처음부터 상태어로 시작한다(`docs/frontend/reviewnary_ui_system_audit_v1.md` §3).
  *
  * <p>여기서 재는 것은 문구가 아니라 <b>순서와 중복</b>이다: 상태어가 제목보다 앞에 오는지, 그리고 상태어와
  * 같은 말을 태그가 한 번 더 하지 않는지.

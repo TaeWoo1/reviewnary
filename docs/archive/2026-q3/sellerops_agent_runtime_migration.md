@@ -47,7 +47,7 @@ A repo-wide audit (2026-07-30) established the starting point:
 > `provider/DraftModelSeam.ts` is a Korean template table, and nothing binds the LangChain tools
 > (`bindTools` / `ChatOpenAI` / `createReactAgent`: zero occurrences repo-wide). So the repository today
 > has a **graph runtime with no model, and a model with no graph**. That is recorded as an open
-> architecture question in `docs/decisions/agent-runtime-langgraph-llm-split.md`; **no migration in
+> architecture question in `docs/standing/agent-runtime-langgraph-llm-split.md`; **no migration in
 > either direction is planned or in progress.**
 
 So "how far was the whole migration reflected?" — **it wasn't.** What existed was a

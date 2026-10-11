@@ -100,7 +100,7 @@ Resolved to `[minmax(0,1fr) | 440px]` everywhere, with the list column at the or
 and left-aligned like every other page. `minmax(0,1fr)` and not `1fr`: a `1fr` track floors at its
 content's min-content width, so one long unbroken Korean line would push the pane off screen. A narrow
 viewport falls back to single-pane; it never squeezes the detail.
-(`docs/ui/reviewnary_ui_system_audit_v1.md` §7, §10.2.)
+(`docs/frontend/reviewnary_ui_system_audit_v1.md` §7, §10.2.)
 
 Breakpoints: default (mobile) · `sm` 640 · `md` 768 (sidebar appears) · `lg` 1024 (two-pane) · `xl` 1280.
 No custom breakpoints. The page body never scrolls horizontally; wide tables scroll inside their own

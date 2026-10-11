@@ -11,7 +11,7 @@ import java.util.Optional;
  * The goal-interpretation call: one request per Operator run, over {@link AgentLlmTransport}.
  *
  * <p><b>This is the LLM behind {@code parseGoal}</b> — the seam
- * {@code docs/decisions/agent-runtime-langgraph-llm-split.md} left explicitly open ("Filling it is the
+ * {@code docs/standing/agent-runtime-langgraph-llm-split.md} left explicitly open ("Filling it is the
  * same shape of decision and has not been made") and that scope lock v1.12 makes. It follows the same
  * shape as {@code AgentDraftGenerator} for the same reasons, and it keeps the property that made that
  * decision affordable: the model is a BACKEND capability, so {@code agent-runtime} still holds no

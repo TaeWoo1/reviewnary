@@ -563,7 +563,7 @@ export function ReviewCaseView({
               실행 준비. The third step never had a numeral, so the numbering was not describing the flow
               it appeared to describe — it was labelling the two steps that happen to share a card. Order
               and the card boundary say the same thing truthfully, and a structural device that encodes
-              nothing true is decoration (docs/ui/reviewnary_ui_system_audit_v1.md §10). Neither control
+              nothing true is decoration (docs/frontend/reviewnary_ui_system_audit_v1.md §10). Neither control
               moved and neither heading changed its noun. */}
           {/* <b>오른쪽 열은 속성이지 카드가 아니다</b> (리뷰 canonical mockup, 2026-10-05). 240px 열의
               전부가 이 덩어리이므로 테두리는 아무것도 나누지 못하고, 준비된 답변과 같은 모양을 한 번 더

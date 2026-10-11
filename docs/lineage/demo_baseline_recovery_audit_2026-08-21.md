@@ -246,7 +246,7 @@ Live proof: Cafe24 board-6 2026-07-31 · Coupang `onlineInquiries` 2026-08-14 (�
   `InquiryResponsePanel.publish.test.tsx`, `Agent.test.tsx`.
 - **마지막 live proof** — 2026-08-20, `POST /api/agent/inquiry-draft` → `200 {available:true, …
   providerVersion:"agent-draft/v1+openai:gpt-5-2025-08-07+…"}`
-  (`docs/decisions/agent-runtime-langgraph-llm-split.md`). 그 evidence 행이 스스로 밝히듯 **그 문의는
+  (`docs/standing/agent-runtime-langgraph-llm-split.md`). 그 evidence 행이 스스로 밝히듯 **그 문의는
   증명을 위해 운영자가 작성한 것이고, 실제 셀러 데이터로는 아직 통과된 적이 없다.** 같은 날의
   `/agent` HITL 런은 초안이 "규칙 기반"으로 라벨링됐다(그 시점 org 플래그 off) — provenance 라벨이
   보수적인 방향으로 스스로를 증명한 사례.

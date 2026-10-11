@@ -15,7 +15,7 @@ import java.util.UUID;
  *
  * <p><b>Why the shipped one is not an embedding.</b> Embedding a corpus of inquiries and reviews means
  * sending customer bodies to a vendor in bulk. That is a data-minimization decision, not a wiring one —
- * the same distinction {@code docs/decisions/agent-runtime-langgraph-llm-split.md} drew for the draft
+ * the same distinction {@code docs/standing/agent-runtime-langgraph-llm-split.md} drew for the draft
  * seam — and scope lock v1.12 opened retrieval as CONTEXT while explicitly leaving that decision
  * closed. So v1 retrieves over closed vocabulary that never left this database.
  *
