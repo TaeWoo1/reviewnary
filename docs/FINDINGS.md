@@ -470,6 +470,26 @@
   텍스트가 아니라 **등록된 도구 이름**을 읽는다. ③ `turnGraphOwnership`은 `this.phaseX(`
   형태를 센다. **"울타리가 안 물었다"를 결함으로 보고하기 전에 그 울타리가 무엇을 읽는지
   먼저 읽는다.**
+- **아직 감사하지 않은 범위 (2026-10-13 측정, 열림)** — 위 작업은 `agent-runtime`의 울타리
+  7개만 다뤘다. 같은 형태가 다른 패키지에 남아 있고, 숫자는 이렇다.
+
+  | 패키지 | 소스를 읽는 테스트 | 양성 단정 슬라이스 | 고정 크기 창 | 경계가 주석 |
+  |---|---|---|---|---|
+  | `agent-runtime` | 19 | **0** (고침) | **0** (고침) | **0** (고침) |
+  | `collector` | 33 | **57** | 2 | 6 |
+  | `backend` | 76 | 1 | 1 | 0 |
+  | `frontend` | 0 | — | — | — |
+
+  **양성 단정(`toContain`/`toMatch`/`contains`)을 거는 슬라이스만 위험하다** — 넓어질수록
+  쉽게 통과한다. 부정 단정만 거는 슬라이스는 넓어지면 **실패**하므로 보수적이다. 그래서
+  `collector`의 57건이 실제 잔여 표면이고, 대부분
+  `test/action-window/coupang-issuance/`와 `test/action-window/initial-import/`에 몰려 있다.
+  `backend`는 울타리 대부분이 **파일 전체**에 `.contains(`를 걸어(1,355회) 이 병에 걸리지
+  않는다 — 전체 스캔이 슬라이스보다 안전하다는 증거다.
+
+  다시 세는 방법: 슬라이스 선언을 찾고, 그 변수에 걸린 단정의 **극성**으로 분류한다.
+  **분류기를 언어별로 맞춰야 한다** — 처음에 `const|let`만 보는 정규식을 Java에 돌려
+  "backend 0건"이 나왔다. 0은 또 "내가 보는 범위에 없다"였다(§B17).
 - **출처** — 2026-10-13. `agent-runtime/test/support/sourceSlice.ts` ·
   `test/conversation/{conversationWriteFence,turnGraphOwnership,reviewApprovalDeepLink}.test.ts` ·
   §B10 · §B12 · §B16 · §B17을 잇는다. 넷 다 같은 병이다 — **검사 도구의 실패는 빨간색이
