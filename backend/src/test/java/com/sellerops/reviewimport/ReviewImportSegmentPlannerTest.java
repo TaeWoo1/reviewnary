@@ -10,10 +10,11 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * Calendar-month segmentation is the V1 plan shape, so its edges are pinned: partial first/last months are
- * clipped to the request, whole months fill in between, adjacent segments never overlap by a day, and a
- * missing/inverted range fails closed rather than planning an unbounded sweep. No NAVER row cap appears
- * here — the segment count is a function of the calendar span alone.
+ * One window per requested period, at most a year, is the plan shape (2026-10-13), so its edges are pinned:
+ * a period of a year or less is ONE export whatever months it crosses, a longer one tiles into consecutive
+ * one-year windows with a partial last one, adjacent windows never overlap by a day, and a missing/inverted
+ * range fails closed rather than planning an unbounded sweep. No NAVER row cap appears here — whether one
+ * export came back whole is measured at ingest, not presumed from a small window.
  */
 class ReviewImportSegmentPlannerTest {
 
@@ -22,63 +23,64 @@ class ReviewImportSegmentPlannerTest {
     }
 
     @Test
-    void wholeMonthsInAYearProduceOneSegmentPerMonth() {
-        List<DateRange> out = ReviewImportSegmentPlanner.monthlySegments(
-                LocalDate.parse("2026-01-01"), LocalDate.parse("2026-12-31"));
-        assertThat(out).hasSize(12);
-        assertThat(out.get(0)).isEqualTo(r("2026-01-01", "2026-01-31"));
-        assertThat(out.get(1)).isEqualTo(r("2026-02-01", "2026-02-28")); // 2026 is not a leap year
-        assertThat(out.get(11)).isEqualTo(r("2026-12-01", "2026-12-31"));
+    void aPeriodCrossingSeveralMonthsIsOneExport() {
+        assertThat(ReviewImportSegmentPlanner.segments(LocalDate.parse("2026-04-01"), LocalDate.parse("2026-06-30")))
+                .containsExactly(r("2026-04-01", "2026-06-30"));
+        assertThat(ReviewImportSegmentPlanner.segments(LocalDate.parse("2026-01-15"), LocalDate.parse("2026-03-10")))
+                .containsExactly(r("2026-01-15", "2026-03-10"));
     }
 
     @Test
-    void partialFirstAndLastMonthsAreClippedToTheRequest() {
-        List<DateRange> out = ReviewImportSegmentPlanner.monthlySegments(
-                LocalDate.parse("2026-01-15"), LocalDate.parse("2026-03-10"));
-        assertThat(out).containsExactly(
-                r("2026-01-15", "2026-01-31"),
-                r("2026-02-01", "2026-02-28"),
-                r("2026-03-01", "2026-03-10"));
+    void exactlyOneYearIsStillOneExport() {
+        assertThat(ReviewImportSegmentPlanner.segments(LocalDate.parse("2026-01-01"), LocalDate.parse("2026-12-31")))
+                .containsExactly(r("2026-01-01", "2026-12-31"));
+        assertThat(ReviewImportSegmentPlanner.segments(LocalDate.parse("2025-10-13"), LocalDate.parse("2026-10-12")))
+                .containsExactly(r("2025-10-13", "2026-10-12"));
     }
 
     @Test
-    void adjacentSegmentsNeverOverlapAndTileTheWholeRange() {
-        List<DateRange> out = ReviewImportSegmentPlanner.monthlySegments(
-                LocalDate.parse("2025-11-20"), LocalDate.parse("2026-02-05"));
+    void oneDayMoreThanAYearBecomesTwoWindows() {
+        assertThat(ReviewImportSegmentPlanner.segments(LocalDate.parse("2026-01-01"), LocalDate.parse("2027-01-01")))
+                .containsExactly(r("2026-01-01", "2026-12-31"), r("2027-01-01", "2027-01-01"));
+    }
+
+    @Test
+    void longPeriodsTileIntoYearWindowsThatNeverOverlap() {
+        List<DateRange> out = ReviewImportSegmentPlanner.segments(
+                LocalDate.parse("2023-07-01"), LocalDate.parse("2026-07-26"));
         assertThat(out).containsExactly(
-                r("2025-11-20", "2025-11-30"),
-                r("2025-12-01", "2025-12-31"),
-                r("2026-01-01", "2026-01-31"),
-                r("2026-02-01", "2026-02-05"));
+                r("2023-07-01", "2024-06-30"),
+                r("2024-07-01", "2025-06-30"),
+                r("2025-07-01", "2026-06-30"),
+                r("2026-07-01", "2026-07-26"));
         for (int i = 1; i < out.size(); i++) {
             assertThat(out.get(i).start()).isEqualTo(out.get(i - 1).end().plusDays(1));
         }
     }
 
     @Test
-    void leapFebruaryEndsOnThe29th() {
-        List<DateRange> out = ReviewImportSegmentPlanner.monthlySegments(
-                LocalDate.parse("2028-02-01"), LocalDate.parse("2028-02-29"));
-        assertThat(out).containsExactly(r("2028-02-01", "2028-02-29"));
+    void aWindowStartingOnALeapDayStaysUnderAYear() {
+        // 2024-02-29 + 1 year is 2025-02-28; the window ends the day before, never reaching past a year.
+        assertThat(ReviewImportSegmentPlanner.segments(LocalDate.parse("2024-02-29"), LocalDate.parse("2025-03-31")))
+                .containsExactly(r("2024-02-29", "2025-02-27"), r("2025-02-28", "2025-03-31"));
     }
 
     @Test
     void singleDayRequestYieldsOneOneDaySegment() {
-        List<DateRange> out = ReviewImportSegmentPlanner.monthlySegments(
-                LocalDate.parse("2026-06-07"), LocalDate.parse("2026-06-07"));
-        assertThat(out).containsExactly(r("2026-06-07", "2026-06-07"));
+        assertThat(ReviewImportSegmentPlanner.segments(LocalDate.parse("2026-06-07"), LocalDate.parse("2026-06-07")))
+                .containsExactly(r("2026-06-07", "2026-06-07"));
     }
 
     @Test
     void invertedRangeFailsClosed() {
-        assertThatThrownBy(() -> ReviewImportSegmentPlanner.monthlySegments(
+        assertThatThrownBy(() -> ReviewImportSegmentPlanner.segments(
                 LocalDate.parse("2026-06-07"), LocalDate.parse("2026-06-01")))
                 .isInstanceOf(ApiException.class);
     }
 
     @Test
     void missingBoundFailsClosed() {
-        assertThatThrownBy(() -> ReviewImportSegmentPlanner.monthlySegments(null, LocalDate.parse("2026-06-01")))
+        assertThatThrownBy(() -> ReviewImportSegmentPlanner.segments(null, LocalDate.parse("2026-06-01")))
                 .isInstanceOf(ApiException.class);
     }
 }

@@ -11,6 +11,9 @@ import java.util.UUID;
  * says the scope was confirmed, the evidence says by whom/how (a guided run's read-back versus an operator
  * attestation). Null on attempts predating the column. The UI must not render an operator confirmation as
  * a machine check.
+ *
+ * <p>{@code expectedRows} is the row total the marketplace screen stated for the exported range, null when it
+ * was not read; a FAILED attempt with it set and no ingest error is an export that did not bring the whole range.
  */
 public record ReviewImportAttemptView(
         int attemptNo,
@@ -21,6 +24,7 @@ public record ReviewImportAttemptView(
         Integer rowsNew,
         Integer rowsDuplicate,
         Integer rowsFailed,
+        Integer expectedRows,
         String errorMessage,
         Instant startedAt,
         Instant finishedAt) {
@@ -29,7 +33,7 @@ public record ReviewImportAttemptView(
         return new ReviewImportAttemptView(a.getAttemptNo(), a.getResult().name(), a.getSyncJobId(),
                 a.isScopeConfirmed(),
                 a.getScopeEvidence() == null ? null : a.getScopeEvidence().name(),
-                a.getRowsNew(), a.getRowsDuplicate(), a.getRowsFailed(),
+                a.getRowsNew(), a.getRowsDuplicate(), a.getRowsFailed(), a.getExpectedRows(),
                 a.getErrorMessage(), a.getStartedAt(), a.getFinishedAt());
     }
 }

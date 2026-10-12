@@ -8,8 +8,9 @@ package com.sellerops.reviewimport;
  *   <li>{@code UNVERIFIED} — not yet covered: no successful export has reconciled this range (initial).</li>
  *   <li>{@code COVERED} — the segment's scope was exported and ingested successfully. Includes a valid
  *       EMPTY export (COVERED with zero rows). "Covered" means the SCOPE was exported successfully; it is
- *       NOT a claim that every expected row was reconciled — NAVER's per-export row cap is UNKNOWN, so
- *       completeness is tracked separately (a segment's {@code rows_reconciled} flag, default false).</li>
+ *       NOT by itself a claim that every expected row was reconciled — completeness is tracked separately
+ *       (a segment's {@code rows_reconciled} flag, true only when the file matched the screen's stated
+ *       total). An export that did not match that total never reaches COVERED.</li>
  *   <li>{@code MISSING} — a coverage conclusion that this range cannot be covered: earlier than the
  *       earliest date NAVER lets the seller select, or repeatedly unreconcilable. It is surfaced honestly
  *       and the segment stays reachable; it is NOT the same as a {@link SegmentExecutionState#FAILED} attempt.</li>

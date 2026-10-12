@@ -89,7 +89,7 @@ public class ReviewImportPlanController {
 
     /**
      * "과거 리뷰 전체 연동하기" — create the plan the seller chose: their start month through today, one segment
-     * per calendar month.
+     * per year of it at most (2026-10-13; calendar months before).
      *
      * This replaced a guided range-DISCOVERY run (2026-07-26). That run drove the seller through NAVER's date
      * pickers to find how far back the marketplace would let them reach; the 2026-07-25 live run established
@@ -212,12 +212,15 @@ public class ReviewImportPlanController {
     /**
      * Ingest the file a guided run downloaded, into the segment its ticket is bound to. This is the
      * automatic path — the seller never locates or uploads the file. {@code scopeEvidence} states how the
-     * exported scope was established (MACHINE_MATCHED | OPERATOR_CONFIRMED).
+     * exported scope was established (MACHINE_MATCHED | OPERATOR_CONFIRMED). {@code expectedRows}, when the
+     * guided run could read it, is the row total the marketplace screen stated for the exported range; the
+     * file is reconciled against it. Absent means it was not read — never zero.
      */
     @PostMapping(value = "/launches/{launchRef}/ingest", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ReviewImportAttemptView ingestForLaunch(@AuthenticationPrincipal AuthPrincipal principal,
                                                    @PathVariable String launchRef,
                                                    @RequestParam String scopeEvidence,
+                                                   @RequestParam(required = false) Integer expectedRows,
                                                    @RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw ApiException.badRequest("파일이 비어 있습니다.");
@@ -226,7 +229,7 @@ public class ReviewImportPlanController {
                 "내보내기 범위를 어떻게 확인했는지 알 수 없습니다.");
         try {
             return ReviewImportAttemptView.from(launchService.ingestForLaunch(principal.orgId(), launchRef,
-                    evidence, file.getOriginalFilename(), file.getInputStream()));
+                    evidence, expectedRows, file.getOriginalFilename(), file.getInputStream()));
         } catch (IOException e) {
             throw ApiException.badRequest("파일을 읽지 못했습니다: " + e.getMessage());
         }

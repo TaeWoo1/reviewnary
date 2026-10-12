@@ -10,13 +10,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Plans a historical review import and lets the operator adjust its shape. Structure only — generating the
- * monthly segments and reshaping them by split/merge. It does NOT run exports or ingest: an attempt's
+ * segments and reshaping them by split/merge. It does NOT run exports or ingest: an attempt's
  * lifecycle lives in the run service (added next). All reads/writes are org-scoped at the boundary.
  *
  * <p>The plan is created from the REQUESTED period verbatim (decision, 2026-07-24: no SellerOps depth
  * limit — the earliest reachable date is discovered per-segment from the live export UI, and any
- * earlier-than-reachable range surfaces later as {@link SegmentCoverageState#MISSING}). V1 segmentation is
- * fixed calendar months ({@link ReviewImportSegmentPlanner}); the operator may split a segment into shorter
+ * earlier-than-reachable range surfaces later as {@link SegmentCoverageState#MISSING}). Segmentation is one
+ * window per requested period, capped at a year ({@link ReviewImportSegmentPlanner}, 2026-10-13); the operator
+ * may split a segment into shorter
  * child ranges (e.g. after a failure or a suspected truncation) or merge adjacent not-yet-run segments.
  */
 @Service
@@ -30,14 +31,14 @@ public class ReviewImportPlanService {
         this.segments = segments;
     }
 
-    /** Create a plan over [requestedStart, requestedEnd] and persist its calendar-month segments (PENDING). */
+    /** Create a plan over [requestedStart, requestedEnd] and persist its segments (PENDING). */
     @Transactional
     public ReviewImportPlan createPlan(UUID orgId, UUID sellerAccountId, UUID channelId,
                                        LocalDate requestedStart, LocalDate requestedEnd) {
         if (sellerAccountId == null || channelId == null) {
             throw ApiException.badRequest("가져오기를 진행할 채널 계정을 먼저 선택해 주세요.");
         }
-        List<DateRange> ranges = ReviewImportSegmentPlanner.monthlySegments(requestedStart, requestedEnd);
+        List<DateRange> ranges = ReviewImportSegmentPlanner.segments(requestedStart, requestedEnd);
 
         ReviewImportPlan plan = new ReviewImportPlan();
         plan.setOrgId(orgId);
@@ -156,7 +157,7 @@ public class ReviewImportPlanService {
     }
 
     /**
-     * Extend a plan FORWARD to {@code today}: materialize new PENDING calendar-month segments covering the
+     * Extend a plan FORWARD to {@code today}: materialize new PENDING segments covering the
      * span AFTER the plan's current latest live segment, up to today. This is the repeated review-operations
      * loop's incremental step — a plan created weeks ago over [start, then] is carried forward to cover the
      * reviews that have arrived since, WITHOUT creating a second plan (a second plan is refused while one is
@@ -166,15 +167,15 @@ public class ReviewImportPlanService {
      * <p>Structure only, like {@link #createPlan}: it appends PENDING segments and bumps {@code requestedEnd}
      * to today; it runs no export and ingests nothing. A COMPLETED plan that gains new PENDING segments
      * recomputes back to ACTIVE — that reopening IS the loop. Overlap-safe dedup means even if the newest
-     * existing segment's month is re-run, no row is double-counted, so the forward edge never needs to be
+     * existing segment's span is re-run, no row is double-counted, so the forward edge never needs to be
      * pixel-perfect. Fails closed on a MISSING-only tail the same as elsewhere: a concluded MISSING segment
      * does not block the forward edge because the new span starts after the latest segment end.
      */
     @Transactional
     public List<ReviewImportSegment> extendPlanForward(UUID orgId, UUID planId, LocalDate today) {
         // Row-lock the plan so two concurrent extends serialize: the second waits, then re-reads the
-        // segments the first materialized and no-ops instead of inserting a duplicate month. Without this,
-        // a double-click across two tabs would create two live PENDING segments for the same forward month.
+        // segments the first materialized and no-ops instead of inserting a duplicate window. Without this,
+        // a double-click across two tabs would create two live PENDING segments for the same forward span.
         ReviewImportPlan plan = plans.findByIdAndOrgIdForUpdate(planId, orgId)
                 .orElseThrow(() -> ApiException.notFound("가져오기 계획을 찾을 수 없습니다."));
         if (plan.getStatus() == ReviewImportPlanStatus.ABANDONED) {
@@ -194,7 +195,7 @@ public class ReviewImportPlanService {
         }
         int ordinal = live.stream().mapToInt(ReviewImportSegment::getOrdinal).max().orElse(-1) + 1;
         List<ReviewImportSegment> created = new java.util.ArrayList<>();
-        for (DateRange r : ReviewImportSegmentPlanner.monthlySegments(newStart, today)) {
+        for (DateRange r : ReviewImportSegmentPlanner.segments(newStart, today)) {
             created.add(segments.save(newSegment(planId, orgId, null, ordinal++, r.start(), r.end())));
         }
         plan.setRequestedEnd(today);

@@ -26,8 +26,15 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Execution vs coverage stay separate: a hard ingest failure marks the attempt and the segment
  * {@link SegmentExecutionState#FAILED} with coverage untouched; a success (a valid EMPTY included) marks
  * {@link SegmentExecutionState#COMPLETED} + {@link SegmentCoverageState#COVERED}. {@code coveredRows} is
- * new + duplicate (rows now accounted for); {@code rowsReconciled} stays false — "scope exported
- * successfully" is not "all expected rows reconciled" while the row cap is unknown.
+ * new + duplicate (rows now accounted for).
+ *
+ * <p>Completeness is a measurement, not a presumption (2026-10-13). When the guided run read the
+ * marketplace screen's row total for the exported range ({@code expectedRows}), the file is reconciled
+ * against it: equal, with no failed row, sets {@code rowsReconciled}; anything else means this export did not
+ * bring the whole range, so the attempt is FAILED and the segment is not COVERED — the operator splits it and
+ * exports the shorter windows. The rows that did arrive stay (dedup makes the re-export overlap-safe). With no
+ * total read (the manual fallback, or a read that found none), {@code rowsReconciled} stays false: "scope
+ * exported successfully" is not "all expected rows reconciled".
  */
 @Service
 public class ReviewImportRunService {
@@ -74,6 +81,21 @@ public class ReviewImportRunService {
     public ReviewImportSegmentAttempt importSegment(UUID orgId, UUID segmentId, boolean scopeConfirmed,
                                                     ScopeEvidence scopeEvidence,
                                                     String filename, InputStream data) {
+        return importSegment(orgId, segmentId, scopeConfirmed, scopeEvidence, null, filename, data);
+    }
+
+    /**
+     * As above, with the row total the marketplace screen stated for the exported range ({@code null} when
+     * it was not read). A total that the file does not match fails the attempt instead of covering the
+     * segment — see the class note.
+     */
+    @Transactional
+    public ReviewImportSegmentAttempt importSegment(UUID orgId, UUID segmentId, boolean scopeConfirmed,
+                                                    ScopeEvidence scopeEvidence, Integer expectedRows,
+                                                    String filename, InputStream data) {
+        if (expectedRows != null && expectedRows < 0) {
+            throw ApiException.badRequest("화면 총 건수가 올바르지 않습니다.");
+        }
         ReviewImportSegment segment = segments.findByIdAndOrgId(segmentId, orgId)
                 .orElseThrow(() -> ApiException.notFound("구간을 찾을 수 없습니다."));
         if (segment.isSuperseded()) {
@@ -97,6 +119,7 @@ public class ReviewImportRunService {
         attempt.setAttemptNo(attempts.nextAttemptNo(segmentId));
         attempt.setScopeConfirmed(true);
         attempt.setScopeEvidence(scopeEvidence);
+        attempt.setExpectedRows(expectedRows);
         attempt.setResult(SegmentAttemptResult.ACTIVE);
         attempt.setStartedAt(Instant.now());
         attempt = attempts.save(attempt);
@@ -113,24 +136,35 @@ public class ReviewImportRunService {
         attempt.setRowsFailed(result.failedRows());
         attempt.setFinishedAt(Instant.now());
 
-        if ("FAILED".equals(result.status())) {
+        int accounted = result.successRows() + result.skippedRows();
+        boolean hardFailure = "FAILED".equals(result.status());
+        boolean shortOfTotal = !hardFailure && expectedRows != null
+                && (accounted != expectedRows || result.failedRows() > 0);
+        if (hardFailure) {
             attempt.setResult(SegmentAttemptResult.FAILED);
             attempt.setErrorMessage(result.errorMessage());
             segment.setExecutionState(SegmentExecutionState.FAILED);
             // coverage stays UNVERIFIED — a failed attempt is not a coverage conclusion.
+        } else if (shortOfTotal) {
+            attempt.setResult(SegmentAttemptResult.FAILED);
+            attempt.setErrorMessage("받은 파일이 " + accounted + "건, 화면 총 건수는 " + expectedRows
+                    + "건입니다. 이 구간을 더 짧게 나눠 다시 받아 주세요.");
+            segment.setExecutionState(SegmentExecutionState.FAILED);
+            // coverage stays UNVERIFIED — the window was not brought whole, whatever did arrive.
         } else {
             attempt.setResult(SegmentAttemptResult.SUCCEEDED);
             segment.setExecutionState(SegmentExecutionState.COMPLETED);
             segment.setCoverageState(SegmentCoverageState.COVERED); // a valid empty (0 rows) is still COVERED
-            segment.setCoveredRows(result.successRows() + result.skippedRows());
+            segment.setCoveredRows(accounted);
+            segment.setRowsReconciled(expectedRows != null);
         }
         attempts.save(attempt);
         segments.save(segment);
         planService.recomputePlanStatus(plan.getId());
 
-        // A COVERED segment means new reviews may have landed; let downstream analysis refresh off them.
+        // A COVERED segment (or a short one that still brought new rows) means new reviews landed; let downstream analysis refresh off them.
         // Fired only on success, AFTER_COMMIT-consumed and best-effort, so it never affects this ingest.
-        if (attempt.getResult() == SegmentAttemptResult.SUCCEEDED) {
+        if (attempt.getResult() == SegmentAttemptResult.SUCCEEDED || (shortOfTotal && result.successRows() > 0)) {
             events.publishEvent(
                     new ReviewSegmentIngestedEvent(orgId, plan.getChannelId(), ReviewImportCalendar.today()));
         }

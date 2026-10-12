@@ -61,6 +61,14 @@ public class ReviewImportSegmentAttempt extends BaseEntity {
     @Column(name = "rows_failed")
     private Integer rowsFailed;
 
+    /**
+     * The row total the marketplace screen stated for the exported range, read by the guided run before the
+     * export. Null when it was not read — the manual fallback, an attempt recorded before V133, or a read that
+     * found no total. Never back-filled.
+     */
+    @Column(name = "expected_rows")
+    private Integer expectedRows;
+
     @Column(name = "error_message", columnDefinition = "text")
     private String errorMessage;
 

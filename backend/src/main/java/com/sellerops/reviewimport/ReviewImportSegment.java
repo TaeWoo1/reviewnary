@@ -57,9 +57,10 @@ public class ReviewImportSegment extends BaseEntity {
     private Integer coveredRows;
 
     /**
-     * Honest completeness flag. With NAVER's per-export row cap UNKNOWN we cannot prove every expected row
-     * arrived, so a covered segment stays {@code false}: "scope exported successfully" is not "all expected
-     * rows reconciled". Only set true if a source of truth for the expected count is ever established.
+     * Honest completeness flag: true only when the covering export's rows were reconciled against the row
+     * total the marketplace screen stated for the same range ({@code review_import_segment_attempt.expected_rows},
+     * V133). Without that total — the manual fallback, or any attempt before 2026-10-13 — it stays
+     * {@code false}: "scope exported successfully" is not "all expected rows reconciled".
      */
     @Column(name = "rows_reconciled", nullable = false)
     private boolean rowsReconciled = false;

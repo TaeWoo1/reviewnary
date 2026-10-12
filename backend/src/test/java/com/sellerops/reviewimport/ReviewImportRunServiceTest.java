@@ -100,6 +100,95 @@ class ReviewImportRunServiceTest {
     }
 
     @Test
+    void aFileThatMatchesTheScreenTotalIsReconciled() {
+        ReviewImportSegment segment = pendingSegment();
+        stubCommon(segment);
+        when(uploadConnector.ingest(any(), any(), any(), any(), any(), any()))
+                .thenReturn(ingest("SUCCESS", 5, 2, 0, null));
+
+        ReviewImportSegmentAttempt attempt = service.importSegment(orgId, segId, true,
+                ScopeEvidence.MACHINE_MATCHED, 7, "export.xlsx", file());
+
+        assertThat(attempt.getResult()).isEqualTo(SegmentAttemptResult.SUCCEEDED);
+        assertThat(attempt.getExpectedRows()).isEqualTo(7);
+        assertThat(segment.getCoverageState()).isEqualTo(SegmentCoverageState.COVERED);
+        assertThat(segment.getCoveredRows()).isEqualTo(7);
+        assertThat(segment.isRowsReconciled()).isTrue();
+    }
+
+    @Test
+    void aValidEmptyExportAgainstAZeroTotalIsReconciled() {
+        ReviewImportSegment segment = pendingSegment();
+        stubCommon(segment);
+        when(uploadConnector.ingest(any(), any(), any(), any(), any(), any()))
+                .thenReturn(ingest("SUCCESS", 0, 0, 0, null));
+
+        service.importSegment(orgId, segId, true, ScopeEvidence.MACHINE_MATCHED, 0, "export.xlsx", file());
+
+        assertThat(segment.getCoverageState()).isEqualTo(SegmentCoverageState.COVERED);
+        assertThat(segment.isRowsReconciled()).isTrue();
+    }
+
+    /** A short file is the truncation the month split was presumed to prevent; now it is caught and never covered. */
+    @Test
+    void aFileShortOfTheScreenTotalFailsTheAttemptAndLeavesTheSegmentUncovered() {
+        ReviewImportSegment segment = pendingSegment();
+        stubCommon(segment);
+        when(uploadConnector.ingest(any(), any(), any(), any(), any(), any()))
+                .thenReturn(ingest("SUCCESS", 900, 100, 0, null));
+
+        ReviewImportSegmentAttempt attempt = service.importSegment(orgId, segId, true,
+                ScopeEvidence.MACHINE_MATCHED, 3812, "export.xlsx", file());
+
+        assertThat(attempt.getResult()).isEqualTo(SegmentAttemptResult.FAILED);
+        assertThat(attempt.getRowsNew()).isEqualTo(900); // what did arrive stays — dedup makes a re-export safe
+        assertThat(attempt.getErrorMessage()).contains("1000").contains("3812");
+        assertThat(segment.getExecutionState()).isEqualTo(SegmentExecutionState.FAILED);
+        assertThat(segment.getCoverageState()).isEqualTo(SegmentCoverageState.UNVERIFIED);
+        assertThat(segment.getCoveredRows()).isNull();
+        assertThat(segment.isRowsReconciled()).isFalse();
+        // New rows did land, so downstream analysis still refreshes off them.
+        verify(events).publishEvent(any(ReviewSegmentIngestedEvent.class));
+    }
+
+    @Test
+    void aFileWithMoreRowsThanTheScreenTotalIsNotReconciledEither() {
+        ReviewImportSegment segment = pendingSegment();
+        stubCommon(segment);
+        when(uploadConnector.ingest(any(), any(), any(), any(), any(), any()))
+                .thenReturn(ingest("SUCCESS", 0, 8, 0, null));
+
+        ReviewImportSegmentAttempt attempt = service.importSegment(orgId, segId, true,
+                ScopeEvidence.MACHINE_MATCHED, 7, "export.xlsx", file());
+
+        assertThat(attempt.getResult()).isEqualTo(SegmentAttemptResult.FAILED);
+        assertThat(segment.getCoverageState()).isEqualTo(SegmentCoverageState.UNVERIFIED);
+        verify(events, never()).publishEvent(any());
+    }
+
+    @Test
+    void aMatchingCountWithUnparsableRowsIsNotReconciled() {
+        ReviewImportSegment segment = pendingSegment();
+        stubCommon(segment);
+        when(uploadConnector.ingest(any(), any(), any(), any(), any(), any()))
+                .thenReturn(ingest("SUCCESS", 5, 2, 1, null));
+
+        ReviewImportSegmentAttempt attempt = service.importSegment(orgId, segId, true,
+                ScopeEvidence.MACHINE_MATCHED, 7, "export.xlsx", file());
+
+        assertThat(attempt.getResult()).isEqualTo(SegmentAttemptResult.FAILED);
+        assertThat(segment.isRowsReconciled()).isFalse();
+    }
+
+    @Test
+    void aNegativeTotalIsRefusedBeforeAnythingIsRecorded() {
+        assertThatThrownBy(() -> service.importSegment(orgId, segId, true,
+                ScopeEvidence.MACHINE_MATCHED, -1, "export.xlsx", file()))
+                .isInstanceOf(ApiException.class);
+        verify(attempts, never()).save(any());
+    }
+
+    @Test
     void validEmptyExportIsCompletedAndCoveredWithZeroRows() {
         ReviewImportSegment segment = pendingSegment();
         stubCommon(segment);

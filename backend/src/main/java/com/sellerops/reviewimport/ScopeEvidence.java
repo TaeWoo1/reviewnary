@@ -6,9 +6,9 @@ package com.sellerops.reviewimport;
  * <p>Kept separate from {@link RangeDiscoveryEvidence} — which answers a different question (what range
  * was reachable at all) — so neither column can hold a value that makes no sense for it.
  *
- * <p>Neither value claims that every review NAVER holds for the range was reconciled: the per-export row
- * cap is unknown, so a matched scope proves the right window was exported, not that the window was
- * complete. That distinction lives in {@code review_import_segment.rows_reconciled}.
+ * <p>Neither value claims that every review NAVER holds for the range was reconciled: a matched scope proves
+ * the right window was exported, not that the window was complete. Completeness is the separate row
+ * reconciliation against the screen's stated total, recorded in {@code review_import_segment.rows_reconciled}.
  */
 public enum ScopeEvidence {
 

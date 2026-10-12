@@ -75,7 +75,7 @@ public class ReviewImportLaunchService {
      * The earliest month a seller may choose to import from.
      *
      * A floor, not a marketplace limit — nothing here claims NAVER can reach it. It exists so a typo cannot
-     * plan two thousand monthly segments, and it is far enough back to cover any real seller's history.
+     * plan an unbounded sweep, and it is far enough back to cover any real seller's history.
      */
     static final YearMonth EARLIEST_SELECTABLE_MONTH = YearMonth.of(2010, 1);
 
@@ -157,11 +157,13 @@ public class ReviewImportLaunchService {
      * of the current month whatever had already been covered, which is how a seller ended up abandoning a
      * plan, typing dates and merging segments to ask a question the product could answer itself.
      *
-     * <p><b>Calendar months stay the unit.</b> The continuation is expressed as the month containing the day
-     * after the last covered one, because that is the segmentation this product's exports have always used —
-     * one export per month is a bound the marketplace screen imposes, not a detail to optimize away. A month
-     * that overlaps days already covered is safe by construction: ingest dedups, so the overlap costs rows
-     * nobody counts twice, never a wrong answer.
+     * <p><b>The continuation starts at a month boundary.</b> It is expressed as the month containing the day
+     * after the last covered one, so a seller reads "from 2026-03" rather than a stray mid-month date. The
+     * span from there to today is one export ({@link ReviewImportSegmentPlanner}: one window per period, at
+     * most a year). An earlier version of this note called one export per month "a bound the marketplace
+     * screen imposes"; nothing ever measured such a bound, and the NAVER review search offers a one-year
+     * range itself (corrected 2026-10-13). Days that overlap what is already covered are safe by
+     * construction: ingest dedups, so the overlap costs rows nobody counts twice, never a wrong answer.
      *
      * <p>An account with nothing covered yet starts at the current month: one export, the reviews that exist
      * now. Reaching further back is the recovery surface's job, where the seller can see what it costs.
@@ -322,7 +324,8 @@ public class ReviewImportLaunchService {
      * What choosing {@code startMonth} would actually create — WITHOUT creating it.
      *
      * <p>Exists because the consequence of the choice is not obvious from the choice: three years of history is
-     * 37 monthly segments, and each one is an export the seller performs by hand. The product owner's rule is
+     * four segments (one per year, the last a partial one), and each one is an export the seller performs by
+     * hand. The product owner's rule is
      * that they see the period and the segment count and confirm before a plan exists, so this is the read that
      * confirmation screen is built from.
      *
@@ -336,7 +339,7 @@ public class ReviewImportLaunchService {
     }
 
     /**
-     * Create the plan the seller chose: their start month through today, one segment per calendar month.
+     * Create the plan the seller chose: their start month through today, one segment per year of it at most.
      *
      * <p>Spends a DISCOVERY ticket even though no run happens, and that is deliberate rather than vestigial. The
      * ticket is what makes plan creation single-use per account (V28's partial unique index) and what records
@@ -377,7 +380,7 @@ public class ReviewImportLaunchService {
             throw ApiException.badRequest("가져오기 시작 월이 너무 이릅니다. 더 최근 달을 선택해 주세요.");
         }
         LocalDate start = month.atDay(1);
-        int segmentCount = ReviewImportSegmentPlanner.monthlySegments(start, today).size();
+        int segmentCount = ReviewImportSegmentPlanner.segments(start, today).size();
         return new RangeSelection(start, today, segmentCount);
     }
 
@@ -401,7 +404,7 @@ public class ReviewImportLaunchService {
     /* ─────────────────────────── Spend ─────────────────────────── */
 
     /**
-     * Record what the discovery run found and build the plan from it: monthly segments over the range the
+     * Record what the discovery run found and build the plan from it: segments over the range the
      * marketplace actually allows, rather than a period guessed up front. Spends the discovery ticket and
      * returns the created plan.
      *
@@ -444,7 +447,7 @@ public class ReviewImportLaunchService {
      */
     @Transactional
     public ReviewImportSegmentAttempt ingestForLaunch(UUID orgId, String launchRef, ScopeEvidence scopeEvidence,
-                                                     String filename, InputStream data) {
+                                                     Integer expectedRows, String filename, InputStream data) {
         ReviewImportLaunch ticket = requireOpen(orgId, launchRef);
         if (ticket.getKind() != ReviewImportLaunchKind.SEGMENT) {
             throw ApiException.badRequest("구간 가져오기용 요청이 아닙니다.");
@@ -454,7 +457,8 @@ public class ReviewImportLaunchService {
         }
         ticket.setScopeEvidence(scopeEvidence);
         consume(ticket);
-        return runService.importSegment(orgId, ticket.getSegmentId(), true, scopeEvidence, filename, data);
+        return runService.importSegment(orgId, ticket.getSegmentId(), true, scopeEvidence, expectedRows,
+                filename, data);
     }
 
     /**

@@ -6,15 +6,25 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Pure segmentation of a requested historical period into export windows. V1 default: one CALENDAR MONTH
- * per segment (decision, 2026-07-24) — NOT row-density-adaptive. Calendar months, not rolling 30-day
- * windows, so a seller reads "2026-03" rather than "Feb 14 – Mar 15" and adjacent months never overlap by
- * a day. The window is inclusive on both ends. Fails closed on a missing or inverted range, mirroring
- * {@code BackfillWindow}, so an unbounded sweep can never be planned by mistake.
+ * Pure segmentation of a requested historical period into export windows. Default: <b>one segment per
+ * requested period</b>, capped at one year — a longer period becomes consecutive windows of at most one year
+ * each (decision, 2026-10-13, superseding the 2026-07-24 calendar-month default).
  *
- * <p>No NAVER row/range cap is assumed anywhere here: the number of segments is a function of the calendar
- * span alone. Whether any single month is too large is discovered from the live export, and handled by the
- * operator splitting that month into shorter child ranges — never by a guessed limit.
+ * <p>Why the period and not the month. {@code segmentCount} is the number of separate exports the seller
+ * sits through, and the month default made that count a function of the calendar alone: a year of history
+ * cost twelve seated downloads although the NAVER review search exports a range of up to a year (its own
+ * 「1년」 preset) in one. The month split bought no safety in exchange — no export was ever reconciled
+ * against anything, so a truncated month and a truncated year were equally invisible. Completeness is now
+ * judged per export by row reconciliation ({@code review_import_segment.rows_reconciled}), not presumed
+ * from a small window.
+ *
+ * <p>Why one year. It is the widest window the marketplace's own range control offers as a preset; asking
+ * for more in one export would be a guess about the marketplace, which this class never makes. No row cap
+ * is assumed either: whether one export came back whole is measured, and an export that did not is split by
+ * the operator into shorter child ranges.
+ *
+ * <p>The window is inclusive on both ends. Fails closed on a missing or inverted range, mirroring
+ * {@code BackfillWindow}, so an unbounded sweep can never be planned by mistake.
  */
 public final class ReviewImportSegmentPlanner {
 
@@ -34,17 +44,17 @@ public final class ReviewImportSegmentPlanner {
     }
 
     /**
-     * Divide [start, end] into calendar-month segments in chronological order. A partial first/last month
-     * is clipped to the requested bound (e.g. a request of 2026-01-15 … 2026-03-10 yields 2026-01-15…01-31,
-     * 2026-02-01…02-28, 2026-03-01…03-10). A single-day request yields one one-day segment.
+     * Divide [start, end] into consecutive windows of at most one year, in chronological order. A period of
+     * a year or less is one window; 2025-01-15 … 2026-03-10 yields 2025-01-15 … 2026-01-14 and 2026-01-15 …
+     * 2026-03-10. Adjacent windows never overlap by a day. A single-day request yields one one-day window.
      */
-    public static List<DateRange> monthlySegments(LocalDate start, LocalDate end) {
+    public static List<DateRange> segments(LocalDate start, LocalDate end) {
         DateRange window = new DateRange(start, end); // validates
         List<DateRange> out = new ArrayList<>();
         LocalDate cursor = window.start();
         while (!cursor.isAfter(window.end())) {
-            LocalDate monthEnd = cursor.withDayOfMonth(cursor.lengthOfMonth());
-            LocalDate segEnd = monthEnd.isAfter(window.end()) ? window.end() : monthEnd;
+            LocalDate yearEnd = cursor.plusYears(1).minusDays(1);
+            LocalDate segEnd = yearEnd.isAfter(window.end()) ? window.end() : yearEnd;
             out.add(new DateRange(cursor, segEnd));
             cursor = segEnd.plusDays(1);
         }

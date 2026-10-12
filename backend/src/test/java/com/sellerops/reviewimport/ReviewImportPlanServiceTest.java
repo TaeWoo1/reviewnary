@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 /**
- * Planning + reshaping logic, repositories mocked (no DB, no FK seeding). Pins: monthly generation, and
+ * Planning + reshaping logic, repositories mocked (no DB, no FK seeding). Pins: one window per period (at most a year), and
  * the fail-closed guards on split (exact tiling) and merge (contiguous, not-yet-run) that keep an operator
  * from carving gaps into the plan or merging away a run.
  */
@@ -71,12 +71,12 @@ class ReviewImportPlanServiceTest {
     }
 
     @Test
-    void createPlanPersistsOneSegmentPerCalendarMonth() {
+    void createPlanPersistsOneSegmentPerYearOfThePeriod() {
         stubSaves();
-        service.createPlan(org, account, channel, LocalDate.parse("2026-01-10"), LocalDate.parse("2026-03-05"));
+        service.createPlan(org, account, channel, LocalDate.parse("2025-01-10"), LocalDate.parse("2026-03-05"));
 
         ArgumentCaptor<ReviewImportSegment> cap = ArgumentCaptor.forClass(ReviewImportSegment.class);
-        verify(segments, times(3)).save(cap.capture());
+        verify(segments, times(2)).save(cap.capture());
         List<ReviewImportSegment> saved = cap.getAllValues();
         assertThat(saved).allSatisfy(s -> {
             assertThat(s.getExecutionState()).isEqualTo(SegmentExecutionState.PENDING);
@@ -85,9 +85,8 @@ class ReviewImportPlanServiceTest {
         });
         assertThat(saved).extracting(ReviewImportSegment::getSegmentStart, ReviewImportSegment::getSegmentEnd)
                 .containsExactly(
-                        Tuple.tuple(LocalDate.parse("2026-01-10"), LocalDate.parse("2026-01-31")),
-                        Tuple.tuple(LocalDate.parse("2026-02-01"), LocalDate.parse("2026-02-28")),
-                        Tuple.tuple(LocalDate.parse("2026-03-01"), LocalDate.parse("2026-03-05")));
+                        Tuple.tuple(LocalDate.parse("2025-01-10"), LocalDate.parse("2026-01-09")),
+                        Tuple.tuple(LocalDate.parse("2026-01-10"), LocalDate.parse("2026-03-05")));
     }
 
     @Test
@@ -182,7 +181,7 @@ class ReviewImportPlanServiceTest {
     }
 
     @Test
-    void extendMaterializesMonthsAfterLatestSegmentUpToToday() {
+    void extendMaterializesOneWindowAfterLatestSegmentUpToToday() {
         stubSaves();
         ReviewImportPlan plan = planWith(ReviewImportPlanStatus.COMPLETED, "2026-03-31");
         when(plans.findByIdAndOrgIdForUpdate(planId, org)).thenReturn(Optional.of(plan));
@@ -196,8 +195,7 @@ class ReviewImportPlanServiceTest {
         assertThat(created).extracting(ReviewImportSegment::getSegmentStart, ReviewImportSegment::getSegmentEnd,
                         ReviewImportSegment::getOrdinal)
                 .containsExactly(
-                        Tuple.tuple(LocalDate.parse("2026-04-01"), LocalDate.parse("2026-04-30"), 3),
-                        Tuple.tuple(LocalDate.parse("2026-05-01"), LocalDate.parse("2026-05-10"), 4));
+                        Tuple.tuple(LocalDate.parse("2026-04-01"), LocalDate.parse("2026-05-10"), 3));
         assertThat(created).allSatisfy(s -> {
             assertThat(s.getExecutionState()).isEqualTo(SegmentExecutionState.PENDING);
             assertThat(s.getCoverageState()).isEqualTo(SegmentCoverageState.UNVERIFIED);

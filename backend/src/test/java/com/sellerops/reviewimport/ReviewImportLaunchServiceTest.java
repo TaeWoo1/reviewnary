@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -304,7 +305,8 @@ class ReviewImportLaunchServiceTest {
     /**
      * The confirmation screen's whole content: the period, and how many separate manual exports it becomes.
      *
-     * The count is the fact that makes the choice a decision — three years reads like one click and is 37.
+     * The count is the fact that makes the choice a decision. Under a year it is one export, whatever the
+     * calendar says; three years is four (one per year, the last partial).
      */
     @Test
     void previewSaysWhatTheChosenPeriodWouldCostBeforeAnythingIsCreated() {
@@ -315,7 +317,9 @@ class ReviewImportLaunchServiceTest {
         assertThat(preview.start()).isEqualTo(LocalDate.parse("2026-05-01"));
         // Today, from the server's KST clock — not a date the browser supplied.
         assertThat(preview.end()).isEqualTo(LocalDate.parse("2026-07-26"));
-        assertThat(preview.segmentCount()).isEqualTo(3);
+        // Three calendar months, one export: the marketplace takes up to a year in one.
+        assertThat(preview.segmentCount()).isEqualTo(1);
+        assertThat(dated.previewSelection(orgId, accountId, "2023-07").segmentCount()).isEqualTo(4);
         // A preview creates nothing at all.
         verify(launches, never()).save(any());
         verify(planService, never()).createPlan(any(), any(), any(), any(), any());
@@ -537,9 +541,9 @@ class ReviewImportLaunchServiceTest {
         when(launches.findByLaunchRef("00112233445566bb"))
                 .thenReturn(Optional.of(ticket(ReviewImportLaunchKind.DISCOVERY, ReviewImportLaunchStatus.ISSUED)));
         assertThatThrownBy(() -> service.ingestForLaunch(orgId, "00112233445566bb",
-                ScopeEvidence.MACHINE_MATCHED, "export.xlsx", file()))
+                ScopeEvidence.MACHINE_MATCHED, null, "export.xlsx", file()))
                 .isInstanceOf(ApiException.class);
-        verify(runService, never()).importSegment(any(), any(), any(boolean.class), any(), any(), any());
+        verify(runService, never()).importSegment(any(), any(), any(boolean.class), any(), any(), any(), any());
     }
 
     @Test
@@ -548,10 +552,10 @@ class ReviewImportLaunchServiceTest {
         when(launches.findByLaunchRef("00112233445566aa")).thenReturn(Optional.of(t));
         stubSave();
 
-        service.ingestForLaunch(orgId, "00112233445566aa", ScopeEvidence.MACHINE_MATCHED, "export.xlsx", file());
+        service.ingestForLaunch(orgId, "00112233445566aa", ScopeEvidence.MACHINE_MATCHED, 412, "export.xlsx", file());
 
         verify(runService).importSegment(eq(orgId), eq(segId), eq(true), eq(ScopeEvidence.MACHINE_MATCHED),
-                eq("export.xlsx"), any());
+                eq(412), eq("export.xlsx"), any());
         assertThat(t.getScopeEvidence()).isEqualTo(ScopeEvidence.MACHINE_MATCHED);
         assertThat(t.getStatus()).isEqualTo(ReviewImportLaunchStatus.CONSUMED);
     }
@@ -562,9 +566,10 @@ class ReviewImportLaunchServiceTest {
         when(launches.findByLaunchRef("00112233445566aa")).thenReturn(Optional.of(t));
         stubSave();
 
-        service.ingestForLaunch(orgId, "00112233445566aa", ScopeEvidence.OPERATOR_CONFIRMED, "export.xlsx", file());
+        service.ingestForLaunch(orgId, "00112233445566aa", ScopeEvidence.OPERATOR_CONFIRMED, null, "export.xlsx", file());
 
-        verify(runService).importSegment(any(), any(), eq(true), eq(ScopeEvidence.OPERATOR_CONFIRMED), any(), any());
+        verify(runService).importSegment(any(), any(), eq(true), eq(ScopeEvidence.OPERATOR_CONFIRMED), any(), any(),
+                any());
         assertThat(t.getScopeEvidence()).isEqualTo(ScopeEvidence.OPERATOR_CONFIRMED);
     }
 
@@ -656,9 +661,9 @@ class ReviewImportLaunchServiceTest {
 
         // 3. That run finishes: the file is ingested against the segment its ticket is bound to, and the ticket
         //    is spent. July is covered from here on.
-        dated.ingestForLaunch(orgId, first.getLaunchRef(), ScopeEvidence.MACHINE_MATCHED, "export.xlsx", file());
+        dated.ingestForLaunch(orgId, first.getLaunchRef(), ScopeEvidence.MACHINE_MATCHED, null, "export.xlsx", file());
         verify(runService).importSegment(eq(orgId), eq(july.getId()), eq(true), eq(ScopeEvidence.MACHINE_MATCHED),
-                eq("export.xlsx"), any());
+                isNull(), eq("export.xlsx"), any());
         assertThat(first.getStatus()).isEqualTo(ReviewImportLaunchStatus.CONSUMED);
         july.setExecutionState(SegmentExecutionState.COMPLETED);
         july.setCoverageState(SegmentCoverageState.COVERED);
