@@ -179,7 +179,7 @@ the reveal run, the destructive deletion run, and the gated live scaffold
 `run-coupang-wing-issuance-live`. The WING selector recorder takes its first per-checkpoint
 confirmation before it reads anything, which is the same gate under another name.
 
-**Live proof:** [`trusted_operator_confirmation_proof_v1.md`](./trusted_operator_confirmation_proof_v1.md)
+**Live proof:** [`trusted_operator_confirmation_proof_v1.md`](../lineage/trusted_operator_confirmation_proof_v1.md)
 — two sittings on 2026-08-13, same code and phase, differing only in whether the operator pressed:
 no press ⇒ `REFUSED_ABORTED` with zero WING navigation / read / action / observation; press ⇒
 `GRANTED`, and the next checkpoint arms with its own fresh token.
@@ -449,7 +449,7 @@ The value-cell structure is measured first, by a separate `READ_ONLY` phase
 (`COUPANG_WING_CREDENTIAL_CELL_CALIBRATION`) with its own approval — a grant for the calibration is never
 a grant for the handoff. That order is **enforced**: `WING_CREDENTIAL_CELLS_CALIBRATED` ships `false` and
 the gate refuses a `CREDENTIAL_READ` manifest while it is (`CREDENTIAL_CELLS_NOT_CALIBRATED`), so the
-handoff cannot reach PREPARED on a screen nobody has measured. Full contract: [`coupang_credential_handoff_v1.md`](./coupang_credential_handoff_v1.md).
+handoff cannot reach PREPARED on a screen nobody has measured. Full contract: [`coupang_credential_handoff_v1.md`](../lineage/coupang_credential_handoff_v1.md).
 
 ---
 

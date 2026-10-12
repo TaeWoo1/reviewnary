@@ -19,9 +19,9 @@ any status claim later in the file.
   with **no browser**, and it activates a carrier **on demand** when a SellerOps tab asks for one over
   the already-authenticated socket (`{type:"aw_attach", carrier, channelCode}`).
   Servable on demand today: `issuance/coupang`, `issuance/naver`.
-  **Design + live proof: [`../resident_helper_on_demand_carrier_v1.md`](../resident_helper_on_demand_carrier_v1.md)** — that
+  **Design + live proof: [`../resident_helper_on_demand_carrier_v1.md`](../lineage/resident_helper_on_demand_carrier_v1.md)** — that
   document, not this one, is the current architecture of record for the carrier seam.
-- **Reachability per capability:** [`../channel_integration_completeness_audit_v1.md`](../channel_integration_completeness_audit_v1.md)
+- **Reachability per capability:** [`../channel_integration_completeness_audit_v1.md`](../channel/channel_integration_completeness_audit_v1.md)
   audits the full chain (seller control → FE → bridge → carrier → driver → UI) for every NAVER / Coupang /
   Cafe24 capability, and separates *past live proof* from *current reachability* — several capabilities
   are live-proven **and** currently unreachable from the resident helper.
@@ -47,7 +47,7 @@ any status claim later in the file.
   file the runtime cannot see. The run stays a **silent PENDING**, not a failure. The manual fallback cannot
   rescue it either: NAVER's export downloads with **no filename extension** and both the file input
   (`accept=".xlsx,.csv"`) and `FileParser` dispatch on extension. Recorded with the live numbers in
-  [`../demo_org_and_channel_knowledge_v1.md`](../demo_org_and_channel_knowledge_v1.md) §4g; being fixed as
+  [`../demo_org_and_channel_knowledge_v1.md`](../knowledge/demo_org_and_channel_knowledge_v1.md) §4g; being fixed as
   the "NAVER Review Acquisition Completion Hardening" package. UI discoverability / screen density /
   month-segmentation sizing are **separate** (Connection/Acquisition UX Polish backlog) and are not blockers.
 - **Live evidence:** every run is indexed in [`../evidence/INDEX.md`](../evidence/INDEX.md). The r4
@@ -60,7 +60,8 @@ any status claim later in the file.
 | `HANDOFF.md` (this header) | **CURRENT** |
 | `r4-*-dispatch-record.md`, `r4-evidence-pack.md`, `r4-gate-record.md` | **HISTORICAL — live evidence.** Accurate about the runs they record; indexed in `../evidence/INDEX.md` |
 | `decisions.md`, `contract-boundary.md`, `agent-first-ui-light-adr.md` | **HISTORICAL — decisions.** Still readable as lineage |
-| `current-state.md`, `checklist.md`, `r4-preparation.md`, `naver-smartstore-v1-plan.md` | **HISTORICAL — superseded.** `current-state.md` already declares its own body stale in its first bullet. Do not cite for current state |
+| `current-state.md`, `checklist.md`, `r4-preparation.md`, `naver-smartstore-v1-plan.md` | **RETIRED — not in the repository.** Deleted in `39186802` (2026-08-19); the links above that still carry these labels land on their successors. Where each one went: `docs/lineage_index.md` |
+| `account-scoped-persistent-session-runtime.md` | **HISTORICAL — design + offline proof** (2026-07-27). Owns the per-account browser profile: migration `V30` `account_session_slot`, `AccountSessionSlotService.resolveSlot`. Read it before touching profile scoping |
 | everything else here | **HISTORICAL** unless it says otherwise |
 
 **`docs/multi-channel-connector-roadmap.md` §4.1** — the capability table — outranks this file (conflict
@@ -96,7 +97,7 @@ a worktree, and a "current slice" that no longer exist.
 3. [`r4-preparation.md`](r4-gate-record.md) — **normative**: §3 gates G1–G6, §4 live-action safety
    boundary, §6 adapter ladder, §7 abort criteria.
 4. [`r4-gate-record.md`](r4-gate-record.md) — recorded gate sign-offs + the export-pilot pre-dispatch runbook.
-5. [`r4-operator-runbook.md`](../sellerops_live_approval_contract.md) — **the only operator-facing doc here**; the other
+5. [`r4-operator-runbook.md`](../standing/sellerops_live_approval_contract.md) — **the only operator-facing doc here**; the other
    entries are engineering records. Read it if a human is about to run an **export**: Phase A prep, the
    click and confirm windows, what a lapse costs, when to abort. **Grants nothing.**
    ⚠ **It describes the EXPORT pilot. Run 5 deliberately inverts its §3** (click, do NOT confirm) — that
@@ -188,7 +189,7 @@ follow-up (a classification probe that needs a fresh single-use G6), and product
 raises an **expected NAVER confirmation dialog** the operator must manually confirm; the download fires only
 on that confirmation. Both steps must land inside the ~60 s detect window. That dialog is **expected and is
 NOT a §7 abort trigger**; §7's "any *unrecognized* prompt/dialog → abort" still stands for everything else.
-Operator-facing version: [`r4-operator-runbook.md`](../sellerops_live_approval_contract.md) §3; normative:
+Operator-facing version: [`r4-operator-runbook.md`](../standing/sellerops_live_approval_contract.md) §3; normative:
 `r4-preparation.md` §7.
 
 **Timing facts a cold session re-derives WRONG (code-verified, not run-verified):**
@@ -503,7 +504,7 @@ paragraph is currently the decision's only home in the repo.
 Run 4 proved the path; the human choreography was scattered and the one text an operator reads at run time
 was stale. Now closed, offline, in one commit:
 
-- **NEW [`r4-operator-runbook.md`](../sellerops_live_approval_contract.md)** — the run-time choreography (Phase A prep,
+- **NEW [`r4-operator-runbook.md`](../standing/sellerops_live_approval_contract.md)** — the run-time choreography (Phase A prep,
   the ~60 s window, timeout cost, abort, evidence). Choreography **only**: it links to the gate record for
   authorization and §8-17 for evidence rather than restating them. **It grants nothing.**
 - **`r4-preparation.md` §7** — the expected-dialog carve-out, now explicit in the normative section, and

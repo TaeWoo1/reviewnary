@@ -7,7 +7,7 @@ straight to the backend credential vault, which verifies them against a read-onl
 What does not change: the seller issues the key. Every press on WING is theirs. SellerOps does not
 click, submit, or create a credential, and never has.
 
-Canonical approval contract: [`sellerops_live_approval_contract.md`](./sellerops_live_approval_contract.md)
+Canonical approval contract: [`sellerops_live_approval_contract.md`](../standing/sellerops_live_approval_contract.md)
 (§3 the run grant, §5a in-run checkpoints, §5b the auto-read arm policy). This document is the
 credential-specific half and adds nothing that weakens those.
 

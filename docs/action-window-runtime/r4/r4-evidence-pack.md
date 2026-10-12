@@ -1170,4 +1170,4 @@ already spent.** Any follow-up classification probe needs a **fresh single-use G
 - Gate + readiness source → [`r4-preparation.md`](r4-gate-record.md) §1/§3/§6/§7/§8
 - Durable decisions → [`decisions.md`](decisions.md) D-019/D-020/D-021/D-022/D-023
 - Living handoff state → [`current-state.md`](HANDOFF.md)
-- Capability ledger → [`checklist.md`](../evidence/INDEX.md) row 14
+- Capability ledger → [`checklist.md`](../../evidence/INDEX.md) row 14

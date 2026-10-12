@@ -118,7 +118,7 @@ dispatching turn should cite that proof rather than rest on rows that predate th
 
 ## 4. Operator choreography — this DEVIATES from the operator runbook, on purpose
 
-⚠ [`r4-operator-runbook.md`](../sellerops_live_approval_contract.md) §3 tells the operator to confirm the dialog
+⚠ [`r4-operator-runbook.md`](../../standing/sellerops_live_approval_contract.md) §3 tells the operator to confirm the dialog
 "without hesitation". **Run 5 requires the opposite.** The runbook describes the **export pilot** and is
 correct for it; **it must not be rewritten to describe Run 5, and these two must not be "reconciled".**
 This record is the sole choreography for this run.
@@ -191,6 +191,6 @@ two points this record restates because Run 5 inverts the usual reading:
 
 **Related:** [`r4-gate-record.md`](r4-gate-record.md) (the Run-5 G6 template — authorization) ·
 [`r4-preparation.md`](r4-gate-record.md) (§4 boundary, §7 abort — normative) ·
-[`r4-operator-runbook.md`](../sellerops_live_approval_contract.md) (the **export-pilot** choreography — deliberately
+[`r4-operator-runbook.md`](../../standing/sellerops_live_approval_contract.md) (the **export-pilot** choreography — deliberately
 different from §4 above) · [`r4-evidence-pack.md`](r4-evidence-pack.md) (§8-16 Run 3 is this run's
 terminal shape; §8-17 Run 4 is the choreography observation) · [`HANDOFF.md`](HANDOFF.md).

@@ -5,10 +5,10 @@
 > WING credential achieved first connection, first `ORDER_SUMMARY` sync, `PREPARING → CONNECTED`, and
 > same-window idempotent re-sync — with zero code modification and zero secret/PII/provider-body leakage.
 >
-> Canonical live-run rules: [`sellerops_live_approval_contract.md`](./sellerops_live_approval_contract.md).
+> Canonical live-run rules: [`sellerops_live_approval_contract.md`](../standing/sellerops_live_approval_contract.md).
 > Predecessors: [`coupang_ordersheets_response_contract_hardening_v1.md`](./coupang_ordersheets_response_contract_hardening_v1.md)
 > (the parse fix this proof exercises on `main`),
-> [`coupang_connection_failure_diagnostic_hardening_v1.md`](./coupang_connection_failure_diagnostic_hardening_v1.md)
+> [`coupang_connection_failure_diagnostic_hardening_v1.md`](../archive/2026-q3/coupang_connection_failure_diagnostic_hardening_v1.md)
 > (the connect-test fix).
 
 ## Scope & authorization

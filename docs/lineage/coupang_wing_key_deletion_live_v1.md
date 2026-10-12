@@ -8,8 +8,8 @@
 > see". This is **not** `DELETED_KEY_REISSUANCE_PATH_LIVE_PASS`; no key was issued or reissued, and no
 > SellerOps credential was replaced.
 >
-> Approval rules: [`sellerops_live_approval_contract.md`](./sellerops_live_approval_contract.md). Selector
-> provenance: [`coupang_wing_delete_selector_calibration_v1.md`](./coupang_wing_delete_selector_calibration_v1.md).
+> Approval rules: [`sellerops_live_approval_contract.md`](../standing/sellerops_live_approval_contract.md). Selector
+> provenance: [`coupang_wing_delete_selector_calibration_v1.md`](../archive/2026-q3/coupang_wing_delete_selector_calibration_v1.md).
 
 ## Product classification — internal tooling, not a feature (2026-08-08)
 
@@ -27,8 +27,8 @@ walkthrough for it.
 
 Consequently the tooling described here is **feature-frozen**: kept for diagnostics and regression-protected,
 never surfaced in a frontend CTA, never labelled a capability, and not developed further. The rule is recorded
-in [`product-scope-v1.md`](./product-scope-v1.md) §7.19, the onboarding states in
-[`coupang_guided_issuance_credential_lifecycle_scope_v1.md`](./coupang_guided_issuance_credential_lifecycle_scope_v1.md),
+in [`product-scope-v1.md`](../product-scope-v1.md) §7.19, the onboarding states in
+[`coupang_guided_issuance_credential_lifecycle_scope_v1.md`](../standing/coupang_guided_issuance_credential_lifecycle_scope_v1.md),
 and the seller-facing-tree exclusion is enforced by
 `collector/test/crossstack/deletion-tooling-not-product-surface.test.ts`.
 
@@ -74,7 +74,7 @@ see below.
 > `credentialAnchorPresent`. The real no-key form then read `credentialAnchorPresent: true` — the anchor is a
 > **false positive** for issued-state, so that verdict was wrong on real data and has been withdrawn. The
 > deletion itself is unaffected and did succeed; only the instrument was wrong. Read
-> [`coupang_no_key_form_classifier_selector_recon_v1.md`](./coupang_no_key_form_classifier_selector_recon_v1.md)
+> [`coupang_no_key_form_classifier_selector_recon_v1.md`](../archive/2026-q3/coupang_no_key_form_classifier_selector_recon_v1.md)
 > before relying on anything in Fix 1. Fix 2 (the overlay cleanup) is unaffected.
 
 ## Fix 1 — the issued-state verdict (`wingIssuedStateFrom`) — WITHDRAWN 2026-08-08
@@ -137,7 +137,7 @@ clearing does not reset the driver's phase, so the checkpoint-before-operator-ac
 > `self_dev` 0, `call_ip` 0, `vendor_info` 8 ⇒ NEEDS RECALIBRATION. The secondary deletion-evidence criterion
 > was not met and cannot be: `credentialAnchorPresent` read `true` on the operator-confirmed no-key form, so it
 > is a **false positive** and the verdict built on it is withdrawn. Full audit + the recon design:
-> [`coupang_no_key_form_classifier_selector_recon_v1.md`](./coupang_no_key_form_classifier_selector_recon_v1.md).
+> [`coupang_no_key_form_classifier_selector_recon_v1.md`](../archive/2026-q3/coupang_no_key_form_classifier_selector_recon_v1.md).
 > The plan below is kept as the record of what was intended; where it conflicts with that document, that
 > document wins.
 

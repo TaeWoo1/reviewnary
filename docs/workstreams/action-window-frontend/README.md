@@ -54,3 +54,17 @@ params produced upstream.
 
 FE-1 is **implemented** (mock-driven, no Bridge/Runtime). See `progress.md` for the live
 state, files, and validation.
+
+## The documents here
+
+- [`progress.md`](./progress.md) — live state, files, validation. **Status lives here**, not in
+  this README.
+- [`implementation-plan.md`](./implementation-plan.md) — the FE-1 build plan.
+- [`live-verification-protocol.md`](./live-verification-protocol.md) — *how* to verify the
+  Operations UI against a live paired agent.
+- [`live-verification-readiness.md`](./live-verification-readiness.md) — *whether it can be run
+  yet*, and which runtime-owned pieces were missing. Its 2026-07-13 bottom line: the synthetic
+  paired agent now exists (`collector` → `npm run action-window-ui-harness`) and the wire
+  contract is proven hermetically by
+  `collector/test/crossstack/fe-transport-real-bridge.test.ts`; what still needs the manual
+  approval-gated protocol is the browser-rendered UI itself.

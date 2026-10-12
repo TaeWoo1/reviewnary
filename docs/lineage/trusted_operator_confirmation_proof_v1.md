@@ -7,7 +7,7 @@ question about the run-level grant: **does a live run start without a human pres
 Same code, same procedure, same phase, two approvals. The only difference between them is whether a
 person pressed a button.
 
-Canonical contract: [`sellerops_live_approval_contract.md`](./sellerops_live_approval_contract.md)
+Canonical contract: [`sellerops_live_approval_contract.md`](../standing/sellerops_live_approval_contract.md)
 §3 (the grant) and §5a (in-run checkpoints).
 
 ---

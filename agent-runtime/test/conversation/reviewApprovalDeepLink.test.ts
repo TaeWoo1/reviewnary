@@ -78,9 +78,14 @@ describe("review action artifacts deep-link to the exact review", () => {
 
   it("carries no approve or send path of its own — the link is the whole handoff", () => {
     const block = methodBody("private async routeSend(");
-    // 120 lines at the time of writing. A slice that silently grew to the rest of the file is what
-    // this bound catches: generous enough for the method to change, far short of 1,186.
-    expect(block.split("\n").length, "routeSend slice is no longer one method").toBeLessThan(400);
+    // 120 lines at the time of writing. The bound is not a line count — it is the property that the
+    // slice was actually CUT SHORT of the rest of the file. An absolute cap decays: this said `< 400`
+    // while the runaway it guarded was 1,186 lines, and after the service was split the same runaway
+    // became 295 lines and would have passed the cap. Compare against the file itself instead, so the
+    // assertion keeps its meaning at any size. See `docs/FINDINGS.md` §B12 · §B16.
+    const toEndOfFile = SOURCE.slice(SOURCE.indexOf("private async routeSend(")).split("\n").length;
+    expect(block.split("\n").length, "routeSend slice runs to the end of the file")
+      .toBeLessThan(toEndOfFile);
     for (const forbidden of APPROVE_OR_SEND) {
       expect(block, `routeSend must not reach ${forbidden}`).not.toContain(forbidden);
     }

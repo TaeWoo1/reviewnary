@@ -107,7 +107,7 @@ preflight-selfcheck.sh}`. **향후 라이브는 코드/프로세스 재시작으
 manifest 생성 후 새 단일-사용 승인 필요.**
 
 > **승인 규칙 정본:** live-run 승인(Standing Safety Contract · Approval Manifest · 한 줄 `Seated and ready.` ·
-> lifecycle · READ_ONLY vs WRITE)은 이제 [`docs/standing/sellerops_live_approval_contract.md`](../sellerops_live_approval_contract.md)
+> lifecycle · READ_ONLY vs WRITE)은 이제 [`docs/standing/sellerops_live_approval_contract.md`](../standing/sellerops_live_approval_contract.md)
 > 에 한 번만 정의된다. 이 슬라이스는 그 계약을 참조하며 승인 규칙을 재기술하지 않는다. bootstrap/preflight가
 > Approval Manifest를 준비·표시하면 기본 승인은 한 줄이고, 상세 승인이 필요한 예외는 정본 §3에 있다. 아래
 > §0.1.1의 과거 walkthrough 기록에 남은 긴 승인문은 **당시 기록**이며 현재 표준이 아니다.

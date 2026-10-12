@@ -1,7 +1,7 @@
 # Coupang Credential Expiry + Guided Renewal v1
 
 > **Status:** Implemented (cross-stack), **offline-synthetic-verified**. No live WING; **no database
-> migration** (audit: [`coupang_credential_expiry_audit_v1.md`](./coupang_credential_expiry_audit_v1.md)).
+> migration** (audit: [`coupang_credential_expiry_audit_v1.md`](../../lineage/coupang_credential_expiry_audit_v1.md)).
 > Branch `feat/coupang-credential-expiry-guided-renewal-v1`.
 
 SellerOps now recognizes the Coupang WING Open API key's validity period, warns before expiry, and guides

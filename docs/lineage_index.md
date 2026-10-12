@@ -75,8 +75,33 @@
 | 삭제 커밋 | 날짜 | 없어진 문서 |
 |---|---|---|
 | `e1550892` — chore(repo): separate legacy VOC stack from SellerOps | 2026-07-22 | `docs/PROJECT.md` · `docs/review_acquisition.md` · `docs/review_ops_architecture.md` · `docs/review_ops_brand20_pipeline.md` · `docs/review_ops_brand20_manual_mapping_guide.md` · `docs/detail_page_snapshot_design.md` · `docs/agent_harness_design.md` · `docs/agent_orchestration_playbook.md` · `docs/instagram_voc_brand_strategy.md` · `docs/instagram_voc_dm_response_script.md` · `docs/instagram_voc_dm_conversion_ledger.md` · `docs/instagram_voc_publishing_checklist.md` · `docs/public_instagram_cardnews_spec.md` · `docs/sellerops_product_roadmap.md` · `docs/sellerops_ceo_connector_status_onepager.md` · `docs/sellerops_ui_reference.md` · `docs/sellerops_phase2.md` · `docs/sellerops_phase3a.md` · `docs/sellerops_phase3b_completion.md` · `docs/sellerops_phase3c.md` |
-| `39186802` — docs: retire 49 superseded documents | 2026-08-19 | `docs/sellerops_current_state.md` |
+| `39186802` — docs: retire 49 superseded documents | 2026-08-19 | `docs/sellerops_current_state.md` · `docs/action-window-runtime/r4-preparation.md` · `docs/action-window-runtime/r4-operator-runbook.md` · `docs/action-window-runtime/checklist.md` · `docs/action-window-runtime/current-state.md` · `docs/action-window-runtime/goal.md` · `docs/action-window-runtime/naver-smartstore-v1-plan.md` · `docs/action-window-runtime/naver-v1-integration-manifest.md` · `docs/action-window-runtime/r4-reply-submission-abort-rehearsal-dispatch-record.md` · `docs/action-window-runtime/r4-reply-submission-live-kickoff.md` · `docs/coupang_live_approval_harness_v1.md` · `docs/coupang_wing_guided_issuance_tutorial_v1.md` · `docs/slices/product-shell.md` |
+| `8d9a2310` — docs: give docs a lane structure and start a findings ledger | 2026-10-12 | `.claude/commands/orchestrate.md` · `.claude/agents/implementation.md` · `.claude/agents/ops-data.md` · `.claude/agents/orchestrator.md` · `.claude/agents/product-strategy.md` · `.claude/agents/qa-regression.md` — 쓰이지 않던 멀티에이전트 틀. `docs/FINDINGS.md` §B8이 이 삭제를 기록한다. |
 | — | — | `docs/action-window-runtime/r4-review-id-trace.md` · `docs/phase_b_public_education_planner_plan.md` — **git의 어느 ref에도 존재한 적이 없다.** 쓰겠다고 적히고 쓰이지 않았다. |
+
+### 라벨이 폐기된 이름을 말하고, 링크는 후임 문서로 간다 (2026-10-12 발견)
+
+`39186802`은 49개를 폐기하면서 **링크 목적지는 살아남은 문서로 바꾸고 라벨은 폐기된
+이름 그대로** 두었다. 그래서 `[`r4-preparation.md`](…/r4-gate-record.md)` 같은 링크가
+**61건** 남아 있다 — 읽는 사람은 한 이름을 보고 다른 문서에 도착한다. 문장을 고쳐 쓰지
+않은 이유는 이것들이 대부분 **라이브 런 증거 기록**이고, 그때 그 문서를 인용했다는 사실
+자체가 기록의 일부이기 때문이다. 대신 어디로 승계됐는지를 여기 적는다.
+
+| 폐기된 이름 | 링크가 실제로 가는 곳 |
+|---|---|
+| `r4-preparation.md` | `docs/action-window-runtime/r4/r4-gate-record.md` |
+| `r4-operator-runbook.md` | `docs/standing/sellerops_live_approval_contract.md` |
+| `checklist.md` | `docs/evidence/INDEX.md` |
+| `current-state.md` | `docs/action-window-runtime/HANDOFF.md` |
+| `goal.md` | `docs/architecture.md` |
+| `r4-reply-submission-*.md` (2개) | `docs/evidence/INDEX.md` |
+| `coupang_live_approval_harness_v1.md` | `docs/standing/sellerops_live_approval_contract.md` |
+| `coupang_wing_guided_issuance_tutorial_v1.md` | `docs/lineage/resident_helper_on_demand_carrier_v1.md` |
+
+**저장소 어디에도 없고 승계도 없는 이름 3개** — `docs/.../SOURCE.md`(한 번도 존재 안 함,
+`archive/2026-q3/inquiry_architecture_v3_wp3.md`가 부른다) ·
+`conversation.md` · `message.md`(이 둘은 저장소 문서가 아니라 외부 `vercel/ai-elements`
+스킬의 참고 파일이다 — `docs/frontend/reviewnary_visual_system_v1.md` §설치 목록).
 
 **예외 두 가지 — 이것들은 깨진 게 아니다.**
 

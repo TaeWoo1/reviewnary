@@ -6,9 +6,9 @@
 > (credential expiry + guided renewal). Read this before relying on any Coupang WING guided/renewal behavior.
 >
 > Detail lives in the feature docs: [`coupang_wing_guided_issuance_tutorial_v1.md`](resident_helper_on_demand_carrier_v1.md),
-> [`coupang_wing_live_calibration_v1.md`](./coupang_wing_live_calibration_v1.md),
-> [`coupang_credential_expiry_guided_renewal_v1.md`](./coupang_credential_expiry_guided_renewal_v1.md),
-> [`coupang_credential_expiry_audit_v1.md`](./coupang_credential_expiry_audit_v1.md).
+> [`coupang_wing_live_calibration_v1.md`](../archive/2026-q3/coupang_wing_live_calibration_v1.md),
+> [`coupang_credential_expiry_guided_renewal_v1.md`](../archive/2026-q3/coupang_credential_expiry_guided_renewal_v1.md),
+> [`coupang_credential_expiry_audit_v1.md`](../lineage/coupang_credential_expiry_audit_v1.md).
 
 ## The four onboarding states — the whole of the seller-facing surface
 

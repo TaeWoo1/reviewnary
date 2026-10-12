@@ -219,7 +219,7 @@ happens before authorization, which is precisely why it must not be mistaken for
 
 ## 4. Operator choreography — this DEVIATES from the operator runbook, on purpose
 
-⚠ [`r4-operator-runbook.md`](../sellerops_live_approval_contract.md) §2 tells the operator to **log in during Phase A and
+⚠ [`r4-operator-runbook.md`](../../standing/sellerops_live_approval_contract.md) §2 tells the operator to **log in during Phase A and
 then signal ready.** **Run 6 requires the opposite.** The runbook describes the **export pilot** and is
 correct for it; **it must not be rewritten to describe Run 6, and the two must not be "reconciled"** — the
 same rule Run 5 established. This record is the sole choreography for this run.
@@ -321,7 +321,7 @@ points this record restates, because Run 6 **removes** a carve-out rather than i
 
 **Related:** [`r4-gate-record.md`](r4-gate-record.md) (gates + templates — authorization; **this run's G6
 template now exists there and is BLANK** — [D-030](decisions.md)) · [`r4-preparation.md`](r4-gate-record.md) (§3 gates, §4 boundary, §6
-ladder, §7 abort — normative) · [`r4-operator-runbook.md`](../sellerops_live_approval_contract.md) (the **export-pilot**
+ladder, §7 abort — normative) · [`r4-operator-runbook.md`](../../standing/sellerops_live_approval_contract.md) (the **export-pilot**
 choreography — deliberately different from §4 above) · [`r4-evidence-pack.md`](r4-evidence-pack.md) (§8-20
 A2-B and §8-21 A3 are the code under test; §8-16 Run 3 is this run's terminal shape) ·
 [`decisions.md`](decisions.md) ([D-025](decisions.md) period/scope · [D-026](decisions.md) G3 per-run ·

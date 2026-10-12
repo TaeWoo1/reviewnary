@@ -110,7 +110,7 @@ the **strongest current technical candidate** (existing profile resolver,
 candidate-signature, download-readiness, and upload seams) — **not an
 irreversible decision**. The first pilot channel is confirmed by the product
 owner, not by this document. See
-[`../channel-capability-registration-matrix.md`](../channel-capability-registration-matrix.md).
+[`../channel-capability-registration-matrix.md`](../channel/channel-capability-registration-matrix.md).
 
 ## Related
 

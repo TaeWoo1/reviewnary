@@ -325,13 +325,13 @@ rehearsal (no submit, one submissionRef, ≤20 min, recover only to PARKED / `SU
 note (resolved before mint/launch): **G4** was operator-waived (real-browser proof not re-run this session); **stable
 location/IP** is **operator-CONFIRMED this turn (2026-07-18)**; checkout SHA corrected to the **verified current
 origin/main tip `666d334`** (HEAD == main, contained, clean). Choreography:
-[`r4-reply-submission-abort-rehearsal-dispatch-record.md`](../evidence/INDEX.md).
+[`r4-reply-submission-abort-rehearsal-dispatch-record.md`](../../evidence/INDEX.md).
 
-*Live reply-run kickoff checklist:* [`r4-reply-submission-live-kickoff.md`](../evidence/INDEX.md)
+*Live reply-run kickoff checklist:* [`r4-reply-submission-live-kickoff.md`](../../evidence/INDEX.md)
 — the pre-dispatch runbook (build prerequisites now MET offline; every run-gate still ☐). It grants nothing.
 
 *First reply-submission dispatch record (scaffold):*
-[`r4-reply-submission-abort-rehearsal-dispatch-record.md`](../evidence/INDEX.md)
+[`r4-reply-submission-abort-rehearsal-dispatch-record.md`](../../evidence/INDEX.md)
 — choreography + evidence sheet for one **abort-path rehearsal** (operator reaches the composer and does NOT
 submit → `SUBMISSION_ABORTED · UNVERIFIED`, non-mutating by construction). ☐ NOT AUTHORIZED, all gates blank;
 it grants nothing.
@@ -747,7 +747,7 @@ authorization.
 > P6 to date is **CONSUMED**, so *any* further live contact (including a read-only diagnostic) needs a
 > **fresh** G3-export + G6 in its own dispatching turn. A past success is not a standing authorization.
 >
-> **Operator choreography for the run itself:** [`r4-operator-runbook.md`](../sellerops_live_approval_contract.md) —
+> **Operator choreography for the run itself:** [`r4-operator-runbook.md`](../../standing/sellerops_live_approval_contract.md) —
 > what the human does, in order, including the ~60 s click+confirm window. It grants nothing either.
 
 ### Scope of the first authorized export pilot

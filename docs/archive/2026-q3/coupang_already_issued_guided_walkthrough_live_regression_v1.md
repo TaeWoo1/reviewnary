@@ -40,7 +40,7 @@ wired for Coupang:
   contract revokes the in-run grant — so it cannot be done inside this observe-only run.
 
 This is consistent with #402's canonical scope
-([`coupang_guided_issuance_credential_lifecycle_scope_v1.md`](./coupang_guided_issuance_credential_lifecycle_scope_v1.md)),
+([`coupang_guided_issuance_credential_lifecycle_scope_v1.md`](../../standing/coupang_guided_issuance_credential_lifecycle_scope_v1.md)),
 which lists **"the full FE-driven real-WING guided walkthrough"** as **SYNTHETIC-ONLY** — its live path was
 never wired.
 

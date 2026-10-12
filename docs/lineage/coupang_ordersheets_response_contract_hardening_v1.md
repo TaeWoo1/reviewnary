@@ -6,8 +6,8 @@
 > into `OrdersheetEnvelope`** for the live vendor. Under a fresh single-use approval, the same failing
 > sync now **succeeds** on this fix against the retained credential (details below).
 >
-> Canonical live-run rules: [`sellerops_live_approval_contract.md`](./sellerops_live_approval_contract.md).
-> Predecessor (the connect-test fix, proven live): [`coupang_connection_failure_diagnostic_hardening_v1.md`](./coupang_connection_failure_diagnostic_hardening_v1.md).
+> Canonical live-run rules: [`sellerops_live_approval_contract.md`](../standing/sellerops_live_approval_contract.md).
+> Predecessor (the connect-test fix, proven live): [`coupang_connection_failure_diagnostic_hardening_v1.md`](../archive/2026-q3/coupang_connection_failure_diagnostic_hardening_v1.md).
 
 ## What went wrong (the live finding)
 

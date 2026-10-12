@@ -12,8 +12,8 @@ for the next, and the code enforces the order: `WING_CREDENTIAL_CELLS_CALIBRATED
 
 Both UX defects found in phase 1 (D1, D2) are closed; see their sections below.
 
-Contract: [`coupang_credential_handoff_v1.md`](./coupang_credential_handoff_v1.md).
-Approval contract: [`sellerops_live_approval_contract.md`](./sellerops_live_approval_contract.md) §5c.
+Contract: [`coupang_credential_handoff_v1.md`](../../lineage/coupang_credential_handoff_v1.md).
+Approval contract: [`sellerops_live_approval_contract.md`](../../standing/sellerops_live_approval_contract.md) §5c.
 
 ---
 
