@@ -588,6 +588,39 @@
 - **다음에** — 운영 시간·준비 지연 목표를 합의하기 전에 수집 방식과 실행 위치를 나눈다. 상시 서버의 API 수집과 로컬 수집의 가용성을 별도로 표시하고, 확인하지 못한 구간을 신규 업무 없음으로 표현하지 않는다. 로컬 제약을 이유로 API 수집도 업무 시간에 제한한다고 임의 결정하지 않는다.
 - **출처** — 2026-10-12 제품 오너 인터뷰 · `docs/reviewnary_implementation_goals_draft_v1.md` 질문 36 · `collector/src/aside/aside-cli.ts` · `backend/src/main/java/com/sellerops/responsibility/aside/AsideHelperDevices.java`.
 
+### 벽에 막힌 lane이 설정 행에서는 한 주기 늦게 보인다 (2026-10-13)
+
+- **했던 것** — 자동 확인 lane을 라이브로 다시 띄운 뒤 `review_auto_check.paused_reason`을 보고 「벽이
+  섰는지」를 판정하려 했다. settle이 `AUTH_REQUIRED`로 끝났는데 행은 `paused_reason=null` ·
+  `next_check_at`은 평소 주기(+60분)였고, 8분 동안 그 행만 보면 lane은 정상으로 보였다.
+- **사실** — `PAUSED_AUTH`를 쓰는 것은 settle이 아니라 **다음 tick의 판정**이다
+  (`ReviewAutoCheckReconciler.heldByWalk` → `Outcome.PAUSED_AUTH`). claim이 먼저 pause를 지우고 주기를
+  세운 뒤에 읽기가 벽을 만나므로, 그 사이 **최대 한 주기(60분)** 동안 행은 벽을 말하지 않는다. 2026-10-11도
+  같은 모양이었다(settle 14:58:53 → 표기 15:18:47). 그때는 20분 차이라 눈에 띄지 않았다.
+- **다음에** — 「이 lane이 지금 벽에 막혔는가」는 `review_catch_up_run.state`(+`stop_reason`)로 읽는다.
+  설정 행의 `paused_reason`은 **표시용 요약이고 한 주기 늦는다.** 그 행을 읽는 다른 lane
+  (`OperationsCaseProcessor`의 관측 공백, `CollectNowService.autoCheckParkedOnSignIn`)도 같은 지연을
+  물려받는다는 사실까지 같이 본다.
+- **출처** — 2026-10-13 라이브 런 `apr-4b88269414ba` · `docs/review/review_auto_check_live_proof_v1.md` §7-1.
+
+---
+
+### 도우미 재설치는 기기 연결이 아니라 브라우저 페어링을 끊는다 (2026-10-13)
+
+- **했던 것** — 도우미를 HEAD에서 재빌드·재설치한 뒤 연결 화면이 「도우미 연결 안 됨」이라 기기 연결이
+  날아간 줄 알고 `helper_devices`부터 뒤졌다.
+- **사실** — 기기 연결은 멀쩡했다(`helper_devices` 행 그대로, 재설치 뒤에도 `last_used_at` 갱신). 끊긴 것은
+  **브라우저 탭 ↔ bridge 페어링**이고 그것은 **브라우저 프로필마다** 따로다. 판매자가 「이 기기 연결」을 한 번
+  누르자 `bridge_pair_presented approved` → `ticket_minted` → `ws_accepted`로 복구됐고 **새 device link는
+  생기지 않았다**. 그 다음이 더 헷갈린다 — 페어링이 화면이 뜬 뒤에 맺히면 그 탭은 복귀 확인을 **한 번도**
+  돌리지 않는다. 복귀 확인은 **탭 활성화당 1회**다(`CollectNowAction.returnCheck`).
+- **다음에** — 재설치 뒤 「연결 안 됨」을 보면 ① `helper_devices`의 `last_used_at`으로 기기 연결 생사를 먼저
+  가르고, ② 끊긴 쪽이 페어링이면 화면에서 한 번 눌러 복구하고, ③ **탭을 떠났다 돌아오는 한 번**을 반드시
+  넣는다. 그 한 번이 없으면 「고쳤는데 아무 일도 안 일어난다」가 된다.
+- **출처** — 2026-10-13 라이브 런 · `docs/review/review_auto_check_live_proof_v1.md` §7-2.
+
+---
+
 ## 어디에 무엇이 있나
 
 | 찾는 것 | 가는 곳 |

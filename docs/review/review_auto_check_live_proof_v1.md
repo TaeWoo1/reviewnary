@@ -1,4 +1,4 @@
-# Review Auto-Check — Live Proof v1 (2026-10-09 → 10-11)
+# Review Auto-Check — Live Proof v1 (2026-10-09 → 10-13)
 
 > **무엇을 증명한 문서인가.** 「자동 리뷰 확인」 lane이 실제 NAVER 스마트스토어센터에서 끝까지 도는지를
 > 라이브로 확인한 기록이고, 그 과정에서 드러난 결함 네 개와 그 수정을 함께 담는다. 계약은
@@ -196,13 +196,13 @@ B는 임시 안전 동작이었다. 저판매량 매장의 빈 하루가 영원�
 - 벽이 아닌 실패로 멈춰 있을 때 복귀마다 probe를 한 번씩 쓴다(수집 0 · resume 0이라 해는 없다).
 - 10-09 22:49 tick이 park해 둔 것보다 5분 일찍 due가 된 건이 설명되지 않았다 — 별도 조사 메모로 남긴다.
 
-## 6. 2026-10-11 — AUTH 복구 구간, 그리고 그 과정에서 드러난 결함 (진행 중)
+## 6. 2026-10-11 — AUTH 복구 구간, 그리고 그 과정에서 드러난 결함
 
-> **이 절은 PASS를 선언하지 않는다.** 결함 하나를 측정하고 고쳤고, 그 수정이 라이브 배포에서 보이는
+> **이 절은 PASS를 선언하지 않았다.** 결함 하나를 측정하고 고쳤고, 그 수정이 라이브 배포에서 보이는
 > 것까지 확인했다. 계약이 약속하는 복구 경로 ②(「어디서든 로그인하고 **복귀만** 한다」)의 라이브 재현은
-> **아직 남아 있다** — 그 한 칸이 닫히기 전에는 이 lane을 「증명됐다」고 적지 않는다.
+> 이 날 남아 있었고, **2026-10-13에 닫혔다 — §7.**
 
-**상태: code complete · final live recovery proof pending.**
+**상태: 2026-10-11 기준 code complete · final live recovery proof pending → §7에서 해소.**
 
 ### 6-1. 측정된 결함 — 복귀 확인이 엉뚱한 lane으로 나간다
 
@@ -251,11 +251,79 @@ settle 즉시 `paused_reason` → null · `next_check_at`이 settle+**60분**(6�
 freshness `2026-10-10 03:48:51` → `2026-10-11 14:19:58`. 동시에 날아온 INQUIRY resume 2건은 `null`이었고
 중복 읽기는 0이었다.
 
-**남은 한 칸: ②번 길의 라이브 재현** — 로그아웃 → 벽 → 로그인 → **복귀만**으로 REVIEW resume 1회.
+**남은 한 칸이었던 ②번 길의 라이브 재현** — 로그아웃 → 벽 → 로그인 → **복귀만**으로 REVIEW resume 1회.
 2026-10-11 재현 시도는 판매자 네트워크의 IP 제한으로 NAVER 로그인 자체가 되지 않아 중단했다(접속 제한·
-2차 인증은 우회 대상이 아니다). 벽은 세워진 채로 남아 있고, 로그인 가능한 네트워크에서 한 번의 복귀로
-닫힌다.
+2차 인증은 우회 대상이 아니다). 벽은 세워진 채로 남았고, **2026-10-13 로그인 가능한 네트워크에서 한 번의
+복귀로 닫혔다 — §7.**
 
 전 구간 marketplace WRITE **0**(`review_reply_outcome|execution|submission_ref` = 4 / 2 / 23 불변).
 부수 관측: 밤사이 호스트가 잠든 동안 6시간 fallback(`AUTH_RETRY`)이 11:53에 먼저 발동해 pause를 스스로
 풀었다 — 계약 §4의 ③번 길(교착 방지)이 라이브에서 동작하는 것을 본 셈이다.
+
+## 7. 2026-10-13 — ②번 길(복귀만)의 라이브 재현 — PASS
+
+§6이 남겨 둔 한 칸이다. 증명할 문장은 하나였다 — **판매자가 제품이 보지 않는 곳에서 로그인하고 화면으로
+돌아오기만 해도, 벽에 주차된 REVIEW walk가 그 복귀로 이어진다.**
+
+| | |
+|---|---|
+| 커밋 | `77a1966b` (§6의 수정 `84e88b00` 이후 30여 커밋이 쌓인 HEAD — 10-11 승인은 §1.6으로 REVOKED, 새로 받았다) |
+| 승인 | `apr-4b88269414ba` / `wt-badb6f16` · READ_ONLY · 운영자 「Seated and ready.」 · **소진됨** |
+| 도우미 | HEAD에서 재빌드·재설치(`tools/helper/build-macos.sh` → `설치.command`), `live-preflight.sh` **OK**. provider는 `helper.env`의 `REVIEWNARY_EXECUTION_PROVIDER=ASIDE` — 번들 Chromium은 이 lane을 읽지 않는다 |
+| 화면 | production 번들 `vite preview --port 5173`. 출고 번들의 CSP `connect-src`에 도우미 origin `47615`가 dev 플래그 없이 들어 있다(§2-2 수정이 배포물에서 보임) |
+| 플래그 | `SELLEROPS_REVIEW_AUTO_CHECK_ENABLED` 구간 ON(01:21 기동) → 구간 종료와 함께 OFF |
+| 예약 | 수집 3종(`ORDER_SUMMARY`·`PRODUCT`·`INQUIRY`)은 `schedule-guard`로 pause → 종료 후 restore(3/3) |
+| 기준선 | 리뷰 5089 · WRITE `review_reply_outcome\|execution\|submission_ref` = **4 / 2 / 23** |
+
+```
+01:21:33  tick            10-11의 벽 흔적이 AUTH_RETRY(6h)보다 오래돼 다시 본다 → walk 계획(2026-10-12)
+01:21:53  settle AUTH_REQUIRED      walk 53e9531c → PAUSED_AUTH · stop_reason AUTH_REQUIRED
+          ── 8분 동안 제품은 아무것도 모른다: job 0 · sign-in 이벤트 0 ──
+          (판매자가 Aside의 다른 탭에서 직접 로그인. 제품은 그 사실을 보지 못한다)
+01:29:22  CHECK started → 01:29:25 SIGNED_IN        ← 탭으로 복귀만. 「판매자센터 로그인」 누름 0
+01:29:25  resume → job 264779f9                     trigger_source SCHEDULED 보존 · 요청 2026-10-12
+01:29:47  claimed → 01:29:58 SETTLED OBSERVED       obs 7 · inserted 7 · changed 0 · failed 0
+          identity MATCH · delivery BOUNDED · gridReadMode MODEL · month_moves 0 · llmCalls 0
+          walk → COMPLETE (cursor 2026-10-13 · windows 1 · rows 7 · days 1)
+          sync_jobs 1행 SCHEDULED_ASIDE_READ · SELLER_CENTER_READ · 7/7/0/0 · BOUNDED_WINDOW_DAYS_1
+```
+
+- **복구 세션 0건** — `aw_sign_in_session_started`는 이 구간에 없다. 확인은 probe 1회이고 창을 앞으로
+  가져오지 않는다(§1과 같은 성질이 ②번 길에서도 성립).
+- **resume 1회.** 01:29:34의 두 번째 CHECK도 `SIGNED_IN`이었지만 새 job을 만들지 않았다.
+- **trigger는 보존된다** — 복귀가 시작한 읽기인데도 `SCHEDULED`다. 오늘 생긴 job 2개 모두 `SCHEDULED`,
+  **OPERATOR 0 · `collectNow` 0**.
+- 전 구간 marketplace **WRITE 0**(`4 / 2 / 23` 불변). 리뷰 5089 → 5096(+7)은 이 읽기가 우리 DB에 적재한
+  행이지 마켓플레이스 쓰기가 아니다.
+
+- **회귀(HEAD `77a1966b`)** — backend **5,338** · frontend **3,921** · collector **9,946**, 실패 0.
+  문서 링크 검사(`tools/docs-link-check.py`) 끊김 0.
+
+### 7-1. 오늘 증명하지 **않은** 것 — 설정 행의 `paused_reason`은 한 주기 늦는다
+
+오늘 `review_auto_check` 행은 `PAUSED_AUTH`라는 글자를 **한 번도 달지 않았다.** 01:21:33의 claim이 pause를
+지우고 `next_check_at`을 평소 주기(+60분)로 세운 **뒤에** 벽을 만났고, 그 글자를 쓰는 것은 settle이 아니라
+**다음 tick의 판정**이기 때문이다(`ReviewAutoCheckReconciler.heldByWalk` → `Outcome.PAUSED_AUTH`). §6-3의
+10-11도 같은 모양이었다 — settle 14:58:53, 표기 15:18:47.
+
+그래서 8분 동안 행은 「정상 · 02:21 확인 예정」이라고 말했고 walk는 벽에 주차돼 있었다. **화면은 틀리지
+않았다** — 연결 화면은 walk 상태를 보고 「로그인 확인됨. 멈췄던 확인을 이어서 진행합니다」라고 말했다.
+어긋난 것은 설정 행의 표기이며, 그 행을 읽는 다른 lane(`OperationsCaseProcessor`의 관측 공백 판정,
+`CollectNowService.autoCheckParkedOnSignIn`)은 그 한 주기 동안 이 벽을 보지 못한다. 결함으로 단정하지
+않는다 — 측정된 사실로 적어 두고, 고칠지는 계약(`review_auto_check_v1.md` §4)이 정할 일이다.
+
+따라서 **「settle이 즉시 pause를 푼다」의 라이브 증거는 여전히 10-11 ①번 길의 관측**이고(그때 행은 실제로
+`PAUSED_AUTH`였다), 오늘 run은 그 문장을 다시 증명하지 않는다. 오늘이 닫은 것은 §6이 이름 붙인 바로 그
+한 칸 — **복귀만으로 REVIEW lane이 이어진다** — 하나다.
+
+### 7-2. 이 sitting이 쓴 시간 — 재설치가 브라우저 페어링을 끊는다
+
+도우미를 HEAD에서 재설치한 뒤 연결 화면은 「도우미 연결 안 됨」이었다. 기기 연결(`helper_devices`
+`27d22cbc`)은 멀쩡히 살아 있었고 — 재설치 뒤에도 `last_used_at`이 갱신되고 있었다 — 끊긴 것은 **브라우저
+탭 ↔ bridge 페어링**(브라우저 프로필마다 따로)이었다. 판매자가 「이 기기 연결」을 한 번 누르자
+`bridge_pair_presented approved` → `ticket_minted` → `ws_accepted`로 즉시 복구됐고, **새 device link는
+생기지 않았다**(기존 링크 재사용).
+
+그 다음이 더 오래 걸릴 뻔했다: 페어링이 **화면이 뜬 뒤에** 맺혔기 때문에 그 탭은 복귀 확인을 한 번도
+돌리지 않았다. 복귀 확인은 **탭 활성화당 1회**다(`CollectNowAction.returnCheck`). 다른 탭으로 갔다
+돌아오는 한 번이 전부였다 — 그리고 그 동작이 마침 이번에 증명할 동작이었다.
