@@ -349,6 +349,29 @@
 - **출처** — 2026-10-12 세션.
   `src/conversation/{sellerSentences,historyReaders,turnArtifacts,workingSet,turnGrounding}.ts`.
 
+### B15. `this`를 쓰지 않는 메서드는 이미 함수다 — 그리고 가장 큰 메서드가 가장 쪼갤 만한 것은 아니다
+
+- **했던 것** — `ConversationService.ts`를 줄이려고 **가장 큰 메서드**부터 찾았다
+  (`compose` 559줄 · `routeSend` 295줄 · `directLane` 248줄 · `applyVisibleFilter` 148줄).
+- **사실** — 크기는 쪼갤 만한지와 거의 무관했다. 가른 것은 **`this` 사용 횟수**다.
+  `compose`는 `this`를 10번 쓰고 더 중요하게는 `headline` · `selected` · `pendingCapture` ·
+  `trailingQuestion` · `extraChips`를 **여러 분기가 함께 고치는** 선형 파이프라인이다.
+  바로 `return`하는 lane은 세 개(41줄)뿐이고 나머지는 전부 공유 지역변수를 건드린다.
+  반면 `resolveTargets`(87줄)는 **`this`를 한 번도 쓰지 않았다** — 이미 함수였고 메서드처럼
+  보였을 뿐이다. `applyVisibleFilter`(148줄)는 `this.now()` 한 번뿐이다.
+- **다음에** — 큰 클래스를 줄일 때 정렬 기준은 줄 수가 아니라 **`this` 사용 횟수(오름차순)**다.
+  `grep -c 'this\.'`로 메서드별로 세면 "이미 함수인 것"이 먼저 나온다. 그것들을 먼저 빼면
+  남은 클래스가 작아지고, 진짜로 상태를 들고 있는 메서드만 남는다.
+- **`compose`를 쪼개지 않은 이유** — 쪼개려면 공유 지역변수를 담는 상태 객체를 만들어 각
+  lane이 그것을 변형하게 해야 한다. 그것은 정리가 아니라 **대화 조립 모델의 재설계**이고,
+  순서·변형에 숨은 버그가 들어갈 자리가 넓다. 1,054개 테스트가 좋은 안전망이지만 compose의
+  동작 공간은 그보다 넓고, 무엇보다 **조용히 할 결정이 아니다**
+  (`CLAUDE.md` § Assumption rule · § 리팩터 게이트 5).
+- **곁따라 나온 측정 함정** — 선언 간격으로 메서드 크기를 재면 **클래스의 마지막 메서드만
+  부풀려진다**(그 뒤의 모듈 레벨 코드까지 더해진다). `routeSend`가 120줄로도, 295줄로도
+  나온 이유다. 마지막 메서드는 **클래스 닫는 중괄호**를 끝으로 써야 한다. §B13의 세 번째 변종.
+- **출처** — 2026-10-12 세션. `src/conversation/targetResolution.ts` · 관련 B11 · B13 · B14.
+
 ---
 
 ## C. 증거 · 계약
