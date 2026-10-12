@@ -85,6 +85,65 @@ export function buildNaverReviewAuthScript(): string {
 }
 
 /**
+ * **The list's own total, 「리뷰목록 (총 N개)」 — one page-side function, shared verbatim.**
+ *
+ * Live-proven on `#/review/search` (2026-10-08 census: h3 「리뷰목록 (총 42개)」 over a 42-row model). It answers
+ * the single labelled number, or `null` when there is none, when two labels disagree, or when the digits do not
+ * parse. It never guesses and it returns no page text — a number or null.
+ *
+ * Shared, not copied: the observe lane's grid read and the guided import's expected-row read
+ * ({@link buildNaverLabelledTotalScript}) interpolate this exact source, so the two can never parse the label
+ * differently. Loosening it loosens both.
+ */
+export const NAVER_LABELLED_TOTAL_FN = `  function labelledTotal() {
+    var nodes = document.querySelectorAll('h1, h2, h3, h4, h5, strong, em, b, span, div, p, td, li');
+    var seen = null;
+    for (var i = 0; i < nodes.length && i < 6000; i++) {
+      var t = String(nodes[i].textContent || '').replace(/\\s+/g, '');
+      if (t.length === 0 || t.length > 24) { continue; }
+      var m = /^(?:[^0-9]{0,8})총([0-9,]+)개\\)?$/.exec(t);
+      if (!m) { continue; }
+      var v = parseInt(String(m[1]).replace(/,/g, ''), 10);
+      if (isNaN(v)) { continue; }
+      if (seen !== null && seen !== v) { return null; }
+      seen = v;
+    }
+    return seen;
+  }
+`;
+
+/**
+ * **How many rows the list says the selected period holds — for the guided import's reconciliation.**
+ *
+ * A guided NAVER import segment uploads the seller's exported file, and the backend compares the file's rows
+ * against this number: equal reconciles the segment, different FAILS it. A wrong number therefore costs the
+ * seller a whole segment, so this read is built to answer `null` whenever it is not sure:
+ *
+ *  - the label itself is {@link NAVER_LABELLED_TOTAL_FN}, unchanged — absent, disagreeing or unparsable → null;
+ *  - while ag-Grid's own loading overlay is visible the list is mid-refresh and its label may still describe
+ *    the PREVIOUS period, so the answer is `loading: true` and no total. That overlay is a structure the grid
+ *    draws, never page text.
+ *
+ * No click, no scroll, no navigation. It returns two primitives and nothing the page wrote.
+ */
+export function buildNaverLabelledTotalScript(): string {
+  return `(function () {
+${NAVER_LABELLED_TOTAL_FN}  function gridLoading() {
+    var panes = document.querySelectorAll('.ag-overlay-loading-wrapper');
+    for (var i = 0; i < panes.length; i++) {
+      var cs = window.getComputedStyle(panes[i]);
+      if (cs.display === 'none' || cs.visibility === 'hidden') { continue; }
+      return true;
+    }
+    return false;
+  }
+  if (gridLoading()) { return { total: null, loading: true }; }
+  var t = labelledTotal();
+  return { total: (typeof t === 'number' && isFinite(t) && t >= 0) ? t : null, loading: false };
+})()`;
+}
+
+/**
  * Read every row of the screen's current period from the grid's row model.
  *
  * Returns `{ reason, modelType, rowCount, loaded, rows }`. `rows` is empty unless `reason === "OK"`.
@@ -100,22 +159,7 @@ export function buildNaverReviewListReadScript(): string {
   // per page. The list prints its total as 「리뷰목록 (총 N개)」 and its chosen page size as 「N개씩」. A total
   // the model disagrees with, or a total above the page size, means this screen is not showing the whole
   // period — whatever the model says it loaded.
-  function labelledTotal() {
-    var nodes = document.querySelectorAll('h1, h2, h3, h4, h5, strong, em, b, span, div, p, td, li');
-    var seen = null;
-    for (var i = 0; i < nodes.length && i < 6000; i++) {
-      var t = String(nodes[i].textContent || '').replace(/\\s+/g, '');
-      if (t.length === 0 || t.length > 24) { continue; }
-      var m = /^(?:[^0-9]{0,8})총([0-9,]+)개\\)?$/.exec(t);
-      if (!m) { continue; }
-      var v = parseInt(String(m[1]).replace(/,/g, ''), 10);
-      if (isNaN(v)) { continue; }
-      if (seen !== null && seen !== v) { return null; }
-      seen = v;
-    }
-    return seen;
-  }
-  function selectedPageSize() {
+${NAVER_LABELLED_TOTAL_FN}  function selectedPageSize() {
     var sels = document.querySelectorAll('select');
     for (var s = 0; s < sels.length; s++) {
       var sv = /^([0-9,]+)개씩$/.exec(String(sels[s].value || '').replace(/\\s+/g, ''));

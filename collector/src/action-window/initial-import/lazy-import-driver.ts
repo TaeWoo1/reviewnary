@@ -186,6 +186,12 @@ export class LazyImportDriver implements ImportProbeDriver {
     return (await this.surface()).readSelectedScope(required);
   }
 
+  /** Forwarded; a surface without the read answers `null` — no total, nothing sent. */
+  async readExpectedRows(): Promise<number | null> {
+    const surface = await this.surface();
+    return surface.readExpectedRows ? surface.readExpectedRows() : null;
+  }
+
   /**
    * Forwarded like every other call, and it matters more than most: the download race has to be armed
    * before the export barrier opens, so a lazy driver that quietly dropped it would put the listener back
@@ -203,8 +209,8 @@ export class LazyImportDriver implements ImportProbeDriver {
     return (await this.surface()).validateArtifact(artifactRef);
   }
 
-  async ingest(artifactRef: string, scopeEvidence: ScopeEvidenceWire): Promise<IngestResult> {
-    return (await this.surface()).ingest(artifactRef, scopeEvidence);
+  async ingest(artifactRef: string, scopeEvidence: ScopeEvidenceWire, expectedRows?: number | null): Promise<IngestResult> {
+    return (await this.surface()).ingest(artifactRef, scopeEvidence, expectedRows ?? null);
   }
 
   /**

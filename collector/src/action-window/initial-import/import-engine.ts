@@ -30,6 +30,7 @@ import type {
   RunStatus,
 } from "../../../../contracts/action-window/v2/index";
 import type { ScopeMatch } from "../../naver/export-scope-match";
+import { expectedRowsOrNull } from "../scope-evidence";
 import { gateOnScope, type ImportSurfaceFacts } from "../../naver/import-guidance-plan";
 import type { ArtifactValidateResult, DownloadDetectResult, IngestResult, LocateResult, SurfaceProbeResult } from "../engine";
 import {
@@ -167,6 +168,12 @@ export class ImportSegmentEngine {
   private plan: readonly ImportStepMeta[] = [];
   private targetSig: Partial<Record<ImportTarget, string>> = {};
   private scopeEvidence: ImportScopeEvidence | null = null;
+  /**
+   * The list's displayed total for the selected range, recorded ONLY with a `MACHINE_MATCHED` scope — the
+   * number the ingest sends as `expectedRows`. Cleared by every scope read, so a corrected range never carries
+   * the total of the window it replaced. Null = not read; the upload then omits the field.
+   */
+  private expectedRows: number | null = null;
   private artifactRef: string | null = null;
   private processed: number | null = null;
   private blockerCode: ImportBlockerCode | null = null;
@@ -483,8 +490,12 @@ export class ImportSegmentEngine {
    * `UNREADABLE` proceeds but inserts the seller's confirmation and records THEIR evidence.
    * `MISMATCH` parks recoverably: nothing highlights export until the selected window agrees.
    */
-  onScopeRead(match: ScopeMatch): ImportEffect {
+  onScopeRead(match: ScopeMatch, expectedRows: number | null = null): ImportEffect {
     if (this.isTerminal()) return "NONE";
+    // Every read starts from "no total". Only the MACHINE_MATCHED branch below records one: a total read beside
+    // a mismatched or unreadable range describes a window nobody verified, and the backend would fail the
+    // attempt on it.
+    this.expectedRows = null;
     const decision = gateOnScope(match);
     if (!decision.proceed) {
       this.blockerCode = "SCOPE_MISMATCH";
@@ -516,6 +527,7 @@ export class ImportSegmentEngine {
       return "CLEAR_HIGHLIGHT";
     }
     this.scopeEvidence = "MACHINE_MATCHED";
+    this.expectedRows = match === "MATCH" ? expectedRowsOrNull(expectedRows) : null;
     this.completedSteps = this.activeStepIndex;
     this.emit("STEP_COMPLETED", { stepId: this.stepId(), stepStatus: "SKIPPED" });
     this.activeStepIndex += 1;
@@ -810,6 +822,10 @@ export class ImportSegmentEngine {
   /** The evidence for how the scope was established. Null until the gate has spoken. */
   recordedScopeEvidence(): ImportScopeEvidence | null {
     return this.scopeEvidence;
+  }
+  /** The list total recorded with a MACHINE_MATCHED scope, for the ingest's `expectedRows`. Null = none read. */
+  recordedExpectedRows(): number | null {
+    return this.expectedRows;
   }
   /** Rows the server reported ingesting. Null until the run completed. */
   processedCount(): number | null {

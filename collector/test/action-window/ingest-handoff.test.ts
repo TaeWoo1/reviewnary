@@ -232,6 +232,36 @@ describe("buildSegmentIngestUpload (hermetic)", () => {
     expect(captured.form?.get("scopeEvidence")).toBe("OPERATOR_CONFIRMED");
   });
 
+  // The list total travels only when one was read with certainty; the backend FAILS an attempt on a different
+  // number, so "not read" must be an absent field, never an empty string or a 0.
+  it("sends expectedRows as a decimal string only when a total was read", async () => {
+    const { fetchImpl, captured } = fakeSegmentBackend();
+    const ingest = buildSegmentIngestUpload({
+      baseUrl: "http://backend", email: "e", password: "p", launchRef: LAUNCH, fetchImpl,
+    });
+    await ingest({ ...source(), expectedRows: 1234 });
+    expect(captured.form?.get("expectedRows")).toBe("1234");
+    await ingest({ ...source(), expectedRows: 0 });
+    expect(captured.form?.get("expectedRows")).toBe("0");
+  });
+
+  it.each([
+    ["absent", undefined],
+    ["null", null],
+    ["negative", -1],
+    ["fractional", 1.5],
+    ["NaN", Number.NaN],
+    ["unsafe", Number.MAX_SAFE_INTEGER + 1],
+  ])("omits expectedRows entirely when it is %s", async (_label, expectedRows) => {
+    const { fetchImpl, captured } = fakeSegmentBackend();
+    await buildSegmentIngestUpload({
+      baseUrl: "http://backend", email: "e", password: "p", launchRef: LAUNCH, fetchImpl,
+    })({ ...source(), expectedRows: expectedRows as number | null | undefined });
+    expect(captured.form?.has("expectedRows")).toBe(false);
+    // the rest of the upload is unchanged
+    expect(captured.form?.get("scopeEvidence")).toBe("MACHINE_MATCHED");
+  });
+
   it("maps an all-duplicates re-import to an ok outcome (idempotent, not a failure)", async () => {
     const { fetchImpl } = fakeSegmentBackend({
       attempt: { attemptNo: 2, result: "SUCCEEDED", syncJobId: "job-y", rowsNew: 0, rowsDuplicate: 6, rowsFailed: 0 },

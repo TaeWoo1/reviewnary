@@ -335,6 +335,7 @@ export async function uploadReviewBytes(
 /** Sanitized scope-evidence value the backend records on the attempt. Defined in a zero-import leaf so the
  * browser drivers can carry it without importing this network module; re-exported here for existing callers. */
 import type { ScopeEvidenceWire } from "./action-window/scope-evidence";
+import { expectedRowsOrNull } from "./action-window/scope-evidence";
 export type { ScopeEvidenceWire };
 
 /** What a guided run learns when it resolves its launch ref. Identity-free by design. */
@@ -430,10 +431,16 @@ export async function uploadSegmentReviewBytes(
   bytes: Uint8Array,
   filename: string,
   scopeEvidence: ScopeEvidenceWire,
+  expectedRows: number | null,
   fetchImpl: FetchImpl = fetch,
 ): Promise<IngestResult> {
   const form = new FormData();
   form.append("scopeEvidence", scopeEvidence);
+  // The list's displayed total for the selected range, when — and only when — one was read with certainty.
+  // Absent means "not read": the field is omitted, never sent empty or as a default, because the backend fails
+  // the attempt on any number that differs from the file's rows. The exact value is never logged.
+  const expected = expectedRowsOrNull(expectedRows);
+  if (expected !== null) form.append("expectedRows", String(expected));
   form.append("file", new Blob([new Uint8Array(bytes)]), filename);
 
   const res = await fetchImpl(`${baseUrl}/api/imports/reviews/launches/${launchRef}/ingest`, {
@@ -450,6 +457,7 @@ export async function uploadSegmentReviewBytes(
     rowsNewBucket: rowCountBucket(result.rowsNew ?? 0),
     rowsDuplicateBucket: rowCountBucket(result.rowsDuplicate ?? 0),
     rowsFailedBucket: rowCountBucket(result.rowsFailed ?? 0),
+    expectedRowsBucket: expected === null ? "absent" : rowCountBucket(expected),
   });
   // Re-shape to the IngestResult the AW ingest handoff already knows how to sanitize, so the segment path
   // reuses that one reduction instead of inventing a second, divergent notion of "did the ingest succeed".

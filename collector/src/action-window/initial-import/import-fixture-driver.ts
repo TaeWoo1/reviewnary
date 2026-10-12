@@ -64,6 +64,13 @@ export interface ImportFixtureScript {
   candidates?: Partial<Record<ImportTarget, number>>;
   /** Successive `readSelectedScope` verdicts; the last repeats. Models a mismatch the seller then corrects. */
   scopeSequence?: ScopeMatch[];
+  /**
+   * What `readExpectedRows` answers — the list's displayed total for the selected range. Absent → the read
+   * answers `null` and is NOT recorded in {@link ImportFixtureDriver.calls}, so every existing call-sequence
+   * assertion stays byte-identical. Present (a number or an explicit `null`) → the read is recorded as
+   * `expectedRows`, so a test can prove WHEN the session asked.
+   */
+  expectedRows?: number | null;
 }
 
 /** Deterministic 16-hex signature per target — opaque, and stable across a run so drift is detectable. */
@@ -195,6 +202,12 @@ export class ImportFixtureDriver implements ImportProbeDriver {
     return this.script.scope ?? "MATCH";
   }
 
+  async readExpectedRows(): Promise<number | null> {
+    if (this.script.expectedRows === undefined) return null;
+    this.calls.push("expectedRows");
+    return this.script.expectedRows;
+  }
+
   async armDownloadDetection(): Promise<void> {
     // Recorded, not simulated: what the ordering test needs is that this happened BEFORE the export
     // barrier was opened to the seller.
@@ -214,9 +227,13 @@ export class ImportFixtureDriver implements ImportProbeDriver {
   /** The scope evidence the session handed to the most recent ingest, or null before any ingest. */
   lastIngestEvidence: ScopeEvidenceWire | null = null;
 
-  async ingest(artifactRef: string, scopeEvidence: ScopeEvidenceWire): Promise<IngestResult> {
+  /** The expected-row total the session handed to the most recent ingest (`null` = none), `undefined` before any. */
+  lastIngestExpectedRows: number | null | undefined = undefined;
+
+  async ingest(artifactRef: string, scopeEvidence: ScopeEvidenceWire, expectedRows?: number | null): Promise<IngestResult> {
     // Record what the SESSION passed in (from the engine's single record) — the fixture never derives its own.
     this.lastIngestEvidence = scopeEvidence;
+    this.lastIngestExpectedRows = expectedRows ?? null;
     this.calls.push(`ingest:${artifactRef}`);
     return this.script.ingest ?? { ok: true, processed: 42 };
   }

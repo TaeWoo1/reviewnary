@@ -142,6 +142,18 @@ export interface ImportProbeDriver {
   readSelectedScope(required: RequiredRange): Promise<ScopeMatch>;
 
   /**
+   * **How many rows the list says the selected range holds — read in-page, no click/scroll/navigation.** Optional.
+   *
+   * The session calls this ONLY right after {@link readSelectedScope} answered `MATCH` (the range is applied and
+   * machine-verified, and the export control has not been located yet). The engine records the answer and the
+   * ingest sends it as `expectedRows`, which the backend reconciles against the file's rows — a different number
+   * FAILS the attempt. So `null` is the answer whenever the total is absent, ambiguous, mid-refresh or unparsable;
+   * a guess is never an answer. Like the scope read, the value never leaves the driver/engine/upload chain and is
+   * never logged except as a bucket. A driver with no list omits it, and nothing is sent.
+   */
+  readExpectedRows?(): Promise<number | null>;
+
+  /**
    * **Start listening for the download before the seller can produce one.** Optional.
    *
    * Detection is a race against the browser's download event, so it has to exist before the click that
@@ -165,8 +177,9 @@ export interface ImportProbeDriver {
    *
    * The scope evidence is PASSED IN by the session from the engine's single record — the driver does not
    * derive it. This is what keeps the value the backend records identical to the value the engine holds.
+   * `expectedRows` is passed the same way — the engine's record of the list total, `null` when none was read.
    */
-  ingest(artifactRef: string, scopeEvidence: ScopeEvidenceWire): Promise<IngestResult>;
+  ingest(artifactRef: string, scopeEvidence: ScopeEvidenceWire, expectedRows?: number | null): Promise<IngestResult>;
 
   /** Remove every annotation. Must be safe to call twice and on a half-built run. */
   cleanup(): Promise<void>;

@@ -90,6 +90,10 @@ export class ReadinessObservingImportDriver implements ImportProbeDriver {
     return this.inner.readSelectedScope(required);
   }
 
+  readExpectedRows(): Promise<number | null> {
+    return this.inner.readExpectedRows ? this.inner.readExpectedRows() : Promise.resolve(null);
+  }
+
   armDownloadDetection(): Promise<void> {
     return this.inner.armDownloadDetection?.() ?? Promise.resolve();
   }
@@ -102,8 +106,8 @@ export class ReadinessObservingImportDriver implements ImportProbeDriver {
     return this.inner.validateArtifact(artifactRef);
   }
 
-  ingest(artifactRef: string, scopeEvidence: ScopeEvidenceWire): Promise<IngestResult> {
-    return this.inner.ingest(artifactRef, scopeEvidence);
+  ingest(artifactRef: string, scopeEvidence: ScopeEvidenceWire, expectedRows?: number | null): Promise<IngestResult> {
+    return this.inner.ingest(artifactRef, scopeEvidence, expectedRows ?? null);
   }
 
   cleanup(): Promise<void> {

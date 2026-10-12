@@ -42,6 +42,9 @@
  */
 import type { Frame, Page } from "playwright";
 import type { ScopeEvidenceWire } from "../scope-evidence";
+import { expectedRowsOrNull } from "../scope-evidence";
+import { rowCountBucket } from "../../row-count-bucket";
+import { buildNaverLabelledTotalScript } from "../../naver/review-list-observe-inpage";
 import type { ScopeMatch } from "../../naver/export-scope-match";
 import { matchExportScope } from "../../naver/export-scope-match";
 import { planExportAction } from "../../naver/export-classify";
@@ -127,6 +130,18 @@ export interface NaverLiveImportDriverOptions {
    * fires on a genuine no-show (the "idle CPU, page never rendered" shape). `0` disables the guard.
    */
   surfaceSettleGuardMs?: number;
+  /**
+   * The list-total read ({@link NaverLiveImportDriver.readExpectedRows}) samples the label this many times, at
+   * {@link expectedRowsIntervalMs}, and answers only once {@link expectedRowsStableReads} CONSECUTIVE samples
+   * agree with no loading overlay showing. The range was applied a moment ago and the list refreshes
+   * asynchronously, so a single sample can read the PREVIOUS period's total — and the backend fails a segment
+   * whose number differs from its file. Defaults: 12 samples, 500 ms apart, 3 in a row.
+   */
+  expectedRowsMaxSamples?: number;
+  expectedRowsIntervalMs?: number;
+  expectedRowsStableReads?: number;
+  /** Injected sleep for that sampling (tests). */
+  sleepFn?: (ms: number) => Promise<void>;
 }
 
 export class NaverLiveImportDriver implements ImportProbeDriver {
@@ -596,6 +611,78 @@ export class NaverLiveImportDriver implements ImportProbeDriver {
     return verdict.match;
   }
 
+  /**
+   * **The list's displayed total for the selected range — 「리뷰목록 (총 N개)」, read in-page.**
+   *
+   * Called by the session only after {@link readSelectedScope} answered `MATCH`, i.e. with the range applied and
+   * before the export control is located. The page script is {@link buildNaverLabelledTotalScript} — the observe
+   * lane's live-proven label parser, shared verbatim, plus a refusal while ag-Grid's loading overlay is up. No
+   * click, no scroll, no navigation.
+   *
+   * Because the backend FAILS a segment whose file disagrees with this number, the answer is a number only when
+   * several consecutive samples agree; anything else — label absent, labels disagreeing, still loading, still
+   * changing, a read that threw — is `null`, and the ingest omits the field. Logged as a closed reason word and
+   * a row-count bucket; the number and the page text are never logged.
+   */
+  async readExpectedRows(): Promise<number | null> {
+    const maxSamples = Math.max(1, this.opts.expectedRowsMaxSamples ?? 12);
+    const intervalMs = Math.max(0, this.opts.expectedRowsIntervalMs ?? 500);
+    const needed = Math.max(2, this.opts.expectedRowsStableReads ?? 3);
+    const sleep = this.opts.sleepFn ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+    const script = buildNaverLabelledTotalScript();
+    let state: "STABLE" | "LOADING" | "ABSENT" | "UNSTABLE" | "READ_FAILED" = "ABSENT";
+    let candidate: number | null = null;
+    let streak = 0;
+    let samples = 0;
+    for (let i = 0; i < maxSamples; i++) {
+      if (i > 0) await sleep(intervalMs);
+      samples += 1;
+      let raw: unknown;
+      try {
+        raw = await this.ctx().evaluate(script);
+      } catch {
+        // A context that navigated or closed mid-read is not a total. Stop rather than keep reading a dead page.
+        state = "READ_FAILED";
+        candidate = null;
+        streak = 0;
+        break;
+      }
+      const r = (raw ?? {}) as { total?: unknown; loading?: unknown };
+      const total = expectedRowsOrNull(r.total);
+      if (r.loading === true) {
+        state = "LOADING";
+        candidate = null;
+        streak = 0;
+        continue;
+      }
+      if (total === null) {
+        state = "ABSENT";
+        candidate = null;
+        streak = 0;
+        continue;
+      }
+      if (candidate === total) {
+        streak += 1;
+      } else {
+        // A changed value restarts the count — the list was still settling on the new range.
+        state = candidate === null ? state : "UNSTABLE";
+        candidate = total;
+        streak = 1;
+      }
+      if (streak >= needed) {
+        state = "STABLE";
+        break;
+      }
+    }
+    const answer = state === "STABLE" ? candidate : null;
+    log("aw_import_expected_rows", {
+      read: state,
+      samples,
+      expectedRowsBucket: answer === null ? "absent" : rowCountBucket(answer),
+    });
+    return answer;
+  }
+
   /* ── stopping, skipping, and the in-page panel ─────────────────────────────── */
 
   /**
@@ -714,8 +801,8 @@ export class NaverLiveImportDriver implements ImportProbeDriver {
     return this.proven.validateArtifact(artifactRef);
   }
 
-  ingest(artifactRef: string, scopeEvidence: ScopeEvidenceWire): Promise<IngestResult> {
-    return this.proven.ingest(artifactRef, scopeEvidence);
+  ingest(artifactRef: string, scopeEvidence: ScopeEvidenceWire, expectedRows?: number | null): Promise<IngestResult> {
+    return this.proven.ingest(artifactRef, scopeEvidence, expectedRows ?? null);
   }
 
   async cleanup(): Promise<void> {

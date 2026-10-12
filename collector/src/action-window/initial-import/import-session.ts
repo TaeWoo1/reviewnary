@@ -489,7 +489,14 @@ export class ImportSegmentSession {
         // The driver reads the raw selected dates in-process and returns only the verdict; nothing here
         // ever sees a date value, which is what keeps the OPERATOR-LOCAL rule intact by construction.
         const match = await this.driver.readSelectedScope(this.required);
-        const next = this.engine.onScopeRead(match);
+        // The list's displayed total, read at this same moment — the range is applied and the export control has
+        // not been located — and ONLY when the range was machine-matched. A total beside an unverified range is
+        // never read, and a failed read is "no total", never a stopped run: the ingest then omits the field.
+        let expectedRows: number | null = null;
+        if (match === "MATCH" && this.driver.readExpectedRows) {
+          expectedRows = await this.driver.readExpectedRows().catch(() => null);
+        }
+        const next = this.engine.onScopeRead(match, expectedRows);
         this.publishState();
         return this.drive(next);
       }
@@ -514,7 +521,11 @@ export class ImportSegmentSession {
         // derives its own evidence; the session hands the engine's record to the ingest, so the value the
         // backend records can never diverge from the value the engine holds. (Unreachable-null defaults to the
         // operator-confirmed side, exactly as the previous default did.)
-        const res = await this.driver.ingest(ref, this.engine.recordedScopeEvidence() ?? "OPERATOR_CONFIRMED");
+        const res = await this.driver.ingest(
+          ref,
+          this.engine.recordedScopeEvidence() ?? "OPERATOR_CONFIRMED",
+          this.engine.recordedExpectedRows(),
+        );
         const next = this.engine.onIngested(res);
         this.publishState();
         return this.drive(next);

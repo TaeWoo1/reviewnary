@@ -874,3 +874,97 @@ describe("import segment session — scope evidence single source (AR-EV1..3)", 
     expect(src).not.toContain("lastScopeVerdict");
   });
 });
+
+/**
+ * The list total ("리뷰목록 (총 N개)") rides with a MACHINE-matched scope only. The backend fails an attempt whose
+ * file disagrees with it, so it is asked for right after a MATCH and before the export control is located, and
+ * never beside a range nobody verified.
+ */
+describe("import segment session — expected rows ride with a machine-matched scope", () => {
+  it("MATCH: reads the total after the scope and before locating export, and the ingest carries the engine's record", async () => {
+    const { io, engine, driver, session } = build({ scope: "MATCH", expectedRows: 37 });
+    startRun(io);
+    await session.whenSettled();
+
+    expect(engine.currentStage()).toBe("COMPLETED");
+    expect(engine.recordedExpectedRows()).toBe(37);
+    expect(driver.lastIngestExpectedRows).toBe(37);
+    const scopeAt = driver.calls.findIndex((c) => c.startsWith("scope:"));
+    const readAt = driver.calls.indexOf("expectedRows");
+    const exportAt = driver.calls.findIndex((c) => c.endsWith(":export"));
+    expect(scopeAt).toBeGreaterThanOrEqual(0);
+    expect(exportAt).toBeGreaterThan(0);
+    expect(readAt).toBe(scopeAt + 1);
+    expect(readAt).toBeLessThan(exportAt);
+    expect(driver.calls.filter((c) => c === "expectedRows")).toHaveLength(1);
+  });
+
+  it("MATCH with no readable total: the ingest gets null (the upload then omits the field)", async () => {
+    const { io, engine, driver, session } = build({ scope: "MATCH", expectedRows: null });
+    startRun(io);
+    await session.whenSettled();
+    expect(engine.currentStage()).toBe("COMPLETED");
+    expect(driver.calls).toContain("expectedRows");
+    expect(engine.recordedExpectedRows()).toBeNull();
+    expect(driver.lastIngestExpectedRows).toBeNull();
+  });
+
+  it("a driver without the read sends nothing", async () => {
+    const { io, engine, driver, session } = build({ scope: "MATCH" });
+    startRun(io);
+    await session.whenSettled();
+    expect(engine.currentStage()).toBe("COMPLETED");
+    expect(driver.calls).not.toContain("expectedRows");
+    expect(driver.lastIngestExpectedRows).toBeNull();
+  });
+
+  it("UNREADABLE → operator-confirmed: the total is never asked for, and nothing is sent", async () => {
+    const { io, engine, driver, session } = build({ scope: "UNREADABLE", expectedRows: 37 });
+    startRun(io);
+    await session.whenSettled();
+    command(io, "REQUEST_STEP_RECHECK", io.lastView()!.revision);
+    await session.whenSettled();
+
+    expect(engine.currentStage()).toBe("COMPLETED");
+    expect(engine.recordedScopeEvidence()).toBe("OPERATOR_CONFIRMED");
+    expect(driver.calls).not.toContain("expectedRows");
+    expect(driver.lastIngestExpectedRows).toBeNull();
+  });
+
+  it("MISMATCH then corrected: asked once, only after the range matched", async () => {
+    const { io, engine, driver, session } = build({ scopeSequence: ["MISMATCH", "MATCH"], expectedRows: 12 });
+    startRun(io);
+    await session.whenSettled();
+    expect(engine.currentStage()).toBe("SCOPE_BLOCKED");
+    expect(driver.calls).not.toContain("expectedRows");
+
+    command(io, "REQUEST_STEP_RECHECK", io.lastView()!.revision);
+    await session.whenSettled();
+    expect(engine.currentStage()).toBe("COMPLETED");
+    expect(driver.calls.filter((c) => c === "expectedRows")).toHaveLength(1);
+    expect(driver.lastIngestExpectedRows).toBe(12);
+  });
+});
+
+describe("import engine — expected rows are recorded only with MACHINE_MATCHED", () => {
+  const engineOf = () =>
+    new ImportSegmentEngine(
+      { runId: "run_import01", channelCode: "naver", importRef: REF, required: REQUIRED },
+      { clock: makeImportClock() },
+    );
+
+  it("ignores a total offered beside an unverified or mismatched range, and drops non-integers", () => {
+    const a = engineOf();
+    a.onScopeRead("UNREADABLE", 5);
+    expect(a.recordedExpectedRows()).toBeNull();
+    const b = engineOf();
+    b.onScopeRead("MISMATCH", 5);
+    expect(b.recordedExpectedRows()).toBeNull();
+    const c = engineOf();
+    c.onScopeRead("MATCH", -3);
+    expect(c.recordedExpectedRows()).toBeNull();
+    const d = engineOf();
+    d.onScopeRead("MATCH", 2.5);
+    expect(d.recordedExpectedRows()).toBeNull();
+  });
+});

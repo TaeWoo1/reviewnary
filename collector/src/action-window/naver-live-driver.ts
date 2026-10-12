@@ -802,13 +802,19 @@ export class NaverLiveProbeDriver implements ProbeDriver {
    * platform's suggested filename is never passed). Only the sanitized `{ ok, processed }` crosses
    * back; a non-`ok` outcome fails the run closed (`INGEST_FAILED`, per the engine).
    */
-  async ingest(artifactRef: string, scopeEvidence?: ScopeEvidenceWire): Promise<IngestResult> {
+  async ingest(artifactRef: string, scopeEvidence?: ScopeEvidenceWire, expectedRows?: number | null): Promise<IngestResult> {
     // `scopeEvidence` is optional here ONLY so this driver still satisfies the export `ProbeDriver` (whose
     // ingest takes no evidence). On the SEGMENT import path the session always passes the engine's record.
+    // `expectedRows` is likewise the engine's record (null = no total was read) and is only carried, never derived.
     const retained = this.retained;
     this.retained = null;
     if (!retained) return { ok: false, processed: 0 };
-    const outcome = await this.opts.ingest({ bytes: () => retained.bytes(), artifactRef, scopeEvidence });
+    const outcome = await this.opts.ingest({
+      bytes: () => retained.bytes(),
+      artifactRef,
+      scopeEvidence,
+      expectedRows: expectedRows ?? null,
+    });
     return { ok: outcome.ok, processed: outcome.processed };
   }
 

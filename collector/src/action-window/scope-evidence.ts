@@ -10,3 +10,19 @@
  * one a run records (see `import-engine.ts` `onScopeRead`); everything else only carries the value.
  */
 export type ScopeEvidenceWire = "MACHINE_MATCHED" | "OPERATOR_CONFIRMED";
+
+/**
+ * **The list's displayed total for the selected range — the number the backend reconciles the file against.**
+ *
+ * Read off the marketplace at the same moment as a MACHINE-matched scope read, and sent with the segment ingest
+ * as the optional `expectedRows` field. The backend treats a difference from the file's accounted rows as a
+ * FAILED attempt, so a wrong number costs the seller a segment: everything that is not a plain non-negative
+ * safe integer is `null`, and `null` means the field is omitted entirely — never a guess, never a default.
+ *
+ * Lives in this zero-import leaf for the same reason as {@link ScopeEvidenceWire}: the engine, the drivers and
+ * the network layer all carry it, and the drivers may not import `../upload`.
+ */
+export function expectedRowsOrNull(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) return null;
+  return value;
+}

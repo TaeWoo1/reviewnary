@@ -44,6 +44,12 @@ export interface AwIngestSource {
    * passes the engine's record.
    */
   scopeEvidence?: ScopeEvidenceWire;
+  /**
+   * The list's displayed total for the selected range, as recorded by the ENGINE alongside a MACHINE-matched
+   * scope read. `null`/absent = not read, and the upload then omits the `expectedRows` field entirely. Only the
+   * SEGMENT upload sends it; the export/reply carriers ignore it.
+   */
+  expectedRows?: number | null;
 }
 
 /**
@@ -175,6 +181,7 @@ export function buildSegmentIngestUpload(opts: SegmentIngestUploadOpts): AwInges
         // Always present on the segment path (the session passes the engine's record); the fallback only guards
         // the impossible unset case and matches the previous default.
         src.scopeEvidence ?? "OPERATOR_CONFIRMED",
+        src.expectedRows ?? null,
         fetchImpl,
       );
       return sanitizeBackendIngest(result);
