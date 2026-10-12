@@ -237,3 +237,8 @@ export function drewFreshObjectList(turnArtifacts: readonly Artifact[], object: 
   }
   return true;
 }
+
+/* ─── Shared with `./visibleFilterLane`: how many rows a narrowing may read in detail ─── */
+
+export /** Detail READs one deterministic FILTER may spend on topic matching (the workload lane's own cap). */
+const FILTER_DETAIL_CAP = 8;

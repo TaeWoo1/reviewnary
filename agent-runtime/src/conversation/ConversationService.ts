@@ -128,6 +128,9 @@ import {
 // The frame around what a turn drew, and the capture a turn carries — lifted out on 2026-10-12.
 import { headlineOf, suggestionsFor } from "./turnFraming";
 import { resolveTargets } from "./targetResolution";
+import type { Composed } from "./composedTurn";
+import { applyVisibleFilter } from "./visibleFilterLane";
+import { FILTER_DETAIL_CAP } from "./workingSet";
 import {
   ASPECT_ARTIFACT_ID, ASSISTANT_CAPABILITY_ID, DOMAIN_ARTIFACT_TYPES, saidOnceId,
 } from "./turnArtifacts";
@@ -207,8 +210,6 @@ type ProgressFn = (e: ProgressEvent) => void;
  * old shape as 「시스템 상태 설명이 대화보다 앞선다」 — the fix is a cap, not another per-sentence filter.
  */
 const FINDINGS_MAX = 2;
-/** Detail READs one deterministic FILTER may spend on topic matching (the workload lane's own cap). */
-const FILTER_DETAIL_CAP = 8;
 
 /**
  * Where a seller goes to finish ONE review's reply — the review alone, because that is all a
@@ -233,18 +234,6 @@ const SEE_SO_FAR_PROMPT = "지금까지 확인된 리뷰 보여줘";
 
 
 
-interface Composed {
-  status: TurnStatus; message: string; artifacts: Artifact[]; suggestedActions: SuggestedAction[];
-  /** The run's limits, said apart from the answer (contract `TurnView.notes`). */
-  notes?: string[];
-  workingSet: WorkingSetView | null; pendingHumanActions: PendingHumanAction[];
-  pendingPrepared: PendingPreparedAction | null; failureCode?: string; failureReason?: string;
-  budget?: TurnView["budget"]; answer?: OperatorAnswer;
-  /** Knowledge Capture v1: the gap to hold open after this turn; `undefined` = carry the thread's as it is. */
-  pendingCapture?: PendingKnowledgeCapture | null;
-  /** Agent Interaction Model v2 §1-C: the task this turn leaves in flight; `undefined` = derive/carry. */
-  activeTask?: ActiveTask | null;
-}
 
 /** What a resumed turn says first when it follows a saved capture (Knowledge Capture v1, GOAL resume). */
 interface AfterCapture { readonly message: string; readonly artifact: KnowledgeCaptureArtifact }
@@ -2240,13 +2229,13 @@ export class ConversationService {
     // ── PRIORITIZE (§B): 「그중 급한 것부터」 · 「뭐부터 봐야 해?」 — the rows on screen, ordered by how
     // long each customer has waited, with the criterion said out loud. Zero reads, zero model calls.
     if (set?.kind === "INQUIRIES" && visiblePriorityOf(text)) {
-      const ranked = await this.applyVisibleFilter(view, set, EMPTY_FILTER, bundle, true, hints.referenceDate);
+      const ranked = await applyVisibleFilter(view, set, EMPTY_FILTER, bundle, true, hints.referenceDate ?? this.now());
       if (ranked) return ranked;
     }
     if (set?.kind === "INQUIRIES") {
       const filter = visibleFilterOf(text);
       if (filter) {
-        const filtered = await this.applyVisibleFilter(view, set, filter, bundle);
+        const filtered = await applyVisibleFilter(view, set, filter, bundle, false, this.now());
         if (filtered) return filtered;
       }
     }
@@ -2404,161 +2393,6 @@ export class ConversationService {
     };
   }
 
-  /**
-   * FILTER (Conversation Core v1): narrow the VISIBLE inquiry rows by closed axes — channel · topic ·
-   * status · order · limit — with no planner and no org re-read. Topic matching reads the row's own
-   * persisted title/product name first; a row that cannot answer from its title spends one bounded
-   * detail READ (in-process comparison, never persisted — the same rule the workload filter follows).
-   * `null` ⇒ the sentence asks for more than the set can carry (a larger limit) and the planner decides.
-   */
-  private async applyVisibleFilter(
-    view: ConversationView, set: WorkingSetView, filter: VisibleFilter, bundle: SpringClientBundle,
-    urgency = false, referenceDate?: string,
-  ): Promise<Composed | null> {
-    const started = Date.now();
-    const rows = set.ids
-      .map((id) => inquiryFromHistory(view, id))
-      .filter((item): item is InquiryItem => item != null);
-    if (rows.length === 0) return null;
-    // Persistence bounds the rows a thread keeps; a set this lane cannot fully see is the planner's
-    // WORKING_SET re-read — filtering a fifth of the rows would be a silently wrong answer.
-    if (rows.length < set.ids.length) return null;
-    // A limit larger than the set cannot be a refine of it (scopeOverride's NEW_LIMIT, same rule here).
-    if (filter.limit != null && filter.limit > rows.length) return null;
-
-    let detailReads = 0;
-    const matched: InquiryItem[] = [];
-    for (const row of rows) {
-      if (filter.channel && (row.channelCode ?? "").toUpperCase() !== filter.channel) continue;
-      if (filter.status === "UNANSWERED" && row.status.toUpperCase() === "ANSWERED") continue;
-      if (filter.status === "ANSWERED" && row.status.toUpperCase() !== "ANSWERED") continue;
-      if (filter.topic) {
-        let hit = matchesTopic(filter.topic, [row.title, row.productName]);
-        if (!hit && row.workItemId && detailReads < FILTER_DETAIL_CAP) {
-          detailReads += 1;
-          try {
-            const detail = await bundle.inquiry.getInquiryDetail(row.workItemId);
-            hit = matchesTopic(filter.topic, [detail.title, detail.details]);
-          } catch {
-            hit = false;
-          }
-        }
-        if (!hit) continue;
-      }
-      // The seller's own subject word over the rows on screen — the row's own text first (its subject
-      // line, its product, the snippet it was drawn with), then one bounded detail read.
-      if (filter.term) {
-        let hit = matchesTerm(filter.term, [row.title, row.productName, row.snippet]);
-        if (!hit && row.workItemId && detailReads < FILTER_DETAIL_CAP) {
-          detailReads += 1;
-          try {
-            const detail = await bundle.inquiry.getInquiryDetail(row.workItemId);
-            hit = matchesTerm(filter.term, [detail.title, detail.details]);
-          } catch {
-            hit = false;
-          }
-        }
-        if (!hit) continue;
-      }
-      matched.push(row);
-    }
-    if (urgency) {
-      // The longest wait first — the one urgency signal this product holds (`urgency.ts`).
-      matched.splice(0, matched.length, ...rankByUrgency(matched));
-    } else if (filter.order) {
-      matched.sort((a, b) => filter.order === "OLDEST"
-        ? a.receivedAt.localeCompare(b.receivedAt)
-        : b.receivedAt.localeCompare(a.receivedAt));
-    }
-    const kept = filter.limit != null ? matched.slice(0, filter.limit) : matched;
-
-    const budget = { toolCalls: detailReads, llmCalls: 0, elapsedMs: Date.now() - started, stopReason: urgency ? "VISIBLE_PRIORITY" : "VISIBLE_FILTER" };
-    const desc = filterWords(filter);
-    const orderWord = filter.order === "OLDEST" ? "가장 오래된" : "가장 최근";
-    const today = (referenceDate ?? this.now()).slice(0, 10);
-    log("conversation_visible_filter", {
-      axes: [filter.channel && "channel", filter.topic && "topic", filter.term && "term", filter.status && "status", filter.limit != null && "limit", filter.order && "order", urgency && "urgency"].filter(Boolean).join(","),
-      of: rows.length, matched: kept.length, detailReads,
-    });
-    if (kept.length === 0) {
-      // R2: a filter that left nothing keeps the previous set as the anchor — 「없습니다」 is the answer.
-      return {
-        status: "DONE", message: `방금 본 문의 ${rows.length}건 중 ${desc}문의는 없습니다.`,
-        artifacts: [], suggestedActions: [promptChip("답변 안 한 문의만 보여줘")],
-        workingSet: view.workingSet, pendingHumanActions: [], pendingPrepared: view.pendingPrepared, budget,
-      };
-    }
-    const message = urgency
-      ? `방금 본 문의 ${kept.length}건을 먼저 볼 순서로 정리했습니다. ${URGENCY_CRITERION} ${URGENCY_LIMIT}`
-      : desc.length === 0 && filter.limit != null
-        ? `방금 본 문의 ${rows.length}건 중 ${orderWord} ${kept.length}건입니다.`
-        : filter.limit != null && matched.length > kept.length
-          ? `방금 본 문의 ${rows.length}건 중 ${desc}문의는 ${matched.length}건이고, 그중 ${orderWord} ${kept.length}건입니다.`
-          : `방금 본 문의 ${rows.length}건 중 ${desc}문의는 ${kept.length}건입니다.`;
-
-    // Consecutive runs of the same answered state become one group each — the rows step's own rule.
-    const groups: Array<{ key: "UNANSWERED" | "ANSWERED"; label: string; items: InquiryItem[] }> = [];
-    for (const row of kept) {
-      const key = row.status.toUpperCase() === "ANSWERED" ? "ANSWERED" as const : "UNANSWERED" as const;
-      const shown: InquiryItem = urgency ? { ...row, waitingDays: waitingDaysOf(row.receivedAt, today) } : row;
-      const last = groups.at(-1);
-      if (last && last.key === key) last.items.push(shown);
-      else groups.push({ key, label: key === "UNANSWERED" ? "답변 필요" : "답변함", items: [shown] });
-    }
-    const title = urgency
-      ? "먼저 볼 문의"
-      : desc.length === 0 && filter.limit != null
-        ? `방금 본 문의 중 ${orderWord} ${kept.length}건`
-        : `방금 본 문의 중 ${desc}문의${filter.limit != null && matched.length > kept.length ? ` · ${orderWord} ${kept.length}건` : ""}`;
-    const artifact: InquiryListArtifact = {
-      artifactId: `a-filter-${randomUUID()}`, type: "INQUIRY_LIST", title, groups, totalCount: kept.length,
-      scope: {
-        period: set.filters.period ?? null,
-        channelCode: filter.channel ?? set.filters.channelCode ?? null,
-        status: filter.status ?? set.filters.status ?? "ALL",
-        order: filter.order ?? set.filters.order ?? "NEWEST",
-        limit: filter.limit,
-        ...(filter.term ? { term: filter.term } : {}),
-        ...(urgency ? { rank: "URGENCY" as const } : {}),
-      },
-      more: { label: "문의 화면에서 보기", to: "/inquiries", count: kept.length },
-    };
-    const workingSet: WorkingSetView = {
-      kind: "INQUIRIES", label: title, count: kept.length,
-      ids: kept.map((i) => i.inquiryId).slice(0, WORKING_SET_MAX_IDS),
-      filters: {
-        ...(set.filters.period ? { period: set.filters.period } : {}),
-        channelCode: filter.channel ?? set.filters.channelCode ?? null,
-        ...(filter.status ? { status: filter.status } : set.filters.status ? { status: set.filters.status } : {}),
-        order: filter.order ?? set.filters.order ?? "NEWEST",
-        ...(filter.topic ? { topic: filter.topic } : set.filters.topic ? { topic: set.filters.topic } : {}),
-        ...(filter.term ? { term: filter.term } : set.filters.term ? { term: set.filters.term } : {}),
-        inquiryIntent: set.filters.inquiryIntent ?? "ROWS",
-      },
-      productIds: [...new Set(kept.map((i) => i.productId).filter((p): p is string => p != null))].slice(0, WORKING_SET_MAX_IDS),
-      workItemIds: kept.map((i) => i.workItemId).filter((w): w is string => w != null).slice(0, WORKING_SET_MAX_IDS),
-      turnId: "",
-    };
-    return {
-      status: "DONE",
-      message,
-      artifacts: [artifact],
-      suggestedActions: [
-        promptChip("첫 번째 거 답변 준비해줘"),
-        ...(filter.status !== "UNANSWERED" ? [promptChip("답변 안 한 것만 보여줘")] : []),
-      ],
-      workingSet, pendingHumanActions: [], pendingPrepared: view.pendingPrepared, activeTask: null, budget,
-    };
-  }
-
-  /**
-   * INSPECT for the OTHER object (Agent Object v1 §1): the selected review, read exactly.
-   *
-   * The same shape as {@link inspect} — one read, the object's own card, the anchor kept, zero planner
-   * and zero model calls. `null` when the read failed: a card assembled from the anchor's own fields
-   * would be this runtime describing a review it could not read, so the turn falls through to the
-   * planner instead of inventing one.
-   */
   private async inspectReview(
     view: ConversationView, object: SelectedObject, bundle: SpringClientBundle,
   ): Promise<Composed | null> {
