@@ -22,6 +22,7 @@ export const WORKSPACE_OF: Record<WorkingSetKind, { label: string; to: string }>
   ISSUES: { label: "반복 문제", to: "/memory" },
 };
 
+import type { CapabilityAspect } from "../operator/capability/ProductSelfKnowledge";
 import type { InquiryActionability } from "./inquiryActionability";
 import type { ReviewDraftTarget } from "./DraftPreparer";
 import type { SelectedInquiryRow } from "./historyReaders";
@@ -147,4 +148,63 @@ export function humanItem(actionType: string, channel: string | null, to: string
     : actionType === "KNOWLEDGE_ENTRY" ? "답변 기준 등록하기"
       : actionType === "CHANNEL_CONNECT" ? `${channel ?? "채널"} 연결하기` : "규격 확인하기";
   return { label, ...(to ? { to } : {}) };
+}
+
+/* ─── The assistant's own capability card: its artifact ids and the types that are domain answers ─── */
+
+/**
+ * The id of the 「제가 도와드릴 수 있는 일」 card — read back off the thread so the same card is not
+ * drawn twice. An id, not a sentence: what makes it the same card is that it IS the same card.
+ */
+export const ASSISTANT_CAPABILITY_ID = "a-assistant-capability";
+
+/**
+ * One artifact id per product-question ASPECT — which is also what «said once» is keyed on.
+ *
+ * The overview keeps {@link ASSISTANT_CAPABILITY_ID} so a conversation that has already drawn that
+ * card still counts as having drawn it.
+ */
+/**
+ * What a product question gets when the reviewed facts do not answer it.
+ *
+ * One sentence, and deliberately without a next step: this lane does not know what the seller would
+ * have to do, and offering a guess would be the same overclaim in a friendlier shape.
+ */
+/**
+ * The artifacts that show the SELLER's rows. None of them belongs on a turn that asked what the
+ * product does — they answer a question about this store, and the turn asked about reviewnary.
+ */
+export const DOMAIN_ARTIFACT_TYPES: ReadonlySet<string> = new Set([
+  "INQUIRY_LIST", "REVIEW_LIST", "PRODUCT_LIST", "ISSUE_LIST", "OPPORTUNITY_LIST", "ORDER_SUMMARY",
+  "CHART", "EVIDENCE", "INQUIRY_DETAIL", "REVIEW_DETAIL",
+]);
+
+export const ASPECT_ARTIFACT_ID: Readonly<Record<CapabilityAspect, string>> = {
+  PRODUCT_OVERVIEW: ASSISTANT_CAPABILITY_ID,
+  SUPPORTED_CHANNELS: "a-supported-channels",
+  AFTER_CONNECT: "a-after-connect",
+  CHANNEL_ACTION: "a-channel-action",
+  HOW_TO_CONNECT: "a-getting-started",
+  PRODUCT_DIFFERENCE: "a-product-difference",
+  FUTURE_DIRECTION: "a-future-direction",
+  COLLECTION_STATE: "a-collection-state",
+  DAILY_OPERATION: "a-daily-operation",
+  TEAM_ACCESS: "a-team-access",
+  SECURITY_AND_DATA: "a-security-and-data",
+};
+
+/**
+ * The «said once» key — the aspect, and the channel when the aspect has one.
+ *
+ * <b>Found live 2026-09-07, one level below the defect this package opened on.</b> With the aspect
+ * alone as the key, 「네이버 연결하면 정확히 뭘 해줘?」 · 「리뷰 답글도 자동으로 보내?」 · 「쿠팡은 어디까지
+ * 가능해?」 are three CHANNEL_ACTION turns, so the second and third were answered 「말씀드린 것까지가…」 —
+ * three different questions collapsed onto one answer, which is the shape this whole package exists to
+ * remove. NAVER's matrix and Coupang's are different FACTS, and a fact is said once means once per
+ * fact.
+ */
+export function saidOnceId(aspect: CapabilityAspect, channel: string | null): string {
+  const base = ASPECT_ARTIFACT_ID[aspect];
+  const scoped = aspect === "CHANNEL_ACTION" || aspect === "AFTER_CONNECT";
+  return scoped && channel ? `${base}-${channel.toUpperCase()}` : base;
 }

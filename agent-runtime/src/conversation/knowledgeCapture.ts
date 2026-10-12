@@ -14,7 +14,11 @@
  */
 import { createHash } from "node:crypto";
 import type { KnowledgeGapView, RetrievalOutcome } from "../spring/types";
-import type { KnowledgeCaptureScope, PendingKnowledgeCapture, ToneHint } from "./contract";
+import type {
+  ConversationView, KnowledgeCaptureArtifact, KnowledgeCaptureScope, PendingKnowledgeCapture,
+  ToneHint, WorkingSetView,
+} from "./contract";
+import { excerpt } from "../operator/wording/sellerWording";
 import { ordinalSelectionOf, toneIntentOf } from "./styleIntent";
 
 /* ───────────── topics ───────────── */
@@ -269,4 +273,45 @@ export const CAPTURE_SENTENCE = {
 /** The settings screen for a captured fact's scope. */
 export function settingsPathFor(scope: KnowledgeCaptureScope, productId: string | null): string {
   return scope === "ORG" || !productId ? SETTINGS_POLICIES : `/products/${productId}`;
+}
+
+/* ─── The pending capture as a turn carries it: its artifact, its stamp, what survives ───
+   Lifted out of `ConversationService.ts` on 2026-10-12 — pure, like the rest of this module. */
+
+/** The card for one capture state. `content` is the seller's normalized sentence and nothing else. */
+export function captureArtifact(
+  pending: PendingKnowledgeCapture, state: KnowledgeCaptureArtifact["state"],
+  extra: { content?: string; fingerprint?: string; existing?: ExistingKnowledge; resume?: KnowledgeCaptureArtifact["resume"] },
+): KnowledgeCaptureArtifact {
+  return {
+    artifactId: `a-capture-${pending.captureId}-${state.toLowerCase()}`, type: "KNOWLEDGE_CAPTURE",
+    title: state === "SAVED" ? `${pending.topicLabel} 기준 저장됨` : state === "CANDIDATE" ? `${pending.topicLabel} 기준으로 저장` : `${pending.topicLabel} 기준`,
+    captureId: pending.captureId, state, scope: pending.scope, topicLabel: pending.topicLabel,
+    productId: pending.productId, productName: pending.productName, variantName: pending.variantName,
+    inquiryId: pending.inquiryId, question: pending.question,
+    content: extra.content ?? null, fingerprint: extra.fingerprint ?? null,
+    existing: extra.existing ? { title: extra.existing.title, excerpt: excerpt(extra.existing.body) } : null,
+    resume: extra.resume ?? null, settingsTo: settingsPathFor(pending.scope, pending.productId),
+  };
+}
+
+/** A capture opened this turn gets this turn's id (and, for a GOAL resume, the turn to re-run). */
+export function stampCapture(pending: PendingKnowledgeCapture | null, turnId: string): PendingKnowledgeCapture | null {
+  if (!pending) return null;
+  const resume = pending.resume.kind === "GOAL" && pending.resume.turnId === "" ? { kind: "GOAL" as const, turnId } : pending.resume;
+  return pending.turnId === "" ? { ...pending, turnId, resume } : pending;
+}
+
+/** A carried gap survives a turn unless the seller now stands on a different inquiry. */
+export function carriedCapture(pending: PendingKnowledgeCapture | null, workingSet: WorkingSetView | null): PendingKnowledgeCapture | null {
+  if (!pending) return null;
+  const now = workingSet?.selectedInquiry?.inquiryId ?? null;
+  if (pending.inquiryId && now && now !== pending.inquiryId) return null;
+  return pending;
+}
+
+/** Did the previous AGENT turn save a capture? Then this turn is its one resume and opens no new gap. */
+export function lastTurnSavedCapture(view: ConversationView): boolean {
+  const last = [...view.turns].reverse().find((t) => t.role === "AGENT");
+  return last?.artifacts.some((a) => a.type === "KNOWLEDGE_CAPTURE" && a.state === "SAVED") ?? false;
 }
