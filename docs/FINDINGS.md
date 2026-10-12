@@ -321,6 +321,29 @@
 - **출처** — 2026-10-12 세션. 관련: B8(확장자 allowlist가 결론을 뒤집은 것)과 같은 종류 —
   **측정 도구의 결함이 측정값이 아니라 결론으로 나타난다.**
 
+### B14. 큰 파일을 쪼갤 때 `tsc`가 의존성 목록을 대신 만들어 준다
+
+- **했던 것** — `ConversationService.ts`(4,710줄)에서 모듈 레벨 헬퍼를 세 묶음으로 나눠
+  옮겼다. 묶음마다 "이 함수가 무엇에 의존하는지"를 먼저 읽어 import 목록을 손으로 만들려
+  했다.
+- **사실** — 손으로 만든 목록은 매번 틀렸고, 매번 `tsc --noEmit`가 **정확히 무엇이 빠졌는지
+  이름으로** 알려줬다. 세 묶음에서 각각 1 · 2 · 3개가 틀렸다 — `ResolvedTarget`은
+  `./contract`가 아니라 서비스 안의 비공개 타입이었고, `DraftTarget`/`ReviewDraftTarget`은
+  `./DraftPreparer`에 있었고, `InquiryDetailArtifact`는 `./contract`에 있었다. 읽어서
+  맞히려는 쪽이 느리고 덜 정확했다.
+- **다음에** — 모듈을 분리할 때는 **먼저 옮기고 `tsc`에게 묻는다.** 블록을 그대로 옮기고
+  빈 import로 시작해, 컴파일러가 대는 이름을 하나씩 채운다. 타입이 강한 저장소에서
+  컴파일러는 의존성 분석기이고, 그 일을 사람이 대신하면 오류가 는다. 단 **옮기는 블록의
+  경계는 여전히 사람이 확인**해야 한다 — 그건 `tsc`가 모른다(§B13).
+- **곁따라 나온 규칙** — 옮긴 쪽이 **타입의 소유자**가 되는 것이 맞다.
+  `ResolvedTarget`과 `SelectedInquiryRow`는 그것을 만드는 함수들과 함께 `historyReaders.ts`로
+  갔고 서비스가 되가져온다. 서비스에 남겨 두고 새 모듈이 import하면 순환이 된다.
+- **검증 방식** — 리팩터마다 ① `tsc --noEmit` 0 ② 전체 테스트 수가 기준선과 같음
+  ③ **fence가 세는 심볼 카운트가 그대로**(`answer.axis` 1 · `honestZero(` 1 ·
+  `inquiryDraftPrecondition(` 3 · `reviewDraftPrecondition(` 2 · `selectProcedure(` 3) —
+  ③이 같은 파일 안 분해와 모듈 분리를 가르는 선이다(§B11).
+- **출처** — 2026-10-12 세션. `src/conversation/{sellerSentences,historyReaders,turnArtifacts}.ts`.
+
 ---
 
 ## C. 증거 · 계약

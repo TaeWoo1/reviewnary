@@ -103,6 +103,21 @@ import {
   NUMBER, PRODUCT_KNOWLEDGE_GAP_SENTENCE, redundantWithHeadline, sellerSentence, STATUS_WORD,
   summaryLineFor, won,
 } from "./sellerSentences";
+// What the conversation already has — pure view lookups, lifted out on 2026-10-12.
+import {
+  channelNameOf, focusInquiryOf, inquiryFromHistory, inquiryTargetFromHistory, lastReviewItemOf,
+  pendingActionsOf, pendingHumanWindowOf, precedingUserTurn, priorLineOf, productFromHistory,
+  reviewFromHistory, reviewTargetFromHistory, verifiedReview,
+} from "./historyReaders";
+import type { ResolvedTarget, SelectedInquiryRow } from "./historyReaders";
+// The artifacts a turn shows, and the shape decisions about them — lifted out on 2026-10-12.
+import {
+  copyOnlySummary, dedupeLists, drewSetOf, humanItem, inquiryDetailArtifact, inquiryLine,
+  inquiryStateSummary, isEmptyRowArtifact, PRIMARY_ORDER, primaryOf, promptChip, reasonSummary,
+  reviewUnsupportedSummary, ROW_BEARING, selectionSummary, SET_ARTIFACT_TYPES,
+} from "./turnArtifacts";
+// `priorLineOf` has always been imported from here by the lane's callers.
+export { priorLineOf } from "./historyReaders";
 // Re-exported because the tests and the lane's callers have always imported them from here.
 export {
   CANCELLED_MESSAGE, COPY_ONLY_SENTENCE, COUPANG_REVIEW_UNSUPPORTED_SENTENCE, DRAFT_FAILED_SENTENCE,
@@ -205,28 +220,7 @@ const WORKSPACE_OF: Record<WorkingSetKind, { label: string; to: string }> = {
 const REVIEW_UNSUPPORTED_CHIPS = ["이 상품 리뷰 더 보여줘", "이 상품 관련 문의 확인해줘", "이 상품에 반복되는 문제 있어?"];
 const SEE_SO_FAR_PROMPT = "지금까지 확인된 리뷰 보여줘";
 
-/** The inquiry a sentence pointed at — by inquiry id; whether a draft can attach to it is a separate fact. */
-interface SelectedInquiryRow extends SelectedInquiry {
-  readonly channelNameKo: string | null;
-  readonly productName: string | null;
-  readonly title: string | null;
-  readonly status: string;
-  readonly receivedAt: string | null;
-  /** transient — the bounded opening of the customer's message the row was drawn with, when it had one. */
-  readonly snippet?: string | null;
-}
 
-type ResolvedTarget =
-  | {
-    readonly kind: "INQUIRY";
-    readonly inquiry: SelectedInquiryRow;
-    readonly actionability: InquiryActionability;
-    /** Present only when the row is DRAFTABLE — the product's draft path needs the work item. */
-    readonly target: DraftTarget | null;
-    readonly executableIdentity: ExecutableIdentity;
-    readonly sourceSubtype: string | null;
-  }
-  | { readonly kind: "REVIEW"; readonly target: ReviewDraftTarget; readonly executableIdentity: ExecutableIdentity };
 
 interface Composed {
   status: TurnStatus; message: string; artifacts: Artifact[]; suggestedActions: SuggestedAction[];
@@ -3524,43 +3518,8 @@ function emptyPlan(): InvestigationPlan {
   };
 }
 
-function precedingUserTurn(view: ConversationView, agentTurnId: string): TurnView | null {
-  const at = view.turns.findIndex((t) => t.turnId === agentTurnId);
-  for (let i = at - 1; i >= 0; i -= 1) {
-    if (view.turns[i]!.role === "USER") return view.turns[i]!;
-  }
-  return null;
-}
 
-/** Every pending step the conversation holds — the list when the store has it, else the singular. */
-function pendingActionsOf(view: ConversationView): PendingHumanAction[] {
-  if (view.pendingHumanActions && view.pendingHumanActions.length > 0) return [...view.pendingHumanActions];
-  return view.pendingHumanAction ? [view.pendingHumanAction] : [];
-}
 
-/**
- * The inquiry a reference resolves to — the FOCUS of the conversation.
- *
- * <b>Selection is one way to have a referent, not the only one.</b> The deterministic lanes bound
- * 「이 고객」·「답변 준비해줘」 to `selectedInquiry` alone, so a refine that left exactly ONE row on screen
- * had a referent everybody could see and nobody could name: 「파손 관련 문의 보여줘」 → 「그중 네이버 것만」
- * → 「이 고객한테 뭐라고 답해야 해?」 fell through to the planner, which read the org's whole queue and
- * ended the turn WAITING_HUMAN. The planner's own `resolveTargets` had always treated a one-row set as
- * the target, so the two paths disagreed about what 「이 문의」 means; this is the one answer.
- *
- * A set of two or more has no unique referent and returns null — the sentence is then a selection
- * question, and the lanes that ask it are the ones that run.
- */
-function focusInquiryOf(set: WorkingSetView | null): SelectedInquiry | null {
-  if (set?.kind !== "INQUIRIES") return null;
-  if (set.selectedInquiry) return set.selectedInquiry;
-  if (set.ids.length !== 1) return null;
-  return {
-    inquiryId: set.ids[0]!, workItemId: set.workItemIds.length === 1 ? set.workItemIds[0]! : null,
-    productId: set.productIds.length === 1 ? set.productIds[0]! : null,
-    channelCode: set.filters.channelCode ?? null,
-  };
-}
 
 /**
  * The set a draft/send sentence indexes into — the one the seller was LOOKING AT when they said it
@@ -3670,110 +3629,14 @@ export function withoutSettledCollectionSteps(
   ));
 }
 
-/** The last REVIEW_LIST row of a channel the thread has shown — the object an explanation is about. */
-function lastReviewItemOf(view: ConversationView, channelCode: string): ReviewItem | null {
-  for (let i = view.turns.length - 1; i >= 0; i--) {
-    for (const a of view.turns[i]!.artifacts) {
-      if (a.type !== "REVIEW_LIST") continue;
-      const hit = a.items.find((r) => r.channelCode.toUpperCase() === channelCode);
-      if (hit) return hit;
-    }
-  }
-  return null;
-}
 
-/** The seller-facing channel name as the thread already printed it, when any artifact carries it. */
-function channelNameOf(view: ConversationView, channelCode: string): string | null {
-  for (let i = view.turns.length - 1; i >= 0; i--) {
-    for (const a of view.turns[i]!.artifacts) {
-      if (a.type === "REVIEW_LIST") {
-        const f = a.freshness.find((r) => r.channelCode.toUpperCase() === channelCode);
-        if (f?.channelNameKo) return f.channelNameKo;
-      }
-      if (a.type === "HUMAN_ACTION_REQUIRED" && (a.channelCode ?? "").toUpperCase() === channelCode && a.channelNameKo) return a.channelNameKo;
-    }
-  }
-  return null;
-}
 
-/** Same-type list artifacts with the same title collapse to the last one; everything else is kept in order. */
-function dedupeLists(artifacts: readonly Artifact[]): Artifact[] {
-  const LISTS = new Set(["INQUIRY_LIST", "REVIEW_LIST", "PRODUCT_LIST", "ISSUE_LIST", "OPPORTUNITY_LIST", "ORDER_SUMMARY", "CHART"]);
-  const lastIndex = new Map<string, number>();
-  artifacts.forEach((a, i) => { if (LISTS.has(a.type)) lastIndex.set(`${a.type}:${a.title}`, i); });
-  return artifacts.filter((a, i) => !LISTS.has(a.type) || lastIndex.get(`${a.type}:${a.title}`) === i);
-}
 
-/** The period token of the review window a pending human step was asked for — null when none is pending. */
-function pendingHumanWindowOf(view: ConversationView): string | null {
-  const pending = view.pendingHumanActions?.length ? view.pendingHumanActions : view.pendingHumanAction ? [view.pendingHumanAction] : [];
-  // An offered refresh gates nothing: only a REQUIRED step keeps the window gated on the next question.
-  if (!pending.some((p) => p.actionType === "REVIEW_IMPORT" && !p.optional)) return null;
-  return view.workingSet?.kind === "REVIEWS" ? view.workingSet.filters.period?.token ?? null : null;
-}
 
-/** The working-set line for the planner — closed tokens only, never a count, an id or a customer word. */
-export function priorLineOf(view: ConversationView): string | null {
-  const set = view.workingSet;
-  const parts: string[] = [];
-  if (set) {
-    parts.push(`직전 작업 집합: ${set.kind} (기간:${set.filters.period?.token ?? "없음"}, 채널:${set.filters.channelCode ?? "전체"}, `
-      + `평점:${set.filters.rating ?? "ALL"}, 상태:${set.filters.status ?? "없음"}, 상품 특정:${set.productIds.length > 0 ? "예" : "아니오"})`);
-    // New-list Scope Integrity (Conversation Core v1 §9): the set's axes DESCRIBE what is on screen —
-    // they are not defaults for the next sentence. A fixed instruction, like `contextLine`'s: closed
-    // vocabulary about run state, no data. The deterministic backstop is `scopeOverride`'s axis strip.
-    parts.push("집합 규칙: 위 괄호의 값은 지금 화면에 있는 집합의 설명이지 이번 문장의 조건이 아닙니다. "
-      + "그 집합을 좁히는 문장(「그중」·「여기서」·「~만」)에서만 filters.scope=\"WORKING_SET\"으로 두고 새 조건만 더하세요. "
-      + "새 목록을 요청하는 문장(「최근 문의 N개 보여줘」·「오늘 문의 보여줘」)은 filters.scope=\"ORG\"이고, "
-      + "filters의 채널·상태·기간·주제는 이번 문장에 적힌 것만 적으세요 — 위 괄호의 값을 복사하지 마세요.");
-  }
-  if (set?.kind === "INQUIRIES" && set.selectedInquiry) {
-    parts.push("직전 선택: INQUIRY (판매자가 방금 문의 하나를 골랐습니다 — 「이 문의」·「답변 준비해줘」는 그 문의를 가리킵니다)");
-  }
-  // The same fact for the other two objects: WHICH one is never sent (an id is not a plan input), only
-  // that one is standing — so 「이 상품」·「이 리뷰」 is a resolved reference and not a question to ask back.
-  if (set?.selectedObject?.kind === "PRODUCT") {
-    parts.push("직전 선택: PRODUCT (판매자가 방금 상품 하나를 골랐습니다 — 「이 상품」은 그 상품을 가리킵니다)");
-  } else if (set?.selectedObject?.kind === "REVIEW") {
-    // Agent Object v1: the exact single-review read exists, so a question about the selected review is
-    // answerable — the planner declares a REVIEW_SIGNAL need instead of asking which review it was.
-    parts.push("직전 선택: REVIEW (판매자가 방금 리뷰 하나를 골랐습니다 — 「이 리뷰」는 그 리뷰를 가리키며, "
-      + "그 리뷰 하나를 정확히 읽는 조회가 있습니다: REVIEW_SIGNAL 필요 정보로 두면 됩니다)");
-  }
-  if (view.pendingPrepared) {
-    parts.push(view.pendingPrepared.kind === "REVIEW_DRAFT"
-      ? "직전 준비: REVIEW_DRAFT (판매자가 방금 준비된 리뷰 답글 초안을 보고 있습니다)"
-      : "직전 준비: INQUIRY_DRAFT (판매자가 방금 준비된 초안을 보고 있습니다)");
-  }
-  return parts.length > 0 ? parts.join("\n") : null;
-}
 
-const PRIMARY_ORDER: readonly Artifact["type"][] = [
-  "DRAFT", "APPROVAL_REQUIRED", "APPROVAL", "GUIDED_EXECUTION", "REVIEW_LIST", "INQUIRY_LIST", "PRODUCT_LIST", "ORDER_SUMMARY", "ISSUE_LIST",
-  "OPPORTUNITY_LIST",
-  "WORKSPACE_LINK", "CHART", "METRIC", "TABLE", "LIST", "SUMMARY", "CHECKLIST",
-];
 
-/**
- * The artifact types that ARE a working set on screen — the same five {@link workingSetOf} builds one
- * from. Listed here rather than derived from that switch because the two answer different questions:
- * that one asks "what is the conversation standing on now", which has a carried-forward answer, and
- * this one asks "did this turn draw it", which must not.
- */
-const SET_ARTIFACT_TYPES: readonly Artifact["type"][] =
-  ["INQUIRY_LIST", "REVIEW_LIST", "PRODUCT_LIST", "ORDER_SUMMARY", "ISSUE_LIST"];
 
-function drewSetOf(artifacts: readonly Artifact[]): boolean {
-  return artifacts.some((a) => SET_ARTIFACT_TYPES.includes(a.type));
-}
 
-function primaryOf(artifacts: readonly Artifact[]): Artifact | null {
-  for (const type of PRIMARY_ORDER) {
-    const found = artifacts.find((a) => a.type === type);
-    if (found) return found;
-  }
-  return null;
-}
 
 /** The first sentence, from the primary artifact. Deterministic; never model prose. */
 function headlineOf(
@@ -3859,9 +3722,6 @@ function headlineOf(
 
 
 
-function promptChip(label: string): SuggestedAction {
-  return { label, kind: "PROMPT", prompt: label };
-}
 
 /** The seller's words for a visible filter's predicate axes (channel · topic · status), trailing space. */
 const FILTER_CHANNEL_WORD: Record<string, string> = { NAVER: "네이버", COUPANG: "쿠팡", CAFE24: "카페24" };
@@ -3943,102 +3803,12 @@ function workingSetOf(
   }
 }
 
-/**
- * An inquiry the conversation has shown, by inquiry id OR work item id.
- *
- * <b>`drawn` is the rows THIS turn produced, and it is searched first.</b> The persisted history is the
- * previous turns only — the current turn's artifacts are not saved until it ends — so a turn that both
- * FOUND a row and was asked to act on it could not see its own result: 「케이블 커버에 전선 몇 가닥
- * 들어가는지 물어본 문의 답변 준비해줘」 read the queue, drew exactly one row, and then answered
- * 「어떤 문의의 답변을 준비할지 알려주세요」 with that row printed underneath. The target step must be
- * able to see the objects the same turn put on the table.
- */
-function inquiryFromHistory(view: ConversationView, id: string, drawn: readonly Artifact[] = []): InquiryItem | null {
-  const scan = (artifacts: readonly Artifact[]): InquiryItem | null => {
-    for (const artifact of artifacts) {
-      if (artifact.type !== "INQUIRY_LIST") continue;
-      for (const group of artifact.groups) {
-        const item = group.items.find((it) => it.inquiryId === id || it.workItemId === id);
-        if (item) return item;
-      }
-    }
-    return null;
-  };
-  const fresh = scan(drawn);
-  if (fresh) return fresh;
-  for (let i = view.turns.length - 1; i >= 0; i -= 1) {
-    const found = scan(view.turns[i]!.artifacts);
-    if (found) return found;
-  }
-  return null;
-}
-
-function inquiryTargetFromHistory(view: ConversationView, id: string, drawn: readonly Artifact[] = []): ResolvedTarget | null {
-  const item = inquiryFromHistory(view, id, drawn);
-  if (!item) return null;
-  const actionability = actionabilityOf({ workItemId: item.workItemId, phase: item.phase, status: item.status });
-  return {
-    kind: "INQUIRY",
-    inquiry: {
-      inquiryId: item.inquiryId, workItemId: item.workItemId, productId: item.productId, channelCode: item.channelCode,
-      channelNameKo: item.channelNameKo, productName: item.productName, title: item.title ?? null, status: item.status,
-      receivedAt: item.receivedAt ?? null, snippet: item.snippet ?? null,
-    },
-    actionability,
-    // Only a DRAFTABLE row has a work item the product's draft path will accept.
-    target: actionability === "DRAFTABLE" && item.workItemId ? {
-      workItemId: item.workItemId, inquiryId: item.inquiryId, channelCode: item.channelCode,
-      channelNameKo: item.channelNameKo, productId: item.productId, productName: item.productName,
-    } : null,
-    // Absent on a row from an older backend ⇒ NONE: a channel label is not a marketplace binding.
-    executableIdentity: item.executableIdentity ?? "NONE",
-    sourceSubtype: item.sourceSubtype ?? null,
-  };
-}
-
-/**
- * ONE inquiry as a card: the row's closed facts and, when it is known, the customer's own sentence.
- * Shared by the INSPECT lane and by a planner turn that resolved exactly one row — the two must not
- * draw the selected inquiry in two different shapes.
- */
-function inquiryDetailArtifact(row: SelectedInquiryRow, actionability: InquiryActionability, excerptText: string | null): InquiryDetailArtifact {
-  return {
-    artifactId: `a-inspect-${row.inquiryId}`, type: "INQUIRY_DETAIL",
-    title: row.title ?? "제목 없는 문의",
-    inquiryId: row.inquiryId, workItemId: row.workItemId,
-    channelCode: row.channelCode, channelNameKo: row.channelNameKo,
-    status: row.status, receivedAt: row.receivedAt,
-    productId: row.productId, productName: row.productName,
-    stateLabel: STATUS_WORD[row.status.toUpperCase()] ?? "상태 미확인",
-    excerpt: excerptText,
-    actionability,
-    to: `/inquiries/${row.inquiryId}`,
-  };
-}
 
 
-function inquiryLine(row: SelectedInquiryRow): string {
-  const parts = [row.channelNameKo ?? row.channelCode ?? "채널", STATUS_WORD[row.status.toUpperCase()] ?? "상태 미확인"];
-  if (row.receivedAt) parts.push(`${row.receivedAt.slice(0, 10)} 접수`);
-  if (row.productName) parts.push(row.productName);
-  return parts.join(" · ");
-}
 
-/** The state of a non-draftable inquiry, as an artifact the seller can act on — the row, the sentence, the link. */
-function inquiryStateSummary(row: SelectedInquiryRow, line: string): SummaryArtifact {
-  return {
-    artifactId: `a-state-${row.inquiryId}`, type: "SUMMARY", title: "초안을 만들지 않은 문의",
-    lines: [row.title ? `「${row.title}」` : inquiryLine(row), ...(row.title ? [inquiryLine(row)] : []), line],
-  };
-}
 
-/** The selected inquiry, shown so the seller sees WHICH row the next verb will act on. */
-function selectionSummary(row: SelectedInquiryRow): SummaryArtifact {
-  return {
-    artifactId: `a-selected-${row.inquiryId}`, type: "SUMMARY", title: "선택한 문의",
-    lines: [row.title ? `「${row.title}」` : "제목 없는 문의", inquiryLine(row)],
-  };
-}
+
+
 
 
 /**
@@ -4122,42 +3892,8 @@ function selectedFromEntities(result: Extract<OperatorRunResult, { status: "DONE
   };
 }
 
-/** A ReviewItem the conversation has shown, from the persisted REVIEW_LIST rows. */
-function reviewFromHistory(view: ConversationView, reviewId: string): ReviewItem | null {
-  for (let i = view.turns.length - 1; i >= 0; i -= 1) {
-    for (const artifact of view.turns[i]!.artifacts) {
-      if (artifact.type !== "REVIEW_LIST") continue;
-      const item = artifact.items.find((it) => it.reviewId === reviewId);
-      if (item) return item;
-    }
-  }
-  return null;
-}
 
-/** A product row the conversation has drawn — the proof that an org-scoped read returned it. */
-function productFromHistory(view: ConversationView, productId: string): { productId: string } | null {
-  for (let i = view.turns.length - 1; i >= 0; i -= 1) {
-    for (const artifact of view.turns[i]!.artifacts) {
-      if (artifact.type !== "PRODUCT_LIST") continue;
-      if (artifact.items.some((p) => p.productId === productId)) return { productId };
-    }
-  }
-  return null;
-}
 
-/**
- * A clicked REVIEW, verified by the only proof this runtime has.
- *
- * There is no single-review endpoint, so the check is the thread's own record: a review row the
- * conversation drew came back from an org-scoped read of this seller's reviews. An id that appears in
- * no drawn list is refused rather than trusted — and refusing costs the seller nothing, because a row
- * they can click is by definition a row on their screen.
- */
-function verifiedReview(view: ConversationView, reviewId: string): SelectedObject | null {
-  const item = reviewFromHistory(view, reviewId);
-  if (!item) return null;
-  return { kind: "REVIEW", id: item.reviewId, productId: item.productId ?? null, channelCode: item.channelCode ?? null };
-}
 
 /**
  * The working set anchored on a product or a review — the same shape {@link anchoredSet} builds for an
@@ -4181,34 +3917,9 @@ function anchoredObjectSet(object: SelectedObject, previous: WorkingSetView | nu
   };
 }
 
-function reviewTargetFromHistory(view: ConversationView, reviewId: string): ResolvedTarget | null {
-  const item = reviewFromHistory(view, reviewId);
-  if (!item) return null;
-  return {
-    kind: "REVIEW",
-    target: {
-      reviewId: item.reviewId, accountId: item.accountId, actionRef: `review:${item.reviewId}`,
-      channelCode: item.channelCode, channelNameKo: item.channelNameKo, productId: item.productId, productName: item.productName,
-    },
-    executableIdentity: item.executableIdentity ?? "NONE",
-  };
-}
 
 
-function reviewUnsupportedSummary(t: ReviewDraftTarget): SummaryArtifact {
-  return {
-    artifactId: `a-unsupported-${t.reviewId}`, type: "SUMMARY", title: "리뷰 답글을 보낼 수 없는 채널",
-    lines: [summaryLineFor(t.channelCode), "대신 이 리뷰로 무엇을 확인할지 아래에서 고르실 수 있습니다."],
-  };
-}
 
-function copyOnlySummary(kind: "INQUIRY" | "REVIEW", id: string, to?: string): SummaryArtifact {
-  return {
-    artifactId: `a-send-${id}`, type: "SUMMARY", title: kind === "INQUIRY" ? "채널로 보낼 수 없는 문의" : "채널로 보낼 수 없는 리뷰",
-    lines: [NOT_EXECUTABLE_SENTENCE[kind], COPY_ONLY_SENTENCE],
-    ...(to ? { note: to } : {}),
-  };
-}
 
 /**
  * The id of the 「제가 도와드릴 수 있는 일」 card — read back off the thread so the same card is not
@@ -4269,9 +3980,6 @@ function saidOnceId(aspect: CapabilityAspect, channel: string | null): string {
 }
 
 
-function reasonSummary(artifactId: string, title: string, lines: string[]): SummaryArtifact {
-  return { artifactId, type: "SUMMARY", title, lines };
-}
 
 
 
@@ -4515,26 +4223,8 @@ export function checklistOf(artifacts: readonly Artifact[], view: ConversationVi
  * {@link import("../operator/procedure/Procedure").nextStepFor}'s — one place, two callers.
  */
 
-/** Artifacts that report ROWS — the ones whose emptiness is a claim about the seller's store. */
-const ROW_BEARING: ReadonlySet<Artifact["type"]> = new Set<Artifact["type"]>([
-  "INQUIRY_LIST", "REVIEW_LIST", "LIST", "PRODUCT_LIST", "OPPORTUNITY_LIST",
-]);
 
-/** Whether one row-bearing artifact came back with nothing in it. */
-function isEmptyRowArtifact(a: Artifact): boolean {
-  if (a.type === "INQUIRY_LIST") return a.groups.every((g) => g.items.length === 0);
-  if (a.type === "REVIEW_LIST" || a.type === "LIST" || a.type === "PRODUCT_LIST" || a.type === "OPPORTUNITY_LIST") {
-    return a.items.length === 0;
-  }
-  return false;
-}
 
-function humanItem(actionType: string, channel: string | null, to: string | null): { label: string; to?: string } {
-  const label = actionType === "REVIEW_IMPORT" ? `${channel ?? "채널"} 리뷰 가져오기`
-    : actionType === "KNOWLEDGE_ENTRY" ? "답변 기준 등록하기"
-      : actionType === "CHANNEL_CONNECT" ? `${channel ?? "채널"} 연결하기` : "규격 확인하기";
-  return { label, ...(to ? { to } : {}) };
-}
 
 /** Type-level use so an unused-import lint never removes the draft artifact shape from this file's vocabulary. */
 export type { DraftArtifact as ConversationDraftArtifact };
