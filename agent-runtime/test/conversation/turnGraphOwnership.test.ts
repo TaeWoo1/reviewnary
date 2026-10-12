@@ -14,6 +14,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { between, memberBody } from "../support/sourceSlice";
 import { join } from "node:path";
 import { buildTurnGraph } from "../../src/conversation/graph/turnGraph";
 import { TurnStateAnnotation } from "../../src/conversation/graph/TurnState";
@@ -28,7 +29,7 @@ const GRAPH = code("conversation/graph/turnGraph.ts");
 
 describe("§A — one driver", () => {
   it("`turnNow` invokes the graph and does nothing else with the turn", () => {
-    const body = SERVICE.slice(SERVICE.indexOf("private async turnNow("), SERVICE.indexOf("private async phaseHydrate("));
+    const body = between(SERVICE, "private async turnNow(", "private async phaseHydrate(");
     expect(body).toContain("this.turnGraph.invoke");
     // The phases are reached THROUGH the graph. A driver that called them in order would be a second
     // orchestration wearing the first one's method names.
@@ -140,8 +141,10 @@ describe("§C — the checkpoint is an execution cursor, not a second source of 
     // The conversation IS the durable state, and `ConversationStore` has owned it since before this
     // migration. A second durable store for the same facts is the disagreement §5 prevents.
     expect(SERVICE).toContain("buildTurnGraph({");
-    expect(SERVICE.slice(SERVICE.indexOf("buildTurnGraph({"), SERVICE.indexOf("async create(")))
-      .not.toContain("checkpointer");
+    // A negative assertion over an empty slice passes. `indexOf("async create(")` landing above
+    // `buildTurnGraph({` would make this read nothing and still go green, so `between` refuses an
+    // out-of-order or missing boundary instead (`docs/FINDINGS.md` §B18).
+    expect(between(SERVICE, "buildTurnGraph({", "async create(")).not.toContain("checkpointer");
   });
 });
 
@@ -151,13 +154,17 @@ describe("§D — procedure selection is the graph's, through the AOP router", (
     // and the post-plan run. Three, and each one is inside a method whose name says which.
     expect(SERVICE.split("selectProcedure(").length - 1).toBe(3);
     for (const method of ["phaseRoute", "phaseProcedure", "selectPostPlanProcedure"]) {
-      const from = SERVICE.indexOf(`private async ${method}(`) >= 0
-        ? SERVICE.indexOf(`private async ${method}(`) : SERVICE.indexOf(`private ${method}(`);
-      const body = SERVICE.slice(from, from + 2600);
-      expect(body, `${method} asks the router`).toContain("selectProcedure(");
+      // This was `SERVICE.slice(from, from + 2600)` — a fixed character window, which overshot every
+      // one of these three into its neighbours by 719–1,676 characters. `phaseProcedure` and
+      // `selectPostPlanProcedure` are adjacent, so the day the call moves from one to the other the
+      // window still finds it and this fence stays green while its claim — three named places, each
+      // inside the method whose name says which — has become false. See `docs/FINDINGS.md` §B18.
+      const signature = SERVICE.includes(`private async ${method}(`)
+        ? `private async ${method}(` : `private ${method}(`;
+      expect(memberBody(SERVICE, signature), `${method} asks the router`).toContain("selectProcedure(");
     }
     // The procedure's own steps settle the verdict; nothing here writes a sentence about it.
-    const node = SERVICE.slice(SERVICE.indexOf("private async phaseProcedure("), SERVICE.indexOf("private selectPostPlanProcedure("));
+    const node = memberBody(SERVICE, "private async phaseProcedure(");
     expect(node).not.toContain("absenceSentence(");
     expect(node).not.toContain("operationalPrecondition(");
   });

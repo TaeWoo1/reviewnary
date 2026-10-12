@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { reviewReplyTaskLink } from "../../src/conversation/ConversationService";
 
+import { between, memberBody } from "../support/sourceSlice";
+
 const SOURCE = readFileSync(new URL("../../src/conversation/ConversationService.ts", import.meta.url), "utf8");
 
 /**
@@ -35,8 +37,9 @@ describe("review action artifacts deep-link to the exact review", () => {
     ]) {
       const start = SOURCE.indexOf(marker);
       expect(start, `${marker} not found — the artifact was renamed, so this fence is not reading it`).toBeGreaterThan(-1);
-      // The object literal that starts at the marker, to its closing brace.
-      const block = SOURCE.slice(start, SOURCE.indexOf("};", start));
+      // The object literal that starts at the marker, to its closing brace. `between` refuses a
+      // missing `};` rather than letting `slice(start, -1)` run to EOF (`docs/FINDINGS.md` §B18).
+      const block = between(SOURCE, marker, "};");
       expect(block).toContain("to: reviewReplyTaskLink(t.reviewId)");
       expect(block).not.toContain('to: "/reviews"');
     }
@@ -57,27 +60,8 @@ describe("review action artifacts deep-link to the exact review", () => {
     }
   });
 
-  /**
-   * **The method's body, and only that.** This used to be
-   * `SOURCE.slice(start, SOURCE.indexOf("\n  private ", start + 10))`. `routeSend` is the LAST
-   * `private` member of the class, so that `indexOf` returned `-1`, `slice(start, -1)` ran to the end
-   * of the file, and the fence read ~1,186 lines while saying it read one method's 120. It passed for
-   * reasons that had nothing to do with `routeSend`. A missing terminator must fail, not widen.
-   * See `docs/FINDINGS.md` §B12.
-   */
-  function methodBody(signature: string): string {
-    const start = SOURCE.indexOf(signature);
-    expect(start, `${signature} not found — this fence is no longer reading it`).toBeGreaterThan(-1);
-    // Whichever comes first: the next member at class indent, or the class's own closing brace.
-    const ends = ["\n  private ", "\n  public ", "\n  protected ", "\n  async ", "\n}"]
-      .map((marker) => SOURCE.indexOf(marker, start + signature.length))
-      .filter((at) => at > -1);
-    expect(ends.length, `no end boundary after ${signature} — the slice would run to EOF`).toBeGreaterThan(0);
-    return SOURCE.slice(start, Math.min(...ends));
-  }
-
   it("carries no approve or send path of its own — the link is the whole handoff", () => {
-    const block = methodBody("private async routeSend(");
+    const block = memberBody(SOURCE, "private async routeSend(");
     // 120 lines at the time of writing. The bound is not a line count — it is the property that the
     // slice was actually CUT SHORT of the rest of the file. An absolute cap decays: this said `< 400`
     // while the runaway it guarded was 1,186 lines, and after the service was split the same runaway

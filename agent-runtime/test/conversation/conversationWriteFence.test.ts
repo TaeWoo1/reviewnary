@@ -8,6 +8,7 @@
  * 100% READ — the lane added three READ tools and no other class.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
+import { memberBody } from "../support/sourceSlice";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildOperatorTools, OPERATOR_TOOL } from "../../src/operator/tools/OperatorTools";
@@ -89,9 +90,12 @@ describe("conversation write fence", () => {
 
   it("Captured Knowledge Reuse v1: after a save the original work is resumed through the ordinary draft path — no capture-specific bypass hands the saved text to a prompt or an evidence list", () => {
     const service = FILES.find((f) => f.name === "ConversationService.ts")!.text;
-    const start = service.indexOf("private async decideCapture(");
-    const end = service.indexOf("/** Which objects a draft/send sentence points at", start);
-    const decide = service.slice(start, end);
+    // This slice used to end at the docblock sentence "Which objects a draft/send sentence points
+    // at". On 2026-10-12 a refactor moved that docblock to `targetResolution.ts`, `indexOf` returned
+    // -1, and `slice(start, -1)` widened this fence from ~200 lines to ~1,500 — green the whole
+    // time, because the positive assertions below only get easier as the slice grows. A boundary is
+    // structural now, and a missing one throws. See `docs/FINDINGS.md` §B18.
+    const decide = memberBody(service, "private async decideCapture(");
     expect(decide).toMatch(/prepareWithView\(/);
     // The resume reads the saved source id back from the backend's own evidence; it never writes one in.
     expect(decide).toMatch(/evidence \?\? \[\]\)\.some\(\(e\) => e\.sourceId === savedId\)/);

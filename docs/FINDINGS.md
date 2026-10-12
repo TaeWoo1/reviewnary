@@ -431,6 +431,50 @@
   `docs/lineage_index.md` · `docs/action-window-runtime/HANDOFF.md` ·
   `docs/workstreams/action-window-frontend/README.md`.
 
+### B18. 울타리의 경계를 주석에 두면, 그 주석을 옮기는 리팩터가 울타리를 14.7배 넓힌다 — 초록색으로
+
+- **했던 것** — `ae0205ef`(2026-10-12)에서 `resolveTargets`를 `targetResolution.ts`로 옮겼다.
+  딸린 docblock `/** Which objects a draft/send sentence points at …`도 같이 갔다.
+  `tsc` 0 · 1,054 테스트 통과 · 고정 심볼 5/5를 확인하고 보고했다.
+- **사실** — `conversationWriteFence`의 `decideCapture` 슬라이스가 **그 주석 문장을 종료
+  표식으로** 쓰고 있었다. 주석이 사라지자 `indexOf`가 `-1`을 돌려주고
+  `slice(start, -1)`이 EOF까지 흘렀다. 울타리가 읽는 범위가 **102줄 → 1,501줄, 14.7배**로
+  넓어졌다. 그런데 그 블록의 양성 단정(`toMatch`)은 **넓어질수록 쉽게 통과**하고 금지
+  목록은 마침 그 범위에 없어서, **테스트는 끝까지 초록이었다.** 고정 심볼 카운트도
+  못 잡는다 — 그건 심볼을 세고, 경계는 **주석**이었다.
+- **다음에** — **울타리의 경계는 읽는 대상의 구조여야 한다.** 클래스 들여쓰기의 다음 멤버,
+  또는 클래스 닫는 중괄호. 주석 문장 · 이웃 선언의 이름 · 고정 글자 수는 경계가 아니다.
+  경계를 못 찾으면 **넓어지지 말고 던진다.** 그래서
+  `agent-runtime/test/support/sourceSlice.ts`를 만들어 세 울타리가 같이 쓰게 했다 —
+  `memberBody()`(한 멤버만) · `between()`(두 표식, 둘 다 있고 순서까지 맞아야) ·
+  `memberEnd()`.
+- **같이 고친 같은 병 셋**
+  - `turnGraphOwnership`의 `slice(from, from + 2600)` — **고정 2,600자 창.** 세 메서드를
+    각각 **719 · 1,676 · 1,125자**씩 이웃까지 침범했다. `phaseProcedure`와
+    `selectPostPlanProcedure`는 붙어 있어서, 호출이 한쪽에서 다른 쪽으로 옮겨가는 날
+    창은 여전히 찾아내고 울타리는 초록으로 남는다. 지금은 거짓이 아니었지만 **잠복**이었다.
+  - `.not.toContain`을 **빈 슬라이스**에 걸면 공허하게 통과한다.
+    `slice(indexOf(a), indexOf(b))`는 `b`가 `a` 위로 올라가는 순간 `""`가 된다 —
+    `between()`이 순서까지 거부한다.
+  - `reviewApprovalDeepLink`의 `indexOf("};", start)`에 표식 존재 단정이 없었다.
+- **전수 주입 테스트** — "읽는다고 적힌 것을 실제로 읽는가"는 통과 여부로 알 수 없어서,
+  울타리마다 금지된 것을 **직접 넣어 보고** 되돌렸다. 7개 전부 물었다 —
+  `conversationWriteFence`(하위 폴더 포함) · `reviewApprovalDeepLink`(`tsc` 0인 상태로) ·
+  `plannerFence`(키워드 표 · 문장 매칭) · `semanticOwnership`(금지 단어표 · `answer.axis`
+  두 번째 사용 · `senseOf(` 소유 파일 추가) · `procedureLayer`(`honestZero(` 두 번째) ·
+  `privilegedPlaneFence`(도구 이름에 `sync`) · `turnGraphOwnership`(phase 호출 2곳).
+  디렉터리 순회 6개는 전부 재귀임을 확인했다(§B10 형태 없음).
+- **주입이 안 물었는데 울타리가 옳았던 경우 3번** — 내 주입이 틀렸다. ① `semanticOwnership`의
+  `CODE`는 **주석을 제거**한 소스다(이웃의 설명 때문에 실패하는 울타리는 고치는 게 아니라
+  지운다는 설계). 주석으로 주입하면 안 걸리는 게 맞다. ② `privilegedPlaneFence`는 소스
+  텍스트가 아니라 **등록된 도구 이름**을 읽는다. ③ `turnGraphOwnership`은 `this.phaseX(`
+  형태를 센다. **"울타리가 안 물었다"를 결함으로 보고하기 전에 그 울타리가 무엇을 읽는지
+  먼저 읽는다.**
+- **출처** — 2026-10-13. `agent-runtime/test/support/sourceSlice.ts` ·
+  `test/conversation/{conversationWriteFence,turnGraphOwnership,reviewApprovalDeepLink}.test.ts` ·
+  §B10 · §B12 · §B16 · §B17을 잇는다. 넷 다 같은 병이다 — **검사 도구의 실패는 빨간색이
+  아니라 초록색으로 나타난다.**
+
 ---
 
 ## C. 증거 · 계약
