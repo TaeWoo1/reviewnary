@@ -1064,11 +1064,11 @@ export const api = {
     const { data } = await http.post<ReviewImportSegmentView>(`/api/imports/reviews/segments/${segmentId}/missing`);
     return data;
   },
-  // The PRODUCT path: the seller chooses how far back to import, then each month is one guided Action Window
+  // The PRODUCT path: the seller chooses how far back to import, then each segment (at most a year) is one guided Action Window
   // run. They never handle a file. `launchRef` is an opaque single-use authorization — never rendered, only
   // handed to the local agent.
   //
-  // What starting from `startMonth` would create, WITHOUT creating it: the period and how many monthly exports
+  // What starting from `startMonth` would create, WITHOUT creating it: the period and how many exports
   // it becomes. Both come from the server — "today" is its clock, and the count has to be the one the planner
   // will really produce.
   async previewReviewImportRange(accountId: string, startMonth: string): Promise<ReviewImportRangeSelectionView> {

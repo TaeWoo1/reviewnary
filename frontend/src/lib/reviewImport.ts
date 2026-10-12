@@ -154,7 +154,7 @@ export function coveredRowsText(segment: ReviewImportSegmentView): string {
   if ((segment.coveredRows ?? 0) === 0) {
     return "리뷰 없음 (정상적으로 커버됨)";
   }
-  const suffix = segment.rowsReconciled ? "" : " · 전체 건수 대사 전";
+  const suffix = segment.rowsReconciled ? " · 화면 총 건수와 일치" : " · 전체 건수 대사 전";
   return `${(segment.coveredRows ?? 0).toLocaleString()}건 커버됨${suffix}`;
 }
 
@@ -163,7 +163,7 @@ export function coveredRowsText(segment: ReviewImportSegmentView): string {
 export interface ImportProgress {
   done: number;
   total: number;
-  /** `13개 구간 중 5개 완료` — the one progress line the seller reads. */
+  /** `4개 구간 중 2개 완료` — the one progress line the seller reads. */
   text: string;
 }
 
@@ -439,7 +439,7 @@ export interface ImportContinuation {
 /**
  * The panel's closing words, and the button that starts the next segment.
  *
- * The product owner's decision (2026-07-26): a seller who has just finished one of thirteen monthly exports
+ * The product owner's decision (2026-07-26): a seller who has just finished one of thirteen exports
  * should not have to go and find the SellerOps tab to start the fourteenth. So the panel that says "this part is
  * done" is also the panel that starts the next part, and the SellerOps window is somewhere they may return when
  * everything is finished rather than between every export.
@@ -489,11 +489,12 @@ export function continuationAfterNext(
  *
  * The wording is about DEPTH, not about limits: nothing here suggests the marketplace restricts anything,
  * because the live run established that it does not. And the confirmation states the consequence in the unit the
- * seller pays it in — one export per month, performed by hand — since that is what turns a date into a decision.
+ * seller pays it in — one export per year of history at most, performed by hand — since that is what turns a date
+ * into a decision. (Until 2026-10-13 it was one export per month; nothing on the marketplace required that.)
  */
 export const RANGE_CHOICE_COPY = {
   title: "언제부터 가져올까요?",
-  body: "고른 달부터 오늘까지의 리뷰를 가져와요. 한 달에 한 번씩 판매자센터에서 파일을 내려받게 안내해 드려요.",
+  body: "고른 달부터 오늘까지의 리뷰를 가져와요. 1년치까지는 판매자센터에서 파일을 한 번만 내려받으면 되도록 안내해 드려요.",
   monthLabel: "시작 월",
   confirm: "이 기간으로 시작하기",
   confirming: "준비하는 중…",

@@ -167,19 +167,19 @@ describe("GuidedImportCard — one action carries the import", () => {
     expect(screen.getByTestId("range-chooser")).toBeInTheDocument();
     // No guided run is offered yet: there is nothing to guide until the seller has decided a period.
     expect(screen.queryByTestId("guided-import-cta")).toBeNull();
-    // And the choice is a MONTH, because segments are calendar months.
+    // And the choice is a MONTH — the way a seller names a point in their history.
     expect(screen.getByTestId("range-start-month")).toBeInTheDocument();
   });
 
-  /** The count is the fact that makes the choice a decision: 13 months is 13 exports done by hand. */
-  it("shows the period AND how many monthly exports it becomes, before creating anything", async () => {
+  /** The count is the fact that makes the choice a decision: each segment is an export done by hand. */
+  it("shows the period AND how many exports it becomes, before creating anything", async () => {
     const preview = vi.spyOn(api, "previewReviewImportRange").mockResolvedValue({
-      start: "2025-07-01", end: "2026-07-26", segmentCount: 13,
+      start: "2025-07-01", end: "2026-07-26", segmentCount: 2,
     });
     const create = vi.spyOn(api, "selectReviewImportRange");
     render(<GuidedImportCard account={account} plan={null} agent="ready" />);
 
-    await waitFor(() => expect(screen.getByTestId("range-preview")).toHaveTextContent("13개 구간"));
+    await waitFor(() => expect(screen.getByTestId("range-preview")).toHaveTextContent("2개 구간"));
     expect(screen.getByTestId("range-preview")).toHaveTextContent("2025-07-01 ~ 2026-07-26");
     expect(preview).toHaveBeenCalled();
     // Nothing was created by looking.
@@ -419,7 +419,7 @@ describe("GuidedImportCard — the repeated loop's completion result + change su
 /**
  * **The whole plan, finished inside the SmartStore window (2026-07-26).**
  *
- * The seller does not come back here between monthly exports. The panel in their marketplace window closes one
+ * The seller does not come back here between exports. The panel in their marketplace window closes one
  * segment and starts the next, and every one of those starts still goes through the backend mint — this card's own
  * `start`, the same endpoint, the same agent connection. What follows pins both halves: that the words the panel
  * will need are handed down before the run, and that a press on it does exactly what the button here does.

@@ -16,10 +16,11 @@ import type { ReviewImportPlanDetailView, ReviewImportRangeSelectionView } from 
  *
  * ## Two rules the product owner set for this screen
  *
- *  1. **A month, ending today.** They pick the start month; the end is today. Segments are calendar months, so
- *     offering a day would imply a precision the plan does not have.
- *  2. **Confirm the consequence, not just the period.** The count of monthly exports is shown BEFORE the plan
- *     exists, because three years reads like one click and is 37 exports the seller performs by hand. Agreeing
+ *  1. **A month, ending today.** They pick the start month; the end is today. A month reads the way a seller
+ *     thinks about history ("from 2026-03"); offering a day would imply a precision nobody asked for.
+ *  2. **Confirm the consequence, not just the period.** The count of exports is shown BEFORE the plan exists,
+ *     because three years reads like one click and is four exports the seller performs by hand (one per year,
+ *     2026-10-13 — it was 37 when segments were calendar months). Agreeing
  *     to a period without seeing that is agreeing to work they were not told about.
  *
  * Both numbers come from the server: "today" is its clock, and the count is the one the planner will really

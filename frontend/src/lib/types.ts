@@ -912,6 +912,8 @@ export interface ReviewImportAttemptView {
   rowsNew: number | null;
   rowsDuplicate: number | null;
   rowsFailed: number | null;
+  /** The row total the marketplace screen stated for the exported range; null when it was not read. */
+  expectedRows: number | null;
   errorMessage: string | null;
   startedAt: string | null;
   finishedAt: string | null;

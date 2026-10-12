@@ -135,6 +135,11 @@ describe("honest coverage / health copy — never claims 100%", () => {
     expect(text).toContain("대사 전");
   });
 
+  it("a reconciled segment says its file matched the screen's total", () => {
+    const text = coveredRowsText(seg({ coverageState: "COVERED", coveredRows: 40, rowsReconciled: true }));
+    expect(text).toBe("40건 커버됨 · 화면 총 건수와 일치");
+  });
+
   it("health shows duplicate vs new vs failed distinctly and a next recommendation", () => {
     const health: ReviewImportHealthView = {
       lastCoveredDate: "2026-02-28",
@@ -588,12 +593,12 @@ describe("monthOptions", () => {
 
 describe("rangeChoiceSummary", () => {
   /**
-   * The period AND its cost, always together: three years reads like one click and is 37 exports the seller
+   * The period AND its cost, always together: three years reads like one click and is four exports the seller
    * performs by hand. Agreeing to a period without seeing that is agreeing to work nobody mentioned.
    */
-  it("states the period and how many monthly exports it becomes", () => {
-    expect(rangeChoiceSummary({ start: "2023-07-01", end: "2026-07-26", segmentCount: 37 })).toBe(
-      "2023-07-01 ~ 2026-07-26 · 37개 구간",
+  it("states the period and how many exports it becomes", () => {
+    expect(rangeChoiceSummary({ start: "2023-07-01", end: "2026-07-26", segmentCount: 4 })).toBe(
+      "2023-07-01 ~ 2026-07-26 · 4개 구간",
     );
   });
 

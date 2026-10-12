@@ -60,6 +60,7 @@ describe("SegmentImportPanel — the scope-confirmation gate", () => {
       rowsNew: 5,
       rowsDuplicate: 0,
       rowsFailed: 0,
+      expectedRows: null,
       errorMessage: null,
       startedAt: null,
       finishedAt: null,

@@ -6,7 +6,8 @@ import type { SellerAccountResponse } from "../../lib/types";
  * Start a historical review import for a connected NAVER seller account: pick the period, create the
  * plan. The period is taken as chosen — the copy makes NO claim about a NAVER row cap or a maximum
  * history depth (both unknown); any range the marketplace cannot reach simply surfaces later as a
- * "가져올 수 없는 기간" segment. The period is divided into calendar-month segments to import one at a time.
+ * "가져올 수 없는 기간" segment. A period of up to a year is one export; a longer one is divided into one-year
+ * segments to import one at a time (2026-10-13; calendar months before).
  */
 export function ReviewImportEntry({
   account,
@@ -47,8 +48,8 @@ export function ReviewImportEntry({
     <section aria-label="과거 리뷰 가져오기 시작" className="rounded-2xl bg-surface p-5 border border-line">
       <h2 className="text-lg font-semibold text-ink">과거 리뷰 가져오기</h2>
       <p className="mt-1 text-sm text-muted break-keep">
-        {account.alias ?? account.channelNameKo} 계정의 과거 리뷰를 기간별로 가져와요. 선택한 기간은 월 단위 구간으로
-        나뉘고, 각 구간을 하나씩 내보내 올리면 돼요.
+        {account.alias ?? account.channelNameKo} 계정의 과거 리뷰를 기간별로 가져와요. 1년까지는 파일 한 번으로 받고,
+        그보다 긴 기간은 1년씩 나눠 하나씩 내보내 올리면 돼요.
       </p>
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
