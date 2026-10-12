@@ -10,7 +10,18 @@
  * <p>Directly under `src/conversation/` on purpose — the write fence walks that tree
  * (`docs/FINDINGS.md` §B10).
  */
-import type { Artifact, InquiryDetailArtifact, SuggestedAction, SummaryArtifact } from "./contract";
+import type { Artifact, InquiryDetailArtifact, SuggestedAction, SummaryArtifact, WorkingSetKind } from "./contract";
+
+/** Each working-set kind's own screen — the one place a 「전체 N건 처리하기」 link and a workspace
+ * artifact agree on where the work continues. Shared by the service and `./turnGrounding`. */
+export const WORKSPACE_OF: Record<WorkingSetKind, { label: string; to: string }> = {
+  REVIEWS: { label: "리뷰", to: "/reviews" },
+  INQUIRIES: { label: "문의", to: "/inquiries?state=NEEDS_REPLY" },
+  PRODUCTS: { label: "상품", to: "/products" },
+  ORDERS: { label: "주문", to: "/orders" },
+  ISSUES: { label: "반복 문제", to: "/memory" },
+};
+
 import type { InquiryActionability } from "./inquiryActionability";
 import type { ReviewDraftTarget } from "./DraftPreparer";
 import type { SelectedInquiryRow } from "./historyReaders";

@@ -342,7 +342,12 @@
   ③ **fence가 세는 심볼 카운트가 그대로**(`answer.axis` 1 · `honestZero(` 1 ·
   `inquiryDraftPrecondition(` 3 · `reviewDraftPrecondition(` 2 · `selectProcedure(` 3) —
   ③이 같은 파일 안 분해와 모듈 분리를 가르는 선이다(§B11).
-- **출처** — 2026-10-12 세션. `src/conversation/{sellerSentences,historyReaders,turnArtifacts}.ts`.
+- **공유 상수는 양쪽이 아니라 **제3의 파일**이 가진다** — `WORKSPACE_OF`(작업 집합별 화면)는
+  남아 있는 `suggestionsFor`와 옮긴 `workspaceFor`가 **같이** 썼다. 서비스에 남겨 두고 새
+  모듈이 import하면 순환이 되므로, 둘 다 쓰는 `turnArtifacts.ts`로 옮기고 양쪽이 가져간다.
+  "누가 쓰는가"가 아니라 **"무엇에 대한 것인가"**로 집을 정한다.
+- **출처** — 2026-10-12 세션.
+  `src/conversation/{sellerSentences,historyReaders,turnArtifacts,workingSet,turnGrounding}.ts`.
 
 ---
 

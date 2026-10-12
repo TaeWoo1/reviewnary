@@ -114,8 +114,19 @@ import type { ResolvedTarget, SelectedInquiryRow } from "./historyReaders";
 import {
   copyOnlySummary, dedupeLists, drewSetOf, humanItem, inquiryDetailArtifact, inquiryLine,
   inquiryStateSummary, isEmptyRowArtifact, PRIMARY_ORDER, primaryOf, promptChip, reasonSummary,
-  reviewUnsupportedSummary, ROW_BEARING, selectionSummary, SET_ARTIFACT_TYPES,
+  reviewUnsupportedSummary, ROW_BEARING, selectionSummary, SET_ARTIFACT_TYPES, WORKSPACE_OF,
 } from "./turnArtifacts";
+// What the conversation is standing on — lifted out on 2026-10-12.
+import {
+  anchoredObjectSet, anchoredSet, drewFreshList, drewFreshObjectList, EMPTY_FILTER,
+  FILTER_CHANNEL_WORD, filterWords, pickSet, sameAnchor, selectedFromEntities, workingSetOf,
+} from "./workingSet";
+// What the turn shows as grounding, and what it leaves the seller to do — lifted out on 2026-10-12.
+import {
+  checklistOf, companyIsTheQuestion, evidenceOf, GENERIC_BASIS_NOTE, productListOf, workspaceFor,
+} from "./turnGrounding";
+// The tests have always imported this one from here.
+export { companyIsTheQuestion } from "./turnGrounding";
 // `priorLineOf` has always been imported from here by the lane's callers.
 export { priorLineOf } from "./historyReaders";
 // Re-exported because the tests and the lane's callers have always imported them from here.
@@ -177,8 +188,6 @@ export interface ConversationServiceDeps {
 
 type ProgressFn = (e: ProgressEvent) => void;
 
-/** How much of the answer's evidence the EVIDENCE artifact shows. */
-const EVIDENCE_ITEMS_MAX = 20;
 /**
  * How many SUPPORTED finding sentences follow the headline.
  *
@@ -206,13 +215,6 @@ export function reviewReplyTaskLink(reviewId: string): string {
   return `/reviews/reply/${encodeURIComponent(reviewId)}?from=chat`;
 }
 
-const WORKSPACE_OF: Record<WorkingSetKind, { label: string; to: string }> = {
-  REVIEWS: { label: "리뷰", to: "/reviews" },
-  INQUIRIES: { label: "문의", to: "/inquiries?state=NEEDS_REPLY" },
-  PRODUCTS: { label: "상품", to: "/products" },
-  ORDERS: { label: "주문", to: "/orders" },
-  ISSUES: { label: "반복 문제", to: "/memory" },
-};
 
 /** What a seller can still do about a review nobody can reply to — prompts, never a CTA. */
 // Each chip is a sentence the planner already serves (review rows · inquiry workload · product signals);
@@ -3521,35 +3523,7 @@ function emptyPlan(): InvestigationPlan {
 
 
 
-/**
- * The set a draft/send sentence indexes into — the one the seller was LOOKING AT when they said it
- * (the conversation's), and only when there is none, the list this turn happened to draw. Found live:
- * a PREPARE plan that also read the org queue made 「첫 번째 거」 the first row of that queue, not of the
- * three rows on screen (Conversation Object Integrity v1).
- */
-/**
- * <b>Is the conversation still standing on the same object it was?</b>
- *
- * Grounded Conversation Lane v1 §4. The step in flight is carried when the anchor did not move, and
- * the test for that used to read {@code selectedInquiry} alone — so a thread anchored on a REVIEW or a
- * PRODUCT lost its task on the first conversational turn: 「답글 준비해줘」 leaves PREPARE_REPLY on a
- * review, 「왜 이렇게 썼어?」 answers about that same review, and the context bar stops saying what the
- * conversation is doing with it. The anchor is one of three kinds — {@code selectedObject} clears
- * {@code selectedInquiry} and back — so the comparison has to be over the ANCHOR, not over one of its
- * shapes.
- */
-function sameAnchor(next: WorkingSetView | null, previous: WorkingSetView | null): boolean {
-  const key = (set: WorkingSetView | null): string | null =>
-    set?.selectedObject ? `${set.selectedObject.kind}:${set.selectedObject.id}`
-      : set?.selectedInquiry ? `INQUIRY:${set.selectedInquiry.inquiryId}` : null;
-  const a = key(next);
-  return a != null && a === key(previous);
-}
 
-function pickSet(workingSet: WorkingSetView | null, view: ConversationView): WorkingSetView | null {
-  const candidates = [view.workingSet, workingSet];
-  return candidates.find((s) => s?.kind === "INQUIRIES" || s?.kind === "REVIEWS") ?? null;
-}
 
 /** Channel names as the resumed turn's own artifacts carried them — no extra read when they are there. */
 async function channelNamesOf(bundle: SpringClientBundle, target: TurnView): Promise<Map<string, string>> {
@@ -3723,85 +3697,6 @@ function headlineOf(
 
 
 
-/** The seller's words for a visible filter's predicate axes (channel · topic · status), trailing space. */
-const FILTER_CHANNEL_WORD: Record<string, string> = { NAVER: "네이버", COUPANG: "쿠팡", CAFE24: "카페24" };
-function filterWords(filter: VisibleFilter): string {
-  const parts: string[] = [];
-  if (filter.channel) parts.push(FILTER_CHANNEL_WORD[filter.channel] ?? filter.channel);
-  if (filter.topic) parts.push(TOPIC_LABEL[filter.topic]);
-  // The seller's own subject word, said back verbatim — a 0 under it is a 0 about that subject.
-  if (filter.term) parts.push(`${filter.term} 관련`);
-  if (filter.status) parts.push(filter.status === "UNANSWERED" ? "답변 안 한" : "답변한");
-  return parts.length > 0 ? `${parts.join(" ")} ` : "";
-}
-
-/** The all-null filter a PRIORITIZE reuses: no narrowing, only an order. */
-const EMPTY_FILTER: VisibleFilter = { channel: null, topic: null, term: null, status: null, limit: null, order: null, urgency: false };
-
-/** The working set the primary artifact leaves behind — ids and closed filters, bounded. */
-function workingSetOf(
-  artifacts: readonly Artifact[], axis: ReturnType<typeof conversationAxisOf>, view: ConversationView,
-): WorkingSetView | null {
-  const primary = primaryOf(artifacts.filter((a) => a.type !== "DRAFT" && a.type !== "APPROVAL_REQUIRED" && a.type !== "APPROVAL" && a.type !== "GUIDED_EXECUTION"
-    && a.type !== "WORKSPACE_LINK" && a.type !== "SUMMARY"));
-  const bounded = (ids: readonly string[]): string[] => ids.slice(0, WORKING_SET_MAX_IDS);
-  switch (primary?.type) {
-    case "REVIEW_LIST": {
-      const productIds = [...new Set(primary.items.map((i) => i.productId).filter((p): p is string => p != null))];
-      return {
-        kind: "REVIEWS", label: primary.title, count: primary.totalCount,
-        ids: bounded(primary.items.map((i) => i.reviewId)),
-        filters: {
-          period: primary.scope.period, channelCode: primary.scope.channelCode, rating: primary.scope.rating,
-          ...(primary.scope.productId ? { productIds: [primary.scope.productId] } : {}),
-        },
-        productIds: bounded(productIds), workItemIds: [], turnId: "",
-      };
-    }
-    case "INQUIRY_LIST": {
-      const items: InquiryItem[] = primary.groups.flatMap((g) => g.items);
-      const productIds = [...new Set(items.map((i) => i.productId).filter((p): p is string => p != null))];
-      const workItemIds = items.map((i) => i.workItemId).filter((w): w is string => w != null);
-      // Query Accuracy v1: a ROWS list is anchored by inquiry ids and remembers the spec it was read
-      // with, so the next sentence refines the same read; a WORKLOAD list is anchored by work items.
-      const rows = primary.scope != null && !(primary.more?.to ?? "").includes("NEEDS_REPLY");
-      return {
-        kind: "INQUIRIES", label: primary.title, count: primary.totalCount,
-        ids: bounded(rows ? items.map((i) => i.inquiryId) : workItemIds),
-        filters: {
-          ...(primary.scope?.topic ?? axis.filters.topic ? { topic: primary.scope?.topic ?? axis.filters.topic } : {}),
-          ...(primary.scope?.term ? { term: primary.scope.term } : {}),
-          ...(primary.scope ? {
-            period: primary.scope.period, channelCode: primary.scope.channelCode, status: primary.scope.status,
-            order: primary.scope.order,
-          } : {}),
-          inquiryIntent: rows ? "ROWS" : "WORKLOAD",
-        },
-        productIds: bounded(productIds), workItemIds: bounded(workItemIds), turnId: "",
-      };
-    }
-    case "PRODUCT_LIST":
-      return {
-        kind: "PRODUCTS", label: primary.title, count: primary.items.length,
-        ids: bounded(primary.items.map((i) => i.productId)), filters: {},
-        productIds: bounded(primary.items.map((i) => i.productId)), workItemIds: [], turnId: "",
-      };
-    case "ORDER_SUMMARY":
-      return {
-        kind: "ORDERS", label: primary.title, count: primary.totals.orders, ids: [],
-        filters: { period: primary.period, channelCode: primary.channelCode }, productIds: [], workItemIds: [], turnId: "",
-      };
-    case "ISSUE_LIST":
-      return {
-        kind: "ISSUES", label: primary.title, count: primary.items.length,
-        ids: bounded(primary.items.map((i) => i.issueId)), filters: {},
-        productIds: bounded([...new Set(primary.items.map((i) => i.productId).filter((p): p is string => p != null))]),
-        workItemIds: [], turnId: "",
-      };
-    default:
-      return axis.requestedAction === "NONE" && artifacts.length > 0 ? null : view.workingSet;
-  }
-}
 
 
 
@@ -3811,111 +3706,15 @@ function workingSetOf(
 
 
 
-/**
- * The working set anchored on one inquiry: the INQUIRIES kind the follow-up rules already read, exactly
- * one id, the previous set's closed filters (so 「그중 …」 still refines the same read), the products
- * beside it, and the selection itself. The label is the selection, never a customer word.
- */
-function anchoredSet(row: SelectedInquiry, previous: WorkingSetView | null, productIds: readonly string[]): WorkingSetView {
-  // The list the selection was made from stays the set (「세 번째 거」 after 「첫 번째 거」 still counts on
-  // the same three rows; 「그중 네이버만」 still refines the same read); the selection rides beside it.
-  //
-  // A set is keyed by ONE of two identities and which one depends on the read that produced it: a ROWS
-  // list is inquiry ids, a work-queue list is work-item ids (`ids: bounded(rows ? … : workItemIds)`).
-  // Testing only the inquiry id therefore never matched a work-queue list, so clicking a row of the
-  // queue silently collapsed the set to that one row — and 「세 번째 거」 or 「그중 네이버만」 after the
-  // click acted on a set of one. The row carries both ids; recognise the set by either.
-  const inSet = (set: WorkingSetView): boolean =>
-    set.ids.includes(row.inquiryId) || (row.workItemId != null && set.workItemIds.includes(row.workItemId));
-  const list = previous?.kind === "INQUIRIES" && inSet(previous) ? previous : null;
-  const inherited = previous?.kind === "INQUIRIES" ? previous.filters : {};
-  const selectedInquiry: SelectedInquiry = {
-    inquiryId: row.inquiryId, workItemId: row.workItemId, productId: row.productId, channelCode: row.channelCode,
-  };
-  return {
-    kind: "INQUIRIES", label: list?.label ?? "선택한 문의", count: list?.count ?? 1, ids: list ? [...list.ids] : [row.inquiryId],
-    filters: { ...inherited, inquiryIntent: inherited.inquiryIntent ?? "ROWS" },
-    productIds: [...new Set(productIds)].slice(0, WORKING_SET_MAX_IDS),
-    workItemIds: list ? [...list.workItemIds] : row.workItemId ? [row.workItemId] : [],
-    // One anchor at a time: standing on an inquiry leaves whatever product or review was anchored.
-    selectedInquiry, selectedObject: null, turnId: "",
-  };
-}
-
-/** Did THIS turn's own specialists draw a list the seller asked for? (An R4 product grouping is not one.) */
-function drewFreshList(turnArtifacts: readonly Artifact[], anchor: SelectedInquiry | null): boolean {
-  const list = turnArtifacts.find((a) => a.type === "INQUIRY_LIST" || a.type === "REVIEW_LIST" || a.type === "ISSUE_LIST" || a.type === "ORDER_SUMMARY");
-  if (!list) return false;
-  // A refine that narrowed the list to the anchored inquiry itself is still about that inquiry.
-  if (anchor && list.type === "INQUIRY_LIST") {
-    const ids = list.groups.flatMap((g) => g.items.map((i) => i.inquiryId));
-    if (ids.length === 1 && ids[0] === anchor.inquiryId) return false;
-  }
-  return true;
-}
-
-/**
- * Did this turn draw a set that leaves the anchored PRODUCT or REVIEW behind?
- *
- * The object analogue of {@link drewFreshList}, and the same rule: a list that still holds the anchored
- * object (「비슷한 리뷰도 있어?」 returns this review among its product's rows) has not moved the seller
- * off it, so the anchor stands and 「이 리뷰」 still means the same review.
- */
-function drewFreshObjectList(turnArtifacts: readonly Artifact[], object: SelectedObject): boolean {
-  const list = turnArtifacts.find((a) => SET_ARTIFACT_TYPES.includes(a.type));
-  if (!list) return false;
-  if (object.kind === "REVIEW" && list.type === "REVIEW_LIST") {
-    return !list.items.some((i) => i.reviewId === object.id);
-  }
-  if (object.kind === "PRODUCT" && list.type === "PRODUCT_LIST") {
-    return !list.items.some((i) => i.productId === object.id);
-  }
-  return true;
-}
-
-/** The inquiry a screen launch resolved inside the graph — read back from the ref the runtime minted for it. */
-function selectedFromEntities(result: Extract<OperatorRunResult, { status: "DONE" }>, answer: OperatorAnswer, workItemId: string): SelectedInquiryRow | null {
-  const entity = result.entities.find((e) => e.kind === "INQUIRY" && e.id === workItemId);
-  if (!entity) return null;
-  const ref = answer.evidence.find((e) => e.kind === "INQUIRY" && e.locator.workItemId === workItemId);
-  const inquiryId = typeof ref?.locator.inquiryId === "string" ? ref.locator.inquiryId : null;
-  if (!inquiryId) return null;
-  return {
-    inquiryId, workItemId,
-    productId: typeof ref?.locator.productId === "string" ? ref.locator.productId : null,
-    channelCode: typeof ref?.locator.channelCode === "string" ? ref.locator.channelCode : null,
-    channelNameKo: null,
-    productName: typeof ref?.locator.productName === "string" ? ref.locator.productName : null,
-    title: null,
-    status: typeof ref?.locator.status === "string" ? ref.locator.status : "",
-    receivedAt: ref?.events?.from ?? null,
-  };
-}
 
 
 
 
-/**
- * The working set anchored on a product or a review — the same shape {@link anchoredSet} builds for an
- * inquiry: the list the selection was made from stays the set (「그중 …」 still refines the same rows),
- * the object rides beside it, and the OTHER anchor is dropped because there is only ever one.
- */
-function anchoredObjectSet(object: SelectedObject, previous: WorkingSetView | null): WorkingSetView {
-  const kind: WorkingSetView["kind"] = object.kind === "PRODUCT" ? "PRODUCTS" : "REVIEWS";
-  const list = previous?.kind === kind && previous.ids.includes(object.id) ? previous : null;
-  return {
-    kind,
-    label: list?.label ?? (object.kind === "PRODUCT" ? "선택한 상품" : "선택한 리뷰"),
-    count: list?.count ?? 1,
-    ids: list ? [...list.ids] : [object.id],
-    filters: list?.filters ?? {},
-    productIds: [...new Set([...(list?.productIds ?? []), ...(object.productId ? [object.productId] : [])])].slice(0, WORKING_SET_MAX_IDS),
-    workItemIds: list ? [...list.workItemIds] : [],
-    selectedInquiry: null,
-    selectedObject: object,
-    turnId: "",
-  };
-}
+
+
+
+
+
 
 
 
@@ -3983,49 +3782,8 @@ function saidOnceId(aspect: CapabilityAspect, channel: string | null): string {
 
 
 
-/** Evidence kinds whose locator label is a seller-authored title (a rule, a document, a remembered answer, an issue). */
-const EVIDENCE_DETAIL_KINDS = new Set(["ORG_POLICY", "PRODUCT_KNOWLEDGE_DOC", "PAST_ANSWER", "REVIEW_ISSUE", "ISSUE_EVIDENCE", "REPEATED_INQUIRY", "IMPROVEMENT_OPPORTUNITY"]);
 
-function evidenceOf(
-  answer: OperatorAnswer, extra: ReadonlyArray<EvidenceArtifact["items"][number]> = [],
-): EvidenceArtifact | null {
-  if (answer.evidence.length === 0 && extra.length === 0) return null;
-  // The seller's word for the source, then the row's own title when it reads as words (a document
-  // title, a strength label) — never a token, a stamp or an id (Response Hygiene v1 §1).
-  const labelOf = (kind: string, detail: string | null | undefined): string => {
-    const source = SOURCE_LABEL[kind] ?? "자료";
-    if (!EVIDENCE_DETAIL_KINDS.has(kind) || !isSellerSafeLabel(detail) || !/[가-힣]/.test(detail) || detail === source) return source;
-    return detail.includes(source) ? detail : `${source} · ${detail}`;
-  };
-  return {
-    artifactId: "a-evidence", type: "EVIDENCE", title: "확인한 자료",
-    items: answer.evidence.slice(0, EVIDENCE_ITEMS_MAX).map((e) => ({
-      label: labelOf(e.kind, e.locator.label),
-      count: e.locator.count ?? null,
-      from: e.events?.from ?? null, to: e.events?.to ?? null, asOf: e.asOf,
-      covered: e.coverage === "COVERED",
-      ...(e.locator.productId ? { link: `/products/${e.locator.productId}` }
-        : e.locator.inquiryId ? { link: `/inquiries/${e.locator.inquiryId}` } : {}),
-    })).concat(extra),
-  };
-}
 
-function workspaceFor(plan: InvestigationPlan | null, workingSet: WorkingSetView | null): WorkspaceLinkArtifact {
-  const kinds = new Set((plan?.informationNeeds ?? []).map((n) => n.kind));
-  // A navigation-only plan names no need; the screen the seller asked for is then the entity kind the
-  // planner heard (「문의 화면」 ⇒ INQUIRY), and only after that the working set.
-  const mentioned = new Set((plan?.entities.unresolved ?? []).map((e) => e.kind));
-  const target = kinds.has("INQUIRY_VOLUME") || kinds.has("CUSTOMER_HISTORY") ? WORKSPACE_OF.INQUIRIES
-    : kinds.has("REVIEW_SIGNAL") ? WORKSPACE_OF.REVIEWS
-      : kinds.has("ORDER_HISTORY") ? WORKSPACE_OF.ORDERS
-        : kinds.has("PRODUCT_FACT") || kinds.has("PRODUCT_LISTING") || kinds.has("PRODUCT_VARIANT") || kinds.has("PRODUCT_KNOWLEDGE_DOC")
-          ? WORKSPACE_OF.PRODUCTS
-          : mentioned.has("INQUIRY") ? WORKSPACE_OF.INQUIRIES
-            : mentioned.has("ORDER") ? WORKSPACE_OF.ORDERS
-              : mentioned.has("PRODUCT") ? WORKSPACE_OF.PRODUCTS
-                : workingSet ? WORKSPACE_OF[workingSet.kind] : WORKSPACE_OF.INQUIRIES;
-  return { artifactId: "a-workspace", type: "WORKSPACE_LINK", title: `${target.label} 화면`, link: { label: target.label, to: target.to } };
-}
 
 /**
  * Up to three prompt chips from the set's kind, plus the workspace link. Examples, never capabilities.
@@ -4123,96 +3881,11 @@ function suggestionsFor(
 /* ─────────────── R3 / R4 / R6 helpers ─────────────── */
 
 
-/** The backend's generic basis note — the card's title already says it, so the prose does not. */
-const GENERIC_BASIS_NOTE = /^답변 기준이 필요합니다\.?$/;
-
-/**
- * <b>Was the company profile the whole question, or one input among several?</b> — asked of the plan,
- * which already answered it (Agent Semantic Ownership v1 §3).
- *
- * The 「회사 정보에는…」 finding is produced in exactly one place, the `COMPANY_PROFILE` branch of
- * InquiryOps, so its existence proves the planner wanted the profile. What it does NOT prove is that
- * the seller asked to READ it: traced live 2026-09-06, 「우리 회사 특성 고려하면 배송 문의에 어떻게
- * 답하는 게 좋을까」 declares `COMPANY_PROFILE` beside `POLICY` and `PAST_ANSWER`, and reading the whole
- * introduction back on that turn is the noise §3 was written to stop. Being the run's ONLY need is the
- * difference, and it is the planner's own token — no sentence is read.
- *
- * <b>It replaces a regex that got this wrong in the seller's favour and against it.</b> The old
- * `/(회사|우리|저희).{0,12}(어떤 곳|소개|…)/` missed 「우리 회사는 어떤 회사야?」 and 「우리 회사에 대해
- * 알려줘」 — both planned as the sole `COMPANY_PROFILE` need — and replaced the seller's own summary
- * with 「등록된 회사 정보를 참고했습니다」 on the two most ordinary ways to ask.
- */
-export function companyIsTheQuestion(answer: OperatorAnswer): boolean {
-  return answer.needs.length === 1 && answer.needs[0]!.kind === "COMPANY_PROFILE";
-}
 
 
-/** A PRODUCT_LIST from product-scoped evidence refs, first appearance first — or from one resolved entity. */
-export function productListOf(answer: OperatorAnswer, entities: readonly { kind: string; id: string; label: string }[]): Artifact | null {
-  const rows = new Map<string, { name: string; facts: Map<string, number> }>();
-  for (const ref of answer.evidence) {
-    const productId = ref.locator.productId;
-    if (!productId) continue;
-    // A ref that carries the id without the name is named by the entity the run resolved (found live:
-    // a remembered answer's product read as 「(이름 없는 상품)」 under the product it was about).
-    const resolvedName = entities.find((e) => e.kind === "PRODUCT" && e.id === productId)?.label ?? null;
-    const row = rows.get(productId) ?? { name: ref.locator.productName ?? resolvedName ?? "(이름 없는 상품)", facts: new Map() };
-    if (ref.locator.productName && row.name === "(이름 없는 상품)") row.name = ref.locator.productName;
-    if (ref.locator.count != null) {
-      const label = FACT_LABEL[ref.kind] ?? ref.locator.label ?? "근거";
-      row.facts.set(label, Math.max(row.facts.get(label) ?? 0, ref.locator.count));
-    }
-    rows.set(productId, row);
-  }
-  if (rows.size === 0) {
-    const product = entities.filter((e) => e.kind === "PRODUCT");
-    if (product.length !== 1) return null;
-    rows.set(product[0]!.id, { name: product[0]!.label, facts: new Map() });
-  }
-  return {
-    artifactId: "a-products", type: "PRODUCT_LIST", title: "이 답변이 가리키는 상품",
-    items: [...rows.entries()].map(([productId, row]) => ({
-      productId, productName: row.name,
-      facts: [...row.facts.entries()].map(([label, count]) => ({ label, count })),
-      to: `/products/${productId}`,
-    })),
-  };
-}
 
 
-/** The seller's to-do list, from what this turn showed and what the conversation is waiting on. */
-export function checklistOf(artifacts: readonly Artifact[], view: ConversationView): Extract<Artifact, { type: "CHECKLIST" }> {
-  const items: { label: string; detail?: string; to?: string }[] = [];
-  const seenHuman = new Set<string>();
-  for (const a of artifacts) {
-    if (a.type !== "HUMAN_ACTION_REQUIRED") continue;
-    const key = `${a.actionType}:${a.channelCode ?? ""}`;
-    if (seenHuman.has(key)) continue;
-    seenHuman.add(key);
-    items.push(humanItem(a.actionType, a.channelNameKo ?? a.channelCode, a.to));
-  }
-  for (const pending of pendingActionsOf(view)) {
-    if (seenHuman.has(`${pending.actionType}:${pending.channelCode ?? ""}`)) continue;
-    seenHuman.add(`${pending.actionType}:${pending.channelCode ?? ""}`);
-    items.push(humanItem(pending.actionType, pending.channelCode, null));
-  }
-  for (const a of artifacts) {
-    if (a.type === "INQUIRY_LIST") {
-      const ready = a.groups.find((g) => g.key === "DRAFT_READY")?.items.length ?? 0;
-      const open = a.groups.find((g) => g.key === "UNANSWERED")?.items.length ?? 0;
-      if (ready > 0) items.push({ label: `초안 준비된 문의 ${ready}건 확인하고 보내기`, to: "/inquiries?state=NEEDS_REPLY" });
-      if (open > 0) items.push({ label: `답변이 필요한 문의 ${open}건`, to: "/inquiries?state=NEEDS_REPLY" });
-    }
-    if (a.type === "REVIEW_LIST") {
-      const negative = a.items.filter((i) => i.negative).length;
-      if (negative > 0) items.push({ label: `낮은 평점 리뷰 ${negative}건 확인`, to: "/reviews" });
-    }
-    if (a.type === "ORDER_SUMMARY" && a.totals.salesDeltaPercent != null) {
-      items.push({ label: `매출 변화 확인 (${a.totals.salesDeltaPercent > 0 ? "+" : ""}${a.totals.salesDeltaPercent}%)`, to: a.to });
-    }
-  }
-  return { artifactId: "a-checklist", type: "CHECKLIST", title: "지금 하실 일", items };
-}
+
 
 /**
  * `CHANNEL_CONNECT` has been in {@code HumanActionType} and in {@link humanItem}'s labels since the
