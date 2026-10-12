@@ -57,10 +57,30 @@ describe("review action artifacts deep-link to the exact review", () => {
     }
   });
 
+  /**
+   * **The method's body, and only that.** This used to be
+   * `SOURCE.slice(start, SOURCE.indexOf("\n  private ", start + 10))`. `routeSend` is the LAST
+   * `private` member of the class, so that `indexOf` returned `-1`, `slice(start, -1)` ran to the end
+   * of the file, and the fence read ~1,186 lines while saying it read one method's 120. It passed for
+   * reasons that had nothing to do with `routeSend`. A missing terminator must fail, not widen.
+   * See `docs/FINDINGS.md` §B12.
+   */
+  function methodBody(signature: string): string {
+    const start = SOURCE.indexOf(signature);
+    expect(start, `${signature} not found — this fence is no longer reading it`).toBeGreaterThan(-1);
+    // Whichever comes first: the next member at class indent, or the class's own closing brace.
+    const ends = ["\n  private ", "\n  public ", "\n  protected ", "\n  async ", "\n}"]
+      .map((marker) => SOURCE.indexOf(marker, start + signature.length))
+      .filter((at) => at > -1);
+    expect(ends.length, `no end boundary after ${signature} — the slice would run to EOF`).toBeGreaterThan(0);
+    return SOURCE.slice(start, Math.min(...ends));
+  }
+
   it("carries no approve or send path of its own — the link is the whole handoff", () => {
-    const start = SOURCE.indexOf("private async routeSend(");
-    expect(start, "routeSend was renamed — this fence is no longer reading it").toBeGreaterThan(-1);
-    const block = SOURCE.slice(start, SOURCE.indexOf("\n  private ", start + 10));
+    const block = methodBody("private async routeSend(");
+    // 120 lines at the time of writing. A slice that silently grew to the rest of the file is what
+    // this bound catches: generous enough for the method to change, far short of 1,186.
+    expect(block.split("\n").length, "routeSend slice is no longer one method").toBeLessThan(400);
     for (const forbidden of APPROVE_OR_SEND) {
       expect(block, `routeSend must not reach ${forbidden}`).not.toContain(forbidden);
     }
