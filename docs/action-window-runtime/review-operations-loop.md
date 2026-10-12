@@ -31,7 +31,8 @@ The loop is the thin layer *above* that: sequence iterations incrementally, refr
 
 1. **Forward plan-extension** (`ReviewImportPlanService.extendPlanForward`). A plan is fixed at creation
    over `[start, then]`; nothing advanced it as time passed, and a second plan is refused while one is
-   live. Extension materializes new PENDING calendar-month segments **after the plan's latest live
+   live. Extension materializes new PENDING segments (one per span, at most a year — 2026-10-13; calendar months
+   before) **after the plan's latest live
    segment, up to today, on the SAME plan** — idempotent, and a COMPLETED plan reopens to ACTIVE (that
    reopening *is* the loop). Endpoint `POST /api/imports/reviews/plans/{planId}/extend`. Overlap-safe
    dedup means the forward edge never has to be pixel-perfect.
@@ -77,7 +78,7 @@ loop-summary (read)  ── upToDate? ──no──▶  extend plan forward (op
 
 | criterion | evidence |
 |---|---|
-| Incremental plan after the last covered range | `extendPlanForward` materializes months after the latest live segment to today, idempotent (`ReviewImportPlanServiceTest`). |
+| Incremental plan after the last covered range | `extendPlanForward` materializes the span after the latest live segment to today, idempotent (`ReviewImportPlanServiceTest`). |
 | Account-scoped session reuse | unchanged from PR #366 (same slot → same profile); the loop rides it. |
 | Readiness ↔ Acquisition Supervisor | unchanged from PR #365 (four probe moments, admission gate); the loop rides it. |
 | Export via one HumanCheckpoint | unchanged engine/driver invariants — the seller performs every marketplace action; the loop adds no click. |

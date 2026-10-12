@@ -95,7 +95,7 @@ NAVER·Coupang 리뷰에는 **공식 API가 없다**(`NaverApiConnector` · `Cou
 ### 2.2 호출 흐름 (실제 code path)
 ```
 [FE] /connect/review-history
-  POST /api/imports/reviews/plans/selected-range            ReviewImportPlanController → ReviewImportPlanService.createPlan (월 단위 세그먼트)
+  POST /api/imports/reviews/plans/selected-range            ReviewImportPlanController → ReviewImportPlanService.createPlan (기간당 1구간, 최대 1년 — 2026-10-13)
   POST /api/imports/reviews/plans/{planId}/launches/next-segment
         → ReviewImportLaunchService  : review_import_launch 1행, launch_ref 16-hex, kind=SEGMENT, ISSUED (single-use, V28)
   ws://127.0.0.1:<port>/bridge/ws  (pairing token → 단일 사용 ticket)  aw_attach{import,naver}
@@ -147,7 +147,9 @@ observe · READ_SCOPE · CLEAR_HIGHLIGHT · DETECT_DOWNLOAD · VALIDATE_ARTIFACT
 `IngestionService.ingestReviews(..., acquisitionSyncJobId)`.
 결과: `review_import_segment_attempt` 1행(SUCCEEDED/FAILED, 자기 sync_job), segment `COMPLETED+COVERED`,
 `sync_jobs{method=SELLER_CENTER_EXPORT, data_type=REVIEW}`, `reviews.acquisition_sync_job_id` 스탬프.
-`review_import_segment.rows_reconciled`는 **항상 false** — NAVER export 행 상한 미확인.
+`review_import_segment.rows_reconciled` — 2026-10-13부터 guided run이 export 직전 화면의 「총 N개」를 읽어 `expectedRows`로
+보내면(V133 `review_import_segment_attempt.expected_rows`) 파일 행 수(new+duplicate, failed 0)와 대조한다: 같으면 true,
+다르면 시도 `FAILED`·구간 미커버(split 안내). 총 건수를 못 읽은 경로(수동 업로드·읽기 실패·이전 기록)는 false 그대로.
 
 ### 2.5 파일 lifecycle (판매자 PC)
 - 감지된 download 바이트 → `.aw-quarantine/aw-quarantine-<artifactRef>`: 확장자 category + ZIP/OOXML magic sniff
@@ -387,7 +389,8 @@ run store save/load 양쪽 gate). `log.ts`가 secret-ish 키를 드롭.
 ## 18. known limitations (코드·기록에서 확인된 것)
 
 - 도우미 **macOS 전용**, 서명 없음, 아키텍처별 빌드(`build-macos.sh`). Windows 미검증(ADR §1).
-- NAVER export **행 상한 미확인** ⇒ `rows_reconciled=false` 영구.
+- NAVER export **행 상한 미확인** — 이제 상한을 가정하는 대신 export마다 화면 총 건수와 대조한다(§2.4). 화면 총 건수와
+  export가 같은 집합을 세는지(삭제·블라인드 리뷰 등)는 **라이브 미검증** — 정의가 다르면 대조가 매번 실패한다(fail closed).
 - unattended 실행 **없음**; 세그먼트마다 판매자 착석.
 - 스토어 identity run-time 대조 **없음**(§14); 다중 스토어 계정 라이브 검증 **1곳**.
 - 재시작 시 run **ABANDONED**(설계).

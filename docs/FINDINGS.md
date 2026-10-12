@@ -621,6 +621,26 @@
 
 ---
 
+### 월 단위 분할은 마켓 제약이 아니었다 — 측정 대신 추정이 안전장치 노릇을 했다 (2026-10-13)
+
+- **했던 것** — 과거 리뷰 2026-04~06을 가져오려다 「구간이 달력 월로 쪼개지니 다운로드 3번」을 그대로 받아들였고,
+  사용자가 「NAVER는 1년도 한 번에 되잖아?」라고 묻자 「행 상한이 미확인이라 보수적으로 월」이라고 설명했다.
+  그 설명도 틀렸다.
+- **사실** — `ReviewImportSegmentPlanner`는 2026-07-24에 **가독성**(「2026-03」으로 읽힌다)을 이유로 월을 골랐고,
+  NAVER 상한은 **가정하지 않는다**고 스스로 적고 있었다. 그런데 2026-09-02 `mintNextForAccount` 주석은 같은 규칙을
+  「one export per month is a bound the marketplace screen imposes」라고 적었다 — **출처 없는 마켓 제약 주장**이다.
+  collector·docs 어디에도 월 상한 관측은 없고, NAVER 리뷰 검색은 「1년」 프리셋을 스스로 준다. 그리고 월 분할이 사주던
+  안전은 **없었다**: `rows_reconciled`는 V27 이래 한 번도 true가 된 적이 없어서 잘린 한 달과 잘린 1년이 똑같이
+  안 보였다. 비용만 진짜였다 — 1년치 = 판매자 착석 12번. 이 최적화는 §4g(`docs/knowledge/demo_org_and_channel_knowledge_v1.md`)에서
+  이미 backlog로 이름이 붙어 있었다.
+- **다음에** — 사람 손이 드는 횟수를 정하는 규칙을 만나면 「이 수치는 누가 측정했나」를 먼저 묻는다. 코드 주석이
+  마켓 제약이라고 말해도 collector 관측이나 evidence 행이 없으면 그건 추정이다. 완결성은 **작은 창으로 추정하지 말고
+  대조로 측정한다** — 2026-10-13부터 구간은 기간당 1개(최대 1년)이고, guided run이 읽은 화면 총 건수와 파일 행 수가
+  다르면 그 시도는 실패하고 구간은 커버되지 않는다.
+- **출처** — 2026-10-13 세션 · `ReviewImportSegmentPlanner` · `ReviewImportRunService` · V133 · `docs/review/review_acquisition_baseline_v1.md` §2.4.
+
+---
+
 ## 어디에 무엇이 있나
 
 | 찾는 것 | 가는 곳 |

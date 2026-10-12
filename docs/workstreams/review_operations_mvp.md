@@ -719,7 +719,8 @@ Append a dated entry; never rewrite prior entries — correct forward.
   1. Range selection is the seller choosing **how far back to import**, not discovery of a marketplace limit
      (finding 16 — NAVER's review calendar restricts nothing).
   2. End date = today; the seller picks the **start month**.
-  3. The **period AND its monthly-segment count** are confirmed before a plan is created.
+  3. The **period AND its segment count** are confirmed before a plan is created. (2026-10-13 개정: 구간은
+     달력 월이 아니라 기간당 1개, 최대 1년 — `ReviewImportSegmentPlanner`. 월 분할은 마켓 제약이 아니었다.)
   4. Processing order is **most recent month first**.
   5. A date step whose field already holds the required value is **`SKIPPED`**.
   6. On a block: **remove the previous highlight** and show cause · repair · recheck in the marketplace-page panel.

@@ -49,7 +49,7 @@ any status claim later in the file.
   (`accept=".xlsx,.csv"`) and `FileParser` dispatch on extension. Recorded with the live numbers in
   [`../demo_org_and_channel_knowledge_v1.md`](../knowledge/demo_org_and_channel_knowledge_v1.md) §4g; being fixed as
   the "NAVER Review Acquisition Completion Hardening" package. UI discoverability / screen density /
-  month-segmentation sizing are **separate** (Connection/Acquisition UX Polish backlog) and are not blockers.
+  month-segmentation sizing (closed 2026-10-13: one segment per period, at most a year) are **separate** (Connection/Acquisition UX Polish backlog) and are not blockers.
 - **Live evidence:** every run is indexed in [`../evidence/INDEX.md`](../evidence/INDEX.md). The r4
   dispatch records in this directory are indexed there as a group.
 

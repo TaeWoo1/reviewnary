@@ -675,7 +675,7 @@ NAVER는 `Content-Disposition`에 파일명을 주지 않아 다운로드가 **�
 
 **섞지 않는다** — UI 발견성(`/connect/review-history` 진입점이 문장 속 ghost 링크), 화면 복잡도,
 월 단위 segmentation 최적화(한 번에 되는 크기면 한 구간)는 **Connection/Acquisition UX Polish
-backlog**로 분리한다. 그것들은 불편이고, 위 둘은 완주 불가다.
+backlog**로 분리한다. (segmentation은 2026-10-13 해소 — 기간당 1구간·최대 1년 + 화면 총 건수 대조.) 그것들은 불편이고, 위 둘은 완주 불가다.
 
 ## 4h. NAVER Review Acquisition Completion Hardening (2026-08-23) — 마켓플레이스 접촉 0회
 
