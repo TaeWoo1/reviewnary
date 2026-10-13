@@ -142,7 +142,9 @@ page size widget: div.item 「500개씩」 / div.option.selected 「500개씩」
 | 달력 열림 판정 | `YYYY.MM` title 1개 **그리고** 요일 heading 7개 **그리고** day cell ≥28 — 셋이 모두 | `PICKER_VIEW_UNREADABLE` |
 | 월 이동 식별 | icon class가 한 걸음(`backward`/`forward`, `last-`/`first-` 제외) **그리고** handler가 현재 view 내 이동(`currentView`) — 둘이 일치 | `MONTH_NAV_NOT_FOUND` / `_AMBIGUOUS` |
 | 월 이동 검증 | click 후 title이 **정확히 한 달**, 요청한 방향으로 | `MONTH_NAV_UNVERIFIED` |
-| 월 이동 상한 | **field마다** 13걸음 | `MONTH_NAV_EXHAUSTED` |
+| 월 이동 상한 | **field마다** 목표 월까지의 거리 + 2걸음, 절대 상한 120걸음(≈10년) — 2026-10-13 고정 13걸음·365일 상한을 걷어냄. 120을 넘는 창은 열기 전에 거부 | `MONTH_NAV_EXHAUSTED` / `WINDOW_INVALID` |
+| 월 이동 대기 | click 후 title이 바뀔 때까지 100ms마다 확인, 걸음당 최대 1.5초(고정 700ms 대기를 대체) | `MONTH_NAV_UNVERIFIED` |
+| 도달 불가 날짜 | 목표 일 cell이 `disabled`이거나 목표 방향 월 이동 화살표가 disabled — **누르지 않고** 멈춘다. 마켓이 막은 과거는 마켓이 정한다 | `DATE_NOT_SELECTABLE` |
 | 날짜 cell | `day` 있고 `past`·`future`·`disabled` 없고 visible/enabled, text == 목표 일, **정확히 1개** | `DAY_CELL_NOT_FOUND` / `_AMBIGUOUS` |
 | field 반영 | cell click 후 input value == 요청 날짜 | `RANGE_NOT_SETTABLE` |
 | 조회 | 두 date control과 **같은 form** 안의 visible·enabled·허용된 조회/검색 의미, **정확히 1개** | `QUERY_CONTROL_NOT_FOUND` / `_AMBIGUOUS` |
@@ -234,6 +236,11 @@ scroll end보다 강한 증거**이고, scroll로 바꾸는 것은 느려지고 
 
 - **page size는 읽기만 한다.** 바꾸지 않는다. `labelledTotal > selectedPageSize`이면 지금 한 페이지로
   그 기간을 증명할 수 없으므로 PARTIAL이고, 더 작게 쪼개거나 별도 pagination capability가 필요하다.
+- **시간 예산 (2026-10-13).** 창 run 전체 110초(Aside repl 상한 120초 안), 그중 읽기 settle 30초는 **조회 후
+  기간 검증 시점부터** 센다(이전에는 탭을 연 순간부터 45초를 내비게이션과 나눠 썼다). 내비게이션은 78초 —
+  월 걸음이 그 안에 끝나야 한다. 2년 전 창(약 48걸음)은 걸음당 ≈1.2초 이하면 들어가고, 3년(≈74걸음)은
+  빠듯하다. 실측 걸음 시간과 NAVER가 1년보다 오래된 날짜를 열어 주는지(그리고 막을 때 `disabled`로 막는지)는
+  **live 미측정**이다. 모자라면 연 단위 화살표를 click 어휘에 더하는 것이 다음 선택지다(지금은 4종 그대로).
 - **이 규칙들은 아직 live로 다시 실행되지 않았다.** §2는 실측이고 §3은 그 실측에서 뽑은 규칙이지만,
   구현된 lane이 end-to-end로 과거 창을 읽은 live proof는 아직 없다. 그 run이 성립하면 이 문서 §2에
   결과를 붙이고 `docs/evidence/INDEX.md`의 행을 갱신한다.

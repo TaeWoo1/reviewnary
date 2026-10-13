@@ -353,3 +353,33 @@ walk는 `turn()`의 첫 줄에서 돌아나갔다 — KST 자정마다 창이 �
 6시간은 제품이 들을 방법이 없는 사건(판매자가 어딘가에서 다시 로그인했다) 하나를 위해서만 존재한다.
 따라서 probe가 여러 번 돌았다는 것은 lane이 건강하다는 증거가 아니며, 반복된 `AUTH_REQUIRED`만으로
 무인 운전을 통과로 적지 않는다: `docs/standing/pilot_reliability_v1.md` §3 판정 기준.
+
+## 15. 과거 채우기 — 기록된 시작일까지 거슬러 읽는다 (2026-10-13)
+
+**제품 책임자 결정(2026-10-13):** 과거 리뷰는 판매자가 엑셀을 내려받는 대신 이 lane이 Aside 화면 읽기로
+채운다 — 판매자 손을 최소로, 리뷰 사진(`review_media`)도 같은 읽기로 함께 들어온다. 이 lane을 묶던 과한
+제약은 걷어낸다.
+
+- **시작일은 추측이 아니라 기록이다.** 설정 행 `review_auto_check.history_from`(V134). 새 행은 KST 오늘
+  − 1년이 기본값이고, 기존 행은 V134가 같은 기본값으로 채웠다. `PUT /api/seller-accounts/{id}/review-auto-check`
+  의 `{historyFrom}`으로 바꿀 수 있다(미래 불가, 2010-01-01 이전 불가). §6이 「추측한 시작은 계획이 아니다」라고
+  한 이유는 그대로이고, 이 값은 판매자/기본값이 **저장한** 선택이라 그 규칙에 걸리지 않는다
+  (`ReviewCoverageCursor`, `ReviewCatchUpPlan`).
+- **한 walk, 두 단계.** 먼저 forward gap(7일 창, 오래된 것부터), 그 다음 `phase=HISTORY`로 바뀌어
+  `[history_from, coverageFrom − 1]`(증거가 없으면 어제까지)을 **최근 → 과거** 순서로 31일 창씩 읽는다.
+  최근부터 읽는 이유: 행이 있는 창이 먼저 화면 지문(§11-1)을 가르쳐야 조용한 옛 달의 빈 기간이 귀속된다.
+- **넘치면 나눈다.** `PARTIAL`과 `TOO_MANY_ROWS`(행 500 초과 · `SURFACE_UNREADABLE`) 모두 창을 반으로 나눠
+  최근 반쪽부터 다시 읽는다. 하루가 여전히 넘치면 `STOPPED_SATURATED`.
+- **마켓이 막은 과거는 마켓이 정한다.** 달력이 날짜를 막으면 도우미는 누르지 않고
+  `DATE_NOT_SELECTABLE`로 멈춘다. HISTORY에서는 최근 반쪽으로 좁혀 들어가 경계 하루를 찾고, walk는
+  `COMPLETE` · `HISTORY_BOUNDARY`로 끝난다. 다음 walk는 그 경계 다음 날부터만 계획한다 —
+  `history_from` 자체는 바꾸지 않는다. forward 창의 `DATE_NOT_SELECTABLE`은 실패다.
+- **한도.** walk당 24창 · 400일 · 12,000행 · 20분(이전 8 · 70 · 3,000 · 6분). 1년이면 한두 walk.
+- **자동 재시도 보류.** 무인 walk가 HISTORY에서 실패·포화로 멈추면 자동 확인은 24시간 동안 과거를 건드리지
+  않는다 — 매 tick이 같은 벽에 부딪혀 오늘 읽기가 밀리지 않게. 사람의 누름은 보류하지 않는다.
+- **자동 확인이 꺼져 있으면 과거도 읽지 않는다**(누름 포함).
+- **도우미 쪽 상한**(`docs/review/naver_review_date_picker_capability_v1.md` §3·§7): 365일 상한과 고정 13걸음을
+  걷어내고 목표까지의 거리 + 2걸음, 절대 상한 120걸음. 창 run 110초(읽기 settle 30초는 기간 검증 시점부터).
+- **아직 live 미증명:** 여러 달을 넘기는 과거 창 읽기, 실측 걸음 시간, NAVER가 1년보다 오래된 날짜를 여는지,
+  실제 스토어에서 1년이 한도 안에 끝나는지, 리뷰 화면의 사진 표시. 증명 전까지 이 절은 **구현 계약**이다.
+- 미리보기(`CollectNowService.catchUpPlan`)는 아직 forward gap만 보여준다.
