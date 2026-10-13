@@ -48,7 +48,7 @@ function detail(over: Partial<ChannelReviewDetailView> = {}): ChannelReviewDetai
     body: "괜찮긴한데 자꾸 떨어져요",
     bodyRedacted: false,
     productName: "합성 전선몰딩",
-    mediaCount: 0,
+    mediaCount: 0, mediaCountObserved: true,
     textless: false,
     isNew: false,
     triage: { tier: "FYI", reason: "같은 분류가 늘어나는지 지켜보세요.", tags: ["설치"], recommendedAction: null },

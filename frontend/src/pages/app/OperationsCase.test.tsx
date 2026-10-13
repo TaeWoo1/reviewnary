@@ -348,6 +348,13 @@ describe("OperationsCase", () => {
     // A review with no title is named by its first line.
     expect(screen.getByRole("heading", { level: 1, name: "별은 5개인데 모서리가 깨져서 왔어요." })).toBeTruthy();
     await expectNoAxeViolations(container);
+    // The larger view opens in the page (Chrome refuses a new tab on a data: URL) and Esc hands focus back.
+    const thumb = screen.getByRole("button", { name: "고객이 올린 사진 1 크게 보기" });
+    await userEvent.setup().click(thumb);
+    expect(screen.getByRole("dialog", { name: "고객이 올린 사진 1" })).toBeTruthy();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(thumb);
   });
 
   it("an inquiry with no named product can only be taught company-wide", async () => {

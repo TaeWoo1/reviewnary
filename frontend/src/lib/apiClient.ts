@@ -47,6 +47,7 @@ import type {
   TriageCorrectionView,
   TriageEventView,
   ChannelReviewLocateRun,
+  ReviewMediaListView,
   ChannelReviewPageView,
   ReviewRecordPageView,
   ReviewWorkView,
@@ -297,6 +298,19 @@ async function getOrMock<T>(path: string, mock: () => T): Promise<T> {
 /** `(issueId, kind)` is an opportunity's whole identity — the path says so. */
 function opportunityPath(issueId: string, kind: OpportunityKind, action: string): string {
   return `/api/opportunities/${encodeURIComponent(issueId)}/${encodeURIComponent(kind)}/${action}`;
+}
+
+/**
+ * Image bytes behind the bearer token, as a data: URL. A plain <img src> cannot send the token, and the app's
+ * image policy admits data: but not blob:, so the bytes are fetched here and inlined.
+ */
+async function fetchImageAsDataUrl(path: string): Promise<string> {
+  const response = await http.get<ArrayBuffer>(path, { responseType: "arraybuffer" });
+  const type = String(response.headers["content-type"] ?? "image/jpeg").split(";")[0];
+  const bytes = new Uint8Array(response.data);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+  return `data:${type};base64,${btoa(binary)}`;
 }
 
 export const api = {
@@ -1995,15 +2009,19 @@ export const api = {
   // One review photo of a case, as a data: URL — the endpoint needs the bearer token (a plain <img> cannot send it)
   // and the app's image policy admits data: but not blob:.
   async getOperationsCaseMedia(caseId: string, ordinal: number): Promise<string> {
-    const response = await http.get<ArrayBuffer>(
-      `/api/responsibilities/customer-operations/cases/${caseId}/media/${ordinal}`,
-      { responseType: "arraybuffer" },
-    );
-    const type = String(response.headers["content-type"] ?? "image/jpeg").split(";")[0];
-    const bytes = new Uint8Array(response.data);
-    let binary = "";
-    for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
-    return `data:${type};base64,${btoa(binary)}`;
+    return fetchImageAsDataUrl(`/api/responsibilities/customer-operations/cases/${caseId}/media/${ordinal}`);
+  },
+  /**
+   * A review's photos and videos, and whether Reviewnary looked at each. No mock fallback — a fixture here would
+   * show a seller photos that are not on their review. `imagePath` in the answer is for fetching, never for display.
+   */
+  async getReviewMedia(reviewId: string): Promise<ReviewMediaListView> {
+    const { data } = await http.get<ReviewMediaListView>(`/api/reviews/${encodeURIComponent(reviewId)}/media`);
+    return data;
+  },
+  /** One review photo as a data: URL — same reason as {@link getOperationsCaseMedia}: bearer auth, and no blob:. */
+  async getReviewMediaImage(reviewId: string, ordinal: number): Promise<string> {
+    return fetchImageAsDataUrl(`/api/reviews/${encodeURIComponent(reviewId)}/media/${ordinal}`);
   },
   /**
    * Saves the seller's knowledge, then re-investigates and re-drafts the case on the server — two model calls in

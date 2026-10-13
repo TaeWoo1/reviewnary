@@ -29,7 +29,7 @@ function page(total: number, items: Array<{ id: string; productName?: string; ra
     triageSummary: { needsAttention: total, watch: 0, fyi: 0, aiAttention: 0, repeatedCategories: [] },
     items: items.map((i) => ({
       id: i.id, writtenOn: i.writtenOn ?? "2026-08-10", rating: i.rating ?? 1, negative: true, preview: "본문", productName: i.productName ?? null,
-      productId: null, vendorItemId: null, mediaCount: 0, textless: false, isNew: false,
+      productId: null, vendorItemId: null, mediaCount: 0, mediaCountObserved: true, textless: false, isNew: false,
       triage: { tier: "NEEDS_ATTENTION", reason: "1점", tags: [], recommendedAction: null }, aiMark: null, sellerCorrection: null,
     })),
   } as ChannelReviewPageView;

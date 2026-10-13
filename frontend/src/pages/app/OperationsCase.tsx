@@ -5,12 +5,13 @@ import { Btn, BtnLink } from "../../components/ui/Btn";
 import { Disclosure } from "../../components/ui/Disclosure";
 import { WorkFlowCard } from "../../components/ui/WorkFlowCard";
 import { Facts } from "../../components/ui/ObjectRow";
+import { MediaThumb } from "../../components/reviews/ReviewPhotos";
 import { CaseBlock, CaseLayout, CaseQuote, useCaseVariant, type CaseVariant, type PaneDepth } from "../../components/workspace/CaseLayout";
 import { inquiryReading } from "../../lib/inquiryNextAction";
 import { gapSentence, usableTopic } from "../../lib/caseTopic";
 import { api } from "../../lib/apiClient";
 import { actionKo, subjectFallback } from "../../lib/customerOperations";
-import { COPY, draftSendWord, decisionOf, elapsedLabel, elapsedSource, photoWord, shortDate, sourceLabel, waitDays } from "../../lib/copy/customerOps";
+import { COPY, draftSendWord, decisionOf, elapsedLabel, elapsedSource, shortDate, sourceLabel, waitDays } from "../../lib/copy/customerOps";
 import { Status } from "../../components/ui/Status";
 import { WORK_STATE, type WorkStateKey } from "../../lib/workState";
 import { plainText } from "../../lib/plainText";
@@ -296,7 +297,7 @@ export function OperationsCaseView({
             {hasMedia ? (
               <ul className="mt-4 flex flex-wrap gap-3" aria-label="고객이 올린 사진">
                 {detail.media!.map((m) => (
-                  <MediaItem key={m.ordinal} caseId={caseId} media={m} />
+                  <MediaThumb key={m.ordinal} media={m} sourceKey={caseId} load={() => api.getOperationsCaseMedia(caseId, m.ordinal)} />
                 ))}
               </ul>
             ) : null}
@@ -784,59 +785,6 @@ function Tag({ tone = "gray", children }: { tone?: "gray" | "blue" | "line"; chi
         ? "bg-surface text-muted shadow-[inset_0_0_0_1px_#DCE0E6]"
         : "bg-[#F1F3F5] text-muted";
   return <span className={`whitespace-nowrap rounded-md px-1.5 py-px text-xs font-semibold ${cls}`}>{children}</span>;
-}
-
-type MediaProps = { caseId: string; media: NonNullable<OperationsCaseDetail["media"]>[number] };
-
-/**
- * One photo as a thumbnail with what Reviewnary saw under it. A photo that was not inspected never gets a
- * description — only its status sentence.
- */
-function MediaItem({ caseId, media }: MediaProps) {
-  const [src, setSrc] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    if (!media.imagePath) return;
-    let alive = true;
-    api
-      .getOperationsCaseMedia(caseId, media.ordinal)
-      .then((url) => alive && setSrc(url))
-      .catch(() => alive && setFailed(true));
-    return () => {
-      alive = false;
-    };
-  }, [caseId, media.imagePath, media.ordinal]);
-  const word = media.inspected ? photoWord(media.problemVisible) : null;
-  const hit = media.inspected && media.problemVisible === "YES";
-  return (
-    <li className="w-[168px]">
-      <span
-        className={`relative block h-[112px] w-[168px] overflow-hidden rounded-[10px] bg-gradient-to-br from-[#E3E8EF] to-[#C9D2DD] ${
-          hit ? "ring-2 ring-[#D97706] ring-offset-2" : ""
-        }`}
-      >
-        {src ? (
-          <a href={src} target="_blank" rel="noreferrer" className="block h-full w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700">
-            <img src={src} alt={`고객이 올린 사진 ${media.ordinal}`} className="h-full w-full object-cover" />
-          </a>
-        ) : (
-          <span className="flex h-full items-center justify-center px-2 text-center text-xs text-muted">
-            {media.imagePath ? (failed ? "불러오기 실패" : "불러오는 중") : "영상"}
-          </span>
-        )}
-        {word ? (
-          <span className={`absolute bottom-1.5 left-1.5 rounded bg-surface px-1.5 text-[11px] font-bold ${hit ? "text-warn" : "text-muted"}`}>
-            {word}
-          </span>
-        ) : null}
-      </span>
-      {media.inspected && media.depicts ? <p className="mt-1.5 break-keep text-xs leading-snug text-muted">분석: {media.depicts}</p> : null}
-      {media.inspected && media.problemDescription ? (
-        <p className="mt-0.5 break-keep text-xs leading-snug text-ink">{media.problemDescription}</p>
-      ) : null}
-      {!media.inspected ? <p className="mt-1.5 break-keep text-xs leading-snug text-muted">{media.statusKo}</p> : null}
-    </li>
-  );
 }
 
 /**

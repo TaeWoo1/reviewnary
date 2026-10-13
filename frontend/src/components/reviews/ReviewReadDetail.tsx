@@ -8,6 +8,7 @@ import { plainText } from "../../lib/plainText";
 import { triageDispositionLabel } from "../../lib/vocItems";
 import { AI_TRIAGE_DISCLOSURE, TRIAGE_TAG_DISCLOSURE } from "../../lib/reviewTriage";
 import { Disclosure } from "../ui/Disclosure";
+import { ReviewPhotos } from "./ReviewPhotos";
 import type { ActionWindowRunView } from "../../../../contracts/action-window/v2/index";
 import { locateMessage, locateUnavailableText } from "../../lib/actionWindow/locate/locateCopy";
 import type { LocateUnavailable, ReviewLocateBinding } from "../../lib/actionWindow/locate/useReviewLocate";
@@ -194,6 +195,7 @@ export function ReviewReadDetail({
           연락처·링크처럼 개인정보로 보이는 부분은 가려서 표시했습니다.
         </p>
       ) : null}
+      <ReviewPhotos reviewId={detail.id} mediaCount={detail.mediaCount} mediaCountObserved={detail.mediaCountObserved} />
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
         {/* The header prints the product under the customer's sentence; a second 「상품 …」 row here was
             the same name twice in one column. The locate identifiers below are Coupang's own and have

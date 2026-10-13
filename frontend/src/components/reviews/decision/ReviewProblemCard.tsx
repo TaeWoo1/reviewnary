@@ -1,6 +1,7 @@
 import { Chip } from "../../ui/Chip";
 import { usePaneDepth } from "../../workspace/CaseLayout";
 import { Disclosure } from "../../ui/Disclosure";
+import { ReviewPhotos } from "../ReviewPhotos";
 import { AiMarkChip, TriageTierChip } from "../TriageTierChip";
 import { TRIAGE_TAG_DISCLOSURE } from "../../../lib/reviewTriage";
 import { plainText } from "../../../lib/plainText";
@@ -118,6 +119,10 @@ export function ReviewProblemCard({
           개인정보로 보이는 부분은 가려서 보여드립니다. 원문은 판매자센터에서 확인하실 수 있습니다.
         </p>
       ) : null}
+
+      {/* <b>The customer's photos stand with the customer's words</b> (product-owner decision, 2026-10-13). Read
+          only when this block is on screen; the thumbnail is the one the operations case draws. */}
+      <ReviewPhotos reviewId={detail.id} mediaCount={detail.mediaCount} mediaCountObserved={detail.mediaCountObserved} />
 
       {/* Why it is here. The tier was decided by the rating and whether there is text, and by nothing
           else; the reason cites what else the row carries. */}

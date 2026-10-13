@@ -167,7 +167,7 @@ beforeEach(() => {
           productName: "선바로 일체형 전선몰딩",
           productId: null,
           vendorItemId: null,
-          mediaCount: 0,
+          mediaCount: 0, mediaCountObserved: true,
           textless: false,
           isNew: false,
           triage: { tier: "NEEDS_ATTENTION", reason: "1점", recommendedAction: null, tags: [] },
@@ -258,7 +258,7 @@ describe("리뷰 — the workflow surface", () => {
   it("a row is the door to that review's workspace", async () => {
     getReviewWorkspace.mockResolvedValue({
       id: "rv-1", writtenOn: "2026-09-01", rating: 1, negative: true, body: "접착이 약해요", bodyRedacted: false,
-      productName: "선바로 일체형 전선몰딩", mediaCount: 0, textless: false, isNew: false,
+      productName: "선바로 일체형 전선몰딩", mediaCount: 0, mediaCountObserved: true, textless: false, isNew: false,
       triage: { tier: "NEEDS_ATTENTION", reason: "1점", recommendedAction: null, tags: [] }, aiMark: null,
       sellerCorrection: null, locateTarget: { productId: null, vendorItemId: null, writtenOn: null, rating: null },
       replyWork: null, sellerAccountId: "acc-cp", replyUnavailableReason: "CHANNEL_HAS_NO_REPLY_FLOW",

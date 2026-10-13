@@ -2509,6 +2509,11 @@ export interface ChannelReviewItemView {
   vendorItemId: string | null;
   mediaCount: number;
   /**
+   * Whether `mediaCount` is a reading (true) or a default nobody counted (false). Only `true` with 0 may
+   * ever be read as «no photos»; `false` is unknown, and a screen says nothing rather than «없음».
+   */
+  mediaCountObserved: boolean;
+  /**
    * The buyer rated and wrote nothing. Render it as what it is — 별점만 남긴 상품평 — never as "본문을
    * 표시할 수 없습니다", which would blame SellerOps for something the buyer chose.
    */
@@ -2699,6 +2704,27 @@ export interface ChannelReviewLocateTarget {
  * What pressing `[쿠팡에서 보기]` returns: a single-use opaque binding to put in the Action Window
  * `START_RUN`, and the channel whose screen the run will read. No target, by design — see above.
  */
+/**
+ * One photo or video on a review (`GET /api/reviews/{reviewId}/media`). `inspected` is true only when a vision
+ * model looked at it; `depicts` and `problemDescription` are then what it saw, and are never shown otherwise.
+ * `imagePath` is a same-origin API path used only to FETCH the bytes (bearer auth) — it is never rendered, and it
+ * is null for a video, whose bytes are not served.
+ */
+export interface ReviewMediaItemView {
+  ordinal: number;
+  kind: "IMAGE" | "VIDEO" | "UNKNOWN";
+  inspected: boolean;
+  statusKo: string;
+  depicts: string | null;
+  problemVisible: "YES" | "NO" | "UNCLEAR" | null;
+  problemDescription: string | null;
+  imagePath: string | null;
+}
+
+export interface ReviewMediaListView {
+  items: ReviewMediaItemView[];
+}
+
 export interface ChannelReviewLocateRun {
   locateRef: string;
   channelCode: string;
@@ -2717,6 +2743,8 @@ export interface ChannelReviewDetailView {
   bodyRedacted: boolean;
   productName: string | null;
   mediaCount: number;
+  /** See `ChannelReviewItemView.mediaCountObserved` — false is unknown, never «none». */
+  mediaCountObserved: boolean;
   /** The buyer rated and wrote nothing — see `ChannelReviewItemView.textless`. */
   textless: boolean;
   isNew: boolean;

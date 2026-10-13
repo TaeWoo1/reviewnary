@@ -87,6 +87,9 @@ const ON_THE_SYSTEM = [
   "components/knowledge/KnowledgeDocuments.tsx",
   "components/knowledge/LearnedKnowledge.tsx",
   "components/actionWindow/HomeReviewOpsCard.tsx",
+  // 리뷰 사진, since review photos (2026-10-13): the one thumbnail and enlarged view the case screen and the
+  // review screens share, brought onto the palette when it moved out of the case screen.
+  "components/reviews/ReviewPhotos.tsx",
 ];
 
 /** One file with its comments removed — the ban is on USING these values, not on explaining them. */
