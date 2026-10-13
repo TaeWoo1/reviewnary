@@ -34,8 +34,13 @@ import { buildNaverStoreFingerprintScript } from "../naver/store-fingerprint-inp
 import {
   NAVER_REVIEW_DATE_INPUT_SELECTOR,
   NAVER_REVIEW_DAY_CELL_SELECTOR,
-  NAVER_REVIEW_MAX_MONTH_MOVES,
+  NAVER_REVIEW_MONTH_STEP_POLL_MS,
+  NAVER_REVIEW_MONTH_STEP_SETTLE_MS,
   NAVER_REVIEW_READ_WORKFLOW,
+  NAVER_REVIEW_WINDOW_LOAD_WAIT_MS,
+  NAVER_REVIEW_WINDOW_READ_SETTLE_MS,
+  NAVER_REVIEW_WINDOW_RUN_BUDGET_MS,
+  naverReviewMonthMoveAllowance,
   NAVER_REVIEW_QUERY_CONTROL_SELECTOR,
   NAVER_REVIEW_ROUTE_POLL_MS,
   NAVER_REVIEW_ROUTE_WAIT_MS,
@@ -103,7 +108,13 @@ export function buildNaverReviewWindowRuntimePlan(
   const end = civilDayOf(window.end);
   if (start === null || end === null) return null;
   // A period that ends before it starts, or that reaches into the future, is not a period to go and look at.
-  if (endDaysBefore < 0 || startDaysBefore < endDaysBefore || startDaysBefore > 365) return null;
+  // How FAR back is not decided here (2026-10-13: the 365-day refusal is gone). The marketplace decides what
+  // it will offer — a day it will not is a `disabled` cell and a named stop — and this only refuses a window
+  // whose month-step allowance would pass the runaway ceiling.
+  if (endDaysBefore < 0 || startDaysBefore < endDaysBefore) return null;
+  const maxMonthMoves = naverReviewMonthMoveAllowance(kstCivilDate(now), start);
+  if (maxMonthMoves === null) return null;
+  const searchSettleMs = 2_000;
   return {
     entryUrl: workflow.entryUrl,
     // One script, one judge: it walks the same two candidate sets the locators will, and says which of their
@@ -126,14 +137,30 @@ export function buildNaverReviewWindowRuntimePlan(
     requestedEnd: end,
     requestedStartDaysBefore: startDaysBefore,
     requestedEndDaysBefore: endDaysBefore,
-    maxMonthMoves: NAVER_REVIEW_MAX_MONTH_MOVES,
+    maxMonthMoves,
     routeWaitTimeoutMs: NAVER_REVIEW_ROUTE_WAIT_MS,
     routePollMs: NAVER_REVIEW_ROUTE_POLL_MS,
-    settleTimeoutMs: workflow.settleTimeoutMs,
+    // The window lane's own budgets (see `naver-review-workflow.ts`). The read's settle is measured from the
+    // verified period, and the navigation gets what the run budget leaves after reserving it.
+    loadWaitMs: NAVER_REVIEW_WINDOW_LOAD_WAIT_MS,
+    runBudgetMs: NAVER_REVIEW_WINDOW_RUN_BUDGET_MS,
+    navigationBudgetMs: NAVER_REVIEW_WINDOW_RUN_BUDGET_MS - NAVER_REVIEW_WINDOW_READ_SETTLE_MS - searchSettleMs,
+    settleTimeoutMs: NAVER_REVIEW_WINDOW_READ_SETTLE_MS,
     pollMs: 1_500,
     pickerSettleMs: 700,
-    searchSettleMs: 2_000,
+    monthStepSettleMs: NAVER_REVIEW_MONTH_STEP_SETTLE_MS,
+    monthStepPollMs: NAVER_REVIEW_MONTH_STEP_POLL_MS,
+    searchSettleMs,
   };
+}
+
+/**
+ * The CLI ceiling for one window run: the program's own run budget plus room to start and tear down,
+ * clamped by `runAsideRepl` to Aside's own per-call ceiling. Never the plain read's `settle + 30 s` — that
+ * is what a window run used to be killed at while it was still stepping months.
+ */
+export function naverReviewWindowCliTimeoutMs(plan: NaverReviewWindowRuntimePlan): number {
+  return plan.runBudgetMs + 10_000;
 }
 
 export function buildNaverReviewWindowRuntimeProgram(plan: NaverReviewWindowRuntimePlan): string {
@@ -154,7 +181,7 @@ const WINDOW_CODES = [
   "RANGE_CONTROLS_AMBIGUOUS", "QUERY_CONTROL_NOT_FOUND", "QUERY_CONTROL_AMBIGUOUS", "RANGE_ORDER_UNKNOWN",
   "CALENDAR_OPENER_NOT_FOUND", "CALENDAR_OPENER_AMBIGUOUS", "PICKER_VIEW_UNREADABLE",
   "MONTH_NAV_NOT_FOUND", "MONTH_NAV_AMBIGUOUS", "MONTH_NAV_UNVERIFIED", "MONTH_NAV_EXHAUSTED",
-  "DAY_CELL_NOT_FOUND", "DAY_CELL_AMBIGUOUS",
+  "DAY_CELL_NOT_FOUND", "DAY_CELL_AMBIGUOUS", "DATE_NOT_SELECTABLE",
   "RANGE_NOT_SETTABLE", "RANGE_MISMATCH", "READ_UNSETTLED", "RUNTIME_FAULT",
 ] as const;
 const WINDOW_STAGES = ["PREPARE", "SURFACE", "AUTH", "CONTROLS", "PICK_START", "PICK_END", "NAVIGATE",
@@ -315,7 +342,7 @@ export class AsideNaverReviewExecutor {
     if (plan === null) return { kind: "WINDOW_INVALID", llmCalls: 0 };
     const run = await runAsideRepl(buildNaverReviewWindowRuntimeProgram(plan), {
       ...this.cli,
-      timeoutMs: this.workflow.settleTimeoutMs + 30_000,
+      timeoutMs: naverReviewWindowCliTimeoutMs(plan),
     });
     if (run.kind === "NO_RESULT") {
       return {

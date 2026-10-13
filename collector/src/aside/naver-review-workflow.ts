@@ -63,14 +63,67 @@ export const NAVER_REVIEW_QUERY_CONTROL_SELECTOR =
 export const NAVER_REVIEW_DAY_CELL_SELECTOR = 'td';
 
 /**
- * How many single-month steps a historical read may take before it gives up.
+ * **The month-step allowance is derived from the window, not fixed.**
  *
- * <p>Thirteen covers the 365 days {@code buildNaverReviewWindowRuntimePlan} already accepts, with a step to
- * spare for a calendar that opens on some other month. It is a bound, not a budget: every step is checked
- * against the title afterwards, so a step that does not move the month by exactly one stops the read on the
- * spot instead of spending the allowance.
+ * <p>Until 2026-10-13 this was a flat 13, sized to the 365 days the plan builder then accepted. The product
+ * decision of that day (NAVER review history is backfilled by this lane, a year back by default and possibly
+ * further, newest→oldest) removed the 365-day refusal, so a flat 13 would have become the new, unstated
+ * horizon. Reachability is the marketplace's call — a day it will not offer is a `disabled` cell, and that is
+ * a named stop ({@code DATE_NOT_SELECTABLE}) — so the allowance here only has to keep a runaway loop from
+ * happening:
+ *
+ *  - **per field: the months between the run's KST month and the window's start month, plus
+ *    {@link NAVER_REVIEW_MONTH_MOVE_MARGIN}.** Both calendars open on (or within a month of) the current
+ *    month, and the end field is never further than the start field. The margin covers a calendar that
+ *    opens on the default period's start month instead.
+ *  - **never above {@link NAVER_REVIEW_MONTH_MOVE_CEILING}.** A window that would need more is refused at the
+ *    plan (`WINDOW_INVALID`) — nothing is opened.
+ *
+ * It is a bound, not a budget: every step is checked against the title afterwards, so a step that does not
+ * move the month by exactly one stops the read on the spot instead of spending the allowance.
  */
-export const NAVER_REVIEW_MAX_MONTH_MOVES = 13;
+export const NAVER_REVIEW_MONTH_MOVE_MARGIN = 2;
+/** The hard ceiling on single-month steps per field — about ten years. A runaway bound, not a horizon. */
+export const NAVER_REVIEW_MONTH_MOVE_CEILING = 120;
+
+/** The per-field allowance for a window starting on `start`, as of the run's KST month — or null past the ceiling. */
+export function naverReviewMonthMoveAllowance(
+  asOf: { year: number; month: number },
+  start: { year: number; month: number },
+): number | null {
+  const monthsBack = (asOf.year * 12 + asOf.month) - (start.year * 12 + start.month);
+  if (!Number.isInteger(monthsBack) || monthsBack < 0) return null;
+  const allowance = monthsBack + NAVER_REVIEW_MONTH_MOVE_MARGIN;
+  return allowance > NAVER_REVIEW_MONTH_MOVE_CEILING ? null : allowance;
+}
+
+/**
+ * **The window lane's own time budgets — separate from the plain read's, and separate from each other.**
+ *
+ * <p>Until 2026-10-13 the window program measured its read deadline as `startedAt + settleTimeoutMs`
+ * (45 s), from the moment the tab opened. Page load, route wait, two calendars and every month step were
+ * all paid out of the read's own settle time, so the further back a window was, the less time the grid had
+ * to fill after 조회 — a year back meant ~24 steps eating into it before the first reading. Now:
+ *
+ *  - the whole program must answer inside {@link NAVER_REVIEW_WINDOW_RUN_BUDGET_MS}, which sits under
+ *    Aside's own per-call ceiling (`ASIDE_REPL_CEILING_MS`, 120 s), so a slow run ends with a named stop
+ *    rather than a killed process;
+ *  - the first `networkidle` wait is capped at {@link NAVER_REVIEW_WINDOW_LOAD_WAIT_MS} — an unsettled page
+ *    is decided by the gates, not by this timer;
+ *  - the read gets {@link NAVER_REVIEW_WINDOW_READ_SETTLE_MS} **measured from the moment the period was
+ *    verified**, and the navigation is given whatever is left of the run budget after reserving it (a
+ *    month-step stop past that line is `MONTH_NAV_EXHAUSTED`);
+ *  - a month step waits for the title to change (polled every {@link NAVER_REVIEW_MONTH_STEP_POLL_MS}, up to
+ *    {@link NAVER_REVIEW_MONTH_STEP_SETTLE_MS}) instead of a fixed pause, because ~50 fixed 700 ms pauses
+ *    for a two-year-back window would spend most of the budget waiting on a calendar that redrew long ago.
+ *
+ * The plain 7-day read keeps {@link NAVER_REVIEW_READ_WORKFLOW}'s `settleTimeoutMs` exactly as it was.
+ */
+export const NAVER_REVIEW_WINDOW_RUN_BUDGET_MS = 110_000;
+export const NAVER_REVIEW_WINDOW_LOAD_WAIT_MS = 10_000;
+export const NAVER_REVIEW_WINDOW_READ_SETTLE_MS = 30_000;
+export const NAVER_REVIEW_MONTH_STEP_SETTLE_MS = 1_500;
+export const NAVER_REVIEW_MONTH_STEP_POLL_MS = 100;
 
 /**
  * **How long the seller centre's own router may take to draw the review route before the read gives up.**

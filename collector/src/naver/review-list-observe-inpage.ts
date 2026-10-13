@@ -631,11 +631,16 @@ export function buildNaverReviewPickerScript(
   }
   // A single month step: an icon naming one step, and a handler that moves inside the view already shown.
   // The year jumps carry 'last-'/'first-' and a handler that names the year; the title opens another view.
-  function monthSteps(root, direction) {
+  // 'blocked' asks the same question of the steps the component drew but disabled — the marketplace's own
+  // «no further». They are only ever counted, never handed back as an index, so none can be pressed.
+  function monthSteps(root, direction, blocked) {
     var out = [];
+    var off = 0;
     for (var p = 0; p < pressNodes.length; p++) {
       var el = pressNodes[p];
-      if (!root.contains(el) || !usable(el)) { continue; }
+      if (!root.contains(el)) { continue; }
+      var live = usable(el);
+      if (!live && !blocked) { continue; }
       var marks = classMarks(el);
       var ng = handlerOf(el);
       if (ng.indexOf('year') >= 0 || marks.indexOf('last-backward') >= 0 || marks.indexOf('first-forward') >= 0) {
@@ -644,10 +649,11 @@ export function buildNaverReviewPickerScript(
       if (ng.replace(/\\s+/g, '').indexOf('currentview') < 0) { continue; }
       var back = marks.indexOf('backward') >= 0 || marks.indexOf('prev') >= 0;
       var fwd = marks.indexOf('forward') >= 0 || marks.indexOf('next') >= 0;
-      if (direction < 0 && back && !fwd) { out.push(p); }
-      if (direction > 0 && fwd && !back) { out.push(p); }
+      var match = (direction < 0 && back && !fwd) || (direction > 0 && fwd && !back);
+      if (!match) { continue; }
+      if (live) { out.push(p); } else if (el.disabled === true || String(el.getAttribute('aria-disabled') || '') === 'true') { off++; }
     }
-    return out;
+    return blocked ? off : out;
   }
   var WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
   function hasClassWord(el, word) {
@@ -656,7 +662,8 @@ export function buildNaverReviewPickerScript(
   function sideState(dateIndex) {
     var state = {
       dateIndex: dateIndex, open: false, year: null, month: null,
-      weekdays: 0, cells: 0, prev: [], next: [], days: [], titles: 0
+      weekdays: 0, cells: 0, prev: [], next: [], prevBlocked: 0, nextBlocked: 0, days: [], disabledDays: [],
+      titles: 0
     };
     var root = sideRootOf(dateNodes[dateIndex]);
     if (root === null) { return state; }
@@ -680,7 +687,8 @@ export function buildNaverReviewPickerScript(
     var head = picker;
     for (var h = 0; h < 4 && head.parentElement; h++) {
       head = head.parentElement;
-      if (head.querySelectorAll('th').length >= 7 && monthSteps(head, -1).length > 0) { break; }
+      if (head.querySelectorAll('th').length >= 7
+        && (monthSteps(head, -1).length > 0 || monthSteps(head, -1, true) > 0)) { break; }
     }
     var ths = head.querySelectorAll('th');
     for (var t = 0; t < ths.length; t++) {
@@ -703,19 +711,26 @@ export function buildNaverReviewPickerScript(
     if (state.titles !== 1) { state.year = null; state.month = null; }
     state.prev = monthSteps(head, -1);
     state.next = monthSteps(head, 1);
+    state.prevBlocked = monthSteps(head, -1, true);
+    state.nextBlocked = monthSteps(head, 1, true);
     // A selectable day of the month on show. 'past'/'future' are the component's own words for the
     // neighbouring months' filler days, and they are the whole reason a cell is never chosen by its number.
+    // A day of the month on show that the component drew 'disabled' is reported as a bare NUMBER and never
+    // as an index: the runtime can name it (DATE_NOT_SELECTABLE) and has nothing it could press.
     for (var y = 0; y < mine.length; y++) {
       var cell = cellNodes[mine[y]];
-      if (hasClassWord(cell, 'past') || hasClassWord(cell, 'future') || hasClassWord(cell, 'disabled')) { continue; }
-      if (!usable(cell)) { continue; }
+      if (hasClassWord(cell, 'past') || hasClassWord(cell, 'future')) { continue; }
       var num = String(cell.textContent || '').replace(/\\s+/g, '');
       if (!/^\\d{1,2}$/.test(num)) { continue; }
       var day = Number(num);
       if (day < 1 || day > 31) { continue; }
+      if (hasClassWord(cell, 'disabled')) { state.disabledDays.push(day); continue; }
+      if (!usable(cell)) { continue; }
       state.days.push([mine[y], day]);
     }
-    state.open = state.weekdays === 7 && state.year !== null && state.days.length > 0;
+    // A month whose every day is disabled is still a readable DAY view — the marketplace saying no is an
+    // answer, and reading it as «no calendar» would hide it behind PICKER_VIEW_UNREADABLE.
+    state.open = state.weekdays === 7 && state.year !== null && (state.days.length + state.disabledDays.length) > 0;
     return state;
   }
   var sides = [];

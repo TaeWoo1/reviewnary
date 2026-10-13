@@ -89,6 +89,14 @@
  *     on show. `past` / `future` / `disabled` are the component's own words, and they are the whole reason a
  *     cell is never chosen by the number printed on it: a September page prints 「3」 twice.
  *
+ * <h2>How far back is the marketplace's call (2026-10-13)</h2>
+ *
+ * There is no horizon in this file. A day the seller centre will not offer is drawn `disabled`; the picker
+ * script hands a disabled day back as a bare day NUMBER with no index, so there is nothing here that could
+ * press it, and asking for one is `DATE_NOT_SELECTABLE` — as is a single-month step toward the target that
+ * the component has disabled. Never a nearby day, never a partial period: the verification after 조회 still
+ * requires both ends to the day.
+ *
  * <h2>And then it proves the screen moved</h2>
  *
  * Each field is checked against the day that was asked for as soon as its calendar closes — a calendar that
@@ -149,15 +157,25 @@ export interface NaverReviewWindowRuntimePlan {
   requestedEnd: NaverWindowDay;
   requestedStartDaysBefore: number;
   requestedEndDaysBefore: number;
-  /** How many single-month steps one field may take before the read gives up. */
+  /** How many single-month steps one field may take before the read gives up — derived from the window. */
   maxMonthMoves: number;
   /** How long the list's own router may take to draw the review route before the read gives up. */
   routeWaitTimeoutMs: number;
   routePollMs: number;
+  /** The ceiling on the first `networkidle` wait. An unsettled page is decided by the gates, not this timer. */
+  loadWaitMs: number;
+  /** The whole program answers inside this, measured from the start. Sits under Aside's per-call ceiling. */
+  runBudgetMs: number;
+  /** Month steps stop (`MONTH_NAV_EXHAUSTED`) once this much of the run is spent, so the read keeps its own. */
+  navigationBudgetMs: number;
+  /** The READ's own settle budget, measured from the moment the period on screen was verified. */
   settleTimeoutMs: number;
   pollMs: number;
-  /** How long a calendar may take to draw or redraw before it is read. */
+  /** How long a calendar may take to draw after its opener, or to take a day, before it is read. */
   pickerSettleMs: number;
+  /** After a month step: the title is polled every `monthStepPollMs` until it moves, up to this long. */
+  monthStepSettleMs: number;
+  monthStepPollMs: number;
   /** How long the list may take to redraw after the search before the census is asked. */
   searchSettleMs: number;
 }
@@ -186,6 +204,7 @@ export type NaverWindowRuntimeResult =
         | "MONTH_NAV_EXHAUSTED"
         | "DAY_CELL_NOT_FOUND"
         | "DAY_CELL_AMBIGUOUS"
+        | "DATE_NOT_SELECTABLE"
         | "RANGE_NOT_SETTABLE"
         | "RANGE_MISMATCH"
         | "READ_UNSETTLED"
@@ -237,7 +256,7 @@ export async function asideNaverReviewWindowRuntime(
   try {
     if (typeof tab.waitForLoadState === "function") {
       try {
-        await tab.waitForLoadState("networkidle", { timeout: plan.settleTimeoutMs });
+        await tab.waitForLoadState("networkidle", { timeout: plan.loadWaitMs });
       } catch (e) {
         /* an unsettled page is decided by the gates below, not by a timer */
       }
@@ -424,7 +443,12 @@ export async function asideNaverReviewWindowRuntime(
       month: number | null;
       prev: number[];
       next: number[];
+      /** Single-month steps the component drew but disabled — the marketplace saying «no further». */
+      prevBlocked: number;
+      nextBlocked: number;
       days: [number, number][];
+      /** Days of the month on show drawn `disabled`. Numbers only — no index crosses back, so none can be pressed. */
+      disabledDays: number[];
     };
 
     const readSide = async (dateIndex: number): Promise<SideState | null> => {
@@ -441,7 +465,8 @@ export async function asideNaverReviewWindowRuntime(
       for (const entry of r.sides as unknown[]) {
         const s = (entry ?? {}) as {
           dateIndex?: unknown; open?: unknown; year?: unknown; month?: unknown;
-          prev?: unknown; next?: unknown; days?: unknown;
+          prev?: unknown; next?: unknown; days?: unknown; disabledDays?: unknown;
+          prevBlocked?: unknown; nextBlocked?: unknown;
         };
         if (typeof s.dateIndex !== "number" || s.dateIndex !== dateIndex) {
           continue;
@@ -460,7 +485,12 @@ export async function asideNaverReviewWindowRuntime(
           month: typeof s.month === "number" ? s.month : null,
           prev: Array.isArray(s.prev) ? (s.prev as unknown[]).map((v) => Number(v)) : [],
           next: Array.isArray(s.next) ? (s.next as unknown[]).map((v) => Number(v)) : [],
+          prevBlocked: typeof s.prevBlocked === "number" ? s.prevBlocked : 0,
+          nextBlocked: typeof s.nextBlocked === "number" ? s.nextBlocked : 0,
           days,
+          disabledDays: Array.isArray(s.disabledDays)
+            ? (s.disabledDays as unknown[]).filter((v) => typeof v === "number") as number[]
+            : [],
         };
       }
       return null;
@@ -517,9 +547,18 @@ export async function asideNaverReviewWindowRuntime(
         if (moves >= plan.maxMonthMoves) {
           return fail("MONTH_NAV_EXHAUSTED", stage, moves);
         }
+        // The navigation's share of the run is spent. Stopping HERE keeps the read's own budget intact and
+        // ends the run with a word, instead of being killed at Aside's ceiling halfway through a step.
+        if (elapsed() >= plan.navigationBudgetMs) {
+          return fail("MONTH_NAV_EXHAUSTED", stage, moves);
+        }
         const back = haveMonths > wantMonths;
         const steps = back ? state.prev : state.next;
         if (steps.length === 0) {
+          // A step the component drew and disabled is the marketplace's «no further», not a missing control.
+          if ((back ? state.prevBlocked : state.nextBlocked) > 0) {
+            return fail("DATE_NOT_SELECTABLE", stage, 0);
+          }
           return fail("MONTH_NAV_NOT_FOUND", stage, 0);
         }
         if (steps.length > 1) {
@@ -533,8 +572,20 @@ export async function asideNaverReviewWindowRuntime(
         }
         moves += 1;
         monthMoves += 1;
-        await env.wait(plan.pickerSettleMs);
-        state = await readSide(dateIndex);
+        // Wait for the title to MOVE, not for a fixed pause: poll until the month on show differs from the one
+        // the step was pressed on, or the ceiling passes. Either way the check below is what holds — an
+        // unmoved title is still MONTH_NAV_UNVERIFIED, a year jump is still caught.
+        const stepDeadline = Date.now() + plan.monthStepSettleMs;
+        for (;;) {
+          await env.wait(plan.monthStepPollMs);
+          state = await readSide(dateIndex);
+          if (state === null || !state.open || state.year === null || state.month === null) {
+            break;
+          }
+          if (state.year * 12 + state.month !== haveMonths || Date.now() >= stepDeadline) {
+            break;
+          }
+        }
         if (state === null || !state.open || state.year === null || state.month === null) {
           return fail("PICKER_VIEW_UNREADABLE", stage);
         }
@@ -552,6 +603,11 @@ export async function asideNaverReviewWindowRuntime(
         }
       }
       if (matching.length === 0) {
+        // The day is on this page and the component will not let it be chosen. Named apart from «not found»:
+        // this is the marketplace's horizon, not a calendar this lane failed to read.
+        if (state.disabledDays.indexOf(want.day) >= 0) {
+          return fail("DATE_NOT_SELECTABLE", stage, state.days.length);
+        }
         return fail("DAY_CELL_NOT_FOUND", stage, state.days.length);
       }
       if (matching.length > 1) {
@@ -614,10 +670,11 @@ export async function asideNaverReviewWindowRuntime(
       return fail("RANGE_MISMATCH", "VERIFY");
     }
 
-    // READ — the same settle rule as the plain read: two consecutive readings that agree.
+    // READ — the same settle rule as the plain read: two consecutive readings that agree. Its budget starts
+    // HERE, at the verified period — the navigation no longer eats it — and never runs past the run budget.
     let settled: unknown = null;
     let previous = "";
-    const deadline = startedAt + plan.settleTimeoutMs;
+    const deadline = Math.min(Date.now() + plan.settleTimeoutMs, startedAt + plan.runBudgetMs);
     for (;;) {
       let reading: unknown;
       try {

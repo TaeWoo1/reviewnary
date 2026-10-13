@@ -20,6 +20,11 @@ describe("읽기 거절은 페이지가 쓴 단어로 기록된다", () => {
     });
   }
 
+  it("DATE_NOT_SELECTABLE(마켓이 고를 수 없게 그린 날짜)는 닫힌 목록의 단어다 — DAY_CELL_NOT_FOUND와 다르다", () => {
+    expect(NAVER_OBSERVE_FAILURE_CODES).toContain("DATE_NOT_SELECTABLE");
+    expect(NAVER_OBSERVE_FAILURE_CODES).toContain("DAY_CELL_NOT_FOUND");
+  });
+
   it("이 runner가 모르는 단어는 READING_REFUSED로 남는다 — 임의의 문자열이 기록에 닿지 않는다", () => {
     expect(readingFailureCode("ROW_RATING")).toBe("READING_REFUSED");
     expect(readingFailureCode("무엇이든")).toBe("READING_REFUSED");

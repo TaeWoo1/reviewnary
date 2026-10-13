@@ -175,6 +175,19 @@ describe.each(READ_NAVIGATORS)("aside provider — %s navigates a READ, and only
     expect(code).toContain("RANGE_ORDER_UNKNOWN");
     expect(code).toContain("inputValue()");
   });
+  it("a disabled day is named, never pressed — no disabled number ever reaches a locator (2026-10-13)", () => {
+    // How far back is the marketplace's call: a day it will not offer is reported by the picker as a bare
+    // number, and the only thing this file may do with that number is stop with DATE_NOT_SELECTABLE.
+    const lines = code.split("\n").filter((l) => l.includes("disabledDays"));
+    expect(lines.length, "disabledDays sites").toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(line, line.trim()).not.toMatch(/\.(nth|click)\(/);
+    }
+    expect(code).toContain("DATE_NOT_SELECTABLE");
+    // The only cell this file presses is one chosen from the page's SELECTABLE days.
+    expect(code).toMatch(/for \(const pair of state\.days\)/);
+    expect(code.split("cells.nth(").length - 1, "cell press sites").toBe(1);
+  });
 });
 
 describe("aside provider — focus belongs to the sign-in lane alone", () => {

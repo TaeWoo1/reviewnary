@@ -77,6 +77,9 @@ export const NAVER_OBSERVE_FAILURE_CODES = [
   "MONTH_NAV_EXHAUSTED",
   "DAY_CELL_NOT_FOUND",
   "DAY_CELL_AMBIGUOUS",
+  // The day asked for (or the month step toward it) is drawn `disabled` — the seller centre's own horizon.
+  // Not DAY_CELL_NOT_FOUND: that is a calendar this lane failed to read; this is the marketplace saying no.
+  "DATE_NOT_SELECTABLE",
   "RANGE_NOT_SETTABLE",
   "RANGE_MISMATCH",
   "READ_UNSETTLED",
@@ -486,7 +489,10 @@ export async function runNaverReviewObservation(deps: NaverObserveDeps): Promise
     range.valuesParsed < 2
     || range.endDaysBefore !== wantedEnd
     || range.startDaysBefore < 0
-    || range.startDaysBefore > 365
+    // A sanity bound on the PLAIN read only — the screen's own default period, which nobody asked for. A
+    // window is held to the exact start it asked for instead, and how far back that may be is the
+    // marketplace's call (2026-10-13: the 365-day horizon is gone from the window lane).
+    || (asked === null && range.startDaysBefore > 365)
     || (wantedStart !== null && range.startDaysBefore !== wantedStart)
   ) {
     log("aside_naver_review_read", {

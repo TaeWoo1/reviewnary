@@ -131,6 +131,8 @@ interface Calendar {
   twoPrev?: boolean;
   /** No single-step arrows at all — only the year jumps. */
   yearJumpsOnly?: boolean;
+  /** The single backward step is drawn but `disabled` — the component's own «no further». */
+  prevDisabled?: boolean;
 }
 
 /** The 6x7 grid as the component draws it: the previous month's tail, this month, the next month's head. */
@@ -171,7 +173,7 @@ function header(cal: Calendar): Spec {
       kids: [{ tag: "i", cls: "fn-booking fn-booking-last-backward1", attrs: { "aria-hidden": "true" } }] },
   ];
   if (!cal.yearJumpsOnly) {
-    arrows.push({ tag: "button", cls: "left",
+    arrows.push({ tag: "button", cls: "left", disabled: cal.prevDisabled === true,
       attrs: { "data-ng-click": "changeView(data.currentView, data.leftDate, $event)" },
       kids: [{ tag: "i", cls: "fn-booking fn-booking-backward1", attrs: { "aria-hidden": "true" } }] });
   }
@@ -279,6 +281,7 @@ function page(opts: { startValue?: string; endValue?: string; open?: "start" | "
 type SideAnswer = {
   dateIndex: number; open: boolean; year: number | null; month: number | null;
   weekdays: number; cells: number; prev: number[]; next: number[]; days: [number, number][];
+  disabledDays: number[]; prevBlocked: number; nextBlocked: number;
 };
 
 function pickerCensus(sandbox: Record<string, unknown>) {
@@ -370,6 +373,41 @@ describe("the open calendar, read as structure", () => {
     expect(s.days.map((d) => d[1])).not.toContain(9);
     expect(s.days.map((d) => d[1])).not.toContain(10);
     expect(s.days).toHaveLength(29);
+  });
+
+  it("a disabled day of the month on show is NAMED, as a bare number — never as an index that could be pressed", () => {
+    const sandbox = page({ open: "start", cal: { year: 2026, month: 10, disabledDays: [9, 10] } });
+    const s = pickerCensus(sandbox).sides.find((x) => x.open)!;
+    expect(s.disabledDays).toEqual([9, 10]);
+    // The neighbours' disabled filler days (`future disabled`) are not this month's, and are not named.
+    expect(s.disabledDays.every((d) => d === 9 || d === 10)).toBe(true);
+    // Every index handed back points at a cell that is NOT disabled.
+    const cells = (sandbox.document.querySelectorAll(NAVER_REVIEW_DAY_CELL_SELECTOR) as unknown as
+      { className: string }[]);
+    expect(s.days.length).toBeGreaterThan(0);
+    for (const [index] of s.days) {
+      expect(` ${cells[index]!.className} `).not.toContain(" disabled ");
+    }
+  });
+
+  it("a month drawn entirely disabled is still a readable day view — the marketplace's «no» is an answer", () => {
+    const all = Array.from({ length: 31 }, (_, i) => i + 1);
+    const r = pickerCensus(page({ open: "start", cal: { year: 2026, month: 10, disabledDays: all } }));
+    const s = r.sides.find((x) => x.dateIndex === 0)!;
+    expect(s.days).toEqual([]);
+    expect(s.disabledDays).toHaveLength(31);
+    expect(s.open).toBe(true);
+  });
+
+  it("a single-month step drawn disabled is counted as blocked, and never offered as a step", () => {
+    const r = pickerCensus(page({ open: "start", cal: { year: 2026, month: 10, prevDisabled: true } }));
+    const s = r.sides.find((x) => x.dateIndex === 0)!;
+    expect(s.prev).toEqual([]);
+    expect(s.prevBlocked).toBe(1);
+    // The year jump beside it is not a blocked month step, and the live forward step is untouched.
+    expect(s.next).toHaveLength(1);
+    expect(s.nextBlocked).toBe(0);
+    expect(s.open).toBe(true);
   });
 
   it("finds exactly one single-month step each way, and neither is a year jump", () => {

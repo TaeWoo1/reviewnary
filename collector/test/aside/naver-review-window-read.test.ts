@@ -6,18 +6,25 @@ import {
   type NaverWindowTabLike,
 } from "../../src/aside/naver-review-window-runtime";
 import {
+  buildNaverReviewRuntimePlan,
   buildNaverReviewWindowRuntimePlan,
   buildNaverReviewWindowRuntimeProgram,
   civilDayOf,
   kstDaysBeforeDay,
+  naverReviewWindowCliTimeoutMs,
   parseNaverReviewWindowRuntimeResult,
 } from "../../src/aside/naver-review-executor";
+import { ASIDE_REPL_CEILING_MS } from "../../src/aside/aside-cli";
 import {
   NAVER_REVIEW_DATE_INPUT_SELECTOR,
   NAVER_REVIEW_DAY_CELL_SELECTOR,
-  NAVER_REVIEW_MAX_MONTH_MOVES,
+  NAVER_REVIEW_MONTH_MOVE_CEILING,
+  NAVER_REVIEW_MONTH_MOVE_MARGIN,
   NAVER_REVIEW_QUERY_CONTROL_SELECTOR,
   NAVER_REVIEW_READ_WORKFLOW,
+  NAVER_REVIEW_WINDOW_READ_SETTLE_MS,
+  NAVER_REVIEW_WINDOW_RUN_BUDGET_MS,
+  naverReviewMonthMoveAllowance,
 } from "../../src/aside/naver-review-workflow";
 import {
   executorFailureCode,
@@ -64,9 +71,14 @@ const plan: NaverReviewWindowRuntimePlan = {
   maxMonthMoves: 13,
   routeWaitTimeoutMs: 2_000,
   routePollMs: 1,
+  loadWaitMs: 1_000,
+  runBudgetMs: 60_000,
+  navigationBudgetMs: 50_000,
   settleTimeoutMs: 5_000,
   pollMs: 1,
   pickerSettleMs: 0,
+  monthStepSettleMs: 0,
+  monthStepPollMs: 0,
   searchSettleMs: 0,
 };
 
@@ -109,6 +121,18 @@ interface Screen {
   titleUnknown?: boolean;
   /** The requested day is not among the selectable cells. */
   targetAbsent?: boolean;
+  /** The requested START day is on the page but drawn `disabled` — the marketplace's horizon. */
+  targetDisabled?: boolean;
+  /** Every day of the month on show is drawn `disabled`. */
+  monthDisabled?: boolean;
+  /** Single-month steps the component drew but disabled, per direction. */
+  prevBlocked?: number;
+  nextBlocked?: number;
+  /**
+   * A virtual clock. When given, `wait(ms)` advances it by `ms`, every press by `clickMs` and every evaluate by
+   * `evaluateMs` — so a run's budgets are exercised in simulated time, not skipped.
+   */
+  clock?: { t: number; clickMs: number; evaluateMs: number };
   /** The requested day is offered twice — the way choosing by number goes wrong. */
   targetTwice?: boolean;
   /** The field keeps its old value after the cell is clicked. */
@@ -165,7 +189,11 @@ function screen(over: Screen = {}) {
     return s.openerCandidates && dateIndex in s.openerCandidates ? s.openerCandidates[dateIndex]! : 1;
   };
 
+  const tick = (ms: number) => {
+    if (s.clock) s.clock.t += ms;
+  };
   const pressClick = (i: number) => {
+    tick(s.clock?.clickMs ?? 0);
     const openerPosition = [0, 1].find((p) => accepted.length === 2 && opener(p) === i);
     if (openerPosition !== undefined) {
       open = openerPosition;
@@ -202,6 +230,7 @@ function screen(over: Screen = {}) {
         return;
       }
       if (selector === "CELLS") {
+        tick(s.clock?.clickMs ?? 0);
         const day = (index ?? 0) - CELL_BASE;
         acts.push(`click:cell:${day}`);
         if (open !== null && !s.pickIgnored) {
@@ -218,6 +247,7 @@ function screen(over: Screen = {}) {
 
   const tab: NaverWindowTabLike = {
     evaluate: async (script: string) => {
+      tick(s.clock?.evaluateMs ?? 0);
       if (script === "CONTROLS") {
         censusReads += 1;
         const hashOk = s.hashOkFromRead !== undefined
@@ -254,8 +284,14 @@ function screen(over: Screen = {}) {
             }
             const len = DAYS_IN(shown.year, shown.month);
             const days: [number, number][] = [];
+            const disabledDays: number[] = [];
             for (let d = 1; d <= len; d++) {
               if (s.targetAbsent && (d === plan.requestedStart.day || d === plan.requestedEnd.day)) continue;
+              // As the picker script reports a disabled day: its NUMBER, and no index to press.
+              if (s.monthDisabled || (s.targetDisabled && d === plan.requestedStart.day)) {
+                disabledDays.push(d);
+                continue;
+              }
               days.push([CELL_BASE + d, d]);
             }
             if (s.targetTwice) {
@@ -271,7 +307,10 @@ function screen(over: Screen = {}) {
               cells: 42,
               prev: s.prev,
               next: s.next,
+              prevBlocked: s.prevBlocked ?? 0,
+              nextBlocked: s.nextBlocked ?? 0,
               days,
+              disabledDays,
             };
           }),
         };
@@ -290,7 +329,7 @@ function screen(over: Screen = {}) {
   const env = {
     openTab: async () => tab,
     closeTab: async () => void closed.push("closed"),
-    wait: async () => undefined,
+    wait: async (ms: number) => void tick(ms),
   };
   const touched = () => acts.filter((a) => !a.startsWith("count:") && a !== "evaluate:READER");
   return { env, acts, closed, values, touched };
@@ -536,7 +575,8 @@ describe("the month on show — identified, then proved", () => {
     // Eleven steps on each calendar. A single shared allowance of thirteen would have stopped the second
     // field halfway for no reason but the first one's distance.
     expect(r).toMatchObject({ ok: true, monthMoves: 22 });
-    expect(NAVER_REVIEW_MAX_MONTH_MOVES).toBeGreaterThanOrEqual(12);
+    expect(naverReviewMonthMoveAllowance({ year: 2026, month: 10 }, { year: 2025, month: 11 }))
+      .toBeGreaterThanOrEqual(11);
   });
 
   it("a period further back than the bound stops, with the steps it had taken", async () => {
@@ -601,13 +641,14 @@ describe("the window plan and its program", () => {
     expect(built!.dateInputSelector).toBe(NAVER_REVIEW_DATE_INPUT_SELECTOR);
     expect(built!.queryControlSelector).toBe(NAVER_REVIEW_QUERY_CONTROL_SELECTOR);
     expect(built!.dayCellSelector).toBe(NAVER_REVIEW_DAY_CELL_SELECTOR);
-    expect(built!.maxMonthMoves).toBe(NAVER_REVIEW_MAX_MONTH_MOVES);
+    // One month back, plus the margin — derived from the window, not a flat number.
+    expect(built!.maxMonthMoves).toBe(1 + NAVER_REVIEW_MONTH_MOVE_MARGIN);
     expect(built!.pickerScript.length).toBeGreaterThan(0);
   });
 
-  it("refuses a period that is reversed, in the future, or further back than a year", () => {
+  it("refuses a period that is reversed, in the future, past the runaway ceiling, or not a date", () => {
     for (const w of [{ start: "2026-09-09", end: "2026-09-03" }, { start: "2026-10-09", end: "2026-10-12" },
-      { start: "2024-01-01", end: "2024-01-07" }, { start: "nope", end: "2026-09-09" }]) {
+      { start: "2016-01-01", end: "2016-01-07" }, { start: "nope", end: "2026-09-09" }]) {
       expect(buildNaverReviewWindowRuntimePlan(NAVER_REVIEW_READ_WORKFLOW, NOW, w), JSON.stringify(w)).toBeNull();
     }
   });
@@ -1009,5 +1050,222 @@ describe("빈 기간 — 읽었고, 저장할 것이 없고, 귀속할 것도 �
       executor: windowExecutor({ ok: true, reading: contradictory, range, monthMoves: 0, elapsedMs: 1 }),
     });
     expect(r.outcome).toBe("STORE_UNRESOLVED");
+  });
+});
+
+/**
+ * **Backfill is unattended and goes back further than a year (product decision, 2026-10-13).**
+ *
+ * The 365-day refusal and the flat 13-step allowance are gone; what replaces them is pinned here:
+ *
+ *  - a window two years back PLANS, and RUNS on the fake page inside the real budgets, in simulated time;
+ *  - the read's settle budget starts at the verified period — a long navigation no longer eats it;
+ *  - the navigation's share of the run is bounded, and running past it is a named stop before 조회;
+ *  - the month-step allowance is derived from the window and capped at a runaway ceiling;
+ *  - how far back is the marketplace's call: a `disabled` day — or a disabled step toward it — is
+ *    `DATE_NOT_SELECTABLE`, nothing is pressed on it, and no period is reported.
+ */
+describe("the backfill window — further than a year, inside the budgets", () => {
+  const TWO_YEARS = { start: "2024-10-01", end: "2024-10-31" };
+
+  /** The real plan for a window, with the page scripts swapped for the fake page's names. */
+  function realPlan(window: { start: string; end: string }): NaverReviewWindowRuntimePlan {
+    const built = buildNaverReviewWindowRuntimePlan(NAVER_REVIEW_READ_WORKFLOW, NOW, window);
+    expect(built, JSON.stringify(window)).not.toBeNull();
+    return { ...built!, entryUrl: plan.entryUrl, controlsScript: "CONTROLS", authScript: "AUTH",
+      readerScript: "READER", rangeScript: "RANGE", pickerScript: "PICKER", storeFingerprintScript: undefined,
+      dateInputSelector: "DATES", queryControlSelector: "QUERY", dayCellSelector: "CELLS" };
+  }
+
+  async function runOnClock(p: NaverReviewWindowRuntimePlan, clickMs: number, evaluateMs: number) {
+    const clock = { t: 1_000_000, clickMs, evaluateMs };
+    const spy = vi.spyOn(Date, "now").mockImplementation(() => clock.t);
+    try {
+      const h = screen({
+        clock,
+        showsAfterSearch: { valuesParsed: 2, startDaysBefore: p.requestedStartDaysBefore,
+          endDaysBefore: p.requestedEndDaysBefore },
+      });
+      const r = await asideNaverReviewWindowRuntime(p, h.env);
+      return { r, h, spent: clock.t - 1_000_000 };
+    } finally {
+      spy.mockRestore();
+    }
+  }
+
+  it("a window two years back is a plan — the 365-day horizon is gone", () => {
+    const p = buildNaverReviewWindowRuntimePlan(NAVER_REVIEW_READ_WORKFLOW, NOW, TWO_YEARS);
+    expect(p).not.toBeNull();
+    expect(p!.requestedStartDaysBefore).toBe(kstDaysBeforeDay("2024-10-01", NOW));
+    expect(p!.requestedStartDaysBefore).toBeGreaterThan(700);
+    // 24 months back, plus the margin.
+    expect(p!.maxMonthMoves).toBe(24 + NAVER_REVIEW_MONTH_MOVE_MARGIN);
+  });
+
+  it("the window lane has its own budgets, under Aside's ceiling — the plain read keeps its own", () => {
+    const p = buildNaverReviewWindowRuntimePlan(NAVER_REVIEW_READ_WORKFLOW, NOW, TWO_YEARS)!;
+    expect(p.runBudgetMs).toBe(NAVER_REVIEW_WINDOW_RUN_BUDGET_MS);
+    expect(p.settleTimeoutMs).toBe(NAVER_REVIEW_WINDOW_READ_SETTLE_MS);
+    // The read's share is reserved out of the run before the navigation gets the rest.
+    expect(p.navigationBudgetMs + p.settleTimeoutMs + p.searchSettleMs).toBe(p.runBudgetMs);
+    expect(p.loadWaitMs).toBeLessThan(p.navigationBudgetMs);
+    // The CLI waits for the whole program, and never longer than Aside itself will.
+    expect(naverReviewWindowCliTimeoutMs(p)).toBeGreaterThan(p.runBudgetMs);
+    expect(naverReviewWindowCliTimeoutMs(p)).toBeLessThanOrEqual(ASIDE_REPL_CEILING_MS);
+    expect(naverReviewWindowCliTimeoutMs(p)).toBeGreaterThan(NAVER_REVIEW_READ_WORKFLOW.settleTimeoutMs + 30_000);
+    // The plain 7-day read is unchanged.
+    expect(NAVER_REVIEW_READ_WORKFLOW.settleTimeoutMs).toBe(45_000);
+    expect(buildNaverReviewRuntimePlan(NAVER_REVIEW_READ_WORKFLOW, NOW).settleTimeoutMs).toBe(45_000);
+  });
+
+  it("the executor hands the CLI the window ceiling, not the plain read's settle + 30 s", async () => {
+    const seen: (number | undefined)[] = [];
+    vi.resetModules();
+    vi.doMock("../../src/aside/aside-cli", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("../../src/aside/aside-cli")>()),
+      runAsideRepl: async (_program: string, opts: { timeoutMs?: number } = {}) => {
+        seen.push(opts.timeoutMs);
+        return { kind: "NO_RESULT", reason: "UNAVAILABLE", elapsedMs: 0, exitCode: null, signal: null };
+      },
+    }));
+    try {
+      const mod = await import("../../src/aside/naver-review-executor");
+      const ex = new mod.AsideNaverReviewExecutor({ now: () => NOW });
+      await ex.executeWindow(TWO_YEARS);
+      await ex.execute();
+    } finally {
+      vi.doUnmock("../../src/aside/aside-cli");
+      vi.resetModules();
+    }
+    // The window run waits for its whole program; the plain read keeps the ceiling it always had.
+    expect(seen).toEqual([NAVER_REVIEW_WINDOW_RUN_BUDGET_MS + 10_000, NAVER_REVIEW_READ_WORKFLOW.settleTimeoutMs + 30_000]);
+  });
+
+  it("two years back RUNS on the fake page, inside the run budget, at a realistic step cost", async () => {
+    const p = realPlan(TWO_YEARS);
+    // 300 ms per press and 50 ms per evaluate, in simulated time; the page redraws on the first poll.
+    const { r, h, spent } = await runOnClock(p, 300, 50);
+    expect(r).toMatchObject({ ok: true, monthMoves: 48 });
+    expect(h.touched().filter((a) => a === "click:prev")).toHaveLength(48);
+    expect(h.touched().at(-1)).toBe("click:search");
+    expect(spent).toBeLessThan(p.navigationBudgetMs);
+    expect(spent).toBeLessThan(p.runBudgetMs);
+  });
+
+  it("the read's settle starts at the verified period — a navigation longer than it no longer eats it", async () => {
+    // ~1.1 s per step for 48 steps: the navigation alone passes the read's whole 30 s settle. Measured from the
+    // tab opening (the old rule) the read would have had nothing left; measured from VERIFY it reads.
+    const p = realPlan(TWO_YEARS);
+    const { r, spent } = await runOnClock(p, 1_000, 50);
+    expect(spent).toBeGreaterThan(p.settleTimeoutMs);
+    expect(r).toMatchObject({ ok: true, monthMoves: 48 });
+  });
+
+  it("past the navigation's share of the run it stops BEFORE 조회, with a word — never killed mid-step", async () => {
+    const p = realPlan(TWO_YEARS);
+    const { r, h, spent } = await runOnClock(p, 2_000, 50);
+    expect(r).toMatchObject({ ok: false, code: "MONTH_NAV_EXHAUSTED" });
+    expect(h.touched()).not.toContain("click:search");
+    expect(h.acts).not.toContain("evaluate:READER");
+    expect(spent).toBeLessThan(p.runBudgetMs);
+  });
+
+  it("the move allowance is derived from the window and capped at the runaway ceiling", () => {
+    const asOf = { year: 2026, month: 10 };
+    expect(naverReviewMonthMoveAllowance(asOf, { year: 2026, month: 10 })).toBe(NAVER_REVIEW_MONTH_MOVE_MARGIN);
+    expect(naverReviewMonthMoveAllowance(asOf, { year: 2024, month: 10 })).toBe(24 + NAVER_REVIEW_MONTH_MOVE_MARGIN);
+    // Exactly at the ceiling is allowed; one month past it is refused.
+    const lastMonths = NAVER_REVIEW_MONTH_MOVE_CEILING - NAVER_REVIEW_MONTH_MOVE_MARGIN;
+    const last = { year: Math.floor((2026 * 12 + 10 - lastMonths - 1) / 12),
+      month: ((2026 * 12 + 10 - lastMonths - 1) % 12) + 1 };
+    expect(naverReviewMonthMoveAllowance(asOf, last)).toBe(NAVER_REVIEW_MONTH_MOVE_CEILING);
+    const beyond = { year: last.month === 1 ? last.year - 1 : last.year, month: last.month === 1 ? 12 : last.month - 1 };
+    expect(naverReviewMonthMoveAllowance(asOf, beyond)).toBeNull();
+    expect(NAVER_REVIEW_MONTH_MOVE_CEILING).toBeLessThanOrEqual(120);
+    // A future start month is not an allowance.
+    expect(naverReviewMonthMoveAllowance(asOf, { year: 2026, month: 11 })).toBeNull();
+  });
+
+  it("the ceiling holds at runtime: a calendar that never reaches the month stops at the allowance", async () => {
+    // A title that keeps moving one month at a time but the target is further than the allowance.
+    const far: NaverReviewWindowRuntimePlan = {
+      ...plan,
+      maxMonthMoves: 3,
+      requestedStart: { year: 2024, month: 10, day: 3 },
+      requestedEnd: { year: 2024, month: 10, day: 9 },
+    };
+    const h = screen();
+    const r = await asideNaverReviewWindowRuntime(far, h.env);
+    expect(r).toMatchObject({ ok: false, code: "MONTH_NAV_EXHAUSTED", stage: "PICK_START", candidates: 3 });
+    expect(h.touched().filter((a) => a === "click:prev")).toHaveLength(3);
+  });
+
+  it("a disabled target day is DATE_NOT_SELECTABLE — nothing is pressed on it, no period is reported", async () => {
+    const h = screen({ targetDisabled: true });
+    const r = await asideNaverReviewWindowRuntime(plan, h.env);
+    expect(r).toMatchObject({ ok: false, code: "DATE_NOT_SELECTABLE", stage: "PICK_START" });
+    expect(h.touched()).toEqual(["click:opener:0", "click:prev"]);
+    expect(h.touched().filter((a) => a.startsWith("click:cell"))).toEqual([]);
+    expect(h.acts).not.toContain("evaluate:READER");
+  });
+
+  it("a month drawn entirely disabled is still read as a calendar — and still DATE_NOT_SELECTABLE", async () => {
+    const r = await asideNaverReviewWindowRuntime(plan, screen({ monthDisabled: true }).env);
+    expect(r).toMatchObject({ ok: false, code: "DATE_NOT_SELECTABLE", stage: "PICK_START" });
+  });
+
+  it("a month step toward the target that the component disabled is DATE_NOT_SELECTABLE, not NOT_FOUND", async () => {
+    const blocked = await asideNaverReviewWindowRuntime(plan, screen({ prev: [], prevBlocked: 1 }).env);
+    expect(blocked).toMatchObject({ ok: false, code: "DATE_NOT_SELECTABLE", stage: "PICK_START", candidates: 0 });
+    // A step that is simply absent stays the calendar-reading stop it always was.
+    const absent = await asideNaverReviewWindowRuntime(plan, screen({ prev: [] }).env);
+    expect(absent).toMatchObject({ ok: false, code: "MONTH_NAV_NOT_FOUND" });
+  });
+
+  it("DATE_NOT_SELECTABLE is a word the parser and the runner's closed list both publish", async () => {
+    expect(parseNaverReviewWindowRuntimeResult({ ok: false, code: "DATE_NOT_SELECTABLE", stage: "PICK_END",
+      candidates: 0, labelled: null, monthMoves: 24, elapsedMs: 3 }))
+      .toMatchObject({ ok: false, code: "DATE_NOT_SELECTABLE", stage: "PICK_END" });
+    expect(NAVER_OBSERVE_FAILURE_CODES).toContain("DATE_NOT_SELECTABLE");
+    const r = await runNaverReviewObservation({
+      deliver: vi.fn(async (_request: unknown) => ({ identityVerdict: "MATCH", received: 0, inserted: 0,
+        changed: 0, skipped: 0, failed: 0 }) as NaverDeliveryResponse),
+      window: TWO_YEARS,
+      executor: {
+        execute: vi.fn(),
+        executeWindow: vi.fn(async () => ({ kind: "RESULT" as const, llmCalls: 0 as const,
+          result: { ok: false, code: "DATE_NOT_SELECTABLE", stage: "PICK_START", candidates: 0, labelled: null,
+            monthMoves: 24, elapsedMs: 3 } as never })),
+        asOf: () => NOW,
+      },
+    });
+    expect(r).toMatchObject({ outcome: "SURFACE_UNREADABLE", failureCode: "DATE_NOT_SELECTABLE" });
+  });
+
+  it("the runner accepts a verified window two years back — its old 365 bound no longer refuses it", async () => {
+    const start = kstDaysBeforeDay(TWO_YEARS.start, NOW)!;
+    const end = kstDaysBeforeDay(TWO_YEARS.end, NOW)!;
+    const deliver = vi.fn(async (_request: unknown) => ({ identityVerdict: "MATCH", received: 0, inserted: 0,
+      changed: 0, skipped: 0, failed: 0 }) as NaverDeliveryResponse);
+    const r = await runNaverReviewObservation({
+      deliver,
+      window: TWO_YEARS,
+      executor: {
+        execute: vi.fn(),
+        executeWindow: vi.fn(async () => ({ kind: "RESULT" as const, llmCalls: 0 as const, result: {
+          ok: true,
+          reading: { reason: "OK", modelType: "infinite", rowCount: 0, loaded: 0, rows: [] },
+          range: { dateInputCount: 2, valuesParsed: 2, startDaysBefore: start, endDaysBefore: end,
+            pagerNumberCount: 0, highestPagerNumber: 0 },
+          monthMoves: 48, elapsedMs: 1,
+        } as never })),
+        asOf: () => NOW,
+      },
+    });
+    expect(r.outcome).toBe("OBSERVED");
+    const sent = deliver.mock.calls[0]![0] as unknown as { windowStart: string; windowEnd: string; windowDays: number };
+    expect(sent.windowStart).toBe(TWO_YEARS.start);
+    expect(sent.windowEnd).toBe(TWO_YEARS.end);
+    expect(sent.windowDays).toBe(31);
   });
 });
