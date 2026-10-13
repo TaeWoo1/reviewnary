@@ -621,7 +621,7 @@ class ReviewCatchUpOrchestratorTest {
     }
 
     @Test
-    @DisplayName("앞쪽 공백을 먼저(오래된 것부터), 그다음 경계 앞 이력을 최신부터 31일씩 — 한 번의 walk로")
+    @DisplayName("앞쪽 공백을 먼저(오래된 것부터), 그다음 경계 앞 이력을 최신부터 28일씩 — 한 번의 walk로")
     void forwardGapsThenHistoryNewestFirst() {
         coveredThrough(10); // 덮인 구간: today-70 … today-10
         ReviewCatchUpOrchestrator h = withHistory(today.minusDays(130));
@@ -643,27 +643,27 @@ class ReviewCatchUpOrchestratorTest {
             walked.add(shown(child.get()));
             settleAsRead(child.get(), 10, 500);
         }
-        assertThat(walked).containsExactly(days(9, 3), days(2, 1), days(101, 71), days(130, 102));
+        assertThat(walked).containsExactly(days(9, 3), days(2, 1), days(98, 71), days(126, 99), days(130, 127));
         ReviewCatchUpRun run = runs.findById(started.run().getId()).orElseThrow();
         assertThat(run.getState()).isEqualTo(ReviewCatchUpState.COMPLETE);
         assertThat(run.getStopReason()).isNull();
         assertThat(run.getPhase()).isEqualTo(ReviewCatchUpRun.Phase.HISTORY);
-        assertThat(run.getWindowsDone()).isEqualTo(4);
+        assertThat(run.getWindowsDone()).isEqualTo(5);
         assertThat(run.getDaysCovered()).isEqualTo(9 + 60);
     }
 
     @Test
-    @DisplayName("경계가 없어도 기록된 시작일이 있으면 걷는다 — 어제부터 거꾸로, 31일씩")
+    @DisplayName("경계가 없어도 기록된 시작일이 있으면 걷는다 — 어제부터 거꾸로, 28일씩")
     void noBoundaryWalksHistory() {
         ReviewCatchUpOrchestrator h = withHistory(today.minusDays(40));
         ReviewCatchUpOrchestrator.Started started = pressWith(h, "press-1").orElseThrow();
 
         assertThat(started.run().getPhase()).isEqualTo(ReviewCatchUpRun.Phase.HISTORY);
         assertThat(started.run().getRequestedFrom()).isEqualTo(today.minusDays(40));
-        assertThat(shown(started.firstJob())).isEqualTo(days(31, 1));
+        assertThat(shown(started.firstJob())).isEqualTo(days(28, 1));
         settleAsRead(started.firstJob(), 10, 500);
         ScheduledAsideJob older = onDesk().orElseThrow();
-        assertThat(shown(older)).isEqualTo(days(40, 32));
+        assertThat(shown(older)).isEqualTo(days(40, 29));
         settleAsRead(older, 10, 500);
         assertThat(onDesk()).isEmpty();
         assertThat(runs.findById(started.run().getId()).orElseThrow().getState())
@@ -719,16 +719,62 @@ class ReviewCatchUpOrchestratorTest {
     void tooManyRowsInHistorySplitsNewestHalfFirst() {
         ReviewCatchUpOrchestrator h = withHistory(today.minusDays(40));
         ScheduledAsideJob first = pressWith(h, "press-1").orElseThrow().firstJob();
-        assertThat(shown(first)).isEqualTo(days(31, 1));
+        assertThat(shown(first)).isEqualTo(days(28, 1));
 
         settleAsFailure(first, AsideJobOutcome.SURFACE_UNREADABLE, "TOO_MANY_ROWS");
         ScheduledAsideJob newer = onDesk().orElseThrow();
-        assertThat(shown(newer)).isEqualTo(days(15, 1));
+        assertThat(shown(newer)).isEqualTo(days(14, 1));
         settleAsRead(newer, 100, 500);
         ScheduledAsideJob older = onDesk().orElseThrow();
-        assertThat(shown(older)).isEqualTo(days(31, 16));
+        assertThat(shown(older)).isEqualTo(days(28, 15));
         settleAsRead(older, 100, 500);
-        assertThat(shown(onDesk().orElseThrow())).isEqualTo(days(40, 32));
+        assertThat(shown(onDesk().orElseThrow())).isEqualTo(days(40, 29));
+    }
+
+    /**
+     * 2026-10-13 첫 라이브 이력 walk: 05-31…06-30은 통째로 읽혔고, 같은 31일인 04-30…05-30은 화면이 하루 짧은 기간에
+     * 멈춰 RANGE_MISMATCH였다. 이력에서 그 코드는 「더 짧게 물어라」다 — 걷기를 끝내지 않고 반으로 나눈다.
+     */
+    @Test
+    @DisplayName("이력 창의 RANGE_MISMATCH는 실패가 아니라 쪼갬이다 — 최신 절반부터, 나머지를 정확히 이어서")
+    void rangeMismatchInHistorySplits() {
+        ReviewCatchUpOrchestrator h = withHistory(today.minusDays(40));
+        ScheduledAsideJob first = pressWith(h, "press-1").orElseThrow().firstJob();
+        assertThat(shown(first)).isEqualTo(days(28, 1));
+
+        settleAsFailure(first, AsideJobOutcome.SURFACE_UNREADABLE, "RANGE_MISMATCH");
+        ScheduledAsideJob newer = onDesk().orElseThrow();
+        assertThat(shown(newer)).isEqualTo(days(14, 1));
+        ReviewCatchUpRun run = runs.findById(first.getCatchUpRunId()).orElseThrow();
+        assertThat(run.getState()).isEqualTo(ReviewCatchUpState.RUNNING);
+        settleAsRead(newer, 100, 500);
+        assertThat(shown(onDesk().orElseThrow())).isEqualTo(days(28, 15));
+    }
+
+    @Test
+    @DisplayName("하루짜리 이력 창도 RANGE_MISMATCH면 더 쪼갤 수 없다 — 예전처럼 FAILED")
+    void rangeMismatchOnOneHistoryDayFails() {
+        ReviewCatchUpOrchestrator h = withHistory(today.minusDays(1));
+        ScheduledAsideJob child = pressWith(h, "press-1").orElseThrow().firstJob();
+        assertThat(child.getRequestedWindowStart()).isEqualTo(child.getRequestedWindowEnd());
+        settleAsFailure(child, AsideJobOutcome.SURFACE_UNREADABLE, "RANGE_MISMATCH");
+
+        ReviewCatchUpRun run = runs.findById(child.getCatchUpRunId()).orElseThrow();
+        assertThat(run.getState()).isEqualTo(ReviewCatchUpState.FAILED);
+        assertThat(run.getStopReason()).isEqualTo("RANGE_MISMATCH");
+        assertThat(onDesk()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("앞쪽 공백 창의 RANGE_MISMATCH는 쪼개지 않는다 — 그 창은 7일이고 기간 상한 탓이 아니다")
+    void rangeMismatchInForwardGapStillFails() {
+        coveredThrough(36);
+        ScheduledAsideJob first = press("press-1").orElseThrow().firstJob();
+        settleAsFailure(first, AsideJobOutcome.SURFACE_UNREADABLE, "RANGE_MISMATCH");
+
+        ReviewCatchUpRun run = runs.findById(first.getCatchUpRunId()).orElseThrow();
+        assertThat(run.getState()).isEqualTo(ReviewCatchUpState.FAILED);
+        assertThat(run.getStopReason()).isEqualTo("RANGE_MISMATCH");
     }
 
     @Test
@@ -749,7 +795,7 @@ class ReviewCatchUpOrchestratorTest {
             }
             child = onDesk().orElse(null);
         }
-        assertThat(walked).containsExactly(days(31, 1), days(40, 32), days(35, 32), days(40, 36), days(37, 36),
+        assertThat(walked).containsExactly(days(28, 1), days(40, 29), days(34, 29), days(40, 35), days(37, 35),
                 days(40, 38), days(38, 38));
         ReviewCatchUpRun run = runs.findById(runId).orElseThrow();
         assertThat(run.getState()).as("경계까지 읽은 것은 실패가 아니다").isEqualTo(ReviewCatchUpState.COMPLETE);
@@ -818,8 +864,8 @@ class ReviewCatchUpOrchestratorTest {
         assertThat(limits.maxDays()).isEqualTo(400);
         assertThat(limits.maxRows()).isEqualTo(12_000);
         assertThat(limits.maxElapsed()).isEqualTo(Duration.ofMinutes(20));
-        // 1년 = 31일 창 12개 — 창 상한의 절반이라 쪼갬이 있어도 한 walk에 들어간다.
-        assertThat(366 / ReviewCatchUpRun.HISTORY_STEP_DAYS + 1).isLessThanOrEqualTo(limits.maxWindows() / 2);
-        assertThat(limits.maxDays()).isGreaterThan(366 + 31);
+        // 1년 = 28일 창 14개 — 쪼갬 열 번이 들어갈 여유를 남기고 한 walk에 들어간다.
+        assertThat(366 / ReviewCatchUpRun.HISTORY_STEP_DAYS + 1).isLessThanOrEqualTo(limits.maxWindows() - 10);
+        assertThat(limits.maxDays()).isGreaterThan(366 + ReviewCatchUpRun.HISTORY_STEP_DAYS);
     }
 }

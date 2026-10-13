@@ -44,12 +44,19 @@ public record ReviewCatchUpPlan(List<CoveredWindow> windows, Stop stopped, long 
     }
 
     /**
-     * How many days one history window spans. 31, against 7 forward: history is read once, unattended, and a
-     * year in seven-day windows is 53 reads where 31-day windows make 12. A month that holds more than one
+     * How many days one history window spans. 28, against 7 forward: history is read once, unattended, and a
+     * year in seven-day windows is 53 reads where 28-day windows make 14. A month that holds more than one
      * page does not get lost to the larger stride — it comes back PARTIAL (or {@code TOO_MANY_ROWS}) and the walk
      * halves it, down to a single day.
+     *
+     * <p>Not 31: the first live history walk (2026-10-13, {@code apr-449b0c62eea9}) read 2026-05-31..06-30 whole
+     * and then got {@code RANGE_MISMATCH} on 2026-04-30..05-30 — the same 31 days, one day short of matching.
+     * That is what a search period capped at "start + one month − one day" does (05-31 + 1 month rolls to
+     * 07-01, so 06-30 fits; 04-30 + 1 month is 05-30, so the screen ends the period on 05-29). The cap itself is
+     * inferred, not read — the screen's dates never leave the helper. 28 days fits under it in every month; a
+     * window that still comes back mismatched is halved ({@code ReviewCatchUpOrchestrator}).
      */
-    public static final int HISTORY_STEP_DAYS = 31;
+    public static final int HISTORY_STEP_DAYS = 28;
 
     /**
      * How much one press may set in motion.

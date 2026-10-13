@@ -123,6 +123,9 @@ public class ReviewCatchUpOrchestrator {
     /** The reader's word for a page that held more rows than it reads at once — a window to halve. */
     static final String TOO_MANY_ROWS = "TOO_MANY_ROWS";
 
+    /** The window lane's word for a period the screen did not settle on exactly as asked. */
+    static final String RANGE_MISMATCH = "RANGE_MISMATCH";
+
     private final ReviewCatchUpRunRepository runs;
     private final ReviewCoverageCursor coverage;
     private final ScheduledAsideJobService jobs;
@@ -456,6 +459,20 @@ public class ReviewCatchUpOrchestrator {
                 return;
             }
             continueWalk(run, child);
+            return;
+        }
+        if (child.getOutcome() != AsideJobOutcome.OBSERVED && RANGE_MISMATCH.equals(child.getFailureCode())
+                && run.getPhase() == ReviewCatchUpRun.Phase.HISTORY) {
+            // <b>The screen settled on a different period than the one asked for — nothing was ingested.</b>
+            // In history this is what a period longer than the marketplace allows looks like (2026-10-13: a
+            // 31-day window ending one day past "start + one month − one day"). Halve it and ask again; a
+            // shorter period is what the screen is telling us to ask for. Down to one day, where a mismatch
+            // is no longer about length and the walk stops FAILED as before.
+            if (run.split(start, end)) {
+                continueWalk(run, child);
+                return;
+            }
+            stop(run, ReviewCatchUpState.FAILED, RANGE_MISMATCH);
             return;
         }
         if (child.getOutcome() != AsideJobOutcome.OBSERVED && DATE_NOT_SELECTABLE.equals(child.getFailureCode())
