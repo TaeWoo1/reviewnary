@@ -366,7 +366,7 @@ walk는 `turn()`의 첫 줄에서 돌아나갔다 — KST 자정마다 창이 �
   한 이유는 그대로이고, 이 값은 판매자/기본값이 **저장한** 선택이라 그 규칙에 걸리지 않는다
   (`ReviewCoverageCursor`, `ReviewCatchUpPlan`).
 - **한 walk, 두 단계.** 먼저 forward gap(7일 창, 오래된 것부터), 그 다음 `phase=HISTORY`로 바뀌어
-  `[history_from, coverageFrom − 1]`(증거가 없으면 어제까지)을 **최근 → 과거** 순서로 31일 창씩 읽는다.
+  `[history_from, coverageFrom − 1]`(증거가 없으면 어제까지)을 **최근 → 과거** 순서로 28일 창씩 읽는다(처음 31일 — 라이브가 줄였다).
   최근부터 읽는 이유: 행이 있는 창이 먼저 화면 지문(§11-1)을 가르쳐야 조용한 옛 달의 빈 기간이 귀속된다.
 - **넘치면 나눈다.** `PARTIAL`과 `TOO_MANY_ROWS`(행 500 초과 · `SURFACE_UNREADABLE`) 모두 창을 반으로 나눠
   최근 반쪽부터 다시 읽는다. 하루가 여전히 넘치면 `STOPPED_SATURATED`.
@@ -380,6 +380,10 @@ walk는 `turn()`의 첫 줄에서 돌아나갔다 — KST 자정마다 창이 �
 - **자동 확인이 꺼져 있으면 과거도 읽지 않는다**(누름 포함).
 - **도우미 쪽 상한**(`docs/review/naver_review_date_picker_capability_v1.md` §3·§7): 365일 상한과 고정 13걸음을
   걷어내고 목표까지의 거리 + 2걸음, 절대 상한 120걸음. 창 run 110초(읽기 settle 30초는 기간 검증 시점부터).
-- **아직 live 미증명:** 여러 달을 넘기는 과거 창 읽기, 실측 걸음 시간, NAVER가 1년보다 오래된 날짜를 여는지,
-  실제 스토어에서 1년이 한도 안에 끝나는지, 리뷰 화면의 사진 표시. 증명 전까지 이 절은 **구현 계약**이다.
+- **라이브 (2026-10-13, `apr-27f15a9538af`):** 버튼 1회로 HISTORY walk가 2025-10-13까지 28일 창 9개를 4분 35초에
+  읽었다 — 전부 BOUNDED(관측=화면 총 건수), 달력 10~24걸음, 사진 참조 +1,612. 첫 시도의 31일 창이
+  `RANGE_MISMATCH`였던 것이 창 28일과 「HISTORY의 RANGE_MISMATCH는 나눈다」의 이유다(원인은 추론).
+  `docs/evidence/INDEX.md` 2026-10-13 행.
+- **아직 live 미증명:** RANGE_MISMATCH의 진짜 원인, NAVER가 1년보다 오래된 날짜를 여는지,
+  `DATE_NOT_SELECTABLE`·`TOO_MANY_ROWS` 분기, 리뷰 화면의 사진 표시(브라우저).
 - 미리보기(`CollectNowService.catchUpPlan`)는 아직 forward gap만 보여준다.
