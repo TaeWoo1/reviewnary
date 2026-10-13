@@ -26,6 +26,11 @@ public record ChannelReviewItemView(
         String vendorItemId,
         int mediaCount,
         /**
+         * Whether {@code mediaCount} is a reading ({@code Review#mediaCountObserved}). False = nobody counted, so a
+         * 0 must not be drawn as «no photos»; true with 0 = looked, none.
+         */
+        boolean mediaCountObserved,
+        /**
          * The buyer rated and wrote nothing. Derived from the stored body being blank — the placeholder a
          * channel prints in that cell is never stored, so blank means exactly this. The surface must say
          * "별점만 남긴 상품평" rather than "본문을 표시할 수 없습니다": one is what happened, the other implies

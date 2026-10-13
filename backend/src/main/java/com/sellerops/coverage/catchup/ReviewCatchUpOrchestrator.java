@@ -52,7 +52,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Five ways, four of which are not failures:
  *
  * <ul>
- *   <li><b>COMPLETE</b> — the cursor passed today.</li>
+ *   <li><b>COMPLETE</b> — the cursor passed yesterday, and any history span reached its start. Also COMPLETE,
+ *   with stop reason {@code HISTORY_BOUNDARY}: a history window met a day the marketplace calendar will not
+ *   select — the store's reachable history ends there, which is the end of the walk rather than a failure.</li>
  *   <li><b>PAUSED_AUTH</b> — a window met the sign-in wall. The window is remembered, not skipped; the seller
  *   signs in and the same window is read again.</li>
  *   <li><b>STOPPED_SATURATED</b> — a single day held at least a full page. It cannot be narrowed by date, so
@@ -68,15 +70,28 @@ public class ReviewCatchUpOrchestrator {
     private static final Logger log = LoggerFactory.getLogger(ReviewCatchUpOrchestrator.class);
 
     /**
-     * What one press may set in motion.
+     * What one walk — a press or an automatic check — may set in motion.
      *
      * <p>Four ceilings because a catch-up runs long in four independent ways. Measured against this store: a
-     * 7-day NAVER window held 45 rows and settled in 14 seconds, so eight windows is ~two minutes and ~360
-     * rows — and today's 36-day gap (six windows) fits inside one press, which is the point.
+     * 7-day NAVER window held 45 rows and settled in 14 seconds.
+     *
+     * <p><b>Raised 2026-10-13 (product-owner decision: a year of history, unattended).</b> The old 8 windows /
+     * 70 days / 3,000 rows / 6 minutes made a year of history take five or more walks an hour apart. A year is
+     * 12 history windows of 31 days plus a few forward ones; 24 windows and 400 days let it finish in one walk,
+     * or two when splits eat the window budget. 12,000 rows is roughly a year of a store four times busier than
+     * the measured one; 20 machine-minutes is 24 windows at ~30 s each with room for splits. The bounds still
+     * exist because an unattended walk that never ends is a different product.
      */
     public record Limits(int maxWindows, int maxDays, int maxRows, Duration maxElapsed) {
 
-        public static final Limits PRESS = new Limits(8, 70, 3_000, Duration.ofMinutes(6));
+        public static final int WALK_MAX_WINDOWS = 24;
+        public static final int WALK_MAX_DAYS = 400;
+        public static final int WALK_MAX_ROWS = 12_000;
+        public static final Duration WALK_MAX_ELAPSED = Duration.ofMinutes(20);
+
+        /** The bounds of one walk, whoever started it. Named PRESS for history; the automatic check uses it too. */
+        public static final Limits PRESS = new Limits(WALK_MAX_WINDOWS, WALK_MAX_DAYS, WALK_MAX_ROWS,
+                WALK_MAX_ELAPSED);
 
         public Limits {
             if (maxWindows < 1 || maxDays < 1 || maxRows < 1) {
@@ -88,25 +103,55 @@ public class ReviewCatchUpOrchestrator {
         }
     }
 
+    /**
+     * <b>How long an automatic check leaves history alone after a walk stopped inside it.</b>
+     *
+     * <p>A history window that failed or saturated would otherwise be planned again by the very next hourly
+     * tick, fail again, and — because a tick that starts a walk does not also refresh today — the seller's
+     * freshness would stop moving while the walk kept walking into the same wall. A day is long enough for
+     * that not to happen and short enough that a transient failure costs one day of history, not the year.
+     * A person's press is never held back by this.
+     */
+    public static final Duration HISTORY_RETRY = Duration.ofHours(24);
+
+    /** Why a history walk ended at a day the marketplace calendar would not select. */
+    public static final String HISTORY_BOUNDARY = "HISTORY_BOUNDARY";
+
+    /** The window lane's word for a day the marketplace calendar disabled (or the month step toward it). */
+    static final String DATE_NOT_SELECTABLE = "DATE_NOT_SELECTABLE";
+
+    /** The reader's word for a page that held more rows than it reads at once — a window to halve. */
+    static final String TOO_MANY_ROWS = "TOO_MANY_ROWS";
+
     private final ReviewCatchUpRunRepository runs;
     private final ReviewCoverageCursor coverage;
     private final ScheduledAsideJobService jobs;
     private final Clock clock;
     private final Limits limits;
+    private final ReviewHistoryHorizon horizon;
 
     @org.springframework.beans.factory.annotation.Autowired
     public ReviewCatchUpOrchestrator(ReviewCatchUpRunRepository runs, ReviewCoverageCursor coverage,
-                                     ScheduledAsideJobService jobs) {
-        this(runs, coverage, jobs, Clock.systemUTC(), Limits.PRESS);
+                                     ScheduledAsideJobService jobs,
+                                     org.springframework.beans.factory.ObjectProvider<ReviewHistoryHorizon> horizon) {
+        this(runs, coverage, jobs, Clock.systemUTC(), Limits.PRESS,
+                horizon.getIfAvailable(() -> ReviewHistoryHorizon.NONE));
     }
 
     public ReviewCatchUpOrchestrator(ReviewCatchUpRunRepository runs, ReviewCoverageCursor coverage,
                                      ScheduledAsideJobService jobs, Clock clock, Limits limits) {
+        this(runs, coverage, jobs, clock, limits, ReviewHistoryHorizon.NONE);
+    }
+
+    public ReviewCatchUpOrchestrator(ReviewCatchUpRunRepository runs, ReviewCoverageCursor coverage,
+                                     ScheduledAsideJobService jobs, Clock clock, Limits limits,
+                                     ReviewHistoryHorizon horizon) {
         this.runs = runs;
         this.coverage = coverage;
         this.jobs = jobs;
         this.clock = clock;
         this.limits = limits;
+        this.horizon = horizon == null ? ReviewHistoryHorizon.NONE : horizon;
     }
 
     /** What a press learns: the intent it started or re-found, and the first child it put on the desk. */
@@ -176,13 +221,19 @@ public class ReviewCatchUpOrchestrator {
                                     AsideRecipe recipe, AsideTrigger trigger, String requestId) {
         LocalDate today = LocalDate.now(ReviewCoverageCursor.KST);
         ReviewCoverage held = coverage.of(orgId, channelId, today);
+        LocalDate historyFrom = historyFrom(orgId, sellerAccountId, dataType, trigger);
         ReviewCatchUpPlan plan = ReviewCatchUpPlan.from(held, today,
                 new ReviewCatchUpPlan.Limits(limits.maxWindows(), limits.maxRows(), limits.maxElapsed(),
-                        ReviewCatchUpRun.DEFAULT_STEP_DAYS));
+                        ReviewCatchUpRun.DEFAULT_STEP_DAYS),
+                historyFrom, ReviewCatchUpRun.HISTORY_STEP_DAYS);
         if (plan.windows().isEmpty()) {
             return Optional.empty();
         }
         CoveredWindow first = plan.windows().get(0);
+        Optional<CoveredWindow> history = ReviewCatchUpPlan.historySpan(held, today, historyFrom);
+        // The plan puts forward gaps before history, and every forward window lies after the history span — so
+        // a first window that starts after it is a forward one, and one inside it means there were no gaps.
+        boolean startsInHistory = history.isPresent() && !first.start().isAfter(history.get().end());
         Instant now = clock.instant();
         ReviewCatchUpRun run = new ReviewCatchUpRun();
         run.setOrgId(orgId);
@@ -191,21 +242,79 @@ public class ReviewCatchUpOrchestrator {
         run.setDataType(dataType);
         run.setState(ReviewCatchUpState.RUNNING);
         run.setTriggerSource(trigger);
-        run.setRequestedFrom(first.start());
+        // <b>The real planned start — not a guess.</b> With a history span it is the setting's recorded
+        // history_from (the product owner's one-year default, or the seller's own date); without one it is the
+        // oldest forward gap, as before. Either way it is what this walk was asked to read, written down.
+        run.setRequestedFrom(history.map(CoveredWindow::start)
+                .filter(h -> h.isBefore(first.start()))
+                .orElse(first.start()));
+        history.ifPresent(h -> {
+            run.setHistoryFrom(h.start());
+            run.setHistoryThrough(h.end());
+        });
         // <b>어제까지.</b> A walk closes history, and the day still being written is not history — it is read
         // separately, as freshness. Setting this to today would leave a window on a day whose coverage can never
         // be claimed, and the run would reach it and stop being able to finish.
         run.setRequestedThrough(ReviewCoverage.lastClosedDay(today));
-        run.setCursorDay(first.start());
-        run.setStepDays(ReviewCatchUpRun.DEFAULT_STEP_DAYS);
+        if (startsInHistory) {
+            run.setPhase(ReviewCatchUpRun.Phase.HISTORY);
+            run.setCursorDay(first.end());
+            run.setStepDays(ReviewCatchUpRun.HISTORY_STEP_DAYS);
+        } else {
+            run.setCursorDay(first.start());
+            run.setStepDays(ReviewCatchUpRun.DEFAULT_STEP_DAYS);
+        }
         run.setStartedAt(now);
         run.setUpdatedAt(now);
         run.setClientRequestId(requestId);
         runs.save(run);
         ScheduledAsideJob child = queue(run, recipe, first.start(), first.end());
-        log.info("review catch-up: started run={} trigger={} from={} through={} windows={}",
-                run.getId(), trigger, run.getRequestedFrom(), run.getRequestedThrough(), plan.windows().size());
+        log.info("review catch-up: started run={} trigger={} from={} through={} phase={} windows={}",
+                run.getId(), trigger, run.getRequestedFrom(), run.getRequestedThrough(), run.getPhase(),
+                plan.windows().size());
         return Optional.of(new Started(run, child));
+    }
+
+    /**
+     * The history start this walk plans to, or null for none.
+     *
+     * <p>The setting's recorded {@code history_from}, then two corrections, both from this row's own walks:
+     *
+     * <ul>
+     *   <li><b>A calendar boundary already met is not asked again.</b> A walk that ended at
+     *   {@link #HISTORY_BOUNDARY} recorded the first day the marketplace would not select; the start moves to
+     *   the day after it. Without this every tick would plan those days and meet the same disabled calendar.</li>
+     *   <li><b>An automatic check leaves history alone for {@link #HISTORY_RETRY} after a walk stopped in it</b>
+     *   (FAILED or STOPPED_SATURATED in the HISTORY phase). A press is a person asking, and is not held back.</li>
+     * </ul>
+     */
+    private LocalDate historyFrom(UUID orgId, UUID sellerAccountId, String dataType, AsideTrigger trigger) {
+        LocalDate recorded = horizon.historyFrom(orgId, sellerAccountId).orElse(null);
+        if (recorded == null) {
+            return null;
+        }
+        LocalDate boundary = runs.findFirstBySellerAccountIdAndDataTypeAndStopReasonAndFinishedAtIsNotNullOrderByFinishedAtDesc(
+                        sellerAccountId, dataType, HISTORY_BOUNDARY)
+                .filter(r -> orgId.equals(r.getOrgId()))
+                .map(ReviewCatchUpRun::getPausedWindowStart)
+                .orElse(null);
+        if (boundary != null && !boundary.isBefore(recorded)) {
+            recorded = boundary.plusDays(1);
+        }
+        if (trigger == AsideTrigger.SCHEDULED) {
+            boolean heldBack = runs.findFirstBySellerAccountIdAndDataTypeAndFinishedAtIsNotNullOrderByFinishedAtDesc(
+                            sellerAccountId, dataType)
+                    .filter(r -> orgId.equals(r.getOrgId()))
+                    .filter(r -> r.getPhase() == ReviewCatchUpRun.Phase.HISTORY)
+                    .filter(r -> r.getState() == ReviewCatchUpState.FAILED
+                            || r.getState() == ReviewCatchUpState.STOPPED_SATURATED)
+                    .filter(r -> r.getFinishedAt().plus(HISTORY_RETRY).isAfter(clock.instant()))
+                    .isPresent();
+            if (heldBack) {
+                return null;
+            }
+        }
+        return recorded;
     }
 
     /**
@@ -336,6 +445,35 @@ public class ReviewCatchUpOrchestrator {
             stop(run, ReviewCatchUpState.PAUSED_AUTH, "AUTH_REQUIRED");
             return;
         }
+        if (child.getOutcome() != AsideJobOutcome.OBSERVED && TOO_MANY_ROWS.equals(child.getFailureCode())) {
+            // <b>More rows than one page reads — the same fact as a PARTIAL window, said by the reader instead
+            // of the delivery.</b> It arrives as SURFACE_UNREADABLE + TOO_MANY_ROWS, and it used to end the walk
+            // as FAILED: one busy month in a year of history stopped the year. Halve it and look again, down to a
+            // single day, which still stops as DAY_SATURATED.
+            if (!run.split(start, end)) {
+                run.setPausedWindowStart(start);
+                stop(run, ReviewCatchUpState.STOPPED_SATURATED, "DAY_SATURATED");
+                return;
+            }
+            continueWalk(run, child);
+            return;
+        }
+        if (child.getOutcome() != AsideJobOutcome.OBSERVED && DATE_NOT_SELECTABLE.equals(child.getFailureCode())
+                && run.getPhase() == ReviewCatchUpRun.Phase.HISTORY) {
+            // <b>The marketplace calendar will not select a day in this history window.</b> Somewhere in it the
+            // store's reachable history ends. Halve toward the newer half until one day is left, so the days
+            // that ARE reachable are still read; that day is the boundary. Recorded on the run (paused window
+            // start) so the next walk starts the day after it, and the walk ends COMPLETE — reading as far back
+            // as the marketplace allows is the whole of what was asked. In a forward-gap window this is not a
+            // boundary and falls through to FAILED below.
+            if (run.split(start, end)) {
+                continueWalk(run, child);
+                return;
+            }
+            run.setPausedWindowStart(start);
+            stop(run, ReviewCatchUpState.COMPLETE, HISTORY_BOUNDARY);
+            return;
+        }
         if (child.getOutcome() != AsideJobOutcome.OBSERVED) {
             // Where it stopped, when the child could say — the outcome alone covers three different fixes
             // (2026-10-08), and the one word the seller's screen turns into a sentence is this one.
@@ -364,12 +502,17 @@ public class ReviewCatchUpOrchestrator {
         } else {
             run.completed(start, end, child.getObservedCount() == null ? 0 : child.getObservedCount());
         }
+        continueWalk(run, child);
+    }
+
+    /** After a window was counted or split: the bound, then the next window — or the end of the walk. */
+    private void continueWalk(ReviewCatchUpRun run, ScheduledAsideJob child) {
         Optional<String> bound = exceeded(run);
         if (bound.isPresent()) {
             stop(run, ReviewCatchUpState.STOPPED_LIMIT, bound.get());
             return;
         }
-        LocalDate[] next = run.nextWindow();
+        LocalDate[] next = run.nextWindowOrHistory();
         if (next == null) {
             stop(run, ReviewCatchUpState.COMPLETE, null);
             return;
@@ -389,8 +532,9 @@ public class ReviewCatchUpOrchestrator {
 
     private Started resume(ReviewCatchUpRun run, AsideRecipe recipe) {
         if (run.getState() == ReviewCatchUpState.PAUSED_AUTH) {
-            // The paused window, not the one after it.
-            if (run.getPausedWindowStart() != null) {
+            // The paused window, not the one after it. In history the cursor already IS that window (its last
+            // day), because a walled window never moved it.
+            if (run.getPausedWindowStart() != null && run.getPhase() == ReviewCatchUpRun.Phase.FORWARD) {
                 run.setCursorDay(run.getPausedWindowStart());
             }
             run.setPausedWindowStart(null);
@@ -401,7 +545,7 @@ public class ReviewCatchUpOrchestrator {
             // A new attempt, so the walled window gets a NEW child instead of the settled one coming back.
             run.setAttempt(run.getAttempt() + 1);
         }
-        LocalDate[] next = run.nextWindow();
+        LocalDate[] next = run.nextWindowOrHistory();
         if (next == null) {
             stop(run, ReviewCatchUpState.COMPLETE, null);
             return new Started(run, null);

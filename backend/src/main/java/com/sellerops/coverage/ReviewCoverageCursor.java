@@ -50,8 +50,14 @@ import org.springframework.transaction.annotation.Transactional;
  * </ol>
  *
  * <p>Nothing here synthesises a date. A channel with no evidence returns {@link ReviewCoverage#NONE}, and the
- * planner refuses to plan from it rather than starting «a year ago» — a guessed start would be indistinguishable,
- * downstream, from a measured one.
+ * planner does not invent a start from it — a guessed start would be indistinguishable, downstream, from a
+ * measured one.
+ *
+ * <p><b>Reading «a year ago» is not that guess (2026-10-13).</b> Since V134 the seller's automatic-check setting
+ * records {@code history_from} — one year back by the product owner's default, or a date the seller set — and the
+ * planner reads history from <i>that</i> ({@code ReviewCatchUpPlan#historySpan}). It is a recorded choice of what
+ * to read, kept on the walk as {@code requested_from}; it is never written here as coverage. What this class
+ * reports is still only what evidence proves.
  */
 @Component
 public class ReviewCoverageCursor {

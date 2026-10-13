@@ -41,6 +41,10 @@ public final class AsideJobFailureCode {
             "MONTH_NAV_AMBIGUOUS",
             "MONTH_NAV_UNVERIFIED",
             "MONTH_NAV_EXHAUSTED",
+            // <b>The marketplace calendar disabled the requested day</b> (or the month step toward it). In a
+            // history window that is where the store's reachable history ends — the walk records the boundary
+            // and stops reading older days; in a forward-gap window it is an ordinary failure (2026-10-13).
+            "DATE_NOT_SELECTABLE",
             "DAY_CELL_NOT_FOUND",
             "DAY_CELL_AMBIGUOUS",
             "RANGE_NOT_SETTABLE",

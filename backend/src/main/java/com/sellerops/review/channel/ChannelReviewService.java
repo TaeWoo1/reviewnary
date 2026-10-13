@@ -527,6 +527,7 @@ public class ChannelReviewService {
                 body.redacted(),
                 ReviewProductLabel.displayName(review, product == null ? null : product.getName()),
                 review.getMediaCount(),
+                review.isMediaCountObserved(),
                 isTextless(review),
                 isNew(review, newSince),
                 // Built from the SAME inputs as the list row's note — the raw stored body, not the
@@ -591,6 +592,7 @@ public class ChannelReviewService {
                 product == null ? null : product.getSku(),
                 review.getSourceOptionId(),
                 review.getMediaCount(),
+                review.isMediaCountObserved(),
                 isTextless(review),
                 isNew(review, newSince),
                 triage,

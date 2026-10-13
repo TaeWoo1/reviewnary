@@ -12,13 +12,18 @@ package com.sellerops.autocheck;
  *                  the setting is not drawn — never that it is off, which would read as a choice someone made
  * @param enabled   whether the seller currently wants automatic checking
  * @param paused    {@code PAUSED_DEVICE} / {@code PAUSED_AUTH}, or null while it is simply working
+ * @param historyFrom the first KST day of review history the walk reads back to ({@code yyyy-MM-dd}) — one year
+ *                  before the row was created unless the seller moved it. Null when there is no row, or no
+ *                  history is to be read
  */
-public record ReviewAutoCheckView(boolean supported, boolean enabled, String paused) {
+public record ReviewAutoCheckView(boolean supported, boolean enabled, String paused,
+                                  java.time.LocalDate historyFrom) {
 
-    public static final ReviewAutoCheckView UNSUPPORTED = new ReviewAutoCheckView(false, false, null);
+    public static final ReviewAutoCheckView UNSUPPORTED = new ReviewAutoCheckView(false, false, null, null);
 
     public static ReviewAutoCheckView of(ReviewAutoCheck row) {
         return new ReviewAutoCheckView(true, row.on(),
-                row.on() && row.getPausedReason() != null ? row.getPausedReason().name() : null);
+                row.on() && row.getPausedReason() != null ? row.getPausedReason().name() : null,
+                row.getHistoryFrom());
     }
 }

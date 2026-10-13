@@ -8,6 +8,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
@@ -23,9 +24,10 @@ import lombok.Setter;
  * <p><b>What it is not scoped by, deliberately.</b> No device: a desk is how the reading happens, resolved at
  * dispatch time, and a setting pinned to one would have cost the seller their setting every time their helper
  * was re-paired ({@code HelperDeviceService#redeem} mints a new row each time). No channel: the account already
- * knows its channel. No period, no cadence the seller picks, no consent record beyond who switched it on and
- * when — a product that asked a seller to choose an interval would be asking them to own a decision they have
- * no way to make.
+ * knows its channel. No cadence the seller picks, no consent record beyond who switched it on and when — a
+ * product that asked a seller to choose an interval would be asking them to own a decision they have no way to
+ * make. The one period on the row, {@link #historyFrom}, is filled in for them (one year back) and only
+ * <i>may</i> be changed.
  *
  * <p><b>READ_ONLY is an invariant, not a column anyone sets.</b> Every published recipe reads and closes; there
  * is no WRITE recipe and a structural test refuses one. The field exists so the row states the fact it is
@@ -95,6 +97,17 @@ public class ReviewAutoCheck extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "paused_reason", length = 24)
     private AutoCheckPause pausedReason;
+
+    /**
+     * <b>How far back this store's review history is read</b> — the first KST day the catch-up walk reaches.
+     *
+     * <p>Recorded, not guessed. The coverage cursor refuses to synthesise a start date because a guessed one would
+     * be indistinguishable downstream from a measured one; this is neither — it is a choice written down, by the
+     * product on the seller's behalf (product-owner decision 2026-10-13: one year, set automatically, the seller
+     * does nothing) or later by the seller. Null means «do not read history backwards».
+     */
+    @Column(name = "history_from")
+    private LocalDate historyFrom;
 
     /** Whether the seller currently wants this. The only question that is about permission. */
     public boolean on() {

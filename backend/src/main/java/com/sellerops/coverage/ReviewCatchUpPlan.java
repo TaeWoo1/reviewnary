@@ -4,15 +4,21 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
- * <b>Which periods still have to be read, oldest first — and where the plan stops.</b>
+ * <b>Which periods still have to be read — and where the plan stops.</b>
+ *
+ * <p>Two spans, in this order: the <b>forward gaps</b> after the coverage boundary, oldest first; then, when a
+ * history start was recorded ({@link #from(ReviewCoverage, LocalDate, Limits, LocalDate, int)}), the
+ * <b>history</b> before the covered stretch, newest first.
  *
  * <p>A plan is produced and shown before anything runs. That is the point: the 2026-10-08 read covered the last
  * seven days and the seller had no way to see that twenty-nine days behind it were untouched. A plan that can be
  * printed is a plan that can be disagreed with.
  *
- * @param windows  the periods to read, oldest first, each inside the bound one read can carry
+ * @param windows  the periods to read — forward gaps oldest first, then history newest first — each inside the
+ *                 bound one read can carry
  * @param stopped  why the plan ends where it does
  * @param remaining days still uncovered after the planned windows — 0 when the plan reaches today
  */
@@ -30,9 +36,20 @@ public record ReviewCatchUpPlan(List<CoveredWindow> windows, Stop stopped, long 
         MAX_WINDOWS,
         /** The row budget for one authorisation was reached. */
         MAX_ROWS,
-        /** There is no evidence to plan from — the boundary is unknown, and a guessed start is not a plan. */
+        /**
+         * There is no evidence to plan from — the boundary is unknown, and a guessed start is not a plan. Only
+         * returned when no history start was recorded either: a recorded start is a plan.
+         */
         NO_BOUNDARY
     }
+
+    /**
+     * How many days one history window spans. 31, against 7 forward: history is read once, unattended, and a
+     * year in seven-day windows is 53 reads where 31-day windows make 12. A month that holds more than one
+     * page does not get lost to the larger stride — it comes back PARTIAL (or {@code TOO_MANY_ROWS}) and the walk
+     * halves it, down to a single day.
+     */
+    public static final int HISTORY_STEP_DAYS = 31;
 
     /**
      * How much one press may set in motion.
@@ -110,6 +127,95 @@ public record ReviewCatchUpPlan(List<CoveredWindow> windows, Stop stopped, long 
         long remaining = 0;
         for (LocalDate d = cursor; !d.isAfter(through); d = d.plusDays(1)) {
             if (!coverage.covers(d)) {
+                remaining++;
+            }
+        }
+        if (remaining > 0 && stop == Stop.COMPLETE) {
+            stop = Stop.MAX_WINDOWS;
+        }
+        return new ReviewCatchUpPlan(List.copyOf(windows), windows.isEmpty() ? Stop.NOTHING_TO_DO : stop, remaining);
+    }
+
+    /**
+     * <b>The history span: from the recorded start to the day before the covered stretch begins.</b>
+     *
+     * <p>{@code [historyFrom, coverageFrom - 1]}, or {@code [historyFrom, yesterday]} when nothing is covered at
+     * all. Empty when no start was recorded, or when it falls on or after the covered stretch — history already
+     * held is not history still to read.
+     *
+     * <p><b>Not a guessed start.</b> {@link ReviewCoverageCursor} refuses to synthesise one because a guessed date
+     * would be indistinguishable downstream from a measured one. {@code historyFrom} is neither: it is a choice
+     * the seller's setting records — the product's default of one year (product-owner decision 2026-10-13), or a
+     * date the seller set — and it is planned from as exactly that.
+     */
+    public static Optional<CoveredWindow> historySpan(ReviewCoverage coverage, LocalDate asOf, LocalDate historyFrom) {
+        LocalDate through = ReviewCoverage.lastClosedDay(asOf);
+        if (historyFrom == null || through == null) {
+            return Optional.empty();
+        }
+        LocalDate end = coverage == null || coverage.coverageFrom() == null
+                ? through : coverage.coverageFrom().minusDays(1);
+        if (end.isAfter(through)) {
+            end = through;
+        }
+        if (historyFrom.isAfter(end)) {
+            return Optional.empty();
+        }
+        return Optional.of(new CoveredWindow(historyFrom, end, CoveredWindow.CoverageSource.SCREEN_READ));
+    }
+
+    /**
+     * <b>Plan the forward gaps, then the recorded history — newest first.</b>
+     *
+     * <p>The forward part is exactly {@link #from(ReviewCoverage, LocalDate, Limits)}. The history part walks
+     * {@link #historySpan} from its newest day back to {@code historyFrom} in {@code historyStepDays} windows.
+     * Newest first for two reasons: a period that holds rows is read before quiet old ones, so the seller-centre
+     * screen's fingerprint is on record by the time an empty month has to be attributed to this store; and a walk
+     * that stops part-way leaves one contiguous stretch rather than an island with a hole behind it.
+     *
+     * <p>Days already covered are skipped as the forward planner skips them, and both spans share one
+     * {@code maxWindows}. With no history start this is the forward plan, unchanged — including
+     * {@link Stop#NO_BOUNDARY}.
+     */
+    public static ReviewCatchUpPlan from(ReviewCoverage coverage, LocalDate asOf, Limits limits,
+                                         LocalDate historyFrom, int historyStepDays) {
+        if (historyStepDays < 1) {
+            throw new IllegalArgumentException("a bound below one is not a bound");
+        }
+        ReviewCatchUpPlan forward = from(coverage, asOf, limits);
+        Optional<CoveredWindow> span = historySpan(coverage, asOf, historyFrom);
+        if (span.isEmpty()) {
+            return forward;
+        }
+        List<CoveredWindow> windows = new ArrayList<>(forward.windows());
+        Stop stop = forward.stopped() == Stop.MAX_WINDOWS || forward.stopped() == Stop.MAX_ROWS
+                ? forward.stopped() : Stop.COMPLETE;
+        LocalDate first = span.get().start();
+        LocalDate cursor = span.get().end();
+        while (!cursor.isBefore(first)) {
+            if (coverage != null && coverage.covers(cursor)) {
+                cursor = cursor.minusDays(1);
+                continue;
+            }
+            if (windows.size() >= limits.maxWindows()) {
+                if (stop == Stop.COMPLETE) {
+                    stop = Stop.MAX_WINDOWS;
+                }
+                break;
+            }
+            LocalDate start = cursor.minusDays(historyStepDays - 1L);
+            if (start.isBefore(first)) {
+                start = first;
+            }
+            while (start.isBefore(cursor) && coverage != null && coverage.covers(start)) {
+                start = start.plusDays(1);
+            }
+            windows.add(new CoveredWindow(start, cursor, CoveredWindow.CoverageSource.SCREEN_READ));
+            cursor = start.minusDays(1);
+        }
+        long remaining = forward.remaining();
+        for (LocalDate d = cursor; !d.isBefore(first); d = d.minusDays(1)) {
+            if (coverage == null || !coverage.covers(d)) {
                 remaining++;
             }
         }

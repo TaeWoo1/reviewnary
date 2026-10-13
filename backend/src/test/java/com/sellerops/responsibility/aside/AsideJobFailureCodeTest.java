@@ -32,7 +32,7 @@ class AsideJobFailureCodeTest {
                                          "PICKER_VIEW_UNREADABLE", "MONTH_NAV_NOT_FOUND",
                                          "MONTH_NAV_AMBIGUOUS", "MONTH_NAV_UNVERIFIED",
                                          "MONTH_NAV_EXHAUSTED", "DAY_CELL_NOT_FOUND",
-                                         "DAY_CELL_AMBIGUOUS"}) {
+                                         "DAY_CELL_AMBIGUOUS", "DATE_NOT_SELECTABLE"}) {
             assertThat(AsideJobFailureCode.of(word)).as(word).isEqualTo(word);
         }
     }

@@ -16,8 +16,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * <b>The one setting: 「새 리뷰를 자동으로 확인합니다」.</b>
  *
- * <p>A GET and a PUT with a single boolean. No interval, no device, no channel, no scope and no consent token —
- * a client cannot ask for anything but on or off, because there is nothing else to ask for.
+ * <p>A GET and a PUT with a boolean and one date. No interval, no device, no channel, no scope and no consent
+ * token — a client can ask for on or off, and move how far back history is read (a default the product already
+ * chose for the seller: one year), because there is nothing else to ask for.
  *
  * <p>The organisation comes from the session principal, and a helper's own token is refused here: a device must
  * never be able to switch on the lane that gives it work.
@@ -31,7 +32,11 @@ public class ReviewAutoCheckController {
         this.service = service;
     }
 
-    public record AutoCheckRequest(Boolean enabled) {
+    /**
+     * Either field, or both. {@code historyFrom} ({@code yyyy-MM-dd}, KST) moves how far back history is read;
+     * absent leaves it where it is. There is no way to clear it here — the default is the product's decision.
+     */
+    public record AutoCheckRequest(Boolean enabled, java.time.LocalDate historyFrom) {
     }
 
     @GetMapping("/api/seller-accounts/{accountId}/review-auto-check")
@@ -67,9 +72,16 @@ public class ReviewAutoCheckController {
         if (request.getAttribute(HelperDeviceAuthFilter.DEVICE_ID_ATTRIBUTE) != null) {
             throw ApiException.forbidden("이 요청은 사용자만 보낼 수 있습니다.");
         }
-        if (body == null || body.enabled() == null) {
+        if (body == null || (body.enabled() == null && body.historyFrom() == null)) {
             throw ApiException.badRequest("자동 확인을 켤지 끌지 알 수 없습니다.");
         }
-        return service.set(principal.orgId(), accountId, principal.userId(), body.enabled());
+        ReviewAutoCheckView view = null;
+        if (body.historyFrom() != null) {
+            view = service.setHistoryFrom(principal.orgId(), accountId, body.historyFrom());
+        }
+        if (body.enabled() != null) {
+            view = service.set(principal.orgId(), accountId, principal.userId(), body.enabled());
+        }
+        return view;
     }
 }

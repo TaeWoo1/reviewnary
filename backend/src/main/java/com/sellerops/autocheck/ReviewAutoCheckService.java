@@ -5,6 +5,8 @@ import com.sellerops.channel.ChannelRepository;
 import com.sellerops.channel.ChannelStatus;
 import com.sellerops.common.ApiException;
 import com.sellerops.connector.DataType;
+import com.sellerops.coverage.ReviewCoverageCursor;
+import com.sellerops.coverage.catchup.ReviewHistoryHorizon;
 import com.sellerops.responsibility.aside.AsideJobOutcome;
 import com.sellerops.responsibility.aside.AsideRecipe;
 import com.sellerops.responsibility.aside.AutoCheckAuthority;
@@ -13,6 +15,7 @@ import com.sellerops.selleraccount.SellerAccount;
 import com.sellerops.selleraccount.SellerAccountRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -40,10 +43,24 @@ import org.springframework.transaction.annotation.Transactional;
  * and its replacement machine are none of this setting's business.
  */
 @Service
-public class ReviewAutoCheckService implements AutoCheckAuthority {
+public class ReviewAutoCheckService implements AutoCheckAuthority, ReviewHistoryHorizon {
 
     /** REVIEW is the only data type with a boundary to be missing and a screen to read it from. */
     public static final String DATA_TYPE = "REVIEW";
+
+    /**
+     * <b>How far back a new store's review history is read: one year.</b> A product-owner decision (2026-10-13),
+     * not a measurement — the seller does nothing and their last year of NAVER reviews arrives, photos included.
+     * The same default is applied by V134 to every row that existed before it.
+     */
+    public static final int DEFAULT_HISTORY_YEARS = 1;
+
+    /**
+     * The earliest {@code history_from} anyone may set. A floor against typos (0202, 1970), not a claim that the
+     * marketplace shows that far back — its own calendar decides what is reachable, and the runtime fails closed
+     * on a day it disables. The schema carries the same floor ({@code chk_review_auto_check_history_from}).
+     */
+    public static final LocalDate HISTORY_FLOOR = LocalDate.of(2010, 1, 1);
 
     private final ReviewAutoCheckRepository rows;
     private final SellerAccountRepository accounts;
@@ -101,7 +118,7 @@ public class ReviewAutoCheckService implements AutoCheckAuthority {
                 .map(ReviewAutoCheckView::of)
                 // 읽을 화면은 있는데 행이 없다: 이 기능 전에 연결한 계정이다. 「꺼짐」으로 그리는 것이 맞고,
                 // 그것을 켜는 것은 그 조직의 명시적 backfill이지 화면을 열어 보는 일이 아니다.
-                .orElse(new ReviewAutoCheckView(true, false, null));
+                .orElse(new ReviewAutoCheckView(true, false, null, null));
     }
 
     /**
@@ -132,6 +149,59 @@ public class ReviewAutoCheckService implements AutoCheckAuthority {
             row.setPausedReason(null);
         }
         return ReviewAutoCheckView.of(rows.save(row));
+    }
+
+    /**
+     * <b>Move how far back this store's history is read.</b> The seller's change to a default the product chose
+     * for them; nothing else about the setting moves.
+     *
+     * <p>Validated, not clamped: a day in the future is not history, and a day before {@link #HISTORY_FLOOR} is a
+     * typo. There is no other lower bound — whether the marketplace still shows a period is its own calendar's
+     * answer, and a read of a day it disables fails closed at run time rather than being guessed at here.
+     *
+     * <p>Like {@link #set}, it may create the default-on row, because changing a setting is an explicit act.
+     */
+    @Transactional
+    public ReviewAutoCheckView setHistoryFrom(UUID orgId, UUID sellerAccountId, LocalDate historyFrom) {
+        validateHistoryFrom(historyFrom, clock.instant());
+        ReviewAutoCheck row = ensure(orgId, sellerAccountId)
+                .orElseThrow(() -> ApiException.badRequest("이 판매 계정은 자동 확인을 지원하지 않습니다."));
+        row.setHistoryFrom(historyFrom);
+        return ReviewAutoCheckView.of(rows.save(row));
+    }
+
+    /** The default for a row created at {@code now}: one year before the seller's own (KST) today. */
+    static LocalDate defaultHistoryFrom(Instant now) {
+        return LocalDate.ofInstant(now, ReviewCoverageCursor.KST).minusYears(DEFAULT_HISTORY_YEARS);
+    }
+
+    static void validateHistoryFrom(LocalDate historyFrom, Instant now) {
+        if (historyFrom == null) {
+            throw ApiException.badRequest("이력을 읽기 시작할 날짜가 필요합니다.");
+        }
+        if (historyFrom.isAfter(LocalDate.ofInstant(now, ReviewCoverageCursor.KST))) {
+            throw ApiException.badRequest("이력 시작일은 오늘 이후일 수 없습니다.");
+        }
+        if (historyFrom.isBefore(HISTORY_FLOOR)) {
+            throw ApiException.badRequest("이력 시작일이 너무 이릅니다.");
+        }
+    }
+
+    /**
+     * <b>The walk's question: how far back should this store's history be read?</b> The row's recorded
+     * {@code history_from} while the setting is on — and nothing for an account whose seller turned automatic
+     * checking off, or that has no row: a seller who switched the lane off did not ask for a year of reading.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<LocalDate> historyFrom(UUID orgId, UUID sellerAccountId) {
+        if (orgId == null || sellerAccountId == null) {
+            return Optional.empty();
+        }
+        return rows.findBySellerAccountIdAndDataType(sellerAccountId, DATA_TYPE)
+                .filter(row -> orgId.equals(row.getOrgId()))
+                .filter(ReviewAutoCheck::on)
+                .map(ReviewAutoCheck::getHistoryFrom);
     }
 
     /**
@@ -217,6 +287,8 @@ public class ReviewAutoCheckService implements AutoCheckAuthority {
         }
         Instant now = clock.instant();
         ReviewAutoCheck row = new ReviewAutoCheck();
+        // 판매자가 아무것도 하지 않아도 지난 1년이 읽힌다 — 추측한 시작일이 아니라 생성 시점에 적어 둔 기본값.
+        row.setHistoryFrom(defaultHistoryFrom(now));
         row.setOrgId(orgId);
         row.setSellerAccountId(sellerAccountId);
         row.setDataType(DATA_TYPE);

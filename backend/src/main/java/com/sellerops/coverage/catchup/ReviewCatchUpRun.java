@@ -33,6 +33,14 @@ import lombok.Setter;
  * at its own row ceiling halves the step and re-reads from the same cursor — deterministically, so a seven-day
  * window becomes three days and then the remaining four, and never two overlapping halves or a day skipped
  * between them ({@link #splitThrough} is what remembers the four).
+ *
+ * <h2>Two spans, one walk (2026-10-13)</h2>
+ *
+ * A walk may also read <b>history</b>: the days before the covered stretch, back to the setting's recorded
+ * {@code history_from}. It walks the forward gaps first ({@link Phase#FORWARD}: cursor = the next window's first
+ * day, oldest first), then turns to history ({@link Phase#HISTORY}: cursor = the next window's <b>last</b> day,
+ * newest first, {@link #HISTORY_STEP_DAYS} at a time). A split in history reads the newer half first and
+ * {@link #splitThrough} then remembers the older edge of the window being split.
  */
 @Entity
 @Table(name = "review_catch_up_run")
@@ -42,6 +50,17 @@ public class ReviewCatchUpRun {
 
     /** The step a press starts with, and returns to after every complete window. */
     public static final int DEFAULT_STEP_DAYS = 7;
+
+    /** The step a history window starts with — see {@code ReviewCatchUpPlan#HISTORY_STEP_DAYS}. */
+    public static final int HISTORY_STEP_DAYS = com.sellerops.coverage.ReviewCatchUpPlan.HISTORY_STEP_DAYS;
+
+    /** Which span the walk is in. Forward gaps first, then history. */
+    public enum Phase {
+        /** After the coverage boundary, oldest first. {@link #cursorDay} is the next window's first day. */
+        FORWARD,
+        /** Before the covered stretch, newest first. {@link #cursorDay} is the next window's last day. */
+        HISTORY
+    }
 
     @Id
     @GeneratedValue
@@ -91,8 +110,26 @@ public class ReviewCatchUpRun {
     @Column(name = "step_days", nullable = false)
     private int stepDays = DEFAULT_STEP_DAYS;
 
+    /**
+     * The far edge of the window being split, or null. FORWARD: its last day. HISTORY: its first (oldest) day.
+     */
     @Column(name = "split_through")
     private LocalDate splitThrough;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "phase", nullable = false, length = 8)
+    private Phase phase = Phase.FORWARD;
+
+    /**
+     * The history span this walk set out to read, or both null when it reads none. {@code historyFrom} is the
+     * setting's recorded start (clamped to a calendar boundary already met); {@code historyThrough} is the day
+     * before the covered stretch when the walk began, or yesterday when nothing was covered.
+     */
+    @Column(name = "history_from")
+    private LocalDate historyFrom;
+
+    @Column(name = "history_through")
+    private LocalDate historyThrough;
 
     @Column(name = "windows_done", nullable = false)
     private int windowsDone;
@@ -158,8 +195,21 @@ public class ReviewCatchUpRun {
     @Column(name = "client_request_id", length = 64)
     private String clientRequestId;
 
-    /** The next period to read, clamped to what this run set out to cover. Null when there is nothing left. */
+    /**
+     * The next period to read <b>in the current span</b>, clamped to it. Null when this span has nothing left —
+     * see {@link #nextWindowOrHistory} for the walk as a whole.
+     */
     public java.time.LocalDate[] nextWindow() {
+        if (phase == Phase.HISTORY) {
+            if (cursorDay == null || historyFrom == null || cursorDay.isBefore(historyFrom)) {
+                return null;
+            }
+            LocalDate start = cursorDay.minusDays(Math.max(stepDays, 1) - 1L);
+            if (start.isBefore(historyFrom)) {
+                start = historyFrom;
+            }
+            return new LocalDate[] {start, cursorDay};
+        }
         if (cursorDay == null || cursorDay.isAfter(requestedThrough)) {
             return null;
         }
@@ -170,7 +220,31 @@ public class ReviewCatchUpRun {
         return new LocalDate[] {cursorDay, end};
     }
 
-    /** A window came back whole: step past it, and go back to the default stride. */
+    /**
+     * The next period of the walk as a whole: the current span's, or — when the forward gaps are done and this
+     * walk has a history span — the newest history window, turning the walk to {@link Phase#HISTORY}.
+     */
+    public java.time.LocalDate[] nextWindowOrHistory() {
+        LocalDate[] next = nextWindow();
+        if (next == null && turnToHistory()) {
+            next = nextWindow();
+        }
+        return next;
+    }
+
+    /** Forward gaps done: start the history span at its newest day. False when there is none to turn to. */
+    boolean turnToHistory() {
+        if (phase != Phase.FORWARD || historyFrom == null || historyThrough == null
+                || historyThrough.isBefore(historyFrom)) {
+            return false;
+        }
+        phase = Phase.HISTORY;
+        cursorDay = historyThrough;
+        stepDays = HISTORY_STEP_DAYS;
+        splitThrough = null;
+        return true;
+    }
+
     /** The intent starts waiting on a person. Idempotent: a second call does not restart the clock. */
     public void beginWaiting(Instant now) {
         if (pausedSince == null) {
@@ -201,10 +275,22 @@ public class ReviewCatchUpRun {
         return java.time.Duration.ofMillis(Math.max(0L, total - pausedMs - waiting));
     }
 
+    /** A window came back whole: step past it, and go back to the default stride. */
     public void completed(LocalDate windowStart, LocalDate windowEnd, int observed) {
         windowsDone += 1;
         rowsObserved += Math.max(observed, 0);
         daysCovered += (int) (windowEnd.toEpochDay() - windowStart.toEpochDay() + 1);
+        if (phase == Phase.HISTORY) {
+            cursorDay = windowStart.minusDays(1);
+            if (splitThrough != null && !cursorDay.isBefore(splitThrough)) {
+                // Still inside the window that was split: the remainder is its older part, exactly.
+                stepDays = (int) (cursorDay.toEpochDay() - splitThrough.toEpochDay() + 1);
+            } else {
+                splitThrough = null;
+                stepDays = HISTORY_STEP_DAYS;
+            }
+            return;
+        }
         cursorDay = windowEnd.plusDays(1);
         if (splitThrough != null && !cursorDay.isAfter(splitThrough)) {
             // Still inside the window that was split: the remainder is the rest of it, exactly.
@@ -224,6 +310,15 @@ public class ReviewCatchUpRun {
         long days = windowEnd.toEpochDay() - windowStart.toEpochDay() + 1;
         if (days < 2) {
             return false;
+        }
+        if (phase == Phase.HISTORY) {
+            // Newest half first, so the walk keeps moving from new to old; the older edge is remembered.
+            if (splitThrough == null) {
+                splitThrough = windowStart;
+            }
+            cursorDay = windowEnd;
+            stepDays = (int) (days / 2);
+            return true;
         }
         if (splitThrough == null) {
             splitThrough = windowEnd;

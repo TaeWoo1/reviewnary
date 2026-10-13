@@ -46,6 +46,11 @@ public record ChannelReviewDetailView(
         boolean bodyRedacted,
         String productName,
         int mediaCount,
+        /**
+         * Whether {@code mediaCount} is a reading ({@code Review#mediaCountObserved}). False = nobody counted, so a
+         * 0 must not be drawn as «no photos»; true with 0 = looked, none.
+         */
+        boolean mediaCountObserved,
         /** The buyer rated and wrote nothing — see {@code ChannelReviewItemView.textless}. */
         boolean textless,
         boolean isNew,

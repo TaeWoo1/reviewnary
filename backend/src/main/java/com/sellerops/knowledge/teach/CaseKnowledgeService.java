@@ -298,13 +298,7 @@ public class CaseKnowledgeService {
     }
 
     static String mediaStatusKo(com.sellerops.review.media.ReviewMedia.InspectionStatus status, boolean on) {
-        return switch (status) {
-            case INSPECTED -> "Reviewnary가 사진을 확인했습니다.";
-            case NOT_INSPECTED -> on ? "아직 사진을 확인하지 않았습니다." : "사진 확인 기능이 꺼져 있어 사진 내용은 보지 않았습니다.";
-            case FETCH_FAILED -> "사진을 가져오지 못해 내용은 보지 않았습니다.";
-            case MODEL_FAILED -> "사진을 확인하지 못했습니다.";
-            case NOT_AN_IMAGE -> "사진이 아니어서 내용은 보지 않았습니다.";
-        };
+        return com.sellerops.review.media.ReviewMediaPresentation.statusKo(status, on);
     }
 
     /**

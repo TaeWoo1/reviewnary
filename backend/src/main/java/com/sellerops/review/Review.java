@@ -136,10 +136,9 @@ public class Review extends BaseEntity {
      * count is «we looked and here is how many». Only the middle case may ever be rendered as an
      * absence, which is the same rule {@code ChannelDataState} states for collection.
      *
-     * <p><b>No product surface reads this yet, and that is the design.</b> The first reader is
-     * whatever consumes media; until then the field exists so a measurement can tell a zero apart
-     * from a silence — which is precisely what no measurement could do before it. It holds no URL,
-     * no filename and no reference.
+     * <p>The first surface to read it is the review list/detail ({@code ChannelReviewItemView} /
+     * {@code ChannelReviewDetailView.mediaCountObserved}, 2026-10-13), so a screen can tell a zero apart
+     * from a silence. It holds no URL, no filename and no reference.
      */
     @Column(name = "media_count_observed", nullable = false)
     private boolean mediaCountObserved;

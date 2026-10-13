@@ -586,4 +586,240 @@ class ReviewCatchUpOrchestratorTest {
         assertThat(run.getWindowsDone()).isZero();
         assertThat(run.getPausedWindowStart()).isEqualTo(walked);
     }
+
+    // ── 이력 (2026-10-13 제품 책임자 결정: 1년, 무인, 최신부터) ───────────────────────────────────────────────
+
+    /** 기록된 이력 시작일을 가진 walk — 설정의 history_from을 흉내 낸다. 자동 확인 게이트는 열어 둔다. */
+    private ReviewCatchUpOrchestrator withHistory(LocalDate historyFrom) {
+        ReviewCatchUpOrchestrator h = new ReviewCatchUpOrchestrator(runs,
+                new ReviewCoverageCursor(segments, channels, jobs), dispatcher, clock,
+                ReviewCatchUpOrchestrator.Limits.PRESS, (o, a) -> Optional.of(historyFrom));
+        dispatcher.setAutoCheckAuthority((o, a, r) -> true);
+        walker = h;
+        return h;
+    }
+
+    private Optional<ReviewCatchUpOrchestrator.Started> scheduled(ReviewCatchUpOrchestrator h) {
+        return h.startScheduled(org, account.getId(), naver.getId(), "REVIEW", AsideRecipe.NAVER_REVIEW_OBSERVE_V1);
+    }
+
+    private Optional<ReviewCatchUpOrchestrator.Started> pressWith(ReviewCatchUpOrchestrator h, String id) {
+        return h.start(org, account.getId(), naver.getId(), "REVIEW", AsideRecipe.NAVER_REVIEW_OBSERVE_V1, id);
+    }
+
+    private void settleAsFailure(ScheduledAsideJob child, AsideJobOutcome outcome, String code) {
+        claim();
+        dispatcher.settle(org, deviceId, child.getId(), outcome, null, null, code);
+    }
+
+    private static String shown(ScheduledAsideJob j) {
+        return j.getRequestedWindowStart() + "~" + j.getRequestedWindowEnd();
+    }
+
+    private String days(int from, int to) {
+        return today.minusDays(from) + "~" + today.minusDays(to);
+    }
+
+    @Test
+    @DisplayName("앞쪽 공백을 먼저(오래된 것부터), 그다음 경계 앞 이력을 최신부터 31일씩 — 한 번의 walk로")
+    void forwardGapsThenHistoryNewestFirst() {
+        coveredThrough(10); // 덮인 구간: today-70 … today-10
+        ReviewCatchUpOrchestrator h = withHistory(today.minusDays(130));
+
+        ReviewCatchUpOrchestrator.Started started = scheduled(h).orElseThrow();
+        // 진짜 계획된 시작 — 기록된 history_from이다. 추측이 아니다.
+        assertThat(started.run().getRequestedFrom()).isEqualTo(today.minusDays(130));
+        assertThat(started.run().getRequestedThrough()).isEqualTo(today.minusDays(1));
+        assertThat(started.run().getHistoryFrom()).isEqualTo(today.minusDays(130));
+        assertThat(started.run().getHistoryThrough()).isEqualTo(today.minusDays(71));
+        assertThat(started.run().getPhase()).isEqualTo(ReviewCatchUpRun.Phase.FORWARD);
+
+        List<String> walked = new java.util.ArrayList<>();
+        for (int i = 0; i < 12; i++) {
+            Optional<ScheduledAsideJob> child = onDesk();
+            if (child.isEmpty()) {
+                break;
+            }
+            walked.add(shown(child.get()));
+            settleAsRead(child.get(), 10, 500);
+        }
+        assertThat(walked).containsExactly(days(9, 3), days(2, 1), days(101, 71), days(130, 102));
+        ReviewCatchUpRun run = runs.findById(started.run().getId()).orElseThrow();
+        assertThat(run.getState()).isEqualTo(ReviewCatchUpState.COMPLETE);
+        assertThat(run.getStopReason()).isNull();
+        assertThat(run.getPhase()).isEqualTo(ReviewCatchUpRun.Phase.HISTORY);
+        assertThat(run.getWindowsDone()).isEqualTo(4);
+        assertThat(run.getDaysCovered()).isEqualTo(9 + 60);
+    }
+
+    @Test
+    @DisplayName("경계가 없어도 기록된 시작일이 있으면 걷는다 — 어제부터 거꾸로, 31일씩")
+    void noBoundaryWalksHistory() {
+        ReviewCatchUpOrchestrator h = withHistory(today.minusDays(40));
+        ReviewCatchUpOrchestrator.Started started = pressWith(h, "press-1").orElseThrow();
+
+        assertThat(started.run().getPhase()).isEqualTo(ReviewCatchUpRun.Phase.HISTORY);
+        assertThat(started.run().getRequestedFrom()).isEqualTo(today.minusDays(40));
+        assertThat(shown(started.firstJob())).isEqualTo(days(31, 1));
+        settleAsRead(started.firstJob(), 10, 500);
+        ScheduledAsideJob older = onDesk().orElseThrow();
+        assertThat(shown(older)).isEqualTo(days(40, 32));
+        settleAsRead(older, 10, 500);
+        assertThat(onDesk()).isEmpty();
+        assertThat(runs.findById(started.run().getId()).orElseThrow().getState())
+                .isEqualTo(ReviewCatchUpState.COMPLETE);
+    }
+
+    @Test
+    @DisplayName("기록된 시작일이 없으면 예전 그대로 — 경계 없음은 walk 없음")
+    void noHorizonIsTheOldBehaviour() {
+        assertThat(press("press-1")).isEmpty();
+        assertThat(runs.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("TOO_MANY_ROWS(SURFACE_UNREADABLE + 코드)는 실패가 아니라 쪼갬이다 — PARTIAL과 똑같이")
+    void tooManyRowsSplitsLikePartial() {
+        coveredThrough(36);
+        ScheduledAsideJob first = press("press-1").orElseThrow().firstJob();
+        LocalDate windowStart = first.getRequestedWindowStart();
+
+        // 수집기가 실제로 보내는 모양 그대로.
+        settleAsFailure(first, AsideJobOutcome.SURFACE_UNREADABLE, "TOO_MANY_ROWS");
+        assertThat(jobs.findById(first.getId()).orElseThrow().getFailureCode()).isEqualTo("TOO_MANY_ROWS");
+
+        ScheduledAsideJob next = onDesk().orElseThrow();
+        assertThat(next.getRequestedWindowStart()).isEqualTo(windowStart);
+        assertThat(next.getRequestedWindowEnd()).isEqualTo(windowStart.plusDays(2));
+        ReviewCatchUpRun run = runs.findById(first.getCatchUpRunId()).orElseThrow();
+        assertThat(run.getState()).isEqualTo(ReviewCatchUpState.RUNNING);
+        assertThat(run.getWindowsDone()).isZero();
+        settleAsRead(next, 200, 500);
+        ScheduledAsideJob remainder = onDesk().orElseThrow();
+        assertThat(remainder.getRequestedWindowStart()).isEqualTo(windowStart.plusDays(3));
+        assertThat(remainder.getRequestedWindowEnd()).isEqualTo(windowStart.plusDays(6));
+    }
+
+    @Test
+    @DisplayName("하루짜리 창이 여전히 TOO_MANY_ROWS면 거기서 멈춘다 — DAY_SATURATED")
+    void tooManyRowsOnOneDayStops() {
+        coveredThrough(2); // 공백은 어제 하루
+        ScheduledAsideJob child = press("press-1").orElseThrow().firstJob();
+        assertThat(child.getRequestedWindowStart()).isEqualTo(child.getRequestedWindowEnd());
+        settleAsFailure(child, AsideJobOutcome.SURFACE_UNREADABLE, "TOO_MANY_ROWS");
+
+        ReviewCatchUpRun run = runs.findById(child.getCatchUpRunId()).orElseThrow();
+        assertThat(run.getState()).isEqualTo(ReviewCatchUpState.STOPPED_SATURATED);
+        assertThat(run.getStopReason()).isEqualTo("DAY_SATURATED");
+        assertThat(onDesk()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("이력 창의 TOO_MANY_ROWS는 최신 절반부터 다시 읽고, 나머지(오래된 쪽)를 정확히 이어 읽는다")
+    void tooManyRowsInHistorySplitsNewestHalfFirst() {
+        ReviewCatchUpOrchestrator h = withHistory(today.minusDays(40));
+        ScheduledAsideJob first = pressWith(h, "press-1").orElseThrow().firstJob();
+        assertThat(shown(first)).isEqualTo(days(31, 1));
+
+        settleAsFailure(first, AsideJobOutcome.SURFACE_UNREADABLE, "TOO_MANY_ROWS");
+        ScheduledAsideJob newer = onDesk().orElseThrow();
+        assertThat(shown(newer)).isEqualTo(days(15, 1));
+        settleAsRead(newer, 100, 500);
+        ScheduledAsideJob older = onDesk().orElseThrow();
+        assertThat(shown(older)).isEqualTo(days(31, 16));
+        settleAsRead(older, 100, 500);
+        assertThat(shown(onDesk().orElseThrow())).isEqualTo(days(40, 32));
+    }
+
+    @Test
+    @DisplayName("이력 창의 DATE_NOT_SELECTABLE은 경계다 — 닿는 날은 다 읽고, 경계를 적고, 다음 walk는 묻지 않는다")
+    void dateNotSelectableInHistoryIsTheBoundary() {
+        ReviewCatchUpOrchestrator h = withHistory(today.minusDays(40));
+        // 마켓 달력: today-37보다 오래된 날은 고를 수 없다.
+        LocalDate oldestSelectable = today.minusDays(37);
+        ScheduledAsideJob child = scheduled(h).orElseThrow().firstJob();
+        UUID runId = child.getCatchUpRunId();
+        List<String> walked = new java.util.ArrayList<>();
+        for (int i = 0; i < 20 && child != null; i++) {
+            walked.add(shown(child));
+            if (child.getRequestedWindowStart().isBefore(oldestSelectable)) {
+                settleAsFailure(child, AsideJobOutcome.SURFACE_UNREADABLE, "DATE_NOT_SELECTABLE");
+            } else {
+                settleAsRead(child, 5, 500);
+            }
+            child = onDesk().orElse(null);
+        }
+        assertThat(walked).containsExactly(days(31, 1), days(40, 32), days(35, 32), days(40, 36), days(37, 36),
+                days(40, 38), days(38, 38));
+        ReviewCatchUpRun run = runs.findById(runId).orElseThrow();
+        assertThat(run.getState()).as("경계까지 읽은 것은 실패가 아니다").isEqualTo(ReviewCatchUpState.COMPLETE);
+        assertThat(run.getStopReason()).isEqualTo(ReviewCatchUpOrchestrator.HISTORY_BOUNDARY);
+        assertThat(run.getPausedWindowStart()).isEqualTo(today.minusDays(38));
+        assertThat(jobs.findAll().stream().filter(j -> "DATE_NOT_SELECTABLE".equals(j.getFailureCode())))
+                .as("코드가 null로 떨어지지 않고 기록된다").isNotEmpty();
+
+        // 다음 tick: 경계 너머는 다시 계획하지 않는다 — 읽을 이력도 공백도 없으니 walk가 없다.
+        assertThat(scheduled(h)).isEmpty();
+        assertThat(onDesk()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("앞쪽 공백 창의 DATE_NOT_SELECTABLE은 경계가 아니라 실패다")
+    void dateNotSelectableInAForwardGapFails() {
+        coveredThrough(36);
+        ScheduledAsideJob child = press("press-1").orElseThrow().firstJob();
+        settleAsFailure(child, AsideJobOutcome.SURFACE_UNREADABLE, "DATE_NOT_SELECTABLE");
+
+        ReviewCatchUpRun run = runs.findById(child.getCatchUpRunId()).orElseThrow();
+        assertThat(run.getState()).isEqualTo(ReviewCatchUpState.FAILED);
+        assertThat(run.getStopReason()).isEqualTo("DATE_NOT_SELECTABLE");
+    }
+
+    @Test
+    @DisplayName("MONTH_NAV_EXHAUSTED는 그 창의 실패다 — 이력에서도 경계로 읽지 않는다")
+    void monthNavExhaustedFailsTheWindow() {
+        ReviewCatchUpOrchestrator h = withHistory(today.minusDays(40));
+        ScheduledAsideJob child = pressWith(h, "press-1").orElseThrow().firstJob();
+        settleAsFailure(child, AsideJobOutcome.SURFACE_UNREADABLE, "MONTH_NAV_EXHAUSTED");
+
+        ReviewCatchUpRun run = runs.findById(child.getCatchUpRunId()).orElseThrow();
+        assertThat(run.getState()).isEqualTo(ReviewCatchUpState.FAILED);
+        assertThat(run.getStopReason()).isEqualTo("MONTH_NAV_EXHAUSTED");
+        assertThat(jobs.findById(child.getId()).orElseThrow().getFailureCode()).isEqualTo("MONTH_NAV_EXHAUSTED");
+    }
+
+    @Test
+    @DisplayName("이력에서 멈춘 walk 뒤로 자동 확인은 하루 동안 이력을 건드리지 않는다 — 사람의 누름은 막지 않는다")
+    void aStoppedHistoryWalkIsNotRetriedEveryHour() {
+        ReviewCatchUpOrchestrator h = withHistory(today.minusDays(40));
+        ScheduledAsideJob child = scheduled(h).orElseThrow().firstJob();
+        settleAsFailure(child, AsideJobOutcome.SURFACE_UNREADABLE, "MONTH_NAV_EXHAUSTED");
+
+        tick(Duration.ofHours(1));
+        assertThat(scheduled(h)).as("한 시간 뒤의 tick은 같은 벽으로 걸어 들어가지 않는다").isEmpty();
+        tick(ReviewCatchUpOrchestrator.HISTORY_RETRY);
+        assertThat(scheduled(h)).as("하루가 지나면 다시 본다").isPresent();
+    }
+
+    @Test
+    @DisplayName("사람의 누름은 이력 보류에 걸리지 않는다")
+    void aPressIsNotHeldBack() {
+        ReviewCatchUpOrchestrator h = withHistory(today.minusDays(40));
+        ScheduledAsideJob child = scheduled(h).orElseThrow().firstJob();
+        settleAsFailure(child, AsideJobOutcome.SURFACE_UNREADABLE, "MONTH_NAV_EXHAUSTED");
+        assertThat(pressWith(h, "press-after")).isPresent();
+    }
+
+    @Test
+    @DisplayName("한 walk의 상한은 1년 이력이 한두 번에 끝날 만큼 넓다")
+    void theWalkBoundsFitAYear() {
+        ReviewCatchUpOrchestrator.Limits limits = ReviewCatchUpOrchestrator.Limits.PRESS;
+        assertThat(limits.maxWindows()).isEqualTo(24);
+        assertThat(limits.maxDays()).isEqualTo(400);
+        assertThat(limits.maxRows()).isEqualTo(12_000);
+        assertThat(limits.maxElapsed()).isEqualTo(Duration.ofMinutes(20));
+        // 1년 = 31일 창 12개 — 창 상한의 절반이라 쪼갬이 있어도 한 walk에 들어간다.
+        assertThat(366 / ReviewCatchUpRun.HISTORY_STEP_DAYS + 1).isLessThanOrEqualTo(limits.maxWindows() / 2);
+        assertThat(limits.maxDays()).isGreaterThan(366 + 31);
+    }
 }

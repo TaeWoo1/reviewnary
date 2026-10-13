@@ -1042,4 +1042,67 @@ class ReviewAutoCheckTest {
         assertThat(reconciler.tick(now).refreshedToday()).isEqualTo(1);
         assertThat(dispatcher.busy(org)).isTrue();
     }
+
+    // ── history_from (V134, 제품 책임자 기본값 2026-10-13) ─────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("새 설정 행은 판매자가 아무것도 하지 않아도 1년 전부터 이력을 읽도록 적힌다")
+    void aNewRowReadsAYearOfHistory() {
+        connectionCompleted(account);
+        LocalDate expected = LocalDate.ofInstant(now, KST).minusYears(1);
+
+        ReviewAutoCheck row = settingRows.findBySellerAccountIdAndDataType(account.getId(), "REVIEW")
+                .orElseThrow();
+        assertThat(row.getHistoryFrom()).isEqualTo(expected);
+        assertThat(settings.view(org, account.getId()).historyFrom()).isEqualTo(expected);
+        assertThat(settings.historyFrom(org, account.getId())).contains(expected);
+        assertThat(ReviewAutoCheckService.DEFAULT_HISTORY_YEARS).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("이력 시작일은 바꿀 수 있다 — 미래와 2010년 이전만 거절한다")
+    void historyFromMayBeMovedWithinSanity() {
+        connectionCompleted(account);
+        LocalDate twoYears = LocalDate.ofInstant(now, KST).minusYears(2);
+        assertThat(settings.setHistoryFrom(org, account.getId(), twoYears).historyFrom()).isEqualTo(twoYears);
+        assertThat(settings.historyFrom(org, account.getId())).contains(twoYears);
+        // 오늘은 허용(읽을 이력이 없을 뿐), 내일은 이력이 아니다.
+        settings.setHistoryFrom(org, account.getId(), LocalDate.ofInstant(now, KST));
+        assertThatThrownBy(() -> settings.setHistoryFrom(org, account.getId(),
+                LocalDate.ofInstant(now, KST).plusDays(1))).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> settings.setHistoryFrom(org, account.getId(), LocalDate.of(2009, 12, 31)))
+                .isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> settings.setHistoryFrom(org, account.getId(), null))
+                .isInstanceOf(ApiException.class);
+        settings.setHistoryFrom(org, account.getId(), ReviewAutoCheckService.HISTORY_FLOOR);
+        assertThat(settings.historyFrom(org, account.getId())).contains(ReviewAutoCheckService.HISTORY_FLOOR);
+    }
+
+    @Test
+    @DisplayName("자동 확인을 끈 계정, 다른 조직의 계정에는 이력 시작일이 없다")
+    void historyFromNeedsTheSettingOn() {
+        connectionCompleted(account);
+        assertThat(settings.historyFrom(UUID.randomUUID(), account.getId())).isEmpty();
+        settings.set(org, account.getId(), userId, false);
+        assertThat(settings.historyFrom(org, account.getId())).isEmpty();
+        assertThat(settings.view(org, account.getId()).historyFrom()).as("값은 남아 있다 — 다시 켜면 그대로")
+                .isNotNull();
+    }
+
+    @Test
+    @DisplayName("V134는 기존 행에 같은 1년 기본값을 판매자의 KST 하루로 채우고, 그 결정을 주석으로 남긴다")
+    void v134AppliesTheSameDefault() throws java.io.IOException {
+        String sql = java.nio.file.Files.readString(
+                java.nio.file.Path.of("src/main/resources/db/migration/V134__review_history_from.sql"));
+        String executable = sql.replaceAll("(?m)--.*$", "");
+        assertThat(executable).contains("add column history_from date");
+        assertThat(executable).contains(
+                "set history_from = ((now() at time zone 'Asia/Seoul')::date - interval '1 year')::date");
+        assertThat(executable).contains("where history_from is null");
+        assertThat(sql).contains("제품 책임자 결정");
+        // 이미 적용된 마이그레이션을 고치지 않았다: 새 칼럼은 V134에만 있다.
+        String v126 = java.nio.file.Files.readString(
+                java.nio.file.Path.of("src/main/resources/db/migration/V126__review_auto_check.sql"));
+        assertThat(v126).doesNotContain("history_from");
+    }
 }
