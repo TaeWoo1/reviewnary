@@ -1134,7 +1134,8 @@ SSG는 거부). `OutboundGateFenceTest`가 검사 누락을 막는다. 네이버
 패키징(JRE · Postgres · Node 번들) spike는 L4가 아니라 L1과 병행한다. 판매자 PC에 Postgres를 넣는 방식이 가장 큰 미지수이고 L1의 설계에 영향을 준다.
 
 **1의 결과 (2026-10-17).** 엔드포인트 · 저장 필드 · 상태 전이 · 삭제 시점은 `docs/vendor_server_contract_v1.md`(초안)에
-옮겼다. 구현 전 오너 확인 5건(D1 별도 앱 · D2 초대 전용 · D3 담당자 TOTP · D4 비답글 리뷰 보유 · D5 사진)이 그 문서 §0에 있다.
+옮겼다. 2026-10-17 오너 결정(그 문서 §0, scope lock v1.14 ⑧-3): 별도 앱 · 초대 전용 · 담당자 2단계 인증 · 답글 불필요
+리뷰 90일 상한 · OS별 앱 묶음은 확정, 리뷰 사진은 실제 내보내기 파일의 첨부 구조 확인 뒤로 보류.
 
 **2의 결과 — 패키징 spike (2026-10-17, Apple Silicon Mac, 합성 빈 DB, 외부 호출 없음).**
 
@@ -1157,6 +1158,6 @@ SSG는 거부). `OutboundGateFenceTest`가 검사 누락을 막는다. 네이버
 | D. A + Tauri 트레이 실행기 | 설치 1회, 용량 소폭 증가 | 트레이 · 자동시작 UX가 필요해지면 A 위에 얹는다 |
 | E. DB 교체(H2 · SQLite) | — | §17.2에 따라 하지 않는다 |
 
-A를 고르면 남는 일: 화면 같은 출처 서빙 [REPO], 첫 실행 시 `initdb`와 DB 비밀번호 생성, 설치별 JWT secret 생성,
+A로 확정했다(2026-10-17). 남는 일: 화면 같은 출처 서빙 [REPO], 첫 실행 시 `initdb`와 DB 비밀번호 생성, 설치별 JWT secret 생성,
 Mac 공증(Apple Developer Program, 개인 가입 가능 [PO] · [EXT]), Windows는 Windows에서 jlink · 서명(Authenticode)
 검증 후 지원 표시(§18.3 L4).
