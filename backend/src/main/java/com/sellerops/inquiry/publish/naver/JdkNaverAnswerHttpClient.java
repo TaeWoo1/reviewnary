@@ -1,5 +1,6 @@
 package com.sellerops.inquiry.publish.naver;
 
+import com.sellerops.outbound.OutboundGate;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -47,6 +48,7 @@ public class JdkNaverAnswerHttpClient implements NaverAnswerHttpClient {
     }
 
     private Response send(HttpRequest request) {
+        OutboundGate.check(request.uri(), OutboundGate.Destination.NAVER_COMMERCE);
         try {
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
             Map<String, String> headers = new HashMap<>();

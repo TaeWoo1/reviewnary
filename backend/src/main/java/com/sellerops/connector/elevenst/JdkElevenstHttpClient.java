@@ -1,5 +1,6 @@
 package com.sellerops.connector.elevenst;
 
+import com.sellerops.outbound.OutboundGate;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -34,6 +35,7 @@ public class JdkElevenstHttpClient implements ElevenstHttpClient {
     }
 
     private Response send(HttpRequest request) {
+        OutboundGate.check(request.uri(), OutboundGate.Destination.ELEVENST);
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             return new Response(response.statusCode(), response.body(), firstValueHeaders(response));

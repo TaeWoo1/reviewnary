@@ -156,6 +156,11 @@ export const CALL_IP_COPY = {
   alreadyRegisteredCta: "이미 API 호출 IP를 등록했어요",
   acknowledgedNote: "호출 IP 등록을 확인함으로 표시했어요. 실제 등록 여부는 연결 테스트로 최종 확인됩니다.",
   readyConfirmed: "호출 IP·주문 API 접근 정상 — 첫 주문 수집까지 완료되었습니다.",
+  // Seller-PC install (scope lock v1.14 ①): the API call leaves from THIS PC, so the address to register is the
+  // seller's own public IP — there is no reviewnary address to show. The lookup is the seller's own search.
+  thisPcTitle: "이 PC의 인터넷 주소(공인 IP)를 'API 호출 IP'에 등록하세요.",
+  thisPcBody:
+    "reviewnary는 이 PC에서 직접 API를 호출합니다. 네이버 검색창에 '내 IP'를 검색하면 나오는 주소를 그대로 등록하면 됩니다. 인터넷 회선이나 공유기를 바꾸면 주소가 달라질 수 있고, 그때는 새 주소로 다시 등록해야 연결이 이어집니다.",
 } as const;
 
 /**

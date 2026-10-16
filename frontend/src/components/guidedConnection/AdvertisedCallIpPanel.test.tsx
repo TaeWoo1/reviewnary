@@ -3,7 +3,7 @@
 // The 'API 호출 IP' panel must keep TWO root causes visibly distinct and never block a seller who already
 // registered: an empty advertised list is OUR-side "not configured yet" (no fabricated value), a non-empty
 // list is the seller's remaining action, and the acknowledgment is a local reassurance that stores no IP.
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { AdvertisedCallIpPanel } from "./AdvertisedCallIpPanel";
 import { CALL_IP_COPY } from "../../lib/guidedConnection";
@@ -44,5 +44,35 @@ describe("AdvertisedCallIpPanel — already-registered acknowledgment (recovery 
   it("non-empty ips + showRegisteredAck also offers the acknowledgment", () => {
     render(<AdvertisedCallIpPanel ips={["203.0.113.10"]} showRegisteredAck />);
     expect(screen.getByTestId("call-ip-already-registered")).toBeInTheDocument();
+  });
+});
+
+describe("AdvertisedCallIpPanel — seller-PC install (VITE_LOCAL_SELLER=true)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("asks for THIS PC's public IP and never shows a reviewnary address, even one that is configured", () => {
+    vi.stubEnv("VITE_LOCAL_SELLER", "true");
+    render(<AdvertisedCallIpPanel ips={["203.0.113.10"]} />);
+    expect(screen.getByText(CALL_IP_COPY.thisPcTitle)).toBeInTheDocument();
+    expect(screen.getByText(CALL_IP_COPY.thisPcBody)).toBeInTheDocument();
+    expect(screen.queryByText("203.0.113.10")).toBeNull();
+    expect(screen.queryByText(CALL_IP_COPY.registerTitle)).toBeNull();
+    expect(screen.queryByText(CALL_IP_COPY.advertisedUnsetTitle)).toBeNull();
+  });
+
+  it("keeps the already-registered acknowledgment in recovery contexts", () => {
+    vi.stubEnv("VITE_LOCAL_SELLER", "true");
+    render(<AdvertisedCallIpPanel ips={[]} showRegisteredAck />);
+    fireEvent.click(screen.getByTestId("call-ip-already-registered"));
+    expect(screen.getByText(CALL_IP_COPY.acknowledgedNote)).toBeInTheDocument();
+  });
+
+  it("an ordinary build is unchanged: the advertised address is still shown", () => {
+    vi.stubEnv("VITE_LOCAL_SELLER", "");
+    render(<AdvertisedCallIpPanel ips={["203.0.113.10"]} />);
+    expect(screen.getByText("203.0.113.10")).toBeInTheDocument();
+    expect(screen.queryByText(CALL_IP_COPY.thisPcTitle)).toBeNull();
   });
 });

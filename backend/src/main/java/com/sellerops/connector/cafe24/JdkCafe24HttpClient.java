@@ -1,5 +1,6 @@
 package com.sellerops.connector.cafe24;
 
+import com.sellerops.outbound.OutboundGate;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -100,6 +101,7 @@ public class JdkCafe24HttpClient implements Cafe24HttpClient {
     }
 
     private Response send(HttpRequest request) {
+        OutboundGate.check(request.uri(), OutboundGate.Destination.CAFE24);
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             return new Response(response.statusCode(), response.body(), firstValueHeaders(response));

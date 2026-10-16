@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
@@ -38,6 +39,9 @@ import org.springframework.test.context.ActiveProfiles;
         "spring.datasource.url=jdbc:h2:mem:local_seller_guard;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
 })
 @ActiveProfiles("test")
+// Closed after this class: the context arms the process-wide OutboundGate, and a cached context would leave it
+// armed for every later test class in the JVM.
+@DirtiesContext
 class LocalSellerGuardWiringTest {
 
     @LocalServerPort

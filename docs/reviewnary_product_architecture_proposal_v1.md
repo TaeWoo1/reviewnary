@@ -912,4 +912,11 @@ LLM 제공자. LLM 엔드포인트는 약 9개 capability에 하드코딩돼 있
 5. 테스트: 잘못된 Host/Origin · 미인증 loopback 요청 거부와 정상 경로 성공을 같이 증명, 금지 목적지 주입 시 fail · 되돌리면 pass, 기준선 재측정.
 6. 롤백: 프로필을 끄면 원상태. migration 추가 없음을 목표로 하고, 필요하면 새 버전만 추가한다(migration 계약 테스트의 글자 순 정렬 주의).
 
+**L1 진행 (2026-10-16).** 1 · 2 · 3 · 5는 `local-seller` 모드로 구현했다(`LocalSellerConfigValidator`,
+`LoopbackRequestGuard`, agent-runtime `AGENT_RUNTIME_HOST` · `disableVendorTracing`, frontend `localSellerBuild`).
+4는 `OutboundGate`로 구현했다 — backend의 JDK `HttpClient` 10곳이 모두 `send` 직전에 목적지 분류와 함께 검사하고,
+판매자 PC 모드에서는 채널 공식 호스트 · LLM 제공자 · 공개 상품 이미지(https) · loopback만 통과한다(ESM · 11번가 ·
+SSG는 거부). `OutboundGateFenceTest`가 검사 누락을 막는다. 네이버 호출 IP는 판매자 PC 빌드에서 "이 PC의 공인 IP"를
+안내하고(`AdvertisedCallIpPanel`), backend는 그 모드에서 공급자 고정 IP 설정을 요구하지 않는다. 남은 것: 패키징 spike.
+
 패키징(JRE · Postgres · Node 번들) spike는 L4가 아니라 L1과 병행한다. 판매자 PC에 Postgres를 넣는 방식이 가장 큰 미지수이고 L1의 설계에 영향을 준다.

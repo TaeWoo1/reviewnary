@@ -1,5 +1,6 @@
 package com.sellerops.product.detail.image;
 
+import com.sellerops.outbound.OutboundGate;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.URI;
@@ -109,6 +110,7 @@ public class DetailImageFetcher {
                 return dropped(ordinal, refusalOf(resolved.verdict()));
             }
             HttpResponse<InputStream> response;
+            OutboundGate.check(URI.create(target), OutboundGate.Destination.PRODUCT_IMAGE);
             try {
                 response = client.send(request(target), HttpResponse.BodyHandlers.ofInputStream());
             } catch (InterruptedException e) {

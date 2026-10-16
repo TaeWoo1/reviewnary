@@ -3,7 +3,9 @@ package com.sellerops.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.sellerops.outbound.OutboundGate;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -18,6 +20,12 @@ class LocalSellerConfigValidatorTest {
 
     private static final String SECRET = "a-per-install-generated-secret-of-at-least-32-chars";
     private static final String H2 = "jdbc:h2:mem:sellerops_test";
+
+    /** A passing local configuration arms the process-wide outbound gate; leave it as every other test expects. */
+    @AfterEach
+    void disarm() {
+        OutboundGate.arm(false);
+    }
 
     private static LocalSellerConfigValidator clean() {
         return v(true, "127.0.0.1", "jdbc:postgresql://localhost:5432/sellerops", SECRET,
@@ -37,12 +45,14 @@ class LocalSellerConfigValidatorTest {
                 "https://key@sentry.example.com/1", "smtp", "gid", "nid");
         assertThat(off.problems()).isEmpty();
         off.afterPropertiesSet();
+        assertThat(OutboundGate.armed()).as("an ordinary deployment never arms the gate").isFalse();
     }
 
     @Test
     void aCleanLocalInstallBoots() {
         assertThat(clean().problems()).isEmpty();
         clean().afterPropertiesSet();
+        assertThat(OutboundGate.armed()).as("a passing local install arms the outbound gate").isTrue();
         assertThat(v(true, "::1", H2, SECRET, "http://127.0.0.1:5173", "", "dev-outbox", "", "").problems())
                 .isEmpty();
     }

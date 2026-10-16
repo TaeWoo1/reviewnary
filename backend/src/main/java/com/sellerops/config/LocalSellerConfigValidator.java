@@ -1,10 +1,12 @@
 package com.sellerops.config;
 
+import com.sellerops.outbound.OutboundGate;
 import com.sellerops.selfpilot.SelfPilotProperties;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -29,9 +31,12 @@ import org.springframework.stereotype.Component;
  * singleton is built, so throwing here means a misbound install never answers a single request — not
  * even for the moment between "listening" and "ready". Like that validator it names the setting to
  * change and never the value: no secret, DSN or address is read into the message.
+ *
+ * <p>A configuration it accepts in local-seller mode also arms {@link OutboundGate}, so every outbound request
+ * is checked against the seller-PC allow-list from the first one; closing the context disarms it again.
  */
 @Component
-public class LocalSellerConfigValidator implements InitializingBean {
+public class LocalSellerConfigValidator implements InitializingBean, DisposableBean {
 
     /** The JWT secret {@code application.yml} ships with; any install still on it signs forgeable tokens. */
     static final String SHIPPED_JWT_SECRET = "change-me-local-dev-only-please-use-a-long-random-string";
@@ -77,6 +82,16 @@ public class LocalSellerConfigValidator implements InitializingBean {
                     "판매자 PC 모드(local-seller)로 시작할 수 없는 설정입니다. "
                             + "아래를 고친 뒤 다시 시작하세요:\n  - "
                             + String.join("\n  - ", problems));
+        }
+        if (enabled) {
+            OutboundGate.arm(true);
+        }
+    }
+
+    @Override
+    public void destroy() {
+        if (enabled) {
+            OutboundGate.arm(false);
         }
     }
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { copyText } from "../../lib/clipboard";
 import { CALL_IP_COPY } from "../../lib/guidedConnection";
+import { isLocalSellerBuild } from "../../lib/security/localSellerMode";
 
 /**
  * Displays SellerOps' advertised fixed egress IP(s) — the value the seller registers in their NAVER
@@ -34,6 +35,19 @@ export function AdvertisedCallIpPanel({
       <p className="rounded-lg bg-canvas px-3 py-2 text-xs text-muted" role="status">
         {CALL_IP_COPY.acknowledgedNote}
       </p>
+    );
+  }
+
+  // Seller-PC install: the call leaves from this PC, so the seller registers their own public IP. Any advertised
+  // value is irrelevant here and is not shown — showing a reviewnary address would tell them to register the
+  // wrong one.
+  if (isLocalSellerBuild()) {
+    return (
+      <div className="space-y-2 rounded-lg bg-canvas px-3 py-2" role="note" aria-label="이 PC의 호출 IP 등록 안내">
+        <p className="text-xs font-medium text-ink">{CALL_IP_COPY.thisPcTitle}</p>
+        <p className="text-xs text-muted">{CALL_IP_COPY.thisPcBody}</p>
+        {showRegisteredAck && <AlreadyRegisteredButton onAck={() => setAcknowledged(true)} />}
+      </div>
     );
   }
 

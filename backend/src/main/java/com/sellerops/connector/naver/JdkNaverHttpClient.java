@@ -1,5 +1,6 @@
 package com.sellerops.connector.naver;
 
+import com.sellerops.outbound.OutboundGate;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -63,6 +64,7 @@ public class JdkNaverHttpClient implements NaverHttpClient {
     }
 
     private Response send(HttpRequest request) {
+        OutboundGate.check(request.uri(), OutboundGate.Destination.NAVER_COMMERCE);
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             return new Response(response.statusCode(), response.body(), firstValueHeaders(response));

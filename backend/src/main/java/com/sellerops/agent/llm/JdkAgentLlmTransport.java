@@ -1,5 +1,6 @@
 package com.sellerops.agent.llm;
 
+import com.sellerops.outbound.OutboundGate;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -35,6 +36,7 @@ public class JdkAgentLlmTransport implements AgentLlmTransport {
                 .header("Content-Type", "application/json;charset=UTF-8")
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8));
         headers.forEach(builder::header);
+        OutboundGate.check(uri, OutboundGate.Destination.LLM);
         long started = System.nanoTime();
         try {
             HttpResponse<String> response =

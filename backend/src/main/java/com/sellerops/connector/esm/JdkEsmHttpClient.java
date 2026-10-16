@@ -1,5 +1,6 @@
 package com.sellerops.connector.esm;
 
+import com.sellerops.outbound.OutboundGate;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -35,6 +36,7 @@ public class JdkEsmHttpClient implements EsmHttpClient {
     }
 
     private Response send(HttpRequest request) {
+        OutboundGate.check(request.uri(), OutboundGate.Destination.ESM);
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             return new Response(response.statusCode(), response.body(), firstValueHeaders(response));

@@ -26,6 +26,16 @@ class PilotConfigValidatorTest {
                 "ALLOW_LIST", false, false, "", "", 0, "", java.util.List.of());
     }
 
+    @Test
+    void aSellerPcInstallIsNotAskedForAnAdvertisedNaverCallIp() {
+        java.util.function.Function<Boolean, PilotConfigValidator> naverOnly = local -> new PilotConfigValidator(
+                true, false, false, "vault-key", "", "", "", "", "ALLOW_LIST", false, false, "", "", 0, "",
+                java.util.List.of(), local);
+        assertThat(naverOnly.apply(false).problems())
+                .singleElement().asString().startsWith("SELLEROPS_CONNECTOR_NAVER_ADVERTISED_EGRESS_IPS");
+        assertThat(naverOnly.apply(true).problems()).isEmpty();
+    }
+
     /** An AI capability with three switches, everything else off. */
     private PilotConfigValidator agent(String scope, boolean enabled, String key, String orgIds) {
         return new PilotConfigValidator(false, false, false, "", "", "", "", "",

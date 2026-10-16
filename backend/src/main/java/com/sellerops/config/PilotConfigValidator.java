@@ -5,6 +5,7 @@ import com.sellerops.agent.access.AgentCapabilityGate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -69,7 +70,25 @@ public class PilotConfigValidator {
      * questions about itself keeps this validator able to check all of them while reading none.
      */
     private final List<AgentCapabilityGate> agentCapabilities;
+    /**
+     * A seller-PC install (scope lock v1.14 ①): the backend calls NAVER from the seller's own machine, so the
+     * address the seller registers is that machine's public IP, not one this deployment advertises.
+     */
+    private final boolean localSeller;
 
+    /** Everything as before, for a deployment that is not a seller-PC install. */
+    public PilotConfigValidator(boolean naverEnabled, boolean coupangEnabled, boolean cafe24Enabled,
+                                String vaultMasterKey, String naverAdvertisedEgressIps, String cafe24ClientId,
+                                String cafe24ClientSecret, String cafe24RedirectUri, String agentAccessScope,
+                                boolean mockConnectorEnabled, boolean inquiryPublishEnabled,
+                                String cafe24LiveApprovalId, String cafe24ClientIp, int cafe24ShopNo,
+                                String naverLiveApprovalId, List<AgentCapabilityGate> agentCapabilities) {
+        this(naverEnabled, coupangEnabled, cafe24Enabled, vaultMasterKey, naverAdvertisedEgressIps, cafe24ClientId,
+                cafe24ClientSecret, cafe24RedirectUri, agentAccessScope, mockConnectorEnabled, inquiryPublishEnabled,
+                cafe24LiveApprovalId, cafe24ClientIp, cafe24ShopNo, naverLiveApprovalId, agentCapabilities, false);
+    }
+
+    @Autowired
     public PilotConfigValidator(
             @Value("${sellerops.connector.naver.enabled:false}") boolean naverEnabled,
             @Value("${sellerops.connector.coupang.enabled:false}") boolean coupangEnabled,
@@ -86,7 +105,9 @@ public class PilotConfigValidator {
             @Value("${sellerops.inquiry.publish.cafe24.client-ip:}") String cafe24ClientIp,
             @Value("${sellerops.inquiry.publish.cafe24.shop-no:0}") int cafe24ShopNo,
             @Value("${sellerops.inquiry.publish.naver.live-approval-id:}") String naverLiveApprovalId,
-            List<AgentCapabilityGate> agentCapabilities) {
+            List<AgentCapabilityGate> agentCapabilities,
+            @Value("${sellerops.local-seller.enabled:false}") boolean localSeller) {
+        this.localSeller = localSeller;
         this.inquiryPublishEnabled = inquiryPublishEnabled;
         this.cafe24LiveApprovalId = cafe24LiveApprovalId;
         this.cafe24ClientIp = cafe24ClientIp;
@@ -148,7 +169,9 @@ public class PilotConfigValidator {
         // The NAVER app refuses calls from an unregistered address, and the connect screen tells the
         // seller to register "SellerOps 고정 호출 IP" — a value this deployment has to know to name.
         // Blank means the screen shows generic guidance and the first order sync fails on call IP.
-        if (naverEnabled && blank(naverAdvertisedEgressIps)) {
+        // Not on a seller's PC: there the call comes from the seller's own address, which the connect screen
+        // tells them to register (AdvertisedCallIpPanel, local build) — this deployment has nothing to advertise.
+        if (naverEnabled && !localSeller && blank(naverAdvertisedEgressIps)) {
             problems.add("SELLEROPS_CONNECTOR_NAVER_ADVERTISED_EGRESS_IPS — "
                     + "네이버를 켰지만 판매자에게 등록하라고 안내할 고정 호출 IP가 설정되지 않았습니다.");
         }

@@ -1,5 +1,6 @@
 package com.sellerops.review.triage.llm;
 
+import com.sellerops.outbound.OutboundGate;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -35,6 +36,7 @@ public class JdkLlmHttpClient implements LlmHttpClient {
                 .header("Content-Type", "application/json;charset=UTF-8")
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8));
         headers.forEach(builder::header);
+        OutboundGate.check(uri, OutboundGate.Destination.LLM);
         try {
             HttpResponse<String> response =
                     client.send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));

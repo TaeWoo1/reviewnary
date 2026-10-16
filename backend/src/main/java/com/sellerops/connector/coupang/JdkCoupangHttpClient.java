@@ -1,5 +1,6 @@
 package com.sellerops.connector.coupang;
 
+import com.sellerops.outbound.OutboundGate;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -55,6 +56,7 @@ public class JdkCoupangHttpClient implements CoupangHttpClient {
      *              can say "it failed"; a write can only say "I do not know".
      */
     private Response send(HttpRequest request, boolean write) {
+        OutboundGate.check(request.uri(), OutboundGate.Destination.COUPANG);
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             return new Response(response.statusCode(), response.body(), firstValueHeaders(response));
