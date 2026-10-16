@@ -154,7 +154,7 @@ document is not on this path and nothing here links to it, it does not carry cur
 | # | Stop | Owns | Document |
 |---|---|---|---|
 | 0 | orientation | what SellerOps is, who for, channel posture, user journey — **points, owns nothing** | `docs/product_operating_model.md` |
-| 1 | **product scope / journeys** | identity, strategy, honest state, authority · the scope contract | `docs/sellerops_canonical_reference.md` · `docs/product-scope-v1.md` (**scope lock v1.13**) |
+| 1 | **product scope / journeys** | identity, strategy, honest state, authority · the scope contract | `docs/sellerops_canonical_reference.md` · `docs/product-scope-v1.md` (**scope lock v1.14**) |
 | 2 | **architecture** | the five runtimes, how they connect, the fail-closed gates — **a pointer page** | `docs/architecture.md` |
 | 3 | **capability truth** | channel × DataType × method × status — **the single declaration** | `docs/multi-channel-connector-roadmap.md` §4.1 |
 | 4 | **decisions** | ADRs and standing contracts | `docs/standing/` · the contracts in `docs/INDEX.md` — the *Standing contracts and ADRs* group, plus the lane documents under *Inquiry* / *Review* / *Knowledge and retrieval*, which are contracts rather than history |

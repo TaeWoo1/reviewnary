@@ -1,11 +1,62 @@
-# Product Scope v1.13 — Drift Guard
+# Product Scope v1.14 — Drift Guard
 
 SellerOps 제품 범위를 **하나의 합의된 정의로 고정**하기 위한 문서. 목적은 "무엇을 만드는가"보다
 **"무엇을 지금 만들지 않는가"를 못 박는 것**이다. 멀티채널 확장(`docs/multi-channel-connector-roadmap.md`)이
 구체화되면서 범위가 넓어지는 자연스러운 drift를 막는다.
 
-> Status: SCOPE LOCK **v1.13** (planning only). 본 문서는 코드를 바꾸지 않으며, 라이브 접속/브라우저/업로드/
+> Status: SCOPE LOCK **v1.14** (planning only). 본 문서는 코드를 바꾸지 않으며, 라이브 접속/브라우저/업로드/
 > DB 변경을 지시하지 않는다. 범위 변경은 이 문서를 고쳐 합의한 뒤에만 이뤄진다.
+>
+> v1.14 변경 (2026-10-16, 제품 오너 결정 반영): **판매자 자체 운영형 로컬 제품.** 정본:
+> `docs/reviewnary_product_architecture_proposal_v1.md` §17(구조)·§18(개발 인계·단계). v1.13을 **대체하지 않고
+> 조인다** — 아래에 적지 않은 v1.13 이하의 결정은 그대로다.
+>
+> ① **제품의 실행 위치를 판매자 PC로 옮긴다.** 기존 Spring backend · Postgres · React · credential 없는
+> `agent-runtime`을 판매자 PC에서 실행하는 것이 초기 목표 배치다. 채널 API 조회 · 토큰 관리 · 스케줄 ·
+> 업무 저장 · 승인 원장 · 승인된 실행은 판매자 PC의 런타임이 담당한다. **공급자(우리)는 채널 인증정보 ·
+> 문의/리뷰/상품 원문 · 작업 큐를 받지 않고, 개별 API 작업을 원격으로 지시하거나 실행하지 않는다.**
+> 공급자 쪽에 남는 것은 프로그램 배포 · 라이선스 · 일반 지원과 ⑦의 리뷰 교환 서비스뿐이며, 각 통신의
+> 필드는 별도로 명시한다.
+>
+> ② **판매자 자기 PC 설치본의 자기 org official-API READ 자동 스케줄은 v1.9 ①과 같은 지위다.** 마켓 WRITE는
+> 그대로 개별 승인 + 승인 계약(`docs/standing/sellerops_live_approval_contract.md`)을 따른다. 이 항목은
+> 플랫폼의 허가나 외부 판매자 제공 자격을 뜻하지 않는다(정본 §17.8 · §15.4).
+>
+> ③ **v1.13 ⑧의 "채널 공식 seller-product API 별도 결정 전 금지"를 이 결정으로 READ에 한해 해제한다.**
+> NAVER · Coupang · Cafe24 공식 상품 조회는 범위 안이다. 상품 수정 등 상품 WRITE는 계속 범위 밖이다.
+>
+> ④ **v1.12 ③의 "리뷰 축 LLM 초안은 v1 범위 밖"을 대체한다.** 근거가 있을 때 LLM이 리뷰 답글 초안을 쓰고
+> org 템플릿을 하한으로 두는 현행 구현(`ReviewDraftComposer`)이 범위 안이다. 자기 flag · 자기 key ·
+> backend-only egress 성질은 그대로다.
+>
+> ⑤ **로컬 모드의 외부 통신은 허용 목록으로만 연다.** 허용 대상은 채널 공식 API와 판매자가 허용한 LLM
+> 제공자다. v1.10 · v1.11의 Sentry · GTM/GA4 · PostHog · 소셜 로그인 · SMTP는 **로컬 모드에서 기본 OFF**이며
+> 켜는 것은 별도 결정이다. LLM 제공자 · 계약 방식(판매자 직접 계약 등)은 정본 §18.5의 [PO] 항목으로 남는다.
+>
+> ⑥ **그대로인 것:** backend가 유일한 LLM egress · `agent-runtime` credential 없음 · Operator WRITE tool 0개 ·
+> LLM-first planning(v1.13 ⑥) · 채널 집합(NAVER/Coupang/Cafe24) · A7 FE freeze(새 화면 · 상태는 구체적
+> delta로 따로 확인) · 적용된 Flyway migration 불변 · capability 표기 규율(구현 · 동작 증거 · 정책 허가를
+> 섞지 않음). 전면 재작성 · 기존 기능 삭제 · 실데이터 이전은 이 결정에 포함되지 않는다.
+>
+> ⑦ **NAVER 리뷰는 사람 대행 + 교환 서비스로 처리한다**(정본 §17.6). 정식 초대받은 담당자가 자료를 직접
+> 확보하고, 판매자가 로컬에서 개별 승인한 정확한 답글을 담당자가 판매자센터에서 직접 등록한다. 판매자 PC와
+> 담당자 사이는 범위가 정해진 자료 · 승인 패키지 · 작업 상태만 오가는 **교환 서비스(공급자 운영 서버)**가
+> 잇는다. 교환 서비스는 원격 명령 · 로컬 파일 읽기 · 채널 API 프록시가 아니며, 채널 인증정보를 받지 않는다.
+> 리뷰 원문 중 위임 범위의 자료가 교환 서비스를 지나가므로 ① "공급자는 원문을 받지 않는다"의 **명시적
+> 예외**이고, 그 필드 · 보유 기간은 별도로 정한다. **브라우저 자동 수집 · 자동 입력 · 자동 게시(Aside ·
+> collector Action Window 포함)는 이 결정의 제품 범위에 들어가지 않는다** — 기존 코드는 삭제하지 않는다.
+>
+> ⑧ **이 항목으로 확정하지 않는 것:** 기존 중앙 pilot 배포(`deploy/`, `docs/pilot/`)는 NAVER 경로에서
+> **보류**하며 삭제하지 않는다. Cafe24 OAuth의 설치형 연결 방식(공급자 앱 · 토큰 교환 위치), 설치
+> 패키징 방식, 교환 서비스의 프로토콜 · 보유 기간은 별도 결정이다.
+>
+> ⑨ 상충하는 서술 — `docs/standing/sellerops_local_to_pilot_connectivity_decision.md`(중앙 backend ·
+> 고정 egress 전제), `docs/standing/sellerops_local_agent_runtime_adr.md`(collector만 로컬),
+> `docs/architecture.md`(런타임 배치) — 은 **로컬 모드에 한해** 이 결정으로 대체되며, 각 문서의 범위를
+> 좁히는 수정은 정본 §18.3 L0에서 한다. NAVER 리뷰 답글을 판매자가 직접 등록한다는 서술(§9의 v1.6 예외,
+> `docs/sellerops_canonical_reference.md` D-032, `docs/frontend/reviewnary_design.md` §8-G′)과 승인 계약에
+> 대행 게시 분류가 없는 점도 같은 L0 정합화 대상이다 — 그 전까지 담당자 등록 결과는 기존 쌍
+> (`OPERATOR_REPORTED_SUBMITTED` + `UNVERIFIED`)으로만 기록하고 `COMPLETED`로 승격하지 않는다.
 >
 > v1.13 변경 (2026-08-21, 제품 오너 결정 반영): **SellerOps Operator Graph v2.** 정본:
 > `docs/standing/sellerops_operator_graph_v2.md`. v1.12를 **대체하지 않고 조인다** — v1.12의 ①③④⑤는 그대로이고,

@@ -39,9 +39,10 @@ live proof · selector calibration · audit · closure record는 여기 올라�
 - `docs/demo_core_experience_v1.md` — Demo Core Experience v1 — SellerOps 데모 제품 정의
 - `docs/demo_runbook_v1.md` — SellerOps Demo Runbook v1 (product assembly A7 — 2026-08-18)
 - `docs/multi-channel-connector-roadmap.md` — Multi-Channel Connector Roadmap
-- `docs/product-scope-v1.md` — Product Scope v1.13 — Drift Guard
+- `docs/product-scope-v1.md` — Product Scope v1.14 — Drift Guard
 - `docs/product_assembly_ia_v1.md` — Product Assembly v1 — 목표 IA와 화면 책임 (정본)
 - `docs/product_operating_model.md` — SellerOps — Product Operating Model
+- `docs/reviewnary_product_architecture_proposal_v1.md` — Reviewnary 제품 구조 v1 — §17 판매자 자체 운영형 로컬 구조 + 네이버 리뷰 사람 대행·교환 서비스 (2026-10-16, scope lock v1.14의 정본), §18 Claude 개발 인계·계약 충돌·전환 단계; 외부 허가·구현 상태와 구분
 - `docs/sellerops_canonical_reference.md` — SellerOps — Canonical Reference: Product, Strategy, State
 - `docs/frontend/sellerops_frontend_spec.md` — SellerOps Frontend Spec — 통합 셀러센터 리디자인 정본
 - `docs/sellerops_local_env_setup.md` — SellerOps — Local Environment Setup (Live-Smoke Preparation)
