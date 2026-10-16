@@ -140,6 +140,8 @@ Reviewnary는 상품과 판매자의 운영 기준을 이해하고, 여러 채�
 
 ## 7. 지금 고정할 구조와 유보할 것
 
+> 이 절의 "하나의 SaaS"·중앙 서버 전제는 2026-10-16 이전 서술이다. 실행 위치는 §17과 `docs/product-scope-v1.md` v1.14 ①을 따른다. 업무 모델(지식·판단·개별 승인·결과 상태)은 유지된다.
+
 **확정한 중심 구조 (§12):** 하나의 SaaS·공통 업무 모델·판매자별 지식과 기억·교체 가능한 수집/실행 어댑터·작업별 권한·개별 승인·정확한 결과 상태. 외부 허가와 구현 완료를 뜻하지 않는다.
 
 **유보:** 네이버 리뷰의 최종 연동사, 수동 파일 처리의 상용 조건·주기, 외부결제 승인, 네이버 무인 게시·포괄 위임 허용 여부, 신규 채널 출시, 세부 화면과 threshold. Aside 필수 설치는 §12에서 초기 기본 의존성에서 제외한다. 수집 경로의 불확실성을 이유로 상품 지식·판단·대응 준비 개발 전체를 정지하지 않는다.
@@ -162,6 +164,8 @@ Cafe24는 오너가 검증한 API 경로를 활용하는 기준 채널로 둔다
 기존 인터뷰 기록(구현 목표 초안)은 저장소 밖에 보관한다. §12는 확정된 변경만 명시하며, 그 밖의 인터뷰 합의를 조용히 대체하지 않는다.
 
 ## 9. NAVER / Coupang / Cafe24 실행 구조 상세
+
+> 이 절의 입점·중앙 SaaS 연결 전제(특히 §9.1 "내스토어 앱 인증정보를 상용 연결에 쓰지 않는다")는 초기 조사안이다. 판매자가 자기 PC에서 자기 앱 인증정보로 직접 호출하는 현재 구조는 §17.5, 브라우저 자동화의 제품 범위는 v1.14 ⑦을 따른다.
 
 2026-10-14 추가 검토. 아래는 출시 구조 제안이며 동작 완료 선언·정책 허가·실행 지시가 아니다. Cafe24 API 존재 여부의 검증을 다시 요구하지 않는다.
 
@@ -189,7 +193,7 @@ Cafe24는 오너가 검증한 API 경로를 활용하는 기준 채널로 둔다
 
 자료 확보 후 가능한 업무는 상품 사용 문제·반복 불만·안전 우려·안내 누락의 대응 준비다. 상품/옵션 단위 근거와 확인된 판매자 귀속을 보존하며, 결합된 카탈로그 리뷰를 해당 판매자의 거래 결과로 단정하지 않는다. 리뷰만으로 고객/주문을 특정하거나 연락처를 찾아 개별 연락하지 않는다. FAQ·상세페이지 개선은 향후 승인 과제로 준비하고, 이번 제안으로 상품 수정 기능을 실행하지 않는다.
 
-**Aside 조건:** 일반 이용약관의 자동 접근 제한과 WING 판매자 계약의 구체적 적용을 구분한다. 기존 repo policy gate는 WING 리뷰를 POLICY_UNCLEAR / GA_POLICY_GATED로 기록한다. 기술 proof·내부 파일럿 허용은 플랫폼 허가가 아니다. 상용 기본으로 채택하려면 현재 판매자 계약 및 쿠팡의 구체적 허용 범위를 확인해야 한다.
+**Aside 조건:** 일반 이용약관의 자동 접근 제한과 WING 판매자 계약의 구체적 적용을 구분한다. 기존 repo policy gate는 WING 리뷰를 `POLICY_UNCLEAR`로 두고, 개발 posture `PILOT_ALLOWED` · GA `POLICY_GATED`로 기록한다. 외부 LLM 사용은 D6 개정에 따라 AI triage pilot에 한정된다. 기술 proof·내부 파일럿 허용은 플랫폼 허가가 아니다. 상용 기본으로 채택하려면 현재 판매자 계약 및 쿠팡의 구체적 허용 범위를 확인해야 한다.
 
 **확보할 결과:** 판매자 본인 WING의 제한된 읽기·저장·AI 분석에 대한 명시적 조건, 공식 자료 전달 방법 또는 해당 용도의 제공 권한이 있는 연동사. 공식 리뷰 export는 아직 확보되지 않았으므로 대체 경로로 존재한다고 가정하지 않는다. 확보 전에는 허용된 API 업무를 운영하고 리뷰 coverage 부족을 표시한다. 특정 리뷰만 판매자가 직접 제공하는 경로도 자료 사용 조건 검토 뒤 제한적으로 사용할 후보이지, 상시 리뷰 모니터링의 대체 증명이 아니다.
 
@@ -406,6 +410,8 @@ Reviewnary에서 개별 승인 -> 원채널 식별자와 확정된 초안 버전
 - [개인정보 보호법 제26조](https://law.go.kr/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1020399009): 2026-09-11 시행 조문 확인. 개별 서비스의 구체적 법률 판단은 별도.
 
 ## 12. 오너 확정: API와 사람 수행을 결합한 운영 AI
+
+> 이 절의 "하나의 SaaS"·중앙 서버 전제는 2026-10-16 이전 서술이다. 실행 위치는 §17과 `docs/product-scope-v1.md` v1.14 ①을 따른다. 업무 모델(지식·판단·개별 승인·결과 상태)은 유지된다.
 
 2026-10-15 오너 결정: '좋아 일단 이렇게 제품을 고정하자.' 이는 직전 하이브리드 구조 권고의 채택이며, 제품의 실행 목표를 소유한다. 앞선 제안 중 아래와 충돌하는 기본 경로는 이 결정으로 대체한다.
 
@@ -713,7 +719,7 @@ Spring을 로컬에 배치해도 **backend-only LLM egress**는 유지된다. No
 | Coupang 리뷰 | 공식적으로 허용된 확보 수단을 확인한 범위에서 분석 | Excel 존재·자동 취득을 미리 약속하지 않음. 답글 발송 업무는 없음. 과거 READ proof는 최신 정책 허가가 아님 |
 | Cafe24 문의·리뷰·상품 | 오너가 검증한 API를 로컬로 재배치하는 방향 | 검증을 다시 처음부터 요구하지 않되, 설치형 배포에 따른 OAuth callback·scope·발송 의미·토큰 갱신은 영향 점검 |
 
-Cafe24 OAuth는 특히 [EXT/REPO] 선행 검증 대상이다. 데스크톱에서 기존 앱에 등록된 callback을 어떻게 만족하는지, 공개 relay가 code를 받는지, 토큰 교환을 누가 하는지 확인한다. loopback callback/PKCE 지원이나 token 없는 relay를 추측해 확정하지 않는다. 현재 `localhost` 기본값·개발 터널 증거만으로 판매자 설치형 연결이 해결됐다고 판정하지 않는다.
+Cafe24 OAuth는 특히 [EXT/REPO] 선행 검증 대상이다. 2026-10-16 공식 가이드 확인: Admin API는 PKCE를 쓰지 않고, 코드 교환과 refresh 모두 `client_id:client_secret` Basic 인증이며 "backend server"에서 하라고 안내한다(access 2시간, refresh 2주·회전). 저장소의 `Cafe24TokenClient`도 같은 방식이다. 따라서 공급자 앱 하나를 판매자들이 설치하는 구조에서 secret을 판매자 PC에 배포하지 않으려면 **공급자 서버의 토큰 중계**가 필요하다 — callback 수신·코드 교환·refresh에 secret만 덧붙여 전달하고, 토큰·상품·게시물 자료를 저장하거나 기록하지 않는다. 토큰이 공급자 서버를 지나가므로 v1.14 ①의 두 번째 예외로 [PO] 확정이 필요하다. 교환 서비스와 같은 서버에 두더라도 기능·로그·저장소를 분리한다. 개발자센터 FAQ는 개인·사업체 가입을 허용하나 "개인개발자에게는 개인정보 취급권한을 부여하고 있지 않"고 테스트 설치는 5개 쇼핑몰까지다. 개인사업자의 개인정보 권한 범위와 현재 scope(`mall.read_community`, `mall.read_order`, `mall.read_product`)의 분류는 [EXT] 확인 대상이다. 데스크톱에서 기존 앱에 등록된 callback을 어떻게 만족하는지, 공개 relay가 code를 받는지, 토큰 교환을 누가 하는지 확인한다. loopback callback/PKCE 지원이나 token 없는 relay를 추측해 확정하지 않는다. 현재 `localhost` 기본값·개발 터널 증거만으로 판매자 설치형 연결이 해결됐다고 판정하지 않는다.
 
 장기적으로 공식 SaaS 자격이나 허용된 외부 도구가 확보되면 실행 어댑터를 교체한다. 지식·기준·승인·결과 모델을 다시 만들지 않는다. 다만 클라우드 전환은 판매자 데이터의 무단 이전이 아니며 별도 계약·이동·권한 회수 절차를 거친다. 원문을 중앙 학습시키지 않아도 판매자별 수정·결과를 로컬에서 재사용하는 제품 가치는 유지된다.
 
@@ -755,7 +761,7 @@ Cafe24 OAuth는 특히 [EXT/REPO] 선행 검증 대상이다. 데스크톱에서
 | Spring/React/collector/LangGraph/contracts 분리 | `docs/architecture.md` | 모듈별 책임을 유지하고 배치 경계를 변경 |
 | 암호화 credential 저장·runtime connector 사용 | `backend/src/main/java/com/sellerops/credential/CredentialVault.java` | 판매자 로컬에서 재사용. 키 보관·복구·중앙 경로 차단은 추가 검증 |
 | 승인 초안 지문·대상 바인딩·중복 방지·결과 조회 | `backend/src/main/java/com/sellerops/inquiry/publish/InquiryPublishService.java` | 재사용 후보. 채널별 live gate·실제 adapter·현재 canonical 계약과 함께 감사 |
-| 지식·기존 응대·템플릿 기반 리뷰 초안 | `backend/src/main/java/com/sellerops/review/draft/ReviewDraftComposer.java` | 재사용. 오래된 scope의 '리뷰 LLM 제외' 문구와 현재 코드를 조정 대상으로 기록 |
+| 리뷰 답글 초안: 근거가 있으면 LLM 작성(`AgentDraftService`), 없으면 org 템플릿 | `backend/src/main/java/com/sellerops/review/draft/ReviewDraftComposer.java` | 재사용. scope v1.14 ④로 '리뷰 LLM 제외' 문구를 대체함 |
 | 로컬 self-pilot scope | `backend/src/main/java/com/sellerops/selfpilot/SelfPilotProperties.java` | loopback DB 검사만으로 충분하지 않음. 모든 org 대상 성질·계정 격리·외부 통신 별도 검증 |
 | Operator WRITE 등록 거부 | `agent-runtime/src/operator/tools/OperatorToolRegistry.ts` | 보존. 별도 실행을 Graph tool로 우회하지 않음 |
 | FE API 주소·오류 계측, runtime backend URL | `frontend/src/lib/apiClient.ts`, `frontend/src/main.tsx`, `agent-runtime/src/http/config.ts` | 로컬 주소 고정·공급자 fallback 제거·telemetry 비활성 범위를 감사 |
@@ -773,6 +779,14 @@ Cafe24 OAuth는 특히 [EXT/REPO] 선행 검증 대상이다. 데스크톱에서
 | `docs/product_assembly_ia_v1.md`, FE 디자인 계약 | 새 설치/가동/대행 상태 표현과 A7 freeze | 기존 workflow-centric 화면 재사용. 새 화면·메뉴·디자인 변경은 구체적 delta로 별도 확인 |
 | Operator/LLM 분리 계약 | 로컬이라는 이유로 Node에 키·WRITE·직접 LLM 호출 추가할 위험 | credential-free/READ-only/backend-only egress 유지 |
 | capability 표·evidence index | 과거 기술 proof를 설치형 외부 공급 허가로 승격할 위험 | 기술·정책·운영 증거 분리. 상태를 문서 작업으로 올리지 않음 |
+| `docs/standing/sellerops_local_to_pilot_connectivity_decision.md` §2.1 · §2.2 · §5 | "로컬 backend egress는 실제 판매자 pilot에 쓰지 않는다", 고정 Cafe24 callback, 공급자 egress IP 광고 계획(B2–B4) | 로컬 모드에서 superseded 표기. 기존 pilot 문서는 보류 상태로 보존 |
+| `docs/product-scope-v1.md` §9(v1.6 예외) · `docs/sellerops_canonical_reference.md` D-032 · `docs/frontend/reviewnary_design.md` §8-G′ | NAVER 답글은 판매자가 직접 등록, 결과는 `OPERATOR_REPORTED_SUBMITTED` + `UNVERIFIED`, 「등록은 판매자님이 누릅니다」 | 담당자 대행 등록의 상태·증거 등급·문구를 별도로 정의. 그 전까지 기존 쌍만 사용, `COMPLETED` 금지 |
+| `docs/standing/sellerops_live_approval_contract.md` §1.1 · §6a | "판매자가 모든 실제 행동을 수행", standing READ grant는 운영자 env 기준 | 판매자 설치본의 WRITE와 제3자 담당자 게시의 분류를 정본 안에서 정의 [PO]. 이 문서에서 절차를 복제하지 않음 |
+| `docs/product-scope-v1.md` §1.4 · §7-7 | 자율 모드 4개, 다중 사용자 RBAC 범위 밖 | 담당자 역할·대행 모드를 넣을 때 해당 항목을 좁혀 개정 |
+| `docs/standing/service_readiness_v1.md` · `docs/standing/auth_growth_instrumentation_v1.md` | Sentry · GTM/GA4 · PostHog · 소셜 로그인 · SMTP 전제 | v1.14 ⑤로 로컬 모드 기본 OFF. 코드 경로는 보존하고 로컬 프로필에서만 차단 |
+| `docs/pilot/*` · `deploy/` | EC2 + EIP + Caddy 중앙 pilot, 중앙 backend에 인증하는 helper | v1.14 ⑧로 NAVER 경로에서 보류. 삭제하지 않음 |
+| `docs/review/review_auto_check_v1.md` 및 리뷰 이력 화면 읽기 레인 | 60분 주기 NAVER 리뷰 자동 READ(helper/Aside) | v1.14 ⑦로 제품 범위 밖. 코드는 보존하고 로컬 설치본에서 제외 |
+| `docs/architecture.md` | 판매자 기기에서 도는 것은 `collector/`뿐 | 배치 열을 로컬 Spring 포함으로 갱신 |
 
 라이브 승인 절차는 `docs/standing/sellerops_live_approval_contract.md`만 참조한다. 여기에 새 승인 절차를 복제하거나 현재 대화로 라이브 승인을 대체하지 않는다.
 
@@ -817,7 +831,7 @@ Cafe24 OAuth는 특히 [EXT/REPO] 선행 검증 대상이다. 데스크톱에서
 
 ### 18.4 Claude가 반드시 증명할 핵심 테스트
 
-1. **공급자 비수령:** 합성 고유 표식을 키/원문에 심고 실제 실행 경로의 HTTP·WebSocket·telemetry·파일 전송 목적지를 관측한다. 공급자 목적지 수신 0을 확인한다. 허용된 LLM·리뷰 교환은 별도 필드 계약으로 검사한다. 문자열 검색만으로 비수령을 증명하지 않는다.
+1. **공급자 비수령:** 합성 고유 표식을 키/원문에 심고 실제 실행 경로의 HTTP·WebSocket·telemetry·파일 전송 목적지를 관측한다. 공급자 목적지 수신 0을 확인한다. 허용된 LLM·리뷰 교환·Cafe24 토큰 중계는 별도 필드 계약으로 검사한다. 문자열 검색만으로 비수령을 증명하지 않는다. **공급자 목적지가 아직 없는 상태의 "0"은 증거가 아니다** — 외부 목적지를 허용 목록으로 고정하고, 목록 밖 목적지(공급자 주소 포함)를 일부러 넣었을 때 실패하고 되돌리면 통과하는 양방향 증명을 함께 낸다.
 2. **악성 로컬 접근:** 잘못된 Host/Origin, CSRF, 위조 WS, 미인증 loopback 요청이 업무/키/등록에 접근하지 못한다. 허용 경로의 정상 성공도 함께 증명한다.
 3. **권한의 실제 분리:** Graph가 키나 privileged 실행을 얻지 못하고, 모델 출력/문서에 원격 전송 지시를 넣어도 실행되지 않는다. 대상·내용·명령 replay/변조는 등록 전에 거부된다.
 4. **재시작 안전성:** 승인/전송 중 crash·DB 복구·중복 시작 후 이미 실행한 효과를 다시 발송하지 않는다. 네트워크 타임아웃 뒤에는 결과 확인만 수행한다.
@@ -855,3 +869,47 @@ Operator READ-only, credential-free, backend-only LLM egress를 유지하라.
 현재 대화는 라이브 실행 승인이 아니다. 승인 계약은 정본을 따른다.
 정책 허가·코드 존재·합성 검증·라이브 증명·운영 지원을 섞어 보고하지 마라.
 ```
+
+### 18.7 L0 결과 (2026-10-16, HEAD `9a070db5` 기준)
+
+소스·문서 읽기만으로 낸 결과다. 앱 코드·DB·runtime holder·`.env`는 열지 않았고, 실행·라이브 호출은 없다.
+
+**기능 기준선.** backend 매핑 어노테이션 GET 141 · POST 132 · PUT 13 · DELETE 9 · `@RequestMapping` 93,
+controller 104 · Flyway 132개(V134까지, V29·V35 결번은 기존) · frontend 라우트 정의 56(`frontend/src/App.tsx`) ·
+collector `src/cli` 28 · npm scripts 23 · 추적 소스 파일 backend/main 1734 · frontend/src 747 ·
+collector/src 409 · agent-runtime/src 155 · contracts 181 · tools 155 · 테스트 파일 backend 613 · frontend 288 ·
+collector 446 · agent-runtime 118 · git 추적 파일 5229. L1 종료 시 같은 방법으로 다시 재서 나란히 적는다.
+
+**§18.1 재사용 지점 대조.** `CredentialVault`(AES-256-GCM 봉투 암호화, 마스터 키 기본값 비어 있음 → fail closed,
+공급자 복구 키 없음) · `InquiryPublishService`(승인 지문 · 대상 바인딩 · `commandId` 중복 거부 ·
+`DELIVERY_UNKNOWN` 재조회; NAVER · Coupang · Cafe24 어댑터는 `execution-enabled`와 채널별 live-approval-id 뒤에서 기본 OFF) ·
+`OperatorToolRegistry` WRITE 거부 — 확인. `ReviewDraftComposer`는 §18.1 표를 고쳤다. `SelfPilotProperties`의
+`LOCAL_SINGLE_USER`는 DB의 모든 org를 대상으로 하고 loopback 검사는 datasource 호스트만 본다.
+NAVER 문의·상품과 Cafe24 게시판은 backend가 공식 API를 직접 부른다. NAVER 리뷰만 collector 경유다.
+
+**외부 통신 지도 — 로컬 모드에서 막을 것.**
+- 바인드: backend는 `server.address`가 없어 모든 인터페이스, Vite dev `host: true`, agent-runtime `listen(port)`, 루트 `docker-compose.yml` 포트 공개.
+- 인증: 기본 JWT secret을 거부하는 검사가 없다(`PilotConfigValidator`도 검사하지 않음). Host/Origin 검사·DNS rebinding 방어 없음(CSRF는 bearer header 방식이라 낮은 위험).
+- 계측: backend Sentry(`SENTRY_DSN`), frontend Sentry · GTM · PostHog — 모두 env가 있을 때만 켜지지만 로컬 프로필에서 켜지지 못하게 해야 한다. SMTP · 소셜 로그인도 같다.
+- 범위: `SELLEROPS_AGENT_ACCESS_SCOPE=ALL_ORGS`는 loopback 확인 없이 모든 org에 동작한다(`AgentCapabilityAccess`).
+- agent-runtime: `langsmith`가 간접 의존성으로 설치돼 있고 `LANGCHAIN_TRACING_V2`를 명시적으로 끄는 코드가 없다.
+
+**허용 목록 후보.** 채널 공식 API(NAVER `api.commerce.naver.com`, Coupang `api-gateway.coupang.com`, `{mall}.cafe24api.com`)와
+LLM 제공자. LLM 엔드포인트는 약 9개 capability에 하드코딩돼 있어(`api.anthropic.com`, `api.openai.com`) 제공자 선택을 열려면 코드 변경이 필요하다.
+
+**연결 튜토리얼.** 설치 없는 `NaverIssuanceTutorial` · `CoupangIssuanceTutorial`은 재사용한다. helper/bridge에 의존하는
+`*IssuanceGuidedWalkthrough`는 v1.14 ⑦에 따라 로컬 설치본에서 뺀다. `AdvertisedCallIpPanel`은 공급자 고정 IP를
+안내하므로 **판매자 자신의 현재 공인 IP**를 안내하도록 바꾸고, IP 변경으로 호출이 실패하면 재등록을 안내한다.
+현재 IP 확인은 공급자 서버의 최소 응답으로 하고 제3자 서비스를 부르지 않는 쪽을 권고한다.
+
+**기존 결함.** Cafe24 결과 리다이렉트 기본값이 `http://localhost:3000/connect/cafe24/result`인데 Vite는 5173이다(`application.yml`).
+
+**L1 구체 범위(권고).** 기본 동작은 바꾸지 않고 새 `local-seller` 프로필에 가둔다.
+1. backend: 프로필 전용 설정 + `PilotConfigValidator`와 같은 형태의 부팅 검사 — loopback 바인드, 기본 JWT secret · Sentry DSN · 메일 · 소셜 로그인 · `ALL_ORGS` · 비-loopback datasource면 부팅 거부. Host/Origin 검사 필터 신설.
+2. agent-runtime: listen 호스트 설정화(기본 `127.0.0.1`), LangChain tracing 강제 OFF.
+3. frontend: 로컬 빌드에 telemetry env가 있으면 빌드 실패.
+4. 외부 통신 허용 목록: JDK `HttpClient` 생성 지점을 한 관문으로 모은다 — 범위가 커서 L1b로 분리.
+5. 테스트: 잘못된 Host/Origin · 미인증 loopback 요청 거부와 정상 경로 성공을 같이 증명, 금지 목적지 주입 시 fail · 되돌리면 pass, 기준선 재측정.
+6. 롤백: 프로필을 끄면 원상태. migration 추가 없음을 목표로 하고, 필요하면 새 버전만 추가한다(migration 계약 테스트의 글자 순 정렬 주의).
+
+패키징(JRE · Postgres · Node 번들) spike는 L4가 아니라 L1과 병행한다. 판매자 PC에 Postgres를 넣는 방식이 가장 큰 미지수이고 L1의 설계에 영향을 준다.
