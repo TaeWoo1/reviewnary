@@ -1,5 +1,6 @@
 package com.sellerops.vendorlink;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -36,6 +37,9 @@ public interface VendorServerClient {
     Poll poll(String deviceCode);
 
     PublicIp publicIp(String installToken);
+
+    /** The vendor server's approval page with this code filled in — opened in the seller's default browser. */
+    URI approvalPage(String userCode);
 
     /** Removes this install on the server. Best effort: the local record is dropped either way. */
     void unlink(String installToken);

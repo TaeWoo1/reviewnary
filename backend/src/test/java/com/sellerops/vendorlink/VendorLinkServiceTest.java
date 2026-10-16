@@ -89,6 +89,7 @@ class VendorLinkServiceTest {
         VendorLinkService.Status pending = service.start();
         assertThat(pending.state()).isEqualTo(State.PENDING);
         assertThat(pending.userCode()).isEqualTo("BCDFGHJK");
+        assertThat(pending.approvalUrl()).isEqualTo("http://127.0.0.1:8090/link?code=BCDFGHJK");
         assertThat(Base64.getDecoder().decode(server.publicKey)).hasSize(32);
         assertThat(server.deviceName).matches("(macOS|Windows|Linux|PC)( \\([A-Za-z0-9_]+\\))?");
         String host = java.net.InetAddress.getLocalHost().getHostName();
@@ -103,6 +104,7 @@ class VendorLinkServiceTest {
         VendorLinkService.Status linked = service.poll();
         assertThat(linked.state()).isEqualTo(State.LINKED);
         assertThat(linked.userCode()).isNull();
+        assertThat(linked.approvalUrl()).isNull();
 
         VendorInstallLink row = links.findAll().get(0);
         assertThat(indexOf(row.getTokenEnc(), TOKEN.getBytes(StandardCharsets.UTF_8))).as("token in plain text").isEqualTo(-1);
@@ -238,6 +240,11 @@ class VendorLinkServiceTest {
                 throw new Unreachable();
             }
             return ip;
+        }
+
+        @Override
+        public java.net.URI approvalPage(String userCode) {
+            return java.net.URI.create("http://127.0.0.1:8090/link?code=" + userCode);
         }
 
         @Override

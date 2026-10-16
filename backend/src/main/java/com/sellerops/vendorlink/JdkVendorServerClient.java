@@ -87,6 +87,11 @@ public class JdkVendorServerClient implements VendorServerClient {
     }
 
     @Override
+    public URI approvalPage(String userCode) {
+        return base.resolve("link?code=" + java.net.URLEncoder.encode(userCode, StandardCharsets.UTF_8));
+    }
+
+    @Override
     public void unlink(String installToken) {
         send(HttpRequest.newBuilder(base.resolve("v1/installs/me")).timeout(REQUEST_TIMEOUT)
                 .header("Authorization", "Bearer " + installToken).DELETE().build());

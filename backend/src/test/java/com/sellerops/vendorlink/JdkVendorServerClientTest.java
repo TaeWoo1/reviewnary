@@ -70,6 +70,7 @@ class JdkVendorServerClientTest {
         assertThat(code.intervalSeconds()).isEqualTo(3);
         assertThat(client.poll("dc")).isInstanceOf(VendorServerClient.Pending.class);
         assertThat(client.publicIp("rvi_x")).isEqualTo(new VendorServerClient.Ipv4("203.0.113.7"));
+        assertThat(client.approvalPage("BCDFGHJK").toString()).isEqualTo(base + "/link?code=BCDFGHJK");
         client.unlink("rvi_x");
         assertThat(seen).containsExactly(
                 "POST /v1/installs/code auth=false {\"deviceName\":\"macOS (aarch64)\",\"publicKey\":\"AQID\"}",

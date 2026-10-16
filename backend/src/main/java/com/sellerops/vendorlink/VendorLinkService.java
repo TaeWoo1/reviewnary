@@ -39,16 +39,20 @@ public class VendorLinkService {
 
     public enum OffReason { NOT_LOCAL_SELLER, NOT_CONFIGURED, NO_VAULT_KEY }
 
-    /** What the screen may know. Never the token, the device code or a key. */
+    /**
+     * What the screen may know. Never the token, the device code or a key. {@code approvalUrl} is the vendor
+     * server's approval page with the user code filled in, for the screen to open in the seller's browser — the
+     * same PC, so the seller does not move to a phone and copy a code (owner decision 2026-10-17).
+     */
     public record Status(State state, OffReason offReason, String userCode, Instant codeExpiresAt,
-                         Integer pollIntervalSeconds, String deviceName, Instant linkedAt) {
+                         Integer pollIntervalSeconds, String approvalUrl, String deviceName, Instant linkedAt) {
 
         static Status off(OffReason reason) {
-            return new Status(State.OFF, reason, null, null, null, null, null);
+            return new Status(State.OFF, reason, null, null, null, null, null, null);
         }
 
         static Status of(State state) {
-            return new Status(state, null, null, null, null, null, null);
+            return new Status(state, null, null, null, null, null, null, null);
         }
     }
 
@@ -95,12 +99,12 @@ public class VendorLinkService {
         }
         Optional<VendorInstallLink> link = links.findFirstByOrderByCreatedAtDesc();
         if (link.isPresent()) {
-            return new Status(State.LINKED, null, null, null, null, link.get().getDeviceName(),
+            return new Status(State.LINKED, null, null, null, null, null, link.get().getDeviceName(),
                     link.get().getCreatedAt());
         }
         if (pending != null && pending.expiresAt().isAfter(clock.instant())) {
             return new Status(State.PENDING, null, pending.userCode(), pending.expiresAt(), pending.interval(),
-                    pending.deviceName(), null);
+                    client.approvalPage(pending.userCode()).toString(), pending.deviceName(), null);
         }
         return Status.of(State.UNLINKED);
     }
