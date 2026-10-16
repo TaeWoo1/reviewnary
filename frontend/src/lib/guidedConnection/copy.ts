@@ -161,6 +161,21 @@ export const CALL_IP_COPY = {
   thisPcTitle: "이 PC의 인터넷 주소(공인 IP)를 'API 호출 IP'에 등록하세요.",
   thisPcBody:
     "reviewnary는 이 PC에서 직접 API를 호출합니다. 네이버 검색창에 '내 IP'를 검색하면 나오는 주소를 그대로 등록하면 됩니다. 인터넷 회선이나 공유기를 바꾸면 주소가 달라질 수 있고, 그때는 새 주소로 다시 등록해야 연결이 이어집니다.",
+  // The address the vendor server saw this PC call from (contract §7). Shown only when it actually answered.
+  thisPcDetectedTitle: "이 PC의 공인 IP입니다. 애플리케이션의 'API 호출 IP'에 그대로 등록하세요.",
+  thisPcChangeNote: "인터넷 회선이나 공유기를 바꾸면 주소가 달라질 수 있어요. 그때는 이 화면에서 새 주소를 확인해 다시 등록하세요.",
+  // Linking this PC to the reviewnary server is what lets the address be read instead of searched for.
+  linkOffer: "이 PC를 reviewnary 서버에 연결하면 주소를 자동으로 확인해 드려요.",
+  linkCta: "이 PC 연결",
+  linkPending: "브라우저 새 탭에서 로그인한 뒤 '연결 허용'을 눌러 주세요. 연결되면 이 화면이 자동으로 이어집니다.",
+  linkCodeLabel: "확인 코드",
+  linkReopen: "승인 화면 다시 열기",
+  linkExpired: "확인 코드가 만료됐어요. 다시 연결해 주세요.",
+  linkFailed: "reviewnary 서버에 연결하지 못했어요. 아래 방법으로 직접 확인해 주세요.",
+  ipUnreachable: "지금은 reviewnary 서버에 닿지 않아 주소를 자동으로 확인하지 못했어요.",
+  ipIpv6Only: "이 PC가 IPv6로만 연결돼 있어 등록할 IPv4 주소를 확인하지 못했어요.",
+  ipRevoked: "reviewnary 서버에서 이 PC의 연결이 해제됐어요. 다시 연결하면 주소를 확인할 수 있어요.",
+  relinkCta: "다시 연결",
 } as const;
 
 /**

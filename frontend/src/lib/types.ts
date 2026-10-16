@@ -156,6 +156,27 @@ export interface NaverSetupView {
 }
 
 /**
+ * The seller PC's link to the vendor server (mirrors backend `VendorLinkService.Status`). Never carries the install
+ * token, the device code or a key. `approvalUrl` is opened in the seller's own browser, never displayed.
+ */
+export interface VendorLinkStatus {
+  state: "OFF" | "UNLINKED" | "PENDING" | "CODE_EXPIRED" | "LINKED";
+  offReason: "NOT_LOCAL_SELLER" | "NOT_CONFIGURED" | "NO_VAULT_KEY" | null;
+  userCode: string | null;
+  codeExpiresAt: string | null;
+  pollIntervalSeconds: number | null;
+  approvalUrl: string | null;
+  deviceName: string | null;
+  linkedAt: string | null;
+}
+
+/** This PC's public IPv4 as the vendor server sees it, or why there is none (backend `PublicIpView`). */
+export interface VendorPublicIpView {
+  ipv4: string | null;
+  reason: "NOT_LINKED" | "IPV6_ONLY" | "NOT_AUTHORIZED" | "UNREACHABLE" | null;
+}
+
+/**
  * Deployment-global Coupang setup facts (mirrors the backend CoupangSetupView), available WITHOUT an
  * account so the connection surface can show them during first-time connection. `advertisedEgressIps`
  * is the fixed public egress IPv4(s) to register in the Coupang app's calling-IP allowlist — sanitized,

@@ -55,6 +55,8 @@ import type {
   ConnectionInfoView,
   ConnectionCapabilityView,
   NaverSetupView,
+  VendorLinkStatus,
+  VendorPublicIpView,
   CoupangSetupView,
   ConnectionStatusView,
   ConnectionTestResultView,
@@ -491,6 +493,28 @@ export const api = {
   // GET, no account scope, no secret (the advertised IP is a value the seller registers publicly).
   async getNaverSetup(): Promise<NaverSetupView> {
     const { data } = await http.get<NaverSetupView>("/api/connect/naver/setup");
+    return data;
+  },
+  // Seller-PC install: this PC's link to the vendor server and the public IPv4 it learns through it
+  // (docs/vendor_server_contract_v1.md §2 · §7). Every call answers with a status, never a secret.
+  async getVendorLink(): Promise<VendorLinkStatus> {
+    const { data } = await http.get<VendorLinkStatus>("/api/local/vendor-link");
+    return data;
+  },
+  async startVendorLink(): Promise<VendorLinkStatus> {
+    const { data } = await http.post<VendorLinkStatus>("/api/local/vendor-link/start");
+    return data;
+  },
+  async pollVendorLink(): Promise<VendorLinkStatus> {
+    const { data } = await http.post<VendorLinkStatus>("/api/local/vendor-link/poll");
+    return data;
+  },
+  async unlinkVendor(): Promise<VendorLinkStatus> {
+    const { data } = await http.delete<VendorLinkStatus>("/api/local/vendor-link");
+    return data;
+  },
+  async getVendorPublicIp(): Promise<VendorPublicIpView> {
+    const { data } = await http.get<VendorPublicIpView>("/api/local/vendor-link/public-ip");
     return data;
   },
   // Deployment-global Coupang setup facts (advertised calling IP(s)) for the connection surface —

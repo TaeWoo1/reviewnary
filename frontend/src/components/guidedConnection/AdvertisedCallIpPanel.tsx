@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { copyText } from "../../lib/clipboard";
 import { CALL_IP_COPY } from "../../lib/guidedConnection";
 import { isLocalSellerBuild } from "../../lib/security/localSellerMode";
+import { CopyableIp } from "./CopyableIp";
+import { ThisPcCallIp } from "./ThisPcCallIp";
 
 /**
  * Displays SellerOps' advertised fixed egress IP(s) — the value the seller registers in their NAVER
@@ -40,14 +41,12 @@ export function AdvertisedCallIpPanel({
 
   // Seller-PC install: the call leaves from this PC, so the seller registers their own public IP. Any advertised
   // value is irrelevant here and is not shown — showing a reviewnary address would tell them to register the
-  // wrong one.
+  // wrong one. The address itself comes from the reviewnary server once this PC is linked (ThisPcCallIp).
   if (isLocalSellerBuild()) {
     return (
-      <div className="space-y-2 rounded-lg bg-canvas px-3 py-2" role="note" aria-label="이 PC의 호출 IP 등록 안내">
-        <p className="text-xs font-medium text-ink">{CALL_IP_COPY.thisPcTitle}</p>
-        <p className="text-xs text-muted">{CALL_IP_COPY.thisPcBody}</p>
-        {showRegisteredAck && <AlreadyRegisteredButton onAck={() => setAcknowledged(true)} />}
-      </div>
+      <ThisPcCallIp
+        ackSlot={showRegisteredAck ? <AlreadyRegisteredButton onAck={() => setAcknowledged(true)} /> : null}
+      />
     );
   }
 
@@ -81,23 +80,5 @@ function AlreadyRegisteredButton({ onAck }: { onAck: () => void }) {
     <button type="button" className="btn-ghost text-xs" onClick={onAck} data-testid="call-ip-already-registered">
       {CALL_IP_COPY.alreadyRegisteredCta}
     </button>
-  );
-}
-
-function CopyableIp({ ip }: { ip: string }) {
-  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
-
-  const onCopy = async () => {
-    const result = await copyText(ip);
-    setState(result.ok ? "copied" : "failed");
-  };
-
-  return (
-    <li className="flex items-center justify-between gap-3">
-      <code className="select-all text-sm font-medium text-ink">{ip}</code>
-      <button type="button" className="btn-ghost text-xs" onClick={onCopy}>
-        {state === "copied" ? "복사됨" : state === "failed" ? "복사 실패 · 직접 선택" : "복사"}
-      </button>
-    </li>
   );
 }

@@ -5,6 +5,18 @@
 // list is the seller's remaining action, and the acknowledgment is a local reassurance that stores no IP.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+
+// The seller-PC branch asks the backend for this PC's link and address; an install with the link off answers
+// with the manual guidance, which is what the local-build cases below assert. The link flow itself is
+// ThisPcCallIp.test.tsx.
+vi.mock("../../lib/apiClient", () => ({
+  api: {
+    getVendorLink: vi.fn(async () => ({ state: "OFF", offReason: "NOT_CONFIGURED", userCode: null,
+      codeExpiresAt: null, pollIntervalSeconds: null, approvalUrl: null, deviceName: null, linkedAt: null })),
+    getVendorPublicIp: vi.fn(async () => ({ ipv4: null, reason: "NOT_LINKED" })),
+  },
+}));
+
 import { AdvertisedCallIpPanel } from "./AdvertisedCallIpPanel";
 import { CALL_IP_COPY } from "../../lib/guidedConnection";
 
