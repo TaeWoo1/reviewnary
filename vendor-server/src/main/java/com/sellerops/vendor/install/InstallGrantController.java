@@ -1,5 +1,7 @@
 package com.sellerops.vendor.install;
 
+import com.sellerops.vendor.ip.ClientIpv4;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
@@ -36,10 +38,10 @@ public class InstallGrantController {
     }
 
     @PostMapping("/code")
-    public ResponseEntity<?> code(@RequestBody @Valid CodeRequest request) {
+    public ResponseEntity<?> code(@RequestBody @Valid CodeRequest request, HttpServletRequest http) {
         try {
             InstallGrants.Issued issued = installs.start(request.deviceName(), request.appVersion(),
-                    request.publicKey());
+                    request.publicKey(), ClientIpv4.of(http.getRemoteAddr()).orElse(null));
             return ResponseEntity.ok(new CodeResponse(issued.deviceCode(), issued.userCode(), issued.expiresAt(),
                     issued.intervalSeconds()));
         } catch (Installs.StartException e) {

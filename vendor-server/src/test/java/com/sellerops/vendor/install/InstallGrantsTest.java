@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 /** <b>A pending grant is approved once, handed over once, and gone after ten minutes</b> — contract §2. */
 class InstallGrantsTest {
 
-    private static final InstallGrants.Pending PC = new InstallGrants.Pending("Seller PC", "0.1.0", new byte[32]);
+    private static final InstallGrants.Pending PC = new InstallGrants.Pending("Seller PC", "0.1.0", new byte[32], null);
 
     @Test
     void approvalIsSingleAndTheHandoverIsSingle() {
@@ -47,6 +47,16 @@ class InstallGrantsTest {
         assertThat(grants.approve(issued.deviceCode(), UUID.randomUUID())).isEmpty();
         String typed = " " + issued.userCode().substring(0, 4).toLowerCase() + "-" + issued.userCode().substring(4) + " ";
         assertThat(grants.approve(typed, UUID.randomUUID())).isPresent();
+    }
+
+    @Test
+    void peekingNeitherApprovesNorConsumes() {
+        InstallGrants grants = new InstallGrants(new MutableClock(Instant.parse("2026-10-17T00:00:00Z")));
+        InstallGrants.Issued issued = grants.issue(PC).orElseThrow();
+        assertThat(grants.peek(issued.userCode())).hasValueSatisfying(p -> assertThat(p.deviceName()).isEqualTo("Seller PC"));
+        assertThat(grants.poll(issued.deviceCode()).outcome()).isEqualTo(InstallGrants.PollOutcome.AUTHORIZATION_PENDING);
+        assertThat(grants.approve(issued.userCode(), UUID.randomUUID())).isPresent();
+        assertThat(grants.peek(issued.userCode())).as("an approved grant is no longer offered").isEmpty();
     }
 
     @Test

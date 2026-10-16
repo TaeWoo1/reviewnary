@@ -23,6 +23,11 @@ server:
   # Behind the edge (Caddy): trust X-Forwarded-For only from the internal proxy range, so the caller's address is
   # the edge's view of it — contract §7.
   forward-headers-strategy: native
+  # Every response says UTF-8, including the static approval page (/link) — Korean text, no guessing.
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
   # Error responses carry a status, never a message, a stack trace or request material (contract §9).
   error:
     include-message: never

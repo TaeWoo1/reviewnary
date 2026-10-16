@@ -37,7 +37,12 @@ public class InstallGrants {
 
     public record Issued(String deviceCode, String userCode, Instant expiresAt, int intervalSeconds) {}
 
-    public record Pending(String deviceName, String appVersion, byte[] publicKey) {}
+    /**
+     * What the PC sent, plus the IPv4 it asked from ({@code null} when unknown or IPv6). The address is held only
+     * for the grant's ten minutes, in memory, to tell the approval page whether the approving browser is on the
+     * same network as the PC — it is never written anywhere.
+     */
+    public record Pending(String deviceName, String appVersion, byte[] publicKey, String requesterIpv4) {}
 
     public record Poll(PollOutcome outcome, UUID accountId, Pending pending) {}
 
@@ -98,6 +103,14 @@ public class InstallGrants {
         }
         grant.approvedBy = accountId;
         return Optional.of(grant.pending.deviceName());
+    }
+
+    /** The still-unapproved grant a user code names, without approving or consuming it. */
+    public synchronized Optional<Pending> peek(String userCode) {
+        sweep(clock.instant());
+        String deviceCodeHash = byUserCode.get(Codes.hash(normalizeUserCode(userCode)));
+        Grant grant = deviceCodeHash == null ? null : byDeviceCode.get(deviceCodeHash);
+        return grant == null || grant.approvedBy != null ? Optional.empty() : Optional.of(grant.pending);
     }
 
     /** An approved grant is handed over exactly once: a second poll with the same device code is expired. */

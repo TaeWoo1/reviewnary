@@ -174,6 +174,49 @@ class VendorServerSecurityTest {
                 .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.error").value("invalid_login"));
     }
 
+    @Test
+    void theApprovalPageIsOpenButCannotBeFramedOrLeakItsCode() throws Exception {
+        mvc.perform(get("/link").param("code", "BCDF-GHJK"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .forwardedUrl("/link/index.html"));
+        mvc.perform(get("/link/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("연결 허용")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Content-Security-Policy", org.hamcrest.Matchers.containsString("frame-ancestors 'none'")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("X-Frame-Options", "DENY"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Referrer-Policy", "no-referrer"));
+        mvc.perform(get("/link/link.js")).andExpect(status().isOk());
+        mvc.perform(get("/link/other.html")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void theCodeIsPrefilledOnlyForABrowserOnTheSameNetworkAsThePc() throws Exception {
+        JsonNode same = startGrantFrom("198.51.100.20");
+        mvc.perform(json(post("/v1/installs/pending").with(bearer(session)).with(remote("198.51.100.20")),
+                        "{\"userCode\":\"" + same.path("userCode").asText() + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deviceName").value("Seller Mac"))
+                .andExpect(jsonPath("$.sameNetwork").value(true));
+        JsonNode elsewhere = startGrantFrom("198.51.100.20");
+        mvc.perform(json(post("/v1/installs/pending").with(bearer(session)).with(remote("203.0.113.99")),
+                        "{\"userCode\":\"" + elsewhere.path("userCode").asText() + "\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.sameNetwork").value(false));
+        JsonNode v6 = startGrantFrom("2001:db8::7");
+        mvc.perform(json(post("/v1/installs/pending").with(bearer(session)).with(remote("2001:db8::7")),
+                        "{\"userCode\":\"" + v6.path("userCode").asText() + "\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.sameNetwork").value(false));
+        mvc.perform(json(post("/v1/installs/pending").with(bearer(session)), "{\"userCode\":\"ZZZZZZZZ\"}"))
+                .andExpect(status().isNotFound());
+        mvc.perform(json(post("/v1/installs/pending").with(bearer(link())),
+                        "{\"userCode\":\"" + same.path("userCode").asText() + "\"}"))
+                .andExpect(status().isForbidden());
+        approve(same.path("userCode").asText());
+    }
+
     // --- helpers ---------------------------------------------------------------------------------------------------
 
     /** A PC grant approved by this test's seller, redeemed into an install token. */
@@ -183,6 +226,13 @@ class VendorServerSecurityTest {
         return body(mvc.perform(json(post("/v1/installs/token"),
                 "{\"deviceCode\":\"" + code.path("deviceCode").asText() + "\"}"))
                 .andExpect(status().isOk())).path("token").asText();
+    }
+
+    private JsonNode startGrantFrom(String address) throws Exception {
+        String key = Base64.getEncoder().encodeToString(PUBLIC_KEY);
+        return body(mvc.perform(json(post("/v1/installs/code").with(remote(address)),
+                        "{\"deviceName\":\"Seller Mac\",\"publicKey\":\"" + key + "\"}"))
+                .andExpect(status().isOk()));
     }
 
     private JsonNode startGrant() throws Exception {

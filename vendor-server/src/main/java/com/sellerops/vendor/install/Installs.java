@@ -75,7 +75,14 @@ public class Installs {
         this.clock = clock;
     }
 
+    /** What the approval page shows before the seller allows a PC. */
+    public record PendingView(String deviceName, boolean sameNetwork) {}
+
     public InstallGrants.Issued start(String deviceName, String appVersion, String publicKey) {
+        return start(deviceName, appVersion, publicKey, null);
+    }
+
+    public InstallGrants.Issued start(String deviceName, String appVersion, String publicKey, String requesterIpv4) {
         String name = deviceName == null ? "" : deviceName.trim();
         if (!DEVICE_NAME.matcher(name).matches()) {
             throw new StartException(StartFailure.INVALID_DEVICE_NAME);
@@ -86,8 +93,22 @@ public class Installs {
         }
         byte[] key = InstallPublicKey.parse(publicKey)
                 .orElseThrow(() -> new StartException(StartFailure.INVALID_PUBLIC_KEY));
-        return grants.issue(new InstallGrants.Pending(name, version, key))
+        return grants.issue(new InstallGrants.Pending(name, version, key, requesterIpv4))
                 .orElseThrow(() -> new StartException(StartFailure.BUSY));
+    }
+
+    /**
+     * The pending PC a user code names, for the approval page. {@code sameNetwork} is true only when both the PC's
+     * request and the approving browser came from the same known IPv4 — the case of a seller approving on the PC
+     * that asked. Anything else (another network, IPv6, unknown) is false, and the page then asks for the code to
+     * be typed from the PC's own screen instead of trusting one carried in a link.
+     */
+    public Optional<PendingView> pending(UUID accountId, String userCode, String approverIpv4) {
+        if (!accounts.isActive(accountId)) {
+            return Optional.empty();
+        }
+        return grants.peek(userCode).map(p -> new PendingView(p.deviceName(),
+                p.requesterIpv4() != null && p.requesterIpv4().equals(approverIpv4)));
     }
 
     /** The seller's session is the approval. Returns the approved device name, or empty for an unknown code. */

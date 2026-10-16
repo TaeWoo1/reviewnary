@@ -1,0 +1,54 @@
+/* Tokens from docs/frontend/reviewnary_design.md (§1 type, §4 surfaces, §5 colour, §10 accessibility). */
+:root {
+  --canvas: #F2F4F6;
+  --surface: #FFFFFF;
+  --line: #E5E8EB;
+  --ink: #191F28;
+  --muted: #4E5968;
+  --brand-700: #1B64DA;
+  --brand-800: #1550B5;
+  --good: #12662F;
+  --warn: #92400E;
+  --bad: #B91C1C;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+.page { max-width: 440px; margin: 0 auto; padding: 40px 16px; }
+h1 { font-size: 22px; line-height: 1.35; font-weight: 700; margin: 0 0 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.lead { margin: 0 0 16px; }
+label { display: block; font-size: 15px; color: var(--muted); margin: 12px 0 4px; }
+input {
+  width: 100%; min-height: 44px; padding: 8px 12px; font: inherit; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+}
+button {
+  min-height: 44px; padding: 8px 16px; font: inherit; border-radius: 8px; cursor: pointer;
+}
+button.primary { margin-top: 16px; width: 100%; border: 0; background: var(--brand-700); color: #fff; font-weight: 600; }
+button.primary:hover { background: var(--brand-800); }
+button.primary:disabled { background: var(--line); color: var(--muted); cursor: not-allowed; }
+button.ghost { margin-top: 8px; width: 100%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+:focus-visible { outline: 2px solid var(--brand-700); outline-offset: 2px; }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0 0 16px; }
+.facts dt { color: var(--muted); font-size: 15px; }
+.facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.code { font-variant-numeric: tabular-nums; letter-spacing: 0.08em; }
+.inset { background: var(--canvas); border-radius: 10px; padding: 12px; margin: 0 0 12px; }
+.inset p { margin: 0 0 4px; }
+.inset.warn p { color: var(--warn); }
+.note { color: var(--muted); font-size: 15px; margin: 0; }
+.msg { font-size: 15px; margin: 12px 0 0; }
+.msg.bad { color: var(--bad); }
+.status { font-weight: 600; margin: 0 0 8px; }
+.status.good { color: var(--good); }
+.status.bad { color: var(--bad); }
+.actions { margin-top: 8px; }

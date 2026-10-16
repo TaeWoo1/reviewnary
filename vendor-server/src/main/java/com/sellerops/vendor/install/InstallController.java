@@ -1,6 +1,8 @@
 package com.sellerops.vendor.install;
 
 import com.sellerops.vendor.auth.BearerAuthFilter.Principal;
+import com.sellerops.vendor.ip.ClientIpv4;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
@@ -16,8 +18,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Installs seen from both sides — contract §2, D2. The seller (session) approves a PC's code, lists their PCs and
- * revokes one; a PC (install token) reads and removes only its own row. Which caller may reach which route is
+ * Installs seen from both sides — contract §2, D2. The seller (session) looks up and approves a PC's code, lists
+ * their PCs and revokes one; a PC (install token) reads and removes only its own row. Which caller may reach which route is
  * decided in {@code SecurityConfig}, not here.
  */
 @RestController
@@ -36,6 +38,14 @@ public class InstallController {
                                      @RequestBody @Valid ApproveRequest request) {
         return installs.approve(seller.accountId(), request.userCode())
                 .<ResponseEntity<?>>map(name -> ResponseEntity.ok(Map.of("deviceName", name)))
+                .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "unknown_code")));
+    }
+
+    @PostMapping("/v1/installs/pending")
+    public ResponseEntity<?> pending(@AuthenticationPrincipal Principal seller,
+                                     @RequestBody @Valid ApproveRequest request, HttpServletRequest http) {
+        return installs.pending(seller.accountId(), request.userCode(), ClientIpv4.of(http.getRemoteAddr()).orElse(null))
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "unknown_code")));
     }
 

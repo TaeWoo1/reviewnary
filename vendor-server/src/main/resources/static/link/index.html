@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>PC 연결 확인 · reviewnary</title>
+  <link rel="stylesheet" href="/link/link.css">
+  <script src="/link/link.js" defer></script>
+</head>
+<body>
+<main class="page" aria-label="PC 연결 확인">
+  <h1>PC 연결 확인</h1>
+
+  <section id="view-login" class="card" aria-label="로그인" hidden>
+    <p class="lead">PC를 연결할 reviewnary 계정으로 로그인하세요.</p>
+    <form id="login-form" novalidate>
+      <label for="email">이메일</label>
+      <input id="email" type="email" autocomplete="username" required>
+      <label for="password">비밀번호</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <p id="login-error" class="msg bad" role="alert" hidden></p>
+      <button type="submit" class="primary">로그인</button>
+    </form>
+  </section>
+
+  <section id="view-code" class="card" aria-label="코드 입력" hidden>
+    <p class="lead">PC 화면에 보이는 8자리 코드를 입력하세요.</p>
+    <form id="code-form" novalidate>
+      <label for="code-input">코드</label>
+      <input id="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="9" required>
+      <p id="code-error" class="msg bad" role="alert" hidden></p>
+      <button type="submit" class="primary">확인</button>
+    </form>
+  </section>
+
+  <section id="view-confirm" class="card" aria-label="연결 허용" hidden>
+    <p class="lead">아래 PC가 이 계정의 리뷰와 작업을 받아 갈 수 있게 됩니다.</p>
+    <dl class="facts">
+      <dt>계정</dt><dd id="fact-account"></dd>
+      <dt>PC 종류</dt><dd id="fact-device"></dd>
+      <dt>코드</dt><dd id="fact-code" class="code"></dd>
+    </dl>
+    <div id="retype" class="inset warn" hidden>
+      <p>이 요청은 지금 브라우저와 다른 네트워크의 PC에서 왔습니다. 직접 시작한 연결이 맞다면 <strong>그 PC 화면에 보이는 코드</strong>를 입력하세요.</p>
+      <label for="retype-input">PC 화면의 코드</label>
+      <input id="retype-input" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="9">
+    </div>
+    <p class="note">PC 화면의 코드와 같은지 확인하세요. 직접 시작하지 않은 연결이면 허용하지 마세요.</p>
+    <p id="confirm-error" class="msg bad" role="alert" hidden></p>
+    <div class="actions">
+      <button type="button" id="allow" class="primary">연결 허용</button>
+      <button type="button" id="cancel" class="ghost">허용하지 않음</button>
+    </div>
+  </section>
+
+  <section id="view-done" class="card" aria-label="결과" hidden>
+    <p id="done-status" class="status"></p>
+    <p id="done-body"></p>
+  </section>
+</main>
+</body>
+</html>

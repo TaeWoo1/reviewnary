@@ -19,15 +19,17 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 /**
  * <b>Closed by default; every open route is named here.</b> Contract §2.
  *
  * <ul>
- *   <li>No credential: {@code GET /health}, the seller's invite redemption and login, and the PC's grant
- *       {@code code} / {@code token} calls.</li>
+ *   <li>No credential: {@code GET /health}, the approval page ({@code /link}), the seller's invite redemption and
+ *       login, and the PC's grant {@code code} / {@code token} calls.</li>
  *   <li>Install token only ({@link Principal#INSTALL}): {@code GET /v1/ip}, the PC's own row.</li>
- *   <li>Seller session only ({@link Principal#SELLER}): approving a PC, listing and revoking the account's PCs.</li>
+ *   <li>Seller session only ({@link Principal#SELLER}): looking up and approving a PC, listing and revoking the
+ *       account's PCs.</li>
  *   <li>Everything else: refused — 401 without a credential, 403 with one.</li>
  * </ul>
  *
@@ -52,6 +54,14 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // The approval page (/link) is where a seller allows a PC onto their account: it must never be
+                // framed (clickjacking the 「연결 허용」 press), run a script from anywhere but here, or hand the
+                // code in its URL to another site as a referrer.
+                .headers(h -> h
+                        .frameOptions(f -> f.deny())
+                        .contentSecurityPolicy(c -> c.policyDirectives("default-src 'self'; frame-ancestors 'none'; "
+                                + "base-uri 'none'; form-action 'none'; object-src 'none'"))
+                        .referrerPolicy(r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
                 .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .addFilterBefore(new BearerAuthFilter(installs, sessions, accounts),
                         UsernamePasswordAuthenticationFilter.class)
@@ -64,7 +74,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/v1/ip").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.GET, "/v1/installs/me").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.DELETE, "/v1/installs/me").hasRole(INSTALL)
-                        .requestMatchers(HttpMethod.POST, "/v1/installs/approve").hasRole(SELLER)
+                        .requestMatchers(HttpMethod.GET, "/link", "/link/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/v1/installs/pending", "/v1/installs/approve").hasRole(SELLER)
                         .requestMatchers(HttpMethod.GET, "/v1/installs").hasRole(SELLER)
                         .requestMatchers(HttpMethod.DELETE, "/v1/installs/*").hasRole(SELLER)
                         .anyRequest().denyAll());
