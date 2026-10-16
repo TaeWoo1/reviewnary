@@ -58,7 +58,9 @@ PC가 코드를 받아 보여 주고 → 판매자가 웹에서 그 코드를 �
 | `POST /v1/auth/login` {email, password} | 없음 | 세션 JWT(HS256, 12시간). 실패는 이유를 구분하지 않는 `invalid_login`. 주소당 15분에 10회 실패면 429 |
 | `POST /v1/installs/code` {deviceName, appVersion?, publicKey} | 없음 | 32바이트 공개키(base64), 10분짜리 장치 코드 · 8자 사용자 코드. 동시 대기 100개 상한 |
 | `POST /v1/installs/token` {deviceCode} | 없음 | `authorization_pending` · `expired_token`(400) 또는 토큰 1회(`rvi_…`, 180일) |
+| `POST /v1/installs/pending` {userCode} | 판매자 세션 | 승인 전 조회: `{deviceName, sameNetwork}`. 승인도 소진도 하지 않는다 |
 | `POST /v1/installs/approve` {userCode} | 판매자 세션 | 승인한 장치 이름을 돌려준다 |
+| `GET /link?code=…` | 없음 | 승인 화면(정적 페이지, 아래) |
 | `GET /v1/installs` · `DELETE /v1/installs/{id}` | 판매자 세션 | 자기 계정의 PC 목록 · 분실 PC 회수. 다른 계정의 PC는 없는 것과 같은 404 |
 | `GET /v1/installs/me` · `DELETE /v1/installs/me` | 설치 토큰 | 자기 행 조회 · 스스로 연결 해제 |
 | `GET /v1/ip` | 설치 토큰 | §7 |
@@ -74,6 +76,13 @@ PC가 코드를 받아 보여 주고 → 판매자가 웹에서 그 코드를 �
 - **PC 쪽 보관.** 설치 토큰과 개인키(PKCS#8)는 PC의 DB(`vendor_install_link`)에 기존 vault 키(`VaultKeyRing`)로 봉인한
   봉투로만 둔다 — 채널 자격 증명과 같은 보호다. vault 키 자체를 OS 비밀 저장소(Keychain · DPAPI)에서 읽는 것은 패키징
   항목이다(proposal §18.7 2). vault 키가 없는 설치에서는 연결 기능이 꺼진다.
+- **승인 화면 `/link` (⑧-4 (a)).** 로컬 화면이 `/link?code=XXXXXXXX`를 판매자의 기본 브라우저로 연다. 페이지는 코드를 읽은
+  즉시 주소창에서 지우고, 로그인 → 계정 · PC 종류 · 코드 확인 → 「연결 허용」. **코드가 링크로 왔는데 승인하는 브라우저와
+  코드를 요청한 PC의 공인 IPv4가 다르면**(다른 네트워크 · IPv6 · 알 수 없음) 페이지는 코드를 보여 주지 않고, PC 화면의
+  코드를 직접 입력해야 허용 버튼이 켜진다 — 남의 코드가 담긴 링크를 눌러 공격자의 PC를 자기 계정에 붙이는 피싱(RFC 8628
+  §5.4)을 막기 위해서다. 요청 IP는 승인 대기 10분 동안 메모리에만 있다. 페이지는 프레임 안에서 열리지 않고(CSP
+  `frame-ancestors 'none'` · `X-Frame-Options DENY`), 스크립트는 같은 출처 파일만, `Referrer-Policy: no-referrer`, 세션은
+  페이지 메모리에만 둔다. 거절은 서버에 알리지 않고 코드가 10분 뒤 사라진다.
 - 장치 이름은 PC가 정하는 닫힌 값(`macOS (aarch64)` 같은 OS · 아키텍처)이다. 호스트 이름은 소유자 이름을 담는 일이 많아
   보내지 않는다.
 
@@ -281,7 +290,8 @@ EC2 볼륨 · 백업 대상의 저장 암호화도 AWS 콘솔에서 확인한다
 - **PC 쪽 (2026-10-17).** backend `GET /api/local/vendor-link/public-ip` → `{ipv4}` 또는 `{reason}`
   (`NOT_LINKED` · `IPV6_ONLY` · `NOT_AUTHORIZED` · `UNREACHABLE`). 같은 답을 60초 재사용한다. 판매자 PC의
   `OutboundGate`는 새 목적지 `VENDOR`로 이 요청을 검사하는데, 운영 호스트 이름이 정해지지 않아 지금은 loopback만
-  통과한다 — 설정한 주소가 다른 곳을 가리켜도 나가지 않는다. 호스트 이름(A 레코드만) 확정은 [PO] · [EXT].
+  통과한다 — 설정한 주소가 다른 곳을 가리켜도 나가지 않는다. 서버는 기존 AWS 주소 `3.39.210.89`의 하위 도메인(A
+  레코드만)으로 둔다(⑧-4 (c)) — 도메인 이름이 정해지면 `OutboundGate.VENDOR_HOSTS`에 그 이름 하나를 넣는다 [PO].
 
 ## 8. 라이선스
 
@@ -317,5 +327,6 @@ EC2 볼륨 · 백업 대상의 저장 암호화도 AWS 콘솔에서 확인한다
 |---|---|
 | 별도 앱 뼈대 `vendor-server/` | 2026-10-17. 기본 닫힘(`/health`만 열림), §10-1 fence 구현 · 양방향 증명, CI |
 | §2 판매자 계정(초대 · 로그인 · 정지) · 설치 등록 · 회수 | 2026-10-17. PostgreSQL + Flyway(테스트는 같은 마이그레이션을 H2에서). 실제 PostgreSQL 15에서 전 흐름 확인 |
-| §7 공인 IP | 2026-10-17. 설치 토큰으로 열림. PC 쪽 연결 서비스 · 경로(`backend/.../vendorlink/`)까지 있음. **연결 화면 표시는 FE delta로 확인 대기** |
+| §2 승인 화면 `/link` | 2026-10-17. 같은 네트워크 판별 · 코드 재입력 · 프레임 금지. 실제 브라우저(Playwright Chromium)로 두 경우 확인 |
+| §7 공인 IP | 2026-10-17. 설치 토큰으로 열림. PC 쪽 연결 서비스와 연결 화면의 「이 PC 연결」 · IP 표시(`ThisPcCallIp`)까지 있음. 운영 도메인 미정 |
 | §2 담당자 · 관리자(TOTP · 배정), §3 리뷰 교환, §4 상태 머신, §5 Cafe24 중계, §6 정리 작업, §8 라이선스, §9 배치 | 미구현 |
