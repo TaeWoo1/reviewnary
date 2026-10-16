@@ -23,6 +23,16 @@ public interface AgentLlmTransport {
     Response post(URI uri, Map<String, String> headers, String jsonBody);
 
     /**
+     * {@link #post} for a body that carries <b>public images from the seller's own product page</b> — the one kind
+     * of image a seller-PC install sends to a model without a local check ({@code LlmSendGate.Images.PRODUCT}).
+     * A buyer's review photo is never sent through here; {@code LlmSendGateFenceTest} pins the single caller.
+     * Fakes need not care: by default it is {@link #post}.
+     */
+    default Response postProductImages(URI uri, Map<String, String> headers, String jsonBody) {
+        return post(uri, headers, jsonBody);
+    }
+
+    /**
      * @param status    the HTTP status, or 0 when the request never completed
      * @param body      the response body, or a transport-level marker when {@code status} is 0
      * @param elapsedMs how long the vendor took, wall clock, measured around the call itself

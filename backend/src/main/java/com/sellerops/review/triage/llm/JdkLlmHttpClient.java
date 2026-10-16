@@ -1,5 +1,6 @@
 package com.sellerops.review.triage.llm;
 
+import com.sellerops.outbound.LlmSendGate;
 import com.sellerops.outbound.OutboundGate;
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -18,6 +19,10 @@ import java.util.Map;
  *
  * <p>The message carries the exception's <b>type</b> and not its text: a timeout message can contain
  * the URI, and some clients put request material in it.
+ *
+ * <p>On a seller's PC the body first passes {@link LlmSendGate} (no images on this lane): identifiers are removed in
+ * place, and a held body is not sent — it comes back as {@code status 0} with the finding labels, which the caller
+ * already turns into {@code CLASSIFICATION_FAILED}.
  */
 public class JdkLlmHttpClient implements LlmHttpClient {
 
@@ -30,13 +35,17 @@ public class JdkLlmHttpClient implements LlmHttpClient {
 
     @Override
     public Response post(URI uri, Map<String, String> headers, String jsonBody) {
+        OutboundGate.check(uri, OutboundGate.Destination.LLM);
+        LlmSendGate.Prepared prepared = LlmSendGate.prepare(jsonBody, LlmSendGate.Images.NONE);
+        if (!prepared.sendable()) {
+            return new Response(0, prepared.heldMarker());
+        }
         HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
                 .timeout(REQUEST_TIMEOUT)
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/json;charset=UTF-8")
-                .POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8));
+                .POST(HttpRequest.BodyPublishers.ofString(prepared.body(), StandardCharsets.UTF_8));
         headers.forEach(builder::header);
-        OutboundGate.check(uri, OutboundGate.Destination.LLM);
         try {
             HttpResponse<String> response =
                     client.send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));

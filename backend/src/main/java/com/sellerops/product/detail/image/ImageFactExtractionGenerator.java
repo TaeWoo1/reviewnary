@@ -121,7 +121,8 @@ public class ImageFactExtractionGenerator {
             return Result.failed("no_bytes");
         }
         String body = requestBody(imageBytes, contentType);
-        AgentLlmTransport.Response response = http.post(vendor.endpoint, headers(), body);
+        // The seller's own product-page image: the one image kind a seller-PC install sends unchecked (LlmSendGate).
+        AgentLlmTransport.Response response = http.postProductImages(vendor.endpoint, headers(), body);
         if (response.status() == 0) {
             return Result.failed("transport:" + response.body());
         }

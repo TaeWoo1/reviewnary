@@ -1,5 +1,6 @@
 package com.sellerops.agent.llm;
 
+import com.sellerops.outbound.LlmSendGate;
 import com.sellerops.outbound.OutboundGate;
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -18,6 +19,10 @@ import java.util.Map;
  *
  * <p>The marker carries the exception's <b>type</b> and not its text: a timeout message can contain
  * the URI, and some clients put request material in it.
+ *
+ * <p>On a seller's PC the body first passes {@link LlmSendGate}: identifiers are removed in place, and a held body
+ * is not sent — it comes back as {@code status 0} with the finding labels, which every caller already turns into
+ * its fail-closed "no draft".
  */
 public class JdkAgentLlmTransport implements AgentLlmTransport {
 
@@ -30,13 +35,26 @@ public class JdkAgentLlmTransport implements AgentLlmTransport {
 
     @Override
     public Response post(URI uri, Map<String, String> headers, String jsonBody) {
+        return send(uri, headers, jsonBody, LlmSendGate.Images.NONE);
+    }
+
+    @Override
+    public Response postProductImages(URI uri, Map<String, String> headers, String jsonBody) {
+        return send(uri, headers, jsonBody, LlmSendGate.Images.PRODUCT);
+    }
+
+    private Response send(URI uri, Map<String, String> headers, String jsonBody, LlmSendGate.Images images) {
+        OutboundGate.check(uri, OutboundGate.Destination.LLM);
+        LlmSendGate.Prepared prepared = LlmSendGate.prepare(jsonBody, images);
+        if (!prepared.sendable()) {
+            return new Response(0, prepared.heldMarker(), 0L);
+        }
         HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
                 .timeout(REQUEST_TIMEOUT)
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/json;charset=UTF-8")
-                .POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8));
+                .POST(HttpRequest.BodyPublishers.ofString(prepared.body(), StandardCharsets.UTF_8));
         headers.forEach(builder::header);
-        OutboundGate.check(uri, OutboundGate.Destination.LLM);
         long started = System.nanoTime();
         try {
             HttpResponse<String> response =

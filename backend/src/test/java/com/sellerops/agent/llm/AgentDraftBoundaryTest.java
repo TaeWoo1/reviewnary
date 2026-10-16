@@ -117,6 +117,10 @@ class AgentDraftBoundaryTest {
             "InquiryGoalGenerator.java",
             "JdkAgentLlmTransport.java", "AgentLlmConfiguration.java");
 
+    /** Either way into the transport — {@code postProductImages} is a {@code .post} too (LlmSendGate). */
+    private static final java.util.regex.Pattern TRANSPORT_CALL =
+            java.util.regex.Pattern.compile("\\.post(ProductImages)?\\(");
+
     @Test
     @DisplayName("each capability's service is the only door to its generator, and only generators post")
     void theServiceIsTheOnlyDoor() throws IOException {
@@ -136,7 +140,7 @@ class AgentDraftBoundaryTest {
                 }
                 // The transport may be DECLARED (the @Bean factory) but only a generator may call it.
                 if (!TRANSPORT_HOLDERS.contains(name)
-                        && code.contains("AgentLlmTransport") && code.contains(".post(")) {
+                        && code.contains("AgentLlmTransport") && TRANSPORT_CALL.matcher(code).find()) {
                     offenders.add(name + " (calls the transport directly)");
                 }
             }
