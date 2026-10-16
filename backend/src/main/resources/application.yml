@@ -59,6 +59,12 @@ server:
   forward-headers-strategy: ${SELLEROPS_FORWARD_HEADERS_STRATEGY:native}
 
 sellerops:
+  # Seller-PC install (scope lock v1.14 ①·⑤, docs/product-scope-v1.md). Off by default: every existing
+  # deployment boots unchanged. The `local-seller` profile (application-local-seller.yml) turns it on, which
+  # arms LocalSellerConfigValidator (refuses a non-loopback bind/DB/origin, the shipped JWT secret, Sentry,
+  # SMTP, social login) and LoopbackRequestGuard (refuses a non-loopback Host or Origin).
+  local-seller:
+    enabled: ${SELLEROPS_LOCAL_SELLER_MODE:false}
   # The Local Agent credential handoff — the ONE path that reads a seller's API keys off their marketplace
   # screen and writes them into the vault. Armed separately from the read-only live-call interlock above,
   # with the WHOLE identity the operator's grant was bound to, and spent after one store.

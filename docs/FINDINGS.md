@@ -655,6 +655,35 @@
 
 ---
 
+### 403이 났다고 그 403이 내 필터의 것은 아니다 — 거부 필터는 실제 서버와 응답 본문으로 증명한다 (2026-10-16)
+
+- **했던 것** — local-seller 모드의 `LoopbackRequestGuard`(Host/Origin 거부)를 MockMvc에 `addFilters`로 직접 끼워
+  "evil Host → 403"을 단정했고 통과했다. 거부는 `response.sendError(403)`이었다.
+- **사실** — 실제 내장 서버(RANDOM_PORT + 소켓으로 쓴 원시 HTTP)에서는 **401**이었다. `sendError`는 컨테이너가
+  `/error`로 재전송하게 만들고, 그 경로를 Spring Security가 인증 필요로 막아 401로 바꾼다. MockMvc는 error
+  dispatch를 하지 않아 이 결함을 볼 수 없었다. 고친 뒤에는 가드를 꺼도 외부 `Origin` 케이스가 **여전히 403으로
+  통과**했다 — Spring CORS가 같은 요청을 "Invalid CORS request" 403으로 막기 때문이다.
+- **다음에** — 서블릿 필터의 거부는 `setStatus` + 빈 본문으로 끝내고, 실제 서버에 원시 HTTP를 써서 검증한다
+  (HTTP 클라이언트는 `Host`를 못 바꾼다). 단정은 상태 코드만이 아니라 **그 필터의 응답 모양**(여기선 `body=0`)까지
+  한다. 가드를 꺼서 두 거부 케이스가 모두 빨개지는지 본다.
+- **출처** — 2026-10-16 L1 · `LoopbackRequestGuard` · `LocalSellerGuardWiringTest`.
+
+---
+
+### 자기 속성을 가진 SpringBootTest가 기본 H2 이름을 쓰면 무관한 428개가 깨진다 (2026-10-16)
+
+- **했던 것** — `LocalSellerGuardWiringTest`를 `@SpringBootTest(properties=…)`로 추가하고 datasource는 기본값
+  (`jdbc:h2:mem:sellerops_test`)을 그대로 두었다. 단독 실행은 초록색이었다.
+- **사실** — 전체 실행에서 ingest · connector 계열 **428개**가 `channels(code)` 유일 제약 위반 등으로 실패했다. 속성이
+  다른 컨텍스트는 새로 만들어지고, 같은 이름의 인메모리 DB(`DB_CLOSE_DELAY=-1`)에 create-drop과 seed를 한 번 더
+  실행해 캐시된 기본 컨텍스트의 상태와 부딪힌다. 저장소의 다른 23개 클래스는 이미 자기 DB 이름을 쓴다.
+- **다음에** — 속성을 바꾸는 SpringBootTest는 `spring.datasource.url=jdbc:h2:mem:<자기이름>;…`을 함께 준다. 새 테스트
+  클래스는 단독 통과가 아니라 **전체 실행**의 결과 XML로 판정한다(§A2). 컨텍스트 하나가 늘면 힙 한도도 다시 본다
+  (`build.gradle` test 블록 주석).
+- **출처** — 2026-10-16 L1 · 첫 전체 실행 5389건 중 428 실패 → DB 이름 분리 후 0 실패.
+
+---
+
 ## 어디에 무엇이 있나
 
 | 찾는 것 | 가는 곳 |

@@ -127,7 +127,7 @@ public class SelfPilotProperties {
     }
 
     /** True for a JDBC URL whose host is the local loopback (the only place LOCAL_SINGLE_USER may run). */
-    static boolean isLoopbackDatabase(String jdbcUrl) {
+    public static boolean isLoopbackDatabase(String jdbcUrl) {
         if (jdbcUrl == null || jdbcUrl.isBlank()) {
             return false;
         }

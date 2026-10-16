@@ -21,6 +21,12 @@ export type RunStoreKind = "spring" | "file" | "memory";
 
 export interface RuntimeConfig {
   readonly port: number;
+  /**
+   * Interface to listen on. Unset keeps Node's default (every interface), which the compose stack needs
+   * so other containers can reach this service; a seller-PC install sets `127.0.0.1`
+   * (scope lock v1.14 ①, proposal §18.7 L1).
+   */
+  readonly host?: string;
   /** Base URL of the Spring backend (system of record). Server-to-server; no CORS involved. */
   readonly backendBaseUrl: string;
   readonly env: RuntimeEnv;
@@ -54,10 +60,34 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RuntimeConfig 
 
   return {
     port: Number(env["AGENT_RUNTIME_PORT"] ?? "8787"),
+    host: env["AGENT_RUNTIME_HOST"]?.trim() || undefined,
     backendBaseUrl: (env["SELLEROPS_BASE_URL"] ?? "http://127.0.0.1:8080").replace(/\/+$/, ""),
     env: pickEnv(env["APP_ENV"]),
     runStoreKind: pickStoreKind(env["AGENT_RUNTIME_RUNSTORE_KIND"]),
     runStoreDir: env["AGENT_RUNTIME_RUNSTORE_DIR"] ?? "./.runstore",
     corsAllowedOrigins: origins,
   };
+}
+
+/**
+ * The LangChain/LangSmith switches that send run traces to LangSmith's servers. `langsmith` arrives as a
+ * transitive dependency of `@langchain/core`, and it traces when ANY of these reads "true" — the
+ * `LANGSMITH_` name wins over the `LANGCHAIN_` one, so each pair is set, not just the familiar one.
+ */
+export const VENDOR_TRACING_ENV = [
+  "LANGSMITH_TRACING_V2",
+  "LANGCHAIN_TRACING_V2",
+  "LANGSMITH_TRACING",
+  "LANGCHAIN_TRACING",
+] as const;
+
+/**
+ * This service talks to the backend and nothing else; a trace of a run (goal, plan, tool results) leaving
+ * for a vendor would be a second egress that no flag in this repository names. So tracing is forced OFF
+ * at boot whatever the environment says — an inherited shell variable cannot turn it on.
+ */
+export function disableVendorTracing(env: NodeJS.ProcessEnv = process.env): void {
+  for (const name of VENDOR_TRACING_ENV) {
+    env[name] = "false";
+  }
 }

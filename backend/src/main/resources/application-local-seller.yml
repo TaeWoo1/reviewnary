@@ -1,0 +1,12 @@
+# Seller-PC install profile — activate with SPRING_PROFILES_ACTIVE=local-seller.
+# Scope lock v1.14 ① · ⑤ (docs/product-scope-v1.md) and proposal §18.7 L1.
+#
+# Defaults only: everything here can still be overridden by env, and LocalSellerConfigValidator refuses
+# to boot if an override reaches past this PC (bind address, database, CORS origin, JWT secret, Sentry,
+# SMTP, social login). Secrets are never written here — the installer generates them per install.
+server:
+  address: 127.0.0.1
+
+sellerops:
+  local-seller:
+    enabled: true

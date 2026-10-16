@@ -2,6 +2,7 @@ import { execSync } from "node:child_process";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { buildCsp } from "./src/lib/security/csp";
+import { localSellerBuildProblems } from "./src/lib/security/localSellerBuild";
 
 // Dev API proxy target. The frontend calls SAME-ORIGIN `/api/*` (see apiClient.ts BASE_URL), and the dev
 // server forwards those to the backend here. Overriding the port for a disposable/walkthrough backend is
@@ -45,6 +46,14 @@ function previewProxy() {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
+  // Seller-PC build (VITE_LOCAL_SELLER=true): refuse before anything is built or served if env would ship a
+  // destination off the PC — scope lock v1.14 ⑤. Names the variables, never their values.
+  const localSellerProblems = localSellerBuildProblems(env);
+  if (localSellerProblems.length > 0) {
+    throw new Error(
+      `판매자 PC 빌드(VITE_LOCAL_SELLER=true)에 PC 밖으로 나가는 설정이 있습니다: ${localSellerProblems.join(", ")}`,
+    );
+  }
   return {
     plugins: [react(), cspMetaPlugin(env)],
     define: {

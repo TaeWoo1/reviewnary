@@ -9,7 +9,7 @@
  * Run: `npm run serve` (tsx) or `node dist/http/main.js` (built). See `.env.example` / the Dockerfile
  * for the env knobs.
  */
-import { loadConfig } from "./config";
+import { disableVendorTracing, loadConfig } from "./config";
 import { RunStoreProvider } from "./runStoreProvider";
 import { defaultSpringClientFactory } from "./springClientFactory";
 import { AgentRunService } from "./AgentRunService";
@@ -18,6 +18,7 @@ import { ConversationService } from "../conversation/ConversationService";
 import { log } from "../log";
 
 function main(): void {
+  disableVendorTracing();
   const config = loadConfig();
   // Throws ProductionStoreNotConfiguredError before any port is opened if the store is unsafe here.
   const storeProvider = new RunStoreProvider(config);
@@ -26,15 +27,21 @@ function main(): void {
   const conversations = new ConversationService({ storeProvider, clientFactory });
   const server = createHttpServer(service, config, { conversations });
 
-  server.listen(config.port, () => {
+  const onListening = (): void => {
     log("agent_runtime_listening", {
       port: config.port,
+      host: config.host ?? "*",
       env: config.env,
       runStore: storeProvider.kind,
       durable: storeProvider.durable,
       corsOrigins: config.corsAllowedOrigins.length,
     });
-  });
+  };
+  if (config.host === undefined) {
+    server.listen(config.port, onListening);
+  } else {
+    server.listen(config.port, config.host, onListening);
+  }
 
   // Graceful shutdown: stop accepting new connections, let in-flight requests drain, then exit. A
   // bounded timeout forces exit so a hung keep-alive connection can't block the deploy; a second
