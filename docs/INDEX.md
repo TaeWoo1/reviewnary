@@ -43,6 +43,7 @@ live proof · selector calibration · audit · closure record는 여기 올라�
 - `docs/product_assembly_ia_v1.md` — Product Assembly v1 — 목표 IA와 화면 책임 (정본)
 - `docs/product_operating_model.md` — SellerOps — Product Operating Model
 - `docs/reviewnary_product_architecture_proposal_v1.md` — Reviewnary 제품 구조 v1 — §17 판매자 자체 운영형 로컬 구조 + 네이버 리뷰 사람 대행·교환 서비스, §17.9 서버·PC 책임 분할 (2026-10-16, scope lock v1.14의 정본), §18 Claude 개발 인계·계약 충돌·전환 단계; 외부 허가·구현 상태와 구분
+- `docs/vendor_server_contract_v1.md` — 공급자 서버 범위와 API 계약 v1 (2026-10-17 초안): 리뷰 교환 열 제거 · 모바일 승인 상태 머신 · Cafe24 토큰 중계 · 공인 IP · 라이선스 · 보유와 삭제; §0 오너 확인 전 구현하지 않음
 - `docs/sellerops_canonical_reference.md` — SellerOps — Canonical Reference: Product, Strategy, State
 - `docs/frontend/sellerops_frontend_spec.md` — SellerOps Frontend Spec — 통합 셀러센터 리디자인 정본
 - `docs/sellerops_local_env_setup.md` — SellerOps — Local Environment Setup (Live-Smoke Preparation)

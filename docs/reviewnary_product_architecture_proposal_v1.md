@@ -1043,7 +1043,7 @@ Cafe24 중계, 앞으로의 AI 중계)가 늘수록 질의에서 함께 설명�
 
 ### 18.5 남은 선택과 조사
 
-- **[PO]** 판매자 직접 LLM 계약/BYOK의 초기 UX·과금, 로컬 패키징 선택, 라이선스 유예 기간, 리뷰 대행 처리회차·인력 비용(리뷰 교환 보유 기준은 §17.9에서 확정). 상세 인터뷰 재개 전 임의 숫자를 확정하지 않는다.
+- **[PO]** 판매자 직접 LLM 계약/BYOK의 초기 UX·과금, 로컬 패키징 선택(spike 결과 §18.7), 라이선스 유예 기간, 리뷰 대행 처리회차·인력 비용(리뷰 교환 보유 기준은 §17.9에서 확정). 상세 인터뷰 재개 전 임의 숫자를 확정하지 않는다.
 - **[EXT]** NAVER의 유료 설치형 자체 이용 분류와 외부 LLM/리뷰 대행 자료 조건, 적용 약관 전문, 채널별 설치형 등록/IP/OAuth 조건. 법률·플랫폼 허가와 기술 검증을 구분한다.
 - **[REPO]** 모든 connector와 publish adapter의 실제 호출 주체, 숨어 있는 중앙 URL·관측 SDK·백업/relay·credential handoff, 현재 승인/발송/정책/지식 계약과의 차이, Windows 포트와 DB 배포 가능성.
 
@@ -1132,3 +1132,31 @@ SSG는 거부). `OutboundGateFenceTest`가 검사 누락을 막는다. 네이버
 4. 공인 IP 자동 감지는 1의 서버 엔드포인트가 생기면 연결 화면에 붙인다.
 
 패키징(JRE · Postgres · Node 번들) spike는 L4가 아니라 L1과 병행한다. 판매자 PC에 Postgres를 넣는 방식이 가장 큰 미지수이고 L1의 설계에 영향을 준다.
+
+**1의 결과 (2026-10-17).** 엔드포인트 · 저장 필드 · 상태 전이 · 삭제 시점은 `docs/vendor_server_contract_v1.md`(초안)에
+옮겼다. 구현 전 오너 확인 5건(D1 별도 앱 · D2 초대 전용 · D3 담당자 TOTP · D4 비답글 리뷰 보유 · D5 사진)이 그 문서 §0에 있다.
+
+**2의 결과 — 패키징 spike (2026-10-17, Apple Silicon Mac, 합성 빈 DB, 외부 호출 없음).**
+
+| 구성 요소 | 측정 | 비고 |
+|---|---|---|
+| backend | jar 85MB · 기동 8.7–11.0초 · 마이그레이션 132개 적용 | `local-seller` 프로필로 127.0.0.1에만 열림, 위조 Host 403 · loopback 401 확인. 부팅 중 `OutboundGate` 거부 0건 |
+| JRE | jlink 최소 런타임 47MB (JDK 585MB 대비) | 22개 모듈로 기동 확인. 배포는 재배포 가능한 OpenJDK 빌드(예: Temurin)로 만든다 — 측정에 쓴 Oracle JDK가 아니다 |
+| Postgres 16.15 | 이식형 바이너리(zonky 배포, EDB 빌드 · 서명): universal 296MB / 압축 62MB, arm64만 150MB / 압축 34MB, Windows 압축 23MB | `initdb` 0.6초 · 기동 0.1초 · 대기 메모리 14MB. Homebrew 빌드는 Homebrew 라이브러리 경로에 묶여 있어 번들에 못 쓴다. 첫 실행은 macOS 서명 검사로 약 12초 걸렸다. `libicudata` 57MB가 같은 파일 3벌이라 링크로 줄일 수 있다 |
+| agent-runtime | esbuild 단일 파일 2.9MB + Node 실행 파일 약 60MB · 메모리 33MB | 127.0.0.1 바인드 확인 |
+| frontend | 정적 자산 1.5MB | **backend가 화면을 서빙하지 않는다**(`/` → 401). 같은 출처로 서빙하는 경로가 필요하다 [REPO] |
+| 합계 | 메모리 약 450MB(backend 397MB: `-Xmx384m` · SerialGC · C1, 기본 설정이면 626MB) · 내려받기 약 200MB(추정) | 8GB PC 기준 |
+
+비교와 권고:
+
+| 방식 | 판매자 부담 | 판단 |
+|---|---|---|
+| **A. OS별 앱 묶음** — jlink JRE + backend + 이식형 Postgres + Node + 정적 화면, 작은 실행기 · 자동시작 | 설치 1회 | **권고.** 위 측정이 모두 이 방식으로 돌아갔다 |
+| B. Docker Desktop + compose | Docker 설치 · VM 메모리 2GB 이상 | 일반 판매자에게 부적합(§18.3 L4) |
+| C. A를 Electron으로 감쌈 | 설치 1회, 용량 +250MB 안팎 | 화면은 기본 브라우저로 충분해 이득이 작다 |
+| D. A + Tauri 트레이 실행기 | 설치 1회, 용량 소폭 증가 | 트레이 · 자동시작 UX가 필요해지면 A 위에 얹는다 |
+| E. DB 교체(H2 · SQLite) | — | §17.2에 따라 하지 않는다 |
+
+A를 고르면 남는 일: 화면 같은 출처 서빙 [REPO], 첫 실행 시 `initdb`와 DB 비밀번호 생성, 설치별 JWT secret 생성,
+Mac 공증(Apple Developer Program, 개인 가입 가능 [PO] · [EXT]), Windows는 Windows에서 jlink · 서명(Authenticode)
+검증 후 지원 표시(§18.3 L4).
