@@ -49,6 +49,22 @@ ever produces. Specifically, the real shape adds:
 reviewer, order, or review body. The header labels are a schema alias — the same labels already
 ground `ReviewRowMapper`, `RowMapperTest`, `FileParserTest` and `ExportToAttentionChainTest`.
 
+## Checked against a real export (2026-10-17)
+
+The product owner downloaded one real export from their own Seller Center and reported its **structure
+only** (no cell content entered the repository):
+
+- The 25 headers match `expected-rows.json` `headers` **in name and order**. There is no reply-body,
+  product-option or extra attachment column.
+- `포토/영상` carries **one image URL as plain text** (not an embedded picture), shaped
+  `https://phinf.pstatic.net/checkout.phinf/{date_seq}/{id}_JPEG/{original file name}`. A review with
+  two photos still shows one URL — consistent with NAVER's FAQ that the Excel download carries a single
+  attachment. The URL opened without login, including for a review six months old.
+- This fixture already models the shape: one row's `포토/영상` holds the text URL
+  `https://example.invalid/synthetic-media-1`, the rest are empty. The real host differs, so the
+  vendor-server import's host check (`docs/vendor_server_contract_v1.md` §3.1) is tested with its own
+  fixture rather than by rebuilding this one.
+
 ## Sensitive columns
 
 `등록자`, `상품주문번호`, and `유저정보 등록 항목` are the PII-class columns of a real export
