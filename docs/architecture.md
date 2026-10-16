@@ -24,7 +24,7 @@
 | 5 | **`contracts/`** | Hand-written ESM TypeScript + JSON fixtures + golden vectors | The shared shapes: Action Window v1/v2, acquisition, session readiness, review-import journey, fingerprints, triage rubrics | the per-family `README.md` / `SPEC.md` / `CONTRACT.md` beside each |
 
 Plus **`vendor-server/`** — the seller-PC product's central service (Spring Boot, a separate build with no channel
-client and no credential store; `docs/vendor_server_contract_v1.md`, 2026-10-17 skeleton) — `tools/` — operator harnesses, validation scripts, and calibration instruments — and `docs/`.
+client and no credential store; `docs/vendor_server_contract_v1.md` — invite-only seller accounts, install registration and the public-IP echo as of 2026-10-17) — `tools/` — operator harnesses, validation scripts, and calibration instruments — and `docs/`.
 
 ## How they connect
 
@@ -98,6 +98,7 @@ Not a layer — a set of gates, each in code, each fail-closed. The fences thems
 | Seller-PC outbound gate | `backend/.../outbound/OutboundGate.java` + `OutboundGateFenceTest` | in local-seller mode, any request whose host is not on the fixed list for its destination (scope lock v1.14 ⑤) |
 | Seller-PC LLM send gate | `backend/.../outbound/LlmSendGate.java` + `LlmSendGateFenceTest` | in local-seller mode, phone · e-mail · long numbers leaving for a model (removed in place); an address, a non-product image or an unreadable body (held, not sent) — proposal §17.9 |
 | Vendor server scope | `vendor-server/.../VendorServerScopeFenceTest` | a channel API host, a backend connector/credential package, a model host or an analytics SDK in the vendor server |
+| Vendor server callers | `vendor-server/.../config/SecurityConfig.java` + `VendorServerSecurityTest` | a route answering a caller it is not named for — an install token on a seller route, a seller session on an install route, a revoked install or a suspended account on anything; every unnamed route is refused |
 | Evidence digest floor | `EvidenceDigestFloor` + `AgentOperatorPayloadFloorTest` | any judge request whose evidence digest is not `key=value` metadata — prose is refused before the vendor call, not masked |
 
 ## Verification architecture
