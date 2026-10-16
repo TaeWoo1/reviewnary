@@ -64,6 +64,9 @@ one place on disk and are **not** recoverable from git.
   - **Two lanes, and they are not the same product:** a button sends a closed `intent` and runs
     deterministically; a typed sentence is planned by the LLM or the run **fails**.
 - `contracts/` — shared contracts (Action Window, review fingerprint).
+- `vendor-server/` — the seller-PC product's central service (scope lock v1.14 ⑧-3): a separate Spring Boot build
+  that holds **no channel client, no channel credential and no model call** — `VendorServerScopeFenceTest`.
+  Contract: `docs/vendor_server_contract_v1.md`.
 - `tools/` — dev/support tooling.
 - `docs/` — current SellerOps docs; `docs/archive/` holds historical material.
 

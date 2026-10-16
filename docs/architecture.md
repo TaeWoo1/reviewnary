@@ -23,7 +23,8 @@
 | 4 | **`agent-runtime/`** | Standalone Node/TypeScript LangGraph orchestration service (port 8787) — **SellerOps의 AI Operator 실행 구조** (2026-08-21) | The `OperatorGraph` (goal → **LLM plan** → plan validation → specialists → evidence judge → answer, bounded) over the four checkpointed `StateGraph`s; tools are thin adapters onto Spring, and the Operator's own catalogue is READ-only. **Agent chat has no deterministic planner** — no plan, no run; a button's `intent` runs without one | **`docs/standing/sellerops_operator_graph_v2.md`** (제품 행동 계약 · Planner · Product Knowledge) · `docs/standing/sellerops_operator_graph_v1.md` (구성·tool·evidence 계약 · 구현 기록) · `docs/archive/2026-q3/sellerops_agent_runtime_migration.md` · `docs/standing/agent-runtime-langgraph-llm-split.md` |
 | 5 | **`contracts/`** | Hand-written ESM TypeScript + JSON fixtures + golden vectors | The shared shapes: Action Window v1/v2, acquisition, session readiness, review-import journey, fingerprints, triage rubrics | the per-family `README.md` / `SPEC.md` / `CONTRACT.md` beside each |
 
-Plus `tools/` — operator harnesses, validation scripts, and calibration instruments — and `docs/`.
+Plus **`vendor-server/`** — the seller-PC product's central service (Spring Boot, a separate build with no channel
+client and no credential store; `docs/vendor_server_contract_v1.md`, 2026-10-17 skeleton) — `tools/` — operator harnesses, validation scripts, and calibration instruments — and `docs/`.
 
 ## How they connect
 
@@ -94,6 +95,9 @@ Not a layer — a set of gates, each in code, each fail-closed. The fences thems
 | Classifier boundary | `ClassifierBoundaryTest` | any class but the gate constructing the classifier (build fails) |
 | LLM capability doors | `AgentDraftBoundaryTest` | any class but a capability's own service constructing its generator, or anything but a generator calling the transport (three capabilities: draft · plan · judge) |
 | Operator WRITE fence | `OperatorToolRegistry` + `operatorToolRegistry.test.ts` | a WRITE-classed tool at registry construction; a tool outside the run's plan; the whole privileged plane (credentials, Action Window, guided-submission mint) from the Operator catalogue |
+| Seller-PC outbound gate | `backend/.../outbound/OutboundGate.java` + `OutboundGateFenceTest` | in local-seller mode, any request whose host is not on the fixed list for its destination (scope lock v1.14 ⑤) |
+| Seller-PC LLM send gate | `backend/.../outbound/LlmSendGate.java` + `LlmSendGateFenceTest` | in local-seller mode, phone · e-mail · long numbers leaving for a model (removed in place); an address, a non-product image or an unreadable body (held, not sent) — proposal §17.9 |
+| Vendor server scope | `vendor-server/.../VendorServerScopeFenceTest` | a channel API host, a backend connector/credential package, a model host or an analytics SDK in the vendor server |
 | Evidence digest floor | `EvidenceDigestFloor` + `AgentOperatorPayloadFloorTest` | any judge request whose evidence digest is not `key=value` metadata — prose is refused before the vendor call, not masked |
 
 ## Verification architecture

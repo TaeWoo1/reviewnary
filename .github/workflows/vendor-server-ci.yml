@@ -1,0 +1,58 @@
+# Vendor server CI — runs the vendor-server test suite on PRs, including VendorServerScopeFenceTest (no channel
+# client, credential store, model host or analytics SDK in the vendor server — docs/vendor_server_contract_v1.md).
+# Same shape as backend-ci.yml. Hermetic: no database, no Docker, no secrets.
+name: vendor-server-ci
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'vendor-server/**'
+      - '.github/workflows/vendor-server-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'vendor-server/**'
+      - '.github/workflows/vendor-server-ci.yml'
+
+concurrency:
+  group: vendor-server-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  vendor-server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vendor-server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # JDK 17 matches the toolchain in vendor-server/build.gradle; Gradle is pinned by the committed wrapper.
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+          cache-dependency-path: |
+            vendor-server/*.gradle*
+            vendor-server/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Test
+        run: ./gradlew test --no-daemon
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vendor-server-test-reports
+          path: |
+            vendor-server/build/reports/tests/test/
+            vendor-server/build/test-results/test/
+          retention-days: 7
+          if-no-files-found: warn

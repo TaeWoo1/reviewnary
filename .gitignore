@@ -127,6 +127,8 @@ Thumbs.db
 # Backend (Spring Boot / Gradle)
 backend/.gradle/
 backend/build/
+vendor-server/.gradle/
+vendor-server/build/
 backend/bin/
 backend/out/
 # Frontend (React / Vite)
