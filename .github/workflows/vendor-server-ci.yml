@@ -1,6 +1,7 @@
 # Vendor server CI — runs the vendor-server test suite on PRs, including VendorServerScopeFenceTest (no channel
 # client, credential store, model host or analytics SDK in the vendor server — docs/vendor_server_contract_v1.md).
-# Same shape as backend-ci.yml. Hermetic: no database, no Docker, no secrets.
+# Same shape as backend-ci.yml. Hermetic: no database server (the Flyway migrations run on in-memory H2), no Docker,
+# no secrets.
 name: vendor-server-ci
 
 on:

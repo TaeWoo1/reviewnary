@@ -1,9 +1,22 @@
-# The vendor server (docs/vendor_server_contract_v1.md). Nothing here is a secret; nothing here names a channel API.
+# The vendor server (docs/vendor_server_contract_v1.md). Nothing here is a secret — secrets arrive by environment;
+# nothing here names a channel API.
 spring:
   application:
     name: sellerops-vendor-server
   main:
     banner-mode: off
+  # The server's own database (contract §9). Supplied by the deployment; there is no default to fall back to.
+  datasource:
+    url: ${VENDOR_DB_URL}
+    username: ${VENDOR_DB_USER}
+    password: ${VENDOR_DB_PASSWORD}
+  flyway:
+    enabled: true
+
+vendor:
+  session:
+    # HS256 key for seller sessions — at least 32 characters, required; SessionTokens refuses to start without it.
+    secret: ${VENDOR_SESSION_SECRET:}
 
 server:
   port: ${VENDOR_SERVER_PORT:8090}

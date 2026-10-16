@@ -1,0 +1,10 @@
+# Hermetic test profile: H2 in PostgreSQL mode, the real Flyway migrations, and a test-only session key.
+spring:
+  datasource:
+    url: jdbc:h2:mem:vendor_test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+
+vendor:
+  session:
+    secret: test-only-session-key-not-for-any-deployment-0123456789
