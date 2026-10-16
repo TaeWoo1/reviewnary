@@ -58,8 +58,11 @@ only** (no cell content entered the repository):
   product-option or extra attachment column.
 - `포토/영상` carries **one image URL as plain text** (not an embedded picture), shaped
   `https://phinf.pstatic.net/checkout.phinf/{date_seq}/{id}_JPEG/{original file name}`. A review with
-  two photos still shows one URL — consistent with NAVER's FAQ that the Excel download carries a single
-  attachment. The URL opened without login, including for a review six months old.
+  two photos still shows one URL, and it is the **first** attachment as ordered in Seller Center —
+  which is what NAVER's FAQ ("the Excel download shows one attachment") means. A video attachment is
+  exported as a **still jpg** on the same host under a different path,
+  `https://phinf.pstatic.net/image.nmv/{upload_batch}/{id}.jpg`. The URL opened without login,
+  including for a review six months old.
 - This fixture already models the shape: one row's `포토/영상` holds the text URL
   `https://example.invalid/synthetic-media-1`, the rest are empty. The real host differs, so the
   vendor-server import's host check (`docs/vendor_server_contract_v1.md` §3.1) is tested with its own
