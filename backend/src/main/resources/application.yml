@@ -65,6 +65,11 @@ sellerops:
   # SMTP, social login) and LoopbackRequestGuard (refuses a non-loopback Host or Origin).
   local-seller:
     enabled: ${SELLEROPS_LOCAL_SELLER_MODE:false}
+  # The vendor server a seller PC registers with (docs/vendor_server_contract_v1.md §2 · §7). Empty = off: the
+  # connection screen keeps its manual call-IP guidance. Only used in a seller-PC install, and OutboundGate admits
+  # only the vendor server's own host (VENDOR) or loopback, whatever this names.
+  vendor-link:
+    base-url: ${SELLEROPS_VENDOR_LINK_BASE_URL:}
   # The Local Agent credential handoff — the ONE path that reads a seller's API keys off their marketplace
   # screen and writes them into the vault. Armed separately from the read-only live-call interlock above,
   # with the WHOLE identity the operator's grant was bound to, and spent after one store.

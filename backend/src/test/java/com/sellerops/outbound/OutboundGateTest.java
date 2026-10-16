@@ -62,6 +62,13 @@ class OutboundGateTest {
     }
 
     @Test
+    void theVendorServerIsReachableOnlyOnLoopbackUntilItsHostIsFixed() {
+        assertThat(allows("https://vendor.example.com/v1/ip", Destination.VENDOR)).isFalse();
+        assertThat(allows("https://api.commerce.naver.com/v1/ip", Destination.VENDOR)).isFalse();
+        assertThat(allows("http://127.0.0.1:8090/v1/ip", Destination.VENDOR)).isTrue();
+    }
+
+    @Test
     void loopbackIsAlwaysAllowedForSyntheticServers() {
         for (Destination d : Destination.values()) {
             assertThat(allows("http://127.0.0.1:18080/x", d)).as(d.name()).isTrue();

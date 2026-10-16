@@ -41,6 +41,13 @@ public final class OutboundGate {
          * (SSRF, size, type) on every hop.
          */
         PRODUCT_IMAGE,
+        /**
+         * The vendor server ({@code vendor-server/}, contract {@code docs/vendor_server_contract_v1.md}): install
+         * registration, the public-IP echo, later the review exchange and the Cafe24 token relay. Its production
+         * host name is not decided yet, so {@link #VENDOR_HOSTS} is empty and only loopback (development against a
+         * local vendor server) is reachable — a configured base URL cannot point this anywhere else.
+         */
+        VENDOR,
         /** Channels outside the seller-visible set (NAVER/Coupang/Cafe24) — refused on a seller's PC. */
         ESM,
         ELEVENST,
@@ -51,6 +58,8 @@ public final class OutboundGate {
     private static final Set<String> COUPANG_HOSTS = Set.of("api-gateway.coupang.com");
     private static final String CAFE24_SUFFIX = ".cafe24api.com";
     private static final Set<String> LLM_HOSTS = Set.of("api.anthropic.com", "api.openai.com");
+    /** Empty until the vendor server's IPv4-only host name is fixed (contract §7, §9) — refused off loopback. */
+    private static final Set<String> VENDOR_HOSTS = Set.of();
     private static final Set<String> LOOPBACK = Set.of("localhost", "127.0.0.1", "::1", "[::1]");
 
     private static volatile boolean armed;
@@ -97,6 +106,7 @@ public final class OutboundGate {
                     && host.indexOf('.') == host.length() - CAFE24_SUFFIX.length();
             case LLM -> LLM_HOSTS.contains(host);
             case PRODUCT_IMAGE -> true;
+            case VENDOR -> VENDOR_HOSTS.contains(host);
             case ESM, ELEVENST, SSG -> false;
         };
     }
