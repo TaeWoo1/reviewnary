@@ -886,6 +886,9 @@ export class BridgeServer {
         // already announced on connect) or when nothing is mounted. Never logged with its values beyond those two.
         const carrier = parseAwCarrierKind(msg.carrier);
         const channelCode = typeof msg.channelCode === "string" && /^[a-z][a-z0-9_-]{0,31}$/.test(msg.channelCode) ? msg.channelCode : null;
+        const onDemand = !!this.actionWindow?.onClientAttachRequest;
+        // Only a guidance tab sends this (status sockets never do), so it is what tells a walk's socket apart.
+        log("bridge_aw_attach_requested", { carrier: carrier ?? "invalid", channelCode: channelCode ?? "invalid", onDemand });
         if (carrier && channelCode && this.actionWindow?.onClientAttachRequest) {
           this.actionWindow.onClientAttachRequest(ws, { carrier, channelCode });
         }

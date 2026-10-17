@@ -130,7 +130,8 @@ export class ApiIssuanceEndpoint implements AwCarrierEndpoint {
   }
 
   onClientDisconnected(ws: WebSocket): void {
-    this.sockets.delete(ws);
+    if (!this.sockets.delete(ws)) return;
+    log("aw_issuance_client_detached", { carrier: this.carrier, clients: this.sockets.size });
   }
 
   /** An opaque `{type:"aw"}` carrier payload from an authenticated socket. Malformed frames are dropped. */
@@ -146,6 +147,9 @@ export class ApiIssuanceEndpoint implements AwCarrierEndpoint {
       log("aw_issuance_frame_malformed", { dropped: true });
       return;
     }
+    // Which frame arrived, by its closed enums only — so a walk that never starts shows whether the tab ever
+    // asked (resync) and whether START_RUN followed. Never the envelope's ids, payload or revision.
+    log("aw_issuance_frame_received", frame.kind === "aw_command" ? { kind: frame.kind, command: frame.command.type } : { kind: frame.kind });
     this.replyTarget = ws;
     try {
       for (const listener of [...this.listeners]) listener(frame);

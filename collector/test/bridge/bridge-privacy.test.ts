@@ -28,6 +28,29 @@ function post(port: number, path: string, body: unknown, headers: Record<string,
 }
 
 describe("bridge privacy / no-secret-leak", () => {
+  it("logs a tab's aw_attach by its two validated enums only, and an invalid one as `invalid`", async () => {
+    const { port } = await startServer();
+    const req = await (await post(port, "/bridge/pair/request", { workspaceLabel: "회사" })).json();
+    const token: string = (await (await post(port, "/bridge/pair/poll", { requestId: req.requestId })).json()).pairingToken;
+    const ticket: string = (await (await post(port, "/bridge/ws-ticket", { clientProtocolVersion: 1 }, { Authorization: `Bearer ${token}` })).json()).ticket;
+    const up = await connect({ port, path: `/bridge/ws?ticket=${ticket}`, origin: APP });
+    await readMessages(up.ws!, 2);
+    clearLogSink();
+
+    up.ws!.send(JSON.stringify({ type: "aw_attach", carrier: "issuance", channelCode: "naver" }));
+    up.ws!.send(JSON.stringify({ type: "aw_attach", carrier: "issuance", channelCode: "NAVER <script>" }));
+    up.ws!.send(JSON.stringify({ type: "request_snapshot" }));
+    await readMessages(up.ws!, 1); // the snapshot reply — both attaches were handled before it, in order
+    up.ws?.close();
+
+    const attaches = getLogSink().filter((e) => e.event === "bridge_aw_attach_requested").map((e) => e.meta);
+    expect(attaches).toEqual([
+      { carrier: "issuance", channelCode: "naver", onDemand: false },
+      { carrier: "issuance", channelCode: "invalid", onDemand: false },
+    ]);
+    expect(JSON.stringify(getLogSink())).not.toContain("<script>");
+  });
+
   it("never logs the pairing token, ticket, or confirmation code, and puts no secret in a URL", async () => {
     const { server, port } = await startServer();
     clearLogSink();
