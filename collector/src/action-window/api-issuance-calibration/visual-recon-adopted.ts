@@ -2,7 +2,8 @@
  * **ADOPTED visual-recon fixed-label selectors — CONFIRMED matchCount=1 on the REAL NAVER API center.**
  *
  * Each of these was proposed from the redacted visual recon, measured live, and confirmed to resolve to EXACTLY
- * one element on the real API center (live runs of 2026-08-02: #4/#5/#6; the call-IP pair on 2026-10-17 —
+ * one element on the real API center (live runs of 2026-08-02: #4/#5/#6; the call-IP pair on 2026-10-17, the edit-form label by a value-free
+ * structure read in the operator's own browser —
  * `docs/evidence/INDEX.md` §2). Each passes the frozen
  * {@link evaluateSelectorCandidate} adoption gate once its live `matchCount===1` is supplied. This module is the
  * SOURCE OF TRUTH for locating these API-center CONTROLS by a fixed NAVER UI label — never by an application
@@ -29,7 +30,9 @@ export const ADOPTED_TARGET_IDS = [
   "credentials.secret_view_button", // 보기 (view) — #4/#5
   "credentials.secret_copy_button", // 복사 (copy) — #4/#5
   "app_detail.edit_button", // 수정 (edit) — 2026-10-17 detail re-measure
-  "app_edit.call_ip_label", // API호출 IP (edit-form row label) — 2026-10-17
+  // NOT `app_edit.call_ip_label`: its `matchCount 1` (2026-10-17 recon) was a never-painted node — the hidden detail
+  // view's exact 「API호출 IP」 — and the 3차 Phase B run parked on it. Retired; the counted label replaces it.
+  "app_edit.call_ip_count_label", // API호출 IP (n/3) — visible 1, its TR holds the inputs + 「추가」 — 2026-10-17
 ] as const satisfies readonly VisualReconTargetId[];
 export type AdoptedTargetId = (typeof ADOPTED_TARGET_IDS)[number];
 
@@ -42,7 +45,7 @@ const CONFIRMED_LIVE_RUNS: Readonly<Record<AdoptedTargetId, readonly string[]>> 
   "credentials.secret_view_button": ["2026-08-02#4", "2026-08-02#5"],
   "credentials.secret_copy_button": ["2026-08-02#4", "2026-08-02#5"],
   "app_detail.edit_button": ["2026-10-17#detail"],
-  "app_edit.call_ip_label": ["2026-10-17#edit"],
+  "app_edit.call_ip_count_label": ["2026-10-17#aside-edit"],
 };
 
 export interface AdoptedVisualReconSelector {

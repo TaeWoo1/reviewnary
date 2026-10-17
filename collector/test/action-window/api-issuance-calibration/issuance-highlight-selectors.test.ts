@@ -91,7 +91,7 @@ describe("issuance highlight-target selector registry", () => {
       create_app: "button, a, [role='button']",
       api_group: "h1,h2,h3,h4,h5,h6,[role='heading']",
       open_edit: "button, a, [role='button']",
-      call_ip: "th,td,dt,label,span,div",
+      call_ip: "label",
       application_id: "th,td,dt,label,span,div",
       application_secret: "button, a, [role='button']",
     };

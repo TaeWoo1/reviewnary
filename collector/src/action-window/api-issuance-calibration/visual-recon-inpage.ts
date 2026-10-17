@@ -370,6 +370,12 @@ export function buildFixedLabelProbeScript(probes: readonly { targetId: string; 
     /* text read ONLY to compare against a KNOWN fixed label; only a COUNT is returned, never the text. */
     return norm(el.textContent || '');
   }
+  /* The fixed label, optionally followed by NAVER's own count 「(n/m)」 and nothing else. */
+  function labelIs(name, want, countSuffix) {
+    if (name === want) { return true; }
+    if (!countSuffix || name.indexOf(want) !== 0) { return false; }
+    return /^ ?\\(\\d+\\/\\d+\\)$/.test(name.slice(want.length));
+  }
   /* The highlight's own paint rule (buildFixedLabelLocateScript): a match a person cannot see is not a target.
      STRUCTURE only — no text, value, or attribute is read or returned. */
   function paints(node) {
@@ -388,7 +394,7 @@ export function buildFixedLabelProbeScript(probes: readonly { targetId: string; 
     var want = norm(probe.exactText);
     var els; try { els = slice(document.querySelectorAll(probe.candidateQuery)); } catch (e) { els = []; }
     var n = 0, seen = 0, CAP = 4000;
-    for (var i = 0; i < els.length && i < CAP; i++) { if (accName(els[i]) === want) { n = n + 1; if (paints(els[i])) { seen = seen + 1; } } }
+    for (var i = 0; i < els.length && i < CAP; i++) { if (labelIs(accName(els[i]), want, probe.countSuffix === true)) { n = n + 1; if (paints(els[i])) { seen = seen + 1; } } }
     out.push({ targetId: probe.targetId, matchCount: n, visibleCount: seen });
   }
   return out;
@@ -722,6 +728,8 @@ export function buildFixedLabelLocateScript(input: {
   exactText: string;
   tag: boolean;
   tagAncestor?: string;
+  /** Admit NAVER's own count after the label, 「(n/m)」 — see `FixedLabelProbe.countSuffix`. */
+  countSuffix?: boolean;
 }): string {
   return `(function () {
   /* issuance-fixed-label-${input.tag ? "tag" : "locate"} (value-free OUTPUT: { count, sig? }) */
@@ -733,6 +741,12 @@ export function buildFixedLabelLocateScript(input: {
     if (al && norm(al).length) { return norm(al); }
     /* text read ONLY to compare against a KNOWN fixed label; only a COUNT / structural sig is returned. */
     return norm(el.textContent || '');
+  }
+  /* The fixed label, optionally followed by NAVER's own count 「(n/m)」 and nothing else. */
+  function labelIs(name, want, countSuffix) {
+    if (name === want) { return true; }
+    if (!countSuffix || name.indexOf(want) !== 0) { return false; }
+    return /^ ?\\(\\d+\\/\\d+\\)$/.test(name.slice(want.length));
   }
   /* Does this element actually PAINT? A highlight on a non-painting node is invisible to the operator while every
      count/sig here still reports success — the exact failure observed live on 2026-08-09, where the sole textual
@@ -754,7 +768,8 @@ export function buildFixedLabelLocateScript(input: {
   var want = norm(${JSON.stringify(input.exactText)});
   var cands; try { cands = slice(document.querySelectorAll(${JSON.stringify(input.candidateQuery)})); } catch (e) { cands = []; }
   var matches = [], CAP = 4000;
-  for (var i = 0; i < cands.length && i < CAP; i++) { if (accName(cands[i]) === want) { matches.push(cands[i]); } }
+  var countSuffix = ${input.countSuffix === true ? "true" : "false"};
+  for (var i = 0; i < cands.length && i < CAP; i++) { if (labelIs(accName(cands[i]), want, countSuffix)) { matches.push(cands[i]); } }
   var visible = [];
   for (var v = 0; v < matches.length; v++) { if (paints(matches[v])) { visible.push(matches[v]); } }
   /* hiddenCount is a COUNT of rejected non-painting matches — it names no element and carries no text. It exists

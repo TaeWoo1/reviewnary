@@ -228,7 +228,14 @@ describe("fixed-label read-only matchCount probe — value-free integer counts",
     expect(byId["app_detail.call_ip_row"]!.exactText).toBe("API호출 IP");
     expect(byId["app_detail.edit_button"]!.exactText).toBe("수정");
     // The edit form: the exact label (which measured only a never-painted node) and the paste target's 「추가」.
-    expect(labelProbesForScreen("app_edit").map((p) => p.targetId)).toEqual(["app_edit.call_ip_label", "app_edit.call_ip_add_button"]);
+    expect(labelProbesForScreen("app_edit").map((p) => p.targetId)).toEqual([
+      "app_edit.call_ip_label",
+      "app_edit.call_ip_add_button",
+      "app_edit.call_ip_count_label",
+    ]);
+    // Only the counted label admits NAVER's 「(n/m)」, and only on the edit form's LABEL element.
+    expect(VISUAL_RECON_LABEL_PROBES.filter((p) => p.countSuffix).map((p) => p.targetId)).toEqual(["app_edit.call_ip_count_label"]);
+    expect(byId["app_edit.call_ip_count_label"]).toMatchObject({ candidateQuery: "label", exactText: "API호출 IP" });
     expect(byId["app_edit.call_ip_add_button"]!.exactText).toBe("추가");
   });
 

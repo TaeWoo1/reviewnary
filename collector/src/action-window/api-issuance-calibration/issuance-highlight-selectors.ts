@@ -110,6 +110,8 @@ export interface IssuanceFixedLabelLocator {
    * the wrong row. Same shape and same value-free count as the locator itself.
    */
   requiresAbsent?: { candidateQuery: string; exactText: string };
+  /** The label carries NAVER's own count 「(n/m)」 after the fixed text (reused verbatim from the adopted probe). */
+  countSuffix?: true;
 }
 
 export interface IssuanceTargetSelectorSpec {
@@ -132,7 +134,7 @@ const DERIVES_FROM: Readonly<Record<IssuanceHighlightTarget, VisualReconTargetId
   create_app: "app_list.register_application", // 애플리케이션 등록 (register button) — #4/#5
   api_group: "api_group.section", // API 그룹 (section heading) — #4/#5
   open_edit: "app_detail.edit_button", // 수정 (edit button) — 2026-10-17
-  call_ip: "app_edit.call_ip_label", // API호출 IP (edit-form row label → its row) — 2026-10-17
+  call_ip: "app_edit.call_ip_count_label", // API호출 IP (n/3) (edit-form row label → its row) — 2026-10-17
   application_id: "credentials.application_id_label", // 애플리케이션 ID (label cell → its row) — #4/#5
   application_secret: "credentials.secret_view_button", // 시크릿 보기 (view control → its row) — #4/#5
 };
@@ -215,6 +217,7 @@ export const ISSUANCE_TARGET_SELECTORS: readonly IssuanceTargetSelectorSpec[] = 
     locator: {
       candidateQuery: probe.candidateQuery,
       exactText: probe.exactText,
+      ...(probe.countSuffix ? { countSuffix: true as const } : {}),
       ...(TAG_ANCESTOR[target] ? { tagAncestor: TAG_ANCESTOR[target] } : {}),
       ...(absent ? { requiresAbsent: { candidateQuery: absent.candidateQuery, exactText: absent.exactText } } : {}),
     },

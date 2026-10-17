@@ -146,8 +146,11 @@ function escapeForRegExp(s: string): string {
  * the SAME "candidates whose normalized accessible name equals the label" the audited in-page script asserts —
  * keeping the locator's narrowing consistent with the value-free tag+sig script that follows it.
  */
-function exactLabelRegex(label: string): RegExp {
-  return new RegExp(`^\\s*${escapeForRegExp(label)}\\s*$`);
+/** Exported for the real-Chromium parity test only — the driver's own Playwright `hasText` matcher. */
+export function exactLabelRegex(label: string, countSuffix = false): RegExp {
+  // `countSuffix`: NAVER's own 「(n/m)」 after the label, and nothing else — the same shape the in-page scripts admit.
+  const suffix = countSuffix ? String.raw`(\s?\(\d+/\d+\))?` : "";
+  return new RegExp(`^\\s*${escapeForRegExp(label)}${suffix}\\s*$`);
 }
 
 /** True for a Playwright locator TIMEOUT (a bounded miss → recoverable park), by error NAME only (never message). */
@@ -488,6 +491,7 @@ function issuanceLocateScript(target: IssuanceHighlightTarget, tag: boolean): st
     exactText: loc.exactText,
     tag,
     tagAncestor: loc.tagAncestor,
+    countSuffix: loc.countSuffix === true,
   });
 }
 
@@ -599,7 +603,7 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
     afterTag?: (page: Page) => Promise<void>,
   ): Promise<LocateResult> {
     const loc = locatorFor(target);
-    const hasText = exactLabelRegex(loc.exactText);
+    const hasText = exactLabelRegex(loc.exactText, loc.countSuffix === true);
     const script = guidedLocateScript(target, tag);
     if (!script) return { count: 0 }; // fail closed rather than resolve a non-calibrated control
     let lastErr: unknown;

@@ -24,7 +24,7 @@ describe("adopted visual-recon selectors", () => {
       "credentials.secret_view_button",
       "credentials.secret_copy_button",
       "app_detail.edit_button",
-      "app_edit.call_ip_label",
+      "app_edit.call_ip_count_label",
     ]);
     // the state-dependent 다시사용 (0 live) and the gate-blocked 시크릿 label are NOT adopted.
     const ids = ADOPTED_VISUAL_RECON_SELECTORS.map((a) => a.targetId);
@@ -32,6 +32,8 @@ describe("adopted visual-recon selectors", () => {
     expect(ids).not.toContain("credentials.application_secret_label");
     // the detail page's read-only 「API호출 IP」 row measured once too, but nothing points at it, so it stays a probe.
     expect(ids).not.toContain("app_detail.call_ip_row");
+    // the edit form's exact 「API호출 IP」 measured 1 but never painted (hidden detail view) — retired, not adopted.
+    expect(ids).not.toContain("app_edit.call_ip_label");
     expect(ADOPTED_VISUAL_RECON_SELECTORS).toHaveLength(8);
   });
 
