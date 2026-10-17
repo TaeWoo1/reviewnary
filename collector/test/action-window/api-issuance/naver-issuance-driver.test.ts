@@ -77,6 +77,11 @@ interface FakePageOptions {
   /** When true, the Playwright locator's `waitFor` always TIMES OUT (models a label that never renders → park). */
   locatorTimeout?: boolean;
   /**
+   * The seller pressed the call-IP step's 「저장했어요 · 다음」 with NAVER's edit form still open (live 2026-10-17):
+   * the credential labels then sit only in the hidden detail view, so their painted-only tag count is 0.
+   */
+  editFormStaysOpen?: boolean;
+  /**
    * Throw a TRANSIENT nav error on the first N api_group OVERLAY MOUNTS (the function-form overlay `evaluate`,
    * targeted by its `api_group` copyKey) — models the SPA destroying the context under the mount (the live-#5
    * blocker). The overlay's own bounded retry absorbs a few; past that the driver's atomic re-tag+re-mount does.
@@ -157,6 +162,9 @@ class FakePage {
   apiGroupMountFaultMessage: string;
   mountSubStage: string | undefined;
   editFormOpens: boolean;
+  editFormStaysOpen: boolean;
+  /** The copy key of every overlay mount, in order — what a park notice said is read from here. */
+  readonly mountKeys: string[] = [];
   /** Latches once 「수정」 has been ringed and the seller (modelled) opened the edit form: 「수정」 is then gone. */
   private editOpen = false;
   /** Latches once the app-entry rows have been read — the seller then opens their app, so census → postOpen. */
@@ -188,6 +196,7 @@ class FakePage {
     this.apiGroupMountFaultMessage = o.apiGroupMountFaultMessage ?? "boom weird mount failure";
     this.mountSubStage = o.mountSubStage;
     this.editFormOpens = o.editFormOpens ?? true;
+    this.editFormStaysOpen = o.editFormStaysOpen ?? false;
     this.throwLocateLeft = o.throwLocateTimes ?? 0;
     this.apiGroupMountThrowLeft = o.apiGroupMountThrowTimes ?? 0;
     this.apiGroupMountNoPaintLeft = o.apiGroupMountNoPaintTimes ?? 0;
@@ -231,6 +240,7 @@ class FakePage {
       // WITHOUT being the mount itself (the mount also references the global, but it carries scrollIntoView).
       const isSubStageRead = s.includes("__aw_mount_stage__") && !isMount;
       if (isMount) {
+        this.mountKeys.push(copyKey);
         if (copyKey.includes("api_group") && this.apiGroupMountThrowLeft > 0) {
           this.apiGroupMountThrowLeft -= 1;
           throw new Error("Execution context was destroyed, most likely because of a navigation");
@@ -275,6 +285,8 @@ class FakePage {
         }
         if (this.editOpen) return { count: 0 };
       }
+      // The credential labels live in the detail view, hidden under the still-open edit form.
+      if (this.editOpen && this.editFormStaysOpen && (s.includes('"애플리케이션 ID"') || s.includes('"보기"'))) return { count: 0 };
       // Decoupled tag count (drift): the in-page exact-label scan may count differently than the locator did.
       if (this.tagResult) return this.tagResult;
       return this.locate;
@@ -1086,6 +1098,36 @@ describe("NaverIssuanceDriver — the call-IP steps", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toContain("var ROWS = [];");
     expect(rows[0]).toContain("'API 호출 IP 등록 안내'");
+  });
+
+  it("**a ⑦ park with the edit form still open says so** — and once the form is closed, 다시 확인 rings ⑦", async () => {
+    const { io, engine, session, page } = build({ appEntryCount: 1, editFormStaysOpen: true });
+    startRun(io);
+    await session.whenSettled();
+    await pressUntil(io, engine, session, "guiding_call_ip");
+    command(io, "REQUEST_STEP_RECHECK", io.lastView()!.revision, "past-call-ip");
+    await session.whenSettled();
+
+    expect(engine.currentStage()).toBe("target_not_found");
+    expect(io.lastView()?.currentStep?.stepNumber).toBe(7);
+    expect(page.mountKeys[page.mountKeys.length - 1]).toBe("actionWindow.issuance.park.TARGET_NOT_FOUND.edit_form_open");
+
+    page.editFormStaysOpen = false; // the seller saved (or cancelled): the detail view paints again
+    command(io, "REQUEST_STEP_RECHECK", io.lastView()!.revision, "after-close");
+    await session.whenSettled();
+    expect(engine.currentStage()).toBe("guiding_application_id");
+    expect(io.lastView()?.blocker).toBeUndefined();
+  });
+
+  it("a ⑥ park on the detail page keeps the generic notice — the edit-form notice is only for the steps after it", async () => {
+    const { io, engine, session, page } = build({ appEntryCount: 1, editFormOpens: false });
+    startRun(io);
+    await session.whenSettled();
+    await pressUntil(io, engine, session, "guiding_open_edit");
+    command(io, "REQUEST_STEP_RECHECK", io.lastView()!.revision, "to-call-ip");
+    await session.whenSettled();
+    expect(engine.currentStage()).toBe("target_not_found");
+    expect(page.mountKeys[page.mountKeys.length - 1]).toBe("actionWindow.issuance.park.TARGET_NOT_FOUND");
   });
 
   it("SECRET READ = 0 across the WHOLE walk; the clipboard appears only in the audited write-only copy rows", async () => {

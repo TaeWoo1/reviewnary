@@ -401,6 +401,24 @@ const NAVER_PARK_NOTICE_COPY: Readonly<Record<NaverIssuanceParkNotice, { badge: 
   });
 
 /**
+ * **The one park whose cause the walk can name: NAVER's edit form is still open** (live 2026-10-17, 4차 Phase B).
+ *
+ * The edit form replaces the detail view in place and keeps it in the page under `display:none`, so a step after
+ * the call-IP row finds its label there but never painted — the generic notice then told a seller still on the
+ * form that the screen had not finished loading. When the form is provably still open — its counted 「API호출 IP」
+ * label paints and the detail page's 「수정」 does not — the notice says so instead. Same rule as every other park
+ * notice: it names no NAVER control, and the way on is the seller's own 다시 확인.
+ */
+const NAVER_EDIT_FORM_OPEN_COPY = Object.freeze({
+  badge: "안내 멈춤",
+  brief: "네이버 수정 화면이 아직 열려 있어요.",
+  detail: "IP 등록을 마치고 애플리케이션 상세 화면으로 돌아간 뒤, reviewnary에서 '다시 확인'을 눌러 주세요.",
+});
+
+/** The steps that sit on the detail page AFTER the edit form — the only parks the edit-form notice can explain. */
+const AFTER_EDIT_FORM: ReadonlySet<IssuanceHighlightTarget> = new Set(["application_id", "application_secret"]);
+
+/**
  * The walk is over. Copy-only, and that is a decision rather than an omission: the WING walk's completion panel
  * carries a `SellerOps로 돌아가기` button because that carrier injects a real navigation. This one does not, and
  * a button that recorded a press and moved nothing is exactly the defect the WING walk had to fix on 2026-08-12.
@@ -522,6 +540,8 @@ const IN_PAGE_APP_ENTRY_COUNT = `(function () {
 export class NaverIssuanceDriver implements IssuanceProbeDriver {
   /** The step the walk was last guiding — so a park notice keeps its place in the walk. */
   private lastStepNumber = 1;
+  /** The highlight target the walk last tried to locate — what a `TARGET_NOT_FOUND` park is about. */
+  private lastLocateTarget: IssuanceHighlightTarget | null = null;
   private readonly page: Page;
   private readonly opts: NaverIssuanceDriverOptions;
   private readonly closed: Promise<void>;
@@ -602,6 +622,7 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
     tag: boolean,
     afterTag?: (page: Page) => Promise<void>,
   ): Promise<LocateResult> {
+    this.lastLocateTarget = target;
     const loc = locatorFor(target);
     const hasText = exactLabelRegex(loc.exactText, loc.countSuffix === true);
     const script = guidedLocateScript(target, tag);
@@ -941,14 +962,19 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
    * the seller exactly where this method exists to stop leaving them.
    */
   async showParkNotice(code: NaverIssuanceParkNotice): Promise<boolean> {
-    const copy = NAVER_PARK_NOTICE_COPY[code];
     const page = this.activePage();
+    const about = this.lastLocateTarget;
+    const editFormOpen =
+      code === "TARGET_NOT_FOUND" && about !== null && AFTER_EDIT_FORM.has(about) && (await this.editFormOpen(page));
+    if (editFormOpen) log("aw_issuance_park_edit_form_open", { target: about });
+    const copy = editFormOpen ? NAVER_EDIT_FORM_OPEN_COPY : NAVER_PARK_NOTICE_COPY[code];
     await this.evalStr(page, IN_PAGE_CLEAR_TAG).catch(() => undefined);
     await mountOverlay(page, {
       dockedPanelOnly: true,
-      stepNumber: this.lastStepNumber,
+      // The park is about the step that could not be found, as the run view says — not the one before it.
+      stepNumber: editFormOpen && about ? OVERLAY_STEP[about] : this.lastStepNumber,
       totalSteps: ISSUANCE_TOTAL_STEPS,
-      copyKey: `actionWindow.issuance.park.${code}`,
+      copyKey: editFormOpen ? `actionWindow.issuance.park.${code}.edit_form_open` : `actionWindow.issuance.park.${code}`,
       label: copy.brief,
       detail: copy.detail,
       badgeLabel: copy.badge,
@@ -957,6 +983,29 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
       channelName: NAVER_CHANNEL_NAME,
     }).catch(() => undefined);
     return overlayMounted(page).catch(() => false);
+  }
+
+  /**
+   * Is NAVER's edit form still open? Its counted 「API호출 IP」 label paints once and the detail page's 「수정」 does
+   * not — the same two value-free counts the call-IP step locates and gates on. Unreadable ⇒ `false`, so a doubt
+   * falls back to the generic notice rather than a specific claim.
+   */
+  private async editFormOpen(page: Page): Promise<boolean> {
+    try {
+      const form = locatorFor("call_ip");
+      const label = await this.evalStr<LocateResult>(
+        page,
+        buildFixedLabelLocateScript({ candidateQuery: form.candidateQuery, exactText: form.exactText, tag: false, countSuffix: form.countSuffix === true }),
+      );
+      if (label?.count !== 1 || !form.requiresAbsent) return false;
+      const edit = await this.evalStr<LocateResult>(
+        page,
+        buildFixedLabelLocateScript({ candidateQuery: form.requiresAbsent.candidateQuery, exactText: form.requiresAbsent.exactText, tag: false }),
+      );
+      return edit?.count === 0;
+    } catch {
+      return false;
+    }
   }
 
   /**

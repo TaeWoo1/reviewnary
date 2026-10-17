@@ -418,6 +418,7 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
         // the index it was created for, so the pairing survives a scroll without any shared state.
         const els = document.querySelectorAll("[data-aw-target]");
         const boxes = document.querySelectorAll("#__aw_overlay__,[data-aw-ring-secondary]");
+        const panelEl = document.getElementById("__aw_advance_panel__");
         for (let i = 0; i < boxes.length; i++) {
           const b = boxes[i] as HTMLElement;
           const el = els[Number(b.getAttribute("data-aw-ring-index"))];
@@ -427,6 +428,28 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
           setStyle(b, "top", `${r.top - 6}px`);
           setStyle(b, "width", `${r.width + 12}px`);
           setStyle(b, "height", `${r.height + 12}px`);
+          // **A ring YIELDS to whatever the page put on top of its control.** Live 2026-10-17: pressing NAVER's
+          // 시크릿 「보기」 opened an anti-automation challenge over the ringed row, and the ring — with its
+          // page-wide shroud, at the top z-index — sat over the challenge the seller had to read and solve. Our
+          // rings are `pointer-events:none`, so the hit test skips them and answers with what is really on top
+          // at the control's centre: the control (or a part of it) means visible; anything else means covered,
+          // and the ring and its shroud step aside until it is not. Our own panel is not a cover. A hit on an
+          // ANCESTOR of the control (a shadow host, a control that ignores pointer events) proves nothing, so it
+          // keeps the ring — and so does a control off-screen, or a host with no hit test at all.
+          if (!o.guidanceEnabled || typeof (document as { elementFromPoint?: unknown }).elementFromPoint !== "function") continue;
+          const cx = (Math.max(r.left, 0) + Math.min(r.right, window.innerWidth)) / 2;
+          const cy = (Math.max(r.top, 0) + Math.min(r.bottom, window.innerHeight)) / 2;
+          let covered = false;
+          if (r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < window.innerHeight) {
+            const hit = document.elementFromPoint(cx, cy);
+            covered =
+              !!hit &&
+              hit !== el &&
+              !(el as Element).contains(hit) &&
+              !hit.contains(el as Element) &&
+              !(panelEl && panelEl.contains(hit));
+          }
+          setStyle(b, "display", covered ? "none" : "block");
         }
         // …and then KEEP THE PANEL OFF THE CONTROL IT DESCRIBES. The panel is docked bottom-centre, which is
         // also where a marketplace dialog puts its primary buttons — live-observed twice on the Coupang walk,
