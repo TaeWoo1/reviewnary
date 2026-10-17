@@ -23,7 +23,8 @@
  * PAUSED — do not run this without a fresh, single-use, in-turn operator approval.
  */
 import { randomUUID } from "node:crypto";
-import { pathToFileURL } from "node:url";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Page } from "playwright";
 import { loadConfig } from "../../src/config";
 import { log } from "../../src/log";
@@ -39,6 +40,7 @@ import {
 } from "../../src/cli/local-agent";
 import { screenApiCenterUrl } from "../../src/cli/observe-api-center";
 import { approvalRequiredMessage, hasLiveRunApproval } from "../../src/cli/live-run-approval";
+import { captureAfterPanels, createMaskedCapturer, ensureCaptureDir, screenCaptureDir, type MaskedCapturer } from "./masked-capture";
 
 const CHANNEL_CODE = "naver";
 
@@ -103,6 +105,25 @@ async function main(): Promise<void> {
     const runId = mintIssuanceRunId();
     // The call-IP step shows the address this machine's backend reports — the same source the resident helper uses.
     const driver = new NaverIssuanceDriver(page, { context: ctx, callIps: naverCallIpSource(cfg), returnToSellerOps: naverReturnToSellerOps });
+    // Opt-in dev instrument (2026-10-18): masked screenshots after each panel, for a UX pass on the real walk.
+    // Off unless SELLEROPS_MASKED_CAPTURE_DIR names an absolute folder OUTSIDE the repository.
+    let capturer: MaskedCapturer | null = null;
+    if (process.env.SELLEROPS_MASKED_CAPTURE_DIR !== undefined) {
+      const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+      const dir = screenCaptureDir(process.env.SELLEROPS_MASKED_CAPTURE_DIR, repoRoot);
+      if (!dir) {
+        console.error("Refusing masked captures: SELLEROPS_MASKED_CAPTURE_DIR must be absolute and outside the repository.");
+        process.exit(2);
+        return;
+      }
+      ensureCaptureDir(dir);
+      capturer = createMaskedCapturer(() => {
+        const pages = ctx.pages();
+        return pages[pages.length - 1] as Page | undefined;
+      }, dir);
+      captureAfterPanels(driver, capturer);
+      log("aw_masked_capture_armed", {});
+    }
     const bridge = createAgentBridge({
       ...resolveAgentBridgeConfig(args, process.env),
       approvalPresenter: createApprovalPresenterFor(decideApprovalPresenter(process.env, process.platform)),
@@ -113,6 +134,7 @@ async function main(): Promise<void> {
     console.log(JSON.stringify({ event: "ISSUANCE_BRIDGE", ...listen, runId, channelCode: CHANNEL_CODE }));
     log("aw_issuance_live_hosted", { runId, channelCode: CHANNEL_CODE });
     await waitForShutdown(bridge);
+    capturer?.stop();
   } finally {
     await ctx.close();
   }
