@@ -95,3 +95,42 @@ describe.skipIf(!RUN)("a ring yields to a page dialog over its control — real 
     await unmountOverlay(page);
   });
 });
+
+describe.skipIf(!RUN)("the step chip stays inside the viewport — real Chromium", () => {
+  let browser: Browser;
+  let page: Page;
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true });
+    page = await browser.newPage({ viewport: { width: 1160, height: 794 } });
+  });
+  afterAll(async () => {
+    await browser?.close();
+  });
+
+  it("**a control at the right edge keeps its whole chip on screen** (live 2026-10-18: 「5/9 · 수정 화면 열」)", async () => {
+    await page.setContent(`<!doctype html><meta charset="utf-8"><body style="margin:0">
+      <button id="edit" data-aw-target style="position:absolute;right:16px;top:300px;width:60px;height:34px">수정</button></body>`);
+    await mountOverlay(page, { ...OPTS, stepNumber: 5, badgeLabel: "수정 화면 열기" });
+    await page.waitForTimeout(100);
+    const chip = await page.evaluate(() => {
+      const r = document.querySelector("[data-aw-badge]")!.getBoundingClientRect();
+      return { left: r.left, right: r.right, vw: window.innerWidth };
+    });
+    expect(chip.right).toBeLessThanOrEqual(chip.vw - 8 + 0.5);
+    expect(chip.left).toBeGreaterThanOrEqual(8);
+  });
+
+  it("a control with room keeps its chip on its own left edge", async () => {
+    await page.setContent(`<!doctype html><meta charset="utf-8"><body style="margin:0">
+      <button id="edit" data-aw-target style="position:absolute;left:200px;top:300px;width:60px;height:34px">수정</button></body>`);
+    await mountOverlay(page, { ...OPTS, stepNumber: 5, badgeLabel: "수정 화면 열기" });
+    await page.waitForTimeout(100);
+    const gap = await page.evaluate(() => {
+      const c = document.querySelector("[data-aw-badge]")!.getBoundingClientRect();
+      const o = document.getElementById("__aw_overlay__")!.getBoundingClientRect();
+      return c.left - o.left;
+    });
+    expect(gap).toBeGreaterThanOrEqual(0); // inside the ring's border, unshifted
+    expect(gap).toBeLessThan(4);
+  });
+});

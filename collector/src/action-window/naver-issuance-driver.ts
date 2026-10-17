@@ -976,7 +976,9 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
       totalSteps: ISSUANCE_TOTAL_STEPS,
       copyKey: editFormOpen ? `actionWindow.issuance.park.${code}.edit_form_open` : `actionWindow.issuance.park.${code}`,
       label: copy.brief,
+      // The detail is the instruction ("press 다시 확인"), so it is shown, open — a copy-only panel drops it otherwise.
       detail: copy.detail,
+      detailExpanded: true,
       badgeLabel: copy.badge,
       guidanceEnabled: this.opts.guidanceEnabled ?? true,
       residentPanel: true,
@@ -1070,7 +1072,9 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
       totalSteps: ISSUANCE_TOTAL_STEPS,
       copyKey: "actionWindow.issuance.complete",
       label: NAVER_COMPLETION_COPY.brief,
+      // What to do next — the one sentence a finished walk owes the seller — shown open.
       detail: NAVER_COMPLETION_COPY.detail,
+      detailExpanded: true,
       badgeLabel: NAVER_COMPLETION_COPY.badge,
       guidanceEnabled: this.opts.guidanceEnabled ?? true,
       residentPanel: true,

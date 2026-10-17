@@ -352,7 +352,7 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
     // A structural backstop, not a substitute for `badgeLabel`: the ellipsis says something is missing, and the
     // short title means nothing is.
     badge.style.cssText =
-      "position:absolute;left:0;top:-28px;background:#2b6cff;color:#fff;font:12px system-ui;padding:2px 8px;border-radius:4px;white-space:nowrap;max-width:min(420px,60vw);overflow:hidden;text-overflow:ellipsis";
+      "position:absolute;left:0px;top:-28px;background:#2b6cff;color:#fff;font:12px system-ui;padding:2px 8px;border-radius:4px;white-space:nowrap;max-width:min(420px,60vw);overflow:hidden;text-overflow:ellipsis";
     box.appendChild(badge);
     G["__aw_mount_stage__"] = "append_overlay";
     document.body.appendChild(box);
@@ -428,6 +428,17 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
           setStyle(b, "top", `${r.top - 6}px`);
           setStyle(b, "width", `${r.width + 12}px`);
           setStyle(b, "height", `${r.height + 12}px`);
+          // The chip hangs off the ring's left edge, so a control at the right of the page pushed it past the
+          // viewport — live 2026-10-18, 「5/9 · 수정 화면 열기」 over NAVER's [수정] read 「5/9 · 수정 화면 열」. Slide it
+          // left by exactly the overflow, never past the ring's own left edge.
+          const chip = (typeof b.querySelector === "function" ? b.querySelector("[data-aw-badge]") : null) as HTMLElement | null;
+          if (chip && typeof chip.getBoundingClientRect === "function") {
+            // Measured, not derived: where the chip would sit unshifted is where it sits now minus its own shift.
+            const cr = chip.getBoundingClientRect();
+            const natural = cr.left - (parseFloat(chip.style.left) || 0);
+            const over = natural + cr.width - (window.innerWidth - 8);
+            setStyle(chip, "left", `${over > 0 ? -Math.min(over, Math.max(natural - 8, 0)) : 0}px`);
+          }
           // **A ring YIELDS to whatever the page put on top of its control.** Live 2026-10-17: pressing NAVER's
           // 시크릿 「보기」 opened an anti-automation challenge over the ringed row, and the ring — with its
           // page-wide shroud, at the top z-index — sat over the challenge the seller had to read and solve. Our
@@ -675,6 +686,11 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
       // the single button on an element that is `pointer-events:none` precisely so it can never block a control.
       const detailShown = o.detail != null && o.advance != null;
       const startOpen = o.detailExpanded === true;
+      // …but a copy-only panel whose detail IS the instruction — a park notice's "press 다시 확인", the finished
+      // walk's "enter the two values in SellerOps" — shows it as plain text, open, with nothing to press. Live
+      // 2026-10-18 (Aside UX pass): those notices drew their one-line brief and silently dropped the only sentence
+      // that told the seller what to do next. Opt-in through `detailExpanded`, so a long reach-step panel stays short.
+      const detailStatic = o.detail != null && o.advance == null && startOpen;
       if (detailShown) {
         const toggle = document.createElement("button");
         toggle.setAttribute("type", "button");
@@ -725,7 +741,7 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
         row.appendChild(btn);
       }
       panel.appendChild(row);
-      if (detailShown) {
+      if (detailShown || detailStatic) {
         const detail = document.createElement("div");
         detail.id = "__aw_panel_detail__";
         detail.textContent = o.detail != null ? o.detail : "";

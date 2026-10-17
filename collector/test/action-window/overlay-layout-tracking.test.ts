@@ -373,6 +373,20 @@ describe("the guidance panel's disclosure", () => {
     expect(toggleOf(doc)).toBeNull();
   });
 
+  it("**a copy-only panel that opts in shows its detail as plain text, open, with nothing to press**", async () => {
+    // Live 2026-10-18 (Aside UX pass): the park and completion notices drew one line and dropped the only
+    // sentence that said what to do next. Opt-in, so a long reach-step panel is still short.
+    const doc = new Doc();
+    tagged(doc, rect(380, 300, 100, 40));
+    const { page } = fakePage(doc, 800);
+    const { advance: _dropped, ...copyOnly } = WITH_DETAIL;
+    await mountOverlay(page as never, { ...copyOnly, detailExpanded: true });
+    expect(detailOf(doc)?.textContent).toBe(DETAIL);
+    expect(detailOf(doc)?.style["display"]).toBe("block");
+    expect(toggleOf(doc)).toBeNull();
+    expect(doc.getElementById("__aw_advance_panel__")!.style["pointer-events"]).toBe("none");
+  });
+
   it("a panel with no detail at all is exactly what it always was", async () => {
     const doc = new Doc();
     tagged(doc, rect(380, 300, 100, 40));
