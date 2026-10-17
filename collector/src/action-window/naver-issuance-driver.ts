@@ -391,14 +391,21 @@ const NAVER_PARK_NOTICE_COPY: Readonly<Record<NaverIssuanceParkNotice, { badge: 
     TARGET_NOT_FOUND: {
       badge: "안내 멈춤",
       brief: "이 화면에서 다음 위치를 찾지 못했어요.",
-      detail: "화면이 모두 뜬 뒤 reviewnary에서 '다시 확인'을 눌러 주세요.",
+      detail: "화면이 모두 뜬 뒤 '다시 확인'을 눌러 주세요.",
     },
     UI_DRIFT: {
       badge: "안내 멈춤",
       brief: "네이버 화면이 예상과 달라요.",
-      detail: "연결할 애플리케이션의 상세 화면인지 확인한 뒤, reviewnary에서 '다시 확인'을 눌러 주세요.",
+      detail: "연결할 애플리케이션의 상세 화면인지 확인한 뒤 '다시 확인'을 눌러 주세요.",
     },
   });
+
+/**
+ * The park notice's own button (2026-10-18, PO): the seller recovers a parked walk on the window they are in.
+ * Its latch token is its own namespace, so a press can never be read as a step's "다음" or the reverse.
+ */
+const PARK_RECHECK_LABEL = "다시 확인";
+const PARK_RECHECK_TOKEN = "naver-issuance-park:recheck";
 
 /**
  * **The one park whose cause the walk can name: NAVER's edit form is still open** (live 2026-10-17, 4차 Phase B).
@@ -412,7 +419,7 @@ const NAVER_PARK_NOTICE_COPY: Readonly<Record<NaverIssuanceParkNotice, { badge: 
 const NAVER_EDIT_FORM_OPEN_COPY = Object.freeze({
   badge: "안내 멈춤",
   brief: "네이버 수정 화면이 아직 열려 있어요.",
-  detail: "IP 등록을 마치고 애플리케이션 상세 화면으로 돌아간 뒤, reviewnary에서 '다시 확인'을 눌러 주세요.",
+  detail: "IP 등록을 마치고 애플리케이션 상세 화면으로 돌아간 뒤 '다시 확인'을 눌러 주세요.",
 });
 
 /** The steps that sit on the detail page AFTER the edit form — the only parks the edit-form notice can explain. */
@@ -1034,8 +1041,8 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
   }
 
   /**
-   * **What the seller sees on the API centre while the run is parked.** A docked panel and nothing else: the
-   * ring is cleared first, there is no button, and the copy names no NAVER control.
+   * **What the seller sees on the API centre while the run is parked.** A docked panel: the ring is cleared
+   * first, the copy names no NAVER control, and its one button is SellerOps' own 「다시 확인」.
    *
    * The paint is VERIFIED before it is reported — a notice that claims to be on screen when it is not leaves
    * the seller exactly where this method exists to stop leaving them.
@@ -1048,6 +1055,8 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
     if (editFormOpen) log("aw_issuance_park_edit_form_open", { target: about });
     const copy = editFormOpen ? NAVER_EDIT_FORM_OPEN_COPY : NAVER_PARK_NOTICE_COPY[code];
     await this.evalStr(page, IN_PAGE_CLEAR_TAG).catch(() => undefined);
+    // A fresh park is a fresh press: drop any press left from an earlier notice before the button exists.
+    await resetOverlayAdvance(page, PARK_RECHECK_TOKEN).catch(() => undefined);
     await mountOverlay(page, {
       dockedPanelOnly: true,
       // The park is about the step that could not be found, as the run view says — not the one before it.
@@ -1062,8 +1071,16 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
       guidanceEnabled: this.opts.guidanceEnabled ?? true,
       residentPanel: true,
       channelName: NAVER_CHANNEL_NAME,
+      // The way on, where the seller is. Docked, so it covers no NAVER control; a press is the same "look again"
+      // the SellerOps tab sends, and the engine still decides.
+      advance: { buttonLabel: PARK_RECHECK_LABEL, token: PARK_RECHECK_TOKEN },
     }).catch(() => undefined);
     return overlayMounted(page).catch(() => false);
+  }
+
+  /** Did the seller press the park notice's 다시 확인? Value-free equality poll; an unreadable page ⇒ `false`. */
+  async readParkRecheck(): Promise<boolean> {
+    return (await readOverlayAdvancePressed(this.activePage(), PARK_RECHECK_TOKEN).catch(() => false)) === true;
   }
 
   /**

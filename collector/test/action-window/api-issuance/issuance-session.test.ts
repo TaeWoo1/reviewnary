@@ -1022,6 +1022,44 @@ describe("a parked NAVER walk stays visible on the window the seller is in", () 
 
     expect(driver.calls.filter((c) => c.startsWith("parkNotice:"))).toEqual([]);
   });
+
+  it("**the notice's own 다시 확인 recovers the park** — the same command the SellerOps tab sends (2026-10-18)", async () => {
+    const script: IssuanceFixtureScript = { ...EXISTING, locate: { open_edit: { count: 0 } } };
+    const { io, engine, driver, session } = build(script);
+    startRun(io);
+    await session.whenSettled();
+    await passUsageCheck(io, engine, session);
+    expect(engine.currentStage()).toBe("target_not_found");
+    await new Promise((r) => setTimeout(r, 0)); // the notice paints asynchronously
+    expect(driver.calls).toContain("parkNotice:TARGET_NOT_FOUND");
+
+    script.locate = {}; // the screen has finished loading
+    driver.setParkRecheck(true);
+    await session.whenPanelWatchSettled();
+    await session.whenSettled();
+    expect(engine.currentStage()).toBe("guiding_open_edit");
+    expect(io.lastView()?.blocker).toBeUndefined();
+  });
+
+  it("a press after the park was already cleared from the SellerOps tab changes nothing", async () => {
+    const script: IssuanceFixtureScript = { ...EXISTING, locate: { open_edit: { count: 0 } } };
+    const { io, engine, driver, session } = build(script);
+    startRun(io);
+    await session.whenSettled();
+    await passUsageCheck(io, engine, session);
+    await new Promise((r) => setTimeout(r, 0));
+    script.locate = {};
+    command(io, "REQUEST_STEP_RECHECK", io.lastView()!.revision, "fe-recheck");
+    await session.whenSettled();
+    expect(engine.currentStage()).toBe("guiding_open_edit");
+    const revision = io.lastView()!.revision;
+
+    driver.setParkRecheck(true);
+    await session.whenPanelWatchSettled();
+    await session.whenSettled();
+    expect(engine.currentStage()).toBe("guiding_open_edit");
+    expect(io.lastView()!.revision).toBe(revision);
+  });
 });
 
 describe("step 3 — the advisory with no control to ring", () => {

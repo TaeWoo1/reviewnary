@@ -172,6 +172,8 @@ class FakePage {
   editFormStaysOpen: boolean;
   /** The copy key of every overlay mount, in order — what a park notice said is read from here. */
   readonly mountKeys: string[] = [];
+  /** Every overlay mount's options object, in order — what a panel carried (its buttons) is read from here. */
+  readonly mountArgs: unknown[] = [];
   /** Latches once 「수정」 has been ringed and the seller (modelled) opened the edit form: 「수정」 is then gone. */
   private editOpen = false;
   /** Latches once the app-entry rows have been read — the seller then opens their app, so census → postOpen. */
@@ -248,6 +250,7 @@ class FakePage {
       const isSubStageRead = s.includes("__aw_mount_stage__") && !isMount;
       if (isMount) {
         this.mountKeys.push(copyKey);
+        this.mountArgs.push(_arg);
         if (copyKey.includes(FIRST_CHECKPOINT) && this.apiGroupMountThrowLeft > 0) {
           this.apiGroupMountThrowLeft -= 1;
           throw new Error("Execution context was destroyed, most likely because of a navigation");
@@ -1124,6 +1127,18 @@ describe("NaverIssuanceDriver — the call-IP steps", () => {
     await session.whenSettled();
     expect(engine.currentStage()).toBe("guiding_application_id");
     expect(io.lastView()?.blocker).toBeUndefined();
+  });
+
+  it("**the park notice carries its own 다시 확인**, armed fresh, and the driver reads that latch", async () => {
+    const { driver, page } = build({ appEntryCount: 1 });
+    expect(await driver.showParkNotice("TARGET_NOT_FOUND")).toBe(true);
+    const args = page.mountArgs[page.mountArgs.length - 1] as { advance?: { buttonLabel: string; token: string }; dockedPanelOnly?: boolean };
+    expect(args.dockedPanelOnly).toBe(true);
+    expect(args.advance?.buttonLabel).toBe("다시 확인");
+    expect(args.advance?.token).toBe("naver-issuance-park:recheck");
+    // Its own namespace — never a step's "다음" token.
+    expect(args.advance?.token).not.toMatch(/naver-issuance-advance:/);
+    expect(await driver.readParkRecheck()).toBe(false);
   });
 
   it("a ⑥ park on the detail page keeps the generic notice — the edit-form notice is only for the steps after it", async () => {

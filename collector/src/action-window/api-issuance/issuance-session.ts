@@ -90,6 +90,8 @@ export class IssuanceGuidanceSession {
   private panelWatch: Promise<void> | null = null;
   /** One advisory watcher at a time — several would each paint the panel and each issue their own recheck. */
   private appUsageWatching = false;
+  /** The park whose notice button is being watched, so one park never starts two watchers. */
+  private parkWatching: string | null = null;
   /** How often the on-page latch is polled. A poll, not a hot path; tests set it to 0. */
   private readonly panelPollMs: number;
 
@@ -344,8 +346,55 @@ export class IssuanceGuidanceSession {
     if (code === null) return;
     void show
       .call(this.driver, code)
-      .then((painted) => log("aw_issuance_park_notice", { code, painted }))
+      .then((painted) => {
+        log("aw_issuance_park_notice", { code, painted });
+        if (painted) this.watchParkRecheck(code);
+      })
       .catch(() => log("aw_issuance_park_notice", { code, painted: false }, "warn"));
+  }
+
+  /**
+   * **The park notice's own 「다시 확인」** (2026-10-18, PO) — the same `REQUEST_STEP_RECHECK` the SellerOps tab's
+   * button sends, read where the seller is. Watches only while the run is still parked on this code; a park the
+   * FE already cleared, a cancel, or a closed window ends the watch without a press.
+   */
+  private watchParkRecheck(code: string): void {
+    const read = this.driver.readParkRecheck;
+    if (!read || this.parkWatching === code) return;
+    this.parkWatching = code;
+    const stillParked = () =>
+      !this.stopped && !this.surfaceClosed && this.parkNoticeShown === code && this.engine.view().blocker?.code === code;
+    this.panelWatch = (async () => {
+      try {
+        for (let i = 0; i < PANEL_ADVANCE_MAX_POLLS; i++) {
+          await new Promise<void>((resolve) => setTimeout(resolve, this.panelPollMs));
+          if (!stillParked()) return;
+          if (!(await read.call(this.driver).catch(() => false))) continue;
+          if (!stillParked()) return;
+          log("aw_issuance_park_recheck", { code });
+          // The notice is about to be replaced by whatever the recheck finds; let a repeat park draw it again.
+          this.parkNoticeShown = null;
+          const outcome = this.engine.command({ type: "REQUEST_STEP_RECHECK", expectedRevision: this.engine.view().revision });
+          if (!outcome.ok) return;
+          this.publishState();
+          if ("effect" in outcome && outcome.effect !== "NONE") {
+            this.busyCount += 1;
+            try {
+              await this.drive(outcome.effect);
+            } catch (e) {
+              await this.onDriveError(e);
+            } finally {
+              this.busyCount -= 1;
+            }
+          } else {
+            this.afterChain();
+          }
+          return;
+        }
+      } finally {
+        if (this.parkWatching === code) this.parkWatching = null;
+      }
+    })();
   }
 
   /** Say the walk is finished, on the window it happened in. Never opens one; never claims an unpainted mount. */

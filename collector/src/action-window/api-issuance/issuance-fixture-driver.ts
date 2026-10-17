@@ -76,6 +76,7 @@ export class IssuanceFixtureDriver implements IssuanceProbeDriver {
   /** This driver's own presses and screen changes — seeded from the script, then written only here. */
   private readonly panelPressed: Partial<Record<IssuanceTarget, boolean>>;
   private readonly stepDoneNow: Partial<Record<IssuanceTarget, boolean>>;
+  private parkRecheckPressed = false;
   /** Every call, in order — so a test can assert the runtime never armed a control it should not have. */
   readonly calls: string[] = [];
   /** Polled call signatures already recorded once — see {@link recordOnce}. */
@@ -173,6 +174,17 @@ export class IssuanceFixtureDriver implements IssuanceProbeDriver {
   async readPanelAdvance(target: IssuanceTarget): Promise<boolean> {
     this.recordOnce(`panel?:${target}`);
     return this.panelPressed[target] ?? false;
+  }
+
+  /** Has the seller pressed the park notice's 다시 확인? Fail-closed default: no. Recorded once. */
+  async readParkRecheck(): Promise<boolean> {
+    this.recordOnce("parkRecheck?");
+    return this.parkRecheckPressed;
+  }
+
+  /** Model the seller pressing the park notice's 다시 확인 (or releasing it, for a re-armed park). */
+  setParkRecheck(pressed: boolean): void {
+    this.parkRecheckPressed = pressed;
   }
 
   /** Has the page already shown this step done (a screen change the seller made)? Fail-closed default: no. */

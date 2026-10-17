@@ -17,7 +17,7 @@ import {
   buildFixedLabelLocateScript,
 } from "../../../src/action-window/api-issuance-calibration/visual-recon-inpage";
 import { locatorFor } from "../../../src/action-window/api-issuance-calibration/issuance-highlight-selectors";
-import { BRING_SECONDARY_ABOVE_INTO_VIEW } from "../../../src/action-window/naver-issuance-driver";
+import { BRING_SECONDARY_ABOVE_INTO_VIEW, NaverIssuanceDriver } from "../../../src/action-window/naver-issuance-driver";
 import { mountOverlay } from "../../../src/action-window/overlay";
 
 const RUN = process.env.RUN_INTEGRATION === "1";
@@ -112,5 +112,32 @@ describe.skipIf(!RUN)("the edit form's step rings 「저장」 and the API group
     const loc = locatorFor("call_ip");
     const also = (await page.evaluate(buildFixedLabelAlsoRingScript({ specs: loc.alsoRing! }))) as { rung: number };
     expect(also.rung).toBe(0);
+  });
+});
+
+describe.skipIf(!RUN)("the park notice's 다시 확인 — real Chromium", () => {
+  let browser: Browser;
+  let page: Page;
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true });
+    page = await browser.newPage({ viewport: { width: 1160, height: 794 } });
+    await page.setContent(`<!doctype html><meta charset="utf-8"><body style="margin:0"><main style="height:2000px">상세</main></body>`);
+  });
+  afterAll(async () => {
+    await browser?.close();
+  });
+
+  it("**a real click on the notice's own button is what the driver reads** — and the notice still says what to do", async () => {
+    const driver = new NaverIssuanceDriver(page, {});
+    expect(await driver.showParkNotice("TARGET_NOT_FOUND")).toBe(true);
+    const panel = page.locator("#__aw_advance_panel__");
+    expect(await panel.getByText("화면이 모두 뜬 뒤 '다시 확인'을 눌러 주세요.").isVisible()).toBe(true);
+    expect(await driver.readParkRecheck()).toBe(false);
+    await panel.getByRole("button", { name: "다시 확인" }).click();
+    expect(await driver.readParkRecheck()).toBe(true);
+    // A script's press is not a person's: re-arm, dispatch a synthetic click, and the latch stays clear.
+    expect(await driver.showParkNotice("TARGET_NOT_FOUND")).toBe(true);
+    await page.evaluate(() => (document.querySelector("[data-aw-advance]") as HTMLElement).click());
+    expect(await driver.readParkRecheck()).toBe(false);
   });
 });

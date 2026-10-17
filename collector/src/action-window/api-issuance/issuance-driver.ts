@@ -215,6 +215,13 @@ export interface IssuanceProbeDriver {
   readStepDone?(target: IssuanceTarget): Promise<boolean>;
 
   /**
+   * Optional: has the seller pressed the park notice's own 「다시 확인」? Value-free latch poll, like the step
+   * panels' "다음" (2026-10-18, PO: a parked walk is recovered where the seller is, not from the other tab).
+   * The press means exactly what the SellerOps tab's 다시 확인 means; the engine still decides what happens.
+   */
+  readParkRecheck?(): Promise<boolean>;
+
+  /**
    * **Optional: keep a docked, NON-INTERACTIVE notice on the marketplace window while the run is parked.**
    *
    * A park takes the guidance down, and what the seller is then looking at is a NAVER screen with nothing of
