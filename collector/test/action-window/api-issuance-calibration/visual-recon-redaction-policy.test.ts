@@ -232,7 +232,10 @@ describe("fixed-label read-only matchCount probe — value-free integer counts",
       "app_edit.call_ip_label",
       "app_edit.call_ip_add_button",
       "app_edit.call_ip_count_label",
+      "app_edit.save_button",
     ]);
+    // The edit form's 「저장」 is NAVER's own `blocking-button` element, not a <button> — so the probe names it.
+    expect(byId["app_edit.save_button"]).toMatchObject({ candidateQuery: "button, a, [role='button'], blocking-button", exactText: "저장" });
     // Only the counted label admits NAVER's 「(n/m)」, and only on the edit form's LABEL element.
     expect(VISUAL_RECON_LABEL_PROBES.filter((p) => p.countSuffix).map((p) => p.targetId)).toEqual(["app_edit.call_ip_count_label"]);
     expect(byId["app_edit.call_ip_count_label"]).toMatchObject({ candidateQuery: "label", exactText: "API호출 IP" });

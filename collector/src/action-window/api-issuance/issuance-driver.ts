@@ -204,6 +204,17 @@ export interface IssuanceProbeDriver {
   readPanelAdvance?(target: IssuanceTarget): Promise<boolean>;
 
   /**
+   * Optional: does the page ALREADY show that the seller finished this step? Polled beside the panel's "다음".
+   *
+   * For the two steps whose end is a screen change the seller makes themselves — 「수정」 opens the edit form;
+   * 「저장」 (or 「취소」) closes it — the walk can see the change instead of asking for a press (2026-10-18, PO
+   * decision after the Aside UX pass). A true answer is turned into exactly the command the button sends, so
+   * the engine still decides and the button still works. Value-free: fixed-label paint counts only, the same
+   * reads the steps already locate with. A driver that cannot tell omits it, and the step waits for the press.
+   */
+  readStepDone?(target: IssuanceTarget): Promise<boolean>;
+
+  /**
    * **Optional: keep a docked, NON-INTERACTIVE notice on the marketplace window while the run is parked.**
    *
    * A park takes the guidance down, and what the seller is then looking at is a NAVER screen with nothing of

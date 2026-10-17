@@ -112,6 +112,11 @@ export interface IssuanceFixedLabelLocator {
   requiresAbsent?: { candidateQuery: string; exactText: string };
   /** The label carries NAVER's own count 「(n/m)」 after the fixed text (reused verbatim from the adopted probe). */
   countSuffix?: true;
+  /**
+   * Other fixed-label controls the seller operates on the same screen, rung beside this one (each only when it
+   * paints exactly once). The edit form's step asks for 「저장」 and for the API groups as well as the IP row.
+   */
+  alsoRing?: readonly { candidateQuery: string; exactText: string }[];
 }
 
 export interface IssuanceTargetSelectorSpec {
@@ -184,6 +189,14 @@ const REQUIRES_ABSENT: Readonly<Partial<Record<IssuanceHighlightTarget, VisualRe
   call_ip: "app_detail.edit_button",
 };
 
+/**
+ * Which highlight targets ring further controls beside their own. `call_ip` (2026-10-18): NAVER adds API groups
+ * only on the edit form, so that step carries them — and its 「저장」 sits above the IP row, out of view.
+ */
+const ALSO_RING: Readonly<Partial<Record<IssuanceHighlightTarget, readonly VisualReconTargetId[]>>> = {
+  call_ip: ["app_edit.save_button", "api_group.section"],
+};
+
 /** The fixed-label probe for an adopted target — the single source the locator's query+text is reused from. */
 function probeFor(id: VisualReconTargetId): FixedLabelProbe {
   const p = VISUAL_RECON_LABEL_PROBES.find((x) => x.targetId === id);
@@ -208,6 +221,13 @@ export const ISSUANCE_TARGET_SELECTORS: readonly IssuanceTargetSelectorSpec[] = 
     throw new Error(`issuance-highlight-selectors: ${target} requires the absence of a non-adopted target ${absentId}`);
   }
   const absent = absentId ? probeFor(absentId) : null;
+  const also = (ALSO_RING[target] ?? []).map((id) => {
+    if (!(ADOPTED_TARGET_IDS as readonly VisualReconTargetId[]).includes(id)) {
+      throw new Error(`issuance-highlight-selectors: ${target} rings a non-adopted target ${id}`);
+    }
+    const p = probeFor(id);
+    return { candidateQuery: p.candidateQuery, exactText: p.exactText };
+  });
   return {
     target,
     screen: TARGET_SCREEN[target],
@@ -220,6 +240,7 @@ export const ISSUANCE_TARGET_SELECTORS: readonly IssuanceTargetSelectorSpec[] = 
       ...(probe.countSuffix ? { countSuffix: true as const } : {}),
       ...(TAG_ANCESTOR[target] ? { tagAncestor: TAG_ANCESTOR[target] } : {}),
       ...(absent ? { requiresAbsent: { candidateQuery: absent.candidateQuery, exactText: absent.exactText } } : {}),
+      ...(also.length > 0 ? { alsoRing: also } : {}),
     },
   };
 });

@@ -20,6 +20,7 @@ vi.mock("../../hooks/useBridge", () => ({
 }));
 
 import { NaverIssuanceGuidedWalkthrough } from "./NaverIssuanceGuidedWalkthrough";
+import { NAVER_LIKE_TEMPLATE } from "../../lib/guidedConnection";
 import type { GuidedIssuanceRuntime } from "../../lib/actionWindow/issuance/issuanceRuntime";
 
 /** A fake issuance host runtime — records ensureStarted() (the START_RUN proxy) and lets a test publish views. */
@@ -441,5 +442,55 @@ describe("NaverIssuanceGuidedWalkthrough — an ENDED walk is never a dead end (
     );
     expect(screen.getByRole("button", { name: "연결 정보 입력하기" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "직접 진행하기" })).toBeNull();
+  });
+});
+
+describe("paste as you go — the form sits beside the walk from the Application-ID step (2026-10-18)", () => {
+  // Copying the Secret replaces the copied ID on the clipboard, so the NAVER panel tells the seller to paste each
+  // value into SellerOps as soon as they copy it. The form has to BE here at that moment.
+  const atStep = (targetKind: string, stepNumber: number) =>
+    issuanceRun({
+      currentStep: {
+        stepId: `aw.issuance_${targetKind}`,
+        stepNumber,
+        totalSteps: 8,
+        copyKey: "actionWindow.issuance.applicationId",
+        status: "AWAITING_USER",
+        copyParams: { targetKind } as never,
+      },
+    });
+
+  it("**shows the masked form at the Application-ID step**, wired to the page's own submit handler", () => {
+    const onSubmit = vi.fn();
+    render(
+      <NaverIssuanceGuidedWalkthrough
+        dispatch={vi.fn()}
+        run={atStep("application_id", 6)}
+        onCommand={vi.fn()}
+        credentialTemplate={NAVER_LIKE_TEMPLATE}
+        onSubmitCredentials={onSubmit}
+      />,
+    );
+    expect(screen.getByText(/네이버 창에서 복사한 값을 바로 아래에 붙여넣어/)).toBeInTheDocument();
+    expect(screen.getByText("애플리케이션 ID·시크릿 입력")).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled(); // nothing is sent until the seller submits
+  });
+
+  it("does not show it before there is a value to paste (the edit form's step)", () => {
+    render(
+      <NaverIssuanceGuidedWalkthrough
+        dispatch={vi.fn()}
+        run={atStep("call_ip", 5)}
+        onCommand={vi.fn()}
+        credentialTemplate={NAVER_LIKE_TEMPLATE}
+        onSubmitCredentials={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText(/네이버 창에서 복사한 값을 바로 아래에 붙여넣어/)).toBeNull();
+  });
+
+  it("without a template the walk shows status only, exactly as before", () => {
+    render(<NaverIssuanceGuidedWalkthrough dispatch={vi.fn()} run={atStep("application_secret", 7)} onCommand={vi.fn()} />);
+    expect(screen.queryByText(/네이버 창에서 복사한 값을 바로 아래에 붙여넣어/)).toBeNull();
   });
 });

@@ -86,12 +86,14 @@ const TARGET_STEP: Readonly<Record<IssuanceTarget, number>> = {
   open_app: 2,
   // Step 3 is the target-less usage-state advisory (`guiding_app_usage_check`); the highlightable controls
   // resume at step 4.
-  api_group: 4,
-  open_edit: 5,
-  call_ip: 6,
-  application_id: 7,
-  application_secret: 8,
-  return: 9,
+  // `api_group` is no longer a step of its own (2026-10-18): groups can only be ADDED on the edit form, so the
+  // call-IP step there carries them. Kept in the map (the type is shared) and never guided.
+  api_group: 5,
+  open_edit: 4,
+  call_ip: 5,
+  application_id: 6,
+  application_secret: 7,
+  return: 8,
 };
 
 /** The 1-based step number of the text-only usage-state advisory barrier (no target — highlights nothing). */
@@ -267,19 +269,19 @@ export class IssuanceEngine {
   /**
    * "다음" at the usage-state advisory: the seller confirmed they checked their app. No NAVER action was
    * observed (this barrier watches none), so COMPLETE step 3 and guide the first same-page checkpoint,
-   * `api_group`. Only meaningful while still resting on the advisory barrier.
+   * `open_edit`. Only meaningful while still resting on the advisory barrier.
    */
   private advanceAppUsageCheck(): IssuanceEffect {
     // Guard on BOTH stage AND target (as `advanceCheckpoint` does): the stage stays `guiding_app_usage_check`
-    // until the async `guide` chain lands `api_group`'s highlight, so a second "다음" pressed against the fresh
-    // revision during that window would otherwise re-enter and DOUBLE-guide api_group (duplicate STEP_COMPLETED
+    // until the async `guide` chain lands `open_edit`'s highlight, so a second "다음" pressed against the fresh
+    // revision during that window would otherwise re-enter and DOUBLE-guide open_edit (duplicate STEP_COMPLETED
     // + a second overlay annotation). The first advance sets `currentTarget` non-null, so the repeat resolves to
     // NONE — the same idempotency the checkpoint and park-recovery paths already guarantee.
     if (this.stage !== "guiding_app_usage_check" || this.currentTarget !== null) return "NONE";
     this.completedSteps = this.activeStepIndex; // step 3
     this.emit("STEP_COMPLETED", { stepId: this.stepId(), stepStatus: "COMPLETED" });
-    this.currentTarget = "api_group";
-    return { guide: "api_group" };
+    this.currentTarget = "open_edit";
+    return { guide: "open_edit" };
   }
 
   /* ── automatic-drive callbacks ────────────────────────────────────────────── */

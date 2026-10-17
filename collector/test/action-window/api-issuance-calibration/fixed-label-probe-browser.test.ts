@@ -56,6 +56,7 @@ describe.skipIf(!RUN)("edit-form call-IP target — real Chromium", () => {
       { targetId: "app_edit.call_ip_label", matchCount: 1, visibleCount: 0 },
       { targetId: "app_edit.call_ip_add_button", matchCount: 2, visibleCount: 2 },
       { targetId: "app_edit.call_ip_count_label", matchCount: 1, visibleCount: 1 },
+      { targetId: "app_edit.save_button", matchCount: 1, visibleCount: 1 },
     ]);
   });
 

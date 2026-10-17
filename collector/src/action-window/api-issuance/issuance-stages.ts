@@ -16,11 +16,12 @@
  *    terminal — where "completed" means the GUIDANCE finished, not that a credential was stored.
  *  - **It has a one-time branch at step 2.** A seller with an existing application OPENS it; a seller with
  *    none CREATES one. The branch changes only step 2's (and step 3's) copy, never the step count —
- *    `totalSteps` is a fixed 9 either way, exactly like import's always-present `CONFIRM_RANGE` slot, so a
- *    frontend showing "9단계 중 2" never sees the total shift under it. (The call IP is two steps — open the
- *    edit form, then register the IP — the credential section is two steps — Application ID, then Application
- *    Secret — and step 3 is a text-only usage-state advisory present on both branches with branch-appropriate
- *    copy, so the total is 9 and still branch-invariant.)
+ *    `totalSteps` is a fixed 8 either way, exactly like import's always-present `CONFIRM_RANGE` slot, so a
+ *    frontend showing "8단계 중 2" never sees the total shift under it. (The edit form is two steps — open it,
+ *    then register the IP and check the API groups there, the only screen that can add one — the credential
+ *    section is two steps — Application ID, then Application Secret — and step 3 is a text-only usage-state
+ *    advisory present on both branches with branch-appropriate copy, so the total is 8 and still
+ *    branch-invariant.)
  *  - **Its parks recover by re-probing.** A login gate, a control it cannot find, or a page it did not expect
  *    all PARK recoverably; a `REQUEST_STEP_RECHECK` re-reads the page category from the top (mirroring import's
  *    `SESSION_BLOCKED → PREPARE`). None of them is a failure.
@@ -115,7 +116,7 @@ export function isIssuanceTerminal(stage: IssuanceStage): boolean {
   return ISSUANCE_TERMINAL_STAGES.includes(stage);
 }
 
-/* ────────────────────────────── the fixed 9-step plan ────────────────────────────── */
+/* ────────────────────────────── the fixed 8-step plan ────────────────────────────── */
 
 export interface IssuanceStepMeta {
   stepNumber: number;
@@ -150,18 +151,18 @@ export function issuanceStepPlan(hasExistingApp: boolean): readonly IssuanceStep
     hasExistingApp
       ? { stepNumber: 3, stepId: "aw.issuance_app_usage_check", copyKey: "actionWindow.issuance.appUsageCheck", mode: "ACTION_WINDOW" }
       : { stepNumber: 3, stepId: "aw.issuance_app_usage_check", copyKey: "actionWindow.issuance.appUsageCheckNew", mode: "ACTION_WINDOW" },
-    { stepNumber: 4, stepId: "aw.issuance_api_group", copyKey: "actionWindow.issuance.apiGroup", mode: "ACTION_WINDOW", copyParams: { targetKind: "api_group" } },
+    // No API-group step of its own (2026-10-18): NAVER adds groups only on the edit form, so the call-IP step carries them.
     // The call IP is TWO steps: open the edit form, then register the IP there. Before the credential copies.
-    { stepNumber: 5, stepId: "aw.issuance_open_edit", copyKey: "actionWindow.issuance.openEdit", mode: "ACTION_WINDOW", copyParams: { targetKind: "open_edit" } },
-    { stepNumber: 6, stepId: "aw.issuance_call_ip", copyKey: "actionWindow.issuance.callIp", mode: "ACTION_WINDOW", copyParams: { targetKind: "call_ip" } },
+    { stepNumber: 4, stepId: "aw.issuance_open_edit", copyKey: "actionWindow.issuance.openEdit", mode: "ACTION_WINDOW", copyParams: { targetKind: "open_edit" } },
+    { stepNumber: 5, stepId: "aw.issuance_call_ip", copyKey: "actionWindow.issuance.callIp", mode: "ACTION_WINDOW", copyParams: { targetKind: "call_ip" } },
     // The credential section is TWO steps: copy the Application ID, then view+copy the Application Secret.
-    { stepNumber: 7, stepId: "aw.issuance_application_id", copyKey: "actionWindow.issuance.applicationId", mode: "ACTION_WINDOW", copyParams: { targetKind: "application_id" } },
-    { stepNumber: 8, stepId: "aw.issuance_application_secret", copyKey: "actionWindow.issuance.applicationSecret", mode: "ACTION_WINDOW", copyParams: { targetKind: "application_secret" } },
-    { stepNumber: 9, stepId: "aw.issuance_return", copyKey: "actionWindow.issuance.return", mode: "ACTION_WINDOW", copyParams: { targetKind: "return" } },
+    { stepNumber: 6, stepId: "aw.issuance_application_id", copyKey: "actionWindow.issuance.applicationId", mode: "ACTION_WINDOW", copyParams: { targetKind: "application_id" } },
+    { stepNumber: 7, stepId: "aw.issuance_application_secret", copyKey: "actionWindow.issuance.applicationSecret", mode: "ACTION_WINDOW", copyParams: { targetKind: "application_secret" } },
+    { stepNumber: 8, stepId: "aw.issuance_return", copyKey: "actionWindow.issuance.return", mode: "ACTION_WINDOW", copyParams: { targetKind: "return" } },
   ];
 }
 
-/** The fixed total — nine, whichever branch steps 2 and 3 take. */
+/** The fixed total — eight, whichever branch steps 2 and 3 take. */
 export const ISSUANCE_TOTAL_STEPS = issuanceStepPlan(false).length;
 
 /** Step metadata at a 1-based index, clamped so a park/terminal view never reads past the plan. */

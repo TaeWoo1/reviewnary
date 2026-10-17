@@ -251,6 +251,8 @@ export function GuidedConnectionWizard({
             reuseExistingApp={reusesExistingApp(state.path)}
             busy={busy}
             advertisedEgressIps={advertisedEgressIps}
+            credentialTemplate={template}
+            onSubmitCredentials={onSubmitCredentials}
           />
         )}
 

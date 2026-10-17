@@ -85,26 +85,33 @@ describe("FE-owned copy registry", () => {
     });
 
     it("api-group names the order/seller groups; the ID + Secret are now SEPARATE steps, each read-free", () => {
+      // `apiGroup` is no longer a step of the walk (2026-10-18) — the edit-form step carries the groups — but its
+      // copy stays mapped for the text checklist and any older run view.
       expect(issuanceStepDetail("actionWindow.issuance.apiGroup")).toMatch(/주문/);
       expect(issuanceStepDetail("actionWindow.issuance.apiGroup")).toMatch(/판매자/);
-      // ID step: copy the ID, SellerOps reads no value.
+      // ID step: copy the ID and paste it into SellerOps right away; SellerOps reads no value.
       const id = issuanceStepDetail("actionWindow.issuance.applicationId") ?? "";
-      expect(id).toMatch(/애플리케이션 ID를 복사/);
-      expect(id).toMatch(/이 값을 읽지 않습니다/);
-      expect(id).not.toMatch(/시크릿/); // the ID step must not conflate the Secret
-      // Secret step: view + copy the Secret, SellerOps reads no value / clipboard.
+      expect(id).toMatch(/애플리케이션 ID를 직접 복사/);
+      expect(id).toMatch(/바로 붙여넣어/);
+      expect(id).toMatch(/값을 읽지 않습니다/);
+      expect(id).not.toMatch(/'보기'/); // the ID step must not send the seller to the Secret's controls
+      // Secret step: view (solve NAVER's own check if shown) + copy, SellerOps reads no value / clipboard.
       const sec = issuanceStepDetail("actionWindow.issuance.applicationSecret") ?? "";
-      expect(sec).toMatch(/시크릿을 확인하고 복사/);
+      expect(sec).toMatch(/'보기'를 눌러 시크릿을 확인/);
+      expect(sec).toMatch(/자동입력 방지 확인을 띄우면 직접 풀어/);
       expect(sec).toMatch(/시크릿 값도, 클립보드도 읽지 않습니다/);
       const ret = issuanceStepDetail("actionWindow.issuance.return") ?? "";
-      expect(ret).toMatch(/두 값을 복사했다면/);
+      expect(ret).toMatch(/두 값을 붙여넣었다면/);
     });
 
-    it("the call-IP steps leave every press to the seller and name the three-IP limit", () => {
+    it("the edit-form steps leave every press to the seller, name the three-IP limit and the needed API groups", () => {
       expect(issuanceStepDetail("actionWindow.issuance.openEdit")).toMatch(/'수정' 버튼을 직접 눌러/);
       const ip = issuanceStepDetail("actionWindow.issuance.callIp") ?? "";
-      expect(ip).toMatch(/'추가'를 누른 뒤, 위쪽 '저장'을 눌러/);
+      expect(ip).toMatch(/'추가'를 누르세요/);
+      expect(ip).toMatch(/위쪽 '저장'/);
       expect(ip).toMatch(/3개까지/);
+      // The groups SellerOps calls, by the names the edit form shows (measured 2026-10-18 from NAVER's own lists).
+      expect(ip).toMatch(/'문의', '주문 판매자', '상품\/N배송'/);
       expect(ip).toMatch(/칸을 채우거나 저장하지 않으며/);
       expect(ip).toMatch(/연결 테스트에서 확인/);
     });

@@ -268,7 +268,7 @@ export function runApprovalManifestCli(opts: ApprovalManifestCliOptions = {}): n
       : phase === "API_ISSUANCE_SELECTOR_PROBE"
         ? "API issuance read-only selector probe"
         : isFeLiveProof
-          ? "existing-app guided issuance tutorial — FE-run-host READ-only live proof (open_app→api_group→credentials→return)"
+          ? "existing-app guided issuance tutorial — FE-run-host READ-only live proof (open_app→open_edit→call_ip+groups→credentials→return)"
           : "API issuance highlight proof (new-app or existing-app)";
   const defaultMaxActions = isWingKeyDeletion
     ? COUPANG_WING_KEY_DELETION_SCOPE.maxActions

@@ -34,6 +34,7 @@ export const VISUAL_RECON_TARGET_IDS = [
   "app_edit.call_ip_label",
   "app_edit.call_ip_add_button",
   "app_edit.call_ip_count_label",
+  "app_edit.save_button",
 ] as const;
 export type VisualReconTargetId = (typeof VISUAL_RECON_TARGET_IDS)[number];
 
@@ -144,6 +145,12 @@ export const VISUAL_RECON_CANDIDATES: readonly ProposedCandidate[] = [
     note: "수정 화면 「API호출 IP (n/3)」 라벨(개수 표시 포함) — 그 tr 행에 입력 칸 + '추가', 등록된 IP마다 '삭제'. 개수(n)는 등록 개수일 뿐 값이 아님.",
     candidate: fixedLabelCandidate("app_edit", 'label:text-matches("^API호출 IP ?\\(\\d+/\\d+\\)$")'),
   },
+  {
+    targetId: "app_edit.save_button",
+    screen: "app_edit",
+    note: "수정 화면 맨 위 '취소' 옆의 '저장'(NAVER의 blocking-button 요소). 상세 화면에서는 같은 자리가 '수정'.",
+    candidate: fixedLabelCandidate("app_edit", 'blocking-button:text-is("저장")'),
+  },
 ];
 
 /** A proposal with its eligibility verdict — every one is non-adoptable offline (matchCount unmeasured). */
@@ -207,6 +214,7 @@ export const VISUAL_RECON_LABEL_PROBES: readonly FixedLabelProbe[] = [
   // sits under a display:none ancestor (the hidden detail view). Its TR holds the text inputs, one visible 「추가」 and
   // a 「삭제」 per registered address. The other visible 「추가」 is outside any TR, so 「추가」 alone is not unique.
   { targetId: "app_edit.call_ip_count_label", screen: "app_edit", candidateQuery: "label", exactText: "API호출 IP", countSuffix: true },
+  { targetId: "app_edit.save_button", screen: "app_edit", candidateQuery: "button, a, [role='button'], blocking-button", exactText: "저장" },
 ];
 
 /** The fixed-label probes that apply to a given screen (the CLI runs these on that screen's live viewport). */

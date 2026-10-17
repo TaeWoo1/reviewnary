@@ -124,11 +124,11 @@ describe("issuance stages — allowed commands", () => {
   });
 });
 
-describe("issuance stages — the fixed 9-step plan", () => {
-  it("is always nine steps, whichever branch steps 2/3 take", () => {
-    expect(ISSUANCE_TOTAL_STEPS).toBe(9);
-    expect(issuanceStepPlan(true)).toHaveLength(9);
-    expect(issuanceStepPlan(false)).toHaveLength(9);
+describe("issuance stages — the fixed 8-step plan", () => {
+  it("is always eight steps, whichever branch steps 2/3 take", () => {
+    expect(ISSUANCE_TOTAL_STEPS).toBe(8);
+    expect(issuanceStepPlan(true)).toHaveLength(8);
+    expect(issuanceStepPlan(false)).toHaveLength(8);
   });
 
   it("branches ONLY step 2's target/copy and step 3's copy (same stepIds, same slots)", () => {
@@ -147,8 +147,8 @@ describe("issuance stages — the fixed 9-step plan", () => {
     expect(empty[2]!.copyKey).toBe("actionWindow.issuance.appUsageCheckNew");
     expect(existing[2]!.copyParams).toBeUndefined();
     expect(empty[2]!.copyParams).toBeUndefined();
-    // Steps 1 and 4–9 are identical across branches.
-    for (const i of [0, 3, 4, 5, 6, 7, 8]) expect(existing[i]).toEqual(empty[i]);
+    // Steps 1 and 4–8 are identical across branches.
+    for (const i of [0, 3, 4, 5, 6, 7]) expect(existing[i]).toEqual(empty[i]);
   });
 
   it("uses the exact product-required stepIds and copy keys", () => {
@@ -156,7 +156,6 @@ describe("issuance stages — the fixed 9-step plan", () => {
       "aw.issuance_reach_applications",
       "aw.issuance_open_or_create_app",
       "aw.issuance_app_usage_check",
-      "aw.issuance_api_group",
       "aw.issuance_open_edit",
       "aw.issuance_call_ip",
       "aw.issuance_application_id",
@@ -170,5 +169,13 @@ describe("issuance stages — the fixed 9-step plan", () => {
     expect(targets.indexOf("call_ip")).toBe(targets.indexOf("open_edit") + 1);
     expect(targets.indexOf("call_ip")).toBeLessThan(targets.indexOf("application_id"));
     expect(targets.indexOf("call_ip")).toBeLessThan(targets.indexOf("application_secret"));
+  });
+
+  it("**has no API-group step of its own** — NAVER adds groups only on the edit form, where the IP step carries them", () => {
+    // 2026-10-18 (Aside UX pass + PO): the detail page cannot add a group, so a step there could only say "go to
+    // the edit form" — which is the next step anyway.
+    const targets = issuanceStepPlan(true).map((s) => s.copyParams?.targetKind ?? null);
+    expect(targets).not.toContain("api_group");
+    expect(targets.indexOf("open_edit")).toBe(3);
   });
 });

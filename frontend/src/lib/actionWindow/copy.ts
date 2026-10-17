@@ -32,10 +32,10 @@ const COPY: Record<string, string> = {
   "actionWindow.issuance.appUsageCheckNew": "생성 직후 상태 확인",
   "actionWindow.issuance.apiGroup": "주문·판매자 관련 API 그룹 추가",
   "actionWindow.issuance.openEdit": "수정 화면 열기",
-  "actionWindow.issuance.callIp": "API 호출 IP 등록",
-  "actionWindow.issuance.applicationId": "애플리케이션 ID 복사",
-  "actionWindow.issuance.applicationSecret": "애플리케이션 시크릿 확인·복사",
-  "actionWindow.issuance.return": "reviewnary로 돌아와 입력",
+  "actionWindow.issuance.callIp": "IP 등록 · API 그룹 확인 · 저장",
+  "actionWindow.issuance.applicationId": "애플리케이션 ID 복사 · 붙여넣기",
+  "actionWindow.issuance.applicationSecret": "애플리케이션 시크릿 복사 · 붙여넣기",
+  "actionWindow.issuance.return": "reviewnary에서 연결 마무리",
 
   // Coupang WING Open API key issuance guidance (Action Window). Shared step copy keys with the collector
   // runtime — the runtime sends only the key, this FE owns the wording. Hedged, position/role based: exact
@@ -118,23 +118,24 @@ const ISSUANCE_STEP_DETAIL: Record<string, string> = {
   // step, so a suspended app doesn't fail later. SellerOps does not read the app's state and never asserts it is
   // active — absence of a reactivate button is NOT treated as active. The seller reactivates it themselves if shown.
   "actionWindow.issuance.appUsageCheck":
-    "애플리케이션 상태를 확인해 주세요. 화면에 '다시사용' 버튼이 보인다면 직접 눌러 앱을 활성화해 주세요. 버튼이 보이지 않더라도 reviewnary가 활성 상태라고 단정하지 않습니다. 확인했다면 다음으로 진행해 주세요.",
+    "화면에 '다시사용' 버튼이 보인다면 직접 눌러 앱을 활성화해 주세요. 버튼이 보이지 않더라도 reviewnary가 활성 상태라고 단정하지 않습니다. 확인했다면 다음으로 진행해 주세요.",
   "actionWindow.issuance.appUsageCheckNew":
-    "방금 만든 애플리케이션의 상태를 확인해 주세요. 새로 만든 앱은 보통 바로 사용할 수 있지만, 혹시 화면에 '다시사용' 버튼이 보이면 직접 눌러 활성화해 주세요. 버튼이 보이지 않더라도 reviewnary가 활성 상태라고 단정하지 않습니다. 확인했다면 다음으로 진행해 주세요.",
+    "새로 만든 앱은 보통 바로 사용할 수 있지만, 혹시 화면에 '다시사용' 버튼이 보이면 직접 눌러 활성화해 주세요. 버튼이 보이지 않더라도 reviewnary가 활성 상태라고 단정하지 않습니다. 확인했다면 다음으로 진행해 주세요.",
   "actionWindow.issuance.apiGroup":
     "이 애플리케이션에 상품·주문(판매자) 관련 API 그룹이 포함돼 있는지 확인하고, 없으면 추가하세요. 정확한 그룹 이름은 화면마다 다를 수 있으니 '주문'·'판매자'가 포함된 항목을 찾아 선택하면 됩니다.",
-  // The call IP, as two steps (2026-10-17): open the edit form, then paste the shown IP and save. SellerOps fills
-  // nothing and saves nothing; the connection test decides whether the registration is right.
+  // The edit form, as two steps (2026-10-17, regrouped 2026-10-18): open it, then register the IP AND check the API
+  // groups there — the only screen that can add one — and save. SellerOps fills nothing and saves nothing; the
+  // connection test decides whether the registration is right. `apiGroup` below is no longer a step of the walk.
   "actionWindow.issuance.openEdit":
-    "네이버가 이 IP에서 오는 요청만 받도록 API 호출 IP를 등록합니다. 표시된 '수정' 버튼을 직접 눌러 수정 화면을 열어 주세요. 이 단계에서는 아직 아무것도 저장되지 않습니다.",
+    "IP 등록과 API 그룹 추가는 수정 화면에서만 할 수 있어요. 표시된 '수정' 버튼을 직접 눌러 수정 화면을 열어 주세요. 이 단계에서는 아직 아무것도 저장되지 않습니다.",
   "actionWindow.issuance.callIp":
-    "표시된 IP를 복사해 'API호출 IP' 칸에 붙여넣고 '추가'를 누른 뒤, 위쪽 '저장'을 눌러 주세요. IP는 3개까지 등록되므로 이미 3개가 있으면 쓰지 않는 IP를 '삭제'한 뒤 추가하세요. 앱을 만들 때 이미 등록했다면 그대로 다음으로 넘어가면 됩니다. reviewnary는 칸을 채우거나 저장하지 않으며, 등록이 맞는지는 마지막 연결 테스트에서 확인합니다.",
+    "① 아래 IP를 복사해 'API호출 IP' 칸에 붙여넣고 '추가'를 누르세요. IP는 3개까지 등록되므로 이미 3개가 있으면 쓰지 않는 IP를 '삭제'한 뒤 추가하세요. ② 'API 그룹'에 '문의', '주문 판매자', '상품/N배송'이 있는지 보고, 없는 그룹은 직접 추가하세요. ③ 위쪽 '저장'을 누르면 상세 화면으로 돌아가고 안내가 다음 단계로 넘어갑니다. 이미 모두 등록돼 있다면 '취소'를 눌러도 됩니다. reviewnary는 칸을 채우거나 저장하지 않으며, 등록이 맞는지는 마지막 연결 테스트에서 확인합니다.",
   "actionWindow.issuance.applicationId":
-    "애플리케이션 ID를 복사해 주세요. 표시된 애플리케이션 ID 행에서 값을 직접 복사하시면 됩니다. reviewnary는 이 값을 읽지 않습니다 — 복사는 직접 하시고, 마지막에 reviewnary 보안 입력란에 붙여넣으세요.",
+    "표시된 애플리케이션 ID를 직접 복사해, reviewnary 창(이 안내를 시작한 화면)의 애플리케이션 ID 칸에 바로 붙여넣어 주세요. 다음 단계에서 시크릿을 복사하면 클립보드의 ID가 지워지므로 먼저 붙여넣어야 합니다. reviewnary는 네이버 화면의 값을 읽지 않습니다.",
   "actionWindow.issuance.applicationSecret":
-    "애플리케이션 시크릿을 확인하고 복사해 주세요. 표시된 '보기/복사' 컨트롤에서 시크릿을 직접 확인·복사하시면 됩니다. reviewnary는 시크릿 값도, 클립보드도 읽지 않습니다. 확인이 어려우면 시크릿 재발급이 필요할 수 있습니다.",
+    "표시된 '보기'를 눌러 시크릿을 확인하세요. 네이버가 자동입력 방지 확인을 띄우면 직접 풀어 주세요. 그다음 '복사'를 눌러 reviewnary 창의 시크릿 칸에 붙여넣으면 됩니다. reviewnary는 시크릿 값도, 클립보드도 읽지 않습니다. 확인이 어려우면 시크릿 재발급이 필요할 수 있습니다.",
   "actionWindow.issuance.return":
-    "두 값을 복사했다면 reviewnary로 돌아가 주세요. 안내가 끝나면 연결 정보 입력 화면으로 이동합니다.",
+    "두 값을 붙여넣었다면 reviewnary 창으로 돌아가 연결을 마무리해 주세요. 연결 테스트가 IP 등록과 두 값을 함께 확인합니다.",
 
   // Coupang WING Open API key issuance — FULL per-step instruction. Same hedged, position/role wording
   // (exact WING labels differ by screen version, so none is asserted as fact) and the same privacy

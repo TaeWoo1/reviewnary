@@ -44,6 +44,8 @@ export interface IssuanceFixtureScript {
   highlightThrows?: Partial<Record<IssuanceTarget, number>>;
   /** Whether the seller has pressed a step's ON-PAGE "다음" (the guided panel's own button). */
   panelAdvance?: Partial<Record<IssuanceTarget, boolean>>;
+  /** Which steps the page already shows finished (a screen change the seller made). Default: none. */
+  stepDone?: Partial<Record<IssuanceTarget, boolean>>;
   /** Whether the seller has pressed step 3's on-page 확인했어요 · 다음 (the usage-state advisory). */
   appUsageAdvance?: boolean;
 }
@@ -71,6 +73,9 @@ const EMPTY_CENSUS: ApiCenterStructuralCensus = {
 
 export class IssuanceFixtureDriver implements IssuanceProbeDriver {
   private readonly script: IssuanceFixtureScript;
+  /** This driver's own presses and screen changes — seeded from the script, then written only here. */
+  private readonly panelPressed: Partial<Record<IssuanceTarget, boolean>>;
+  private readonly stepDoneNow: Partial<Record<IssuanceTarget, boolean>>;
   /** Every call, in order — so a test can assert the runtime never armed a control it should not have. */
   readonly calls: string[] = [];
   /** Polled call signatures already recorded once — see {@link recordOnce}. */
@@ -93,7 +98,12 @@ export class IssuanceFixtureDriver implements IssuanceProbeDriver {
   private readonly highlightThrowsLeft: Partial<Record<IssuanceTarget, number>>;
 
   constructor(script: IssuanceFixtureScript = {}) {
+    // Kept LIVE: tests change the landing a re-check reads after building. What the setters below write is kept
+    // per driver instead — the scripts are shared constants, and writing through them leaked one test's press
+    // into every later test built from the same script.
     this.script = script;
+    this.panelPressed = { ...(script.panelAdvance ?? {}) };
+    this.stepDoneNow = { ...(script.stepDone ?? {}) };
     this.locateThrowsLeft = { ...(script.locateThrows ?? {}) };
     this.highlightThrowsLeft = { ...(script.highlightThrows ?? {}) };
   }
@@ -162,7 +172,13 @@ export class IssuanceFixtureDriver implements IssuanceProbeDriver {
    */
   async readPanelAdvance(target: IssuanceTarget): Promise<boolean> {
     this.recordOnce(`panel?:${target}`);
-    return this.script.panelAdvance?.[target] ?? false;
+    return this.panelPressed[target] ?? false;
+  }
+
+  /** Has the page already shown this step done (a screen change the seller made)? Fail-closed default: no. */
+  async readStepDone(target: IssuanceTarget): Promise<boolean> {
+    this.recordOnce(`done?:${target}`);
+    return this.stepDoneNow[target] ?? false;
   }
 
   /** Record the parked-run notice, painted. A test that cares about a FAILED paint says so explicitly. */
@@ -208,7 +224,12 @@ export class IssuanceFixtureDriver implements IssuanceProbeDriver {
 
   /** Test helper: the seller presses this step's on-page "다음". */
   setPanelAdvance(target: IssuanceTarget, pressed: boolean): void {
-    this.script.panelAdvance = { ...(this.script.panelAdvance ?? {}), [target]: pressed };
+    this.panelPressed[target] = pressed;
+  }
+
+  /** Model the seller's own screen change finishing a step (the edit form opened, or closed again). */
+  setStepDone(target: IssuanceTarget, done: boolean): void {
+    this.stepDoneNow[target] = done;
   }
 
   async armObserve(target: IssuanceTarget): Promise<void> {

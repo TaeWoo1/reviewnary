@@ -646,6 +646,57 @@ export function buildFixedLabelAvoidTagScript(input: {
 })()`;
 }
 
+/**
+ * **Ring more than the step's one control** — the other fixed-label controls the seller must operate on the same
+ * screen, added BESIDE the primary tag (which it marks `data-aw-primary`, so the chip and the panel placement stay
+ * on it). Live 2026-10-18 (Aside UX pass): the edit form's step told the seller to press 「저장」 and to check the
+ * API groups, and rang neither — 「저장」 sat above the viewport. Each spec rings only a match that is painted and
+ * unique; anything else is skipped, never guessed, and the primary ring stands alone. Value-free OUTPUT: a count.
+ */
+export function buildFixedLabelAlsoRingScript(input: {
+  specs: readonly { candidateQuery: string; exactText: string }[];
+}): string {
+  const encoded = JSON.stringify(input.specs.map((sp) => ({ q: sp.candidateQuery, t: sp.exactText })));
+  return `(function () {
+  /* issuance-also-ring (value-free OUTPUT: { rung }) */
+  var SPECS = ${encoded};
+  var slice = Function.prototype.call.bind(Array.prototype.slice);
+  function norm(s) { return String(s == null ? '' : s).replace(/\\s+/g, ' ').trim(); }
+  function accName(el) {
+    var al = el.getAttribute ? el.getAttribute('aria-label') : null;
+    if (al && norm(al).length) { return norm(al); }
+    /* text read ONLY to compare against a KNOWN fixed label; only a COUNT is returned. */
+    return norm(el.textContent || '');
+  }
+  function paints(node) {
+    if (!node || !node.getClientRects) { return false; }
+    var cs = window.getComputedStyle ? window.getComputedStyle(node) : null;
+    if (cs && (cs.display === 'none' || cs.visibility === 'hidden')) { return false; }
+    if (cs && cs.display === 'contents') { return node.childElementCount > 0; }
+    var rects = node.getClientRects();
+    if (!rects || rects.length === 0) { return false; }
+    var r = node.getBoundingClientRect ? node.getBoundingClientRect() : null;
+    return !!r && r.width > 0 && r.height > 0;
+  }
+  var primary = slice(document.querySelectorAll('[data-aw-target]'));
+  if (primary.length !== 1) { return { rung: 0 }; }
+  primary[0].setAttribute('data-aw-primary', '');
+  var CAP = 4000, rung = 0, i, j;
+  for (i = 0; i < SPECS.length; i++) {
+    var want = norm(SPECS[i].t), cands;
+    try { cands = slice(document.querySelectorAll(SPECS[i].q)); } catch (e) { cands = []; }
+    var visible = [];
+    for (j = 0; j < cands.length && j < CAP; j++) {
+      if (accName(cands[j]) === want && paints(cands[j])) { visible.push(cands[j]); }
+    }
+    if (visible.length !== 1 || visible[0] === primary[0] || primary[0].contains(visible[0])) { continue; }
+    visible[0].setAttribute('data-aw-target', '');
+    rung += 1;
+  }
+  return { rung: rung };
+})()`;
+}
+
 export function buildFixedLabelRingPlanScript(input: {
   specs: readonly { candidateQuery: string; exactText: string; tagAncestor?: string }[];
   tag: boolean;

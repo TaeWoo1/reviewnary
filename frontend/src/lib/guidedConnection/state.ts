@@ -264,6 +264,10 @@ export function guidedConnectionReducer(
         // existing-app seller to issue a forbidden second app and strand them without secret recovery (§17.2).
         return state("application_path_choice", m, null, "unknown");
       }
+      // The seller pastes each value as the walk reaches it (2026-10-18): copying the Secret replaces the copied
+      // Application ID on the clipboard, so the form shows beside the walk from the ID step on and may be
+      // submitted before the walk's own last step. Same registration as the post-walk form.
+      if (event.type === "SUBMIT_CREDENTIALS") return state("credential_registration", m, null, p);
       if (event.type === "APPLICATION_ISSUANCE_MODE" && event.mode === "text") {
         if (reusesExistingApp(p)) return state("existing_credential_entry", m, null, p);
         if (p === "new") return state("application_issuance", m, null, p);

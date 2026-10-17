@@ -8,6 +8,8 @@ import { BlockerNotice } from "../actionWindow/BlockerNotice";
 import { AgentPairingPanel } from "../reviewImport/AgentPairingPanel";
 import { AgentEnvNotice } from "./AgentEnvNotice";
 import { AdvertisedCallIpPanel } from "./AdvertisedCallIpPanel";
+import { SecureCredentialForm } from "./SecureCredentialForm";
+import type { CredentialTemplateView } from "../../lib/types";
 import { useGuidedIssuance } from "../../lib/actionWindow/issuance/useGuidedIssuance";
 import type { GuidedIssuanceRuntime } from "../../lib/actionWindow/issuance/issuanceRuntime";
 import { classifyAgentEnv, type AgentEnvStatus, type GuidedEvent } from "../../lib/guidedConnection";
@@ -91,7 +93,17 @@ export interface NaverIssuanceGuidedWalkthroughProps {
    *  the guided path (not just the text checklist) tells the seller to register the fixed call IP.
    *  Empty ⇒ generic guidance, never a fabricated IP. */
   advertisedEgressIps?: readonly string[];
+  /**
+   * The masked credential form, shown BESIDE the walk from its Application-ID step on (2026-10-18). The NAVER
+   * panel tells the seller to paste each value here as soon as they copy it — copying the Secret replaces the ID
+   * on the clipboard. Omitted ⇒ no form here; the seller enters both after the walk, as before.
+   */
+  credentialTemplate?: CredentialTemplateView | null;
+  onSubmitCredentials?: (secrets: Record<string, string>) => void;
 }
+
+/** The walk's steps on which the seller has a value in hand to paste — the form shows from here on. */
+const PASTE_STEPS: ReadonlySet<string> = new Set(["application_id", "application_secret", "return"]);
 
 export function NaverIssuanceGuidedWalkthrough({
   dispatch,
@@ -101,6 +113,8 @@ export function NaverIssuanceGuidedWalkthrough({
   reuseExistingApp = false,
   busy,
   advertisedEgressIps = [],
+  credentialTemplate,
+  onSubmitCredentials,
 }: NaverIssuanceGuidedWalkthroughProps) {
   // GUIDED-FIRST start gate. Guided is the default path, so the seller reaches here without a guided/text
   // choice; a single CTA ("네이버 연결 안내 시작") begins pairing + hosting. Pairing is deferred until the
@@ -338,6 +352,19 @@ export function NaverIssuanceGuidedWalkthrough({
               )}
             </section>
           )}
+          {/* Paste as you go: from the Application-ID step on, the form the seller fills sits right here. */}
+          {effectiveRun.status !== "COMPLETED" &&
+            credentialTemplate &&
+            onSubmitCredentials &&
+            PASTE_STEPS.has(String(effectiveRun.currentStep?.copyParams?.targetKind ?? "")) && (
+              <div className="space-y-2">
+                <p className="text-sm text-ink break-keep">
+                  네이버 창에서 복사한 값을 바로 아래에 붙여넣어 주세요. 애플리케이션 ID를 먼저 붙여넣은 뒤 시크릿을
+                  복사하면 됩니다.
+                </p>
+                <SecureCredentialForm template={credentialTemplate} onSubmit={onSubmitCredentials} submitting={busy === true} />
+              </div>
+            )}
           {effectiveRun.blocker && (
             <BlockerNotice
               title={blockerView(effectiveRun.blocker.code).title}

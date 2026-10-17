@@ -15,7 +15,7 @@ import {
 import { VISUAL_RECON_CANDIDATES } from "../../../src/action-window/api-issuance-calibration/visual-recon-candidates";
 
 describe("adopted visual-recon selectors", () => {
-  it("adopts exactly the 8 fixed-label controls confirmed matchCount=1 live (not 다시사용/시크릿-label)", () => {
+  it("adopts exactly the 9 fixed-label controls confirmed matchCount=1 live (not 다시사용/시크릿-label)", () => {
     expect([...ADOPTED_TARGET_IDS]).toEqual([
       "app_list.register_application",
       "app_detail.application_section",
@@ -25,6 +25,7 @@ describe("adopted visual-recon selectors", () => {
       "credentials.secret_copy_button",
       "app_detail.edit_button",
       "app_edit.call_ip_count_label",
+      "app_edit.save_button",
     ]);
     // the state-dependent 다시사용 (0 live) and the gate-blocked 시크릿 label are NOT adopted.
     const ids = ADOPTED_VISUAL_RECON_SELECTORS.map((a) => a.targetId);
@@ -34,7 +35,7 @@ describe("adopted visual-recon selectors", () => {
     expect(ids).not.toContain("app_detail.call_ip_row");
     // the edit form's exact 「API호출 IP」 measured 1 but never painted (hidden detail view) — retired, not adopted.
     expect(ids).not.toContain("app_edit.call_ip_label");
-    expect(ADOPTED_VISUAL_RECON_SELECTORS).toHaveLength(8);
+    expect(ADOPTED_VISUAL_RECON_SELECTORS).toHaveLength(9);
   });
 
   it("each adopted selector reuses its candidate proposal verbatim (single source of truth — no drift)", () => {
@@ -50,13 +51,13 @@ describe("adopted visual-recon selectors", () => {
     for (const a of ADOPTED_VISUAL_RECON_SELECTORS) {
       expect(/데이터수집|\[value=/i.test(a.selector)).toBe(false);
       // section anchor + id label are the same unique "애플리케이션 ID"; buttons/heading are fixed labels.
-      expect(a.selector).toMatch(/애플리케이션 등록|애플리케이션 ID|API 그룹|보기|복사|수정|API호출 IP/);
+      expect(a.selector).toMatch(/애플리케이션 등록|애플리케이션 ID|API 그룹|보기|복사|수정|API호출 IP|저장/);
     }
   });
 
   it("every adopted selector is machine-proven ADOPTABLE through the frozen gate at matchCount===1", () => {
     const evals = evaluateAdopted();
-    expect(evals).toHaveLength(8);
+    expect(evals).toHaveLength(9);
     for (const e of evals) {
       expect(e.adoptable, `${e.targetId}: ${e.reasons.join(",")}`).toBe(true);
       expect(e.reasons).toEqual([]);

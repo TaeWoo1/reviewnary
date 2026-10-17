@@ -147,6 +147,13 @@ class FakeLocator {
   }
 }
 
+/**
+ * The first highlighted checkpoint after step 3 — where the live-#5 mount faults are modelled. It was `api_group`
+ * until 2026-10-18, when the walk dropped its API-group step (groups are added on the edit form); the `apiGroup*`
+ * option names keep their history, the step they now land on is 「수정」.
+ */
+const FIRST_CHECKPOINT = "step.open_edit";
+
 /** A scripted, browser-free Page: records every evaluate, returns scripted values, and spies on `click`. */
 class FakePage {
   urlValue: string;
@@ -241,17 +248,17 @@ class FakePage {
       const isSubStageRead = s.includes("__aw_mount_stage__") && !isMount;
       if (isMount) {
         this.mountKeys.push(copyKey);
-        if (copyKey.includes("api_group") && this.apiGroupMountThrowLeft > 0) {
+        if (copyKey.includes(FIRST_CHECKPOINT) && this.apiGroupMountThrowLeft > 0) {
           this.apiGroupMountThrowLeft -= 1;
           throw new Error("Execution context was destroyed, most likely because of a navigation");
         }
         // A NON-TRANSIENT generic Error (name "Error", not a soft-nav message) — the live `reason=OTHER` shape the
         // identification unit localizes. The driver must observe (sub-stage + fingerprint) and re-throw unchanged.
-        if (copyKey.includes("api_group") && this.apiGroupMountFaultLeft > 0) {
+        if (copyKey.includes(FIRST_CHECKPOINT) && this.apiGroupMountFaultLeft > 0) {
           this.apiGroupMountFaultLeft -= 1;
           throw new Error(this.apiGroupMountFaultMessage);
         }
-        if (copyKey.includes("api_group") && this.apiGroupMountNoPaintLeft > 0) {
+        if (copyKey.includes(FIRST_CHECKPOINT) && this.apiGroupMountNoPaintLeft > 0) {
           this.apiGroupMountNoPaintLeft -= 1;
           this.overlayPainted = false; // ran without throwing, but painted nothing (tag lost) — the fail-open case
           return undefined;
@@ -426,10 +433,10 @@ describe("NaverIssuanceDriver over a fake Page — the calibrated NEW-app (creat
     const step2 = io.views().find((v) => v.currentStep?.stepNumber === 2)?.currentStep;
     expect(step2?.copyParams?.targetKind).toBe("create_app");
 
-    // Every highlighted target ref is an opaque 16-hex — never a selector or value. Seven barriers highlight:
-    // create_app, api_group, open_edit, call_ip, application_id, application_secret, and the guidance-only `return`.
+    // Every highlighted target ref is an opaque 16-hex — never a selector or value. Six barriers highlight:
+    // create_app, open_edit, call_ip, application_id, application_secret, and the guidance-only `return`.
     const refs = io.events().filter((e) => e.type === "TARGET_HIGHLIGHTED").map((e) => e.payload.targetRef as string);
-    expect(refs.length).toBe(7);
+    expect(refs.length).toBe(6);
     for (const ref of refs) expect(ref).toMatch(HEX16);
 
     // AUTOMATIC ACTION = 0: the driver never invoked the page's click.
@@ -515,7 +522,7 @@ describe("NaverIssuanceDriver — the EXISTING-app branch (open_app = navigation
     // open_app never located/highlighted a NAVER control (no fixed-label or structural locate ran for it) — the
     // only fixed-label locates are for api_group + credentials, plus the guidance overlays.
     const highlightedSteps = io.events().filter((e) => e.type === "TARGET_HIGHLIGHTED").map((e) => e.payload.stepId);
-    expect(highlightedSteps).toContain("aw.issuance_api_group");
+    expect(highlightedSteps).toContain("aw.issuance_open_edit");
     expect(highlightedSteps).toContain("aw.issuance_application_id");
     expect(highlightedSteps).toContain("aw.issuance_application_secret");
     expect(page.scripts.some((s) => s.includes("issuance-structural"))).toBe(false);
@@ -603,7 +610,7 @@ describe("NaverIssuanceDriver — the EXISTING-app branch (open_app = navigation
     expect(engine.currentStage()).toBe("page_mismatch");
     expect(io.lastView()?.blocker).toEqual({ code: "UI_DRIFT", recoverable: true });
     expect(io.events().map((e) => e.type)).not.toContain("RUN_FAILED");
-    expect(io.events().some((e) => e.type === "TARGET_HIGHLIGHTED" && e.payload.stepId === "aw.issuance_api_group")).toBe(false);
+    expect(io.events().some((e) => e.type === "TARGET_HIGHLIGHTED" && e.payload.stepId === "aw.issuance_open_edit")).toBe(false);
     expect(page.clickCalls).toBe(0);
   });
 });
@@ -750,7 +757,7 @@ describe("NaverIssuanceDriver — SPA-safe overlay mount (api_group overlay rend
     expect(io.lastView()?.status).toBe("COMPLETED");
     expect(io.events().map((e) => e.type)).not.toContain("RUN_FAILED");
     // api_group WAS highlighted (its overlay mounted) despite the transient mount throws — not a page_mismatch park.
-    expect(io.events().some((e) => e.type === "TARGET_HIGHLIGHTED" && e.payload.stepId === "aw.issuance_api_group")).toBe(true);
+    expect(io.events().some((e) => e.type === "TARGET_HIGHLIGHTED" && e.payload.stepId === "aw.issuance_open_edit")).toBe(true);
   });
 
   it("a PERMANENT overlay-mount fault parks recoverably (never loops, never RUN_FAILED)", async () => {
@@ -781,7 +788,7 @@ describe("NaverIssuanceDriver — SPA-safe overlay mount (api_group overlay rend
     expect(engine.currentStage()).toBe("guidance_complete");
     expect(io.lastView()?.status).toBe("COMPLETED");
     // api_group WAS truly highlighted (overlay painted) only after the verify forced a re-mount — not fail-open.
-    expect(io.events().some((e) => e.type === "TARGET_HIGHLIGHTED" && e.payload.stepId === "aw.issuance_api_group")).toBe(true);
+    expect(io.events().some((e) => e.type === "TARGET_HIGHLIGHTED" && e.payload.stepId === "aw.issuance_open_edit")).toBe(true);
   });
 
   it("a PERMANENT silent no-op mount parks recoverably — never a fail-OPEN highlight with no overlay", async () => {
@@ -797,7 +804,7 @@ describe("NaverIssuanceDriver — SPA-safe overlay mount (api_group overlay rend
     expect(engine.currentStage()).toBe("page_mismatch");
     expect(io.lastView()?.blocker).toEqual({ code: "UI_DRIFT", recoverable: true });
     // Fail-CLOSED: api_group was NOT reported highlighted, because its overlay never painted.
-    expect(io.events().some((e) => e.type === "TARGET_HIGHLIGHTED" && e.payload.stepId === "aw.issuance_api_group")).toBe(false);
+    expect(io.events().some((e) => e.type === "TARGET_HIGHLIGHTED" && e.payload.stepId === "aw.issuance_open_edit")).toBe(false);
     expect(io.events().map((e) => e.type)).not.toContain("RUN_FAILED");
   });
 });
@@ -865,7 +872,7 @@ describe("NaverIssuanceDriver — Overlay Root-Cause Isolation: per-stage saniti
     clearLogSink();
     const page = new FakePage({ apiGroupMountThrowTimes: 99 });
     const driver = new NaverIssuanceDriver(asPage(page), { inpageRetryMs: 0 });
-    await expect(driver.highlightTarget("api_group")).rejects.toThrow();
+    await expect(driver.highlightTarget("open_edit")).rejects.toThrow();
     const f = faults();
     expect(f.length).toBeGreaterThanOrEqual(1);
     expect(f.every((e) => e.meta.stage === "mount")).toBe(true);
@@ -876,7 +883,7 @@ describe("NaverIssuanceDriver — Overlay Root-Cause Isolation: per-stage saniti
     clearLogSink();
     const page = new FakePage({ apiGroupMountNoPaintTimes: 99 });
     const driver = new NaverIssuanceDriver(asPage(page), { inpageRetryMs: 0 });
-    await expect(driver.highlightTarget("api_group")).rejects.toThrow();
+    await expect(driver.highlightTarget("open_edit")).rejects.toThrow();
     const f = faults();
     expect(f.length).toBeGreaterThanOrEqual(1);
     expect(f.every((e) => e.meta.stage === "visible_check")).toBe(true);
@@ -887,7 +894,7 @@ describe("NaverIssuanceDriver — Overlay Root-Cause Isolation: per-stage saniti
     clearLogSink();
     const page = new FakePage({ apiGroupMountThrowTimes: 99 });
     const driver = new NaverIssuanceDriver(asPage(page), { inpageRetryMs: 0 });
-    await expect(driver.highlightTarget("api_group")).rejects.toThrow();
+    await expect(driver.highlightTarget("open_edit")).rejects.toThrow();
     for (const e of faults()) {
       expect(REASONS).toContain(e.meta.reason as string);
       expect(e.meta.errorName).toBe("Error"); // NAME only — no message
@@ -950,11 +957,11 @@ describe("NaverIssuanceDriver — Overlay Mount Fault Identification: sub-stage 
       mountSubStage: "reveal_target",
     });
     const driver = new NaverIssuanceDriver(asPage(page), { inpageRetryMs: 0 });
-    await expect(driver.highlightTarget("api_group")).rejects.toThrow(); // SAME rejection as before — unchanged
+    await expect(driver.highlightTarget("open_edit")).rejects.toThrow(); // SAME rejection as before — unchanged
 
     const subs = substageFaults();
     expect(subs.length).toBeGreaterThanOrEqual(1);
-    expect(subs.every((e) => e.meta.target === "api_group")).toBe(true);
+    expect(subs.every((e) => e.meta.target === "open_edit")).toBe(true);
     expect(subs.every((e) => e.meta.subStage === "reveal_target")).toBe(true); // monotonic breadcrumb localized it
     expect(subs.every((e) => e.meta.reason === "SYMBOL_NOT_DEFINED")).toBe(true); // code-fingerprinted, not "OTHER"
     expect(subs.every((e) => e.meta.errorName === "Error")).toBe(true);
@@ -975,7 +982,7 @@ describe("NaverIssuanceDriver — Overlay Mount Fault Identification: sub-stage 
       mountSubStage: "position_overlay",
     });
     const driver = new NaverIssuanceDriver(asPage(page), { inpageRetryMs: 0 });
-    await expect(driver.highlightTarget("api_group")).rejects.toThrow();
+    await expect(driver.highlightTarget("open_edit")).rejects.toThrow();
 
     const subs = substageFaults();
     expect(subs.length).toBeGreaterThanOrEqual(1);
@@ -1000,7 +1007,7 @@ describe("NaverIssuanceDriver — Overlay Mount Fault Identification: sub-stage 
     clearLogSink();
     const page = new FakePage({ apiGroupMountThrowTimes: 99, mountSubStage: "append_overlay" });
     const driver = new NaverIssuanceDriver(asPage(page), { inpageRetryMs: 0 });
-    await expect(driver.highlightTarget("api_group")).rejects.toThrow();
+    await expect(driver.highlightTarget("open_edit")).rejects.toThrow();
 
     const subs = substageFaults();
     expect(subs.length).toBeGreaterThanOrEqual(1);
@@ -1012,7 +1019,7 @@ describe("NaverIssuanceDriver — Overlay Mount Fault Identification: sub-stage 
     clearLogSink();
     const page = new FakePage({ apiGroupMountFaultTimes: 99, mountSubStage: undefined });
     const driver = new NaverIssuanceDriver(asPage(page), { inpageRetryMs: 0 });
-    await expect(driver.highlightTarget("api_group")).rejects.toThrow();
+    await expect(driver.highlightTarget("open_edit")).rejects.toThrow();
 
     const subs = substageFaults();
     expect(subs.length).toBeGreaterThanOrEqual(1);
@@ -1045,15 +1052,15 @@ async function pressUntil(
 }
 
 describe("NaverIssuanceDriver — the call-IP steps", () => {
-  it("rings 「수정」 at step 5 and the edit form's row at step 6, both before the credential copies", async () => {
+  it("rings 「수정」 at step 4 and the edit form's row at step 5, both before the credential copies", async () => {
     const { io, engine, session } = build({ appEntryCount: 1 });
     startRun(io);
     await session.whenSettled();
     await pressUntil(io, engine, session, "guiding_open_edit");
-    expect(io.lastView()?.currentStep?.stepNumber).toBe(5);
+    expect(io.lastView()?.currentStep?.stepNumber).toBe(4);
     expect(io.lastView()?.currentStep?.copyParams?.targetKind).toBe("open_edit");
     await pressUntil(io, engine, session, "guiding_call_ip");
-    expect(io.lastView()?.currentStep?.stepNumber).toBe(6);
+    expect(io.lastView()?.currentStep?.stepNumber).toBe(5);
     expect(io.lastView()?.currentStep?.copyParams?.targetKind).toBe("call_ip");
     expect(io.lastView()?.blocker).toBeUndefined();
   });
@@ -1070,8 +1077,8 @@ describe("NaverIssuanceDriver — the call-IP steps", () => {
     expect(engine.currentStage()).toBe("target_not_found");
     expect(io.lastView()?.blocker?.code).toBe("TARGET_NOT_FOUND");
     expect(io.lastView()?.blocker?.recoverable).toBe(true);
-    expect(io.lastView()?.currentStep?.stepNumber).toBe(6);
-    expect(io.events().filter((e) => e.type === "TARGET_HIGHLIGHTED").length).toBe(3); // create/open_app, api_group, open_edit — never call_ip
+    expect(io.lastView()?.currentStep?.stepNumber).toBe(5);
+    expect(io.events().filter((e) => e.type === "TARGET_HIGHLIGHTED").length).toBe(2); // open_app, open_edit — never call_ip
   });
 
   it("puts the carrier's IPv4 beside a write-only copy button — and only IPv4", async () => {
@@ -1109,7 +1116,7 @@ describe("NaverIssuanceDriver — the call-IP steps", () => {
     await session.whenSettled();
 
     expect(engine.currentStage()).toBe("target_not_found");
-    expect(io.lastView()?.currentStep?.stepNumber).toBe(7);
+    expect(io.lastView()?.currentStep?.stepNumber).toBe(6);
     expect(page.mountKeys[page.mountKeys.length - 1]).toBe("actionWindow.issuance.park.TARGET_NOT_FOUND.edit_form_open");
 
     page.editFormStaysOpen = false; // the seller saved (or cancelled): the detail view paints again
@@ -1128,6 +1135,39 @@ describe("NaverIssuanceDriver — the call-IP steps", () => {
     await session.whenSettled();
     expect(engine.currentStage()).toBe("target_not_found");
     expect(page.mountKeys[page.mountKeys.length - 1]).toBe("actionWindow.issuance.park.TARGET_NOT_FOUND");
+  });
+
+  it("**the edit-form steps can see their own end** — the form opening ends ④, the form closing ends ⑤", async () => {
+    const { page, driver } = build({ appEntryCount: 1 });
+    // Before 「수정」 is pressed: the form is not open, and nothing else claims to be done. ⑤ is not done either
+    // while the form's counted label still paints — 「수정」 painting is not enough on its own.
+    expect(await driver.readStepDone("open_edit")).toBe(false);
+    expect(await driver.readStepDone("call_ip")).toBe(false);
+    // The fake models the seller opening the form once 「수정」 is ringed.
+    await driver.highlightTarget("open_edit");
+    expect(await driver.readStepDone("open_edit")).toBe(true);
+    // While the form is open, ⑤ is not done — 「수정」 does not paint.
+    expect(await driver.readStepDone("call_ip")).toBe(false);
+    for (const t of ["create_app", "application_id", "application_secret", "return"] as const) {
+      expect(await driver.readStepDone(t), t).toBe(false);
+    }
+    // Every read was a value-free fixed-label count.
+    for (const s of page.scripts) for (const tok of [".value", "inputValue", "clipboard"]) expect(s).not.toContain(tok);
+  });
+
+  it("**⑤ rings 「저장」 and the API groups beside the IP row, then scrolls 「저장」 into view**", async () => {
+    const { io, engine, session, page } = build({ appEntryCount: 1 });
+    startRun(io);
+    await session.whenSettled();
+    await pressUntil(io, engine, session, "guiding_call_ip");
+    const also = page.scripts.filter((s) => s.includes("issuance-also-ring"));
+    expect(also).toHaveLength(1);
+    expect(also[0]).toContain('"저장"');
+    expect(also[0]).toContain("blocking-button");
+    expect(also[0]).toContain('"API 그룹"');
+    expect(page.scripts.some((s) => s.includes("issuance-bring-secondary-into-view"))).toBe(true);
+    // Only ⑤ rings extra controls.
+    expect(page.scripts.filter((s) => s.includes("issuance-also-ring"))).toHaveLength(1);
   });
 
   it("SECRET READ = 0 across the WHOLE walk; the clipboard appears only in the audited write-only copy rows", async () => {

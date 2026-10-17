@@ -384,8 +384,13 @@ export class IssuanceGuidanceSession {
           // The barrier moved on (the FE's own 다음, a park, a cancel) — stop rather than press into a step the
           // run has already left.
           if (!this.stillWaitingOn(target)) return;
-          if (!(await read.call(this.driver, target).catch(() => false))) continue;
-          log("aw_issuance_panel_advance", { target });
+          const pressed = await read.call(this.driver, target).catch(() => false);
+          // …or the seller's own screen change already finished the step (「수정」 opened the form; 「저장」 closed
+          // it). Same command, same engine decision — only who noticed differs.
+          const done = !pressed && (await this.driver.readStepDone?.(target).catch(() => false)) === true;
+          if (!pressed && !done) continue;
+          if (!this.stillWaitingOn(target)) return;
+          log(pressed ? "aw_issuance_panel_advance" : "aw_issuance_step_done_observed", { target });
           // **The last step's press is also the walk's one navigation.** NAVER has no credential handoff — the
           // seller types the two values in themselves — so `return`'s CTA takes them to the screen where they
           // do that. Performed BEFORE the command, so the browser is already moving while the run completes;

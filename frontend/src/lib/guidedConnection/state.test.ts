@@ -204,6 +204,13 @@ describe("issuance mode — guided (Action Window) vs text, same completion hand
     expect(actorFor("application_issuance_guided")).toBe("SUPERVISED_ACTION");
   });
 
+  it("**a submit DURING the guided walk registers the credential** (paste as you go, 2026-10-18)", () => {
+    const guided = reduce(issuance, { type: "APPLICATION_ISSUANCE_MODE", mode: "guided" });
+    const submitted = reduce(guided, { type: "SUBMIT_CREDENTIALS" });
+    expect(submitted.phase).toBe("credential_registration");
+    expect(submitted.path).toBe("new");
+  });
+
   it("APPLICATION_ISSUANCE_MODE{text} at issuance is a NO-OP (the checklist already renders in place)", () => {
     expect(reduce(issuance, { type: "APPLICATION_ISSUANCE_MODE", mode: "text" })).toBe(issuance);
   });

@@ -33,6 +33,7 @@ export const ADOPTED_TARGET_IDS = [
   // NOT `app_edit.call_ip_label`: its `matchCount 1` (2026-10-17 recon) was a never-painted node — the hidden detail
   // view's exact 「API호출 IP」 — and the 3차 Phase B run parked on it. Retired; the counted label replaces it.
   "app_edit.call_ip_count_label", // API호출 IP (n/3) — visible 1, its TR holds the inputs + 「추가」 — 2026-10-17
+  "app_edit.save_button", // 저장 (blocking-button) — visible 1 on the edit form, 0 painted on the detail page — 2026-10-18
 ] as const satisfies readonly VisualReconTargetId[];
 export type AdoptedTargetId = (typeof ADOPTED_TARGET_IDS)[number];
 
@@ -46,6 +47,7 @@ const CONFIRMED_LIVE_RUNS: Readonly<Record<AdoptedTargetId, readonly string[]>> 
   "credentials.secret_copy_button": ["2026-08-02#4", "2026-08-02#5"],
   "app_detail.edit_button": ["2026-10-17#detail"],
   "app_edit.call_ip_count_label": ["2026-10-17#aside-edit"],
+  "app_edit.save_button": ["2026-10-18#aside-edit"],
 };
 
 export interface AdoptedVisualReconSelector {

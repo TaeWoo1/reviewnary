@@ -64,7 +64,7 @@ import {
   type ApiCenterStructuralCensus,
 } from "../cli/observe-api-center";
 import { pageCategoryFromCensus } from "./api-issuance/api-center-adapter";
-import { buildFixedLabelLocateScript } from "./api-issuance-calibration/visual-recon-inpage";
+import { buildFixedLabelAlsoRingScript, buildFixedLabelLocateScript } from "./api-issuance-calibration/visual-recon-inpage";
 import { copyableIpv4s, mountPanelCopyRows } from "./overlay-copy-values";
 import {
   isGuidedHighlightTarget,
@@ -230,12 +230,12 @@ function isVerifyResolved(category: ApiCenterPageCategory): boolean {
 const OVERLAY_STEP: Readonly<Record<IssuanceTarget, number>> = {
   create_app: 2,
   open_app: 2,
-  api_group: 4,
-  open_edit: 5,
-  call_ip: 6,
-  application_id: 7,
-  application_secret: 8,
-  return: 9,
+  api_group: 5, // not a step of its own any more — the edit form's call-IP step carries the groups
+  open_edit: 4,
+  call_ip: 5,
+  application_id: 6,
+  application_secret: 7,
+  return: 8,
 };
 
 /** Step 3's number — the target-less usage-state advisory. */
@@ -267,11 +267,11 @@ const NAVER_STEP_BRIEF: Readonly<Record<IssuanceTarget, string>> = {
   create_app: "'애플리케이션 등록'을 직접 눌러 애플리케이션을 만드세요. 다 만드셨으면 아래 '다음'을 누르세요.",
   open_app: "연결할 애플리케이션을 직접 여세요. 상세 화면이 열리면 자동으로 넘어갑니다.",
   api_group: "표시된 '커머스 API' 그룹이 선택돼 있는지 확인하세요.",
-  open_edit: "'수정'을 직접 눌러 수정 화면을 여세요. 열렸으면 아래 '다음'을 누르세요.",
-  call_ip: "아래 IP를 복사해 'API호출 IP' 칸에 붙여넣고 '추가', '저장'을 직접 누르세요.",
-  application_id: "표시된 애플리케이션 ID를 직접 복사해 두세요. reviewnary는 값을 읽지 않습니다.",
-  application_secret: "'보기'를 눌러 시크릿을 확인하고 직접 복사해 두세요. reviewnary는 값을 읽지 않습니다.",
-  return: "복사한 두 값을 reviewnary 창에 입력하면 연결이 끝납니다.",
+  open_edit: "'수정'을 직접 눌러 주세요. 수정 화면이 열리면 자동으로 넘어갑니다.",
+  call_ip: "아래 IP를 붙여넣고 '추가' → API 그룹 확인 → 위쪽 '저장'을 직접 눌러 주세요.",
+  application_id: "애플리케이션 ID를 복사해 reviewnary 창의 ID 칸에 바로 붙여넣어 주세요.",
+  application_secret: "'보기' → (보안 확인이 뜨면 직접 풀기) → '복사' 후 reviewnary 창의 시크릿 칸에 붙여넣어 주세요.",
+  return: "reviewnary 창에서 연결을 마무리하면 끝납니다.",
 };
 
 /**
@@ -293,18 +293,18 @@ export const NAVER_STEP_DETAIL: Readonly<Record<IssuanceTarget, string>> = {
   api_group:
     "이 애플리케이션에 상품·주문(판매자) 관련 API 그룹이 포함돼 있는지 확인하고, 없으면 추가하세요. 정확한 그룹 이름은 화면마다 다를 수 있으니 '주문'·'판매자'가 포함된 항목을 찾아 선택하면 됩니다.",
   open_edit:
-    "네이버가 이 IP에서 오는 요청만 받도록 API 호출 IP를 등록합니다. 표시된 '수정' 버튼을 직접 눌러 수정 화면을 열어 주세요. 이 단계에서는 아직 아무것도 저장되지 않습니다.",
+    "IP 등록과 API 그룹 추가는 수정 화면에서만 할 수 있어요. 표시된 '수정' 버튼을 직접 눌러 수정 화면을 열어 주세요. 이 단계에서는 아직 아무것도 저장되지 않습니다.",
   call_ip:
-    "표시된 IP를 복사해 'API호출 IP' 칸에 붙여넣고 '추가'를 누른 뒤, 위쪽 '저장'을 눌러 주세요. IP는 3개까지 등록되므로 이미 3개가 있으면 쓰지 않는 IP를 '삭제'한 뒤 추가하세요. 앱을 만들 때 이미 등록했다면 그대로 다음으로 넘어가면 됩니다. reviewnary는 칸을 채우거나 저장하지 않으며, 등록이 맞는지는 마지막 연결 테스트에서 확인합니다.",
+    "① 아래 IP를 복사해 'API호출 IP' 칸에 붙여넣고 '추가'를 누르세요. IP는 3개까지 등록되므로 이미 3개가 있으면 쓰지 않는 IP를 '삭제'한 뒤 추가하세요. ② 'API 그룹'에 '문의', '주문 판매자', '상품/N배송'이 있는지 보고, 없는 그룹은 직접 추가하세요. ③ 위쪽 '저장'을 누르면 상세 화면으로 돌아가고 안내가 다음 단계로 넘어갑니다. 이미 모두 등록돼 있다면 '취소'를 눌러도 됩니다. reviewnary는 칸을 채우거나 저장하지 않으며, 등록이 맞는지는 마지막 연결 테스트에서 확인합니다.",
   application_id:
-    "애플리케이션 ID를 복사해 주세요. 표시된 애플리케이션 ID 행에서 값을 직접 복사하시면 됩니다. reviewnary는 이 값을 읽지 않습니다 — 복사는 직접 하시고, 마지막에 reviewnary 보안 입력란에 붙여넣으세요.",
+    "표시된 애플리케이션 ID를 직접 복사해, reviewnary 창(이 안내를 시작한 화면)의 애플리케이션 ID 칸에 바로 붙여넣어 주세요. 다음 단계에서 시크릿을 복사하면 클립보드의 ID가 지워지므로 먼저 붙여넣어야 합니다. reviewnary는 네이버 화면의 값을 읽지 않습니다.",
   application_secret:
-    "애플리케이션 시크릿을 확인하고 복사해 주세요. 표시된 '보기/복사' 컨트롤에서 시크릿을 직접 확인·복사하시면 됩니다. reviewnary는 시크릿 값도, 클립보드도 읽지 않습니다. 확인이 어려우면 시크릿 재발급이 필요할 수 있습니다.",
+    "표시된 '보기'를 눌러 시크릿을 확인하세요. 네이버가 자동입력 방지 확인을 띄우면 직접 풀어 주세요. 그다음 '복사'를 눌러 reviewnary 창의 시크릿 칸에 붙여넣으면 됩니다. reviewnary는 시크릿 값도, 클립보드도 읽지 않습니다. 확인이 어려우면 시크릿 재발급이 필요할 수 있습니다.",
   // **The honest ending, and it is deliberately different from the WING walk's.** Coupang shows the three
   // values on a page SellerOps can read under the seller's consent, so that walk ends with one press. NAVER
   // does not: the seller types the two values in themselves, and a panel that implied otherwise would be
   // promising a capability this channel does not have.
-  return: "두 값을 복사했다면 reviewnary로 돌아가 주세요. 안내가 끝나면 연결 정보 입력 화면으로 이동합니다.",
+  return: "두 값을 붙여넣었다면 reviewnary 창으로 돌아가 연결을 마무리해 주세요. 연결 테스트가 IP 등록과 두 값을 함께 확인합니다.",
 };
 
 /**
@@ -320,15 +320,15 @@ export const NAVER_STEP_DETAIL: Readonly<Record<IssuanceTarget, string>> = {
  */
 export const NAVER_APP_USAGE_COPY = Object.freeze({
   existing: {
-    brief: "애플리케이션 상태를 확인해 주세요.",
+    brief: "애플리케이션 상태가 '활성'인지 확인해 주세요.",
     detail:
-      "애플리케이션 상태를 확인해 주세요. 화면에 '다시사용' 버튼이 보인다면 직접 눌러 앱을 활성화해 주세요. 버튼이 보이지 않더라도 reviewnary가 활성 상태라고 단정하지 않습니다. 확인했다면 다음으로 진행해 주세요.",
+      "화면에 '다시사용' 버튼이 보인다면 직접 눌러 앱을 활성화해 주세요. 버튼이 보이지 않더라도 reviewnary가 활성 상태라고 단정하지 않습니다. 확인했다면 다음으로 진행해 주세요.",
     badge: "애플리케이션 상태 확인",
   },
   new: {
-    brief: "방금 만든 애플리케이션의 상태를 확인해 주세요.",
+    brief: "방금 만든 애플리케이션의 상태가 '활성'인지 확인해 주세요.",
     detail:
-      "방금 만든 애플리케이션의 상태를 확인해 주세요. 새로 만든 앱은 보통 바로 사용할 수 있지만, 혹시 화면에 '다시사용' 버튼이 보이면 직접 눌러 활성화해 주세요. 버튼이 보이지 않더라도 reviewnary가 활성 상태라고 단정하지 않습니다. 확인했다면 다음으로 진행해 주세요.",
+      "새로 만든 앱은 보통 바로 사용할 수 있지만, 혹시 화면에 '다시사용' 버튼이 보이면 직접 눌러 활성화해 주세요. 버튼이 보이지 않더라도 reviewnary가 활성 상태라고 단정하지 않습니다. 확인했다면 다음으로 진행해 주세요.",
     badge: "생성 직후 상태 확인",
   },
 });
@@ -357,8 +357,8 @@ const NAVER_ADVANCE_LABEL: Readonly<Partial<Record<IssuanceTarget, string>>> = {
   api_group: "확인했어요 · 다음",
   open_edit: "열었어요 · 다음",
   call_ip: "저장했어요 · 다음",
-  application_id: "복사했어요 · 다음",
-  application_secret: "복사했어요 · 다음",
+  application_id: "붙여넣었어요 · 다음",
+  application_secret: "붙여넣었어요 · 다음",
   // **The walk's last button, and the only one in it that moves the seller.** It is a CTA rather than a
   // "완료" because what is left is not a step of this walk — it is the connection, finished in SellerOps, where
   // the seller types the two values they just copied. The navigation behind it is real (see
@@ -373,10 +373,10 @@ export const NAVER_STEP_TITLE: Readonly<Record<IssuanceTarget, string>> = {
   open_app: "발급한 애플리케이션 열기",
   api_group: "주문·판매자 관련 API 그룹 추가",
   open_edit: "수정 화면 열기",
-  call_ip: "API 호출 IP 등록",
-  application_id: "애플리케이션 ID 복사",
-  application_secret: "애플리케이션 시크릿 확인·복사",
-  return: "reviewnary로 돌아와 입력",
+  call_ip: "IP 등록 · API 그룹 확인 · 저장",
+  application_id: "애플리케이션 ID 복사 · 붙여넣기",
+  application_secret: "애플리케이션 시크릿 복사 · 붙여넣기",
+  return: "reviewnary에서 연결 마무리",
 };
 
 /**
@@ -417,6 +417,30 @@ const NAVER_EDIT_FORM_OPEN_COPY = Object.freeze({
 
 /** The steps that sit on the detail page AFTER the edit form — the only parks the edit-form notice can explain. */
 const AFTER_EDIT_FORM: ReadonlySet<IssuanceHighlightTarget> = new Set(["application_id", "application_secret"]);
+
+/**
+ * After centring a step's primary ring, scroll UP just enough to show any secondary ring above the viewport —
+ * only if the primary stays fully on screen. Value-free: tagged elements' rectangles and one `scrollBy`.
+ */
+export const BRING_SECONDARY_ABOVE_INTO_VIEW = `(function () {
+  /* issuance-bring-secondary-into-view (value-free OUTPUT: scrolled boolean) */
+  var primary = document.querySelector('[data-aw-primary]');
+  if (!primary) { return false; }
+  var pr = primary.getBoundingClientRect();
+  var tags = document.querySelectorAll('[data-aw-target]');
+  var top = null;
+  for (var i = 0; i < tags.length; i++) {
+    if (tags[i] === primary) { continue; }
+    var r = tags[i].getBoundingClientRect();
+    if (r.bottom <= 0 && (top === null || r.top > top)) { top = r.top; }
+    if (r.top < 0 && r.bottom > 0 && (top === null || r.top > top)) { top = r.top; }
+  }
+  if (top === null) { return false; }
+  var delta = top - 24;
+  if (pr.bottom - delta > window.innerHeight - 8) { return false; }
+  window.scrollBy(0, delta);
+  return true;
+})()`;
 
 /**
  * The walk is over. Copy-only, and that is a decision rather than an omission: the WING walk's completion panel
@@ -690,6 +714,12 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
         // between the tag and the mount destroys the context under the mount → this attempt retries and RE-TAGS +
         // RE-MOUNTS on the fresh context, instead of mounting against a stale/lost tag. This is the live fix for the
         // api_group overlay never rendering (the mount was the remaining un-retried `.evaluate`).
+        // The other controls this step's screen asks the seller to operate — rung beside the primary, each only
+        // when it paints exactly once. Best-effort: the primary ring stands alone otherwise.
+        if (tag && loc.alsoRing) {
+          const also = await this.evalStr<{ rung?: number }>(page, buildFixedLabelAlsoRingScript({ specs: loc.alsoRing }));
+          log("aw_issuance_also_ring", { target, rung: typeof also?.rung === "number" ? also.rung : 0, of: loc.alsoRing.length });
+        }
         if (afterTag) {
           stage = "mount";
           await afterTag(page);
@@ -919,6 +949,9 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
     if (target === "call_ip") {
       const ips = await this.callIpsForPanel();
       await mountPanelCopyRows(page, ips, NAVER_CALL_IP_ROWS_COPY).catch(() => false);
+      // The mount centred the IP row, which put the form's 「저장」 above the viewport (live 2026-10-18). Scroll it
+      // back in when the row can stay on screen too. Reads only ring geometry; scrolling is not a click.
+      await this.evalStr(page, BRING_SECONDARY_ABOVE_INTO_VIEW).catch(() => undefined);
     }
   }
 
@@ -952,6 +985,39 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
   async readPanelAdvance(target: IssuanceTarget): Promise<boolean> {
     if (!NAVER_ADVANCE_LABEL[target]) return false;
     return readOverlayAdvancePressed(this.activePage(), naverAdvanceToken(target)).catch(() => false);
+  }
+
+  /**
+   * Did the seller's own screen change already finish this step? `open_edit`: the edit form is open (the same
+   * two counts the call-IP step gates on). `call_ip`: the form is closed again — 「수정」 paints and the counted
+   * call-IP label does not — which is where both NAVER's 「저장」 and 「취소」 land; whether the address was really
+   * saved is the connection test's question, as it always was. Every other step: never. Unreadable ⇒ `false`.
+   */
+  async readStepDone(target: IssuanceTarget): Promise<boolean> {
+    const page = this.activePage();
+    if (target === "open_edit") return this.editFormOpen(page);
+    if (target === "call_ip") return this.detailViewBack(page);
+    return false;
+  }
+
+  /** The detail view is showing again: 「수정」 paints once and the edit form's counted label paints nowhere. */
+  private async detailViewBack(page: Page): Promise<boolean> {
+    try {
+      const form = locatorFor("call_ip");
+      if (!form.requiresAbsent) return false;
+      const edit = await this.evalStr<LocateResult>(
+        page,
+        buildFixedLabelLocateScript({ candidateQuery: form.requiresAbsent.candidateQuery, exactText: form.requiresAbsent.exactText, tag: false }),
+      );
+      if (edit?.count !== 1) return false;
+      const label = await this.evalStr<LocateResult>(
+        page,
+        buildFixedLabelLocateScript({ candidateQuery: form.candidateQuery, exactText: form.exactText, tag: false, countSuffix: form.countSuffix === true }),
+      );
+      return label?.count === 0;
+    } catch {
+      return false;
+    }
   }
 
   /**
