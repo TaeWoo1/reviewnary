@@ -17,7 +17,11 @@ import {
   buildFixedLabelLocateScript,
 } from "../../../src/action-window/api-issuance-calibration/visual-recon-inpage";
 import { locatorFor } from "../../../src/action-window/api-issuance-calibration/issuance-highlight-selectors";
-import { BRING_SECONDARY_ABOVE_INTO_VIEW, NaverIssuanceDriver } from "../../../src/action-window/naver-issuance-driver";
+import {
+  AVOID_EDIT_FORM_GROUP_LISTS,
+  BRING_SECONDARY_ABOVE_INTO_VIEW,
+  NaverIssuanceDriver,
+} from "../../../src/action-window/naver-issuance-driver";
 import { mountOverlay } from "../../../src/action-window/overlay";
 
 const RUN = process.env.RUN_INTEGRATION === "1";
@@ -27,13 +31,25 @@ const EDIT_FORM = `<!doctype html><meta charset="utf-8"><body style="margin:0">
   <section id="detail" style="display:none"><button>수정</button><table><tr><th>API호출 IP</th><td>—</td></tr></table></section>
   <section id="edit" style="padding-top:500px">
     <div id="top"><blocking-button id="cancel">취소</blocking-button> <blocking-button id="save">저장</blocking-button></div>
-    <table style="margin-top:290px"><tbody>
+    <table style="margin-top:290px;width:100%"><tbody>
       <tr id="ip-row" style="height:200px">
         <th><label>API호출 IP (<em>2</em>/3)</label></th>
         <td><input type="text"><button type="button">추가</button></td>
       </tr>
     </tbody></table>
     <h4 id="groups" style="margin-top:300px">API 그룹</h4>
+    <div id="lists">
+      <h5 id="mine">내 API 그룹 <span>4</span></h5>
+      <div style="height:0"></div>
+      <div class="row" style="height:91px">문의 <button>삭제</button></div>
+      <div class="row" style="height:91px">주문 판매자 <button>삭제</button></div>
+      <div class="row" style="height:91px">상품/N배송 <button>삭제</button></div>
+      <div class="row" style="height:91px">정산 <button>삭제</button></div>
+      <h5 id="all">전체 API 그룹</h5>
+      <div class="row" style="height:91px">판매자정보 <button>추가</button></div>
+      <h5 id="other">다른 영역</h5>
+      <div id="after" style="height:91px">끝</div>
+    </div>
     <div style="height:1400px"></div>
   </section>
 </body>`;
@@ -85,6 +101,39 @@ describe.skipIf(!RUN)("the edit form's step rings 「저장」 and the API group
     expect(onTop).toBe("save");
     expect(after.rowTop).toBeGreaterThanOrEqual(0);
     expect(after.rowBottom).toBeLessThanOrEqual(after.vh);
+  });
+
+  it("**marks both group lists keep-clear, and the panel steers off them once the seller scrolls there**", async () => {
+    const marked = (await page.evaluate(AVOID_EDIT_FORM_GROUP_LISTS)) as { marked: number };
+    // 「내 API 그룹」 + 4 rows + 「전체 API 그룹」 + 1 row; the zero-height spacer and anything after another heading are not.
+    expect(marked.marked).toBe(7);
+    expect(await page.evaluate(() => document.getElementById("after")!.hasAttribute("data-aw-avoid"))).toBe(false);
+    await mountOverlay(page, {
+      stepNumber: 5,
+      totalSteps: 8,
+      copyKey: "actionWindow.issuance.step.call_ip",
+      guidanceEnabled: true,
+      residentPanel: true,
+      label: "IP · 그룹 · 저장",
+      advance: { buttonLabel: "저장했어요 · 다음", token: "tok" },
+    });
+    // The seller scrolls down to the lists: the rings above (「저장」, the IP row) leave the viewport.
+    await page.evaluate(() => window.scrollTo(0, document.getElementById("mine")!.getBoundingClientRect().top + window.scrollY - 300));
+    await page.waitForTimeout(650);
+    const hit = await page.evaluate(() => {
+      const p = document.getElementById("__aw_advance_panel__")!.getBoundingClientRect();
+      const save = document.getElementById("save")!.getBoundingClientRect();
+      let overlap = 0;
+      for (const e of Array.from(document.querySelectorAll("[data-aw-avoid]"))) {
+        const r = e.getBoundingClientRect();
+        const ox = Math.min(p.right, r.right) - Math.max(p.left, r.left);
+        const oy = Math.min(p.bottom, r.bottom) - Math.max(p.top, r.top);
+        if (ox > 0 && oy > 0) overlap += ox * oy;
+      }
+      return { overlap, saveOff: save.bottom <= 0 };
+    });
+    expect(hit.saveOff).toBe(true); // the case is real: a ring is off screen above
+    expect(hit.overlap).toBe(0);
   });
 
   it("does not scroll when the row could not stay on screen", async () => {

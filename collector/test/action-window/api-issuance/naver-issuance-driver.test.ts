@@ -1181,6 +1181,12 @@ describe("NaverIssuanceDriver — the call-IP steps", () => {
     expect(also[0]).toContain("blocking-button");
     expect(also[0]).toContain('"API 그룹"');
     expect(page.scripts.some((s) => s.includes("issuance-bring-secondary-into-view"))).toBe(true);
+    // …and marks the group lists keep-clear before the panel is placed; the steps before it drop such marks.
+    const avoidAt = page.scripts.findIndex((s) => s.includes("issuance-avoid-group-lists"));
+    const mountAt = page.scripts.findIndex((s, i) => i > avoidAt && s.startsWith("[fn]") && s.includes("scrollIntoView"));
+    expect(avoidAt).toBeGreaterThan(-1);
+    expect(mountAt).toBeGreaterThan(avoidAt);
+    expect(page.scripts.some((s) => s.includes("issuance-clear-avoid"))).toBe(true);
     // Only ⑤ rings extra controls.
     expect(page.scripts.filter((s) => s.includes("issuance-also-ring"))).toHaveLength(1);
   });

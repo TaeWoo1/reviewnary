@@ -426,6 +426,53 @@ const NAVER_EDIT_FORM_OPEN_COPY = Object.freeze({
 const AFTER_EDIT_FORM: ReadonlySet<IssuanceHighlightTarget> = new Set(["application_id", "application_secret"]);
 
 /**
+ * **The edit form's API-group lists are the seller's to operate — keep the panel off them** (2026-10-18, PO).
+ *
+ * Measured value-free on the real edit form: a flat run of siblings — an H5 「내 API 그룹」 (its own text, the
+ * count sits in a child span) followed by one row per group, then an H5 「전체 API 그룹」 and the rows that carry
+ * 「추가」. Each painted element of that run is marked `data-aw-avoid`, which the panel placement steers around
+ * (rings first, then these). The run stops at any other heading. Headings' OWN text is compared to the two fixed
+ * labels; nothing else is read and only a count leaves the page.
+ */
+export const AVOID_EDIT_FORM_GROUP_LISTS = `(function () {
+  /* issuance-avoid-group-lists (value-free OUTPUT: { marked }) */
+  var slice = Function.prototype.call.bind(Array.prototype.slice);
+  function norm(s) { return String(s == null ? '' : s).replace(/\\s+/g, ' ').trim(); }
+  function own(e) {
+    var t = '';
+    for (var i = 0; i < e.childNodes.length; i++) { if (e.childNodes[i].nodeType === 3) { t += ' ' + e.childNodes[i].nodeValue; } }
+    return norm(t);
+  }
+  function paints(n) {
+    var cs = window.getComputedStyle ? window.getComputedStyle(n) : null;
+    if (cs && (cs.display === 'none' || cs.visibility === 'hidden')) { return false; }
+    var r = n.getBoundingClientRect ? n.getBoundingClientRect() : null;
+    return !!r && r.width > 0 && r.height > 0;
+  }
+  var HEADS = ['내 API 그룹', '전체 API 그룹'];
+  var prior = slice(document.querySelectorAll('[data-aw-avoid]'));
+  for (var p = 0; p < prior.length; p++) { prior[p].removeAttribute('data-aw-avoid'); }
+  var starts = slice(document.querySelectorAll('h1,h2,h3,h4,h5,h6')).filter(function (e) { return own(e) === HEADS[0] && paints(e); });
+  if (starts.length !== 1) { return { marked: 0 }; }
+  var marked = 0, n = starts[0], seen = 0;
+  while (n && seen < 40) {
+    if (/^H[1-6]$/.test(n.tagName) && HEADS.indexOf(own(n)) < 0) { break; }
+    if (paints(n)) { n.setAttribute('data-aw-avoid', ''); marked += 1; }
+    n = n.nextElementSibling;
+    seen += 1;
+  }
+  return { marked: marked };
+})()`;
+
+/** Drop keep-clear marks left by an earlier step, so a later panel is not steered by a screen it left. */
+const CLEAR_AVOID_MARKS = `(function () {
+  /* issuance-clear-avoid */
+  var els = document.querySelectorAll('[data-aw-avoid]');
+  for (var i = 0; i < els.length; i++) { els[i].removeAttribute('data-aw-avoid'); }
+  return true;
+})()`;
+
+/**
  * After centring a step's primary ring, scroll UP just enough to show any secondary ring above the viewport —
  * only if the primary stays fully on screen. Value-free: tagged elements' rectangles and one `scrollBy`.
  */
@@ -928,6 +975,14 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
     // to 1, which would read as the run having started over.
     this.lastStepNumber = OVERLAY_STEP[target];
     const buttonLabel = NAVER_ADVANCE_LABEL[target];
+    // The edit form's group lists are where the seller adds and removes groups at this step; mark them before
+    // the mount so the very first placement already steers around them. Every other step drops such marks.
+    if (target === "call_ip") {
+      const avoid = await this.evalStr<{ marked?: number }>(page, AVOID_EDIT_FORM_GROUP_LISTS).catch(() => null);
+      log("aw_issuance_avoid_marked", { target, marked: typeof avoid?.marked === "number" ? avoid.marked : 0 });
+    } else {
+      await this.evalStr(page, CLEAR_AVOID_MARKS).catch(() => undefined);
+    }
     try {
       await mountOverlay(page, {
         // Set only for a step with no anchor to ring; without it the mount finds no target and paints nothing.

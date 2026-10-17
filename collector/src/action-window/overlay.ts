@@ -496,14 +496,20 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
         // It is projected FLUSH AGAINST that edge, keeping its own height — the position it holds after the
         // smallest scroll that brings it into view. A one-pixel marker at the very edge would be technically
         // "inside the viewport" and would clear every candidate, which is the same blindness in a new costume.
+        // `onScreen` splits the two kinds of box: what is in front of the seller NOW, and a projection of where
+        // an off-screen one will arrive. Live 2026-10-18 (NAVER edit form): scrolled down to the API-group lists
+        // the seller was working in, the rings above them (「저장」, the IP row) were projected onto the top edge,
+        // and because rings outranked keep-clear areas the panel settled onto the lists. What is on screen now
+        // outranks what might scroll in.
         const spansOf = [
-          (nodes: NodeListOf<Element>) => {
+          (nodes: NodeListOf<Element>, onScreen: boolean) => {
             const out: number[][] = [];
             for (let i = 0; i < nodes.length; i++) {
               const r = nodes[i]!.getBoundingClientRect();
               const rh = Math.min(Math.max(r.bottom - r.top, 1), vh);
               const above = r.bottom <= 0;
               const below = r.top >= vh;
+              if ((above || below) === onScreen) continue;
               const top = above ? 0 : below ? vh - rh : r.top;
               const bottom = above ? rh : below ? vh : r.bottom;
               out.push([r.left, top, r.right, bottom]);
@@ -511,8 +517,10 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
             return out;
           },
         ][0]!;
-        const spans = spansOf(targets);
-        const avoidSpans = spansOf(avoided);
+        const spans = spansOf(targets, true);
+        const avoidSpans = spansOf(avoided, true);
+        const projSpans = spansOf(targets, false);
+        const projAvoidSpans = spansOf(avoided, false);
         // How much of a set of controls a panel at (x, y) would sit on, in square pixels. Zero means clear;
         // comparing areas is what lets the least-bad placement win when nothing is clear.
         const overlapAt = [
@@ -539,22 +547,32 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
         // seller is not being pointed at yet, if the alternative is sitting on the one they are. Ranking them
         // together with a weight would let enough avoided area outvote the ring, which is a step that hides the
         // thing it is about — and it would need a fudge factor nothing measured. Least ring, then least next.
+        // Ranked lexicographically: on-screen rings, on-screen keep-clear areas, then the projected (off-screen)
+        // rings, then projected keep-clear areas. With nothing off screen this is exactly the old two-key order.
         let bestX = xs[0]!;
         let bestY = ys[0]!;
-        let bestArea = -1;
-        let bestAvoid = -1;
-        for (let xi = 0; xi < xs.length && !(bestArea === 0 && bestAvoid === 0); xi++) {
-          for (let yi = 0; yi < ys.length; yi++) {
-            const area = overlapAt(xs[xi]!, ys[yi]!, spans);
-            const avoid = overlapAt(xs[xi]!, ys[yi]!, avoidSpans);
-            if (bestArea < 0 || area < bestArea || (area === bestArea && avoid < bestAvoid)) {
-              bestArea = area;
-              bestAvoid = avoid;
-              bestX = xs[xi]!;
-              bestY = ys[yi]!;
+        let best: number[] | null = null;
+        const better = [
+          (a: number[], b: number[]) => {
+            for (let k = 0; k < a.length; k++) {
+              if (a[k]! !== b[k]!) return a[k]! < b[k]!;
             }
-            if (bestArea === 0 && bestAvoid === 0) break;
+            return false;
+          },
+        ][0]!;
+        for (let xi = 0; xi < xs.length; xi++) {
+          for (let yi = 0; yi < ys.length; yi++) {
+            const x = xs[xi]!;
+            const y = ys[yi]!;
+            const score = [overlapAt(x, y, spans), overlapAt(x, y, avoidSpans), overlapAt(x, y, projSpans), overlapAt(x, y, projAvoidSpans)];
+            if (best === null || better(score, best)) {
+              best = score;
+              bestX = x;
+              bestY = y;
+            }
+            if (best[0] === 0 && best[1] === 0 && best[2] === 0 && best[3] === 0) break;
           }
+          if (best && best[0] === 0 && best[1] === 0 && best[2] === 0 && best[3] === 0) break;
         }
         setStyle(panel, "left", `${Math.round(bestX)}px`);
         setStyle(panel, "top", `${Math.round(bestY)}px`);
