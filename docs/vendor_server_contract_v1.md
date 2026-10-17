@@ -289,9 +289,10 @@ EC2 볼륨 · 백업 대상의 저장 암호화도 AWS 콘솔에서 확인한다
 - 연결 화면은 이 값을 "이 PC의 공인 IP"로 보여 주고, 서버에 닿지 않으면 지금의 수동 안내로 돌아간다(§17.9).
 - **PC 쪽 (2026-10-17).** backend `GET /api/local/vendor-link/public-ip` → `{ipv4}` 또는 `{reason}`
   (`NOT_LINKED` · `IPV6_ONLY` · `NOT_AUTHORIZED` · `UNREACHABLE`). 같은 답을 60초 재사용한다. 판매자 PC의
-  `OutboundGate`는 새 목적지 `VENDOR`로 이 요청을 검사하는데, 운영 호스트 이름이 정해지지 않아 지금은 loopback만
-  통과한다 — 설정한 주소가 다른 곳을 가리켜도 나가지 않는다. 서버는 기존 AWS 주소 `3.39.210.89`의 하위 도메인(A
-  레코드만)으로 둔다(⑧-4 (c)) — 도메인 이름이 정해지면 `OutboundGate.VENDOR_HOSTS`에 그 이름 하나를 넣는다 [PO].
+  `OutboundGate`는 새 목적지 `VENDOR`로 이 요청을 검사한다. 통과하는 것은 loopback과 `OutboundGate.VENDOR_HOSTS`의
+  이름 하나 — `https://vendor.reviewnary-pilot.duckdns.org`(⑧-4 (c), 2026-10-17)뿐이고, http · 원래 pilot 이름 · 닮은
+  이름은 전송 전에 막힌다. 설정한 주소가 다른 곳을 가리켜도 나가지 않는다. DNS는 A `3.39.210.89` 하나, AAAA 없음 —
+  PC가 IPv4로 닿으므로 IP 응답이 네이버에 등록할 주소다.
 
 ## 8. 라이선스
 
@@ -328,5 +329,5 @@ EC2 볼륨 · 백업 대상의 저장 암호화도 AWS 콘솔에서 확인한다
 | 별도 앱 뼈대 `vendor-server/` | 2026-10-17. 기본 닫힘(`/health`만 열림), §10-1 fence 구현 · 양방향 증명, CI |
 | §2 판매자 계정(초대 · 로그인 · 정지) · 설치 등록 · 회수 | 2026-10-17. PostgreSQL + Flyway(테스트는 같은 마이그레이션을 H2에서). 실제 PostgreSQL 15에서 전 흐름 확인 |
 | §2 승인 화면 `/link` | 2026-10-17. 같은 네트워크 판별 · 코드 재입력 · 프레임 금지. 실제 브라우저(Playwright Chromium)로 두 경우 확인 |
-| §7 공인 IP | 2026-10-17. 설치 토큰으로 열림. PC 쪽 연결 서비스와 연결 화면의 「이 PC 연결」 · IP 표시(`ThisPcCallIp`)까지 있음. 운영 도메인 미정 |
+| §7 공인 IP | 2026-10-17. 설치 토큰으로 열림. PC 쪽 연결 서비스와 연결 화면의 「이 PC 연결」 · IP 표시(`ThisPcCallIp`)까지 있음. 운영 이름 `vendor.reviewnary-pilot.duckdns.org`, 서버 배치(§9) 전 |
 | §2 담당자 · 관리자(TOTP · 배정), §3 리뷰 교환, §4 상태 머신, §5 Cafe24 중계, §6 정리 작업, §8 라이선스, §9 배치 | 미구현 |

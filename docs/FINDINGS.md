@@ -727,6 +727,35 @@
 
 ---
 
+### 실행 도구 스크립트는 나중에 생긴 시작 검사를 모른다 (2026-10-17)
+
+- **했던 것** — API센터 화면 측정을 위해 `tools/naver-local/run-backend-local.sh`로 walkthrough 백엔드를 띄웠다.
+- **사실** — 두 번 막혔다. (1) `PilotConfigValidator`(`eb3b3b9c`, 2026-10-16)가 NAVER 커넥터가 켜져 있으면
+  `SELLEROPS_CONNECTOR_NAVER_ADVERTISED_EGRESS_IPS`를 요구해 백엔드가 시작을 거부했다. 스크립트는 그 값을 넣지 않는다.
+  (2) 기본으로 켜진 `sellerops.seed.seller-accounts`가 NAVER 판매자 계정 한 줄을 만들어 preflight의 깨끗한 DB 확인
+  (`naver_accounts=0`)에 걸렸다. 둘 다 스크립트보다 나중에 생긴 검사 · 시드이고, 스크립트 자체 테스트는 그것을 보지 않는다.
+- **다음에** — 라이브 전 실행 도구는 시작부터 한 번 돌려 본다. 고정 호출 IP는 지어내지 않고 이 기기의 실제 공인 IPv4를
+  조회해 실행 설정에만 넣는다(출력 · 기록 안 함). 깨끗한 DB가 필요한 런은 `SELLEROPS_SEED_SELLER_ACCOUNTS=false`로 띄운다.
+  스크립트에 두 기본값을 넣을지는 따로 정한다.
+- **출처** — 2026-10-17 run `wt-cca943ebbc03` / `apr-54d92eeabd12` 준비 과정. `PilotConfigValidator.java`,
+  `application.yml` `sellerops.seed.seller-accounts`.
+
+---
+
+### 화면 측정은 운영자가 다른 화면에서 눌러도 그 자리에 찍는다 (2026-10-17)
+
+- **했던 것** — `capture-api-center-visual`로 `app_detail` · `app_edit` 두 화면을 측정했다.
+- **사실** — `app_detail` 자리의 확인을 운영자가 앱 **목록** 화면에서 눌렀고, 도구는 가림 검증 후 그대로 찍어
+  `app_detail` 이름으로 저장했다. 요약의 분류는 `app_list`로 맞게 나왔지만 체크포인트와 비교하지 않으므로 런 결과는
+  「찍음 2 · 정지 0」으로 초록이었다. 상세용 고정 라벨 세 개가 0인 것을 보고서야 드러났다. 수정 화면은 분류 어휘에 없어
+  `credential_issuance`로 분류된다.
+- **다음에** — 측정 결과는 숫자보다 먼저 **요약의 `pageCategory`가 그 체크포인트의 화면과 같은지** 본다. 안내 문구에
+  화면을 알아볼 단서(예: 「[수정] 버튼이 보이는 화면」)를 넣는다. 도구가 분류 불일치를 표시하거나 그 화면을 다시 묻게 할지는
+  따로 정한다.
+- **출처** — 2026-10-17 recon `vis_87e268bf4894`, `docs/evidence/INDEX.md` §2.
+
+---
+
 ## 어디에 무엇이 있나
 
 | 찾는 것 | 가는 곳 |

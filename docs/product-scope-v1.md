@@ -78,7 +78,8 @@ SellerOps 제품 범위를 **하나의 합의된 정의로 고정**하기 위한
 > 자동화 제외에 대한 예외이며 범위는 **안내 전용**이다: 현재 단계의 칸 · 버튼 강조와 IP 표시만 하고, 입력 · 저장 · 값
 > 읽기는 판매자가 직접 한다. 도우미가 없거나 거절하면 지금의 글 안내로 끝까지 진행할 수 있어야 한다. 연결 완료는
 > 로컬 연결 테스트가 성공했을 때만 표시한다. (c) 공급자 서버는 기존 AWS 주소 `3.39.210.89`에 **하위 도메인**(A
-> 레코드만)으로 둔다 — 도메인 이름은 미정.
+> 레코드만)으로 둔다 — 이름은 `vendor.reviewnary-pilot.duckdns.org`(2026-10-17, 오너가 준 `reviewnary-pilot.duckdns.org`
+> 아래 하위 이름. 원래 이름은 멈춘 pilot이 쓰므로 건드리지 않는다. https만).
 >
 > ⑨ 상충하는 서술 — `docs/standing/sellerops_local_to_pilot_connectivity_decision.md`(중앙 backend ·
 > 고정 egress 전제), `docs/standing/sellerops_local_agent_runtime_adr.md`(collector만 로컬),
