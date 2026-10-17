@@ -23,6 +23,7 @@ import { mountOverlay } from "../../../src/action-window/overlay";
 const RUN = process.env.RUN_INTEGRATION === "1";
 
 const EDIT_FORM = `<!doctype html><meta charset="utf-8"><body style="margin:0">
+  <header id="bar" style="position:fixed;top:0;left:0;right:0;height:61px;background:#222;z-index:10">커머스API센터</header>
   <section id="detail" style="display:none"><button>수정</button><table><tr><th>API호출 IP</th><td>—</td></tr></table></section>
   <section id="edit" style="padding-top:500px">
     <div id="top"><blocking-button id="cancel">취소</blocking-button> <blocking-button id="save">저장</blocking-button></div>
@@ -75,7 +76,13 @@ describe.skipIf(!RUN)("the edit form's step rings 「저장」 and the API group
       const r = document.getElementById("ip-row")!.getBoundingClientRect();
       return { saveTop: s.top, rowTop: r.top, rowBottom: r.bottom, vh: window.innerHeight };
     });
-    expect(after.saveTop).toBeGreaterThanOrEqual(0);
+    // …and not under NAVER's fixed header, which covers whatever is scrolled to the very top (live 2026-10-18).
+    expect(after.saveTop).toBeGreaterThanOrEqual(61);
+    const onTop = await page.evaluate(() => {
+      const r = document.getElementById("save")!.getBoundingClientRect();
+      return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.id;
+    });
+    expect(onTop).toBe("save");
     expect(after.rowTop).toBeGreaterThanOrEqual(0);
     expect(after.rowBottom).toBeLessThanOrEqual(after.vh);
   });

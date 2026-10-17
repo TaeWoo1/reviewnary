@@ -428,15 +428,28 @@ export const BRING_SECONDARY_ABOVE_INTO_VIEW = `(function () {
   if (!primary) { return false; }
   var pr = primary.getBoundingClientRect();
   var tags = document.querySelectorAll('[data-aw-target]');
-  var top = null;
+  var pick = null, top = null;
   for (var i = 0; i < tags.length; i++) {
     if (tags[i] === primary) { continue; }
     var r = tags[i].getBoundingClientRect();
-    if (r.bottom <= 0 && (top === null || r.top > top)) { top = r.top; }
-    if (r.top < 0 && r.bottom > 0 && (top === null || r.top > top)) { top = r.top; }
+    if (r.bottom <= 0 && (top === null || r.top > top)) { top = r.top; pick = tags[i]; }
+    if (r.top < 0 && r.bottom > 0 && (top === null || r.top > top)) { top = r.top; pick = tags[i]; }
   }
   if (top === null) { return false; }
-  var delta = top - 24;
+  /* A fixed or sticky bar across the top of the page (NAVER's API-centre header, live 2026-10-18) covers whatever
+     is scrolled to y=0 — so land BELOW it. Measured from what paints at the very top above the control's column;
+     geometry only. */
+  var band = 0;
+  if (typeof document.elementFromPoint === 'function') {
+    var pc = pick.getBoundingClientRect();
+    var n = document.elementFromPoint(Math.max(1, Math.min(window.innerWidth - 1, pc.left + pc.width / 2)), 1);
+    while (n && n !== document.body && n !== document.documentElement) {
+      var pos = window.getComputedStyle(n).position;
+      if (pos === 'fixed' || pos === 'sticky') { var hb = n.getBoundingClientRect(); if (hb.top <= 1) { band = Math.max(band, hb.bottom); } break; }
+      n = n.parentElement;
+    }
+  }
+  var delta = top - band - 16;
   if (pr.bottom - delta > window.innerHeight - 8) { return false; }
   window.scrollBy(0, delta);
   return true;
@@ -450,7 +463,7 @@ export const BRING_SECONDARY_ABOVE_INTO_VIEW = `(function () {
 const NAVER_COMPLETION_COPY = Object.freeze({
   badge: "확인 완료",
   brief: "✓ 네이버 API 확인 완료",
-  detail: "reviewnary 창으로 돌아가 애플리케이션 ID와 시크릿을 입력하면 연결이 끝납니다. 이 창은 닫으셔도 됩니다.",
+  detail: "reviewnary 창에서 연결을 마무리하면 끝납니다. 두 값을 아직 붙여넣지 않았다면 그 창의 입력란에 붙여넣어 주세요. 이 창은 닫으셔도 됩니다.",
 });
 
 /**
