@@ -190,3 +190,120 @@ describe.skipIf(!RUN)("the park notice's 다시 확인 — real Chromium", () =>
     expect(await driver.readParkRecheck()).toBe(false);
   });
 });
+
+describe.skipIf(!RUN)("nowhere clear to sit ⇒ the panel shrinks, and grows back — real Chromium", () => {
+  let browser: Browser;
+  let page: Page;
+  const rows = (n: number, label: string) =>
+    Array.from({ length: n }, (_, i) => `<div class="row" style="height:91px;border:1px solid #ccc">${label} ${i} <button>삭제</button></div>`).join("");
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true });
+    page = await browser.newPage({ viewport: { width: 1160, height: 794 } });
+    await page.setContent(`<!doctype html><meta charset="utf-8"><body style="margin:0">
+      <section style="padding-top:200px">
+        <button id="target" data-aw-target data-aw-primary style="width:200px;height:40px">저장</button>
+        <div style="height:600px"></div>
+        <div id="lists"><h5 id="mine">내 API 그룹 <span>4</span></h5>${rows(6, "그룹")}<h5>전체 API 그룹</h5>${rows(6, "추가")}</div>
+        <div style="height:1600px"></div>
+      </section></body>`);
+  });
+  afterAll(async () => {
+    await browser?.close();
+  });
+
+  const state = () =>
+    page.evaluate(() => {
+      const panel = document.getElementById("__aw_advance_panel__")!;
+      const text = panel.querySelector("[data-aw-compactable]") as HTMLElement;
+      const btn = panel.querySelector("[data-aw-advance]") as HTMLElement;
+      return {
+        compact: panel.hasAttribute("data-aw-compact"),
+        textShown: getComputedStyle(text).display !== "none",
+        buttonShown: getComputedStyle(btn).display !== "none" && btn.getBoundingClientRect().width > 0,
+        height: panel.getBoundingClientRect().height,
+      };
+    });
+
+  it("**shrinks to its header and buttons when every placement covers the lists, and opens again when there is room**", async () => {
+    await page.evaluate(AVOID_EDIT_FORM_GROUP_LISTS);
+    await mountOverlay(page, {
+      stepNumber: 5,
+      totalSteps: 8,
+      copyKey: "actionWindow.issuance.step.call_ip",
+      guidanceEnabled: true,
+      residentPanel: true,
+      label: "아래 IP를 붙여넣고 '추가' → API 그룹 확인 → 위쪽 '저장'을 직접 눌러 주세요.",
+      detail: "자세한 안내",
+      detailExpanded: true,
+      advance: { buttonLabel: "저장했어요 · 다음", token: "tok" },
+    });
+    await page.waitForTimeout(200);
+    const open = await state();
+    expect(open.compact).toBe(false);
+    expect(open.textShown).toBe(true);
+
+    // The seller scrolls into the lists: they fill the viewport, so no placement is clear.
+    await page.evaluate(() => window.scrollTo(0, document.getElementById("mine")!.getBoundingClientRect().top + window.scrollY - 40));
+    await page.waitForTimeout(700);
+    const small = await state();
+    expect(small.compact).toBe(true);
+    expect(small.textShown).toBe(false);
+    expect(small.buttonShown).toBe(true); // the way on is still there
+    expect(small.height).toBeLessThan(open.height);
+
+    // Back up where there is room: it opens again, and stays open (no flip-flop on the next frames).
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(700);
+    const again = await state();
+    expect(again.compact).toBe(false);
+    expect(again.textShown).toBe(true);
+    await page.waitForTimeout(700);
+    expect((await state()).compact).toBe(false);
+  });
+});
+
+describe.skipIf(!RUN)("shrinking never flip-flops — real Chromium", () => {
+  let browser: Browser;
+  let page: Page;
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true });
+    page = await browser.newPage({ viewport: { width: 1160, height: 794 } });
+    // Keep-clear rows fill the viewport except a 110px band at the very bottom: room for the SHRUNK panel, not
+    // for the full one. Deciding on the current size would open it (it fits), find it no longer fits, shrink it,
+    // and repeat every frame.
+    await page.setContent(`<!doctype html><meta charset="utf-8"><body style="margin:0;overflow:hidden">
+      <button data-aw-target data-aw-primary style="position:fixed;left:0;top:-200px;width:10px;height:10px">x</button>
+      <div data-aw-avoid style="position:fixed;left:0;top:0;width:1160px;height:684px"></div>
+      </body>`);
+  });
+  afterAll(async () => {
+    await browser?.close();
+  });
+
+  it("**stays shrunk where only the shrunk panel fits** — no open/shrink cycle across frames", async () => {
+    await mountOverlay(page, {
+      stepNumber: 5,
+      totalSteps: 8,
+      copyKey: "actionWindow.issuance.step.call_ip",
+      guidanceEnabled: true,
+      residentPanel: true,
+      label: "아래 IP를 붙여넣고 '추가' → API 그룹 확인 → 위쪽 '저장'을 직접 눌러 주세요.",
+      detail: "자세한 안내 문장이 여기에 길게 들어갑니다. 두 줄 이상이 되도록 충분히 길게 씁니다. 그래야 펼친 패널이 띠에 들어가지 않습니다.",
+      detailExpanded: true,
+      advance: { buttonLabel: "저장했어요 · 다음", token: "tok" },
+    });
+    const flips = await page.evaluate(
+      () =>
+        new Promise<number>((resolve) => {
+          const panel = document.getElementById("__aw_advance_panel__")!;
+          let n = 0;
+          new MutationObserver((recs) => {
+            for (const r of recs) if (r.attributeName === "data-aw-compact") n += 1;
+          }).observe(panel, { attributes: true });
+          setTimeout(() => resolve(n), 1500);
+        }),
+    );
+    expect(await page.evaluate(() => document.getElementById("__aw_advance_panel__")!.hasAttribute("data-aw-compact"))).toBe(true);
+    expect(flips).toBe(0);
+  });
+});

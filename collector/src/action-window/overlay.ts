@@ -484,8 +484,6 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
         const avoided = document.querySelectorAll("[data-aw-avoid]");
         if (targets.length === 0 && avoided.length === 0) return;
         const p = panel.getBoundingClientRect();
-        const pw = p.width;
-        const ph = p.height;
         const vw = window.innerWidth;
         const vh = window.innerHeight;
         const margin = 24;
@@ -524,7 +522,7 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
         // How much of a set of controls a panel at (x, y) would sit on, in square pixels. Zero means clear;
         // comparing areas is what lets the least-bad placement win when nothing is clear.
         const overlapAt = [
-          (x: number, y: number, boxes: number[][]) => {
+          (x: number, y: number, pw: number, ph: number, boxes: number[][]) => {
             let area = 0;
             for (let i = 0; i < boxes.length; i++) {
               const s = boxes[i]!;
@@ -535,23 +533,6 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
             return area;
           },
         ][0]!;
-        // Clamped so an oversized panel (a long step, a narrow window) is never pushed off the top-left, where
-        // the seller could not read it at all.
-        const xs = [Math.max(margin, (vw - pw) / 2), Math.max(margin, vw - pw - margin), margin];
-        const ys = [Math.max(margin, vh - ph - margin), margin];
-        // Order IS the preference: bottom-centre first (where it has always rested), then top-centre, then the
-        // right corners, then the left. The decision reads only the TARGETS and the panel's own size — never the
-        // panel's current position — so re-running it cannot move the panel, and it cannot oscillate.
-        //
-        // The two sets are compared LEXICOGRAPHICALLY, ring overlap first: the panel may sit on a control the
-        // seller is not being pointed at yet, if the alternative is sitting on the one they are. Ranking them
-        // together with a weight would let enough avoided area outvote the ring, which is a step that hides the
-        // thing it is about — and it would need a fudge factor nothing measured. Least ring, then least next.
-        // Ranked lexicographically: on-screen rings, on-screen keep-clear areas, then the projected (off-screen)
-        // rings, then projected keep-clear areas. With nothing off screen this is exactly the old two-key order.
-        let bestX = xs[0]!;
-        let bestY = ys[0]!;
-        let best: number[] | null = null;
         const better = [
           (a: number[], b: number[]) => {
             for (let k = 0; k < a.length; k++) {
@@ -560,20 +541,83 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
             return false;
           },
         ][0]!;
-        for (let xi = 0; xi < xs.length; xi++) {
-          for (let yi = 0; yi < ys.length; yi++) {
-            const x = xs[xi]!;
-            const y = ys[yi]!;
-            const score = [overlapAt(x, y, spans), overlapAt(x, y, avoidSpans), overlapAt(x, y, projSpans), overlapAt(x, y, projAvoidSpans)];
-            if (best === null || better(score, best)) {
-              best = score;
-              bestX = x;
-              bestY = y;
+        // The best of the six placements for a panel of this size. Clamped so an oversized panel (a long step, a
+        // narrow window) is never pushed off the top-left, where the seller could not read it at all.
+        //
+        // Order IS the preference: bottom-centre first (where it has always rested), then top-centre, then the
+        // right corners, then the left. The decision reads only the boxes and the panel's own size — never the
+        // panel's current position — so re-running it cannot move the panel, and it cannot oscillate.
+        //
+        // Ranked LEXICOGRAPHICALLY: on-screen rings, on-screen keep-clear areas, then the projected (off-screen)
+        // rings, then projected keep-clear areas. The panel may sit on a control the seller is not being pointed
+        // at yet, if the alternative is sitting on the one they are; weighting the sets together would let enough
+        // avoided area outvote a ring, and would need a fudge factor nothing measured. With nothing off screen this
+        // is exactly the old two-key order.
+        const choose = [
+          (pw: number, ph: number) => {
+            const xs = [Math.max(margin, (vw - pw) / 2), Math.max(margin, vw - pw - margin), margin];
+            const ys = [Math.max(margin, vh - ph - margin), margin];
+            let bx = xs[0]!;
+            let by = ys[0]!;
+            let best: number[] | null = null;
+            for (let xi = 0; xi < xs.length; xi++) {
+              for (let yi = 0; yi < ys.length; yi++) {
+                const x = xs[xi]!;
+                const y = ys[yi]!;
+                const score = [
+                  overlapAt(x, y, pw, ph, spans),
+                  overlapAt(x, y, pw, ph, avoidSpans),
+                  overlapAt(x, y, pw, ph, projSpans),
+                  overlapAt(x, y, pw, ph, projAvoidSpans),
+                ];
+                if (best === null || better(score, best)) {
+                  best = score;
+                  bx = x;
+                  by = y;
+                }
+              }
             }
-            if (best[0] === 0 && best[1] === 0 && best[2] === 0 && best[3] === 0) break;
-          }
-          if (best && best[0] === 0 && best[1] === 0 && best[2] === 0 && best[3] === 0) break;
+            return { x: bx, y: by, score: best ?? [0, 0, 0, 0] };
+          },
+        ][0]!;
+        // **Nowhere clear to sit ⇒ shrink, never sit on the seller's work** (live 2026-10-18, PO: NAVER's edit form,
+        // scrolled to the API-group lists that fill the viewport — every placement covered a list row). The panel
+        // keeps its header (channel, step) and its buttons and hides the instruction, the detail and the copy rows
+        // until a placement for its FULL size is clear again. The decision always uses the full size — remembered
+        // from the last time the panel was open — so shrinking cannot itself flip the decision back.
+        const compactParts: HTMLElement[] = Array.prototype.slice.call(document.querySelectorAll("[data-aw-compactable]"));
+        const copyRows = document.getElementById("__aw_panel_copy_rows__");
+        if (copyRows) compactParts.push(copyRows);
+        const isCompact = panel.hasAttribute("data-aw-compact");
+        if (!isCompact) {
+          G["__aw_panel_full_w__"] = p.width;
+          G["__aw_panel_full_h__"] = p.height;
         }
+        const fullW = typeof G["__aw_panel_full_w__"] === "number" ? (G["__aw_panel_full_w__"] as number) : p.width;
+        const fullH = typeof G["__aw_panel_full_h__"] === "number" ? (G["__aw_panel_full_h__"] as number) : p.height;
+        let pick = choose(fullW, fullH);
+        const crowded = pick.score[0]! > 0 || pick.score[1]! > 0;
+        if (crowded && compactParts.length > 0 && o.advance) {
+          if (!isCompact) panel.setAttribute("data-aw-compact", "");
+          for (let c = 0; c < compactParts.length; c++) {
+            const part = compactParts[c]!;
+            if (part.hasAttribute("data-aw-compact-prev") || part.style.display === "none") continue;
+            part.setAttribute("data-aw-compact-prev", part.style.display || "");
+            setStyle(part, "display", "none");
+          }
+          const small = panel.getBoundingClientRect();
+          pick = choose(small.width, small.height);
+        } else if (isCompact) {
+          panel.removeAttribute("data-aw-compact");
+          for (let c = 0; c < compactParts.length; c++) {
+            const part = compactParts[c]!;
+            if (!part.hasAttribute("data-aw-compact-prev")) continue;
+            setStyle(part, "display", part.getAttribute("data-aw-compact-prev") || "");
+            part.removeAttribute("data-aw-compact-prev");
+          }
+        }
+        const bestX = pick.x;
+        const bestY = pick.y;
         setStyle(panel, "left", `${Math.round(bestX)}px`);
         setStyle(panel, "top", `${Math.round(bestY)}px`);
         // The mount styles the panel bottom-centred with a translate; an explicit placement has to clear both or
@@ -699,6 +743,8 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
       const text = document.createElement("div");
       text.textContent = o.label != null ? o.label : o.copyKey;
       text.style.cssText = "flex:1 1 auto;line-height:1.45";
+      // Hidden when the panel has to shrink because it has nowhere clear to sit (see `reposition`).
+      text.setAttribute("data-aw-compactable", "");
       row.appendChild(text);
       // The disclosure is offered only where the panel is ALREADY interactive. On a copy-only panel it would be
       // the single button on an element that is `pointer-events:none` precisely so it can never block a control.
@@ -729,6 +775,7 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
           reposition();
         });
         toggle.id = "__aw_panel_detail_toggle__";
+        toggle.setAttribute("data-aw-compactable", "");
         row.appendChild(toggle);
       }
       if (o.advance) {
@@ -762,6 +809,7 @@ export async function mountOverlay(page: PageOrFrame, opts: OverlayOptions): Pro
       if (detailShown || detailStatic) {
         const detail = document.createElement("div");
         detail.id = "__aw_panel_detail__";
+        detail.setAttribute("data-aw-compactable", "");
         detail.textContent = o.detail != null ? o.detail : "";
         detail.style.cssText = `line-height:1.5;font-size:13px;color:#e6eeff;border-top:1px solid rgba(255,255,255,0.18);padding-top:10px;display:${startOpen ? "block" : "none"}`;
         panel.appendChild(detail);
