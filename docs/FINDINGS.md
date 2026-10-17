@@ -865,6 +865,16 @@
   요소를 넣는다(`cd8e937f`).
 - **출처** — 2026-10-18 Aside 재생 측정(「저장」 24→80px), `naver-issuance-driver.ts` `BRING_SECONDARY_ABOVE_INTO_VIEW`.
 
+### 브라우저를 못 띄운 실 Chromium 테스트가 「통과」로 보였다 (2026-10-18)
+
+- **했던 것** — `RUN_INTEGRATION=1`로 브라우저 묶음을 한꺼번에 돌리고 합계가 초록이면 통과로 읽었다.
+- **사실** — `calibration-initscript-browser.test.ts`는 `chromium.launch`가 실패하면 각 테스트를 `skip`한다. 묶음 실행에서
+  launch가 부하로 실패해 7~18건이 skipped로 바뀌었고, 실패는 0이었다. 그 파일만 따로 돌리면 7/7 통과. 같은 날 Playwright 캐시
+  폴더가 통째로 사라졌을 때도 같은 모양(통과 0 · 실패 1 · 나머지 skipped)이었다.
+- **다음에** — 실 Chromium 묶음은 합계의 skipped 수를 직전 실행과 맞춰 본다. 늘었으면 그 파일을 따로 돌린다. launch 실패를 skip으로
+  바꾸는 패턴은 RUN_INTEGRATION 아래에선 실패여야 맞다 — 고칠 대상으로 남긴다.
+- **출처** — 2026-10-18, `test/action-window/api-issuance-calibration/calibration-initscript-browser.test.ts:44-49`.
+
 ### 감시 필터의 `cut`이 줄을 모아 두어 라이브 진행을 실시간으로 못 봤다 (2026-10-17)
 
 - **했던 것** — 강조 확인 4차 호스트 로그를 `tail -f | grep -v --line-buffered … | cut -c1-300`으로 감시했다.
