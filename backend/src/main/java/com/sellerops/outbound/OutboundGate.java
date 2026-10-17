@@ -43,9 +43,9 @@ public final class OutboundGate {
         PRODUCT_IMAGE,
         /**
          * The vendor server ({@code vendor-server/}, contract {@code docs/vendor_server_contract_v1.md}): install
-         * registration, the public-IP echo, later the review exchange and the Cafe24 token relay. Its production
-         * host name is not decided yet, so {@link #VENDOR_HOSTS} is empty and only loopback (development against a
-         * local vendor server) is reachable — a configured base URL cannot point this anywhere else.
+         * registration, the public-IP echo, later the review exchange and the Cafe24 token relay. Exactly one host
+         * ({@link #VENDOR_HOSTS}) plus loopback (development against a local vendor server) — a configured base URL
+         * cannot point this anywhere else.
          */
         VENDOR,
         /** Channels outside the seller-visible set (NAVER/Coupang/Cafe24) — refused on a seller's PC. */
@@ -58,8 +58,12 @@ public final class OutboundGate {
     private static final Set<String> COUPANG_HOSTS = Set.of("api-gateway.coupang.com");
     private static final String CAFE24_SUFFIX = ".cafe24api.com";
     private static final Set<String> LLM_HOSTS = Set.of("api.anthropic.com", "api.openai.com");
-    /** Empty until the vendor server's IPv4-only host name is fixed (contract §7, §9) — refused off loopback. */
-    private static final Set<String> VENDOR_HOSTS = Set.of();
+    /**
+     * The vendor server's one host name (scope lock v1.14 ⑧-4 (c), contract §7): a sub-domain with an A record
+     * (3.39.210.89) and no AAAA, so a PC that reaches it does so over IPv4 and {@code /v1/ip} answers the address
+     * NAVER needs. The bare {@code reviewnary-pilot} name stays the paused pilot's.
+     */
+    private static final Set<String> VENDOR_HOSTS = Set.of("vendor.reviewnary-pilot.duckdns.org");
     private static final Set<String> LOOPBACK = Set.of("localhost", "127.0.0.1", "::1", "[::1]");
 
     private static volatile boolean armed;

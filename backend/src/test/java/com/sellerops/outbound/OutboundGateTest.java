@@ -62,7 +62,13 @@ class OutboundGateTest {
     }
 
     @Test
-    void theVendorServerIsReachableOnlyOnLoopbackUntilItsHostIsFixed() {
+    void theVendorServerIsReachableOnlyAtItsOwnHost() {
+        assertThat(allows("https://vendor.reviewnary-pilot.duckdns.org/v1/ip", Destination.VENDOR)).isTrue();
+        assertThat(allows("http://vendor.reviewnary-pilot.duckdns.org/v1/ip", Destination.VENDOR)).isFalse();
+        assertThat(allows("https://reviewnary-pilot.duckdns.org/v1/ip", Destination.VENDOR)).as("the pilot").isFalse();
+        assertThat(allows("https://vendor.reviewnary-pilot.duckdns.org.evil.example.com/v1/ip", Destination.VENDOR))
+                .isFalse();
+        assertThat(allows("https://vendor.reviewnary-pilot.duckdns.org/v1/ip", Destination.LLM)).isFalse();
         assertThat(allows("https://vendor.example.com/v1/ip", Destination.VENDOR)).isFalse();
         assertThat(allows("https://api.commerce.naver.com/v1/ip", Destination.VENDOR)).isFalse();
         assertThat(allows("http://127.0.0.1:8090/v1/ip", Destination.VENDOR)).isTrue();
