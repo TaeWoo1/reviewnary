@@ -11,8 +11,20 @@
  * discarded and replaced with the connect route, so nothing can ride along in it.
  */
 
-/** The one route the walk returns to: the Coupang connect screen, where the connection is completed. */
+/** The route the Coupang walk returns to: the Coupang connect screen, where the connection is completed. */
 export const SELLEROPS_COUPANG_CONNECT_PATH = "/connect/coupang";
+
+/**
+ * The route the NAVER walk returns to: the NAVER connect screen, where the seller types the two values in.
+ *
+ * Until 2026-10-17 there was one route for both walks, so the NAVER walk's last step opened the COUPANG connect
+ * screen — found when the 4차 Phase B harness was first given the product's return. It carries no resume marker:
+ * the NAVER screen has no reader for one, and a marker nothing reads would be a promise nobody keeps.
+ */
+export const SELLEROPS_NAVER_CONNECT_PATH = "/connect/naver";
+
+/** Which walk is returning — it decides the route, and nothing else. */
+export type SellerOpsReturnChannel = "coupang" | "naver";
 
 /**
  * **The marker that says "this is a RETURN, not an arrival"** — the whole of D2's URL half.
@@ -57,12 +69,17 @@ const LOOPBACK_HOSTS: readonly string[] = ["localhost", "127.0.0.1", "[::1]", ":
  * to have run the screening first.
  */
 export function isSellerOpsReturnUrl(url: string): boolean {
-  const screened = screenSellerOpsReturnUrl(url);
-  return screened.ok && screened.url === url;
+  return (["coupang", "naver"] as const).some((channel) => {
+    const screened = screenSellerOpsReturnUrl(url, channel);
+    return screened.ok && screened.url === url;
+  });
 }
 
 /** Screen a configured SellerOps app URL into the exact return destination, or refuse with a reason. */
-export function screenSellerOpsReturnUrl(appUrl: string | undefined): SellerOpsReturnScreen {
+export function screenSellerOpsReturnUrl(
+  appUrl: string | undefined,
+  channel: SellerOpsReturnChannel = "coupang",
+): SellerOpsReturnScreen {
   const raw = (appUrl ?? "").trim();
   if (raw === "") return { ok: false, reason: "EMPTY" };
   let parsed: URL;
@@ -75,5 +92,6 @@ export function screenSellerOpsReturnUrl(appUrl: string | undefined): SellerOpsR
   if (!LOOPBACK_HOSTS.includes(parsed.hostname)) return { ok: false, reason: "NOT_LOOPBACK" };
   // ORIGIN ONLY. Everything else about the configured value is dropped rather than carried forward — the
   // route and the resume marker are ours, not the operator's.
+  if (channel === "naver") return { ok: true, url: `${parsed.origin}${SELLEROPS_NAVER_CONNECT_PATH}` };
   return { ok: true, url: `${parsed.origin}${SELLEROPS_COUPANG_CONNECT_PATH}?${SELLEROPS_ISSUANCE_RESUME_QUERY}` };
 }

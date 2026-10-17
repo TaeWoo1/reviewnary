@@ -743,6 +743,28 @@ export function naverCallIpSource(cfg: ReturnType<typeof loadConfig>): () => Pro
   };
 }
 
+/**
+ * **The NAVER walk's last step, made real** — the screened hand-off back to SellerOps, shared by the resident
+ * carrier and the gated live CLI so a proof run ends the way the product does.
+ */
+export async function naverReturnToSellerOps(): Promise<void> {
+  const screened = screenSellerOpsReturnUrl(loadConfig().appUrl, "naver");
+  if (!screened.ok) {
+    // Nothing opens. A refused destination leaves the seller on the API centre with their two values,
+    // which is a worse ending than a working button and a much better one than a browser sent somewhere
+    // unvouched for.
+    log("aw_issuance_return_refused", { reason: screened.reason }, "warn");
+    return;
+  }
+  const plan = planOsOpen(screened.url, process.platform);
+  if (!plan.ok) {
+    log("aw_issuance_return_refused", { reason: plan.reason }, "warn");
+    return;
+  }
+  const opened = await openInDefaultBrowser(plan.command, plan.args);
+  log("aw_issuance_returned_to_sellerops", { opened, surface: "DEFAULT_BROWSER" });
+}
+
 export function buildNaverIssuanceLiveConfig(): NaverIssuanceLiveCarrier {
   const cfg = loadConfig();
   let walkContext: BrowserContext | null = null;
@@ -759,23 +781,7 @@ export function buildNaverIssuanceLiveConfig(): NaverIssuanceLiveCarrier {
      * This channel has no credential handoff, so the walk ends where the seller finishes the connection
      * themselves. Getting them there is the difference between a CTA and a label.
      */
-    returnToSellerOps: async () => {
-      const screened = screenSellerOpsReturnUrl(loadConfig().appUrl);
-      if (!screened.ok) {
-        // Nothing opens. A refused destination leaves the seller on the API centre with their two values,
-        // which is a worse ending than a working button and a much better one than a browser sent somewhere
-        // unvouched for.
-        log("aw_issuance_return_refused", { reason: screened.reason }, "warn");
-        return;
-      }
-      const plan = planOsOpen(screened.url, process.platform);
-      if (!plan.ok) {
-        log("aw_issuance_return_refused", { reason: plan.reason }, "warn");
-        return;
-      }
-      const opened = await openInDefaultBrowser(plan.command, plan.args);
-      log("aw_issuance_returned_to_sellerops", { opened, surface: "DEFAULT_BROWSER" });
-    },
+    returnToSellerOps: naverReturnToSellerOps,
     open: async () => {
       if (!walkContext) {
         // `followWindow` for the same live-measured reason the WING walk needs it: without it Playwright pins
