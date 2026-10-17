@@ -29,6 +29,9 @@ export const VISUAL_RECON_TARGET_IDS = [
   "credentials.application_secret_label",
   "credentials.secret_view_button",
   "credentials.secret_copy_button",
+  "app_detail.call_ip_row",
+  "app_detail.edit_button",
+  "app_edit.call_ip_label",
 ] as const;
 export type VisualReconTargetId = (typeof VISUAL_RECON_TARGET_IDS)[number];
 
@@ -158,6 +161,12 @@ export const VISUAL_RECON_LABEL_PROBES: readonly FixedLabelProbe[] = [
   { targetId: "credentials.application_id_label", screen: "credentials", candidateQuery: "th,td,dt,label,span,div", exactText: "애플리케이션 ID" },
   { targetId: "credentials.secret_view_button", screen: "credentials", candidateQuery: "button, a, [role='button']", exactText: "보기" },
   { targetId: "credentials.secret_copy_button", screen: "credentials", candidateQuery: "button, a, [role='button']", exactText: "복사" },
+  // The call-IP step (2026-10-17). On the detail page 「API호출 IP」 is a read-only row (NAVER writes it with no
+  // space) and 「수정」 opens the edit form — whose label wording is not yet seen, so the edit-screen probe measures
+  // the same fixed label and the redacted screenshot settles the rest.
+  { targetId: "app_detail.call_ip_row", screen: "app_detail", candidateQuery: "th,td,dt,label,span,div", exactText: "API호출 IP" },
+  { targetId: "app_detail.edit_button", screen: "app_detail", candidateQuery: "button, a, [role='button']", exactText: "수정" },
+  { targetId: "app_edit.call_ip_label", screen: "app_edit", candidateQuery: "th,td,dt,label,span,div", exactText: "API호출 IP" },
 ];
 
 /** The fixed-label probes that apply to a given screen (the CLI runs these on that screen's live viewport). */

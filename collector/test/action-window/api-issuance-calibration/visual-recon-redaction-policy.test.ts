@@ -223,6 +223,11 @@ describe("fixed-label read-only matchCount probe — value-free integer counts",
     // app_detail SECTION is anchored on the unique "애플리케이션 ID" label (the bare "애플리케이션" heading is
     // non-unique on this page: run #5 measured 3 copies incl. sidebar + breadcrumb).
     expect(byId["app_detail.application_section"]!.exactText).toBe("애플리케이션 ID");
+    // The call-IP step: NAVER writes 「API호출 IP」 with no space (redacted capture vis_207bfc3901f6), on the
+    // detail row and — to be measured — on the edit form behind 「수정」.
+    expect(byId["app_detail.call_ip_row"]!.exactText).toBe("API호출 IP");
+    expect(byId["app_detail.edit_button"]!.exactText).toBe("수정");
+    expect(labelProbesForScreen("app_edit").map((p) => p.targetId)).toEqual(["app_edit.call_ip_label"]);
   });
 
   it("the probe script embeds the probes and RETURNS only {targetId, matchCount} — never page text", () => {

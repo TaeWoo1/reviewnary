@@ -275,8 +275,16 @@ describe("evaluateSelectorCandidate — the five adoption conditions", () => {
 });
 
 describe("VISUAL_RECON_SCREENS", () => {
-  it("covers the four onboarding screens in order", () => {
-    expect(VISUAL_RECON_SCREENS).toEqual(["app_list", "app_detail", "api_group", "credentials"]);
+  it("covers the onboarding screens in order, then the edit form that holds the call-IP input", () => {
+    expect(VISUAL_RECON_SCREENS).toEqual(["app_list", "app_detail", "api_group", "credentials", "app_edit"]);
+  });
+
+  it("the call-IP sitting can scope to the detail page and the edit form only", () => {
+    const r = resolveVisualReconScope("app_edit, app_detail");
+    expect(r).toEqual({ ok: true, screens: ["app_detail", "app_edit"] });
+    expect(isCanonicalVisualReconSubset(["app_detail", "app_edit"])).toBe(true);
+    expect(isCanonicalVisualReconSubset(["app_edit", "app_detail"])).toBe(false);
+    expect(resolveVisualReconScope("app_edit,app_save").ok).toBe(false);
   });
 });
 

@@ -274,9 +274,11 @@ export function visualScreenAskFor(screen: VisualReconScreen, checkpoint: Visual
   return {
     title: `VISUAL RECON — ${screen}`,
     headline:
-      checkpoint.navigation === "scroll_same_page"
-        ? "같은 페이지입니다 — 이동하지 마시고, 이 구간이 보이도록 직접 스크롤한 뒤 확인해 주세요."
-        : "이 페이지로 직접 이동하신 뒤 확인해 주세요.",
+      screen === "app_edit"
+        ? "애플리케이션 상세에서 [수정]을 직접 눌러 수정 화면을 연 뒤 확인해 주세요. 저장 · 확인 버튼은 누르지 마세요 — 화면만 봅니다."
+        : checkpoint.navigation === "scroll_same_page"
+          ? "같은 페이지입니다 — 이동하지 마시고, 이 구간이 보이도록 직접 스크롤한 뒤 확인해 주세요."
+          : "이 페이지로 직접 이동하신 뒤 확인해 주세요.",
     lines: [
       `page: ${checkpoint.page}, ${checkpoint.kind}`,
       "열린 전용 Chrome 창에서 직접 이동/스크롤하세요 — SellerOps는 그 창을 조작하지 않습니다.",

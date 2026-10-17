@@ -10,6 +10,7 @@ import {
   runVisualReconSession,
   visualArtifactDirAbs,
   visualScreenshotAbsPath,
+  visualScreenAskFor,
   visualSummaryAbsPath,
   type VisualCheckpointSignal,
   type VisualReconSessionDeps,
@@ -185,5 +186,15 @@ describe("visual-recon artifact paths — confined to the gitignored sink", () =
   it("rejects any path that escapes the sink", () => {
     expect(isSafeVisualArtifactPath(visualArtifactDirAbs() + "/../escape.png")).toBe(false);
     expect(isSafeVisualArtifactPath("/etc/passwd")).toBe(false);
+  });
+});
+
+describe("visualScreenAskFor — the edit form", () => {
+  it("asks the operator to open 「수정」 themselves and to save nothing", async () => {
+    const { checkpointFor } = await import("../../src/action-window/api-issuance-calibration/visual-recon");
+    const ask = visualScreenAskFor("app_edit", checkpointFor("app_edit"));
+    expect(ask.headline).toContain("[수정]을 직접 눌러");
+    expect(ask.headline).toContain("저장 · 확인 버튼은 누르지 마세요");
+    expect(visualScreenAskFor("app_detail", checkpointFor("app_detail")).headline).not.toContain("수정");
   });
 });

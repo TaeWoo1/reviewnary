@@ -41,14 +41,18 @@ import {
 } from "./calibration";
 import { countBucket, observeFrom, type ApiCenterPageCategory, type ApiCenterSignals, type ApiCenterStructuralCensus, type ApiCenterUrlCategory, type CountBucket } from "../../cli/observe-api-center";
 
-/* ────────────────────────────── the four recon screens ────────────────────────────── */
+/* ────────────────────────────── the recon screens ────────────────────────────── */
 
 /**
- * The four API-center screens visual recon covers, in the natural onboarding order. Distinct from the hotkey
+ * The API-center screens visual recon covers, in the natural onboarding order. `app_edit` (added 2026-10-17) is
+ * the application's edit form behind 「수정」: the app detail page shows 「API호출 IP」 only as a read-only row
+ * (redacted capture `vis_207bfc3901f6`), so the input a seller types the call IP into lives there — the target the
+ * seller-PC connection flow needs to point at (scope lock v1.14 ⑧-4). The operator opens it themselves and saves
+ * nothing. Distinct from the hotkey
  * calibrator's `CALIBRATION_STAGES` (which carried an `app_detail_anchor` capture stage): visual recon captures
  * a redacted image of each SCREEN, so the unit is the screen, not a per-element anchor.
  */
-export const VISUAL_RECON_SCREENS = ["app_list", "app_detail", "api_group", "credentials"] as const;
+export const VISUAL_RECON_SCREENS = ["app_list", "app_detail", "api_group", "credentials", "app_edit"] as const;
 export type VisualReconScreen = (typeof VISUAL_RECON_SCREENS)[number];
 
 /**
@@ -60,7 +64,7 @@ export type VisualReconScreen = (typeof VISUAL_RECON_SCREENS)[number];
  * the recon honest about how many real page loads there are. `VISUAL_RECON_SCREENS` (and the manifest) are
  * unchanged; this is grouping metadata only.
  */
-export type VisualReconPage = "application_list" | "application_detail";
+export type VisualReconPage = "application_list" | "application_detail" | "application_edit";
 export interface VisualReconCheckpoint {
   screen: VisualReconScreen;
   page: VisualReconPage;
@@ -74,6 +78,7 @@ export const VISUAL_RECON_CHECKPOINTS: readonly VisualReconCheckpoint[] = [
   { screen: "app_detail", page: "application_detail", kind: "page", navigation: "navigate" },
   { screen: "api_group", page: "application_detail", kind: "viewport_checkpoint", navigation: "scroll_same_page" },
   { screen: "credentials", page: "application_detail", kind: "viewport_checkpoint", navigation: "scroll_same_page" },
+  { screen: "app_edit", page: "application_edit", kind: "page", navigation: "navigate" },
 ];
 /** The checkpoint metadata for a screen (defaults to a standalone page if — impossibly — unmapped). */
 export function checkpointFor(screen: VisualReconScreen): VisualReconCheckpoint {
