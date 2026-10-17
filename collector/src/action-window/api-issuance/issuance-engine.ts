@@ -87,9 +87,11 @@ const TARGET_STEP: Readonly<Record<IssuanceTarget, number>> = {
   // Step 3 is the target-less usage-state advisory (`guiding_app_usage_check`); the highlightable controls
   // resume at step 4.
   api_group: 4,
-  application_id: 5,
-  application_secret: 6,
-  return: 7,
+  open_edit: 5,
+  call_ip: 6,
+  application_id: 7,
+  application_secret: 8,
+  return: 9,
 };
 
 /** The 1-based step number of the text-only usage-state advisory barrier (no target — highlights nothing). */
@@ -121,7 +123,7 @@ export class IssuanceEngine {
   private targetSig: Partial<Record<IssuanceTarget, string>> = {};
   private blockerCode: "LOGIN_REQUIRED" | "TARGET_NOT_FOUND" | "UI_DRIFT" | "SURFACE_CLOSED" | null = null;
   private blockerRecoverable = false;
-  /** A pause is an overlay on a barrier, not a 16th stage — the product's stage list is exactly 15. */
+  /** A pause is an overlay on a barrier, not an 18th stage — the product's stage list is exactly 17. */
   private paused = false;
   private readonly log: EventEnvelope[] = [];
 
@@ -324,7 +326,12 @@ export class IssuanceEngine {
     if (isIssuanceTerminal(this.stage)) return "NONE";
     // Not unique, OR a signature that is not an opaque 16-hex token → park. The hex check is fail-closed
     // against a driver that returned a raw value as its "sig": such a value must never reach `targetRef`.
-    if (res.count !== 1 || !res.sig || !HEX16.test(res.sig)) return this.park("target_not_found", "TARGET_NOT_FOUND");
+    if (res.count !== 1 || !res.sig || !HEX16.test(res.sig)) {
+      // The park is ABOUT this target's step, not the one just completed — the same move `onDriveFault` makes, so
+      // a seller parked on the call-IP row reads "6/9", not the 「수정」 step they already finished.
+      this.activeStepIndex = TARGET_STEP[target];
+      return this.park("target_not_found", "TARGET_NOT_FOUND");
+    }
     this.targetSig[target] = res.sig;
     return { guide: target }; // session proceeds to highlight; kept as a `guide` continuation marker
   }
@@ -410,7 +417,15 @@ export class IssuanceEngine {
       case "create_app":
       case "open_app":
         return this.enterAppUsageCheck();
+      // The call IP (2026-10-17): open the edit form, then register the IP on it — before the credential copies,
+      // so the IP the seller copies cannot overwrite a copied Application ID / Secret on their clipboard.
       case "api_group":
+        this.currentTarget = "open_edit";
+        return { guide: "open_edit" };
+      case "open_edit":
+        this.currentTarget = "call_ip";
+        return { guide: "call_ip" };
+      case "call_ip":
         this.currentTarget = "application_id";
         return { guide: "application_id" };
       // The credential section is two steps: copy the Application ID, then view+copy the Secret. `return` is

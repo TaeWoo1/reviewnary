@@ -28,6 +28,8 @@ const KEY_FOR_TARGET: Readonly<Record<IssuanceTarget, string>> = {
   create_app: "actionWindow.issuance.createApp",
   open_app: "actionWindow.issuance.openApp",
   api_group: "actionWindow.issuance.apiGroup",
+  open_edit: "actionWindow.issuance.openEdit",
+  call_ip: "actionWindow.issuance.callIp",
   application_id: "actionWindow.issuance.applicationId",
   application_secret: "actionWindow.issuance.applicationSecret",
   return: "actionWindow.issuance.return",

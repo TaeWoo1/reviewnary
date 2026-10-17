@@ -23,10 +23,32 @@ import type { IssuanceStage } from "./issuance-stages";
  * A control the runtime may highlight and then watch. Never a selector — a semantic role. The credential
  * section is TWO separate steps: `application_id` (highlight the ID row) then `application_secret` (highlight
  * the Secret view/copy controls) — the seller copies each value itself; the runtime reads neither.
+ *
+ * The call IP is TWO steps as well (2026-10-17): `open_edit` points at the detail page's 「수정」, and `call_ip`
+ * points at the edit form's 「API호출 IP」 row while the panel shows the IP to register. The seller presses
+ * 「수정」, pastes, presses 「추가」 and 「저장」 themselves. They come BEFORE the credential copies so the IP the
+ * seller copies never overwrites a copied Application ID or Secret on the clipboard.
  */
-export type IssuanceTarget = "create_app" | "open_app" | "api_group" | "application_id" | "application_secret" | "return";
+export type IssuanceTarget =
+  | "create_app"
+  | "open_app"
+  | "api_group"
+  | "open_edit"
+  | "call_ip"
+  | "application_id"
+  | "application_secret"
+  | "return";
 
-export const ISSUANCE_TARGETS: readonly IssuanceTarget[] = ["create_app", "open_app", "api_group", "application_id", "application_secret", "return"];
+export const ISSUANCE_TARGETS: readonly IssuanceTarget[] = [
+  "create_app",
+  "open_app",
+  "api_group",
+  "open_edit",
+  "call_ip",
+  "application_id",
+  "application_secret",
+  "return",
+];
 
 /**
  * The ONE target for which SellerOps observes a real NAVER click / page TRANSITION: opening (or creating and
@@ -45,7 +67,15 @@ export const ISSUANCE_TRANSITION_OBSERVE_TARGET: IssuanceTarget = "open_app";
  * the app themselves, then presses "다음" — the following `api_group` checkpoint's own locate gates that they
  * actually reached the detail page. `return` is a guidance-only checkpoint (no NAVER section to locate).
  */
-export const ISSUANCE_CHECKPOINT_TARGETS: readonly IssuanceTarget[] = ["create_app", "api_group", "application_id", "application_secret", "return"];
+export const ISSUANCE_CHECKPOINT_TARGETS: readonly IssuanceTarget[] = [
+  "create_app",
+  "api_group",
+  "open_edit",
+  "call_ip",
+  "application_id",
+  "application_secret",
+  "return",
+];
 
 /** True for a same-page viewport checkpoint (advance on operator "다음"); false only for {@link ISSUANCE_TRANSITION_OBSERVE_TARGET}. */
 export function isCheckpointTarget(target: IssuanceTarget): boolean {
@@ -60,6 +90,8 @@ export const TARGET_BARRIER_STAGE: Readonly<Record<IssuanceTarget, IssuanceStage
   create_app: "guiding_create",
   open_app: "guiding_app_detail",
   api_group: "guiding_api_group",
+  open_edit: "guiding_open_edit",
+  call_ip: "guiding_call_ip",
   application_id: "guiding_application_id",
   application_secret: "guiding_application_secret",
   return: "return_to_sellerops",

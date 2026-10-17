@@ -118,6 +118,18 @@ export const VISUAL_RECON_CANDIDATES: readonly ProposedCandidate[] = [
     note: "시크릿 행의 '복사' 버튼(값 복사 컨트롤의 위치만 식별 — 값 자체는 대상 아님).",
     candidate: fixedLabelCandidate("credentials", 'role=button[name="복사"]'),
   },
+  {
+    targetId: "app_detail.edit_button",
+    screen: "app_detail",
+    note: "app_detail 「애플리케이션」 구역 머리의 '수정' 버튼('사용현황' 옆). 수정 화면에서는 같은 자리가 '취소'·'저장'으로 바뀜.",
+    candidate: fixedLabelCandidate("app_detail", 'role=button[name="수정"]'),
+  },
+  {
+    targetId: "app_edit.call_ip_label",
+    screen: "app_edit",
+    note: "수정 화면 「API호출 IP (n/3)」 행의 라벨. 같은 행에 입력 칸 + '추가', 등록된 IP마다 '삭제'. 값(IP)은 대상 아님.",
+    candidate: fixedLabelCandidate("app_edit", 'text="API호출 IP"'),
+  },
 ];
 
 /** A proposal with its eligibility verdict — every one is non-adoptable offline (matchCount unmeasured). */

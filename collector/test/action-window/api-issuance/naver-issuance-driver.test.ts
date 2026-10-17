@@ -107,6 +107,13 @@ interface FakePageOptions {
    * narrows to one match but the in-page exact-label scan counts differently → the `tag`-stage non-unique path.
    */
   tagResult?: LocateResult;
+  /**
+   * Whether the seller opens the edit form once 「수정」 is ringed (default true). The call-IP step counts as found
+   * only when the detail page's 「수정」 is gone, so `false` models a seller who pressed 다음 without opening it.
+   */
+  editFormOpens?: boolean;
+  /** The IP(s) the carrier hands the call-IP panel; absent ⇒ no source wired. */
+  callIps?: readonly string[];
 }
 
 /** A minimal fake Playwright Locator: enough of the surface the SPA-stable resolver uses (never a click/type). */
@@ -149,6 +156,9 @@ class FakePage {
   tagResult: LocateResult | undefined;
   apiGroupMountFaultMessage: string;
   mountSubStage: string | undefined;
+  editFormOpens: boolean;
+  /** Latches once 「수정」 has been ringed and the seller (modelled) opened the edit form: 「수정」 is then gone. */
+  private editOpen = false;
   /** Latches once the app-entry rows have been read — the seller then opens their app, so census → postOpen. */
   private opened = false;
   /** Index into `postOpenCensusSequence` — advances per post-open census read (last entry sticks). */
@@ -177,6 +187,7 @@ class FakePage {
     this.tagResult = o.tagResult;
     this.apiGroupMountFaultMessage = o.apiGroupMountFaultMessage ?? "boom weird mount failure";
     this.mountSubStage = o.mountSubStage;
+    this.editFormOpens = o.editFormOpens ?? true;
     this.throwLocateLeft = o.throwLocateTimes ?? 0;
     this.apiGroupMountThrowLeft = o.apiGroupMountThrowTimes ?? 0;
     this.apiGroupMountNoPaintLeft = o.apiGroupMountNoPaintTimes ?? 0;
@@ -252,6 +263,15 @@ class FakePage {
       if (this.throwLocateLeft > 0) {
         this.throwLocateLeft -= 1;
         throw new Error("execution context was destroyed");
+      }
+      // 「수정」: present on the detail page until the seller opens the edit form (modelled as happening once the
+      // ring is drawn on it), then gone — which is what the call-IP step's absence check reads.
+      if (s.includes('"수정"')) {
+        if (s.includes("issuance-fixed-label-tag")) {
+          this.editOpen = this.editFormOpens;
+          return this.locate;
+        }
+        if (this.editOpen) return { count: 0 };
       }
       // Decoupled tag count (drift): the in-page exact-label scan may count differently than the locator did.
       if (this.tagResult) return this.tagResult;
@@ -329,6 +349,7 @@ function build(o: BuildOptions = {}) {
     inpageRetryMs: 0,
     verifyPollMs: 0,
     ...(o.context ? { context: o.context } : {}),
+    ...(o.callIps ? { callIps: async () => o.callIps! } : {}),
   });
   const session = new IssuanceGuidanceSession(engine, driver, io.transport, { rearmDelayMs: 1 });
   session.attach();
@@ -371,7 +392,7 @@ async function pressNextToComplete(
   engine: IssuanceEngine,
   session: IssuanceGuidanceSession,
 ): Promise<void> {
-  for (let i = 0; i < 8 && engine.currentStage() !== "guidance_complete"; i++) {
+  for (let i = 0; i < 12 && engine.currentStage() !== "guidance_complete"; i++) {
     command(io, "REQUEST_STEP_RECHECK", io.lastView()!.revision, `nx${i}`);
     await session.whenSettled();
   }
@@ -391,10 +412,10 @@ describe("NaverIssuanceDriver over a fake Page — the calibrated NEW-app (creat
     const step2 = io.views().find((v) => v.currentStep?.stepNumber === 2)?.currentStep;
     expect(step2?.copyParams?.targetKind).toBe("create_app");
 
-    // Every highlighted target ref is an opaque 16-hex — never a selector or value. Five barriers highlight:
-    // create_app, api_group, application_id, application_secret, and the guidance-only `return`.
+    // Every highlighted target ref is an opaque 16-hex — never a selector or value. Seven barriers highlight:
+    // create_app, api_group, open_edit, call_ip, application_id, application_secret, and the guidance-only `return`.
     const refs = io.events().filter((e) => e.type === "TARGET_HIGHLIGHTED").map((e) => e.payload.targetRef as string);
-    expect(refs.length).toBe(5);
+    expect(refs.length).toBe(7);
     for (const ref of refs) expect(ref).toMatch(HEX16);
 
     // AUTOMATIC ACTION = 0: the driver never invoked the page's click.
@@ -991,5 +1012,98 @@ describe("NaverIssuanceDriver — Overlay Mount Fault Identification: sub-stage 
     await session.whenSettled();
     await pressNextToComplete(io, engine, session);
     expect(substageFaults().length).toBe(0);
+  });
+});
+
+/* ─────────────────── the call IP (2026-10-17): 「수정」, then the edit form's 「API호출 IP」 row ─────────────────── */
+
+/** Press 다음 until the run rests on `stage` (bounded). */
+async function pressUntil(
+  io: ReturnType<typeof loopback>,
+  engine: IssuanceEngine,
+  session: IssuanceGuidanceSession,
+  stage: string,
+): Promise<void> {
+  for (let i = 0; i < 12 && engine.currentStage() !== stage; i++) {
+    command(io, "REQUEST_STEP_RECHECK", io.lastView()!.revision, `pu${i}`);
+    await session.whenSettled();
+  }
+}
+
+describe("NaverIssuanceDriver — the call-IP steps", () => {
+  it("rings 「수정」 at step 5 and the edit form's row at step 6, both before the credential copies", async () => {
+    const { io, engine, session } = build({ appEntryCount: 1 });
+    startRun(io);
+    await session.whenSettled();
+    await pressUntil(io, engine, session, "guiding_open_edit");
+    expect(io.lastView()?.currentStep?.stepNumber).toBe(5);
+    expect(io.lastView()?.currentStep?.copyParams?.targetKind).toBe("open_edit");
+    await pressUntil(io, engine, session, "guiding_call_ip");
+    expect(io.lastView()?.currentStep?.stepNumber).toBe(6);
+    expect(io.lastView()?.currentStep?.copyParams?.targetKind).toBe("call_ip");
+    expect(io.lastView()?.blocker).toBeUndefined();
+  });
+
+  it("**parks instead of ringing the detail page's read-only row** when the edit form was never opened", async () => {
+    // 「API호출 IP」 measured once on BOTH screens; only 「수정」's absence tells the edit form apart.
+    const { io, engine, session } = build({ appEntryCount: 1, editFormOpens: false });
+    startRun(io);
+    await session.whenSettled();
+    await pressUntil(io, engine, session, "guiding_open_edit");
+    command(io, "REQUEST_STEP_RECHECK", io.lastView()!.revision, "to-call-ip");
+    await session.whenSettled();
+
+    expect(engine.currentStage()).toBe("target_not_found");
+    expect(io.lastView()?.blocker?.code).toBe("TARGET_NOT_FOUND");
+    expect(io.lastView()?.blocker?.recoverable).toBe(true);
+    expect(io.lastView()?.currentStep?.stepNumber).toBe(6);
+    expect(io.events().filter((e) => e.type === "TARGET_HIGHLIGHTED").length).toBe(3); // create/open_app, api_group, open_edit — never call_ip
+  });
+
+  it("puts the carrier's IPv4 beside a write-only copy button — and only IPv4", async () => {
+    const { io, engine, session, page } = build({ appEntryCount: 1, callIps: ["203.0.113.7", "not-an-ip", "203.0.113.7"] });
+    startRun(io);
+    await session.whenSettled();
+    await pressUntil(io, engine, session, "guiding_call_ip");
+
+    const rows = page.scripts.filter((s) => s.includes("aw-panel-copy-rows"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toContain('["203.0.113.7"]');
+    expect(rows[0]).not.toContain("not-an-ip");
+    expect(rows[0]).toContain("navigator.clipboard.writeText(ip)");
+    for (const tok of ["readText", "clipboard.read(", ".value", "inputValue"]) expect(rows[0]).not.toContain(tok);
+  });
+
+  it("says where to find the IP rather than inventing one when the carrier has none", async () => {
+    const { io, engine, session, page } = build({ appEntryCount: 1 });
+    startRun(io);
+    await session.whenSettled();
+    await pressUntil(io, engine, session, "guiding_call_ip");
+
+    const rows = page.scripts.filter((s) => s.includes("aw-panel-copy-rows"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toContain("var ROWS = [];");
+    expect(rows[0]).toContain("'API 호출 IP 등록 안내'");
+  });
+
+  it("SECRET READ = 0 across the WHOLE walk; the clipboard appears only in the audited write-only copy rows", async () => {
+    const { io, engine, session, page } = build({ appEntryCount: 1, callIps: ["203.0.113.7"] });
+    startRun(io);
+    await session.whenSettled();
+    await pressNextToComplete(io, engine, session);
+    expect(engine.currentStage()).toBe("guidance_complete");
+
+    let copyRows = 0;
+    for (const s of page.scripts) {
+      for (const tok of [".value", "inputValue", "readText(", ".screenshot("]) expect(s, `leaked ${tok}`).not.toContain(tok);
+      if (s.includes("aw-panel-copy-rows")) {
+        copyRows += 1;
+        expect(s).not.toContain("clipboard.read(");
+        continue;
+      }
+      expect(s, "clipboard outside the audited copy rows").not.toContain("clipboard");
+    }
+    expect(copyRows).toBe(1);
+    expect(page.clickCalls).toBe(0);
   });
 });

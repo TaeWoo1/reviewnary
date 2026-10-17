@@ -22,6 +22,8 @@ const ALL_STAGES: IssuanceStage[] = [
   "empty_state",
   "guiding_create",
   "guiding_api_group",
+  "guiding_open_edit",
+  "guiding_call_ip",
   "guiding_app_detail",
   "guiding_app_usage_check",
   "guiding_application_id",
@@ -42,6 +44,8 @@ describe("issuance stages — run-status projection", () => {
     empty_state: "RUNNING",
     guiding_create: "WAITING_FOR_HUMAN",
     guiding_api_group: "WAITING_FOR_HUMAN",
+    guiding_open_edit: "WAITING_FOR_HUMAN",
+    guiding_call_ip: "WAITING_FOR_HUMAN",
     guiding_app_detail: "WAITING_FOR_HUMAN",
     guiding_app_usage_check: "WAITING_FOR_HUMAN",
     guiding_application_id: "WAITING_FOR_HUMAN",
@@ -66,6 +70,8 @@ describe("issuance stages — step-status projection", () => {
     empty_state: "READY",
     guiding_create: "AWAITING_USER",
     guiding_api_group: "AWAITING_USER",
+    guiding_open_edit: "AWAITING_USER",
+    guiding_call_ip: "AWAITING_USER",
     guiding_app_detail: "AWAITING_USER",
     guiding_app_usage_check: "AWAITING_USER",
     guiding_application_id: "AWAITING_USER",
@@ -100,7 +106,7 @@ describe("issuance stages — allowed commands", () => {
   });
 
   it("guiding barriers offer recheck + PAUSE + cancel + manual", () => {
-    for (const stage of ["guiding_create", "guiding_app_detail", "guiding_app_usage_check", "guiding_api_group", "guiding_application_id", "guiding_application_secret", "return_to_sellerops"] as IssuanceStage[]) {
+    for (const stage of ["guiding_create", "guiding_app_detail", "guiding_app_usage_check", "guiding_api_group", "guiding_open_edit", "guiding_call_ip", "guiding_application_id", "guiding_application_secret", "return_to_sellerops"] as IssuanceStage[]) {
       const cmds = issuanceAllowedCommands(stage);
       expect(cmds).toContain("REQUEST_STEP_RECHECK");
       expect(cmds).toContain("PAUSE_RUN");
@@ -118,11 +124,11 @@ describe("issuance stages — allowed commands", () => {
   });
 });
 
-describe("issuance stages — the fixed 7-step plan", () => {
-  it("is always seven steps, whichever branch steps 2/3 take", () => {
-    expect(ISSUANCE_TOTAL_STEPS).toBe(7);
-    expect(issuanceStepPlan(true)).toHaveLength(7);
-    expect(issuanceStepPlan(false)).toHaveLength(7);
+describe("issuance stages — the fixed 9-step plan", () => {
+  it("is always nine steps, whichever branch steps 2/3 take", () => {
+    expect(ISSUANCE_TOTAL_STEPS).toBe(9);
+    expect(issuanceStepPlan(true)).toHaveLength(9);
+    expect(issuanceStepPlan(false)).toHaveLength(9);
   });
 
   it("branches ONLY step 2's target/copy and step 3's copy (same stepIds, same slots)", () => {
@@ -141,8 +147,8 @@ describe("issuance stages — the fixed 7-step plan", () => {
     expect(empty[2]!.copyKey).toBe("actionWindow.issuance.appUsageCheckNew");
     expect(existing[2]!.copyParams).toBeUndefined();
     expect(empty[2]!.copyParams).toBeUndefined();
-    // Steps 1, 4, 5, 6, 7 are identical across branches.
-    for (const i of [0, 3, 4, 5, 6]) expect(existing[i]).toEqual(empty[i]);
+    // Steps 1 and 4–9 are identical across branches.
+    for (const i of [0, 3, 4, 5, 6, 7, 8]) expect(existing[i]).toEqual(empty[i]);
   });
 
   it("uses the exact product-required stepIds and copy keys", () => {
@@ -151,9 +157,18 @@ describe("issuance stages — the fixed 7-step plan", () => {
       "aw.issuance_open_or_create_app",
       "aw.issuance_app_usage_check",
       "aw.issuance_api_group",
+      "aw.issuance_open_edit",
+      "aw.issuance_call_ip",
       "aw.issuance_application_id",
       "aw.issuance_application_secret",
       "aw.issuance_return",
     ]);
+  });
+
+  it("registers the call IP BEFORE the credential copies — copying the IP must not overwrite a copied secret", () => {
+    const targets = issuanceStepPlan(true).map((s) => s.copyParams?.targetKind ?? null);
+    expect(targets.indexOf("call_ip")).toBe(targets.indexOf("open_edit") + 1);
+    expect(targets.indexOf("call_ip")).toBeLessThan(targets.indexOf("application_id"));
+    expect(targets.indexOf("call_ip")).toBeLessThan(targets.indexOf("application_secret"));
   });
 });

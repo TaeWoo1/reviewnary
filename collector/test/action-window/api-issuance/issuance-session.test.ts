@@ -94,7 +94,7 @@ async function pressNextToComplete(
   engine: IssuanceEngine,
   session: IssuanceGuidanceSession,
 ): Promise<void> {
-  for (let i = 0; i < 8 && engine.currentStage() !== "guidance_complete"; i++) {
+  for (let i = 0; i < 10 && engine.currentStage() !== "guidance_complete"; i++) {
     command(io, "REQUEST_STEP_RECHECK", io.lastView()!.revision, `nx${i}`);
     await session.whenSettled();
   }
@@ -154,6 +154,12 @@ describe("issuance session — the app-exists path", () => {
       "locate:api_group",
       "highlight:api_group", // checkpoint — rest (no observe/wait); "다음" advances
       "armPanel:api_group",
+      "locate:open_edit",
+      "highlight:open_edit", // checkpoint — the seller opens the edit form themselves
+      "armPanel:open_edit",
+      "locate:call_ip",
+      "highlight:call_ip", // checkpoint — paste the shown IP, 추가, 저장 (all theirs)
+      "armPanel:call_ip",
       "locate:application_id",
       "highlight:application_id", // checkpoint — copy the Application ID
       "armPanel:application_id",
@@ -174,12 +180,12 @@ describe("issuance session — the app-exists path", () => {
     expect(step2?.copyParams?.targetKind).toBe("open_app");
   });
 
-  it("keeps totalSteps a fixed 7 for the whole run, carrying the issuance intent on every view", async () => {
+  it("keeps totalSteps a fixed 9 for the whole run, carrying the issuance intent on every view", async () => {
     const { io, session } = build(EXISTING);
     startRun(io);
     await session.whenSettled();
     const totals = new Set(io.views().map((v) => v.currentStep!.totalSteps));
-    expect(totals).toEqual(new Set([7]));
+    expect(totals).toEqual(new Set([9]));
     for (const v of io.views()) expect(v.intent).toBe("API_ISSUANCE_GUIDANCE");
     for (const v of io.views()) expect(v.channelCode).toBe("naver");
   });
@@ -478,12 +484,13 @@ describe("issuance session — same-page viewport checkpoints (다음-driven)", 
     expect(driver.calls).not.toContain("observe:api_group");
     expect(driver.calls).not.toContain("wait:api_group");
 
-    // "다음" ADVANCES to the next checkpoint (credentials) — it does not complete the run on its own.
+    // "다음" ADVANCES to the next checkpoint (opening the edit form for the call IP) — it does not complete the
+    // run on its own.
     command(io, "REQUEST_STEP_RECHECK", io.lastView()!.revision);
     await session.whenSettled();
-    expect(engine.currentStage()).toBe("guiding_application_id");
-    expect(driver.calls).toContain("highlight:application_id");
-    expect(driver.calls).not.toContain("observe:application_id");
+    expect(engine.currentStage()).toBe("guiding_open_edit");
+    expect(driver.calls).toContain("highlight:open_edit");
+    expect(driver.calls).not.toContain("observe:open_edit");
   });
 
   it("observes a NAVER click/transition ONLY for open_app — never for a viewport checkpoint", async () => {
@@ -845,7 +852,7 @@ describe("issuance session — loopback E2E over the real v2 transport", () => {
     });
     await session.whenSettled();
     // The client presses "다음" (REQUEST_STEP_RECHECK) through the same-page checkpoints to completion.
-    for (let i = 0; i < 6 && engine.currentStage() !== "guidance_complete"; i++) {
+    for (let i = 0; i < 8 && engine.currentStage() !== "guidance_complete"; i++) {
       const rev = clientViews[clientViews.length - 1]!.revision;
       client.send({
         kind: "aw_command",
@@ -915,7 +922,7 @@ describe("the seller advances on the window they are working in", () => {
     driver.setPanelAdvance("api_group", true);
     await session.whenPanelWatchSettled();
 
-    expect(engine.currentStage()).toBe("guiding_application_id");
+    expect(engine.currentStage()).toBe("guiding_open_edit");
   });
 
   it("ARMS the latch before watching it — a press left over from the previous step cannot skip this one", async () => {
@@ -939,13 +946,13 @@ describe("the seller advances on the window they are working in", () => {
     // The seller advances from the SellerOps tab instead; the walk moves to the next control.
     command(io, "REQUEST_STEP_RECHECK", io.lastView()!.revision, "fe");
     await session.whenSettled();
-    expect(engine.currentStage()).toBe("guiding_application_id");
+    expect(engine.currentStage()).toBe("guiding_open_edit");
 
     // …and only NOW the old step's latch reads pressed. It must change nothing.
     driver.setPanelAdvance("api_group", true);
     await session.whenPanelWatchSettled();
 
-    expect(engine.currentStage()).toBe("guiding_application_id");
+    expect(engine.currentStage()).toBe("guiding_open_edit");
   });
 });
 
@@ -1008,7 +1015,7 @@ describe("the last step's CTA actually moves the seller", () => {
     startRun(io);
     await session.whenSettled();
     await passUsageCheck(io, engine, session);
-    for (const target of ["api_group", "application_id", "application_secret"] as const) {
+    for (const target of ["api_group", "open_edit", "call_ip", "application_id", "application_secret"] as const) {
       driver.setPanelAdvance(target, true);
       await session.whenPanelWatchSettled();
       await session.whenSettled();

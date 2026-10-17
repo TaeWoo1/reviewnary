@@ -26,8 +26,8 @@ import { ISSUANCE_TARGETS } from "../../../src/action-window/api-issuance/issuan
 import { SELECTORS_CALIBRATED } from "../../../src/action-window/api-issuance/api-center-adapter";
 
 describe("issuance highlight-target selector registry", () => {
-  it("covers exactly the 4 highlighted NAVER controls — `open_app` and `return` are guidance-only", () => {
-    expect([...ISSUANCE_HIGHLIGHT_TARGETS]).toEqual(["create_app", "api_group", "application_id", "application_secret"]);
+  it("covers exactly the 6 highlighted NAVER controls — `open_app` and `return` are guidance-only", () => {
+    expect([...ISSUANCE_HIGHLIGHT_TARGETS]).toEqual(["create_app", "api_group", "open_edit", "call_ip", "application_id", "application_secret"]);
     // `open_app` (existing-app step 2) and `return` (final step) are both guidance-only, never highlighted.
     expect([...ISSUANCE_GUIDANCE_ONLY_TARGETS]).toEqual(["open_app", "return"]);
     // Highlight ∪ guidance-only == the whole issuance target set (nothing dropped, nothing double-counted).
@@ -66,6 +66,9 @@ describe("issuance highlight-target selector registry", () => {
     // Single-element targets (a button / a heading) have no ancestor promotion — highlight is unchanged.
     expect(selectorSpecFor("create_app").locator.tagAncestor).toBeUndefined();
     expect(selectorSpecFor("api_group").locator.tagAncestor).toBeUndefined();
+    expect(selectorSpecFor("open_edit").locator.tagAncestor).toBeUndefined();
+    // The edit form's 「API호출 IP」 label boxes its row too — the row that holds the inputs and 「추가」.
+    expect(selectorSpecFor("call_ip").locator.tagAncestor).toBe("tr");
     // The promotion selector is purely STRUCTURAL — never a value pin / credential token.
     for (const t of ["application_id", "application_secret"] as const) {
       expect(/\[\s*value\s*=|시크릿|secret|애플리케이션 ID/i.test(selectorSpecFor(t).locator.tagAncestor!)).toBe(false);
@@ -74,7 +77,7 @@ describe("issuance highlight-target selector registry", () => {
 
   it("uses ONLY fixed NAVER labels — never an app name, credential value, or [value=] pin", () => {
     for (const spec of ISSUANCE_TARGET_SELECTORS) {
-      expect(spec.locator.exactText).toMatch(/애플리케이션 등록|API 그룹|애플리케이션 ID|보기/);
+      expect(spec.locator.exactText).toMatch(/^(애플리케이션 등록|API 그룹|애플리케이션 ID|보기|수정|API호출 IP)$/);
       // BOTH halves of the locator are pinned: the FIXED label AND the STRUCTURAL candidate query must carry no
       // value pin / credential-value token, so a future edit to either half in the source probe trips a guard.
       for (const half of [spec.locator.exactText, spec.locator.candidateQuery]) {
@@ -87,6 +90,8 @@ describe("issuance highlight-target selector registry", () => {
     const EXPECTED_CANDIDATE_QUERY: Record<string, string> = {
       create_app: "button, a, [role='button']",
       api_group: "h1,h2,h3,h4,h5,h6,[role='heading']",
+      open_edit: "button, a, [role='button']",
+      call_ip: "th,td,dt,label,span,div",
       application_id: "th,td,dt,label,span,div",
       application_secret: "button, a, [role='button']",
     };
@@ -103,6 +108,8 @@ describe("issuance highlight-target selector registry", () => {
   it("all four highlight targets are GUIDED-highlightable (live_confirmed); guidance targets are not", () => {
     expect(isGuidedHighlightTarget("create_app")).toBe(true);
     expect(isGuidedHighlightTarget("api_group")).toBe(true);
+    expect(isGuidedHighlightTarget("open_edit")).toBe(true);
+    expect(isGuidedHighlightTarget("call_ip")).toBe(true);
     expect(isGuidedHighlightTarget("application_id")).toBe(true);
     expect(isGuidedHighlightTarget("application_secret")).toBe(true);
   });
@@ -128,7 +135,7 @@ describe("issuance highlight-target selector registry", () => {
   it("every live_confirmed locator is machine-proven ADOPTABLE through the frozen gate", () => {
     const evals = evaluateIssuanceHighlightSelectors();
     const byTarget = new Map(evals.map((e) => [e.target, e]));
-    for (const t of ["create_app", "api_group", "application_id", "application_secret"] as const) {
+    for (const t of ["create_app", "api_group", "open_edit", "call_ip", "application_id", "application_secret"] as const) {
       const e = byTarget.get(t)!;
       expect(e.adoptable, `${t}: ${e.reasons.join(",")}`).toBe(true);
       expect(e.reasons).toEqual([]);
@@ -142,5 +149,17 @@ describe("issuance highlight-target selector registry", () => {
     expect(selectorSpecFor("api_group").paths).toEqual(["new_app", "existing_app"]);
     expect(selectorSpecFor("application_id").paths).toEqual(["new_app", "existing_app"]);
     expect(selectorSpecFor("application_secret").paths).toEqual(["new_app", "existing_app"]);
+    expect(selectorSpecFor("open_edit").paths).toEqual(["new_app", "existing_app"]);
+    expect(selectorSpecFor("call_ip").paths).toEqual(["new_app", "existing_app"]);
+  });
+
+  it("`call_ip` counts as found only once the detail page's 「수정」 is gone — its label is on the detail page too", () => {
+    // 「API호출 IP」 measured exactly once on BOTH screens (2026-10-17). The guard is the adopted 「수정」 probe,
+    // verbatim, so the edit form is told apart by a measured control rather than by a guess.
+    const edit = VISUAL_RECON_LABEL_PROBES.find((p) => p.targetId === "app_detail.edit_button")!;
+    expect(selectorSpecFor("call_ip").locator.requiresAbsent).toEqual({ candidateQuery: edit.candidateQuery, exactText: edit.exactText });
+    for (const spec of ISSUANCE_TARGET_SELECTORS) {
+      if (spec.target !== "call_ip") expect(spec.locator.requiresAbsent, spec.target).toBeUndefined();
+    }
   });
 });

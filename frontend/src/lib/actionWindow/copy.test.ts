@@ -68,6 +68,8 @@ describe("FE-owned copy registry", () => {
       "actionWindow.issuance.createApp",
       "actionWindow.issuance.openApp",
       "actionWindow.issuance.apiGroup",
+      "actionWindow.issuance.openEdit",
+      "actionWindow.issuance.callIp",
       "actionWindow.issuance.applicationId",
       "actionWindow.issuance.applicationSecret",
       "actionWindow.issuance.return",
@@ -96,6 +98,15 @@ describe("FE-owned copy registry", () => {
       expect(sec).toMatch(/시크릿 값도, 클립보드도 읽지 않습니다/);
       const ret = issuanceStepDetail("actionWindow.issuance.return") ?? "";
       expect(ret).toMatch(/두 값을 복사했다면/);
+    });
+
+    it("the call-IP steps leave every press to the seller and name the three-IP limit", () => {
+      expect(issuanceStepDetail("actionWindow.issuance.openEdit")).toMatch(/'수정' 버튼을 직접 눌러/);
+      const ip = issuanceStepDetail("actionWindow.issuance.callIp") ?? "";
+      expect(ip).toMatch(/'추가'를 누른 뒤, 위쪽 '저장'을 눌러/);
+      expect(ip).toMatch(/3개까지/);
+      expect(ip).toMatch(/칸을 채우거나 저장하지 않으며/);
+      expect(ip).toMatch(/연결 테스트에서 확인/);
     });
 
     it("returns null for a step with no detail mapping (never leaks the raw key)", () => {

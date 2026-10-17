@@ -65,6 +65,7 @@ import {
 } from "../cli/observe-api-center";
 import { pageCategoryFromCensus } from "./api-issuance/api-center-adapter";
 import { buildFixedLabelLocateScript } from "./api-issuance-calibration/visual-recon-inpage";
+import { copyableIpv4s, mountPanelCopyRows } from "./overlay-copy-values";
 import {
   isGuidedHighlightTarget,
   isIssuanceHighlightTarget,
@@ -165,7 +166,7 @@ function isTimeout(e: unknown): boolean {
  *   - `mount`         — the overlay mount (`afterTag`).
  *   - `visible_check` — the post-mount `overlayMounted` paint verify.
  */
-type IssuanceStage = "resolve" | "scroll" | "tag" | "mount" | "visible_check";
+type IssuanceStage = "resolve" | "absent_check" | "scroll" | "tag" | "mount" | "visible_check";
 
 /**
  * A FIXED, sanitized reason enum for a highlight fault — the ONLY failure detail emitted alongside the stage and
@@ -227,10 +228,15 @@ const OVERLAY_STEP: Readonly<Record<IssuanceTarget, number>> = {
   create_app: 2,
   open_app: 2,
   api_group: 4,
-  application_id: 5,
-  application_secret: 6,
-  return: 7,
+  open_edit: 5,
+  call_ip: 6,
+  application_id: 7,
+  application_secret: 8,
+  return: 9,
 };
+
+/** Step 3's number — the target-less usage-state advisory. */
+const APP_USAGE_STEP = 3;
 
 /**
  * Operator-legible dev-overlay labels for the headed live run (no product FE is present, so the badge is the
@@ -258,6 +264,8 @@ const NAVER_STEP_BRIEF: Readonly<Record<IssuanceTarget, string>> = {
   create_app: "'애플리케이션 등록'을 직접 눌러 애플리케이션을 만드세요. 다 만드셨으면 아래 '다음'을 누르세요.",
   open_app: "연결할 애플리케이션을 직접 여세요. 상세 화면이 열리면 자동으로 넘어갑니다.",
   api_group: "표시된 '커머스 API' 그룹이 선택돼 있는지 확인하세요.",
+  open_edit: "'수정'을 직접 눌러 수정 화면을 여세요. 열렸으면 아래 '다음'을 누르세요.",
+  call_ip: "아래 IP를 복사해 'API호출 IP' 칸에 붙여넣고 '추가', '저장'을 직접 누르세요.",
   application_id: "표시된 애플리케이션 ID를 직접 복사해 두세요. reviewnary는 값을 읽지 않습니다.",
   application_secret: "'보기'를 눌러 시크릿을 확인하고 직접 복사해 두세요. reviewnary는 값을 읽지 않습니다.",
   return: "복사한 두 값을 reviewnary 창에 입력하면 연결이 끝납니다.",
@@ -281,6 +289,10 @@ export const NAVER_STEP_DETAIL: Readonly<Record<IssuanceTarget, string>> = {
     "이미 만들어 둔 애플리케이션의 상세 화면을 여세요. 새 애플리케이션을 만들지 마세요 — 스토어당 1개만 가능하고 삭제할 수 없습니다.",
   api_group:
     "이 애플리케이션에 상품·주문(판매자) 관련 API 그룹이 포함돼 있는지 확인하고, 없으면 추가하세요. 정확한 그룹 이름은 화면마다 다를 수 있으니 '주문'·'판매자'가 포함된 항목을 찾아 선택하면 됩니다.",
+  open_edit:
+    "네이버가 이 IP에서 오는 요청만 받도록 API 호출 IP를 등록합니다. 표시된 '수정' 버튼을 직접 눌러 수정 화면을 열어 주세요. 이 단계에서는 아직 아무것도 저장되지 않습니다.",
+  call_ip:
+    "표시된 IP를 복사해 'API호출 IP' 칸에 붙여넣고 '추가'를 누른 뒤, 위쪽 '저장'을 눌러 주세요. IP는 3개까지 등록되므로 이미 3개가 있으면 쓰지 않는 IP를 '삭제'한 뒤 추가하세요. 앱을 만들 때 이미 등록했다면 그대로 다음으로 넘어가면 됩니다. reviewnary는 칸을 채우거나 저장하지 않으며, 등록이 맞는지는 마지막 연결 테스트에서 확인합니다.",
   application_id:
     "애플리케이션 ID를 복사해 주세요. 표시된 애플리케이션 ID 행에서 값을 직접 복사하시면 됩니다. reviewnary는 이 값을 읽지 않습니다 — 복사는 직접 하시고, 마지막에 reviewnary 보안 입력란에 붙여넣으세요.",
   application_secret:
@@ -318,6 +330,17 @@ export const NAVER_APP_USAGE_COPY = Object.freeze({
   },
 });
 
+/**
+ * **The call-IP step's copy rows** — the IP beside a copy button on the panel. The address comes from the carrier
+ * (`callIps`); when there is none to show, the panel says where the seller can find it instead of inventing one.
+ */
+const NAVER_CALL_IP_ROWS_COPY = Object.freeze({
+  copyLabel: "복사",
+  copiedLabel: "복사됨",
+  failedLabel: "직접 복사해 주세요",
+  emptyNote: "등록할 IP를 불러오지 못했어요. reviewnary 창의 'API 호출 IP 등록 안내'에서 확인해 주세요.",
+});
+
 /** The advisory's own latch token — its own namespace, like every other press in this walk. */
 const APP_USAGE_ADVANCE_TOKEN = "naver-issuance-advance:app_usage_check";
 
@@ -329,6 +352,8 @@ const APP_USAGE_ADVANCE_TOKEN = "naver-issuance-advance:app_usage_check";
 const NAVER_ADVANCE_LABEL: Readonly<Partial<Record<IssuanceTarget, string>>> = {
   create_app: "만들었어요 · 다음",
   api_group: "확인했어요 · 다음",
+  open_edit: "열었어요 · 다음",
+  call_ip: "저장했어요 · 다음",
   application_id: "복사했어요 · 다음",
   application_secret: "복사했어요 · 다음",
   // **The walk's last button, and the only one in it that moves the seller.** It is a CTA rather than a
@@ -344,6 +369,8 @@ export const NAVER_STEP_TITLE: Readonly<Record<IssuanceTarget, string>> = {
   create_app: "애플리케이션 만들기 (스토어당 1개)",
   open_app: "발급한 애플리케이션 열기",
   api_group: "주문·판매자 관련 API 그룹 추가",
+  open_edit: "수정 화면 열기",
+  call_ip: "API 호출 IP 등록",
   application_id: "애플리케이션 ID 복사",
   application_secret: "애플리케이션 시크릿 확인·복사",
   return: "reviewnary로 돌아와 입력",
@@ -421,7 +448,16 @@ export interface NaverIssuanceDriverOptions {
    * and says so in the log, rather than silently pretending it returned.
    */
   returnToSellerOps?: () => Promise<void>;
+  /**
+   * **The IP(s) the call-IP step shows**, injected by the carrier: this PC's public IPv4 on a seller-PC install,
+   * the service's advertised egress IP otherwise. Only well-formed IPv4 strings reach the panel. Absent, failing,
+   * or empty ⇒ the panel says where to find the IP rather than showing one it does not have.
+   */
+  callIps?: () => Promise<readonly string[]>;
 }
+
+/** How long the call-IP step waits for its address before showing the panel without it. */
+const CALL_IP_FETCH_TIMEOUT_MS = 3_000;
 
 /**
  * A FIXED, synthetic guidance signature for `return`. Returning to SellerOps is NOT a NAVER control — it is
@@ -583,6 +619,20 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
         await located.first().waitFor({ state: "attached", timeout: LOCATOR_TIMEOUT_MS });
         const matchCount = await located.count();
         if (matchCount !== 1) return { count: matchCount }; // non-unique → engine parks target_not_found (recoverable)
+        // A label that also appears on the page this target must NOT be on (`call_ip`'s 「API호출 IP」 is a read-only
+        // row on the detail page too): if the control that marks that other page still resolves, report no match so
+        // the step parks recoverably instead of ringing the wrong row. The same audited value-free count script.
+        if (loc.requiresAbsent) {
+          stage = "absent_check";
+          const absent = await this.evalStr<LocateResult>(
+            page,
+            buildFixedLabelLocateScript({ candidateQuery: loc.requiresAbsent.candidateQuery, exactText: loc.requiresAbsent.exactText, tag: false }),
+          );
+          if (absent.count !== 0) {
+            log("aw_issuance_stage_wrong_screen", { target, stage: "absent_check", count: absent.count });
+            return { count: 0 };
+          }
+        }
         // Read-only: bring the section into view (never a click) so the tag lands on an on-screen element. Scroll is
         // best-effort — a scroll timeout/miss must not fail the resolve, so it never reaches the catch below. But we
         // DO record a swallowed scroll fault (a live hypothesis is that this scroll triggers a re-render that then
@@ -825,6 +875,29 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
       });
       throw e; // re-throw the SAME error — control flow unchanged for every caller
     }
+    // The call-IP step carries the address beside a copy button, on the window the seller pastes into. Best-effort:
+    // the ring and the panel are already up, and a panel without rows still says where the IP is.
+    if (target === "call_ip") {
+      const ips = await this.callIpsForPanel();
+      await mountPanelCopyRows(page, ips, NAVER_CALL_IP_ROWS_COPY).catch(() => false);
+    }
+  }
+
+  /** The address(es) for the call-IP panel — bounded, swallowing, and screened to IPv4 before any reaches a page. */
+  private async callIpsForPanel(): Promise<string[]> {
+    const source = this.opts.callIps;
+    if (!source) return [];
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<readonly string[]>((resolve) => {
+      timer = setTimeout(() => resolve([]), CALL_IP_FETCH_TIMEOUT_MS);
+    });
+    try {
+      const ips = copyableIpv4s(await Promise.race([source().catch(() => [] as readonly string[]), timeout]));
+      log("aw_issuance_call_ip_rows", { count: ips.length });
+      return ips;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   /**
@@ -882,7 +955,7 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
     await resetOverlayAdvance(page, APP_USAGE_ADVANCE_TOKEN).catch(() => undefined);
     await mountOverlay(page, {
       dockedPanelOnly: true,
-      stepNumber: 3,
+      stepNumber: APP_USAGE_STEP,
       totalSteps: ISSUANCE_TOTAL_STEPS,
       copyKey: "actionWindow.issuance.appUsageCheck",
       label: copy.brief,
@@ -894,7 +967,7 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
       channelName: NAVER_CHANNEL_NAME,
       advance: { buttonLabel: "확인했어요 · 다음", token: APP_USAGE_ADVANCE_TOKEN },
     }).catch(() => undefined);
-    this.lastStepNumber = 3;
+    this.lastStepNumber = APP_USAGE_STEP;
     return overlayMounted(page).catch(() => false);
   }
 
@@ -1003,6 +1076,16 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
     const script = issuanceLocateScript(target, false);
     const res = await this.evalStr<LocateResult>(this.activePage(), script);
     const matchCount = typeof res?.count === "number" && res.count >= 0 ? res.count : 0;
+    // Same verdict the guided locate reaches: a target whose marker of the OTHER screen is still present cannot be
+    // highlighted here, however many times its own label matched.
+    const absent = locatorFor(target).requiresAbsent;
+    if (matchCount === 1 && absent) {
+      const other = await this.evalStr<LocateResult>(
+        this.activePage(),
+        buildFixedLabelLocateScript({ candidateQuery: absent.candidateQuery, exactText: absent.exactText, tag: false }),
+      );
+      if (other?.count !== 0) return { matchCount, canHighlight: false };
+    }
     return { matchCount, canHighlight: matchCount === 1 };
   }
 

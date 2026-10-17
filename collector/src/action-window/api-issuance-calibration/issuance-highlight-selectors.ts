@@ -44,7 +44,14 @@ import type { IssuanceTarget } from "../api-issuance/issuance-driver";
  * an existing app is opened by NAVIGATION guidance (see {@link ISSUANCE_NAVIGATION_TARGETS}), and `return` is
  * terminal text guidance, so the only highlighted controls are the four fixed-label ones below (create_app, api_group, application_id, application_secret).
  */
-export const ISSUANCE_HIGHLIGHT_TARGETS = ["create_app", "api_group", "application_id", "application_secret"] as const satisfies readonly IssuanceTarget[];
+export const ISSUANCE_HIGHLIGHT_TARGETS = [
+  "create_app",
+  "api_group",
+  "open_edit",
+  "call_ip",
+  "application_id",
+  "application_secret",
+] as const satisfies readonly IssuanceTarget[];
 export type IssuanceHighlightTarget = (typeof ISSUANCE_HIGHLIGHT_TARGETS)[number];
 
 /**
@@ -94,6 +101,15 @@ export interface IssuanceFixedLabelLocator {
    * no such ancestor exists. Reads structure only (no `<td>` value / text).
    */
   tagAncestor?: string;
+  /**
+   * A fixed-label control that must NOT be on the page for this target to count as found. `call_ip`'s label
+   * 「API호출 IP」 measured exactly once on BOTH the detail page (a read-only row) and the edit form (2026-10-17), so
+   * the label alone would ring the read-only row for a seller who has not opened the form yet. The detail page's
+   * 「수정」 is the difference: present on the detail page, replaced by 「취소」·「저장」 on the form. When this
+   * control still resolves, the locate reports no match and the step parks recoverably instead of pointing at
+   * the wrong row. Same shape and same value-free count as the locator itself.
+   */
+  requiresAbsent?: { candidateQuery: string; exactText: string };
 }
 
 export interface IssuanceTargetSelectorSpec {
@@ -115,6 +131,8 @@ export interface IssuanceTargetSelectorSpec {
 const DERIVES_FROM: Readonly<Record<IssuanceHighlightTarget, VisualReconTargetId>> = {
   create_app: "app_list.register_application", // 애플리케이션 등록 (register button) — #4/#5
   api_group: "api_group.section", // API 그룹 (section heading) — #4/#5
+  open_edit: "app_detail.edit_button", // 수정 (edit button) — 2026-10-17
+  call_ip: "app_edit.call_ip_label", // API호출 IP (edit-form row label → its row) — 2026-10-17
   application_id: "credentials.application_id_label", // 애플리케이션 ID (label cell → its row) — #4/#5
   application_secret: "credentials.secret_view_button", // 시크릿 보기 (view control → its row) — #4/#5
 };
@@ -126,6 +144,8 @@ const DERIVES_FROM: Readonly<Record<IssuanceHighlightTarget, VisualReconTargetId
 const TARGET_PATHS: Readonly<Record<IssuanceHighlightTarget, readonly IssuancePath[]>> = {
   create_app: ["new_app"],
   api_group: ["new_app", "existing_app"],
+  open_edit: ["new_app", "existing_app"],
+  call_ip: ["new_app", "existing_app"],
   application_id: ["new_app", "existing_app"],
   application_secret: ["new_app", "existing_app"],
 };
@@ -134,6 +154,8 @@ const TARGET_PATHS: Readonly<Record<IssuanceHighlightTarget, readonly IssuancePa
 const TARGET_SCREEN: Readonly<Record<IssuanceHighlightTarget, VisualReconScreen>> = {
   create_app: "app_list",
   api_group: "api_group",
+  open_edit: "app_detail",
+  call_ip: "app_edit",
   application_id: "credentials",
   application_secret: "credentials",
 };
@@ -150,6 +172,14 @@ const TAG_ANCESTOR: Readonly<Partial<Record<IssuanceHighlightTarget, string>>> =
   // whole row (ID label+value; Secret label + view/copy controls) without ever reading a `<td>` value.
   application_id: "tr",
   application_secret: "tr",
+  // The edit form's label sits in the same key/value layout; its row also holds the IP inputs and 「추가」, so the
+  // ring covers where the seller pastes — without reading any input.
+  call_ip: "tr",
+};
+
+/** Which highlight targets must not coexist with another fixed-label control (see `requiresAbsent`). */
+const REQUIRES_ABSENT: Readonly<Partial<Record<IssuanceHighlightTarget, VisualReconTargetId>>> = {
+  call_ip: "app_detail.edit_button",
 };
 
 /** The fixed-label probe for an adopted target — the single source the locator's query+text is reused from. */
@@ -171,6 +201,11 @@ export const ISSUANCE_TARGET_SELECTORS: readonly IssuanceTargetSelectorSpec[] = 
     throw new Error(`issuance-highlight-selectors: ${target} derives from a non-adopted target ${derivesFrom}`);
   }
   const probe = probeFor(derivesFrom);
+  const absentId = REQUIRES_ABSENT[target];
+  if (absentId && !(ADOPTED_TARGET_IDS as readonly VisualReconTargetId[]).includes(absentId)) {
+    throw new Error(`issuance-highlight-selectors: ${target} requires the absence of a non-adopted target ${absentId}`);
+  }
+  const absent = absentId ? probeFor(absentId) : null;
   return {
     target,
     screen: TARGET_SCREEN[target],
@@ -181,6 +216,7 @@ export const ISSUANCE_TARGET_SELECTORS: readonly IssuanceTargetSelectorSpec[] = 
       candidateQuery: probe.candidateQuery,
       exactText: probe.exactText,
       ...(TAG_ANCESTOR[target] ? { tagAncestor: TAG_ANCESTOR[target] } : {}),
+      ...(absent ? { requiresAbsent: { candidateQuery: absent.candidateQuery, exactText: absent.exactText } } : {}),
     },
   };
 });

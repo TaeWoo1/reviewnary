@@ -2,7 +2,8 @@
  * **ADOPTED visual-recon fixed-label selectors — CONFIRMED matchCount=1 on the REAL NAVER API center.**
  *
  * Each of these was proposed from the redacted visual recon, measured live, and confirmed to resolve to EXACTLY
- * one element on the real API center (live runs of 2026-08-02: #4/#5/#6). Each passes the frozen
+ * one element on the real API center (live runs of 2026-08-02: #4/#5/#6; the call-IP pair on 2026-10-17 —
+ * `docs/evidence/INDEX.md` §2). Each passes the frozen
  * {@link evaluateSelectorCandidate} adoption gate once its live `matchCount===1` is supplied. This module is the
  * SOURCE OF TRUTH for locating these API-center CONTROLS by a fixed NAVER UI label — never by an application
  * name or a credential value.
@@ -27,6 +28,8 @@ export const ADOPTED_TARGET_IDS = [
   "credentials.application_id_label", // 애플리케이션 ID (label cell) — #4/#5
   "credentials.secret_view_button", // 보기 (view) — #4/#5
   "credentials.secret_copy_button", // 복사 (copy) — #4/#5
+  "app_detail.edit_button", // 수정 (edit) — 2026-10-17 detail re-measure
+  "app_edit.call_ip_label", // API호출 IP (edit-form row label) — 2026-10-17
 ] as const satisfies readonly VisualReconTargetId[];
 export type AdoptedTargetId = (typeof ADOPTED_TARGET_IDS)[number];
 
@@ -38,6 +41,8 @@ const CONFIRMED_LIVE_RUNS: Readonly<Record<AdoptedTargetId, readonly string[]>> 
   "credentials.application_id_label": ["2026-08-02#4", "2026-08-02#5"],
   "credentials.secret_view_button": ["2026-08-02#4", "2026-08-02#5"],
   "credentials.secret_copy_button": ["2026-08-02#4", "2026-08-02#5"],
+  "app_detail.edit_button": ["2026-10-17#detail"],
+  "app_edit.call_ip_label": ["2026-10-17#edit"],
 };
 
 export interface AdoptedVisualReconSelector {

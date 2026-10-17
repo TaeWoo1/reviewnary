@@ -53,6 +53,7 @@ import { ReviewLocateEngine } from "../action-window/coupang-review/review-locat
 import { ReviewLocateSession } from "../action-window/coupang-review/review-locate-session";
 import { ReviewLocateEndpoint } from "../bridge/review-locate-endpoint";
 import { fetchReviewLocateTarget } from "../action-window/coupang-review/review-locate-target-client";
+import { fetchNaverCallIps } from "../action-window/call-ip-source";
 import { LazyReviewAcquisitionDriver } from "../action-window/coupang-review/lazy-review-acquisition-driver";
 import { ReviewAcquisitionEngine } from "../action-window/coupang-review/review-acquisition-engine";
 import { ReviewAcquisitionRunSession } from "../action-window/coupang-review/review-acquisition-run-session";
@@ -718,11 +719,36 @@ export interface NaverIssuanceLiveCarrier {
  * function's comments for why the context is held out here rather than in the driver, why the landing is ONE
  * navigation per carrier, and why a page the seller closes is forgotten rather than re-navigated.
  */
+/**
+ * **The NAVER call-IP step's address source** — THIS machine's SellerOps backend, asked under the helper's own
+ * session, on the same screened loopback origin the credential carriers use. A refused origin or no session ⇒ no
+ * address, and the panel says where to find it instead. Shared by the resident carrier and the gated live CLI so
+ * the walk shows the same IP whichever entrypoint hosts it.
+ */
+export function naverCallIpSource(cfg: ReturnType<typeof loadConfig>): () => Promise<readonly string[]> {
+  const backend = screenCredentialBackendOrigin(cfg.baseUrl);
+  let token: string | null = null;
+  return async () => {
+    if (!backend.ok) return [];
+    try {
+      if (!token) token = await backendBearer({ ...cfg, baseUrl: backend.origin });
+    } catch {
+      token = null;
+      log("aw_issuance_call_ip_source_refused", { reason: "NO_SESSION" });
+      return [];
+    }
+    const ips = await fetchNaverCallIps(backend.origin, token);
+    if (ips.length === 0) token = null; // a rejected token is re-fetched on the next step, not replayed
+    return ips;
+  };
+}
+
 export function buildNaverIssuanceLiveConfig(): NaverIssuanceLiveCarrier {
   const cfg = loadConfig();
   let walkContext: BrowserContext | null = null;
   let navigated = false;
   const driver = new LazyNaverIssuanceDriver({
+    callIps: naverCallIpSource(cfg),
     /**
      * **The walk's last step, made real** — the same screened hand-off the WING carrier performs, for the same
      * reasons and with the same three properties: the API-centre window is NOT touched (not navigated, no tab

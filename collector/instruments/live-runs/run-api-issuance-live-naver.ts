@@ -33,6 +33,7 @@ import { createAgentBridge, type AgentBridge } from "../../src/agent/agent-bridg
 import {
   createApprovalPresenterFor,
   decideApprovalPresenter,
+  naverCallIpSource,
   resolveAgentBridgeConfig,
 } from "../../src/cli/local-agent";
 import { screenApiCenterUrl } from "../../src/cli/observe-api-center";
@@ -99,7 +100,8 @@ async function main(): Promise<void> {
     await page.goto(url, { waitUntil: "domcontentloaded" });
 
     const runId = mintIssuanceRunId();
-    const driver = new NaverIssuanceDriver(page, { context: ctx });
+    // The call-IP step shows the address this machine's backend reports — the same source the resident helper uses.
+    const driver = new NaverIssuanceDriver(page, { context: ctx, callIps: naverCallIpSource(cfg) });
     const bridge = createAgentBridge({
       ...resolveAgentBridgeConfig(args, process.env),
       approvalPresenter: createApprovalPresenterFor(decideApprovalPresenter(process.env, process.platform)),

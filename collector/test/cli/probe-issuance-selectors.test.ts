@@ -21,6 +21,8 @@ import type { IssuanceHighlightTarget } from "../../src/action-window/api-issuan
 const DEFAULT_MATCHES: Record<IssuanceHighlightTarget, { matchCount: number; canHighlight: boolean }> = {
   create_app: { matchCount: 1, canHighlight: true },
   api_group: { matchCount: 1, canHighlight: true },
+  open_edit: { matchCount: 1, canHighlight: true },
+  call_ip: { matchCount: 1, canHighlight: true },
   application_id: { matchCount: 1, canHighlight: true },
   application_secret: { matchCount: 1, canHighlight: true },
 };
@@ -48,13 +50,14 @@ function fakeDeps(o: FakeOptions = {}): { deps: SelectorProbeDeps; probed: Issua
 }
 
 describe("issuance selector probe — screen selection", () => {
-  it("walks exactly the screens that carry a highlight target (app_list, api_group, credentials — never app_detail)", () => {
-    expect(issuanceProbeScreens()).toEqual(["app_list", "api_group", "credentials"]);
+  it("walks exactly the screens that carry a highlight target — app_detail and app_edit now carry the call-IP pair", () => {
+    expect(issuanceProbeScreens()).toEqual(["app_list", "app_detail", "api_group", "credentials", "app_edit"]);
     // app_list now carries only create_app — open_app is navigation guidance, not a highlighted control.
     expect(targetsForScreen("app_list")).toEqual(["create_app"]);
     expect(targetsForScreen("api_group")).toEqual(["api_group"]);
     expect(targetsForScreen("credentials")).toEqual(["application_id", "application_secret"]);
-    expect(targetsForScreen("app_detail")).toEqual([]);
+    expect(targetsForScreen("app_detail")).toEqual(["open_edit"]);
+    expect(targetsForScreen("app_edit")).toEqual(["call_ip"]);
   });
 });
 
@@ -64,23 +67,23 @@ describe("issuance selector probe — read-only walk", () => {
     const result = await runSelectorProbeSession(deps);
 
     expect(result.aborted).toBe(false);
-    expect(result.screensProbed).toBe(3);
-    expect(result.screens.map((s) => s.screen)).toEqual(["app_list", "api_group", "credentials"]);
+    expect(result.screensProbed).toBe(5);
+    expect(result.screens.map((s) => s.screen)).toEqual(["app_list", "app_detail", "api_group", "credentials", "app_edit"]);
     // Every highlighted control was measured — open_app is not among them (it is navigation guidance).
-    expect(probed).toEqual(["create_app", "api_group", "application_id", "application_secret"]);
+    expect(probed).toEqual(["create_app", "open_edit", "api_group", "application_id", "application_secret", "call_ip"]);
 
     const appList = result.screens[0]!;
     expect(appList.targets).toEqual([
       { target: "create_app", status: "live_confirmed", matchCount: 1, canHighlight: true },
     ]);
-    expect(result.uniqueCalibrated).toBe(4);
+    expect(result.uniqueCalibrated).toBe(6);
     expect(result.nonUniqueCalibrated).toBe(0);
   });
 
   it("flags a calibrated target that drifted to a non-unique match (nonUniqueCalibrated)", async () => {
     const { deps } = fakeDeps({ matches: { api_group: { matchCount: 2, canHighlight: false } } });
     const result = await runSelectorProbeSession(deps);
-    expect(result.uniqueCalibrated).toBe(3); // create_app + application_id + application_secret
+    expect(result.uniqueCalibrated).toBe(5); // every target but api_group
     expect(result.nonUniqueCalibrated).toBe(1); // api_group drifted
   });
 
@@ -88,8 +91,8 @@ describe("issuance selector probe — read-only walk", () => {
     const { deps } = fakeDeps({ signal: (s) => (s === "api_group" ? "abort" : "ready") });
     const result = await runSelectorProbeSession(deps);
     expect(result.aborted).toBe(true);
-    expect(result.screensProbed).toBe(1); // only app_list completed
-    expect(result.screens.map((s) => s.screen)).toEqual(["app_list"]);
+    expect(result.screensProbed).toBe(2); // app_list and app_detail completed
+    expect(result.screens.map((s) => s.screen)).toEqual(["app_list", "app_detail"]);
   });
 
   it("stops on timeout without marking the run aborted", async () => {

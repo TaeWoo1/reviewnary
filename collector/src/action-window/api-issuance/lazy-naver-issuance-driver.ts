@@ -40,6 +40,8 @@ export interface LazyNaverIssuanceDriverDeps {
    * button. Absent ⇒ the step behaves as it did, and says so in the log.
    */
   returnToSellerOps?: () => Promise<void>;
+  /** The call-IP step's address source, passed straight through to {@link NaverIssuanceDriver}. */
+  callIps?: () => Promise<readonly string[]>;
 }
 
 export class LazyNaverIssuanceDriver implements IssuanceProbeDriver {
@@ -87,6 +89,7 @@ export class LazyNaverIssuanceDriver implements IssuanceProbeDriver {
         const d = new NaverIssuanceDriver(page, {
           context,
           ...(this.deps.returnToSellerOps ? { returnToSellerOps: this.deps.returnToSellerOps } : {}),
+          ...(this.deps.callIps ? { callIps: this.deps.callIps } : {}),
         });
         this.opened = d;
         this.context = context;

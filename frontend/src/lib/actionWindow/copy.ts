@@ -31,6 +31,8 @@ const COPY: Record<string, string> = {
   "actionWindow.issuance.appUsageCheck": "애플리케이션 상태 확인",
   "actionWindow.issuance.appUsageCheckNew": "생성 직후 상태 확인",
   "actionWindow.issuance.apiGroup": "주문·판매자 관련 API 그룹 추가",
+  "actionWindow.issuance.openEdit": "수정 화면 열기",
+  "actionWindow.issuance.callIp": "API 호출 IP 등록",
   "actionWindow.issuance.applicationId": "애플리케이션 ID 복사",
   "actionWindow.issuance.applicationSecret": "애플리케이션 시크릿 확인·복사",
   "actionWindow.issuance.return": "reviewnary로 돌아와 입력",
@@ -121,6 +123,12 @@ const ISSUANCE_STEP_DETAIL: Record<string, string> = {
     "방금 만든 애플리케이션의 상태를 확인해 주세요. 새로 만든 앱은 보통 바로 사용할 수 있지만, 혹시 화면에 '다시사용' 버튼이 보이면 직접 눌러 활성화해 주세요. 버튼이 보이지 않더라도 reviewnary가 활성 상태라고 단정하지 않습니다. 확인했다면 다음으로 진행해 주세요.",
   "actionWindow.issuance.apiGroup":
     "이 애플리케이션에 상품·주문(판매자) 관련 API 그룹이 포함돼 있는지 확인하고, 없으면 추가하세요. 정확한 그룹 이름은 화면마다 다를 수 있으니 '주문'·'판매자'가 포함된 항목을 찾아 선택하면 됩니다.",
+  // The call IP, as two steps (2026-10-17): open the edit form, then paste the shown IP and save. SellerOps fills
+  // nothing and saves nothing; the connection test decides whether the registration is right.
+  "actionWindow.issuance.openEdit":
+    "네이버가 이 IP에서 오는 요청만 받도록 API 호출 IP를 등록합니다. 표시된 '수정' 버튼을 직접 눌러 수정 화면을 열어 주세요. 이 단계에서는 아직 아무것도 저장되지 않습니다.",
+  "actionWindow.issuance.callIp":
+    "표시된 IP를 복사해 'API호출 IP' 칸에 붙여넣고 '추가'를 누른 뒤, 위쪽 '저장'을 눌러 주세요. IP는 3개까지 등록되므로 이미 3개가 있으면 쓰지 않는 IP를 '삭제'한 뒤 추가하세요. 앱을 만들 때 이미 등록했다면 그대로 다음으로 넘어가면 됩니다. reviewnary는 칸을 채우거나 저장하지 않으며, 등록이 맞는지는 마지막 연결 테스트에서 확인합니다.",
   "actionWindow.issuance.applicationId":
     "애플리케이션 ID를 복사해 주세요. 표시된 애플리케이션 ID 행에서 값을 직접 복사하시면 됩니다. reviewnary는 이 값을 읽지 않습니다 — 복사는 직접 하시고, 마지막에 reviewnary 보안 입력란에 붙여넣으세요.",
   "actionWindow.issuance.applicationSecret":
