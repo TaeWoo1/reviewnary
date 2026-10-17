@@ -370,14 +370,26 @@ export function buildFixedLabelProbeScript(probes: readonly { targetId: string; 
     /* text read ONLY to compare against a KNOWN fixed label; only a COUNT is returned, never the text. */
     return norm(el.textContent || '');
   }
+  /* The highlight's own paint rule (buildFixedLabelLocateScript): a match a person cannot see is not a target.
+     STRUCTURE only — no text, value, or attribute is read or returned. */
+  function paints(node) {
+    if (!node || !node.getClientRects) { return false; }
+    var cs = window.getComputedStyle ? window.getComputedStyle(node) : null;
+    if (cs && (cs.display === 'none' || cs.visibility === 'hidden')) { return false; }
+    if (cs && cs.display === 'contents') { return node.childElementCount > 0; }
+    var rects = node.getClientRects();
+    if (!rects || rects.length === 0) { return false; }
+    var r = node.getBoundingClientRect ? node.getBoundingClientRect() : null;
+    return !!r && r.width > 0 && r.height > 0;
+  }
   var out = [];
   for (var p = 0; p < PROBES.length; p++) {
     var probe = PROBES[p];
     var want = norm(probe.exactText);
     var els; try { els = slice(document.querySelectorAll(probe.candidateQuery)); } catch (e) { els = []; }
-    var n = 0, CAP = 4000;
-    for (var i = 0; i < els.length && i < CAP; i++) { if (accName(els[i]) === want) { n = n + 1; } }
-    out.push({ targetId: probe.targetId, matchCount: n });
+    var n = 0, seen = 0, CAP = 4000;
+    for (var i = 0; i < els.length && i < CAP; i++) { if (accName(els[i]) === want) { n = n + 1; if (paints(els[i])) { seen = seen + 1; } } }
+    out.push({ targetId: probe.targetId, matchCount: n, visibleCount: seen });
   }
   return out;
 })()`;

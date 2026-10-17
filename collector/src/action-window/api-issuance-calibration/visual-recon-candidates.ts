@@ -32,6 +32,7 @@ export const VISUAL_RECON_TARGET_IDS = [
   "app_detail.call_ip_row",
   "app_detail.edit_button",
   "app_edit.call_ip_label",
+  "app_edit.call_ip_add_button",
 ] as const;
 export type VisualReconTargetId = (typeof VISUAL_RECON_TARGET_IDS)[number];
 
@@ -130,6 +131,12 @@ export const VISUAL_RECON_CANDIDATES: readonly ProposedCandidate[] = [
     note: "수정 화면 「API호출 IP (n/3)」 행의 라벨. 같은 행에 입력 칸 + '추가', 등록된 IP마다 '삭제'. 값(IP)은 대상 아님.",
     candidate: fixedLabelCandidate("app_edit", 'text="API호출 IP"'),
   },
+  {
+    targetId: "app_edit.call_ip_add_button",
+    screen: "app_edit",
+    note: "수정 화면 「API호출 IP」 입력 칸 옆 '추가' 버튼. 입력 칸과 같은 form 안에 있어, 그 form이 판매자가 IP를 붙여넣는 자리다.",
+    candidate: fixedLabelCandidate("app_edit", 'role=button[name="추가"]'),
+  },
 ];
 
 /** A proposal with its eligibility verdict — every one is non-adoptable offline (matchCount unmeasured). */
@@ -179,6 +186,9 @@ export const VISUAL_RECON_LABEL_PROBES: readonly FixedLabelProbe[] = [
   { targetId: "app_detail.call_ip_row", screen: "app_detail", candidateQuery: "th,td,dt,label,span,div", exactText: "API호출 IP" },
   { targetId: "app_detail.edit_button", screen: "app_detail", candidateQuery: "button, a, [role='button']", exactText: "수정" },
   { targetId: "app_edit.call_ip_label", screen: "app_edit", candidateQuery: "th,td,dt,label,span,div", exactText: "API호출 IP" },
+  // The paste target itself (2026-10-17 Phase B 3차): the label as the seller sees it reads 「API호출 IP (n/3)」, so the
+  // exact-label probe above matched only a node that never paints. The input sits in its own form beside 「추가」.
+  { targetId: "app_edit.call_ip_add_button", screen: "app_edit", candidateQuery: "button, a, [role='button']", exactText: "추가" },
 ];
 
 /** The fixed-label probes that apply to a given screen (the CLI runs these on that screen's live viewport). */

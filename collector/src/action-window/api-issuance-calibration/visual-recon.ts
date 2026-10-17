@@ -133,6 +133,12 @@ export interface FixedLabelMatch {
   targetId: string;
   /** Live `count` of elements whose role + accessible name equals the fixed label (integer only). */
   matchCount: number;
+  /**
+   * How many of those matches actually PAINT — the same rule the highlight's locate script applies. A target is
+   * adoptable only at `visibleCount === 1`: `matchCount` alone counted a never-painted node as the edit form's
+   * 「API호출 IP」 label (2026-10-17, `docs/FINDINGS.md`).
+   */
+  visibleCount: number;
 }
 
 /* ────────────────────────────── redaction categories + report ────────────────────────────── */
@@ -475,7 +481,7 @@ export function sanitizeVisualSummary(input: {
   screenshotTaken: boolean;
   viewport: { w: number; h: number };
   /** Raw fixed-label probe results (from the in-page probe). Coerced to value-free integer counts here. */
-  labelMatches?: readonly { targetId: string; matchCount: number }[];
+  labelMatches?: readonly { targetId: string; matchCount: number; visibleCount?: number }[];
 }): SanitizedVisualSummary {
   const obs = observeFrom(input.urlCategory, input.raw.census);
   // `targetId` is the one verbatim string channel in the summary, so screen it like every other emitted string:
@@ -484,7 +490,12 @@ export function sanitizeVisualSummary(input: {
   // `matchCount` is coerced to a non-negative int.
   const labelMatchCounts: FixedLabelMatch[] = (input.labelMatches ?? [])
     .filter((m) => typeof m?.targetId === "string" && TARGET_ID_SHAPE.test(m.targetId) && !looksSensitive(m.targetId))
-    .map((m) => ({ targetId: m.targetId, matchCount: isNonNegInt(m.matchCount) ? m.matchCount : 0 }));
+    .map((m) => {
+      const matchCount = isNonNegInt(m.matchCount) ? m.matchCount : 0;
+      // Never more visible than matched: a page that inflated one count cannot make an unmatched label look seen.
+      const visibleCount = isNonNegInt(m.visibleCount) ? Math.min(m.visibleCount, matchCount) : 0;
+      return { targetId: m.targetId, matchCount, visibleCount };
+    });
   return {
     screen: input.screen,
     pageCategory: obs.pageCategory,

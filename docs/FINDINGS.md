@@ -794,6 +794,18 @@
   다시 확인을 누를 수 있게 한다(제품 경로). 클라이언트만으로 하는 런은 멈춤이 없을 때만 끝까지 간다.
 - **출처** — 2026-10-17 run `wt-7c2c8cd2c384`, `local-agent.ts` `resolveAgentBridgeConfig`, `issuance-live-proof.ts`.
 
+### 고정 라벨 측정의 「1건」이 화면에 그려지지 않는 요소였다 (2026-10-17)
+
+- **했던 것** — 수정 화면 측정(`vis_87e268bf4894`)에서 `app_edit.call_ip_label`(「API호출 IP」 정확 일치)이 `matchCount 1`로 나와
+  채택하고, 강조 확인 3차(`apr-974d094587aa`)에서 ⑥ 링을 기대했다.
+- **사실** — 측정 스크립트(`buildFixedLabelProbeScript`)는 개수만 세고 **그려지는지 보지 않는다.** 강조 스크립트는 그려지는 것만
+  센다. 판매자가 보는 라벨은 「API호출 IP (n/3)」라 정확 일치에 걸리지 않았고, 걸린 1건은 그려지지 않는 요소였다 — 스크롤이 8초
+  「보이지 않음」으로 끝나고 그리는 요소 0. 측정 기록 자체에 「(n/3)」이 적혀 있었는데 라벨과 대조하지 않았다.
+- **다음에** — 고정 라벨을 채택하기 전에 그 화면에서 `buildFixedLabelContainmentScript`(exactVisible/exactHidden/deepestContains*)로
+  **보이는 1건**인지 잰다. `matchCount 1`만으로는 채택하지 않는다. 측정 요약에 적힌 화면 문구와 `exactText`가 글자 그대로 같은지도 본다.
+- **출처** — 2026-10-17 run `wt-d20b19d31058`, `visual-recon-inpage.ts` `buildFixedLabelProbeScript` · `buildFixedLabelLocateScript`,
+  `docs/evidence/INDEX.md` §2 수정 화면 측정 행.
+
 ---
 
 ## 어디에 무엇이 있나

@@ -64,7 +64,7 @@ function harness(opts: { signals: VisualCheckpointSignal[]; applyQ: RawRedaction
     readViewport: async () => ({ w: 1280, h: 800 }),
     probeFixedLabels: async (scr) => {
       calls.probed.push(scr);
-      return [{ targetId: `probe.${scr}`, matchCount: 1 }];
+      return [{ targetId: `probe.${scr}`, matchCount: 2, visibleCount: 1 }];
     },
     clearOverlaysAllFrames: async () => {
       calls.clear += 1;
@@ -100,8 +100,8 @@ describe("runVisualReconSession — screenshot only after redaction verifies", (
     expect(h.calls.clear).toBe(2);
     // the value-free fixed-label counts flow into each screen's summary.
     expect(h.calls.persisted.map((s) => s.labelMatchCounts)).toEqual([
-      [{ targetId: "probe.app_list", matchCount: 1 }],
-      [{ targetId: "probe.app_detail", matchCount: 1 }],
+      [{ targetId: "probe.app_list", matchCount: 2, visibleCount: 1 }],
+      [{ targetId: "probe.app_detail", matchCount: 2, visibleCount: 1 }],
     ]);
   });
 

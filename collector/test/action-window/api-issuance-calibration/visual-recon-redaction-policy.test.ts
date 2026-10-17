@@ -227,10 +227,12 @@ describe("fixed-label read-only matchCount probe — value-free integer counts",
     // detail row and — to be measured — on the edit form behind 「수정」.
     expect(byId["app_detail.call_ip_row"]!.exactText).toBe("API호출 IP");
     expect(byId["app_detail.edit_button"]!.exactText).toBe("수정");
-    expect(labelProbesForScreen("app_edit").map((p) => p.targetId)).toEqual(["app_edit.call_ip_label"]);
+    // The edit form: the exact label (which measured only a never-painted node) and the paste target's 「추가」.
+    expect(labelProbesForScreen("app_edit").map((p) => p.targetId)).toEqual(["app_edit.call_ip_label", "app_edit.call_ip_add_button"]);
+    expect(byId["app_edit.call_ip_add_button"]!.exactText).toBe("추가");
   });
 
-  it("the probe script embeds the probes and RETURNS only {targetId, matchCount} — never page text", () => {
+  it("the probe script embeds the probes and RETURNS only {targetId, matchCount, visibleCount} — never page text", () => {
     const probes = labelProbesForScreen("app_list");
     const script = buildFixedLabelProbeScript(probes);
     expect(script.includes(JSON.stringify(probes))).toBe(true);
@@ -239,7 +241,7 @@ describe("fixed-label read-only matchCount probe — value-free integer counts",
     expect(returns.length).toBeGreaterThan(0);
     for (const block of returns) {
       const keys = block.split(",").map((kv) => kv.split(":")[0]!.trim()).filter(Boolean);
-      expect(keys.sort()).toEqual(["matchCount", "targetId"]);
+      expect(keys.sort()).toEqual(["matchCount", "targetId", "visibleCount"]);
     }
     // it reads text ONLY to compare against the known fixed label (documented), and never emits it.
     expect(script).toContain("el.textContent");
@@ -273,8 +275,10 @@ describe("sanitizeVisualSummary — fixed-label counts are coerced value-free", 
     const s = sanitizeVisualSummary({
       ...base,
       labelMatches: [
-        { targetId: "app_list.register_application", matchCount: 1 },
+        { targetId: "app_list.register_application", matchCount: 1, visibleCount: 1 },
         { targetId: "app_list.reactivate_application", matchCount: -3 as unknown as number },
+        { targetId: "app_edit.call_ip_label", matchCount: 1, visibleCount: 0 }, // matched, never painted
+        { targetId: "app_edit.call_ip_add_button", matchCount: 1, visibleCount: 5 }, // inflated → capped at matchCount
         { targetId: "", matchCount: 2 }, // empty → dropped
         { targetId: "not a target id", matchCount: 1 }, // wrong shape → dropped
         { targetId: "credentials.애플리케이션시크릿AB12CD34EF56", matchCount: 1 }, // page-smuggled string → dropped
@@ -282,8 +286,10 @@ describe("sanitizeVisualSummary — fixed-label counts are coerced value-free", 
       ],
     });
     expect(s.labelMatchCounts).toEqual([
-      { targetId: "app_list.register_application", matchCount: 1 },
-      { targetId: "app_list.reactivate_application", matchCount: 0 },
+      { targetId: "app_list.register_application", matchCount: 1, visibleCount: 1 },
+      { targetId: "app_list.reactivate_application", matchCount: 0, visibleCount: 0 },
+      { targetId: "app_edit.call_ip_label", matchCount: 1, visibleCount: 0 },
+      { targetId: "app_edit.call_ip_add_button", matchCount: 1, visibleCount: 1 },
     ]);
   });
 
