@@ -1043,3 +1043,51 @@ describe("the last step's CTA actually moves the seller", () => {
     expect(driver.calls).not.toContain("returnToSellerOps");
   });
 });
+
+describe("a park while opening the app recovers WHERE the seller is (live 2026-10-17)", () => {
+  it("**re-checking on the detail page advances** — it does not demand the applications list again", async () => {
+    const script: IssuanceFixtureScript = { ...EXISTING, openAppLanding: { ok: true, pageCategory: "unknown" } };
+    const { io, engine, driver, session } = build(script);
+    startRun(io);
+    await session.whenSettled();
+    expect(engine.currentStage()).toBe("page_mismatch");
+    expect(io.lastView()?.currentStep?.stepNumber).toBe(2);
+
+    // The SPA settles on the detail page; the seller presses 다시 확인 from there.
+    script.openAppLanding = { ok: true, pageCategory: "app_detail" };
+    const probesBefore = driver.calls.filter((c) => c === "readApplications").length;
+    command(io, "REQUEST_STEP_RECHECK", io.lastView()!.revision, "recover");
+    await session.whenSettled();
+
+    expect(engine.currentStage()).toBe("guiding_app_usage_check");
+    expect(driver.calls.filter((c) => c === "readApplications").length).toBe(probesBefore); // never re-read the list
+    for (const v of io.views()) expect(validateRunView(v).ok, JSON.stringify(validateRunView(v))).toBe(true);
+  });
+
+  it("re-checking back on the list guides the open again", async () => {
+    const script: IssuanceFixtureScript = { ...EXISTING, openAppLanding: { ok: true, pageCategory: "unknown" } };
+    const { io, engine, driver, session } = build(script);
+    startRun(io);
+    await session.whenSettled();
+    expect(engine.currentStage()).toBe("page_mismatch");
+
+    script.openAppLanding = { ok: true, pageCategory: "app_list" };
+    const guidesBefore = driver.calls.filter((c) => c === "highlight:open_app").length;
+    command(io, "REQUEST_STEP_RECHECK", io.lastView()!.revision, "recover");
+    await session.whenSettled();
+
+    expect(driver.calls.filter((c) => c === "highlight:open_app").length).toBe(guidesBefore + 1);
+  });
+
+  it("a park on some other page stays a recoverable park, at step 2", async () => {
+    const script: IssuanceFixtureScript = { ...EXISTING, openAppLanding: { ok: true, pageCategory: "unknown" } };
+    const { io, engine, session } = build(script);
+    startRun(io);
+    await session.whenSettled();
+    command(io, "REQUEST_STEP_RECHECK", io.lastView()!.revision, "again");
+    await session.whenSettled();
+    expect(engine.currentStage()).toBe("page_mismatch");
+    expect(io.lastView()?.blocker?.recoverable).toBe(true);
+    expect(io.lastView()?.currentStep?.stepNumber).toBe(2);
+  });
+});

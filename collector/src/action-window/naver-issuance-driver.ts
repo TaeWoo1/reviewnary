@@ -746,12 +746,26 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
     const pollMs = this.opts.verifyPollMs ?? VERIFY_POLL_MS;
     // Settle ONCE up front (give the just-started navigation a beat), then quick-read the category between short
     // delays — NOT a full 15 s settle per poll, which would stall VERIFY for minutes on a never-idle SPA.
-    let last = await this.probeSurface();
+    let last = await this.probeSurface().catch((e) => this.midNavigationRead(e));
     for (let i = 1; i < VERIFY_MAX_POLLS && !isVerifyResolved(last.pageCategory); i++) {
       if (pollMs > 0) await sleep(pollMs); // pollMs 0 (tests) stays microtask-only; live waits a real beat
-      last = await this.readSurface();
+      last = await this.readSurface().catch((e) => this.midNavigationRead(e));
     }
     return last;
+  }
+
+  /**
+   * A read that lost its page to the seller's own navigation is "not settled yet", not a fault. Live 2026-10-17
+   * (Phase B, run `wt-7c2c8cd2c384`): the seller opened their app, the first verify read came back `unknown`
+   * mid-hydration, and the NEXT read threw as the SPA destroyed its execution context — escaping this poll as a
+   * drive error and parking the walk on step 2 with the seller already on the right page. A transient
+   * navigation error now reads as `unknown` and the poll continues; anything else still propagates.
+   */
+  private midNavigationRead(e: unknown): IssuanceSurfaceProbe {
+    const reason = classifyFaultReason(e);
+    if (reason !== "CONTEXT_DESTROYED" && reason !== "FRAME_DETACHED") throw e;
+    log("aw_issuance_verify_read_mid_navigation", { reason });
+    return { ok: true, pageCategory: "unknown" };
   }
 
   async readApplications(): Promise<ApplicationsRead> {

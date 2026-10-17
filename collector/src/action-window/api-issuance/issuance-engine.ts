@@ -175,9 +175,10 @@ export class IssuanceEngine {
    *       transient locate miss (`target_not_found`), a `page_mismatch`, a surface close, or an execution-context
    *       throw. It self-heals — if the reopened/scrolled page is wrong it just re-parks recoverably, and the
    *       instant the section is on screen the re-locate succeeds.</li>
-   *   <li><b>Park with no checkpoint in flight</b> (the initial probe, a login gate, or the `open_app`
-   *       transition) → re-probe the surface from the top (mirroring import's `SESSION_BLOCKED → PREPARE`); the
-   *       seller belongs back on the applications list.</li>
+   *   <li><b>Park while opening the app</b> (`open_app`) → VERIFY where the seller is: the detail page
+   *       advances, the list re-guides the open, anything else re-parks. They may already be on the right page.</li>
+   *   <li><b>Park with no target in flight</b> (the initial probe, a login gate before the list was read) →
+   *       re-probe the surface from the top (mirroring import's `SESSION_BLOCKED → PREPARE`).</li>
    *   <li><b>Checkpoint barrier</b> → "다음" advances it (see the barrier branch below).</li>
    *   <li><b>open_app barrier</b> → re-arm the navigation observation.</li>
    * </ul>
@@ -200,6 +201,18 @@ export class IssuanceEngine {
         this.stage = "locating_applications";
         this.emit("RUN_STATUS_CHANGED", { status: "RUNNING" });
         return { guide: target };
+      }
+      // Parked while opening the app (`open_app`): the seller may ALREADY be on their app's detail page — the
+      // live 2026-10-17 park happened exactly there. Re-probing from the top would demand the applications list
+      // and park them again on the right page, so VERIFY where they are instead: the detail page advances, the
+      // list re-guides the open, anything else re-parks recoverably (`onOpenAppVerified`).
+      if (this.currentTarget === "open_app") {
+        this.blockerCode = null;
+        this.blockerRecoverable = false;
+        this.activeStepIndex = TARGET_STEP.open_app;
+        this.stage = "locating_applications";
+        this.emit("RUN_STATUS_CHANGED", { status: "RUNNING" });
+        return "VERIFY_OPEN";
       }
       this.blockerCode = null;
       this.blockerRecoverable = false;
@@ -393,7 +406,10 @@ export class IssuanceEngine {
    */
   onOpenAppVerified(probe: IssuanceSurfaceProbe): IssuanceEffect {
     if (isIssuanceTerminal(this.stage)) return "NONE";
-    if (this.stage !== TARGET_BARRIER.open_app || this.currentTarget !== "open_app") return "NONE";
+    if (this.currentTarget !== "open_app") return "NONE";
+    // Resting on the open barrier, or re-verifying after a park (see `recheck`) — nothing else may verify.
+    const reverifying = this.stage === "locating_applications";
+    if (this.stage !== TARGET_BARRIER.open_app && !reverifying) return "NONE";
     if (!probe.ok || probe.blockerCode === "LOGIN_REQUIRED" || probe.pageCategory === "login") {
       return this.park("waiting_login", "LOGIN_REQUIRED");
     }
@@ -404,7 +420,13 @@ export class IssuanceEngine {
       // Step 3 is the text-only usage-state advisory (rest until the seller confirms), THEN api_group.
       return this.enterAppUsageCheck();
     }
-    // Wrong page / multiple transitions → recoverable park; a REQUEST_STEP_RECHECK re-probes from the top.
+    // Re-verifying after a park and the seller is back on the list → guide the open again rather than park.
+    if (reverifying && probe.pageCategory === "app_list") {
+      this.stage = "existing_app";
+      this.emit("STEP_READY", { stepId: this.stepId(), stepStatus: "READY" });
+      return { guide: "open_app" };
+    }
+    // Wrong page / multiple transitions → recoverable park; a REQUEST_STEP_RECHECK verifies again where they are.
     return this.park("page_mismatch", "UI_DRIFT");
   }
 

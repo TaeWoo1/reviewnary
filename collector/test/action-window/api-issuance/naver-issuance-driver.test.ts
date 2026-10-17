@@ -71,7 +71,7 @@ interface FakePageOptions {
    * Models the app-detail SPA classifying as a transient `unknown` for a beat before it settles to `app_detail`,
    * so VERIFY_OPEN's bounded polling can be proven to ride out the transient. Overrides `postOpenCensus`.
    */
-  postOpenCensusSequence?: ApiCenterStructuralCensus[];
+  postOpenCensusSequence?: (ApiCenterStructuralCensus | "throw")[];
   /** Throw an execution-context error on the first N fixed-label tag/sig reads (models a soft-nav mid-annotation). */
   throwLocateTimes?: number;
   /** When true, the Playwright locator's `waitFor` always TIMES OUT (models a label that never renders → park). */
@@ -150,7 +150,7 @@ class FakePage {
   appEntryCount: number;
   observed: boolean;
   postOpenCensus: ApiCenterStructuralCensus;
-  postOpenCensusSequence: ApiCenterStructuralCensus[] | undefined;
+  postOpenCensusSequence: (ApiCenterStructuralCensus | "throw")[] | undefined;
   locatorTimeout: boolean;
   scrollThrows: boolean;
   tagResult: LocateResult | undefined;
@@ -209,6 +209,8 @@ class FakePage {
     if (seq && seq.length > 0) {
       const c = seq[Math.min(this.postOpenPoll, seq.length - 1)]!;
       this.postOpenPoll += 1;
+      // "throw" models the SPA destroying the execution context under the read (live 2026-10-17, Phase B).
+      if (c === "throw") throw new Error("Execution context was destroyed, most likely because of a navigation");
       return c;
     }
     return this.postOpenCensus;
@@ -1105,5 +1107,39 @@ describe("NaverIssuanceDriver — the call-IP steps", () => {
     }
     expect(copyRows).toBe(1);
     expect(page.clickCalls).toBe(0);
+  });
+});
+
+describe("NaverIssuanceDriver — VERIFY_OPEN survives the SPA destroying its context mid-read (live 2026-10-17)", () => {
+  it("**a read lost to the seller's own navigation is 'not settled yet', not a fault** — step 2 completes", async () => {
+    // The live sequence: the observe saw the page leave the list (`unknown`), the first verify read was still
+    // `unknown`, and the next read threw as the SPA navigated. That used to escape as a drive error and park the
+    // walk with the seller already on the right page.
+    const { io, engine, session } = build({
+      appEntryCount: 1,
+      postOpenCensusSequence: [UNKNOWN_CENSUS, UNKNOWN_CENSUS, "throw", APP_DETAIL_CENSUS],
+    });
+    startRun(io);
+    await session.whenSettled();
+    expect(engine.currentStage()).toBe("guiding_app_usage_check");
+    expect(io.lastView()?.blocker).toBeUndefined();
+  });
+
+  it("a non-navigation fault still propagates — only the transient family is absorbed", async () => {
+    const { io, engine, session, page } = build({ appEntryCount: 1, postOpenCensusSequence: [UNKNOWN_CENSUS, UNKNOWN_CENSUS] });
+    const real = page.evaluate.bind(page);
+    // The 1st census read on the open barrier is the observe poll (which treats any failure as "still on the
+    // list"); the 2nd is the VERIFY read this test is about.
+    let reads = 0;
+    page.evaluate = async (fnOrStr: unknown, arg?: unknown) => {
+      if (typeof fnOrStr === "string" && fnOrStr.includes("passwordFieldPresent") && engine.currentStage() === "guiding_app_detail") {
+        reads += 1;
+        if (reads === 2) throw new TypeError("unexpected");
+      }
+      return real(fnOrStr, arg);
+    };
+    startRun(io);
+    await session.whenSettled();
+    expect(io.lastView()?.blocker?.code).toBe("UI_DRIFT");
   });
 });
