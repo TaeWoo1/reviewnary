@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium, type Browser, type Page } from "playwright";
 import {
+  captureAfterPanels,
   createMaskedCapturer,
   redactionHolds,
   screenCaptureDir,
@@ -46,6 +47,41 @@ describe("masked capture — the guards", () => {
     expect(redactionHolds({ integrityOk: true, detected: { form_field: 2 }, covered: { form_field: 1 } })).toBe(false);
     expect(redactionHolds({ integrityOk: false, detected: {}, covered: {} })).toBe(false);
     expect(redactionHolds(null)).toBe(false);
+  });
+});
+
+describe("masked capture — **nothing from step 6 on** (run 5: a revealed secret reached a capture)", () => {
+  it("captures steps 4–5, then stops for good at the application ID — park and completion notices included", async () => {
+    const labels: string[] = [];
+    const capturer = { capture: async (l: string) => (labels.push(l), true), stop: () => undefined };
+    const driver = {
+      highlightTarget: async (_t: string) => ({}),
+      showParkNotice: async (_c: string) => true,
+      showCompletionNotice: async () => true,
+    };
+    captureAfterPanels(driver, capturer, 0);
+    const settle = () => new Promise((r) => setTimeout(r, 5));
+    await driver.highlightTarget("open_edit");
+    await driver.highlightTarget("call_ip");
+    await settle();
+    expect(labels).toEqual(["highlightTarget-open_edit", "highlightTarget-call_ip"]);
+    await driver.highlightTarget("application_id");
+    await driver.showParkNotice("UI_DRIFT");
+    await driver.highlightTarget("call_ip");
+    await driver.showCompletionNotice();
+    await settle();
+    expect(labels).toEqual(["highlightTarget-open_edit", "highlightTarget-call_ip"]);
+  });
+
+  it("the completion notice alone also stops captures", async () => {
+    const labels: string[] = [];
+    const capturer = { capture: async (l: string) => (labels.push(l), true), stop: () => undefined };
+    const driver = { showCompletionNotice: async () => true, showParkNotice: async (_c: string) => true };
+    captureAfterPanels(driver, capturer, 0);
+    await driver.showCompletionNotice();
+    await driver.showParkNotice("UI_DRIFT");
+    await new Promise((r) => setTimeout(r, 5));
+    expect(labels).toEqual([]);
   });
 });
 

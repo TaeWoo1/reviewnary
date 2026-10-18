@@ -11,7 +11,8 @@
  *   3. screenshots the viewport only,
  *   4. verifies again, then removes the overlays,
  *
- * and writes the PNG only if both verifications passed. A failed verification writes nothing and logs a reason
+ * and writes the PNG only if both verifications passed. From step 6 (application ID) on, nothing is captured at
+ * all (`NO_CAPTURE_FROM`). A failed verification writes nothing and logs a reason
  * enum. Nothing is clicked or typed; the overlays are visible to the seller for the moment of the capture.
  *
  * There is deliberately NO file trigger: a file is something a model can write, and the live CLIs keep no
@@ -114,16 +115,30 @@ export function createMaskedCapturer(
 const CAPTURE_AFTER = ["highlightTarget", "showAppUsageNotice", "showParkNotice", "showCompletionNotice"] as const;
 
 /**
+ * The steps from which NAVER's page can show the application ID or a revealed secret (run 5, 2026-10-18: a
+ * revealed secret reached a capture). Once the walk reaches one of them, nothing more is captured for the rest of
+ * the run — park and completion notices included, since a revealed value stays on the page.
+ */
+export const NO_CAPTURE_FROM: readonly string[] = ["application_id", "application_secret", "return"];
+
+/**
  * Wrap a driver so each panel it draws is followed by one masked capture, `delayMs` later (the panel's own
  * placement and the copy rows settle first). The wrapped method's result and timing are unchanged.
  */
 export function captureAfterPanels<T extends object>(driver: T, capturer: MaskedCapturer, delayMs = 800): T {
   const d = driver as unknown as Record<string, unknown>;
+  let stopped = false;
   for (const name of CAPTURE_AFTER) {
     const fn = d[name];
     if (typeof fn !== "function") continue;
     d[name] = async (...args: unknown[]) => {
+      if (name === "highlightTarget" && typeof args[0] === "string" && NO_CAPTURE_FROM.includes(args[0])) {
+        if (!stopped) log("aw_masked_capture_stopped", { at: args[0] });
+        stopped = true;
+      }
+      if (name === "showCompletionNotice") stopped = true;
       const out = await (fn as (...a: unknown[]) => Promise<unknown>).apply(driver, args);
+      if (stopped) return out;
       const label = `${name}${typeof args[0] === "string" ? `-${args[0]}` : ""}`;
       setTimeout(() => void capturer.capture(label), delayMs);
       return out;
