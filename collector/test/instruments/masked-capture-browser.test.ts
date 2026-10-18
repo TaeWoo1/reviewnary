@@ -13,6 +13,12 @@ import {
   redactionHolds,
   screenCaptureDir,
 } from "../../instruments/live-runs/masked-capture";
+import {
+  REDACTION_APPLY_SCRIPT,
+  REDACTION_CLEAR_SCRIPT,
+  REDACTION_VERIFY_SCRIPT,
+} from "../../src/action-window/api-issuance-calibration/visual-recon-inpage";
+import { isIdentityTextToRedact } from "../../src/action-window/api-issuance-calibration/visual-recon";
 
 const RUN = process.env.RUN_INTEGRATION === "1";
 const REPO = resolve(__dirname, "../../..");
@@ -24,6 +30,15 @@ describe("masked capture — the guards", () => {
     expect(screenCaptureDir(REPO, REPO)).toBeNull();
     expect(screenCaptureDir(join(REPO, "collector", "shots"), REPO)).toBeNull();
     expect(screenCaptureDir(join(tmpdir(), "aw-shots"), REPO)).toBe(join(tmpdir(), "aw-shots"));
+  });
+
+  it("**a hash-shaped secret is a token to redact**, public prose and dates are not (2026-10-18 leak)", () => {
+    for (const v of ["$2a$04$abcdEFGHijklMNOP/qrstUV", "abcdEFGHijkl/MNOPqrst+uv==", "ab.cd.efgh_ijkl-mnop$q"]) {
+      expect(isIdentityTextToRedact(v), v).toBe(true);
+    }
+    for (const v of ["나누리샵의 api를 통한 데이터 수집용", "2026-08-04 발급 | nanu******", "애플리케이션 시크릿"]) {
+      expect(isIdentityTextToRedact(v), v).toBe(false);
+    }
   });
 
   it("a redaction holds only when every detected element is covered and the overlays are intact", () => {
@@ -102,4 +117,51 @@ describe.skipIf(!RUN)("masked capture — real Chromium", () => {
     expect(await page.evaluate(() => document.querySelectorAll("[data-sellerops-redact]").length)).toBe(0);
   });
 
+});
+
+describe.skipIf(!RUN)("**a REVEALED secret is covered** — the 2026-10-18 leak, reproduced", () => {
+  let browser: Browser;
+  let page: Page;
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true });
+    page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  });
+  afterAll(async () => {
+    await browser?.close();
+  });
+
+  // The shape the leak had: a key/value row with NO attribute naming it, the value in plain text after 「보기」,
+  // hash-shaped (separators split it into short runs), next to 「숨기기」「복사」「재발급」 buttons that carry only
+  // their visible labels. A synthetic value — never a real one.
+  const ROW = (value: string) => `<!doctype html><meta charset="utf-8"><body style="margin:0;padding:40px">
+    <table><tbody>
+      <tr><th>애플리케이션 ID</th><td><span id="idv">${value.replace(/\$/g, "x")}</span></td></tr>
+      <tr><th>애플리케이션 시크릿</th><td><span id="val">${value}</span>
+        <button>숨기기</button><button>복사</button><button>재발급</button></td></tr>
+      <tr><th>설명</th><td id="desc">나누리샵의 api를 통한 데이터 수집용</td></tr>
+    </tbody></table></body>`;
+  const covered = (id: string) =>
+    page.evaluate((elId) => {
+      const r = document.getElementById(elId)!.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return !!hit && hit.hasAttribute("data-sellerops-redact");
+    }, id);
+
+  it("**covers the revealed secret and the ID value; leaves the public description visible**", async () => {
+    await page.setContent(ROW("$2a$04$abcdEFGHijklMNOP/qrstUV"));
+    await page.evaluate(REDACTION_APPLY_SCRIPT);
+    expect(redactionHolds(await page.evaluate(REDACTION_VERIFY_SCRIPT))).toBe(true);
+    expect(await covered("val")).toBe(true);
+    expect(await covered("idv")).toBe(true);
+    expect(await covered("desc")).toBe(false);
+    await page.evaluate(REDACTION_CLEAR_SCRIPT);
+  });
+
+  it("covers it by the row's label alone — no copy control, a value no token pattern would ever match", async () => {
+    await page.setContent(`<!doctype html><meta charset="utf-8"><body style="margin:0;padding:40px"><table><tbody>
+      <tr><th>애플리케이션 시크릿</th><td><span id="val">가나다라마바사</span></td></tr></tbody></table></body>`);
+    await page.evaluate(REDACTION_APPLY_SCRIPT);
+    expect(await covered("val")).toBe(true);
+    await page.evaluate(REDACTION_CLEAR_SCRIPT);
+  });
 });

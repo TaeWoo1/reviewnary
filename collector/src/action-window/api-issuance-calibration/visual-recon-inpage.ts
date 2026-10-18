@@ -223,11 +223,35 @@ export function buildRedactionScript(mode: RedactionMode): string {
     }
   }
 
+  /* credential ROWS by their visible label (2026-10-18, live leak): NAVER marks nothing in attributes, so a
+     revealed Application Secret ('보기' pressed) sat in plain text beside a 「애플리케이션 시크릿」 label that no
+     attribute rule could see. A label cell whose own text names a credential has every OTHER cell of its row
+     covered — the value, whatever it looks like — and a non-table label has its next sibling and parent covered.
+     The label text is read only to decide coverage; only counts leave the page. */
+  var CRED_LABEL = /^(애플리케이션\\s*(ID|시크릿)|클라이언트\\s*(ID|시크릿)|client\\s*(id|secret)|application\\s*(id|secret)|시크릿|secret)$/i;
+  for (var i = 0; i < all.length; i++) {
+    var lab = all[i];
+    if (lab.getAttribute && lab.getAttribute(OVERLAY_ATTR) != null) { continue; }
+    if (!CRED_LABEL.test(ownText(lab).replace(/\\s+/g, ' ').trim())) { continue; }
+    var cell = lab.closest ? (lab.closest('th, td, dt, dd') || lab) : lab;
+    var row = cell.parentElement;
+    if (row && /^(TR|DL)$/.test(row.tagName)) {
+      for (var k = 0; k < row.children.length; k++) {
+        if (row.children[k] !== cell) { cover(row.children[k], 'credential_area'); }
+      }
+    } else {
+      if (cell.nextElementSibling) { cover(cell.nextElementSibling, 'credential_area'); }
+      if (cell.parentElement) { cover(cell.parentElement, 'credential_area'); }
+    }
+  }
+
   var COPY = /복사|copy/;
+  var COPY_TEXT = /^(복사|copy)$/i;
   var controls = slice(document.querySelectorAll("button, a, [role='button']"));
   for (var i = 0; i < controls.length; i++) {
     var c = controls[i];
-    if (!COPY.test(attrText(c))) { continue; }
+    /* the control's own LABEL counts too — NAVER's 「복사」 carries no attribute naming it (2026-10-18 leak) */
+    if (!COPY.test(attrText(c)) && !COPY_TEXT.test(String(c.textContent || '').replace(/\\s+/g, ' ').trim())) { continue; }
     cover(c, 'copy_linked');
     if (c.previousElementSibling) { cover(c.previousElementSibling, 'copy_linked'); }
     if (c.nextElementSibling) { cover(c.nextElementSibling, 'copy_linked'); }

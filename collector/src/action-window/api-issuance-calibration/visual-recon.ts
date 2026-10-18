@@ -185,6 +185,10 @@ export const IDENTITY_REDACT_PATTERN_SOURCES: readonly string[] = [
   "\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}", // IPv4 (e.g. an API-call IP)
   "\\d{6,}", // a long numeric id
   "(?=[A-Za-z0-9_-]*\\d)[A-Za-z0-9_-]{12,}", // a long credential/token/secret/client-id (12+ chars incl. a digit)
+  // a secret with separators — a hash-shaped value like a bcrypt string ("$2a$04$…/…"), base64 with + / = — that
+  // the run above splits into short pieces. 16+ chars of token alphabet, containing a separator and a letter.
+  // Live 2026-10-18: a revealed NAVER Application Secret matched nothing here and reached a screenshot.
+  "(?=[A-Za-z0-9_$./+=-]*[$/+=])(?=[A-Za-z0-9_$./+=-]*[A-Za-z])[A-Za-z0-9_$./+=-]{16,}",
   "[A-Za-z][A-Za-z0-9]{2,}\\d{2,}", // a login-id-like account handle (letters then ≥2 digits)
   "[\\uAC00-\\uD7A3A-Za-z0-9_.\\-]{1,}\\s*님", // the logged-in account greeting "<id-or-name> 님" (Hangul or ASCII)
 ];
