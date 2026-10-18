@@ -19,6 +19,10 @@
  * file-driven action on a live page (`test/cli/operator-advance-channel-guard.test.ts`). Captures follow the
  * panels the walk itself draws, nothing else.
  *
+ * Only a panel that actually painted is followed by a capture, at most once per panel every few seconds, and a page
+ * with a password field is never touched — run 6 (2026-10-18) flashed the overlays over NAVER's login form twice a
+ * second, because every refused redraw of the login notice was followed by a capture.
+ *
  * The folder must be absolute and outside the repository, so a capture can never be staged by accident.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -75,6 +79,14 @@ export function createMaskedCapturer(
     const pg = page();
     if (!pg) return false;
     const safeLabel = label.replace(/[^a-z0-9_-]/gi, "").slice(0, 40) || "shot";
+    // A login form is never touched (run 6, 2026-10-18): the overlays flashed over the fields the seller was typing in.
+    const loginForm = await pg
+      .evaluate(() => !!document.querySelector('input[type="password"]'))
+      .catch(() => true);
+    if (loginForm) {
+      log("aw_masked_capture", { label: safeLabel, ok: false, reason: "LOGIN_FORM" });
+      return false;
+    }
     try {
       await pg.evaluate(REDACTION_APPLY_SCRIPT);
       const before = await pg.evaluate(REDACTION_VERIFY_SCRIPT);
@@ -115,6 +127,15 @@ export function createMaskedCapturer(
 const CAPTURE_AFTER = ["highlightTarget", "showAppUsageNotice", "showParkNotice", "showCompletionNotice"] as const;
 
 /**
+ * Did the wrapped call actually draw its panel? A refused notice (run 6, 2026-10-18: the login notice is refused on
+ * NAVER's login form every 500ms poll) or an unlocated target draws nothing, so nothing follows it.
+ */
+function painted(name: (typeof CAPTURE_AFTER)[number], out: unknown): boolean {
+  if (name === "highlightTarget") return (out as { count?: unknown } | null)?.count === 1;
+  return out === true;
+}
+
+/**
  * The steps from which NAVER's page can show the application ID or a revealed secret (run 5, 2026-10-18: a
  * revealed secret reached a capture). Once the walk reaches one of them, nothing more is captured for the rest of
  * the run — park and completion notices included, since a revealed value stays on the page.
@@ -125,9 +146,16 @@ export const NO_CAPTURE_FROM: readonly string[] = ["application_id", "applicatio
  * Wrap a driver so each panel it draws is followed by one masked capture, `delayMs` later (the panel's own
  * placement and the copy rows settle first). The wrapped method's result and timing are unchanged.
  */
-export function captureAfterPanels<T extends object>(driver: T, capturer: MaskedCapturer, delayMs = 800): T {
+export function captureAfterPanels<T extends object>(
+  driver: T,
+  capturer: MaskedCapturer,
+  delayMs = 800,
+  minGapMs = 5_000,
+  now: () => number = () => Date.now(),
+): T {
   const d = driver as unknown as Record<string, unknown>;
   let stopped = false;
+  const lastAt = new Map<string, number>();
   for (const name of CAPTURE_AFTER) {
     const fn = d[name];
     if (typeof fn !== "function") continue;
@@ -138,8 +166,13 @@ export function captureAfterPanels<T extends object>(driver: T, capturer: Masked
       }
       if (name === "showCompletionNotice") stopped = true;
       const out = await (fn as (...a: unknown[]) => Promise<unknown>).apply(driver, args);
-      if (stopped) return out;
+      if (stopped || !painted(name, out)) return out;
       const label = `${name}${typeof args[0] === "string" ? `-${args[0]}` : ""}`;
+      // A notice redrawn over and over (a page that keeps navigating) is captured once, not on every redraw.
+      const t = now();
+      const prev = lastAt.get(label);
+      if (prev !== undefined && t - prev < minGapMs) return out;
+      lastAt.set(label, t);
       setTimeout(() => void capturer.capture(label), delayMs);
       return out;
     };

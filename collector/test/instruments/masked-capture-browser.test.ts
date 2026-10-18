@@ -55,7 +55,7 @@ describe("masked capture — **nothing from step 6 on** (run 5: a revealed secre
     const labels: string[] = [];
     const capturer = { capture: async (l: string) => (labels.push(l), true), stop: () => undefined };
     const driver = {
-      highlightTarget: async (_t: string) => ({}),
+      highlightTarget: async (_t: string) => ({ count: 1 }),
       showParkNotice: async (_c: string) => true,
       showCompletionNotice: async () => true,
     };
@@ -85,13 +85,57 @@ describe("masked capture — **nothing from step 6 on** (run 5: a revealed secre
   });
 });
 
+describe("masked capture — **only after a panel that painted, once** (run 6: the overlays flashed over NAVER's login form)", () => {
+  const settle = () => new Promise((r) => setTimeout(r, 5));
+  function rig(now: () => number = () => 0) {
+    const labels: string[] = [];
+    const capturer = { capture: async (l: string) => (labels.push(l), true), stop: () => undefined };
+    let paints = true;
+    let count = 1;
+    const driver = {
+      highlightTarget: async (_t: string) => ({ count }),
+      showParkNotice: async (_c: string) => paints,
+    };
+    captureAfterPanels(driver, capturer, 0, 5_000, now);
+    return { labels, driver, refuse: () => (paints = false), unlocate: () => (count = 0) };
+  }
+
+  it("**a refused notice — the login notice on NAVER's login form, every 500ms poll — is never followed by a capture**", async () => {
+    const r = rig();
+    r.refuse();
+    for (let i = 0; i < 20; i++) await r.driver.showParkNotice("LOGIN_REQUIRED");
+    await settle();
+    expect(r.labels).toEqual([]);
+  });
+
+  it("an unlocated target draws no ring, so nothing is captured", async () => {
+    const r = rig();
+    r.unlocate();
+    await r.driver.highlightTarget("open_edit");
+    await settle();
+    expect(r.labels).toEqual([]);
+  });
+
+  it("**a notice redrawn again and again is captured once per few seconds**", async () => {
+    let t = 0;
+    const r = rig(() => t);
+    for (let i = 0; i <= 10; i++) { // t = 0 … 5000ms, every 500ms
+      await r.driver.showParkNotice("UI_DRIFT");
+      t += 500;
+    }
+    await settle();
+    expect(r.labels).toEqual(["showParkNotice-UI_DRIFT", "showParkNotice-UI_DRIFT"]);
+  });
+});
+
 describe("masked capture — a mask that does not hold writes nothing", () => {
   /** A page double whose redaction verify reports the given result; records whether it was screenshotted. */
   function fakePage(verify: unknown[]) {
     const calls: string[] = [];
     let v = 0;
     const page = {
-      evaluate: async (src: string) => {
+      evaluate: async (src: string | (() => unknown)) => {
+        if (typeof src === "function") return false; // the login-form check: no password field here
         if (src.includes("visual-recon-redaction (verify)")) return verify[Math.min(v++, verify.length - 1)];
         calls.push(src.includes("(apply)") ? "apply" : "clear");
         return { integrityOk: true, detected: {}, covered: {} };
@@ -151,6 +195,24 @@ describe.skipIf(!RUN)("masked capture — real Chromium", () => {
     expect(writes).toHaveLength(1);
     expect(writes[0]).toMatch(/001-step\.png$/);
     expect(await page.evaluate(() => document.querySelectorAll("[data-sellerops-redact]").length)).toBe(0);
+  });
+
+  it("**a login form is never touched: no overlay is ever drawn over it, no file**", async () => {
+    await page.setContent(`<!doctype html><body><form><input id="id"><input id="pw" type="password"></form></body>`);
+    await page.evaluate(() => {
+      (window as unknown as { __drawn: number }).__drawn = 0;
+      new MutationObserver((ms) => {
+        for (const m of ms)
+          for (const n of Array.from(m.addedNodes))
+            if (n instanceof Element && n.hasAttribute("data-sellerops-redact"))
+              (window as unknown as { __drawn: number }).__drawn += 1;
+      }).observe(document.documentElement, { childList: true, subtree: true });
+    });
+    const writes: string[] = [];
+    const cap = createMaskedCapturer(() => page, dir, (p) => writes.push(p));
+    expect(await cap.capture("login")).toBe(false);
+    expect(writes).toHaveLength(0);
+    expect(await page.evaluate(() => (window as unknown as { __drawn: number }).__drawn)).toBe(0);
   });
 
 });
