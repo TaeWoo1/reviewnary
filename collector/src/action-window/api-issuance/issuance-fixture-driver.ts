@@ -78,6 +78,7 @@ export class IssuanceFixtureDriver implements IssuanceProbeDriver {
   private readonly stepDoneNow: Partial<Record<IssuanceTarget, boolean>>;
   private parkRecheckPressed = false;
   private panelGone = false;
+  private parkClearedNow = false;
   /** Every call, in order — so a test can assert the runtime never armed a control it should not have. */
   readonly calls: string[] = [];
   /** Polled call signatures already recorded once — see {@link recordOnce}. */
@@ -186,6 +187,17 @@ export class IssuanceFixtureDriver implements IssuanceProbeDriver {
   /** Is the panel still on the page? A test sets `panelGone` to model a navigation that took it away. */
   async panelPresent(): Promise<boolean> {
     return !this.panelGone;
+  }
+
+  /** Has the park's cause gone away (the seller logged in)? Fail-closed default: no. */
+  async parkCleared(code: string): Promise<boolean> {
+    this.recordOnce(`parkCleared?:${code}`);
+    return this.parkClearedNow;
+  }
+
+  /** Model the seller finishing their login (or not). */
+  setParkCleared(cleared: boolean): void {
+    this.parkClearedNow = cleared;
   }
 
   /** Model a full navigation that replaced the document (and the panel with it). */

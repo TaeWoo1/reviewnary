@@ -1015,12 +1015,23 @@ describe("a parked NAVER walk stays visible on the window the seller is in", () 
     expect(notices).toEqual(["parkNotice:TARGET_NOT_FOUND"]);
   });
 
-  it("draws NO notice over a login screen — the one page where a seller is typing a password", async () => {
-    const { io, driver, session } = build({ probe: { ok: false, pageCategory: "login", blockerCode: "LOGIN_REQUIRED" } });
+  it("**a login park asks the driver for its notice, and carries on by itself once the seller is logged in**", async () => {
+    // 2026-10-18 (PO): the public landing gets a login notice — the DRIVER refuses it over any password field
+    // (its own tests) — and the walk no longer waits for a 다시 확인 after the seller logs in.
+    const script: IssuanceFixtureScript = { ...EXISTING, probe: { ok: false, pageCategory: "login", blockerCode: "LOGIN_REQUIRED" } };
+    const { io, engine, driver, session } = build(script);
     startRun(io);
     await session.whenSettled();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(engine.currentStage()).toBe("waiting_login");
+    expect(driver.calls).toContain("parkNotice:LOGIN_REQUIRED");
 
-    expect(driver.calls.filter((c) => c.startsWith("parkNotice:"))).toEqual([]);
+    delete script.probe; // logged in: the API centre now shows the applications list
+    driver.setParkCleared(true);
+    await session.whenPanelWatchSettled();
+    await session.whenSettled();
+    expect(engine.currentStage()).not.toBe("waiting_login");
+    expect(driver.calls.filter((c) => c === "highlight:open_app").length).toBeGreaterThan(0);
   });
 
   it("**the notice's own 다시 확인 recovers the park** — the same command the SellerOps tab sends (2026-10-18)", async () => {

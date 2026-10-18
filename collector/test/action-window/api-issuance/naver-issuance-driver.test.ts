@@ -1155,6 +1155,30 @@ describe("NaverIssuanceDriver — the call-IP steps", () => {
     expect(await driver.readParkRecheck()).toBe(false);
   });
 
+  it("**the login notice paints only on the API centre's logged-out landing — never over a password field**", async () => {
+    const landing = build({ appEntryCount: 1, census: { ...APP_LIST_CENSUS, passwordFieldPresent: false, loggedOutMarkerPresent: true } });
+    expect(await landing.driver.showParkNotice("LOGIN_REQUIRED")).toBe(true);
+    expect(landing.page.mountKeys[landing.page.mountKeys.length - 1]).toBe("actionWindow.issuance.park.LOGIN_REQUIRED");
+
+    const form = build({ appEntryCount: 1, census: { ...APP_LIST_CENSUS, passwordFieldPresent: true } });
+    expect(await form.driver.showParkNotice("LOGIN_REQUIRED")).toBe(false);
+    expect(form.page.mountKeys).toEqual([]); // nothing painted over the form
+
+    const authHost = build({ appEntryCount: 1, url: "https://nid.naver.com/nidlogin.login", census: { ...APP_LIST_CENSUS, loggedOutMarkerPresent: true } });
+    expect(await authHost.driver.showParkNotice("LOGIN_REQUIRED")).toBe(false);
+    expect(authHost.page.mountKeys).toEqual([]);
+  });
+
+  it("a login park is cleared only by a logged-in API-centre page", async () => {
+    const loggedIn = build({ appEntryCount: 1, census: { ...APP_LIST_CENSUS, loggedOutMarkerPresent: false } });
+    expect(await loggedIn.driver.parkCleared("LOGIN_REQUIRED")).toBe(true);
+    const landing = build({ appEntryCount: 1, census: { ...APP_LIST_CENSUS, loggedOutMarkerPresent: true } });
+    expect(await landing.driver.parkCleared("LOGIN_REQUIRED")).toBe(false);
+    const form = build({ appEntryCount: 1, census: { ...APP_LIST_CENSUS, passwordFieldPresent: true } });
+    expect(await form.driver.parkCleared("LOGIN_REQUIRED")).toBe(false);
+    expect(await loggedIn.driver.parkCleared("TARGET_NOT_FOUND")).toBe(false);
+  });
+
   it("a ⑥ park on the detail page keeps the generic notice — the edit-form notice is only for the steps after it", async () => {
     const { io, engine, session, page } = build({ appEntryCount: 1, editFormOpens: false });
     startRun(io);

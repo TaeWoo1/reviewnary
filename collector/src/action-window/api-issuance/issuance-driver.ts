@@ -229,6 +229,13 @@ export interface IssuanceProbeDriver {
   panelPresent?(): Promise<boolean>;
 
   /**
+   * Optional: has the cause of this park gone away on its own? Today only `LOGIN_REQUIRED`: the seller is no
+   * longer on a logged-out or login page. Polled while parked; true is turned into the same 다시 확인 a press sends,
+   * so the walk carries on after the seller logs in without a second trip to either window. Value-free.
+   */
+  parkCleared?(code: NaverIssuanceParkNotice): Promise<boolean>;
+
+  /**
    * **Optional: keep a docked, NON-INTERACTIVE notice on the marketplace window while the run is parked.**
    *
    * A park takes the guidance down, and what the seller is then looking at is a NAVER screen with nothing of
@@ -278,10 +285,12 @@ export interface IssuanceProbeDriver {
 /**
  * The parks a NAVER API-centre notice exists for — a closed set, and deliberately NOT every blocker code.
  *
- * `LOGIN_REQUIRED` is absent for the same reason it is on the WING walk: SellerOps does not put a floating
- * panel over a screen where someone is typing a password.
+ * `LOGIN_REQUIRED` is drawn ONLY on the API centre's public landing (2026-10-18, PO): that page has no password
+ * field — the form is on NAVER's auth host — and a seller parked there saw nothing of SellerOps. The driver
+ * refuses to paint it over any page with a password field or off the API-centre host, which is the rule the WING
+ * walk keeps: no floating panel over a screen where someone is typing a password.
  */
-export const NAVER_ISSUANCE_PARK_NOTICES = ["TARGET_NOT_FOUND", "UI_DRIFT"] as const;
+export const NAVER_ISSUANCE_PARK_NOTICES = ["TARGET_NOT_FOUND", "UI_DRIFT", "LOGIN_REQUIRED"] as const;
 export type NaverIssuanceParkNotice = (typeof NAVER_ISSUANCE_PARK_NOTICES)[number];
 
 /** Narrow a published blocker code to one this walk will draw. Anything else ⇒ no notice, never a guess. */

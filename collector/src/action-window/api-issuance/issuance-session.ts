@@ -348,7 +348,9 @@ export class IssuanceGuidanceSession {
       .call(this.driver, code)
       .then((painted) => {
         log("aw_issuance_park_notice", { code, painted });
-        if (painted) this.watchParkRecheck(code);
+        // A login park is watched even unpainted (the auth host's form is never painted over): the walk carries
+        // on by itself once the seller is logged in.
+        if (painted || code === "LOGIN_REQUIRED") this.watchParkRecheck(code);
       })
       .catch(() => log("aw_issuance_park_notice", { code, painted: false }, "warn"));
   }
@@ -369,12 +371,37 @@ export class IssuanceGuidanceSession {
         for (let i = 0; i < PANEL_ADVANCE_MAX_POLLS; i++) {
           await new Promise<void>((resolve) => setTimeout(resolve, this.panelPollMs));
           if (!stillParked()) return;
+          // The cause went away on its own (the seller logged in): carry on exactly as a 다시 확인 press would.
+          const cleared = this.driver.parkCleared
+            ? (await this.driver.parkCleared.call(this.driver, code).catch(() => false)) === true
+            : false;
+          if (cleared) {
+            log("aw_issuance_park_cleared", { code });
+            this.parkNoticeShown = null;
+            const outcome = this.engine.command({ type: "REQUEST_STEP_RECHECK", expectedRevision: this.engine.view().revision });
+            if (!outcome.ok) return;
+            this.publishState();
+            if ("effect" in outcome && outcome.effect !== "NONE") {
+              this.busyCount += 1;
+              try {
+                await this.drive(outcome.effect);
+              } catch (e) {
+                await this.onDriveError(e);
+              } finally {
+                this.busyCount -= 1;
+              }
+            } else {
+              this.afterChain();
+            }
+            return;
+          }
           // A navigation took the notice away (login redirect, a menu click): draw it again on the new page.
           const present = this.driver.panelPresent;
           if (present && !(await present.call(this.driver).catch(() => true))) {
             const show = this.driver.showParkNotice;
             const redrawn = show ? await show.call(this.driver, code).catch(() => false) : false;
-            log("aw_issuance_park_notice_redrawn", { code, painted: redrawn });
+            // Logged only when drawn: on NAVER's login form the login notice is refused every poll, by design.
+            if (redrawn) log("aw_issuance_park_notice_redrawn", { code, painted: true });
             continue;
           }
           if (!(await read.call(this.driver).catch(() => false))) continue;

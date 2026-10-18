@@ -61,3 +61,45 @@ describe.skipIf(!RUN)("API-centre census page markers — real Chromium", () => 
     expect(census.appListMarkerPresent).toBe(false);
   });
 });
+
+describe.skipIf(!RUN)("the login notice on the real driver — real Chromium, NAVER URLs answered locally", () => {
+  let browser: Browser;
+  let page: Page;
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true });
+    page = await browser.newPage();
+    // Every request is answered here — nothing reaches NAVER.
+    await page.route("**/*", (route) => {
+      const url = route.request().url();
+      const html = url.includes("nid.naver.com")
+        ? `<!doctype html><meta charset="utf-8"><body><form><input id="id"><input type="password"></form></body>`
+        : url.includes("/landing")
+          ? `<!doctype html><meta charset="utf-8"><body>${PAGES.landing}</body>`
+          : `<!doctype html><meta charset="utf-8"><body>${PAGES.solutions}</body>`;
+      return route.fulfill({ status: 200, contentType: "text/html", body: html });
+    });
+  });
+  afterAll(async () => {
+    await browser?.close();
+  });
+
+  const notice = () => page.evaluate(() => !!document.getElementById("__aw_advance_panel__"));
+
+  it("**paints on the API centre's logged-out landing; refuses NAVER's login form; clears once logged in**", async () => {
+    const { NaverIssuanceDriver } = await import("../../src/action-window/naver-issuance-driver");
+    const driver = new NaverIssuanceDriver(page, {});
+
+    await page.goto("https://apicenter.commerce.naver.com/landing");
+    expect(await driver.showParkNotice("LOGIN_REQUIRED")).toBe(true);
+    expect(await notice()).toBe(true);
+    expect(await driver.parkCleared("LOGIN_REQUIRED")).toBe(false);
+
+    await page.goto("https://nid.naver.com/nidlogin.login");
+    expect(await driver.showParkNotice("LOGIN_REQUIRED")).toBe(false);
+    expect(await notice()).toBe(false);
+    expect(await driver.parkCleared("LOGIN_REQUIRED")).toBe(false);
+
+    await page.goto("https://apicenter.commerce.naver.com/solutions");
+    expect(await driver.parkCleared("LOGIN_REQUIRED")).toBe(true);
+  });
+});

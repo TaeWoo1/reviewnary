@@ -409,6 +409,11 @@ export const NAVER_STEP_TITLE: Readonly<Record<IssuanceTarget, string>> = {
  */
 const NAVER_PARK_NOTICE_COPY: Readonly<Record<NaverIssuanceParkNotice, { badge: string; brief: string; detail: string }>> =
   Object.freeze({
+    LOGIN_REQUIRED: {
+      badge: "로그인 필요",
+      brief: "네이버 커머스API센터에 로그인해 주세요.",
+      detail: "오른쪽 위 '로그인'을 눌러 직접 로그인하세요. 로그인이 끝나면 안내가 자동으로 이어집니다. reviewnary는 로그인 정보를 입력하거나 읽지 않습니다.",
+    },
     TARGET_NOT_FOUND: {
       badge: "안내 멈춤",
       brief: "이 화면에서 다음 위치를 찾지 못했어요.",
@@ -1144,6 +1149,12 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
    */
   async showParkNotice(code: NaverIssuanceParkNotice): Promise<boolean> {
     const page = this.activePage();
+    // The login notice is for the API centre's public landing only — never over a password field, never on
+    // NAVER's auth host. Anywhere else it paints nothing and takes down anything SellerOps had there.
+    if (code === "LOGIN_REQUIRED" && !(await this.onLoggedOutLanding(page))) {
+      await unmountOverlay(page).catch(() => undefined);
+      return false;
+    }
     const about = this.lastLocateTarget;
     const editFormOpen =
       code === "TARGET_NOT_FOUND" && about !== null && AFTER_EDIT_FORM.has(about) && (await this.editFormOpen(page));
@@ -1171,6 +1182,33 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
       advance: { buttonLabel: PARK_RECHECK_LABEL, token: PARK_RECHECK_TOKEN },
     }).catch(() => undefined);
     return overlayMounted(page).catch(() => false);
+  }
+
+  /** The API centre's own host, logged out, no password field on the page: the one place the login notice paints. */
+  private async onLoggedOutLanding(page: Page): Promise<boolean> {
+    try {
+      if (classifyUrlCategory(page.url()) !== "api_center_host") return false;
+      const census = await this.evalStr<ApiCenterStructuralCensus>(page, EXTRACT_API_CENTER_CENSUS);
+      return census?.passwordFieldPresent === false && census?.loggedOutMarkerPresent === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Has the park's cause gone away? `LOGIN_REQUIRED`: the API centre shows a logged-in page (no password field,
+   * no 「로그인」 without 「로그아웃」). Anything unreadable, or any other code, is "not yet".
+   */
+  async parkCleared(code: NaverIssuanceParkNotice): Promise<boolean> {
+    if (code !== "LOGIN_REQUIRED") return false;
+    try {
+      const page = this.activePage();
+      if (classifyUrlCategory(page.url()) !== "api_center_host") return false;
+      const census = await this.evalStr<ApiCenterStructuralCensus>(page, EXTRACT_API_CENTER_CENSUS);
+      return census?.passwordFieldPresent === false && census?.loggedOutMarkerPresent === false;
+    } catch {
+      return false;
+    }
   }
 
   /** Is SellerOps' panel still on the page? Value-free; an unreadable page ⇒ `false` (redraw is harmless). */
