@@ -268,7 +268,7 @@ const NAVER_STEP_BRIEF: Readonly<Record<IssuanceTarget, string>> = {
   open_app: "연결할 애플리케이션을 직접 여세요. 상세 화면이 열리면 자동으로 넘어갑니다.",
   api_group: "표시된 '커머스 API' 그룹이 선택돼 있는지 확인하세요.",
   open_edit: "'수정'을 직접 눌러 주세요. 수정 화면이 열리면 자동으로 넘어갑니다.",
-  call_ip: "아래 IP를 붙여넣고 '추가' → API 그룹 확인 → 위쪽 '저장'을 직접 눌러 주세요.",
+  call_ip: "아래 IP를 'API호출 IP'에 붙여넣고 '추가'. 아래 '내 API 그룹'에 문의 · 주문 판매자 · 상품/N배송이 없으면 '전체 API 그룹'에서 추가한 뒤, 위쪽 '저장'을 눌러 주세요.",
   application_id: "애플리케이션 ID를 복사해 reviewnary 창의 ID 칸에 바로 붙여넣어 주세요.",
   application_secret: "'보기' → (보안 확인이 뜨면 직접 풀기) → '복사' 후 reviewnary 창의 시크릿 칸에 붙여넣어 주세요.",
   return: "reviewnary 창에서 연결을 마무리하면 끝납니다.",
@@ -295,7 +295,7 @@ export const NAVER_STEP_DETAIL: Readonly<Record<IssuanceTarget, string>> = {
   open_edit:
     "IP 등록과 API 그룹 추가는 수정 화면에서만 할 수 있어요. 표시된 '수정' 버튼을 직접 눌러 수정 화면을 열어 주세요. 이 단계에서는 아직 아무것도 저장되지 않습니다.",
   call_ip:
-    "① 아래 IP를 복사해 'API호출 IP' 칸에 붙여넣고 '추가'를 누르세요. IP는 3개까지 등록되므로 이미 3개가 있으면 쓰지 않는 IP를 '삭제'한 뒤 추가하세요. ② 'API 그룹'에 '문의', '주문 판매자', '상품/N배송'이 있는지 보고, 없는 그룹은 직접 추가하세요. ③ 위쪽 '저장'을 누르면 상세 화면으로 돌아가고 안내가 다음 단계로 넘어갑니다. 이미 모두 등록돼 있다면 '취소'를 눌러도 됩니다. reviewnary는 칸을 채우거나 저장하지 않으며, 등록이 맞는지는 마지막 연결 테스트에서 확인합니다.",
+    "① 아래 IP를 복사해 'API호출 IP' 칸에 붙여넣고 '추가'를 누르세요. IP는 3개까지 등록되므로 이미 3개가 있으면 쓰지 않는 IP를 '삭제'한 뒤 추가하세요. ② 화면 아래 '내 API 그룹' 목록에 '문의', '주문 판매자', '상품/N배송' 세 그룹이 모두 있는지 보세요. 빠진 그룹이 있으면 그 아래 '전체 API 그룹' 목록에서 해당 그룹의 '추가'를 누르세요. reviewnary가 문의 · 주문 · 상품을 가져오려면 세 그룹이 모두 필요합니다. ③ 위쪽 '저장'을 누르면 상세 화면으로 돌아가고 안내가 다음 단계로 넘어갑니다. 이미 모두 등록돼 있다면 '취소'를 눌러도 됩니다. reviewnary는 칸을 채우거나 저장하지 않으며, 등록이 맞는지는 마지막 연결 테스트에서 확인합니다.",
   application_id:
     "표시된 애플리케이션 ID를 직접 복사해, reviewnary 창(이 안내를 시작한 화면)의 애플리케이션 ID 칸에 바로 붙여넣어 주세요. 다음 단계에서 시크릿을 복사하면 클립보드의 ID가 지워지므로 먼저 붙여넣어야 합니다. reviewnary는 네이버 화면의 값을 읽지 않습니다.",
   application_secret:
@@ -367,6 +367,27 @@ const NAVER_ADVANCE_LABEL: Readonly<Partial<Record<IssuanceTarget, string>>> = {
   return: "reviewnary에서 연결 마무리하기",
 };
 
+/** What a held press says (see `readPanelAdvance`): what is still missing, and that the step will move on its own. */
+const NAVER_HELD_ADVANCE_NOTE: Readonly<Record<"open_edit" | "call_ip", string>> = {
+  open_edit: "아직 수정 화면이 열리지 않았어요. '수정'을 누르면 자동으로 넘어갑니다.",
+  call_ip: "아직 수정 화면이에요. 위쪽 '저장'(또는 '취소')을 누르면 자동으로 넘어갑니다.",
+};
+
+/** Replace the panel's instruction line with a held-press note. Our own panel only; returns a boolean. */
+function buildPanelHoldScript(note: string): string {
+  return `(function () {
+  /* issuance-panel-hold (value-free OUTPUT: boolean) */
+  var panel = document.getElementById('__aw_advance_panel__');
+  if (!panel) { return false; }
+  var line = panel.querySelector('[data-aw-compactable]');
+  if (!line) { return false; }
+  while (line.firstChild) { line.removeChild(line.firstChild); }
+  line.appendChild(document.createTextNode(${JSON.stringify(note)}));
+  line.style.color = '#ffd36b';
+  return true;
+})()`;
+}
+
 /** The chip above the ring: which step this is, never an abbreviated instruction (the panel carries that). */
 export const NAVER_STEP_TITLE: Readonly<Record<IssuanceTarget, string>> = {
   create_app: "애플리케이션 만들기 (스토어당 1개)",
@@ -396,7 +417,8 @@ const NAVER_PARK_NOTICE_COPY: Readonly<Record<NaverIssuanceParkNotice, { badge: 
     UI_DRIFT: {
       badge: "안내 멈춤",
       brief: "네이버 화면이 예상과 달라요.",
-      detail: "연결할 애플리케이션의 상세 화면인지 확인한 뒤 '다시 확인'을 눌러 주세요.",
+      // Live 2026-10-18: after login NAVER lands on 「내 솔루션」, not the applications — say where to go.
+      detail: "왼쪽 메뉴의 '내 스토어 애플리케이션'에서 연결할 애플리케이션을 연 뒤 '다시 확인'을 눌러 주세요.",
     },
   });
 
@@ -1056,10 +1078,28 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
     await resetOverlayAdvance(this.activePage(), naverAdvanceToken(target)).catch(() => undefined);
   }
 
-  /** Did the seller press THIS step's panel button? Value-free equality poll; an unreadable page ⇒ `false`. */
+  /**
+   * Did the seller press THIS step's panel button? Value-free equality poll; an unreadable page ⇒ `false`.
+   *
+   * ④ and ⑤ end on a screen change the walk can see (`readStepDone`). A press that contradicts the screen — 「열었어요」
+   * with the edit form still closed, 「저장했어요」 with it still open — is HELD (live 2026-10-18: ⑤ advanced to ⑥ and
+   * parked on the hidden detail view): the press is dropped, the panel says what is still missing, and the step
+   * advances on its own once the screen changes.
+   */
   async readPanelAdvance(target: IssuanceTarget): Promise<boolean> {
     if (!NAVER_ADVANCE_LABEL[target]) return false;
-    return readOverlayAdvancePressed(this.activePage(), naverAdvanceToken(target)).catch(() => false);
+    const page = this.activePage();
+    const pressed = await readOverlayAdvancePressed(page, naverAdvanceToken(target)).catch(() => false);
+    if (!pressed || (target !== "open_edit" && target !== "call_ip")) return pressed === true;
+    if (await this.readStepDone(target)) return true;
+    // The form state contradicts the press only when it is READABLE: an unreadable page is not a contradiction.
+    const formOpen = await this.editFormOpen(page);
+    const contradicts = target === "call_ip" ? formOpen : !formOpen && (await this.detailViewBack(page));
+    if (!contradicts) return true;
+    log("aw_issuance_advance_held", { target });
+    await resetOverlayAdvance(page, naverAdvanceToken(target)).catch(() => undefined);
+    await this.evalStr(page, buildPanelHoldScript(NAVER_HELD_ADVANCE_NOTE[target])).catch(() => undefined);
+    return false;
   }
 
   /**
@@ -1131,6 +1171,11 @@ export class NaverIssuanceDriver implements IssuanceProbeDriver {
       advance: { buttonLabel: PARK_RECHECK_LABEL, token: PARK_RECHECK_TOKEN },
     }).catch(() => undefined);
     return overlayMounted(page).catch(() => false);
+  }
+
+  /** Is SellerOps' panel still on the page? Value-free; an unreadable page ⇒ `false` (redraw is harmless). */
+  async panelPresent(): Promise<boolean> {
+    return (await overlayMounted(this.activePage()).catch(() => false)) === true;
   }
 
   /** Did the seller press the park notice's 다시 확인? Value-free equality poll; an unreadable page ⇒ `false`. */

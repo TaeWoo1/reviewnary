@@ -174,6 +174,10 @@ class FakePage {
   readonly mountKeys: string[] = [];
   /** Every overlay mount's options object, in order — what a panel carried (its buttons) is read from here. */
   readonly mountArgs: unknown[] = [];
+  /** The on-page advance latch: the token the seller's press copied, or null. Reset by `resetOverlayAdvance`. */
+  pressedToken: string | null = null;
+  /** The seller closed the edit form again (저장/취소): 「수정」 paints, the counted call-IP label does not. */
+  formClosed = false;
   /** Latches once 「수정」 has been ringed and the seller (modelled) opened the edit form: 「수정」 is then gone. */
   private editOpen = false;
   /** Latches once the app-entry rows have been read — the seller then opens their app, so census → postOpen. */
@@ -269,6 +273,11 @@ class FakePage {
         this.overlayPainted = true; // a real mount paints the overlay
         return undefined;
       }
+      if (s.includes('delete g["__aw_advance_pressed__"]')) {
+        this.pressedToken = null; // resetOverlayAdvance
+        return undefined;
+      }
+      if (s.includes('["__aw_advance_pressed__"] === t')) return this.pressedToken !== null && this.pressedToken === _arg; // readOverlayAdvancePressed
       if (isSubStageRead) return this.mountSubStage; // the driver's post-fault readMountSubStage(page) breadcrumb read
       if (isOverlayVerify) return this.overlayPainted; // the driver's post-mount overlayMounted(page) read
       return undefined; // other overlay/observer function-form → no-op
@@ -285,6 +294,11 @@ class FakePage {
       if (this.throwLocateLeft > 0) {
         this.throwLocateLeft -= 1;
         throw new Error("execution context was destroyed");
+      }
+      // The form closed again: 「수정」 is back and the edit form's counted label paints nowhere.
+      if (this.formClosed) {
+        if (s.includes('"수정"')) return { count: 1, sig: "abcd1234abcd1234" };
+        if (s.includes('"API호출 IP"')) return { count: 0 };
       }
       // 「수정」: present on the detail page until the seller opens the edit form (modelled as happening once the
       // ring is drawn on it), then gone — which is what the call-IP step's absence check reads.
@@ -1189,6 +1203,31 @@ describe("NaverIssuanceDriver — the call-IP steps", () => {
     expect(page.scripts.some((s) => s.includes("issuance-clear-avoid"))).toBe(true);
     // Only ⑤ rings extra controls.
     expect(page.scripts.filter((s) => s.includes("issuance-also-ring"))).toHaveLength(1);
+  });
+
+  it("**a 「저장했어요」 press with the edit form still open is held on ⑤**, not carried to a ⑥ that cannot be found", async () => {
+    // Live 2026-10-18 (run 5): the press moved the walk to ⑥, which parked on the hidden detail view.
+    const { io, engine, session, page, driver } = build({ appEntryCount: 1 });
+    startRun(io);
+    await session.whenSettled();
+    await pressUntil(io, engine, session, "guiding_call_ip");
+    page.pressedToken = "naver-issuance-advance:call_ip";
+    expect(await driver.readPanelAdvance("call_ip")).toBe(false);
+    expect(page.pressedToken).toBeNull(); // the press was dropped…
+    expect(page.scripts.some((s) => s.includes("issuance-panel-hold") && s.includes("아직 수정 화면이에요"))).toBe(true); // …and said why
+    expect(engine.currentStage()).toBe("guiding_call_ip");
+
+    // Once the form is closed the same press advances — and the screen change alone would too.
+    page.formClosed = true;
+    page.pressedToken = "naver-issuance-advance:call_ip";
+    expect(await driver.readPanelAdvance("call_ip")).toBe(true);
+    expect(await driver.readStepDone("call_ip")).toBe(true);
+  });
+
+  it("a press on a step the walk cannot see the end of is never held", async () => {
+    const { page, driver } = build({ appEntryCount: 1 });
+    page.pressedToken = "naver-issuance-advance:application_id";
+    expect(await driver.readPanelAdvance("application_id")).toBe(true);
   });
 
   it("SECRET READ = 0 across the WHOLE walk; the clipboard appears only in the audited write-only copy rows", async () => {

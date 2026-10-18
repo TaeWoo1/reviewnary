@@ -1041,6 +1041,30 @@ describe("a parked NAVER walk stays visible on the window the seller is in", () 
     expect(io.lastView()?.blocker).toBeUndefined();
   });
 
+  it("**a navigation that takes the notice away gets it redrawn**, and its button still recovers the park", async () => {
+    // Live 2026-10-18 (run 5): the notice was painted, then NAVER's login redirect replaced the page and it was
+    // gone 0.8s later — the seller saw no SellerOps panel at all while the run was parked.
+    const script: IssuanceFixtureScript = { ...EXISTING, locate: { open_edit: { count: 0 } } };
+    const { io, engine, driver, session } = build(script);
+    startRun(io);
+    await session.whenSettled();
+    await passUsageCheck(io, engine, session);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(driver.calls.filter((c) => c === "parkNotice:TARGET_NOT_FOUND")).toHaveLength(1);
+
+    driver.dropPanel();
+    for (let i = 0; i < 50 && driver.calls.filter((c) => c === "parkNotice:TARGET_NOT_FOUND").length < 2; i++) {
+      await new Promise((r) => setTimeout(r, 2));
+    }
+    expect(driver.calls.filter((c) => c === "parkNotice:TARGET_NOT_FOUND")).toHaveLength(2);
+
+    script.locate = {};
+    driver.setParkRecheck(true);
+    await session.whenPanelWatchSettled();
+    await session.whenSettled();
+    expect(engine.currentStage()).toBe("guiding_open_edit");
+  });
+
   it("a press after the park was already cleared from the SellerOps tab changes nothing", async () => {
     const script: IssuanceFixtureScript = { ...EXISTING, locate: { open_edit: { count: 0 } } };
     const { io, engine, driver, session } = build(script);

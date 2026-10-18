@@ -77,6 +77,7 @@ export class IssuanceFixtureDriver implements IssuanceProbeDriver {
   private readonly panelPressed: Partial<Record<IssuanceTarget, boolean>>;
   private readonly stepDoneNow: Partial<Record<IssuanceTarget, boolean>>;
   private parkRecheckPressed = false;
+  private panelGone = false;
   /** Every call, in order — so a test can assert the runtime never armed a control it should not have. */
   readonly calls: string[] = [];
   /** Polled call signatures already recorded once — see {@link recordOnce}. */
@@ -182,6 +183,16 @@ export class IssuanceFixtureDriver implements IssuanceProbeDriver {
     return this.parkRecheckPressed;
   }
 
+  /** Is the panel still on the page? A test sets `panelGone` to model a navigation that took it away. */
+  async panelPresent(): Promise<boolean> {
+    return !this.panelGone;
+  }
+
+  /** Model a full navigation that replaced the document (and the panel with it). */
+  dropPanel(): void {
+    this.panelGone = true;
+  }
+
   /** Model the seller pressing the park notice's 다시 확인 (or releasing it, for a re-armed park). */
   setParkRecheck(pressed: boolean): void {
     this.parkRecheckPressed = pressed;
@@ -196,6 +207,7 @@ export class IssuanceFixtureDriver implements IssuanceProbeDriver {
   /** Record the parked-run notice, painted. A test that cares about a FAILED paint says so explicitly. */
   async showParkNotice(code: string): Promise<boolean> {
     this.calls.push(`parkNotice:${code}`);
+    this.panelGone = false;
     return true;
   }
 

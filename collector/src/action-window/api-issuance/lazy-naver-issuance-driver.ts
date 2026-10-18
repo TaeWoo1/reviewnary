@@ -164,6 +164,11 @@ export class LazyNaverIssuanceDriver implements IssuanceProbeDriver {
     return (await this.driver()).readParkRecheck();
   }
 
+  async panelPresent(): Promise<boolean> {
+    if (!this.isOpen()) return false;
+    return (await this.driver()).panelPresent();
+  }
+
   /** Drawn only on a surface that already exists — a "we stopped" panel is of no use on a closed window. */
   async showParkNotice(code: NaverIssuanceParkNotice): Promise<boolean> {
     if (!this.isOpen()) return false;

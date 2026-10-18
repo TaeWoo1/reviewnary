@@ -51,6 +51,8 @@ const SIGNALS: ApiCenterSignals = {
   readonlyFieldCountBucket: "none",
   listLikeContainerCountBucket: "few",
   appDetailMarkerPresent: false,
+  appListMarkerPresent: null,
+  loggedOutMarkerPresent: false,
 };
 
 describe("4-stage contract (return_path removed)", () => {

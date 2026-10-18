@@ -82,7 +82,23 @@ export interface ApiCenterStructuralCensus {
    * Optional so the 28 existing census literals need no change; absent ⇒ treated as `false` (prior behavior).
    */
   appDetailMarkerPresent?: boolean;
+  /**
+   * STRUCTURAL app-LIST marker (2026-10-18): a painted 「애플리케이션 등록」 control or 「내 스토어 애플리케이션」
+   * heading — {@link APP_LIST_MARKER_LABELS}. A list-like container alone is not a list page: the logged-out
+   * landing and the 「내 솔루션」 page both carry menus, and both read as `app_list` in run 5. Same value-free pattern
+   * (a boolean only). Optional; absent ⇒ the old list-only rule (the existing census literals are unchanged).
+   */
+  appListMarkerPresent?: boolean;
+  /**
+   * LOGGED-OUT marker (2026-10-18): a painted 「로그인」 link/button and no painted 「로그아웃」. The API centre's
+   * public landing has no password field — the login form is on NAVER's auth host — so without this the walk
+   * read the landing as the applications list and told a logged-out seller to open their app. Optional.
+   */
+  loggedOutMarkerPresent?: boolean;
 }
+
+/** FIXED app-list page markers — the adopted register control and the page's own heading. */
+export const APP_LIST_MARKER_LABELS = ["애플리케이션 등록", "내 스토어 애플리케이션"] as const;
 
 /**
  * FIXED, live-confirmed API-application detail-page marker labels — the API-group section heading and the
@@ -105,6 +121,10 @@ export interface ApiCenterSignals {
   listLikeContainerCountBucket: CountBucket;
   /** Whether a fixed, live-confirmed app-detail marker label is present (see census `appDetailMarkerPresent`). */
   appDetailMarkerPresent: boolean;
+  /** The app-list page marker; `null` when the census did not measure it (older literals ⇒ the old rule). */
+  appListMarkerPresent: boolean | null;
+  /** The public landing's logged-out marker (see census `loggedOutMarkerPresent`). */
+  loggedOutMarkerPresent: boolean;
 }
 
 export interface ApiCenterObservation {
@@ -160,6 +180,8 @@ export function toSignals(urlCategory: ApiCenterUrlCategory, census: ApiCenterSt
     readonlyFieldCountBucket: countBucket(census.readonlyFieldCount),
     listLikeContainerCountBucket: countBucket(census.listLikeContainerCount),
     appDetailMarkerPresent: census.appDetailMarkerPresent ?? false,
+    appListMarkerPresent: census.appListMarkerPresent ?? null,
+    loggedOutMarkerPresent: census.loggedOutMarkerPresent ?? false,
   };
 }
 
@@ -199,13 +221,18 @@ export function classifyApiCenterPage(signals: ApiCenterSignals): { pageCategory
   }
 
   if (signals.passwordFieldPresent) return { pageCategory: "login", blockers };
+  // The public landing (logged out): no password field here, the form lives on the auth host.
+  if (signals.loggedOutMarkerPresent) return { pageCategory: "login", blockers };
   if (signals.readonlyFieldCountBucket !== "none") return { pageCategory: "credential_issuance", blockers };
   if (signals.editableTextInputCountBucket !== "none") return { pageCategory: "app_detail", blockers };
   // Structural app-detail marker (API-group heading / Application-ID label) wins over the list signal: the live
   // existing-app detail page shows its keys as plain text, so it has no editable/read-only input to fall through
   // on and would otherwise mis-read as `app_list`. Fail-closed downstream if it ever fires on a real list page.
   if (signals.appDetailMarkerPresent) return { pageCategory: "app_detail", blockers };
-  if (signals.listLikeContainerCountBucket !== "none") return { pageCategory: "app_list", blockers };
+  // A list page needs its own marker when the census measured one: menus are lists on every page.
+  if (signals.listLikeContainerCountBucket !== "none" && signals.appListMarkerPresent !== false) {
+    return { pageCategory: "app_list", blockers };
+  }
 
   blockers.push("AMBIGUOUS_SIGNALS");
   return { pageCategory: "unknown", blockers };
@@ -525,6 +552,25 @@ export const EXTRACT_API_CENTER_CENSUS = `(function () {
     nm = accNm(markerCands[mi]);
     for (mm = 0; mm < MARKERS.length; mm++) { if (nm === MARKERS[mm]) { appDetailMarkerPresent = true; break; } }
   }
+  /* app-LIST marker and LOGGED-OUT marker — painted elements compared to KNOWN fixed labels; booleans only. */
+  function paints(n) {
+    var cs = window.getComputedStyle ? window.getComputedStyle(n) : null;
+    if (cs && (cs.display === 'none' || cs.visibility === 'hidden')) { return false; }
+    var r = n.getBoundingClientRect ? n.getBoundingClientRect() : null;
+    return !!r && r.width > 0 && r.height > 0;
+  }
+  var LIST_MARKERS = ${JSON.stringify(APP_LIST_MARKER_LABELS)};
+  var listCands = slice(document.querySelectorAll("h1,h2,h3,h4,h5,h6,[role='heading'],button,a,[role='button']"));
+  var appListMarkerPresent = false, hasLogin = false, hasLogout = false, li;
+  for (li = 0; li < listCands.length && li < 6000; li++) {
+    var ln = accNm(listCands[li]);
+    if (LIST_MARKERS.indexOf(ln) >= 0 && paints(listCands[li])) { appListMarkerPresent = true; }
+    var tg = listCands[li].tagName;
+    if ((tg === 'A' || tg === 'BUTTON' || listCands[li].getAttribute('role') === 'button') && paints(listCands[li])) {
+      if (ln === '로그인') { hasLogin = true; }
+      if (ln === '로그아웃') { hasLogout = true; }
+    }
+  }
   return {
     passwordFieldPresent: document.querySelector("input[type='password']") != null,
     submitAffordancePresent: document.querySelector("button[type='submit'], input[type='submit']") != null,
@@ -532,7 +578,9 @@ export const EXTRACT_API_CENTER_CENSUS = `(function () {
     editableTextInputCount: editableTextInputCount,
     readonlyFieldCount: readonlyFieldCount,
     listLikeContainerCount: listLikeContainerCount,
-    appDetailMarkerPresent: appDetailMarkerPresent
+    appDetailMarkerPresent: appDetailMarkerPresent,
+    appListMarkerPresent: appListMarkerPresent,
+    loggedOutMarkerPresent: hasLogin && !hasLogout
   };
 })()`;
 

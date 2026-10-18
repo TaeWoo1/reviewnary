@@ -241,6 +241,8 @@ describe("EXTRACT_API_CENTER_CENSUS — browser-context safe (regression for the
       readonlyFieldCount: 0,
       listLikeContainerCount: 0,
       appDetailMarkerPresent: false, // the login DOM carries no API-group/Application-ID marker label
+      appListMarkerPresent: false,
+      loggedOutMarkerPresent: false,
     });
     // And it classifies as a login page end-to-end.
     expect(observeFrom("api_center_host", census).pageCategory).toBe("login");
@@ -595,10 +597,41 @@ describe("observeFrom — end-to-end sanitized shape leaks no value/URL/DOM", ()
         readonlyFieldCountBucket: "many",
         listLikeContainerCountBucket: "none",
         appDetailMarkerPresent: false,
+        appListMarkerPresent: null,
+        loggedOutMarkerPresent: false,
       },
       blockers: ["LIVE_DOM_CALIBRATION_PENDING"],
     });
     // Structural buckets only — the raw count (9) never surfaces anywhere in the output.
     expect(JSON.stringify(obs)).not.toContain("9");
+  });
+});
+
+describe("run 5's misreads (2026-10-18): a list-like page is not the applications list without its own marker", () => {
+  const base = (o: Partial<ApiCenterStructuralCensus>): ApiCenterStructuralCensus => ({
+    passwordFieldPresent: false,
+    submitAffordancePresent: false,
+    formCount: 0,
+    editableTextInputCount: 0,
+    readonlyFieldCount: 0,
+    listLikeContainerCount: 3,
+    appDetailMarkerPresent: false,
+    ...o,
+  });
+
+  it("**the logged-out landing is a login page**, not the applications list", () => {
+    expect(observeFrom("api_center_host", base({ appListMarkerPresent: false, loggedOutMarkerPresent: true })).pageCategory).toBe("login");
+  });
+
+  it("**the 「내 솔루션」 page (menus, no list marker) is not the applications list**", () => {
+    expect(observeFrom("api_center_host", base({ appListMarkerPresent: false, loggedOutMarkerPresent: false })).pageCategory).toBe("unknown");
+  });
+
+  it("the applications list, with its marker, still is", () => {
+    expect(observeFrom("api_center_host", base({ appListMarkerPresent: true })).pageCategory).toBe("app_list");
+  });
+
+  it("a census that never measured the marker keeps the old list rule (older literals)", () => {
+    expect(observeFrom("api_center_host", base({})).pageCategory).toBe("app_list");
   });
 });

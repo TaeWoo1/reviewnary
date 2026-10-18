@@ -222,6 +222,13 @@ export interface IssuanceProbeDriver {
   readParkRecheck?(): Promise<boolean>;
 
   /**
+   * Optional: is SellerOps' panel still on the page? A full navigation (NAVER's login redirect, a menu click)
+   * replaces the document and takes the park notice with it — live 2026-10-18 the notice was painted and gone
+   * 0.8s later. While parked the session asks, and redraws the notice when it is gone. Value-free boolean.
+   */
+  panelPresent?(): Promise<boolean>;
+
+  /**
    * **Optional: keep a docked, NON-INTERACTIVE notice on the marketplace window while the run is parked.**
    *
    * A park takes the guidance down, and what the seller is then looking at is a NAVER screen with nothing of

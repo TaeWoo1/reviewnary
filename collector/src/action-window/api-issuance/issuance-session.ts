@@ -16,7 +16,7 @@ import { validateCommandEnvelope } from "../../../../contracts/action-window/v2/
 import type { AwClientFrame, AwServerTransport } from "../../../../contracts/action-window/v2/transport";
 import { log } from "../../log";
 import type { IssuanceEffect, IssuanceEngine } from "./issuance-engine";
-import { TARGET_BARRIER_STAGE, naverIssuanceParkNotice, type IssuanceProbeDriver, type IssuanceTarget } from "./issuance-driver";
+import { TARGET_BARRIER_STAGE, naverIssuanceParkNotice, type IssuanceProbeDriver, type IssuanceTarget, type NaverIssuanceParkNotice } from "./issuance-driver";
 import { isIssuanceTerminal } from "./issuance-stages";
 
 export interface IssuanceSessionOptions {
@@ -358,7 +358,7 @@ export class IssuanceGuidanceSession {
    * button sends, read where the seller is. Watches only while the run is still parked on this code; a park the
    * FE already cleared, a cancel, or a closed window ends the watch without a press.
    */
-  private watchParkRecheck(code: string): void {
+  private watchParkRecheck(code: NaverIssuanceParkNotice): void {
     const read = this.driver.readParkRecheck;
     if (!read || this.parkWatching === code) return;
     this.parkWatching = code;
@@ -369,6 +369,14 @@ export class IssuanceGuidanceSession {
         for (let i = 0; i < PANEL_ADVANCE_MAX_POLLS; i++) {
           await new Promise<void>((resolve) => setTimeout(resolve, this.panelPollMs));
           if (!stillParked()) return;
+          // A navigation took the notice away (login redirect, a menu click): draw it again on the new page.
+          const present = this.driver.panelPresent;
+          if (present && !(await present.call(this.driver).catch(() => true))) {
+            const show = this.driver.showParkNotice;
+            const redrawn = show ? await show.call(this.driver, code).catch(() => false) : false;
+            log("aw_issuance_park_notice_redrawn", { code, painted: redrawn });
+            continue;
+          }
           if (!(await read.call(this.driver).catch(() => false))) continue;
           if (!stillParked()) return;
           log("aw_issuance_park_recheck", { code });
