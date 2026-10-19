@@ -118,8 +118,15 @@ export class IssuanceEngine {
    * copy key (open-app vs create-app), so the two can never disagree; it is surfaced on the run view
    * (`appBranch`) so the FE routes the guided-first journey on it instead of decoding the copy key. Once set
    * it never changes — the list is read once — so every later frame (barrier, park, terminal, resync) carries it.
+   * The one other place it is set is a seller already on their app's detail page ({@link enterFromOpenedApp}),
+   * which is `existing` by construction.
    */
   private appBranch: IssuanceAppBranch | null = null;
+  /**
+   * Set when a park with no target in flight re-probes from the top — the next probe may find the seller already
+   * on their app's detail page, which is where the page-mismatch notice sends them. Consumed by that probe.
+   */
+  private reprobingAfterPark = false;
   /** The control the current barrier/checkpoint rests on, so a recheck/resume re-guides the right section. */
   private currentTarget: IssuanceTarget | null = null;
   private targetSig: Partial<Record<IssuanceTarget, string>> = {};
@@ -221,6 +228,7 @@ export class IssuanceEngine {
       this.stage = "opening";
       this.activeStepIndex = 1;
       this.currentTarget = null;
+      this.reprobingAfterPark = true;
       this.emit("RUN_STATUS_CHANGED", { status: "PREPARING" });
       return "PROBE";
     }
@@ -295,11 +303,19 @@ export class IssuanceEngine {
     return "PROBE";
   }
 
-  /** The sanitized page category the seller is on. Login parks; app_list proceeds; anything else parks. */
+  /**
+   * The sanitized page category the seller is on. Login parks; app_list proceeds; anything else parks — except an
+   * app's own detail page on a re-probe after a park (see {@link enterFromOpenedApp}).
+   */
   onSurfaceProbed(probe: IssuanceSurfaceProbe): IssuanceEffect {
     if (isIssuanceTerminal(this.stage)) return "NONE";
+    const reprobingAfterPark = this.reprobingAfterPark;
+    this.reprobingAfterPark = false;
     if (!probe.ok || probe.blockerCode === "LOGIN_REQUIRED" || probe.pageCategory === "login") {
       return this.park("waiting_login", "LOGIN_REQUIRED");
+    }
+    if (reprobingAfterPark && (probe.pageCategory === "app_detail" || probe.pageCategory === "credential_issuance")) {
+      return this.enterFromOpenedApp();
     }
     const { branch } = branchAfterProbe(probe.pageCategory);
     if (branch === "app_list") {
@@ -310,6 +326,29 @@ export class IssuanceEngine {
     }
     // `login` is already handled above; anything else is an unexpected page → recoverable page_mismatch park.
     return this.park("page_mismatch", "UI_DRIFT");
+  }
+
+  /**
+   * **The seller opened their app before the walk read the list** (2026-10-19). A walk that starts with the NAVER
+   * session still logged in lands on 「내 솔루션」, parks on the page mismatch, and its notice tells the seller to
+   * open the app they are connecting from 「내 스토어 애플리케이션」. Re-probing for the list alone then parked them
+   * again on exactly that page, every press.
+   *
+   * A detail page means an app exists, so this is the existing branch, and steps 1–2 are done — the same
+   * acceptance `onOpenAppVerified` makes after an `open_app` park, without its observation (none was armed). It
+   * stays fail-closed downstream: on a page that is not really the detail page the `api_group` locate finds
+   * nothing and parks `target_not_found` recoverably.
+   */
+  private enterFromOpenedApp(): IssuanceEffect {
+    this.hasExistingApp = true;
+    this.appBranch = "existing";
+    this.completedSteps = 1;
+    this.emit("STEP_COMPLETED", { stepId: this.stepIdFor(1), stepStatus: "COMPLETED" });
+    this.activeStepIndex = 2;
+    this.completedSteps = 2;
+    this.emit("STEP_COMPLETED", { stepId: this.stepId(), stepStatus: "COMPLETED" });
+    this.emit("RUN_STATUS_CHANGED", { status: "RUNNING" });
+    return this.enterAppUsageCheck();
   }
 
   /** The applications list, read structurally. Branches existing-vs-empty via the CANDIDATE population rule. */

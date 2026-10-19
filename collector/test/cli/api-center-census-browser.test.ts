@@ -18,6 +18,8 @@ const PAGES = {
   appList: `${HEADER(true)}${MENU}<h2>내 스토어 애플리케이션</h2><button>애플리케이션 등록</button><table><tbody><tr><td>앱</td></tr><tr><td>-</td></tr></tbody></table>`,
   // The menu ITEM reads 「내 스토어 애플리케이션」 on every page — it is a list item, not a heading or a control.
   menuOnly: `${HEADER(true)}${MENU}<h2>API 사용통계</h2>`,
+  // The same public landing with a live session: the header says 「로그아웃」, the body is still the landing's.
+  landingLoggedIn: `${HEADER(true)}<h1>내 비즈니스가 쉬워지는 네이버 커머스API</h1><a href="#">커머스API센터 시작하기</a><footer><ul><li>약관</li><li>정책</li></ul></footer>`,
 } as const;
 
 describe.skipIf(!RUN)("API-centre census page markers — real Chromium", () => {
@@ -59,6 +61,13 @@ describe.skipIf(!RUN)("API-centre census page markers — real Chromium", () => 
   it("the left menu's 「내 스토어 애플리케이션」 item alone is not the list marker", async () => {
     const { census } = await read(PAGES.menuOnly);
     expect(census.appListMarkerPresent).toBe(false);
+  });
+
+  it("**the landing with a live session is neither login nor the applications list**", async () => {
+    const { census, category } = await read(PAGES.landingLoggedIn);
+    expect(census.loggedOutMarkerPresent).toBe(false);
+    expect(census.appListMarkerPresent).toBe(false);
+    expect(category).toBe("unknown");
   });
 });
 

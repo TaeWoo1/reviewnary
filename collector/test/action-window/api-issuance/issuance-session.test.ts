@@ -1034,6 +1034,66 @@ describe("a parked NAVER walk stays visible on the window the seller is in", () 
     expect(driver.calls.filter((c) => c === "highlight:open_app").length).toBeGreaterThan(0);
   });
 
+  describe("**a walk that starts with the NAVER session still logged in**", () => {
+    // The profile is persistent: a seller who logged in on an earlier walk starts the next one logged in, on
+    // whatever page NAVER shows a live session — not on the applications list, and not on a login page.
+    const UNKNOWN_START = { ok: true, pageCategory: "unknown" } as const;
+
+    async function parkedOnStart(script: IssuanceFixtureScript) {
+      const built = build(script);
+      startRun(built.io);
+      await built.session.whenSettled();
+      await new Promise((r) => setTimeout(r, 0)); // the notice paints asynchronously
+      return built;
+    }
+
+    it("parks on the page mismatch notice — no login notice, no highlight", async () => {
+      const { engine, driver } = await parkedOnStart({ ...EXISTING, probe: UNKNOWN_START });
+      expect(engine.currentStage()).toBe("page_mismatch");
+      expect(driver.calls.filter((c) => c.startsWith("parkNotice:"))).toEqual(["parkNotice:UI_DRIFT"]);
+      expect(driver.calls.some((c) => c.startsWith("highlight:"))).toBe(false);
+    });
+
+    it("the seller goes to the applications list and presses 다시 확인: the walk guides the open", async () => {
+      const script: IssuanceFixtureScript = { ...EXISTING, probe: UNKNOWN_START };
+      const { engine, driver, session } = await parkedOnStart(script);
+      delete script.probe; // the applications list
+      driver.setParkRecheck(true);
+      await session.whenPanelWatchSettled();
+      await session.whenSettled();
+      expect(engine.currentStage()).not.toBe("page_mismatch");
+      expect(driver.calls).toContain("highlight:open_app");
+    });
+
+    it("the seller opens their application, as the notice says, and presses 다시 확인: the walk carries on", async () => {
+      const script: IssuanceFixtureScript = { ...EXISTING, probe: UNKNOWN_START };
+      const { io, engine, driver, session } = await parkedOnStart(script);
+      script.probe = { ok: true, pageCategory: "app_detail" };
+      driver.setParkRecheck(true);
+      await session.whenPanelWatchSettled();
+      await session.whenSettled();
+      // Steps 1–2 are done (a detail page means an app exists); the walk rests on step 3, as after an open.
+      expect(engine.currentStage()).toBe("guiding_app_usage_check");
+      expect(io.lastView()?.appBranch).toBe("existing");
+      expect(io.lastView()?.blocker).toBeUndefined();
+      expect(driver.calls.some((c) => c.startsWith("highlight:open_app"))).toBe(false);
+      for (const e of io.events()) {
+        expect(validateEventEnvelope(e), `event ${e.type}`).toEqual({ ok: true });
+        expect(findProhibitedFields(e)).toEqual([]);
+      }
+      for (const v of io.views()) expect(validateRunView(v), `view ${v.status}`).toEqual({ ok: true });
+
+      await passUsageCheck(io, engine, session);
+      await pressNextToComplete(io, engine, session);
+      expect(engine.currentStage()).toBe("guidance_complete");
+    });
+
+    it("a detail page on the walk's FIRST read still parks — only a re-check after the notice accepts it", async () => {
+      const { engine } = await parkedOnStart({ ...EXISTING, probe: { ok: true, pageCategory: "app_detail" } });
+      expect(engine.currentStage()).toBe("page_mismatch");
+    });
+  });
+
   it("**the notice's own 다시 확인 recovers the park** — the same command the SellerOps tab sends (2026-10-18)", async () => {
     const script: IssuanceFixtureScript = { ...EXISTING, locate: { open_edit: { count: 0 } } };
     const { io, engine, driver, session } = build(script);
