@@ -16,7 +16,8 @@
  *   - refuses without `--i-understand-this-opens-live-naver` (`hasLiveRunApproval`);
  *   - reads the operator-owned `NAVER_API_CENTER_URL` (never logged) and `screenApiCenterUrl`-fail-closed
  *     BEFORE launching Chrome, so the browser only ever opens the API-center / auth host;
- *   - always closes the context.
+ *   - always closes the context — or, attached to the kept-alive test browser (`SELLEROPS_NAVER_TEST_BROWSER_PORT`,
+ *     `naver-test-browser.ts`), only disconnects from it, so the seller's NAVER login outlives the walk.
  *
  * ⚠ This program NEVER affirms the flag — building/verifying is offline and hermetic, and `main()` runs ONLY
  * when invoked directly (inert on import) so tests launch nothing. Current standing state: NAVER live work is
@@ -29,6 +30,7 @@ import type { Page } from "playwright";
 import { loadConfig } from "../../src/config";
 import { log } from "../../src/log";
 import { launchNaverContext } from "../../src/profile";
+import { attachTestBrowser, parseTestBrowserPort, testBrowserAnswers } from "../../src/naver-test-browser";
 import { NaverIssuanceDriver } from "../../src/action-window/naver-issuance-driver";
 import { createAgentBridge, type AgentBridge } from "../../src/agent/agent-bridge";
 import {
@@ -96,10 +98,24 @@ async function main(): Promise<void> {
     return;
   }
 
+  // The kept-alive test browser, when named: attach, never launch beside it (the profile is locked by it) and
+  // never fall back to a launch — a walk that silently got a fresh browser would start logged out again.
+  const attachRaw = process.env.SELLEROPS_NAVER_TEST_BROWSER_PORT;
+  const attachPort = attachRaw === undefined ? null : parseTestBrowserPort(attachRaw);
+  if (attachRaw !== undefined && (attachPort === null || !(await testBrowserAnswers(attachPort)))) {
+    console.error("Refusing: SELLEROPS_NAVER_TEST_BROWSER_PORT names no running test browser. No browser launched.");
+    process.exit(2);
+    return;
+  }
+
   const cfg = loadConfig();
-  const ctx = await launchNaverContext(cfg.profileDir, cfg.browserChannel);
+  const attached = attachPort === null ? null : await attachTestBrowser(attachPort);
+  const ctx = attached?.context ?? (await launchNaverContext(cfg.profileDir, cfg.browserChannel));
+  log("aw_issuance_browser", { mode: attached ? "attached_test_browser" : "launched" });
   try {
-    const page = (ctx.pages()[0] ?? (await ctx.newPage())) as Page;
+    // Attached, the walk gets a tab of its own: the newest tab is the one the driver works on, and the seller's
+    // earlier tabs are theirs.
+    const page = (attached ? await ctx.newPage() : (ctx.pages()[0] ?? (await ctx.newPage()))) as Page;
     await page.goto(url, { waitUntil: "domcontentloaded" });
 
     const runId = mintIssuanceRunId();
@@ -136,7 +152,8 @@ async function main(): Promise<void> {
     await waitForShutdown(bridge);
     capturer?.stop();
   } finally {
-    await ctx.close();
+    if (attached) await attached.disconnect();
+    else await ctx.close();
   }
 }
 

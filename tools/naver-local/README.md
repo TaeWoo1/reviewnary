@@ -86,6 +86,24 @@ The operator's action after approval depends on the **phase**, and the preflight
   `structuralSummaryPolicy` (redacted viewport + sanitized closed-vocabulary only), and its driver is
   `capture-api-center-visual` — never the hotkey calibrator.
 
+### Keeping the NAVER login between issuance walks
+
+A NAVER login does not survive a closed browser — 「로그인 상태 유지」 included (live, 2026-10-19, runs 7–8) — and the
+issuance host closes its browser when it stops. To start a walk **already logged in**, keep one test browser up
+and let each host attach to it:
+
+```bash
+cd collector
+npx tsx instruments/live-runs/naver-test-browser.ts start      # empty window on the walk's profile; port 47691
+SELLEROPS_NAVER_TEST_BROWSER_PORT=47691 npx tsx instruments/live-runs/run-api-issuance-live-naver.ts -- ...
+npx tsx instruments/live-runs/naver-test-browser.ts stop       # when the session is no longer needed
+```
+
+The host opens its own tab, and on stop only **disconnects**. Named but not running ⇒ it refuses and launches
+nothing. While the test browser is up it holds the profile lock, so nothing else can launch on that profile.
+The debugging port is loopback-only and closed to web origins, but any local process can drive that browser
+while it is up: stop it when the session is not needed.
+
 ## API-center Visual Recon (redacted-screenshot calibration)
 
 An alternative to the hotkey selector calibrator (`calibrate-api-center`). Instead of the operator hovering one
