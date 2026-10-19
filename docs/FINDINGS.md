@@ -875,6 +875,19 @@
   바꾸는 패턴은 RUN_INTEGRATION 아래에선 실패여야 맞다 — 고칠 대상으로 남긴다.
 - **출처** — 2026-10-18, `test/action-window/api-issuance-calibration/calibration-initscript-browser.test.ts:44-49`.
 
+### 걷기의 마지막 「돌아가기」가 걷기 프런트의 환경 확인에 막혔다 (2026-10-19)
+
+- **했던 것** — 발급 안내의 마지막 단계가 SellerOps로 돌려보내면 운영자가 연결 화면에 그대로 닿는다고 보고, 걷기 증명의 끝을
+  「돌아감 → 완료 안내」 로그로만 판정했다(7 · 8차 행도 그렇게 적었다).
+- **사실** — 돌아가는 주소는 `screenSellerOpsReturnUrl`이 origin + `/connect/naver`로 고정해 만든다(`sellerops-return-url.ts:95`).
+  걷기 프런트는 주소의 `walkthroughRun`이 없으면 `MISSING_URL_RUN`으로 연결 화면 전체를 막는다(`walkthrough.ts` `evaluateBinding`).
+  9차에서 운영자가 「환경 확인 실패 — 연결을 진행할 수 없습니다」를 봤다. 제품 빌드(걷기 모드 아님)에는 이 검사가 없으니 제품 결함은
+  아니지만, 걷기 증명은 마지막 화면을 한 번도 확인하지 않았다.
+- **다음에** — 「돌아감」은 호스트 로그(`opened:true`)가 아니라 **도착한 화면**으로 판정한다. 걷기 모드에서 돌아가는 주소는 그 실행의
+  `walkthroughRun`을 실어야 한다 — 고칠 대상으로 남긴다.
+- **출처** — 2026-10-19 run `wt-2b54572d84c8`(`apr-6faa81cb9e6a`), `collector/src/cli/local-agent.ts` `naverReturnToSellerOps`,
+  `frontend/src/components/guidedConnection/WalkthroughMismatch.tsx`.
+
 ### 영구 프로필이면 로그인이 남는다고 봤다 (2026-10-19)
 
 - **했던 것** — 걷기 프로필이 `launchPersistentContext`로 디스크에 남으니, 7차에서 한 로그인으로 8차가 로그인된 채 시작할 거라 보고
