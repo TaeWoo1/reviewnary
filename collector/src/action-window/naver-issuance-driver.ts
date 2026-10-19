@@ -265,7 +265,9 @@ const NAVER_CHANNEL_NAME = "네이버 커머스 API";
  */
 const NAVER_STEP_BRIEF: Readonly<Record<IssuanceTarget, string>> = {
   create_app: "'애플리케이션 등록'을 직접 눌러 애플리케이션을 만드세요. 다 만드셨으면 아래 '다음'을 누르세요.",
-  open_app: "연결할 애플리케이션을 직접 여세요. 상세 화면이 열리면 자동으로 넘어갑니다.",
+  // No ring on this step (see `open_app` above) — so the line says where to press and that no mark is coming;
+  // run 9's operator waited for one (2026-10-19).
+  open_app: "목록에서 연결할 애플리케이션을 직접 눌러 여세요. 어느 앱인지는 표시하지 않습니다. 상세 화면이 열리면 자동으로 넘어갑니다.",
   api_group: "표시된 '커머스 API' 그룹이 선택돼 있는지 확인하세요.",
   open_edit: "'수정'을 직접 눌러 주세요. 수정 화면이 열리면 자동으로 넘어갑니다.",
   call_ip: "아래 IP를 'API호출 IP'에 붙여넣고 '추가'. 아래 '내 API 그룹'에 문의 · 주문 판매자 · 상품/N배송이 없으면 '전체 API 그룹'에서 추가한 뒤, 위쪽 '저장'을 눌러 주세요.",

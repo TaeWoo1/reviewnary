@@ -9,6 +9,7 @@ import {
   SELLEROPS_COUPANG_CONNECT_PATH,
   SELLEROPS_ISSUANCE_RESUME_QUERY,
   SELLEROPS_NAVER_CONNECT_PATH,
+  SELLEROPS_WALKTHROUGH_RUN_QUERY,
   isSellerOpsReturnUrl,
   screenSellerOpsReturnUrl,
 } from "../../src/cli/sellerops-return-url";
@@ -92,9 +93,44 @@ describe("the NAVER carrier asks for the NAVER route", () => {
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
     const body = agent.slice(start, end);
-    expect(body).toContain('screenSellerOpsReturnUrl(loadConfig().appUrl, "naver")');
+    expect(body).toContain('screenSellerOpsReturnUrl(loadConfig().appUrl, "naver", walkthroughRunId)');
     expect(agent).toContain("returnToSellerOps: naverReturnToSellerOps,");
     const harness = readFileSync(new URL("../../instruments/live-runs/run-api-issuance-live-naver.ts", import.meta.url), "utf8");
-    expect(harness).toContain("returnToSellerOps: naverReturnToSellerOps");
+    // The live harness returns to ITS bootstrap run; the product carrier above passes no run at all.
+    expect(harness).toContain("returnToSellerOps: () => naverReturnToSellerOps(process.env.WALKTHROUGH_RUN_ID)");
+  });
+});
+
+describe("a NAVER local proof returns to its own bound walk tab (run 9, 2026-10-19)", () => {
+  const RUN = "wt-2b54572d84c8";
+
+  it("**carries the bootstrap run, so the walk frontend opens instead of refusing with MISSING_URL_RUN**", () => {
+    expect(screenSellerOpsReturnUrl("http://localhost:5173/x?y=1", "naver", RUN)).toEqual({
+      ok: true,
+      url: `http://localhost:5173${SELLEROPS_NAVER_CONNECT_PATH}?${SELLEROPS_WALKTHROUGH_RUN_QUERY}=${RUN}`,
+    });
+    expect(SELLEROPS_WALKTHROUGH_RUN_QUERY).toBe("walkthroughRun");
+  });
+
+  it("refuses any run that is not bootstrap's shape, rather than carrying it", () => {
+    for (const bad of ["", "wt-2B54572D84C8", "wt-2b54572d84c", "wt-2b54572d84c8&next=x", "x wt-2b54572d84c8", "../wt-2b54572d84c8"]) {
+      expect(screenSellerOpsReturnUrl("http://localhost:5173", "naver", bad), bad).toEqual({ ok: false, reason: "BAD_WALKTHROUGH_RUN" });
+    }
+  });
+
+  it("the Coupang route and the run-less NAVER route are unchanged", () => {
+    expect(screenSellerOpsReturnUrl("http://localhost:5173", "coupang", RUN)).toEqual(screenSellerOpsReturnUrl("http://localhost:5173"));
+    expect(screenSellerOpsReturnUrl("http://localhost:5173", "naver")).toEqual({
+      ok: true,
+      url: `http://localhost:5173${SELLEROPS_NAVER_CONNECT_PATH}`,
+    });
+  });
+
+  it("the launcher's re-screen accepts the carried run and nothing riding beside it", () => {
+    expect(isSellerOpsReturnUrl(`http://localhost:5173/connect/naver?walkthroughRun=${RUN}`)).toBe(true);
+    expect(isSellerOpsReturnUrl(`http://localhost:5173/connect/naver?walkthroughRun=${RUN}&next=x`)).toBe(false);
+    expect(isSellerOpsReturnUrl("http://localhost:5173/connect/naver?walkthroughRun=wt-bad")).toBe(false);
+    expect(isSellerOpsReturnUrl(`http://localhost:5173/connect/coupang?walkthroughRun=${RUN}`)).toBe(false);
+    expect(isSellerOpsReturnUrl(`http://example.com/connect/naver?walkthroughRun=${RUN}`)).toBe(false);
   });
 });

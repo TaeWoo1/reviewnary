@@ -45,8 +45,20 @@ export type SellerOpsReturnChannel = "coupang" | "naver";
  */
 export const SELLEROPS_ISSUANCE_RESUME_QUERY = "issuance=resume";
 
+/**
+ * **The walkthrough run a local proof's return must carry** (2026-10-19, run 9).
+ *
+ * A bootstrapped walk frontend refuses any `/connect/naver` tab whose address names no `walkthroughRun`
+ * (`MISSING_URL_RUN`), so the walk's own return landed the operator on 「환경 확인 실패」 — every NAVER proof run did,
+ * and none looked at the screen it ended on. The live harness passes its bootstrap run id; the product carrier passes
+ * nothing and its return is unchanged. The id is bootstrap's shape (`wt-` + 12 hex) or the return is refused: it is
+ * the one thing besides the origin that may ride along, so it is held to the one shape bootstrap mints.
+ */
+export const SELLEROPS_WALKTHROUGH_RUN_QUERY = "walkthroughRun";
+const WALKTHROUGH_RUN_ID = /^wt-[0-9a-f]{12}$/;
+
 /** Why a return destination was refused. Fixed enum — it is logged, so it carries no URL and no host. */
-export type SellerOpsReturnRefusal = "EMPTY" | "UNPARSEABLE" | "NOT_HTTP" | "NOT_LOOPBACK";
+export type SellerOpsReturnRefusal = "EMPTY" | "UNPARSEABLE" | "NOT_HTTP" | "NOT_LOOPBACK" | "BAD_WALKTHROUGH_RUN";
 
 export type SellerOpsReturnScreen =
   | { readonly ok: true; readonly url: string }
@@ -69,16 +81,27 @@ const LOOPBACK_HOSTS: readonly string[] = ["localhost", "127.0.0.1", "[::1]", ":
  * to have run the screening first.
  */
 export function isSellerOpsReturnUrl(url: string): boolean {
+  let walkthroughRunId: string | undefined;
+  try {
+    walkthroughRunId = new URL(url).searchParams.get(SELLEROPS_WALKTHROUGH_RUN_QUERY) ?? undefined;
+  } catch {
+    return false;
+  }
   return (["coupang", "naver"] as const).some((channel) => {
-    const screened = screenSellerOpsReturnUrl(url, channel);
+    const screened = screenSellerOpsReturnUrl(url, channel, channel === "naver" ? walkthroughRunId : undefined);
     return screened.ok && screened.url === url;
   });
 }
 
-/** Screen a configured SellerOps app URL into the exact return destination, or refuse with a reason. */
+/**
+ * Screen a configured SellerOps app URL into the exact return destination, or refuse with a reason.
+ * `walkthroughRunId` is the NAVER local proof's bootstrap run ({@link SELLEROPS_WALKTHROUGH_RUN_QUERY}); the
+ * Coupang route ignores it.
+ */
 export function screenSellerOpsReturnUrl(
   appUrl: string | undefined,
   channel: SellerOpsReturnChannel = "coupang",
+  walkthroughRunId?: string,
 ): SellerOpsReturnScreen {
   const raw = (appUrl ?? "").trim();
   if (raw === "") return { ok: false, reason: "EMPTY" };
@@ -92,6 +115,10 @@ export function screenSellerOpsReturnUrl(
   if (!LOOPBACK_HOSTS.includes(parsed.hostname)) return { ok: false, reason: "NOT_LOOPBACK" };
   // ORIGIN ONLY. Everything else about the configured value is dropped rather than carried forward — the
   // route and the resume marker are ours, not the operator's.
-  if (channel === "naver") return { ok: true, url: `${parsed.origin}${SELLEROPS_NAVER_CONNECT_PATH}` };
+  if (channel === "naver") {
+    if (walkthroughRunId === undefined) return { ok: true, url: `${parsed.origin}${SELLEROPS_NAVER_CONNECT_PATH}` };
+    if (!WALKTHROUGH_RUN_ID.test(walkthroughRunId)) return { ok: false, reason: "BAD_WALKTHROUGH_RUN" };
+    return { ok: true, url: `${parsed.origin}${SELLEROPS_NAVER_CONNECT_PATH}?${SELLEROPS_WALKTHROUGH_RUN_QUERY}=${walkthroughRunId}` };
+  }
   return { ok: true, url: `${parsed.origin}${SELLEROPS_COUPANG_CONNECT_PATH}?${SELLEROPS_ISSUANCE_RESUME_QUERY}` };
 }

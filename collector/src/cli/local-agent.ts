@@ -745,10 +745,11 @@ export function naverCallIpSource(cfg: ReturnType<typeof loadConfig>): () => Pro
 
 /**
  * **The NAVER walk's last step, made real** — the screened hand-off back to SellerOps, shared by the resident
- * carrier and the gated live CLI so a proof run ends the way the product does.
+ * carrier and the gated live CLI so a proof run ends the way the product does. The live CLI alone passes its
+ * bootstrap run, so the bound walk frontend it returns to opens instead of refusing the tab.
  */
-export async function naverReturnToSellerOps(): Promise<void> {
-  const screened = screenSellerOpsReturnUrl(loadConfig().appUrl, "naver");
+export async function naverReturnToSellerOps(walkthroughRunId?: string): Promise<void> {
+  const screened = screenSellerOpsReturnUrl(loadConfig().appUrl, "naver", walkthroughRunId);
   if (!screened.ok) {
     // Nothing opens. A refused destination leaves the seller on the API centre with their two values,
     // which is a worse ending than a working button and a much better one than a browser sent somewhere

@@ -120,7 +120,7 @@ async function main(): Promise<void> {
 
     const runId = mintIssuanceRunId();
     // The call-IP step shows the address this machine's backend reports — the same source the resident helper uses.
-    const driver = new NaverIssuanceDriver(page, { context: ctx, callIps: naverCallIpSource(cfg), returnToSellerOps: naverReturnToSellerOps });
+    const driver = new NaverIssuanceDriver(page, { context: ctx, callIps: naverCallIpSource(cfg), returnToSellerOps: () => naverReturnToSellerOps(process.env.WALKTHROUGH_RUN_ID) });
     // Opt-in dev instrument (2026-10-18): masked screenshots after each panel, for a UX pass on the real walk.
     // Off unless SELLEROPS_MASKED_CAPTURE_DIR names an absolute folder OUTSIDE the repository.
     let capturer: MaskedCapturer | null = null;
