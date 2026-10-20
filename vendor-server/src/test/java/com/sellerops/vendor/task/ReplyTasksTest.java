@@ -85,6 +85,13 @@ class ReplyTasksTest {
         assertThat(draft.state()).isEqualTo(State.AWAITING_APPROVAL);
         assertThat(draft.draftVersion()).isEqualTo(1);
         assertThat(draft.draftFingerprint()).isEqualTo(ReplyText.fingerprint("소중한 리뷰 감사합니다."));
+        assertThat(draft.review()).as("the phone approves from the task alone").satisfies(r -> {
+            assertThat(r.body()).isEqualTo("합성 리뷰 1");
+            assertThat(r.rating()).isEqualTo(5);
+            assertThat(r.productName()).isEqualTo("합성 상품");
+            assertThat(r.displayState()).isEqualTo("노출");
+            assertThat(r.replied()).isFalse();
+        });
 
         TaskView approved = approve(draft);
         assertThat(approved.state()).isEqualTo(State.APPROVED);
@@ -221,6 +228,49 @@ class ReplyTasksTest {
                 new Meta(currentFingerprint("1"), clock.instant(), "k1", "p2", "v1"));
         assertThat(redone.state()).isEqualTo(State.AWAITING_APPROVAL);
         assertThat(redone.draftVersion()).isEqualTo(2);
+    }
+
+    @Test
+    void editingADraftOnThePhoneIsNotAPolicyRecheck() {
+        TaskView sentBack = submit("1", "초안 1");
+        tasks.policyCheck(store, "k1", "p2", "v1");
+        TaskView edited = tasks.editDraft(sentBack.id(), 1, "휴대폰에서 고친 초안", true);
+        assertThat(edited.state()).as("new text, old policy").isEqualTo(State.RECHECK_NEEDED);
+        assertThat(edited.policyFp()).isEqualTo("p1");
+        assertThatThrownBy(() -> tasks.approve(edited.id(), account, 2, edited.draftFingerprint(), command()))
+                .isInstanceOfSatisfying(TaskException.class, e -> assertThat(e.failure()).isEqualTo(Failure.WRONG_STATE));
+
+        TaskView stale = tasks.submitDraft(store, review("1"), "옛 정책의 PC가 낸 초안", meta("1"));
+        assertThat(stale.state()).as("a PC still on the old policy cannot clear it either")
+                .isEqualTo(State.RECHECK_NEEDED);
+        TaskView redone = tasks.submitDraft(store, review("1"), "휴대폰에서 고친 초안",
+                new Meta(currentFingerprint("1"), clock.instant(), "k1", "p2", "v1"));
+        assertThat(redone.state()).isEqualTo(State.AWAITING_APPROVAL);
+        assertThat(approve(redone).state()).isEqualTo(State.APPROVED);
+
+        TaskView fresh = tasks.submitDraft(store, review("2"), "처음부터 옛 정책인 초안", meta("2"));
+        assertThat(fresh.state()).as("opened under an outdated policy").isEqualTo(State.RECHECK_NEEDED);
+        TaskView current = tasks.submitDraft(store, review("2"), "지금 정책의 초안",
+                new Meta(currentFingerprint("2"), clock.instant(), "k1", "p2", "v1"));
+        assertThat(tasks.editDraft(current.id(), current.draftVersion(), "현재 정책 아래 휴대폰 수정", true).state())
+                .as("an edit under the current policy stays approvable").isEqualTo(State.AWAITING_APPROVAL);
+    }
+
+    @Test
+    void aClaimedReviewThatIsHiddenIsNotClearToPost() throws Exception {
+        TaskView claimed = approve(submit("1", "초안 1"));
+        tasks.claim(claimed.id(), me, claimed.stateVersion());
+        TaskView waiting = approve(submit("2", "초안 2"));
+        assertThat(tasks.preflight(claimed.id(), me).clearToPost()).isTrue();
+
+        upload(ExportWorkbooks.line("1", Map.of("전시상태", "비노출")),
+                ExportWorkbooks.line("2", Map.of("전시상태", "비노출")));
+        assertThat(tasks.get(waiting.id()).orElseThrow().state()).as("unclaimed: ended")
+                .isEqualTo(State.INVALIDATED);
+        ReplyTasks.Preflight look = tasks.preflight(claimed.id(), me);
+        assertThat(look.reviewChanged()).as("the text is the same").isFalse();
+        assertThat(look.displayChanged()).isTrue();
+        assertThat(look.clearToPost()).isFalse();
     }
 
     @Test

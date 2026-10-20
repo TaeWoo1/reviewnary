@@ -1,5 +1,6 @@
 package com.sellerops.vendor.task;
 
+import com.sellerops.vendor.review.ReviewAttachment;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -10,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -68,7 +70,7 @@ public class ReplyTasks {
 
     public enum Failure {
         NOT_FOUND, REVIEW_CHANGED, ALREADY_REPLIED, TASK_IN_PROGRESS, ALREADY_POSTED, STALE, WRONG_STATE,
-        FINGERPRINT_MISMATCH, INVALID_BODY, INVALID_META, COMMAND_REUSED, NOT_ASSIGNED, NOT_CLAIMER
+        FINGERPRINT_MISMATCH, INVALID_BODY, INVALID_META, COMMAND_REUSED, NOT_ASSIGNED, NOT_CLAIMER, POLICY_CHANGED
     }
 
     public static final class TaskException extends RuntimeException {
@@ -88,14 +90,21 @@ public class ReplyTasks {
     public record Meta(String reviewBodyFingerprint, Instant generatedAt, String knowledgeFp, String policyFp,
                        String voiceFp) {}
 
-    /** A task as the seller and the PC see it. Who claimed it is not shown — only that someone has. */
-    public record TaskView(UUID id, UUID storeId, UUID reviewId, String reviewNo, State state, int stateVersion,
-                           int draftVersion, String draftBody, String draftFingerprint, String reviewBodyFingerprint,
-                           Instant generatedAt, String knowledgeFp, String policyFp, String voiceFp,
-                           boolean editedOnMobile, List<String> serverChecks, Integer pcRecheckVersion,
-                           String pcRecheck, Integer approvedVersion, String approvedFingerprint, Instant approvedAt,
-                           boolean claimed, Outcome outcome, Instant checkedAt, String reportMethod,
-                           Instant updatedAt) {}
+    /**
+     * A task as the seller and the PC see it, with the review as it stands now — the phone approves from this alone
+     * (§4.3 「리뷰 원문 + 초안 + 메타」). Who claimed it is not shown — only that someone has.
+     */
+    public record TaskView(UUID id, UUID storeId, UUID reviewId, String reviewNo, TaskReview review, State state,
+                           int stateVersion, int draftVersion, String draftBody, String draftFingerprint,
+                           String reviewBodyFingerprint, Instant generatedAt, String knowledgeFp, String policyFp,
+                           String voiceFp, boolean editedOnMobile, List<String> serverChecks,
+                           Integer pcRecheckVersion, String pcRecheck, Integer approvedVersion,
+                           String approvedFingerprint, Instant approvedAt, boolean claimed, Outcome outcome,
+                           Instant checkedAt, String reportMethod, Instant updatedAt) {}
+
+    /** The review a task answers, as the latest upload states it. */
+    public record TaskReview(String productName, int rating, String body, ReviewAttachment attachment,
+                             Instant writtenAt, String displayState, boolean replied) {}
 
     /** What a delegate needs to post by hand: the review and the exact approved text. */
     public record DelegateTask(UUID id, UUID storeId, String storeLabel, State state, int stateVersion,
@@ -105,11 +114,12 @@ public class ReplyTasks {
 
     /**
      * The last look before saving in Seller Center. {@code clearToPost} is true only while the task is still the
-     * delegate's to post and nothing about the review moved since the draft; anything else means do not post.
+     * delegate's to post and nothing about the review moved since the draft — its text, its display state (hidden
+     * or removed) or its reply flag; anything else means do not post.
      */
     public record Preflight(UUID taskId, State state, String approvedBody, String approvedFingerprint,
-                            boolean reviewChanged, boolean alreadyReplied, boolean cancelRequested,
-                            boolean clearToPost) {}
+                            boolean reviewChanged, boolean displayChanged, boolean alreadyReplied,
+                            boolean cancelRequested, boolean clearToPost) {}
 
     public record PolicyCheck(List<UUID> sentBackForRecheck, List<UUID> withdrawalSuggested) {}
 
@@ -142,16 +152,18 @@ public class ReplyTasks {
 
     /**
      * The PC's draft for a review. A first draft opens a task; a different draft for a task still awaiting approval
-     * (or sent back for a recheck) becomes its next version; the same draft again changes nothing.
+     * (or sent back for a recheck) becomes its next version; the same draft again changes nothing. A draft made
+     * under other fingerprints than the store's last policy check is not approvable: it lands in
+     * {@code RECHECK_NEEDED}.
      */
     @Transactional
     public TaskView submitDraft(UUID storeId, UUID reviewId, String rawBody, Meta meta) {
         String body = body(rawBody);
         validate(meta);
-        Optional<ReviewState> review = jdbc.sql("select body_fingerprint, replied from store_reviews "
+        Optional<ReviewState> review = jdbc.sql("select body_fingerprint, replied, display_state from store_reviews "
                         + "where id = ? and store_id = ?")
                 .params(reviewId, storeId)
-                .query((rs, n) -> new ReviewState(rs.getString(1), rs.getBoolean(2)))
+                .query((rs, n) -> new ReviewState(rs.getString(1), rs.getBoolean(2), rs.getString(3)))
                 .optional();
         if (review.isEmpty()) {
             throw new TaskException(Failure.NOT_FOUND);
@@ -163,6 +175,8 @@ public class ReplyTasks {
             throw new TaskException(Failure.REVIEW_CHANGED);
         }
         Instant now = clock.instant();
+        State lands = underCurrentPolicy(storeId, meta.knowledgeFp(), meta.policyFp(), meta.voiceFp())
+                ? State.AWAITING_APPROVAL : State.RECHECK_NEEDED;
         Optional<TaskView> open = jdbc.sql(SELECT + " where t.open_review_id = ?").param(reviewId)
                 .query(ReplyTasks::view).optional();
         if (open.isEmpty()) {
@@ -175,30 +189,34 @@ public class ReplyTasks {
                 jdbc.sql("insert into reply_tasks (id, store_id, review_id, state, state_version, draft_version, "
                                 + "draft_body, draft_fingerprint, review_body_fingerprint, generated_at, knowledge_fp, "
                                 + "policy_fp, voice_fp, edited_on_mobile, server_checks, created_at, updated_at, "
-                                + "open_review_id) values (?, ?, ?, ?, 0, 1, ?, ?, ?, ?, ?, ?, ?, false, ?, ?, ?, ?)")
-                        .params(id, storeId, reviewId, State.AWAITING_APPROVAL.name(), body,
+                                + "open_review_id, review_display_state) "
+                                + "values (?, ?, ?, ?, 0, 1, ?, ?, ?, ?, ?, ?, ?, false, ?, ?, ?, ?, ?)")
+                        .params(id, storeId, reviewId, lands.name(), body,
                                 ReplyText.fingerprint(body), meta.reviewBodyFingerprint(), ts(meta.generatedAt()),
                                 meta.knowledgeFp(), meta.policyFp(), meta.voiceFp(), joined(ReplyText.checks(body)),
-                                ts(now), ts(now), reviewId)
+                                ts(now), ts(now), reviewId, review.get().displayState())
                         .update();
             } catch (DuplicateKeyException e) {
                 // Another PC opened a task on this review a moment ago.
                 throw new TaskException(Failure.TASK_IN_PROGRESS);
             }
-            change(storeId, id, State.AWAITING_APPROVAL, now);
+            change(storeId, id, lands, now);
             return get(id).orElseThrow();
         }
         TaskView task = open.get();
         if (task.state() != State.AWAITING_APPROVAL && task.state() != State.RECHECK_NEEDED) {
             throw new TaskException(Failure.TASK_IN_PROGRESS);
         }
-        if (task.state() == State.AWAITING_APPROVAL && task.draftBody().equals(body) && sameMeta(task, meta)) {
+        if (task.state() == lands && task.draftBody().equals(body) && sameMeta(task, meta)) {
             return task;
         }
-        return newVersion(task, body, meta, false, now);
+        return newVersion(task, body, meta, false, lands, now);
     }
 
-    /** A new version written on the phone or the PC. {@code baseVersion} must be the current one. */
+    /**
+     * A new version written on the phone or the PC. {@code baseVersion} must be the current one. Editing the text is
+     * not a recheck: a draft sent back for one stays sent back until the PC drafts it again under the current policy.
+     */
     @Transactional
     public TaskView editDraft(UUID taskId, int baseVersion, String rawBody, boolean onMobile) {
         String body = body(rawBody);
@@ -211,7 +229,9 @@ public class ReplyTasks {
         }
         Meta same = new Meta(task.reviewBodyFingerprint(), task.generatedAt(), task.knowledgeFp(), task.policyFp(),
                 task.voiceFp());
-        return newVersion(task, body, same, onMobile, clock.instant());
+        State lands = task.state() == State.AWAITING_APPROVAL && underCurrentPolicy(task)
+                ? State.AWAITING_APPROVAL : State.RECHECK_NEEDED;
+        return newVersion(task, body, same, onMobile, lands, clock.instant());
     }
 
     /** The PC's knowledge-based check of a version (typically one edited on the phone). */
@@ -251,6 +271,7 @@ public class ReplyTasks {
             }
         }
         Instant now = clock.instant();
+        recordPolicy(storeId, knowledgeFp, policyFp, voiceFp, now);
         List<UUID> sentBack = new ArrayList<>();
         List<UUID> suggested = new ArrayList<>();
         for (TaskView task : list(storeId, null)) {
@@ -287,6 +308,9 @@ public class ReplyTasks {
         }
         if (!task.draftFingerprint().equals(fingerprint)) {
             throw new TaskException(Failure.FINGERPRINT_MISMATCH);
+        }
+        if (!underCurrentPolicy(task)) {
+            throw new TaskException(Failure.POLICY_CHANGED);
         }
         Instant now = clock.instant();
         if (!transition(task, State.AWAITING_APPROVAL, State.APPROVED, ", approved_version = ?, "
@@ -379,15 +403,18 @@ public class ReplyTasks {
     @Transactional(readOnly = true)
     public Preflight preflight(UUID taskId, UUID delegateId) {
         TaskView task = claimedBy(taskId, delegateId);
-        ReviewState review = jdbc.sql("select body_fingerprint, replied from store_reviews where id = ?")
+        ReviewState review = jdbc.sql("select body_fingerprint, replied, display_state from store_reviews where id = ?")
                 .param(task.reviewId())
-                .query((rs, n) -> new ReviewState(rs.getString(1), rs.getBoolean(2)))
+                .query((rs, n) -> new ReviewState(rs.getString(1), rs.getBoolean(2), rs.getString(3)))
                 .single();
+        String displayedThen = jdbc.sql("select review_display_state from reply_tasks where id = ?").param(taskId)
+                .query((rs, n) -> rs.getString(1)).list().get(0);
         boolean changed = !review.bodyFingerprint().equals(task.reviewBodyFingerprint());
+        boolean displayChanged = !Objects.equals(review.displayState(), displayedThen);
         boolean cancelRequested = task.state() == State.CANCEL_REQUESTED;
-        boolean clear = task.state() == State.CLAIMED && !changed && !review.replied();
+        boolean clear = task.state() == State.CLAIMED && !changed && !displayChanged && !review.replied();
         return new Preflight(task.id(), task.state(), task.draftBody(), task.approvedFingerprint(), changed,
-                review.replied(), cancelRequested, clear);
+                displayChanged, review.replied(), cancelRequested, clear);
     }
 
     /**
@@ -513,18 +540,52 @@ public class ReplyTasks {
 
     /* ── internals ──────────────────────────────────────────────────────────────────────────────────────────────── */
 
-    private static final String SELECT = "select t.*, r.review_no from reply_tasks t "
+    private static final String SELECT = "select t.*, r.review_no, r.product_name as r_product_name, "
+            + "r.rating as r_rating, r.body as r_body, r.attachment_url as r_attachment_url, "
+            + "r.attachment_kind as r_attachment_kind, r.written_at as r_written_at, "
+            + "r.display_state as r_display_state, r.replied as r_replied from reply_tasks t "
             + "join store_reviews r on r.id = t.review_id";
 
-    private record ReviewState(String bodyFingerprint, boolean replied) {}
+    private record ReviewState(String bodyFingerprint, boolean replied, String displayState) {}
 
-    private TaskView newVersion(TaskView task, String body, Meta meta, boolean onMobile, Instant now) {
+    /** True unless the store's PC has reported other draft fingerprints since this draft was made. */
+    private boolean underCurrentPolicy(UUID storeId, String knowledgeFp, String policyFp, String voiceFp) {
+        return jdbc.sql("select knowledge_fp, policy_fp, voice_fp from store_draft_policies where store_id = ?")
+                .param(storeId)
+                .query((rs, n) -> rs.getString(1).equals(knowledgeFp) && rs.getString(2).equals(policyFp)
+                        && rs.getString(3).equals(voiceFp))
+                .optional()
+                .orElse(true);
+    }
+
+    private boolean underCurrentPolicy(TaskView task) {
+        return underCurrentPolicy(task.storeId(), task.knowledgeFp(), task.policyFp(), task.voiceFp());
+    }
+
+    private void recordPolicy(UUID storeId, String knowledgeFp, String policyFp, String voiceFp, Instant at) {
+        String update = "update store_draft_policies set knowledge_fp = ?, policy_fp = ?, voice_fp = ?, "
+                + "checked_at = ? where store_id = ?";
+        if (jdbc.sql(update).params(knowledgeFp, policyFp, voiceFp, ts(at), storeId).update() == 1) {
+            return;
+        }
+        try {
+            jdbc.sql("insert into store_draft_policies (store_id, knowledge_fp, policy_fp, voice_fp, checked_at) "
+                            + "values (?, ?, ?, ?, ?)")
+                    .params(storeId, knowledgeFp, policyFp, voiceFp, ts(at))
+                    .update();
+        } catch (DuplicateKeyException e) {
+            // Another check of the same store inserted first; this one is the later word.
+            jdbc.sql(update).params(knowledgeFp, policyFp, voiceFp, ts(at), storeId).update();
+        }
+    }
+
+    private TaskView newVersion(TaskView task, String body, Meta meta, boolean onMobile, State lands, Instant now) {
         int moved = jdbc.sql("update reply_tasks set state = ?, state_version = state_version + 1, "
                         + "draft_version = draft_version + 1, draft_body = ?, draft_fingerprint = ?, "
                         + "review_body_fingerprint = ?, generated_at = ?, knowledge_fp = ?, policy_fp = ?, voice_fp = ?, "
                         + "edited_on_mobile = ?, server_checks = ?, pc_recheck_version = null, pc_recheck = null, "
                         + "updated_at = ? where id = ? and state = ? and state_version = ?")
-                .params(State.AWAITING_APPROVAL.name(), body, ReplyText.fingerprint(body),
+                .params(lands.name(), body, ReplyText.fingerprint(body),
                         meta.reviewBodyFingerprint(), ts(meta.generatedAt()), meta.knowledgeFp(), meta.policyFp(),
                         meta.voiceFp(), onMobile, joined(ReplyText.checks(body)), ts(now), task.id(),
                         task.state().name(), task.stateVersion())
@@ -532,7 +593,7 @@ public class ReplyTasks {
         if (moved != 1) {
             throw new TaskException(Failure.STALE);
         }
-        change(task.storeId(), task.id(), State.AWAITING_APPROVAL, now);
+        change(task.storeId(), task.id(), lands, now);
         return get(task.id()).orElseThrow();
     }
 
@@ -651,8 +712,15 @@ public class ReplyTasks {
         int approved = rs.getInt("approved_version");
         Integer approvedVersion = rs.wasNull() ? null : approved;
         String outcome = rs.getString("outcome");
+        String attachmentUrl = rs.getString("r_attachment_url");
+        TaskReview review = new TaskReview(rs.getString("r_product_name"), rs.getInt("r_rating"),
+                rs.getString("r_body"), attachmentUrl == null ? null : new ReviewAttachment(attachmentUrl,
+                        ReviewAttachment.Kind.valueOf(rs.getString("r_attachment_kind"))),
+                instant(rs.getTimestamp("r_written_at")), rs.getString("r_display_state"),
+                rs.getBoolean("r_replied"));
         return new TaskView(rs.getObject("id", UUID.class), rs.getObject("store_id", UUID.class),
-                rs.getObject("review_id", UUID.class), rs.getString("review_no"), State.valueOf(rs.getString("state")),
+                rs.getObject("review_id", UUID.class), rs.getString("review_no"), review,
+                State.valueOf(rs.getString("state")),
                 rs.getInt("state_version"), rs.getInt("draft_version"), rs.getString("draft_body"),
                 rs.getString("draft_fingerprint"), rs.getString("review_body_fingerprint"),
                 instant(rs.getTimestamp("generated_at")), rs.getString("knowledge_fp"), rs.getString("policy_fp"),

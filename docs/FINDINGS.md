@@ -966,6 +966,18 @@
 - **출처** — 2026-10-20 run `wt-5bf616a2c9d0`(`apr-9581410a53a5`), `collector/src/cli/sellerops-return-url.ts`,
   `frontend/src/components/guidedConnection/NaverIssuanceGuidedWalkthrough.tsx`, `collector/test/crossstack/naver-issuance-fe-copy-parity.test.ts`.
 
+### 답글 대행 서버가 계약 문서의 세 문장을 코드에서 놓쳤다 (2026-10-21)
+
+- **했던 것** — 답글 대행 상태 기계(`36f7736e`)를 계약 §4대로 만들었다고 보고했다. 테스트 95개와 변형 증명 4건이 통과했다.
+- **사실** — 오너 리뷰에서 세 군데가 계약과 달랐다. ① 휴대폰 수정이 `RECHECK_NEEDED`를 `AWAITING_APPROVAL`로 되돌려, 옛 정책 지문
+  그대로 승인할 수 있었다(계약: "PC가 지금의 지문으로 다시 내야 승인"). ② 착수한 건의 등록 직전 검사가 본문과 답글 여부만 보고
+  전시 상태를 보지 않았다(계약: 숨김 · 삭제는 `전시상태`로만 안다). ③ 판매자용 작업 응답에 리뷰 원문이 없었다(계약 §4.3 표:
+  "리뷰 원문 + 초안 + 메타"). 세 테스트 모두 정상 경로만 확인하고, 계약 문장마다 "우회 경로"를 넣어 보지 않았다.
+- **다음에** — 상태 기계는 **계약의 금지 문장마다 그 금지를 우회하는 다른 입구**(다른 역할 · 다른 엔드포인트 · 다른 필드)를 테스트로
+  하나씩 넣는다. 응답 필드는 계약 표의 열과 한 줄씩 대조한다.
+- **출처** — 2026-10-21 오너 리뷰, `vendor-server/src/main/java/com/sellerops/vendor/task/ReplyTasks.java`,
+  `V5__reply_task_guards.sql`, `ReplyTasksTest`(`editingADraftOnThePhoneIsNotAPolicyRecheck` · `aClaimedReviewThatIsHiddenIsNotClearToPost`).
+
 ---
 
 ## 어디에 무엇이 있나

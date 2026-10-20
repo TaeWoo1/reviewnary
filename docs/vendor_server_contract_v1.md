@@ -279,14 +279,20 @@ AWAITING_APPROVAL ──승인──▶ APPROVED ──착수──▶ CLAIMED �
   새 작업이 열리지 않는다.
 - **무효화**: 업로드에서 본문 · 전시 상태가 바뀌거나 답글 여부가 N→Y가 되면 `AWAITING_APPROVAL` · `RECHECK_NEEDED` ·
   `APPROVED` 작업은 `INVALIDATED`. 착수한 작업은 건드리지 않고, 담당자 `preflight`가 `reviewChanged` ·
-  `alreadyReplied`로 알리며 `clearToPost=false`가 된다.
+  `displayChanged` · `alreadyReplied`로 알리며 `clearToPost=false`가 된다. 전시 상태는 작업이 열릴 때의 값을
+  작업에 적어 두고(`review_display_state`) 그 값과 비교한다 — 숨김 · 삭제는 `전시상태`로만 보이기 때문이다.
 - **담당자 정지** 시 그 사람이 착수한 작업(`CLAIMED` · `CANCEL_REQUESTED`)은 `UNKNOWN`.
 - 착수하지 않은 담당자에게 남의 스토어 작업은 없는 것과 같은 404, 다른 담당자가 착수한 작업은 403.
 - `RECHECK_NEEDED`는 바로 승인할 수 없다 — PC가 지금의 지문으로 초안을 다시 내야(`AWAITING_APPROVAL`, 새 버전) 승인된다.
+  **문장 수정은 재검증이 아니다:** 휴대폰 · PC의 `PUT …/draft`는 새 버전을 만들어도 `RECHECK_NEEDED`를 그대로 둔다.
+  서버는 스토어마다 마지막 `policy-check` 지문을 적어 두고(`store_draft_policies`), 그와 다른 지문의 초안은 새로 내든
+  고쳐 쓰든 `RECHECK_NEEDED`로 들어가며, 승인 시점에도 다시 비교한다(`409 policy_changed`).
 - 서버 검사(`serverChecks`)는 연락처 · 이메일 · 링크 표시뿐이고 승인을 막지 않는다. 답글 지문 · 정규화는 backend
   `ReviewReplyFingerprint` · `ReviewReplyValidation`을 옮긴 것이고, backend 클래스로 계산한 값으로 테스트를 묶었다.
   본문 상한 4,000바이트는 backend와 같은 저장 상한이고 네이버의 한도가 아니다.
 - 모든 상태 변경은 `reply_task_changes`에 순서대로 남고 PC가 `tasks/changes?cursor=`로 받는다.
+- 판매자 · PC가 받는 작업 응답에는 `review`(상품명 · 평점 · 본문 · 첨부 · 작성 시각 · 전시 상태 · 답글 여부, 최신 업로드
+  기준)가 같이 실린다. 휴대폰은 리뷰 피드(설치 토큰 전용) 없이 이 응답만으로 원문을 보고 승인한다.
 
 ## 5. Cafe24 토큰 중계
 

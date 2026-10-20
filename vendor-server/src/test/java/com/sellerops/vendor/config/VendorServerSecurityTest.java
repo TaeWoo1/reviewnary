@@ -371,7 +371,13 @@ class VendorServerSecurityTest {
         String taskPath = "/v1/tasks/" + task.path("id").asText();
         assertThat(task.path("state").asText()).isEqualTo("AWAITING_APPROVAL");
 
-        // 2. The seller approves that exact version. A delegate may not.
+        // 2. The seller approves that exact version from the phone, reading the review from the task alone. A delegate
+        // may not.
+        mvc.perform(get(taskPath).with(bearer(session))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.review.body").value(review.path("body").asText()))
+                .andExpect(jsonPath("$.review.rating").value(review.path("rating").asInt()))
+                .andExpect(jsonPath("$.review.productName").value(review.path("productName").asText()))
+                .andExpect(jsonPath("$.review.displayState").value(review.path("displayState").asText()));
         String approve = "{\"version\":1,\"fingerprint\":\"" + task.path("draftFingerprint").asText()
                 + "\",\"commandId\":\"approve-1\"}";
         mvc.perform(json(post(taskPath + "/approve").with(bearer(me.token())), approve)).andExpect(status().isForbidden());
