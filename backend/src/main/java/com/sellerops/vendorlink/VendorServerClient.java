@@ -70,6 +70,43 @@ public interface VendorServerClient {
     /** Tells the server this PC stored everything up to {@code cursor}. */
     void ackReviews(String installToken, UUID storeId, long cursor);
 
+    /* ── reply tasks (§4.3) ── */
+
+    /** §17.9 초안 메타 as the server takes it. */
+    record DraftMeta(String reviewBodyFingerprint, Instant generatedAt, String knowledgeFp, String policyFp,
+                     String voiceFp) {}
+
+    /** A task as the server reports it to a PC. {@code reviewId} is the server's review id. */
+    record TaskSnapshot(UUID id, UUID reviewId, String state, int stateVersion, int draftVersion, String draftBody,
+                        String draftFingerprint, String approvedFingerprint, boolean editedOnMobile) {}
+
+    record TaskChange(long seq, String state, TaskSnapshot task) {}
+
+    record TaskChanges(List<TaskChange> changes, long cursor, boolean more) {}
+
+    /** Opens a task for the review, or makes this text its next version while it awaits approval. */
+    TaskSnapshot submitDraft(String installToken, UUID storeId, UUID reviewId, String body, DraftMeta meta);
+
+    /** The store's task transitions after {@code cursor}, in order. */
+    TaskChanges taskChanges(String installToken, UUID storeId, long cursor, int limit);
+
+    /** Tells the server the seller decided this review needs no reply (§3.2, D4). */
+    void markNoReplyNeeded(String installToken, UUID storeId, UUID reviewId, String commandId);
+
+    /** The server refused a task request; {@code code} is its closed error ({@code task_in_progress}, …). */
+    final class TaskRefused extends RuntimeException {
+        private final String code;
+
+        public TaskRefused(String code) {
+            super("공급자 서버가 이 작업 요청을 받지 않았습니다.");
+            this.code = code;
+        }
+
+        public String code() {
+            return code;
+        }
+    }
+
     /** The install token or the store was refused — revoked, suspended, or not this account's. */
     final class Refused extends RuntimeException {
         public Refused() {

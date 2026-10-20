@@ -53,12 +53,13 @@ abstract class VendorReviewPullScenarios {
     private static final String KEY = Base64.getEncoder().encodeToString(new byte[] {
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
             30, 31, 32});
-    private static final String TOKEN = "rvi_synthetic-install-token-for-tests";
+    private static final String TOKEN = FakeVendorServer.TOKEN;
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-10-21T00:00:00Z"), ZoneOffset.UTC);
 
     @Autowired VendorInstallLinkRepository links;
     @Autowired VendorStoreBindingRepository bindings;
     @Autowired VendorReviewRefRepository refs;
+    @Autowired VendorReplyTaskRepository taskCopies;
     @Autowired ReviewRepository reviews;
     @Autowired ChannelRepository channels;
     @Autowired OrganizationRepository organizations;
@@ -66,7 +67,7 @@ abstract class VendorReviewPullScenarios {
     @Autowired IngestFollowUp followUp;
     @Autowired SyncJobRepository syncJobs;
 
-    private FakeVendor vendor;
+    private FakeVendorServer vendor;
     private VendorLinkService link;
     private VendorReviewPullService pull;
     private UUID org;
@@ -74,6 +75,7 @@ abstract class VendorReviewPullScenarios {
 
     @BeforeEach
     void setUp() {
+        taskCopies.deleteAll();
         refs.deleteAll();
         bindings.deleteAll();
         links.deleteAll();
@@ -88,7 +90,7 @@ abstract class VendorReviewPullScenarios {
         });
         org = organization("합성 판매자");
         store = UUID.randomUUID();
-        vendor = new FakeVendor(store);
+        vendor = new FakeVendorServer(store);
         link = new VendorLinkService(links, new LocalSecretSealer(new VaultKeyRing(KEY, "test-key-1", "")), vendor,
                 true, CLOCK);
         link.start();
@@ -226,73 +228,5 @@ abstract class VendorReviewPullScenarios {
 
     private static String fingerprintOf(String key) {
         return String.format("%64s", Integer.toHexString(key.hashCode())).replace(' ', '0');
-    }
-
-    /** The vendor server, holding one NAVER store's feed. */
-    private static final class FakeVendor implements VendorServerClient {
-        final UUID store;
-        final java.util.Map<String, UUID> ids = new java.util.HashMap<>();
-        final List<FeedEvent> feed = new ArrayList<>();
-        final List<Long> cursorsAsked = new ArrayList<>();
-        final List<Long> acks = new ArrayList<>();
-        final List<String> bearers = new ArrayList<>();
-        boolean refuse;
-
-        FakeVendor(UUID store) {
-            this.store = store;
-        }
-
-        void event(String kind, FeedReview review) {
-            feed.add(new FeedEvent(feed.size() + 1, kind, review));
-        }
-
-        @Override
-        public Code requestCode(String deviceName, String appVersion, String publicKeyBase64) {
-            return new Code("device-code", "BCDFGHJK", Instant.parse("2026-10-21T00:10:00Z"), 3);
-        }
-
-        @Override
-        public Poll poll(String deviceCode) {
-            return new Linked(TOKEN, UUID.randomUUID(), Instant.parse("2027-04-15T00:00:00Z"));
-        }
-
-        @Override
-        public PublicIp publicIp(String installToken) {
-            return new NoIpv4();
-        }
-
-        @Override
-        public java.net.URI approvalPage(String userCode) {
-            return java.net.URI.create("http://127.0.0.1:8090/link?code=" + userCode);
-        }
-
-        @Override
-        public void unlink(String installToken) {
-        }
-
-        @Override
-        public List<Store> stores(String installToken) {
-            bearers.add(installToken);
-            if (refuse) {
-                throw new Refused();
-            }
-            return List.of(new Store(store, "NAVER", "합성 스토어"));
-        }
-
-        @Override
-        public FeedPage reviewFeed(String installToken, UUID storeId, long cursor, int limit) {
-            bearers.add(installToken);
-            cursorsAsked.add(cursor);
-            List<FeedEvent> after = feed.stream().filter(e -> e.seq() > cursor).toList();
-            List<FeedEvent> page = after.subList(0, Math.min(limit, after.size()));
-            long last = page.isEmpty() ? cursor : page.get(page.size() - 1).seq();
-            return new FeedPage(page, last, after.size() > page.size());
-        }
-
-        @Override
-        public void ackReviews(String installToken, UUID storeId, long cursor) {
-            bearers.add(installToken);
-            acks.add(cursor);
-        }
     }
 }

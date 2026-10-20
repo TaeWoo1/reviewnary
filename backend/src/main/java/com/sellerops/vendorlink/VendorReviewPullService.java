@@ -65,7 +65,8 @@ public class VendorReviewPullService {
 
     /** What one store's pull did. {@code bound} false: the store belongs to no organisation on this PC yet. */
     public record StoreResult(UUID storeId, String label, boolean bound, boolean otherOrganisation, int received,
-                              int inserted, int updated, int failed, long cursor, boolean more) {}
+                              int inserted, int updated, int failed, long cursor, boolean more, int taskChanges,
+                              int noReplyReported) {}
 
     public record PullResult(State state, List<StoreResult> stores) {
 
@@ -82,20 +83,29 @@ public class VendorReviewPullService {
     private final IngestionService ingestion;
     private final IngestFollowUp followUp;
     private final SyncJobRepository syncJobs;
+    /** Reply tasks follow each review pull (§4); null where a test pulls reviews alone. */
+    private final VendorReplyTaskService replyTasks;
     private final Clock clock;
 
     @Autowired
     public VendorReviewPullService(VendorLinkService link, VendorStoreBindingRepository bindings,
                                    VendorReviewRefRepository refs, ReviewRepository reviews,
                                    ChannelRepository channels, IngestionService ingestion, IngestFollowUp followUp,
-                                   SyncJobRepository syncJobs) {
-        this(link, bindings, refs, reviews, channels, ingestion, followUp, syncJobs, Clock.systemUTC());
+                                   SyncJobRepository syncJobs, VendorReplyTaskService replyTasks) {
+        this(link, bindings, refs, reviews, channels, ingestion, followUp, syncJobs, replyTasks, Clock.systemUTC());
     }
 
     VendorReviewPullService(VendorLinkService link, VendorStoreBindingRepository bindings,
                             VendorReviewRefRepository refs, ReviewRepository reviews, ChannelRepository channels,
                             IngestionService ingestion, IngestFollowUp followUp, SyncJobRepository syncJobs,
                             Clock clock) {
+        this(link, bindings, refs, reviews, channels, ingestion, followUp, syncJobs, null, clock);
+    }
+
+    VendorReviewPullService(VendorLinkService link, VendorStoreBindingRepository bindings,
+                            VendorReviewRefRepository refs, ReviewRepository reviews, ChannelRepository channels,
+                            IngestionService ingestion, IngestFollowUp followUp, SyncJobRepository syncJobs,
+                            VendorReplyTaskService replyTasks, Clock clock) {
         this.link = link;
         this.bindings = bindings;
         this.refs = refs;
@@ -104,6 +114,7 @@ public class VendorReviewPullService {
         this.ingestion = ingestion;
         this.followUp = followUp;
         this.syncJobs = syncJobs;
+        this.replyTasks = replyTasks;
         this.clock = clock;
     }
 
@@ -148,13 +159,13 @@ public class VendorReviewPullService {
                 bound = Optional.of(bind(store, sellerOrg, naver.get().getId()));
             }
             if (bound.isEmpty()) {
-                results.add(new StoreResult(store.id(), store.label(), false, false, 0, 0, 0, 0, 0, false));
+                results.add(new StoreResult(store.id(), store.label(), false, false, 0, 0, 0, 0, 0, false, 0, 0));
                 continue;
             }
             if (sellerOrg != null && !sellerOrg.equals(bound.get().getOrgId())) {
                 // Bound to another organisation on this PC: its reviews are not this seller's to pull.
                 results.add(new StoreResult(store.id(), store.label(), true, true, 0, 0, 0, 0,
-                        bound.get().getReviewCursor(), false));
+                        bound.get().getReviewCursor(), false, 0, 0));
                 continue;
             }
             try {
@@ -226,8 +237,11 @@ public class VendorReviewPullService {
         // Counts and closed words only — the reviews are in hand here, which is why they are not in this line.
         log.info("vendor review relay: store={} received={} inserted={} updated={} failed={} cursor={} more={}",
                 binding.getVendorStoreId(), received, inserted.size(), updated.size(), failed, cursor, more);
+        // Tasks after reviews: a task change names a review, and the review must already be here.
+        int taskChanges = replyTasks == null ? 0 : replyTasks.sync(binding, token);
+        int noReply = replyTasks == null ? 0 : replyTasks.reportNoReply(binding, token);
         return new StoreResult(binding.getVendorStoreId(), label, true, false, received, inserted.size(),
-                updated.size(), failed, cursor, more);
+                updated.size(), failed, cursor, more, taskChanges, noReply);
     }
 
     /** Brings one review to the state the event carries. Throws when it cannot be stored. */

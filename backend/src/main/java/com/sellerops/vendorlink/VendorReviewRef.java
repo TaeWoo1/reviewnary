@@ -4,6 +4,7 @@ import com.sellerops.common.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
@@ -39,4 +40,8 @@ public class VendorReviewRef extends BaseEntity {
 
     @Column(name = "attachment_kind", length = 16)
     private String attachmentKind;
+
+    /** When the seller's own 'no reply' for this review was told to the server (V137); null until then. */
+    @Column(name = "no_reply_reported_at")
+    private Instant noReplyReportedAt;
 }

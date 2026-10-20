@@ -68,9 +68,15 @@ class VendorRelayWireIT {
     @Autowired IngestionService ingestion;
     @Autowired IngestFollowUp followUp;
     @Autowired SyncJobRepository syncJobs;
+    @Autowired VendorReplyTaskRepository taskCopies;
+    @Autowired com.sellerops.attention.reply.ReviewReplyDraftService drafts;
+    @Autowired com.sellerops.attention.reply.ReviewReplyApprovalService approvals;
+    @Autowired com.sellerops.attention.reply.ReviewReplyOutcomeService outcomes;
+    @Autowired com.sellerops.attention.reply.ReviewReplyOutcomeRepository outcomeRows;
+    @Autowired com.sellerops.attention.triage.ReviewTriageService triage;
 
     @Test
-    void theRealServersFeedLandsOnceAndBothBuildsAgreeOnTheBodyFingerprint() {
+    void theRealServersFeedAndTheWholeReplyLoopReachThisPc() {
         Channel naver = new Channel();
         naver.setCode("NAVER");
         naver.setNameKo("네이버");
@@ -88,8 +94,10 @@ class VendorRelayWireIT {
                 new LocalSecretSealer(new VaultKeyRing(KEY, "test-key-1", "")), wire, true, Clock.systemUTC());
         link.start();
         link.poll();
+        VendorReplyTaskService replyTasks = new VendorReplyTaskService(link, bindings, refs, taskCopies, reviews, drafts,
+                approvals, outcomes, Clock.systemUTC());
         VendorReviewPullService pull = new VendorReviewPullService(link, bindings, refs, reviews, channels, ingestion,
-                followUp, syncJobs, Clock.systemUTC());
+                followUp, syncJobs, replyTasks, Clock.systemUTC());
 
         int expected = Integer.parseInt(System.getenv("VENDOR_E2E_REVIEWS"));
         StoreResult first = pull.pullFor(org).stores().get(0);
@@ -106,6 +114,82 @@ class VendorRelayWireIT {
         StoreResult again = pull.pullFor(org).stores().get(0);
         assertThat(again.received()).isZero();
         assertThat(again.cursor()).isEqualTo(first.cursor());
+
+        // The loop, end to end: the seller sends a draft to the phone, approves it there, the delegate claims it,
+        // looks once more and reports it posted; the PC records that as a reported, unverified post.
+        Review answer = stored.stream().filter(r -> r.getReplyState() != com.sellerops.review.ReviewReplyState.ANSWERED)
+                .findFirst().orElseThrow();
+        UUID seller = UUID.randomUUID();
+        triage.decide(org, answer.getId(), "RESPONSE_NEEDED", "wire-needs", seller);
+        String text = "소중한 리뷰 감사합니다. 다음에도 만족하실 수 있게 준비하겠습니다.";
+        drafts.save(org, answer.getId(), "SELLER:" + seller, text, 0);
+        assertThat(replyTasks.requestApproval(org, answer.getId()).state()).isEqualTo("AWAITING_APPROVAL");
+        VendorReplyTask copy = taskCopies.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(org, answer.getId())
+                .orElseThrow();
+        String fingerprint = com.sellerops.attention.reply.ReviewReplyFingerprint.of(text);
+        assertThat(copy.getDraftFingerprint()).as("both builds fingerprint the reply alike").isEqualTo(fingerprint);
+
+        String task = copy.getVendorTaskId().toString();
+        String sellerSession = System.getenv("VENDOR_E2E_SELLER_TOKEN");
+        String delegate = System.getenv("VENDOR_E2E_DELEGATE_TOKEN");
+        assertThat(call("POST", "/v1/tasks/" + task + "/approve", sellerSession, "{\"version\":" + copy.getDraftVersion()
+                + ",\"fingerprint\":\"" + fingerprint + "\",\"commandId\":\"wire-approve\"}")).isEqualTo(200);
+        com.fasterxml.jackson.databind.JsonNode listed = json(get("/v1/delegate/tasks?state=APPROVED", delegate));
+        int stateVersion = listed.get(0).path("stateVersion").asInt();
+        assertThat(call("POST", "/v1/delegate/tasks/" + task + "/claim", delegate,
+                "{\"stateVersion\":" + stateVersion + "}")).isEqualTo(200);
+        assertThat(json(get("/v1/delegate/tasks/" + task + "/preflight", delegate)).path("clearToPost").asBoolean())
+                .isTrue();
+        assertThat(call("POST", "/v1/delegate/tasks/" + task + "/report", delegate, "{\"outcome\":\"POSTED\","
+                + "\"postedFingerprint\":\"" + fingerprint + "\",\"checkedAt\":\"" + Instant.now()
+                + "\",\"method\":\"SELLER_CENTER_SCREEN\",\"commandId\":\"wire-report\"}")).isEqualTo(200);
+
+        assertThat(pull.pullFor(org).stores().get(0).taskChanges()).isGreaterThanOrEqualTo(3);
+        assertThat(replyTasks.openOn(org, answer.getId())).isFalse();
+        assertThat(outcomeRows.findAllByOrgIdAndReviewIdOrderByCreatedAtDesc(org, answer.getId())).singleElement()
+                .satisfies(recorded -> {
+                    assertThat(recorded.getOperatorOutcome())
+                            .isEqualTo(com.sellerops.attention.reply.OperatorOutcome.OPERATOR_REPORTED_SUBMITTED);
+                    assertThat(recorded.getVerification().name()).isEqualTo("UNVERIFIED");
+                    assertThat(recorded.getRecordedFingerprint()).isEqualTo(fingerprint);
+                });
+
+        // The seller's own 'no reply' on another review reaches the server once.
+        Review quiet = stored.stream().filter(r -> !r.getId().equals(answer.getId())).findFirst().orElseThrow();
+        triage.decide(org, quiet.getId(), "NO_ACTION", "wire-quiet", seller);
+        assertThat(pull.pullFor(org).stores().get(0).noReplyReported()).isEqualTo(1);
+        assertThat(pull.pullFor(org).stores().get(0).noReplyReported()).isZero();
+    }
+
+    private static final java.net.http.HttpClient HTTP = java.net.http.HttpClient.newHttpClient();
+
+    private static int call(String method, String path, String bearer, String body) {
+        try {
+            return HTTP.send(java.net.http.HttpRequest.newBuilder(URI.create(System.getenv("VENDOR_E2E_URL") + path))
+                    .header("Authorization", "Bearer " + bearer).header("Content-Type", "application/json")
+                    .method(method, java.net.http.HttpRequest.BodyPublishers.ofString(body)).build(),
+                    java.net.http.HttpResponse.BodyHandlers.discarding()).statusCode();
+        } catch (Exception e) {
+            throw new IllegalStateException(e.getClass().getSimpleName());
+        }
+    }
+
+    private static String get(String path, String bearer) {
+        try {
+            return HTTP.send(java.net.http.HttpRequest.newBuilder(URI.create(System.getenv("VENDOR_E2E_URL") + path))
+                    .header("Authorization", "Bearer " + bearer).GET().build(),
+                    java.net.http.HttpResponse.BodyHandlers.ofString()).body();
+        } catch (Exception e) {
+            throw new IllegalStateException(e.getClass().getSimpleName());
+        }
+    }
+
+    private static com.fasterxml.jackson.databind.JsonNode json(String body) {
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().readTree(body);
+        } catch (Exception e) {
+            throw new IllegalStateException(e.getClass().getSimpleName());
+        }
     }
 
     /** The real client for every relay call; the grant answers with the token issued outside the test. */
@@ -148,6 +232,22 @@ class VendorRelayWireIT {
         @Override
         public void ackReviews(String installToken, UUID storeId, long cursor) {
             real.ackReviews(installToken, storeId, cursor);
+        }
+
+        @Override
+        public TaskSnapshot submitDraft(String installToken, UUID storeId, UUID reviewId, String body,
+                                        DraftMeta meta) {
+            return real.submitDraft(installToken, storeId, reviewId, body, meta);
+        }
+
+        @Override
+        public TaskChanges taskChanges(String installToken, UUID storeId, long cursor, int limit) {
+            return real.taskChanges(installToken, storeId, cursor, limit);
+        }
+
+        @Override
+        public void markNoReplyNeeded(String installToken, UUID storeId, UUID reviewId, String commandId) {
+            real.markNoReplyNeeded(installToken, storeId, reviewId, commandId);
         }
     }
 }

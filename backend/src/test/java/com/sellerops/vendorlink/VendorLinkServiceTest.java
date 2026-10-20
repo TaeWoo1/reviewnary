@@ -270,6 +270,22 @@ class VendorLinkServiceTest {
         public void ackReviews(String installToken, UUID storeId, long cursor) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public TaskSnapshot submitDraft(String installToken, UUID storeId, UUID reviewId, String body,
+                                        DraftMeta meta) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public TaskChanges taskChanges(String installToken, UUID storeId, long cursor, int limit) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void markNoReplyNeeded(String installToken, UUID storeId, UUID reviewId, String commandId) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static final class MovableClock extends Clock {

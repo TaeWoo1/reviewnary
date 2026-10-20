@@ -157,6 +157,88 @@ public class JdkVendorServerClient implements VendorServerClient {
         }
     }
 
+    @Override
+    public TaskSnapshot submitDraft(String installToken, UUID storeId, UUID reviewId, String body, DraftMeta meta) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("reviewBodyFingerprint", meta.reviewBodyFingerprint());
+        m.put("generatedAt", meta.generatedAt().toString());
+        m.put("knowledgeFp", meta.knowledgeFp());
+        m.put("policyFp", meta.policyFp());
+        m.put("voiceFp", meta.voiceFp());
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("reviewId", reviewId.toString());
+        request.put("body", body);
+        request.put("meta", m);
+        Answer a = taskCall(jsonPost("v1/stores/" + storeId + "/tasks", installToken, request));
+        return task(a.json());
+    }
+
+    @Override
+    public TaskChanges taskChanges(String installToken, UUID storeId, long cursor, int limit) {
+        Answer a = relay(HttpRequest.newBuilder(base.resolve("v1/stores/" + storeId + "/tasks/changes?cursor="
+                        + cursor + "&limit=" + limit)).timeout(REQUEST_TIMEOUT)
+                .header("Authorization", "Bearer " + installToken).header("Accept", "application/json")
+                .GET().build());
+        JsonNode changes = a.json().path("changes");
+        if (!changes.isArray() || !a.json().path("cursor").canConvertToLong()) {
+            throw new Unreachable();
+        }
+        List<TaskChange> out = new ArrayList<>();
+        for (JsonNode c : changes) {
+            if (!c.path("seq").canConvertToLong()) {
+                throw new Unreachable();
+            }
+            out.add(new TaskChange(c.path("seq").asLong(), text(c, "state"), task(c.path("task"))));
+        }
+        return new TaskChanges(out, a.json().path("cursor").asLong(), a.json().path("more").asBoolean(false));
+    }
+
+    @Override
+    public void markNoReplyNeeded(String installToken, UUID storeId, UUID reviewId, String commandId) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("noReplyNeeded", true);
+        request.put("commandId", commandId);
+        relay(jsonPost("v1/stores/" + storeId + "/reviews/" + reviewId + "/disposition", installToken, request));
+    }
+
+    private HttpRequest jsonPost(String path, String installToken, Map<String, Object> body) {
+        try {
+            return HttpRequest.newBuilder(base.resolve(path)).timeout(REQUEST_TIMEOUT)
+                    .header("Authorization", "Bearer " + installToken).header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body), StandardCharsets.UTF_8))
+                    .build();
+        } catch (IOException e) {
+            throw new Unreachable();
+        }
+    }
+
+    /** A task call: 400 and 409 carry the server's closed error code; the rest as {@link #relay}. */
+    private Answer taskCall(HttpRequest request) {
+        Answer a = send(request);
+        if (a.status() == 400 || a.status() == 409) {
+            String code = a.json().path("error").asText("");
+            throw new TaskRefused(code.matches("[a-z_]{1,40}") ? code : "refused");
+        }
+        if (a.status() == 401 || a.status() == 403 || a.status() == 404) {
+            throw new Refused();
+        }
+        if (a.status() / 100 != 2) {
+            throw new Unreachable();
+        }
+        return a;
+    }
+
+    private static TaskSnapshot task(JsonNode t) {
+        if (!t.path("stateVersion").canConvertToInt() || !t.path("draftVersion").canConvertToInt()
+                || !t.path("draftBody").isTextual() || !t.path("editedOnMobile").isBoolean()) {
+            throw new Unreachable();
+        }
+        return new TaskSnapshot(uuid(t, "id"), uuid(t, "reviewId"), text(t, "state"), t.path("stateVersion").asInt(),
+                t.path("draftVersion").asInt(), t.path("draftBody").asText(), text(t, "draftFingerprint"),
+                optionalText(t, "approvedFingerprint"), t.path("editedOnMobile").asBoolean());
+    }
+
     /** A relay call: 2xx is the answer, a refused token or store is {@link Refused}, anything else unreachable. */
     private Answer relay(HttpRequest request) {
         Answer a = send(request);

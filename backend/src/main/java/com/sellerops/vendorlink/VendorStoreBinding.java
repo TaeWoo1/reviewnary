@@ -37,6 +37,10 @@ public class VendorStoreBinding extends BaseEntity {
     @Column(name = "review_cursor", nullable = false)
     private long reviewCursor;
 
+    /** The last reply-task change seq this PC applied (V137). */
+    @Column(name = "task_cursor", nullable = false)
+    private long taskCursor;
+
     @Column(name = "last_pulled_at")
     private Instant lastPulledAt;
 }

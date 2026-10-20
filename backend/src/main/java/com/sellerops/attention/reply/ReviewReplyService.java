@@ -164,6 +164,25 @@ public class ReviewReplyService {
      */
     private com.sellerops.review.memory.ReviewAnswerMemoryHook answerMemory;
 
+    /** The vendor's delegate lane, or null in a context that has none ({@link DelegatedReplyLane}). */
+    private DelegatedReplyLane delegated;
+
+    @Autowired(required = false)
+    public void setDelegatedReplyLane(DelegatedReplyLane delegated) {
+        this.delegated = delegated;
+    }
+
+    private boolean delegatedOpen(UUID orgId, UUID reviewId) {
+        return delegated != null && delegated.openOn(orgId, reviewId);
+    }
+
+    /** Approving here or starting a guided run while a delegate holds the reply would be a second public reply. */
+    private void requireNotDelegated(UUID orgId, UUID reviewId) {
+        if (delegatedOpen(orgId, reviewId)) {
+            throw ApiException.conflict("휴대폰 승인 · 대행 등록이 진행 중인 리뷰입니다. 여기서 승인하거나 등록하지 않습니다.");
+        }
+    }
+
     /** Everything the preparation surface needs for one review, in one read. */
     public ReviewReplyPrepView view(UUID orgId, UUID accountId, String actionRef) {
         Review review = authorize(orgId, accountId, actionRef);
@@ -277,6 +296,8 @@ public class ReviewReplyService {
             // Same reason, for the same rule: approving is the last step before a reply is meant
             // to be posted, and the channel says one already is.
             requireChannelNotAnswered(review);
+            // …and a delegate already holds this reply for the seller's phone approval.
+            requireNotDelegated(orgId, reviewId);
             // Approve the version you actually saw. If the head moved on, binding to the newer
             // text would approve words the operator never read.
             //
@@ -356,6 +377,7 @@ public class ReviewReplyService {
         if (!guidedLane(review.getChannelId())) {
             throw ApiException.conflict("이 채널은 판매자센터에서 직접 답변하는 방식이 아닙니다. 승인한 답변을 복사해 사용하세요.");
         }
+        requireNotDelegated(orgId, reviewId);
         ReviewReplyApproval approval = approvals.current(orgId, reviewId)
                 .filter(a -> a.getState() == ReviewReplyApprovalState.APPROVED)
                 .orElseThrow(() -> ApiException.conflict("승인된 답변이 없습니다. 먼저 답변을 승인하세요."));
@@ -668,15 +690,17 @@ public class ReviewReplyService {
         boolean sourceExecutable = identity.forReview(review) == ExecutableIdentity.MARKETPLACE;
         // …and only for a channel whose approved reply actually travels through the seller center.
         boolean guidedLane = guidedLane(review.getChannelId());
+        // A delegate holds this reply (vendor lane): the flags say what the guards above enforce.
+        boolean delegatedNow = delegatedOpen(orgId, review.getId());
         ReviewReplyCapabilities capabilities = new ReviewReplyCapabilities(
                 responseNeeded && !approved && !channelAnswered,
-                responseNeeded && !approved && !channelAnswered && head != null,
+                responseNeeded && !approved && !channelAnswered && head != null && !delegatedNow,
                 approved,
                 responseNeeded && approved,
                 // canStartSubmissionRun — the same rule as canCopy (a guided post is the copy step
                 // performed in the seller center); it never authorizes a send. Plus: never for a
                 // review the channel already reports as answered, and never for one no run can find.
-                responseNeeded && approved && !channelAnswered && sourceExecutable && guidedLane);
+                responseNeeded && approved && !channelAnswered && !delegatedNow && sourceExecutable && guidedLane);
         // Said only when the seller is otherwise ready to send — that is when the missing control is a
         // question. `null` while there is nothing approved yet: the panel is already showing them the
         // approve step, and answering an unasked question is how a screen gets noisy.
