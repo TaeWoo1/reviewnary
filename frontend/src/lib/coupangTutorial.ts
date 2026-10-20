@@ -200,7 +200,8 @@ export function resolvePhase(input: CoupangResolveInput): ResolvedPhase {
  *
  * The local agent appends `?issuance=resume` when its WING panel hands focus back — see
  * `SELLEROPS_ISSUANCE_RESUME_QUERY` in `collector/src/cli/sellerops-return-url.ts`, which a cross-stack test
- * pins against this reader.
+ * pins against this reader. The NAVER walk's return carries the same marker and `NaverIssuanceGuidedWalkthrough`
+ * reads it here too (2026-10-20) — one marker, one reader.
  *
  * It exists because nothing else on this page can know. The landing phase is derived from PERSISTED state, and
  * a seller in the middle of issuance has persisted nothing yet; the walkthrough component's own "started" flag

@@ -97,3 +97,38 @@ describe("NAVER issuance step copy — the FE and the API-centre panel say the S
     expect(Object.keys(KEY_FOR_TARGET).sort()).toEqual(Object.keys(NAVER_STEP_DETAIL).sort());
   });
 });
+
+/**
+ * **The NAVER walk's return marker survives the trip to the frontend** (2026-10-20, run 10).
+ *
+ * The return opens `/connect/naver` in a fresh tab. Run 10 landed on the walk's start gate after a finished walk —
+ * Coupang's D2, on the NAVER screen — because that screen had no reader and the URL carried no marker. Both halves
+ * now exist, in two packages, and a disagreement between them is silent: the tab opens and shows the gate again.
+ * The collector's real screening is executed; the FE files are PARSED.
+ */
+describe("the NAVER walk's return marker survives the trip to the frontend", () => {
+  const FE_TUTORIAL = resolve(HERE, "../../../frontend/src/lib/coupangTutorial.ts");
+  const FE_WALK = resolve(HERE, "../../../frontend/src/components/guidedConnection/NaverIssuanceGuidedWalkthrough.tsx");
+
+  it("both NAVER returns — the product's and a local proof's — carry exactly the pair the FE reader tests for", async () => {
+    const { screenSellerOpsReturnUrl, SELLEROPS_ISSUANCE_RESUME_QUERY } = await import("../../src/cli/sellerops-return-url");
+    const [key, value] = SELLEROPS_ISSUANCE_RESUME_QUERY.split("=");
+    for (const run of [undefined, "wt-0123456789ab"]) {
+      const screened = screenSellerOpsReturnUrl("http://localhost:5173", "naver", run);
+      expect(screened.ok, String(run)).toBe(true);
+      const url = new URL((screened as { url: string }).url);
+      expect(url.pathname).toBe("/connect/naver");
+      expect(url.searchParams.get(key!), String(run)).toBe(value);
+    }
+    const fe = readFileSync(FE_TUTORIAL, "utf8");
+    const reader = fe.slice(fe.indexOf("export function isIssuanceResumeReturn"));
+    expect(reader).toContain(`get("${key}") === "${value}"`);
+  });
+
+  it("the NAVER walk reads the marker into its start gate — an unused import would pass the URL check alone", () => {
+    const walk = readFileSync(FE_WALK, "utf8");
+    expect(walk).toContain('import { isIssuanceResumeReturn } from "../../lib/coupangTutorial";');
+    expect(walk).toContain("isIssuanceResumeReturn(typeof window === \"undefined\" ? \"\" : window.location.search)");
+    expect(walk).toContain("useState(controlled || resumed)");
+  });
+});

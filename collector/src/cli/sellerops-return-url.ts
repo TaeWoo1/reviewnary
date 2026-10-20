@@ -18,8 +18,10 @@ export const SELLEROPS_COUPANG_CONNECT_PATH = "/connect/coupang";
  * The route the NAVER walk returns to: the NAVER connect screen, where the seller types the two values in.
  *
  * Until 2026-10-17 there was one route for both walks, so the NAVER walk's last step opened the COUPANG connect
- * screen — found when the 4차 Phase B harness was first given the product's return. It carries no resume marker:
- * the NAVER screen has no reader for one, and a marker nothing reads would be a promise nobody keeps.
+ * screen — found when the 4차 Phase B harness was first given the product's return. It carries the same resume
+ * marker as the Coupang route ({@link SELLEROPS_ISSUANCE_RESUME_QUERY}) since 2026-10-20: run 10's return opened a
+ * fresh tab that showed the walk's start gate to an operator who had just finished it — D2 again, on the NAVER
+ * screen, which until then had no reader for the marker.
  */
 export const SELLEROPS_NAVER_CONNECT_PATH = "/connect/naver";
 
@@ -41,7 +43,8 @@ export type SellerOpsReturnChannel = "coupang" | "naver";
  * permission to skip the start gate. A forged value can therefore do nothing a seller cannot do by pressing
  * the CTA themselves.
  *
- * The frontend's reader (`isIssuanceResumeReturn`) is pinned against this constant by a cross-stack test.
+ * Both walks return with it, and both screens read it with the one frontend reader (`isIssuanceResumeReturn`),
+ * which a cross-stack test pins against this constant.
  */
 export const SELLEROPS_ISSUANCE_RESUME_QUERY = "issuance=resume";
 
@@ -116,9 +119,14 @@ export function screenSellerOpsReturnUrl(
   // ORIGIN ONLY. Everything else about the configured value is dropped rather than carried forward — the
   // route and the resume marker are ours, not the operator's.
   if (channel === "naver") {
-    if (walkthroughRunId === undefined) return { ok: true, url: `${parsed.origin}${SELLEROPS_NAVER_CONNECT_PATH}` };
+    if (walkthroughRunId === undefined) {
+      return { ok: true, url: `${parsed.origin}${SELLEROPS_NAVER_CONNECT_PATH}?${SELLEROPS_ISSUANCE_RESUME_QUERY}` };
+    }
     if (!WALKTHROUGH_RUN_ID.test(walkthroughRunId)) return { ok: false, reason: "BAD_WALKTHROUGH_RUN" };
-    return { ok: true, url: `${parsed.origin}${SELLEROPS_NAVER_CONNECT_PATH}?${SELLEROPS_WALKTHROUGH_RUN_QUERY}=${walkthroughRunId}` };
+    return {
+      ok: true,
+      url: `${parsed.origin}${SELLEROPS_NAVER_CONNECT_PATH}?${SELLEROPS_WALKTHROUGH_RUN_QUERY}=${walkthroughRunId}&${SELLEROPS_ISSUANCE_RESUME_QUERY}`,
+    };
   }
   return { ok: true, url: `${parsed.origin}${SELLEROPS_COUPANG_CONNECT_PATH}?${SELLEROPS_ISSUANCE_RESUME_QUERY}` };
 }

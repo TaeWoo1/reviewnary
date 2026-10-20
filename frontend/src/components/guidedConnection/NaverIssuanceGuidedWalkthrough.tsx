@@ -13,6 +13,7 @@ import type { CredentialTemplateView } from "../../lib/types";
 import { useGuidedIssuance } from "../../lib/actionWindow/issuance/useGuidedIssuance";
 import type { GuidedIssuanceRuntime } from "../../lib/actionWindow/issuance/issuanceRuntime";
 import { classifyAgentEnv, type AgentEnvStatus, type GuidedEvent } from "../../lib/guidedConnection";
+import { isIssuanceResumeReturn } from "../../lib/coupangTutorial";
 
 /**
  * The Action Window guided walkthrough for NAVER API-center issuance (`application_issuance_guided`).
@@ -121,7 +122,13 @@ export function NaverIssuanceGuidedWalkthrough({
   // seller starts, so the dedicated NAVER window / agent handshake only begins on an explicit action. Fixture
   // renders (a `run` prop) start immediately — they drive the surfaces directly, not the live start flow.
   const controlled = run !== undefined;
-  const [started, setStarted] = useState(controlled);
+  // …and a RETURN is not an arrival (2026-10-20, run 10). The walk's last step opens `/connect/naver` in a FRESH tab,
+  // where nothing persisted says a walk is in flight (this phase is never restored) and this flag starts false — so
+  // an operator who had just finished was shown this gate. The return carries `?issuance=resume`, the same marker
+  // and the same reader as the Coupang walk: it skips a gate the seller can press themselves and adopts whatever run
+  // the agent is hosting. It authorizes nothing.
+  const resumed = !controlled && isIssuanceResumeReturn(typeof window === "undefined" ? "" : window.location.search);
+  const [started, setStarted] = useState(controlled || resumed);
 
   // The bridge is confined to this component (this phase). Enabled ONLY after the seller starts, and the order
   // connection never mounts it.

@@ -66,7 +66,7 @@ describe("screenSellerOpsReturnUrl — the NAVER walk returns to the NAVER scree
   it("**the NAVER walk's return is the NAVER connect route, never Coupang's**", () => {
     expect(screenSellerOpsReturnUrl("http://localhost:5173/x?y=1", "naver")).toEqual({
       ok: true,
-      url: `http://localhost:5173${SELLEROPS_NAVER_CONNECT_PATH}`,
+      url: `http://localhost:5173${SELLEROPS_NAVER_CONNECT_PATH}?${SELLEROPS_ISSUANCE_RESUME_QUERY}`,
     });
     expect(SELLEROPS_NAVER_CONNECT_PATH).toBe("/connect/naver");
   });
@@ -77,8 +77,10 @@ describe("screenSellerOpsReturnUrl — the NAVER walk returns to the NAVER scree
   });
 
   it("the launcher's re-screen accepts exactly the two screened routes", () => {
-    expect(isSellerOpsReturnUrl("http://localhost:5173/connect/naver")).toBe(true);
+    expect(isSellerOpsReturnUrl(`http://localhost:5173/connect/naver?${SELLEROPS_ISSUANCE_RESUME_QUERY}`)).toBe(true);
     expect(isSellerOpsReturnUrl(`http://localhost:5173/connect/coupang?${SELLEROPS_ISSUANCE_RESUME_QUERY}`)).toBe(true);
+    // The marker-less route is no longer what the screen produces, so the launcher refuses it too.
+    expect(isSellerOpsReturnUrl("http://localhost:5173/connect/naver")).toBe(false);
     expect(isSellerOpsReturnUrl("http://localhost:5173/connect/naver?next=x")).toBe(false);
     expect(isSellerOpsReturnUrl("http://example.com/connect/naver")).toBe(false);
   });
@@ -107,7 +109,7 @@ describe("a NAVER local proof returns to its own bound walk tab (run 9, 2026-10-
   it("**carries the bootstrap run, so the walk frontend opens instead of refusing with MISSING_URL_RUN**", () => {
     expect(screenSellerOpsReturnUrl("http://localhost:5173/x?y=1", "naver", RUN)).toEqual({
       ok: true,
-      url: `http://localhost:5173${SELLEROPS_NAVER_CONNECT_PATH}?${SELLEROPS_WALKTHROUGH_RUN_QUERY}=${RUN}`,
+      url: `http://localhost:5173${SELLEROPS_NAVER_CONNECT_PATH}?${SELLEROPS_WALKTHROUGH_RUN_QUERY}=${RUN}&${SELLEROPS_ISSUANCE_RESUME_QUERY}`,
     });
     expect(SELLEROPS_WALKTHROUGH_RUN_QUERY).toBe("walkthroughRun");
   });
@@ -122,13 +124,15 @@ describe("a NAVER local proof returns to its own bound walk tab (run 9, 2026-10-
     expect(screenSellerOpsReturnUrl("http://localhost:5173", "coupang", RUN)).toEqual(screenSellerOpsReturnUrl("http://localhost:5173"));
     expect(screenSellerOpsReturnUrl("http://localhost:5173", "naver")).toEqual({
       ok: true,
-      url: `http://localhost:5173${SELLEROPS_NAVER_CONNECT_PATH}`,
+      url: `http://localhost:5173${SELLEROPS_NAVER_CONNECT_PATH}?${SELLEROPS_ISSUANCE_RESUME_QUERY}`,
     });
   });
 
   it("the launcher's re-screen accepts the carried run and nothing riding beside it", () => {
-    expect(isSellerOpsReturnUrl(`http://localhost:5173/connect/naver?walkthroughRun=${RUN}`)).toBe(true);
+    expect(isSellerOpsReturnUrl(`http://localhost:5173/connect/naver?walkthroughRun=${RUN}&issuance=resume`)).toBe(true);
+    expect(isSellerOpsReturnUrl(`http://localhost:5173/connect/naver?walkthroughRun=${RUN}`)).toBe(false);
     expect(isSellerOpsReturnUrl(`http://localhost:5173/connect/naver?walkthroughRun=${RUN}&next=x`)).toBe(false);
+    expect(isSellerOpsReturnUrl(`http://localhost:5173/connect/naver?walkthroughRun=${RUN}&issuance=resume&next=x`)).toBe(false);
     expect(isSellerOpsReturnUrl("http://localhost:5173/connect/naver?walkthroughRun=wt-bad")).toBe(false);
     expect(isSellerOpsReturnUrl(`http://localhost:5173/connect/coupang?walkthroughRun=${RUN}`)).toBe(false);
     expect(isSellerOpsReturnUrl(`http://example.com/connect/naver?walkthroughRun=${RUN}`)).toBe(false);

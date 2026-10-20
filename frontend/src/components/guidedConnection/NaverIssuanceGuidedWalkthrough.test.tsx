@@ -273,6 +273,59 @@ describe("NaverIssuanceGuidedWalkthrough", () => {
     });
   });
 
+  /**
+   * **A return is not an arrival** (2026-10-20, run 10). The walk's last step opens `/connect/naver` in a fresh tab;
+   * without the marker that tab showed this gate to an operator who had just finished the walk.
+   */
+  describe("returning from the guided walk is not arriving at it", () => {
+    const GATE = "화면 안내로 진행하기 (도우미 필요)";
+    const setSearch = (search: string) => {
+      window.history.replaceState({}, "", `/connect/naver${search}`);
+    };
+    afterEach(() => setSearch(""));
+
+    it("**skips the start gate, attaches once, and shows the finished walk's hand-off**", () => {
+      setSearch("?issuance=resume");
+      const dispatch = vi.fn();
+      const host = fakeHost(); // bridge defaults to paired in beforeEach
+      render(<NaverIssuanceGuidedWalkthrough dispatch={dispatch} hostRuntime={host.runtime} />);
+      expect(screen.queryByRole("button", { name: GATE })).toBeNull();
+      expect(host.ensureCalls()).toBe(1);
+      // The resync adopts the run the agent already finished — the hand-off, not a new walk.
+      act(() => host.publish(issuanceRun({ status: "COMPLETED", allowedCommands: [], appBranch: "existing" })));
+      expect(screen.getByRole("button", { name: "연결 정보 입력하기" })).toBeInTheDocument();
+      expect(dispatch).toHaveBeenCalledWith({ type: "ISSUANCE_APP_BRANCH_OBSERVED", branch: "existing" });
+      expect(host.ensureCalls()).toBe(1);
+    });
+
+    it("a local proof's return — run id beside the marker — resumes the same way", () => {
+      setSearch("?walkthroughRun=wt-0123456789ab&issuance=resume");
+      const host = fakeHost();
+      render(<NaverIssuanceGuidedWalkthrough dispatch={vi.fn()} hostRuntime={host.runtime} />);
+      expect(screen.queryByRole("button", { name: GATE })).toBeNull();
+      expect(host.ensureCalls()).toBe(1);
+    });
+
+    it("a plain arrival — with or without a bound run — still gets the start gate", () => {
+      for (const search of ["", "?walkthroughRun=wt-0123456789ab"]) {
+        setSearch(search);
+        const host = fakeHost();
+        const { unmount } = render(<NaverIssuanceGuidedWalkthrough dispatch={vi.fn()} hostRuntime={host.runtime} />);
+        expect(screen.getByRole("button", { name: GATE }), search).toBeInTheDocument();
+        expect(host.ensureCalls(), search).toBe(0);
+        unmount();
+      }
+    });
+
+    it("some other query is not the marker", () => {
+      setSearch("?issuance=start&resume=1");
+      const host = fakeHost();
+      render(<NaverIssuanceGuidedWalkthrough dispatch={vi.fn()} hostRuntime={host.runtime} />);
+      expect(screen.getByRole("button", { name: GATE })).toBeInTheDocument();
+      expect(host.ensureCalls()).toBe(0);
+    });
+  });
+
   describe("live host wiring (no run prop → the shared issuance host)", () => {
     // Guided-first: the live host only begins after the seller clicks the start CTA.
     const start = () => act(() => fireEvent.click(screen.getByRole("button", { name: "화면 안내로 진행하기 (도우미 필요)" })));
