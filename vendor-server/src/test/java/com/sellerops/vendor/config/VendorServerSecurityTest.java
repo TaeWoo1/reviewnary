@@ -10,8 +10,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sellerops.vendor.TestTotp;
 import com.sellerops.vendor.account.SellerAccounts;
+import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.install.Installs;
+import com.sellerops.vendor.store.Stores;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +55,10 @@ class VendorServerSecurityTest {
     private SellerAccounts accounts;
     @Autowired
     private Installs installs;
+    @Autowired
+    private Delegates delegates;
+    @Autowired
+    private Stores stores;
 
     private String email;
     private String session;
@@ -217,7 +225,105 @@ class VendorServerSecurityTest {
         approve(same.path("userCode").asText());
     }
 
+    @Test
+    void aDelegateEnrolsOverHttpAndSeesOnlyTheirOwnRoute() throws Exception {
+        Delegate me = enrolDelegate();
+        JsonNode body = body(mvc.perform(get("/v1/delegate/me").with(bearer(me.token()))).andExpect(status().isOk()));
+        assertThat(body.path("email").asText()).isEqualTo(me.email());
+        assertThat(body.path("role").asText()).isEqualTo("DELEGATE");
+        assertThat(body.path("unusedRecoveryCodes").asInt()).isEqualTo(Delegates.RECOVERY_CODES);
+        assertThat(body.path("stores")).isEmpty();
+
+        mvc.perform(get("/v1/delegate/me")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/v1/delegate/me").with(bearer(session))).andExpect(status().isForbidden());
+        mvc.perform(get("/v1/delegate/me").with(bearer(link()))).andExpect(status().isForbidden());
+        // …and a delegate session opens no seller or PC route.
+        mvc.perform(get("/v1/installs").with(bearer(me.token()))).andExpect(status().isForbidden());
+        mvc.perform(get("/v1/stores").with(bearer(me.token()))).andExpect(status().isForbidden());
+        mvc.perform(get("/v1/ip").with(bearer(me.token())).with(remote("203.0.113.7"))).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void aDelegateSeesAStoreOnlyWhileAssignedAndASellerOnlyTheirOwn() throws Exception {
+        Delegate me = enrolDelegate();
+        UUID account = accounts.idOf(email).orElseThrow();
+        UUID store = stores.add(account, Stores.Channel.NAVER, "데모 스토어");
+        UUID elsewhere = stores.add(accounts.redeem(accounts.issueInvite("x-" + email), "another long one"),
+                Stores.Channel.NAVER, "남의 스토어");
+        stores.assign(store, me.id());
+        mvc.perform(get("/v1/delegate/me").with(bearer(me.token()))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.stores.length()").value(1))
+                .andExpect(jsonPath("$.stores[0].id").value(store.toString()))
+                .andExpect(jsonPath("$.stores[0].label").value("데모 스토어"));
+        stores.unassign(store, me.id());
+        mvc.perform(get("/v1/delegate/me").with(bearer(me.token()))).andExpect(jsonPath("$.stores.length()").value(0));
+
+        mvc.perform(get("/v1/stores").with(bearer(session))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(store.toString()))
+                .andExpect(jsonPath("$[0].channel").value("NAVER"));
+        mvc.perform(get("/v1/stores").with(bearer(link()))).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(store.toString()));
+        mvc.perform(get("/v1/stores")).andExpect(status().isUnauthorized());
+        assertThat(elsewhere).isNotEqualTo(store);
+    }
+
+    @Test
+    void aDelegateSignInFailsAloneOnEitherFactorAndASuspendedDelegateIsOutAtTheNextRequest() throws Exception {
+        Delegate me = enrolDelegate();
+        String nextCode = TestTotp.code(me.secret(), Instant.now(), 1);
+        mvc.perform(json(post("/v1/delegate/auth/login"), login(me.email(), "wrong password!!", nextCode)))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.error").value("invalid_login"));
+        mvc.perform(json(post("/v1/delegate/auth/login"), "{\"email\":\"" + me.email()
+                        + "\",\"password\":\"correct horse battery\"}"))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.error").value("invalid_login"));
+        String token = body(mvc.perform(json(post("/v1/delegate/auth/login"),
+                login(me.email(), "correct horse battery", nextCode))).andExpect(status().isOk()))
+                .path("token").asText();
+        // A seller's login is not a delegate's, even with the same password.
+        mvc.perform(json(post("/v1/auth/login"), "{\"email\":\"" + me.email()
+                        + "\",\"password\":\"correct horse battery\"}"))
+                .andExpect(status().isUnauthorized());
+
+        assertThat(delegates.suspend(me.email())).isTrue();
+        mvc.perform(get("/v1/delegate/me").with(bearer(token))).andExpect(status().isUnauthorized());
+        mvc.perform(get("/v1/delegate/me").with(bearer(me.token()))).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void enrolmentErrorsAreFixedCodes() throws Exception {
+        mvc.perform(json(post("/v1/delegate/auth/invites/stage"),
+                        "{\"inviteCode\":\"nope\",\"password\":\"correct horse battery\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("invalid_invite"));
+        String invite = delegates.issueInvite("e-" + email, Delegates.Role.DELEGATE);
+        mvc.perform(json(post("/v1/delegate/auth/invites/confirm"),
+                        "{\"inviteCode\":\"" + invite + "\",\"otp\":\"123456\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("not_staged"));
+    }
+
     // --- helpers ---------------------------------------------------------------------------------------------------
+
+    private record Delegate(UUID id, String email, String secret, String token) {}
+
+    /** A delegate invited, staged and confirmed through the real routes. */
+    private Delegate enrolDelegate() throws Exception {
+        String address = "delegate-" + UUID.randomUUID() + "@example.com";
+        String invite = delegates.issueInvite(address, Delegates.Role.DELEGATE);
+        String secret = body(mvc.perform(json(post("/v1/delegate/auth/invites/stage"),
+                        "{\"inviteCode\":\"" + invite + "\",\"password\":\"correct horse battery\"}"))
+                .andExpect(status().isOk())).path("secret").asText();
+        JsonNode enrolled = body(mvc.perform(json(post("/v1/delegate/auth/invites/confirm"),
+                        "{\"inviteCode\":\"" + invite + "\",\"otp\":\"" + TestTotp.code(secret, Instant.now(), 0)
+                                + "\"}"))
+                .andExpect(status().isCreated()));
+        assertThat(enrolled.path("recoveryCodes")).hasSize(Delegates.RECOVERY_CODES);
+        return new Delegate(delegates.idOf(address).orElseThrow(), address, secret, enrolled.path("token").asText());
+    }
+
+    private static String login(String email, String password, String otp) {
+        return "{\"email\":\"" + email + "\",\"password\":\"" + password + "\",\"otp\":\"" + otp + "\"}";
+    }
+
 
     /** A PC grant approved by this test's seller, redeemed into an install token. */
     private String link() throws Exception {

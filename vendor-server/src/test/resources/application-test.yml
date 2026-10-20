@@ -8,3 +8,6 @@ spring:
 vendor:
   session:
     secret: test-only-session-key-not-for-any-deployment-0123456789
+  totp:
+    # The bytes 00..1f, base64. Test-only.
+    key: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=

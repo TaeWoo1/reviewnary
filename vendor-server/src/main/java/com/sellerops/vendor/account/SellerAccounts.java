@@ -138,6 +138,12 @@ public class SellerAccounts {
                 .query(Integer.class).single() > 0;
     }
 
+    @Transactional(readOnly = true)
+    public Optional<UUID> idOf(String rawEmail) {
+        return jdbc.sql("select id from seller_accounts where email = ?").param(normalizeEmail(rawEmail))
+                .query(UUID.class).optional();
+    }
+
     /** Suspends by e-mail. False when no such account exists. */
     @Transactional
     public boolean suspend(String rawEmail) {

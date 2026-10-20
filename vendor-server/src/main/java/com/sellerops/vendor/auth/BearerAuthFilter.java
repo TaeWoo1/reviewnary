@@ -1,6 +1,7 @@
 package com.sellerops.vendor.auth;
 
 import com.sellerops.vendor.account.SellerAccounts;
+import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.install.InstallTokens;
 import com.sellerops.vendor.install.Installs;
 import jakarta.servlet.FilterChain;
@@ -22,13 +23,16 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *
  * <ol>
  *   <li>A bearer starting with {@link InstallTokens#PREFIX} is an install token, looked up by hash. Anything else
- *       is treated as a seller session JWT. The kind is decided by the prefix, never by trying one and then the
- *       other.</li>
+ *       is treated as a session JWT, whose signed {@code typ} claim says whether it is a seller's or a delegate's.
+ *       The kind is decided by the prefix and that claim, never by trying one and then the other.</li>
  *   <li>A bearer that does not authenticate ends the request with 401 here. It does not fall through to see
  *       whether some other rule admits it — that is how a revoked credential quietly becomes a working one.</li>
- *   <li>The two kinds carry different authorities ({@link Principal#INSTALL}, {@link Principal#SELLER}), and the
- *       route rules in {@code SecurityConfig} name one or the other — an install token never opens a seller
- *       route, and a seller session never opens an install route.</li>
+ *   <li>The kinds carry different authorities ({@link Principal#INSTALL}, {@link Principal#SELLER},
+ *       {@link DelegatePrincipal#DELEGATE}), and the route rules in {@code SecurityConfig} name one of them — an
+ *       install token never opens a seller route, a seller session never opens an install route, and neither ever
+ *       opens a delegate route (nor a delegate session theirs).</li>
+ *   <li>The person behind a session is re-read on every request: a suspended seller or delegate gets 401 at the
+ *       next one.</li>
  * </ol>
  *
  * <p>Not a Spring bean: {@code SecurityConfig} builds it, so it is not also registered as a plain servlet filter.
@@ -41,14 +45,21 @@ public class BearerAuthFilter extends OncePerRequestFilter {
         public static final String INSTALL = "ROLE_INSTALL";
     }
 
+    /** A signed-in delegate (vendor staff). {@code admin} is the role, carried for the routes that will need it. */
+    public record DelegatePrincipal(UUID delegateId, boolean admin) {
+        public static final String DELEGATE = "ROLE_DELEGATE";
+    }
+
     private final Installs installs;
     private final SessionTokens sessions;
     private final SellerAccounts accounts;
+    private final Delegates delegates;
 
-    public BearerAuthFilter(Installs installs, SessionTokens sessions, SellerAccounts accounts) {
+    public BearerAuthFilter(Installs installs, SessionTokens sessions, SellerAccounts accounts, Delegates delegates) {
         this.installs = installs;
         this.sessions = sessions;
         this.accounts = accounts;
+        this.delegates = delegates;
     }
 
     @Override
@@ -63,8 +74,7 @@ public class BearerAuthFilter extends OncePerRequestFilter {
         Optional<UsernamePasswordAuthenticationToken> auth = InstallTokens.looksLikeInstallToken(bearer)
                 ? installs.authenticate(bearer).map(i -> token(new Principal(i.accountId(), i.installId()),
                         Principal.INSTALL))
-                : sessions.verify(bearer).filter(accounts::isActive)
-                        .map(id -> token(new Principal(id, null), Principal.SELLER));
+                : sessions.verifyAny(bearer).flatMap(this::session);
         if (auth.isEmpty()) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
             return;
@@ -73,7 +83,18 @@ public class BearerAuthFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
-    private static UsernamePasswordAuthenticationToken token(Principal principal, String authority) {
+    private Optional<UsernamePasswordAuthenticationToken> session(SessionTokens.Session session) {
+        UUID subject = session.subject();
+        return switch (session.kind()) {
+            case SELLER -> Optional.of(subject).filter(accounts::isActive)
+                    .map(id -> token(new Principal(id, null), Principal.SELLER));
+            case DELEGATE -> delegates.active(subject)
+                    .map(d -> token(new DelegatePrincipal(d.id(), d.role() == Delegates.Role.ADMIN),
+                            DelegatePrincipal.DELEGATE));
+        };
+    }
+
+    private static UsernamePasswordAuthenticationToken token(Object principal, String authority) {
         return new UsernamePasswordAuthenticationToken(principal, null, List.of(new SimpleGrantedAuthority(authority)));
     }
 }

@@ -2,8 +2,10 @@ package com.sellerops.vendor.config;
 
 import com.sellerops.vendor.account.SellerAccounts;
 import com.sellerops.vendor.auth.BearerAuthFilter;
+import com.sellerops.vendor.auth.BearerAuthFilter.DelegatePrincipal;
 import com.sellerops.vendor.auth.BearerAuthFilter.Principal;
 import com.sellerops.vendor.auth.SessionTokens;
+import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.install.Installs;
 import jakarta.servlet.DispatcherType;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -26,10 +28,14 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
  *
  * <ul>
  *   <li>No credential: {@code GET /health}, the approval page ({@code /link}), the seller's invite redemption and
- *       login, and the PC's grant {@code code} / {@code token} calls.</li>
+ *       login, the delegate's invite staging, confirmation and sign-in, and the PC's grant {@code code} /
+ *       {@code token} calls.</li>
  *   <li>Install token only ({@link Principal#INSTALL}): {@code GET /v1/ip}, the PC's own row.</li>
  *   <li>Seller session only ({@link Principal#SELLER}): looking up and approving a PC, listing and revoking the
  *       account's PCs.</li>
+ *   <li>Seller session or install token: the account's stores.</li>
+ *   <li>Delegate session only ({@link DelegatePrincipal#DELEGATE}): everything under {@code /v1/delegate/} that is
+ *       not sign-in.</li>
  *   <li>Everything else: refused — 401 without a credential, 403 with one.</li>
  * </ul>
  *
@@ -44,10 +50,11 @@ public class SecurityConfig {
 
     private static final String INSTALL = Principal.INSTALL.substring("ROLE_".length());
     private static final String SELLER = Principal.SELLER.substring("ROLE_".length());
+    private static final String DELEGATE = DelegatePrincipal.DELEGATE.substring("ROLE_".length());
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http, Installs installs, SessionTokens sessions,
-                                    SellerAccounts accounts) throws Exception {
+                                    SellerAccounts accounts, Delegates delegates) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -63,7 +70,7 @@ public class SecurityConfig {
                                 + "base-uri 'none'; form-action 'none'; object-src 'none'"))
                         .referrerPolicy(r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
                 .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
-                .addFilterBefore(new BearerAuthFilter(installs, sessions, accounts),
+                .addFilterBefore(new BearerAuthFilter(installs, sessions, accounts, delegates),
                         UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(a -> a
                         // Spring's error page renders a status and nothing else (application.yml server.error).
@@ -78,6 +85,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/v1/installs/pending", "/v1/installs/approve").hasRole(SELLER)
                         .requestMatchers(HttpMethod.GET, "/v1/installs").hasRole(SELLER)
                         .requestMatchers(HttpMethod.DELETE, "/v1/installs/*").hasRole(SELLER)
+                        .requestMatchers(HttpMethod.GET, "/v1/stores").hasAnyRole(SELLER, INSTALL)
+                        .requestMatchers(HttpMethod.POST, "/v1/delegate/auth/invites/stage",
+                                "/v1/delegate/auth/invites/confirm", "/v1/delegate/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/delegate/me").hasRole(DELEGATE)
                         .anyRequest().denyAll());
         return http.build();
     }

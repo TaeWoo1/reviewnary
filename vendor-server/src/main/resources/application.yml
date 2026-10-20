@@ -17,6 +17,10 @@ vendor:
   session:
     # HS256 key for seller sessions — at least 32 characters, required; SessionTokens refuses to start without it.
     secret: ${VENDOR_SESSION_SECRET:}
+  totp:
+    # AES-256 key (base64, 32 bytes) that seals delegates' TOTP secrets — required; TotpSecretBox refuses to start
+    # without it. Separate from the session key: one leaking does not give the other.
+    key: ${VENDOR_TOTP_KEY:}
 
 server:
   port: ${VENDOR_SERVER_PORT:8090}

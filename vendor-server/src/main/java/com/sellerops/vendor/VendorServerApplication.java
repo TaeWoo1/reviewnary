@@ -1,7 +1,9 @@
 package com.sellerops.vendor;
 
 import com.sellerops.vendor.account.SellerAccounts;
+import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.ops.OpsCommands;
+import com.sellerops.vendor.store.Stores;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -24,7 +26,8 @@ public class VendorServerApplication {
             int code;
             try (ConfigurableApplicationContext context = new SpringApplicationBuilder(VendorServerApplication.class)
                     .web(WebApplicationType.NONE).run()) {
-                code = OpsCommands.run(context.getBean(SellerAccounts.class), args, System.out);
+                code = OpsCommands.run(new OpsCommands.Services(context.getBean(SellerAccounts.class),
+                        context.getBean(Delegates.class), context.getBean(Stores.class)), args, System.out);
             }
             System.exit(code);
         }
