@@ -1,5 +1,6 @@
 package com.sellerops.vendor.review;
 
+import com.sellerops.vendor.task.ReplyTasks;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -144,6 +145,12 @@ public class StoreReviews {
             if (contentChanged) {
                 event(storeId, before.id(), EventKind.CHANGED, now);
                 changed++;
+            }
+            // §4.2: an unclaimed reply task can no longer be posted as approved once the review's text or display
+            // changed or the channel says it is answered.
+            if (nowReplied || !Objects.equals(before.body(), line.body())
+                    || !Objects.equals(before.displayState(), line.displayState())) {
+                ReplyTasks.invalidateOpen(jdbc, before.id(), now);
             }
             if (nowReplied) {
                 event(storeId, before.id(), EventKind.REPLIED, now);

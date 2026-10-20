@@ -2,6 +2,7 @@ package com.sellerops.vendor.delegate;
 
 import com.sellerops.vendor.Codes;
 import com.sellerops.vendor.account.SellerAccounts;
+import com.sellerops.vendor.task.ReplyTasks;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
@@ -272,6 +273,7 @@ public class Delegates {
         jdbc.sql("update store_assignments set ended_at = ? where delegate_id = ? and ended_at is null")
                 .params(ts(now), id.get())
                 .update();
+        ReplyTasks.unknownForSuspended(jdbc, id.get(), now);
         return true;
     }
 

@@ -265,6 +265,29 @@ AWAITING_APPROVAL ──승인──▶ APPROVED ──착수──▶ CLAIMED �
 
 담당자 화면은 승인된 문장을 복사하는 것까지만 돕는다. 판매자센터에 대신 입력하거나 저장하지 않는다(§17.6).
 
+**구현 (2026-10-20, 서버 쪽).** 위 표대로이고, 정한 점:
+
+- **한 리뷰에 열린 작업은 하나**(`open_review_id` 유일). 두 PC가 동시에 초안을 내면 하나만 열리고 다른 쪽은
+  `409 task_in_progress`. 같은 초안을 다시 내면 버전이 오르지 않는다. 승인 · 착수 이후에는 새 초안을 받지 않는다
+  (`task_in_progress`) — 바꾸려면 판매자가 먼저 취소한다. 이미 `POSTED`인 리뷰(`already_posted`)와 채널이 답글 있음이라
+  말하는 리뷰(`already_replied`)에는 작업을 열지 않는다. 초안의 `reviewBodyFingerprint`가 서버의 현재 본문 지문과
+  다르면 `review_changed`.
+- **승인은 버전 + 지문에 묶인다.** 담당자의 `POSTED` 보고도 승인된 지문과 같아야 한다(`fingerprint_mismatch`) —
+  담당자가 문장을 고쳐 올리는 경로는 없다. 보고 결과는 `POSTED` · `FAILED` · `UNKNOWN`, 방법은
+  `SELLER_CENTER_SCREEN`(판매자센터 화면에서 직접 확인) 하나. `CANCEL_REQUESTED`에서 `FAILED`(올리지 않음)는
+  `CANCELLED`로 끝난다. `UNKNOWN`은 같은 담당자가 나중에 `POSTED` · `FAILED`로 확정할 수 있고, 그 전에는 같은 리뷰에
+  새 작업이 열리지 않는다.
+- **무효화**: 업로드에서 본문 · 전시 상태가 바뀌거나 답글 여부가 N→Y가 되면 `AWAITING_APPROVAL` · `RECHECK_NEEDED` ·
+  `APPROVED` 작업은 `INVALIDATED`. 착수한 작업은 건드리지 않고, 담당자 `preflight`가 `reviewChanged` ·
+  `alreadyReplied`로 알리며 `clearToPost=false`가 된다.
+- **담당자 정지** 시 그 사람이 착수한 작업(`CLAIMED` · `CANCEL_REQUESTED`)은 `UNKNOWN`.
+- 착수하지 않은 담당자에게 남의 스토어 작업은 없는 것과 같은 404, 다른 담당자가 착수한 작업은 403.
+- `RECHECK_NEEDED`는 바로 승인할 수 없다 — PC가 지금의 지문으로 초안을 다시 내야(`AWAITING_APPROVAL`, 새 버전) 승인된다.
+- 서버 검사(`serverChecks`)는 연락처 · 이메일 · 링크 표시뿐이고 승인을 막지 않는다. 답글 지문 · 정규화는 backend
+  `ReviewReplyFingerprint` · `ReviewReplyValidation`을 옮긴 것이고, backend 클래스로 계산한 값으로 테스트를 묶었다.
+  본문 상한 4,000바이트는 backend와 같은 저장 상한이고 네이버의 한도가 아니다.
+- 모든 상태 변경은 `reply_task_changes`에 순서대로 남고 PC가 `tasks/changes?cursor=`로 받는다.
+
 ## 5. Cafe24 토큰 중계
 
 §17.7의 설계를 엔드포인트로 옮긴다. 서버가 쥐는 비밀은 **공급자 앱의 client secret 하나**다.
@@ -374,4 +397,5 @@ EC2 볼륨 · 백업 대상의 저장 암호화도 AWS 콘솔에서 확인한다
 | §7 공인 IP | 2026-10-17. 설치 토큰으로 열림. PC 쪽 연결 서비스와 연결 화면의 「이 PC 연결」 · IP 표시(`ThisPcCallIp`)까지 있음. 운영 이름 `vendor.reviewnary-pilot.duckdns.org`, 서버 배치(§9) 전 |
 | §2 담당자 · 관리자(TOTP · 복구 코드 · 정지) · 스토어 · 배정 | 2026-10-20. 실제 PostgreSQL 15에서 초대 → 등록 → 로그인 → 배정 → 정지까지 HTTP로 확인. 관리 화면은 없음(운영 명령) |
 | §3 리뷰 교환(서버 쪽: 업로드 · 피드 · 확인 · 대응 불필요) | 2026-10-20. 실제 PostgreSQL 15에서 계약 엑셀 업로드 → PC 피드 두 쪽 → 확인 → 판정까지 HTTP로 확인. PC 쪽 반입은 미구현 |
-| §4 상태 머신, §5 Cafe24 중계, §6 정리 작업, §8 라이선스, §9 배치 | 미구현 |
+| §4 리뷰 대행 작업 상태 머신(서버 쪽) | 2026-10-20. 실제 PostgreSQL 15에서 초안 경합(1개만 열림) → 승인 → 동시 착수 4건(1건만 성공) → 사전 확인 → `POSTED` → PC 변경 동기화까지 HTTP로 확인. PC 쪽(초안 생성 · 동기화)과 화면은 미구현 |
+| §5 Cafe24 중계, §6 정리 작업, §8 라이선스, §9 배치 | 미구현 |

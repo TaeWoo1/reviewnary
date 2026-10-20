@@ -34,7 +34,9 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
  *   <li>Seller session only ({@link Principal#SELLER}): looking up and approving a PC, listing and revoking the
  *       account's PCs.</li>
  *   <li>Seller session or install token: the account's stores, and marking a review as needing no reply.</li>
- *   <li>Install token only: pulling a store's review events and confirming what was saved.</li>
+ *   <li>Install token only: pulling a store's review events and confirming what was saved; submitting reply
+ *       drafts, syncing their changes, reporting policy and a knowledge-based recheck.</li>
+ *   <li>Seller session or install token: reading, editing, approving and cancelling reply tasks.</li>
  *   <li>Delegate session only ({@link DelegatePrincipal#DELEGATE}): everything under {@code /v1/delegate/} that is
  *       not sign-in.</li>
  *   <li>Everything else: refused — 401 without a credential, 403 with one.</li>
@@ -95,6 +97,18 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/v1/stores/*/reviews/ack").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.POST, "/v1/stores/*/reviews/*/disposition")
                         .hasAnyRole(SELLER, INSTALL)
+                        // Reply tasks (contract §4.3). The PC's own calls first, then what the seller or the PC may do.
+                        .requestMatchers(HttpMethod.POST, "/v1/stores/*/tasks", "/v1/stores/*/tasks/policy-check",
+                                "/v1/tasks/*/pc-recheck").hasRole(INSTALL)
+                        .requestMatchers(HttpMethod.GET, "/v1/stores/*/tasks/changes").hasRole(INSTALL)
+                        .requestMatchers(HttpMethod.GET, "/v1/stores/*/tasks", "/v1/tasks/*").hasAnyRole(SELLER, INSTALL)
+                        .requestMatchers(HttpMethod.PUT, "/v1/tasks/*/draft").hasAnyRole(SELLER, INSTALL)
+                        .requestMatchers(HttpMethod.POST, "/v1/tasks/*/approve", "/v1/tasks/*/cancel")
+                        .hasAnyRole(SELLER, INSTALL)
+                        .requestMatchers(HttpMethod.GET, "/v1/delegate/tasks", "/v1/delegate/tasks/*/preflight")
+                        .hasRole(DELEGATE)
+                        .requestMatchers(HttpMethod.POST, "/v1/delegate/tasks/*/claim", "/v1/delegate/tasks/*/report",
+                                "/v1/delegate/tasks/*/release").hasRole(DELEGATE)
                         .anyRequest().denyAll());
         return http.build();
     }

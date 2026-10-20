@@ -347,6 +347,69 @@ class VendorServerSecurityTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void theWholeLoopRunsOverHttpWithEachStepOpenToExactlyOneKindOfCaller() throws Exception {
+        Delegate me = enrolDelegate();
+        UUID store = stores.add(accounts.idOf(email).orElseThrow(), Stores.Channel.NAVER, "데모 스토어");
+        stores.assign(store, me.id());
+        mvc.perform(multipart("/v1/delegate/stores/" + store + "/review-uploads").file(new MockMultipartFile("file",
+                "export.xlsx", "application/octet-stream", ExportWorkbooks.fixture())).with(bearer(me.token())))
+                .andExpect(status().isCreated());
+        String pc = link();
+        JsonNode review = body(mvc.perform(get("/v1/stores/" + store + "/reviews").with(bearer(pc))))
+                .path("events").get(0).path("review");
+
+        // 1. The PC drafts. Nobody else may.
+        String draft = "{\"reviewId\":\"" + review.path("id").asText() + "\",\"body\":\"소중한 리뷰 감사합니다.\","
+                + "\"meta\":{\"reviewBodyFingerprint\":\"" + review.path("bodyFingerprint").asText()
+                + "\",\"generatedAt\":\"2026-10-20T00:00:00Z\",\"knowledgeFp\":\"k1\",\"policyFp\":\"p1\","
+                + "\"voiceFp\":\"v1\"}}";
+        String tasksPath = "/v1/stores/" + store + "/tasks";
+        mvc.perform(json(post(tasksPath).with(bearer(session)), draft)).andExpect(status().isForbidden());
+        mvc.perform(json(post(tasksPath).with(bearer(me.token())), draft)).andExpect(status().isForbidden());
+        JsonNode task = body(mvc.perform(json(post(tasksPath).with(bearer(pc)), draft)).andExpect(status().isCreated()));
+        String taskPath = "/v1/tasks/" + task.path("id").asText();
+        assertThat(task.path("state").asText()).isEqualTo("AWAITING_APPROVAL");
+
+        // 2. The seller approves that exact version. A delegate may not.
+        String approve = "{\"version\":1,\"fingerprint\":\"" + task.path("draftFingerprint").asText()
+                + "\",\"commandId\":\"approve-1\"}";
+        mvc.perform(json(post(taskPath + "/approve").with(bearer(me.token())), approve)).andExpect(status().isForbidden());
+        mvc.perform(json(post(taskPath + "/approve").with(bearer(session)), approve)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.state").value("APPROVED"));
+        mvc.perform(json(post(taskPath + "/approve").with(bearer(session)), approve)).andExpect(status().isOk());
+
+        // 3. The delegate claims, looks again, posts by hand and reports. A PC or seller may not.
+        JsonNode listed = body(mvc.perform(get("/v1/delegate/tasks").with(bearer(me.token()))).andExpect(status().isOk()))
+                .get(0);
+        assertThat(listed.path("approvedBody").asText()).isEqualTo("소중한 리뷰 감사합니다.");
+        String claimPath = "/v1/delegate/tasks/" + task.path("id").asText();
+        String claim = "{\"stateVersion\":" + listed.path("stateVersion").asInt() + "}";
+        mvc.perform(json(post(claimPath + "/claim").with(bearer(pc)), claim)).andExpect(status().isForbidden());
+        mvc.perform(json(post(claimPath + "/claim").with(bearer(me.token())), claim)).andExpect(status().isOk());
+        mvc.perform(json(post(claimPath + "/claim").with(bearer(me.token())), claim)).andExpect(status().isConflict());
+        mvc.perform(get(claimPath + "/preflight").with(bearer(me.token()))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.clearToPost").value(true));
+        String report = "{\"outcome\":\"POSTED\",\"postedFingerprint\":\"" + task.path("draftFingerprint").asText()
+                + "\",\"checkedAt\":\"2026-10-20T00:05:00Z\",\"method\":\"SELLER_CENTER_SCREEN\","
+                + "\"commandId\":\"report-1\"}";
+        mvc.perform(json(post(claimPath + "/report").with(bearer(session)), report)).andExpect(status().isForbidden());
+        mvc.perform(json(post(claimPath + "/report").with(bearer(me.token())), report)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.state").value("POSTED"));
+
+        // 4. The PC syncs the end; the seller reads it; another seller sees nothing of it.
+        JsonNode changes = body(mvc.perform(get(tasksPath + "/changes").with(bearer(pc))).andExpect(status().isOk()));
+        assertThat(changes.path("changes").get(changes.path("changes").size() - 1).path("state").asText())
+                .isEqualTo("POSTED");
+        mvc.perform(get(taskPath).with(bearer(session))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.outcome").value("POSTED")).andExpect(jsonPath("$.claimed").value(true));
+        String otherSession = body(mvc.perform(json(post("/v1/auth/invites/redeem"),
+                "{\"inviteCode\":\"" + accounts.issueInvite("z-" + email) + "\",\"password\":\"another long one\"}")))
+                .path("token").asText();
+        mvc.perform(get(taskPath).with(bearer(otherSession))).andExpect(status().isNotFound());
+        mvc.perform(get(tasksPath).with(bearer(otherSession))).andExpect(status().isNotFound());
+    }
+
     // --- helpers ---------------------------------------------------------------------------------------------------
 
     private record Delegate(UUID id, String email, String secret, String token) {}
