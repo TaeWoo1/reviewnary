@@ -12,6 +12,11 @@ spring:
     password: ${VENDOR_DB_PASSWORD}
   flyway:
     enabled: true
+  # A delegate's review export (contract §3.1): 10MB, the same cap as the backend's upload.
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
 
 vendor:
   session:

@@ -3,6 +3,7 @@ package com.sellerops.vendor.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -14,6 +15,7 @@ import com.sellerops.vendor.TestTotp;
 import com.sellerops.vendor.account.SellerAccounts;
 import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.install.Installs;
+import com.sellerops.vendor.review.ExportWorkbooks;
 import com.sellerops.vendor.store.Stores;
 import java.time.Instant;
 import java.util.Base64;
@@ -24,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -299,6 +302,49 @@ class VendorServerSecurityTest {
         mvc.perform(json(post("/v1/delegate/auth/invites/confirm"),
                         "{\"inviteCode\":\"" + invite + "\",\"otp\":\"123456\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("not_staged"));
+    }
+
+    @Test
+    void anAssignedDelegateUploadsAndOnlyThatSellersPcPullsTheResult() throws Exception {
+        Delegate me = enrolDelegate();
+        UUID store = stores.add(accounts.idOf(email).orElseThrow(), Stores.Channel.NAVER, "데모 스토어");
+        String uploadPath = "/v1/delegate/stores/" + store + "/review-uploads";
+        MockMultipartFile file = new MockMultipartFile("file", "export.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ExportWorkbooks.fixture());
+
+        mvc.perform(multipart(uploadPath).file(file).with(bearer(me.token()))).andExpect(status().isNotFound());
+        stores.assign(store, me.id());
+        mvc.perform(multipart(uploadPath).file(file).with(bearer(me.token()))).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.added").value(6)).andExpect(jsonPath("$.attachmentsDropped").value(1));
+        mvc.perform(multipart(uploadPath).file(file).with(bearer(session))).andExpect(status().isForbidden());
+        mvc.perform(multipart(uploadPath).file(file)).andExpect(status().isUnauthorized());
+        mvc.perform(multipart(uploadPath).file(new MockMultipartFile("file", "x.csv", "text/csv",
+                        "a,b\n".getBytes())).with(bearer(me.token())))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("not_xlsx"));
+
+        String pc = link();
+        String feed = "/v1/stores/" + store + "/reviews";
+        JsonNode page = body(mvc.perform(get(feed).with(bearer(pc))).andExpect(status().isOk()));
+        assertThat(page.path("events")).hasSize(6);
+        assertThat(page.path("events").get(0).path("kind").asText()).isEqualTo("NEW");
+        assertThat(page.path("events").get(0).path("review").path("reviewNo").asText()).isEqualTo("1000000001");
+        assertThat(page.toString()).doesNotContain("MUST-NOT-PERSIST");
+        mvc.perform(json(post(feed + "/ack").with(bearer(pc)), "{\"cursor\":" + page.path("cursor").asLong() + "}"))
+                .andExpect(status().isNoContent());
+        String reviewId = page.path("events").get(0).path("review").path("id").asText();
+        mvc.perform(json(post(feed + "/" + reviewId + "/disposition").with(bearer(session)),
+                        "{\"noReplyNeeded\":true,\"commandId\":\"c-1\"}"))
+                .andExpect(status().isNoContent());
+
+        // The seller's session cannot pull (the PC does), a delegate cannot pull, and another seller sees nothing.
+        mvc.perform(get(feed).with(bearer(session))).andExpect(status().isForbidden());
+        mvc.perform(get(feed).with(bearer(me.token()))).andExpect(status().isForbidden());
+        String otherSession = body(mvc.perform(json(post("/v1/auth/invites/redeem"),
+                "{\"inviteCode\":\"" + accounts.issueInvite("y-" + email) + "\",\"password\":\"another long one\"}")))
+                .path("token").asText();
+        mvc.perform(json(post(feed + "/" + reviewId + "/disposition").with(bearer(otherSession)),
+                        "{\"noReplyNeeded\":true,\"commandId\":\"c-2\"}"))
+                .andExpect(status().isNotFound());
     }
 
     // --- helpers ---------------------------------------------------------------------------------------------------

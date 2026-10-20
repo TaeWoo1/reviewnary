@@ -33,7 +33,8 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
  *   <li>Install token only ({@link Principal#INSTALL}): {@code GET /v1/ip}, the PC's own row.</li>
  *   <li>Seller session only ({@link Principal#SELLER}): looking up and approving a PC, listing and revoking the
  *       account's PCs.</li>
- *   <li>Seller session or install token: the account's stores.</li>
+ *   <li>Seller session or install token: the account's stores, and marking a review as needing no reply.</li>
+ *   <li>Install token only: pulling a store's review events and confirming what was saved.</li>
  *   <li>Delegate session only ({@link DelegatePrincipal#DELEGATE}): everything under {@code /v1/delegate/} that is
  *       not sign-in.</li>
  *   <li>Everything else: refused — 401 without a credential, 403 with one.</li>
@@ -89,6 +90,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/v1/delegate/auth/invites/stage",
                                 "/v1/delegate/auth/invites/confirm", "/v1/delegate/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/v1/delegate/me").hasRole(DELEGATE)
+                        .requestMatchers(HttpMethod.POST, "/v1/delegate/stores/*/review-uploads").hasRole(DELEGATE)
+                        .requestMatchers(HttpMethod.GET, "/v1/stores/*/reviews").hasRole(INSTALL)
+                        .requestMatchers(HttpMethod.POST, "/v1/stores/*/reviews/ack").hasRole(INSTALL)
+                        .requestMatchers(HttpMethod.POST, "/v1/stores/*/reviews/*/disposition")
+                        .hasAnyRole(SELLER, INSTALL)
                         .anyRequest().denyAll());
         return http.build();
     }

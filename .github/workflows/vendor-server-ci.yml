@@ -9,11 +9,17 @@ on:
     branches: [main]
     paths:
       - 'vendor-server/**'
+      # The review upload reads the shared export fixture and the body-fingerprint vectors (contract §3.1).
+      - 'contracts/review-export/**'
+      - 'contracts/review-fingerprint/**'
       - '.github/workflows/vendor-server-ci.yml'
   push:
     branches: [main]
     paths:
       - 'vendor-server/**'
+      # The review upload reads the shared export fixture and the body-fingerprint vectors (contract §3.1).
+      - 'contracts/review-export/**'
+      - 'contracts/review-fingerprint/**'
       - '.github/workflows/vendor-server-ci.yml'
 
 concurrency:
