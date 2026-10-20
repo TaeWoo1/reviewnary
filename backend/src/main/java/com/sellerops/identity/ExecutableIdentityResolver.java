@@ -291,7 +291,8 @@ public class ExecutableIdentityResolver {
                     .filter(p -> p.getSellerAccountId() != null)
                     .map(p -> new RunBinding(method, p.getSellerAccountId()));
             // MANUAL_UPLOAD and API: a file is a file, and an API review pull does not exist on any
-            // channel reviewnary serves (Cafe24 goes through the article table above).
+            // channel reviewnary serves (Cafe24 goes through the article table above). VENDOR_RELAY: the
+            // reply goes back through the vendor's delegate, never this PC's own posting path.
             default -> Optional.empty();
         };
     }

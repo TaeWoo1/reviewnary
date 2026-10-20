@@ -223,6 +223,25 @@ public class VendorLinkService {
         return view;
     }
 
+    /**
+     * This PC's install token while it is linked and the token unexpired; empty otherwise (off, unlinked, expired,
+     * or the vault key cannot open it). For the relays in this package — it never leaves the process except as the
+     * bearer of a request to the vendor server.
+     */
+    @Transactional(readOnly = true)
+    synchronized Optional<String> installToken() {
+        if (offReason().isPresent()) {
+            return Optional.empty();
+        }
+        return links.findFirstByOrderByCreatedAtDesc()
+                .filter(l -> l.getTokenExpiresAt().isAfter(clock.instant()))
+                .flatMap(this::openToken);
+    }
+
+    VendorServerClient client() {
+        return client;
+    }
+
     /** A closed platform name — never the host name, which often carries the owner's name. */
     static String deviceName() {
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);

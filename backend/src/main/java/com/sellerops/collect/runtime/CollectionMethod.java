@@ -21,7 +21,16 @@ public enum CollectionMethod {
      * whose only evidence is what the agent returned — a weaker provenance, and the operator surface should
      * not have to infer the difference from a channel name.
      */
-    SELLER_CENTER_READ;
+    SELLER_CENTER_READ,
+    /**
+     * Reviews relayed by the vendor server (contract {@code docs/vendor_server_contract_v1.md} §3.2): a delegate
+     * exported them from Seller Center and uploaded the file there, and this PC pulled the server's feed.
+     *
+     * <p>Not an observation by this PC: the file's age is the delegate's, not this run's, so it is not freshness
+     * (as {@link #MANUAL_UPLOAD}). Nor is it an executable identity — the reply goes back through the delegate,
+     * not through this PC's own posting path, so {@code ExecutableIdentityResolver} binds nothing to it.
+     */
+    VENDOR_RELAY;
 
     /**
      * Did this run OBSERVE the channel at the moment it ran?

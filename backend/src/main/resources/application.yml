@@ -70,6 +70,11 @@ sellerops:
   # only the vendor server's own host (VENDOR) or loopback, whatever this names.
   vendor-link:
     base-url: ${SELLEROPS_VENDOR_LINK_BASE_URL:}
+    # The review relay (§3.2): pull the vendor server's review feed into this PC's review lane. Off by default; the
+    # local-seller profile turns it on. Inert until the PC is linked and its seller has pulled once.
+    review-pull:
+      enabled: ${SELLEROPS_VENDOR_REVIEW_PULL_ENABLED:false}
+      poll-interval-ms: ${SELLEROPS_VENDOR_REVIEW_PULL_INTERVAL_MS:300000}
   # The Local Agent credential handoff — the ONE path that reads a seller's API keys off their marketplace
   # screen and writes them into the vault. Armed separately from the read-only live-call interlock above,
   # with the WHOLE identity the operator's grant was bound to, and spent after one store.

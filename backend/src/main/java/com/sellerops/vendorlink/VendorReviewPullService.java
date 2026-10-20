@@ -1,0 +1,343 @@
+package com.sellerops.vendorlink;
+
+import com.sellerops.channel.Channel;
+import com.sellerops.channel.ChannelRepository;
+import com.sellerops.collect.runtime.CollectionMethod;
+import com.sellerops.ingest.IngestFollowUp;
+import com.sellerops.ingest.IngestOutcome;
+import com.sellerops.ingest.IngestionService;
+import com.sellerops.ingest.canonical.CanonicalReview;
+import com.sellerops.ingest.canonical.ChannelProductRef;
+import com.sellerops.review.Review;
+import com.sellerops.review.ReviewReplyState;
+import com.sellerops.review.ReviewRepository;
+import com.sellerops.sync.SyncJob;
+import com.sellerops.sync.SyncJobRepository;
+import com.sellerops.vendorlink.VendorServerClient.FeedEvent;
+import com.sellerops.vendorlink.VendorServerClient.FeedPage;
+import com.sellerops.vendorlink.VendorServerClient.FeedReview;
+import com.sellerops.vendorlink.VendorServerClient.Store;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+/**
+ * <b>Pulls the vendor server's review feed into this PC's review lane</b> — contract
+ * {@code docs/vendor_server_contract_v1.md} §3.2.
+ *
+ * <ol>
+ *   <li><b>Which stores.</b> A store is pulled into the organisation it is bound to. A binding is made only when a
+ *       seller presses pull on this PC — to that seller's organisation, for a NAVER store not yet bound. The
+ *       scheduled pull follows bindings and never makes one, so nothing here guesses whose reviews these are.</li>
+ *   <li><b>Each event is the review as it is now.</b> A review this PC does not hold is ingested through the
+ *       ordinary lane ({@link IngestionService}, keyed on 리뷰글번호 as every NAVER source is). One it holds is brought
+ *       up to date: text and rating as the server says, the reply flag forward only (the lane never un-answers a
+ *       review). The server's review id, body fingerprint, display state and one attachment go in
+ *       {@link VendorReviewRef} — the lane has no column for them and a reply task needs the first two.</li>
+ *   <li><b>The cursor moves only past what was stored.</b> An event that fails stops the store's pull at the event
+ *       before it; the next pull starts there. Re-applying an event is harmless — it sets the same state again.
+ *       The server is told ({@code ack}) after the cursor is saved, best effort: the ack only starts its retention
+ *       clock (D4), and a lost one is repeated by the next pull.</li>
+ * </ol>
+ *
+ * <p>Deliberately not one transaction, like the Coupang handoff: a failure late in a page must not roll back
+ * reviews already stored, and the cursor is what makes a repeat safe.
+ */
+@Service
+public class VendorReviewPullService {
+
+    private static final Logger log = LoggerFactory.getLogger(VendorReviewPullService.class);
+
+    static final String NAVER = "NAVER";
+    static final int PAGE_SIZE = 200;
+    /** One pull reads at most this many pages per store; the rest waits for the next pull. */
+    static final int MAX_PAGES = 25;
+
+    public enum State { OFF, NOT_LINKED, NOT_AUTHORIZED, UNREACHABLE, PULLED }
+
+    /** What one store's pull did. {@code bound} false: the store belongs to no organisation on this PC yet. */
+    public record StoreResult(UUID storeId, String label, boolean bound, boolean otherOrganisation, int received,
+                              int inserted, int updated, int failed, long cursor, boolean more) {}
+
+    public record PullResult(State state, List<StoreResult> stores) {
+
+        static PullResult of(State state) {
+            return new PullResult(state, List.of());
+        }
+    }
+
+    private final VendorLinkService link;
+    private final VendorStoreBindingRepository bindings;
+    private final VendorReviewRefRepository refs;
+    private final ReviewRepository reviews;
+    private final ChannelRepository channels;
+    private final IngestionService ingestion;
+    private final IngestFollowUp followUp;
+    private final SyncJobRepository syncJobs;
+    private final Clock clock;
+
+    @Autowired
+    public VendorReviewPullService(VendorLinkService link, VendorStoreBindingRepository bindings,
+                                   VendorReviewRefRepository refs, ReviewRepository reviews,
+                                   ChannelRepository channels, IngestionService ingestion, IngestFollowUp followUp,
+                                   SyncJobRepository syncJobs) {
+        this(link, bindings, refs, reviews, channels, ingestion, followUp, syncJobs, Clock.systemUTC());
+    }
+
+    VendorReviewPullService(VendorLinkService link, VendorStoreBindingRepository bindings,
+                            VendorReviewRefRepository refs, ReviewRepository reviews, ChannelRepository channels,
+                            IngestionService ingestion, IngestFollowUp followUp, SyncJobRepository syncJobs,
+                            Clock clock) {
+        this.link = link;
+        this.bindings = bindings;
+        this.refs = refs;
+        this.reviews = reviews;
+        this.channels = channels;
+        this.ingestion = ingestion;
+        this.followUp = followUp;
+        this.syncJobs = syncJobs;
+        this.clock = clock;
+    }
+
+    /** A seller's pull: binds this account's unbound NAVER stores to {@code orgId}, then pulls that org's stores. */
+    public synchronized PullResult pullFor(UUID orgId) {
+        return pull(Objects.requireNonNull(orgId), "MANUAL");
+    }
+
+    /** The scheduled pull: every bound store, binding nothing new. */
+    public synchronized PullResult pullBound() {
+        return pull(null, "SCHEDULED");
+    }
+
+    private PullResult pull(UUID sellerOrg, String trigger) {
+        if (link.client() == null || link.status().state() == VendorLinkService.State.OFF) {
+            return PullResult.of(State.OFF);
+        }
+        Optional<String> token = link.installToken();
+        if (token.isEmpty()) {
+            return PullResult.of(State.NOT_LINKED);
+        }
+        Optional<Channel> naver = channels.findByCode(NAVER);
+        if (naver.isEmpty()) {
+            return PullResult.of(State.PULLED);
+        }
+        VendorServerClient client = link.client();
+        List<Store> stores;
+        try {
+            stores = client.stores(token.get());
+        } catch (VendorServerClient.Refused e) {
+            return PullResult.of(State.NOT_AUTHORIZED);
+        } catch (VendorServerClient.Unreachable e) {
+            return PullResult.of(State.UNREACHABLE);
+        }
+        List<StoreResult> results = new ArrayList<>();
+        for (Store store : stores) {
+            if (!NAVER.equals(store.channel())) {
+                continue;
+            }
+            Optional<VendorStoreBinding> bound = bindings.findByVendorStoreId(store.id());
+            if (bound.isEmpty() && sellerOrg != null) {
+                bound = Optional.of(bind(store, sellerOrg, naver.get().getId()));
+            }
+            if (bound.isEmpty()) {
+                results.add(new StoreResult(store.id(), store.label(), false, false, 0, 0, 0, 0, 0, false));
+                continue;
+            }
+            if (sellerOrg != null && !sellerOrg.equals(bound.get().getOrgId())) {
+                // Bound to another organisation on this PC: its reviews are not this seller's to pull.
+                results.add(new StoreResult(store.id(), store.label(), true, true, 0, 0, 0, 0,
+                        bound.get().getReviewCursor(), false));
+                continue;
+            }
+            try {
+                results.add(pullStore(client, token.get(), bound.get(), store.label(), trigger));
+            } catch (VendorServerClient.Refused e) {
+                return new PullResult(State.NOT_AUTHORIZED, results);
+            } catch (VendorServerClient.Unreachable e) {
+                return new PullResult(State.UNREACHABLE, results);
+            }
+        }
+        return new PullResult(State.PULLED, results);
+    }
+
+    private VendorStoreBinding bind(Store store, UUID orgId, UUID channelId) {
+        VendorStoreBinding binding = new VendorStoreBinding();
+        binding.setVendorStoreId(store.id());
+        binding.setOrgId(orgId);
+        binding.setChannelId(channelId);
+        binding.setStoreLabel(store.label());
+        binding.setReviewCursor(0);
+        return bindings.save(binding);
+    }
+
+    private StoreResult pullStore(VendorServerClient client, String token, VendorStoreBinding binding, String label,
+                                  String trigger) {
+        Instant startedAt = clock.instant();
+        long cursor = binding.getReviewCursor();
+        int received = 0;
+        int failed = 0;
+        boolean more = true;
+        List<UUID> inserted = new ArrayList<>();
+        List<UUID> updated = new ArrayList<>();
+        for (int page = 0; page < MAX_PAGES && more && failed == 0; page++) {
+            FeedPage feed = client.reviewFeed(token, binding.getVendorStoreId(), cursor, PAGE_SIZE);
+            long stored = cursor;
+            for (FeedEvent event : feed.events()) {
+                received++;
+                try {
+                    apply(binding, event.review(), inserted, updated);
+                    stored = event.seq();
+                } catch (RuntimeException e) {
+                    failed++;
+                    log.warn("vendor review relay: event not stored store={} seq={} type={}",
+                            binding.getVendorStoreId(), event.seq(), e.getClass().getSimpleName());
+                    break;
+                }
+            }
+            more = failed == 0 && feed.more();
+            if (stored != cursor) {
+                cursor = stored;
+                binding.setReviewCursor(cursor);
+                binding.setLastPulledAt(clock.instant());
+                bindings.save(binding);
+                try {
+                    client.ackReviews(token, binding.getVendorStoreId(), cursor);
+                } catch (RuntimeException e) {
+                    // Best effort: the next pull acks again from the saved cursor.
+                }
+            }
+        }
+        if (received == 0) {
+            binding.setLastPulledAt(clock.instant());
+            bindings.save(binding);
+        }
+        followUp.afterReviewIngest(binding.getOrgId(), binding.getChannelId(), inserted);
+        if (received > 0) {
+            record(binding, trigger, startedAt, received, inserted, updated.size(), failed);
+        }
+        // Counts and closed words only — the reviews are in hand here, which is why they are not in this line.
+        log.info("vendor review relay: store={} received={} inserted={} updated={} failed={} cursor={} more={}",
+                binding.getVendorStoreId(), received, inserted.size(), updated.size(), failed, cursor, more);
+        return new StoreResult(binding.getVendorStoreId(), label, true, false, received, inserted.size(),
+                updated.size(), failed, cursor, more);
+    }
+
+    /** Brings one review to the state the event carries. Throws when it cannot be stored. */
+    private void apply(VendorStoreBinding binding, FeedReview r, List<UUID> inserted, List<UUID> updated) {
+        Optional<Review> held = reviews.findByOrgIdAndChannelIdAndExternalId(binding.getOrgId(),
+                binding.getChannelId(), r.reviewNo());
+        Optional<VendorReviewRef> known = refs.findByVendorReviewId(r.id());
+        if (known.isPresent() && !held.map(h -> h.getId().equals(known.get().getReviewId())).orElse(false)) {
+            // The server's review arriving under another 리뷰글번호 than the one it is paired with here: never two.
+            throw new IllegalStateException("vendor review bound to another local review");
+        }
+        UUID reviewId;
+        if (held.isEmpty()) {
+            IngestOutcome outcome = ingestion.ingestReviews(binding.getOrgId(), binding.getChannelId(),
+                    List.of(canonical(r)));
+            if (outcome.insertedIds().size() != 1) {
+                throw new IllegalStateException("review not stored");
+            }
+            reviewId = outcome.insertedIds().get(0);
+            inserted.add(reviewId);
+        } else {
+            Review review = held.get();
+            if (refresh(review, r)) {
+                reviews.save(review);
+                updated.add(review.getId());
+            }
+            reviewId = review.getId();
+        }
+        VendorReviewRef ref = known.orElseGet(() -> {
+            VendorReviewRef fresh = new VendorReviewRef();
+            fresh.setVendorReviewId(r.id());
+            fresh.setVendorStoreId(binding.getVendorStoreId());
+            fresh.setReviewId(reviewId);
+            return fresh;
+        });
+        ref.setBodyFingerprint(r.bodyFingerprint());
+        ref.setDisplayState(r.displayState());
+        ref.setAttachmentUrl(r.attachmentUrl());
+        ref.setAttachmentKind(r.attachmentKind());
+        refs.save(ref);
+    }
+
+    /** The server's current text, rating and reply flag onto a held review; true when anything changed. */
+    static boolean refresh(Review review, FeedReview r) {
+        boolean changed = false;
+        if (!Objects.equals(review.getBody(), r.body())) {
+            review.setBody(r.body());
+            changed = true;
+        }
+        if (!Objects.equals(review.getRating(), r.rating())) {
+            review.setRating(r.rating());
+            review.setNegative(r.rating() <= 2);
+            changed = true;
+        }
+        ReviewReplyState stated = r.replied() ? ReviewReplyState.ANSWERED : ReviewReplyState.PENDING;
+        if (ReviewReplyState.isProgress(review.getReplyState(), stated)) {
+            review.setReplyState(stated);
+            changed = true;
+        }
+        if (r.replied() && r.repliedAt() != null && review.getRepliedAt() == null
+                && review.getReplyState() == ReviewReplyState.ANSWERED) {
+            review.setRepliedAt(r.repliedAt());
+            changed = true;
+        }
+        return changed;
+    }
+
+    private static CanonicalReview canonical(FeedReview r) {
+        return new CanonicalReview(
+                r.productName(),
+                null,
+                r.rating(),
+                r.body(),
+                r.writtenAt(),
+                r.reviewNo(),
+                1,
+                r.replied() ? ReviewReplyState.ANSWERED : ReviewReplyState.PENDING,
+                r.replied() ? r.repliedAt() : null,
+                null,
+                0,
+                // The export carries one attachment address, not a count: nobody counted.
+                false,
+                r.body().isBlank(),
+                // Attribute by the channel's own 상품번호, find-only, as every NAVER source does.
+                ChannelProductRef.of(r.productNo()));
+    }
+
+    /** The run's own import record. No data type: a relayed file's age is the delegate's, not freshness. */
+    private void record(VendorStoreBinding binding, String trigger, Instant startedAt, int received,
+                        List<UUID> inserted, int updated, int failed) {
+        try {
+            SyncJob job = new SyncJob();
+            job.setOrgId(binding.getOrgId());
+            job.setChannelId(binding.getChannelId());
+            job.setUploadType("REVIEW");
+            job.setJobType("VENDOR_RELAY_PULL");
+            job.setMethod(CollectionMethod.VENDOR_RELAY.name());
+            job.setTrigger(trigger);
+            job.setStartedAt(startedAt);
+            job.setFinishedAt(clock.instant());
+            job.setTotalRows(received);
+            job.setSuccessRows(inserted.size() + updated);
+            job.setSkippedRows(Math.max(0, received - inserted.size() - updated - failed));
+            job.setFailedRows(failed);
+            job.setStatus(failed == 0 ? "SUCCESS" : "PARTIAL");
+            SyncJob saved = syncJobs.save(job);
+            ingestion.stampAcquisition(binding.getOrgId(), inserted, saved.getId());
+        } catch (RuntimeException e) {
+            log.warn("vendor review relay stored, import history not recorded: type={}",
+                    e.getClass().getSimpleName());
+        }
+    }
+}

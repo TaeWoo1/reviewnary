@@ -254,6 +254,22 @@ class VendorLinkServiceTest {
                 throw new Unreachable();
             }
         }
+
+        // The review relay is VendorReviewPullServiceTest's.
+        @Override
+        public List<Store> stores(String installToken) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public FeedPage reviewFeed(String installToken, UUID storeId, long cursor, int limit) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void ackReviews(String installToken, UUID storeId, long cursor) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static final class MovableClock extends Clock {

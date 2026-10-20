@@ -87,6 +87,63 @@ class JdkVendorServerClientTest {
     }
 
     @Test
+    void theReviewRelayReadsTheServersFeedShapes() {
+        OutboundGate.arm(true);
+        String store = "6f1c2a3b-0000-4000-8000-000000000001";
+        List<String> uris = new ArrayList<>();
+        stub.createContext("/v1/stores", exchange -> {
+            uris.add(exchange.getRequestMethod() + " " + exchange.getRequestURI() + " "
+                    + new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            String path = exchange.getRequestURI().getPath();
+            // The bodies vendor-server's StoreController and StoreReviewController produce (Boot's ISO instants).
+            String body = path.equals("/v1/stores")
+                    ? "[{\"id\":\"" + store + "\",\"channel\":\"NAVER\",\"label\":\"데모 스토어\"}]"
+                    : path.endsWith("/ack") ? ""
+                    : "{\"events\":[{\"seq\":7,\"kind\":\"NEW\",\"review\":{\"id\":\"6f1c2a3b-0000-4000-8000-0000000000aa\","
+                    + "\"reviewNo\":\"1000000001\",\"productNo\":\"SKU-1\",\"productName\":\"합성 상품\",\"kind\":\"일반\","
+                    + "\"rating\":5,\"body\":\"합성 리뷰\",\"bodyFingerprint\":\"" + "a".repeat(64) + "\","
+                    + "\"attachment\":{\"url\":\"https://phinf.pstatic.net/checkout.phinf/x.jpg\",\"kind\":\"PHOTO\"},"
+                    + "\"writtenAt\":\"2026-10-01T01:00:00Z\",\"modifiedAt\":null,\"displayState\":\"노출\","
+                    + "\"replied\":true,\"repliedAt\":\"2026-10-02T02:00:00Z\",\"relatedReviewNo\":null,"
+                    + "\"relatedBody\":null}}],\"cursor\":7,\"more\":true}";
+            byte[] out = body.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(body.isEmpty() ? 204 : 200, out.length == 0 ? -1 : out.length);
+            if (out.length > 0) {
+                exchange.getResponseBody().write(out);
+            }
+            exchange.close();
+        });
+        JdkVendorServerClient client = new JdkVendorServerClient(base);
+
+        assertThat(client.stores("rvi_x")).containsExactly(new VendorServerClient.Store(
+                java.util.UUID.fromString(store), "NAVER", "데모 스토어"));
+        VendorServerClient.FeedPage page = client.reviewFeed("rvi_x", java.util.UUID.fromString(store), 6, 200);
+        assertThat(page.cursor()).isEqualTo(7);
+        assertThat(page.more()).isTrue();
+        assertThat(page.events()).singleElement().satisfies(e -> {
+            assertThat(e.seq()).isEqualTo(7);
+            assertThat(e.kind()).isEqualTo("NEW");
+            assertThat(e.review().reviewNo()).isEqualTo("1000000001");
+            assertThat(e.review().attachmentKind()).isEqualTo("PHOTO");
+            assertThat(e.review().replied()).isTrue();
+            assertThat(e.review().repliedAt()).hasToString("2026-10-02T02:00:00Z");
+            assertThat(e.review().displayState()).isEqualTo("노출");
+        });
+        client.ackReviews("rvi_x", java.util.UUID.fromString(store), 7);
+        assertThat(uris).containsExactly("GET /v1/stores ",
+                "GET /v1/stores/" + store + "/reviews?cursor=6&limit=200 ",
+                "POST /v1/stores/" + store + "/reviews/ack {\"cursor\":7}");
+    }
+
+    @Test
+    void aRefusedTokenOrStoreIsRefusedNotUnreachable() {
+        OutboundGate.arm(true);
+        route("/v1/stores", 404, "");
+        JdkVendorServerClient client = new JdkVendorServerClient(base);
+        assertThatThrownBy(() -> client.stores("rvi_x")).isInstanceOf(VendorServerClient.Refused.class);
+    }
+
+    @Test
     void aClosedPortIsUnreachableNotAnAnswer() {
         JdkVendorServerClient client = new JdkVendorServerClient(URI.create("http://127.0.0.1:1"));
         assertThatThrownBy(() -> client.publicIp("rvi_x")).isInstanceOf(VendorServerClient.Unreachable.class);

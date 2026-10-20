@@ -11,7 +11,9 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -95,6 +97,89 @@ public class JdkVendorServerClient implements VendorServerClient {
     public void unlink(String installToken) {
         send(HttpRequest.newBuilder(base.resolve("v1/installs/me")).timeout(REQUEST_TIMEOUT)
                 .header("Authorization", "Bearer " + installToken).DELETE().build());
+    }
+
+    @Override
+    public List<Store> stores(String installToken) {
+        Answer a = relay(HttpRequest.newBuilder(base.resolve("v1/stores")).timeout(REQUEST_TIMEOUT)
+                .header("Authorization", "Bearer " + installToken).header("Accept", "application/json")
+                .GET().build());
+        if (!a.json().isArray()) {
+            throw new Unreachable();
+        }
+        List<Store> stores = new ArrayList<>();
+        for (JsonNode s : a.json()) {
+            stores.add(new Store(uuid(s, "id"), text(s, "channel"), text(s, "label")));
+        }
+        return stores;
+    }
+
+    @Override
+    public FeedPage reviewFeed(String installToken, UUID storeId, long cursor, int limit) {
+        Answer a = relay(HttpRequest.newBuilder(base.resolve("v1/stores/" + storeId + "/reviews?cursor=" + cursor
+                        + "&limit=" + limit)).timeout(REQUEST_TIMEOUT)
+                .header("Authorization", "Bearer " + installToken).header("Accept", "application/json")
+                .GET().build());
+        JsonNode events = a.json().path("events");
+        if (!events.isArray() || !a.json().path("cursor").canConvertToLong()) {
+            throw new Unreachable();
+        }
+        List<FeedEvent> out = new ArrayList<>();
+        for (JsonNode e : events) {
+            JsonNode r = e.path("review");
+            JsonNode attachment = r.path("attachment");
+            boolean hasAttachment = attachment.isObject();
+            if (!e.path("seq").canConvertToLong() || !r.path("rating").canConvertToInt()
+                    || !r.path("body").isTextual() || !r.path("replied").isBoolean()) {
+                throw new Unreachable();
+            }
+            out.add(new FeedEvent(e.path("seq").asLong(), text(e, "kind"), new FeedReview(uuid(r, "id"),
+                    text(r, "reviewNo"), optionalText(r, "productNo"), optionalText(r, "productName"),
+                    r.path("rating").asInt(), r.path("body").asText(), text(r, "bodyFingerprint"),
+                    hasAttachment ? text(attachment, "url") : null, hasAttachment ? text(attachment, "kind") : null,
+                    instant(r, "writtenAt"), optionalText(r, "displayState"), r.path("replied").asBoolean(),
+                    optionalText(r, "repliedAt") == null ? null : instant(r, "repliedAt"))));
+        }
+        return new FeedPage(out, a.json().path("cursor").asLong(), a.json().path("more").asBoolean(false));
+    }
+
+    @Override
+    public void ackReviews(String installToken, UUID storeId, long cursor) {
+        try {
+            relay(HttpRequest.newBuilder(base.resolve("v1/stores/" + storeId + "/reviews/ack"))
+                    .timeout(REQUEST_TIMEOUT).header("Authorization", "Bearer " + installToken)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(Map.of("cursor", cursor)),
+                            StandardCharsets.UTF_8))
+                    .build());
+        } catch (IOException e) {
+            throw new Unreachable();
+        }
+    }
+
+    /** A relay call: 2xx is the answer, a refused token or store is {@link Refused}, anything else unreachable. */
+    private Answer relay(HttpRequest request) {
+        Answer a = send(request);
+        if (a.status() == 401 || a.status() == 403 || a.status() == 404) {
+            throw new Refused();
+        }
+        if (a.status() / 100 != 2) {
+            throw new Unreachable();
+        }
+        return a;
+    }
+
+    private static UUID uuid(JsonNode json, String field) {
+        try {
+            return UUID.fromString(text(json, field));
+        } catch (IllegalArgumentException e) {
+            throw new Unreachable();
+        }
+    }
+
+    private static String optionalText(JsonNode json, String field) {
+        JsonNode v = json.path(field);
+        return v.isTextual() && !v.asText().isBlank() ? v.asText() : null;
     }
 
     private HttpRequest post(String path, Map<String, String> body) {

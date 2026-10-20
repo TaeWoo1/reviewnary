@@ -10,3 +10,6 @@ server:
 sellerops:
   local-seller:
     enabled: true
+  vendor-link:
+    review-pull:
+      enabled: ${SELLEROPS_VENDOR_REVIEW_PULL_ENABLED:true}
