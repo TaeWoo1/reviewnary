@@ -990,6 +990,14 @@
 - **출처** — `backend/src/main/java/com/sellerops/vendorlink/VendorReplyTaskService.java` `holds`,
   `VendorReplyTaskScenarios.aDelegatesPostIsRecordedOnceAsReportedAndUnverifiedWithThePhoneText`, 2026-10-21.
 
+### 링크의 `#` 뒤만 바뀐 이동은 페이지를 다시 읽지 않는다 (2026-10-21)
+
+- **했던 것** — 담당자 초대 수락 화면(`/delegate/join#<코드>`)이 코드를 페이지를 읽을 때 한 번만 읽게 만들었다.
+- **사실** — 이미 `/delegate/join`이 열린 탭에서 링크를 열면 주소의 `#` 뒤만 바뀌는 같은 문서 안 이동이라 스크립트가 다시 돌지 않고,
+  화면은 "초대 링크가 없습니다"에 머문다. 단위 테스트로는 보이지 않고, 실제 브라우저에서 빈 화면 → 링크 순서로 열 때 처음 드러났다.
+- **다음에** — 비밀을 fragment로 받는 화면은 **로드와 `hashchange` 둘 다에서** 읽고, 브라우저 확인에 "같은 탭에서 다시 연다"를 넣는다.
+- **출처** — `vendor-server/src/main/resources/static/delegate/join.js` `start`, 2026-10-21.
+
 ---
 
 ## 어디에 무엇이 있나
