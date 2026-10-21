@@ -978,6 +978,18 @@
 - **출처** — 2026-10-21 오너 리뷰, `vendor-server/src/main/java/com/sellerops/vendor/task/ReplyTasks.java`,
   `V5__reply_task_guards.sql`, `ReplyTasksTest`(`editingADraftOnThePhoneIsNotAPolicyRecheck` · `aClaimedReviewThatIsHiddenIsNotClearToPost`).
 
+### '끝난 작업'을 '답글이 없는 리뷰'로 읽어 PC 승인 길을 다시 열었다 (2026-10-21)
+
+- **했던 것** — PC 쪽 대행 연결(`8e83bdcf`)에서 서버의 종료 상태(`POSTED` · `FAILED` · `CANCELLED` · `INVALIDATED`)를 그대로 써서
+  "열린 작업이 없으면 PC의 승인 · 가이드 등록 길을 연다"고 했다. 테스트도 `POSTED ends it`을 단정했다.
+- **사실** — `POSTED`는 서버 작업의 끝이지 리뷰의 끝이 아니다. 담당자가 등록했다고 보고한 뒤, 다음 엑셀 반입에서 `답글여부=Y`가
+  보이기 전까지 PC의 어느 것도 답글이 나간 줄 모르므로 그 사이 PC에서 승인 · 등록하면 두 번째 답글이 된다. 화면 작업 중 코드를 다시
+  읽다 발견했고, 테스트는 잘못된 단정을 초록으로 지키고 있었다.
+- **다음에** — 다른 시스템의 상태 집합을 내 쪽 규칙의 조건으로 빌려 쓸 때는 **그 상태가 내 쪽 질문("답글이 나갔나")에 같은 답을
+  하는지** 상태마다 따로 적는다. 종료 상태 묶음을 통째로 가져오지 않는다.
+- **출처** — `backend/src/main/java/com/sellerops/vendorlink/VendorReplyTaskService.java` `holds`,
+  `VendorReplyTaskScenarios.aDelegatesPostIsRecordedOnceAsReportedAndUnverifiedWithThePhoneText`, 2026-10-21.
+
 ---
 
 ## 어디에 무엇이 있나
