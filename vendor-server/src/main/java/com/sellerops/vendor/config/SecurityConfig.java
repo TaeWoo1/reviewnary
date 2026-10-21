@@ -27,7 +27,8 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
  * <b>Closed by default; every open route is named here.</b> Contract §2.
  *
  * <ul>
- *   <li>No credential: {@code GET /health}, the approval page ({@code /link}), the seller's invite redemption and
+ *   <li>No credential: {@code GET /health}, the pages ({@code /link}, {@code /replies}, {@code /delegate} and their
+ *       {@code /assets}), the seller's invite redemption and
  *       login, the delegate's invite staging, confirmation and sign-in, and the PC's grant {@code code} /
  *       {@code token} calls.</li>
  *   <li>Install token only ({@link Principal#INSTALL}): {@code GET /v1/ip}, the PC's own row.</li>
@@ -69,7 +70,10 @@ public class SecurityConfig {
                 // code in its URL to another site as a referrer.
                 .headers(h -> h
                         .frameOptions(f -> f.deny())
-                        .contentSecurityPolicy(c -> c.policyDirectives("default-src 'self'; frame-ancestors 'none'; "
+                        // A review's one attachment is shown from where NAVER keeps it (ReviewAttachment.HOST), and
+                        // only from there.
+                        .contentSecurityPolicy(c -> c.policyDirectives("default-src 'self'; "
+                                + "img-src 'self' https://phinf.pstatic.net; frame-ancestors 'none'; "
                                 + "base-uri 'none'; form-action 'none'; object-src 'none'"))
                         .referrerPolicy(r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
                 .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
@@ -84,7 +88,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/v1/ip").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.GET, "/v1/installs/me").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.DELETE, "/v1/installs/me").hasRole(INSTALL)
-                        .requestMatchers(HttpMethod.GET, "/link", "/link/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/link", "/link/*", "/replies", "/replies/*", "/delegate",
+                                "/delegate/*", "/assets/*").permitAll()
                         .requestMatchers(HttpMethod.POST, "/v1/installs/pending", "/v1/installs/approve").hasRole(SELLER)
                         .requestMatchers(HttpMethod.GET, "/v1/installs").hasRole(SELLER)
                         .requestMatchers(HttpMethod.DELETE, "/v1/installs/*").hasRole(SELLER)

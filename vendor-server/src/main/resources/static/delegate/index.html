@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>답글 등록 · reviewnary 담당자</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <script src="/delegate/delegate.js" defer></script>
+</head>
+<body>
+<main class="page wide" aria-label="담당자 답글 등록">
+
+  <section id="view-login" class="page" aria-label="담당자 로그인" hidden>
+    <h1>담당자 로그인</h1>
+    <form id="login-form" class="card" novalidate>
+      <label for="email">이메일</label>
+      <input id="email" type="email" autocomplete="username" required>
+      <label for="password">비밀번호</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <label id="second-label" for="second">인증 앱의 6자리 코드</label>
+      <input id="second" autocomplete="one-time-code" inputmode="numeric" spellcheck="false" required>
+      <button type="button" id="use-recovery" class="btn link">인증 앱을 쓸 수 없으면 복구 코드로 로그인</button>
+      <p id="login-error" class="msg bad-text" role="alert" hidden></p>
+      <button type="submit" class="btn solid big">로그인</button>
+    </form>
+  </section>
+
+  <section id="view-list" aria-label="등록할 답글" hidden>
+    <div class="stack24">
+      <div class="between">
+        <h1>등록할 답글</h1>
+        <span class="row"><span id="who" class="sm muted"></span><button type="button" id="refresh" class="btn text">새로고침</button><button type="button" id="logout" class="btn text">로그아웃</button></span>
+      </div>
+      <p id="list-notice" class="msg" role="status" hidden></p>
+      <div id="mine-section" class="stack" hidden>
+        <h2>내가 맡은 것 <span id="mine-count" class="muted"></span></h2>
+        <div id="mine" class="list"></div>
+      </div>
+      <div class="stack">
+        <h2>승인된 답글 <span id="open-count" class="muted"></span></h2>
+        <div id="open" class="list"></div>
+        <p id="open-empty" class="card muted" hidden>등록을 기다리는 승인된 답글이 없습니다.</p>
+        <p class="xs muted">「맡기」를 먼저 누른 한 사람만 그 답글을 등록합니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-task" aria-label="맡은 답글" hidden>
+    <div class="stack24">
+      <div class="between">
+        <div class="row"><button type="button" id="back" class="btn link">‹ 목록</button><h1 id="task-title"></h1></div>
+        <span class="row"><span id="task-state" class="chip"></span><button type="button" id="release" class="btn text" hidden>반납</button></span>
+      </div>
+      <div class="split">
+        <div class="card stack8">
+          <h2 class="sm muted">판매자센터에서 이 리뷰 찾기</h2>
+          <dl class="facts">
+            <dt>스토어</dt><dd id="fact-store"></dd>
+            <dt>리뷰번호</dt><dd><span id="fact-no" class="num-text"></span> <button type="button" id="copy-no" class="btn link small">복사</button></dd>
+            <dt>상품</dt><dd id="fact-product"></dd>
+            <dt>평점</dt><dd id="fact-rating"></dd>
+          </dl>
+          <p id="fact-body" class="lg draft"></p>
+        </div>
+        <div class="card stack">
+          <div class="step"><span class="num done">1</span><p class="strong">판매자센터에서 리뷰를 찾습니다</p></div>
+
+          <div class="step"><span id="n2" class="num on">2</span><div class="grow stack8">
+            <p class="strong">저장 직전에 확인합니다</p>
+            <div id="pre-result" class="stack8" hidden>
+              <span id="pre-chip" class="chip"></span>
+              <p id="pre-text" class="sm"></p>
+            </div>
+            <button type="button" id="preflight" class="btn solid">지금 확인</button>
+            <p class="xs muted">확인하지 못하면 등록하지 않습니다.</p>
+          </div></div>
+
+          <div id="step3" class="step"><span id="n3" class="num">3</span><div class="grow stack8">
+            <p class="strong">승인된 답글을 붙여넣고 저장합니다</p>
+            <div class="inset"><p id="approved-body" class="draft sm"></p></div>
+            <div class="row"><button type="button" id="copy-reply" class="btn outline" disabled>답글 복사</button><span id="copied" class="xs good-text" role="status"></span></div>
+            <p class="xs muted">문장은 고칠 수 없습니다. 판매자가 승인한 그대로 붙여넣습니다.</p>
+          </div></div>
+
+          <div class="step"><span id="n4" class="num">4</span><div class="grow stack8">
+            <p id="report-title" class="strong">판매자센터 화면에서 저장된 것을 보고 알립니다</p>
+            <div id="report-clear" class="row">
+              <button type="button" id="report-posted" class="btn outline" disabled>등록함</button>
+              <button type="button" id="report-failed" class="btn outline" disabled>등록 못 함</button>
+              <button type="button" id="report-unknown" class="btn text" disabled>잘 모르겠음</button>
+            </div>
+            <div id="report-stop" class="row" hidden>
+              <button type="button" id="stop-failed" class="btn outline">등록하지 않고 끝내기</button>
+              <button type="button" id="stop-posted" class="btn text" hidden>이미 등록했음</button>
+            </div>
+          </div></div>
+          <p id="task-error" class="msg bad-text" role="alert" hidden></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

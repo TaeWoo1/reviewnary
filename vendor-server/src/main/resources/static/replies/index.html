@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>답글 승인 · reviewnary</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <script src="/replies/replies.js" defer></script>
+</head>
+<body>
+<main class="page" aria-label="답글 승인">
+
+  <section id="view-login" aria-label="로그인" hidden>
+    <h1>답글 승인</h1>
+    <form id="login-form" class="card" novalidate>
+      <p>판매자 계정으로 로그인하세요.</p>
+      <label for="email">이메일</label>
+      <input id="email" type="email" autocomplete="username" required>
+      <label for="password">비밀번호</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <p id="login-error" class="msg bad-text" role="alert" hidden></p>
+      <button type="submit" class="btn solid big">로그인</button>
+    </form>
+  </section>
+
+  <section id="view-list" aria-label="승인할 답글" hidden>
+    <div class="bar">
+      <h1>승인할 답글 <span id="awaiting-count" class="muted"></span></h1>
+      <button type="button" id="refresh" class="btn text">새로고침</button>
+    </div>
+    <div class="stack24">
+      <p id="list-notice" class="msg" role="status" hidden></p>
+      <div id="awaiting" class="list"></div>
+      <p id="awaiting-empty" class="card muted" hidden>승인을 기다리는 답글이 없습니다.</p>
+      <div id="moving-section" class="stack" hidden>
+        <h2>진행 중 <span id="moving-count" class="muted"></span></h2>
+        <div id="moving" class="list"></div>
+      </div>
+      <p class="xs muted">PC에서 「휴대폰으로 승인 요청」을 누른 답글만 여기 옵니다.</p>
+      <button type="button" id="logout" class="btn text">로그아웃</button>
+    </div>
+  </section>
+
+  <section id="view-task" aria-label="답글" hidden>
+    <div class="bar">
+      <button type="button" id="back" class="btn link">‹ 목록</button>
+      <span id="task-state" class="chip"></span>
+    </div>
+    <div class="stack">
+      <div class="card stack8">
+        <div class="row"><span id="review-stars" class="stars"></span><span id="review-meta" class="sm muted"></span></div>
+        <p id="review-body" class="lg draft"></p>
+        <div id="review-attachment" class="row" hidden>
+          <img id="review-photo" class="photo" alt="리뷰 첨부 이미지" referrerpolicy="no-referrer">
+          <span id="review-attachment-note" class="xs muted"></span>
+        </div>
+        <p id="review-flag" class="sm warn-text" hidden></p>
+      </div>
+
+      <div id="read-reply" class="card stack8">
+        <div class="between"><h2 class="sm muted">답글</h2><span id="edited" class="chip neutral" hidden>휴대폰에서 고침</span></div>
+        <p id="reply-body" class="draft"></p>
+        <div id="checks" class="inset" hidden><p id="checks-text" class="sm warn-text"></p></div>
+      </div>
+
+      <form id="edit-form" class="card stack8" novalidate hidden>
+        <label for="edit-body">답글 고치기</label>
+        <textarea id="edit-body" rows="7"></textarea>
+        <p class="xs muted">고친 문장은 PC에도 그대로 남습니다.</p>
+      </form>
+
+      <div id="approved-note" class="card stack8" hidden>
+        <p class="strong">승인했습니다</p>
+        <p class="sm">담당자가 판매자센터에 이 문장 그대로 등록합니다. 담당자는 문장을 바꿀 수 없습니다.</p>
+      </div>
+      <p id="state-note" class="sm muted" hidden></p>
+      <p id="task-error" class="msg bad-text" role="alert" hidden></p>
+
+      <button type="button" id="approve" class="btn solid big" hidden>이 답글로 승인</button>
+      <button type="button" id="save-edit" class="btn solid big" hidden>고친 문장 저장</button>
+      <p id="save-note" class="sm muted" hidden>저장한 뒤 다시 한 번 「이 답글로 승인」을 눌러야 승인됩니다.</p>
+      <div id="secondary" class="row">
+        <button type="button" id="edit" class="btn outline grow" hidden>문장 고치기</button>
+        <button type="button" id="cancel-edit" class="btn outline grow" hidden>고치지 않고 돌아가기</button>
+        <button type="button" id="cancel" class="btn text" hidden>요청 취소</button>
+      </div>
+      <div id="confirm-cancel" class="inset stack8" hidden>
+        <p id="confirm-cancel-text" class="sm"></p>
+        <div class="row">
+          <button type="button" id="cancel-yes" class="btn outline">취소하기</button>
+          <button type="button" id="cancel-no" class="btn text">그대로 두기</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

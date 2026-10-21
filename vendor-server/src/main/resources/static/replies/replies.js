@@ -1,0 +1,339 @@
+// The seller's reply approval page — docs/vendor_server_contract_v1.md §4.3, mockup confirmed 2026-10-21.
+// The PC sends a draft here only when the seller presses 「휴대폰으로 승인 요청」 (D7); the seller reads the review,
+// may rewrite the text, and approves exactly that version; a delegate then pastes it into Seller Center by hand.
+//
+// The session token lives in this tab's sessionStorage — a phone browser drops background tabs, and a reload must not
+// cost the seller their place. It is gone when the tab closes. Every value from the server is written with
+// textContent, never as HTML.
+(function () {
+  "use strict";
+
+  var KEY = "reviewnary.replies.session";
+  var AWAITING = ["AWAITING_APPROVAL", "RECHECK_NEEDED"];
+  var MOVING = ["APPROVED", "CLAIMED", "CANCEL_REQUESTED"];
+  var STATE = {
+    AWAITING_APPROVAL: ["승인 기다리는 중", "info"],
+    RECHECK_NEEDED: ["다시 확인 필요", "warn"],
+    APPROVED: ["승인됨", "info"],
+    CLAIMED: ["담당자가 등록하는 중", "info"],
+    CANCEL_REQUESTED: ["취소 요청함", "warn"],
+    POSTED: ["담당자가 등록함 · 확인 전", "neutral"],
+    FAILED: ["담당자가 등록하지 못함", "neutral"],
+    UNKNOWN: ["담당자가 확인 중", "warn"],
+    CANCELLED: ["취소됨", "neutral"],
+    INVALIDATED: ["요청이 끝남", "neutral"]
+  };
+  var CHECKS = {
+    CONTACT_PHONE: "전화번호로 보이는 부분이 있습니다.",
+    CONTACT_EMAIL: "이메일 주소로 보이는 부분이 있습니다.",
+    URL: "링크로 보이는 부분이 있습니다."
+  };
+
+  var session = read();
+  var stores = [];
+  var task = null;
+  var editing = false;
+
+  function $(id) { return document.getElementById(id); }
+
+  function read() { try { return window.sessionStorage.getItem(KEY); } catch (e) { return null; } }
+
+  function keep(token) {
+    session = token;
+    try {
+      if (token) { window.sessionStorage.setItem(KEY, token); } else { window.sessionStorage.removeItem(KEY); }
+    } catch (e) { /* private mode: the session stays in memory only */ }
+  }
+
+  function show(view) {
+    ["login", "list", "task"].forEach(function (v) { $("view-" + v).hidden = v !== view; });
+    window.scrollTo(0, 0);
+  }
+
+  function say(id, text) { var el = $(id); el.textContent = text || ""; el.hidden = !text; }
+
+  function commandId() {
+    if (window.crypto && window.crypto.randomUUID) { return window.crypto.randomUUID(); }
+    var b = new Uint8Array(16);
+    window.crypto.getRandomValues(b);
+    return Array.prototype.map.call(b, function (x) { return (x + 256).toString(16).slice(1); }).join("");
+  }
+
+  function call(method, path, body) {
+    var headers = { "Accept": "application/json" };
+    if (body !== undefined) { headers["Content-Type"] = "application/json"; }
+    if (session) { headers.Authorization = "Bearer " + session; }
+    return fetch(path, {
+      method: method, headers: headers, credentials: "omit",
+      body: body === undefined ? undefined : JSON.stringify(body)
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        var json = null;
+        try { json = t ? JSON.parse(t) : null; } catch (e) { json = null; }
+        if (r.status === 401) { keep(null); show("login"); }
+        return { status: r.status, json: json };
+      });
+    });
+  }
+
+  function stars(n) {
+    var k = Math.max(0, Math.min(5, n | 0));
+    return "★★★★★".slice(0, k) + "☆☆☆☆☆".slice(0, 5 - k);
+  }
+
+  function day(iso) {
+    if (!iso) { return ""; }
+    try {
+      return new Date(iso).toLocaleDateString("ko-KR", { month: "long", day: "numeric", timeZone: "Asia/Seoul" });
+    } catch (e) { return ""; }
+  }
+
+  function chip(el, state) {
+    var s = STATE[state] || [state, "neutral"];
+    el.textContent = s[0];
+    el.className = "chip " + s[1];
+  }
+
+  function storeLabel(id) {
+    for (var i = 0; i < stores.length; i++) { if (stores[i].id === id) { return stores[i].label; } }
+    return "";
+  }
+
+  /* ── list ─────────────────────────────────────────────────────────────────────────────────────────── */
+
+  function loadList(notice) {
+    say("list-notice", notice || "");
+    return call("GET", "/v1/stores").then(function (r) {
+      if (r.status !== 200 || !Array.isArray(r.json)) { if (r.status !== 401) { listFailed(); } return; }
+      stores = r.json;
+      var states = AWAITING.concat(MOVING);
+      var calls = [];
+      stores.forEach(function (s) {
+        states.forEach(function (st) {
+          calls.push(call("GET", "/v1/stores/" + s.id + "/tasks?state=" + st));
+        });
+      });
+      return Promise.all(calls).then(function (answers) {
+        var all = [];
+        for (var i = 0; i < answers.length; i++) {
+          if (answers[i].status !== 200 || !Array.isArray(answers[i].json)) { listFailed(); return; }
+          all = all.concat(answers[i].json);
+        }
+        all.sort(function (a, b) { return String(b.updatedAt).localeCompare(String(a.updatedAt)); });
+        renderList(all.filter(function (t) { return AWAITING.indexOf(t.state) >= 0; }),
+          all.filter(function (t) { return MOVING.indexOf(t.state) >= 0; }));
+        show("list");
+      });
+    }, listFailed);
+  }
+
+  function listFailed() {
+    say("list-notice", "목록을 불러오지 못했습니다. 잠시 후 새로고침하세요.");
+    $("list-notice").className = "msg bad-text";
+    show("list");
+  }
+
+  function row(t) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "item stack8";
+    var head = document.createElement("div");
+    head.className = "between";
+    var left = document.createElement("span");
+    left.className = "row";
+    var st = document.createElement("span");
+    st.className = "stars";
+    st.textContent = stars(t.review ? t.review.rating : 0);
+    var meta = document.createElement("span");
+    meta.className = "sm muted";
+    var label = stores.length > 1 ? storeLabel(t.storeId) + " · " : "";
+    meta.textContent = label + (t.review && t.review.productName ? t.review.productName : "");
+    left.appendChild(st);
+    left.appendChild(meta);
+    var state = document.createElement("span");
+    chip(state, t.state);
+    head.appendChild(left);
+    head.appendChild(state);
+    var body = document.createElement("p");
+    var text = t.review && t.review.body ? t.review.body : "";
+    body.textContent = text.length > 60 ? text.slice(0, 60) + "…" : text;
+    b.appendChild(head);
+    b.appendChild(body);
+    b.addEventListener("click", function () { open(t.id); });
+    return b;
+  }
+
+  function renderList(awaiting, moving) {
+    $("list-notice").className = "msg";
+    $("awaiting-count").textContent = String(awaiting.length);
+    var a = $("awaiting");
+    a.textContent = "";
+    awaiting.forEach(function (t) { a.appendChild(row(t)); });
+    a.hidden = awaiting.length === 0;
+    $("awaiting-empty").hidden = awaiting.length !== 0;
+    var m = $("moving");
+    m.textContent = "";
+    moving.forEach(function (t) { m.appendChild(row(t)); });
+    $("moving-count").textContent = String(moving.length);
+    $("moving-section").hidden = moving.length === 0;
+  }
+
+  /* ── one task ─────────────────────────────────────────────────────────────────────────────────────── */
+
+  function open(id) {
+    say("task-error", "");
+    return call("GET", "/v1/tasks/" + id).then(function (r) {
+      if (r.status === 200 && r.json) { task = r.json; editing = false; renderTask(); show("task"); }
+      else if (r.status !== 401) { loadList("이 답글을 불러오지 못했습니다. 목록을 다시 불러왔습니다."); }
+    }, function () { say("task-error", "서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요."); });
+  }
+
+  function renderTask() {
+    var t = task;
+    var rv = t.review || {};
+    chip($("task-state"), t.state);
+    $("review-stars").textContent = stars(rv.rating);
+    $("review-meta").textContent = [rv.productName || "", day(rv.writtenAt)].filter(Boolean).join(" · ");
+    $("review-body").textContent = rv.body || "";
+    var att = rv.attachment;
+    $("review-attachment").hidden = !att;
+    if (att) {
+      $("review-photo").src = att.url;
+      $("review-attachment-note").textContent = (att.kind === "VIDEO_STILL" ? "영상 첫 장면" : "사진")
+        + " 1장 · 나머지 첨부는 파일로 받을 수 없음";
+    } else {
+      $("review-photo").removeAttribute("src");
+    }
+    var flag = rv.replied ? "이 리뷰에는 이미 답글이 있습니다." : "";
+    say("review-flag", flag);
+
+    var awaiting = t.state === "AWAITING_APPROVAL";
+    var editable = AWAITING.indexOf(t.state) >= 0;
+    var cancellable = ["AWAITING_APPROVAL", "RECHECK_NEEDED", "APPROVED", "CLAIMED"].indexOf(t.state) >= 0;
+
+    $("reply-body").textContent = t.draftBody || "";
+    $("edited").hidden = !t.editedOnMobile;
+    var checks = (t.serverChecks || []).map(function (c) { return CHECKS[c]; }).filter(Boolean);
+    $("checks").hidden = checks.length === 0 || !editable;
+    $("checks-text").textContent = checks.length ? checks.join(" ") + " 확인하고 승인하세요." : "";
+
+    $("read-reply").hidden = editing;
+    $("edit-form").hidden = !editing;
+    $("approved-note").hidden = editing || MOVING.indexOf(t.state) < 0 || t.state === "CANCEL_REQUESTED";
+    $("approve").hidden = editing || !awaiting;
+    $("save-edit").hidden = !editing;
+    $("save-note").hidden = !editing;
+    $("edit").hidden = editing || !editable;
+    $("cancel-edit").hidden = !editing;
+    $("cancel").hidden = editing || !cancellable;
+    $("cancel").textContent = t.state === "APPROVED" ? "승인 취소" : t.state === "CLAIMED" ? "취소 요청" : "요청 취소";
+    $("confirm-cancel").hidden = true;
+
+    var note = "";
+    if (t.state === "RECHECK_NEEDED") {
+      note = "응대 기준이 바뀌어 이 초안은 승인할 수 없습니다. PC에서 초안을 확인하고 다시 보내 주세요.";
+    } else if (t.state === "CLAIMED") {
+      note = "담당자가 등록을 시작했습니다. 취소하면 담당자가 등록 전인지 확인한 뒤 끝납니다.";
+    } else if (t.state === "CANCEL_REQUESTED") {
+      note = "취소를 요청했습니다. 담당자가 등록 전인지 확인한 뒤 끝납니다.";
+    }
+    say("state-note", note);
+  }
+
+  function refused(r, fallback) {
+    var code = r.json && r.json.error;
+    if (code === "stale" || code === "fingerprint_mismatch" || code === "wrong_state") {
+      return open(task.id).then(function () {
+        say("task-error", "그 사이에 답글이 바뀌었습니다. 지금 내용을 다시 보여 드립니다.");
+      });
+    }
+    if (code === "policy_changed") {
+      return open(task.id).then(function () {
+        say("task-error", "응대 기준이 바뀌어 승인할 수 없습니다. PC에서 초안을 다시 보내 주세요.");
+      });
+    }
+    if (code === "invalid_body") { say("task-error", "답글이 비었거나 너무 깁니다."); return; }
+    say("task-error", fallback);
+  }
+
+  function busy(on) {
+    ["approve", "save-edit", "edit", "cancel", "cancel-yes"].forEach(function (id) { $(id).disabled = on; });
+  }
+
+  $("approve").addEventListener("click", function () {
+    say("task-error", "");
+    busy(true);
+    call("POST", "/v1/tasks/" + task.id + "/approve",
+      { version: task.draftVersion, fingerprint: task.draftFingerprint, commandId: commandId() })
+      .then(function (r) {
+        busy(false);
+        if (r.status === 200 && r.json) { task = r.json; renderTask(); window.scrollTo(0, 0); }
+        else if (r.status !== 401) { return refused(r, "승인하지 못했습니다. 잠시 후 다시 시도하세요."); }
+      }, function () { busy(false); say("task-error", "서버에 연결하지 못했습니다. 승인되지 않았습니다."); });
+  });
+
+  $("edit").addEventListener("click", function () {
+    editing = true;
+    $("edit-body").value = task.draftBody || "";
+    say("task-error", "");
+    renderTask();
+    $("edit-body").focus();
+  });
+
+  $("cancel-edit").addEventListener("click", function () { editing = false; say("task-error", ""); renderTask(); });
+
+  $("edit-form").addEventListener("submit", function (e) { e.preventDefault(); });
+
+  $("save-edit").addEventListener("click", function () {
+    var body = $("edit-body").value;
+    if (!body.trim()) { say("task-error", "답글이 비어 있습니다."); return; }
+    say("task-error", "");
+    busy(true);
+    call("PUT", "/v1/tasks/" + task.id + "/draft", { baseVersion: task.draftVersion, body: body })
+      .then(function (r) {
+        busy(false);
+        if (r.status === 200 && r.json) { task = r.json; editing = false; renderTask(); }
+        else if (r.status !== 401) { return refused(r, "저장하지 못했습니다. 잠시 후 다시 시도하세요."); }
+      }, function () { busy(false); say("task-error", "서버에 연결하지 못했습니다. 저장되지 않았습니다."); });
+  });
+
+  $("cancel").addEventListener("click", function () {
+    $("confirm-cancel-text").textContent = task.state === "CLAIMED"
+      ? "담당자에게 등록을 멈춰 달라고 요청할까요?"
+      : task.state === "APPROVED" ? "승인을 취소할까요? 담당자에게 가지 않습니다." : "이 요청을 취소할까요?";
+    $("confirm-cancel").hidden = false;
+    $("cancel-yes").focus();
+  });
+
+  $("cancel-no").addEventListener("click", function () { $("confirm-cancel").hidden = true; });
+
+  $("cancel-yes").addEventListener("click", function () {
+    say("task-error", "");
+    busy(true);
+    call("POST", "/v1/tasks/" + task.id + "/cancel", { commandId: commandId() }).then(function (r) {
+      busy(false);
+      if (r.status === 200 && r.json) {
+        if (r.json.state === "CANCELLED") { loadList("취소했습니다."); } else { task = r.json; renderTask(); }
+      } else if (r.status !== 401) { return refused(r, "취소하지 못했습니다. 잠시 후 다시 시도하세요."); }
+    }, function () { busy(false); say("task-error", "서버에 연결하지 못했습니다. 취소되지 않았습니다."); });
+  });
+
+  $("back").addEventListener("click", function () { loadList(); });
+  $("refresh").addEventListener("click", function () { loadList(); });
+  $("logout").addEventListener("click", function () { keep(null); show("login"); $("email").focus(); });
+
+  $("login-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    say("login-error", "");
+    call("POST", "/v1/auth/login", { email: $("email").value.trim(), password: $("password").value })
+      .then(function (r) {
+        $("password").value = "";
+        if (r.status === 200 && r.json && r.json.token) { keep(r.json.token); loadList(); }
+        else if (r.status === 429) { say("login-error", "로그인 시도가 많았습니다. 15분 뒤 다시 시도하세요."); }
+        else if (r.status === 401 || r.status === 400) { say("login-error", "이메일 또는 비밀번호가 맞지 않습니다."); }
+        else { say("login-error", "서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요."); }
+      }, function () { say("login-error", "서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요."); });
+  });
+
+  if (session) { loadList(); } else { show("login"); $("email").focus(); }
+})();

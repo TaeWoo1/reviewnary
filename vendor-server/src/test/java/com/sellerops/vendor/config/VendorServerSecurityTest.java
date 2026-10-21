@@ -19,6 +19,7 @@ import com.sellerops.vendor.review.ExportWorkbooks;
 import com.sellerops.vendor.store.Stores;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -202,6 +203,63 @@ class VendorServerSecurityTest {
                         .string("Referrer-Policy", "no-referrer"));
         mvc.perform(get("/link/link.js")).andExpect(status().isOk());
         mvc.perform(get("/link/other.html")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void theSellerAndDelegatePagesAreOpenUnframeableAndShowImagesOnlyFromNaver() throws Exception {
+        mvc.perform(get("/replies")).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .forwardedUrl("/replies/index.html"));
+        mvc.perform(get("/delegate")).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .forwardedUrl("/delegate/index.html"));
+        for (String page : List.of("/replies/index.html", "/delegate/index.html")) {
+            mvc.perform(get(page))
+                    .andExpect(status().isOk())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                            .string("Content-Security-Policy", org.hamcrest.Matchers.allOf(
+                                    org.hamcrest.Matchers.containsString("default-src 'self'"),
+                                    org.hamcrest.Matchers.containsString("img-src 'self' https://phinf.pstatic.net;"),
+                                    org.hamcrest.Matchers.containsString("frame-ancestors 'none'"),
+                                    org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("unsafe")))))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                            .string("X-Frame-Options", "DENY"));
+        }
+        for (String asset : List.of("/replies/replies.js", "/delegate/delegate.js", "/assets/app.css")) {
+            mvc.perform(get(asset)).andExpect(status().isOk());
+        }
+        mvc.perform(get("/delegate/other.html")).andExpect(status().isNotFound());
+        mvc.perform(get("/v1/delegate/tasks")).andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * The pages run under {@code default-src 'self'}, so inline code would simply not run — but a page that needed it
+     * would be "fixed" by loosening the policy. And every server value is customer or seller text: it is written as
+     * text, never parsed as HTML.
+     */
+    @Test
+    void thePagesCarryNoInlineCodeAndNeverWriteServerTextAsHtml() throws Exception {
+        java.nio.file.Path root = java.nio.file.Path.of("src/main/resources/static");
+        List<java.nio.file.Path> files;
+        try (var walk = java.nio.file.Files.walk(root)) {
+            files = walk.filter(java.nio.file.Files::isRegularFile).toList();
+        }
+        List<java.nio.file.Path> html = files.stream().filter(f -> f.toString().endsWith(".html")).toList();
+        List<java.nio.file.Path> js = files.stream().filter(f -> f.toString().endsWith(".js")).toList();
+        org.assertj.core.api.Assertions.assertThat(html).hasSizeGreaterThanOrEqualTo(3);
+        org.assertj.core.api.Assertions.assertThat(js).hasSizeGreaterThanOrEqualTo(3);
+        java.util.regex.Pattern inline = java.util.regex.Pattern.compile(
+                "<script(?![^>]*\\ssrc=)[^>]*>|\\sstyle=|\\son[a-z]+=|<style", java.util.regex.Pattern.CASE_INSENSITIVE);
+        for (java.nio.file.Path f : html) {
+            String text = java.nio.file.Files.readString(f);
+            org.assertj.core.api.Assertions.assertThat(inline.matcher(text).find()).as(f.toString()).isFalse();
+        }
+        java.util.regex.Pattern asHtml = java.util.regex.Pattern.compile(
+                "innerHTML|outerHTML|insertAdjacentHTML|document\\.write|\\beval\\(|new Function");
+        for (java.nio.file.Path f : js) {
+            String text = java.nio.file.Files.readString(f);
+            org.assertj.core.api.Assertions.assertThat(asHtml.matcher(text).find()).as(f.toString()).isFalse();
+        }
     }
 
     @Test
