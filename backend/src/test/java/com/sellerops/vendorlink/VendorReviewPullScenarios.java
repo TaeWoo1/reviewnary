@@ -191,6 +191,20 @@ abstract class VendorReviewPullScenarios {
     }
 
     @Test
+    void aLostAckIsRepeatedByTheNextPullEvenWithNothingNew() {
+        vendor.event("NEW", review("v1", "9000000041", "첫 리뷰", 5, false, "노출"));
+        vendor.dropAcks = 1;
+        assertThat(pull.pullFor(org).stores().get(0).cursor()).isEqualTo(1);
+        assertThat(vendor.acks).as("the first ack was lost").isEmpty();
+
+        assertThat(pull.pullBound().stores().get(0).received()).as("nothing new on the server").isZero();
+        assertThat(vendor.acks).as("owed, so asked again").containsExactly(1L);
+
+        pull.pullBound();
+        assertThat(vendor.acks).as("confirmed, so not asked again").containsExactly(1L);
+    }
+
+    @Test
     void anUnlinkedPcOrARefusedTokenPullsNothing() {
         link.unlink();
         assertThat(pull.pullFor(org).state()).isEqualTo(State.NOT_LINKED);

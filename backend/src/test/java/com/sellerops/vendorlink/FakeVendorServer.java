@@ -21,6 +21,8 @@ final class FakeVendorServer implements VendorServerClient {
     final List<FeedEvent> feed = new ArrayList<>();
     final List<Long> cursorsAsked = new ArrayList<>();
     final List<Long> acks = new ArrayList<>();
+    /** This many acks are lost on the way, like a dropped connection. */
+    int dropAcks;
     final List<String> bearers = new ArrayList<>();
     boolean refuse;
 
@@ -102,6 +104,10 @@ final class FakeVendorServer implements VendorServerClient {
     @Override
     public void ackReviews(String installToken, UUID storeId, long cursor) {
         bearers.add(installToken);
+        if (dropAcks > 0) {
+            dropAcks--;
+            throw new Unreachable();
+        }
         acks.add(cursor);
     }
 

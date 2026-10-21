@@ -37,6 +37,10 @@ public class VendorStoreBinding extends BaseEntity {
     @Column(name = "review_cursor", nullable = false)
     private long reviewCursor;
 
+    /** The last feed seq the server confirmed this PC's {@code ack} for (V138). Behind the cursor, the ack is owed. */
+    @Column(name = "acked_cursor", nullable = false)
+    private long ackedCursor;
+
     /** The last reply-task change seq this PC applied (V137). */
     @Column(name = "task_cursor", nullable = false)
     private long taskCursor;

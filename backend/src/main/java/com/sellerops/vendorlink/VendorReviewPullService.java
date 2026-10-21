@@ -45,7 +45,8 @@ import org.springframework.stereotype.Service;
  *   <li><b>The cursor moves only past what was stored.</b> An event that fails stops the store's pull at the event
  *       before it; the next pull starts there. Re-applying an event is harmless — it sets the same state again.
  *       The server is told ({@code ack}) after the cursor is saved, best effort: the ack only starts its retention
- *       clock (D4), and a lost one is repeated by the next pull.</li>
+ *       clock (D4). Which cursor the server confirmed is kept apart ({@code ackedCursor}), so a lost ack is repeated
+ *       by the next pull even when that pull brings nothing new.</li>
  * </ol>
  *
  * <p>Deliberately not one transaction, like the Coupang handoff: a failure late in a page must not roll back
@@ -198,6 +199,7 @@ public class VendorReviewPullService {
         boolean more = true;
         List<UUID> inserted = new ArrayList<>();
         List<UUID> updated = new ArrayList<>();
+        ackSaved(client, token, binding);
         for (int page = 0; page < MAX_PAGES && more && failed == 0; page++) {
             FeedPage feed = client.reviewFeed(token, binding.getVendorStoreId(), cursor, PAGE_SIZE);
             long stored = cursor;
@@ -219,11 +221,7 @@ public class VendorReviewPullService {
                 binding.setReviewCursor(cursor);
                 binding.setLastPulledAt(clock.instant());
                 bindings.save(binding);
-                try {
-                    client.ackReviews(token, binding.getVendorStoreId(), cursor);
-                } catch (RuntimeException e) {
-                    // Best effort: the next pull acks again from the saved cursor.
-                }
+                ackSaved(client, token, binding);
             }
         }
         if (received == 0) {
@@ -242,6 +240,22 @@ public class VendorReviewPullService {
         int noReply = replyTasks == null ? 0 : replyTasks.reportNoReply(binding, token);
         return new StoreResult(binding.getVendorStoreId(), label, true, false, received, inserted.size(),
                 updated.size(), failed, cursor, more, taskChanges, noReply);
+    }
+
+    /** Tells the server how far this PC has stored, when it has not yet confirmed that far. Best effort. */
+    private void ackSaved(VendorServerClient client, String token, VendorStoreBinding binding) {
+        long cursor = binding.getReviewCursor();
+        if (cursor <= binding.getAckedCursor()) {
+            return;
+        }
+        try {
+            client.ackReviews(token, binding.getVendorStoreId(), cursor);
+        } catch (RuntimeException e) {
+            // Owed still: the next pull — new events or none — asks again from the saved cursor.
+            return;
+        }
+        binding.setAckedCursor(cursor);
+        bindings.save(binding);
     }
 
     /** Brings one review to the state the event carries. Throws when it cannot be stored. */
