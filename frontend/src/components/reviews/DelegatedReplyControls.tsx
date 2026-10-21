@@ -84,7 +84,8 @@ export function DelegatedReplyControls({
   const canSend = delegation.canSend && !dirty;
 
   async function press(which: Press) {
-    if (inFlight.current) return;
+    // aria-disabled keeps the button focusable, so the press itself refuses whatever the look says is off.
+    if (inFlight.current || disabled) return;
     if (which === "cancel" ? !delegation.canCancel : !canSend) return;
     inFlight.current = true;
     setBusy(which);

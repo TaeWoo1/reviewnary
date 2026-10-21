@@ -120,6 +120,25 @@ describe("VocItemReplyPrep · delegate lane", () => {
     expect(screen.getAllByText("저장하지 않은 변경이 있습니다. 먼저 초안을 저장하세요.").length).toBeGreaterThan(0);
   });
 
+  it("sends nothing while the panel's own write is in flight, though the buttons stay focusable", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getReviewReplyPrep).mockResolvedValue(
+      prepView({ taskState: "AWAITING_APPROVAL", editedOnMobile: false, canSend: true, canCancel: true }),
+    );
+    vi.mocked(api.decideReviewReplyApproval).mockReturnValue(new Promise(() => {}));
+    mount();
+
+    await user.click(await screen.findByRole("button", { name: "승인" }));
+    const handOver = screen.getByRole("button", { name: "승인하고 담당자에게 맡기기" });
+    await waitFor(() => expect(handOver.getAttribute("aria-disabled")).toBe("true"));
+    await user.click(handOver);
+    await user.click(screen.getByRole("button", { name: "고친 초안 다시 보내기" }));
+    await user.click(screen.getByRole("button", { name: "요청 취소" }));
+    expect(api.handOverReviewReply).not.toHaveBeenCalled();
+    expect(api.requestPhoneApproval).not.toHaveBeenCalled();
+    expect(api.cancelReviewReplyDelegation).not.toHaveBeenCalled();
+  });
+
   it("says a reported post is the delegate's report, not a proven state", async () => {
     vi.mocked(api.getReviewReplyPrep).mockResolvedValue(
       prepView({ taskState: "POSTED", editedOnMobile: true, canSend: false, canCancel: false }, false),
