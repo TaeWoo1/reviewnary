@@ -1342,6 +1342,26 @@ export interface ReviewReplyOutcome {
 //
 // `draft` is null until they save one; `approval` is null until they approve one. Both
 // nulls mean "not yet", never "not allowed" — `capabilities` is where permission lives.
+/** The delegate lane as the server judges it for one review — render from it, never re-derive it. */
+export interface ReviewReplyDelegation {
+  /** The latest task's server state, or null when none was ever opened. */
+  taskState: string | null;
+  editedOnMobile: boolean;
+  /** 「승인하고 담당자에게 맡기기」 · 「휴대폰으로 승인 요청」 may be pressed. */
+  canSend: boolean;
+  /** 「요청 취소」 may be pressed. */
+  canCancel: boolean;
+}
+
+/** What the PC knows of a delegation task after a press. */
+export interface VendorReplyTaskView {
+  reviewId: string;
+  state: string;
+  draftVersion: number;
+  editedOnMobile: boolean;
+  outcomeRecorded: boolean;
+}
+
 export interface ReviewReplyPrep {
   actionRef: string;
   redactedBody: string | null;
@@ -1375,6 +1395,11 @@ export interface ReviewReplyPrep {
    * never prints the token.
    */
   guidedUnavailableReason?: string | null;
+  /**
+   * The vendor delegate lane (docs/vendor_server_contract_v1.md §4): absent or null when this review
+   * did not come from the vendor server or this PC is not linked — the panel then shows nothing of it.
+   */
+  delegation?: ReviewReplyDelegation | null;
   /**
    * What wrote the head draft — `MODEL`, `RULE`, or null for a version written before reviewnary
    * recorded an author (Grounded Review Drafting v1). Null is "not recorded", never "a person typed

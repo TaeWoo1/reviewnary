@@ -57,6 +57,7 @@ import type {
   NaverSetupView,
   VendorLinkStatus,
   VendorPublicIpView,
+  VendorReplyTaskView,
   CoupangSetupView,
   ConnectionStatusView,
   ConnectionTestResultView,
@@ -511,6 +512,21 @@ export const api = {
   },
   async unlinkVendor(): Promise<VendorLinkStatus> {
     const { data } = await http.delete<VendorLinkStatus>("/api/local/vendor-link");
+    return data;
+  },
+  // The delegate lane for one review (§4): each is the seller's own press; nothing here runs on its own.
+  async handOverReviewReply(reviewId: string): Promise<VendorReplyTaskView> {
+    const { data } = await http.post<VendorReplyTaskView>(`/api/local/vendor-link/reviews/${reviewId}/hand-over`);
+    return data;
+  },
+  async requestPhoneApproval(reviewId: string): Promise<VendorReplyTaskView> {
+    const { data } = await http.post<VendorReplyTaskView>(
+      `/api/local/vendor-link/reviews/${reviewId}/approval-request`,
+    );
+    return data;
+  },
+  async cancelReviewReplyDelegation(reviewId: string): Promise<VendorReplyTaskView> {
+    const { data } = await http.post<VendorReplyTaskView>(`/api/local/vendor-link/reviews/${reviewId}/cancel`);
     return data;
   },
   async getVendorPublicIp(): Promise<VendorPublicIpView> {

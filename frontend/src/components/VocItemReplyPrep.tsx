@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { GroundedReviewDraft } from "./GroundedReviewDraft";
+import { DelegatedReplyControls } from "./reviews/DelegatedReplyControls";
 import { Disclosure } from "./ui/Disclosure";
 import { api } from "../lib/apiClient";
 import { copyText } from "../lib/clipboard";
@@ -323,6 +324,14 @@ export function VocItemReplyPrep({
   // of hiding the control with no reason. Copy stays available — the clipboard is the operator's.
   // The one sentence that explains a missing guided step, chosen by the server's own reason.
   const guidedUnavailable = guidedUnavailableSentence(prep.guidedUnavailableReason);
+  // The vendor delegate lane, when this review can use it (§4). Its own press is the panel's primary then — the
+  // delegate posts — so 승인 (the copy road) steps down to an outline, and disappears while the lane holds the
+  // review: the server has already shut that road (`canApprove` false) and a dead 승인 beside the lane's status
+  // would only ask why.
+  const delegation = prep.delegation ?? null;
+  const reviewId = actionRef.startsWith("review:") ? actionRef.slice("review:".length) : null;
+  const laneHolds = delegation != null && !capabilities.canApprove && delegation.taskState != null
+    && !["FAILED", "CANCELLED", "INVALIDATED"].includes(delegation.taskState);
 
   /**
    * Approving binds the last SAVED version — never what is in the box.
@@ -703,7 +712,7 @@ export function VocItemReplyPrep({
             control when the row can NEVER carry the action (no ref); here the truth is
             "not while this review is 지켜보기" — a reason, and one the operator can reverse.
             The explanation is the '대응 필요로 기록된 리뷰만…' line above. */}
-        {capabilities.canApprove || (!approved && draft != null) ? (
+        {(capabilities.canApprove || (!approved && draft != null)) && !laneHolds ? (
           <button
             type="button"
             aria-disabled={!approvable || working || unavailable}
@@ -717,7 +726,9 @@ export function VocItemReplyPrep({
                approval stands, and this button is gone by then. */
             className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
               approvable && !working
-                ? "bg-brand-700 text-white hover:bg-brand-800"
+                ? delegation != null
+                  ? "bg-white text-ink ring-1 ring-line"
+                  : "bg-brand-700 text-white hover:bg-brand-800"
                 : "bg-canvas text-muted opacity-40"
             }`}
           >
@@ -782,6 +793,16 @@ export function VocItemReplyPrep({
           </span>
         ) : null}
       </div>
+
+      {delegation != null && reviewId != null ? (
+        <DelegatedReplyControls
+          delegation={delegation}
+          reviewId={reviewId}
+          dirty={dirty}
+          disabled={working}
+          onChanged={refresh}
+        />
+      ) : null}
 
       {/* <b>사실은 그대로, 무게만 한 단계 아래로</b> (리뷰 canonical, 2026-10-06). 둘은 바로 위 두 컨트롤이
           각각 왜 그렇게 생겼는지를 말하는 각주다 — 복사뿐인 이유, 그리고 본문이 문장으로 서 있는 이유.
