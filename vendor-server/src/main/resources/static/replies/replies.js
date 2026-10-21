@@ -11,6 +11,8 @@
   var KEY = "reviewnary.replies.session";
   var AWAITING = ["AWAITING_APPROVAL", "RECHECK_NEEDED"];
   var MOVING = ["APPROVED", "CLAIMED", "CANCEL_REQUESTED"];
+  // Not settled either way: listed with the moving ones until the delegate says what happened, never dropped.
+  var IN_DOUBT = ["UNKNOWN"];
   var STATE = {
     AWAITING_APPROVAL: ["승인 기다리는 중", "info"],
     RECHECK_NEEDED: ["다시 확인 필요", "warn"],
@@ -106,7 +108,7 @@
     return call("GET", "/v1/stores").then(function (r) {
       if (r.status !== 200 || !Array.isArray(r.json)) { if (r.status !== 401) { listFailed(); } return; }
       stores = r.json;
-      var states = AWAITING.concat(MOVING);
+      var states = AWAITING.concat(MOVING, IN_DOUBT);
       var calls = [];
       stores.forEach(function (s) {
         states.forEach(function (st) {
@@ -121,7 +123,7 @@
         }
         all.sort(function (a, b) { return String(b.updatedAt).localeCompare(String(a.updatedAt)); });
         renderList(all.filter(function (t) { return AWAITING.indexOf(t.state) >= 0; }),
-          all.filter(function (t) { return MOVING.indexOf(t.state) >= 0; }));
+          all.filter(function (t) { return MOVING.indexOf(t.state) >= 0 || IN_DOUBT.indexOf(t.state) >= 0; }));
         show("list");
       });
     }, listFailed);
@@ -216,6 +218,17 @@
     var checks = (t.serverChecks || []).map(function (c) { return CHECKS[c]; }).filter(Boolean);
     $("checks").hidden = checks.length === 0 || !editable;
     $("checks-text").textContent = checks.length ? checks.join(" ") + " 확인하고 승인하세요." : "";
+    // A phone edit skipped the PC's knowledge checks (grounds · banned phrases); the server only looks for contacts
+    // and links. Until the PC has checked this exact version, say so rather than let the edit pass for a checked draft.
+    var unchecked = "";
+    if (t.editedOnMobile && t.pcRecheckVersion !== t.draftVersion) {
+      unchecked = "휴대폰에서 고친 문장은 PC의 근거 · 금지 표현 검사를 거치지 않았습니다. 서버는 연락처 · 링크만 봅니다. "
+        + "내용을 직접 확인하고 승인하세요.";
+    } else if (t.editedOnMobile && String(t.pcRecheck || "").indexOf("FLAGGED") === 0) {
+      unchecked = "PC 검사에서 확인할 부분이 나왔습니다. PC에서 초안을 확인하세요.";
+    }
+    $("unchecked").hidden = !unchecked || !editable;
+    $("unchecked-text").textContent = unchecked;
 
     $("read-reply").hidden = editing;
     $("edit-form").hidden = !editing;
@@ -236,6 +249,8 @@
       note = "담당자가 등록을 시작했습니다. 취소하면 담당자가 등록 전인지 확인한 뒤 끝납니다.";
     } else if (t.state === "CANCEL_REQUESTED") {
       note = "취소를 요청했습니다. 담당자가 등록 전인지 확인한 뒤 끝납니다.";
+    } else if (t.state === "UNKNOWN") {
+      note = "담당자가 등록했는지 아직 확인되지 않았습니다. 확인될 때까지 이 리뷰에는 새 답글을 보내지 않습니다.";
     }
     say("state-note", note);
   }
@@ -320,7 +335,14 @@
 
   $("back").addEventListener("click", function () { loadList(); });
   $("refresh").addEventListener("click", function () { loadList(); });
-  $("logout").addEventListener("click", function () { keep(null); show("login"); $("email").focus(); });
+  // The server ends this session too, so a copy of the token left anywhere stops working; the page signs out
+  // whether or not that answer arrives.
+  $("logout").addEventListener("click", function () {
+    if (session) { call("POST", "/v1/auth/logout").then(null, function () {}); }
+    keep(null);
+    show("login");
+    $("email").focus();
+  });
 
   $("login-form").addEventListener("submit", function (e) {
     e.preventDefault();

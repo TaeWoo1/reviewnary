@@ -23,6 +23,7 @@
   var check = null;
   var useRecovery = false;
   var chosen = null;
+  var uploading = false;
   var MAX_UPLOAD = 10 * 1024 * 1024;
 
   function $(id) { return document.getElementById(id); }
@@ -347,10 +348,13 @@
   }
 
   function pickable() {
-    $("upload").disabled = !(chosen && $("store").value);
+    $("upload").disabled = uploading || !(chosen && $("store").value);
+    $("store").disabled = uploading;
+    $("file").disabled = uploading;
   }
 
   function choose(file) {
+    if (uploading) { return; }
     resetOutcome();
     chosen = null;
     if (!file) { $("file-name").textContent = ".xlsx · 10MB까지"; pickable(); return; }
@@ -403,9 +407,9 @@
     }
   }
 
-  function uploaded(result) {
-    var store = $("store").options[$("store").selectedIndex];
-    $("result-chip").textContent = ["올렸습니다", store ? store.textContent : "", result.rows + "행"]
+  // The result names the store the file went to, held from the moment it was sent — never the picker as it is now.
+  function uploaded(result, target) {
+    $("result-chip").textContent = ["올렸습니다", target.label, result.rows + "행"]
       .filter(Boolean).join(" · ");
     $("r-added").textContent = String(result.added);
     $("r-changed").textContent = String(result.changed);
@@ -418,15 +422,18 @@
 
   $("upload-form").addEventListener("submit", function (e) {
     e.preventDefault();
-    if (!chosen || !$("store").value) { return; }
+    if (uploading || !chosen || !$("store").value) { return; }
     resetOutcome();
+    var picked = $("store").options[$("store").selectedIndex];
+    var target = { id: $("store").value, label: picked ? picked.textContent : "" };
     var form = new FormData();
     form.append("file", chosen, chosen.name);
-    $("upload").disabled = true;
+    uploading = true;
+    pickable();
     $("upload").textContent = "올리는 중…";
     var headers = { "Accept": "application/json" };
     if (session) { headers.Authorization = "Bearer " + session; }
-    fetch("/v1/delegate/stores/" + encodeURIComponent($("store").value) + "/review-uploads", {
+    fetch("/v1/delegate/stores/" + encodeURIComponent(target.id) + "/review-uploads", {
       method: "POST", headers: headers, credentials: "omit", body: form
     }).then(function (r) {
       return r.text().then(function (t) {
@@ -435,18 +442,20 @@
         return { status: r.status, json: json };
       });
     }).then(function (r) {
+      uploading = false;
       $("upload").textContent = "올리기";
-      if (r.status === 401) { keep(null); show("login"); return; }
+      if (r.status === 401) { keep(null); show("login"); pickable(); return; }
       if (r.status === 201 && r.json) {
         chosen = null;
         $("file").value = "";
         $("file-name").textContent = ".xlsx · 10MB까지";
-        uploaded(r.json);
+        uploaded(r.json, target);
       } else {
         refusal(r);
       }
       pickable();
     }, function () {
+      uploading = false;
       $("upload").textContent = "올리기";
       refuse("서버에 연결하지 못했습니다. 반영된 것은 없습니다.");
       pickable();
@@ -454,7 +463,7 @@
   });
 
   $("file").addEventListener("change", function () { choose($("file").files && $("file").files[0]); });
-  $("store").addEventListener("change", function () { resetOutcome(); pickable(); });
+  $("store").addEventListener("change", function () { if (!uploading) { resetOutcome(); } pickable(); });
   $("drop").addEventListener("dragover", function (e) { e.preventDefault(); $("drop").className = "drop stack8 over"; });
   $("drop").addEventListener("dragleave", function () { $("drop").className = "drop stack8"; });
   $("drop").addEventListener("drop", function (e) {
@@ -462,13 +471,16 @@
     $("drop").className = "drop stack8";
     choose(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
   });
-  $("upload-again").addEventListener("click", function () { resetOutcome(); });
+  $("upload-again").addEventListener("click", function () { if (!uploading) { resetOutcome(); } });
   $("tab-tasks").addEventListener("click", function () { tab("tasks"); loadList(); });
   $("tab-upload").addEventListener("click", function () { tab("upload"); whoAmI(); });
 
   $("back").addEventListener("click", function () { loadList(); });
   $("refresh").addEventListener("click", function () { whoAmI(); loadList(); });
+  // The server ends this session too, so a copy of the token left anywhere stops working; the page signs out
+  // whether or not that answer arrives.
   $("logout").addEventListener("click", function () {
+    if (session) { call("POST", "/v1/delegate/auth/logout").then(null, function () {}); }
     keep(null);
     chosen = null;
     $("file").value = "";
