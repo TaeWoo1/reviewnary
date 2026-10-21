@@ -302,6 +302,28 @@ class ReplyTasksTest {
     }
 
     @Test
+    void aRepeatedReportIsAnsweredOnlyToTheClaimerWhileTheStoreIsStillTheirs() {
+        TaskView task = approve(submit("1", "초안"));
+        tasks.claim(task.id(), me, task.stateVersion());
+        String command = command();
+        tasks.report(task.id(), me, Outcome.POSTED, task.approvedFingerprint(), clock.instant(),
+                ReportMethod.SELLER_CENTER_SCREEN, command);
+        assertThat(tasks.report(task.id(), me, Outcome.POSTED, task.approvedFingerprint(), clock.instant(),
+                ReportMethod.SELLER_CENTER_SCREEN, command).state()).as("the claimer's own repeat").isEqualTo(State.POSTED);
+
+        assertThatThrownBy(() -> tasks.report(task.id(), other, Outcome.POSTED, task.approvedFingerprint(),
+                clock.instant(), ReportMethod.SELLER_CENTER_SCREEN, command))
+                .as("another delegate replaying the claimer's command")
+                .isInstanceOfSatisfying(TaskException.class,
+                        e -> assertThat(e.failure()).isEqualTo(Failure.NOT_CLAIMER));
+        stores.unassign(store, me);
+        assertThatThrownBy(() -> tasks.report(task.id(), me, Outcome.POSTED, task.approvedFingerprint(),
+                clock.instant(), ReportMethod.SELLER_CENTER_SCREEN, command))
+                .as("the claimer after the store was taken back")
+                .isInstanceOfSatisfying(TaskException.class, e -> assertThat(e.failure()).isEqualTo(Failure.NOT_FOUND));
+    }
+
+    @Test
     void ofTwoDelegatesClaimingAtOnceExactlyOneWins() throws Exception {
         TaskView task = approve(submit("1", "초안"));
         List<Callable<Boolean>> claims = new ArrayList<>();

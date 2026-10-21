@@ -17,6 +17,10 @@ spring:
     multipart:
       max-file-size: 10MB
       max-request-size: 12MB
+      # Above the request cap, so the container never spools an upload to its temp folder — the default (0B) writes
+      # every file part to disk before the controller sees it. The export is read from memory and dropped (§3.1);
+      # UploadStaysInMemoryTest looks in that folder mid-request.
+      file-size-threshold: 13MB
 
 vendor:
   # The address people open this server at (https://…, no trailing path). Only the operator commands read it, to print

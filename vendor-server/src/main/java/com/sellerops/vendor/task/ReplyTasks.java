@@ -425,11 +425,13 @@ public class ReplyTasks {
     @Transactional
     public TaskView report(UUID taskId, UUID delegateId, Outcome outcome, String postedFingerprint, Instant checkedAt,
                            ReportMethod method, String commandId) {
+        // Who may ask comes before what was asked: a repeat answers with the review, so it is answered only to
+        // the claimer while the store is still theirs — never to one whose assignment has since ended.
+        TaskView task = claimedBy(taskId, delegateId);
         Optional<TaskView> repeat = repeated(commandId, taskId, "REPORT");
         if (repeat.isPresent()) {
             return repeat.get();
         }
-        TaskView task = claimedBy(taskId, delegateId);
         Instant now = clock.instant();
         if (checkedAt == null || checkedAt.isAfter(now.plus(CLOCK_SKEW)) || method == null) {
             throw new TaskException(Failure.INVALID_META);

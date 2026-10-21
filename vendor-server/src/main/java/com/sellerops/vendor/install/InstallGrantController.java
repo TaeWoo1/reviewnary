@@ -1,6 +1,5 @@
 package com.sellerops.vendor.install;
 
-import com.sellerops.vendor.ip.ClientIpv4;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -41,12 +40,15 @@ public class InstallGrantController {
     public ResponseEntity<?> code(@RequestBody @Valid CodeRequest request, HttpServletRequest http) {
         try {
             InstallGrants.Issued issued = installs.start(request.deviceName(), request.appVersion(),
-                    request.publicKey(), ClientIpv4.of(http.getRemoteAddr()).orElse(null));
+                    request.publicKey(), http.getRemoteAddr());
             return ResponseEntity.ok(new CodeResponse(issued.deviceCode(), issued.userCode(), issued.expiresAt(),
                     issued.intervalSeconds()));
         } catch (Installs.StartException e) {
-            HttpStatus status = e.failure() == Installs.StartFailure.BUSY
-                    ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.BAD_REQUEST;
+            HttpStatus status = switch (e.failure()) {
+                case BUSY -> HttpStatus.SERVICE_UNAVAILABLE;
+                case TOO_MANY -> HttpStatus.TOO_MANY_REQUESTS;
+                default -> HttpStatus.BAD_REQUEST;
+            };
             return ResponseEntity.status(status).body(Map.of("error", e.failure().name().toLowerCase()));
         }
     }

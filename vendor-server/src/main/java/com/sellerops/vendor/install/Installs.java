@@ -2,6 +2,7 @@ package com.sellerops.vendor.install;
 
 import com.sellerops.vendor.Codes;
 import com.sellerops.vendor.account.SellerAccounts;
+import com.sellerops.vendor.ip.ClientIpv4;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
@@ -33,7 +34,7 @@ public class Installs {
     private static final Pattern DEVICE_NAME = Pattern.compile("[\\p{L}\\p{N} ._()'\\-]{1,80}");
     private static final Pattern VERSION = Pattern.compile("[A-Za-z0-9._+\\-]{1,40}");
 
-    public enum StartFailure { INVALID_DEVICE_NAME, INVALID_VERSION, INVALID_PUBLIC_KEY, BUSY }
+    public enum StartFailure { INVALID_DEVICE_NAME, INVALID_VERSION, INVALID_PUBLIC_KEY, BUSY, TOO_MANY }
 
     public static final class StartException extends RuntimeException {
         private final StartFailure failure;
@@ -82,7 +83,8 @@ public class Installs {
         return start(deviceName, appVersion, publicKey, null);
     }
 
-    public InstallGrants.Issued start(String deviceName, String appVersion, String publicKey, String requesterIpv4) {
+    /** {@code remoteAddress} is the caller's address as the container resolved it; null in tests. */
+    public InstallGrants.Issued start(String deviceName, String appVersion, String publicKey, String remoteAddress) {
         String name = deviceName == null ? "" : deviceName.trim();
         if (!DEVICE_NAME.matcher(name).matches()) {
             throw new StartException(StartFailure.INVALID_DEVICE_NAME);
@@ -93,8 +95,13 @@ public class Installs {
         }
         byte[] key = InstallPublicKey.parse(publicKey)
                 .orElseThrow(() -> new StartException(StartFailure.INVALID_PUBLIC_KEY));
-        return grants.issue(new InstallGrants.Pending(name, version, key, requesterIpv4))
-                .orElseThrow(() -> new StartException(StartFailure.BUSY));
+        InstallGrants.Issue issue = grants.issue(new InstallGrants.Pending(name, version, key,
+                ClientIpv4.of(remoteAddress).orElse(null)), InstallGrants.source(remoteAddress));
+        if (issue.refusal() != null) {
+            throw new StartException(issue.refusal() == InstallGrants.Refusal.BUSY ? StartFailure.BUSY
+                    : StartFailure.TOO_MANY);
+        }
+        return issue.issued();
     }
 
     /**
