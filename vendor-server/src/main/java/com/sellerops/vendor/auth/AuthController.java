@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,11 +32,14 @@ public class AuthController {
     private final SellerAccounts accounts;
     private final SessionTokens sessions;
     private final LoginThrottle throttle;
+    private final SessionRevocations revocations;
 
-    public AuthController(SellerAccounts accounts, SessionTokens sessions, LoginThrottle throttle) {
+    public AuthController(SellerAccounts accounts, SessionTokens sessions, LoginThrottle throttle,
+                          SessionRevocations revocations) {
         this.accounts = accounts;
         this.sessions = sessions;
         this.throttle = throttle;
+        this.revocations = revocations;
     }
 
     @PostMapping("/invites/redeem")
@@ -66,5 +70,15 @@ public class AuthController {
         throttle.succeeded(email);
         SessionTokens.Issued issued = sessions.issue(account.get());
         return ResponseEntity.ok(new SessionResponse(issued.token(), issued.expiresAt()));
+    }
+
+    /**
+     * Ends the session this request carries — only that one; the seller's other sessions keep working. The route
+     * already required a live seller session, so the bearer here is exactly that one.
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestHeader("Authorization") String authorization) {
+        sessions.verifyAny(authorization.substring("Bearer ".length()).trim()).ifPresent(revocations::revoke);
+        return ResponseEntity.noContent().build();
     }
 }

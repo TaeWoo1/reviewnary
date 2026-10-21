@@ -1,6 +1,8 @@
 package com.sellerops.vendor.ops;
 
 import com.sellerops.vendor.account.SellerAccounts;
+import com.sellerops.vendor.auth.SessionRevocations;
+import com.sellerops.vendor.auth.SessionTokens;
 import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.store.Stores;
 import java.io.PrintStream;
@@ -18,6 +20,7 @@ import java.util.UUID;
  *   java -jar vendor-server.jar invite seller@example.com              # prints the invite code once
  *   java -jar vendor-server.jar suspend seller@example.com             # ends its sessions and installs at the next request
  *   java -jar vendor-server.jar reinstate seller@example.com
+ *   java -jar vendor-server.jar end-sessions someone@example.com       # signs them out everywhere; the account stays
  *   java -jar vendor-server.jar invite-delegate me@example.com [admin] # prints the delegate's join link once
  *   java -jar vendor-server.jar suspend-delegate me@example.com        # ends sessions and every store assignment
  *   java -jar vendor-server.jar reinstate-delegate me@example.com      # the account only; assign stores again
@@ -34,10 +37,11 @@ import java.util.UUID;
  */
 public final class OpsCommands {
 
-    public static final Set<String> NAMES = Set.of("invite", "suspend", "reinstate", "invite-delegate",
-            "suspend-delegate", "reinstate-delegate", "add-store", "assign", "unassign");
+    public static final Set<String> NAMES = Set.of("invite", "suspend", "reinstate", "end-sessions",
+            "invite-delegate", "suspend-delegate", "reinstate-delegate", "add-store", "assign", "unassign");
 
-    static final String USAGE = "usage: invite|suspend|reinstate <email> · invite-delegate <email> [admin] · "
+    static final String USAGE = "usage: invite|suspend|reinstate|end-sessions <email> · "
+            + "invite-delegate <email> [admin] · "
             + "suspend-delegate|reinstate-delegate <email> · add-store <seller-email> <label> · "
             + "assign|unassign <delegate-email> <store-id>";
 
@@ -45,7 +49,8 @@ public final class OpsCommands {
     public static final String JOIN_PATH = "/delegate/join#";
 
     /** The services the commands act on, and the server's public address ({@code ""} when not set). */
-    public record Services(SellerAccounts accounts, Delegates delegates, Stores stores, String publicUrl) {}
+    public record Services(SellerAccounts accounts, Delegates delegates, Stores stores,
+                           SessionRevocations revocations, String publicUrl) {}
 
     private OpsCommands() {
     }
@@ -59,7 +64,7 @@ public final class OpsCommands {
         String name = args[0];
         boolean twoArgs = args.length == 2;
         return switch (name) {
-            case "invite", "suspend", "reinstate", "suspend-delegate", "reinstate-delegate" ->
+            case "invite", "suspend", "reinstate", "end-sessions", "suspend-delegate", "reinstate-delegate" ->
                     twoArgs ? person(services, name, args[1], out) : usage(out);
             case "invite-delegate" -> {
                 if (args.length > 3 || (args.length == 3 && !"admin".equals(args[2]))) {
@@ -78,12 +83,32 @@ public final class OpsCommands {
             case "invite" -> invite(out, () -> services.accounts().issueInvite(email),
                     SellerAccounts.INVITE_LIFETIME.toDays());
             case "suspend" -> done(out, services.accounts().suspend(email), "suspended", "no such account");
+            case "end-sessions" -> endSessions(services, email, out);
             case "reinstate" -> done(out, services.accounts().reinstate(email), "reinstated", "no such account");
             case "suspend-delegate" -> done(out, services.delegates().suspend(email),
                     "suspended; store assignments ended", "no such delegate");
             default -> done(out, services.delegates().reinstate(email),
                     "reinstated; assign stores again", "no such delegate");
         };
+    }
+
+    /**
+     * A leaked session or a lost phone: every session the person holds now ends at its next request, as a seller
+     * and as a delegate when the address is both (the owner is the first delegate). The account itself is untouched
+     * — signing in again works — so this is not suspension. A PC's install token is not a session; it is revoked
+     * from the seller's own list of PCs.
+     */
+    private static int endSessions(Services services, String email, PrintStream out) {
+        boolean seller = services.accounts().idOf(email)
+                .map(id -> services.revocations().endAll(SessionTokens.Kind.SELLER, id)).orElse(false);
+        boolean delegate = services.delegates().idOf(email)
+                .map(id -> services.revocations().endAll(SessionTokens.Kind.DELEGATE, id)).orElse(false);
+        if (!seller && !delegate) {
+            out.println("no such account or delegate");
+            return 1;
+        }
+        out.println("sessions ended:" + (seller ? " seller" : "") + (delegate ? " delegate" : ""));
+        return 0;
     }
 
     private static int addStore(Services services, String[] args, PrintStream out) {

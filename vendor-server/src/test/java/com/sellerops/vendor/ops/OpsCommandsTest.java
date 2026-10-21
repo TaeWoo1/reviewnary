@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sellerops.vendor.TestTotp;
 import com.sellerops.vendor.account.SellerAccounts;
+import com.sellerops.vendor.auth.SessionRevocations;
+import com.sellerops.vendor.auth.SessionTokens;
 import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.store.Stores;
 import java.io.ByteArrayOutputStream;
@@ -27,13 +29,18 @@ class OpsCommandsTest {
     private Delegates delegates;
     @Autowired
     private Stores stores;
+    @Autowired
+    private SessionRevocations revocations;
+    @Autowired
+    private SessionTokens sessions;
 
     private OpsCommands.Services services;
     private ByteArrayOutputStream out;
 
     @BeforeEach
     void setUp() {
-        services = new OpsCommands.Services(accounts, delegates, stores, "https://vendor.example.com/");
+        services = new OpsCommands.Services(accounts, delegates, stores, revocations,
+                "https://vendor.example.com/");
         out = new ByteArrayOutputStream();
     }
 
@@ -44,6 +51,27 @@ class OpsCommandsTest {
         assertThat(accounts.redeem(lastWord(), "a long enough password")).isNotNull();
         assertThat(run("suspend", email)).isZero();
         assertThat(run("suspend", "nobody@example.com")).isEqualTo(1);
+    }
+
+    @Test
+    void endSessionsSignsThePersonOutAsSellerAndDelegateAndLeavesTheAccounts() {
+        String email = "ops-both-" + UUID.randomUUID() + "@example.com";
+        UUID seller = accounts.redeem(accounts.issueInvite(email), "a long enough password");
+        String invite = delegates.issueInvite(email, Delegates.Role.ADMIN);
+        Delegates.Staged staged = delegates.stage(invite, "a long enough password");
+        UUID delegate = delegates.confirm(invite, TestTotp.code(staged.secret(), Instant.now(), 0)).delegateId();
+        SessionTokens.Session asSeller = sessions.verifyAny(sessions.issue(seller).token()).orElseThrow();
+        SessionTokens.Session asDelegate = sessions.verifyAny(
+                sessions.issue(SessionTokens.Kind.DELEGATE, delegate).token()).orElseThrow();
+        assertThat(revocations.live(asSeller)).isTrue();
+
+        assertThat(run("end-sessions", email.toUpperCase())).isZero();
+        assertThat(out.toString()).contains("sessions ended: seller delegate");
+        assertThat(revocations.live(asSeller)).isFalse();
+        assertThat(revocations.live(asDelegate)).isFalse();
+        assertThat(accounts.isActive(seller)).as("not a suspension").isTrue();
+        assertThat(delegates.active(delegate)).isPresent();
+        assertThat(run("end-sessions", "nobody@example.com")).isEqualTo(1);
     }
 
     @Test
@@ -80,7 +108,7 @@ class OpsCommandsTest {
 
     @Test
     void withoutAPublicAddressTheJoinLinkIsPrintedAsAPath() {
-        services = new OpsCommands.Services(accounts, delegates, stores, "");
+        services = new OpsCommands.Services(accounts, delegates, stores, revocations, "");
         assertThat(run("invite-delegate", "ops-path-" + UUID.randomUUID() + "@example.com")).isZero();
         String path = lastWord();
         assertThat(path).startsWith("/delegate/join#");

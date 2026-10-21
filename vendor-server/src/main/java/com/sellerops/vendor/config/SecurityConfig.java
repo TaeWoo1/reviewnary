@@ -4,6 +4,7 @@ import com.sellerops.vendor.account.SellerAccounts;
 import com.sellerops.vendor.auth.BearerAuthFilter;
 import com.sellerops.vendor.auth.BearerAuthFilter.DelegatePrincipal;
 import com.sellerops.vendor.auth.BearerAuthFilter.Principal;
+import com.sellerops.vendor.auth.SessionRevocations;
 import com.sellerops.vendor.auth.SessionTokens;
 import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.install.Installs;
@@ -58,7 +59,8 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http, Installs installs, SessionTokens sessions,
-                                    SellerAccounts accounts, Delegates delegates) throws Exception {
+                                    SellerAccounts accounts, Delegates delegates, SessionRevocations revocations)
+            throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -77,13 +79,14 @@ public class SecurityConfig {
                                 + "base-uri 'none'; form-action 'none'; object-src 'none'"))
                         .referrerPolicy(r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
                 .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
-                .addFilterBefore(new BearerAuthFilter(installs, sessions, accounts, delegates),
+                .addFilterBefore(new BearerAuthFilter(installs, sessions, accounts, delegates, revocations),
                         UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(a -> a
                         // Spring's error page renders a status and nothing else (application.yml server.error).
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET, "/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/v1/auth/login", "/v1/auth/invites/redeem").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/v1/auth/logout").hasRole(SELLER)
                         .requestMatchers(HttpMethod.POST, "/v1/installs/code", "/v1/installs/token").permitAll()
                         .requestMatchers(HttpMethod.GET, "/v1/ip").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.GET, "/v1/installs/me").hasRole(INSTALL)
@@ -96,6 +99,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/v1/stores").hasAnyRole(SELLER, INSTALL)
                         .requestMatchers(HttpMethod.POST, "/v1/delegate/auth/invites/stage",
                                 "/v1/delegate/auth/invites/confirm", "/v1/delegate/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/v1/delegate/auth/logout").hasRole(DELEGATE)
                         .requestMatchers(HttpMethod.GET, "/v1/delegate/me").hasRole(DELEGATE)
                         .requestMatchers(HttpMethod.POST, "/v1/delegate/stores/*/review-uploads").hasRole(DELEGATE)
                         .requestMatchers(HttpMethod.GET, "/v1/stores/*/reviews").hasRole(INSTALL)

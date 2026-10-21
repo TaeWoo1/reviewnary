@@ -1,5 +1,6 @@
 package com.sellerops.vendor.auth;
 
+import com.sellerops.vendor.Codes;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -18,8 +19,11 @@ import org.springframework.stereotype.Component;
 /**
  * Session tokens — contract §2: a seller's (e-mail and password) and a delegate's (password and authenticator code),
  * each a session JWT (HS256, same library as the backend's {@code JwtTokenProvider}) whose {@code typ} claim names
- * which of the two it is. A JWT alone cannot be revoked, so {@link BearerAuthFilter} also reads the account's status
- * on every request: suspension ends every session at the next request.
+ * which of the two it is. A JWT alone cannot be revoked, so {@link BearerAuthFilter} also reads the account's
+ * status on every request — suspension ends every session at the next request — and asks
+ * {@link SessionRevocations} whether this one session was logged out, or every session of its person ended. Each
+ * token carries its own id ({@code jti}) and its issue time to the millisecond ({@code iat} is whole seconds, too
+ * coarse to tell a session from one ended in the same second); a token without either is not a session.
  *
  * <p>Refuses to start without a key of at least 32 characters (HS256 wants 256 bits). There is no default key.
  */
@@ -29,6 +33,9 @@ public class SessionTokens {
     public static final Duration LIFETIME = Duration.ofHours(12);
     static final int MIN_SECRET_LENGTH = 32;
     private static final String TYPE_CLAIM = "typ";
+    private static final String ISSUED_MS_CLAIM = "iat_ms";
+    /** {@code revoked_sessions.jti}'s width. */
+    static final int MAX_ID_LENGTH = 64;
 
     /** Whose session it is. The claim value is fixed: a token of one kind never verifies as the other. */
     public enum Kind {
@@ -43,8 +50,11 @@ public class SessionTokens {
 
     public record Issued(String token, Instant expiresAt) {}
 
-    /** A verified session: its kind and the id it names (a seller account or a delegate). */
-    public record Session(Kind kind, UUID subject) {}
+    /**
+     * A verified session: its kind, the id it names (a seller account or a delegate), and the token's own id and
+     * times, which revocation needs.
+     */
+    public record Session(Kind kind, UUID subject, String id, Instant issuedAt, Instant expiresAt) {}
 
     private final SecretKey key;
     private final Clock clock;
@@ -72,8 +82,10 @@ public class SessionTokens {
         Instant now = clock.instant();
         Instant expiresAt = now.plus(LIFETIME);
         String token = Jwts.builder()
+                .id(Codes.newCode())
                 .subject(subject.toString())
                 .claim(TYPE_CLAIM, kind.claim)
+                .claim(ISSUED_MS_CLAIM, now.toEpochMilli())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiresAt))
                 .signWith(key, Jwts.SIG.HS256)
@@ -92,9 +104,15 @@ public class SessionTokens {
             var claims = Jwts.parser().verifyWith(key).clock(() -> Date.from(clock.instant())).build()
                     .parseSignedClaims(token).getPayload();
             String type = claims.get(TYPE_CLAIM, String.class);
+            String id = claims.getId();
+            Long issuedMs = claims.get(ISSUED_MS_CLAIM, Long.class);
+            if (id == null || id.isEmpty() || id.length() > MAX_ID_LENGTH || issuedMs == null) {
+                return Optional.empty();
+            }
             for (Kind kind : Kind.values()) {
                 if (kind.claim.equals(type)) {
-                    return Optional.of(new Session(kind, UUID.fromString(claims.getSubject())));
+                    return Optional.of(new Session(kind, UUID.fromString(claims.getSubject()), id,
+                            Instant.ofEpochMilli(issuedMs), claims.getExpiration().toInstant()));
                 }
             }
             return Optional.empty();

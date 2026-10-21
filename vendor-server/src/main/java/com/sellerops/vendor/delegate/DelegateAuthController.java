@@ -2,6 +2,7 @@ package com.sellerops.vendor.delegate;
 
 import com.sellerops.vendor.account.SellerAccounts;
 import com.sellerops.vendor.auth.LoginThrottle;
+import com.sellerops.vendor.auth.SessionRevocations;
 import com.sellerops.vendor.auth.SessionTokens;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -14,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -46,11 +48,14 @@ public class DelegateAuthController {
     private final Delegates delegates;
     private final SessionTokens sessions;
     private final LoginThrottle throttle;
+    private final SessionRevocations revocations;
 
-    public DelegateAuthController(Delegates delegates, SessionTokens sessions, LoginThrottle throttle) {
+    public DelegateAuthController(Delegates delegates, SessionTokens sessions, LoginThrottle throttle,
+                                  SessionRevocations revocations) {
         this.delegates = delegates;
         this.sessions = sessions;
         this.throttle = throttle;
+        this.revocations = revocations;
     }
 
     @PostMapping("/invites/stage")
@@ -91,6 +96,13 @@ public class DelegateAuthController {
         throttle.succeeded(key);
         SessionTokens.Issued issued = sessions.issue(SessionTokens.Kind.DELEGATE, delegate.get());
         return ResponseEntity.ok(new SessionResponse(issued.token(), issued.expiresAt()));
+    }
+
+    /** Ends this one session (the route required a live delegate session); the delegate's others keep working. */
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestHeader("Authorization") String authorization) {
+        sessions.verifyAny(authorization.substring("Bearer ".length()).trim()).ifPresent(revocations::revoke);
+        return ResponseEntity.noContent().build();
     }
 
     private static ResponseEntity<?> failure(Delegates.EnrolException e) {

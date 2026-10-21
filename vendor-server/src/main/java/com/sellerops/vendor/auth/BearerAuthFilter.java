@@ -32,7 +32,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *       install token never opens a seller route, a seller session never opens an install route, and neither ever
  *       opens a delegate route (nor a delegate session theirs).</li>
  *   <li>The person behind a session is re-read on every request: a suspended seller or delegate gets 401 at the
- *       next one.</li>
+ *       next one, and so does a session that was logged out or ended ({@link SessionRevocations}).</li>
  * </ol>
  *
  * <p>Not a Spring bean: {@code SecurityConfig} builds it, so it is not also registered as a plain servlet filter.
@@ -54,12 +54,15 @@ public class BearerAuthFilter extends OncePerRequestFilter {
     private final SessionTokens sessions;
     private final SellerAccounts accounts;
     private final Delegates delegates;
+    private final SessionRevocations revocations;
 
-    public BearerAuthFilter(Installs installs, SessionTokens sessions, SellerAccounts accounts, Delegates delegates) {
+    public BearerAuthFilter(Installs installs, SessionTokens sessions, SellerAccounts accounts, Delegates delegates,
+                            SessionRevocations revocations) {
         this.installs = installs;
         this.sessions = sessions;
         this.accounts = accounts;
         this.delegates = delegates;
+        this.revocations = revocations;
     }
 
     @Override
@@ -74,7 +77,7 @@ public class BearerAuthFilter extends OncePerRequestFilter {
         Optional<UsernamePasswordAuthenticationToken> auth = InstallTokens.looksLikeInstallToken(bearer)
                 ? installs.authenticate(bearer).map(i -> token(new Principal(i.accountId(), i.installId()),
                         Principal.INSTALL))
-                : sessions.verifyAny(bearer).flatMap(this::session);
+                : sessions.verifyAny(bearer).filter(revocations::live).flatMap(this::session);
         if (auth.isEmpty()) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
             return;

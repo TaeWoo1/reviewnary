@@ -13,6 +13,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sellerops.vendor.TestTotp;
 import com.sellerops.vendor.account.SellerAccounts;
+import com.sellerops.vendor.auth.SessionRevocations;
+import com.sellerops.vendor.auth.SessionTokens;
 import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.delegate.OtpQrTest;
 import com.sellerops.vendor.install.Installs;
@@ -64,6 +66,8 @@ class VendorServerSecurityTest {
     private Delegates delegates;
     @Autowired
     private Stores stores;
+    @Autowired
+    private SessionRevocations revocations;
 
     private String email;
     private String session;
@@ -175,6 +179,42 @@ class VendorServerSecurityTest {
                 .andExpect(status().isUnauthorized());
         assertThat(accounts.reinstate(email)).isTrue();
         mvc.perform(get("/v1/ip").with(bearer(install)).with(remote("203.0.113.7"))).andExpect(status().isOk());
+    }
+
+    @Test
+    void loggingOutEndsThatOneSessionAndEndingAllEndsEveryOneButNotTheAccountOrItsPcs() throws Exception {
+        String install = link();
+        String phone = sellerLogin();
+        mvc.perform(post("/v1/auth/logout")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/v1/delegate/auth/logout").with(bearer(session))).andExpect(status().isForbidden());
+
+        mvc.perform(post("/v1/auth/logout").with(bearer(session))).andExpect(status().isNoContent());
+        // The same token, wherever a copy of it was left.
+        mvc.perform(get("/v1/stores").with(bearer(session))).andExpect(status().isUnauthorized());
+        mvc.perform(post("/v1/auth/logout").with(bearer(session))).andExpect(status().isUnauthorized());
+        // The seller's other session (the phone) is not this one.
+        mvc.perform(get("/v1/stores").with(bearer(phone))).andExpect(status().isOk());
+
+        assertThat(revocations.endAll(SessionTokens.Kind.SELLER, accounts.idOf(email).orElseThrow())).isTrue();
+        mvc.perform(get("/v1/stores").with(bearer(phone))).andExpect(status().isUnauthorized());
+        // A PC's install token is not a session, and the account is untouched: signing in again works.
+        mvc.perform(get("/v1/stores").with(bearer(install))).andExpect(status().isOk());
+        mvc.perform(get("/v1/stores").with(bearer(sellerLogin()))).andExpect(status().isOk());
+    }
+
+    @Test
+    void aDelegateLogsOutOneSessionAndEndingAllEndsTheRest() throws Exception {
+        Delegate me = enrolDelegate();
+        String second = body(mvc.perform(json(post("/v1/delegate/auth/login"),
+                login(me.email(), "correct horse battery", TestTotp.code(me.secret(), Instant.now(), 1))))
+                .andExpect(status().isOk())).path("token").asText();
+        mvc.perform(post("/v1/auth/logout").with(bearer(second))).andExpect(status().isForbidden());
+        mvc.perform(post("/v1/delegate/auth/logout").with(bearer(second))).andExpect(status().isNoContent());
+        mvc.perform(get("/v1/delegate/me").with(bearer(second))).andExpect(status().isUnauthorized());
+        mvc.perform(get("/v1/delegate/me").with(bearer(me.token()))).andExpect(status().isOk());
+
+        assertThat(revocations.endAll(SessionTokens.Kind.DELEGATE, me.id())).isTrue();
+        mvc.perform(get("/v1/delegate/me").with(bearer(me.token()))).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -508,6 +548,12 @@ class VendorServerSecurityTest {
                 .andExpect(status().isCreated()));
         assertThat(enrolled.path("recoveryCodes")).hasSize(Delegates.RECOVERY_CODES);
         return new Delegate(delegates.idOf(address).orElseThrow(), address, secret, enrolled.path("token").asText());
+    }
+
+    private String sellerLogin() throws Exception {
+        return body(mvc.perform(json(post("/v1/auth/login"),
+                "{\"email\":\"" + email + "\",\"password\":\"correct horse battery\"}"))
+                .andExpect(status().isOk())).path("token").asText();
     }
 
     private static String login(String email, String password, String otp) {

@@ -48,6 +48,29 @@ class SessionTokensTest {
         assertThat(tokens.verify(untyped)).as("same key, but not a seller session").isEmpty();
     }
 
+    @Test
+    void eachSessionHasItsOwnIdAndMillisecondIssueTimeAndATokenWithoutThemIsNotASession() {
+        MutableClock clock = Clock.at();
+        clock.advance(Duration.ofMillis(123));
+        SessionTokens tokens = new SessionTokens(SECRET, clock);
+        UUID account = UUID.randomUUID();
+        SessionTokens.Session one = tokens.verifyAny(tokens.issue(account).token()).orElseThrow();
+        SessionTokens.Session two = tokens.verifyAny(tokens.issue(account).token()).orElseThrow();
+        assertThat(one.id()).isNotEqualTo(two.id()).hasSizeLessThanOrEqualTo(SessionTokens.MAX_ID_LENGTH);
+        assertThat(one.issuedAt()).isEqualTo(clock.instant());
+        assertThat(one.expiresAt()).isEqualTo(clock.instant().plus(SessionTokens.LIFETIME).truncatedTo(
+                java.time.temporal.ChronoUnit.SECONDS));
+
+        var key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        Date expiry = Date.from(clock.instant().plusSeconds(60));
+        String noId = Jwts.builder().subject(account.toString()).claim("typ", "seller")
+                .claim("iat_ms", clock.instant().toEpochMilli()).expiration(expiry).signWith(key).compact();
+        String noTime = Jwts.builder().id("x").subject(account.toString()).claim("typ", "seller")
+                .expiration(expiry).signWith(key).compact();
+        assertThat(tokens.verifyAny(noId)).as("no id: it could never be logged out").isEmpty();
+        assertThat(tokens.verifyAny(noTime)).as("no issue time: it could never be ended").isEmpty();
+    }
+
     private static final class Clock {
         static MutableClock at() {
             return new MutableClock(Instant.parse("2026-10-17T00:00:00Z"));
