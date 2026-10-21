@@ -72,6 +72,20 @@ public class VendorLinkController {
         return replyTasks.requestApproval(principal.orgId(), reviewId);
     }
 
+    /** 「승인하고 담당자에게 맡기기」: sends the current draft and approves it here, for a delegate to post (§4, D9). */
+    @PostMapping("/reviews/{reviewId}/hand-over")
+    public VendorReplyTaskService.TaskView handOver(@AuthenticationPrincipal AuthPrincipal principal,
+                                                    @PathVariable UUID reviewId) {
+        return replyTasks.handOver(principal.orgId(), reviewId);
+    }
+
+    /** 「요청 취소」: cancels the review's delegation task, or asks the delegate to stop once claimed (§4.2, D10). */
+    @PostMapping("/reviews/{reviewId}/cancel")
+    public VendorReplyTaskService.TaskView cancel(@AuthenticationPrincipal AuthPrincipal principal,
+                                                  @PathVariable UUID reviewId) {
+        return replyTasks.cancel(principal.orgId(), reviewId);
+    }
+
     /** The latest delegation task this PC knows for the review; 204 when there is none. */
     @GetMapping("/reviews/{reviewId}/task")
     public ResponseEntity<VendorReplyTaskService.TaskView> task(@AuthenticationPrincipal AuthPrincipal principal,

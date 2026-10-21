@@ -278,6 +278,17 @@ class VendorLinkServiceTest {
         }
 
         @Override
+        public TaskSnapshot approve(String installToken, UUID taskId, int version, String fingerprint,
+                                    String commandId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public TaskSnapshot cancel(String installToken, UUID taskId, String commandId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public TaskChanges taskChanges(String installToken, UUID storeId, long cursor, int limit) {
             throw new UnsupportedOperationException();
         }

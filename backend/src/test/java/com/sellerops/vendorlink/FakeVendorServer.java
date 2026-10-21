@@ -32,6 +32,7 @@ final class FakeVendorServer implements VendorServerClient {
     String refuseNextSubmit;
     final List<UUID> noReply = new ArrayList<>();
     final List<String> noReplyCommands = new ArrayList<>();
+    final List<String> approveCommands = new ArrayList<>();
 
     record Submitted(UUID reviewId, String body, DraftMeta meta) {}
 
@@ -123,6 +124,34 @@ final class FakeVendorServer implements VendorServerClient {
         tasks.put(next.id(), next);
         changes.add(new TaskChange(changes.size() + 1, next.state(), next));
         return next;
+    }
+
+    /** As the server: only the latest version and its exact text, and only while it awaits approval. */
+    @Override
+    public TaskSnapshot approve(String installToken, UUID taskId, int version, String fingerprint, String commandId) {
+        bearers.add(installToken);
+        approveCommands.add(commandId);
+        TaskSnapshot t = tasks.get(taskId);
+        if (t == null || !t.state().equals("AWAITING_APPROVAL")) {
+            throw new TaskRefused("wrong_state");
+        }
+        if (t.draftVersion() != version || !t.draftFingerprint().equals(fingerprint)) {
+            throw new TaskRefused("fingerprint_mismatch");
+        }
+        return move(taskId, "APPROVED", t.draftBody(), fingerprint, false);
+    }
+
+    /** As the server: ended at once until claimed, then a request the delegate settles. */
+    @Override
+    public TaskSnapshot cancel(String installToken, UUID taskId, String commandId) {
+        bearers.add(installToken);
+        TaskSnapshot t = tasks.get(taskId);
+        String to = switch (t == null ? "" : t.state()) {
+            case "AWAITING_APPROVAL", "RECHECK_NEEDED", "APPROVED" -> "CANCELLED";
+            case "CLAIMED" -> "CANCEL_REQUESTED";
+            default -> throw new TaskRefused("wrong_state");
+        };
+        return move(taskId, to, t.draftBody(), t.approvedFingerprint(), false);
     }
 
     @Override

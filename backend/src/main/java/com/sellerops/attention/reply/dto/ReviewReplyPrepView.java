@@ -143,5 +143,10 @@ public record ReviewReplyPrepView(
          * this side of the wire; what crosses is the consequence, and the surface turns that into a
          * sentence about what the seller can do next.
          */
-        String guidedUnavailableReason) {
+        String guidedUnavailableReason,
+        /**
+         * The vendor delegate lane for this review ({@code docs/vendor_server_contract_v1.md} §4), or null when
+         * the review cannot use it — not received from the vendor server, or this PC is not linked.
+         */
+        ReviewReplyDelegationView delegation) {
 }

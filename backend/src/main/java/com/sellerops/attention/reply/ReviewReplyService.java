@@ -173,13 +173,13 @@ public class ReviewReplyService {
     }
 
     private boolean delegatedOpen(UUID orgId, UUID reviewId) {
-        return delegated != null && delegated.openOn(orgId, reviewId);
+        return delegated != null && delegated.holds(orgId, reviewId);
     }
 
     /** Approving here or starting a guided run while a delegate holds the reply would be a second public reply. */
     private void requireNotDelegated(UUID orgId, UUID reviewId) {
         if (delegatedOpen(orgId, reviewId)) {
-            throw ApiException.conflict("휴대폰 승인 · 대행 등록이 진행 중인 리뷰입니다. 여기서 승인하거나 등록하지 않습니다.");
+            throw ApiException.conflict("담당자에게 맡긴 리뷰입니다. 여기서 승인하거나 등록하지 않습니다.");
         }
     }
 
@@ -756,7 +756,10 @@ public class ReviewReplyService {
                 head == null ? null
                         : ReviewDraftComposer.basisNoteOf(head.getAnswerBasis(),
                                 !storedEvidence.isEmpty()),
-                guidedUnavailableReason);
+                guidedUnavailableReason,
+                // The delegate lane adds its own state to the reply lane's verdict that this saved draft may move on.
+                delegated == null ? null : delegated.describe(orgId, review.getId(),
+                        responseNeeded && !approved && !channelAnswered && head != null));
     }
 
     /**

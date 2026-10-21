@@ -87,6 +87,12 @@ public interface VendorServerClient {
     /** Opens a task for the review, or makes this text its next version while it awaits approval. */
     TaskSnapshot submitDraft(String installToken, UUID storeId, UUID reviewId, String body, DraftMeta meta);
 
+    /** Approves the task's exact version and text (contract §4.3) — the seller pressing it on this PC. */
+    TaskSnapshot approve(String installToken, UUID taskId, int version, String fingerprint, String commandId);
+
+    /** Cancels the task, or asks its delegate to stop once claimed (§4.2). */
+    TaskSnapshot cancel(String installToken, UUID taskId, String commandId);
+
     /** The store's task transitions after {@code cursor}, in order. */
     TaskChanges taskChanges(String installToken, UUID storeId, long cursor, int limit);
 

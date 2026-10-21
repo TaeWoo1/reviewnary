@@ -174,6 +174,22 @@ public class JdkVendorServerClient implements VendorServerClient {
     }
 
     @Override
+    public TaskSnapshot approve(String installToken, UUID taskId, int version, String fingerprint, String commandId) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("version", version);
+        request.put("fingerprint", fingerprint);
+        request.put("commandId", commandId);
+        return task(taskCall(jsonPost("v1/tasks/" + taskId + "/approve", installToken, request)).json());
+    }
+
+    @Override
+    public TaskSnapshot cancel(String installToken, UUID taskId, String commandId) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("commandId", commandId);
+        return task(taskCall(jsonPost("v1/tasks/" + taskId + "/cancel", installToken, request)).json());
+    }
+
+    @Override
     public TaskChanges taskChanges(String installToken, UUID storeId, long cursor, int limit) {
         Answer a = relay(HttpRequest.newBuilder(base.resolve("v1/stores/" + storeId + "/tasks/changes?cursor="
                         + cursor + "&limit=" + limit)).timeout(REQUEST_TIMEOUT)

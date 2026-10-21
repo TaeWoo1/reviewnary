@@ -12,6 +12,8 @@ import com.sellerops.attention.reply.ReviewReplyOutcome;
 import com.sellerops.attention.reply.ReviewReplyOutcomeRepository;
 import com.sellerops.attention.reply.ReviewReplyOutcomeService;
 import com.sellerops.attention.reply.ReviewReplyService;
+import com.sellerops.attention.reply.dto.ReviewReplyDelegationView;
+import com.sellerops.attention.triage.ReviewTriageRepository;
 import com.sellerops.attention.triage.ReviewTriageService;
 import com.sellerops.attention.triage.ReviewTriageWriter;
 import com.sellerops.attention.triage.TriageDisposition;
@@ -79,6 +81,7 @@ abstract class VendorReplyTaskScenarios {
     @Autowired ReviewReplyService replyLane;
     @Autowired ReviewTriageService triage;
     @Autowired ReviewTriageWriter triageWriter;
+    @Autowired ReviewTriageRepository triageRows;
 
     private FakeVendorServer vendor;
     private VendorReplyTaskService tasks;
@@ -119,7 +122,8 @@ abstract class VendorReplyTaskScenarios {
         link.start();
         link.poll();
         tasks = new VendorReplyTaskService(link, bindings, refs, taskCopies, reviews, drafts, approvals, outcomes,
-                CLOCK);
+                triageRows, CLOCK);
+        replyLane.setDelegatedReplyLane(tasks);
         pull = new VendorReviewPullService(link, bindings, refs, reviews, channels, ingestion, followUp, syncJobs,
                 tasks, CLOCK);
     }
@@ -141,12 +145,12 @@ abstract class VendorReplyTaskScenarios {
                     .containsOnly(VendorReplyTaskService.UNVERSIONED);
         });
 
-        assertThat(tasks.openOn(org, review)).isTrue();
+        assertThat(tasks.holds(org, review)).isTrue();
         String ref = VocItemRef.forReview(review);
         assertThat(replyLane.view(org, account, ref).capabilities().canApprove())
                 .as("the flag says what the guard enforces").isFalse();
         assertThatThrownBy(() -> replyLane.decideApproval(org, account, ref, "APPROVED", 1, "cmd-approve-1", seller))
-                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("휴대폰"));
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("맡긴"));
     }
 
     @Test
@@ -172,7 +176,11 @@ abstract class VendorReplyTaskScenarios {
             assertThat(o.getVerification().name()).isEqualTo("UNVERIFIED");
             assertThat(o.getRecordedFingerprint()).isEqualTo(ReviewReplyFingerprint.of(phoneText));
         });
-        assertThat(tasks.openOn(org, review)).as("POSTED ends it").isFalse();
+        assertThat(tasks.holds(org, review)).as("a reported post still holds the review: no second reply from here")
+                .isTrue();
+        assertThat(replyLane.view(org, account, VocItemRef.forReview(review)).capabilities().canApprove()).isFalse();
+        assertThatThrownBy(() -> tasks.requestApproval(org, review))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("이미 담당자가"));
 
         VendorStoreBinding binding = bindings.findByVendorStoreId(vendor.store).orElseThrow();
         binding.setTaskCursor(0);
@@ -190,9 +198,21 @@ abstract class VendorReplyTaskScenarios {
         replyLane.decideApproval(org, account, VocItemRef.forReview(approvedHere), "APPROVED", 1, "cmd-approve-2",
                 seller);
         assertThatThrownBy(() -> tasks.requestApproval(org, approvedHere))
-                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("철회"));
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("해제"));
+
+        UUID notNeeded = pulledReview("v3", "9100000023", "무난해요");
+        needsReply(notNeeded);
+        drafts.save(org, notNeeded, "SELLER:" + seller, "감사합니다.", 0);
+        triage.decide(org, notNeeded, TriageDisposition.MONITOR.name(), "cmd-monitor-" + notNeeded, seller);
+        assertThatThrownBy(() -> tasks.handOver(org, notNeeded)).as("a review the seller now only watches")
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("대응 필요"));
+        UUID undecided = pulledReview("v4", "9100000024", "그럭저럭");
+        assertThatThrownBy(() -> tasks.requestApproval(org, undecided)).as("and one nobody has decided")
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("대응 필요"));
+        assertThat(vendor.submitted).isEmpty();
 
         UUID noDraft = pulledReview("v2", "9100000022", "사이즈가 맞아요");
+        needsReply(noDraft);
         assertThatThrownBy(() -> tasks.requestApproval(org, noDraft))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("초안"));
 
@@ -201,7 +221,62 @@ abstract class VendorReplyTaskScenarios {
         assertThatThrownBy(() -> tasks.requestApproval(org, noDraft))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("취소"));
         assertThat(vendor.submitted).isEmpty();
-        assertThat(tasks.openOn(org, noDraft)).isFalse();
+        assertThat(tasks.holds(org, noDraft)).isFalse();
+    }
+
+    @Test
+    void handingOverApprovesTheSavedDraftHereAndTheSellerCanTakeItBack() {
+        UUID review = pulledReview("v1", "9100000041", "설명서가 작아요");
+        needsReply(review);
+        String text = "불편을 드려 죄송합니다. 큰 글씨 설명서를 보내 드리겠습니다.";
+        drafts.save(org, review, "SELLER:" + seller, text, 0);
+        String ref = VocItemRef.forReview(review);
+        assertThat(replyLane.view(org, account, ref).delegation()).satisfies(d -> {
+            assertThat(d.taskState()).isNull();
+            assertThat(d.canSend()).isTrue();
+            assertThat(d.canCancel()).isFalse();
+        });
+
+        VendorReplyTaskService.TaskView handed = tasks.handOver(org, review);
+        assertThat(handed.state()).isEqualTo("APPROVED");
+        UUID task = vendorTaskOf(handed);
+        assertThat(vendor.tasks.get(task).approvedFingerprint()).as("approved: exactly the text sent")
+                .isEqualTo(ReviewReplyFingerprint.of(text));
+        assertThat(vendor.approveCommands).containsExactly("pc-approve:" + task + ":1");
+        assertThat(approvals.current(org, review)).as("the server holds the approval, not this PC's copy road")
+                .isEmpty();
+        ReviewReplyDelegationView held = replyLane.view(org, account, ref).delegation();
+        assertThat(held.taskState()).isEqualTo("APPROVED");
+        assertThat(held.canSend()).as("approved: not sent again").isFalse();
+        assertThat(held.canCancel()).isTrue();
+        assertThatThrownBy(() -> tasks.handOver(org, review))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("취소"));
+
+        assertThat(tasks.cancel(org, review).state()).isEqualTo("CANCELLED");
+        assertThat(tasks.holds(org, review)).isFalse();
+        ReviewReplyDelegationView after = replyLane.view(org, account, ref).delegation();
+        assertThat(after.canSend()).as("cancelled: the seller may send again").isTrue();
+        assertThat(after.canCancel()).isFalse();
+        assertThat(replyLane.view(org, account, ref).capabilities().canApprove()).as("and approve here again")
+                .isTrue();
+        assertThatThrownBy(() -> tasks.cancel(org, review))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("취소할 수 있는"));
+    }
+
+    @Test
+    void aClaimedTaskIsOnlyAskedToStopAndAReviewNotFromTheServerHasNoLane() {
+        UUID review = pulledReview("v1", "9100000051", "배송이 늦어요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "늦어져 죄송합니다.", 0);
+        UUID task = vendorTaskOf(tasks.handOver(org, review));
+        vendor.move(task, "CLAIMED", "늦어져 죄송합니다.", vendor.tasks.get(task).approvedFingerprint(), false);
+        pull.pullFor(org);
+
+        assertThat(tasks.cancel(org, review).state()).isEqualTo("CANCEL_REQUESTED");
+        assertThat(tasks.holds(org, review)).as("the delegate may already have saved it").isTrue();
+        assertThat(replyLane.view(org, account, VocItemRef.forReview(review)).delegation().canCancel()).isFalse();
+
+        assertThat(tasks.describe(org, UUID.randomUUID(), true)).as("not received from the server").isNull();
     }
 
     @Test

@@ -10,6 +10,10 @@ import com.sellerops.attention.reply.ReviewReplyDraftService;
 import com.sellerops.attention.reply.ReviewReplyFingerprint;
 import com.sellerops.attention.reply.ReviewReplyOutcomeService;
 import com.sellerops.attention.reply.ReviewReplyValidation;
+import com.sellerops.attention.reply.dto.ReviewReplyDelegationView;
+import com.sellerops.attention.triage.ReviewTriage;
+import com.sellerops.attention.triage.ReviewTriageRepository;
+import com.sellerops.attention.triage.TriageDisposition;
 import com.sellerops.common.ApiException;
 import com.sellerops.common.ReviewBodyFingerprint;
 import com.sellerops.review.Review;
@@ -22,6 +26,7 @@ import com.sellerops.vendorlink.VendorServerClient.TaskSnapshot;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,10 +39,12 @@ import org.springframework.stereotype.Service;
  * decisions of 2026-10-21:
  *
  * <ol>
- *   <li><b>Only a draft the seller sends goes to the phone.</b> {@link #requestApproval} is the seller pressing
- *       「휴대폰으로 승인 요청」 on this PC for a review's current draft; nothing is sent on its own.</li>
+ *   <li><b>Only a draft the seller sends leaves this PC.</b> {@link #requestApproval} is the seller pressing
+ *       「휴대폰으로 승인 요청」 for a review's current draft, {@link #handOver} is 「승인하고 담당자에게 맡기기」 — the
+ *       same draft approved here and now (D9). Nothing is sent on its own.</li>
  *   <li><b>Only the seller's own 'no reply' is told to the server.</b> {@link #reportNoReply} sends a review whose
  *       triage a person set to {@code NO_ACTION}; an automated judgement is never sent.</li>
+ *   <li><b>The seller can take it back from here</b> ({@link #cancel}, D10) as well as from the phone.</li>
  * </ol>
  *
  * <p>The server is the state of record. {@link #sync} copies its task changes here ({@link VendorReplyTask}); while a
@@ -59,6 +66,10 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
     static final int MAX_PAGES = 25;
     /** Who wrote what this lane records: the vendor's delegate, reported through the server. */
     static final String ACTOR = "VENDOR_DELEGATE";
+    /** A draft may (again) be sent while the review has no task, or its task still awaits approval or has ended unposted. */
+    static final Set<String> SENDABLE = Set.of("AWAITING_APPROVAL", "RECHECK_NEEDED", "FAILED", "CANCELLED", "INVALIDATED");
+    /** What the server still lets the seller cancel (§4.2). */
+    static final Set<String> CANCELLABLE = Set.of("AWAITING_APPROVAL", "RECHECK_NEEDED", "APPROVED", "CLAIMED");
 
     /** What the seller's screen may know of a task. */
     public record TaskView(UUID reviewId, String state, int draftVersion, boolean editedOnMobile,
@@ -78,20 +89,22 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
     private final ReviewReplyDraftService drafts;
     private final ReviewReplyApprovalService approvals;
     private final ReviewReplyOutcomeService outcomes;
+    private final ReviewTriageRepository triages;
     private final Clock clock;
 
     @Autowired
     public VendorReplyTaskService(VendorLinkService link, VendorStoreBindingRepository bindings,
                                   VendorReviewRefRepository refs, VendorReplyTaskRepository tasks,
                                   ReviewRepository reviews, ReviewReplyDraftService drafts,
-                                  ReviewReplyApprovalService approvals, ReviewReplyOutcomeService outcomes) {
-        this(link, bindings, refs, tasks, reviews, drafts, approvals, outcomes, Clock.systemUTC());
+                                  ReviewReplyApprovalService approvals, ReviewReplyOutcomeService outcomes,
+                                  ReviewTriageRepository triages) {
+        this(link, bindings, refs, tasks, reviews, drafts, approvals, outcomes, triages, Clock.systemUTC());
     }
 
     VendorReplyTaskService(VendorLinkService link, VendorStoreBindingRepository bindings,
                            VendorReviewRefRepository refs, VendorReplyTaskRepository tasks, ReviewRepository reviews,
                            ReviewReplyDraftService drafts, ReviewReplyApprovalService approvals,
-                           ReviewReplyOutcomeService outcomes, Clock clock) {
+                           ReviewReplyOutcomeService outcomes, ReviewTriageRepository triages, Clock clock) {
         this.link = link;
         this.bindings = bindings;
         this.refs = refs;
@@ -100,12 +113,32 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         this.drafts = drafts;
         this.approvals = approvals;
         this.outcomes = outcomes;
+        this.triages = triages;
         this.clock = clock;
     }
 
+    /**
+     * Open, or reported posted. {@code POSTED} ends the task on the server, but until the channel itself says the
+     * review is answered (the next upload's 답글여부) nothing else on this PC knows a reply is out — approving here
+     * then would be the second reply.
+     */
     @Override
-    public boolean openOn(UUID orgId, UUID reviewId) {
-        return tasks.existsByOrgIdAndReviewIdAndStateNotIn(orgId, reviewId, VendorReplyTask.ENDED);
+    public boolean holds(UUID orgId, UUID reviewId) {
+        return tasks.existsByOrgIdAndReviewIdAndStateNotIn(orgId, reviewId, UNPOSTED_ENDS);
+    }
+
+    private static final Set<String> UNPOSTED_ENDS = Set.of("FAILED", "CANCELLED", "INVALIDATED");
+
+    @Override
+    public ReviewReplyDelegationView describe(UUID orgId, UUID reviewId, boolean draftReady) {
+        if (link.installToken().isEmpty() || refs.findByReviewId(reviewId).isEmpty()) {
+            return null;
+        }
+        Optional<VendorReplyTask> task = tasks.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(orgId, reviewId);
+        String state = task.map(VendorReplyTask::getState).orElse(null);
+        return new ReviewReplyDelegationView(state, task.map(VendorReplyTask::isEditedOnMobile).orElse(false),
+                draftReady && (state == null || SENDABLE.contains(state)),
+                state != null && CANCELLABLE.contains(state));
     }
 
     /** The latest task this PC knows for the review, if any. */
@@ -118,6 +151,60 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
      * sends the new text as the task's next version while it still awaits approval.
      */
     public synchronized TaskView requestApproval(UUID orgId, UUID reviewId) {
+        return TaskView.of(send(orgId, reviewId).task());
+    }
+
+    /**
+     * 「승인하고 담당자에게 맡기기」 (D9): the seller, at this PC, sends the review's current draft and approves exactly
+     * that version and text in one press — the delegate can claim it without a trip to the phone. If the approval is
+     * refused after the draft went, the task stays awaiting approval on the phone and the seller is told so.
+     */
+    public synchronized TaskView handOver(UUID orgId, UUID reviewId) {
+        Sent sent = send(orgId, reviewId);
+        TaskSnapshot submitted = sent.snapshot();
+        if (!"AWAITING_APPROVAL".equals(submitted.state())) {
+            throw ApiException.conflict("휴대폰으로 보낸 답글이 다시 확인을 기다리고 있습니다. 초안을 확인한 뒤 다시 보내세요.");
+        }
+        TaskSnapshot approved;
+        try {
+            approved = link.client().approve(sent.token(), submitted.id(), submitted.draftVersion(),
+                    submitted.draftFingerprint(), "pc-approve:" + submitted.id() + ":" + submitted.draftVersion());
+        } catch (VendorServerClient.TaskRefused e) {
+            throw ApiException.conflict("답글은 보냈지만 승인하지 못했습니다. 휴대폰에서 승인하거나 다시 시도하세요.");
+        } catch (VendorServerClient.Refused e) {
+            throw ApiException.conflict("공급자 서버가 이 PC의 요청을 받지 않았습니다. 연결 상태를 확인하세요.");
+        } catch (VendorServerClient.Unreachable e) {
+            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "답글은 보냈지만 승인 결과를 받지 못했습니다. 잠시 후 다시 확인하세요.");
+        }
+        return TaskView.of(apply(orgId, reviewId, sent.binding().getVendorStoreId(), approved));
+    }
+
+    /** 「요청 취소」 (D10): ends the task at once until a delegate claims it; after that, asks the delegate to stop. */
+    public synchronized TaskView cancel(UUID orgId, UUID reviewId) {
+        VendorReplyTask task = tasks.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(orgId, reviewId)
+                .filter(t -> CANCELLABLE.contains(t.getState()))
+                .orElseThrow(() -> ApiException.conflict("취소할 수 있는 요청이 없습니다."));
+        String token = link.installToken()
+                .orElseThrow(() -> ApiException.conflict("공급자 서버에 연결된 PC가 아닙니다."));
+        TaskSnapshot snapshot;
+        try {
+            snapshot = link.client().cancel(token, task.getVendorTaskId(),
+                    "pc-cancel:" + task.getVendorTaskId() + ":" + task.getStateVersion());
+        } catch (VendorServerClient.TaskRefused e) {
+            throw ApiException.conflict("요청 상태가 바뀌어 취소하지 못했습니다. 리뷰를 다시 받아 온 뒤 확인하세요.");
+        } catch (VendorServerClient.Refused e) {
+            throw ApiException.conflict("공급자 서버가 이 PC의 요청을 받지 않았습니다. 연결 상태를 확인하세요.");
+        } catch (VendorServerClient.Unreachable e) {
+            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "공급자 서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.");
+        }
+        return TaskView.of(apply(orgId, reviewId, task.getVendorStoreId(), snapshot));
+    }
+
+    private record Sent(VendorStoreBinding binding, String token, TaskSnapshot snapshot, VendorReplyTask task) {}
+
+    /** The checks both presses share, then the draft submitted; the server's answer is copied here. */
+    private Sent send(UUID orgId, UUID reviewId) {
         Review review = reviews.findByIdAndOrgId(reviewId, orgId)
                 .orElseThrow(() -> ApiException.notFound("해당 리뷰를 찾을 수 없습니다."));
         VendorReviewRef ref = refs.findByReviewId(reviewId)
@@ -128,10 +215,19 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         if (review.getReplyState() == ReviewReplyState.ANSWERED) {
             throw ApiException.conflict("채널에 이미 답글이 등록된 리뷰입니다.");
         }
+        if (triages.findByOrgIdAndReviewId(orgId, reviewId).map(ReviewTriage::getDisposition).orElse(null)
+                != TriageDisposition.RESPONSE_NEEDED) {
+            throw ApiException.conflict("'대응 필요'로 기록된 리뷰만 담당자에게 보낼 수 있습니다.");
+        }
+        Optional<VendorReplyTask> latest = tasks.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(orgId, reviewId);
+        if (latest.isPresent() && !SENDABLE.contains(latest.get().getState())) {
+            throw ApiException.conflict(refusal("POSTED".equals(latest.get().getState()) ? "already_posted"
+                    : "task_in_progress"));
+        }
         if (approvals.current(orgId, reviewId).filter(a -> a.getState() == ReviewReplyApprovalState.APPROVED)
                 .isPresent()) {
             // The seller already approved here, for the copy or guided road. Two roads, two replies.
-            throw ApiException.conflict("이 PC에서 이미 승인한 답글입니다. 승인을 철회한 뒤 휴대폰 승인을 요청하세요.");
+            throw ApiException.conflict("여기서 이미 승인한 답글입니다. 담당자에게 보내려면 먼저 승인을 해제하세요.");
         }
         if (!ReviewBodyFingerprint.of(review.getBody()).equals(ref.getBodyFingerprint())) {
             throw ApiException.conflict("리뷰 내용이 서버와 다릅니다. 리뷰를 다시 받아 온 뒤 초안을 확인하세요.");
@@ -152,7 +248,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         } catch (VendorServerClient.Unreachable e) {
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "공급자 서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.");
         }
-        return TaskView.of(apply(orgId, reviewId, binding.getVendorStoreId(), snapshot));
+        return new Sent(binding, token, snapshot, apply(orgId, reviewId, binding.getVendorStoreId(), snapshot));
     }
 
     /** Copies the store's task changes since the last sync. Returns how many were applied. */
@@ -266,7 +362,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
 
     private static String refusal(String code) {
         return switch (code) {
-            case "task_in_progress" -> "이미 승인됐거나 담당자가 등록 중인 답글이 있습니다. 바꾸려면 휴대폰에서 먼저 취소하세요.";
+            case "task_in_progress" -> "이미 승인됐거나 담당자가 등록 중인 답글이 있습니다. 바꾸려면 먼저 요청을 취소하세요.";
             case "review_changed" -> "리뷰 내용이 바뀌었습니다. 리뷰를 다시 받아 온 뒤 초안을 확인하세요.";
             case "already_replied" -> "채널에 이미 답글이 등록된 리뷰입니다.";
             case "already_posted" -> "이 리뷰에는 이미 담당자가 답글을 등록했습니다.";

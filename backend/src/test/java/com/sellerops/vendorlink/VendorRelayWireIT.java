@@ -74,6 +74,7 @@ class VendorRelayWireIT {
     @Autowired com.sellerops.attention.reply.ReviewReplyOutcomeService outcomes;
     @Autowired com.sellerops.attention.reply.ReviewReplyOutcomeRepository outcomeRows;
     @Autowired com.sellerops.attention.triage.ReviewTriageService triage;
+    @Autowired com.sellerops.attention.triage.ReviewTriageRepository triageRows;
 
     @Test
     void theRealServersFeedAndTheWholeReplyLoopReachThisPc() {
@@ -95,7 +96,7 @@ class VendorRelayWireIT {
         link.start();
         link.poll();
         VendorReplyTaskService replyTasks = new VendorReplyTaskService(link, bindings, refs, taskCopies, reviews, drafts,
-                approvals, outcomes, Clock.systemUTC());
+                approvals, outcomes, triageRows, Clock.systemUTC());
         VendorReviewPullService pull = new VendorReviewPullService(link, bindings, refs, reviews, channels, ingestion,
                 followUp, syncJobs, replyTasks, Clock.systemUTC());
 
@@ -145,7 +146,7 @@ class VendorRelayWireIT {
                 + "\",\"method\":\"SELLER_CENTER_SCREEN\",\"commandId\":\"wire-report\"}")).isEqualTo(200);
 
         assertThat(pull.pullFor(org).stores().get(0).taskChanges()).isGreaterThanOrEqualTo(3);
-        assertThat(replyTasks.openOn(org, answer.getId())).isFalse();
+        assertThat(replyTasks.holds(org, answer.getId())).as("reported posted: still held").isTrue();
         assertThat(outcomeRows.findAllByOrgIdAndReviewIdOrderByCreatedAtDesc(org, answer.getId())).singleElement()
                 .satisfies(recorded -> {
                     assertThat(recorded.getOperatorOutcome())
@@ -154,8 +155,24 @@ class VendorRelayWireIT {
                     assertThat(recorded.getRecordedFingerprint()).isEqualTo(fingerprint);
                 });
 
+        // 「승인하고 담당자에게 맡기기」 on another review: approved on the server by this PC, listed for the delegate,
+        // then taken back with 「요청 취소」.
+        Review handed = stored.stream().filter(r -> !r.getId().equals(answer.getId())
+                && r.getReplyState() != com.sellerops.review.ReviewReplyState.ANSWERED).findFirst().orElseThrow();
+        triage.decide(org, handed.getId(), "RESPONSE_NEEDED", "wire-needs-2", seller);
+        drafts.save(org, handed.getId(), "SELLER:" + seller, "확인 감사합니다. 더 꼼꼼히 챙기겠습니다.", 0);
+        assertThat(replyTasks.handOver(org, handed.getId()).state()).isEqualTo("APPROVED");
+        String handedTask = taskCopies.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(org, handed.getId())
+                .orElseThrow().getVendorTaskId().toString();
+        assertThat(json(get("/v1/delegate/tasks?state=APPROVED", delegate)).findValuesAsText("id"))
+                .contains(handedTask);
+        assertThat(replyTasks.cancel(org, handed.getId()).state()).isEqualTo("CANCELLED");
+        assertThat(json(get("/v1/delegate/tasks?state=APPROVED", delegate)).findValuesAsText("id"))
+                .doesNotContain(handedTask);
+
         // The seller's own 'no reply' on another review reaches the server once.
-        Review quiet = stored.stream().filter(r -> !r.getId().equals(answer.getId())).findFirst().orElseThrow();
+        Review quiet = stored.stream().filter(r -> !r.getId().equals(answer.getId())
+                && !r.getId().equals(handed.getId())).findFirst().orElseThrow();
         triage.decide(org, quiet.getId(), "NO_ACTION", "wire-quiet", seller);
         assertThat(pull.pullFor(org).stores().get(0).noReplyReported()).isEqualTo(1);
         assertThat(pull.pullFor(org).stores().get(0).noReplyReported()).isZero();
@@ -238,6 +255,17 @@ class VendorRelayWireIT {
         public TaskSnapshot submitDraft(String installToken, UUID storeId, UUID reviewId, String body,
                                         DraftMeta meta) {
             return real.submitDraft(installToken, storeId, reviewId, body, meta);
+        }
+
+        @Override
+        public TaskSnapshot approve(String installToken, UUID taskId, int version, String fingerprint,
+                                    String commandId) {
+            return real.approve(installToken, taskId, version, fingerprint, commandId);
+        }
+
+        @Override
+        public TaskSnapshot cancel(String installToken, UUID taskId, String commandId) {
+            return real.cancel(installToken, taskId, commandId);
         }
 
         @Override
