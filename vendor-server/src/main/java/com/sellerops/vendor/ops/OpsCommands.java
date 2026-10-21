@@ -18,7 +18,7 @@ import java.util.UUID;
  *   java -jar vendor-server.jar invite seller@example.com              # prints the invite code once
  *   java -jar vendor-server.jar suspend seller@example.com             # ends its sessions and installs at the next request
  *   java -jar vendor-server.jar reinstate seller@example.com
- *   java -jar vendor-server.jar invite-delegate me@example.com [admin] # prints the delegate invite code once
+ *   java -jar vendor-server.jar invite-delegate me@example.com [admin] # prints the delegate's join link once
  *   java -jar vendor-server.jar suspend-delegate me@example.com        # ends sessions and every store assignment
  *   java -jar vendor-server.jar reinstate-delegate me@example.com      # the account only; assign stores again
  *   java -jar vendor-server.jar add-store seller@example.com 라벨       # a seller's NAVER store; prints its id
@@ -27,7 +27,10 @@ import java.util.UUID;
  * </pre>
  *
  * <p>Invite codes are printed to the operator's terminal and nowhere else — they are not logged, and the database
- * keeps only their hash. The operator hands each to its person.
+ * keeps only their hash. The operator hands each to its person. A delegate's invite is printed as the join page's
+ * link with the code in its fragment ({@code /delegate/join#…}): the code is 43 characters, not something to type,
+ * and a fragment never reaches a server log. The link starts with {@code vendor.public-url} when the deployment sets
+ * it; without it only the path is printed, to be put after the server's address.
  */
 public final class OpsCommands {
 
@@ -38,8 +41,11 @@ public final class OpsCommands {
             + "suspend-delegate|reinstate-delegate <email> · add-store <seller-email> <label> · "
             + "assign|unassign <delegate-email> <store-id>";
 
-    /** The services the commands act on. */
-    public record Services(SellerAccounts accounts, Delegates delegates, Stores stores) {}
+    /** The page a delegate's invite link opens; the code follows {@code #}. */
+    public static final String JOIN_PATH = "/delegate/join#";
+
+    /** The services the commands act on, and the server's public address ({@code ""} when not set). */
+    public record Services(SellerAccounts accounts, Delegates delegates, Stores stores, String publicUrl) {}
 
     private OpsCommands() {
     }
@@ -60,8 +66,7 @@ public final class OpsCommands {
                     yield usage(out);
                 }
                 Delegates.Role role = args.length == 3 ? Delegates.Role.ADMIN : Delegates.Role.DELEGATE;
-                yield invite(out, () -> services.delegates().issueInvite(args[1], role),
-                        Delegates.INVITE_LIFETIME.toDays());
+                yield joinLink(services, out, args[1], role);
             }
             case "add-store" -> args.length < 3 ? usage(out) : addStore(services, args, out);
             default -> args.length == 3 ? assignment(services, name, args[1], args[2], out) : usage(out);
@@ -133,6 +138,23 @@ public final class OpsCommands {
             out.println("not an e-mail address");
             return 2;
         }
+    }
+
+    private static int joinLink(Services services, PrintStream out, String email, Delegates.Role role) {
+        String code;
+        try {
+            code = services.delegates().issueInvite(email, role);
+        } catch (IllegalArgumentException e) {
+            out.println("not an e-mail address");
+            return 2;
+        }
+        String base = services.publicUrl() == null ? "" : services.publicUrl().strip().replaceAll("/+$", "");
+        long days = Delegates.INVITE_LIFETIME.toDays();
+        out.println(base.isEmpty()
+                ? "join link path (valid " + days + " days, shown once; put the server's address in front): "
+                        + JOIN_PATH + code
+                : "join link (valid " + days + " days, shown once): " + base + JOIN_PATH + code);
+        return 0;
     }
 
     private static int done(PrintStream out, boolean ok, String yes, String no) {

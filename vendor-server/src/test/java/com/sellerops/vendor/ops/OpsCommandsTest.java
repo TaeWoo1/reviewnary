@@ -33,7 +33,7 @@ class OpsCommandsTest {
 
     @BeforeEach
     void setUp() {
-        services = new OpsCommands.Services(accounts, delegates, stores);
+        services = new OpsCommands.Services(accounts, delegates, stores, "https://vendor.example.com/");
         out = new ByteArrayOutputStream();
     }
 
@@ -53,7 +53,9 @@ class OpsCommandsTest {
         String person = "ops-delegate-" + UUID.randomUUID() + "@example.com";
 
         assertThat(run("invite-delegate", person, "admin")).isZero();
-        String invite = lastWord();
+        String link = lastWord();
+        assertThat(link).startsWith("https://vendor.example.com/delegate/join#");
+        String invite = link.substring(link.indexOf('#') + 1);
         Delegates.Staged staged = delegates.stage(invite, "a long enough password");
         UUID delegateId = delegates.confirm(invite, TestTotp.code(staged.secret(), Instant.now(), 0)).delegateId();
         assertThat(delegates.active(delegateId)).hasValueSatisfying(
@@ -74,6 +76,16 @@ class OpsCommandsTest {
         assertThat(run("assign", person, storeId.toString())).isEqualTo(1);
         assertThat(run("reinstate-delegate", person)).isZero();
         assertThat(run("assign", person, storeId.toString())).isZero();
+    }
+
+    @Test
+    void withoutAPublicAddressTheJoinLinkIsPrintedAsAPath() {
+        services = new OpsCommands.Services(accounts, delegates, stores, "");
+        assertThat(run("invite-delegate", "ops-path-" + UUID.randomUUID() + "@example.com")).isZero();
+        String path = lastWord();
+        assertThat(path).startsWith("/delegate/join#");
+        Delegates.Staged staged = delegates.stage(path.substring(path.indexOf('#') + 1), "a long enough password");
+        assertThat(staged.secret()).isNotBlank();
     }
 
     @Test

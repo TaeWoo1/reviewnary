@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>담당자 등록 · reviewnary</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <script src="/delegate/join.js" defer></script>
+</head>
+<body>
+<main class="page" aria-label="담당자 등록">
+  <div class="stack">
+    <div class="steps no-print" aria-hidden="true">
+      <span id="s1" class="on">1 비밀번호</span><span>·</span><span id="s2">2 인증 앱</span><span>·</span><span id="s3">3 복구 코드</span>
+    </div>
+
+    <section id="view-none" class="stack" hidden>
+      <h1>담당자 등록</h1>
+      <div class="card"><p class="sm bad-text">초대 링크가 없습니다. 초대한 사람에게 받은 링크를 그대로 여세요. 이 화면을 새로고침했다면 링크를 다시 여세요.</p></div>
+    </section>
+
+    <section id="view-password" class="stack" hidden>
+      <h1>담당자 등록</h1>
+      <form id="password-form" class="card stack8" novalidate>
+        <div class="inset"><p class="sm good-text">초대 링크로 열었습니다.</p></div>
+        <p class="sm">이 담당자 계정의 비밀번호를 정하세요.</p>
+        <label for="password">비밀번호 (10자 이상)</label>
+        <input id="password" type="password" autocomplete="new-password" required>
+        <label for="password2">비밀번호 확인</label>
+        <input id="password2" type="password" autocomplete="new-password" required>
+        <p id="password-error" class="msg bad-text" role="alert" hidden></p>
+        <button type="submit" id="password-next" class="btn solid big">다음</button>
+      </form>
+      <p class="xs muted">초대 링크는 7일 동안 한 번만 쓸 수 있습니다. 링크 속 코드는 이 화면이 읽자마자 주소창에서 지웠습니다. 이 단계에서는 아직 계정이 만들어지지 않습니다.</p>
+    </section>
+
+    <section id="view-totp" class="stack" hidden>
+      <h1>인증 앱 등록</h1>
+      <form id="totp-form" class="card stack" novalidate>
+        <p class="sm">Google Authenticator 같은 인증 앱으로 아래 QR을 찍으세요.</p>
+        <div class="row">
+          <canvas id="qr" class="qr" width="0" height="0" role="img" aria-label="인증 앱 등록 QR 코드"></canvas>
+          <div class="stack8 grow">
+            <p class="xs muted">QR을 찍을 수 없으면 앱에 이 키를 직접 입력하세요.</p>
+            <p id="secret" class="key"></p>
+          </div>
+        </div>
+        <label for="otp">인증 앱에 나온 6자리 코드</label>
+        <input id="otp" autocomplete="one-time-code" inputmode="numeric" spellcheck="false" required>
+        <p id="totp-error" class="msg bad-text" role="alert" hidden></p>
+        <button type="submit" id="totp-confirm" class="btn solid big">확인</button>
+        <button type="button" id="restart" class="btn link">처음부터 다시 하기</button>
+      </form>
+      <p class="xs muted">코드가 맞아야 계정이 만들어집니다. 처음부터 다시 하면 새 QR이 나오고, 이전 QR은 쓸 수 없습니다.</p>
+    </section>
+
+    <section id="view-codes" class="stack" hidden>
+      <h1>복구 코드</h1>
+      <div class="card stack">
+        <p class="sm">휴대폰을 잃어버려 인증 앱을 쓸 수 없을 때 로그인에 씁니다. <b>각 코드는 한 번만</b> 쓸 수 있고, <b>이 화면을 닫으면 다시 볼 수 없습니다.</b></p>
+        <div id="codes" class="codes inset"></div>
+        <div class="row no-print">
+          <button type="button" id="copy-codes" class="btn outline">복사</button>
+          <button type="button" id="print-codes" class="btn outline">인쇄</button>
+          <span id="copied" class="xs" role="status"></span>
+        </div>
+        <label class="check no-print"><input id="saved" type="checkbox"><span class="sm">복구 코드를 안전한 곳에 적어 두었습니다.</span></label>
+        <button type="button" id="to-desk" class="btn solid big no-print" disabled>작업 화면으로</button>
+      </div>
+    </section>
+  </div>
+</main>
+</body>
+</html>

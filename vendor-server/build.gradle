@@ -30,6 +30,9 @@ dependencies {
     // Reading the delegate's review export (contract §3.1) — same library and version as backend/'s FileParser.
     implementation 'org.apache.poi:poi-ooxml:5.3.0'
     implementation 'org.flywaydb:flyway-database-postgresql'
+    // The authenticator QR on the delegate's join page (contract §2): the page runs under default-src 'self', so the
+    // server encodes the QR and the page only draws its modules. Core only — no image or web module.
+    implementation 'com.google.zxing:core:3.5.3'
     runtimeOnly 'org.postgresql:postgresql'
 
     // Seller sessions (contract §2) — same library and version as backend/.

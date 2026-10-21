@@ -1,6 +1,7 @@
 // The delegate's desk — docs/vendor_server_contract_v1.md §4.3, mockup confirmed 2026-10-21. Opened in a PC browser
 // beside Seller Center: claim an approved reply, look once more just before saving, paste the exact approved text
-// by hand, and report what Seller Center shows. This page and this server post nothing anywhere.
+// by hand, and report what Seller Center shows. A second tab uploads a store's review export (§3.1) as it came out
+// of Seller Center. This page and this server post nothing anywhere.
 //
 // Copying the reply and reporting it posted open only after a clear pre-save check (`clearToPost`); a check that
 // fails or cannot be read means do not post. The session token lives in this tab's sessionStorage and is gone when
@@ -21,6 +22,8 @@
   var task = null;
   var check = null;
   var useRecovery = false;
+  var chosen = null;
+  var MAX_UPLOAD = 10 * 1024 * 1024;
 
   function $(id) { return document.getElementById(id); }
 
@@ -154,6 +157,7 @@
     mine.forEach(function (t) { m.appendChild(item(t, "open")); });
     $("mine-count").textContent = String(mine.length);
     $("mine-section").hidden = mine.length === 0;
+    $("tab-count").textContent = String(open.length + mine.length);
   }
 
   function claim(t, button) {
@@ -314,9 +318,166 @@
     }, function () { $("release").disabled = false; say("task-error", "서버에 연결하지 못했습니다."); });
   });
 
+  /* ── review export upload ─────────────────────────────────────────────────────────────────────────── */
+
+  function tab(name) {
+    var upload = name === "upload";
+    $("tab-tasks").className = upload ? "tab" : "tab on";
+    $("tab-upload").className = upload ? "tab on" : "tab";
+    $("tab-tasks").setAttribute("aria-selected", String(!upload));
+    $("tab-upload").setAttribute("aria-selected", String(upload));
+    $("pane-tasks").hidden = upload;
+    $("pane-upload").hidden = !upload;
+  }
+
+  function stores(list) {
+    var select = $("store");
+    var before = select.value;
+    select.textContent = "";
+    list.forEach(function (s) {
+      var o = document.createElement("option");
+      o.value = s.id;
+      o.textContent = s.label;
+      select.appendChild(o);
+    });
+    if (before && list.some(function (s) { return s.id === before; })) { select.value = before; }
+    select.hidden = list.length === 0;
+    $("no-store").hidden = list.length !== 0;
+    pickable();
+  }
+
+  function pickable() {
+    $("upload").disabled = !(chosen && $("store").value);
+  }
+
+  function choose(file) {
+    resetOutcome();
+    chosen = null;
+    if (!file) { $("file-name").textContent = ".xlsx · 10MB까지"; pickable(); return; }
+    if (file.size > MAX_UPLOAD) {
+      refuse("파일이 10MB보다 큽니다. 판매자센터에서 기간을 나눠 내려받아 올려 주세요.");
+      $("file-name").textContent = ".xlsx · 10MB까지";
+      pickable();
+      return;
+    }
+    chosen = file;
+    $("file-name").textContent = file.name + " · " + Math.max(1, Math.round(file.size / 1024)) + "KB";
+    pickable();
+  }
+
+  function resetOutcome() {
+    $("upload-refused").hidden = true;
+    $("refused-columns").hidden = true;
+    $("upload-result").hidden = true;
+    $("upload-pick").hidden = false;
+  }
+
+  function refuse(text, missing, unexpected) {
+    $("refused-text").textContent = text;
+    var columns = missing != null || unexpected != null;
+    $("refused-columns").hidden = !columns;
+    if (columns) {
+      $("refused-missing").textContent = missing && missing.length ? missing.join(", ") : "없음";
+      $("refused-unexpected").textContent = unexpected && unexpected.length ? unexpected.join(", ") : "없음";
+    }
+    $("upload-refused").hidden = false;
+  }
+
+  function refusal(r) {
+    var j = r.json || {};
+    if (r.status === 400 && j.error === "not_xlsx") { refuse("엑셀(.xlsx) 파일이 아닙니다."); }
+    else if (r.status === 422 && j.error === "header_mismatch") {
+      refuse("판매자센터에서 받은 리뷰 엑셀과 열이 다릅니다. 파일을 고치지 말고 다시 내려받아 올려 주세요. "
+        + "이 파일에서는 아무것도 반영하지 않았습니다.", j.missing || [], j.unexpected || []);
+    } else if (r.status === 422 && j.error === "invalid_rows") {
+      var rows = Array.isArray(j.rows) ? j.rows : [];
+      var count = typeof j.rowCount === "number" ? j.rowCount : rows.length;
+      var named = rows.join(", ") + "행" + (count > rows.length ? " 외 " + (count - rows.length) + "행" : "");
+      refuse(count + "행을 읽지 못했습니다" + (rows.length ? ": " + named : "") + ". 이 파일에서는 아무것도 반영하지 않았습니다.");
+    } else if (r.status === 404) {
+      refuse("이 스토어는 지금 배정돼 있지 않습니다. 새로고침한 뒤 다시 고르세요.");
+    } else if (r.status === 413) {
+      refuse("파일이 10MB보다 큽니다. 판매자센터에서 기간을 나눠 내려받아 올려 주세요.");
+    } else {
+      refuse("올리지 못했습니다. 잠시 후 다시 시도하세요. 반영된 것은 없습니다.");
+    }
+  }
+
+  function uploaded(result) {
+    var store = $("store").options[$("store").selectedIndex];
+    $("result-chip").textContent = ["올렸습니다", store ? store.textContent : "", result.rows + "행"]
+      .filter(Boolean).join(" · ");
+    $("r-added").textContent = String(result.added);
+    $("r-changed").textContent = String(result.changed);
+    $("r-replied").textContent = String(result.replied);
+    $("r-unchanged").textContent = String(result.unchanged);
+    $("r-dropped").textContent = String(result.attachmentsDropped);
+    $("upload-pick").hidden = true;
+    $("upload-result").hidden = false;
+  }
+
+  $("upload-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (!chosen || !$("store").value) { return; }
+    resetOutcome();
+    var form = new FormData();
+    form.append("file", chosen, chosen.name);
+    $("upload").disabled = true;
+    $("upload").textContent = "올리는 중…";
+    var headers = { "Accept": "application/json" };
+    if (session) { headers.Authorization = "Bearer " + session; }
+    fetch("/v1/delegate/stores/" + encodeURIComponent($("store").value) + "/review-uploads", {
+      method: "POST", headers: headers, credentials: "omit", body: form
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        var json = null;
+        try { json = t ? JSON.parse(t) : null; } catch (x) { json = null; }
+        return { status: r.status, json: json };
+      });
+    }).then(function (r) {
+      $("upload").textContent = "올리기";
+      if (r.status === 401) { keep(null); show("login"); return; }
+      if (r.status === 201 && r.json) {
+        chosen = null;
+        $("file").value = "";
+        $("file-name").textContent = ".xlsx · 10MB까지";
+        uploaded(r.json);
+      } else {
+        refusal(r);
+      }
+      pickable();
+    }, function () {
+      $("upload").textContent = "올리기";
+      refuse("서버에 연결하지 못했습니다. 반영된 것은 없습니다.");
+      pickable();
+    });
+  });
+
+  $("file").addEventListener("change", function () { choose($("file").files && $("file").files[0]); });
+  $("store").addEventListener("change", function () { resetOutcome(); pickable(); });
+  $("drop").addEventListener("dragover", function (e) { e.preventDefault(); $("drop").className = "drop stack8 over"; });
+  $("drop").addEventListener("dragleave", function () { $("drop").className = "drop stack8"; });
+  $("drop").addEventListener("drop", function (e) {
+    e.preventDefault();
+    $("drop").className = "drop stack8";
+    choose(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+  });
+  $("upload-again").addEventListener("click", function () { resetOutcome(); });
+  $("tab-tasks").addEventListener("click", function () { tab("tasks"); loadList(); });
+  $("tab-upload").addEventListener("click", function () { tab("upload"); whoAmI(); });
+
   $("back").addEventListener("click", function () { loadList(); });
-  $("refresh").addEventListener("click", function () { loadList(); });
-  $("logout").addEventListener("click", function () { keep(null); show("login"); $("email").focus(); });
+  $("refresh").addEventListener("click", function () { whoAmI(); loadList(); });
+  $("logout").addEventListener("click", function () {
+    keep(null);
+    chosen = null;
+    $("file").value = "";
+    $("file-name").textContent = ".xlsx · 10MB까지";
+    resetOutcome();
+    tab("tasks");
+    show("login");
+    $("email").focus();
+  });
 
   $("use-recovery").addEventListener("click", function () {
     useRecovery = !useRecovery;
@@ -347,7 +508,10 @@
 
   function whoAmI() {
     call("GET", "/v1/delegate/me").then(function (r) {
-      if (r.status === 200 && r.json) { $("who").textContent = "담당자 · " + r.json.email; }
+      if (r.status === 200 && r.json) {
+        $("who").textContent = "담당자 · " + r.json.email;
+        stores(Array.isArray(r.json.stores) ? r.json.stores : []);
+      }
     }, function () {});
   }
 

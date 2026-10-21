@@ -36,6 +36,9 @@ public class DelegateAuthController {
     /** Exactly one of {@code otp} and {@code recoveryCode}. */
     public record LoginRequest(@NotBlank String email, @NotBlank String password, String otp, String recoveryCode) {}
 
+    /** {@code qr}: the same URI as rows of modules ({@link OtpQr}) for the join page to draw. */
+    public record StageResponse(String secret, String otpauthUri, List<String> qr) {}
+
     public record EnrolledResponse(String token, Instant expiresAt, List<String> recoveryCodes) {}
 
     public record SessionResponse(String token, Instant expiresAt) {}
@@ -53,7 +56,9 @@ public class DelegateAuthController {
     @PostMapping("/invites/stage")
     public ResponseEntity<?> stage(@RequestBody @Valid StageRequest request) {
         try {
-            return ResponseEntity.ok(delegates.stage(request.inviteCode(), request.password()));
+            Delegates.Staged staged = delegates.stage(request.inviteCode(), request.password());
+            return ResponseEntity.ok(new StageResponse(staged.secret(), staged.otpauthUri(),
+                    OtpQr.rows(staged.otpauthUri())));
         } catch (Delegates.EnrolException e) {
             return failure(e);
         }

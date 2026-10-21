@@ -1,4 +1,5 @@
-/* The seller's approval page (/replies) and the delegate's desk (/delegate) — mockup confirmed 2026-10-21.
+/* The seller's approval page (/replies), the delegate's desk (/delegate) and join page (/delegate/join) — mockups
+   confirmed 2026-10-21.
    Tokens from docs/frontend/reviewnary_design.md (§1 type, §3 spacing, §4 surfaces, §5 colour), as /link uses them.
    No inline style anywhere: the server's CSP (default-src 'self') refuses it. */
 :root {
@@ -99,7 +100,34 @@ dl.facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .num.on { background: var(--brand-700); color: #fff; }
 .num.done { background: rgba(18, 102, 47, .12); color: var(--good); }
 .split { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 16px; align-items: start; }
+/* The join page: steps, the authenticator QR and key, the recovery codes. */
+.steps { display: flex; gap: 8px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.steps .on { color: var(--brand-700); }
+/* Drawn at whole pixels per module (join.js) and shown at that size: a scaled QR blurs its module edges. */
+.qr { flex: none; border-radius: 8px; box-shadow: 0 0 0 1px var(--line); }
+.key { font-variant-numeric: tabular-nums; letter-spacing: .08em; font-weight: 600; background: var(--canvas); border-radius: 8px; padding: 8px 12px; overflow-wrap: anywhere; }
+.codes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; font-variant-numeric: tabular-nums; letter-spacing: .06em; font-weight: 600; }
+label.check { display: flex; gap: 8px; align-items: flex-start; color: var(--ink); margin: 0; cursor: pointer; }
+label.check input { width: 20px; height: 20px; min-height: 0; margin: 2px 0 0; flex: none; }
+/* The desk's two tabs and the export upload. */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.tab { padding: 8px 12px; font-weight: 600; color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab.on { color: var(--ink); border-bottom-color: var(--brand-700); }
+.tab:hover { color: var(--ink); }
+.drop { display: flex; flex-direction: column; align-items: center; margin: 0; border: 1px dashed #B0B8C1; border-radius: 12px; padding: 24px; text-align: center; color: var(--ink); background: var(--surface); cursor: pointer; }
+.drop > * + * { margin-top: 8px; }
+.drop.over { border-color: var(--brand-700); background: var(--brand-50); }
+.file-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+select { width: 100%; min-height: 44px; font: inherit; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; background: var(--surface); }
+.stat { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.stat > div { background: var(--canvas); border-radius: 10px; padding: 12px; }
+.stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
 @media (max-width: 1023px) {
   .page.wide { padding: 24px 16px 40px; }
   .split { grid-template-columns: minmax(0, 1fr); }
+  .stat { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
 }

@@ -19,6 +19,9 @@ spring:
       max-request-size: 12MB
 
 vendor:
+  # The address people open this server at (https://…, no trailing path). Only the operator commands read it, to print
+  # a delegate's join link whole; unset, they print the path alone.
+  public-url: ${VENDOR_PUBLIC_URL:}
   session:
     # HS256 key for seller sessions — at least 32 characters, required; SessionTokens refuses to start without it.
     secret: ${VENDOR_SESSION_SECRET:}

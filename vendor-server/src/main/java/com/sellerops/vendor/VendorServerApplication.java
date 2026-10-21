@@ -27,7 +27,8 @@ public class VendorServerApplication {
             try (ConfigurableApplicationContext context = new SpringApplicationBuilder(VendorServerApplication.class)
                     .web(WebApplicationType.NONE).run()) {
                 code = OpsCommands.run(new OpsCommands.Services(context.getBean(SellerAccounts.class),
-                        context.getBean(Delegates.class), context.getBean(Stores.class)), args, System.out);
+                        context.getBean(Delegates.class), context.getBean(Stores.class),
+                        context.getEnvironment().getProperty("vendor.public-url", "")), args, System.out);
             }
             System.exit(code);
         }

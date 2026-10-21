@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <title>답글 등록 · reviewnary 담당자</title>
+  <title>담당자 · reviewnary</title>
   <link rel="stylesheet" href="/assets/app.css">
   <script src="/delegate/delegate.js" defer></script>
 </head>
 <body>
-<main class="page wide" aria-label="담당자 답글 등록">
+<main class="page wide" aria-label="담당자">
 
   <section id="view-login" class="page" aria-label="담당자 로그인" hidden>
     <h1>담당자 로그인</h1>
@@ -26,22 +26,74 @@
     </form>
   </section>
 
-  <section id="view-list" aria-label="등록할 답글" hidden>
+  <section id="view-list" aria-label="담당자" hidden>
     <div class="stack24">
       <div class="between">
-        <h1>등록할 답글</h1>
+        <h1>담당자</h1>
         <span class="row"><span id="who" class="sm muted"></span><button type="button" id="refresh" class="btn text">새로고침</button><button type="button" id="logout" class="btn text">로그아웃</button></span>
       </div>
-      <p id="list-notice" class="msg" role="status" hidden></p>
-      <div id="mine-section" class="stack" hidden>
-        <h2>내가 맡은 것 <span id="mine-count" class="muted"></span></h2>
-        <div id="mine" class="list"></div>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tab-tasks" class="tab on" aria-selected="true" aria-controls="pane-tasks">등록할 답글 <span id="tab-count" class="muted"></span></button>
+        <button type="button" role="tab" id="tab-upload" class="tab" aria-selected="false" aria-controls="pane-upload">리뷰 파일 올리기</button>
       </div>
-      <div class="stack">
-        <h2>승인된 답글 <span id="open-count" class="muted"></span></h2>
-        <div id="open" class="list"></div>
-        <p id="open-empty" class="card muted" hidden>등록을 기다리는 승인된 답글이 없습니다.</p>
-        <p class="xs muted">「맡기」를 먼저 누른 한 사람만 그 답글을 등록합니다.</p>
+
+      <div id="pane-tasks" class="stack24" role="tabpanel" aria-labelledby="tab-tasks">
+        <p id="list-notice" class="msg" role="status" hidden></p>
+        <div id="mine-section" class="stack" hidden>
+          <h2>내가 맡은 것 <span id="mine-count" class="muted"></span></h2>
+          <div id="mine" class="list"></div>
+        </div>
+        <div class="stack">
+          <h2>승인된 답글 <span id="open-count" class="muted"></span></h2>
+          <div id="open" class="list"></div>
+          <p id="open-empty" class="card muted" hidden>등록을 기다리는 승인된 답글이 없습니다.</p>
+          <p class="xs muted">「맡기」를 먼저 누른 한 사람만 그 답글을 등록합니다.</p>
+        </div>
+      </div>
+
+      <div id="pane-upload" class="stack" role="tabpanel" aria-labelledby="tab-upload" hidden>
+        <div id="upload-refused" class="card stack8" role="alert" hidden>
+          <span class="chip bad">올리지 못했습니다</span>
+          <p id="refused-text" class="sm"></p>
+          <dl id="refused-columns" class="facts" hidden>
+            <dt>없는 열</dt><dd id="refused-missing"></dd>
+            <dt>모르는 열</dt><dd id="refused-unexpected"></dd>
+          </dl>
+        </div>
+        <div id="upload-pick" class="split">
+          <form id="upload-form" class="card stack" novalidate>
+            <div>
+              <label for="store">스토어</label>
+              <select id="store"></select>
+              <p id="no-store" class="sm muted" hidden>지금 배정된 스토어가 없습니다. 운영자에게 스토어 배정을 요청하세요.</p>
+            </div>
+            <label id="drop" for="file" class="drop stack8">
+              <span class="strong">리뷰 엑셀 파일을 여기에 끌어 놓거나</span>
+              <span class="btn outline">파일 고르기</span>
+              <span id="file-name" class="xs muted">.xlsx · 10MB까지</span>
+            </label>
+            <input id="file" type="file" class="file-input" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+            <button type="submit" id="upload" class="btn solid" disabled>올리기</button>
+          </form>
+          <div class="card stack8">
+            <h2 class="sm muted">어떤 파일인가요</h2>
+            <p class="sm">판매자센터 리뷰 관리에서 내려받은 엑셀을 <b>고치지 말고 그대로</b> 올립니다.</p>
+            <p class="sm">작성자 · 주문번호 같은 열은 서버가 읽자마자 버리고 저장하지 않습니다. 올린 파일 자체도 읽은 뒤 바로 지웁니다.</p>
+            <p class="sm">같은 리뷰를 다시 올려도 됩니다. 바뀐 것만 반영합니다.</p>
+          </div>
+        </div>
+        <div id="upload-result" class="card stack" role="status" hidden>
+          <div class="between"><span id="result-chip" class="chip good"></span><button type="button" id="upload-again" class="btn outline">다른 파일 올리기</button></div>
+          <div class="stat">
+            <div><span class="xs muted">새 리뷰</span><b id="r-added"></b></div>
+            <div><span class="xs muted">내용이 바뀐 리뷰</span><b id="r-changed"></b></div>
+            <div><span class="xs muted">새로 답글이 확인된 리뷰</span><b id="r-replied"></b></div>
+            <div><span class="xs muted">그대로</span><b id="r-unchanged"></b></div>
+            <div><span class="xs muted">사진 주소를 뺀 리뷰</span><b id="r-dropped"></b></div>
+          </div>
+          <p class="sm">판매자 PC가 켜져 있으면 몇 분 안에 받아 갑니다.</p>
+          <p class="xs muted">내용이 바뀌었거나 답글이 확인된 리뷰에 승인 대기 중인 답글이 있으면 그 요청은 멈춥니다. 맡은 답글은 「지금 확인」에서 알려 줍니다.</p>
+        </div>
       </div>
     </div>
   </section>

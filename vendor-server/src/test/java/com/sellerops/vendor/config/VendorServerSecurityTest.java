@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sellerops.vendor.TestTotp;
 import com.sellerops.vendor.account.SellerAccounts;
 import com.sellerops.vendor.delegate.Delegates;
+import com.sellerops.vendor.delegate.OtpQrTest;
 import com.sellerops.vendor.install.Installs;
 import com.sellerops.vendor.review.ExportWorkbooks;
 import com.sellerops.vendor.store.Stores;
@@ -228,6 +229,17 @@ class VendorServerSecurityTest {
         for (String asset : List.of("/replies/replies.js", "/delegate/delegate.js", "/assets/app.css")) {
             mvc.perform(get(asset)).andExpect(status().isOk());
         }
+        mvc.perform(get("/delegate/join")).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .forwardedUrl("/delegate/join.html"));
+        mvc.perform(get("/delegate/join.html")).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Content-Security-Policy", org.hamcrest.Matchers.allOf(
+                                org.hamcrest.Matchers.containsString("default-src 'self'"),
+                                org.hamcrest.Matchers.containsString("frame-ancestors 'none'"))))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Referrer-Policy", "no-referrer"));
+        mvc.perform(get("/delegate/join.js")).andExpect(status().isOk());
         mvc.perform(get("/delegate/other.html")).andExpect(status().isNotFound());
         mvc.perform(get("/v1/delegate/tasks")).andExpect(status().isUnauthorized());
     }
@@ -482,9 +494,14 @@ class VendorServerSecurityTest {
     private Delegate enrolDelegate() throws Exception {
         String address = "delegate-" + UUID.randomUUID() + "@example.com";
         String invite = delegates.issueInvite(address, Delegates.Role.DELEGATE);
-        String secret = body(mvc.perform(json(post("/v1/delegate/auth/invites/stage"),
+        JsonNode staged = body(mvc.perform(json(post("/v1/delegate/auth/invites/stage"),
                         "{\"inviteCode\":\"" + invite + "\",\"password\":\"correct horse battery\"}"))
-                .andExpect(status().isOk())).path("secret").asText();
+                .andExpect(status().isOk()));
+        String secret = staged.path("secret").asText();
+        // The join page draws the QR the server encoded — of the same URI, nothing else.
+        assertThat(staged.path("qr")).isNotEmpty();
+        assertThat(OtpQrTest.decode(JSON.convertValue(staged.path("qr"), String[].class)))
+                .isEqualTo(staged.path("otpauthUri").asText());
         JsonNode enrolled = body(mvc.perform(json(post("/v1/delegate/auth/invites/confirm"),
                         "{\"inviteCode\":\"" + invite + "\",\"otp\":\"" + TestTotp.code(secret, Instant.now(), 0)
                                 + "\"}"))
