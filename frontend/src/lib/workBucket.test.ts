@@ -28,6 +28,7 @@ const base: HomeWorkRow = {
   workItemId: "w1",
   channel: "카페24 자사몰",
   rating: null,
+  safety: false,
 };
 
 const rows: HomeWorkRow[] = [

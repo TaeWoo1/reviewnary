@@ -16,6 +16,10 @@ package com.sellerops.review.triage;
  * can clear it today. Body-derived material still reaches the operator on this surface, but only as
  * a CITATION beside the row ({@link ReviewTriageNote}), never as the reason it ranked where it did.
  *
+ * <p><b>One text signal stands beside the tiers, not inside them</b> (product-owner exception, 2026-10-22,
+ * RUBRIC §7): {@link ReviewSafetySignal} adds a review that reports a safety or legal problem to the seller's
+ * undecided list whatever its rating. It never changes what this class returns.
+ *
  * <p>Three cases are worth stating rather than inferring:
  *
  * <ul>

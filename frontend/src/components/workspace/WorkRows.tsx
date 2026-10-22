@@ -141,6 +141,7 @@ export function WorkRows({
         dense={dense}
         metaBelow={queue}
         product={product}
+        alert={row.safety ? SAFETY_MARK : null}
       />
     );
   };
@@ -189,6 +190,9 @@ export function WorkRows({
     </div>
   );
 }
+
+/** The word a row reporting a safety or legal problem carries (product-owner decision, 2026-10-22). */
+export const SAFETY_MARK = "안전 문제";
 
 /** True when the second line would only repeat the sentence already drawn above it. */
 function echoes(line: string, lead: string): boolean {
@@ -320,6 +324,7 @@ function RailRows({
                 })()}
               </span>
               <span className="mt-1.5 block truncate text-xs text-muted">
+                {row.safety ? <span className="font-semibold text-bad">{SAFETY_MARK} · </span> : null}
                 <span className="font-semibold">{state.text}</span>
                 {facts.map((fact) => ` · ${fact}`).join("")}
               </span>

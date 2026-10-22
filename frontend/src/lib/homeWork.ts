@@ -99,6 +99,12 @@ export interface HomeWorkRow {
    * source of truth this file refuses everywhere else; the number is right here on the view that made the row.
    */
   rating: number | null;
+  /**
+   * <b>A review that reports a safety or legal problem</b> — the server's reading of the whole review
+   * (`ReviewSafetySignal`), carried, never derived from the cut `title`. It is the one exception to inquiries first
+   * (product-owner decision, 2026-10-22) and the row says so. Always false for an inquiry.
+   */
+  safety: boolean;
 }
 
 export interface HomeWork {
@@ -175,6 +181,7 @@ export function caseWorkRow(row: CustomerOperationsDecisionRow): HomeWorkRow {
     subject: row.subjectKind,
     subjectId: row.caseId,
     workItemId: null,
+    safety: row.safety === true,
   };
 }
 
@@ -224,11 +231,13 @@ export function mergeHomeWork(
       subject: "REVIEW",
       subjectId: row.reviewId,
       workItemId: null,
+      safety: row.safety === true,
     });
   }
 
   if (reviewWork && reviewWork.attentionTotal > reviewWork.attention.length) truncated = true;
 
+  const safetyReviews = new Set(reviewWork?.safetyReviewIds ?? []);
   // The seller's own reply work before approval. A decided review is not in the undecided list above, so the two
   // never describe one review twice; a case about it still wins, by the same owner key.
   for (const account of reviewWork?.committed ?? []) {
@@ -266,6 +275,7 @@ export function mergeHomeWork(
         subject: "REVIEW",
         subjectId: item.reviewId,
         workItemId: null,
+        safety: safetyReviews.has(item.reviewId),
       });
     }
   }
@@ -312,48 +322,44 @@ export function mergeHomeWork(
       subject: "INQUIRY",
       subjectId: row.inquiryId,
       workItemId: row.workItemId,
+      safety: false,
     });
   }
   if (queue && queue.totalElements > queue.content.length) truncated = true;
 
   /*
-    <b>No single age key across the lanes</b> (product-owner decision, 2026-10-01).
+    <b>One order of importance, not three lanes</b> (product-owner decisions, 2026-10-22 — interview
+    questions 18–20 and 64, replacing the 2026-10-01 lanes Case → Review → Inquiry).
 
-    <p>This list used to end with one comparator — year-plus backlog last, then longest-waiting
-    first across everything — and measured on the live org that produced a Home whose top four rows
-    were네이버 reviews written 339 · 334 · 239 · 212 days ago, with this month's inquiry nowhere on
-    the screen. Three facts explain it and none of them is a missing cutoff:
+    <ol>
+      <li><b>A review that reports a safety or legal problem</b> ({@link HomeWorkRow.safety}) — the
+          one exception to inquiries first, whatever its rating. Newest first among them.</li>
+      <li><b>The inquiries, and the cases about one</b> — longest waiting first. Time urgency is the
+          importance the owner named, and no channel tells us an inquiry's reply deadline, so the one
+          that has waited longest is read as the one nearest it (option A of the 2026-10-22 mockup).
+          This is the reading `/inquiries` has used since Operational Workspace UX System v1.</li>
+      <li><b>The reviews, and the cases about one</b> — newest first, the interview's rule for equal
+          importance: nobody is waiting on a review the way they wait on a question.</li>
+    </ol>
 
-    <ul>
-      <li>339 days is not backlog. {@link isOldBacklog} is the 문의 screen's own predicate and its
-          only boundary is a year, so every one of those rows sat in the RECENT group.</li>
-      <li>The review lane already declares an order and this comparator inverted it. The server
-          serves undecided 확인 필요 reviews `order by r.receivedAt desc` — newest first
-          (`ReviewRepository.findUndecidedByOrgAndTier`).</li>
-      <li>A review's `since` is when the customer WROTE it. Sorting it against an inquiry's receipt
-          time ranks a review nobody is waiting on above a question somebody is.</li>
-    </ul>
+    <p>A case sits with what it is ABOUT, so a case and the inquiry beside it are read by one clock —
+    `since` is the customer's own time on both (the elapsed-time contract). A row with no time goes
+    last in its group: absence of a date is not evidence of urgency.
 
-    <p>So each lane keeps the order it already has, and they are concatenated rather than merged:
-
-    <ul>
-      <li><b>CASE</b> — the server's own lane priority, which is the insertion order above.</li>
-      <li><b>REVIEW</b> — tier rank + `receivedAt desc`, i.e. the order the reads arrived in.</li>
-      <li><b>INQUIRY</b> — oldest first, which is the SLA reading `/inquiries` has used since
-          Operational Workspace UX System v1 (`queueOrder`). It is applied HERE because the queue
-          read itself arrives `createdAt desc` (`InquiryQueueService`), so this is the one lane whose
-          own order has to be restated rather than preserved.</li>
-    </ul>
-
-    <p>The year-plus split stays as the outer grouping — it is `/inquiries`' contract, it is drawn as
-    a divider rather than a sort, and nothing here hides or drops a row. What the Home shows out of
-    this list is {@link homeBriefRows}, which is a composition and not another order.
+    <p>What the 2026-10-01 comment here measured still holds and still shapes this: a review's
+    `since` is when the customer WROTE it, so it is never ranked against an inquiry's receipt by age —
+    the groups are concatenated, never merged. The year-plus split stays as the outer grouping — it
+    is `/inquiries`' contract, drawn as a divider rather than a sort — and nothing here hides or drops
+    a row.
   */
-  const lane = (kind: HomeWorkRow["kind"]) => {
-    const rows = [...byOwner.values()].filter((r) => r.kind === kind);
-    return kind === "INQUIRY" ? rows.sort((a, b) => waitSince(a.since) - waitSince(b.since)) : rows;
-  };
-  const ordered = [...lane("CASE"), ...lane("REVIEW"), ...lane("INQUIRY")];
+  const group = (r: HomeWorkRow) => (r.safety ? 0 : r.subject === "INQUIRY" ? 1 : 2);
+  const at = (r: HomeWorkRow) => waitSince(r.since);
+  const timed = (a: number, b: number) =>
+    a === b ? 0 : !Number.isFinite(a) ? 1 : !Number.isFinite(b) ? -1 : a - b;
+  const ordered = [...byOwner.values()].sort((a, b) => {
+    if (group(a) !== group(b)) return group(a) - group(b);
+    return group(a) === 1 ? timed(at(a), at(b)) : timed(-at(a), -at(b));
+  });
   const rows = [
     ...ordered.filter((r) => !isOldBacklog(r, now)),
     ...ordered.filter((r) => isOldBacklog(r, now)),
@@ -362,51 +368,19 @@ export function mergeHomeWork(
 }
 
 /**
- * <b>What the Home draws out of the list: four slots, allotted by lane</b> (product-owner decision,
- * 2026-10-01 — Review 2 / Inquiry 1 / Case 1).
+ * <b>What the Home draws out of the list: its first rows</b> (product-owner decision, 2026-10-22).
  *
- * <p>Taking the first N of {@link mergeHomeWork}'s order would make the brief whichever lane happens
- * to be longest — on the measured org, four reviews — and the morning's question is 「오늘 무엇을
- * 해야 하는가」, which no single lane answers. The quota is the composition; an empty slot is not held
- * open, it is spent on whatever else is waiting, so a seller with no cases still gets four rows.
- *
- * <p>Inside a lane the order is that lane's own, untouched: this function only chooses how many of
- * each, never which. The leftover pass walks the lanes in quota order (Review → Inquiry → Case), so
- * the same list always produces the same brief.
+ * <p>Until then the brief was four slots allotted by lane — Review 2 / Inquiry 1 / Case 1 (2026-10-01) —
+ * so the morning brief could not show a second inquiry however long it had waited, and measured on a
+ * synthetic morning it left out a review reporting a burn while showing two others. The list's own order
+ * is now the order of importance ({@link mergeHomeWork}), so the brief is simply its head, and the Home
+ * and 확인할 일 can never disagree about what comes first.
  *
  * <p>`limit` is the caller's, because the Home's capacity is a function of the layout
- * (`visibleHomeRows`) and not of this rule. A limit smaller than the quota total fills the lanes in
- * quota order and stops — it never drops a lane's first row to honour a later lane's.
+ * (`visibleHomeRows`) and not of this rule.
  */
-export const HOME_LANE_SLOTS: ReadonlyArray<readonly [HomeWorkRow["kind"], number]> = [
-  ["REVIEW", 2],
-  ["INQUIRY", 1],
-  ["CASE", 1],
-];
-
 export function homeBriefRows(rows: readonly HomeWorkRow[], limit: number): HomeWorkRow[] {
-  if (limit <= 0) return [];
-  const taken = new Set<string>();
-  const picked: HomeWorkRow[] = [];
-  const take = (row: HomeWorkRow) => {
-    taken.add(row.key);
-    picked.push(row);
-  };
-  for (const [kind, quota] of HOME_LANE_SLOTS) {
-    if (picked.length >= limit) break;
-    const room = Math.min(quota, limit - picked.length);
-    for (const row of rows.filter((r) => r.kind === kind).slice(0, room)) take(row);
-  }
-  // Slots no lane could fill. Walked in quota order so the result is a function of the list alone.
-  for (const [kind] of HOME_LANE_SLOTS) {
-    if (picked.length >= limit) break;
-    for (const row of rows.filter((r) => r.kind === kind && !taken.has(r.key))) {
-      if (picked.length >= limit) break;
-      take(row);
-    }
-  }
-  // The list's own order is what the brief is read in — the quota decided how many, not the sequence.
-  return rows.filter((r) => taken.has(r.key)).slice(0, limit);
+  return limit <= 0 ? [] : rows.slice(0, limit);
 }
 
 /**

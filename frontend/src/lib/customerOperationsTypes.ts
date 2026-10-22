@@ -101,6 +101,11 @@ export interface CustomerOperationsDecisionRow {
   /** When the customer's own event happened (KST date). The elapsed-time source wherever it exists. */
   receivedOn: string | null;
   to: string;
+  /**
+   * The case is about a review that reports a safety or legal problem (product-owner decision, 2026-10-22) — the
+   * one reason it is listed ahead of the inquiries. Absent from a server older than that reads as false.
+   */
+  safety?: boolean;
 }
 
 /**

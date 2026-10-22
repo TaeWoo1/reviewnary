@@ -30,6 +30,7 @@ import com.sellerops.responsibility.SourceFailureReason;
 import com.sellerops.review.Review;
 import com.sellerops.review.ReviewReplyState;
 import com.sellerops.review.ReviewRepository;
+import com.sellerops.review.triage.ReviewSafetySignal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -207,7 +208,7 @@ public class CustomerOperationsHomeService {
                     c.getRecommendedAction(), missing(c.getMissingInformation()),
                     c.getPreparedAction() == CasePreparedAction.DRAFT_PREPARED,
                     c.getDecidedBy() == null ? null : c.getDecidedBy().name(), c.getCreatedAt(),
-                    subject.receivedOn(), linkOf(c));
+                    subject.receivedOn(), linkOf(c), subject.safety());
         }).toList();
     }
 
@@ -317,7 +318,12 @@ public class CustomerOperationsHomeService {
      *                   already loads, and by the same expression {@code CaseKnowledgeService.subject} uses — so
      *                   the row and the detail of one case cannot date it differently.
      */
-    private record Subject(String title, String preview, Integer rating, java.time.LocalDate receivedOn) {
+    private record Subject(String title, String preview, Integer rating, java.time.LocalDate receivedOn,
+                           boolean safety) {
+
+        Subject(String title, String preview, Integer rating, java.time.LocalDate receivedOn) {
+            this(title, preview, rating, receivedOn, false);
+        }
     }
 
     private Subject subject(OperationsCase c) {
@@ -338,7 +344,8 @@ public class CustomerOperationsHomeService {
             return reviews.findById(c.getSubjectId()).filter(x -> c.getOrgId().equals(x.getOrgId()))
                     // No preview: a review's title IS its body, and the row would print the sentence twice.
                     .map(x -> new Subject(preview(MarkupText.toPlainText(x.getBody())), null, x.getRating(),
-                            receivedOn(x.getReceivedAt())))
+                            receivedOn(x.getReceivedAt()),
+                            ReviewSafetySignal.in(MarkupText.toPlainText(x.getBody()))))
                     .orElse(new Subject(null, null, null, null));
         }
         return new Subject(null, null, null, null);

@@ -21,6 +21,7 @@ import com.sellerops.repeatedissue.RepeatedIssueWorkspaceService;
 import com.sellerops.review.Review;
 import com.sellerops.review.ReviewProductLabel;
 import com.sellerops.review.ReviewRepository;
+import com.sellerops.review.triage.ReviewSafetySignal;
 import com.sellerops.review.triage.pilot.AiTriagePilotService;
 import com.sellerops.reviewissue.IssueLifecycleState;
 import com.sellerops.reviewissue.ReviewIssueQueryService;
@@ -32,11 +33,15 @@ import com.sellerops.channel.Channel;
 import com.sellerops.channel.ChannelRepository;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,6 +77,12 @@ public class OperationsHomeService {
      * not 「한 화면에서」. The count beside the list says how many there are; 리뷰 기록 열기 opens the rest.
      */
     private static final int MAX_REVIEWS = 3;
+    /**
+     * How many undecided reviews outside 확인 필요 are read for {@link ReviewSafetySignal}, newest first, after the
+     * database has kept only bodies that hold one of its openings. A bound on the read, not on the answer the seller
+     * gets: an org with more candidates than this is reading the newest of them.
+     */
+    static final int SAFETY_SCAN = 200;
     private static final int MAX_PREPARED = 5;
     /**
      * Hardest cap of the four: each problem row costs its own context read (evidence roll-up, the
@@ -145,9 +156,11 @@ public class OperationsHomeService {
             byTier.put(((Number) row[0]).intValue(), ((Number) row[1]).longValue());
         }
 
-        long undecided = reviews.countUndecidedByOrgAndTier(orgId, NEEDS_ATTENTION_RANK, aiEnabled);
-        List<Review> rows = reviews.findUndecidedByOrgAndTier(
-                orgId, NEEDS_ATTENTION_RANK, aiEnabled, PageRequest.of(0, MAX_REVIEWS));
+        List<Review> safety = safetyOutsideAttention(orgId, aiEnabled);
+        long undecided = reviews.countUndecidedByOrgAndTier(orgId, NEEDS_ATTENTION_RANK, aiEnabled) + safety.size();
+        List<Review> rows = Stream.concat(safety.stream(), reviews.findUndecidedByOrgAndTier(
+                orgId, NEEDS_ATTENTION_RANK, aiEnabled, PageRequest.of(0, MAX_REVIEWS)).stream())
+                .limit(MAX_REVIEWS).toList();
 
         return new OperationsHomeView.ReviewAttention(
                 undecided,
@@ -164,14 +177,46 @@ public class OperationsHomeService {
     @Transactional(readOnly = true)
     public List<OperationsHomeView.AttentionReview> undecidedAttention(UUID orgId, int limit) {
         boolean aiEnabled = pilot.isEnabledFor(orgId);
-        return attentionRows(orgId, reviews.findUndecidedByOrgAndTier(
-                orgId, NEEDS_ATTENTION_RANK, aiEnabled, PageRequest.of(0, Math.max(1, limit))));
+        int size = Math.max(1, limit);
+        return attentionRows(orgId, Stream.concat(safetyOutsideAttention(orgId, aiEnabled).stream(),
+                        reviews.findUndecidedByOrgAndTier(orgId, NEEDS_ATTENTION_RANK, aiEnabled,
+                                PageRequest.of(0, size)).stream())
+                .limit(size).toList());
     }
 
     /** How many undecided 확인 필요 reviews exist — the count {@link #undecidedAttention} is a page of. */
     @Transactional(readOnly = true)
     public long undecidedAttentionCount(UUID orgId) {
-        return reviews.countUndecidedByOrgAndTier(orgId, NEEDS_ATTENTION_RANK, pilot.isEnabledFor(orgId));
+        boolean aiEnabled = pilot.isEnabledFor(orgId);
+        return reviews.countUndecidedByOrgAndTier(orgId, NEEDS_ATTENTION_RANK, aiEnabled)
+                + safetyOutsideAttention(orgId, aiEnabled).size();
+    }
+
+    /**
+     * Which of these reviews report a safety or legal problem — for rows that are not this list's own (the seller's
+     * reply work). Another org's review is never read: it is simply not in the answer.
+     */
+    @Transactional(readOnly = true)
+    public Set<UUID> safetyAmong(UUID orgId, Collection<UUID> reviewIds) {
+        if (reviewIds.isEmpty()) {
+            return Set.of();
+        }
+        return reviews.findAllById(reviewIds).stream()
+                .filter(r -> orgId.equals(r.getOrgId()) && ReviewSafetySignal.in(r.getBody()))
+                .map(Review::getId)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    /**
+     * <b>A safety or legal report is the seller's work whatever its rating</b> (product-owner decision, 2026-10-22).
+     * The undecided reviews the 확인 필요 tier does not already hold, read by {@link ReviewSafetySignal}; they come
+     * ahead of the tier's rows and are counted with them, so the list and its number stay one population.
+     */
+    private List<Review> safetyOutsideAttention(UUID orgId, boolean aiEnabled) {
+        return reviews.findUndecidedSafetyCandidatesOutsideTier(orgId, NEEDS_ATTENTION_RANK, aiEnabled,
+                        PageRequest.of(0, SAFETY_SCAN)).stream()
+                .filter(r -> ReviewSafetySignal.in(r.getBody()))
+                .toList();
     }
 
     private List<OperationsHomeView.AttentionReview> attentionRows(UUID orgId, List<Review> rows) {
@@ -210,7 +255,8 @@ public class OperationsHomeService {
                             : review.getReceivedAt().atZone(ZoneOffset.UTC).toLocalDate(),
                     ReviewProductLabel.displayName(review,
                             review.getProductId() == null ? null : productNames.get(review.getProductId())),
-                    quote);
+                    quote,
+                    ReviewSafetySignal.in(review.getBody()));
         }).toList();
     }
 

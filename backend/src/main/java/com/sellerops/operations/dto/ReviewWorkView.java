@@ -2,6 +2,7 @@ package com.sellerops.operations.dto;
 
 import com.sellerops.attention.dto.OperatorVocItem;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -23,7 +24,12 @@ import java.util.UUID;
 public record ReviewWorkView(
         long attentionTotal,
         List<OperationsHomeView.AttentionReview> attention,
-        List<AccountWork> committed) {
+        List<AccountWork> committed,
+        /**
+         * The reviews in {@code committed} that report a safety or legal problem ({@code ReviewSafetySignal}) — an
+         * {@code OperatorVocItem} is metadata only and does not carry it; an {@code attention} row carries its own.
+         */
+        Set<UUID> safetyReviewIds) {
 
     /**
      * One account's share. {@code recentlyReported} is the same read's history — replies the seller reported

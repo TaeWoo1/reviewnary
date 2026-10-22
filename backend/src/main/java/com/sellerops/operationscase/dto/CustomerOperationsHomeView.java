@@ -45,6 +45,9 @@ public record CustomerOperationsHomeView(
      *                   is the customer's SUBJECT line — 「문의 드립니다」 on every one of them — so a queue
      *                   ordered by urgency drew two indistinguishable rows and the seller could not tell which
      *                   was which without opening both (product-owner decision, 2026-10-02).
+     * @param safety     the case is about a review that reports a safety or legal problem
+     *                   ({@code ReviewSafetySignal}, product-owner decision 2026-10-22) — the one reason a review's
+     *                   case is listed ahead of the inquiries. Always false for an inquiry's case.
      * @param receivedOn when the customer's own event happened, in KST — the inquiry's or review's
      *                   {@code receivedAt}, the same field {@code CaseDetailView.receivedOn} reads. It is here
      *                   because the list and the detail of one item must say the same elapsed time, and the list
@@ -56,7 +59,8 @@ public record CustomerOperationsHomeView(
                               Integer rating,
                               String reasonNote, String summary, String recommendedActionType,
                               String recommendedAction, List<String> missingInformation, boolean draftPrepared,
-                              String decidedBy, Instant openedAt, java.time.LocalDate receivedOn, String to) {
+                              String decidedBy, Instant openedAt, java.time.LocalDate receivedOn, String to,
+                              boolean safety) {
     }
 
     /**

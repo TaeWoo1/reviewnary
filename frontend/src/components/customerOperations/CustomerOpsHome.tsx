@@ -104,13 +104,13 @@ const HOME_BRIEF_TITLE = "오늘 먼저 볼 일";
  *
  * <p>It said 「오래 기다린 문의와 리뷰부터 보여드립니다」, and that was an accurate description of the
  * single age comparator this brief used to be sliced from — the one the visual QA removed. The rows
- * are a lane quota now ({@link homeBriefRows}: Review 2 / Inquiry 1 / Case 1), each lane in the order
- * its own source declares, so 「오래 기다린 … 부터」 would be a promise about a ranking that no longer
- * exists and that two of the four rows never obeyed.
+ * are the head of one order of importance now (product-owner decision, 2026-10-22: a review reporting
+ * harm, then inquiries longest-waiting first, then reviews newest first — {@link mergeHomeWork}), so
+ * 「오래 기다린 … 부터」 would still describe only one of its three groups.
  *
  * <p>The sentence says what IS true of every row: it is drawn from both kinds of work, and it is a
- * selection rather than the whole list — which is what the 전체 보기 beside it is for. It claims
- * nothing about order, because the honest answer is three orders and that is the queue screen's.
+ * selection rather than the whole list — which is what the 전체 보기 beside it is for. The order is
+ * not spelled out here; the 2026-10-22 mockup changed the order and the mark, not this sentence.
  */
 const HOME_BRIEF_NOTE = "문의와 리뷰에서 먼저 볼 것을 모았습니다.";
 
@@ -188,10 +188,10 @@ export function CustomerOpsHome({
   // place, and defaulting to narrow there would drop a row on a 1440 screen that has the space.
   const roomy = useWideLayout();
   /*
-    <b>Four slots, allotted by lane</b> (product-owner decision, 2026-10-01 — Review 2 / Inquiry 1 /
-    Case 1). Slicing the first four off one order made the brief whichever lane was longest: measured
-    on the live org it was four네이버 reviews, and this month's inquiry was not on the screen.
-    {@link homeBriefRows} chooses how many of each; the lanes' own orders choose which.
+    <b>The head of the list's own order</b> (product-owner decision, 2026-10-22, replacing the 2026-10-01
+    quota Review 2 / Inquiry 1 / Case 1). The quota existed because one age order had filled the brief
+    with old reviews; the order is now one of importance, in which a review cannot outrank a waiting
+    inquiry unless it reports harm, so the brief and 확인할 일 read the same first rows.
   */
   const shown = homeBriefRows(work.rows, visibleHomeRows(roomy));
   const hidden = work.rows.length - shown.length;

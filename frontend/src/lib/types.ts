@@ -2469,6 +2469,8 @@ export interface ReviewWorkView {
   attentionTotal: number;
   attention: HomeAttentionReview[];
   committed: ReviewWorkAccount[];
+  /** The reviews in `committed` that report a safety or legal problem; an attention row carries its own. */
+  safetyReviewIds?: string[];
 }
 
 export interface ReviewWorkAccount {
@@ -2489,6 +2491,11 @@ export interface HomeAttentionReview {
   productName: string | null;
   /** Masked opening of what the customer wrote; null when masking left nothing to show. */
   quote: string | null;
+  /**
+   * The whole review reports a safety or legal problem — read by the server from the body, not from `quote`
+   * (product-owner decision, 2026-10-22). Such a review is here whatever its rating.
+   */
+  safety?: boolean;
 }
 
 /**

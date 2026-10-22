@@ -73,7 +73,7 @@ class ReviewWorkControllerTest {
         when(accounts.findAllByOrgId(org)).thenReturn(List.of());
         List<OperationsHomeView.AttentionReview> eleven = java.util.stream.IntStream.range(0, 11)
                 .mapToObj(i -> new OperationsHomeView.AttentionReview(UUID.randomUUID(), null, "NAVER", 1,
-                        LocalDate.of(2026, 9, 1), "상품", "불만"))
+                        LocalDate.of(2026, 9, 1), "상품", "불만", false))
                 .toList();
         when(home.undecidedAttention(org, ReviewWorkController.MAX_ATTENTION)).thenReturn(eleven);
         when(home.undecidedAttentionCount(org)).thenReturn(11L);
@@ -81,6 +81,25 @@ class ReviewWorkControllerTest {
         ReviewWorkView view = controller.reviewWork(principal());
         assertThat(view.attention()).hasSize(11);
         assertThat(view.attentionTotal()).isEqualTo(11);
+    }
+
+    @Test
+    void namesTheSellersReplyWorkThatReportsASafetyProblem_askingOnlyAboutItsOwnRows() {
+        Channel naver = channel("NAVER");
+        SellerAccount acc = account(naver);
+        UUID hurt = UUID.randomUUID();
+        UUID fine = UUID.randomUUID();
+        when(channels.findAll()).thenReturn(List.of(naver));
+        when(accounts.findAllByOrgId(org)).thenReturn(List.of(acc));
+        when(attention.replyWork(eq(org), eq(acc.getId()), anyInt(), anyInt())).thenReturn(new OperatorReplyWorkView(
+                acc.getId(), "네이버", null,
+                List.of(item(hurt.toString(), "AWAITING_APPROVAL"), item(fine.toString(), "DRAFT_NEEDED"),
+                        item("not-a-review", "DRAFT_NEEDED")),
+                List.of()));
+        when(home.undecidedAttention(eq(org), anyInt())).thenReturn(List.of());
+        when(home.safetyAmong(org, java.util.Set.of(hurt, fine))).thenReturn(java.util.Set.of(hurt));
+
+        assertThat(controller.reviewWork(principal()).safetyReviewIds()).containsExactly(hurt);
     }
 
     private AuthPrincipal principal() {

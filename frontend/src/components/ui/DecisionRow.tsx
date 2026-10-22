@@ -61,6 +61,7 @@ export function DecisionRow({
   tagHidden = false,
   metaBelow = false,
   product = null,
+  alert = null,
 }: {
   tone: ReasonTone;
   icon: ReasonIcon;
@@ -144,7 +145,18 @@ export function DecisionRow({
    * the default reading a review's product is the row's {@link line}, and moving it would change the Home.
    */
   product?: string | null;
+  /**
+   * <b>Why this row stands above the others when that reason is a harm</b> — 「안전 문제」 for a review that reports
+   * one (product-owner decision, 2026-10-22). Drawn before the sentence in {@code bad}, the tone §5 gives a
+   * negative fact, on its own tint so it reads as a mark and not as the customer's first word.
+   */
+  alert?: string | null;
 }) {
+  const alertMark = alert ? (
+    <span className="mr-1.5 inline-block rounded-md bg-bad/10 px-1.5 py-px align-[1px] text-xs font-semibold text-bad">
+      {alert}
+    </span>
+  ) : null;
   const stateWord = work ? WORK_STATE[work] : null;
   /**
    * <b>The badge goes when it would repeat the state word.</b> `REASON` carries real categories
@@ -227,6 +239,7 @@ export function DecisionRow({
               metaBelow ? "text-lg" : "text-sm"
             }`}
           >
+            {alertMark}
             {title}
           </span>
           {/* What reviewnary adds about this item. `xs`, which is the size the provenance beside it takes:
@@ -349,6 +362,7 @@ export function DecisionRow({
           {source ? <span>{source}</span> : null}
         </span>
         <span className="mt-1 block break-keep text-base font-bold leading-snug tracking-tight text-ink [overflow-wrap:anywhere]">
+          {alertMark}
           {title}
         </span>
         {line ? <span className="mt-0.5 block truncate text-sm text-muted">{line}</span> : null}

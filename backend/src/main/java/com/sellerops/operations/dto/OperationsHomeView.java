@@ -53,13 +53,17 @@ public record OperationsHomeView(
      * deliberately not added to anything.
      */
     public record ReviewAttention(
-            /** 확인 필요로 분류됐고 아직 아무도 결정하지 않은 수 — the one number that asks for work. */
+            /**
+             * 확인 필요로 분류됐고 아직 아무도 결정하지 않은 수 — the one number that asks for work. Includes the undecided
+             * reviews of any rating that report a safety or legal problem (product-owner decision, 2026-10-22), which
+             * are that work too.
+             */
             long needsAttentionUndecided,
             /** 확인 필요로 분류된 전체. Includes reviews already decided; never the work number. */
             long needsAttentionTotal,
             /** 지켜보기로 분류된 전체. An observation signal; see above. */
             long watchTotal,
-            /** The undecided 확인 필요 reviews themselves, newest first, bounded. */
+            /** Those reviews themselves, bounded: the safety reports first, then 확인 필요 newest first. */
             List<AttentionReview> rows) {
     }
 
@@ -77,7 +81,12 @@ public record OperationsHomeView(
             LocalDate occurredOn,
             String productName,
             /** The masked opening of what the customer wrote, or null when masking left nothing. */
-            String quote) {
+            String quote,
+            /**
+             * Whether the whole review reports a safety or legal problem ({@code ReviewSafetySignal}) — read from the
+             * body, not from {@code quote}, which is cut. Only the answer leaves; never the words that matched.
+             */
+            boolean safety) {
     }
 
     /**

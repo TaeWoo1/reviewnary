@@ -31,6 +31,7 @@ function row(over: Partial<HomeWorkRow> = {}): HomeWorkRow {
     subjectId: "r-1",
     workItemId: null,
     rating: 1,
+    safety: false,
     ...over,
   };
 }
@@ -249,5 +250,20 @@ describe("WorkRows — the rail reading", () => {
     // §5 spends the accent on what you can press; which row is open is a neutral fact about the list.
     expect(link.className).toContain("bg-canvas");
     expect(link.className).not.toMatch(/shadow-selected|bg-brand-50/);
+  });
+});
+
+/** A review reporting harm says why it stands first, in every reading (product-owner decision, 2026-10-22). */
+describe("WorkRows — the safety mark", () => {
+  it("marks only the row that carries it, in the Home, queue and rail readings", () => {
+    for (const reading of ["home", "queue", "rail"] as const) {
+      draw([row({ safety: true }), row({ key: "review:r-2", subjectId: "r-2", title: "끈이 짧아요" })], { reading });
+      const list = screen.getByLabelText("확인할 일");
+      const marks = within(list).getAllByText(/안전 문제/);
+      expect(marks, reading).toHaveLength(1);
+      expect(marks[0].className, reading).toContain("text-bad");
+      expect(within(list).getAllByRole("link")[0], reading).toHaveTextContent("안전 문제");
+      cleanup();
+    }
   });
 });

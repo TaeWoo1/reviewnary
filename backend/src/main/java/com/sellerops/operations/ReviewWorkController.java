@@ -70,7 +70,22 @@ public class ReviewWorkController {
                     work.todo().stream().filter(t -> STILL_THE_SELLERS.contains(t.replyWorkState())).toList(),
                     work.recentlyReported()));
         }
+        Set<UUID> todoReviews = committed.stream().flatMap(a -> a.todo().stream())
+                .map(item -> reviewIdOf(item.reviewId())).filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
         return new ReviewWorkView(home.undecidedAttentionCount(orgId), home.undecidedAttention(orgId, MAX_ATTENTION),
-                committed);
+                committed, home.safetyAmong(orgId, todoReviews));
+    }
+
+    /** A row's id is ours and a uuid; anything else names no review, and asks nothing. */
+    private static UUID reviewIdOf(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException notOurs) {
+            return null;
+        }
     }
 }

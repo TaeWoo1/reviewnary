@@ -158,19 +158,58 @@ describe("mergeHomeWork — one list from three reads", () => {
   });
 
   /**
-   * <b>Re-pointed: there is no single age key across the lanes any more</b> (product-owner decision,
-   * 2026-10-01). This asserted 「oldest first」 over the merged list, and that comparator is exactly
-   * what the Home's visual QA failed on: it inverted the review lane's declared order (the server
-   * serves undecided 확인 필요 reviews `receivedAt desc`) and ranked a review's authoring date against
-   * an inquiry's receipt time, so four네이버 reviews written 212–339 days ago filled the brief.
-   *
-   * <p>The surviving guarantee is that the ORDER IS A LANE'S OWN, not this list's — and the one lane
-   * whose order has to be restated here is the inquiry lane, because its read arrives
-   * `createdAt desc` while `/inquiries` reads it oldest-first.
+   * <b>Re-pointed again: one order of importance</b> (product-owner decision, 2026-10-22, replacing the
+   * 2026-10-01 lanes Case → Review → Inquiry). Inquiries first, longest waiting first — no channel gives
+   * a reply deadline, so the longest wait is read as the nearest one — and a case stands with the
+   * inquiry it is about, on the same clock. Reviews after them. What 2026-10-01 measured still holds: a
+   * review's authoring date is never ranked against an inquiry's receipt, because the groups are
+   * concatenated, not merged.
    */
-  it("concatenates the lanes, each in its own order — case, review, inquiry", () => {
+  it("inquiries and the cases about them first, longest waiting first; then reviews", () => {
     const work = mergeHomeWork(co(), ops(), queue());
-    expect(work.rows.map((r) => r.key)).toEqual(["case:c-1", "case:c-2", "review:r-1", "inquiry:i-3"]);
+    // c-2 opened 00:30, c-1 02:30, i-3 arrived 04:30 — and the review, a day old, after all three.
+    expect(work.rows.map((r) => r.key)).toEqual(["case:c-2", "case:c-1", "inquiry:i-3", "review:r-1"]);
+  });
+
+  it("reviews are newest first: nobody is waiting on one, so equal importance is broken by recency", () => {
+    const o = ops();
+    const older = { ...o.reviews.rows[0], reviewId: "r-old", occurredOn: "2026-09-01", quote: "끈이 짧아요" };
+    const newer = { ...o.reviews.rows[0], reviewId: "r-new", occurredOn: "2026-09-16", quote: "색이 달라요" };
+    const work = mergeHomeWork(null, { ...o, reviews: { ...o.reviews, rows: [older, o.reviews.rows[0], newer] } } as never, null, NOW);
+    expect(work.rows.map((r) => r.key)).toEqual(["review:r-new", "review:r-1", "review:r-old"]);
+  });
+
+  /**
+   * <b>The one exception to inquiries first</b> (product-owner decision, 2026-10-22): a review the server read as
+   * reporting a safety or legal problem, whatever its rating — from the attention read, the seller's own reply
+   * work, or a case about it.
+   */
+  it("a review reporting harm leads, ahead of every inquiry, from whichever read carried it", () => {
+    const o = ops();
+    const burned = { ...o.reviews.rows[0], reviewId: "r-burn", rating: 5, occurredOn: "2026-09-02", quote: "손에 화상을 입었어요", safety: true };
+    const fromAttention = mergeHomeWork(co(), { ...o, reviews: { ...o.reviews, rows: [o.reviews.rows[0], burned] } } as never, queue(), NOW);
+    expect(fromAttention.rows[0]).toMatchObject({ key: "review:r-burn", safety: true });
+    expect(fromAttention.rows.filter((r) => r.safety).map((r) => r.key)).toEqual(["review:r-burn"]);
+
+    const c = co();
+    const reviewCase = { ...c.decisions.rows[1], caseId: "c-burn", subjectKind: "REVIEW" as const, to: "/reviews/reply/r-9", safety: true };
+    const fromCase = mergeHomeWork({ ...c, decisions: { total: 3, rows: [...c.decisions.rows, reviewCase] } }, null, queue(), NOW);
+    expect(fromCase.rows[0].key).toBe("case:c-burn");
+
+    const work = {
+      attentionTotal: 0, attention: [], safetyReviewIds: ["r-todo"],
+      committed: [{ accountId: "a", channelCode: "NAVER", channelNameKo: "네이버", coverage: null, recentlyReported: [],
+        todo: [{ reviewId: "r-todo", channelCode: "NAVER", replyWorkState: "AWAITING_APPROVAL", safePreview: "배탈이 났어요", rating: 4, productName: null, sourceCreatedDate: "2026-09-03" }] }],
+    };
+    const fromReplyWork = mergeHomeWork(null, null, queue(), NOW, work as never);
+    expect(fromReplyWork.rows[0]).toMatchObject({ key: "review:r-todo", safety: true, state: "AWAITING_APPROVAL" });
+  });
+
+  it("an inquiry has no safety exception, and a row with no time goes last in its group", () => {
+    const untimed = { ...queue().content[1], workItemId: "w-u", inquiryId: "i-untimed", receivedAt: null };
+    const work = mergeHomeWork(null, null, queue({ content: [untimed as never, ...queue().content] }), NOW);
+    expect(work.rows.map((r) => r.key)).toEqual(["inquiry:i-1", "inquiry:i-3", "inquiry:i-untimed"]);
+    expect(work.rows.every((r) => r.safety === false)).toBe(true);
   });
 
   it("orders the inquiry lane oldest-first — the SLA reading, restated because the read is newest-first", () => {
@@ -188,7 +227,7 @@ describe("mergeHomeWork — one list from three reads", () => {
 
   it("a read that failed is absent, not zero — and the count is what was drawn", () => {
     const work = mergeHomeWork(co(), ops(), null);
-    expect(work.rows.map((r) => r.key)).toEqual(["case:c-1", "case:c-2", "review:r-1"]);
+    expect(work.rows.map((r) => r.key)).toEqual(["case:c-2", "case:c-1", "review:r-1"]);
     expect(work.truncated).toBe(false);
   });
 
@@ -217,8 +256,8 @@ describe("mergeHomeWork — one list from three reads", () => {
     // It is still there, and it is last — the row that waited longest of all.
     expect(keys).toContain("inquiry:i-2016");
     expect(keys[keys.length - 1]).toBe("inquiry:i-2016");
-    // And this morning's work still leads, each lane in its own order.
-    expect(keys.slice(0, 4)).toEqual(["case:c-1", "case:c-2", "review:r-1", "inquiry:i-3"]);
+    // And this morning's work still leads, in the order of importance.
+    expect(keys.slice(0, 4)).toEqual(["case:c-2", "case:c-1", "inquiry:i-3", "review:r-1"]);
   });
 
   it("says when a read knows of more than it returned", () => {
@@ -303,9 +342,10 @@ describe("CustomerOpsHome", () => {
    * a solid CTA. What moved is WHICH rows are drawn and WHERE two of those facts stand:
    *
    * <ul>
-   *   <li>The four rows are no longer the first four of one age-sorted list — they are
-   *       {@code homeBriefRows}' lane quota (Review 2 / Inquiry 1 / Case 1), so the rows are looked
-   *       up by what they say rather than by index.</li>
+   *   <li>The rows are looked up by what they say rather than by index. They were a lane quota
+   *       (Review 2 / Inquiry 1 / Case 1) and since 2026-10-22 they are the head of one order of
+   *       importance; this test draws two inquiry cases and a review so that all three readings are
+   *       drawn under either.</li>
    *   <li>「초안 있음 · 미발송」 was in the row's second line, which is customer context only now. The
    *       fact is the state word's, off the same {@code draftPrepared} field.</li>
    *   <li>A review says 「N일 전」, not 「N일 대기」: nobody is waiting on a review. An inquiry and a
@@ -313,6 +353,9 @@ describe("CustomerOpsHome", () => {
    * </ul>
    */
   it("each row says why, from where, how long — and no row carries a button of its own", async () => {
+    // Two inquiry cases and a review: the review is the third of three, so all three readings are drawn.
+    // The plain inquiry's own row is asserted in the brief test below.
+    api.getInquiryQueueStrict.mockResolvedValue(queue({ content: [queue().content[0]], totalElements: 1 }));
     draw();
     const list = await screen.findByRole("list", { name: "확인할 일" });
     // jsdom cannot measure a width, so the brief draws its narrow count.
@@ -341,12 +384,6 @@ describe("CustomerOpsHome", () => {
     // The verb (「검토」, 「정보 입력」) is gone from the row: the one primary action lives in the item itself.
     expect(kase).not.toHaveTextContent("정보 입력");
 
-    // The inquiry lane's row carries the customer's own words in the second line — the slot that used
-    // to read 「초안 없음」, which the badge beside it already said.
-    const inquiry = within(list).getByRole("link", { name: /주문 취소 가능할까요/ });
-    expect(inquiry).toHaveAttribute("href", "/inquiries/i-3");
-    expect(inquiry).not.toHaveTextContent("초안 없음");
-
     // No row carries a solid CTA. This used to assert 「no `.bg-brand-700` anywhere」, which became wrong
     // when the row grew a state word: `Status` draws an `info` state's 6px dot in the accent, and a dot
     // is not a control. The claim is about a BUTTON, so it is asserted as one.
@@ -355,19 +392,31 @@ describe("CustomerOpsHome", () => {
   });
 
   /**
-   * <b>Four slots, allotted by lane</b> (product-owner decision, 2026-10-01 — Review 2 / Inquiry 1 /
-   * Case 1). The regression this catches is the measured one: taking the first N of one order made
-   * the brief whichever lane happened to be longest, and on the live org that was four reviews with
-   * this month's inquiry nowhere on the screen.
+   * <b>The brief is the head of one order of importance</b> (product-owner decision, 2026-10-22, replacing the
+   * 2026-10-01 quota Review 2 / Inquiry 1 / Case 1). Under the quota a second inquiry could never reach the
+   * brief however long it had waited, and a review reporting a burn could lose its slot to two newer reviews.
    */
-  it("briefs across the lanes rather than filling up from the longest one", async () => {
+  it("briefs the inquiries before a review, and a review reporting harm before both", async () => {
     draw();
     const list = await screen.findByRole("list", { name: "확인할 일" });
     await waitFor(() => expect(within(list).getAllByRole("link")).toHaveLength(visibleHomeRows(false)));
-    // Three slots, three lanes — not three of whichever lane came first in the merged order.
-    expect(within(list).getByRole("link", { name: /뚜껑이 컵에 잘 안 맞아요/ })).toBeInTheDocument();
-    expect(within(list).getByRole("link", { name: /주문 취소 가능할까요/ })).toBeInTheDocument();
+    const inquiry = within(list).getByRole("link", { name: /주문 취소 가능할까요/ });
+    expect(inquiry).toHaveAttribute("href", "/inquiries/i-3");
+    // The inquiry's second line is the customer's own words — the slot that used to read 「초안 없음」.
+    expect(inquiry).not.toHaveTextContent("초안 없음");
     expect(within(list).getByRole("link", { name: /뚜껑이 깨져서 왔어요/ })).toBeInTheDocument();
+    expect(within(list).queryByRole("link", { name: /뚜껑이 컵에 잘 안 맞아요/ })).toBeNull();
+    expect(list).not.toHaveTextContent("안전 문제");
+
+    cleanup();
+    const o = ops();
+    const burned = { ...o.reviews.rows[0], reviewId: "r-burn", rating: 5, quote: "손잡이가 뜨거워 화상을 입었어요", safety: true };
+    draw(co(), { ...o, reviews: { ...o.reviews, rows: [...o.reviews.rows, burned] } } as never);
+    const again = await screen.findByRole("list", { name: "확인할 일" });
+    await waitFor(() => expect(within(again).getAllByRole("link")).toHaveLength(visibleHomeRows(false)));
+    const first = within(again).getAllByRole("link")[0];
+    expect(first).toHaveTextContent("화상을 입었어요");
+    expect(within(first).getByText("안전 문제")).toHaveClass("text-bad");
   });
 
   it("a source that was not read is excluded from the count and says so, with its fix", async () => {

@@ -1113,6 +1113,52 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
                                     @Param("tierRank") int tierRank,
                                     @Param("aiEnabled") boolean aiEnabled);
 
+    /**
+     * The database's half of {@link com.sellerops.review.triage.ReviewSafetySignal}: a body that holds none of its
+     * two-character openings cannot carry the signal, so only the rest are read. Written out because a query is a
+     * constant; {@code ReviewSafetySignalTest} pins it to {@code ReviewSafetySignal.stems()} exactly.
+     */
+    String SAFETY_STEM_PREDICATE = """
+            (r.body like '%감전%' or r.body like '%고발%' or r.body like '%고소%' or r.body like '%곰팡%'
+             or r.body like '%공정%' or r.body like '%구토%' or r.body like '%누전%' or r.body like '%다쳐%'
+             or r.body like '%다쳤%' or r.body like '%다치%' or r.body like '%다칠%' or r.body like '%데어%'
+             or r.body like '%데였%' or r.body like '%두드%' or r.body like '%멍들%' or r.body like '%멍이%'
+             or r.body like '%발진%' or r.body like '%배탈%' or r.body like '%벌레%' or r.body like '%베여%'
+             or r.body like '%베였%' or r.body like '%변질%' or r.body like '%변호%' or r.body like '%병원%'
+             or r.body like '%부상%' or r.body like '%불꽃%' or r.body like '%불이%' or r.body like '%설사%'
+             or r.body like '%소비%' or r.body like '%소송%' or r.body like '%식약%' or r.body like '%식중%'
+             or r.body like '%신고%' or r.body like '%알러%' or r.body like '%알레%' or r.body like '%연기%'
+             or r.body like '%응급%' or r.body like '%이물%' or r.body like '%타는%' or r.body like '%토했%'
+             or r.body like '%폭발%' or r.body like '%피가%' or r.body like '%화상%')
+            """;
+
+    /**
+     * <b>Undecided reviews OUTSIDE one tier that might report a safety or legal problem</b> — newest first, for the
+     * caller to read with {@link com.sellerops.review.triage.ReviewSafetySignal} (product-owner decision,
+     * 2026-10-22: such a review is the seller's work whatever its rating). The same undecided and not-dismissed
+     * predicate as {@link #findUndecidedByOrgAndTier}, so a review the seller already decided about is never raised
+     * again; the tier is excluded so a review already in that list is not counted twice.
+     */
+    @Query("""
+            select r from Review r
+            """ + AI_JOIN + """
+            where r.orgId = :orgId
+              and
+            """ + FINAL_TIER_RANK + """
+              <> :tierRank
+              and
+            """ + SAFETY_STEM_PREDICATE + """
+              and not exists (select 1 from ReviewTriage t
+                              where t.orgId = r.orgId and t.reviewId = r.id)
+              and
+            """ + NOT_DISMISSED_PREDICATE + """
+            order by r.receivedAt desc, r.id asc
+            """)
+    List<Review> findUndecidedSafetyCandidatesOutsideTier(@Param("orgId") UUID orgId,
+                                                         @Param("tierRank") int tierRank,
+                                                         @Param("aiEnabled") boolean aiEnabled,
+                                                         Pageable pageable);
+
     String NOT_DISMISSED_PREDICATE = """
             (not exists (select 1 from ReviewReplyWorkDismissal dis
                          where dis.orgId = r.orgId and dis.reviewId = r.id)

@@ -1256,6 +1256,24 @@ class OperationsCaseProcessorTest {
                 workItems, reviews, channels).home(org).available()).isFalse();
     }
 
+    /** A case about a review that reports harm says so on its row (product-owner decision, 2026-10-22). */
+    @Test
+    void aCaseAboutAReviewReportingHarmSaysSo_anInquirysCaseNever() {
+        Inquiry inquiry = inquiry("배송은 언제 되나요?", Instant.now());
+        workItem(inquiry);
+        review(1, "손잡이가 뜨거워서 아이가 화상을 입었어요. 교환 원합니다.");
+        processor.process(run(Instant.now(), null, null), () -> false);
+        CustomerOperationsHomeService home = new CustomerOperationsHomeService(responsibilities, runs, sourceRows,
+                new ResponsibilitySources(accounts, channels), ResponsibilityRollout.of(List.of(org)), cases,
+                inquiries, workItems, reviews, channels);
+
+        List<CustomerOperationsHomeView.DecisionRow> rows = home.home(org).decisions().rows();
+        assertThat(rows).filteredOn(r -> "REVIEW".equals(r.subjectKind())).singleElement()
+                .satisfies(r -> assertThat(r.safety()).isTrue());
+        assertThat(rows).filteredOn(r -> "INQUIRY".equals(r.subjectKind())).singleElement()
+                .satisfies(r -> assertThat(r.safety()).isFalse());
+    }
+
     // ── the lane the seller's own setting runs (Review Auto-Check v1) ─────────────────────────────────────────
 
     /**
