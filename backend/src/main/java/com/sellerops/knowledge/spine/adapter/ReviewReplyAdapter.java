@@ -32,6 +32,12 @@ import org.springframework.stereotype.Component;
  * reproduced for this review; approving it decides this review, and says nothing about how the company answers
  * a topic. It is left out, the same judgement {@code InquiryAnswerMemoryHook} makes for inquiries.
  *
+ * <p><b>The delegate road counts the same</b> (2026-10-22 external review). A reply the seller approved for the
+ * vendor's delegate — on the phone, possibly reworded there — has no approval row on this PC; its task keeps the
+ * draft version that holds the approved words ({@code vendor_reply_task.approved_draft_version}). It is read while
+ * the approval stands (the task approved, claimed, posted, failed or in doubt) and not once the seller cancelled it or
+ * the review changed under it, just as a withdrawn approval is not read.
+ *
  * <p>The review is the raw source the entry points at. Its text is matched on and never returned.
  */
 @Component
@@ -80,7 +86,59 @@ public class ReviewReplyAdapter implements KnowledgeSourceAdapter {
                 .toList());
         Set<UUID> approved = new HashSet<>();
         rows.forEach(row -> approved.add(((Review) row[2]).getId()));
+        out.addAll(delegatedReplies(orgId, productId, approved));
         out.addAll(channelReplies(orgId, productId, approved));
+        return out;
+    }
+
+    /** Task states in which the seller's approval of the delegate's text still stands. */
+    static final List<String> DELEGATED_STANDING = List.of("APPROVED", "CLAIMED", "POSTED", "FAILED", "UNKNOWN");
+
+    /**
+     * Replies the seller approved for the vendor's delegate. Adds each review it lists to {@code listed}, so the
+     * channel's copy of the same reply is not listed a second time.
+     */
+    private List<Indexed> delegatedReplies(UUID orgId, UUID productId, Set<UUID> listed) {
+        List<Object[]> rows = em.createQuery("""
+                        select t, d, r from VendorReplyTask t, ReviewReplyDraft d, Review r
+                        where t.orgId = :orgId and t.state in :standing and t.approvedDraftVersion is not null
+                          and d.orgId = :orgId and d.reviewId = t.reviewId and d.version = t.approvedDraftVersion
+                          and r.orgId = :orgId and r.id = t.reviewId
+                          and (r.productId is null or r.productId = :productId)
+                        order by t.updatedAt desc
+                        """, Object[].class)
+                .setParameter("orgId", orgId)
+                .setParameter("standing", DELEGATED_STANDING)
+                .setParameter("productId", productId == null ? UUID.randomUUID() : productId)
+                .setMaxResults(MAX_REPLIES)
+                .getResultList();
+        Set<String> reported = deliveredVersions(orgId, rows);
+        List<Indexed> out = new java.util.ArrayList<>();
+        for (Object[] row : rows) {
+            com.sellerops.vendorlink.VendorReplyTask task = (com.sellerops.vendorlink.VendorReplyTask) row[0];
+            ReviewReplyDraft draft = (ReviewReplyDraft) row[1];
+            Review review = (Review) row[2];
+            if (listed.contains(review.getId()) || !isAnswer(draft.getAuthorKind())
+                    || task.getApprovedFingerprint() == null
+                    || !task.getApprovedFingerprint().equals(draft.getContentFingerprint())) {
+                continue;
+            }
+            listed.add(review.getId());
+            boolean submitted = reported.contains(review.getId() + ":" + draft.getVersion());
+            UUID bound = review.getProductId();
+            String question = VocPreviewSanitizer.redactFullBody(review.getBody()).text();
+            out.add(new Indexed(new KnowledgeEntry(
+                    SpineSourceType.REVIEW_REPLY + ":" + task.getId(),
+                    SpineSourceType.REVIEW_REPLY,
+                    bound == null ? KnowledgeSpineScope.ORG : KnowledgeSpineScope.PRODUCT, bound, null,
+                    KnowledgeAuthority.PAST_SELLER_ANSWER,
+                    review.getRating() == null ? "리뷰 답글" : "리뷰 답글 · 별점 " + review.getRating() + "점",
+                    draft.getBody(), task.getUpdatedAt(),
+                    submitted ? "리뷰 답글 · 채널에 등록된 것으로 기록된 답글" : "리뷰 답글 · 판매자가 승인한 답글",
+                    List.of(new SourceRef(SourceRef.Kind.REVIEW_REPLY_DRAFT, draft.getId(), "v" + draft.getVersion()),
+                            SourceRef.of(SourceRef.Kind.REVIEW, review.getId()))),
+                    KnowledgeText.normalize(question == null ? "" : question) + KnowledgeText.normalize(draft.getBody())));
+        }
         return out;
     }
 
@@ -164,6 +222,7 @@ public class ReviewReplyAdapter implements KnowledgeSourceAdapter {
      * submitted composer are not registrations, and this adapter does not restate that judgement.
      */
     private Set<String> deliveredVersions(UUID orgId, List<Object[]> rows) {
+        // The review is the third column of both reads (approvals and delegate tasks).
         List<UUID> reviewIds = rows.stream().map(row -> ((Review) row[2]).getId()).toList();
         return deliveries.deliveredVersions(orgId, reviewIds);
     }

@@ -79,6 +79,10 @@ abstract class VendorReplyTaskScenarios {
     @Autowired ReviewReplyOutcomeService outcomes;
     @Autowired ReviewReplyOutcomeRepository outcomeRows;
     @Autowired ReviewReplyService replyLane;
+    @Autowired com.sellerops.review.memory.ReviewAnswerMemoryHook answerMemoryHook;
+    @Autowired com.sellerops.knowledge.memory.AnswerMemoryRepository memories;
+    @Autowired com.sellerops.knowledge.spine.adapter.ReviewReplyAdapter pastReplies;
+    @Autowired com.sellerops.knowledge.spine.KnowledgeSpineService spine;
     @Autowired ReviewTriageService triage;
     @Autowired ReviewTriageWriter triageWriter;
     @Autowired ReviewTriageRepository triageRows;
@@ -123,6 +127,7 @@ abstract class VendorReplyTaskScenarios {
         link.poll();
         tasks = new VendorReplyTaskService(link, bindings, refs, taskCopies, reviews, drafts, approvals, outcomes,
                 triageRows, CLOCK);
+        tasks.setAnswerMemory(answerMemoryHook);
         replyLane.setDelegatedReplyLane(tasks);
         pull = new VendorReviewPullService(link, bindings, refs, reviews, channels, ingestion, followUp, syncJobs,
                 tasks, CLOCK);
@@ -188,6 +193,64 @@ abstract class VendorReplyTaskScenarios {
         pull.pullFor(org);
         assertThat(outcomeRows.findAllByOrgIdAndReviewIdOrderByCreatedAtDesc(org, review))
                 .as("re-reading the changes records nothing twice").hasSize(1);
+    }
+
+    @Test
+    void aReplyTheSellerRewordedOnThePhoneIsTheirAnswerTheNextSimilarReviewIsDraftedFrom() {
+        UUID review = pulledReview("v1", "9100000051", "배송이 정말 빠르고 포장이 꼼꼼해서 좋았어요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "감사합니다.", 0);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+
+        String phoneText = "빠른 배송과 꼼꼼한 포장을 알아봐 주셔서 감사합니다. 다음에도 정성껏 포장해 보내 드리겠습니다.";
+        vendor.move(task, "APPROVED", phoneText, ReviewReplyFingerprint.of(phoneText), true);
+        pull.pullFor(org);
+
+        com.sellerops.attention.reply.ReviewReplyDraft head = drafts.latest(review).orElseThrow();
+        assertThat(head.getBody()).as("the phone's words are the seller's version here").isEqualTo(phoneText);
+        assertThat(head.getAuthorKind()).isEqualTo("SELLER");
+        assertThat(taskCopies.findByVendorTaskId(task)).get()
+                .satisfies(t -> assertThat(t.getApprovedDraftVersion()).isEqualTo(head.getVersion()));
+        assertThat(memories.findByOrgIdAndOriginRef(org, "review-approved:" + review + ":" + head.getVersion()))
+                .get().satisfies(m -> {
+                    assertThat(m.getAnswerBody()).isEqualTo(phoneText);
+                    assertThat(m.getStrength()).isEqualTo(com.sellerops.knowledge.memory.AnswerMemoryStrength.USER_APPROVED);
+                });
+        assertThat(pastReplies.read(org, null)).filteredOn(i -> i.entry().text().equals(phoneText)).singleElement()
+                .satisfies(i -> assertThat(i.entry().provenance()).isEqualTo("리뷰 답글 · 판매자가 승인한 답글"));
+
+        // The next review about the same thing is drafted with the seller's own sentence among its evidence. Lexical
+        // retrieval only here (no embeddings in tests): a short review in the same words is found; a long one whose
+        // words carry other particles (배송이 · 배송과) is not — the real-case check is where that is measured.
+        assertThat(spine.retrieveForProduct(org, null,
+                        com.sellerops.knowledge.RetrievalQuery.ofCustomer(null, "포장 꼼꼼 배송 빠름"),
+                        com.sellerops.product.library.KnowledgeVariantScope.unresolved())
+                .lanes().passages())
+                .anySatisfy(p -> assertThat(p.text()).isEqualTo(phoneText));
+
+        vendor.move(task, "CLAIMED", phoneText, ReviewReplyFingerprint.of(phoneText), true);
+        vendor.move(task, "POSTED", phoneText, ReviewReplyFingerprint.of(phoneText), true);
+        pull.pullFor(org);
+        assertThat(drafts.latest(review).orElseThrow().getVersion()).as("no second copy of the same words")
+                .isEqualTo(head.getVersion());
+        assertThat(pastReplies.read(org, null)).filteredOn(i -> i.entry().text().equals(phoneText)).singleElement()
+                .satisfies(i -> assertThat(i.entry().provenance()).isEqualTo("리뷰 답글 · 채널에 등록된 것으로 기록된 답글"));
+    }
+
+    @Test
+    void anApprovalTheSellerTookBackIsNotPrecedent() {
+        UUID review = pulledReview("v1", "9100000061", "색감이 사진과 달라요");
+        needsReply(review);
+        String text = "사진과 색감이 달라 불편을 드려 죄송합니다. 교환을 도와 드리겠습니다.";
+        drafts.save(org, review, "SELLER:" + seller, text, 0);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        vendor.move(task, "APPROVED", text, ReviewReplyFingerprint.of(text), false);
+        pull.pullFor(org);
+        assertThat(pastReplies.read(org, null)).anySatisfy(i -> assertThat(i.entry().text()).isEqualTo(text));
+
+        vendor.move(task, "CANCELLED", text, ReviewReplyFingerprint.of(text), false);
+        pull.pullFor(org);
+        assertThat(pastReplies.read(org, null)).noneSatisfy(i -> assertThat(i.entry().text()).isEqualTo(text));
     }
 
     @Test

@@ -54,6 +54,13 @@ public class VendorReplyTask extends BaseEntity {
     @Column(name = "edited_on_mobile", nullable = false)
     private boolean editedOnMobile;
 
+    /**
+     * The draft version on this PC that holds the text the seller approved for this task — the phone's edit if there
+     * was one. Set when this PC first sees the task approved; what past-reply search and Answer Memory read.
+     */
+    @Column(name = "approved_draft_version")
+    private Integer approvedDraftVersion;
+
     /** When a delegate's POSTED was recorded in this PC's reply lane; null until then. */
     @Column(name = "outcome_recorded_at")
     private Instant outcomeRecordedAt;

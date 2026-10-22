@@ -52,6 +52,13 @@ import org.springframework.stereotype.Service;
  * gets two replies. A delegate's {@code POSTED} is recorded once in the ordinary reply lane as the existing pair
  * {@code OPERATOR_REPORTED_SUBMITTED} + {@code UNVERIFIED} (v1.14 ⑨) — never as a completion.
  *
+ * <p><b>An approval here is the seller's word, as on any other road</b> (2026-10-22 external review). When this PC
+ * first sees a task approved — on the phone, with or without an edit, or by 「승인하고 맡기기」 — the approved text
+ * becomes the review's draft head in the seller's name and is remembered as {@code USER_APPROVED}, exactly what
+ * {@code ReviewReplyService.decideApproval} does for an approval made here. The version is kept on the task
+ * ({@code approvedDraftVersion}) for past-reply search. A delegate's post adds no stronger memory: it is a report,
+ * not a read-back.
+ *
  * <p><b>Draft fingerprints.</b> This PC has no versioned knowledge, policy or voice yet, so every draft says
  * {@value #UNVERSIONED} for all three and the PC sends no policy check: the server's recheck rule has nothing to
  * compare until such versions exist.
@@ -68,6 +75,9 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
     static final String ACTOR = "VENDOR_DELEGATE";
     /** A draft may (again) be sent while the review has no task, or its task still awaits approval or has ended unposted. */
     static final Set<String> SENDABLE = Set.of("AWAITING_APPROVAL", "RECHECK_NEEDED", "FAILED", "CANCELLED", "INVALIDATED");
+    /** States in which the seller has approved the task's text — the approval happened, whatever came after. */
+    static final Set<String> APPROVED_ONCE = Set.of("APPROVED", "CLAIMED", "CANCEL_REQUESTED", "POSTED", "FAILED",
+            "UNKNOWN");
     /** What the server still lets the seller cancel (§4.2). */
     static final Set<String> CANCELLABLE = Set.of("AWAITING_APPROVAL", "RECHECK_NEEDED", "APPROVED", "CLAIMED");
 
@@ -91,6 +101,13 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
     private final ReviewReplyOutcomeService outcomes;
     private final ReviewTriageRepository triages;
     private final Clock clock;
+    /** Answer Memory's review-lane hook, or null where a test runs this lane without it. */
+    private com.sellerops.review.memory.ReviewAnswerMemoryHook answerMemory;
+
+    @Autowired(required = false)
+    public void setAnswerMemory(com.sellerops.review.memory.ReviewAnswerMemoryHook answerMemory) {
+        this.answerMemory = answerMemory;
+    }
 
     @Autowired
     public VendorReplyTaskService(VendorLinkService link, VendorStoreBindingRepository bindings,
@@ -318,17 +335,61 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         if (task.getId() != null && snapshot.stateVersion() < task.getStateVersion()) {
             return task;
         }
+        boolean newlyApproved = APPROVED_ONCE.contains(snapshot.state()) && snapshot.approvedFingerprint() != null
+                && (task.getApprovedDraftVersion() == null
+                        || !snapshot.approvedFingerprint().equals(task.getApprovedFingerprint()));
         task.setState(snapshot.state());
         task.setStateVersion(snapshot.stateVersion());
         task.setDraftVersion(snapshot.draftVersion());
         task.setDraftFingerprint(snapshot.draftFingerprint());
         task.setApprovedFingerprint(snapshot.approvedFingerprint());
         task.setEditedOnMobile(snapshot.editedOnMobile());
+        if (newlyApproved) {
+            rememberApproved(orgId, reviewId, task, snapshot);
+        }
         if ("POSTED".equals(snapshot.state()) && task.getOutcomeRecordedAt() == null) {
             recordPosted(orgId, reviewId, task, snapshot);
             task.setOutcomeRecordedAt(clock.instant());
         }
         return tasks.save(task);
+    }
+
+    /**
+     * The seller approved this text: it becomes the review's draft head in the seller's name (the phone's words, if
+     * they edited there) and is remembered as the seller's answer. Remembering is best effort and never fails the
+     * sync — the approval is the server's fact either way.
+     */
+    private void rememberApproved(UUID orgId, UUID reviewId, VendorReplyTask task, TaskSnapshot snapshot) {
+        String body = ReviewReplyValidation.normalize(snapshot.draftBody());
+        if (!ReviewReplyFingerprint.of(body).equals(snapshot.approvedFingerprint())) {
+            // The snapshot's text is not the approved one (a later version in flight): nothing to stand behind yet.
+            return;
+        }
+        ReviewReplyDraft approved = approvedHead(orgId, reviewId, body);
+        task.setApprovedDraftVersion(approved.getVersion());
+        if (answerMemory == null) {
+            return;
+        }
+        reviews.findByIdAndOrgId(reviewId, orgId).ifPresent(review -> {
+            try {
+                answerMemory.rememberApproved(review, approved, null);
+            } catch (RuntimeException e) {
+                log.warn("vendor reply task: approval not remembered type={}", e.getClass().getSimpleName());
+            }
+        });
+    }
+
+    /** The draft holding exactly {@code body}: the head if it already does, else a new seller version on top. */
+    private ReviewReplyDraft approvedHead(UUID orgId, UUID reviewId, String body) {
+        String fingerprint = ReviewReplyFingerprint.of(body);
+        ReviewReplyDraft head = drafts.latest(reviewId).orElse(null);
+        if (head != null && fingerprint.equals(head.getContentFingerprint())) {
+            return head;
+        }
+        // The seller's approved words — a person's sentence, whoever drafted the version before it.
+        drafts.saveAs(orgId, reviewId, ACTOR, body, head == null ? 0 : head.getVersion(),
+                ReviewReplyDraftService.Provenance.seller());
+        return drafts.latest(reviewId).orElseThrow();
     }
 
     /**
@@ -342,18 +403,10 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         if (!fingerprint.equals(snapshot.approvedFingerprint())) {
             throw new IllegalStateException("posted text is not the approved text");
         }
-        ReviewReplyDraft head = drafts.latest(reviewId).orElse(null);
-        int version;
-        String algorithm;
-        if (head != null && fingerprint.equals(head.getContentFingerprint())) {
-            version = head.getVersion();
-            algorithm = head.getFingerprintAlgorithm();
-        } else {
-            // The seller's approved words — a person's sentence, whoever drafted the version before it.
-            version = drafts.saveAs(orgId, reviewId, ACTOR, body, head == null ? 0 : head.getVersion(),
-                    ReviewReplyDraftService.Provenance.seller()).version();
-            algorithm = ReviewReplyValidation.FINGERPRINT_ALGORITHM;
-        }
+        ReviewReplyDraft head = approvedHead(orgId, reviewId, body);
+        int version = head.getVersion();
+        String algorithm = head.getFingerprintAlgorithm() == null ? ReviewReplyValidation.FINGERPRINT_ALGORITHM
+                : head.getFingerprintAlgorithm();
         String submissionRef = outcomes.mint(orgId, reviewId, version, fingerprint, ACTOR);
         outcomes.record(orgId, reviewId, VocItemRef.forReview(reviewId), submissionRef, version, fingerprint,
                 algorithm, OperatorOutcome.OPERATOR_REPORTED_SUBMITTED, null, "vendor-posted:" + task.getVendorTaskId(),
