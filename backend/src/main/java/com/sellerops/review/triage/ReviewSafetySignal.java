@@ -27,10 +27,15 @@ import java.util.TreeSet;
  *
  * <p><b>How a match is read.</b> Whitespace is removed first, because a customer's spacing is not a signal
  * (타는 냄새 · 타는냄새). Compounds that only look like a term are removed before that (화상회의). A match followed
- * within {@value #NEGATION_WINDOW} characters by a negation or a reassurance (없 · 않 · 걱정 · 방지 · 괜찮 …) does not
+ * within {@value #NEGATION_WINDOW} characters by a negation or a reassurance (없 · 않 · 방지 · 괜찮 …) does not
  * count — 「이물질 없이 깨끗해요」. The window is short so that a later, unrelated clause cannot cancel a real report
- * (「피가 났는데 연락이 없어요」). What it still gets wrong is stated, not hidden: a reassurance farther than the window
- * (「알레르기 있는 아이도 잘 써요」) still rises, and a report written as a worry (「화상 입을까 걱정돼요」) does not.
+ * (「피가 났는데 연락이 없어요」).
+ *
+ * <p><b>A worry is not a reassurance</b> (product-owner decision, 2026-10-23). 「너무 뜨거워서 화상 입을까 걱정돼요」 is
+ * a customer telling the seller the product may hurt someone, so 걱정 · 염려 no longer cancel a match on their own;
+ * only a worry that is itself denied does (「화상 걱정 없어요」 · 「다칠 걱정은 전혀 없어요」). The signal is a
+ * candidate for the seller to look at — the mark says 「안전 관련 확인」, not that harm happened — and an occurrence,
+ * a worry and a background mention (「알레르기 있는 아이도 잘 써요」, which still rises) are not told apart here.
  */
 public final class ReviewSafetySignal {
 
@@ -48,8 +53,10 @@ public final class ReviewSafetySignal {
 
     /** What, right after a term, turns it into its absence or a reassurance. */
     static final List<String> NEGATIONS = List.of(
-            "없", "않", "아니", "걱정", "염려", "방지", "예방", "제거", "지워", "퇴치", "괜찮", "안심", "안생", "안들",
-            "안나", "잘써");
+            "없", "않", "아니", "방지", "예방", "제거", "지워", "퇴치", "괜찮", "안심", "안생", "안들", "안나", "잘써");
+
+    /** A worry about the term. It keeps the match standing unless a negation follows the worry itself. */
+    static final List<String> WORRIES = List.of("걱정", "염려");
 
     private ReviewSafetySignal() {
     }
@@ -103,8 +110,21 @@ public final class ReviewSafetySignal {
     }
 
     private static boolean negatedAfter(String text, int from) {
-        String after = text.substring(from, Math.min(text.length(), from + NEGATION_WINDOW));
-        return NEGATIONS.stream().anyMatch(after::contains);
+        String after = window(text, from);
+        if (NEGATIONS.stream().anyMatch(after::contains)) {
+            return true;
+        }
+        for (String worry : WORRIES) {
+            int at = after.indexOf(worry);
+            if (at >= 0 && NEGATIONS.stream().anyMatch(window(text, from + at + worry.length())::contains)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String window(String text, int from) {
+        return text.substring(from, Math.min(text.length(), from + NEGATION_WINDOW));
     }
 
     /**

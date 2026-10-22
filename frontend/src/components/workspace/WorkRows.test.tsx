@@ -259,10 +259,10 @@ describe("WorkRows — the safety mark", () => {
     for (const reading of ["home", "queue", "rail"] as const) {
       draw([row({ safety: true }), row({ key: "review:r-2", subjectId: "r-2", title: "끈이 짧아요" })], { reading });
       const list = screen.getByLabelText("확인할 일");
-      const marks = within(list).getAllByText(/안전 문제/);
+      const marks = within(list).getAllByText(/안전 관련 확인/);
       expect(marks, reading).toHaveLength(1);
       expect(marks[0].className, reading).toContain("text-bad");
-      expect(within(list).getAllByRole("link")[0], reading).toHaveTextContent("안전 문제");
+      expect(within(list).getAllByRole("link")[0], reading).toHaveTextContent("안전 관련 확인");
       cleanup();
     }
   });

@@ -31,6 +31,10 @@ class ReviewSafetySignalTest {
             "소비자원에 신고했습니다",
             "환불 안 해주시면 고소하겠습니다",
             "먹고 병원에 갔어요",
+            "사용하다 화상을 입었어요",
+            // A worry is the customer telling the seller the product may hurt someone (2026-10-23).
+            "너무 뜨거워서 화상 입을까 걱정돼요",
+            "아이가 다칠까 봐 염려됩니다",
     })
     void aReportOfHarmRises(String body) {
         assertThat(ReviewSafetySignal.in(body)).as(body).isTrue();
@@ -39,6 +43,8 @@ class ReviewSafetySignalTest {
     @ParameterizedTest
     @ValueSource(strings = {
             "아이가 다칠 걱정 없어요",
+            "뜨겁지 않고 화상 걱정 없어요",
+            "다칠 걱정은 전혀 없어요",
             "이물질 없이 깨끗해요",
             "알레르기 반응 없이 잘 쓰고 있어요",
             "화상 방지 손잡이라 안심이에요",

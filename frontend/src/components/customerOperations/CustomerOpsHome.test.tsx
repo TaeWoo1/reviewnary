@@ -406,7 +406,7 @@ describe("CustomerOpsHome", () => {
     expect(inquiry).not.toHaveTextContent("초안 없음");
     expect(within(list).getByRole("link", { name: /뚜껑이 깨져서 왔어요/ })).toBeInTheDocument();
     expect(within(list).queryByRole("link", { name: /뚜껑이 컵에 잘 안 맞아요/ })).toBeNull();
-    expect(list).not.toHaveTextContent("안전 문제");
+    expect(list).not.toHaveTextContent("안전 관련 확인");
 
     cleanup();
     const o = ops();
@@ -416,7 +416,7 @@ describe("CustomerOpsHome", () => {
     await waitFor(() => expect(within(again).getAllByRole("link")).toHaveLength(visibleHomeRows(false)));
     const first = within(again).getAllByRole("link")[0];
     expect(first).toHaveTextContent("화상을 입었어요");
-    expect(within(first).getByText("안전 문제")).toHaveClass("text-bad");
+    expect(within(first).getByText("안전 관련 확인")).toHaveClass("text-bad");
   });
 
   it("a source that was not read is excluded from the count and says so, with its fix", async () => {

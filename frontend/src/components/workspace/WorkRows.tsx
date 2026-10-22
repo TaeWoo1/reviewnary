@@ -191,8 +191,12 @@ export function WorkRows({
   );
 }
 
-/** The word a row reporting a safety or legal problem carries (product-owner decision, 2026-10-22). */
-export const SAFETY_MARK = "안전 문제";
+/**
+ * The word a row carrying the safety or legal signal is marked with (product-owner decisions, 2026-10-22 and
+ * 2026-10-23). 「확인」, not 「문제」: a fixed list of expressions finds a candidate — a report, a worry, or a mention
+ * that only looks like one — and the seller is the one who says which.
+ */
+export const SAFETY_MARK = "안전 관련 확인";
 
 /** True when the second line would only repeat the sentence already drawn above it. */
 function echoes(line: string, lead: string): boolean {
