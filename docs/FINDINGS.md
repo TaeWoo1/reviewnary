@@ -552,6 +552,18 @@
 - **출처** — 2026-10-22, `VendorReplyTaskScenarios.aReplyTheSellerRewordedOnThePhoneIsTheirAnswerTheNextSimilarReviewIsDraftedFrom`
   작성 중 질문 4개 시험(긴 문장 2개 0건, 짧은 문장 2개 1건).
 
+### B23. 검색이 못 찾은 이유를 재지 않고 그럴듯한 원인으로 적었다
+
+- **했던 것** — B22를 적으며 긴 리뷰가 자기 답변 기억을 못 찾는 이유를 "조사가 달라서(배송이 · 배송과)"라고
+  보고했다.
+- **사실** — 조사 보정은 이미 있었다. 원인은 질문 단위 부재 문턱(`MIN_ASKABLE_RATIO` 0.35)이었다 — 긴 리뷰는
+  기억에 없는 내용어가 분모를 채워 약 0.21. 그리고 찾았더라도 리뷰 초안은 과거 답변만 있으면 템플릿을 썼다.
+  외부 검토가 코드에서 두 겹을 짚었다. 합성 품질 세트로 재 보니 lexical은 자연스러운 문장 9개 중 0개를 찾았다.
+- **다음에** — 검색 실패의 원인을 적기 전에 **어느 문턱에서 떨어졌는지** 값을 찍어 본다(부재 비율 · 겹친 글자 ·
+  coverage). 찾기와 쓰기는 다른 단계라 따로 확인한다(B22). 짧은 질문으로 바꿔 통과시키지 않는다.
+- **출처** — 2026-10-22, B22 → 외부 검토(코드 대조) → `docs/knowledge/retrieval_runtime_closure_v1.md` §10,
+  `ReviewPrecedentQualitySetTest` lexical arm(hit 0 / 9).
+
 ---
 
 ## C. 증거 · 계약
