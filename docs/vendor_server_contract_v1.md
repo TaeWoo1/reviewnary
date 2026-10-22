@@ -344,12 +344,26 @@ AWAITING_APPROVAL ──승인──▶ APPROVED ──착수──▶ CLAIMED �
    │                          ▼                  ▼
    ├─정책 지문 다름─▶ RECHECK_NEEDED            CANCEL_REQUESTED ──담당자 확인──▶ CANCELLED · POSTED
    ├─취소─▶ CANCELLED      CANCELLED
-   └─리뷰 변경 · 삭제 · 이미 답글─▶ INVALIDATED   (APPROVED에서도 같은 사건이면 INVALIDATED)
+   └─리뷰 변경 · 삭제 · 이미 답글─▶ INVALIDATED   (APPROVED · HELD에서도 같은 사건이면 INVALIDATED)
+
+APPROVED ──PC: 승인된 문장이 지금 근거와 실질적으로 충돌──▶ HELD ──새 버전(휴대폰 · PC)──▶ RECHECK_NEEDED · AWAITING_APPROVAL
+CLAIMED  ──같은 판정──▶ HOLD_REQUESTED ──담당자 「등록 안 했음」 · 반납──▶ HELD   (등록했음 → POSTED, 모름 → UNKNOWN)
 ```
 
 - **취소:** `APPROVED`까지는 즉시 `CANCELLED`. `CLAIMED`에서는 `CANCEL_REQUESTED`가 되고 담당자가 저장 직전에 확인한다.
 - **고정 기한 없음(2026-10-17 오너 결정).** 무효화는 사건으로만: 리뷰 변경 · 삭제(다음 반입에서 관측), 이미 답글
   있음(`답글여부=Y`), 판매자 취소, 미승인 건의 정책 지문 변경.
+- **승인 보류(2026-10-23 오너 확정, 시안 확인 같은 날).** 근거가 바뀐 뒤 PC가 승인된 문장을 다시 검사해 **실질적 충돌**이
+  있으면 `approved-check`로 보류한다 — `APPROVED`는 `HELD`(다시 승인 필요), 담당자가 착수한 `CLAIMED`는 `HOLD_REQUESTED`가
+  되어 담당자의 등록 직전 확인이 「등록하지 마세요」와 사유를 보이고, 담당자가 「등록 안 했음 · 보류 확인」을 누르면 착수가
+  풀린 채 `HELD`로 판매자에게 돌아간다(결과 기록 없음 — 멈춘 것이지 실패가 아니다). 판매자 화면에만 알리고 실제 등록은 계속되는
+  틈은 없다. `HELD`는 새 버전으로만 다시 승인된다(휴대폰 수정은 `RECHECK_NEEDED`를 거쳐 PC 검사를 받는다). 취소는 `HELD` →
+  `CANCELLED`, `HOLD_REQUESTED` → `CANCEL_REQUESTED`. 의미 기반 검사(2단계)가 생기기 전까지 「실질적 충돌」은 PC가 증명할 수 있는
+  것으로 한정한다: **승인된 문장의 약속(교환 · 환불 …)을 지금 근거가 뒷받침하지 않음**. 인용한 문서가 고쳐지기만 했으면 승인은
+  그대로 두고 사유만 남긴다(「이 답글과 부딪히는 곳이 없어 승인을 그대로 둡니다」).
+- **보류 사유(`basis_note`, vendor V11).** PC가 남기는 사유는 닫힌 코드 · 바뀐 문서(종류 · 제목 · 고친 때 · 사용 중지) · 근거를 잃은
+  약속 낱말 · 그 낱말이 든 답글의 문장이다. 서버는 판정하지 않고 형식 · 길이와 **인용한 문장이 그 작업의 문장 안에 실제로 있는지**만
+  확인한다. 새 버전이 생기면 지운다. 판매자 PC · 휴대폰 · 담당자 화면이 같은 사유를 보인다.
 - **정책 재확인:** PC가 켜지면 `POST /v1/stores/{storeId}/tasks/policy-check {policy_fp, knowledge_fp, voice_fp}`.
   서버는 `AWAITING_APPROVAL` 중 지문이 다른 건을 `RECHECK_NEEDED`로 돌리고 목록을 돌려준다. `APPROVED`는 판매자의
   결정이라 상태를 바꾸지 않고 응답에 "철회 제안" 목록으로만 담는다. `CLAIMED` 이후는 건드리지 않는다.
@@ -365,7 +379,8 @@ AWAITING_APPROVAL ──승인──▶ APPROVED ──착수──▶ CLAIMED �
 |---|---|---|
 | PC | `POST /v1/stores/{storeId}/tasks` {reviewId, draftVersion, body, 초안 메타} | `AWAITING_APPROVAL` 생성. 같은 리뷰에 열린 작업이 있으면 새 버전으로 갱신 |
 | PC | `GET /v1/stores/{storeId}/tasks/changes?cursor=` | 상태 변경 동기화(서버가 정본) |
-| PC | `POST /v1/tasks/{id}/pc-recheck` {draftVersion, 결과} | 휴대폰 수정본의 지식 기반 검사 결과 기록 |
+| PC | `POST /v1/tasks/{id}/pc-recheck` {draftVersion, 결과, note?} | 휴대폰 수정본 · 되돌아온 초안의 지식 기반 검사 결과와 사유 기록 |
+| PC | `POST /v1/tasks/{id}/approved-check` {approvedVersion, hold, note, commandId} | 근거가 바뀐 뒤 승인된 문장의 검사 — `hold`면 `HELD` · `HOLD_REQUESTED`, 아니면 사유만 남김. 설치 토큰만 |
 | PC | `POST /v1/stores/{storeId}/tasks/policy-check` | §4.2 |
 | 휴대폰 · PC | `GET /v1/stores/{storeId}/tasks?state=` · `GET /v1/tasks/{id}` | 리뷰 원문 + 초안 + 메타 + 표시(휴대폰 수정 · 미검사) |
 | 휴대폰 · PC | `PUT /v1/tasks/{id}/draft` {baseVersion, body} | 새 버전, `edited_on_mobile`, 서버 검사. `baseVersion`이 최신이 아니면 409 |
@@ -443,8 +458,11 @@ AWAITING_APPROVAL ──승인──▶ APPROVED ──착수──▶ CLAIMED �
     못 통과하면 `pc-recheck`에 코드를 남기고 `RECHECK_NEEDED`로 둔다 — 판매자가 PC에서 초안을 다시 보고 보낸다. **문장은 바꾸지
     않는다**(판매자의 수정은 보존, 질문 24). 같은 버전을 같은 지문으로 두 번 검사하지 않는다(`vendor_reply_task.rechecked_version` ·
     `rechecked_basis`, V141).
-  - **이미 승인된 답글은 건드리지 않는다.** 서버가 `withdrawalSuggested`로 돌려주는 목록은 개수만 로그에 남긴다. 승인 뒤 근거가 바뀐
-    답글을 판매자에게 어떻게 알릴지는 [PO] — 인터뷰 질문 34의 추가 확인 항목이고 화면 시안이 필요하다.
+  - **승인된 답글은 실질적 충돌일 때만 보류한다(2026-10-23 오너 확정).** 같은 받기에서 되돌아온 초안 다음에, 지금과 다른 지문으로
+    쓴 `APPROVED` · `CLAIMED` 문장을 버전 · 지문마다 한 번 검사한다(`VendorReplyTaskService#recheckApproved`). 근거 없는 약속이면
+    `approved-check` hold, 인용한 문서만 고쳐졌으면 사유만 남기고 승인을 둔다. 사유는 PC 사본(`vendor_reply_task.basis_note`,
+    V142)에 받아 리뷰 패널이 「왜 멈췄나요」로 보인다 — 바뀐 근거 · 부딪히는 곳(문장 표시) · 할 일. **한계:** 휴대폰에서 근거 없는
+    약속을 넣고 판매자가 알고 승인한 문장도, 그 뒤 근거가 바뀌어 처음 검사할 때 보류된다(승인 시점의 근거를 저장하지 않아서다).
   - **서버 쪽 정한 점.** PC가 같은 문장을 새 지문으로 다시 내면 `edited_on_mobile`을 유지한다(휴대폰의 문장이라는 표시가 재검사로
     지워지지 않게). 다른 문장이면 PC의 문장이라 해제된다.
   - **한계.** 재검사는 근거 문서가 "고쳐졌는가"를 시각으로 본다 — 초안 시점의 문서 내용 해시를 저장하지 않아서다. 따라서 내용이
