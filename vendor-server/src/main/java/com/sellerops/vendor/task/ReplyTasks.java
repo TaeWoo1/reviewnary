@@ -263,6 +263,12 @@ public class ReplyTasks {
         return newVersion(task, body, meta, task.draftBody().equals(body) && task.editedOnMobile(), lands, now);
     }
 
+    /** States whose approval is standing: the text is the seller's approved one. */
+    static final Set<State> APPROVAL_STANDS = EnumSet.of(State.APPROVED, State.CLAIMED);
+    /** States in which the PC may record its check of the current version. */
+    static final Set<State> CHECKABLE = EnumSet.of(State.AWAITING_APPROVAL, State.RECHECK_NEEDED, State.APPROVED,
+            State.CLAIMED);
+
     /** States a new version may be written in: not yet approved, sent back, or held after approval. */
     static final Set<State> REVISABLE = EnumSet.of(State.AWAITING_APPROVAL, State.RECHECK_NEEDED, State.HELD);
 
@@ -290,7 +296,9 @@ public class ReplyTasks {
 
     /**
      * The PC's knowledge-based check of a version (typically one edited on the phone). A held version may carry
-     * {@code note} — why, for the seller; a passed one may not.
+     * {@code note} — why, for the seller; a passed one may not. An approved or claimed version may be checked too,
+     * while its approval stands: the finding is recorded beside it and moves nothing — it is what the seller was
+     * shown when they approved, so a later basis change does not hold the same promise again (2026-10-23).
      */
     @Transactional
     public TaskView recordPcRecheck(UUID taskId, int draftVersion, boolean passed, List<String> codes,
@@ -300,10 +308,11 @@ public class ReplyTasks {
             throw new TaskException(Failure.INVALID_META);
         }
         TaskView task = get(taskId).orElseThrow(() -> new TaskException(Failure.NOT_FOUND));
-        if (task.state() != State.AWAITING_APPROVAL && task.state() != State.RECHECK_NEEDED) {
+        if (!CHECKABLE.contains(task.state())) {
             throw new TaskException(Failure.WRONG_STATE);
         }
-        if (task.draftVersion() != draftVersion) {
+        if (task.draftVersion() != draftVersion || (APPROVAL_STANDS.contains(task.state())
+                && !Integer.valueOf(draftVersion).equals(task.approvedVersion()))) {
             throw new TaskException(Failure.STALE);
         }
         String noteJson = note == null ? null : noteJson(note, task.draftBody());

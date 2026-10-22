@@ -206,11 +206,16 @@
     var doc = src ? (SOURCE_KIND[src.kind] || "자료") + " 「" + src.title + "」 문서가 " : "";
     var changed = src ? (src.removed ? "사용 중지" : day(src.changedAt) + "에 고쳐") : "";
     var promises = (note.promises || []).map(function (p) { return "「" + p + "」"; }).join(" · ");
+    if (codes.indexOf("UNSUPPORTED_PROMISE") >= 0 && (state === "APPROVED" || state === "CLAIMED")) {
+      // The PC flagged it before approval and the seller approved it anyway: their word, not a hold.
+      return { text: "근거에 없는 " + promises + " 약속을 확인하고 승인한 답글입니다.", todo: "" };
+    }
     if (codes.indexOf("UNSUPPORTED_PROMISE") >= 0) {
       return {
         text: (src ? doc + changed + (src.removed ? "되어, " : "져, ") : "") + "이 답글의 " + promises
           + " 약속이 지금 근거와 맞지 않습니다.",
-        todo: state === "RECHECK_NEEDED" ? "PC에서 초안을 고쳐 다시 보내 주세요."
+        todo: state === "AWAITING_APPROVAL" ? "이 약속이 맞는지 확인하고 승인하세요. 맞다면 PC에서 근거에 먼저 적어 두는 것이 좋습니다."
+          : state === "RECHECK_NEEDED" ? "PC에서 초안을 고쳐 다시 보내 주세요."
           : "문장을 고쳐 다시 승인하세요. 그 약속이 맞다면 PC에서 근거를 먼저 고쳐 주세요."
       };
     }
@@ -291,7 +296,7 @@
     if (t.editedOnMobile && t.pcRecheckVersion !== t.draftVersion) {
       unchecked = "휴대폰에서 고친 문장은 PC의 근거 · 금지 표현 검사를 거치지 않았습니다. 서버는 연락처 · 링크만 봅니다. "
         + "내용을 직접 확인하고 승인하세요.";
-    } else if (t.editedOnMobile && String(t.pcRecheck || "").indexOf("FLAGGED") === 0) {
+    } else if (t.editedOnMobile && String(t.pcRecheck || "").indexOf("FLAGGED") === 0 && !note) {
       unchecked = "PC 검사에서 확인할 부분이 나왔습니다. PC에서 초안을 확인하세요.";
     }
     $("unchecked").hidden = !unchecked || !editable;

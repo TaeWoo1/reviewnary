@@ -77,7 +77,9 @@ import org.springframework.stereotype.Service;
  * check of meaning exists, "substantive" is what this PC can prove: the approved words promise something (교환 · 환불
  * …) the current evidence no longer supports. That holds the reply for a new approval, and a claimed one asks its
  * delegate to stop first. A cited document that was only edited leaves the approval standing, with a note saying so.
- * Every hold carries what changed, the sentences it touches and the words that lost their ground. Without {@link
+ * Every hold carries what changed, the sentences it touches and the words that lost their ground. A promise the seller
+ * already saw flagged and approved anyway is not held again: this PC checks each phone edit under the basis it was
+ * written in ({@link #checkPhoneEdits}) before the seller approves it, and that finding is the baseline. Without {@link
  * ReviewDraftBasis} (a test wiring this lane alone) drafts say {@value #UNVERSIONED} and nothing is reported, as
  * before.
  */
@@ -102,6 +104,8 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             "HOLD_REQUESTED");
     /** Approved texts this PC checks again when what replies are written from changed. */
     static final Set<String> STANDING_APPROVALS = Set.of("APPROVED", "CLAIMED");
+    /** Phone-edited versions this PC checks under the basis they were written in, before or after approval. */
+    static final Set<String> PHONE_CHECKED = Set.of("AWAITING_APPROVAL", "APPROVED", "CLAIMED");
     private static final com.fasterxml.jackson.databind.ObjectMapper NOTE_JSON =
             com.fasterxml.jackson.databind.json.JsonMapper.builder().findAndAddModules()
                     .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
@@ -477,6 +481,65 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         return held;
     }
 
+    /**
+     * Checks each phone-edited version this PC has not yet checked, while what replies are written from is still
+     * what it was written in (2026-10-23). The finding — passed, or a promise the evidence does not support, with its
+     * sentence — goes to the server beside the version, so the phone shows it before the seller approves, and a
+     * later basis change does not hold the same promise again. Returns how many were checked.
+     */
+    synchronized int checkPhoneEdits(VendorStoreBinding binding, String token) {
+        if (basis == null || recheck == null) {
+            return 0;
+        }
+        UUID orgId = binding.getOrgId();
+        UUID storeId = binding.getVendorStoreId();
+        Fingerprints now = fingerprints(orgId);
+        int checked = 0;
+        for (VendorReplyTask copy : tasks.findByVendorStoreIdAndStateIn(storeId, PHONE_CHECKED)) {
+            if (!copy.isEditedOnMobile() || Integer.valueOf(copy.getDraftVersion()).equals(copy.getPcCheckedVersion())) {
+                continue;
+            }
+            TaskSnapshot current = link.client().task(token, copy.getVendorTaskId());
+            VendorReplyTask task = apply(orgId, copy.getReviewId(), storeId, current);
+            boolean due = PHONE_CHECKED.contains(current.state()) && current.editedOnMobile()
+                    && !Integer.valueOf(current.draftVersion()).equals(current.pcRecheckVersion())
+                    && now.combined().equals(current.draftBasis())
+                    && (!STANDING_APPROVALS.contains(current.state())
+                            || Integer.valueOf(current.draftVersion()).equals(current.approvedVersion()));
+            Review review = reviews.findByIdAndOrgId(task.getReviewId(), orgId).orElse(null);
+            VendorReviewRef ref = refs.findByReviewId(task.getReviewId()).orElse(null);
+            if (due && review != null && ref != null
+                    && ReviewBodyFingerprint.of(review.getBody()).equals(ref.getBodyFingerprint())) {
+                ReviewDraftRecheck.Result result = recheck.check(orgId, review,
+                        VocPreviewSanitizer.redactFullBody(review.getBody()).text(), current.draftBody());
+                try {
+                    TaskSnapshot after = link.client().pcRecheck(token, current.id(), current.draftVersion(),
+                            result.passed(), result.codes(), result.passed() ? null : note(result));
+                    task = apply(orgId, task.getReviewId(), storeId, after);
+                    checked++;
+                } catch (VendorServerClient.TaskRefused e) {
+                    log.warn("vendor reply task: phone edit check not recorded store={} code={}", storeId, e.code());
+                }
+            }
+            // Checked, or not checkable here (the basis moved on, or the review did): either way not asked again for
+            // this version — a moved basis is the approved check's to judge.
+            task.setPcCheckedVersion(current.draftVersion());
+            tasks.save(task);
+        }
+        return checked;
+    }
+
+    /** The promise words a PC flagged on {@code current}'s approved version before it was approved. */
+    private static Set<String> knownPromises(TaskSnapshot current) {
+        if (current.pcRecheck() == null || !current.pcRecheck().startsWith("FLAGGED")
+                || current.basisNoteJson() == null
+                || !java.util.Objects.equals(current.pcRecheckVersion(), current.approvedVersion())) {
+            return Set.of();
+        }
+        ReviewReplyDelegationView.Note seen = note(current.basisNoteJson());
+        return seen == null || seen.promises() == null ? Set.of() : Set.copyOf(seen.promises());
+    }
+
     /** One approved text checked; the server's answer, or null when nothing was sent. */
     private TaskSnapshot checkOne(UUID orgId, UUID storeId, String token, VendorReplyTask task, TaskSnapshot current) {
         Review review = reviews.findByIdAndOrgId(task.getReviewId(), orgId).orElse(null);
@@ -491,9 +554,23 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         if (result.passed()) {
             return null;
         }
-        boolean hold = result.codes().contains(ReviewDraftRecheck.UNSUPPORTED_PROMISE);
+        // A promise the seller was shown and approved anyway is their word, not a new conflict.
+        Set<String> known = knownPromises(current);
+        List<String> fresh = result.promises().stream().filter(p -> !known.contains(p)).toList();
+        boolean hold = !fresh.isEmpty();
+        boolean sourceChanged = result.codes().contains(ReviewDraftRecheck.SOURCE_CHANGED);
+        if (!hold && !sourceChanged) {
+            return null;
+        }
+        VendorServerClient.BasisNote note = hold
+                ? new VendorServerClient.BasisNote(sourceChanged
+                        ? List.of(ReviewDraftRecheck.SOURCE_CHANGED, ReviewDraftRecheck.UNSUPPORTED_PROMISE)
+                        : List.of(ReviewDraftRecheck.UNSUPPORTED_PROMISE), sources(result), fresh,
+                        ReviewDraftRecheck.sentencesWith(ReviewReplyValidation.normalize(current.draftBody()), fresh))
+                : new VendorServerClient.BasisNote(List.of(ReviewDraftRecheck.SOURCE_CHANGED), sources(result),
+                        List.of(), List.of());
         try {
-            return link.client().checkApproved(token, current.id(), current.approvedVersion(), hold, note(result),
+            return link.client().checkApproved(token, current.id(), current.approvedVersion(), hold, note,
                     "pc-check:" + current.id() + ":" + current.approvedVersion() + ":" + current.stateVersion());
         } catch (VendorServerClient.TaskRefused e) {
             log.warn("vendor reply task: approved check not recorded store={} code={}", storeId, e.code());
@@ -503,9 +580,13 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
 
     /** What the seller is shown about a finding: the server's note. */
     private static VendorServerClient.BasisNote note(ReviewDraftRecheck.Result result) {
-        return new VendorServerClient.BasisNote(result.codes(), result.changed().stream()
+        return new VendorServerClient.BasisNote(result.codes(), sources(result), result.promises(), result.sentences());
+    }
+
+    private static List<VendorServerClient.ChangedSource> sources(ReviewDraftRecheck.Result result) {
+        return result.changed().stream()
                 .map(c -> new VendorServerClient.ChangedSource(c.kind(), c.title(), c.changedAt(), c.removed()))
-                .toList(), result.promises(), result.sentences());
+                .toList();
     }
 
     /** Tells the server about the seller's own 'no reply' decisions in this store. Returns how many were sent. */

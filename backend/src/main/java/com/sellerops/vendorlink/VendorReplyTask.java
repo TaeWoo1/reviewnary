@@ -79,6 +79,13 @@ public class VendorReplyTask extends BaseEntity {
     @Column(name = "basis_note", length = 4000)
     private String basisNote;
 
+    /**
+     * The phone-edited version this PC last checked and recorded on the server ahead of the seller's approval
+     * (2026-10-23); null until then. Not re-asked on every pull.
+     */
+    @Column(name = "pc_checked_version")
+    private Integer pcCheckedVersion;
+
     /** When a delegate's POSTED was recorded in this PC's reply lane; null until then. */
     @Column(name = "outcome_recorded_at")
     private Instant outcomeRecordedAt;

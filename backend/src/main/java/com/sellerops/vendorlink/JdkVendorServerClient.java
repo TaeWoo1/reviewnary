@@ -348,7 +348,9 @@ public class JdkVendorServerClient implements VendorServerClient {
                 basis ? t.path("knowledgeFp").asText() + "|" + t.path("policyFp").asText() + "|"
                         + t.path("voiceFp").asText() : null,
                 note.isObject() && t.path("basisNoteVersion").asInt(-1) == t.path("draftVersion").asInt()
-                        ? note.toString() : null);
+                        ? note.toString() : null,
+                t.path("pcRecheckVersion").canConvertToInt() ? t.path("pcRecheckVersion").asInt() : null,
+                optionalText(t, "pcRecheck"));
     }
 
     /** A relay call: 2xx is the answer, a refused token or store is {@link Refused}, anything else unreachable. */

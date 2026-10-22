@@ -389,6 +389,23 @@ class ReplyTasksTest {
     }
 
     @Test
+    void anApprovedTextMayCarryThePcsCheckWithoutMoving() {
+        TaskView approved = approve(submit("1", PROMISING));
+        TaskView checked = tasks.recordPcRecheck(approved.id(), 1, false, List.of("UNSUPPORTED_PROMISE"),
+                promiseNote());
+        assertThat(checked.state()).isEqualTo(State.APPROVED);
+        assertThat(checked.stateVersion()).isEqualTo(approved.stateVersion());
+        assertThat(checked.pcRecheck()).isEqualTo("FLAGGED:UNSUPPORTED_PROMISE");
+        assertThat(checked.basisNote()).isEqualTo(promiseNote());
+        TaskView posted = approve(submit("2", "감사합니다."));
+        tasks.claim(posted.id(), me, posted.stateVersion());
+        report(posted.id(), me, Outcome.POSTED, posted.approvedFingerprint());
+        assertThatThrownBy(() -> tasks.recordPcRecheck(posted.id(), 1, true, List.of(), null))
+                .as("an ended task is not checked").isInstanceOfSatisfying(TaskException.class,
+                        e -> assertThat(e.failure()).isEqualTo(Failure.WRONG_STATE));
+    }
+
+    @Test
     void aSentBackDraftCarriesThePcsReasonUntilItsNextVersion() {
         TaskView waiting = submit("1", PROMISING);
         tasks.policyCheck(store, "k1", "p2", "v1");

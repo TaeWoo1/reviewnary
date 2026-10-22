@@ -677,6 +677,62 @@ abstract class VendorReplyTaskScenarios {
     }
 
     @Test
+    void aPhoneEditIsCheckedBeforeApprovalAndAPromiseTheSellerApprovedAnywayIsNotHeldAgain() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        UUID review = pulledReview("v1", "9100000313", "사이즈가 안 맞아요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "불편을 드려 죄송합니다.", 0);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        String phoneText = "불편을 드려 죄송합니다. 사이즈 교환을 도와드리겠습니다.";
+        vendor.move(task, "AWAITING_APPROVAL", phoneText, null, true);
+
+        pull.pullFor(org);
+        assertThat(vendor.rechecks).as("checked under the basis it was written in, before approval").singleElement()
+                .satisfies(r -> {
+                    assertThat(r.passed()).isFalse();
+                    assertThat(r.note().promises()).containsExactly("교환");
+                    assertThat(r.note().sentences()).containsExactly("사이즈 교환을 도와드리겠습니다.");
+                });
+        pull.pullFor(org);
+        assertThat(vendor.rechecks).as("once per version").hasSize(1);
+
+        // The seller saw it flagged and approved it on the phone anyway.
+        vendor.move(task, "APPROVED", phoneText, vendor.tasks.get(task).draftFingerprint(), false);
+        companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.GENERAL_CS_FAQ, "공통 안내",
+                "문의는 평일 10시부터 17시까지 받습니다.", null), null, "합성 판매자");
+        pull.pullFor(org);
+
+        assertThat(vendor.approvedChecks).as("the same promise is the seller's word, not a new conflict").isEmpty();
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("APPROVED");
+    }
+
+    @Test
+    void aPromiseThatLosesItsGroundAfterApprovalIsHeldEvenBesideOneTheSellerAccepted() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        var exchanges = exchangeRule();
+        UUID review = pulledReview("v1", "9100000314", "사이즈 교환 되나요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "불편을 드려 죄송합니다.", 0);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        String phoneText = "불편을 드려 죄송합니다. 사이즈 교환 또는 환불을 도와드리겠습니다.";
+        vendor.move(task, "AWAITING_APPROVAL", phoneText, null, true);
+        pull.pullFor(org);
+        assertThat(vendor.rechecks).singleElement().satisfies(r -> assertThat(r.note().promises())
+                .containsExactly("환불"));
+        vendor.move(task, "APPROVED", phoneText, vendor.tasks.get(task).draftFingerprint(), false);
+
+        retire(exchanges.id());
+        pull.pullFor(org);
+
+        assertThat(vendor.approvedChecks).singleElement().satisfies(c -> {
+            assertThat(c.hold()).isTrue();
+            assertThat(c.note().promises()).as("only the promise that lost its ground since").containsExactly("교환");
+        });
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("HELD");
+    }
+
+    @Test
     void anApprovalWhoseCitedRuleWasOnlyEditedStandsWithANote() throws Exception {
         tasks.setDraftBasis(draftBasis, draftRecheck);
         var rule = companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(

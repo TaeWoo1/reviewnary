@@ -109,7 +109,7 @@ public class ReviewDraftRecheck {
      * The reply's sentences that carry one of {@code promises}, in order and at most {@value #MAX_SENTENCES} — each
      * cut to {@value #MAX_SENTENCE} characters from its start, so it stays a piece of the reply's own text.
      */
-    static List<String> sentencesWith(String body, List<String> promises) {
+    public static List<String> sentencesWith(String body, List<String> promises) {
         List<String> out = new java.util.ArrayList<>();
         if (promises.isEmpty()) {
             return out;

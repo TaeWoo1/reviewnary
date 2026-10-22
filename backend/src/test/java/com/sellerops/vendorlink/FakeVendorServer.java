@@ -74,7 +74,8 @@ final class FakeVendorServer implements VendorServerClient {
                 com.sellerops.attention.reply.ReviewReplyFingerprint.of(body), approvedFingerprint,
                 editedOnMobile || t.editedOnMobile(),
                 "APPROVED".equals(state) ? Integer.valueOf(version) : t.approvedVersion(), basisOf(t.id()),
-                sameText ? t.basisNoteJson() : null);
+                sameText ? t.basisNoteJson() : null, sameText ? t.pcRecheckVersion() : null,
+                sameText ? t.pcRecheck() : null);
         tasks.put(taskId, next);
         changes.add(new TaskChange(changes.size() + 1, state, next));
         return next;
@@ -258,9 +259,12 @@ final class FakeVendorServer implements VendorServerClient {
                                   List<String> codes, BasisNote note) {
         bearers.add(installToken);
         rechecks.add(new Recheck(taskId, draftVersion, passed, List.copyOf(codes), note));
-        if (note != null) {
-            tasks.put(taskId, withNote(tasks.get(taskId), tasks.get(taskId).state(), 0, note));
-        }
+        TaskSnapshot t = tasks.get(taskId);
+        TaskSnapshot noted = note == null ? t : withNote(t, t.state(), 0, note);
+        tasks.put(taskId, new TaskSnapshot(t.id(), t.reviewId(), t.state(), t.stateVersion(), t.draftVersion(),
+                t.draftBody(), t.draftFingerprint(), t.approvedFingerprint(), t.editedOnMobile(), t.approvedVersion(),
+                t.draftBasis(), noted.basisNoteJson(), draftVersion,
+                passed ? "PASSED" : "FLAGGED:" + String.join(",", codes)));
         return tasks.get(taskId);
     }
 
@@ -287,7 +291,8 @@ final class FakeVendorServer implements VendorServerClient {
         try {
             return new TaskSnapshot(t.id(), t.reviewId(), state, t.stateVersion() + step, t.draftVersion(),
                     t.draftBody(), t.draftFingerprint(), t.approvedFingerprint(), t.editedOnMobile(),
-                    t.approvedVersion(), t.draftBasis(), JSON.writeValueAsString(note));
+                    t.approvedVersion(), t.draftBasis(), JSON.writeValueAsString(note), t.pcRecheckVersion(),
+                    t.pcRecheck());
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             throw new IllegalStateException(e);
         }

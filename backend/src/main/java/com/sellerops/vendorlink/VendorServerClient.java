@@ -86,16 +86,26 @@ public interface VendorServerClient {
     /**
      * A task as the server reports it to a PC. {@code reviewId} is the server's review id. {@code draftBasis} is the
      * three fingerprints the current version was drafted under, joined as {@code ReviewDraftBasis.Fingerprints#combined}
-     * does; {@code basisNoteJson} the reason a PC recorded for it (owner decision 2026-10-23), as the server holds it.
+     * does; {@code basisNoteJson} the reason a PC recorded for it (owner decision 2026-10-23), as the server holds it;
+     * {@code pcRecheckVersion} · {@code pcRecheck} the version a PC last checked and its result ({@code PASSED} ·
+     * {@code FLAGGED:<codes>}).
      */
     record TaskSnapshot(UUID id, UUID reviewId, String state, int stateVersion, int draftVersion, String draftBody,
                         String draftFingerprint, String approvedFingerprint, boolean editedOnMobile,
-                        Integer approvedVersion, String draftBasis, String basisNoteJson) {
+                        Integer approvedVersion, String draftBasis, String basisNoteJson, Integer pcRecheckVersion,
+                        String pcRecheck) {
+
+        public TaskSnapshot(UUID id, UUID reviewId, String state, int stateVersion, int draftVersion, String draftBody,
+                            String draftFingerprint, String approvedFingerprint, boolean editedOnMobile,
+                            Integer approvedVersion, String draftBasis, String basisNoteJson) {
+            this(id, reviewId, state, stateVersion, draftVersion, draftBody, draftFingerprint, approvedFingerprint,
+                    editedOnMobile, approvedVersion, draftBasis, basisNoteJson, null, null);
+        }
 
         public TaskSnapshot(UUID id, UUID reviewId, String state, int stateVersion, int draftVersion, String draftBody,
                             String draftFingerprint, String approvedFingerprint, boolean editedOnMobile) {
             this(id, reviewId, state, stateVersion, draftVersion, draftBody, draftFingerprint, approvedFingerprint,
-                    editedOnMobile, null, null, null);
+                    editedOnMobile, null, null, null, null, null);
         }
     }
 

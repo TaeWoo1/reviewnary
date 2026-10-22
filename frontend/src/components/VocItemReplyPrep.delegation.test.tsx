@@ -281,6 +281,34 @@ describe("VocItemReplyPrep · delegate lane", () => {
     expect(screen.queryByRole("region", { name: "왜 멈췄나요" })).toBeNull();
   });
 
+  it("shows a phone edit's unsupported promise as something to check before approval, not as a hold", async () => {
+    vi.mocked(api.getReviewReplyPrep).mockResolvedValue(
+      prepView(
+        { taskState: "AWAITING_APPROVAL", editedOnMobile: true, canSend: true, canCancel: true, note: { ...PROMISE_NOTE, sources: [] } },
+        false,
+      ),
+    );
+    mount();
+
+    const check = await screen.findByRole("region", { name: "확인할 점" });
+    expect(check.textContent).toContain("휴대폰에서 승인하기 전에 이 약속이 맞는지 확인하세요.");
+    expect(screen.queryByRole("region", { name: "왜 멈췄나요" })).toBeNull();
+  });
+
+  it("says once, quietly, that the seller approved a promise they were shown", async () => {
+    vi.mocked(api.getReviewReplyPrep).mockResolvedValue(
+      prepView(
+        { taskState: "APPROVED", editedOnMobile: true, canSend: false, canCancel: true, note: { ...PROMISE_NOTE, sources: [] } },
+        false,
+      ),
+    );
+    mount();
+
+    expect(await screen.findByText(/근거에 없는 「교환」 약속을 확인하고 승인한 답글입니다/)).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "왜 멈췄나요" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "확인할 점" })).toBeNull();
+  });
+
   it("draws nothing of the lane for a review that cannot use it", async () => {
     vi.mocked(api.getReviewReplyPrep).mockResolvedValue(prepView(null));
     mount();

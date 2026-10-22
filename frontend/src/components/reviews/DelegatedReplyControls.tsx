@@ -66,7 +66,8 @@ function when(iso: string | null): string {
 /**
  * <b>Why a version was stopped</b> (owner decision 2026-10-23; mockup confirmed the same day): what changed, which
  * sentence it touches, and what to do. Drawn only from the PC's own finding — nothing here is inferred on screen.
- * A cited document that was only edited, under an approval that stands, is one quiet line instead.
+ * A cited document that was only edited, under an approval that stands, is one quiet line instead. A phone edit the
+ * PC checked before approval is not a hold: before approval it is 「확인할 점」, after it one quiet line.
  */
 function WhyStopped({ state, note }: { state: string; note: ReviewReplyDelegationNote }) {
   const promise = note.codes.includes("UNSUPPORTED_PROMISE");
@@ -75,21 +76,33 @@ function WhyStopped({ state, note }: { state: string; note: ReviewReplyDelegatio
     ? `${SOURCE_KIND[source.kind] ?? "자료"} 「${source.title}」`
     : null;
   const changedWhen = source ? (source.removed ? "사용 중지됨" : `${when(source.changedAt)}에 고쳐짐`) : null;
-  if (!promise && (state === "APPROVED" || state === "CLAIMED")) {
+  const words = note.promises.map((p) => `「${p}」`).join(" · ");
+  if (state === "APPROVED" || state === "CLAIMED") {
+    if (promise) {
+      return (
+        <p className="text-xs leading-relaxed text-muted">
+          근거에 없는 {words} 약속을 확인하고 승인한 답글입니다. 응대 기준에 적어 두면 근거가 생깁니다.
+        </p>
+      );
+    }
     return changed ? (
       <p className="text-xs leading-relaxed text-muted">
         근거로 쓴 {changed} 문서가 바뀌었지만, 이 답글과 부딪히는 곳이 없어 승인을 그대로 둡니다.
       </p>
     ) : null;
   }
+  const advisory = state === "AWAITING_APPROVAL";
+  const heading = advisory ? "확인할 점" : "왜 멈췄나요";
   const todo = promise
-    ? state === "RECHECK_NEEDED"
+    ? advisory
+      ? "휴대폰에서 승인하기 전에 이 약속이 맞는지 확인하세요. 맞다면 응대 기준에 적어 두면 근거가 생깁니다."
+      : state === "RECHECK_NEEDED"
       ? "문장을 고쳐 다시 보내세요. 그 약속이 맞다면 응대 기준에 먼저 적으세요."
       : "문장을 고쳐 다시 승인하세요. 그 약속이 맞다면 응대 기준에 먼저 적은 뒤 다시 승인하세요."
     : "고쳐진 문서와 초안을 비교해 보고, 맞으면 그대로, 아니면 고쳐서 다시 보내세요.";
   return (
-    <section aria-label="왜 멈췄나요" className="flex flex-col gap-2 rounded-xl bg-surface p-3 ring-1 ring-line">
-      <h4 className="text-sm font-bold text-ink">왜 멈췄나요</h4>
+    <section aria-label={heading} className="flex flex-col gap-2 rounded-xl bg-surface p-3 ring-1 ring-line">
+      <h4 className="text-sm font-bold text-ink">{heading}</h4>
       <dl className="grid grid-cols-[88px_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm leading-relaxed">
         {changed ? (
           <>
@@ -104,7 +117,7 @@ function WhyStopped({ state, note }: { state: string; note: ReviewReplyDelegatio
         <dd className="text-ink">
           {promise ? (
             <>
-              답글의 {note.promises.map((p) => `「${p}」`).join(" · ")} 약속이 지금 근거에는 없습니다.
+              답글의 {words} 약속이 지금 근거에는 없습니다.
               {note.sentences.map((s) => (
                 <mark key={s} className="mt-1 block rounded bg-warn/10 px-1.5 py-0.5 font-semibold text-ink">
                   {s}
