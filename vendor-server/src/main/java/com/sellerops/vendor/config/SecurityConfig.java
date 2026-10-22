@@ -110,7 +110,7 @@ public class SecurityConfig {
                         .hasAnyRole(SELLER, INSTALL)
                         // Reply tasks (contract §4.3). The PC's own calls first, then what the seller or the PC may do.
                         .requestMatchers(HttpMethod.POST, "/v1/stores/*/tasks", "/v1/stores/*/tasks/policy-check",
-                                "/v1/tasks/*/pc-recheck").hasRole(INSTALL)
+                                "/v1/tasks/*/pc-recheck", "/v1/tasks/*/approved-check").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.GET, "/v1/stores/*/tasks/changes").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.GET, "/v1/stores/*/tasks", "/v1/tasks/*").hasAnyRole(SELLER, INSTALL)
                         .requestMatchers(HttpMethod.PUT, "/v1/tasks/*/draft").hasAnyRole(SELLER, INSTALL)

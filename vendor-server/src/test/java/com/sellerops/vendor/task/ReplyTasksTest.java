@@ -136,7 +136,7 @@ class ReplyTasksTest {
         assertThat(edited.editedOnMobile()).isTrue();
         assertThatThrownBy(() -> tasks.editDraft(v2.id(), 2, "늦은 수정", true))
                 .isInstanceOfSatisfying(TaskException.class, e -> assertThat(e.failure()).isEqualTo(Failure.STALE));
-        assertThat(tasks.recordPcRecheck(v2.id(), 3, false, List.of("UNSUPPORTED_CLAIM")).pcRecheck())
+        assertThat(tasks.recordPcRecheck(v2.id(), 3, false, List.of("UNSUPPORTED_CLAIM"), null).pcRecheck())
                 .isEqualTo("FLAGGED:UNSUPPORTED_CLAIM");
 
         TaskView approved = approve(edited);
@@ -231,6 +231,174 @@ class ReplyTasksTest {
                 new Meta(currentFingerprint("1"), clock.instant(), "k1", "p2", "v1"));
         assertThat(redone.state()).isEqualTo(State.AWAITING_APPROVAL);
         assertThat(redone.draftVersion()).isEqualTo(2);
+    }
+
+    /* ── holds after approval (owner decision 2026-10-23) ── */
+
+    private static final String PROMISING = "불편을 드려 죄송합니다. 세탁 후 수축이면 무료 교환해 드리겠습니다.";
+
+    private ReplyTasks.BasisNote promiseNote() {
+        return new ReplyTasks.BasisNote(List.of("UNSUPPORTED_PROMISE"),
+                List.of(new ReplyTasks.ChangedSource("ORG_POLICY", "교환 · 반품 안내",
+                        Instant.parse("2026-10-20T02:30:00Z"), false)),
+                List.of("교환"), List.of("세탁 후 수축이면 무료 교환해 드리겠습니다."));
+    }
+
+    @Test
+    void anApprovedReplyThatConflictsIsHeldWithItsReasonAndMustBeApprovedAgain() {
+        TaskView approved = approve(submit("1", PROMISING));
+        assertThat(tasks.policyCheck(store, "k1", "p2", "v1").withdrawalSuggested()).containsExactly(approved.id());
+        assertThat(tasks.get(approved.id()).orElseThrow().state()).as("a fingerprint alone moves nothing")
+                .isEqualTo(State.APPROVED);
+
+        TaskView held = tasks.checkApproved(approved.id(), 1, true, promiseNote(), command());
+        assertThat(held.state()).isEqualTo(State.HELD);
+        assertThat(held.basisNote()).isEqualTo(promiseNote());
+        assertThat(held.basisNoteVersion()).isEqualTo(1);
+        assertThat(tasks.forDelegate(me, State.APPROVED)).as("no delegate can take a held reply").isEmpty();
+        assertThatThrownBy(() -> tasks.approve(held.id(), account, 1, held.draftFingerprint(), command()))
+                .as("the same version is not approvable again").isInstanceOfSatisfying(TaskException.class,
+                        e -> assertThat(e.failure()).isEqualTo(Failure.WRONG_STATE));
+
+        TaskView edited = tasks.editDraft(held.id(), 1, "불편을 드려 죄송합니다. 주문 내역에서 문의 주시면 확인하겠습니다.", true);
+        assertThat(edited.state()).as("a phone edit of a held reply goes to the PC's check first")
+                .isEqualTo(State.RECHECK_NEEDED);
+        assertThat(edited.basisNote()).as("a new version has no reason yet").isNull();
+        TaskView redone = tasks.submitDraft(store, review("1"), edited.draftBody(),
+                new Meta(currentFingerprint("1"), clock.instant(), "k1", "p2", "v1"));
+        assertThat(redone.state()).isEqualTo(State.AWAITING_APPROVAL);
+        assertThat(approve(redone).state()).isEqualTo(State.APPROVED);
+    }
+
+    @Test
+    void aHeldReplyCanBeDraftedAgainOnThePcOrCancelled() {
+        TaskView held = tasks.checkApproved(approve(submit("1", PROMISING)).id(), 1, true, promiseNote(), command());
+        TaskView other = tasks.checkApproved(approve(submit("2", PROMISING)).id(), 1, true, promiseNote(), command());
+        tasks.policyCheck(store, "k1", "p2", "v1");
+        TaskView redone = tasks.submitDraft(store, review("1"), "고친 문장입니다.",
+                new Meta(currentFingerprint("1"), clock.instant(), "k1", "p2", "v1"));
+        assertThat(redone.id()).isEqualTo(held.id());
+        assertThat(redone.state()).isEqualTo(State.AWAITING_APPROVAL);
+        assertThat(tasks.cancel(other.id(), command()).state()).isEqualTo(State.CANCELLED);
+    }
+
+    @Test
+    void aClaimedReplyThatConflictsAsksItsDelegateToStopAndReturnsToTheSeller() {
+        TaskView approved = approve(submit("1", PROMISING));
+        TaskView claimed = tasks.claim(approved.id(), me, approved.stateVersion());
+        assertThat(tasks.policyCheck(store, "k1", "p2", "v1").withdrawalSuggested()).containsExactly(claimed.id());
+
+        TaskView asked = tasks.checkApproved(claimed.id(), 1, true, promiseNote(), command());
+        assertThat(asked.state()).isEqualTo(State.HOLD_REQUESTED);
+        ReplyTasks.Preflight look = tasks.preflight(asked.id(), me);
+        assertThat(look.clearToPost()).isFalse();
+        assertThat(look.holdRequested()).isTrue();
+        assertThat(look.holdNote()).isEqualTo(promiseNote());
+        assertThat(tasks.forDelegate(me, State.HOLD_REQUESTED)).as("the claimer sees it among their own")
+                .singleElement().satisfies(t -> assertThat(t.mine()).isTrue());
+
+        TaskView back = report(asked.id(), me, Outcome.FAILED, null);
+        assertThat(back.state()).as("stopped, not tried").isEqualTo(State.HELD);
+        assertThat(back.outcome()).isNull();
+        assertThat(back.claimed()).isFalse();
+        assertThat(back.basisNote()).isEqualTo(promiseNote());
+        assertThat(tasks.changes(store, 0, 100).changes()).extracting(ReplyTasks.Change::state)
+                .containsExactly(State.AWAITING_APPROVAL, State.APPROVED, State.CLAIMED, State.HOLD_REQUESTED,
+                        State.HELD);
+    }
+
+    @Test
+    void aHoldThatArrivesAfterThePostingSettlesAsPostedAndAReleaseReturnsItToTheSeller() {
+        TaskView first = approve(submit("1", PROMISING));
+        tasks.claim(first.id(), me, first.stateVersion());
+        tasks.checkApproved(first.id(), 1, true, promiseNote(), command());
+        assertThat(report(first.id(), me, Outcome.POSTED, first.approvedFingerprint()).state())
+                .isEqualTo(State.POSTED);
+
+        TaskView second = approve(submit("2", PROMISING));
+        tasks.claim(second.id(), me, second.stateVersion());
+        tasks.checkApproved(second.id(), 1, true, promiseNote(), command());
+        TaskView released = tasks.release(second.id(), me);
+        assertThat(released.state()).isEqualTo(State.HELD);
+        assertThat(released.claimed()).isFalse();
+    }
+
+    @Test
+    void aSellerCancelsAHoldRequestAndASuspendedClaimerLeavesItUnknown() {
+        TaskView first = approve(submit("1", PROMISING));
+        tasks.claim(first.id(), me, first.stateVersion());
+        tasks.checkApproved(first.id(), 1, true, promiseNote(), command());
+        assertThat(tasks.cancel(first.id(), command()).state()).isEqualTo(State.CANCEL_REQUESTED);
+
+        TaskView second = approve(submit("2", PROMISING));
+        tasks.claim(second.id(), other, second.stateVersion());
+        tasks.checkApproved(second.id(), 1, true, promiseNote(), command());
+        delegates.suspend("o-" + myEmail);
+        assertThat(tasks.get(second.id()).orElseThrow().state()).isEqualTo(State.UNKNOWN);
+    }
+
+    @Test
+    void aChangedReviewInvalidatesAHeldReply() throws Exception {
+        TaskView held = tasks.checkApproved(approve(submit("1", PROMISING)).id(), 1, true, promiseNote(), command());
+        clock.advance(Duration.ofHours(1));
+        upload(ExportWorkbooks.line("1", Map.of("리뷰상세내용", "고쳐 쓴 리뷰")), ExportWorkbooks.line("2", Map.of()));
+        assertThat(tasks.get(held.id()).orElseThrow().state()).isEqualTo(State.INVALIDATED);
+    }
+
+    @Test
+    void anEditThatTouchesNoPromiseKeepsTheApprovalAndItsNote() {
+        TaskView approved = approve(submit("1", PROMISING));
+        ReplyTasks.BasisNote kept = new ReplyTasks.BasisNote(List.of("SOURCE_CHANGED"),
+                List.of(new ReplyTasks.ChangedSource("PRODUCT_KNOWLEDGE", "린넨 커튼 · 소재 안내",
+                        Instant.parse("2026-10-20T02:30:00Z"), false)), List.of(), List.of());
+        TaskView after = tasks.checkApproved(approved.id(), 1, false, kept, command());
+        assertThat(after.state()).isEqualTo(State.APPROVED);
+        assertThat(after.stateVersion()).as("no transition").isEqualTo(approved.stateVersion());
+        assertThat(after.basisNote()).isEqualTo(kept);
+        TaskView claimed = tasks.claim(after.id(), me, after.stateVersion());
+        assertThat(tasks.preflight(claimed.id(), me).clearToPost()).isTrue();
+    }
+
+    @Test
+    void aNoteMustQuoteTheTasksOwnWordsAndNameTheApprovedVersion() {
+        TaskView approved = approve(submit("1", PROMISING));
+        ReplyTasks.BasisNote foreign = new ReplyTasks.BasisNote(List.of("UNSUPPORTED_PROMISE"), List.of(),
+                List.of("환불"), List.of("전액 환불해 드리겠습니다."));
+        ReplyTasks.BasisNote noCode = new ReplyTasks.BasisNote(List.of(), List.of(), List.of(), List.of());
+        ReplyTasks.BasisNote badKind = new ReplyTasks.BasisNote(List.of("SOURCE_CHANGED"),
+                List.of(new ReplyTasks.ChangedSource("PAST_REPLY", "옛 답글", clock.instant(), false)), List.of(),
+                List.of());
+        for (ReplyTasks.BasisNote bad : List.of(foreign, noCode, badKind)) {
+            assertThatThrownBy(() -> tasks.checkApproved(approved.id(), 1, true, bad, command()))
+                    .isInstanceOfSatisfying(TaskException.class,
+                            e -> assertThat(e.failure()).isEqualTo(Failure.INVALID_META));
+        }
+        assertThatThrownBy(() -> tasks.checkApproved(approved.id(), 2, true, promiseNote(), command()))
+                .isInstanceOfSatisfying(TaskException.class, e -> assertThat(e.failure()).isEqualTo(Failure.STALE));
+        assertThat(tasks.get(approved.id()).orElseThrow().state()).isEqualTo(State.APPROVED);
+
+        TaskView waiting = submit("2", PROMISING);
+        assertThatThrownBy(() -> tasks.checkApproved(waiting.id(), 1, true, promiseNote(), command()))
+                .as("only an approved text is checked this way").isInstanceOfSatisfying(TaskException.class,
+                        e -> assertThat(e.failure()).isEqualTo(Failure.WRONG_STATE));
+
+        String once = command();
+        TaskView held = tasks.checkApproved(approved.id(), 1, true, promiseNote(), once);
+        assertThat(tasks.checkApproved(approved.id(), 1, true, promiseNote(), once).stateVersion())
+                .as("the same command again is a no-op").isEqualTo(held.stateVersion());
+    }
+
+    @Test
+    void aSentBackDraftCarriesThePcsReasonUntilItsNextVersion() {
+        TaskView waiting = submit("1", PROMISING);
+        tasks.policyCheck(store, "k1", "p2", "v1");
+        TaskView flagged = tasks.recordPcRecheck(waiting.id(), 1, false, List.of("UNSUPPORTED_PROMISE"),
+                promiseNote());
+        assertThat(flagged.basisNote()).isEqualTo(promiseNote());
+        assertThatThrownBy(() -> tasks.recordPcRecheck(waiting.id(), 1, true, List.of(), promiseNote()))
+                .as("a pass carries no reason").isInstanceOfSatisfying(TaskException.class,
+                        e -> assertThat(e.failure()).isEqualTo(Failure.INVALID_META));
+        assertThat(tasks.editDraft(waiting.id(), 1, "고친 문장", true).basisNote()).isNull();
     }
 
     @Test

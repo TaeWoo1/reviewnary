@@ -9,8 +9,9 @@
   "use strict";
 
   var KEY = "reviewnary.replies.session";
-  var AWAITING = ["AWAITING_APPROVAL", "RECHECK_NEEDED"];
-  var MOVING = ["APPROVED", "CLAIMED", "CANCEL_REQUESTED"];
+  // HELD waits on the seller like a draft does: an approval held because its words lost their ground (2026-10-23).
+  var AWAITING = ["AWAITING_APPROVAL", "RECHECK_NEEDED", "HELD"];
+  var MOVING = ["APPROVED", "CLAIMED", "CANCEL_REQUESTED", "HOLD_REQUESTED"];
   // Not settled either way: listed with the moving ones until the delegate says what happened, never dropped.
   var IN_DOUBT = ["UNKNOWN"];
   var STATE = {
@@ -23,8 +24,11 @@
     FAILED: ["담당자가 등록하지 못함", "neutral"],
     UNKNOWN: ["담당자가 확인 중", "warn"],
     CANCELLED: ["취소됨", "neutral"],
-    INVALIDATED: ["요청이 끝남", "neutral"]
+    INVALIDATED: ["요청이 끝남", "neutral"],
+    HELD: ["승인 보류 · 다시 승인 필요", "warn"],
+    HOLD_REQUESTED: ["승인 보류 · 담당자 확인 중", "warn"]
   };
+  var SOURCE_KIND = { PRODUCT_KNOWLEDGE: "상품 지식", ORG_POLICY: "운영 정책" };
   var CHECKS = {
     CONTACT_PHONE: "전화번호로 보이는 부분이 있습니다.",
     CONTACT_EMAIL: "이메일 주소로 보이는 부분이 있습니다.",
@@ -190,6 +194,62 @@
     }, function () { say("task-error", "서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요."); });
   }
 
+  /**
+   * Why a version was stopped, in the seller's words (owner decision 2026-10-23: what changed, which sentence, what
+   * to do). Built from the PC's note only — the server judged nothing — and null when there is nothing to say.
+   */
+  function reason(state, note) {
+    if (!note) { return null; }
+    var codes = note.codes || [];
+    var src = (note.sources || [])[0];
+    // 「…」 문서가: the particle follows 문서, never the seller's own title, so it is always right.
+    var doc = src ? (SOURCE_KIND[src.kind] || "자료") + " 「" + src.title + "」 문서가 " : "";
+    var changed = src ? (src.removed ? "사용 중지" : day(src.changedAt) + "에 고쳐") : "";
+    var promises = (note.promises || []).map(function (p) { return "「" + p + "」"; }).join(" · ");
+    if (codes.indexOf("UNSUPPORTED_PROMISE") >= 0) {
+      return {
+        text: (src ? doc + changed + (src.removed ? "되어, " : "져, ") : "") + "이 답글의 " + promises
+          + " 약속이 지금 근거와 맞지 않습니다.",
+        todo: state === "RECHECK_NEEDED" ? "PC에서 초안을 고쳐 다시 보내 주세요."
+          : "문장을 고쳐 다시 승인하세요. 그 약속이 맞다면 PC에서 근거를 먼저 고쳐 주세요."
+      };
+    }
+    if (codes.indexOf("SOURCE_CHANGED") >= 0 && src) {
+      if (state === "APPROVED" || state === "CLAIMED") {
+        return { text: "근거로 쓴 " + doc + changed + (src.removed ? "됐지만" : "졌지만")
+          + ", 이 답글과 부딪히는 곳이 없어 승인을 그대로 둡니다.", todo: "" };
+      }
+      return {
+        text: "이 초안이 근거로 쓴 " + doc + changed + (src.removed ? "됐습니다." : "졌습니다.")
+          + " 어느 문장이 달라졌는지는 아직 짚지 못합니다.",
+        todo: "PC에서 바뀐 문서와 초안을 비교해 보고, 맞으면 그대로, 아니면 고쳐서 다시 보내 주세요."
+      };
+    }
+    return null;
+  }
+
+  /** The reply, with each sentence the hold is about marked. Text nodes only — the server's words are never HTML. */
+  function reply(el, body, sentences) {
+    while (el.firstChild) { el.removeChild(el.firstChild); }
+    var at = 0;
+    var marks = [];
+    sentences.forEach(function (s) {
+      var i = body.indexOf(s);
+      if (i >= 0) { marks.push([i, i + s.length]); }
+    });
+    marks.sort(function (a, b) { return a[0] - b[0]; });
+    marks.forEach(function (m) {
+      if (m[0] < at) { return; }
+      el.appendChild(document.createTextNode(body.slice(at, m[0])));
+      var span = document.createElement("span");
+      span.className = "hl";
+      span.textContent = body.slice(m[0], m[1]);
+      el.appendChild(span);
+      at = m[1];
+    });
+    el.appendChild(document.createTextNode(body.slice(at)));
+  }
+
   function renderTask() {
     var t = task;
     var rv = t.review || {};
@@ -211,9 +271,16 @@
 
     var awaiting = t.state === "AWAITING_APPROVAL";
     var editable = AWAITING.indexOf(t.state) >= 0;
-    var cancellable = ["AWAITING_APPROVAL", "RECHECK_NEEDED", "APPROVED", "CLAIMED"].indexOf(t.state) >= 0;
+    var cancellable = ["AWAITING_APPROVAL", "RECHECK_NEEDED", "APPROVED", "CLAIMED", "HELD", "HOLD_REQUESTED"]
+      .indexOf(t.state) >= 0;
 
-    $("reply-body").textContent = t.draftBody || "";
+    var note = t.basisNote && t.basisNoteVersion === t.draftVersion ? t.basisNote : null;
+    reply($("reply-body"), t.draftBody || "", note ? note.sentences || [] : []);
+    var why = reason(t.state, note);
+    $("why").hidden = !why || editing;
+    $("why-text").textContent = why ? why.text : "";
+    $("why-todo").textContent = why ? why.todo : "";
+    $("why-todo").hidden = !why || !why.todo;
     $("edited").hidden = !t.editedOnMobile;
     var checks = (t.serverChecks || []).map(function (c) { return CHECKS[c]; }).filter(Boolean);
     $("checks").hidden = checks.length === 0 || !editable;
@@ -232,27 +299,31 @@
 
     $("read-reply").hidden = editing;
     $("edit-form").hidden = !editing;
-    $("approved-note").hidden = editing || MOVING.indexOf(t.state) < 0 || t.state === "CANCEL_REQUESTED";
+    $("approved-note").hidden = editing || ["APPROVED", "CLAIMED"].indexOf(t.state) < 0;
     $("approve").hidden = editing || !awaiting;
     $("save-edit").hidden = !editing;
     $("save-note").hidden = !editing;
     $("edit").hidden = editing || !editable;
     $("cancel-edit").hidden = !editing;
     $("cancel").hidden = editing || !cancellable;
-    $("cancel").textContent = t.state === "APPROVED" ? "승인 취소" : t.state === "CLAIMED" ? "취소 요청" : "요청 취소";
+    $("cancel").textContent = t.state === "APPROVED" ? "승인 취소"
+      : t.state === "CLAIMED" || t.state === "HOLD_REQUESTED" ? "취소 요청"
+      : t.state === "HELD" ? "답글 취소" : "요청 취소";
     $("confirm-cancel").hidden = true;
 
-    var note = "";
-    if (t.state === "RECHECK_NEEDED") {
-      note = "응대 기준이 바뀌어 이 초안은 승인할 수 없습니다. PC에서 초안을 확인하고 다시 보내 주세요.";
+    var stateNote = "";
+    if (t.state === "RECHECK_NEEDED" && !note) {
+      stateNote = "응대 기준이 바뀌어 이 초안은 승인할 수 없습니다. PC에서 초안을 확인하고 다시 보내 주세요.";
+    } else if (t.state === "HOLD_REQUESTED") {
+      stateNote = "담당자에게도 멈춤을 전했습니다. 등록 전인지 담당자가 확인하는 중입니다.";
     } else if (t.state === "CLAIMED") {
-      note = "담당자가 등록을 시작했습니다. 취소하면 담당자가 등록 전인지 확인한 뒤 끝납니다.";
+      stateNote = "담당자가 등록을 시작했습니다. 취소하면 담당자가 등록 전인지 확인한 뒤 끝납니다.";
     } else if (t.state === "CANCEL_REQUESTED") {
-      note = "취소를 요청했습니다. 담당자가 등록 전인지 확인한 뒤 끝납니다.";
+      stateNote = "취소를 요청했습니다. 담당자가 등록 전인지 확인한 뒤 끝납니다.";
     } else if (t.state === "UNKNOWN") {
-      note = "담당자가 등록했는지 아직 확인되지 않았습니다. 확인될 때까지 이 리뷰에는 새 답글을 보내지 않습니다.";
+      stateNote = "담당자가 등록했는지 아직 확인되지 않았습니다. 확인될 때까지 이 리뷰에는 새 답글을 보내지 않습니다.";
     }
-    say("state-note", note);
+    say("state-note", stateNote);
   }
 
   function refused(r, fallback) {

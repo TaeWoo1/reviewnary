@@ -619,6 +619,57 @@ class VendorServerSecurityTest {
         mvc.perform(get(tasksPath).with(bearer(otherSession))).andExpect(status().isNotFound());
     }
 
+    /** Owner decision 2026-10-23: only the PC holds an approved reply, and the delegate is told why before saving. */
+    @Test
+    void onlyThePcHoldsAnApprovedReplyAndTheDelegateIsToldWhy() throws Exception {
+        Delegate me = enrolDelegate();
+        UUID store = stores.add(accounts.idOf(email).orElseThrow(), Stores.Channel.NAVER, "데모 스토어");
+        stores.assign(store, me.id());
+        CheckedStores.checked(jdbc, store, me.id());
+        mvc.perform(multipart("/v1/delegate/stores/" + store + "/review-uploads").file(new MockMultipartFile("file",
+                "export.xlsx", "application/octet-stream", ExportWorkbooks.fixture())).with(bearer(me.token())))
+                .andExpect(status().isCreated());
+        String pc = link();
+        JsonNode review = body(mvc.perform(get("/v1/stores/" + store + "/reviews").with(bearer(pc))))
+                .path("events").get(0).path("review");
+        String draft = "{\"reviewId\":\"" + review.path("id").asText() + "\",\"body\":\"세탁 후 수축이면 무료 교환해 "
+                + "드리겠습니다.\",\"meta\":{\"reviewBodyFingerprint\":\"" + review.path("bodyFingerprint").asText()
+                + "\",\"generatedAt\":\"2026-10-20T00:00:00Z\",\"knowledgeFp\":\"k1\",\"policyFp\":\"p1\","
+                + "\"voiceFp\":\"v1\"}}";
+        JsonNode task = body(mvc.perform(json(post("/v1/stores/" + store + "/tasks").with(bearer(pc)), draft))
+                .andExpect(status().isCreated()));
+        String taskPath = "/v1/tasks/" + task.path("id").asText();
+        mvc.perform(json(post(taskPath + "/approve").with(bearer(session)), "{\"version\":1,\"fingerprint\":\""
+                + task.path("draftFingerprint").asText() + "\",\"commandId\":\"approve-h\"}"))
+                .andExpect(status().isOk());
+        String delegatePath = "/v1/delegate/tasks/" + task.path("id").asText();
+        mvc.perform(json(post(delegatePath + "/claim").with(bearer(me.token())), "{\"stateVersion\":1}"))
+                .andExpect(status().isOk());
+
+        String check = "{\"approvedVersion\":1,\"hold\":true,\"commandId\":\"check-1\",\"note\":{"
+                + "\"codes\":[\"UNSUPPORTED_PROMISE\"],\"sources\":[{\"kind\":\"ORG_POLICY\",\"title\":\"교환 안내\","
+                + "\"changedAt\":\"2026-10-20T00:30:00Z\",\"removed\":false}],\"promises\":[\"교환\"],"
+                + "\"sentences\":[\"세탁 후 수축이면 무료 교환해 드리겠습니다.\"]}}";
+        mvc.perform(json(post(taskPath + "/approved-check").with(bearer(session)), check))
+                .andExpect(status().isForbidden());
+        mvc.perform(json(post(taskPath + "/approved-check").with(bearer(me.token())), check))
+                .andExpect(status().isForbidden());
+        mvc.perform(json(post(taskPath + "/approved-check").with(bearer(pc)), check)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.state").value("HOLD_REQUESTED"))
+                .andExpect(jsonPath("$.basisNote.sources[0].changedAt").value("2026-10-20T00:30:00Z"));
+
+        mvc.perform(get(delegatePath + "/preflight").with(bearer(me.token()))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.clearToPost").value(false))
+                .andExpect(jsonPath("$.holdRequested").value(true))
+                .andExpect(jsonPath("$.holdNote.promises[0]").value("교환"));
+        mvc.perform(json(post(delegatePath + "/report").with(bearer(me.token())), "{\"outcome\":\"FAILED\","
+                + "\"checkedAt\":\"2026-10-20T00:40:00Z\",\"method\":\"SELLER_CENTER_SCREEN\",\"commandId\":\"r-h\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.state").value("HELD"));
+        mvc.perform(get(taskPath).with(bearer(session))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.state").value("HELD"))
+                .andExpect(jsonPath("$.basisNote.sentences[0]").value("세탁 후 수축이면 무료 교환해 드리겠습니다."));
+    }
+
     // --- helpers ---------------------------------------------------------------------------------------------------
 
     private record Delegate(UUID id, String email, String secret, String token) {}

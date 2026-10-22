@@ -36,7 +36,11 @@ public class TaskController {
 
     public record EditRequest(@NotNull Integer baseVersion, @NotBlank String body) {}
 
-    public record RecheckRequest(@NotNull Integer draftVersion, @NotNull Boolean passed, List<String> codes) {}
+    public record RecheckRequest(@NotNull Integer draftVersion, @NotNull Boolean passed, List<String> codes,
+                                 ReplyTasks.BasisNote note) {}
+
+    public record ApprovedCheckRequest(@NotNull Integer approvedVersion, @NotNull Boolean hold,
+                                       @NotNull ReplyTasks.BasisNote note, @NotBlank String commandId) {}
 
     public record PolicyRequest(@NotBlank String knowledgeFp, @NotBlank String policyFp, @NotBlank String voiceFp) {}
 
@@ -106,7 +110,23 @@ public class TaskController {
                                        @RequestBody @Valid RecheckRequest request) {
         ownTask(pc, taskId);
         return tasks.recordPcRecheck(taskId, request.draftVersion(), request.passed(),
-                request.codes() == null ? List.of() : request.codes());
+                request.codes() == null ? List.of() : request.codes(), request.note());
+    }
+
+    /**
+     * The PC's check of an approved text after the basis changed (owner decision 2026-10-23). Only an installed PC
+     * makes this finding — it alone holds the seller's knowledge — so a seller's session is answered as if the task
+     * were not there.
+     */
+    @PostMapping("/v1/tasks/{taskId}/approved-check")
+    public ReplyTasks.TaskView approvedCheck(@AuthenticationPrincipal Principal pc, @PathVariable UUID taskId,
+                                             @RequestBody @Valid ApprovedCheckRequest request) {
+        ownTask(pc, taskId);
+        if (pc.installId() == null) {
+            throw new TaskException(Failure.NOT_FOUND);
+        }
+        return tasks.checkApproved(taskId, request.approvedVersion(), request.hold(), request.note(),
+                request.commandId());
     }
 
     @PostMapping("/v1/tasks/{taskId}/approve")

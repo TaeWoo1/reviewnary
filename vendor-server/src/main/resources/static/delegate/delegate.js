@@ -10,11 +10,12 @@
   "use strict";
 
   var KEY = "reviewnary.delegate.session";
-  var MINE = ["CLAIMED", "CANCEL_REQUESTED", "UNKNOWN"];
+  var MINE = ["CLAIMED", "CANCEL_REQUESTED", "HOLD_REQUESTED", "UNKNOWN"];
   var STATE = {
     APPROVED: ["승인됨", "info"],
     CLAIMED: ["등록하는 중", "info"],
     CANCEL_REQUESTED: ["판매자가 취소 요청", "warn"],
+    HOLD_REQUESTED: ["판매자가 승인 보류", "warn"],
     UNKNOWN: ["확인 필요", "warn"]
   };
 
@@ -217,7 +218,8 @@
     $("report-unknown").hidden = unknown;
     $("stop-failed").disabled = false;
     $("stop-posted").disabled = false;
-    $("stop-posted").hidden = !(stop && check.cancelRequested);
+    $("stop-posted").hidden = !(stop && (check.cancelRequested || check.holdRequested));
+    $("stop-failed").textContent = stop && check.holdRequested ? "등록 안 했음 · 보류 확인" : "등록하지 않고 끝내기";
     $("report-title").textContent = unknown
       ? "판매자센터에서 등록됐는지 확인한 뒤 알립니다"
       : stop ? "이 작업 끝내기" : "판매자센터 화면에서 저장된 것을 보고 알립니다";
@@ -242,6 +244,13 @@
         } else {
           var why = [];
           if (check.cancelRequested) { why.push("판매자가 취소를 요청했습니다."); }
+          if (check.holdRequested) {
+            // Owner decision 2026-10-23: a held reply stops here too, and the delegate is told why.
+            var promises = ((check.holdNote || {}).promises || []).join(" · ");
+            why.push("판매자가 이 답글의 승인을 보류했습니다." + (promises
+              ? " 판매자의 기준이 바뀌어, 승인된 문장의 약속이 지금 기준과 맞지 않습니다: " + promises + "." : ""));
+            why.push("판매자센터에 붙여 넣지 마세요. 이미 붙여 넣었다면 저장하지 말고 지우세요.");
+          }
           if (check.reviewChanged) { why.push("리뷰 내용이 바뀌었습니다."); }
           if (check.displayChanged) { why.push("리뷰가 숨김 처리됐거나 전시 상태가 바뀌었습니다."); }
           if (check.alreadyReplied) { why.push("이미 답글이 있습니다."); }
@@ -292,7 +301,8 @@
     }).then(function (r) {
       if (r.status === 200 && r.json) {
         var words = { POSTED: "등록함으로 알렸습니다.", FAILED: "등록하지 않음으로 알렸습니다.",
-          UNKNOWN: "확인 필요로 남겼습니다. 판매자센터에서 확인한 뒤 다시 알려 주세요.", CANCELLED: "취소로 끝냈습니다." };
+          UNKNOWN: "확인 필요로 남겼습니다. 판매자센터에서 확인한 뒤 다시 알려 주세요.", CANCELLED: "취소로 끝냈습니다.",
+          HELD: "보류를 확인했습니다. 답글은 판매자에게 돌아갔습니다." };
         loadList(words[r.json.state] || "알렸습니다.", "good-text");
       } else if (r.status !== 401) {
         renderSteps();

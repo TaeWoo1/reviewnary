@@ -1,5 +1,9 @@
 package com.sellerops.vendor.task;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.sellerops.vendor.review.ReviewAttachment;
 import com.sellerops.vendor.review.StoreReviews;
 import com.sellerops.vendor.store.Stores;
@@ -33,7 +37,10 @@ import org.springframework.transaction.annotation.Transactional;
  *   │   └─new version (PC/phone)   │cancel              │cancel
  *   ├─policy differs─▶ RECHECK_NEEDED                  ▼
  *   ├─cancel─▶ CANCELLED       CANCELLED          CANCEL_REQUESTED ──report──▶ CANCELLED · POSTED
- *   └─review changed · removed · answered ─▶ INVALIDATED   (from APPROVED too)
+ *   └─review changed · removed · answered ─▶ INVALIDATED   (from APPROVED and HELD too)
+ *
+ * APPROVED ──PC: approved text conflicts with the current basis──▶ HELD ──new version──▶ AWAITING_APPROVAL · RECHECK_NEEDED
+ * CLAIMED  ──same──▶ HOLD_REQUESTED ──report not posted · release──▶ HELD      (POSTED · UNKNOWN as reported)
  * </pre>
  *
  * <ul>
@@ -58,7 +65,11 @@ public class ReplyTasks {
 
     public enum State {
         AWAITING_APPROVAL, RECHECK_NEEDED, APPROVED, CLAIMED, CANCEL_REQUESTED, POSTED, FAILED, UNKNOWN, CANCELLED,
-        INVALIDATED;
+        INVALIDATED,
+        /** An approval held because the approved text conflicts with what replies are now written from (2026-10-23). */
+        HELD,
+        /** The same hold after a delegate claimed it: the delegate's preflight says stop, and they confirm. */
+        HOLD_REQUESTED;
 
         /** States in which the task no longer holds its review open. */
         static final Set<State> ENDED = EnumSet.of(POSTED, FAILED, CANCELLED, INVALIDATED);
@@ -99,6 +110,18 @@ public class ReplyTasks {
         }
     }
 
+    /**
+     * <b>Why a version was stopped, as the PC that checked it says</b> (owner decision 2026-10-23: a hold always
+     * shows what changed, which sentence it touches and what to do). The server judges nothing in it: it keeps the
+     * PC's closed codes, the documents that changed, the promise words that lost their ground and the sentences
+     * that carry them — and refuses a note whose sentences are not in the task's own text.
+     */
+    public record BasisNote(List<String> codes, List<ChangedSource> sources, List<String> promises,
+                            List<String> sentences) {}
+
+    /** A product or company document a version was written from that has since been edited or taken out of use. */
+    public record ChangedSource(String kind, String title, Instant changedAt, boolean removed) {}
+
     /** The PC's statement of what a draft was made from (§17.9 초안 메타). */
     public record Meta(String reviewBodyFingerprint, Instant generatedAt, String knowledgeFp, String policyFp,
                        String voiceFp) {}
@@ -113,7 +136,8 @@ public class ReplyTasks {
                            String voiceFp, boolean editedOnMobile, List<String> serverChecks,
                            Integer pcRecheckVersion, String pcRecheck, Integer approvedVersion,
                            String approvedFingerprint, Instant approvedAt, boolean claimed, Outcome outcome,
-                           Instant checkedAt, String reportMethod, Instant updatedAt) {}
+                           Instant checkedAt, String reportMethod, Instant updatedAt, BasisNote basisNote,
+                           Integer basisNoteVersion) {}
 
     /** The review a task answers, as the latest upload states it. */
     public record TaskReview(String productName, int rating, String body, ReviewAttachment attachment,
@@ -132,7 +156,8 @@ public class ReplyTasks {
      */
     public record Preflight(UUID taskId, State state, String approvedBody, String approvedFingerprint,
                             boolean reviewChanged, boolean displayChanged, boolean alreadyReplied,
-                            boolean cancelRequested, boolean clearToPost) {}
+                            boolean cancelRequested, boolean holdRequested, BasisNote holdNote,
+                            boolean clearToPost) {}
 
     public record PolicyCheck(List<UUID> sentBackForRecheck, List<UUID> withdrawalSuggested) {}
 
@@ -147,6 +172,15 @@ public class ReplyTasks {
     private static final Pattern PROVENANCE = Pattern.compile("[A-Za-z0-9._:-]{1,64}");
     private static final Pattern CHECK_CODE = Pattern.compile("[A-Z][A-Z0-9_]{0,39}");
     private static final Pattern COMMAND_ID = Pattern.compile("[A-Za-z0-9._:-]{1,100}");
+    static final Set<String> SOURCE_KINDS = Set.of("PRODUCT_KNOWLEDGE", "ORG_POLICY");
+    static final int NOTE_MAX_SOURCES = 5;
+    static final int NOTE_MAX_TITLE = 120;
+    static final int NOTE_MAX_PROMISES = 12;
+    static final int NOTE_MAX_PROMISE = 20;
+    static final int NOTE_MAX_SENTENCES = 3;
+    static final int NOTE_MAX_SENTENCE = 300;
+    private static final ObjectMapper NOTE_JSON = JsonMapper.builder().findAndAddModules()
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).build();
 
     private final JdbcClient jdbc;
     private final Clock clock;
@@ -218,7 +252,7 @@ public class ReplyTasks {
             return get(id).orElseThrow();
         }
         TaskView task = open.get();
-        if (task.state() != State.AWAITING_APPROVAL && task.state() != State.RECHECK_NEEDED) {
+        if (!REVISABLE.contains(task.state())) {
             throw new TaskException(Failure.TASK_IN_PROGRESS);
         }
         if (task.state() == lands && task.draftBody().equals(body) && sameMeta(task, meta)) {
@@ -229,15 +263,19 @@ public class ReplyTasks {
         return newVersion(task, body, meta, task.draftBody().equals(body) && task.editedOnMobile(), lands, now);
     }
 
+    /** States a new version may be written in: not yet approved, sent back, or held after approval. */
+    static final Set<State> REVISABLE = EnumSet.of(State.AWAITING_APPROVAL, State.RECHECK_NEEDED, State.HELD);
+
     /**
      * A new version written on the phone or the PC. {@code baseVersion} must be the current one. Editing the text is
-     * not a recheck: a draft sent back for one stays sent back until the PC drafts it again under the current policy.
+     * not a recheck: a draft sent back for one — or held after approval — goes back for one until the PC drafts it
+     * again under the current policy.
      */
     @Transactional
     public TaskView editDraft(UUID taskId, int baseVersion, String rawBody, boolean onMobile) {
         String body = body(rawBody);
         TaskView task = get(taskId).orElseThrow(() -> new TaskException(Failure.NOT_FOUND));
-        if (task.state() != State.AWAITING_APPROVAL && task.state() != State.RECHECK_NEEDED) {
+        if (!REVISABLE.contains(task.state())) {
             throw new TaskException(Failure.WRONG_STATE);
         }
         if (task.draftVersion() != baseVersion) {
@@ -250,11 +288,15 @@ public class ReplyTasks {
         return newVersion(task, body, same, onMobile, lands, clock.instant());
     }
 
-    /** The PC's knowledge-based check of a version (typically one edited on the phone). */
+    /**
+     * The PC's knowledge-based check of a version (typically one edited on the phone). A held version may carry
+     * {@code note} — why, for the seller; a passed one may not.
+     */
     @Transactional
-    public TaskView recordPcRecheck(UUID taskId, int draftVersion, boolean passed, List<String> codes) {
+    public TaskView recordPcRecheck(UUID taskId, int draftVersion, boolean passed, List<String> codes,
+                                    BasisNote note) {
         if (codes.size() > 10 || !codes.stream().allMatch(c -> CHECK_CODE.matcher(c).matches())
-                || (passed && !codes.isEmpty())) {
+                || (passed && !codes.isEmpty()) || (passed && note != null)) {
             throw new TaskException(Failure.INVALID_META);
         }
         TaskView task = get(taskId).orElseThrow(() -> new TaskException(Failure.NOT_FOUND));
@@ -264,10 +306,12 @@ public class ReplyTasks {
         if (task.draftVersion() != draftVersion) {
             throw new TaskException(Failure.STALE);
         }
+        String noteJson = note == null ? null : noteJson(note, task.draftBody());
         String result = passed ? "PASSED" : "FLAGGED:" + String.join(",", codes);
-        int moved = jdbc.sql("update reply_tasks set pc_recheck_version = ?, pc_recheck = ?, updated_at = ? "
-                        + "where id = ? and state_version = ?")
-                .params(draftVersion, result, ts(clock.instant()), taskId, task.stateVersion())
+        int moved = jdbc.sql("update reply_tasks set pc_recheck_version = ?, pc_recheck = ?, basis_note = ?, "
+                        + "basis_note_version = ?, updated_at = ? where id = ? and state_version = ?")
+                .params(draftVersion, result, noteJson, noteJson == null ? null : draftVersion,
+                        ts(clock.instant()), taskId, task.stateVersion())
                 .update();
         if (moved != 1) {
             throw new TaskException(Failure.STALE);
@@ -276,8 +320,9 @@ public class ReplyTasks {
     }
 
     /**
-     * The PC's current policy fingerprints. Unapproved drafts made under others go back for a recheck; approved
-     * ones are only listed as a suggestion to withdraw; claimed ones are left alone.
+     * The PC's current policy fingerprints. Unapproved drafts made under others go back for a recheck; approved and
+     * claimed ones are only listed — the PC checks their text ({@link #checkApproved}) and the server moves nothing
+     * on a fingerprint alone.
      */
     @Transactional
     public PolicyCheck policyCheck(UUID storeId, String knowledgeFp, String policyFp, String voiceFp) {
@@ -299,11 +344,55 @@ public class ReplyTasks {
             if (task.state() == State.AWAITING_APPROVAL
                     && transition(task, State.AWAITING_APPROVAL, State.RECHECK_NEEDED, "", now)) {
                 sentBack.add(task.id());
-            } else if (task.state() == State.APPROVED) {
+            } else if (task.state() == State.APPROVED || task.state() == State.CLAIMED) {
                 suggested.add(task.id());
             }
         }
         return new PolicyCheck(List.copyOf(sentBack), List.copyOf(suggested));
+    }
+
+    /**
+     * <b>The PC's check of an approved text against what replies are now written from</b> (owner decision
+     * 2026-10-23). {@code hold} is the PC's finding of a substantive conflict: an {@code APPROVED} task is held for
+     * a new approval, a {@code CLAIMED} one asks its delegate to stop first. Without {@code hold} the note is only
+     * kept — a document edit that touches nothing the reply promises leaves the approval standing. Either way the
+     * note must name the approved version. The same {@code commandId} again is a no-op.
+     */
+    @Transactional
+    public TaskView checkApproved(UUID taskId, int approvedVersion, boolean hold, BasisNote note, String commandId) {
+        Optional<TaskView> repeat = repeated(commandId, taskId, "CHECK_APPROVED");
+        if (repeat.isPresent()) {
+            return repeat.get();
+        }
+        if (note == null) {
+            throw new TaskException(Failure.INVALID_META);
+        }
+        TaskView task = get(taskId).orElseThrow(() -> new TaskException(Failure.NOT_FOUND));
+        if (task.state() != State.APPROVED && task.state() != State.CLAIMED) {
+            throw new TaskException(Failure.WRONG_STATE);
+        }
+        if (task.approvedVersion() == null || task.approvedVersion() != approvedVersion
+                || task.draftVersion() != approvedVersion) {
+            throw new TaskException(Failure.STALE);
+        }
+        String noteJson = noteJson(note, task.draftBody());
+        Instant now = clock.instant();
+        boolean moved;
+        if (hold) {
+            State to = task.state() == State.APPROVED ? State.HELD : State.HOLD_REQUESTED;
+            moved = transition(task, task.state(), to, ", basis_note = ?, basis_note_version = ?", now, noteJson,
+                    approvedVersion);
+        } else {
+            moved = jdbc.sql("update reply_tasks set basis_note = ?, basis_note_version = ?, updated_at = ? "
+                            + "where id = ? and state = ? and state_version = ?")
+                    .params(noteJson, approvedVersion, ts(now), taskId, task.state().name(), task.stateVersion())
+                    .update() == 1;
+        }
+        if (!moved) {
+            throw new TaskException(Failure.STALE);
+        }
+        remember(commandId, taskId, "CHECK_APPROVED", now);
+        return get(taskId).orElseThrow();
     }
 
     /* ── Seller: approve, cancel ────────────────────────────────────────────────────────────────────────────────── */
@@ -348,8 +437,9 @@ public class ReplyTasks {
         TaskView task = get(taskId).orElseThrow(() -> new TaskException(Failure.NOT_FOUND));
         Instant now = clock.instant();
         boolean moved = switch (task.state()) {
-            case AWAITING_APPROVAL, RECHECK_NEEDED, APPROVED -> transition(task, task.state(), State.CANCELLED, "", now);
-            case CLAIMED -> transition(task, State.CLAIMED, State.CANCEL_REQUESTED, "", now);
+            case AWAITING_APPROVAL, RECHECK_NEEDED, APPROVED, HELD ->
+                    transition(task, task.state(), State.CANCELLED, "", now);
+            case CLAIMED, HOLD_REQUESTED -> transition(task, task.state(), State.CANCEL_REQUESTED, "", now);
             default -> throw new TaskException(Failure.WRONG_STATE);
         };
         if (!moved) {
@@ -402,15 +492,15 @@ public class ReplyTasks {
         return get(taskId).orElseThrow();
     }
 
-    /** Hands back a claimed task untouched. */
+    /** Hands back a claimed task untouched — to the other delegates, or to the seller when it was held meanwhile. */
     @Transactional
     public TaskView release(UUID taskId, UUID delegateId) {
         TaskView task = claimedBy(taskId, delegateId);
-        if (task.state() != State.CLAIMED) {
+        if (task.state() != State.CLAIMED && task.state() != State.HOLD_REQUESTED) {
             throw new TaskException(Failure.WRONG_STATE);
         }
-        if (!transition(task, State.CLAIMED, State.APPROVED, ", claimed_by = null, claimed_at = null",
-                clock.instant())) {
+        State to = task.state() == State.CLAIMED ? State.APPROVED : State.HELD;
+        if (!transition(task, task.state(), to, ", claimed_by = null, claimed_at = null", clock.instant())) {
             throw new TaskException(Failure.STALE);
         }
         return get(taskId).orElseThrow();
@@ -428,15 +518,18 @@ public class ReplyTasks {
         boolean changed = !review.bodyFingerprint().equals(task.reviewBodyFingerprint());
         boolean displayChanged = !Objects.equals(review.displayState(), displayedThen);
         boolean cancelRequested = task.state() == State.CANCEL_REQUESTED;
+        boolean holdRequested = task.state() == State.HOLD_REQUESTED;
         boolean clear = task.state() == State.CLAIMED && !changed && !displayChanged && !review.replied();
         return new Preflight(task.id(), task.state(), task.draftBody(), task.approvedFingerprint(), changed,
-                displayChanged, review.replied(), cancelRequested, clear);
+                displayChanged, review.replied(), cancelRequested, holdRequested,
+                holdRequested ? task.basisNote() : null, clear);
     }
 
     /**
      * What the delegate saw in Seller Center. {@code POSTED} must name the approved text's fingerprint. From a
-     * cancel request, {@code FAILED} (not posted) settles as {@code CANCELLED}. An {@code UNKNOWN} may later be
-     * settled by the same delegate.
+     * cancel request, {@code FAILED} (not posted) settles as {@code CANCELLED}; from a hold request it returns the
+     * task to the seller as {@code HELD}, unclaimed and with no outcome — it was stopped, not tried. An
+     * {@code UNKNOWN} may later be settled by the same delegate.
      */
     @Transactional
     public TaskView report(UUID taskId, UUID delegateId, Outcome outcome, String postedFingerprint, Instant checkedAt,
@@ -455,8 +548,17 @@ public class ReplyTasks {
         if (outcome == Outcome.POSTED && !task.approvedFingerprint().equals(postedFingerprint)) {
             throw new TaskException(Failure.FINGERPRINT_MISMATCH);
         }
+        if (task.state() == State.HOLD_REQUESTED && outcome == Outcome.FAILED) {
+            if (!transition(task, State.HOLD_REQUESTED, State.HELD, ", claimed_by = null, claimed_at = null, "
+                    + "checked_at = ?, reported_at = ?, report_method = ?", now, ts(checkedAt), ts(now),
+                    method.name())) {
+                throw new TaskException(Failure.STALE);
+            }
+            remember(commandId, taskId, "REPORT", now);
+            return get(taskId).orElseThrow();
+        }
         State to = switch (task.state()) {
-            case CLAIMED -> State.valueOf(outcome.name());
+            case CLAIMED, HOLD_REQUESTED -> State.valueOf(outcome.name());
             case CANCEL_REQUESTED -> outcome == Outcome.FAILED ? State.CANCELLED : State.valueOf(outcome.name());
             case UNKNOWN -> {
                 if (outcome == Outcome.UNKNOWN) {
@@ -562,14 +664,14 @@ public class ReplyTasks {
      */
     public static void invalidateOpen(JdbcClient jdbc, UUID reviewId, Instant at) {
         List<Object[]> open = jdbc.sql("select id, store_id from reply_tasks where open_review_id = ? and state in "
-                        + "('AWAITING_APPROVAL', 'RECHECK_NEEDED', 'APPROVED')")
+                        + "('AWAITING_APPROVAL', 'RECHECK_NEEDED', 'APPROVED', 'HELD')")
                 .param(reviewId)
                 .query((rs, n) -> new Object[] {rs.getObject(1, UUID.class), rs.getObject(2, UUID.class)})
                 .list();
         for (Object[] task : open) {
             int moved = jdbc.sql("update reply_tasks set state = ?, state_version = state_version + 1, updated_at = ?, "
                             + "open_review_id = null, ended_at = ? where id = ? and state in "
-                            + "('AWAITING_APPROVAL', 'RECHECK_NEEDED', 'APPROVED')")
+                            + "('AWAITING_APPROVAL', 'RECHECK_NEEDED', 'APPROVED', 'HELD')")
                     .params(State.INVALIDATED.name(), ts(at), ts(at), task[0])
                     .update();
             if (moved == 1) {
@@ -581,13 +683,13 @@ public class ReplyTasks {
     /** A suspended delegate's claimed work becomes UNKNOWN — never silently handed to someone else (§2). */
     public static void unknownForSuspended(JdbcClient jdbc, UUID delegateId, Instant at) {
         List<Object[]> claimed = jdbc.sql("select id, store_id from reply_tasks where claimed_by = ? and state in "
-                        + "('CLAIMED', 'CANCEL_REQUESTED')")
+                        + "('CLAIMED', 'CANCEL_REQUESTED', 'HOLD_REQUESTED')")
                 .param(delegateId)
                 .query((rs, n) -> new Object[] {rs.getObject(1, UUID.class), rs.getObject(2, UUID.class)})
                 .list();
         for (Object[] task : claimed) {
             int moved = jdbc.sql("update reply_tasks set state = ?, state_version = state_version + 1, updated_at = ? "
-                            + "where id = ? and state in ('CLAIMED', 'CANCEL_REQUESTED')")
+                            + "where id = ? and state in ('CLAIMED', 'CANCEL_REQUESTED', 'HOLD_REQUESTED')")
                     .params(State.UNKNOWN.name(), ts(at), task[0])
                     .update();
             if (moved == 1) {
@@ -642,6 +744,7 @@ public class ReplyTasks {
                         + "draft_version = draft_version + 1, draft_body = ?, draft_fingerprint = ?, "
                         + "review_body_fingerprint = ?, generated_at = ?, knowledge_fp = ?, policy_fp = ?, voice_fp = ?, "
                         + "edited_on_mobile = ?, server_checks = ?, pc_recheck_version = null, pc_recheck = null, "
+                        + "basis_note = null, basis_note_version = null, "
                         + "updated_at = ? where id = ? and state = ? and state_version = ?")
                 .params(lands.name(), body, ReplyText.fingerprint(body),
                         meta.reviewBodyFingerprint(), ts(meta.generatedAt()), meta.knowledgeFp(), meta.policyFp(),
@@ -794,7 +897,66 @@ public class ReplyTasks {
                 approvedVersion, rs.getString("approved_fingerprint"), instant(rs.getTimestamp("approved_at")),
                 rs.getObject("claimed_by") != null, outcome == null ? null : Outcome.valueOf(outcome),
                 instant(rs.getTimestamp("checked_at")), rs.getString("report_method"),
-                instant(rs.getTimestamp("updated_at")));
+                instant(rs.getTimestamp("updated_at")), note(rs.getString("basis_note")), noteVersion(rs));
+    }
+
+    private static Integer noteVersion(ResultSet rs) throws SQLException {
+        int v = rs.getInt("basis_note_version");
+        return rs.wasNull() ? null : v;
+    }
+
+    private static BasisNote note(String json) {
+        if (json == null) {
+            return null;
+        }
+        try {
+            return NOTE_JSON.readValue(json, BasisNote.class);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("stored basis note unreadable", e);
+        }
+    }
+
+    /**
+     * The note as stored, after its shape is checked: closed codes, bounded lists and lengths, known document kinds,
+     * no control characters — and every quoted sentence found, whitespace aside, in {@code text}, the version it is
+     * about. The server cannot judge the PC's finding; it can refuse a note that quotes something the task never
+     * said.
+     */
+    static String noteJson(BasisNote note, String text) {
+        List<String> codes = note.codes() == null ? List.of() : note.codes();
+        List<ChangedSource> sources = note.sources() == null ? List.of() : note.sources();
+        List<String> promises = note.promises() == null ? List.of() : note.promises();
+        List<String> sentences = note.sentences() == null ? List.of() : note.sentences();
+        boolean ok = !codes.isEmpty() && codes.size() <= 4 && codes.stream().allMatch(c -> c != null
+                && CHECK_CODE.matcher(c).matches())
+                && sources.size() <= NOTE_MAX_SOURCES && sources.stream().allMatch(ReplyTasks::sourceOk)
+                && promises.size() <= NOTE_MAX_PROMISES
+                && promises.stream().allMatch(p -> plain(p, NOTE_MAX_PROMISE))
+                && sentences.size() <= NOTE_MAX_SENTENCES
+                && sentences.stream().allMatch(x -> plain(x, NOTE_MAX_SENTENCE) && squeezed(text).contains(squeezed(x)));
+        if (!ok) {
+            throw new TaskException(Failure.INVALID_META);
+        }
+        try {
+            return NOTE_JSON.writeValueAsString(new BasisNote(List.copyOf(codes), List.copyOf(sources),
+                    List.copyOf(promises), List.copyOf(sentences)));
+        } catch (JsonProcessingException e) {
+            throw new TaskException(Failure.INVALID_META);
+        }
+    }
+
+    private static boolean sourceOk(ChangedSource s) {
+        return s != null && SOURCE_KINDS.contains(s.kind()) && plain(s.title(), NOTE_MAX_TITLE)
+                && (s.removed() || s.changedAt() != null);
+    }
+
+    private static boolean plain(String value, int max) {
+        return value != null && !value.isBlank() && value.length() <= max
+                && value.chars().noneMatch(Character::isISOControl);
+    }
+
+    private static String squeezed(String value) {
+        return value == null ? "" : value.replaceAll("\\s+", "");
     }
 
     private static Instant instant(Timestamp t) {
