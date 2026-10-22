@@ -438,7 +438,16 @@ AWAITING_APPROVAL ──승인──▶ APPROVED ──착수──▶ CLAIMED �
   거절한다. 리뷰 화면은 답변 준비 응답의 `delegation`(`taskState` · `editedOnMobile` · `canSend` · `canCancel`)만 보고 버튼을 그린다 —
   서버에서 받은 리뷰가 아니거나 연결되지 않은 PC면 `null`이고 화면에 아무것도 서지 않는다.
 - **결과 기록.** `POSTED`는 기존 답글 레인에 `OPERATOR_REPORTED_SUBMITTED` + `UNVERIFIED`로 한 번만 남긴다(명령 ID
-  `vendor-posted:{taskId}`). 휴대폰에서 고친 문장이면 그 문장을 판매자 작성 초안 새 버전으로 먼저 저장한다.
+  `vendor-posted:{taskId}`).
+- **승인은 답변 기억이 된다 (2026-10-22 외부 검토 P2, V140).** PC가 작업이 승인된 것을 처음 볼 때(휴대폰 승인 · 휴대폰에서
+  고친 뒤 승인 · 이 PC의 「승인하고 맡기기」) 승인된 문장을 판매자 작성 초안 버전으로 저장하고(이미 같은 문장이면 그 버전),
+  그 버전을 `vendor_reply_task.approved_draft_version`에 적고, 이 PC에서 승인한 답글과 같은 `USER_APPROVED`로 답변 기억에
+  남긴다(`ReviewAnswerMemoryHook`, 행위 ID `review-approved:{review}:{version}`). 과거 답변 검색(`ReviewReplyAdapter`)은 승인이
+  서 있는 작업(승인 · 착수 · 등록 · 실패 · 확인 중)의 그 버전을 「판매자가 승인한 답글」로, 등록 보고 뒤에는 「채널에 등록된
+  것으로 기록된 답글」로 읽고, 취소 · 리뷰 변경으로 끝난 작업은 읽지 않는다. 담당자의 등록은 보고일 뿐 읽어 확인한 것이
+  아니라 더 강한 기억(`EXECUTOR_SENT_VERIFIED`)은 만들지 않는다. 그래서 판매자가 휴대폰에서 고친 답글이 다음 비슷한 리뷰의
+  초안 근거(과거 답변 칸)로 돌아온다. 한계: 테스트의 근거 찾기는 낱말 일치뿐이라, 조사가 다른 긴 문장(배송이 · 배송과)은
+  같은 리뷰 문장으로도 찾지 못했다 — 실제 사례 확인에서 잰다(`docs/FINDINGS.md` B22).
 - **'답글 필요 없음'(D8).** 리뷰 받기마다, 현재 분류가 `NO_ACTION`이고 `SELLER:`가 정한 리뷰를 `disposition`으로 한 번 알린다.
   나중에 판매자가 생각을 바꿔도 서버의 90일 시작점은 움직이지 않는다(§6) — 그 사이 서버의 리뷰가 지워지면 그 리뷰의 대행 작업은
   더 열 수 없고, PC의 리뷰와 PC의 답글 길은 그대로다.
