@@ -85,14 +85,15 @@ public class SecurityConfig {
                         // Spring's error page renders a status and nothing else (application.yml server.error).
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET, "/health").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/v1/auth/login", "/v1/auth/invites/redeem").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/v1/auth/login", "/v1/auth/invites/peek",
+                                "/v1/auth/invites/redeem").permitAll()
                         .requestMatchers(HttpMethod.POST, "/v1/auth/logout").hasRole(SELLER)
                         .requestMatchers(HttpMethod.POST, "/v1/installs/code", "/v1/installs/token").permitAll()
                         .requestMatchers(HttpMethod.GET, "/v1/ip").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.GET, "/v1/installs/me").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.DELETE, "/v1/installs/me").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.GET, "/link", "/link/*", "/replies", "/replies/*", "/delegate",
-                                "/delegate/*", "/assets/*").permitAll()
+                                "/delegate/*", "/join", "/join/*", "/assets/*").permitAll()
                         .requestMatchers(HttpMethod.POST, "/v1/installs/pending", "/v1/installs/approve").hasRole(SELLER)
                         .requestMatchers(HttpMethod.GET, "/v1/installs").hasRole(SELLER)
                         .requestMatchers(HttpMethod.DELETE, "/v1/installs/*").hasRole(SELLER)

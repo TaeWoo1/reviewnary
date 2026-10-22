@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>판매자 가입 · reviewnary</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <script src="/join/join.js" defer></script>
+</head>
+<body>
+<main class="page" aria-label="판매자 가입">
+  <div class="stack">
+    <div class="steps" aria-hidden="true">
+      <span id="s1" class="on">1 비밀번호</span><span>·</span><span id="s2">2 다음에 할 일</span>
+    </div>
+
+    <section id="view-none" class="stack" hidden>
+      <h1>reviewnary 판매자 가입</h1>
+      <div class="card"><p id="none-text" class="sm bad-text"></p></div>
+    </section>
+
+    <section id="view-password" class="stack" hidden>
+      <h1>reviewnary 판매자 가입</h1>
+      <form id="password-form" class="card stack8" novalidate>
+        <div class="inset stack8">
+          <p class="xs muted">초대받은 계정</p>
+          <p id="invited" class="strong"></p>
+        </div>
+        <p class="sm">이 계정의 비밀번호를 정하세요. 이 비밀번호로 PC 연결을 허용하고, 휴대폰에서 답글을 승인합니다.</p>
+        <label for="password">비밀번호 (10자 이상)</label>
+        <input id="password" type="password" autocomplete="new-password" required>
+        <label for="password2">비밀번호 확인</label>
+        <input id="password2" type="password" autocomplete="new-password" required>
+        <p id="password-error" class="msg bad-text" role="alert" hidden></p>
+        <button type="submit" id="join" class="btn solid big">가입하기</button>
+      </form>
+      <p class="xs muted">초대 링크는 7일 동안 한 번만 쓸 수 있습니다. 가입하기를 누르기 전에는 계정이 만들어지지 않습니다. 내 계정이 아니면 가입하지 말고 초대한 분께 알려 주세요.</p>
+    </section>
+
+    <section id="view-done" class="stack" hidden>
+      <div class="row"><h1>가입했습니다</h1><span id="done-email" class="chip good"></span></div>
+      <div class="card stack">
+        <div class="step"><span class="num">1</span>
+          <div class="stack8 grow">
+            <p class="strong">PC를 연결하세요</p>
+            <p class="sm">판매자 PC의 SellerOps에서 <b>채널 연결</b> 화면을 열고 「이 PC 연결」을 누르세요. 이 계정으로 로그인해 허용하면 연결됩니다.</p>
+          </div>
+        </div>
+        <div class="step"><span class="num">2</span>
+          <div class="stack8 grow">
+            <p class="strong">휴대폰에 승인 화면을 열어 두세요</p>
+            <p class="sm">자리를 비웠을 때 담당자에게 맡길 답글을 휴대폰에서 승인합니다. 카메라로 찍고 홈 화면에 추가해 두세요.</p>
+            <div class="row">
+              <canvas id="qr" class="qr" width="0" height="0" role="img" aria-label="휴대폰 승인 화면 QR 코드"></canvas>
+              <div class="stack8 grow">
+                <p class="xs muted">또는 이 주소를 휴대폰에서 여세요</p>
+                <p id="phone-url" class="key sm"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button type="button" id="open-replies" class="btn outline big">이 브라우저에서 승인 화면 열기</button>
+      <p class="xs muted">채널 로그인 정보는 이 서버로 오지 않습니다. 네이버 · 쿠팡 연결은 판매자 PC 안에만 저장됩니다.</p>
+    </section>
+  </div>
+</main>
+</body>
+</html>

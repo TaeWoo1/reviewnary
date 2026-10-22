@@ -1,5 +1,7 @@
 package com.sellerops.vendor.store;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
@@ -30,7 +32,14 @@ public class Stores {
 
     public static final int MAX_LABEL_LENGTH = 80;
 
-    public record View(UUID id, String channel, String label) {}
+    /**
+     * {@code lastUploadAt}: when a delegate last uploaded this store's export, or null — how fresh what the PC pulls
+     * can be, which the PC shows apart from when it last asked.
+     */
+    public record View(UUID id, String channel, String label, Instant lastUploadAt) {}
+
+    private static final String LAST_UPLOAD =
+            "(select max(u.uploaded_at) from review_uploads u where u.store_id = s.id)";
 
     private final JdbcClient jdbc;
     private final Clock clock;
@@ -61,10 +70,10 @@ public class Stores {
 
     @Transactional(readOnly = true)
     public List<View> ofAccount(UUID accountId) {
-        return jdbc.sql("select id, channel, label from stores where account_id = ? order by created_at, id")
+        return jdbc.sql("select s.id, s.channel, s.label, " + LAST_UPLOAD + " as last_upload_at from stores s "
+                        + "where s.account_id = ? order by s.created_at, s.id")
                 .param(accountId)
-                .query((rs, n) -> new View(rs.getObject("id", UUID.class), rs.getString("channel"),
-                        rs.getString("label")))
+                .query(Stores::view)
                 .list();
     }
 
@@ -105,11 +114,11 @@ public class Stores {
     /** The stores a delegate may work on now. */
     @Transactional(readOnly = true)
     public List<View> assignedTo(UUID delegateId) {
-        return jdbc.sql("select s.id, s.channel, s.label from stores s join store_assignments a on a.store_id = s.id "
+        return jdbc.sql("select s.id, s.channel, s.label, " + LAST_UPLOAD + " as last_upload_at from stores s "
+                        + "join store_assignments a on a.store_id = s.id "
                         + "where a.delegate_id = ? and a.ended_at is null order by s.created_at, s.id")
                 .param(delegateId)
-                .query((rs, n) -> new View(rs.getObject("id", UUID.class), rs.getString("channel"),
-                        rs.getString("label")))
+                .query(Stores::view)
                 .list();
     }
 
@@ -120,5 +129,11 @@ public class Stores {
 
     private static Timestamp ts(Instant instant) {
         return Timestamp.from(instant);
+    }
+
+    private static View view(ResultSet rs, int n) throws SQLException {
+        Timestamp last = rs.getTimestamp("last_upload_at");
+        return new View(rs.getObject("id", UUID.class), rs.getString("channel"), rs.getString("label"),
+                last == null ? null : last.toInstant());
     }
 }

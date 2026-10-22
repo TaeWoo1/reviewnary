@@ -47,7 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
  *       {@link ReplyText#checks}; a policy change only sends unapproved drafts back for a recheck and only
  *       <i>suggests</i> withdrawing an approved one — the seller's decision is theirs.</li>
  *   <li><b>{@code UNKNOWN} is never retried.</b> It stays open on its review until a delegate confirms what
- *       happened.</li>
+ *       happened — or, when that delegate was suspended, an admin does ({@link #settleByOperator}).</li>
  * </ul>
  *
  * <p>Callers decide who may touch which store; the delegate methods additionally check assignment and claim.
@@ -66,8 +66,17 @@ public class ReplyTasks {
     /** What a delegate reports after looking at Seller Center. */
     public enum Outcome { POSTED, FAILED, UNKNOWN }
 
-    /** How a delegate confirmed it. One way today: they looked at the review in Seller Center. */
-    public enum ReportMethod { SELLER_CENTER_SCREEN }
+    /**
+     * How it was confirmed: the claiming delegate looked at the review in Seller Center, or — for a suspended
+     * delegate's task — an admin did ({@link #settleByOperator}).
+     */
+    public enum ReportMethod { SELLER_CENTER_SCREEN, OPERATOR_SELLER_CENTER_SCREEN }
+
+    /**
+     * An {@code UNKNOWN} task whose claimer is suspended: nobody can settle it on the delegate desk any more. The
+     * approved text is what the operator compares with Seller Center.
+     */
+    public record InDoubt(UUID taskId, String storeLabel, String reviewNo, String approvedBody, Instant since) {}
 
     public enum Failure {
         NOT_FOUND, REVIEW_CHANGED, ALREADY_REPLIED, TASK_IN_PROGRESS, ALREADY_POSTED, STALE, WRONG_STATE,
@@ -461,6 +470,46 @@ public class ReplyTasks {
         }
         remember(commandId, taskId, "REPORT", now);
         return get(taskId).orElseThrow();
+    }
+
+    /**
+     * An admin settles a suspended delegate's {@code UNKNOWN} after looking at the review in Seller Center — §4.2. The
+     * suspended account stays shut out; only {@code POSTED} (the approved text is there, word for word) or
+     * {@code FAILED} (no reply of ours is there) settles it. Whatever cannot be confirmed stays {@code UNKNOWN}, and
+     * so the review stays closed to a second reply. Who settled it and when are kept with the task.
+     */
+    @Transactional
+    public TaskView settleByOperator(UUID taskId, UUID adminId, Outcome outcome) {
+        if (outcome == Outcome.UNKNOWN) {
+            throw new TaskException(Failure.WRONG_STATE);
+        }
+        boolean admin = jdbc.sql("select count(*) from delegates where id = ? and role = 'ADMIN' and status = 'ACTIVE'")
+                .param(adminId).query(Integer.class).single() > 0;
+        if (!admin) {
+            throw new TaskException(Failure.NOT_ASSIGNED);
+        }
+        TaskView task = inDoubt().stream().filter(t -> t.taskId().equals(taskId)).findFirst()
+                .flatMap(t -> get(taskId)).orElseThrow(() -> new TaskException(Failure.NOT_FOUND));
+        Instant now = clock.instant();
+        if (!transition(task, State.UNKNOWN, State.valueOf(outcome.name()), ", outcome = ?, posted_fingerprint = ?, "
+                        + "checked_at = ?, reported_at = ?, report_method = ?, settled_by = ?", now, outcome.name(),
+                outcome == Outcome.POSTED ? task.approvedFingerprint() : null, ts(now), ts(now),
+                ReportMethod.OPERATOR_SELLER_CENTER_SCREEN.name(), adminId)) {
+            throw new TaskException(Failure.STALE);
+        }
+        return get(taskId).orElseThrow();
+    }
+
+    /** Every {@code UNKNOWN} task whose claimer is suspended, oldest first. */
+    @Transactional(readOnly = true)
+    public List<InDoubt> inDoubt() {
+        return jdbc.sql("select t.id, s.label, r.review_no, t.draft_body, t.updated_at from reply_tasks t "
+                        + "join stores s on s.id = t.store_id join store_reviews r on r.id = t.review_id "
+                        + "join delegates d on d.id = t.claimed_by "
+                        + "where t.state = 'UNKNOWN' and d.status = 'SUSPENDED' order by t.updated_at, t.id")
+                .query((rs, n) -> new InDoubt(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3),
+                        rs.getString(4), instant(rs.getTimestamp(5))))
+                .list();
     }
 
     /* ── reads ──────────────────────────────────────────────────────────────────────────────────────────────────── */

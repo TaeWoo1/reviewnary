@@ -1,10 +1,12 @@
 package com.sellerops.vendor.install;
 
+import com.sellerops.vendor.account.SellerAccounts;
 import com.sellerops.vendor.auth.BearerAuthFilter.Principal;
 import com.sellerops.vendor.ip.ClientIpv4;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -27,10 +29,16 @@ public class InstallController {
 
     public record ApproveRequest(@NotBlank String userCode) {}
 
-    private final Installs installs;
+    /** This PC's row, and the seller account it belongs to — the PC shows "from this account → into this one". */
+    public record Me(UUID id, String deviceName, String appVersion, Instant createdAt, Instant lastUsedAt,
+                     Instant expiresAt, String accountEmail) {}
 
-    public InstallController(Installs installs) {
+    private final Installs installs;
+    private final SellerAccounts accounts;
+
+    public InstallController(Installs installs, SellerAccounts accounts) {
         this.installs = installs;
+        this.accounts = accounts;
     }
 
     @PostMapping("/v1/installs/approve")
@@ -61,8 +69,11 @@ public class InstallController {
     }
 
     @GetMapping("/v1/installs/me")
-    public ResponseEntity<Installs.View> me(@AuthenticationPrincipal Principal install) {
-        return ResponseEntity.of(installs.view(install.accountId(), install.installId()));
+    public ResponseEntity<Me> me(@AuthenticationPrincipal Principal install) {
+        String email = accounts.emailOf(install.accountId()).orElse(null);
+        return ResponseEntity.of(installs.view(install.accountId(), install.installId())
+                .map(v -> new Me(v.id(), v.deviceName(), v.appVersion(), v.createdAt(), v.lastUsedAt(), v.expiresAt(),
+                        email)));
     }
 
     @DeleteMapping("/v1/installs/me")

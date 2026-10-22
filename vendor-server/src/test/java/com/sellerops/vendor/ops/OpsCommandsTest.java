@@ -9,6 +9,7 @@ import com.sellerops.vendor.auth.SessionTokens;
 import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.retention.Retention;
 import com.sellerops.vendor.store.Stores;
+import com.sellerops.vendor.task.ReplyTasks;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -42,6 +43,8 @@ class OpsCommandsTest {
     private JdbcClient jdbc;
     @Autowired
     private PlatformTransactionManager transactions;
+    @Autowired
+    private ReplyTasks tasks;
     /** At the epoch nothing has expired: the command's own pass, without touching other tests' rows. */
     private Retention retention;
 
@@ -51,16 +54,21 @@ class OpsCommandsTest {
     @BeforeEach
     void setUp() {
         retention = new Retention(jdbc, transactions, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
-        services = new OpsCommands.Services(accounts, delegates, stores, revocations, retention,
+        services = new OpsCommands.Services(accounts, delegates, stores, revocations, retention, tasks,
                 "https://vendor.example.com/");
         out = new ByteArrayOutputStream();
     }
 
     @Test
-    void theInviteCodePrintedOnceRedeemsIntoAnAccount() {
+    void theInviteLinkPrintedOnceRedeemsIntoAnAccount() {
         String email = "ops-" + UUID.randomUUID() + "@example.com";
         assertThat(run("invite", email)).isZero();
-        assertThat(accounts.redeem(lastWord(), "a long enough password")).isNotNull();
+        String link = lastWord();
+        assertThat(link).startsWith("https://vendor.example.com/join#");
+        String code = link.substring(link.indexOf('#') + 1);
+        assertThat(accounts.inviteEmail(code)).contains(email);
+        assertThat(accounts.redeem(code, "a long enough password")).isNotNull();
+        assertThat(accounts.inviteEmail(code)).as("a spent invite names nobody").isEmpty();
         assertThat(run("suspend", email)).isZero();
         assertThat(run("suspend", "nobody@example.com")).isEqualTo(1);
     }
@@ -120,7 +128,7 @@ class OpsCommandsTest {
 
     @Test
     void withoutAPublicAddressTheJoinLinkIsPrintedAsAPath() {
-        services = new OpsCommands.Services(accounts, delegates, stores, revocations, retention, "");
+        services = new OpsCommands.Services(accounts, delegates, stores, revocations, retention, tasks, "");
         assertThat(run("invite-delegate", "ops-path-" + UUID.randomUUID() + "@example.com")).isZero();
         String path = lastWord();
         assertThat(path).startsWith("/delegate/join#");
@@ -147,6 +155,24 @@ class OpsCommandsTest {
         assertThat(run("assign", "a@example.com")).isEqualTo(2);
         assertThat(run("suspend", "a@example.com", "extra")).isEqualTo(2);
         assertThat(run("purge", "now")).isEqualTo(2);
+        assertThat(run("in-doubt", "now")).isEqualTo(2);
+        assertThat(run("settle", "not-a-uuid", "posted", "a@example.com")).isEqualTo(2);
+        assertThat(run("settle", UUID.randomUUID().toString(), "maybe", "a@example.com")).isEqualTo(2);
+        assertThat(run("settle", UUID.randomUUID().toString(), "posted")).isEqualTo(2);
+    }
+
+    @Test
+    void settlingNeedsAnActiveAdminAndAnInDoubtTask() {
+        assertThat(run("in-doubt")).isZero();
+        assertThat(run("settle", UUID.randomUUID().toString(), "posted", "nobody@example.com")).isEqualTo(1);
+        String admin = "ops-admin-" + UUID.randomUUID() + "@example.com";
+        String invite = delegates.issueInvite(admin, Delegates.Role.ADMIN);
+        Delegates.Staged staged = delegates.stage(invite, "a long enough password");
+        delegates.confirm(invite, TestTotp.code(staged.secret(), Instant.now(), 0));
+        out.reset();
+        assertThat(run("settle", UUID.randomUUID().toString(), "not-posted", admin)).isEqualTo(1);
+        assertThat(out.toString(StandardCharsets.UTF_8).trim())
+                .isEqualTo("no in-doubt task of a suspended delegate with that id");
     }
 
     @Test

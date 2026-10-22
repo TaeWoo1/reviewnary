@@ -6,8 +6,10 @@ import com.sellerops.vendor.auth.SessionTokens;
 import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.retention.Retention;
 import com.sellerops.vendor.store.Stores;
+import com.sellerops.vendor.task.ReplyTasks;
 import java.io.PrintStream;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -18,7 +20,7 @@ import java.util.UUID;
  * invite-only service needs some way to invite.
  *
  * <pre>
- *   java -jar vendor-server.jar invite seller@example.com              # prints the invite code once
+ *   java -jar vendor-server.jar invite seller@example.com              # prints the seller's join link once
  *   java -jar vendor-server.jar suspend seller@example.com             # ends its sessions and installs at the next request
  *   java -jar vendor-server.jar reinstate seller@example.com
  *   java -jar vendor-server.jar end-sessions someone@example.com       # signs them out everywhere; the account stays
@@ -29,30 +31,37 @@ import java.util.UUID;
  *   java -jar vendor-server.jar assign me@example.com &lt;store-id&gt;
  *   java -jar vendor-server.jar unassign me@example.com &lt;store-id&gt;
  *   java -jar vendor-server.jar purge                                  # one retention pass (§6); after a restore, before serving
+ *   java -jar vendor-server.jar in-doubt                               # a suspended delegate's in-doubt tasks, to check
+ *   java -jar vendor-server.jar settle &lt;task-id&gt; posted|not-posted admin@example.com
  * </pre>
  *
  * <p>Invite codes are printed to the operator's terminal and nowhere else — they are not logged, and the database
- * keeps only their hash. The operator hands each to its person. A delegate's invite is printed as the join page's
- * link with the code in its fragment ({@code /delegate/join#…}): the code is 43 characters, not something to type,
- * and a fragment never reaches a server log. The link starts with {@code vendor.public-url} when the deployment sets
+ * keeps only their hash. The operator hands each to its person. Every invite is printed as its join page's link with
+ * the code in its fragment ({@code /join#…} for a seller, {@code /delegate/join#…} for a delegate): the code is 43
+ * characters, not something to type, and a fragment never reaches a server log. The link starts with {@code vendor.public-url} when the deployment sets
  * it; without it only the path is printed, to be put after the server's address.
  */
 public final class OpsCommands {
 
     public static final Set<String> NAMES = Set.of("invite", "suspend", "reinstate", "end-sessions",
-            "invite-delegate", "suspend-delegate", "reinstate-delegate", "add-store", "assign", "unassign", "purge");
+            "invite-delegate", "suspend-delegate", "reinstate-delegate", "add-store", "assign", "unassign", "purge",
+            "in-doubt", "settle");
 
     static final String USAGE = "usage: invite|suspend|reinstate|end-sessions <email> · "
             + "invite-delegate <email> [admin] · "
             + "suspend-delegate|reinstate-delegate <email> · add-store <seller-email> <label> · "
-            + "assign|unassign <delegate-email> <store-id> · purge";
+            + "assign|unassign <delegate-email> <store-id> · purge · in-doubt · "
+            + "settle <task-id> posted|not-posted <admin-email>";
 
     /** The page a delegate's invite link opens; the code follows {@code #}. */
     public static final String JOIN_PATH = "/delegate/join#";
 
+    /** The page a seller's invite link opens; the code follows {@code #}. */
+    public static final String SELLER_JOIN_PATH = "/join#";
+
     /** The services the commands act on, and the server's public address ({@code ""} when not set). */
     public record Services(SellerAccounts accounts, Delegates delegates, Stores stores,
-                           SessionRevocations revocations, Retention retention, String publicUrl) {}
+                           SessionRevocations revocations, Retention retention, ReplyTasks tasks, String publicUrl) {}
 
     private OpsCommands() {
     }
@@ -65,7 +74,13 @@ public final class OpsCommands {
                     + purged.invites() + " · logged-out sessions " + purged.sessions());
             return 0;
         }
-        if (args.length < 2 || !NAMES.contains(args[0]) || "purge".equals(args[0])) {
+        if (args.length == 1 && "in-doubt".equals(args[0])) {
+            return inDoubt(services, out);
+        }
+        if (args.length == 4 && "settle".equals(args[0])) {
+            return settle(services, args, out);
+        }
+        if (args.length < 2 || !NAMES.contains(args[0]) || Set.of("purge", "in-doubt", "settle").contains(args[0])) {
             out.println(USAGE);
             return 2;
         }
@@ -88,8 +103,8 @@ public final class OpsCommands {
 
     private static int person(Services services, String name, String email, PrintStream out) {
         return switch (name) {
-            case "invite" -> invite(out, () -> services.accounts().issueInvite(email),
-                    SellerAccounts.INVITE_LIFETIME.toDays());
+            case "invite" -> link(services, out, () -> services.accounts().issueInvite(email),
+                    SellerAccounts.INVITE_LIFETIME.toDays(), SELLER_JOIN_PATH);
             case "suspend" -> done(out, services.accounts().suspend(email), "suspended", "no such account");
             case "end-sessions" -> endSessions(services, email, out);
             case "reinstate" -> done(out, services.accounts().reinstate(email), "reinstated", "no such account");
@@ -158,35 +173,87 @@ public final class OpsCommands {
         return done(out, services.stores().unassign(storeId, delegate.get()), "unassigned", "was not assigned");
     }
 
+    /**
+     * A suspended delegate's in-doubt tasks, with what an admin needs to look each up in Seller Center: the store, the
+     * review number and the approved reply to compare word for word. The review itself is not printed.
+     */
+    private static int inDoubt(Services services, PrintStream out) {
+        List<ReplyTasks.InDoubt> tasks = services.tasks().inDoubt();
+        if (tasks.isEmpty()) {
+            out.println("no in-doubt tasks of suspended delegates");
+            return 0;
+        }
+        for (ReplyTasks.InDoubt t : tasks) {
+            out.println("task " + t.taskId() + " · " + t.storeLabel() + " · 리뷰번호 " + t.reviewNo() + " · since "
+                    + t.since());
+            out.println("  approved reply: " + t.approvedBody());
+        }
+        return 0;
+    }
+
+    /**
+     * An admin who looked in Seller Center settles one: {@code posted} when the approved reply is there word for word,
+     * {@code not-posted} when no reply of ours is. Anything else — a different text, unsure — is not settled here; the
+     * task stays in doubt and the review closed to a second reply.
+     */
+    private static int settle(Services services, String[] args, PrintStream out) {
+        UUID taskId;
+        try {
+            taskId = UUID.fromString(args[1]);
+        } catch (IllegalArgumentException e) {
+            out.println("not a task id");
+            return 2;
+        }
+        ReplyTasks.Outcome outcome = switch (args[2]) {
+            case "posted" -> ReplyTasks.Outcome.POSTED;
+            case "not-posted" -> ReplyTasks.Outcome.FAILED;
+            default -> null;
+        };
+        if (outcome == null) {
+            return usage(out);
+        }
+        Optional<UUID> admin = services.delegates().idOf(args[3]);
+        if (admin.isEmpty()) {
+            out.println("no such admin");
+            return 1;
+        }
+        try {
+            ReplyTasks.TaskView settled = services.tasks().settleByOperator(taskId, admin.get(), outcome);
+            out.println("settled: " + settled.state());
+            return 0;
+        } catch (ReplyTasks.TaskException e) {
+            out.println(switch (e.failure()) {
+                case NOT_ASSIGNED -> "not an active admin";
+                case NOT_FOUND -> "no in-doubt task of a suspended delegate with that id";
+                default -> "task moved; list again";
+            });
+            return 1;
+        }
+    }
+
     private interface CodeIssuer {
         String issue();
     }
 
-    private static int invite(PrintStream out, CodeIssuer issuer, long days) {
-        try {
-            String code = issuer.issue();
-            out.println("invite code (valid " + days + " days, shown once): " + code);
-            return 0;
-        } catch (IllegalArgumentException e) {
-            out.println("not an e-mail address");
-            return 2;
-        }
+    private static int joinLink(Services services, PrintStream out, String email, Delegates.Role role) {
+        return link(services, out, () -> services.delegates().issueInvite(email, role),
+                Delegates.INVITE_LIFETIME.toDays(), JOIN_PATH);
     }
 
-    private static int joinLink(Services services, PrintStream out, String email, Delegates.Role role) {
+    /** Issues an invite and prints its join link once — the code only ever in the link's fragment. */
+    private static int link(Services services, PrintStream out, CodeIssuer issuer, long days, String path) {
         String code;
         try {
-            code = services.delegates().issueInvite(email, role);
+            code = issuer.issue();
         } catch (IllegalArgumentException e) {
             out.println("not an e-mail address");
             return 2;
         }
         String base = services.publicUrl() == null ? "" : services.publicUrl().strip().replaceAll("/+$", "");
-        long days = Delegates.INVITE_LIFETIME.toDays();
         out.println(base.isEmpty()
                 ? "join link path (valid " + days + " days, shown once; put the server's address in front): "
-                        + JOIN_PATH + code
-                : "join link (valid " + days + " days, shown once): " + base + JOIN_PATH + code);
+                        + path + code
+                : "join link (valid " + days + " days, shown once): " + base + path + code);
         return 0;
     }
 

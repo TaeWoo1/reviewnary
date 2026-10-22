@@ -32,4 +32,13 @@ public class AppPagesController {
     public String join() {
         return "forward:/delegate/join.html";
     }
+
+    /**
+     * A seller accepts an invite: the invited address is shown first, then a password, then the two next steps (link
+     * the PC, open the phone page). The code arrives in the fragment ({@code /join#…}) like the delegate's.
+     */
+    @GetMapping("/join")
+    public String sellerJoin() {
+        return "forward:/join/index.html";
+    }
 }

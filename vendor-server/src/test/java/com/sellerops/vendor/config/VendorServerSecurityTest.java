@@ -81,6 +81,29 @@ class VendorServerSecurityTest {
                 .andExpect(status().isCreated())).path("token").asText();
     }
 
+    /**
+     * The join page shows the invited address before a password is chosen; the redeem answer carries the phone page's
+     * address and its QR. A spent or unknown code names nobody.
+     */
+    @Test
+    void anInviteNamesItsAccountUntilItIsSpentAndTheNewAccountGetsItsPhoneAddress() throws Exception {
+        String invited = "join-" + UUID.randomUUID() + "@example.com";
+        String code = accounts.issueInvite(invited);
+        mvc.perform(json(post("/v1/auth/invites/peek"), "{\"inviteCode\":\"" + code + "\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.email").value(invited));
+        JsonNode redeemed = body(mvc.perform(json(post("/v1/auth/invites/redeem"),
+                        "{\"inviteCode\":\"" + code + "\",\"password\":\"correct horse battery\"}"))
+                .andExpect(status().isCreated()));
+        assertThat(redeemed.path("token").asText()).isNotBlank();
+        assertThat(redeemed.path("email").asText()).isEqualTo(invited);
+        assertThat(redeemed.path("phoneUrl").asText()).isEqualTo("http://localhost/replies");
+        assertThat(redeemed.path("phoneQr").size()).isGreaterThan(20);
+        mvc.perform(json(post("/v1/auth/invites/peek"), "{\"inviteCode\":\"" + code + "\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("invalid_invite"));
+        mvc.perform(json(post("/v1/auth/invites/peek"), "{\"inviteCode\":\"not-a-code\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
     @Test
     void healthIsOpenAndAnUnnamedRouteIsClosedToEveryone() throws Exception {
         mvc.perform(get("/health")).andExpect(status().isOk()).andExpect(content().string("ok"));
@@ -112,6 +135,7 @@ class VendorServerSecurityTest {
         mvc.perform(get("/v1/installs/me").with(bearer(session))).andExpect(status().isForbidden());
         mvc.perform(get("/v1/installs/me").with(bearer(install))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.deviceName").value("Seller Mac"))
+                .andExpect(jsonPath("$.accountEmail").value(email))
                 .andExpect(jsonPath("$.token").doesNotExist());
         mvc.perform(get("/v1/installs").with(bearer(session))).andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].deviceName").value("Seller Mac"));
@@ -280,6 +304,15 @@ class VendorServerSecurityTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
                         .string("Referrer-Policy", "no-referrer"));
         mvc.perform(get("/delegate/join.js")).andExpect(status().isOk());
+        mvc.perform(get("/join")).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .forwardedUrl("/join/index.html"));
+        mvc.perform(get("/join/index.html")).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Content-Security-Policy", org.hamcrest.Matchers.containsString("default-src 'self'")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Referrer-Policy", "no-referrer"));
+        mvc.perform(get("/join/join.js")).andExpect(status().isOk());
         mvc.perform(get("/delegate/other.html")).andExpect(status().isNotFound());
         mvc.perform(get("/v1/delegate/tasks")).andExpect(status().isUnauthorized());
     }
@@ -376,7 +409,8 @@ class VendorServerSecurityTest {
                 .andExpect(jsonPath("$[0].id").value(store.toString()))
                 .andExpect(jsonPath("$[0].channel").value("NAVER"));
         mvc.perform(get("/v1/stores").with(bearer(link()))).andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(store.toString()));
+                .andExpect(jsonPath("$[0].id").value(store.toString()))
+                .andExpect(jsonPath("$[0].lastUploadAt").value(org.hamcrest.Matchers.nullValue()));
         mvc.perform(get("/v1/stores")).andExpect(status().isUnauthorized());
         assertThat(elsewhere).isNotEqualTo(store);
     }
@@ -433,6 +467,8 @@ class VendorServerSecurityTest {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("not_xlsx"));
 
         String pc = link();
+        mvc.perform(get("/v1/stores").with(bearer(pc))).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].lastUploadAt").isNotEmpty());
         String feed = "/v1/stores/" + store + "/reviews";
         JsonNode page = body(mvc.perform(get(feed).with(bearer(pc))).andExpect(status().isOk()));
         assertThat(page.path("events")).hasSize(6);

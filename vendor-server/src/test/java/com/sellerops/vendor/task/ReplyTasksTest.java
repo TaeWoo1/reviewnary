@@ -288,6 +288,50 @@ class ReplyTasksTest {
     }
 
     @Test
+    void anAdminSettlesASuspendedDelegatesInDoubtTaskAndNothingElse() {
+        UUID admin = delegate("a-" + myEmail, Delegates.Role.ADMIN);
+        TaskView mine = approve(submit("1", "초안 1"));
+        tasks.claim(mine.id(), me, mine.stateVersion());
+        TaskView others = approve(submit("2", "초안 2"));
+        tasks.claim(others.id(), other, others.stateVersion());
+        report(others.id(), other, Outcome.UNKNOWN, null);
+        assertThat(tasks.get(others.id()).orElseThrow().state()).isEqualTo(State.UNKNOWN);
+        assertThatThrownBy(() -> tasks.settleByOperator(others.id(), admin, Outcome.POSTED))
+                .as("in doubt, but its claimer is active: it is theirs to settle")
+                .isInstanceOfSatisfying(TaskException.class, e -> assertThat(e.failure()).isEqualTo(Failure.NOT_FOUND));
+        assertThat(tasks.inDoubt()).extracting(ReplyTasks.InDoubt::taskId).doesNotContain(others.id());
+
+        delegates.suspend(myEmail);
+        delegates.suspend("o-" + myEmail);
+        assertThat(tasks.inDoubt()).extracting(ReplyTasks.InDoubt::taskId).contains(mine.id(), others.id());
+        assertThat(tasks.inDoubt()).filteredOn(t -> t.taskId().equals(mine.id())).singleElement()
+                .satisfies(t -> assertThat(t.approvedBody()).isEqualTo("초안 1"));
+        assertThatThrownBy(() -> tasks.settleByOperator(mine.id(), delegate("p-" + myEmail), Outcome.POSTED))
+                .as("an ordinary delegate").isInstanceOfSatisfying(TaskException.class,
+                        e -> assertThat(e.failure()).isEqualTo(Failure.NOT_ASSIGNED));
+        assertThatThrownBy(() -> tasks.settleByOperator(mine.id(), admin, Outcome.UNKNOWN))
+                .isInstanceOfSatisfying(TaskException.class,
+                        e -> assertThat(e.failure()).isEqualTo(Failure.WRONG_STATE));
+
+        TaskView posted = tasks.settleByOperator(mine.id(), admin, Outcome.POSTED);
+        assertThat(posted.state()).isEqualTo(State.POSTED);
+        assertThat(posted.reportMethod()).isEqualTo(ReplyTasks.ReportMethod.OPERATOR_SELLER_CENTER_SCREEN.name());
+        assertThat(jdbc.sql("select settled_by from reply_tasks where id = ?").param(mine.id()).query(UUID.class)
+                .single()).isEqualTo(admin);
+        assertThat(jdbc.sql("select posted_fingerprint from reply_tasks where id = ?").param(mine.id())
+                .query(String.class).single()).isEqualTo(mine.approvedFingerprint());
+        assertThatThrownBy(() -> submit("1", "또 답글")).isInstanceOfSatisfying(TaskException.class,
+                e -> assertThat(e.failure()).isEqualTo(Failure.ALREADY_POSTED));
+
+        assertThat(tasks.settleByOperator(others.id(), admin, Outcome.FAILED).state()).isEqualTo(State.FAILED);
+        assertThat(submit("2", "다시 쓴 초안").state()).as("not posted frees the review")
+                .isEqualTo(State.AWAITING_APPROVAL);
+        assertThat(tasks.inDoubt()).extracting(ReplyTasks.InDoubt::taskId).doesNotContain(mine.id(), others.id());
+        assertThatThrownBy(() -> tasks.settleByOperator(mine.id(), admin, Outcome.FAILED))
+                .as("settled once").isInstanceOf(TaskException.class);
+    }
+
+    @Test
     void onlyAnAssignedDelegateClaimsAndOnlyTheClaimerReports() {
         TaskView task = approve(submit("1", "초안"));
         UUID stranger = delegate("x-" + myEmail);
@@ -467,7 +511,11 @@ class ReplyTasksTest {
     }
 
     private UUID delegate(String email) {
-        String invite = delegates.issueInvite(email, Delegates.Role.DELEGATE);
+        return delegate(email, Delegates.Role.DELEGATE);
+    }
+
+    private UUID delegate(String email, Delegates.Role role) {
+        String invite = delegates.issueInvite(email, role);
         Delegates.Staged staged = delegates.stage(invite, PASSWORD);
         return delegates.confirm(invite, TestTotp.code(staged.secret(), Instant.now(), 0)).delegateId();
     }

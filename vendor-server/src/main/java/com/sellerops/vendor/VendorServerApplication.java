@@ -6,6 +6,7 @@ import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.ops.OpsCommands;
 import com.sellerops.vendor.retention.Retention;
 import com.sellerops.vendor.store.Stores;
+import com.sellerops.vendor.task.ReplyTasks;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -31,6 +32,7 @@ public class VendorServerApplication {
                 code = OpsCommands.run(new OpsCommands.Services(context.getBean(SellerAccounts.class),
                         context.getBean(Delegates.class), context.getBean(Stores.class),
                         context.getBean(SessionRevocations.class), context.getBean(Retention.class),
+                        context.getBean(ReplyTasks.class),
                         context.getEnvironment().getProperty("vendor.public-url", "")), args, System.out);
             }
             System.exit(code);

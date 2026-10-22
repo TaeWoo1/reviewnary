@@ -84,6 +84,18 @@ public class SellerAccounts {
         return code;
     }
 
+    /**
+     * The address a still-usable invite was issued to — what the join page shows before anything is decided, so the
+     * person sees which account they are about to make. Empty for a spent, expired or unknown code.
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> inviteEmail(String code) {
+        return jdbc.sql("select email from seller_invites where code_hash = ? and redeemed_at is null and expires_at > ?")
+                .params(Codes.hash(code == null ? "" : code.trim()), ts(clock.instant()))
+                .query(String.class)
+                .optional();
+    }
+
     /** Spends the invite and creates the account. The invite is consumed in the same transaction. */
     @Transactional
     public UUID redeem(String code, String password) {
@@ -136,6 +148,13 @@ public class SellerAccounts {
         return jdbc.sql("select count(*) from seller_accounts where id = ? and status = ?")
                 .params(accountId, Status.ACTIVE.name())
                 .query(Integer.class).single() > 0;
+    }
+
+    /** The account's sign-in address — a linked PC shows which server account it receives for. */
+    @Transactional(readOnly = true)
+    public Optional<String> emailOf(UUID accountId) {
+        return jdbc.sql("select email from seller_accounts where id = ?").param(accountId)
+                .query(String.class).optional();
     }
 
     @Transactional(readOnly = true)
