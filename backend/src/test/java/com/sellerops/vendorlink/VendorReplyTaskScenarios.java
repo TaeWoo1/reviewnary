@@ -191,6 +191,36 @@ abstract class VendorReplyTaskScenarios {
     }
 
     @Test
+    void stoppingAStoreStopsNewReviewsButNotTheRepliesAlreadyHandedOver() {
+        UUID review = pulledReview("v1", "9100000041", "사이즈가 딱 맞아요");
+        UUID told = pulledReview("v2", "9100000042", "그럭저럭");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "딱 맞으셨다니 다행입니다.", 0);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        assertThat(pull.setPaused(org, vendor.store, true)).isTrue();
+
+        String phoneText = "딱 맞으셨다니 다행입니다. 감사합니다.";
+        vendor.move(task, "APPROVED", phoneText, ReviewReplyFingerprint.of(phoneText), true);
+        vendor.move(task, "CLAIMED", phoneText, ReviewReplyFingerprint.of(phoneText), true);
+        vendor.move(task, "POSTED", phoneText, ReviewReplyFingerprint.of(phoneText), true);
+        triage.decide(org, told, TriageDisposition.NO_ACTION.name(), "cmd-triage-paused", seller);
+        UUID later = vendor.ids.computeIfAbsent("v3", k -> UUID.randomUUID());
+        vendor.event("NEW", new VendorServerClient.FeedReview(later, "9100000043", "SKU-합성-1", "합성 상품", 5,
+                "멈춘 뒤 올라온 리뷰", com.sellerops.common.ReviewBodyFingerprint.of("멈춘 뒤 올라온 리뷰"), null, null,
+                Instant.parse("2026-10-01T01:00:00Z"), "노출", false, null));
+
+        VendorReviewPullService.StoreResult stopped = pull.pullBound().stores().get(0);
+        assertThat(stopped.paused()).isTrue();
+        assertThat(stopped.received()).as("no new review while stopped").isZero();
+        assertThat(stopped.taskChanges()).as("the phone's approval and the delegate's post still arrive").isEqualTo(4);
+        assertThat(stopped.noReplyReported()).isEqualTo(1);
+        assertThat(taskCopies.findByVendorTaskId(task)).get().satisfies(t -> assertThat(t.getState())
+                .isEqualTo("POSTED"));
+        assertThat(outcomeRows.findAllByOrgIdAndReviewIdOrderByCreatedAtDesc(org, review)).hasSize(1);
+        assertThat(refs.findByVendorReviewId(later)).as("the review after the stop is not taken").isEmpty();
+    }
+
+    @Test
     void aRequestIsRefusedWhenAnotherRoadOrTheServerSaysNo() {
         UUID approvedHere = pulledReview("v1", "9100000021", "색이 예뻐요");
         needsReply(approvedHere);

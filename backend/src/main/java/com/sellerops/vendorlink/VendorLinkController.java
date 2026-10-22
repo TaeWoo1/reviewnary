@@ -86,7 +86,7 @@ public class VendorLinkController {
         return reviewPull.start(principal.orgId(), request.storeIds() == null ? List.of() : request.storeIds());
     }
 
-    /** 「지금 받기」: this organisation's started stores that are not stopped. Binds nothing. */
+    /** 「지금 받기」: new reviews from this organisation's started stores that are not stopped. Binds nothing. */
     @PostMapping("/reviews/pull")
     public VendorReviewPullService.PullResult pullReviews(@AuthenticationPrincipal AuthPrincipal principal) {
         return reviewPull.pullFor(principal.orgId());

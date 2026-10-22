@@ -37,7 +37,8 @@ import org.springframework.stereotype.Service;
  *   <li><b>Which stores.</b> A store is pulled into the organisation it is bound to. A binding is made only by
  *       {@link #start} — the seller's 「리뷰 받기 시작」 for the stores the screen showed, into that seller's
  *       organisation. No pull binds: a store the server adds later is shown and waits to be started, so nothing here
- *       guesses whose reviews these are. A store the seller stopped ({@link #setPaused}) is not pulled at all.</li>
+ *       guesses whose reviews these are. A store the seller stopped ({@link #setPaused}) brings no new review, but
+ *       the replies already handed over in it keep following the server.</li>
  *   <li><b>Each event is the review as it is now.</b> A review this PC does not hold is ingested through the
  *       ordinary lane ({@link IngestionService}, keyed on 리뷰글번호 as every NAVER source is). One it holds is brought
  *       up to date: text and rating as the server says, the reply flag forward only (the lane never un-answers a
@@ -67,7 +68,7 @@ public class VendorReviewPullService {
 
     /**
      * What one store's pull did. {@code bound} false: the store belongs to no organisation on this PC yet;
-     * {@code paused}: the seller stopped receiving it, so it was not asked.
+     * {@code paused}: the seller stopped receiving it, so no review was asked for — only its reply tasks.
      */
     public record StoreResult(UUID storeId, String label, boolean bound, boolean otherOrganisation, int received,
                               int inserted, int updated, int failed, long cursor, boolean more, int taskChanges,
@@ -178,7 +179,7 @@ public class VendorReviewPullService {
         return pull(orgId, "MANUAL");
     }
 
-    /** 「지금 받기」: this organisation's bound stores that are not stopped. Binds nothing. */
+    /** 「지금 받기」: this organisation's bound stores (a stopped one for its reply tasks only). Binds nothing. */
     public synchronized PullResult pullFor(UUID orgId) {
         return pull(Objects.requireNonNull(orgId), "MANUAL");
     }
@@ -247,7 +248,7 @@ public class VendorReviewPullService {
                 b.getLastFailure() == null ? null : Failure.valueOf(b.getLastFailure()), b.getLastFailureAt());
     }
 
-    /** The scheduled pull: every bound store that is not stopped, binding nothing new. */
+    /** The scheduled pull: every bound store (a stopped one for its reply tasks only), binding nothing new. */
     public synchronized PullResult pullBound() {
         return pull(null, "SCHEDULED");
     }
@@ -293,8 +294,17 @@ public class VendorReviewPullService {
                 continue;
             }
             if (binding.isPaused()) {
-                results.add(new StoreResult(store.id(), store.label(), true, false, 0, 0, 0, 0,
-                        binding.getReviewCursor(), false, 0, 0, true));
+                // Stopping stops new reviews only. Replies already handed over keep following the server — the
+                // phone's approval, the delegate's post — so the review feed is not asked, the task changes are.
+                try {
+                    results.add(followTasks(token.get(), binding, store.label()));
+                } catch (VendorServerClient.Refused e) {
+                    failed(binding, Failure.NOT_AUTHORIZED);
+                    return new PullResult(State.NOT_AUTHORIZED, results);
+                } catch (VendorServerClient.Unreachable e) {
+                    failed(binding, Failure.UNREACHABLE);
+                    return new PullResult(State.UNREACHABLE, results);
+                }
                 continue;
             }
             binding.setLastUploadAt(store.lastUploadAt() != null ? store.lastUploadAt() : binding.getLastUploadAt());
@@ -380,6 +390,14 @@ public class VendorReviewPullService {
         int noReply = replyTasks == null ? 0 : replyTasks.reportNoReply(binding, token);
         return new StoreResult(binding.getVendorStoreId(), label, true, false, received, inserted.size(),
                 updated.size(), failed, cursor, more, taskChanges, noReply, false);
+    }
+
+    /** A stopped store: its reply tasks only, no review asked for. */
+    private StoreResult followTasks(String token, VendorStoreBinding binding, String label) {
+        int taskChanges = replyTasks == null ? 0 : replyTasks.sync(binding, token);
+        int noReply = replyTasks == null ? 0 : replyTasks.reportNoReply(binding, token);
+        return new StoreResult(binding.getVendorStoreId(), label, true, false, 0, 0, 0, 0, binding.getReviewCursor(),
+                false, taskChanges, noReply, true);
     }
 
     /** Tells the server how far this PC has stored, when it has not yet confirmed that far. Best effort. */
