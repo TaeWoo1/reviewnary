@@ -247,8 +247,10 @@
           if (check.holdRequested) {
             // Owner decision 2026-10-23: a held reply stops here too, and the delegate is told why.
             var promises = ((check.holdNote || {}).promises || []).join(" · ");
+            var phrases = ((check.holdNote || {}).phrases || []).join(" · ");
             why.push("판매자가 이 답글의 승인을 보류했습니다." + (promises
-              ? " 판매자의 기준이 바뀌어, 승인된 문장의 약속이 지금 기준과 맞지 않습니다: " + promises + "." : ""));
+              ? " 판매자의 기준이 바뀌어, 승인된 문장의 약속이 지금 기준과 맞지 않습니다: " + promises + "." : "")
+              + (phrases ? " 판매자가 쓰지 않기로 한 표현이 들어 있습니다: " + phrases + "." : ""));
             why.push("판매자센터에 붙여 넣지 마세요. 이미 붙여 넣었다면 저장하지 말고 지우세요.");
           }
           if (check.reviewChanged) { why.push("리뷰 내용이 바뀌었습니다."); }

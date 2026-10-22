@@ -113,7 +113,14 @@ public interface VendorServerClient {
      * Why this PC stopped a version — what changed, the promise words that lost their ground, and the reply's own
      * sentences that carry them (owner decision 2026-10-23). The server keeps it for the phone and the delegate.
      */
-    record BasisNote(List<String> codes, List<ChangedSource> sources, List<String> promises, List<String> sentences) {}
+    record BasisNote(List<String> codes, List<ChangedSource> sources, List<String> promises, List<String> sentences,
+                     List<String> phrases) {
+
+        public BasisNote(List<String> codes, List<ChangedSource> sources, List<String> promises,
+                         List<String> sentences) {
+            this(codes, sources, promises, sentences, List.of());
+        }
+    }
 
     /** A cited product or company document that was edited after the version, or taken out of use. */
     record ChangedSource(String kind, String title, Instant changedAt, boolean removed) {}

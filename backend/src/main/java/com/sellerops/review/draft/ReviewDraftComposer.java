@@ -88,6 +88,8 @@ public class ReviewDraftComposer {
     static final String UNSUPPORTED_CLAIM =
             "근거에 없는 교환·환불·보상 약속이 들어가 AI 초안을 저장하지 않았습니다. "
                     + "저장된 문구로 초안을 준비했습니다.";
+    static final String FORBIDDEN_PHRASE =
+            "회사가 쓰지 않기로 한 표현이 들어가 AI 초안을 저장하지 않았습니다. 저장된 문구로 초안을 준비했습니다.";
 
     /** The sentences the seller reads above the draft, per basis. */
     static final String BASIS_GROUNDED_NOTE = "판매자가 등록한 근거를 사용해 썼습니다.";
@@ -127,6 +129,13 @@ public class ReviewDraftComposer {
     private final ReviewReplyTemplateService templates;
     private final AgentDraftService model;
     private final AgentQuotaService quota;
+    /** The company's 답변 스타일, whose forbidden phrases review replies obey (2026-10-23); null in a bare test. */
+    private com.sellerops.knowledge.style.AnswerStyleService styles;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setStyles(com.sellerops.knowledge.style.AnswerStyleService styles) {
+        this.styles = styles;
+    }
     private final DraftEvidenceSnippets snippets;
     private final ReviewIssueEvidenceRepository issueEvidence;
     private final ReviewIssueRepository issues;
@@ -333,6 +342,10 @@ public class ReviewDraftComposer {
                 passages.stream().filter(p -> p.scope().current()).map(ScopedPassage::text).toList());
         if (!unsupported.isEmpty()) {
             return new Written(null, UNSUPPORTED_CLAIM);
+        }
+        // Refused, not edited: deleting words out of a sentence is how a reply comes to say the opposite.
+        if (styles != null && !ReviewStyleGuard.forbiddenIn(candidate, styles.profileFor(orgId)).isEmpty()) {
+            return new Written(null, FORBIDDEN_PHRASE);
         }
         return new Written(candidate, null);
     }

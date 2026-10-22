@@ -304,9 +304,31 @@ describe("VocItemReplyPrep · delegate lane", () => {
     );
     mount();
 
-    expect(await screen.findByText(/근거에 없는 「교환」 약속을 확인하고 승인한 답글입니다/)).toBeTruthy();
+    expect(await screen.findByText(/확인하고 승인한 답글입니다 — 근거에 없는 약속 「교환」/)).toBeTruthy();
     expect(screen.queryByRole("region", { name: "왜 멈췄나요" })).toBeNull();
     expect(screen.queryByRole("region", { name: "확인할 점" })).toBeNull();
+  });
+
+  it("names a forbidden phrase and marks its sentence when an approval is held for it", async () => {
+    vi.mocked(api.getReviewReplyPrep).mockResolvedValue(
+      prepView(
+        {
+          taskState: "HELD",
+          editedOnMobile: false,
+          canSend: true,
+          canCancel: true,
+          note: { codes: ["FORBIDDEN_PHRASE"], sources: [], promises: [], sentences: ["고객님 탓이 아닙니다."], phrases: ["고객님 탓"] },
+        },
+        false,
+      ),
+    );
+    mount();
+
+    const why = await screen.findByRole("region", { name: "왜 멈췄나요" });
+    expect(why.textContent).toContain("회사가 쓰지 않기로 한 표현이 있습니다: 「고객님 탓」");
+    expect(why.querySelector("mark")?.textContent).toBe("고객님 탓이 아닙니다.");
+    expect(why.textContent).toContain("그 표현을 빼고 문장을 고쳐 다시 승인하세요.");
+    expect(why.textContent).not.toContain("약속이 지금 근거에는 없습니다");
   });
 
   it("draws nothing of the lane for a review that cannot use it", async () => {

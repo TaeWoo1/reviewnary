@@ -28,8 +28,10 @@ public record ReviewReplyDelegationView(String taskState, boolean editedOnMobile
      * @param sources   the cited documents that changed
      * @param promises  the commitment words that lost their ground
      * @param sentences the reply's own sentences that carry them
+     * @param phrases   the company's forbidden phrases the reply carries (2026-10-23)
      */
-    public record Note(List<String> codes, List<Source> sources, List<String> promises, List<String> sentences) {}
+    public record Note(List<String> codes, List<Source> sources, List<String> promises, List<String> sentences,
+                       List<String> phrases) {}
 
     /** {@code kind}: {@code PRODUCT_KNOWLEDGE} · {@code ORG_POLICY}. */
     public record Source(String kind, String title, Instant changedAt, boolean removed) {}

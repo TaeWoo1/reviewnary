@@ -278,6 +278,7 @@ public class JdkVendorServerClient implements VendorServerClient {
         out.put("sources", sources);
         out.put("promises", note.promises());
         out.put("sentences", note.sentences());
+        out.put("phrases", note.phrases());
         return out;
     }
 

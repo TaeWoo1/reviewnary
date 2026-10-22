@@ -253,6 +253,25 @@ class ReviewDraftComposerTest {
     }
 
     @Test
+    @DisplayName("a company-banned phrase in the model's draft falls back to the template; a bare topic word does not")
+    void aForbiddenPhraseFallsBackToTheTemplate() {
+        com.sellerops.knowledge.style.AnswerStyleService styles = mock(com.sellerops.knowledge.style.AnswerStyleService.class);
+        when(styles.profileFor(ORG)).thenReturn(new com.sellerops.knowledge.style.AnswerStyleProfile(null, null, null,
+                null, null, null, List.of(), List.of("고객님 탓", "먼지"), null, 1));
+        composer.setStyles(styles);
+        retrieval(DraftKnowledgeState.GROUNDED,
+                productPassage("표면의 먼지와 기름기를 닦아낸 뒤 눌러 붙여 주세요."));
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
+                .thenReturn(Optional.of("고객님 탓이 아닙니다. 부착 전 표면의 먼지를 닦아 주세요."));
+
+        GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
+
+        assertThat(view.draft().body()).isEqualTo(TEMPLATE);
+        assertThat(view.unavailableMessage()).isEqualTo(ReviewDraftComposer.FORBIDDEN_PHRASE);
+        verify(evidence, never()).save(any(ReviewDraftEvidence.class));
+    }
+
+    @Test
     @DisplayName("an unsupported promise is REFUSED, not edited — the template floor is saved instead")
     void anUnsupportedPromiseFallsBackToTheTemplate() {
         retrieval(DraftKnowledgeState.GROUNDED,

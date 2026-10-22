@@ -1,6 +1,8 @@
 package com.sellerops.review.draft;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.sellerops.attention.reply.ReviewReplyTemplate;
 import com.sellerops.attention.reply.ReviewReplyTemplateKey;
@@ -65,6 +67,25 @@ class ReviewDraftBasisTest {
         p.setName("합성 상품");
         p.setStatus("ACTIVE");
         product = products.save(p).getId();
+    }
+
+    @Test
+    void aNewBanChangesTheVoiceFingerprintAndNoBanLeavesItAsItWas() {
+        Fingerprints before = basis.of(org);
+        com.sellerops.knowledge.style.AnswerStyleService styles =
+                mock(com.sellerops.knowledge.style.AnswerStyleService.class);
+        when(styles.profileFor(org)).thenReturn(com.sellerops.knowledge.style.AnswerStyleProfile.defaults());
+        basis.setStyles(styles);
+        assertThat(basis.of(org)).as("a company with no ban keeps its fingerprint").isEqualTo(before);
+        when(styles.profileFor(org)).thenReturn(new com.sellerops.knowledge.style.AnswerStyleProfile(
+                null, null, null, null, null, null, java.util.List.of(), java.util.List.of("환불"), null, 1));
+        assertThat(basis.of(org)).as("a bare topic word is not enforced, so it is not a change").isEqualTo(before);
+        when(styles.profileFor(org)).thenReturn(new com.sellerops.knowledge.style.AnswerStyleProfile(
+                null, null, null, null, null, null, java.util.List.of(), java.util.List.of("고객님 탓"), null, 1));
+        Fingerprints after = basis.of(org);
+        assertThat(after.voice()).isNotEqualTo(before.voice());
+        assertThat(after.knowledge()).isEqualTo(before.knowledge());
+        assertThat(after.policy()).isEqualTo(before.policy());
     }
 
     @Test

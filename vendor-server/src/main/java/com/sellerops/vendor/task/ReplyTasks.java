@@ -113,11 +113,18 @@ public class ReplyTasks {
     /**
      * <b>Why a version was stopped, as the PC that checked it says</b> (owner decision 2026-10-23: a hold always
      * shows what changed, which sentence it touches and what to do). The server judges nothing in it: it keeps the
-     * PC's closed codes, the documents that changed, the promise words that lost their ground and the sentences
-     * that carry them — and refuses a note whose sentences are not in the task's own text.
+     * PC's closed codes, the documents that changed, the promise words that lost their ground, the company's
+     * forbidden phrases the text carries (2026-10-23) and the sentences that carry them — and refuses a note whose
+     * sentences or phrases are not in the task's own text.
      */
     public record BasisNote(List<String> codes, List<ChangedSource> sources, List<String> promises,
-                            List<String> sentences) {}
+                            List<String> sentences, List<String> phrases) {
+
+        public BasisNote(List<String> codes, List<ChangedSource> sources, List<String> promises,
+                         List<String> sentences) {
+            this(codes, sources, promises, sentences, List.of());
+        }
+    }
 
     /** A product or company document a version was written from that has since been edited or taken out of use. */
     public record ChangedSource(String kind, String title, Instant changedAt, boolean removed) {}
@@ -177,6 +184,7 @@ public class ReplyTasks {
     static final int NOTE_MAX_TITLE = 120;
     static final int NOTE_MAX_PROMISES = 12;
     static final int NOTE_MAX_PROMISE = 20;
+    static final int NOTE_MAX_PHRASE = 60;
     static final int NOTE_MAX_SENTENCES = 3;
     static final int NOTE_MAX_SENTENCE = 300;
     private static final ObjectMapper NOTE_JSON = JsonMapper.builder().findAndAddModules()
@@ -936,19 +944,24 @@ public class ReplyTasks {
         List<ChangedSource> sources = note.sources() == null ? List.of() : note.sources();
         List<String> promises = note.promises() == null ? List.of() : note.promises();
         List<String> sentences = note.sentences() == null ? List.of() : note.sentences();
+        List<String> phrases = note.phrases() == null ? List.of() : note.phrases();
         boolean ok = !codes.isEmpty() && codes.size() <= 4 && codes.stream().allMatch(c -> c != null
                 && CHECK_CODE.matcher(c).matches())
                 && sources.size() <= NOTE_MAX_SOURCES && sources.stream().allMatch(ReplyTasks::sourceOk)
                 && promises.size() <= NOTE_MAX_PROMISES
                 && promises.stream().allMatch(p -> plain(p, NOTE_MAX_PROMISE))
                 && sentences.size() <= NOTE_MAX_SENTENCES
-                && sentences.stream().allMatch(x -> plain(x, NOTE_MAX_SENTENCE) && squeezed(text).contains(squeezed(x)));
+                && sentences.stream().allMatch(x -> plain(x, NOTE_MAX_SENTENCE) && squeezed(text).contains(squeezed(x)))
+                && phrases.size() <= NOTE_MAX_PROMISES
+                && phrases.stream().allMatch(x -> plain(x, NOTE_MAX_PHRASE)
+                        && squeezed(text).toLowerCase(java.util.Locale.ROOT)
+                                .contains(squeezed(x).toLowerCase(java.util.Locale.ROOT)));
         if (!ok) {
             throw new TaskException(Failure.INVALID_META);
         }
         try {
             return NOTE_JSON.writeValueAsString(new BasisNote(List.copyOf(codes), List.copyOf(sources),
-                    List.copyOf(promises), List.copyOf(sentences)));
+                    List.copyOf(promises), List.copyOf(sentences), List.copyOf(phrases)));
         } catch (JsonProcessingException e) {
             throw new TaskException(Failure.INVALID_META);
         }

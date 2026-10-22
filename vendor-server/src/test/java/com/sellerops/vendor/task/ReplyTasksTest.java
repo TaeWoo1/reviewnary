@@ -406,6 +406,21 @@ class ReplyTasksTest {
     }
 
     @Test
+    void aForbiddenPhraseInTheNoteMustBeInTheText() {
+        TaskView approved = approve(submit("1", "불편을 드려 죄송합니다. 고객님 탓이 아닙니다."));
+        ReplyTasks.BasisNote banned = new ReplyTasks.BasisNote(List.of("FORBIDDEN_PHRASE"), List.of(), List.of(),
+                List.of("고객님 탓이 아닙니다."), List.of("고객님 탓"));
+        assertThat(tasks.checkApproved(approved.id(), 1, true, banned, command()).basisNote().phrases())
+                .containsExactly("고객님 탓");
+        TaskView other = approve(submit("2", "감사합니다."));
+        ReplyTasks.BasisNote foreignPhrase = new ReplyTasks.BasisNote(List.of("FORBIDDEN_PHRASE"), List.of(),
+                List.of(), List.of(), List.of("고객님 탓"));
+        assertThatThrownBy(() -> tasks.checkApproved(other.id(), 1, true, foreignPhrase, command()))
+                .isInstanceOfSatisfying(TaskException.class,
+                        e -> assertThat(e.failure()).isEqualTo(Failure.INVALID_META));
+    }
+
+    @Test
     void aSentBackDraftCarriesThePcsReasonUntilItsNextVersion() {
         TaskView waiting = submit("1", PROMISING);
         tasks.policyCheck(store, "k1", "p2", "v1");

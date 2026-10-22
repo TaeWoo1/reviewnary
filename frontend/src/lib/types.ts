@@ -1411,6 +1411,8 @@ export interface ReviewReplyDelegationNote {
   promises: string[];
   /** The reply's own sentences that carry them. */
   sentences: string[];
+  /** The company's forbidden phrases the reply carries (2026-10-23). Absent on notes written before. */
+  phrases?: string[];
 }
 
 /** What the PC knows of a delegation task after a press. */

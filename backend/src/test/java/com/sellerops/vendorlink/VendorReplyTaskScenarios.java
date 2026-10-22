@@ -89,6 +89,7 @@ abstract class VendorReplyTaskScenarios {
     @Autowired com.sellerops.review.draft.ReviewDraftBasis draftBasis;
     @Autowired com.sellerops.review.draft.ReviewDraftRecheck draftRecheck;
     @Autowired com.sellerops.knowledge.org.OrgKnowledgeChunkRepository companyRuleChunks;
+    @Autowired com.sellerops.knowledge.style.AnswerStyleService answerStyles;
     @Autowired com.sellerops.knowledge.org.SellerOperationsKnowledgeService companyRules;
     @Autowired com.sellerops.knowledge.org.OrgKnowledgeSourceRepository companyRuleRows;
     @Autowired com.sellerops.review.draft.ReviewDraftEvidenceRepository draftEvidence;
@@ -591,6 +592,52 @@ abstract class VendorReplyTaskScenarios {
             assertThat(r.taskId()).isEqualTo(task);
             assertThat(r.passed()).isFalse();
             assertThat(r.codes()).containsExactly(com.sellerops.review.draft.ReviewDraftRecheck.SOURCE_CHANGED);
+        });
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("RECHECK_NEEDED");
+    }
+
+    /* ── the company's forbidden phrases reach review replies (2026-10-23, B24) ── */
+
+    private void ban(String... phrases) {
+        answerStyles.save(org, new com.sellerops.knowledge.style.dto.AnswerStyleRequest(null, null, null, null, null,
+                null, java.util.List.of(), java.util.List.of(phrases), null), seller);
+    }
+
+    @Test
+    void anApprovedReplyCarryingAPhraseBannedSinceIsHeldWithThePhrase() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        UUID review = pulledReview("v1", "9100000317", "배송이 늦었어요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "늦어서 죄송합니다. 고객님 탓이 아닙니다.", 0);
+        UUID task = vendorTaskOf(tasks.handOver(org, review));
+
+        ban("고객님 탓", "환불");
+        pull.pullFor(org);
+
+        assertThat(vendor.approvedChecks).singleElement().satisfies(c -> {
+            assertThat(c.hold()).isTrue();
+            assertThat(c.note().codes()).containsExactly(com.sellerops.review.draft.ReviewDraftRecheck.FORBIDDEN_PHRASE);
+            assertThat(c.note().phrases()).as("a bare topic word is not enforced").containsExactly("고객님 탓");
+            assertThat(c.note().sentences()).containsExactly("고객님 탓이 아닙니다.");
+        });
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("HELD");
+        assertThat(tasks.describe(org, review, true).note().phrases()).containsExactly("고객님 탓");
+    }
+
+    @Test
+    void aWaitingDraftCarryingABannedPhraseIsSentBackForTheSeller() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        UUID review = pulledReview("v1", "9100000318", "배송이 늦었어요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "늦어서 죄송합니다. 고객님 탓이 아닙니다.", 0);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+
+        ban("고객님 탓");
+        pull.pullFor(org);
+
+        assertThat(vendor.rechecks).singleElement().satisfies(r -> {
+            assertThat(r.codes()).containsExactly(com.sellerops.review.draft.ReviewDraftRecheck.FORBIDDEN_PHRASE);
+            assertThat(r.note().phrases()).containsExactly("고객님 탓");
         });
         assertThat(vendor.tasks.get(task).state()).isEqualTo("RECHECK_NEEDED");
     }

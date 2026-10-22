@@ -37,6 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li><b>It promises nothing the current evidence does not.</b> {@link ReviewClaimGuard} against the evidence the
  *       review finds now, and the seller's own wording for its kind of review — else {@value #UNSUPPORTED_PROMISE}.
  *       This is the only check a text written on the phone can get here: it has no citations of its own.</li>
+ *   <li><b>It says nothing the company has banned.</b> {@link ReviewStyleGuard} — the 답변 스타일 forbidden phrases,
+ *       less bare topic words — else {@value #FORBIDDEN_PHRASE} (2026-10-23, finding B24).</li>
  * </ol>
  *
  * <p>A seller's edit is never rewritten: the result is pass or hold, and the text is the text.
@@ -46,6 +48,7 @@ public class ReviewDraftRecheck {
 
     public static final String SOURCE_CHANGED = "SOURCE_CHANGED";
     public static final String UNSUPPORTED_PROMISE = "UNSUPPORTED_PROMISE";
+    public static final String FORBIDDEN_PHRASE = "FORBIDDEN_PHRASE";
 
     /**
      * The finding, and what the seller is shown about it (owner decision 2026-10-23: a hold names the changed basis,
@@ -54,11 +57,12 @@ public class ReviewDraftRecheck {
      * sentences that carry them, at most {@value #MAX_SENTENCES}.
      */
     public record Result(boolean passed, List<String> codes, List<Changed> changed, List<String> promises,
-                         List<String> sentences) {
+                         List<String> sentences, List<String> phrases) {
 
-        static Result of(List<String> codes, List<Changed> changed, List<String> promises, List<String> sentences) {
+        static Result of(List<String> codes, List<Changed> changed, List<String> promises, List<String> sentences,
+                         List<String> phrases) {
             return new Result(codes.isEmpty(), List.copyOf(codes), List.copyOf(changed), List.copyOf(promises),
-                    List.copyOf(sentences));
+                    List.copyOf(sentences), List.copyOf(phrases));
         }
     }
 
@@ -74,6 +78,14 @@ public class ReviewDraftRecheck {
     private final ReviewDraftEvidenceRepository evidence;
     private final ProductKnowledgeSourceRepository productSources;
     private final OrgKnowledgeSourceRepository orgSources;
+    /** The company's 답변 스타일; null where a test wires the recheck without it. */
+    private com.sellerops.knowledge.style.AnswerStyleService styles;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setStyles(com.sellerops.knowledge.style.AnswerStyleService styles) {
+        this.styles = styles;
+    }
+
     /** The documents' passages as they stand; null where a test wires the recheck without them. */
     private com.sellerops.product.library.ProductKnowledgeChunkRepository productChunks;
     private com.sellerops.knowledge.org.OrgKnowledgeChunkRepository orgChunks;
@@ -115,7 +127,14 @@ public class ReviewDraftRecheck {
         if (!promises.isEmpty()) {
             codes.add(UNSUPPORTED_PROMISE);
         }
-        return Result.of(codes, changed, promises, sentencesWith(body, promises));
+        List<String> phrases = styles == null ? List.of()
+                : ReviewStyleGuard.forbiddenIn(body, styles.profileFor(orgId));
+        if (!phrases.isEmpty()) {
+            codes.add(FORBIDDEN_PHRASE);
+        }
+        List<String> marked = new java.util.ArrayList<>(promises);
+        marked.addAll(phrases);
+        return Result.of(codes, changed, promises, sentencesWith(body, marked), phrases);
     }
 
     /**
@@ -128,9 +147,10 @@ public class ReviewDraftRecheck {
             return out;
         }
         for (String sentence : body.split("(?<=[.!?。])\\s+|\\n+")) {
-            String squeezed = sentence.replaceAll("\\s+", "");
+            String squeezed = sentence.replaceAll("\\s+", "").toLowerCase(java.util.Locale.ROOT);
             String trimmed = sentence.strip();
-            if (!trimmed.isEmpty() && promises.stream().anyMatch(squeezed::contains)) {
+            if (!trimmed.isEmpty() && promises.stream().map(p -> p.replaceAll("\\s+", "").toLowerCase(java.util.Locale.ROOT))
+                    .anyMatch(squeezed::contains)) {
                 out.add(trimmed.length() > MAX_SENTENCE ? trimmed.substring(0, MAX_SENTENCE) : trimmed);
                 if (out.size() == MAX_SENTENCES) {
                     break;

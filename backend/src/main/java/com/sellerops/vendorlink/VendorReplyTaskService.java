@@ -529,15 +529,28 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         return checked;
     }
 
-    /** The promise words a PC flagged on {@code current}'s approved version before it was approved. */
-    private static Set<String> knownPromises(TaskSnapshot current) {
+    /**
+     * The promise words and forbidden phrases a PC flagged on {@code current}'s approved version before it was
+     * approved — what the seller was shown and approved anyway.
+     */
+    private static Set<String> knownFindings(TaskSnapshot current) {
         if (current.pcRecheck() == null || !current.pcRecheck().startsWith("FLAGGED")
                 || current.basisNoteJson() == null
                 || !java.util.Objects.equals(current.pcRecheckVersion(), current.approvedVersion())) {
             return Set.of();
         }
         ReviewReplyDelegationView.Note seen = note(current.basisNoteJson());
-        return seen == null || seen.promises() == null ? Set.of() : Set.copyOf(seen.promises());
+        if (seen == null) {
+            return Set.of();
+        }
+        java.util.Set<String> known = new java.util.HashSet<>();
+        if (seen.promises() != null) {
+            known.addAll(seen.promises());
+        }
+        if (seen.phrases() != null) {
+            known.addAll(seen.phrases());
+        }
+        return Set.copyOf(known);
     }
 
     /** One approved text checked; the server's answer, or null when nothing was sent. */
@@ -554,21 +567,37 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         if (result.passed()) {
             return null;
         }
-        // A promise the seller was shown and approved anyway is their word, not a new conflict.
-        Set<String> known = knownPromises(current);
+        // A promise or phrase the seller was shown and approved anyway is their word, not a new conflict. A promise
+        // that lost its ground, or a phrase banned since, is.
+        Set<String> known = knownFindings(current);
         List<String> fresh = result.promises().stream().filter(p -> !known.contains(p)).toList();
-        boolean hold = !fresh.isEmpty();
+        List<String> banned = result.phrases().stream().filter(p -> !known.contains(p)).toList();
+        boolean hold = !fresh.isEmpty() || !banned.isEmpty();
         boolean sourceChanged = result.codes().contains(ReviewDraftRecheck.SOURCE_CHANGED);
         if (!hold && !sourceChanged) {
             return null;
         }
-        VendorServerClient.BasisNote note = hold
-                ? new VendorServerClient.BasisNote(sourceChanged
-                        ? List.of(ReviewDraftRecheck.SOURCE_CHANGED, ReviewDraftRecheck.UNSUPPORTED_PROMISE)
-                        : List.of(ReviewDraftRecheck.UNSUPPORTED_PROMISE), sources(result), fresh,
-                        ReviewDraftRecheck.sentencesWith(ReviewReplyValidation.normalize(current.draftBody()), fresh))
-                : new VendorServerClient.BasisNote(List.of(ReviewDraftRecheck.SOURCE_CHANGED), sources(result),
-                        List.of(), List.of());
+        VendorServerClient.BasisNote note;
+        if (hold) {
+            List<String> codes = new java.util.ArrayList<>();
+            if (sourceChanged) {
+                codes.add(ReviewDraftRecheck.SOURCE_CHANGED);
+            }
+            if (!fresh.isEmpty()) {
+                codes.add(ReviewDraftRecheck.UNSUPPORTED_PROMISE);
+            }
+            if (!banned.isEmpty()) {
+                codes.add(ReviewDraftRecheck.FORBIDDEN_PHRASE);
+            }
+            List<String> marked = new java.util.ArrayList<>(fresh);
+            marked.addAll(banned);
+            note = new VendorServerClient.BasisNote(codes, sources(result), fresh,
+                    ReviewDraftRecheck.sentencesWith(ReviewReplyValidation.normalize(current.draftBody()), marked),
+                    banned);
+        } else {
+            note = new VendorServerClient.BasisNote(List.of(ReviewDraftRecheck.SOURCE_CHANGED), sources(result),
+                    List.of(), List.of());
+        }
         try {
             return link.client().checkApproved(token, current.id(), current.approvedVersion(), hold, note,
                     "pc-check:" + current.id() + ":" + current.approvedVersion() + ":" + current.stateVersion());
@@ -580,7 +609,8 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
 
     /** What the seller is shown about a finding: the server's note. */
     private static VendorServerClient.BasisNote note(ReviewDraftRecheck.Result result) {
-        return new VendorServerClient.BasisNote(result.codes(), sources(result), result.promises(), result.sentences());
+        return new VendorServerClient.BasisNote(result.codes(), sources(result), result.promises(), result.sentences(),
+                result.phrases());
     }
 
     private static List<VendorServerClient.ChangedSource> sources(ReviewDraftRecheck.Result result) {

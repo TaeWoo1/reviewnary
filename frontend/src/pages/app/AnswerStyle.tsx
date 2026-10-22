@@ -258,7 +258,8 @@ export function AnswerStyle() {
                     />
                   </label>
                   <p className="mt-1 break-keep text-sm text-muted">
-                    여기 적힌 표현이 들어간 초안은 저장하지 않고 다시 만들도록 합니다.
+                    여기 적힌 표현이 들어간 초안은 저장하지 않고 다시 만들도록 합니다. 리뷰 답글에도 적용됩니다 — 다만
+                    「환불」「교환」처럼 주제를 가리키는 낱말 하나만 적은 줄은 리뷰에서는 막지 않습니다.
                   </p>
                 </div>
               </div>

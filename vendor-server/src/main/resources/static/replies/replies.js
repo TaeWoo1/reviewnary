@@ -206,14 +206,26 @@
     var doc = src ? (SOURCE_KIND[src.kind] || "자료") + " 「" + src.title + "」 문서가 " : "";
     var changed = src ? (src.removed ? "사용 중지" : day(src.changedAt) + "에 고쳐") : "";
     var promises = (note.promises || []).map(function (p) { return "「" + p + "」"; }).join(" · ");
-    if (codes.indexOf("UNSUPPORTED_PROMISE") >= 0 && (state === "APPROVED" || state === "CLAIMED")) {
+    var phrases = (note.phrases || []).map(function (p) { return "「" + p + "」"; }).join(" · ");
+    var promise = codes.indexOf("UNSUPPORTED_PROMISE") >= 0;
+    var forbidden = codes.indexOf("FORBIDDEN_PHRASE") >= 0 && phrases;
+    if ((promise || forbidden) && (state === "APPROVED" || state === "CLAIMED")) {
       // The PC flagged it before approval and the seller approved it anyway: their word, not a hold.
-      return { text: "근거에 없는 " + promises + " 약속을 확인하고 승인한 답글입니다.", todo: "" };
+      return { text: "확인하고 승인한 답글입니다 — " + [promise ? "근거에 없는 약속 " + promises : "",
+        forbidden ? "쓰지 않기로 한 표현 " + phrases : ""].filter(Boolean).join(", ") + ".", todo: "" };
+    }
+    if (forbidden && !promise) {
+      return {
+        text: "회사가 쓰지 않기로 한 표현이 있습니다: " + phrases + ".",
+        todo: state === "AWAITING_APPROVAL" ? "승인하기 전에 그 표현을 빼고 고치세요."
+          : state === "RECHECK_NEEDED" ? "PC에서 그 표현을 빼고 고쳐 다시 보내 주세요."
+          : "그 표현을 빼고 문장을 고쳐 다시 승인하세요."
+      };
     }
     if (codes.indexOf("UNSUPPORTED_PROMISE") >= 0) {
       return {
         text: (src ? doc + changed + (src.removed ? "되어, " : "져, ") : "") + "이 답글의 " + promises
-          + " 약속이 지금 근거와 맞지 않습니다.",
+          + " 약속이 지금 근거와 맞지 않습니다." + (forbidden ? " 회사가 쓰지 않기로 한 표현도 있습니다: " + phrases + "." : ""),
         todo: state === "AWAITING_APPROVAL" ? "이 약속이 맞는지 확인하고 승인하세요. 맞다면 PC에서 근거에 먼저 적어 두는 것이 좋습니다."
           : state === "RECHECK_NEEDED" ? "PC에서 초안을 고쳐 다시 보내 주세요."
           : "문장을 고쳐 다시 승인하세요. 그 약속이 맞다면 PC에서 근거를 먼저 고쳐 주세요."

@@ -216,7 +216,7 @@ class JdkVendorServerClientTest {
         assertThat(seen).containsExactly("POST /v1/tasks/" + task + "/approved-check auth=true "
                 + "{\"approvedVersion\":2,\"hold\":true,\"note\":{\"codes\":[\"UNSUPPORTED_PROMISE\"],\"sources\":"
                 + "[{\"kind\":\"ORG_POLICY\",\"title\":\"교환 안내\",\"changedAt\":\"2026-10-22T06:40:00Z\","
-                + "\"removed\":false}],\"promises\":[\"교환\"],\"sentences\":[\"교환해 드리겠습니다.\"]},"
+                + "\"removed\":false}],\"promises\":[\"교환\"],\"sentences\":[\"교환해 드리겠습니다.\"],\"phrases\":[]},"
                 + "\"commandId\":\"pc-check:x\"}");
     }
 

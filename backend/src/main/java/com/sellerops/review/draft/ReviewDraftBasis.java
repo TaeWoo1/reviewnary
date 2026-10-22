@@ -57,6 +57,13 @@ public class ReviewDraftBasis {
     private final ProductKnowledgeSourceRepository productSources;
     private final OrgKnowledgeSourceRepository orgSources;
     private final ReviewReplyTemplateService templates;
+    /** The company's 답변 스타일, whose forbidden phrases review replies obey; null in a bare test. */
+    private com.sellerops.knowledge.style.AnswerStyleService styles;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setStyles(com.sellerops.knowledge.style.AnswerStyleService styles) {
+        this.styles = styles;
+    }
 
     public ReviewDraftBasis(ProductKnowledgeSourceRepository productSources, OrgKnowledgeSourceRepository orgSources,
                             ReviewReplyTemplateService templates) {
@@ -80,6 +87,13 @@ public class ReviewDraftBasis {
         Digest voice = new Digest();
         for (ReviewReplyTemplateKey key : ReviewReplyTemplateKey.values()) {
             voice.add(key.category(), templates.bodyFor(orgId, key));
+        }
+        // A new ban sends waiting drafts back and has approved ones checked (2026-10-23, finding B24).
+        // Only when there is a ban, so the fingerprint of a company without one stays what it was.
+        java.util.List<String> banned = styles == null ? java.util.List.of()
+                : ReviewStyleGuard.enforced(styles.profileFor(orgId));
+        if (!banned.isEmpty()) {
+            voice.add("forbidden", String.join("\n", banned));
         }
         return new Fingerprints(knowledge.value(), policy.value(), voice.value());
     }

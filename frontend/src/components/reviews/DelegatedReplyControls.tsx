@@ -71,17 +71,22 @@ function when(iso: string | null): string {
  */
 function WhyStopped({ state, note }: { state: string; note: ReviewReplyDelegationNote }) {
   const promise = note.codes.includes("UNSUPPORTED_PROMISE");
+  const forbidden = note.codes.includes("FORBIDDEN_PHRASE") && (note.phrases?.length ?? 0) > 0;
   const source = note.sources[0];
   const changed = source
     ? `${SOURCE_KIND[source.kind] ?? "자료"} 「${source.title}」`
     : null;
   const changedWhen = source ? (source.removed ? "사용 중지됨" : `${when(source.changedAt)}에 고쳐짐`) : null;
   const words = note.promises.map((p) => `「${p}」`).join(" · ");
+  const phrases = (note.phrases ?? []).map((p) => `「${p}」`).join(" · ");
   if (state === "APPROVED" || state === "CLAIMED") {
-    if (promise) {
+    if (promise || forbidden) {
+      const seen = [promise ? `근거에 없는 약속 ${words}` : null, forbidden ? `쓰지 않기로 한 표현 ${phrases}` : null]
+        .filter(Boolean)
+        .join(", ");
       return (
         <p className="text-xs leading-relaxed text-muted">
-          근거에 없는 {words} 약속을 확인하고 승인한 답글입니다. 응대 기준에 적어 두면 근거가 생깁니다.
+          확인하고 승인한 답글입니다 — {seen}. 응대 기준이나 답변 스타일에 맞게 고쳐 두면 다음 답글부터 걸리지 않습니다.
         </p>
       );
     }
@@ -97,9 +102,15 @@ function WhyStopped({ state, note }: { state: string; note: ReviewReplyDelegatio
     ? advisory
       ? "휴대폰에서 승인하기 전에 이 약속이 맞는지 확인하세요. 맞다면 응대 기준에 적어 두면 근거가 생깁니다."
       : state === "RECHECK_NEEDED"
-      ? "문장을 고쳐 다시 보내세요. 그 약속이 맞다면 응대 기준에 먼저 적으세요."
-      : "문장을 고쳐 다시 승인하세요. 그 약속이 맞다면 응대 기준에 먼저 적은 뒤 다시 승인하세요."
-    : "고쳐진 문서와 초안을 비교해 보고, 맞으면 그대로, 아니면 고쳐서 다시 보내세요.";
+        ? "문장을 고쳐 다시 보내세요. 그 약속이 맞다면 응대 기준에 먼저 적으세요."
+        : "문장을 고쳐 다시 승인하세요. 그 약속이 맞다면 응대 기준에 먼저 적은 뒤 다시 승인하세요."
+    : forbidden
+      ? advisory
+        ? "휴대폰에서 승인하기 전에 그 표현을 빼고 고치세요."
+        : state === "RECHECK_NEEDED"
+          ? "그 표현을 빼고 고쳐서 다시 보내세요."
+          : "그 표현을 빼고 문장을 고쳐 다시 승인하세요."
+      : "고쳐진 문서와 초안을 비교해 보고, 맞으면 그대로, 아니면 고쳐서 다시 보내세요.";
   return (
     <section aria-label={heading} className="flex flex-col gap-2 rounded-xl bg-surface p-3 ring-1 ring-line">
       <h4 className="text-sm font-bold text-ink">{heading}</h4>
@@ -113,11 +124,12 @@ function WhyStopped({ state, note }: { state: string; note: ReviewReplyDelegatio
             </dd>
           </>
         ) : null}
-        <dt className="text-muted">{promise ? "부딪히는 곳" : "영향받는 문장"}</dt>
+        <dt className="text-muted">{promise || forbidden ? "부딪히는 곳" : "영향받는 문장"}</dt>
         <dd className="text-ink">
-          {promise ? (
+          {promise || forbidden ? (
             <>
-              답글의 {words} 약속이 지금 근거에는 없습니다.
+              {promise ? <span className="block">답글의 {words} 약속이 지금 근거에는 없습니다.</span> : null}
+              {forbidden ? <span className="block">회사가 쓰지 않기로 한 표현이 있습니다: {phrases}</span> : null}
               {note.sentences.map((s) => (
                 <mark key={s} className="mt-1 block rounded bg-warn/10 px-1.5 py-0.5 font-semibold text-ink">
                   {s}
