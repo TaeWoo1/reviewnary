@@ -118,3 +118,28 @@ The first thing the harness produces is the honest `rules-v1` number. Expected f
 than from sentiment: recall on high-rating complaints ≈ 0, since `urgency` is a pure function of
 `rating`. The harness must **confirm** that rather than assume it — and that number is what every
 future candidate has to beat.
+
+## 7. Owner exception — the safety and legal signal (2026-10-22)
+
+§5 still binds every detector of the §1 question. One narrower signal is surfaced **without** clearing
+it, by an explicit product-owner decision, and it is recorded here so the gate is not read as broken
+silently.
+
+- **What it is.** `ReviewSafetySignal`: a fixed list of expressions that report someone hurt or made
+  ill (화상 · 다쳤 · 배탈 · 두드러기 …), a dangerous product (이물질 · 감전 · 타는 냄새 …) or a legal step
+  (소비자원 · 신고했 · 소송 …), with a short negation window (「다칠 걱정 없어요」 · 「이물질 없이」 do not
+  count). No model.
+- **What it does.** A review carrying it joins the seller's undecided 확인 필요 list **whatever its
+  rating**, is marked 「안전 문제」, and is listed ahead of the inquiries — interview questions 19–20's
+  「매우 심각한 리뷰는 문의 우선의 예외」. It never changes a tier and only ADDS rows (§5's regression gate
+  holds).
+- **Why without the gate.** The owner was shown, before deciding, that `labels.json` holds no labels
+  for this question and that the §5 harm — a happy 4–5★ customer's 「다칠 걱정 없어요」 raised as a
+  problem — is the likely error, and chose rating-independent surfacing over (a) applying it only to
+  1–2★ reviews and (b) holding it until labelled.
+- **Known misses, stated.** A reassurance farther than the window still rises (「알레르기 있는 아이도 잘
+  써요」); a report written as a worry does not (「화상 입을까 걱정돼요」); anything worded outside the
+  list is not seen.
+- **What would end the exception.** Labels for this narrower question on real reviews, measured against
+  §5's bars with the same Wilson lower bound. Until then the false-positive rate on 4–5★ is unknown and
+  must not be claimed.

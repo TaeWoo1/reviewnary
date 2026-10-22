@@ -90,6 +90,14 @@ Three of these rows deserve their reasoning written down:
   surface splits that band because 확인 필요 is a stronger claim than "in the attention window", and a
   3★ is where the two honestly differ.
 
+**One addition beside the tiers, not inside them (product-owner decision, 2026-10-22).** A review whose
+body reports a safety or legal problem (`ReviewSafetySignal` — 화상 · 이물질 · 소비자원 …, with a short
+negation window) joins the seller's undecided 확인 필요 list and its count **whatever its rating**, marked
+「안전 문제」 and listed ahead of the inquiries. Its tier is unchanged, so every claim above still holds of
+the tier; the Home's list is the tier's undecided rows **plus** these. It is a text-derived signal surfaced
+without RUBRIC §5's measurement, by an explicit owner exception recorded in
+[RUBRIC §7](../../contracts/review-eval/naver/v1/RUBRIC.md).
+
 ### 3.1 Stated once, so the order and the counts cannot disagree
 
 The tier rule exists in two representations — Java, for rendering, and JPQL, for sorting and counting
