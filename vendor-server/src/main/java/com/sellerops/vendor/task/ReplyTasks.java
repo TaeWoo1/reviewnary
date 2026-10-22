@@ -1,6 +1,7 @@
 package com.sellerops.vendor.task;
 
 import com.sellerops.vendor.review.ReviewAttachment;
+import com.sellerops.vendor.review.StoreReviews;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -70,7 +71,9 @@ public class ReplyTasks {
 
     public enum Failure {
         NOT_FOUND, REVIEW_CHANGED, ALREADY_REPLIED, TASK_IN_PROGRESS, ALREADY_POSTED, STALE, WRONG_STATE,
-        FINGERPRINT_MISMATCH, INVALID_BODY, INVALID_META, COMMAND_REUSED, NOT_ASSIGNED, NOT_CLAIMER, POLICY_CHANGED
+        FINGERPRINT_MISMATCH, INVALID_BODY, INVALID_META, COMMAND_REUSED, NOT_ASSIGNED, NOT_CLAIMER, POLICY_CHANGED,
+        /** The review was deleted when its retention ran out (§6); the server no longer holds anything to answer. */
+        REVIEW_PURGED
     }
 
     public static final class TaskException extends RuntimeException {
@@ -166,7 +169,8 @@ public class ReplyTasks {
                 .query((rs, n) -> new ReviewState(rs.getString(1), rs.getBoolean(2), rs.getString(3)))
                 .optional();
         if (review.isEmpty()) {
-            throw new TaskException(Failure.NOT_FOUND);
+            throw new TaskException(StoreReviews.purged(jdbc, storeId, reviewId) ? Failure.REVIEW_PURGED
+                    : Failure.NOT_FOUND);
         }
         if (review.get().replied()) {
             throw new TaskException(Failure.ALREADY_REPLIED);
@@ -512,9 +516,9 @@ public class ReplyTasks {
                 .list();
         for (Object[] task : open) {
             int moved = jdbc.sql("update reply_tasks set state = ?, state_version = state_version + 1, updated_at = ?, "
-                            + "open_review_id = null where id = ? and state in "
+                            + "open_review_id = null, ended_at = ? where id = ? and state in "
                             + "('AWAITING_APPROVAL', 'RECHECK_NEEDED', 'APPROVED')")
-                    .params(State.INVALIDATED.name(), ts(at), task[0])
+                    .params(State.INVALIDATED.name(), ts(at), ts(at), task[0])
                     .update();
             if (moved == 1) {
                 insertChange(jdbc, (UUID) task[1], (UUID) task[0], State.INVALIDATED, at);
@@ -599,20 +603,27 @@ public class ReplyTasks {
         return get(task.id()).orElseThrow();
     }
 
-    /** One conditional UPDATE; {@code extra} is a ", col = ?, …" tail whose values follow {@code now}. */
+    /**
+     * One conditional UPDATE; {@code extra} is a ", col = ?, …" tail whose values follow {@code now}. Entering an
+     * ended state releases the review and starts the task's retention (§6) — the first time only.
+     */
     private boolean transition(TaskView task, State from, State to, String extra, Instant now, Object... values) {
-        String open = State.ENDED.contains(to) ? ", open_review_id = null" : "";
-        Object[] params = new Object[values.length + 6];
-        params[0] = to.name();
-        params[1] = ts(now);
-        System.arraycopy(values, 0, params, 2, values.length);
-        params[values.length + 2] = task.id();
-        params[values.length + 3] = from.name();
-        params[values.length + 4] = task.stateVersion();
-        params[values.length + 5] = task.storeId();
+        boolean ends = State.ENDED.contains(to);
+        String open = ends ? ", open_review_id = null, ended_at = coalesce(ended_at, ?)" : "";
+        List<Object> params = new ArrayList<>();
+        params.add(to.name());
+        params.add(ts(now));
+        params.addAll(Arrays.asList(values));
+        if (ends) {
+            params.add(ts(now));
+        }
+        params.add(task.id());
+        params.add(from.name());
+        params.add(task.stateVersion());
+        params.add(task.storeId());
         int moved = jdbc.sql("update reply_tasks set state = ?, state_version = state_version + 1, updated_at = ?"
                         + extra + open + " where id = ? and state = ? and state_version = ? and store_id = ?")
-                .params(Arrays.asList(params))
+                .params(params)
                 .update();
         if (moved == 1) {
             change(task.storeId(), task.id(), to, now);

@@ -4,6 +4,7 @@ import com.sellerops.vendor.account.SellerAccounts;
 import com.sellerops.vendor.auth.SessionRevocations;
 import com.sellerops.vendor.auth.SessionTokens;
 import com.sellerops.vendor.delegate.Delegates;
+import com.sellerops.vendor.retention.Retention;
 import com.sellerops.vendor.store.Stores;
 import java.io.PrintStream;
 import java.util.Arrays;
@@ -27,6 +28,7 @@ import java.util.UUID;
  *   java -jar vendor-server.jar add-store seller@example.com 라벨       # a seller's NAVER store; prints its id
  *   java -jar vendor-server.jar assign me@example.com &lt;store-id&gt;
  *   java -jar vendor-server.jar unassign me@example.com &lt;store-id&gt;
+ *   java -jar vendor-server.jar purge                                  # one retention pass (§6); after a restore, before serving
  * </pre>
  *
  * <p>Invite codes are printed to the operator's terminal and nowhere else — they are not logged, and the database
@@ -38,26 +40,32 @@ import java.util.UUID;
 public final class OpsCommands {
 
     public static final Set<String> NAMES = Set.of("invite", "suspend", "reinstate", "end-sessions",
-            "invite-delegate", "suspend-delegate", "reinstate-delegate", "add-store", "assign", "unassign");
+            "invite-delegate", "suspend-delegate", "reinstate-delegate", "add-store", "assign", "unassign", "purge");
 
     static final String USAGE = "usage: invite|suspend|reinstate|end-sessions <email> · "
             + "invite-delegate <email> [admin] · "
             + "suspend-delegate|reinstate-delegate <email> · add-store <seller-email> <label> · "
-            + "assign|unassign <delegate-email> <store-id>";
+            + "assign|unassign <delegate-email> <store-id> · purge";
 
     /** The page a delegate's invite link opens; the code follows {@code #}. */
     public static final String JOIN_PATH = "/delegate/join#";
 
     /** The services the commands act on, and the server's public address ({@code ""} when not set). */
     public record Services(SellerAccounts accounts, Delegates delegates, Stores stores,
-                           SessionRevocations revocations, String publicUrl) {}
+                           SessionRevocations revocations, Retention retention, String publicUrl) {}
 
     private OpsCommands() {
     }
 
     /** Runs one command; returns the process exit code. */
     public static int run(Services services, String[] args, PrintStream out) {
-        if (args.length < 2 || !NAMES.contains(args[0])) {
+        if (args.length == 1 && "purge".equals(args[0])) {
+            Retention.Purged purged = services.retention().purge();
+            out.println("deleted: reviews " + purged.reviews() + " · tasks " + purged.tasks() + " · invites "
+                    + purged.invites() + " · logged-out sessions " + purged.sessions());
+            return 0;
+        }
+        if (args.length < 2 || !NAMES.contains(args[0]) || "purge".equals(args[0])) {
             out.println(USAGE);
             return 2;
         }

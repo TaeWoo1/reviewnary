@@ -1,5 +1,6 @@
 package com.sellerops.vendor.review;
 
+import com.sellerops.vendor.Codes;
 import com.sellerops.vendor.task.ReplyTasks;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -44,8 +45,12 @@ public class StoreReviews {
 
     public enum EventKind { NEW, CHANGED, REPLIED }
 
+    /**
+     * {@code purged} counts rows naming a review already deleted at the end of its retention (§6): it is not taken
+     * again, so nothing changed for it here and it is counted in {@code unchanged} too.
+     */
     public record Imported(UUID uploadId, int rows, int added, int changed, int replied, int unchanged,
-                           int attachmentsDropped) {}
+                           int attachmentsDropped, int purged) {}
 
     /** What a PC receives about one review. */
     public record ReviewView(UUID id, String reviewNo, String productNo, String productName, String kind, int rating,
@@ -90,12 +95,19 @@ public class StoreReviews {
         int replied = 0;
         int unchanged = 0;
         int dropped = 0;
+        int purged = 0;
         for (NaverReviewExport.Line line : lines) {
             if (ReviewAttachment.refused(line.attachment())) {
                 dropped++;
             }
             ReviewAttachment attachment = ReviewAttachment.screen(line.attachment()).orElse(null);
             ReviewView before = existing.get(line.reviewNo());
+            if (before == null && purgedNumber(storeId, line.reviewNo())) {
+                // D4: re-uploading never extends a review's retention — once deleted, it is not collected again.
+                unchanged++;
+                purged++;
+                continue;
+            }
             if (before == null) {
                 UUID id = UUID.randomUUID();
                 jdbc.sql("insert into store_reviews (id, store_id, review_no, product_no, product_name, review_kind, "
@@ -161,7 +173,7 @@ public class StoreReviews {
                         + "attachments_dropped = ? where id = ?")
                 .params(added, changed, replied, unchanged, dropped, uploadId)
                 .update();
-        return new Imported(uploadId, lines.size(), added, changed, replied, unchanged, dropped);
+        return new Imported(uploadId, lines.size(), added, changed, replied, unchanged, dropped, purged);
     }
 
     @Transactional(readOnly = true)
@@ -210,7 +222,11 @@ public class StoreReviews {
         return true;
     }
 
-    /** The seller's PC (or the seller) judged that this review needs no reply. False for an unknown review. */
+    /**
+     * The seller's PC (or the seller) judged that this review needs no reply. False for an unknown review. A review
+     * already deleted at the end of its retention is answered as done — there is nothing left to keep — so a PC that
+     * decided late is not refused forever.
+     */
     @Transactional
     public boolean markNoReplyNeeded(UUID storeId, UUID reviewId) {
         int found = jdbc.sql("update store_reviews set no_reply_needed_at = coalesce(no_reply_needed_at, ?) "
@@ -218,7 +234,7 @@ public class StoreReviews {
                 .params(ts(clock.instant()), storeId, reviewId)
                 .update();
         if (found == 0) {
-            return false;
+            return purged(jdbc, storeId, reviewId);
         }
         startRetention(storeId);
         return true;
@@ -239,6 +255,22 @@ public class StoreReviews {
                     .params(ts(start.plus(NO_REPLY_RETENTION)), id)
                     .update();
         }
+    }
+
+    /** True when this store's review was deleted at the end of its retention (§6). */
+    public static boolean purged(JdbcClient jdbc, UUID storeId, UUID reviewId) {
+        return jdbc.sql("select count(*) from purged_reviews where store_id = ? and review_id = ?")
+                .params(storeId, reviewId).query(Integer.class).single() > 0;
+    }
+
+    /** What a deleted review's 리뷰글번호 is kept as: its hash, never the number. */
+    public static String reviewNoHash(String reviewNo) {
+        return Codes.hash(reviewNo);
+    }
+
+    private boolean purgedNumber(UUID storeId, String reviewNo) {
+        return jdbc.sql("select count(*) from purged_reviews where store_id = ? and review_no_hash = ?")
+                .params(storeId, reviewNoHash(reviewNo)).query(Integer.class).single() > 0;
     }
 
     private void event(UUID storeId, UUID reviewId, EventKind kind, Instant at) {

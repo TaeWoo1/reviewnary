@@ -11,3 +11,6 @@ vendor:
   totp:
     # The bytes 00..1f, base64. Test-only.
     key: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
+  # The retention pass runs on the real clock; tests drive Retention with their own and turn the schedule off.
+  retention:
+    enabled: false

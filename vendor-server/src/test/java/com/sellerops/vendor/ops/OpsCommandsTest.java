@@ -7,17 +7,22 @@ import com.sellerops.vendor.account.SellerAccounts;
 import com.sellerops.vendor.auth.SessionRevocations;
 import com.sellerops.vendor.auth.SessionTokens;
 import com.sellerops.vendor.delegate.Delegates;
+import com.sellerops.vendor.retention.Retention;
 import com.sellerops.vendor.store.Stores;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.PlatformTransactionManager;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -33,13 +38,20 @@ class OpsCommandsTest {
     private SessionRevocations revocations;
     @Autowired
     private SessionTokens sessions;
+    @Autowired
+    private JdbcClient jdbc;
+    @Autowired
+    private PlatformTransactionManager transactions;
+    /** At the epoch nothing has expired: the command's own pass, without touching other tests' rows. */
+    private Retention retention;
 
     private OpsCommands.Services services;
     private ByteArrayOutputStream out;
 
     @BeforeEach
     void setUp() {
-        services = new OpsCommands.Services(accounts, delegates, stores, revocations,
+        retention = new Retention(jdbc, transactions, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
+        services = new OpsCommands.Services(accounts, delegates, stores, revocations, retention,
                 "https://vendor.example.com/");
         out = new ByteArrayOutputStream();
     }
@@ -108,7 +120,7 @@ class OpsCommandsTest {
 
     @Test
     void withoutAPublicAddressTheJoinLinkIsPrintedAsAPath() {
-        services = new OpsCommands.Services(accounts, delegates, stores, revocations, "");
+        services = new OpsCommands.Services(accounts, delegates, stores, revocations, retention, "");
         assertThat(run("invite-delegate", "ops-path-" + UUID.randomUUID() + "@example.com")).isZero();
         String path = lastWord();
         assertThat(path).startsWith("/delegate/join#");
@@ -134,6 +146,14 @@ class OpsCommandsTest {
         assertThat(run("invite-delegate", "not-an-address")).isEqualTo(2);
         assertThat(run("assign", "a@example.com")).isEqualTo(2);
         assertThat(run("suspend", "a@example.com", "extra")).isEqualTo(2);
+        assertThat(run("purge", "now")).isEqualTo(2);
+    }
+
+    @Test
+    void purgeRunsOneRetentionPassAndPrintsCountsOnly() {
+        assertThat(run("purge")).isZero();
+        assertThat(out.toString(StandardCharsets.UTF_8).trim())
+                .isEqualTo("deleted: reviews 0 · tasks 0 · invites 0 · logged-out sessions 0");
     }
 
     private int run(String... args) {
