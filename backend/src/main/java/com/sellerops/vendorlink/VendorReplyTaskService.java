@@ -367,6 +367,8 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             case "already_replied" -> "채널에 이미 답글이 등록된 리뷰입니다.";
             case "already_posted" -> "이 리뷰에는 이미 담당자가 답글을 등록했습니다.";
             case "invalid_body" -> "답글 내용을 보낼 수 없습니다. 길이와 내용을 확인하세요.";
+            // The server deleted it when its retention ended (contract §6): nothing there to hand over any more.
+            case "review_purged" -> "서버 보관 기간이 끝나 정리된 리뷰라 담당자에게 맡길 수 없습니다. 판매자센터에서 직접 답글을 다세요.";
             default -> "공급자 서버가 이 요청을 받지 않았습니다.";
         };
     }

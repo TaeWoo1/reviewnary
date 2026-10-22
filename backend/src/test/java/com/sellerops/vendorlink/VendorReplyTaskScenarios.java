@@ -222,6 +222,11 @@ abstract class VendorReplyTaskScenarios {
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("취소"));
         assertThat(vendor.submitted).isEmpty();
         assertThat(tasks.holds(org, noDraft)).isFalse();
+
+        vendor.refuseNextSubmit = "review_purged";
+        assertThatThrownBy(() -> tasks.requestApproval(org, noDraft)).as("deleted on the server at retention's end")
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("판매자센터에서 직접"));
+        assertThat(tasks.holds(org, noDraft)).isFalse();
     }
 
     @Test
