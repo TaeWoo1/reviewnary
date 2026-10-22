@@ -2,6 +2,7 @@ package com.sellerops.vendor.task;
 
 import com.sellerops.vendor.review.ReviewAttachment;
 import com.sellerops.vendor.review.StoreReviews;
+import com.sellerops.vendor.store.Stores;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -371,8 +372,8 @@ public class ReplyTasks {
                         + "r.rating, r.body, t.draft_body, t.approved_fingerprint, t.approved_at, t.claimed_by "
                         + "from reply_tasks t join stores s on s.id = t.store_id "
                         + "join store_reviews r on r.id = t.review_id "
-                        + "join store_assignments a on a.store_id = t.store_id and a.ended_at is null "
-                        + "where a.delegate_id = ? and t.state = ?" + own + " order by t.approved_at, t.id")
+                        + "join store_assignments a on a.store_id = t.store_id "
+                        + "where a.delegate_id = ? and " + Stores.WORKING + " and t.state = ?" + own + " order by t.approved_at, t.id")
                 .params(params)
                 .query((rs, n) -> new DelegateTask(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class),
                         rs.getString(3), State.valueOf(rs.getString(4)), rs.getInt(5), rs.getString(6),
@@ -682,8 +683,8 @@ public class ReplyTasks {
 
     private TaskView assigned(UUID taskId, UUID delegateId) {
         TaskView task = get(taskId).orElseThrow(() -> new TaskException(Failure.NOT_FOUND));
-        boolean assigned = jdbc.sql("select count(*) from store_assignments where store_id = ? and delegate_id = ? "
-                        + "and ended_at is null")
+        boolean assigned = jdbc.sql("select count(*) from store_assignments a join stores s on s.id = a.store_id "
+                        + "where a.store_id = ? and a.delegate_id = ? and " + Stores.WORKING)
                 .params(task.storeId(), delegateId).query(Integer.class).single() > 0;
         if (!assigned) {
             // The same answer as a task that does not exist: an unassigned delegate learns nothing about it.

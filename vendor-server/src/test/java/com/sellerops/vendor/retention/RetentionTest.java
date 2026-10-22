@@ -14,6 +14,7 @@ import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.review.ExportWorkbooks;
 import com.sellerops.vendor.review.NaverReviewExport;
 import com.sellerops.vendor.review.StoreReviews;
+import com.sellerops.vendor.store.CheckedStores;
 import com.sellerops.vendor.store.Stores;
 import com.sellerops.vendor.task.ReplyTasks;
 import com.sellerops.vendor.task.ReplyTasks.Failure;
@@ -83,6 +84,7 @@ class RetentionTest {
         store = stores.add(account, Stores.Channel.NAVER, "보관 스토어");
         me = delegate("d-" + UUID.randomUUID() + "@example.com");
         stores.assign(store, me);
+        CheckedStores.checked(jdbc, store, me);
         install = UUID.randomUUID();
         jdbc.sql("insert into installs (id, account_id, token_hash, public_key, device_name, created_at, expires_at) "
                         + "values (?, ?, ?, ?, ?, ?, ?)")

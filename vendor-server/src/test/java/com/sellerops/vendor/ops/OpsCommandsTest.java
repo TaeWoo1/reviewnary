@@ -116,7 +116,21 @@ class OpsCommandsTest {
 
         assertThat(run("assign", person, storeId.toString())).isZero();
         assertThat(run("assign", person, storeId.toString())).isEqualTo(1);
+        assertThat(stores.assignedTo(delegateId)).as("assigned, not yet checked").isEmpty();
+        assertThat(run("checklist")).isZero();
+        assertThat(output()).contains("store " + storeId + " · 데모 스마트스토어 · seller " + seller
+                + " · does not receive reviews yet", "[ ] 판매자 소유", "[ ] 담당자 배정 " + person);
+        assertThat(run("check-owner", storeId.toString(), "trust-me", person)).isEqualTo(2);
+        assertThat(run("check-owner", storeId.toString(), "seller-center-screen", "nobody@example.com"))
+                .isEqualTo(1);
+        assertThat(run("check-owner", storeId.toString(), "seller-center-screen", person)).isZero();
+        assertThat(run("check-assignment", person, storeId.toString(), person)).isZero();
+        assertThat(run("check-assignment", person, storeId.toString(), person)).as("already checked").isZero();
+        assertThat(lastLine()).isEqualTo("already checked");
         assertThat(stores.assignedTo(delegateId)).extracting(Stores.View::id).containsExactly(storeId);
+        assertThat(run("checklist")).isZero();
+        assertThat(output()).contains("receives reviews", "[x] 판매자 소유 — " + person, "seller-center-screen",
+                "[x] 담당자 배정 " + person + " — " + person);
         assertThat(run("unassign", person, storeId.toString())).isZero();
         assertThat(stores.assignedTo(delegateId)).isEmpty();
 
@@ -189,5 +203,14 @@ class OpsCommandsTest {
     private String lastWord() {
         String printed = out.toString(StandardCharsets.UTF_8).trim();
         return printed.substring(printed.lastIndexOf(' ') + 1);
+    }
+
+    private String output() {
+        return out.toString(StandardCharsets.UTF_8);
+    }
+
+    private String lastLine() {
+        String printed = output().trim();
+        return printed.substring(printed.lastIndexOf('\n') + 1);
     }
 }

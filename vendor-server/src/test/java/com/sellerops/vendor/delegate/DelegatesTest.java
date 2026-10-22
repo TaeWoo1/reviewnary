@@ -9,6 +9,7 @@ import com.sellerops.vendor.TestTotp;
 import com.sellerops.vendor.account.SellerAccounts;
 import com.sellerops.vendor.delegate.Delegates.EnrolException;
 import com.sellerops.vendor.delegate.Delegates.EnrolFailure;
+import com.sellerops.vendor.store.CheckedStores;
 import com.sellerops.vendor.store.Stores;
 import java.time.Duration;
 import java.time.Instant;
@@ -166,6 +167,8 @@ class DelegatesTest {
         Enrolment me = enrol(email);
         UUID store = store();
         stores.assign(store, me.id());
+        CheckedStores.checked(jdbc, store, me.id());
+        assertThat(stores.isAssigned(store, me.id())).isTrue();
         assertThat(delegates.suspend(email)).isTrue();
         assertThat(delegates.active(me.id())).isEmpty();
         assertThat(stores.isAssigned(store, me.id())).isFalse();
@@ -187,6 +190,8 @@ class DelegatesTest {
         assertThat(stores.assign(mine, me.id())).isTrue();
         assertThat(stores.assign(mine, me.id())).isFalse();
         stores.assign(theirs, other.id());
+        CheckedStores.checked(jdbc, mine, me.id());
+        CheckedStores.checked(jdbc, theirs, other.id());
         assertThat(stores.assignedTo(me.id())).extracting(Stores.View::id).containsExactly(mine);
         assertThat(stores.unassign(mine, me.id())).isTrue();
         assertThat(stores.unassign(mine, me.id())).isFalse();

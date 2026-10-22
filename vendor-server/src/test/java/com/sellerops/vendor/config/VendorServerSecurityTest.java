@@ -19,6 +19,7 @@ import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.delegate.OtpQrTest;
 import com.sellerops.vendor.install.Installs;
 import com.sellerops.vendor.review.ExportWorkbooks;
+import com.sellerops.vendor.store.CheckedStores;
 import com.sellerops.vendor.store.Stores;
 import java.time.Instant;
 import java.util.Base64;
@@ -66,6 +67,8 @@ class VendorServerSecurityTest {
     private Delegates delegates;
     @Autowired
     private Stores stores;
+    @Autowired
+    private org.springframework.jdbc.core.simple.JdbcClient jdbc;
     @Autowired
     private SessionRevocations revocations;
 
@@ -397,6 +400,7 @@ class VendorServerSecurityTest {
         UUID elsewhere = stores.add(accounts.redeem(accounts.issueInvite("x-" + email), "another long one"),
                 Stores.Channel.NAVER, "남의 스토어");
         stores.assign(store, me.id());
+        CheckedStores.checked(jdbc, store, me.id());
         mvc.perform(get("/v1/delegate/me").with(bearer(me.token()))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.stores.length()").value(1))
                 .andExpect(jsonPath("$.stores[0].id").value(store.toString()))
@@ -458,6 +462,9 @@ class VendorServerSecurityTest {
 
         mvc.perform(multipart(uploadPath).file(file).with(bearer(me.token()))).andExpect(status().isNotFound());
         stores.assign(store, me.id());
+        // Assigned but not yet checked (V9): no seller's reviews are taken, the same answer as no assignment.
+        mvc.perform(multipart(uploadPath).file(file).with(bearer(me.token()))).andExpect(status().isNotFound());
+        CheckedStores.checked(jdbc, store, me.id());
         mvc.perform(multipart(uploadPath).file(file).with(bearer(me.token()))).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.added").value(6)).andExpect(jsonPath("$.attachmentsDropped").value(1));
         mvc.perform(multipart(uploadPath).file(file).with(bearer(session))).andExpect(status().isForbidden());
@@ -498,6 +505,7 @@ class VendorServerSecurityTest {
         Delegate me = enrolDelegate();
         UUID store = stores.add(accounts.idOf(email).orElseThrow(), Stores.Channel.NAVER, "데모 스토어");
         stores.assign(store, me.id());
+        CheckedStores.checked(jdbc, store, me.id());
         mvc.perform(multipart("/v1/delegate/stores/" + store + "/review-uploads").file(new MockMultipartFile("file",
                 "export.xlsx", "application/octet-stream", ExportWorkbooks.fixture())).with(bearer(me.token())))
                 .andExpect(status().isCreated());

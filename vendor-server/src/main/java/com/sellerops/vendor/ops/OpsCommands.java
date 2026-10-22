@@ -28,7 +28,10 @@ import java.util.UUID;
  *   java -jar vendor-server.jar suspend-delegate me@example.com        # ends sessions and every store assignment
  *   java -jar vendor-server.jar reinstate-delegate me@example.com      # the account only; assign stores again
  *   java -jar vendor-server.jar add-store seller@example.com 라벨       # a seller's NAVER store; prints its id
- *   java -jar vendor-server.jar assign me@example.com &lt;store-id&gt;
+ *   java -jar vendor-server.jar assign me@example.com &lt;store-id&gt;     # opens it; it works once checked
+ *   java -jar vendor-server.jar checklist                              # every store's two checks, to go through
+ *   java -jar vendor-server.jar check-owner &lt;store-id&gt; seller-center-screen|submanager-invite admin@example.com
+ *   java -jar vendor-server.jar check-assignment me@example.com &lt;store-id&gt; admin@example.com
  *   java -jar vendor-server.jar unassign me@example.com &lt;store-id&gt;
  *   java -jar vendor-server.jar purge                                  # one retention pass (§6); after a restore, before serving
  *   java -jar vendor-server.jar in-doubt                               # a suspended delegate's in-doubt tasks, to check
@@ -45,13 +48,15 @@ public final class OpsCommands {
 
     public static final Set<String> NAMES = Set.of("invite", "suspend", "reinstate", "end-sessions",
             "invite-delegate", "suspend-delegate", "reinstate-delegate", "add-store", "assign", "unassign", "purge",
-            "in-doubt", "settle");
+            "in-doubt", "settle", "checklist", "check-owner", "check-assignment");
 
     static final String USAGE = "usage: invite|suspend|reinstate|end-sessions <email> · "
             + "invite-delegate <email> [admin] · "
             + "suspend-delegate|reinstate-delegate <email> · add-store <seller-email> <label> · "
             + "assign|unassign <delegate-email> <store-id> · purge · in-doubt · "
-            + "settle <task-id> posted|not-posted <admin-email>";
+            + "settle <task-id> posted|not-posted <admin-email> · checklist · "
+            + "check-owner <store-id> seller-center-screen|submanager-invite <admin-email> · "
+            + "check-assignment <delegate-email> <store-id> <admin-email>";
 
     /** The page a delegate's invite link opens; the code follows {@code #}. */
     public static final String JOIN_PATH = "/delegate/join#";
@@ -80,7 +85,18 @@ public final class OpsCommands {
         if (args.length == 4 && "settle".equals(args[0])) {
             return settle(services, args, out);
         }
-        if (args.length < 2 || !NAMES.contains(args[0]) || Set.of("purge", "in-doubt", "settle").contains(args[0])) {
+        if (args.length == 1 && "checklist".equals(args[0])) {
+            return checklist(services, out);
+        }
+        if (args.length == 4 && "check-owner".equals(args[0])) {
+            return checkOwner(services, args, out);
+        }
+        if (args.length == 4 && "check-assignment".equals(args[0])) {
+            return checkAssignment(services, args, out);
+        }
+        if (args.length < 2 || !NAMES.contains(args[0])
+                || Set.of("purge", "in-doubt", "settle", "checklist", "check-owner", "check-assignment")
+                        .contains(args[0])) {
             out.println(USAGE);
             return 2;
         }
@@ -168,7 +184,8 @@ public final class OpsCommands {
                 out.println("delegate is suspended");
                 return 1;
             }
-            return done(out, services.stores().assign(storeId, delegate.get()), "assigned", "already assigned");
+            return done(out, services.stores().assign(storeId, delegate.get()),
+                    "assigned; it works once checked (checklist)", "already assigned");
         }
         return done(out, services.stores().unassign(storeId, delegate.get()), "unassigned", "was not assigned");
     }
@@ -228,6 +245,92 @@ public final class OpsCommands {
                 default -> "task moved; list again";
             });
             return 1;
+        }
+    }
+
+    /**
+     * The store check (contract §2), as a list to go through before any seller's reviews reach the server. Each store
+     * says its two questions and, once answered, who answered when. Nothing about reviews is printed.
+     */
+    private static int checklist(Services services, PrintStream out) {
+        List<Stores.ChecklistEntry> entries = services.stores().checklist();
+        if (entries.isEmpty()) {
+            out.println("no stores");
+            return 0;
+        }
+        for (Stores.ChecklistEntry e : entries) {
+            out.println("store " + e.storeId() + " · " + e.label() + " · seller " + e.sellerEmail() + " · "
+                    + (e.receives() ? "receives reviews" : "does not receive reviews yet"));
+            out.println(e.ownerCheckedAt() == null
+                    ? "  [ ] 판매자 소유 — 이 스토어가 판매자 계정 주인의 것인가: check-owner " + e.storeId()
+                            + " seller-center-screen|submanager-invite <admin-email>"
+                    : "  [x] 판매자 소유 — " + e.ownerCheckedBy() + " · " + e.ownerCheckedAt() + " · "
+                            + basisWord(e.ownerBasis()));
+            if (e.assignments().isEmpty()) {
+                out.println("  [ ] 담당자 배정 — 배정된 담당자 없음: assign <delegate-email> " + e.storeId());
+            }
+            for (Stores.AssignmentCheck a : e.assignments()) {
+                out.println(a.checkedAt() == null
+                        ? "  [ ] 담당자 배정 " + a.delegateEmail() + " — 그 담당자의 네이버 계정이 판매자센터에서 이 스토어의 "
+                                + "부매니저인가: check-assignment " + a.delegateEmail() + " " + e.storeId()
+                                + " <admin-email>"
+                        : "  [x] 담당자 배정 " + a.delegateEmail() + " — " + a.checkedBy() + " · " + a.checkedAt());
+            }
+        }
+        return 0;
+    }
+
+    private static int checkOwner(Services services, String[] args, PrintStream out) {
+        Optional<UUID> storeId = uuid(args[1]);
+        Stores.OwnerBasis basis = switch (args[2]) {
+            case "seller-center-screen" -> Stores.OwnerBasis.SELLER_CENTER_SCREEN;
+            case "submanager-invite" -> Stores.OwnerBasis.SUBMANAGER_INVITE;
+            default -> null;
+        };
+        if (storeId.isEmpty() || basis == null) {
+            return usage(out);
+        }
+        Optional<UUID> admin = services.delegates().idOf(args[3]);
+        return checked(out, admin.isEmpty() ? Stores.Check.NOT_ADMIN
+                : services.stores().checkOwner(storeId.get(), admin.get(), basis), "no such store");
+    }
+
+    private static int checkAssignment(Services services, String[] args, PrintStream out) {
+        Optional<UUID> storeId = uuid(args[2]);
+        if (storeId.isEmpty()) {
+            out.println("not a store id");
+            return 2;
+        }
+        Optional<UUID> delegate = services.delegates().idOf(args[1]);
+        Optional<UUID> admin = services.delegates().idOf(args[3]);
+        if (delegate.isEmpty()) {
+            out.println("no such delegate");
+            return 1;
+        }
+        return checked(out, admin.isEmpty() ? Stores.Check.NOT_ADMIN
+                : services.stores().checkAssignment(storeId.get(), delegate.get(), admin.get()),
+                "no open assignment of that delegate to that store");
+    }
+
+    private static int checked(PrintStream out, Stores.Check check, String notFound) {
+        out.println(switch (check) {
+            case CHECKED -> "checked";
+            case ALREADY_CHECKED -> "already checked";
+            case NOT_ADMIN -> "not an active admin";
+            case NOT_FOUND -> notFound;
+        });
+        return check == Stores.Check.CHECKED || check == Stores.Check.ALREADY_CHECKED ? 0 : 1;
+    }
+
+    private static String basisWord(Stores.OwnerBasis basis) {
+        return basis == Stores.OwnerBasis.SELLER_CENTER_SCREEN ? "seller-center-screen" : "submanager-invite";
+    }
+
+    private static Optional<UUID> uuid(String raw) {
+        try {
+            return Optional.of(UUID.fromString(raw));
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
         }
     }
 

@@ -10,6 +10,7 @@ import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.review.ExportWorkbooks;
 import com.sellerops.vendor.review.NaverReviewExport;
 import com.sellerops.vendor.review.StoreReviews;
+import com.sellerops.vendor.store.CheckedStores;
 import com.sellerops.vendor.store.Stores;
 import com.sellerops.vendor.task.ReplyTasks.Failure;
 import com.sellerops.vendor.task.ReplyTasks.Meta;
@@ -76,6 +77,8 @@ class ReplyTasksTest {
         other = delegate("o-" + myEmail);
         stores.assign(store, me);
         stores.assign(store, other);
+        CheckedStores.checked(jdbc, store, me);
+        CheckedStores.checked(jdbc, store, other);
         upload(ExportWorkbooks.line("1", Map.of()), ExportWorkbooks.line("2", Map.of()));
     }
 
@@ -283,6 +286,7 @@ class ReplyTasksTest {
                 e -> assertThat(e.failure()).isEqualTo(Failure.TASK_IN_PROGRESS));
         delegates.reinstate(myEmail);
         stores.assign(store, me);
+        CheckedStores.checked(jdbc, store, me);
         assertThat(report(task.id(), me, Outcome.POSTED, task.approvedFingerprint()).state())
                 .isEqualTo(State.POSTED);
     }
@@ -337,6 +341,12 @@ class ReplyTasksTest {
         UUID stranger = delegate("x-" + myEmail);
         assertThatThrownBy(() -> tasks.claim(task.id(), stranger, task.stateVersion()))
                 .isInstanceOfSatisfying(TaskException.class, e -> assertThat(e.failure()).isEqualTo(Failure.NOT_FOUND));
+        stores.assign(store, stranger);
+        assertThat(tasks.forDelegate(stranger, State.APPROVED)).as("assigned, not yet checked (V9)").isEmpty();
+        assertThatThrownBy(() -> tasks.claim(task.id(), stranger, task.stateVersion()))
+                .isInstanceOfSatisfying(TaskException.class, e -> assertThat(e.failure()).isEqualTo(Failure.NOT_FOUND));
+        CheckedStores.checked(jdbc, store, stranger);
+        assertThat(tasks.forDelegate(stranger, State.APPROVED)).hasSize(1);
         tasks.claim(task.id(), me, task.stateVersion());
         assertThatThrownBy(() -> report(task.id(), other, Outcome.POSTED, task.approvedFingerprint()))
                 .isInstanceOfSatisfying(TaskException.class,
