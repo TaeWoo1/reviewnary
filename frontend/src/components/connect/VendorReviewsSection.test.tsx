@@ -2,7 +2,8 @@
 //
 // 「담당자가 올리는 네이버 리뷰」 on the seller PC: the route is named before anything starts, only the stores shown are
 // started, a store added later waits to be started, the last check and the last upload are two times, and each store
-// says its own failure and can be stopped.
+// says its own failure and can be stopped. It stays current without a reload, and a read that fails is said with a way
+// to try again.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -68,7 +69,8 @@ function renderSection() {
 
 describe("VendorReviewsSection", () => {
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.useRealTimers();
+    vi.resetAllMocks();
   });
 
   it("is not there on an install that cannot link", async () => {
@@ -155,5 +157,83 @@ describe("VendorReviewsSection", () => {
     expect(screen.getByTestId("vendor-store-facts")).toHaveTextContent("서버 확인 2시간 전");
     expect(screen.queryByTestId("vendor-reviews-start")).toBeNull();
     expect(screen.queryByRole("button", { name: "지금 받기" })).toBeNull();
+  });
+
+  it("a first read that fails is said with 「다시 확인」, not left as an empty page", async () => {
+    getVendorLink.mockRejectedValueOnce(new Error("down"));
+    getVendorLink.mockResolvedValue(linkStatus("LINKED"));
+    getVendorReviewsOverview.mockResolvedValue(overview([store({ standing: "RECEIVING", lastCheckedAt: ago(0) })]));
+    renderSection();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("리뷰 받기 상태를 불러오지 못했습니다");
+    fireEvent.click(screen.getByRole("button", { name: "다시 확인" }));
+    expect(await screen.findByTestId("vendor-store")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("a server that was away is asked again, by 「다시 확인」 or when the tab comes back", async () => {
+    getVendorLink.mockResolvedValue(linkStatus("LINKED"));
+    const away = overview([store({ standing: "RECEIVING", lastCheckedAt: ago(2 * HOUR) })], "UNREACHABLE");
+    const back = overview([store({ standing: "RECEIVING", lastCheckedAt: ago(0) })]);
+    getVendorReviewsOverview.mockResolvedValueOnce(away).mockResolvedValueOnce(away).mockResolvedValue(back);
+    renderSection();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("reviewnary 서버에 닿지 않습니다");
+    fireEvent.click(screen.getByRole("button", { name: "다시 확인" }));
+    await waitFor(() => expect(getVendorReviewsOverview).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+
+    fireEvent(window, new Event("focus"));
+    expect(await screen.findByRole("button", { name: "지금 받기" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByTestId("vendor-store-facts")).toHaveTextContent("서버 확인 방금 전");
+  });
+
+  it("while shown it reads again, so the scheduled pull's reviews appear without a reload", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    getVendorLink.mockResolvedValue(linkStatus("LINKED"));
+    getVendorReviewsOverview
+      .mockResolvedValueOnce(overview([store({ standing: "RECEIVING", lastCheckedAt: ago(0), received: 6 })]))
+      .mockResolvedValue(overview([store({ standing: "RECEIVING", lastCheckedAt: ago(0), received: 9 })]));
+    renderSection();
+
+    expect(await screen.findByTestId("vendor-store-facts")).toHaveTextContent("받은 리뷰 6건");
+    await vi.advanceTimersByTimeAsync(60_000);
+    await waitFor(() => expect(screen.getByTestId("vendor-store-facts")).toHaveTextContent("받은 리뷰 9건"));
+  });
+
+  it("a server that is away is asked again sooner than the minute", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    getVendorLink.mockResolvedValue(linkStatus("LINKED"));
+    getVendorReviewsOverview
+      .mockResolvedValueOnce(overview([store({ standing: "RECEIVING" })], "UNREACHABLE"))
+      .mockResolvedValue(overview([store({ standing: "RECEIVING", lastCheckedAt: ago(0) })]));
+    renderSection();
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(15_000);
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  });
+
+  it("a read that 「지금 받기」 overtook does not paint older rows over the newer ones", async () => {
+    getVendorLink.mockResolvedValue(linkStatus("LINKED"));
+    let answerOld: (v: VendorReviewsOverview) => void = () => undefined;
+    getVendorReviewsOverview
+      .mockResolvedValueOnce(overview([store({ standing: "RECEIVING", lastCheckedAt: ago(0), received: 6 })]))
+      .mockImplementationOnce(() => new Promise((resolve) => { answerOld = resolve; }))
+      .mockResolvedValue(overview([store({ standing: "RECEIVING", lastCheckedAt: ago(0), received: 12 })]));
+    pullVendorReviews.mockResolvedValue(pulled);
+    renderSection();
+
+    const pullNow = await screen.findByRole("button", { name: "지금 받기" });
+    fireEvent(window, new Event("focus"));
+    await waitFor(() => expect(getVendorReviewsOverview).toHaveBeenCalledTimes(2));
+    fireEvent.click(pullNow);
+    expect(await screen.findByText("새 리뷰 6건 · 바뀐 리뷰 0건을 받았습니다.")).toBeInTheDocument();
+    expect(screen.getByTestId("vendor-store-facts")).toHaveTextContent("받은 리뷰 12건");
+
+    answerOld(overview([store({ standing: "RECEIVING", lastCheckedAt: ago(0), received: 6 })]));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByTestId("vendor-store-facts")).toHaveTextContent("받은 리뷰 12건");
   });
 });

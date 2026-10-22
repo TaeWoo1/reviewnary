@@ -16,6 +16,10 @@ const TITLE = "담당자가 올리는 네이버 리뷰";
 const HINT = "담당자가 판매자센터 리뷰 엑셀을 reviewnary 서버에 올리면 이 PC가 받아 옵니다.";
 const OFFLINE = "reviewnary 서버에 닿지 않습니다. 인터넷 연결을 확인해 주세요. 이미 받은 리뷰는 그대로 있습니다.";
 const REVOKED = "이 PC의 연결이 해제됐습니다. 다시 연결해야 리뷰를 받을 수 있습니다.";
+const LOAD_FAILED = "리뷰 받기 상태를 불러오지 못했습니다. 이미 받은 리뷰는 그대로 있습니다.";
+/** How often an open section reads again: the scheduled pull runs every 5 minutes; a server that was away is asked sooner. */
+const REFRESH_MS = 60_000;
+const RETRY_MS = 15_000;
 
 const FAILURE: Record<NonNullable<VendorReviewStoreView["failure"]>, string> = {
   UNREACHABLE: "마지막 받기에서 서버에 닿지 않았습니다. 다음 받기에서 다시 시도합니다.",
@@ -36,6 +40,9 @@ const FAILURE: Record<NonNullable<VendorReviewStoreView["failure"]>, string> = {
  *   <li>Each store says its own failure, and each can be stopped and started again.</li>
  * </ul>
  *
+ * It stays current without a reload: it reads again every minute while shown, sooner while the server is away, and
+ * when the tab comes back; a read that fails says so with 「다시 확인」 instead of leaving the section empty.
+ *
  * Hidden entirely where the PC cannot link (`OFF`: not a seller-PC install).
  */
 export function VendorReviewsSection() {
@@ -45,18 +52,30 @@ export function VendorReviewsSection() {
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const mounted = useRef(true);
+  // A read in flight or a button's request under way: a refresh then waits for the next turn instead of racing it,
+  // and a read that a button overtook is dropped rather than painting older rows over newer ones.
+  const working = useRef(false);
+  const turn = useRef(0);
 
   const load = useCallback(async () => {
+    if (working.current) return;
+    working.current = true;
+    const mine = ++turn.current;
+    const current = () => mounted.current && turn.current === mine;
     try {
       const nextLink = await api.getVendorLink();
-      if (!mounted.current) return;
+      if (!current()) return;
       setLink(nextLink);
       if (nextLink.state === "LINKED") {
         const next = await api.getVendorReviewsOverview();
-        if (mounted.current) setOverview(next);
+        if (!current()) return;
+        setOverview(next);
       }
+      setFailed(false);
     } catch {
-      if (mounted.current) setFailed(true);
+      if (current()) setFailed(true);
+    } finally {
+      if (turn.current === mine) working.current = false;
     }
   }, []);
 
@@ -84,9 +103,35 @@ export function VendorReviewsSection() {
     return () => window.clearTimeout(timer);
   }, [link]);
 
+  // Kept current while shown: the scheduled pull's reviews, a server that came back, a tab brought back to the front.
+  const watching = failed || link?.state === "LINKED";
+  const away = failed || overview?.state === "UNREACHABLE";
+  useEffect(() => {
+    if (!watching) return undefined;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    const timer = window.setInterval(refresh, away ? RETRY_MS : REFRESH_MS);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [watching, away, load]);
+
+  const retry = async () => {
+    setBusy(true);
+    await load();
+    if (mounted.current) setBusy(false);
+  };
+
   const startLink = async (relink: boolean) => {
     setBusy(true);
     setFailed(false);
+    working.current = true;
+    const mine = ++turn.current;
     try {
       if (relink) await api.unlinkVendor();
       const next = await api.startVendorLink();
@@ -97,6 +142,7 @@ export function VendorReviewsSection() {
     } catch {
       if (mounted.current) setFailed(true);
     } finally {
+      if (turn.current === mine) working.current = false;
       if (mounted.current) setBusy(false);
     }
   };
@@ -105,6 +151,8 @@ export function VendorReviewsSection() {
     setBusy(true);
     setNotice(null);
     setFailed(false);
+    working.current = true;
+    const mine = ++turn.current;
     try {
       const result = await action();
       // The rows are read again before the line about what arrived is shown, so the two never disagree.
@@ -115,11 +163,30 @@ export function VendorReviewsSection() {
     } catch {
       if (mounted.current) setFailed(true);
     } finally {
+      if (turn.current === mine) working.current = false;
       if (mounted.current) setBusy(false);
     }
   };
 
-  if (link === null || link.state === "OFF") {
+  const retryButton = (
+    <Btn size="sm" variant="outline" className="ml-2" disabled={busy} onClick={() => void retry()}>
+      다시 확인
+    </Btn>
+  );
+
+  if (link === null) {
+    // Nothing read yet. A first read that failed is said, not hidden; until then there is nothing to show.
+    return failed ? (
+      <section aria-label={TITLE} className="space-y-2" data-testid="vendor-reviews">
+        <SectionHeader title={TITLE} hint={HINT} />
+        <Banner tone="bad">
+          {LOAD_FAILED}
+          {retryButton}
+        </Banner>
+      </section>
+    ) : null;
+  }
+  if (link.state === "OFF") {
     return null;
   }
 
@@ -158,7 +225,12 @@ export function VendorReviewsSection() {
     <section aria-label={TITLE} className="space-y-2" data-testid="vendor-reviews">
       <SectionHeader title={TITLE} hint={HINT} action={action} />
 
-      {failed ? <Banner tone="bad">{OFFLINE}</Banner> : null}
+      {failed ? (
+        <Banner tone="bad">
+          {LOAD_FAILED}
+          {retryButton}
+        </Banner>
+      ) : null}
 
       {!linked && link.state !== "PENDING" ? (
         <>
@@ -198,7 +270,12 @@ export function VendorReviewsSection() {
 
       {linked && overview ? (
         <>
-          {overview.state === "UNREACHABLE" ? <Banner tone="bad">{OFFLINE}</Banner> : null}
+          {overview.state === "UNREACHABLE" && !failed ? (
+            <Banner tone="bad">
+              {OFFLINE}
+              {retryButton}
+            </Banner>
+          ) : null}
           {overview.state === "NOT_AUTHORIZED" ? (
             <Banner tone="bad">
               {REVOKED}{" "}
