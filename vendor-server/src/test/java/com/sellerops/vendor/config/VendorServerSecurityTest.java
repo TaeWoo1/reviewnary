@@ -18,6 +18,9 @@ import com.sellerops.vendor.auth.SessionTokens;
 import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.delegate.OtpQrTest;
 import com.sellerops.vendor.install.Installs;
+import com.sellerops.vendor.mail.DevOutboxMailer;
+import com.sellerops.vendor.mail.Mailer;
+import com.sellerops.vendor.mail.OutboundMail;
 import com.sellerops.vendor.review.ExportWorkbooks;
 import com.sellerops.vendor.store.CheckedStores;
 import com.sellerops.vendor.store.Stores;
@@ -25,6 +28,8 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,6 +72,8 @@ class VendorServerSecurityTest {
     private Delegates delegates;
     @Autowired
     private Stores stores;
+    @Autowired
+    private Mailer mailer;
     @Autowired
     private org.springframework.jdbc.core.simple.JdbcClient jdbc;
     @Autowired
@@ -127,6 +134,48 @@ class VendorServerSecurityTest {
                 .andExpect(jsonPath("$.error").value("ipv4_unavailable"));
         mvc.perform(get("/v1/ip").with(remote("203.0.113.7"))).andExpect(status().isUnauthorized());
         mvc.perform(get("/v1/ip").with(bearer(session))).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void aNewPcIsApprovedOnlyWithTheMailedCodeOfThatSessionForThatPc() throws Exception {
+        String userCode = startGrant().path("userCode").asText();
+        String approveBody = "{\"userCode\":\"" + userCode + "\"}";
+        mvc.perform(json(post("/v1/installs/approve").with(bearer(session)), approveBody))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.error").value("step_up_required"));
+
+        mvc.perform(json(post("/v1/installs/step-up").with(bearer(session)), approveBody)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.sentTo").value(email.substring(0, 2) + "***" + email.substring(email.indexOf('@'))));
+        OutboundMail codeMail = lastMailTo(email);
+        assertThat(codeMail.subject()).startsWith("[reviewnary] PC 연결 확인 코드");
+        assertThat(codeMail.text()).contains("PC 종류: Seller Mac").doesNotContain("http");
+        String code = mailedCode(email);
+        assertThat(verifiedAccounts()).as("a mailed code proves nothing until it comes back").isZero();
+
+        String other = body(mvc.perform(json(post("/v1/auth/login"),
+                "{\"email\":\"" + email + "\",\"password\":\"correct horse battery\"}"))).path("token").asText();
+        mvc.perform(json(post("/v1/installs/step-up/verify").with(bearer(other)),
+                        "{\"userCode\":\"" + userCode + "\",\"code\":\"" + code + "\"}"))
+                .andExpect(status().isGone()).andExpect(jsonPath("$.error").value("expired"));
+        String wrong = code.equals("000000") ? "111111" : "000000";
+        mvc.perform(json(post("/v1/installs/step-up/verify").with(bearer(session)),
+                        "{\"userCode\":\"" + userCode + "\",\"code\":\"" + wrong + "\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("wrong_code"))
+                .andExpect(jsonPath("$.left").value(4));
+        mvc.perform(json(post("/v1/installs/step-up/verify").with(bearer(session)),
+                        "{\"userCode\":\"" + userCode + "\",\"code\":\"" + code + "\"}"))
+                .andExpect(status().isNoContent());
+        assertThat(verifiedAccounts()).isEqualTo(1);
+
+        String secondPc = startGrant().path("userCode").asText();
+        // The code was for the first PC only, and for this session only.
+        mvc.perform(json(post("/v1/installs/approve").with(bearer(session)), "{\"userCode\":\"" + secondPc + "\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(json(post("/v1/installs/approve").with(bearer(other)), approveBody))
+                .andExpect(status().isForbidden());
+        mvc.perform(json(post("/v1/installs/approve").with(bearer(session)), approveBody)).andExpect(status().isOk());
+        OutboundMail notice = lastMailTo(email);
+        assertThat(notice.subject()).isEqualTo("[reviewnary] 새 PC가 연결됐습니다");
+        assertThat(notice.text()).contains("PC 종류: Seller Mac", "(한국 시간)", "운영자").doesNotContain("http");
     }
 
     @Test
@@ -630,8 +679,35 @@ class VendorServerSecurityTest {
 
     private void approve(String userCode) throws Exception {
         String dashed = userCode.substring(0, 4) + "-" + userCode.substring(4).toLowerCase();
+        stepUp(session, email, dashed);
         mvc.perform(json(post("/v1/installs/approve").with(bearer(session)), "{\"userCode\":\"" + dashed + "\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.deviceName").value("Seller Mac"));
+    }
+
+    /** The step-up a PC approval takes (§2): a code mailed to {@code to}, entered by this session for this PC. */
+    private void stepUp(String bearerToken, String to, String userCode) throws Exception {
+        mvc.perform(json(post("/v1/installs/step-up").with(bearer(bearerToken)), "{\"userCode\":\"" + userCode + "\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(json(post("/v1/installs/step-up/verify").with(bearer(bearerToken)),
+                        "{\"userCode\":\"" + userCode + "\",\"code\":\"" + mailedCode(to) + "\"}"))
+                .andExpect(status().isNoContent());
+    }
+
+    private int verifiedAccounts() {
+        return jdbc.sql("select count(*) from seller_accounts where email = ? and email_verified_at is not null")
+                .param(email).query(Integer.class).single();
+    }
+
+    private OutboundMail lastMailTo(String to) {
+        List<OutboundMail> mails = ((DevOutboxMailer) mailer).outbox().stream().filter(m -> m.to().equals(to)).toList();
+        return mails.get(mails.size() - 1);
+    }
+
+    private String mailedCode(String to) {
+        List<OutboundMail> mails = ((DevOutboxMailer) mailer).outbox().stream().filter(m -> m.to().equals(to)).toList();
+        Matcher m = Pattern.compile("PC 연결 확인 코드: (\\d{6})").matcher(mails.get(mails.size() - 1).text());
+        assertThat(m.find()).isTrue();
+        return m.group(1);
     }
 
     private static MockHttpServletRequestBuilder json(MockHttpServletRequestBuilder b, String body) {

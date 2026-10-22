@@ -242,7 +242,19 @@ class RetentionTest {
                         Timestamp.from(now.plus(Duration.ofHours(1))))
                 .update();
 
-        retention.purge();
+        UUID codeOld = UUID.randomUUID();
+        UUID codeYoung = UUID.randomUUID();
+        jdbc.sql("insert into step_up_codes (id, account_id, session_id, purpose, target_hash, code_hash, issued_at, "
+                        + "expires_at) values (?, ?, 's', 'PC_LINK', ?, ?, ?, ?), (?, ?, 's', 'PC_LINK', ?, ?, ?, ?)")
+                .params(codeOld, account, Codes.hash("a"), Codes.hash("b"),
+                        Timestamp.from(now.minus(Duration.ofDays(1)).minus(SECOND)), Timestamp.from(now),
+                        codeYoung, account, Codes.hash("a"), Codes.hash("c"),
+                        Timestamp.from(now.minus(Duration.ofHours(23))), Timestamp.from(now))
+                .update();
+
+        assertThat(retention.purge().stepUps()).isEqualTo(1);
+        assertThat(count("step_up_codes where id = ?", codeOld)).isZero();
+        assertThat(count("step_up_codes where id = ?", codeYoung)).as("still inside a cap's look-back").isOne();
         assertThat(count("seller_invites where code_hash = ?", Codes.hash(sellerOld))).isZero();
         assertThat(count("seller_invites where code_hash = ?", Codes.hash(sellerLive))).isOne();
         assertThat(count("delegate_invites where code_hash = ?", Codes.hash(delegateOld))).isZero();

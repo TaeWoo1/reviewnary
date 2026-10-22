@@ -45,6 +45,8 @@ class OpsCommandsTest {
     private PlatformTransactionManager transactions;
     @Autowired
     private ReplyTasks tasks;
+    @Autowired
+    private com.sellerops.vendor.install.Installs installs;
     /** At the epoch nothing has expired: the command's own pass, without touching other tests' rows. */
     private Retention retention;
 
@@ -54,7 +56,7 @@ class OpsCommandsTest {
     @BeforeEach
     void setUp() {
         retention = new Retention(jdbc, transactions, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
-        services = new OpsCommands.Services(accounts, delegates, stores, revocations, retention, tasks,
+        services = new OpsCommands.Services(accounts, delegates, stores, revocations, retention, tasks, installs,
                 "https://vendor.example.com/");
         out = new ByteArrayOutputStream();
     }
@@ -141,8 +143,56 @@ class OpsCommandsTest {
     }
 
     @Test
+    void aRecoveryLinkGivesTheSameAccountANewPasswordAndEndsItsSessions() {
+        String email = "ops-rec-" + UUID.randomUUID() + "@example.com";
+        UUID id = accounts.redeem(accounts.issueInvite(email), "the first long password");
+        UUID store = stores.add(id, Stores.Channel.NAVER, "복구 스토어");
+        SessionTokens.Issued before = sessions.issue(id);
+        jdbc.sql("update seller_accounts set email_verified_at = current_timestamp where id = ?").param(id).update();
+
+        String plain = accounts.issueInvite(email);
+        assertThat(org.assertj.core.api.Assertions.catchThrowableOfType(() -> accounts.redeem(plain, "whatever long one"),
+                SellerAccounts.RedeemException.class).failure())
+                .as("an ordinary invite never redeems into an existing address")
+                .isEqualTo(SellerAccounts.RedeemFailure.ALREADY_REGISTERED);
+
+        UUID pc = linkedPc(id);
+        assertThat(run("recover-seller", email)).isZero();
+        assertThat(output()).contains("install " + pc + " · Seller Mac");
+        String code = joinCode();
+        assertThat(accounts.invite(code)).hasValue(new SellerAccounts.Invite(email, true));
+        assertThat(accounts.redeem(code, "the second long password")).isEqualTo(id);
+        assertThat(accounts.login(email, "the first long password")).isEmpty();
+        assertThat(accounts.login(email, "the second long password")).hasValue(id);
+        assertThat(stores.ofAccount(id)).extracting(Stores.View::id).containsExactly(store);
+        assertThat(sessions.verifyAny(before.token()).filter(revocations::live)).as("ended").isEmpty();
+        assertThat(sessions.verifyAny(sessions.issue(id).token()).filter(revocations::live)).isPresent();
+        assertThat(installs.list(id)).as("PCs stay; the operator reviews them").hasSize(1);
+        assertThat(verified(id)).as("same address, still proven").isTrue();
+
+        String moved = "ops-rec-new-" + UUID.randomUUID() + "@example.com";
+        assertThat(run("recover-seller", email, moved)).isZero();
+        accounts.redeem(joinCode(), "the third long password");
+        assertThat(accounts.emailOf(id)).hasValue(moved);
+        assertThat(verified(id)).as("a new address proves itself with a code first").isFalse();
+
+        String taken = "ops-rec-taken-" + UUID.randomUUID() + "@example.com";
+        accounts.redeem(accounts.issueInvite(taken), "someone else's password");
+        assertThat(run("recover-seller", moved, taken)).isEqualTo(2);
+        assertThat(lastLine()).isEqualTo("that address belongs to another account");
+        assertThat(run("recover-seller", "nobody-" + UUID.randomUUID() + "@example.com")).isEqualTo(1);
+
+        assertThat(run("installs", moved)).isZero();
+        assertThat(run("revoke-install", taken, pc.toString())).as("not that account's PC").isEqualTo(1);
+        assertThat(run("revoke-install", moved, pc.toString())).isZero();
+        assertThat(installs.list(id)).isEmpty();
+        assertThat(run("installs", moved)).isZero();
+        assertThat(lastLine()).isEqualTo("no linked PCs");
+    }
+
+    @Test
     void withoutAPublicAddressTheJoinLinkIsPrintedAsAPath() {
-        services = new OpsCommands.Services(accounts, delegates, stores, revocations, retention, tasks, "");
+        services = new OpsCommands.Services(accounts, delegates, stores, revocations, retention, tasks, installs, "");
         assertThat(run("invite-delegate", "ops-path-" + UUID.randomUUID() + "@example.com")).isZero();
         String path = lastWord();
         assertThat(path).startsWith("/delegate/join#");
@@ -193,7 +243,7 @@ class OpsCommandsTest {
     void purgeRunsOneRetentionPassAndPrintsCountsOnly() {
         assertThat(run("purge")).isZero();
         assertThat(out.toString(StandardCharsets.UTF_8).trim())
-                .isEqualTo("deleted: reviews 0 · tasks 0 · invites 0 · logged-out sessions 0");
+                .isEqualTo("deleted: reviews 0 · tasks 0 · invites 0 · logged-out sessions 0 · step-up codes 0");
     }
 
     private int run(String... args) {
@@ -203,6 +253,29 @@ class OpsCommandsTest {
     private String lastWord() {
         String printed = out.toString(StandardCharsets.UTF_8).trim();
         return printed.substring(printed.lastIndexOf(' ') + 1);
+    }
+
+    private UUID linkedPc(UUID account) {
+        byte[] raw = new byte[32];
+        for (int i = 0; i < raw.length; i++) {
+            raw[i] = (byte) (i + 1);
+        }
+        String key = java.util.Base64.getEncoder().encodeToString(raw);
+        com.sellerops.vendor.install.InstallGrants.Issued grant = installs.start("Seller Mac", "0.1.0", key);
+        installs.approve(account, grant.userCode());
+        return installs.redeem(grant.deviceCode()).redeemed().installId();
+    }
+
+    private boolean verified(UUID account) {
+        return jdbc.sql("select count(*) from seller_accounts where id = ? and email_verified_at is not null")
+                .param(account).query(Integer.class).single() == 1;
+    }
+
+    private String joinCode() {
+        String printed = output();
+        int at = printed.lastIndexOf("/join#");
+        int end = printed.indexOf('\n', at);
+        return printed.substring(at + "/join#".length(), end < 0 ? printed.length() : end).trim();
     }
 
     private String output() {

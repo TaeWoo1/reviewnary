@@ -35,7 +35,8 @@ public class AuthController {
 
     public record PeekRequest(@NotBlank String inviteCode) {}
 
-    public record PeekResponse(String email) {}
+    /** {@code recovery}: the invite sets a new password on an existing account instead of making one. */
+    public record PeekResponse(String email, boolean recovery) {}
 
     /**
      * A new account's session, and where its phone approval page is — the join page shows that address and its QR
@@ -63,8 +64,8 @@ public class AuthController {
     /** Which account an invite makes, before the password is chosen. The code itself is the credential. */
     @PostMapping("/invites/peek")
     public ResponseEntity<?> peek(@RequestBody @Valid PeekRequest request) {
-        return accounts.inviteEmail(request.inviteCode())
-                .<ResponseEntity<?>>map(email -> ResponseEntity.ok(new PeekResponse(email)))
+        return accounts.invite(request.inviteCode())
+                .<ResponseEntity<?>>map(invite -> ResponseEntity.ok(new PeekResponse(invite.email(), invite.recovery())))
                 .orElseGet(() -> ResponseEntity.badRequest().body(Map.of("error", "invalid_invite")));
     }
 

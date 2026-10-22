@@ -94,7 +94,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/v1/installs/me").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.GET, "/link", "/link/*", "/replies", "/replies/*", "/delegate",
                                 "/delegate/*", "/join", "/join/*", "/assets/*").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/v1/installs/pending", "/v1/installs/approve").hasRole(SELLER)
+                        .requestMatchers(HttpMethod.POST, "/v1/installs/pending", "/v1/installs/approve",
+                                "/v1/installs/step-up", "/v1/installs/step-up/verify").hasRole(SELLER)
                         .requestMatchers(HttpMethod.GET, "/v1/installs").hasRole(SELLER)
                         .requestMatchers(HttpMethod.DELETE, "/v1/installs/*").hasRole(SELLER)
                         .requestMatchers(HttpMethod.GET, "/v1/stores").hasAnyRole(SELLER, INSTALL)

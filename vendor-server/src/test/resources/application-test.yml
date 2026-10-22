@@ -14,3 +14,6 @@ vendor:
   # The retention pass runs on the real clock; tests drive Retention with their own and turn the schedule off.
   retention:
     enabled: false
+  # Step-up codes and new-PC notices land in the in-memory outbox, where tests read them.
+  mail:
+    mode: dev-outbox

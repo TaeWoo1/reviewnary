@@ -21,7 +21,7 @@
   function pretty(c) { return c.length === 8 ? c.slice(0, 4) + "-" + c.slice(4) : c; }
 
   function show(view) {
-    ["login", "code", "confirm", "done"].forEach(function (v) { $("view-" + v).hidden = v !== view; });
+    ["login", "code", "confirm", "stepup", "done"].forEach(function (v) { $("view-" + v).hidden = v !== view; });
   }
 
   function say(id, text) { var el = $(id); el.textContent = text; el.hidden = !text; }
@@ -105,8 +105,70 @@
     $("allow").disabled = normalize($("retype-input").value) !== code;
   });
 
+  // Linking a PC takes a code mailed to the account (§2 추가 인증): asked for here, entered below, spent by the one
+  // approval that follows. The code is for this PC and this page's session only.
+  var STEP_UP = {
+    mail_off: "메일 발송이 아직 설정되지 않아 지금은 PC를 연결할 수 없습니다. reviewnary 운영자에게 알려 주세요.",
+    mail_failed: "코드 메일을 보내지 못했습니다. 잠시 후 「코드 다시 받기」를 누르세요.",
+    too_many: "코드를 너무 많이 요청했습니다. 잠시 뒤 PC 화면에서 연결을 다시 시작하세요.",
+    locked: "틀린 코드가 많아 이 연결 요청을 막았습니다. 직접 요청한 연결이 아니라면 reviewnary 운영자에게 알려 주세요.",
+    expired: "코드 시간이 지났습니다. 「코드 다시 받기」를 누르세요."
+  };
+
+  function sendCode() {
+    say("stepup-error", "");
+    call("/v1/installs/step-up", { userCode: code }).then(function (r) {
+      if (r.status === 200) {
+        $("stepup-to").textContent = r.json.sentTo || "";
+        $("stepup-code").value = "";
+        show("stepup");
+        $("stepup-code").focus();
+      } else if (r.status === 401) {
+        session = null; show("login");
+      } else if (r.status === 404) {
+        finish("bad", "코드를 찾지 못했습니다.", "코드가 만료됐거나 이미 사용됐습니다. PC 화면에서 연결을 다시 시작해 주세요.");
+      } else if (r.json && STEP_UP[r.json.error]) {
+        show("stepup");
+        say("stepup-error", STEP_UP[r.json.error]);
+      } else {
+        unreachable();
+      }
+    }, unreachable);
+  }
+
   $("allow").addEventListener("click", function () {
     $("allow").disabled = true;
+    sendCode();
+  });
+
+  $("stepup-resend").addEventListener("click", sendCode);
+
+  $("stepup-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var typed = $("stepup-code").value.replace(/\s/g, "");
+    if (!/^[0-9]{6}$/.test(typed)) { say("stepup-error", "이메일의 6자리 숫자를 입력하세요."); return; }
+    say("stepup-error", "");
+    $("stepup-submit").disabled = true;
+    call("/v1/installs/step-up/verify", { userCode: code, code: typed }).then(function (r) {
+      $("stepup-submit").disabled = false;
+      if (r.status === 204) { approve(); return; }
+      if (r.status === 401) { session = null; show("login"); return; }
+      if (r.status === 404) {
+        finish("bad", "코드를 찾지 못했습니다.", "PC 연결 요청이 만료됐습니다. PC 화면에서 연결을 다시 시작해 주세요.");
+        return;
+      }
+      var err = r.json && r.json.error;
+      if (err === "wrong_code") {
+        say("stepup-error", "코드가 맞지 않습니다. " + r.json.left + "번 더 틀리면 이 연결 요청을 막습니다.");
+      } else if (STEP_UP[err]) {
+        say("stepup-error", STEP_UP[err]);
+      } else {
+        unreachable();
+      }
+    }, function () { $("stepup-submit").disabled = false; unreachable(); });
+  });
+
+  function approve() {
     call("/v1/installs/approve", { userCode: code }).then(function (r) {
       if (r.status === 200) {
         finish("good", "PC를 연결했습니다.", "이 탭을 닫고 reviewnary 화면으로 돌아가세요. 연결은 자동으로 이어집니다.");
@@ -114,11 +176,14 @@
         session = null; show("login");
       } else if (r.status === 404) {
         finish("bad", "코드를 찾지 못했습니다.", "코드가 만료됐거나 이미 사용됐습니다. PC 화면에서 연결을 다시 시작해 주세요.");
+      } else if (r.status === 403) {
+        say("stepup-error", "이메일 코드 확인이 끝나지 않았습니다. 「코드 다시 받기」를 누르세요.");
+        show("stepup");
       } else {
         unreachable();
       }
     }, unreachable);
-  });
+  }
 
   $("cancel").addEventListener("click", function () {
     finish("", "연결을 허용하지 않았습니다.", "이 탭을 닫아도 됩니다. 요청한 코드는 10분 뒤 사라집니다.");

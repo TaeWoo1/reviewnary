@@ -3,6 +3,7 @@ package com.sellerops.vendor;
 import com.sellerops.vendor.account.SellerAccounts;
 import com.sellerops.vendor.auth.SessionRevocations;
 import com.sellerops.vendor.delegate.Delegates;
+import com.sellerops.vendor.install.Installs;
 import com.sellerops.vendor.ops.OpsCommands;
 import com.sellerops.vendor.retention.Retention;
 import com.sellerops.vendor.store.Stores;
@@ -32,7 +33,7 @@ public class VendorServerApplication {
                 code = OpsCommands.run(new OpsCommands.Services(context.getBean(SellerAccounts.class),
                         context.getBean(Delegates.class), context.getBean(Stores.class),
                         context.getBean(SessionRevocations.class), context.getBean(Retention.class),
-                        context.getBean(ReplyTasks.class),
+                        context.getBean(ReplyTasks.class), context.getBean(Installs.class),
                         context.getEnvironment().getProperty("vendor.public-url", "")), args, System.out);
             }
             System.exit(code);

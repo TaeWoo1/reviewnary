@@ -39,8 +39,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
  */
 public class BearerAuthFilter extends OncePerRequestFilter {
 
-    /** Who is asking. {@code installId} is null for a seller session. */
-    public record Principal(UUID accountId, UUID installId) {
+    /**
+     * Who is asking. {@code installId} is null for a seller session; {@code sessionId} (the session's {@code jti}) is
+     * null for an install — a step-up is bound to the one session that passed it ({@link StepUps}).
+     */
+    public record Principal(UUID accountId, UUID installId, String sessionId) {
         public static final String SELLER = "ROLE_SELLER";
         public static final String INSTALL = "ROLE_INSTALL";
     }
@@ -75,7 +78,7 @@ public class BearerAuthFilter extends OncePerRequestFilter {
         }
         String bearer = header.substring(7).trim();
         Optional<UsernamePasswordAuthenticationToken> auth = InstallTokens.looksLikeInstallToken(bearer)
-                ? installs.authenticate(bearer).map(i -> token(new Principal(i.accountId(), i.installId()),
+                ? installs.authenticate(bearer).map(i -> token(new Principal(i.accountId(), i.installId(), null),
                         Principal.INSTALL))
                 : sessions.verifyAny(bearer).filter(revocations::live).flatMap(this::session);
         if (auth.isEmpty()) {
@@ -90,7 +93,7 @@ public class BearerAuthFilter extends OncePerRequestFilter {
         UUID subject = session.subject();
         return switch (session.kind()) {
             case SELLER -> Optional.of(subject).filter(accounts::isActive)
-                    .map(id -> token(new Principal(id, null), Principal.SELLER));
+                    .map(id -> token(new Principal(id, null, session.id()), Principal.SELLER));
             case DELEGATE -> delegates.active(subject)
                     .map(d -> token(new DelegatePrincipal(d.id(), d.role() == Delegates.Role.ADMIN),
                             DelegatePrincipal.DELEGATE));

@@ -24,8 +24,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  *       and either its no-reply retention ran out ({@code purge_after}, D4) or it had tasks and none is left that
  *       young. Whichever of the two comes later wins. A review nobody has decided about — no task, no "no reply" —
  *       is work in progress and is never deleted here.</li>
- *   <li>Expired invites (they hold an address and, for delegates, a staged password and TOTP secret), and logged-out
- *       sessions past their expiry.</li>
+ *   <li>Expired invites (they hold an address and, for delegates, a staged password and TOTP secret), logged-out
+ *       sessions past their expiry, and step-up codes a day old (their caps look back an hour, §2).</li>
  * </ul>
  *
  * <p>What a deleted review leaves behind is its id and the hash of its 리뷰글번호 ({@code purged_reviews}), so the
@@ -52,7 +52,10 @@ public class Retention {
             + "and ((r.purge_after is not null and r.purge_after <= :now) "
             + "or (r.purge_after is null and exists (select 1 from reply_tasks t where t.review_id = r.id)))";
 
-    public record Purged(int reviews, int tasks, int invites, int sessions) {}
+    public record Purged(int reviews, int tasks, int invites, int sessions, int stepUps) {}
+
+    /** How long a step-up code row is kept: past its ten minutes and the hour its caps count over. */
+    static final java.time.Duration STEP_UP_RETENTION = java.time.Duration.ofDays(1);
 
     private final JdbcClient jdbc;
     private final TransactionTemplate tx;
@@ -95,10 +98,13 @@ public class Retention {
                 + jdbc.sql("delete from delegate_invites where expires_at <= ?").param(Timestamp.from(now)).update());
         Integer sessions = tx.execute(s -> jdbc.sql("delete from revoked_sessions where expires_at < ?")
                 .param(Timestamp.from(now)).update());
-        Purged purged = new Purged(reviews, tasks, invites == null ? 0 : invites, sessions == null ? 0 : sessions);
+        Integer stepUps = tx.execute(s -> jdbc.sql("delete from step_up_codes where issued_at < ?")
+                .param(Timestamp.from(now.minus(STEP_UP_RETENTION))).update());
+        Purged purged = new Purged(reviews, tasks, invites == null ? 0 : invites, sessions == null ? 0 : sessions,
+                stepUps == null ? 0 : stepUps);
         // Counts only — what was deleted is not written anywhere.
-        log.info("retention: deleted reviews={} tasks={} invites={} sessions={}", purged.reviews(), purged.tasks(),
-                purged.invites(), purged.sessions());
+        log.info("retention: deleted reviews={} tasks={} invites={} sessions={} stepUps={}", purged.reviews(),
+                purged.tasks(), purged.invites(), purged.sessions(), purged.stepUps());
         return purged;
     }
 

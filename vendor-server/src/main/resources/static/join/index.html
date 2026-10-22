@@ -21,13 +21,14 @@
     </section>
 
     <section id="view-password" class="stack" hidden>
-      <h1>reviewnary 판매자 가입</h1>
+      <h1 id="password-title">reviewnary 판매자 가입</h1>
       <form id="password-form" class="card stack8" novalidate>
         <div class="inset stack8">
-          <p class="xs muted">초대받은 계정</p>
+          <p id="invited-label" class="xs muted">초대받은 계정</p>
           <p id="invited" class="strong"></p>
         </div>
         <p class="sm">이 계정의 비밀번호를 정하세요. 이 비밀번호로 PC 연결을 허용하고, 휴대폰에서 답글을 승인합니다.</p>
+        <p id="recovery-note" class="sm" hidden>계정 복구입니다. 새 비밀번호를 정하면 이 계정의 다른 로그인은 모두 끝납니다. 스토어와 기록, 연결된 PC는 그대로입니다.</p>
         <label for="password">비밀번호 (10자 이상)</label>
         <input id="password" type="password" autocomplete="new-password" required>
         <label for="password2">비밀번호 확인</label>
@@ -39,7 +40,7 @@
     </section>
 
     <section id="view-done" class="stack" hidden>
-      <div class="row"><h1>가입했습니다</h1><span id="done-email" class="chip good"></span></div>
+      <div class="row"><h1 id="done-title">가입했습니다</h1><span id="done-email" class="chip good"></span></div>
       <div class="card stack">
         <div class="step"><span class="num">1</span>
           <div class="stack8 grow">

@@ -29,6 +29,13 @@ vendor:
   session:
     # HS256 key for seller sessions — at least 32 characters, required; SessionTokens refuses to start without it.
     secret: ${VENDOR_SESSION_SECRET:}
+  mail:
+    # smtp (spring.mail.* / SPRING_MAIL_HOST… — the server refuses to start without a host) | dev-outbox (mails, one-time
+    # codes included, go to THIS LOG — local runs only) | off (default: nothing is sent, so no new PC can be linked).
+    mode: ${VENDOR_MAIL_MODE:off}
+    from: ${VENDOR_MAIL_FROM:no-reply@localhost}
+    # Where a seller's reply to a new-PC notice goes — the operator. Optional.
+    reply-to: ${VENDOR_MAIL_REPLY_TO:}
   totp:
     # AES-256 key (base64, 32 bytes) that seals delegates' TOTP secrets — required; TotpSecretBox refuses to start
     # without it. Separate from the session key: one leaking does not give the other.

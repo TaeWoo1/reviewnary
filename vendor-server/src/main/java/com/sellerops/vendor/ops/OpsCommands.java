@@ -4,6 +4,7 @@ import com.sellerops.vendor.account.SellerAccounts;
 import com.sellerops.vendor.auth.SessionRevocations;
 import com.sellerops.vendor.auth.SessionTokens;
 import com.sellerops.vendor.delegate.Delegates;
+import com.sellerops.vendor.install.Installs;
 import com.sellerops.vendor.retention.Retention;
 import com.sellerops.vendor.store.Stores;
 import com.sellerops.vendor.task.ReplyTasks;
@@ -24,6 +25,9 @@ import java.util.UUID;
  *   java -jar vendor-server.jar suspend seller@example.com             # ends its sessions and installs at the next request
  *   java -jar vendor-server.jar reinstate seller@example.com
  *   java -jar vendor-server.jar end-sessions someone@example.com       # signs them out everywhere; the account stays
+ *   java -jar vendor-server.jar recover-seller seller@example.com [new@example.com]  # recovery link; same account
+ *   java -jar vendor-server.jar installs seller@example.com            # the seller's linked PCs
+ *   java -jar vendor-server.jar revoke-install seller@example.com &lt;install-id&gt;
  *   java -jar vendor-server.jar invite-delegate me@example.com [admin] # prints the delegate's join link once
  *   java -jar vendor-server.jar suspend-delegate me@example.com        # ends sessions and every store assignment
  *   java -jar vendor-server.jar reinstate-delegate me@example.com      # the account only; assign stores again
@@ -48,7 +52,8 @@ public final class OpsCommands {
 
     public static final Set<String> NAMES = Set.of("invite", "suspend", "reinstate", "end-sessions",
             "invite-delegate", "suspend-delegate", "reinstate-delegate", "add-store", "assign", "unassign", "purge",
-            "in-doubt", "settle", "checklist", "check-owner", "check-assignment");
+            "in-doubt", "settle", "checklist", "check-owner", "check-assignment", "recover-seller", "installs",
+            "revoke-install");
 
     static final String USAGE = "usage: invite|suspend|reinstate|end-sessions <email> · "
             + "invite-delegate <email> [admin] · "
@@ -56,7 +61,8 @@ public final class OpsCommands {
             + "assign|unassign <delegate-email> <store-id> · purge · in-doubt · "
             + "settle <task-id> posted|not-posted <admin-email> · checklist · "
             + "check-owner <store-id> seller-center-screen|submanager-invite <admin-email> · "
-            + "check-assignment <delegate-email> <store-id> <admin-email>";
+            + "check-assignment <delegate-email> <store-id> <admin-email> · "
+            + "recover-seller <email> [new-email] · installs <seller-email> · revoke-install <seller-email> <install-id>";
 
     /** The page a delegate's invite link opens; the code follows {@code #}. */
     public static final String JOIN_PATH = "/delegate/join#";
@@ -66,7 +72,8 @@ public final class OpsCommands {
 
     /** The services the commands act on, and the server's public address ({@code ""} when not set). */
     public record Services(SellerAccounts accounts, Delegates delegates, Stores stores,
-                           SessionRevocations revocations, Retention retention, ReplyTasks tasks, String publicUrl) {}
+                           SessionRevocations revocations, Retention retention, ReplyTasks tasks, Installs installs,
+                           String publicUrl) {}
 
     private OpsCommands() {
     }
@@ -76,7 +83,8 @@ public final class OpsCommands {
         if (args.length == 1 && "purge".equals(args[0])) {
             Retention.Purged purged = services.retention().purge();
             out.println("deleted: reviews " + purged.reviews() + " · tasks " + purged.tasks() + " · invites "
-                    + purged.invites() + " · logged-out sessions " + purged.sessions());
+                    + purged.invites() + " · logged-out sessions " + purged.sessions() + " · step-up codes "
+                    + purged.stepUps());
             return 0;
         }
         if (args.length == 1 && "in-doubt".equals(args[0])) {
@@ -94,9 +102,18 @@ public final class OpsCommands {
         if (args.length == 4 && "check-assignment".equals(args[0])) {
             return checkAssignment(services, args, out);
         }
+        if ((args.length == 2 || args.length == 3) && "recover-seller".equals(args[0])) {
+            return recoverSeller(services, args, out);
+        }
+        if (args.length == 2 && "installs".equals(args[0])) {
+            return sellerInstalls(services, args[1], out);
+        }
+        if (args.length == 3 && "revoke-install".equals(args[0])) {
+            return revokeInstall(services, args, out);
+        }
         if (args.length < 2 || !NAMES.contains(args[0])
-                || Set.of("purge", "in-doubt", "settle", "checklist", "check-owner", "check-assignment")
-                        .contains(args[0])) {
+                || Set.of("purge", "in-doubt", "settle", "checklist", "check-owner", "check-assignment",
+                        "recover-seller", "installs", "revoke-install").contains(args[0])) {
             out.println(USAGE);
             return 2;
         }
@@ -334,6 +351,65 @@ public final class OpsCommands {
         }
     }
 
+    /**
+     * A seller who lost their mailbox or password — after the operator has checked who is asking, outside this
+     * server. Prints a recovery link for the same account (to the new address when given) and the account's PCs, to
+     * review: a PC the seller does not recognise is revoked with {@code revoke-install}.
+     */
+    private static int recoverSeller(Services services, String[] args, PrintStream out) {
+        Optional<UUID> account = services.accounts().idOf(args[1]);
+        if (account.isEmpty()) {
+            out.println("no such account");
+            return 1;
+        }
+        String newEmail = args.length == 3 ? args[2] : null;
+        int printed = link(services, out, () -> {
+            try {
+                return services.accounts().issueRecovery(account.get(), newEmail);
+            } catch (IllegalStateException e) {
+                throw new IllegalArgumentException("address in use");
+            }
+        }, SellerAccounts.INVITE_LIFETIME.toDays(), SELLER_JOIN_PATH);
+        if (printed != 0) {
+            return printed;
+        }
+        out.println("redeeming it sets a new password on the same account and ends its sessions; stores, tasks and "
+                + "PCs stay. Review the PCs:");
+        return sellerInstalls(services, args[1], out);
+    }
+
+    private static int sellerInstalls(Services services, String email, PrintStream out) {
+        Optional<UUID> account = services.accounts().idOf(email);
+        if (account.isEmpty()) {
+            out.println("no such account");
+            return 1;
+        }
+        List<Installs.View> pcs = services.installs().list(account.get());
+        if (pcs.isEmpty()) {
+            out.println("no linked PCs");
+        }
+        for (Installs.View pc : pcs) {
+            out.println("install " + pc.id() + " · " + pc.deviceName() + " · linked " + pc.createdAt()
+                    + " · last used " + (pc.lastUsedAt() == null ? "never" : pc.lastUsedAt()));
+        }
+        return 0;
+    }
+
+    private static int revokeInstall(Services services, String[] args, PrintStream out) {
+        Optional<UUID> account = services.accounts().idOf(args[1]);
+        Optional<UUID> install = uuid(args[2]);
+        if (install.isEmpty()) {
+            out.println("not an install id");
+            return 2;
+        }
+        if (account.isEmpty()) {
+            out.println("no such account");
+            return 1;
+        }
+        return done(out, services.installs().revoke(account.get(), install.get()), "revoked",
+                "no such install of that account");
+    }
+
     private interface CodeIssuer {
         String issue();
     }
@@ -349,7 +425,8 @@ public final class OpsCommands {
         try {
             code = issuer.issue();
         } catch (IllegalArgumentException e) {
-            out.println("not an e-mail address");
+            out.println("address in use".equals(e.getMessage()) ? "that address belongs to another account"
+                    : "not an e-mail address");
             return 2;
         }
         String base = services.publicUrl() == null ? "" : services.publicUrl().strip().replaceAll("/+$", "");

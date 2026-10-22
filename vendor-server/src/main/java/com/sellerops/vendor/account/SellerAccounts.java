@@ -22,6 +22,12 @@ import org.springframework.transaction.annotation.Transactional;
  * {@link com.sellerops.vendor.ops.OpsCommands}); the seller redeems it once, choosing a password; from then on the
  * account logs in. Suspension is a status, read on every authenticated request (sessions and installs alike), so it
  * takes effect on the next request and lifting it restores the same installs.
+ *
+ * <p><b>Recovery</b> (contract §2): a seller who lost their mailbox or password is not invited again — an invite never
+ * redeems into an address that already has an account. The operator, having checked who is asking, issues a recovery
+ * invite tied to the existing account ({@link #issueRecovery}); redeeming it sets a new password (and the new address,
+ * if one was given) on that same account and ends its sessions. Stores, tasks and PC links stay; the operator reviews
+ * the PCs separately. A changed address is unverified again until a step-up code reaches it.
  */
 @Service
 public class SellerAccounts {
@@ -32,6 +38,9 @@ public class SellerAccounts {
     private static final Pattern EMAIL = Pattern.compile("[^@\\s]{1,64}@[^@\\s]{1,189}\\.[^@\\s]{2,}");
 
     public enum Status { ACTIVE, SUSPENDED }
+
+    /** What an invite is for: a new account, or a recovery of {@code accountId}'s. */
+    public record Invite(String email, boolean recovery) {}
 
     /** Why a redemption did not create an account. One message per case the seller can act on. */
     public enum RedeemFailure { INVALID_INVITE, WEAK_PASSWORD, ALREADY_REGISTERED }
@@ -85,14 +94,43 @@ public class SellerAccounts {
     }
 
     /**
+     * A recovery invite for an existing account, to its current address or to {@code rawNewEmail}. Throws
+     * {@link IllegalArgumentException} for a malformed address and {@link IllegalStateException} when the new address
+     * already belongs to another account.
+     */
+    @Transactional
+    public String issueRecovery(UUID accountId, String rawNewEmail) {
+        String current = emailOf(accountId).orElseThrow(() -> new IllegalArgumentException("no such account"));
+        String email = rawNewEmail == null || rawNewEmail.isBlank() ? current : normalizeEmail(rawNewEmail);
+        if (!EMAIL.matcher(email).matches()) {
+            throw new IllegalArgumentException("not an e-mail address");
+        }
+        if (!email.equals(current) && idOf(email).isPresent()) {
+            throw new IllegalStateException("address in use");
+        }
+        String code = Codes.newCode();
+        jdbc.sql("insert into seller_invites (code_hash, email, expires_at, account_id) values (?, ?, ?, ?)")
+                .params(Codes.hash(code), email, ts(clock.instant().plus(INVITE_LIFETIME)), accountId)
+                .update();
+        return code;
+    }
+
+    /**
      * The address a still-usable invite was issued to — what the join page shows before anything is decided, so the
      * person sees which account they are about to make. Empty for a spent, expired or unknown code.
      */
     @Transactional(readOnly = true)
     public Optional<String> inviteEmail(String code) {
-        return jdbc.sql("select email from seller_invites where code_hash = ? and redeemed_at is null and expires_at > ?")
+        return invite(code).map(Invite::email);
+    }
+
+    /** {@link #inviteEmail}, and whether the invite recovers an existing account. */
+    @Transactional(readOnly = true)
+    public Optional<Invite> invite(String code) {
+        return jdbc.sql("select email, account_id from seller_invites "
+                        + "where code_hash = ? and redeemed_at is null and expires_at > ?")
                 .params(Codes.hash(code == null ? "" : code.trim()), ts(clock.instant()))
-                .query(String.class)
+                .query((rs, n) -> new Invite(rs.getString("email"), rs.getObject("account_id") != null))
                 .optional();
     }
 
@@ -113,6 +151,11 @@ public class SellerAccounts {
         }
         String email = jdbc.sql("select email from seller_invites where code_hash = ?").param(hash)
                 .query(String.class).single();
+        UUID recovering = jdbc.sql("select account_id from seller_invites where code_hash = ?").param(hash)
+                .query(UUID.class).optional().orElse(null);
+        if (recovering != null) {
+            return recover(recovering, email, password, now);
+        }
         if (jdbc.sql("select count(*) from seller_accounts where email = ?").param(email)
                 .query(Integer.class).single() > 0) {
             throw new RedeemException(RedeemFailure.ALREADY_REGISTERED);
@@ -122,6 +165,23 @@ public class SellerAccounts {
                 .params(id, email, passwords.encode(password), Status.ACTIVE.name(), ts(now))
                 .update();
         return id;
+    }
+
+    /**
+     * The recovery half of {@link #redeem}: the same account, a new password, the invite's address. Its sessions end —
+     * every one issued before this moment; the session the join page gets next is issued after it.
+     */
+    private UUID recover(UUID accountId, String email, String password, Instant now) {
+        if (jdbc.sql("select count(*) from seller_accounts where email = ? and id <> ?").params(email, accountId)
+                .query(Integer.class).single() > 0) {
+            throw new RedeemException(RedeemFailure.ALREADY_REGISTERED);
+        }
+        jdbc.sql("update seller_accounts set password_hash = ?, "
+                        + "email_verified_at = case when email = ? then email_verified_at else null end, email = ?, "
+                        + "sessions_not_before = ? where id = ?")
+                .params(passwords.encode(password), email, email, ts(now.minusMillis(1)), accountId)
+                .update();
+        return accountId;
     }
 
     /** The account a correct, active login names; empty for every failure alike. */

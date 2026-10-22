@@ -57,6 +57,14 @@
     post("/v1/auth/invites/peek", { inviteCode: code }).then(function (r) {
       if (r.status === 200 && r.json && r.json.email) {
         $("invited").textContent = r.json.email;
+        if (r.json.recovery === true) {
+          // A recovery invite: the same account, a new password — never a second account.
+          $("password-title").textContent = "reviewnary 계정 복구";
+          $("invited-label").textContent = "복구할 계정";
+          $("recovery-note").hidden = false;
+          $("join").textContent = "새 비밀번호로 정하기";
+          $("done-title").textContent = "비밀번호를 새로 정했습니다";
+        }
         say("password-error", "");
         show("password");
         $("password").focus();
