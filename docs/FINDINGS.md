@@ -508,6 +508,21 @@
 - **출처** — 2026-10-22, `ReplyTasksTest.aRepeatedReportIsAnsweredOnlyToTheClaimerWhileTheStoreIsStillTheirs`가
   되돌린 뒤에도 실패 → `clean` 뒤 112건 통과. `CLAUDE.md` "검사 도구의 실패" 4번(양방향 증명)을 잇는다.
 
+### B20. 통과한 테스트가 구별해야 할 경우를 만들지 않으면, 고친 줄을 지워도 초록이다
+
+- **했던 것** — 2026-10-22 시안 보완을 구현하며 새 테스트를 썼다: "담당자가 활동 중인 `UNKNOWN`은 운영자가 종결할 수
+  없다", "「리뷰 받기 시작」은 이름 받은 스토어만 묶는다". 둘 다 통과했다.
+- **사실** — 고친 줄을 되돌려도 둘 다 통과했다. 첫째는 활동 중인 담당자의 작업을 `UNKNOWN`이 되기 **전**(`CLAIMED`)에
+  시험해, 상태 조건만으로 거절됐다. 둘째는 시작할 때 서버에 스토어가 **하나뿐**이라 "이름 받은 것만"과 "전부"가 같았다.
+  같은 날 단위 테스트를 다 통과한 화면이 실제 서버로 돌리자 결과 문구("새 리뷰 6건")와 스토어 목록("아직 받지 않음")이
+  어긋나 보였다 — 문구를 먼저 그리고 목록을 나중에 다시 읽었는데, 가짜 API는 즉시 답해 그 틈이 없었다.
+- **다음에** — 조건을 하나 더한 코드는 **그 조건만 다른 두 입력**으로 시험한다(같은 상태 · 다른 담당자 상태, 같은 서버 ·
+  이름 없는 스토어 하나 더). 두 응답을 이어 그리는 화면은 둘 다 받은 뒤 함께 반영하고, 테스트는 문구가 보이는 그 순간의
+  목록을 단언한다. 새 테스트도 변형 증명 전에는 증거가 아니다.
+- **출처** — 2026-10-22, `ReplyTasksTest.anAdminSettlesASuspendedDelegatesInDoubtTaskAndNothingElse` ·
+  `VendorReviewPullScenarios.onlyTheStoresShownAreStartedAndALaterStoreWaitsToBeShown`(변형 생존 → 입력 보강 → 실패 확인),
+  `VendorReviewsSection`(실제 서버 e2e에서 발견, 순서 변형으로 고정).
+
 ---
 
 ## C. 증거 · 계약
