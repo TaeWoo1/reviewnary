@@ -23,6 +23,9 @@ public interface ProductKnowledgeChunkRepository extends JpaRepository<ProductKn
 
     void deleteAllBySourceId(UUID sourceId);
 
+    /** One document's passages as they stand — what a recheck compares a cited passage against. */
+    List<ProductKnowledgeChunk> findAllBySourceId(UUID sourceId);
+
     /** How many passages one document produced — the 자료 list's honest 「찾을 수 있는가」. */
     int countBySourceId(UUID sourceId);
 }

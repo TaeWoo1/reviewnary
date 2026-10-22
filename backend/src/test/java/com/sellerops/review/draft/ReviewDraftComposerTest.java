@@ -245,7 +245,9 @@ class ReviewDraftComposerTest {
         assertThat(view.evidence().get(0).kind()).isEqualTo("PRODUCT_KNOWLEDGE");
         assertThat(view.evidence().get(0).scopeLabel()).isEqualTo("상품 정보");
         assertThat(view.evidence().get(0).snippet()).contains("먼지와 기름기");
-        verify(evidence).save(any(ReviewDraftEvidence.class));
+        verify(evidence).save(org.mockito.ArgumentMatchers.argThat((ReviewDraftEvidence row) ->
+                ReviewDraftEvidence.fingerprintOf("표면의 먼지와 기름기를 닦아낸 뒤 눌러 붙여 주세요.")
+                        .equals(row.getPassageFingerprint())));
         // The product lane answered, so there is nothing to ask for.
         assertThat(view.knowledgeGaps()).isEmpty();
     }

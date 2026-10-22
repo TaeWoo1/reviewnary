@@ -88,6 +88,7 @@ abstract class VendorReplyTaskScenarios {
     @Autowired ReviewTriageRepository triageRows;
     @Autowired com.sellerops.review.draft.ReviewDraftBasis draftBasis;
     @Autowired com.sellerops.review.draft.ReviewDraftRecheck draftRecheck;
+    @Autowired com.sellerops.knowledge.org.OrgKnowledgeChunkRepository companyRuleChunks;
     @Autowired com.sellerops.knowledge.org.SellerOperationsKnowledgeService companyRules;
     @Autowired com.sellerops.knowledge.org.OrgKnowledgeSourceRepository companyRuleRows;
     @Autowired com.sellerops.review.draft.ReviewDraftEvidenceRepository draftEvidence;
@@ -592,6 +593,69 @@ abstract class VendorReplyTaskScenarios {
             assertThat(r.codes()).containsExactly(com.sellerops.review.draft.ReviewDraftRecheck.SOURCE_CHANGED);
         });
         assertThat(vendor.tasks.get(task).state()).isEqualTo("RECHECK_NEEDED");
+    }
+
+    /* ── stage 2: an edit counts only when it changed the passage the draft used (2026-10-23) ── */
+
+    private static final String SHIPPING = "평일 오후 2시 전 주문은 당일 출고합니다. ".repeat(14).strip();
+    private static final String ISLANDS = "제주와 도서 지역은 배송에 이틀이 더 걸립니다. ".repeat(14).strip();
+
+    /** A two-section shipping rule, and a waiting draft that cites its first section the way the composer does. */
+    private UUID[] draftCitingTheFirstSection(String reviewNo) {
+        var rule = companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.SHIPPING_POLICY, "배송 안내", SHIPPING + "\n\n" + ISLANDS,
+                null), null, "합성 판매자");
+        var chunks = companyRuleChunks.findAllBySourceId(rule.id());
+        assertThat(chunks).as("two sections, two passages").hasSize(2);
+        UUID review = pulledReview("v1", reviewNo, "배송이 빨라요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "오후 2시 전 주문은 당일 출고해 드립니다.", 0);
+        com.sellerops.review.draft.ReviewDraftEvidence cited = new com.sellerops.review.draft.ReviewDraftEvidence();
+        cited.setOrgId(org);
+        cited.setReviewId(review);
+        cited.setDraftVersion(drafts.currentVersion(review));
+        cited.setOrdinal(0);
+        cited.setKind(com.sellerops.inquiry.draft.InquiryDraftEvidence.KIND_ORG_POLICY);
+        cited.setSourceId(rule.id());
+        cited.setChunkId(chunks.get(0).getId());
+        cited.setTitle("배송 안내");
+        cited.setPassageFingerprint(com.sellerops.review.draft.ReviewDraftEvidence.fingerprintOf(
+                chunks.stream().filter(c -> c.getContent().startsWith("평일")).findFirst().orElseThrow().getContent()));
+        draftEvidence.save(cited);
+        return new UUID[] {rule.id(), review, vendorTaskOf(tasks.requestApproval(org, review))};
+    }
+
+    @Test
+    void anEditToAnotherSectionOfTheCitedDocumentDoesNotSendTheDraftBack() throws Exception {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        UUID[] ids = draftCitingTheFirstSection("9100000315");
+
+        Thread.sleep(5);
+        companyRules.update(org, ids[0], new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.SHIPPING_POLICY, "배송 안내",
+                SHIPPING + "\n\n" + ISLANDS.replace("이틀이", "사흘이"), null));
+        pull.pullFor(org);
+
+        assertThat(vendor.rechecks).as("the passage it used is word for word as it was").isEmpty();
+        assertThat(vendor.tasks.get(ids[2]).state()).isEqualTo("AWAITING_APPROVAL");
+    }
+
+    @Test
+    void anEditToTheCitedSectionStillSendsTheDraftBack() throws Exception {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        UUID[] ids = draftCitingTheFirstSection("9100000316");
+
+        Thread.sleep(5);
+        companyRules.update(org, ids[0], new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.SHIPPING_POLICY, "배송 안내",
+                SHIPPING.replace("오후 2시", "오전 11시") + "\n\n" + ISLANDS, null));
+        pull.pullFor(org);
+
+        assertThat(vendor.rechecks).singleElement().satisfies(r -> {
+            assertThat(r.codes()).containsExactly(com.sellerops.review.draft.ReviewDraftRecheck.SOURCE_CHANGED);
+            assertThat(r.note().sources()).singleElement().satisfies(src -> assertThat(src.title()).isEqualTo("배송 안내"));
+        });
+        assertThat(vendor.tasks.get(ids[2]).state()).isEqualTo("RECHECK_NEEDED");
     }
 
     @Test

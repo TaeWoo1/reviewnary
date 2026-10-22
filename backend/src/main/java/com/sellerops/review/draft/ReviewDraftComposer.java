@@ -360,6 +360,7 @@ public class ReviewDraftComposer {
             row.setChunkId(passage.chunkId());
             row.setTitle(passage.heading());
             row.setLocator(passage.locator());
+            row.setPassageFingerprint(ReviewDraftEvidence.fingerprintOf(passage.text()));
             evidence.save(row);
             views.add(new DraftEvidenceView(InquiryDraftEvidence.kindOf(passage.scope()),
                     passage.scope().labelKo(), passage.heading(), passage.locator(),

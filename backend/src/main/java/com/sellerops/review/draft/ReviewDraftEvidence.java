@@ -67,6 +67,28 @@ public class ReviewDraftEvidence {
     @Column(name = "locator", length = 200)
     private String locator;
 
+    /**
+     * The SHA-256 of the cited passage as the drafter saw it, whitespace folded ({@link #fingerprintOf}) — not the
+     * passage itself, which stays in the seller's document. Null on citations recorded before 2026-10-23 and on past
+     * answers. What lets a recheck tell an edit to the cited passage from an edit elsewhere in the same document.
+     */
+    @Column(name = "passage_fingerprint", length = 64)
+    private String passageFingerprint;
+
+    /** One passage's fingerprint: whitespace runs folded to one space, trimmed, SHA-256 hex. */
+    public static String fingerprintOf(String passage) {
+        if (passage == null) {
+            return null;
+        }
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(passage.replaceAll("\\s+", " ").strip().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(digest);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

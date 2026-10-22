@@ -29,8 +29,11 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <ol>
  *   <li><b>What it was written from is unchanged.</b> When the text is a version written here, every product or
- *       company document that version cited must still exist, be in use, and not have been edited since — else
- *       {@value #SOURCE_CHANGED}. A citation to a past reply is not checked: it was never a fact.</li>
+ *       company document that version cited must still exist and be in use, and the passage it cited must still be
+ *       in it — else {@value #SOURCE_CHANGED}. An edit elsewhere in the same document is not a change to what the
+ *       reply used (stage 2, 2026-10-23: the cited passage's fingerprint is found among the document's passages as
+ *       they stand). A citation recorded before fingerprints were kept is judged by the document's edit time, as
+ *       before. A citation to a past reply is not checked: it was never a fact.</li>
  *   <li><b>It promises nothing the current evidence does not.</b> {@link ReviewClaimGuard} against the evidence the
  *       review finds now, and the seller's own wording for its kind of review — else {@value #UNSUPPORTED_PROMISE}.
  *       This is the only check a text written on the phone can get here: it has no citations of its own.</li>
@@ -71,6 +74,16 @@ public class ReviewDraftRecheck {
     private final ReviewDraftEvidenceRepository evidence;
     private final ProductKnowledgeSourceRepository productSources;
     private final OrgKnowledgeSourceRepository orgSources;
+    /** The documents' passages as they stand; null where a test wires the recheck without them. */
+    private com.sellerops.product.library.ProductKnowledgeChunkRepository productChunks;
+    private com.sellerops.knowledge.org.OrgKnowledgeChunkRepository orgChunks;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setChunks(com.sellerops.product.library.ProductKnowledgeChunkRepository productChunks,
+                          com.sellerops.knowledge.org.OrgKnowledgeChunkRepository orgChunks) {
+        this.productChunks = productChunks;
+        this.orgChunks = orgChunks;
+    }
 
     public ReviewDraftRecheck(ReviewDraftComposer composer, ReviewReplyDraftRepository drafts,
                               ReviewDraftEvidenceRepository evidence, ProductKnowledgeSourceRepository productSources,
@@ -145,7 +158,8 @@ public class ReviewDraftRecheck {
             } else {
                 continue;
             }
-            if (source.isEmpty() || !active || source.get().getUpdatedAt().isAfter(version.getCreatedAt())) {
+            boolean edited = source.isPresent() && source.get().getUpdatedAt().isAfter(version.getCreatedAt());
+            if (source.isEmpty() || !active || (edited && !passageStands(row))) {
                 if (out.size() < MAX_CHANGED) {
                     // A document deleted outright has no title left to show.
                     String title = source.map(ReviewDraftRecheck::title).orElse(null);
@@ -155,6 +169,19 @@ public class ReviewDraftRecheck {
             }
         }
         return out;
+    }
+
+    /** Whether the passage {@code row} cited is still, word for word, one of its document's passages. */
+    private boolean passageStands(ReviewDraftEvidence row) {
+        if (row.getPassageFingerprint() == null || productChunks == null || orgChunks == null) {
+            return false;
+        }
+        java.util.stream.Stream<String> now = InquiryDraftEvidence.KIND_PRODUCT_KNOWLEDGE.equals(row.getKind())
+                ? productChunks.findAllBySourceId(row.getSourceId()).stream()
+                        .map(com.sellerops.product.library.ProductKnowledgeChunk::getContent)
+                : orgChunks.findAllBySourceId(row.getSourceId()).stream()
+                        .map(com.sellerops.knowledge.org.OrgKnowledgeChunk::getContent);
+        return now.map(ReviewDraftEvidence::fingerprintOf).anyMatch(row.getPassageFingerprint()::equals);
     }
 
     private static String title(BaseEntity source) {
