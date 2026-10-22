@@ -146,8 +146,8 @@ export function DecisionRow({
    */
   product?: string | null;
   /**
-   * <b>Why this row stands above the others when that reason is a harm</b> — 「안전 문제」 for a review that reports
-   * one (product-owner decision, 2026-10-22). Drawn before the sentence in {@code bad}, the tone §5 gives a
+   * <b>Why this row stands above the others when that reason is a possible harm</b> — 「안전 관련 확인」 for a review
+   * whose words may report one (product-owner decisions, 2026-10-22 and 2026-10-23). Drawn before the sentence in {@code bad}, the tone §5 gives a
    * negative fact, on its own tint so it reads as a mark and not as the customer's first word.
    */
   alert?: string | null;
@@ -232,8 +232,12 @@ export function DecisionRow({
             <b>Only the Home's reading.</b> The queue's target demotes the state to the provenance line
             below the sentence (2026-10-02): a 104px gutter of tinted marks is the first thing the eye
             lands on down a list of 46, and what the seller came to read is the customers' sentences. */}
-        {leadBadge && !metaBelow ? <span className="w-[104px] shrink-0">{leadBadge}</span> : null}
-        <span className="min-w-0 flex-1">
+        {/* <b>Below `sm` the Home's row stacks</b> (measured at 390×844, 2026-10-23). The lead badge and the
+            right-hand group both hold their width, and at phone width together they left the sentence a
+            column one syllable wide. So under 640px the sentence takes its own line beneath them — the same
+            facts in the same order of reading; at `sm` and up nothing changes. */}
+        {leadBadge && !metaBelow ? <span className="w-[104px] shrink-0 max-sm:w-auto">{leadBadge}</span> : null}
+        <span className={`min-w-0 flex-1 ${metaBelow ? "" : "max-sm:order-last max-sm:basis-full"}`}>
           <span
             className={`block min-w-0 max-w-[62ch] break-keep font-semibold leading-snug text-ink [overflow-wrap:anywhere] ${
               metaBelow ? "text-lg" : "text-sm"
@@ -292,15 +296,23 @@ export function DecisionRow({
           ) : null}
         </span>
         {(metaBelow ? null : meta) || wait ? (
-          <span className={`flex shrink-0 items-start gap-6 text-muted ${metaBelow ? "pt-1 text-sm" : "pt-px text-xs"}`}>
+          <span
+            className={`flex shrink-0 items-start gap-6 text-muted ${
+              metaBelow ? "pt-1 text-sm" : "pt-px text-xs max-sm:ml-auto max-sm:min-w-0 max-sm:shrink max-sm:gap-3"
+            }`}
+          >
             {meta && !metaBelow ? (
-              <span className="whitespace-nowrap" aria-label={star ? `${meta.replace(star, `별점 ${rating}점`)}` : undefined}>
+              <span className="whitespace-nowrap max-sm:min-w-0 max-sm:truncate" aria-label={star ? `${meta.replace(star, `별점 ${rating}점`)}` : undefined}>
                 {meta}
               </span>
             ) : null}
             {/* Fixed width and right-aligned, so the sort key this list is ordered by lines up down the
                 column instead of floating at the end of a variable string. */}
-            {wait ? <span className="w-[88px] shrink-0 whitespace-nowrap text-right tabular-nums">{wait}</span> : null}
+            {wait ? (
+              <span className={`w-[88px] shrink-0 whitespace-nowrap text-right tabular-nums ${metaBelow ? "" : "max-sm:w-auto"}`}>
+                {wait}
+              </span>
+            ) : null}
           </span>
         ) : null}
         {/* <b>No chevron in the queue reading</b> (2026-10-02). Forty-six identical ›, one per row, on a
@@ -330,7 +342,7 @@ export function DecisionRow({
        continuous sheet with hairlines, so the selected row runs edge to edge and the accent bar is the
        only thing that marks it. §4's 8px edge belongs to the Home's reading, where the row is one of
        five on a page of cards. */
-    const shape = `flex items-start gap-3 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
+    const shape = `flex items-start gap-3 ${metaBelow ? "" : "max-sm:flex-wrap max-sm:gap-y-2"} transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
       metaBelow ? "px-4 py-4" : "rounded-lg px-3 py-3"
     } ${selected ? "!border-transparent bg-brand-50 shadow-selected" : "hover:bg-canvas"}`;
     return (
