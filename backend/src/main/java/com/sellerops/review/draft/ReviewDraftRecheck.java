@@ -6,9 +6,12 @@ import com.sellerops.attention.reply.ReviewReplyFingerprint;
 import com.sellerops.attention.reply.ReviewReplyValidation;
 import com.sellerops.common.BaseEntity;
 import com.sellerops.inquiry.draft.InquiryDraftEvidence;
+import com.sellerops.knowledge.org.OrgKnowledgeSource;
 import com.sellerops.knowledge.org.OrgKnowledgeSourceRepository;
+import com.sellerops.product.library.ProductKnowledgeSource;
 import com.sellerops.product.library.ProductKnowledgeSourceRepository;
 import com.sellerops.review.Review;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,12 +44,27 @@ public class ReviewDraftRecheck {
     public static final String SOURCE_CHANGED = "SOURCE_CHANGED";
     public static final String UNSUPPORTED_PROMISE = "UNSUPPORTED_PROMISE";
 
-    public record Result(boolean passed, List<String> codes) {
+    /**
+     * The finding, and what the seller is shown about it (owner decision 2026-10-23: a hold names the changed basis,
+     * the sentence it touches and what to do). {@code changed}: the cited documents that were edited or taken out of
+     * use; {@code promises}: the commitment words that lost their ground; {@code sentences}: the reply's own
+     * sentences that carry them, at most {@value #MAX_SENTENCES}.
+     */
+    public record Result(boolean passed, List<String> codes, List<Changed> changed, List<String> promises,
+                         List<String> sentences) {
 
-        static Result of(List<String> codes) {
-            return new Result(codes.isEmpty(), List.copyOf(codes));
+        static Result of(List<String> codes, List<Changed> changed, List<String> promises, List<String> sentences) {
+            return new Result(codes.isEmpty(), List.copyOf(codes), List.copyOf(changed), List.copyOf(promises),
+                    List.copyOf(sentences));
         }
     }
+
+    /** A document a version cited that is no longer as it was: edited after the version, or out of use. */
+    public record Changed(String kind, String title, Instant changedAt, boolean removed) {}
+
+    static final int MAX_SENTENCES = 3;
+    static final int MAX_SENTENCE = 300;
+    static final int MAX_CHANGED = 5;
 
     private final ReviewDraftComposer composer;
     private final ReviewReplyDraftRepository drafts;
@@ -74,17 +92,44 @@ public class ReviewDraftRecheck {
         String body = ReviewReplyValidation.normalize(text);
         Optional<ReviewReplyDraft> written = drafts.findTopByReviewIdAndContentFingerprintOrderByVersionDesc(
                 review.getId(), ReviewReplyFingerprint.of(body));
-        if (written.isPresent() && !citationsStand(orgId, review.getId(), written.get())) {
+        List<Changed> changed = written.isPresent() ? changedCitations(orgId, review.getId(), written.get())
+                : List.of();
+        if (!changed.isEmpty()) {
             codes.add(SOURCE_CHANGED);
         }
         List<String> license = composer.currentLicense(orgId, review, redactedBody);
-        if (!ReviewClaimGuard.unsupportedClaims(body, license).isEmpty()) {
+        List<String> promises = ReviewClaimGuard.unsupportedClaims(body, license);
+        if (!promises.isEmpty()) {
             codes.add(UNSUPPORTED_PROMISE);
         }
-        return Result.of(codes);
+        return Result.of(codes, changed, promises, sentencesWith(body, promises));
     }
 
-    private boolean citationsStand(UUID orgId, UUID reviewId, ReviewReplyDraft version) {
+    /**
+     * The reply's sentences that carry one of {@code promises}, in order and at most {@value #MAX_SENTENCES} — each
+     * cut to {@value #MAX_SENTENCE} characters from its start, so it stays a piece of the reply's own text.
+     */
+    static List<String> sentencesWith(String body, List<String> promises) {
+        List<String> out = new java.util.ArrayList<>();
+        if (promises.isEmpty()) {
+            return out;
+        }
+        for (String sentence : body.split("(?<=[.!?。])\\s+|\\n+")) {
+            String squeezed = sentence.replaceAll("\\s+", "");
+            String trimmed = sentence.strip();
+            if (!trimmed.isEmpty() && promises.stream().anyMatch(squeezed::contains)) {
+                out.add(trimmed.length() > MAX_SENTENCE ? trimmed.substring(0, MAX_SENTENCE) : trimmed);
+                if (out.size() == MAX_SENTENCES) {
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    /** The cited product and company documents that were removed, put out of use, or edited after {@code version}. */
+    private List<Changed> changedCitations(UUID orgId, UUID reviewId, ReviewReplyDraft version) {
+        List<Changed> out = new java.util.ArrayList<>();
         for (ReviewDraftEvidence row : evidence.findByOrgIdAndReviewIdAndDraftVersionOrderByOrdinalAsc(orgId, reviewId,
                 version.getVersion())) {
             Optional<? extends BaseEntity> source;
@@ -101,9 +146,24 @@ public class ReviewDraftRecheck {
                 continue;
             }
             if (source.isEmpty() || !active || source.get().getUpdatedAt().isAfter(version.getCreatedAt())) {
-                return false;
+                if (out.size() < MAX_CHANGED) {
+                    // A document deleted outright has no title left to show.
+                    String title = source.map(ReviewDraftRecheck::title).orElse(null);
+                    out.add(new Changed(row.getKind(), title == null ? "삭제된 문서" : title,
+                            source.map(BaseEntity::getUpdatedAt).orElse(null), source.isEmpty() || !active));
+                }
             }
         }
-        return true;
+        return out;
+    }
+
+    private static String title(BaseEntity source) {
+        String title = source instanceof ProductKnowledgeSource p ? p.getTitle()
+                : source instanceof OrgKnowledgeSource o ? o.getTitle() : null;
+        if (title == null || title.isBlank()) {
+            return null;
+        }
+        String clean = title.strip().replaceAll("\\p{Cntrl}", " ");
+        return clean.length() > 120 ? clean.substring(0, 120) : clean;
     }
 }

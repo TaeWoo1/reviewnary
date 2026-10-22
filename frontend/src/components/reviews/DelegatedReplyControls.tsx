@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { api } from "../../lib/apiClient";
-import type { ReviewReplyDelegation } from "../../lib/types";
+import type { ReviewReplyDelegation, ReviewReplyDelegationNote } from "../../lib/types";
 import { Status, type StatusTone } from "../ui/Status";
 
 // The delegate lane on the review panel (docs/vendor_server_contract_v1.md §4; owner decisions D7 · D9 · D10,
@@ -37,6 +37,13 @@ const STATE: Record<string, { word: string; tone: StatusTone; note?: string }> =
   },
   FAILED: { word: "담당자가 등록하지 못함", tone: "neutral", note: "다시 보내거나 여기서 직접 처리할 수 있습니다." },
   CANCELLED: { word: "요청 취소됨", tone: "neutral" },
+  // Owner decision 2026-10-23: an approval is held only when its words lost their ground, and says why below.
+  HELD: { word: "승인 보류 · 다시 승인 필요", tone: "warn" },
+  HOLD_REQUESTED: {
+    word: "승인 보류 · 담당자 확인 중",
+    tone: "warn",
+    note: "담당자가 등록을 시작한 답글이라 담당자에게도 멈춤을 전했습니다. 담당자가 등록 전인지 확인하면 이 표시가 바뀝니다.",
+  },
   INVALIDATED: {
     word: "요청이 끝남",
     tone: "neutral",
@@ -45,7 +52,75 @@ const STATE: Record<string, { word: string; tone: StatusTone; note?: string }> =
 };
 
 /** States where a new press re-sends the open task's text rather than opening a new one. */
-const AWAITING = new Set(["AWAITING_APPROVAL", "RECHECK_NEEDED"]);
+const AWAITING = new Set(["AWAITING_APPROVAL", "RECHECK_NEEDED", "HELD"]);
+
+const SOURCE_KIND: Record<string, string> = { PRODUCT_KNOWLEDGE: "상품 지식", ORG_POLICY: "운영 정책" };
+
+function when(iso: string | null): string {
+  if (!iso) return "";
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "";
+  return at.toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+/**
+ * <b>Why a version was stopped</b> (owner decision 2026-10-23; mockup confirmed the same day): what changed, which
+ * sentence it touches, and what to do. Drawn only from the PC's own finding — nothing here is inferred on screen.
+ * A cited document that was only edited, under an approval that stands, is one quiet line instead.
+ */
+function WhyStopped({ state, note }: { state: string; note: ReviewReplyDelegationNote }) {
+  const promise = note.codes.includes("UNSUPPORTED_PROMISE");
+  const source = note.sources[0];
+  const changed = source
+    ? `${SOURCE_KIND[source.kind] ?? "자료"} 「${source.title}」`
+    : null;
+  const changedWhen = source ? (source.removed ? "사용 중지됨" : `${when(source.changedAt)}에 고쳐짐`) : null;
+  if (!promise && (state === "APPROVED" || state === "CLAIMED")) {
+    return changed ? (
+      <p className="text-xs leading-relaxed text-muted">
+        근거로 쓴 {changed} 문서가 바뀌었지만, 이 답글과 부딪히는 곳이 없어 승인을 그대로 둡니다.
+      </p>
+    ) : null;
+  }
+  const todo = promise
+    ? state === "RECHECK_NEEDED"
+      ? "문장을 고쳐 다시 보내세요. 그 약속이 맞다면 응대 기준에 먼저 적으세요."
+      : "문장을 고쳐 다시 승인하세요. 그 약속이 맞다면 응대 기준에 먼저 적은 뒤 다시 승인하세요."
+    : "고쳐진 문서와 초안을 비교해 보고, 맞으면 그대로, 아니면 고쳐서 다시 보내세요.";
+  return (
+    <section aria-label="왜 멈췄나요" className="flex flex-col gap-2 rounded-xl bg-surface p-3 ring-1 ring-line">
+      <h4 className="text-sm font-bold text-ink">왜 멈췄나요</h4>
+      <dl className="grid grid-cols-[88px_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm leading-relaxed">
+        {changed ? (
+          <>
+            <dt className="text-muted">바뀐 근거</dt>
+            <dd className="text-ink">
+              {changed}
+              <span className="block text-xs text-muted">{changedWhen}</span>
+            </dd>
+          </>
+        ) : null}
+        <dt className="text-muted">{promise ? "부딪히는 곳" : "영향받는 문장"}</dt>
+        <dd className="text-ink">
+          {promise ? (
+            <>
+              답글의 {note.promises.map((p) => `「${p}」`).join(" · ")} 약속이 지금 근거에는 없습니다.
+              {note.sentences.map((s) => (
+                <mark key={s} className="mt-1 block rounded bg-warn/10 px-1.5 py-0.5 font-semibold text-ink">
+                  {s}
+                </mark>
+              ))}
+            </>
+          ) : (
+            "이 초안은 그 문서를 근거로 썼습니다. 어느 문장이 달라졌는지는 아직 짚지 못합니다."
+          )}
+        </dd>
+        <dt className="text-muted">할 일</dt>
+        <dd className="font-semibold text-ink">{todo}</dd>
+      </dl>
+    </section>
+  );
+}
 
 type Press = "handOver" | "phone" | "cancel";
 
@@ -121,9 +196,12 @@ export function DelegatedReplyControls({
               </Status>
             ) : null}
           </div>
-          {shown.note != null ? <p className="text-xs leading-relaxed text-muted">{shown.note}</p> : null}
+          {shown.note != null && !(state === "RECHECK_NEEDED" && delegation.note) ? (
+            <p className="text-xs leading-relaxed text-muted">{shown.note}</p>
+          ) : null}
         </div>
       ) : null}
+      {state != null && delegation.note ? <WhyStopped state={state} note={delegation.note} /> : null}
 
       {delegation.canSend || delegation.canCancel ? (
         <div className="flex flex-wrap items-center gap-2">
@@ -187,9 +265,14 @@ export function DelegatedReplyControls({
           답글이 두 번 달리지 않도록, 채널에서 답글이 확인되기 전까지 여기서 다시 승인하거나 등록하지 않습니다.
         </p>
       ) : null}
-      {state != null && AWAITING.has(state) ? (
+      {state != null && AWAITING.has(state) && state !== "HELD" ? (
         <p className="text-xs leading-relaxed text-muted">
           휴대폰에 보낸 동안에는 여기서 따로 승인할 수 없습니다. 여기서 맡기면 휴대폰 승인 없이 바로 담당자에게 갑니다.
+        </p>
+      ) : null}
+      {state === "HELD" ? (
+        <p className="text-xs leading-relaxed text-muted">
+          초안을 고쳐 저장한 뒤 다시 보내면 새로 승인을 받습니다. 그전까지 담당자는 이 답글을 등록하지 않습니다.
         </p>
       ) : null}
       {failed != null ? (

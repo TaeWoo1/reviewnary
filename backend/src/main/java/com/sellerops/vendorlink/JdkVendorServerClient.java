@@ -240,12 +240,45 @@ public class JdkVendorServerClient implements VendorServerClient {
 
     @Override
     public TaskSnapshot pcRecheck(String installToken, UUID taskId, int draftVersion, boolean passed,
-                                  List<String> codes) {
+                                  List<String> codes, BasisNote note) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("draftVersion", draftVersion);
         request.put("passed", passed);
         request.put("codes", codes);
+        if (note != null) {
+            request.put("note", note(note));
+        }
         return task(taskCall(jsonPost("v1/tasks/" + taskId + "/pc-recheck", installToken, request)).json());
+    }
+
+    @Override
+    public TaskSnapshot checkApproved(String installToken, UUID taskId, int approvedVersion, boolean hold,
+                                      BasisNote note, String commandId) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("approvedVersion", approvedVersion);
+        request.put("hold", hold);
+        request.put("note", note(note));
+        request.put("commandId", commandId);
+        return task(taskCall(jsonPost("v1/tasks/" + taskId + "/approved-check", installToken, request)).json());
+    }
+
+    /** The note as the server reads it; a date goes as its ISO instant. */
+    private static Map<String, Object> note(BasisNote note) {
+        List<Map<String, Object>> sources = new ArrayList<>();
+        for (ChangedSource s : note.sources()) {
+            Map<String, Object> source = new LinkedHashMap<>();
+            source.put("kind", s.kind());
+            source.put("title", s.title());
+            source.put("changedAt", s.changedAt() == null ? null : s.changedAt().toString());
+            source.put("removed", s.removed());
+            sources.add(source);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("codes", note.codes());
+        out.put("sources", sources);
+        out.put("promises", note.promises());
+        out.put("sentences", note.sentences());
+        return out;
     }
 
     private static List<UUID> uuids(JsonNode array) {
@@ -304,9 +337,18 @@ public class JdkVendorServerClient implements VendorServerClient {
                 || !t.path("draftBody").isTextual() || !t.path("editedOnMobile").isBoolean()) {
             throw new Unreachable();
         }
+        JsonNode approved = t.path("approvedVersion");
+        boolean basis = t.path("knowledgeFp").isTextual() && t.path("policyFp").isTextual()
+                && t.path("voiceFp").isTextual();
+        JsonNode note = t.path("basisNote");
         return new TaskSnapshot(uuid(t, "id"), uuid(t, "reviewId"), text(t, "state"), t.path("stateVersion").asInt(),
                 t.path("draftVersion").asInt(), t.path("draftBody").asText(), text(t, "draftFingerprint"),
-                optionalText(t, "approvedFingerprint"), t.path("editedOnMobile").asBoolean());
+                optionalText(t, "approvedFingerprint"), t.path("editedOnMobile").asBoolean(),
+                approved.canConvertToInt() ? approved.asInt() : null,
+                basis ? t.path("knowledgeFp").asText() + "|" + t.path("policyFp").asText() + "|"
+                        + t.path("voiceFp").asText() : null,
+                note.isObject() && t.path("basisNoteVersion").asInt(-1) == t.path("draftVersion").asInt()
+                        ? note.toString() : null);
     }
 
     /** A relay call: 2xx is the answer, a refused token or store is {@link Refused}, anything else unreachable. */

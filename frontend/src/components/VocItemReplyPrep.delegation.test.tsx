@@ -190,6 +190,97 @@ describe("VocItemReplyPrep · delegate lane", () => {
     expect(api.cancelReviewReplyDelegation).toHaveBeenCalledWith(REVIEW);
   });
 
+  // Owner decision 2026-10-23 (mockup confirmed the same day): a hold always says what changed, which sentence, and
+  // what to do — and a document edit that touches nothing keeps the approval with one quiet line.
+  const PROMISE_NOTE = {
+    codes: ["UNSUPPORTED_PROMISE"],
+    sources: [{ kind: "ORG_POLICY", title: "교환 · 반품 안내", changedAt: "2026-10-22T06:40:00Z", removed: false }],
+    promises: ["교환"],
+    sentences: ["세탁 후 수축이면 무료 교환해 드리겠습니다."],
+  };
+
+  it("says why an approval was held, marks its sentence, and lets the seller send a fixed draft", async () => {
+    vi.mocked(api.getReviewReplyPrep).mockResolvedValue(
+      prepView({ taskState: "HELD", editedOnMobile: false, canSend: true, canCancel: true, note: PROMISE_NOTE }, false),
+    );
+    const { container } = mount();
+
+    expect(await screen.findByText("승인 보류 · 다시 승인 필요")).toBeTruthy();
+    const why = screen.getByRole("region", { name: "왜 멈췄나요" });
+    expect(why.textContent).toContain("운영 정책 「교환 · 반품 안내」");
+    expect(why.textContent).toContain("답글의 「교환」 약속이 지금 근거에는 없습니다.");
+    expect(why.querySelector("mark")?.textContent).toBe("세탁 후 수축이면 무료 교환해 드리겠습니다.");
+    expect(why.textContent).toContain("문장을 고쳐 다시 승인하세요.");
+    expect(screen.getByRole("button", { name: "고친 초안 다시 보내기" })).toBeTruthy();
+    await expectNoAxeViolations(container);
+  });
+
+  it("tells the seller a claimed reply's delegate was asked to stop", async () => {
+    vi.mocked(api.getReviewReplyPrep).mockResolvedValue(
+      prepView(
+        { taskState: "HOLD_REQUESTED", editedOnMobile: false, canSend: false, canCancel: true, note: PROMISE_NOTE },
+        false,
+      ),
+    );
+    mount();
+
+    expect(await screen.findByText("승인 보류 · 담당자 확인 중")).toBeTruthy();
+    expect(screen.getByText(/담당자에게도 멈춤을 전했습니다/)).toBeTruthy();
+    expect(screen.getByRole("region", { name: "왜 멈췄나요" })).toBeTruthy();
+  });
+
+  it("names the edited document of a sent-back draft and admits it cannot point at the sentence", async () => {
+    vi.mocked(api.getReviewReplyPrep).mockResolvedValue(
+      prepView(
+        {
+          taskState: "RECHECK_NEEDED",
+          editedOnMobile: false,
+          canSend: true,
+          canCancel: true,
+          note: {
+            codes: ["SOURCE_CHANGED"],
+            sources: [{ kind: "PRODUCT_KNOWLEDGE", title: "전기 주전자 · 사용 안내", changedAt: "2026-10-22T06:40:00Z", removed: false }],
+            promises: [],
+            sentences: [],
+          },
+        },
+        false,
+      ),
+    );
+    mount();
+
+    const why = await screen.findByRole("region", { name: "왜 멈췄나요" });
+    expect(why.textContent).toContain("상품 지식 「전기 주전자 · 사용 안내」");
+    expect(why.textContent).toContain("어느 문장이 달라졌는지는 아직 짚지 못합니다.");
+    expect(why.querySelector("mark")).toBeNull();
+    expect(screen.queryByText(/응대 기준이 바뀌어 이 초안은 승인할 수 없습니다/)).toBeNull();
+  });
+
+  it("keeps an approval whose cited document was only edited, with one quiet line", async () => {
+    vi.mocked(api.getReviewReplyPrep).mockResolvedValue(
+      prepView(
+        {
+          taskState: "APPROVED",
+          editedOnMobile: false,
+          canSend: false,
+          canCancel: true,
+          note: {
+            codes: ["SOURCE_CHANGED"],
+            sources: [{ kind: "PRODUCT_KNOWLEDGE", title: "린넨 커튼 · 소재 안내", changedAt: "2026-10-22T06:40:00Z", removed: false }],
+            promises: [],
+            sentences: [],
+          },
+        },
+        false,
+      ),
+    );
+    mount();
+
+    expect(await screen.findByText("승인됨 · 담당자 등록 대기")).toBeTruthy();
+    expect(screen.getByText(/이 답글과 부딪히는 곳이 없어 승인을 그대로 둡니다/)).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "왜 멈췄나요" })).toBeNull();
+  });
+
   it("draws nothing of the lane for a review that cannot use it", async () => {
     vi.mocked(api.getReviewReplyPrep).mockResolvedValue(prepView(null));
     mount();

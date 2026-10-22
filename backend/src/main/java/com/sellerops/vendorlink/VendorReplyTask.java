@@ -72,6 +72,13 @@ public class VendorReplyTask extends BaseEntity {
     @Column(name = "rechecked_basis", length = 200)
     private String recheckedBasis;
 
+    /**
+     * Why the task's current version was stopped or kept, as a PC recorded it on the server (JSON, the server's
+     * {@code basisNote}); null when there is nothing to say. Read by the seller's screen only.
+     */
+    @Column(name = "basis_note", length = 4000)
+    private String basisNote;
+
     /** When a delegate's POSTED was recorded in this PC's reply lane; null until then. */
     @Column(name = "outcome_recorded_at")
     private Instant outcomeRecordedAt;

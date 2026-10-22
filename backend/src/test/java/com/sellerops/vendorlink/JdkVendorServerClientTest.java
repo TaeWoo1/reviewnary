@@ -180,13 +180,44 @@ class JdkVendorServerClientTest {
             assertThat(t.draftVersion()).isEqualTo(2);
             assertThat(t.editedOnMobile()).isTrue();
         });
-        client.pcRecheck("rvi_x", java.util.UUID.fromString(task), 2, false, List.of("UNSUPPORTED_PROMISE"));
+        client.pcRecheck("rvi_x", java.util.UUID.fromString(task), 2, false, List.of("UNSUPPORTED_PROMISE"), null);
         assertThat(seen).containsExactly(
                 "POST /v1/stores/" + store + "/tasks/policy-check auth=true {\"knowledgeFp\":\"v1:" + "1".repeat(32)
                         + "\",\"policyFp\":\"v1:" + "2".repeat(32) + "\",\"voiceFp\":\"v1:" + "3".repeat(32) + "\"}",
                 "GET /v1/tasks/" + task + " auth=true ",
                 "POST /v1/tasks/" + task + "/pc-recheck auth=true "
                         + "{\"draftVersion\":2,\"passed\":false,\"codes\":[\"UNSUPPORTED_PROMISE\"]}");
+    }
+
+    /** Owner decision 2026-10-23: the approved check and its note as vendor-server reads them, and its reply read back. */
+    @Test
+    void anApprovedCheckSendsItsNoteAndReadsTheHeldTaskWithItsReason() {
+        OutboundGate.arm(true);
+        String task = "6f1c2a3b-0000-4000-8000-0000000000cc";
+        String view = "{\"id\":\"" + task + "\",\"reviewId\":\"6f1c2a3b-0000-4000-8000-0000000000aa\","
+                + "\"state\":\"HELD\",\"stateVersion\":4,\"draftVersion\":2,\"draftBody\":\"교환해 드리겠습니다.\","
+                + "\"draftFingerprint\":\"" + "b".repeat(64) + "\",\"approvedFingerprint\":\"" + "b".repeat(64) + "\","
+                + "\"approvedVersion\":2,\"editedOnMobile\":false,\"knowledgeFp\":\"k\",\"policyFp\":\"p\","
+                + "\"voiceFp\":\"v\",\"basisNoteVersion\":2,\"basisNote\":{\"codes\":[\"UNSUPPORTED_PROMISE\"],"
+                + "\"sources\":[],\"promises\":[\"교환\"],\"sentences\":[\"교환해 드리겠습니다.\"]}}";
+        route("/v1/tasks/" + task + "/approved-check", 200, view);
+        JdkVendorServerClient client = new JdkVendorServerClient(base);
+        VendorServerClient.BasisNote note = new VendorServerClient.BasisNote(List.of("UNSUPPORTED_PROMISE"),
+                List.of(new VendorServerClient.ChangedSource("ORG_POLICY", "교환 안내",
+                        java.time.Instant.parse("2026-10-22T06:40:00Z"), false)),
+                List.of("교환"), List.of("교환해 드리겠습니다."));
+
+        VendorServerClient.TaskSnapshot held = client.checkApproved("rvi_x", java.util.UUID.fromString(task), 2, true,
+                note, "pc-check:x");
+        assertThat(held.state()).isEqualTo("HELD");
+        assertThat(held.approvedVersion()).isEqualTo(2);
+        assertThat(held.draftBasis()).isEqualTo("k|p|v");
+        assertThat(held.basisNoteJson()).contains("\"promises\":[\"교환\"]");
+        assertThat(seen).containsExactly("POST /v1/tasks/" + task + "/approved-check auth=true "
+                + "{\"approvedVersion\":2,\"hold\":true,\"note\":{\"codes\":[\"UNSUPPORTED_PROMISE\"],\"sources\":"
+                + "[{\"kind\":\"ORG_POLICY\",\"title\":\"교환 안내\",\"changedAt\":\"2026-10-22T06:40:00Z\","
+                + "\"removed\":false}],\"promises\":[\"교환\"],\"sentences\":[\"교환해 드리겠습니다.\"]},"
+                + "\"commandId\":\"pc-check:x\"}");
     }
 
     @Test

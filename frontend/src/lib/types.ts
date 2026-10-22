@@ -1395,6 +1395,22 @@ export interface ReviewReplyDelegation {
   canSend: boolean;
   /** 「요청 취소」 may be pressed. */
   canCancel: boolean;
+  /**
+   * Why the current version was stopped — or kept — after what replies are written from changed (owner decision
+   * 2026-10-23). Absent or null when there is nothing to say.
+   */
+  note?: ReviewReplyDelegationNote | null;
+}
+
+export interface ReviewReplyDelegationNote {
+  /** `SOURCE_CHANGED` · `UNSUPPORTED_PROMISE`. */
+  codes: string[];
+  /** The cited documents that were edited or taken out of use. */
+  sources: { kind: string; title: string; changedAt: string | null; removed: boolean }[];
+  /** The commitment words (교환 · 환불 …) the current evidence no longer supports. */
+  promises: string[];
+  /** The reply's own sentences that carry them. */
+  sentences: string[];
 }
 
 /** What the PC knows of a delegation task after a press. */

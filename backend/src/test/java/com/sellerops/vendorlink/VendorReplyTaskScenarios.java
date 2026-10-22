@@ -469,11 +469,15 @@ abstract class VendorReplyTaskScenarios {
             assertThat(r.taskId()).isEqualTo(task);
             assertThat(r.passed()).isFalse();
             assertThat(r.codes()).containsExactly(com.sellerops.review.draft.ReviewDraftRecheck.UNSUPPORTED_PROMISE);
+            assertThat(r.note().promises()).as("the word that lost its ground").containsExactly("교환");
+            assertThat(r.note().sentences()).as("the reply's own sentence").containsExactly(text);
         });
         assertThat(vendor.tasks.get(task)).satisfies(t -> {
             assertThat(t.state()).isEqualTo("RECHECK_NEEDED");
             assertThat(t.draftBody()).isEqualTo(text);
         });
+        assertThat(tasks.describe(org, review, true).note()).as("the seller's screen is told why").satisfies(n ->
+                assertThat(n.promises()).containsExactly("교환"));
         pull.pullFor(org);
         assertThat(vendor.rechecks).as("held once, not on every pull").hasSize(1);
         assertThat(tasks.describe(org, review, true).canSend()).as("the seller can draft it again").isTrue();
@@ -605,6 +609,115 @@ abstract class VendorReplyTaskScenarios {
 
         assertThat(vendor.tasks.get(task).state()).isEqualTo("APPROVED");
         assertThat(vendor.rechecks).isEmpty();
+        assertThat(vendor.approvedChecks).as("nothing in it conflicts: nothing sent").isEmpty();
+    }
+
+    /* ── approvals held only for a substantive conflict (owner decision 2026-10-23) ── */
+
+    private com.sellerops.knowledge.org.dto.OrgKnowledgeView exchangeRule() {
+        return companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.EXCHANGE_REFUND_POLICY, "교환 안내",
+                "사이즈 교환은 수령 후 7일 이내 무료로 해 드립니다.", null), null, "합성 판매자");
+    }
+
+    private void retire(UUID ruleId) {
+        var retired = companyRuleRows.findById(ruleId).orElseThrow();
+        retired.setActive(false);
+        companyRuleRows.save(retired);
+    }
+
+    @Test
+    void anApprovedPromiseWhoseRuleWasRetiredIsHeldOnceWithItsReason() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        var rule = exchangeRule();
+        UUID review = pulledReview("v1", "9100000310", "사이즈 교환 되나요");
+        needsReply(review);
+        String text = "불편을 드려 죄송합니다. 수령 후 7일 이내라면 사이즈 교환을 도와드리겠습니다.";
+        drafts.save(org, review, "SELLER:" + seller, text, 0);
+        UUID task = vendorTaskOf(tasks.handOver(org, review));
+
+        retire(rule.id());
+        pull.pullFor(org);
+
+        assertThat(vendor.approvedChecks).singleElement().satisfies(c -> {
+            assertThat(c.taskId()).isEqualTo(task);
+            assertThat(c.hold()).isTrue();
+            assertThat(c.approvedVersion()).isEqualTo(1);
+            assertThat(c.note().promises()).containsExactly("교환");
+            assertThat(c.note().sentences()).containsExactly("수령 후 7일 이내라면 사이즈 교환을 도와드리겠습니다.");
+        });
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("HELD");
+        var shown = tasks.describe(org, review, true);
+        assertThat(shown.taskState()).isEqualTo("HELD");
+        assertThat(shown.note().sentences()).containsExactly("수령 후 7일 이내라면 사이즈 교환을 도와드리겠습니다.");
+        assertThat(shown.canSend()).as("the seller can draft it again").isTrue();
+        assertThat(tasks.holds(org, review)).as("still one road: no approval here meanwhile").isTrue();
+
+        pull.pullFor(org);
+        assertThat(vendor.approvedChecks).as("checked once, not on every pull").hasSize(1);
+    }
+
+    @Test
+    void aClaimedPromiseWhoseRuleWasRetiredAsksItsDelegateToStop() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        var rule = exchangeRule();
+        UUID review = pulledReview("v1", "9100000311", "사이즈 교환 되나요");
+        needsReply(review);
+        String text = "수령 후 7일 이내라면 사이즈 교환을 도와드리겠습니다.";
+        drafts.save(org, review, "SELLER:" + seller, text, 0);
+        UUID task = vendorTaskOf(tasks.handOver(org, review));
+        vendor.move(task, "CLAIMED", text, vendor.tasks.get(task).approvedFingerprint(), false);
+
+        retire(rule.id());
+        pull.pullFor(org);
+
+        assertThat(vendor.approvedChecks).singleElement().satisfies(c -> assertThat(c.hold()).isTrue());
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("HOLD_REQUESTED");
+        assertThat(tasks.describe(org, review, true).canCancel()).isTrue();
+    }
+
+    @Test
+    void anApprovalWhoseCitedRuleWasOnlyEditedStandsWithANote() throws Exception {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        var rule = companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.SHIPPING_POLICY, "배송 안내",
+                "평일 오후 2시 전 주문은 당일 출고합니다.", null), null, "합성 판매자");
+        UUID review = pulledReview("v1", "9100000312", "배송이 빨라요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "빠르게 받아 보셨다니 기쁩니다.", 0);
+        com.sellerops.review.draft.ReviewDraftEvidence cited = new com.sellerops.review.draft.ReviewDraftEvidence();
+        cited.setOrgId(org);
+        cited.setReviewId(review);
+        cited.setDraftVersion(drafts.currentVersion(review));
+        cited.setOrdinal(0);
+        cited.setKind(com.sellerops.inquiry.draft.InquiryDraftEvidence.KIND_ORG_POLICY);
+        cited.setSourceId(rule.id());
+        cited.setTitle("배송 안내");
+        draftEvidence.save(cited);
+        UUID task = vendorTaskOf(tasks.handOver(org, review));
+
+        Thread.sleep(5);
+        companyRules.update(org, rule.id(), new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.SHIPPING_POLICY, "배송 안내",
+                "평일 오전 11시 전 주문만 당일 출고합니다.", null));
+        pull.pullFor(org);
+
+        assertThat(vendor.approvedChecks).singleElement().satisfies(c -> {
+            assertThat(c.hold()).as("a document edit alone cancels no approval").isFalse();
+            assertThat(c.note().codes()).containsExactly(com.sellerops.review.draft.ReviewDraftRecheck.SOURCE_CHANGED);
+            assertThat(c.note().sources()).singleElement().satisfies(src -> {
+                assertThat(src.title()).isEqualTo("배송 안내");
+                assertThat(src.kind()).isEqualTo("ORG_POLICY");
+                assertThat(src.removed()).isFalse();
+                assertThat(src.changedAt()).isNotNull();
+            });
+        });
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("APPROVED");
+        assertThat(tasks.describe(org, review, true).note().codes())
+                .containsExactly(com.sellerops.review.draft.ReviewDraftRecheck.SOURCE_CHANGED);
+
+        pull.pullFor(org);
+        assertThat(vendor.approvedChecks).as("a standing approval is checked once, not on every pull").hasSize(1);
     }
 
     private UUID pulledReview(String key, String reviewNo, String body) {

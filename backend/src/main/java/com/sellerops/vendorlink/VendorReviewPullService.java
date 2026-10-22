@@ -402,8 +402,8 @@ public class VendorReviewPullService {
 
     /**
      * The store's reply tasks: what this PC's drafts are now written under first (so a change sends waiting drafts
-     * back in the same pass), then the server's changes, then the sent-back ones checked again. Returns the changes
-     * applied.
+     * back in the same pass), then the server's changes, then the sent-back ones checked again, then the approved ones
+     * drafted under other fingerprints (2026-10-23). Returns the changes applied.
      */
     private int followReplies(VendorStoreBinding binding, String token) {
         if (replyTasks == null) {
@@ -412,6 +412,7 @@ public class VendorReviewPullService {
         replyTasks.reportBasis(binding, token);
         int applied = replyTasks.sync(binding, token);
         replyTasks.recheckSentBack(binding, token);
+        replyTasks.recheckApproved(binding, token);
         return applied;
     }
 

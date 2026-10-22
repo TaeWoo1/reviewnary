@@ -83,9 +83,30 @@ public interface VendorServerClient {
     record DraftMeta(String reviewBodyFingerprint, Instant generatedAt, String knowledgeFp, String policyFp,
                      String voiceFp) {}
 
-    /** A task as the server reports it to a PC. {@code reviewId} is the server's review id. */
+    /**
+     * A task as the server reports it to a PC. {@code reviewId} is the server's review id. {@code draftBasis} is the
+     * three fingerprints the current version was drafted under, joined as {@code ReviewDraftBasis.Fingerprints#combined}
+     * does; {@code basisNoteJson} the reason a PC recorded for it (owner decision 2026-10-23), as the server holds it.
+     */
     record TaskSnapshot(UUID id, UUID reviewId, String state, int stateVersion, int draftVersion, String draftBody,
-                        String draftFingerprint, String approvedFingerprint, boolean editedOnMobile) {}
+                        String draftFingerprint, String approvedFingerprint, boolean editedOnMobile,
+                        Integer approvedVersion, String draftBasis, String basisNoteJson) {
+
+        public TaskSnapshot(UUID id, UUID reviewId, String state, int stateVersion, int draftVersion, String draftBody,
+                            String draftFingerprint, String approvedFingerprint, boolean editedOnMobile) {
+            this(id, reviewId, state, stateVersion, draftVersion, draftBody, draftFingerprint, approvedFingerprint,
+                    editedOnMobile, null, null, null);
+        }
+    }
+
+    /**
+     * Why this PC stopped a version — what changed, the promise words that lost their ground, and the reply's own
+     * sentences that carry them (owner decision 2026-10-23). The server keeps it for the phone and the delegate.
+     */
+    record BasisNote(List<String> codes, List<ChangedSource> sources, List<String> promises, List<String> sentences) {}
+
+    /** A cited product or company document that was edited after the version, or taken out of use. */
+    record ChangedSource(String kind, String title, Instant changedAt, boolean removed) {}
 
     record TaskChange(long seq, String state, TaskSnapshot task) {}
 
@@ -112,8 +133,16 @@ public interface VendorServerClient {
     /** Reports the store's current draft fingerprints; unapproved drafts made under others are sent back. */
     PolicyCheck policyCheck(String installToken, UUID storeId, String knowledgeFp, String policyFp, String voiceFp);
 
-    /** Records this PC's check of one version — passed, or held with closed codes. */
-    TaskSnapshot pcRecheck(String installToken, UUID taskId, int draftVersion, boolean passed, List<String> codes);
+    /** Records this PC's check of one version — passed, or held with closed codes and, when held, why. */
+    TaskSnapshot pcRecheck(String installToken, UUID taskId, int draftVersion, boolean passed, List<String> codes,
+                           BasisNote note);
+
+    /**
+     * Records this PC's check of an approved text after the basis changed: {@code hold} for a substantive conflict
+     * (the server holds it, or asks its delegate to stop), otherwise the note is only kept beside the approval.
+     */
+    TaskSnapshot checkApproved(String installToken, UUID taskId, int approvedVersion, boolean hold, BasisNote note,
+                               String commandId);
 
     /** Tells the server the seller decided this review needs no reply (§3.2, D4). */
     void markNoReplyNeeded(String installToken, UUID storeId, UUID reviewId, String commandId);

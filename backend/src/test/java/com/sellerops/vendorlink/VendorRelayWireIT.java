@@ -292,8 +292,14 @@ class VendorRelayWireIT {
 
         @Override
         public TaskSnapshot pcRecheck(String installToken, UUID taskId, int draftVersion, boolean passed,
-                                      java.util.List<String> codes) {
-            return real.pcRecheck(installToken, taskId, draftVersion, passed, codes);
+                                      java.util.List<String> codes, BasisNote note) {
+            return real.pcRecheck(installToken, taskId, draftVersion, passed, codes, note);
+        }
+
+        @Override
+        public TaskSnapshot checkApproved(String installToken, UUID taskId, int approvedVersion, boolean hold,
+                                          BasisNote note, String commandId) {
+            return real.checkApproved(installToken, taskId, approvedVersion, hold, note, commandId);
         }
 
         @Override

@@ -15,5 +15,8 @@ public interface VendorReplyTaskRepository extends JpaRepository<VendorReplyTask
     /** A store's tasks in one state — the sent-back ones this PC checks again. */
     List<VendorReplyTask> findByVendorStoreIdAndState(UUID vendorStoreId, String state);
 
+    /** A store's tasks in any of these states — the approved ones this PC checks after the basis changed. */
+    List<VendorReplyTask> findByVendorStoreIdAndStateIn(UUID vendorStoreId, Collection<String> states);
+
     boolean existsByOrgIdAndReviewIdAndStateNotIn(UUID orgId, UUID reviewId, Collection<String> states);
 }

@@ -47,8 +47,13 @@ final class FakeVendorServer implements VendorServerClient {
     DraftMeta policy;
     /** Every policy check the PC made. */
     final List<DraftMeta> policyChecks = new ArrayList<>();
-    record Recheck(UUID taskId, int draftVersion, boolean passed, List<String> codes) {}
+    record Recheck(UUID taskId, int draftVersion, boolean passed, List<String> codes, BasisNote note) {}
     final List<Recheck> rechecks = new ArrayList<>();
+    record ApprovedCheck(UUID taskId, int approvedVersion, boolean hold, BasisNote note, String commandId) {}
+    final List<ApprovedCheck> approvedChecks = new ArrayList<>();
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON =
+            com.fasterxml.jackson.databind.json.JsonMapper.builder().findAndAddModules()
+                    .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).build();
     /** The fingerprints each task's current version was drafted under. */
     final Map<UUID, DraftMeta> metaOf = new HashMap<>();
 
@@ -63,10 +68,13 @@ final class FakeVendorServer implements VendorServerClient {
     /** The server moves a task: a new state version, optionally new text (a phone edit), recorded as a change. */
     TaskSnapshot move(UUID taskId, String state, String body, String approvedFingerprint, boolean editedOnMobile) {
         TaskSnapshot t = tasks.get(taskId);
-        TaskSnapshot next = new TaskSnapshot(t.id(), t.reviewId(), state, t.stateVersion() + 1,
-                body.equals(t.draftBody()) ? t.draftVersion() : t.draftVersion() + 1, body,
+        boolean sameText = body.equals(t.draftBody());
+        int version = sameText ? t.draftVersion() : t.draftVersion() + 1;
+        TaskSnapshot next = new TaskSnapshot(t.id(), t.reviewId(), state, t.stateVersion() + 1, version, body,
                 com.sellerops.attention.reply.ReviewReplyFingerprint.of(body), approvedFingerprint,
-                editedOnMobile || t.editedOnMobile());
+                editedOnMobile || t.editedOnMobile(),
+                "APPROVED".equals(state) ? Integer.valueOf(version) : t.approvedVersion(), basisOf(t.id()),
+                sameText ? t.basisNoteJson() : null);
         tasks.put(taskId, next);
         changes.add(new TaskChange(changes.size() + 1, state, next));
         return next;
@@ -149,16 +157,19 @@ final class FakeVendorServer implements VendorServerClient {
         }
         submitted.add(new Submitted(reviewId, body, meta));
         TaskSnapshot open = tasks.values().stream().filter(t -> t.reviewId().equals(reviewId)
-                && (t.state().equals("AWAITING_APPROVAL") || t.state().equals("RECHECK_NEEDED"))).findFirst()
+                && (t.state().equals("AWAITING_APPROVAL") || t.state().equals("RECHECK_NEEDED")
+                        || t.state().equals("HELD"))).findFirst()
                 .orElse(null);
         String fp = com.sellerops.attention.reply.ReviewReplyFingerprint.of(body);
         // As the server: a draft under other fingerprints than the last policy check lands sent back, and the same
         // text drafted again keeps the phone's mark.
         String lands = underPolicy(meta) ? "AWAITING_APPROVAL" : "RECHECK_NEEDED";
+        String basis = meta.knowledgeFp() + "|" + meta.policyFp() + "|" + meta.voiceFp();
         TaskSnapshot next = open == null
-                ? new TaskSnapshot(UUID.randomUUID(), reviewId, lands, 0, 1, body, fp, null, false)
+                ? new TaskSnapshot(UUID.randomUUID(), reviewId, lands, 0, 1, body, fp, null, false, null, basis, null)
                 : new TaskSnapshot(open.id(), reviewId, lands, open.stateVersion() + 1,
-                        open.draftVersion() + 1, body, fp, null, open.draftBody().equals(body) && open.editedOnMobile());
+                        open.draftVersion() + 1, body, fp, null, open.draftBody().equals(body) && open.editedOnMobile(),
+                        open.approvedVersion(), basis, null);
         tasks.put(next.id(), next);
         metaOf.put(next.id(), meta);
         changes.add(new TaskChange(changes.size() + 1, next.state(), next));
@@ -186,8 +197,8 @@ final class FakeVendorServer implements VendorServerClient {
         bearers.add(installToken);
         TaskSnapshot t = tasks.get(taskId);
         String to = switch (t == null ? "" : t.state()) {
-            case "AWAITING_APPROVAL", "RECHECK_NEEDED", "APPROVED" -> "CANCELLED";
-            case "CLAIMED" -> "CANCEL_REQUESTED";
+            case "AWAITING_APPROVAL", "RECHECK_NEEDED", "APPROVED", "HELD" -> "CANCELLED";
+            case "CLAIMED", "HOLD_REQUESTED" -> "CANCEL_REQUESTED";
             default -> throw new TaskRefused("wrong_state");
         };
         return move(taskId, to, t.draftBody(), t.approvedFingerprint(), false);
@@ -200,6 +211,11 @@ final class FakeVendorServer implements VendorServerClient {
         List<TaskChange> page = after.subList(0, Math.min(limit, after.size()));
         long last = page.isEmpty() ? cursor : page.get(page.size() - 1).seq();
         return new TaskChanges(page, last, after.size() > page.size());
+    }
+
+    private String basisOf(UUID taskId) {
+        DraftMeta m = metaOf.get(taskId);
+        return m == null ? null : m.knowledgeFp() + "|" + m.policyFp() + "|" + m.voiceFp();
     }
 
     private boolean underPolicy(DraftMeta meta) {
@@ -230,7 +246,7 @@ final class FakeVendorServer implements VendorServerClient {
             if (t.state().equals("AWAITING_APPROVAL")) {
                 move(t.id(), "RECHECK_NEEDED", t.draftBody(), null, false);
                 sentBack.add(t.id());
-            } else if (t.state().equals("APPROVED")) {
+            } else if (t.state().equals("APPROVED") || t.state().equals("CLAIMED")) {
                 suggested.add(t.id());
             }
         }
@@ -239,10 +255,42 @@ final class FakeVendorServer implements VendorServerClient {
 
     @Override
     public TaskSnapshot pcRecheck(String installToken, UUID taskId, int draftVersion, boolean passed,
-                                  List<String> codes) {
+                                  List<String> codes, BasisNote note) {
         bearers.add(installToken);
-        rechecks.add(new Recheck(taskId, draftVersion, passed, List.copyOf(codes)));
+        rechecks.add(new Recheck(taskId, draftVersion, passed, List.copyOf(codes), note));
+        if (note != null) {
+            tasks.put(taskId, withNote(tasks.get(taskId), tasks.get(taskId).state(), 0, note));
+        }
         return tasks.get(taskId);
+    }
+
+    /** As the server: an approved or claimed text is held (or its delegate asked to stop), or only noted. */
+    @Override
+    public TaskSnapshot checkApproved(String installToken, UUID taskId, int approvedVersion, boolean hold,
+                                      BasisNote note, String commandId) {
+        bearers.add(installToken);
+        approvedChecks.add(new ApprovedCheck(taskId, approvedVersion, hold, note, commandId));
+        TaskSnapshot t = tasks.get(taskId);
+        if (!t.state().equals("APPROVED") && !t.state().equals("CLAIMED")) {
+            throw new TaskRefused("wrong_state");
+        }
+        String to = !hold ? t.state() : t.state().equals("APPROVED") ? "HELD" : "HOLD_REQUESTED";
+        TaskSnapshot next = withNote(t, to, hold ? 1 : 0, note);
+        tasks.put(taskId, next);
+        if (hold) {
+            changes.add(new TaskChange(changes.size() + 1, to, next));
+        }
+        return next;
+    }
+
+    private static TaskSnapshot withNote(TaskSnapshot t, String state, int step, BasisNote note) {
+        try {
+            return new TaskSnapshot(t.id(), t.reviewId(), state, t.stateVersion() + step, t.draftVersion(),
+                    t.draftBody(), t.draftFingerprint(), t.approvedFingerprint(), t.editedOnMobile(),
+                    t.approvedVersion(), t.draftBasis(), JSON.writeValueAsString(note));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Override

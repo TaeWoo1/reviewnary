@@ -311,7 +311,13 @@ class VendorLinkServiceTest {
 
         @Override
         public TaskSnapshot pcRecheck(String installToken, UUID taskId, int draftVersion, boolean passed,
-                                      java.util.List<String> codes) {
+                                      java.util.List<String> codes, BasisNote note) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public TaskSnapshot checkApproved(String installToken, UUID taskId, int approvedVersion, boolean hold,
+                                          BasisNote note, String commandId) {
             throw new UnsupportedOperationException();
         }
 

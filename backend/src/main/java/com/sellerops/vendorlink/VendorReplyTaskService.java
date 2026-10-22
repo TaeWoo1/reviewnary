@@ -70,9 +70,16 @@ import org.springframework.stereotype.Service;
  * #reportBasis}), so the server sends unapproved drafts made under others back ({@code RECHECK_NEEDED}); after the
  * sync this PC checks each sent-back text again without a model ({@link ReviewDraftRecheck}). A text that still
  * stands goes back to waiting for approval, unchanged, under the current fingerprints; one that does not is held
- * with closed codes for the seller. An approval already given is the seller's and is not touched — the server only
- * lists it as a withdrawal suggestion, which this PC logs by count. Without {@link ReviewDraftBasis} (a test wiring
- * this lane alone) drafts say {@value #UNVERSIONED} and nothing is reported, as before.
+ * with closed codes and a reason for the seller.
+ *
+ * <p><b>An approval is held only for a substantive conflict</b> (owner decision 2026-10-23). After the same pull this
+ * PC checks each approved or claimed text that was drafted under other fingerprints ({@link #recheckApproved}). Until a
+ * check of meaning exists, "substantive" is what this PC can prove: the approved words promise something (교환 · 환불
+ * …) the current evidence no longer supports. That holds the reply for a new approval, and a claimed one asks its
+ * delegate to stop first. A cited document that was only edited leaves the approval standing, with a note saying so.
+ * Every hold carries what changed, the sentences it touches and the words that lost their ground. Without {@link
+ * ReviewDraftBasis} (a test wiring this lane alone) drafts say {@value #UNVERSIONED} and nothing is reported, as
+ * before.
  */
 @Service
 public class VendorReplyTaskService implements DelegatedReplyLane {
@@ -85,12 +92,19 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
     /** Who wrote what this lane records: the vendor's delegate, reported through the server. */
     static final String ACTOR = "VENDOR_DELEGATE";
     /** A draft may (again) be sent while the review has no task, or its task still awaits approval or has ended unposted. */
-    static final Set<String> SENDABLE = Set.of("AWAITING_APPROVAL", "RECHECK_NEEDED", "FAILED", "CANCELLED", "INVALIDATED");
+    static final Set<String> SENDABLE = Set.of("AWAITING_APPROVAL", "RECHECK_NEEDED", "HELD", "FAILED", "CANCELLED",
+            "INVALIDATED");
     /** States in which the seller has approved the task's text — the approval happened, whatever came after. */
     static final Set<String> APPROVED_ONCE = Set.of("APPROVED", "CLAIMED", "CANCEL_REQUESTED", "POSTED", "FAILED",
-            "UNKNOWN");
+            "UNKNOWN", "HELD", "HOLD_REQUESTED");
     /** What the server still lets the seller cancel (§4.2). */
-    static final Set<String> CANCELLABLE = Set.of("AWAITING_APPROVAL", "RECHECK_NEEDED", "APPROVED", "CLAIMED");
+    static final Set<String> CANCELLABLE = Set.of("AWAITING_APPROVAL", "RECHECK_NEEDED", "APPROVED", "CLAIMED", "HELD",
+            "HOLD_REQUESTED");
+    /** Approved texts this PC checks again when what replies are written from changed. */
+    static final Set<String> STANDING_APPROVALS = Set.of("APPROVED", "CLAIMED");
+    private static final com.fasterxml.jackson.databind.ObjectMapper NOTE_JSON =
+            com.fasterxml.jackson.databind.json.JsonMapper.builder().findAndAddModules()
+                    .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
 
     /** What the seller's screen may know of a task. */
     public record TaskView(UUID reviewId, String state, int draftVersion, boolean editedOnMobile,
@@ -176,7 +190,18 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         String state = task.map(VendorReplyTask::getState).orElse(null);
         return new ReviewReplyDelegationView(state, task.map(VendorReplyTask::isEditedOnMobile).orElse(false),
                 draftReady && (state == null || SENDABLE.contains(state)),
-                state != null && CANCELLABLE.contains(state));
+                state != null && CANCELLABLE.contains(state),
+                task.map(VendorReplyTask::getBasisNote).map(VendorReplyTaskService::note).orElse(null));
+    }
+
+    /** The stored note as the screen reads it; an unreadable one is shown as none rather than guessed at. */
+    private static ReviewReplyDelegationView.Note note(String json) {
+        try {
+            return NOTE_JSON.readValue(json, ReviewReplyDelegationView.Note.class);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.warn("vendor reply task: basis note unreadable type={}", e.getClass().getSimpleName());
+            return null;
+        }
     }
 
     /** The latest task this PC knows for the review, if any. */
@@ -394,12 +419,13 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
                                 current.draftBody(), new DraftMeta(ref.getBodyFingerprint(), clock.instant(),
                                         now.knowledge(), now.policy(), now.voice()));
                         if (after.editedOnMobile() && "AWAITING_APPROVAL".equals(after.state())) {
-                            after = link.client().pcRecheck(token, after.id(), after.draftVersion(), true, List.of());
+                            after = link.client().pcRecheck(token, after.id(), after.draftVersion(), true, List.of(),
+                                    null);
                         }
                         passed += "AWAITING_APPROVAL".equals(after.state()) ? 1 : 0;
                     } else {
                         after = link.client().pcRecheck(token, current.id(), current.draftVersion(), false,
-                                result.codes());
+                                result.codes(), note(result));
                     }
                 } catch (VendorServerClient.TaskRefused e) {
                     log.warn("vendor reply task: recheck not recorded store={} code={}", storeId, e.code());
@@ -413,6 +439,73 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             tasks.save(checked);
         }
         return passed;
+    }
+
+    /**
+     * Checks each of the store's approved or claimed texts that was drafted under other fingerprints than this PC's
+     * now, once per version and fingerprints (owner decision 2026-10-23). A promise the current evidence no longer
+     * supports holds it — or, claimed, asks its delegate to stop; a cited document that was only edited is noted and
+     * the approval stands. Returns how many were held.
+     */
+    synchronized int recheckApproved(VendorStoreBinding binding, String token) {
+        if (basis == null || recheck == null) {
+            return 0;
+        }
+        UUID orgId = binding.getOrgId();
+        UUID storeId = binding.getVendorStoreId();
+        Fingerprints now = fingerprints(orgId);
+        int held = 0;
+        for (VendorReplyTask copy : tasks.findByVendorStoreIdAndStateIn(storeId, STANDING_APPROVALS)) {
+            if (Integer.valueOf(copy.getDraftVersion()).equals(copy.getRecheckedVersion())
+                    && now.combined().equals(copy.getRecheckedBasis())) {
+                continue;
+            }
+            TaskSnapshot current = link.client().task(token, copy.getVendorTaskId());
+            VendorReplyTask task = apply(orgId, copy.getReviewId(), storeId, current);
+            TaskSnapshot after = null;
+            if (STANDING_APPROVALS.contains(current.state()) && current.approvedVersion() != null
+                    && current.approvedVersion() == current.draftVersion()
+                    && !now.combined().equals(current.draftBasis())) {
+                after = checkOne(orgId, storeId, token, task, current);
+                held += after != null && !STANDING_APPROVALS.contains(after.state()) ? 1 : 0;
+            }
+            VendorReplyTask checked = after == null ? task : apply(orgId, task.getReviewId(), storeId, after);
+            checked.setRecheckedVersion(current.draftVersion());
+            checked.setRecheckedBasis(now.combined());
+            tasks.save(checked);
+        }
+        return held;
+    }
+
+    /** One approved text checked; the server's answer, or null when nothing was sent. */
+    private TaskSnapshot checkOne(UUID orgId, UUID storeId, String token, VendorReplyTask task, TaskSnapshot current) {
+        Review review = reviews.findByIdAndOrgId(task.getReviewId(), orgId).orElse(null);
+        VendorReviewRef ref = refs.findByReviewId(task.getReviewId()).orElse(null);
+        if (review == null || ref == null
+                || !ReviewBodyFingerprint.of(review.getBody()).equals(ref.getBodyFingerprint())) {
+            // The review moved since it was pulled; the next upload invalidates the task or the delegate's check stops it.
+            return null;
+        }
+        ReviewDraftRecheck.Result result = recheck.check(orgId, review,
+                VocPreviewSanitizer.redactFullBody(review.getBody()).text(), current.draftBody());
+        if (result.passed()) {
+            return null;
+        }
+        boolean hold = result.codes().contains(ReviewDraftRecheck.UNSUPPORTED_PROMISE);
+        try {
+            return link.client().checkApproved(token, current.id(), current.approvedVersion(), hold, note(result),
+                    "pc-check:" + current.id() + ":" + current.approvedVersion() + ":" + current.stateVersion());
+        } catch (VendorServerClient.TaskRefused e) {
+            log.warn("vendor reply task: approved check not recorded store={} code={}", storeId, e.code());
+            return null;
+        }
+    }
+
+    /** What the seller is shown about a finding: the server's note. */
+    private static VendorServerClient.BasisNote note(ReviewDraftRecheck.Result result) {
+        return new VendorServerClient.BasisNote(result.codes(), result.changed().stream()
+                .map(c -> new VendorServerClient.ChangedSource(c.kind(), c.title(), c.changedAt(), c.removed()))
+                .toList(), result.promises(), result.sentences());
     }
 
     /** Tells the server about the seller's own 'no reply' decisions in this store. Returns how many were sent. */
@@ -454,6 +547,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         task.setDraftFingerprint(snapshot.draftFingerprint());
         task.setApprovedFingerprint(snapshot.approvedFingerprint());
         task.setEditedOnMobile(snapshot.editedOnMobile());
+        task.setBasisNote(snapshot.basisNoteJson());
         if (newlyApproved) {
             rememberApproved(orgId, reviewId, task, snapshot);
         }
