@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { BridgeClient, makeBridgeClient, type BridgeState } from "../lib/bridge/bridgeClient";
+import { isLocalSellerBuild } from "../lib/security/localSellerMode";
 
 /**
  * React binding for the Local Agent Bridge client. Owns the client lifecycle, drives the pairing poll while
@@ -10,6 +11,11 @@ import { BridgeClient, makeBridgeClient, type BridgeState } from "../lib/bridge/
  * `enabled` (default true) gates the whole client lifecycle. When false, NO client is created and NO poll
  * runs, so a surface that does not use the bridge (e.g. the Local-Agent-free NAVER order connection when
  * the bridge feature flag is off) never opens a local connection or triggers a Local-Network-Access prompt.
+ *
+ * **On the seller-PC install** (`VITE_LOCAL_SELLER=true`) the helper serves one thing only: the API-center
+ * issuance guidance the seller starts by pressing (scope lock v1.14 ⑧-4, the guidance-only exception to ⑦).
+ * There the client exists only for `purpose: "issuance"`; every other surface stays inert and asks nothing —
+ * a helper the install does not use must not be looked for every 1.5 seconds (2026-10-22 external review).
  */
 export function useBridge(
   enabled = true,
@@ -20,6 +26,8 @@ export function useBridge(
      * false so it never raises more than the ONE OS dialog the seller's own press asks for.
      */
     autoPair?: boolean;
+    /** What the bridge is for. On the seller-PC install only `"issuance"` opens it (see above). */
+    purpose?: "issuance";
   } = {},
 ): {
   state: BridgeState;
@@ -30,8 +38,10 @@ export function useBridge(
   const clientRef = useRef<BridgeClient | null>(null);
   const [state, setState] = useState<BridgeState>({ phase: "connecting", maybeNeedsLocalNetworkAccess: false });
 
+  const open = enabled && (!isLocalSellerBuild() || options.purpose === "issuance");
+
   useEffect(() => {
-    if (!enabled) {
+    if (!open) {
       // Disabled: no client, no polling. Report a stable inert state (never "paired").
       clientRef.current = null;
       setState({ phase: "disconnected", maybeNeedsLocalNetworkAccess: false });
@@ -55,7 +65,7 @@ export function useBridge(
       clientRef.current = null;
     };
     // `options.autoPair` is read once, at client creation, on purpose — it must not re-create the client.
-  }, [enabled]);
+  }, [open]);
 
   return {
     state,

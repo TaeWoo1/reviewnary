@@ -116,7 +116,7 @@ export function CoupangIssuanceGuidedWalkthrough({
 
   // The bridge is confined to this component (this phase). Enabled ONLY after the seller starts; the order
   // connection never mounts it.
-  const bridge = useBridge(started);
+  const bridge = useBridge(started, { purpose: "issuance" });
   const phase = bridge.state.phase;
   const paired = phase === "paired";
   // The agent cannot guide and pairing will not fix it. `incompatible_version` needs an app update; a

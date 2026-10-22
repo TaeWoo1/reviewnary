@@ -69,7 +69,7 @@ export function CoupangRenewalGuidedWalkthrough({
   const [started, setStarted] = useState(controlled);
   const [textMode, setTextMode] = useState(false);
 
-  const bridge = useBridge(started);
+  const bridge = useBridge(started, { purpose: "issuance" });
   const phase = bridge.state.phase;
   const paired = phase === "paired";
   const cannotPair = phase === "incompatible_version" || phase === "pairing_denied" || phase === "revoked";

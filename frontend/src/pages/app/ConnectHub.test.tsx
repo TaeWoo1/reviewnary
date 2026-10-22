@@ -337,6 +337,22 @@ describe("채널 연결 — honesty", () => {
   });
 });
 
+describe("채널 연결 — on the seller-PC install", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("has no 이 Mac section and no way into the helper's review collection", async () => {
+    vi.stubEnv("VITE_LOCAL_SELLER", "true");
+    renderHub();
+    await screen.findByLabelText("채널 목록");
+    expect(screen.queryByRole("heading", { name: "이 Mac" })).toBeNull();
+    expect(screen.queryByTestId("helper-state")).toBeNull();
+    expect(screen.queryByRole("link", { name: "기간별로 가져오기" })).toBeNull();
+    expect(screen.getByRole("link", { name: "파일로 넘기기" })).toHaveAttribute("href", "/connect/upload");
+  });
+});
+
 describe("채널 연결 — accessibility", () => {
   it("has no axe violations", async () => {
     const { container } = renderHub();

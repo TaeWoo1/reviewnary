@@ -132,7 +132,7 @@ export function NaverIssuanceGuidedWalkthrough({
 
   // The bridge is confined to this component (this phase). Enabled ONLY after the seller starts, and the order
   // connection never mounts it.
-  const bridge = useBridge(started);
+  const bridge = useBridge(started, { purpose: "issuance" });
   const phase = bridge.state.phase;
   const paired = phase === "paired";
   // The agent cannot guide and pairing will not fix it → the seller should switch to text. `incompatible_version`

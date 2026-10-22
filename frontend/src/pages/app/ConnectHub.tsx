@@ -11,6 +11,7 @@ import { HelperStatusCard } from "../../components/connect/HelperStatusCard";
 import { HomeReviewOpsCard } from "../../components/actionWindow/HomeReviewOpsCard";
 import { useOperationsStore } from "../../hooks/useOperationsStore";
 import { isFixturePreviewEnabled } from "../../lib/actionWindow/devMode";
+import { isLocalSellerBuild } from "../../lib/security/localSellerMode";
 import { useOpenAlerts } from "../../lib/openAlerts";
 import { api } from "../../lib/apiClient";
 import { selectChannelAccount } from "../../lib/channelConnection";
@@ -45,6 +46,7 @@ import type {
  * 설정·리포트가 쓰는 그것.
  */
 export function ConnectHub() {
+  const sellerPc = isLocalSellerBuild();
   const [channels, setChannels] = useState<ChannelResponse[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(true);
   const [channelsError, setChannelsError] = useState(false);
@@ -294,9 +296,16 @@ export function ConnectHub() {
         이름 셋. 이제 카드가 제 구역이다: 상태와 버튼은 제목 줄에 서고, 아래에는 이름이 있는 행만 남는다.
         지금 하고 있는 일은 그 구역 안, 자기 상태 아래가 자리다 — 그리고 있을 때만 그려진다.
       */}
-      <HelperStatusCard section naverHealth={naverHealth}>
-        <HomeReviewOpsCard run={liveRun} />
-      </HelperStatusCard>
+      {/*
+        <b>판매자 PC 설치에는 이 구역이 없다</b> (2026-10-22 외부 검토 · 오너 동의). 그 설치에서 브라우저 자동화(도우미의
+        네이버 로그인 · 리뷰 수집)는 범위 밖이고(v1.14 ⑦), 도우미는 판매자가 시작하는 API 발급 안내에만 쓰인다 —
+        그 안내는 각 채널의 연결 화면에서 따로 들어간다. 그래서 구역도, 이 구역이 하던 1.5초마다의 탐색도 없다.
+      */}
+      {sellerPc ? null : (
+        <HelperStatusCard section naverHealth={naverHealth}>
+          <HomeReviewOpsCard run={liveRun} />
+        </HelperStatusCard>
+      )}
 
       <section aria-label="잘 안 될 때" className="space-y-2">
         <Disclosure label="잘 안 될 때" summaryClassName="-ml-2">
@@ -304,10 +313,12 @@ export function ConnectHub() {
             <li className="break-keep border-t border-line/70 py-2">
               <Go to="/connect/upload">파일로 넘기기</Go> — 연결이 어려운 채널은 파일로 받습니다.
             </li>
-            <li className="break-keep border-t border-line/70 py-2">
-              <Go to="/connect/review-history">기간별로 가져오기</Go> — 지난 기간의 리뷰를 판매자센터에서 직접
-              내려받아 넘깁니다.
-            </li>
+            {sellerPc ? null : (
+              <li className="break-keep border-t border-line/70 py-2">
+                <Go to="/connect/review-history">기간별로 가져오기</Go> — 지난 기간의 리뷰를 판매자센터에서 직접
+                내려받아 넘깁니다.
+              </li>
+            )}
             <li className="break-keep border-t border-line/70 py-2">
               <Go to="/connect/imports">실행 기록</Go> — 지난 실행과 구간별 이력.
             </li>
