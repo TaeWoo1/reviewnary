@@ -128,18 +128,31 @@ silently.
 - **What it is.** `ReviewSafetySignal`: a fixed list of expressions that report someone hurt or made
   ill (화상 · 다쳤 · 배탈 · 두드러기 …), a dangerous product (이물질 · 감전 · 타는 냄새 …) or a legal step
   (소비자원 · 신고했 · 소송 …), with a short negation window (「다칠 걱정 없어요」 · 「이물질 없이」 do not
-  count). No model.
+  count). No model. **A worry is not a negation (2026-10-23):** 「화상 입을까 걱정돼요」 rises; only a
+  worry that is itself denied (「화상 걱정 없어요」) does not.
 - **What it does.** A review carrying it joins the seller's undecided 확인 필요 list **whatever its
-  rating**, is marked 「안전 문제」, and is listed ahead of the inquiries — interview questions 19–20's
+  rating**, is marked **「안전 관련 확인」** (2026-10-23; it was 「안전 문제」 for one day — a term list finds a
+  candidate, it does not establish that harm happened), and is listed ahead of the inquiries — interview questions 19–20's
   「매우 심각한 리뷰는 문의 우선의 예외」. It never changes a tier and only ADDS rows (§5's regression gate
   holds).
 - **Why without the gate.** The owner was shown, before deciding, that `labels.json` holds no labels
   for this question and that the §5 harm — a happy 4–5★ customer's 「다칠 걱정 없어요」 raised as a
   problem — is the likely error, and chose rating-independent surfacing over (a) applying it only to
   1–2★ reviews and (b) holding it until labelled.
-- **Known misses, stated.** A reassurance farther than the window still rises (「알레르기 있는 아이도 잘
-  써요」); a report written as a worry does not (「화상 입을까 걱정돼요」); anything worded outside the
-  list is not seen.
-- **What would end the exception.** Labels for this narrower question on real reviews, measured against
-  §5's bars with the same Wilson lower bound. Until then the false-positive rate on 4–5★ is unknown and
-  must not be claimed.
+- **Known misses, stated.** The signal does not tell an occurrence (「화상을 입었어요」) from a worry
+  (「화상 입을까 걱정돼요」) or a background mention (「알레르기 있는 아이도 잘 써요」, which still rises);
+  all three are candidates for the seller. Anything worded outside the list is not seen. Telling them
+  apart is the next step — rules find the candidate, a context judgement is added on top, and that
+  judgement keeps its uncertainty and is measured like this one.
+- **What it reads, stated.** Outside the attention window it scans the 200 most recent undecided
+  reviews whose text contains a term's opening (`OperationsHomeService.SAFETY_SCAN`). It therefore never
+  supports 「there is no safety problem in this seller's reviews」, and no surface may say so. The
+  intended shape is a check when each review arrives plus a separate sequential pass over the backlog.
+- **What would end the exception.** A small labelled set of the seller's real reviews for this narrower
+  question — reports, worries, reassurances and unrelated mentions all included — scored separately for
+  **missed harm** and **needless alarms** against **bars the owner fixes before the labels are read**.
+  Measuring is not enough by itself: meeting those bars ends the exception; missing them leads to a
+  narrower operation or a fix, never to switching the signal off for 4–5★ reviews as a whole (the point of
+  the signal is that content, not the rating, decides). This set is a separate task from the
+  past-reply retrieval measurement, which says nothing about this signal. Until it is scored the
+  false-alarm rate on 4–5★ is unknown and must not be claimed.

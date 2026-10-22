@@ -92,8 +92,8 @@ Three of these rows deserve their reasoning written down:
 
 **One addition beside the tiers, not inside them (product-owner decision, 2026-10-22).** A review whose
 body reports a safety or legal problem (`ReviewSafetySignal` — 화상 · 이물질 · 소비자원 …, with a short
-negation window) joins the seller's undecided 확인 필요 list and its count **whatever its rating**, marked
-「안전 문제」 and listed ahead of the inquiries. Its tier is unchanged, so every claim above still holds of
+negation window; a worry such as 「화상 입을까 걱정돼요」 is not a negation) joins the seller's undecided 확인 필요
+list and its count **whatever its rating**, marked 「안전 관련 확인」 and listed ahead of the inquiries. Its tier is unchanged, so every claim above still holds of
 the tier; the Home's list is the tier's undecided rows **plus** these. It is a text-derived signal surfaced
 without RUBRIC §5's measurement, by an explicit owner exception recorded in
 [RUBRIC §7](../../contracts/review-eval/naver/v1/RUBRIC.md).
