@@ -126,6 +126,17 @@ describe("Grounded Review Drafting v1 — the draft first, then why, then what i
     );
   });
 
+  it("a draft written from a past reply's wording says so, apart from both 근거 있음 and 기본 문구", () => {
+    draw([], vi.fn(), {
+      basis: "PAST_ANSWER",
+      note: "비슷한 후기에 판매자가 승인했던 답글의 말투를 참고해 썼습니다. 지금 근거가 없어 사실이나 약속은 넣지 않았습니다.",
+    });
+    const basis = screen.getByTestId("grounded-review-basis");
+    expect(basis).toHaveTextContent("과거 답글 참고");
+    expect(basis).toHaveTextContent("사실이나 약속은 넣지 않았습니다");
+    expect(basis).not.toHaveTextContent(/근거 있음|기본 문구/);
+  });
+
   it("says nothing about the basis when the stored version recorded none", () => {
     draw();
     expect(screen.queryByTestId("grounded-review-basis")).toBeNull();

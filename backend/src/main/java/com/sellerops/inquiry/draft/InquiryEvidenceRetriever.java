@@ -314,8 +314,15 @@ public class InquiryEvidenceRetriever {
      */
     public InquiryEvidence retrieveFor(UUID orgId, UUID productId, RetrievalQuery question,
                                        KnowledgeVariantScope scope) {
+        return retrieveFor(orgId, productId, question, scope, m -> true);
+    }
+
+    /** The same, with the past answers this caller may use narrowed first ({@code memoryAdmits}). */
+    public InquiryEvidence retrieveFor(UUID orgId, UUID productId, RetrievalQuery question,
+                                       KnowledgeVariantScope scope,
+                                       java.util.function.Predicate<com.sellerops.knowledge.memory.AnswerMemory> memoryAdmits) {
         return lanes(orgId, namedProductOrNull(orgId, productId), question, null, scope,
-                OrderFact.unavailable(OrderFactState.NO_ORDER_REFERENCE, null, null));
+                OrderFact.unavailable(OrderFactState.NO_ORDER_REFERENCE, null, null), memoryAdmits);
     }
 
     /** Whether this id points at a real, named product of this org — the shared-bucket check. */
@@ -326,6 +333,12 @@ public class InquiryEvidenceRetriever {
     /** The three retrieval lanes and the merge, over a product that is already resolved. */
     private InquiryEvidence lanes(UUID orgId, UUID productId, RetrievalQuery question,
                                   UUID excludeInquiryId, KnowledgeVariantScope scope, OrderFact order) {
+        return lanes(orgId, productId, question, excludeInquiryId, scope, order, m -> true);
+    }
+
+    private InquiryEvidence lanes(UUID orgId, UUID productId, RetrievalQuery question,
+                                  UUID excludeInquiryId, KnowledgeVariantScope scope, OrderFact order,
+                                  java.util.function.Predicate<com.sellerops.knowledge.memory.AnswerMemory> memoryAdmits) {
         List<ScopedPassage> productLane = new ArrayList<>();
         DraftKnowledgeState productVerdict = DraftKnowledgeState.NO_PRODUCT;
         RetrievalOutcome productOutcome = RetrievalOutcome.ABSENT;
@@ -355,7 +368,8 @@ public class InquiryEvidenceRetriever {
         // This inquiry's own answer is excluded: a reply approved on THIS work item must not come
         // back as precedent for the next version of itself.
         AnswerMemorySearchResponse remembered =
-                answerMemory.search(orgId, question, productId, excludeInquiryId, MAX_PASSAGES);
+                answerMemory.search(orgId, question, productId, null, excludeInquiryId, MAX_PASSAGES,
+                        memoryAdmits);
         List<ScopedPassage> memoryLane = new ArrayList<>();
         for (AnswerMemoryPassage passage : remembered.passages()) {
             memoryLane.add(new ScopedPassage(KnowledgeScope.PAST_ANSWER, headingFor(passage),

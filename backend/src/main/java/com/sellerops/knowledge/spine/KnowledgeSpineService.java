@@ -161,6 +161,16 @@ public class KnowledgeSpineService {
         return assemble(orgId, lanes, question);
     }
 
+    /** The same retrieval, with the past answers this caller may use narrowed first. */
+    @Transactional(readOnly = true)
+    public SpineRetrieval retrieveForProduct(UUID orgId, UUID productId, RetrievalQuery question,
+                                             KnowledgeVariantScope scope,
+                                             java.util.function.Predicate<com.sellerops.knowledge.memory.AnswerMemory> memoryAdmits) {
+        InquiryEvidenceRetriever.InquiryEvidence lanes =
+                retriever.retrieveFor(orgId, productId, question, scope, memoryAdmits);
+        return assemble(orgId, lanes, question);
+    }
+
     private SpineRetrieval assemble(UUID orgId, InquiryEvidenceRetriever.InquiryEvidence lanes,
                                     RetrievalQuery question) {
         UUID productId = lanes.productId();

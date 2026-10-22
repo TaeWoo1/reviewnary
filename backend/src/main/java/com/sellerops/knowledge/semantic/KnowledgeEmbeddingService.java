@@ -63,6 +63,32 @@ public class KnowledgeEmbeddingService {
      * @return a map from text to vector; a text missing from it could not be embedded, and the caller
      *         must treat the corpus as incompletely seen rather than judge absence from a hole
      */
+    /** The vectors already cached for these texts — no vendor call. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public Map<String, float[]> cachedVectors(UUID orgId, List<String> texts) {
+        if (!enabledFor(orgId) || texts.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> hashOf = new LinkedHashMap<>();
+        for (String text : texts) {
+            hashOf.put(text, Vectors.sha256(text));
+        }
+        Map<String, float[]> byHash = new HashMap<>();
+        for (KnowledgeEmbedding row : repository.findAllByOrgIdAndModelAndDimensionsAndContentSha256In(
+                orgId, properties.model(), properties.dimensions(),
+                new LinkedHashSet<>(hashOf.values()))) {
+            byHash.put(row.getContentSha256(), Vectors.decode(row.getVector()));
+        }
+        Map<String, float[]> out = new LinkedHashMap<>();
+        hashOf.forEach((text, hash) -> {
+            float[] vector = byHash.get(hash);
+            if (vector != null) {
+                out.put(text, vector);
+            }
+        });
+        return out;
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Map<String, float[]> vectorsFor(UUID orgId, List<String> texts) {
         if (!enabledFor(orgId) || texts.isEmpty()) {

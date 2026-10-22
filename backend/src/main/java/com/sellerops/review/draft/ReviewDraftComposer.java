@@ -58,6 +58,13 @@ import org.springframework.stereotype.Service;
  * evidence never mentions. All three REFUSE rather than edit, and every refusal falls back to the
  * template floor — which promises nothing by construction.
  *
+ * <p><b>A past answer is a way of saying, not a fact</b> (2026-10-22 external review). When the only evidence for a
+ * review is a reply the seller once stood behind for a review like it — same rating band
+ * ({@link ReviewReplyPrecedent}) — the model still writes, from that reply's wording and shape (basis
+ * {@code PAST_ANSWER}), because a thank-you the seller already reworded is exactly what they want reused. What a past
+ * answer can never do is authorize a promise: {@link ReviewClaimGuard} is shown CURRENT evidence only, so an exchange
+ * the seller once granted as an exception does not become a policy in the next reply.
+ *
  * <p><b>It writes a draft and nothing else.</b> No approval, no submission ref, no execution. The
  * result is one more append-only version on the review, indistinguishable in the approval contract
  * from one the seller typed — except for the provenance stamped on it and the citations recorded
@@ -84,6 +91,10 @@ public class ReviewDraftComposer {
     static final String BASIS_GROUNDED_NOTE = "판매자가 등록한 근거를 사용해 썼습니다.";
     static final String BASIS_NONE_NOTE =
             "이 후기에 해당하는 근거를 찾지 못해, 저장된 문구로 안전한 기본 답글만 준비했습니다.";
+    static final String BASIS_PAST_ANSWER_NOTE =
+            "비슷한 후기에 판매자가 승인했던 답글의 말투를 참고해 썼습니다. 지금 근거가 없어 사실이나 약속은 넣지 않았습니다.";
+    /** The basis of a draft written from a past answer's wording alone — no current evidence behind it. */
+    static final String BASIS_PAST_ANSWER = "PAST_ANSWER";
 
     /**
      * The sentence for a STORED version, read back from what that version recorded.
@@ -102,6 +113,9 @@ public class ReviewDraftComposer {
         if (answerBasis == null) {
             return null;
         }
+        if (BASIS_PAST_ANSWER.equals(answerBasis) && hasEvidence) {
+            return BASIS_PAST_ANSWER_NOTE;
+        }
         return "GROUNDED".equals(answerBasis) && hasEvidence ? BASIS_GROUNDED_NOTE : BASIS_NONE_NOTE;
     }
 
@@ -116,6 +130,13 @@ public class ReviewDraftComposer {
     private final ReviewIssueRepository issues;
     private final KnowledgeCandidateService candidates;
     private com.sellerops.knowledge.spine.KnowledgeSpineService spine;
+    /** Which past answers a review reply may draw on; null where a test composes without it (every memory). */
+    private ReviewReplyPrecedent precedent;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setPrecedent(ReviewReplyPrecedent precedent) {
+        this.precedent = precedent;
+    }
 
     /** Production wiring: the review draft reads the Knowledge Spine retrieval the case investigator reads. */
     @org.springframework.beans.factory.annotation.Autowired
@@ -167,15 +188,23 @@ public class ReviewDraftComposer {
         // what the customer wrote. The candidate ladder (TITLE/SUBJECT/FULL) narrows it the same way
         // it narrows a forwarded mail thread.
         RetrievalQuery question = RetrievalQuery.ofCustomer(null, redactedBody);
-        InquiryEvidenceRetriever.InquiryEvidence retrieved =
-                spine.retrieveForProduct(orgId, productId, question, KnowledgeVariantScope.unresolved()).lanes();
+        // Past answers narrowed to replies the seller stood behind for reviews in this review's rating band.
+        InquiryEvidenceRetriever.InquiryEvidence retrieved = (precedent == null
+                ? spine.retrieveForProduct(orgId, productId, question, KnowledgeVariantScope.unresolved())
+                : spine.retrieveForProduct(orgId, productId, question, KnowledgeVariantScope.unresolved(),
+                        precedent.forReviewRated(orgId, review.getRating())))
+                .lanes();
 
         ReviewReplyTemplateKey key = RuleBasedReviewReplyProvider.keyFor(
                 new ReviewReplyContext(orgId, review.getId(), redactedBody, review.getRating()));
         ReviewReplyTemplateService.Resolved template = templates.resolve(orgId, key);
 
         boolean grounded = retrieved.state() == DraftKnowledgeState.GROUNDED;
-        String basis = grounded ? "GROUNDED" : "NO_ANSWER_BASIS";
+        // No current evidence, but a reply the seller stood behind for a review like this one: written from its
+        // wording, promising nothing (the guard sees current evidence only).
+        boolean pastAnswerOnly = !grounded
+                && retrieved.passages().stream().anyMatch(p -> p.scope() == KnowledgeScope.PAST_ANSWER);
+        String basis = grounded ? "GROUNDED" : pastAnswerOnly ? BASIS_PAST_ANSWER : "NO_ANSWER_BASIS";
 
         String body = template.body();
         String authorKind = DraftAuthorKind.RULE.name();
@@ -183,7 +212,7 @@ public class ReviewDraftComposer {
         String unavailable = null;
         List<ScopedPassage> cited = List.of();
 
-        if (grounded) {
+        if (grounded || pastAnswerOnly) {
             Written written = writeGrounded(orgId, redactedBody, retrieved.passages(), template.body());
             unavailable = written.unavailable();
             if (written.body() != null) {
@@ -191,6 +220,9 @@ public class ReviewDraftComposer {
                 authorKind = DraftAuthorKind.MODEL.name();
                 provenanceVersion = model.versionFor(orgId);
                 cited = retrieved.passages();
+            } else if (pastAnswerOnly) {
+                // The model did not write: what is saved is the template, and the basis says so.
+                basis = "NO_ANSWER_BASIS";
             }
         }
 
@@ -267,8 +299,10 @@ public class ReviewDraftComposer {
             return new Written(null, MODEL_FAILED);
         }
         String candidate = written.get();
+        // Only CURRENT evidence may authorize a promise. A past answer is shown to the model for its wording, and an
+        // exchange the seller once granted is not a policy (2026-10-22 review).
         List<String> unsupported = ReviewClaimGuard.unsupportedClaims(candidate,
-                passages.stream().map(ScopedPassage::text).toList());
+                passages.stream().filter(p -> p.scope().current()).map(ScopedPassage::text).toList());
         if (!unsupported.isEmpty()) {
             return new Written(null, UNSUPPORTED_CLAIM);
         }

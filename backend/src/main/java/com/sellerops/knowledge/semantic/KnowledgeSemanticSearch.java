@@ -26,6 +26,12 @@ import org.springframework.stereotype.Component;
  * <p><b>All or nothing.</b> If any candidate has no usable vector, this returns null and the lane
  * falls back to the lexical scorer — a lane that has not read every passage may not conclude that
  * the corpus is silent.
+ *
+ * <p><b>The corpus is indexed as it is searched</b> (2026-10-22). Passage vectors are cached by content, so one
+ * search pays only for sentences nobody has embedded yet, at most {@link #MAX_SENTENCES} of them; the rest wait for
+ * the next search, which falls back to the lexical scorer meanwhile. Before this the cap counted the whole corpus,
+ * so a seller whose past answers passed 64 sentences lost semantic search for good, silently. Every fallback now
+ * says why in the log (counts only), so "semantic was on but did not run" is visible.
  */
 @Component
 public class KnowledgeSemanticSearch {
@@ -38,6 +44,14 @@ public class KnowledgeSemanticSearch {
      * scorer rather than turning one search into a bulk upload.
      */
     static final int MAX_SENTENCES = 64;
+
+    /**
+     * The most sentences one search compares at all, cached or not — a bound on the in-memory work, far above any
+     * one seller's notes, policies or past answers in the reference deployment.
+     */
+    static final int MAX_CORPUS_SENTENCES = 4000;
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(KnowledgeSemanticSearch.class);
 
     private final KnowledgeEmbeddingService embeddings;
     private final KnowledgeQuestionIntent intent;
@@ -102,19 +116,25 @@ public class KnowledgeSemanticSearch {
             List<String> sentences = KnowledgeText.comparableUnits(quotable);
             sentencesOf.put(quotable, sentences);
             all.addAll(sentences);
-            if (all.size() > MAX_SENTENCES) {
-                return null;
+            if (all.size() > MAX_CORPUS_SENTENCES) {
+                return fellBack(orgId, "CORPUS_TOO_LARGE", all.size(), -1);
             }
         }
-        Map<String, float[]> vectors = embeddings.vectorsFor(orgId, new ArrayList<>(all));
-        for (String sentence : all) {
-            if (!vectors.containsKey(sentence)) {
-                return null;
-            }
+        List<String> ordered = new ArrayList<>(all);
+        Map<String, float[]> vectors = new HashMap<>(embeddings.cachedVectors(orgId, ordered));
+        List<String> missing = ordered.stream().filter(s -> !vectors.containsKey(s)).toList();
+        if (!missing.isEmpty()) {
+            vectors.putAll(embeddings.vectorsFor(orgId,
+                    missing.subList(0, Math.min(MAX_SENTENCES, missing.size()))));
+        }
+        long unseen = ordered.stream().filter(s -> !vectors.containsKey(s)).count();
+        if (unseen > 0) {
+            return fellBack(orgId, missing.size() > MAX_SENTENCES ? "INDEXING" : "NOT_EMBEDDED", ordered.size(),
+                    unseen);
         }
         float[] asked = embeddings.questionVector(orgId, question);
         if (asked == null) {
-            return null;
+            return fellBack(orgId, "QUESTION_NOT_EMBEDDED", ordered.size(), 0);
         }
         // The customer's own sentence is always one of the phrasings. The restatement is added when
         // there is one; a vendor that refused, a capability that is off and a sentence that asks for
@@ -167,5 +187,12 @@ public class KnowledgeSemanticSearch {
                 return OptionalDouble.of(Vectors.cosine(vectors.get(a), vectors.get(b)));
             }
         };
+    }
+
+    /** The lexical fallback, said once in the log: which org, why, and how much was or was not seen. */
+    private static <T> T fellBack(UUID orgId, String reason, int sentences, long unseen) {
+        log.info("knowledge semantic search fell back to lexical org={} reason={} sentences={} unseen={}", orgId,
+                reason, sentences, unseen);
+        return null;
     }
 }

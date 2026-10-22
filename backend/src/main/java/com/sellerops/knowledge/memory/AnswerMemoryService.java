@@ -283,10 +283,23 @@ public class AnswerMemoryService {
     @Transactional(readOnly = true)
     public AnswerMemorySearchResponse search(UUID orgId, RetrievalQuery question, UUID productId,
                                              String productName, UUID excludeInquiryId, int limit) {
+        return search(orgId, question, productId, productName, excludeInquiryId, limit, m -> true);
+    }
+
+    /**
+     * The same search over the memories {@code admits} lets in — decided before anything is ranked, so a memory the
+     * caller may not use is never a candidate, never embedded and never wins a conflict. The review lane uses it to
+     * keep a reply to a happy review away from an unhappy one ({@code ReviewReplyPrecedent}).
+     */
+    @Transactional(readOnly = true)
+    public AnswerMemorySearchResponse search(UUID orgId, RetrievalQuery question, UUID productId,
+                                             String productName, UUID excludeInquiryId, int limit,
+                                             java.util.function.Predicate<AnswerMemory> admits) {
         List<AnswerMemory> corpus = memories.findAllByOrgId(orgId).stream()
                 .filter(m -> m.getProductId() == null || m.getProductId().equals(productId))
                 .filter(m -> excludeInquiryId == null
                         || !excludeInquiryId.equals(m.getOriginInquiryId()))
+                .filter(admits)
                 .toList();
         List<KnowledgeRetriever.Candidate<AnswerMemory>> candidates = corpus.stream()
                 // The past answer as the seller wrote it — its own title, then its body. Same two

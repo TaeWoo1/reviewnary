@@ -117,6 +117,11 @@ class ReviewDraftComposerTest {
                 "product-knowledge/USAGE:판매자", 0.9);
     }
 
+    private static ScopedPassage pastAnswer(String text) {
+        return new ScopedPassage(KnowledgeScope.PAST_ANSWER, "리뷰 답글 · 별점 5점", text,
+                UUID.fromString("a1b2c3d4-0000-4000-8000-000000000008"), null, "answer-memory", 0.8);
+    }
+
     private static ScopedPassage policyPassage(String text) {
         return new ScopedPassage(KnowledgeScope.ORG_OPERATIONS, "배송 안내", text,
                 UUID.fromString("a1b2c3d4-0000-4000-8000-000000000006"),
@@ -293,5 +298,56 @@ class ReviewDraftComposerTest {
         assertThat(view.draft().body()).isEqualTo("선바로입니다. 후기 감사합니다.");
         assertThat(view.templateSource()).isEqualTo("ORG");
         assertThat(view.templateCategory()).isEqualTo("positive_reply");
+    }
+
+    @Test
+    @DisplayName("only a past answer: the model writes from its wording, the basis says so, and nothing is promised")
+    void aPastAnswerAloneShapesTheWordingAndIsSaidToBeThat() {
+        retrieval(DraftKnowledgeState.NO_LIBRARY, pastAnswer("빠른 배송과 꼼꼼한 포장을 알아봐 주셔서 감사합니다."));
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
+                .thenReturn(Optional.of("꼼꼼한 포장을 알아봐 주셔서 감사합니다. 또 찾아 주세요."));
+
+        GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
+
+        assertThat(view.authorKind()).isEqualTo("MODEL");
+        assertThat(view.answerBasis()).isEqualTo(ReviewDraftComposer.BASIS_PAST_ANSWER);
+        assertThat(view.answerBasisNote()).isEqualTo(ReviewDraftComposer.BASIS_PAST_ANSWER_NOTE);
+        assertThat(view.evidence()).singleElement().satisfies(e -> assertThat(e.scopeLabel()).isEqualTo("과거 답변"));
+    }
+
+    @Test
+    @DisplayName("a past answer never authorizes a promise: an exchange once granted is not a policy")
+    void aPastAnswerCannotAuthorizeAPromise() {
+        retrieval(DraftKnowledgeState.NO_LIBRARY, pastAnswer("불편을 드려 죄송합니다. 교환해 드렸습니다."));
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
+                .thenReturn(Optional.of("불편을 드려 죄송합니다. 교환 도와드리겠습니다."));
+
+        GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
+
+        assertThat(view.draft().body()).isEqualTo(TEMPLATE);
+        assertThat(view.unavailableMessage()).isEqualTo(ReviewDraftComposer.UNSUPPORTED_CLAIM);
+        assertThat(view.answerBasis()).as("the template was saved, and the basis says so").isEqualTo("NO_ANSWER_BASIS");
+
+        // The same with current evidence beside it that says nothing about exchanges.
+        retrieval(DraftKnowledgeState.GROUNDED, productPassage("표면의 먼지와 기름기를 닦아낸 뒤 눌러 붙여 주세요."),
+                pastAnswer("불편을 드려 죄송합니다. 교환해 드렸습니다."));
+        GeneratedReviewDraftView grounded = composer.compose(ORG, review(), BODY, "SELLER:u1");
+        assertThat(grounded.draft().body()).isEqualTo(TEMPLATE);
+        assertThat(grounded.unavailableMessage()).isEqualTo(ReviewDraftComposer.UNSUPPORTED_CLAIM);
+    }
+
+    @Test
+    @DisplayName("past answers are narrowed to replies for reviews in this review's rating band")
+    void thePastAnswersAreThoseOfTheSameRatingBand() {
+        ReviewReplyPrecedent precedent = mock(ReviewReplyPrecedent.class);
+        java.util.function.Predicate<com.sellerops.knowledge.memory.AnswerMemory> band = m -> false;
+        when(precedent.forReviewRated(ORG, 4)).thenReturn(band);
+        composer.setPrecedent(precedent);
+        when(retriever.retrieveFor(eq(ORG), eq(PRODUCT), any(), any(), eq(band)))
+                .thenReturn(new InquiryEvidence(PRODUCT, DraftKnowledgeState.NO_LIBRARY, List.of(), null, 0));
+
+        composer.compose(ORG, review(), BODY, "SELLER:u1");
+
+        verify(retriever).retrieveFor(eq(ORG), eq(PRODUCT), any(), any(), eq(band));
     }
 }

@@ -220,8 +220,9 @@ abstract class VendorReplyTaskScenarios {
                 .satisfies(i -> assertThat(i.entry().provenance()).isEqualTo("리뷰 답글 · 판매자가 승인한 답글"));
 
         // The next review about the same thing is drafted with the seller's own sentence among its evidence. Lexical
-        // retrieval only here (no embeddings in tests): a short review in the same words is found; a long one whose
-        // words carry other particles (배송이 · 배송과) is not — the real-case check is where that is measured.
+        // retrieval only here (no embeddings in this context), so the review is a short one: a whole sentence fails
+        // the lexical absence gate and needs the semantic lane — ReviewReplyPrecedentRetrievalTest and
+        // ReviewPrecedentQualitySetTest hold that path (retrieval_runtime_closure_v1 §10).
         assertThat(spine.retrieveForProduct(org, null,
                         com.sellerops.knowledge.RetrievalQuery.ofCustomer(null, "포장 꼼꼼 배송 빠름"),
                         com.sellerops.product.library.KnowledgeVariantScope.unresolved())

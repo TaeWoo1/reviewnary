@@ -122,7 +122,7 @@ export function GroundedReviewDraft({
       {basis ? (
         <p className="flex flex-wrap items-center gap-2 text-sm" role="status" data-testid="grounded-review-basis">
           <Status tone={basis === "GROUNDED" ? "good" : "neutral"}>
-            {basis === "GROUNDED" ? "근거 있음" : "기본 문구"}
+            {basisLabel(basis)}
           </Status>
           {basisNote ? <span className="break-keep text-muted">{basisNote}</span> : null}
         </p>
@@ -199,4 +199,14 @@ function Gap({ gap, onSaved }: { gap: ReviewKnowledgeGapView; onSaved: () => voi
       />
     </div>
   );
+}
+
+/**
+ * The chip for a draft's basis. PAST_ANSWER (2026-10-22): written from the wording of a reply the seller once
+ * approved for a review like this one, with no current evidence — not "근거 있음", and not the template either.
+ */
+function basisLabel(basis: string): string {
+  if (basis === "GROUNDED") return "근거 있음";
+  if (basis === "PAST_ANSWER") return "과거 답글 참고";
+  return "기본 문구";
 }
