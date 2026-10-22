@@ -170,6 +170,50 @@ export interface VendorLinkStatus {
   linkedAt: string | null;
 }
 
+/** Whether a vendor-server store is received here, and into which organisation (backend `Standing`). */
+export type VendorReviewStanding = "NOT_RECEIVING" | "RECEIVING" | "PAUSED" | "OTHER_ORGANISATION";
+
+/**
+ * One vendor-server store as the 「채널 연결」 section shows it (backend `StoreView`). Two times, never one:
+ * `lastCheckedAt` is when this PC last asked the server, `lastUploadAt` when a delegate last uploaded the export.
+ */
+export interface VendorReviewStoreView {
+  storeId: string;
+  label: string;
+  standing: VendorReviewStanding;
+  lastCheckedAt: string | null;
+  lastUploadAt: string | null;
+  received: number;
+  failure: "UNREACHABLE" | "NOT_AUTHORIZED" | "NOT_STORED" | null;
+  failedAt: string | null;
+}
+
+export type VendorReviewRelayState = "OFF" | "NOT_LINKED" | "NOT_AUTHORIZED" | "UNREACHABLE" | "PULLED";
+
+/** Whose server account this PC receives for, into which organisation, and each store (backend `ReviewsOverview`). */
+export interface VendorReviewsOverview {
+  state: VendorReviewRelayState;
+  accountEmail: string | null;
+  organisation: string | null;
+  stores: VendorReviewStoreView[];
+}
+
+/** What one pull did, per store (backend `PullResult`). */
+export interface VendorReviewPullResult {
+  state: VendorReviewRelayState;
+  stores: Array<{
+    storeId: string;
+    label: string;
+    bound: boolean;
+    otherOrganisation: boolean;
+    paused: boolean;
+    received: number;
+    inserted: number;
+    updated: number;
+    failed: number;
+  }>;
+}
+
 /** This PC's public IPv4 as the vendor server sees it, or why there is none (backend `PublicIpView`). */
 export interface VendorPublicIpView {
   ipv4: string | null;

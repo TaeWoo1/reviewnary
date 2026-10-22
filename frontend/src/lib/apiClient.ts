@@ -57,6 +57,8 @@ import type {
   NaverSetupView,
   VendorLinkStatus,
   VendorPublicIpView,
+  VendorReviewPullResult,
+  VendorReviewsOverview,
   VendorReplyTaskView,
   CoupangSetupView,
   ConnectionStatusView,
@@ -528,6 +530,23 @@ export const api = {
   async cancelReviewReplyDelegation(reviewId: string): Promise<VendorReplyTaskView> {
     const { data } = await http.post<VendorReplyTaskView>(`/api/local/vendor-link/reviews/${reviewId}/cancel`);
     return data;
+  },
+  // Reviews a delegate uploads to the vendor server (§3.2). Only 「리뷰 받기 시작」 binds a store, and only the
+  // stores it names — the ones the screen showed.
+  async getVendorReviewsOverview(): Promise<VendorReviewsOverview> {
+    const { data } = await http.get<VendorReviewsOverview>("/api/local/vendor-link/reviews/overview");
+    return data;
+  },
+  async startVendorReviews(storeIds: string[]): Promise<VendorReviewPullResult> {
+    const { data } = await http.post<VendorReviewPullResult>("/api/local/vendor-link/reviews/start", { storeIds });
+    return data;
+  },
+  async pullVendorReviews(): Promise<VendorReviewPullResult> {
+    const { data } = await http.post<VendorReviewPullResult>("/api/local/vendor-link/reviews/pull");
+    return data;
+  },
+  async setVendorStorePaused(storeId: string, paused: boolean): Promise<void> {
+    await http.post(`/api/local/vendor-link/reviews/stores/${storeId}/${paused ? "pause" : "resume"}`);
   },
   async getVendorPublicIp(): Promise<VendorPublicIpView> {
     const { data } = await http.get<VendorPublicIpView>("/api/local/vendor-link/public-ip");

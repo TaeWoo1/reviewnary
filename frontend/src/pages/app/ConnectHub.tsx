@@ -6,6 +6,7 @@ import { SectionHeader } from "../../components/ui/SectionHeader";
 import { Disclosure } from "../../components/ui/Disclosure";
 import { BtnLink } from "../../components/ui/Btn";
 import { ChannelList } from "../../components/connect/ChannelList";
+import { VendorReviewsSection } from "../../components/connect/VendorReviewsSection";
 import { HelperStatusCard } from "../../components/connect/HelperStatusCard";
 import { HomeReviewOpsCard } from "../../components/actionWindow/HomeReviewOpsCard";
 import { useOperationsStore } from "../../hooks/useOperationsStore";
@@ -273,6 +274,9 @@ export function ConnectHub() {
           channelsError={channelsError}
         />
       </Block>
+
+      {/* 담당자가 서버에 올린 리뷰를 이 PC가 받는 길 — 판매자 PC 설치에서만 보인다 (2026-10-22 시안 확인). */}
+      <VendorReviewsSection />
 
       {/*
         <b>이 화면에는 두 가지가 있다 — 채널의 상태와, 이 Mac의 상태.</b> 그 둘이 판매자가 실제로 가진 것이고,
