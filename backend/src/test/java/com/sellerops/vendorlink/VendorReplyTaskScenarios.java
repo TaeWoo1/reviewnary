@@ -306,7 +306,7 @@ abstract class VendorReplyTaskScenarios {
         vendor.event("NEW", new VendorServerClient.FeedReview(id, reviewNo, "SKU-합성-1", "합성 상품", 5, body,
                 com.sellerops.common.ReviewBodyFingerprint.of(body), null, null,
                 Instant.parse("2026-10-01T01:00:00Z"), "노출", false, null));
-        pull.pullFor(org);
+        pull.start(org, List.of(vendor.store));
         UUID naver = channels.findByCode("NAVER").orElseThrow().getId();
         return reviews.findByOrgIdAndChannelIdAndExternalId(org, naver, reviewNo).orElseThrow().getId();
     }

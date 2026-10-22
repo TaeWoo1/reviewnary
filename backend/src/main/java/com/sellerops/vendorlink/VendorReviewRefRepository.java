@@ -13,6 +13,8 @@ public interface VendorReviewRefRepository extends JpaRepository<VendorReviewRef
 
     Optional<VendorReviewRef> findByReviewId(UUID reviewId);
 
+    long countByVendorStoreId(UUID vendorStoreId);
+
     /**
      * A store's reviews whose seller decided 'no reply' on this PC and the server has not heard it: the current triage
      * is {@code NO_ACTION} and a person set it ({@code SELLER:} — never an automated judgement, 2026-10-21 owner

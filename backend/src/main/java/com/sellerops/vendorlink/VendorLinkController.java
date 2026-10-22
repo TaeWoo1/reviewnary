@@ -1,6 +1,9 @@
 package com.sellerops.vendorlink;
 
 import com.sellerops.auth.AuthPrincipal;
+import com.sellerops.organization.Organization;
+import com.sellerops.organization.OrganizationRepository;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -8,6 +11,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,15 +24,23 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/local/vendor-link")
 public class VendorLinkController {
 
+    public record StartRequest(List<UUID> storeIds) {}
+
+    /** {@code organisation}: the name of the SellerOps organisation the stores are received into. */
+    public record ReviewsOverview(VendorReviewPullService.State state, String accountEmail, String organisation,
+                                  List<VendorReviewPullService.StoreView> stores) {}
+
     private final VendorLinkService service;
     private final VendorReviewPullService reviewPull;
     private final VendorReplyTaskService replyTasks;
+    private final OrganizationRepository organizations;
 
     public VendorLinkController(VendorLinkService service, VendorReviewPullService reviewPull,
-                                VendorReplyTaskService replyTasks) {
+                                VendorReplyTaskService replyTasks, OrganizationRepository organizations) {
         this.service = service;
         this.reviewPull = reviewPull;
         this.replyTasks = replyTasks;
+        this.organizations = organizations;
     }
 
     @GetMapping
@@ -56,13 +68,36 @@ public class VendorLinkController {
         return service.publicIp();
     }
 
+    /** The 「담당자가 올리는 네이버 리뷰」 section: whose server account, into which organisation, each store (§3.2). */
+    @GetMapping("/reviews/overview")
+    public ReviewsOverview reviewsOverview(@AuthenticationPrincipal AuthPrincipal principal) {
+        VendorReviewPullService.Overview overview = reviewPull.overview(principal.orgId());
+        String organisation = organizations.findById(principal.orgId()).map(Organization::getName).orElse(null);
+        return new ReviewsOverview(overview.state(), overview.accountEmail(), organisation, overview.stores());
+    }
+
     /**
-     * Pulls the vendor server's review feed now (§3.2). The seller's own press is what binds this account's
-     * not-yet-bound NAVER stores to their organisation; the scheduled pull never binds.
+     * 「리뷰 받기 시작」: binds exactly the stores the screen showed ({@code storeIds}) to this organisation and pulls.
+     * Nothing else binds a store — a store the server adds later waits to be shown and started the same way.
      */
+    @PostMapping("/reviews/start")
+    public VendorReviewPullService.PullResult startReviews(@AuthenticationPrincipal AuthPrincipal principal,
+                                                           @RequestBody StartRequest request) {
+        return reviewPull.start(principal.orgId(), request.storeIds() == null ? List.of() : request.storeIds());
+    }
+
+    /** 「지금 받기」: this organisation's started stores that are not stopped. Binds nothing. */
     @PostMapping("/reviews/pull")
     public VendorReviewPullService.PullResult pullReviews(@AuthenticationPrincipal AuthPrincipal principal) {
         return reviewPull.pullFor(principal.orgId());
+    }
+
+    /** 「받기 멈추기」 · 「다시 받기」 for one store of this organisation; 404 when it is not theirs. */
+    @PostMapping("/reviews/stores/{storeId}/{action:pause|resume}")
+    public ResponseEntity<Void> pauseOrResume(@AuthenticationPrincipal AuthPrincipal principal,
+                                              @PathVariable UUID storeId, @PathVariable String action) {
+        return reviewPull.setPaused(principal.orgId(), storeId, "pause".equals(action))
+                ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
 
     /** 「휴대폰으로 승인 요청」: sends this review's current draft for the seller's approval on the phone (§4). */

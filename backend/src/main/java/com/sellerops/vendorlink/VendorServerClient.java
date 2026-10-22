@@ -3,6 +3,7 @@ package com.sellerops.vendorlink;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -48,8 +49,11 @@ public interface VendorServerClient {
 
     /* ── review relay (§3.2) ── */
 
-    /** A store of this install's seller account. {@code channel} is the server's closed value (e.g. {@code NAVER}). */
-    record Store(UUID id, String channel, String label) {}
+    /**
+     * A store of this install's seller account. {@code channel} is the server's closed value (e.g. {@code NAVER});
+     * {@code lastUploadAt} is when a delegate last uploaded its export, null before the first.
+     */
+    record Store(UUID id, String channel, String label, Instant lastUploadAt) {}
 
     /** One review as the server holds it now. Times are instants; {@code attachmentUrl} is the one kept address. */
     record FeedReview(UUID id, String reviewNo, String productNo, String productName, int rating, String body,
@@ -63,6 +67,9 @@ public interface VendorServerClient {
 
     /** This install's seller account's stores. */
     List<Store> stores(String installToken);
+
+    /** The seller account this install belongs to, by its sign-in address — shown as where reviews come from. */
+    Optional<String> accountEmail(String installToken);
 
     /** The store's review events after {@code cursor}, oldest first. */
     FeedPage reviewFeed(String installToken, UUID storeId, long cursor, int limit);

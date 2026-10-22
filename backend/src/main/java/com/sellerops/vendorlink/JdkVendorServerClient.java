@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -109,9 +110,18 @@ public class JdkVendorServerClient implements VendorServerClient {
         }
         List<Store> stores = new ArrayList<>();
         for (JsonNode s : a.json()) {
-            stores.add(new Store(uuid(s, "id"), text(s, "channel"), text(s, "label")));
+            stores.add(new Store(uuid(s, "id"), text(s, "channel"), text(s, "label"),
+                    optionalInstant(s, "lastUploadAt")));
         }
         return stores;
+    }
+
+    @Override
+    public Optional<String> accountEmail(String installToken) {
+        Answer a = relay(HttpRequest.newBuilder(base.resolve("v1/installs/me")).timeout(REQUEST_TIMEOUT)
+                .header("Authorization", "Bearer " + installToken).header("Accept", "application/json")
+                .GET().build());
+        return Optional.ofNullable(optionalText(a.json(), "accountEmail"));
     }
 
     @Override
@@ -311,6 +321,11 @@ public class JdkVendorServerClient implements VendorServerClient {
             Thread.currentThread().interrupt();
             throw new Unreachable();
         }
+    }
+
+    /** Null when absent; a present value that is not an instant is a broken answer. */
+    private static Instant optionalInstant(JsonNode json, String field) {
+        return optionalText(json, field) == null ? null : instant(json, field);
     }
 
     private static Instant instant(JsonNode json, String field) {

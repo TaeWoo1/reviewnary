@@ -1,6 +1,7 @@
 package com.sellerops.vendorlink;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.sellerops.channel.Channel;
 import com.sellerops.channel.ChannelRepository;
@@ -17,9 +18,13 @@ import com.sellerops.review.ReviewReplyState;
 import com.sellerops.review.ReviewRepository;
 import com.sellerops.sync.SyncJob;
 import com.sellerops.sync.SyncJobRepository;
+import com.sellerops.vendorlink.VendorReviewPullService.Failure;
+import com.sellerops.vendorlink.VendorReviewPullService.Overview;
 import com.sellerops.vendorlink.VendorReviewPullService.PullResult;
+import com.sellerops.vendorlink.VendorReviewPullService.Standing;
 import com.sellerops.vendorlink.VendorReviewPullService.State;
 import com.sellerops.vendorlink.VendorReviewPullService.StoreResult;
+import com.sellerops.vendorlink.VendorReviewPullService.StoreView;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -100,11 +105,11 @@ abstract class VendorReviewPullScenarios {
     }
 
     @Test
-    void aSellersPullBindsTheStoreAndStoresEachReviewOnceWithItsRun() {
+    void startingBindsTheShownStoreAndStoresEachReviewOnceWithItsRun() {
         vendor.event("NEW", review("v1", "9000000001", "만족합니다", 5, false, "노출"));
         vendor.event("NEW", review("v2", "9000000002", "", 3, true, "노출"));
 
-        PullResult first = pull.pullFor(org);
+        PullResult first = pull.start(org, List.of(store));
         assertThat(first.state()).isEqualTo(State.PULLED);
         assertThat(first.stores()).singleElement().satisfies(s -> {
             assertThat(s.bound()).isTrue();
@@ -135,7 +140,7 @@ abstract class VendorReviewPullScenarios {
     @Test
     void aChangedReviewIsUpdatedAndAReplyIsNeverTakenBack() {
         vendor.event("NEW", review("v1", "9000000011", "처음 쓴 리뷰", 2, false, "노출"));
-        pull.pullFor(org);
+        pull.start(org, List.of(store));
         UUID id = held("9000000011").getId();
 
         vendor.event("CHANGED", review("v1", "9000000011", "고쳐 쓴 리뷰", 4, false, "비노출"));
@@ -153,15 +158,17 @@ abstract class VendorReviewPullScenarios {
     }
 
     @Test
-    void theScheduledPullNeverBindsAndAnotherOrganisationNeverReceives() {
+    void noPullBindsAndAnotherOrganisationNeverReceives() {
         vendor.event("NEW", review("v1", "9000000021", "합성 리뷰", 5, false, "노출"));
 
         PullResult unattended = pull.pullBound();
         assertThat(unattended.stores()).singleElement().satisfies(s -> assertThat(s.bound()).isFalse());
+        assertThat(pull.pullFor(org).stores()).as("nor does 「지금 받기」").singleElement()
+                .satisfies(s -> assertThat(s.bound()).isFalse());
         assertThat(bindings.findByVendorStoreId(store)).isEmpty();
         assertThat(vendor.cursorsAsked).isEmpty();
 
-        pull.pullFor(org);
+        pull.start(org, List.of(store));
         UUID other = organization("다른 판매자");
         StoreResult refused = pull.pullFor(other).stores().get(0);
         assertThat(refused.otherOrganisation()).isTrue();
@@ -178,13 +185,17 @@ abstract class VendorReviewPullScenarios {
         vendor.event("NEW", review("v1", "9000000032", "둘째 리뷰", 5, false, "노출"));
         vendor.event("NEW", review("v3", "9000000033", "셋째 리뷰", 5, false, "노출"));
 
-        StoreResult result = pull.pullFor(org).stores().get(0);
+        StoreResult result = pull.start(org, List.of(store)).stores().get(0);
         assertThat(result.failed()).isEqualTo(1);
         assertThat(result.cursor()).isEqualTo(1);
         assertThat(result.more()).isFalse();
         assertThat(vendor.acks).containsExactly(1L);
         assertThat(reviews.findByOrgIdAndChannelIdAndExternalId(org, naverId(), "9000000032")).isEmpty();
         assertThat(reviews.findByOrgIdAndChannelIdAndExternalId(org, naverId(), "9000000033")).isEmpty();
+        assertThat(pull.overview(org).stores()).singleElement().satisfies(v -> {
+            assertThat(v.failure()).as("this store, said apart from the others").isEqualTo(Failure.NOT_STORED);
+            assertThat(v.failedAt()).isNotNull();
+        });
 
         pull.pullFor(org);
         assertThat(vendor.cursorsAsked).as("the next pull starts at the event that failed").containsExactly(0L, 1L);
@@ -194,7 +205,7 @@ abstract class VendorReviewPullScenarios {
     void aLostAckIsRepeatedByTheNextPullEvenWithNothingNew() {
         vendor.event("NEW", review("v1", "9000000041", "첫 리뷰", 5, false, "노출"));
         vendor.dropAcks = 1;
-        assertThat(pull.pullFor(org).stores().get(0).cursor()).isEqualTo(1);
+        assertThat(pull.start(org, List.of(store)).stores().get(0).cursor()).isEqualTo(1);
         assertThat(vendor.acks).as("the first ack was lost").isEmpty();
 
         assertThat(pull.pullBound().stores().get(0).received()).as("nothing new on the server").isZero();
@@ -214,6 +225,73 @@ abstract class VendorReviewPullScenarios {
         vendor.refuse = true;
         assertThat(pull.pullFor(org).state()).isEqualTo(State.NOT_AUTHORIZED);
         assertThat(bindings.findByVendorStoreId(store)).isEmpty();
+    }
+
+    @Test
+    void onlyTheStoresShownAreStartedAndALaterStoreWaitsToBeShown() {
+        vendor.event("NEW", review("v1", "9000000051", "합성 리뷰", 5, false, "노출"));
+        UUID notNamed = UUID.randomUUID();
+        vendor.laterStores.add(new VendorServerClient.Store(notNamed, "NAVER", "이름이 오지 않은 스토어", null));
+        UUID later = UUID.randomUUID();
+        pull.start(org, List.of(store, UUID.randomUUID()));
+        assertThat(bindings.findAll()).as("only what the press named, and only what the server has")
+                .extracting(VendorStoreBinding::getVendorStoreId).containsExactly(store);
+        vendor.laterStores.clear();
+
+        vendor.laterStores.add(new VendorServerClient.Store(later, "NAVER", "나중에 생긴 스토어", null));
+        pull.pullFor(org);
+        pull.pullBound();
+        assertThat(bindings.findByVendorStoreId(later)).as("added on the server later: shown, not taken").isEmpty();
+        assertThat(pull.overview(org).stores()).extracting(StoreView::storeId, StoreView::standing)
+                .containsExactly(tuple(store, Standing.RECEIVING), tuple(later, Standing.NOT_RECEIVING));
+
+        pull.start(org, List.of(later));
+        assertThat(bindings.findByVendorStoreId(later)).get().extracting(VendorStoreBinding::getOrgId).isEqualTo(org);
+    }
+
+    @Test
+    void theOverviewSaysWhoseAccountAndKeepsTheLastCheckApartFromTheLastUpload() {
+        Instant uploaded = Instant.parse("2026-10-19T09:00:00Z");
+        vendor.lastUploadAt = uploaded;
+        vendor.event("NEW", review("v1", "9000000061", "합성 리뷰", 5, false, "노출"));
+        Overview before = pull.overview(org);
+        assertThat(before.accountEmail()).isEqualTo("seller@example.com");
+        assertThat(before.stores()).singleElement().satisfies(v -> {
+            assertThat(v.standing()).isEqualTo(Standing.NOT_RECEIVING);
+            assertThat(v.lastUploadAt()).isEqualTo(uploaded);
+            assertThat(v.lastCheckedAt()).isNull();
+        });
+
+        pull.start(org, List.of(store));
+        StoreView after = pull.overview(org).stores().get(0);
+        assertThat(after.lastCheckedAt()).as("asked just now").isEqualTo(CLOCK.instant());
+        assertThat(after.lastUploadAt()).as("but the newest file is still the delegate's last").isEqualTo(uploaded);
+        assertThat(after.received()).isEqualTo(1);
+
+        vendor.refuse = true;
+        Overview refused = pull.overview(org);
+        assertThat(refused.state()).isEqualTo(State.NOT_AUTHORIZED);
+        assertThat(refused.stores()).as("what this PC had stays on screen").singleElement()
+                .satisfies(v -> assertThat(v.lastUploadAt()).isEqualTo(uploaded));
+    }
+
+    @Test
+    void aStoppedStoreIsNotAskedUntilItIsStartedAgain() {
+        vendor.event("NEW", review("v1", "9000000071", "합성 리뷰", 5, false, "노출"));
+        pull.start(org, List.of(store));
+        UUID other = organization("다른 판매자");
+        assertThat(pull.setPaused(other, store, true)).as("not theirs to stop").isFalse();
+        assertThat(pull.setPaused(org, store, true)).isTrue();
+
+        vendor.event("NEW", review("v2", "9000000072", "다음 리뷰", 5, false, "노출"));
+        int asked = vendor.cursorsAsked.size();
+        assertThat(pull.pullBound().stores()).singleElement().satisfies(s -> assertThat(s.paused()).isTrue());
+        assertThat(pull.pullFor(org).stores().get(0).inserted()).isZero();
+        assertThat(vendor.cursorsAsked).as("neither pull asked the server").hasSize(asked);
+        assertThat(pull.overview(org).stores().get(0).standing()).isEqualTo(Standing.PAUSED);
+
+        pull.setPaused(org, store, false);
+        assertThat(pull.pullBound().stores().get(0).inserted()).isEqualTo(1);
     }
 
     // --- helpers ---------------------------------------------------------------------------------------------------

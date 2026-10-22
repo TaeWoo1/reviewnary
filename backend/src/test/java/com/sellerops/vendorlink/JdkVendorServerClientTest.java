@@ -10,6 +10,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -35,7 +36,19 @@ class JdkVendorServerClientTest {
                 + "\"expiresAt\":\"2026-10-17T00:10:00Z\",\"interval\":3}");
         route("/v1/installs/token", 400, "{\"error\":\"authorization_pending\"}");
         route("/v1/ip", 200, "{\"ipv4\":\"203.0.113.7\"}");
-        route("/v1/installs/me", 204, "");
+        // GET answers with the PC's row and its account (vendor-server InstallController.Me); DELETE with nothing.
+        stub.createContext("/v1/installs/me", exchange -> {
+            String auth = exchange.getRequestHeaders().getFirst("Authorization");
+            seen.add(exchange.getRequestMethod() + " /v1/installs/me auth=" + (auth != null) + " ");
+            byte[] out = "GET".equals(exchange.getRequestMethod())
+                    ? "{\"deviceName\":\"Seller Mac\",\"accountEmail\":\"seller@example.com\"}"
+                            .getBytes(StandardCharsets.UTF_8) : new byte[0];
+            exchange.sendResponseHeaders(out.length == 0 ? 204 : 200, out.length == 0 ? -1 : out.length);
+            if (out.length > 0) {
+                exchange.getResponseBody().write(out);
+            }
+            exchange.close();
+        });
         stub.start();
         base = URI.create("http://127.0.0.1:" + stub.getAddress().getPort());
     }
@@ -71,11 +84,13 @@ class JdkVendorServerClientTest {
         assertThat(client.poll("dc")).isInstanceOf(VendorServerClient.Pending.class);
         assertThat(client.publicIp("rvi_x")).isEqualTo(new VendorServerClient.Ipv4("203.0.113.7"));
         assertThat(client.approvalPage("BCDFGHJK").toString()).isEqualTo(base + "/link?code=BCDFGHJK");
+        assertThat(client.accountEmail("rvi_x")).contains("seller@example.com");
         client.unlink("rvi_x");
         assertThat(seen).containsExactly(
                 "POST /v1/installs/code auth=false {\"deviceName\":\"macOS (aarch64)\",\"publicKey\":\"AQID\"}",
                 "POST /v1/installs/token auth=false {\"deviceCode\":\"dc\"}",
                 "GET /v1/ip auth=true ",
+                "GET /v1/installs/me auth=true ",
                 "DELETE /v1/installs/me auth=true ");
     }
 
@@ -97,7 +112,9 @@ class JdkVendorServerClientTest {
             String path = exchange.getRequestURI().getPath();
             // The bodies vendor-server's StoreController and StoreReviewController produce (Boot's ISO instants).
             String body = path.equals("/v1/stores")
-                    ? "[{\"id\":\"" + store + "\",\"channel\":\"NAVER\",\"label\":\"데모 스토어\"}]"
+                    ? "[{\"id\":\"" + store + "\",\"channel\":\"NAVER\",\"label\":\"데모 스토어\","
+                    + "\"lastUploadAt\":\"2026-10-20T01:00:00Z\"},{\"id\":\"" + store.replace("001", "002")
+                    + "\",\"channel\":\"NAVER\",\"label\":\"새 스토어\",\"lastUploadAt\":null}]"
                     : path.endsWith("/ack") ? ""
                     : "{\"events\":[{\"seq\":7,\"kind\":\"NEW\",\"review\":{\"id\":\"6f1c2a3b-0000-4000-8000-0000000000aa\","
                     + "\"reviewNo\":\"1000000001\",\"productNo\":\"SKU-1\",\"productName\":\"합성 상품\",\"kind\":\"일반\","
@@ -115,8 +132,11 @@ class JdkVendorServerClientTest {
         });
         JdkVendorServerClient client = new JdkVendorServerClient(base);
 
-        assertThat(client.stores("rvi_x")).containsExactly(new VendorServerClient.Store(
-                java.util.UUID.fromString(store), "NAVER", "데모 스토어"));
+        assertThat(client.stores("rvi_x")).containsExactly(
+                new VendorServerClient.Store(java.util.UUID.fromString(store), "NAVER", "데모 스토어",
+                        Instant.parse("2026-10-20T01:00:00Z")),
+                new VendorServerClient.Store(java.util.UUID.fromString(store.replace("001", "002")), "NAVER",
+                        "새 스토어", null));
         VendorServerClient.FeedPage page = client.reviewFeed("rvi_x", java.util.UUID.fromString(store), 6, 200);
         assertThat(page.cursor()).isEqualTo(7);
         assertThat(page.more()).isTrue();

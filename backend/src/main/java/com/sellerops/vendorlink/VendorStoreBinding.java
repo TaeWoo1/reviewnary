@@ -45,6 +45,22 @@ public class VendorStoreBinding extends BaseEntity {
     @Column(name = "task_cursor", nullable = false)
     private long taskCursor;
 
+    /** When this PC last asked the server for this store's reviews and got an answer. */
     @Column(name = "last_pulled_at")
     private Instant lastPulledAt;
+
+    /** The seller stopped receiving this store (V139): no pull touches it until they start it again. */
+    @Column(name = "paused", nullable = false)
+    private boolean paused;
+
+    /** When a delegate last uploaded this store's export, as the server last said (V139) — the age of the source. */
+    @Column(name = "last_upload_at")
+    private Instant lastUploadAt;
+
+    /** Why the last pull of this store failed — a closed code — or null after one that succeeded (V139). */
+    @Column(name = "last_failure", length = 32)
+    private String lastFailure;
+
+    @Column(name = "last_failure_at")
+    private Instant lastFailureAt;
 }

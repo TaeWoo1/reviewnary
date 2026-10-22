@@ -101,7 +101,8 @@ class VendorRelayWireIT {
                 followUp, syncJobs, replyTasks, Clock.systemUTC());
 
         int expected = Integer.parseInt(System.getenv("VENDOR_E2E_REVIEWS"));
-        StoreResult first = pull.pullFor(org).stores().get(0);
+        List<UUID> shown = pull.overview(org).stores().stream().map(VendorReviewPullService.StoreView::storeId).toList();
+        StoreResult first = pull.start(org, shown).stores().get(0);
         assertThat(first.inserted()).isEqualTo(expected);
         assertThat(first.failed()).isZero();
         List<Review> stored = reviews.findAll().stream().filter(r -> org.equals(r.getOrgId())
@@ -239,6 +240,11 @@ class VendorRelayWireIT {
         @Override
         public List<Store> stores(String installToken) {
             return real.stores(installToken);
+        }
+
+        @Override
+        public java.util.Optional<String> accountEmail(String installToken) {
+            return real.accountEmail(installToken);
         }
 
         @Override

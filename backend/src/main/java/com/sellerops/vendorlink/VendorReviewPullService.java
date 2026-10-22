@@ -34,9 +34,10 @@ import org.springframework.stereotype.Service;
  * {@code docs/vendor_server_contract_v1.md} §3.2.
  *
  * <ol>
- *   <li><b>Which stores.</b> A store is pulled into the organisation it is bound to. A binding is made only when a
- *       seller presses pull on this PC — to that seller's organisation, for a NAVER store not yet bound. The
- *       scheduled pull follows bindings and never makes one, so nothing here guesses whose reviews these are.</li>
+ *   <li><b>Which stores.</b> A store is pulled into the organisation it is bound to. A binding is made only by
+ *       {@link #start} — the seller's 「리뷰 받기 시작」 for the stores the screen showed, into that seller's
+ *       organisation. No pull binds: a store the server adds later is shown and waits to be started, so nothing here
+ *       guesses whose reviews these are. A store the seller stopped ({@link #setPaused}) is not pulled at all.</li>
  *   <li><b>Each event is the review as it is now.</b> A review this PC does not hold is ingested through the
  *       ordinary lane ({@link IngestionService}, keyed on 리뷰글번호 as every NAVER source is). One it holds is brought
  *       up to date: text and rating as the server says, the reply flag forward only (the lane never un-answers a
@@ -64,10 +65,33 @@ public class VendorReviewPullService {
 
     public enum State { OFF, NOT_LINKED, NOT_AUTHORIZED, UNREACHABLE, PULLED }
 
-    /** What one store's pull did. {@code bound} false: the store belongs to no organisation on this PC yet. */
+    /**
+     * What one store's pull did. {@code bound} false: the store belongs to no organisation on this PC yet;
+     * {@code paused}: the seller stopped receiving it, so it was not asked.
+     */
     public record StoreResult(UUID storeId, String label, boolean bound, boolean otherOrganisation, int received,
                               int inserted, int updated, int failed, long cursor, boolean more, int taskChanges,
-                              int noReplyReported) {}
+                              int noReplyReported, boolean paused) {}
+
+    /** Where a server store stands for the organisation looking at it. */
+    public enum Standing { NOT_RECEIVING, RECEIVING, PAUSED, OTHER_ORGANISATION }
+
+    /** Why a store's last pull failed; null after one that succeeded. */
+    public enum Failure { UNREACHABLE, NOT_AUTHORIZED, NOT_STORED }
+
+    /**
+     * One server store as the 「채널 연결」 section shows it. Two times, never one: {@code lastCheckedAt} is when this
+     * PC last asked the server, {@code lastUploadAt} when a delegate last uploaded the store's export — a PC that
+     * asked a minute ago still holds nothing newer than the last upload. {@code received}: reviews held here from it.
+     */
+    public record StoreView(UUID storeId, String label, Standing standing, Instant lastCheckedAt, Instant lastUploadAt,
+                            long received, Failure failure, Instant failedAt) {}
+
+    /**
+     * The section: whose server account this PC receives for and each of its NAVER stores. Unreachable or refused,
+     * the stores are this organisation's bound ones as last seen, so the seller still sees what they had.
+     */
+    public record Overview(State state, String accountEmail, List<StoreView> stores) {}
 
     public record PullResult(State state, List<StoreResult> stores) {
 
@@ -119,12 +143,111 @@ public class VendorReviewPullService {
         this.clock = clock;
     }
 
-    /** A seller's pull: binds this account's unbound NAVER stores to {@code orgId}, then pulls that org's stores. */
+    /**
+     * 「리뷰 받기 시작」: binds exactly the stores the seller was shown — named by id, on the server, NAVER, not yet bound
+     * to any organisation here — to {@code orgId}, then pulls that organisation's stores. A store the server adds
+     * later is not taken by this or any later pull; it waits to be shown and started the same way.
+     */
+    public synchronized PullResult start(UUID orgId, List<UUID> storeIds) {
+        Objects.requireNonNull(orgId);
+        if (link.client() == null || link.status().state() == VendorLinkService.State.OFF) {
+            return PullResult.of(State.OFF);
+        }
+        Optional<String> token = link.installToken();
+        if (token.isEmpty()) {
+            return PullResult.of(State.NOT_LINKED);
+        }
+        Optional<Channel> naver = channels.findByCode(NAVER);
+        if (naver.isEmpty()) {
+            return PullResult.of(State.PULLED);
+        }
+        List<Store> stores;
+        try {
+            stores = link.client().stores(token.get());
+        } catch (VendorServerClient.Refused e) {
+            return PullResult.of(State.NOT_AUTHORIZED);
+        } catch (VendorServerClient.Unreachable e) {
+            return PullResult.of(State.UNREACHABLE);
+        }
+        for (Store store : stores) {
+            if (NAVER.equals(store.channel()) && storeIds.contains(store.id())
+                    && bindings.findByVendorStoreId(store.id()).isEmpty()) {
+                bind(store, orgId, naver.get().getId());
+            }
+        }
+        return pull(orgId, "MANUAL");
+    }
+
+    /** 「지금 받기」: this organisation's bound stores that are not stopped. Binds nothing. */
     public synchronized PullResult pullFor(UUID orgId) {
         return pull(Objects.requireNonNull(orgId), "MANUAL");
     }
 
-    /** The scheduled pull: every bound store, binding nothing new. */
+    /** Stops or resumes receiving one store of this organisation. False when it is not bound to it. */
+    public synchronized boolean setPaused(UUID orgId, UUID storeId, boolean paused) {
+        Optional<VendorStoreBinding> bound = bindings.findByVendorStoreId(storeId)
+                .filter(b -> b.getOrgId().equals(orgId));
+        bound.ifPresent(b -> {
+            b.setPaused(paused);
+            bindings.save(b);
+        });
+        return bound.isPresent();
+    }
+
+    /** What the section shows. Asks the server for the store list and the account; stores nothing but their ages. */
+    public synchronized Overview overview(UUID orgId) {
+        if (link.client() == null || link.status().state() == VendorLinkService.State.OFF) {
+            return new Overview(State.OFF, null, List.of());
+        }
+        Optional<String> token = link.installToken();
+        if (token.isEmpty()) {
+            return new Overview(State.NOT_LINKED, null, List.of());
+        }
+        List<Store> stores;
+        String email;
+        try {
+            stores = link.client().stores(token.get());
+            email = link.client().accountEmail(token.get()).orElse(null);
+        } catch (VendorServerClient.Refused e) {
+            return new Overview(State.NOT_AUTHORIZED, null, lastSeen(orgId));
+        } catch (VendorServerClient.Unreachable e) {
+            return new Overview(State.UNREACHABLE, null, lastSeen(orgId));
+        }
+        List<StoreView> views = new ArrayList<>();
+        for (Store store : stores) {
+            if (!NAVER.equals(store.channel())) {
+                continue;
+            }
+            Optional<VendorStoreBinding> bound = bindings.findByVendorStoreId(store.id());
+            if (bound.isEmpty()) {
+                views.add(new StoreView(store.id(), store.label(), Standing.NOT_RECEIVING, null, store.lastUploadAt(),
+                        0, null, null));
+            } else if (!bound.get().getOrgId().equals(orgId)) {
+                views.add(new StoreView(store.id(), store.label(), Standing.OTHER_ORGANISATION, null, null, 0, null,
+                        null));
+            } else {
+                VendorStoreBinding b = bound.get();
+                if (!Objects.equals(b.getLastUploadAt(), store.lastUploadAt()) && store.lastUploadAt() != null) {
+                    b.setLastUploadAt(store.lastUploadAt());
+                    bindings.save(b);
+                }
+                views.add(view(b, store.label()));
+            }
+        }
+        return new Overview(State.PULLED, email, views);
+    }
+
+    private List<StoreView> lastSeen(UUID orgId) {
+        return bindings.findAllByOrgIdOrderByCreatedAt(orgId).stream().map(b -> view(b, b.getStoreLabel())).toList();
+    }
+
+    private StoreView view(VendorStoreBinding b, String label) {
+        return new StoreView(b.getVendorStoreId(), label, b.isPaused() ? Standing.PAUSED : Standing.RECEIVING,
+                b.getLastPulledAt(), b.getLastUploadAt(), refs.countByVendorStoreId(b.getVendorStoreId()),
+                b.getLastFailure() == null ? null : Failure.valueOf(b.getLastFailure()), b.getLastFailureAt());
+    }
+
+    /** The scheduled pull: every bound store that is not stopped, binding nothing new. */
     public synchronized PullResult pullBound() {
         return pull(null, "SCHEDULED");
     }
@@ -156,28 +279,45 @@ public class VendorReviewPullService {
                 continue;
             }
             Optional<VendorStoreBinding> bound = bindings.findByVendorStoreId(store.id());
-            if (bound.isEmpty() && sellerOrg != null) {
-                bound = Optional.of(bind(store, sellerOrg, naver.get().getId()));
-            }
             if (bound.isEmpty()) {
-                results.add(new StoreResult(store.id(), store.label(), false, false, 0, 0, 0, 0, 0, false, 0, 0));
+                // Never bound here by a pull: only 「리뷰 받기 시작」 binds, and only what it was shown (start).
+                results.add(new StoreResult(store.id(), store.label(), false, false, 0, 0, 0, 0, 0, false, 0, 0,
+                        false));
                 continue;
             }
-            if (sellerOrg != null && !sellerOrg.equals(bound.get().getOrgId())) {
+            VendorStoreBinding binding = bound.get();
+            if (sellerOrg != null && !sellerOrg.equals(binding.getOrgId())) {
                 // Bound to another organisation on this PC: its reviews are not this seller's to pull.
                 results.add(new StoreResult(store.id(), store.label(), true, true, 0, 0, 0, 0,
-                        bound.get().getReviewCursor(), false, 0, 0));
+                        binding.getReviewCursor(), false, 0, 0, false));
                 continue;
             }
+            if (binding.isPaused()) {
+                results.add(new StoreResult(store.id(), store.label(), true, false, 0, 0, 0, 0,
+                        binding.getReviewCursor(), false, 0, 0, true));
+                continue;
+            }
+            binding.setLastUploadAt(store.lastUploadAt() != null ? store.lastUploadAt() : binding.getLastUploadAt());
             try {
-                results.add(pullStore(client, token.get(), bound.get(), store.label(), trigger));
+                StoreResult result = pullStore(client, token.get(), binding, store.label(), trigger);
+                failed(binding, result.failed() > 0 ? Failure.NOT_STORED : null);
+                results.add(result);
             } catch (VendorServerClient.Refused e) {
+                failed(binding, Failure.NOT_AUTHORIZED);
                 return new PullResult(State.NOT_AUTHORIZED, results);
             } catch (VendorServerClient.Unreachable e) {
+                failed(binding, Failure.UNREACHABLE);
                 return new PullResult(State.UNREACHABLE, results);
             }
         }
         return new PullResult(State.PULLED, results);
+    }
+
+    /** Records how this store's pull ended; null clears an earlier failure. */
+    private void failed(VendorStoreBinding binding, Failure failure) {
+        binding.setLastFailure(failure == null ? null : failure.name());
+        binding.setLastFailureAt(failure == null ? null : clock.instant());
+        bindings.save(binding);
     }
 
     private VendorStoreBinding bind(Store store, UUID orgId, UUID channelId) {
@@ -239,7 +379,7 @@ public class VendorReviewPullService {
         int taskChanges = replyTasks == null ? 0 : replyTasks.sync(binding, token);
         int noReply = replyTasks == null ? 0 : replyTasks.reportNoReply(binding, token);
         return new StoreResult(binding.getVendorStoreId(), label, true, false, received, inserted.size(),
-                updated.size(), failed, cursor, more, taskChanges, noReply);
+                updated.size(), failed, cursor, more, taskChanges, noReply, false);
     }
 
     /** Tells the server how far this PC has stored, when it has not yet confirmed that far. Best effort. */

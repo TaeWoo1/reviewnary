@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -25,6 +26,10 @@ final class FakeVendorServer implements VendorServerClient {
     int dropAcks;
     final List<String> bearers = new ArrayList<>();
     boolean refuse;
+    /** When the delegate last uploaded {@link #store}'s export, as the store list says. */
+    Instant lastUploadAt;
+    /** Stores the operator added to the account later. Their feeds are empty. */
+    final List<Store> laterStores = new ArrayList<>();
 
     /** Every draft the PC submitted, with its meta. */
     final List<Submitted> submitted = new ArrayList<>();
@@ -88,12 +93,26 @@ final class FakeVendorServer implements VendorServerClient {
         if (refuse) {
             throw new Refused();
         }
-        return List.of(new Store(store, "NAVER", "합성 스토어"));
+        List<Store> all = new ArrayList<>(List.of(new Store(store, "NAVER", "합성 스토어", lastUploadAt)));
+        all.addAll(laterStores);
+        return all;
+    }
+
+    @Override
+    public Optional<String> accountEmail(String installToken) {
+        bearers.add(installToken);
+        if (refuse) {
+            throw new Refused();
+        }
+        return Optional.of("seller@example.com");
     }
 
     @Override
     public FeedPage reviewFeed(String installToken, UUID storeId, long cursor, int limit) {
         bearers.add(installToken);
+        if (!store.equals(storeId)) {
+            return new FeedPage(List.of(), cursor, false);
+        }
         cursorsAsked.add(cursor);
         List<FeedEvent> after = feed.stream().filter(e -> e.seq() > cursor).toList();
         List<FeedEvent> page = after.subList(0, Math.min(limit, after.size()));

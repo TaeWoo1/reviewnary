@@ -262,6 +262,11 @@ class VendorLinkServiceTest {
         }
 
         @Override
+        public java.util.Optional<String> accountEmail(String installToken) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public FeedPage reviewFeed(String installToken, UUID storeId, long cursor, int limit) {
             throw new UnsupportedOperationException();
         }
