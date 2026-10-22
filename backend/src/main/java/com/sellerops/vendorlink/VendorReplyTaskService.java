@@ -16,15 +16,20 @@ import com.sellerops.attention.triage.ReviewTriageRepository;
 import com.sellerops.attention.triage.TriageDisposition;
 import com.sellerops.common.ApiException;
 import com.sellerops.common.ReviewBodyFingerprint;
+import com.sellerops.common.VocPreviewSanitizer;
 import com.sellerops.review.Review;
 import com.sellerops.review.ReviewReplyState;
 import com.sellerops.review.ReviewRepository;
+import com.sellerops.review.draft.ReviewDraftBasis;
+import com.sellerops.review.draft.ReviewDraftBasis.Fingerprints;
+import com.sellerops.review.draft.ReviewDraftRecheck;
 import com.sellerops.vendorlink.VendorServerClient.DraftMeta;
 import com.sellerops.vendorlink.VendorServerClient.TaskChange;
 import com.sellerops.vendorlink.VendorServerClient.TaskChanges;
 import com.sellerops.vendorlink.VendorServerClient.TaskSnapshot;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -59,9 +64,15 @@ import org.springframework.stereotype.Service;
  * ({@code approvedDraftVersion}) for past-reply search. A delegate's post adds no stronger memory: it is a report,
  * not a read-back.
  *
- * <p><b>Draft fingerprints.</b> This PC has no versioned knowledge, policy or voice yet, so every draft says
- * {@value #UNVERSIONED} for all three and the PC sends no policy check: the server's recheck rule has nothing to
- * compare until such versions exist.
+ * <p><b>Draft fingerprints and the recheck</b> (2026-10-22 external review; interview question 34). Every draft goes
+ * out with the fingerprints of what review drafts are written from here — the seller's product knowledge, company
+ * rules and reply wording ({@link ReviewDraftBasis}). Each pull first reports them when they changed ({@link
+ * #reportBasis}), so the server sends unapproved drafts made under others back ({@code RECHECK_NEEDED}); after the
+ * sync this PC checks each sent-back text again without a model ({@link ReviewDraftRecheck}). A text that still
+ * stands goes back to waiting for approval, unchanged, under the current fingerprints; one that does not is held
+ * with closed codes for the seller. An approval already given is the seller's and is not touched — the server only
+ * lists it as a withdrawal suggestion, which this PC logs by count. Without {@link ReviewDraftBasis} (a test wiring
+ * this lane alone) drafts say {@value #UNVERSIONED} and nothing is reported, as before.
  */
 @Service
 public class VendorReplyTaskService implements DelegatedReplyLane {
@@ -107,6 +118,16 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
     @Autowired(required = false)
     public void setAnswerMemory(com.sellerops.review.memory.ReviewAnswerMemoryHook answerMemory) {
         this.answerMemory = answerMemory;
+    }
+
+    /** What drafts are written from, and the check of a sent-back text; null where a test runs this lane alone. */
+    private ReviewDraftBasis basis;
+    private ReviewDraftRecheck recheck;
+
+    @Autowired(required = false)
+    public void setDraftBasis(ReviewDraftBasis basis, ReviewDraftRecheck recheck) {
+        this.basis = basis;
+        this.recheck = recheck;
     }
 
     @Autowired
@@ -255,9 +276,12 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
                 .orElseThrow(() -> ApiException.conflict("공급자 서버에 연결된 PC가 아닙니다."));
         TaskSnapshot snapshot;
         try {
+            // The seller is looking at this draft and pressing send: it goes under what drafts are written from now,
+            // reported first if that changed, so it does not land sent back.
+            Fingerprints now = reportBasis(binding, token);
             snapshot = link.client().submitDraft(token, binding.getVendorStoreId(), ref.getVendorReviewId(),
-                    draft.getBody(), new DraftMeta(ref.getBodyFingerprint(), draft.getCreatedAt(), UNVERSIONED,
-                            UNVERSIONED, UNVERSIONED));
+                    draft.getBody(), new DraftMeta(ref.getBodyFingerprint(), draft.getCreatedAt(), now.knowledge(),
+                            now.policy(), now.voice()));
         } catch (VendorServerClient.TaskRefused e) {
             throw ApiException.conflict(refusal(e.code()));
         } catch (VendorServerClient.Refused e) {
@@ -303,6 +327,92 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             more = !stop && changes.more();
         }
         return applied;
+    }
+
+    /** What review drafts are written from on this PC now. */
+    private Fingerprints fingerprints(UUID orgId) {
+        return basis == null ? new Fingerprints(UNVERSIONED, UNVERSIONED, UNVERSIONED) : basis.of(orgId);
+    }
+
+    /**
+     * Reports the store's draft fingerprints when they differ from what this PC last reported; the server sends
+     * waiting drafts made under others back. A refusal is logged and retried on the next pull — it never stops one.
+     */
+    Fingerprints reportBasis(VendorStoreBinding binding, String token) {
+        Fingerprints now = fingerprints(binding.getOrgId());
+        if (basis == null || now.combined().equals(binding.getReportedDraftBasis())) {
+            return now;
+        }
+        try {
+            VendorServerClient.PolicyCheck answer = link.client().policyCheck(token, binding.getVendorStoreId(),
+                    now.knowledge(), now.policy(), now.voice());
+            binding.setReportedDraftBasis(now.combined());
+            bindings.save(binding);
+            log.info("vendor reply task: draft basis reported store={} sentBack={} withdrawalSuggested={}",
+                    binding.getVendorStoreId(), answer.sentBackForRecheck().size(),
+                    answer.withdrawalSuggested().size());
+        } catch (VendorServerClient.TaskRefused e) {
+            log.warn("vendor reply task: draft basis refused store={} code={}", binding.getVendorStoreId(), e.code());
+        }
+        return now;
+    }
+
+    /**
+     * Checks again each of the store's sent-back tasks this PC has not checked at its current version and
+     * fingerprints. Passed: the same text is drafted again under the current fingerprints, back to waiting for
+     * approval (a phone edit stays marked as one and gets this PC's pass). Held: the codes are recorded on the
+     * server and the task stays sent back for the seller. Returns how many went back to waiting.
+     */
+    synchronized int recheckSentBack(VendorStoreBinding binding, String token) {
+        if (basis == null || recheck == null) {
+            return 0;
+        }
+        UUID orgId = binding.getOrgId();
+        UUID storeId = binding.getVendorStoreId();
+        Fingerprints now = fingerprints(orgId);
+        int passed = 0;
+        for (VendorReplyTask copy : tasks.findByVendorStoreIdAndState(storeId, "RECHECK_NEEDED")) {
+            if (Integer.valueOf(copy.getDraftVersion()).equals(copy.getRecheckedVersion())
+                    && now.combined().equals(copy.getRecheckedBasis())) {
+                continue;
+            }
+            TaskSnapshot current = link.client().task(token, copy.getVendorTaskId());
+            VendorReplyTask task = apply(orgId, copy.getReviewId(), storeId, current);
+            if (!"RECHECK_NEEDED".equals(task.getState())) {
+                continue;
+            }
+            Review review = reviews.findByIdAndOrgId(task.getReviewId(), orgId).orElse(null);
+            VendorReviewRef ref = refs.findByReviewId(task.getReviewId()).orElse(null);
+            TaskSnapshot after = null;
+            if (review != null && ref != null
+                    && ReviewBodyFingerprint.of(review.getBody()).equals(ref.getBodyFingerprint())) {
+                ReviewDraftRecheck.Result result = recheck.check(orgId, review,
+                        VocPreviewSanitizer.redactFullBody(review.getBody()).text(), current.draftBody());
+                try {
+                    if (result.passed()) {
+                        after = link.client().submitDraft(token, storeId, ref.getVendorReviewId(),
+                                current.draftBody(), new DraftMeta(ref.getBodyFingerprint(), clock.instant(),
+                                        now.knowledge(), now.policy(), now.voice()));
+                        if (after.editedOnMobile() && "AWAITING_APPROVAL".equals(after.state())) {
+                            after = link.client().pcRecheck(token, after.id(), after.draftVersion(), true, List.of());
+                        }
+                        passed += "AWAITING_APPROVAL".equals(after.state()) ? 1 : 0;
+                    } else {
+                        after = link.client().pcRecheck(token, current.id(), current.draftVersion(), false,
+                                result.codes());
+                    }
+                } catch (VendorServerClient.TaskRefused e) {
+                    log.warn("vendor reply task: recheck not recorded store={} code={}", storeId, e.code());
+                }
+            }
+            // Otherwise the review changed since it was pulled: the next upload invalidates the task, or the seller
+            // drafts it again. Either way this version is not checked here twice.
+            VendorReplyTask checked = after == null ? task : apply(orgId, task.getReviewId(), storeId, after);
+            checked.setRecheckedVersion(after == null ? current.draftVersion() : after.draftVersion());
+            checked.setRecheckedBasis(now.combined());
+            tasks.save(checked);
+        }
+        return passed;
     }
 
     /** Tells the server about the seller's own 'no reply' decisions in this store. Returns how many were sent. */

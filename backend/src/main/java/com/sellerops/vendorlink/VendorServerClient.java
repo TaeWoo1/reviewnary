@@ -103,6 +103,18 @@ public interface VendorServerClient {
     /** The store's task transitions after {@code cursor}, in order. */
     TaskChanges taskChanges(String installToken, UUID storeId, long cursor, int limit);
 
+    /** One task as the server holds it now. */
+    TaskSnapshot task(String installToken, UUID taskId);
+
+    /** What the server did when this PC reported the fingerprints its drafts are now written under (§4.2). */
+    record PolicyCheck(List<UUID> sentBackForRecheck, List<UUID> withdrawalSuggested) {}
+
+    /** Reports the store's current draft fingerprints; unapproved drafts made under others are sent back. */
+    PolicyCheck policyCheck(String installToken, UUID storeId, String knowledgeFp, String policyFp, String voiceFp);
+
+    /** Records this PC's check of one version — passed, or held with closed codes. */
+    TaskSnapshot pcRecheck(String installToken, UUID taskId, int draftVersion, boolean passed, List<String> codes);
+
     /** Tells the server the seller decided this review needs no reply (§3.2, D4). */
     void markNoReplyNeeded(String installToken, UUID storeId, UUID reviewId, String commandId);
 

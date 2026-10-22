@@ -299,6 +299,23 @@ class VendorLinkServiceTest {
         }
 
         @Override
+        public TaskSnapshot task(String installToken, UUID taskId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public PolicyCheck policyCheck(String installToken, UUID storeId, String knowledgeFp, String policyFp,
+                                       String voiceFp) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public TaskSnapshot pcRecheck(String installToken, UUID taskId, int draftVersion, boolean passed,
+                                      java.util.List<String> codes) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public void markNoReplyNeeded(String installToken, UUID storeId, UUID reviewId, String commandId) {
             throw new UnsupportedOperationException();
         }

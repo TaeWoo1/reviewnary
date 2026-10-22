@@ -61,6 +61,17 @@ public class VendorReplyTask extends BaseEntity {
     @Column(name = "approved_draft_version")
     private Integer approvedDraftVersion;
 
+    /**
+     * The draft version this PC last checked again after the task was sent back, and the fingerprints it checked it
+     * under ({@code ReviewDraftBasis.Fingerprints#combined}). A version held for the seller is not checked again
+     * until its text or the seller's knowledge, policy or wording changes.
+     */
+    @Column(name = "rechecked_version")
+    private Integer recheckedVersion;
+
+    @Column(name = "rechecked_basis", length = 200)
+    private String recheckedBasis;
+
     /** When a delegate's POSTED was recorded in this PC's reply lane; null until then. */
     @Column(name = "outcome_recorded_at")
     private Instant outcomeRecordedAt;

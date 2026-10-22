@@ -52,11 +52,13 @@ import org.springframework.stereotype.Service;
  * that nothing was invented: the machine that could invent was not started. With evidence, a model
  * writes inside it, and the org's template still supplies the voice through the style layer.
  *
- * <p><b>Three checks stand between the model and a saved public reply.</b> The prompt forbids the
- * seven promise classes; {@link AnswerStyleInstruction#forbiddenPresentIn} refuses a draft carrying a
- * phrase this company banned; {@link ReviewClaimGuard} refuses a draft that offers a remedy the
- * evidence never mentions. All three REFUSE rather than edit, and every refusal falls back to the
- * template floor — which promises nothing by construction.
+ * <p><b>Two checks stand between the model and a saved public reply.</b> The prompt forbids the
+ * seven promise classes; {@link ReviewClaimGuard} refuses a draft that offers a remedy the evidence
+ * never mentions. Both REFUSE rather than edit, and every refusal falls back to the template floor —
+ * which promises nothing by construction. The company's forbidden phrases (answer style) are NOT
+ * checked here: that setting is the inquiry lane's, and the screen says so. This comment said
+ * otherwise until 2026-10-22 ({@code docs/FINDINGS.md} B24); whether reviews should honour it is the
+ * product owner's call.
  *
  * <p><b>A past answer is a way of saying, not a fact</b> (2026-10-22 external review). When the only evidence for a
  * review is a reply the seller once stood behind for a review like it — same rating band
@@ -183,17 +185,7 @@ public class ReviewDraftComposer {
     public GeneratedReviewDraftView compose(UUID orgId, Review review, String redactedBody,
                                             String actor) {
         UUID productId = retriever.namedProduct(orgId, review.getProductId());
-        // The review's own words are the question. There is no title and no structured topic: a
-        // review states, it does not ask, so the only form of "what is this about" that exists is
-        // what the customer wrote. The candidate ladder (TITLE/SUBJECT/FULL) narrows it the same way
-        // it narrows a forwarded mail thread.
-        RetrievalQuery question = RetrievalQuery.ofCustomer(null, redactedBody);
-        // Past answers narrowed to replies the seller stood behind for reviews in this review's rating band.
-        InquiryEvidenceRetriever.InquiryEvidence retrieved = (precedent == null
-                ? spine.retrieveForProduct(orgId, productId, question, KnowledgeVariantScope.unresolved())
-                : spine.retrieveForProduct(orgId, productId, question, KnowledgeVariantScope.unresolved(),
-                        precedent.forReviewRated(orgId, review.getRating())))
-                .lanes();
+        InquiryEvidenceRetriever.InquiryEvidence retrieved = retrieve(orgId, review, redactedBody, productId);
 
         ReviewReplyTemplateKey key = RuleBasedReviewReplyProvider.keyFor(
                 new ReviewReplyContext(orgId, review.getId(), redactedBody, review.getRating()));
@@ -244,6 +236,42 @@ public class ReviewDraftComposer {
         return new GeneratedReviewDraftView(saved, authorKind, basis,
                 basisNoteOf(basis, !views.isEmpty()), views,
                 gaps, key.category(), template.customized() ? "ORG" : "DEFAULT", unavailable);
+    }
+
+    /**
+     * The evidence a review reply is written from — one retrieval, asked by this unit of work only.
+     *
+     * <p>The review's own words are the question. There is no title and no structured topic: a review states, it
+     * does not ask, so the only form of "what is this about" that exists is what the customer wrote. The candidate
+     * ladder (TITLE/SUBJECT/FULL) narrows it the same way it narrows a forwarded mail thread. Past answers are
+     * narrowed to replies the seller stood behind for reviews in this review's rating band.
+     */
+    private InquiryEvidenceRetriever.InquiryEvidence retrieve(UUID orgId, Review review, String redactedBody,
+                                                               UUID productId) {
+        RetrievalQuery question = RetrievalQuery.ofCustomer(null, redactedBody);
+        return (precedent == null
+                ? spine.retrieveForProduct(orgId, productId, question, KnowledgeVariantScope.unresolved())
+                : spine.retrieveForProduct(orgId, productId, question, KnowledgeVariantScope.unresolved(),
+                        precedent.forReviewRated(orgId, review.getRating())))
+                .lanes();
+    }
+
+    /**
+     * The texts that may license a promise in a reply to this review NOW: the current evidence the same retrieval
+     * finds today, and the seller's own saved wording for this kind of review (never checked when a draft is written
+     * from it, so it is the seller's standing word). What {@link ReviewDraftRecheck} holds a sent-back reply to —
+     * asked here, so a review still has exactly one place that retrieves for it. No draft is written and no model
+     * writes anything; the retrieval is the draft's own, semantic lanes included when they are turned on.
+     */
+    public List<String> currentLicense(UUID orgId, Review review, String redactedBody) {
+        UUID productId = retriever.namedProduct(orgId, review.getProductId());
+        List<String> license = new ArrayList<>(retrieve(orgId, review, redactedBody, productId).passages().stream()
+                .filter(p -> p.scope().current())
+                .map(ScopedPassage::text)
+                .toList());
+        license.add(templates.resolve(orgId, RuleBasedReviewReplyProvider.keyFor(
+                new ReviewReplyContext(orgId, review.getId(), redactedBody, review.getRating()))).body());
+        return license;
     }
 
     /**

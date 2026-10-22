@@ -220,6 +220,50 @@ public class JdkVendorServerClient implements VendorServerClient {
     }
 
     @Override
+    public TaskSnapshot task(String installToken, UUID taskId) {
+        return task(taskCall(HttpRequest.newBuilder(base.resolve("v1/tasks/" + taskId)).timeout(REQUEST_TIMEOUT)
+                .header("Authorization", "Bearer " + installToken).header("Accept", "application/json")
+                .GET().build()).json());
+    }
+
+    @Override
+    public PolicyCheck policyCheck(String installToken, UUID storeId, String knowledgeFp, String policyFp,
+                                   String voiceFp) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("knowledgeFp", knowledgeFp);
+        request.put("policyFp", policyFp);
+        request.put("voiceFp", voiceFp);
+        JsonNode json = taskCall(jsonPost("v1/stores/" + storeId + "/tasks/policy-check", installToken, request))
+                .json();
+        return new PolicyCheck(uuids(json.path("sentBackForRecheck")), uuids(json.path("withdrawalSuggested")));
+    }
+
+    @Override
+    public TaskSnapshot pcRecheck(String installToken, UUID taskId, int draftVersion, boolean passed,
+                                  List<String> codes) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("draftVersion", draftVersion);
+        request.put("passed", passed);
+        request.put("codes", codes);
+        return task(taskCall(jsonPost("v1/tasks/" + taskId + "/pc-recheck", installToken, request)).json());
+    }
+
+    private static List<UUID> uuids(JsonNode array) {
+        if (!array.isArray()) {
+            throw new Unreachable();
+        }
+        List<UUID> out = new ArrayList<>();
+        for (JsonNode id : array) {
+            try {
+                out.add(UUID.fromString(id.asText()));
+            } catch (IllegalArgumentException e) {
+                throw new Unreachable();
+            }
+        }
+        return out;
+    }
+
+    @Override
     public void markNoReplyNeeded(String installToken, UUID storeId, UUID reviewId, String commandId) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("noReplyNeeded", true);

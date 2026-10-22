@@ -386,7 +386,7 @@ public class VendorReviewPullService {
         log.info("vendor review relay: store={} received={} inserted={} updated={} failed={} cursor={} more={}",
                 binding.getVendorStoreId(), received, inserted.size(), updated.size(), failed, cursor, more);
         // Tasks after reviews: a task change names a review, and the review must already be here.
-        int taskChanges = replyTasks == null ? 0 : replyTasks.sync(binding, token);
+        int taskChanges = followReplies(binding, token);
         int noReply = replyTasks == null ? 0 : replyTasks.reportNoReply(binding, token);
         return new StoreResult(binding.getVendorStoreId(), label, true, false, received, inserted.size(),
                 updated.size(), failed, cursor, more, taskChanges, noReply, false);
@@ -394,10 +394,25 @@ public class VendorReviewPullService {
 
     /** A stopped store: its reply tasks only, no review asked for. */
     private StoreResult followTasks(String token, VendorStoreBinding binding, String label) {
-        int taskChanges = replyTasks == null ? 0 : replyTasks.sync(binding, token);
+        int taskChanges = followReplies(binding, token);
         int noReply = replyTasks == null ? 0 : replyTasks.reportNoReply(binding, token);
         return new StoreResult(binding.getVendorStoreId(), label, true, false, 0, 0, 0, 0, binding.getReviewCursor(),
                 false, taskChanges, noReply, true);
+    }
+
+    /**
+     * The store's reply tasks: what this PC's drafts are now written under first (so a change sends waiting drafts
+     * back in the same pass), then the server's changes, then the sent-back ones checked again. Returns the changes
+     * applied.
+     */
+    private int followReplies(VendorStoreBinding binding, String token) {
+        if (replyTasks == null) {
+            return 0;
+        }
+        replyTasks.reportBasis(binding, token);
+        int applied = replyTasks.sync(binding, token);
+        replyTasks.recheckSentBack(binding, token);
+        return applied;
     }
 
     /** Tells the server how far this PC has stored, when it has not yet confirmed that far. Best effort. */

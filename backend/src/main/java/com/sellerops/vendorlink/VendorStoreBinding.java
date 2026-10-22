@@ -45,6 +45,10 @@ public class VendorStoreBinding extends BaseEntity {
     @Column(name = "task_cursor", nullable = false)
     private long taskCursor;
 
+    /** The draft fingerprints this PC last reported for the store (policy-check); null before the first report. */
+    @Column(name = "reported_draft_basis", length = 200)
+    private String reportedDraftBasis;
+
     /** When this PC last asked the server for this store's reviews and got an answer. */
     @Column(name = "last_pulled_at")
     private Instant lastPulledAt;

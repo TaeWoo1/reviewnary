@@ -43,6 +43,15 @@ final class FakeVendorServer implements VendorServerClient {
 
     record Submitted(UUID reviewId, String body, DraftMeta meta) {}
 
+    /** The fingerprints of the PC's last policy check, as the server keeps them per store; null before one. */
+    DraftMeta policy;
+    /** Every policy check the PC made. */
+    final List<DraftMeta> policyChecks = new ArrayList<>();
+    record Recheck(UUID taskId, int draftVersion, boolean passed, List<String> codes) {}
+    final List<Recheck> rechecks = new ArrayList<>();
+    /** The fingerprints each task's current version was drafted under. */
+    final Map<UUID, DraftMeta> metaOf = new HashMap<>();
+
     FakeVendorServer(UUID store) {
         this.store = store;
     }
@@ -140,13 +149,18 @@ final class FakeVendorServer implements VendorServerClient {
         }
         submitted.add(new Submitted(reviewId, body, meta));
         TaskSnapshot open = tasks.values().stream().filter(t -> t.reviewId().equals(reviewId)
-                && t.state().equals("AWAITING_APPROVAL")).findFirst().orElse(null);
+                && (t.state().equals("AWAITING_APPROVAL") || t.state().equals("RECHECK_NEEDED"))).findFirst()
+                .orElse(null);
         String fp = com.sellerops.attention.reply.ReviewReplyFingerprint.of(body);
+        // As the server: a draft under other fingerprints than the last policy check lands sent back, and the same
+        // text drafted again keeps the phone's mark.
+        String lands = underPolicy(meta) ? "AWAITING_APPROVAL" : "RECHECK_NEEDED";
         TaskSnapshot next = open == null
-                ? new TaskSnapshot(UUID.randomUUID(), reviewId, "AWAITING_APPROVAL", 0, 1, body, fp, null, false)
-                : new TaskSnapshot(open.id(), reviewId, "AWAITING_APPROVAL", open.stateVersion() + 1,
-                        open.draftVersion() + 1, body, fp, null, false);
+                ? new TaskSnapshot(UUID.randomUUID(), reviewId, lands, 0, 1, body, fp, null, false)
+                : new TaskSnapshot(open.id(), reviewId, lands, open.stateVersion() + 1,
+                        open.draftVersion() + 1, body, fp, null, open.draftBody().equals(body) && open.editedOnMobile());
         tasks.put(next.id(), next);
+        metaOf.put(next.id(), meta);
         changes.add(new TaskChange(changes.size() + 1, next.state(), next));
         return next;
     }
@@ -186,6 +200,49 @@ final class FakeVendorServer implements VendorServerClient {
         List<TaskChange> page = after.subList(0, Math.min(limit, after.size()));
         long last = page.isEmpty() ? cursor : page.get(page.size() - 1).seq();
         return new TaskChanges(page, last, after.size() > page.size());
+    }
+
+    private boolean underPolicy(DraftMeta meta) {
+        return policy == null || (policy.knowledgeFp().equals(meta.knowledgeFp())
+                && policy.policyFp().equals(meta.policyFp()) && policy.voiceFp().equals(meta.voiceFp()));
+    }
+
+    @Override
+    public TaskSnapshot task(String installToken, UUID taskId) {
+        bearers.add(installToken);
+        return tasks.get(taskId);
+    }
+
+    /** As the server: waiting drafts under other fingerprints go back; approved ones are only listed. */
+    @Override
+    public PolicyCheck policyCheck(String installToken, UUID storeId, String knowledgeFp, String policyFp,
+                                   String voiceFp) {
+        bearers.add(installToken);
+        policy = new DraftMeta(null, null, knowledgeFp, policyFp, voiceFp);
+        policyChecks.add(policy);
+        List<UUID> sentBack = new ArrayList<>();
+        List<UUID> suggested = new ArrayList<>();
+        for (TaskSnapshot t : List.copyOf(tasks.values())) {
+            DraftMeta m = metaOf.get(t.id());
+            if (m == null || underPolicy(m)) {
+                continue;
+            }
+            if (t.state().equals("AWAITING_APPROVAL")) {
+                move(t.id(), "RECHECK_NEEDED", t.draftBody(), null, false);
+                sentBack.add(t.id());
+            } else if (t.state().equals("APPROVED")) {
+                suggested.add(t.id());
+            }
+        }
+        return new PolicyCheck(sentBack, suggested);
+    }
+
+    @Override
+    public TaskSnapshot pcRecheck(String installToken, UUID taskId, int draftVersion, boolean passed,
+                                  List<String> codes) {
+        bearers.add(installToken);
+        rechecks.add(new Recheck(taskId, draftVersion, passed, List.copyOf(codes)));
+        return tasks.get(taskId);
     }
 
     @Override

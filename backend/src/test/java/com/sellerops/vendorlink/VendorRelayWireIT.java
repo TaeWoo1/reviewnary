@@ -280,6 +280,23 @@ class VendorRelayWireIT {
         }
 
         @Override
+        public TaskSnapshot task(String installToken, UUID taskId) {
+            return real.task(installToken, taskId);
+        }
+
+        @Override
+        public PolicyCheck policyCheck(String installToken, UUID storeId, String knowledgeFp, String policyFp,
+                                       String voiceFp) {
+            return real.policyCheck(installToken, storeId, knowledgeFp, policyFp, voiceFp);
+        }
+
+        @Override
+        public TaskSnapshot pcRecheck(String installToken, UUID taskId, int draftVersion, boolean passed,
+                                      java.util.List<String> codes) {
+            return real.pcRecheck(installToken, taskId, draftVersion, passed, codes);
+        }
+
+        @Override
         public void markNoReplyNeeded(String installToken, UUID storeId, UUID reviewId, String commandId) {
             real.markNoReplyNeeded(installToken, storeId, reviewId, commandId);
         }

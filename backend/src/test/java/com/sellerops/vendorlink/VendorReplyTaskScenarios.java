@@ -86,6 +86,13 @@ abstract class VendorReplyTaskScenarios {
     @Autowired ReviewTriageService triage;
     @Autowired ReviewTriageWriter triageWriter;
     @Autowired ReviewTriageRepository triageRows;
+    @Autowired com.sellerops.review.draft.ReviewDraftBasis draftBasis;
+    @Autowired com.sellerops.review.draft.ReviewDraftRecheck draftRecheck;
+    @Autowired com.sellerops.knowledge.org.SellerOperationsKnowledgeService companyRules;
+    @Autowired com.sellerops.knowledge.org.OrgKnowledgeSourceRepository companyRuleRows;
+    @Autowired com.sellerops.review.draft.ReviewDraftEvidenceRepository draftEvidence;
+    @Autowired com.sellerops.attention.reply.ReviewReplyTemplateRepository templateRows;
+    @Autowired com.sellerops.knowledge.memory.AnswerMemoryService answerMemory;
 
     private FakeVendorServer vendor;
     private VendorReplyTaskService tasks;
@@ -394,6 +401,211 @@ abstract class VendorReplyTaskScenarios {
     }
 
     // --- helpers ---------------------------------------------------------------------------------------------------
+
+    /* ── what drafts are written from changes (2026-10-22 review; interview question 34) ── */
+
+    @Test
+    void aDraftGoesOutUnderTheSellersCurrentFingerprintsReportedFirst() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        UUID review = pulledReview("v1", "9100000301", "배송이 빨라요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "빠른 배송으로 만족하셨다니 기쁩니다.", 0);
+
+        assertThat(tasks.requestApproval(org, review).state()).isEqualTo("AWAITING_APPROVAL");
+
+        var now = draftBasis.of(org);
+        assertThat(List.of(now.knowledge(), now.policy(), now.voice())).allMatch(fp -> fp.matches("v1:[0-9a-f]{32}"));
+        assertThat(vendor.policyChecks).as("reported once, before the draft").hasSize(1);
+        assertThat(vendor.submitted).singleElement().satisfies(s -> assertThat(List.of(s.meta().knowledgeFp(),
+                s.meta().policyFp(), s.meta().voiceFp())).containsExactly(now.knowledge(), now.policy(), now.voice()));
+        pull.pullFor(org);
+        assertThat(vendor.policyChecks).as("nothing changed: not reported again").hasSize(1);
+    }
+
+    @Test
+    void aWaitingDraftSentBackByANewRuleThatStillStandsReturnsToWaitingUnchanged() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        UUID review = pulledReview("v1", "9100000302", "배송이 빨라요");
+        needsReply(review);
+        String text = "빠른 배송으로 만족하셨다니 기쁩니다.";
+        drafts.save(org, review, "SELLER:" + seller, text, 0);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+
+        companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.SHIPPING_POLICY, "배송 안내",
+                "평일 오후 2시 전 주문은 당일 출고합니다.", null), null, "합성 판매자");
+        pull.pullFor(org);
+
+        assertThat(vendor.policyChecks).hasSize(2);
+        assertThat(vendor.tasks.get(task)).satisfies(t -> {
+            assertThat(t.state()).isEqualTo("AWAITING_APPROVAL");
+            assertThat(t.draftBody()).as("the text is the text").isEqualTo(text);
+        });
+        assertThat(vendor.submitted).last().satisfies(s ->
+                assertThat(s.meta().policyFp()).isEqualTo(draftBasis.of(org).policy()));
+        assertThat(vendor.rechecks).as("not a phone edit: nothing to mark").isEmpty();
+        assertThat(tasks.taskFor(org, review)).get().extracting(VendorReplyTaskService.TaskView::state)
+                .isEqualTo("AWAITING_APPROVAL");
+    }
+
+    @Test
+    void aPromiseTheCurrentRulesNoLongerMakeIsHeldForTheSellerOnceAndNotRewritten() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        var rule = companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.EXCHANGE_REFUND_POLICY, "교환 안내",
+                "사이즈 교환은 수령 후 7일 이내 무료로 해 드립니다.", null), null, "합성 판매자");
+        UUID review = pulledReview("v1", "9100000303", "사이즈 교환 되나요");
+        needsReply(review);
+        String text = "수령 후 7일 이내라면 사이즈 교환을 도와드리겠습니다.";
+        drafts.save(org, review, "SELLER:" + seller, text, 0);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+
+        var retired = companyRuleRows.findById(rule.id()).orElseThrow();
+        retired.setActive(false);
+        companyRuleRows.save(retired);
+        pull.pullFor(org);
+
+        assertThat(vendor.rechecks).singleElement().satisfies(r -> {
+            assertThat(r.taskId()).isEqualTo(task);
+            assertThat(r.passed()).isFalse();
+            assertThat(r.codes()).containsExactly(com.sellerops.review.draft.ReviewDraftRecheck.UNSUPPORTED_PROMISE);
+        });
+        assertThat(vendor.tasks.get(task)).satisfies(t -> {
+            assertThat(t.state()).isEqualTo("RECHECK_NEEDED");
+            assertThat(t.draftBody()).isEqualTo(text);
+        });
+        pull.pullFor(org);
+        assertThat(vendor.rechecks).as("held once, not on every pull").hasSize(1);
+        assertThat(tasks.describe(org, review, true).canSend()).as("the seller can draft it again").isTrue();
+    }
+
+    @Test
+    void theSellersOwnWordingIsTheirStandingWordNotAnUnsupportedPromise() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        String own = "찾아 주셔서 감사합니다. 사이즈가 맞지 않으면 교환해 드립니다.";
+        com.sellerops.attention.reply.ReviewReplyTemplate template = new com.sellerops.attention.reply.ReviewReplyTemplate();
+        template.setOrgId(org);
+        template.setTemplateKey(com.sellerops.attention.reply.ReviewReplyTemplateKey.POSITIVE.category());
+        template.setBody(own);
+        templateRows.save(template);
+        UUID review = pulledReview("v1", "9100000307", "좋아요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, own, 0);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+
+        companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.GENERAL_CS_FAQ, "공통 안내",
+                "문의는 평일 10시부터 17시까지 받습니다.", null), null, "합성 판매자");
+        pull.pullFor(org);
+
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("AWAITING_APPROVAL");
+        assertThat(vendor.rechecks).isEmpty();
+    }
+
+    @Test
+    void anExchangeOnceGrantedInAPastReplyDoesNotLicenseOneNow() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        // The seller once granted an exchange for a review like this one. A way of saying, never a policy.
+        UUID earlier = pulledReview("v0", "9100000308", "사이즈 교환 되나요");
+        answerMemory.remember(new com.sellerops.knowledge.memory.AnswerMemoryService.RememberCommand(org,
+                "review-approved:" + earlier + ":1", com.sellerops.knowledge.memory.AnswerMemoryStrength.USER_APPROVED,
+                "사이즈 교환 되나요", "리뷰 답글 · 별점 5점", "이번에는 특별히 사이즈 교환을 도와드리겠습니다.", null,
+                "NAVER", null, null, null, null, 1, null, null, null, null, earlier));
+        UUID review = pulledReview("v1", "9100000309", "사이즈 교환 되나요");
+        needsReply(review);
+        String text = "사이즈 교환을 도와드리겠습니다.";
+        drafts.save(org, review, "SELLER:" + seller, text, 0);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+
+        companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.GENERAL_CS_FAQ, "공통 안내",
+                "문의는 평일 10시부터 17시까지 받습니다.", null), null, "합성 판매자");
+        pull.pullFor(org);
+
+        assertThat(vendor.rechecks).singleElement().satisfies(r -> {
+            assertThat(r.taskId()).isEqualTo(task);
+            assertThat(r.codes()).containsExactly(com.sellerops.review.draft.ReviewDraftRecheck.UNSUPPORTED_PROMISE);
+        });
+    }
+
+    @Test
+    void aPhoneEditThatStillStandsKeepsItsMarkAndGetsThisPcsPass() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        UUID review = pulledReview("v1", "9100000304", "포장이 꼼꼼해요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "꼼꼼한 포장을 알아봐 주셔서 감사합니다.", 0);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        String phoneText = "꼼꼼한 포장을 알아봐 주셔서 감사합니다! 또 찾아 주세요.";
+        vendor.move(task, "AWAITING_APPROVAL", phoneText, null, true);
+
+        companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.GENERAL_CS_FAQ, "공통 안내",
+                "문의는 평일 10시부터 17시까지 받습니다.", null), null, "합성 판매자");
+        pull.pullFor(org);
+
+        assertThat(vendor.tasks.get(task)).satisfies(t -> {
+            assertThat(t.state()).isEqualTo("AWAITING_APPROVAL");
+            assertThat(t.draftBody()).isEqualTo(phoneText);
+            assertThat(t.editedOnMobile()).as("still the phone's words").isTrue();
+        });
+        assertThat(vendor.rechecks).singleElement().satisfies(r -> {
+            assertThat(r.passed()).isTrue();
+            assertThat(r.draftVersion()).isEqualTo(vendor.tasks.get(task).draftVersion());
+        });
+    }
+
+    @Test
+    void aDraftWhoseCitedRuleWasEditedSinceIsHeldEvenWithoutAPromise() throws Exception {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        var rule = companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.SHIPPING_POLICY, "배송 안내",
+                "평일 오후 2시 전 주문은 당일 출고합니다.", null), null, "합성 판매자");
+        UUID review = pulledReview("v1", "9100000305", "배송이 빨라요");
+        needsReply(review);
+        String text = "오후 2시 전 주문은 당일 출고해 빠르게 받아 보실 수 있습니다.";
+        drafts.save(org, review, "SELLER:" + seller, text, 0);
+        // As the composer records it: this version was written from that rule.
+        com.sellerops.review.draft.ReviewDraftEvidence cited = new com.sellerops.review.draft.ReviewDraftEvidence();
+        cited.setOrgId(org);
+        cited.setReviewId(review);
+        cited.setDraftVersion(drafts.currentVersion(review));
+        cited.setOrdinal(0);
+        cited.setKind(com.sellerops.inquiry.draft.InquiryDraftEvidence.KIND_ORG_POLICY);
+        cited.setSourceId(rule.id());
+        cited.setTitle("배송 안내");
+        draftEvidence.save(cited);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+
+        Thread.sleep(5);
+        companyRules.update(org, rule.id(), new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.SHIPPING_POLICY, "배송 안내",
+                "평일 오전 11시 전 주문만 당일 출고합니다.", null));
+        pull.pullFor(org);
+
+        assertThat(vendor.rechecks).singleElement().satisfies(r -> {
+            assertThat(r.taskId()).isEqualTo(task);
+            assertThat(r.passed()).isFalse();
+            assertThat(r.codes()).containsExactly(com.sellerops.review.draft.ReviewDraftRecheck.SOURCE_CHANGED);
+        });
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("RECHECK_NEEDED");
+    }
+
+    @Test
+    void anApprovalAlreadyGivenIsNotSentBackByANewRule() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        UUID review = pulledReview("v1", "9100000306", "배송이 빨라요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "빠른 배송으로 만족하셨다니 기쁩니다.", 0);
+        UUID task = vendorTaskOf(tasks.handOver(org, review));
+
+        companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.SHIPPING_POLICY, "배송 안내",
+                "평일 오후 2시 전 주문은 당일 출고합니다.", null), null, "합성 판매자");
+        pull.pullFor(org);
+
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("APPROVED");
+        assertThat(vendor.rechecks).isEmpty();
+    }
 
     private UUID pulledReview(String key, String reviewNo, String body) {
         UUID id = vendor.ids.computeIfAbsent(key, k -> UUID.randomUUID());

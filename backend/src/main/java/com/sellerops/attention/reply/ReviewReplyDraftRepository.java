@@ -25,6 +25,10 @@ public interface ReviewReplyDraftRepository extends JpaRepository<ReviewReplyDra
     /** One exact version — how an approval's bound body is re-served. */
     Optional<ReviewReplyDraft> findByReviewIdAndVersion(UUID reviewId, int version);
 
+    /** The latest version holding exactly this text — what a sent-back reply task's text was written as here. */
+    Optional<ReviewReplyDraft> findTopByReviewIdAndContentFingerprintOrderByVersionDesc(UUID reviewId,
+                                                                                      String contentFingerprint);
+
     long countByReviewId(UUID reviewId);
 
     /**

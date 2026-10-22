@@ -260,6 +260,24 @@ class ReplyTasksTest {
     }
 
     @Test
+    void thePhonesWordsDraftedAgainUnderANewPolicyStayMarkedAsThePhones() {
+        TaskView sent = submit("1", "초안 1");
+        TaskView edited = tasks.editDraft(sent.id(), 1, "휴대폰에서 고친 초안", true);
+        tasks.policyCheck(store, "k1", "p2", "v1");
+
+        TaskView same = tasks.submitDraft(store, review("1"), "휴대폰에서 고친 초안",
+                new Meta(currentFingerprint("1"), clock.instant(), "k1", "p2", "v1"));
+        assertThat(same.state()).isEqualTo(State.AWAITING_APPROVAL);
+        assertThat(same.draftVersion()).isEqualTo(edited.draftVersion() + 1);
+        assertThat(same.editedOnMobile()).as("the PC checked the phone's words; they are still the phone's").isTrue();
+        assertThat(same.pcRecheckVersion()).as("this version not yet checked").isNull();
+
+        TaskView other = tasks.submitDraft(store, review("1"), "PC에서 새로 쓴 초안",
+                new Meta(currentFingerprint("1"), clock.instant(), "k1", "p2", "v1"));
+        assertThat(other.editedOnMobile()).as("new text from the PC is the PC's").isFalse();
+    }
+
+    @Test
     void aClaimedReviewThatIsHiddenIsNotClearToPost() throws Exception {
         TaskView claimed = approve(submit("1", "초안 1"));
         tasks.claim(claimed.id(), me, claimed.stateVersion());

@@ -156,6 +156,40 @@ class JdkVendorServerClientTest {
     }
 
     @Test
+    void thePolicyCheckTheTaskReadAndTheRecheckUseTheServersShapes() {
+        OutboundGate.arm(true);
+        String store = "6f1c2a3b-0000-4000-8000-000000000001";
+        String task = "6f1c2a3b-0000-4000-8000-0000000000bb";
+        // vendor-server ReplyTasks.PolicyCheck and TaskView, as Boot writes them.
+        String view = "{\"id\":\"" + task + "\",\"reviewId\":\"6f1c2a3b-0000-4000-8000-0000000000aa\","
+                + "\"state\":\"RECHECK_NEEDED\",\"stateVersion\":3,\"draftVersion\":2,\"draftBody\":\"합성 답글\","
+                + "\"draftFingerprint\":\"" + "b".repeat(64) + "\",\"approvedFingerprint\":null,"
+                + "\"editedOnMobile\":true,\"knowledgeFp\":\"v1:" + "c".repeat(32) + "\"}";
+        route("/v1/stores/" + store + "/tasks/policy-check", 200, "{\"sentBackForRecheck\":[\"" + task
+                + "\"],\"withdrawalSuggested\":[]}");
+        route("/v1/tasks/" + task + "/pc-recheck", 200, view);
+        route("/v1/tasks/" + task, 200, view);
+        JdkVendorServerClient client = new JdkVendorServerClient(base);
+
+        VendorServerClient.PolicyCheck check = client.policyCheck("rvi_x", java.util.UUID.fromString(store),
+                "v1:" + "1".repeat(32), "v1:" + "2".repeat(32), "v1:" + "3".repeat(32));
+        assertThat(check.sentBackForRecheck()).containsExactly(java.util.UUID.fromString(task));
+        assertThat(check.withdrawalSuggested()).isEmpty();
+        assertThat(client.task("rvi_x", java.util.UUID.fromString(task))).satisfies(t -> {
+            assertThat(t.state()).isEqualTo("RECHECK_NEEDED");
+            assertThat(t.draftVersion()).isEqualTo(2);
+            assertThat(t.editedOnMobile()).isTrue();
+        });
+        client.pcRecheck("rvi_x", java.util.UUID.fromString(task), 2, false, List.of("UNSUPPORTED_PROMISE"));
+        assertThat(seen).containsExactly(
+                "POST /v1/stores/" + store + "/tasks/policy-check auth=true {\"knowledgeFp\":\"v1:" + "1".repeat(32)
+                        + "\",\"policyFp\":\"v1:" + "2".repeat(32) + "\",\"voiceFp\":\"v1:" + "3".repeat(32) + "\"}",
+                "GET /v1/tasks/" + task + " auth=true ",
+                "POST /v1/tasks/" + task + "/pc-recheck auth=true "
+                        + "{\"draftVersion\":2,\"passed\":false,\"codes\":[\"UNSUPPORTED_PROMISE\"]}");
+    }
+
+    @Test
     void aRefusedTokenOrStoreIsRefusedNotUnreachable() {
         OutboundGate.arm(true);
         route("/v1/stores", 404, "");

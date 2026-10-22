@@ -224,7 +224,9 @@ public class ReplyTasks {
         if (task.state() == lands && task.draftBody().equals(body) && sameMeta(task, meta)) {
             return task;
         }
-        return newVersion(task, body, meta, false, lands, now);
+        // The same text drafted again under new fingerprints (a sent-back draft the PC checked again) is still the
+        // phone's words if it was: the mark stays, and the PC's check of the new version is recorded after it.
+        return newVersion(task, body, meta, task.draftBody().equals(body) && task.editedOnMobile(), lands, now);
     }
 
     /**
