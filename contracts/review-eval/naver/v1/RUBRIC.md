@@ -149,8 +149,10 @@ silently.
   intended shape is a check when each review arrives plus a separate sequential pass over the backlog.
 - **What would end the exception.** The labelled set [`contracts/review-eval/safety/v1`](../../safety/v1/RUBRIC.md):
   four labels (실제 위험 발생 · 구체적 위험 우려 · 위험 부정·안심 · 관련 없음, plus 판단 불가), a random set that
-  measures needless alarms and a challenge set that measures misses, and the owner's pilot bars of 2026-10-23 —
-  detection ≥ 0.90 on the challenge set, 0 real reports cancelled by the negation filter, alarm precision ≥ 0.50
+  measures needless alarms, a challenge set that measures misses among reviews using a word the signal knows, a
+  low-star set drawn without the word list that measures misses outside it (reference, no bar yet), and the owner's
+  pilot bars of 2026-10-23 — detection ≥ 0.90 on the challenge set (which says nothing about reports written in words
+  the signal does not know), 0 real reports cancelled by the negation filter, alarm precision ≥ 0.50
   (target 0.70) on the random set, and a 4–5★ false-alarm rate ≤ 0.05 among reviews that are not harm. Below a
   measure's minimum count the verdict is 판단 보류. Meeting the bars ends the exception for the pilot; missing one
   leads to a narrower operation or a fix, never to switching the signal off for 4–5★ reviews as a whole. Until it

@@ -69,11 +69,12 @@ class SafetySignalEvalIT {
             frame.add(row.frame());
             bodies.put(row.frame().fingerprint(), row.body());
         }
-        // One row per review, in either set or both; the order within the sheet is the sample order, so the two sets
+        // One row per review, in one set or more; the order within the sheet is the sample order, so the sets
         // interleave and the labeller does not read all the harm words in a row.
         Map<String, String> sets = new LinkedHashMap<>();
         SafetySample.randomSet(frame).forEach(r -> sets.put(r.fingerprint(), "RANDOM"));
-        SafetySample.challengeSet(frame).forEach(r -> sets.merge(r.fingerprint(), "CHALLENGE", (a, b) -> "BOTH"));
+        SafetySample.challengeSet(frame).forEach(r -> sets.merge(r.fingerprint(), "CHALLENGE", (a, b) -> a + "+" + b));
+        SafetySample.lowStarSet(frame).forEach(r -> sets.merge(r.fingerprint(), "LOWSTAR", (a, b) -> a + "+" + b));
         Map<String, FrameRow> byId = new HashMap<>();
         frame.forEach(r -> byId.put(r.fingerprint(), r));
         StringBuilder csv = new StringBuilder(HEADER).append('\n');

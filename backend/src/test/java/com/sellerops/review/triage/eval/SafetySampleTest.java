@@ -126,6 +126,52 @@ class SafetySampleTest {
     }
 
     @Test
+    void theLowStarSetIsDrawnByRatingAloneWhateverTheSignalMakesOfIt() {
+        List<FrameRow> frame = new ArrayList<>();
+        for (int i = 0; i < 600; i++) {
+            frame.add(row("l" + i, i % 5 + 1, i % 3 == 0 ? Outcome.RAISED : Outcome.NONE));
+        }
+        List<FrameRow> low = SafetySample.lowStarSet(frame);
+        assertThat(low).hasSize(200).allMatch(r -> r.rating() <= 2);
+        assertThat(low).as("not only the reviews with a known word").anyMatch(r -> r.outcome() == Outcome.NONE);
+        List<FrameRow> reversed = new ArrayList<>(frame);
+        Collections.reverse(reversed);
+        assertThat(SafetySample.lowStarSet(reversed)).as("reproducible").isEqualTo(low);
+    }
+
+    @Test
+    void reportsOutsideTheWordListAreMeasuredApartAndNeverDecideTheOverallVerdict() {
+        List<FrameRow> frame = new ArrayList<>();
+        List<Labelled> labelled = new ArrayList<>();
+        // A real mix around them, so most of the low-star reports are not also in the random set.
+        for (int i = 0; i < 1000; i++) {
+            frame.add(row("f" + i, 5, Outcome.NONE));
+        }
+        // 40 low-star reports: 25 raised, 5 cancelled by a negation, 10 in words the signal does not know.
+        for (int i = 0; i < 40; i++) {
+            Outcome o = i < 25 ? Outcome.RAISED : i < 30 ? Outcome.NEGATED : Outcome.NONE;
+            FrameRow r = row("o" + i, 1, o);
+            frame.add(r);
+            labelled.add(new Labelled(r, Label.REPORT));
+        }
+        SafetySample.Report r = SafetySample.report(frame, labelled);
+        assertThat(r.lowStarLabelled()).isEqualTo(40);
+        assertThat(r.randomLabelled()).as("the random set alone would miss most of them").isLessThan(40);
+        assertThat(r.outside().numerator()).isEqualTo(25);
+        assertThat(r.outside().denominator()).isEqualTo(40);
+        assertThat(r.outside().verdict()).as("measured, but no bar yet").isEqualTo(Verdict.NO_BAR);
+        assertThat(r.missedWithoutKnownWord()).isEqualTo(10);
+        assertThat(r.measures()).as("not one of the pilot bars").doesNotContain(r.outside());
+        assertThat(measure(r, "위험 리뷰 탐지율").denominator()).as("the challenge set sees only the 30 with a known word")
+                .isEqualTo(30);
+        assertThat(SafetySample.render(r)).contains("낱말 목록 밖 탐지율").contains("아는 낱말이 전혀 없는 리뷰 10건")
+                .contains("측정만 — 기준 미정");
+
+        List<Labelled> few = labelled.subList(0, 20);
+        assertThat(SafetySample.report(frame, few).outside().verdict()).isEqualTo(Verdict.HOLD);
+    }
+
+    @Test
     void theSheetsQuotingRoundTripsCommasQuotesAndLineBreaks() {
         String body = "뜨거워요, \"정말\"\n화상 입었어요";
         String csv = "a,5,RANDOM,REPORT,OWNER,Y," + SafetySignalEvalIT.quote(body) + "\n";
