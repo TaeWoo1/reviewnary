@@ -45,6 +45,10 @@ class ReviewSafetySignalTest {
             "아이가 다칠 걱정 없어요",
             "뜨겁지 않고 화상 걱정 없어요",
             "다칠 걱정은 전혀 없어요",
+            // A noun that only names a harm, with nothing after it saying it happened or is feared (2026-10-23).
+            "알레르기 있는 아이도 잘 써요",
+            "식약처 인증 받은 제품이라 믿고 샀어요",
+            "화상 입은 피부에 바르려고 샀는데 순해요",
             "이물질 없이 깨끗해요",
             "알레르기 반응 없이 잘 쓰고 있어요",
             "화상 방지 손잡이라 안심이에요",
@@ -61,6 +65,31 @@ class ReviewSafetySignalTest {
     })
     void theSameWordsInAHappyOrUnrelatedSentenceDoNot(String body) {
         assertThat(ReviewSafetySignal.in(body)).as(body).isFalse();
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(delimiter = '|', value = {
+            "사용하다 화상을 입었어요|OCCURRENCE",
+            "모서리에 다쳤어요|OCCURRENCE",
+            "바르고 두드러기가 올라왔어요|OCCURRENCE",
+            "안에서 이물질이 나왔어요|OCCURRENCE",
+            "식약처에 문의하겠습니다|OCCURRENCE",
+            "너무 뜨거워서 화상 입을까 걱정돼요|WORRY",
+            "아이가 다칠까 봐 염려됩니다|WORRY",
+            "모서리가 날카로워 다치기 쉬워 보여요|WORRY",
+            "화상 입을까 걱정했는데 결국 손을 데였어요|OCCURRENCE",
+    })
+    void anOccurrenceIsToldFromAWorry(String body, ReviewSafetySignal.Reading reading) {
+        assertThat(ReviewSafetySignal.find(body)).as(body).get()
+                .extracting(ReviewSafetySignal.Finding::reading).isEqualTo(reading);
+    }
+
+    @Test
+    void theOutcomeSaysWhyAReviewDidNotRise() {
+        assertThat(ReviewSafetySignal.explain("사용하다 화상을 입었어요")).isEqualTo(ReviewSafetySignal.Outcome.RAISED);
+        assertThat(ReviewSafetySignal.explain("화상 걱정 없어요")).isEqualTo(ReviewSafetySignal.Outcome.NEGATED);
+        assertThat(ReviewSafetySignal.explain("알레르기 있는 아이도 잘 써요")).isEqualTo(ReviewSafetySignal.Outcome.NO_CUE);
+        assertThat(ReviewSafetySignal.explain("배송이 빨라요")).isEqualTo(ReviewSafetySignal.Outcome.NONE);
     }
 
     @Test

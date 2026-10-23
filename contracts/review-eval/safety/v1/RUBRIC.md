@@ -2,80 +2,80 @@
 
 The labelled set that decides whether the review safety signal (`ReviewSafetySignal`) keeps its owner exception
 (`contracts/review-eval/naver/v1/RUBRIC.md` §7). It is a separate task from the past-reply retrieval measurement,
-which says nothing about this signal.
+which says nothing about this signal. Criteria, sets and pilot bars fixed by the owner on 2026-10-23, **before any
+label was read**.
 
-## 1. The labelling question
+## 1. The answer — four labels
 
 For each review, reading **only its text and star rating**:
 
-> **Does this customer tell the seller the product hurt someone, may hurt someone, or that they are taking it
-> further?**
-
 | label | meaning | example |
 |---|---|---|
-| `REPORT` | It happened: an injury, a bodily reaction, a dangerous product, or a legal step taken or announced. | 「사용하다 화상을 입었어요」 |
-| `WORRY` | A warning about a danger that has not (yet) happened. | 「너무 뜨거워서 화상 입을까 걱정돼요」 |
-| `REASSURANCE` | The danger word is denied or reassured away. | 「뜨겁지 않고 화상 걱정 없어요」 |
-| `BACKGROUND` | The word describes the customer, not the product's effect. | 「알레르기 있는 아이도 잘 써요」 |
-| `UNRELATED` | Nothing about harm or a legal step. | 「배송이 빨라요」 |
-| `UNCERTAIN` | Honestly unclear. **Use it.** Excluded from every metric and reported separately. | |
+| `REPORT` | **실제 위험 발생** — it happened: an injury, a bodily reaction, a dangerous product, or a legal step taken or announced. | 「사용하다 화상을 입었어요」 |
+| `WORRY` | **구체적인 위험 우려** — a danger the customer foresees from real use, not yet happened. | 「너무 뜨거워서 화상 입을까 걱정돼요」 |
+| `REASSURANCE` | **위험 부정 · 안심** — an experience of no danger. | 「뜨겁지 않고 화상 걱정 없어요」 |
+| `UNRELATED` | **관련 없음** — background or nothing about harm. | 「알레르기 있는 아이도 잘 써요」 · 「배송이 빨라요」 |
+| `UNKNOWN` | **판단 불가** — not enough to tell. Excluded from every rate and reported on its own. | |
 
-`REPORT` and `WORRY` are the reviews the signal **should raise**; the other three should not be raised.
+`REPORT` and `WORRY` are what the seller should be asked to look at, and the screen tells the two apart. A harm
+word alone (「알레르기」) does not make a review `REPORT`. A worry denied in the same breath is `REASSURANCE`. A legal
+word used figuratively (「고소한 맛」) is `UNRELATED`.
 
-Tie-breakers: a worry that is denied in the same breath is `REASSURANCE`. A report about a different product or
-a past purchase is still `REPORT`. A legal word used figuratively (「고소한 맛」) is `UNRELATED`.
+## 2. Two sets, two jobs — never mixed
 
-## 2. The frame and the draw
+| set | what it holds | measures | never claims |
+|---|---|---|---|
+| **random** | the first 400 of all NAVER reviews by sample order — the real mix | how often an alarm is needless (precision), the 4–5★ false-alarm rate, alarms per 100 reviews | what is missed (positives are too rare) |
+| **challenge** | the first 300 reviews that mention any harm word at all — raised, cancelled by a negation, or a bare noun | what is missed (detection rate), real reports the negation filter cancelled | operating precision |
 
-All NAVER reviews in the local database that carry an id, split by what the signal does with them today:
+Sample order is `CalibrationSample.sampleOrderKey` of the review-id fingerprint, so both draws are reproducible. A
+review drawn into both sets is labelled once and counts in each by its membership.
 
-| stratum | what it holds | drawn |
+## 3. Who labels, and what is kept
+
+1. **The owner labels a first batch** (about 30, mixed from both sets) to set the criteria in practice.
+2. **The delegate labels the rest.** The owner then checks every `UNKNOWN`, every case the delegate marks unsure, and
+   a sample of the rest (at least one in ten).
+3. **No suggested labels.** The sheet has no model-proposed answer; a model's guess is never the truth here.
+
+The labelling sheet (`SafetySignalEvalIT`, sheet run) holds the review text so a person can read it; it is written
+**outside the repository**, never committed, and read by no one but the labellers. `labels.json` keeps only the
+review-id fingerprint, the label, the labeller's role (`OWNER` · `DELEGATE`) and whether the owner checked it —
+never the body, the raw `리뷰글번호`, the rating or the product (`contracts/review-eval/naver/v1/RUBRIC.md` §3).
+
+## 4. Measures — each on its own denominator
+
+| measure | set | numerator / denominator |
 |---|---|---|
-| `RAISED` | the signal raises it | first 150 by sample order |
-| `FILTERED` | a term matched, but a negation or reassurance cancelled it | first 80 |
-| `OTHER` | no term matched | first 200 |
+| **위험 리뷰 탐지율** | challenge | raised `REPORT`+`WORRY` / all `REPORT`+`WORRY` |
+| **부정 필터가 지운 실제 신고** | challenge | `REPORT` whose words were cancelled by a negation |
+| **경보 정밀도** | random | raised and `REPORT`+`WORRY` / all raised |
+| **4–5★ 오탐률** | random | raised / 4–5★ reviews labelled `REASSURANCE` or `UNRELATED` |
 
-Sample order is `CalibrationSample.sampleOrderKey` of the review-id fingerprint, so the draw is reproducible and
-the labelled set can be re-derived. Strata are sampled at different rates, and every population estimate below
-is weighted by stratum size.
+The 4–5★ rate is a false-positive rate on reviews that are **not** harm — not the share of all reviews that raise an
+alarm. If many reviews really report harm, alarms above 5% are correct; few alarms do not mean harm is found. The
+report also prints alarms per 100 random reviews and the Wilson 95% interval of precision **for reference**.
 
-## 3. Storage
+## 5. Pilot bars — owner decision 2026-10-23
 
-`labels.json` carries **only** the review-id fingerprint and the label, exactly as
-`contracts/review-eval/naver/v1/RUBRIC.md` §3 — never the body, the raw `리뷰글번호`, the rating or the product.
-The labelling sheet (`SafetyLabelSheetIT`) holds the review text so a person can read it; it is written **outside
-the repository** to a path the labeller names, is never committed, and is not read by anyone but the labeller.
-`SafetyLabelImportIT` turns the filled sheet into `labels.json`, keeping the fingerprint and the label only.
+These are this product's early operating targets, not an industry standard.
 
-## 4. Metrics
-
-Computed by `SafetySignalEvalIT` (counts and rates only on stdout):
-
-- **Missed harm** — weighted recall of `REPORT` + `WORRY`: the share of the reviews that should rise that do.
-- **Hidden reports** — `REPORT` labels in the `FILTERED` stratum: real events the negation filter cancelled.
-- **Needless alarms** — precision of `RAISED` (share that is `REPORT` or `WORRY`), with its Wilson 95% lower
-  bound; and the weighted share of 4–5★ non-harm reviews that the signal raises.
-
-## 5. Bars — **proposed, for the owner to fix before any label is read**
-
-These are a proposal. The owner fixes the numbers **before** the labels are read; changing them afterwards
-voids the run. Meeting all of them ends the RUBRIC §7 exception. Missing one leads to a narrower operation or a
-fix — never to switching the signal off for 4–5★ reviews as a whole.
-
-| gate | proposed bar | why |
+| measure | pilot bar | at least, else 「판단 보류」 |
 |---|---|---|
-| Missed harm | weighted recall **≥ 0.80** | A safety report that does not rise is the costly error. |
-| Hidden reports | **0** `REPORT` in `FILTERED` | The negation filter may cancel a reassurance, never an event. |
-| Needless alarms (raised) | precision Wilson lower bound **≥ 0.50** | Cheaper than a miss, but a list where most marks are wrong teaches the seller to ignore them. |
-| Needless alarms (4–5★) | weighted share **≤ 0.05** | The same ceiling as RUBRIC §5 for a happy customer raised as a problem. |
+| 위험 리뷰 탐지율 | **≥ 0.90** | 30 `REPORT`+`WORRY` in the challenge set |
+| 부정 필터가 지운 실제 신고 | **0** in the labelled set — not a promise that none will ever be missed | 30 `REPORT`+`WORRY` in the challenge set |
+| 경보 정밀도 | **≥ 0.50** measured value (improvement target 0.70) — one alarm in two may be a needless check | 20 raised reviews in the random set |
+| 4–5★ 오탐률 | **≤ 0.05** | 100 labelled non-harm 4–5★ reviews in the random set |
 
-**Adequacy floor** — no verdict below it: ≥ 30 labelled `REPORT` + `WORRY`, ≥ 100 labelled in `OTHER`, ≥ 60
-labelled 4–5★ non-harm. Below the floor the harness reports counts and says it cannot judge.
+**"≥ 0.50" is the measured value, reported with its count**, not a confidence bound. Below a measure's minimum count
+the run says **판단 보류**, never 통과. Meeting every bar ends the RUBRIC §7 exception for the pilot. Missing one leads
+to a narrower operation or a fix to the signal — never to switching it off for 4–5★ reviews as a whole.
 
 ## 6. Running it
 
-1. `RUN_SAFETY_SHEET=true SAFETY_SHEET_PATH=<outside the repo>.csv` plus the `REVIEW_EVAL_*` database variables:
-   writes the sheet. The labeller fills the `label` column.
-2. `RUN_SAFETY_IMPORT=true SAFETY_SHEET_PATH=…`: writes `labels.json` (fingerprint + label).
-3. `RUN_SAFETY_EVAL=true` plus the database variables: prints the metrics and, above the floor, the verdict
-   against the bars as fixed in §5.
+Database variables as `ReviewTriageEvalIT`: `REVIEW_EVAL_JDBC_URL` · `REVIEW_EVAL_DB_USER` · `REVIEW_EVAL_DB_PASSWORD`.
+
+1. `RUN_SAFETY_SHEET=true SAFETY_SHEET_PATH=<outside the repo>.csv` — writes the sheet: fingerprint, rating, set,
+   then empty `label` · `labeller` · `ownerChecked`, then the review.
+2. `RUN_SAFETY_IMPORT=true SAFETY_SHEET_PATH=…` — writes `labels.json` from the filled rows.
+3. `RUN_SAFETY_EVAL=true` — prints the measures, their counts and verdicts (통과 · 미달 · 판단 보류). Counts and rates only.

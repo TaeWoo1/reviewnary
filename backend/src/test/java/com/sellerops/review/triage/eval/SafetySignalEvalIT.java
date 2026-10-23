@@ -21,6 +21,7 @@ import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -46,7 +47,15 @@ class SafetySignalEvalIT {
 
     private static final Path DIR = Path.of("..", "contracts", "review-eval", "safety", "v1");
     private static final Path LABELS = DIR.resolve("labels.json");
-    private static final String HEADER = "reviewIdFingerprint,rating,stratum,label,review";
+    /**
+     * The sheet: who labelled (OWNER · DELEGATE) and whether the owner checked it are columns, because the owner sets
+     * the criteria on a first batch and then checks the unsure ones and a sample of the delegate's (RUBRIC §3). There
+     * is deliberately no suggested-label column — a model's guess is never the answer.
+     */
+    private static final String HEADER = "reviewIdFingerprint,rating,set,label,labeller,ownerChecked,review";
+
+    /** The labeller roles RUBRIC §3 names. */
+    private static final java.util.Set<String> LABELLERS = java.util.Set.of("OWNER", "DELEGATE");
 
     private record Row(FrameRow frame, String body) {}
 
@@ -60,13 +69,21 @@ class SafetySignalEvalIT {
             frame.add(row.frame());
             bodies.put(row.frame().fingerprint(), row.body());
         }
+        // One row per review, in either set or both; the order within the sheet is the sample order, so the two sets
+        // interleave and the labeller does not read all the harm words in a row.
+        Map<String, String> sets = new LinkedHashMap<>();
+        SafetySample.randomSet(frame).forEach(r -> sets.put(r.fingerprint(), "RANDOM"));
+        SafetySample.challengeSet(frame).forEach(r -> sets.merge(r.fingerprint(), "CHALLENGE", (a, b) -> "BOTH"));
+        Map<String, FrameRow> byId = new HashMap<>();
+        frame.forEach(r -> byId.put(r.fingerprint(), r));
         StringBuilder csv = new StringBuilder(HEADER).append('\n');
-        for (FrameRow r : SafetySample.draw(frame)) {
-            csv.append(String.join(",", r.fingerprint(), r.rating() == null ? "" : r.rating().toString(),
-                    r.stratum().name(), "", quote(bodies.get(r.fingerprint())))).append('\n');
-        }
+        sets.keySet().stream().sorted(java.util.Comparator.comparing(CalibrationSample::sampleOrderKey)).forEach(id -> {
+            FrameRow r = byId.get(id);
+            csv.append(String.join(",", id, r.rating() == null ? "" : r.rating().toString(), sets.get(id), "", "", "",
+                    quote(bodies.get(id)))).append('\n');
+        });
         Files.writeString(sheet, csv.toString(), StandardCharsets.UTF_8);
-        System.out.println("safety sheet: " + SafetySample.draw(frame).size() + " rows written");
+        System.out.println("safety sheet: " + sets.size() + " rows written");
     }
 
     @Test
@@ -77,13 +94,16 @@ class SafetySignalEvalIT {
         ArrayNode labels = root.putArray("labels");
         int kept = 0;
         for (List<String> cells : parse(Files.readString(sheetPath(), StandardCharsets.UTF_8))) {
-            if (cells.isEmpty() || cells.get(0).equals("reviewIdFingerprint") || cells.size() < 4
+            if (cells.isEmpty() || cells.get(0).equals("reviewIdFingerprint") || cells.size() < 6
                     || cells.get(3).isBlank()) {
                 continue;
             }
             Label label = Label.valueOf(cells.get(3).strip());
+            String labeller = cells.get(4).strip();
             assertThat(cells.get(0)).as("a fingerprint, never a raw id").matches("[0-9a-f]{64}");
-            labels.addObject().put("reviewIdFingerprint", cells.get(0)).put("label", label.name());
+            assertThat(LABELLERS).as("who labelled it, by role").contains(labeller);
+            labels.addObject().put("reviewIdFingerprint", cells.get(0)).put("label", label.name())
+                    .put("labeller", labeller).put("ownerChecked", "Y".equalsIgnoreCase(cells.get(5).strip()));
             kept++;
         }
         Files.writeString(LABELS, json.writeValueAsString(root) + "\n");
@@ -99,6 +119,13 @@ class SafetySignalEvalIT {
         }
         List<FrameRow> frame = new ArrayList<>();
         List<Labelled> labelled = new ArrayList<>();
+        int byDelegate = 0;
+        int ownerChecked = 0;
+        for (JsonNode entry : new ObjectMapper().readTree(Files.readString(LABELS)).path("labels")) {
+            byDelegate += "DELEGATE".equals(entry.path("labeller").asText()) ? 1 : 0;
+            ownerChecked += entry.path("ownerChecked").asBoolean() ? 1 : 0;
+        }
+        System.out.println("  labelled by delegate " + byDelegate + " · checked by owner " + ownerChecked);
         for (Row row : readFrame()) {
             frame.add(row.frame());
             Label label = labels.get(row.frame().fingerprint());
@@ -133,7 +160,7 @@ class SafetySignalEvalIT {
                         continue;
                     }
                     Integer rating = rs.getObject("rating") == null ? null : rs.getInt("rating");
-                    rows.add(new Row(new FrameRow(fingerprint, rating, SafetySample.stratumOf(body)), body));
+                    rows.add(new Row(SafetySample.row(fingerprint, rating, body), body));
                 }
             }
         }

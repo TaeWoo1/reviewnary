@@ -139,20 +139,19 @@ silently.
   for this question and that the §5 harm — a happy 4–5★ customer's 「다칠 걱정 없어요」 raised as a
   problem — is the likely error, and chose rating-independent surfacing over (a) applying it only to
   1–2★ reviews and (b) holding it until labelled.
-- **Known misses, stated.** The signal does not tell an occurrence (「화상을 입었어요」) from a worry
-  (「화상 입을까 걱정돼요」) or a background mention (「알레르기 있는 아이도 잘 써요」, which still rises);
-  all three are candidates for the seller. Anything worded outside the list is not seen. Telling them
-  apart is the next step — rules find the candidate, a context judgement is added on top, and that
-  judgement keeps its uncertainty and is measured like this one.
+- **Known misses, stated.** Since 2026-10-23 the signal tells an occurrence (「화상을 입었어요」) from a worry
+  (「화상 입을까 걱정돼요」), and a noun that only names a harm (「알레르기 있는 아이도 잘 써요」) no longer rises
+  unless what follows says it happened or is feared. Anything worded outside the list, or a cue farther than the
+  window, is not seen.
 - **What it reads, stated.** Outside the attention window it scans the 200 most recent undecided
   reviews whose text contains a term's opening (`OperationsHomeService.SAFETY_SCAN`). It therefore never
   supports 「there is no safety problem in this seller's reviews」, and no surface may say so. The
   intended shape is a check when each review arrives plus a separate sequential pass over the backlog.
-- **What would end the exception.** A small labelled set of the seller's real reviews for this narrower
-  question — prepared as [`contracts/review-eval/safety/v1`](../../safety/v1/RUBRIC.md), labels still empty — — reports, worries, reassurances and unrelated mentions all included — scored separately for
-  **missed harm** and **needless alarms** against **bars the owner fixes before the labels are read**.
-  Measuring is not enough by itself: meeting those bars ends the exception; missing them leads to a
-  narrower operation or a fix, never to switching the signal off for 4–5★ reviews as a whole (the point of
-  the signal is that content, not the rating, decides). This set is a separate task from the
-  past-reply retrieval measurement, which says nothing about this signal. Until it is scored the
-  false-alarm rate on 4–5★ is unknown and must not be claimed.
+- **What would end the exception.** The labelled set [`contracts/review-eval/safety/v1`](../../safety/v1/RUBRIC.md):
+  four labels (실제 위험 발생 · 구체적 위험 우려 · 위험 부정·안심 · 관련 없음, plus 판단 불가), a random set that
+  measures needless alarms and a challenge set that measures misses, and the owner's pilot bars of 2026-10-23 —
+  detection ≥ 0.90 on the challenge set, 0 real reports cancelled by the negation filter, alarm precision ≥ 0.50
+  (target 0.70) on the random set, and a 4–5★ false-alarm rate ≤ 0.05 among reviews that are not harm. Below a
+  measure's minimum count the verdict is 판단 보류. Meeting the bars ends the exception for the pilot; missing one
+  leads to a narrower operation or a fix, never to switching the signal off for 4–5★ reviews as a whole. Until it
+  is scored the false-alarm rate is unknown and must not be claimed.

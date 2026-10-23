@@ -2,173 +2,193 @@ package com.sellerops.review.triage.eval;
 
 import com.sellerops.itemanalysis.eval.EvalMetrics;
 import com.sellerops.review.triage.ReviewSafetySignal;
+import com.sellerops.review.triage.ReviewSafetySignal.Outcome;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * <b>The safety evaluation set's draw and arithmetic</b> — {@code contracts/review-eval/safety/v1/RUBRIC.md}. Pure,
+ * <b>The safety evaluation set's draws and arithmetic</b> — {@code contracts/review-eval/safety/v1/RUBRIC.md}. Pure,
  * so the numbers the gated runs print are the numbers {@code SafetySampleTest} checks.
+ *
+ * <p>Two sets with two jobs, never mixed (owner decision 2026-10-23): the <b>random</b> set keeps the real mix of
+ * reviews and says how often an alarm is needless; the <b>challenge</b> set gathers every review that mentions a
+ * harm word and says what is missed. A precision measured on the challenge set would say nothing about operation.
  */
 final class SafetySample {
 
-    enum Stratum {
-        /** The signal raises it. */
-        RAISED(150),
-        /** A term matched, and a negation or reassurance cancelled it. */
-        FILTERED(80),
-        /** No term matched. */
-        OTHER(200);
+    /** The labels of RUBRIC §1. {@code UNKNOWN} is excluded from every rate and reported on its own. */
+    enum Label { REPORT, WORRY, REASSURANCE, UNRELATED, UNKNOWN }
 
-        final int quota;
+    static final Set<Label> SHOULD_RISE = Set.of(Label.REPORT, Label.WORRY);
+    static final Set<Label> NOT_HARM = Set.of(Label.REASSURANCE, Label.UNRELATED);
 
-        Stratum(int quota) {
-            this.quota = quota;
+    static final int RANDOM_SIZE = 400;
+    static final int CHALLENGE_SIZE = 300;
+
+    /** The pilot bars of RUBRIC §5, fixed by the owner on 2026-10-23 before any label was read. */
+    static final double MIN_CHALLENGE_RECALL = 0.90;
+    static final int MAX_HIDDEN_REPORTS = 0;
+    static final double MIN_PRECISION = 0.50;
+    static final double TARGET_PRECISION = 0.70;
+    static final double MAX_HIGH_RATING_FALSE_ALARM = 0.05;
+
+    /** Below these, a measure says 「판단 보류」, not pass or fail (RUBRIC §5). */
+    static final int MIN_RAISED_FOR_PRECISION = 20;
+    static final int MIN_HIGH_RATING_NOT_HARM = 100;
+    static final int MIN_CHALLENGE_POSITIVES = 30;
+
+    record FrameRow(String fingerprint, Integer rating, Outcome outcome) {
+
+        boolean raised() {
+            return outcome == Outcome.RAISED;
+        }
+
+        boolean challenge() {
+            return outcome != Outcome.NONE;
         }
     }
 
-    enum Label { REPORT, WORRY, REASSURANCE, BACKGROUND, UNRELATED, UNCERTAIN }
-
-    static final Set<Label> SHOULD_RISE = Set.of(Label.REPORT, Label.WORRY);
-
-    /** The proposed bars of RUBRIC §5. The owner fixes them before any label is read. */
-    static final double MIN_RECALL = 0.80;
-    static final int MAX_HIDDEN_REPORTS = 0;
-    static final double MIN_PRECISION_LOWER_BOUND = 0.50;
-    static final double MAX_HIGH_RATING_ALARM_RATE = 0.05;
-
-    /** The adequacy floor of RUBRIC §5. */
-    static final int MIN_POSITIVES = 30;
-    static final int MIN_OTHER = 100;
-    static final int MIN_HIGH_RATING_NEGATIVES = 60;
-
-    record FrameRow(String fingerprint, Integer rating, Stratum stratum) {}
-
     record Labelled(FrameRow row, Label label) {}
 
-    static Stratum stratumOf(String body) {
-        if (ReviewSafetySignal.in(body)) {
-            return Stratum.RAISED;
-        }
-        return ReviewSafetySignal.mentions(body) ? Stratum.FILTERED : Stratum.OTHER;
+    static FrameRow row(String fingerprint, Integer rating, String body) {
+        return new FrameRow(fingerprint, rating, ReviewSafetySignal.explain(body));
     }
 
     static boolean highRating(Integer rating) {
         return rating != null && rating >= 4;
     }
 
-    /** The reproducible draw: each stratum's first {@code quota} rows by sample order. */
-    static List<FrameRow> draw(List<FrameRow> frame) {
-        List<FrameRow> out = new ArrayList<>();
-        for (Stratum s : Stratum.values()) {
-            frame.stream().filter(r -> r.stratum() == s)
-                    .sorted(Comparator.comparing(r -> CalibrationSample.sampleOrderKey(r.fingerprint())))
-                    .limit(s.quota).forEach(out::add);
-        }
-        return out;
+    private static List<FrameRow> first(List<FrameRow> rows, int n) {
+        return rows.stream().sorted(Comparator.comparing(r -> CalibrationSample.sampleOrderKey(r.fingerprint())))
+                .limit(n).toList();
     }
 
-    record Report(Map<Stratum, Integer> frameSize, Map<Stratum, Integer> labelled, int uncertain, int positives,
-                  int highRatingNegatives, double recall, int hiddenReports, int raisedLabelled, int raisedPositive,
-                  double precision, double precisionLowerBound, double highRatingAlarmRate, boolean adequate) {
+    /** The random set: the first {@value #RANDOM_SIZE} of every review by sample order — the real mix. */
+    static List<FrameRow> randomSet(List<FrameRow> frame) {
+        return first(frame, RANDOM_SIZE);
+    }
 
-        boolean passes() {
-            return adequate && recall >= MIN_RECALL && hiddenReports <= MAX_HIDDEN_REPORTS
-                    && precisionLowerBound >= MIN_PRECISION_LOWER_BOUND
-                    && highRatingAlarmRate <= MAX_HIGH_RATING_ALARM_RATE;
+    /** The challenge set: the first {@value #CHALLENGE_SIZE} reviews that mention any harm word at all. */
+    static List<FrameRow> challengeSet(List<FrameRow> frame) {
+        return first(frame.stream().filter(FrameRow::challenge).toList(), CHALLENGE_SIZE);
+    }
+
+    /** What one measure concluded. */
+    enum Verdict { PASS, BELOW, HOLD }
+
+    record Measure(String name, double value, int numerator, int denominator, String bar, Verdict verdict) {}
+
+    record Report(int randomLabelled, int challengeLabelled, int unknown, List<Measure> measures,
+                  double alarmsPerHundred, double precisionLow, double precisionHigh, Map<String, Integer> readings) {
+
+        Verdict overall() {
+            if (measures.stream().anyMatch(m -> m.verdict() == Verdict.HOLD)) {
+                return Verdict.HOLD;
+            }
+            return measures.stream().allMatch(m -> m.verdict() == Verdict.PASS) ? Verdict.PASS : Verdict.BELOW;
         }
     }
 
     /**
-     * The metrics of RUBRIC §4 from the frame and the labelled rows. Population estimates weight each stratum by
-     * its frame size over its labelled count; {@code UNCERTAIN} is left out of every rate.
+     * The measures of RUBRIC §4, each on its own denominator. {@code labelled} may hold one label per review; a review
+     * in both sets counts in both, by its set membership.
      */
     static Report report(List<FrameRow> frame, List<Labelled> labelled) {
-        Map<Stratum, Integer> size = new EnumMap<>(Stratum.class);
-        Map<Stratum, Integer> sizeHigh = new EnumMap<>(Stratum.class);
-        for (Stratum s : Stratum.values()) {
-            size.put(s, (int) frame.stream().filter(r -> r.stratum() == s).count());
-            sizeHigh.put(s, (int) frame.stream().filter(r -> r.stratum() == s && highRating(r.rating())).count());
-        }
-        Map<Stratum, Integer> n = new EnumMap<>(Stratum.class);
-        Map<Stratum, Integer> pos = new EnumMap<>(Stratum.class);
-        Map<Stratum, Integer> nHigh = new EnumMap<>(Stratum.class);
-        Map<Stratum, Integer> negHigh = new EnumMap<>(Stratum.class);
-        int uncertain = 0;
+        Set<String> random = new java.util.HashSet<>();
+        randomSet(frame).forEach(r -> random.add(r.fingerprint()));
+        Set<String> challenge = new java.util.HashSet<>();
+        challengeSet(frame).forEach(r -> challenge.add(r.fingerprint()));
+
+        int unknown = 0;
+        int randomN = 0;
+        int raisedN = 0;
+        int raisedTrue = 0;
+        int highNotHarm = 0;
+        int highNotHarmRaised = 0;
+        int challengeN = 0;
+        int challengePositive = 0;
+        int challengeCaught = 0;
         int hidden = 0;
-        for (Stratum s : Stratum.values()) {
-            n.put(s, 0);
-            pos.put(s, 0);
-            nHigh.put(s, 0);
-            negHigh.put(s, 0);
-        }
+        Map<String, Integer> readings = new LinkedHashMap<>();
         for (Labelled l : labelled) {
-            if (l.label() == Label.UNCERTAIN) {
-                uncertain++;
+            if (l.label() == Label.UNKNOWN) {
+                unknown++;
                 continue;
             }
-            Stratum s = l.row().stratum();
-            n.merge(s, 1, Integer::sum);
+            FrameRow row = l.row();
             boolean positive = SHOULD_RISE.contains(l.label());
-            if (positive) {
-                pos.merge(s, 1, Integer::sum);
-            }
-            if (s == Stratum.FILTERED && l.label() == Label.REPORT) {
-                hidden++;
-            }
-            if (highRating(l.row().rating())) {
-                nHigh.merge(s, 1, Integer::sum);
-                if (!positive) {
-                    negHigh.merge(s, 1, Integer::sum);
+            if (random.contains(row.fingerprint())) {
+                randomN++;
+                if (row.raised()) {
+                    raisedN++;
+                    raisedTrue += positive ? 1 : 0;
+                }
+                if (highRating(row.rating()) && NOT_HARM.contains(l.label())) {
+                    highNotHarm++;
+                    highNotHarmRaised += row.raised() ? 1 : 0;
                 }
             }
+            if (challenge.contains(row.fingerprint())) {
+                challengeN++;
+                if (positive) {
+                    challengePositive++;
+                    challengeCaught += row.raised() ? 1 : 0;
+                }
+                if (l.label() == Label.REPORT && row.outcome() == Outcome.NEGATED) {
+                    hidden++;
+                }
+            }
+            readings.merge(l.label().name(), 1, Integer::sum);
         }
-        double estPositives = 0;
-        double estHighNegatives = 0;
-        for (Stratum s : Stratum.values()) {
-            estPositives += weighted(size.get(s), pos.get(s), n.get(s));
-            estHighNegatives += weighted(sizeHigh.get(s), negHigh.get(s), nHigh.get(s));
-        }
-        double caught = weighted(size.get(Stratum.RAISED), pos.get(Stratum.RAISED), n.get(Stratum.RAISED));
-        double raisedHighNegatives = weighted(sizeHigh.get(Stratum.RAISED), negHigh.get(Stratum.RAISED),
-                nHigh.get(Stratum.RAISED));
-        int positives = pos.values().stream().mapToInt(Integer::intValue).sum();
-        int highNegatives = negHigh.values().stream().mapToInt(Integer::intValue).sum();
-        int raisedN = n.get(Stratum.RAISED);
-        int raisedPos = pos.get(Stratum.RAISED);
-        boolean adequate = positives >= MIN_POSITIVES && n.get(Stratum.OTHER) >= MIN_OTHER
-                && highNegatives >= MIN_HIGH_RATING_NEGATIVES;
-        return new Report(size, n, uncertain, positives, highNegatives,
-                estPositives == 0 ? 0.0 : caught / estPositives, hidden, raisedN, raisedPos,
-                raisedN == 0 ? 0.0 : (double) raisedPos / raisedN, EvalMetrics.wilsonLowerBound(raisedPos, raisedN),
-                estHighNegatives == 0 ? 0.0 : raisedHighNegatives / estHighNegatives, adequate);
+        List<Measure> measures = new ArrayList<>();
+        double recall = ratio(challengeCaught, challengePositive);
+        measures.add(new Measure("위험 리뷰 탐지율 (도전 사례)", recall, challengeCaught, challengePositive,
+                "≥ " + MIN_CHALLENGE_RECALL, challengePositive < MIN_CHALLENGE_POSITIVES ? Verdict.HOLD
+                        : recall >= MIN_CHALLENGE_RECALL ? Verdict.PASS : Verdict.BELOW));
+        measures.add(new Measure("부정 필터가 지운 실제 신고 (도전 사례)", hidden, hidden, challengeN,
+                "≤ " + MAX_HIDDEN_REPORTS, challengePositive < MIN_CHALLENGE_POSITIVES ? Verdict.HOLD
+                        : hidden <= MAX_HIDDEN_REPORTS ? Verdict.PASS : Verdict.BELOW));
+        double precision = ratio(raisedTrue, raisedN);
+        measures.add(new Measure("경보 정밀도 (무작위)", precision, raisedTrue, raisedN,
+                "≥ " + MIN_PRECISION + " (목표 " + TARGET_PRECISION + ")", raisedN < MIN_RAISED_FOR_PRECISION
+                        ? Verdict.HOLD : precision >= MIN_PRECISION ? Verdict.PASS : Verdict.BELOW));
+        double falseAlarm = ratio(highNotHarmRaised, highNotHarm);
+        measures.add(new Measure("4–5★ 오탐률 (무작위, 위험 아닌 리뷰 중)", falseAlarm, highNotHarmRaised, highNotHarm,
+                "≤ " + MAX_HIGH_RATING_FALSE_ALARM, highNotHarm < MIN_HIGH_RATING_NOT_HARM ? Verdict.HOLD
+                        : falseAlarm <= MAX_HIGH_RATING_FALSE_ALARM ? Verdict.PASS : Verdict.BELOW));
+        return new Report(randomN, challengeN, unknown, List.copyOf(measures),
+                randomN == 0 ? 0.0 : 100.0 * raisedN / randomN, EvalMetrics.wilsonLowerBound(raisedTrue, raisedN),
+                raisedN == 0 ? 1.0 : 1.0 - EvalMetrics.wilsonLowerBound(raisedN - raisedTrue, raisedN), readings);
     }
 
-    /** A stratum's estimated count of something: its frame size times the labelled share. */
-    private static double weighted(int frameSize, int hits, int labelled) {
-        return labelled == 0 ? 0.0 : (double) frameSize * hits / labelled;
+    private static double ratio(int part, int whole) {
+        return whole == 0 ? 0.0 : (double) part / whole;
     }
 
     /** Counts and rates only — no body, no id, no fingerprint. */
     static String render(Report r) {
         StringBuilder out = new StringBuilder("safety signal evaluation (contracts/review-eval/safety/v1)\n");
-        for (Stratum s : Stratum.values()) {
-            out.append(String.format("  %-9s frame %6d  labelled %4d%n", s, r.frameSize().get(s), r.labelled().get(s)));
+        out.append(String.format("  labelled: random %d · challenge %d · 판단 불가 %d · by label %s%n", r.randomLabelled(),
+                r.challengeLabelled(), r.unknown(), r.readings()));
+        for (Measure m : r.measures()) {
+            out.append(String.format("  %-28s %.3f (%d/%d) bar %s → %s%n", m.name(), m.value(), m.numerator(),
+                    m.denominator(), m.bar(), switch (m.verdict()) {
+                        case PASS -> "통과";
+                        case BELOW -> "미달";
+                        case HOLD -> "판단 보류 (표본 부족)";
+                    }));
         }
-        out.append(String.format("  uncertain %d · should-rise labelled %d · 4–5★ non-harm labelled %d%n",
-                r.uncertain(), r.positives(), r.highRatingNegatives()));
-        out.append(String.format("  missed harm   recall %.3f (bar ≥ %.2f)%n", r.recall(), MIN_RECALL));
-        out.append(String.format("  hidden reports %d (bar ≤ %d)%n", r.hiddenReports(), MAX_HIDDEN_REPORTS));
-        out.append(String.format("  needless alarms  raised precision %.3f, Wilson low %.3f (bar ≥ %.2f) on %d%n",
-                r.precision(), r.precisionLowerBound(), MIN_PRECISION_LOWER_BOUND, r.raisedLabelled()));
-        out.append(String.format("  needless alarms  4–5★ raised share %.3f (bar ≤ %.2f)%n", r.highRatingAlarmRate(),
-                MAX_HIGH_RATING_ALARM_RATE));
-        out.append(r.adequate() ? (r.passes() ? "  verdict: PASS — the exception may end\n"
-                : "  verdict: BELOW A BAR — narrow the operation or fix the signal\n")
-                : "  verdict: none — below the adequacy floor of RUBRIC §5\n");
+        out.append(String.format("  경보 정밀도 95%% 구간(참고) %.3f – %.3f · 무작위 100건당 경보 %.1f건%n", r.precisionLow(),
+                r.precisionHigh(), r.alarmsPerHundred()));
+        out.append("  overall: ").append(switch (r.overall()) {
+            case PASS -> "통과 — 파일럿 기준 충족";
+            case BELOW -> "미달 — 범위를 좁혀 운영하거나 신호를 고친다";
+            case HOLD -> "판단 보류 — 표본이 기준에 못 미친다";
+        }).append('\n');
         return out.toString();
     }
 

@@ -2,10 +2,10 @@
   "contract": "review-eval/safety/v1",
   "rubricVersion": "v1",
   "_comment": [
-    "DELIBERATELY EMPTY. No labelling session has been run. Labels come from a person reading real review",
-    "text on the sheet SafetyLabelSheetIT writes outside the repository; only the review-id fingerprint and",
-    "the label are kept here (RUBRIC.md section 3). Until the adequacy floor in RUBRIC.md section 5 is met,",
-    "SafetySignalEvalIT reports counts and refuses a verdict."
+    "DELIBERATELY EMPTY. No labelling session has been run. Labels come from people reading real review",
+    "text on the sheet SafetySignalEvalIT writes outside the repository; only the review-id fingerprint, the label,",
+    "the labeller's role (OWNER or DELEGATE) and whether the owner checked it are kept here (RUBRIC.md section 3).",
+    "Below a measure's minimum count SafetySignalEvalIT says 판단 보류, never 통과."
   ],
   "labels": []
 }

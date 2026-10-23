@@ -29,18 +29,49 @@ import java.util.TreeSet;
  * (타는 냄새 · 타는냄새). Compounds that only look like a term are removed before that (화상회의). A match followed
  * within {@value #NEGATION_WINDOW} characters by a negation or a reassurance (없 · 않 · 방지 · 괜찮 …) does not
  * count — 「이물질 없이 깨끗해요」. The window is short so that a later, unrelated clause cannot cancel a real report
- * (「피가 났는데 연락이 없어요」).
+ * (「피가 났는데 연락이 없어요」). A noun that only names a harm (화상 · 알레르기 · 소비자원 …) stands only when what
+ * follows says it happened or is feared (2026-10-23) — 「알레르기 있는 아이도 잘 써요」 no longer rises.
  *
  * <p><b>A worry is not a reassurance</b> (product-owner decision, 2026-10-23). 「너무 뜨거워서 화상 입을까 걱정돼요」 is
  * a customer telling the seller the product may hurt someone, so 걱정 · 염려 no longer cancel a match on their own;
  * only a worry that is itself denied does (「화상 걱정 없어요」 · 「다칠 걱정은 전혀 없어요」). The signal is a
- * candidate for the seller to look at — the mark says 「안전 관련 확인」, not that harm happened — and an occurrence,
- * a worry and a background mention (「알레르기 있는 아이도 잘 써요」, which still rises) are not told apart here.
+ * candidate for the seller to look at — the mark says 「안전 관련 확인」, not that harm happened. {@link #find} tells an
+ * occurrence from a worry ({@link Reading}), so the screen can say which.
  */
 public final class ReviewSafetySignal {
 
     /** What kind of thing the review reported — the reason a seller is told when they ask why it rose. */
     public enum Kind { INJURY, BODY_REACTION, PRODUCT_HAZARD, LEGAL }
+
+    /**
+     * How the review says it (product-owner decision 2026-10-23, labels of {@code contracts/review-eval/safety/v1}):
+     * it happened, or a concrete worry that it may. Both are raised; the screen tells them apart.
+     */
+    public enum Reading { OCCURRENCE, WORRY }
+
+    /** One standing expression: what kind of harm, and whether it happened or is feared. */
+    public record Finding(Kind kind, Reading reading) {}
+
+    /** How far after a term a cue is looked for, whitespace removed. */
+    static final int CUE_WINDOW = 8;
+
+    /**
+     * Nouns that name a harm without saying anything happened — 「알레르기 있는 아이도 잘 써요」. They stand only with a
+     * cue after them: an event (났 · 올라 · 입었 · 하겠 …) or a worry (까봐 · 을까 · 걱정 …). Forms that already say it
+     * happened (다쳤 · 데였 · 신고했 …) and product hazards (이물질 · 타는냄새 …), which a review rarely mentions in
+     * passing, stand without one.
+     */
+    static final java.util.Set<String> NEEDS_CUE = java.util.Set.of("다치", "다칠", "부상", "화상", "알레르기", "알러지",
+            "두드러기", "발진", "식중독", "배탈", "구토", "응급실", "고발", "소송", "변호사", "소비자원", "식약처", "공정위");
+
+    /** After a term: the customer fears it. Read before the event cues — 「화상 입을까」 is a worry. */
+    static final List<String> WORRY_CUES = List.of("걱정", "염려", "까봐", "을까", "할까", "될까", "날까", "갈까", "까싶",
+            "위험", "무서", "불안", "쉬워", "것같");
+
+    /** After a term: it happened, or a step is taken or announced. */
+    static final List<String> EVENT_CUES = List.of("났", "나왔", "나요", "나서", "생겼", "생겨", "입었", "입어", "올라",
+            "있었", "발생", "걸렸", "걸려", "했", "됐", "되었", "돼서", "일어", "갔", "왔", "하겠", "할게", "할거", "합니다",
+            "넣었", "접수", "받았", "피었", "번졌", "퍼졌", "심해", "부었", "빨개", "가려");
 
     static final int NEGATION_WINDOW = 5;
 
@@ -84,13 +115,64 @@ public final class ReviewSafetySignal {
 
     /** Whether the review carries the signal. */
     public static boolean in(String body) {
-        return of(body).isPresent();
+        return find(body).isPresent();
     }
 
-    /** The first expression's kind that stands, or empty. */
+    /** The kind of the finding that stands, or empty. */
     public static Optional<Kind> of(String body) {
+        return find(body).map(Finding::kind);
+    }
+
+    /**
+     * The finding that stands: an occurrence if any expression reports one, else the first worry; empty when every
+     * match is negated, reassured away, or a bare noun with no cue.
+     */
+    public static Optional<Finding> find(String body) {
         if (body == null || body.isBlank()) {
             return Optional.empty();
+        }
+        String text = body.replaceAll("\\s+", "");
+        for (String compound : NOT_SAFETY) {
+            text = text.replace(compound, "");
+        }
+        Finding worry = null;
+        for (Map.Entry<String, Kind> term : TERMS.entrySet()) {
+            int at = text.indexOf(term.getKey());
+            while (at >= 0) {
+                int end = at + term.getKey().length();
+                if (!negatedAfter(text, end)) {
+                    Reading reading = readingAfter(text, end, NEEDS_CUE.contains(term.getKey()));
+                    if (reading == Reading.OCCURRENCE) {
+                        return Optional.of(new Finding(term.getValue(), reading));
+                    }
+                    if (reading == Reading.WORRY && worry == null) {
+                        worry = new Finding(term.getValue(), reading);
+                    }
+                }
+                at = text.indexOf(term.getKey(), end);
+            }
+        }
+        return Optional.ofNullable(worry);
+    }
+
+    /** What the signal did with a review, for the evaluation set ({@code contracts/review-eval/safety/v1}). */
+    public enum Outcome {
+        /** It rises. */
+        RAISED,
+        /** A term matched and a negation or reassurance cancelled it — where a hidden report would be. */
+        NEGATED,
+        /** Only a bare noun matched, with nothing after it saying it happened or is feared. */
+        NO_CUE,
+        /** No term at all. */
+        NONE
+    }
+
+    public static Outcome explain(String body) {
+        if (find(body).isPresent()) {
+            return Outcome.RAISED;
+        }
+        if (!mentions(body)) {
+            return Outcome.NONE;
         }
         String text = body.replaceAll("\\s+", "");
         for (String compound : NOT_SAFETY) {
@@ -100,13 +182,25 @@ public final class ReviewSafetySignal {
             int at = text.indexOf(term.getKey());
             while (at >= 0) {
                 int end = at + term.getKey().length();
-                if (!negatedAfter(text, end)) {
-                    return Optional.of(term.getValue());
+                if (negatedAfter(text, end)) {
+                    return Outcome.NEGATED;
                 }
                 at = text.indexOf(term.getKey(), end);
             }
         }
-        return Optional.empty();
+        return Outcome.NO_CUE;
+    }
+
+    /** A worry cue first, then an event cue; a term that says it happened by its own form needs neither. */
+    private static Reading readingAfter(String text, int from, boolean needsCue) {
+        String after = text.substring(from, Math.min(text.length(), from + CUE_WINDOW));
+        if (WORRY_CUES.stream().anyMatch(after::contains)) {
+            return Reading.WORRY;
+        }
+        if (!needsCue || EVENT_CUES.stream().anyMatch(after::contains)) {
+            return Reading.OCCURRENCE;
+        }
+        return null;
     }
 
     /**
