@@ -129,12 +129,12 @@ public class ReviewDraftComposer {
     private final ReviewReplyTemplateService templates;
     private final AgentDraftService model;
     private final AgentQuotaService quota;
-    /** The company's 답변 스타일, whose forbidden phrases review replies obey (2026-10-23); null in a bare test. */
-    private com.sellerops.knowledge.style.AnswerStyleService styles;
+    /** The company's forbidden phrases, as review replies obey them (2026-10-23); null in a bare test. */
+    private ReviewStyleGuard styleGuard;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
-    public void setStyles(com.sellerops.knowledge.style.AnswerStyleService styles) {
-        this.styles = styles;
+    public void setStyleGuard(ReviewStyleGuard styleGuard) {
+        this.styleGuard = styleGuard;
     }
     private final DraftEvidenceSnippets snippets;
     private final ReviewIssueEvidenceRepository issueEvidence;
@@ -344,7 +344,7 @@ public class ReviewDraftComposer {
             return new Written(null, UNSUPPORTED_CLAIM);
         }
         // Refused, not edited: deleting words out of a sentence is how a reply comes to say the opposite.
-        if (styles != null && !ReviewStyleGuard.forbiddenIn(candidate, styles.profileFor(orgId)).isEmpty()) {
+        if (styleGuard != null && !styleGuard.forbiddenIn(candidate, orgId).isEmpty()) {
             return new Written(null, FORBIDDEN_PHRASE);
         }
         return new Written(candidate, null);

@@ -75,7 +75,7 @@ class ReviewDraftBasisTest {
         com.sellerops.knowledge.style.AnswerStyleService styles =
                 mock(com.sellerops.knowledge.style.AnswerStyleService.class);
         when(styles.profileFor(org)).thenReturn(com.sellerops.knowledge.style.AnswerStyleProfile.defaults());
-        basis.setStyles(styles);
+        basis.setStyleGuard(new ReviewStyleGuard(styles));
         assertThat(basis.of(org)).as("a company with no ban keeps its fingerprint").isEqualTo(before);
         when(styles.profileFor(org)).thenReturn(new com.sellerops.knowledge.style.AnswerStyleProfile(
                 null, null, null, null, null, null, java.util.List.of(), java.util.List.of("환불"), null, 1));

@@ -29,7 +29,7 @@ class ReviewStyleGuardTest {
 
     @Test
     void noProfileNoBan() {
-        assertThat(ReviewStyleGuard.forbiddenIn("아무 문장", null)).isEmpty();
+        assertThat(ReviewStyleGuard.forbiddenIn("아무 문장", (com.sellerops.knowledge.style.AnswerStyleProfile) null)).isEmpty();
         assertThat(ReviewStyleGuard.enforced(AnswerStyleProfile.defaults())).isEmpty();
     }
 }

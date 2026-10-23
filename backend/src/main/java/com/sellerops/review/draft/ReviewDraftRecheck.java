@@ -78,12 +78,12 @@ public class ReviewDraftRecheck {
     private final ReviewDraftEvidenceRepository evidence;
     private final ProductKnowledgeSourceRepository productSources;
     private final OrgKnowledgeSourceRepository orgSources;
-    /** The company's 답변 스타일; null where a test wires the recheck without it. */
-    private com.sellerops.knowledge.style.AnswerStyleService styles;
+    /** The company's forbidden phrases, as review replies obey them; null where a test wires the recheck without it. */
+    private ReviewStyleGuard styleGuard;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
-    public void setStyles(com.sellerops.knowledge.style.AnswerStyleService styles) {
-        this.styles = styles;
+    public void setStyleGuard(ReviewStyleGuard styleGuard) {
+        this.styleGuard = styleGuard;
     }
 
     /** The documents' passages as they stand; null where a test wires the recheck without them. */
@@ -127,8 +127,7 @@ public class ReviewDraftRecheck {
         if (!promises.isEmpty()) {
             codes.add(UNSUPPORTED_PROMISE);
         }
-        List<String> phrases = styles == null ? List.of()
-                : ReviewStyleGuard.forbiddenIn(body, styles.profileFor(orgId));
+        List<String> phrases = styleGuard == null ? List.of() : styleGuard.forbiddenIn(body, orgId);
         if (!phrases.isEmpty()) {
             codes.add(FORBIDDEN_PHRASE);
         }

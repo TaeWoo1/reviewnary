@@ -16,7 +16,8 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Three of this package's regressions are absences, and an absence is only checkable by naming
  * the thing that must not be there: <b>I</b> a style save reaches no marketplace, <b>J</b> nothing
- * learns a style from past answers, <b>K</b> a review reply is not written in the inquiry style.
+ * learns a style from past answers, <b>K</b> a review reply is not written in the inquiry style (only the forbidden
+ * phrases cross, through {@code ReviewStyleGuard}, by the owner's decision of 2026-10-23).
  * Each of them would be easy to break by accident and impossible to notice in a green suite.
  */
 class AnswerStyleFenceTest {
@@ -108,19 +109,35 @@ class AnswerStyleFenceTest {
     // ---------------------------------------------------------------- K
 
     @Test
-    @DisplayName("K — a review reply is not written in the inquiry answer style")
+    @DisplayName("K — a review reply is not written in the inquiry answer style; only the forbidden list crosses")
     void reviewRepliesAreUntouched() throws IOException {
+        // Owner decision 2026-10-23 (FINDINGS B24): the company's forbidden phrases apply to reviews too — as a check,
+        // through ReviewStyleGuard alone. Every other review file stays away from the style, and the guard itself
+        // reads nothing of it but the forbidden list: no tone, length, emoji, greeting, closing, address, required
+        // phrase or rendered instruction.
         List<String> offenders = new ArrayList<>();
+        Path guard = null;
         for (Path source : javaIn(MAIN.resolve("review"))) {
             String code = executable(source);
+            if (source.getFileName().toString().equals("ReviewStyleGuard.java")) {
+                guard = source;
+                continue;
+            }
             if (code.contains("AnswerStyleProfile") || code.contains("AnswerStyleService")
                     || code.contains("AnswerStyleInstruction")) {
                 offenders.add(source.getFileName().toString());
             }
         }
         assertThat(offenders)
-                .as("리뷰 답글과 문의 답변은 다른 글이다 — v1 says so by not reaching across")
+                .as("리뷰 답글과 문의 답변은 다른 글이다 — only ReviewStyleGuard may reach across")
                 .isEmpty();
+        assertThat(guard).as("the one door exists where this fence looks for it").isNotNull();
+        String door = executable(guard);
+        assertThat(door).contains("forbiddenPhrases()").contains("forbiddenPresentIn(");
+        for (String other : List.of("tone()", "length()", "emoji()", "greeting()", "closing()", "customerAddress()",
+                "requiredPhrases()", "unknownFallback()", "AnswerStyleInstruction.of(")) {
+            assertThat(door).as("the guard reads only the forbidden list, not " + other).doesNotContain(other);
+        }
     }
 
     // ---------------------------------------------------------------- the floor is wired now

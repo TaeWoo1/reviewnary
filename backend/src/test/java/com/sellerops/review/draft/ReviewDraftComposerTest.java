@@ -258,7 +258,7 @@ class ReviewDraftComposerTest {
         com.sellerops.knowledge.style.AnswerStyleService styles = mock(com.sellerops.knowledge.style.AnswerStyleService.class);
         when(styles.profileFor(ORG)).thenReturn(new com.sellerops.knowledge.style.AnswerStyleProfile(null, null, null,
                 null, null, null, List.of(), List.of("고객님 탓", "먼지"), null, 1));
-        composer.setStyles(styles);
+        composer.setStyleGuard(new ReviewStyleGuard(styles));
         retrieval(DraftKnowledgeState.GROUNDED,
                 productPassage("표면의 먼지와 기름기를 닦아낸 뒤 눌러 붙여 주세요."));
         when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
