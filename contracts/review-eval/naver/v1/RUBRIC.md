@@ -149,7 +149,7 @@ silently.
   supports 「there is no safety problem in this seller's reviews」, and no surface may say so. The
   intended shape is a check when each review arrives plus a separate sequential pass over the backlog.
 - **What would end the exception.** A small labelled set of the seller's real reviews for this narrower
-  question — reports, worries, reassurances and unrelated mentions all included — scored separately for
+  question — prepared as [`contracts/review-eval/safety/v1`](../../safety/v1/RUBRIC.md), labels still empty — — reports, worries, reassurances and unrelated mentions all included — scored separately for
   **missed harm** and **needless alarms** against **bars the owner fixes before the labels are read**.
   Measuring is not enough by itself: meeting those bars ends the exception; missing them leads to a
   narrower operation or a fix, never to switching the signal off for 4–5★ reviews as a whole (the point of

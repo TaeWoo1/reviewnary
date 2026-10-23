@@ -64,6 +64,14 @@ class ReviewSafetySignalTest {
     }
 
     @Test
+    void aCancelledMentionIsStillAMention() {
+        assertThat(ReviewSafetySignal.mentions("화상 걱정 없어요")).isTrue();
+        assertThat(ReviewSafetySignal.in("화상 걱정 없어요")).isFalse();
+        assertThat(ReviewSafetySignal.mentions("화상회의용으로 샀어요")).as("a compound is not a mention").isFalse();
+        assertThat(ReviewSafetySignal.mentions(null)).isFalse();
+    }
+
+    @Test
     void nothingIsNotASignal() {
         assertThat(ReviewSafetySignal.in(null)).isFalse();
     }

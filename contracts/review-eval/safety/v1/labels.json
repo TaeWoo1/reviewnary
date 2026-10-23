@@ -1,0 +1,11 @@
+{
+  "contract": "review-eval/safety/v1",
+  "rubricVersion": "v1",
+  "_comment": [
+    "DELIBERATELY EMPTY. No labelling session has been run. Labels come from a person reading real review",
+    "text on the sheet SafetyLabelSheetIT writes outside the repository; only the review-id fingerprint and",
+    "the label are kept here (RUBRIC.md section 3). Until the adequacy floor in RUBRIC.md section 5 is met,",
+    "SafetySignalEvalIT reports counts and refuses a verdict."
+  ],
+  "labels": []
+}

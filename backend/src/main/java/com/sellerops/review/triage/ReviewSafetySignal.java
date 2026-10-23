@@ -109,6 +109,26 @@ public final class ReviewSafetySignal {
         return Optional.empty();
     }
 
+    /**
+     * Whether any expression occurs at all, negated or not — what the safety evaluation set
+     * ({@code contracts/review-eval/safety/v1}) samples the reviews the negation filter cancelled from.
+     */
+    public static boolean mentions(String body) {
+        if (body == null || body.isBlank()) {
+            return false;
+        }
+        String text = body.replaceAll("\\s+", "");
+        for (String compound : NOT_SAFETY) {
+            text = text.replace(compound, "");
+        }
+        for (String term : TERMS.keySet()) {
+            if (text.contains(term)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean negatedAfter(String text, int from) {
         String after = window(text, from);
         if (NEGATIONS.stream().anyMatch(after::contains)) {
