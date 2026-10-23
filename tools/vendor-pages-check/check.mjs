@@ -151,6 +151,16 @@ const cases = [
     expect(await p.locator("#reply-body .hl").allInnerTexts(), [banned]);
     return run;
   }],
+  ["phone · a phone edit carrying a banned phrase cannot be approved until fixed", async (b) => {
+    const banned = "고객님 탓이 아닙니다.";
+    const { p, ...run } = await phone(b, task({ state: "AWAITING_APPROVAL", approvedVersion: null, editedOnMobile: true,
+      draftBody: `불편을 드려 죄송합니다. ${banned}`, pcRecheckVersion: 1, pcRecheck: "FLAGGED:FORBIDDEN_PHRASE",
+      basisNote: { codes: ["FORBIDDEN_PHRASE"], sources: [], promises: [], sentences: [banned], phrases: ["고객님 탓"] } }));
+    expectHas(await text(p, "#why-todo"), "승인하기 전에 그 표현을 빼고 고치세요.");
+    expect(await shown(p, "#approve"), false);
+    expect(await shown(p, "#edit"), true);
+    return run;
+  }],
   ["phone · the server's words are drawn as text, never as markup", async (b) => {
     const html = "<b id=\"injected\">굵게</b> 교환해 드리겠습니다.";
     const { p, ...run } = await phone(b, task({ draftBody: `안녕하세요. ${html}`,

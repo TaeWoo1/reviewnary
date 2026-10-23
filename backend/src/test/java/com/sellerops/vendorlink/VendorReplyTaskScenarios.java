@@ -90,6 +90,7 @@ abstract class VendorReplyTaskScenarios {
     @Autowired com.sellerops.review.draft.ReviewDraftRecheck draftRecheck;
     @Autowired com.sellerops.knowledge.org.OrgKnowledgeChunkRepository companyRuleChunks;
     @Autowired com.sellerops.knowledge.style.AnswerStyleService answerStyles;
+    @Autowired com.sellerops.review.draft.ReviewStyleGuard styleGuard;
     @Autowired com.sellerops.knowledge.org.SellerOperationsKnowledgeService companyRules;
     @Autowired com.sellerops.knowledge.org.OrgKnowledgeSourceRepository companyRuleRows;
     @Autowired com.sellerops.review.draft.ReviewDraftEvidenceRepository draftEvidence;
@@ -622,6 +623,40 @@ abstract class VendorReplyTaskScenarios {
         });
         assertThat(vendor.tasks.get(task).state()).isEqualTo("HELD");
         assertThat(tasks.describe(org, review, true).note().phrases()).containsExactly("고객님 탓");
+    }
+
+    @Test
+    void aDraftCarryingABannedPhraseIsNotSentToThePhoneOrTheDelegate() {
+        tasks.setStyleGuard(styleGuard);
+        ban("고객님 탓");
+        UUID review = pulledReview("v1", "9100000319", "배송이 늦었어요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "늦어서 죄송합니다. 고객님 탓이 아닙니다.", 0);
+        assertThatThrownBy(() -> tasks.handOver(org, review)).isInstanceOf(com.sellerops.common.ApiException.class)
+                .hasMessageContaining("「고객님 탓」");
+        assertThatThrownBy(() -> tasks.requestApproval(org, review)).isInstanceOf(com.sellerops.common.ApiException.class);
+        assertThat(vendor.submitted).isEmpty();
+    }
+
+    @Test
+    void aPhoneEditCarryingABannedPhraseApprovedBeforeThisPcSawItIsHeld() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        ban("고객님 탓");
+        UUID review = pulledReview("v1", "9100000320", "배송이 늦었어요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "늦어서 죄송합니다.", 0);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        String phoneText = "늦어서 죄송합니다. 고객님 탓이 아닙니다.";
+        vendor.move(task, "AWAITING_APPROVAL", phoneText, null, true);
+        vendor.move(task, "APPROVED", phoneText, vendor.tasks.get(task).draftFingerprint(), false);
+
+        pull.pullFor(org);
+
+        assertThat(vendor.approvedChecks).singleElement().satisfies(c -> {
+            assertThat(c.hold()).isTrue();
+            assertThat(c.note().phrases()).containsExactly("고객님 탓");
+        });
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("HELD");
     }
 
     @Test

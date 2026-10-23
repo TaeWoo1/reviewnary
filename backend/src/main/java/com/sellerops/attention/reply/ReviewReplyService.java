@@ -164,6 +164,30 @@ public class ReviewReplyService {
      */
     private com.sellerops.review.memory.ReviewAnswerMemoryHook answerMemory;
 
+    /** The company's forbidden phrases as review replies obey them; null in a bare test. */
+    private com.sellerops.review.draft.ReviewStyleGuard styleGuard;
+
+    @Autowired(required = false)
+    public void setStyleGuard(com.sellerops.review.draft.ReviewStyleGuard styleGuard) {
+        this.styleGuard = styleGuard;
+    }
+
+    /**
+     * <b>A reply that carries a phrase the company never uses is not approved</b> (owner decision 2026-10-23). The
+     * check reads the exact text being approved — whoever wrote it, the model or the seller — and nothing else: the
+     * customer's words and the evidence may carry the phrase without stopping the work.
+     */
+    private void requireNoForbiddenPhrase(UUID orgId, String text) {
+        if (styleGuard == null) {
+            return;
+        }
+        java.util.List<String> found = styleGuard.forbiddenIn(text, orgId);
+        if (!found.isEmpty()) {
+            throw ApiException.conflict("회사가 쓰지 않기로 한 표현이 있어 승인할 수 없습니다: "
+                    + String.join(" · ", found.stream().map(p -> "「" + p + "」").toList()) + ". 문장을 고친 뒤 승인하세요.");
+        }
+    }
+
     /** The vendor's delegate lane, or null in a context that has none ({@link DelegatedReplyLane}). */
     private DelegatedReplyLane delegated;
 
@@ -298,6 +322,7 @@ public class ReviewReplyService {
             requireChannelNotAnswered(review);
             // …and a delegate already holds this reply for the seller's phone approval.
             requireNotDelegated(orgId, reviewId);
+            requireNoForbiddenPhrase(orgId, bound.getBody());
             // Approve the version you actually saw. If the head moved on, binding to the newer
             // text would approve words the operator never read.
             //

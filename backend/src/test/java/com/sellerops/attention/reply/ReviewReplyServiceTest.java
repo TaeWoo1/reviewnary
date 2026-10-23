@@ -244,6 +244,25 @@ class ReviewReplyServiceTest {
      * version, no knowledge state and no answer basis, and inheriting the previous version's would
      * claim a model wrote a sentence a human typed.
      */
+    /** Owner decision 2026-10-23: whoever wrote it, a reply carrying a banned phrase is not approved until fixed. */
+    @Test
+    void aSellersOwnTextCarryingABannedPhraseIsNotApprovedUntilFixed() {
+        com.sellerops.knowledge.style.AnswerStyleService styles =
+                mock(com.sellerops.knowledge.style.AnswerStyleService.class);
+        when(styles.profileFor(org)).thenReturn(new com.sellerops.knowledge.style.AnswerStyleProfile(
+                null, null, null, null, null, null, java.util.List.of(), java.util.List.of("고객님 탓", "환불"), null, 1));
+        service.setStyleGuard(new com.sellerops.review.draft.ReviewStyleGuard(styles));
+        triage(TriageDisposition.RESPONSE_NEEDED);
+        service.saveDraft(org, account, ref, "합성-고객님 탓이 아닙니다. 환불은 주문 내역에서 접수해 주세요.", 0, user);
+
+        assertThatThrownBy(this::approveHead).isInstanceOf(com.sellerops.common.ApiException.class)
+                .hasMessageContaining("「고객님 탓」").hasMessageNotContaining("「환불」");
+
+        service.saveDraft(org, account, ref, "합성-불편을 드려 죄송합니다. 환불은 주문 내역에서 접수해 주세요.", 1, user);
+        approveHead();
+        assertThat(service.view(org, account, ref).approval()).isNotNull();
+    }
+
     @Test
     void aHandTypedVersionIsStampedSeller() {
         triage(TriageDisposition.RESPONSE_NEEDED);

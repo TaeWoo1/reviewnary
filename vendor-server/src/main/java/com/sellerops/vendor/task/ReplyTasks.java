@@ -94,7 +94,9 @@ public class ReplyTasks {
         NOT_FOUND, REVIEW_CHANGED, ALREADY_REPLIED, TASK_IN_PROGRESS, ALREADY_POSTED, STALE, WRONG_STATE,
         FINGERPRINT_MISMATCH, INVALID_BODY, INVALID_META, COMMAND_REUSED, NOT_ASSIGNED, NOT_CLAIMER, POLICY_CHANGED,
         /** The review was deleted when its retention ran out (§6); the server no longer holds anything to answer. */
-        REVIEW_PURGED
+        REVIEW_PURGED,
+        /** The PC found a phrase the company never uses in this version; it is fixed before it is approved. */
+        FORBIDDEN_PHRASE
     }
 
     public static final class TaskException extends RuntimeException {
@@ -433,6 +435,12 @@ public class ReplyTasks {
         }
         if (!underCurrentPolicy(task)) {
             throw new TaskException(Failure.POLICY_CHANGED);
+        }
+        // The server judges no text; it honours the PC's finding on this exact version (owner decision 2026-10-23).
+        if (Integer.valueOf(version).equals(task.pcRecheckVersion()) && task.pcRecheck() != null
+                && task.pcRecheck().startsWith("FLAGGED:")
+                && List.of(task.pcRecheck().substring("FLAGGED:".length()).split(",")).contains("FORBIDDEN_PHRASE")) {
+            throw new TaskException(Failure.FORBIDDEN_PHRASE);
         }
         Instant now = clock.instant();
         if (!transition(task, State.AWAITING_APPROVAL, State.APPROVED, ", approved_version = ?, "

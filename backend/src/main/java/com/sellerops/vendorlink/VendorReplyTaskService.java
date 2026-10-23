@@ -138,6 +138,14 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         this.answerMemory = answerMemory;
     }
 
+    /** The company's forbidden phrases as review replies obey them; null where a test runs this lane alone. */
+    private com.sellerops.review.draft.ReviewStyleGuard styleGuard;
+
+    @Autowired(required = false)
+    public void setStyleGuard(com.sellerops.review.draft.ReviewStyleGuard styleGuard) {
+        this.styleGuard = styleGuard;
+    }
+
     /** What drafts are written from, and the check of a sent-back text; null where a test runs this lane alone. */
     private ReviewDraftBasis basis;
     private ReviewDraftRecheck recheck;
@@ -301,6 +309,12 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         }
         ReviewReplyDraft draft = drafts.latest(reviewId)
                 .orElseThrow(() -> ApiException.conflict("보낼 답글 초안이 없습니다. 먼저 초안을 저장하세요."));
+        // The same gate as approving here (2026-10-23): a banned phrase never leaves for the phone or the delegate.
+        java.util.List<String> banned = styleGuard == null ? List.of() : styleGuard.forbiddenIn(draft.getBody(), orgId);
+        if (!banned.isEmpty()) {
+            throw ApiException.conflict("회사가 쓰지 않기로 한 표현이 있어 보낼 수 없습니다: "
+                    + String.join(" · ", banned.stream().map(p -> "「" + p + "」").toList()) + ". 문장을 고친 뒤 보내세요.");
+        }
         String token = link.installToken()
                 .orElseThrow(() -> ApiException.conflict("공급자 서버에 연결된 PC가 아닙니다."));
         TaskSnapshot snapshot;
@@ -515,6 +529,15 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
                 try {
                     TaskSnapshot after = link.client().pcRecheck(token, current.id(), current.draftVersion(),
                             result.passed(), result.codes(), result.passed() ? null : note(result));
+                    // A phone edit approved before this PC saw it, carrying a banned phrase: held now, not later.
+                    if (STANDING_APPROVALS.contains(after.state()) && !result.phrases().isEmpty()) {
+                        after = link.client().checkApproved(token, after.id(), after.draftVersion(), true,
+                                new VendorServerClient.BasisNote(List.of(ReviewDraftRecheck.FORBIDDEN_PHRASE),
+                                        List.of(), List.of(), ReviewDraftRecheck.sentencesWith(
+                                                ReviewReplyValidation.normalize(after.draftBody()), result.phrases()),
+                                        result.phrases()),
+                                "pc-ban:" + after.id() + ":" + after.draftVersion() + ":" + after.stateVersion());
+                    }
                     task = apply(orgId, task.getReviewId(), storeId, after);
                     checked++;
                 } catch (VendorServerClient.TaskRefused e) {
@@ -530,8 +553,8 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
     }
 
     /**
-     * The promise words and forbidden phrases a PC flagged on {@code current}'s approved version before it was
-     * approved — what the seller was shown and approved anyway.
+     * The promise words a PC flagged on {@code current}'s approved version before it was approved — what the seller
+     * was shown and approved anyway. Forbidden phrases are never in it: they are absolute.
      */
     private static Set<String> knownFindings(TaskSnapshot current) {
         if (current.pcRecheck() == null || !current.pcRecheck().startsWith("FLAGGED")
@@ -543,14 +566,8 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         if (seen == null) {
             return Set.of();
         }
-        java.util.Set<String> known = new java.util.HashSet<>();
-        if (seen.promises() != null) {
-            known.addAll(seen.promises());
-        }
-        if (seen.phrases() != null) {
-            known.addAll(seen.phrases());
-        }
-        return Set.copyOf(known);
+        // Promises only. A forbidden phrase is an absolute ban: approved past a flag or not, it is held (2026-10-23).
+        return seen.promises() == null ? Set.of() : Set.copyOf(seen.promises());
     }
 
     /** One approved text checked; the server's answer, or null when nothing was sent. */

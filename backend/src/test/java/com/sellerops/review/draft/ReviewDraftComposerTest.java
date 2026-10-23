@@ -253,22 +253,43 @@ class ReviewDraftComposerTest {
     }
 
     @Test
-    @DisplayName("a company-banned phrase in the model's draft falls back to the template; a bare topic word does not")
-    void aForbiddenPhraseFallsBackToTheTemplate() {
+    @DisplayName("a banned phrase gets one retry with the bans quoted in; the clean retry is the draft")
+    void aBannedPhraseIsRetriedOnceWithTheBansInTheRequest() {
         com.sellerops.knowledge.style.AnswerStyleService styles = mock(com.sellerops.knowledge.style.AnswerStyleService.class);
         when(styles.profileFor(ORG)).thenReturn(new com.sellerops.knowledge.style.AnswerStyleProfile(null, null, null,
-                null, null, null, List.of(), List.of("고객님 탓", "먼지"), null, 1));
+                null, null, null, List.of(), List.of("고객님 탓", "환불"), null, 1));
         composer.setStyleGuard(new ReviewStyleGuard(styles));
         retrieval(DraftKnowledgeState.GROUNDED,
                 productPassage("표면의 먼지와 기름기를 닦아낸 뒤 눌러 붙여 주세요."));
-        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
-                .thenReturn(Optional.of("고객님 탓이 아닙니다. 부착 전 표면의 먼지를 닦아 주세요."));
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of("고객님 탓"))))
+                .thenReturn(Optional.of("고객님 탓이 아닙니다. 표면의 먼지를 닦아 주세요."),
+                        Optional.of("불편을 드려 죄송합니다. 부착 전 표면의 먼지를 닦아 주세요."));
 
         GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
 
-        assertThat(view.draft().body()).isEqualTo(TEMPLATE);
-        assertThat(view.unavailableMessage()).isEqualTo(ReviewDraftComposer.FORBIDDEN_PHRASE);
-        verify(evidence, never()).save(any(ReviewDraftEvidence.class));
+        assertThat(view.draft().body()).isEqualTo("불편을 드려 죄송합니다. 부착 전 표면의 먼지를 닦아 주세요.");
+        assertThat(view.authorKind()).isEqualTo("MODEL");
+        assertThat(view.unavailableMessage()).isNull();
+        verify(model, org.mockito.Mockito.times(2)).draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of("고객님 탓")));
+    }
+
+    @Test
+    @DisplayName("a banned phrase that survives the retry keeps the draft, says which phrase, and leaves approval to the gate")
+    void aBannedPhraseThatStaysKeepsTheDraftAndNamesIt() {
+        com.sellerops.knowledge.style.AnswerStyleService styles = mock(com.sellerops.knowledge.style.AnswerStyleService.class);
+        when(styles.profileFor(ORG)).thenReturn(new com.sellerops.knowledge.style.AnswerStyleProfile(null, null, null,
+                null, null, null, List.of(), List.of("고객님 탓"), null, 1));
+        composer.setStyleGuard(new ReviewStyleGuard(styles));
+        retrieval(DraftKnowledgeState.GROUNDED,
+                productPassage("표면의 먼지와 기름기를 닦아낸 뒤 눌러 붙여 주세요."));
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of("고객님 탓"))))
+                .thenReturn(Optional.of("고객님 탓이 아닙니다. 표면의 먼지를 닦아 주세요."));
+
+        GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
+
+        assertThat(view.draft().body()).as("not dropped for the template").contains("고객님 탓이 아닙니다");
+        assertThat(view.unavailableMessage()).isEqualTo(ReviewDraftComposer.forbiddenLeft(List.of("고객님 탓")));
+        assertThat(view.unavailableMessage()).contains("「고객님 탓」");
     }
 
     @Test

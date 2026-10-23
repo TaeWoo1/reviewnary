@@ -162,11 +162,18 @@ public class AgentDraftService {
      */
     public Optional<String> draftReviewReply(UUID orgId, String reviewBody,
                                              List<AgentDraftGenerator.Passage> knowledge, String style) {
+        return draftReviewReply(orgId, reviewBody, knowledge, style, List.of());
+    }
+
+    /** The same, with the phrases the company never uses quoted into the request (2026-10-23). */
+    public Optional<String> draftReviewReply(UUID orgId, String reviewBody,
+                                             List<AgentDraftGenerator.Passage> knowledge, String style,
+                                             List<String> banned) {
         if (!access.allows(properties, orgId)) {
             return Optional.empty();
         }
         AgentDraftGenerator.Result result = generator().generateReview(
-                new AgentDraftGenerator.ReviewInput(reviewBody, knowledge, style));
+                new AgentDraftGenerator.ReviewInput(reviewBody, knowledge, style, banned));
         Optional<String> written = result.draft().map(AgentDraftResponseParser.ParsedDraft::comments);
         log.info("agent_review_draft orgId={} drafted={} grounded={} styled={} reason={} {}",
                 orgId, written.isPresent(), knowledge == null ? 0 : knowledge.size(),

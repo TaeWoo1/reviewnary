@@ -88,8 +88,11 @@ public class ReviewDraftComposer {
     static final String UNSUPPORTED_CLAIM =
             "근거에 없는 교환·환불·보상 약속이 들어가 AI 초안을 저장하지 않았습니다. "
                     + "저장된 문구로 초안을 준비했습니다.";
-    static final String FORBIDDEN_PHRASE =
-            "회사가 쓰지 않기로 한 표현이 들어가 AI 초안을 저장하지 않았습니다. 저장된 문구로 초안을 준비했습니다.";
+    /** The draft is kept with the phrase marked; approval waits for the seller's fix (2026-10-23). */
+    static String forbiddenLeft(List<String> phrases) {
+        return "회사가 쓰지 않기로 한 표현이 남아 있습니다: " + String.join(" · ", phrases.stream()
+                .map(p -> "「" + p + "」").toList()) + ". 고친 뒤에 승인하거나 보낼 수 있습니다.";
+    }
 
     /** The sentences the seller reads above the draft, per basis. */
     static final String BASIS_GROUNDED_NOTE = "판매자가 등록한 근거를 사용해 썼습니다.";
@@ -331,7 +334,12 @@ public class ReviewDraftComposer {
         if (!decision.allowed()) {
             return new Written(null, decision.messageKo());
         }
-        Optional<String> written = model.draftReviewReply(orgId, reviewBody, passagesFor(passages), voice);
+        // The company's absolute bans go into the request as quoted data (owner decision 2026-10-23); the check after
+        // generation still holds, since a request is only a request.
+        List<String> banned = styleGuard == null ? List.of() : styleGuard.enforced(orgId);
+        Optional<String> written = banned.isEmpty()
+                ? model.draftReviewReply(orgId, reviewBody, passagesFor(passages), voice)
+                : model.draftReviewReply(orgId, reviewBody, passagesFor(passages), voice, banned);
         if (written.isEmpty()) {
             return new Written(null, MODEL_FAILED);
         }
@@ -343,9 +351,22 @@ public class ReviewDraftComposer {
         if (!unsupported.isEmpty()) {
             return new Written(null, UNSUPPORTED_CLAIM);
         }
-        // Refused, not edited: deleting words out of a sentence is how a reply comes to say the opposite.
-        if (styleGuard != null && !styleGuard.forbiddenIn(candidate, orgId).isEmpty()) {
-            return new Written(null, FORBIDDEN_PHRASE);
+        // A banned phrase: one more try with the bans in the request. Still there, the draft is kept — not dropped,
+        // not edited by us (deleting words is how a reply comes to say the opposite) — and approval waits for the
+        // seller's fix, which the approval gate enforces on whatever text is approved (2026-10-23).
+        List<String> found = styleGuard == null ? List.of() : styleGuard.forbiddenIn(candidate, orgId);
+        if (!found.isEmpty() && quota.consume(orgId, AgentUsageKind.DRAFT, null).allowed()) {
+            Optional<String> again = model.draftReviewReply(orgId, reviewBody, passagesFor(passages), voice,
+                    styleGuard.enforced(orgId));
+            if (again.isPresent()
+                    && ReviewClaimGuard.unsupportedClaims(again.get(), passages.stream().filter(p -> p.scope().current())
+                            .map(ScopedPassage::text).toList()).isEmpty()) {
+                candidate = again.get();
+                found = styleGuard.forbiddenIn(candidate, orgId);
+            }
+        }
+        if (!found.isEmpty()) {
+            return new Written(candidate, forbiddenLeft(found));
         }
         return new Written(candidate, null);
     }

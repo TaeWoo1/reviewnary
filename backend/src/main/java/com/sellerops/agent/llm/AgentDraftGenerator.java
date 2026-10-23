@@ -184,10 +184,15 @@ public class AgentDraftGenerator {
      * inquiries (an order line, a 규격 line, a company summary) would silently start leaving on review
      * requests too. Two records, two builders, two floor tests.
      */
-    public record ReviewInput(String reviewBody, List<Passage> knowledge, String style) {
+    public record ReviewInput(String reviewBody, List<Passage> knowledge, String style, List<String> banned) {
 
         public ReviewInput {
             knowledge = knowledge == null ? List.of() : List.copyOf(knowledge);
+            banned = banned == null ? List.of() : List.copyOf(banned);
+        }
+
+        public ReviewInput(String reviewBody, List<Passage> knowledge, String style) {
+            this(reviewBody, knowledge, style, List.of());
         }
     }
 
@@ -216,7 +221,7 @@ public class AgentDraftGenerator {
         ObjectNode user = messages.addObject();
         user.put("role", "user");
         user.put("content",
-                AgentDraftPrompt.reviewUser(input.knowledge(), input.reviewBody(), input.style()));
+                AgentDraftPrompt.reviewUser(input.knowledge(), input.reviewBody(), input.style(), input.banned()));
         if (vendor == Vendor.ANTHROPIC) {
             root.put("max_tokens", maxOutputTokens);
             root.put("system", AgentDraftPrompt.reviewSystem());

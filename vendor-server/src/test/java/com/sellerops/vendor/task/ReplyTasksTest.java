@@ -421,6 +421,22 @@ class ReplyTasksTest {
     }
 
     @Test
+    void aVersionThePcFlaggedForABannedPhraseIsNotApprovedUntilFixed() {
+        TaskView draft = submit("1", "고객님 탓이 아닙니다.");
+        tasks.recordPcRecheck(draft.id(), 1, false, List.of("FORBIDDEN_PHRASE"),
+                new ReplyTasks.BasisNote(List.of("FORBIDDEN_PHRASE"), List.of(), List.of(), List.of("고객님 탓이 아닙니다."),
+                        List.of("고객님 탓")));
+        assertThatThrownBy(() -> approve(draft)).isInstanceOfSatisfying(TaskException.class,
+                e -> assertThat(e.failure()).isEqualTo(Failure.FORBIDDEN_PHRASE));
+        TaskView fixed = tasks.editDraft(draft.id(), 1, "불편을 드려 죄송합니다.", true);
+        assertThat(approve(fixed).state()).as("a new version carries no finding").isEqualTo(State.APPROVED);
+
+        TaskView promise = submit("2", PROMISING);
+        tasks.recordPcRecheck(promise.id(), 1, false, List.of("UNSUPPORTED_PROMISE"), promiseNote());
+        assertThat(approve(promise).state()).as("a promise is the seller's to approve").isEqualTo(State.APPROVED);
+    }
+
+    @Test
     void aSentBackDraftCarriesThePcsReasonUntilItsNextVersion() {
         TaskView waiting = submit("1", PROMISING);
         tasks.policyCheck(store, "k1", "p2", "v1");

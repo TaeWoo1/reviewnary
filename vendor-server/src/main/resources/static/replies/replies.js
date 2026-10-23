@@ -317,7 +317,9 @@
     $("read-reply").hidden = editing;
     $("edit-form").hidden = !editing;
     $("approved-note").hidden = editing || ["APPROVED", "CLAIMED"].indexOf(t.state) < 0;
-    $("approve").hidden = editing || !awaiting;
+    // A banned phrase the PC found in this version is fixed before approval (2026-10-23); a promise is advice.
+    var banned = !!note && (note.codes || []).indexOf("FORBIDDEN_PHRASE") >= 0;
+    $("approve").hidden = editing || !awaiting || banned;
     $("save-edit").hidden = !editing;
     $("save-note").hidden = !editing;
     $("edit").hidden = editing || !editable;
@@ -356,6 +358,10 @@
       });
     }
     if (code === "invalid_body") { say("task-error", "답글이 비었거나 너무 깁니다."); return; }
+    if (code === "forbidden_phrase") {
+      say("task-error", "회사가 쓰지 않기로 한 표현이 있어 승인할 수 없습니다. 문장을 고친 뒤 승인하세요.");
+      return;
+    }
     say("task-error", fallback);
   }
 
