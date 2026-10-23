@@ -34,8 +34,9 @@ import org.springframework.transaction.annotation.Transactional;
  *       reply used (stage 2, 2026-10-23: the cited passage's fingerprint is found among the document's passages as
  *       they stand). A citation recorded before fingerprints were kept is judged by the document's edit time, as
  *       before. A citation to a past reply is not checked: it was never a fact.</li>
- *   <li><b>It promises nothing the current evidence does not.</b> {@link ReviewClaimGuard} against the evidence the
- *       review finds now, and the seller's own wording for its kind of review — else {@value #UNSUPPORTED_PROMISE}.
+ *   <li><b>It promises nothing the current evidence does not</b> — neither the remedy nor its terms (period, amount,
+ *       scope). {@link ReviewClaimGuard} against the evidence the review finds now, and the seller's own wording for
+ *       its kind of review — else {@value #UNSUPPORTED_PROMISE}.
  *       This is the only check a text written on the phone can get here: it has no citations of its own.</li>
  *   <li><b>It says nothing the company has banned.</b> {@link ReviewStyleGuard} — the 답변 스타일 forbidden phrases,
  *       less bare topic words — else {@value #FORBIDDEN_PHRASE} (2026-10-23, finding B24).</li>
@@ -123,7 +124,11 @@ public class ReviewDraftRecheck {
             codes.add(SOURCE_CHANGED);
         }
         List<String> license = composer.currentLicense(orgId, review, redactedBody);
-        List<String> promises = ReviewClaimGuard.unsupportedClaims(body, license);
+        // The word and its terms: a period, an amount or a scope the current evidence no longer states is a promise
+        // that lost its ground as surely as the word (2026-10-23 external review).
+        List<String> promises = new java.util.ArrayList<>(ReviewClaimGuard.unsupportedClaims(body, license));
+        ReviewClaimGuard.unsupportedConditions(body, license, redactedBody).stream()
+                .filter(c -> !promises.contains(c)).forEach(promises::add);
         if (!promises.isEmpty()) {
             codes.add(UNSUPPORTED_PROMISE);
         }

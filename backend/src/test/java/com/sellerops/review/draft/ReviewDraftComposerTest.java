@@ -343,6 +343,24 @@ class ReviewDraftComposerTest {
     }
 
     @Test
+    @DisplayName("a promise whose period the evidence does not state is refused like an unsupported promise")
+    void aPromiseWithTermsTheEvidenceDoesNotStateFallsBackToTheTemplate() {
+        retrieval(DraftKnowledgeState.GROUNDED, productPassage("수령 후 14일 이내 교환이 가능합니다."));
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
+                .thenReturn(Optional.of("불편을 드려 죄송합니다. 7일 이내 교환 도와드리겠습니다."));
+
+        GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
+
+        assertThat(view.draft().body()).isEqualTo(TEMPLATE);
+        assertThat(view.unavailableMessage()).isEqualTo(ReviewDraftComposer.UNSUPPORTED_CLAIM);
+
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
+                .thenReturn(Optional.of("불편을 드려 죄송합니다. 14일 이내 교환 도와드리겠습니다."));
+        assertThat(composer.compose(ORG, review(), BODY, "SELLER:u1").authorKind())
+                .as("the period the evidence states is fine").isEqualTo("MODEL");
+    }
+
+    @Test
     @DisplayName("only a past answer: the model writes from its wording, the basis says so, and nothing is promised")
     void aPastAnswerAloneShapesTheWordingAndIsSaidToBeThat() {
         retrieval(DraftKnowledgeState.NO_LIBRARY, pastAnswer("빠른 배송과 꼼꼼한 포장을 알아봐 주셔서 감사합니다."));

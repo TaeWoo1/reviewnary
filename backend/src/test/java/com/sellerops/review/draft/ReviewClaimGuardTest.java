@@ -56,6 +56,58 @@ class ReviewClaimGuardTest {
                 .containsExactly("환불");
     }
 
+    /* ── a promise is its word and its terms (2026-10-23 external review) ── */
+
+    @Test
+    void a_period_the_policy_no_longer_states_is_unsupported_though_the_word_is_still_there() {
+        String reply = "불편을 드려 죄송합니다. 수령 후 7일 이내라면 교환해 드리겠습니다.";
+        assertThat(ReviewClaimGuard.unsupportedConditions(reply, List.of("수령 후 7일 이내 교환이 가능합니다."), null))
+                .isEmpty();
+        List<String> changed = List.of("수령 후 14일 이내 교환이 가능합니다.");
+        assertThat(ReviewClaimGuard.unsupportedClaims(reply, changed)).as("the word test alone passes").isEmpty();
+        assertThat(ReviewClaimGuard.unsupportedConditions(reply, changed, null)).containsExactly("7일");
+        assertThat(ReviewClaimGuard.unsupportedConditions(reply, List.of("수령 후 17일 이내 교환"), null))
+                .as("7일 is not inside 17일").containsExactly("7일");
+    }
+
+    @Test
+    void an_amount_or_a_cost_the_policy_does_not_state_is_unsupported() {
+        List<String> policy = List.of("교환 시 왕복 배송비는 고객님 부담입니다.");
+        assertThat(ReviewClaimGuard.unsupportedConditions("무료로 교환해 드리겠습니다.", policy, null))
+                .containsExactly("무료");
+        assertThat(ReviewClaimGuard.unsupportedConditions("전액 환불해 드리겠습니다.",
+                List.of("불량이면 환불해 드립니다."), null)).containsExactly("전액");
+        assertThat(ReviewClaimGuard.unsupportedConditions("30,000원까지 보상해 드리겠습니다.",
+                List.of("파손 시 최대 30000원 보상"), null)).as("a thousands comma is the same number").isEmpty();
+        assertThat(ReviewClaimGuard.unsupportedConditions("1,000원 적립금을 드리겠습니다.",
+                List.of("리뷰 적립금 11,000원"), null)).containsExactly("1000원");
+    }
+
+    @Test
+    void a_scope_the_policy_does_not_grant_is_unsupported_and_its_negated_form_never_grants_it() {
+        assertThat(ReviewClaimGuard.unsupportedConditions("단순 변심도 환불해 드리겠습니다.",
+                List.of("제품 불량 시 환불해 드립니다."), null)).as("one term, not two").containsExactly("단순변심");
+        assertThat(ReviewClaimGuard.unsupportedConditions("개봉 후에도 교환해 드리겠습니다.",
+                List.of("미개봉 상품만 교환됩니다."), null)).containsExactly("개봉");
+        assertThat(ReviewClaimGuard.unsupportedConditions("미개봉이시면 교환해 드리겠습니다.",
+                List.of("미개봉 상품만 교환됩니다."), null)).isEmpty();
+        assertThat(ReviewClaimGuard.unsupportedConditions("착용하셨어도 반품해 드리겠습니다.",
+                List.of("미착용 상품에 한해 반품 가능"), null)).containsExactly("착용");
+    }
+
+    @Test
+    void only_a_promise_sentence_is_read_and_the_customer_may_authorize_only_a_number() {
+        assertThat(ReviewClaimGuard.unsupportedConditions("배송이 7일 걸렸네요. 죄송합니다.", List.of(), null))
+                .as("no remedy in that sentence").isEmpty();
+        assertThat(ReviewClaimGuard.unsupportedConditions("7일 이내 교환해 드리겠습니다.", List.of(), null))
+                .as("an unsupported remedy is the word test's finding, not repeated as its terms").isEmpty();
+        assertThat(ReviewClaimGuard.unsupportedConditions("3일 만에 고장 나셨다니 교환해 드리겠습니다.",
+                List.of("불량 제품은 교환해 드립니다."), "산 지 3일 만에 고장 났어요")).isEmpty();
+        assertThat(ReviewClaimGuard.unsupportedConditions("단순 변심도 환불해 드리겠습니다.",
+                List.of("제품 불량 시 환불해 드립니다."), "단순 변심인데 환불 되나요"))
+                .as("the customer asking is not the seller granting").containsExactly("단순변심");
+    }
+
     @Test
     void a_blank_draft_is_not_a_violation() {
         assertThat(ReviewClaimGuard.unsupportedClaims(null, List.of())).isEmpty();

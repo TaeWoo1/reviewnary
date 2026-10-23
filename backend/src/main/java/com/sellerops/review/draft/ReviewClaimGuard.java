@@ -1,8 +1,12 @@
 package com.sellerops.review.draft;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * <b>A public reply may promise only what the seller's own text already promises.</b>
@@ -30,6 +34,13 @@ import java.util.Locale;
  * whose meaning nobody chose; keeping it makes the rule a preference. The caller falls back to the
  * seller's own template, which promises nothing by construction.
  *
+ * <p><b>A promise is its word and its terms</b> (2026-10-23 external review). The word alone is not enough: a policy
+ * that still says 「교환」 after its period went from 7 to 14 days still "supports" 「7일 이내 교환」 by the noun test.
+ * {@link #unsupportedConditions} reads the terms a promise sentence states — how long (7일 · 즉시), how much (무료 ·
+ * 전액 · 왕복 배송비) and for what (단순 변심 · 개봉 후) — and each must be in the evidence too. Same closed shape: a
+ * short list, checked against the evidence, never a meaning test. It cannot see a term written in words it does not
+ * list, nor a term the evidence states somewhere unrelated to the promise.
+ *
  * <p>Pure: no I/O, no model, no state.
  */
 public final class ReviewClaimGuard {
@@ -44,7 +55,86 @@ public final class ReviewClaimGuard {
     static final List<String> COMMITMENT_TERMS = List.of(
             "환불", "반품", "교환", "재발송", "재배송", "보상", "배상", "할인", "쿠폰", "적립금", "회수");
 
+    /**
+     * A period or an amount a promise states: a number with its unit. Read from the sentence as written — squashing
+     * 「1 7일」 would read a number nobody wrote.
+     */
+    static final Pattern FIGURE = Pattern.compile(
+            "\\d+(?:[.,]\\d+)*\\s*(?:영업일|일|시간|개월|주|년|만원|원|%|퍼센트|회|번)");
+
+    /**
+     * The terms of a promise in words, by what a Korean seller writes — when (no number), how much, and for what.
+     * Matched with whitespace removed. A term that has a listed 「미」 form (개봉 · 미개봉) is not matched inside it:
+     * 「미개봉 상품만 교환」 must never authorize 「개봉 후에도 교환」.
+     */
+    static final List<String> CONDITION_TERMS = List.of(
+            "즉시", "당일", "익일", "일주일", "한달",
+            "전액", "무료", "무상", "차액", "왕복", "편도", "배송비", "택배비", "반품비", "교환비",
+            "단순변심", "변심", "개봉", "미개봉", "사용후", "미사용", "착용", "미착용", "세탁후", "포장훼손",
+            "모든상품", "전상품", "전제품");
+
     private ReviewClaimGuard() {
+    }
+
+    /**
+     * The terms the draft's promise sentences state that the evidence does not — each one as the draft wrote it,
+     * whitespace removed, in the order they appear. Only a sentence that carries a {@link #COMMITMENT_TERMS} noun the
+     * evidence supports is read: 「7일 걸렸네요」 promises nothing, and a remedy the evidence never names is already
+     * {@link #unsupportedClaims}' finding.
+     *
+     * @param body       the reply
+     * @param evidence   the passage texts that may authorize a promise — the same ones {@link #unsupportedClaims} reads
+     * @param reviewText the customer's own review: it may authorize a number repeated back to them (「3일 만에
+     *                   고장」) and nothing else — a customer asking for 「단순 변심 환불」 is not the seller granting it
+     */
+    public static List<String> unsupportedConditions(String body, List<String> evidence, String reviewText) {
+        if (body == null || body.isBlank()) {
+            return List.of();
+        }
+        String grounds = normalize(evidence == null ? "" : String.join(" ", evidence));
+        String asked = normalize(reviewText == null ? "" : reviewText);
+        Set<String> found = new LinkedHashSet<>();
+        for (String sentence : body.split("(?<=[.!?。])\\s+|\\n+")) {
+            String squashed = normalize(sentence);
+            List<String> remedies = COMMITMENT_TERMS.stream().filter(squashed::contains).toList();
+            // No remedy, nothing promised; a remedy the evidence does not name at all is unsupportedClaims' finding,
+            // and its terms add nothing to it.
+            if (remedies.isEmpty() || remedies.stream().anyMatch(r -> !grounds.contains(r))) {
+                continue;
+            }
+            Matcher figure = FIGURE.matcher(sentence);
+            while (figure.find()) {
+                String f = normalize(figure.group()).replace(",", "");
+                if (!statesFigure(grounds, f) && !statesFigure(asked, f)) {
+                    found.add(f);
+                }
+            }
+            List<String> stated = CONDITION_TERMS.stream().filter(t -> has(squashed, t)).toList();
+            for (String term : stated) {
+                // 「단순 변심」 is one term, not two: the shorter one inside a longer stated term is not reported again.
+                boolean inside = stated.stream().anyMatch(o -> o.length() > term.length() && o.contains(term));
+                if (!inside && !has(grounds, term)) {
+                    found.add(term);
+                }
+            }
+        }
+        return List.copyOf(found);
+    }
+
+    /** Whether {@code text} states the figure itself — 「7일」 is not inside 「17일」, nor 「1000원」 inside 「11,000원」. */
+    private static boolean statesFigure(String text, String figure) {
+        return Pattern.compile("(?<![\\d.])" + Pattern.quote(figure)).matcher(text.replace(",", "")).find();
+    }
+
+    /** Whether {@code text} states {@code term} — not only inside its listed 「미」 form. */
+    private static boolean has(String text, String term) {
+        boolean negatedForm = CONDITION_TERMS.contains("미" + term);
+        for (int i = text.indexOf(term); i >= 0; i = text.indexOf(term, i + 1)) {
+            if (!negatedForm || i == 0 || text.charAt(i - 1) != '미') {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

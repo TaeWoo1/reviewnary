@@ -84,6 +84,7 @@ public class ReviewDraftBasis {
                 .sorted(Comparator.comparing(OrgKnowledgeSource::getId))
                 .forEach(s -> policy.add(s.getId(), s.getKnowledgeType(), s.isActive(), s.getTitle(), s.getBody()));
         policy.add("guard", String.join(",", ReviewClaimGuard.COMMITMENT_TERMS));
+        policy.add("conditions", ReviewClaimGuard.FIGURE.pattern(), String.join(",", ReviewClaimGuard.CONDITION_TERMS));
         Digest voice = new Digest();
         for (ReviewReplyTemplateKey key : ReviewReplyTemplateKey.values()) {
             voice.add(key.category(), templates.bodyFor(orgId, key));

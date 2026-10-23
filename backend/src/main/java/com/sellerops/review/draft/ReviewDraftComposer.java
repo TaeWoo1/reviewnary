@@ -86,7 +86,7 @@ public class ReviewDraftComposer {
      * wrong when it is not, and the sentence a seller needs is which of those happened.
      */
     static final String UNSUPPORTED_CLAIM =
-            "근거에 없는 교환·환불·보상 약속이 들어가 AI 초안을 저장하지 않았습니다. "
+            "근거에 없는 교환·환불·보상 약속이나 조건(기간·금액·대상)이 들어가 AI 초안을 저장하지 않았습니다. "
                     + "저장된 문구로 초안을 준비했습니다.";
     /** The draft is kept with the phrase marked; approval waits for the seller's fix (2026-10-23). */
     static String forbiddenLeft(List<String> phrases) {
@@ -346,9 +346,11 @@ public class ReviewDraftComposer {
         String candidate = written.get();
         // Only CURRENT evidence may authorize a promise. A past answer is shown to the model for its wording, and an
         // exchange the seller once granted is not a policy (2026-10-22 review).
-        List<String> unsupported = ReviewClaimGuard.unsupportedClaims(candidate,
-                passages.stream().filter(p -> p.scope().current()).map(ScopedPassage::text).toList());
-        if (!unsupported.isEmpty()) {
+        List<String> current = passages.stream().filter(p -> p.scope().current()).map(ScopedPassage::text).toList();
+        // The promise's terms as well as its word: 「7일 이내 무료 교환」 needs the 7 days and the 무료 in the evidence
+        // too (2026-10-23 external review).
+        if (!ReviewClaimGuard.unsupportedClaims(candidate, current).isEmpty()
+                || !ReviewClaimGuard.unsupportedConditions(candidate, current, reviewBody).isEmpty()) {
             return new Written(null, UNSUPPORTED_CLAIM);
         }
         // A banned phrase: one more try with the bans in the request. Still there, the draft is kept — not dropped,
@@ -358,9 +360,8 @@ public class ReviewDraftComposer {
         if (!found.isEmpty() && quota.consume(orgId, AgentUsageKind.DRAFT, null).allowed()) {
             Optional<String> again = model.draftReviewReply(orgId, reviewBody, passagesFor(passages), voice,
                     styleGuard.enforced(orgId));
-            if (again.isPresent()
-                    && ReviewClaimGuard.unsupportedClaims(again.get(), passages.stream().filter(p -> p.scope().current())
-                            .map(ScopedPassage::text).toList()).isEmpty()) {
+            if (again.isPresent() && ReviewClaimGuard.unsupportedClaims(again.get(), current).isEmpty()
+                    && ReviewClaimGuard.unsupportedConditions(again.get(), current, reviewBody).isEmpty()) {
                 candidate = again.get();
                 found = styleGuard.forbiddenIn(candidate, orgId);
             }

@@ -1035,6 +1035,30 @@ abstract class VendorReplyTaskScenarios {
         assertThat(vendor.approvedChecks).as("a standing approval is checked once, not on every pull").hasSize(1);
     }
 
+    @Test
+    void anApprovedPromiseWhosePeriodAndCostChangedIsHeldThoughTheRuleStillSaysExchange() throws Exception {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        var rule = exchangeRule();
+        UUID review = pulledReview("v1", "9100000336", "사이즈 교환 되나요");
+        needsReply(review);
+        String text = "불편을 드려 죄송합니다. 수령 후 7일 이내 무료로 사이즈 교환해 드리겠습니다.";
+        drafts.save(org, review, "SELLER:" + seller, text, 0);
+        UUID task = vendorTaskOf(tasks.handOver(org, review));
+
+        Thread.sleep(5);
+        companyRules.update(org, rule.id(), new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.EXCHANGE_REFUND_POLICY, "교환 안내",
+                "사이즈 교환은 수령 후 14일 이내 가능하며 왕복 배송비는 고객님 부담입니다.", null));
+        pull.pullFor(org);
+
+        assertThat(vendor.approvedChecks).singleElement().satisfies(c -> {
+            assertThat(c.hold()).as("the rule still says 교환; its terms no longer match").isTrue();
+            assertThat(c.note().promises()).containsExactly("7일", "무료");
+            assertThat(c.note().sentences()).containsExactly("수령 후 7일 이내 무료로 사이즈 교환해 드리겠습니다.");
+        });
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("HELD");
+    }
+
     private UUID pulledReview(String key, String reviewNo, String body) {
         UUID id = vendor.ids.computeIfAbsent(key, k -> UUID.randomUUID());
         vendor.event("NEW", new VendorServerClient.FeedReview(id, reviewNo, "SKU-합성-1", "합성 상품", 5, body,
