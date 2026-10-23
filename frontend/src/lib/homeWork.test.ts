@@ -42,6 +42,21 @@ function reviewWork(attentionRows: ReturnType<typeof attention>[], total: number
 }
 
 describe("mergeHomeWork — the review half, whole", () => {
+  it("carries 발생 or 우려 for each safety row, from whichever read made it (owner decision 2026-10-23)", () => {
+    const worried = { ...attention("a-worry"), safety: true, safetyReading: "WORRY" as const };
+    const older = { ...attention("a-old"), safety: true };
+    const work = mergeHomeWork(null, null, null, NOW, {
+      ...reviewWork([worried, older], 2, [todo("r-burn", "AWAITING_APPROVAL"), todo("r-fear", "DRAFT_NEEDED")]),
+      safetyReviewIds: ["r-burn", "r-fear"],
+      safetyWorryReviewIds: ["r-fear"],
+    });
+    const byId = Object.fromEntries(work.rows.map((r) => [r.subjectId, r]));
+    expect(byId["a-worry"].safetyReading).toBe("WORRY");
+    expect(byId["a-old"].safetyReading, "an older server's row reads as the stronger mark").toBeNull();
+    expect(byId["r-burn"].safetyReading).toBe("OCCURRENCE");
+    expect(byId["r-fear"].safetyReading).toBe("WORRY");
+  });
+
   it("lists every undecided 확인 필요 review, not the Home's three", () => {
     const eleven = Array.from({ length: 11 }, (_, i) => attention(`a${i}`));
     const work = mergeHomeWork(null, ops(eleven.slice(0, 3)), null, NOW, reviewWork(eleven, 11, []));

@@ -24,11 +24,19 @@ import java.util.List;
 public record AnswerStyleProfile(AnswerTone tone, AnswerLength length, EmojiPolicy emoji,
                                  String greeting, String closing, String customerAddress,
                                  List<String> requiredPhrases, List<String> forbiddenPhrases,
-                                 String unknownFallback, int version) {
+                                 String unknownFallback, int version, List<AvoidPhrase> avoidPhrases) {
 
     private static final AnswerStyleProfile DEFAULTS = new AnswerStyleProfile(
             AnswerTone.POLITE, AnswerLength.NORMAL, EmojiPolicy.NONE,
-            null, null, null, List.of(), List.of(), null, 0);
+            null, null, null, List.of(), List.of(), null, 0, List.of());
+
+    /** A profile with no 「되도록 피할 표현」 — every profile before 2026-10-23. */
+    public AnswerStyleProfile(AnswerTone tone, AnswerLength length, EmojiPolicy emoji, String greeting,
+                              String closing, String customerAddress, List<String> requiredPhrases,
+                              List<String> forbiddenPhrases, String unknownFallback, int version) {
+        this(tone, length, emoji, greeting, closing, customerAddress, requiredPhrases, forbiddenPhrases,
+                unknownFallback, version, List.of());
+    }
 
     public AnswerStyleProfile {
         tone = tone == null ? AnswerTone.POLITE : tone;
@@ -36,6 +44,7 @@ public record AnswerStyleProfile(AnswerTone tone, AnswerLength length, EmojiPoli
         emoji = emoji == null ? EmojiPolicy.NONE : emoji;
         requiredPhrases = requiredPhrases == null ? List.of() : List.copyOf(requiredPhrases);
         forbiddenPhrases = forbiddenPhrases == null ? List.of() : List.copyOf(forbiddenPhrases);
+        avoidPhrases = avoidPhrases == null ? List.of() : List.copyOf(avoidPhrases);
     }
 
     /**
@@ -59,7 +68,7 @@ public record AnswerStyleProfile(AnswerTone tone, AnswerLength length, EmojiPoli
     public boolean isDefault() {
         return tone == AnswerTone.POLITE && length == AnswerLength.NORMAL && emoji == EmojiPolicy.NONE
                 && blank(greeting) && blank(closing) && blank(customerAddress)
-                && requiredPhrases.isEmpty() && forbiddenPhrases.isEmpty();
+                && requiredPhrases.isEmpty() && forbiddenPhrases.isEmpty() && avoidPhrases.isEmpty();
     }
 
     private static boolean blank(String value) {
@@ -112,6 +121,9 @@ public record AnswerStyleProfile(AnswerTone tone, AnswerLength length, EmojiPoli
                 .append("a=").append(norm(customerAddress)).append('\n')
                 .append("r=").append(String.join("\u001f", requiredPhrases)).append('\n')
                 .append("f=").append(String.join("\u001f", forbiddenPhrases)).append('\n')
+                // Only when there are any, so every identity stamped before the list existed still reads the same.
+                .append(avoidPhrases.isEmpty() ? "" : "v=" + String.join("\u001f", avoidPhrases.stream()
+                        .map(a -> a.phrase() + "\u001e" + norm(a.replacement())).toList()) + "\n")
                 // The fallback is part of the identity even though it renders no prompt section: it
                 // is the exact text a SELLER_APPROVED_FALLBACK draft was saved from, and a draft
                 // whose source sentence has since changed must not read as reproducible.

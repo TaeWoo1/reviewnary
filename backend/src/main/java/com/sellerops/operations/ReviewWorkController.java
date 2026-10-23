@@ -74,7 +74,7 @@ public class ReviewWorkController {
                 .map(item -> reviewIdOf(item.reviewId())).filter(java.util.Objects::nonNull)
                 .collect(Collectors.toSet());
         return new ReviewWorkView(home.undecidedAttentionCount(orgId), home.undecidedAttention(orgId, MAX_ATTENTION),
-                committed, home.safetyAmong(orgId, todoReviews));
+                committed, home.safetyAmong(orgId, todoReviews), home.safetyWorryAmong(orgId, todoReviews));
     }
 
     /** A row's id is ours and a uuid; anything else names no review, and asks nothing. */

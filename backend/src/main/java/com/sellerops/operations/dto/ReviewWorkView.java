@@ -29,7 +29,9 @@ public record ReviewWorkView(
          * The reviews in {@code committed} that report a safety or legal problem ({@code ReviewSafetySignal}) — an
          * {@code OperatorVocItem} is metadata only and does not carry it; an {@code attention} row carries its own.
          */
-        Set<UUID> safetyReviewIds) {
+        Set<UUID> safetyReviewIds,
+        /** Of {@code safetyReviewIds}, those that read as a worry (우려) rather than an occurrence (발생). */
+        Set<UUID> safetyWorryReviewIds) {
 
     /**
      * One account's share. {@code recentlyReported} is the same read's history — replies the seller reported

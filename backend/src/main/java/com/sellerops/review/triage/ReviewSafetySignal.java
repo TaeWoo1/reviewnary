@@ -118,6 +118,14 @@ public final class ReviewSafetySignal {
         return find(body).isPresent();
     }
 
+    /**
+     * {@code OCCURRENCE} or {@code WORRY} — how the finding that stands reads, for the screen to tell 발생 from 우려
+     * (owner decision 2026-10-23) — or null when the review carries no signal.
+     */
+    public static String readingOf(String body) {
+        return find(body).map(f -> f.reading().name()).orElse(null);
+    }
+
     /** The kind of the finding that stands, or empty. */
     public static Optional<Kind> of(String body) {
         return find(body).map(Finding::kind);

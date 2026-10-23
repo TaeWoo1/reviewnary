@@ -65,6 +65,10 @@ public final class AnswerStyleInstruction {
         for (String phrase : profile.forbiddenPhrases()) {
             lines.add("- \"" + phrase + "\" 라는 표현은 쓰지 마세요.");
         }
+        for (AvoidPhrase pair : profile.avoidPhrases()) {
+            lines.add("- \"" + pair.phrase() + "\" 라는 표현은 되도록 피하세요."
+                    + (pair.replacement() == null ? "" : " 대신 \"" + pair.replacement() + "\" 처럼 쓸 수 있습니다."));
+        }
         return String.join("\n", lines) + "\n" + FOOTER;
     }
 

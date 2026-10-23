@@ -73,7 +73,7 @@ public class AnswerStyleService {
     @Transactional
     public AnswerStyleView save(UUID orgId, AnswerStyleRequest request, UUID actorUserId) {
         AnswerStyleRequest form = request == null
-                ? new AnswerStyleRequest(null, null, null, null, null, null, null, null, null)
+                ? new AnswerStyleRequest(null, null, null, null, null, null, null, null, null, null)
                 : request;
 
         String greeting = StylePhrases.line("첫 인사", form.greeting(), MAX_GREETING);
@@ -83,11 +83,19 @@ public class AnswerStyleService {
                 MAX_FALLBACK);
         List<String> required = StylePhrases.validate("꼭 포함할 표현", form.requiredPhrases(),
                 StylePhrases.MAX_REQUIRED);
-        List<String> forbidden = StylePhrases.validate("사용하지 않을 표현", form.forbiddenPhrases(),
+        List<String> forbidden = StylePhrases.validate("절대 쓰지 않을 표현", form.forbiddenPhrases(),
                 StylePhrases.MAX_FORBIDDEN);
+        List<AvoidPhrase> avoid = StylePhrases.validateAvoid("되도록 피할 표현", form.avoidPhrases());
+        List<String> both = avoid.stream().map(AvoidPhrase::phrase).filter(forbidden::contains).toList();
+        if (!both.isEmpty()) {
+            // One phrase, one rule: a ban the seller can approve past is not a ban.
+            throw ApiException.badRequest("같은 표현을 두 목록에 넣을 수 없습니다: "
+                    + String.join(", ", both.stream().map(p -> "「" + p + "」").toList())
+                    + ". 절대 쓰지 않을지, 되도록 피할지 하나를 고르세요.");
+        }
 
         refuseFactualRequirements(required);
-        refuseUnsafe(greeting, closing, address, fallback, required, forbidden);
+        refuseUnsafe(greeting, closing, address, fallback, required, forbidden, avoid);
 
         OrganizationAnswerStyle row = styles.findById(orgId).orElseGet(() -> {
             OrganizationAnswerStyle fresh = new OrganizationAnswerStyle();
@@ -104,6 +112,7 @@ public class AnswerStyleService {
         row.setCustomerAddress(address);
         row.setRequiredPhrases(StylePhrases.format(required));
         row.setForbiddenPhrases(StylePhrases.format(forbidden));
+        row.setAvoidPhrases(StylePhrases.formatAvoid(avoid));
         row.setUnknownFallback(fallback);
         row.setVersion(row.getVersion() + 1);
         row.setUpdatedBy(actorUserId);
@@ -135,7 +144,7 @@ public class AnswerStyleService {
 
     /** Every seller-typed field, through the floor, reported together. */
     private static void refuseUnsafe(String greeting, String closing, String address, String fallback,
-                                     List<String> required, List<String> forbidden) {
+                                     List<String> required, List<String> forbidden, List<AvoidPhrase> avoid) {
         Map<String, String> fields = new LinkedHashMap<>();
         fields.put("첫 인사", greeting);
         fields.put("끝 인사", closing);
@@ -147,7 +156,13 @@ public class AnswerStyleService {
         }
         i = 1;
         for (String phrase : forbidden) {
-            fields.put("사용하지 않을 표현 " + i++, phrase);
+            fields.put("절대 쓰지 않을 표현 " + i++, phrase);
+        }
+        i = 1;
+        for (AvoidPhrase pair : avoid) {
+            // The replacement is text the seller can put into a reply with one press; it meets the same floor.
+            fields.put("되도록 피할 표현 " + i, pair.phrase());
+            fields.put("대신 쓸 표현 " + i++, pair.replacement());
         }
         List<AnswerStyleSafetyFloor.Violation> violations = AnswerStyleSafetyFloor.checkAll(fields);
         if (!violations.isEmpty()) {

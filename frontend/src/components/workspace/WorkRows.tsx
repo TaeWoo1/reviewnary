@@ -141,7 +141,8 @@ export function WorkRows({
         dense={dense}
         metaBelow={queue}
         product={product}
-        alert={row.safety ? SAFETY_MARK : null}
+        alert={safetyMark(row)?.text ?? null}
+        alertTone={safetyMark(row)?.tone}
       />
     );
   };
@@ -192,11 +193,20 @@ export function WorkRows({
 }
 
 /**
- * The word a row carrying the safety or legal signal is marked with (product-owner decisions, 2026-10-22 and
- * 2026-10-23). 「확인」, not 「문제」: a fixed list of expressions finds a candidate — a report, a worry, or a mention
- * that only looks like one — and the seller is the one who says which.
+ * The words a row carrying the safety or legal signal is marked with (product-owner decisions, 2026-10-22 and
+ * 2026-10-23, the second approving the 발생/우려 mockup). 「확인」, not 「문제」: a fixed list of expressions finds a
+ * candidate, and the seller is the one who says what it is. 발생 — the customer says it happened — is red; 우려 — they
+ * fear it will — is orange. A reading the server did not send is 발생: never milder than the report may be.
  */
-export const SAFETY_MARK = "안전 관련 확인";
+export const SAFETY_MARK = { OCCURRENCE: "안전 확인 · 발생", WORRY: "안전 확인 · 우려" } as const;
+
+export function safetyMark(row: Pick<HomeWorkRow, "safety" | "safetyReading">):
+  { text: string; tone: "bad" | "warn" } | null {
+  if (!row.safety) return null;
+  return row.safetyReading === "WORRY"
+    ? { text: SAFETY_MARK.WORRY, tone: "warn" }
+    : { text: SAFETY_MARK.OCCURRENCE, tone: "bad" };
+}
 
 /** True when the second line would only repeat the sentence already drawn above it. */
 function echoes(line: string, lead: string): boolean {
@@ -328,7 +338,14 @@ function RailRows({
                 })()}
               </span>
               <span className="mt-1.5 block truncate text-xs text-muted">
-                {row.safety ? <span className="font-semibold text-bad">{SAFETY_MARK} · </span> : null}
+                {(() => {
+                  const mark = safetyMark(row);
+                  return mark ? (
+                    <span className={`font-semibold ${mark.tone === "warn" ? "text-warn" : "text-bad"}`}>
+                      {mark.text} ·{" "}
+                    </span>
+                  ) : null;
+                })()}
                 <span className="font-semibold">{state.text}</span>
                 {facts.map((fact) => ` · ${fact}`).join("")}
               </span>

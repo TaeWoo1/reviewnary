@@ -185,6 +185,48 @@ class AnswerStyleServiceTest {
         assertThat(service.profileFor(org).requiredPhrases()).containsExactly("잘 부탁드립니다");
     }
 
+    // ---------------------------------------------------------------- the split (owner decision 2026-10-23)
+
+    private static AnswerStyleRequest avoiding(List<String> forbidden, List<AvoidPhrase> avoid) {
+        return new AnswerStyleRequest(null, null, null, null, null, null, List.of(), forbidden, null, avoid);
+    }
+
+    @Test
+    @DisplayName("「되도록 피할 표현」 round-trips with its replacement, and an empty replacement only marks")
+    void avoidPhrasesRoundTrip() {
+        AnswerStyleView saved = service.save(org, avoiding(List.of("고객님 탓"), List.of(
+                new AvoidPhrase(" 죄송하지만 ", " 번거로우시겠지만 "), new AvoidPhrase("양해 부탁드립니다", " "),
+                new AvoidPhrase("죄송하지만", "다른 말"))), user);
+
+        assertThat(saved.forbiddenPhrases()).containsExactly("고객님 탓");
+        assertThat(saved.avoidPhrases()).as("trimmed, the repeat collapsed, a blank replacement is none")
+                .containsExactly(new AvoidPhrase("죄송하지만", "번거로우시겠지만"), new AvoidPhrase("양해 부탁드립니다", null));
+        assertThat(service.profileFor(org).avoidPhrases()).isEqualTo(saved.avoidPhrases());
+        assertThat(AnswerStyleInstruction.of(service.profileFor(org)))
+                .contains("\"죄송하지만\" 라는 표현은 되도록 피하세요. 대신 \"번거로우시겠지만\" 처럼 쓸 수 있습니다.")
+                .contains("\"양해 부탁드립니다\" 라는 표현은 되도록 피하세요.");
+    }
+
+    @Test
+    @DisplayName("one phrase, one rule: the same phrase cannot be a ban and a preference")
+    void aPhraseIsOnOneListOnly() {
+        assertThatThrownBy(() -> service.save(org, avoiding(List.of("죄송하지만"),
+                List.of(new AvoidPhrase("죄송하지만", "번거로우시겠지만"))), user))
+                .hasMessageContaining("두 목록").hasMessageContaining("「죄송하지만」");
+        assertThatThrownBy(() -> service.save(org, avoiding(List.of(),
+                List.of(new AvoidPhrase("죄송\t하지만", null))), user)).hasMessageContaining("탭");
+        assertThatThrownBy(() -> service.save(org, avoiding(List.of(),
+                List.of(new AvoidPhrase("죄송하지만", "죄송하지만"))), user)).hasMessageContaining("같습니다");
+    }
+
+    @Test
+    @DisplayName("a replacement is text a reply can carry, so it meets the floor")
+    void theReplacementMeetsTheFloor() {
+        assertThatThrownBy(() -> service.save(org, avoiding(List.of(),
+                List.of(new AvoidPhrase("죄송하지만", "고객 잘못이라고 말씀드리면"))), user))
+                .hasMessageContaining("대신 쓸 표현 1");
+    }
+
     // ---------------------------------------------------------------- L
 
     @Test

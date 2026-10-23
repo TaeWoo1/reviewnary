@@ -208,7 +208,7 @@ public class CustomerOperationsHomeService {
                     c.getRecommendedAction(), missing(c.getMissingInformation()),
                     c.getPreparedAction() == CasePreparedAction.DRAFT_PREPARED,
                     c.getDecidedBy() == null ? null : c.getDecidedBy().name(), c.getCreatedAt(),
-                    subject.receivedOn(), linkOf(c), subject.safety());
+                    subject.receivedOn(), linkOf(c), subject.safety(), subject.safetyReading());
         }).toList();
     }
 
@@ -319,10 +319,10 @@ public class CustomerOperationsHomeService {
      *                   the row and the detail of one case cannot date it differently.
      */
     private record Subject(String title, String preview, Integer rating, java.time.LocalDate receivedOn,
-                           boolean safety) {
+                           boolean safety, String safetyReading) {
 
         Subject(String title, String preview, Integer rating, java.time.LocalDate receivedOn) {
-            this(title, preview, rating, receivedOn, false);
+            this(title, preview, rating, receivedOn, false, null);
         }
     }
 
@@ -345,7 +345,8 @@ public class CustomerOperationsHomeService {
                     // No preview: a review's title IS its body, and the row would print the sentence twice.
                     .map(x -> new Subject(preview(MarkupText.toPlainText(x.getBody())), null, x.getRating(),
                             receivedOn(x.getReceivedAt()),
-                            ReviewSafetySignal.in(MarkupText.toPlainText(x.getBody()))))
+                            ReviewSafetySignal.in(MarkupText.toPlainText(x.getBody())),
+                            ReviewSafetySignal.readingOf(MarkupText.toPlainText(x.getBody()))))
                     .orElse(new Subject(null, null, null, null));
         }
         return new Subject(null, null, null, null);

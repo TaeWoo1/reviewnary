@@ -23,6 +23,7 @@ public final class StylePhrases {
     public static final int MAX_REQUIRED = 5;
     public static final int MAX_FORBIDDEN = 10;
     public static final int MAX_PHRASE_CHARS = 40;
+    public static final int MAX_AVOID = 10;
 
     private StylePhrases() {
     }
@@ -38,6 +39,59 @@ public final class StylePhrases {
             if (!trimmed.isEmpty()) {
                 out.add(trimmed);
             }
+        }
+        return List.copyOf(out);
+    }
+
+    /** 「되도록 피할 표현」 storage form to list: a tab splits phrase from replacement. Never throws. */
+    public static List<AvoidPhrase> parseAvoid(String stored) {
+        List<AvoidPhrase> out = new ArrayList<>();
+        for (String line : parse(stored)) {
+            int tab = line.indexOf('\t');
+            String phrase = (tab < 0 ? line : line.substring(0, tab)).strip();
+            String replacement = tab < 0 ? "" : line.substring(tab + 1).strip();
+            if (!phrase.isEmpty()) {
+                out.add(new AvoidPhrase(phrase, replacement.isEmpty() ? null : replacement));
+            }
+        }
+        return List.copyOf(out);
+    }
+
+    /** List to storage form, or null for an empty list. */
+    public static String formatAvoid(List<AvoidPhrase> phrases) {
+        return phrases == null || phrases.isEmpty() ? null : String.join("\n", phrases.stream()
+                .map(a -> a.replacement() == null ? a.phrase() : a.phrase() + "\t" + a.replacement()).toList());
+    }
+
+    /**
+     * Validate the 「되도록 피할 표현」 pairs: each side single-line and capped, no tab (the storage separator), the
+     * phrase not repeated, the replacement not the phrase itself, and at most {@value #MAX_AVOID}.
+     */
+    public static List<AvoidPhrase> validateAvoid(String field, List<AvoidPhrase> pairs) {
+        if (pairs == null) {
+            return List.of();
+        }
+        List<AvoidPhrase> out = new ArrayList<>();
+        for (AvoidPhrase raw : pairs) {
+            if (raw == null || raw.phrase() == null || raw.phrase().isBlank()) {
+                continue;
+            }
+            String phrase = validate(field, List.of(raw.phrase()), 1).get(0);
+            List<String> replaced = validate(field, raw.replacement() == null ? List.of()
+                    : List.of(raw.replacement()), 1);
+            String replacement = replaced.isEmpty() ? null : replaced.get(0);
+            if (phrase.contains("\t") || (replacement != null && replacement.contains("\t"))) {
+                throw ApiException.badRequest("「" + field + "」에는 탭을 넣을 수 없습니다.");
+            }
+            if (phrase.equals(replacement)) {
+                throw ApiException.badRequest("「" + field + "」의 「" + phrase + "」은 대신 쓸 표현이 같습니다.");
+            }
+            if (out.stream().noneMatch(a -> a.phrase().equals(phrase))) {
+                out.add(new AvoidPhrase(phrase, replacement));
+            }
+        }
+        if (out.size() > MAX_AVOID) {
+            throw ApiException.badRequest("「" + field + "」은 최대 " + MAX_AVOID + "개까지 등록할 수 있습니다.");
         }
         return List.copyOf(out);
     }

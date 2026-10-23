@@ -106,6 +106,8 @@ export interface CustomerOperationsDecisionRow {
    * one reason it is listed ahead of the inquiries. Absent from a server older than that reads as false.
    */
   safety?: boolean;
+  /** 발생 or 우려 when `safety` (2026-10-23). */
+  safetyReading?: "OCCURRENCE" | "WORRY" | null;
 }
 
 /**

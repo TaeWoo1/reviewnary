@@ -60,7 +60,7 @@ public record CustomerOperationsHomeView(
                               String reasonNote, String summary, String recommendedActionType,
                               String recommendedAction, List<String> missingInformation, boolean draftPrepared,
                               String decidedBy, Instant openedAt, java.time.LocalDate receivedOn, String to,
-                              boolean safety) {
+                              boolean safety, String safetyReading) {
     }
 
     /**

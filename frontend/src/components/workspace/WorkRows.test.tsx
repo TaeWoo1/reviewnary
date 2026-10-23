@@ -259,10 +259,24 @@ describe("WorkRows — the safety mark", () => {
     for (const reading of ["home", "queue", "rail"] as const) {
       draw([row({ safety: true }), row({ key: "review:r-2", subjectId: "r-2", title: "끈이 짧아요" })], { reading });
       const list = screen.getByLabelText("확인할 일");
-      const marks = within(list).getAllByText(/안전 관련 확인/);
+      const marks = within(list).getAllByText(/안전 확인 · 발생/);
       expect(marks, reading).toHaveLength(1);
       expect(marks[0].className, reading).toContain("text-bad");
-      expect(within(list).getAllByRole("link")[0], reading).toHaveTextContent("안전 관련 확인");
+      expect(within(list).getAllByRole("link")[0], reading).toHaveTextContent("안전 확인 · 발생");
+      cleanup();
+    }
+  });
+
+  /** 발생 and 우려 are shown apart (owner decision 2026-10-23, the approved mockup). */
+  it("tells a worry from an occurrence — orange beside red — in every reading", () => {
+    for (const reading of ["home", "queue", "rail"] as const) {
+      draw([
+        row({ safety: true, safetyReading: "OCCURRENCE" }),
+        row({ key: "review:r-2", subjectId: "r-2", title: "화상 입을까 걱정돼요", safety: true, safetyReading: "WORRY" }),
+      ], { reading });
+      const list = screen.getByLabelText("확인할 일");
+      expect(within(list).getByText(/안전 확인 · 발생/).className, reading).toContain("text-bad");
+      expect(within(list).getByText(/안전 확인 · 우려/).className, reading).toContain("text-warn");
       cleanup();
     }
   });

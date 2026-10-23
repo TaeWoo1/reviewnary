@@ -28,6 +28,21 @@ class AnswerStyleIdentityTest {
     }
 
     @Test
+    @DisplayName("an empty 「되도록 피할 표현」 leaves every earlier identity as it was; a filled one changes it")
+    void anEmptyAvoidListLeavesEveryEarlierIdentityAsItWas() {
+        AnswerStyleProfile before = new AnswerStyleProfile(AnswerTone.POLITE, null, null, "안녕하세요.", null, null,
+                List.of(), List.of("고객님 탓"), null, 3);
+        AnswerStyleProfile none = new AnswerStyleProfile(AnswerTone.POLITE, null, null, "안녕하세요.", null, null,
+                List.of(), List.of("고객님 탓"), null, 3, List.of());
+        AnswerStyleProfile some = new AnswerStyleProfile(AnswerTone.POLITE, null, null, "안녕하세요.", null, null,
+                List.of(), List.of("고객님 탓"), null, 3, List.of(new AvoidPhrase("죄송하지만", "번거로우시겠지만")));
+        assertThat(none.identity()).isEqualTo(before.identity());
+        assertThat(some.identity()).isNotEqualTo(before.identity());
+        assertThat(new AnswerStyleProfile(null, null, null, null, null, null, List.of(), List.of(), null, 1,
+                List.of(new AvoidPhrase("죄송하지만", null))).isDefault()).isFalse();
+    }
+
+    @Test
     @DisplayName("B — no profile at all is DEFAULT_STYLE, and it is not a digest of anything")
     void absenceIsItsOwnIdentity() {
         assertThat(AnswerStyleProfile.defaults().identity()).isEqualTo("style/default");

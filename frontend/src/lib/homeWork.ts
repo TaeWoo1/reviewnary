@@ -105,6 +105,11 @@ export interface HomeWorkRow {
    * (product-owner decision, 2026-10-22) and the row says so. Always false for an inquiry.
    */
   safety: boolean;
+  /**
+   * 발생 or 우려 when `safety` (owner decision 2026-10-23) — the row shows them apart. Absent reads as 발생, the
+   * stronger mark: an older server never makes a report look milder than it is.
+   */
+  safetyReading?: "OCCURRENCE" | "WORRY" | null;
 }
 
 export interface HomeWork {
@@ -182,6 +187,7 @@ export function caseWorkRow(row: CustomerOperationsDecisionRow): HomeWorkRow {
     subjectId: row.caseId,
     workItemId: null,
     safety: row.safety === true,
+    safetyReading: row.safety === true ? (row.safetyReading ?? null) : null,
   };
 }
 
@@ -232,12 +238,14 @@ export function mergeHomeWork(
       subjectId: row.reviewId,
       workItemId: null,
       safety: row.safety === true,
+      safetyReading: row.safety === true ? (row.safetyReading ?? null) : null,
     });
   }
 
   if (reviewWork && reviewWork.attentionTotal > reviewWork.attention.length) truncated = true;
 
   const safetyReviews = new Set(reviewWork?.safetyReviewIds ?? []);
+  const worryReviews = new Set(reviewWork?.safetyWorryReviewIds ?? []);
   // The seller's own reply work before approval. A decided review is not in the undecided list above, so the two
   // never describe one review twice; a case about it still wins, by the same owner key.
   for (const account of reviewWork?.committed ?? []) {
@@ -276,6 +284,8 @@ export function mergeHomeWork(
         subjectId: item.reviewId,
         workItemId: null,
         safety: safetyReviews.has(item.reviewId),
+        safetyReading: !safetyReviews.has(item.reviewId) ? null
+          : worryReviews.has(item.reviewId) ? "WORRY" : "OCCURRENCE",
       });
     }
   }

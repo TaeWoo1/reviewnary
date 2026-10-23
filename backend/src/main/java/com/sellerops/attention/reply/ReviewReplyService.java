@@ -7,6 +7,7 @@ import com.sellerops.attention.reply.dto.ReviewReplyCapabilities;
 import com.sellerops.attention.reply.dto.ReviewReplyDraftView;
 import com.sellerops.attention.reply.dto.ReviewReplyOutcomeResponse;
 import com.sellerops.attention.reply.dto.ReviewReplyOutcomeView;
+import com.sellerops.attention.reply.dto.ReviewReplyPhraseFindingView;
 import com.sellerops.attention.reply.dto.ReviewReplyPrepView;
 import com.sellerops.attention.reply.dto.ReviewReplySubmissionRunResponse;
 import com.sellerops.attention.reply.dto.ReviewReplySuggestionView;
@@ -784,7 +785,12 @@ public class ReviewReplyService {
                 guidedUnavailableReason,
                 // The delegate lane adds its own state to the reply lane's verdict that this saved draft may move on.
                 delegated == null ? null : delegated.describe(orgId, review.getId(),
-                        responseNeeded && !approved && !channelAnswered && head != null));
+                        responseNeeded && !approved && !channelAnswered && head != null),
+                head == null || styleGuard == null ? java.util.List.of()
+                        : styleGuard.findings(head.getBody(), orgId).stream()
+                                .map(f -> new ReviewReplyPhraseFindingView(f.kind().name(), f.phrase(),
+                                        f.replacement(), f.sentence()))
+                                .toList());
     }
 
     /**

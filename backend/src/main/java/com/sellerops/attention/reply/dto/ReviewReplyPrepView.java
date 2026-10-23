@@ -148,5 +148,11 @@ public record ReviewReplyPrepView(
          * The vendor delegate lane for this review ({@code docs/vendor_server_contract_v1.md} §4), or null when
          * the review cannot use it — not received from the vendor server, or this PC is not linked.
          */
-        ReviewReplyDelegationView delegation) {
+        ReviewReplyDelegationView delegation,
+        /**
+         * The company's phrases the saved head draft carries (2026-10-23): absolute bans first, then the phrases it
+         * would rather avoid. Empty when there is no draft or nothing is marked. A {@code FORBIDDEN} entry is why
+         * approval and sending stay shut until the text is fixed — the server refuses them on the same check.
+         */
+        java.util.List<ReviewReplyPhraseFindingView> phraseFindings) {
 }

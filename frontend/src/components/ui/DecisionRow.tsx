@@ -62,6 +62,7 @@ export function DecisionRow({
   metaBelow = false,
   product = null,
   alert = null,
+  alertTone = "bad",
 }: {
   tone: ReasonTone;
   icon: ReasonIcon;
@@ -151,9 +152,18 @@ export function DecisionRow({
    * negative fact, on its own tint so it reads as a mark and not as the customer's first word.
    */
   alert?: string | null;
+  /**
+   * {@code bad} for something that happened, {@code warn} for a worry the customer voiced (owner decision
+   * 2026-10-23: 발생 is red, 우려 orange; both stand above the inquiries).
+   */
+  alertTone?: "bad" | "warn";
 }) {
   const alertMark = alert ? (
-    <span className="mr-1.5 inline-block rounded-md bg-bad/10 px-1.5 py-px align-[1px] text-xs font-semibold text-bad">
+    <span
+      className={`mr-1.5 inline-block rounded-md px-1.5 py-px align-[1px] text-xs font-semibold ${
+        alertTone === "warn" ? "bg-warn/10 text-warn" : "bg-bad/10 text-bad"
+      }`}
+    >
       {alert}
     </span>
   ) : null;

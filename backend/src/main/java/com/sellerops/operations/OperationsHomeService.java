@@ -207,6 +207,19 @@ public class OperationsHomeService {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
+    /** Of {@link #safetyAmong}, the ones that read as a worry rather than something that happened (2026-10-23). */
+    @Transactional(readOnly = true)
+    public Set<UUID> safetyWorryAmong(UUID orgId, Collection<UUID> reviewIds) {
+        if (reviewIds.isEmpty()) {
+            return Set.of();
+        }
+        return reviews.findAllById(reviewIds).stream()
+                .filter(r -> orgId.equals(r.getOrgId())
+                        && "WORRY".equals(ReviewSafetySignal.readingOf(r.getBody())))
+                .map(Review::getId)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
     /**
      * <b>A safety or legal report is the seller's work whatever its rating</b> (product-owner decision, 2026-10-22).
      * The undecided reviews the 확인 필요 tier does not already hold, read by {@link ReviewSafetySignal}; they come
@@ -256,7 +269,8 @@ public class OperationsHomeService {
                     ReviewProductLabel.displayName(review,
                             review.getProductId() == null ? null : productNames.get(review.getProductId())),
                     quote,
-                    ReviewSafetySignal.in(review.getBody()));
+                    ReviewSafetySignal.in(review.getBody()),
+                    ReviewSafetySignal.readingOf(review.getBody()));
         }).toList();
     }
 

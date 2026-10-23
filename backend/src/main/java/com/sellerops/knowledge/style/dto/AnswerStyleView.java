@@ -3,6 +3,7 @@ package com.sellerops.knowledge.style.dto;
 import com.sellerops.knowledge.style.AnswerLength;
 import com.sellerops.knowledge.style.AnswerStyleProfile;
 import com.sellerops.knowledge.style.AnswerTone;
+import com.sellerops.knowledge.style.AvoidPhrase;
 import com.sellerops.knowledge.style.EmojiPolicy;
 import java.util.List;
 
@@ -15,12 +16,13 @@ import java.util.List;
 public record AnswerStyleView(AnswerTone tone, AnswerLength lengthPreference, EmojiPolicy emojiPolicy,
                               String greeting, String closing, String customerAddress,
                               List<String> requiredPhrases, List<String> forbiddenPhrases,
-                              String unknownFallbackTemplate, boolean configured, int version) {
+                              String unknownFallbackTemplate, boolean configured, int version,
+                              List<AvoidPhrase> avoidPhrases) {
 
     public static AnswerStyleView of(AnswerStyleProfile profile) {
         return new AnswerStyleView(profile.tone(), profile.length(), profile.emoji(),
                 profile.greeting(), profile.closing(), profile.customerAddress(),
                 profile.requiredPhrases(), profile.forbiddenPhrases(), profile.unknownFallback(),
-                profile.version() > 0, profile.version());
+                profile.version() > 0, profile.version(), profile.avoidPhrases());
     }
 }

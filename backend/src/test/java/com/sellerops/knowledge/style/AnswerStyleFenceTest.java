@@ -109,7 +109,7 @@ class AnswerStyleFenceTest {
     // ---------------------------------------------------------------- K
 
     @Test
-    @DisplayName("K — a review reply is not written in the inquiry answer style; only the forbidden list crosses")
+    @DisplayName("K — a review reply is not written in the inquiry answer style; only the two phrase lists cross")
     void reviewRepliesAreUntouched() throws IOException {
         // Owner decision 2026-10-23 (FINDINGS B24): the company's forbidden phrases apply to reviews too — as a check,
         // through ReviewStyleGuard alone. Every other review file stays away from the style, and the guard itself
@@ -134,6 +134,8 @@ class AnswerStyleFenceTest {
         assertThat(guard).as("the one door exists where this fence looks for it").isNotNull();
         String door = executable(guard);
         assertThat(door).contains("forbiddenPhrases()").contains("forbiddenPresentIn(");
+        // The owner approved the split on 2026-10-23: 「되도록 피할 표현」 crosses too, as marks, never as an instruction.
+        assertThat(door).contains("avoidPhrases()");
         for (String other : List.of("tone()", "length()", "emoji()", "greeting()", "closing()", "customerAddress()",
                 "requiredPhrases()", "unknownFallback()", "AnswerStyleInstruction.of(")) {
             assertThat(door).as("the guard reads only the forbidden list, not " + other).doesNotContain(other);

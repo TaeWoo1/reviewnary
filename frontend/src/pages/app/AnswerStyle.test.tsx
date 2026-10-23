@@ -59,7 +59,7 @@ describe("AI 답변 스타일", () => {
 
     await screen.findByLabelText("답변 말투");
     for (const label of ["답변 길이", "이모지", "고객 호칭", "첫 인사", "끝 인사",
-      "꼭 포함할 표현", "사용하지 않을 표현", "답을 모를 때 사용할 문구"]) {
+      "꼭 포함할 표현", "절대 쓰지 않을 표현", "피할 표현 1", "대신 쓸 표현 1", "답을 모를 때 사용할 문구"]) {
       expect(screen.getByLabelText(label)).toBeTruthy();
     }
     for (const forbidden of ["프롬프트", "prompt", "system", "temperature", "모델"]) {
@@ -84,8 +84,51 @@ describe("AI 답변 스타일", () => {
       requiredPhrases: ["정성껏 준비하겠습니다", "잘 부탁드립니다"],
       forbiddenPhrases: [],
       unknownFallbackTemplate: null,
+      avoidPhrases: [],
     });
     expect(await screen.findByText("저장했습니다.")).toBeTruthy();
+  });
+
+  /** The split the owner approved on 2026-10-23 (mockup ①). */
+  it("keeps a ban and a preference apart, and sends each preference with what to write instead", async () => {
+    getAnswerStyle.mockResolvedValue(style({ configured: true, version: 4, forbiddenPhrases: ["고객님 탓"],
+      avoidPhrases: [{ phrase: "죄송하지만", replacement: "번거로우시겠지만" }] }));
+    saveAnswerStyle.mockImplementation(async (form) => style({ ...form, configured: true, version: 5 }));
+    renderScreen();
+
+    expect(await screen.findByDisplayValue("고객님 탓")).toBeTruthy();
+    expect(screen.getByText("발견되면 승인 · 등록 보류")).toBeTruthy();
+    expect(screen.getByText("대신 쓸 표현을 제안 · 그대로 둬도 승인 가능")).toBeTruthy();
+    expect((screen.getByLabelText("피할 표현 1") as HTMLInputElement).value).toBe("죄송하지만");
+    expect((screen.getByLabelText("대신 쓸 표현 1") as HTMLInputElement).value).toBe("번거로우시겠지만");
+
+    await userEvent.type(screen.getByLabelText("피할 표현 2"), "양해 부탁드립니다");
+    await userEvent.click(screen.getByRole("button", { name: "저장" }));
+
+    await waitFor(() => expect(saveAnswerStyle).toHaveBeenCalledTimes(1));
+    expect(saveAnswerStyle.mock.calls[0][0]).toMatchObject({
+      forbiddenPhrases: ["고객님 탓"],
+      avoidPhrases: [
+        { phrase: "죄송하지만", replacement: "번거로우시겠지만" },
+        { phrase: "양해 부탁드립니다", replacement: null },
+      ],
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "「죄송하지만」 빼기" }));
+    expect((screen.getByLabelText("피할 표현 1") as HTMLInputElement).value).toBe("양해 부탁드립니다");
+  });
+
+  it("warns as it is typed that a bare topic word would block plain guidance, with the right particle", async () => {
+    getAnswerStyle.mockResolvedValue(style());
+    renderScreen();
+
+    await screen.findByLabelText("절대 쓰지 않을 표현");
+    expect(screen.queryByRole("note")).toBeNull();
+    await userEvent.type(screen.getByLabelText("절대 쓰지 않을 표현"), "환불\n무조건 전액 환불\n회수");
+    const notes = screen.getAllByRole("note");
+    expect(notes).toHaveLength(2);
+    expect(notes[0].textContent).toContain("「환불은 주문 내역에서 접수해 주세요」");
+    expect(notes[0].textContent).toContain("이 줄은 리뷰에서는 적용하지 않습니다");
+    expect(notes[1].textContent).toContain("「회수는 주문 내역에서");
   });
 
   it("shows the server's own refusal — it names which phrase, and that is the useful part", async () => {

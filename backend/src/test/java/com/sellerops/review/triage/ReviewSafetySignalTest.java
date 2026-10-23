@@ -85,6 +85,14 @@ class ReviewSafetySignalTest {
     }
 
     @Test
+    void theScreenIsToldTheReadingByNameAndNothingForAReviewThatDoesNotRise() {
+        assertThat(ReviewSafetySignal.readingOf("사용하다 손에 화상을 입었어요")).isEqualTo("OCCURRENCE");
+        assertThat(ReviewSafetySignal.readingOf("너무 뜨거워서 아이가 화상 입을까 걱정돼요")).isEqualTo("WORRY");
+        assertThat(ReviewSafetySignal.readingOf("알레르기 있는 아이도 잘 써요")).isNull();
+        assertThat(ReviewSafetySignal.readingOf(null)).isNull();
+    }
+
+    @Test
     void theOutcomeSaysWhyAReviewDidNotRise() {
         assertThat(ReviewSafetySignal.explain("사용하다 화상을 입었어요")).isEqualTo(ReviewSafetySignal.Outcome.RAISED);
         assertThat(ReviewSafetySignal.explain("화상 걱정 없어요")).isEqualTo(ReviewSafetySignal.Outcome.NEGATED);

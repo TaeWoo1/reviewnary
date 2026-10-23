@@ -8,8 +8,10 @@ import type {
   AnswerLength,
   AnswerStyleView,
   AnswerTone,
+  AvoidPhrase,
   EmojiPolicy,
 } from "../../lib/types";
+import { isReviewTopicWord } from "../../lib/reviewTopicWords";
 
 /**
  * AI 답변 스타일 — how this company words a reply.
@@ -54,6 +56,9 @@ export function AnswerStyle() {
   const [address, setAddress] = useState("");
   const [required, setRequired] = useState("");
   const [forbidden, setForbidden] = useState("");
+  // 「되도록 피할 표현 → 대신 쓸 표현」 (owner decision 2026-10-23). Pairs, so not a textarea: each row is one phrase
+  // and what to write instead, and an empty row is drawn to type into.
+  const [avoid, setAvoid] = useState<AvoidPhrase[]>([]);
   const [fallback, setFallback] = useState("");
 
   const [saving, setSaving] = useState(false);
@@ -75,6 +80,7 @@ export function AnswerStyle() {
         setAddress(style.customerAddress ?? "");
         setRequired(style.requiredPhrases.join("\n"));
         setForbidden(style.forbiddenPhrases.join("\n"));
+        setAvoid(style.avoidPhrases ?? []);
         setFallback(style.unknownFallbackTemplate ?? "");
       })
       .catch(() => active && setLoadError(true));
@@ -98,7 +104,11 @@ export function AnswerStyle() {
         requiredPhrases: lines(required),
         forbiddenPhrases: lines(forbidden),
         unknownFallbackTemplate: fallback.trim() || null,
+        avoidPhrases: avoid
+          .map((a) => ({ phrase: a.phrase.trim(), replacement: a.replacement?.trim() || null }))
+          .filter((a) => a.phrase.length > 0),
       });
+      setAvoid(style.avoidPhrases ?? []);
       setLoaded(style);
       setSaved(true);
     } catch (e) {
@@ -223,46 +233,110 @@ export function AnswerStyle() {
             </Panel>
 
             <Panel
-              title="표현"
-              description="한 줄에 하나씩 적어 주세요. 꼭 포함할 표현은 5개, 사용하지 않을 표현은 10개까지입니다."
+              title="꼭 포함할 표현"
+              description="한 줄에 하나씩, 5개까지 적어 주세요."
             >
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  {/* The hint is a SIBLING of the label, not inside it: a field's accessible name is
-                      everything the label contains, and a two-sentence caveat read out as the name of
-                      the box is worse for the person using a screen reader than no caveat at all. */}
-                  <label className="block">
-                    <span className="text-sm font-medium text-ink">꼭 포함할 표현</span>
-                    <textarea
-                      value={required}
-                      onChange={(e) => setRequired(e.target.value)}
-                      rows={4}
-                      placeholder={"예: 정성껏 준비하겠습니다"}
-                      className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-base leading-relaxed focus:border-brand focus:outline-none"
-                    />
-                  </label>
-                  <p className="mt-1 break-keep text-sm text-muted">
-                    배송·환불·재고처럼 사실을 단정하는 문장은 넣을 수 없습니다. 그런 내용은 「운영 기준」에
-                    등록하시면, 해당하는 문의에서 근거로 인용됩니다.
-                  </p>
-                </div>
-                <div>
-                  <label className="block">
-                    <span className="text-sm font-medium text-ink">사용하지 않을 표현</span>
-                    <textarea
-                      value={forbidden}
-                      onChange={(e) => setForbidden(e.target.value)}
-                      rows={4}
-                      placeholder={"예: 죄송하지만"}
-                      className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-base leading-relaxed focus:border-brand focus:outline-none"
-                    />
-                  </label>
-                  <p className="mt-1 break-keep text-sm text-muted">
-                    여기 적힌 표현이 들어간 초안은 저장하지 않고 다시 만들도록 합니다. 리뷰 답글에도 적용됩니다 — 다만
-                    「환불」「교환」처럼 주제를 가리키는 낱말 하나만 적은 줄은 리뷰에서는 막지 않습니다.
-                  </p>
-                </div>
-              </div>
+              {/* The hint is a SIBLING of the label, not inside it: a field's accessible name is everything the
+                  label contains, and a two-sentence caveat read out as the name of the box is worse for the person
+                  using a screen reader than no caveat at all. */}
+              <label className="block">
+                <span className="text-sm font-medium text-ink">꼭 포함할 표현</span>
+                <textarea
+                  value={required}
+                  onChange={(e) => setRequired(e.target.value)}
+                  rows={3}
+                  placeholder={"예: 정성껏 준비하겠습니다"}
+                  className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-base leading-relaxed focus:border-brand focus:outline-none"
+                />
+              </label>
+              <p className="mt-1 break-keep text-sm text-muted">
+                배송·환불·재고처럼 사실을 단정하는 문장은 넣을 수 없습니다. 그런 내용은 「운영 기준」에
+                등록하시면, 해당하는 문의에서 근거로 인용됩니다.
+              </p>
+            </Panel>
+
+            {/* The split the owner approved on 2026-10-23: an absolute ban, and a preference with what to say
+                instead. Both apply to inquiry answers and review replies. */}
+            <Panel title="절대 쓰지 않을 표현" description="문의 답변과 리뷰 답글 모두에 적용됩니다. 한 줄에 하나씩, 10개까지.">
+              <p>
+                <span className="inline-block rounded-md bg-bad/10 px-1.5 py-px text-xs font-semibold text-bad">
+                  발견되면 승인 · 등록 보류
+                </span>
+              </p>
+              <label className="mt-2 block">
+                <span className="sr-only">절대 쓰지 않을 표현</span>
+                <textarea
+                  value={forbidden}
+                  onChange={(e) => setForbidden(e.target.value)}
+                  rows={4}
+                  placeholder={"예: 고객님 탓"}
+                  className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-base leading-relaxed focus:border-brand focus:outline-none"
+                />
+              </label>
+              {lines(forbidden).filter(isReviewTopicWord).map((word) => (
+                <p key={word} role="note" className="mt-2 break-keep rounded-xl bg-warn/10 px-3 py-2 text-sm leading-relaxed text-warn">
+                  「{word}」처럼 낱말 하나만 적으면 「{word}{topicParticle(word)} 주문 내역에서 접수해 주세요」 같은 안내까지 막힐 수 있어요.
+                  막고 싶은 문장을 구체적으로 적어 주세요 — 예: 「무조건 전액 {word}」. 이 줄은 리뷰에서는 적용하지 않습니다.
+                </p>
+              ))}
+              <p className="mt-2 break-keep text-sm leading-relaxed text-muted">
+                AI 초안을 쓸 때 피하도록 알려 줍니다. 그래도 들어가면 문의 답변은 그 초안을 쓰지 않고, 리뷰 답글은 한 번 다시
+                써 본 뒤에도 남으면 초안을 그대로 두고 그 표현을 표시합니다 — 고치기 전에는 승인하거나 담당자에게 보낼 수
+                없습니다. 판매자나 휴대폰에서 고친 문장에도 똑같이 검사합니다. 고객이 쓴 리뷰나 근거 문서에 들어 있는 것은
+                상관없습니다.
+              </p>
+            </Panel>
+
+            <Panel title="되도록 피할 표현" description="문의 답변과 리뷰 답글 모두에 적용됩니다. 10개까지.">
+              <p>
+                <span className="inline-block rounded-md bg-canvas px-1.5 py-px text-xs font-semibold text-muted">
+                  대신 쓸 표현을 제안 · 그대로 둬도 승인 가능
+                </span>
+              </p>
+              <ul className="mt-2 space-y-2" aria-label="되도록 피할 표현 목록">
+                {[...avoid, { phrase: "", replacement: null }].map((pair, i) => {
+                  const last = i === avoid.length;
+                  const set = (next: AvoidPhrase) =>
+                    setAvoid(last ? [...avoid, next] : avoid.map((a, j) => (j === i ? next : a)));
+                  return (
+                    <li key={i} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] items-center gap-2">
+                      <input
+                        value={pair.phrase}
+                        onChange={(e) => set({ ...pair, phrase: e.target.value })}
+                        maxLength={40}
+                        placeholder={last ? "예: 죄송하지만" : undefined}
+                        aria-label={`피할 표현 ${i + 1}`}
+                        className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-base focus:border-brand focus:outline-none"
+                      />
+                      <span aria-hidden="true" className="text-muted">→</span>
+                      <input
+                        value={pair.replacement ?? ""}
+                        onChange={(e) => set({ ...pair, replacement: e.target.value })}
+                        maxLength={40}
+                        placeholder={last ? "예: 번거로우시겠지만" : "비워 두면 표시만"}
+                        aria-label={`대신 쓸 표현 ${i + 1}`}
+                        className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-base focus:border-brand focus:outline-none"
+                      />
+                      {last ? (
+                        <span className="w-10" />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setAvoid(avoid.filter((_, j) => j !== i))}
+                          aria-label={`「${pair.phrase}」 빼기`}
+                          className="w-10 rounded-lg px-1 py-2 text-sm font-semibold text-muted hover:text-ink"
+                        >
+                          빼기
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="mt-2 break-keep text-sm leading-relaxed text-muted">
+                말투 선호입니다. 들어가도 초안은 저장되고, 리뷰 답글에서는 그 표현을 표시해 대신 쓸 표현을 제안합니다. 그대로
+                두고 승인해도 됩니다. 비워 두면 표시만 합니다.
+              </p>
             </Panel>
 
             <Panel
@@ -335,6 +409,12 @@ export function AnswerStyle() {
       )}
     </>
   );
+}
+
+/** 은 after a final consonant, else 는 — 「환불은」, 「회수는」. */
+function topicParticle(word: string): string {
+  const code = word.charCodeAt(word.length - 1) - 0xac00;
+  return code >= 0 && code < 11172 && code % 28 !== 0 ? "은" : "는";
 }
 
 /** Textarea to list. Empty lines are not phrases. */

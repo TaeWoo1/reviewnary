@@ -64,6 +64,10 @@ public class OrganizationAnswerStyle {
     @Column(name = "forbidden_phrases")
     private String forbiddenPhrases;
 
+    /** 「되도록 피할 표현」: one per line, phrase and replacement split by a tab — see {@link StylePhrases#parseAvoid}. */
+    @Column(name = "avoid_phrases")
+    private String avoidPhrases;
+
     /**
      * The seller's own approved sentence for "there is no basis to answer this yet".
      *
@@ -105,6 +109,7 @@ public class OrganizationAnswerStyle {
     public AnswerStyleProfile toProfile() {
         return new AnswerStyleProfile(tone, lengthPreference, emojiPolicy, greeting, closing,
                 customerAddress, StylePhrases.parse(requiredPhrases),
-                StylePhrases.parse(forbiddenPhrases), unknownFallback, version);
+                StylePhrases.parse(forbiddenPhrases), unknownFallback, version,
+                StylePhrases.parseAvoid(avoidPhrases));
     }
 }

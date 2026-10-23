@@ -1463,6 +1463,12 @@ export interface ReviewReplyPrep {
    */
   delegation?: ReviewReplyDelegation | null;
   /**
+   * The company's phrases the SAVED head draft carries (2026-10-23): absolute bans first, then preferences. A
+   * `FORBIDDEN` entry keeps approval and sending shut until the text is fixed — the server refuses them on the same
+   * check. Absent from an older server.
+   */
+  phraseFindings?: ReviewReplyPhraseFinding[];
+  /**
    * What wrote the head draft — `MODEL`, `RULE`, or null for a version written before reviewnary
    * recorded an author (Grounded Review Drafting v1). Null is "not recorded", never "a person typed
    * it": the screen says nothing rather than guessing.
@@ -2489,6 +2495,19 @@ export interface ReviewWorkView {
   committed: ReviewWorkAccount[];
   /** The reviews in `committed` that report a safety or legal problem; an attention row carries its own. */
   safetyReviewIds?: string[];
+  /** Of `safetyReviewIds`, those that read as a worry (우려) rather than an occurrence (발생). */
+  safetyWorryReviewIds?: string[];
+}
+
+/** How a safety finding reads (owner decision 2026-10-23): it happened, or the customer fears it will. */
+export type SafetyReading = "OCCURRENCE" | "WORRY";
+
+/** One phrase the review panel marks in the saved draft. */
+export interface ReviewReplyPhraseFinding {
+  kind: "FORBIDDEN" | "AVOID";
+  phrase: string;
+  replacement: string | null;
+  sentence: string | null;
 }
 
 export interface ReviewWorkAccount {
@@ -2514,6 +2533,8 @@ export interface HomeAttentionReview {
    * (product-owner decision, 2026-10-22). Such a review is here whatever its rating.
    */
   safety?: boolean;
+  /** How it reads when `safety` — 발생 or 우려. Absent from an older server: shown as 발생, the stronger mark. */
+  safetyReading?: SafetyReading | null;
 }
 
 /**
@@ -3735,6 +3756,14 @@ export interface AnswerStyleView {
   unknownFallbackTemplate: string | null;
   configured: boolean;
   version: number;
+  /** 「되도록 피할 표현」 and what to write instead (owner decision 2026-10-23). Absent from an older server. */
+  avoidPhrases?: AvoidPhrase[];
+}
+
+/** A phrase this company would rather not use; `replacement` null only marks it. */
+export interface AvoidPhrase {
+  phrase: string;
+  replacement: string | null;
 }
 
 /**
@@ -3768,6 +3797,7 @@ export interface AnswerStyleRequest {
   requiredPhrases: string[];
   forbiddenPhrases: string[];
   unknownFallbackTemplate: string | null;
+  avoidPhrases: AvoidPhrase[];
 }
 
 /**

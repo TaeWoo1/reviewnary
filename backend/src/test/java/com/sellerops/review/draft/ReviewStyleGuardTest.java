@@ -28,6 +28,23 @@ class ReviewStyleGuardTest {
     }
 
     @Test
+    void thePanelIsShownEachBanAndEachPreferenceWithItsSentence() {
+        AnswerStyleProfile profile = new AnswerStyleProfile(null, null, null, null, null, null, List.of(),
+                List.of("고객님 탓", "환불"), null, 1,
+                List.of(new com.sellerops.knowledge.style.AvoidPhrase("죄송하지만", "번거로우시겠지만"),
+                        new com.sellerops.knowledge.style.AvoidPhrase("양해", null)));
+        String draft = "늦어서 죄송합니다. 고객님 탓이 아니라 택배사 사정으로 늦어졌습니다. 죄송하지만 다음에는 더 빨리 보내 드리겠습니다.";
+
+        assertThat(ReviewStyleGuard.findings(draft, profile)).containsExactly(
+                new ReviewStyleGuard.Finding(ReviewStyleGuard.Kind.FORBIDDEN, "고객님 탓", null,
+                        "고객님 탓이 아니라 택배사 사정으로 늦어졌습니다."),
+                new ReviewStyleGuard.Finding(ReviewStyleGuard.Kind.AVOID, "죄송하지만", "번거로우시겠지만",
+                        "죄송하지만 다음에는 더 빨리 보내 드리겠습니다."));
+        assertThat(ReviewStyleGuard.findings("소중한 후기 감사합니다.", profile)).isEmpty();
+        assertThat(ReviewStyleGuard.findings(null, profile)).isEmpty();
+    }
+
+    @Test
     void noProfileNoBan() {
         assertThat(ReviewStyleGuard.forbiddenIn("아무 문장", (com.sellerops.knowledge.style.AnswerStyleProfile) null)).isEmpty();
         assertThat(ReviewStyleGuard.enforced(AnswerStyleProfile.defaults())).isEmpty();

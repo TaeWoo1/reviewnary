@@ -86,6 +86,24 @@ class HomeSafetyReviewTest {
     }
 
     @Test
+    void anOccurrenceAndAWorryAreToldApartOnTheRowAndAmongTheSellersWork() {
+        Review burned = review(org, 5, "사용하다 손에 화상을 입었어요");
+        Review worried = review(org, 4, "너무 뜨거워서 아이가 화상 입을까 걱정돼요");
+        Review complaint = review(org, 1, "색이 사진이랑 너무 달라요");
+
+        List<AttentionReview> rows = home.undecidedAttention(org, 10);
+        assertThat(rows).filteredOn(r -> r.reviewId().equals(burned.getId())).singleElement()
+                .extracting(AttentionReview::safetyReading).isEqualTo("OCCURRENCE");
+        assertThat(rows).filteredOn(r -> r.reviewId().equals(worried.getId())).singleElement()
+                .extracting(AttentionReview::safetyReading).isEqualTo("WORRY");
+        assertThat(rows).filteredOn(r -> r.reviewId().equals(complaint.getId())).singleElement()
+                .extracting(AttentionReview::safetyReading).isNull();
+        Set<UUID> all = Set.of(burned.getId(), worried.getId(), complaint.getId());
+        assertThat(home.safetyWorryAmong(org, all)).containsExactly(worried.getId());
+        assertThat(home.safetyWorryAmong(UUID.randomUUID(), all)).as("another org's reviews are not in it").isEmpty();
+    }
+
+    @Test
     void aLowRatedReportIsMarkedInPlaceAndNotCountedTwice() {
         Review burned = review(org, 1, "충전하다가 타는 냄새가 났어요");
 

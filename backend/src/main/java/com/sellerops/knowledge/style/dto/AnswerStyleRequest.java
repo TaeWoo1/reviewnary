@@ -3,6 +3,7 @@ package com.sellerops.knowledge.style.dto;
 import com.sellerops.knowledge.style.AnswerLength;
 import com.sellerops.knowledge.style.AnswerTone;
 import com.sellerops.knowledge.style.EmojiPolicy;
+import com.sellerops.knowledge.style.AvoidPhrase;
 import java.util.List;
 
 /**
@@ -15,5 +16,14 @@ import java.util.List;
 public record AnswerStyleRequest(AnswerTone tone, AnswerLength lengthPreference,
                                  EmojiPolicy emojiPolicy, String greeting, String closing,
                                  String customerAddress, List<String> requiredPhrases,
-                                 List<String> forbiddenPhrases, String unknownFallbackTemplate) {
+                                 List<String> forbiddenPhrases, String unknownFallbackTemplate,
+                                 List<AvoidPhrase> avoidPhrases) {
+
+    /** The form before 「되도록 피할 표현」 existed: none. */
+    public AnswerStyleRequest(AnswerTone tone, AnswerLength lengthPreference, EmojiPolicy emojiPolicy, String greeting,
+                              String closing, String customerAddress, List<String> requiredPhrases,
+                              List<String> forbiddenPhrases, String unknownFallbackTemplate) {
+        this(tone, lengthPreference, emojiPolicy, greeting, closing, customerAddress, requiredPhrases,
+                forbiddenPhrases, unknownFallbackTemplate, null);
+    }
 }

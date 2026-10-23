@@ -73,7 +73,7 @@ class ReviewWorkControllerTest {
         when(accounts.findAllByOrgId(org)).thenReturn(List.of());
         List<OperationsHomeView.AttentionReview> eleven = java.util.stream.IntStream.range(0, 11)
                 .mapToObj(i -> new OperationsHomeView.AttentionReview(UUID.randomUUID(), null, "NAVER", 1,
-                        LocalDate.of(2026, 9, 1), "상품", "불만", false))
+                        LocalDate.of(2026, 9, 1), "상품", "불만", false, null))
                 .toList();
         when(home.undecidedAttention(org, ReviewWorkController.MAX_ATTENTION)).thenReturn(eleven);
         when(home.undecidedAttentionCount(org)).thenReturn(11L);

@@ -163,6 +163,7 @@ export function DelegatedReplyControls({
   reviewId,
   dirty,
   disabled,
+  blocked = null,
   onChanged,
 }: {
   delegation: ReviewReplyDelegation;
@@ -171,6 +172,11 @@ export function DelegatedReplyControls({
   dirty: boolean;
   /** The panel itself has a write in flight. */
   disabled: boolean;
+  /**
+   * Why the saved draft may not leave yet — a company ban it carries (2026-10-23), said in the panel's own words.
+   * The server refuses the send on the same check; this keeps the presses off and says why beneath them.
+   */
+  blocked?: string | null;
   /** Re-read the panel: the server's verdicts (this lane's and the reply lane's) moved. */
   onChanged: () => Promise<unknown> | void;
 }) {
@@ -181,7 +187,7 @@ export function DelegatedReplyControls({
   const state = delegation.taskState;
   const shown = state == null ? null : STATE[state];
   const working = busy != null || disabled;
-  const canSend = delegation.canSend && !dirty;
+  const canSend = delegation.canSend && !dirty && blocked == null;
 
   async function press(which: Press) {
     // aria-disabled keeps the button focusable, so the press itself refuses whatever the look says is off.
@@ -270,6 +276,9 @@ export function DelegatedReplyControls({
         </div>
       ) : null}
 
+      {delegation.canSend && !dirty && blocked != null ? (
+        <p className="break-keep text-sm text-muted">{blocked}</p>
+      ) : null}
       {delegation.canSend && dirty ? (
         <p className="text-sm text-muted">저장하지 않은 변경이 있습니다. 먼저 초안을 저장하세요.</p>
       ) : null}

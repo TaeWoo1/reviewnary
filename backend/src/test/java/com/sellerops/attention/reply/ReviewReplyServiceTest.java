@@ -1,6 +1,7 @@
 package com.sellerops.attention.reply;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -261,6 +262,32 @@ class ReviewReplyServiceTest {
         service.saveDraft(org, account, ref, "합성-불편을 드려 죄송합니다. 환불은 주문 내역에서 접수해 주세요.", 1, user);
         approveHead();
         assertThat(service.view(org, account, ref).approval()).isNotNull();
+    }
+
+    @Test
+    void thePanelIsToldWhichPhrasesTheSavedDraftCarriesAndAPreferenceStopsNothing() {
+        com.sellerops.knowledge.style.AnswerStyleService styles =
+                mock(com.sellerops.knowledge.style.AnswerStyleService.class);
+        when(styles.profileFor(org)).thenReturn(new com.sellerops.knowledge.style.AnswerStyleProfile(
+                null, null, null, null, null, null, java.util.List.of(), java.util.List.of("고객님 탓"), null, 1,
+                java.util.List.of(new com.sellerops.knowledge.style.AvoidPhrase("죄송하지만", "번거로우시겠지만"))));
+        service.setStyleGuard(new com.sellerops.review.draft.ReviewStyleGuard(styles));
+        triage(TriageDisposition.RESPONSE_NEEDED);
+        assertThat(service.view(org, account, ref).phraseFindings()).as("no draft, nothing marked").isEmpty();
+
+        service.saveDraft(org, account, ref, "합성-고객님 탓이 아닙니다. 죄송하지만 다시 보내 드리겠습니다.", 0, user);
+        assertThat(service.view(org, account, ref).phraseFindings()).extracting(
+                        com.sellerops.attention.reply.dto.ReviewReplyPhraseFindingView::kind,
+                        com.sellerops.attention.reply.dto.ReviewReplyPhraseFindingView::phrase,
+                        com.sellerops.attention.reply.dto.ReviewReplyPhraseFindingView::replacement)
+                .containsExactly(tuple("FORBIDDEN", "고객님 탓", null),
+                        tuple("AVOID", "죄송하지만", "번거로우시겠지만"));
+
+        service.saveDraft(org, account, ref, "합성-불편을 드려 죄송합니다. 죄송하지만 다시 보내 드리겠습니다.", 1, user);
+        assertThat(service.view(org, account, ref).phraseFindings()).singleElement()
+                .satisfies(f -> assertThat(f.kind()).isEqualTo("AVOID"));
+        approveHead();
+        assertThat(service.view(org, account, ref).approval()).as("a preference is the seller's to keep").isNotNull();
     }
 
     @Test

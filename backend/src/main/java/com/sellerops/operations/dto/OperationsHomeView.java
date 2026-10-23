@@ -86,7 +86,9 @@ public record OperationsHomeView(
              * Whether the whole review reports a safety or legal problem ({@code ReviewSafetySignal}) — read from the
              * body, not from {@code quote}, which is cut. Only the answer leaves; never the words that matched.
              */
-            boolean safety) {
+            boolean safety,
+            /** {@code OCCURRENCE} · {@code WORRY} when {@code safety}, else null — 발생 and 우려 are shown apart. */
+            String safetyReading) {
     }
 
     /**

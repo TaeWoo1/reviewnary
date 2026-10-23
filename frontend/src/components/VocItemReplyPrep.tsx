@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { PhraseFindings, phraseBlockSentence } from "./reviews/PhraseFindings";
 import { GroundedReviewDraft } from "./GroundedReviewDraft";
 import { DelegatedReplyControls } from "./reviews/DelegatedReplyControls";
 import { Disclosure } from "./ui/Disclosure";
@@ -260,6 +261,7 @@ export function VocItemReplyPrep({
 
   const headingId = useId();
   const editorId = useId();
+  const editorRef = useRef<HTMLTextAreaElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -343,7 +345,11 @@ export function VocItemReplyPrep({
    * instead of the wire, and the server cannot see it — only this side knows the buffer
    * diverged. The fix is to refuse rather than to guess which text they meant.
    */
-  const approvable = capabilities.canApprove && responseNeeded && !dirty;
+  // The company's phrases in the SAVED draft (2026-10-23). A ban keeps approval and sending shut until it is fixed;
+  // the server refuses both on the same check, and this is the screen saying so before the press.
+  const findings = approved || dirty ? [] : (prep.phraseFindings ?? []);
+  const phraseBlock = phraseBlockSentence(findings);
+  const approvable = capabilities.canApprove && responseNeeded && !dirty && phraseBlock == null;
 
   async function refresh() {
     const next = await load();
@@ -352,7 +358,8 @@ export function VocItemReplyPrep({
     }
   }
 
-  async function save() {
+  /** Saves the editor — or {@code text}, a change the seller pressed for in 걸린 표현, which also becomes the editor's. */
+  async function save(text?: string) {
     if (inFlight.current || !canSave) {
       return;
     }
@@ -360,7 +367,8 @@ export function VocItemReplyPrep({
     setBusy("saving");
     setFailed(null);
     try {
-      await api.saveReviewReplyDraft(accountId, actionRef, { body, baseVersion });
+      if (text != null) setBody(text);
+      await api.saveReviewReplyDraft(accountId, actionRef, { body: text ?? body, baseVersion });
       setDirty(false);
       // Before the re-read, so the row pins itself open on the save itself rather than on
       // the read that follows it — a failed refresh must not cost the operator their panel.
@@ -664,6 +672,7 @@ export function VocItemReplyPrep({
         ) : (
           <textarea
             id={editorId}
+            ref={editorRef}
             value={body}
             onChange={(e) => {
               setBody(e.target.value);
@@ -689,6 +698,22 @@ export function VocItemReplyPrep({
           </p>
         ) : null}
       </div>
+
+      {findings.length > 0 && canSave ? (
+        <PhraseFindings
+          body={body}
+          findings={findings}
+          disabled={working}
+          onApply={(next) => void save(next)}
+          onEdit={(phrase) => {
+            const editor = editorRef.current;
+            if (!editor) return;
+            const at = editor.value.indexOf(phrase);
+            editor.focus();
+            if (at >= 0) editor.setSelectionRange(at, at + phrase.length);
+          }}
+        />
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
         {/* <b>승인된 동안에는 그리지 않는다.</b> 이 단추는 「지금은 못 누른다, 그러나 되돌릴 수 있다」를
@@ -793,6 +818,7 @@ export function VocItemReplyPrep({
           </span>
         ) : null}
       </div>
+      {phraseBlock != null && delegation == null ? <p className="break-keep text-sm text-muted">{phraseBlock}</p> : null}
 
       {delegation != null && reviewId != null ? (
         <DelegatedReplyControls
@@ -800,6 +826,7 @@ export function VocItemReplyPrep({
           reviewId={reviewId}
           dirty={dirty}
           disabled={working}
+          blocked={phraseBlock}
           onChanged={refresh}
         />
       ) : null}
