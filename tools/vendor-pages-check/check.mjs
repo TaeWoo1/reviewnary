@@ -161,6 +161,19 @@ const cases = [
     expect(await shown(p, "#edit"), true);
     return run;
   }],
+  ["phone · a phone edit approved before the PC checked it waits for the PC, and says so", async (b) => {
+    const { p, ...run } = await phone(b, task({ state: "APPROVED", editedOnMobile: true, draftVersion: 2,
+      approvedVersion: 2, pcRecheckVersion: null, pcRecheck: null, basisNote: null }));
+    expect(await text(p, "#task-state"), "승인됨 · PC 검사 기다리는 중");
+    expectHas(await text(p, "#state-note"), "판매자 PC가 이 문장을 검사하면 담당자에게 넘어갑니다.");
+    expect(await shown(p, "#approve"), false);
+    const waiting = await phone(b, task({ state: "AWAITING_APPROVAL", approvedVersion: null, editedOnMobile: true,
+      draftVersion: 2, pcRecheckVersion: null, pcRecheck: null, basisNote: null }));
+    expectHas(await text(waiting.p, "#unchecked-text"), "지금 승인해도 검사가 끝난 뒤에 담당자에게 넘어가고");
+    expect(await shown(waiting.p, "#approve"), true);
+    await waiting.ctx.close();
+    return run;
+  }],
   ["phone · the server's words are drawn as text, never as markup", async (b) => {
     const html = "<b id=\"injected\">굵게</b> 교환해 드리겠습니다.";
     const { p, ...run } = await phone(b, task({ draftBody: `안녕하세요. ${html}`,

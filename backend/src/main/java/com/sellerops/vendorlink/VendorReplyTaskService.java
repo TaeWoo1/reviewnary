@@ -79,7 +79,9 @@ import org.springframework.stereotype.Service;
  * delegate to stop first. A cited document that was only edited leaves the approval standing, with a note saying so.
  * Every hold carries what changed, the sentences it touches and the words that lost their ground. A promise the seller
  * already saw flagged and approved anyway is not held again: this PC checks each phone edit under the basis it was
- * written in ({@link #checkPhoneEdits}) before the seller approves it, and that finding is the baseline. Without {@link
+ * written in ({@link #checkPhoneEdits}) before the seller approves it, and that finding is the baseline. A phone version
+ * the seller approved before this PC checked it reaches no delegate until the check is on the server, and a finding
+ * then holds it (2026-10-23 external review); a check the server refused is not a check and is asked again. Without {@link
  * ReviewDraftBasis} (a test wiring this lane alone) drafts say {@value #UNVERSIONED} and nothing is reported, as
  * before.
  */
@@ -446,7 +448,9 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
                                 result.codes(), note(result));
                     }
                 } catch (VendorServerClient.TaskRefused e) {
+                    // Not recorded on the server, so not checked: the next pull asks again (2026-10-23 review).
                     log.warn("vendor reply task: recheck not recorded store={} code={}", storeId, e.code());
+                    continue;
                 }
             }
             // Otherwise the review changed since it was pulled: the next upload invalidates the task, or the seller
@@ -484,7 +488,13 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             if (STANDING_APPROVALS.contains(current.state()) && current.approvedVersion() != null
                     && current.approvedVersion() == current.draftVersion()
                     && !now.combined().equals(current.draftBasis())) {
-                after = checkOne(orgId, storeId, token, task, current);
+                try {
+                    after = checkOne(orgId, storeId, token, task, current);
+                } catch (VendorServerClient.TaskRefused e) {
+                    // The finding did not reach the server: this version is not checked, and the next pull tries again.
+                    log.warn("vendor reply task: approved check not recorded store={} code={}", storeId, e.code());
+                    continue;
+                }
                 held += after != null && !STANDING_APPROVALS.contains(after.state()) ? 1 : 0;
             }
             VendorReplyTask checked = after == null ? task : apply(orgId, task.getReviewId(), storeId, after);
@@ -513,42 +523,47 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             if (!copy.isEditedOnMobile() || Integer.valueOf(copy.getDraftVersion()).equals(copy.getPcCheckedVersion())) {
                 continue;
             }
-            TaskSnapshot current = link.client().task(token, copy.getVendorTaskId());
-            VendorReplyTask task = apply(orgId, copy.getReviewId(), storeId, current);
-            boolean due = PHONE_CHECKED.contains(current.state()) && current.editedOnMobile()
-                    && !Integer.valueOf(current.draftVersion()).equals(current.pcRecheckVersion())
-                    && now.combined().equals(current.draftBasis())
-                    && (!STANDING_APPROVALS.contains(current.state())
-                            || Integer.valueOf(current.draftVersion()).equals(current.approvedVersion()));
-            Review review = reviews.findByIdAndOrgId(task.getReviewId(), orgId).orElse(null);
-            VendorReviewRef ref = refs.findByReviewId(task.getReviewId()).orElse(null);
-            if (due && review != null && ref != null
-                    && ReviewBodyFingerprint.of(review.getBody()).equals(ref.getBodyFingerprint())) {
-                ReviewDraftRecheck.Result result = recheck.check(orgId, review,
-                        VocPreviewSanitizer.redactFullBody(review.getBody()).text(), current.draftBody());
-                try {
-                    TaskSnapshot after = link.client().pcRecheck(token, current.id(), current.draftVersion(),
-                            result.passed(), result.codes(), result.passed() ? null : note(result));
-                    // A phone edit approved before this PC saw it, carrying a banned phrase: held now, not later.
-                    if (STANDING_APPROVALS.contains(after.state()) && !result.phrases().isEmpty()) {
-                        after = link.client().checkApproved(token, after.id(), after.draftVersion(), true,
-                                new VendorServerClient.BasisNote(List.of(ReviewDraftRecheck.FORBIDDEN_PHRASE),
-                                        List.of(), List.of(), ReviewDraftRecheck.sentencesWith(
-                                                ReviewReplyValidation.normalize(after.draftBody()), result.phrases()),
-                                        result.phrases()),
-                                "pc-ban:" + after.id() + ":" + after.draftVersion() + ":" + after.stateVersion());
-                    }
-                    task = apply(orgId, task.getReviewId(), storeId, after);
-                    checked++;
-                } catch (VendorServerClient.TaskRefused e) {
-                    log.warn("vendor reply task: phone edit check not recorded store={} code={}", storeId, e.code());
-                }
-            }
-            // Checked, or not checkable here (the basis moved on, or the review did): either way not asked again for
-            // this version — a moved basis is the approved check's to judge.
-            task.setPcCheckedVersion(current.draftVersion());
-            tasks.save(task);
+            checked += checkPhoneEdit(orgId, storeId, token, copy.getVendorTaskId(), now) ? 1 : 0;
         }
+        return checked;
+    }
+
+    /**
+     * One phone-edited task checked, if its current version is due. The server keeps an approved one from every
+     * delegate until this check is recorded, and holds it in the same step when the check finds something — the
+     * seller approved before the finding existed (2026-10-23 external review). Marked checked here only once the
+     * server has the finding, or when there is nothing this PC can check; a refused finding is asked again next pull.
+     */
+    private boolean checkPhoneEdit(UUID orgId, UUID storeId, String token, UUID vendorTaskId, Fingerprints now) {
+        VendorReplyTask copy = tasks.findByVendorTaskId(vendorTaskId).orElseThrow();
+        TaskSnapshot current = link.client().task(token, vendorTaskId);
+        VendorReplyTask task = apply(orgId, copy.getReviewId(), storeId, current);
+        boolean due = PHONE_CHECKED.contains(current.state()) && current.editedOnMobile()
+                && !Integer.valueOf(current.draftVersion()).equals(current.pcRecheckVersion())
+                && now.combined().equals(current.draftBasis())
+                && (!STANDING_APPROVALS.contains(current.state())
+                        || Integer.valueOf(current.draftVersion()).equals(current.approvedVersion()));
+        Review review = reviews.findByIdAndOrgId(task.getReviewId(), orgId).orElse(null);
+        VendorReviewRef ref = refs.findByReviewId(task.getReviewId()).orElse(null);
+        boolean checked = false;
+        if (due && review != null && ref != null
+                && ReviewBodyFingerprint.of(review.getBody()).equals(ref.getBodyFingerprint())) {
+            ReviewDraftRecheck.Result result = recheck.check(orgId, review,
+                    VocPreviewSanitizer.redactFullBody(review.getBody()).text(), current.draftBody());
+            try {
+                TaskSnapshot after = link.client().pcRecheck(token, current.id(), current.draftVersion(),
+                        result.passed(), result.codes(), result.passed() ? null : note(result));
+                task = apply(orgId, task.getReviewId(), storeId, after);
+                checked = true;
+            } catch (VendorServerClient.TaskRefused e) {
+                log.warn("vendor reply task: phone edit check not recorded store={} code={}", storeId, e.code());
+                return false;
+            }
+        }
+        // Checked, or not checkable here (the basis moved on, or the review did): either way not asked again for
+        // this version — a moved basis is the approved check's to judge ({@link #checkOne}).
+        task.setPcCheckedVersion(current.draftVersion());
+        tasks.save(task);
         return checked;
     }
 
@@ -570,7 +585,10 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         return seen.promises() == null ? Set.of() : Set.copyOf(seen.promises());
     }
 
-    /** One approved text checked; the server's answer, or null when nothing was sent. */
+    /**
+     * One approved text checked; the server's answer, or null when nothing was sent. A refusal is the caller's: it is
+     * not a check.
+     */
     private TaskSnapshot checkOne(UUID orgId, UUID storeId, String token, VendorReplyTask task, TaskSnapshot current) {
         Review review = reviews.findByIdAndOrgId(task.getReviewId(), orgId).orElse(null);
         VendorReviewRef ref = refs.findByReviewId(task.getReviewId()).orElse(null);
@@ -581,6 +599,12 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         }
         ReviewDraftRecheck.Result result = recheck.check(orgId, review,
                 VocPreviewSanitizer.redactFullBody(review.getBody()).text(), current.draftBody());
+        if (current.editedOnMobile() && !java.util.Objects.equals(current.pcRecheckVersion(), current.draftVersion())) {
+            // A phone version approved before any check, under a basis that has since moved: this is its first check,
+            // the one the delegate waits for. Passed frees it; a finding holds it on the server — nothing was seen.
+            return link.client().pcRecheck(token, current.id(), current.draftVersion(), result.passed(),
+                    result.codes(), result.passed() ? null : note(result));
+        }
         if (result.passed()) {
             return null;
         }
@@ -615,13 +639,8 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             note = new VendorServerClient.BasisNote(List.of(ReviewDraftRecheck.SOURCE_CHANGED), sources(result),
                     List.of(), List.of());
         }
-        try {
-            return link.client().checkApproved(token, current.id(), current.approvedVersion(), hold, note,
-                    "pc-check:" + current.id() + ":" + current.approvedVersion() + ":" + current.stateVersion());
-        } catch (VendorServerClient.TaskRefused e) {
-            log.warn("vendor reply task: approved check not recorded store={} code={}", storeId, e.code());
-            return null;
-        }
+        return link.client().checkApproved(token, current.id(), current.approvedVersion(), hold, note,
+                "pc-check:" + current.id() + ":" + current.approvedVersion() + ":" + current.stateVersion());
     }
 
     /** What the seller is shown about a finding: the server's note. */

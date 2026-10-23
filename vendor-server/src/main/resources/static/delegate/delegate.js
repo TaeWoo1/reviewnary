@@ -170,6 +170,8 @@
         t.stateVersion = r.json.stateVersion;
         t.mine = true;
         openTask(t);
+      } else if (r.status === 409 && r.json && r.json.error === "pc_check_pending") {
+        loadList("판매자 PC가 이 답글을 아직 검사하지 않았습니다. 검사가 끝나면 목록에 다시 나타납니다.", "warn-text");
       } else if (r.status !== 401) {
         loadList("다른 담당자가 먼저 맡았거나 판매자가 취소했습니다. 목록을 다시 불러왔습니다.", "warn-text");
       }

@@ -51,6 +51,11 @@ final class FakeVendorServer implements VendorServerClient {
     final List<Recheck> rechecks = new ArrayList<>();
     record ApprovedCheck(UUID taskId, int approvedVersion, boolean hold, BasisNote note, String commandId) {}
     final List<ApprovedCheck> approvedChecks = new ArrayList<>();
+    /** When set, the next PC check (or approved-text check) is refused with this code, as a server that said no. */
+    String refuseNextRecheck;
+    String refuseNextApprovedCheck;
+    /** Runs just before a PC check lands — the phone editing again while this PC was checking. */
+    Runnable beforeRecheck;
     private static final com.fasterxml.jackson.databind.ObjectMapper JSON =
             com.fasterxml.jackson.databind.json.JsonMapper.builder().findAndAddModules()
                     .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).build();
@@ -258,14 +263,36 @@ final class FakeVendorServer implements VendorServerClient {
     public TaskSnapshot pcRecheck(String installToken, UUID taskId, int draftVersion, boolean passed,
                                   List<String> codes, BasisNote note) {
         bearers.add(installToken);
-        rechecks.add(new Recheck(taskId, draftVersion, passed, List.copyOf(codes), note));
+        if (beforeRecheck != null) {
+            Runnable meanwhile = beforeRecheck;
+            beforeRecheck = null;
+            meanwhile.run();
+        }
+        if (refuseNextRecheck != null) {
+            String code = refuseNextRecheck;
+            refuseNextRecheck = null;
+            throw new TaskRefused(code);
+        }
         TaskSnapshot t = tasks.get(taskId);
+        if (t.draftVersion() != draftVersion) {
+            throw new TaskRefused("stale");
+        }
+        rechecks.add(new Recheck(taskId, draftVersion, passed, List.copyOf(codes), note));
+        // As the server: a phone version approved before its first check is held by a finding (2026-10-23).
+        boolean approved = t.state().equals("APPROVED") || t.state().equals("CLAIMED");
+        boolean hold = !passed && approved && t.editedOnMobile()
+                && !Integer.valueOf(draftVersion).equals(t.pcRecheckVersion());
+        String state = !hold ? t.state() : t.state().equals("APPROVED") ? "HELD" : "HOLD_REQUESTED";
         TaskSnapshot noted = note == null ? t : withNote(t, t.state(), 0, note);
-        tasks.put(taskId, new TaskSnapshot(t.id(), t.reviewId(), t.state(), t.stateVersion(), t.draftVersion(),
-                t.draftBody(), t.draftFingerprint(), t.approvedFingerprint(), t.editedOnMobile(), t.approvedVersion(),
-                t.draftBasis(), noted.basisNoteJson(), draftVersion,
-                passed ? "PASSED" : "FLAGGED:" + String.join(",", codes)));
-        return tasks.get(taskId);
+        TaskSnapshot next = new TaskSnapshot(t.id(), t.reviewId(), state, t.stateVersion() + (hold ? 1 : 0),
+                t.draftVersion(), t.draftBody(), t.draftFingerprint(), t.approvedFingerprint(), t.editedOnMobile(),
+                t.approvedVersion(), t.draftBasis(), noted.basisNoteJson(), draftVersion,
+                passed ? "PASSED" : "FLAGGED:" + String.join(",", codes));
+        tasks.put(taskId, next);
+        if (hold) {
+            changes.add(new TaskChange(changes.size() + 1, state, next));
+        }
+        return next;
     }
 
     /** As the server: an approved or claimed text is held (or its delegate asked to stop), or only noted. */
@@ -273,6 +300,11 @@ final class FakeVendorServer implements VendorServerClient {
     public TaskSnapshot checkApproved(String installToken, UUID taskId, int approvedVersion, boolean hold,
                                       BasisNote note, String commandId) {
         bearers.add(installToken);
+        if (refuseNextApprovedCheck != null) {
+            String code = refuseNextApprovedCheck;
+            refuseNextApprovedCheck = null;
+            throw new TaskRefused(code);
+        }
         approvedChecks.add(new ApprovedCheck(taskId, approvedVersion, hold, note, commandId));
         TaskSnapshot t = tasks.get(taskId);
         if (!t.state().equals("APPROVED") && !t.state().equals("CLAIMED")) {

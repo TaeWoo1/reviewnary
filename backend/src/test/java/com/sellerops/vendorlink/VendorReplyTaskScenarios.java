@@ -652,11 +652,124 @@ abstract class VendorReplyTaskScenarios {
 
         pull.pullFor(org);
 
-        assertThat(vendor.approvedChecks).singleElement().satisfies(c -> {
-            assertThat(c.hold()).isTrue();
-            assertThat(c.note().phrases()).containsExactly("고객님 탓");
-        });
+        assertThat(vendor.rechecks).as("its first check holds it on the server, in one step").singleElement()
+                .satisfies(r -> {
+                    assertThat(r.passed()).isFalse();
+                    assertThat(r.note().phrases()).containsExactly("고객님 탓");
+                });
+        assertThat(vendor.approvedChecks).isEmpty();
         assertThat(vendor.tasks.get(task).state()).isEqualTo("HELD");
+    }
+
+    /* ── a check that did not reach the server is not a check (2026-10-23 external review) ── */
+
+    @Test
+    void aPhoneEditCheckTheServerRefusedIsAskedAgainOnTheNextPull() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        UUID review = pulledReview("v1", "9100000330", "사이즈가 안 맞아요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "불편을 드려 죄송합니다.", 0);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        vendor.move(task, "AWAITING_APPROVAL", "불편을 드려 죄송합니다. 확인해 보겠습니다.", null, true);
+
+        vendor.refuseNextRecheck = "stale";
+        pull.pullFor(org);
+        assertThat(vendor.rechecks).isEmpty();
+        assertThat(vendor.tasks.get(task).pcRecheckVersion()).isNull();
+
+        pull.pullFor(org);
+        assertThat(vendor.rechecks).singleElement().satisfies(r -> assertThat(r.draftVersion()).isEqualTo(2));
+        pull.pullFor(org);
+        assertThat(vendor.rechecks).as("once recorded, once only").hasSize(1);
+    }
+
+    @Test
+    void aPhoneEditMadeAgainWhileThisPcCheckedIsCheckedAtItsNewVersion() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        UUID review = pulledReview("v1", "9100000331", "사이즈가 안 맞아요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "불편을 드려 죄송합니다.", 0);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        vendor.move(task, "AWAITING_APPROVAL", "첫 휴대폰 수정입니다.", null, true);
+        vendor.beforeRecheck = () -> vendor.move(task, "AWAITING_APPROVAL", "두 번째 휴대폰 수정입니다.", null, true);
+
+        pull.pullFor(org);
+        assertThat(vendor.rechecks).as("the check of the old words was refused as stale").isEmpty();
+
+        pull.pullFor(org);
+        assertThat(vendor.rechecks).singleElement().satisfies(r -> assertThat(r.draftVersion()).isEqualTo(3));
+    }
+
+    @Test
+    void anApprovedCheckTheServerRefusedIsAskedAgainOnTheNextPull() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        UUID review = pulledReview("v1", "9100000332", "배송이 늦었어요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "늦어서 죄송합니다. 고객님 탓이 아닙니다.", 0);
+        UUID task = vendorTaskOf(tasks.handOver(org, review));
+        ban("고객님 탓");
+
+        vendor.refuseNextApprovedCheck = "stale";
+        pull.pullFor(org);
+        assertThat(vendor.approvedChecks).isEmpty();
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("APPROVED");
+
+        pull.pullFor(org);
+        assertThat(vendor.approvedChecks).singleElement().satisfies(c -> assertThat(c.hold()).isTrue());
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("HELD");
+    }
+
+    @Test
+    void aSentBackCheckTheServerRefusedIsAskedAgainOnTheNextPull() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        var rule = exchangeRule();
+        UUID review = pulledReview("v1", "9100000335", "사이즈 교환 되나요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "수령 후 7일 이내라면 사이즈 교환을 도와드리겠습니다.", 0);
+        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        retire(rule.id());
+
+        vendor.refuseNextRecheck = "stale";
+        pull.pullFor(org);
+        assertThat(vendor.rechecks).isEmpty();
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("RECHECK_NEEDED");
+
+        pull.pullFor(org);
+        assertThat(vendor.rechecks).singleElement().satisfies(r -> assertThat(r.passed()).isFalse());
+    }
+
+    @Test
+    void phoneEditsApprovedWhileThisPcWasOffAreCheckedWhenItComesBackEvenUnderAMovedBasis() {
+        tasks.setDraftBasis(draftBasis, draftRecheck);
+        UUID clean = pulledReview("v1", "9100000333", "배송이 늦었어요");
+        UUID promising = pulledReview("v2", "9100000334", "사이즈가 안 맞아요");
+        needsReply(clean);
+        needsReply(promising);
+        drafts.save(org, clean, "SELLER:" + seller, "늦어서 죄송합니다.", 0);
+        drafts.save(org, promising, "SELLER:" + seller, "불편을 드려 죄송합니다.", 0);
+        UUID cleanTask = vendorTaskOf(tasks.requestApproval(org, clean));
+        UUID promisingTask = vendorTaskOf(tasks.requestApproval(org, promising));
+        // This PC is off: the seller edits and approves both on the phone, and the company rules change meanwhile.
+        String cleanText = "늦어서 정말 죄송합니다.";
+        String promisingText = "불편을 드려 죄송합니다. 사이즈 교환을 도와드리겠습니다.";
+        vendor.move(cleanTask, "AWAITING_APPROVAL", cleanText, null, true);
+        vendor.move(cleanTask, "APPROVED", cleanText, vendor.tasks.get(cleanTask).draftFingerprint(), false);
+        vendor.move(promisingTask, "AWAITING_APPROVAL", promisingText, null, true);
+        vendor.move(promisingTask, "APPROVED", promisingText, vendor.tasks.get(promisingTask).draftFingerprint(),
+                false);
+        companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.GENERAL_CS_FAQ, "공통 안내",
+                "문의는 평일 10시부터 17시까지 받습니다.", null), null, "합성 판매자");
+
+        pull.pullFor(org);
+
+        assertThat(vendor.tasks.get(cleanTask).pcRecheckVersion()).as("checked: the delegate may take it")
+                .isEqualTo(vendor.tasks.get(cleanTask).draftVersion());
+        assertThat(vendor.tasks.get(cleanTask).state()).isEqualTo("APPROVED");
+        assertThat(vendor.tasks.get(promisingTask).state()).as("the seller never saw this promise flagged")
+                .isEqualTo("HELD");
+        assertThat(vendor.rechecks).filteredOn(r -> r.taskId().equals(promisingTask)).singleElement()
+                .satisfies(r -> assertThat(r.note().promises()).containsExactly("교환"));
     }
 
     @Test

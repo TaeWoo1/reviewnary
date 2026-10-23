@@ -436,6 +436,91 @@ class ReplyTasksTest {
         assertThat(approve(promise).state()).as("a promise is the seller's to approve").isEqualTo(State.APPROVED);
     }
 
+    /* ── a phone version reaches no delegate before the PC has checked it (2026-10-23 external review) ── */
+
+    @Test
+    void aPhoneVersionApprovedBeforeThePcCheckWaitsForItAndThenGoesToTheDelegate() {
+        TaskView draft = submit("1", "초안 1");
+        TaskView edited = tasks.editDraft(draft.id(), 1, "휴대폰에서 고친 초안", true);
+        TaskView approved = approve(edited);
+        assertThat(approved.state()).as("the seller's approval is kept").isEqualTo(State.APPROVED);
+        assertThat(ReplyTasks.awaitingPcCheck(approved)).isTrue();
+        assertThat(tasks.forDelegate(me, State.APPROVED)).as("listed to no delegate yet").isEmpty();
+        assertThatThrownBy(() -> tasks.claim(approved.id(), me, approved.stateVersion()))
+                .isInstanceOfSatisfying(TaskException.class,
+                        e -> assertThat(e.failure()).isEqualTo(Failure.PC_CHECK_PENDING));
+
+        TaskView checked = tasks.recordPcRecheck(approved.id(), 2, true, List.of(), null);
+        assertThat(checked.state()).as("passed: nothing for the seller to press again").isEqualTo(State.APPROVED);
+        assertThat(ReplyTasks.awaitingPcCheck(checked)).isFalse();
+        assertThat(tasks.forDelegate(me, State.APPROVED)).extracting(ReplyTasks.DelegateTask::id)
+                .containsExactly(approved.id());
+        assertThat(tasks.claim(approved.id(), me, checked.stateVersion()).state()).isEqualTo(State.CLAIMED);
+        assertThat(tasks.preflight(approved.id(), me).clearToPost()).isTrue();
+
+        TaskView pcWritten = approve(submit("2", "PC에서 쓴 초안"));
+        assertThat(ReplyTasks.awaitingPcCheck(pcWritten)).as("the PC checked its own text before sending").isFalse();
+        assertThat(tasks.forDelegate(other, State.APPROVED)).extracting(ReplyTasks.DelegateTask::id)
+                .containsExactly(pcWritten.id());
+    }
+
+    @Test
+    void aFindingOnAPhoneVersionApprovedBeforeTheCheckHoldsItInTheSameStep() {
+        TaskView draft = submit("1", "초안 1");
+        TaskView approved = approve(tasks.editDraft(draft.id(), 1, PROMISING, true));
+        ReplyTasks.BasisNote note = new ReplyTasks.BasisNote(List.of("UNSUPPORTED_PROMISE"), List.of(),
+                List.of("교환"), List.of("세탁 후 수축이면 무료 교환해 드리겠습니다."));
+
+        TaskView held = tasks.recordPcRecheck(approved.id(), 2, false, List.of("UNSUPPORTED_PROMISE"), note);
+        assertThat(held.state()).as("the seller approved before this finding existed").isEqualTo(State.HELD);
+        assertThat(held.stateVersion()).isEqualTo(approved.stateVersion() + 1);
+        assertThat(held.pcRecheck()).isEqualTo("FLAGGED:UNSUPPORTED_PROMISE");
+        assertThat(held.basisNote()).isEqualTo(note);
+        assertThat(held.basisNoteVersion()).isEqualTo(2);
+        assertThat(tasks.forDelegate(me, State.APPROVED)).isEmpty();
+        assertThat(tasks.changes(store, 0, 100).changes()).extracting(ReplyTasks.Change::state).last()
+                .isEqualTo(State.HELD);
+        assertThatThrownBy(() -> tasks.recordPcRecheck(approved.id(), 2, false, List.of("UNSUPPORTED_PROMISE"), note))
+                .as("a held version is not checked again").isInstanceOfSatisfying(TaskException.class,
+                        e -> assertThat(e.failure()).isEqualTo(Failure.WRONG_STATE));
+
+        TaskView seen = submit("2", "초안 2");
+        TaskView flaggedFirst = tasks.editDraft(seen.id(), 1, PROMISING, true);
+        tasks.recordPcRecheck(flaggedFirst.id(), 2, false, List.of("UNSUPPORTED_PROMISE"), note);
+        TaskView approvedAnyway = approve(tasks.get(flaggedFirst.id()).orElseThrow());
+        assertThat(approvedAnyway.state()).as("a finding the seller saw before approving is their word")
+                .isEqualTo(State.APPROVED);
+        assertThat(tasks.forDelegate(me, State.APPROVED)).extracting(ReplyTasks.DelegateTask::id)
+                .containsExactly(approvedAnyway.id());
+    }
+
+    @Test
+    void aStaleCheckFromBeforeAnotherPhoneEditIsRefusedAndTheNewVersionStillWaits() {
+        TaskView draft = submit("1", "초안 1");
+        TaskView first = tasks.editDraft(draft.id(), 1, "첫 휴대폰 수정", true);
+        TaskView second = tasks.editDraft(first.id(), 2, "두 번째 휴대폰 수정", true);
+        assertThatThrownBy(() -> tasks.recordPcRecheck(draft.id(), 2, true, List.of(), null))
+                .as("the PC checked a version that is gone").isInstanceOfSatisfying(TaskException.class,
+                        e -> assertThat(e.failure()).isEqualTo(Failure.STALE));
+        TaskView approved = approve(second);
+        assertThat(tasks.forDelegate(me, State.APPROVED)).isEmpty();
+        tasks.recordPcRecheck(approved.id(), 3, true, List.of(), null);
+        assertThat(tasks.forDelegate(me, State.APPROVED)).hasSize(1);
+    }
+
+    @Test
+    void aClaimMadeBeforeTheRuleOnAnUncheckedPhoneVersionIsNotClearAndAFindingStopsTheDelegate() {
+        TaskView approved = approve(submit("1", PROMISING));
+        TaskView claimed = tasks.claim(approved.id(), me, approved.stateVersion());
+        // A row from before 2026-10-23: claimed while its phone version was still unchecked.
+        jdbc.sql("update reply_tasks set edited_on_mobile = true where id = ?").param(claimed.id()).update();
+        assertThat(tasks.preflight(claimed.id(), me).clearToPost()).isFalse();
+
+        TaskView stop = tasks.recordPcRecheck(claimed.id(), 1, false, List.of("UNSUPPORTED_PROMISE"), promiseNote());
+        assertThat(stop.state()).isEqualTo(State.HOLD_REQUESTED);
+        assertThat(tasks.preflight(claimed.id(), me).holdRequested()).isTrue();
+    }
+
     @Test
     void aSentBackDraftCarriesThePcsReasonUntilItsNextVersion() {
         TaskView waiting = submit("1", PROMISING);

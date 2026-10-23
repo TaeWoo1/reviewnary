@@ -94,10 +94,17 @@
     } catch (e) { return ""; }
   }
 
-  function chip(el, state) {
-    var s = STATE[state] || [state, "neutral"];
+  function chip(el, state, t) {
+    // An approved phone version waits for the PC's check before a delegate can take it (2026-10-23).
+    var s = state === "APPROVED" && t && pcPending(t) ? ["승인됨 · PC 검사 기다리는 중", "info"]
+      : STATE[state] || [state, "neutral"];
     el.textContent = s[0];
     el.className = "chip " + s[1];
+  }
+
+  /** The phone version the PC has not checked yet — the server's own rule (ReplyTasks.awaitingPcCheck). */
+  function pcPending(t) {
+    return !!t.editedOnMobile && t.pcRecheckVersion !== t.draftVersion;
   }
 
   function storeLabel(id) {
@@ -157,7 +164,7 @@
     left.appendChild(st);
     left.appendChild(meta);
     var state = document.createElement("span");
-    chip(state, t.state);
+    chip(state, t.state, t);
     head.appendChild(left);
     head.appendChild(state);
     var body = document.createElement("p");
@@ -270,7 +277,7 @@
   function renderTask() {
     var t = task;
     var rv = t.review || {};
-    chip($("task-state"), t.state);
+    chip($("task-state"), t.state, t);
     $("review-stars").textContent = stars(rv.rating);
     $("review-meta").textContent = [rv.productName || "", day(rv.writtenAt)].filter(Boolean).join(" · ");
     $("review-body").textContent = rv.body || "";
@@ -305,9 +312,9 @@
     // A phone edit skipped the PC's knowledge checks (grounds · banned phrases); the server only looks for contacts
     // and links. Until the PC has checked this exact version, say so rather than let the edit pass for a checked draft.
     var unchecked = "";
-    if (t.editedOnMobile && t.pcRecheckVersion !== t.draftVersion) {
-      unchecked = "휴대폰에서 고친 문장은 PC의 근거 · 금지 표현 검사를 거치지 않았습니다. 서버는 연락처 · 링크만 봅니다. "
-        + "내용을 직접 확인하고 승인하세요.";
+    if (pcPending(t)) {
+      unchecked = "휴대폰에서 고친 문장은 아직 PC의 근거 · 금지 표현 검사를 거치지 않았습니다. 지금 승인해도 검사가 끝난 뒤에 "
+        + "담당자에게 넘어가고, 검사에서 문제가 나오면 보류됩니다.";
     } else if (t.editedOnMobile && String(t.pcRecheck || "").indexOf("FLAGGED") === 0 && !note) {
       unchecked = "PC 검사에서 확인할 부분이 나왔습니다. PC에서 초안을 확인하세요.";
     }
@@ -333,6 +340,8 @@
     var stateNote = "";
     if (t.state === "RECHECK_NEEDED" && !note) {
       stateNote = "응대 기준이 바뀌어 이 초안은 승인할 수 없습니다. PC에서 초안을 확인하고 다시 보내 주세요.";
+    } else if (t.state === "APPROVED" && pcPending(t)) {
+      stateNote = "승인했습니다. 판매자 PC가 이 문장을 검사하면 담당자에게 넘어갑니다. PC가 꺼져 있으면 켜질 때까지 기다립니다.";
     } else if (t.state === "HOLD_REQUESTED") {
       stateNote = "담당자에게도 멈춤을 전했습니다. 등록 전인지 담당자가 확인하는 중입니다.";
     } else if (t.state === "CLAIMED") {

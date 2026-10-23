@@ -41,6 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * APPROVED ──PC: approved text conflicts with the current basis──▶ HELD ──new version──▶ AWAITING_APPROVAL · RECHECK_NEEDED
  * CLAIMED  ──same──▶ HOLD_REQUESTED ──report not posted · release──▶ HELD      (POSTED · UNKNOWN as reported)
+ *
+ * APPROVED, phone version the PC has not checked ──PC check passed──▶ (claimable) · ──PC check found something──▶ HELD
  * </pre>
  *
  * <ul>
@@ -54,6 +56,10 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li><b>The server judges no draft.</b> It carries the PC's provenance fingerprints and its knowledge-free
  *       {@link ReplyText#checks}; a policy change only sends unapproved drafts back for a recheck and only
  *       <i>suggests</i> withdrawing an approved one — the seller's decision is theirs.</li>
+ *   <li><b>A phone version reaches no delegate before the PC has checked it</b> (2026-10-23 external review). The
+ *       seller may approve it at once — the approval is kept — but it is not listed, claimed or cleared to post
+ *       until the PC's knowledge check of that exact version is recorded ({@link #awaitingPcCheck}); a finding then
+ *       holds it, since the seller approved without seeing it.</li>
  *   <li><b>{@code UNKNOWN} is never retried.</b> It stays open on its review until a delegate confirms what
  *       happened — or, when that delegate was suspended, an admin does ({@link #settleByOperator}).</li>
  * </ul>
@@ -96,7 +102,9 @@ public class ReplyTasks {
         /** The review was deleted when its retention ran out (§6); the server no longer holds anything to answer. */
         REVIEW_PURGED,
         /** The PC found a phrase the company never uses in this version; it is fixed before it is approved. */
-        FORBIDDEN_PHRASE
+        FORBIDDEN_PHRASE,
+        /** A phone version the PC has not checked yet: approved, but no delegate takes it until the check is in. */
+        PC_CHECK_PENDING
     }
 
     public static final class TaskException extends RuntimeException {
@@ -275,6 +283,18 @@ public class ReplyTasks {
 
     /** States whose approval is standing: the text is the seller's approved one. */
     static final Set<State> APPROVAL_STANDS = EnumSet.of(State.APPROVED, State.CLAIMED);
+    /**
+     * True while {@code task}'s current version was written on the phone and the PC has not yet recorded its check
+     * of that exact version. Until then no delegate lists, claims or is cleared to post it.
+     */
+    public static boolean awaitingPcCheck(TaskView task) {
+        return task.editedOnMobile() && !Integer.valueOf(task.draftVersion()).equals(task.pcRecheckVersion());
+    }
+
+    /** The same rule as {@link #awaitingPcCheck}, as SQL on {@code reply_tasks t}. */
+    static final String PC_CHECKED_SQL = "not (t.edited_on_mobile and (t.pc_recheck_version is null "
+            + "or t.pc_recheck_version <> t.draft_version))";
+
     /** States in which the PC may record its check of the current version. */
     static final Set<State> CHECKABLE = EnumSet.of(State.AWAITING_APPROVAL, State.RECHECK_NEEDED, State.APPROVED,
             State.CLAIMED);
@@ -307,8 +327,11 @@ public class ReplyTasks {
     /**
      * The PC's knowledge-based check of a version (typically one edited on the phone). A held version may carry
      * {@code note} — why, for the seller; a passed one may not. An approved or claimed version may be checked too,
-     * while its approval stands: the finding is recorded beside it and moves nothing — it is what the seller was
-     * shown when they approved, so a later basis change does not hold the same promise again (2026-10-23).
+     * while its approval stands. A phone version's first check is the one the delegate waits for ({@link
+     * #awaitingPcCheck}): passed,
+     * it frees the approval; a finding holds it in the same update — {@code APPROVED} to {@code HELD}, a legacy
+     * {@code CLAIMED} to {@code HOLD_REQUESTED} — because the seller approved before the finding existed and so never
+     * saw it (2026-10-23 external review). A version already checked is only recorded again, moving nothing.
      */
     @Transactional
     public TaskView recordPcRecheck(UUID taskId, int draftVersion, boolean passed, List<String> codes,
@@ -327,10 +350,20 @@ public class ReplyTasks {
         }
         String noteJson = note == null ? null : noteJson(note, task.draftBody());
         String result = passed ? "PASSED" : "FLAGGED:" + String.join(",", codes);
+        Instant now = clock.instant();
+        if (!passed && APPROVAL_STANDS.contains(task.state()) && awaitingPcCheck(task)) {
+            State to = task.state() == State.APPROVED ? State.HELD : State.HOLD_REQUESTED;
+            if (!transition(task, task.state(), to, ", pc_recheck_version = ?, pc_recheck = ?, basis_note = ?, "
+                    + "basis_note_version = ?", now, draftVersion, result, noteJson,
+                    noteJson == null ? null : draftVersion)) {
+                throw new TaskException(Failure.STALE);
+            }
+            return get(taskId).orElseThrow();
+        }
         int moved = jdbc.sql("update reply_tasks set pc_recheck_version = ?, pc_recheck = ?, basis_note = ?, "
                         + "basis_note_version = ?, updated_at = ? where id = ? and state_version = ?")
                 .params(draftVersion, result, noteJson, noteJson == null ? null : draftVersion,
-                        ts(clock.instant()), taskId, task.stateVersion())
+                        ts(now), taskId, task.stateVersion())
                 .update();
         if (moved != 1) {
             throw new TaskException(Failure.STALE);
@@ -482,7 +515,8 @@ public class ReplyTasks {
      */
     @Transactional(readOnly = true)
     public List<DelegateTask> forDelegate(UUID delegateId, State state) {
-        String own = state == State.APPROVED ? "" : " and t.claimed_by = ?";
+        // An approved phone version waits for the PC's check before any delegate sees it.
+        String own = state == State.APPROVED ? " and " + PC_CHECKED_SQL : " and t.claimed_by = ?";
         Object[] params = state == State.APPROVED ? new Object[] {delegateId, state.name()}
                 : new Object[] {delegateId, state.name(), delegateId};
         return jdbc.sql("select t.id, t.store_id, s.label, t.state, t.state_version, r.review_no, r.product_name, "
@@ -508,6 +542,9 @@ public class ReplyTasks {
         }
         if (task.stateVersion() != stateVersion) {
             throw new TaskException(Failure.STALE);
+        }
+        if (awaitingPcCheck(task)) {
+            throw new TaskException(Failure.PC_CHECK_PENDING);
         }
         Instant now = clock.instant();
         if (!transition(task, State.APPROVED, State.CLAIMED, ", claimed_by = ?, claimed_at = ?", now, delegateId,
@@ -544,7 +581,9 @@ public class ReplyTasks {
         boolean displayChanged = !Objects.equals(review.displayState(), displayedThen);
         boolean cancelRequested = task.state() == State.CANCEL_REQUESTED;
         boolean holdRequested = task.state() == State.HOLD_REQUESTED;
-        boolean clear = task.state() == State.CLAIMED && !changed && !displayChanged && !review.replied();
+        // A claim made before this rule existed may still name an unchecked phone version: not cleared either.
+        boolean clear = task.state() == State.CLAIMED && !changed && !displayChanged && !review.replied()
+                && !awaitingPcCheck(task);
         return new Preflight(task.id(), task.state(), task.draftBody(), task.approvedFingerprint(), changed,
                 displayChanged, review.replied(), cancelRequested, holdRequested,
                 holdRequested ? task.basisNote() : null, clear);
