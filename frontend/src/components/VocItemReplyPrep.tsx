@@ -889,7 +889,7 @@ export function VocItemReplyPrep({
             control when the row can NEVER carry the action (no ref); here the truth is
             "not while this review is 지켜보기" — a reason, and one the operator can reverse.
             The explanation is the '대응 필요로 기록된 리뷰만…' line above. */}
-        {(capabilities.canApprove || (!approved && draft != null)) && !laneHolds ? (
+        {(capabilities.canApprove || (!approved && draft != null)) && !laneHolds && delegation == null ? (
           <button
             type="button"
             aria-disabled={!approvable || working || unavailable}
@@ -1007,6 +1007,25 @@ export function VocItemReplyPrep({
           blocked={phraseBlock}
           onChanged={refresh}
         />
+      ) : null}
+
+      {/* The copy road, where the delegate's road stands: kept — it is the seller's own way to answer — but under the
+          one press, never above it (mockup ①, 2026-10-25). */}
+      {delegation != null && !approved && !laneHolds && (capabilities.canApprove || draft != null) ? (
+        <p className="flex flex-wrap items-center gap-1 text-xs text-muted">
+          직접 복사해 답할 때는
+          <button
+            type="button"
+            aria-disabled={!approvable || working || unavailable}
+            aria-busy={busy === "approving"}
+            onClick={() => void decide("APPROVED")}
+            className={`rounded px-1 py-0.5 font-semibold underline underline-offset-2 ${
+              approvable && !working ? "text-ink" : "text-muted opacity-40"
+            }`}
+          >
+            승인
+          </button>
+        </p>
       ) : null}
 
       {/* <b>사실은 그대로, 무게만 한 단계 아래로</b> (리뷰 canonical, 2026-10-06). 둘은 바로 위 두 컨트롤이
