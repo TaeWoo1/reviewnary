@@ -47,7 +47,7 @@ class OperationsInsightPeriodTest {
         return new ChannelMetricRow(code, nameKo,
                 ChannelDataState.OBSERVED_FRESH, revenue, revenue > 0 ? 1 : 0, true,
                 ChannelDataState.OBSERVED_FRESH, unanswered, unanswered, true, true,
-                ChannelDataState.OBSERVED_FRESH, 0, 0, true, true, true);
+                ChannelDataState.OBSERVED_FRESH, 0, 0, true, 0, true, true);
     }
 
     private OperationsInsight only(String key, List<OperationsInsight> found) {
@@ -102,7 +102,7 @@ class OperationsInsightPeriodTest {
         ChannelMetricRow blocked = new ChannelMetricRow("ESM", "G마켓/옥션",
                 ChannelDataState.BLOCKED, 0, 0, false,
                 ChannelDataState.BLOCKED, 0, 0, false, false,
-                ChannelDataState.BLOCKED, 0, 0, false, false, false);
+                ChannelDataState.BLOCKED, 0, 0, false, 0, false, false);
 
         OperationsInsight found = only("CHANNEL_NOT_REPORTING",
                 service.insights(ORG, metrics(List.of(blocked)), List.of()));

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { mergeHomeWork } from "./homeWork";
+import { mergeHomeWork, workBucket } from "./homeWork";
+import { WORK_STATE } from "./workState";
 import type { OperationsHome, OperatorVocItem, ReviewWorkView } from "./types";
 import type { CustomerOperationsHome } from "./customerOperationsTypes";
 
@@ -55,6 +56,20 @@ describe("mergeHomeWork — the review half, whole", () => {
     expect(byId["a-old"].safetyReading, "an older server's row reads as the stronger mark").toBeNull();
     expect(byId["r-burn"].safetyReading).toBe("OCCURRENCE");
     expect(byId["r-fear"].safetyReading).toBe("WORRY");
+  });
+
+  it("says where a reply that came back from the delegate stands, still under 승인할 일 (measured 2026-10-24)", () => {
+    const work = mergeHomeWork(null, null, null, NOW, {
+      ...reviewWork([], 0, [todo("r-held", "AWAITING_APPROVAL"), todo("r-failed", "AWAITING_APPROVAL"),
+        todo("r-phone", "AWAITING_APPROVAL"), todo("r-here", "AWAITING_APPROVAL")]),
+      delegatedStates: { "r-held": "HELD", "r-failed": "FAILED", "r-phone": "AWAITING_APPROVAL", "r-gone": "POSTED" },
+    });
+    const byId = Object.fromEntries(work.rows.map((r) => [r.subjectId, r]));
+    expect(WORK_STATE[byId["r-held"].state].text).toBe("승인 보류");
+    expect(WORK_STATE[byId["r-failed"].state].text).toBe("등록 못 함");
+    expect(WORK_STATE[byId["r-phone"].state].text).toBe("휴대폰 승인");
+    expect(WORK_STATE[byId["r-here"].state].text, "no lane state: the draft read stands").toBe("승인 대기");
+    expect(work.rows.map(workBucket)).toEqual(["approve", "approve", "approve", "approve"]);
   });
 
   it("lists every undecided 확인 필요 review, not the Home's three", () => {

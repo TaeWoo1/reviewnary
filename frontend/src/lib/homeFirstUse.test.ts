@@ -99,6 +99,9 @@ describe("the three-state rule, shared with agent-runtime's SellerReadiness", ()
     // The backlog is windowless: an org whose inquiries all predate the window still holds them.
     expect(homeFirstUseState([{ ...row("ZERO", "OBSERVED_FRESH", "NOT_SUPPORTED"), unansweredInquiries: 3 }]).kind)
       .toBe("WORKING");
+    // So are reviews: six from an export of last season, none in the window (measured 2026-10-24, seller-PC build).
+    expect(homeFirstUseState([{ ...row("ZERO", "ZERO", "OBSERVED_FRESHNESS_UNPROVEN"), reviewsHeld: 6 }]).kind)
+      .toBe("WORKING");
   });
 
   /**

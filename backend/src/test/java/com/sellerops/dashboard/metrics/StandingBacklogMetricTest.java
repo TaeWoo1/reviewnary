@@ -79,8 +79,23 @@ class StandingBacklogMetricTest {
         assertThat(kpi(metricsFor(21L), "unansweredInquiries").freshnessUnproven()).isTrue();
     }
 
-    /** One channel, nothing in the window, `held` inquiries waiting, freshness unproven. */
+    @Test
+    @DisplayName("지난 철 리뷰만 들여온 가게도 비어 있지 않다 — 기간 리뷰는 0, 들고 있는 리뷰는 6")
+    void reviewsHeldFromBeforeTheWindowAreStillHeld() {
+        OperationsMetricsResponse response = metricsFor(0L, 6L);
+
+        ChannelMetricRow row = response.channels().get(0);
+        assertThat(row.reviews()).isZero();
+        assertThat(row.reviewsHeld()).isEqualTo(6);
+        assertThat(kpi(response, "reviews").value()).as("the window figure is not borrowed").isZero();
+    }
+
     private static OperationsMetricsResponse metricsFor(long held) {
+        return metricsFor(held, 0L);
+    }
+
+    /** One channel, nothing in the window, `held` inquiries and `reviews` reviews waiting, freshness unproven. */
+    private static OperationsMetricsResponse metricsFor(long held, long reviews) {
         UUID channelId = UUID.randomUUID();
         Channel channel = new Channel();
         channel.setId(channelId);
@@ -98,6 +113,9 @@ class StandingBacklogMetricTest {
 
         // No rows in either window: the series repositories return nothing for this org.
         OperationsMetricsRepository metrics = mock(OperationsMetricsRepository.class);
+        if (reviews > 0) {
+            when(metrics.reviewsHeld(ORG)).thenReturn(List.<Object[]>of(new Object[] {channelId, reviews}));
+        }
 
         return new OperationsMetricsService(channels, coverage, metrics)
                 .metrics(ORG, List.of("CAFE24"), 7);

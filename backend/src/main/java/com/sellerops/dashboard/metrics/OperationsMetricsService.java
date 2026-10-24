@@ -134,6 +134,11 @@ public class OperationsMetricsService {
             }
         }
 
+        Map<UUID, Long> reviewsHeld = new HashMap<>();
+        for (Object[] row : metrics.reviewsHeld(orgId)) {
+            reviewsHeld.put((UUID) row[0], ((Number) row[1]).longValue());
+        }
+
         List<ChannelMetricRow> channelRows = new ArrayList<>();
         List<MetricExclusion> exclusions = new ArrayList<>();
         Totals totals = new Totals();
@@ -161,7 +166,7 @@ public class OperationsMetricsService {
             channelRows.add(new ChannelMetricRow(code, channel.getNameKo(),
                     orderState, order[1], order[0], countOrders,
                     inquiryState, inquiry[0], unansweredHeld, countInquiries, countUnansweredNow,
-                    reviewState, review[0], review[1], countReviews,
+                    reviewState, review[0], review[1], countReviews, reviewsHeld.getOrDefault(id, 0L),
                     // Two facts, neither of them a data state. `connected` is read from the coverage
                     // rows that already carry it rather than inferred from the three enums above —
                     // that inference held only while a row could not exist without a connection.

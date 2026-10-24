@@ -2497,6 +2497,12 @@ export interface ReviewWorkView {
   safetyReviewIds?: string[];
   /** Of `safetyReviewIds`, those that read as a worry (우려) rather than an occurrence (발생). */
   safetyWorryReviewIds?: string[];
+  /**
+   * The reviews in `committed` that went to the delegate and came back to the seller, by the lane's own state
+   * (`AWAITING_APPROVAL` on the phone · `RECHECK_NEEDED` · `HELD` · `FAILED`). A reply the delegate holds is not in
+   * `committed` at all. Absent from an older server, and then every row reads as its draft says.
+   */
+  delegatedStates?: Record<string, string>;
 }
 
 /** How a safety finding reads (owner decision 2026-10-23): it happened, or the customer fears it will. */
@@ -3251,6 +3257,11 @@ export interface ChannelMetricRow {
   reviews: number;
   negativeReviews: number;
   countedInReviews: boolean;
+  /**
+   * Every REAL review this org holds on the channel, with no window — `reviews` is the window's. Absent from an
+   * older server. It answers 「is this shop empty」 for a seller whose only reviews came from an older export.
+   */
+  reviewsHeld?: number;
   /**
    * Whether this org holds a CONNECTED account on the channel — the account fact, from the server.
    *

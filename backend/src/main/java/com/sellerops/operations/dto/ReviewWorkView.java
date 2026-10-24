@@ -2,6 +2,7 @@ package com.sellerops.operations.dto;
 
 import com.sellerops.attention.dto.OperatorVocItem;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -31,7 +32,13 @@ public record ReviewWorkView(
          */
         Set<UUID> safetyReviewIds,
         /** Of {@code safetyReviewIds}, those that read as a worry (우려) rather than an occurrence (발생). */
-        Set<UUID> safetyWorryReviewIds) {
+        Set<UUID> safetyWorryReviewIds,
+        /**
+         * The reviews in {@code committed} that went to the delegate lane and came back to the seller — the lane's own
+         * state ({@code AWAITING_APPROVAL} on the phone, {@code RECHECK_NEEDED}, {@code HELD}, {@code FAILED}). This
+         * PC's draft read cannot see the lane, so without it every one of them reads as a plain 승인 대기.
+         */
+        Map<UUID, String> delegatedStates) {
 
     /**
      * One account's share. {@code recentlyReported} is the same read's history — replies the seller reported

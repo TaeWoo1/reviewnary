@@ -1,6 +1,8 @@
 package com.sellerops.attention.reply;
 
 import com.sellerops.attention.reply.dto.ReviewReplyDelegationView;
+import java.util.Collection;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -26,4 +28,11 @@ public interface DelegatedReplyLane {
      * unapproved draft may move forward — the lane adds only its own state to it.
      */
     ReviewReplyDelegationView describe(UUID orgId, UUID reviewId, boolean draftReady);
+
+    /**
+     * The state {@link #describe} would show, for many reviews in one read: the newest task's state per review that
+     * has one, and nothing for the rest. Empty when this PC is not linked, by the same gate as {@link #describe} — a
+     * list must not say what the review's own panel does not.
+     */
+    Map<UUID, String> statesOf(UUID orgId, Collection<UUID> reviewIds);
 }

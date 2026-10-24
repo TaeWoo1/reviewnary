@@ -82,4 +82,18 @@ public interface OperationsMetricsRepository
     List<Object[]> reviewSeries(@Param("orgId") UUID orgId, @Param("from") LocalDate from,
                                 @Param("to") LocalDate to,
                                 @Param("syntheticVisible") boolean syntheticVisible);
+
+    /**
+     * {@code [channelId, held]} — every REAL review this org holds, whenever it was received. Not a window figure:
+     * it answers 「is this shop empty」, which a 7-day count cannot. A seller who brought in last spring's reviews
+     * from an export holds work this morning while every window on this screen reads zero. REAL only, like the
+     * standing inquiry backlog: seeded rows never make a shop look started.
+     */
+    @Query(value = """
+            select r.channel_id, count(*)
+            from reviews r
+            where r.org_id = :orgId and r.data_origin = 'REAL'
+            group by r.channel_id
+            """, nativeQuery = true)
+    List<Object[]> reviewsHeld(@Param("orgId") UUID orgId);
 }

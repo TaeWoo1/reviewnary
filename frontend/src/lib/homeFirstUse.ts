@@ -99,7 +99,7 @@ function typesOf(row: ChannelMetricRow): ReadonlyArray<{ type: "ORDER" | "INQUIR
  */
 function holdsAnything(rows: readonly ChannelMetricRow[]): boolean {
   return rows.some((row) =>
-    typesOf(row).some((t) => t.count > 0) || (row.unansweredInquiries ?? 0) > 0);
+    typesOf(row).some((t) => t.count > 0) || (row.unansweredInquiries ?? 0) > 0 || (row.reviewsHeld ?? 0) > 0);
 }
 
 export function homeFirstUseState(rows: readonly ChannelMetricRow[]): HomeFirstUseState {
@@ -132,7 +132,9 @@ export function homeFirstUseState(rows: readonly ChannelMetricRow[]): HomeFirstU
    * inquiries are all older than the window read as 「아직 아무것도 없습니다 · 첫 수집이 끝나면…」 while it
    * held three of them — the product telling a seller it had not started on data it already had. The two
    * measures are not added (they count different things); either one being non-zero is enough to say the
-   * shop is not empty.
+   * shop is not empty. Reviews have the same split (`reviewsHeld`): measured 2026-10-24 on the seller-PC build, six
+   * reviews from an export of last season left 오늘 saying 「첫 수집이 끝나면…」 and 확인할 일 0건 while 확인할 일
+   * held five of them.
    */
   const held = holdsAnything(rows);
   const observed = connectedRows.some((row) => typesOf(row).some((t) => OBSERVED.has(t.state)));

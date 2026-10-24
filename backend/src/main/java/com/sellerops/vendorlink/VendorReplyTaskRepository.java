@@ -12,6 +12,8 @@ public interface VendorReplyTaskRepository extends JpaRepository<VendorReplyTask
 
     Optional<VendorReplyTask> findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(UUID orgId, UUID reviewId);
 
+    List<VendorReplyTask> findByOrgIdAndReviewIdIn(UUID orgId, Collection<UUID> reviewIds);
+
     /** A store's tasks in one state — the sent-back ones this PC checks again. */
     List<VendorReplyTask> findByVendorStoreIdAndState(UUID vendorStoreId, String state);
 

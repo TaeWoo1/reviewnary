@@ -29,7 +29,11 @@ import com.sellerops.vendorlink.VendorServerClient.TaskChanges;
 import com.sellerops.vendorlink.VendorServerClient.TaskSnapshot;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -206,6 +210,21 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
                 draftReady && (state == null || SENDABLE.contains(state)),
                 state != null && CANCELLABLE.contains(state),
                 task.map(VendorReplyTask::getBasisNote).map(VendorReplyTaskService::note).orElse(null));
+    }
+
+    @Override
+    public Map<UUID, String> statesOf(UUID orgId, Collection<UUID> reviewIds) {
+        if (reviewIds.isEmpty() || link.installToken().isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, VendorReplyTask> newest = new HashMap<>();
+        for (VendorReplyTask task : tasks.findByOrgIdAndReviewIdIn(orgId, reviewIds)) {
+            newest.merge(task.getReviewId(), task,
+                    (a, b) -> Comparator.comparing(VendorReplyTask::getCreatedAt).compare(a, b) >= 0 ? a : b);
+        }
+        Map<UUID, String> states = new HashMap<>();
+        newest.forEach((reviewId, task) -> states.put(reviewId, task.getState()));
+        return states;
     }
 
     /** The stored note as the screen reads it; an unreadable one is shown as none rather than guessed at. */

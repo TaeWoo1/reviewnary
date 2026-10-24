@@ -34,7 +34,16 @@ export type WorkStateKey =
   /** 승인이 서 있다. 「완료」가 아니다 — the next step happens in the seller center. */
   | "APPROVED"
   /** 답변했다 — proven answered, by the channel or by a verified send. */
-  | "ANSWERED";
+  | "ANSWERED"
+  /**
+   * The four delegate-lane states that put a reply back in front of the seller — the lane's own state, from
+   * `ReviewWorkView.delegatedStates`. This PC's draft read cannot see the lane, so before these every one of them
+   * read 승인 대기, including a reply the delegate had already reported posted (measured 2026-10-24).
+   */
+  | "PHONE_APPROVAL"
+  | "DELEGATE_RECHECK"
+  | "DELEGATE_HELD"
+  | "DELEGATE_FAILED";
 
 export interface WorkStateWord {
   text: string;
@@ -76,6 +85,20 @@ export const WORK_STATE: Record<WorkStateKey, WorkStateWord> = {
   AWAITING_APPROVAL: { text: "승인 대기", tone: "info" },
   APPROVED: { text: "승인됨", tone: "neutral" },
   ANSWERED: { text: "답변함", tone: "neutral" },
+  // The review panel's words for the same states (`DelegatedReplyControls`), cut to fit the Home's 104px lead
+  // column — 「담당자 등록 못 함」 ran into the title beside it (measured 2026-10-24). The panel says the rest.
+  PHONE_APPROVAL: { text: "휴대폰 승인", tone: "info" },
+  DELEGATE_RECHECK: { text: "다시 확인", tone: "warn" },
+  DELEGATE_HELD: { text: "승인 보류", tone: "warn" },
+  DELEGATE_FAILED: { text: "등록 못 함", tone: "warn" },
+};
+
+/** A lane state from `ReviewWorkView.delegatedStates`, as a work word; anything else is not the lane's to say. */
+export const DELEGATED_WORK: Readonly<Record<string, WorkStateKey>> = {
+  AWAITING_APPROVAL: "PHONE_APPROVAL",
+  RECHECK_NEEDED: "DELEGATE_RECHECK",
+  HELD: "DELEGATE_HELD",
+  FAILED: "DELEGATE_FAILED",
 };
 
 export function workStateWord(key: WorkStateKey): WorkStateWord {

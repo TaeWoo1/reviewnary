@@ -36,6 +36,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -386,6 +387,21 @@ abstract class VendorReplyTaskScenarios {
         assertThat(replyLane.view(org, account, VocItemRef.forReview(review)).delegation().canCancel()).isFalse();
 
         assertThat(tasks.describe(org, UUID.randomUUID(), true)).as("not received from the server").isNull();
+    }
+
+    @Test
+    void aListAsksTheNewestTaskOfEachReviewAndHearsNothingOfAReviewWithoutOne() {
+        UUID resent = pulledReview("v1", "9100000061", "포장이 찢겨 왔어요");
+        UUID untouched = pulledReview("v2", "9100000062", "잘 받았습니다");
+        needsReply(resent);
+        drafts.save(org, resent, "SELLER:" + seller, "불편을 드려 죄송합니다.", 0);
+        tasks.handOver(org, resent);
+        assertThat(tasks.cancel(org, resent).state()).isEqualTo("CANCELLED");
+        tasks.handOver(org, resent);
+
+        assertThat(tasks.statesOf(org, List.of(resent, untouched)))
+                .as("the second hand-over, not the cancelled one").containsExactlyEntriesOf(Map.of(resent, "APPROVED"));
+        assertThat(tasks.statesOf(org, List.of())).isEmpty();
     }
 
     @Test

@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.sellerops.attention.OperatorAttentionService;
 import com.sellerops.attention.dto.OperatorReplyWorkView;
 import com.sellerops.attention.dto.OperatorVocItem;
+import com.sellerops.attention.reply.DelegatedReplyLane;
 import com.sellerops.auth.AuthPrincipal;
 import com.sellerops.channel.Channel;
 import com.sellerops.channel.ChannelRepository;
@@ -100,6 +101,57 @@ class ReviewWorkControllerTest {
         when(home.safetyAmong(org, java.util.Set.of(hurt, fine))).thenReturn(java.util.Set.of(hurt));
 
         assertThat(controller.reviewWork(principal()).safetyReviewIds()).containsExactly(hurt);
+    }
+
+    @Test
+    void aReplyTheDelegateHoldsLeavesTheList_oneBackWithTheSellerSaysWhy() {
+        Channel naver = channel("NAVER");
+        SellerAccount acc = account(naver);
+        UUID posted = UUID.randomUUID();
+        UUID held = UUID.randomUUID();
+        UUID failed = UUID.randomUUID();
+        UUID onPhone = UUID.randomUUID();
+        UUID cancelled = UUID.randomUUID();
+        UUID mine = UUID.randomUUID();
+        when(channels.findAll()).thenReturn(List.of(naver));
+        when(accounts.findAllByOrgId(org)).thenReturn(List.of(acc));
+        when(attention.replyWork(eq(org), eq(acc.getId()), anyInt(), anyInt())).thenReturn(new OperatorReplyWorkView(
+                acc.getId(), "네이버", null,
+                List.of(item(posted.toString(), "AWAITING_APPROVAL"), item(held.toString(), "AWAITING_APPROVAL"),
+                        item(failed.toString(), "AWAITING_APPROVAL"), item(onPhone.toString(), "AWAITING_APPROVAL"),
+                        item(cancelled.toString(), "AWAITING_APPROVAL"), item(mine.toString(), "DRAFT_NEEDED"),
+                        item("not-a-review", "DRAFT_NEEDED")),
+                List.of()));
+        when(home.undecidedAttention(eq(org), anyInt())).thenReturn(List.of());
+        DelegatedReplyLane lane = mock(DelegatedReplyLane.class);
+        when(lane.statesOf(eq(org), any())).thenReturn(java.util.Map.of(posted, "POSTED", held, "HELD",
+                failed, "FAILED", onPhone, "AWAITING_APPROVAL", cancelled, "CANCELLED"));
+        controller.setDelegatedReplyLane(lane);
+
+        ReviewWorkView view = controller.reviewWork(principal());
+
+        assertThat(view.committed().get(0).todo()).extracting(OperatorVocItem::reviewId).containsExactly(
+                held.toString(), failed.toString(), onPhone.toString(), cancelled.toString(), mine.toString(),
+                "not-a-review");
+        assertThat(view.delegatedStates()).containsExactlyInAnyOrderEntriesOf(
+                java.util.Map.of(held, "HELD", failed, "FAILED", onPhone, "AWAITING_APPROVAL"));
+    }
+
+    @Test
+    void withoutADelegateLane_everyRowStandsAsItsDraftReadSays() {
+        Channel naver = channel("NAVER");
+        SellerAccount acc = account(naver);
+        when(channels.findAll()).thenReturn(List.of(naver));
+        when(accounts.findAllByOrgId(org)).thenReturn(List.of(acc));
+        when(attention.replyWork(eq(org), eq(acc.getId()), anyInt(), anyInt())).thenReturn(new OperatorReplyWorkView(
+                acc.getId(), "네이버", null, List.of(item(UUID.randomUUID().toString(), "AWAITING_APPROVAL")),
+                List.of()));
+        when(home.undecidedAttention(eq(org), anyInt())).thenReturn(List.of());
+
+        ReviewWorkView view = controller.reviewWork(principal());
+
+        assertThat(view.committed().get(0).todo()).hasSize(1);
+        assertThat(view.delegatedStates()).isEmpty();
     }
 
     private AuthPrincipal principal() {

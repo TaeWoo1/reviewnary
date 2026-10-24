@@ -30,6 +30,10 @@ import com.sellerops.coverage.ChannelDataState;
  * channel is one the product offers to connect at all ({@code ProductChannels}); a data-bearing
  * channel outside that set appears here so its rows are not erased, and this flag is how a surface
  * avoids offering a connection that does not exist.
+ *
+ * <p><b>{@code reviewsHeld} is the review half of the same standing question</b> — every REAL review this
+ * org holds on the channel, with no window. {@code reviews} counts what arrived in the window, so a shop
+ * whose only reviews came in from an export of last season read as empty while its 확인할 일 held them.
  */
 public record ChannelMetricRow(String channelCode, String channelNameKo,
                                ChannelDataState orderState, long revenue, long orders,
@@ -39,6 +43,7 @@ public record ChannelMetricRow(String channelCode, String channelNameKo,
                                boolean countedInUnansweredNow,
                                ChannelDataState reviewState, long reviews, long negativeReviews,
                                boolean countedInReviews,
+                               long reviewsHeld,
                                boolean connected,
                                boolean connectable) {
 }

@@ -1,6 +1,6 @@
 import { REASON, channelShort, elapsedSource, reasonOfCase, sourceLabel, waitSince, type Reason } from "./copy/customerOps";
 import { onlySharedWord } from "./sharedWord";
-import type { WorkStateKey } from "./workState";
+import { DELEGATED_WORK, type WorkStateKey } from "./workState";
 import { subjectFallback } from "./customerOperations";
 import { isOldBacklog as isOldInquiryBacklog } from "./inquiryWorkspace";
 import type { CustomerOperationsDecisionRow, CustomerOperationsHome } from "./customerOperationsTypes";
@@ -246,6 +246,7 @@ export function mergeHomeWork(
 
   const safetyReviews = new Set(reviewWork?.safetyReviewIds ?? []);
   const worryReviews = new Set(reviewWork?.safetyWorryReviewIds ?? []);
+  const delegated = reviewWork?.delegatedStates ?? {};
   // The seller's own reply work before approval. A decided review is not in the undecided list above, so the two
   // never describe one review twice; a case about it still wins, by the same owner key.
   for (const account of reviewWork?.committed ?? []) {
@@ -254,13 +255,16 @@ export function mergeHomeWork(
       const owner = `/reviews/reply/${item.reviewId}`;
       if (byOwner.has(owner) || settled.has(owner)) continue;
       const awaiting = item.replyWorkState === "AWAITING_APPROVAL";
+      // A reply that went to the delegate and came back says where it came back from; it is still the seller's to
+      // approve or send again, so it stays under 승인할 일.
+      const lane = DELEGATED_WORK[delegated[item.reviewId] ?? ""];
       byOwner.set(owner, {
         key: `review:${item.reviewId}`,
-        reason: awaiting ? REASON.approve : REASON.draft,
+        reason: awaiting || lane ? REASON.approve : REASON.draft,
         // `replyWorkState` is the fact for both: a saved draft with no standing approval, or reply work
         // the seller committed to and has not written anything for yet. These two are deliberately not
         // merged with 답변 필요 — that one is about the customer, these are about the seller's own work.
-        state: awaiting ? "AWAITING_APPROVAL" : "DRAFT_NEEDED",
+        state: lane ?? (awaiting ? "AWAITING_APPROVAL" : "DRAFT_NEEDED"),
         source: sourceLabel(item.channelCode ?? account.channelCode, "REVIEW"),
         channel: channelShort(item.channelCode ?? account.channelCode),
         rating: item.rating ?? null,
