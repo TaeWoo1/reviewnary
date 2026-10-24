@@ -149,6 +149,27 @@ class ReplyTasksTest {
     }
 
     @Test
+    void aPcDraftWithItsBaseVersionNeverReplacesAPhoneEditItDidNotSee() {
+        assertThatThrownBy(() -> tasks.submitDraft(store, review("1"), "PC 초안", meta("1"), 1))
+                .as("the PC saw a task that is not there").isInstanceOfSatisfying(TaskException.class,
+                        e -> assertThat(e.failure()).isEqualTo(Failure.STALE));
+        TaskView v1 = tasks.submitDraft(store, review("1"), "PC 초안", meta("1"), 0);
+        assertThat(v1.draftVersion()).isEqualTo(1);
+        TaskView phone = tasks.editDraft(v1.id(), 1, "휴대폰에서 고친 초안", true);
+
+        assertThatThrownBy(() -> tasks.submitDraft(store, review("1"), "PC에서 고친 초안", meta("1"), 1))
+                .isInstanceOfSatisfying(TaskException.class, e -> assertThat(e.failure()).isEqualTo(Failure.STALE));
+        assertThat(tasks.get(v1.id()).orElseThrow().draftBody()).isEqualTo("휴대폰에서 고친 초안");
+        assertThat(tasks.submitDraft(store, review("1"), "휴대폰에서 고친 초안", meta("1"), 1).draftVersion())
+                .as("the text it already holds is no conflict").isEqualTo(2);
+        TaskView v3 = tasks.submitDraft(store, review("1"), "PC에서 고친 초안", meta("1"), phone.draftVersion());
+        assertThat(v3.draftVersion()).isEqualTo(3);
+        assertThat(v3.editedOnMobile()).isFalse();
+        assertThat(tasks.submitDraft(store, review("1"), "없는 기준", meta("1"), null).draftVersion())
+                .as("no base is the unconditional submit").isEqualTo(4);
+    }
+
+    @Test
     void aSentTwiceCommandHappensOnceAndACommandIdIsNotReused() {
         TaskView draft = submit("1", "초안");
         String command = command();

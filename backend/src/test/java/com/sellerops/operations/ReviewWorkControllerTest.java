@@ -134,7 +134,7 @@ class ReviewWorkControllerTest {
                 held.toString(), failed.toString(), onPhone.toString(), cancelled.toString(), mine.toString(),
                 "not-a-review");
         assertThat(view.delegatedStates()).containsExactlyInAnyOrderEntriesOf(
-                java.util.Map.of(held, "HELD", failed, "FAILED", onPhone, "AWAITING_APPROVAL"));
+                java.util.Map.of(held, "HELD", failed, "FAILED"));
     }
 
     @Test

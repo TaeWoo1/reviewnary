@@ -154,23 +154,34 @@ final class FakeVendorServer implements VendorServerClient {
     }
 
     @Override
-    public TaskSnapshot submitDraft(String installToken, UUID storeId, UUID reviewId, String body, DraftMeta meta) {
+    public TaskSnapshot submitDraft(String installToken, UUID storeId, UUID reviewId, String body, DraftMeta meta,
+                                    Integer baseVersion) {
         bearers.add(installToken);
         if (refuseNextSubmit != null) {
             String code = refuseNextSubmit;
             refuseNextSubmit = null;
             throw new TaskRefused(code);
         }
-        submitted.add(new Submitted(reviewId, body, meta));
         TaskSnapshot open = tasks.values().stream().filter(t -> t.reviewId().equals(reviewId)
                 && (t.state().equals("AWAITING_APPROVAL") || t.state().equals("RECHECK_NEEDED")
                         || t.state().equals("HELD"))).findFirst()
                 .orElse(null);
         String fp = com.sellerops.attention.reply.ReviewReplyFingerprint.of(body);
+        // As the server: a version the PC did not see (the phone's edit) is not replaced (2026-10-25).
+        if (baseVersion != null && (open == null ? baseVersion != 0
+                : open.draftVersion() != baseVersion && !open.draftFingerprint().equals(fp))) {
+            throw new TaskRefused("stale");
+        }
+        submitted.add(new Submitted(reviewId, body, meta));
         // As the server: a draft under other fingerprints than the last policy check lands sent back, and the same
         // text drafted again keeps the phone's mark.
         String lands = underPolicy(meta) ? "AWAITING_APPROVAL" : "RECHECK_NEEDED";
         String basis = meta.knowledgeFp() + "|" + meta.policyFp() + "|" + meta.voiceFp();
+        // As the server: the same text again, landing where it stands under the same fingerprints, changes nothing.
+        if (open != null && open.draftBody().equals(body) && open.state().equals(lands)
+                && basis.equals(basisOf(open.id()))) {
+            return open;
+        }
         TaskSnapshot next = open == null
                 ? new TaskSnapshot(UUID.randomUUID(), reviewId, lands, 0, 1, body, fp, null, false, null, basis, null)
                 : new TaskSnapshot(open.id(), reviewId, lands, open.stateVersion() + 1,

@@ -86,6 +86,24 @@ public class VendorReplyTask extends BaseEntity {
     @Column(name = "pc_checked_version")
     private Integer pcCheckedVersion;
 
+    /**
+     * The server draft version and this PC's draft version the two were last brought together at (2026-10-25: one
+     * draft, either device). A server version past the first is the phone's edit; a draft version past the second is
+     * this PC's. Null until the first time.
+     */
+    @Column(name = "mirrored_server_version")
+    private Integer mirroredServerVersion;
+
+    @Column(name = "mirrored_local_version")
+    private Integer mirroredLocalVersion;
+
+    /**
+     * This PC's draft version the phone's edit replaced when both devices changed the text at once — kept for the
+     * seller to choose between, never dropped. Null when there is nothing to choose.
+     */
+    @Column(name = "set_aside_local_version")
+    private Integer setAsideLocalVersion;
+
     /** When a delegate's POSTED was recorded in this PC's reply lane; null until then. */
     @Column(name = "outcome_recorded_at")
     private Instant outcomeRecordedAt;

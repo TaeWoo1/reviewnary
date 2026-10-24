@@ -3,58 +3,42 @@ import { api } from "../../lib/apiClient";
 import type { ReviewReplyDelegation, ReviewReplyDelegationNote } from "../../lib/types";
 import { Status, type StatusTone } from "../ui/Status";
 
-// The delegate lane on the review panel (docs/vendor_server_contract_v1.md §4; owner decisions D7 · D9 · D10,
-// mockup confirmed 2026-10-21). The seller sends a saved draft either straight to the delegate — approved here —
-// or to their phone for approval; the delegate pastes it into Seller Center by hand. Nothing on this panel posts
-// anything, and nothing is sent without the seller's press.
+// The delegate lane on the review panel (docs/vendor_server_contract_v1.md §4; owner decisions D9 · D10, and D7 as
+// revised 2026-10-25 with mockup ①: one draft, either device). The draft is already on the seller's phone; the one
+// press here, 「답글 등록 요청」, approves the version on screen and hands it to the delegate, who pastes it into
+// Seller Center by hand. Nothing on this panel posts anything, and nothing is approved without the seller's press.
 //
 // Every control is drawn from the SERVER's `delegation` (canSend / canCancel), never re-derived here.
 
 /** What each server state reads as. `POSTED` is the delegate's report, never a proven state — so never `good`. */
+// Words as mockup ③ fixed them (2026-10-25): short labels, no sentence a label can carry. An unapproved draft only
+// waiting on the phone is not a state the seller has to read — it has no chip.
 const STATE: Record<string, { word: string; tone: StatusTone; note?: string }> = {
-  AWAITING_APPROVAL: { word: "휴대폰 승인 기다리는 중", tone: "info" },
-  RECHECK_NEEDED: {
-    word: "다시 확인 필요",
-    tone: "warn",
-    note: "응대 기준이 바뀌어 이 초안은 승인할 수 없습니다. 초안을 확인한 뒤 다시 보내세요.",
-  },
-  APPROVED: { word: "승인됨 · 담당자 등록 대기", tone: "info" },
-  CLAIMED: { word: "담당자가 등록하는 중", tone: "info" },
-  CANCEL_REQUESTED: {
-    word: "취소 요청함 · 담당자 확인 중",
-    tone: "warn",
-    note: "담당자가 이미 등록을 시작해, 등록 전인지 담당자가 확인한 뒤 끝납니다.",
-  },
-  POSTED: {
-    word: "담당자가 등록함 · 확인 전",
-    tone: "neutral",
-    note: "담당자의 보고입니다. 판매자센터에서 직접 확인한 것은 아닙니다.",
-  },
-  UNKNOWN: {
-    word: "담당자가 확인 중",
-    tone: "warn",
-    note: "등록됐는지 담당자가 확실하지 않다고 보고했습니다. 확인될 때까지 다시 보낼 수 없습니다.",
-  },
-  FAILED: { word: "담당자가 등록하지 못함", tone: "neutral", note: "다시 보내거나 여기서 직접 처리할 수 있습니다." },
-  CANCELLED: { word: "요청 취소됨", tone: "neutral" },
+  RECHECK_NEEDED: { word: "다시 검사 중", tone: "neutral", note: "응대 기준이 바뀌어 이 초안을 다시 검사합니다." },
+  APPROVED: { word: "담당자 대기", tone: "info" },
+  CLAIMED: { word: "등록하는 중", tone: "info" },
+  CANCEL_REQUESTED: { word: "취소 요청 중", tone: "warn", note: "담당자 응답 대기" },
+  POSTED: { word: "등록함 · 네이버 확인 전", tone: "neutral", note: "담당자의 보고 · 다음 엑셀에서 네이버 확인" },
+  UNKNOWN: { word: "결과 확인 중", tone: "warn", note: "담당자가 등록 여부 확인 중 · 중복 방지로 다시 요청 불가" },
+  FAILED: { word: "등록 못 함", tone: "warn", note: "다시 요청하거나 직접 등록" },
+  CANCELLED: { word: "요청 취소함", tone: "neutral" },
   // Owner decision 2026-10-23: an approval is held only when its words lost their ground, and says why below.
-  HELD: { word: "승인 보류 · 다시 승인 필요", tone: "warn" },
-  HOLD_REQUESTED: {
-    word: "승인 보류 · 담당자 확인 중",
-    tone: "warn",
-    note: "담당자가 등록을 시작한 답글이라 담당자에게도 멈춤을 전했습니다. 담당자가 등록 전인지 확인하면 이 표시가 바뀝니다.",
-  },
-  INVALIDATED: {
-    word: "요청이 끝남",
-    tone: "neutral",
-    note: "리뷰가 바뀌었거나 이미 답글이 있어 더 진행하지 않습니다.",
-  },
+  HELD: { word: "고칠 곳", tone: "warn" },
+  HOLD_REQUESTED: { word: "멈춤 요청 중", tone: "warn", note: "담당자가 등록 전인지 확인하면 바뀝니다" },
+  INVALIDATED: { word: "요청 끝남", tone: "neutral", note: "리뷰가 바뀌었거나 이미 답글이 있음" },
 };
 
-/** States where a new press re-sends the open task's text rather than opening a new one. */
-const AWAITING = new Set(["AWAITING_APPROVAL", "RECHECK_NEEDED", "HELD"]);
+/** States in which a delegate holds the reply: this PC approves nothing else meanwhile. */
+const WITH_THE_DELEGATE = new Set(["APPROVED", "CLAIMED", "CANCEL_REQUESTED", "UNKNOWN", "HOLD_REQUESTED"]);
 
 const SOURCE_KIND: Record<string, string> = { PRODUCT_KNOWLEDGE: "상품 지식", ORG_POLICY: "운영 정책" };
+
+/** 「10:12」 — the hour and minute alone, for a request made today or lately. */
+function clock(iso: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "";
+  return at.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
 
 function when(iso: string | null): string {
   if (!iso) return "";
@@ -100,13 +84,13 @@ function WhyStopped({ state, note }: { state: string; note: ReviewReplyDelegatio
   const heading = advisory ? "확인할 점" : "왜 멈췄나요";
   const todo = promise
     ? advisory
-      ? "휴대폰에서 승인하기 전에 이 약속이 맞는지 확인하세요. 맞다면 응대 기준에 적어 두면 근거가 생깁니다."
+      ? "승인하기 전에 이 약속이 맞는지 보세요. 맞다면 응대 기준에 적어 두면 근거가 생깁니다."
       : state === "RECHECK_NEEDED"
         ? "문장을 고쳐 다시 보내세요. 그 약속이 맞다면 응대 기준에 먼저 적으세요."
         : "문장을 고쳐 다시 승인하세요. 그 약속이 맞다면 응대 기준에 먼저 적은 뒤 다시 승인하세요."
     : forbidden
       ? advisory
-        ? "휴대폰에서 승인하기 전에 그 표현을 빼고 고치세요."
+        ? "승인하기 전에 그 표현을 빼고 고치세요."
         : state === "RECHECK_NEEDED"
           ? "그 표현을 빼고 고쳐서 다시 보내세요."
           : "그 표현을 빼고 문장을 고쳐 다시 승인하세요."
@@ -147,7 +131,7 @@ function WhyStopped({ state, note }: { state: string; note: ReviewReplyDelegatio
   );
 }
 
-type Press = "handOver" | "phone" | "cancel";
+type Press = "handOver" | "cancel";
 
 /** The backend's own Korean sentence for a refusal (409 / 503), else a generic one. */
 function refusal(e: unknown): string {
@@ -161,6 +145,7 @@ function refusal(e: unknown): string {
 export function DelegatedReplyControls({
   delegation,
   reviewId,
+  baseVersion,
   dirty,
   disabled,
   blocked = null,
@@ -168,7 +153,9 @@ export function DelegatedReplyControls({
 }: {
   delegation: ReviewReplyDelegation;
   reviewId: string;
-  /** The editor holds text that is not saved — every press sends the SAVED draft, so it must wait. */
+  /** The saved draft version on screen — the one approved, and no other. */
+  baseVersion: number;
+  /** The editor holds text not saved yet (it saves itself after a pause) — the press waits for it. */
   dirty: boolean;
   /** The panel itself has a write in flight. */
   disabled: boolean;
@@ -197,20 +184,17 @@ export function DelegatedReplyControls({
     setBusy(which);
     setFailed(null);
     try {
-      if (which === "handOver") await api.handOverReviewReply(reviewId);
-      else if (which === "phone") await api.requestPhoneApproval(reviewId);
+      if (which === "handOver") await api.handOverReviewReply(reviewId, baseVersion);
       else await api.cancelReviewReplyDelegation(reviewId);
     } catch (e) {
       setFailed(refusal(e));
     } finally {
-      // Re-read either way: a refused hand-over may still have sent the draft for the phone.
+      // Re-read either way: a refused hand-over may have brought the phone's newer words to this screen.
       await onChanged();
       inFlight.current = false;
       setBusy(null);
     }
   }
-
-  const sendLabel = state != null && AWAITING.has(state) ? "고친 초안 다시 보내기" : "휴대폰으로 승인 요청";
 
   return (
     <div className="flex flex-col gap-2" data-testid="delegated-reply">
@@ -219,12 +203,12 @@ export function DelegatedReplyControls({
           <div className="flex flex-wrap items-center gap-2">
             {/* The panel itself is canvas; a neutral chip's tint is canvas too, so it carries a hairline. */}
             <Status tone={shown.tone} className={shown.tone === "neutral" ? "ring-1 ring-line" : ""}>
-              {shown.word}
+              {state === "HELD" && delegation.note
+                ? `${shown.word} ${Math.max(1, delegation.note.promises.length + (delegation.note.phrases?.length ?? 0))}`
+                : shown.word}
             </Status>
-            {delegation.editedOnMobile ? (
-              <Status tone="neutral" className="ring-1 ring-line">
-                휴대폰에서 고침
-              </Status>
+            {delegation.since != null && state != null && WITH_THE_DELEGATE.has(state) ? (
+              <span className="text-sm text-muted">{clock(delegation.since)} 요청</span>
             ) : null}
           </div>
           {shown.note != null && !(state === "RECHECK_NEEDED" && delegation.note) ? (
@@ -232,35 +216,28 @@ export function DelegatedReplyControls({
           ) : null}
         </div>
       ) : null}
-      {state != null && delegation.note ? <WhyStopped state={state} note={delegation.note} /> : null}
+      {state != null && delegation.note && (state !== "AWAITING_APPROVAL" || delegation.note.promises.length > 0) ? (
+        // Waiting, the only news is a promise without ground: the company's phrases are already marked in the editor.
+        <WhyStopped
+          state={state}
+          note={state === "AWAITING_APPROVAL" ? { ...delegation.note, phrases: [], codes: ["UNSUPPORTED_PROMISE"] } : delegation.note}
+        />
+      ) : null}
 
       {delegation.canSend || delegation.canCancel ? (
         <div className="flex flex-wrap items-center gap-2">
           {delegation.canSend ? (
-            <>
-              <button
-                type="button"
-                aria-disabled={!canSend || working}
-                aria-busy={busy === "handOver"}
-                onClick={() => void press("handOver")}
-                className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
-                  canSend && !working ? "bg-brand-700 text-white hover:bg-brand-800" : "bg-canvas text-muted opacity-40"
-                }`}
-              >
-                답글 등록 요청
-              </button>
-              <button
-                type="button"
-                aria-disabled={!canSend || working}
-                aria-busy={busy === "phone"}
-                onClick={() => void press("phone")}
-                className={`rounded-lg px-2.5 py-1 text-sm font-semibold ${
-                  canSend && !working ? "bg-white text-ink ring-1 ring-line" : "bg-canvas text-muted opacity-40"
-                }`}
-              >
-                {sendLabel}
-              </button>
-            </>
+            <button
+              type="button"
+              aria-disabled={!canSend || working}
+              aria-busy={busy === "handOver"}
+              onClick={() => void press("handOver")}
+              className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
+                canSend && !working ? "bg-brand-700 text-white hover:bg-brand-800" : "bg-canvas text-muted opacity-40"
+              }`}
+            >
+              답글 등록 요청
+            </button>
           ) : null}
           {delegation.canCancel ? (
             <button
@@ -279,35 +256,12 @@ export function DelegatedReplyControls({
       {delegation.canSend && !dirty && blocked != null ? (
         <p className="break-keep text-sm text-muted">{blocked}</p>
       ) : null}
-      {delegation.canSend && dirty ? (
-        <p className="text-sm text-muted">저장하지 않은 변경이 있습니다. 먼저 초안을 저장하세요.</p>
+      {delegation.canSend ? (
+        // What the press means, in the line under it (spec §10-2, 2026-10-25 exception) — and nothing it cannot keep.
+        <p className="text-xs leading-relaxed text-muted">이 문장 그대로 승인 · 담당자가 네이버에 등록</p>
       ) : null}
-      {delegation.canSend && state == null ? (
-        <p className="text-xs leading-relaxed text-muted">
-          「답글 등록 요청」을 누르면 이 문장 그대로 승인되고, 담당자가 판매자센터에 등록합니다. 휴대폰으로 보내면
-          휴대폰에서 승인한 뒤 담당자가 등록합니다. 누르기 전에는 아무것도 보내지 않습니다.
-        </p>
-      ) : null}
-      {state != null && !AWAITING.has(state) && !["FAILED", "CANCELLED", "INVALIDATED", "POSTED"].includes(state) ? (
-        <p className="text-xs leading-relaxed text-muted">
-          담당자에게 맡긴 동안에는 여기서 승인하거나 판매자센터 등록을 시작할 수 없습니다. 답글이 두 번 달리지 않게
-          하기 위해서입니다.
-        </p>
-      ) : null}
-      {state === "POSTED" ? (
-        <p className="text-xs leading-relaxed text-muted">
-          답글이 두 번 달리지 않도록, 채널에서 답글이 확인되기 전까지 여기서 다시 승인하거나 등록하지 않습니다.
-        </p>
-      ) : null}
-      {state != null && AWAITING.has(state) && state !== "HELD" ? (
-        <p className="text-xs leading-relaxed text-muted">
-          휴대폰에 보낸 동안에는 여기서 따로 승인할 수 없습니다. 여기서 「답글 등록 요청」을 누르면 휴대폰 승인 없이 바로 담당자에게 갑니다.
-        </p>
-      ) : null}
-      {state === "HELD" ? (
-        <p className="text-xs leading-relaxed text-muted">
-          초안을 고쳐 저장한 뒤 다시 보내면 새로 승인을 받습니다. 그전까지 담당자는 이 답글을 등록하지 않습니다.
-        </p>
+      {state != null && (WITH_THE_DELEGATE.has(state) || state === "POSTED") ? (
+        <p className="text-xs leading-relaxed text-muted">중복 방지로 여기서 따로 승인·등록하지 않음</p>
       ) : null}
       {failed != null ? (
         <p role="alert" className="text-sm text-bad">

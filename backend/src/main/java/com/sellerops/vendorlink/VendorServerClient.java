@@ -129,8 +129,13 @@ public interface VendorServerClient {
 
     record TaskChanges(List<TaskChange> changes, long cursor, boolean more) {}
 
-    /** Opens a task for the review, or makes this text its next version while it awaits approval. */
-    TaskSnapshot submitDraft(String installToken, UUID storeId, UUID reviewId, String body, DraftMeta meta);
+    /**
+     * Opens a task for the review, or makes this text its next version while it awaits approval. {@code baseVersion}
+     * is the open task's version this PC last saw ({@code 0}: none), and a version it did not see — the phone's edit —
+     * is refused {@code stale} instead of replaced (2026-10-25); null submits unconditionally.
+     */
+    TaskSnapshot submitDraft(String installToken, UUID storeId, UUID reviewId, String body, DraftMeta meta,
+                             Integer baseVersion);
 
     /** Approves the task's exact version and text (contract §4.3) — the seller pressing it on this PC. */
     TaskSnapshot approve(String installToken, UUID taskId, int version, String fingerprint, String commandId);

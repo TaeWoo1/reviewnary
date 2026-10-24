@@ -48,9 +48,11 @@ import org.springframework.stereotype.Service;
  * decisions of 2026-10-21:
  *
  * <ol>
- *   <li><b>Only a draft the seller sends leaves this PC.</b> {@link #requestApproval} is the seller pressing
- *       「휴대폰으로 승인 요청」 for a review's current draft, {@link #handOver} is 「답글 등록 요청」 — the
- *       same draft approved here and now (D9). Nothing is sent on its own.</li>
+ *   <li><b>One draft, either device</b> (owner decision 2026-10-25, revising D7). Every draft this PC writes for a
+ *       review received from the server goes up on its own ({@link #mirror}), so the phone's 「할 일」 shows what this
+ *       PC shows; an edit made on the phone comes back as this PC's draft; when both changed, the phone's words lead
+ *       and this PC's are set aside for the seller to choose, never dropped. Nothing is <i>approved</i> on its own:
+ *       {@link #handOver} is 「답글 등록 요청」 — the version on the seller's screen approved here and now (D9).</li>
  *   <li><b>Only the seller's own 'no reply' is told to the server.</b> {@link #reportNoReply} sends a review whose
  *       triage a person set to {@code NO_ACTION}; an automated judgement is never sent.</li>
  *   <li><b>The seller can take it back from here</b> ({@link #cancel}, D10) as well as from the phone.</li>
@@ -105,9 +107,19 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
     /** States in which the seller has approved the task's text — the approval happened, whatever came after. */
     static final Set<String> APPROVED_ONCE = Set.of("APPROVED", "CLAIMED", "CANCEL_REQUESTED", "POSTED", "FAILED",
             "UNKNOWN", "HELD", "HOLD_REQUESTED");
-    /** What the server still lets the seller cancel (§4.2). */
-    static final Set<String> CANCELLABLE = Set.of("AWAITING_APPROVAL", "RECHECK_NEEDED", "APPROVED", "CLAIMED", "HELD",
-            "HOLD_REQUESTED");
+    /**
+     * What 「요청 취소」 takes back (§4.2): a request the seller made. A draft only waiting on the phone was never
+     * requested (2026-10-25), so there is nothing to cancel.
+     */
+    static final Set<String> CANCELLABLE = Set.of("APPROVED", "CLAIMED", "HELD", "HOLD_REQUESTED");
+    /** Open tasks whose text either device may still change (2026-10-25). */
+    static final Set<String> REVISABLE = Set.of("AWAITING_APPROVAL", "RECHECK_NEEDED", "HELD");
+    /** Open tasks the seller has not approved: they wait on the phone and do not hold the review here. */
+    static final Set<String> UNAPPROVED = Set.of("AWAITING_APPROVAL", "RECHECK_NEEDED");
+    /** Who wrote a draft version this PC took over from the phone. */
+    static final String PHONE_ACTOR = "SELLER_PHONE";
+    /** How long a review's panel read waits before asking the server about it again. */
+    static final java.time.Duration ASK_AGAIN = java.time.Duration.ofSeconds(20);
     /** Approved texts this PC checks again when what replies are written from changed. */
     static final Set<String> STANDING_APPROVALS = Set.of("APPROVED", "CLAIMED");
     /** Phone-edited versions this PC checks under the basis they were written in, before or after approval. */
@@ -115,6 +127,19 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
     private static final com.fasterxml.jackson.databind.ObjectMapper NOTE_JSON =
             com.fasterxml.jackson.databind.json.JsonMapper.builder().findAndAddModules()
                     .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
+
+    /** Where {@link #draftSaved} runs: off the save's own thread, so a slow server never slows a save. */
+    private java.util.concurrent.Executor after = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "vendor-draft-mirror");
+        t.setDaemon(true);
+        return t;
+    });
+    private final Map<UUID, Instant> askedAt = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Tests run the follow-up inline, or not at all. */
+    void setAfter(java.util.concurrent.Executor after) {
+        this.after = after;
+    }
 
     /** What the seller's screen may know of a task. */
     public record TaskView(UUID reviewId, String state, int draftVersion, boolean editedOnMobile,
@@ -194,10 +219,73 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
      */
     @Override
     public boolean holds(UUID orgId, UUID reviewId) {
-        return tasks.existsByOrgIdAndReviewIdAndStateNotIn(orgId, reviewId, UNPOSTED_ENDS);
+        return tasks.existsByOrgIdAndReviewIdAndStateNotIn(orgId, reviewId, NOT_HOLDING);
     }
 
     private static final Set<String> UNPOSTED_ENDS = Set.of("FAILED", "CANCELLED", "INVALIDATED");
+    /** Ended unposted, or not yet approved: no reply is on its way. */
+    private static final Set<String> NOT_HOLDING = Set.of("FAILED", "CANCELLED", "INVALIDATED", "AWAITING_APPROVAL",
+            "RECHECK_NEEDED");
+
+    /**
+     * Approving here for the copy or guided road takes the review back from the phone: its unapproved task is
+     * cancelled first, so the phone cannot approve a second reply. Read first and refused when the phone approved it
+     * meanwhile. (Residual: an approval landing on the phone between that read and the cancel is cancelled with it;
+     * the seller sees it cancelled, never posted.)
+     */
+    @Override
+    public synchronized void yieldToApprovalHere(UUID orgId, UUID reviewId) {
+        Optional<VendorReplyTask> open = tasks.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(orgId, reviewId)
+                .filter(t -> UNAPPROVED.contains(t.getState()));
+        if (open.isEmpty()) {
+            return;
+        }
+        VendorReplyTask task = open.get();
+        String token = link.installToken()
+                .orElseThrow(() -> ApiException.conflict("공급자 서버에 연결된 PC가 아니라 휴대폰의 초안을 거둘 수 없습니다."));
+        try {
+            TaskSnapshot now = link.client().task(token, task.getVendorTaskId());
+            task = apply(orgId, reviewId, task.getVendorStoreId(), now);
+            if (!UNAPPROVED.contains(now.state())) {
+                throw ApiException.conflict("휴대폰에서 이미 승인한 답글입니다. 화면을 다시 불러와 확인하세요.");
+            }
+            TaskSnapshot cancelled = link.client().cancel(token, task.getVendorTaskId(),
+                    "pc-approve-here:" + task.getVendorTaskId() + ":" + task.getStateVersion());
+            apply(orgId, reviewId, task.getVendorStoreId(), cancelled);
+        } catch (VendorServerClient.TaskRefused e) {
+            throw ApiException.conflict("휴대폰의 초안을 거두지 못해 여기서 승인하지 않았습니다. 화면을 다시 불러오세요.");
+        } catch (VendorServerClient.Refused e) {
+            throw ApiException.conflict("공급자 서버가 이 PC의 요청을 받지 않았습니다. 연결 상태를 확인하세요.");
+        } catch (VendorServerClient.Unreachable e) {
+            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "공급자 서버에 연결하지 못해 휴대폰의 초안을 거둘 수 없습니다. 잠시 후 다시 시도하세요.");
+        }
+    }
+
+    /** A save here: the phone's copy follows soon, off this thread. */
+    @Override
+    public void draftSaved(UUID orgId, UUID reviewId) {
+        if (link.installToken().isEmpty() || refs.findByReviewId(reviewId).isEmpty()) {
+            return;
+        }
+        askedAt.put(reviewId, clock.instant());
+        followUp(orgId, reviewId);
+    }
+
+    private void followUp(UUID orgId, UUID reviewId) {
+        try {
+            after.execute(() -> {
+                try {
+                    mirrorReview(orgId, reviewId);
+                } catch (RuntimeException e) {
+                    // The next pull brings the two together again; a save never hears of this.
+                    log.warn("vendor reply task: draft not mirrored type={}", e.getClass().getSimpleName());
+                }
+            });
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            log.warn("vendor reply task: draft mirror not scheduled");
+        }
+    }
 
     @Override
     public ReviewReplyDelegationView describe(UUID orgId, UUID reviewId, boolean draftReady) {
@@ -206,10 +294,36 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         }
         Optional<VendorReplyTask> task = tasks.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(orgId, reviewId);
         String state = task.map(VendorReplyTask::getState).orElse(null);
+        // The seller is looking at this review: ask the server about it soon, so an edit on the phone shows here.
+        Instant now = clock.instant();
+        Instant last = askedAt.get(reviewId);
+        if (last == null || !now.isBefore(last.plus(ASK_AGAIN))) {
+            askedAt.put(reviewId, now);
+            followUp(orgId, reviewId);
+        }
+        Optional<ReviewReplyDraft> head = drafts.latest(reviewId);
+        boolean fromPhone = head.map(d -> PHONE_ACTOR.equals(d.getCreatedBy())).orElse(false);
+        ReviewReplyDelegationView.SetAside aside = task
+                .filter(t -> t.getSetAsideLocalVersion() != null && head.isPresent()
+                        && Integer.valueOf(head.get().getVersion()).equals(t.getMirroredLocalVersion()))
+                .flatMap(t -> drafts.version(reviewId, t.getSetAsideLocalVersion()))
+                .map(d -> new ReviewReplyDelegationView.SetAside(d.getVersion(), d.getBody(), d.getCreatedAt()))
+                .orElse(null);
         return new ReviewReplyDelegationView(state, task.map(VendorReplyTask::isEditedOnMobile).orElse(false),
                 draftReady && (state == null || SENDABLE.contains(state)),
                 state != null && CANCELLABLE.contains(state),
-                task.map(VendorReplyTask::getBasisNote).map(VendorReplyTaskService::note).orElse(null));
+                task.map(VendorReplyTask::getBasisNote).map(VendorReplyTaskService::note).orElse(null),
+                task.map(VendorReplyTask::getUpdatedAt).orElse(null), fromPhone, aside);
+    }
+
+    /** 「휴대폰 문장 쓰기」: the seller keeps the phone's words; this PC's set-aside text is no longer offered. */
+    public synchronized void dropSetAside(UUID orgId, UUID reviewId) {
+        tasks.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(orgId, reviewId)
+                .filter(t -> t.getSetAsideLocalVersion() != null)
+                .ifPresent(t -> {
+                    t.setSetAsideLocalVersion(null);
+                    tasks.save(t);
+                });
     }
 
     @Override
@@ -243,30 +357,50 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
     }
 
     /**
-     * The seller sends the review's current draft for approval on the phone. Pressing it again after editing here
-     * sends the new text as the task's next version while it still awaits approval.
+     * The review's current draft up to the server, as {@link #mirror} sends it, with every refusal said: a first
+     * draft opens a task, a newer one becomes its next version while it is unapproved or held.
      */
-    public synchronized TaskView requestApproval(UUID orgId, UUID reviewId) {
-        return TaskView.of(send(orgId, reviewId).task());
+    synchronized TaskView upload(UUID orgId, UUID reviewId) {
+        Sent sent = send(orgId, reviewId, true);
+        markMirrored(sent.task(), drafts.latest(reviewId).orElseThrow().getVersion(), true);
+        return TaskView.of(sent.task());
     }
 
     /**
-     * 「답글 등록 요청」 (D9): the seller, at this PC, sends the review's current draft and approves exactly
-     * that version and text in one press — the delegate can claim it without a trip to the phone. If the approval is
-     * refused after the draft went, the task stays awaiting approval on the phone and the seller is told so.
+     * 「답글 등록 요청」 (D9): the seller, at this PC, approves exactly the draft version on their screen ({@code
+     * baseVersion}) and it goes to the delegate in one press. A newer version here, or an edit on the phone this PC
+     * had not taken in, refuses it and shows the newer words instead (2026-10-25) — the seller approves what they
+     * read. If the approval is refused after the draft went, the task stays waiting and the seller is told so.
      */
-    public synchronized TaskView handOver(UUID orgId, UUID reviewId) {
-        Sent sent = send(orgId, reviewId);
+    public synchronized TaskView handOver(UUID orgId, UUID reviewId, int baseVersion) {
+        int head = drafts.latest(reviewId).map(ReviewReplyDraft::getVersion).orElse(0);
+        if (head != baseVersion) {
+            throw ApiException.conflict(CHANGED);
+        }
+        // An edit on the phone first: taken in as this PC's draft, and the seller is shown it instead of approving.
+        if (mirrorReview(orgId, reviewId) == Mirrored.TAKEN_IN) {
+            throw ApiException.conflict(CHANGED_ON_PHONE);
+        }
+        Sent sent;
+        try {
+            sent = send(orgId, reviewId, false);
+        } catch (ApiException e) {
+            if (CHANGED_ON_PHONE.equals(e.getMessage())) {
+                mirrorReview(orgId, reviewId);
+            }
+            throw e;
+        }
+        markMirrored(sent.task(), head, true);
         TaskSnapshot submitted = sent.snapshot();
         if (!"AWAITING_APPROVAL".equals(submitted.state())) {
-            throw ApiException.conflict("휴대폰으로 보낸 답글이 다시 확인을 기다리고 있습니다. 초안을 확인한 뒤 다시 보내세요.");
+            throw ApiException.conflict("응대 기준이 바뀌어 이 초안은 다시 확인해야 합니다. 초안을 확인한 뒤 다시 누르세요.");
         }
         TaskSnapshot approved;
         try {
             approved = link.client().approve(sent.token(), submitted.id(), submitted.draftVersion(),
                     submitted.draftFingerprint(), "pc-approve:" + submitted.id() + ":" + submitted.draftVersion());
         } catch (VendorServerClient.TaskRefused e) {
-            throw ApiException.conflict("답글은 보냈지만 승인하지 못했습니다. 휴대폰에서 승인하거나 다시 시도하세요.");
+            throw ApiException.conflict("답글은 올렸지만 승인하지 못했습니다. 다시 누르거나 휴대폰에서 승인하세요.");
         } catch (VendorServerClient.Refused e) {
             throw ApiException.conflict("공급자 서버가 이 PC의 요청을 받지 않았습니다. 연결 상태를 확인하세요.");
         } catch (VendorServerClient.Unreachable e) {
@@ -299,8 +433,15 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
 
     private record Sent(VendorStoreBinding binding, String token, TaskSnapshot snapshot, VendorReplyTask task) {}
 
-    /** The checks both presses share, then the draft submitted; the server's answer is copied here. */
-    private Sent send(UUID orgId, UUID reviewId) {
+    static final String CHANGED = "문장이 바뀌어 승인하지 않았습니다. 바뀐 문장을 보고 다시 누르세요.";
+    static final String CHANGED_ON_PHONE = "휴대폰에서 문장이 바뀌어 승인하지 않았습니다. 바뀐 문장을 보고 다시 누르세요.";
+
+    /**
+     * The checks every send shares, then the draft submitted under the version this PC last saw; the server's answer
+     * is copied here. {@code mirroring}: a draft with a company ban still goes up, marked by this PC's check so the
+     * phone cannot approve it either — the phone must not keep an older text the seller has since rewritten.
+     */
+    private Sent send(UUID orgId, UUID reviewId, boolean mirroring) {
         Review review = reviews.findByIdAndOrgId(reviewId, orgId)
                 .orElseThrow(() -> ApiException.notFound("해당 리뷰를 찾을 수 없습니다."));
         VendorReviewRef ref = refs.findByReviewId(reviewId)
@@ -332,7 +473,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
                 .orElseThrow(() -> ApiException.conflict("보낼 답글 초안이 없습니다. 먼저 초안을 저장하세요."));
         // The same gate as approving here (2026-10-23): a banned phrase never leaves for the phone or the delegate.
         java.util.List<String> banned = styleGuard == null ? List.of() : styleGuard.forbiddenIn(draft.getBody(), orgId);
-        if (!banned.isEmpty()) {
+        if (!banned.isEmpty() && !mirroring) {
             throw ApiException.conflict("회사가 쓰지 않기로 한 표현이 있어 보낼 수 없습니다: "
                     + String.join(" · ", banned.stream().map(p -> "「" + p + "」").toList()) + ". 문장을 고친 뒤 보내세요.");
         }
@@ -343,9 +484,12 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             // The seller is looking at this draft and pressing send: it goes under what drafts are written from now,
             // reported first if that changed, so it does not land sent back.
             Fingerprints now = reportBasis(binding, token);
+            int seen = latest.filter(t -> REVISABLE.contains(t.getState())).map(VendorReplyTask::getDraftVersion)
+                    .orElse(0);
             snapshot = link.client().submitDraft(token, binding.getVendorStoreId(), ref.getVendorReviewId(),
                     draft.getBody(), new DraftMeta(ref.getBodyFingerprint(), draft.getCreatedAt(), now.knowledge(),
-                            now.policy(), now.voice()));
+                            now.policy(), now.voice()), seen);
+            snapshot = checkSent(orgId, review, token, snapshot);
         } catch (VendorServerClient.TaskRefused e) {
             throw ApiException.conflict(refusal(e.code()));
         } catch (VendorServerClient.Refused e) {
@@ -354,6 +498,138 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "공급자 서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.");
         }
         return new Sent(binding, token, snapshot, apply(orgId, reviewId, binding.getVendorStoreId(), snapshot));
+    }
+
+    /**
+     * This PC's check of a version it just sent: a finding is recorded beside it on the server — the phone shows what
+     * to fix, and a company ban keeps the phone from approving it (the server honours the finding). A version written
+     * here with nothing found is recorded as nothing; the phone reads an unmarked PC version as passed. Without a
+     * check here, or when the server refuses the record, the version goes up unmarked as before.
+     */
+    private TaskSnapshot checkSent(UUID orgId, Review review, String token, TaskSnapshot sent) {
+        if (!REVISABLE.contains(sent.state()) || Integer.valueOf(sent.draftVersion()).equals(sent.pcRecheckVersion())) {
+            return sent;
+        }
+        VendorServerClient.BasisNote finding;
+        if (recheck != null) {
+            ReviewDraftRecheck.Result result = recheck.check(orgId, review,
+                    VocPreviewSanitizer.redactFullBody(review.getBody()).text(), sent.draftBody());
+            finding = result.passed() ? null : note(result);
+        } else {
+            // No knowledge check wired here: the company's bans are still this PC's to enforce.
+            List<String> banned = styleGuard == null ? List.of() : styleGuard.forbiddenIn(sent.draftBody(), orgId);
+            finding = banned.isEmpty() ? null : new VendorServerClient.BasisNote(
+                    List.of(ReviewDraftRecheck.FORBIDDEN_PHRASE), List.of(), List.of(),
+                    ReviewDraftRecheck.sentencesWith(ReviewReplyValidation.normalize(sent.draftBody()), banned), banned);
+        }
+        if (finding == null) {
+            return sent;
+        }
+        try {
+            return link.client().pcRecheck(token, sent.id(), sent.draftVersion(), false, finding.codes(), finding);
+        } catch (VendorServerClient.TaskRefused e) {
+            log.warn("vendor reply task: sent draft check not recorded code={}", e.code());
+            return sent;
+        }
+    }
+
+    /** How one review's two copies were brought together. */
+    enum Mirrored { NOTHING, SENT, TAKEN_IN }
+
+    /**
+     * <b>One draft, either device</b> (owner decision 2026-10-25). Each of the store's reviews with a draft for a
+     * reply: a draft written here goes up; an edit on the phone becomes this PC's draft; when both changed since they
+     * were last together, the phone's words lead and this PC's version is set aside for the seller. Approved, posted
+     * or ended tasks are never touched — and a review the seller withdrew from the phone is not sent again on its
+     * own. Runs after {@link #sync}. Returns how many reviews moved.
+     */
+    synchronized int mirror(VendorStoreBinding binding, String token) {
+        int moved = 0;
+        for (VendorReviewRef ref : refs.draftedForReply(binding.getVendorStoreId())) {
+            try {
+                moved += mirrorOne(binding, token, ref) == Mirrored.NOTHING ? 0 : 1;
+            } catch (ApiException | VendorServerClient.TaskRefused e) {
+                // This review only (changed under the server, purged, banned on approval …); the next pull asks again.
+                log.warn("vendor reply task: draft not mirrored store={} type={}", binding.getVendorStoreId(),
+                        e.getClass().getSimpleName());
+            }
+        }
+        return moved;
+    }
+
+    /** One review brought together now — after a save here, a hand-over, or a seller opening it. */
+    synchronized Mirrored mirrorReview(UUID orgId, UUID reviewId) {
+        Optional<String> token = link.installToken();
+        VendorReviewRef ref = refs.findByReviewId(reviewId).orElse(null);
+        VendorStoreBinding binding = ref == null ? null : bindings.findByVendorStoreId(ref.getVendorStoreId())
+                .filter(b -> orgId.equals(b.getOrgId())).orElse(null);
+        if (token.isEmpty() || binding == null) {
+            return Mirrored.NOTHING;
+        }
+        sync(binding, token.get());
+        return mirrorOne(binding, token.get(), ref);
+    }
+
+    private Mirrored mirrorOne(VendorStoreBinding binding, String token, VendorReviewRef ref) {
+        UUID orgId = binding.getOrgId();
+        UUID reviewId = ref.getReviewId();
+        Review review = reviews.findByIdAndOrgId(reviewId, orgId).orElse(null);
+        ReviewReplyDraft head = drafts.latest(reviewId).orElse(null);
+        if (review == null || head == null || review.getReplyState() == ReviewReplyState.ANSWERED
+                || triages.findByOrgIdAndReviewId(orgId, reviewId).map(ReviewTriage::getDisposition).orElse(null)
+                        != TriageDisposition.RESPONSE_NEEDED
+                || approvals.current(orgId, reviewId).filter(a -> a.getState() == ReviewReplyApprovalState.APPROVED)
+                        .isPresent()
+                || !ReviewBodyFingerprint.of(review.getBody()).equals(ref.getBodyFingerprint())) {
+            return Mirrored.NOTHING;
+        }
+        VendorReplyTask task = tasks.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(orgId, reviewId).orElse(null);
+        if (task == null) {
+            markMirrored(send(orgId, reviewId, true).task(), head.getVersion(), true);
+            return Mirrored.SENT;
+        }
+        if (!REVISABLE.contains(task.getState())) {
+            return Mirrored.NOTHING;
+        }
+        if (task.getDraftFingerprint().equals(head.getContentFingerprint())) {
+            if (!Integer.valueOf(task.getDraftVersion()).equals(task.getMirroredServerVersion())
+                    || !Integer.valueOf(head.getVersion()).equals(task.getMirroredLocalVersion())) {
+                markMirrored(task, head.getVersion(), false);
+            }
+            return Mirrored.NOTHING;
+        }
+        // Before the first time (a task sent before 2026-10-25) the phone's mark says which side wrote last.
+        boolean phone = task.getMirroredServerVersion() == null ? task.isEditedOnMobile()
+                : task.getDraftVersion() != task.getMirroredServerVersion();
+        boolean here = task.getMirroredLocalVersion() == null ? !task.isEditedOnMobile()
+                : head.getVersion() != task.getMirroredLocalVersion();
+        if (!phone) {
+            markMirrored(send(orgId, reviewId, true).task(), head.getVersion(), true);
+            return Mirrored.SENT;
+        }
+        TaskSnapshot current = link.client().task(token, task.getVendorTaskId());
+        task = apply(orgId, reviewId, binding.getVendorStoreId(), current);
+        if (!REVISABLE.contains(current.state())) {
+            return Mirrored.NOTHING;
+        }
+        // The phone's words become this PC's draft — a person's sentence; a version written here meanwhile is kept
+        // aside for the seller to choose, not overwritten in silence.
+        drafts.saveAs(orgId, reviewId, PHONE_ACTOR, current.draftBody(), head.getVersion(),
+                ReviewReplyDraftService.Provenance.seller());
+        int taken = drafts.latest(reviewId).orElseThrow().getVersion();
+        task.setSetAsideLocalVersion(here ? Integer.valueOf(head.getVersion()) : null);
+        markMirrored(task, taken, false);
+        return Mirrored.TAKEN_IN;
+    }
+
+    /** The two copies are together at the task's current server version and this PC's draft {@code localVersion}. */
+    private void markMirrored(VendorReplyTask task, int localVersion, boolean clearSetAside) {
+        task.setMirroredServerVersion(task.getDraftVersion());
+        task.setMirroredLocalVersion(localVersion);
+        if (clearSetAside) {
+            task.setSetAsideLocalVersion(null);
+        }
+        tasks.save(task);
     }
 
     /** Copies the store's task changes since the last sync. Returns how many were applied. */
@@ -456,7 +732,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
                     if (result.passed()) {
                         after = link.client().submitDraft(token, storeId, ref.getVendorReviewId(),
                                 current.draftBody(), new DraftMeta(ref.getBodyFingerprint(), clock.instant(),
-                                        now.knowledge(), now.policy(), now.voice()));
+                                        now.knowledge(), now.policy(), now.voice()), current.draftVersion());
                         if (after.editedOnMobile() && "AWAITING_APPROVAL".equals(after.state())) {
                             after = link.client().pcRecheck(token, after.id(), after.draftVersion(), true, List.of(),
                                     null);
@@ -790,6 +1066,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             case "already_replied" -> "채널에 이미 답글이 등록된 리뷰입니다.";
             case "already_posted" -> "이 리뷰에는 이미 담당자가 답글을 등록했습니다.";
             case "invalid_body" -> "답글 내용을 보낼 수 없습니다. 길이와 내용을 확인하세요.";
+            case "stale" -> CHANGED_ON_PHONE;
             // The server deleted it when its retention ended (contract §6): nothing there to hand over any more.
             case "review_purged" -> "서버 보관 기간이 끝나 정리된 리뷰라 담당자에게 맡길 수 없습니다. 판매자센터에서 직접 답글을 다세요.";
             default -> "공급자 서버가 이 요청을 받지 않았습니다.";

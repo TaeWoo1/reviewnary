@@ -14,7 +14,7 @@ vi.mock("../lib/apiClient", () => ({
     saveReviewReplyDraft: vi.fn(),
     decideReviewReplyApproval: vi.fn(),
     handOverReviewReply: vi.fn(),
-    requestPhoneApproval: vi.fn(),
+    dropReplySetAside: vi.fn(),
     cancelReviewReplyDelegation: vi.fn(),
   },
 }));
@@ -106,14 +106,14 @@ describe("VocItemReplyPrep · 걸린 표현", () => {
     expect(editor.value.slice(editor.selectionStart, editor.selectionEnd)).toBe("고객님 탓");
   });
 
-  it("keeps the delegate's two presses shut for a ban and says why once, beneath them", async () => {
+  it("keeps the delegate's press shut for a ban and says why once, beneath it", async () => {
     vi.mocked(api.getReviewReplyPrep).mockResolvedValue(
       prepView(BODY, FINDINGS, { taskState: null, editedOnMobile: false, canSend: true, canCancel: false }));
     mount();
 
     const handOver = await screen.findByRole("button", { name: "답글 등록 요청" });
     expect(handOver.getAttribute("aria-disabled")).toBe("true");
-    expect(screen.getByRole("button", { name: "휴대폰으로 승인 요청" }).getAttribute("aria-disabled")).toBe("true");
+    expect(screen.getByTestId("draft-status").textContent).toBe("고칠 곳 1");
     await userEvent.click(handOver);
     expect(api.handOverReviewReply).not.toHaveBeenCalled();
     expect(screen.getAllByText(/을 고치면 승인할 수 있어요/)).toHaveLength(1);

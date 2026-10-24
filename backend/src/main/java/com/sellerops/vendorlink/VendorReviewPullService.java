@@ -403,7 +403,8 @@ public class VendorReviewPullService {
     /**
      * The store's reply tasks: what this PC's drafts are now written under first (so a change sends waiting drafts
      * back in the same pass), then the server's changes, then the sent-back ones checked again, then phone edits checked
-     * under the basis they were written in, then the approved ones drafted under other fingerprints (2026-10-23).
+     * under the basis they were written in, then the approved ones drafted under other fingerprints (2026-10-23), then
+     * the drafts themselves brought together with the phone's (2026-10-25).
      * Returns the changes applied.
      */
     private int followReplies(VendorStoreBinding binding, String token) {
@@ -415,6 +416,8 @@ public class VendorReviewPullService {
         replyTasks.recheckSentBack(binding, token);
         replyTasks.checkPhoneEdits(binding, token);
         replyTasks.recheckApproved(binding, token);
+        // Last: this PC's drafts up and the phone's edits in, against the task copies just brought up to date.
+        replyTasks.mirror(binding, token);
         return applied;
     }
 

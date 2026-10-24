@@ -223,6 +223,17 @@ public class ReplyTasks {
      */
     @Transactional
     public TaskView submitDraft(UUID storeId, UUID reviewId, String rawBody, Meta meta) {
+        return submitDraft(storeId, reviewId, rawBody, meta, null);
+    }
+
+    /**
+     * {@link #submitDraft(UUID, UUID, String, Meta)} that refuses to replace a version the PC never saw (2026-10-25:
+     * every PC draft is mirrored to the phone, so the phone's edit may be newer). {@code baseVersion} is the open task's
+     * version the PC last saw, {@code 0} when it saw none; a mismatch is {@code stale} unless the text is already the
+     * current one. Null is the unconditional submit.
+     */
+    @Transactional
+    public TaskView submitDraft(UUID storeId, UUID reviewId, String rawBody, Meta meta, Integer baseVersion) {
         String body = body(rawBody);
         validate(meta);
         Optional<ReviewState> review = jdbc.sql("select body_fingerprint, replied, display_state from store_reviews "
@@ -245,6 +256,10 @@ public class ReplyTasks {
                 ? State.AWAITING_APPROVAL : State.RECHECK_NEEDED;
         Optional<TaskView> open = jdbc.sql(SELECT + " where t.open_review_id = ?").param(reviewId)
                 .query(ReplyTasks::view).optional();
+        if (baseVersion != null && open.map(t -> t.draftVersion() != baseVersion && !t.draftBody().equals(body))
+                .orElse(baseVersion != 0)) {
+            throw new TaskException(Failure.STALE);
+        }
         if (open.isEmpty()) {
             if (jdbc.sql("select count(*) from reply_tasks where review_id = ? and state = ?")
                     .params(reviewId, State.POSTED.name()).query(Integer.class).single() > 0) {

@@ -32,7 +32,12 @@ public class TaskController {
     public record MetaRequest(@NotBlank String reviewBodyFingerprint, @NotNull Instant generatedAt,
                               @NotBlank String knowledgeFp, @NotBlank String policyFp, @NotBlank String voiceFp) {}
 
-    public record DraftRequest(@NotNull UUID reviewId, @NotBlank String body, @NotNull @Valid MetaRequest meta) {}
+    /**
+     * {@code baseVersion} (2026-10-25, optional): the version the PC last saw — {@code 0} for "no open task". Given, a
+     * draft that would replace a version the PC never saw (a phone edit) is refused as {@code stale}.
+     */
+    public record DraftRequest(@NotNull UUID reviewId, @NotBlank String body, @NotNull @Valid MetaRequest meta,
+                               Integer baseVersion) {}
 
     public record EditRequest(@NotNull Integer baseVersion, @NotBlank String body) {}
 
@@ -63,7 +68,7 @@ public class TaskController {
         MetaRequest m = request.meta();
         return ResponseEntity.status(HttpStatus.CREATED).body(tasks.submitDraft(storeId, request.reviewId(),
                 request.body(), new ReplyTasks.Meta(m.reviewBodyFingerprint(), m.generatedAt(), m.knowledgeFp(),
-                        m.policyFp(), m.voiceFp())));
+                        m.policyFp(), m.voiceFp()), request.baseVersion()));
     }
 
     @GetMapping("/v1/stores/{storeId}/tasks/changes")

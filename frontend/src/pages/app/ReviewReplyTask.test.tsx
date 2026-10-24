@@ -1398,9 +1398,8 @@ describe("리뷰 상세 — the one object and the one column (2026-10-06)", () 
     const card = [...page.querySelectorAll("div")].find(
       (e) => /\brounded-2xl\b/.test(e.className) && !e.closest("button,a,summary"),
     )!;
-    // 답변과 그 동작은 안에 있다 (이 fixture는 승인 전이라 저장·승인이 그 동작이다).
+    // 답변과 그 동작은 안에 있다 (이 fixture는 승인 전이라 승인이 그 동작이다 — 저장은 스스로 한다, 2026-10-25).
     expect(within(card as HTMLElement).getByLabelText("답변 초안")).toBeTruthy();
-    expect(within(card as HTMLElement).getByRole("button", { name: "초안 저장" })).toBeTruthy();
     expect(within(card as HTMLElement).getByRole("button", { name: "승인" })).toBeTruthy();
     // 할 일에서 빼는 길은 밖에 있다 — 사라지지는 않았다.
     const setAside = screen.getByRole("button", { name: "작업에서 제외" });

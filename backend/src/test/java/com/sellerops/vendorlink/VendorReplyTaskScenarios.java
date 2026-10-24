@@ -105,6 +105,11 @@ abstract class VendorReplyTaskScenarios {
     private UUID account;
     private UUID seller;
 
+    /** 「답글 등록 요청」 on the version the seller has on screen — the head, as a fresh panel shows it. */
+    private VendorReplyTaskService.TaskView handOver(UUID review) {
+        return tasks.handOver(org, review, drafts.currentVersion(review));
+    }
+
     @BeforeEach
     void setUp() {
         taskCopies.deleteAll();
@@ -139,18 +144,20 @@ abstract class VendorReplyTaskScenarios {
         tasks = new VendorReplyTaskService(link, bindings, refs, taskCopies, reviews, drafts, approvals, outcomes,
                 triageRows, CLOCK);
         tasks.setAnswerMemory(answerMemoryHook);
+        // A save's follow-up runs only where a test asks for it: the fake server is not shared across threads.
+        tasks.setAfter(r -> {});
         replyLane.setDelegatedReplyLane(tasks);
         pull = new VendorReviewPullService(link, bindings, refs, reviews, channels, ingestion, followUp, syncJobs,
                 tasks, CLOCK);
     }
 
     @Test
-    void theSellersRequestSendsTheCurrentDraftAndShutsThisPcsOwnRoad() {
+    void aDraftGoesUpForThePhoneWithoutHoldingTheReviewAndApprovingHereTakesItBack() {
         UUID review = pulledReview("v1", "9100000001", "배송이 빨라요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "빠른 배송으로 만족하셨다니 기쁩니다.", 0);
 
-        VendorReplyTaskService.TaskView sent = tasks.requestApproval(org, review);
+        VendorReplyTaskService.TaskView sent = tasks.upload(org, review);
         assertThat(sent.state()).isEqualTo("AWAITING_APPROVAL");
         assertThat(vendor.submitted).singleElement().satisfies(s -> {
             assertThat(s.reviewId()).isEqualTo(vendor.ids.get("v1"));
@@ -161,12 +168,180 @@ abstract class VendorReplyTaskScenarios {
                     .containsOnly(VendorReplyTaskService.UNVERSIONED);
         });
 
-        assertThat(tasks.holds(org, review)).isTrue();
+        // Waiting on the phone is not on its way (2026-10-25): no reply is out, so this PC's own road stays open…
+        assertThat(tasks.holds(org, review)).isFalse();
         String ref = VocItemRef.forReview(review);
-        assertThat(replyLane.view(org, account, ref).capabilities().canApprove())
-                .as("the flag says what the guard enforces").isFalse();
-        assertThatThrownBy(() -> replyLane.decideApproval(org, account, ref, "APPROVED", 1, "cmd-approve-1", seller))
-                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("맡긴"));
+        assertThat(replyLane.view(org, account, ref).capabilities().canApprove()).isTrue();
+        assertThat(replyLane.view(org, account, ref).delegation().canCancel()).as("nothing was requested").isFalse();
+        // …and taking it means taking the draft back from the phone first, so the phone cannot approve a second one.
+        replyLane.decideApproval(org, account, ref, "APPROVED", 1, "cmd-approve-1", seller);
+        assertThat(vendor.tasks.get(vendorTaskOf(sent)).state()).isEqualTo("CANCELLED");
+        assertThat(tasks.taskFor(org, review)).get().extracting(VendorReplyTaskService.TaskView::state)
+                .isEqualTo("CANCELLED");
+    }
+
+    /* ── one draft, either device (owner decision 2026-10-25) ── */
+
+    @Test
+    void everyDraftForAReplyGoesUpOnThePullWithoutAPressAndOnlyThose() {
+        UUID drafted = pulledReview("v1", "9100000101", "배송이 빨라요");
+        needsReply(drafted);
+        drafts.save(org, drafted, "SELLER:" + seller, "빠른 배송으로 만족하셨다니 기쁩니다.", 0);
+        UUID undecided = pulledReview("v2", "9100000102", "그냥 그래요");
+        drafts.save(org, undecided, "SELLER:" + seller, "의견 감사합니다.", 0);
+        UUID noDraft = pulledReview("v3", "9100000103", "색이 예뻐요");
+        needsReply(noDraft);
+
+        pull.pullFor(org);
+
+        assertThat(vendor.submitted).singleElement().satisfies(s -> {
+            assertThat(s.reviewId()).isEqualTo(vendor.ids.get("v1"));
+            assertThat(s.body()).isEqualTo("빠른 배송으로 만족하셨다니 기쁩니다.");
+        });
+        assertThat(vendor.approveCommands).as("up for the phone, never approved on its own").isEmpty();
+        pull.pullFor(org);
+        assertThat(vendor.submitted).as("the same text is not sent twice").hasSize(1);
+
+        drafts.save(org, drafted, "SELLER:" + seller, "빠른 배송으로 만족하셨다니 정말 기쁩니다.", 1);
+        pull.pullFor(org);
+        UUID task = taskCopies.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(org, drafted).orElseThrow()
+                .getVendorTaskId();
+        assertThat(vendor.tasks.get(task)).satisfies(t -> {
+            assertThat(t.draftVersion()).as("the edit here is the phone's next version").isEqualTo(2);
+            assertThat(t.draftBody()).isEqualTo("빠른 배송으로 만족하셨다니 정말 기쁩니다.");
+        });
+    }
+
+    @Test
+    void aSaveHereGoesUpAtOnceAndARequestTheSellerCancelledIsNotSentAgainOnItsOwn() {
+        tasks.setAfter(Runnable::run);
+        UUID review = pulledReview("v1", "9100000104", "배송이 빨라요");
+        needsReply(review);
+        String ref = VocItemRef.forReview(review);
+        replyLane.saveDraft(org, account, ref, "빠른 배송으로 만족하셨다니 기쁩니다.", 0, seller);
+        assertThat(vendor.submitted).as("a save is followed up at once, not at the next pull").hasSize(1);
+
+        UUID task = vendorTaskOf(handOver(review));
+        tasks.cancel(org, review);
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("CANCELLED");
+        int before = vendor.submitted.size();
+        pull.pullFor(org);
+        assertThat(vendor.submitted).as("the seller took it back; it stays back").hasSize(before);
+    }
+
+    @Test
+    void anEditOnThePhoneBecomesThisPcsDraftInTheSellersName() {
+        UUID review = pulledReview("v1", "9100000105", "포장이 꼼꼼해요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "꼼꼼한 포장을 알아봐 주셔서 감사합니다.", 0);
+        UUID task = vendorTaskOf(tasks.upload(org, review));
+        String phoneText = "꼼꼼한 포장을 알아봐 주셔서 감사합니다! 또 찾아 주세요.";
+        vendor.move(task, "AWAITING_APPROVAL", phoneText, null, true);
+
+        pull.pullFor(org);
+
+        assertThat(drafts.latest(review)).get().satisfies(d -> {
+            assertThat(d.getBody()).isEqualTo(phoneText);
+            assertThat(d.getVersion()).isEqualTo(2);
+            assertThat(d.getAuthorKind()).isEqualTo("SELLER");
+            assertThat(d.getCreatedBy()).isEqualTo(VendorReplyTaskService.PHONE_ACTOR);
+        });
+        ReviewReplyDelegationView shown = tasks.describe(org, review, true);
+        assertThat(shown.draftFromPhone()).isTrue();
+        assertThat(shown.setAside()).as("nothing was written here meanwhile").isNull();
+        assertThat(vendor.tasks.get(task).draftVersion()).as("nothing sent back up").isEqualTo(2);
+
+        drafts.save(org, review, "SELLER:" + seller, phoneText + " 감사합니다.", 2);
+        pull.pullFor(org);
+        assertThat(vendor.tasks.get(task).draftVersion()).as("then this PC's edit goes up on top of it").isEqualTo(3);
+        assertThat(vendor.tasks.get(task).editedOnMobile()).isFalse();
+    }
+
+    @Test
+    void whenBothDevicesChangedTheTextThePhoneLeadsAndThisPcsWordsAreKeptForTheSeller() {
+        UUID review = pulledReview("v1", "9100000106", "배송이 늦어요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "늦어져 죄송합니다.", 0);
+        UUID task = vendorTaskOf(tasks.upload(org, review));
+        vendor.move(task, "AWAITING_APPROVAL", "늦어져 정말 죄송합니다. 택배사와 이야기하겠습니다.", null, true);
+        drafts.save(org, review, "SELLER:" + seller, "늦어져 죄송합니다. 다음엔 더 빨리 보내겠습니다.", 1);
+
+        pull.pullFor(org);
+
+        assertThat(drafts.latest(review)).get().extracting(d -> d.getBody())
+                .isEqualTo("늦어져 정말 죄송합니다. 택배사와 이야기하겠습니다.");
+        assertThat(vendor.tasks.get(task).draftBody()).as("the phone's words were not overwritten")
+                .isEqualTo("늦어져 정말 죄송합니다. 택배사와 이야기하겠습니다.");
+        ReviewReplyDelegationView shown = tasks.describe(org, review, true);
+        assertThat(shown.setAside()).isNotNull().satisfies(a -> {
+            assertThat(a.version()).isEqualTo(2);
+            assertThat(a.body()).isEqualTo("늦어져 죄송합니다. 다음엔 더 빨리 보내겠습니다.");
+        });
+
+        // 「이 PC 문장 쓰기」: the set-aside words saved on top go up, and there is nothing left to choose.
+        drafts.save(org, review, "SELLER:" + seller, "늦어져 죄송합니다. 다음엔 더 빨리 보내겠습니다.", 3);
+        pull.pullFor(org);
+        assertThat(vendor.tasks.get(task).draftBody()).isEqualTo("늦어져 죄송합니다. 다음엔 더 빨리 보내겠습니다.");
+        assertThat(tasks.describe(org, review, true).setAside()).isNull();
+    }
+
+    @Test
+    void keepingThePhonesWordsDropsTheSetAsideVersion() {
+        UUID review = pulledReview("v1", "9100000107", "배송이 늦어요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "늦어져 죄송합니다.", 0);
+        UUID task = vendorTaskOf(tasks.upload(org, review));
+        vendor.move(task, "AWAITING_APPROVAL", "늦어져 정말 죄송합니다.", null, true);
+        drafts.save(org, review, "SELLER:" + seller, "늦어져 죄송합니다!", 1);
+        pull.pullFor(org);
+        assertThat(tasks.describe(org, review, true).setAside()).isNotNull();
+
+        tasks.dropSetAside(org, review);
+
+        assertThat(tasks.describe(org, review, true).setAside()).isNull();
+        assertThat(vendor.tasks.get(task).draftBody()).isEqualTo("늦어져 정말 죄송합니다.");
+    }
+
+    @Test
+    void handingOverApprovesOnlyTheVersionOnTheScreenAndNeverAPhoneEditItHadNotShown() {
+        UUID review = pulledReview("v1", "9100000108", "설명서가 작아요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "불편을 드려 죄송합니다.", 0);
+        UUID task = vendorTaskOf(tasks.upload(org, review));
+        drafts.save(org, review, "SELLER:" + seller, "불편을 드려 죄송합니다. 큰 글씨 설명서를 보내 드리겠습니다.", 1);
+
+        assertThatThrownBy(() -> tasks.handOver(org, review, 1)).as("an older version than the head")
+                .isInstanceOfSatisfying(ApiException.class,
+                        e -> assertThat(e.getMessage()).isEqualTo(VendorReplyTaskService.CHANGED));
+        assertThat(vendor.approveCommands).isEmpty();
+
+        vendor.move(task, "AWAITING_APPROVAL", "불편을 드려 죄송합니다. 설명서 파일을 보내 드릴게요.", null, true);
+        assertThatThrownBy(() -> tasks.handOver(org, review, 2)).as("the phone changed it unseen")
+                .isInstanceOfSatisfying(ApiException.class,
+                        e -> assertThat(e.getMessage()).isEqualTo(VendorReplyTaskService.CHANGED_ON_PHONE));
+        assertThat(vendor.approveCommands).isEmpty();
+        assertThat(drafts.latest(review)).get().extracting(d -> d.getBody())
+                .as("the screen now shows the phone's words").isEqualTo("불편을 드려 죄송합니다. 설명서 파일을 보내 드릴게요.");
+
+        int shown = drafts.currentVersion(review);
+        assertThat(tasks.handOver(org, review, shown).state()).isEqualTo("APPROVED");
+        assertThat(vendor.tasks.get(task).draftBody()).isEqualTo("불편을 드려 죄송합니다. 설명서 파일을 보내 드릴게요.");
+    }
+
+    @Test
+    void approvingHereIsRefusedWhenThePhoneApprovedFirst() {
+        UUID review = pulledReview("v1", "9100000002", "배송이 빨라요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "빠른 배송으로 만족하셨다니 기쁩니다.", 0);
+        UUID task = vendorTaskOf(tasks.upload(org, review));
+        vendor.move(task, "APPROVED", "빠른 배송으로 만족하셨다니 기쁩니다.", vendor.tasks.get(task).draftFingerprint(),
+                false);
+
+        String ref = VocItemRef.forReview(review);
+        assertThatThrownBy(() -> replyLane.decideApproval(org, account, ref, "APPROVED", 1, "cmd-approve-2", seller))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("휴대폰에서 이미"));
+        assertThat(vendor.tasks.get(task).state()).as("the phone's approval stands").isEqualTo("APPROVED");
+        assertThat(approvals.current(org, review)).isEmpty();
     }
 
     @Test
@@ -174,7 +349,7 @@ abstract class VendorReplyTaskScenarios {
         UUID review = pulledReview("v1", "9100000011", "포장이 꼼꼼해요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "꼼꼼한 포장을 알아봐 주셔서 감사합니다.", 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
 
         String phoneText = "꼼꼼한 포장을 알아봐 주셔서 감사합니다! 또 찾아 주세요.";
         vendor.move(task, "APPROVED", phoneText, ReviewReplyFingerprint.of(phoneText), true);
@@ -195,7 +370,7 @@ abstract class VendorReplyTaskScenarios {
         assertThat(tasks.holds(org, review)).as("a reported post still holds the review: no second reply from here")
                 .isTrue();
         assertThat(replyLane.view(org, account, VocItemRef.forReview(review)).capabilities().canApprove()).isFalse();
-        assertThatThrownBy(() -> tasks.requestApproval(org, review))
+        assertThatThrownBy(() -> tasks.upload(org, review))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("이미 담당자가"));
 
         VendorStoreBinding binding = bindings.findByVendorStoreId(vendor.store).orElseThrow();
@@ -211,7 +386,7 @@ abstract class VendorReplyTaskScenarios {
         UUID review = pulledReview("v1", "9100000051", "배송이 정말 빠르고 포장이 꼼꼼해서 좋았어요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "감사합니다.", 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
 
         String phoneText = "빠른 배송과 꼼꼼한 포장을 알아봐 주셔서 감사합니다. 다음에도 정성껏 포장해 보내 드리겠습니다.";
         vendor.move(task, "APPROVED", phoneText, ReviewReplyFingerprint.of(phoneText), true);
@@ -255,7 +430,7 @@ abstract class VendorReplyTaskScenarios {
         needsReply(review);
         String text = "사진과 색감이 달라 불편을 드려 죄송합니다. 교환을 도와 드리겠습니다.";
         drafts.save(org, review, "SELLER:" + seller, text, 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
         vendor.move(task, "APPROVED", text, ReviewReplyFingerprint.of(text), false);
         pull.pullFor(org);
         assertThat(pastReplies.read(org, null)).anySatisfy(i -> assertThat(i.entry().text()).isEqualTo(text));
@@ -271,7 +446,7 @@ abstract class VendorReplyTaskScenarios {
         UUID told = pulledReview("v2", "9100000042", "그럭저럭");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "딱 맞으셨다니 다행입니다.", 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
         assertThat(pull.setPaused(org, vendor.store, true)).isTrue();
 
         String phoneText = "딱 맞으셨다니 다행입니다. 감사합니다.";
@@ -302,34 +477,34 @@ abstract class VendorReplyTaskScenarios {
         drafts.save(org, approvedHere, "SELLER:" + seller, "예쁘게 봐 주셔서 감사합니다.", 0);
         replyLane.decideApproval(org, account, VocItemRef.forReview(approvedHere), "APPROVED", 1, "cmd-approve-2",
                 seller);
-        assertThatThrownBy(() -> tasks.requestApproval(org, approvedHere))
+        assertThatThrownBy(() -> tasks.upload(org, approvedHere))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("해제"));
 
         UUID notNeeded = pulledReview("v3", "9100000023", "무난해요");
         needsReply(notNeeded);
         drafts.save(org, notNeeded, "SELLER:" + seller, "감사합니다.", 0);
         triage.decide(org, notNeeded, TriageDisposition.MONITOR.name(), "cmd-monitor-" + notNeeded, seller);
-        assertThatThrownBy(() -> tasks.handOver(org, notNeeded)).as("a review the seller now only watches")
+        assertThatThrownBy(() -> handOver(notNeeded)).as("a review the seller now only watches")
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("대응 필요"));
         UUID undecided = pulledReview("v4", "9100000024", "그럭저럭");
-        assertThatThrownBy(() -> tasks.requestApproval(org, undecided)).as("and one nobody has decided")
+        assertThatThrownBy(() -> tasks.upload(org, undecided)).as("and one nobody has decided")
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("대응 필요"));
         assertThat(vendor.submitted).isEmpty();
 
         UUID noDraft = pulledReview("v2", "9100000022", "사이즈가 맞아요");
         needsReply(noDraft);
-        assertThatThrownBy(() -> tasks.requestApproval(org, noDraft))
+        assertThatThrownBy(() -> tasks.upload(org, noDraft))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("초안"));
 
         drafts.save(org, noDraft, "SELLER:" + seller, "잘 맞으셨다니 다행입니다.", 0);
         vendor.refuseNextSubmit = "task_in_progress";
-        assertThatThrownBy(() -> tasks.requestApproval(org, noDraft))
+        assertThatThrownBy(() -> tasks.upload(org, noDraft))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("취소"));
         assertThat(vendor.submitted).isEmpty();
         assertThat(tasks.holds(org, noDraft)).isFalse();
 
         vendor.refuseNextSubmit = "review_purged";
-        assertThatThrownBy(() -> tasks.requestApproval(org, noDraft)).as("deleted on the server at retention's end")
+        assertThatThrownBy(() -> tasks.upload(org, noDraft)).as("deleted on the server at retention's end")
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("판매자센터에서 직접"));
         assertThat(tasks.holds(org, noDraft)).isFalse();
     }
@@ -347,7 +522,7 @@ abstract class VendorReplyTaskScenarios {
             assertThat(d.canCancel()).isFalse();
         });
 
-        VendorReplyTaskService.TaskView handed = tasks.handOver(org, review);
+        VendorReplyTaskService.TaskView handed = handOver(review);
         assertThat(handed.state()).isEqualTo("APPROVED");
         UUID task = vendorTaskOf(handed);
         assertThat(vendor.tasks.get(task).approvedFingerprint()).as("approved: exactly the text sent")
@@ -359,7 +534,7 @@ abstract class VendorReplyTaskScenarios {
         assertThat(held.taskState()).isEqualTo("APPROVED");
         assertThat(held.canSend()).as("approved: not sent again").isFalse();
         assertThat(held.canCancel()).isTrue();
-        assertThatThrownBy(() -> tasks.handOver(org, review))
+        assertThatThrownBy(() -> handOver(review))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getMessage()).contains("취소"));
 
         assertThat(tasks.cancel(org, review).state()).isEqualTo("CANCELLED");
@@ -378,7 +553,7 @@ abstract class VendorReplyTaskScenarios {
         UUID review = pulledReview("v1", "9100000051", "배송이 늦어요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "늦어져 죄송합니다.", 0);
-        UUID task = vendorTaskOf(tasks.handOver(org, review));
+        UUID task = vendorTaskOf(handOver(review));
         vendor.move(task, "CLAIMED", "늦어져 죄송합니다.", vendor.tasks.get(task).approvedFingerprint(), false);
         pull.pullFor(org);
 
@@ -395,9 +570,9 @@ abstract class VendorReplyTaskScenarios {
         UUID untouched = pulledReview("v2", "9100000062", "잘 받았습니다");
         needsReply(resent);
         drafts.save(org, resent, "SELLER:" + seller, "불편을 드려 죄송합니다.", 0);
-        tasks.handOver(org, resent);
+        handOver(resent);
         assertThat(tasks.cancel(org, resent).state()).isEqualTo("CANCELLED");
-        tasks.handOver(org, resent);
+        handOver(resent);
 
         assertThat(tasks.statesOf(org, List.of(resent, untouched)))
                 .as("the second hand-over, not the cancelled one").containsExactlyEntriesOf(Map.of(resent, "APPROVED"));
@@ -430,7 +605,7 @@ abstract class VendorReplyTaskScenarios {
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "빠른 배송으로 만족하셨다니 기쁩니다.", 0);
 
-        assertThat(tasks.requestApproval(org, review).state()).isEqualTo("AWAITING_APPROVAL");
+        assertThat(tasks.upload(org, review).state()).isEqualTo("AWAITING_APPROVAL");
 
         var now = draftBasis.of(org);
         assertThat(List.of(now.knowledge(), now.policy(), now.voice())).allMatch(fp -> fp.matches("v1:[0-9a-f]{32}"));
@@ -448,7 +623,7 @@ abstract class VendorReplyTaskScenarios {
         needsReply(review);
         String text = "빠른 배송으로 만족하셨다니 기쁩니다.";
         drafts.save(org, review, "SELLER:" + seller, text, 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
 
         companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
                 com.sellerops.knowledge.org.OrgKnowledgeType.SHIPPING_POLICY, "배송 안내",
@@ -477,7 +652,7 @@ abstract class VendorReplyTaskScenarios {
         needsReply(review);
         String text = "수령 후 7일 이내라면 사이즈 교환을 도와드리겠습니다.";
         drafts.save(org, review, "SELLER:" + seller, text, 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
 
         var retired = companyRuleRows.findById(rule.id()).orElseThrow();
         retired.setActive(false);
@@ -514,7 +689,7 @@ abstract class VendorReplyTaskScenarios {
         UUID review = pulledReview("v1", "9100000307", "좋아요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, own, 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
 
         companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
                 com.sellerops.knowledge.org.OrgKnowledgeType.GENERAL_CS_FAQ, "공통 안내",
@@ -538,14 +713,15 @@ abstract class VendorReplyTaskScenarios {
         needsReply(review);
         String text = "사이즈 교환을 도와드리겠습니다.";
         drafts.save(org, review, "SELLER:" + seller, text, 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
 
         companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
                 com.sellerops.knowledge.org.OrgKnowledgeType.GENERAL_CS_FAQ, "공통 안내",
                 "문의는 평일 10시부터 17시까지 받습니다.", null), null, "합성 판매자");
         pull.pullFor(org);
 
-        assertThat(vendor.rechecks).singleElement().satisfies(r -> {
+        // Found when it went up (the phone shows it), and found again when the new rule sent it back.
+        assertThat(vendor.rechecks).hasSize(2).allSatisfy(r -> {
             assertThat(r.taskId()).isEqualTo(task);
             assertThat(r.codes()).containsExactly(com.sellerops.review.draft.ReviewDraftRecheck.UNSUPPORTED_PROMISE);
         });
@@ -557,7 +733,7 @@ abstract class VendorReplyTaskScenarios {
         UUID review = pulledReview("v1", "9100000304", "포장이 꼼꼼해요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "꼼꼼한 포장을 알아봐 주셔서 감사합니다.", 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
         String phoneText = "꼼꼼한 포장을 알아봐 주셔서 감사합니다! 또 찾아 주세요.";
         vendor.move(task, "AWAITING_APPROVAL", phoneText, null, true);
 
@@ -597,7 +773,7 @@ abstract class VendorReplyTaskScenarios {
         cited.setSourceId(rule.id());
         cited.setTitle("배송 안내");
         draftEvidence.save(cited);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
 
         Thread.sleep(5);
         companyRules.update(org, rule.id(), new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
@@ -626,7 +802,7 @@ abstract class VendorReplyTaskScenarios {
         UUID review = pulledReview("v1", "9100000317", "배송이 늦었어요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "늦어서 죄송합니다. 고객님 탓이 아닙니다.", 0);
-        UUID task = vendorTaskOf(tasks.handOver(org, review));
+        UUID task = vendorTaskOf(handOver(review));
 
         ban("고객님 탓", "환불");
         pull.pullFor(org);
@@ -642,16 +818,23 @@ abstract class VendorReplyTaskScenarios {
     }
 
     @Test
-    void aDraftCarryingABannedPhraseIsNotSentToThePhoneOrTheDelegate() {
+    void aDraftCarryingABannedPhraseIsNeverApprovedAndGoesToThePhoneMarked() {
         tasks.setStyleGuard(styleGuard);
         ban("고객님 탓");
         UUID review = pulledReview("v1", "9100000319", "배송이 늦었어요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "늦어서 죄송합니다. 고객님 탓이 아닙니다.", 0);
-        assertThatThrownBy(() -> tasks.handOver(org, review)).isInstanceOf(com.sellerops.common.ApiException.class)
+        assertThatThrownBy(() -> handOver(review)).isInstanceOf(com.sellerops.common.ApiException.class)
                 .hasMessageContaining("「고객님 탓」");
-        assertThatThrownBy(() -> tasks.requestApproval(org, review)).isInstanceOf(com.sellerops.common.ApiException.class);
-        assertThat(vendor.submitted).isEmpty();
+        assertThat(vendor.approveCommands).as("never approved").isEmpty();
+        // It still goes up for the phone — an older text there would be worse — marked so the phone cannot approve it.
+        UUID task = vendorTaskOf(tasks.upload(org, review));
+        assertThat(vendor.rechecks).singleElement().satisfies(r -> {
+            assertThat(r.taskId()).isEqualTo(task);
+            assertThat(r.passed()).isFalse();
+            assertThat(r.codes()).containsExactly(com.sellerops.review.draft.ReviewDraftRecheck.FORBIDDEN_PHRASE);
+            assertThat(r.note().phrases()).containsExactly("고객님 탓");
+        });
     }
 
     @Test
@@ -661,7 +844,7 @@ abstract class VendorReplyTaskScenarios {
         UUID review = pulledReview("v1", "9100000320", "배송이 늦었어요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "늦어서 죄송합니다.", 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
         String phoneText = "늦어서 죄송합니다. 고객님 탓이 아닙니다.";
         vendor.move(task, "AWAITING_APPROVAL", phoneText, null, true);
         vendor.move(task, "APPROVED", phoneText, vendor.tasks.get(task).draftFingerprint(), false);
@@ -685,7 +868,7 @@ abstract class VendorReplyTaskScenarios {
         UUID review = pulledReview("v1", "9100000330", "사이즈가 안 맞아요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "불편을 드려 죄송합니다.", 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
         vendor.move(task, "AWAITING_APPROVAL", "불편을 드려 죄송합니다. 확인해 보겠습니다.", null, true);
 
         vendor.refuseNextRecheck = "stale";
@@ -705,7 +888,7 @@ abstract class VendorReplyTaskScenarios {
         UUID review = pulledReview("v1", "9100000331", "사이즈가 안 맞아요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "불편을 드려 죄송합니다.", 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
         vendor.move(task, "AWAITING_APPROVAL", "첫 휴대폰 수정입니다.", null, true);
         vendor.beforeRecheck = () -> vendor.move(task, "AWAITING_APPROVAL", "두 번째 휴대폰 수정입니다.", null, true);
 
@@ -722,7 +905,7 @@ abstract class VendorReplyTaskScenarios {
         UUID review = pulledReview("v1", "9100000332", "배송이 늦었어요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "늦어서 죄송합니다. 고객님 탓이 아닙니다.", 0);
-        UUID task = vendorTaskOf(tasks.handOver(org, review));
+        UUID task = vendorTaskOf(handOver(review));
         ban("고객님 탓");
 
         vendor.refuseNextApprovedCheck = "stale";
@@ -742,7 +925,7 @@ abstract class VendorReplyTaskScenarios {
         UUID review = pulledReview("v1", "9100000335", "사이즈 교환 되나요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "수령 후 7일 이내라면 사이즈 교환을 도와드리겠습니다.", 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
         retire(rule.id());
 
         vendor.refuseNextRecheck = "stale";
@@ -763,8 +946,8 @@ abstract class VendorReplyTaskScenarios {
         needsReply(promising);
         drafts.save(org, clean, "SELLER:" + seller, "늦어서 죄송합니다.", 0);
         drafts.save(org, promising, "SELLER:" + seller, "불편을 드려 죄송합니다.", 0);
-        UUID cleanTask = vendorTaskOf(tasks.requestApproval(org, clean));
-        UUID promisingTask = vendorTaskOf(tasks.requestApproval(org, promising));
+        UUID cleanTask = vendorTaskOf(tasks.upload(org, clean));
+        UUID promisingTask = vendorTaskOf(tasks.upload(org, promising));
         // This PC is off: the seller edits and approves both on the phone, and the company rules change meanwhile.
         String cleanText = "늦어서 정말 죄송합니다.";
         String promisingText = "불편을 드려 죄송합니다. 사이즈 교환을 도와드리겠습니다.";
@@ -794,7 +977,7 @@ abstract class VendorReplyTaskScenarios {
         UUID review = pulledReview("v1", "9100000318", "배송이 늦었어요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "늦어서 죄송합니다. 고객님 탓이 아닙니다.", 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
 
         ban("고객님 탓");
         pull.pullFor(org);
@@ -833,7 +1016,7 @@ abstract class VendorReplyTaskScenarios {
         cited.setPassageFingerprint(com.sellerops.review.draft.ReviewDraftEvidence.fingerprintOf(
                 chunks.stream().filter(c -> c.getContent().startsWith("평일")).findFirst().orElseThrow().getContent()));
         draftEvidence.save(cited);
-        return new UUID[] {rule.id(), review, vendorTaskOf(tasks.requestApproval(org, review))};
+        return new UUID[] {rule.id(), review, vendorTaskOf(tasks.upload(org, review))};
     }
 
     @Test
@@ -875,7 +1058,7 @@ abstract class VendorReplyTaskScenarios {
         UUID review = pulledReview("v1", "9100000306", "배송이 빨라요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "빠른 배송으로 만족하셨다니 기쁩니다.", 0);
-        UUID task = vendorTaskOf(tasks.handOver(org, review));
+        UUID task = vendorTaskOf(handOver(review));
 
         companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
                 com.sellerops.knowledge.org.OrgKnowledgeType.SHIPPING_POLICY, "배송 안내",
@@ -909,7 +1092,7 @@ abstract class VendorReplyTaskScenarios {
         needsReply(review);
         String text = "불편을 드려 죄송합니다. 수령 후 7일 이내라면 사이즈 교환을 도와드리겠습니다.";
         drafts.save(org, review, "SELLER:" + seller, text, 0);
-        UUID task = vendorTaskOf(tasks.handOver(org, review));
+        UUID task = vendorTaskOf(handOver(review));
 
         retire(rule.id());
         pull.pullFor(org);
@@ -940,7 +1123,7 @@ abstract class VendorReplyTaskScenarios {
         needsReply(review);
         String text = "수령 후 7일 이내라면 사이즈 교환을 도와드리겠습니다.";
         drafts.save(org, review, "SELLER:" + seller, text, 0);
-        UUID task = vendorTaskOf(tasks.handOver(org, review));
+        UUID task = vendorTaskOf(handOver(review));
         vendor.move(task, "CLAIMED", text, vendor.tasks.get(task).approvedFingerprint(), false);
 
         retire(rule.id());
@@ -957,7 +1140,7 @@ abstract class VendorReplyTaskScenarios {
         UUID review = pulledReview("v1", "9100000313", "사이즈가 안 맞아요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "불편을 드려 죄송합니다.", 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
         String phoneText = "불편을 드려 죄송합니다. 사이즈 교환을 도와드리겠습니다.";
         vendor.move(task, "AWAITING_APPROVAL", phoneText, null, true);
 
@@ -989,7 +1172,7 @@ abstract class VendorReplyTaskScenarios {
         UUID review = pulledReview("v1", "9100000314", "사이즈 교환 되나요");
         needsReply(review);
         drafts.save(org, review, "SELLER:" + seller, "불편을 드려 죄송합니다.", 0);
-        UUID task = vendorTaskOf(tasks.requestApproval(org, review));
+        UUID task = vendorTaskOf(tasks.upload(org, review));
         String phoneText = "불편을 드려 죄송합니다. 사이즈 교환 또는 환불을 도와드리겠습니다.";
         vendor.move(task, "AWAITING_APPROVAL", phoneText, null, true);
         pull.pullFor(org);
@@ -1025,7 +1208,7 @@ abstract class VendorReplyTaskScenarios {
         cited.setSourceId(rule.id());
         cited.setTitle("배송 안내");
         draftEvidence.save(cited);
-        UUID task = vendorTaskOf(tasks.handOver(org, review));
+        UUID task = vendorTaskOf(handOver(review));
 
         Thread.sleep(5);
         companyRules.update(org, rule.id(), new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
@@ -1059,7 +1242,7 @@ abstract class VendorReplyTaskScenarios {
         needsReply(review);
         String text = "불편을 드려 죄송합니다. 수령 후 7일 이내 무료로 사이즈 교환해 드리겠습니다.";
         drafts.save(org, review, "SELLER:" + seller, text, 0);
-        UUID task = vendorTaskOf(tasks.handOver(org, review));
+        UUID task = vendorTaskOf(handOver(review));
 
         Thread.sleep(5);
         companyRules.update(org, rule.id(), new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(

@@ -168,7 +168,8 @@ public class JdkVendorServerClient implements VendorServerClient {
     }
 
     @Override
-    public TaskSnapshot submitDraft(String installToken, UUID storeId, UUID reviewId, String body, DraftMeta meta) {
+    public TaskSnapshot submitDraft(String installToken, UUID storeId, UUID reviewId, String body, DraftMeta meta,
+                                    Integer baseVersion) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("reviewBodyFingerprint", meta.reviewBodyFingerprint());
         m.put("generatedAt", meta.generatedAt().toString());
@@ -179,6 +180,9 @@ public class JdkVendorServerClient implements VendorServerClient {
         request.put("reviewId", reviewId.toString());
         request.put("body", body);
         request.put("meta", m);
+        if (baseVersion != null) {
+            request.put("baseVersion", baseVersion);
+        }
         Answer a = taskCall(jsonPost("v1/stores/" + storeId + "/tasks", installToken, request));
         return task(a.json());
     }

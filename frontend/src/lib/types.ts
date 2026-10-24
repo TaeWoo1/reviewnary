@@ -1391,15 +1391,21 @@ export interface ReviewReplyDelegation {
   /** The latest task's server state, or null when none was ever opened. */
   taskState: string | null;
   editedOnMobile: boolean;
-  /** 「답글 등록 요청」 · 「휴대폰으로 승인 요청」 may be pressed. */
+  /** 「답글 등록 요청」 may be pressed. */
   canSend: boolean;
-  /** 「요청 취소」 may be pressed. */
+  /** 「요청 취소」 may be pressed: the seller requested it, and it is not settled. */
   canCancel: boolean;
   /**
    * Why the current version was stopped — or kept — after what replies are written from changed (owner decision
    * 2026-10-23). Absent or null when there is nothing to say.
    */
   note?: ReviewReplyDelegationNote | null;
+  /** When this PC last saw the task move — the request's time for 「10:12 요청」. Absent from an older server. */
+  since?: string | null;
+  /** The draft head is the phone's edit (2026-10-25: one draft, either device). */
+  draftFromPhone?: boolean;
+  /** This PC's version the phone's edit replaced while both were changing it — for the seller to choose. */
+  setAside?: { version: number; body: string; writtenAt: string | null } | null;
 }
 
 export interface ReviewReplyDelegationNote {

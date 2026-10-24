@@ -100,18 +100,26 @@ public class VendorLinkController {
                 ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
 
-    /** 「휴대폰으로 승인 요청」: sends this review's current draft for the seller's approval on the phone (§4). */
-    @PostMapping("/reviews/{reviewId}/approval-request")
-    public VendorReplyTaskService.TaskView requestApproval(@AuthenticationPrincipal AuthPrincipal principal,
-                                                           @PathVariable UUID reviewId) {
-        return replyTasks.requestApproval(principal.orgId(), reviewId);
-    }
+    /** {@code baseVersion}: the draft version on the seller's screen — the one approved, and no other. */
+    public record HandOverRequest(@jakarta.validation.constraints.NotNull Integer baseVersion) {}
 
-    /** 「답글 등록 요청」: sends the current draft and approves it here, for a delegate to post (§4, D9). */
+    /**
+     * 「답글 등록 요청」: approves the draft version on the seller's screen here, for a delegate to post (§4, D9). There
+     * is no separate phone request any more (2026-10-25): every draft is already on the phone.
+     */
     @PostMapping("/reviews/{reviewId}/hand-over")
     public VendorReplyTaskService.TaskView handOver(@AuthenticationPrincipal AuthPrincipal principal,
-                                                    @PathVariable UUID reviewId) {
-        return replyTasks.handOver(principal.orgId(), reviewId);
+                                                    @PathVariable UUID reviewId,
+                                                    @RequestBody @jakarta.validation.Valid HandOverRequest request) {
+        return replyTasks.handOver(principal.orgId(), reviewId, request.baseVersion());
+    }
+
+    /** 「휴대폰 문장 쓰기」: the phone's edit stays the draft, and this PC's set-aside version is no longer offered. */
+    @PostMapping("/reviews/{reviewId}/set-aside/drop")
+    public ResponseEntity<Void> dropSetAside(@AuthenticationPrincipal AuthPrincipal principal,
+                                             @PathVariable UUID reviewId) {
+        replyTasks.dropSetAside(principal.orgId(), reviewId);
+        return ResponseEntity.noContent().build();
     }
 
     /** 「요청 취소」: cancels the review's delegation task, or asks the delegate to stop once claimed (§4.2, D10). */

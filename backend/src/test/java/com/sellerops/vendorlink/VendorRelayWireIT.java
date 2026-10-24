@@ -97,6 +97,7 @@ class VendorRelayWireIT {
         link.poll();
         VendorReplyTaskService replyTasks = new VendorReplyTaskService(link, bindings, refs, taskCopies, reviews, drafts,
                 approvals, outcomes, triageRows, Clock.systemUTC());
+        replyTasks.setAfter(r -> {});
         VendorReviewPullService pull = new VendorReviewPullService(link, bindings, refs, reviews, channels, ingestion,
                 followUp, syncJobs, replyTasks, Clock.systemUTC());
 
@@ -125,7 +126,7 @@ class VendorRelayWireIT {
         triage.decide(org, answer.getId(), "RESPONSE_NEEDED", "wire-needs", seller);
         String text = "소중한 리뷰 감사합니다. 다음에도 만족하실 수 있게 준비하겠습니다.";
         drafts.save(org, answer.getId(), "SELLER:" + seller, text, 0);
-        assertThat(replyTasks.requestApproval(org, answer.getId()).state()).isEqualTo("AWAITING_APPROVAL");
+        assertThat(replyTasks.upload(org, answer.getId()).state()).isEqualTo("AWAITING_APPROVAL");
         VendorReplyTask copy = taskCopies.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(org, answer.getId())
                 .orElseThrow();
         String fingerprint = com.sellerops.attention.reply.ReviewReplyFingerprint.of(text);
@@ -162,7 +163,7 @@ class VendorRelayWireIT {
                 && r.getReplyState() != com.sellerops.review.ReviewReplyState.ANSWERED).findFirst().orElseThrow();
         triage.decide(org, handed.getId(), "RESPONSE_NEEDED", "wire-needs-2", seller);
         drafts.save(org, handed.getId(), "SELLER:" + seller, "확인 감사합니다. 더 꼼꼼히 챙기겠습니다.", 0);
-        assertThat(replyTasks.handOver(org, handed.getId()).state()).isEqualTo("APPROVED");
+        assertThat(replyTasks.handOver(org, handed.getId(), drafts.currentVersion(handed.getId())).state()).isEqualTo("APPROVED");
         String handedTask = taskCopies.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(org, handed.getId())
                 .orElseThrow().getVendorTaskId().toString();
         assertThat(json(get("/v1/delegate/tasks?state=APPROVED", delegate)).findValuesAsText("id"))
@@ -259,8 +260,8 @@ class VendorRelayWireIT {
 
         @Override
         public TaskSnapshot submitDraft(String installToken, UUID storeId, UUID reviewId, String body,
-                                        DraftMeta meta) {
-            return real.submitDraft(installToken, storeId, reviewId, body, meta);
+                                        DraftMeta meta, Integer baseVersion) {
+            return real.submitDraft(installToken, storeId, reviewId, body, meta, baseVersion);
         }
 
         @Override

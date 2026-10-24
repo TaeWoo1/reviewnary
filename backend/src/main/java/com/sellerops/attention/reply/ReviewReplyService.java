@@ -226,7 +226,16 @@ public class ReviewReplyService {
         requireResponseNeeded(orgId, review.getId());
         requireNotFrozen(orgId, review.getId());
         requireChannelNotAnswered(review);
-        return drafts.save(orgId, review.getId(), ACTOR_PREFIX + actorUserId, body, baseVersion);
+        ReviewReplyDraftView saved = drafts.save(orgId, review.getId(), ACTOR_PREFIX + actorUserId, body, baseVersion);
+        draftSaved(orgId, review.getId());
+        return saved;
+    }
+
+    /** The phone shows the same draft (2026-10-25); bringing it up to date never fails the write that moved it. */
+    private void draftSaved(UUID orgId, UUID reviewId) {
+        if (delegated != null) {
+            delegated.draftSaved(orgId, reviewId);
+        }
     }
 
     /**
@@ -256,7 +265,9 @@ public class ReviewReplyService {
         // part of what the customer wrote, and a knowledge request that quotes them back is
         // unreadable to the seller.
         RedactedBody body = VocPreviewSanitizer.redactFullBody(review.getBody());
-        return composer.compose(orgId, review, body.text(), ACTOR_PREFIX + actorUserId);
+        GeneratedReviewDraftView generated = composer.compose(orgId, review, body.text(), ACTOR_PREFIX + actorUserId);
+        draftSaved(orgId, review.getId());
+        return generated;
     }
 
     /**
@@ -321,7 +332,7 @@ public class ReviewReplyService {
             // Same reason, for the same rule: approving is the last step before a reply is meant
             // to be posted, and the channel says one already is.
             requireChannelNotAnswered(review);
-            // …and a delegate already holds this reply for the seller's phone approval.
+            // …and the seller already approved it for a delegate, here or on the phone.
             requireNotDelegated(orgId, reviewId);
             requireNoForbiddenPhrase(orgId, bound.getBody());
             // Approve the version you actually saw. If the head moved on, binding to the newer
@@ -337,6 +348,10 @@ public class ReviewReplyService {
             int headVersion = drafts.latest(reviewId).map(ReviewReplyDraft::getVersion).orElse(0);
             if (baseVersion.intValue() != headVersion) {
                 throw ApiException.conflict("이미 최신 초안이 있습니다. 새로고침 후 다시 시도하세요.");
+            }
+            // The same draft waits on the phone (2026-10-25); approving here takes it back from there first.
+            if (delegated != null) {
+                delegated.yieldToApprovalHere(orgId, reviewId);
             }
         });
         ReviewReplyApprovalResponse decided = approvals.decide(orgId, reviewId, actionRef, target,

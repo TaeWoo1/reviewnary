@@ -25,4 +25,14 @@ public interface VendorReviewRefRepository extends JpaRepository<VendorReviewRef
             + "and t.disposition = com.sellerops.attention.triage.TriageDisposition.NO_ACTION "
             + "and t.decidedBy like 'SELLER:%')")
     List<VendorReviewRef> sellerNoReplyUnreported(@Param("store") UUID vendorStoreId);
+
+    /**
+     * A store's reviews that need a reply and have a draft on this PC — what the phone's 「할 일」 mirrors (2026-10-25).
+     * The rest of the rule (not answered, not approved here, the review unchanged) is the service's.
+     */
+    @Query("select r from VendorReviewRef r where r.vendorStoreId = :store "
+            + "and exists (select 1 from ReviewTriage t where t.reviewId = r.reviewId "
+            + "and t.disposition = com.sellerops.attention.triage.TriageDisposition.RESPONSE_NEEDED) "
+            + "and exists (select 1 from ReviewReplyDraft d where d.reviewId = r.reviewId)")
+    List<VendorReviewRef> draftedForReply(@Param("store") UUID vendorStoreId);
 }

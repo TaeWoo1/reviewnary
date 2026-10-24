@@ -39,6 +39,17 @@ interface ApprovalAttempt {
   commandId: string;
 }
 
+/** How long the editor waits after the last keystroke before it saves itself (mockup ①, 2026-10-25). */
+export const AUTOSAVE_AFTER_MS = 1500;
+
+/** 「10:08」 — when a version was written, for the status line. */
+function clockOf(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "";
+  return at.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
 /** What the panel is currently doing, so only one write is ever in flight. */
 type Busy = null | "saving" | "approving" | "withdrawing" | "starting" | "reporting";
 
@@ -87,6 +98,58 @@ export function draftProvenanceNote(authorKind: string | null, approved: boolean
   if (authorKind === "SELLER") return "아래 초안은 판매자가 직접 쓴 문장입니다.";
   if (authorKind === "RULE") return `아래 초안은 저장된 문구에서 시작합니다.${check}`;
   return null;
+}
+
+/**
+ * The one line beside 「답변 초안」 that says where the draft stands (mockup ①, 2026-10-25): being saved, not saved,
+ * changed on the phone, something to fix, or checked. The service saves and checks; the seller only reads this.
+ */
+function DraftStatus({
+  saving,
+  saveFailed,
+  onRetry,
+  hasDraft,
+  fromPhoneAt,
+  toFix,
+}: {
+  saving: boolean;
+  saveFailed: boolean;
+  onRetry: () => void;
+  hasDraft: boolean;
+  fromPhoneAt: string | null;
+  toFix: number;
+}) {
+  const dot = (tone: string) => <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${tone}`} />;
+  let content: React.ReactNode = null;
+  if (saveFailed) {
+    content = (
+      <span className="inline-flex items-center gap-1.5 text-bad">
+        {dot("bg-bad")}저장 실패 ·{" "}
+        <button type="button" onClick={onRetry} className="underline underline-offset-2">
+          다시 시도
+        </button>
+      </span>
+    );
+  } else if (saving) {
+    content = <span className="inline-flex items-center gap-1.5 text-muted">{dot("bg-muted")}저장 중…</span>;
+  } else if (!hasDraft) {
+    content = null;
+  } else if (toFix > 0) {
+    content = <span className="inline-flex items-center gap-1.5 text-bad">{dot("bg-bad")}고칠 곳 {toFix}</span>;
+  } else if (fromPhoneAt != null) {
+    content = (
+      <span className="inline-flex items-center gap-1.5 text-warn">
+        {dot("bg-warn")}휴대폰에서 고침{clockOf(fromPhoneAt) ? ` · ${clockOf(fromPhoneAt)}` : ""}
+      </span>
+    );
+  } else {
+    content = <span className="inline-flex items-center gap-1.5 text-good">{dot("bg-good")}검사 통과</span>;
+  }
+  return (
+    <span aria-live="polite" className="text-xs font-semibold" data-testid="draft-status">
+      {content}
+    </span>
+  );
 }
 
 export function VocItemReplyPrep({
@@ -218,8 +281,22 @@ export function VocItemReplyPrep({
   const [manualCopy, setManualCopy] = useState<string | null>(null);
   const [body, setBody] = useState("");
   // True once the operator has touched the editor, so a reload does not silently discard
-  // their typing by re-seeding from the server.
+  // their typing by re-seeding from the server. The editor saves itself after a pause (mockup ①, 2026-10-25), so
+  // this is the window between a keystroke and its save — also true for a suggestion no one has saved yet.
   const [dirty, setDirty] = useState(false);
+  // The last save failed: the text stays in the box and the status line offers 「다시 시도」.
+  const [saveFailed, setSaveFailed] = useState(false);
+  // What this screen was typing when the phone's edit landed first (a 409 on save): kept for the seller to choose.
+  const [localAside, setLocalAside] = useState<string | null>(null);
+  // The latest editor text and dirtiness, for a save that finishes after more typing.
+  const bodyRef = useRef("");
+  bodyRef.current = body;
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
+  const saveRef = useRef<(() => Promise<void>) | null>(null);
+  const dispositionRef = useRef(disposition);
+  dispositionRef.current = disposition;
+  const refreshRef = useRef<(() => Promise<void>) | null>(null);
   // A guided reply-submission run in progress (after 네이버에서 직접 답변하기, before the operator
   // reports). Local and re-enterable: the ref is single-use, so backing out just re-mints on reopen.
   const [guided, setGuided] = useState<GuidedRun | null>(null);
@@ -285,11 +362,33 @@ export function VocItemReplyPrep({
       // Seed the editor once: the saved draft if there is one, else the suggestion. Never
       // over an edit in progress — see `dirty`.
       setBody((current) => (current === "" ? (next.draft?.body ?? next.suggestion.body) : current));
+      // A suggestion nobody saved is saved like any edit: the service prepares the draft, the seller only judges it.
+      if (next.draft == null && next.capabilities.canSave && dispositionRef.current === "RESPONSE_NEEDED"
+          && next.suggestion.body.trim() !== "") {
+        setDirty(true);
+      }
     })();
     return () => {
       active = false;
     };
   }, [load]);
+
+  // Saves itself a moment after the last keystroke — no 「초안 저장」 to press (mockup ①, 2026-10-25).
+  useEffect(() => {
+    if (!dirty) return;
+    const timer = setTimeout(() => void saveRef.current?.(), AUTOSAVE_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [body, dirty]);
+
+  // The same draft is on the seller's phone: a quiet panel re-reads now and then, so an edit made there shows here.
+  const linked = prep?.delegation != null;
+  useEffect(() => {
+    if (!linked) return;
+    const timer = setInterval(() => {
+      if (!dirtyRef.current && !inFlight.current) void refreshRef.current?.();
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [linked]);
 
   if (loadFailed) {
     return (
@@ -353,35 +452,81 @@ export function VocItemReplyPrep({
 
   async function refresh() {
     const next = await load();
-    if (next != null && !dirty) {
+    if (next != null && !dirtyRef.current) {
       setBody(next.draft?.body ?? next.suggestion.body);
     }
   }
+  refreshRef.current = refresh;
 
-  /** Saves the editor — or {@code text}, a change the seller pressed for in 걸린 표현, which also becomes the editor's. */
+  /**
+   * Saves the editor — or {@code text}, a change the seller pressed for in 걸린 표현 or the set-aside words they chose,
+   * which also becomes the editor's. Typing that arrived during the save stays unsaved and saves itself next.
+   */
   async function save(text?: string) {
-    if (inFlight.current || !canSave) {
+    if (inFlight.current || !canSave || approved) {
       return;
     }
+    const sending = text ?? bodyRef.current;
+    if (sending.trim() === "") return;
     inFlight.current = true;
     setBusy("saving");
     setFailed(null);
+    setSaveFailed(false);
     try {
-      if (text != null) setBody(text);
-      await api.saveReviewReplyDraft(accountId, actionRef, { body: text ?? body, baseVersion });
-      setDirty(false);
+      if (text != null) {
+        setBody(text);
+        bodyRef.current = text;
+      }
+      await api.saveReviewReplyDraft(accountId, actionRef, { body: sending, baseVersion });
+      const still = bodyRef.current !== sending;
+      setDirty(still);
+      dirtyRef.current = still;
       // Before the re-read, so the row pins itself open on the save itself rather than on
       // the read that follows it — a failed refresh must not cost the operator their panel.
       onPrepared?.();
       await refresh();
-    } catch {
-      // No detail: the actionable fact is "it did not save". A status code tells the
-      // operator nothing, and a server message risks surfacing what this UI should not.
-      setFailed("초안을 저장하지 못했습니다. 다시 시도해 주세요.");
+    } catch (e) {
+      const response = (e as { response?: { status?: number; data?: { message?: string } } })?.response;
+      if (response?.status === 409 && (response.data?.message ?? "").includes("최신 초안")) {
+        // The phone's edit landed first. Its words lead; this screen's are kept aside, not thrown away.
+        setLocalAside(sending);
+        setDirty(false);
+        dirtyRef.current = false;
+        await refresh();
+      } else {
+        // No detail: the actionable fact is "it did not save". A status code tells the
+        // operator nothing, and a server message risks surfacing what this UI should not.
+        setSaveFailed(true);
+      }
     } finally {
       inFlight.current = false;
       setBusy(null);
     }
+  }
+  saveRef.current = () => save();
+
+  // The words this screen was writing when the phone's edit led — this session's, or a saved version the server kept.
+  const aside = dirty ? null : (localAside ?? delegation?.setAside?.body ?? null);
+
+  /** 「휴대폰 문장 쓰기」: the phone's words stay the draft; the set-aside ones are let go. */
+  async function keepPhoneWords() {
+    if (inFlight.current) return;
+    setLocalAside(null);
+    if (delegation?.setAside != null && reviewId != null) {
+      try {
+        await api.dropReplySetAside(reviewId);
+      } catch {
+        setFailed("처리하지 못했습니다. 다시 시도해 주세요.");
+      }
+      await refresh();
+    }
+  }
+
+  /** 「이 PC 문장 쓰기」: the set-aside words become the newest draft, and go to the phone like any other edit. */
+  async function useAsideWords(words: string) {
+    if (inFlight.current) return;
+    setLocalAside(null);
+    await save(words);
   }
 
   async function decide(state: "APPROVED" | "WITHDRAWN") {
@@ -655,9 +800,21 @@ export function VocItemReplyPrep({
             출처 한 줄이 「아래 초안은 …」이라고 가리킨다. 편집기가 있을 때는 입력칸에 이름이 필요하므로
             `<label>`이 그대로 선다. 읽어 주는 이름은 양쪽 다 「답변 초안」으로 남는다. */}
         {approved ? null : (
-          <label htmlFor={editorId} className="text-sm font-semibold text-muted">
-            답변 초안
-          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor={editorId} className="text-sm font-semibold text-muted">
+              답변 초안
+            </label>
+            {canSave ? (
+              <DraftStatus
+                saving={dirty || busy === "saving"}
+                saveFailed={saveFailed}
+                onRetry={() => void save()}
+                hasDraft={draft != null}
+                fromPhoneAt={delegation?.draftFromPhone ? (draft?.createdAt ?? null) : null}
+                toFix={findings.filter((f) => f.kind === "FORBIDDEN").length}
+              />
+            ) : null}
+          </div>
         )}
         {draftProvenanceNote(prep.draftAuthorKind, approved) ? (
           <p className="text-sm text-muted">{draftProvenanceNote(prep.draftAuthorKind, approved)}</p>
@@ -677,8 +834,14 @@ export function VocItemReplyPrep({
             onChange={(e) => {
               setBody(e.target.value);
               setDirty(true);
+              setSaveFailed(false);
             }}
-            readOnly={!canSave || working}
+            onBlur={() => {
+              // Leaving the box is a pause too: save now rather than after the timer.
+              if (dirtyRef.current) void save();
+            }}
+            // Typing goes on while the panel saves itself: a save only takes what was in the box when it began.
+            readOnly={!canSave || (working && busy !== "saving")}
             rows={5}
             className="w-full rounded-lg border border-line bg-white p-2 text-sm text-ink"
           />
@@ -720,19 +883,8 @@ export function VocItemReplyPrep({
             말하려고 비활성으로 남아 있었고 그 이유는 지켜보기일 때 옳다. 승인일 때의 이유는 다르다 —
             초안이 얼어 있는 것이고, 그 사실은 바로 아래 한 줄이 말하며 승인 해제가 되돌린다. 기본 화면에서
             눌리지 않는 회색 단추 하나가 줄어든다. */}
-        {approved ? null : (
-          <button
-            type="button"
-            aria-disabled={!canSave || working}
-            aria-busy={busy === "saving"}
-            onClick={() => void save()}
-            className={`rounded-lg px-2.5 py-1 text-sm font-semibold ${
-              canSave && !working ? "bg-canvas text-ink" : "bg-canvas text-muted opacity-40"
-            }`}
-          >
-            초안 저장
-          </button>
-        )}
+        {/* No 「초안 저장」: the editor saves itself after a pause, and the status line beside its label says where
+            it stands (mockup ①, 2026-10-25). */}
         {/* Rendered inert rather than removed once a draft exists. The card removes a
             control when the row can NEVER carry the action (no ref); here the truth is
             "not while this review is 지켜보기" — a reason, and one the operator can reverse.
@@ -807,11 +959,7 @@ export function VocItemReplyPrep({
             a control the mint would refuse. Absent reason ⇒ nothing rendered. */}
         {/* 컨트롤 줄에 섞여 있던 긴 설명 둘은 아래 각주 묶음으로 내려갔다. 여기 남는 것은 눌렀을 때
             무엇이 막혔는지를 말하는 짧은 상태들뿐이다. */}
-        {capabilities.canApprove && dirty ? (
-          <span className="text-sm text-muted">
-            저장하지 않은 변경이 있습니다. 먼저 초안을 저장하세요.
-          </span>
-        ) : null}
+
         {approved && !canCopy ? (
           <span className="text-sm text-muted">
             '대응 필요'로 되돌리면 복사할 수 있습니다.
@@ -820,11 +968,41 @@ export function VocItemReplyPrep({
       </div>
       {phraseBlock != null && delegation == null ? <p className="break-keep text-sm text-muted">{phraseBlock}</p> : null}
 
+      {aside != null && !approved ? (
+        <div
+          role="group"
+          aria-label="이 PC에서 쓰던 문장"
+          className="flex flex-col gap-2 rounded-lg border border-line bg-white p-2"
+        >
+          <p className="text-sm font-semibold text-muted">이 PC에서 쓰던 문장</p>
+          <p className="whitespace-pre-wrap break-keep text-sm text-muted">{aside}</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              aria-disabled={working}
+              onClick={() => void keepPhoneWords()}
+              className="rounded-lg bg-white px-2.5 py-1 text-sm font-semibold text-ink ring-1 ring-line"
+            >
+              휴대폰 문장 쓰기
+            </button>
+            <button
+              type="button"
+              aria-disabled={working}
+              onClick={() => void useAsideWords(aside)}
+              className="rounded-lg bg-white px-2.5 py-1 text-sm font-semibold text-ink ring-1 ring-line"
+            >
+              이 PC 문장 쓰기
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {delegation != null && reviewId != null ? (
         <DelegatedReplyControls
           delegation={delegation}
           reviewId={reviewId}
-          dirty={dirty}
+          baseVersion={baseVersion}
+          dirty={dirty || aside != null}
           disabled={working}
           blocked={phraseBlock}
           onChanged={refresh}
@@ -991,7 +1169,6 @@ export function VocItemReplyPrep({
           before its content changes or assistive tech never registers on it. Empty renders
           as nothing, so there is no visual cost. */}
       <p aria-live="polite" className="text-sm text-muted">
-        {busy === "saving" ? "저장 중…" : ""}
         {busy === "approving" ? "승인 중…" : ""}
         {busy === "withdrawing" ? "승인 해제 중…" : ""}
         {/* Honest about who sends. The product does not post this anywhere, and the moment

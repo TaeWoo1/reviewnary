@@ -517,15 +517,16 @@ export const api = {
     return data;
   },
   // The delegate lane for one review (§4): each is the seller's own press; nothing here runs on its own.
-  async handOverReviewReply(reviewId: string): Promise<VendorReplyTaskView> {
-    const { data } = await http.post<VendorReplyTaskView>(`/api/local/vendor-link/reviews/${reviewId}/hand-over`);
+  /** 「답글 등록 요청」 on exactly the draft version the screen shows. */
+  async handOverReviewReply(reviewId: string, baseVersion: number): Promise<VendorReplyTaskView> {
+    const { data } = await http.post<VendorReplyTaskView>(`/api/local/vendor-link/reviews/${reviewId}/hand-over`, {
+      baseVersion,
+    });
     return data;
   },
-  async requestPhoneApproval(reviewId: string): Promise<VendorReplyTaskView> {
-    const { data } = await http.post<VendorReplyTaskView>(
-      `/api/local/vendor-link/reviews/${reviewId}/approval-request`,
-    );
-    return data;
+  /** 「휴대폰 문장 쓰기」: the phone's edit stays, and this PC's set-aside version is no longer offered. */
+  async dropReplySetAside(reviewId: string): Promise<void> {
+    await http.post(`/api/local/vendor-link/reviews/${reviewId}/set-aside/drop`);
   },
   async cancelReviewReplyDelegation(reviewId: string): Promise<VendorReplyTaskView> {
     const { data } = await http.post<VendorReplyTaskView>(`/api/local/vendor-link/reviews/${reviewId}/cancel`);

@@ -17,10 +17,20 @@ import java.util.UUID;
 public interface DelegatedReplyLane {
 
     /**
-     * True while a task on the review is open, and after a delegate reported it posted: a reply that is out (as far
-     * as anyone has said) must not be followed by a second one from this PC.
+     * True while a task the seller approved is open, and after a delegate reported it posted: a reply that is out (as
+     * far as anyone has said) must not be followed by a second one from this PC. A draft that only waits on the phone
+     * (2026-10-25: every draft does) does not hold the review — see {@link #yieldToApprovalHere}.
      */
     boolean holds(UUID orgId, UUID reviewId);
+
+    /**
+     * The seller approves the review here, for the copy or guided road: an unapproved draft waiting on the phone is
+     * withdrawn first, so the phone cannot approve a second reply. Refuses (409 / 503) when it cannot be withdrawn.
+     */
+    default void yieldToApprovalHere(UUID orgId, UUID reviewId) {}
+
+    /** A draft version was saved here; the lane brings the phone's copy up to it soon. Never fails the save. */
+    default void draftSaved(UUID orgId, UUID reviewId) {}
 
     /**
      * What the review panel shows of the lane, or null when this review cannot travel through it (not received from

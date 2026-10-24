@@ -50,8 +50,11 @@ public class ReviewWorkController {
      */
     static final Set<String> WITH_THE_DELEGATE =
             Set.of("APPROVED", "CLAIMED", "CANCEL_REQUESTED", "HOLD_REQUESTED", "UNKNOWN", "POSTED");
-    /** Lane states that put the reply back in front of the seller; the row says which, not a plain 승인 대기. */
-    static final Set<String> BACK_WITH_THE_SELLER = Set.of("AWAITING_APPROVAL", "RECHECK_NEEDED", "HELD", "FAILED");
+    /**
+     * Lane states that put the reply back in front of the seller; the row says which, not a plain 승인 대기. A draft
+     * only waiting on the phone is not one of them (2026-10-25: every draft is on the phone) — it is plain 승인 대기.
+     */
+    static final Set<String> BACK_WITH_THE_SELLER = Set.of("RECHECK_NEEDED", "HELD", "FAILED");
 
     private final OperationsHomeService home;
     private final OperatorAttentionService attention;

@@ -278,7 +278,7 @@ class VendorLinkServiceTest {
 
         @Override
         public TaskSnapshot submitDraft(String installToken, UUID storeId, UUID reviewId, String body,
-                                        DraftMeta meta) {
+                                        DraftMeta meta, Integer baseVersion) {
             throw new UnsupportedOperationException();
         }
 

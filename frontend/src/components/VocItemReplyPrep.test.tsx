@@ -253,10 +253,13 @@ describe("VocItemReplyPrep", () => {
         capabilities: { canSave: true, canApprove: true, canWithdraw: false, canCopy: false, canStartSubmissionRun: false },
       }),
     );
-    await user.click(screen.getByRole("button", { name: "초안 저장" }));
+    expect(screen.queryByRole("button", { name: "초안 저장" })).toBeNull();
+    await user.type(screen.getByLabelText("답변 초안"), "-수정");
+    // Leaving the box saves at once; otherwise the editor saves itself after a pause.
+    await user.tab();
     await waitFor(() =>
       expect(api.saveReviewReplyDraft).toHaveBeenCalledWith(ACCOUNT, REF, {
-        body: "합성-저장된-초안",
+        body: "합성-저장된-초안-수정",
         baseVersion: 3,
       }),
     );
@@ -272,7 +275,7 @@ describe("VocItemReplyPrep", () => {
       }),
     );
     expect(screen.getByLabelText("답변 초안")).toHaveAttribute("readonly");
-    expect(inert(screen.getByRole("button", { name: "초안 저장" }))).toBe(true);
+    expect(screen.queryByTestId("draft-status")).toBeNull();
     // The reason is stated, not left as a dead control.
     expect(screen.getByText(/'대응 필요'로 기록된 리뷰만/)).toBeTruthy();
   });
@@ -284,7 +287,8 @@ describe("VocItemReplyPrep", () => {
         capabilities: { canSave: false, canApprove: false, canWithdraw: false, canCopy: false, canStartSubmissionRun: false },
       }),
     );
-    await user.click(screen.getByRole("button", { name: "초안 저장" }));
+    await user.click(screen.getByLabelText("답변 초안"));
+    await user.tab();
     expect(api.saveReviewReplyDraft).not.toHaveBeenCalled();
   });
 
@@ -422,7 +426,7 @@ describe("VocItemReplyPrep", () => {
     await user.type(screen.getByLabelText("답변 초안"), "-수정");
 
     expect(inert(approve)).toBe(true);
-    expect(screen.getByText(/저장하지 않은 변경이 있습니다/)).toBeTruthy();
+    expect(screen.getByTestId("draft-status").textContent).toBe("저장 중…");
     await user.click(approve);
     expect(api.decideReviewReplyApproval).not.toHaveBeenCalled();
   });
@@ -508,12 +512,12 @@ describe("VocItemReplyPrep", () => {
     const user = userEvent.setup();
     await renderStale(STALE_SAVEABLE);
 
-    expect(inert(screen.getByRole("button", { name: "초안 저장" }))).toBe(true);
     expect(screen.getByLabelText("답변 초안")).toHaveAttribute("readonly");
     // The reason renders — it used to be gated on the very flag that was stale.
     expect(screen.getByText(/'대응 필요'로 기록된 리뷰만/)).toBeTruthy();
 
-    await user.click(screen.getByRole("button", { name: "초안 저장" }));
+    await user.click(screen.getByLabelText("답변 초안"));
+    await user.tab();
     expect(api.saveReviewReplyDraft).not.toHaveBeenCalled();
   });
 
@@ -635,19 +639,23 @@ describe("VocItemReplyPrep", () => {
    * ahead of the saved draft while `approvable` read clean — so 승인 would bind the text the
    * operator had just replaced. The editor is inert while the write is in flight.
    */
-  it("accepts no keystroke while a save is in flight", async () => {
+  it("keeps typing while it saves itself", async () => {
     const user = userEvent.setup();
     let resolveSave: (v: ReviewReplyDraft) => void = () => {};
-    vi.mocked(api.saveReviewReplyDraft).mockReturnValue(
+    vi.mocked(api.saveReviewReplyDraft).mockReturnValueOnce(
       new Promise<ReviewReplyDraft>((r) => {
         resolveSave = r;
       }),
     );
     await renderPanel();
 
-    await user.click(screen.getByRole("button", { name: "초안 저장" }));
     const editor = await screen.findByLabelText("답변 초안");
-    await waitFor(() => expect(editor).toHaveAttribute("readonly"));
+    await user.type(editor, "-가");
+    await user.tab();
+    await waitFor(() => expect(api.saveReviewReplyDraft).toHaveBeenCalledTimes(1));
+    expect(editor).not.toHaveAttribute("readonly");
+    await user.type(editor, "-나");
+    expect((editor as HTMLTextAreaElement).value).toBe("합성-추천-초안-가-나");
 
     resolveSave({
       version: 1,
@@ -664,10 +672,13 @@ describe("VocItemReplyPrep", () => {
     const user = userEvent.setup();
     vi.mocked(api.saveReviewReplyDraft).mockRejectedValue(new Error("409 stale base"));
     await renderPanel();
-    await user.click(screen.getByRole("button", { name: "초안 저장" }));
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("초안을 저장하지 못했습니다. 다시 시도해 주세요.");
-    expect(alert.textContent).not.toMatch(/409|stale/);
+    await user.type(screen.getByLabelText("답변 초안"), "-수정");
+    await user.tab();
+    const status = screen.getByTestId("draft-status");
+    await waitFor(() => expect(status.textContent).toBe("저장 실패 · 다시 시도"));
+    expect(status.textContent).not.toMatch(/409|stale/);
+    await user.click(screen.getByRole("button", { name: "다시 시도" }));
+    await waitFor(() => expect(api.saveReviewReplyDraft).toHaveBeenCalledTimes(2));
   });
 
   it("fails closed when the prep read fails", async () => {
