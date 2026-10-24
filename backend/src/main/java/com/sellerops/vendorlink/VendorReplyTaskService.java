@@ -49,7 +49,7 @@ import org.springframework.stereotype.Service;
  *
  * <ol>
  *   <li><b>Only a draft the seller sends leaves this PC.</b> {@link #requestApproval} is the seller pressing
- *       「휴대폰으로 승인 요청」 for a review's current draft, {@link #handOver} is 「승인하고 담당자에게 맡기기」 — the
+ *       「휴대폰으로 승인 요청」 for a review's current draft, {@link #handOver} is 「답글 등록 요청」 — the
  *       same draft approved here and now (D9). Nothing is sent on its own.</li>
  *   <li><b>Only the seller's own 'no reply' is told to the server.</b> {@link #reportNoReply} sends a review whose
  *       triage a person set to {@code NO_ACTION}; an automated judgement is never sent.</li>
@@ -251,7 +251,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
     }
 
     /**
-     * 「승인하고 담당자에게 맡기기」 (D9): the seller, at this PC, sends the review's current draft and approves exactly
+     * 「답글 등록 요청」 (D9): the seller, at this PC, sends the review's current draft and approves exactly
      * that version and text in one press — the delegate can claim it without a trip to the phone. If the approval is
      * refused after the draft went, the task stays awaiting approval on the phone and the seller is told so.
      */

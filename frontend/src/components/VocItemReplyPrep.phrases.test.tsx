@@ -111,7 +111,7 @@ describe("VocItemReplyPrep · 걸린 표현", () => {
       prepView(BODY, FINDINGS, { taskState: null, editedOnMobile: false, canSend: true, canCancel: false }));
     mount();
 
-    const handOver = await screen.findByRole("button", { name: "승인하고 담당자에게 맡기기" });
+    const handOver = await screen.findByRole("button", { name: "답글 등록 요청" });
     expect(handOver.getAttribute("aria-disabled")).toBe("true");
     expect(screen.getByRole("button", { name: "휴대폰으로 승인 요청" }).getAttribute("aria-disabled")).toBe("true");
     await userEvent.click(handOver);

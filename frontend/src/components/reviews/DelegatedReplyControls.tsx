@@ -247,7 +247,7 @@ export function DelegatedReplyControls({
                   canSend && !working ? "bg-brand-700 text-white hover:bg-brand-800" : "bg-canvas text-muted opacity-40"
                 }`}
               >
-                승인하고 담당자에게 맡기기
+                답글 등록 요청
               </button>
               <button
                 type="button"
@@ -284,8 +284,8 @@ export function DelegatedReplyControls({
       ) : null}
       {delegation.canSend && state == null ? (
         <p className="text-xs leading-relaxed text-muted">
-          맡기면 담당자가 판매자센터에 이 문장 그대로 등록합니다. 휴대폰으로 보내면 휴대폰에서 승인한 뒤 담당자가
-          등록합니다. 누르기 전에는 아무것도 보내지 않습니다.
+          「답글 등록 요청」을 누르면 이 문장 그대로 승인되고, 담당자가 판매자센터에 등록합니다. 휴대폰으로 보내면
+          휴대폰에서 승인한 뒤 담당자가 등록합니다. 누르기 전에는 아무것도 보내지 않습니다.
         </p>
       ) : null}
       {state != null && !AWAITING.has(state) && !["FAILED", "CANCELLED", "INVALIDATED", "POSTED"].includes(state) ? (
@@ -301,7 +301,7 @@ export function DelegatedReplyControls({
       ) : null}
       {state != null && AWAITING.has(state) && state !== "HELD" ? (
         <p className="text-xs leading-relaxed text-muted">
-          휴대폰에 보낸 동안에는 여기서 따로 승인할 수 없습니다. 여기서 맡기면 휴대폰 승인 없이 바로 담당자에게 갑니다.
+          휴대폰에 보낸 동안에는 여기서 따로 승인할 수 없습니다. 여기서 「답글 등록 요청」을 누르면 휴대폰 승인 없이 바로 담당자에게 갑니다.
         </p>
       ) : null}
       {state === "HELD" ? (

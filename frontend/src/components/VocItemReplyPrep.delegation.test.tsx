@@ -75,7 +75,7 @@ describe("VocItemReplyPrep · delegate lane", () => {
     vi.mocked(api.getReviewReplyPrep).mockResolvedValue(prepView(READY));
     const { container } = mount();
 
-    const handOver = await screen.findByRole("button", { name: "승인하고 담당자에게 맡기기" });
+    const handOver = await screen.findByRole("button", { name: "답글 등록 요청" });
     expect(handOver.className).toContain("bg-brand-700");
     expect(screen.getByRole("button", { name: "휴대폰으로 승인 요청" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "승인" }).className).not.toContain("bg-brand-700");
@@ -98,11 +98,11 @@ describe("VocItemReplyPrep · delegate lane", () => {
     });
     mount();
 
-    await user.click(await screen.findByRole("button", { name: "승인하고 담당자에게 맡기기" }));
+    await user.click(await screen.findByRole("button", { name: "답글 등록 요청" }));
     expect(api.handOverReviewReply).toHaveBeenCalledWith(REVIEW);
     expect(await screen.findByText("승인됨 · 담당자 등록 대기")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "승인" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "승인하고 담당자에게 맡기기" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "답글 등록 요청" })).toBeNull();
     expect(screen.getByRole("button", { name: "요청 취소" })).toBeTruthy();
   });
 
@@ -129,7 +129,7 @@ describe("VocItemReplyPrep · delegate lane", () => {
     mount();
 
     await user.click(await screen.findByRole("button", { name: "승인" }));
-    const handOver = screen.getByRole("button", { name: "승인하고 담당자에게 맡기기" });
+    const handOver = screen.getByRole("button", { name: "답글 등록 요청" });
     await waitFor(() => expect(handOver.getAttribute("aria-disabled")).toBe("true"));
     await user.click(handOver);
     await user.click(screen.getByRole("button", { name: "고친 초안 다시 보내기" }));
@@ -164,7 +164,7 @@ describe("VocItemReplyPrep · delegate lane", () => {
     mount();
 
     expect(await screen.findByRole("button", { name: "고친 초안 다시 보내기" })).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "승인하고 담당자에게 맡기기" }));
+    await user.click(screen.getByRole("button", { name: "답글 등록 요청" }));
     expect(await screen.findByRole("alert")).toHaveProperty(
       "textContent",
       "답글은 보냈지만 승인하지 못했습니다. 휴대폰에서 승인하거나 다시 시도하세요.",

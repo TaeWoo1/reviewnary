@@ -156,7 +156,7 @@ class VendorRelayWireIT {
                     assertThat(recorded.getRecordedFingerprint()).isEqualTo(fingerprint);
                 });
 
-        // 「승인하고 담당자에게 맡기기」 on another review: approved on the server by this PC, listed for the delegate,
+        // 「답글 등록 요청」 on another review: approved on the server by this PC, listed for the delegate,
         // then taken back with 「요청 취소」.
         Review handed = stored.stream().filter(r -> !r.getId().equals(answer.getId())
                 && r.getReplyState() != com.sellerops.review.ReviewReplyState.ANSWERED).findFirst().orElseThrow();

@@ -1391,7 +1391,7 @@ export interface ReviewReplyDelegation {
   /** The latest task's server state, or null when none was ever opened. */
   taskState: string | null;
   editedOnMobile: boolean;
-  /** 「승인하고 담당자에게 맡기기」 · 「휴대폰으로 승인 요청」 may be pressed. */
+  /** 「답글 등록 요청」 · 「휴대폰으로 승인 요청」 may be pressed. */
   canSend: boolean;
   /** 「요청 취소」 may be pressed. */
   canCancel: boolean;

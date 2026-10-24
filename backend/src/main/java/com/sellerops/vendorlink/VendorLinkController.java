@@ -107,7 +107,7 @@ public class VendorLinkController {
         return replyTasks.requestApproval(principal.orgId(), reviewId);
     }
 
-    /** 「승인하고 담당자에게 맡기기」: sends the current draft and approves it here, for a delegate to post (§4, D9). */
+    /** 「답글 등록 요청」: sends the current draft and approves it here, for a delegate to post (§4, D9). */
     @PostMapping("/reviews/{reviewId}/hand-over")
     public VendorReplyTaskService.TaskView handOver(@AuthenticationPrincipal AuthPrincipal principal,
                                                     @PathVariable UUID reviewId) {
