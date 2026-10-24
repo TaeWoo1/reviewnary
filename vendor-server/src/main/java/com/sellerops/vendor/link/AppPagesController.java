@@ -9,17 +9,18 @@ import org.springframework.web.bind.annotation.GetMapping;
  * claims an approved reply, checks once more just before saving, copies it into Seller Center by hand and reports,
  * and uploads a store's review export.
  * Static files under {@code static/replies/}, {@code static/delegate/} and {@code static/assets/}; this only maps the
- * bare paths. Both pages sign in through the ordinary API and hold no credential the API does not already give.
+ * bare paths, with or without a trailing slash (a pasted {@code /delegate/} once gave a 404). Both pages sign in
+ * through the ordinary API and hold no credential the API does not already give.
  */
 @Controller
 public class AppPagesController {
 
-    @GetMapping("/replies")
+    @GetMapping({"/replies", "/replies/"})
     public String replies() {
         return "forward:/replies/index.html";
     }
 
-    @GetMapping("/delegate")
+    @GetMapping({"/delegate", "/delegate/"})
     public String delegate() {
         return "forward:/delegate/index.html";
     }
@@ -28,7 +29,7 @@ public class AppPagesController {
      * A delegate accepts an invite: password → authenticator → recovery codes. The invite code arrives in the link's
      * fragment ({@code /delegate/join#…}), which a browser never sends to any server; the page clears it on load.
      */
-    @GetMapping("/delegate/join")
+    @GetMapping({"/delegate/join", "/delegate/join/"})
     public String join() {
         return "forward:/delegate/join.html";
     }
@@ -37,7 +38,7 @@ public class AppPagesController {
      * A seller accepts an invite: the invited address is shown first, then a password, then the two next steps (link
      * the PC, open the phone page). The code arrives in the fragment ({@code /join#…}) like the delegate's.
      */
-    @GetMapping("/join")
+    @GetMapping({"/join", "/join/"})
     public String sellerJoin() {
         return "forward:/join/index.html";
     }

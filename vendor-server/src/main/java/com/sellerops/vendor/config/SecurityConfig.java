@@ -94,6 +94,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/v1/installs/me").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.GET, "/link", "/link/*", "/replies", "/replies/*", "/delegate",
                                 "/delegate/*", "/join", "/join/*", "/assets/*").permitAll()
+                        // The same pages typed with a slash on the end: "/link/*" does not match "/link/".
+                        .requestMatchers(HttpMethod.GET, "/link/", "/replies/", "/delegate/", "/delegate/join/",
+                                "/join/").permitAll()
                         .requestMatchers(HttpMethod.POST, "/v1/installs/pending", "/v1/installs/approve",
                                 "/v1/installs/step-up", "/v1/installs/step-up/verify").hasRole(SELLER)
                         .requestMatchers(HttpMethod.GET, "/v1/installs").hasRole(SELLER)

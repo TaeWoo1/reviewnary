@@ -370,6 +370,23 @@ class VendorServerSecurityTest {
     }
 
     /**
+     * A page address is often typed or pasted with a slash on the end; it must open the same page, not a 404 (found
+     * 2026-10-24 on the screens-only loop: {@code /delegate/}). The query stays — {@code /link/?code=…} still carries
+     * its code to the page.
+     */
+    @Test
+    void aPageAddressWithATrailingSlashOpensTheSamePage() throws Exception {
+        for (String page : List.of("/link", "/replies", "/delegate", "/delegate/join", "/join")) {
+            String target = mvc.perform(get(page)).andReturn().getResponse().getForwardedUrl();
+            mvc.perform(get(page + "/")).andExpect(status().isOk())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl(target));
+        }
+        mvc.perform(get("/link/").param("code", "BCDF-GHJK")).andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .forwardedUrl("/link/index.html"));
+    }
+
+    /**
      * The pages run under {@code default-src 'self'}, so inline code would simply not run — but a page that needed it
      * would be "fixed" by loosening the policy. And every server value is customer or seller text: it is written as
      * text, never parsed as HTML.
