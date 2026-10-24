@@ -260,7 +260,7 @@ export function OperationsCaseView({
             </section>
           ) : null
         ) : (
-          <WorkFlowCard ariaLabel="자동 확인과 내가 확인할 일" {...flowCells(detail, receipt !== null)} />
+          <WorkFlowCard ariaLabel="자동 확인과 내가 할 일" {...flowCells(detail, receipt !== null)} />
         )
       }
       notice={
@@ -469,7 +469,7 @@ function flowCells(detail: OperationsCaseDetail, taught: boolean) {
       line: detail.summary ? <span>{detail.summary}</span> : undefined,
     },
     // <b>Only when nothing below says it better</b> (Review Decision UX v3.2). With a draft written, the
-    // draft card IS 「내가 확인할 일」 — it names the recommendation and carries the controls that act on
+    // draft card IS 「내가 할 일」 — it names the recommendation and carries the controls that act on
     // it — so repeating it here was a second statement of the same thing, and the sentence under it
     // (「고객에게 무엇을 말하거나 약속할지는 판매자가 정합니다」) is a fact about the product, not about
     // this customer. With no draft there is no such block, and the cell is the only place the seller is
@@ -563,7 +563,7 @@ function caseWorkState(detail: OperationsCaseDetail): WorkStateKey {
  * <b>왜 지금 볼 일인가</b> (canonical mockup, 2026-10-02) — why this item is in front of the seller, as
  * facts rather than as reviewnary's own workflow vocabulary.
  *
- * <p>It replaces the two-cell 자동 확인 / 내가 확인할 일 strip in the full pane. The strip's left cell said
+ * <p>It replaces the two-cell 자동 확인 / 내가 할 일 strip in the full pane. The strip's left cell said
  * 「답변 초안 작성」 — a stage name — above the sentence that actually carried the reason, and its right cell
  * restated the lead badge.
  *

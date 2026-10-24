@@ -59,8 +59,8 @@ export const COPY = {
   // The tally's WINDOW, not the cadence. The cadence is 2 hours and stands in the header; this cell counts the
   // last 24 hours, and 「자동 확인 · 24시간」 put the two numbers side by side with nothing saying which was which.
   checkedLabel: "최근 24시간 자동 확인",
-  mineLabel: "내가 확인할 일",
-  listTitle: "확인할 일",
+  mineLabel: "내가 할 일",
+  listTitle: "할 일",
   /*
     <b>The list no longer has ONE order to name</b> (product-owner decision, 2026-10-01). It said
     「오래된 순」, which was true while one comparator ran across every lane — and that comparator is

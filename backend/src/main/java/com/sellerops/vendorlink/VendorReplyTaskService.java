@@ -952,6 +952,78 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
                 .toList();
     }
 
+    /**
+     * The store's posted replies the channel has not shown yet, asked again: the server's overdue judgement moves
+     * with time and uploads, not with a task change, so the change feed alone never brings it (2026-10-25).
+     */
+    void refreshPosted(VendorStoreBinding binding, String token) {
+        for (VendorReplyTask copy : tasks.findByVendorStoreIdAndState(binding.getVendorStoreId(), "POSTED")) {
+            boolean shown = reviews.findByIdAndOrgId(copy.getReviewId(), binding.getOrgId())
+                    .map(r -> r.getReplyState() == ReviewReplyState.ANSWERED).orElse(true);
+            if (!shown) {
+                apply(binding.getOrgId(), copy.getReviewId(), binding.getVendorStoreId(),
+                        link.client().task(token, copy.getVendorTaskId()));
+            }
+        }
+    }
+
+    /** One row of 「진행 중」 or 「끝난 일」 (mockup ③, 2026-10-25), the lane's facts only — the screen words them. */
+    public record BoardRow(UUID reviewId, String state, Instant since, boolean channelAnswered, boolean confirmOverdue,
+                           String preview, Integer rating) {}
+
+    /**
+     * 「진행 중」: someone else's to finish. 「끝난 일」: the last {@link #DONE_SHOWN} of what ended. {@code linked}: this
+     * PC has the delegate lane at all — without it there is no 진행 중 to count, which is not the same as zero.
+     */
+    public record Board(List<BoardRow> moving, List<BoardRow> done, boolean linked) {}
+
+    /** What a delegate, the server or the channel still has to finish — never the seller's. */
+    static final Set<String> MOVING = Set.of("APPROVED", "CLAIMED", "CANCEL_REQUESTED", "HOLD_REQUESTED", "UNKNOWN",
+            "POSTED");
+    /** How long 「끝난 일」 shows an ended task (owner decision 2026-10-25); the server keeps it by its own rule. */
+    static final java.time.Duration DONE_SHOWN = java.time.Duration.ofDays(30);
+
+    /**
+     * The lane's 「진행 중」 and 「끝난 일」: each review's newest task. A post is 진행 중 until the channel's own export
+     * shows a reply — then 끝난 일 — however long that takes; the server's overdue mark says when an operator looks.
+     * Failed, held and waiting tasks are the seller's, and are the to-do's to show.
+     */
+    public Board board(UUID orgId) {
+        if (link.installToken().isEmpty()) {
+            return new Board(List.of(), List.of(), false);
+        }
+        Map<UUID, VendorReplyTask> newest = new HashMap<>();
+        for (VendorReplyTask task : tasks.findByOrgId(orgId)) {
+            newest.merge(task.getReviewId(), task,
+                    (a, b) -> Comparator.comparing(VendorReplyTask::getCreatedAt).compare(a, b) >= 0 ? a : b);
+        }
+        Instant shownFrom = clock.instant().minus(DONE_SHOWN);
+        List<BoardRow> moving = new java.util.ArrayList<>();
+        List<BoardRow> done = new java.util.ArrayList<>();
+        for (VendorReplyTask task : newest.values()) {
+            Review review = reviews.findByIdAndOrgId(task.getReviewId(), orgId).orElse(null);
+            if (review == null) {
+                continue;
+            }
+            boolean answered = review.getReplyState() == ReviewReplyState.ANSWERED;
+            boolean ended = Set.of("CANCELLED", "INVALIDATED").contains(task.getState())
+                    || ("POSTED".equals(task.getState()) && answered);
+            if (!ended && !MOVING.contains(task.getState())) {
+                continue;
+            }
+            if (ended && task.getUpdatedAt().isBefore(shownFrom)) {
+                continue;
+            }
+            BoardRow row = new BoardRow(task.getReviewId(), task.getState(), task.getUpdatedAt(), answered,
+                    task.isConfirmOverdue(), VocPreviewSanitizer.sanitize(review.getBody()).text(), review.getRating());
+            (ended ? done : moving).add(row);
+        }
+        Comparator<BoardRow> latest = Comparator.comparing(BoardRow::since).reversed();
+        moving.sort(latest);
+        done.sort(latest);
+        return new Board(List.copyOf(moving), List.copyOf(done), true);
+    }
+
     /** Tells the server about the seller's own 'no reply' decisions in this store. Returns how many were sent. */
     int reportNoReply(VendorStoreBinding binding, String token) {
         int sent = 0;
@@ -992,6 +1064,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         task.setApprovedFingerprint(snapshot.approvedFingerprint());
         task.setEditedOnMobile(snapshot.editedOnMobile());
         task.setBasisNote(snapshot.basisNoteJson());
+        task.setConfirmOverdue(snapshot.confirmOverdue());
         if (newlyApproved) {
             rememberApproved(orgId, reviewId, task, snapshot);
         }

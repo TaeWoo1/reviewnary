@@ -433,6 +433,17 @@ APPROVED(PC가 아직 검사하지 않은 휴대폰 버전) ──PC 검사 통�
   언제(`reported_at`) · 무엇을 보고(`report_method=OPERATOR_SELLER_CENTER_SCREEN`) 종결했는지 작업에 남는다. 담당자가 아직
   활동 중인 `UNKNOWN`은 그 담당자의 몫이라 운영자가 종결할 수 없다. 판매자는 PC · 휴대폰에서 「담당자가 확인 중」을 본다.
   판매자가 휴대폰에서 직접 확인을 요청하는 단추는 화면 시안이 필요해 아직 없다.
+- **오래 확인되지 않은 등록 보고 (2026-10-25 오너 결정).** `POSTED`는 시간이 지나도 완료로 바뀌지 않는다 — 채널의 엑셀이
+  답글을 보여 줄 때(`replied`)까지 판매자 화면의 「진행 중」에 남는다. 등록 보고 뒤 그 스토어의 새 업로드가
+  2번(`CONFIRM_UPLOADS`) 있었는데도 답글이 없거나, 업로드 없이 7일(`CONFIRM_WAIT`)이 지나면 서버가 작업 응답에
+  `confirmOverdue=true`를 싣는다(판정은 서버 하나). PC는 받기마다 아직 채널에 안 보인 `POSTED`를 다시 물어 그 값을 받고
+  (`vendor_reply_task.confirm_overdue`, V147), 「할 일 · 진행 중」에 「운영팀 확인」으로 보인다 — 판매자가 할 일은 없다.
+  운영자는 `unconfirmed`(스토어 · 리뷰번호 · 보고 시각 · 그 뒤 업로드 수, 리뷰 원문은 출력하지 않음)로 목록을 보고
+  판매자센터를 확인해 담당자와 처리한다. 이 명령은 아무 작업도 옮기지 않는다.
+- **판매자 PC의 「할 일」 세 보기** (시안 ③): `GET /api/local/vendor-link/reviews/board` — 리뷰마다 가장 새 작업 하나.
+  진행 중 = `APPROVED` · `CLAIMED` · `CANCEL_REQUESTED` · `HOLD_REQUESTED` · `UNKNOWN` · 채널에 아직 안 보인 `POSTED`,
+  끝난 일 = 채널에 보인 `POSTED` · `CANCELLED` · `INVALIDATED`(최근 30일). 기다리는 초안 · 보류 · 다시 검사 · 등록 못 함은
+  판매자의 일이라 「내가 할 일」 목록이 보인다. 판매자가 직접 등록했다고 기록한 답글도 엑셀의 답글여부가 `Y`면 「네이버 확인」.
 - 착수하지 않은 담당자에게 남의 스토어 작업은 없는 것과 같은 404, 다른 담당자가 착수한 작업은 403.
 - `RECHECK_NEEDED`는 바로 승인할 수 없다 — PC가 지금의 지문으로 초안을 다시 내야(`AWAITING_APPROVAL`, 새 버전) 승인된다.
   **문장 수정은 재검증이 아니다:** 휴대폰 · PC의 `PUT …/draft`는 새 버전을 만들어도 `RECHECK_NEEDED`를 그대로 둔다.

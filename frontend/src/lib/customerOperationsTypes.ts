@@ -108,6 +108,10 @@ export interface CustomerOperationsDecisionRow {
   safety?: boolean;
   /** 발생 or 우려 when `safety` (2026-10-23). */
   safetyReading?: "OCCURRENCE" | "WORRY" | null;
+  /** Which kind of harm when `safety` (2026-10-25), for its label. */
+  safetyKind?: "INJURY" | "BODY_REACTION" | "PRODUCT_HAZARD" | "LEGAL" | null;
+  /** The group the 리뷰 screen shows a review in (2026-10-25), so 할 일 names the same one. Null for an inquiry. */
+  reviewTier?: "NEEDS_ATTENTION" | "WATCH" | "FYI" | null;
 }
 
 /**

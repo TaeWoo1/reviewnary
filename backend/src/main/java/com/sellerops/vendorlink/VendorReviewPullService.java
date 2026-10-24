@@ -418,6 +418,7 @@ public class VendorReviewPullService {
         replyTasks.recheckApproved(binding, token);
         // Last: this PC's drafts up and the phone's edits in, against the task copies just brought up to date.
         replyTasks.mirror(binding, token);
+        replyTasks.refreshPosted(binding, token);
         return applied;
     }
 

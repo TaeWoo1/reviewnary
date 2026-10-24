@@ -155,7 +155,7 @@ describe("확인할 일 — linked from the record, not drawn twice", () => {
       queueOf([queued({ workItemId: "w1", inquiryId: "i1" }), queued({ workItemId: "w2", inquiryId: "i2" })]),
     );
     renderInbox();
-    const link = await screen.findByRole("link", { name: /확인할 일에 문의 2건/ });
+    const link = await screen.findByRole("link", { name: /할 일에 문의 2건/ });
     expect(link).toHaveAttribute("href", "/customer-operations/cases");
     expect(screen.queryByLabelText("지금 처리할 일")).toBeNull();
     // Membership is still the server's: one read, no phase named.
@@ -166,7 +166,7 @@ describe("확인할 일 — linked from the record, not drawn twice", () => {
   it("says nothing about 확인할 일 when nothing is waiting — never 「0건」", async () => {
     renderInbox();
     await screen.findByLabelText("문의 목록");
-    expect(screen.queryByRole("link", { name: /확인할 일에 문의/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /할 일에 문의/ })).toBeNull();
   });
 
   it("a queue read that FAILED says so — an unread queue is not an empty one", async () => {
@@ -295,7 +295,7 @@ describe("상품 → 문의 doorway", () => {
 
     // The link counts this product's waiting inquiries, not the other products' — scoped from the rows already
     // read, so the queue is not asked a second time for the product.
-    expect(await screen.findByRole("link", { name: /확인할 일에 문의 1건/ })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /할 일에 문의 1건/ })).toBeInTheDocument();
     expect(getInquiryQueueStrict).toHaveBeenCalledTimes(1);
   });
 

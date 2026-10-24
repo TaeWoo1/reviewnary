@@ -45,6 +45,6 @@ class DecisionRowPreviewTest {
     void reviewSuppressesThePreview() throws IOException {
         assertThat(code(SERVICE))
                 .as("the review branch passes the body as the title and null as the preview")
-                .contains("new Subject(preview(MarkupText.toPlainText(x.getBody())), null, x.getRating(),");
+                .contains("new Subject(preview(plain), null, x.getRating(),");
     }
 }

@@ -25,6 +25,11 @@ export type WorkStateKey =
   | "REPLY_NEEDED"
   /** 확인 필요 — the stored triage tier says look at this. Never computed here. */
   | "NEEDS_LOOK"
+  /**
+   * 살펴볼 일 — something reviewnary opened for the seller to look at (a case). Not 확인 필요: that is a review's
+   * GROUP on the 리뷰 screen, and one review read as 지켜보기 there and 확인 필요 here (mockup ③, 2026-10-25).
+   */
+  | "LOOK_INTO"
   /** 초안이 실제로 쓰여 있다 — a draft VERSION exists (`hasDraft`), not a phase. */
   | "DRAFT_READY"
   /** 판매자가 답변하기로 했고 아직 아무것도 쓰지 않았다 — reply work committed, no draft. */
@@ -80,6 +85,7 @@ export interface WorkStateWord {
 export const WORK_STATE: Record<WorkStateKey, WorkStateWord> = {
   REPLY_NEEDED: { text: "답변 필요", tone: "info" },
   NEEDS_LOOK: { text: "확인 필요", tone: "warn" },
+  LOOK_INTO: { text: "살펴볼 일", tone: "warn" },
   DRAFT_READY: { text: "초안 준비됨", tone: "info" },
   DRAFT_NEEDED: { text: "초안 필요", tone: "warn" },
   AWAITING_APPROVAL: { text: "승인 대기", tone: "info" },
@@ -87,8 +93,8 @@ export const WORK_STATE: Record<WorkStateKey, WorkStateWord> = {
   ANSWERED: { text: "답변함", tone: "neutral" },
   // The review panel's words for the same states (`DelegatedReplyControls`), cut to fit the Home's 104px lead
   // column — 「담당자 등록 못 함」 ran into the title beside it (measured 2026-10-24). The panel says the rest.
-  DELEGATE_RECHECK: { text: "다시 확인", tone: "warn" },
-  DELEGATE_HELD: { text: "승인 보류", tone: "warn" },
+  DELEGATE_RECHECK: { text: "다시 검사", tone: "warn" },
+  DELEGATE_HELD: { text: "고칠 곳", tone: "warn" },
   DELEGATE_FAILED: { text: "등록 못 함", tone: "warn" },
 };
 

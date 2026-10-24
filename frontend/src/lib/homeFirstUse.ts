@@ -151,7 +151,7 @@ export function delegableSentence(state: HomeFirstUseState): string {
   const words = state.delegable.map((t) => DELEGABLE_WORD[t]);
   return words.length > 0
     ? `채널을 연결하시면 ${words.join(" · ")}를 대신 확인하고, 먼저 봐야 할 일을 여기에 정리해 두겠습니다.`
-    : "채널을 연결하시면 매일 확인할 일을 여기에 정리해 두겠습니다.";
+    : "채널을 연결하시면 매일 할 일을 여기에 정리해 두겠습니다.";
 }
 
 /**
@@ -165,7 +165,7 @@ export function noDataSentence(state: HomeFirstUseState): string {
   const names = state.connected.join(" · ");
   return state.observed
     ? `${names} 연결은 끝났고, 아직 들어온 주문·문의·리뷰가 없습니다. 새로 들어오면 여기에 먼저 정리해 두겠습니다.`
-    : `${names} 연결은 끝났습니다. 첫 수집이 끝나면 확인할 일을 여기에 정리해 두겠습니다.`;
+    : `${names} 연결은 끝났습니다. 첫 수집이 끝나면 할 일을 여기에 정리해 두겠습니다.`;
 }
 
 /**

@@ -208,7 +208,8 @@ public class CustomerOperationsHomeService {
                     c.getRecommendedAction(), missing(c.getMissingInformation()),
                     c.getPreparedAction() == CasePreparedAction.DRAFT_PREPARED,
                     c.getDecidedBy() == null ? null : c.getDecidedBy().name(), c.getCreatedAt(),
-                    subject.receivedOn(), linkOf(c), subject.safety(), subject.safetyReading());
+                    subject.receivedOn(), linkOf(c), subject.safety(), subject.safetyReading(), subject.safetyKind(),
+                    subject.reviewTier());
         }).toList();
     }
 
@@ -319,11 +320,20 @@ public class CustomerOperationsHomeService {
      *                   the row and the detail of one case cannot date it differently.
      */
     private record Subject(String title, String preview, Integer rating, java.time.LocalDate receivedOn,
-                           boolean safety, String safetyReading) {
+                           boolean safety, String safetyReading, String safetyKind, String reviewTier) {
 
         Subject(String title, String preview, Integer rating, java.time.LocalDate receivedOn) {
-            this(title, preview, rating, receivedOn, false, null);
+            this(title, preview, rating, receivedOn, false, null, null, null);
         }
+    }
+
+    /** The 리뷰 screen's tier for a review, or null where this context has no review list (a test wiring). */
+    private com.sellerops.review.channel.ChannelReviewService reviewList;
+
+    @Autowired(required = false)
+    public void setReviewList(@org.springframework.context.annotation.Lazy
+                              com.sellerops.review.channel.ChannelReviewService reviewList) {
+        this.reviewList = reviewList;
     }
 
     private Subject subject(OperationsCase c) {
@@ -343,10 +353,13 @@ public class CustomerOperationsHomeService {
         if (c.getSubjectKind() == OperationsSubjectKind.REVIEW) {
             return reviews.findById(c.getSubjectId()).filter(x -> c.getOrgId().equals(x.getOrgId()))
                     // No preview: a review's title IS its body, and the row would print the sentence twice.
-                    .map(x -> new Subject(preview(MarkupText.toPlainText(x.getBody())), null, x.getRating(),
-                            receivedOn(x.getReceivedAt()),
-                            ReviewSafetySignal.in(MarkupText.toPlainText(x.getBody())),
-                            ReviewSafetySignal.readingOf(MarkupText.toPlainText(x.getBody()))))
+                    .map(x -> {
+                        String plain = MarkupText.toPlainText(x.getBody());
+                        return new Subject(preview(plain), null, x.getRating(), receivedOn(x.getReceivedAt()),
+                                ReviewSafetySignal.in(plain), ReviewSafetySignal.readingOf(plain),
+                                ReviewSafetySignal.find(plain).map(f -> f.kind().name()).orElse(null),
+                                reviewList == null ? null : reviewList.shownTier(c.getOrgId(), x).name());
+                    })
                     .orElse(new Subject(null, null, null, null));
         }
         return new Subject(null, null, null, null);

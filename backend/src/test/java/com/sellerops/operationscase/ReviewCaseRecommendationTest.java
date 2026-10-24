@@ -185,7 +185,7 @@ class ReviewCaseRecommendationTest {
                 .as("one menu entry for one screen")
                 .isEqualTo(1);
         assertThat(nav)
-                .as("named for the seller's question, in 운영 where that question is asked")
-                .contains("label: \"확인할 일\"");
+                .as("named for the seller's work (2026-10-25: 할 일 — 「확인」 is only the channel's evidence)")
+                .contains("label: \"할 일\"");
     }
 }

@@ -14,6 +14,9 @@ const api = vi.hoisted(() => ({
   getReviewWorkStrict: vi.fn((): Promise<unknown> => Promise.reject(new Error("not in this test"))),
   // The pane beside the list reads the selected case; it never settles here — the list is what is under test.
   getOperationsCase: vi.fn(() => new Promise(() => undefined)),
+  getReplyBoard: vi.fn((): Promise<unknown> => Promise.reject(new Error("not in this test"))),
+  getDismissedReplyWork: vi.fn(() => new Promise(() => undefined)),
+  restoreReplyWork: vi.fn(),
 }));
 vi.mock("../../lib/apiClient", () => ({ api, getToken: () => null }));
 
@@ -109,7 +112,7 @@ describe("OperationsCaseQueue", () => {
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 2, rows: [row(), REVIEW] });
     draw();
 
-    const list = await screen.findByRole("list", { name: "확인할 일" });
+    const list = await screen.findByRole("list", { name: "할 일" });
     const items = within(list).getAllByRole("listitem");
     expect(items).toHaveLength(2);
     // The case lane, in the order the server sent it.
@@ -124,7 +127,7 @@ describe("OperationsCaseQueue", () => {
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 2, rows: [row(), REVIEW] });
     draw();
 
-    await screen.findByRole("list", { name: "확인할 일" });
+    await screen.findByRole("list", { name: "할 일" });
     const links = screen.getAllByRole("link");
     // A case opens its case screen whatever its subject is — the investigation is what the seller came for, and
     // splitting cases by subject kind would be two queues wearing one name.
@@ -137,7 +140,7 @@ describe("OperationsCaseQueue", () => {
   /**
    * <b>The defect this screen was fixed for.</b> The Home's list is cases + flagged reviews + the inquiry queue,
    * deduplicated by owning screen; this screen read cases alone and called itself the same thing. On the demo org
-   * that was 27건 against 1건, with 확인할 일 — the sidebar entry a seller reaches for first — pointing at the 1.
+   * that was 27건 against 1건, with 할 일 — the sidebar entry a seller reaches for first — pointing at the 1.
    */
   it("홈과 같은 목록을 그린다 — 케이스만이 아니라 리뷰와 문의도 선다", async () => {
     reads({
@@ -162,13 +165,13 @@ describe("OperationsCaseQueue", () => {
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 1, rows: [row()] });
     draw();
 
-    const list = await screen.findByRole("list", { name: "확인할 일" });
+    const list = await screen.findByRole("list", { name: "할 일" });
     expect(list).toHaveTextContent("접착이 약해요");
     expect(list).toHaveTextContent("배송 언제 되나요?");
     expect(list).toHaveTextContent("교환 신청은 언제까지 가능한가요?");
     // Each row opens the screen that owns it — the same identity the Home dedupes by.
     const hrefs = screen.getAllByRole("link").map((a) => a.getAttribute("href"));
-    // A review carries the way back to this list (UI/UX v2 Phase 1) — the Review Case offers 「← 확인할 일」 then.
+    // A review carries the way back to this list (UI/UX v2 Phase 1) — the Review Case offers 「← 할 일」 then.
     expect(hrefs).toContain("/reviews/reply/r-9?from=work");
     expect(hrefs).toContain("/inquiries/i-9");
     expect(hrefs).toContain("/customer-operations/cases/c-1");
@@ -187,7 +190,7 @@ describe("OperationsCaseQueue", () => {
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 1, rows: [row()] });
     draw();
 
-    const list = await screen.findByRole("list", { name: "확인할 일" });
+    const list = await screen.findByRole("list", { name: "할 일" });
     expect(list).toHaveTextContent("초안 준비됨");
     // Said once. Nothing on the row claims it went out, and nothing restates the badge.
     expect(list).not.toHaveTextContent("초안 있음");
@@ -218,7 +221,7 @@ describe("OperationsCaseQueue", () => {
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 80, rows: [row(), REVIEW] });
     draw();
 
-    await screen.findByRole("list", { name: "확인할 일" });
+    await screen.findByRole("list", { name: "할 일" });
     // It says the depth it reached, not a total: the reads that overflow count different populations, and their
     // sum is a number nobody measured.
     const note = screen.getByText(/2건까지 보여 드립니다/);
@@ -244,7 +247,7 @@ describe("OperationsCaseQueue", () => {
     });
     draw();
 
-    const list = await screen.findByRole("list", { name: "확인할 일" });
+    const list = await screen.findByRole("list", { name: "할 일" });
     /*
       <b>Re-pointed: the sentence moved off the row, the TAG is what was being defended</b>
       (product-owner decision, 2026-10-01 — 「내부 workflow metadata는 기본 행에서 제거」).
@@ -272,7 +275,7 @@ describe("OperationsCaseQueue", () => {
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 1, rows: [row()] });
     draw();
 
-    const list = await screen.findByRole("list", { name: "확인할 일" });
+    const list = await screen.findByRole("list", { name: "할 일" });
     /*
       <b>Re-pointed: the tag is the guarantee, and the row is no longer where it is read</b> (canonical
       mockup semantic correction, 2026-10-02).
@@ -295,7 +298,7 @@ describe("OperationsCaseQueue", () => {
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 1, rows: [REVIEW] });
     draw();
 
-    const list = await screen.findByRole("list", { name: "확인할 일" });
+    const list = await screen.findByRole("list", { name: "할 일" });
     /*
       <b>Re-pointed to the stronger form of the same rule</b> (product-owner decision, 2026-10-01).
       It asserted the fallback to `reasonNote` — 「확인이 필요한 리뷰입니다」, the same sentence on every
@@ -304,7 +307,9 @@ describe("OperationsCaseQueue", () => {
       second line, which is the strongest version of 「없는 추천을 지어내지 않는다」: the row says the
       state, the customer's own words and where it came from, and stops.
     */
-    expect(list).toHaveTextContent("확인 필요");
+    // A case is something reviewnary opened to look at: 살펴볼 일 — 확인 필요 is the 리뷰 screen's group name.
+    expect(list).toHaveTextContent("살펴볼 일");
+    expect(list).not.toHaveTextContent("확인 필요");
     expect(list).toHaveTextContent("배송이 너무 늦었어요");
     expect(list).not.toHaveTextContent("확인이 필요한 리뷰입니다");
   });
@@ -315,7 +320,7 @@ describe("OperationsCaseQueue", () => {
       reads();
       api.getCustomerOperationsDecisions.mockResolvedValue({ total: 2, rows: [row(), REVIEW] });
       draw();
-      const list = await screen.findByRole("list", { name: "확인할 일" });
+      const list = await screen.findByRole("list", { name: "할 일" });
       // No row carries a verb of its own: the list used to end every row in 「검토」.
       expect(within(list).queryByText("검토")).toBeNull();
       // Each row selects in place.
@@ -337,25 +342,25 @@ describe("OperationsCaseQueue", () => {
       reads();
       api.getCustomerOperationsDecisions.mockResolvedValue({ total: 2, rows: [row(), REVIEW] });
       draw();
-      const list = await screen.findByRole("list", { name: "확인할 일" });
+      const list = await screen.findByRole("list", { name: "할 일" });
       const links = within(list).getAllByRole("link");
 
       // Nothing is selected, and no pane stands for a row nobody picked.
       expect(links.some((a) => a.getAttribute("aria-current") === "true")).toBe(false);
-      expect(screen.queryByLabelText("선택한 확인할 일")).toBeNull();
+      expect(screen.queryByLabelText("선택한 할 일")).toBeNull();
       expect(screen.queryByRole("button", { name: /닫기/ })).toBeNull();
 
       // A press selects that row — and only that row.
       await userEvent.click(links[0]);
-      const after = within(await screen.findByRole("list", { name: "확인할 일" })).getAllByRole("link");
+      const after = within(await screen.findByRole("list", { name: "할 일" })).getAllByRole("link");
       expect(after[0]).toHaveAttribute("aria-current", "true");
       expect(after[1]).not.toHaveAttribute("aria-current", "true");
-      expect(await screen.findByLabelText("선택한 확인할 일")).toBeInTheDocument();
+      expect(await screen.findByLabelText("선택한 할 일")).toBeInTheDocument();
 
       // …and 닫기 puts the screen back to where it opened.
       await userEvent.click(screen.getByRole("button", { name: /닫기/ }));
-      expect(screen.queryByLabelText("선택한 확인할 일")).toBeNull();
-      const closed = within(await screen.findByRole("list", { name: "확인할 일" })).getAllByRole("link");
+      expect(screen.queryByLabelText("선택한 할 일")).toBeNull();
+      const closed = within(await screen.findByRole("list", { name: "할 일" })).getAllByRole("link");
       expect(closed.some((a) => a.getAttribute("aria-current") === "true")).toBe(false);
     } finally {
       restore();
@@ -375,15 +380,15 @@ describe("OperationsCaseQueue", () => {
       reads();
       api.getCustomerOperationsDecisions.mockResolvedValue({ total: 2, rows: [row(), REVIEW] });
       draw();
-      const title = await screen.findByRole("heading", { level: 1, name: "확인할 일" });
+      const title = await screen.findByRole("heading", { level: 1, name: "할 일" });
       expect(title.className).toMatch(/text-title/);
       expect(title.className).not.toMatch(/text-section/);
 
       // 한 건을 열면 이 열은 rail이 된다.
-      const links = within(await screen.findByRole("list", { name: "확인할 일" })).getAllByRole("link");
+      const links = within(await screen.findByRole("list", { name: "할 일" })).getAllByRole("link");
       await userEvent.click(links[0]);
-      await screen.findByLabelText("선택한 확인할 일");
-      expect(screen.getByRole("heading", { level: 1, name: "확인할 일" }).className).toMatch(/text-section/);
+      await screen.findByLabelText("선택한 할 일");
+      expect(screen.getByRole("heading", { level: 1, name: "할 일" }).className).toMatch(/text-section/);
     } finally {
       restore();
     }
@@ -394,7 +399,7 @@ describe("OperationsCaseQueue", () => {
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 2, rows: [row(), REVIEW] });
     draw();
 
-    const list = await screen.findByRole("list", { name: "확인할 일" });
+    const list = await screen.findByRole("list", { name: "할 일" });
     // Every row is a link to the screen that owns the decision; nothing here resolves, dismisses or sends.
     expect(within(list).queryAllByRole("button")).toHaveLength(0);
     /* The guarantee, where it now lives: every button on this screen only changes what is DRAWN. The
@@ -402,10 +407,12 @@ describe("OperationsCaseQueue", () => {
        second such control beside the title — the search toggle, which narrows the same rows. So the
        check names both populations rather than the one container they used to share, and nothing that
        resolves, dismisses or sends has a way onto this screen. */
-    const views = screen.getByRole("group", { name: "확인할 일 보기" });
+    const views = screen.getByRole("group", { name: "할 일 보기" });
+    // The three views of the place (mockup ③, 2026-10-25) only change what is drawn, too.
+    const parts = screen.getByRole("group", { name: "할 일 나누어 보기" });
     const search = screen.getByRole("button", { name: "검색" });
     for (const button of screen.queryAllByRole("button")) {
-      if (button === search) continue;
+      if (button === search || parts.contains(button)) continue;
       expect(views).toContainElement(button);
     }
   });
@@ -454,7 +461,7 @@ describe("OperationsCaseQueue", () => {
       });
       draw();
 
-      const list = await screen.findByRole("list", { name: "확인할 일" });
+      const list = await screen.findByRole("list", { name: "할 일" });
       const rowText = within(list).getAllByRole("listitem")[0].textContent ?? "";
       const elapsed = rowText.match(/\d+일 (대기|전)/)?.[0];
       expect(elapsed).toBe("4일 대기"); // 09-18 → 09-22 KST, the CUSTOMER's clock
@@ -471,7 +478,7 @@ describe("OperationsCaseQueue", () => {
     reads();
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 2, rows: [row(), REVIEW] });
     const { container } = draw();
-    await screen.findByRole("list", { name: "확인할 일" });
+    await screen.findByRole("list", { name: "할 일" });
     await expectNoAxeViolations(container);
   });
 });
@@ -523,7 +530,7 @@ describe("OperationsCaseQueue — the seller's own reply work (UI/UX v2 Phase 3)
         <OperationsCaseQueue />
       </MemoryRouter>,
     );
-    const list = await screen.findByRole("list", { name: "확인할 일" });
+    const list = await screen.findByRole("list", { name: "할 일" });
     const row = within(list).getByRole("link", { name: /잘 떨어져요/ });
     expect(row).toHaveTextContent("승인 대기");
     expect(row).toHaveAttribute("href", "/reviews/reply/r-1?from=work");
@@ -560,31 +567,31 @@ describe("OperationsCaseQueue — views of the one list (UI/UX v2 Phase 4)", () 
     });
     draw();
 
-    const views = await screen.findByRole("group", { name: "확인할 일 보기" });
+    const views = await screen.findByRole("group", { name: "할 일 보기" });
     // Every view says how many rows it holds, out of the same four.
     expect(within(views).getByRole("button", { name: "전체 4" })).toHaveAttribute("aria-pressed", "true");
     expect(within(views).getByRole("button", { name: "답변할 문의 1" })).toBeInTheDocument();
-    expect(within(views).getByRole("button", { name: "확인할 리뷰 1" })).toBeInTheDocument();
+    expect(within(views).getByRole("button", { name: "살펴볼 리뷰 1" })).toBeInTheDocument();
     expect(within(views).getByRole("button", { name: "승인할 일 1" })).toBeInTheDocument();
     expect(within(views).getByRole("button", { name: "초안 필요 1" })).toBeInTheDocument();
 
     await userEvent.click(within(views).getByRole("button", { name: "승인할 일 1" }));
-    const list = screen.getByRole("list", { name: "확인할 일" });
+    const list = screen.getByRole("list", { name: "할 일" });
     expect(within(list).getAllByRole("link")).toHaveLength(1);
     expect(within(list).getByRole("link", { name: /승인을 기다리는 답변/ })).toBeInTheDocument();
 
     await userEvent.click(within(views).getByRole("button", { name: "답변할 문의 1" }));
-    expect(within(screen.getByRole("list", { name: "확인할 일" })).getByRole("link", { name: /교환 신청/ })).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "할 일" })).getByRole("link", { name: /교환 신청/ })).toBeInTheDocument();
 
-    // The header still counts the whole list: a view never passes itself off as the total.
-    expect(screen.getByText("4건")).toBeInTheDocument();
+    // 「내가 할 일」 still counts the whole list: a view never passes itself off as the total.
+    expect(screen.getByRole("button", { name: "내가 할 일 4" })).toBeInTheDocument();
   });
 
   /**
    * <b>Two 「문의 드립니다」 are two different questions</b> (product-owner decision, 2026-10-02).
    *
    * <p>An inquiry's `title` is the SUBJECT line the customer typed, and nearly every one of them types
-   * the same four characters. Measured at 1600×1000 on the demo org, the first two rows of 확인할 일 were
+   * the same four characters. Measured at 1600×1000 on the demo org, the first two rows of 할 일 were
    * identical down to 「9일 대기」 — the only way to tell them apart was to open both. The row now leads
    * with `preview`, the customer's own body off the wire, and falls back to the title where the record
    * carries no body of its own.
@@ -600,7 +607,7 @@ describe("OperationsCaseQueue — views of the one list (UI/UX v2 Phase 4)", () 
     });
     draw();
 
-    const list = await screen.findByRole("list", { name: "확인할 일" });
+    const list = await screen.findByRole("list", { name: "할 일" });
     expect(within(list).getByRole("link", { name: /수령한 상품을 교환하려면/ })).toBeInTheDocument();
     expect(within(list).getByRole("link", { name: /박스가 찌그러져 왔는데/ })).toBeInTheDocument();
     // The subject line is not drawn twice beside the sentence it was standing in for.
@@ -624,7 +631,7 @@ describe("OperationsCaseQueue — views of the one list (UI/UX v2 Phase 4)", () 
     });
     draw();
 
-    const list = await screen.findByRole("list", { name: "확인할 일" });
+    const list = await screen.findByRole("list", { name: "할 일" });
     expect(within(list).getByRole("link", { name: /박스가 찌그러져 왔는데/ })).toBeInTheDocument();
     expect(list).not.toHaveTextContent("등록된 지식으로 답변할 수 있는 문의입니다.");
     // What the row keeps: where it came from and what state it is in.
@@ -642,7 +649,53 @@ describe("OperationsCaseQueue — views of the one list (UI/UX v2 Phase 4)", () 
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 1, rows: [REVIEW] });
     draw();
 
-    const list = await screen.findByRole("list", { name: "확인할 일" });
+    const list = await screen.findByRole("list", { name: "할 일" });
     expect(within(list).getByRole("link", { name: /배송이 너무 늦었어요/ })).toBeInTheDocument();
+  });
+});
+
+describe("OperationsCaseQueue — 진행 중 · 끝난 일 (mockup ③, 2026-10-25)", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  const ROW = { channelAnswered: false, confirmOverdue: false, rating: 2 };
+
+  it("counts what others are finishing beside the seller's own work, and never adds the two", async () => {
+    reads();
+    api.getCustomerOperationsDecisions.mockResolvedValue({ total: 0, rows: [] });
+    api.getReviewWorkStrict.mockRejectedValue(new Error("none"));
+    api.getReplyBoard.mockResolvedValue({
+      moving: [
+        { ...ROW, reviewId: "r-a", state: "APPROVED", since: "2026-09-10T01:12:00Z", preview: "색이 사진과 같아요" },
+        { ...ROW, reviewId: "r-b", state: "POSTED", since: "2026-09-01T01:12:00Z", preview: "포장이 꼼꼼해요",
+          confirmOverdue: true },
+        { ...ROW, reviewId: "r-c", state: "UNKNOWN", since: "2026-09-09T01:12:00Z", preview: "튼튼하고 좋아요" },
+      ],
+      done: [
+        { ...ROW, reviewId: "r-d", state: "POSTED", since: "2026-09-05T01:12:00Z", preview: "사이즈가 딱 맞아요",
+          channelAnswered: true },
+        { ...ROW, reviewId: "r-e", state: "CANCELLED", since: "2026-09-04T01:12:00Z", preview: "빨라요" },
+      ],
+    });
+    draw();
+
+    const parts = await screen.findByRole("group", { name: "할 일 나누어 보기" });
+    await within(parts).findByRole("button", { name: "진행 중 3" });
+    expect(within(parts).getByRole("button", { name: "내가 할 일 0" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(parts).getByRole("button", { name: "끝난 일" })).toBeInTheDocument();
+
+    await userEvent.click(within(parts).getByRole("button", { name: "진행 중 3" }));
+    const moving = screen.getByRole("list", { name: "진행 중" });
+    expect(within(moving).getByRole("link", { name: /색이 사진과 같아요/ })).toHaveTextContent("담당자 대기");
+    expect(within(moving).getByRole("link", { name: /포장이 꼼꼼해요/ })).toHaveTextContent("운영팀 확인");
+    expect(within(moving).getByRole("link", { name: /튼튼하고 좋아요/ })).toHaveTextContent("결과 확인 중");
+    expect(within(moving).getByRole("link", { name: /튼튼하고 좋아요/ })).toHaveTextContent("중복 방지로 다시 요청 불가");
+    expect(within(moving).getByRole("link", { name: /색이 사진과 같아요/ }))
+      .toHaveAttribute("href", "/reviews/reply/r-a?from=work");
+
+    await userEvent.click(within(parts).getByRole("button", { name: "끝난 일" }));
+    const confirmed = screen.getByRole("region", { name: "네이버에 답글 있음" });
+    expect(within(confirmed).getByRole("link", { name: /사이즈가 딱 맞아요/ })).toHaveTextContent("네이버 확인");
+    expect(screen.getByRole("region", { name: "요청 취소 · 끝남" })).toHaveTextContent("요청 취소함");
+    expect(screen.queryByText("포장이 꼼꼼해요")).toBeNull();
   });
 });

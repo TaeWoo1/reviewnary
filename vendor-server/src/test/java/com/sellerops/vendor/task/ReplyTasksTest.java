@@ -170,6 +170,48 @@ class ReplyTasksTest {
     }
 
     @Test
+    void aPostTheChannelDoesNotShowAfterTwoUploadsOrAWeekGoesToAnOperatorAndIsNeverCompletedByTime()
+            throws Exception {
+        TaskView one = approve(submit("1", "답글 1"));
+        tasks.claim(one.id(), me, one.stateVersion());
+        report(one.id(), me, Outcome.POSTED, one.approvedFingerprint());
+        TaskView two = approve(submit("2", "답글 2"));
+        tasks.claim(two.id(), me, two.stateVersion());
+        report(two.id(), me, Outcome.POSTED, two.approvedFingerprint());
+        assertThat(tasks.get(one.id()).orElseThrow().confirmOverdue()).isFalse();
+
+        clock.advance(Duration.ofHours(1));
+        upload(ExportWorkbooks.line("1", Map.of()), ExportWorkbooks.line("2", Map.of("답글여부", "Y",
+                "답글등록일시", "2026.10.20. 13:00:00")));
+        assertThat(tasks.get(one.id()).orElseThrow().confirmOverdue()).as("one upload is not enough").isFalse();
+        clock.advance(Duration.ofHours(1));
+        upload(ExportWorkbooks.line("1", Map.of()), ExportWorkbooks.line("2", Map.of("답글여부", "Y",
+                "답글등록일시", "2026.10.20. 13:00:00")));
+
+        assertThat(tasks.get(one.id()).orElseThrow()).satisfies(t -> {
+            assertThat(t.confirmOverdue()).isTrue();
+            assertThat(t.state()).as("never completed by time").isEqualTo(State.POSTED);
+        });
+        assertThat(tasks.get(two.id()).orElseThrow().confirmOverdue()).as("the channel shows it").isFalse();
+        assertThat(tasks.unconfirmed()).singleElement().satisfies(u -> {
+            assertThat(u.taskId()).isEqualTo(one.id());
+            assertThat(u.storeLabel()).isEqualTo("데모 스토어");
+            assertThat(u.uploadsSince()).isEqualTo(2);
+        });
+    }
+
+    @Test
+    void aWeekWithoutAnyUploadIsOverdueToo() {
+        TaskView one = approve(submit("1", "답글 1"));
+        tasks.claim(one.id(), me, one.stateVersion());
+        report(one.id(), me, Outcome.POSTED, one.approvedFingerprint());
+        clock.advance(ReplyTasks.CONFIRM_WAIT.minusMinutes(1));
+        assertThat(tasks.get(one.id()).orElseThrow().confirmOverdue()).isFalse();
+        clock.advance(Duration.ofMinutes(1));
+        assertThat(tasks.get(one.id()).orElseThrow().confirmOverdue()).isTrue();
+    }
+
+    @Test
     void aSentTwiceCommandHappensOnceAndACommandIdIsNotReused() {
         TaskView draft = submit("1", "초안");
         String command = command();

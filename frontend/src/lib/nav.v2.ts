@@ -64,7 +64,7 @@ export const NAV_GROUPS: NavGroup[] = [
     heading: "운영",
     items: [
       { to: "/", label: "오늘", short: "오늘", icon: "home", end: true },
-      { to: "/customer-operations/cases", label: "확인할 일", short: "확인", icon: "inbox" },
+      { to: "/customer-operations/cases", label: "할 일", short: "할 일", icon: "inbox" },
       { to: "/memory", label: "반복 문제", short: "반복", icon: "memory" },
     ],
   },

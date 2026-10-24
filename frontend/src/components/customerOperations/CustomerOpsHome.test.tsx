@@ -308,8 +308,8 @@ describe("CustomerOpsHome", () => {
     ).toHaveAttribute("href", "/memory");
     // <b>The count moved up one line</b> (product-owner decision, 2026-09-26): it is 「지금 볼 것」 of the
     // summary, and the heading no longer repeats it 12px below. Same number, same `work`, one place.
-    await waitFor(() => expect(summary).toHaveTextContent("확인할 일 4"));
-    // The brief's heading is 「오늘 먼저 볼 일」 since the Home visual target: 확인할 일 names the QUEUE —
+    await waitFor(() => expect(summary).toHaveTextContent("할 일 4"));
+    // The brief's heading is 「오늘 먼저 볼 일」 since the Home visual target: 할 일 names the QUEUE —
     // the rail item, the screen it links to, and the summary cell above — and printing it here was the
     // third copy. What is asserted is unchanged and is the point of the re-point: the count lives in the
     // band, once, and the heading of the rows does not repeat it.
@@ -317,7 +317,7 @@ describe("CustomerOpsHome", () => {
     expect(heading).not.toHaveTextContent("4");
     // <b>The breakdown is the queue's, not the brief's</b> (product-owner decision, 2026-10-01). It used to
     // stand here: 「교환·환불 1 · 정보 부족 1 · 답변 필요 1 · 리뷰 1」, four tallies over a list showing four
-    // rows. Every one of them is a filter chip on 확인할 일, where it is a control the seller can press; on a
+    // rows. Every one of them is a filter chip on 할 일, where it is a control the seller can press; on a
     // brief it is a number nothing can be done with. The ORDER stays, because the order is how to read the
     // rows that are here.
     // The order, in the sentence the target writes it as rather than as the two-syllable chip 「오래된
@@ -357,7 +357,7 @@ describe("CustomerOpsHome", () => {
     // The plain inquiry's own row is asserted in the brief test below.
     api.getInquiryQueueStrict.mockResolvedValue(queue({ content: [queue().content[0]], totalElements: 1 }));
     draw();
-    const list = await screen.findByRole("list", { name: "확인할 일" });
+    const list = await screen.findByRole("list", { name: "할 일" });
     // jsdom cannot measure a width, so the brief draws its narrow count.
     await waitFor(() => expect(within(list).getAllByRole("link")).toHaveLength(visibleHomeRows(false)));
 
@@ -398,7 +398,7 @@ describe("CustomerOpsHome", () => {
    */
   it("briefs the inquiries before a review, and a review reporting harm before both", async () => {
     draw();
-    const list = await screen.findByRole("list", { name: "확인할 일" });
+    const list = await screen.findByRole("list", { name: "할 일" });
     await waitFor(() => expect(within(list).getAllByRole("link")).toHaveLength(visibleHomeRows(false)));
     const inquiry = within(list).getByRole("link", { name: /주문 취소 가능할까요/ });
     expect(inquiry).toHaveAttribute("href", "/inquiries/i-3");
@@ -412,7 +412,7 @@ describe("CustomerOpsHome", () => {
     const o = ops();
     const burned = { ...o.reviews.rows[0], reviewId: "r-burn", rating: 5, quote: "손잡이가 뜨거워 화상을 입었어요", safety: true };
     draw(co(), { ...o, reviews: { ...o.reviews, rows: [...o.reviews.rows, burned] } } as never);
-    const again = await screen.findByRole("list", { name: "확인할 일" });
+    const again = await screen.findByRole("list", { name: "할 일" });
     await waitFor(() => expect(within(again).getAllByRole("link")).toHaveLength(visibleHomeRows(false)));
     const first = within(again).getAllByRole("link")[0];
     expect(first).toHaveTextContent("화상을 입었어요");
@@ -459,7 +459,7 @@ describe("CustomerOpsHome", () => {
     expect(gaps).not.toHaveTextContent("리뷰 목록 읽기 실패");
     // c-1, c-2 and the review — what loaded, with no 「+」.
     const summary = screen.getByTestId("today-summary");
-    expect(summary).toHaveTextContent("확인할 일 3");
+    expect(summary).toHaveTextContent("할 일 3");
     expect(summary).not.toHaveTextContent("3+");
   });
 
@@ -467,7 +467,7 @@ describe("CustomerOpsHome", () => {
     api.getInquiryQueueStrict.mockResolvedValue(queue({ totalElements: 80 }));
     draw();
     const summary = await screen.findByTestId("today-summary");
-    await waitFor(() => expect(summary).toHaveTextContent("확인할 일 4+"));
+    await waitFor(() => expect(summary).toHaveTextContent("할 일 4+"));
     expect(screen.queryByLabelText("집계에서 빠진 곳")).toBeNull();
   });
 
@@ -486,12 +486,12 @@ describe("CustomerOpsHome", () => {
     api.getInquiryQueueStrict.mockResolvedValue(queue({ content: [], totalElements: 0 }));
     draw(co({ decisions: { total: 0, rows: [] } }), null);
     // Nothing waiting is a state, and it is stated: the list's absence is not a sentence.
-    await waitFor(() => expect(screen.getByText("지금 확인할 일이 없습니다.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("지금 할 일이 없습니다.")).toBeTruthy());
     // When there is nothing to do, the line still says the job is running — that is the whole reason the empty
     // list can be trusted. It no longer says when the next check is; that is a schedule parameter.
     expect(await screen.findByTestId("today-status")).toHaveTextContent("자동 확인 중");
     expect(await screen.findByTestId("today-status")).not.toHaveTextContent("다음 확인");
-    expect(screen.queryByRole("list", { name: "확인할 일" })).toBeNull();
+    expect(screen.queryByRole("list", { name: "할 일" })).toBeNull();
   });
 
   it("a paused job says so and resumes on one press", async () => {
@@ -524,7 +524,7 @@ describe("CustomerOpsHome", () => {
   it("does not offer anything 확인 필요 is already offering", async () => {
     draw();
     const section = await screen.findByRole("region", { name: "실행 대기" });
-    const queueList = await screen.findByRole("region", { name: "확인할 일" });
+    const queueList = await screen.findByRole("region", { name: "할 일" });
 
     // The draft-ready inquiry is AWAITING_SELLER, so it is a 확인 필요 row — with 「초안 있음 · 미발송」 on it,
     // which says more than a second row here would. It must appear in exactly one of the two sections.
@@ -552,7 +552,7 @@ describe("CustomerOpsHome", () => {
 
   it("renders nothing when the operations read failed, rather than claiming nothing is waiting", async () => {
     draw(co(), null);
-    await screen.findByRole("region", { name: "확인할 일" });
+    await screen.findByRole("region", { name: "할 일" });
     expect(screen.queryByRole("region", { name: "실행 대기" })).toBeNull();
   });
 
@@ -607,7 +607,7 @@ describe("CustomerOpsHome", () => {
     expect(section).not.toHaveTextContent("검토");
     expect(section).not.toHaveTextContent("답변");
 
-    const list = container.querySelector('section[aria-label="확인할 일"]');
+    const list = container.querySelector('section[aria-label="할 일"]');
     expect(list).not.toBeNull();
     // Node.DOCUMENT_POSITION_FOLLOWING — the problems come after the work.
     expect(list!.compareDocumentPosition(section) & 4).toBeTruthy();
@@ -836,12 +836,12 @@ describe("오늘 — an inbox, not a dashboard", () => {
     // Scoped to the brief: since the target gave 실행 대기 and 반복 문제 the same three-slot header, three
     // sections on this screen carry a 「전체 보기 →」, and an unscoped query would be asking the page which
     // one it meant. The assertion is the brief's and is unchanged.
-    const brief = await screen.findByRole("region", { name: "확인할 일" });
+    const brief = await screen.findByRole("region", { name: "할 일" });
     const more = within(brief).getByRole("link", { name: "전체 보기 →" });
     expect(more).toHaveAttribute("href", "/customer-operations/cases");
     expect(more.textContent).not.toMatch(/\d/);
     // The Pulse still owns it, and still marks a floor as a floor.
-    expect(screen.getByTestId("pulse-work")).toHaveTextContent(/확인할 일 \d/);
+    expect(screen.getByTestId("pulse-work")).toHaveTextContent(/할 일 \d/);
     const firstRow = screen.getByText("뚜껑이 깨져서 왔어요");
     expect(more.compareDocumentPosition(firstRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
@@ -880,7 +880,7 @@ describe("visible rows — the Pulse's cost, paid in whole rows", () => {
     draw();
     // Both the section and its list carry the canonical noun, which is the point of the naming decision;
     // the rows are the list's.
-    const list = (await screen.findAllByLabelText("확인할 일")).find((el) => el.tagName === "UL");
+    const list = (await screen.findAllByLabelText("할 일")).find((el) => el.tagName === "UL");
     await waitFor(() => expect(list?.querySelectorAll("li").length).toBe(HOME_ROWS_NARROW));
   });
 
@@ -889,11 +889,11 @@ describe("visible rows — the Pulse's cost, paid in whole rows", () => {
     // so the same control changed its wording for a reason no seller could see.
     api.getInquiryQueueStrict.mockResolvedValue(queue({ totalElements: 80 }));
     draw();
-    const brief = await screen.findByRole("region", { name: "확인할 일" });
+    const brief = await screen.findByRole("region", { name: "할 일" });
     const more = within(brief).getByRole("link", { name: "전체 보기 →" });
     expect(more).toHaveAttribute("href", "/customer-operations/cases");
     expect(more.textContent).not.toMatch(/\d/);
-    expect(screen.getByTestId("pulse-work")).toHaveTextContent("확인할 일 4+");
+    expect(screen.getByTestId("pulse-work")).toHaveTextContent("할 일 4+");
   });
 });
 

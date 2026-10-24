@@ -1,5 +1,7 @@
 package com.sellerops.operationscase;
 
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -1269,9 +1271,26 @@ class OperationsCaseProcessorTest {
 
         List<CustomerOperationsHomeView.DecisionRow> rows = home.home(org).decisions().rows();
         assertThat(rows).filteredOn(r -> "REVIEW".equals(r.subjectKind())).singleElement()
-                .satisfies(r -> assertThat(r.safety()).isTrue());
+                .satisfies(r -> {
+                    assertThat(r.safety()).isTrue();
+                    assertThat(r.safetyKind()).as("which kind, for its label (2026-10-25)").isEqualTo("INJURY");
+                    assertThat(r.reviewTier()).as("no review list wired here").isNull();
+                });
         assertThat(rows).filteredOn(r -> "INQUIRY".equals(r.subjectKind())).singleElement()
-                .satisfies(r -> assertThat(r.safety()).isFalse());
+                .satisfies(r -> {
+                    assertThat(r.safety()).isFalse();
+                    assertThat(r.safetyKind()).isNull();
+                    assertThat(r.reviewTier()).isNull();
+                });
+
+        // The group is the 리뷰 screen's own, read from it — so 할 일 cannot place the review in another.
+        com.sellerops.review.channel.ChannelReviewService list =
+                Mockito.mock(com.sellerops.review.channel.ChannelReviewService.class);
+        Mockito.when(list.shownTier(ArgumentMatchers.any(), ArgumentMatchers.any()))
+                .thenReturn(com.sellerops.review.triage.ReviewTriageTier.WATCH);
+        home.setReviewList(list);
+        assertThat(home.home(org).decisions().rows()).filteredOn(r -> "REVIEW".equals(r.subjectKind())).singleElement()
+                .extracting(CustomerOperationsHomeView.DecisionRow::reviewTier).isEqualTo("WATCH");
     }
 
     // ── the lane the seller's own setting runs (Review Auto-Check v1) ─────────────────────────────────────────

@@ -328,6 +328,57 @@ abstract class VendorReplyTaskScenarios {
         assertThat(vendor.tasks.get(task).draftBody()).isEqualTo("불편을 드려 죄송합니다. 설명서 파일을 보내 드릴게요.");
     }
 
+    /* ── 할 일's 진행 중 · 끝난 일 (mockup ③, 2026-10-25) ── */
+
+    @Test
+    void theBoardKeepsAPostInProgressUntilTheChannelShowsItAndMarksOneTheServerCallsOverdue() {
+        UUID waiting = pulledReview("v1", "9100000201", "색이 사진과 같아요");
+        needsReply(waiting);
+        drafts.save(org, waiting, "SELLER:" + seller, "감사합니다.", 0);
+        handOver(waiting);
+        UUID posted = pulledReview("v2", "9100000202", "배송이 늦었어요");
+        needsReply(posted);
+        drafts.save(org, posted, "SELLER:" + seller, "늦어져 죄송합니다.", 0);
+        UUID postedTask = vendorTaskOf(handOver(posted));
+        String text = "늦어져 죄송합니다.";
+        vendor.move(postedTask, "CLAIMED", text, ReviewReplyFingerprint.of(text), false);
+        vendor.move(postedTask, "POSTED", text, ReviewReplyFingerprint.of(text), false);
+        UUID cancelled = pulledReview("v3", "9100000203", "튼튼해요");
+        needsReply(cancelled);
+        drafts.save(org, cancelled, "SELLER:" + seller, "감사합니다!", 0);
+        handOver(cancelled);
+        tasks.cancel(org, cancelled);
+        UUID onlyWaiting = pulledReview("v4", "9100000204", "좋아요");
+        needsReply(onlyWaiting);
+        drafts.save(org, onlyWaiting, "SELLER:" + seller, "고맙습니다.", 0);
+        pull.pullFor(org);
+
+        VendorReplyTaskService.Board board = tasks.board(org);
+        assertThat(board.moving()).extracting(VendorReplyTaskService.BoardRow::reviewId)
+                .containsExactlyInAnyOrder(waiting, posted);
+        assertThat(board.moving()).filteredOn(r -> r.reviewId().equals(posted)).singleElement().satisfies(r -> {
+            assertThat(r.state()).isEqualTo("POSTED");
+            assertThat(r.channelAnswered()).isFalse();
+            assertThat(r.confirmOverdue()).isFalse();
+            assertThat(r.preview()).isEqualTo("배송이 늦었어요");
+        });
+        assertThat(board.done()).extracting(VendorReplyTaskService.BoardRow::reviewId).containsExactly(cancelled);
+
+        vendor.overdue(postedTask);
+        pull.pullFor(org);
+        assertThat(tasks.board(org).moving()).filteredOn(r -> r.reviewId().equals(posted)).singleElement()
+                .extracting(VendorReplyTaskService.BoardRow::confirmOverdue).as("asked again on the pull").isEqualTo(true);
+
+        vendor.event("REPLIED", new VendorServerClient.FeedReview(vendor.ids.get("v2"), "9100000202", "SKU-합성-1",
+                "합성 상품", 5, "배송이 늦었어요", com.sellerops.common.ReviewBodyFingerprint.of("배송이 늦었어요"), null,
+                null, Instant.parse("2026-10-01T01:00:00Z"), "노출", true, Instant.parse("2026-10-20T01:00:00Z")));
+        pull.pullFor(org);
+        VendorReplyTaskService.Board after = tasks.board(org);
+        assertThat(after.moving()).extracting(VendorReplyTaskService.BoardRow::reviewId).containsExactly(waiting);
+        assertThat(after.done()).filteredOn(r -> r.reviewId().equals(posted)).singleElement()
+                .extracting(VendorReplyTaskService.BoardRow::channelAnswered).as("the channel shows it").isEqualTo(true);
+    }
+
     @Test
     void approvingHereIsRefusedWhenThePhoneApprovedFirst() {
         UUID review = pulledReview("v1", "9100000002", "배송이 빨라요");

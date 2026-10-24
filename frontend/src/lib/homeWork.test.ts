@@ -65,7 +65,7 @@ describe("mergeHomeWork — the review half, whole", () => {
       delegatedStates: { "r-held": "HELD", "r-failed": "FAILED", "r-phone": "AWAITING_APPROVAL", "r-gone": "POSTED" },
     });
     const byId = Object.fromEntries(work.rows.map((r) => [r.subjectId, r]));
-    expect(WORK_STATE[byId["r-held"].state].text).toBe("승인 보류");
+    expect(WORK_STATE[byId["r-held"].state].text).toBe("고칠 곳");
     expect(WORK_STATE[byId["r-failed"].state].text).toBe("등록 못 함");
     // Waiting on the phone is every draft now (2026-10-25): plain 승인 대기, not a lane word.
     expect(WORK_STATE[byId["r-phone"].state].text).toBe("승인 대기");

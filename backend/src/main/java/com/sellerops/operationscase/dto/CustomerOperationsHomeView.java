@@ -60,7 +60,22 @@ public record CustomerOperationsHomeView(
                               String reasonNote, String summary, String recommendedActionType,
                               String recommendedAction, List<String> missingInformation, boolean draftPrepared,
                               String decidedBy, Instant openedAt, java.time.LocalDate receivedOn, String to,
-                              boolean safety, String safetyReading) {
+                              boolean safety, String safetyReading, String safetyKind, String reviewTier) {
+
+        /**
+         * {@code safetyKind} — {@code INJURY} · {@code BODY_REACTION} · {@code PRODUCT_HAZARD} · {@code LEGAL} when
+         * {@code safety}; {@code reviewTier} — the group the 리뷰 screen shows the review in ({@code NEEDS_ATTENTION} ·
+         * {@code WATCH} · {@code FYI}), so 할 일 names the same group (2026-10-25). Both null for an inquiry.
+         */
+        public DecisionRow(UUID caseId, String subjectKind, String channelNameKo, String title, String preview,
+                           Integer rating, String reasonNote, String summary, String recommendedActionType,
+                           String recommendedAction, List<String> missingInformation, boolean draftPrepared,
+                           String decidedBy, Instant openedAt, java.time.LocalDate receivedOn, String to,
+                           boolean safety, String safetyReading) {
+            this(caseId, subjectKind, channelNameKo, title, preview, rating, reasonNote, summary,
+                    recommendedActionType, recommendedAction, missingInformation, draftPrepared, decidedBy, openedAt,
+                    receivedOn, to, safety, safetyReading, null, null);
+        }
     }
 
     /**

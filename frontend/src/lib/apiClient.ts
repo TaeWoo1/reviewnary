@@ -60,6 +60,7 @@ import type {
   VendorReviewPullResult,
   VendorReviewsOverview,
   VendorReplyTaskView,
+  ReplyBoard,
   CoupangSetupView,
   ConnectionStatusView,
   ConnectionTestResultView,
@@ -522,6 +523,11 @@ export const api = {
     const { data } = await http.post<VendorReplyTaskView>(`/api/local/vendor-link/reviews/${reviewId}/hand-over`, {
       baseVersion,
     });
+    return data;
+  },
+  /** 할 일's 진행 중 · 끝난 일 from the delegate lane; empty lists when this PC is not linked. */
+  async getReplyBoard(): Promise<ReplyBoard> {
+    const { data } = await http.get<ReplyBoard>("/api/local/vendor-link/reviews/board");
     return data;
   },
   /** 「휴대폰 문장 쓰기」: the phone's edit stays, and this PC's set-aside version is no longer offered. */

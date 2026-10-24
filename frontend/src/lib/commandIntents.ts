@@ -55,6 +55,6 @@ export function matchCommandIntent(text: string): CommandIntentKey | null {
 
 /** What the screen says it is showing, in the seller's words. Never the intent key. */
 export const INTENT_HEADING: Record<CommandIntentKey, string> = {
-  TODAY: "오늘 확인할 일",
+  TODAY: "오늘 할 일",
   UNANSWERED_INQUIRIES: "답변이 필요한 문의",
 };

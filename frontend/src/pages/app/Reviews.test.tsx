@@ -332,7 +332,7 @@ describe("리뷰 — the workflow surface", () => {
  *
  * <p>이 branch만 shell의 맨 {@code main}으로 직접 들어갔다. `/reviews`는 master-detail 경로라 그 main은
  * padding도 폭 제한도 주지 않는다 — 측정된 결과는 1600·1366 양쪽에서 오른쪽으로 16px 넘침(날짜 열과
- * 「확인할 일에 리뷰 N건 →」이 잘림)과 화면 꼭대기에 붙어 잘린 제목이었다. 다른 네 갈래는 처음부터
+ * 「할 일에 리뷰 N건 →」이 잘림)과 화면 꼭대기에 붙어 잘린 제목이었다. 다른 네 갈래는 처음부터
  * {@code MasterDetail}의 목록 열을 지난다.
  */
 describe("리뷰 목록의 자리", () => {

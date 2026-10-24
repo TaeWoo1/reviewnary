@@ -21,4 +21,6 @@ public interface VendorReplyTaskRepository extends JpaRepository<VendorReplyTask
     List<VendorReplyTask> findByVendorStoreIdAndStateIn(UUID vendorStoreId, Collection<String> states);
 
     boolean existsByOrgIdAndReviewIdAndStateNotIn(UUID orgId, UUID reviewId, Collection<String> states);
+
+    List<VendorReplyTask> findByOrgId(UUID orgId);
 }

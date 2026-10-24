@@ -90,14 +90,14 @@ export function DismissedReplyWork({
         data-testid="dismissed-work-toggle"
       >
         <span aria-hidden="true">{expanded ? "▾" : "▸"}</span>
-        제외한 작업
+        할 일에서 뺀 리뷰
       </button>
 
       {expanded ? (
         <div className="mt-3" data-testid="dismissed-work-panel">
           {status === "error" ? (
             <p className="rounded-xl bg-bad/5 px-4 py-3 text-sm text-bad">
-              제외한 작업을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+              할 일에서 뺀 리뷰를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
             </p>
           ) : uncertainty ? (
             <div
@@ -112,13 +112,12 @@ export function DismissedReplyWork({
             <p className="text-sm text-muted">불러오는 중…</p>
           ) : items.length === 0 ? (
             <p className="text-sm text-muted" data-testid="dismissed-work-empty">
-              제외한 리뷰가 없습니다.
+              할 일에서 뺀 리뷰가 없습니다.
             </p>
           ) : (
             <>
               <p className="mb-3 text-sm text-muted">
-                작업에서 제외한 리뷰예요. '복원'하면 '내 답변 작업'에 다시 나타납니다. 저장한 초안과
-                기록은 그대로예요.
+                「되돌리기」를 누르면 할 일에 다시 나타납니다. 저장한 초안과 기록은 그대로입니다.
               </p>
               <ul className="divide-y divide-line" data-testid="dismissed-work-list">
                 {items.map((item) => (
@@ -135,7 +134,7 @@ export function DismissedReplyWork({
                           disabled={restoring === item.actionRef}
                           data-testid="dismissed-work-restore"
                         >
-                          {restoring === item.actionRef ? "복원하는 중…" : "복원"}
+                          {restoring === item.actionRef ? "되돌리는 중…" : "되돌리기"}
                         </button>
                       </div>
                     ) : null}

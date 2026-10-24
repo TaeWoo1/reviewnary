@@ -230,6 +230,12 @@ visual QA에서 정한 한 가지 수정(구역 제목이 상품 상세·홈과 
   2026-08-19 Service Readiness v1: 같은 auth shell에 `/forgot-password`, `/reset-password`; public shell에
   `/legal/terms`, `/legal/privacy`(확정 전 placeholder) — `docs/standing/service_readiness_v1.md` §2-4·§2-6·§4.)
 - **화면 책임(§4)과 네 계약(§4a Today Inbox · §4b 채널 연결 hub · §4c 리뷰 답변 준비 · §4d 주문 기록 workspace)**.
+- (2026-10-25 product-owner decision, 시안 ③ 확인) 메뉴 이름 「확인할 일」 → **「할 일」**(route
+  `/customer-operations/cases` 그대로). 「확인」은 채널에서 본 증거(「네이버 확인」)에만 쓰고, 서비스의 규칙 검사는
+  「검사」, 판매자의 일은 「할 일」이다. 「할 일」 안은 **내가 할 일 · 진행 중 · 끝난 일** 세 보기(`?view=moving|done`):
+  진행 중은 담당자 · PC 검사 · 채널이 끝낼 일이고 내 할 일 숫자에 더하지 않는다. 끝난 일은 최근 30일(서버 보관은 90일
+  규칙 그대로). 오늘의 맨 위 줄은 「내가 할 일 N건 · 진행 중 N건」(진행 중은 담당자 길이 있는 PC에서만).
+  계약: `docs/vendor_server_contract_v1.md` D7 · §4.
 - **노출 채널 = NAVER / Coupang / Cafe24** (`ProductChannels.java`, `lib/productChannels.ts`), 표시 순서도 그 순서.
 - **새 채널의 기본값**: connector + capability proof(§4.1 승격) **뒤에** 기존 surface에 끼운다 —
   `/reviews`에는 계정 chip 하나 + `ReviewChannelCapabilityView` 행 하나 + 어휘 한 줄(`channelVocabulary`);

@@ -55,6 +55,11 @@ export interface HomeWorkRow {
    */
   said?: string | null;
   line: string | null;
+  /**
+   * The group the 리뷰 screen shows this review in — 확인 필요 · 지켜보기 · 참고 — for a case about a review, so this
+   * list names the same group (mockup ③, 2026-10-25). Null elsewhere.
+   */
+  group?: string | null;
   since: string | null;
   /** Where the row opens: the case screen for a case, the owning screen otherwise. */
   to: string;
@@ -162,8 +167,9 @@ export function caseWorkRow(row: CustomerOperationsDecisionRow): HomeWorkRow {
     reason,
     // `draftPrepared` is the stored fact, which is what `DRAFT_READY` requires — the row's own line
     // already says 초안 있음 off the same field. Without one, a case is something reviewnary opened for
-    // the seller to look at, which is exactly what `NEEDS_LOOK` names.
-    state: row.draftPrepared ? "DRAFT_READY" : "NEEDS_LOOK",
+    // the seller to look at: 살펴볼 일, never the 리뷰 screen's group name (mockup ③, 2026-10-25).
+    state: row.draftPrepared ? "DRAFT_READY" : "LOOK_INTO",
+    group: row.subjectKind === "REVIEW" && row.reviewTier ? (TIER_NAME[row.reviewTier] ?? null) : null,
     source: sourceLabel(row.channelNameKo, row.subjectKind),
     channel: channelShort(row.channelNameKo),
     rating: row.rating ?? null,
@@ -190,6 +196,9 @@ export function caseWorkRow(row: CustomerOperationsDecisionRow): HomeWorkRow {
     safetyReading: row.safety === true ? (row.safetyReading ?? null) : null,
   };
 }
+
+/** The 리뷰 screen's group names. */
+const TIER_NAME: Record<string, string> = { NEEDS_ATTENTION: "확인 필요", WATCH: "지켜보기", FYI: "참고" };
 
 export function mergeHomeWork(
   co: CustomerOperationsHome | null | undefined,
@@ -500,7 +509,7 @@ export function workBucket(row: HomeWorkRow): Exclude<WorkFilterKey, "all"> {
  * views of the one list, never a second list. None of them ranks, and the order inside a tab is the
  * list's own.
  *
- * <p>The words are the mockup's: 답변할 문의 · 확인할 리뷰 · 승인할 일 — what the seller DOES with the
+ * <p>The words are the mockup's: 답변할 문의 · 살펴볼 리뷰 · 승인할 일 — what the seller DOES with the
  * bucket, which is the axis a tab row on an operating queue is read along. 초안 필요 keeps its
  * {@link WORK_STATE} word because that is the word its rows already wear in the list's lead column, and
  * it is a tab the mockup does not draw: dropping it would leave four rows reachable from 전체 alone.
@@ -508,7 +517,7 @@ export function workBucket(row: HomeWorkRow): Exclude<WorkFilterKey, "all"> {
 export const WORK_FILTERS = [
   { key: "all", label: "전체", test: () => true },
   { key: "inquiry", label: "답변할 문의", test: (r: HomeWorkRow) => workBucket(r) === "inquiry" },
-  { key: "review", label: "확인할 리뷰", test: (r: HomeWorkRow) => workBucket(r) === "review" },
+  { key: "review", label: "살펴볼 리뷰", test: (r: HomeWorkRow) => workBucket(r) === "review" },
   { key: "approve", label: "승인할 일", test: (r: HomeWorkRow) => workBucket(r) === "approve" },
   { key: "draft", label: "초안 필요", test: (r: HomeWorkRow) => workBucket(r) === "draft" },
 ] as const;

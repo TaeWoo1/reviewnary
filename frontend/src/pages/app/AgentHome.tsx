@@ -35,7 +35,7 @@ import type { InquiryQueueResponse, MetricKpi, OperationsHome, OverviewResponse,
  * copied here. Nothing is chosen until the seller chooses it, and what they chose can be closed.
  *
  * <p><b>그 일이 없는 org도 같은 화면을 본다</b> (product-owner decision, 2026-10-06). 전에는 여기서 갈라져
- * 네 개의 성긴 영역(지금 확인할 리뷰 · 반복 문제 · 최근 수집 상태 · 준비된 작업)과 대화 턴 하나로 된 두 번째
+ * 네 개의 성긴 영역(지금 살펴볼 리뷰 · 반복 문제 · 최근 수집 상태 · 준비된 작업)과 대화 턴 하나로 된 두 번째
  * Home이 그려졌고, 어느 쪽이 보이는지는 판매자의 데이터가 아니라 배포 설정과 그 한 번의 읽기가 성공했는지가
  * 정했다 — 같은 판매자가 backend가 잠깐 죽은 아침에 다른 제품을 열었다는 뜻이다. 이제 골격은 하나이고
  * ({@link CustomerOpsHome}), 자동 확인에 <b>속한</b> 줄만 그 일이 있을 때 선다. 그 Home과 함께 대화 브리핑
@@ -189,7 +189,7 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
       const key = matchCommandIntent(text);
       if (!key) return false;
       if (key === "TODAY") {
-        conversation.addLocalTurn(text, { message: "오늘 확인할 일은 이 대화 맨 위에 정리해 두었습니다.", artifacts: [] });
+        conversation.addLocalTurn(text, { message: "오늘 할 일은 이 대화 맨 위에 정리해 두었습니다.", artifacts: [] });
         return true;
       }
       if (key === "UNANSWERED_INQUIRIES") {

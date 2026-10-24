@@ -863,8 +863,8 @@ function SetAsideFromWork({ accountId, actionRef, onDone }: { accountId: string;
       {confirming ? (
         <div role="group" aria-label="작업에서 제외 확인" className="space-y-2" data-testid="reply-work-dismiss-confirm">
           <p className="break-keep text-sm text-muted">
-            이 리뷰를 확인할 일에서만 제외합니다. 저장한 초안과 기록은 그대로 남고, 답변한 것으로 기록되지 않습니다.
-            제외한 리뷰는 확인할 일 아래 &apos;제외한 작업&apos;에서 다시 확인하고 복원할 수 있어요.
+            이 리뷰를 할 일에서만 제외합니다. 저장한 초안과 기록은 그대로 남고, 답변한 것으로 기록되지 않습니다.
+            제외한 리뷰는 할 일의 「끝난 일」에서 다시 보고 되돌릴 수 있습니다.
           </p>
           <div className="flex flex-wrap gap-2">
             <Btn

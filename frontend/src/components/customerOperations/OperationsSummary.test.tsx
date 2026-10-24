@@ -5,7 +5,7 @@
  * §8-4b allows 「새로 확인」 and forbids 「처리 완료」, and only rendered text can be held to that.
  *
  * <p><b>Two surfaces since UI System v2</b> (product-owner decision, 2026-09-30). The band
- * (`today-summary`) holds OBLIGATIONS only — 확인할 일 · 실행 대기 · 현재 미답변 — and the quiet line under
+ * (`today-summary`) holds OBLIGATIONS only — 할 일 · 실행 대기 · 현재 미답변 — and the quiet line under
  * it (`today-context`) holds what changed, what reviewnary did, and whether the figures can be trusted.
  * Every qualification rule this file already pinned still holds; what moved is which surface states it.
  * A rule that was about the inflow CELL is now about the context LINE and is asserted there, so the
@@ -304,7 +304,7 @@ describe("최근 24시간 — what we opened, never what was completed", () => {
 /**
  * <b>The band — obligations, and nothing else</b> (product-owner decision, 2026-09-30).
  *
- * <p>An obligation is something waiting for the seller. 확인할 일 is our queue of decisions, 실행 대기 is
+ * <p>An obligation is something waiting for the seller. 할 일 is our queue of decisions, 실행 대기 is
  * what they already decided and has not been posted, 현재 미답변 is the channel's own fact. 오늘 들어온 것
  * and 최근 24시간 are neither, and they are asserted ABSENT here — a band that mixes 「what you must do」
  * with 「what happened」 is a dashboard, and this screen's subject is the list below it.
@@ -321,11 +321,11 @@ describe("the band — obligations only", () => {
     });
   };
 
-  it("states 확인할 일, 실행 대기 and 현재 미답변 — and never inflow or the 24-hour window", async () => {
+  it("states 할 일, 실행 대기 and 현재 미답변 — and never inflow or the 24-hour window", async () => {
     withWork();
     draw(co({ checked: 12, autoResolved: 3, draftsPrepared: 2 }));
     const band = await summary();
-    await waitFor(() => expect(band).toHaveTextContent("확인할 일"));
+    await waitFor(() => expect(band).toHaveTextContent("할 일"));
     expect(band).toHaveTextContent("실행 대기");
     expect(band).toHaveTextContent("현재 미답변");
     // The two facts that moved. Both are still on the screen — on the quiet line — and neither may be
@@ -341,17 +341,17 @@ describe("the band — obligations only", () => {
     withWork();
     draw(co({ checked: 1 }));
     const band = await summary();
-    await waitFor(() => expect(band).toHaveTextContent("확인할 일"));
+    await waitFor(() => expect(band).toHaveTextContent("할 일"));
     expect(band).not.toHaveTextContent("반복 문제");
   });
 
-  it("reads 확인할 일 → 실행 대기 → 현재 미답변, in that order", async () => {
+  it("reads 할 일 → 실행 대기 → 현재 미답변, in that order", async () => {
     withWork();
     draw(co({ checked: 1 }));
     const band = await summary();
     await waitFor(() => expect(band).toHaveTextContent("현재 미답변"));
     const text = band.textContent ?? "";
-    expect(text.indexOf("확인할 일")).toBeLessThan(text.indexOf("실행 대기"));
+    expect(text.indexOf("할 일")).toBeLessThan(text.indexOf("실행 대기"));
     expect(text.indexOf("실행 대기")).toBeLessThan(text.indexOf("현재 미답변"));
   });
 
@@ -372,7 +372,7 @@ describe("the band — obligations only", () => {
     withWork();
     draw(co(), metrics({ kpis: [kpi("reviews"), kpi("inquiries"), kpi("unansweredInquiries", { value: 4, freshnessUnproven: true })] }));
     const band = await summary();
-    await waitFor(() => expect(band).toHaveTextContent("확인할 일"));
+    await waitFor(() => expect(band).toHaveTextContent("할 일"));
     const cell = band.querySelector("[data-testid='pulse-unanswered']")!;
     expect(cell).toHaveTextContent("현재 미답변");
     // <b>The figure is never floored.</b> 4 is what the qualified population counted, and printing it
@@ -414,7 +414,7 @@ describe("the band — obligations only", () => {
     withWork();
     draw(co({ checked: 1 }), null);
     const band = await summary();
-    await waitFor(() => expect(band).toHaveTextContent("확인할 일"));
+    await waitFor(() => expect(band).toHaveTextContent("할 일"));
     const cell = band.querySelector("[data-testid='pulse-unanswered']")!;
     // A failed request still does not say zero. What it now also does not do is vanish: the slot stands
     // and names its own cause. <b>And the cause is OURS, not the seller's</b> — 「수집 상태 확인 필요」 is
@@ -431,7 +431,7 @@ describe("the band — obligations only", () => {
     // Same reason as the sibling test: the «nothing is drawn» check is the band's, not the page's.
     draw(co({ checked: 12 }));
     const band = await summary();
-    await waitFor(() => expect(band).toHaveTextContent("확인할 일"));
+    await waitFor(() => expect(band).toHaveTextContent("할 일"));
     // <b>The surface is ruled, not filled</b> (Home visual target, 2026-10-01). The guarantee has not
     // changed — ONE surface, never three cards — only what draws it: the band was a `bg-canvas` box at
     // `max-w-3xl`, which is the dashboard shape §8-A spends on nothing else on this screen, and the
@@ -470,7 +470,7 @@ describe("the band — obligations only", () => {
     withWork();
     draw(co({ checked: 12, autoResolved: 3, draftsPrepared: 2 }));
     const band = await summary();
-    await waitFor(() => expect(band).toHaveTextContent("확인할 일"));
+    await waitFor(() => expect(band).toHaveTextContent("할 일"));
     expect(band.className).toContain("divide-x");
     expect(band.className).toContain("divide-line");
     for (const c of band.querySelectorAll("[data-testid^='pulse-']")) {
@@ -489,10 +489,10 @@ describe("the band — obligations only", () => {
     // NOTHING. The tracks are the target's thirds, so the cells that do have something keep their width
     // and their rule position whatever the read returned.
     withWork();
-    // No metrics: 확인할 일 and 실행 대기 only.
+    // No metrics: 할 일 and 실행 대기 only.
     draw(co({ checked: 1 }), null);
     const band = await summary();
-    await waitFor(() => expect(band).toHaveTextContent("확인할 일"));
+    await waitFor(() => expect(band).toHaveTextContent("할 일"));
     expect(band.querySelectorAll("[data-testid^='pulse-']")).toHaveLength(3);
     // The third cell stands and says it was not read — see 「says 현재 미답변 could not be read」. What
     // this test keeps is the rhythm: three tracks, so the two that DO have figures sit where they sit
@@ -510,7 +510,7 @@ describe("the band — obligations only", () => {
     withWork();
     draw(co({ checked: 12 }));
     const band = await summary();
-    await waitFor(() => expect(band).toHaveTextContent("확인할 일"));
+    await waitFor(() => expect(band).toHaveTextContent("할 일"));
     expect(band.getAttribute("aria-label")).toBe("지금 해야 할 일");
     expect(band.getAttribute("aria-labelledby")).toBeNull();
     expect(band.querySelector("h1,h2,h3")).toBeNull();
@@ -527,7 +527,7 @@ describe("the band — obligations only", () => {
     const band = await summary();
     const cells = [...band.querySelectorAll("[data-testid^='pulse-']")] as HTMLElement[];
     expect(cells).toHaveLength(3);
-    // 확인할 일 is a measured zero here — the list read landed and found nothing — so it alone is a figure.
+    // 할 일 is a measured zero here — the list read landed and found nothing — so it alone is a figure.
     expect(cells[0]).toHaveTextContent("0건");
     for (const cell of cells.slice(1)) {
       expect(cell).toHaveTextContent("—");
@@ -539,7 +539,7 @@ describe("the band — obligations only", () => {
     withWork();
     draw({ ...co({ checked: 1 }), status: "PAUSED" });
     const band = await summary();
-    await waitFor(() => expect(band).toHaveTextContent("확인할 일"));
+    await waitFor(() => expect(band).toHaveTextContent("할 일"));
     const cell = band.querySelector("[data-testid='pulse-awaiting']")!;
     // The claim the test has always protected: 실행 대기 is a fact about a job that is LOOKING, and a
     // paused job has not looked. So no number — and now the slot says that instead of leaving the
@@ -608,7 +608,7 @@ describe("the channel row", () => {
     const row = await channels();
     const band = await summary();
     expect(band.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const list = screen.queryByRole("list", { name: "확인할 일" });
+    const list = screen.queryByRole("list", { name: "할 일" });
     if (list) expect(list.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

@@ -129,6 +129,12 @@ public class VendorLinkController {
         return replyTasks.cancel(principal.orgId(), reviewId);
     }
 
+    /** 「할 일」's 진행 중 · 끝난 일 from the delegate lane (mockup ③, 2026-10-25); empty when this PC is not linked. */
+    @GetMapping("/reviews/board")
+    public VendorReplyTaskService.Board board(@AuthenticationPrincipal AuthPrincipal principal) {
+        return replyTasks.board(principal.orgId());
+    }
+
     /** The latest delegation task this PC knows for the review; 204 when there is none. */
     @GetMapping("/reviews/{reviewId}/task")
     public ResponseEntity<VendorReplyTaskService.TaskView> task(@AuthenticationPrincipal AuthPrincipal principal,

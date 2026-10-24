@@ -130,7 +130,7 @@ export function Overview() {
                 left to decide which screen is wrong. */}
             {waiting.some((kpi) => kpi.key === "unansweredInquiries") ? (
               <p className="break-keep text-sm text-muted">
-                「현재 미답변 문의」는 채널에서 아직 답변되지 않은 문의 전체입니다. 오늘의 「확인할 일」은 판매자님의
+                「현재 미답변 문의」는 채널에서 아직 답변되지 않은 문의 전체입니다. 오늘의 「할 일」은 판매자님의
                 결정을 기다리는 문의와 리뷰를 세므로 두 수는 다를 수 있습니다.
               </p>
             ) : null}

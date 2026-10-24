@@ -199,6 +199,7 @@ export function CustomerOpsHome({
   const wide = selection?.wide ?? false;
   const search = selection?.search ?? "";
   const awaiting = awaitingRows(ops, work);
+  const moving = useMovingCount();
   // What every row in the WHOLE list says identically — over `work.rows`, not the six or seven drawn, because
   // this heading stands under the Pulse's 「확인할 일 11」 and a 「모두 …」 that covered only what is drawn would
   // be a claim about eleven made from six. `WorkRows` is handed the same population and hides exactly this.
@@ -326,6 +327,7 @@ export function CustomerOpsHome({
           다만 보유 읽기가 실패했으면 0이 아니라 아무 말도 하지 않는다(null). */}
       <OperationsSummary
         work={work}
+        moving={moving}
         awaiting={co ? (co.status === "ACTIVE" ? awaiting.count : null) : ops ? awaiting.count : null}
         unanswered={unansweredNow(metrics)}
       />
@@ -426,7 +428,7 @@ export function CustomerOpsHome({
         // Nothing waiting is a state, and the list's absence does not state it. 「다음 확인」 is on the status
         // line above, where it was before this became one line. 자동 확인이 없는 배포에서도 같은 문장을
         // 적는다 — 빈 자리는 「없다」와 「읽지 못했다」를 구분해 주지 않는다(읽기 실패는 채널 줄이 말한다).
-        <p className="break-keep text-sm text-muted">지금 확인할 일이 없습니다.</p>
+        <p className="break-keep text-sm text-muted">지금 할 일이 없습니다.</p>
       ) : null}
 
       {/*
@@ -730,6 +732,25 @@ export function useReviewWork(enabled = true): ReviewWorkView | null | undefined
   return value;
 }
 
+/**
+ * How many replies a delegate, the PC's check or the channel is finishing — 할 일's 「진행 중」 (mockup ③,
+ * 2026-10-25). `null` when this PC has no delegate lane or the read failed: then there is no such count to show.
+ */
+export function useMovingCount(): number | null {
+  const [value, setValue] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    Promise.resolve()
+      .then(() => api.getReplyBoard())
+      .then((b) => live && setValue(b && b.linked ? b.moving.length : null))
+      .catch(() => live && setValue(null));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return value;
+}
+
 /** The queue read the Home's list needs. `enabled` false when the page around it already made the same read. */
 export function useHomeQueue(enabled = true): InquiryQueueResponse | null | undefined {
   const [queue, setQueue] = useState<InquiryQueueResponse | null | undefined>(undefined);
@@ -948,10 +969,13 @@ const PULSE_LABEL = "지금 해야 할 일";
  */
 function OperationsSummary({
   work,
+  moving = null,
   awaiting,
   unanswered,
 }: {
   work: HomeWork;
+  /** 할 일's 진행 중, shown beside the seller's own count and never added to it; `null` = no such lane here. */
+  moving?: number | null;
   /** `null` when the job is not running — 실행 대기 is a fact about a job that is looking. */
   awaiting: number | null;
   /** `null` when the metrics read did not land. */
@@ -970,11 +994,24 @@ function OperationsSummary({
     neighbouring read, a previous window, or a partial population.
   */
   const cells: ReactNode[] = [
-    <Cell key="work" id="work" label={COPY.listTitle}>
+    <Cell key="work" id="work" label={COPY.mineLabel}>
       {/* A measured zero is a figure: the list read landed and found nothing. The server saying there are
           more than it sent makes this total a floor — 「11+」건. */}
       <Big value={work.rows.length} suffix={work.truncated ? "+" : ""} unit={COUNT_UNIT} />
     </Cell>,
+    ...(moving === null
+      ? []
+      : [
+          <Cell key="moving" id="moving" label="진행 중">
+            <Link
+              to="/customer-operations/cases?view=moving"
+              aria-label={`진행 중 ${moving.toLocaleString("ko-KR")}${COUNT_UNIT}`}
+              className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+            >
+              <Big value={moving} unit={COUNT_UNIT} />
+            </Link>
+          </Cell>,
+        ]),
     <Cell
       key="awaiting"
       id="awaiting"

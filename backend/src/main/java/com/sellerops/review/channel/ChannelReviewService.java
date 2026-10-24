@@ -363,6 +363,21 @@ public class ChannelReviewService {
      * <p>Only rows with {@code aiAttention = true} become marks. A current row with {@code false} is
      * the pilot saying "nothing to add", and nothing to add renders as nothing.
      */
+    /**
+     * The tier the 리뷰 screen shows this review in — the rules tier, or the pilot's when the display decision shows
+     * it ({@link TriageDisplayDecision}). Other screens that name a review's group read it here, so the two cannot
+     * place one review in two groups (2026-10-25: 할 일 names the group beside a safety review).
+     */
+    public ReviewTriageTier shownTier(UUID orgId, Review review) {
+        ReviewTriageTier rules = ReviewTriageRules.tier(review.getRating(), review.getBody());
+        if (!pilot.isEnabledFor(orgId)) {
+            return rules;
+        }
+        AiTriageCurrent current = aiCurrent.findByOrgIdAndReviewIdIn(orgId, List.of(review.getId())).stream()
+                .findFirst().orElse(null);
+        return TriageDisplayDecision.resolve(rules, current, true).tier();
+    }
+
     private Map<UUID, AiTriageMarkView> marksOf(UUID orgId, List<Review> page) {
         boolean surfaceOn = pilot.isEnabledFor(orgId);
         if (!surfaceOn || page.isEmpty()) {

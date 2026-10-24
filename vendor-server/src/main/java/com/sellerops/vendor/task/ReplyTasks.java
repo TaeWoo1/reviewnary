@@ -154,7 +154,18 @@ public class ReplyTasks {
                            Integer pcRecheckVersion, String pcRecheck, Integer approvedVersion,
                            String approvedFingerprint, Instant approvedAt, boolean claimed, Outcome outcome,
                            Instant checkedAt, String reportMethod, Instant updatedAt, BasisNote basisNote,
-                           Integer basisNoteVersion) {}
+                           Integer basisNoteVersion, boolean confirmOverdue) {}
+
+    /**
+     * A delegate's post the channel has not shown for too long (owner decision 2026-10-25): {@code POSTED}, and the
+     * review still has no reply after {@value #CONFIRM_UPLOADS} newer uploads of the store's export, or
+     * {@link #CONFIRM_WAIT} without one. It is never completed by time — it goes to an operator to look at.
+     */
+    static final int CONFIRM_UPLOADS = 2;
+    static final Duration CONFIRM_WAIT = Duration.ofDays(7);
+
+    /** A post an operator should check: {@code ops unconfirmed}. */
+    public record Unconfirmed(UUID taskId, String storeLabel, String reviewNo, Instant postedAt, int uploadsSince) {}
 
     /** The review a task answers, as the latest upload states it. */
     public record TaskReview(String productName, int rating, String body, ReviewAttachment attachment,
@@ -255,7 +266,7 @@ public class ReplyTasks {
         State lands = underCurrentPolicy(storeId, meta.knowledgeFp(), meta.policyFp(), meta.voiceFp())
                 ? State.AWAITING_APPROVAL : State.RECHECK_NEEDED;
         Optional<TaskView> open = jdbc.sql(SELECT + " where t.open_review_id = ?").param(reviewId)
-                .query(ReplyTasks::view).optional();
+                .query(this::view).optional();
         if (baseVersion != null && open.map(t -> t.draftVersion() != baseVersion && !t.draftBody().equals(body))
                 .orElse(baseVersion != 0)) {
             throw new TaskException(Failure.STALE);
@@ -696,11 +707,31 @@ public class ReplyTasks {
                 .list();
     }
 
+    /** Every delegate's post the channel has not shown for too long, oldest first — what an operator checks. */
+    @Transactional(readOnly = true)
+    public List<Unconfirmed> unconfirmed() {
+        return jdbc.sql(SELECT + " where t.state = 'POSTED' and not r.replied order by t.updated_at, t.id")
+                .query(this::view).list().stream().filter(TaskView::confirmOverdue)
+                .map(t -> new Unconfirmed(t.id(), storeLabelOf(t.storeId()), t.reviewNo(), t.updatedAt(),
+                        uploadsSince(t)))
+                .toList();
+    }
+
+    private String storeLabelOf(UUID storeId) {
+        return jdbc.sql("select label from stores where id = ?").param(storeId).query(String.class).optional()
+                .orElse("");
+    }
+
+    private int uploadsSince(TaskView t) {
+        return jdbc.sql("select count(*) from review_uploads where store_id = ? and uploaded_at > ?")
+                .params(t.storeId(), ts(t.updatedAt())).query(Integer.class).single();
+    }
+
     /* ── reads ──────────────────────────────────────────────────────────────────────────────────────────────────── */
 
     @Transactional(readOnly = true)
     public Optional<TaskView> get(UUID taskId) {
-        return jdbc.sql(SELECT + " where t.id = ?").param(taskId).query(ReplyTasks::view).optional();
+        return jdbc.sql(SELECT + " where t.id = ?").param(taskId).query(this::view).optional();
     }
 
     @Transactional(readOnly = true)
@@ -713,9 +744,9 @@ public class ReplyTasks {
     public List<TaskView> list(UUID storeId, State state) {
         return state == null
                 ? jdbc.sql(SELECT + " where t.store_id = ? order by t.created_at desc, t.id").param(storeId)
-                        .query(ReplyTasks::view).list()
+                        .query(this::view).list()
                 : jdbc.sql(SELECT + " where t.store_id = ? and t.state = ? order by t.created_at desc, t.id")
-                        .params(storeId, state.name()).query(ReplyTasks::view).list();
+                        .params(storeId, state.name()).query(this::view).list();
     }
 
     @Transactional(readOnly = true)
@@ -782,7 +813,10 @@ public class ReplyTasks {
     private static final String SELECT = "select t.*, r.review_no, r.product_name as r_product_name, "
             + "r.rating as r_rating, r.body as r_body, r.attachment_url as r_attachment_url, "
             + "r.attachment_kind as r_attachment_kind, r.written_at as r_written_at, "
-            + "r.display_state as r_display_state, r.replied as r_replied from reply_tasks t "
+            + "r.display_state as r_display_state, r.replied as r_replied, "
+            // Uploads since the task last moved — for a POSTED one, since the delegate reported it.
+            + "(select count(*) from review_uploads u where u.store_id = t.store_id "
+            + "and u.uploaded_at > t.updated_at) as uploads_since from reply_tasks t "
             + "join store_reviews r on r.id = t.review_id";
 
     private record ReviewState(String bodyFingerprint, boolean replied, String displayState) {}
@@ -952,7 +986,7 @@ public class ReplyTasks {
         return String.join(",", flags);
     }
 
-    private static TaskView view(ResultSet rs, int n) throws SQLException {
+    private TaskView view(ResultSet rs, int n) throws SQLException {
         String checks = rs.getString("server_checks");
         int recheck = rs.getInt("pc_recheck_version");
         Integer recheckVersion = rs.wasNull() ? null : recheck;
@@ -976,7 +1010,14 @@ public class ReplyTasks {
                 approvedVersion, rs.getString("approved_fingerprint"), instant(rs.getTimestamp("approved_at")),
                 rs.getObject("claimed_by") != null, outcome == null ? null : Outcome.valueOf(outcome),
                 instant(rs.getTimestamp("checked_at")), rs.getString("report_method"),
-                instant(rs.getTimestamp("updated_at")), note(rs.getString("basis_note")), noteVersion(rs));
+                instant(rs.getTimestamp("updated_at")), note(rs.getString("basis_note")), noteVersion(rs),
+                overdue(rs.getString("state"), rs.getBoolean("r_replied"), instant(rs.getTimestamp("updated_at")),
+                        rs.getInt("uploads_since")));
+    }
+
+    private boolean overdue(String state, boolean replied, Instant since, int uploadsSince) {
+        return State.POSTED.name().equals(state) && !replied
+                && (uploadsSince >= CONFIRM_UPLOADS || !clock.instant().isBefore(since.plus(CONFIRM_WAIT)));
     }
 
     private static Integer noteVersion(ResultSet rs) throws SQLException {

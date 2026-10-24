@@ -86,6 +86,14 @@ final class FakeVendorServer implements VendorServerClient {
         return next;
     }
 
+    /** As the server, a while later: a posted reply the channel has not shown for too long (2026-10-25). */
+    void overdue(UUID taskId) {
+        TaskSnapshot t = tasks.get(taskId);
+        tasks.put(taskId, new TaskSnapshot(t.id(), t.reviewId(), t.state(), t.stateVersion(), t.draftVersion(),
+                t.draftBody(), t.draftFingerprint(), t.approvedFingerprint(), t.editedOnMobile(), t.approvedVersion(),
+                t.draftBasis(), t.basisNoteJson(), t.pcRecheckVersion(), t.pcRecheck(), true));
+    }
+
     @Override
     public Code requestCode(String deviceName, String appVersion, String publicKeyBase64) {
         return new Code("device-code", "BCDFGHJK", Instant.parse("2026-10-21T00:10:00Z"), 3);

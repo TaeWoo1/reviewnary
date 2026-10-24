@@ -205,7 +205,7 @@ describe("greeting — arithmetic, never a model", () => {
     expect(strip.map((k) => k.label)).toEqual(["현재 미답변"]);
     // The same noun the other Home's band uses for the same fact — one product, one word.
     expect(strip.map((k) => k.label)).not.toContain("현재 미답변 문의");
-    expect(contextStrip(overview(), false, 22).map((k) => k.label)).toEqual(["확인할 일"]);
+    expect(contextStrip(overview(), false, 22).map((k) => k.label)).toEqual(["할 일"]);
     expect(contextStrip(overview(), false, 22)[0]!.value).toBe(22);
     // 주문 and 부정 리뷰 are gone from the Home, in both readings.
     for (const labels of [contextStrip(overview()).map((k) => k.label), contextStrip(overview(), false, 22).map((k) => k.label)]) {
@@ -236,7 +236,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     expect(screen.getByRole("form", { name: "AI 담당자에게 요청" })).toBeInTheDocument();
     // 두 번째 Home은 없다 — 같은 아침이 두 가지 모양을 갖지 않는다.
     expect(screen.queryByLabelText("오늘 확인할 것")).toBeNull();
-    expect(screen.queryByLabelText("지금 확인할 리뷰")).toBeNull();
+    expect(screen.queryByLabelText("지금 살펴볼 리뷰")).toBeNull();
     expect(screen.queryByLabelText("최근 수집 상태")).toBeNull();
     // 우리 어휘는 화면에 없다.
     expect(screen.queryByText(/proactive|PROPOSED|DRAFT_PREPARED|case/i)).toBeNull();
@@ -313,7 +313,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
       prepared: { reviewRepliesApproved: 0, inquiryDraftsReady: 0, rows: [] },
     });
     renderHome();
-    expect(await screen.findByText("지금 확인할 일이 없습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("지금 할 일이 없습니다.")).toBeInTheDocument();
   });
 
   /**
@@ -329,7 +329,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     expect(screen.getByLabelText("채널 상태")).toBeInTheDocument();
     // 네 개의 성긴 영역도, 그 아래 「지금 처리할 일이 N건」 대화 턴도 없다.
     expect(screen.queryByLabelText("오늘 확인할 것")).toBeNull();
-    expect(screen.queryByLabelText("지금 확인할 리뷰")).toBeNull();
+    expect(screen.queryByLabelText("지금 살펴볼 리뷰")).toBeNull();
     expect(screen.queryByLabelText("최근 수집 상태")).toBeNull();
     expect(screen.queryByText(/지금 처리할 일이/)).toBeNull();
     expect(screen.queryAllByTestId("agent-turn")).toHaveLength(0);
@@ -443,7 +443,7 @@ describe("Customer Operations v3.1 — the job's Home", () => {
     // 홈 → 오늘 (UI/UX v2 Phase 1, product-owner decision).
     expect(screen.getByRole("heading", { level: 1, name: "오늘" })).toBeInTheDocument();
     // The case and the queue row are the same inquiry: drawn once, as the case.
-    const list = await screen.findByRole("list", { name: "확인할 일" });
+    const list = await screen.findByRole("list", { name: "할 일" });
     const hrefs = within(list).getAllByRole("link").map((a) => a.getAttribute("href"));
     expect(hrefs).toContain("/customer-operations/cases/k-1");
     expect(hrefs).not.toContain("/inquiries/i-1");
@@ -451,7 +451,7 @@ describe("Customer Operations v3.1 — the job's Home", () => {
     // Nothing of the other Home is drawn beside it.
     expect(screen.queryByRole("region", { name: "오늘 상태" })).toBeNull();
     expect(screen.queryByText("AI가 먼저 확인한 일")).toBeNull();
-    expect(screen.queryByText("지금 확인할 리뷰")).toBeNull();
+    expect(screen.queryByText("지금 살펴볼 리뷰")).toBeNull();
     // The composer's own string, not a copy of it: the placeholder changed with the Home visual target
     // (「리뷰나 문의를 자연어로 요청해보세요」) and a second spelling of it here is exactly the kind of
     // literal that makes a copy change look like a regression.

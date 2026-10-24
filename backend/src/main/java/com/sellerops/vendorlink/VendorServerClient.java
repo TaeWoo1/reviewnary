@@ -93,7 +93,16 @@ public interface VendorServerClient {
     record TaskSnapshot(UUID id, UUID reviewId, String state, int stateVersion, int draftVersion, String draftBody,
                         String draftFingerprint, String approvedFingerprint, boolean editedOnMobile,
                         Integer approvedVersion, String draftBasis, String basisNoteJson, Integer pcRecheckVersion,
-                        String pcRecheck) {
+                        String pcRecheck, boolean confirmOverdue) {
+
+        /** {@code confirmOverdue} (2026-10-25): a post the channel has not shown for too long, as the server judges. */
+        public TaskSnapshot(UUID id, UUID reviewId, String state, int stateVersion, int draftVersion, String draftBody,
+                            String draftFingerprint, String approvedFingerprint, boolean editedOnMobile,
+                            Integer approvedVersion, String draftBasis, String basisNoteJson, Integer pcRecheckVersion,
+                            String pcRecheck) {
+            this(id, reviewId, state, stateVersion, draftVersion, draftBody, draftFingerprint, approvedFingerprint,
+                    editedOnMobile, approvedVersion, draftBasis, basisNoteJson, pcRecheckVersion, pcRecheck, false);
+        }
 
         public TaskSnapshot(UUID id, UUID reviewId, String state, int stateVersion, int draftVersion, String draftBody,
                             String draftFingerprint, String approvedFingerprint, boolean editedOnMobile,

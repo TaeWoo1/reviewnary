@@ -58,7 +58,7 @@ export function WorkItemPane({ row, now, depth = "full" }: { row: HomeWorkRow; n
         depth={depth}
         reading="document"
         decisionLabel="판매자의 결정"
-        label="선택한 확인할 일"
+        label="선택한 할 일"
         meta={
           <Facts>
             <span className="font-semibold text-ink">{row.source}</span>

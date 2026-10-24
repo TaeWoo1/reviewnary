@@ -23,7 +23,7 @@ describe("nav.v2 — structure", () => {
     expect(NAV_GROUPS.map(navGroupLabel)).toEqual(["운영", "데이터", "Reviewnary", null]);
   });
 
-  it("declares the destinations, in order — 오늘 · 확인할 일 · 반복 문제 / 리뷰 · 문의 · 상품 · 주문 · 리포트 / 지식 · 연결 / 설정", () => {
+  it("declares the destinations, in order — 오늘 · 할 일 · 반복 문제 / 리뷰 · 문의 · 상품 · 주문 · 리포트 / 지식 · 연결 / 설정", () => {
     // <b>The destinations and their order did not move</b>; the grouping did. 오늘 joined 운영 because it
     // is the answer to 운영's own question, and a heading-less group of one put the most-visited screen
     // outside the structure that names it. 설정 left 준비 because it is not something reviewnary needs.
@@ -41,7 +41,7 @@ describe("nav.v2 — structure", () => {
   it("labels every destination in seller language", () => {
     expect(NAV_ITEMS.map((item) => item.label)).toEqual([
       "오늘",
-      "확인할 일",
+      "할 일",
       "반복 문제",
       "리뷰",
       "문의",

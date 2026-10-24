@@ -104,6 +104,13 @@ public class VendorReplyTask extends BaseEntity {
     @Column(name = "set_aside_local_version")
     private Integer setAsideLocalVersion;
 
+    /**
+     * The server's word that this POSTED reply has not shown on the channel for too long (2026-10-25: two newer
+     * uploads or seven days) — the seller sees 「운영팀 확인」. Never a completion.
+     */
+    @Column(name = "confirm_overdue", nullable = false)
+    private boolean confirmOverdue;
+
     /** When a delegate's POSTED was recorded in this PC's reply lane; null until then. */
     @Column(name = "outcome_recorded_at")
     private Instant outcomeRecordedAt;

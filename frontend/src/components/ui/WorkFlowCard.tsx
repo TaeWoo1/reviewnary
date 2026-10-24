@@ -29,7 +29,7 @@ export function WorkFlowCard({
 }: {
   done: FlowCell;
   /**
-   * Omitted when the page states 「내가 확인할 일」 better below (Review Decision UX v3.2).
+   * Omitted when the page states 「내가 할 일」 better below (Review Decision UX v3.2).
    *
    * <p>On a case whose draft is already written, this cell said 「답변 확인 후 발송」 over a sentence about
    * who decides what to promise a customer — a product generality — while the draft card six inches

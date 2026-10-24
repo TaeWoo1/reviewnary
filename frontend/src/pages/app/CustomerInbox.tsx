@@ -394,7 +394,7 @@ export function CustomerInbox() {
         />
         {queueRows.length > 0 ? (
           <Link to="/customer-operations/cases" className="shrink-0 text-sm font-semibold text-brand-700 hover:underline">
-            확인할 일에 문의 {(productId ? queueRows.length : queueTotal ?? queueRows.length).toLocaleString("ko-KR")}건 →
+            할 일에 문의 {(productId ? queueRows.length : queueTotal ?? queueRows.length).toLocaleString("ko-KR")}건 →
           </Link>
         ) : null}
       </div>

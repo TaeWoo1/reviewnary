@@ -64,7 +64,7 @@ describe("확인할 일 — one row, one primary bucket", () => {
   });
 
   it("the seller's own reply work outranks the noun the row is about", () => {
-    // An approval standing on a review is 승인할 일, not 확인할 리뷰: what the row is FOR decides.
+    // An approval standing on a review is 승인할 일, not 살펴볼 리뷰: what the row is FOR decides.
     expect(workBucket({ ...base, kind: "REVIEW", subject: "REVIEW", reason: REASON.approve })).toBe("approve");
     expect(workBucket({ ...base, kind: "REVIEW", subject: "REVIEW", reason: REASON.draft })).toBe("draft");
     expect(workBucket({ ...base, kind: "REVIEW", subject: "REVIEW", reason: REASON.review })).toBe("review");

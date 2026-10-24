@@ -302,6 +302,7 @@ function RailRows({
            for a case it is reviewnary's own summary, which 왜 지금 볼 일인가 owns in the pane. */
         const facts = [
           row.source,
+          row.group ? `리뷰 묶음 ${row.group}` : null,
           row.rating === null ? null : `★${row.rating}`,
           /* The tag only when it is a CATEGORY. `REASON` mixes real categories (교환·환불 · 정보 부족 ·
              판단 보류) with three words that are states wearing a category badge — and the state word

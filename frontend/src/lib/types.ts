@@ -1421,6 +1421,28 @@ export interface ReviewReplyDelegationNote {
   phrases?: string[];
 }
 
+/**
+ * One row of 할 일's 「진행 중」 or 「끝난 일」 from the delegate lane (mockup ③, 2026-10-25): the lane's facts, worded
+ * on screen. `channelAnswered` is the channel's own 답글여부; `confirmOverdue` the server's word that a post has not
+ * shown there for too long — an operator looks, nothing is completed by time.
+ */
+export interface ReplyBoardRow {
+  reviewId: string;
+  state: string;
+  since: string;
+  channelAnswered: boolean;
+  confirmOverdue: boolean;
+  preview: string | null;
+  rating: number | null;
+}
+
+export interface ReplyBoard {
+  moving: ReplyBoardRow[];
+  done: ReplyBoardRow[];
+  /** This PC has the delegate lane at all; without it there is no 진행 중 to count — not the same as zero. */
+  linked: boolean;
+}
+
 /** What the PC knows of a delegation task after a press. */
 export interface VendorReplyTaskView {
   reviewId: string;

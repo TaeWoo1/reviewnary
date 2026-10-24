@@ -39,6 +39,7 @@ import java.util.UUID;
  *   java -jar vendor-server.jar unassign me@example.com &lt;store-id&gt;
  *   java -jar vendor-server.jar purge                                  # one retention pass (§6); after a restore, before serving
  *   java -jar vendor-server.jar in-doubt                               # a suspended delegate's in-doubt tasks, to check
+ *   java -jar vendor-server.jar unconfirmed                            # posts the channel has not shown for too long
  *   java -jar vendor-server.jar settle &lt;task-id&gt; posted|not-posted admin@example.com
  * </pre>
  *
@@ -53,12 +54,12 @@ public final class OpsCommands {
     public static final Set<String> NAMES = Set.of("invite", "suspend", "reinstate", "end-sessions",
             "invite-delegate", "suspend-delegate", "reinstate-delegate", "add-store", "assign", "unassign", "purge",
             "in-doubt", "settle", "checklist", "check-owner", "check-assignment", "recover-seller", "installs",
-            "revoke-install");
+            "revoke-install", "unconfirmed");
 
     static final String USAGE = "usage: invite|suspend|reinstate|end-sessions <email> · "
             + "invite-delegate <email> [admin] · "
             + "suspend-delegate|reinstate-delegate <email> · add-store <seller-email> <label> · "
-            + "assign|unassign <delegate-email> <store-id> · purge · in-doubt · "
+            + "assign|unassign <delegate-email> <store-id> · purge · in-doubt · unconfirmed · "
             + "settle <task-id> posted|not-posted <admin-email> · checklist · "
             + "check-owner <store-id> seller-center-screen|submanager-invite <admin-email> · "
             + "check-assignment <delegate-email> <store-id> <admin-email> · "
@@ -90,6 +91,9 @@ public final class OpsCommands {
         if (args.length == 1 && "in-doubt".equals(args[0])) {
             return inDoubt(services, out);
         }
+        if (args.length == 1 && "unconfirmed".equals(args[0])) {
+            return unconfirmed(services, out);
+        }
         if (args.length == 4 && "settle".equals(args[0])) {
             return settle(services, args, out);
         }
@@ -113,7 +117,7 @@ public final class OpsCommands {
         }
         if (args.length < 2 || !NAMES.contains(args[0])
                 || Set.of("purge", "in-doubt", "settle", "checklist", "check-owner", "check-assignment",
-                        "recover-seller", "installs", "revoke-install").contains(args[0])) {
+                        "recover-seller", "installs", "revoke-install", "unconfirmed").contains(args[0])) {
             out.println(USAGE);
             return 2;
         }
@@ -221,6 +225,24 @@ public final class OpsCommands {
             out.println("task " + t.taskId() + " · " + t.storeLabel() + " · 리뷰번호 " + t.reviewNo() + " · since "
                     + t.since());
             out.println("  approved reply: " + t.approvedBody());
+        }
+        return 0;
+    }
+
+    /**
+     * Delegates' posts the channel has not shown for too long (owner decision 2026-10-25: {@value
+     * ReplyTasks#CONFIRM_UPLOADS} newer uploads or 7 days). The seller sees 「운영팀 확인」 and has nothing to do; an
+     * operator looks in Seller Center and takes it up with the delegate. Nothing here completes or moves a task.
+     */
+    private static int unconfirmed(Services services, PrintStream out) {
+        List<ReplyTasks.Unconfirmed> tasks = services.tasks().unconfirmed();
+        if (tasks.isEmpty()) {
+            out.println("no unconfirmed posts");
+            return 0;
+        }
+        for (ReplyTasks.Unconfirmed t : tasks) {
+            out.println("task " + t.taskId() + " · " + t.storeLabel() + " · 리뷰번호 " + t.reviewNo() + " · posted "
+                    + t.postedAt() + " · uploads since " + t.uploadsSince());
         }
         return 0;
     }

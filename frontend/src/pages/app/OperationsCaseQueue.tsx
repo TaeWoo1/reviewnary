@@ -8,9 +8,20 @@ import { api } from "../../lib/apiClient";
 import { mergeHomeWork, WORK_FILTERS, workFilterOf, type HomeWork, type HomeWorkRow } from "../../lib/homeWork";
 import { HOME_QUEUE_SIZE } from "../../components/customerOperations/CustomerOpsHome";
 import { COPY } from "../../lib/copy/customerOps";
-import { ReplyWorkHistory } from "../../components/customerOperations/ReplyWorkHistory";
+import { FinishedList, MovingList } from "../../components/customerOperations/ReplyBoardList";
 import { attentionUncertaintyCopy } from "../../lib/attention";
-import type { ReviewWorkView } from "../../lib/types";
+import type { ReplyBoard, ReviewWorkView } from "../../lib/types";
+
+/**
+ * <b>Three views of one place</b> (mockup ③, confirmed 2026-10-25): what the seller has to do, what the service or a
+ * delegate is doing, and what ended. 진행 중 is counted where it is shown and never added to the seller's number.
+ */
+const VIEWS = [
+  { key: "todo", label: "내가 할 일" },
+  { key: "moving", label: "진행 중" },
+  { key: "done", label: "끝난 일" },
+] as const;
+type View = (typeof VIEWS)[number]["key"];
 
 /** One name for one list: the nav entry, this page's title and the Home's section all say 확인할 일 (UI/UX v2). */
 const TITLE = COPY.listTitle;
@@ -91,6 +102,7 @@ function matches(row: HomeWorkRow, query: string): boolean {
 export function OperationsCaseQueue({ now }: { now?: Date }) {
   const [work, setWork] = useState<HomeWork | null | undefined>(undefined);
   const [reviewWork, setReviewWork] = useState<ReviewWorkView | null>(null);
+  const [board, setBoard] = useState<ReplyBoard | null>(null);
   // Bumped when a set-aside review is restored below, so it comes back into this list without a reload.
   const [reloadKey, setReloadKey] = useState(0);
   const wide = useWideLayout();
@@ -116,8 +128,11 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       nothing<Awaited<ReturnType<typeof api.getReviewWorkStrict>>>()(
         Promise.resolve().then(() => api.getReviewWorkStrict()),
       ),
-    ]).then(([co, decisions, ops, queue, reviewWork]) => {
+      // 진행 중 · 끝난 일 from the delegate lane; an install without one reads as empty lists.
+      nothing<ReplyBoard>()(Promise.resolve().then(() => api.getReplyBoard())),
+    ]).then(([co, decisions, ops, queue, reviewWork, board]) => {
       if (!live) return;
+      setBoard(board);
       if (!co && !decisions && !ops && !queue && !reviewWork) {
         setWork(null);
         return;
@@ -138,6 +153,19 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
   const allRows = (work?.rows ?? []).filter((r) => matches(r, query));
   // A view of the one list (UI/UX v2 Phase 4): the same rows in the same order, narrowed by a fact each row carries.
   const filter = workFilterOf(params.get("filter"));
+  const view: View = VIEWS.find((v) => v.key === params.get("view"))?.key ?? "todo";
+  const setView = (key: View) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (key === "todo") next.delete("view");
+        else next.set("view", key);
+        next.delete("item");
+        next.delete("filter");
+        return next;
+      },
+      { replace: true },
+    );
   const rows = allRows.filter(WORK_FILTERS.find((f) => f.key === filter)!.test);
   const key = params.get("item");
   // Only what the address names — see the docblock. The first-row fallback this screen used is gone, and with
@@ -186,13 +214,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
             rail이 되고, 거기서 28px은 세 줄짜리 행 위의 현판이 된다 — 문의가 {@code compact}로 같은
             전환을 이미 한다. 한 규칙이고, 두 치수가 아니다. */}
         <h1 className={`font-bold tracking-tight text-ink ${rail ? "text-section" : "text-title"}`}>{TITLE}</h1>
-        {work && allRows.length > 0 ? (
-          <span className="text-sm tabular-nums text-muted">
-            {allRows.length.toLocaleString("ko-KR")}
-            {work.truncated ? "+" : ""}건
-          </span>
-        ) : null}
-        {work && (work.rows.length > 0 || query) ? (
+        {view === "todo" && work && (work.rows.length > 0 || query) ? (
           <button
             type="button"
             aria-label={searching ? "검색 닫기" : "검색"}
@@ -212,11 +234,48 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
         ) : null}
       </div>
 
+      <div role="group" aria-label="할 일 나누어 보기" className="flex w-max gap-1 rounded-xl bg-canvas p-1">
+        {VIEWS.map((v) => {
+          const count = v.key === "todo" ? (work ? allRows.length : null) : v.key === "moving" ? (board?.moving.length ?? null) : null;
+          return (
+            <button
+              key={v.key}
+              type="button"
+              aria-pressed={view === v.key}
+              onClick={() => setView(v.key)}
+              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
+                view === v.key ? "bg-surface text-ink ring-1 ring-line" : "text-muted hover:text-ink"
+              }`}
+            >
+              {v.label}
+              {count != null ? (
+                <span className="ml-1 font-medium tabular-nums">
+                  {count.toLocaleString("ko-KR")}
+                  {v.key === "todo" && work?.truncated ? "+" : ""}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {view === "moving" ? <MovingList rows={board?.moving ?? []} now={now} /> : null}
+      {view === "done" ? (
+        <FinishedList
+          rows={board?.done ?? []}
+          accounts={reviewWork?.committed ?? []}
+          onRestored={() => setReloadKey((n) => n + 1)}
+          now={now}
+        />
+      ) : null}
+
+      {view === "todo" ? (
+      <>
       {searching ? (
         <input
           ref={searchBox}
           type="search"
-          aria-label="확인할 일 검색"
+          aria-label="할 일 검색"
           placeholder="고객이 쓴 내용으로 찾기"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -249,7 +308,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
           them is good news. */}
       {work === null ? (
         <p className="text-sm text-bad" role="alert">
-          확인할 일 목록을 불러오지 못했습니다.
+          할 일 목록을 불러오지 못했습니다.
         </p>
       ) : null}
 
@@ -273,7 +332,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       */}
 
       {work && allRows.length > 0 ? (
-        <div className="-mx-2 flex flex-wrap items-center gap-1" role="group" aria-label="확인할 일 보기">
+        <div className="-mx-2 flex flex-wrap items-center gap-1" role="group" aria-label="할 일 보기">
           {WORK_FILTERS.map((f) => (
             <Chip key={f.key} pressed={filter === f.key} onClick={() => setFilter(f.key)}>
               {f.label} {allRows.filter(f.test).length.toLocaleString("ko-KR")}
@@ -314,9 +373,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
         </section>
       ) : null}
 
-      {/* History, not work: what the seller reported posting, and what they set aside — with 복원. */}
-      {reviewWork ? (
-        <ReplyWorkHistory accounts={reviewWork.committed} onRestored={() => setReloadKey((n) => n + 1)} />
+      </>
       ) : null}
     </div>
   );
@@ -325,7 +382,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
     <MasterDetail
       wide={wide}
       list={list}
-      detailLabel="선택한 확인할 일"
+      detailLabel="선택한 할 일"
       detail={selected ? <WorkItemPane row={selected} now={now} /> : null}
       onClose={selected ? close : undefined}
       /* <b>The Decision Workspace's own pane</b> (product-owner decision, 2026-10-02). This route only:
