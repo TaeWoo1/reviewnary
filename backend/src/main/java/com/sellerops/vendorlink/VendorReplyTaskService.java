@@ -309,8 +309,10 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
                 .flatMap(t -> drafts.version(reviewId, t.getSetAsideLocalVersion()))
                 .map(d -> new ReviewReplyDelegationView.SetAside(d.getVersion(), d.getBody(), d.getCreatedAt()))
                 .orElse(null);
+        // A held reply is requested again by fixing its words: the edit goes up as a new version, which is then
+        // waiting like any draft. The same words again would only be held again.
         return new ReviewReplyDelegationView(state, task.map(VendorReplyTask::isEditedOnMobile).orElse(false),
-                draftReady && (state == null || SENDABLE.contains(state)),
+                draftReady && (state == null || SENDABLE.contains(state)) && !"HELD".equals(state),
                 state != null && CANCELLABLE.contains(state),
                 task.map(VendorReplyTask::getBasisNote).map(VendorReplyTaskService::note).orElse(null),
                 task.map(VendorReplyTask::getUpdatedAt).orElse(null), fromPhone, aside);

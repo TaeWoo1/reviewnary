@@ -267,9 +267,9 @@ describe("VocItemReplyPrep · delegate lane", () => {
     sentences: ["세탁 후 수축이면 무료 교환해 드리겠습니다."],
   };
 
-  it("says why an approval was held, marks its sentence, and lets the seller send a fixed draft", async () => {
+  it("says why an approval was held and marks its sentence; fixing the words, not a press, asks again", async () => {
     vi.mocked(api.getReviewReplyPrep).mockResolvedValue(
-      prepView({ taskState: "HELD", editedOnMobile: false, canSend: true, canCancel: true, note: PROMISE_NOTE }, false),
+      prepView({ taskState: "HELD", editedOnMobile: false, canSend: false, canCancel: true, note: PROMISE_NOTE }, false),
     );
     const { container } = mount();
 
@@ -279,7 +279,8 @@ describe("VocItemReplyPrep · delegate lane", () => {
     expect(why.textContent).toContain("답글의 「교환」 약속이 지금 근거에는 없습니다.");
     expect(why.querySelector("mark")?.textContent).toBe("세탁 후 수축이면 무료 교환해 드리겠습니다.");
     expect(why.textContent).toContain("문장을 고쳐 다시 승인하세요.");
-    expect(screen.getByRole("button", { name: "답글 등록 요청" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "답글 등록 요청" })).toBeNull();
+    expect(screen.getByRole("button", { name: "요청 취소" })).toBeTruthy();
     await expectNoAxeViolations(container);
   });
 

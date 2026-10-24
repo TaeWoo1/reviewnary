@@ -1108,7 +1108,7 @@ abstract class VendorReplyTaskScenarios {
         var shown = tasks.describe(org, review, true);
         assertThat(shown.taskState()).isEqualTo("HELD");
         assertThat(shown.note().sentences()).containsExactly("수령 후 7일 이내라면 사이즈 교환을 도와드리겠습니다.");
-        assertThat(shown.canSend()).as("the seller can draft it again").isTrue();
+        assertThat(shown.canSend()).as("fixed by changing its words, not by pressing again").isFalse();
         assertThat(tasks.holds(org, review)).as("still one road: no approval here meanwhile").isTrue();
 
         pull.pullFor(org);
