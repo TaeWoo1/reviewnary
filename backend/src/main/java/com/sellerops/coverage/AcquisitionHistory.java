@@ -8,6 +8,8 @@ import com.sellerops.responsibility.aside.ScheduledAsideJobStatus;
 import com.sellerops.reviewimport.ReviewImportSegmentAttemptRepository;
 import com.sellerops.sync.SyncJob;
 import com.sellerops.sync.SyncJobRepository;
+import com.sellerops.vendorlink.VendorStoreBinding;
+import com.sellerops.vendorlink.VendorStoreBindingRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -38,15 +40,27 @@ public class AcquisitionHistory {
      * class existed — absent means «this deployment has no screen-read lane», never «nothing was attempted».
      */
     private final ScheduledAsideJobRepository screenReads;
+    /**
+     * The seller PC's third record (2026-10-26): reviews a delegate uploaded to the vendor server and this PC pulled.
+     * Optional for the same reason as {@link #screenReads} — absent means this deployment relays nothing.
+     */
+    private final VendorStoreBindingRepository relays;
+
+    public AcquisitionHistory(SyncJobRepository syncJobs, ReviewImportSegmentAttemptRepository acquisitions,
+                              ChannelRepository channels, ScheduledAsideJobRepository screenReads) {
+        this(syncJobs, acquisitions, channels, screenReads, null);
+    }
 
     @Autowired
     public AcquisitionHistory(SyncJobRepository syncJobs, ReviewImportSegmentAttemptRepository acquisitions,
                               ChannelRepository channels,
-                              @Autowired(required = false) ScheduledAsideJobRepository screenReads) {
+                              @Autowired(required = false) ScheduledAsideJobRepository screenReads,
+                              @Autowired(required = false) VendorStoreBindingRepository relays) {
         this.syncJobs = syncJobs;
         this.acquisitions = acquisitions;
         this.channels = channels;
         this.screenReads = screenReads;
+        this.relays = relays;
     }
 
     /** One attempt, reduced to what a surface says about it. Both members are null when none is on record. */
@@ -77,11 +91,35 @@ public class AcquisitionHistory {
         if (!"REVIEW".equals(dataType)) {
             return collected;
         }
-        Instant acquired = acquisitions.lastSucceededAt(orgId, channelId);
-        if (collected == null) {
-            return acquired;
+        Instant acquired = later(acquisitions.lastSucceededAt(orgId, channelId), relayedAt(orgId, channelId));
+        return later(collected, acquired);
+    }
+
+    private static Instant later(Instant a, Instant b) {
+        if (a == null) {
+            return b;
         }
-        return acquired == null || acquired.isBefore(collected) ? collected : acquired;
+        return b == null || b.isBefore(a) ? a : b;
+    }
+
+    /**
+     * <b>The upload a delegate took from Seller Center, once this PC has it</b> (2026-10-26). On the seller-PC install
+     * NAVER reviews arrive only this way, and the channel line said 「네이버 수집 기록 없음」 over 3,555 reviews pulled
+     * that morning. The time is the UPLOAD's — when the data was read off the marketplace — not the pull's, and it
+     * counts only when the PC pulled after that upload without a failure since: a server that announced an upload
+     * this PC has not taken is not a read.
+     */
+    private Instant relayedAt(UUID orgId, UUID channelId) {
+        if (relays == null) {
+            return null;
+        }
+        return relays.findAllByOrgIdOrderByCreatedAt(orgId).stream()
+                .filter(b -> channelId.equals(b.getChannelId()) && b.getLastUploadAt() != null
+                        && b.getLastPulledAt() != null && !b.getLastPulledAt().isBefore(b.getLastUploadAt())
+                        && b.getLastFailure() == null)
+                .map(VendorStoreBinding::getLastUploadAt)
+                .max(Instant::compareTo)
+                .orElse(null);
     }
 
     /**
