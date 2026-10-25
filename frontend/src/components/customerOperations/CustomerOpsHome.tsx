@@ -12,7 +12,7 @@ import { api } from "../../lib/apiClient";
 import { problemLine } from "../../lib/operationsHome";
 import { RESPONSIBILITY_NAME, cadenceLabel, dataTypeKo, kstClock } from "../../lib/customerOperations";
 import { COPY, autoCheckWhat, channelShort, failureShort, gapActionKo, kstLongDate } from "../../lib/copy/customerOps";
-import { homeBriefRows, mergeHomeWork, sharedRowFacts, type HomeWork } from "../../lib/homeWork";
+import { homeBriefRows, isOldBacklog, mergeHomeWork, sharedRowFacts, type HomeWork } from "../../lib/homeWork";
 import { automationHealth, type HealthTone } from "../../lib/automationHealth";
 import { NO_CHANGE_TODAY, changeInsights } from "../../lib/homeInsights";
 import {
@@ -23,7 +23,7 @@ import {
   recentDay,
   todayInflow,
   unansweredNow,
-  type InflowFact,
+  type UnansweredFact,
 } from "../../lib/homeSummary";
 import type { CustomerOperationsHome } from "../../lib/customerOperationsTypes";
 import type {
@@ -193,8 +193,18 @@ export function CustomerOpsHome({
     with old reviews; the order is now one of importance, in which a review cannot outrank a waiting
     inquiry unless it reports harm, so the brief and 확인할 일 read the same first rows.
   */
-  const shown = homeBriefRows(work.rows, visibleHomeRows(roomy));
-  const hidden = work.rows.length - shown.length;
+  /*
+    <b>The brief is this morning's work; the rest is one line</b> (product-owner decision, 2026-10-26). After a
+    first upload of a year of reviews the brief led with 88–116-day-old reviews and 내가 할 일 counted them — the
+    owner: 「오래된 것밖에 안 보인다」. `isOldBacklog` now ages an unlooked-at review out after two weeks (an inquiry
+    after a year, as before), and the Home draws and counts only what is not backlog. The backlog is not hidden:
+    its size is said under the list and 확인할 일 holds every row of it under 「지난 일」.
+  */
+  const recent = work.rows.filter((r) => !isOldBacklog(r, now));
+  const past = work.rows.length - recent.length;
+  const today: HomeWork = { rows: recent, truncated: work.truncated };
+  const shown = homeBriefRows(recent, visibleHomeRows(roomy));
+  const hidden = recent.length - shown.length;
   const running = co?.status === "ACTIVE" || co?.status === "PAUSED";
   const wide = selection?.wide ?? false;
   const search = selection?.search ?? "";
@@ -203,7 +213,7 @@ export function CustomerOpsHome({
   // What every row in the WHOLE list says identically — over `work.rows`, not the six or seven drawn, because
   // this heading stands under the Pulse's 「확인할 일 11」 and a 「모두 …」 that covered only what is drawn would
   // be a claim about eleven made from six. `WorkRows` is handed the same population and hides exactly this.
-  const shared = sharedRowFacts(work.rows);
+  const shared = sharedRowFacts(recent);
   const sharedSaid = sharedPhrase(shared);
 
   async function act(run: () => Promise<unknown>) {
@@ -326,7 +336,7 @@ export function CustomerOpsHome({
       {/* 실행 대기는 판매자가 승인해 둔 것이고 자동 확인의 소유가 아니다 — 그 일이 열려 있지 않아도 센다.
           다만 보유 읽기가 실패했으면 0이 아니라 아무 말도 하지 않는다(null). */}
       <OperationsSummary
-        work={work}
+        work={today}
         moving={moving}
         awaiting={co ? (co.status === "ACTIVE" ? awaiting.count : null) : ops ? awaiting.count : null}
         unanswered={unansweredNow(metrics)}
@@ -377,7 +387,7 @@ export function CustomerOpsHome({
         </section>
       )}
 
-      {work.rows.length > 0 ? (
+      {recent.length > 0 ? (
         <section aria-label={COPY.listTitle}>
           {/* Count and order on the heading, the way out on the right, one hairline under it — the list header
               both references draw (Intercom: 「5 Open ⌄」 / 「Newest ⌄」). No box, no pill, no second number: the
@@ -417,12 +427,18 @@ export function CustomerOpsHome({
             ariaLabel={COPY.listTitle}
             showBacklogDivider={false}
             dense
-            sharedOver={work.rows}
+            sharedOver={recent}
             // The shared facts are on the heading above. What 리뷰 counts here is a rule about the queue, and it
             // now stands on the queue screen that owns the whole list rather than as a paragraph under a
             // five-row brief — neither reference puts an explanatory sentence under a work list.
             captionSaysReason
           />
+          <PastWork count={past} />
+        </section>
+      ) : past > 0 ? (
+        <section aria-label={COPY.listTitle} className="space-y-2">
+          <p className="break-keep text-sm text-muted">새로 할 일은 없습니다.</p>
+          <PastWork count={past} />
         </section>
       ) : !co || (running && co.status === "ACTIVE") ? (
         // Nothing waiting is a state, and the list's absence does not state it. 「다음 확인」 is on the status
@@ -978,8 +994,8 @@ function OperationsSummary({
   moving?: number | null;
   /** `null` when the job is not running — 실행 대기 is a fact about a job that is looking. */
   awaiting: number | null;
-  /** `null` when the metrics read did not land. */
-  unanswered: InflowFact | null;
+  /** `null` when the metrics read did not land; `NO_LANE` drops the cell — no channel collects inquiries. */
+  unanswered: UnansweredFact | null;
 }) {
   /*
     <b>Three columns, always, and an unmeasured one says so</b> (product-owner decision, 2026-10-01).
@@ -1035,7 +1051,7 @@ function OperationsSummary({
         </a>
       )}
     </Cell>,
-    <Cell
+    ...(unanswered?.kind === "NO_LANE" ? [] : [<Cell
       key="unanswered"
       id="unanswered"
       label={UNANSWERED_WORD.lead}
@@ -1060,7 +1076,7 @@ function OperationsSummary({
       ) : (
         <Unknown />
       )}
-    </Cell>,
+    </Cell>]),
   ];
 
   return (
@@ -1075,7 +1091,7 @@ function OperationsSummary({
     <section
       data-testid="today-summary"
       aria-label={PULSE_LABEL}
-      className="grid grid-cols-3 divide-x divide-line border-b border-line pb-4"
+      className={`grid ${COLUMNS[cells.length] ?? "grid-cols-3"} divide-x divide-line border-b border-line pb-4`}
     >
       {cells}
     </section>
@@ -1588,3 +1604,30 @@ function ProblemHeading({ problems }: { problems: HomeRepeatedProblems }) {
     </>
   );
 }
+
+/**
+ * The backlog the brief leaves out, as one line with its way in (product-owner decision, 2026-10-26). A count and a
+ * link — not rows: the brief answers 「오늘 무엇을 해야 하지?」, and a year of undecided reviews is not that answer,
+ * but it is still real work, so its size is said and the queue that holds every row is one press away.
+ */
+function PastWork({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <p className="mt-2 flex flex-wrap items-center gap-x-2 break-keep text-sm text-muted">
+      <span>
+        지난 일 <span className="font-semibold tabular-nums text-ink">{count.toLocaleString("ko-KR")}</span>건
+      </span>
+      <span aria-hidden="true">·</span>
+      <span>2주 넘은 리뷰 · 1년 넘은 문의</span>
+      <Link
+        to="/customer-operations/cases"
+        className="ml-auto font-semibold text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+      >
+        확인할 일에서 보기 →
+      </Link>
+    </p>
+  );
+}
+
+/** The strip is as wide as the cells it has (static class names, for Tailwind). */
+const COLUMNS: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" };

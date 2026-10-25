@@ -186,7 +186,7 @@ describe("mergeHomeWork — one list from three reads", () => {
    */
   it("a review reporting harm leads, ahead of every inquiry, from whichever read carried it", () => {
     const o = ops();
-    const burned = { ...o.reviews.rows[0], reviewId: "r-burn", rating: 5, occurredOn: "2026-09-02", quote: "손에 화상을 입었어요", safety: true };
+    const burned = { ...o.reviews.rows[0], reviewId: "r-burn", rating: 5, occurredOn: "2026-09-10", quote: "손에 화상을 입었어요", safety: true };
     const fromAttention = mergeHomeWork(co(), { ...o, reviews: { ...o.reviews, rows: [o.reviews.rows[0], burned] } } as never, queue(), NOW);
     expect(fromAttention.rows[0]).toMatchObject({ key: "review:r-burn", safety: true });
     expect(fromAttention.rows.filter((r) => r.safety).map((r) => r.key)).toEqual(["review:r-burn"]);

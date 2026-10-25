@@ -33,6 +33,8 @@ export function kstDayKey(now: Date): string {
  * every channel able to contribute today was actually read.
  */
 export type InflowFact = { kind: "COUNT"; value: number } | { kind: "UNQUALIFIED" };
+/** 현재 미답변 can also have no lane at all: no channel collects inquiries. */
+export type UnansweredFact = InflowFact | { kind: "NO_LANE" };
 
 export interface TodayInflow {
   reviews: InflowFact;
@@ -145,8 +147,17 @@ export const INFLOW_WORD = {
  *
  * <p>`null` when the read did not land. A failed request says nothing; it does not say zero.
  */
-export function unansweredNow(metrics: OperationsMetrics | null | undefined): InflowFact | null {
+export function unansweredNow(metrics: OperationsMetrics | null | undefined): UnansweredFact | null {
   if (!metrics) return null;
+  // No channel collects inquiries at all — the seller-PC install whose reviews arrive by upload (2026-10-26). There
+  // is no population to qualify, so the cell is not 「수집 상태 확인 필요」 (a warning about a lane that does not
+  // exist): it is absent.
+  if (
+    metrics.channels.length > 0 &&
+    metrics.channels.every((c) => c.inquiryState === "NOT_CONNECTED" || c.inquiryState === "NOT_SUPPORTED")
+  ) {
+    return { kind: "NO_LANE" };
+  }
   const kpi = metrics.kpis.find((k) => k.key === "unansweredInquiries");
   if (!kpi) return null;
   // Unlike `todayInflow` there is no window to check: 미답변 is a present fact, not a day's arrivals.

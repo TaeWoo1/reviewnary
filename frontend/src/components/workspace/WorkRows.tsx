@@ -183,10 +183,10 @@ export function WorkRows({
         {rows.slice(0, firstOld).map(draw)}
       </DecisionList>
       <p className="flex items-center gap-3 text-sm font-semibold text-muted" role="separator">
-        <span>1년 넘게 기다린 것 {oldCount.toLocaleString("ko-KR")}건</span>
+        <span>지난 일 {oldCount.toLocaleString("ko-KR")}건</span>
         <span aria-hidden="true" className="h-px flex-1 bg-line" />
       </p>
-      <DecisionList ariaLabel={`${ariaLabel} · 1년 넘게 기다린 것`} plain={dense}>
+      <DecisionList ariaLabel={`${ariaLabel} · 지난 일`} plain={dense}>
         {rows.slice(firstOld).map(draw)}
       </DecisionList>
     </div>
@@ -359,10 +359,10 @@ function RailRows({
     <div className="space-y-4">
       {list(ariaLabel, rows.slice(0, firstOld))}
       <p className="flex items-center gap-3 text-xs font-semibold text-muted" role="separator">
-        <span>1년 넘게 기다린 것 {oldCount.toLocaleString("ko-KR")}건</span>
+        <span>지난 일 {oldCount.toLocaleString("ko-KR")}건</span>
         <span aria-hidden="true" className="h-px flex-1 bg-line" />
       </p>
-      {list(`${ariaLabel} · 1년 넘게 기다린 것`, rows.slice(firstOld))}
+      {list(`${ariaLabel} · 지난 일`, rows.slice(firstOld))}
     </div>
   );
 }

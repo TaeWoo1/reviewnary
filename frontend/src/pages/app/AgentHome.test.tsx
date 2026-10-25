@@ -102,7 +102,7 @@ const HOME = {
         accountId: "acc-1",
         channelCode: "NAVER",
         rating: 1,
-        occurredOn: "2026-07-23",
+        occurredOn: "2026-08-25",
         productName: "선바로 전선몰딩",
         quote: "상품페이지 설명에 혼선을 줍니다.",
       },
@@ -225,6 +225,16 @@ describe("greeting — arithmetic, never a model", () => {
  * 있었다. 이제 골격은 하나이고, 자동 확인에 <b>속한</b> 줄만 그 일이 열려 있을 때 선다.
  */
 describe("home — 연결된 org이 보는 하나의 Home", () => {
+  it("2주 넘은 리뷰는 오늘 할 일로 세지 않고 한 줄로 말한다 (owner, 2026-10-26)", async () => {
+    // The same review, seen five weeks after it was written: the brief does not lead with it, 내가 할 일 does not
+    // count it, and the line under the heading names it with the way to the queue that holds it.
+    renderHome(new Date("2026-09-30T09:30:00+09:00"));
+    expect(await screen.findByText("새로 할 일은 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("상품페이지 설명에 혼선을 줍니다.")).toBeNull();
+    expect(screen.getByText("확인할 일에서 보기 →").closest("p")?.textContent).toContain("지난 일 1건");
+    expect(screen.getByTestId("today-summary").textContent).toMatch(/내가 할 일\s*0/);
+  });
+
   it("골격이 선다 — 오늘 · 숫자 · 오늘 먼저 볼 일 · 반복 문제 · 채널, 그리고 그 아래 한 줄 입력", async () => {
     renderHome();
     const title = await screen.findByRole("heading", { level: 1, name: "오늘" });

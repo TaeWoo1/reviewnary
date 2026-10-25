@@ -429,8 +429,27 @@ export function homeBriefRows(rows: readonly HomeWorkRow[], limit: number): Home
  * <p>A row with no timestamp is not backlog: absence of a date is not evidence of age.
  */
 export function isOldBacklog(row: HomeWorkRow, now: Date): boolean {
-  return row.since != null && isOldInquiryBacklog({ receivedAt: row.since }, now);
+  if (row.since == null) return false;
+  if (row.kind === "REVIEW" && row.state === "NEEDS_LOOK") {
+    const at = Date.parse(row.since);
+    return Number.isFinite(at) && now.getTime() - at > REVIEW_RECENT_DAYS * DAY_MS;
+  }
+  return isOldInquiryBacklog({ receivedAt: row.since }, now);
 }
+
+/**
+ * <b>A review the seller has not looked at is this morning's work for two weeks, not a year</b> (product-owner
+ * decision, 2026-10-26).
+ *
+ * <p>The year rule above is the 문의 screen's, and an inquiry is a customer waiting for an answer. A review is a
+ * verdict already published. On the seller-PC run the first upload was a year of NAVER reviews; the Home then led
+ * with 1–2★ reviews written 88–116 days earlier and counted them in 내가 할 일 — the owner read it as 「오래된 것밖에
+ * 안 보인다」. Older undecided reviews are not hidden: they stand after the recent work under 「지난 일」 on 확인할
+ * 일, and the Home names how many there are in one line. Only the triage's 「지금 확인」 rows age out this way — a
+ * reply the seller has started, or a case reviewnary opened, keeps the year rule.
+ */
+export const REVIEW_RECENT_DAYS = 14;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * The customer's own words for the row's second line, or nothing when they would repeat the first.
