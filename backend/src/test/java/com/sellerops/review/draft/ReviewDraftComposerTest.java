@@ -180,16 +180,15 @@ class ReviewDraftComposerTest {
     }
 
     @Test
-    @DisplayName("no evidence: NO MODEL IS CALLED, the org's own template is the draft, and the gap names the customer's words")
+    @DisplayName("no evidence and the model writes nothing: the org's own template is the draft, and nothing is asked")
     void withoutEvidenceNothingIsInvented() {
         retrieval(DraftKnowledgeState.NO_LIBRARY);
 
         GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
 
-        // The strongest possible guarantee that nothing was invented: the machine that could invent
-        // was never started.
-        verify(model, never()).draftReviewReply(any(), any(), any(), any());
-        verify(quota, never()).consume(any(), any(), any());
+        // Owner decision 2026-10-26: with no evidence the model is asked for thanks and empathy only. Here it
+        // answers nothing, so the floor is what is saved — exactly as before.
+        verify(model).draftReviewReply(eq(ORG), eq(BODY), eq(List.of()), eq(TEMPLATE));
         assertThat(view.draft().body()).isEqualTo(TEMPLATE);
         assertThat(view.authorKind()).isEqualTo("RULE");
         assertThat(view.answerBasis()).isEqualTo("NO_ANSWER_BASIS");
@@ -201,6 +200,38 @@ class ReviewDraftComposerTest {
         // the REVIEW says an answer was owed, and an empty library is a fact about the library. The
         // draft is still the seller's own template and the screen still says what it used.
         assertThat(view.knowledgeGaps()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("no evidence: the model's thanks-only reply is the draft, stamped THANKS_ONLY with no citations")
+    void withoutEvidenceTheModelThanks() {
+        // The real-export case (2026-10-26): a ★3 「가격대비 저렴하고 좋아요」 drew the pricing template, whose floor
+        // answers praise with 「더 나은 가치를 드릴 수 있도록 계속 고민하겠습니다」.
+        retrieval(DraftKnowledgeState.NO_LIBRARY);
+        when(model.draftReviewReply(eq(ORG), eq(BODY), eq(List.of()), eq(TEMPLATE)))
+                .thenReturn(Optional.of("안녕하세요, 고객님. 만족스럽게 사용해 주셔서 감사합니다."));
+
+        GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
+
+        assertThat(view.authorKind()).isEqualTo("MODEL");
+        assertThat(view.answerBasis()).isEqualTo("THANKS_ONLY");
+        assertThat(view.draft().body()).isEqualTo("안녕하세요, 고객님. 만족스럽게 사용해 주셔서 감사합니다.");
+        assertThat(view.evidence()).isEmpty();
+        assertThat(ReviewDraftComposer.basisNoteOf("THANKS_ONLY", false)).contains("감사와 공감만");
+    }
+
+    @Test
+    @DisplayName("no evidence: a remedy the model offers anyway is refused and the floor is saved")
+    void withoutEvidenceAPromiseIsRefused() {
+        retrieval(DraftKnowledgeState.NO_LIBRARY);
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
+                .thenReturn(Optional.of("불편을 드려 죄송합니다. 바로 교환해 드리겠습니다."));
+
+        GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
+
+        assertThat(view.draft().body()).isEqualTo(TEMPLATE);
+        assertThat(view.authorKind()).isEqualTo("RULE");
+        assertThat(view.answerBasis()).isEqualTo("NO_ANSWER_BASIS");
     }
 
     @Test

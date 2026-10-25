@@ -223,5 +223,7 @@ function Gap({ gap, onSaved }: { gap: ReviewKnowledgeGapView; onSaved: () => voi
 function basisLabel(basis: string): string {
   if (basis === "GROUNDED") return "근거 있음";
   if (basis === "PAST_ANSWER") return "과거 답글 참고";
+  // Written by the model with no evidence: thanks and empathy only (owner decision 2026-10-26).
+  if (basis === "THANKS_ONLY") return "감사 인사";
   return "기본 문구";
 }

@@ -1737,7 +1737,7 @@ export interface ReviewKnowledgeGapView {
 export interface GeneratedReviewDraftView {
   draft: ReviewReplyDraft;
   authorKind: string;
-  answerBasis: "GROUNDED" | "PAST_ANSWER" | "NO_ANSWER_BASIS" | string;
+  answerBasis: "GROUNDED" | "PAST_ANSWER" | "THANKS_ONLY" | "NO_ANSWER_BASIS" | string;
   answerBasisNote: string;
   evidence: DraftEvidenceView[];
   knowledgeGaps: ReviewKnowledgeGapView[];

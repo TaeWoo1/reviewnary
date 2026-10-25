@@ -47,10 +47,12 @@ import org.springframework.stereotype.Service;
  * before — through the SAME retriever, scorer, absence gate and passage budget
  * ({@link InquiryEvidenceRetriever#retrieveFor}). No second retrieval subsystem exists.
  *
- * <p><b>The template is the floor; the evidence is the lift.</b> With no current evidence, the reply
- * IS the org's own template — no model is called at all, which is the strongest possible guarantee
- * that nothing was invented: the machine that could invent was not started. With evidence, a model
- * writes inside it, and the org's template still supplies the voice through the style layer.
+ * <p><b>The template is the floor; the evidence is the lift.</b> With evidence, a model writes inside it, and the
+ * org's template still supplies the voice through the style layer. With no evidence at all the model writes thanks
+ * and empathy only (basis {@code THANKS_ONLY}, owner decision 2026-10-26) — until then no model was called and the
+ * reply WAS the template, but the template is chosen by a topic keyword and answered praise with an apology. The
+ * guarantee that nothing is invented now rests on the prompt and on {@link ReviewClaimGuard}, which is shown no
+ * evidence and so refuses every remedy; any refusal, a disabled model or a failure still saves the template.
  *
  * <p><b>Two checks stand between the model and a saved public reply.</b> The prompt forbids the
  * seven promise classes; {@link ReviewClaimGuard} refuses a draft that offers a remedy the evidence
@@ -102,6 +104,15 @@ public class ReviewDraftComposer {
             "비슷한 후기에 판매자가 승인했던 답글의 말투를 참고해 썼습니다. 지금 근거가 없어 사실이나 약속은 넣지 않았습니다.";
     /** The basis of a draft written from a past answer's wording alone — no current evidence behind it. */
     static final String BASIS_PAST_ANSWER = "PAST_ANSWER";
+    static final String BASIS_THANKS_NOTE =
+            "등록된 근거가 없어 감사와 공감만 담아 썼습니다. 사실이나 약속은 넣지 않았습니다.";
+    /**
+     * The basis of a draft the model wrote with NO evidence at all: thanks and empathy only (owner decision
+     * 2026-10-26). Before, this case saved the template floor verbatim, and the floor is picked by a topic keyword
+     * that cannot tell praise from complaint: a ★3 「가격대비 저렴하고 좋아요」 got the pricing template's 「더 나은
+     * 가치를 드릴 수 있도록 계속 고민하겠습니다」 on the owner's real-export run.
+     */
+    static final String BASIS_THANKS_ONLY = "THANKS_ONLY";
 
     /**
      * The sentence for a STORED version, read back from what that version recorded.
@@ -122,6 +133,9 @@ public class ReviewDraftComposer {
         }
         if (BASIS_PAST_ANSWER.equals(answerBasis) && hasEvidence) {
             return BASIS_PAST_ANSWER_NOTE;
+        }
+        if (BASIS_THANKS_ONLY.equals(answerBasis)) {
+            return BASIS_THANKS_NOTE;
         }
         return "GROUNDED".equals(answerBasis) && hasEvidence ? BASIS_GROUNDED_NOTE : BASIS_NONE_NOTE;
     }
@@ -227,6 +241,19 @@ public class ReviewDraftComposer {
             } else if (pastAnswerOnly) {
                 // The model did not write: what is saved is the template, and the basis says so.
                 basis = "NO_ANSWER_BASIS";
+            }
+        } else {
+            // No evidence at all. The model still writes — thanks and empathy only — because the template floor is
+            // chosen by topic, not by what the customer felt. Nothing it could promise survives: the guard is shown
+            // no current evidence, so every remedy is refused and the floor is saved instead, as when the model is
+            // off or fails.
+            Written written = writeGrounded(orgId, redactedBody, List.of(), template.body());
+            unavailable = written.unavailable();
+            if (written.body() != null) {
+                body = written.body();
+                authorKind = DraftAuthorKind.MODEL.name();
+                provenanceVersion = model.versionFor(orgId);
+                basis = BASIS_THANKS_ONLY;
             }
         }
 

@@ -189,7 +189,7 @@ describe("VocItemReplyPrep", () => {
    */
   it("says what the draft stands on, and does not name a writer, when a model is recorded", async () => {
     await renderPanel(prepView({ draftAuthorKind: "MODEL" }));
-    expect(screen.getByText(/저장된 지식을 근거로 준비했습니다/)).toBeTruthy();
+    expect(screen.getByText(/AI가 준비했습니다/)).toBeTruthy();
     expect(screen.queryByText(/AI가 썼습니다/)).toBeNull();
   });
 
