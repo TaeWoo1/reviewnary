@@ -46,8 +46,9 @@ function task(over) {
 }
 
 /** Opens one page with `routes` as the vendor server; returns the page and what it sent. */
-async function open(browser, page, routes, viewport) {
+async function open(browser, page, routes, viewport, at) {
   const ctx = await browser.newContext({ viewport, timezoneId: "Asia/Seoul" });
+  if (at) await ctx.clock.setFixedTime(new Date(at));
   const key = page === "replies" ? "reviewnary.replies.session" : "reviewnary.delegate.session";
   await ctx.addInitScript((k) => sessionStorage.setItem(k, "fixture-not-a-token"), key);
   const sent = [];
@@ -62,7 +63,7 @@ async function open(browser, page, routes, viewport) {
     if (u.pathname.startsWith("/v1/")) {
       const path = u.pathname + u.search;
       sent.push({ method: r.request().method(), path, body: r.request().postDataJSON?.() ?? null });
-      const answer = routes(r.request().method(), path);
+      const answer = routes(r.request().method(), path, sent[sent.length - 1].body);
       if (answer === undefined) problems.push(`unmocked ${path}`);
       return r.fulfill({ status: answer === undefined ? 404 : 200, contentType: "application/json",
         body: JSON.stringify(answer ?? {}) });
@@ -77,110 +78,239 @@ async function open(browser, page, routes, viewport) {
   return { p, ctx, sent, problems };
 }
 
-function phoneRoutes(t) {
-  return (method, path) => {
+// The phone page's clock: 16:05 in Korea. The fixture task was last touched at 16:00, the PC used its link at 16:00.
+const PHONE_NOW = "2026-10-22T07:05:00Z";
+const PC_ON = [{ id: "i-1", lastUsedAt: "2026-10-22T07:00:00Z" }];
+const PC_OFF = [{ id: "i-1", lastUsedAt: "2026-10-22T06:30:00Z" }];
+// Which tab a state is listed under (docs/vendor_server_contract_v1.md §8 판매자 휴대폰: 내가 할 일 · 진행 중 · 끝난 일).
+const TAB = { AWAITING_APPROVAL: "todo", RECHECK_NEEDED: "todo", HELD: "todo", FAILED: "todo",
+  APPROVED: "moving", CLAIMED: "moving", CANCEL_REQUESTED: "moving", HOLD_REQUESTED: "moving", UNKNOWN: "moving",
+  POSTED: "moving", CANCELLED: "done", INVALIDATED: "done" };
+
+/**
+ * The vendor server for one phone task. It keeps the task's current version: a saved draft (`saved`) or an approval
+ * (`approved`) replaces it, and the lists and the task read that version back. A save or approval the case did not
+ * expect is unmocked and fails the run.
+ */
+function phoneRoutes(t, { installs = PC_ON, saved, approved } = {}) {
+  let cur = t;
+  return (method, path, body) => {
     if (path === "/v1/stores") return [{ id: "s-1", label: "합성 스토어", channel: "NAVER" }];
-    if (path.startsWith("/v1/stores/s-1/tasks?state=")) return path.endsWith(`=${t.state}`) ? [t] : [];
-    if (path === "/v1/tasks/t-1") return t;
+    if (path === "/v1/installs") return installs;
+    if (path.startsWith("/v1/stores/s-1/tasks?state=")) return path.endsWith(`=${cur.state}`) ? [cur] : [];
+    if (path === "/v1/tasks/t-1" && method === "GET") return cur;
+    if (path === "/v1/tasks/t-1/draft" && method === "PUT" && saved) return (cur = saved(cur, body));
+    if (path === "/v1/tasks/t-1/approve" && method === "POST" && approved) return (cur = approved(cur, body));
     return undefined;
   };
 }
 
-/** The phone page with one task, opened from the list. */
-async function phone(browser, t) {
-  const run = await open(browser, "replies", phoneRoutes(t), { width: 390, height: 844 });
-  await run.p.getByText("린넨 커튼").first().click();
-  await run.p.locator("#task-state").waitFor();
+/** The phone page with one task: its tab counts it, and its row opens it. */
+async function phone(browser, t, opts) {
+  const run = await open(browser, "replies", phoneRoutes(t, opts), { width: 390, height: 844 }, PHONE_NOW);
+  const { p } = run;
+  const tab = TAB[t.state];
+  await p.locator("#view-list").waitFor({ state: "visible" });
+  for (const k of ["todo", "moving"]) expect(await text(p, `#${k}-count`), k === tab ? "1" : "0");
+  await p.locator(`.tab[data-tab="${tab}"]`).click();
+  const row = p.locator(`#list-${tab} .item`);
+  expect(await row.count(), 1);
+  run.row = await row.innerText();
+  await row.click();
+  await p.locator("#view-task").waitFor({ state: "visible" });
   return run;
+}
+
+/** A second page in the same case: its problems count against the case. */
+async function also(run, other) {
+  run.problems.push(...other.problems);
+  await other.ctx.close();
+}
+
+/** Rewrites the reply box and lets the page save it on its own, as the seller would. */
+async function rewrite(p, body, how) {
+  const put = p.waitForRequest((r) => r.method() === "PUT" && r.url().endsWith("/v1/tasks/t-1/draft"));
+  await p.locator("#reply-edit").fill(body);
+  if (how === "blur") await p.locator("#reply-edit").blur(); // otherwise the 1.5 s pause saves it
+  await put;
+  await p.locator("#draft-status").filter({ hasText: /^PC 검사 전$/ }).waitFor();
 }
 
 const text = (p, sel) => p.locator(sel).innerText();
 const shown = (p, sel) => p.locator(sel).isVisible();
+const marks = (p) => p.locator("#reply-body .hl").allInnerTexts();
+const BANNED = "고객님 탓이 아닙니다.";
+const BANNED_NOTE = { codes: ["FORBIDDEN_PHRASE"], sources: [], promises: [], sentences: [BANNED], phrases: ["고객님 탓"] };
+/** A version written on the phone and saved: the PC has not checked it, and the old version's note is not its note. */
+const phoneVersion = (cur, body) => ({ ...cur, state: "AWAITING_APPROVAL", draftVersion: cur.draftVersion + 1,
+  draftBody: body.body, draftFingerprint: "e".repeat(64), approvedVersion: null, editedOnMobile: true,
+  pcRecheckVersion: cur.pcRecheckVersion, pcRecheck: cur.pcRecheck, updatedAt: "2026-10-22T07:05:00Z" });
 
 const cases = [
-  ["phone · a held reply says why, marks its sentence, and offers an edit", async (b) => {
-    const { p, ...run } = await phone(b, task({ state: "HELD" }));
-    expect(await text(p, "#task-state"), "승인 보류 · 다시 승인 필요");
-    expectHas(await text(p, "#why-text"), "운영 정책 「교환 · 반품 안내」 문서가");
-    expectHas(await text(p, "#why-text"), "이 답글의 「교환」 약속이 지금 근거와 맞지 않습니다.");
-    expectHas(await text(p, "#why-todo"), "문장을 고쳐 다시 승인하세요.");
-    expect(await p.locator("#reply-body .hl").allInnerTexts(), [SENTENCE]);
-    expect(await shown(p, "#edit"), true);
+  ["phone · a held reply says why, cannot be requested again unchanged, and an edit makes it requestable", async (b) => {
+    const edited = BODY.replace(SENTENCE, "세탁 방법을 다시 안내해 드리겠습니다.");
+    const run = await phone(b, task({ state: "HELD" }), { saved: phoneVersion });
+    const { p } = run;
+    expectHas(run.row, "고칠 곳 1");
+    expect(await text(p, "#task-state"), "고칠 곳 1");
+    expect(await text(p, "#why-text"),
+      "운영 정책 「교환 · 반품 안내」 문서가 10월 22일에 고쳐져, 이 답글의 「교환」 약속이 지금 근거와 맞지 않습니다.");
+    expect(await text(p, "#why-todo"), "문장을 고쳐 다시 요청하세요. 그 약속이 맞다면 PC에서 근거를 먼저 고쳐 주세요.");
+    expect(await text(p, "#draft-status"), "고칠 곳 1");
+    expect(await shown(p, "#reply-edit"), true);
+    expect(await p.locator("#reply-edit").inputValue(), BODY);
     expect(await shown(p, "#approve"), false);
-    expect(await text(p, "#cancel"), "답글 취소");
+    expect(await shown(p, "#approve-note"), false);
+    expect(await text(p, "#cancel"), "요청 취소");
+    await rewrite(p, edited, "blur");
+    const put = run.sent.filter((s) => s.method === "PUT");
+    expect(put.map((s) => s.body), [{ baseVersion: 1, body: edited }]);
+    expect(await shown(p, "#why"), false);
+    expect(await shown(p, "#approve"), true);
+    expect(await p.locator("#approve").isEnabled(), true);
     return run;
   }],
-  ["phone · a hold sent to the delegate says the delegate was told", async (b) => {
-    const { p, ...run } = await phone(b, task({ state: "HOLD_REQUESTED", claimed: true }));
-    expect(await text(p, "#task-state"), "승인 보류 · 담당자 확인 중");
-    expectHas(await text(p, "#state-note"), "담당자에게도 멈춤을 전했습니다.");
-    expect(await shown(p, "#edit"), false);
-    expect(await shown(p, "#approved-note"), false);
+  ["phone · a hold sent to the delegate says the stop was asked of them, and marks the sentence", async (b) => {
+    const run = await phone(b, task({ state: "HOLD_REQUESTED", claimed: true }));
+    const { p } = run;
+    expect(await text(p, "#task-state"), "멈춤 요청 중");
+    expect(await text(p, "#state-note"), "담당자가 등록 전인지 확인하면 바뀝니다");
+    expectHas(await text(p, "#why-text"), "이 답글의 「교환」 약속이 지금 근거와 맞지 않습니다.");
+    expect(await text(p, "#reply-body"), BODY);
+    expect(await marks(p), [SENTENCE]);
+    expect(await shown(p, "#reply-edit"), false);
+    expect(await shown(p, "#approve"), false);
     expect(await text(p, "#cancel"), "취소 요청");
+    await p.locator("#cancel").click();
+    expect(await text(p, "#confirm-cancel-text"), "담당자에게 등록을 멈춰 달라고 요청할까요?");
     return run;
   }],
   ["phone · a sent-back draft names the edited document and does not guess the sentence", async (b) => {
-    const { p, ...run } = await phone(b, task({ state: "RECHECK_NEEDED", approvedVersion: null, basisNote: EDITED }));
-    expectHas(await text(p, "#why-text"), "상품 지식 「린넨 커튼 · 소재 안내」 문서가");
-    expectHas(await text(p, "#why-text"), "어느 문장이 달라졌는지는 아직 짚지 못합니다.");
-    expect(await p.locator("#reply-body .hl").count(), 0);
+    const run = await phone(b, task({ state: "RECHECK_NEEDED", approvedVersion: null, basisNote: EDITED }));
+    const { p } = run;
+    expect(await text(p, "#task-state"), "다시 검사 중");
+    expect(await text(p, "#why-text"), "이 초안이 근거로 쓴 상품 지식 「린넨 커튼 · 소재 안내」 문서가 10월 22일에 고쳐졌습니다."
+      + " 어느 문장이 달라졌는지는 아직 짚지 못합니다.");
+    expect(await text(p, "#why-todo"), "바뀐 문서와 비교해 보고, 맞으면 그대로, 아니면 고쳐 주세요. PC가 다시 검사합니다.");
+    expect(await text(p, "#draft-status"), "다시 검사 중");
+    expect(await p.locator("#reply-edit").inputValue(), BODY);
+    expect(await p.locator(".hl").count(), 0);
     expect(await shown(p, "#state-note"), false);
+    expect(await shown(p, "#approve"), false);
     return run;
   }],
-  ["phone · an approval kept after a document edit says so in one line", async (b) => {
-    const { p, ...run } = await phone(b, task({ state: "APPROVED", basisNote: EDITED }));
-    expectHas(await text(p, "#why-text"), "이 답글과 부딪히는 곳이 없어 승인을 그대로 둡니다.");
+  ["phone · an approval kept after a document edit says so in one line, with no sentence marked", async (b) => {
+    const run = await phone(b, task({ state: "APPROVED", basisNote: EDITED }));
+    const { p } = run;
+    expect(await text(p, "#task-state"), "담당자 대기");
+    expect(await text(p, "#why-text"),
+      "근거로 쓴 상품 지식 「린넨 커튼 · 소재 안내」 문서가 10월 22일에 고쳐졌지만, 이 답글과 부딪히는 곳이 없어 승인을 그대로 둡니다.");
     expect(await shown(p, "#why-todo"), false);
+    expect(await text(p, "#why-todo"), "");
+    expect(await text(p, "#reply-body"), BODY);
+    expect(await marks(p), []);
+    expect(await text(p, "#state-note"), "16:00 요청");
+    expect(await text(p, "#cancel"), "요청 취소");
     return run;
   }],
   ["phone · a phone edit the PC flagged is advice before approval, not a hold", async (b) => {
-    const { p, ...run } = await phone(b, task({
+    const run = await phone(b, task({
       state: "AWAITING_APPROVAL", approvedVersion: null, editedOnMobile: true, pcRecheckVersion: 1,
-      pcRecheck: "FLAGGED:UNSUPPORTED_PROMISE", basisNote: { ...PROMISE, sources: [] } }));
-    expectHas(await text(p, "#why-todo"), "이 약속이 맞는지 확인하고 승인하세요.");
-    expect(await shown(p, "#unchecked"), false);
+      pcRecheck: "FLAGGED:UNSUPPORTED_PROMISE", basisNote: { ...PROMISE, sources: [] } }), {
+      approved: (cur) => ({ ...cur, state: "APPROVED", approvedVersion: 1, approvedAt: "2026-10-22T07:04:00Z" }) });
+    const { p } = run;
+    expect(await shown(p, "#task-state"), false);
+    expect(await text(p, "#why-text"), "이 답글의 「교환」 약속이 지금 근거와 맞지 않습니다.");
+    expect(await text(p, "#why-todo"), "이 약속이 맞는지 보고 요청하세요. 맞다면 PC에서 근거에 먼저 적어 두면 좋습니다.");
+    expect(await text(p, "#draft-status"), "고칠 곳 1");
     expect(await shown(p, "#approve"), true);
+    expect(await p.locator("#approve").isEnabled(), true);
+    await p.locator("#approve").click();
+    await p.locator("#task-state").filter({ hasText: "담당자 대기" }).waitFor();
+    const sent = run.sent.find((s) => s.path === "/v1/tasks/t-1/approve");
+    expect([sent?.body?.version, sent?.body?.fingerprint], [1, "f".repeat(64)]);
+    expect(await text(p, "#why-text"), "확인하고 승인한 답글입니다 — 근거에 없는 약속 「교환」.");
+    expect(await text(p, "#state-note"), "16:04 요청");
     return run;
   }],
-  ["phone · a reply held for a forbidden phrase names it and marks its sentence", async (b) => {
-    const banned = "고객님 탓이 아닙니다.";
-    const { p, ...run } = await phone(b, task({ draftBody: `불편을 드려 죄송합니다. ${banned}`,
-      basisNote: { codes: ["FORBIDDEN_PHRASE"], sources: [], promises: [], sentences: [banned], phrases: ["고객님 탓"] } }));
-    expectHas(await text(p, "#why-text"), "회사가 쓰지 않기로 한 표현이 있습니다: 「고객님 탓」.");
-    expectHas(await text(p, "#why-todo"), "그 표현을 빼고 문장을 고쳐 다시 승인하세요.");
-    expect(await p.locator("#reply-body .hl").allInnerTexts(), [banned]);
-    return run;
-  }],
-  ["phone · a phone edit carrying a banned phrase cannot be approved until fixed", async (b) => {
-    const banned = "고객님 탓이 아닙니다.";
-    const { p, ...run } = await phone(b, task({ state: "AWAITING_APPROVAL", approvedVersion: null, editedOnMobile: true,
-      draftBody: `불편을 드려 죄송합니다. ${banned}`, pcRecheckVersion: 1, pcRecheck: "FLAGGED:FORBIDDEN_PHRASE",
-      basisNote: { codes: ["FORBIDDEN_PHRASE"], sources: [], promises: [], sentences: [banned], phrases: ["고객님 탓"] } }));
-    expectHas(await text(p, "#why-todo"), "승인하기 전에 그 표현을 빼고 고치세요.");
+  ["phone · a reply held for a forbidden phrase names it, says to take it out, and marks its sentence", async (b) => {
+    const body = `불편을 드려 죄송합니다. ${BANNED}`;
+    const run = await phone(b, task({ draftBody: body, basisNote: BANNED_NOTE }));
+    const { p } = run;
+    expect(await text(p, "#task-state"), "고칠 곳 1");
+    expect(await text(p, "#why-text"), "회사가 쓰지 않기로 한 표현이 있습니다: 「고객님 탓」.");
+    expect(await text(p, "#why-todo"), "그 표현을 빼고 고친 뒤 다시 요청하세요.");
+    expect(await p.locator("#reply-edit").inputValue(), body);
     expect(await shown(p, "#approve"), false);
-    expect(await shown(p, "#edit"), true);
+    // The box the seller edits cannot carry a mark; the read-only reply does (see the report on HELD).
+    const asked = await phone(b, task({ state: "HOLD_REQUESTED", claimed: true, draftBody: body, basisNote: BANNED_NOTE }));
+    expect(await text(asked.p, "#why-text"), "회사가 쓰지 않기로 한 표현이 있습니다: 「고객님 탓」.");
+    expect(await marks(asked.p), [BANNED]);
+    await also(run, asked);
+    return run;
+  }],
+  ["phone · a phone edit carrying a banned phrase cannot be requested until fixed", async (b) => {
+    const fixed = "불편을 드려 죄송합니다. 다음에는 더 꼼꼼히 안내하겠습니다.";
+    const run = await phone(b, task({ state: "AWAITING_APPROVAL", approvedVersion: null, editedOnMobile: true,
+      draftBody: `불편을 드려 죄송합니다. ${BANNED}`, pcRecheckVersion: 1, pcRecheck: "FLAGGED:FORBIDDEN_PHRASE",
+      basisNote: BANNED_NOTE }), { saved: phoneVersion });
+    const { p } = run;
+    expect(await text(p, "#why-text"), "회사가 쓰지 않기로 한 표현이 있습니다: 「고객님 탓」.");
+    expect(await text(p, "#why-todo"), "그 표현을 빼고 고치면 요청할 수 있습니다.");
+    expect(await text(p, "#draft-status"), "고칠 곳 1");
+    expect(await shown(p, "#approve"), false);
+    expect(await shown(p, "#approve-note"), false);
+    expect(await shown(p, "#reply-edit"), true);
+    await rewrite(p, fixed, "pause");
+    expect(run.sent.filter((s) => s.method === "PUT").map((s) => s.body), [{ baseVersion: 1, body: fixed }]);
+    expect(await shown(p, "#why"), false);
+    expect(await shown(p, "#approve"), true);
+    expect(await p.locator("#approve").isEnabled(), true);
     return run;
   }],
   ["phone · a phone edit approved before the PC checked it waits for the PC, and says so", async (b) => {
-    const { p, ...run } = await phone(b, task({ state: "APPROVED", editedOnMobile: true, draftVersion: 2,
-      approvedVersion: 2, pcRecheckVersion: null, pcRecheck: null, basisNote: null }));
-    expect(await text(p, "#task-state"), "승인됨 · PC 검사 기다리는 중");
-    expectHas(await text(p, "#state-note"), "판매자 PC가 이 문장을 검사하면 담당자에게 넘어갑니다.");
+    const run = await phone(b, task({ state: "AWAITING_APPROVAL", approvedVersion: null, editedOnMobile: true,
+      draftVersion: 2, pcRecheckVersion: null, pcRecheck: null, basisNote: null }), { installs: PC_OFF,
+      approved: (cur) => ({ ...cur, state: "APPROVED", approvedVersion: 2, approvedAt: "2026-10-22T07:04:00Z" }) });
+    const { p } = run;
+    expect(await text(p, "#draft-status"), "PC 검사 전");
+    expect(await shown(p, "#approve"), true);
+    expect(await text(p, "#approve-note"), "이 문장 그대로 승인 · 담당자가 네이버에 등록");
+    await p.locator("#approve").click();
+    await p.locator("#task-state").filter({ hasText: /^검사 대기$/ }).waitFor();
+    expect(run.sent.find((s) => s.path === "/v1/tasks/t-1/approve")?.body?.version, 2);
+    expect(await text(p, "#state-note"), "16:04 요청 · PC가 켜지면 검사 후 담당자에게 넘어갑니다.");
     expect(await shown(p, "#approve"), false);
-    const waiting = await phone(b, task({ state: "AWAITING_APPROVAL", approvedVersion: null, editedOnMobile: true,
-      draftVersion: 2, pcRecheckVersion: null, pcRecheck: null, basisNote: null }));
-    expectHas(await text(waiting.p, "#unchecked-text"), "지금 승인해도 검사가 끝난 뒤에 담당자에게 넘어가고");
-    expect(await shown(waiting.p, "#approve"), true);
-    await waiting.ctx.close();
+    await p.locator("#back").click();
+    await p.locator("#view-list").waitFor({ state: "visible" });
+    await p.locator("#pc-off").waitFor({ state: "visible", timeout: 3000 });
+    expect(await text(p, "#pc-off"), "PC 꺼짐 · 새 초안과 검사는 PC가 켜진 뒤");
+    expect(await text(p, "#todo-count"), "0");
+    expect(await text(p, "#moving-count"), "1");
+    await p.locator('.tab[data-tab="moving"]').click();
+    expectHas(await text(p, "#list-moving"), "검사 대기");
+    expectHas(await text(p, "#list-moving"), "PC가 켜지면 검사");
     return run;
   }],
   ["phone · the server's words are drawn as text, never as markup", async (b) => {
     const html = "<b id=\"injected\">굵게</b> 교환해 드리겠습니다.";
-    const { p, ...run } = await phone(b, task({ draftBody: `안녕하세요. ${html}`,
-      basisNote: { ...PROMISE, sources: [{ ...PROMISE.sources[0], title: "<i id=\"t\">안내</i>" }], sentences: [html] } }));
-    expect(await p.locator("#injected").count(), 0);
-    expect(await p.locator("#t").count(), 0);
-    expect(await p.locator("#reply-body .hl").allInnerTexts(), [html]);
+    const body = `안녕하세요. ${html}`;
+    const fixture = (state) => task({ state, claimed: state === "HOLD_REQUESTED", draftBody: body,
+      review: { productName: "<u id=\"p\">린넨 커튼</u>", rating: 1, body: "<s id=\"r\">줄었어요</s>",
+        writtenAt: "2026-10-21T03:00:00Z", displayState: "노출", replied: false },
+      basisNote: { ...PROMISE, sources: [{ ...PROMISE.sources[0], title: "<i id=\"t\">안내</i>" }], sentences: [html] } });
+    const run = await phone(b, fixture("HOLD_REQUESTED"));
+    const { p } = run;
+    expect(await marks(p), [html]);
+    expectHas(await text(p, "#why-text"), "운영 정책 「<i id=\"t\">안내</i>」 문서가");
+    expect(await text(p, "#review-body"), "<s id=\"r\">줄었어요</s>");
+    expectHas(run.row, "<u id=\"p\">린넨 커튼</u>");
+    for (const id of ["#injected", "#t", "#r", "#p"]) expect(await p.locator(id).count(), 0);
+    const held = await phone(b, fixture("HELD"));
+    expect(await held.p.locator("#reply-edit").inputValue(), body);
+    expectHas(await text(held.p, "#why-text"), "운영 정책 「<i id=\"t\">안내</i>」 문서가");
+    for (const id of ["#injected", "#t", "#r", "#p"]) expect(await held.p.locator(id).count(), 0);
+    await also(run, held);
     return run;
   }],
   ["delegate · the pre-save check stops a held reply, says why, and settles it as not posted", async (b) => {
@@ -212,6 +342,25 @@ const cases = [
     await p.locator("#list-notice").filter({ hasText: "보류를 확인했습니다" }).waitFor();
     const report = run.sent.find((s) => s.path === "/v1/delegate/tasks/t-1/report");
     expect(report?.body?.outcome, "FAILED");
+    return run;
+  }],
+  ["delegate · the upload tab says which period to download: from the last upload, or a year the first time", async (b) => {
+    const run = await open(b, "delegate", (method, path) => {
+      if (path === "/v1/delegate/me") return { email: "delegate@example.invalid", stores: [
+        // 01:30 on the 13th in Korea is still the 12th in UTC: the period is Seller Center's date, not UTC's.
+        { id: "s-1", channel: "NAVER", label: "합성 스토어", lastUploadAt: "2026-10-12T16:30:00Z" },
+        { id: "s-2", channel: "NAVER", label: "새 스토어", lastUploadAt: null }] };
+      if (path.startsWith("/v1/delegate/tasks?state=")) return [];
+      return undefined;
+    }, { width: 1100, height: 900 }, "2026-10-25T03:00:00Z");
+    const { p } = run;
+    await p.locator("#tab-upload").click();
+    await p.locator("#period").waitFor({ state: "visible" });
+    expect(await text(p, "#period-range"), "2026.10.13 ~ 2026.10.25");
+    expect(await text(p, "#period-why"), "· 마지막으로 올린 날부터");
+    await p.locator("#store").selectOption("s-2");
+    expect(await text(p, "#period-range"), "2025.10.25 ~ 2026.10.25");
+    expect(await text(p, "#period-why"), "· 처음 올리는 스토어라 판매자센터 최대 기간 1년");
     return run;
   }],
 ];
