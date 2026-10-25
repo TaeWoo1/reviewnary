@@ -16,6 +16,10 @@
 #
 # The PC's reply drafts use the model settings of the web demo — only the SELLEROPS_AGENT_DRAFT_* names are taken
 # from backend/.env.local, inside the process that starts the PC; no other setting of the web demo comes along.
+# SELLER_PC_DEMO=qa runs a second, separate copy beside it — its own databases (vendor_qa, sellerpc_qa), state folder
+# and ports (vendor :18499 · PC :18590 · screen :5691) — for trying changes on made-up data without touching the kept
+# demo. Google sign-in stays off there; delegates use a password and an authenticator.
+#
 # Mail runs in dev-outbox mode: a PC-link code lands in vendor.log, never in a mailbox.
 #
 # Delegates sign in with Google through the web demo's own Google client (SELLEROPS_OAUTH_GOOGLE_* in
@@ -26,12 +30,17 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-RUN="$HERE/.run/seller-pc-demo"
+NAME="${SELLER_PC_DEMO:-demo}"
+case "$NAME" in
+  demo) RUN="$HERE/.run/seller-pc-demo"; VENDOR_PORT=18099 PC_PORT=18190 SCREEN_PORT=5291 ;;
+  qa) RUN="$HERE/.run/seller-pc-qa"; VENDOR_PORT=18499 PC_PORT=18590 SCREEN_PORT=5691 ;;
+  *) echo "SELLER_PC_DEMO is demo or qa"; exit 2 ;;
+esac
+VENDOR_DB="vendor_$NAME" PC_DB="sellerpc_$NAME"
 mkdir -p "$RUN" && chmod 700 "$RUN"
 export JAVA_HOME="${JAVA_HOME_17:-/opt/homebrew/opt/openjdk@17}" PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"
 PG_BIN="${PG_BIN:-/opt/homebrew/opt/postgresql@15/bin}"
 PSQL=("$PG_BIN/psql" -h 127.0.0.1 -p 5432 -U sellerops -tA)
-VENDOR_PORT=18099 PC_PORT=18190 SCREEN_PORT=5291
 PULL_MS="${SELLER_PC_DEMO_PULL_MS:-30000}"
 
 keys() {
@@ -48,7 +57,7 @@ keys() {
 }
 
 vendor_env() {
-  export VENDOR_DB_URL="jdbc:postgresql://127.0.0.1:5432/vendor_demo" VENDOR_DB_USER=sellerops VENDOR_DB_PASSWORD=
+  export VENDOR_DB_URL="jdbc:postgresql://127.0.0.1:5432/$VENDOR_DB" VENDOR_DB_USER=sellerops VENDOR_DB_PASSWORD=
   export VENDOR_SERVER_PORT=$VENDOR_PORT VENDOR_PUBLIC_URL="http://127.0.0.1:$VENDOR_PORT" VENDOR_MAIL_MODE=dev-outbox
 }
 
@@ -97,7 +106,7 @@ draft_env() {
 
 up() {
   keys
-  for db in vendor_demo sellerpc_demo; do
+  for db in "$VENDOR_DB" "$PC_DB"; do
     [[ "$("${PSQL[@]}" -d postgres -c "select 1 from pg_database where datname='$db'")" == 1 ]] \
       || "${PSQL[@]}" -d postgres -qc "create database $db"
   done
@@ -105,7 +114,7 @@ up() {
   echo "built $(cd "$REPO" && git log -1 --format=%h)"
 
   if ! alive vendor; then
-    ( vendor_env; eval "$(google_env)"; exec java -jar "$(own_jar vendor-server vendor)" ) >> "$RUN/vendor.log" 2>&1 &
+    ( vendor_env; [[ "$NAME" == demo ]] && eval "$(google_env)"; exec java -jar "$(own_jar vendor-server vendor)" ) >> "$RUN/vendor.log" 2>&1 &
     echo $! > "$RUN/vendor.pid"
   fi
   wait_for "http://127.0.0.1:$VENDOR_PORT/health" 120 || { echo "vendor server did not start (see $RUN/vendor.log)"; exit 1; }
@@ -114,10 +123,10 @@ up() {
     ( eval "$(draft_env)"
       export SELLEROPS_AGENT_DRAFT_ORG_IDS='*'   # one seller on this PC
       export SPRING_PROFILES_ACTIVE=local-seller SERVER_PORT=$PC_PORT \
-        SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/sellerpc_demo" SPRING_DATASOURCE_USERNAME=sellerops \
+        SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/$PC_DB" SPRING_DATASOURCE_USERNAME=sellerops \
         SPRING_DATASOURCE_PASSWORD= SELLEROPS_JWT_SECRET="$PC_JWT_SECRET" \
         SELLEROPS_CORS_ORIGIN="http://127.0.0.1:$SCREEN_PORT" SELLEROPS_VAULT_MASTER_KEY="$PC_VAULT_KEY" \
-        SELLEROPS_VAULT_KEY_ID=seller-pc-demo-1 SELLEROPS_SEED_ENABLED=true \
+        SELLEROPS_VAULT_KEY_ID=seller-pc-$NAME-1 SELLEROPS_SEED_ENABLED=true \
         SELLEROPS_VENDOR_LINK_BASE_URL="http://127.0.0.1:$VENDOR_PORT" SELLEROPS_VENDOR_REVIEW_PULL_INTERVAL_MS=$PULL_MS
       exec java -jar "$(own_jar backend pc)" ) >> "$RUN/pc.log" 2>&1 &
     echo $! > "$RUN/pc.pid"
