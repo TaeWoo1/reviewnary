@@ -18,9 +18,11 @@
 # from backend/.env.local, inside the process that starts the PC; no other setting of the web demo comes along.
 # Mail runs in dev-outbox mode: a PC-link code lands in vendor.log, never in a mailbox.
 #
-# Delegates sign in with Google when the OAuth client file Google Cloud gives you ("web application", redirect URI
-# http://127.0.0.1:18099/v1/delegate/auth/google/callback) is saved as tools/dev/.run/seller-pc-demo/google-client.json.
-# Only its client id and secret are read, inside the process that starts the vendor server; nothing is printed.
+# Delegates sign in with Google through the web demo's own Google client (SELLEROPS_OAUTH_GOOGLE_* in
+# backend/.env.local), or through a client file Google Cloud gives you saved as
+# tools/dev/.run/seller-pc-demo/google-client.json, which wins. Either way the client must list the redirect URI
+# http://127.0.0.1:18099/v1/delegate/auth/google/callback. Only the id and secret are read, inside the process that
+# starts the vendor server; nothing is printed.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
@@ -52,14 +54,20 @@ vendor_env() {
 
 # The Google client's id and secret, printed as assignments for the caller to eval — never shown.
 google_env() {
-  [[ -f "$RUN/google-client.json" ]] || return 0
-  python3 -I - "$RUN/google-client.json" <<'PY'
+  if [[ -f "$RUN/google-client.json" ]]; then
+    python3 -I - "$RUN/google-client.json" <<'PY'
 import json, shlex, sys
 web = json.load(open(sys.argv[1])).get("web", {})
 for key, name in (("client_id", "VENDOR_GOOGLE_CLIENT_ID"), ("client_secret", "VENDOR_GOOGLE_CLIENT_SECRET")):
     if web.get(key):
         print(f"export {name}={shlex.quote(web[key])}")
 PY
+  elif [[ -f "$REPO/backend/.env.local" ]]; then
+    ( set -a; . "$REPO/backend/.env.local" >/dev/null 2>&1; set +a
+      [[ -n "${SELLEROPS_OAUTH_GOOGLE_CLIENT_ID:-}" ]] && printf 'export VENDOR_GOOGLE_CLIENT_ID=%q\n' "$SELLEROPS_OAUTH_GOOGLE_CLIENT_ID"
+      [[ -n "${SELLEROPS_OAUTH_GOOGLE_CLIENT_SECRET:-}" ]] && printf 'export VENDOR_GOOGLE_CLIENT_SECRET=%q\n' "$SELLEROPS_OAUTH_GOOGLE_CLIENT_SECRET"
+      true )
+  fi
 }
 
 jar() { (cd "$REPO/$1" && ls build/libs/*.jar | grep -v plain | head -1 | sed "s#^#$REPO/$1/#"); }
@@ -134,7 +142,7 @@ down() {
 status() {
   for s in vendor pc screen; do printf '%-7s %s\n' "$s" "$(alive "$s" && echo up || echo down)"; done
   printf '%-7s %s\n' google "$(curl -s "http://127.0.0.1:$VENDOR_PORT/v1/delegate/auth/methods" | grep -q '"google":true' \
-    && echo "sign-in on" || echo "sign-in off (no $RUN/google-client.json)")"
+    && echo "sign-in on" || echo "sign-in off (no Google client in backend/.env.local or $RUN/google-client.json)")"
   echo "PC screen      http://127.0.0.1:$SCREEN_PORT"
   echo "delegate desk  http://127.0.0.1:$VENDOR_PORT/delegate/"
   echo "phone page     http://127.0.0.1:$VENDOR_PORT/replies"
