@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { isAxiosError } from "axios";
 import type { DraftEvidenceView, GeneratedReviewDraftView, ReviewKnowledgeGapView } from "../lib/types";
 import { api } from "../lib/apiClient";
@@ -42,6 +42,7 @@ export function GroundedReviewDraft({
   storedBasisNote,
   hasStoredDraft,
   onDrafted,
+  autoStart = false,
 }: {
   accountId: string;
   actionRef: string;
@@ -70,6 +71,11 @@ export function GroundedReviewDraft({
   hasStoredDraft: boolean;
   /** Hand the generated body to the editor. Called synchronously; never awaited. */
   onDrafted: (body: string) => void;
+  /**
+   * The seller already pressed 「AI 초안 준비」 — on the empty reply area before this panel existed (2026-10-26,
+   * {@code ReplyStarter}). Generate once on mount, exactly as that press would here; never over a stored draft.
+   */
+  autoStart?: boolean;
 }) {
   const [result, setResult] = useState<GeneratedReviewDraftView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -86,6 +92,15 @@ export function GroundedReviewDraft({
   // company's knowledge or its safe default, so it has to survive a reload — before this it did not.
   const basis = result ? result.answerBasis : storedBasis;
   const basisNote = result ? result.answerBasisNote : storedBasisNote;
+
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!autoStart || hasStoredDraft || autoStarted.current) return;
+    autoStarted.current = true;
+    void generate();
+    // Once per mount: the press it stands for happened once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function generate() {
     if (busy) return;

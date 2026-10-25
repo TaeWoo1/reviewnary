@@ -163,6 +163,7 @@ export function VocItemReplyPrep({
   headingLevel = 4,
   subjectShownAbove = false,
   unboxed = false,
+  autoDraft = false,
 }: {
   accountId: string;
   actionRef: string;
@@ -269,6 +270,8 @@ export function VocItemReplyPrep({
    * save that then fails is never reported and the operator is left believing it landed.
    */
   onLocalWork?: (hasLocalWork: boolean) => void;
+  /** The seller asked for an AI draft before this panel mounted (2026-10-26) — {@code GroundedReviewDraft.autoStart}. */
+  autoDraft?: boolean;
 }) {
   const [prep, setPrep] = useState<ReviewReplyPrep | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -780,6 +783,7 @@ export function VocItemReplyPrep({
           storedBasis={prep.draftAnswerBasis ?? null}
           storedBasisNote={prep.draftAnswerBasisNote ?? null}
           hasStoredDraft={prep.draft !== null}
+          autoStart={autoDraft}
           onDrafted={(generated) => {
             setBody(generated);
             setDirty(false);

@@ -10,6 +10,7 @@ import { VocItemReplyPrep } from "../../components/VocItemReplyPrep";
 import { SellerCorrectionControls } from "../../components/reviews/SellerCorrectionControls";
 import { ChannelAnsweredState } from "../../components/reviews/ChannelAnsweredState";
 import { TriageTierChip } from "../../components/reviews/TriageTierChip";
+import { ReplyStarter } from "../../components/reviews/ReplyStarter";
 import { ReviewProblemCard } from "../../components/reviews/decision/ReviewProblemCard";
 import { RepeatedSignal } from "../../components/reviews/decision/RepeatedSignal";
 import { GroundingOnHand, OpenAskNote } from "../../components/reviews/decision/GroundingOnHand";
@@ -53,9 +54,9 @@ import type {
  *   <li>why it is in front of them ({@link ReviewProblemCard});</li>
  *   <li>whether anyone has said it before ({@link RepeatedSignal});</li>
  *   <li>what a reply would stand on ({@link GroundingOnHand});</li>
- *   <li>what the SELLER thinks ({@link SellerCorrectionControls});</li>
- *   <li>what they will DO ({@link DecisionActionStep});</li>
- *   <li>the draft that follows from that choice, and only from 대응 필요;</li>
+ *   <li>the reply — its place stands from the start ({@link ReplyStarter}), and starting it records 대응 필요;</li>
+ *   <li>what the SELLER thinks ({@link SellerCorrectionControls}) and what they will DO ({@link DecisionActionStep}),
+ *       as quiet properties under it (2026-10-26, owner);</li>
  *   <li>what has already been decided — the page draws it as a flat trail ({@code RecordTrail}).</li>
  * </ol>
  *
@@ -170,6 +171,8 @@ export function ReviewCaseView({
   // any approval withdrawable — after the seller moves it to 두고 보기.
   const [prepared, setPrepared] = useState(false);
   const [localWork, setLocalWork] = useState(false);
+  // The seller started the reply from the empty reply area with 「AI 초안 준비」, so the panel drafts on mount.
+  const [autoDraft, setAutoDraft] = useState(false);
 
   const channelCode = context?.channelCode ?? null;
   /** Silver: never fails the screen, and never fires without the account the event is scoped to. */
@@ -208,6 +211,7 @@ export function ReviewCaseView({
     setDecision(null);
     setPrepared(false);
     setLocalWork(false);
+    setAutoDraft(false);
   }, [reviewId]);
 
   useEffect(() => {
@@ -343,6 +347,16 @@ export function ReviewCaseView({
   // already exists so an approved reply can never be stranded where the seller can neither read nor
   // withdraw it.
   const showDraft = replyWork !== null && (decision === "RESPONSE_NEEDED" || prepared || localWork);
+  /**
+   * <b>답변 자리는 결정 전에도 있다</b> (2026-10-26, owner — overturns 「초안은 대응 필요에서만 열린다」 for the
+   * undecided review). On the page, a review with reply work and no decision shows the empty reply area with its
+   * two ways to start ({@link ReplyStarter}); starting records 대응 필요 through the same decision endpoint, and the
+   * reply panel then mounts in its place, reading its capabilities under 대응 필요. A review the seller decided NOT to answer (두고 보기 · 조치 불필요) still shows no
+   * reply area, and one the channel already answered says so instead — the server would refuse a new draft there.
+   */
+  const offerStart =
+    variant === "page" && replyWork !== null && !showDraft && decision === null
+    && replyWork.channelReplyState !== "ANSWERED";
   // The reply lane's own address. Reply work is only ever handed out with an account behind it, so
   // this is non-null exactly when the panel below mounts.
   const replyAccountId = detail.sellerAccountId ?? "";
@@ -512,6 +526,22 @@ export function ReviewCaseView({
                 문장이 화면에서 가장 큰 글이라는 데서 나온다. 브랜드 ring은 「다음에 누를 것」을 가리키는
                 표시인데, 승인이 이미 서 있는 리뷰에서 다음에 누를 것은 복사 하나이고 그것은 제 색을 가지고
                 있다. 확인할 일의 pane은 여러 물건 사이에서 이것을 가리켜야 하므로 ring을 유지한다. */}
+            {/* The channel's own statement, said before the reply area it closes (2026-10-26: the reply area now
+                stands first, so this moved up with it). */}
+            {variant === "page" ? <ChannelAnsweredState state={replyWork?.channelReplyState ?? null} /> : null}
+            {offerStart ? (
+              <DecisionCard primary>
+                <ReplyStarter
+                  key={`start-${detail.id}`}
+                  reviewId={detail.id}
+                  onStarted={(withAi) => {
+                    setAutoDraft(withAi);
+                    setDecision("RESPONSE_NEEDED");
+                    bump();
+                  }}
+                />
+              </DecisionCard>
+            ) : null}
             {showDraft && replyWork ? (
               <DecisionCard>
                 <VocItemReplyPrep
@@ -525,6 +555,7 @@ export function ReviewCaseView({
                   headingLevel={2}
                   subjectShownAbove
                   unboxed
+                  autoDraft={autoDraft}
                 />
                 {/* 작업에서 제외는 이 상자 밖으로 나갔다 — 아래 워크플로 영역. 답변에 대한 동작이 아니라
                     이 리뷰를 할 일 목록에서 빼는 동작이고, 상자가 「이것이 답변이다」라고 말하려면 안에
@@ -563,8 +594,9 @@ export function ReviewCaseView({
           </>
         ) : (
         <>
-          {/* The channel's own statement, said BEFORE anyone decides anything. */}
-          <ChannelAnsweredState state={replyWork?.channelReplyState ?? null} />
+          {/* The channel's own statement, said BEFORE anyone decides anything — on the page it now stands above the
+              reply area instead (2026-10-26), and is not said twice. */}
+          {variant === "page" ? null : <ChannelAnsweredState state={replyWork?.channelReplyState ?? null} />}
 
           {/* <b>Two questions, one card</b> (Review Decision UX v3.2). They were a card each, which cost
               40px of padding and a 14px gap for a separation a hairline makes, and pushed 「AI 초안 준비」
@@ -580,7 +612,9 @@ export function ReviewCaseView({
           {/* <b>오른쪽 열은 속성이지 카드가 아니다</b> (리뷰 canonical mockup, 2026-10-05). 240px 열의
               전부가 이 덩어리이므로 테두리는 아무것도 나누지 못하고, 준비된 답변과 같은 모양을 한 번 더
               그릴 뿐이다. 확인할 일의 pane은 그 안에 다른 것들과 함께 서므로 상자를 유지한다. */}
-          <DecisionCard primary={decision === null} boxed={!!pane}>
+          {/* Highlighted only when it is the next thing to press: an undecided review with no reply area. Where the
+              reply area stands, the reply is the next thing (2026-10-26). */}
+          <DecisionCard primary={decision === null && !offerStart} boxed={!!pane}>
             <div className="space-y-3">
               {/* 판단 — the seller's own judgment of the tier, which does not replace the system's.
                   <b>Folded in the pane.</b> It is a different judgment from 처리 방법 and a secondary one: the

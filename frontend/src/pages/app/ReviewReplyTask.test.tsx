@@ -21,6 +21,8 @@ const recordReviewTriageAction = vi.fn();
 const correctReviewTriage = vi.fn();
 const withdrawReviewTriageCorrection = vi.fn();
 const dismissReplyWork = vi.fn();
+const generateReviewReplyDraft = vi.fn();
+const saveReviewReplyDraft = vi.fn();
 
 vi.mock("../../lib/apiClient", () => ({
   api: {
@@ -33,6 +35,8 @@ vi.mock("../../lib/apiClient", () => ({
     correctReviewTriage: (...a: unknown[]) => correctReviewTriage(...a),
     withdrawReviewTriageCorrection: (...a: unknown[]) => withdrawReviewTriageCorrection(...a),
     dismissReplyWork: (...a: unknown[]) => dismissReplyWork(...a),
+    generateReviewReplyDraft: (...a: unknown[]) => generateReviewReplyDraft(...a),
+    saveReviewReplyDraft: (...a: unknown[]) => saveReviewReplyDraft(...a),
   },
 }));
 
@@ -627,6 +631,8 @@ describe("리뷰 처리 — the decision workspace", () => {
     // The channel's statement is NOT the seller's decision: the choice is still open, and nothing
     // claims the review has been handled.
     expect(screen.getByRole("button", { name: /대응 필요/ })).toBeInTheDocument();
+    // And no way to start a reply the server would refuse (2026-10-26): the statement stands in its place.
+    expect(screen.queryByTestId("reply-starter")).toBeNull();
     expect(screen.queryByText(/처리 완료/)).toBeNull();
   });
 
@@ -1439,5 +1445,106 @@ describe("리뷰 상세 — the one object and the one column (2026-10-06)", () 
     // 데서 온다. 브랜드 ring은 「다음에 누를 것」의 표시이고, 여기서 다음에 누를 것은 복사 하나다.
     expect(cards[0].className).not.toContain("ring-brand-700");
     expect(cards[0].className).toContain("border-line");
+  });
+});
+
+/**
+ * <b>답변 자리는 결정 전에도 있다</b> (2026-10-26, owner: 「버튼이 없는데?」 — the AI draft button appeared only after
+ * 처리 방법 · 대응 필요 was pressed). The reply area stands from the start; starting it is the 대응 필요 decision,
+ * recorded through the same endpoint, and no model is called before the press.
+ */
+describe("리뷰 처리 — the reply area before a decision", () => {
+  const UNDECIDED = {
+    actionRef: `review:${REVIEW}`,
+    triageDisposition: null,
+    hasReplyPreparation: false,
+    channelReplyState: "PENDING",
+  } as const;
+
+  it("shows the empty reply area with 「AI 초안 준비」 at once, above the judgement controls, and calls nothing", async () => {
+    getReviewWorkspace.mockResolvedValue(detail({ replyWork: UNDECIDED }));
+    getReviewDecisionContext.mockResolvedValue(context({ currentDecision: null }));
+    renderTask();
+
+    const starter = await screen.findByTestId("reply-starter");
+    expect(within(starter).getByRole("button", { name: "AI 초안 준비" })).toBeInTheDocument();
+    expect(within(starter).getByRole("button", { name: "직접 쓰기" })).toBeInTheDocument();
+    const controls = screen.getByLabelText("조치 선택");
+    expect(starter.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(getReviewReplyPrep).not.toHaveBeenCalled();
+    expect(generateReviewReplyDraft).not.toHaveBeenCalled();
+    expect(recordReviewDecision).not.toHaveBeenCalled();
+  });
+
+  it("「AI 초안 준비」 records 대응 필요 on the review, then opens the panel and drafts once", async () => {
+    getReviewWorkspace.mockResolvedValue(detail({ replyWork: UNDECIDED }));
+    getReviewDecisionContext.mockResolvedValue(context({ currentDecision: null }));
+    recordReviewDecision.mockResolvedValue({ disposition: "RESPONSE_NEEDED", replayed: false });
+    // The panel's first read has no draft; every read after the generation holds the version it saved.
+    getReviewReplyPrep
+      .mockResolvedValueOnce(prep({ draft: null, triageDisposition: "RESPONSE_NEEDED" }))
+      .mockResolvedValue(prep({
+        triageDisposition: "RESPONSE_NEEDED",
+        draftAuthorKind: "MODEL",
+        draft: { ...prep().draft!, version: 1, body: "AI가 쓴 합성 초안" },
+      }));
+    generateReviewReplyDraft.mockResolvedValue({
+      draft: { version: 1, body: "AI가 쓴 합성 초안" },
+      evidence: [],
+      knowledgeGaps: [],
+      answerBasis: "TEMPLATE",
+      answerBasisNote: null,
+      unavailableMessage: null,
+    });
+    saveReviewReplyDraft.mockResolvedValue(undefined);
+    renderTask();
+
+    const starter = await screen.findByTestId("reply-starter");
+    // From here on the server reads 대응 필요, as it would after the press.
+    getReviewWorkspace.mockResolvedValue(detail({ replyWork: { ...UNDECIDED, triageDisposition: "RESPONSE_NEEDED" } }));
+    getReviewDecisionContext.mockResolvedValue(context({ currentDecision: "RESPONSE_NEEDED" }));
+    await userEvent.click(within(starter).getByRole("button", { name: "AI 초안 준비" }));
+
+    await waitFor(() => expect(recordReviewDecision).toHaveBeenCalledTimes(1));
+    expect(recordReviewDecision).toHaveBeenCalledWith(REVIEW, {
+      commandId: expect.any(String),
+      disposition: "RESPONSE_NEEDED",
+    });
+    await waitFor(() => expect(generateReviewReplyDraft).toHaveBeenCalledTimes(1));
+    expect(generateReviewReplyDraft).toHaveBeenCalledWith(ACCOUNT, `review:${REVIEW}`);
+    expect(await screen.findByDisplayValue("AI가 쓴 합성 초안")).toBeInTheDocument();
+    expect(screen.queryByTestId("reply-starter")).toBeNull();
+  });
+
+  it("「직접 쓰기」 opens the panel without calling the model", async () => {
+    getReviewWorkspace.mockResolvedValue(detail({ replyWork: UNDECIDED }));
+    getReviewDecisionContext.mockResolvedValue(context({ currentDecision: null }));
+    recordReviewDecision.mockResolvedValue({ disposition: "RESPONSE_NEEDED", replayed: false });
+    getReviewReplyPrep.mockResolvedValue(prep({ triageDisposition: "RESPONSE_NEEDED" }));
+    renderTask();
+
+    const starter = await screen.findByTestId("reply-starter");
+    getReviewDecisionContext.mockResolvedValue(context({ currentDecision: "RESPONSE_NEEDED" }));
+    await userEvent.click(within(starter).getByRole("button", { name: "직접 쓰기" }));
+
+    expect(await screen.findByDisplayValue("판매자가 고쳐 쓴 합성 초안")).toBeInTheDocument();
+    expect(generateReviewReplyDraft).not.toHaveBeenCalled();
+  });
+
+  it("a failed start opens nothing, says so, and retries the same decision rather than a second one", async () => {
+    getReviewWorkspace.mockResolvedValue(detail({ replyWork: UNDECIDED }));
+    getReviewDecisionContext.mockResolvedValue(context({ currentDecision: null }));
+    recordReviewDecision.mockRejectedValueOnce(new Error("down"));
+    renderTask();
+
+    const starter = await screen.findByTestId("reply-starter");
+    await userEvent.click(within(starter).getByRole("button", { name: "AI 초안 준비" }));
+    expect(await screen.findByText("답변 준비를 시작하지 못했습니다. 다시 눌러 주세요.")).toBeInTheDocument();
+    expect(getReviewReplyPrep).not.toHaveBeenCalled();
+
+    recordReviewDecision.mockResolvedValue({ disposition: "RESPONSE_NEEDED", replayed: true });
+    await userEvent.click(within(screen.getByTestId("reply-starter")).getByRole("button", { name: "AI 초안 준비" }));
+    await waitFor(() => expect(recordReviewDecision).toHaveBeenCalledTimes(2));
+    expect(recordReviewDecision.mock.calls[1][1].commandId).toBe(recordReviewDecision.mock.calls[0][1].commandId);
   });
 });
