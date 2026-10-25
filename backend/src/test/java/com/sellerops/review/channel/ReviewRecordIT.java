@@ -227,6 +227,55 @@ class ReviewRecordIT {
 
     // ── fixtures ────────────────────────────────────────────────────────────────────────────────────────────
 
+    /**
+     * 답변 상태 (2026-10-26, owner): the channel's own statement narrows the rows and the group counts like a channel
+     * filter, the counts beside the control do not narrow by it, and 모름 is never folded into 미답변.
+     */
+    @Test
+    void theReplyFilterListsOneChannelStatement_andEachChoiceKeepsItsOwnCount() {
+        Review pending = review(naver, 1, "부러져서 왔어요", LocalDate.of(2026, 10, 20));
+        pending.setReplyState(ReviewReplyState.PENDING);
+        reviews.save(pending);
+        Review answered = review(naver, 2, "접착이 약해요", LocalDate.of(2026, 10, 19));
+        answered.setReplyState(ReviewReplyState.ANSWERED);
+        reviews.save(answered);
+        review(coupang, 5, "좋아요", LocalDate.of(2026, 10, 18));
+
+        ReviewRecordPageView only = service.record(org, null, "newest", null, 0, 20, false, "pending", null);
+        assertThat(only.items()).extracting(r -> r.review().id()).containsExactly(pending.getId());
+        assertThat(only.items().get(0).review().channelReplyState()).isEqualTo("PENDING");
+        assertThat(only.triageSummary().needsAttention()).isEqualTo(1);
+        assertThat(only.reply()).isEqualTo(new ReviewRecordPageView.ReplySummary(1, 1, 1));
+
+        ReviewRecordPageView unknown = service.record(org, null, "newest", null, 0, 20, false, "unknown", null);
+        assertThat(unknown.items()).hasSize(1);
+        assertThat(unknown.items().get(0).review().channelReplyState()).isEqualTo("UNKNOWN");
+
+        assertThat(service.record(org, null, "newest", null, 0, 20, false, null, null).total()).isEqualTo(3);
+        assertThatThrownBy(() -> service.record(org, null, null, null, 0, 20, false, "replied", null))
+                .isInstanceOf(ApiException.class);
+    }
+
+    /** 기간 (2026-10-26, owner): the last N days in Korea, today included; only 7 and 30 are asked for. */
+    @Test
+    void thePeriodFilterCountsBackFromTodayInKorea() {
+        service.useClock(java.time.Clock.fixed(Instant.parse("2026-10-26T03:00:00Z"), ZoneOffset.UTC));
+        Review thisWeek = review(naver, 5, "좋아요", LocalDate.of(2026, 10, 20));
+        Review thisMonth = review(naver, 4, "괜찮아요", LocalDate.of(2026, 10, 1));
+        review(naver, 1, "부러져서 왔어요", LocalDate.of(2026, 8, 1));
+
+        ReviewRecordPageView week = service.record(org, null, "newest", null, 0, 20, false, null, 7);
+        assertThat(week.items()).extracting(r -> r.review().id()).containsExactly(thisWeek.getId());
+        assertThat(week.triageSummary().needsAttention()).isZero();
+        assertThat(week.reply().unknown()).isEqualTo(1);
+
+        ReviewRecordPageView month = service.record(org, null, "newest", null, 0, 20, false, null, 30);
+        assertThat(month.items()).extracting(r -> r.review().id()).containsExactly(thisWeek.getId(), thisMonth.getId());
+
+        assertThatThrownBy(() -> service.record(org, null, null, null, 0, 20, false, null, 14))
+                .isInstanceOf(ApiException.class);
+    }
+
     private Channel channel(String code, String name) {
         return channels.findByCode(code).orElseGet(() -> {
             Channel ch = new Channel();

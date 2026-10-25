@@ -2395,10 +2395,16 @@ export const api = {
       size?: number;
       /** Only the reviews that mention a safety or legal problem (mockup ②, 2026-10-25). */
       safety?: boolean;
+      /** The channel's reply statement (2026-10-26): 미답변 · 답변함 · 모름. Absent = every state. */
+      reply?: "pending" | "answered" | "unknown";
+      /** Received in the last N days in Korea, today included. Absent = the whole record. */
+      days?: 7 | 30;
     } = {},
   ): Promise<ReviewRecordPageView> {
     const query = new URLSearchParams();
     if (params.safety) query.set("safety", "true");
+    if (params.reply) query.set("reply", params.reply);
+    if (params.days) query.set("days", String(params.days));
     if (params.channel) query.set("channel", params.channel);
     if (params.sort) query.set("sort", params.sort);
     if (params.tier) query.set("tier", params.tier);

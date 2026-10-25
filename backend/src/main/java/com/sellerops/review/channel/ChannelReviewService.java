@@ -118,6 +118,23 @@ public class ChannelReviewService {
 
     private static final String SOURCE_TYPE_REVIEW = "REVIEW";
 
+    /**
+     * The 답변 상태 filter's words (2026-10-26, owner): the CHANNEL's statement of whether a reply is posted
+     * ({@link com.sellerops.review.ReviewReplyState}). {@code unknown} is its own choice — a channel that never said
+     * is not 미답변, and a 미답변 count that swallowed it would be a number claiming an obligation it cannot prove.
+     */
+    static final Map<String, com.sellerops.review.ReviewReplyState> REPLY_FILTERS = Map.of(
+            "pending", com.sellerops.review.ReviewReplyState.PENDING,
+            "answered", com.sellerops.review.ReviewReplyState.ANSWERED,
+            "unknown", com.sellerops.review.ReviewReplyState.UNKNOWN);
+
+    /** The 기간 filter: the last N days in Korea, today included. Anything else is a 400, like an unknown sort. */
+    static final java.util.Set<Integer> PERIOD_DAYS = java.util.Set.of(7, 30);
+
+    private static final java.time.ZoneId SEOUL = java.time.ZoneId.of("Asia/Seoul");
+
+    private java.time.Clock clock = java.time.Clock.systemUTC();
+
     private final ReviewRepository reviews;
     private final ProductRepository products;
     private final SellerAccountRepository accounts;
@@ -244,7 +261,19 @@ public class ChannelReviewService {
      */
     public ReviewRecordPageView record(UUID orgId, String channel, String sort, String tier, int page, int size,
                                        boolean safetyOnly) {
+        return record(orgId, channel, sort, tier, page, size, safetyOnly, null, null);
+    }
+
+    /**
+     * {@code reply} and {@code days} (2026-10-26, owner) narrow the population the way {@code channel} does — the
+     * rows, the group counts and the safety scan all read the same scope — while {@code tier} still only picks which
+     * rows are listed. {@code null} for either is unfiltered.
+     */
+    public ReviewRecordPageView record(UUID orgId, String channel, String sort, String tier, int page, int size,
+                                       boolean safetyOnly, String reply, Integer days) {
         List<String> codes = visibleCodes(channel);
+        java.util.Collection<com.sellerops.review.ReviewReplyState> replyStates = replyStates(reply);
+        Instant since = since(days);
         Map<UUID, Channel> byId = new LinkedHashMap<>();
         for (String code : codes) {
             channels.findByCode(code).ifPresent(c -> byId.put(c.getId(), c));
@@ -257,21 +286,22 @@ public class ChannelReviewService {
         if (byId.isEmpty()) {
             return new ReviewRecordPageView(pageable.getPageNumber(), pageable.getPageSize(), 0, 0, aiEnabled,
                     codes, new ChannelReviewTriageSummaryView(0, 0, 0, 0, List.of()), List.of(), List.of(),
-                    outsideVisible(orgId), new ReviewRecordPageView.SafetySummary(0, 0, 0, 0));
+                    outsideVisible(orgId), new ReviewRecordPageView.SafetySummary(0, 0, 0, 0),
+                    new ReviewRecordPageView.ReplySummary(0, 0, 0));
         }
         List<UUID> channelIds = List.copyOf(byId.keySet());
 
-        SafetyScan scan = safetyScan(orgId, channelIds, aiEnabled);
+        SafetyScan scan = safetyScan(orgId, channelIds, replyStates, since, aiEnabled);
         Page<Review> found = safetyOnly ? safetyPage(scan, pageable)
-                : findRecordPage(orgId, channelIds, requestedSort, tierRank, aiEnabled, pageable);
+                : findRecordPage(orgId, channelIds, replyStates, since, requestedSort, tierRank, aiEnabled, pageable);
 
         Map<UUID, Instant> newSince = new java.util.HashMap<>();
         long newCount = 0;
         for (UUID channelId : channelIds) {
-            Instant since = lastReviewImport(orgId, channelId).map(SyncJob::getStartedAt).orElse(null);
-            if (since != null) {
-                newSince.put(channelId, since);
-                newCount += reviews.countByOrgIdAndChannelIdAndCreatedAtGreaterThanEqual(orgId, channelId, since);
+            Instant importStart = lastReviewImport(orgId, channelId).map(SyncJob::getStartedAt).orElse(null);
+            if (importStart != null) {
+                newSince.put(channelId, importStart);
+                newCount += reviews.countByOrgIdAndChannelIdAndCreatedAtGreaterThanEqual(orgId, channelId, importStart);
             }
         }
 
@@ -306,13 +336,19 @@ public class ChannelReviewService {
 
         Map<Integer, Long> byTier = new LinkedHashMap<>();
         List<Object[]> grouped = aiEnabled
-                ? reviews.countByChannelsGroupedByFinalTierRank(orgId, channelIds)
-                : reviews.countByChannelsGroupedByTierRank(orgId, channelIds);
+                ? reviews.countByChannelsGroupedByFinalTierRank(orgId, channelIds, replyStates, since)
+                : reviews.countByChannelsGroupedByTierRank(orgId, channelIds, replyStates, since);
         for (Object[] row : grouped) {
             byTier.put(((Number) row[0]).intValue(), ((Number) row[1]).longValue());
         }
         ChannelReviewTriageSummaryView summary = summaryOf(byTier,
-                aiEnabled ? reviews.countAiAttentionByChannels(orgId, channelIds) : 0, countsInScope);
+                aiEnabled ? reviews.countAiAttentionByChannels(orgId, channelIds, replyStates, since) : 0,
+                countsInScope);
+
+        long[] byReply = new long[com.sellerops.review.ReviewReplyState.values().length];
+        for (Object[] row : reviews.countByChannelsGroupedByReplyState(orgId, channelIds, since)) {
+            byReply[((com.sellerops.review.ReviewReplyState) row[0]).ordinal()] = ((Number) row[1]).longValue();
+        }
 
         List<ReviewRecordPageView.ChannelFacts> facts = new java.util.ArrayList<>();
         for (Channel ch : byId.values()) {
@@ -330,7 +366,40 @@ public class ChannelReviewService {
 
         return new ReviewRecordPageView(found.getNumber(), found.getSize(), found.getTotalElements(), newCount,
                 aiEnabled, byId.values().stream().map(Channel::getCode).toList(), summary, items, facts,
-                outsideVisible(orgId), scan.summary());
+                outsideVisible(orgId), scan.summary(),
+                new ReviewRecordPageView.ReplySummary(
+                        byReply[com.sellerops.review.ReviewReplyState.PENDING.ordinal()],
+                        byReply[com.sellerops.review.ReviewReplyState.ANSWERED.ordinal()],
+                        byReply[com.sellerops.review.ReviewReplyState.UNKNOWN.ordinal()]));
+    }
+
+    /** Every state for no filter; the one named state otherwise; a 400 for a word this screen never sends. */
+    private static java.util.Collection<com.sellerops.review.ReviewReplyState> replyStates(String reply) {
+        if (reply == null || reply.isBlank()) {
+            return java.util.EnumSet.allOf(com.sellerops.review.ReviewReplyState.class);
+        }
+        com.sellerops.review.ReviewReplyState state =
+                REPLY_FILTERS.get(reply.strip().toLowerCase(java.util.Locale.ROOT));
+        if (state == null) {
+            throw ApiException.badRequest("답변 상태를 알 수 없습니다. (pending / answered / unknown)");
+        }
+        return java.util.EnumSet.of(state);
+    }
+
+    /** The start of the period in Korea — today and the N-1 days before it — or the epoch for no period. */
+    private Instant since(Integer days) {
+        if (days == null) {
+            return Instant.EPOCH;
+        }
+        if (!PERIOD_DAYS.contains(days)) {
+            throw ApiException.badRequest("기간을 알 수 없습니다. (7 / 30)");
+        }
+        return LocalDate.now(clock.withZone(SEOUL)).minusDays(days - 1L).atStartOfDay(SEOUL).toInstant();
+    }
+
+    /** Test seam: the day 기간 counts back from. */
+    void useClock(java.time.Clock clock) {
+        this.clock = clock;
     }
 
     private record ReviewSafetySignalMark(ReviewRecordPageView.SafetyMark mark, Instant receivedAt, ReviewTriageTier tier) {}
@@ -339,10 +408,12 @@ public class ChannelReviewService {
                               ReviewRecordPageView.SafetySummary summary) {}
 
     /** Every review in scope that mentions harm, with the group the list shows it in, in the filter's order. */
-    private SafetyScan safetyScan(UUID orgId, List<UUID> channelIds, boolean aiEnabled) {
+    private SafetyScan safetyScan(UUID orgId, List<UUID> channelIds,
+                                  java.util.Collection<com.sellerops.review.ReviewReplyState> replyStates, Instant since,
+                                  boolean aiEnabled) {
         Map<UUID, ReviewSafetySignalMark> found = new java.util.HashMap<>();
         Map<UUID, ReviewTriageTier> rulesTier = new java.util.HashMap<>();
-        for (Object[] row : reviews.bodiesInChannels(orgId, channelIds)) {
+        for (Object[] row : reviews.bodiesInChannels(orgId, channelIds, replyStates, since)) {
             UUID id = (UUID) row[0];
             String body = (String) row[1];
             ReviewRecordPageView.SafetyMark mark = safetyMark(body);
@@ -407,16 +478,21 @@ public class ChannelReviewService {
     }
 
     /** {@link #findPage}, over a set of channels — the same three lenses and the same refusal of anything else. */
-    private Page<Review> findRecordPage(UUID orgId, List<UUID> channelIds, String sort, Integer tierRank,
-                                        boolean aiEnabled, Pageable pageable) {
+    private Page<Review> findRecordPage(UUID orgId, List<UUID> channelIds,
+                                        java.util.Collection<com.sellerops.review.ReviewReplyState> replyStates,
+                                        Instant since, String sort, Integer tierRank, boolean aiEnabled,
+                                        Pageable pageable) {
         if (SORT_ATTENTION.equals(sort)) {
-            return reviews.findByOrgIdAndChannelIdInTriaged(orgId, channelIds, tierRank, aiEnabled, pageable);
+            return reviews.findByOrgIdAndChannelIdInTriaged(orgId, channelIds, replyStates, since, tierRank, aiEnabled,
+                    pageable);
         }
         if (SORT_LOWEST.equals(sort)) {
-            return reviews.findByOrgIdAndChannelIdInTriagedLowestFirst(orgId, channelIds, tierRank, aiEnabled, pageable);
+            return reviews.findByOrgIdAndChannelIdInTriagedLowestFirst(orgId, channelIds, replyStates, since, tierRank,
+                    aiEnabled, pageable);
         }
         if (SORT_NEWEST.equals(sort)) {
-            return reviews.findByOrgIdAndChannelIdInTriagedSorted(orgId, channelIds, tierRank, aiEnabled,
+            return reviews.findByOrgIdAndChannelIdInTriagedSorted(orgId, channelIds, replyStates, since, tierRank,
+                    aiEnabled,
                     PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
                             Sort.by(Sort.Order.desc("receivedAt"), Sort.Order.asc("id"))));
         }
@@ -688,7 +764,8 @@ public class ChannelReviewService {
                 triage,
                 aiMark,
                 sellerCorrection,
-                executableIdentity.name());
+                executableIdentity.name(),
+                review.getReplyState().name());
     }
 
     /**

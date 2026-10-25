@@ -394,7 +394,9 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
     //
     // The SAME tier expression, the SAME ordering and the SAME tier filter as the per-channel record above; the
     // only difference is `r.channelId in :channelIds` where those say `r.channelId = :channelId`. With one channel
-    // in the set they are the same query. They are separate methods rather than a rewrite of the per-channel ones
+    // in the set they are the same query. The scope also takes the channel's reply state and a received-since bound
+    // (2026-10-26, owner: 답변 상태 · 기간 filters); unfiltered is every state and the epoch, never a null that each
+    // query would have to special-case. They are separate methods rather than a rewrite of the per-channel ones
     // so the channel record — and every caller that reads it for a single total — stays byte-for-byte what it was.
 
     /** As {@link #findByOrgIdAndChannelIdTriaged}, over a set of channels. */
@@ -402,6 +404,7 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
             select r from Review r
             """ + AI_JOIN + """
             where r.orgId = :orgId and r.channelId in :channelIds
+              and r.replyState in :replyStates and r.receivedAt >= :since
               and (:tierRank is null or
             """ + FINAL_TIER_RANK + """
               = :tierRank)
@@ -411,6 +414,8 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
             """)
     Page<Review> findByOrgIdAndChannelIdInTriaged(@Param("orgId") UUID orgId,
                                                   @Param("channelIds") java.util.Collection<UUID> channelIds,
+                                                  @Param("replyStates") java.util.Collection<ReviewReplyState> replyStates,
+                                                  @Param("since") Instant since,
                                                   @Param("tierRank") Integer tierRank,
                                                   @Param("aiEnabled") boolean aiEnabled,
                                                   Pageable pageable);
@@ -420,12 +425,15 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
             select r from Review r
             """ + AI_JOIN + """
             where r.orgId = :orgId and r.channelId in :channelIds
+              and r.replyState in :replyStates and r.receivedAt >= :since
               and (:tierRank is null or
             """ + FINAL_TIER_RANK + """
               = :tierRank)
             """)
     Page<Review> findByOrgIdAndChannelIdInTriagedSorted(@Param("orgId") UUID orgId,
                                                         @Param("channelIds") java.util.Collection<UUID> channelIds,
+                                                        @Param("replyStates") java.util.Collection<ReviewReplyState> replyStates,
+                                                        @Param("since") Instant since,
                                                         @Param("tierRank") Integer tierRank,
                                                         @Param("aiEnabled") boolean aiEnabled,
                                                         Pageable pageable);
@@ -435,6 +443,7 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
             select r from Review r
             """ + AI_JOIN + """
             where r.orgId = :orgId and r.channelId in :channelIds
+              and r.replyState in :replyStates and r.receivedAt >= :since
               and (:tierRank is null or
             """ + FINAL_TIER_RANK + """
               = :tierRank)
@@ -443,6 +452,8 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
             """)
     Page<Review> findByOrgIdAndChannelIdInTriagedLowestFirst(@Param("orgId") UUID orgId,
                                                              @Param("channelIds") java.util.Collection<UUID> channelIds,
+                                                             @Param("replyStates") java.util.Collection<ReviewReplyState> replyStates,
+                                                             @Param("since") Instant since,
                                                              @Param("tierRank") Integer tierRank,
                                                              @Param("aiEnabled") boolean aiEnabled,
                                                              Pageable pageable);
@@ -453,20 +464,26 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
             """ + TRIAGE_TIER_RANK + """
               , count(r) from Review r
             where r.orgId = :orgId and r.channelId in :channelIds
+              and r.replyState in :replyStates and r.receivedAt >= :since
             group by
             """ + TRIAGE_TIER_RANK + """
             """)
     List<Object[]> countByChannelsGroupedByTierRank(@Param("orgId") UUID orgId,
-                                                    @Param("channelIds") java.util.Collection<UUID> channelIds);
+                                                    @Param("channelIds") java.util.Collection<UUID> channelIds,
+                                                    @Param("replyStates") java.util.Collection<ReviewReplyState> replyStates,
+                                                    @Param("since") Instant since);
 
     /**
      * Id · body · rating · receivedAt of every review in the channels — what the safety filter reads (mockup ②,
      * 2026-10-25). The signal is computed from the body on each read and never stored, so it cannot be a WHERE.
      */
     @Query("select r.id, r.body, r.rating, r.receivedAt from Review r "
-            + "where r.orgId = :orgId and r.channelId in :channelIds")
+            + "where r.orgId = :orgId and r.channelId in :channelIds "
+            + "and r.replyState in :replyStates and r.receivedAt >= :since")
     List<Object[]> bodiesInChannels(@Param("orgId") UUID orgId,
-                                    @Param("channelIds") java.util.Collection<UUID> channelIds);
+                                    @Param("channelIds") java.util.Collection<UUID> channelIds,
+                                    @Param("replyStates") java.util.Collection<ReviewReplyState> replyStates,
+                                    @Param("since") Instant since);
 
     /** As {@link #countByChannelGroupedByFinalTierRank}, over a set of channels — no bound parameter in the CASE. */
     @Query("""
@@ -475,23 +492,43 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
               , count(r) from Review r
             """ + AI_JOIN + """
             where r.orgId = :orgId and r.channelId in :channelIds
+              and r.replyState in :replyStates and r.receivedAt >= :since
             group by
             """ + AI_FINAL_TIER_RANK + """
             """)
     List<Object[]> countByChannelsGroupedByFinalTierRank(@Param("orgId") UUID orgId,
-                                                         @Param("channelIds") java.util.Collection<UUID> channelIds);
+                                                         @Param("channelIds") java.util.Collection<UUID> channelIds,
+                                                         @Param("replyStates") java.util.Collection<ReviewReplyState> replyStates,
+                                                         @Param("since") Instant since);
+
+    /**
+     * {@code [replyState, count]} over the channels and period in scope, every tier — the counts beside the 답변 상태
+     * filter. The channel's own statement ({@link Review#getReplyState}); UNKNOWN stays its own bucket, never folded
+     * into 미답변.
+     */
+    @Query("""
+            select r.replyState, count(r) from Review r
+            where r.orgId = :orgId and r.channelId in :channelIds and r.receivedAt >= :since
+            group by r.replyState
+            """)
+    List<Object[]> countByChannelsGroupedByReplyState(@Param("orgId") UUID orgId,
+                                                      @Param("channelIds") java.util.Collection<UUID> channelIds,
+                                                      @Param("since") Instant since);
 
     /** As {@link #countAiAttentionByChannel}, over a set of channels. */
     @Query("""
             select count(r) from Review r
             join AiTriageCurrent a on a.reviewId = r.id and a.orgId = r.orgId
             where r.orgId = :orgId and r.channelId in :channelIds and a.aiAttention = true
+              and r.replyState in :replyStates and r.receivedAt >= :since
               and
             """ + TRIAGE_TIER_RANK + """
               <> 0
             """)
     long countAiAttentionByChannels(@Param("orgId") UUID orgId,
-                                    @Param("channelIds") java.util.Collection<UUID> channelIds);
+                                    @Param("channelIds") java.util.Collection<UUID> channelIds,
+                                    @Param("replyStates") java.util.Collection<ReviewReplyState> replyStates,
+                                    @Param("since") Instant since);
 
     /**
      * {@code [channelId, category, count]} — {@link #countByChannelGroupedByCategory} for several channels in one

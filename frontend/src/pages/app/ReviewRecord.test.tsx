@@ -184,6 +184,7 @@ function asRecord(page: ChannelReviewPageView): ReviewRecordPageView {
       safety: (review as { safetyMark?: SafetyMark }).safetyMark ?? null,
     })),
     safety: (page as { safety?: ReviewRecordPageView["safety"] }).safety ?? null,
+    reply: (page as { reply?: ReviewRecordPageView["reply"] }).reply ?? null,
     channelFacts: [
       {
         channelCode: code,
@@ -453,7 +454,8 @@ describe("a list longer than one screen can be walked", () => {
         sort: "attention",
         tier: "NEEDS_ATTENTION",
         page: 1,
-        size: 20,
+        // Fifty rows a page (2026-10-26, owner).
+        size: 50,
       }),
     );
   });
@@ -507,11 +509,11 @@ describe("a list longer than one screen can be walked", () => {
     await userEvent.selectOptions(screen.getByLabelText("정렬"), "lowest");
 
     await waitFor(() =>
+      // 낮은 평점순 is one flat list (2026-10-26, owner), so it names no tier.
       expect(getChannelReviewsStrict).toHaveBeenLastCalledWith("acc-1", {
         sort: "lowest",
-        tier: "NEEDS_ATTENTION",
         page: 0,
-        size: 20,
+        size: 50,
       }),
     );
   });
@@ -560,27 +562,37 @@ describe("triage", () => {
     expect(screen.queryByText(/자동 분류한 것이라 정확하지 않을 수 있습니다/)).toBeNull();
   });
 
-  it("asks the backend to narrow to a tier, and keeps that filter across a sort change", async () => {
-    renderPage();
+  /**
+   * <b>정렬이 묶음을 정한다</b> (2026-10-26, owner: 「최신순으로 해도 확인 필요, 지켜보기 항목들이 그대로 유지되고 그
+   * 안에서 순서가 바뀌는 구조 — 별론데」). This test used to keep the tier across a sort change; the owner overturned
+   * that. 최신순 is the whole record, newest first, each row saying its own group; going back to 확인 필요순 reopens
+   * the group the address still names.
+   */
+  it("최신순 lists the whole record flat, each row naming its group, and 확인 필요순 brings the groups back", async () => {
+    renderPage("/reviews?tier=WATCH");
     await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
-
-    await userEvent.click(screen.getByRole("button", { name: /^확인 필요 1$/ }));
-    await waitFor(() =>
-      expect(getChannelReviewsStrict).toHaveBeenLastCalledWith(
-        "acc-1",
-        expect.objectContaining({ tier: "NEEDS_ATTENTION", page: 0 }),
-      ),
-    );
 
     await userEvent.selectOptions(screen.getByLabelText("정렬"), "newest");
     await waitFor(() =>
+      expect(getChannelReviewsStrict).toHaveBeenLastCalledWith("acc-1", { sort: "newest", page: 0, size: 50 }),
+    );
+    expect(screen.getByTestId("location").textContent).toContain("sort=newest");
+    const list = screen.getByRole("region", { name: "목록" });
+    // No group headers: one list.
+    expect(within(list).queryByRole("button", { name: /지켜보기/ })).toBeNull();
+    const rows = within(list).getAllByRole("link");
+    expect(rows[0]).toHaveTextContent("참고");
+    expect(rows[1]).toHaveTextContent("확인 필요");
+    expect(within(rows[1]).getByText("확인 필요").className).toContain("text-bad");
+
+    await userEvent.selectOptions(screen.getByLabelText("정렬"), "attention");
+    await waitFor(() =>
       expect(getChannelReviewsStrict).toHaveBeenLastCalledWith(
         "acc-1",
-        // The filter must survive: a seller who narrowed and then re-sorted wants the newest of
-        // what they narrowed to, not the filter silently dropped with its chip still lit.
-        expect.objectContaining({ sort: "newest", tier: "NEEDS_ATTENTION" }),
+        expect.objectContaining({ sort: "attention", tier: "WATCH" }),
       ),
     );
+    expect(screen.getByTestId("location").textContent).not.toContain("sort=");
   });
 
   it("does not report an empty filter as an empty record", async () => {
@@ -800,22 +812,26 @@ describe("the AI pilot's mark and the feedback spine (RUBRIC v2 §13.7)", () => 
  * 이미 목록이고, 선은 거기에 읽을 것이 하나 더 있다는 뜻이 아니었다.
  */
 describe("리뷰 목록 — the Linear grouping (2026-10-05)", () => {
-  it("the customer's sentence is the only ink on the row, and it comes first", async () => {
+  /**
+   * The row reads 별점 → 고객의 문장 → 주석 under a group header (2026-10-26, owner: the rating moved in front of the
+   * sentence, where a seller scanning a year of reviews filters by it). The sentence is still the only ink.
+   */
+  it("the customer's sentence is the only ink on the row, right after its rating", async () => {
     renderPage();
     const sentence = await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
     const row = sentence.closest("a")!;
 
     expect(sentence.className).toContain("text-ink");
     expect(sentence.className).toContain("text-base");
-    // The sentence is the first child of the row; everything else trails it.
-    expect(row.firstElementChild).toBe(sentence);
+    const rating = row.firstElementChild as HTMLElement;
+    expect(rating).toHaveTextContent("★5");
+    expect(rating).toHaveAccessibleName(/5점/);
+    expect(rating.className).toContain("text-muted");
+    expect(rating.nextElementSibling).toBe(sentence);
     // And the whole right-hand cluster is one weak block, not a column of competing ranks.
     const meta = row.lastElementChild as HTMLElement;
     expect(meta.className).toContain("text-xs");
     expect(meta.className).toContain("text-muted");
-    // The rating is the compact glyph in the row; the sentence a screen reader hears is unchanged.
-    expect(meta.textContent).toContain("★5");
-    expect(within(meta).getByLabelText(/5점/)).toBeInTheDocument();
   });
 
   it("draws no rule between rows — the list is the sentences", async () => {
@@ -906,5 +922,64 @@ describe("the safety filter", () => {
     await user.click(screen.getByRole("button", { name: /안전 관련만 보기 1/ }));
     await waitFor(() => expect(screen.getByTestId("location").textContent).not.toContain("safety=1"));
     expect(screen.queryByRole("region", { name: "안전 관련 리뷰" })).toBeNull();
+  });
+});
+
+/** 답변 상태 · 기간 (2026-10-26, owner): the channel's own reply statement and a recent window, both in the address. */
+describe("the reply and period filters", () => {
+  const WITH_REPLY = {
+    ...PAGE,
+    reply: { pending: 3499, answered: 56, unknown: 0 },
+    items: [{ ...PAGE.items[0], channelReplyState: "ANSWERED" as const }, { ...PAGE.items[1], channelReplyState: "PENDING" as const }],
+  };
+
+  it("offers each choice with what pressing it would list, and asks the server for that state", async () => {
+    getChannelReviewsStrict.mockResolvedValue(WITH_REPLY);
+    renderPage();
+    await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
+
+    const control = screen.getByLabelText("답변 상태");
+    const labels = within(control).getAllByRole("option").map((o) => o.textContent);
+    // 모름 is offered only when the channel left some unsaid — and is never folded into 미답변.
+    expect(labels).toEqual(["답변 상태 전체", "미답변 3,499", "답변함 56"]);
+
+    await userEvent.selectOptions(control, "pending");
+    await waitFor(() =>
+      expect(getChannelReviewsStrict).toHaveBeenLastCalledWith("acc-1", expect.objectContaining({ reply: "pending", page: 0 })),
+    );
+    expect(screen.getByTestId("location").textContent).toContain("reply=pending");
+  });
+
+  it("says 답변함 only on the rows the channel reports answered", async () => {
+    getChannelReviewsStrict.mockResolvedValue(WITH_REPLY);
+    renderPage();
+    const answered = (await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("a")!;
+    expect(answered).toHaveTextContent("답변함");
+    expect(screen.getByText("생각보다 크기가 작아서 아쉬웠습니다").closest("a")!).not.toHaveTextContent("답변");
+  });
+
+  it("asks for the last 7 days from the address, and counts what the condition holds", async () => {
+    getChannelReviewsStrict.mockResolvedValue(WITH_REPLY);
+    renderPage("/reviews?days=7");
+    await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
+    expect(getChannelReviewsStrict).toHaveBeenCalledWith("acc-1", expect.objectContaining({ days: 7 }));
+    expect(screen.getByText("조건에 맞는 2개")).toBeInTheDocument();
+    expect(screen.queryByText("총 2개")).toBeNull();
+  });
+
+  it("does not report a condition with nothing in it as an empty record", async () => {
+    getChannelReviewsStrict.mockResolvedValue({
+      ...PAGE,
+      total: 0,
+      items: [],
+      triageSummary: { needsAttention: 0, watch: 0, fyi: 0, aiAttention: 0, repeatedCategories: [] },
+      reply: { pending: 0, answered: 0, unknown: 0 },
+    });
+    renderPage("/reviews?reply=answered&days=7");
+
+    expect(await screen.findByText("조건에 맞는 리뷰가 없습니다")).toBeInTheDocument();
+    expect(screen.queryByText("아직 수집된 리뷰가 없습니다")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "조건 지우기" }));
+    await waitFor(() => expect(screen.getByTestId("location").textContent).not.toMatch(/reply=|days=/));
   });
 });

@@ -34,7 +34,9 @@ public class ReviewRecordController {
                                      @RequestParam(required = false) String tier,
                                      @RequestParam(defaultValue = "0") int page,
                                      @RequestParam(defaultValue = "20") int size,
-                                     @RequestParam(defaultValue = "false") boolean safety) {
-        return service.record(principal.orgId(), channel, sort, tier, page, size, safety);
+                                     @RequestParam(defaultValue = "false") boolean safety,
+                                     @RequestParam(required = false) String reply,
+                                     @RequestParam(required = false) Integer days) {
+        return service.record(principal.orgId(), channel, sort, tier, page, size, safety, reply, days);
     }
 }

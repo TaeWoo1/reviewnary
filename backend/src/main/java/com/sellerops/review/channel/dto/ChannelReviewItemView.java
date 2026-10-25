@@ -59,5 +59,11 @@ public record ChannelReviewItemView(
          */
         TriageFeedbackRequests.CorrectionView sellerCorrection,
         /** {@code MARKETPLACE} | {@code NONE} — see {@code RecentReviewItemView.executableIdentity}. */
-        String executableIdentity) {
+        String executableIdentity,
+        /**
+         * What the CHANNEL says about a posted reply ({@code ReviewReplyState}: {@code PENDING} | {@code ANSWERED} |
+         * {@code UNKNOWN}) — the same statement the detail carries as {@code ReplyWork.channelReplyState}, now on
+         * the row so the list can say 답변함 and filter by it (2026-10-26, owner). Never the seller's decision.
+         */
+        String channelReplyState) {
 }

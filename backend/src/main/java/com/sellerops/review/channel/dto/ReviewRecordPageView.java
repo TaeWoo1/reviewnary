@@ -41,13 +41,22 @@ public record ReviewRecordPageView(
          * The reviews in scope that mention a safety or legal problem (mockup ②, 2026-10-25): how many, and how many
          * in each group — the group heads say 「안전 관련 N」 and the filter 「안전 관련만 보기 N」.
          */
-        SafetySummary safety) {
+        SafetySummary safety,
+        /**
+         * How many reviews in scope (channel and period, every tier) the channel reports as 미답변 · 답변함 · 모름 —
+         * the counts beside the 답변 상태 filter (2026-10-26, owner). Not narrowed by the reply filter itself, so
+         * each choice shows what pressing it would list.
+         */
+        ReplySummary reply) {
 
     /** A review's safety mark: its kind, how it reads, and the expression that stands (whitespace-free). */
     public record SafetyMark(String kind, String reading, String term) {
     }
 
     public record SafetySummary(long total, long needsAttention, long watch, long fyi) {
+    }
+
+    public record ReplySummary(long pending, long answered, long unknown) {
     }
 
     public record ChannelFacts(String channelCode, String channelNameKo, java.util.UUID accountId,

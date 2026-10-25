@@ -2709,6 +2709,11 @@ export interface ChannelReviewItemView {
    * server's ordering does not read the correction table.
    */
   sellerCorrection: TriageCorrectionView | null;
+  /**
+   * What the CHANNEL says about a posted reply — `PENDING` | `ANSWERED` | `UNKNOWN` — so a row can say 답변함 and
+   * the record can filter by it (2026-10-26, owner). Never the seller's decision; absent from an older server.
+   */
+  channelReplyState?: "PENDING" | "ANSWERED" | "UNKNOWN" | null;
 }
 
 /**
@@ -2800,6 +2805,11 @@ export interface ReviewRecordPageView {
   outsideVisibleChannels: number;
   /** The reviews in scope that mention a safety or legal problem, in all and per group (mockup ②, 2026-10-25). */
   safety?: { total: number; needsAttention: number; watch: number; fyi: number } | null;
+  /**
+   * The channel's 미답변 · 답변함 · 모름 counts over the channel and period in scope, every tier — what each 답변 상태
+   * choice would list (2026-10-26, owner). Absent from an older server, and then the control shows no counts.
+   */
+  reply?: { pending: number; answered: number; unknown: number } | null;
 }
 
 /** A review's safety mark: its kind, how it reads, and the expression that stands (spaces removed). */

@@ -20,10 +20,21 @@ import type {
   TriageBehaviorEvent,
 } from "../../lib/types";
 
-const PAGE_SIZE = 20;
+/**
+ * Fifty rows (2026-10-26, owner): a first import is a year of reviews, and twenty one-line rows filled half a
+ * 1440×900 screen before the pager — the seller paged where a glance would have done.
+ */
+const PAGE_SIZE = 50;
 const WORD = "리뷰";
 
 type Sort = "attention" | "newest" | "lowest";
+type Reply = "pending" | "answered" | "unknown";
+type Days = 7 | 30;
+
+/** The 답변 상태 filter: the channel's own statement, in the words the 문의 screen uses for the same fact. */
+const REPLY_WORD: Record<Reply, string> = { pending: "미답변", answered: "답변함", unknown: "답변 여부 모름" };
+const ALL_REPLIES = "ALL";
+const ALL_DAYS = "ALL";
 
 /** The three orders, in the words the control has always used. */
 const SORTS: readonly { value: Sort; label: string }[] = [
@@ -70,7 +81,18 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
    */
   const safetyOnly = searchParams.get("safety") === "1";
   const channel = normalizeChannel(searchParams.get("channel"));
-  const [sort, setSort] = useState<Sort>("attention");
+  /**
+   * <b>정렬이 묶음을 정한다</b> (2026-10-26, owner: 「최신순으로 해도 확인 필요, 지켜보기 항목들이 그대로 유지되고 그
+   * 안에서 순서가 바뀌는 구조 — 별론데」). 확인 필요순은 묶음 그대로다 — 그 정렬의 뜻이 묶음 순서이므로. 최신순과
+   * 낮은 평점순은 묶음을 풀고 기록 전체를 한 줄로 세운다: 각 행이 자기 묶음을 첫 단어로 말한다(안전 관련만 보기가
+   * 이미 그렇게 한다). Linear의 「정렬」과 「묶기」가 따로인 것과 같은 생각이고, 묶기를 따로 두지 않은 것은 셋째
+   * 컨트롤이 고를 수 있는 조합이 이 둘뿐이기 때문이다. 정렬은 주소에 산다 — 다시 열어도 같은 목록이다.
+   */
+  const sort: Sort = parseSort(searchParams.get("sort"));
+  const flat = sort !== "attention";
+  const reply = parseReply(searchParams.get("reply"));
+  const days = parseDays(searchParams.get("days"));
+  const narrowed = reply !== null || days !== null;
   const [pageIndex, setPageIndex] = useState(0);
   const [page, setPage] = useState<ReviewRecordPageView | null>(null);
   // Whether `page` was read for the safety filter — the filter's list never shows rows read for the groups.
@@ -114,7 +136,7 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
 
   const load = useCallback(
     async (nextSort: Sort, nextTier: ReviewTriageTier | null, nextChannel: string | null, nextPage: number,
-      nextSafety = false) => {
+      nextSafety = false, nextReply: Reply | null = null, nextDays: Days | null = null) => {
       const ticket = ++seq.current;
       setLoading(true);
       try {
@@ -125,6 +147,8 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
           page: nextPage,
           size: PAGE_SIZE,
           ...(nextSafety ? { safety: true } : {}),
+          ...(nextReply ? { reply: nextReply } : {}),
+          ...(nextDays ? { days: nextDays } : {}),
         });
         if (ticket !== seq.current) return;
         setPage(view);
@@ -153,9 +177,11 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
     [recordBehavior],
   );
 
+  // A flat order asks for no tier: the whole record in that order is what the seller chose.
+  const listedTier = flat ? null : openTier;
   useEffect(() => {
-    void load(sort, openTier, channel, pageIndex, safetyOnly);
-  }, [sort, openTier, channel, pageIndex, safetyOnly, load]);
+    void load(sort, listedTier, channel, pageIndex, safetyOnly, reply, days);
+  }, [sort, listedTier, channel, pageIndex, safetyOnly, reply, days, load]);
 
   // How much review work 확인할 일 holds — the one link to the work from a record screen. And which reviews have a
   // case, so the pane can show the case rather than a second reading of the same review. Both fail silent.
@@ -185,16 +211,45 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
   }, []);
 
   const channelChoices = uniqueChannels(targets);
+  // The channel column earns its width only when the rows can come from more than one channel.
+  const manyChannels = (page?.channels.length ?? 0) > 1;
   const totalPages = page === null || page.size <= 0 ? 1 : Math.max(1, Math.ceil(page.total / page.size));
   const recordTotal = page ? page.triageSummary.needsAttention + page.triageSummary.watch + page.triageSummary.fyi : 0;
 
-  /** One row of the record; {@code withGroup} names its group, for the safety filter's one list across them. */
+  /**
+   * One row of the record; {@code withGroup} names its group, for every list that runs across them (최신순 · 낮은
+   * 평점순 · 안전 관련만 보기).
+   *
+   * <p><b>행의 순서: 묶음 → 별점 → 고객의 문장 → 주석</b> (2026-10-26, owner). 묶음 머리 아래에서는 묶음이 이미
+   * 말했으므로 별점부터다. 별점이 문장 앞에 온 것은 리뷰 목록을 훑는 사람이 문장보다 먼저 별점으로 거르기
+   * 때문이다 — 오른쪽 주석 덩어리 안에서는 그 일을 못 했다. 고객의 문장은 여전히 행에서 유일한 잉크다.
+   */
   const reviewRow = ({ channelCode, channelNameKo, review, safety }: ReviewRecordRow, withGroup: boolean) => (
                         <li key={review.id}>
                           <Link
                             to={`/reviews/reply/${review.id}?from=record`}
-                            className="flex items-center gap-8 rounded-lg py-3 pl-12 pr-3 transition hover:bg-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700"
+                            className="flex items-center gap-4 rounded-lg py-3 pl-3 pr-3 transition hover:bg-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700"
                           >
+                            {withGroup ? (
+                              <span className="flex w-[5.5rem] shrink-0 items-center gap-2 text-sm">
+                                <TierDot tier={review.triage.tier} />
+                                <span
+                                  className={`truncate ${
+                                    review.triage.tier === "NEEDS_ATTENTION" ? "font-semibold text-bad" : "text-muted"
+                                  }`}
+                                >
+                                  {TRIAGE_TIER_LABEL[review.triage.tier]}
+                                </span>
+                              </span>
+                            ) : null}
+                            {/* <b>별점은 한 글자와 숫자다</b> (리뷰 canonical mockup, 2026-10-05). 읽어 주는 쪽에는 원래
+                                문장이 그대로 간다. */}
+                            <span
+                              className="w-8 shrink-0 text-sm tabular-nums text-muted"
+                              aria-label={ratingLabel(review.rating)}
+                            >
+                              <span aria-hidden>★{review.rating}</span>
+                            </span>
                             <span
                               className={`min-w-0 flex-1 truncate break-keep text-base leading-snug ${
                                 review.textless ? "text-muted" : "font-medium text-ink"
@@ -205,18 +260,13 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
                             {/* 오른쪽은 한 덩어리의 주석이다 — 폭이 정해져 있고, 줄이 아니라 묶음으로 약하다. */}
                             <span className="flex shrink-0 items-center gap-3 text-xs text-muted">
                               <span className="flex max-w-[16rem] items-center gap-2 overflow-hidden">
-                                {/* <b>한 행에 상태 단어는 하나다</b> (UI audit, 2026-10-06). 둘 다 선 행은
-                                    「판매자 확인 필요 판매자 수정 확인 필요」로 읽혔다 — 앞은 AI가 매긴
-                                    분류를 판매자가 확인해 달라는 표시이고, 뒤는 판매자가 이미 확인하고
-                                    고쳤다는 기록이다. 뒤가 있으면 앞이 요청한 일은 끝난 것이므로 행에서는
-                                    뒤만 선다. 두 사실 모두 상세에 그대로 있다 — 지우는 것이 아니라
-                                    목록에서 겹쳐 말하지 않는 것이다. */}
+                                {/* <b>한 행에 상태 단어는 하나다</b> (UI audit, 2026-10-06). 판매자 수정이 있으면 AI 표시는
+                                    서지 않는다 — 두 사실 모두 상세에 그대로 있다. */}
                                 {safety ? (
                                   <span className={`truncate font-semibold ${safety.reading === "WORRY" ? "text-warn" : "text-bad"}`}>
                                     {safetyLabel(safety.kind, safety.reading)}
                                   </span>
                                 ) : null}
-                                {withGroup ? <span className="truncate">{TRIAGE_TIER_LABEL[review.triage.tier]}</span> : null}
                                 {review.aiMark && !review.sellerCorrection ? <AiMarkChip quiet /> : null}
                                 {review.sellerCorrection ? (
                                   <span className="truncate">{`${TRIAGE_CORRECTION_COPY.sellerPrefix} ${TRIAGE_TIER_LABEL[review.sellerCorrection.correctedTier]}`}</span>
@@ -225,17 +275,15 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
                                   <span className="truncate font-semibold text-brand-700">{COPY.listTitle}</span>
                                 ) : null}
                                 {review.isNew ? <span className="truncate">새 리뷰</span> : null}
+                                {/* The channel's statement, said only where it is a fact worth a word: a posted reply.
+                                    미답변 is most of a first import, and a word on nearly every row is no word. */}
+                                {review.channelReplyState === "ANSWERED" ? <span className="truncate">답변함</span> : null}
                                 {review.mediaCount > 0 ? <span className="truncate">{`사진·영상 ${review.mediaCount}`}</span> : null}
                                 {review.triage.tags.length > 0 ? <span className="truncate">{review.triage.tags[0]}</span> : null}
                               </span>
-                              {/* <b>별점은 한 글자와 숫자다</b> (리뷰 canonical mockup, 2026-10-05). 「★★☆☆☆ 2점」은
-                                  13px에서 90px을 쓰고 두 줄로 접혀 행을 46px에서 63px로 밀어 올렸다 — 이 행에서
-                                  가장 덜 중요한 사실이 가장 많은 자리를 차지한 셈이다. 읽어 주는 쪽에는 원래 문장이
-                                  그대로 간다. */}
-                              <span className="w-10 shrink-0 text-right tabular-nums" aria-label={ratingLabel(review.rating)}>
-                                <span aria-hidden>★{review.rating}</span>
-                              </span>
-                              <span className="w-12 shrink-0 truncate">{channelShort(channelCode) ?? channelNameKo ?? "채널 미상"}</span>
+                              {manyChannels ? (
+                                <span className="w-12 shrink-0 truncate">{channelShort(channelCode) ?? channelNameKo ?? "채널 미상"}</span>
+                              ) : null}
                               <span className="w-44 shrink-0 truncate">{review.productName ?? review.productId ?? "상품 정보 없음"}</span>
                               <span className="w-20 shrink-0 text-right tabular-nums">{review.writtenOn ?? "날짜 없음"}</span>
                             </span>
@@ -275,7 +323,42 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
           value={sort}
           options={SORTS}
           onChange={(value) => {
-            setSort(value as Sort);
+            setParams({ sort: value === "attention" ? null : value });
+            setPageIndex(0);
+          }}
+        />
+        {/* <b>답변 상태</b> (2026-10-26, owner). 채널이 말한 것만 — 미답변과 「답변 여부 모름」은 다른 선택이다. 채널이 한
+            번도 말하지 않은 리뷰를 미답변으로 세면 그 수는 증명하지 못하는 의무를 말한다. 각 선택 옆의 수는 그것을
+            누르면 나올 수이고, 서버가 수를 주지 않으면(오래된 서버) 이름만 선다. */}
+        <QuietSelect
+          label="답변 상태"
+          value={reply ?? ALL_REPLIES}
+          options={[
+            { value: ALL_REPLIES, label: "답변 상태 전체" },
+            ...(["pending", "answered", "unknown"] as const)
+              .filter((value) => value !== "unknown" || reply === "unknown" || (page?.reply?.unknown ?? 0) > 0)
+              .map((value) => ({
+                value,
+                label: page?.reply
+                  ? `${REPLY_WORD[value]} ${page.reply[value].toLocaleString("ko-KR")}`
+                  : REPLY_WORD[value],
+              })),
+          ]}
+          onChange={(value) => {
+            setParams({ reply: value === ALL_REPLIES ? null : value });
+            setPageIndex(0);
+          }}
+        />
+        <QuietSelect
+          label="기간"
+          value={days === null ? ALL_DAYS : String(days)}
+          options={[
+            { value: ALL_DAYS, label: "전체 기간" },
+            { value: "7", label: "최근 7일" },
+            { value: "30", label: "최근 30일" },
+          ]}
+          onChange={(value) => {
+            setParams({ days: value === ALL_DAYS ? null : value });
             setPageIndex(0);
           }}
         />
@@ -307,13 +390,24 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
           title="리뷰를 불러오지 못했습니다"
           body="연결 상태를 확인한 뒤 다시 시도해 주세요. 불러오지 못한 목록을 임의로 채우지는 않습니다."
           action={
-            <Btn size="sm" onClick={() => void load(sort, openTier, channel, pageIndex)}>
+            <Btn size="sm" onClick={() => void load(sort, listedTier, channel, pageIndex, safetyOnly, reply, days)}>
               다시 시도
             </Btn>
           }
         />
       ) : loading && !page ? (
         <p className="text-muted">불러오는 중…</p>
+      ) : page && page.items.length === 0 && recordTotal === 0 && narrowed ? (
+        /* 조건이 비운 목록은 빈 기록이 아니다 — 기록이 비었다고 말하면 수집을 다시 하라는 말이 된다. */
+        <Empty
+          title="조건에 맞는 리뷰가 없습니다"
+          body="답변 상태나 기간을 넓히면 다른 리뷰가 보입니다."
+          action={
+            <Btn size="sm" variant="outline" onClick={() => { setParams({ reply: null, days: null }); setPageIndex(0); }}>
+              조건 지우기
+            </Btn>
+          }
+        />
       ) : page && page.items.length === 0 && recordTotal === 0 ? (
         <Empty
           title={`아직 수집된 ${josa(WORD, "이", "가")} 없습니다`}
@@ -346,6 +440,14 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
                 <p className="px-3 py-6 text-sm text-muted">불러오는 중…</p>
               ) : page.items.length === 0 ? (
                 <p className="px-3 py-6 text-sm text-muted">안전 관련 리뷰가 없습니다.</p>
+              ) : (
+                <ul>{page.items.map((row) => reviewRow(row, true))}</ul>
+              )}
+            </section>
+          ) : flat ? (
+            <section aria-label="목록" className="-mx-3">
+              {page.items.length === 0 ? (
+                <p className="px-3 py-6 text-sm text-muted">{`조건에 맞는 ${josa(WORD, "이", "가")} 없습니다.`}</p>
               ) : (
                 <ul>{page.items.map((row) => reviewRow(row, true))}</ul>
               )}
@@ -410,8 +512,11 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
                 <span className="tabular-nums">{rangeLabel(page)}</span>
                 {/* This 「총 N개」 is the WHOLE record and stays. It is not the number on the pressed tab
                     above — filter to 확인 필요 and this still says 22 while the tab says 1 — and a seller
-                    must not be told their record holds what their current filter holds. */}
-                <span className="tabular-nums">{`총 ${recordTotal}개`}</span>
+                    must not be told their record holds what their current filter holds. Under a 답변 상태 or
+                    기간 condition it is that condition's count and says so (2026-10-26). */}
+                <span className="tabular-nums">
+                  {narrowed ? `조건에 맞는 ${recordTotal.toLocaleString("ko-KR")}개` : `총 ${recordTotal}개`}
+                </span>
                 {page.newCount > 0 ? (
                   <span className="font-semibold tabular-nums text-brand-700">{`새로 들어온 ${page.newCount}개`}</span>
                 ) : null}
@@ -520,6 +625,18 @@ export function rangeLabel(page: ReviewRecordPageView | null): string {
   // hint is here to say WHERE IN IT the seller is. Repeating the denominator beside the window made the
   // same number the loudest thing on a header the list had not started under yet.
   return `${first}–${first + page.items.length - 1}번째`;
+}
+
+function parseSort(value: string | null): Sort {
+  return value === "newest" || value === "lowest" ? value : "attention";
+}
+
+function parseReply(value: string | null): Reply | null {
+  return value === "pending" || value === "answered" || value === "unknown" ? value : null;
+}
+
+function parseDays(value: string | null): Days | null {
+  return value === "7" ? 7 : value === "30" ? 30 : null;
 }
 
 function normalizeChannel(value: string | null): string | null {
