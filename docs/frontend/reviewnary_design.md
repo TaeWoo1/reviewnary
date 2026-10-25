@@ -1,6 +1,6 @@
 # reviewnary Design Contract v3
 
-**Status:** 2026-09-01 · Reviewnary Product UI Redesign v1 + Contextual Agent Workspace & Interactive UX QA v1 (§8-A, §8-B) + Frontend-first Agent Workspace Redesign v1 (§8-B′, §8-K) + **Agent Object + First-use Closure v1** (§8-K, §8-L, colour `bad`) · `frontend/` only · **source of truth for new UI**
+**Status:** 2026-09-01, amended 2026-10-26 (§8-M seller-PC overhaul) · Reviewnary Product UI Redesign v1 + Contextual Agent Workspace & Interactive UX QA v1 (§8-A, §8-B) + Frontend-first Agent Workspace Redesign v1 (§8-B′, §8-K) + **Agent Object + First-use Closure v1** (§8-K, §8-L, colour `bad`) · `frontend/` only · **source of truth for new UI**
 
 v1 of this document was a record of what the code already did. v2 is the other thing: the contract the
 code is built to. Where the code and this document disagree, the code is wrong.
@@ -350,6 +350,22 @@ seller's store that no read supports.
 **One fact, one owner.** A channel's collection state is said by whichever thing carries the control (the
 step card), never also as prose beside it; a card whose title the sentence above already said declares that
 itself (`titleSaid`) rather than being guessed at by containment.
+
+### 8-M. The seller-PC overhaul (2026-10-26 — product-owner decision, built without a mockup round)
+
+The owner ran a year of real NAVER reviews through the seller PC and the delegate desk and called the screens
+unacceptable; the instruction was to take the best of comparable products (Linear's display options, Front's
+suggested reply in the composer, Help Scout/Linear inbox = what is new, Shopify/Stripe checklists and import
+results), build, and report after. These rules amend §7 and §8-A-1 for the screens named.
+
+| Rule | Value |
+|---|---|
+| **오늘 = what is new** | An undecided review (the triage's 「지금 확인」) is this morning's work for **14 days** (`REVIEW_RECENT_DAYS`); an inquiry keeps the year rule (§7 문의). The brief and 내가 할 일 count only what is not backlog; the backlog is one muted line under the list — 「지난 일 N건 · 2주 넘은 리뷰 · 1년 넘은 문의 · 할 일에서 보기 →」 — and 할 일 lists every row of it under a 「지난 일」 divider. Nothing is hidden: the count is said and the rows are one press away. A reply the seller started never ages out. |
+| **A lane that does not exist has no cell** | 현재 미답변 is dropped when no channel collects inquiries (the upload-fed seller PC); the strip is as wide as the cells it has. An existing but unproven lane still says 「—」 with its reason (§9). |
+| **리뷰 list: the sort decides grouping** | 확인 필요순 stays grouped by tier. 최신순 · 낮은 평점순 are one flat list; the tier moves into each row as its `Status` word. Filters: 답변 상태 (미답변 · 답변함 · 모름 — 모름 is never counted as 미답변) and 기간 (7 · 30 days, KST), in the URL. Row: [tier when flat] → ★n → sentence → notes · product · date; the channel column only when the list spans more than one channel. 50 rows a page. |
+| **리뷰 detail: the reply is there before the decision** | Order: customer sentence → 왜 지금 → reply area → 중요도 · 처리 방법 as quiet properties. An undecided review with reply work shows the empty reply area with 「AI 초안 준비」 and 「직접 쓰기」; pressing either records 대응 필요 through the existing decision path. No draft is generated on open (cost). 두고 보기 · 조치 불필요 still close the reply area. This overturns 「the draft opens only on 대응 필요」. |
+| **A reply with no evidence is thanks, not a template** | With no evidence and the model on, the model writes thanks and empathy only (basis `THANKS_ONLY`, chip 「감사 인사」); the claim guard sees no evidence and refuses any remedy, and every refusal, a disabled model or a failure saves the template. The draft caption says 「AI가 준비했습니다」 — what it stood on is the basis chip's to say. |
+| **Delegate desk** (`vendor-server/.../static/delegate`, `app.css` mirrors these tokens) | One page 「오늘 할 일」: ① 리뷰 파일 올리기 per store with its period (from/to large, each with 복사; no Seller Center deep link), ② 등록할 답글. Upload status is measured text only (「올리는 중 62%」 → 「확인 중 · n초」 → result with the date span the file covered against the period asked). Reply steps: the current step is open and highlighted, finished ones fold to ✓ + word; returning to the tab focuses step 4 (never presses it); after a report, 「다음 답글 맡기 · N건 남음」. Join: what the invite is (masked address · role · deadline) and one primary 「구글 계정으로 계속」; password + authenticator is one quiet press away. |
 
 ### 8-C. Artifact vocabulary (closed)
 

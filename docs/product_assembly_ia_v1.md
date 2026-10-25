@@ -236,6 +236,16 @@ visual QA에서 정한 한 가지 수정(구역 제목이 상품 상세·홈과 
   진행 중은 담당자 · PC 검사 · 채널이 끝낼 일이고 내 할 일 숫자에 더하지 않는다. 끝난 일은 최근 30일(서버 보관은 90일
   규칙 그대로). 오늘의 맨 위 줄은 「내가 할 일 N건 · 진행 중 N건」(진행 중은 담당자 길이 있는 PC에서만).
   계약: `docs/vendor_server_contract_v1.md` D7 · §4.
+- (2026-10-26 product-owner decision — 실제 엑셀 1년치로 돌려 본 뒤 「화면이 처참하다, 시안 없이 고치고 나중에 보고」)
+  이 회차에 한해 시안 확인 없이 아래를 바꿨다. 메뉴 · route · 노출 채널은 그대로다. 규칙은
+  `docs/frontend/reviewnary_design.md` §8-M이 소유한다.
+  - 오늘: 판단 전 리뷰는 **2주** 동안만 오늘 할 일이다(문의는 1년 그대로). 그보다 오래된 것은 목록 아래 「지난 일 N건」 한
+    줄이고, 할 일 화면에서는 「지난 일」 구분선 아래에 모두 있다. 문의를 모으는 채널이 없으면 「현재 미답변」 칸은 없다.
+  - 리뷰 목록: 확인 필요순만 묶음으로 보이고, 최신순 · 낮은 평점순은 묶음 없는 한 목록(행 앞에 묶음 이름). 답변 상태 ·
+    기간 필터, 한 쪽 50행.
+  - 리뷰 한 건: 답변 영역이 처음부터 보인다. 「AI 초안 준비」/「직접 쓰기」를 누르면 「대응 필요」가 기록된다.
+  - 담당자 책상(`vendor-server` 정적 화면): 두 탭 → 한 장의 「오늘 할 일」(① 리뷰 파일 올리기 ② 등록할 답글),
+    초대 화면은 초대 내용 + 「구글 계정으로 계속」 하나. 계약은 `docs/vendor_server_contract_v1.md` §8.
 - **노출 채널 = NAVER / Coupang / Cafe24** (`ProductChannels.java`, `lib/productChannels.ts`), 표시 순서도 그 순서.
 - **새 채널의 기본값**: connector + capability proof(§4.1 승격) **뒤에** 기존 surface에 끼운다 —
   `/reviews`에는 계정 chip 하나 + `ReviewChannelCapabilityView` 행 하나 + 어휘 한 줄(`channelVocabulary`);
