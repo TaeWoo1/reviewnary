@@ -345,8 +345,36 @@
     $("pane-upload").hidden = !upload;
   }
 
+  // The period to download (owner decision 2026-10-25): from the day this store's export was last uploaded to today,
+  // in Seller Center's own dates (Korean). The day of the last upload is taken again on purpose — a review written
+  // after that file was downloaded is in it, and a review uploaded twice changes nothing. A store with no upload yet
+  // takes the longest period Seller Center offers, one year.
+  var lastUploads = {};
+  function sellerCenterDate(d) {
+    var parts = {};
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" })
+      .formatToParts(d).forEach(function (x) { parts[x.type] = x.value; });
+    return parts.year + "." + parts.month + "." + parts.day;
+  }
+  function period() {
+    var id = $("store").value;
+    $("period").hidden = !id;
+    if (!id) { return; }
+    var now = new Date();
+    var last = lastUploads[id] ? new Date(lastUploads[id]) : null;
+    var from = last;
+    if (!from) {
+      from = new Date(now.getTime());
+      from.setFullYear(from.getFullYear() - 1);
+    }
+    $("period-range").textContent = sellerCenterDate(from) + " ~ " + sellerCenterDate(now);
+    $("period-why").textContent = last ? "· 마지막으로 올린 날부터" : "· 처음 올리는 스토어라 판매자센터 최대 기간 1년";
+  }
+
   function stores(list) {
     var select = $("store");
+    lastUploads = {};
+    list.forEach(function (s) { lastUploads[s.id] = s.lastUploadAt || null; });
     var before = select.value;
     select.textContent = "";
     list.forEach(function (s) {
@@ -358,6 +386,7 @@
     if (before && list.some(function (s) { return s.id === before; })) { select.value = before; }
     select.hidden = list.length === 0;
     $("no-store").hidden = list.length !== 0;
+    period();
     pickable();
   }
 
@@ -432,6 +461,7 @@
     $("r-dropped").textContent = String(result.attachmentsDropped);
     $("upload-pick").hidden = true;
     $("upload-result").hidden = false;
+    whoAmI();
   }
 
   $("upload-form").addEventListener("submit", function (e) {
@@ -477,7 +507,7 @@
   });
 
   $("file").addEventListener("change", function () { choose($("file").files && $("file").files[0]); });
-  $("store").addEventListener("change", function () { if (!uploading) { resetOutcome(); } pickable(); });
+  $("store").addEventListener("change", function () { if (!uploading) { resetOutcome(); } period(); pickable(); });
   $("drop").addEventListener("dragover", function (e) { e.preventDefault(); $("drop").className = "drop stack8 over"; });
   $("drop").addEventListener("dragleave", function () { $("drop").className = "drop stack8"; });
   $("drop").addEventListener("drop", function (e) {
