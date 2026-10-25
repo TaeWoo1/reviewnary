@@ -38,7 +38,15 @@ public record ReviewWorkView(
          * state ({@code AWAITING_APPROVAL} on the phone, {@code RECHECK_NEEDED}, {@code HELD}, {@code FAILED}). This
          * PC's draft read cannot see the lane, so without it every one of them reads as a plain 승인 대기.
          */
-        Map<UUID, String> delegatedStates) {
+        Map<UUID, String> delegatedStates,
+        /** Of {@code safetyReviewIds}, each one's kind of harm — what its label names (2026-10-25). */
+        Map<UUID, String> safetyKinds) {
+
+    public ReviewWorkView(long attentionTotal, List<OperationsHomeView.AttentionReview> attention,
+                          List<AccountWork> committed, Set<UUID> safetyReviewIds, Set<UUID> safetyWorryReviewIds,
+                          Map<UUID, String> delegatedStates) {
+        this(attentionTotal, attention, committed, safetyReviewIds, safetyWorryReviewIds, delegatedStates, Map.of());
+    }
 
     /**
      * One account's share. {@code recentlyReported} is the same read's history — replies the seller reported

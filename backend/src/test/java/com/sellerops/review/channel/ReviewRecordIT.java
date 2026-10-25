@@ -98,6 +98,31 @@ class ReviewRecordIT {
                 .containsExactly("NAVER", "COUPANG", "NAVER");
     }
 
+    /** Mockup ②, 2026-10-25: the groups stay; 「안전 관련만 보기」 lists the mentions alone, each with its group. */
+    @Test
+    void theSafetyFilterListsOnlyTheMentions_occurrencesFirst_andTheGroupsCountThem() {
+        Review fine = review(naver, 5, "좋아요", LocalDate.of(2026, 9, 10));
+        Review worry = review(naver, 2, "모서리가 날카로워서 아이가 다칠까 걱정돼요", LocalDate.of(2026, 9, 9));
+        Review cut = review(coupang, 3, "조립하다가 아이가 손을 베였어요", LocalDate.of(2026, 9, 1));
+        Review plain = review(naver, 1, "배송이 늦었어요", LocalDate.of(2026, 9, 8));
+
+        ReviewRecordPageView all = service.record(org, null, null, null, 0, 20);
+        assertThat(all.safety()).isEqualTo(new ReviewRecordPageView.SafetySummary(2, 1, 1, 0));
+        assertThat(all.items()).filteredOn(r -> r.review().id().equals(cut.getId())).singleElement()
+                .satisfies(r -> assertThat(r.safety()).isEqualTo(
+                        new ReviewRecordPageView.SafetyMark("INJURY", "OCCURRENCE", "베였")));
+        assertThat(all.items()).filteredOn(r -> r.review().id().equals(plain.getId())).singleElement()
+                .satisfies(r -> assertThat(r.safety()).isNull());
+
+        ReviewRecordPageView only = service.record(org, null, null, null, 0, 20, true);
+        assertThat(only.total()).isEqualTo(2);
+        assertThat(only.items()).extracting(r -> r.review().id())
+                .as("what happened before what is feared, across groups and channels")
+                .containsExactly(cut.getId(), worry.getId());
+        assertThat(only.items()).extracting(r -> r.safety().reading()).containsExactly("OCCURRENCE", "WORRY");
+        assertThat(only.items()).noneMatch(r -> r.review().id().equals(fine.getId()));
+    }
+
     @Test
     void aChannelFilterReproducesThatChannelsOwnRecord() {
         review(naver, 5, "좋아요", LocalDate.of(2026, 9, 10));

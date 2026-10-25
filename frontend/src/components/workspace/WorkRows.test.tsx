@@ -257,12 +257,14 @@ describe("WorkRows — the rail reading", () => {
 describe("WorkRows — the safety mark", () => {
   it("marks only the row that carries it, in the Home, queue and rail readings", () => {
     for (const reading of ["home", "queue", "rail"] as const) {
-      draw([row({ safety: true }), row({ key: "review:r-2", subjectId: "r-2", title: "끈이 짧아요" })], { reading });
+      draw([row({ safety: true, safetyKind: "INJURY" }), row({ key: "review:r-2", subjectId: "r-2", title: "끈이 짧아요" })], { reading });
       const list = screen.getByLabelText("확인할 일");
-      const marks = within(list).getAllByText(/안전 확인 · 발생/);
+      // What the review SAYS, by kind (mockup ②, 2026-10-25) — never 「안전 확인」.
+      const marks = within(list).getAllByText(/부상 언급/);
       expect(marks, reading).toHaveLength(1);
       expect(marks[0].className, reading).toContain("text-bad");
-      expect(within(list).getAllByRole("link")[0], reading).toHaveTextContent("안전 확인 · 발생");
+      expect(within(list).getAllByRole("link")[0], reading).toHaveTextContent("부상 언급");
+      expect(list, reading).not.toHaveTextContent("안전 확인");
       cleanup();
     }
   });
@@ -271,12 +273,14 @@ describe("WorkRows — the safety mark", () => {
   it("tells a worry from an occurrence — orange beside red — in every reading", () => {
     for (const reading of ["home", "queue", "rail"] as const) {
       draw([
-        row({ safety: true, safetyReading: "OCCURRENCE" }),
-        row({ key: "review:r-2", subjectId: "r-2", title: "화상 입을까 걱정돼요", safety: true, safetyReading: "WORRY" }),
+        row({ safety: true, safetyReading: "OCCURRENCE", safetyKind: "PRODUCT_HAZARD" }),
+        row({ key: "review:r-2", subjectId: "r-2", title: "화상 입을까 걱정돼요", safety: true, safetyReading: "WORRY",
+          safetyKind: "INJURY" }),
       ], { reading });
       const list = screen.getByLabelText("확인할 일");
-      expect(within(list).getByText(/안전 확인 · 발생/).className, reading).toContain("text-bad");
-      expect(within(list).getByText(/안전 확인 · 우려/).className, reading).toContain("text-warn");
+      expect(within(list).getByText(/제품 위험 언급/).className, reading).toContain("text-bad");
+      // A worry reads as a worry whatever it is about.
+      expect(within(list).getByText(/걱정 언급/).className, reading).toContain("text-warn");
       cleanup();
     }
   });

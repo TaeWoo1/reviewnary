@@ -33,7 +33,8 @@ public class ReviewRecordController {
                                      @RequestParam(required = false) String sort,
                                      @RequestParam(required = false) String tier,
                                      @RequestParam(defaultValue = "0") int page,
-                                     @RequestParam(defaultValue = "20") int size) {
-        return service.record(principal.orgId(), channel, sort, tier, page, size);
+                                     @RequestParam(defaultValue = "20") int size,
+                                     @RequestParam(defaultValue = "false") boolean safety) {
+        return service.record(principal.orgId(), channel, sort, tier, page, size, safety);
     }
 }

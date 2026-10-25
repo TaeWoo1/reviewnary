@@ -49,8 +49,16 @@ public final class ReviewSafetySignal {
      */
     public enum Reading { OCCURRENCE, WORRY }
 
-    /** One standing expression: what kind of harm, and whether it happened or is feared. */
-    public record Finding(Kind kind, Reading reading) {}
+    /**
+     * One standing expression: what kind of harm, whether it happened or is feared, and the expression itself —
+     * whitespace-free, as matched — so a screen can mark where the review says it (mockup ②, 2026-10-25).
+     */
+    public record Finding(Kind kind, Reading reading, String term) {
+
+        public Finding(Kind kind, Reading reading) {
+            this(kind, reading, null);
+        }
+    }
 
     /** How far after a term a cue is looked for, whitespace removed. */
     static final int CUE_WINDOW = 8;
@@ -151,10 +159,10 @@ public final class ReviewSafetySignal {
                 if (!negatedAfter(text, end)) {
                     Reading reading = readingAfter(text, end, NEEDS_CUE.contains(term.getKey()));
                     if (reading == Reading.OCCURRENCE) {
-                        return Optional.of(new Finding(term.getValue(), reading));
+                        return Optional.of(new Finding(term.getValue(), reading, term.getKey()));
                     }
                     if (reading == Reading.WORRY && worry == null) {
-                        worry = new Finding(term.getValue(), reading);
+                        worry = new Finding(term.getValue(), reading, term.getKey());
                     }
                 }
                 at = text.indexOf(term.getKey(), end);

@@ -105,7 +105,7 @@ public class ReviewWorkController {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         return new ReviewWorkView(home.undecidedAttentionCount(orgId), home.undecidedAttention(orgId, MAX_ATTENTION),
                 committed, home.safetyAmong(orgId, todoReviews), home.safetyWorryAmong(orgId, todoReviews),
-                delegatedStates);
+                delegatedStates, home.safetyKindsAmong(orgId, todoReviews));
     }
 
     private static boolean withTheDelegate(Map<UUID, String> lane, OperatorVocItem item) {

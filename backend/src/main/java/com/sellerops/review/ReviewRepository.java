@@ -459,6 +459,15 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
     List<Object[]> countByChannelsGroupedByTierRank(@Param("orgId") UUID orgId,
                                                     @Param("channelIds") java.util.Collection<UUID> channelIds);
 
+    /**
+     * Id · body · rating · receivedAt of every review in the channels — what the safety filter reads (mockup ②,
+     * 2026-10-25). The signal is computed from the body on each read and never stored, so it cannot be a WHERE.
+     */
+    @Query("select r.id, r.body, r.rating, r.receivedAt from Review r "
+            + "where r.orgId = :orgId and r.channelId in :channelIds")
+    List<Object[]> bodiesInChannels(@Param("orgId") UUID orgId,
+                                    @Param("channelIds") java.util.Collection<UUID> channelIds);
+
     /** As {@link #countByChannelGroupedByFinalTierRank}, over a set of channels — no bound parameter in the CASE. */
     @Query("""
             select

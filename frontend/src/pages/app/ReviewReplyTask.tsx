@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { SafetyMarkNote } from "../../components/reviews/SafetyMarkNote";
 import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { PageHead } from "../../components/ui/PageHead";
 import { Empty } from "../../components/ui/Empty";
@@ -472,6 +473,11 @@ export function ReviewCaseView({
              region keeps the name for anything that cannot see the layout. */
           <section aria-label="왜 올라왔나요">
             <ReviewProblemCard detail={detail} word={word} showBody={false} verdict="controls" flat />
+            {detail.safety ? (
+              <div className="mt-3">
+                <SafetyMarkNote reviewId={detail.id} mark={detail.safety} body={detail.body} />
+              </div>
+            ) : null}
           </section>
         ) : (
           /* <b>왜 지금인가는 한 줄이고, 머리말을 갖지 않는다</b> (리뷰 canonical mockup, 2026-10-06).
@@ -488,6 +494,12 @@ export function ReviewCaseView({
                 whyNow={detail.whyNow}
                 flat
               />
+              {/* What the review says of harm, and where (mockup ②, 2026-10-25). */}
+              {detail.safety ? (
+                <div className="mt-3">
+                  <SafetyMarkNote reviewId={detail.id} mark={detail.safety} body={detail.body} />
+                </div>
+              ) : null}
             </section>
             {/* <b>첫 화면의 중심 물건</b> (리뷰 canonical mockup, 2026-10-06 — Front conversation detail).
                 Front의 대화 상세에서 면을 가진 것은 제안된 답장 하나이고, 그것은 한 줄짜리 요약 바로 아래

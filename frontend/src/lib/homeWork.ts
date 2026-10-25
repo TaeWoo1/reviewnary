@@ -115,6 +115,8 @@ export interface HomeWorkRow {
    * stronger mark: an older server never makes a report look milder than it is.
    */
   safetyReading?: "OCCURRENCE" | "WORRY" | null;
+  /** Which kind of harm when `safety` (2026-10-25) — what the label names: 부상 언급 · 몸 반응 언급 …. */
+  safetyKind?: "INJURY" | "BODY_REACTION" | "PRODUCT_HAZARD" | "LEGAL" | null;
 }
 
 export interface HomeWork {
@@ -194,6 +196,7 @@ export function caseWorkRow(row: CustomerOperationsDecisionRow): HomeWorkRow {
     workItemId: null,
     safety: row.safety === true,
     safetyReading: row.safety === true ? (row.safetyReading ?? null) : null,
+    safetyKind: row.safety === true ? (row.safetyKind ?? null) : null,
   };
 }
 
@@ -248,6 +251,7 @@ export function mergeHomeWork(
       workItemId: null,
       safety: row.safety === true,
       safetyReading: row.safety === true ? (row.safetyReading ?? null) : null,
+      safetyKind: row.safety === true ? (row.safetyKind ?? null) : null,
     });
   }
 
@@ -299,6 +303,7 @@ export function mergeHomeWork(
         safety: safetyReviews.has(item.reviewId),
         safetyReading: !safetyReviews.has(item.reviewId) ? null
           : worryReviews.has(item.reviewId) ? "WORRY" : "OCCURRENCE",
+        safetyKind: safetyReviews.has(item.reviewId) ? (reviewWork?.safetyKinds?.[item.reviewId] ?? null) : null,
       });
     }
   }

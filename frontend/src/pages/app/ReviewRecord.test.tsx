@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { ReviewRecord, rangeLabel } from "./ReviewRecord";
 import { expectNoAxeViolations } from "../../test/axe";
-import type { ChannelReviewDetailView, ChannelReviewPageView, ReviewRecordPageView } from "../../lib/types";
+import type { ChannelReviewDetailView, ChannelReviewPageView, ReviewRecordPageView, SafetyMark } from "../../lib/types";
 import type { ReviewAccount } from "../../lib/reviewAccounts";
 
 const getChannelReviewsStrict = vi.fn();
@@ -176,7 +176,14 @@ function asRecord(page: ChannelReviewPageView): ReviewRecordPageView {
     aiPilotEnabled: page.aiPilotEnabled,
     channels: [code],
     triageSummary: page.triageSummary,
-    items: page.items.map((review) => ({ channelCode: code, channelNameKo: null, review })),
+    items: page.items.map((review) => ({
+      channelCode: code,
+      channelNameKo: null,
+      review,
+      // A fixture may carry a row's safety mark beside the review it describes (mockup ②, 2026-10-25).
+      safety: (review as { safetyMark?: SafetyMark }).safetyMark ?? null,
+    })),
+    safety: (page as { safety?: ReviewRecordPageView["safety"] }).safety ?? null,
     channelFacts: [
       {
         channelCode: code,
@@ -848,3 +855,56 @@ describe("accessibility", () => {
 function rangeLabelOf(page: ChannelReviewPageView | null): string {
   return rangeLabel(page ? asRecord(page) : null);
 }
+
+/** Mockup ②, 2026-10-25: the groups stay; one control lists only the reviews that mention harm. */
+describe("the safety filter", () => {
+  const CUT: SafetyMark = { kind: "INJURY", reading: "OCCURRENCE", term: "베였" };
+  const MARKED = {
+    ...PAGE,
+    safety: { total: 1, needsAttention: 1, watch: 0, fyi: 0 },
+    items: [PAGE.items[0], { ...PAGE.items[1], safetyMark: CUT }],
+  };
+
+  it("counts the mentions on the control and on their group, and marks the row by what it says", async () => {
+    getChannelReviewsStrict.mockResolvedValue(MARKED);
+    const { container } = renderPage();
+
+    const filter = await screen.findByRole("button", { name: "안전 관련만 보기 1" });
+    expect(filter).toHaveAttribute("aria-pressed", "false");
+    const head = screen.getByRole("button", { name: /확인 필요/ });
+    expect(head).toHaveTextContent("· 안전 관련 1");
+    const row = screen.getByRole("link", { name: /생각보다 크기가 작아서/ });
+    expect(within(row).getByText("부상 언급").className).toContain("text-bad");
+    expect(screen.getByRole("link", { name: /배송도 빠르고/ })).not.toHaveTextContent("언급");
+    await expectNoAxeViolations(container);
+  });
+
+  it("lists only them across the groups, each saying its own group, and comes back as it was", async () => {
+    getChannelReviewsStrict.mockResolvedValue(MARKED);
+    renderPage();
+    const user = userEvent.setup();
+
+    // The filtered read is slow: until it lands the filter's list shows no rows read for the groups.
+    let land: (v: unknown) => void = () => {};
+    getChannelReviewsStrict.mockReturnValueOnce(new Promise((r) => { land = r; }));
+    await user.click(await screen.findByRole("button", { name: "안전 관련만 보기 1" }));
+    const waiting = await screen.findByRole("region", { name: "안전 관련 리뷰" });
+    expect(within(waiting).queryAllByRole("link")).toHaveLength(0);
+    expect(waiting).toHaveTextContent("불러오는 중");
+    land({ ...MARKED, total: 1, items: [MARKED.items[1]] });
+
+    await waitFor(() =>
+      expect(getChannelReviewsStrict).toHaveBeenLastCalledWith("acc-1", expect.objectContaining({ safety: true })),
+    );
+    const list = await screen.findByRole("region", { name: "안전 관련 리뷰" });
+    const only = within(list).getAllByRole("link");
+    expect(only).toHaveLength(1);
+    expect(only[0]).toHaveTextContent("부상 언급");
+    expect(only[0]).toHaveTextContent("확인 필요");
+    expect(screen.getByTestId("location").textContent).toContain("safety=1");
+
+    await user.click(screen.getByRole("button", { name: /안전 관련만 보기 1/ }));
+    await waitFor(() => expect(screen.getByTestId("location").textContent).not.toContain("safety=1"));
+    expect(screen.queryByRole("region", { name: "안전 관련 리뷰" })).toBeNull();
+  });
+});

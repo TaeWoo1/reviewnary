@@ -84,6 +84,15 @@ class ReviewSafetySignalTest {
                 .extracting(ReviewSafetySignal.Finding::reading).isEqualTo(reading);
     }
 
+    /** Mockup ②, 2026-10-25: the screen marks where the review says it, so the expression that stands is told. */
+    @Test
+    void theExpressionThatStandsIsToldForTheScreenToMark() {
+        assertThat(ReviewSafetySignal.find("조립하다 아이가 손을 베 였어요")).get()
+                .extracting(ReviewSafetySignal.Finding::term).isEqualTo("베였");
+        assertThat(ReviewSafetySignal.find("아이가 다칠까 걱정돼요")).get()
+                .extracting(ReviewSafetySignal.Finding::term).isEqualTo("다칠");
+    }
+
     @Test
     void theScreenIsToldTheReadingByNameAndNothingForAReviewThatDoesNotRise() {
         assertThat(ReviewSafetySignal.readingOf("사용하다 손에 화상을 입었어요")).isEqualTo("OCCURRENCE");

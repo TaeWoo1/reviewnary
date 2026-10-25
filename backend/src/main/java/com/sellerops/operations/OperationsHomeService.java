@@ -207,6 +207,21 @@ public class OperationsHomeService {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
+    /** Of {@link #safetyAmong}, each one's kind of harm — what its label names (2026-10-25). */
+    @Transactional(readOnly = true)
+    public Map<UUID, String> safetyKindsAmong(UUID orgId, Collection<UUID> reviewIds) {
+        if (reviewIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> kinds = new java.util.HashMap<>();
+        for (Review r : reviews.findAllById(reviewIds)) {
+            if (orgId.equals(r.getOrgId())) {
+                ReviewSafetySignal.of(r.getBody()).ifPresent(k -> kinds.put(r.getId(), k.name()));
+            }
+        }
+        return Map.copyOf(kinds);
+    }
+
     /** Of {@link #safetyAmong}, the ones that read as a worry rather than something that happened (2026-10-23). */
     @Transactional(readOnly = true)
     public Set<UUID> safetyWorryAmong(UUID orgId, Collection<UUID> reviewIds) {
@@ -270,7 +285,8 @@ public class OperationsHomeService {
                             review.getProductId() == null ? null : productNames.get(review.getProductId())),
                     quote,
                     ReviewSafetySignal.in(review.getBody()),
-                    ReviewSafetySignal.readingOf(review.getBody()));
+                    ReviewSafetySignal.readingOf(review.getBody()),
+                    ReviewSafetySignal.of(review.getBody()).map(Enum::name).orElse(null));
         }).toList();
     }
 

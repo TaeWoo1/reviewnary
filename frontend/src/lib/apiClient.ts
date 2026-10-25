@@ -525,6 +525,10 @@ export const api = {
     });
     return data;
   },
+  /** 「표시가 맞지 않음」: the seller's word on a review's safety mark is kept; the mark stays as it is. */
+  async reportWrongSafetyMark(reviewId: string): Promise<void> {
+    await http.post(`/api/reviews/${encodeURIComponent(reviewId)}/safety-feedback`);
+  },
   /** 할 일's 진행 중 · 끝난 일 from the delegate lane; empty lists when this PC is not linked. */
   async getReplyBoard(): Promise<ReplyBoard> {
     const { data } = await http.get<ReplyBoard>("/api/local/vendor-link/reviews/board");
@@ -2389,9 +2393,12 @@ export const api = {
       tier?: ReviewTriageTier;
       page?: number;
       size?: number;
+      /** Only the reviews that mention a safety or legal problem (mockup ②, 2026-10-25). */
+      safety?: boolean;
     } = {},
   ): Promise<ReviewRecordPageView> {
     const query = new URLSearchParams();
+    if (params.safety) query.set("safety", "true");
     if (params.channel) query.set("channel", params.channel);
     if (params.sort) query.set("sort", params.sort);
     if (params.tier) query.set("tier", params.tier);

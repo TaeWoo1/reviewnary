@@ -98,6 +98,18 @@ the tier; the Home's list is the tier's undecided rows **plus** these. It is a t
 without RUBRIC §5's measurement, by an explicit owner exception recorded in
 [RUBRIC §7](../../contracts/review-eval/naver/v1/RUBRIC.md).
 
+**How the mark reads and where it is found (product-owner decision, 2026-10-25, mockup ②).** The mark says what the
+review SAYS, never that an accident was established: 「부상 언급」 · 「몸 반응 언급」 · 「제품 위험 언급」 ·
+「신고·소송 언급」 by `ReviewSafetySignal.Kind`, and any worry is 「걱정 언급」 (red for what happened, orange for a
+worry). This replaces 「안전 관련 확인」 and 「안전 확인 · 발생/우려」 on 오늘 and 할 일. The 리뷰 list keeps its three
+groups — the tier is still unchanged — and adds one control, 「안전 관련만 보기 N」 (`GET /api/reviews/record?safety=true`):
+the mentions alone across the groups, what happened before what is feared, newest first, each row saying its own
+group. Group heads say 「· 안전 관련 N」 as words, not a control. Because the signal is read from the body on every
+read and never stored, the filter and the counts scan the scope's bodies (`ReviewRepository.bodiesInChannels`). The
+review's own page marks the expression that stands (`Finding.term`) in its sentence, under 「리뷰 문구 기준 표시 · 사실
+여부 미확인」; 「표시가 맞지 않음」 keeps the seller's word with the mark they saw (`review_safety_feedback`, V148) as test
+material for the signal and changes nothing — the screen says 「의견 남김」.
+
 ### 3.1 Stated once, so the order and the counts cannot disagree
 
 The tier rule exists in two representations — Java, for rendering, and JPQL, for sorting and counting

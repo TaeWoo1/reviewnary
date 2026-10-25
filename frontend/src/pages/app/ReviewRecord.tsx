@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { safetyLabel } from "../../lib/safetyLabel";
 import { Link, useSearchParams } from "react-router-dom";
 import { Facts } from "../../components/ui/ObjectRow";
 import { Empty } from "../../components/ui/Empty";
@@ -14,6 +15,7 @@ import { TRIAGE_CORRECTION_COPY, TRIAGE_TIERS, TRIAGE_TIER_LABEL } from "../../l
 import type { ReviewAccount } from "../../lib/reviewAccounts";
 import type {
   ReviewRecordPageView,
+  ReviewRecordRow,
   ReviewTriageTier,
   TriageBehaviorEvent,
 } from "../../lib/types";
@@ -62,10 +64,17 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
    * 열지 않은 두 묶음도 이름과 수를 달고 거기 서 있으므로 기록 전체는 여전히 한눈에 보인다.
    */
   const openTier: ReviewTriageTier = tier ?? "NEEDS_ATTENTION";
+  /**
+   * 「안전 관련만 보기」 (mockup ②, 2026-10-25): the groups stay as they are; this one control lists only the reviews
+   * that mention harm, across them, each row saying its own group. Kept in the address, so it reopens as it was.
+   */
+  const safetyOnly = searchParams.get("safety") === "1";
   const channel = normalizeChannel(searchParams.get("channel"));
   const [sort, setSort] = useState<Sort>("attention");
   const [pageIndex, setPageIndex] = useState(0);
   const [page, setPage] = useState<ReviewRecordPageView | null>(null);
+  // Whether `page` was read for the safety filter — the filter's list never shows rows read for the groups.
+  const [pageIsSafety, setPageIsSafety] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [workCount, setWorkCount] = useState<number | null>(null);
@@ -104,7 +113,8 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
   }, []);
 
   const load = useCallback(
-    async (nextSort: Sort, nextTier: ReviewTriageTier | null, nextChannel: string | null, nextPage: number) => {
+    async (nextSort: Sort, nextTier: ReviewTriageTier | null, nextChannel: string | null, nextPage: number,
+      nextSafety = false) => {
       const ticket = ++seq.current;
       setLoading(true);
       try {
@@ -114,9 +124,11 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
           tier: nextTier ?? undefined,
           page: nextPage,
           size: PAGE_SIZE,
+          ...(nextSafety ? { safety: true } : {}),
         });
         if (ticket !== seq.current) return;
         setPage(view);
+        setPageIsSafety(nextSafety);
         setLoadError(false);
         // The pilot's exposure silver, per account, for rows the pilot raised — as the channel record did.
         if (view.aiPilotEnabled) {
@@ -142,8 +154,8 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
   );
 
   useEffect(() => {
-    void load(sort, openTier, channel, pageIndex);
-  }, [sort, openTier, channel, pageIndex, load]);
+    void load(sort, openTier, channel, pageIndex, safetyOnly);
+  }, [sort, openTier, channel, pageIndex, safetyOnly, load]);
 
   // How much review work 확인할 일 holds — the one link to the work from a record screen. And which reviews have a
   // case, so the pane can show the case rather than a second reading of the same review. Both fail silent.
@@ -175,6 +187,61 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
   const channelChoices = uniqueChannels(targets);
   const totalPages = page === null || page.size <= 0 ? 1 : Math.max(1, Math.ceil(page.total / page.size));
   const recordTotal = page ? page.triageSummary.needsAttention + page.triageSummary.watch + page.triageSummary.fyi : 0;
+
+  /** One row of the record; {@code withGroup} names its group, for the safety filter's one list across them. */
+  const reviewRow = ({ channelCode, channelNameKo, review, safety }: ReviewRecordRow, withGroup: boolean) => (
+                        <li key={review.id}>
+                          <Link
+                            to={`/reviews/reply/${review.id}?from=record`}
+                            className="flex items-center gap-8 rounded-lg py-3 pl-12 pr-3 transition hover:bg-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700"
+                          >
+                            <span
+                              className={`min-w-0 flex-1 truncate break-keep text-base leading-snug ${
+                                review.textless ? "text-muted" : "font-medium text-ink"
+                              }`}
+                            >
+                              {review.textless ? "별점만 남긴 리뷰" : previewText(review.preview) || "표시할 수 있는 본문이 없습니다"}
+                            </span>
+                            {/* 오른쪽은 한 덩어리의 주석이다 — 폭이 정해져 있고, 줄이 아니라 묶음으로 약하다. */}
+                            <span className="flex shrink-0 items-center gap-3 text-xs text-muted">
+                              <span className="flex max-w-[16rem] items-center gap-2 overflow-hidden">
+                                {/* <b>한 행에 상태 단어는 하나다</b> (UI audit, 2026-10-06). 둘 다 선 행은
+                                    「판매자 확인 필요 판매자 수정 확인 필요」로 읽혔다 — 앞은 AI가 매긴
+                                    분류를 판매자가 확인해 달라는 표시이고, 뒤는 판매자가 이미 확인하고
+                                    고쳤다는 기록이다. 뒤가 있으면 앞이 요청한 일은 끝난 것이므로 행에서는
+                                    뒤만 선다. 두 사실 모두 상세에 그대로 있다 — 지우는 것이 아니라
+                                    목록에서 겹쳐 말하지 않는 것이다. */}
+                                {safety ? (
+                                  <span className={`truncate font-semibold ${safety.reading === "WORRY" ? "text-warn" : "text-bad"}`}>
+                                    {safetyLabel(safety.kind, safety.reading)}
+                                  </span>
+                                ) : null}
+                                {withGroup ? <span className="truncate">{TRIAGE_TIER_LABEL[review.triage.tier]}</span> : null}
+                                {review.aiMark && !review.sellerCorrection ? <AiMarkChip quiet /> : null}
+                                {review.sellerCorrection ? (
+                                  <span className="truncate">{`${TRIAGE_CORRECTION_COPY.sellerPrefix} ${TRIAGE_TIER_LABEL[review.sellerCorrection.correctedTier]}`}</span>
+                                ) : null}
+                                {cases.has(ownerOf(review.id)) ? (
+                                  <span className="truncate font-semibold text-brand-700">{COPY.listTitle}</span>
+                                ) : null}
+                                {review.isNew ? <span className="truncate">새 리뷰</span> : null}
+                                {review.mediaCount > 0 ? <span className="truncate">{`사진·영상 ${review.mediaCount}`}</span> : null}
+                                {review.triage.tags.length > 0 ? <span className="truncate">{review.triage.tags[0]}</span> : null}
+                              </span>
+                              {/* <b>별점은 한 글자와 숫자다</b> (리뷰 canonical mockup, 2026-10-05). 「★★☆☆☆ 2점」은
+                                  13px에서 90px을 쓰고 두 줄로 접혀 행을 46px에서 63px로 밀어 올렸다 — 이 행에서
+                                  가장 덜 중요한 사실이 가장 많은 자리를 차지한 셈이다. 읽어 주는 쪽에는 원래 문장이
+                                  그대로 간다. */}
+                              <span className="w-10 shrink-0 text-right tabular-nums" aria-label={ratingLabel(review.rating)}>
+                                <span aria-hidden>★{review.rating}</span>
+                              </span>
+                              <span className="w-12 shrink-0 truncate">{channelShort(channelCode) ?? channelNameKo ?? "채널 미상"}</span>
+                              <span className="w-44 shrink-0 truncate">{review.productName ?? review.productId ?? "상품 정보 없음"}</span>
+                              <span className="w-20 shrink-0 text-right tabular-nums">{review.writtenOn ?? "날짜 없음"}</span>
+                            </span>
+                          </Link>
+                        </li>
+  );
 
   const record = (
     <>
@@ -212,6 +279,22 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
             setPageIndex(0);
           }}
         />
+        {page && ((page.safety?.total ?? 0) > 0 || safetyOnly) ? (
+          <button
+            type="button"
+            aria-pressed={safetyOnly}
+            onClick={() => {
+              setParams({ safety: safetyOnly ? null : "1" });
+              setPageIndex(0);
+            }}
+            className={`rounded-full px-3 py-1 text-sm font-semibold ring-1 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
+              safetyOnly ? "bg-bad/10 text-bad ring-bad/30" : "bg-surface text-ink ring-line hover:bg-canvas"
+            }`}
+          >
+            안전 관련만 보기 {(page.safety?.total ?? 0).toLocaleString("ko-KR")}
+            {safetyOnly ? <span aria-hidden className="ml-1.5">✕</span> : null}
+          </button>
+        ) : null}
         {workCount && workCount > 0 ? (
           <Link to="/customer-operations/cases" className="ml-auto text-sm font-semibold text-brand-700 hover:underline">
             {COPY.listTitle}에 리뷰 {workCount.toLocaleString("ko-KR")}건 →
@@ -257,6 +340,17 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
               master-detail `main` 안에서 양쪽으로 16px씩 나갔고, 오른쪽에서는 그대로 뷰포트 밖이었다.
               이제 기록은 {@code max-w-content} 열 안에 서고, 묶음은 12px만 바깥으로 물러난다 — 행의
               글자가 제목과 같은 선에서 시작하면서 hover와 선택이 글자 바깥에서 끝나도록. */}
+          {safetyOnly ? (
+            <section aria-label="안전 관련 리뷰" className="-mx-3">
+              {!pageIsSafety ? (
+                <p className="px-3 py-6 text-sm text-muted">불러오는 중…</p>
+              ) : page.items.length === 0 ? (
+                <p className="px-3 py-6 text-sm text-muted">안전 관련 리뷰가 없습니다.</p>
+              ) : (
+                <ul>{page.items.map((row) => reviewRow(row, true))}</ul>
+              )}
+            </section>
+          ) : (
           <section aria-label="목록" className="-mx-3">
             {TRIAGE_TIERS.map((value) => {
               const open = value === openTier;
@@ -279,6 +373,10 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
                       <TierDot tier={value} />
                       <span className="text-lg font-semibold text-ink">{TRIAGE_TIER_LABEL[value]}</span>
                       <span className="text-sm tabular-nums text-muted">{tierCount(page, value).toLocaleString("ko-KR")}</span>
+                      {/* Words, not a control: the one control for these is 「안전 관련만 보기」 above. */}
+                      {safetyIn(page, value) > 0 ? (
+                        <span className="text-xs text-muted">{`· 안전 관련 ${safetyIn(page, value).toLocaleString("ko-KR")}`}</span>
+                      ) : null}
                     </button>
                   </h2>
                   {open && page.items.length === 0 ? (
@@ -289,59 +387,14 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
                     </p>
                   ) : open ? (
                     <ul>
-                      {page.items.map(({ channelCode, channelNameKo, review }) => (
-                        <li key={review.id}>
-                          <Link
-                            to={`/reviews/reply/${review.id}?from=record`}
-                            className="flex items-center gap-8 rounded-lg py-3 pl-12 pr-3 transition hover:bg-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700"
-                          >
-                            <span
-                              className={`min-w-0 flex-1 truncate break-keep text-base leading-snug ${
-                                review.textless ? "text-muted" : "font-medium text-ink"
-                              }`}
-                            >
-                              {review.textless ? "별점만 남긴 리뷰" : previewText(review.preview) || "표시할 수 있는 본문이 없습니다"}
-                            </span>
-                            {/* 오른쪽은 한 덩어리의 주석이다 — 폭이 정해져 있고, 줄이 아니라 묶음으로 약하다. */}
-                            <span className="flex shrink-0 items-center gap-3 text-xs text-muted">
-                              <span className="flex max-w-[16rem] items-center gap-2 overflow-hidden">
-                                {/* <b>한 행에 상태 단어는 하나다</b> (UI audit, 2026-10-06). 둘 다 선 행은
-                                    「판매자 확인 필요 판매자 수정 확인 필요」로 읽혔다 — 앞은 AI가 매긴
-                                    분류를 판매자가 확인해 달라는 표시이고, 뒤는 판매자가 이미 확인하고
-                                    고쳤다는 기록이다. 뒤가 있으면 앞이 요청한 일은 끝난 것이므로 행에서는
-                                    뒤만 선다. 두 사실 모두 상세에 그대로 있다 — 지우는 것이 아니라
-                                    목록에서 겹쳐 말하지 않는 것이다. */}
-                                {review.aiMark && !review.sellerCorrection ? <AiMarkChip quiet /> : null}
-                                {review.sellerCorrection ? (
-                                  <span className="truncate">{`${TRIAGE_CORRECTION_COPY.sellerPrefix} ${TRIAGE_TIER_LABEL[review.sellerCorrection.correctedTier]}`}</span>
-                                ) : null}
-                                {cases.has(ownerOf(review.id)) ? (
-                                  <span className="truncate font-semibold text-brand-700">{COPY.listTitle}</span>
-                                ) : null}
-                                {review.isNew ? <span className="truncate">새 리뷰</span> : null}
-                                {review.mediaCount > 0 ? <span className="truncate">{`사진·영상 ${review.mediaCount}`}</span> : null}
-                                {review.triage.tags.length > 0 ? <span className="truncate">{review.triage.tags[0]}</span> : null}
-                              </span>
-                              {/* <b>별점은 한 글자와 숫자다</b> (리뷰 canonical mockup, 2026-10-05). 「★★☆☆☆ 2점」은
-                                  13px에서 90px을 쓰고 두 줄로 접혀 행을 46px에서 63px로 밀어 올렸다 — 이 행에서
-                                  가장 덜 중요한 사실이 가장 많은 자리를 차지한 셈이다. 읽어 주는 쪽에는 원래 문장이
-                                  그대로 간다. */}
-                              <span className="w-10 shrink-0 text-right tabular-nums" aria-label={ratingLabel(review.rating)}>
-                                <span aria-hidden>★{review.rating}</span>
-                              </span>
-                              <span className="w-12 shrink-0 truncate">{channelShort(channelCode) ?? channelNameKo ?? "채널 미상"}</span>
-                              <span className="w-44 shrink-0 truncate">{review.productName ?? review.productId ?? "상품 정보 없음"}</span>
-                              <span className="w-20 shrink-0 text-right tabular-nums">{review.writtenOn ?? "날짜 없음"}</span>
-                            </span>
-                          </Link>
-                        </li>
-                      ))}
+                      {page.items.map((row) => reviewRow(row, false))}
                     </ul>
                   ) : null}
                 </div>
               );
             })}
           </section>
+          )}
 
           {/*
             <b>기록의 총계와 수집의 유보는 목록 뒤에 선다</b> (product-owner decision, 2026-10-03).
@@ -444,6 +497,13 @@ function TierDot({ tier }: { tier: ReviewTriageTier }) {
 /** The review's owner address — the key a case names its subject by. */
 function ownerOf(reviewId: string): string {
   return `/reviews/reply/${reviewId}`;
+}
+
+/** How many of a group's reviews mention harm — said on the group's head; 0 from an older server. */
+function safetyIn(page: ReviewRecordPageView, tier: ReviewTriageTier): number {
+  const s = page.safety;
+  if (!s) return 0;
+  return tier === "NEEDS_ATTENTION" ? s.needsAttention : tier === "WATCH" ? s.watch : s.fyi;
 }
 
 function tierCount(page: ReviewRecordPageView, tier: ReviewTriageTier): number {

@@ -36,7 +36,19 @@ public record ReviewRecordPageView(
          * export, for instance. Not listed here (the visible set is a product decision); counted, so 「전체」 is
          * never read as every review the organisation has.
          */
-        long outsideVisibleChannels) {
+        long outsideVisibleChannels,
+        /**
+         * The reviews in scope that mention a safety or legal problem (mockup ②, 2026-10-25): how many, and how many
+         * in each group — the group heads say 「안전 관련 N」 and the filter 「안전 관련만 보기 N」.
+         */
+        SafetySummary safety) {
+
+    /** A review's safety mark: its kind, how it reads, and the expression that stands (whitespace-free). */
+    public record SafetyMark(String kind, String reading, String term) {
+    }
+
+    public record SafetySummary(long total, long needsAttention, long watch, long fyi) {
+    }
 
     public record ChannelFacts(String channelCode, String channelNameKo, java.util.UUID accountId,
                                ReviewChannelCapabilityView capability, java.time.Instant lastImportAt,
@@ -44,6 +56,6 @@ public record ReviewRecordPageView(
     }
 
     /** One row, with the channel it came from — the one fact a per-channel page never needed to say. */
-    public record Row(String channelCode, String channelNameKo, ChannelReviewItemView review) {
+    public record Row(String channelCode, String channelNameKo, ChannelReviewItemView review, SafetyMark safety) {
     }
 }

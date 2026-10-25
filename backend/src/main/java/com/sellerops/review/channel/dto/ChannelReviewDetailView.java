@@ -100,7 +100,9 @@ public record ChannelReviewDetailView(
          */
         String replyUnavailableReason,
         /** {@code MARKETPLACE} | {@code NONE} — see {@code RecentReviewItemView.executableIdentity}. */
-        String executableIdentity) {
+        String executableIdentity,
+        /** What the review says of harm, and where (mockup ②, 2026-10-25); null when it says nothing of it. */
+        ReviewRecordPageView.SafetyMark safety) {
 
     /** The address (client-opaque, round-tripped to the reply endpoints) and state of one review's reply work. */
     public record ReplyWork(

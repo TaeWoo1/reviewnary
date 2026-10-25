@@ -234,6 +234,16 @@ public class ChannelReviewService {
      * nothing.
      */
     public ReviewRecordPageView record(UUID orgId, String channel, String sort, String tier, int page, int size) {
+        return record(orgId, channel, sort, tier, page, size, false);
+    }
+
+    /**
+     * {@code safetyOnly} (mockup ②, 2026-10-25): only the reviews that mention a safety or legal problem, one list
+     * across the groups — occurrences before worries, newest first — each row still saying its own group. The signal
+     * is read from the body on every read and never stored, so finding them is a scan of the scope's bodies.
+     */
+    public ReviewRecordPageView record(UUID orgId, String channel, String sort, String tier, int page, int size,
+                                       boolean safetyOnly) {
         List<String> codes = visibleCodes(channel);
         Map<UUID, Channel> byId = new LinkedHashMap<>();
         for (String code : codes) {
@@ -247,11 +257,13 @@ public class ChannelReviewService {
         if (byId.isEmpty()) {
             return new ReviewRecordPageView(pageable.getPageNumber(), pageable.getPageSize(), 0, 0, aiEnabled,
                     codes, new ChannelReviewTriageSummaryView(0, 0, 0, 0, List.of()), List.of(), List.of(),
-                    outsideVisible(orgId));
+                    outsideVisible(orgId), new ReviewRecordPageView.SafetySummary(0, 0, 0, 0));
         }
         List<UUID> channelIds = List.copyOf(byId.keySet());
 
-        Page<Review> found = findRecordPage(orgId, channelIds, requestedSort, tierRank, aiEnabled, pageable);
+        SafetyScan scan = safetyScan(orgId, channelIds, aiEnabled);
+        Page<Review> found = safetyOnly ? safetyPage(scan, pageable)
+                : findRecordPage(orgId, channelIds, requestedSort, tierRank, aiEnabled, pageable);
 
         Map<UUID, Instant> newSince = new java.util.HashMap<>();
         long newCount = 0;
@@ -286,8 +298,9 @@ public class ChannelReviewService {
                             note(r, categories, countsByChannel.getOrDefault(r.getChannelId(), Map.of())),
                             marks.get(r.getId()), sellerCorrections.get(r.getId()),
                             identities.getOrDefault(r.getId(), com.sellerops.identity.ExecutableIdentity.NONE));
+                    ReviewSafetySignalMark mark = scan.marks().get(r.getId());
                     return new ReviewRecordPageView.Row(ch == null ? null : ch.getCode(),
-                            ch == null ? null : ch.getNameKo(), item);
+                            ch == null ? null : ch.getNameKo(), item, mark == null ? null : mark.mark());
                 })
                 .toList();
 
@@ -317,7 +330,61 @@ public class ChannelReviewService {
 
         return new ReviewRecordPageView(found.getNumber(), found.getSize(), found.getTotalElements(), newCount,
                 aiEnabled, byId.values().stream().map(Channel::getCode).toList(), summary, items, facts,
-                outsideVisible(orgId));
+                outsideVisible(orgId), scan.summary());
+    }
+
+    private record ReviewSafetySignalMark(ReviewRecordPageView.SafetyMark mark, Instant receivedAt, ReviewTriageTier tier) {}
+
+    private record SafetyScan(java.util.LinkedHashMap<UUID, ReviewSafetySignalMark> marks,
+                              ReviewRecordPageView.SafetySummary summary) {}
+
+    /** Every review in scope that mentions harm, with the group the list shows it in, in the filter's order. */
+    private SafetyScan safetyScan(UUID orgId, List<UUID> channelIds, boolean aiEnabled) {
+        Map<UUID, ReviewSafetySignalMark> found = new java.util.HashMap<>();
+        Map<UUID, ReviewTriageTier> rulesTier = new java.util.HashMap<>();
+        for (Object[] row : reviews.bodiesInChannels(orgId, channelIds)) {
+            UUID id = (UUID) row[0];
+            String body = (String) row[1];
+            ReviewRecordPageView.SafetyMark mark = safetyMark(body);
+            if (mark != null) {
+                Integer rating = row[2] == null ? null : ((Number) row[2]).intValue();
+                rulesTier.put(id, ReviewTriageRules.tier(rating, body));
+                found.put(id, new ReviewSafetySignalMark(mark, (Instant) row[3], null));
+            }
+        }
+        Map<UUID, AiTriageCurrent> currents = !aiEnabled || found.isEmpty() ? Map.of()
+                : aiCurrent.findByOrgIdAndReviewIdIn(orgId, List.copyOf(found.keySet())).stream()
+                        .collect(Collectors.toMap(AiTriageCurrent::getReviewId, c -> c, (a, b) -> a));
+        long[] byTier = new long[3];
+        Map<UUID, ReviewSafetySignalMark> tiered = new java.util.HashMap<>();
+        found.forEach((id, m) -> {
+            ReviewTriageTier shown = aiEnabled
+                    ? TriageDisplayDecision.resolve(rulesTier.get(id), currents.get(id), true).tier()
+                    : rulesTier.get(id);
+            byTier[shown.ordinal()]++;
+            tiered.put(id, new ReviewSafetySignalMark(m.mark(), m.receivedAt(), shown));
+        });
+        java.util.LinkedHashMap<UUID, ReviewSafetySignalMark> ordered = new java.util.LinkedHashMap<>();
+        tiered.entrySet().stream()
+                .sorted(Comparator.<Map.Entry<UUID, ReviewSafetySignalMark>>comparingInt(
+                                e -> "OCCURRENCE".equals(e.getValue().mark().reading()) ? 0 : 1)
+                        .thenComparing(e -> e.getValue().receivedAt(),
+                                Comparator.nullsLast(Comparator.reverseOrder())))
+                .forEach(e -> ordered.put(e.getKey(), e.getValue()));
+        return new SafetyScan(ordered, new ReviewRecordPageView.SafetySummary(ordered.size(),
+                byTier[ReviewTriageTier.NEEDS_ATTENTION.ordinal()], byTier[ReviewTriageTier.WATCH.ordinal()],
+                byTier[ReviewTriageTier.FYI.ordinal()]));
+    }
+
+    /** One page of the safety filter, in the scan's order. */
+    private Page<Review> safetyPage(SafetyScan scan, Pageable pageable) {
+        List<UUID> all = List.copyOf(scan.marks().keySet());
+        int from = (int) Math.min(all.size(), pageable.getOffset());
+        List<UUID> slice = all.subList(from, Math.min(all.size(), from + pageable.getPageSize()));
+        Map<UUID, Review> byId = reviews.findAllById(slice).stream()
+                .collect(Collectors.toMap(Review::getId, r -> r));
+        List<Review> ordered = slice.stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
+        return new org.springframework.data.domain.PageImpl<>(ordered, pageable, all.size());
     }
 
     /** Reviews on channels outside {@code ProductChannels.VISIBLE_CODES} — counted, never listed. */
@@ -569,7 +636,15 @@ public class ChannelReviewService {
                 work,
                 account == null ? null : account.getId(),
                 replyUnavailableReason(work, account, channelCode),
-                identity.forReview(review).name());
+                identity.forReview(review).name(),
+                safetyMark(review.getBody()));
+    }
+
+    /** The review's safety mark, read from the stored body like every other reader of the signal; null for none. */
+    static ReviewRecordPageView.SafetyMark safetyMark(String body) {
+        return com.sellerops.review.triage.ReviewSafetySignal.find(com.sellerops.common.MarkupText.toPlainText(body))
+                .map(f -> new ReviewRecordPageView.SafetyMark(f.kind().name(), f.reading().name(), f.term()))
+                .orElse(null);
     }
 
     /**

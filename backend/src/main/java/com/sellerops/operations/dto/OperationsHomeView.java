@@ -88,7 +88,14 @@ public record OperationsHomeView(
              */
             boolean safety,
             /** {@code OCCURRENCE} · {@code WORRY} when {@code safety}, else null — 발생 and 우려 are shown apart. */
-            String safetyReading) {
+            String safetyReading,
+            /** Which kind of harm when {@code safety} (2026-10-25: the label says 부상 언급 · 몸 반응 언급 …), else null. */
+            String safetyKind) {
+
+        public AttentionReview(UUID reviewId, UUID accountId, String channelCode, Integer rating, LocalDate occurredOn,
+                               String productName, String quote, boolean safety, String safetyReading) {
+            this(reviewId, accountId, channelCode, rating, occurredOn, productName, quote, safety, safetyReading, null);
+        }
     }
 
     /**

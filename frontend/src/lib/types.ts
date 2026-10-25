@@ -2525,6 +2525,8 @@ export interface ReviewWorkView {
   safetyReviewIds?: string[];
   /** Of `safetyReviewIds`, those that read as a worry (우려) rather than an occurrence (발생). */
   safetyWorryReviewIds?: string[];
+  /** Of `safetyReviewIds`, each one's kind of harm — what its label names (2026-10-25). */
+  safetyKinds?: Record<string, SafetyMark["kind"]>;
   /**
    * The reviews in `committed` that went to the delegate and came back to the seller, by the lane's own state
    * (`AWAITING_APPROVAL` on the phone · `RECHECK_NEEDED` · `HELD` · `FAILED`). A reply the delegate holds is not in
@@ -2569,6 +2571,8 @@ export interface HomeAttentionReview {
   safety?: boolean;
   /** How it reads when `safety` — 발생 or 우려. Absent from an older server: shown as 발생, the stronger mark. */
   safetyReading?: SafetyReading | null;
+  /** Which kind of harm when `safety` (2026-10-25), for its label. */
+  safetyKind?: SafetyMark["kind"] | null;
 }
 
 /**
@@ -2794,6 +2798,15 @@ export interface ReviewRecordPageView {
   channelFacts: ReviewRecordChannelFacts[];
   /** Reviews on channels outside the seller-visible set — counted, never listed. */
   outsideVisibleChannels: number;
+  /** The reviews in scope that mention a safety or legal problem, in all and per group (mockup ②, 2026-10-25). */
+  safety?: { total: number; needsAttention: number; watch: number; fyi: number } | null;
+}
+
+/** A review's safety mark: its kind, how it reads, and the expression that stands (spaces removed). */
+export interface SafetyMark {
+  kind: "INJURY" | "BODY_REACTION" | "PRODUCT_HAZARD" | "LEGAL";
+  reading: "OCCURRENCE" | "WORRY";
+  term: string | null;
 }
 
 export interface ReviewRecordChannelFacts {
@@ -2809,6 +2822,8 @@ export interface ReviewRecordRow {
   channelCode: string | null;
   channelNameKo: string | null;
   review: ChannelReviewItemView;
+  /** What the review says of harm; null or absent when it says nothing of it. */
+  safety?: SafetyMark | null;
 }
 
 export interface ChannelReviewPageView {
@@ -2958,6 +2973,8 @@ export interface ChannelReviewDetailView {
    * absence and are not the same sentence to a seller.
    */
   replyUnavailableReason: "CHANNEL_HAS_NO_REPLY_FLOW" | "NO_SELLER_ACCOUNT" | null;
+  /** What the review says of harm, and where (mockup ②, 2026-10-25); null or absent when it says nothing of it. */
+  safety?: SafetyMark | null;
 }
 
 export interface ChannelReviewReplyWork {

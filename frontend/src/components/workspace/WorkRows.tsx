@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { safetyLabel, safetyTone } from "../../lib/safetyLabel";
 import { DecisionList, DecisionRow } from "../ui/DecisionRow";
 import { WORK_STATE } from "../../lib/workState";
 import { selectionHref } from "./MasterDetail";
@@ -193,19 +194,15 @@ export function WorkRows({
 }
 
 /**
- * The words a row carrying the safety or legal signal is marked with (product-owner decisions, 2026-10-22 and
- * 2026-10-23, the second approving the 발생/우려 mockup). 「확인」, not 「문제」: a fixed list of expressions finds a
- * candidate, and the seller is the one who says what it is. 발생 — the customer says it happened — is red; 우려 — they
- * fear it will — is orange. A reading the server did not send is 발생: never milder than the report may be.
+ * The words a row carrying the safety or legal signal is marked with (mockup ②, confirmed 2026-10-25, replacing
+ * 「안전 확인 · 발생/우려」). The mark says what the REVIEW says — 「부상 언급」, 「걱정 언급」 — never that reviewnary
+ * established an accident. What happened is red; a worry is orange. A reading the server did not send is an
+ * occurrence: never milder than the report may be.
  */
-export const SAFETY_MARK = { OCCURRENCE: "안전 확인 · 발생", WORRY: "안전 확인 · 우려" } as const;
-
-export function safetyMark(row: Pick<HomeWorkRow, "safety" | "safetyReading">):
+export function safetyMark(row: Pick<HomeWorkRow, "safety" | "safetyReading" | "safetyKind">):
   { text: string; tone: "bad" | "warn" } | null {
   if (!row.safety) return null;
-  return row.safetyReading === "WORRY"
-    ? { text: SAFETY_MARK.WORRY, tone: "warn" }
-    : { text: SAFETY_MARK.OCCURRENCE, tone: "bad" };
+  return { text: safetyLabel(row.safetyKind, row.safetyReading), tone: safetyTone(row.safetyReading) };
 }
 
 /** True when the second line would only repeat the sentence already drawn above it. */

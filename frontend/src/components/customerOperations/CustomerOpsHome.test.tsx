@@ -416,7 +416,8 @@ describe("CustomerOpsHome", () => {
     await waitFor(() => expect(within(again).getAllByRole("link")).toHaveLength(visibleHomeRows(false)));
     const first = within(again).getAllByRole("link")[0];
     expect(first).toHaveTextContent("화상을 입었어요");
-    expect(within(first).getByText("안전 확인 · 발생")).toHaveClass("text-bad");
+    // No kind from this older fixture: still a mention, never 「안전 확인」 (mockup ②, 2026-10-25).
+    expect(within(first).getByText("안전 관련 언급")).toHaveClass("text-bad");
   });
 
   it("a source that was not read is excluded from the count and says so, with its fix", async () => {
