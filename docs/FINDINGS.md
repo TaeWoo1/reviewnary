@@ -603,6 +603,20 @@
 - **출처** — 2026-10-23, `vendor-server/.../task/ReplyTasks.java` `awaitingPcCheck`,
   `backend/.../vendorlink/VendorReplyTaskService.java` `checkPhoneEdit` · `recheckApproved` · `recheckSentBack`.
 
+### B27. 돌고 있는 서버의 jar를 다시 빌드해 덮어써, 셀러 PC가 리뷰 받기를 말없이 멈췄다
+
+- **했던 것** — `tools/dev/seller-pc-demo.sh up`이 서버를 새로 띄울 때마다 `bootJar`로 jar를 다시 만들었고, 이미 떠 있던
+  셀러 PC 백엔드는 **그 같은 파일**에서 돌고 있었다. 실제 리뷰 3,555건을 올렸는데 PC에는 0건이었다.
+- **사실** — 30초마다 돌던 받기 작업이 00:58 이후 한 번도 돌지 않았고 오류 줄도 없었다. 스케줄러 스레드는 빈 큐를 기다리고
+  있었다(작업이 큐에서 빠졌다). 덮어쓴 jar에서는 아직 안 읽은 클래스를 못 읽는다: 처음으로 스택이 찍히는 순간 logback의
+  `ThrowableProxy`가 없어 로그 쓰기마저 실패하고, 그 오류가 예약 작업 밖으로 새어 주기 작업이 조용히 사라진다. 따로 띄운
+  서버의 jar를 덮어쓰고 오류를 하나 내 같은 `NoClassDefFoundError: ch/qos/logback/classic/spi/ThrowableProxy`를 재현했다.
+  PC를 다시 띄우니 바로 3,555건을 받았다(받은 위치가 DB에 있어 잃은 것은 없다).
+- **다음에** — 오래 도는 서버는 다음 빌드가 덮어쓸 파일에서 돌리지 않는다. 데모 스크립트는 띄울 때 jar를 실행 폴더에
+  복사해 그 사본으로 돌린다. "왜 안 들어오지"면 로그보다 먼저 스케줄러 스레드가 무엇을 기다리는지(`jstack`) 본다.
+- **출처** — 2026-10-26, `tools/dev/seller-pc-demo.sh` `own_jar`. "오래 도는 프로세스는 시작한 버전을 붙잡는다"의
+  반대편이다 — 여기서는 붙잡은 버전이 발밑에서 바뀌었다.
+
 ---
 
 ## C. 증거 · 계약

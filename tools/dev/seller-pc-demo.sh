@@ -72,6 +72,12 @@ PY
 
 jar() { (cd "$REPO/$1" && ls build/libs/*.jar | grep -v plain | head -1 | sed "s#^#$REPO/$1/#"); }
 
+# A running server reads its classes out of its jar for as long as it lives, so it must never run from the file the
+# next build overwrites: a class it had not loaded yet — logback's exception class, the first time anything is logged
+# with a stack trace — then fails to load, and a scheduled job that hits it dies without a word (the PC stopped
+# pulling reviews at 00:58 on 2026-10-26 this way; docs/FINDINGS.md). Each server gets its own copy.
+own_jar() { cp "$(jar "$1")" "$RUN/$2.jar" && echo "$RUN/$2.jar"; }
+
 alive() { [[ -f "$RUN/$1.pid" ]] && kill -0 "$(cat "$RUN/$1.pid")" 2>/dev/null; }
 
 wait_for() { # url seconds
@@ -99,7 +105,7 @@ up() {
   echo "built $(cd "$REPO" && git log -1 --format=%h)"
 
   if ! alive vendor; then
-    ( vendor_env; eval "$(google_env)"; exec java -jar "$(jar vendor-server)" ) >> "$RUN/vendor.log" 2>&1 &
+    ( vendor_env; eval "$(google_env)"; exec java -jar "$(own_jar vendor-server vendor)" ) >> "$RUN/vendor.log" 2>&1 &
     echo $! > "$RUN/vendor.pid"
   fi
   wait_for "http://127.0.0.1:$VENDOR_PORT/health" 120 || { echo "vendor server did not start (see $RUN/vendor.log)"; exit 1; }
@@ -113,7 +119,7 @@ up() {
         SELLEROPS_CORS_ORIGIN="http://127.0.0.1:$SCREEN_PORT" SELLEROPS_VAULT_MASTER_KEY="$PC_VAULT_KEY" \
         SELLEROPS_VAULT_KEY_ID=seller-pc-demo-1 SELLEROPS_SEED_ENABLED=true \
         SELLEROPS_VENDOR_LINK_BASE_URL="http://127.0.0.1:$VENDOR_PORT" SELLEROPS_VENDOR_REVIEW_PULL_INTERVAL_MS=$PULL_MS
-      exec java -jar "$(jar backend)" ) >> "$RUN/pc.log" 2>&1 &
+      exec java -jar "$(own_jar backend pc)" ) >> "$RUN/pc.log" 2>&1 &
     echo $! > "$RUN/pc.pid"
   fi
   for _ in $(seq 1 240); do
