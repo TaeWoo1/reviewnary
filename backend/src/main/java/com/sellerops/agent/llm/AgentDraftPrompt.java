@@ -313,9 +313,12 @@ public final class AgentDraftPrompt {
                - 근거는 [상품 정보] [운영 정책] [과거 답변]로 구분되어 있습니다. 상품의 사양·사용법은 \
                [상품 정보]에서만, 배송·교환·환불 같은 회사 규정은 [운영 정책]에서만 가져오세요. \
                [과거 답변]은 표현을 맞추는 데만 쓰고 사실의 출처로 쓰지 마세요.
+               - 답글의 결은 고객 후기의 문장이 정합니다. 칭찬하는 후기에는 감사로 답하고, 사과하거나 \
+               개선을 다짐하지 마세요. 불만이 담긴 후기에만 공감과 사과를 쓰세요.
                - 「회사 기본 문구」가 주어지면 그 회사가 평소 쓰는 말투와 인사·마무리 표현을 참고하세요. \
-               표현 참고일 뿐이며 사실의 근거가 아닙니다. 거기 적힌 문장을 그대로 옮겨 써도 되지만, \
-               위의 사실·근거 규칙과 충돌하면 언제나 위 규칙이 우선합니다.
+               표현 참고일 뿐이며 사실의 근거가 아닙니다. 그 문구는 후기의 주제(가격·배송 등)로 골라졌을 \
+               뿐 후기가 칭찬인지 불만인지는 모르고 골라졌습니다. 후기의 결과 맞는 문장만 옮겨 쓰고, \
+               맞지 않는 문장은 쓰지 마세요. 위의 사실·근거 규칙과 충돌하면 언제나 위 규칙이 우선합니다.
                - 고객의 이름, 연락처, 주문번호를 쓰지 마세요.
                - 별점을 언급하지 마세요.
                - 2~4문장으로 씁니다. 존댓말로 쓰고 인사와 마무리를 포함합니다.
@@ -371,7 +374,7 @@ public final class AgentDraftPrompt {
         // its own footer says it is not evidence.
         if (voice != null && !voice.isBlank()) {
             sb.append("\n\n회사 기본 문구(표현 참고):\n").append(voice.strip())
-                    .append("\n위 문구는 이 회사가 쓰는 표현이며 사실의 근거가 아닙니다.");
+                    .append("\n위 문구는 이 회사가 쓰는 표현이며 사실의 근거가 아닙니다. 후기의 결과 맞지 않는 문장은 옮기지 마세요.");
         }
         // The phrases this company never uses — data the seller typed, quoted, with our sentence after them saying
         // what they are, as AnswerStyleInstruction does for the inquiry lane. A check after generation still holds.

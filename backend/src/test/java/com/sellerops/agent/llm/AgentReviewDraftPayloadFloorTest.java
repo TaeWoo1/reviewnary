@@ -97,6 +97,11 @@ class AgentReviewDraftPayloadFloorTest {
         for (String rule : List.of("공개", "원인", "배송 일정", "교환·반품·환불", "보상", "재발송", "내부 조치")) {
             assertThat(system).as("the review prompt must name %s", rule).contains(rule);
         }
+        // The wording reference is picked by topic, not polarity (ReviewReplyTemplateKey): 「가격대비 저렴하고 좋아요」
+        // drew the pricing template and came back as 「더 나은 가치를 드릴 수 있도록 계속 고민하겠습니다」 (2026-10-26).
+        // The review's own sentences decide whether the reply thanks or apologises.
+        assertThat(system).contains("칭찬하는 후기에는 감사로 답하고");
+        assertThat(system).contains("후기의 결과 맞는 문장만 옮겨 쓰고");
         // One field, because a public reply has no subject line and no category to choose.
         assertThat(system).contains("{\"comments\"");
         assertThat(system).doesNotContain("title");
