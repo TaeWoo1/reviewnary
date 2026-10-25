@@ -31,6 +31,11 @@ public class DelegateAuthController {
     /** Delegate failures share the seller throttle's memory but never its keys. */
     static final String THROTTLE_PREFIX = "delegate:";
 
+    public record PeekRequest(@NotBlank String inviteCode) {}
+
+    /** {@code email} is masked ({@link #mask}): the page names the address without spelling it out on screen. */
+    public record PeekResponse(String email, Delegates.Role role, Instant expiresAt) {}
+
     public record StageRequest(@NotBlank String inviteCode, @NotBlank String password) {}
 
     public record ConfirmRequest(@NotBlank String inviteCode, @NotBlank String otp) {}
@@ -56,6 +61,30 @@ public class DelegateAuthController {
         this.sessions = sessions;
         this.throttle = throttle;
         this.revocations = revocations;
+    }
+
+    /**
+     * What an invite makes, before anything is chosen: the join page says who it is for and until when. The code is
+     * the credential, as on the seller's peek; the address comes back masked because it is drawn on a screen that may
+     * be shared, and Google is told the whole address separately (login_hint).
+     */
+    @PostMapping("/invites/peek")
+    public ResponseEntity<?> peek(@RequestBody @Valid PeekRequest request) {
+        return delegates.invite(request.inviteCode())
+                .<ResponseEntity<?>>map(i -> ResponseEntity.ok(new PeekResponse(mask(i.email()), i.role(),
+                        i.expiresAt())))
+                .orElseGet(() -> ResponseEntity.badRequest().body(Map.of("error", "invalid_invite")));
+    }
+
+    /** {@code reviewnary.kr@gmail.com} → {@code re***@gmail.com}: two letters of the name, the domain whole. */
+    static String mask(String email) {
+        int at = email.lastIndexOf('@');
+        if (at <= 0) {
+            return "***";
+        }
+        // A short name keeps one letter, so the mask never shows the whole of it.
+        int keep = at > 2 ? 2 : 1;
+        return email.substring(0, keep) + "***" + email.substring(at);
     }
 
     @PostMapping("/invites/stage")

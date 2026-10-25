@@ -508,6 +508,19 @@ class VendorServerSecurityTest {
     }
 
     @Test
+    void anInviteSaysWhoItIsForMaskedWithoutASession() throws Exception {
+        String address = "p-" + UUID.randomUUID().toString().substring(0, 8) + "@gmail.com";
+        String invite = delegates.issueInvite(address, Delegates.Role.ADMIN);
+        mvc.perform(json(post("/v1/delegate/auth/invites/peek"), "{\"inviteCode\":\"" + invite + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("p-***@gmail.com"))
+                .andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.expiresAt").isNotEmpty());
+        mvc.perform(json(post("/v1/delegate/auth/invites/peek"), "{\"inviteCode\":\"nope\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("invalid_invite"));
+    }
+
+    @Test
     void enrolmentErrorsAreFixedCodes() throws Exception {
         mvc.perform(json(post("/v1/delegate/auth/invites/stage"),
                         "{\"inviteCode\":\"nope\",\"password\":\"correct horse battery\"}"))

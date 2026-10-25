@@ -239,6 +239,20 @@ public class Delegates {
         return used == 1 ? Optional.of(id) : Optional.empty();
     }
 
+    /** What a live invite makes: for the join page to say before anything is chosen. */
+    public record Invite(String email, Role role, Instant expiresAt) {}
+
+    /** A live invite's address, role and deadline; empty when the code is unknown, spent or expired. */
+    @Transactional(readOnly = true)
+    public Optional<Invite> invite(String code) {
+        return jdbc.sql("select email, role, expires_at from delegate_invites "
+                        + "where code_hash = ? and redeemed_at is null and expires_at > ?")
+                .params(Codes.hash(code == null ? "" : code.trim()), ts(clock.instant()))
+                .query((rs, n) -> new Invite(rs.getString("email"), Role.valueOf(rs.getString("role")),
+                        rs.getTimestamp("expires_at").toInstant()))
+                .optional();
+    }
+
     /** The address a live invite was issued to, for Google to offer that account first; empty when not live. */
     @Transactional(readOnly = true)
     public Optional<String> inviteEmail(String code) {

@@ -103,8 +103,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/v1/installs").hasRole(SELLER)
                         .requestMatchers(HttpMethod.DELETE, "/v1/installs/*").hasRole(SELLER)
                         .requestMatchers(HttpMethod.GET, "/v1/stores").hasAnyRole(SELLER, INSTALL)
-                        .requestMatchers(HttpMethod.POST, "/v1/delegate/auth/invites/stage",
-                                "/v1/delegate/auth/invites/confirm", "/v1/delegate/auth/login",
+                        .requestMatchers(HttpMethod.POST, "/v1/delegate/auth/invites/peek",
+                                "/v1/delegate/auth/invites/stage", "/v1/delegate/auth/invites/confirm", "/v1/delegate/auth/login",
                                 "/v1/delegate/auth/google/start", "/v1/delegate/auth/google/finish").permitAll()
                         .requestMatchers(HttpMethod.GET, "/v1/delegate/auth/methods",
                                 "/v1/delegate/auth/google/callback").permitAll()

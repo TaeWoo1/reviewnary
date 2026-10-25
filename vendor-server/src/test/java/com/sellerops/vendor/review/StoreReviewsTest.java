@@ -65,6 +65,20 @@ class StoreReviewsTest {
     }
 
     @Test
+    void anUploadSaysWhichDaysItsReviewsWereWrittenOn() throws Exception {
+        // The span is Seller Center's own days, read from the file — the first and the last written, in any row order.
+        Imported span = upload(lines(
+                ExportWorkbooks.line("1", Map.of("리뷰등록일", "2026.03.02. 08:30:00")),
+                ExportWorkbooks.line("2", Map.of("리뷰등록일", "2026.10.25. 23:59:00")),
+                ExportWorkbooks.line("3", Map.of("리뷰등록일", "2026.07.14. 12:00:00"))));
+        assertThat(span.writtenFrom()).isEqualTo(java.time.LocalDate.of(2026, 3, 2));
+        assertThat(span.writtenTo()).isEqualTo(java.time.LocalDate.of(2026, 10, 25));
+        Imported none = upload(NaverReviewExport.read(ExportWorkbooks.emptyFixture()));
+        assertThat(none.writtenFrom()).isNull();
+        assertThat(none.writtenTo()).isNull();
+    }
+
+    @Test
     void theFirstUploadIsAllNewAndTheSameUploadAgainIsNothing() throws Exception {
         Imported first = upload(NaverReviewExport.read(ExportWorkbooks.fixture()));
         assertThat(first).extracting(Imported::rows, Imported::added, Imported::changed, Imported::replied,

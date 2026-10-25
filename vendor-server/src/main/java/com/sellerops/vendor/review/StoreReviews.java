@@ -8,6 +8,7 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,9 +49,12 @@ public class StoreReviews {
     /**
      * {@code purged} counts rows naming a review already deleted at the end of its retention (§6): it is not taken
      * again, so nothing changed for it here and it is counted in {@code unchanged} too.
+     *
+     * <p>{@code writtenFrom} · {@code writtenTo}: the first and last day (Korea) a review in the file was written —
+     * what the file actually covered, for the desk to set beside the period it asked for. Null for a file of no rows.
      */
     public record Imported(UUID uploadId, int rows, int added, int changed, int replied, int unchanged,
-                           int attachmentsDropped, int purged) {}
+                           int attachmentsDropped, int purged, LocalDate writtenFrom, LocalDate writtenTo) {}
 
     /** What a PC receives about one review. */
     public record ReviewView(UUID id, String reviewNo, String productNo, String productName, String kind, int rating,
@@ -173,7 +177,15 @@ public class StoreReviews {
                         + "attachments_dropped = ? where id = ?")
                 .params(added, changed, replied, unchanged, dropped, uploadId)
                 .update();
-        return new Imported(uploadId, lines.size(), added, changed, replied, unchanged, dropped, purged);
+        List<Instant> written = lines.stream().map(NaverReviewExport.Line::writtenAt).filter(Objects::nonNull)
+                .sorted().toList();
+        return new Imported(uploadId, lines.size(), added, changed, replied, unchanged, dropped, purged,
+                written.isEmpty() ? null : sellerCenterDay(written.get(0)),
+                written.isEmpty() ? null : sellerCenterDay(written.get(written.size() - 1)));
+    }
+
+    private static LocalDate sellerCenterDay(Instant instant) {
+        return instant.atZone(NaverReviewExport.SELLER_CENTER_ZONE).toLocalDate();
     }
 
     @Transactional(readOnly = true)
