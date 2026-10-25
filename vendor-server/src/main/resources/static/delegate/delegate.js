@@ -6,10 +6,24 @@
 // Copying the reply and reporting it posted open only after a clear pre-save check (`clearToPost`); a check that
 // fails or cannot be read means do not post. The session token lives in this tab's sessionStorage and is gone when
 // the tab closes. Every value from the server is written with textContent, never as HTML.
+//
+// Google sign-in (owner, 2026-10-26) ends here: Google's return lands on /delegate#google=<handoff> (or
+// #google-error=<reason>), and this page finishes it with the binding the starting tab kept in sessionStorage.
 (function () {
   "use strict";
 
   var KEY = "reviewnary.delegate.session";
+  var GOOGLE_KEY = "reviewnary.delegate.google";
+  var GOOGLE_ERRORS = {
+    cancelled: "구글 로그인을 취소했습니다.",
+    expired: "구글 로그인 시간이 지났습니다. 다시 눌러 주세요.",
+    google_failed: "구글 로그인을 마치지 못했습니다. 이 창에서 다시 눌러 주세요.",
+    email_mismatch: "초대받은 주소와 다른 구글 계정입니다. 초대 링크를 다시 열고 초대받은 주소의 구글 계정을 고르세요.",
+    already_registered: "이미 등록된 담당자입니다. 여기서 로그인하세요.",
+    invalid_invite: "초대 링크가 맞지 않거나 이미 썼거나 기한이 지났습니다. 초대한 사람에게 새 링크를 받으세요.",
+    not_registered: "이 구글 계정으로 등록된 담당자가 없습니다. 초대받은 주소의 구글 계정인지 확인하세요.",
+    not_enabled: "구글 로그인이 꺼져 있습니다. 비밀번호와 인증 앱으로 로그인하세요."
+  };
   var MINE = ["CLAIMED", "CANCEL_REQUESTED", "HOLD_REQUESTED", "UNKNOWN"];
   var STATE = {
     APPROVED: ["승인됨", "info"],
@@ -562,6 +576,72 @@
     }, function () { say("login-error", "서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요."); });
   });
 
+  /* ── Google ───────────────────────────────────────────────────────────────────────────────────────── */
+
+  function binding() {
+    var b = new Uint8Array(32);
+    window.crypto.getRandomValues(b);
+    return btoa(String.fromCharCode.apply(null, b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  function googleError(key) {
+    say("google-error", GOOGLE_ERRORS[key] || "서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.");
+  }
+
+  function takeBinding() {
+    var b = null;
+    try { b = window.sessionStorage.getItem(GOOGLE_KEY); window.sessionStorage.removeItem(GOOGLE_KEY); } catch (e) { b = null; }
+    return b;
+  }
+
+  $("google-signin").addEventListener("click", function () {
+    say("google-error", "");
+    var b = binding();
+    try { window.sessionStorage.setItem(GOOGLE_KEY, b); } catch (e) {
+      say("google-error", "이 창에서는 구글 로그인을 마칠 수 없습니다. 비공개 창이 아닌 일반 창에서 여세요.");
+      return;
+    }
+    $("google-signin").disabled = true;
+    call("POST", "/v1/delegate/auth/google/start", { purpose: "LOGIN", binding: b }).then(function (r) {
+      if (r.status === 200 && r.json && typeof r.json.url === "string" && r.json.url.indexOf("https://accounts.google.com/") === 0) {
+        window.location.assign(r.json.url);
+      } else {
+        $("google-signin").disabled = false;
+        googleError(r.json && r.json.error);
+      }
+    }, function () { $("google-signin").disabled = false; googleError(null); });
+  });
+
+  /** Google's return: the fragment is read once and cleared; true when it was one. */
+  function googleReturn() {
+    var hash = window.location.hash ? window.location.hash.slice(1) : "";
+    var m = /^google(-error)?=([A-Za-z0-9_-]{1,128})$/.exec(hash);
+    if (!m) { return false; }
+    window.history.replaceState(null, "", window.location.pathname);
+    var b = takeBinding();
+    show("login");
+    if (m[1]) { googleError(m[2]); return true; }
+    if (!b) { googleError("google_failed"); return true; }
+    call("POST", "/v1/delegate/auth/google/finish", { handoff: m[2], binding: b }).then(function (r) {
+      if (r.status === 200 && r.json && r.json.token) {
+        keep(r.json.token);
+        whoAmI();
+        loadList();
+      } else {
+        googleError(r.json && r.json.error);
+      }
+    }, function () { googleError(null); });
+    return true;
+  }
+
+  function methods() {
+    call("GET", "/v1/delegate/auth/methods").then(function (r) {
+      var on = r.status === 200 && r.json && r.json.google === true;
+      $("google-login").hidden = !on;
+      $("app-login-title").hidden = !on;
+    }, function () {});
+  }
+
   function whoAmI() {
     call("GET", "/v1/delegate/me").then(function (r) {
       if (r.status === 200 && r.json) {
@@ -571,5 +651,7 @@
     }, function () {});
   }
 
-  if (session) { whoAmI(); loadList(); } else { show("login"); $("email").focus(); }
+  methods();
+  if (googleReturn()) { /* finishing the Google trip, or saying why it did not */ }
+  else if (session) { whoAmI(); loadList(); } else { show("login"); $("email").focus(); }
 })();

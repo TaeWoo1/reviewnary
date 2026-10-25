@@ -30,7 +30,8 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
  * <ul>
  *   <li>No credential: {@code GET /health}, the pages ({@code /link}, {@code /replies}, {@code /delegate} and their
  *       {@code /assets}), the seller's invite redemption and
- *       login, the delegate's invite staging, confirmation and sign-in, and the PC's grant {@code code} /
+ *       login, the delegate's invite staging, confirmation and sign-in (and the Google round trip: which ways in,
+ *       start, Google's return, finish), and the PC's grant {@code code} /
  *       {@code token} calls.</li>
  *   <li>Install token only ({@link Principal#INSTALL}): {@code GET /v1/ip}, the PC's own row.</li>
  *   <li>Seller session only ({@link Principal#SELLER}): looking up and approving a PC, listing and revoking the
@@ -103,7 +104,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/v1/installs/*").hasRole(SELLER)
                         .requestMatchers(HttpMethod.GET, "/v1/stores").hasAnyRole(SELLER, INSTALL)
                         .requestMatchers(HttpMethod.POST, "/v1/delegate/auth/invites/stage",
-                                "/v1/delegate/auth/invites/confirm", "/v1/delegate/auth/login").permitAll()
+                                "/v1/delegate/auth/invites/confirm", "/v1/delegate/auth/login",
+                                "/v1/delegate/auth/google/start", "/v1/delegate/auth/google/finish").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/delegate/auth/methods",
+                                "/v1/delegate/auth/google/callback").permitAll()
                         .requestMatchers(HttpMethod.POST, "/v1/delegate/auth/logout").hasRole(DELEGATE)
                         .requestMatchers(HttpMethod.GET, "/v1/delegate/me").hasRole(DELEGATE)
                         .requestMatchers(HttpMethod.POST, "/v1/delegate/stores/*/review-uploads").hasRole(DELEGATE)

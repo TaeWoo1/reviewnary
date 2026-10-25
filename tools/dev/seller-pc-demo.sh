@@ -17,6 +17,10 @@
 # The PC's reply drafts use the model settings of the web demo — only the SELLEROPS_AGENT_DRAFT_* names are taken
 # from backend/.env.local, inside the process that starts the PC; no other setting of the web demo comes along.
 # Mail runs in dev-outbox mode: a PC-link code lands in vendor.log, never in a mailbox.
+#
+# Delegates sign in with Google when the OAuth client file Google Cloud gives you ("web application", redirect URI
+# http://127.0.0.1:18099/v1/delegate/auth/google/callback) is saved as tools/dev/.run/seller-pc-demo/google-client.json.
+# Only its client id and secret are read, inside the process that starts the vendor server; nothing is printed.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
@@ -44,6 +48,18 @@ keys() {
 vendor_env() {
   export VENDOR_DB_URL="jdbc:postgresql://127.0.0.1:5432/vendor_demo" VENDOR_DB_USER=sellerops VENDOR_DB_PASSWORD=
   export VENDOR_SERVER_PORT=$VENDOR_PORT VENDOR_PUBLIC_URL="http://127.0.0.1:$VENDOR_PORT" VENDOR_MAIL_MODE=dev-outbox
+}
+
+# The Google client's id and secret, printed as assignments for the caller to eval — never shown.
+google_env() {
+  [[ -f "$RUN/google-client.json" ]] || return 0
+  python3 -I - "$RUN/google-client.json" <<'PY'
+import json, shlex, sys
+web = json.load(open(sys.argv[1])).get("web", {})
+for key, name in (("client_id", "VENDOR_GOOGLE_CLIENT_ID"), ("client_secret", "VENDOR_GOOGLE_CLIENT_SECRET")):
+    if web.get(key):
+        print(f"export {name}={shlex.quote(web[key])}")
+PY
 }
 
 jar() { (cd "$REPO/$1" && ls build/libs/*.jar | grep -v plain | head -1 | sed "s#^#$REPO/$1/#"); }
@@ -75,7 +91,7 @@ up() {
   echo "built $(cd "$REPO" && git log -1 --format=%h)"
 
   if ! alive vendor; then
-    ( vendor_env; exec java -jar "$(jar vendor-server)" ) >> "$RUN/vendor.log" 2>&1 &
+    ( vendor_env; eval "$(google_env)"; exec java -jar "$(jar vendor-server)" ) >> "$RUN/vendor.log" 2>&1 &
     echo $! > "$RUN/vendor.pid"
   fi
   wait_for "http://127.0.0.1:$VENDOR_PORT/health" 120 || { echo "vendor server did not start (see $RUN/vendor.log)"; exit 1; }
@@ -117,6 +133,8 @@ down() {
 
 status() {
   for s in vendor pc screen; do printf '%-7s %s\n' "$s" "$(alive "$s" && echo up || echo down)"; done
+  printf '%-7s %s\n' google "$(curl -s "http://127.0.0.1:$VENDOR_PORT/v1/delegate/auth/methods" | grep -q '"google":true' \
+    && echo "sign-in on" || echo "sign-in off (no $RUN/google-client.json)")"
   echo "PC screen      http://127.0.0.1:$SCREEN_PORT"
   echo "delegate desk  http://127.0.0.1:$VENDOR_PORT/delegate/"
   echo "phone page     http://127.0.0.1:$VENDOR_PORT/replies"

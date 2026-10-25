@@ -13,6 +13,12 @@
 
   <section id="view-login" class="page" aria-label="담당자 로그인" hidden>
     <h1>담당자 로그인</h1>
+    <div id="google-login" class="card stack8" hidden>
+      <p id="google-error" class="msg bad-text" role="alert" hidden></p>
+      <button type="button" id="google-signin" class="btn solid big">구글 계정으로 로그인</button>
+      <p class="xs muted">구글 계정으로 등록한 담당자는 이 버튼으로 로그인합니다.</p>
+    </div>
+    <p id="app-login-title" class="sm muted" hidden>비밀번호와 인증 앱으로 등록한 담당자</p>
     <form id="login-form" class="card" novalidate>
       <label for="email">이메일</label>
       <input id="email" type="email" autocomplete="username" required>

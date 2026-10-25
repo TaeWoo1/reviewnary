@@ -24,7 +24,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  *       and either its no-reply retention ran out ({@code purge_after}, D4) or it had tasks and none is left that
  *       young. Whichever of the two comes later wins. A review nobody has decided about — no task, no "no reply" —
  *       is work in progress and is never deleted here.</li>
- *   <li>Expired invites (they hold an address and, for delegates, a staged password and TOTP secret), logged-out
+ *   <li>Expired invites (they hold an address and, for delegates, a staged password and TOTP secret) and Google
+ *       sign-in attempts (counted with them), logged-out
  *       sessions past their expiry, and step-up codes a day old (their caps look back an hour, §2).</li>
  * </ul>
  *
@@ -95,7 +96,10 @@ public class Retention {
         }
         Integer invites = tx.execute(s -> jdbc.sql("delete from seller_invites where expires_at <= ?")
                 .param(Timestamp.from(now)).update()
-                + jdbc.sql("delete from delegate_invites where expires_at <= ?").param(Timestamp.from(now)).update());
+                + jdbc.sql("delete from delegate_invites where expires_at <= ?").param(Timestamp.from(now)).update()
+                // A Google round trip holds a PKCE verifier and, until finished, the account Google named.
+                + jdbc.sql("delete from delegate_google_attempts where expires_at <= ?").param(Timestamp.from(now))
+                .update());
         Integer sessions = tx.execute(s -> jdbc.sql("delete from revoked_sessions where expires_at < ?")
                 .param(Timestamp.from(now)).update());
         Integer stepUps = tx.execute(s -> jdbc.sql("delete from step_up_codes where issued_at < ?")

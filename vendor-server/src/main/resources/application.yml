@@ -23,8 +23,8 @@ spring:
       file-size-threshold: 13MB
 
 vendor:
-  # The address people open this server at (https://…, no trailing path). Only the operator commands read it, to print
-  # a delegate's join link whole; unset, they print the path alone.
+  # The address people open this server at (https://…, no trailing path). The operator commands read it to print a
+  # delegate's join link whole (unset, they print the path alone), and Google sign-in builds its redirect URI from it.
   public-url: ${VENDOR_PUBLIC_URL:}
   session:
     # HS256 key for seller sessions — at least 32 characters, required; SessionTokens refuses to start without it.
@@ -36,6 +36,11 @@ vendor:
     from: ${VENDOR_MAIL_FROM:no-reply@localhost}
     # Where a seller's reply to a new-PC notice goes — the operator. Optional.
     reply-to: ${VENDOR_MAIL_REPLY_TO:}
+  google:
+    # A delegate's sign-in with Google (contract §2, D3 revised 2026-10-26): an OAuth "web application" client whose
+    # redirect URI is <public-url>/v1/delegate/auth/google/callback. Off unless both are set AND public-url is set.
+    client-id: ${VENDOR_GOOGLE_CLIENT_ID:}
+    client-secret: ${VENDOR_GOOGLE_CLIENT_SECRET:}
   totp:
     # AES-256 key (base64, 32 bytes) that seals delegates' TOTP secrets — required; TotpSecretBox refuses to start
     # without it. Separate from the session key: one leaking does not give the other.

@@ -1,6 +1,10 @@
 // A delegate accepts an invite — docs/vendor_server_contract_v1.md §2, mockup confirmed 2026-10-21. Password → the
 // authenticator (the account exists only once its first code matches) → ten recovery codes shown once.
 //
+// When the server has Google sign-in (owner, 2026-10-26), that comes first: one press goes to Google with the invite,
+// and the desk (/delegate) finishes the trip. The page keeps a random binding in this tab's sessionStorage; only the
+// tab holding it can finish, so a return link sent by someone else does nothing. The password path stays one press away.
+//
 // The invite code arrives in the link's fragment (/delegate/join#…), which no browser sends to a server. It is read
 // once, kept in this page's memory, and cleared from the address bar at once — a reload or a shared screenshot does
 // not carry it. The session from the last step goes to this tab's sessionStorage under the desk's key, so the desk
@@ -9,13 +13,16 @@
   "use strict";
 
   var DESK_KEY = "reviewnary.delegate.session";
+  var GOOGLE_KEY = "reviewnary.delegate.google";
+  var google = false;
   var MIN_PASSWORD = 10;
   var ERRORS = {
     invalid_invite: "초대 링크가 맞지 않거나 이미 썼거나 기한이 지났습니다. 초대한 사람에게 새 링크를 받으세요.",
     weak_password: "비밀번호는 10자 이상이어야 합니다.",
     already_registered: "이미 등록된 담당자입니다. 로그인 화면에서 로그인하세요.",
     wrong_code: "인증 앱의 코드가 맞지 않습니다. 휴대폰 시계가 자동으로 맞춰져 있는지 확인하고 새 코드를 넣으세요.",
-    not_staged: "처음 단계부터 다시 해 주세요."
+    not_staged: "처음 단계부터 다시 해 주세요.",
+    not_enabled: "구글 등록이 꺼져 있습니다. 비밀번호와 인증 앱으로 등록하세요."
   };
 
   var code = null;
@@ -28,7 +35,8 @@
   function say(id, text) { var el = $(id); el.textContent = text || ""; el.hidden = !text; }
 
   function show(view) {
-    ["none", "password", "totp", "codes"].forEach(function (v) { $("view-" + v).hidden = v !== view; });
+    ["none", "google", "password", "totp", "codes"].forEach(function (v) { $("view-" + v).hidden = v !== view; });
+    $("steps").hidden = view === "google";
     var step = { password: 1, totp: 2, codes: 3 }[view] || 0;
     [1, 2, 3].forEach(function (n) { $("s" + n).className = n === step ? "on" : ""; });
     window.scrollTo(0, 0);
@@ -53,6 +61,41 @@
     var key = r.json && r.json.error;
     return ERRORS[key] || "서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.";
   }
+
+  /* ── 0. Google ────────────────────────────────────────────────────────────────────────────────────── */
+
+  function binding() {
+    var b = new Uint8Array(32);
+    window.crypto.getRandomValues(b);
+    return btoa(String.fromCharCode.apply(null, b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  $("google-join").addEventListener("click", function () {
+    say("google-error", "");
+    var b = binding();
+    try { window.sessionStorage.setItem(GOOGLE_KEY, b); } catch (e) {
+      say("google-error", "이 창에서는 구글 등록을 마칠 수 없습니다. 비공개 창이 아닌 일반 창에서 링크를 여세요.");
+      return;
+    }
+    $("google-join").disabled = true;
+    post("/v1/delegate/auth/google/start", { purpose: "JOIN", inviteCode: code, binding: b }).then(function (r) {
+      if (r.status === 200 && r.json && typeof r.json.url === "string" && r.json.url.indexOf("https://accounts.google.com/") === 0) {
+        window.location.assign(r.json.url);
+      } else {
+        $("google-join").disabled = false;
+        say("google-error", failure(r));
+      }
+    }, function () {
+      $("google-join").disabled = false;
+      say("google-error", "서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.");
+    });
+  });
+
+  $("use-app").addEventListener("click", function () {
+    say("password-error", "");
+    show("password");
+    $("password").focus();
+  });
 
   /* ── 1. password ──────────────────────────────────────────────────────────────────────────────────── */
 
@@ -182,24 +225,37 @@
 
   /* ── start ────────────────────────────────────────────────────────────────────────────────────────── */
 
-  // Also on hashchange: opening the link in a tab already on this page changes only the fragment, and the page
-  // is not loaded again.
-  function start() {
+  /** The fragment, read once and cleared from the address bar at once. */
+  function take() {
     var hash = window.location.hash ? window.location.hash.slice(1) : "";
     if (window.location.hash) {
       window.history.replaceState(null, "", window.location.pathname);
     }
+    return hash;
+  }
+
+  function start(hash) {
     if (/^[A-Za-z0-9_-]{20,128}$/.test(hash)) {
       code = hash;
       password = null;
       say("password-error", "");
-      show("password");
-      $("password").focus();
+      say("google-error", "");
+      if (google) { show("google"); } else { show("password"); $("password").focus(); }
     } else if (code == null) {
       show("none");
     }
   }
 
-  window.addEventListener("hashchange", start);
-  start();
+  // Which ways in this server offers decides the first view; no answer means the password path.
+  function methods() {
+    return fetch("/v1/delegate/auth/methods", { headers: { "Accept": "application/json" }, credentials: "omit" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { google = !!(j && j.google === true); }, function () { google = false; });
+  }
+
+  // Also on hashchange: opening the link in a tab already on this page changes only the fragment, and the page
+  // is not loaded again.
+  window.addEventListener("hashchange", function () { start(take()); });
+  var first = take();
+  methods().then(function () { start(first); });
 })();

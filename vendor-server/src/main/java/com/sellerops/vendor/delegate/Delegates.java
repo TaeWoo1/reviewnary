@@ -37,6 +37,10 @@ import org.springframework.transaction.annotation.Transactional;
  *       factor never reached a phone — and it returns ten single-use recovery codes, shown once.</li>
  *   <li><b>Every sign-in needs both factors.</b> A password with an authenticator code, or with an unused recovery
  *       code. A code's 30-second step is accepted once.</li>
+ *   <li><b>Or Google, instead of both</b> (owner, 2026-10-26). The invite is spent by a Google account whose verified
+ *       address is the invited one ({@link #joinWithGoogle}); that person then has no password or authenticator here
+ *       and is found by Google's account number alone ({@link #googleLogin}). One person uses one way, never both.
+ *       The round trip to Google is {@link GoogleDelegates}.</li>
  *   <li><b>Suspension ends the person's sessions at the next request and ends their store assignments.</b>
  *       Reinstating restores the account, not the assignments — those are given again on purpose. Work a suspended
  *       delegate had already taken on is settled by the task lane (contract §2: it becomes {@code UNKNOWN}, never
@@ -58,7 +62,7 @@ public class Delegates {
     public enum Status { ACTIVE, SUSPENDED }
 
     /** Why an enrolment call did not go through. One per case the invitee can act on. */
-    public enum EnrolFailure { INVALID_INVITE, WEAK_PASSWORD, ALREADY_REGISTERED, NOT_STAGED, WRONG_CODE }
+    public enum EnrolFailure { INVALID_INVITE, WEAK_PASSWORD, ALREADY_REGISTERED, NOT_STAGED, WRONG_CODE, EMAIL_MISMATCH }
 
     public static final class EnrolException extends RuntimeException {
         private final EnrolFailure failure;
@@ -201,7 +205,8 @@ public class Delegates {
                 .query((rs, n) -> new Row(rs.getObject("id", UUID.class), rs.getString("password_hash"),
                         rs.getBytes("totp_secret"), rs.getString("status")))
                 .optional();
-        if (row.isEmpty()) {
+        if (row.isEmpty() || row.get().passwordHash() == null) {
+            // Unknown, or signs in with Google: the same work and the same answer as a wrong password.
             passwords.matches(given, decoyHash);
             return Optional.empty();
         }
@@ -232,6 +237,61 @@ public class Delegates {
                 .params(ts(clock.instant()), id, Codes.hash(normalized))
                 .update();
         return used == 1 ? Optional.of(id) : Optional.empty();
+    }
+
+    /** The address a live invite was issued to, for Google to offer that account first; empty when not live. */
+    @Transactional(readOnly = true)
+    public Optional<String> inviteEmail(String code) {
+        return liveInviteEmail(Codes.hash(code == null ? "" : code.trim()), clock.instant());
+    }
+
+    /**
+     * Spends the invite (by its code's hash — the Google attempt keeps only that) on a Google account whose verified
+     * address is the invited one, and creates the delegate with that account's number and no password or
+     * authenticator. A different address leaves the invite live, so the invitee can come back with the right account.
+     */
+    // Refusals write nothing, so they need not roll back the caller's transaction (it spends the Google attempt).
+    @Transactional(noRollbackFor = EnrolException.class)
+    public UUID joinWithGoogle(String inviteHash, String googleSub, String googleEmail) {
+        Instant now = clock.instant();
+        String hash = inviteHash == null ? "" : inviteHash;
+        Optional<StagedRow> invite = jdbc.sql("select email, role, staged_password, staged_totp_secret "
+                        + "from delegate_invites where code_hash = ? and redeemed_at is null and expires_at > ?")
+                .params(hash, ts(now))
+                .query((rs, n) -> new StagedRow(rs.getString("email"), rs.getString("role"), null, null))
+                .optional();
+        if (invite.isEmpty()) {
+            throw new EnrolException(EnrolFailure.INVALID_INVITE);
+        }
+        if (!invite.get().email().equals(SellerAccounts.normalizeEmail(googleEmail))) {
+            throw new EnrolException(EnrolFailure.EMAIL_MISMATCH);
+        }
+        boolean subTaken = jdbc.sql("select count(*) from delegates where google_sub = ?").param(googleSub)
+                .query(Integer.class).single() > 0;
+        if (registered(invite.get().email()) || subTaken) {
+            throw new EnrolException(EnrolFailure.ALREADY_REGISTERED);
+        }
+        int spent = jdbc.sql("update delegate_invites set redeemed_at = ?, staged_password = null, "
+                        + "staged_totp_secret = null where code_hash = ? and redeemed_at is null")
+                .params(ts(now), hash)
+                .update();
+        if (spent != 1) {
+            throw new EnrolException(EnrolFailure.INVALID_INVITE);
+        }
+        UUID id = UUID.randomUUID();
+        jdbc.sql("insert into delegates (id, email, google_sub, role, status, created_at) values (?, ?, ?, ?, ?, ?)")
+                .params(id, invite.get().email(), googleSub, invite.get().role(), Status.ACTIVE.name(), ts(now))
+                .update();
+        return id;
+    }
+
+    /** The active delegate registered with this Google account; empty when there is none or they are suspended. */
+    @Transactional(readOnly = true)
+    public Optional<UUID> googleLogin(String googleSub) {
+        return jdbc.sql("select id from delegates where google_sub = ? and status = ?")
+                .params(googleSub, Status.ACTIVE.name())
+                .query(UUID.class)
+                .optional();
     }
 
     /** The delegate behind a session, read on every request — empty once suspended. */
