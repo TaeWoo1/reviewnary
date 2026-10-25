@@ -29,6 +29,7 @@ body {
 [hidden] { display: none !important; }
 h1 { font-size: 22px; line-height: 1.35; font-weight: 700; margin: 0; }
 h2 { font-size: 16px; font-weight: 600; margin: 0; }
+h3 { font-size: 16px; font-weight: 600; margin: 0; }
 p { margin: 0; }
 .page { max-width: 440px; margin: 0 auto; padding: 24px 16px 40px; }
 .page.wide { max-width: 1040px; padding: 24px 32px 40px; }
@@ -124,10 +125,53 @@ select { width: 100%; min-height: 44px; font: inherit; color: var(--ink); border
 .stat { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .stat > div { background: var(--canvas); border-radius: 10px; padding: 12px; }
 .stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+/* The delegate desk, 「오늘 할 일」 (owner decision 2026-10-26): one ordered page instead of two tabs, and a reply's
+   four steps as a stepper whose current step is the only open one. Same tokens; nothing here is a new colour. */
+.wordmark { font-size: 16px; font-weight: 700; letter-spacing: -.01em; margin: 0; }
+.wordmark .muted { font-weight: 600; margin-left: 4px; }
+.top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+.narrow { max-width: 760px; margin: 0 auto; }
+.top.narrow { margin: 0 auto 24px; }
+.push { margin-left: auto; }
+.btn.text.flush { padding-left: 0; padding-right: 0; }
+.auth { max-width: 400px; margin: 40px auto 0; }
+.todo-head { display: flex; align-items: center; gap: 8px; }
+.todo-head h2 { flex: none; }
+.todo-head .num { width: 28px; height: 28px; font-size: 14px; }
+.task-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.task-row.picked { background: var(--canvas); }
+.list > .item:first-child { border-radius: 12px 12px 0 0; }
+.list > .item:last-child { border-radius: 0 0 12px 12px; }
+.list > .item:only-child { border-radius: 12px; }
+.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.dates { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.date { background: var(--canvas); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.date b { font-size: 22px; line-height: 1.3; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.drop.chosen { border-style: solid; border-color: var(--line); background: var(--canvas); }
+.fold summary { cursor: pointer; list-style: none; padding: 4px 0; }
+.fold summary::-webkit-details-marker { display: none; }
+.fold summary::before { content: "›"; display: inline-block; width: 16px; transition: transform .15s; }
+.fold[open] summary::before { transform: rotate(90deg); }
+.fold > div { margin-top: 8px; }
+.stat.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.steps-card { padding: 8px 16px; }
+.st { display: flex; gap: 12px; padding: 16px 0; }
+.st + .st { border-top: 1px solid var(--line); }
+.st > .grow > .strong { color: var(--muted); }
+.st.now > .grow > .strong, .st.done > .grow > .strong { color: var(--ink); }
+.st .num { margin-top: 1px; }
+.refno { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.refno b { font-size: 20px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+#view-task .split { grid-template-columns: minmax(0, 1fr) 480px; }
 @media (max-width: 1023px) {
   .page.wide { padding: 24px 16px 40px; }
-  .split { grid-template-columns: minmax(0, 1fr); }
-  .stat { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .split, #view-task .split { grid-template-columns: minmax(0, 1fr); }
+  .stat, .stat.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .task-row { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .task-row > .btn { align-self: stretch; }
+  .auth { margin-top: 8px; }
 }
 @media print {
   .no-print { display: none !important; }

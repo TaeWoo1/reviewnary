@@ -11,15 +11,22 @@
 <body>
 <main class="page wide" aria-label="담당자">
 
-  <section id="view-login" class="page" aria-label="담당자 로그인" hidden>
-    <h1>담당자 로그인</h1>
-    <div id="google-login" class="card stack8" hidden>
+  <section id="view-login" class="auth stack24" aria-label="담당자 로그인" hidden>
+    <p class="wordmark">reviewnary <span class="muted">담당자</span></p>
+    <h1>로그인</h1>
+    <div id="google-login" class="stack8" hidden>
       <p id="google-error" class="msg bad-text" role="alert" hidden></p>
       <button type="button" id="google-signin" class="btn solid big">구글 계정으로 로그인</button>
-      <p class="xs muted">구글 계정으로 등록한 담당자는 이 버튼으로 로그인합니다.</p>
+      <p class="xs muted">등록할 때 고른 구글 계정을 고르세요.</p>
     </div>
-    <p id="app-login-title" class="sm muted" hidden>비밀번호와 인증 앱으로 등록한 담당자</p>
+    <div id="join-retry" class="card stack8" role="alert" hidden>
+      <span class="chip warn">다른 구글 계정을 골랐습니다</span>
+      <p class="sm">초대받은 주소 <b id="retry-email" class="num-text"></b> 의 구글 계정으로 다시 고르세요. 초대는 그대로 살아 있습니다.</p>
+      <button type="button" id="retry-google" class="btn solid big">다른 계정으로 다시</button>
+    </div>
+    <button type="button" id="show-app-login" class="btn text flush" hidden>비밀번호와 인증 앱으로 등록했다면 여기서 로그인</button>
     <form id="login-form" class="card" novalidate>
+      <p id="app-login-title" class="sm strong" hidden>비밀번호와 인증 앱으로 로그인</p>
       <label for="email">이메일</label>
       <input id="email" type="email" autocomplete="username" required>
       <label for="password">비밀번호</label>
@@ -32,117 +39,170 @@
     </form>
   </section>
 
-  <section id="view-list" aria-label="담당자" hidden>
-    <div class="stack24">
-      <div class="between">
-        <h1>담당자</h1>
-        <span class="row"><span id="who" class="sm muted"></span><button type="button" id="refresh" class="btn text">새로고침</button><button type="button" id="logout" class="btn text">로그아웃</button></span>
-      </div>
-      <div class="tabs" role="tablist">
-        <button type="button" role="tab" id="tab-tasks" class="tab on" aria-selected="true" aria-controls="pane-tasks">등록할 답글 <span id="tab-count" class="muted"></span></button>
-        <button type="button" role="tab" id="tab-upload" class="tab" aria-selected="false" aria-controls="pane-upload">리뷰 파일 올리기</button>
-      </div>
+  <header id="top" class="top" hidden>
+    <p class="wordmark">reviewnary <span class="muted">담당자</span></p>
+    <span class="row"><span id="who" class="sm muted"></span><button type="button" id="refresh" class="btn text">새로고침</button><button type="button" id="logout" class="btn text">로그아웃</button></span>
+  </header>
 
-      <div id="pane-tasks" class="stack24" role="tabpanel" aria-labelledby="tab-tasks">
-        <p id="list-notice" class="msg" role="status" hidden></p>
-        <div id="mine-section" class="stack" hidden>
-          <h2>내가 맡은 것 <span id="mine-count" class="muted"></span></h2>
-          <div id="mine" class="list"></div>
-        </div>
-        <div class="stack">
-          <h2>승인된 답글 <span id="open-count" class="muted"></span></h2>
-          <div id="open" class="list"></div>
-          <p id="open-empty" class="card muted" hidden>등록을 기다리는 승인된 답글이 없습니다.</p>
-          <p class="xs muted">「맡기」를 먼저 누른 한 사람만 그 답글을 등록합니다.</p>
-        </div>
-      </div>
+  <section id="view-list" class="narrow stack24" aria-label="오늘 할 일" hidden>
+    <div>
+      <h1>오늘 할 일</h1>
+      <p id="today" class="sm muted"></p>
+    </div>
+    <p id="list-notice" class="msg" role="status" hidden></p>
+    <p id="nothing" class="card sm" hidden>오늘 할 일을 모두 마쳤습니다. 새 답글이 승인되면 여기에 나타납니다.</p>
 
-      <div id="pane-upload" class="stack" role="tabpanel" aria-labelledby="tab-upload" hidden>
-        <div id="upload-refused" class="card stack8" role="alert" hidden>
-          <span class="chip bad">올리지 못했습니다</span>
-          <p id="refused-text" class="sm"></p>
-          <dl id="refused-columns" class="facts" hidden>
-            <dt>없는 열</dt><dd id="refused-missing"></dd>
-            <dt>모르는 열</dt><dd id="refused-unexpected"></dd>
-          </dl>
+    <section id="todo-upload" class="stack" aria-labelledby="upload-title">
+      <div class="todo-head"><span id="upload-num" class="num">1</span><h2 id="upload-title">리뷰 파일 올리기</h2><span id="upload-sum" class="sm muted"></span></div>
+      <div id="store-list" class="list"></div>
+      <p id="no-store" class="card sm muted" hidden>지금 배정된 스토어가 없습니다. 운영자에게 스토어 배정을 요청하세요.</p>
+
+      <div id="upload-panel" class="card stack" hidden>
+        <div class="between">
+          <h3 id="panel-title" class="strong"></h3>
+          <button type="button" id="panel-close" class="btn text">닫기</button>
         </div>
-        <div id="upload-pick" class="split">
-          <form id="upload-form" class="card stack" novalidate>
-            <div>
-              <label for="store">스토어</label>
-              <select id="store"></select>
-              <p id="no-store" class="sm muted" hidden>지금 배정된 스토어가 없습니다. 운영자에게 스토어 배정을 요청하세요.</p>
+
+        <div id="upload-pick" class="stack24">
+          <div class="stack8">
+            <p class="sm"><b>판매자센터 › 리뷰 관리</b>에서 이 기간으로 조회한 뒤 엑셀로 내려받으세요.</p>
+            <div class="dates">
+              <div class="date"><span class="xs muted">시작일</span><b id="from-date" class="num-text"></b><button type="button" id="copy-from" class="btn link small">복사</button></div>
+              <div class="date"><span class="xs muted">종료일</span><b id="to-date" class="num-text"></b><button type="button" id="copy-to" class="btn link small">복사</button></div>
             </div>
-            <p id="period" class="sm" hidden><b>받을 기간</b> <span id="period-range"></span> <span id="period-why" class="xs muted"></span></p>
-            <label id="drop" for="file" class="drop stack8">
-              <span class="strong">리뷰 엑셀 파일을 여기에 끌어 놓거나</span>
+            <p id="period-why" class="xs muted"></p>
+          </div>
+
+          <form id="upload-form" class="stack8" novalidate>
+            <p class="sm">받은 파일을 <b>고치지 말고 그대로</b> 올립니다.</p>
+            <label id="drop" for="file" class="drop">
+              <span class="strong">엑셀 파일을 여기에 끌어 놓거나</span>
               <span class="btn outline">파일 고르기</span>
               <span id="file-name" class="xs muted">.xlsx · 10MB까지</span>
             </label>
             <input id="file" type="file" class="file-input" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-            <button type="submit" id="upload" class="btn solid" disabled>올리기</button>
+            <div class="between">
+              <span id="upload-status" class="sm muted num-text" role="status"></span>
+              <button type="submit" id="upload" class="btn solid push" disabled>올리기</button>
+            </div>
           </form>
-          <div class="card stack8">
-            <h2 class="sm muted">어떤 파일인가요</h2>
-            <p class="sm">판매자센터 리뷰 관리에서 내려받은 엑셀을 <b>고치지 말고 그대로</b> 올립니다.</p>
-            <p class="sm">작성자 · 주문번호 같은 열은 서버가 읽자마자 버리고 저장하지 않습니다. 올린 파일 자체도 읽은 뒤 바로 지웁니다.</p>
-            <p class="sm">같은 리뷰를 다시 올려도 됩니다. 바뀐 것만 반영합니다.</p>
+
+          <div id="upload-refused" class="inset stack8" role="alert" hidden>
+            <span class="chip bad">올리지 못했습니다</span>
+            <p id="refused-text" class="sm"></p>
+            <dl id="refused-columns" class="facts" hidden>
+              <dt>없는 열</dt><dd id="refused-missing"></dd>
+              <dt>모르는 열</dt><dd id="refused-unexpected"></dd>
+            </dl>
           </div>
+
+          <details class="fold">
+            <summary class="sm muted">올린 파일은 어떻게 되나요</summary>
+            <div class="stack8">
+              <p class="sm">작성자 · 주문번호 같은 열은 서버가 읽자마자 버리고 저장하지 않습니다. 파일 자체도 읽은 뒤 바로 지웁니다.</p>
+              <p class="sm">같은 리뷰를 다시 올려도 됩니다. 바뀐 것만 반영합니다.</p>
+            </div>
+          </details>
         </div>
-        <div id="upload-result" class="card stack" role="status" hidden>
-          <div class="between"><span id="result-chip" class="chip good"></span><button type="button" id="upload-again" class="btn outline">다른 파일 올리기</button></div>
-          <div class="stat">
+
+        <div id="upload-result" class="stack" role="status" hidden>
+          <div class="row"><span class="chip good">올렸습니다</span><span id="result-what" class="sm muted num-text"></span></div>
+          <div class="stat four">
             <div><span class="xs muted">새 리뷰</span><b id="r-added"></b></div>
             <div><span class="xs muted">내용이 바뀐 리뷰</span><b id="r-changed"></b></div>
             <div><span class="xs muted">새로 답글이 확인된 리뷰</span><b id="r-replied"></b></div>
             <div><span class="xs muted">그대로</span><b id="r-unchanged"></b></div>
-            <div><span class="xs muted">사진 주소를 뺀 리뷰</span><b id="r-dropped"></b></div>
           </div>
+          <p id="r-dropped-line" class="xs muted" hidden>사진 주소를 뺀 리뷰 <span id="r-dropped" class="num-text"></span>건 · 네이버 사진 주소가 아니라 저장하지 않았습니다.</p>
+          <dl id="coverage" class="facts" hidden>
+            <dt>파일에 든 리뷰</dt><dd id="covered" class="num-text"></dd>
+            <dt>받을 기간</dt><dd id="asked" class="num-text"></dd>
+          </dl>
+          <p id="short" class="sm warn-text" hidden></p>
           <p class="sm">판매자 PC가 켜져 있으면 몇 분 안에 받아 갑니다.</p>
           <p class="xs muted">내용이 바뀌었거나 답글이 확인된 리뷰에 승인 대기 중인 답글이 있으면 그 요청은 멈춥니다. 맡은 답글은 「지금 확인」에서 알려 줍니다.</p>
+          <div class="row"><button type="button" id="upload-again" class="btn outline">다른 파일 올리기</button></div>
         </div>
       </div>
-    </div>
+    </section>
+
+    <section id="todo-replies" class="stack" aria-labelledby="replies-title">
+      <div class="todo-head"><span id="reply-num" class="num">2</span><h2 id="replies-title">등록할 답글</h2><span id="reply-sum" class="sm muted"></span></div>
+      <div id="mine-section" class="stack8" hidden>
+        <p class="xs muted">내가 맡은 것 <span id="mine-count"></span></p>
+        <div id="mine" class="list"></div>
+      </div>
+      <div id="open-section" class="stack8">
+        <p id="open-label" class="xs muted" hidden>승인된 답글 <span id="open-count"></span></p>
+        <div id="open" class="list"></div>
+      </div>
+      <p id="open-empty" class="sm muted" hidden>등록을 기다리는 승인된 답글이 없습니다.</p>
+      <p class="xs muted">「맡기」를 먼저 누른 한 사람만 그 답글을 등록합니다.</p>
+    </section>
   </section>
 
-  <section id="view-task" aria-label="맡은 답글" hidden>
-    <div class="stack24">
-      <div class="between">
-        <div class="row"><button type="button" id="back" class="btn link">‹ 목록</button><h1 id="task-title"></h1></div>
-        <span class="row"><span id="task-state" class="chip"></span><button type="button" id="release" class="btn text" hidden>반납</button></span>
+  <section id="view-task" class="stack24" aria-label="맡은 답글" hidden>
+    <div class="between">
+      <div class="row"><button type="button" id="back" class="btn link">‹ 오늘 할 일</button></div>
+      <span class="row"><span id="task-state" class="chip"></span><button type="button" id="release" class="btn text" hidden>반납</button></span>
+    </div>
+    <h1 id="task-title"></h1>
+    <div class="split">
+      <div class="card stack8">
+        <p class="xs muted">고객 리뷰</p>
+        <p id="fact-body" class="lg draft"></p>
+        <dl class="facts">
+          <dt>스토어</dt><dd id="fact-store"></dd>
+          <dt>상품</dt><dd id="fact-product"></dd>
+          <dt>평점</dt><dd id="fact-rating"></dd>
+        </dl>
       </div>
-      <div class="split">
-        <div class="card stack8">
-          <h2 class="sm muted">판매자센터에서 이 리뷰 찾기</h2>
-          <dl class="facts">
-            <dt>스토어</dt><dd id="fact-store"></dd>
-            <dt>리뷰번호</dt><dd><span id="fact-no" class="num-text"></span> <button type="button" id="copy-no" class="btn link small">복사</button></dd>
-            <dt>상품</dt><dd id="fact-product"></dd>
-            <dt>평점</dt><dd id="fact-rating"></dd>
-          </dl>
-          <p id="fact-body" class="lg draft"></p>
-        </div>
-        <div class="card stack">
-          <div class="step"><span class="num done">1</span><p class="strong">판매자센터에서 리뷰를 찾습니다</p></div>
 
-          <div class="step"><span id="n2" class="num on">2</span><div class="grow stack8">
-            <p class="strong">저장 직전에 확인합니다</p>
-            <div id="pre-result" class="stack8" hidden>
-              <span id="pre-chip" class="chip"></span>
-              <p id="pre-text" class="sm"></p>
+      <div id="steps" class="card steps-card">
+        <div id="st1" class="st">
+          <span class="num">1</span>
+          <div class="grow stack8">
+            <p class="strong">판매자센터에서 리뷰를 찾습니다</p>
+            <div class="refno">
+              <span class="xs muted">리뷰번호</span>
+              <b id="fact-no" class="num-text"></b>
+              <button type="button" id="copy-no" class="btn link small">복사</button>
             </div>
-            <button type="button" id="preflight" class="btn solid">지금 확인</button>
-            <p class="xs muted">확인하지 못하면 등록하지 않습니다.</p>
-          </div></div>
+          </div>
+        </div>
 
-          <div id="step3" class="step"><span id="n3" class="num">3</span><div class="grow stack8">
+        <div id="st2" class="st">
+          <span id="n2" class="num">2</span>
+          <div class="grow stack8">
+            <p class="strong">저장 직전에 확인합니다</p>
+            <div id="pre-done-row" class="row" hidden><span id="pre-done" class="sm good-text"></span><button type="button" id="recheck" class="btn link small">다시 확인</button></div>
+            <div id="st2-body" class="stack8">
+              <div id="pre-result" class="stack8" hidden>
+                <span id="pre-chip" class="chip"></span>
+                <p id="pre-text" class="sm"></p>
+              </div>
+              <button type="button" id="preflight" class="btn solid">지금 확인</button>
+              <p id="pre-hint" class="xs muted">리뷰가 그대로인지, 판매자가 취소하지 않았는지 서버에 묻습니다. 확인하지 못하면 등록하지 않습니다.</p>
+            </div>
+          </div>
+        </div>
+
+        <div id="st3" class="st">
+          <span id="n3" class="num">3</span>
+          <div class="grow stack8">
             <p class="strong">승인된 답글을 붙여넣고 저장합니다</p>
-            <div class="inset"><p id="approved-body" class="draft sm"></p></div>
-            <div class="row"><button type="button" id="copy-reply" class="btn outline" disabled>답글 복사</button><span id="copied" class="xs good-text" role="status"></span></div>
-            <p class="xs muted">문장은 고칠 수 없습니다. 판매자가 승인한 그대로 붙여넣습니다.</p>
-          </div></div>
+            <p id="st3-wait" class="sm muted">확인이 끝나면 열립니다.</p>
+            <div id="st3-body" class="stack8" hidden>
+              <div class="inset"><p id="approved-body" class="draft"></p></div>
+              <div class="row"><button type="button" id="copy-reply" class="btn outline" disabled>답글 복사</button><span id="copied" class="xs good-text" role="status"></span></div>
+              <p class="xs muted">문장은 고칠 수 없습니다. 판매자가 승인한 그대로 붙여넣습니다.</p>
+            </div>
+          </div>
+        </div>
 
-          <div class="step"><span id="n4" class="num">4</span><div class="grow stack8">
+        <div id="st4" class="st">
+          <span id="n4" class="num">4</span>
+          <div class="grow stack8">
             <p id="report-title" class="strong">판매자센터 화면에서 저장된 것을 보고 알립니다</p>
             <div id="report-clear" class="row">
               <button type="button" id="report-posted" class="btn outline" disabled>등록함</button>
@@ -153,9 +213,19 @@
               <button type="button" id="stop-failed" class="btn outline">등록하지 않고 끝내기</button>
               <button type="button" id="stop-posted" class="btn text" hidden>이미 등록했음</button>
             </div>
-          </div></div>
-          <p id="task-error" class="msg bad-text" role="alert" hidden></p>
+          </div>
         </div>
+        <p id="task-error" class="msg bad-text" role="alert" hidden></p>
+      </div>
+
+      <div id="task-done" class="card stack" role="status" hidden>
+        <span id="done-chip" class="chip good"></span>
+        <p id="done-text" class="sm"></p>
+        <div class="row">
+          <button type="button" id="next-task" class="btn solid" hidden>다음 답글 맡기</button>
+          <button type="button" id="to-list" class="btn outline">오늘 할 일로</button>
+        </div>
+        <p id="next-none" class="sm muted" hidden>맡을 수 있는 승인된 답글이 더 없습니다.</p>
       </div>
     </div>
   </section>

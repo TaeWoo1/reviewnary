@@ -3,7 +3,13 @@
 //
 // When the server has Google sign-in (owner, 2026-10-26), that comes first: one press goes to Google with the invite,
 // and the desk (/delegate) finishes the trip. The page keeps a random binding in this tab's sessionStorage; only the
-// tab holding it can finish, so a return link sent by someone else does nothing. The password path stays one press away.
+// tab holding it can finish, so a return link sent by someone else does nothing. The invite code is kept beside it in
+// the same tab, so a return with the wrong Google account can go back to Google without the link (the desk asks).
+// The password path stays one press away.
+//
+// Before anything is chosen the page says what the invite is — the address it was issued to (masked by the server),
+// the role, and until when the link works (owner decision 2026-10-26). An invite carries no inviter and no store,
+// so the page names neither.
 //
 // The invite code arrives in the link's fragment (/delegate/join#…), which no browser sends to a server. It is read
 // once, kept in this page's memory, and cleared from the address bar at once — a reload or a shared screenshot does
@@ -36,7 +42,8 @@
 
   function show(view) {
     ["none", "google", "password", "totp", "codes"].forEach(function (v) { $("view-" + v).hidden = v !== view; });
-    $("steps").hidden = view === "google";
+    $("steps").hidden = view === "google" || view === "none";
+    $("use-google").hidden = !(google && view === "password");
     var step = { password: 1, totp: 2, codes: 3 }[view] || 0;
     [1, 2, 3].forEach(function (n) { $("s" + n).className = n === step ? "on" : ""; });
     window.scrollTo(0, 0);
@@ -73,7 +80,7 @@
   $("google-join").addEventListener("click", function () {
     say("google-error", "");
     var b = binding();
-    try { window.sessionStorage.setItem(GOOGLE_KEY, b); } catch (e) {
+    try { window.sessionStorage.setItem(GOOGLE_KEY, JSON.stringify({ binding: b, invite: code })); } catch (e) {
       say("google-error", "이 창에서는 구글 등록을 마칠 수 없습니다. 비공개 창이 아닌 일반 창에서 링크를 여세요.");
       return;
     }
@@ -90,6 +97,8 @@
       say("google-error", "서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.");
     });
   });
+
+  $("use-google").addEventListener("click", function () { say("google-error", ""); show("google"); });
 
   $("use-app").addEventListener("click", function () {
     say("password-error", "");
@@ -234,13 +243,46 @@
     return hash;
   }
 
+  var ROLE = { ADMIN: "관리자", DELEGATE: "담당자" };
+
+  function until(iso) {
+    var d = new Date(iso);
+    return d.toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short", timeZone: "Asia/Seoul" })
+      + " " + d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Seoul" })
+      + "까지";
+  }
+
+  /** What the invite is, from the server; a spent or unknown code ends here instead of after a password. */
+  function peek() {
+    return post("/v1/delegate/auth/invites/peek", { inviteCode: code }).then(function (r) {
+      if (r.status === 200 && r.json && r.json.email) {
+        $("invite-email").textContent = r.json.email;
+        $("invite-email-2").textContent = r.json.email;
+        $("invite-role").textContent = ROLE[r.json.role] || "담당자";
+        $("invite-role-2").textContent = ROLE[r.json.role] || "담당자";
+        $("invite-until").textContent = r.json.expiresAt ? until(r.json.expiresAt) : "";
+        $("invite-facts").hidden = false;
+        $("invite-facts-2").hidden = false;
+        return true;
+      }
+      if (r.status === 400) { return false; }
+      return true; // the server did not answer: the steps themselves still say what is wrong
+    }, function () { return true; });
+  }
+
   function start(hash) {
     if (/^[A-Za-z0-9_-]{20,128}$/.test(hash)) {
       code = hash;
       password = null;
       say("password-error", "");
       say("google-error", "");
-      if (google) { show("google"); } else { show("password"); $("password").focus(); }
+      peek().then(function (live) {
+        if (!live) {
+          code = null;
+          $("none-text").textContent = ERRORS.invalid_invite;
+          show("none");
+        } else if (google) { show("google"); } else { show("password"); $("password").focus(); }
+      });
     } else if (code == null) {
       show("none");
     }

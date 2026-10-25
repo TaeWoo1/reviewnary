@@ -10,32 +10,40 @@
 </head>
 <body>
 <main class="page" aria-label="담당자 등록">
-  <div class="stack">
-    <div id="steps" class="steps no-print" aria-hidden="true">
+  <div class="stack24">
+    <p class="wordmark">reviewnary <span class="muted">담당자</span></p>
+
+    <div id="steps" class="steps no-print" aria-hidden="true" hidden>
       <span id="s1" class="on">1 비밀번호</span><span>·</span><span id="s2">2 인증 앱</span><span>·</span><span id="s3">3 복구 코드</span>
     </div>
 
     <section id="view-none" class="stack" hidden>
       <h1>담당자 등록</h1>
-      <div class="card"><p class="sm bad-text">초대 링크가 없습니다. 초대한 사람에게 받은 링크를 그대로 여세요. 이 화면을 새로고침했다면 링크를 다시 여세요.</p></div>
+      <div class="card"><p id="none-text" class="sm bad-text">초대 링크가 없습니다. 초대한 사람에게 받은 링크를 그대로 여세요. 이 화면을 새로고침했다면 링크를 다시 여세요.</p></div>
     </section>
 
-    <section id="view-google" class="stack" hidden>
-      <h1>담당자 등록</h1>
-      <div class="card stack8">
-        <div class="inset"><p class="sm good-text">초대 링크로 열었습니다.</p></div>
-        <p class="sm">초대받은 이메일 주소의 구글 계정으로 등록합니다. 비밀번호와 인증 앱은 따로 만들지 않습니다.</p>
+    <section id="view-google" class="stack24" hidden>
+      <h1>담당자로 초대받았습니다</h1>
+      <dl id="invite-facts" class="facts card" hidden>
+        <dt>초대받은 주소</dt><dd id="invite-email" class="num-text"></dd>
+        <dt>역할</dt><dd id="invite-role"></dd>
+        <dt>링크 기한</dt><dd id="invite-until" class="num-text"></dd>
+      </dl>
+      <div class="stack8">
         <p id="google-error" class="msg bad-text" role="alert" hidden></p>
-        <button type="button" id="google-join" class="btn solid big">구글 계정으로 등록</button>
-        <button type="button" id="use-app" class="btn link">구글 계정을 쓸 수 없으면 비밀번호와 인증 앱으로 등록</button>
+        <button type="button" id="google-join" class="btn solid big">구글 계정으로 계속</button>
+        <p class="xs muted">구글에서 <b>초대받은 주소의 계정</b>을 고르세요. 비밀번호와 인증 앱은 따로 만들지 않습니다.</p>
       </div>
-      <p class="xs muted">초대 링크는 7일 동안 한 번만 쓸 수 있습니다. 구글에서 고른 계정의 주소가 초대받은 주소와 같아야 등록됩니다.</p>
+      <button type="button" id="use-app" class="btn text flush">구글 계정을 쓸 수 없나요? 비밀번호와 인증 앱으로 등록</button>
     </section>
 
     <section id="view-password" class="stack" hidden>
       <h1>담당자 등록</h1>
+      <dl id="invite-facts-2" class="facts card" hidden>
+        <dt>초대받은 주소</dt><dd id="invite-email-2" class="num-text"></dd>
+        <dt>역할</dt><dd id="invite-role-2"></dd>
+      </dl>
       <form id="password-form" class="card stack8" novalidate>
-        <div class="inset"><p class="sm good-text">초대 링크로 열었습니다.</p></div>
         <p class="sm">이 담당자 계정의 비밀번호를 정하세요.</p>
         <label for="password">비밀번호 (10자 이상)</label>
         <input id="password" type="password" autocomplete="new-password" required>
@@ -44,7 +52,8 @@
         <p id="password-error" class="msg bad-text" role="alert" hidden></p>
         <button type="submit" id="password-next" class="btn solid big">다음</button>
       </form>
-      <p class="xs muted">초대 링크는 7일 동안 한 번만 쓸 수 있습니다. 링크 속 코드는 이 화면이 읽자마자 주소창에서 지웠습니다. 이 단계에서는 아직 계정이 만들어지지 않습니다.</p>
+      <button type="button" id="use-google" class="btn text flush" hidden>구글 계정으로 등록하기</button>
+      <p class="xs muted">초대 링크는 한 번만 쓸 수 있습니다. 링크 속 코드는 이 화면이 읽자마자 주소창에서 지웠습니다. 이 단계에서는 아직 계정이 만들어지지 않습니다.</p>
     </section>
 
     <section id="view-totp" class="stack" hidden>

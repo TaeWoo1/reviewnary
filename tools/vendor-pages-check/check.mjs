@@ -32,6 +32,11 @@ const EDITED = {
   sentences: [],
 };
 
+const STATUS = Symbol("status");
+/** A mocked answer with a status other than 200. */
+const status = (code, body) => ({ [STATUS]: code, body });
+const wait = (ms) => new Promise((done) => setTimeout(done, ms));
+
 function task(over) {
   return {
     id: "t-1", storeId: "s-1", reviewId: "r-1", reviewNo: "9100000310", state: "HELD", stateVersion: 4,
@@ -50,8 +55,17 @@ function task(over) {
  * signed out; `hash` is the fragment it is opened with; `storage` is put in its sessionStorage first. A visit to
  * Google is recorded in `google` and answered with an empty page.
  */
-async function open(browser, page, routes, viewport, at, { session = true, hash = "", storage = {} } = {}) {
+async function open(browser, page, routes, viewport, at,
+  { session = true, hash = "", storage = {}, clipboard = false } = {}) {
   const ctx = await browser.newContext({ viewport, timezoneId: "Asia/Seoul" });
+  // The fixture origin is not a secure context, so the browser has no clipboard here (127.0.0.1 and https do). A
+  // `clipboard` case gets a stand-in that keeps what was written, for the case to read back as `window.copied`.
+  if (clipboard) {
+    await ctx.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", { configurable: true,
+        value: { writeText: (t) => { window.copied = t; return Promise.resolve(); } } });
+    });
+  }
   if (at) await ctx.clock.setFixedTime(new Date(at));
   const key = page === "replies" ? "reviewnary.replies.session" : "reviewnary.delegate.session";
   const seed = { ...(session ? { [key]: "fixture-not-a-token" } : {}), ...storage };
@@ -64,7 +78,7 @@ async function open(browser, page, routes, viewport, at, { session = true, hash 
   const sent = [];
   const google = [];
   const problems = [];
-  await ctx.route("**/*", (r) => {
+  await ctx.route("**/*", async (r) => {
     const u = new URL(r.request().url());
     if (u.hostname === "accounts.google.com") {
       google.push(u.toString());
@@ -77,11 +91,17 @@ async function open(browser, page, routes, viewport, at, { session = true, hash 
     }
     if (u.pathname.startsWith("/v1/")) {
       const path = u.pathname + u.search;
-      sent.push({ method: r.request().method(), path, body: r.request().postDataJSON?.() ?? null });
-      const answer = routes(r.request().method(), path, sent[sent.length - 1].body);
+      // A multipart upload is not JSON; it is recorded as sent with no body.
+      let body = null;
+      try { body = r.request().postDataJSON?.() ?? null; } catch { body = null; }
+      sent.push({ method: r.request().method(), path, body });
+      // An answer is the JSON body (200), or `status(code, body)` for any other status; it may be a promise, so a
+      // case can hold the server's answer back while it looks at the page.
+      const answer = await routes(r.request().method(), path, body);
       if (answer === undefined) problems.push(`unmocked ${path}`);
-      return r.fulfill({ status: answer === undefined ? 404 : 200, contentType: "application/json",
-        body: JSON.stringify(answer ?? {}) });
+      const coded = answer && answer[STATUS] !== undefined;
+      return r.fulfill({ status: answer === undefined ? 404 : coded ? answer[STATUS] : 200,
+        contentType: "application/json", body: JSON.stringify(coded ? answer.body : answer ?? {}) });
     }
     // /delegate/join is served from join.html (AppPagesController).
     const file = u.pathname === "/delegate/join/" ? "/delegate/join.html"
@@ -346,7 +366,7 @@ const cases = [
     }, { width: 1100, height: 900 });
     const { p } = run;
     expect(await text(p, "#mine"), (s) => s.includes("판매자가 승인 보류"));
-    await p.getByRole("button", { name: "열기" }).first().click();
+    await p.getByRole("button", { name: "이어서 하기" }).first().click();
     await p.locator("#preflight").click();
     await p.locator("#pre-result").waitFor({ state: "visible" });
     expect(await text(p, "#pre-chip"), "등록하지 마세요");
@@ -354,15 +374,79 @@ const cases = [
     expectHas(await text(p, "#pre-text"), "교환");
     expectHas(await text(p, "#pre-text"), "판매자센터에 붙여 넣지 마세요.");
     expect(await p.locator("#copy-reply").isDisabled(), true);
+    // A stopped reply's text never opens for pasting.
+    expect(await shown(p, "#st3-body"), false);
+    expect(await text(p, "#st3-wait"), "이 답글은 붙여넣지 않습니다.");
     expect(await text(p, "#stop-failed"), "등록 안 했음 · 보류 확인");
     expect(await shown(p, "#stop-posted"), true);
     await p.locator("#stop-failed").click();
-    await p.locator("#list-notice").filter({ hasText: "보류를 확인했습니다" }).waitFor();
+    await p.locator("#done-chip").filter({ hasText: "보류를 확인했습니다" }).waitFor();
     const report = run.sent.find((s) => s.path === "/v1/delegate/tasks/t-1/report");
     expect(report?.body?.outcome, "FAILED");
+    await p.locator("#next-none").waitFor({ state: "visible" });
+    expect(await shown(p, "#next-task"), false);
     return run;
   }],
-  ["delegate · the upload tab says which period to download: from the last upload, or a year the first time", async (b) => {
+  ["delegate · claim → check → copy → report, one current step at a time, then the next reply is one press", async (b) => {
+    const approved = (id, no) => ({ id, storeId: "s-1", storeLabel: "합성 스토어", state: "APPROVED", stateVersion: 3,
+      reviewNo: no, productName: "린넨 커튼", rating: 4, reviewBody: "색이 예뻐요.", approvedBody: BODY,
+      approvedFingerprint: "f".repeat(64), approvedAt: "2026-10-21T05:00:00Z", mine: false });
+    let open1 = [approved("t-1", "9100000310"), approved("t-2", "9100000311")];
+    const run = await open(b, "delegate", (method, path, body) => {
+      if (path === "/v1/delegate/auth/methods") return { google: false };
+      if (path === "/v1/delegate/me") return { email: "delegate@example.invalid", stores: [] };
+      if (path === "/v1/delegate/tasks?state=APPROVED") return open1;
+      if (path.startsWith("/v1/delegate/tasks?state=")) return [];
+      const claimed = /^\/v1\/delegate\/tasks\/(t-\d)\/claim$/.exec(path);
+      if (claimed && method === "POST" && body?.stateVersion === 3) {
+        open1 = open1.filter((t) => t.id !== claimed[1]);
+        return { state: "CLAIMED", stateVersion: 4 };
+      }
+      if (path === "/v1/delegate/tasks/t-1/preflight") return { taskId: "t-1", state: "CLAIMED", approvedBody: BODY,
+        approvedFingerprint: "f".repeat(64), reviewChanged: false, displayChanged: false, alreadyReplied: false,
+        cancelRequested: false, holdRequested: false, holdNote: null, clearToPost: true };
+      if (path === "/v1/delegate/tasks/t-1/report" && method === "POST") return { ...task({ state: "POSTED" }) };
+      return undefined;
+    }, { width: 1100, height: 900 }, null, { clipboard: true });
+    const { p } = run;
+    expect(await text(p, "#reply-sum"), "2건");
+    await p.getByRole("button", { name: "맡기" }).first().click();
+    await p.locator("#view-task").waitFor({ state: "visible" });
+    const now = async () => p.locator(".st.now").getAttribute("id");
+    expect(await now(), "st2");
+    // Before the check there is nothing that may be pasted.
+    expect(await shown(p, "#st3-body"), false);
+    expect(await p.locator("#report-posted").isDisabled(), true);
+    await p.locator("#preflight").click();
+    await p.locator("#pre-done").waitFor({ state: "visible" });
+    expect(await now(), "st3");
+    expect(await shown(p, "#st3-body"), true);
+    expect(await p.locator("#copy-reply").getAttribute("class"), "btn solid");
+    await p.locator("#copy-reply").click();
+    await p.locator("#copied").filter({ hasText: "복사됨" }).waitFor();
+    expect(await p.evaluate(() => window.copied), BODY);
+    expect(await now(), "st4");
+    expect(await p.locator("#report-posted").getAttribute("class"), "btn solid");
+    // Back from Seller Center: the report is brought to the keyboard, never pressed.
+    await p.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(await p.evaluate(() => document.activeElement && document.activeElement.id), "report-posted");
+    expect(run.sent.some((s) => s.path.endsWith("/report")), false);
+    await p.locator("#report-posted").click();
+    await p.locator("#done-chip").filter({ hasText: "등록함으로 알렸습니다" }).waitFor();
+    const report = run.sent.find((s) => s.path === "/v1/delegate/tasks/t-1/report");
+    expect([report?.body?.outcome, report?.body?.postedFingerprint], ["POSTED", "f".repeat(64)]);
+    await p.locator("#next-task").filter({ hasText: "다음 답글 맡기 · 1건 남음" }).waitFor();
+    await p.locator("#next-task").click();
+    await p.locator("#fact-no").filter({ hasText: "9100000311" }).waitFor();
+    expect(await now(), "st2");
+    expect(run.sent.filter((s) => s.path.endsWith("/claim")).map((s) => s.path),
+      ["/v1/delegate/tasks/t-1/claim", "/v1/delegate/tasks/t-2/claim"]);
+    return run;
+  }],
+  ["delegate · 오늘 할 일 opens the due store's upload with the period to download, copyable, in Seller Center's dates", async (b) => {
     const run = await open(b, "delegate", (method, path) => {
       if (path === "/v1/delegate/auth/methods") return { google: false };
       if (path === "/v1/delegate/me") return { email: "delegate@example.invalid", stores: [
@@ -371,18 +455,84 @@ const cases = [
         { id: "s-2", channel: "NAVER", label: "새 스토어", lastUploadAt: null }] };
       if (path.startsWith("/v1/delegate/tasks?state=")) return [];
       return undefined;
-    }, { width: 1100, height: 900 }, "2026-10-25T03:00:00Z");
+    }, { width: 1100, height: 900 }, "2026-10-25T03:00:00Z", { clipboard: true });
     const { p } = run;
-    await p.locator("#tab-upload").click();
-    await p.locator("#period").waitFor({ state: "visible" });
-    expect(await text(p, "#period-range"), "2026.10.13 ~ 2026.10.25");
-    expect(await text(p, "#period-why"), "· 마지막으로 올린 날부터");
-    await p.locator("#store").selectOption("s-2");
-    expect(await text(p, "#period-range"), "2025.10.25 ~ 2026.10.25");
-    expect(await text(p, "#period-why"), "· 처음 올리는 스토어라 판매자센터 최대 기간 1년");
+    await p.locator("#upload-panel").waitFor({ state: "visible" });
+    expect(await text(p, "#panel-title"), "합성 스토어");
+    expect([await text(p, "#from-date"), await text(p, "#to-date")], ["2026.10.13", "2026.10.25"]);
+    expectHas(await text(p, "#period-why"), "마지막으로 올린 날(2026.10.13)부터");
+    expect(await text(p, "#upload-sum"), "스토어 2곳");
+    expect(await text(p, "#upload-num"), "1");
+    await p.locator("#copy-from").click();
+    await p.locator("#copy-from").filter({ hasText: "복사됨" }).waitFor();
+    expect(await p.evaluate(() => window.copied), "2026.10.13");
+    await p.locator('#store-list button[data-store="s-2"]').click();
+    expect([await text(p, "#from-date"), await text(p, "#to-date")], ["2025.10.25", "2026.10.25"]);
+    expect(await text(p, "#period-why"), "처음 올리는 스토어라 판매자센터 최대 기간 1년");
+    // No tabs: the replies are on the same page, under the upload.
+    expect(await p.locator(".tab").count(), 0);
+    expect(await shown(p, "#todo-replies"), true);
     return run;
   }],
-  ["delegate · with Google on, the login offers it first and the password form stays below", async (b) => {
+  ["delegate · an upload shows measured progress, then the server's seconds, then what the file covered", async (b) => {
+    let release;
+    const held = new Promise((done) => { release = done; });
+    const run = await open(b, "delegate", async (method, path) => {
+      if (path === "/v1/delegate/auth/methods") return { google: false };
+      if (path === "/v1/delegate/me") return { email: "delegate@example.invalid", stores: [
+        { id: "s-2", channel: "NAVER", label: "새 스토어", lastUploadAt: null }] };
+      if (path.startsWith("/v1/delegate/tasks?state=")) return [];
+      if (path === "/v1/delegate/stores/s-2/review-uploads" && method === "POST") {
+        await held;
+        // The file the delegate downloaded covered one month, not the year that was asked.
+        return status(201, { uploadId: "u-1", rows: 212, added: 212, changed: 0, replied: 0, unchanged: 0,
+          attachmentsDropped: 3, purged: 0, writtenFrom: "2026-09-26", writtenTo: "2026-10-24" });
+      }
+      return undefined;
+    }, { width: 1100, height: 900 }, "2026-10-25T03:00:00Z");
+    const { p } = run;
+    await p.locator("#upload-panel").waitFor({ state: "visible" });
+    await p.locator("#file").setInputFiles({ name: "리뷰.xlsx",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.alloc(300 * 1024, 1) });
+    expect(await text(p, "#file-name"), "리뷰.xlsx · 300KB");
+    await p.locator("#upload").click();
+    // While the server holds its answer the page says only what it measured. (Under this harness's request
+    // interception Chromium reports no upload progress events, so the line stays at 「올리는 중」 here; against a real
+    // server it counts bytes, then the server's seconds — tools/vendor-pages-check has no real server to show that.)
+    await p.locator("#upload-status").filter({ hasText: /^(올리는 중( \d{1,3}%)?|확인 중 · \d+초)$/ }).waitFor();
+    expect(await p.locator("#upload").isDisabled(), true);
+    expect(await p.locator("#panel-close").isDisabled(), true);
+    release();
+    await p.locator("#upload-result").waitFor({ state: "visible" });
+    expect(await text(p, "#result-what"), "새 스토어 · 212행");
+    expect(await text(p, "#r-added"), "212");
+    expect(await text(p, "#covered"), "2026.09.26 ~ 2026.10.24 (작성일)");
+    expect(await text(p, "#asked"), "2025.10.25 ~ 2026.10.25");
+    expectHas(await text(p, "#short"), "받을 기간보다 짧아 보입니다");
+    expect(await shown(p, "#r-dropped-line"), true);
+    expect(await text(p, "#upload-status"), "");
+    const sent = run.sent.find((s) => s.path === "/v1/delegate/stores/s-2/review-uploads");
+    expect(sent?.method, "POST");
+    return run;
+  }],
+  ["delegate · with everything uploaded today and no replies, the day is done in one line", async (b) => {
+    const run = await open(b, "delegate", (method, path) => {
+      if (path === "/v1/delegate/auth/methods") return { google: false };
+      if (path === "/v1/delegate/me") return { email: "delegate@example.invalid", stores: [
+        { id: "s-1", channel: "NAVER", label: "합성 스토어", lastUploadAt: "2026-10-25T01:10:00Z" }] };
+      if (path.startsWith("/v1/delegate/tasks?state=")) return [];
+      return undefined;
+    }, { width: 1100, height: 900 }, "2026-10-25T03:00:00Z");
+    const { p } = run;
+    await p.locator("#nothing").waitFor({ state: "visible" });
+    expect(await text(p, "#upload-num"), "✓");
+    expect(await text(p, "#upload-sum"), "오늘 모두 올렸습니다");
+    expectHas(await text(p, "#store-list"), "✓ 오늘 올렸습니다 · 10:10");
+    expect(await shown(p, "#upload-panel"), false);
+    expect(await shown(p, "#todo-replies"), false);
+    return run;
+  }],
+  ["delegate · with Google on, the login offers it first and the password form is one quiet press away", async (b) => {
     const run = await open(b, "delegate", (method, path, body) => {
       if (path === "/v1/delegate/auth/methods") return { google: true };
       if (path === "/v1/delegate/auth/google/start" && method === "POST" && body?.purpose === "LOGIN")
@@ -391,8 +541,10 @@ const cases = [
     }, { width: 1100, height: 900 }, null, { session: false });
     const { p } = run;
     await p.locator("#google-login").waitFor({ state: "visible" });
+    expect(await shown(p, "#login-form"), false);
+    await p.locator("#show-app-login").click();
     expect(await shown(p, "#login-form"), true);
-    expect(await text(p, "#app-login-title"), "비밀번호와 인증 앱으로 등록한 담당자");
+    expect(await text(p, "#app-login-title"), "비밀번호와 인증 앱으로 로그인");
     await p.locator("#google-signin").click();
     await p.waitForURL(/accounts\.google\.com/);
     const start = run.sent.find((s) => s.path === "/v1/delegate/auth/google/start");
@@ -430,19 +582,40 @@ const cases = [
     expectHas(await text(p, "#google-error"), "구글 로그인을 마치지 못했습니다");
     expect(run.sent.some((s) => s.path === "/v1/delegate/auth/google/finish"), false);
     expect(await p.evaluate(() => window.location.hash), "");
-    const mismatch = await open(b, "delegate", (method, path) => (path === "/v1/delegate/auth/methods"
-      ? { google: true } : undefined), { width: 1100, height: 900 }, null,
-    { session: false, hash: "#google-error=email_mismatch" });
-    await mismatch.p.locator("#google-error").waitFor({ state: "visible" });
-    expectHas(await text(mismatch.p, "#google-error"), "초대받은 주소와 다른 구글 계정입니다");
-    await mismatch.ctx.close();
-    if (mismatch.problems.length) throw new Failure(mismatch.problems.join("; "));
     return run;
   }],
-  ["join · an invite opens on Google first; the password path is one press away, and alone when Google is off", async (b) => {
+  ["delegate · a join that came back with another Google account names the invited address and goes again", async (b) => {
+    const BINDING = "b".repeat(43);
+    const INVITE = "i".repeat(43);
+    const run = await open(b, "delegate", (method, path, body) => {
+      if (path === "/v1/delegate/auth/methods") return { google: true };
+      if (path === "/v1/delegate/auth/google/finish" && method === "POST" && body?.binding === BINDING)
+        return status(400, { error: "email_mismatch" });
+      if (path === "/v1/delegate/auth/invites/peek" && method === "POST" && body?.inviteCode === INVITE)
+        return { email: "re***@gmail.com", role: "ADMIN", expiresAt: "2026-11-01T17:00:00Z" };
+      if (path === "/v1/delegate/auth/google/start" && method === "POST" && body?.purpose === "JOIN"
+        && body?.inviteCode === INVITE) return { url: "https://accounts.google.com/o/oauth2/v2/auth?client_id=fixture" };
+      return undefined;
+    }, { width: 390, height: 844 }, null, { session: false, hash: `#google=${"h".repeat(43)}`,
+      storage: { "reviewnary.delegate.google": JSON.stringify({ binding: BINDING, invite: INVITE }) } });
+    const { p } = run;
+    await p.locator("#join-retry").waitFor({ state: "visible" });
+    expect(await text(p, "#retry-email"), "re***@gmail.com");
+    expect(await shown(p, "#google-login"), false);
+    expect(await shown(p, "#google-error"), false);
+    await p.locator("#retry-google").click();
+    await p.waitForURL(/accounts\.google\.com/);
+    const starts = run.sent.filter((s) => s.path === "/v1/delegate/auth/google/start");
+    expect(starts.length, 1);
+    expect(starts[0].body.binding === BINDING, false);
+    return run;
+  }],
+  ["join · an invite says who it is for and until when, opens on Google first, and the password path is one press away", async (b) => {
     const CODE = "i".repeat(43);
+    const peek = { email: "re***@gmail.com", role: "ADMIN", expiresAt: "2026-11-01T17:21:00Z" };
     const run = await open(b, "delegate/join", (method, path, body) => {
       if (path === "/v1/delegate/auth/methods") return { google: true };
+      if (path === "/v1/delegate/auth/invites/peek" && body?.inviteCode === CODE) return peek;
       if (path === "/v1/delegate/auth/google/start" && method === "POST" && body?.purpose === "JOIN"
         && body?.inviteCode === CODE) return { url: "https://accounts.google.com/o/oauth2/v2/auth?client_id=fixture" };
       return undefined;
@@ -451,29 +624,42 @@ const cases = [
     await p.locator("#view-google").waitFor({ state: "visible" });
     expect(await p.evaluate(() => window.location.hash), "");
     expect(await shown(p, "#steps"), false);
+    expect(await text(p, "#invite-email"), "re***@gmail.com");
+    expect(await text(p, "#invite-role"), "관리자");
+    expect(await text(p, "#invite-until"), "11월 2일 (월) 02:21까지");
+    expect(await text(p, "#google-join"), "구글 계정으로 계속");
     await p.locator("#use-app").click();
     expect(await shown(p, "#view-password"), true);
     expect(await shown(p, "#steps"), true);
+    await p.locator("#use-google").click();
+    expect(await shown(p, "#view-google"), true);
+    await p.locator("#google-join").click();
+    await p.waitForURL(/accounts\.google\.com/);
+    const start = run.sent.find((s) => s.path === "/v1/delegate/auth/google/start");
+    expect(start?.body?.binding, (v) => /^[A-Za-z0-9_-]{43}$/.test(v));
+    // The invite rides beside the binding in this tab only, for a wrong-account return to go again.
+    await p.goBack(); // this tab's storage on the desk's origin
+    const kept = JSON.parse(await p.evaluate(() => sessionStorage.getItem("reviewnary.delegate.google")) ?? "null");
+    expect([kept?.binding === start?.body?.binding, kept?.invite], [true, CODE]);
 
-    const again = await open(b, "delegate/join", (method, path, body) => {
-      if (path === "/v1/delegate/auth/methods") return { google: true };
-      if (path === "/v1/delegate/auth/google/start" && method === "POST" && body?.purpose === "JOIN"
-        && body?.inviteCode === CODE) return { url: "https://accounts.google.com/o/oauth2/v2/auth?client_id=fixture" };
+    const off = await open(b, "delegate/join", (method, path, body) => {
+      if (path === "/v1/delegate/auth/methods") return { google: false };
+      if (path === "/v1/delegate/auth/invites/peek" && body?.inviteCode === CODE) return peek;
       return undefined;
     }, { width: 390, height: 844 }, null, { session: false, hash: `#${CODE}` });
-    await again.p.locator("#google-join").click();
-    await again.p.waitForURL(/accounts\.google\.com/);
-    const start = again.sent.find((s) => s.path === "/v1/delegate/auth/google/start");
-    expect(start?.body?.binding, (v) => /^[A-Za-z0-9_-]{43}$/.test(v));
-    await again.ctx.close();
-    if (again.problems.length) throw new Failure(again.problems.join("; "));
-
-    const off = await open(b, "delegate/join", (method, path) => (path === "/v1/delegate/auth/methods"
-      ? { google: false } : undefined), { width: 390, height: 844 }, null, { session: false, hash: `#${CODE}` });
     await off.p.locator("#view-password").waitFor({ state: "visible" });
     expect(await shown(off.p, "#view-google"), false);
-    await off.ctx.close();
-    if (off.problems.length) throw new Failure(off.problems.join("; "));
+    expect(await shown(off.p, "#use-google"), false);
+    await also(run, off);
+
+    const spent = await open(b, "delegate/join", (method, path, body) => {
+      if (path === "/v1/delegate/auth/methods") return { google: true };
+      if (path === "/v1/delegate/auth/invites/peek" && body?.inviteCode === CODE) return status(400, { error: "invalid_invite" });
+      return undefined;
+    }, { width: 390, height: 844 }, null, { session: false, hash: `#${CODE}` });
+    await spent.p.locator("#view-none").waitFor({ state: "visible" });
+    expectHas(await text(spent.p, "#none-text"), "이미 썼거나 기한이 지났습니다");
+    await also(run, spent);
     return run;
   }],
 ];
@@ -490,7 +676,9 @@ function expectHas(actual, part) {
 
 const browser = await chromium.launch();
 let failed = 0;
-for (const [name, run] of cases) {
+// CHECK_ONLY=<words> runs only the cases whose name contains them.
+const only = process.env.CHECK_ONLY;
+for (const [name, run] of cases.filter(([n]) => !only || n.includes(only))) {
   let ctx;
   try {
     const result = await run(browser);
@@ -499,11 +687,12 @@ for (const [name, run] of cases) {
     console.log(`PASS ${name}`);
   } catch (e) {
     failed++;
-    console.log(`FAIL ${name} — ${e instanceof Failure ? e.message : String(e).split("\n")[0]}`);
+    console.log(`FAIL ${name} — ${e instanceof Failure ? e.message : String(e).split("\n").slice(0, process.env.CHECK_ONLY ? 4 : 1).join(" | ")}`);
   } finally {
     await ctx?.close();
   }
 }
 await browser.close();
-console.log(`${cases.length - failed}/${cases.length} passed`);
+const ran = cases.filter(([n]) => !only || n.includes(only)).length;
+console.log(`${ran - failed}/${ran} passed`);
 process.exit(failed ? 1 : 0);

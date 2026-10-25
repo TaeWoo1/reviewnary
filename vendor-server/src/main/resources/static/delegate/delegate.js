@@ -1,14 +1,18 @@
-// The delegate's desk — docs/vendor_server_contract_v1.md §4.3, mockup confirmed 2026-10-21. Opened in a PC browser
-// beside Seller Center: claim an approved reply, look once more just before saving, paste the exact approved text
-// by hand, and report what Seller Center shows. A second tab uploads a store's review export (§3.1) as it came out
-// of Seller Center. This page and this server post nothing anywhere.
+// The delegate's desk — docs/vendor_server_contract_v1.md §4.3. Opened in a PC browser beside Seller Center.
+//
+// One page, 「오늘 할 일」, in the order the work has to happen (owner decision 2026-10-26: no tabs to find a due
+// upload behind): ① each assigned store's review export, with the exact period to download, then ② the approved
+// replies to register — claim one, look once more just before saving, paste the exact approved text by hand, and
+// report what Seller Center shows. This page and this server post nothing anywhere.
 //
 // Copying the reply and reporting it posted open only after a clear pre-save check (`clearToPost`); a check that
 // fails or cannot be read means do not post. The session token lives in this tab's sessionStorage and is gone when
 // the tab closes. Every value from the server is written with textContent, never as HTML.
 //
 // Google sign-in (owner, 2026-10-26) ends here: Google's return lands on /delegate#google=<handoff> (or
-// #google-error=<reason>), and this page finishes it with the binding the starting tab kept in sessionStorage.
+// #google-error=<reason>), and this page finishes it with the binding the starting tab kept in sessionStorage. A
+// join that came back with the wrong Google account kept its invite code beside the binding (join.js), so this page
+// can name the invited address and send the same tab to Google again.
 (function () {
   "use strict";
 
@@ -32,14 +36,23 @@
     HOLD_REQUESTED: ["판매자가 승인 보류", "warn"],
     UNKNOWN: ["확인 필요", "warn"]
   };
+  var NO_FILE = ".xlsx · 10MB까지";
+  var MAX_UPLOAD = 10 * 1024 * 1024;
+  var DAY = 24 * 60 * 60 * 1000;
 
   var session = read();
   var task = null;
   var check = null;
+  var copiedReply = false;
   var useRecovery = false;
+  var googleOn = false;
+  var retryInvite = null;
+  var storeList = [];
+  var openStore = null;
+  var panelClosed = false;
   var chosen = null;
   var uploading = false;
-  var MAX_UPLOAD = 10 * 1024 * 1024;
+  var ticking = null;
 
   function $(id) { return document.getElementById(id); }
 
@@ -54,6 +67,9 @@
 
   function show(view) {
     ["login", "list", "task"].forEach(function (v) { $("view-" + v).hidden = v !== view; });
+    $("top").hidden = view === "login";
+    // On the list the header spans the list's column; on a task it spans the two panes.
+    $("top").className = view === "list" ? "top narrow" : "top";
     window.scrollTo(0, 0);
   }
 
@@ -95,13 +111,65 @@
 
   function copy(text, done) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done, function () { done(false); });
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
     } else {
       done(false);
     }
   }
 
-  /* ── list ─────────────────────────────────────────────────────────────────────────────────────────── */
+  /** A link-sized copy button that says 「복사됨」 beside itself for a moment, or that it could not. */
+  function copyButton(button, value) {
+    copy(value(), function (ok) {
+      button.textContent = ok ? "복사됨" : "복사 안 됨 · 직접 선택하세요";
+      button.className = "btn link small " + (ok ? "good-text" : "bad-text");
+      window.setTimeout(function () { button.textContent = "복사"; button.className = "btn link small"; }, 2500);
+    });
+  }
+
+  /* ── Seller Center's days ─────────────────────────────────────────────────────────────────────────── */
+
+  function kst(d) {
+    var parts = {};
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" })
+      .formatToParts(d).forEach(function (x) { parts[x.type] = x.value; });
+    return parts;
+  }
+
+  /** Seller Center's own date format, 2026.10.25 — the period is typed or pasted there as it is shown here. */
+  function sellerCenterDate(d) { var p = kst(d); return p.year + "." + p.month + "." + p.day; }
+
+  /** The same day as 2026-10-25, to compare with the server's dates. */
+  function isoDay(d) { var p = kst(d); return p.year + "-" + p.month + "-" + p.day; }
+
+  function dotted(iso) { return iso.replace(/-/g, "."); }
+
+  function daysBetween(fromIso, toIso) { return Math.round((Date.parse(toIso) - Date.parse(fromIso)) / DAY); }
+
+  // The period to download (owner decision 2026-10-25): from the day this store's export was last uploaded to today,
+  // in Seller Center's own dates (Korea). The day of the last upload is taken again on purpose — a review written
+  // after that file was downloaded is in it, and a review uploaded twice changes nothing. A store with no upload yet
+  // takes the longest period Seller Center offers, one year.
+  function periodOf(store) {
+    var now = new Date();
+    var last = store.lastUploadAt ? new Date(store.lastUploadAt) : null;
+    var from = last;
+    if (!from) {
+      from = new Date(now.getTime());
+      from.setFullYear(from.getFullYear() - 1);
+    }
+    return {
+      from: sellerCenterDate(from), to: sellerCenterDate(now), fromIso: isoDay(from), toIso: isoDay(now),
+      why: last ? "마지막으로 올린 날(" + sellerCenterDate(last) + ")부터 오늘까지 · 겹치는 날은 다시 받아도 됩니다"
+        : "처음 올리는 스토어라 판매자센터 최대 기간 1년"
+    };
+  }
+
+  /** Uploaded today, in Korea: nothing is due for this store until tomorrow. */
+  function doneToday(store) { return !!store.lastUploadAt && isoDay(new Date(store.lastUploadAt)) === isoDay(new Date()); }
+
+  /* ── 오늘 할 일 ───────────────────────────────────────────────────────────────────────────────────── */
+
+  var counts = { replies: 0, ready: false };
 
   function loadList(notice, tone) {
     say("list-notice", notice || "");
@@ -128,11 +196,9 @@
     $("list-notice").className = "msg bad-text";
   }
 
-  function meta(t) { return [t.storeLabel, t.productName, "★" + t.rating].filter(Boolean).join(" · "); }
-
   function item(t, action) {
     var div = document.createElement("div");
-    div.className = "item between";
+    div.className = "item task-row";
     var left = document.createElement("div");
     left.className = "grow stack8";
     var line = document.createElement("div");
@@ -142,19 +208,23 @@
       chip(c, t.state);
       line.appendChild(c);
     }
+    var stars = document.createElement("span");
+    stars.className = "sm strong num-text";
+    stars.textContent = "★" + t.rating;
+    line.appendChild(stars);
     var m = document.createElement("span");
     m.className = "sm muted";
-    m.textContent = meta(t);
+    m.textContent = [t.productName, t.storeLabel].filter(Boolean).join(" · ");
     line.appendChild(m);
     var body = document.createElement("p");
-    var text = t.reviewBody || "";
-    body.textContent = text.length > 60 ? text.slice(0, 60) + "…" : text;
+    body.className = "clamp";
+    body.textContent = t.reviewBody || "";
     left.appendChild(line);
     left.appendChild(body);
     var b = document.createElement("button");
     b.type = "button";
     b.className = action === "open" ? "btn solid" : "btn outline";
-    b.textContent = action === "open" ? "열기" : "맡기";
+    b.textContent = action === "open" ? "이어서 하기" : "맡기";
     b.addEventListener("click", function () { if (action === "open") { openTask(t); } else { claim(t, b); } });
     div.appendChild(left);
     div.appendChild(b);
@@ -166,19 +236,36 @@
     o.textContent = "";
     open.forEach(function (t) { o.appendChild(item(t, "claim")); });
     o.hidden = open.length === 0;
-    $("open-empty").hidden = open.length !== 0;
     $("open-count").textContent = String(open.length);
+    $("open-label").hidden = open.length === 0 || mine.length === 0;
     var m = $("mine");
     m.textContent = "";
     mine.forEach(function (t) { m.appendChild(item(t, "open")); });
     $("mine-count").textContent = String(mine.length);
     $("mine-section").hidden = mine.length === 0;
-    $("tab-count").textContent = String(open.length + mine.length);
+    var total = open.length + mine.length;
+    $("open-empty").hidden = total !== 0;
+    $("reply-sum").textContent = total ? total + "건" : "";
+    $("reply-num").className = "num " + (total ? "on" : "done");
+    $("reply-num").textContent = total ? "2" : "✓";
+    counts.replies = total;
+    counts.ready = true;
+    todo();
+  }
+
+  /** The order of the day: the step that is due is numbered in colour; a finished one is a check. */
+  function todo() {
+    var due = storeList.filter(function (s) { return !doneToday(s); }).length;
+    $("upload-num").className = "num " + (storeList.length === 0 ? "" : due ? "on" : "done");
+    $("upload-num").textContent = storeList.length && !due ? "✓" : "1";
+    $("upload-sum").textContent = storeList.length === 0 ? "" : due ? "스토어 " + due + "곳" : "오늘 모두 올렸습니다";
+    $("nothing").hidden = !(counts.ready && storeList.length > 0 && due === 0 && counts.replies === 0);
+    $("todo-replies").hidden = counts.ready && counts.replies === 0 && due === 0 && storeList.length > 0;
   }
 
   function claim(t, button) {
     button.disabled = true;
-    call("POST", "/v1/delegate/tasks/" + t.id + "/claim", { stateVersion: t.stateVersion }).then(function (r) {
+    return call("POST", "/v1/delegate/tasks/" + t.id + "/claim", { stateVersion: t.stateVersion }).then(function (r) {
       if (r.status === 200 && r.json) {
         t.state = r.json.state;
         t.stateVersion = r.json.stateVersion;
@@ -197,10 +284,12 @@
   function openTask(t) {
     task = t;
     check = null;
+    copiedReply = false;
     say("task-error", "");
     $("copied").textContent = "";
     $("task-title").textContent = [t.productName, "★" + t.rating].filter(Boolean).join(" · ");
     chip($("task-state"), t.state);
+    $("task-state").hidden = false;
     $("release").hidden = t.state !== "CLAIMED";
     $("fact-store").textContent = t.storeLabel || "";
     $("fact-no").textContent = t.reviewNo || "";
@@ -208,30 +297,54 @@
     $("fact-rating").textContent = "★" + t.rating;
     $("fact-body").textContent = t.reviewBody || "";
     $("approved-body").textContent = t.approvedBody || "";
+    $("steps").hidden = false;
+    $("task-done").hidden = true;
     renderSteps();
     show("task");
+  }
+
+  /** Which step is the one to do now: highlighted and open; finished ones fold to a check and a word. */
+  function stepClass(id, now, done) {
+    $(id).className = "st" + (now ? " now" : "") + (done ? " done" : "");
   }
 
   function renderSteps() {
     var unknown = task.state === "UNKNOWN";
     var clear = check != null && check.clearToPost;
     var stop = check != null && !check.clearToPost;
-    $("pre-result").hidden = check == null;
+    $("pre-result").hidden = check == null || clear;
     $("preflight").hidden = unknown;
     $("preflight").textContent = check == null ? "지금 확인" : "다시 확인";
     // One solid per step card: once checked, the next thing to press is the copy (or the stop), not the re-check.
     $("preflight").className = check == null ? "btn solid" : "btn outline";
+    $("pre-hint").hidden = check != null;
+    // A clear check folds to one line — what it found and when — with the re-check beside it.
+    $("st2-body").hidden = clear;
+    $("pre-done-row").hidden = !clear;
+    $("pre-done").textContent = clear ? "✓ 등록해도 됩니다 · " + time(check.at) + " 확인" : "";
     $("n2").className = "num " + (clear ? "done" : unknown ? "" : "on");
-    $("n3").className = "num " + (clear ? "on" : "");
-    $("n4").className = "num " + (clear || unknown ? "on" : "");
+    $("n2").textContent = clear ? "✓" : "2";
+    $("n3").className = "num " + (clear && !copiedReply ? "on" : clear ? "done" : "");
+    $("n3").textContent = clear && copiedReply ? "✓" : "3";
+    $("n4").className = "num " + ((clear && copiedReply) || unknown || stop ? "on" : "");
+    stepClass("st2", !clear && !unknown, clear);
+    stepClass("st3", clear && !copiedReply, clear && copiedReply);
+    stepClass("st4", (clear && copiedReply) || unknown || stop, false);
+    // The approved text opens with the check: before it, there is nothing yet that may be pasted. A task already
+    // in doubt (UNKNOWN) shows it read-only, to compare with what Seller Center shows.
+    $("st3-body").hidden = !(clear || unknown);
+    $("st3-wait").hidden = clear || unknown;
+    $("st3-wait").textContent = stop ? "이 답글은 붙여넣지 않습니다." : "확인이 끝나면 열립니다.";
     $("copy-reply").disabled = !clear;
-    $("copy-reply").className = clear ? "btn solid" : "btn outline";
+    $("copy-reply").className = clear && !copiedReply ? "btn solid" : "btn outline";
+    $("copy-reply").textContent = copiedReply ? "다시 복사" : "답글 복사";
     $("report-clear").hidden = stop;
     $("report-stop").hidden = !stop;
     $("report-posted").disabled = !(clear || unknown);
     $("report-failed").disabled = !(clear || unknown);
     $("report-unknown").disabled = !clear;
     $("report-unknown").hidden = unknown;
+    $("report-posted").className = clear && copiedReply ? "btn solid" : "btn outline";
     $("stop-failed").disabled = false;
     $("stop-posted").disabled = false;
     $("stop-posted").hidden = !(stop && (check.cancelRequested || check.holdRequested));
@@ -249,6 +362,8 @@
       if (r.status === 200 && r.json) {
         check = r.json;
         check.at = new Date();
+        copiedReply = false;
+        $("copied").textContent = "";
         task.state = r.json.state;
         chip($("task-state"), task.state);
         $("release").hidden = task.state !== "CLAIMED";
@@ -294,16 +409,36 @@
   $("copy-reply").addEventListener("click", function () {
     if (!(check && check.clearToPost)) { return; }
     copy(check.approvedBody, function (ok) {
-      $("copied").textContent = ok === false ? "복사하지 못했습니다. 위 문장을 직접 선택해 복사하세요." : "복사했습니다";
-      $("copied").className = ok === false ? "xs bad-text" : "xs good-text";
+      $("copied").textContent = ok ? "✓ 복사됨 · 판매자센터 답글 칸에 붙여넣고 저장하세요"
+        : "복사하지 못했습니다. 위 문장을 직접 선택해 복사하세요.";
+      $("copied").className = ok ? "xs good-text" : "xs bad-text";
+      if (ok) { copiedReply = true; renderSteps(); }
     });
   });
 
-  $("copy-no").addEventListener("click", function () {
-    copy(task.reviewNo || "", function (ok) {
-      $("copy-no").textContent = ok === false ? "복사 안 됨" : "복사함";
-    });
+  $("recheck").addEventListener("click", function () { $("preflight").click(); });
+
+  $("copy-no").addEventListener("click", function () { copyButton($("copy-no"), function () { return task.reviewNo || ""; }); });
+
+  // Back from Seller Center with the reply pasted: the next thing is to say what it shows. The page brings that step
+  // to the eye and the keyboard — it never presses it.
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible" || $("view-task").hidden || !$("task-done").hidden) { return; }
+    if (!(check && check.clearToPost && copiedReply)) { return; }
+    $("st4").scrollIntoView({ block: "center" });
+    $("report-posted").focus();
   });
+
+  // The next approved reply to offer once this one is reported; null when none is waiting.
+  var next = null;
+
+  var REPORTED = {
+    POSTED: ["등록함으로 알렸습니다", "good", "판매자에게 등록됐다고 알렸습니다."],
+    FAILED: ["등록하지 않음으로 알렸습니다", "neutral", "답글은 판매자에게 돌아갔습니다."],
+    UNKNOWN: ["확인 필요로 남겼습니다", "warn", "판매자센터에서 등록됐는지 확인한 뒤 「내가 맡은 것」에서 다시 알려 주세요."],
+    CANCELLED: ["취소로 끝냈습니다", "neutral", "판매자가 취소한 답글입니다."],
+    HELD: ["보류를 확인했습니다", "neutral", "답글은 판매자에게 돌아갔습니다."]
+  };
 
   function report(outcome) {
     say("task-error", "");
@@ -318,10 +453,7 @@
       commandId: commandId()
     }).then(function (r) {
       if (r.status === 200 && r.json) {
-        var words = { POSTED: "등록함으로 알렸습니다.", FAILED: "등록하지 않음으로 알렸습니다.",
-          UNKNOWN: "확인 필요로 남겼습니다. 판매자센터에서 확인한 뒤 다시 알려 주세요.", CANCELLED: "취소로 끝냈습니다.",
-          HELD: "보류를 확인했습니다. 답글은 판매자에게 돌아갔습니다." };
-        loadList(words[r.json.state] || "알렸습니다.", "good-text");
+        reported(REPORTED[r.json.state] || ["알렸습니다", "good", ""]);
       } else if (r.status !== 401) {
         renderSteps();
         say("task-error", "알리지 못했습니다. 상태가 바뀌었을 수 있으니 목록에서 다시 여세요.");
@@ -331,6 +463,33 @@
       say("task-error", "서버에 연결하지 못했습니다. 아직 알려지지 않았습니다.");
     });
   }
+
+  /** The report landed: say so, and offer the next approved reply rather than the way back to the list. */
+  function reported(words) {
+    $("steps").hidden = true;
+    $("task-done").hidden = false;
+    $("done-chip").textContent = words[0];
+    $("done-chip").className = "chip " + words[1];
+    $("done-text").textContent = words[2];
+    $("release").hidden = true;
+    $("task-state").hidden = true;
+    $("next-task").hidden = true;
+    $("next-none").hidden = true;
+    $("to-list").className = "btn outline";
+    next = null;
+    call("GET", "/v1/delegate/tasks?state=APPROVED").then(function (r) {
+      var open = r.status === 200 && Array.isArray(r.json) ? r.json : [];
+      next = open.length ? open[0] : null;
+      $("next-task").hidden = !next;
+      $("next-task").textContent = "다음 답글 맡기 · " + open.length + "건 남음";
+      $("next-none").hidden = !!next || r.status !== 200;
+      $("to-list").className = next ? "btn outline" : "btn solid";
+      if (next) { $("next-task").focus(); }
+    }, function () { /* the list stays one press away */ });
+  }
+
+  $("next-task").addEventListener("click", function () { if (next) { claim(next, $("next-task")); } });
+  $("to-list").addEventListener("click", function () { loadList(); });
 
   $("report-posted").addEventListener("click", function () { report("POSTED"); });
   $("report-failed").addEventListener("click", function () { report("FAILED"); });
@@ -349,80 +508,110 @@
 
   /* ── review export upload ─────────────────────────────────────────────────────────────────────────── */
 
-  function tab(name) {
-    var upload = name === "upload";
-    $("tab-tasks").className = upload ? "tab" : "tab on";
-    $("tab-upload").className = upload ? "tab on" : "tab";
-    $("tab-tasks").setAttribute("aria-selected", String(!upload));
-    $("tab-upload").setAttribute("aria-selected", String(upload));
-    $("pane-tasks").hidden = upload;
-    $("pane-upload").hidden = !upload;
-  }
-
-  // The period to download (owner decision 2026-10-25): from the day this store's export was last uploaded to today,
-  // in Seller Center's own dates (Korean). The day of the last upload is taken again on purpose — a review written
-  // after that file was downloaded is in it, and a review uploaded twice changes nothing. A store with no upload yet
-  // takes the longest period Seller Center offers, one year.
-  var lastUploads = {};
-  function sellerCenterDate(d) {
-    var parts = {};
-    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" })
-      .formatToParts(d).forEach(function (x) { parts[x.type] = x.value; });
-    return parts.year + "." + parts.month + "." + parts.day;
-  }
-  function period() {
-    var id = $("store").value;
-    $("period").hidden = !id;
-    if (!id) { return; }
-    var now = new Date();
-    var last = lastUploads[id] ? new Date(lastUploads[id]) : null;
-    var from = last;
-    if (!from) {
-      from = new Date(now.getTime());
-      from.setFullYear(from.getFullYear() - 1);
-    }
-    $("period-range").textContent = sellerCenterDate(from) + " ~ " + sellerCenterDate(now);
-    $("period-why").textContent = last ? "· 마지막으로 올린 날부터" : "· 처음 올리는 스토어라 판매자센터 최대 기간 1년";
-  }
-
   function stores(list) {
-    var select = $("store");
-    lastUploads = {};
-    list.forEach(function (s) { lastUploads[s.id] = s.lastUploadAt || null; });
-    var before = select.value;
-    select.textContent = "";
+    storeList = list;
+    var box = $("store-list");
+    box.textContent = "";
     list.forEach(function (s) {
-      var o = document.createElement("option");
-      o.value = s.id;
-      o.textContent = s.label;
-      select.appendChild(o);
+      var done = doneToday(s);
+      var row = document.createElement("div");
+      row.className = "item task-row" + (openStore === s.id && !$("upload-panel").hidden ? " picked" : "");
+      var left = document.createElement("div");
+      left.className = "grow";
+      var name = document.createElement("p");
+      name.className = "strong";
+      name.textContent = s.label;
+      var sub = document.createElement("p");
+      sub.className = "sm " + (done ? "good-text" : "muted") + " num-text";
+      var p = periodOf(s);
+      sub.textContent = done ? "✓ 오늘 올렸습니다 · " + time(new Date(s.lastUploadAt)) : "받을 기간 " + p.from + " ~ " + p.to;
+      left.appendChild(name);
+      left.appendChild(sub);
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = done ? "btn text" : "btn outline";
+      b.textContent = done ? "다시 올리기" : "올리기";
+      b.setAttribute("data-store", s.id);
+      b.hidden = openStore === s.id && !$("upload-panel").hidden;
+      b.addEventListener("click", function () { panelClosed = false; openPanel(s.id); });
+      row.appendChild(left);
+      row.appendChild(b);
+      box.appendChild(row);
     });
-    if (before && list.some(function (s) { return s.id === before; })) { select.value = before; }
-    select.hidden = list.length === 0;
+    box.hidden = list.length === 0;
     $("no-store").hidden = list.length !== 0;
-    period();
+    var current = list.filter(function (s) { return s.id === openStore; })[0];
+    if (current) {
+      if (!uploading) { fillPeriod(current); }
+    } else {
+      openStore = null;
+      $("upload-panel").hidden = true;
+      // The first store with something due opens by itself: the first thing to do is already in front of the eye.
+      var due = list.filter(function (s) { return !doneToday(s); })[0];
+      if (due && !panelClosed) { openPanel(due.id); }
+    }
+    todo();
+  }
+
+  function openPanel(id) {
+    if (uploading) { return; }
+    var s = storeList.filter(function (x) { return x.id === id; })[0];
+    if (!s) { return; }
+    openStore = id;
+    resetOutcome();
+    chosen = null;
+    $("file").value = "";
+    $("file-name").textContent = NO_FILE;
+    say("upload-status", "");
+    $("panel-title").textContent = s.label;
+    fillPeriod(s);
+    $("upload-panel").hidden = false;
+    Array.prototype.forEach.call($("store-list").children, function (row) {
+      var b = row.querySelector("button");
+      var picked = !!b && b.getAttribute("data-store") === id;
+      row.className = "item task-row" + (picked ? " picked" : "");
+      if (b) { b.hidden = picked; }
+    });
     pickable();
   }
 
+  function fillPeriod(s) {
+    var p = periodOf(s);
+    $("from-date").textContent = p.from;
+    $("to-date").textContent = p.to;
+    $("period-why").textContent = p.why;
+  }
+
+  $("panel-close").addEventListener("click", function () {
+    if (uploading) { return; }
+    panelClosed = true;
+    openStore = null;
+    $("upload-panel").hidden = true;
+    stores(storeList);
+  });
+  $("copy-from").addEventListener("click", function () { copyButton($("copy-from"), function () { return $("from-date").textContent; }); });
+  $("copy-to").addEventListener("click", function () { copyButton($("copy-to"), function () { return $("to-date").textContent; }); });
+
   function pickable() {
-    $("upload").disabled = uploading || !(chosen && $("store").value);
-    $("store").disabled = uploading;
+    $("upload").disabled = uploading || !(chosen && openStore);
     $("file").disabled = uploading;
+    $("panel-close").disabled = uploading;
   }
 
   function choose(file) {
     if (uploading) { return; }
     resetOutcome();
     chosen = null;
-    if (!file) { $("file-name").textContent = ".xlsx · 10MB까지"; pickable(); return; }
+    if (!file) { $("file-name").textContent = NO_FILE; pickable(); return; }
     if (file.size > MAX_UPLOAD) {
       refuse("파일이 10MB보다 큽니다. 판매자센터에서 기간을 나눠 내려받아 올려 주세요.");
-      $("file-name").textContent = ".xlsx · 10MB까지";
+      $("file-name").textContent = NO_FILE;
       pickable();
       return;
     }
     chosen = file;
-    $("file-name").textContent = file.name + " · " + Math.max(1, Math.round(file.size / 1024)) + "KB";
+    $("file-name").textContent = file.name + " · " + Math.max(1, Math.round(file.size / 1024)).toLocaleString("ko-KR") + "KB";
+    $("drop").className = "drop chosen";
     pickable();
   }
 
@@ -431,6 +620,7 @@
     $("refused-columns").hidden = true;
     $("upload-result").hidden = true;
     $("upload-pick").hidden = false;
+    $("drop").className = "drop";
   }
 
   function refuse(text, missing, unexpected) {
@@ -444,94 +634,136 @@
     $("upload-refused").hidden = false;
   }
 
-  function refusal(r) {
-    var j = r.json || {};
-    if (r.status === 400 && j.error === "not_xlsx") { refuse("엑셀(.xlsx) 파일이 아닙니다."); }
-    else if (r.status === 422 && j.error === "header_mismatch") {
+  function refusal(status, j) {
+    j = j || {};
+    if (status === 400 && j.error === "not_xlsx") { refuse("엑셀(.xlsx) 파일이 아닙니다."); }
+    else if (status === 422 && j.error === "header_mismatch") {
       refuse("판매자센터에서 받은 리뷰 엑셀과 열이 다릅니다. 파일을 고치지 말고 다시 내려받아 올려 주세요. "
         + "이 파일에서는 아무것도 반영하지 않았습니다.", j.missing || [], j.unexpected || []);
-    } else if (r.status === 422 && j.error === "invalid_rows") {
+    } else if (status === 422 && j.error === "invalid_rows") {
       var rows = Array.isArray(j.rows) ? j.rows : [];
       var count = typeof j.rowCount === "number" ? j.rowCount : rows.length;
       var named = rows.join(", ") + "행" + (count > rows.length ? " 외 " + (count - rows.length) + "행" : "");
       refuse(count + "행을 읽지 못했습니다" + (rows.length ? ": " + named : "") + ". 이 파일에서는 아무것도 반영하지 않았습니다.");
-    } else if (r.status === 404) {
+    } else if (status === 404) {
       refuse("이 스토어는 지금 배정돼 있지 않습니다. 새로고침한 뒤 다시 고르세요.");
-    } else if (r.status === 413) {
+    } else if (status === 413) {
       refuse("파일이 10MB보다 큽니다. 판매자센터에서 기간을 나눠 내려받아 올려 주세요.");
     } else {
       refuse("올리지 못했습니다. 잠시 후 다시 시도하세요. 반영된 것은 없습니다.");
     }
   }
 
-  // The result names the store the file went to, held from the moment it was sent — never the picker as it is now.
+  function n(x) { return typeof x === "number" ? x.toLocaleString("ko-KR") : "—"; }
+
+  // The result names the store the file went to and the period that was asked, both held from the moment it was
+  // sent — never the panel as it is now.
   function uploaded(result, target) {
-    $("result-chip").textContent = ["올렸습니다", target.label, result.rows + "행"]
-      .filter(Boolean).join(" · ");
-    $("r-added").textContent = String(result.added);
-    $("r-changed").textContent = String(result.changed);
-    $("r-replied").textContent = String(result.replied);
-    $("r-unchanged").textContent = String(result.unchanged);
-    $("r-dropped").textContent = String(result.attachmentsDropped);
+    $("result-what").textContent = target.label + " · " + n(result.rows) + "행";
+    $("r-added").textContent = n(result.added);
+    $("r-changed").textContent = n(result.changed);
+    $("r-replied").textContent = n(result.replied);
+    $("r-unchanged").textContent = n(result.unchanged);
+    $("r-dropped").textContent = n(result.attachmentsDropped);
+    $("r-dropped-line").hidden = !result.attachmentsDropped;
+    var span = typeof result.writtenFrom === "string" && typeof result.writtenTo === "string";
+    $("coverage").hidden = !span && result.rows !== 0;
+    $("covered").textContent = span ? dotted(result.writtenFrom) + " ~ " + dotted(result.writtenTo) + " (작성일)"
+      : "리뷰 없음";
+    $("asked").textContent = target.period.from + " ~ " + target.period.to;
+    say("short", short(result, target.period));
     $("upload-pick").hidden = true;
     $("upload-result").hidden = false;
     whoAmI();
   }
 
+  /**
+   * Whether the file looks shorter than the period that was asked. Only a hint: a day with no reviews looks the same
+   * as a day left out, so it says what to look at and that it may be fine.
+   */
+  function short(result, period) {
+    if (result.rows === 0) {
+      return "파일에 리뷰가 한 건도 없습니다. 판매자센터에서 조회 기간이 " + period.from + " ~ " + period.to + " 인지 확인해 주세요.";
+    }
+    if (typeof result.writtenFrom !== "string" || typeof result.writtenTo !== "string") { return ""; }
+    var lateStart = daysBetween(period.fromIso, result.writtenFrom) > 14;
+    var earlyEnd = daysBetween(result.writtenTo, period.toIso) > 3;
+    if (!lateStart && !earlyEnd) { return ""; }
+    return "받을 기간보다 짧아 보입니다. 판매자센터 조회 기간이 " + period.from + " ~ " + period.to
+      + " 이었는지 확인하고, 아니면 그 기간으로 다시 내려받아 올려 주세요. 그 사이에 리뷰가 없었다면 괜찮습니다.";
+  }
+
+  function stopTicking() { if (ticking) { window.clearInterval(ticking); ticking = null; } }
+
+  // Sent with XMLHttpRequest for its measured upload progress: the percentage is bytes the browser has sent, and
+  // once all are sent the clock counts the seconds the server has been reading — nothing here is a guess.
   $("upload-form").addEventListener("submit", function (e) {
     e.preventDefault();
-    if (uploading || !chosen || !$("store").value) { return; }
+    if (uploading || !chosen || !openStore) { return; }
     resetOutcome();
-    var picked = $("store").options[$("store").selectedIndex];
-    var target = { id: $("store").value, label: picked ? picked.textContent : "" };
+    var s = storeList.filter(function (x) { return x.id === openStore; })[0];
+    var target = { id: openStore, label: s ? s.label : "", period: s ? periodOf(s) : periodOf({}) };
     var form = new FormData();
     form.append("file", chosen, chosen.name);
     uploading = true;
     pickable();
     $("upload").textContent = "올리는 중…";
-    var headers = { "Accept": "application/json" };
-    if (session) { headers.Authorization = "Bearer " + session; }
-    fetch("/v1/delegate/stores/" + encodeURIComponent(target.id) + "/review-uploads", {
-      method: "POST", headers: headers, credentials: "omit", body: form
-    }).then(function (r) {
-      return r.text().then(function (t) {
-        var json = null;
-        try { json = t ? JSON.parse(t) : null; } catch (x) { json = null; }
-        return { status: r.status, json: json };
-      });
-    }).then(function (r) {
+    say("upload-status", "올리는 중");
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "/v1/delegate/stores/" + encodeURIComponent(target.id) + "/review-uploads");
+    xhr.setRequestHeader("Accept", "application/json");
+    if (session) { xhr.setRequestHeader("Authorization", "Bearer " + session); }
+    xhr.upload.addEventListener("progress", function (ev) {
+      if (ev.lengthComputable && ev.total > 0 && !ticking) {
+        say("upload-status", "올리는 중 " + Math.min(100, Math.floor(ev.loaded * 100 / ev.total)) + "%");
+      }
+    });
+    xhr.upload.addEventListener("load", function () {
+      var sent = Date.now();
+      say("upload-status", "확인 중 · 0초");
+      stopTicking();
+      ticking = window.setInterval(function () {
+        say("upload-status", "확인 중 · " + Math.floor((Date.now() - sent) / 1000) + "초");
+      }, 1000);
+    });
+    function finished() {
+      stopTicking();
       uploading = false;
       $("upload").textContent = "올리기";
-      if (r.status === 401) { keep(null); show("login"); pickable(); return; }
-      if (r.status === 201 && r.json) {
+      say("upload-status", "");
+    }
+    xhr.addEventListener("load", function () {
+      finished();
+      var json = null;
+      try { json = xhr.responseText ? JSON.parse(xhr.responseText) : null; } catch (x) { json = null; }
+      if (xhr.status === 401) { keep(null); show("login"); pickable(); return; }
+      if (xhr.status === 201 && json) {
         chosen = null;
         $("file").value = "";
-        $("file-name").textContent = ".xlsx · 10MB까지";
-        uploaded(r.json, target);
+        $("file-name").textContent = NO_FILE;
+        uploaded(json, target);
       } else {
-        refusal(r);
+        refusal(xhr.status, json);
       }
       pickable();
-    }, function () {
-      uploading = false;
-      $("upload").textContent = "올리기";
+    });
+    xhr.addEventListener("error", function () {
+      finished();
       refuse("서버에 연결하지 못했습니다. 반영된 것은 없습니다.");
       pickable();
     });
+    xhr.send(form);
   });
 
   $("file").addEventListener("change", function () { choose($("file").files && $("file").files[0]); });
-  $("store").addEventListener("change", function () { if (!uploading) { resetOutcome(); } period(); pickable(); });
-  $("drop").addEventListener("dragover", function (e) { e.preventDefault(); $("drop").className = "drop stack8 over"; });
-  $("drop").addEventListener("dragleave", function () { $("drop").className = "drop stack8"; });
+  $("drop").addEventListener("dragover", function (e) { e.preventDefault(); if (!uploading) { $("drop").className = "drop over"; } });
+  $("drop").addEventListener("dragleave", function () { $("drop").className = chosen ? "drop chosen" : "drop"; });
   $("drop").addEventListener("drop", function (e) {
     e.preventDefault();
-    $("drop").className = "drop stack8";
+    $("drop").className = "drop";
     choose(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
   });
   $("upload-again").addEventListener("click", function () { if (!uploading) { resetOutcome(); } });
-  $("tab-tasks").addEventListener("click", function () { tab("tasks"); loadList(); });
-  $("tab-upload").addEventListener("click", function () { tab("upload"); whoAmI(); });
 
   $("back").addEventListener("click", function () { loadList(); });
   $("refresh").addEventListener("click", function () { whoAmI(); loadList(); });
@@ -541,11 +773,31 @@
     if (session) { call("POST", "/v1/delegate/auth/logout").then(null, function () {}); }
     keep(null);
     chosen = null;
+    openStore = null;
     $("file").value = "";
-    $("file-name").textContent = ".xlsx · 10MB까지";
+    $("file-name").textContent = NO_FILE;
+    $("upload-panel").hidden = true;
     resetOutcome();
-    tab("tasks");
     show("login");
+    loginLayout();
+  });
+
+  /* ── sign in ──────────────────────────────────────────────────────────────────────────────────────── */
+
+  // With Google on, the password form is the quiet second way: folded behind one text button.
+  function loginLayout() {
+    var open = !googleOn || $("login-form").getAttribute("data-open") === "1";
+    $("google-login").hidden = !googleOn;
+    $("app-login-title").hidden = !googleOn;
+    $("login-form").hidden = !open;
+    $("show-app-login").hidden = open;
+    if (!$("view-login").hidden && !$("login-form").hidden && !googleOn) { $("email").focus(); }
+  }
+
+  $("show-app-login").addEventListener("click", function () {
+    $("login-form").setAttribute("data-open", "1");
+    $("login-form").hidden = false;
+    $("show-app-login").hidden = true;
     $("email").focus();
   });
 
@@ -588,29 +840,58 @@
     say("google-error", GOOGLE_ERRORS[key] || "서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.");
   }
 
-  function takeBinding() {
-    var b = null;
-    try { b = window.sessionStorage.getItem(GOOGLE_KEY); window.sessionStorage.removeItem(GOOGLE_KEY); } catch (e) { b = null; }
-    return b;
+  /** What the starting tab kept: the binding, and for a join its invite code. Read once and removed. */
+  function takeStart() {
+    var raw = null;
+    try { raw = window.sessionStorage.getItem(GOOGLE_KEY); window.sessionStorage.removeItem(GOOGLE_KEY); } catch (e) { raw = null; }
+    if (!raw) { return null; }
+    if (raw.charAt(0) !== "{") { return { binding: raw, invite: null }; }
+    try {
+      var j = JSON.parse(raw);
+      return typeof j.binding === "string" ? { binding: j.binding, invite: typeof j.invite === "string" ? j.invite : null } : null;
+    } catch (e) { return null; }
   }
 
-  $("google-signin").addEventListener("click", function () {
+  /** Off to Google from this tab: `invite` set means a join (the same invite again), otherwise a sign-in. */
+  function toGoogle(invite, button) {
     say("google-error", "");
     var b = binding();
-    try { window.sessionStorage.setItem(GOOGLE_KEY, b); } catch (e) {
+    try {
+      window.sessionStorage.setItem(GOOGLE_KEY, invite ? JSON.stringify({ binding: b, invite: invite }) : b);
+    } catch (e) {
       say("google-error", "이 창에서는 구글 로그인을 마칠 수 없습니다. 비공개 창이 아닌 일반 창에서 여세요.");
       return;
     }
-    $("google-signin").disabled = true;
-    call("POST", "/v1/delegate/auth/google/start", { purpose: "LOGIN", binding: b }).then(function (r) {
+    button.disabled = true;
+    var body = invite ? { purpose: "JOIN", inviteCode: invite, binding: b } : { purpose: "LOGIN", binding: b };
+    call("POST", "/v1/delegate/auth/google/start", body).then(function (r) {
       if (r.status === 200 && r.json && typeof r.json.url === "string" && r.json.url.indexOf("https://accounts.google.com/") === 0) {
         window.location.assign(r.json.url);
       } else {
-        $("google-signin").disabled = false;
+        button.disabled = false;
         googleError(r.json && r.json.error);
       }
-    }, function () { $("google-signin").disabled = false; googleError(null); });
-  });
+    }, function () { button.disabled = false; googleError(null); });
+  }
+
+  $("google-signin").addEventListener("click", function () { toGoogle(null, $("google-signin")); });
+  $("retry-google").addEventListener("click", function () { if (retryInvite) { toGoogle(retryInvite, $("retry-google")); } });
+
+  /**
+   * A join that came back with another Google account: the invite is still live, so name the invited address
+   * (masked, from the server) and offer the same tab one press back to Google's account chooser.
+   */
+  function offerRetry(invite) {
+    call("POST", "/v1/delegate/auth/invites/peek", { inviteCode: invite }).then(function (r) {
+      if (r.status === 200 && r.json && r.json.email) {
+        retryInvite = invite;
+        $("retry-email").textContent = r.json.email;
+        say("google-error", "");
+        $("join-retry").hidden = false;
+        $("google-login").hidden = true;
+      }
+    }, function () {});
+  }
 
   /** Google's return: the fragment is read once and cleared; true when it was one. */
   function googleReturn() {
@@ -618,40 +899,47 @@
     var m = /^google(-error)?=([A-Za-z0-9_-]{1,128})$/.exec(hash);
     if (!m) { return false; }
     window.history.replaceState(null, "", window.location.pathname);
-    var b = takeBinding();
+    var started = takeStart();
     show("login");
-    if (m[1]) { googleError(m[2]); return true; }
-    if (!b) { googleError("google_failed"); return true; }
-    call("POST", "/v1/delegate/auth/google/finish", { handoff: m[2], binding: b }).then(function (r) {
+    if (m[1]) {
+      googleError(m[2]);
+      if (m[2] === "email_mismatch" && started && started.invite) { offerRetry(started.invite); }
+      return true;
+    }
+    if (!started) { googleError("google_failed"); return true; }
+    call("POST", "/v1/delegate/auth/google/finish", { handoff: m[2], binding: started.binding }).then(function (r) {
       if (r.status === 200 && r.json && r.json.token) {
         keep(r.json.token);
         whoAmI();
         loadList();
       } else {
-        googleError(r.json && r.json.error);
+        var key = r.json && r.json.error;
+        googleError(key);
+        if (key === "email_mismatch" && started.invite) { offerRetry(started.invite); }
       }
     }, function () { googleError(null); });
     return true;
   }
 
   function methods() {
-    call("GET", "/v1/delegate/auth/methods").then(function (r) {
-      var on = r.status === 200 && r.json && r.json.google === true;
-      $("google-login").hidden = !on;
-      $("app-login-title").hidden = !on;
-    }, function () {});
+    return call("GET", "/v1/delegate/auth/methods").then(function (r) {
+      googleOn = r.status === 200 && r.json && r.json.google === true;
+      if ($("join-retry").hidden) { loginLayout(); }
+    }, function () { googleOn = false; loginLayout(); });
   }
 
   function whoAmI() {
     call("GET", "/v1/delegate/me").then(function (r) {
       if (r.status === 200 && r.json) {
-        $("who").textContent = "담당자 · " + r.json.email;
+        $("who").textContent = r.json.email;
         stores(Array.isArray(r.json.stores) ? r.json.stores : []);
       }
     }, function () {});
   }
 
+  $("today").textContent = new Date().toLocaleDateString("ko-KR",
+    { month: "long", day: "numeric", weekday: "long", timeZone: "Asia/Seoul" });
   methods();
   if (googleReturn()) { /* finishing the Google trip, or saying why it did not */ }
-  else if (session) { whoAmI(); loadList(); } else { show("login"); $("email").focus(); }
+  else if (session) { whoAmI(); loadList(); } else { show("login"); }
 })();
