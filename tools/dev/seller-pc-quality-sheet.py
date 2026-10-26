@@ -86,19 +86,18 @@ def listed(token, **params):
         page += 1
 
 
-def main():
-    want = int(sys.argv[1]) if len(sys.argv) > 1 else 50
-    token = call("POST", "/api/auth/login", {"email": "demo@sellerops.ai", "password": seed_password()})["token"]
-    link = call("GET", "/api/local/vendor-link", token=token)
-    if link.get("state") != "OFF":
-        raise SystemExit(f"refusing: this PC's vendor link is {link.get('state')}, not OFF — run it on the judging copy")
+def draw(token, groups, safety, want):
+    """The reviews to judge. The first draw is kept (sample.json) and every later build reads the same reviews, in the
+    same order: the groups move when the rule changes, and a fresh draw from the moved groups would judge different
+    reviews — there would be no before and after."""
+    frozen = RUN / "sample.json"
+    if frozen.exists():
+        every = {r["review"]["id"]: r for r in listed(token, sort="attention")}
+        picked = [every[i] for i in json.loads(frozen.read_text()) if i in every]
+        say(f"sample: {len(picked)} (kept from the first draw)")
+        return picked
 
-    groups = {tier: [r for r in listed(token, sort="attention", tier=tier) if (r["review"].get("preview") or "").strip()]
-              for tier in TIER}
-    safety = [r for r in listed(token, sort="attention", safety="true") if r.get("safety")]
-    say("held: " + " · ".join(f"{TIER[t]} {len(rows)}" for t, rows in groups.items()) + f" · 안전 표시 {len(safety)}")
-
-    # Every 확인 필요 and every safety mark (they are few), then 지켜보기, then 참고. The rule never files a 1–3★ review
+    # Every 확인 필요 and every safety mark (they are few), then 지켜보기, then 참고. The rule never files a 1–2★ review
     # under 참고, so what to look for there is a 4–5★ review whose words complain.
     rng = random.Random(SEED)
     picked, seen = [], set()
@@ -115,6 +114,25 @@ def main():
     take(groups["FYI"], want - len(picked))
     say(f"sample: {len(picked)}")
     picked.sort(key=lambda r: (list(TIER).index(r["review"]["triage"]["tier"]), r["review"]["id"]))
+    RUN.mkdir(parents=True, exist_ok=True)
+    frozen.write_text(json.dumps([r["review"]["id"] for r in picked]))
+    frozen.chmod(0o600)
+    return picked
+
+
+def main():
+    want = int(sys.argv[1]) if len(sys.argv) > 1 else 50
+    token = call("POST", "/api/auth/login", {"email": "demo@sellerops.ai", "password": seed_password()})["token"]
+    link = call("GET", "/api/local/vendor-link", token=token)
+    if link.get("state") != "OFF":
+        raise SystemExit(f"refusing: this PC's vendor link is {link.get('state')}, not OFF — run it on the judging copy")
+
+    groups = {tier: [r for r in listed(token, sort="attention", tier=tier) if (r["review"].get("preview") or "").strip()]
+              for tier in TIER}
+    safety = [r for r in listed(token, sort="attention", safety="true") if r.get("safety")]
+    say("held: " + " · ".join(f"{TIER[t]} {len(rows)}" for t, rows in groups.items()) + f" · 안전 표시 {len(safety)}")
+
+    picked = draw(token, groups, safety, want)
 
     ids = ",".join(f"'{r['review']['id']}'" for r in picked)
     facts = {row[0]: row[1:] for row in sql_rows(
