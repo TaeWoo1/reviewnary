@@ -123,6 +123,14 @@ public class VendorReviewPullService {
         this.screens = screens;
     }
 
+    /** Links a relayed review to its product by its channel product number; null in a bare test. */
+    private com.sellerops.product.ReviewProductLink reviewLinks;
+
+    @Autowired(required = false)
+    public void setReviewLinks(com.sellerops.product.ReviewProductLink reviewLinks) {
+        this.reviewLinks = reviewLinks;
+    }
+
     @Autowired
     public VendorReviewPullService(VendorLinkService link, VendorStoreBindingRepository bindings,
                                    VendorReviewRefRepository refs, ReviewRepository reviews,
@@ -425,6 +433,16 @@ public class VendorReviewPullService {
         if (received == 0) {
             binding.setLastPulledAt(clock.instant());
             bindings.save(binding);
+        }
+        if (!inserted.isEmpty() && reviewLinks != null) {
+            // A new product's first reviews take their product before the follow-ups read them (2026-10-27). Never
+            // fails the pull: the reviews are stored, and the next pass links what this one could not.
+            try {
+                reviewLinks.reconcile(binding.getOrgId());
+            } catch (RuntimeException e) {
+                log.warn("vendor review relay: product link skipped store={} cause={}",
+                        binding.getVendorStoreId(), e.getClass().getSimpleName());
+            }
         }
         followUp.afterReviewIngest(binding.getOrgId(), binding.getChannelId(), inserted);
         if (received > 0) {

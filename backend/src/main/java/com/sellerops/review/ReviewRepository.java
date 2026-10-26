@@ -859,6 +859,57 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
     boolean existsByOrgIdAndChannelIdAndContentHash(UUID orgId, UUID channelId, String contentHash);
 
+    /**
+     * Give each unlinked review the product its channel listing names — {@code ReviewProductLink}, on the join V105
+     * indexed for it. One listing at most answers, by
+     * {@code uq_channel_products_external}. Only {@code product_id is null} rows: a link is never moved by this, and tenancy is asserted on
+     * the listing as {@code IngestionService} asserts it for inquiries.
+     */
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+            update reviews r set updated_at = current_timestamp,
+              product_id = (select cp.product_id from channel_products cp
+                            where cp.channel_id = r.channel_id and cp.external_product_id = r.source_product_ref
+                              and (cp.org_id is null or cp.org_id = :orgId))
+            where r.org_id = :orgId and r.product_id is null and r.source_product_ref is not null
+              and exists (select 1 from channel_products cp
+                          where cp.channel_id = r.channel_id and cp.external_product_id = r.source_product_ref
+                            and (cp.org_id is null or cp.org_id = :orgId))
+            """, nativeQuery = true)
+    int linkToListedProducts(@Param("orgId") UUID orgId);
+
+    /** The orgs that have unlinked reviews carrying a channel product number. */
+    @Query(value = """
+            select distinct cast(r.org_id as varchar) from reviews r
+            where r.product_id is null and r.source_product_ref is not null and r.source_product_ref <> ''
+            """, nativeQuery = true)
+    List<String> orgIdsWithUnlinkedProductRef();
+
+    /** Unlinked reviews that carry a channel product number — what a pass leaves behind. */
+    @Query(value = """
+            select count(*) from reviews r
+            where r.org_id = :orgId and r.product_id is null
+              and r.source_product_ref is not null and r.source_product_ref <> ''
+            """, nativeQuery = true)
+    long countUnlinkedWithProductRef(@Param("orgId") UUID orgId);
+
+    /**
+     * Each {@code (channel, product number)} unlinked reviews carry that no listing has: channel id, number, and the
+     * name its reviews most often give it. Ordered so a pass is repeatable.
+     */
+    @Query(value = """
+            select cast(r.channel_id as varchar), r.source_product_ref,
+                   mode() within group (order by r.source_product_name)
+            from reviews r
+            where r.org_id = :orgId and r.product_id is null
+              and r.source_product_ref is not null and r.source_product_ref <> ''
+              and not exists (select 1 from channel_products cp
+                              where cp.channel_id = r.channel_id and cp.external_product_id = r.source_product_ref)
+            group by r.channel_id, r.source_product_ref
+            order by r.channel_id, r.source_product_ref
+            """, nativeQuery = true)
+    List<Object[]> unlistedProductRefs(@Param("orgId") UUID orgId);
+
     /** The stored row a duplicate import matches, so its reply state can be refreshed forward. */
     /**
      * Promoted Cafe24 reviews that carry no product link — the backfill work list.

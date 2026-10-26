@@ -57,6 +57,14 @@ public class ProductKnowledgeWriter {
         this.facts = facts;
     }
 
+    /** Stored reviews that carry a listing's number take its product once it is written (2026-10-27); null in a bare test. */
+    private ReviewProductLink reviewLinks;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setReviewLinks(ReviewProductLink reviewLinks) {
+        this.reviewLinks = reviewLinks;
+    }
+
     /** One page of a channel's catalogue. Returns the SellerOps product ids it touched. */
     @Transactional
     public WriteResult write(UUID orgId, UUID channelId, List<CanonicalProduct> rows) {
@@ -81,8 +89,9 @@ public class ProductKnowledgeWriter {
                         orgId, channelId, e.getClass().getSimpleName());
             }
         }
-        log.info("product-knowledge write org={} channel={} rows={} listings={} variants={} facts={}",
-                orgId, channelId, rows.size(), listings, variantRows, factRows);
+        int linkedReviews = reviewLinks == null ? 0 : reviewLinks.linkListed(orgId);
+        log.info("product-knowledge write org={} channel={} rows={} listings={} variants={} facts={} linkedReviews={}",
+                orgId, channelId, rows.size(), listings, variantRows, factRows, linkedReviews);
         return new WriteResult(List.copyOf(touched), listings, variantRows, factRows);
     }
 

@@ -136,6 +136,8 @@ up() {
   if ! alive pc; then
     ( eval "$(draft_env)"
       export SELLEROPS_AGENT_DRAFT_ORG_IDS='*'   # one seller on this PC
+      # This PC reads no NAVER catalogue yet: its reviews take products made from their own product numbers.
+      export SELLEROPS_REVIEW_PRODUCT_DERIVE=true
       export SPRING_PROFILES_ACTIVE=local-seller SERVER_PORT=$PC_PORT \
         SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/$PC_DB" SPRING_DATASOURCE_USERNAME=sellerops \
         SPRING_DATASOURCE_PASSWORD= SELLEROPS_JWT_SECRET="$PC_JWT_SECRET" \

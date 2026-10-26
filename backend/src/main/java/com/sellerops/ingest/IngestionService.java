@@ -144,7 +144,7 @@ public class IngestionService {
                 // own identifiers, find-only: never resolve-or-create, never a name fallback, never the
                 // shared "(미지정 상품)" bucket. Its product may be null, and a null product is a
                 // storable review — that is the whole of catalogue independence.
-                Product product = attributeReviewProduct(orgId, row);
+                Product product = attributeReviewProduct(orgId, channelId, row);
                 UUID productId = product == null ? null : product.getId();
                 boolean hasExternal = isPresent(row.externalId());
                 int keyVersion = ReviewDedupKey.versionForRow(channelCode, row.textless());
@@ -703,12 +703,31 @@ public class IngestionService {
      * channel's own identity beside it; every read path already null-guards a review's product, because
      * promoted Cafe24 reviews have carried a null one for as long as they have existed.
      *
+     * <p><b>The listing first, then the SKU</b> (2026-10-27). The NAVER delegate's export relayed through the vendor
+     * server declares its 채널상품번호 and no SKU, so a SKU-only lookup could never find it — every review on the seller
+     * PC stored unlinked. The channel's own listing key answers first, exactly as {@link #attributeProduct} answers it
+     * for an inquiry; still find-only. Rows stored before a listing existed are joined later by
+     * {@code ReviewProductLink}.
+     *
      * <p>The non-declaring lane is untouched: name/SKU resolve-or-create, exactly as every file-upload
      * source has always used it.
      */
-    private Product attributeReviewProduct(UUID orgId, CanonicalReview row) {
+    private Product attributeReviewProduct(UUID orgId, UUID channelId, CanonicalReview row) {
         if (row.productRef() == null) {
             return productService.resolveOrCreate(orgId, row.productName(), row.sku());
+        }
+        if (row.productRef().hasIdentifier() && channelProducts != null) {
+            UUID listed = channelProducts
+                    .findByChannelIdAndExternalProductId(channelId, row.productRef().externalProductId())
+                    .filter(listing -> listing.getOrgId() == null || orgId.equals(listing.getOrgId()))
+                    .map(ChannelProduct::getProductId)
+                    .orElse(null);
+            if (listed != null) {
+                Product found = productService.findInOrg(orgId, listed).orElse(null);
+                if (found != null) {
+                    return found;
+                }
+            }
         }
         return productService.findBySku(orgId, row.sku()).orElse(null);
     }

@@ -40,6 +40,12 @@ public class ProductController {
     private final ProductKnowledgeService knowledge;
     private final ProductKnowledgeDerivation derivation;
     private final ReviewProductLinkBackfill reviewLinks;
+    private ReviewProductLink reviewProductLink;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setReviewProductLink(ReviewProductLink reviewProductLink) {
+        this.reviewProductLink = reviewProductLink;
+    }
 
     public ProductController(ProductQueryService query, ProductCatalogService catalogue,
                              ProductSignalsService signals,
@@ -153,6 +159,15 @@ public class ProductController {
             @RequestParam(defaultValue = "500") int limit,
             @RequestParam(defaultValue = "0") int page) {
         return reviewLinks.backfill(principal.orgId(), limit, page);
+    }
+
+    /**
+     * Give stored reviews the product their channel product number names (2026-10-27) — {@link ReviewProductLink}.
+     * Idempotent; reaches no marketplace.
+     */
+    @PostMapping("/review-link/reconcile")
+    public ReviewProductLink.Result reconcileReviewLinks(@AuthenticationPrincipal AuthPrincipal principal) {
+        return reviewProductLink.reconcile(principal.orgId());
     }
 
     private static LocalDate parseDate(String value) {

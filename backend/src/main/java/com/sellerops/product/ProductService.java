@@ -39,6 +39,11 @@ public class ProductService {
         return products.findByOrgIdAndSku(orgId, sku);
     }
 
+    /** One product of this org by id, without creating anything. */
+    public java.util.Optional<Product> findInOrg(UUID orgId, UUID productId) {
+        return products.findById(productId).filter(p -> orgId.equals(p.getOrgId()));
+    }
+
     public Product resolveOrCreateWithinTransaction(UUID orgId, String name, String sku) {
         if (sku != null && !sku.isBlank()) {
             Product existing = products.findByOrgIdAndSku(orgId, sku).orElse(null);

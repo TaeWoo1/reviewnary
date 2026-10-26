@@ -65,6 +65,12 @@ sellerops:
   # SMTP, social login) and LoopbackRequestGuard (refuses a non-loopback Host or Origin).
   local-seller:
     enabled: ${SELLEROPS_LOCAL_SELLER_MODE:false}
+  # A stored review takes the product its channel product number names (ReviewProductLink, 2026-10-27). Linking to a
+  # listing the catalogue read wrote always runs. Deriving a product from the reviews' own number and name, where no
+  # catalogue read has run, is the local demo's stand-in until the seller PC reads the NAVER catalogue — off here,
+  # on in tools/dev/seller-pc-demo.sh. A derived listing is stamped DERIVED:REVIEW_REF and the catalogue read keeps it.
+  review-product:
+    derive-from-review-refs: ${SELLEROPS_REVIEW_PRODUCT_DERIVE:false}
   # The vendor server a seller PC registers with (docs/vendor_server_contract_v1.md §2 · §7). Empty = off: the
   # connection screen keeps its manual call-IP guidance. Only used in a seller-PC install, and OutboundGate admits
   # only the vendor server's own host (VENDOR) or loopback, whatever this names.
