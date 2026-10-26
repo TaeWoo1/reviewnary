@@ -167,7 +167,7 @@ def main():
                 note = f"초안을 만들지 못함 ({getattr(e, 'code', type(e).__name__)})"
         mark = row.get("safety")
         sheet.append({
-            "n": n, "link": f"{SCREEN}/reviews/reply/{review['id']}", "rating": review.get("rating"),
+            "n": n, "id": review["id"], "link": f"{SCREEN}/reviews/reply/{review['id']}", "rating": review.get("rating"),
             "product": product or review.get("productName") or "", "body": body,
             "tier": TIER.get(review["triage"]["tier"], review["triage"]["tier"]),
             "reason": review["triage"].get("reason") or "", "tags": ", ".join(review["triage"].get("tags") or []),
@@ -182,19 +182,30 @@ def main():
     say(f"sheet: {RUN / '판정시트.xlsx'}")
 
 
+def first_pass(kind):
+    """Claude's first pass, if one was made (claude-1차-분류.json / claude-1차-초안.json), keyed by review id. It sits in
+    its own columns beside the owner's — a reading to confirm or overrule, never a mark in the owner's cell."""
+    path = RUN / f"claude-1차-{kind}.json"
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
 def write(rows):
+    grouping, drafting = first_pass("분류"), first_pass("초안")
     wb = Workbook()
     ws = wb.active
     ws.title = "판정"
     head = ["번호", "화면에서 보기", "별점", "상품", "리뷰", "시스템 묶음", "묶은 이유", "태그", "안전 표시",
-            "분류 판정", "분류 — 고칠 점", "AI 초안", "초안 근거", "초안 판정", "초안 — 고칠 점", "참고"]
+            "Claude 1차 — 분류", "Claude 이유 — 분류", "분류 판정", "분류 — 고칠 점",
+            "AI 초안", "초안 근거", "Claude 1차 — 초안", "Claude 이유 — 초안", "초안 판정", "초안 — 고칠 점", "참고"]
     ws.append(head)
     for r in rows:
+        g, d = grouping.get(r["id"], {}), drafting.get(r["id"], {})
         ws.append([r["n"], "열기", r["rating"], r["product"], r["body"], r["tier"], r["reason"], r["tags"], r["safety"],
-                   "", "", r["draft"], r["basis"], "", "", r["note"]])
+                   g.get("verdict", ""), g.get("why", ""), "", "",
+                   r["draft"], r["basis"], d.get("verdict", ""), d.get("why", ""), "", "", r["note"]])
         ws.cell(row=ws.max_row, column=2).hyperlink = r["link"]
         ws.cell(row=ws.max_row, column=2).font = Font(color="1F4FBF", underline="single")
-    widths = [6, 9, 6, 18, 60, 11, 24, 14, 14, 11, 28, 60, 14, 11, 28, 18]
+    widths = [6, 9, 6, 18, 60, 11, 24, 14, 14, 11, 36, 11, 28, 60, 14, 11, 36, 11, 28, 18]
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
     for cell in ws[1]:
@@ -203,7 +214,10 @@ def write(rows):
     for row in ws.iter_rows(min_row=2):
         for cell in row:
             cell.alignment = Alignment(wrap_text=True, vertical="top")
-    for col in ("J", "N"):
+    for col in ("J", "P"):
+        for row in range(2, ws.max_row + 1):
+            ws[f"{col}{row}"].fill = PatternFill("solid", fgColor="EAF2FB")
+    for col in ("L", "R"):
         dv = DataValidation(type="list", formula1=VERDICTS, allow_blank=True)
         ws.add_data_validation(dv)
         dv.add(f"{col}2:{col}{ws.max_row}")
@@ -214,6 +228,8 @@ def write(rows):
     guide = wb.create_sheet("읽는 법")
     for line in [
         "한 줄 = 리뷰 하나. 노란 칸 두 개만 고르시면 됩니다: 맞다 / 고칠 것 / 틀림.",
+        "파란 칸은 Claude가 먼저 본 판정과 이유입니다. 동의하면 노란 칸에 같은 것을, 아니면 다른 것을 고르세요 —"
+        " 파란 칸은 참고일 뿐 결과로 세지 않습니다.",
         "",
         "분류 판정 — 「시스템 묶음 · 묶은 이유 · 안전 표시」가 이 리뷰에 맞는가.",
         "  맞다: 그대로 좋다.   고칠 것: 묶음은 맞는데 이유나 표시가 어색하다.   틀림: 다른 묶음이어야 한다.",
