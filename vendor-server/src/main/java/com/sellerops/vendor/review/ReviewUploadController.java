@@ -17,17 +17,20 @@ import org.springframework.web.multipart.MultipartFile;
 /**
  * A delegate uploads a store's review export — contract §3.1. Only to a store assigned to them now; any other store
  * id is the same 404 as one that does not exist. The file is read in memory and dropped; the answer is counts, or a
- * refusal that names what to fix.
+ * refusal that names what to fix. An upload that changed anything wakes the PCs waiting on the store
+ * ({@link ReviewArrivals}).
  */
 @RestController
 public class ReviewUploadController {
 
     private final Stores stores;
     private final StoreReviews reviews;
+    private final ReviewArrivals arrivals;
 
-    public ReviewUploadController(Stores stores, StoreReviews reviews) {
+    public ReviewUploadController(Stores stores, StoreReviews reviews, ReviewArrivals arrivals) {
         this.stores = stores;
         this.reviews = reviews;
+        this.arrivals = arrivals;
     }
 
     @PostMapping("/v1/delegate/stores/{storeId}/review-uploads")
@@ -38,8 +41,12 @@ public class ReviewUploadController {
         }
         try {
             var lines = NaverReviewExport.read(file.getBytes());
-            return ResponseEntity.status(HttpStatus.CREATED).body(reviews.importExport(storeId, delegate.delegateId(),
-                    lines));
+            StoreReviews.Imported imported = reviews.importExport(storeId, delegate.delegateId(), lines);
+            // Committed by now (the import is its own transaction): a PC waiting on this store goes to fetch it.
+            if (imported.added() + imported.changed() + imported.replied() > 0) {
+                arrivals.arrived(storeId);
+            }
+            return ResponseEntity.status(HttpStatus.CREATED).body(imported);
         } catch (NaverReviewExport.Refused e) {
             return switch (e.reason()) {
                 case NOT_XLSX -> ResponseEntity.badRequest().body(Map.of("error", "not_xlsx"));

@@ -220,6 +220,31 @@ class JdkVendorServerClientTest {
                 + "\"commandId\":\"pc-check:x\"}");
     }
 
+    /**
+     * The held question (vendor-server StoreReviewController.waitForReviews): the cursors go as a map keyed by store,
+     * the answer is the stores that are ready — empty when the hold ran out — and a malformed one is a broken answer.
+     * It waits longer than the server holds, so a held answer is never cut off on this side.
+     */
+    @Test
+    void theWaitSendsEachStoresCursorAndReadsWhichAreReady() {
+        OutboundGate.arm(true);
+        String store = "6f1c2a3b-0000-4000-8000-000000000001";
+        route("/v1/reviews/wait", 200, "{\"ready\":[\"" + store + "\"]}");
+        JdkVendorServerClient client = new JdkVendorServerClient(base);
+        assertThat(client.waitForReviews("rvi_x", java.util.Map.of(java.util.UUID.fromString(store), 7L)))
+                .containsExactly(java.util.UUID.fromString(store));
+        assertThat(seen).last().isEqualTo("POST /v1/reviews/wait auth=true {\"cursors\":{\"" + store + "\":7}}");
+        assertThat(JdkVendorServerClient.WAIT_TIMEOUT).isGreaterThan(java.time.Duration.ofSeconds(25));
+
+        stub.removeContext("/v1/reviews/wait");
+        route("/v1/reviews/wait", 200, "{\"ready\":[]}");
+        assertThat(client.waitForReviews("rvi_x", java.util.Map.of(java.util.UUID.fromString(store), 7L))).isEmpty();
+        stub.removeContext("/v1/reviews/wait");
+        route("/v1/reviews/wait", 200, "{\"ready\":[\"not-a-store\"]}");
+        assertThatThrownBy(() -> client.waitForReviews("rvi_x", java.util.Map.of(java.util.UUID.fromString(store), 7L)))
+                .isInstanceOf(VendorServerClient.Unreachable.class);
+    }
+
     @Test
     void aRefusedTokenOrStoreIsRefusedNotUnreachable() {
         OutboundGate.arm(true);

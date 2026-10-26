@@ -631,6 +631,19 @@
   `tools/dev/seller-pc-qa-perf.mjs upload N`으로 잰다.
 - **출처** — 2026-10-26, `ItemAnalysisBatchQueryTest`, QA 스택(합성 리뷰 300 → 46,855건).
 
+### B29. 느려졌다 빨라졌다 하는 받기를 PC 쪽에서만 찾았다 — 기다린 곳은 vendor 서버의 확인 쿼리였다
+
+- **했던 것** — 업로드 즉시 받기를 붙이자 같은 3,000건이 어떤 때는 7초, 어떤 때는 150초 걸렸다. 새 스레드가 문제인 줄 알고
+  PC에 JFR을 붙였는데 그 회차는 4초였다.
+- **사실** — 받는 동안 양쪽 DB의 `pg_stat_activity`를 0.5초마다 찍자 대부분 vendor 쪽 `ack` 두 문장이었다.
+  `update store_reviews … where seq <= cursor`가 확인마다 스토어의 사건 전부를 다시 읽었고(5,000건 받기 = 확인 25번),
+  계획이 나쁜 날은 PC의 10초 제한을 넘겼다. PC는 포기하고 다음 확인을 보내고, 그 확인은 아직 도는 앞 트랜잭션의
+  `store_review_acks` 행 잠금 뒤에 줄을 섰다. 이번 구간(`seq > 앞 확인`)만 읽게 하자 확인 1회 113ms → 1.4ms, 10,000건 15초로
+  고르게 됐다. B28 직전에 이 쿼리를 `EXPLAIN`했을 때 16ms였던 것은 바꿀 행이 0개인 상태로 쟀기 때문이다.
+- **다음에** — 두 서버가 주고받는 일이 들쭉날쭉하면 **양쪽 DB에서 지금 도는 쿼리**부터 본다. `EXPLAIN ANALYZE`는 실제 상황
+  (바꿀 행이 있는 상태)을 트랜잭션 안에 만들어 놓고 재고 `rollback`한다. 커서까지 "전부"를 읽는 쿼리는 지난 커서부터 읽는다.
+- **출처** — 2026-10-26, `StoreReviews.ack`, `StoreReviewsTest.eachAckMarksTheReviewsItCoversAsSavedOnThePc`, QA 스택.
+
 ---
 
 ## C. 증거 · 계약

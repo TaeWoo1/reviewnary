@@ -3,6 +3,7 @@ package com.sellerops.vendorlink;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -76,6 +77,16 @@ public interface VendorServerClient {
 
     /** Tells the server this PC stored everything up to {@code cursor}. */
     void ackReviews(String installToken, UUID storeId, long cursor);
+
+    /**
+     * Waits for news (§3.2 {@code POST /v1/reviews/wait}, owner decision 2026-10-26): which of these stores have events
+     * after the cursor given for each. The server answers at once when one has, and otherwise holds the question until
+     * a delegate's upload to one of them or about 25 s — then the list is empty. A server without the call is
+     * {@link Unreachable}: the PC keeps its timed pull.
+     */
+    default List<UUID> waitForReviews(String installToken, Map<UUID, Long> cursors) {
+        throw new Unreachable();
+    }
 
     /* ── reply tasks (§4.3) ── */
 

@@ -37,7 +37,8 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
  *   <li>Seller session only ({@link Principal#SELLER}): looking up and approving a PC, listing and revoking the
  *       account's PCs.</li>
  *   <li>Seller session or install token: the account's stores, and marking a review as needing no reply.</li>
- *   <li>Install token only: pulling a store's review events and confirming what was saved; submitting reply
+ *   <li>Install token only: waiting for a store's next upload, pulling its review events and confirming what was
+ *       saved; submitting reply
  *       drafts, syncing their changes, reporting policy and a knowledge-based recheck.</li>
  *   <li>Seller session or install token: reading, editing, approving and cancelling reply tasks.</li>
  *   <li>Delegate session only ({@link DelegatePrincipal#DELEGATE}): everything under {@code /v1/delegate/} that is
@@ -85,6 +86,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(a -> a
                         // Spring's error page renders a status and nothing else (application.yml server.error).
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                        // A held answer (POST /v1/reviews/wait) is written on a second, ASYNC dispatch of a request
+                        // this chain already authorised on its first; that dispatch carries no bearer of its own.
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers(HttpMethod.GET, "/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/v1/auth/login", "/v1/auth/invites/peek",
                                 "/v1/auth/invites/redeem").permitAll()
@@ -111,6 +115,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/v1/delegate/auth/logout").hasRole(DELEGATE)
                         .requestMatchers(HttpMethod.GET, "/v1/delegate/me").hasRole(DELEGATE)
                         .requestMatchers(HttpMethod.POST, "/v1/delegate/stores/*/review-uploads").hasRole(DELEGATE)
+                        .requestMatchers(HttpMethod.POST, "/v1/reviews/wait").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.GET, "/v1/stores/*/reviews").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.POST, "/v1/stores/*/reviews/ack").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.POST, "/v1/stores/*/reviews/*/disposition")

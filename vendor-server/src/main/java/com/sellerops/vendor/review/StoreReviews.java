@@ -209,6 +209,23 @@ public class StoreReviews {
      * A PC saved everything up to {@code cursor}. False when the cursor names no event of this store. Never moves a
      * PC's confirmed position backwards.
      */
+    /**
+     * Of these stores and the cursor a PC holds for each, the ones with an event after that cursor — what a waiting
+     * PC is told to fetch (contract §3.2 {@code /v1/reviews/wait}).
+     */
+    @Transactional(readOnly = true)
+    public List<UUID> ahead(Map<UUID, Long> cursors) {
+        List<UUID> ready = new ArrayList<>();
+        cursors.forEach((store, cursor) -> {
+            long latest = jdbc.sql("select coalesce(max(seq), 0) from store_review_events where store_id = ?")
+                    .param(store).query(Long.class).single();
+            if (latest > cursor) {
+                ready.add(store);
+            }
+        });
+        return ready;
+    }
+
     @Transactional
     public boolean ack(UUID storeId, UUID installId, long cursor) {
         boolean known = jdbc.sql("select count(*) from store_review_events where store_id = ? and seq = ?")
@@ -217,6 +234,11 @@ public class StoreReviews {
             return false;
         }
         Instant now = clock.instant();
+        // Where this PC had confirmed before. Locked: two confirmations from one PC take turns rather than both
+        // marking the same range.
+        long before = jdbc.sql("select acked_seq from store_review_acks where store_id = ? and install_id = ? "
+                        + "for update")
+                .params(storeId, installId).query(Long.class).optional().orElse(0L);
         int moved = jdbc.sql("update store_review_acks set acked_seq = greatest(acked_seq, ?), acked_at = ? "
                         + "where store_id = ? and install_id = ?")
                 .params(cursor, ts(now), storeId, installId)
@@ -226,10 +248,16 @@ public class StoreReviews {
                     .params(storeId, installId, cursor, ts(now))
                     .update();
         }
-        jdbc.sql("update store_reviews set pc_saved_at = ? where store_id = ? and pc_saved_at is null and id in "
-                        + "(select review_id from store_review_events where store_id = ? and seq <= ?)")
-                .params(ts(now), storeId, storeId, cursor)
-                .update();
+        if (cursor > before) {
+            // Only the events since the last confirmation: everything up to it was marked then (pc_saved_at is never
+            // cleared). Reading from the store's first event on every confirmation made a 5,000-review pull — 25
+            // confirmations — re-read the whole store 25 times; past the PC's 10 s wait the confirmations queued
+            // behind each other on this row (measured 2026-10-26, 3,000 reviews 150 s on a store of 70,000).
+            jdbc.sql("update store_reviews set pc_saved_at = ? where store_id = ? and pc_saved_at is null and id in "
+                            + "(select review_id from store_review_events where store_id = ? and seq > ? and seq <= ?)")
+                    .params(ts(now), storeId, storeId, before, cursor)
+                    .update();
+        }
         startRetention(storeId);
         return true;
     }

@@ -1,12 +1,15 @@
 package com.sellerops.vendor.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -39,6 +42,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
@@ -577,6 +581,61 @@ class VendorServerSecurityTest {
         mvc.perform(json(post(feed + "/" + reviewId + "/disposition").with(bearer(otherSession)),
                         "{\"noReplyNeeded\":true,\"commandId\":\"c-2\"}"))
                 .andExpect(status().isNotFound());
+    }
+
+    /**
+     * A PC asks whether its store has anything after its cursor (§3.2, owner decision 2026-10-26). Nothing yet: the
+     * question is held. The delegate's upload answers it with the store; asked again behind those events it is
+     * answered at once; caught up, held again — and the same file uploaded twice changes nothing and wakes nobody.
+     * Only the install token may ask, and only about its own stores.
+     */
+    @Test
+    void aWaitingPcIsAnsweredByTheNextUploadToItsStore() throws Exception {
+        Delegate me = enrolDelegate();
+        UUID store = stores.add(accounts.idOf(email).orElseThrow(), Stores.Channel.NAVER, "기다리는 스토어");
+        stores.assign(store, me.id());
+        CheckedStores.checked(jdbc, store, me.id());
+        String pc = link();
+        String fromStart = "{\"cursors\":{\"" + store + "\":0}}";
+
+        MvcResult held = mvc.perform(json(post("/v1/reviews/wait").with(bearer(pc)), fromStart))
+                .andExpect(request().asyncStarted()).andReturn();
+        assertThatThrownBy(() -> held.getAsyncResult(300)).isInstanceOf(IllegalStateException.class);
+
+        MockMultipartFile file = new MockMultipartFile("file", "export.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ExportWorkbooks.fixture());
+        String uploadPath = "/v1/delegate/stores/" + store + "/review-uploads";
+        mvc.perform(multipart(uploadPath).file(file).with(bearer(me.token()))).andExpect(status().isCreated());
+        mvc.perform(asyncDispatch(held)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.ready.length()").value(1)).andExpect(jsonPath("$.ready[0]").value(store.toString()));
+
+        MvcResult behind = mvc.perform(json(post("/v1/reviews/wait").with(bearer(pc)), fromStart)).andReturn();
+        mvc.perform(asyncDispatch(behind)).andExpect(status().isOk()).andExpect(jsonPath("$.ready[0]").value(store.toString()));
+
+        long cursor = body(mvc.perform(get("/v1/stores/" + store + "/reviews?limit=200").with(bearer(pc))))
+                .path("cursor").asLong();
+        String caughtUp = "{\"cursors\":{\"" + store + "\":" + cursor + "}}";
+        MvcResult again = mvc.perform(json(post("/v1/reviews/wait").with(bearer(pc)), caughtUp))
+                .andExpect(request().asyncStarted()).andReturn();
+        mvc.perform(multipart(uploadPath).file(file).with(bearer(me.token()))).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.added").value(0));
+        assertThatThrownBy(() -> again.getAsyncResult(300)).isInstanceOf(IllegalStateException.class);
+
+        // Nobody but the install token asks; another seller's store is the feed's 404; a bad cursor is refused.
+        mvc.perform(json(post("/v1/reviews/wait").with(bearer(session)), fromStart)).andExpect(status().isForbidden());
+        mvc.perform(json(post("/v1/reviews/wait").with(bearer(me.token())), fromStart))
+                .andExpect(status().isForbidden());
+        mvc.perform(json(post("/v1/reviews/wait"), fromStart)).andExpect(status().isUnauthorized());
+        String otherEmail = "w-" + email;
+        mvc.perform(json(post("/v1/auth/invites/redeem"), "{\"inviteCode\":\"" + accounts.issueInvite(otherEmail)
+                + "\",\"password\":\"another long one\"}")).andExpect(status().isCreated());
+        UUID foreign = stores.add(accounts.idOf(otherEmail).orElseThrow(), Stores.Channel.NAVER, "남의 스토어");
+        mvc.perform(asyncDispatch(mvc.perform(json(post("/v1/reviews/wait").with(bearer(pc)),
+                        "{\"cursors\":{\"" + foreign + "\":0}}")).andReturn()))
+                .andExpect(status().isNotFound());
+        mvc.perform(asyncDispatch(mvc.perform(json(post("/v1/reviews/wait").with(bearer(pc)),
+                        "{\"cursors\":{\"" + store + "\":-1}}")).andReturn()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("invalid_cursor"));
     }
 
     @Test

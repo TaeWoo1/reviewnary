@@ -175,6 +175,31 @@ class StoreReviewsTest {
                 .params(store, install).query(Long.class).single()).isEqualTo(page.cursor());
     }
 
+    /** Each confirmation marks what it covers, page after page; a repeat or a step back marks nothing new. */
+    @Test
+    void eachAckMarksTheReviewsItCoversAsSavedOnThePc() throws Exception {
+        upload(lines(ExportWorkbooks.line("1", Map.of()), ExportWorkbooks.line("2", Map.of()),
+                ExportWorkbooks.line("3", Map.of())));
+        Page first = reviews.feed(store, 0, 2);
+        assertThat(reviews.ack(store, install, first.cursor())).isTrue();
+        assertThat(savedOnPc()).containsExactlyInAnyOrder("1", "2");
+
+        Page second = reviews.feed(store, first.cursor(), 2);
+        assertThat(reviews.ack(store, install, second.cursor())).isTrue();
+        assertThat(savedOnPc()).containsExactlyInAnyOrder("1", "2", "3");
+
+        upload(lines(ExportWorkbooks.line("4", Map.of())));
+        assertThat(reviews.ack(store, install, first.cursor())).as("a step back").isTrue();
+        assertThat(savedOnPc()).doesNotContain("4");
+        assertThat(reviews.ack(store, install, reviews.feed(store, second.cursor(), 2).cursor())).isTrue();
+        assertThat(savedOnPc()).containsExactlyInAnyOrder("1", "2", "3", "4");
+    }
+
+    private List<String> savedOnPc() {
+        return jdbc.sql("select review_no from store_reviews where store_id = ? and pc_saved_at is not null")
+                .param(store).query(String.class).list();
+    }
+
     @Test
     void noForbiddenColumnIsStoredAnywhere() throws Exception {
         upload(NaverReviewExport.read(ExportWorkbooks.fixture()));

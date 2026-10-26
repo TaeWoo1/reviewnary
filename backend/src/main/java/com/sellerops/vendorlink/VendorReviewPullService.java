@@ -20,7 +20,9 @@ import com.sellerops.vendorlink.VendorServerClient.Store;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -246,6 +248,37 @@ public class VendorReviewPullService {
         return new StoreView(b.getVendorStoreId(), label, b.isPaused() ? Standing.PAUSED : Standing.RECEIVING,
                 b.getLastPulledAt(), b.getLastUploadAt(), refs.countByVendorStoreId(b.getVendorStoreId()),
                 b.getLastFailure() == null ? null : Failure.valueOf(b.getLastFailure()), b.getLastFailureAt());
+    }
+
+    /**
+     * What a waiting question names ({@link VendorReviewArrivalWatch}): each store this PC receives — not a stopped one
+     * — with the cursor stored for it. Empty when the link is off or not made.
+     */
+    public Map<UUID, Long> receivingCursors() {
+        if (link.client() == null || link.status().state() == VendorLinkService.State.OFF
+                || link.installToken().isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, Long> cursors = new LinkedHashMap<>();
+        for (VendorStoreBinding binding : bindings.findAll()) {
+            if (!binding.isPaused()) {
+                cursors.put(binding.getVendorStoreId(), binding.getReviewCursor());
+            }
+        }
+        return cursors;
+    }
+
+    /**
+     * Asks the server to say when one of these stores has news, and waits for the answer (up to about 25 s; empty when
+     * nothing came). Deliberately not under this service's lock: the screen and a pull must not queue behind a wait.
+     */
+    public List<UUID> waitForNews(Map<UUID, Long> cursors) {
+        VendorServerClient client = link.client();
+        Optional<String> token = link.installToken();
+        if (client == null || token.isEmpty() || cursors.isEmpty()) {
+            return List.of();
+        }
+        return client.waitForReviews(token.get(), cursors);
     }
 
     /** The scheduled pull: every bound store (a stopped one for its reply tasks only), binding nothing new. */

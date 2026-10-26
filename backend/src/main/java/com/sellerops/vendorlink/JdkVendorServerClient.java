@@ -27,6 +27,8 @@ public class JdkVendorServerClient implements VendorServerClient {
 
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
+    /** Longer than the server holds a waiting question (25 s), so a held answer is never cut off here. */
+    static final Duration WAIT_TIMEOUT = Duration.ofSeconds(35);
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final URI base;
@@ -151,6 +153,36 @@ public class JdkVendorServerClient implements VendorServerClient {
                     optionalText(r, "repliedAt") == null ? null : instant(r, "repliedAt"))));
         }
         return new FeedPage(out, a.json().path("cursor").asLong(), a.json().path("more").asBoolean(false));
+    }
+
+    @Override
+    public List<UUID> waitForReviews(String installToken, Map<UUID, Long> cursors) {
+        Map<String, Long> named = new LinkedHashMap<>();
+        cursors.forEach((store, cursor) -> named.put(store.toString(), cursor));
+        Answer a;
+        try {
+            a = relay(HttpRequest.newBuilder(base.resolve("v1/reviews/wait")).timeout(WAIT_TIMEOUT)
+                    .header("Authorization", "Bearer " + installToken).header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(Map.of("cursors", named)),
+                            StandardCharsets.UTF_8))
+                    .build());
+        } catch (IOException e) {
+            throw new Unreachable();
+        }
+        JsonNode ready = a.json().path("ready");
+        if (!ready.isArray()) {
+            throw new Unreachable();
+        }
+        List<UUID> out = new ArrayList<>();
+        for (JsonNode id : ready) {
+            try {
+                out.add(UUID.fromString(id.asText()));
+            } catch (IllegalArgumentException e) {
+                throw new Unreachable();
+            }
+        }
+        return out;
     }
 
     @Override
