@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Base64;
+import com.sellerops.live.ScreenChanges;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -102,6 +103,21 @@ abstract class VendorReviewPullScenarios {
         link.poll();
         pull = new VendorReviewPullService(link, bindings, refs, reviews, channels, ingestion, followUp, syncJobs,
                 CLOCK);
+    }
+
+    @Test
+    void aPullThatStoredReviewsTellsTheOpenScreensAndAnEmptyOneDoesNot() {
+        ScreenChanges screens = new ScreenChanges();
+        pull.setScreenChanges(screens);
+        long before = screens.version(org);
+        vendor.event("NEW", review("v1", "9000000001", "만족합니다", 5, false, "노출"));
+
+        pull.start(org, List.of(store));
+        long afterReviews = screens.version(org);
+        assertThat(afterReviews).isGreaterThan(before);
+
+        pull.pullBound();
+        assertThat(screens.version(org)).as("nothing arrived, so no screen reads again").isEqualTo(afterReviews);
     }
 
     @Test

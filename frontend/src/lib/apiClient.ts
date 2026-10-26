@@ -534,6 +534,18 @@ export const api = {
     const { data } = await http.get<ReplyBoard>("/api/local/vendor-link/reviews/board");
     return data;
   },
+  /**
+   * The open screen's one question: has anything this organisation's screens show changed since `after`? The server
+   * holds it up to 25 s, so this call waits longer than the shared 8 s; `null` asks for the number as it is now.
+   */
+  async waitForScreenChanges(after: number | null, signal?: AbortSignal): Promise<number> {
+    const { data } = await http.get<{ version: number }>("/api/live/changes", {
+      params: after === null ? {} : { after },
+      timeout: 35_000,
+      ...(signal ? { signal } : {}),
+    });
+    return data.version;
+  },
   /** 「휴대폰 문장 쓰기」: the phone's edit stays, and this PC's set-aside version is no longer offered. */
   async dropReplySetAside(reviewId: string): Promise<void> {
     await http.post(`/api/local/vendor-link/reviews/${reviewId}/set-aside/drop`);

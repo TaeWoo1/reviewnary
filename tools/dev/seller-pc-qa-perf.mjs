@@ -6,11 +6,14 @@
 //   2. upload   — a delegate uploads a NAVER review export on the desk: how long the desk takes to answer, and how long
 //                 until the PC holds every review (the PC pulls on a timer, SELLER_PC_DEMO_PULL_MS, 30 s by default);
 //   3. drafts   — 「AI 초안 준비」 on unanswered reviews: how long until the draft is on screen, and how many fail.
+//   4. live     — the review list and Home left open on the PC while a delegate uploads: how long until each reads
+//                 again by itself and shows the new reviews, with no reload.
 //
 //   node tools/dev/seller-pc-qa-seed.mjs            # first, once
 //   node tools/dev/seller-pc-qa-perf.mjs screens
 //   node tools/dev/seller-pc-qa-perf.mjs upload 3000
 //   node tools/dev/seller-pc-qa-perf.mjs drafts 20
+//   node tools/dev/seller-pc-qa-perf.mjs live 300
 //
 // Uploads add reviews to the QA store for good (new review numbers each time, dated over the last year). Drafts mark
 // the reviews they touch 「대응 필요」 and spend one model call each, as the button does. Results are appended to
@@ -218,6 +221,61 @@ async function upload(browser, s, n) {
   say(`  흐름(저장/분류): ${steps.map((c) => `${secs(c.ms)} ${c.have.toLocaleString()}/${c.analysed.toLocaleString()}`).join(" · ")}`);
 }
 
+/* ── 4. live ────────────────────────────────────────────────────────────────────────────────────────── */
+
+/** The review list and Home stay open on the PC; a delegate uploads; each screen must read again by itself. */
+async function live(browser, s, n) {
+  const pcCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const list = await pcCtx.newPage();
+  await pcSignIn(list);
+  // Not "networkidle": an open screen always holds one question open with the PC now, so the network is never idle.
+  const settled = (page, path) => page.waitForResponse((r) => r.url().includes(path) && r.status() === 200);
+  const home = await pcCtx.newPage();
+  await Promise.all([settled(home, "/api/operations/review-work"), home.goto(`${SCREEN}/`)]);
+  let loads = 0;
+  for (const page of [list, home]) page.on("load", () => loads++);
+
+  let t0 = null;
+  let listTotal = null;
+  let listMs = null;
+  let homeMs = null;
+  list.on("response", async (res) => {
+    if (!res.url().includes("/api/reviews/record") || res.status() !== 200) return;
+    const total = (await res.json().catch(() => null))?.total ?? null;
+    if (process.env.PERF_DEBUG) say(`  list read ${t0 == null ? "before" : secs(Date.now() - t0)} total=${total}`);
+    if (t0 == null) listTotal = total;
+    else if (listMs == null && total != null && listTotal != null && total > listTotal) listMs = Date.now() - t0;
+  });
+  home.on("response", (res) => {
+    if (t0 != null && homeMs == null && res.url().includes("/api/operations/review-work") && res.status() === 200) {
+      homeMs = Date.now() - t0;
+    }
+  });
+  await Promise.all([settled(list, "/api/reviews/record"), list.goto(`${SCREEN}/reviews`)]);
+  loads = 0;
+
+  const first = Number(s.PERF_NEXT_NUMBER ?? 7200000000);
+  const file = join(RUN, `perf-live-${n}.xlsx`);
+  writeFileSync(file, xlsx([HEADERS, ...perfRows(n, first, first)]), { mode: 0o600 });
+  s.PERF_NEXT_NUMBER = String(first + n);
+  saveState(s);
+  const deskCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const desk = await deskCtx.newPage();
+  await deskSignIn(desk, s);
+  if (process.env.PERF_DEBUG) {
+    say(`  visible: list=${await list.evaluate(() => document.visibilityState)} home=${await home.evaluate(() => document.visibilityState)}`);
+  }
+  t0 = Date.now();
+  await deskUpload(desk, s, file, 600_000);
+  await until("the open screens to read again by themselves", () => listMs != null && homeMs != null, 120);
+  const data = { rows: n, listMs, homeMs, reloads: loads };
+  record("live", data);
+  say(`업로드 ${n.toLocaleString()}건 — 열려 있던 리뷰 목록이 새 리뷰를 보이기까지 ${secs(listMs)} · 홈이 다시 읽기까지 ` +
+    `${secs(homeMs)} · 새로고침 ${loads}번`);
+  await deskCtx.close();
+  await pcCtx.close();
+}
+
 /* ── 3. drafts ──────────────────────────────────────────────────────────────────────────────────────── */
 
 /** Unanswered, undecided, undrafted reviews, spread over ratings: the low ones first, then 3★, then 4–5★. */
@@ -306,7 +364,8 @@ try {
   if (what === "screens") await screens(browser, Number(arg ?? 5));
   else if (what === "upload") await upload(browser, s, Number(arg ?? 3000));
   else if (what === "drafts") await drafts(browser, Number(arg ?? 20));
-  else throw new Error("screens [runs] | upload <rows> | drafts <count>");
+  else if (what === "live") await live(browser, s, Number(arg ?? 300));
+  else throw new Error("screens [runs] | upload <rows> | drafts <count> | live <rows>");
 } finally {
   await browser.close();
 }

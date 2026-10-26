@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { OpenAlertsProvider } from "../../lib/openAlerts";
+import { ScreenChangesProvider } from "../../lib/screenChanges";
 
 /**
  * Data providers for the authenticated app.
@@ -9,5 +10,9 @@ import { OpenAlertsProvider } from "../../lib/openAlerts";
  * leaf that needs it.
  */
 export function AppProviders({ children }: { children: ReactNode }) {
-  return <OpenAlertsProvider>{children}</OpenAlertsProvider>;
+  return (
+    <ScreenChangesProvider>
+      <OpenAlertsProvider>{children}</OpenAlertsProvider>
+    </ScreenChangesProvider>
+  );
 }

@@ -13,6 +13,7 @@ import { previewText } from "../../lib/plainText";
 import { channelShort, COPY } from "../../lib/copy/customerOps";
 import { TRIAGE_CORRECTION_COPY, TRIAGE_TIERS, TRIAGE_TIER_LABEL } from "../../lib/reviewTriage";
 import type { ReviewAccount } from "../../lib/reviewAccounts";
+import { useScreenChanges } from "../../lib/screenChanges";
 import type {
   ReviewRecordPageView,
   ReviewRecordRow,
@@ -136,9 +137,9 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
 
   const load = useCallback(
     async (nextSort: Sort, nextTier: ReviewTriageTier | null, nextChannel: string | null, nextPage: number,
-      nextSafety = false, nextReply: Reply | null = null, nextDays: Days | null = null) => {
+      nextSafety = false, nextReply: Reply | null = null, nextDays: Days | null = null, quiet = false) => {
       const ticket = ++seq.current;
-      setLoading(true);
+      if (!quiet) setLoading(true);
       try {
         const view = await api.getReviewRecordStrict({
           channel: nextChannel ?? undefined,
@@ -168,6 +169,8 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
         }
       } catch {
         if (ticket !== seq.current) return;
+        // A quiet re-read that failed keeps the list the seller is reading.
+        if (quiet) return;
         setPage(null);
         setLoadError(true);
       } finally {
@@ -179,9 +182,15 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
 
   // A flat order asks for no tier: the whole record in that order is what the seller chose.
   const listedTier = flat ? null : openTier;
+  // What arrived since this screen opened redraws it by itself (lib/screenChanges.tsx): the same list read again,
+  // quietly — no 「불러오는 중」, and the page the seller is on stays the page they are on.
+  const changes = useScreenChanges();
+  const changesRead = useRef(changes);
   useEffect(() => {
-    void load(sort, listedTier, channel, pageIndex, safetyOnly, reply, days);
-  }, [sort, listedTier, channel, pageIndex, safetyOnly, reply, days, load]);
+    const quiet = changes !== changesRead.current;
+    changesRead.current = changes;
+    void load(sort, listedTier, channel, pageIndex, safetyOnly, reply, days, quiet);
+  }, [sort, listedTier, channel, pageIndex, safetyOnly, reply, days, load, changes]);
 
   // How much review work 확인할 일 holds — the one link to the work from a record screen. And which reviews have a
   // case, so the pane can show the case rather than a second reading of the same review. Both fail silent.
@@ -194,7 +203,7 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
         const committed = work.committed.reduce((n, account) => n + account.todo.length, 0);
         setWorkCount(work.attentionTotal + committed);
       })
-      .catch(() => live && setWorkCount(null));
+      .catch(() => live && changes === 0 && setWorkCount(null));
     Promise.resolve()
       .then(() => api.getCustomerOperationsDecisions())
       .then((d) => {
@@ -208,7 +217,7 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
     return () => {
       live = false;
     };
-  }, []);
+  }, [changes]);
 
   const channelChoices = uniqueChannels(targets);
   // The channel column earns its width only when the rows can come from more than one channel.

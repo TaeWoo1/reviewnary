@@ -13,7 +13,7 @@
  * rewritten from scratch.
  */
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CustomerOperationsHome } from "../../lib/customerOperationsTypes";
@@ -28,6 +28,7 @@ const api = vi.hoisted(() => ({
 vi.mock("../../lib/apiClient", () => ({ api, getToken: () => null }));
 
 import { CustomerOpsHome } from "./CustomerOpsHome";
+import { ScreenChangesProvider, type ScreenChangesClient } from "../../lib/screenChanges";
 
 const NOW = new Date("2026-09-16T05:30:00Z"); // 14:30 KST
 const TODAY = "2026-09-16";
@@ -610,5 +611,34 @@ describe("the channel row", () => {
     expect(band.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const list = screen.queryByRole("list", { name: "할 일" });
     if (list) expect(list.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe("an open Home changes by itself (2026-10-27)", () => {
+  it("reads its work again when the server says something arrived, and only then", async () => {
+    api.getReviewWorkStrict.mockClear();
+    api.getInquiryQueueStrict.mockClear();
+    let answer: ((n: number) => void) | null = null;
+    const client: ScreenChangesClient = {
+      waitForScreenChanges: (after) =>
+        after === null ? Promise.resolve(1) : new Promise<number>((resolve) => (answer = resolve)),
+    };
+    render(
+      <ScreenChangesProvider client={client}>
+        <MemoryRouter>
+          <CustomerOpsHome co={co()} ops={ops()} now={NOW} onChanged={vi.fn()} metrics={metrics()} insights={[]} />
+        </MemoryRouter>
+      </ScreenChangesProvider>,
+    );
+    await waitFor(() => expect(answer).not.toBeNull());
+    expect(api.getReviewWorkStrict).toHaveBeenCalledTimes(1);
+    expect(api.getInquiryQueueStrict).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      answer?.(2);
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(api.getReviewWorkStrict).toHaveBeenCalledTimes(2));
+    expect(api.getInquiryQueueStrict).toHaveBeenCalledTimes(2);
   });
 });

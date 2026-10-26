@@ -9,6 +9,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpMethod;
@@ -75,6 +76,9 @@ public class SecurityConfig {
                         .permissionsPolicy(pp -> pp.policy(
                                 "camera=(), microphone=(), geolocation=(), payment=()")))
                 .authorizeHttpRequests(auth -> auth
+                        // A held answer (/api/live/changes) is written on a second, ASYNC dispatch of a request that
+                        // was already authorised on its first; that dispatch carries no bearer to check again.
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**", "/actuator/health", "/health").permitAll()
                         // Social login (Google · NAVER): the authorize redirect and the provider's callback are

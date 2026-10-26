@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { ReviewRecord, rangeLabel } from "./ReviewRecord";
+import { ScreenChangesProvider, type ScreenChangesClient } from "../../lib/screenChanges";
 import { expectNoAxeViolations } from "../../test/axe";
 import type { ChannelReviewDetailView, ChannelReviewPageView, ReviewRecordPageView, SafetyMark } from "../../lib/types";
 import type { ReviewAccount } from "../../lib/reviewAccounts";
@@ -981,5 +982,65 @@ describe("the reply and period filters", () => {
     expect(screen.queryByText("아직 수집된 리뷰가 없습니다")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "조건 지우기" }));
     await waitFor(() => expect(screen.getByTestId("location").textContent).not.toMatch(/reply=|days=/));
+  });
+});
+
+describe("an open list changes by itself (2026-10-27)", () => {
+  /** A server that answers the open screen's question only when the test says so. */
+  function liveServer() {
+    let answer: ((n: number) => void) | null = null;
+    let version = 1;
+    const client: ScreenChangesClient = {
+      waitForScreenChanges: (after) =>
+        after === null ? Promise.resolve(version) : new Promise<number>((resolve) => (answer = resolve)),
+    };
+    const change = async () => {
+      version += 1;
+      await act(async () => {
+        answer?.(version);
+        await Promise.resolve();
+      });
+    };
+    return { client, change };
+  }
+
+  function renderLive(client: ScreenChangesClient) {
+    return render(
+      <ScreenChangesProvider client={client}>
+        <MemoryRouter initialEntries={["/reviews"]}>
+          <Routes>
+            <Route path="/reviews" element={<ReviewRecord targets={TARGETS} />} />
+          </Routes>
+        </MemoryRouter>
+      </ScreenChangesProvider>,
+    );
+  }
+
+  it("draws a review that arrived after it opened, without the seller doing anything", async () => {
+    const live = liveServer();
+    renderLive(live.client);
+    expect(await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).toBeInTheDocument();
+    const reads = getChannelReviewsStrict.mock.calls.length;
+
+    const arrived = { ...PAGE.items[0], id: "r9", preview: "방금 올라온 리뷰입니다" };
+    getChannelReviewsStrict.mockResolvedValue({ ...PAGE, total: 3, items: [arrived, ...PAGE.items] });
+    await live.change();
+
+    expect(await screen.findByText("방금 올라온 리뷰입니다")).toBeInTheDocument();
+    expect(getChannelReviewsStrict.mock.calls.length).toBe(reads + 1);
+    expect(screen.queryByText("불러오는 중…")).toBeNull();
+  });
+
+  it("keeps the list it shows when the re-read fails", async () => {
+    const live = liveServer();
+    renderLive(live.client);
+    expect(await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).toBeInTheDocument();
+
+    getChannelReviewsStrict.mockRejectedValue(new Error("down"));
+    await live.change();
+    await waitFor(() => expect(getChannelReviewsStrict).toHaveBeenCalledTimes(2));
+
+    expect(screen.getByText("배송도 빠르고 포장도 꼼꼼했어요")).toBeInTheDocument();
+    expect(screen.queryByText("리뷰를 불러오지 못했습니다")).toBeNull();
   });
 });

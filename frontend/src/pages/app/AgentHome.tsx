@@ -7,6 +7,7 @@ import { FIRST_USE_PROMPTS, HOME_PROMPTS } from "../../components/conversation/s
 import { useConversation } from "../../lib/conversation/ConversationProvider";
 import { useAgentSurface } from "../../lib/agentPanel";
 import { useApiData } from "../../lib/useApiData";
+import { useScreenChanges } from "../../lib/screenChanges";
 import { api } from "../../lib/apiClient";
 import { analytics } from "../../lib/analytics";
 import { DISCONNECTED_HEADLINE } from "../../lib/briefing";
@@ -51,7 +52,10 @@ import type { InquiryQueueResponse, MetricKpi, OperationsHome, OverviewResponse,
 export function AgentHome({ now = new Date() }: { now?: Date }) {
   useAgentSurface({ surface: "home", label: "오늘의 운영" });
   const conversation = useConversation();
-  const overview = useApiData<OverviewResponse>(() => api.getOverviewStrict(7), []);
+  // What arrived since this screen opened — a delegate's upload, a phone's approval — redraws it by itself; each read
+  // below runs again quietly when this moves, and a failed re-read keeps what is on screen (lib/screenChanges.tsx).
+  const changes = useScreenChanges();
+  const overview = useApiData<OverviewResponse>(() => api.getOverviewStrict(7), [], changes);
   /**
    * Operations Home's own read — the four areas above the thread.
    *
@@ -84,12 +88,12 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
         if (live) setHome(r);
       })
       .catch(() => {
-        if (live) setHome(null);
+        if (live) setHome((current) => (current === undefined ? null : current));
       });
     return () => {
       live = false;
     };
-  }, []);
+  }, [changes]);
 
   /**
    * A repeated problem changed state in the 오늘 pane (UI/UX v2 Phase 2). The server's answer is the new truth, so
@@ -125,11 +129,11 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
     return Promise.resolve()
       .then(() => api.getCustomerOperationsHome())
       .then((r) => setCo(r))
-      .catch(() => setCo(null));
+      .catch(() => setCo((current) => (current === undefined ? null : current)));
   }, []);
   useEffect(() => {
     void loadCo();
-  }, [loadCo]);
+  }, [loadCo, changes]);
 
   /**
    * **What is waiting is the WORK QUEUE, not the inquiry feed** (Chat-first Outcome & Visual Closure v1
@@ -150,12 +154,12 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
         if (live) setQueue(r);
       })
       .catch(() => {
-        if (live) setQueue(null);
+        if (live) setQueue((current) => (current === undefined ? null : current));
       });
     return () => {
       live = false;
     };
-  }, []);
+  }, [changes]);
 
   const data = overview.data;
   // §2: three first-use states, one derivation, from the numbers already on the page. A failed read is

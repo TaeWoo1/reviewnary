@@ -644,6 +644,16 @@
   (바꿀 행이 있는 상태)을 트랜잭션 안에 만들어 놓고 재고 `rollback`한다. 커서까지 "전부"를 읽는 쿼리는 지난 커서부터 읽는다.
 - **출처** — 2026-10-26, `StoreReviews.ack`, `StoreReviewsTest.eachAckMarksTheReviewsItCoversAsSavedOnThePc`, QA 스택.
 
+### B30. 화면이 질문을 열어 둔 뒤로 Playwright의 `networkidle`이 끝나지 않는다
+
+- **했던 것** — 열린 화면이 저절로 바뀌는지 재려고, 측정 스크립트가 PC 화면을 열고 `waitForLoadState("networkidle")`를 기다렸다.
+  30초 제한에 걸려 끝났다.
+- **사실** — 화면은 이제 늘 `/api/live/changes` 질문 하나를 열어 두고(최대 25초), 답을 받자마자 다음 질문을 보낸다. 그래서
+  "0.5초 동안 요청 없음"이 오지 않는다. 화면이 고장 난 것이 아니라 기능이 의도대로 돈 것이다.
+- **다음에** — PC 화면을 다루는 자동화는 `networkidle`로 기다리지 않는다. 그 화면이 그리는 데 쓰는 **특정 응답**(`/api/reviews/record`,
+  `/api/operations/review-work`)을 `waitForResponse`로 기다린다.
+- **출처** — 2026-10-27, `tools/dev/seller-pc-qa-perf.mjs` `live`, `frontend/src/lib/screenChanges.tsx`.
+
 ---
 
 ## C. 증거 · 계약

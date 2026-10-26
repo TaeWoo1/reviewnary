@@ -115,6 +115,14 @@ public class VendorReviewPullService {
     private final VendorReplyTaskService replyTasks;
     private final Clock clock;
 
+    /** Tells the seller's open screens to read again; null where a test pulls without them. */
+    private com.sellerops.live.ScreenChanges screens;
+
+    @Autowired(required = false)
+    public void setScreenChanges(com.sellerops.live.ScreenChanges screens) {
+        this.screens = screens;
+    }
+
     @Autowired
     public VendorReviewPullService(VendorLinkService link, VendorStoreBindingRepository bindings,
                                    VendorReviewRefRepository refs, ReviewRepository reviews,
@@ -356,6 +364,13 @@ public class VendorReviewPullService {
         return new PullResult(State.PULLED, results);
     }
 
+    /** After the pull's own writes and their follow-up: a screen that reads again now sees them classified. */
+    private void screensChanged(VendorStoreBinding binding) {
+        if (screens != null) {
+            screens.changed(binding.getOrgId());
+        }
+    }
+
     /** Records how this store's pull ended; null clears an earlier failure. */
     private void failed(VendorStoreBinding binding, Failure failure) {
         binding.setLastFailure(failure == null ? null : failure.name());
@@ -421,6 +436,9 @@ public class VendorReviewPullService {
         // Tasks after reviews: a task change names a review, and the review must already be here.
         int taskChanges = followReplies(binding, token);
         int noReply = replyTasks == null ? 0 : replyTasks.reportNoReply(binding, token);
+        if (received > 0 || taskChanges > 0) {
+            screensChanged(binding);
+        }
         return new StoreResult(binding.getVendorStoreId(), label, true, false, received, inserted.size(),
                 updated.size(), failed, cursor, more, taskChanges, noReply, false);
     }
@@ -429,6 +447,9 @@ public class VendorReviewPullService {
     private StoreResult followTasks(String token, VendorStoreBinding binding, String label) {
         int taskChanges = followReplies(binding, token);
         int noReply = replyTasks == null ? 0 : replyTasks.reportNoReply(binding, token);
+        if (taskChanges > 0) {
+            screensChanged(binding);
+        }
         return new StoreResult(binding.getVendorStoreId(), label, true, false, 0, 0, 0, 0, binding.getReviewCursor(),
                 false, taskChanges, noReply, true);
     }

@@ -9,6 +9,7 @@ import { IssueDetailPanel } from "../memory/IssueDetailPanel";
 import { ReviewCaseView } from "../../pages/app/ReviewReplyTask";
 import { PreparedWorkList } from "../home/PreparedWorkList";
 import { api } from "../../lib/apiClient";
+import { useScreenChanges } from "../../lib/screenChanges";
 import { problemLine } from "../../lib/operationsHome";
 import { RESPONSIBILITY_NAME, cadenceLabel, dataTypeKo, kstClock } from "../../lib/customerOperations";
 import { COPY, autoCheckWhat, channelShort, failureShort, gapActionKo, kstLongDate } from "../../lib/copy/customerOps";
@@ -734,17 +735,18 @@ export interface HomeSelection {
 /** The review half of 확인할 일 (UI/UX v2 Phase 3). `null` = the read failed; the list is then what it was. */
 export function useReviewWork(enabled = true): ReviewWorkView | null | undefined {
   const [value, setValue] = useState<ReviewWorkView | null | undefined>(undefined);
+  const changes = useScreenChanges();
   useEffect(() => {
     if (!enabled) return;
     let live = true;
     Promise.resolve()
       .then(() => api.getReviewWorkStrict())
       .then((r) => live && setValue(r))
-      .catch(() => live && setValue(null));
+      .catch(() => live && setValue((current) => (current === undefined ? null : current)));
     return () => {
       live = false;
     };
-  }, [enabled]);
+  }, [enabled, changes]);
   return value;
 }
 
@@ -754,33 +756,36 @@ export function useReviewWork(enabled = true): ReviewWorkView | null | undefined
  */
 export function useMovingCount(): number | null {
   const [value, setValue] = useState<number | null>(null);
+  const changes = useScreenChanges();
   useEffect(() => {
     let live = true;
     Promise.resolve()
       .then(() => api.getReplyBoard())
       .then((b) => live && setValue(b && b.linked ? b.moving.length : null))
-      .catch(() => live && setValue(null));
+      // A failed read leaves the count as it was: nothing before the first answer, the last answer after it.
+      .catch(() => undefined);
     return () => {
       live = false;
     };
-  }, []);
+  }, [changes]);
   return value;
 }
 
 /** The queue read the Home's list needs. `enabled` false when the page around it already made the same read. */
 export function useHomeQueue(enabled = true): InquiryQueueResponse | null | undefined {
   const [queue, setQueue] = useState<InquiryQueueResponse | null | undefined>(undefined);
+  const changes = useScreenChanges();
   useEffect(() => {
     if (!enabled) return;
     let live = true;
     api
       .getInquiryQueueStrict({ size: HOME_QUEUE_SIZE })
       .then((r) => live && setQueue(r))
-      .catch(() => live && setQueue(null));
+      .catch(() => live && setQueue((current) => (current === undefined ? null : current)));
     return () => {
       live = false;
     };
-  }, [enabled]);
+  }, [enabled, changes]);
   return queue;
 }
 
