@@ -19,6 +19,9 @@
 # SELLER_PC_DEMO=qa runs a second, separate copy beside it — its own databases (vendor_qa, sellerpc_qa), state folder
 # and ports (vendor :18499 · PC :18590 · screen :5691) — for trying changes on made-up data without touching the kept
 # demo. Google sign-in stays off there; delegates use a password and an authenticator.
+# SELLER_PC_DEMO=judge runs only a PC (:18690 · screen :6091) over a copy of the kept demo's PC database
+# (sellerpc_judge, copied once on the first `up`) — for judging the reviews' groups and drafts on real reviews without
+# writing into the kept demo. No vendor server, no pull, its own keys: whatever the copy holds sealed stays sealed.
 #
 # Mail runs in dev-outbox mode: a PC-link code lands in vendor.log, never in a mailbox.
 #
@@ -34,7 +37,8 @@ NAME="${SELLER_PC_DEMO:-demo}"
 case "$NAME" in
   demo) RUN="$HERE/.run/seller-pc-demo"; VENDOR_PORT=18099 PC_PORT=18190 SCREEN_PORT=5291 ;;
   qa) RUN="$HERE/.run/seller-pc-qa"; VENDOR_PORT=18499 PC_PORT=18590 SCREEN_PORT=5691 ;;
-  *) echo "SELLER_PC_DEMO is demo or qa"; exit 2 ;;
+  judge) RUN="$HERE/.run/seller-pc-judge"; VENDOR_PORT= PC_PORT=18690 SCREEN_PORT=6091 ;;
+  *) echo "SELLER_PC_DEMO is demo, qa or judge"; exit 2 ;;
 esac
 VENDOR_DB="vendor_$NAME" PC_DB="sellerpc_$NAME"
 mkdir -p "$RUN" && chmod 700 "$RUN"
@@ -106,18 +110,28 @@ draft_env() {
 
 up() {
   keys
-  for db in "$VENDOR_DB" "$PC_DB"; do
-    [[ "$("${PSQL[@]}" -d postgres -c "select 1 from pg_database where datname='$db'")" == 1 ]] \
-      || "${PSQL[@]}" -d postgres -qc "create database $db"
-  done
+  if [[ "$NAME" == judge ]]; then
+    if [[ "$("${PSQL[@]}" -d postgres -c "select 1 from pg_database where datname='$PC_DB'")" != 1 ]]; then
+      "${PSQL[@]}" -d postgres -qc "create database $PC_DB"
+      "$PG_BIN/pg_dump" -h 127.0.0.1 -p 5432 -U sellerops --no-owner sellerpc_demo \
+        | "${PSQL[@]}" -q -d "$PC_DB" >/dev/null
+      echo "copied sellerpc_demo into $PC_DB"
+    fi
+  else
+    for db in "$VENDOR_DB" "$PC_DB"; do
+      [[ "$("${PSQL[@]}" -d postgres -c "select 1 from pg_database where datname='$db'")" == 1 ]] \
+        || "${PSQL[@]}" -d postgres -qc "create database $db"
+    done
+  fi
   (cd "$REPO/vendor-server" && ./gradlew -q bootJar) && (cd "$REPO/backend" && ./gradlew -q bootJar)
   echo "built $(cd "$REPO" && git log -1 --format=%h)"
 
-  if ! alive vendor; then
+  if [[ "$NAME" != judge ]] && ! alive vendor; then
     ( vendor_env; [[ "$NAME" == demo ]] && eval "$(google_env)"; exec java -jar "$(own_jar vendor-server vendor)" ) >> "$RUN/vendor.log" 2>&1 &
     echo $! > "$RUN/vendor.pid"
   fi
-  wait_for "http://127.0.0.1:$VENDOR_PORT/health" 120 || { echo "vendor server did not start (see $RUN/vendor.log)"; exit 1; }
+  [[ "$NAME" == judge ]] || wait_for "http://127.0.0.1:$VENDOR_PORT/health" 120 \
+    || { echo "vendor server did not start (see $RUN/vendor.log)"; exit 1; }
 
   if ! alive pc; then
     ( eval "$(draft_env)"
@@ -128,6 +142,9 @@ up() {
         SELLEROPS_CORS_ORIGIN="http://127.0.0.1:$SCREEN_PORT" SELLEROPS_VAULT_MASTER_KEY="$PC_VAULT_KEY" \
         SELLEROPS_VAULT_KEY_ID=seller-pc-$NAME-1 SELLEROPS_SEED_ENABLED=true \
         SELLEROPS_VENDOR_LINK_BASE_URL="http://127.0.0.1:$VENDOR_PORT" SELLEROPS_VENDOR_REVIEW_PULL_INTERVAL_MS=$PULL_MS
+      if [[ "$NAME" == judge ]]; then
+        export SELLEROPS_VENDOR_LINK_BASE_URL= SELLEROPS_VENDOR_REVIEW_PULL_ENABLED=false
+      fi
       exec java -jar "$(own_jar backend pc)" ) >> "$RUN/pc.log" 2>&1 &
     echo $! > "$RUN/pc.pid"
   fi
@@ -155,6 +172,11 @@ down() {
 }
 
 status() {
+  if [[ "$NAME" == judge ]]; then
+    for s in pc screen; do printf '%-7s %s\n' "$s" "$(alive "$s" && echo up || echo down)"; done
+    echo "PC screen      http://127.0.0.1:$SCREEN_PORT (a copy of the kept demo; nothing here reaches it)"
+    return
+  fi
   for s in vendor pc screen; do printf '%-7s %s\n' "$s" "$(alive "$s" && echo up || echo down)"; done
   printf '%-7s %s\n' google "$(curl -s "http://127.0.0.1:$VENDOR_PORT/v1/delegate/auth/methods" | grep -q '"google":true' \
     && echo "sign-in on" || echo "sign-in off (no Google client in backend/.env.local or $RUN/google-client.json)")"
