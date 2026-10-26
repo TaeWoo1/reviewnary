@@ -145,7 +145,7 @@ class ItemAnalysisReanalysisTest {
         assertThat(service(new FakeV2Analyzer()).reanalyzeOutdated(org, 100).examined()).isZero();
         // The other org's row is untouched and still on the version that wrote it.
         assertThat(analyses.findAllByOrgIdOrderByCreatedAtDesc(otherOrg).get(0).getAnalyzerVersion())
-                .isEqualTo("rules-v1");
+                .isEqualTo(RuleBasedInboxItemAnalyzer.VERSION);
     }
 
     @Test
@@ -192,7 +192,7 @@ class ItemAnalysisReanalysisTest {
         assertThat(preview.dryRun()).isTrue();
         assertThat(preview.changed()).isEqualTo(1);
         ItemAnalysis after = stored(r.getId());
-        assertThat(after.getAnalyzerVersion()).isEqualTo("rules-v1");
+        assertThat(after.getAnalyzerVersion()).isEqualTo(RuleBasedInboxItemAnalyzer.VERSION);
         assertThat(after.getCategory()).isEqualTo("배송");
         assertThat(after.getSummary()).isEqualTo("배송 관련 부정 리뷰");
     }

@@ -148,6 +148,31 @@ sample. It can only narrow what a prompt may ask, never widen what counts as a h
 positive class no easier to reach. The one thing it could have been abused for — discounting the
 crossing rows — is forbidden in the paragraph above rather than left to good intentions.
 
+### 2.4 In the product, a 3★ without a reservation is `FYI` (product-owner decision, 2026-10-27)
+
+> A 3★ review whose text carries **no reservation** — 「만족합니다」, 「디자인이 이뻐요」, a product name — is `FYI` on
+> the seller's screen. One that names anything wrong stays `WATCH`.
+
+This **reverses, for the product, the owner's own §2.2 of 2026-08-16** ("it does not fall to `FYI` either"). The owner
+was shown §2.2 and chose the change after judging a real sample, where 8 of 15 `WATCH` rows were 3★ praise. It is
+the first time text moves a tier in `ReviewTriageRules`, so its limits are stated, not implied:
+
+- **only 3★, only down, only out of `WATCH`.** No text reaches or leaves `NEEDS_ATTENTION`; 1–2★, 4–5★ and an
+  unrated review are read for blankness alone, as before. A blank 3★ stays `WATCH`.
+- **a reservation is any word of `ReviewTriageRules.RESERVATION_MARKERS`** — the §3.1 reason vocabulary (하자·파손 ·
+  배송 지연 · 포장 · 설명과 다름 · 설치·사용 안 됨 · 교환 요구 · 만족하지만 짚음 · 아쉬움), Korean concession endings,
+  every `ReviewSafetySignal` stem, and the words six `DEV` complaints taught the first list (§6.3 allows `DEV` as a
+  source). Over-marking keeps praise in `WATCH`, which is the safe way to be wrong.
+- **what it was measured on.** `DEV` 3★ rows: 43. Praise · neutral · textless-or-noise · off-topic (25) → 23 to
+  `FYI`; complaints (18) → 17 stay `WATCH`, **1 is hidden** (a typo, 「잘 인 움직여요」, no rule reaches it). These are
+  the rows the last markers were learned from, so the figure is optimistic. `HOLDOUT` is spent (`holdout-spent.json`)
+  and is **not** read for this; there is no unbiased number, and none is claimed.
+- **what does not move.** `labels.json`, `agreement.json`, the §2.2 adjudication and every published reading. The gold
+  set still reads 3★ praise as `WATCH`, so any later measurement of the product rule against it must count those rows
+  as a known, decided disagreement — not as errors of the rule, and not as a reason to relabel.
+
+On the owner's store (3,555 reviews, 2026-10-27): 92 are 3★; 57 move to `FYI`, 35 stay `WATCH`.
+
 ## 3. What else the labeler records
 
 Two fields beyond the tier, both **closed vocabularies**. Neither may influence the tier; both exist

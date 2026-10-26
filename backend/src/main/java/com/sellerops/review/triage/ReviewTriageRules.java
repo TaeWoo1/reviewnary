@@ -1,12 +1,15 @@
 package com.sellerops.review.triage;
 
+import java.util.List;
+
 /**
  * The whole of the tier decision, in one pure function of two inputs.
  *
- * <p><b>The two inputs are the rating and whether there is anything to read.</b> That is the entire
- * input space — there is no third. In particular the body's CONTENT is not an input: blankness is,
- * content is not, and {@code ReviewTriageRulesTest} pins that no text whatsoever can move a review
- * between tiers.
+ * <p><b>The two inputs are the rating and the body.</b> For 1–2★, 4–5★ and an unrated review the body is read for
+ * blankness only. <b>For 3★ alone it is also read for a reservation</b> (product-owner decision 2026-10-27,
+ * RUBRIC v2 §2.4): a 3★ whose text carries none of {@link #RESERVATION_MARKERS} — 「만족합니다」, 「디자인이 이뻐요」, a
+ * product name — is {@link ReviewTriageTier#FYI}; one that carries any of them stays {@link ReviewTriageTier#WATCH}.
+ * This only LOWERS a tier, and only out of 지켜보기: nothing here can move a review into or out of 확인 필요.
  *
  * <p><b>Why that boundary exists.</b> {@code contracts/review-eval/naver/v1/RUBRIC.md} §5 is a
  * pre-committed go/no-go: a text-derived detector may be built, but may not be surfaced to an
@@ -44,6 +47,42 @@ package com.sellerops.review.triage;
  */
 public final class ReviewTriageRules {
 
+    /**
+     * The words of {@link #RESERVATION_MARKERS}; that list adds {@link ReviewSafetySignal#stems()} — a 3★ that so much
+     * as names a harm is not 참고.
+     */
+    private static final List<String> WORDS = List.of(
+            "다만", "하지만", "지만", "는데", "은데", "근데", "그런데", "그러나", "아쉽", "아쉬", "별로", "그닥", "그다지", "글쎄", "실망", "불만",
+            "불편", "단점", "보완", "개선", "문제", "불량", "하자", "파손", "고장", "찢", "찌그러", "깨져", "깨짐", "흠집", "기스", "얼룩", "오염",
+            "냄새", "늦", "느려", "지연", "누락", "오배송", "빠져", "부족", "다르", "달라", "설명과", "사진과", "안 되", "안되", "안 돼", "안돼", "않",
+            "못", "없어", "없네", "없음", "떨어", "약해", "약하", "약간", "조금", "좀", "얇", "비싸", "작아", "작네", "커서", "헐거", "뻑뻑", "빡빡",
+            "들뜨", "뜨고", "뜨네", "휘어", "교환", "환불", "반품", "재발송", "ㅠ", "ㅜ", "흠", "ㅡㅡ", "-_-", "씹", "걸리", "빼고", "안좋",
+            "안 좋", "비추", "으나", "하급", "최악", "...", "깨졌", "깨진", "깨지", "데", "던지", "던져", "그럭저럭", "보통", "그냥그", "그냥 그");
+
+    /**
+     * Words that mark a reservation in a review — any one keeps a 3★ in 지켜보기 (RUBRIC v2 §2.4).
+     *
+     * <p>Traced, as RUBRIC §6.3 requires, to the committed reason vocabulary (하자·파손·고장 · 배송 지연 · 포장 ·
+     * 설명·사진과 다름 · 설치·사용 안 됨 · 교환·환불 요구 · 만족하지만 짚음 · 아쉬움) and Korean's concession endings, and
+     * then to the six {@code DEV} complaints the first list missed (씹 · 걸리 · 빼고 · 안좋 · 비추 · 으나 · 하급 · …) and to
+     * the complaints this repository's own tests already name (깨졌 · 던지 · 「예쁜데」's 데 · 그럭저럭).
+     * Over-marking errs the safe way: a word that also appears in praise only keeps that praise in 지켜보기.
+     *
+     * <p>{@code ReviewRepository.TRIAGE_TIER_RANK} spells the same list out in SQL; {@code ReviewTriageRulesTest}
+     * pins the two equal, term for term.
+     */
+    public static final List<String> RESERVATION_MARKERS = markers();
+
+    private static List<String> markers() {
+        List<String> all = new java.util.ArrayList<>(WORDS);
+        for (String stem : ReviewSafetySignal.stems()) {
+            if (!all.contains(stem)) {
+                all.add(stem);
+            }
+        }
+        return List.copyOf(all);
+    }
+
     /** The rating at or below which a review is a complaint rather than a middling report. */
     static final int LOW_RATING_MAX = 2;
     /** The rating at or above which a review carries no action. */
@@ -69,7 +108,23 @@ public final class ReviewTriageRules {
         if (rating >= GOOD_RATING_MIN) {
             return ReviewTriageTier.FYI;
         }
-        return ReviewTriageTier.WATCH;
+        return reservationFree(body) ? ReviewTriageTier.FYI : ReviewTriageTier.WATCH;
+    }
+
+    /**
+     * There is text and none of it marks a reservation. A blank body is not reservation-free: a 3★ with nothing
+     * written stays 지켜보기, as a 1–2★ with nothing written does — the rating is real and still counts.
+     */
+    public static boolean reservationFree(String body) {
+        if (isTextless(body)) {
+            return false;
+        }
+        for (String marker : RESERVATION_MARKERS) {
+            if (body.contains(marker)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

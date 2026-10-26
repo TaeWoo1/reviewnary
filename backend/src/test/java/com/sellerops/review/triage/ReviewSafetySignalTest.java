@@ -35,6 +35,10 @@ class ReviewSafetySignalTest {
             // A worry is the customer telling the seller the product may hurt someone (2026-10-23).
             "너무 뜨거워서 화상 입을까 걱정돼요",
             "아이가 다칠까 봐 염려됩니다",
+            // A worry put to rest only by something else stays a worry (2026-10-27).
+            "화상 걱정되는데 디자인은 만족해요",
+            "곰팡이 걱정되는데 아직 모르겠어요",
+            "곰팡이 걱정돼요 매우 만족하지만",
     })
     void aReportOfHarmRises(String body) {
         assertThat(ReviewSafetySignal.in(body)).as(body).isTrue();
@@ -45,6 +49,10 @@ class ReviewSafetySignalTest {
             "아이가 다칠 걱정 없어요",
             "뜨겁지 않고 화상 걱정 없어요",
             "다칠 걱정은 전혀 없어요",
+            // The customer says at once that the product put the worry to rest (owner's judging sample, 2026-10-27).
+            "청소가 쉬워요..습할 땐 곰팡이 걱정되는데 아주 만족",
+            "곰팡이 걱정했는데 좋아요",
+            "곰팡이 걱정이었지만 정말 깨끗해요",
             // A noun that only names a harm, with nothing after it saying it happened or is feared (2026-10-23).
             "알레르기 있는 아이도 잘 써요",
             "식약처 인증 받은 제품이라 믿고 샀어요",

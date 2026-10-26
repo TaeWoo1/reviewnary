@@ -18,7 +18,9 @@ For each review, reading **only its text and star rating**:
 | `UNKNOWN` | **판단 불가** — not enough to tell. Excluded from every rate and reported on its own. | |
 
 `REPORT` and `WORRY` are what the seller should be asked to look at, and the screen tells the two apart. A harm
-word alone (「알레르기」) does not make a review `REPORT`. A worry denied in the same breath is `REASSURANCE`. A legal
+word alone (「알레르기」) does not make a review `REPORT`. A worry denied in the same breath is `REASSURANCE`. So is a worry the customer says **at once** the product put to rest (「곰팡이 걱정되는데 아주 만족」 —
+product-owner decision, 2026-10-27); a worry followed by praise of something else (「화상 걱정되는데 디자인은 만족」) is still
+`WORRY`. A legal
 word used figuratively (「고소한 맛」) is `UNRELATED`.
 
 ## 2. Three sets, three jobs — never mixed

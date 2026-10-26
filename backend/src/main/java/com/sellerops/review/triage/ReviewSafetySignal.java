@@ -32,7 +32,8 @@ import java.util.TreeSet;
  * (「피가 났는데 연락이 없어요」). A noun that only names a harm (화상 · 알레르기 · 소비자원 …) stands only when what
  * follows says it happened or is feared (2026-10-23) — 「알레르기 있는 아이도 잘 써요」 no longer rises.
  *
- * <p><b>A worry is not a reassurance</b> (product-owner decision, 2026-10-23). 「너무 뜨거워서 화상 입을까 걱정돼요」 is
+ * <p><b>A worry is not a reassurance</b> (product-owner decision, 2026-10-23) — <b>unless the customer says at once
+ * that it was put to rest</b> (2026-10-27, {@link #WORRY_PUT_TO_REST}). 「너무 뜨거워서 화상 입을까 걱정돼요」 is
  * a customer telling the seller the product may hurt someone, so 걱정 · 염려 no longer cancel a match on their own;
  * only a worry that is itself denied does (「화상 걱정 없어요」 · 「다칠 걱정은 전혀 없어요」). The signal is a
  * candidate for the seller to look at — the mark says 「안전 관련 확인」, not that harm happened. {@link #find} tells an
@@ -96,6 +97,14 @@ public final class ReviewSafetySignal {
 
     /** A worry about the term. It keeps the match standing unless a negation follows the worry itself. */
     static final List<String> WORRIES = List.of("걱정", "염려");
+
+    /**
+     * A worry the customer says the product put to rest, right after it (product-owner decision 2026-10-27):
+     * 「곰팡이 걱정되는데 아주 만족」. Only a concession (는데 · 지만 · 데도) followed at once by satisfaction, with no more than
+     * an intensifier between — 「화상 걱정되는데 디자인은 만족」 still rises, because what pleased them is something else.
+     */
+    static final java.util.regex.Pattern WORRY_PUT_TO_REST = java.util.regex.Pattern.compile(
+            "^.{0,3}?(는데|지만|데도)(매우|정말|너무|아주|완전|진짜|그래도|오히려)?(만족|좋|편해|편하|안심|깨끗)");
 
     private ReviewSafetySignal() {
     }
@@ -246,7 +255,12 @@ public final class ReviewSafetySignal {
         }
         for (String worry : WORRIES) {
             int at = after.indexOf(worry);
-            if (at >= 0 && NEGATIONS.stream().anyMatch(window(text, from + at + worry.length())::contains)) {
+            if (at < 0) {
+                continue;
+            }
+            int past = from + at + worry.length();
+            if (NEGATIONS.stream().anyMatch(window(text, past)::contains)
+                    || WORRY_PUT_TO_REST.matcher(text.substring(past)).lookingAt()) {
                 return true;
             }
         }

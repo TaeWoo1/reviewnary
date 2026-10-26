@@ -98,7 +98,7 @@ class AdditiveTriageDecisionTest {
     void failureDegradesToTheRule() {
         assertThat(AdditiveTriageDecision.decide(2, "본문 있음", null))
                 .isEqualTo(ReviewTriageTier.NEEDS_ATTENTION);
-        assertThat(AdditiveTriageDecision.decide(3, "본문", null)).isEqualTo(ReviewTriageTier.WATCH);
+        assertThat(AdditiveTriageDecision.decide(3, "아쉬운 점이 있어요", null)).isEqualTo(ReviewTriageTier.WATCH);
         assertThat(AdditiveTriageDecision.decide(5, "좋아요", null)).isEqualTo(ReviewTriageTier.FYI);
     }
 }

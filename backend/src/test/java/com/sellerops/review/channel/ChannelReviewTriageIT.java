@@ -228,9 +228,10 @@ class ChannelReviewTriageIT {
         assertThat(all.items()).hasSize(tempting.size() * 3);
         assertThat(all.triageSummary().needsAttention()).isZero();
         for (var item : all.items()) {
+            // A 3★ complaint stays 지켜보기 — its words may only lower a 3★ that carries no reservation (RUBRIC v2 §2.4).
             assertThat(item.triage().tier())
                     .as("a %s★ complaint must not be promoted by its own words", item.rating())
-                    .isEqualTo(ReviewTriageRules.tier(item.rating(), "본문"));
+                    .isEqualTo(item.rating() == 3 ? ReviewTriageTier.WATCH : ReviewTriageRules.tier(item.rating(), "본문"));
         }
 
         // And the note must agree with the tier the row was SELECTED by — a promotion in the service

@@ -88,6 +88,157 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
     // --- Review triage: the tier rank, and the three reads that must agree about it -------------
 
     /**
+     * {@code ReviewTriageRules.RESERVATION_MARKERS}, spelled out for SQL (RUBRIC v2 §2.4): a 3★ none of whose words
+     * marks a reservation ranks with 참고. {@code ReviewTriageRulesTest} pins this list equal to the Java one.
+     */
+    String RESERVATION_FREE = """
+                    and locate('다만', r.body) = 0
+                    and locate('하지만', r.body) = 0
+                    and locate('지만', r.body) = 0
+                    and locate('는데', r.body) = 0
+                    and locate('은데', r.body) = 0
+                    and locate('근데', r.body) = 0
+                    and locate('그런데', r.body) = 0
+                    and locate('그러나', r.body) = 0
+                    and locate('아쉽', r.body) = 0
+                    and locate('아쉬', r.body) = 0
+                    and locate('별로', r.body) = 0
+                    and locate('그닥', r.body) = 0
+                    and locate('그다지', r.body) = 0
+                    and locate('글쎄', r.body) = 0
+                    and locate('실망', r.body) = 0
+                    and locate('불만', r.body) = 0
+                    and locate('불편', r.body) = 0
+                    and locate('단점', r.body) = 0
+                    and locate('보완', r.body) = 0
+                    and locate('개선', r.body) = 0
+                    and locate('문제', r.body) = 0
+                    and locate('불량', r.body) = 0
+                    and locate('하자', r.body) = 0
+                    and locate('파손', r.body) = 0
+                    and locate('고장', r.body) = 0
+                    and locate('찢', r.body) = 0
+                    and locate('찌그러', r.body) = 0
+                    and locate('깨져', r.body) = 0
+                    and locate('깨짐', r.body) = 0
+                    and locate('흠집', r.body) = 0
+                    and locate('기스', r.body) = 0
+                    and locate('얼룩', r.body) = 0
+                    and locate('오염', r.body) = 0
+                    and locate('냄새', r.body) = 0
+                    and locate('늦', r.body) = 0
+                    and locate('느려', r.body) = 0
+                    and locate('지연', r.body) = 0
+                    and locate('누락', r.body) = 0
+                    and locate('오배송', r.body) = 0
+                    and locate('빠져', r.body) = 0
+                    and locate('부족', r.body) = 0
+                    and locate('다르', r.body) = 0
+                    and locate('달라', r.body) = 0
+                    and locate('설명과', r.body) = 0
+                    and locate('사진과', r.body) = 0
+                    and locate('안 되', r.body) = 0
+                    and locate('안되', r.body) = 0
+                    and locate('안 돼', r.body) = 0
+                    and locate('안돼', r.body) = 0
+                    and locate('않', r.body) = 0
+                    and locate('못', r.body) = 0
+                    and locate('없어', r.body) = 0
+                    and locate('없네', r.body) = 0
+                    and locate('없음', r.body) = 0
+                    and locate('떨어', r.body) = 0
+                    and locate('약해', r.body) = 0
+                    and locate('약하', r.body) = 0
+                    and locate('약간', r.body) = 0
+                    and locate('조금', r.body) = 0
+                    and locate('좀', r.body) = 0
+                    and locate('얇', r.body) = 0
+                    and locate('비싸', r.body) = 0
+                    and locate('작아', r.body) = 0
+                    and locate('작네', r.body) = 0
+                    and locate('커서', r.body) = 0
+                    and locate('헐거', r.body) = 0
+                    and locate('뻑뻑', r.body) = 0
+                    and locate('빡빡', r.body) = 0
+                    and locate('들뜨', r.body) = 0
+                    and locate('뜨고', r.body) = 0
+                    and locate('뜨네', r.body) = 0
+                    and locate('휘어', r.body) = 0
+                    and locate('교환', r.body) = 0
+                    and locate('환불', r.body) = 0
+                    and locate('반품', r.body) = 0
+                    and locate('재발송', r.body) = 0
+                    and locate('ㅠ', r.body) = 0
+                    and locate('ㅜ', r.body) = 0
+                    and locate('흠', r.body) = 0
+                    and locate('ㅡㅡ', r.body) = 0
+                    and locate('-_-', r.body) = 0
+                    and locate('씹', r.body) = 0
+                    and locate('걸리', r.body) = 0
+                    and locate('빼고', r.body) = 0
+                    and locate('안좋', r.body) = 0
+                    and locate('안 좋', r.body) = 0
+                    and locate('비추', r.body) = 0
+                    and locate('으나', r.body) = 0
+                    and locate('하급', r.body) = 0
+                    and locate('최악', r.body) = 0
+                    and locate('...', r.body) = 0
+                    and locate('깨졌', r.body) = 0
+                    and locate('깨진', r.body) = 0
+                    and locate('깨지', r.body) = 0
+                    and locate('데', r.body) = 0
+                    and locate('던지', r.body) = 0
+                    and locate('던져', r.body) = 0
+                    and locate('그럭저럭', r.body) = 0
+                    and locate('보통', r.body) = 0
+                    and locate('그냥그', r.body) = 0
+                    and locate('그냥 그', r.body) = 0
+                    and locate('감전', r.body) = 0
+                    and locate('고발', r.body) = 0
+                    and locate('고소', r.body) = 0
+                    and locate('곰팡', r.body) = 0
+                    and locate('공정', r.body) = 0
+                    and locate('구토', r.body) = 0
+                    and locate('누전', r.body) = 0
+                    and locate('다쳐', r.body) = 0
+                    and locate('다쳤', r.body) = 0
+                    and locate('다치', r.body) = 0
+                    and locate('다칠', r.body) = 0
+                    and locate('데어', r.body) = 0
+                    and locate('데였', r.body) = 0
+                    and locate('두드', r.body) = 0
+                    and locate('멍들', r.body) = 0
+                    and locate('멍이', r.body) = 0
+                    and locate('발진', r.body) = 0
+                    and locate('배탈', r.body) = 0
+                    and locate('벌레', r.body) = 0
+                    and locate('베여', r.body) = 0
+                    and locate('베였', r.body) = 0
+                    and locate('변질', r.body) = 0
+                    and locate('변호', r.body) = 0
+                    and locate('병원', r.body) = 0
+                    and locate('부상', r.body) = 0
+                    and locate('불꽃', r.body) = 0
+                    and locate('불이', r.body) = 0
+                    and locate('설사', r.body) = 0
+                    and locate('소비', r.body) = 0
+                    and locate('소송', r.body) = 0
+                    and locate('식약', r.body) = 0
+                    and locate('식중', r.body) = 0
+                    and locate('신고', r.body) = 0
+                    and locate('알러', r.body) = 0
+                    and locate('알레', r.body) = 0
+                    and locate('연기', r.body) = 0
+                    and locate('응급', r.body) = 0
+                    and locate('이물', r.body) = 0
+                    and locate('타는', r.body) = 0
+                    and locate('토했', r.body) = 0
+                    and locate('폭발', r.body) = 0
+                    and locate('피가', r.body) = 0
+                    and locate('화상', r.body) = 0
+            """;
+
+    /**
      * The triage tier as a sort key — {@code 0} = 확인 필요, {@code 1} = 지켜보기, {@code 2} = 참고.
      *
      * <p><b>The SQL half of a rule whose Java half is {@code ReviewTriageRules}.</b> Both exist
@@ -127,9 +278,13 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
                when r.rating <= 2 and (r.body is null or trim(r.body) = '') then 1
                when r.rating <= 2 then 0
                when r.rating >= 4 then 2
+               when r.rating = 3 and r.body is not null and trim(r.body) <> ''
+            """ + RESERVATION_FREE + """
+                    then 2
                else 1
              end)
             """;
+
 
     /**
      * The rank a seller actually sees under RUBRIC v2 §13.7's conservative pilot: the rules rank,

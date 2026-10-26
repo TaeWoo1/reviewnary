@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sellerops.itemanalysis.InboxItemAnalyzer.Result;
 import com.sellerops.itemanalysis.InboxItemAnalyzer.SourceItem;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -56,6 +57,17 @@ class RuleBasedInboxItemAnalyzerTest {
         assertThat(r.summary()).isEqualTo("품질 관련 부정 리뷰");
     }
 
+    /** rules-v2 (owner decision 2026-10-27): the owner's judging sample's adhesion complaints, none tagged before. */
+    @Test
+    void howAThingStaysOnTheWallIsInstallation() {
+        for (String body : List.of("다른 리뷰처럼 접착력이 안좋아요", "양면 테이프가  좀  약한 것 같아요",
+                "붙여 놓고 하루 만에 다떨어졌어요", "저는 글루건 으로 한 번 더 붙였어요", "가운데가 계속 들뜨네요")) {
+            assertThat(analyzer.analyze(review(body, 2, true)).category()).as(body).isEqualTo("설치");
+        }
+        // Detection order is unchanged: a delivery word still wins.
+        assertThat(analyzer.analyze(review("배송은 빠른데 테이프가 약해요", 3, false)).category()).isEqualTo("배송");
+    }
+
     @Test
     void positiveReviewIsLowAndConfirmOnly() {
         Result r = analyzer.analyze(review("색상이 예쁘고 만족스러워요", 5, false));
@@ -89,7 +101,7 @@ class RuleBasedInboxItemAnalyzerTest {
 
         assertThat(r.analyzerKind()).isEqualTo("RULE_BASED");
         assertThat(r.analyzerName()).isEqualTo("rule-based");
-        assertThat(r.analyzerVersion()).isEqualTo("rules-v1");
+        assertThat(r.analyzerVersion()).isEqualTo(RuleBasedInboxItemAnalyzer.VERSION);
     }
 
     @Test

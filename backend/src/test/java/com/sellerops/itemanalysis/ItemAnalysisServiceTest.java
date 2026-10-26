@@ -61,7 +61,7 @@ class ItemAnalysisServiceTest {
         ItemAnalysis row = analyses.findAllByOrgIdOrderByCreatedAtDesc(org).get(0);
         assertThat(row.getAnalyzerKind()).isEqualTo("RULE_BASED");
         assertThat(row.getAnalyzerName()).isEqualTo("rule-based");
-        assertThat(row.getAnalyzerVersion()).isEqualTo("rules-v1");
+        assertThat(row.getAnalyzerVersion()).isEqualTo(RuleBasedInboxItemAnalyzer.VERSION);
         assertThat(row.getModelName()).isNull();
         assertThat(row.getPromptVersion()).isNull();
         assertThat(row.getSummary()).doesNotContain("환불하고 싶어요");
@@ -126,7 +126,7 @@ class ItemAnalysisServiceTest {
         ItemAnalysis row = analyses.findAllByOrgIdOrderByCreatedAtDesc(org).stream()
                 .filter(x -> x.getSourceId().equals(a.getId())).findFirst().orElseThrow();
         assertThat(row.getAnalyzerKind()).isEqualTo("RULE_BASED");
-        assertThat(row.getAnalyzerVersion()).isEqualTo("rules-v1");
+        assertThat(row.getAnalyzerVersion()).isEqualTo(RuleBasedInboxItemAnalyzer.VERSION);
         assertThat(row.getModelName()).isNull();
         assertThat(row.getPromptVersion()).isNull();
     }
@@ -180,7 +180,7 @@ class ItemAnalysisServiceTest {
         ItemAnalysis row = analyses.findAllByOrgIdOrderByCreatedAtDesc(org).stream()
                 .filter(x -> x.getSourceId().equals(a.getId())).findFirst().orElseThrow();
         assertThat(row.getAnalyzerKind()).isEqualTo("RULE_BASED");
-        assertThat(row.getAnalyzerVersion()).isEqualTo("rules-v1");
+        assertThat(row.getAnalyzerVersion()).isEqualTo(RuleBasedInboxItemAnalyzer.VERSION);
         assertThat(row.getModelName()).isNull();
         assertThat(row.getPromptVersion()).isNull();
     }

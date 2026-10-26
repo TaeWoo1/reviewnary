@@ -89,6 +89,10 @@ Three of these rows deserve their reasoning written down:
 - **`rating = 3` is `WATCH`.** The existing queue's band is 1–3★ (`IngestedReviewVocItemSource`); this
   surface splits that band because 확인 필요 is a stronger claim than "in the attention window", and a
   3★ is where the two honestly differ.
+  **Since 2026-10-27 (product-owner decision), only when the text carries a reservation:** a 3★ whose text names
+  nothing wrong — praise, thanks, a product name — is `FYI`, and its reason reads 「3점 · 불만 표시 없음」. Only 3★,
+  only down, never into or out of 확인 필요; the words are `ReviewTriageRules.RESERVATION_MARKERS`, spelled out again
+  in `ReviewRepository.RESERVATION_FREE`. Limits and measurement: `contracts/review-eval/naver/v2/RUBRIC.md` §2.4.
 
 **One addition beside the tiers, not inside them (product-owner decision, 2026-10-22).** A review whose
 body reports a safety or legal problem (`ReviewSafetySignal` — 화상 · 이물질 · 소비자원 …, with a short

@@ -56,6 +56,10 @@ public record ReviewTriageNote(
         if (textless) {
             parts.add("별점만");
         }
+        if (rating != null && rating == 3 && tier == ReviewTriageTier.FYI) {
+            // Why a 3★ sits with 참고 (RUBRIC v2 §2.4): said, so the seller can disagree with it.
+            parts.add("불만 표시 없음");
+        }
         if (tag != null) {
             parts.add(tag);
         }

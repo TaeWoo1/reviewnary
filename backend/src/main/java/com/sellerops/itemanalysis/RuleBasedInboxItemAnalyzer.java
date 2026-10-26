@@ -18,7 +18,7 @@ public class RuleBasedInboxItemAnalyzer implements InboxItemAnalyzer {
 
     static final String KIND = "RULE_BASED";
     static final String NAME = "rule-based";
-    static final String VERSION = "rules-v1";
+    static final String VERSION = "rules-v2";
 
     static final String INQUIRY = "INQUIRY";
     static final String REVIEW = "REVIEW";
@@ -40,11 +40,31 @@ public class RuleBasedInboxItemAnalyzer implements InboxItemAnalyzer {
     private record Category(String name, List<String> keywords) {
     }
 
-    private static final List<Category> CATEGORIES = List.of(
+    /**
+     * {@code rules-v1}, kept as it was so a verdict it stored can be reproduced by running it again — the rollback
+     * {@link ItemAnalysisService#reanalyzeOutdated} relies on. Not used for new analyses.
+     */
+    static final List<Category> CATEGORIES_V1 = List.of(
             new Category(ItemAnalysisCategories.DELIVERY, List.of("배송", "택배", "발송", "도착", "출고")),
             new Category(ItemAnalysisCategories.EXCHANGE, List.of("교환", "반품", "환불")),
             new Category(ItemAnalysisCategories.PRODUCT_INFO, List.of("사양", "스펙", "호환", "성분", "크기", "mm")),
             new Category(ItemAnalysisCategories.INSTALLATION, List.of("설치", "시공", "부착")),
+            new Category(ItemAnalysisCategories.PRICE, List.of("가격", "비싸", "할인", "가성비")),
+            new Category(ItemAnalysisCategories.QUALITY, List.of("불량", "하자", "깨짐", "터짐", "품질")),
+            new Category(ItemAnalysisCategories.COLOR, List.of("색상", "컬러", "색깔")),
+            new Category(ItemAnalysisCategories.SIZE, List.of("사이즈", "길이", "폭")));
+
+    /**
+     * {@code rules-v2} (product-owner decision 2026-10-27): 설치 also hears how a thing stays on the wall — 접착 · 테이프 ·
+     * 붙 · 들뜨. In the owner's judging sample every adhesion complaint (양면테이프가 약해요 · 하루 만에 떨어졌어요 · 글루건으로
+     * 붙였어요) carried no topic at all, while the same store's 설치 already held 「부착」. Otherwise as {@code rules-v1}.
+     */
+    private static final List<Category> CATEGORIES = List.of(
+            new Category(ItemAnalysisCategories.DELIVERY, List.of("배송", "택배", "발송", "도착", "출고")),
+            new Category(ItemAnalysisCategories.EXCHANGE, List.of("교환", "반품", "환불")),
+            new Category(ItemAnalysisCategories.PRODUCT_INFO, List.of("사양", "스펙", "호환", "성분", "크기", "mm")),
+            new Category(ItemAnalysisCategories.INSTALLATION,
+                    List.of("설치", "시공", "부착", "접착", "테이프", "붙이", "붙여", "붙어", "붙였", "안붙", "들뜨", "들떠")),
             new Category(ItemAnalysisCategories.PRICE, List.of("가격", "비싸", "할인", "가성비")),
             new Category(ItemAnalysisCategories.QUALITY, List.of("불량", "하자", "깨짐", "터짐", "품질")),
             new Category(ItemAnalysisCategories.COLOR, List.of("색상", "컬러", "색깔")),
