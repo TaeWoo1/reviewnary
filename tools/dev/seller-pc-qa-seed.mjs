@@ -24,18 +24,18 @@ import { createRequire } from "node:module";
 import { createHmac, randomBytes } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { crc32 } from "node:zlib";
+import { crc32, deflateRawSync } from "node:zlib";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const RUN = join(ROOT, "tools", "dev", ".run", "seller-pc-qa");
+export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+export const RUN = join(ROOT, "tools", "dev", ".run", "seller-pc-qa");
 const STATE = join(RUN, "qa.env");
-const VENDOR = "http://127.0.0.1:18499";
-const SCREEN = "http://127.0.0.1:5691";
+export const VENDOR = "http://127.0.0.1:18499";
+export const SCREEN = "http://127.0.0.1:5691";
 const SELLER = "qa-seller@example.com";
-const DELEGATE = "qa-delegate@example.com";
-const STORE_LABEL = "나누리산업(QA)";
+export const DELEGATE = "qa-delegate@example.com";
+export const STORE_LABEL = "나누리산업(QA)";
 const PSQL = process.env.PSQL ?? "/opt/homebrew/opt/postgresql@15/bin/psql";
 const { chromium } = createRequire(join(ROOT, "collector", "package.json"))("playwright");
 
@@ -43,7 +43,7 @@ const say = (line) => console.log(`· ${line}`);
 
 /* ── state ─────────────────────────────────────────────────────────────────────────────────────────── */
 
-function loadState() {
+export function loadState() {
   const s = {};
   if (existsSync(STATE)) {
     for (const line of readFileSync(STATE, "utf8").split("\n")) {
@@ -54,14 +54,14 @@ function loadState() {
   return s;
 }
 
-function saveState(s) {
+export function saveState(s) {
   writeFileSync(STATE, Object.entries(s).map(([k, v]) => `${k}=${v}`).join("\n") + "\n", { mode: 0o600 });
   chmodSync(STATE, 0o600);
 }
 
 /* ── helpers ───────────────────────────────────────────────────────────────────────────────────────── */
 
-function sql(db, query) {
+export function sql(db, query) {
   return execFileSync(PSQL, ["-h", "127.0.0.1", "-p", "5432", "-U", "sellerops", "-tA", "-d", db, "-c", query], {
     encoding: "utf8",
   }).trim();
@@ -87,7 +87,7 @@ function password() {
 
 const BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
-function totp(secret, at = Date.now()) {
+export function totp(secret, at = Date.now()) {
   const clean = secret.replace(/[\s=]/g, "").toUpperCase();
   let bits = "";
   for (const ch of clean) bits += BASE32.indexOf(ch).toString(2).padStart(5, "0");
@@ -101,14 +101,14 @@ function totp(secret, at = Date.now()) {
 }
 
 /** The demo account's password, read from the seed source — the PC screen's own fixture login. */
-function seedPassword() {
+export function seedPassword() {
   const src = readFileSync(join(ROOT, "backend/src/main/java/com/sellerops/config/MockDataSeeder.java"), "utf8");
   const m = src.match(/setEmail\("demo@sellerops\.ai"\);\s*user\.setPasswordHash\(passwordEncoder\.encode\("([^"]+)"\)\)/);
   if (!m) throw new Error("could not find the seed account in MockDataSeeder");
   return m[1];
 }
 
-async function until(what, fn, seconds = 120) {
+export async function until(what, fn, seconds = 120) {
   for (let i = 0; i < seconds; i++) {
     const v = await fn();
     if (v) return v;
@@ -119,36 +119,36 @@ async function until(what, fn, seconds = 120) {
 
 /* ── the synthetic export ──────────────────────────────────────────────────────────────────────────── */
 
-const HEADERS = ["상품번호", "상품명", "리뷰구분", "구매자평점", "포토/영상", "리뷰상세내용", "리뷰도움수", "등록자",
+export const HEADERS = ["상품번호", "상품명", "리뷰구분", "구매자평점", "포토/영상", "리뷰상세내용", "리뷰도움수", "등록자",
   "리뷰등록일", "최종수정일", "리뷰글번호", "관련리뷰글번호", "관련리뷰상세내용", "전시상태", "답글여부", "답글등록일시",
   "베스트리뷰", "베스트리뷰선정일시", "이벤트번호", "혜택지급", "혜택지급일시", "유저정보 등록 항목", "상품주문번호",
   "풀필먼트사", "리뷰이동일"];
 
-const PRODUCTS = [
+export const PRODUCTS = [
   ["8800000101", "스텐 종이컵 디스펜서 벽걸이형"],
   ["8800000102", "분리수거함 3단 슬림 (QA)"],
   ["8800000103", "주방 수납 선반 2단"],
   ["8800000104", "원목 컵홀더 6구"],
   ["8800000105", "욕실 코너 선반 무타공"],
 ];
-const GOOD = ["배송 빠르고 튼튼해요. 잘 쓰겠습니다.", "생각보다 크고 마감이 깔끔해요.", "설치가 쉬웠어요. 만족합니다.",
+export const GOOD = ["배송 빠르고 튼튼해요. 잘 쓰겠습니다.", "생각보다 크고 마감이 깔끔해요.", "설치가 쉬웠어요. 만족합니다.",
   "가격대비 좋아요.", "두 번째 구매입니다. 역시 좋네요.", "색감이 사진이랑 똑같아요.", "포장이 꼼꼼했어요.",
   "자리를 많이 안 차지해서 좋아요.", "부모님 댁에도 하나 보내드렸어요.", "튼튼하고 흔들림이 없어요."];
-const OK = ["쓸만해요. 나사가 하나 헐거웠어요.", "괜찮은데 생각보다 작아요.", "무난합니다. 배송이 조금 늦었어요.",
+export const OK = ["쓸만해요. 나사가 하나 헐거웠어요.", "괜찮은데 생각보다 작아요.", "무난합니다. 배송이 조금 늦었어요.",
   "가격대비 그럭저럭이에요.", "설명서가 조금 불친절해요."];
-const BAD = ["한 달 만에 고정 부분이 부러졌어요.", "벽에서 자꾸 떨어져요. 접착력이 약해요.", "흠집 난 제품이 왔어요. 교환 원합니다.",
+export const BAD = ["한 달 만에 고정 부분이 부러졌어요.", "벽에서 자꾸 떨어져요. 접착력이 약해요.", "흠집 난 제품이 왔어요. 교환 원합니다.",
   "사진이랑 색이 너무 달라요.", "냄새가 심해서 못 쓰겠어요.", "배송 중 파손돼서 왔어요."];
-const SAFETY = ["모서리가 날카로워서 손을 베였어요.", "아이가 만지다 손가락이 끼었어요. 조심하세요.",
+export const SAFETY = ["모서리가 날카로워서 손을 베였어요.", "아이가 만지다 손가락이 끼었어요. 조심하세요.",
   "설치하다가 선반이 떨어져서 발등을 다쳤어요."];
 
-function rng(seed) {
+export function rng(seed) {
   let x = seed >>> 0;
   return () => ((x = (Math.imul(x ^ (x >>> 15), 0x2c1b3c6d) + 0x9e3779b9) >>> 0) / 2 ** 32);
 }
 
-const pad = (n) => String(n).padStart(2, "0");
+export const pad = (n) => String(n).padStart(2, "0");
 /** Seller Center's own time format, Korean local time. */
-function kst(ms) {
+export function kst(ms) {
   const d = new Date(ms + 9 * 3600_000);
   return `${d.getUTCFullYear()}.${pad(d.getUTCMonth() + 1)}.${pad(d.getUTCDate())}. ` +
     `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
@@ -199,8 +199,8 @@ function colName(i) {
   return s;
 }
 
-/** A one-sheet .xlsx of inline strings — the smallest workbook Apache POI reads. Stored (uncompressed) zip. */
-function xlsx(rows) {
+/** A one-sheet .xlsx of inline strings — the smallest workbook Apache POI reads. Deflated, like a real export. */
+export function xlsx(rows) {
   const sheetRows = rows.map((cells, r) => `<row r="${r + 1}">` + cells.map((v, c) => v === "" ? "" :
     `<c r="${colName(c)}${r + 1}" t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`).join("") + "</row>");
   const files = {
@@ -214,19 +214,20 @@ function xlsx(rows) {
   const central = [];
   let offset = 0;
   for (const [name, text] of Object.entries(files)) {
-    const data = Buffer.from(text, "utf8");
+    const raw = Buffer.from(text, "utf8");
+    const data = deflateRawSync(raw);
     const fname = Buffer.from(name, "utf8");
-    const crc = crc32(data);
+    const crc = crc32(raw);
     const head = Buffer.alloc(30);
     head.writeUInt32LE(0x04034b50, 0); head.writeUInt16LE(20, 4); head.writeUInt16LE(0x0800, 6);
-    head.writeUInt16LE(0, 8); head.writeUInt32LE(0, 10); head.writeUInt32LE(crc, 14);
-    head.writeUInt32LE(data.length, 18); head.writeUInt32LE(data.length, 22); head.writeUInt16LE(fname.length, 26);
+    head.writeUInt16LE(8, 8); head.writeUInt32LE(0, 10); head.writeUInt32LE(crc, 14);
+    head.writeUInt32LE(data.length, 18); head.writeUInt32LE(raw.length, 22); head.writeUInt16LE(fname.length, 26);
     head.writeUInt16LE(0, 28);
     local.push(head, fname, data);
     const cen = Buffer.alloc(46);
     cen.writeUInt32LE(0x02014b50, 0); cen.writeUInt16LE(20, 4); cen.writeUInt16LE(20, 6); cen.writeUInt16LE(0x0800, 8);
-    cen.writeUInt16LE(0, 10); cen.writeUInt32LE(0, 12); cen.writeUInt32LE(crc, 16); cen.writeUInt32LE(data.length, 20);
-    cen.writeUInt32LE(data.length, 24); cen.writeUInt16LE(fname.length, 28); cen.writeUInt32LE(offset, 42);
+    cen.writeUInt16LE(8, 10); cen.writeUInt32LE(0, 12); cen.writeUInt32LE(crc, 16); cen.writeUInt32LE(data.length, 20);
+    cen.writeUInt32LE(raw.length, 24); cen.writeUInt16LE(fname.length, 28); cen.writeUInt32LE(offset, 42);
     central.push(cen, fname);
     offset += head.length + fname.length + data.length;
   }
@@ -274,7 +275,7 @@ function store(s) {
   say("store: added");
 }
 
-async function pcSignIn(page) {
+export async function pcSignIn(page) {
   await page.goto(`${SCREEN}/login`);
   await page.fill("#login-email", "demo@sellerops.ai");
   await page.fill("#login-password", seedPassword());
@@ -381,16 +382,8 @@ async function delegate(browser, s) {
   say("delegate: store assigned, owner and assignment checked");
 }
 
-async function upload(browser, s) {
-  if (sql("vendor_qa", `select count(*) from store_reviews where store_id='${s.STORE_ID}'`) !== "0") {
-    say("upload: reviews already on the server");
-    return;
-  }
-  const rows = reviewRows();
-  const file = join(RUN, "qa-naver-reviews.xlsx");
-  writeFileSync(file, xlsx([HEADERS, ...rows]), { mode: 0o600 });
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const page = await ctx.newPage();
+/** Signs the QA delegate in on the desk, or finds them signed in. */
+export async function deskSignIn(page, s) {
   await page.goto(`${VENDOR}/delegate/`);
   await page.locator("#view-login, #view-list").first().waitFor();
   if (await page.locator("#view-login").isVisible()) {
@@ -403,15 +396,39 @@ async function upload(browser, s) {
     await page.click("#login-form button[type=submit]");
   }
   await page.locator("#view-list").waitFor();
-  await page.click("#tab-upload");
+}
+
+/**
+ * Uploads `file` for the QA store from the desk's 「리뷰 파일 올리기」 and waits for the desk's answer; returns the
+ * milliseconds from pressing 올리기 to that answer. The desk opens the panel itself when one store is assigned.
+ */
+export async function deskUpload(page, s, file, timeout = 60_000) {
+  const panel = page.locator("#upload-panel");
+  if (!(await panel.isVisible())) await page.locator(`#store-list button[data-store="${s.STORE_ID}"]`).click();
   await page.locator("#upload-form").waitFor();
-  await page.selectOption("#store", { label: STORE_LABEL }).catch(() => {});
   await page.setInputFiles("#file", file);
+  const t0 = Date.now();
   await page.click("#upload");
-  await page.waitForSelector("#upload-result:not([hidden]), #upload-refused:not([hidden])", { timeout: 60_000 });
+  await page.waitForSelector("#upload-result:not([hidden]), #upload-refused:not([hidden])", { timeout });
+  const ms = Date.now() - t0;
   if (await page.locator("#upload-refused").isVisible()) {
     throw new Error(`the desk refused the file: ${(await page.locator("#refused-text").innerText()).slice(0, 200)}`);
   }
+  return ms;
+}
+
+async function upload(browser, s) {
+  if (sql("vendor_qa", `select count(*) from store_reviews where store_id='${s.STORE_ID}'`) !== "0") {
+    say("upload: reviews already on the server");
+    return;
+  }
+  const rows = reviewRows();
+  const file = join(RUN, "qa-naver-reviews.xlsx");
+  writeFileSync(file, xlsx([HEADERS, ...rows]), { mode: 0o600 });
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await ctx.newPage();
+  await deskSignIn(page, s);
+  await deskUpload(page, s, file);
   await ctx.close();
   say(`upload: ${rows.length} synthetic reviews uploaded on the delegate desk`);
 }
@@ -427,20 +444,23 @@ async function relay(s) {
 
 /* ── main ──────────────────────────────────────────────────────────────────────────────────────────── */
 
-const s = loadState();
-const browser = await chromium.launch();
-try {
-  await seller(browser, s);
-  store(s);
-  await pcLink(browser, s);
-  await delegate(browser, s);
-  await upload(browser, s);
-  await relay(s);
-  const v = sql("vendor_qa", `select count(*) || ' reviews · ' || count(*) filter (where replied) || ' replied · ' || ` +
-    `count(*) filter (where rating <= 2) || ' at 1–2★' from store_reviews`);
-  const pc = sql("sellerpc_qa", "select count(*) from reviews");
-  say(`done — vendor_qa: ${v} · sellerpc_qa: ${pc} reviews`);
-  say(`PC screen ${SCREEN} (demo account) · delegate desk ${VENDOR}/delegate/ (${DELEGATE}; secrets in qa.env)`);
-} finally {
-  await browser.close();
+// Run only when started as a script: seller-pc-qa-perf.mjs imports the helpers above.
+if (resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
+  const s = loadState();
+  const browser = await chromium.launch();
+  try {
+    await seller(browser, s);
+    store(s);
+    await pcLink(browser, s);
+    await delegate(browser, s);
+    await upload(browser, s);
+    await relay(s);
+    const v = sql("vendor_qa", `select count(*) || ' reviews · ' || count(*) filter (where replied) || ' replied · ' || ` +
+      `count(*) filter (where rating <= 2) || ' at 1–2★' from store_reviews`);
+    const pc = sql("sellerpc_qa", "select count(*) from reviews");
+    say(`done — vendor_qa: ${v} · sellerpc_qa: ${pc} reviews`);
+    say(`PC screen ${SCREEN} (demo account) · delegate desk ${VENDOR}/delegate/ (${DELEGATE}; secrets in qa.env)`);
+  } finally {
+    await browser.close();
+  }
 }
