@@ -136,4 +136,40 @@ class AgentReviewDraftPayloadFloorTest {
             assertThat(with).doesNotContain(forbidden);
         }
     }
+
+    @ParameterizedTest
+    @EnumSource(AgentDraftGenerator.Vendor.class)
+    @DisplayName("what the customer felt leaves as a word, never as the rating, and unstated adds nothing")
+    void theMoodLeavesAsAWordNeverAsTheRating(AgentDraftGenerator.Vendor vendor) {
+        String unstated = generator(vendor).reviewRequestBody(new AgentDraftGenerator.ReviewInput(
+                "붙여 놓고 하루 만에 다떨어졌어요", List.of(), null, List.of(), AgentDraftGenerator.ReviewMood.UNSTATED));
+        assertThat(unstated).as("UNSTATED is the request as it was before the mood existed")
+                .isEqualTo(generator(vendor).reviewRequestBody(
+                        new AgentDraftGenerator.ReviewInput("붙여 놓고 하루 만에 다떨어졌어요", List.of(), null)));
+        assertThat(unstated).doesNotContain("후기의 결:");
+
+        String complaint = AgentDraftPrompt.reviewUser(List.of(), "붙여 놓고 하루 만에 다떨어졌어요", null, List.of(),
+                AgentDraftGenerator.ReviewMood.COMPLAINT);
+        assertThat(complaint).contains(AgentDraftPrompt.MOOD_COMPLAINT);
+        String mixed = AgentDraftPrompt.reviewUser(List.of(), "좋은데 접착력이 ..", null, List.of(),
+                AgentDraftGenerator.ReviewMood.MIXED);
+        assertThat(mixed).contains(AgentDraftPrompt.MOOD_MIXED);
+        // The rating is still the customer's private choice: no star, no number reaches the vendor.
+        for (String turn : List.of(complaint, mixed)) {
+            assertThat(turn).doesNotContain("별점").doesNotContainPattern("[1-5]\\s*점");
+        }
+    }
+
+    @Test
+    @DisplayName("a complaint names its problem and closes quietly; praise names what pleased (owner, 2026-10-27)")
+    void theToneRulesAreStated() {
+        String system = AgentDraftPrompt.reviewSystem();
+        // Four of six 1–2★ replies on the owner's judging sheet closed with 「좋은 하루 보내세요」.
+        assertThat(system).contains("밝은 인사로 끝내지 마세요").contains("「좋은 하루 보내세요」");
+        // 「버튼을 누르면 컵이 두 개씩 나와요」 was answered with 「이용 중 불편」.
+        assertThat(system).contains("「이용 중 불편」처럼").contains("고객이 쓴 말로 한 번 짚고");
+        // With the seller's guidance in the grounds, the reply carries it rather than stopping at the apology.
+        assertThat(system).contains("사과 다음에 그 안내를 근거에 적힌");
+        assertThat(system).contains("「후기의 결」이 주어지면");
+    }
 }

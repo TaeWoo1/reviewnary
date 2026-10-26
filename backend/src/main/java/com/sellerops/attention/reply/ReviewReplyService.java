@@ -271,6 +271,20 @@ public class ReviewReplyService {
     }
 
     /**
+     * The evidence a draft of this review would be written from, without writing one (2026-10-27): the same retrieval
+     * {@link #generateDraft} runs, and nothing after it — no model call, no version, no 확인 필요 row. Read-only, so it
+     * needs no response gate: the owner checks what their knowledge reaches before any model is paid.
+     */
+    public java.util.List<com.sellerops.inquiry.draft.dto.DraftEvidenceView> previewGrounds(UUID orgId, UUID accountId,
+                                                                                             String actionRef) {
+        Review review = authorize(orgId, accountId, actionRef);
+        if (composer == null) {
+            throw ApiException.conflict("AI 초안 기능을 사용할 수 없습니다.");
+        }
+        return composer.groundsFor(orgId, review, VocPreviewSanitizer.redactFullBody(review.getBody()).text());
+    }
+
+    /**
      * Approve or withdraw.
      *
      * <p><b>The gate is asymmetric, and that is the design.</b> Approving requires

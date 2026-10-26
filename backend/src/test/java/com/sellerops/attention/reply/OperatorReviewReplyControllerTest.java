@@ -213,7 +213,8 @@ class OperatorReviewReplyControllerTest {
         // Grounded Review Drafting v1 (2026-09-03) adds /draft/generate: it writes ONE more append-only
         // version through the same path /draft writes through, reaching three retrieval lanes in this
         // database and at most one model. It approves nothing and reaches no marketplace.
-        assertThat(mapped).containsExactlyInAnyOrder("/draft", "/draft/generate", "/approval",
+        // 2026-10-27 adds /draft/grounds: a GET that runs the draft's retrieval and stops — no model, no version.
+        assertThat(mapped).containsExactlyInAnyOrder("/draft", "/draft/generate", "/draft/grounds", "/approval",
                 "/submission-run", "/outcome", "/execute", "/execution", "/execution/observe");
     }
 

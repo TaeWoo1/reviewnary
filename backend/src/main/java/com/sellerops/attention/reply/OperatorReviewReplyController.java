@@ -123,6 +123,14 @@ public class OperatorReviewReplyController {
         return service.generateDraft(principal.orgId(), accountId, actionRef, principal.userId());
     }
 
+    /** What a draft of this review would be grounded in, retrieved and not written — no model call (2026-10-27). */
+    @org.springframework.web.bind.annotation.GetMapping("/draft/grounds")
+    public java.util.List<com.sellerops.inquiry.draft.dto.DraftEvidenceView> draftGrounds(
+            @AuthenticationPrincipal AuthPrincipal principal, @PathVariable UUID accountId,
+            @PathVariable String actionRef) {
+        return service.previewGrounds(principal.orgId(), accountId, actionRef);
+    }
+
     /**
      * Approve the current draft, or withdraw a standing approval.
      *

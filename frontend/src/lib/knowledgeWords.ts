@@ -95,5 +95,6 @@ export function scopeLabel(scope: string, productName: string | null | undefined
 export function originLabel(origin: string): string {
   if (origin === "DRAFT_GAP") return "정보 필요";
   if (origin === "REPEATED_ANSWER") return "확인할 후보";
+  if (origin === "ISSUE_GUIDANCE") return "안내 제안";
   return "확인 필요";
 }

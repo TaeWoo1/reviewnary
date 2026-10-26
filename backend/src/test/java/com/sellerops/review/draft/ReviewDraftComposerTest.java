@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.sellerops.agent.llm.AgentDraftGenerator;
 import com.sellerops.agent.llm.AgentDraftService;
 import com.sellerops.agent.quota.AgentQuotaService;
 import com.sellerops.agent.quota.AgentUsageKind;
@@ -144,7 +145,7 @@ class ReviewDraftComposerTest {
     void theBasisSentenceIsReadBackNotRecomputed() {
         // Exactly what the generation reports, for a grounded draft with citations.
         retrieval(DraftKnowledgeState.GROUNDED, productPassage("실리콘 표면에는 부착되지 않습니다."));
-        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of()), eq(AgentDraftGenerator.ReviewMood.UNSTATED)))
                 .thenReturn(java.util.Optional.of("실리콘 표면에는 부착되지 않습니다. 확인 부탁드립니다."));
         GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
         assertThat(view.answerBasis()).isEqualTo("GROUNDED");
@@ -188,7 +189,7 @@ class ReviewDraftComposerTest {
 
         // Owner decision 2026-10-26: with no evidence the model is asked for thanks and empathy only. Here it
         // answers nothing, so the floor is what is saved — exactly as before.
-        verify(model).draftReviewReply(eq(ORG), eq(BODY), eq(List.of()), eq(TEMPLATE));
+        verify(model).draftReviewReply(eq(ORG), eq(BODY), eq(List.of()), eq(TEMPLATE), eq(List.of()), eq(AgentDraftGenerator.ReviewMood.UNSTATED));
         assertThat(view.draft().body()).isEqualTo(TEMPLATE);
         assertThat(view.authorKind()).isEqualTo("RULE");
         assertThat(view.answerBasis()).isEqualTo("NO_ANSWER_BASIS");
@@ -208,7 +209,7 @@ class ReviewDraftComposerTest {
         // The real-export case (2026-10-26): a ★3 「가격대비 저렴하고 좋아요」 drew the pricing template, whose floor
         // answers praise with 「더 나은 가치를 드릴 수 있도록 계속 고민하겠습니다」.
         retrieval(DraftKnowledgeState.NO_LIBRARY);
-        when(model.draftReviewReply(eq(ORG), eq(BODY), eq(List.of()), eq(TEMPLATE)))
+        when(model.draftReviewReply(eq(ORG), eq(BODY), eq(List.of()), eq(TEMPLATE), eq(List.of()), eq(AgentDraftGenerator.ReviewMood.UNSTATED)))
                 .thenReturn(Optional.of("안녕하세요, 고객님. 만족스럽게 사용해 주셔서 감사합니다."));
 
         GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
@@ -224,7 +225,7 @@ class ReviewDraftComposerTest {
     @DisplayName("no evidence: a remedy the model offers anyway is refused and the floor is saved")
     void withoutEvidenceAPromiseIsRefused() {
         retrieval(DraftKnowledgeState.NO_LIBRARY);
-        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of()), eq(AgentDraftGenerator.ReviewMood.UNSTATED)))
                 .thenReturn(Optional.of("불편을 드려 죄송합니다. 바로 교환해 드리겠습니다."));
 
         GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
@@ -264,7 +265,7 @@ class ReviewDraftComposerTest {
     void withEvidenceTheModelWritesInsideIt() {
         retrieval(DraftKnowledgeState.GROUNDED,
                 productPassage("표면의 먼지와 기름기를 닦아낸 뒤 눌러 붙여 주세요."));
-        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of()), eq(AgentDraftGenerator.ReviewMood.UNSTATED)))
                 .thenReturn(Optional.of("후기 감사합니다. 부착 전 표면의 먼지를 닦아 주시면 더 잘 붙습니다."));
 
         GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
@@ -292,7 +293,7 @@ class ReviewDraftComposerTest {
         composer.setStyleGuard(new ReviewStyleGuard(styles));
         retrieval(DraftKnowledgeState.GROUNDED,
                 productPassage("표면의 먼지와 기름기를 닦아낸 뒤 눌러 붙여 주세요."));
-        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of("고객님 탓"))))
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of("고객님 탓")), eq(AgentDraftGenerator.ReviewMood.UNSTATED)))
                 .thenReturn(Optional.of("고객님 탓이 아닙니다. 표면의 먼지를 닦아 주세요."),
                         Optional.of("불편을 드려 죄송합니다. 부착 전 표면의 먼지를 닦아 주세요."));
 
@@ -301,7 +302,7 @@ class ReviewDraftComposerTest {
         assertThat(view.draft().body()).isEqualTo("불편을 드려 죄송합니다. 부착 전 표면의 먼지를 닦아 주세요.");
         assertThat(view.authorKind()).isEqualTo("MODEL");
         assertThat(view.unavailableMessage()).isNull();
-        verify(model, org.mockito.Mockito.times(2)).draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of("고객님 탓")));
+        verify(model, org.mockito.Mockito.times(2)).draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of("고객님 탓")), eq(AgentDraftGenerator.ReviewMood.UNSTATED));
     }
 
     @Test
@@ -313,7 +314,7 @@ class ReviewDraftComposerTest {
         composer.setStyleGuard(new ReviewStyleGuard(styles));
         retrieval(DraftKnowledgeState.GROUNDED,
                 productPassage("표면의 먼지와 기름기를 닦아낸 뒤 눌러 붙여 주세요."));
-        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of("고객님 탓"))))
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of("고객님 탓")), eq(AgentDraftGenerator.ReviewMood.UNSTATED)))
                 .thenReturn(Optional.of("고객님 탓이 아닙니다. 표면의 먼지를 닦아 주세요."));
 
         GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
@@ -328,7 +329,7 @@ class ReviewDraftComposerTest {
     void anUnsupportedPromiseFallsBackToTheTemplate() {
         retrieval(DraftKnowledgeState.GROUNDED,
                 productPassage("표면의 먼지와 기름기를 닦아낸 뒤 눌러 붙여 주세요."));
-        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of()), eq(AgentDraftGenerator.ReviewMood.UNSTATED)))
                 .thenReturn(Optional.of("불편을 드려 죄송합니다. 교환 도와드리겠습니다."));
 
         GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
@@ -356,7 +357,7 @@ class ReviewDraftComposerTest {
         assertThat(view.draft().body()).isEqualTo(TEMPLATE);
         assertThat(view.unavailableMessage()).isNotNull();
         assertThat(view.unavailableMessage()).doesNotContain("답변 기준");
-        verify(model, never()).draftReviewReply(any(), any(), any(), any());
+        verify(model, never()).draftReviewReply(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -377,7 +378,7 @@ class ReviewDraftComposerTest {
     @DisplayName("a promise whose period the evidence does not state is refused like an unsupported promise")
     void aPromiseWithTermsTheEvidenceDoesNotStateFallsBackToTheTemplate() {
         retrieval(DraftKnowledgeState.GROUNDED, productPassage("수령 후 14일 이내 교환이 가능합니다."));
-        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of()), eq(AgentDraftGenerator.ReviewMood.UNSTATED)))
                 .thenReturn(Optional.of("불편을 드려 죄송합니다. 7일 이내 교환 도와드리겠습니다."));
 
         GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
@@ -385,7 +386,7 @@ class ReviewDraftComposerTest {
         assertThat(view.draft().body()).isEqualTo(TEMPLATE);
         assertThat(view.unavailableMessage()).isEqualTo(ReviewDraftComposer.UNSUPPORTED_CLAIM);
 
-        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of()), eq(AgentDraftGenerator.ReviewMood.UNSTATED)))
                 .thenReturn(Optional.of("불편을 드려 죄송합니다. 14일 이내 교환 도와드리겠습니다."));
         assertThat(composer.compose(ORG, review(), BODY, "SELLER:u1").authorKind())
                 .as("the period the evidence states is fine").isEqualTo("MODEL");
@@ -395,7 +396,7 @@ class ReviewDraftComposerTest {
     @DisplayName("only a past answer: the model writes from its wording, the basis says so, and nothing is promised")
     void aPastAnswerAloneShapesTheWordingAndIsSaidToBeThat() {
         retrieval(DraftKnowledgeState.NO_LIBRARY, pastAnswer("빠른 배송과 꼼꼼한 포장을 알아봐 주셔서 감사합니다."));
-        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of()), eq(AgentDraftGenerator.ReviewMood.UNSTATED)))
                 .thenReturn(Optional.of("꼼꼼한 포장을 알아봐 주셔서 감사합니다. 또 찾아 주세요."));
 
         GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
@@ -410,7 +411,7 @@ class ReviewDraftComposerTest {
     @DisplayName("a past answer never authorizes a promise: an exchange once granted is not a policy")
     void aPastAnswerCannotAuthorizeAPromise() {
         retrieval(DraftKnowledgeState.NO_LIBRARY, pastAnswer("불편을 드려 죄송합니다. 교환해 드렸습니다."));
-        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE)))
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of()), eq(AgentDraftGenerator.ReviewMood.UNSTATED)))
                 .thenReturn(Optional.of("불편을 드려 죄송합니다. 교환 도와드리겠습니다."));
 
         GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
@@ -440,5 +441,27 @@ class ReviewDraftComposerTest {
         composer.compose(ORG, review(), BODY, "SELLER:u1");
 
         verify(retriever).retrieveFor(eq(ORG), eq(PRODUCT), any(), any(), eq(band));
+    }
+
+    @Test
+    @DisplayName("a 1–2★ review is asked for as a complaint and a reserved 3★ as mixed — the rating itself stays home")
+    void theMoodFollowsTheRatingAndTheTriageSplit() {
+        assertThat(ReviewDraftComposer.moodOf(1, "버튼을 누르면 컵이 두 개씩 나와요")).isEqualTo(AgentDraftGenerator.ReviewMood.COMPLAINT);
+        // A 2★ that opens with praise is still a complaint: the rating is real.
+        assertThat(ReviewDraftComposer.moodOf(2, "제품은 만족해요 다만 철 아닌 면에는 안 붙는 점이 아쉬워요"))
+                .isEqualTo(AgentDraftGenerator.ReviewMood.COMPLAINT);
+        // The 3★ split is the triage rule's: a reservation in the words is 지켜보기 there and mixed here.
+        assertThat(ReviewDraftComposer.moodOf(3, "재구매 좋은데 접착력이 .. 따로 접착제 사용"))
+                .isEqualTo(AgentDraftGenerator.ReviewMood.MIXED);
+        assertThat(ReviewDraftComposer.moodOf(3, "디자인이 이뻐서 좋아요.")).isEqualTo(AgentDraftGenerator.ReviewMood.UNSTATED);
+        assertThat(ReviewDraftComposer.moodOf(5, "너무 많이 컵이 빠져요 ㅎㅎ")).isEqualTo(AgentDraftGenerator.ReviewMood.UNSTATED);
+        assertThat(ReviewDraftComposer.moodOf(null, "괜찮아요")).isEqualTo(AgentDraftGenerator.ReviewMood.UNSTATED);
+
+        retrieval(DraftKnowledgeState.NO_LIBRARY);
+        Review oneStar = review();
+        oneStar.setRating(1);
+        composer.compose(ORG, oneStar, BODY, "SELLER:u1");
+        verify(model).draftReviewReply(eq(ORG), eq(BODY), eq(List.of()), eq(TEMPLATE), eq(List.of()),
+                eq(AgentDraftGenerator.ReviewMood.COMPLAINT));
     }
 }

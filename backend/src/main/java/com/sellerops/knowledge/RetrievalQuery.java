@@ -55,7 +55,7 @@ public final class RetrievalQuery {
     public static final int MAX_CANDIDATES = 4;
 
     /** Where a candidate came from — reported with the outcome so a hit can say which form found it. */
-    public enum Origin { TOPIC, TITLE, SUBJECT, FULL }
+    public enum Origin { TOPIC, TITLE, CLAUSE, SUBJECT, FULL }
 
     /** One form of the question. */
     public record Candidate(String text, Origin origin) {
@@ -140,6 +140,36 @@ public final class RetrievalQuery {
      */
     public static RetrievalQuery ofCustomer(String title, String body) {
         return new RetrievalQuery(of(null, title, body).candidates(), true);
+    }
+
+    /**
+     * The candidates for a REVIEW: the clauses that say what went wrong first, then the review as {@link #ofCustomer}
+     * asks it (2026-10-27).
+     *
+     * <p>A review states; it does not ask, and what it complains about is seldom at the front. Asked whole, 「만족합니다.
+     * 사무실에 쓰려고 샀는데 벽지에는 부착력이 약해 쉽게 떨어지는 단점이 있어요」 carries a dozen words no note
+     * about adhesion contains, so the absence gate sinks under them — measured on the owner's store, a registered
+     * adhesion note was found for 3 of 79 reviews that complained about adhesion. The clause 「벽지에는 부착력이 약해
+     * 쉽게 떨어지는 단점이 있어요」 is that complaint in the customer's own words. The caller picks the clauses (the review
+     * lane knows which words mark a reservation; this class does not); every one goes through the same gates, and
+     * there are still never more than {@link #MAX_CANDIDATES}.
+     */
+    public static RetrievalQuery ofReview(List<String> complaintClauses, String body) {
+        List<Candidate> out = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (String clause : complaintClauses == null ? List.<String>of() : complaintClauses) {
+            if (out.size() >= MAX_CANDIDATES - 2) {
+                break;
+            }
+            add(out, seen, bound(clean(clause), 120), Origin.CLAUSE);
+        }
+        for (Candidate c : of(null, null, body).candidates()) {
+            if (out.size() >= MAX_CANDIDATES) {
+                break;
+            }
+            add(out, seen, c.text(), c.origin());
+        }
+        return new RetrievalQuery(out, true);
     }
 
     /** The candidates for free text — a planner's need sentence, a screen's search box. */

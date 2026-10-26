@@ -1704,7 +1704,7 @@ export interface KnowledgeCandidateView {
   productName: string | null;
   subject: string;
   content: string;
-  origin: "REPEATED_ANSWER" | "DRAFT_GAP" | string;
+  origin: "REPEATED_ANSWER" | "DRAFT_GAP" | "ISSUE_GUIDANCE" | string;
   evidenceCount: number;
   state: string;
   sourceId: string | null;

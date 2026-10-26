@@ -169,15 +169,22 @@ public class AgentDraftService {
     public Optional<String> draftReviewReply(UUID orgId, String reviewBody,
                                              List<AgentDraftGenerator.Passage> knowledge, String style,
                                              List<String> banned) {
+        return draftReviewReply(orgId, reviewBody, knowledge, style, banned, AgentDraftGenerator.ReviewMood.UNSTATED);
+    }
+
+    /** The same, with what the customer felt said as a word (2026-10-27) — see {@link AgentDraftGenerator.ReviewMood}. */
+    public Optional<String> draftReviewReply(UUID orgId, String reviewBody,
+                                             List<AgentDraftGenerator.Passage> knowledge, String style,
+                                             List<String> banned, AgentDraftGenerator.ReviewMood mood) {
         if (!access.allows(properties, orgId)) {
             return Optional.empty();
         }
         AgentDraftGenerator.Result result = generator().generateReview(
-                new AgentDraftGenerator.ReviewInput(reviewBody, knowledge, style, banned));
+                new AgentDraftGenerator.ReviewInput(reviewBody, knowledge, style, banned, mood));
         Optional<String> written = result.draft().map(AgentDraftResponseParser.ParsedDraft::comments);
-        log.info("agent_review_draft orgId={} drafted={} grounded={} styled={} reason={} {}",
+        log.info("agent_review_draft orgId={} drafted={} grounded={} styled={} mood={} reason={} {}",
                 orgId, written.isPresent(), knowledge == null ? 0 : knowledge.size(),
-                style != null && !style.isBlank(), result.reason(), result.metrics().toLogFields());
+                style != null && !style.isBlank(), mood, result.reason(), result.metrics().toLogFields());
         return written;
     }
 

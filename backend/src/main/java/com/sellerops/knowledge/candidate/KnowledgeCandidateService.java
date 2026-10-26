@@ -36,7 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <b>확인 필요 — what reviewnary noticed, waiting for a person.</b>
  * (Knowledge Sources &amp; Acquisition v1)
  *
- * <p>Two producers, one inbox.
+ * <p>Three producers, one inbox.
  *
  * <ol>
  *   <li><b>Repeated answers.</b> A sentence the seller has written to customers many times is
@@ -46,6 +46,8 @@ import org.springframework.transaction.annotation.Transactional;
  *       paraphrase of a policy is a different policy.</li>
  *   <li><b>Drafting gaps.</b> When a grounded draft could not answer something, the ask can be filed
  *       here instead of nagging on every screen ({@link #noteGap}).</li>
+ *   <li><b>Repeated review problems</b> (2026-10-27). A proposed answer to a problem many reviews of one product
+ *       report, with blanks where only the seller knows the fact ({@link #suggestGuidance}).</li>
  * </ol>
  *
  * <p><b>Nothing here promotes anything.</b> {@link #accept} is the only path from a candidate to
@@ -76,6 +78,18 @@ public class KnowledgeCandidateService {
     public static final String ORIGIN_DRAFT_GAP = "DRAFT_GAP";
     /** The seller answered a case's knowledge gap on the case screen ([정보 알려주기]). */
     public static final String ORIGIN_CASE_TEACH = "CASE_TEACH";
+    /**
+     * A proposed answer to a problem many reviews repeat (owner, 2026-10-27): what the customers themselves reported
+     * and did about it, written up as a sentence the seller can confirm, correct or decline. Never knowledge until
+     * the seller accepts it — and a fact only the seller knows is left as a {@link #BLANK_OPEN} blank.
+     */
+    public static final String ORIGIN_ISSUE_GUIDANCE = "ISSUE_GUIDANCE";
+    /**
+     * The opening of a blank in a proposed answer: 「【확인: 한 세트에 들어가는 마감캡 수량】」. An accept whose text still
+     * holds one is refused, so a proposal accepted without reading cannot file its own question as the company's word
+     * — the failure {@link #accept} already closes for drafting gaps.
+     */
+    public static final String BLANK_OPEN = "【확인:";
 
     private final KnowledgeCandidateRepository candidates;
     private final AnswerMemoryRepository memories;
@@ -205,6 +219,49 @@ public class KnowledgeCandidateService {
         });
     }
 
+    /**
+     * File a proposed answer to a repeated review problem (owner, 2026-10-27).
+     *
+     * <p>Keyed by the SUBJECT, not the sentence: a proposal is rewritten as its wording improves, and a rewrite of an
+     * open one replaces its text and count rather than filing a second row beside it. One the seller has accepted is
+     * left alone — their edited version is the knowledge now — and one they declined may be proposed again, as any
+     * candidate may.
+     *
+     * @return the open candidate, or <b>null</b> when the seller has already accepted this subject
+     */
+    @Transactional
+    public KnowledgeCandidate suggestGuidance(UUID orgId, UUID productId, String subject, String content,
+                                              int evidenceCount) {
+        if (subject == null || subject.isBlank() || content == null || content.isBlank()) {
+            throw ApiException.badRequest("제안할 주제와 안내 문장을 적어 주세요.");
+        }
+        if (productId != null && products.findById(productId).filter(p -> p.getOrgId().equals(orgId)).isEmpty()) {
+            throw ApiException.notFound("상품을 찾을 수 없습니다.");
+        }
+        String scope = productId == null ? "ORG" : "PRODUCT";
+        String key = dedupeKey(scope, productId, ORIGIN_ISSUE_GUIDANCE + "|" + subject.strip());
+        if (candidates.existsByOrgIdAndDedupeKeyAndState(orgId, key, STATE_ACCEPTED)) {
+            return null;
+        }
+        KnowledgeCandidate row = candidates.findByOrgIdAndDedupeKeyAndState(orgId, key, STATE_OPEN).orElseGet(() -> {
+            KnowledgeCandidate fresh = new KnowledgeCandidate();
+            fresh.setOrgId(orgId);
+            fresh.setScope(scope);
+            fresh.setProductId(productId);
+            fresh.setOrigin(ORIGIN_ISSUE_GUIDANCE);
+            fresh.setDedupeKey(key);
+            return fresh;
+        });
+        row.setSubject(bounded(subject, 300));
+        row.setContent(content.strip());
+        row.setEvidenceCount(Math.max(0, evidenceCount));
+        try {
+            return candidates.save(row);
+        } catch (DataIntegrityViolationException race) {
+            return candidates.findByOrgIdAndDedupeKeyAndState(orgId, key, STATE_OPEN).orElseThrow(() -> race);
+        }
+    }
+
     /* ─────────────────────────────── the seller's decision ─────────────────────────────── */
 
     @Transactional(readOnly = true)
@@ -265,6 +322,9 @@ public class KnowledgeCandidateService {
             throw ApiException.badRequest("고객에게 안내할 내용을 적어 주세요.");
         }
         String body = written ? content.strip() : row.getContent();
+        if (body.contains(BLANK_OPEN)) {
+            throw ApiException.badRequest("【확인: …】 부분을 실제 내용으로 바꾼 뒤 등록해 주세요.");
+        }
         String heading = title == null || title.isBlank() ? row.getSubject() : title.strip();
         UUID sourceId;
         if ("PRODUCT".equals(row.getScope()) && row.getProductId() != null) {

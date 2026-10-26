@@ -184,16 +184,40 @@ public class AgentDraftGenerator {
      * inquiries (an order line, a 규격 line, a company summary) would silently start leaving on review
      * requests too. Two records, two builders, two floor tests.
      */
-    public record ReviewInput(String reviewBody, List<Passage> knowledge, String style, List<String> banned) {
+    public record ReviewInput(String reviewBody, List<Passage> knowledge, String style, List<String> banned,
+                              ReviewMood mood) {
 
         public ReviewInput {
             knowledge = knowledge == null ? List.of() : List.copyOf(knowledge);
             banned = banned == null ? List.of() : List.copyOf(banned);
+            mood = mood == null ? ReviewMood.UNSTATED : mood;
+        }
+
+        public ReviewInput(String reviewBody, List<Passage> knowledge, String style, List<String> banned) {
+            this(reviewBody, knowledge, style, banned, ReviewMood.UNSTATED);
         }
 
         public ReviewInput(String reviewBody, List<Passage> knowledge, String style) {
             this(reviewBody, knowledge, style, List.of());
         }
+    }
+
+    /**
+     * <b>What the customer felt, said as a word, never as a number</b> (owner, 2026-10-27).
+     *
+     * <p>Left to read the mood from the text alone, the model closed four of six 1–2★ replies on the owner's judging
+     * sheet with 「좋은 하루 보내세요」 — to 「붙여 놓고 하루 만에 다 떨어졌어요」 — and answered 「버튼을 누르면 컵이 두 개씩 나와요」 with
+     * 「이용 중 불편」. The rating still never leaves (it would invite 「별점 4점 주셔서 감사합니다」): the composer turns it
+     * into one of these words, with the 3★ split the triage rule already makes, and {@link #UNSTATED} adds nothing to
+     * the request.
+     */
+    public enum ReviewMood {
+        /** Nothing said: praise, or a review the rule cannot place. The request is byte-for-byte what it was. */
+        UNSTATED,
+        /** 1–2★: the customer is unhappy, whatever words they chose. */
+        COMPLAINT,
+        /** 3★ with a reservation in its words: something pleased and something did not. */
+        MIXED
     }
 
     /**
@@ -221,7 +245,8 @@ public class AgentDraftGenerator {
         ObjectNode user = messages.addObject();
         user.put("role", "user");
         user.put("content",
-                AgentDraftPrompt.reviewUser(input.knowledge(), input.reviewBody(), input.style(), input.banned()));
+                AgentDraftPrompt.reviewUser(input.knowledge(), input.reviewBody(), input.style(), input.banned(),
+                        input.mood()));
         if (vendor == Vendor.ANTHROPIC) {
             root.put("max_tokens", maxOutputTokens);
             root.put("system", AgentDraftPrompt.reviewSystem());

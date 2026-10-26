@@ -189,6 +189,24 @@ public class KnowledgeAcquisitionController {
         return candidates.open(principal.orgId());
     }
 
+    /**
+     * File proposed answers to repeated review problems — they wait in 확인 필요 like every candidate (2026-10-27).
+     * Re-sending a subject rewrites its open proposal; an accepted one is skipped.
+     */
+    @PostMapping("/candidates/guidance")
+    public List<KnowledgeCandidateView> suggestGuidance(@AuthenticationPrincipal AuthPrincipal principal,
+                                                        @RequestBody List<GuidanceSuggestion> suggestions) {
+        for (GuidanceSuggestion suggestion : suggestions == null ? List.<GuidanceSuggestion>of() : suggestions) {
+            candidates.suggestGuidance(principal.orgId(), suggestion.productId(), suggestion.subject(),
+                    suggestion.content(), suggestion.evidenceCount() == null ? 0 : suggestion.evidenceCount());
+        }
+        return candidates.open(principal.orgId());
+    }
+
+    /** One proposal: the product it is about (null for the whole company), its subject, its sentence, how many reviews. */
+    public record GuidanceSuggestion(UUID productId, String subject, String content, Integer evidenceCount) {
+    }
+
     /** The seller says yes: an ordinary knowledge source is written and the candidate records which. */
     @PostMapping("/candidates/{candidateId}/accept")
     public KnowledgeCandidateView accept(@AuthenticationPrincipal AuthPrincipal principal,

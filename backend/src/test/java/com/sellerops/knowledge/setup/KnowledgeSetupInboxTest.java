@@ -330,4 +330,31 @@ class KnowledgeSetupInboxTest {
         // What reviewnary read WITHOUT being taught is a separate number, and not part of that sum.
         assertThat(view.products()).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("a proposed answer to a repeated review problem waits, is rewritten in place, and never files its blank")
+    void aGuidanceProposalWaitsAndItsBlankIsNeverFiled() {
+        UUID first = candidates.suggestGuidance(org, productId, "접착 — 실크벽지",
+                "실크벽지에서는 떨어질 수 있습니다.", 12).getId();
+        // A better wording of the same subject replaces the open proposal rather than filing a second.
+        UUID again = candidates.suggestGuidance(org, productId, "접착 — 실크벽지",
+                "실크벽지·고르지 않은 벽에서는 폼 양면테이프를 덧대 주세요. 【확인: 권장 테이프】", 37).getId();
+        assertThat(again).isEqualTo(first);
+        KnowledgeCandidateView open = candidates.open(org).stream().filter(c -> c.id().equals(first)).findFirst().orElseThrow();
+        assertThat(open.origin()).isEqualTo(KnowledgeCandidateService.ORIGIN_ISSUE_GUIDANCE);
+        assertThat(open.evidenceCount()).isEqualTo(37);
+        assertThat(productSources.findAll()).as("a proposal is not knowledge").isEmpty();
+
+        // Accepted unread, the blank would become the company's word. It cannot.
+        assertThatThrownBy(() -> candidates.accept(org, first, null, null, KnowledgeSourceType.USAGE, null, null,
+                null, "판매자")).isInstanceOf(ApiException.class).hasMessageContaining("【확인: …】");
+        assertThat(productSources.findAll()).isEmpty();
+
+        candidates.accept(org, first, "실크벽지 부착", "실크벽지·고르지 않은 벽에서는 폼 양면테이프를 덧대 주세요.",
+                KnowledgeSourceType.USAGE, null, null, null, "판매자");
+        assertThat(productSources.findAll()).singleElement()
+                .extracting(ProductKnowledgeSource::getBody).isEqualTo("실크벽지·고르지 않은 벽에서는 폼 양면테이프를 덧대 주세요.");
+        // Once the seller has answered it, the proposal is not filed again — their version is the knowledge now.
+        assertThat(candidates.suggestGuidance(org, productId, "접착 — 실크벽지", "다른 문장", 40)).isNull();
+    }
 }

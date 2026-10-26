@@ -48,7 +48,9 @@ class RetrievalIntentScopeTest {
         List<String> callers = new ArrayList<>();
         try (Stream<Path> walk = Files.walk(MAIN)) {
             for (Path source : walk.filter(p -> p.toString().endsWith(".java")).toList()) {
-                if (Files.readString(source).contains("RetrievalQuery.ofCustomer(")) {
+                // ofReview is the review's customer-written form (2026-10-27): its complaint clauses, then ofCustomer's.
+                String text = Files.readString(source);
+                if (text.contains("RetrievalQuery.ofCustomer(") || text.contains("RetrievalQuery.ofReview(")) {
                     callers.add(source.getFileName().toString());
                 }
             }

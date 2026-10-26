@@ -351,6 +351,27 @@ describe("지식", () => {
     );
   });
 
+  it("a proposed answer to a repeated review problem says so, counts the reviews, and opens holding its sentence", async () => {
+    const GUIDANCE: KnowledgeCandidateView = {
+      ...GAP,
+      id: "c-3",
+      subject: "접착 — 실크벽지·고르지 않은 벽",
+      content: "실크벽지·고르지 않은 벽에 붙일 때\n폼 양면테이프나 실리콘을 덧대어 고정하시길 권해 드립니다.",
+      origin: "ISSUE_GUIDANCE",
+      evidenceCount: 37,
+    };
+    getKnowledgeCandidates.mockResolvedValue([GUIDANCE]);
+    draw();
+    const inbox = await screen.findByTestId("knowledge-inbox");
+    expect(screen.getByText("안내 제안")).toBeInTheDocument();
+    // Its count is of the customers who reported the problem, not of answers the seller wrote.
+    expect(inbox).toHaveTextContent("같은 문제 리뷰 37건");
+    expect(inbox).not.toHaveTextContent("과거 답변");
+    await userEvent.click(screen.getByRole("button", { name: "기준 등록" }));
+    expect((screen.getByLabelText("고객에게 안내할 내용") as HTMLTextAreaElement).value).toBe(GUIDANCE.content);
+    expect(acceptKnowledgeCandidate).not.toHaveBeenCalled();
+  });
+
   it("a drafting gap is a QUESTION — the editor opens empty and the question is never saved as an answer", async () => {
     getKnowledgeCandidates.mockResolvedValue([GAP]);
     draw();

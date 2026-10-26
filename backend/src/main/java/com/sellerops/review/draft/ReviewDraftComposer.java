@@ -217,6 +217,7 @@ public class ReviewDraftComposer {
                 new ReviewReplyContext(orgId, review.getId(), redactedBody, review.getRating()));
         ReviewReplyTemplateService.Resolved template = templates.resolve(orgId, key);
 
+        AgentDraftGenerator.ReviewMood mood = moodOf(review.getRating(), redactedBody);
         boolean grounded = retrieved.state() == DraftKnowledgeState.GROUNDED;
         // No current evidence, but a reply the seller stood behind for a review like this one: written from its
         // wording, promising nothing (the guard sees current evidence only).
@@ -231,7 +232,7 @@ public class ReviewDraftComposer {
         List<ScopedPassage> cited = List.of();
 
         if (grounded || pastAnswerOnly) {
-            Written written = writeGrounded(orgId, redactedBody, retrieved.passages(), template.body());
+            Written written = writeGrounded(orgId, redactedBody, retrieved.passages(), template.body(), mood);
             unavailable = written.unavailable();
             if (written.body() != null) {
                 body = written.body();
@@ -247,7 +248,7 @@ public class ReviewDraftComposer {
             // chosen by topic, not by what the customer felt. Nothing it could promise survives: the guard is shown
             // no current evidence, so every remedy is refused and the floor is saved instead, as when the model is
             // off or fails.
-            Written written = writeGrounded(orgId, redactedBody, List.of(), template.body());
+            Written written = writeGrounded(orgId, redactedBody, List.of(), template.body(), mood);
             unavailable = written.unavailable();
             if (written.body() != null) {
                 body = written.body();
@@ -281,18 +282,60 @@ public class ReviewDraftComposer {
      * The evidence a review reply is written from — one retrieval, asked by this unit of work only.
      *
      * <p>The review's own words are the question. There is no title and no structured topic: a review states, it
-     * does not ask, so the only form of "what is this about" that exists is what the customer wrote. The candidate
-     * ladder (TITLE/SUBJECT/FULL) narrows it the same way it narrows a forwarded mail thread. Past answers are
-     * narrowed to replies the seller stood behind for reviews in this review's rating band.
+     * does not ask, so the only form of "what is this about" that exists is what the customer wrote — its complaint
+     * clauses first ({@link ReviewComplaintClauses}), then the SUBJECT/FULL ladder that narrows a forwarded mail
+     * thread. Past answers are narrowed to replies the seller stood behind for reviews in this review's rating band.
+     *
+     * <p><b>Praise is not grounded in facts</b> (2026-10-27). A review with no complaint, no low rating and no question
+     * keeps only its past answers: on the owner's store a registered adhesion note was attached to 20 reviews that
+     * said 「아주 좋습니다 최고」 — the lexical scorer matched the polite ending 「습니다」 — and a thank-you does not
+     * need the seller's instructions in it.
      */
     private InquiryEvidenceRetriever.InquiryEvidence retrieve(UUID orgId, Review review, String redactedBody,
                                                                UUID productId) {
-        RetrievalQuery question = RetrievalQuery.ofCustomer(null, redactedBody);
-        return (precedent == null
+        // What went wrong first, then the review whole (2026-10-27): asked whole, a review's complaint drowned in its
+        // praise and a registered note was found for 3 of 79 reviews that complained about exactly it.
+        List<String> complaints = ReviewComplaintClauses.of(redactedBody);
+        RetrievalQuery question = RetrievalQuery.ofReview(complaints, redactedBody);
+        InquiryEvidenceRetriever.InquiryEvidence found = (precedent == null
                 ? spine.retrieveForProduct(orgId, productId, question, KnowledgeVariantScope.unresolved())
                 : spine.retrieveForProduct(orgId, productId, question, KnowledgeVariantScope.unresolved(),
                         precedent.forReviewRated(orgId, review.getRating())))
                 .lanes();
+        boolean praise = complaints.isEmpty()
+                && moodOf(review.getRating(), redactedBody) == AgentDraftGenerator.ReviewMood.UNSTATED
+                && !com.sellerops.knowledge.QuestionShape.asks(redactedBody);
+        return praise ? withoutFacts(found) : found;
+    }
+
+    /** The same retrieval with only its past answers — the wording a thank-you may reuse, and no fact. */
+    static InquiryEvidenceRetriever.InquiryEvidence withoutFacts(InquiryEvidenceRetriever.InquiryEvidence found) {
+        List<ScopedPassage> kept = found.passages().stream().filter(p -> !p.scope().current()).toList();
+        if (kept.size() == found.passages().size()) {
+            return found;
+        }
+        DraftKnowledgeState state = found.state() == DraftKnowledgeState.GROUNDED ? DraftKnowledgeState.NO_MATCH
+                : found.state();
+        return new InquiryEvidenceRetriever.InquiryEvidence(found.productId(), state, kept, found.order(),
+                found.supersededMemories(), quiet(found.productOutcome()), quiet(found.policyOutcome()),
+                found.policyTopicsDeclared());
+    }
+
+    private static com.sellerops.knowledge.RetrievalOutcome quiet(com.sellerops.knowledge.RetrievalOutcome outcome) {
+        return outcome == com.sellerops.knowledge.RetrievalOutcome.FOUND
+                ? com.sellerops.knowledge.RetrievalOutcome.NO_RELEVANT_EVIDENCE : outcome;
+    }
+
+    /**
+     * The passages a draft of this review would be written from, as citations — the draft's own retrieval and nothing
+     * after it: no model, no saved version, no gap filed (2026-10-27).
+     */
+    public List<DraftEvidenceView> groundsFor(UUID orgId, Review review, String redactedBody) {
+        UUID productId = retriever.namedProduct(orgId, review.getProductId());
+        return retrieve(orgId, review, redactedBody, productId).passages().stream()
+                .map(p -> new DraftEvidenceView(InquiryDraftEvidence.kindOf(p.scope()), p.scope().labelKo(),
+                        p.heading(), p.locator(), p.sourceId(), p.chunkId(), DraftEvidenceView.snippetOf(p.text())))
+                .toList();
     }
 
     /**
@@ -353,7 +396,7 @@ public class ReviewDraftComposer {
      * improved by asking again with the same evidence.
      */
     private Written writeGrounded(UUID orgId, String reviewBody, List<ScopedPassage> passages,
-                                  String voice) {
+                                  String voice, AgentDraftGenerator.ReviewMood mood) {
         if (!model.isEnabledFor(orgId)) {
             return new Written(null, CAPABILITY_OFF);
         }
@@ -364,9 +407,8 @@ public class ReviewDraftComposer {
         // The company's absolute bans go into the request as quoted data (owner decision 2026-10-23); the check after
         // generation still holds, since a request is only a request.
         List<String> banned = styleGuard == null ? List.of() : styleGuard.enforced(orgId);
-        Optional<String> written = banned.isEmpty()
-                ? model.draftReviewReply(orgId, reviewBody, passagesFor(passages), voice)
-                : model.draftReviewReply(orgId, reviewBody, passagesFor(passages), voice, banned);
+        Optional<String> written = model.draftReviewReply(orgId, reviewBody, passagesFor(passages), voice, banned,
+                mood);
         if (written.isEmpty()) {
             return new Written(null, MODEL_FAILED);
         }
@@ -386,7 +428,7 @@ public class ReviewDraftComposer {
         List<String> found = styleGuard == null ? List.of() : styleGuard.forbiddenIn(candidate, orgId);
         if (!found.isEmpty() && quota.consume(orgId, AgentUsageKind.DRAFT, null).allowed()) {
             Optional<String> again = model.draftReviewReply(orgId, reviewBody, passagesFor(passages), voice,
-                    styleGuard.enforced(orgId));
+                    styleGuard.enforced(orgId), mood);
             if (again.isPresent() && ReviewClaimGuard.unsupportedClaims(again.get(), current).isEmpty()
                     && ReviewClaimGuard.unsupportedConditions(again.get(), current, reviewBody).isEmpty()) {
                 candidate = again.get();
@@ -397,6 +439,24 @@ public class ReviewDraftComposer {
             return new Written(candidate, forbiddenLeft(found));
         }
         return new Written(candidate, null);
+    }
+
+    /**
+     * What the customer felt, as the request says it (2026-10-27): 1–2★ is a complaint whatever its words, and a 3★
+     * is mixed exactly when the triage rule keeps it in 지켜보기 — a reservation in its words. Praise and a missing
+     * rating say nothing, so the model reads the text as before.
+     */
+    static AgentDraftGenerator.ReviewMood moodOf(Integer rating, String body) {
+        if (rating == null) {
+            return AgentDraftGenerator.ReviewMood.UNSTATED;
+        }
+        if (rating <= 2) {
+            return AgentDraftGenerator.ReviewMood.COMPLAINT;
+        }
+        if (rating == 3 && !com.sellerops.review.triage.ReviewTriageRules.reservationFree(body)) {
+            return AgentDraftGenerator.ReviewMood.MIXED;
+        }
+        return AgentDraftGenerator.ReviewMood.UNSTATED;
     }
 
     /** The passages as the model sees them: scope label, heading, text. No ids, no scores. */

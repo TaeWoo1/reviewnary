@@ -23,7 +23,7 @@ package com.sellerops.agent.llm;
 public final class AgentDraftPrompt {
 
     /** Bump on every wording change. It is stamped into the provenance the run records. */
-    public static final String PROMPT_VERSION = "agent-draft-prompt/v12";
+    public static final String PROMPT_VERSION = "agent-draft-prompt/v13";
 
     /**
      * The closed set of reply categories, in the rule drafter's own order.
@@ -315,13 +315,21 @@ public final class AgentDraftPrompt {
                [과거 답변]은 표현을 맞추는 데만 쓰고 사실의 출처로 쓰지 마세요.
                - 답글의 결은 고객 후기의 문장이 정합니다. 칭찬하는 후기에는 감사로 답하고, 사과하거나 \
                개선을 다짐하지 마세요. 불만이 담긴 후기에만 공감과 사과를 쓰세요.
+               - 「후기의 결」이 주어지면 그 결에 맞춰 쓰세요. 후기의 문장보다 그 줄이 우선합니다.
+               - 칭찬에는 고객이 좋다고 한 점을 하나 짚어 감사하세요. 「소중한 후기 감사합니다」만으로 끝내지 마세요.
+               - 불만에는 고객이 말한 문제를 고객이 쓴 말로 한 번 짚고 사과하세요. 「이용 중 불편」처럼 \
+               뭉뚱그리지 마세요. 원인을 짐작하거나 고객의 사용법을 탓하지 마세요.
+               - 불만에 맞는 안내가 [상품 정보]나 [운영 정책]에 있으면, 사과 다음에 그 안내를 근거에 적힌 \
+               그대로 한두 문장으로 전하세요. 근거에 없는 조건(기간·금액·대상)은 덧붙이지 마세요.
+               - 불만이 담긴 후기는 차분하게 마무리하세요. 「좋은 하루 보내세요」「즐거운 쇼핑 되세요」 \
+               「행복한 하루 되세요」처럼 밝은 인사로 끝내지 마세요.
                - 「회사 기본 문구」가 주어지면 그 회사가 평소 쓰는 말투와 인사·마무리 표현을 참고하세요. \
                표현 참고일 뿐이며 사실의 근거가 아닙니다. 그 문구는 후기의 주제(가격·배송 등)로 골라졌을 \
                뿐 후기가 칭찬인지 불만인지는 모르고 골라졌습니다. 후기의 결과 맞는 문장만 옮겨 쓰고, \
                맞지 않는 문장은 쓰지 마세요. 위의 사실·근거 규칙과 충돌하면 언제나 위 규칙이 우선합니다.
                - 고객의 이름, 연락처, 주문번호를 쓰지 마세요.
                - 별점을 언급하지 마세요.
-               - 2~4문장으로 씁니다. 존댓말로 쓰고 인사와 마무리를 포함합니다.
+               - 2~5문장으로 씁니다. 존댓말로 쓰고 인사와 마무리를 포함합니다.
 
                반드시 아래 형태의 JSON 객체 하나만 출력하세요. 다른 텍스트, 설명, 코드펜스는 금지입니다.
                {"comments":"<답글 본문>"}
@@ -342,7 +350,8 @@ public final class AgentDraftPrompt {
      * option. No company description — a public reply is not the place to introduce the company, and
      * every sentence it could add is one the evidence did not support. No rating: it decides which
      * template is the floor, and telling the model would invite 「별점 4점 주셔서 감사합니다」, which is
-     * both a fact about the customer's private choice and a sentence no seller asked for. No product
+     * both a fact about the customer's private choice and a sentence no seller asked for — what the
+     * customer felt goes out as a word instead ({@link AgentDraftGenerator.ReviewMood}, 2026-10-27). No product
      * name, no ids, no channel, no dates.
      */
     public static String reviewUser(java.util.List<AgentDraftGenerator.Passage> knowledge,
@@ -352,8 +361,25 @@ public final class AgentDraftPrompt {
 
     public static String reviewUser(java.util.List<AgentDraftGenerator.Passage> knowledge,
                                     String reviewBody, String voice, java.util.List<String> banned) {
+        return reviewUser(knowledge, reviewBody, voice, banned, AgentDraftGenerator.ReviewMood.UNSTATED);
+    }
+
+    /** The mood line, as words (2026-10-27): the rating itself still never leaves. */
+    static final String MOOD_COMPLAINT = "후기의 결: 불만이 담긴 후기입니다. 칭찬처럼 답하지 말고, 고객이 말한 문제를 짚어 "
+            + "사과하고 차분하게 마무리하세요.";
+    static final String MOOD_MIXED = "후기의 결: 만족과 아쉬움이 함께 담긴 후기입니다. 좋았던 점에 감사하고, 아쉬운 점을 "
+            + "짚어 사과하고 차분하게 마무리하세요.";
+
+    public static String reviewUser(java.util.List<AgentDraftGenerator.Passage> knowledge,
+                                    String reviewBody, String voice, java.util.List<String> banned,
+                                    AgentDraftGenerator.ReviewMood mood) {
         StringBuilder sb = new StringBuilder();
         sb.append("고객 후기:\n").append(reviewBody == null ? "" : reviewBody);
+        if (mood == AgentDraftGenerator.ReviewMood.COMPLAINT) {
+            sb.append("\n\n").append(MOOD_COMPLAINT);
+        } else if (mood == AgentDraftGenerator.ReviewMood.MIXED) {
+            sb.append("\n\n").append(MOOD_MIXED);
+        }
         sb.append("\n\n판매자가 등록한 근거:\n");
         if (knowledge == null || knowledge.isEmpty()) {
             // Said out loud, for the reason the inquiry lane says it: an absent section reads as

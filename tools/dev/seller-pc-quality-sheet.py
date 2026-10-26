@@ -14,6 +14,7 @@ way the review screen does, asks the draft model for a reply to the unanswered o
 맞다 / 고칠 것 / 틀림. Prints counts only: the review text and the drafts are in the sheet and nowhere else.
 """
 import json
+import os
 import random
 import re
 import subprocess
@@ -157,6 +158,9 @@ def main():
             answered += 1
             note = "이미 답한 리뷰 — 오른쪽은 실제로 단 답변"
             draft = seller_reply
+        elif review["id"] not in saved and os.environ.get("SHEET_NO_MODEL") == "1":
+            # No model call on this build (owner, 2026-10-27, until the API subscription is chosen).
+            note = "모델 호출 안 함 — 초안 없음"
         elif review["id"] in saved:
             draft, saved_basis = saved[review["id"]]
             basis = BASIS.get(saved_basis, saved_basis)
@@ -183,6 +187,14 @@ def main():
             except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
                 failed += 1
                 note = f"초안을 만들지 못함 ({getattr(e, 'code', type(e).__name__)})"
+        # What the store's own knowledge would ground a draft of this review in — the draft's retrieval and nothing
+        # after it, so it costs no model call and shows what registering an answer changes (2026-10-27).
+        try:
+            found = call("GET", f"/api/seller-accounts/{account}/attention/items/review:{review['id']}"
+                         "/reply/draft/grounds", token=token)
+            grounds = " · ".join(f"[{g.get('scopeLabel') or ''}] {g.get('title') or ''}".strip() for g in found)
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError):
+            grounds = "확인하지 못함"
         mark = row.get("safety")
         sheet.append({
             "n": n, "id": review["id"], "link": f"{SCREEN}/reviews/reply/{review['id']}", "rating": review.get("rating"),
@@ -191,7 +203,7 @@ def main():
             "reason": review["triage"].get("reason") or "", "tags": ", ".join(review["triage"].get("tags") or []),
             "safety": f"{SAFETY_KIND.get(mark['kind'], mark['kind'])} {SAFETY_READING.get(mark['reading'], '')}"
                       + (f" ({mark['term']})" if mark.get("term") else "") if mark else "",
-            "draft": draft, "basis": basis, "note": note,
+            "draft": draft, "basis": basis, "note": note, "grounds": grounds,
         })
         say(f"  {n}/{len(picked)}")
 
@@ -214,16 +226,18 @@ def write(rows):
     ws.title = "판정"
     head = ["번호", "화면에서 보기", "별점", "상품", "리뷰", "시스템 묶음", "묶은 이유", "태그", "안전 표시",
             "Claude 1차 — 분류", "Claude 이유 — 분류", "분류 판정", "분류 — 고칠 점",
-            "AI 초안", "초안 근거", "Claude 1차 — 초안", "Claude 이유 — 초안", "초안 판정", "초안 — 고칠 점", "참고"]
+            "AI 초안", "초안 근거", "Claude 1차 — 초안", "Claude 이유 — 초안", "초안 판정", "초안 — 고칠 점", "참고",
+            "찾은 우리 정보"]
     ws.append(head)
     for r in rows:
         g, d = grouping.get(r["id"], {}), drafting.get(r["id"], {})
         ws.append([r["n"], "열기", r["rating"], r["product"], r["body"], r["tier"], r["reason"], r["tags"], r["safety"],
                    g.get("verdict", ""), g.get("why", ""), "", "",
-                   r["draft"], r["basis"], d.get("verdict", ""), d.get("why", ""), "", "", r["note"]])
+                   r["draft"], r["basis"], d.get("verdict", ""), d.get("why", ""), "", "", r["note"],
+                   r["grounds"]])
         ws.cell(row=ws.max_row, column=2).hyperlink = r["link"]
         ws.cell(row=ws.max_row, column=2).font = Font(color="1F4FBF", underline="single")
-    widths = [6, 9, 6, 18, 60, 11, 24, 14, 14, 11, 36, 11, 28, 60, 14, 11, 36, 11, 28, 18]
+    widths = [6, 9, 6, 18, 60, 11, 24, 14, 14, 11, 36, 11, 28, 60, 14, 11, 36, 11, 28, 18, 30]
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
     for cell in ws[1]:
@@ -260,6 +274,8 @@ def write(rows):
         "이미 답한 리뷰는 「AI 초안」 칸에 실제로 다신 답변이 있습니다 — 초안 판정은 비워 두셔도 됩니다.",
         "「초안 근거」가 「AI 초안 아님」인 줄은 모델 서비스가 그때 요청을 받지 않아 저장된 문구가 들어간 것입니다 —"
         " 초안 판정은 비워 두세요. 다시 돌리면 그 줄만 AI 초안으로 채워집니다(나머지는 그대로).",
+        "「찾은 우리 정보」는 초안을 쓰지 않고 이 리뷰에 붙을 상품 정보·운영 기준·지난 답변을 찾아 본 결과입니다 —"
+        " 비어 있으면 초안이 감사·공감만 씁니다.",
         "「화면에서 보기」는 판정용 복사본 PC 화면을 엽니다(평소 PC와 같은 계정). 원래 데모에는 아무것도 바뀌지 않습니다.",
         "",
         "이 파일에는 실제 리뷰 원문이 들어 있습니다. 이 PC 밖으로 보내지 마세요.",
