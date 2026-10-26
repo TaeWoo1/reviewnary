@@ -105,9 +105,10 @@ class ItemAnalysisServiceTest {
 
         ItemAnalysisView view = service.list(org).stream()
                 .filter(v -> v.sourceType().equals("REVIEW")).findFirst().orElseThrow();
-        assertThat(view.category()).isEqualTo("교환");
+        // 「불량이라 환불하고 싶어요」: since rules-v3 a plain defect is heard first (owner decision 2026-10-27).
+        assertThat(view.category()).isEqualTo("품질");
         assertThat(view.sentiment()).isEqualTo("NEGATIVE");
-        assertThat(view.summary()).isEqualTo("교환 관련 부정 리뷰");
+        assertThat(view.summary()).isEqualTo("품질 관련 부정 리뷰");
     }
 
     @Test

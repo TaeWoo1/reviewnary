@@ -68,6 +68,25 @@ class RuleBasedInboxItemAnalyzerTest {
         assertThat(analyzer.analyze(review("배송은 빠른데 테이프가 약해요", 3, false)).category()).isEqualTo("배송");
     }
 
+    /** rules-v3 (owner decision 2026-10-27): the judging sample's five rows whose topic was missing or wrong. */
+    @Test
+    void theFiveRowsOfTheJudgingSampleGetTheirTopic() {
+        assertThat(analyzer.analyze(review("상품페이지 설명에 혼선을 줍니다. 수정이 필요해 보여요", 1, true)).category())
+                .isEqualTo("제품정보");
+        assertThat(analyzer.analyze(review("박스포장이 구겨지고 찢어진 채로 왔어요", 2, true)).category()).isEqualTo("배송");
+        assertThat(analyzer.analyze(review("버튼을 누르면 컵이 두 개씩 나와요", 1, true)).category()).isEqualTo("품질");
+        assertThat(analyzer.analyze(review("버튼 누르면 종이컵 두 개씩 나와요", 1, true)).category()).isEqualTo("품질");
+        assertThat(analyzer.analyze(review("인쇄에 얼룩이 있어요. 확인 없이 보내신 것 같아 아쉬워요", 1, true)).category())
+                .as("a defect is heard before the delivery word beside it").isEqualTo("품질");
+    }
+
+    /** 「포장」 alone is praise as often as not, and must not take a review from the topic it is about. */
+    @Test
+    void aWordAboutPackagingDoesNotTakeTheReviewFromItsTopic() {
+        assertThat(analyzer.analyze(review("포장은 꼼꼼한데 테이프가 약해요", 3, false)).category()).isEqualTo("설치");
+        assertThat(analyzer.analyze(review("포장이 꼼꼼해요", 5, false)).category()).isEqualTo("기타");
+    }
+
     @Test
     void positiveReviewIsLowAndConfirmOnly() {
         Result r = analyzer.analyze(review("색상이 예쁘고 만족스러워요", 5, false));
