@@ -12,6 +12,12 @@ public interface ItemAnalysisRepository extends JpaRepository<ItemAnalysis, UUID
 
     boolean existsByOrgIdAndSourceTypeAndSourceId(UUID orgId, String sourceType, UUID sourceId);
 
+    /** Of {@code sourceIds}, the ones this org already has an analysis for — one query for a whole batch. */
+    @Query("select a.sourceId from ItemAnalysis a where a.orgId = :orgId and a.sourceType = :sourceType "
+            + "and a.sourceId in :sourceIds")
+    List<UUID> findAnalysedSourceIds(@Param("orgId") UUID orgId, @Param("sourceType") String sourceType,
+                                     @Param("sourceIds") Collection<UUID> sourceIds);
+
     /**
      * The org-wide current read (the 리포트's FAQ / 상세페이지 후보 counts and the analysis list).
      *

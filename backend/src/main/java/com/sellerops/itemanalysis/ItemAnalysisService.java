@@ -12,10 +12,12 @@ import com.sellerops.itemanalysis.dto.RunResult;
 import com.sellerops.review.Review;
 import com.sellerops.review.ReviewRepository;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,12 +96,16 @@ public class ItemAnalysisService {
         int analyzed = 0;
         int skipped = 0;
         if (ids != null && !ids.isEmpty()) {
+            // Which of them already have an analysis, asked once. Asking per row made every row a query, and every
+            // query flushed — dirty-checking each row loaded so far — so a 5,000-review relay page spent most of its
+            // time here, growing with the square of the batch (measured 2026-10-26, tools/dev/seller-pc-qa-perf.mjs).
+            Set<UUID> analysed = new HashSet<>(analyses.findAnalysedSourceIds(orgId, sourceType, ids));
             if (REVIEW.equals(sourceType)) {
                 for (Review r : reviews.findAllById(ids)) {
                     if (!orgId.equals(r.getOrgId())) {
                         continue;
                     }
-                    if (analyzeReview(orgId, r)) {
+                    if (analyzeReview(orgId, r, analysed)) {
                         analyzed++;
                     } else {
                         skipped++;
@@ -110,7 +116,7 @@ public class ItemAnalysisService {
                     if (!orgId.equals(q.getOrgId())) {
                         continue;
                     }
-                    if (analyzeInquiry(orgId, q)) {
+                    if (analyzeInquiry(orgId, q, analysed)) {
                         analyzed++;
                     } else {
                         skipped++;
@@ -356,6 +362,11 @@ public class ItemAnalysisService {
 
     /** @return true if a new analysis was written, false if skipped (already exists). */
     private boolean analyzeInquiry(UUID orgId, Inquiry q) {
+        return analyzeInquiry(orgId, q, null);
+    }
+
+    /** As {@link #analyzeReview(UUID, Review, Set)}, after the inquiry-only exclusions. */
+    private boolean analyzeInquiry(UUID orgId, Inquiry q, Set<UUID> analysed) {
         // Secret (비밀글) inquiries are worked only in the queue, never in general analysis.
         // A null flag (non-Cafe24 / legacy) is not secret and is analyzed as before.
         if (Boolean.TRUE.equals(q.getSecret())) {
@@ -366,7 +377,7 @@ public class ItemAnalysisService {
         if (!q.getOperationalState().isActive()) {
             return false;
         }
-        if (analyses.existsByOrgIdAndSourceTypeAndSourceId(orgId, INQUIRY, q.getId())) {
+        if (alreadyAnalysed(orgId, INQUIRY, q.getId(), analysed)) {
             return false;
         }
         SourceItem item = new SourceItem(INQUIRY, q.getId(), q.getBody(),
@@ -375,15 +386,31 @@ public class ItemAnalysisService {
         return true;
     }
 
-    /** @return true if a new analysis was written, false if skipped (already exists). */
     private boolean analyzeReview(UUID orgId, Review r) {
-        if (analyses.existsByOrgIdAndSourceTypeAndSourceId(orgId, REVIEW, r.getId())) {
+        return analyzeReview(orgId, r, null);
+    }
+
+    /**
+     * @param analysed the ids already analysed, when the caller asked for them up front (a written id is added to
+     *                 it); null asks the database for this one row
+     * @return true if a new analysis was written, false if skipped (already exists).
+     */
+    private boolean analyzeReview(UUID orgId, Review r, Set<UUID> analysed) {
+        if (alreadyAnalysed(orgId, REVIEW, r.getId(), analysed)) {
             return false;
         }
         SourceItem item = new SourceItem(REVIEW, r.getId(), r.getBody(),
                 r.getRating(), null, r.isNegative());
         persist(orgId, item, r.getContentHash());
         return true;
+    }
+
+    /** True when the row has an analysis; with {@code analysed} given, also records the row as about to have one. */
+    private boolean alreadyAnalysed(UUID orgId, String sourceType, UUID sourceId, Set<UUID> analysed) {
+        if (analysed == null) {
+            return analyses.existsByOrgIdAndSourceTypeAndSourceId(orgId, sourceType, sourceId);
+        }
+        return !analysed.add(sourceId);
     }
 
     @Transactional(readOnly = true)
