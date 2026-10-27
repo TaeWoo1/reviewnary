@@ -38,3 +38,25 @@ Reference, not runtime. The registries these skills describe target **Tailwind v
 design contract in `docs/frontend/reviewnary_design.md` and the visual system in
 `docs/frontend/reviewnary_visual_system_v1.md` remain the authority for what may enter `frontend/`; a colour,
 typeface, or component library that is not in them is not authorised by a skill suggesting it.
+
+## Second set — copied by hand (2026-10-27)
+
+Product-owner decision 2026-10-27: UI design and layout go through design skills, not by hand, and the
+skills may also re-set the design rules. So the closing paragraph above no longer freezes the contract:
+the contract will be **revised** through that work, and a change still lands in
+`docs/frontend/reviewnary_design.md` before it lands in `frontend/`.
+
+These five are copied, not installed with `npx skills add`. One of them is edited (below), and a lockfile
+hash would pin the unedited upstream. They live in `.claude/skills/<name>/` and are ignored. To restore
+them, clone each source and copy the folder:
+
+| skill | source (commit) | folder copied | edit |
+|---|---|---|---|
+| `hallmark` | `Nutlope/hallmark` (`7ec8682`) | `skills/hallmark` | none. `scripts/imagegen.mjs` calls Together AI and needs a key, so it is not used. `install-hook.mjs` is not run |
+| `design-review` | `Superfuture/design-review` (`d4d2609`) | `design-review/skills/design-review` | **§0 usage ping and §5 Pro mode removed**: the first posts an install id to an outside metrics endpoint, the second uploads the reviewed code to an outside server |
+| `accessibility` | `addyosmani/web-quality-skills` (`afa8da9`) | `skills/accessibility` | none |
+| `apple-design` | `emilkowalski/skills` (`2d22863`) | `skills/apple-design/SKILL.md` | none |
+| `beautiful-shadows` | `MengTo/Skills` (`a45892d`) | `agent-skills/web-design/beautiful-shadows/SKILL.md` | none (demo folder left out) |
+
+Source of the list: Hallmark plus a Threads post of design skills that the owner pointed to. The post's
+fifth entry, `frontend-design`, is the Anthropic plugin above.

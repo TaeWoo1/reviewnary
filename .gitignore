@@ -113,6 +113,13 @@ eval_data/.DS_Store
 # whoever is working on the UI, and nothing this product builds, ships, or runs reads them
 # (`docs/pilot/design_skills_bootstrap.md`).
 .agents/skills/
+# Design skills copied by hand (2026-10-27) — Hallmark, design-review (usage ping and the Pro upload removed),
+# accessibility, apple-design, beautiful-shadows. Same reason as above: design-time tooling, not this repo's source.
+.claude/skills/hallmark/
+.claude/skills/design-review/
+.claude/skills/accessibility/
+.claude/skills/apple-design/
+.claude/skills/beautiful-shadows/
 
 # OS
 .DS_Store
