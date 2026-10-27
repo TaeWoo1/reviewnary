@@ -170,6 +170,50 @@ public class KnowledgeAcquisitionController {
         return at > 0 ? email.substring(0, at) : email;
     }
 
+    /* ─────────────────────────────── 엑셀로 관리 ─────────────────────────────── */
+
+    /** 말투 · 답변 템플릿 · 안내 매뉴얼 as one workbook (2026-10-27); absent in a slice test that does not need it. */
+    private com.sellerops.knowledge.workbook.KnowledgeWorkbookService workbook;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setWorkbook(com.sellerops.knowledge.workbook.KnowledgeWorkbookService workbook) {
+        this.workbook = workbook;
+    }
+
+    /** The workbook as this company stands now — what the seller downloads to edit. */
+    @GetMapping("/workbook")
+    public org.springframework.http.ResponseEntity<byte[]> downloadWorkbook(
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        byte[] file = workbook.export(principal.orgId());
+        String name = java.net.URLEncoder.encode("답글 기준.xlsx", java.nio.charset.StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"workbook.xlsx\"; filename*=UTF-8''" + name)
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(file);
+    }
+
+    /**
+     * Read an edited workbook. {@code apply=false} (the default) says what would change and changes nothing; the same
+     * file with {@code apply=true} applies it row by row through the ordinary write paths.
+     */
+    @PostMapping(path = "/workbook", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public com.sellerops.knowledge.workbook.KnowledgeWorkbookService.Result uploadWorkbook(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @RequestParam(defaultValue = "false") boolean apply,
+            @RequestParam("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw ApiException.badRequest("파일이 비어 있습니다.");
+        }
+        try (java.io.InputStream in = file.getInputStream()) {
+            return workbook.read(principal.orgId(), in, apply, principal.userId(), actorName(principal));
+        } catch (IOException e) {
+            throw ApiException.badRequest("파일을 읽지 못했습니다.");
+        }
+    }
+
     /* ─────────────────────────────── 확인 필요 ─────────────────────────────── */
 
     @GetMapping("/candidates")
@@ -198,13 +242,18 @@ public class KnowledgeAcquisitionController {
                                                         @RequestBody List<GuidanceSuggestion> suggestions) {
         for (GuidanceSuggestion suggestion : suggestions == null ? List.<GuidanceSuggestion>of() : suggestions) {
             candidates.suggestGuidance(principal.orgId(), suggestion.productId(), suggestion.subject(),
-                    suggestion.content(), suggestion.evidenceCount() == null ? 0 : suggestion.evidenceCount());
+                    suggestion.content(), suggestion.evidenceCount() == null ? 0 : suggestion.evidenceCount(),
+                    suggestion.customerPhrases());
         }
         return candidates.open(principal.orgId());
     }
 
-    /** One proposal: the product it is about (null for the whole company), its subject, its sentence, how many reviews. */
-    public record GuidanceSuggestion(UUID productId, String subject, String content, Integer evidenceCount) {
+    /**
+     * One proposal: the product it is about (null for the whole company), its subject, its sentence, how many reviews,
+     * and how customers say it.
+     */
+    public record GuidanceSuggestion(UUID productId, String subject, String content, Integer evidenceCount,
+                                     List<String> customerPhrases) {
     }
 
     /** The seller says yes: an ordinary knowledge source is written and the candidate records which. */
@@ -218,6 +267,7 @@ public class KnowledgeAcquisitionController {
                 request == null ? null : request.sourceType(),
                 request == null ? null : request.orgType(),
                 request == null ? null : request.variantId(),
+                request == null ? null : request.customerPhrases(),
                 principal.userId(), actorName(principal));
     }
 

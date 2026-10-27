@@ -49,4 +49,20 @@ class ReviewStyleGuardTest {
         assertThat(ReviewStyleGuard.forbiddenIn("아무 문장", (com.sellerops.knowledge.style.AnswerStyleProfile) null)).isEmpty();
         assertThat(ReviewStyleGuard.enforced(AnswerStyleProfile.defaults())).isEmpty();
     }
+
+    @Test
+    void theSellersMannerReachesAReviewWithoutTheBanListAndNothingWhenUnset() {
+        // Owner, 2026-10-27: 「판매자가 답변 템플릿과 말투를 지정할 수 있게」.
+        assertThat(ReviewStyleGuard.manner(AnswerStyleProfile.defaults())).isNull();
+        assertThat(ReviewStyleGuard.manner(banning("고객님 탓", "환불"))).as("a ban alone is not a manner").isNull();
+        AnswerStyleProfile set = new AnswerStyleProfile(com.sellerops.knowledge.style.AnswerTone.FRIENDLY, null, null,
+                "안녕하세요, 선바로입니다.", "감사합니다.", "고객님", List.of(), List.of("환불"), null, 3,
+                List.of(new com.sellerops.knowledge.style.AvoidPhrase("죄송하지만", "번거로우시겠지만")));
+        String manner = ReviewStyleGuard.manner(set);
+        assertThat(manner).contains(com.sellerops.knowledge.style.AnswerTone.FRIENDLY.instructionKo())
+                .contains("\"안녕하세요, 선바로입니다.\"").contains("\"감사합니다.\"").contains("\"고객님\"")
+                .contains("\"죄송하지만\"");
+        // The bans travel in their own, narrowed section — a bare 「환불」 must not come back through this one.
+        assertThat(manner).doesNotContain("환불");
+    }
 }

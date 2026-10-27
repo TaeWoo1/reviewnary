@@ -350,16 +350,27 @@ public class InquiryEvidenceRetriever {
                     : found.passages().isEmpty() ? DraftKnowledgeState.NO_MATCH
                     : DraftKnowledgeState.GROUNDED;
             for (KnowledgePassage passage : found.passages()) {
+                // A 【확인: …】 blank is the owner's open question, not the company's word (2026-10-27).
+                if (com.sellerops.knowledge.KnowledgeBlanks.carries(passage.content())) {
+                    continue;
+                }
                 productLane.add(new ScopedPassage(KnowledgeScope.PRODUCT, passage.title(),
                         passage.content(), passage.sourceId(), passage.chunkId(),
                         locator(passage), passage.score(), passage.authoredOrigin(),
                         passage.variantName()));
+            }
+            if (productLane.isEmpty() && productVerdict == DraftKnowledgeState.GROUNDED) {
+                productVerdict = DraftKnowledgeState.NO_MATCH;
+                productOutcome = RetrievalOutcome.NO_RELEVANT_EVIDENCE;
             }
         }
 
         OrgKnowledgeSearchResponse policies = orgKnowledge.search(orgId, question, MAX_PASSAGES);
         List<ScopedPassage> policyLane = new ArrayList<>();
         for (OrgKnowledgePassage passage : policies.passages()) {
+            if (com.sellerops.knowledge.KnowledgeBlanks.carries(passage.content())) {
+                continue;
+            }
             policyLane.add(new ScopedPassage(KnowledgeScope.ORG_OPERATIONS, passage.title(),
                     passage.content(), passage.sourceId(), passage.chunkId(), locator(passage),
                     passage.score()));
@@ -372,6 +383,9 @@ public class InquiryEvidenceRetriever {
                         memoryAdmits);
         List<ScopedPassage> memoryLane = new ArrayList<>();
         for (AnswerMemoryPassage passage : remembered.passages()) {
+            if (com.sellerops.knowledge.KnowledgeBlanks.carries(passage.answerBody())) {
+                continue;
+            }
             memoryLane.add(new ScopedPassage(KnowledgeScope.PAST_ANSWER, headingFor(passage),
                     passage.answerBody(), passage.memoryId(), null, locator(passage), passage.score()));
         }
@@ -461,13 +475,23 @@ public class InquiryEvidenceRetriever {
 
     /** {@code product-knowledge/USAGE:데모 운영자} — the same shape the agent runtime cites. */
     private static String locator(KnowledgePassage passage) {
-        return "product-knowledge/" + passage.sourceType().name() + ":" + author(passage.authorName());
+        return productLocator(passage.sourceType(), passage.authorName());
+    }
+
+    /** The product lane's locator for a document found some other way — the review phrase lane (2026-10-27). */
+    public static String productLocator(com.sellerops.product.library.KnowledgeSourceType type, String authorName) {
+        return "product-knowledge/" + type.name() + ":" + author(authorName);
+    }
+
+    /** The policy lane's locator for a rule found some other way — the review phrase lane (2026-10-27). */
+    public static String policyLocator(com.sellerops.knowledge.org.OrgKnowledgeType type, String authorName,
+                                       int version) {
+        return "org-policy/" + type.name() + ":" + author(authorName) + "#v" + version;
     }
 
     /** {@code org-policy/TAX_INVOICE:데모 운영자#v2} — the revision is part of a policy's identity. */
     private static String locator(OrgKnowledgePassage passage) {
-        return "org-policy/" + passage.knowledgeType().name() + ":" + author(passage.authorName())
-                + "#v" + passage.version();
+        return policyLocator(passage.knowledgeType(), passage.authorName(), passage.version());
     }
 
     /** {@code answer-memory/USER_APPROVED:NAVER} — strength first, because that is what it weighs. */

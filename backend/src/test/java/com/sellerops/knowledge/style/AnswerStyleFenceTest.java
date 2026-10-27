@@ -109,12 +109,12 @@ class AnswerStyleFenceTest {
     // ---------------------------------------------------------------- K
 
     @Test
-    @DisplayName("K — a review reply is not written in the inquiry answer style; only the two phrase lists cross")
+    @DisplayName("K — a review reply reaches the answer style through ReviewStyleGuard alone")
     void reviewRepliesAreUntouched() throws IOException {
         // Owner decision 2026-10-23 (FINDINGS B24): the company's forbidden phrases apply to reviews too — as a check,
-        // through ReviewStyleGuard alone. Every other review file stays away from the style, and the guard itself
-        // reads nothing of it but the forbidden list: no tone, length, emoji, greeting, closing, address, required
-        // phrase or rendered instruction.
+        // through ReviewStyleGuard alone. Owner decision 2026-10-27: 「판매자가 답변 템플릿과 말투를 지정할 수 있게」 — the
+        // manner crosses as well, rendered by AnswerStyleInstruction like the inquiry's, through the same one door.
+        // Every other review file stays away from the style.
         List<String> offenders = new ArrayList<>();
         Path guard = null;
         for (Path source : javaIn(MAIN.resolve("review"))) {
@@ -129,17 +129,24 @@ class AnswerStyleFenceTest {
             }
         }
         assertThat(offenders)
-                .as("리뷰 답글과 문의 답변은 다른 글이다 — only ReviewStyleGuard may reach across")
+                .as("only ReviewStyleGuard may reach across into 답변 스타일")
                 .isEmpty();
         assertThat(guard).as("the one door exists where this fence looks for it").isNotNull();
         String door = executable(guard);
         assertThat(door).contains("forbiddenPhrases()").contains("forbiddenPresentIn(");
-        // The owner approved the split on 2026-10-23: 「되도록 피할 표현」 crosses too, as marks, never as an instruction.
+        // The owner approved the split on 2026-10-23: 「되도록 피할 표현」 crosses too.
         assertThat(door).contains("avoidPhrases()");
-        for (String other : List.of("tone()", "length()", "emoji()", "greeting()", "closing()", "customerAddress()",
-                "requiredPhrases()", "unknownFallback()", "AnswerStyleInstruction.of(")) {
-            assertThat(door).as("the guard reads only the forbidden list, not " + other).doesNotContain(other);
-        }
+        // The manner is OUR rendering of the seller's settings, never their strings spliced into a prompt by hand.
+        assertThat(door).contains("AnswerStyleInstruction.of(");
+        // Bounded by the member's own closing brace at class indentation; no boundary found is a failure, not a widening.
+        int start = door.indexOf("static String manner(AnswerStyleProfile");
+        assertThat(start).as("the static manner method exists").isNotNegative();
+        int end = door.indexOf("\n    }\n", start);
+        assertThat(end).as("the manner method's closing brace").isGreaterThan(start);
+        String manner = door.substring(start, end);
+        assertThat(manner).as("the manner method was found").contains("AnswerStyleInstruction.of(");
+        assertThat(manner).as("the forbidden list is quoted in its own narrowed section, not a second time here")
+                .doesNotContain("forbiddenPhrases()");
     }
 
     // ---------------------------------------------------------------- the floor is wired now

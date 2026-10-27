@@ -95,4 +95,11 @@ public class KnowledgeCandidate {
             createdAt = Instant.now();
         }
     }
+
+    /**
+     * 「고객은 이렇게 말해요」 — one expression per line, or null (V149). Read through
+     * {@link com.sellerops.knowledge.CustomerPhrases}; a review that says one is answered with this.
+     */
+    @Column(name = "customer_phrases", columnDefinition = "text")
+    private String customerPhrases;
 }

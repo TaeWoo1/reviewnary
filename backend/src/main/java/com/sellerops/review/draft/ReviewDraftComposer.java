@@ -80,6 +80,9 @@ public class ReviewDraftComposer {
     /** The operational sentences. None of them says anything about the seller's knowledge. */
     static final String CAPABILITY_OFF = "AI 답변 초안 기능이 켜져 있지 않습니다. 저장된 문구로 초안을 준비했습니다.";
     static final String MODEL_FAILED = "AI 초안을 생성하지 못했습니다. 저장된 문구로 초안을 준비했습니다.";
+    /** A reply that carries a 【확인: …】 blank — a fact the owner has not confirmed (2026-10-27). */
+    static final String UNCONFIRMED_TEXT =
+            "확인 전 안내(【확인: …】)가 들어가 AI 초안을 저장하지 않았습니다. 저장된 문구로 초안을 준비했습니다.";
     /**
      * The refusal that only this lane has.
      *
@@ -164,6 +167,14 @@ public class ReviewDraftComposer {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     public void setPrecedent(ReviewReplyPrecedent precedent) {
         this.precedent = precedent;
+    }
+
+    /** 「고객은 이렇게 말해요」 — guidance the review names in the customer's words (2026-10-27); null in a bare test. */
+    private CustomerPhraseLane phraseLane;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setPhraseLane(CustomerPhraseLane phraseLane) {
+        this.phraseLane = phraseLane;
     }
 
     /** Production wiring: the review draft reads the Knowledge Spine retrieval the case investigator reads. */
@@ -305,7 +316,40 @@ public class ReviewDraftComposer {
         boolean praise = complaints.isEmpty()
                 && moodOf(review.getRating(), redactedBody) == AgentDraftGenerator.ReviewMood.UNSTATED
                 && !com.sellerops.knowledge.QuestionShape.asks(redactedBody);
-        return praise ? withoutFacts(found) : found;
+        // The seller's own expressions are read even on praise: a review that says 「떨어져요」 is not only praise, and a
+        // denial (「안 떨어져요」) is not a hit (CustomerPhrases).
+        List<ScopedPassage> named = phraseLane == null ? List.of() : phraseLane.hits(orgId, productId, redactedBody);
+        return withPhraseHits(praise ? withoutFacts(found) : found, named);
+    }
+
+    /**
+     * The retrieval with the guidance the review names in the customer's words in front (2026-10-27): each hit once,
+     * ahead of what the scorer found, inside the same passage budget. Anything a hit makes current earns the GROUNDED
+     * verdict as any current passage does.
+     */
+    static InquiryEvidenceRetriever.InquiryEvidence withPhraseHits(InquiryEvidenceRetriever.InquiryEvidence found,
+                                                                    List<ScopedPassage> hits) {
+        if (hits == null || hits.isEmpty()) {
+            return found;
+        }
+        List<ScopedPassage> merged = new ArrayList<>(hits);
+        java.util.Set<UUID> taken = new java.util.HashSet<>();
+        hits.forEach(h -> taken.add(h.sourceId()));
+        for (ScopedPassage passage : found.passages()) {
+            if (passage.sourceId() == null || taken.add(passage.sourceId())) {
+                merged.add(passage);
+            }
+        }
+        if (merged.size() > InquiryEvidenceRetriever.MAX_PASSAGES) {
+            merged = new ArrayList<>(merged.subList(0, InquiryEvidenceRetriever.MAX_PASSAGES));
+        }
+        boolean product = hits.stream().anyMatch(h -> h.scope() == KnowledgeScope.PRODUCT);
+        boolean policy = hits.stream().anyMatch(h -> h.scope() == KnowledgeScope.ORG_OPERATIONS);
+        return new InquiryEvidenceRetriever.InquiryEvidence(found.productId(), DraftKnowledgeState.GROUNDED,
+                List.copyOf(merged), found.order(), found.supersededMemories(),
+                product ? com.sellerops.knowledge.RetrievalOutcome.FOUND : found.productOutcome(),
+                policy ? com.sellerops.knowledge.RetrievalOutcome.FOUND : found.policyOutcome(),
+                found.policyTopicsDeclared());
     }
 
     /** The same retrieval with only its past answers — the wording a thank-you may reuse, and no fact. */
@@ -407,12 +451,19 @@ public class ReviewDraftComposer {
         // The company's absolute bans go into the request as quoted data (owner decision 2026-10-23); the check after
         // generation still holds, since a request is only a request.
         List<String> banned = styleGuard == null ? List.of() : styleGuard.enforced(orgId);
+        // How the seller wants to sound — set in 답변 스타일 (owner, 2026-10-27).
+        String manner = styleGuard == null ? null : styleGuard.manner(orgId);
         Optional<String> written = model.draftReviewReply(orgId, reviewBody, passagesFor(passages), voice, banned,
-                mood);
+                mood, manner);
         if (written.isEmpty()) {
             return new Written(null, MODEL_FAILED);
         }
         String candidate = written.get();
+        // A 【확인: …】 blank in a reply is the owner's open question sent to a customer (2026-10-27). No passage carries
+        // one any more (the retriever drops them), so this is the last door, not the first.
+        if (com.sellerops.knowledge.KnowledgeBlanks.carries(candidate)) {
+            return new Written(null, UNCONFIRMED_TEXT);
+        }
         // Only CURRENT evidence may authorize a promise. A past answer is shown to the model for its wording, and an
         // exchange the seller once granted is not a policy (2026-10-22 review).
         List<String> current = passages.stream().filter(p -> p.scope().current()).map(ScopedPassage::text).toList();
@@ -428,7 +479,7 @@ public class ReviewDraftComposer {
         List<String> found = styleGuard == null ? List.of() : styleGuard.forbiddenIn(candidate, orgId);
         if (!found.isEmpty() && quota.consume(orgId, AgentUsageKind.DRAFT, null).allowed()) {
             Optional<String> again = model.draftReviewReply(orgId, reviewBody, passagesFor(passages), voice,
-                    styleGuard.enforced(orgId), mood);
+                    styleGuard.enforced(orgId), mood, manner);
             if (again.isPresent() && ReviewClaimGuard.unsupportedClaims(again.get(), current).isEmpty()
                     && ReviewClaimGuard.unsupportedConditions(again.get(), current, reviewBody).isEmpty()) {
                 candidate = again.get();

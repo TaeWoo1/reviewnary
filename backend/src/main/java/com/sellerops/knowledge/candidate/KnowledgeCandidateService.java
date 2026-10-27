@@ -1,6 +1,8 @@
 package com.sellerops.knowledge.candidate;
 
 import com.sellerops.common.ApiException;
+import com.sellerops.knowledge.CustomerPhrases;
+import com.sellerops.knowledge.KnowledgeBlanks;
 import com.sellerops.knowledge.KnowledgeText;
 import com.sellerops.common.ChannelBoilerplate;
 import com.sellerops.knowledge.candidate.dto.KnowledgeCandidateView;
@@ -232,6 +234,16 @@ public class KnowledgeCandidateService {
     @Transactional
     public KnowledgeCandidate suggestGuidance(UUID orgId, UUID productId, String subject, String content,
                                               int evidenceCount) {
+        return suggestGuidance(orgId, productId, subject, content, evidenceCount, null);
+    }
+
+    /**
+     * As {@link #suggestGuidance(UUID, UUID, String, String, int)}, with the 「고객은 이렇게 말해요」 expressions the
+     * proposal was counted from. They travel with it, and become the knowledge's own when the seller accepts.
+     */
+    @Transactional
+    public KnowledgeCandidate suggestGuidance(UUID orgId, UUID productId, String subject, String content,
+                                              int evidenceCount, List<String> customerPhrases) {
         if (subject == null || subject.isBlank() || content == null || content.isBlank()) {
             throw ApiException.badRequest("제안할 주제와 안내 문장을 적어 주세요.");
         }
@@ -255,6 +267,7 @@ public class KnowledgeCandidateService {
         row.setSubject(bounded(subject, 300));
         row.setContent(content.strip());
         row.setEvidenceCount(Math.max(0, evidenceCount));
+        row.setCustomerPhrases(CustomerPhrases.store(customerPhrases));
         try {
             return candidates.save(row);
         } catch (DataIntegrityViolationException race) {
@@ -312,6 +325,19 @@ public class KnowledgeCandidateService {
     public KnowledgeCandidateView accept(UUID orgId, UUID candidateId, String title, String content,
                                          KnowledgeSourceType productType, OrgKnowledgeType orgType,
                                          UUID variantId, UUID actorUserId, String actorName) {
+        return accept(orgId, candidateId, title, content, productType, orgType, variantId, null, actorUserId,
+                actorName);
+    }
+
+    /**
+     * As above, with the 「고객은 이렇게 말해요」 expressions the seller kept or wrote. {@code customerPhrases} null keeps
+     * what the proposal carried; an empty list clears them.
+     */
+    @Transactional
+    public KnowledgeCandidateView accept(UUID orgId, UUID candidateId, String title, String content,
+                                         KnowledgeSourceType productType, OrgKnowledgeType orgType,
+                                         UUID variantId, List<String> customerPhrases, UUID actorUserId,
+                                         String actorName) {
         KnowledgeCandidate row = candidates.findByIdAndOrgId(candidateId, orgId)
                 .orElseThrow(() -> ApiException.notFound("확인할 항목을 찾을 수 없습니다."));
         if (!STATE_OPEN.equals(row.getState())) {
@@ -322,10 +348,12 @@ public class KnowledgeCandidateService {
             throw ApiException.badRequest("고객에게 안내할 내용을 적어 주세요.");
         }
         String body = written ? content.strip() : row.getContent();
-        if (body.contains(BLANK_OPEN)) {
+        if (KnowledgeBlanks.carries(body)) {
             throw ApiException.badRequest("【확인: …】 부분을 실제 내용으로 바꾼 뒤 등록해 주세요.");
         }
         String heading = title == null || title.isBlank() ? row.getSubject() : title.strip();
+        String phrases = customerPhrases == null ? CustomerPhrases.normalized(row.getCustomerPhrases())
+                : CustomerPhrases.store(customerPhrases);
         UUID sourceId;
         if ("PRODUCT".equals(row.getScope()) && row.getProductId() != null) {
             Product product = products.findById(row.getProductId())
@@ -339,6 +367,7 @@ public class KnowledgeCandidateService {
             source.setAuthoredOrigin(KnowledgeAuthorship.SELLER_ENTERED_KNOWLEDGE);
             source.setTitle(bounded(heading, 200));
             source.setBody(body);
+            source.setCustomerPhrases(phrases);
             source.setAuthorUserId(actorUserId);
             source.setAuthorName(actorName);
             ProductKnowledgeSource saved = productSources.save(source);
@@ -351,6 +380,7 @@ public class KnowledgeCandidateService {
             source.setAuthoredOrigin(KnowledgeAuthorship.SELLER_ENTERED_KNOWLEDGE);
             source.setTitle(bounded(heading, 200));
             source.setBody(body);
+            source.setCustomerPhrases(phrases);
             source.setAuthorUserId(actorUserId);
             source.setAuthorName(actorName);
             OrgKnowledgeSource saved = orgSources.save(source);
@@ -359,6 +389,7 @@ public class KnowledgeCandidateService {
         }
         row.setState(STATE_ACCEPTED);
         row.setSourceId(sourceId);
+        row.setCustomerPhrases(phrases);
         row.setDecidedAt(Instant.now());
         row.setDecidedBy(actorName);
         return view(candidates.save(row), productName(orgId, row.getProductId()));
@@ -434,6 +465,26 @@ public class KnowledgeCandidateService {
         row.setState(STATE_DISMISSED);
         row.setDecidedAt(Instant.now());
         row.setDecidedBy(actorName);
+        return view(candidates.save(row), productName(orgId, row.getProductId()));
+    }
+
+    /**
+     * Rewrite an open proposal's sentence and 「고객은 이렇게 말해요」 without deciding it — what the spreadsheet does
+     * for a row the seller edited and left 확인 전 (2026-10-27). The subject is its identity and stays.
+     */
+    @Transactional
+    public KnowledgeCandidateView revise(UUID orgId, UUID candidateId, String content, List<String> customerPhrases) {
+        KnowledgeCandidate row = candidates.findByIdAndOrgId(candidateId, orgId)
+                .orElseThrow(() -> ApiException.notFound("확인할 항목을 찾을 수 없습니다."));
+        if (!STATE_OPEN.equals(row.getState())) {
+            throw ApiException.conflict("이미 처리한 항목입니다.");
+        }
+        if (content != null && !content.isBlank()) {
+            row.setContent(content.strip());
+        }
+        if (customerPhrases != null) {
+            row.setCustomerPhrases(CustomerPhrases.store(customerPhrases));
+        }
         return view(candidates.save(row), productName(orgId, row.getProductId()));
     }
 
@@ -524,7 +575,7 @@ public class KnowledgeCandidateService {
         return new KnowledgeCandidateView(row.getId(), row.getScope(), row.getProductId(), productName,
                 ChannelBoilerplate.strip(row.getSubject()), ChannelBoilerplate.strip(row.getContent()),
                 row.getOrigin(), row.getEvidenceCount(),
-                row.getState(), row.getSourceId(), row.getCreatedAt());
+                row.getState(), row.getSourceId(), row.getCreatedAt(), CustomerPhrases.parse(row.getCustomerPhrases()));
     }
 
     private static String bounded(String text, int max) {

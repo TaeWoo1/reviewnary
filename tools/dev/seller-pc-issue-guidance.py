@@ -3,11 +3,12 @@
 
 The proposals are written by hand from the store's real reviews and live in tools/dev/.run/issue-guidance.json, which is
 gitignored like everything else read from the store. Each one names the products it is about (by channel product
-number), a pattern that finds the reviews reporting the problem, and the proposed sentence, with 【확인: …】 blanks where
-only the owner knows the fact. This script counts the reviews per product, and files one proposal per product that has
-at least MIN_REVIEWS of them — or one for the whole company when it names no product — through the same endpoint a
-future model-written producer will use. Nothing becomes knowledge here: the owner accepts, edits or declines each one,
-and a proposal with a blank left in it cannot be accepted.
+number), a pattern that finds the reviews reporting the problem, the proposed sentence — with 【확인: …】 blanks where
+only the owner knows the fact — and the 「고객은 이렇게 말해요」 expressions customers used for it (customer_phrases), which
+travel with the proposal and become the knowledge's own when the owner accepts it. This script counts the reviews per
+product, and files one proposal per product that has at least MIN_REVIEWS of them — or one for the whole company when
+it names no product — through the same endpoint a future model-written producer will use. Nothing becomes knowledge
+here: the owner accepts, edits or declines each one, and a proposal with a blank left in it cannot be accepted.
 
 Run against the demo or the judging copy:  SELLER_PC_DEMO=judge tools/dev/seller-pc-issue-guidance.py
 Prints counts only.
@@ -84,7 +85,8 @@ def main():
             if n < MIN_REVIEWS or (entry["refs"] and not product_id):
                 continue
             suggestions.append({"productId": product_id or None, "subject": entry["subject"],
-                                "content": entry["content"], "evidenceCount": n})
+                                "content": entry["content"], "evidenceCount": n,
+                                "customerPhrases": entry.get("customer_phrases", [])})
         print(f"  {entry['subject']}: products {sum(1 for k, n in counts.items() if n >= MIN_REVIEWS and (k or not entry['refs']))}"
               f" · reviews {sum(counts.values())}")
     open_now = call(port, "POST", "/api/knowledge/candidates/guidance", suggestions, token=token)

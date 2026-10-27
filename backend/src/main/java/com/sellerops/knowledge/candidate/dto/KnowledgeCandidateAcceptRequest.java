@@ -2,6 +2,7 @@ package com.sellerops.knowledge.candidate.dto;
 
 import com.sellerops.knowledge.org.OrgKnowledgeType;
 import com.sellerops.product.library.KnowledgeSourceType;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -19,5 +20,5 @@ import java.util.UUID;
  */
 public record KnowledgeCandidateAcceptRequest(String title, String content,
                                               KnowledgeSourceType sourceType, OrgKnowledgeType orgType,
-                                              UUID variantId) {
+                                              UUID variantId, List<String> customerPhrases) {
 }

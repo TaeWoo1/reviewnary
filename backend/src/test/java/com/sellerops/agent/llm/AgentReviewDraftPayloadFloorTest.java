@@ -172,4 +172,30 @@ class AgentReviewDraftPayloadFloorTest {
         assertThat(system).contains("사과 다음에 그 안내를 근거에 적힌");
         assertThat(system).contains("「후기의 결」이 주어지면");
     }
+
+    @ParameterizedTest
+    @EnumSource(AgentDraftGenerator.Vendor.class)
+    @DisplayName("the seller's 답변 스타일 leaves only when set, in the user turn, after the review (owner, 2026-10-27)")
+    void theSellersMannerLeavesOnlyWhenSet(AgentDraftGenerator.Vendor vendor) {
+        AgentDraftGenerator gen = generator(vendor);
+        String without = gen.reviewRequestBody(new AgentDraftGenerator.ReviewInput("괜찮아요", List.of(), null, List.of(),
+                AgentDraftGenerator.ReviewMood.UNSTATED, null));
+        assertThat(without).as("no style is the request as it was")
+                .isEqualTo(gen.reviewRequestBody(new AgentDraftGenerator.ReviewInput("괜찮아요", List.of(), null)));
+        assertThat(without).doesNotContain("답변 스타일:");
+        String manner = "- 친근하고 따뜻한 존댓말로 답변하세요.\n- 첫 인사는 \"안녕하세요, 선바로입니다\" 로 시작하세요.";
+        String with = AgentDraftPrompt.reviewUser(List.of(), "괜찮아요", null, List.of(),
+                AgentDraftGenerator.ReviewMood.UNSTATED, manner);
+        assertThat(with).contains("답변 스타일:\n" + manner);
+        assertThat(with.indexOf("답변 스타일:")).isGreaterThan(with.indexOf("고객 후기:"));
+        // The seller's strings never reach the system turn; the rules there say style yields.
+        assertThat(AgentDraftPrompt.reviewSystem()).doesNotContain("선바로").contains("「답변 스타일」이 주어지면")
+                .contains("위 규칙이 우선합니다");
+    }
+
+    @Test
+    @DisplayName("the system turn tells the model a 【확인】 blank is not to be written (owner, 2026-10-27)")
+    void theSystemTurnRefusesBlanks() {
+        assertThat(AgentDraftPrompt.reviewSystem()).contains("「【확인」으로 시작하는 괄호 문구는 쓰지 마세요");
+    }
 }

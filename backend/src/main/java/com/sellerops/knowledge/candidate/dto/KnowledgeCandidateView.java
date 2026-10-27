@@ -1,6 +1,7 @@
 package com.sellerops.knowledge.candidate.dto;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -15,5 +16,6 @@ import java.util.UUID;
  */
 public record KnowledgeCandidateView(UUID id, String scope, UUID productId, String productName,
                                      String subject, String content, String origin, int evidenceCount,
-                                     String state, UUID sourceId, Instant createdAt) {
+                                     String state, UUID sourceId, Instant createdAt,
+                                     List<String> customerPhrases) {
 }

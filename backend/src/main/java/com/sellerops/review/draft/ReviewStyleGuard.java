@@ -29,6 +29,11 @@ import org.springframework.stereotype.Component;
  * <p><b>The door opens onto a second list since the owner approved the split (2026-10-23):</b> 「되도록 피할 표현」 and
  * what to write instead. It is a preference, never a check — a draft carrying one is kept and may be approved; the
  * panel marks it and offers the replacement ({@link #findings}).
+ *
+ * <p><b>And onto the manner since 2026-10-27</b> — the owner: 「판매자가 답변 템플릿과 말투를 지정할 수 있게」. The tone,
+ * length, emoji, greeting, closing, address and required phrases the seller set in 답변 스타일 now reach a review reply
+ * as the section our code renders ({@link #manner}), the same one the inquiry lane sends. Still through this file alone,
+ * and still never a check: style is how it is said, and the evidence rules outrank it in the system turn.
  */
 @Component
 public class ReviewStyleGuard {
@@ -37,6 +42,26 @@ public class ReviewStyleGuard {
 
     public ReviewStyleGuard(AnswerStyleService styles) {
         this.styles = styles;
+    }
+
+    /**
+     * The seller's 답변 스타일 as a review request carries it, or null when they set none (2026-10-27).
+     *
+     * <p>Rendered without the forbidden list: a review request quotes that list in its own section, narrowed by
+     * {@link #enforced} to leave the bare topic words out, and saying it twice — once with 「환불」 in it — would undo
+     * the narrowing.
+     */
+    public String manner(UUID orgId) {
+        return manner(styles.profileFor(orgId));
+    }
+
+    static String manner(AnswerStyleProfile profile) {
+        if (profile == null) {
+            return null;
+        }
+        return AnswerStyleInstruction.of(new AnswerStyleProfile(profile.tone(), profile.length(), profile.emoji(),
+                profile.greeting(), profile.closing(), profile.customerAddress(), profile.requiredPhrases(),
+                List.of(), profile.unknownFallback(), profile.version(), profile.avoidPhrases()));
     }
 
     /** The forbidden phrases this check enforces on {@code orgId}'s review replies. */

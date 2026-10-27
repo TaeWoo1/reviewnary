@@ -3,6 +3,7 @@ package com.sellerops.product.library.dto;
 import com.sellerops.product.library.KnowledgeAuthorship;
 import com.sellerops.product.library.KnowledgeSourceType;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -21,7 +22,8 @@ public record KnowledgeSourceView(UUID id, UUID productId, KnowledgeSourceType s
                                   String authorName, int chunks,
                                   Instant createdAt, Instant updatedAt,
                                   KnowledgeAuthorship authoredOrigin,
-                                  UUID variantId, String variantName) {
+                                  UUID variantId, String variantName,
+                                  List<String> customerPhrases) {
 
     /** The scope as a seller reads it. One sentence, and the default says the common case out loud. */
     public String scopeKo() {

@@ -1,5 +1,6 @@
 package com.sellerops.product.library;
 
+import com.sellerops.knowledge.CustomerPhrases;
 import com.sellerops.common.ApiException;
 import com.sellerops.knowledge.KnowledgeRetriever;
 import com.sellerops.knowledge.KnowledgeTopic;
@@ -290,6 +291,10 @@ public class ProductKnowledgeLibraryService {
         String url = request.sourceUrl() == null || request.sourceUrl().isBlank()
                 ? null : request.sourceUrl().strip();
         source.setSourceUrl(url);
+        // Absent on a request that does not know the field — it keeps what the seller wrote before.
+        if (request.customerPhrases() != null) {
+            source.setCustomerPhrases(CustomerPhrases.store(request.customerPhrases()));
+        }
     }
 
     /**
@@ -330,7 +335,8 @@ public class ProductKnowledgeLibraryService {
         return new KnowledgeSourceView(source.getId(), source.getProductId(), source.getSourceType(),
                 source.getTitle(), source.getBody(), source.getSourceUrl(), source.getAuthorName(),
                 chunkCount, source.getCreatedAt(), source.getUpdatedAt(),
-                source.getAuthoredOrigin(), source.getVariantId(), variantName);
+                source.getAuthoredOrigin(), source.getVariantId(), variantName,
+                CustomerPhrases.parse(source.getCustomerPhrases()));
     }
 
     /** Two decimals — a score is a diagnostic, and full float noise reads as false precision. */

@@ -45,4 +45,8 @@ public interface ProductKnowledgeSourceRepository extends JpaRepository<ProductK
 
     /** The documents for ONE product — the 자료 list on the product screen. */
     List<ProductKnowledgeSource> findAllByOrgIdAndProductIdAndDocumentNameIsNotNull(UUID orgId, UUID productId);
+
+    /** The documents of one product that carry 「고객은 이렇게 말해요」 — the phrase lane's whole corpus. */
+    List<ProductKnowledgeSource> findAllByOrgIdAndProductIdAndActiveTrueAndCustomerPhrasesIsNotNull(UUID orgId,
+                                                                                                   UUID productId);
 }

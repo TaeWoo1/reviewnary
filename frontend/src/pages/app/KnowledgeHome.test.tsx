@@ -14,6 +14,7 @@ import type {
 
 const getKnowledgeDocuments = vi.fn();
 const getKnowledgeCandidates = vi.fn();
+const uploadKnowledgeWorkbook = vi.fn();
 const getKnowledgeSummary = vi.fn();
 const getKnowledgeInventory = vi.fn();
 const proposeKnowledgeCandidates = vi.fn();
@@ -38,6 +39,7 @@ vi.mock("../../lib/apiClient", () => ({
     getProductKnowledgeStrict: (...a: unknown[]) => getProductKnowledgeStrict(...a),
     getLearnedKnowledge: (...a: unknown[]) => getLearnedKnowledge(...a),
     learnFromHistory: (...a: unknown[]) => learnFromHistory(...a),
+    uploadKnowledgeWorkbook: (...a: unknown[]) => uploadKnowledgeWorkbook(...a),
   },
   getToken: () => null,
 }));
@@ -346,6 +348,7 @@ describe("지식", () => {
         title: "부착 전 표면의 먼지와 기름기를 제거해 주세요.",
         content: "부착 전 표면의 먼지와 기름기를 제거해 주세요.",
         variantId: null,
+        customerPhrases: [],
         orgType: "SHIPPING_POLICY",
       }),
     );
@@ -370,6 +373,66 @@ describe("지식", () => {
     await userEvent.click(screen.getByRole("button", { name: "기준 등록" }));
     expect((screen.getByLabelText("고객에게 안내할 내용") as HTMLTextAreaElement).value).toBe(GUIDANCE.content);
     expect(acceptKnowledgeCandidate).not.toHaveBeenCalled();
+  });
+
+  it("a proposal opens holding how customers say it, sends it on 기준 등록, and a refused blank is said as the server said it", async () => {
+    const GUIDANCE: KnowledgeCandidateView = {
+      ...GAP,
+      id: "c-4",
+      subject: "마감캡 구성",
+      content: "한 세트에 【확인: 수량】개 들어 있습니다.",
+      origin: "ISSUE_GUIDANCE",
+      evidenceCount: 5,
+      customerPhrases: ["마감캡", "하나만 왔"],
+    };
+    getKnowledgeCandidates.mockResolvedValue([GUIDANCE]);
+    acceptKnowledgeCandidate.mockRejectedValueOnce(
+      Object.assign(new Error("400"), {
+        isAxiosError: true,
+        response: { status: 400, data: { message: "【확인: …】 부분을 실제 내용으로 바꾼 뒤 등록해 주세요." } },
+      }),
+    );
+    draw();
+    await screen.findByTestId("knowledge-inbox");
+    await userEvent.click(screen.getByRole("button", { name: "기준 등록" }));
+    const phrases = screen.getByLabelText("고객은 이렇게 말해요") as HTMLTextAreaElement;
+    expect(phrases.value).toBe("마감캡\n하나만 왔");
+    await userEvent.type(phrases, "\n두 개가 필요");
+    await userEvent.click(within(screen.getByTestId("knowledge-quick-add")).getByRole("button", { name: "기준 등록" }));
+    await waitFor(() =>
+      expect(acceptKnowledgeCandidate).toHaveBeenCalledWith(
+        "c-4",
+        expect.objectContaining({ customerPhrases: ["마감캡", "하나만 왔", "두 개가 필요"] }),
+      ),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("【확인: …】 부분을 실제 내용으로 바꾼 뒤 등록해 주세요.");
+  });
+
+  it("an uploaded workbook is read first — nothing is applied until 적용", async () => {
+    uploadKnowledgeWorkbook
+      .mockResolvedValueOnce({
+        applied: false,
+        changes: [{ sheet: "안내 매뉴얼", row: 3, text: "「실크벽지 부착」 새 안내 등록" }],
+        problems: [{ sheet: "안내 매뉴얼", row: 4, text: "【확인: …】이 남아 있어 「사용」으로 등록할 수 없습니다." }],
+      })
+      .mockResolvedValueOnce({
+        applied: true,
+        changes: [{ sheet: "안내 매뉴얼", row: 3, text: "「실크벽지 부착」 새 안내 등록" }],
+        problems: [],
+      });
+    draw();
+    const block = await screen.findByTestId("knowledge-workbook");
+    const file = new File(["x"], "답글 기준.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    await userEvent.upload(within(block).getByLabelText("엑셀 파일 고르기"), file);
+    expect(await within(block).findByText("올리면 바뀌는 것 · 1건")).toBeInTheDocument();
+    expect(block).toHaveTextContent("반영하지 않는 줄 · 1건");
+    expect(uploadKnowledgeWorkbook).toHaveBeenCalledTimes(1);
+    expect(uploadKnowledgeWorkbook).toHaveBeenLastCalledWith(file, false);
+    await userEvent.click(within(block).getByRole("button", { name: "적용" }));
+    await waitFor(() => expect(uploadKnowledgeWorkbook).toHaveBeenLastCalledWith(file, true));
+    expect(await within(block).findByText("반영했습니다 · 1건")).toBeInTheDocument();
   });
 
   it("a drafting gap is a QUESTION — the editor opens empty and the question is never saved as an answer", async () => {

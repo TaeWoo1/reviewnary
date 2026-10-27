@@ -100,6 +100,7 @@ import type {
   ReviewReplyPrep,
   GeneratedReviewDraftView,
   KnowledgeCandidateView,
+  KnowledgeWorkbookResult,
   KnowledgeDocumentView,
   KnowledgeSummaryView,
   KnowledgeInventoryView,
@@ -1776,11 +1777,31 @@ export const api = {
       orgType?: string;
       /** The 규격 the seller chose, so the one write that closes the ask carries it too. */
       variantId?: string | null;
+      /** 「고객은 이렇게 말해요」; absent keeps what the proposal carried. */
+      customerPhrases?: string[];
     },
   ): Promise<KnowledgeCandidateView> {
     const { data } = await http.post<KnowledgeCandidateView>(
       `/api/knowledge/candidates/${encodeURIComponent(candidateId)}/accept`,
       body,
+    );
+    return data;
+  },
+
+  /** 말투 · 답변 템플릿 · 안내 매뉴얼 as one workbook the seller edits (2026-10-27). */
+  async downloadKnowledgeWorkbook(): Promise<Blob> {
+    const { data } = await http.get<Blob>("/api/knowledge/workbook", { responseType: "blob" });
+    return data;
+  },
+
+  /** Read an edited workbook: `apply` false says what would change and writes nothing. */
+  async uploadKnowledgeWorkbook(file: File, apply: boolean): Promise<KnowledgeWorkbookResult> {
+    const form = new FormData();
+    form.append("file", file);
+    const { data } = await http.post<KnowledgeWorkbookResult>(
+      `/api/knowledge/workbook?apply=${apply ? "true" : "false"}`,
+      form,
+      { timeout: MODEL_TIMEOUT_MS, headers: { "Content-Type": "multipart/form-data" } },
     );
     return data;
   },

@@ -129,7 +129,7 @@ export function AnswerStyle() {
     <>
       <PageHead
         title="AI 답변 스타일"
-        description="문의 답변의 말투와 표현 방식을 설정합니다. 상품 정보나 정책 등 사실 자체는 바뀌지 않습니다."
+        description="문의 답변과 리뷰 답글의 말투와 표현 방식을 설정합니다. 상품 정보나 정책 등 사실 자체는 바뀌지 않습니다."
       />
 
       {loadError ? (

@@ -17,6 +17,7 @@ import { count } from "../../lib/format";
 import { COPY } from "../../lib/copy/customerOps";
 import { KNOWLEDGE_NOUN, ORG_TOPICS } from "../../lib/knowledgeWords";
 import { KnowledgeInbox } from "../../components/knowledge/KnowledgeInbox";
+import { KnowledgeWorkbook } from "../../components/knowledge/KnowledgeWorkbook";
 import { LearnedKnowledge } from "../../components/knowledge/LearnedKnowledge";
 import { OperatingRuleTable, ProductFactTable, topicsOf } from "../../components/knowledge/KnowledgeInventory";
 import {
@@ -150,6 +151,12 @@ export function KnowledgeHome() {
         ) : (
           <KnowledgeInbox candidates={candidates} documents={documents} onChanged={load} />
         )}
+      </Block>
+
+      {/* 말투 · 답변 템플릿 · 안내 매뉴얼을 한 파일로 (2026-10-27) — 확인 필요 바로 아래, 그 안의 제안을 한 번에
+          읽고 고치는 길이기 때문이다. */}
+      <Block title="엑셀로 관리" note="말투 · 답변 템플릿 · 안내 매뉴얼을 한 파일로">
+        <KnowledgeWorkbook onChanged={load} />
       </Block>
 
       <Block

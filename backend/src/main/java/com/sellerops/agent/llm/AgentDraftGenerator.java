@@ -185,12 +185,18 @@ public class AgentDraftGenerator {
      * requests too. Two records, two builders, two floor tests.
      */
     public record ReviewInput(String reviewBody, List<Passage> knowledge, String style, List<String> banned,
-                              ReviewMood mood) {
+                              ReviewMood mood, String manner) {
 
         public ReviewInput {
             knowledge = knowledge == null ? List.of() : List.copyOf(knowledge);
             banned = banned == null ? List.of() : List.copyOf(banned);
             mood = mood == null ? ReviewMood.UNSTATED : mood;
+        }
+
+        /** No 답변 스타일 — every request before the owner let the seller set one for reviews (2026-10-27). */
+        public ReviewInput(String reviewBody, List<Passage> knowledge, String style, List<String> banned,
+                           ReviewMood mood) {
+            this(reviewBody, knowledge, style, banned, mood, null);
         }
 
         public ReviewInput(String reviewBody, List<Passage> knowledge, String style, List<String> banned) {
@@ -246,7 +252,7 @@ public class AgentDraftGenerator {
         user.put("role", "user");
         user.put("content",
                 AgentDraftPrompt.reviewUser(input.knowledge(), input.reviewBody(), input.style(), input.banned(),
-                        input.mood()));
+                        input.mood(), input.manner()));
         if (vendor == Vendor.ANTHROPIC) {
             root.put("max_tokens", maxOutputTokens);
             root.put("system", AgentDraftPrompt.reviewSystem());

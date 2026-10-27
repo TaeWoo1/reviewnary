@@ -17,6 +17,9 @@ public interface OrgKnowledgeSourceRepository extends JpaRepository<OrgKnowledge
 
     long countByOrgId(UUID orgId);
 
+    /** The company-wide rules that carry 「고객은 이렇게 말해요」 — the phrase lane's corpus, org side. */
+    List<OrgKnowledgeSource> findAllByOrgIdAndActiveTrueAndCustomerPhrasesIsNotNull(UUID orgId);
+
     /** The same count, narrowed to what can actually ground an answer — see the product-scoped twin. */
     long countByOrgIdAndActiveTrue(UUID orgId);
 

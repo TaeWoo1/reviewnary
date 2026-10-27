@@ -1709,6 +1709,22 @@ export interface KnowledgeCandidateView {
   state: string;
   sourceId: string | null;
   createdAt: string;
+  /** 「고객은 이렇게 말해요」 the proposal carries; it becomes the knowledge's own on acceptance (2026-10-27). */
+  customerPhrases?: string[];
+}
+
+/** One line of what a workbook upload would do, did, or could not do — on the sheet row the seller sees. */
+export interface KnowledgeWorkbookLine {
+  sheet: string;
+  row: number;
+  text: string;
+}
+
+/** Mirrors KnowledgeWorkbookService.Result. `applied` false is a preview: nothing was written. */
+export interface KnowledgeWorkbookResult {
+  applied: boolean;
+  changes: KnowledgeWorkbookLine[];
+  problems: KnowledgeWorkbookLine[];
 }
 
 /**
@@ -2155,6 +2171,8 @@ export interface OrgKnowledgeView {
   passageCount: number;
   createdAt: string;
   updatedAt: string;
+  /** 「고객은 이렇게 말해요」 (2026-10-27). */
+  customerPhrases?: string[];
 }
 
 /** What the seller submits when writing or revising an operating rule. */
@@ -2163,6 +2181,8 @@ export interface OrgKnowledgeRequest {
   title: string;
   body: string;
   sourceUrl?: string | null;
+  /** 「고객은 이렇게 말해요」; absent keeps what is stored, an empty list clears it. */
+  customerPhrases?: string[];
 }
 
 /**
@@ -3441,6 +3461,8 @@ export interface KnowledgeSourceView {
   variantId?: string | null;
   /** That variant's option name, for display only. The binding is the id. */
   variantName?: string | null;
+  /** 「고객은 이렇게 말해요」 — how customers say what this answers (2026-10-27). */
+  customerPhrases?: string[];
 }
 
 export interface KnowledgeSourceRequest {
@@ -3450,6 +3472,8 @@ export interface KnowledgeSourceRequest {
   sourceUrl?: string | null;
   /** One of THIS product's stored variants, or null/absent for 전체 상품 공통. */
   variantId?: string | null;
+  /** 「고객은 이렇게 말해요」; absent keeps what is stored, an empty list clears it. */
+  customerPhrases?: string[];
 }
 
 /**

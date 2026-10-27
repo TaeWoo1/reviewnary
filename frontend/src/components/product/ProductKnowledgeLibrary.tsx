@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { splitPhrases } from "../knowledge/KnowledgeQuickAdd";
 import { Btn } from "../ui/Btn";
 import { Empty } from "../ui/Empty";
 import { SectionHeader } from "../ui/SectionHeader";
@@ -180,6 +181,7 @@ function KnowledgeEditor({
   const [body, setBody] = useState(source?.body ?? "");
   const [sourceUrl, setSourceUrl] = useState(source?.sourceUrl ?? "");
   const [variantId, setVariantId] = useState(source?.variantId ?? "");
+  const [phrases, setPhrases] = useState((source?.customerPhrases ?? []).join("\n"));
   const [variants, setVariants] = useState<ProductVariantView[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -205,6 +207,7 @@ function KnowledgeEditor({
         body: body.trim(),
         sourceUrl: sourceUrl.trim() || null,
         variantId: variantId || null,
+        customerPhrases: splitPhrases(phrases),
       };
       if (source) {
         await api.updateProductKnowledgeSource(source.id, request);
@@ -298,6 +301,21 @@ function KnowledgeEditor({
           placeholder={"고객에게 그대로 설명할 수 있는 문장으로 적어 주세요.\n\n빈 줄로 문단을 나누면 그 단위로 인용됩니다."}
           className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-base leading-relaxed focus:border-brand focus:outline-none"
         />
+      </label>
+
+      {/* 「고객은 이렇게 말해요」 (2026-10-27) — 리뷰가 이 표현을 쓰면 이 내용이 답글 초안의 근거로 붙는다. */}
+      <label className="block">
+        <span className="text-sm font-medium text-ink">고객은 이렇게 말해요</span>
+        <textarea
+          value={phrases}
+          onChange={(e) => setPhrases(e.target.value)}
+          rows={3}
+          placeholder={"한 줄에 하나씩, 50개까지 · 예)\n떨어져요\n접착력 약해요"}
+          className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-base leading-relaxed focus:border-brand focus:outline-none"
+        />
+        <span className="mt-1 block break-keep text-sm text-muted">
+          리뷰에 이 표현이 있으면 이 내용이 답글 초안의 근거로 붙습니다. 「안 떨어져요」처럼 부정하는 말에는 붙지 않습니다.
+        </span>
       </label>
 
       {sourceType === "LINK" ? (

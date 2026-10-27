@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isAxiosError } from "axios";
 import { Btn } from "../ui/Btn";
 import { api } from "../../lib/apiClient";
 import { ORG_TOPICS, PRODUCT_TOPICS } from "../../lib/knowledgeWords";
@@ -13,6 +14,11 @@ export interface QuickAddValue {
   body: string;
   /** The 규격 this applies to, or null for the whole listing. Always null for a company-wide rule. */
   variantId: string | null;
+  /**
+   * 「고객은 이렇게 말해요」 — how customers say what this answers, one per line (2026-10-27). A review that says one is
+   * answered with this.
+   */
+  customerPhrases: string[];
 }
 
 /**
@@ -42,6 +48,7 @@ export function KnowledgeQuickAdd({
   productName,
   topic,
   body,
+  customerPhrases,
   variants: variantsAllowed = true,
   saveLabel = "저장",
   onSave,
@@ -55,6 +62,8 @@ export function KnowledgeQuickAdd({
   topic?: KnowledgeTopicValue | null;
   /** Prefilled text — a sentence the seller already wrote. Empty for a question they must answer. */
   body?: string | null;
+  /** Prefilled 「고객은 이렇게 말해요」 — the expressions a proposal was counted from. */
+  customerPhrases?: readonly string[] | null;
   /**
    * Whether the caller's write can carry a 규격.
    *
@@ -71,6 +80,7 @@ export function KnowledgeQuickAdd({
   const topics = scope === "PRODUCT" ? PRODUCT_TOPICS : ORG_TOPICS;
   const [chosenTopic, setChosenTopic] = useState<KnowledgeTopicValue>(topic ?? topics[0].value);
   const [text, setText] = useState(body ?? "");
+  const [phrases, setPhrases] = useState((customerPhrases ?? []).join("\n"));
   const [variantId, setVariantId] = useState("");
   const [variants, setVariants] = useState<ProductVariantView[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -102,9 +112,12 @@ export function KnowledgeQuickAdd({
         title: titleFor(written),
         body: written,
         variantId: scope === "PRODUCT" && variantsAllowed ? variantId || null : null,
+        customerPhrases: splitPhrases(phrases),
       });
-    } catch {
-      setError("저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    } catch (e) {
+      // A refusal the seller can act on — 「【확인: …】 부분을 실제 내용으로 바꾼 뒤 등록해 주세요」 — is shown as written.
+      const message = isAxiosError(e) && e.response?.status === 400 ? serverMessage(e.response.data) : null;
+      setError(message ?? "저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setBusy(false);
     }
@@ -160,6 +173,22 @@ export function KnowledgeQuickAdd({
         disabled={busy}
       />
 
+      <label className="mt-3 block text-sm font-medium text-ink" htmlFor="quick-add-phrases">
+        고객은 이렇게 말해요
+      </label>
+      <textarea
+        id="quick-add-phrases"
+        rows={3}
+        className="mt-1 w-full rounded-lg border border-line bg-canvas p-2 text-base text-ink"
+        placeholder={"한 줄에 하나씩, 50개까지 · 예)\n떨어져요\n접착력 약해요"}
+        value={phrases}
+        onChange={(e) => setPhrases(e.target.value)}
+        disabled={busy}
+      />
+      <p className="mt-1.5 break-keep text-sm text-muted">
+        리뷰에 이 표현이 있으면 이 안내가 답글 초안의 근거로 붙습니다. 「안 떨어져요」처럼 부정하는 말에는 붙지 않습니다.
+      </p>
+
       {/*
         규격 — the second axis, and the only one a customer can be wrong about. Shown only for a
         product, and shown even when the listing has none, because its absence is informative.
@@ -201,6 +230,21 @@ export function KnowledgeQuickAdd({
       </div>
     </div>
   );
+}
+
+/** 「고객은 이렇게 말해요」 as typed: one per line or comma, blanks dropped — the server trims and bounds the rest. */
+export function splitPhrases(raw: string): string[] {
+  return raw
+    .split(/[\n,，、]+/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+}
+
+function serverMessage(data: unknown): string | null {
+  if (data && typeof data === "object" && "message" in data && typeof (data as { message: unknown }).message === "string") {
+    return (data as { message: string }).message;
+  }
+  return null;
 }
 
 /**

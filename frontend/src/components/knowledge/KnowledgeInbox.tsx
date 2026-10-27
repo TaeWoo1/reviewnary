@@ -172,13 +172,17 @@ function CandidateRow({
             scope={scope}
             productId={candidate.productId}
             productName={candidate.productName}
+            // 반복 문제의 안내는 대개 쓰는 법이다 — 주제는 「사용법」으로 열리고, 판매자가 바꿀 수 있다.
+            topic={isGuidance && scope === "PRODUCT" ? "USAGE" : null}
             body={isGap ? "" : candidate.content}
+            customerPhrases={candidate.customerPhrases}
             saveLabel={COPY.registerRule}
             onSave={async (value) => {
               await api.acceptKnowledgeCandidate(candidate.id, {
                 title: value.title,
                 content: value.body,
                 variantId: value.variantId,
+                customerPhrases: value.customerPhrases,
                 ...(scope === "PRODUCT"
                   ? { sourceType: value.topic as string }
                   : { orgType: value.topic as string }),

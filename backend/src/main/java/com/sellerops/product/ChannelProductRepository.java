@@ -28,6 +28,9 @@ public interface ChannelProductRepository extends JpaRepository<ChannelProduct, 
     /** The listing identity — {@code uq_channel_products_external}. */
     Optional<ChannelProduct> findByChannelIdAndExternalProductId(UUID channelId, String externalProductId);
 
+    /** This org's listings carrying one channel product number — the spreadsheet's 상품번호 column (2026-10-27). */
+    List<ChannelProduct> findAllByOrgIdAndExternalProductId(UUID orgId, String externalProductId);
+
     /**
      * A listing by the channel's DISPLAY id — the reverse lookup the Coupang 상품평 path needs, since the
      * review screen names its product with 노출상품ID and nothing else.

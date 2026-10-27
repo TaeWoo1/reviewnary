@@ -1,5 +1,6 @@
 package com.sellerops.knowledge.org;
 
+import com.sellerops.knowledge.CustomerPhrases;
 import com.sellerops.common.ApiException;
 import com.sellerops.knowledge.KnowledgeRetriever;
 import com.sellerops.knowledge.KnowledgeTopic;
@@ -294,13 +295,16 @@ public class SellerOperationsKnowledgeService {
         String url = request.sourceUrl() == null || request.sourceUrl().isBlank()
                 ? null : request.sourceUrl().strip();
         source.setSourceUrl(url);
+        if (request.customerPhrases() != null) {
+            source.setCustomerPhrases(CustomerPhrases.store(request.customerPhrases()));
+        }
     }
 
     private static OrgKnowledgeView view(OrgKnowledgeSource source, int passageCount) {
         return new OrgKnowledgeView(source.getId(), source.getKnowledgeType(),
                 source.getKnowledgeType().labelKo(), source.getTitle(), source.getBody(),
                 source.getSourceUrl(), source.getAuthorName(), source.getVersion(), passageCount,
-                source.getCreatedAt(), source.getUpdatedAt());
+                source.getCreatedAt(), source.getUpdatedAt(), CustomerPhrases.parse(source.getCustomerPhrases()));
     }
 
     /** Two decimals — a score is a diagnostic, and full float noise reads as false precision. */

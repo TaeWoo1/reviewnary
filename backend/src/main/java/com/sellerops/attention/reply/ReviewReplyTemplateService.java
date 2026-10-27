@@ -115,6 +115,10 @@ public class ReviewReplyTemplateService {
         if (ReviewReplyValidation.utf8Bytes(body) > MAX_BODY_BYTES) {
             throw ApiException.badRequest("답변 문구가 너무 깁니다 (최대 " + MAX_BODY_BYTES + " 바이트).");
         }
+        // A template is saved as a reply when the model does not write, so a blank in it would reach a customer.
+        if (com.sellerops.knowledge.KnowledgeBlanks.carries(body)) {
+            throw ApiException.badRequest("【확인: …】 부분을 실제 내용으로 바꾼 뒤 저장해 주세요.");
+        }
         ReviewReplyTemplate row = templates.findByOrgIdAndTemplateKey(orgId, key.category())
                 .orElseGet(() -> {
                     ReviewReplyTemplate fresh = new ReviewReplyTemplate();

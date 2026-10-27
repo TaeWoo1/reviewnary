@@ -176,15 +176,27 @@ public class AgentDraftService {
     public Optional<String> draftReviewReply(UUID orgId, String reviewBody,
                                              List<AgentDraftGenerator.Passage> knowledge, String style,
                                              List<String> banned, AgentDraftGenerator.ReviewMood mood) {
+        return draftReviewReply(orgId, reviewBody, knowledge, style, banned, mood, null);
+    }
+
+    /**
+     * The same, with the seller's 답변 스타일 rendered by our code (owner decision 2026-10-27: the seller sets the
+     * tone of review replies too) — {@code manner} is {@code AnswerStyleInstruction}'s section, or null.
+     */
+    public Optional<String> draftReviewReply(UUID orgId, String reviewBody,
+                                             List<AgentDraftGenerator.Passage> knowledge, String style,
+                                             List<String> banned, AgentDraftGenerator.ReviewMood mood,
+                                             String manner) {
         if (!access.allows(properties, orgId)) {
             return Optional.empty();
         }
         AgentDraftGenerator.Result result = generator().generateReview(
-                new AgentDraftGenerator.ReviewInput(reviewBody, knowledge, style, banned, mood));
+                new AgentDraftGenerator.ReviewInput(reviewBody, knowledge, style, banned, mood, manner));
         Optional<String> written = result.draft().map(AgentDraftResponseParser.ParsedDraft::comments);
-        log.info("agent_review_draft orgId={} drafted={} grounded={} styled={} mood={} reason={} {}",
+        log.info("agent_review_draft orgId={} drafted={} grounded={} styled={} mannered={} mood={} reason={} {}",
                 orgId, written.isPresent(), knowledge == null ? 0 : knowledge.size(),
-                style != null && !style.isBlank(), mood, result.reason(), result.metrics().toLogFields());
+                style != null && !style.isBlank(), manner != null && !manner.isBlank(), mood, result.reason(),
+                result.metrics().toLogFields());
         return written;
     }
 
