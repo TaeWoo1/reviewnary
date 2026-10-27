@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
 import sys
 
 REPO = os.path.dirname(os.path.abspath(os.path.join(__file__, "..")))
@@ -106,14 +107,34 @@ def basenames() -> set[str]:
     return out
 
 
+# 손으로 복사하거나 `npx skills add`로 받은 남의 스킬(docs/pilot/design_skills_bootstrap.md)은 git이
+# 무시하는 디자인 도구다 — 이 저장소의 문서가 아니므로 그 안의 링크는 우리 결함이 아니다. 무시 여부는
+# 이름을 적어 두지 않고 git에게 묻는다: 새 스킬이 무시 목록에 오르면 따라오고, 추적되는 스킬은 그대로 읽는다.
+THIRD_PARTY_SKILLS = (".claude/skills/", ".agents/")
+
+
+def ignored_skill_files() -> set[str]:
+    try:
+        listed = subprocess.run(
+            ["git", "-C", REPO, "ls-files", "--others", "--ignored", "--exclude-standard", "--",
+             *THIRD_PARTY_SKILLS],
+            capture_output=True, text=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return set()
+    return {line for line in listed.splitlines() if line}
+
+
 def walk() -> list[str]:
     out = []
+    skipped = ignored_skill_files()
     for root, dirs, files in os.walk(REPO):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         for f in files:
             if os.path.splitext(f)[1] in SCAN_EXT or f in SCAN_NAMES \
                     or f.startswith("Dockerfile"):
-                out.append(os.path.relpath(os.path.join(root, f), REPO))
+                rel = os.path.relpath(os.path.join(root, f), REPO)
+                if rel not in skipped:
+                    out.append(rel)
     return sorted(out)
 
 
