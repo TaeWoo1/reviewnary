@@ -105,7 +105,9 @@ viewport falls back to single-pane; it never squeezes the detail.
 **Menu (product-owner decision, 2026-10-27):** three destinations — 홈 · 리뷰·문의 · 상품·정책 — and 연동 · 설정
 pinned to the foot of the rail, inside the same 「주 메뉴」 landmark. 할 일, 반복 문제, 주문 and 리포트 left the menu,
 not the product: their routes stay and are opened from the screens that lead to them. Exactly one row is lit — the
-destination whose own or owned route is the longest match (`navOwner`, `lib/nav.v2.ts`).
+destination whose own or owned route is the longest match (`navOwner`, `lib/nav.v2.ts`). 리뷰·문의 is one destination over
+two record screens: both heads read 「리뷰·문의」 with a 리뷰 | 문의 switch (`ReviewInquirySwitch`, a groove in the
+`well` tone with a card in the chosen stop); /reviews and /inquiries stay two routes.
 
 Breakpoints: default (mobile) · `sm` 640 · `md` 768 (sidebar appears) · `lg` 1024 (two-pane) · `xl` 1280.
 No custom breakpoints. The page body never scrolls horizontally; wide tables scroll inside their own

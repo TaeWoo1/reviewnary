@@ -823,7 +823,7 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
       productId: null,
     });
     renderInbox("/inquiries/i1");
-    const heading = await screen.findByRole("heading", { level: 1, name: "문의" });
+    const heading = await screen.findByRole("heading", { level: 1, name: "리뷰·문의" });
     const head = heading.closest("header")!;
     expect(within(head).queryByTestId("agent-launch")).toBeNull();
     // 316px is the list's own width and the longest label in the product was asking for it. Nothing in

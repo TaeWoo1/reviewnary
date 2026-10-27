@@ -22,6 +22,8 @@ export default {
         },
         surface: lch("cotton"),
         canvas: lch("paper"),
+        // A tinted well one step under the paper: a pressed groove, an inset the eye must find on the canvas.
+        well: lch("paper-3"),
         ink: lch("ink"),
         muted: lch("muted"),
         line: lch("rule"),

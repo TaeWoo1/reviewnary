@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { analytics } from "../../lib/analytics";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { PageHead } from "../../components/ui/PageHead";
+import { ReviewInquirySwitch } from "../../components/reviews/ReviewInquirySwitch";
 import { Empty } from "../../components/ui/Empty";
 import { Btn, BtnLink } from "../../components/ui/Btn";
 import { Status } from "../../components/ui/Status";
@@ -318,7 +319,8 @@ export function CustomerInbox() {
 
   const head = (
     <PageHead
-      title="문의"
+      title="리뷰·문의"
+      meta={<ReviewInquirySwitch current="inquiries" />}
       compact={!!itemRef}
       /*
         <b>물어보기는 rail에 없다</b> (문의 redesign polish, 2026-10-04 — product-owner decision).

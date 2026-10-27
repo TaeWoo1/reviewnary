@@ -231,7 +231,7 @@ describe("리뷰 — the workflow surface", () => {
     // The channel is a setting on the list, not its axis: a quiet menu rather than a third row of pills
     // (리뷰 canonical mockup, 2026-10-03). What it offers is unchanged — 전체 and the channels this org holds.
     const filter = (await screen.findByLabelText("채널")) as HTMLSelectElement;
-    expect(screen.getByRole("heading", { level: 1, name: "리뷰" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "리뷰·문의" })).toBeInTheDocument();
     expect(filter.value).toBe("ALL");
     expect(within(filter).getAllByRole("option").map((o) => o.textContent)).toEqual(["전체 채널", "네이버", "쿠팡"]);
     // One read, answered by the server over every channel — nothing merged on this side.
@@ -340,11 +340,11 @@ describe("리뷰 — the workflow surface", () => {
 describe("리뷰 목록의 자리", () => {
   it("기록은 목록 열(max-w-content) 안에 그려지고, 그 밖으로 번지지 않는다", async () => {
     renderAt("/reviews");
-    await screen.findByRole("heading", { level: 1, name: "리뷰" });
+    await screen.findByRole("heading", { level: 1, name: "리뷰·문의" });
 
     const column = screen.getByTestId("master-list");
     // 제목도 목록도 같은 열 안에 있다 — shell이 주는 좌우 여백과 1280 폭을 함께 쓴다.
-    expect(column).toContainElement(screen.getByRole("heading", { level: 1, name: "리뷰" }));
+    expect(column).toContainElement(screen.getByRole("heading", { level: 1, name: "리뷰·문의" }));
     const list = screen.getByRole("region", { name: "목록" });
     expect(column).toContainElement(list);
     expect(column.querySelector(".max-w-content")).not.toBeNull();

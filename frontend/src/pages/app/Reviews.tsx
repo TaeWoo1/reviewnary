@@ -11,6 +11,7 @@ import { reviewAccounts } from "../../lib/reviewAccounts";
 import type { ChannelResponse, SellerAccountResponse } from "../../lib/types";
 import { ReviewRecord } from "./ReviewRecord";
 import { ProductReviews } from "../../components/reviews/ProductReviews";
+import { ReviewInquirySwitch } from "../../components/reviews/ReviewInquirySwitch";
 import { useAgentSurface } from "../../lib/agentPanel";
 
 /**
@@ -66,7 +67,7 @@ export function Reviews() {
   if (loading) {
     return page(
       <>
-        <PageHead title="리뷰" />
+        <PageHead title="리뷰·문의" meta={<ReviewInquirySwitch current="reviews" />} />
         <p className="text-sm text-muted">불러오는 중…</p>
       </>,
     );
@@ -74,7 +75,7 @@ export function Reviews() {
   if (failed) {
     return page(
       <>
-        <PageHead title="리뷰" />
+        <PageHead title="리뷰·문의" meta={<ReviewInquirySwitch current="reviews" />} />
         <Empty
           title="채널 정보를 불러오지 못했습니다"
           body="연결 상태를 확인한 뒤 다시 시도해 주세요."
@@ -99,7 +100,7 @@ export function Reviews() {
   if (targets.length === 0) {
     return page(
       <>
-        <PageHead title="리뷰" />
+        <PageHead title="리뷰·문의" meta={<ReviewInquirySwitch current="reviews" />} />
         <Empty
           title="리뷰를 볼 채널이 아직 없습니다"
           body="네이버 스마트스토어, 쿠팡, 카페24 중 하나를 연결하면 그 채널의 리뷰가 여기에 모입니다."
@@ -135,21 +136,11 @@ export function Reviews() {
       targets={targets}
       head={
         <PageHead
-          title="리뷰"
-          meta={REVIEWS_DESCRIPTION ? <span className="text-sm text-muted">{REVIEWS_DESCRIPTION}</span> : undefined}
+          title="리뷰·문의"
+          meta={<ReviewInquirySwitch current="reviews" />}
           action={<AgentLaunch context={{ surface: "reviews" }} label="리뷰에 대해 물어보기" />}
         />
       }
     />,
   );
 }
-
-/** One line, and it answers 「이 화면은 무엇인가」. */
-/**
- * <b>Empty since 2026-10-01</b> (product-owner decision). It said 「확인이 필요한 리뷰부터 봅니다」 — the
- * default sort — while 「확인 필요순」 stood two rows below as a pressed chip the seller can change. A
- * subtitle that narrates a control the screen already shows is a line of type for nothing.
- *
- * <p>The export stays because the page's own test names it; the page draws no `meta` when it is empty.
- */
-export const REVIEWS_DESCRIPTION = "";

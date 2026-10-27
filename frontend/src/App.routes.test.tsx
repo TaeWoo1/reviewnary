@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { App } from "./App";
 import appSource from "./App.tsx?raw";
@@ -55,10 +55,11 @@ describe("v2 app routes", () => {
     ["/", "오늘"],
     ["/products", "상품"],
     // 리뷰 / 문의 are the workflow doors; memory/reports stay as routes.
-    ["/reviews", "리뷰"],
-    ["/inquiries", "문의"],
+    // 리뷰·문의 is one destination over two record screens (menu decision, 2026-10-27); the switch below says which.
+    ["/reviews", "리뷰·문의"],
+    ["/inquiries", "리뷰·문의"],
     // The mixed queue is absorbed: its bare path lands on 문의.
-    ["/inbox", "문의"],
+    ["/inbox", "리뷰·문의"],
     ["/memory", "반복 문제"],
     ["/reports", "운영 리포트"],
     ["/connect", "채널 연결"],
@@ -78,6 +79,21 @@ describe("v2 app routes", () => {
   });
 });
 
+describe("리뷰·문의 — which side the switch marks", () => {
+  for (const [path, side] of [
+    ["/reviews", "리뷰"],
+    ["/inquiries", "문의"],
+    ["/inbox", "문의"],
+  ] as const) {
+    it(`marks ${side} at ${path}`, async () => {
+      renderAt(path);
+      const sw = await screen.findByRole("navigation", { name: "리뷰·문의" });
+      expect(within(sw).getByRole("link", { name: side })).toHaveAttribute("aria-current", "page");
+      expect(within(sw).getAllByRole("link").filter((link) => link.getAttribute("aria-current") === "page")).toHaveLength(1);
+    });
+  }
+});
+
 describe("legacy routes — live behaviour", () => {
   for (const [from, heading] of [
     ["/issues", "반복 문제"],
@@ -86,7 +102,7 @@ describe("legacy routes — live behaviour", () => {
     ["/connect/channels", "채널 연결"],
     ["/channels", "채널 연결"],
     // The review record moved under 리뷰 (product assembly); the old path redirects.
-    ["/connect/channels/acc-1/reviews", "리뷰"],
+    ["/connect/channels/acc-1/reviews", "리뷰·문의"],
   ] as const) {
     it(`${from} lands on ${heading}`, async () => {
       renderAt(from);
