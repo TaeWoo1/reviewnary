@@ -74,11 +74,11 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    heading: "연결·설정",
+    heading: "연동·설정",
     quiet: true,
     foot: true,
     items: [
-      { to: "/connect", label: "연결", short: "연결", icon: "link" },
+      { to: "/connect", label: "연동", short: "연동", icon: "link" },
       { to: "/settings", label: "설정", short: "설정", icon: "settings" },
     ],
   },

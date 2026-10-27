@@ -102,7 +102,7 @@ content's min-content width, so one long unbroken Korean line would push the pan
 viewport falls back to single-pane; it never squeezes the detail.
 (`docs/frontend/reviewnary_ui_system_audit_v1.md` §7, §10.2.)
 
-**Menu (product-owner decision, 2026-10-27):** three destinations — 홈 · 리뷰·문의 · 상품·정책 — and 연결 · 설정
+**Menu (product-owner decision, 2026-10-27):** three destinations — 홈 · 리뷰·문의 · 상품·정책 — and 연동 · 설정
 pinned to the foot of the rail, inside the same 「주 메뉴」 landmark. 할 일, 반복 문제, 주문 and 리포트 left the menu,
 not the product: their routes stay and are opened from the screens that lead to them. Exactly one row is lit — the
 destination whose own or owned route is the longest match (`navOwner`, `lib/nav.v2.ts`).
@@ -516,15 +516,15 @@ B컷), 해외 AI 답변 도구의 구조(Gorgias·Intercom Fin·Zendesk·Front·
 
 | 개념 | 쓰는 말 | 쓰지 않는 말 | 근거 |
 |---|---|---|---|
-| 메뉴 | 홈 · 리뷰·문의 · 상품·정책 | 오늘 · 할 일 · 반복 문제 · 지식 · 응대 기록 | 사장님 결정 2026-10-27, 「리뷰 관리」「문의 관리」가 국내 표준 |
+| 메뉴 | 홈 · 리뷰·문의 · 상품·정책 · 연동 · 설정 | 오늘 · 할 일 · 반복 문제 · 지식 · 응대 기록 | 사장님 결정 2026-10-27, 「리뷰 관리」「문의 관리」가 국내 표준 |
 | 답 상태 | 미답변 · 답변완료 | 처리 필요 · 확인 필요 · 승인 대기 | 쿠팡·배민·리펀디 공통 |
 | AI가 쓴 답 | AI 답글 · 추천 답글 | 초안 · 드래프트 · 준비된 답변 | 「초안」 라벨은 조사한 곳에 없음. 제안·추천·도우미 |
 | 올리기 | 답글 등록 · 이대로 등록 | 승인 · 승인하고 맡기기 | 「승인」 버튼 0건. 검토 후 게시도 「등록」 |
 | 답의 바탕 | 참고한 내용 · 출처 | 근거 · 기준 후보 · 인용 | 채널톡 「참조」「출처 표기」 |
 | 가게가 아는 것 | 상품 정보 · 정책 · 자주 쓰는 답 · 말투 | 지식 · 운영 기준 · 상품 지식 · 안내 제안 | 채널톡 「지식」(설정 안), 브이리뷰 「지침」, 카페24 「자주 쓰는 답변」 |
 | 빈칸 | 채울 내용 · 아직 없어요 | 정보 부족 · 확인 필요 | 결과로 말한다: 「이 내용이 없어서 감사 인사만 써요」 |
-| 마켓 연결 | (사장님 결정 대기) 연동 · 연결 | — | 국내는 「마켓 연동」이 압도적, 지금 메뉴는 「연결」 |
-| 리뷰에 다는 글 | (사장님 결정 대기) 답글 · 댓글 | — | 배민·크리마·브이리뷰는 「댓글」, 문의는 「답변」 |
+| 마켓 연결 | 연동 · 연동하기 · 연동 끊김 | 연결(채널을 말할 때) | 사장님 결정 2026-10-27. 국내는 「마켓 연동」이 압도적. PC·도우미처럼 기기를 잇는 일은 「연결」로 둔다 |
+| 리뷰에 다는 글 | 답글 | 댓글 | 사장님 결정 2026-10-27(「답글」이 이 제품의 성격에 맞다). 문의에 다는 글은 「답변」 |
 
 ### 12-3. 모양
 

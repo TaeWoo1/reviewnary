@@ -23,7 +23,7 @@ describe("nav.v2 — structure", () => {
   });
 
   it("labels every destination in seller language", () => {
-    expect(NAV_ITEMS.map((item) => item.label)).toEqual(["홈", "리뷰·문의", "상품·정책", "연결", "설정"]);
+    expect(NAV_ITEMS.map((item) => item.label)).toEqual(["홈", "리뷰·문의", "상품·정책", "연동", "설정"]);
   });
 
   it("keeps the routes the menu no longer names, owned by the destination that leads to them", () => {
