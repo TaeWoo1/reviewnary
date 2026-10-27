@@ -107,7 +107,7 @@ const HOME = {
         rating: 1,
         occurredOn: "2026-08-25",
         productName: "선바로 전선몰딩",
-        quote: "상품페이지 설명에 혼선을 줘요.",
+        quote: "합성-상품 설명이 헷갈려요.",
       },
     ],
   },
@@ -233,7 +233,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     // count it, and the line under the heading names it with the way to the queue that holds it.
     renderHome(new Date("2026-09-30T09:30:00+09:00"));
     expect(await screen.findByText("새로 할 일은 없어요.")).toBeInTheDocument();
-    expect(screen.queryByText("상품페이지 설명에 혼선을 줘요.")).toBeNull();
+    expect(screen.queryByText("합성-상품 설명이 헷갈려요.")).toBeNull();
     expect(screen.getByText("할 일에서 보기 →").closest("p")?.textContent).toContain("지난 일 1건");
     // And it is a ★1, so the line names it as one (owner, 2026-10-28): under the rule, not buried by it.
     expect(screen.getByTestId("past-low-rated").textContent).toMatch(/그중 ★1–2 리뷰\s*1건/);
@@ -279,7 +279,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
   it("먼저 볼 일의 리뷰 한 줄은 그 리뷰를 판단하는 화면을 연다", async () => {
     renderHome();
     await screen.findByRole("heading", { name: "할 일" });
-    const row = await screen.findByRole("link", { name: /상품페이지 설명에 혼선을 줘요/ });
+    const row = await screen.findByRole("link", { name: /합성-상품 설명이 헷갈려요/ });
     // `from=work` — 이 화면에서 들어왔다는 표시. 돌아올 곳을 리뷰 화면이 안다.
     expect(row).toHaveAttribute("href", "/reviews/reply/rev-1?from=work");
   });

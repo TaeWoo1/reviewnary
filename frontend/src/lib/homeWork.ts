@@ -388,7 +388,7 @@ export function mergeHomeWork(
   */
   /*
     <b>Inside the reviews, risk before recency</b> (product-owner decision, 2026-10-28, after the walk-through that
-    found 「먼저 볼 일」 led by three ★3–★5 thank-yous while a ★1 「곰돌이 그림에 얼룩」 sat mid-list). A review the
+    found 「먼저 볼 일」 led by three ★3–★5 thank-yous while a ★1 complaint sat mid-list). A review the
     seller still has to judge, or one rated ★1–2, comes first; ★3 next; the rest after — newest first inside each.
     The interview's 「newest first」 still holds for reviews of equal weight.
   */
