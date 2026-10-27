@@ -9,6 +9,8 @@ import type { GeneratedReviewDraftView } from "../lib/types";
 const generateReviewReplyDraft = vi.fn();
 vi.mock("../lib/apiClient", () => ({
   api: {
+    // 「이 리뷰에 맞는 안내」 (2026-10-27): nothing registered, so the block draws nothing.
+    getReviewGuidance: () => Promise.resolve({ attached: [], rejected: [], pickable: [] }),
     generateReviewReplyDraft: (...a: unknown[]) => generateReviewReplyDraft(...a),
     getProductKnowledgeStrict: vi.fn(async () => ({ variants: [] })),
     createProductKnowledgeSource: vi.fn(async () => ({ id: "k-1" })),

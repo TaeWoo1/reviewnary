@@ -4245,3 +4245,22 @@ export interface ReviewCatchUpPlanView {
    */
   executable: boolean;
 }
+
+/** One guidance as the review screen lists it (CustomerPhraseLane.Option, 2026-10-27). */
+export interface ReviewGuidanceOption {
+  sourceId: string;
+  scope: "PRODUCT" | "ORG";
+  title: string;
+  snippet: string | null;
+  /** PHRASE: the customer's words attached it, not yet confirmed. CONFIRMED · PICKED: the seller's. REJECTED: refused. */
+  state: "PHRASE" | "CONFIRMED" | "PICKED" | "REJECTED" | null;
+  /** The customer phrase that attached it, when that is how. */
+  phrase: string | null;
+}
+
+/** 「이 리뷰에 맞는 안내」: attached (draft order), refused, and the rest to pick from. */
+export interface ReviewGuidanceOptions {
+  attached: ReviewGuidanceOption[];
+  rejected: ReviewGuidanceOption[];
+  pickable: ReviewGuidanceOption[];
+}

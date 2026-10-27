@@ -132,6 +132,37 @@ public class OperatorReviewReplyController {
     }
 
     /**
+     * 「이 리뷰에 맞는 안내」 (2026-10-27): the guidance this review's draft is given — chosen by the seller, then attached
+     * by the customer's words — the ones refused, and the rest to pick from. No model call, nothing written.
+     */
+    @GetMapping("/guidance")
+    public com.sellerops.review.draft.CustomerPhraseLane.Options guidance(
+            @AuthenticationPrincipal AuthPrincipal principal, @PathVariable UUID accountId,
+            @PathVariable String actionRef) {
+        return service.guidance(principal.orgId(), accountId, actionRef);
+    }
+
+    /**
+     * The seller's word on one guidance for this review: {@code CONFIRMED} (맞아요), {@code PICKED} (고름) or
+     * {@code REJECTED} (아니에요). It changes the next draft, not the one on screen, and it writes nothing to a channel.
+     */
+    @PutMapping("/guidance/{sourceId}")
+    public com.sellerops.review.draft.CustomerPhraseLane.Options chooseGuidance(
+            @AuthenticationPrincipal AuthPrincipal principal, @PathVariable UUID accountId,
+            @PathVariable String actionRef, @PathVariable UUID sourceId,
+            @RequestBody java.util.Map<String, String> body) {
+        return service.chooseGuidance(principal.orgId(), accountId, actionRef, sourceId,
+                body == null ? null : body.get("choice"), principal.userId());
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/guidance/{sourceId}")
+    public com.sellerops.review.draft.CustomerPhraseLane.Options clearGuidance(
+            @AuthenticationPrincipal AuthPrincipal principal, @PathVariable UUID accountId,
+            @PathVariable String actionRef, @PathVariable UUID sourceId) {
+        return service.clearGuidance(principal.orgId(), accountId, actionRef, sourceId);
+    }
+
+    /**
      * Approve the current draft, or withdraw a standing approval.
      *
      * <p>POST with a client-minted {@code commandId}, matching the triage route rather than the

@@ -23,7 +23,7 @@ package com.sellerops.agent.llm;
 public final class AgentDraftPrompt {
 
     /** Bump on every wording change. It is stamped into the provenance the run records. */
-    public static final String PROMPT_VERSION = "agent-draft-prompt/v14";
+    public static final String PROMPT_VERSION = "agent-draft-prompt/v15";
 
     /**
      * The closed set of reply categories, in the rule drafter's own order.
@@ -321,6 +321,9 @@ public final class AgentDraftPrompt {
                뭉뚱그리지 마세요. 원인을 짐작하거나 고객의 사용법을 탓하지 마세요.
                - 불만에 맞는 안내가 [상품 정보]나 [운영 정책]에 있으면, 사과 다음에 그 안내를 근거에 적힌 \
                그대로 한두 문장으로 전하세요. 근거에 없는 조건(기간·금액·대상)은 덧붙이지 마세요.
+               - 근거 이름에 「후보」가 붙은 것([상품 정보 · 후보] 등)은 고객이 쓴 표현이 맞아 찾은 안내이고, \
+               판매자가 이 후기에 맞다고 확인하지 않았습니다. 후기가 이 상품에서 그 문제를 실제로 겪었다고 \
+               말할 때만 쓰세요. 예전에 쓰던 다른 제품 이야기이거나, 그 문제가 없었다고 말하면 쓰지 마세요.
                - 불만이 담긴 후기는 차분하게 마무리하세요. 「좋은 하루 보내세요」「즐거운 쇼핑 되세요」 \
                「행복한 하루 되세요」처럼 밝은 인사로 끝내지 마세요.
                - 「회사 기본 문구」가 주어지면 그 회사가 평소 쓰는 말투와 인사·마무리 표현을 참고하세요. \

@@ -5,6 +5,7 @@ import { api } from "../lib/apiClient";
 import { Btn } from "./ui/Btn";
 import { Status } from "./ui/Status";
 import { AnswerBasisQuickAdd } from "./inbox/AnswerBasisQuickAdd";
+import { ReviewGuidance } from "./reviews/ReviewGuidance";
 
 /**
  * <b>AI 답변 준비 — the grounded draft, and what it was written from</b> (Grounded Review Drafting v1).
@@ -148,6 +149,10 @@ export function GroundedReviewDraft({
       {result?.unavailableMessage ? (
         <p className="break-keep text-sm text-warn" role="status">{result.unavailableMessage}</p>
       ) : null}
+
+      {/* 다음 초안이 쓸 안내를 판매자가 정하는 자리 (2026-10-27) — 근거 목록 위에 선다: 「왜 이렇게 썼어요?」는 지난
+          초안의 기록이고, 이것은 다음 초안의 재료다. */}
+      <ReviewGuidance accountId={accountId} actionRef={actionRef} />
 
       {evidence.length > 0 ? (
         <div className="flex flex-col gap-1">

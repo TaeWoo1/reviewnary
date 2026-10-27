@@ -99,6 +99,7 @@ import type {
   ReviewReplyOutcomeResponse,
   ReviewReplyPrep,
   GeneratedReviewDraftView,
+  ReviewGuidanceOptions,
   KnowledgeCandidateView,
   KnowledgeWorkbookResult,
   KnowledgeDocumentView,
@@ -1676,6 +1677,35 @@ export const api = {
       `/api/seller-accounts/${accountId}/attention/items/${encodeURIComponent(actionRef)}/reply/draft/generate`,
       {},
       { timeout: MODEL_TIMEOUT_MS },
+    );
+    return data;
+  },
+
+  // 「이 리뷰에 맞는 안내」 (2026-10-27): what the next draft of this review is given, and the seller's word on it.
+  // No model call and nothing reaches a channel; a choice changes the NEXT draft, not the text in the editor.
+  async getReviewGuidance(accountId: string, actionRef: string): Promise<ReviewGuidanceOptions> {
+    const { data } = await http.get<ReviewGuidanceOptions>(
+      `/api/seller-accounts/${accountId}/attention/items/${encodeURIComponent(actionRef)}/reply/guidance`,
+    );
+    return data;
+  },
+
+  async chooseReviewGuidance(
+    accountId: string,
+    actionRef: string,
+    sourceId: string,
+    choice: "CONFIRMED" | "PICKED" | "REJECTED",
+  ): Promise<ReviewGuidanceOptions> {
+    const { data } = await http.put<ReviewGuidanceOptions>(
+      `/api/seller-accounts/${accountId}/attention/items/${encodeURIComponent(actionRef)}/reply/guidance/${sourceId}`,
+      { choice },
+    );
+    return data;
+  },
+
+  async clearReviewGuidance(accountId: string, actionRef: string, sourceId: string): Promise<ReviewGuidanceOptions> {
+    const { data } = await http.delete<ReviewGuidanceOptions>(
+      `/api/seller-accounts/${accountId}/attention/items/${encodeURIComponent(actionRef)}/reply/guidance/${sourceId}`,
     );
     return data;
   },

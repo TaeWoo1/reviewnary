@@ -26,6 +26,8 @@ const saveReviewReplyDraft = vi.fn();
 
 vi.mock("../../lib/apiClient", () => ({
   api: {
+    // 「이 리뷰에 맞는 안내」 (2026-10-27): nothing registered, so the block draws nothing.
+    getReviewGuidance: () => Promise.resolve({ attached: [], rejected: [], pickable: [] }),
     getReviewWorkspace: (...a: unknown[]) => getReviewWorkspace(...a),
     getReviewReplyPrep: (...a: unknown[]) => getReviewReplyPrep(...a),
     getReviewDecisionContext: (...a: unknown[]) => getReviewDecisionContext(...a),

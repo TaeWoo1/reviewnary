@@ -198,4 +198,12 @@ class AgentReviewDraftPayloadFloorTest {
     void theSystemTurnRefusesBlanks() {
         assertThat(AgentDraftPrompt.reviewSystem()).contains("「【확인」으로 시작하는 괄호 문구는 쓰지 마세요");
     }
+
+    @Test
+    void aCandidatePassageIsUsedOnlyWhenTheReviewReportsThatProblem() {
+        // 2026-10-27 evaluation: a phrase match said 「두 개씩」 about the customer's previous dispenser.
+        assertThat(AgentDraftPrompt.reviewSystem()).contains("「후보」가 붙은 것")
+                .contains("예전에 쓰던 다른 제품 이야기이거나, 그 문제가 없었다고 말하면 쓰지 마세요");
+        assertThat(AgentDraftPrompt.PROMPT_VERSION).isEqualTo("agent-draft-prompt/v15");
+    }
 }

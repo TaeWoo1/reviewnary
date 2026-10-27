@@ -196,6 +196,16 @@ class OperatorReviewReplyControllerTest {
             for (PostMapping a : m.getAnnotationsByType(PostMapping.class)) {
                 mapped.addAll(List.of(a.value()));
             }
+            // A DELETE (or PATCH) is a route too: before 2026-10-27 this reader skipped them, so such a mapping would have
+            // passed the outbound check unread (FINDINGS B40).
+            for (org.springframework.web.bind.annotation.DeleteMapping a
+                    : m.getAnnotationsByType(org.springframework.web.bind.annotation.DeleteMapping.class)) {
+                mapped.addAll(List.of(a.value()));
+            }
+            for (org.springframework.web.bind.annotation.PatchMapping a
+                    : m.getAnnotationsByType(org.springframework.web.bind.annotation.PatchMapping.class)) {
+                mapped.addAll(List.of(a.value()));
+            }
             for (RequestMapping a : m.getAnnotationsByType(RequestMapping.class)) {
                 mapped.addAll(List.of(a.value()));
             }
@@ -214,8 +224,11 @@ class OperatorReviewReplyControllerTest {
         // version through the same path /draft writes through, reaching three retrieval lanes in this
         // database and at most one model. It approves nothing and reaches no marketplace.
         // 2026-10-27 adds /draft/grounds: a GET that runs the draft's retrieval and stops — no model, no version.
+        // 2026-10-27 adds 「이 리뷰에 맞는 안내」: GET /guidance reads, PUT and DELETE /guidance/{sourceId} record or take back
+        // the seller's word on one guidance for this review — a row in this database, no model, no marketplace.
         assertThat(mapped).containsExactlyInAnyOrder("/draft", "/draft/generate", "/draft/grounds", "/approval",
-                "/submission-run", "/outcome", "/execute", "/execution", "/execution/observe");
+                "/submission-run", "/outcome", "/execute", "/execution", "/execution/observe", "/guidance",
+                "/guidance/{sourceId}", "/guidance/{sourceId}");
     }
 
     private static void assertNotOutbound(String path) {

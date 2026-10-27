@@ -284,6 +284,36 @@ public class ReviewReplyService {
         return composer.groundsFor(orgId, review, VocPreviewSanitizer.redactFullBody(review.getBody()).text());
     }
 
+    /** 「이 리뷰에 맞는 안내」 — what the review is given, refused, and could be given (2026-10-27). No model call. */
+    public com.sellerops.review.draft.CustomerPhraseLane.Options guidance(UUID orgId, UUID accountId, String actionRef) {
+        Review review = authorize(orgId, accountId, actionRef);
+        return composerOrConflict().guidanceOptions(orgId, review,
+                VocPreviewSanitizer.redactFullBody(review.getBody()).text());
+    }
+
+    /** The seller's 「맞아요」 · pick · 「아니에요」 for one guidance on one review. The next draft follows it. */
+    public com.sellerops.review.draft.CustomerPhraseLane.Options chooseGuidance(UUID orgId, UUID accountId,
+                                                                               String actionRef, UUID sourceId,
+                                                                               String choice, UUID actorUserId) {
+        Review review = authorize(orgId, accountId, actionRef);
+        return composerOrConflict().chooseGuidance(orgId, review,
+                VocPreviewSanitizer.redactFullBody(review.getBody()).text(), sourceId, choice, actorUserId);
+    }
+
+    public com.sellerops.review.draft.CustomerPhraseLane.Options clearGuidance(UUID orgId, UUID accountId,
+                                                                              String actionRef, UUID sourceId) {
+        Review review = authorize(orgId, accountId, actionRef);
+        return composerOrConflict().clearGuidance(orgId, review,
+                VocPreviewSanitizer.redactFullBody(review.getBody()).text(), sourceId);
+    }
+
+    private com.sellerops.review.draft.ReviewDraftComposer composerOrConflict() {
+        if (composer == null) {
+            throw ApiException.conflict("AI 초안 기능을 사용할 수 없습니다.");
+        }
+        return composer;
+    }
+
     /**
      * Approve or withdraw.
      *

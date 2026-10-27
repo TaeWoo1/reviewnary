@@ -535,4 +535,37 @@ class ReviewDraftComposerTest {
                 .filteredOn(p -> adhesion.equals(p.sourceId())).hasSize(1);
         assertThat(ReviewDraftComposer.withPhraseHits(full, List.of())).isSameAs(full);
     }
+
+    @Test
+    @DisplayName("a guidance the seller refused for this review is dropped from the scorer's passages too")
+    void aRefusedSourceLeavesTheScorersPassages() {
+        UUID refused = UUID.randomUUID();
+        ScopedPassage scored = new ScopedPassage(KnowledgeScope.PRODUCT, "실크벽지 부착", "폼 양면테이프를 덧대 주세요.",
+                refused, UUID.randomUUID(), "product-knowledge/USAGE:판매자", 0.4);
+        ScopedPassage past = new ScopedPassage(KnowledgeScope.PAST_ANSWER, "지난 답변", "감사합니다.", null,
+                UUID.randomUUID(), "answer-memory", 0.3);
+        InquiryEvidence found = new InquiryEvidence(null, DraftKnowledgeState.GROUNDED, List.of(scored, past), null, 0);
+
+        InquiryEvidence kept = ReviewDraftComposer.withoutSources(found, java.util.Set.of(refused));
+
+        assertThat(kept.passages()).containsExactly(past);
+        assertThat(kept.state()).as("no current passage is left").isEqualTo(DraftKnowledgeState.NO_MATCH);
+        assertThat(ReviewDraftComposer.withoutSources(found, java.util.Set.of())).isSameAs(found);
+    }
+
+    @Test
+    @DisplayName("a passage only the customer's words attached reaches the model marked as a candidate")
+    void anUnconfirmedPhraseHitIsMarkedACandidate() {
+        UUID hit = UUID.randomUUID();
+        ScopedPassage phrase = new ScopedPassage(KnowledgeScope.PRODUCT, "실크벽지 부착", "폼 양면테이프를 덧대 주세요.",
+                hit, null, "product-knowledge/USAGE:판매자", 1.0);
+        ScopedPassage chosen = new ScopedPassage(KnowledgeScope.PRODUCT, "자르기", "여러 번 그어 자르세요.",
+                UUID.randomUUID(), null, "product-knowledge/USAGE:판매자", 1.0);
+
+        List<AgentDraftGenerator.Passage> shown = ReviewDraftComposer.passagesFor(List.of(phrase, chosen),
+                java.util.Set.of(hit));
+
+        assertThat(shown.get(0).scopeLabel()).isEqualTo(KnowledgeScope.PRODUCT.labelKo() + " · 후보");
+        assertThat(shown.get(1).scopeLabel()).isEqualTo(KnowledgeScope.PRODUCT.labelKo());
+    }
 }

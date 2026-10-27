@@ -233,7 +233,8 @@ public class ReviewDraftComposer {
     public GeneratedReviewDraftView compose(UUID orgId, Review review, String redactedBody,
                                             String actor) {
         UUID productId = retriever.namedProduct(orgId, review.getProductId());
-        InquiryEvidenceRetriever.InquiryEvidence retrieved = retrieve(orgId, review, redactedBody, productId);
+        Retrieved both = retrieveWith(orgId, review, redactedBody, productId);
+        InquiryEvidenceRetriever.InquiryEvidence retrieved = both.evidence();
 
         ReviewReplyTemplateKey key = RuleBasedReviewReplyProvider.keyFor(
                 new ReviewReplyContext(orgId, review.getId(), redactedBody, review.getRating()));
@@ -254,7 +255,8 @@ public class ReviewDraftComposer {
         List<ScopedPassage> cited = List.of();
 
         if (grounded || pastAnswerOnly) {
-            Written written = writeGrounded(orgId, redactedBody, retrieved.passages(), template.body(), mood);
+            Written written = writeGrounded(orgId, redactedBody, retrieved.passages(), both.candidates(),
+                    template.body(), mood);
             unavailable = written.unavailable();
             if (written.body() != null) {
                 body = written.body();
@@ -270,7 +272,7 @@ public class ReviewDraftComposer {
             // chosen by topic, not by what the customer felt. Nothing it could promise survives: the guard is shown
             // no current evidence, so every remedy is refused and the floor is saved instead, as when the model is
             // off or fails.
-            Written written = writeGrounded(orgId, redactedBody, List.of(), template.body(), mood);
+            Written written = writeGrounded(orgId, redactedBody, List.of(), java.util.Set.of(), template.body(), mood);
             unavailable = written.unavailable();
             if (written.body() != null) {
                 body = written.body();
@@ -315,6 +317,14 @@ public class ReviewDraftComposer {
      */
     private InquiryEvidenceRetriever.InquiryEvidence retrieve(UUID orgId, Review review, String redactedBody,
                                                                UUID productId) {
+        return retrieveWith(orgId, review, redactedBody, productId).evidence();
+    }
+
+    /** The retrieval, and which of its passages only the customer's words attached — candidates to the model. */
+    record Retrieved(InquiryEvidenceRetriever.InquiryEvidence evidence, java.util.Set<UUID> candidates) {
+    }
+
+    private Retrieved retrieveWith(UUID orgId, Review review, String redactedBody, UUID productId) {
         // What went wrong first, then the review whole (2026-10-27): asked whole, a review's complaint drowned in its
         // praise and a registered note was found for 3 of 79 reviews that complained about exactly it.
         List<String> complaints = ReviewComplaintClauses.of(redactedBody);
@@ -328,9 +338,30 @@ public class ReviewDraftComposer {
                 && moodOf(review.getRating(), redactedBody) == AgentDraftGenerator.ReviewMood.UNSTATED
                 && !com.sellerops.knowledge.QuestionShape.asks(redactedBody);
         // The seller's own expressions are read even on praise: a review that says 「떨어져요」 is not only praise, and a
-        // denial (「안 떨어져요」) is not a hit (CustomerPhrases).
-        List<ScopedPassage> named = phraseLane == null ? List.of() : phraseLane.hits(orgId, productId, redactedBody);
-        return withPhraseHits(praise ? withoutFacts(found) : found, named);
+        // denial (「안 떨어져요」) is not a hit (CustomerPhrases). What the seller chose for this review comes first, and a
+        // guidance they refused for it is not given — not by the phrase lane, not by the scorer (2026-10-27).
+        CustomerPhraseLane.ForReview named = phraseLane == null ? CustomerPhraseLane.ForReview.NONE
+                : phraseLane.forReview(orgId, review.getId(), productId, redactedBody);
+        InquiryEvidenceRetriever.InquiryEvidence kept = withoutSources(praise ? withoutFacts(found) : found,
+                named.rejected());
+        return new Retrieved(withPhraseHits(kept, named.passages()), named.candidates());
+    }
+
+    /** The retrieval without the passages of {@code refused} sources — the seller said they are not this review's. */
+    static InquiryEvidenceRetriever.InquiryEvidence withoutSources(InquiryEvidenceRetriever.InquiryEvidence found,
+                                                                   java.util.Set<UUID> refused) {
+        // A past answer has no source id, and an immutable set refuses to be asked about null.
+        java.util.function.Predicate<ScopedPassage> out = p -> p.sourceId() != null && refused.contains(p.sourceId());
+        if (refused.isEmpty() || found.passages().stream().noneMatch(out)) {
+            return found;
+        }
+        List<ScopedPassage> kept = found.passages().stream().filter(out.negate()).toList();
+        boolean current = kept.stream().anyMatch(p -> p.scope().current());
+        DraftKnowledgeState state = found.state() == DraftKnowledgeState.GROUNDED && !current
+                ? DraftKnowledgeState.NO_MATCH : found.state();
+        return new InquiryEvidenceRetriever.InquiryEvidence(found.productId(), state, kept, found.order(),
+                found.supersededMemories(), found.productOutcome(), found.policyOutcome(),
+                found.policyTopicsDeclared());
     }
 
     /**
@@ -394,6 +425,38 @@ public class ReviewDraftComposer {
     }
 
     /**
+     * The guidance this review is given and what else it could be (2026-10-27): attached — chosen by the seller, then
+     * attached by the customer's words — refused, and the rest of this product's notes and the company's rules to pick
+     * from. No model, nothing written.
+     */
+    public CustomerPhraseLane.Options guidanceOptions(UUID orgId, Review review, String redactedBody) {
+        if (phraseLane == null) {
+            return new CustomerPhraseLane.Options(List.of(), List.of(), List.of());
+        }
+        UUID productId = retriever.namedProduct(orgId, review.getProductId());
+        return phraseLane.options(orgId, review.getId(), productId, redactedBody);
+    }
+
+    /** Record the seller's 「맞아요」 · pick · 「아니에요」 for one guidance on this review, and answer the new options. */
+    public CustomerPhraseLane.Options chooseGuidance(UUID orgId, Review review, String redactedBody, UUID sourceId,
+                                                     String choice, UUID actorUserId) {
+        if (phraseLane == null) {
+            throw com.sellerops.common.ApiException.conflict("안내 선택을 저장할 수 없습니다.");
+        }
+        UUID productId = retriever.namedProduct(orgId, review.getProductId());
+        phraseLane.choose(orgId, review.getId(), productId, redactedBody, sourceId, choice, actorUserId, null);
+        return phraseLane.options(orgId, review.getId(), productId, redactedBody);
+    }
+
+    /** Take back what the seller said about one guidance on this review. */
+    public CustomerPhraseLane.Options clearGuidance(UUID orgId, Review review, String redactedBody, UUID sourceId) {
+        if (phraseLane != null) {
+            phraseLane.clear(orgId, review.getId(), sourceId);
+        }
+        return guidanceOptions(orgId, review, redactedBody);
+    }
+
+    /**
      * The texts that may license a promise in a reply to this review NOW: the current evidence the same retrieval
      * finds today, and the seller's own saved wording for this kind of review (never checked when a draft is written
      * from it, so it is the seller's standing word). What {@link ReviewDraftRecheck} holds a sent-back reply to —
@@ -450,7 +513,7 @@ public class ReviewDraftComposer {
      * pass and no second call: a draft that promised something the seller never agreed to is not
      * improved by asking again with the same evidence.
      */
-    private Written writeGrounded(UUID orgId, String reviewBody, List<ScopedPassage> passages,
+    private Written writeGrounded(UUID orgId, String reviewBody, List<ScopedPassage> passages, java.util.Set<UUID> candidates,
                                   String voice, AgentDraftGenerator.ReviewMood mood) {
         if (!model.isEnabledFor(orgId)) {
             return new Written(null, CAPABILITY_OFF);
@@ -464,7 +527,7 @@ public class ReviewDraftComposer {
         List<String> banned = styleGuard == null ? List.of() : styleGuard.enforced(orgId);
         // How the seller wants to sound — set in 답변 스타일 (owner, 2026-10-27).
         String manner = styleGuard == null ? null : styleGuard.manner(orgId);
-        Optional<String> written = model.draftReviewReply(orgId, reviewBody, passagesFor(passages), voice, banned,
+        Optional<String> written = model.draftReviewReply(orgId, reviewBody, passagesFor(passages, candidates), voice, banned,
                 mood, manner);
         if (written.isEmpty()) {
             return new Written(null, MODEL_FAILED);
@@ -483,7 +546,7 @@ public class ReviewDraftComposer {
         // passes the same final check as the first, or the first stands (2026-10-27 review: it skipped the blank).
         List<String> found = styleGuard == null ? List.of() : styleGuard.forbiddenIn(candidate, orgId);
         if (!found.isEmpty() && quota.consume(orgId, AgentUsageKind.DRAFT, null).allowed()) {
-            Optional<String> again = model.draftReviewReply(orgId, reviewBody, passagesFor(passages), voice,
+            Optional<String> again = model.draftReviewReply(orgId, reviewBody, passagesFor(passages, candidates), voice,
                     styleGuard.enforced(orgId), mood, manner);
             if (again.isPresent() && refusalOf(again.get(), current, reviewBody) == null) {
                 candidate = again.get();
@@ -546,11 +609,19 @@ public class ReviewDraftComposer {
     }
 
     /** The passages as the model sees them: scope label, heading, text. No ids, no scores. */
-    private static List<AgentDraftGenerator.Passage> passagesFor(List<ScopedPassage> passages) {
+    static List<AgentDraftGenerator.Passage> passagesFor(List<ScopedPassage> passages, java.util.Set<UUID> candidates) {
         return passages.stream()
-                .map(p -> new AgentDraftGenerator.Passage(p.scope().labelKo(), p.heading(), p.text()))
+                .map(p -> new AgentDraftGenerator.Passage(p.sourceId() != null && candidates.contains(p.sourceId())
+                        ? p.scope().labelKo() + " · " + CANDIDATE_LABEL : p.scope().labelKo(), p.heading(), p.text()))
                 .toList();
     }
+
+    /**
+     * What a passage the customer's words attached, and the seller has not confirmed, is called to the model (2026-10-27
+     * evaluation): a phrase match said 「두 개씩」 about the customer's previous dispenser and 「깨져」 about other
+     * moldings. The prompt says how to read it ({@code AgentDraftPrompt}).
+     */
+    static final String CANDIDATE_LABEL = "후보";
 
     /** Store what this version was written from, and return it as the citation list. */
     private List<DraftEvidenceView> recordEvidence(UUID orgId, UUID reviewId, int version,
