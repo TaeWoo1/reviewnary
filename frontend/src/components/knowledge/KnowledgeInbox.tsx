@@ -128,7 +128,7 @@ function CandidateRow({
           <span className="block truncate text-xs text-muted">
             {source}
             {!isGap && candidate.evidenceCount > 0
-              ? ` · ${isGuidance ? "같은 문제 리뷰" : "지난 답변"} ${candidate.evidenceCount}건`
+              ? ` · ${isGuidance ? "관련 리뷰" : "지난 답변"} ${candidate.evidenceCount}건`
               : null}
           </span>
         </span>

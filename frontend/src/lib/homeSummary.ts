@@ -184,8 +184,11 @@ export function freshnessUnproven(metrics: OperationsMetrics | null | undefined)
 }
 
 export const UNANSWERED_WORD = {
-  /** The noun the 문의 screen and `/overview` already use, so one number has one name. */
-  lead: "미답변",
+  /**
+   * The noun the 문의 screen and `/overview` already use, so one number has one name — with the noun it counts
+   * (2026-10-28): the 리뷰 filter beside it also says 미답변, of reviews, and read 3,499 against this cell's 「—」.
+   */
+  lead: "미답변 문의",
   /** Some channel is missing from the population — the figure would be a floor presented as a total. */
   unqualified: "최근에 가져왔는지 몰라요",
 } as const;

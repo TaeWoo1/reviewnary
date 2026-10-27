@@ -126,17 +126,21 @@ export function ReportsV2() {
   }, [params, report, setParams]);
 
   const kindToggle = (
-    <div role="group" aria-label="리포트 기간" className="inline-flex gap-1">
+    // A choice between two views, drawn as the one switch 리뷰|문의 uses (2026-10-28): the solid dark fill is kept for
+    // a screen's one main action, and here it was spent on 「주간」.
+    <div role="group" aria-label="리포트 기간" className="inline-flex gap-0.5 rounded-xl bg-well p-0.5 shadow-[var(--press-groove)]">
       {(["WEEKLY", "MONTHLY"] as const).map((k) => (
-        <Btn
+        <button
           key={k}
-          size="sm"
-          variant={k === kind ? "solid" : "outline"}
+          type="button"
           aria-pressed={k === kind}
           onClick={() => switchKind(k)}
+          className={`rounded-lg px-3 py-1 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
+            k === kind ? "bg-surface font-semibold text-ink shadow-card" : "font-medium text-muted hover:text-ink"
+          }`}
         >
           {k === "WEEKLY" ? "주간" : "월간"}
-        </Btn>
+        </button>
       ))}
     </div>
   );

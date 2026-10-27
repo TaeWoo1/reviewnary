@@ -218,7 +218,10 @@ export function MasterDetail({
         <div
           ref={scroller}
           className={`relative min-h-0 flex-1 overflow-y-auto ${
-            rail ? "px-4 pb-8 pt-6" : "px-4 pb-28 pt-4 md:px-8 md:pb-8 md:pt-6"
+            // Under a docked composer the bottom air is twice its 32px fade (2026-10-28): at md:pb-8 the Home's last
+            // links ended inside the fade, half hidden and covered when focused — the rule ConversationWorkspace's own
+            // scroller already keeps.
+            rail ? "px-4 pb-8 pt-6" : `px-4 pb-28 pt-4 md:px-8 md:pt-6 ${footer ? "md:pb-16" : "md:pb-8"}`
           }`}
           data-testid="master-list"
         >

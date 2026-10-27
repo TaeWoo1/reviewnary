@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { MOBILE_TABS, navItemOwns } from "../../lib/nav.v2";
 import { NavIcon } from "../icons/NavIcon";
+import { useTodayWorkCount } from "../../lib/useTodayWorkCount";
 
 const TAB_BASE =
   "flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 px-1 text-xs font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700";
@@ -14,6 +15,7 @@ const TAB_BASE =
  */
 export function MobileBottomNav({ onMore }: { onMore: () => void }) {
   const { pathname } = useLocation();
+  const work = useTodayWorkCount();
   return (
     <nav
       aria-label="모바일 메뉴"
@@ -28,8 +30,18 @@ export function MobileBottomNav({ onMore }: { onMore: () => void }) {
             `${TAB_BASE} ${navItemOwns(tab, pathname) ? "text-brand-700" : "text-muted"}`
           }
         >
-          <NavIcon name={tab.icon} />
-          <span>{tab.short ?? tab.label}</span>
+          <span className="relative">
+            <NavIcon name={tab.icon} />
+            {tab.badge === "work" && work ? (
+              <span className="absolute -right-3 -top-1.5 rounded-full bg-brand-700 px-1 text-[10px] font-semibold leading-4 tabular-nums text-white">
+                {work > 99 ? "99+" : work}
+              </span>
+            ) : null}
+          </span>
+          <span>
+            {tab.short ?? tab.label}
+            {tab.badge === "work" && work ? <span className="sr-only"> {work}건</span> : null}
+          </span>
         </NavLink>
       ))}
       <button

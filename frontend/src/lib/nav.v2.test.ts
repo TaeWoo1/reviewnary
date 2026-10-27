@@ -23,7 +23,7 @@ describe("nav.v2 — structure", () => {
   });
 
   it("labels every destination in seller language", () => {
-    expect(NAV_ITEMS.map((item) => item.label)).toEqual(["홈", "리뷰·문의", "상품·정책", "연동", "설정"]);
+    expect(NAV_ITEMS.map((item) => item.label)).toEqual(["할 일", "리뷰·문의", "상품·정책", "연동", "설정"]);
   });
 
   it("keeps the routes the menu no longer names, owned by the destination that leads to them", () => {
@@ -37,7 +37,11 @@ describe("nav.v2 — structure", () => {
     // Under /settings, but 정책 is 상품·정책's: the longest owned route wins, so exactly one row is lit.
     expect(owner("/settings/policies")).toEqual(["상품·정책"]);
     expect(owner("/settings/alerts")).toEqual(["설정"]);
-    expect(owner("/")).toEqual(["홈"]);
+    expect(owner("/")).toEqual(["할 일"]);
+    // 할 일 is lit on the queue it heads (2026-10-28) — the walk-through found it lit nowhere there.
+    expect(owner("/customer-operations/cases")).toEqual(["할 일"]);
+    expect(owner("/customer-operations/cases/c1")).toEqual(["할 일"]);
+    expect(owner("/customer-operations")).toEqual([]);
     expect(owner("/orders")).toEqual([]);
   });
 

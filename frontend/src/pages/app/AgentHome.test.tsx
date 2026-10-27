@@ -202,7 +202,7 @@ describe("greeting — arithmetic, never a model", () => {
    */
   it("the context strip carries the waiting work and nothing else", () => {
     const strip = contextStrip(overview());
-    expect(strip.map((k) => k.label)).toEqual(["미답변"]);
+    expect(strip.map((k) => k.label)).toEqual(["미답변 문의"]);
     // The same noun the other Home's band uses for the same fact — one product, one word.
     expect(strip.map((k) => k.label)).not.toContain("현재 미답변 문의");
     expect(contextStrip(overview(), false, 22).map((k) => k.label)).toEqual(["할 일"]);
@@ -239,7 +239,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     renderHome();
     const title = await screen.findByRole("heading", { level: 1, name: "오늘" });
     expect(title.className).toContain("text-title");
-    expect(screen.getByText("먼저 볼 일")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "할 일" })).toBeInTheDocument();
     expect(screen.getByLabelText("오늘 바뀐 것")).toBeInTheDocument();
     expect(screen.getByLabelText("반복 문제")).toBeInTheDocument();
     expect(screen.getByLabelText("채널 상태")).toBeInTheDocument();
@@ -273,7 +273,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
 
   it("먼저 볼 일의 리뷰 한 줄은 그 리뷰를 판단하는 화면을 연다", async () => {
     renderHome();
-    await screen.findByText("먼저 볼 일");
+    await screen.findByRole("heading", { name: "할 일" });
     const row = await screen.findByRole("link", { name: /상품페이지 설명에 혼선을 줘요/ });
     // `from=work` — 이 화면에서 들어왔다는 표시. 돌아올 곳을 리뷰 화면이 안다.
     expect(row).toHaveAttribute("href", "/reviews/reply/rev-1?from=work");
@@ -335,7 +335,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     getCustomerOperationsHome.mockRejectedValue(new Error("responsibility down"));
     renderHome();
     await screen.findByRole("heading", { level: 1, name: "오늘" });
-    expect(screen.getByText("먼저 볼 일")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "할 일" })).toBeInTheDocument();
     expect(screen.getByLabelText("채널 상태")).toBeInTheDocument();
     // 네 개의 성긴 영역도, 그 아래 「지금 처리할 일이 N건」 대화 턴도 없다.
     expect(screen.queryByLabelText("오늘 확인할 것")).toBeNull();
@@ -416,7 +416,7 @@ describe("return-visit signal", () => {
     renderHome();
     await screen.findByRole("heading", { name: "오늘" });
     // The screen the seller came for is drawn exactly as it is when the signal succeeds.
-    expect(await screen.findByText("먼저 볼 일")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "할 일" })).toBeTruthy();
   });
 });
 

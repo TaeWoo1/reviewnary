@@ -58,6 +58,7 @@ function ChannelRow({
   statusLoading,
   reviewCount,
   reviewLane,
+  collectedAt,
   onNotice,
   onStartReviewSetup,
 }: {
@@ -68,6 +69,8 @@ function ChannelRow({
   reviewCount: number | null;
   /** 이 계정의 브라우저 수집 사실. 계정이 없거나 아직 읽지 못했으면 null. */
   reviewLane: { readiness: ScreenReadReadinessState | null; lastReadAt: string | null } | null;
+  /** The last collection that read data (`lib/channelFreshness`); undefined when the coverage read did not land. */
+  collectedAt?: number | null;
   onNotice: (message: string) => void;
   /** 계정이 없으면 만들고 상품평 수집 화면을 연다. 자격은 받지 않는다. */
   onStartReviewSetup: (channel: ChannelResponse, account: SellerAccountResponse | null) => void;
@@ -76,7 +79,14 @@ function ChannelRow({
   const canUpload =
     channel.status === "FILE_UPLOAD_SUPPORTED" || channel.actionLabel === "파일 업로드";
   const support = channelSupportDisplay(channel);
-  const lastCollected = health?.lastSyncedAt ?? channel.lastSyncedAt;
+  // The Home's answer to the same question (2026-10-28): a collection that read data. The connection's own sync time
+  // stands in only when that read did not land.
+  const lastCollected =
+    collectedAt !== undefined
+      ? collectedAt === null
+        ? null
+        : new Date(collectedAt).toISOString()
+      : (health?.lastSyncedAt ?? channel.lastSyncedAt);
   const failing = !!health && (health.consecutiveFailures > 0 || !!health.lastError);
   const action = channelCardAction(channel, account, canUpload, failing);
   // One word for how this channel stands (A5): 연결됨 · 연결 필요 · 연결 중 · 재연결 필요 · 오류.
@@ -321,6 +331,7 @@ export function ChannelList({
   /** Collected 상품평 per account, for the rows that have a record. Absent = unknown, never zero. */
   reviewCounts,
   reviewLanes,
+  collectedAt,
   onNotice,
   onStartReviewSetup,
   /** True while the catalog itself is still loading (as opposed to loaded-and-empty or failed). */
@@ -335,6 +346,8 @@ export function ChannelList({
   reviewCounts?: Map<string, number>;
   /** 계정별 브라우저 수집 사실(준비 상태 · 화면 수집의 마지막 성공). 읽지 못한 계정은 목록에 없다. */
   reviewLanes?: Map<string, { readiness: ScreenReadReadinessState | null; lastReadAt: string | null }>;
+  /** Per channel code, the last collection that read data; absent when the coverage read did not land. */
+  collectedAt?: Map<string, number | null>;
   onNotice: (message: string) => void;
   onStartReviewSetup: (channel: ChannelResponse, account: SellerAccountResponse | null) => void;
   channelsLoading?: boolean;
@@ -374,6 +387,7 @@ export function ChannelList({
               statusLoading={statusLoading}
               reviewCount={account ? reviewCounts?.get(account.id) ?? null : null}
               reviewLane={account ? reviewLanes?.get(account.id) ?? null : null}
+              collectedAt={collectedAt ? (collectedAt.get(channel.code) ?? null) : undefined}
               onNotice={onNotice}
               onStartReviewSetup={onStartReviewSetup}
             />

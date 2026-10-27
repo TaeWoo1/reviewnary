@@ -1,3 +1,4 @@
+import { mergeHomeWork, todayWork } from "../../lib/homeWork";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { safetyLabel } from "../../lib/safetyLabel";
 import { Link, useSearchParams } from "react-router-dom";
@@ -200,8 +201,10 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
       .then(() => api.getReviewWorkStrict())
       .then((work) => {
         if (!live) return;
-        const committed = work.committed.reduce((n, account) => n + account.todo.length, 0);
-        setWorkCount(work.attentionTotal + committed);
+        // 할 일's one count (`todayWork`, 2026-10-28): the same rows the queue's tab and the Home count — this link
+        // said 54 beside a Home that said 49.
+        const now = new Date();
+        setWorkCount(todayWork(mergeHomeWork(null, null, null, now, work).rows, now).length);
       })
       .catch(() => live && changes === 0 && setWorkCount(null));
     Promise.resolve()

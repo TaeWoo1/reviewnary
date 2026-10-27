@@ -156,7 +156,14 @@ channels (`tailwind.config.ts`), so the system lives in one file.
 ## 5. Colour
 
 The action colour is **Coral's ink board** (`brand-700` → `--lch-board`): the primary button is dark stock with its
-label pressed in, links are ink with an underline, and the active menu row is raised paper. Coral itself
+label pressed in, links are ink with an underline, and the active menu row is raised paper.
+
+**The one accent rule (2026-10-28, owner: keep Coral, fix the emphasis).** The dark fill is spent on **one main action
+per screen** — 답글 확정, 등록 — and on 할 일's count badge, and nowhere else. A choice between two or three views
+(리뷰 | 문의, 주간 | 월간) is the pressed groove with a card in the chosen stop, never a dark fill. A press that cannot
+go through stays pressable and says why beside itself; it is not drawn at 40% opacity. Coral is **not** a button
+colour: at hue 33 it sits between `bad` (27) and `warn` (50), and a coral primary reads as a warning. Status keeps
+three colours — `bad` 위험 · `warn` 주의 · `good` 정상. Coral itself
 (`paid`, `--color-paid`) is spent on **one settled state** — 등록됨 — and on focus. No blue anywhere, no gradients,
 no glow, no glass.
 
@@ -529,11 +536,13 @@ B컷), 해외 AI 답변 도구의 구조(Gorgias·Intercom Fin·Zendesk·Front·
 
 | 개념 | 쓰는 말 | 쓰지 않는 말 | 근거 |
 |---|---|---|---|
-| 메뉴 | 홈 · 리뷰·문의 · 상품·정책 · 연동 · 설정 | 오늘 · 할 일 · 반복 문제 · 지식 · 응대 기록 | 사장님 결정 2026-10-27, 「리뷰 관리」「문의 관리」가 국내 표준 |
+| 메뉴 | 할 일(건수) · 리뷰·문의 · 상품·정책 · 연동 · 설정 | 홈 · 오늘 · 반복 문제 · 지식 · 응대 기록 | 사장님 결정 2026-10-27, 2026-10-28에 첫 항목을 「할 일」로(건수 뱃지, 할 일 목록 화면도 이 항목이 밝힌다). 「리뷰 관리」「문의 관리」가 국내 표준 |
 | 답 상태 | 미답변 · 답변완료 | 처리 필요 · 확인 필요 · 승인 대기 | 쿠팡·배민·리펀디 공통 |
 | 리뷰 분류(자동) | 먼저 볼 리뷰 · 지켜볼 리뷰 · 일반 리뷰 | 확인 필요 · 지켜보기 · 참고 | 사장님 결정 2026-10-27. 사장님이 바꾼 분류는 「내가 바꿈」, 자동은 「자동 분류」(「시스템 판단」 · 「판매자 수정」을 쓰지 않음) |
 | 처리 방법(사장님) | 답글 달기 · 나중에 보기 · 답글 안 함 | 대응 필요 · 두고 보기 · 조치 불필요 | 사장님 결정 2026-10-27. 누르면 일어날 일을 말한다 |
-| 홈 숫자 | 오늘 할 일 · 등록 중 · 미답변, 칩 「확정 전」 | 내가 할 일 · 실행 대기 · 현재 미답변 · 승인 대기 | 사장님 결정 2026-10-27. 한 건 화면의 「내가 할 일」은 그대로(오늘의 일이 아니다) |
+| 홈 숫자 | 오늘 할 일 · 등록 중 · 미답변 문의, 칩 「확정 전」 | 내가 할 일 · 실행 대기 · 현재 미답변 · 승인 대기 | 사장님 결정 2026-10-27. 2026-10-28: 「미답변」은 리뷰 필터에도 있어 「미답변 문의」로 센 것을 밝힌다. 홈 목록의 제목은 메뉴와 같은 「할 일」 |
+| 할 일의 상태(행 · 칩 공통) | 판단 필요 · 답글 필요 · 답변 필요 · 확정 전 · 확정함 · 등록 중 | 확인 필요 · 살펴볼 일 · 살펴볼 리뷰 · 초안 필요 · 승인할 일 · 답변할 문의 · 아직 안 정함 · 판단 전 · 승인됨 | 2026-10-28 화면 점검: 같은 상태에 이름이 여러 개였다. 칩은 행이 단 상태어 그대로(`WORK_FILTERS` ← `WORK_STATE`) |
+| 할 일 수 | 「할 일 N」 하나 — 2주 넘은 리뷰·1년 넘은 문의(지난 일)를 뺀 수 | 화면마다 다른 셈 | 2026-10-28: 홈 49 · 할 일 54 · 리뷰 화면 54가 한 아침에 섰다. 메뉴 뱃지 · 홈 · 할 일 탭 · 리뷰 화면 링크가 모두 `todayWork`로 센다. 지난 일은 따로 「지난 일 N건」 |
 | 조사 | 받침을 보고 고른다(`ro()`, `josa()`) | 「(으)로」 「을(를)」 | 고르지 못한 조사는 틀을 그대로 보여 주는 모양이다 |
 | AI가 쓴 답 | AI 답글 · 추천 답글 | 초안 · 드래프트 · 준비된 답변 | 「초안」 라벨은 조사한 곳에 없음. 제안·추천·도우미 |
 | 올리기 | 답글 등록 · 이대로 등록 | 승인 · 승인하고 맡기기 | 「승인」 버튼 0건. 검토 후 게시도 「등록」 |

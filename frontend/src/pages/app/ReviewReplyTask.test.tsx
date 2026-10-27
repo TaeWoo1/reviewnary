@@ -1109,7 +1109,7 @@ describe("리뷰 pane — 판단과 조치는 읽기 전용", () => {
     const { unmount } = renderPreview("full");
 
     let recorded = await screen.findByRole("region", { name: "판단과 조치" });
-    await waitFor(() => expect(within(recorded).getByText("아직 안 정함")).toBeTruthy());
+    await waitFor(() => expect(within(recorded).getByText("판단 필요")).toBeTruthy());
     unmount();
 
     getReviewWorkspace.mockResolvedValue(detail());

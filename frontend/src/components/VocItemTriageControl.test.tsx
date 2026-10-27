@@ -92,14 +92,14 @@ describe("VocItemTriageControl", () => {
 
     // The two absences must not collapse: nobody-decided is not the same fact as
     // someone-decided-nothing-is-needed, and this surface exists to tell them apart.
-    expect(screen.getByText("판단 전")).toBeInTheDocument();
+    expect(screen.getByText("판단 필요")).toBeInTheDocument();
     expect(current()).toBeNull();
   });
 
   it("seeds from the row's already-recorded decision", () => {
     renderControl("MONITOR");
     expect(current()).toBe("나중에 보기");
-    expect(screen.queryByText("판단 전")).not.toBeInTheDocument();
+    expect(screen.queryByText("판단 필요")).not.toBeInTheDocument();
   });
 
   it("reports the server's CURRENT decision, not the one that was asked for", async () => {

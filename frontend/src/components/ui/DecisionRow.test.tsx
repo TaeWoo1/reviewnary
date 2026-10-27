@@ -76,7 +76,7 @@ describe("the dense row — what outweighs what", () => {
     // («쿠팡 리뷰» vs «리뷰») is dropped by design, and a test asserting the weight of something that is
     // never drawn asserts nothing.
     row({ tag: "교환·환불" });
-    const state = screen.getByText("확인 필요");
+    const state = screen.getByText("판단 필요");
     expect(state.className).toMatch(/bg-(bad|warn|good|brand)/);
     const meta = screen.getByText(/교환·환불/);
     expect(meta.className).not.toMatch(/bg-/);
@@ -85,8 +85,8 @@ describe("the dense row — what outweighs what", () => {
 
   it("drops the category entirely when it would repeat the state word", () => {
     // `REASON` carries real categories and three entries that are states wearing a category badge.
-    row({ tag: "확인 필요" });
-    expect(screen.getAllByText("확인 필요")).toHaveLength(1);
+    row({ tag: "판단 필요" });
+    expect(screen.getAllByText("판단 필요")).toHaveLength(1);
   });
 
   it("keeps the filled badge in the three-line reading, where a coloured tile anchors the row", () => {

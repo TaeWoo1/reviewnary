@@ -82,7 +82,7 @@ describe("WorkRows — what every row says identically is a fact about the list"
     // assertion reads the row's text instead of its nodes. What it protects is unchanged and is the whole
     // point of the test: when the rows differ, every distinguishing fact stays ON the row.
     const rows = within(screen.getByLabelText("확인할 일")).getAllByRole("listitem");
-    expect(rows[0]).toHaveTextContent("확인 필요");
+    expect(rows[0]).toHaveTextContent("판단 필요");
     expect(rows[0]).toHaveTextContent(/쿠팡 리뷰/);
     expect(rows[0]).toHaveTextContent("★1");
     /* <b>Re-pointed</b> (canonical mockup semantic correction, 2026-10-02). The second row's category
@@ -145,7 +145,7 @@ describe("the leading slot — the state word, then the category", () => {
   it("상태어가 고객의 문장보다 앞에 온다", () => {
     draw([row({ state: "NEEDS_LOOK" })]);
     const item = within(screen.getByLabelText("확인할 일")).getAllByRole("listitem")[0]!;
-    const state = within(item).getByText("확인 필요");
+    const state = within(item).getByText("판단 필요");
     const title = within(item).getByText("사진이랑 색이 조금 달라요.");
     expect(state.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
@@ -153,9 +153,9 @@ describe("the leading slot — the state word, then the category", () => {
   it("상태어를 WORK_STATE에서 가져온다 — 화면마다 다시 만들지 않는다", () => {
     for (const [key, text] of [
       ["REPLY_NEEDED", "답변 필요"],
-      ["NEEDS_LOOK", "확인 필요"],
+      ["NEEDS_LOOK", "판단 필요"],
       ["DRAFT_READY", "초안 준비됨"],
-      ["DRAFT_NEEDED", "초안 필요"],
+      ["DRAFT_NEEDED", "답글 필요"],
       ["AWAITING_APPROVAL", "확정 전"],
     ] as const) {
       cleanup();
@@ -177,7 +177,7 @@ describe("the leading slot — the state word, then the category", () => {
   it("태그가 상태어가 말하지 않는 것을 말하면 배지가 남는다", () => {
     draw([row({ reason: REASON.info, state: "NEEDS_LOOK", rating: null })]);
     const item = within(screen.getByLabelText("확인할 일")).getAllByRole("listitem")[0]!;
-    expect(within(item).getByText("확인 필요")).toBeTruthy();
+    expect(within(item).getByText("판단 필요")).toBeTruthy();
     // 정보 부족 is not in `source` (「쿠팡 리뷰」), so it survives the dedupe and rides in the provenance
     // group — as part of its one string, which is why this reads the row rather than querying a node.
     expect(item).toHaveTextContent("정보 부족");

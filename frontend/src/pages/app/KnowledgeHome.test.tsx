@@ -412,7 +412,7 @@ describe("지식", () => {
     const inbox = await screen.findByTestId("knowledge-inbox");
     expect(screen.getByText("제안")).toBeInTheDocument();
     // Its count is of the customers who reported the problem, not of answers the seller wrote.
-    expect(inbox).toHaveTextContent("같은 문제 리뷰 37건");
+    expect(inbox).toHaveTextContent("관련 리뷰 37건");
     expect(inbox).not.toHaveTextContent("과거 답변");
     await userEvent.click(screen.getByRole("button", { name: "등록" }));
     expect((screen.getByLabelText("고객에게 안내할 내용") as HTMLTextAreaElement).value).toBe(GUIDANCE.content);

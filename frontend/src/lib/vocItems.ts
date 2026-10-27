@@ -220,7 +220,7 @@ export const TRIAGE_OPTIONS: ReadonlyArray<{ value: TriageDisposition; label: st
 const TRIAGE_VALUES: ReadonlySet<string> = new Set(TRIAGE_OPTIONS.map((o) => o.value));
 
 /** FE-owned label for a row nobody has decided yet — the same word the control shows in place of a choice. */
-export const TRIAGE_UNDECIDED_LABEL = "아직 안 정함";
+export const TRIAGE_UNDECIDED_LABEL = "판단 필요";
 
 /**
  * A read-only label for a triage disposition — the SAME copy as the interactive control's options,

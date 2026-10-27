@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeHomeWork, workBucket } from "./homeWork";
+import { isPraiseApproval, mergeHomeWork, todayWork, workBucket } from "./homeWork";
 import { WORK_STATE } from "./workState";
 import type { OperationsHome, OperatorVocItem, ReviewWorkView } from "./types";
 import type { CustomerOperationsHome } from "./customerOperationsTypes";
@@ -89,7 +89,7 @@ describe("mergeHomeWork — the review half, whole", () => {
     const work = mergeHomeWork(null, null, null, NOW,
       reviewWork([], 0, [todo("r-draft", "DRAFT_NEEDED"), todo("r-approve", "AWAITING_APPROVAL")]));
     const byId = Object.fromEntries(work.rows.map((r) => [r.subjectId, r]));
-    expect(byId["r-draft"].reason.tag).toBe("초안 필요");
+    expect(byId["r-draft"].reason.tag).toBe("답글 필요");
     expect(byId["r-approve"].reason.tag).toBe("확정 전");
     /*
       <b>Re-pointed to where 「미발송」 now stands</b> (product-owner decision, 2026-10-01: the row's
@@ -176,5 +176,40 @@ describe("mergeHomeWork — the review half, whole", () => {
   it("without the read, the list is what it was — the Home's own rows", () => {
     const work = mergeHomeWork(null, ops([attention("a1"), attention("a2"), attention("a3")]), null, NOW);
     expect(work.rows).toHaveLength(3);
+  });
+});
+
+/**
+ * <b>Risk before recency, one count, and the thank-yous as one line</b> (product-owner decision, 2026-10-28). The
+ * walk-through found the Home led by ★3–★5 thank-yous while a ★1 sat mid-list, and three screens counting 할 일 three
+ * ways.
+ */
+describe("할 일 — risk first, one count, praise folded", () => {
+  const rated = (id: string, rating: number, on: string) => ({ ...todo(id, "AWAITING_APPROVAL"), rating, sourceCreatedDate: on });
+
+  it("puts a ★1 reply and a review still to judge ahead of newer ★3–5 ones, newest first among equals", () => {
+    const work = mergeHomeWork(null, null, null, NOW, reviewWork([{ ...attention("judge"), rating: 5, occurredOn: "2026-09-15" }], 1, [
+      rated("praise-new", 5, "2026-09-20"),
+      rated("low-old", 1, "2026-09-10"),
+      rated("mid", 3, "2026-09-19"),
+    ]));
+    expect(work.rows.map((r) => r.subjectId)).toEqual(["judge", "low-old", "mid", "praise-new"]);
+  });
+
+  it("folds only a ★4–5 reply waiting for 확정 that reports nothing", () => {
+    const work = mergeHomeWork(null, null, null, NOW, {
+      ...reviewWork([], 0, [rated("p5", 5, "2026-09-20"), rated("p4", 4, "2026-09-20"), rated("p3", 3, "2026-09-20"),
+        { ...todo("d5", "DRAFT_NEEDED"), rating: 5 }, rated("hurt", 5, "2026-09-20"), rated("held", 5, "2026-09-20")]),
+      safetyReviewIds: ["hurt"],
+      delegatedStates: { held: "HELD" },
+    });
+    expect(work.rows.filter(isPraiseApproval).map((r) => r.subjectId).sort()).toEqual(["p4", "p5"]);
+  });
+
+  it("counts 할 일 without the backlog, the same way on every screen", () => {
+    const work = mergeHomeWork(null, null, null, NOW, reviewWork(
+      [{ ...attention("fresh"), occurredOn: "2026-09-20" }, { ...attention("stale"), occurredOn: "2026-06-01" }], 2, []));
+    expect(work.rows).toHaveLength(2);
+    expect(todayWork(work.rows, NOW).map((r) => r.subjectId)).toEqual(["fresh"]);
   });
 });

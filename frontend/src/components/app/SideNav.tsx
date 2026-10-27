@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../lib/auth";
 import { NAV_GROUPS, navGroupLabel, navItemOwns, type NavGroup } from "../../lib/nav.v2";
+import { useTodayWorkCount } from "../../lib/useTodayWorkCount";
 import { NavIcon } from "../icons/NavIcon";
 import { ConnectionSignal } from "./ConnectionSignal";
 
@@ -27,6 +28,7 @@ function itemClass(isActive: boolean): string {
 export function SideNav() {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
+  const work = useTodayWorkCount();
   const groups = (foot: boolean) => NAV_GROUPS.filter((group) => !!group.foot === foot);
   const renderGroup = (group: NavGroup) => (
     <div key={group.heading} className="mb-6 last:mb-0">
@@ -45,6 +47,7 @@ export function SideNav() {
             >
               <NavIcon name={item.icon} className="h-[18px] w-[18px]" />
               <span className="truncate">{item.label}</span>
+              {item.badge === "work" && work ? <NavBadge count={work} /> : null}
             </NavLink>
           </li>
         ))}
@@ -96,5 +99,15 @@ export function SideNav() {
         </button>
       </div>
     </aside>
+  );
+}
+
+/** The count beside 할 일. Its own words for a screen reader, since the number alone would be read bare. */
+export function NavBadge({ count }: { count: number }) {
+  return (
+    <span className="ml-auto rounded-full bg-brand-700 px-1.5 text-xs font-semibold tabular-nums text-white">
+      <span aria-hidden="true">{count > 99 ? "99+" : count.toLocaleString("ko-KR")}</span>
+      <span className="sr-only">{count.toLocaleString("ko-KR")}건</span>
+    </span>
   );
 }

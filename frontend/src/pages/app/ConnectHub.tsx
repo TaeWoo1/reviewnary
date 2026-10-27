@@ -1,3 +1,4 @@
+import { lastCollectedByChannel } from "../../lib/channelFreshness";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { ReactNode } from "react";
@@ -55,6 +56,8 @@ export function ConnectHub() {
   const [accountsError, setAccountsError] = useState(false);
   const [health, setHealth] = useState<Map<string, ConnectionStatusView>>(new Map());
   const [reviewCounts, setReviewCounts] = useState<Map<string, number>>(new Map());
+  // 「마지막으로 가져온 때」 from the same read the Home uses; undefined until it lands, and on failure.
+  const [collectedAt, setCollectedAt] = useState<Map<string, number | null> | undefined>(undefined);
   /**
    * <b>브라우저 상품평 수집의 사실</b> — 계정별로.
    *
@@ -103,6 +106,19 @@ export function ConnectHub() {
           setAccountsLoading(false);
         }
       });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve()
+      .then(() => api.getChannelCoverageStrict())
+      .then((rows) => {
+        if (active) setCollectedAt(lastCollectedByChannel(rows));
+      })
+      .catch(() => {});
     return () => {
       active = false;
     };
@@ -270,6 +286,7 @@ export function ConnectHub() {
             statusLoading={accountsLoading}
             reviewCounts={reviewCounts}
             reviewLanes={reviewLanes}
+            collectedAt={collectedAt}
             onNotice={setNotice}
             onStartReviewSetup={(channel, account) => void startReviewSetup(channel, account)}
           channelsLoading={channelsLoading}

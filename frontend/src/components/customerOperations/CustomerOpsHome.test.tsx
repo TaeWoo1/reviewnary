@@ -313,7 +313,7 @@ describe("CustomerOpsHome", () => {
     // the rail item, the screen it links to, and the summary cell above — and printing it here was the
     // third copy. What is asserted is unchanged and is the point of the re-point: the count lives in the
     // band, once, and the heading of the rows does not repeat it.
-    const heading = await screen.findByRole("heading", { name: /먼저 볼 일/ });
+    const heading = await screen.findByRole("heading", { name: /^할 일/ });
     expect(heading).not.toHaveTextContent("4");
     // <b>The breakdown is the queue's, not the brief's</b> (product-owner decision, 2026-10-01). It used to
     // stand here: 「교환·환불 1 · 정보 부족 1 · 답변 필요 1 · 리뷰 1」, four tallies over a list showing four
@@ -330,7 +330,7 @@ describe("CustomerOpsHome", () => {
       sentence the rows can prove.
     */
     // Since 2026-10-27 the heading itself says it (「먼저 볼 일」) and the narrating sentence is gone (§12-3).
-    expect(heading).toHaveTextContent("먼저 볼 일");
+    expect(heading).toHaveTextContent("할 일");
     expect(heading.parentElement).not.toHaveTextContent(/오래 기다린 .*부터/);
     expect(heading.parentElement).not.toHaveTextContent(/교환·환불 1|정보 부족 1/);
     await expectNoAxeViolations(container);

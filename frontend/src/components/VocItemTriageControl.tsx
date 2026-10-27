@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from "react";
 import { api } from "../lib/apiClient";
 import { SecureRandomUnavailableError, newCommandId } from "../lib/commandId";
-import { TRIAGE_OPTIONS, asTriageDisposition } from "../lib/vocItems";
+import { TRIAGE_OPTIONS, TRIAGE_UNDECIDED_LABEL, asTriageDisposition } from "../lib/vocItems";
 import { Btn } from "./ui/Btn";
 import type { TriageDisposition } from "../lib/types";
 
@@ -199,7 +199,7 @@ export function VocItemTriageControl({
             is exactly what this surface exists to resolve. "판단 전" says that: a decision
             is still to come. It is not a fourth option, and not a classification. */}
         {recorded == null && !busy ? (
-          <span className="text-sm italic text-muted">판단 전</span>
+          <span className="text-sm italic text-muted">{TRIAGE_UNDECIDED_LABEL}</span>
         ) : null}
       </div>
       {/* Mounted always, with only its TEXT toggling. A live region has to exist in the

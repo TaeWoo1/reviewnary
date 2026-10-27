@@ -84,12 +84,14 @@ export interface WorkStateWord {
  */
 export const WORK_STATE: Record<WorkStateKey, WorkStateWord> = {
   REPLY_NEEDED: { text: "답변 필요", tone: "info" },
-  NEEDS_LOOK: { text: "확인 필요", tone: "warn" },
-  LOOK_INTO: { text: "살펴볼 일", tone: "warn" },
+  // One word for 「the seller has to decide what to do」 (2026-10-28): a review the triage flagged and a case reviewnary
+  // opened read the same, and the queue's chip says it too. 확인 필요 · 살펴볼 일 · 살펴볼 리뷰 were three names for it.
+  NEEDS_LOOK: { text: "판단 필요", tone: "warn" },
+  LOOK_INTO: { text: "판단 필요", tone: "warn" },
   DRAFT_READY: { text: "초안 준비됨", tone: "info" },
-  DRAFT_NEEDED: { text: "초안 필요", tone: "warn" },
+  DRAFT_NEEDED: { text: "답글 필요", tone: "warn" },
   AWAITING_APPROVAL: { text: "확정 전", tone: "info" },
-  APPROVED: { text: "승인됨", tone: "neutral" },
+  APPROVED: { text: "확정함", tone: "neutral" },
   ANSWERED: { text: "답변함", tone: "neutral" },
   // The review panel's words for the same states (`DelegatedReplyControls`), cut to fit the Home's 104px lead
   // column — 「담당자 등록 못 함」 ran into the title beside it (measured 2026-10-24). The panel says the rest.

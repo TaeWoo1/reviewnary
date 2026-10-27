@@ -1,3 +1,4 @@
+import { emptyCause, useCoverage } from "../../lib/emptyCause";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PageHead } from "../../components/ui/PageHead";
@@ -52,6 +53,7 @@ import type { ReviewIssueView } from "../../lib/types";
 export function CustomerMemory() {
   const [params, setParams] = useSearchParams();
   const [issues, setIssues] = useState<ReviewIssueView[] | null>(null);
+  const coverage = useCoverage();
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
@@ -159,11 +161,20 @@ export function CustomerMemory() {
   ) : visible.length === 0 ? (
     <>
       {head}
-      <Empty
-        title="아직 쌓인 기록이 없어요"
-        body="문의와 리뷰가 모이면, 같은 문제가 몇 번 반복됐는지와 무엇을 근거로 그렇게 보는지를 여기에서 확인해요."
-        action={<BtnLink to="/connect">채널 연동하기</BtnLink>}
-      />
+      {/* By cause (2026-10-28): a seller with reviews already in was sent to connect a channel. */}
+      {emptyCause(coverage, "REVIEW") === "NONE" ? (
+        <Empty
+          title="아직 반복된 문제가 없어요"
+          body="같은 문제를 말한 리뷰가 여러 건 쌓이면 여기에 모여요. 몇 번 반복됐는지와 그렇게 보는 근거도 함께 보여드려요."
+          action={<BtnLink to="/reviews">리뷰 보기</BtnLink>}
+        />
+      ) : (
+        <Empty
+          title="아직 쌓인 기록이 없어요"
+          body="문의와 리뷰가 모이면, 같은 문제가 몇 번 반복됐는지와 무엇을 근거로 그렇게 보는지를 여기에서 확인해요."
+          action={<BtnLink to="/connect">채널 연동하기</BtnLink>}
+        />
+      )}
     </>
   ) : (
     <>

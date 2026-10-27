@@ -5,8 +5,8 @@ import { MasterDetail, useWideLayout } from "../../components/workspace/MasterDe
 import { WorkRows } from "../../components/workspace/WorkRows";
 import { WorkItemPane } from "../../components/workspace/WorkItemPane";
 import { api } from "../../lib/apiClient";
-import { mergeHomeWork, WORK_FILTERS, workFilterOf, type HomeWork, type HomeWorkRow } from "../../lib/homeWork";
-import { HOME_QUEUE_SIZE } from "../../components/customerOperations/CustomerOpsHome";
+import { isPraiseApproval, mergeHomeWork, todayWork, WORK_FILTERS, workFilterOf, type HomeWork, type HomeWorkRow } from "../../lib/homeWork";
+import { HOME_QUEUE_SIZE, PraiseBundle } from "../../components/customerOperations/CustomerOpsHome";
 import { COPY } from "../../lib/copy/customerOps";
 import { FinishedList, MovingList } from "../../components/customerOperations/ReplyBoardList";
 import { attentionUncertaintyCopy } from "../../lib/attention";
@@ -167,6 +167,8 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       { replace: true },
     );
   const rows = allRows.filter(WORK_FILTERS.find((f) => f.key === filter)!.test);
+  // The counts are 할 일's one count (`todayWork`): the backlog is listed below its own line, never in the numbers.
+  const today = todayWork(allRows, now ?? new Date());
   const key = params.get("item");
   // Only what the address names — see the docblock. The first-row fallback this screen used is gone, and with
   // it the last caller of the helper that held it.
@@ -226,9 +228,17 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
             }}
             className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-canvas hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
           >
+            {/* Open, the same button closes the box, so it draws a close mark (2026-10-28) — a magnifier that
+                closes the search read as a second search. */}
             <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
-              <circle cx="11" cy="11" r="6.5" />
-              <path d="M16 16l4 4" />
+              {searching ? (
+                <path d="M6 6l12 12M18 6L6 18" />
+              ) : (
+                <>
+                  <circle cx="11" cy="11" r="6.5" />
+                  <path d="M16 16l4 4" />
+                </>
+              )}
             </svg>
           </button>
         ) : null}
@@ -236,7 +246,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
 
       <div role="group" aria-label="할 일 나누어 보기" className="flex w-max gap-1 rounded-xl bg-canvas p-1">
         {VIEWS.map((v) => {
-          const count = v.key === "todo" ? (work ? allRows.length : null) : v.key === "moving" ? (board?.moving.length ?? null) : null;
+          const count = v.key === "todo" ? (work ? today.length : null) : v.key === "moving" ? (board?.moving.length ?? null) : null;
           return (
             <button
               key={v.key}
@@ -335,7 +345,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
         <div className="-mx-2 flex flex-wrap items-center gap-1" role="group" aria-label="할 일 보기">
           {WORK_FILTERS.map((f) => (
             <Chip key={f.key} pressed={filter === f.key} onClick={() => setFilter(f.key)}>
-              {f.label} {allRows.filter(f.test).length.toLocaleString("ko-KR")}
+              {f.label} {today.filter(f.test).length.toLocaleString("ko-KR")}
             </Chip>
           ))}
         </div>
@@ -347,7 +357,25 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
         </p>
       ) : null}
       {work && allRows.length > 0 && rows.length === 0 ? (
-        <p className="break-keep text-sm text-muted">이 보기에 해당하는 일이 없어요.</p>
+        // A search that found rows outside the chip says where they are (2026-10-28) — 「이 보기에 해당하는 일이
+        // 없어요」 under a search with three matches in 전체 read as 「찾는 것이 없다」.
+        query.trim() ? (
+          <p className="break-keep text-sm text-muted">
+            이 보기에는 없고, 전체에서 {allRows.length.toLocaleString("ko-KR")}건 찾았어요.{" "}
+            <button
+              type="button"
+              onClick={() => setFilter("all")}
+              className="font-semibold text-brand-700 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+            >
+              전체에서 보기
+            </button>
+          </p>
+        ) : (
+          <p className="break-keep text-sm text-muted">이 보기에 해당하는 일이 없어요.</p>
+        )
+      ) : null}
+      {work && !query.trim() && (filter === "all" || filter === "approve") ? (
+        <PraiseBundle count={today.filter(isPraiseApproval).length} />
       ) : null}
 
       {work && rows.length > 0 ? (

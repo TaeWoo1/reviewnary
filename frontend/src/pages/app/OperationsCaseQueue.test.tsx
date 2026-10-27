@@ -308,7 +308,7 @@ describe("OperationsCaseQueue", () => {
       state, the customer's own words and where it came from, and stops.
     */
     // A case is something reviewnary opened to look at: 살펴볼 일 — 확인 필요 is the 리뷰 screen's group name.
-    expect(list).toHaveTextContent("살펴볼 일");
+    expect(list).toHaveTextContent("판단 필요");
     expect(list).not.toHaveTextContent("먼저 볼 리뷰");
     expect(list).toHaveTextContent("배송이 너무 늦었어요");
     expect(list).not.toHaveTextContent("확인이 필요한 리뷰예요");
@@ -570,17 +570,17 @@ describe("OperationsCaseQueue — views of the one list (UI/UX v2 Phase 4)", () 
     const views = await screen.findByRole("group", { name: "할 일 보기" });
     // Every view says how many rows it holds, out of the same four.
     expect(within(views).getByRole("button", { name: "전체 4" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(views).getByRole("button", { name: "답변할 문의 1" })).toBeInTheDocument();
-    expect(within(views).getByRole("button", { name: "살펴볼 리뷰 1" })).toBeInTheDocument();
-    expect(within(views).getByRole("button", { name: "승인할 일 1" })).toBeInTheDocument();
-    expect(within(views).getByRole("button", { name: "초안 필요 1" })).toBeInTheDocument();
+    expect(within(views).getByRole("button", { name: "답변 필요 1" })).toBeInTheDocument();
+    expect(within(views).getByRole("button", { name: "판단 필요 1" })).toBeInTheDocument();
+    expect(within(views).getByRole("button", { name: "확정 전 1" })).toBeInTheDocument();
+    expect(within(views).getByRole("button", { name: "답글 필요 1" })).toBeInTheDocument();
 
-    await userEvent.click(within(views).getByRole("button", { name: "승인할 일 1" }));
+    await userEvent.click(within(views).getByRole("button", { name: "확정 전 1" }));
     const list = screen.getByRole("list", { name: "할 일" });
     expect(within(list).getAllByRole("link")).toHaveLength(1);
     expect(within(list).getByRole("link", { name: /승인을 기다리는 답변/ })).toBeInTheDocument();
 
-    await userEvent.click(within(views).getByRole("button", { name: "답변할 문의 1" }));
+    await userEvent.click(within(views).getByRole("button", { name: "답변 필요 1" }));
     expect(within(screen.getByRole("list", { name: "할 일" })).getByRole("link", { name: /교환 신청/ })).toBeInTheDocument();
 
     // 「내가 할 일」 still counts the whole list: a view never passes itself off as the total.

@@ -1,3 +1,4 @@
+import { emptyCause, useCoverage, type EmptyCause } from "../../lib/emptyCause";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { analytics } from "../../lib/analytics";
 import { Link, useParams, useSearchParams } from "react-router-dom";
@@ -70,6 +71,7 @@ import { useAgentSurface } from "../../lib/agentPanel";
  */
 export function CustomerInbox() {
   const { itemRef } = useParams();
+  const coverage = useCoverage();
   // Growth funnel: 문의 workflow opened (no item ref, no text).
   useEffect(() => {
     analytics.track("inquiry_opened");
@@ -432,15 +434,11 @@ export function CustomerInbox() {
           action={<BtnLink to="/connect">채널 연동 확인</BtnLink>}
         />
       ) : (record ?? []).length === 0 ? (
-        <Empty
-          title={hasNarrowing(q, channel, status, productId) ? "찾는 문의가 없어요" : "아직 들어온 문의가 없어요"}
-          body={
-            hasNarrowing(q, channel, status, productId)
-              ? "다른 말로 찾거나 조건을 넓혀 보세요."
-              : "채널을 연동하거나 정기 자료 가져오기로 자료를 넘겨주시면, 채널이 달라도 같은 형태로 모아 보여드려요."
-          }
-          action={hasNarrowing(q, channel, status, productId) ? undefined : <BtnLink to="/connect">채널 연동하기</BtnLink>}
-        />
+        hasNarrowing(q, channel, status, productId) ? (
+          <Empty title="찾는 문의가 없어요" body="다른 말로 찾거나 조건을 넓혀 보세요." />
+        ) : (
+          <InquiryEmpty cause={emptyCause(coverage, "INQUIRY")} />
+        )
       ) : (
         <>
           {/*
@@ -754,3 +752,26 @@ function hasNarrowing(q: string, channel: string | null, status: string, product
   return q.trim() !== "" || channel != null || status !== "ALL" || productId != null;
 }
 
+
+/** An empty 문의 list, said by its cause (`lib/emptyCause`). */
+function InquiryEmpty({ cause }: { cause: EmptyCause | null }) {
+  if (cause === "NOT_FETCHED") {
+    return (
+      <Empty
+        title="아직 가져온 문의가 없어요"
+        body="연동한 채널에서 문의를 아직 가져오지 않았어요. 연동 화면에서 가져오기를 확인해 주세요."
+        action={<BtnLink to="/connect">가져오기 확인</BtnLink>}
+      />
+    );
+  }
+  if (cause === "NONE") {
+    return <Empty title="들어온 문의가 없어요" body="연동한 채널에서 가져온 문의가 0건이에요." />;
+  }
+  return (
+    <Empty
+      title="아직 들어온 문의가 없어요"
+      body="채널을 연동하면 채널이 달라도 같은 형태로 모아 보여드려요."
+      action={<BtnLink to="/connect">채널 연동하기</BtnLink>}
+    />
+  );
+}

@@ -122,7 +122,7 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
     api.getOperationsCase.mockResolvedValue(detail({ draft: null }));
     drawPane();
 
-    expect(await screen.findByText("확인 필요")).toBeTruthy();
+    expect(await screen.findByText("판단 필요")).toBeTruthy();
     expect(screen.queryByText("초안 준비됨")).toBeNull();
   });
 

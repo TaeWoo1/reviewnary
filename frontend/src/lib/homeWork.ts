@@ -380,12 +380,19 @@ export function mergeHomeWork(
     is `/inquiries`' contract, drawn as a divider rather than a sort — and nothing here hides or drops
     a row.
   */
+  /*
+    <b>Inside the reviews, risk before recency</b> (product-owner decision, 2026-10-28, after the walk-through that
+    found 「먼저 볼 일」 led by three ★3–★5 thank-yous while a ★1 「곰돌이 그림에 얼룩」 sat mid-list). A review the
+    seller still has to judge, or one rated ★1–2, comes first; ★3 next; the rest after — newest first inside each.
+    The interview's 「newest first」 still holds for reviews of equal weight.
+  */
   const group = (r: HomeWorkRow) => (r.safety ? 0 : r.subject === "INQUIRY" ? 1 : 2);
   const at = (r: HomeWorkRow) => waitSince(r.since);
   const timed = (a: number, b: number) =>
     a === b ? 0 : !Number.isFinite(a) ? 1 : !Number.isFinite(b) ? -1 : a - b;
   const ordered = [...byOwner.values()].sort((a, b) => {
     if (group(a) !== group(b)) return group(a) - group(b);
+    if (group(a) === 2 && reviewRisk(a) !== reviewRisk(b)) return reviewRisk(a) - reviewRisk(b);
     return group(a) === 1 ? timed(at(a), at(b)) : timed(-at(a), -at(b));
   });
   const rows = [
@@ -393,6 +400,39 @@ export function mergeHomeWork(
     ...ordered.filter((r) => isOldBacklog(r, now)),
   ];
   return { rows, truncated };
+}
+
+/** 0 — to judge, or ★1–2; 1 — ★3; 2 — everything else. */
+function reviewRisk(r: HomeWorkRow): number {
+  if (r.state === "NEEDS_LOOK" || r.state === "LOOK_INTO") return 0;
+  if (r.rating != null && r.rating <= 2) return 0;
+  return r.rating === 3 ? 1 : 2;
+}
+
+/**
+ * <b>A thank-you waiting only for the seller's 확정</b> (2026-10-28): a reply already written for a ★4–5 review that
+ * reports nothing. Forty-nine of these stood one by one in 할 일 on the judge copy and buried the reviews that needed
+ * a decision, so the Home folds them into one line and the seller confirms them together (`/reviews/confirm`).
+ * Nothing else is folded: a low rating, a safety mark or a reply the delegate sent back stays its own row.
+ */
+export function isPraiseApproval(r: HomeWorkRow): boolean {
+  return (
+    r.kind === "REVIEW" &&
+    r.state === "AWAITING_APPROVAL" &&
+    !r.safety &&
+    r.rating != null &&
+    r.rating >= 4
+  );
+}
+
+/**
+ * <b>할 일's one count</b> (2026-10-28). The Home said 49, the queue 54 and the 리뷰 screen 54 on the same morning,
+ * because only the Home left out the backlog. Every count of 할 일 — the menu's badge, the Home, the queue's tab, the
+ * 리뷰 screen's link — is now this: the rows that are not 지난 일. The backlog is still listed, under its own line
+ * with its own count.
+ */
+export function todayWork(rows: readonly HomeWorkRow[], now: Date): HomeWorkRow[] {
+  return rows.filter((r) => !isOldBacklog(r, now));
 }
 
 /**
@@ -540,10 +580,12 @@ export function workBucket(row: HomeWorkRow): Exclude<WorkFilterKey, "all"> {
  */
 export const WORK_FILTERS = [
   { key: "all", label: "전체", test: () => true },
-  { key: "inquiry", label: "답변할 문의", test: (r: HomeWorkRow) => workBucket(r) === "inquiry" },
-  { key: "review", label: "살펴볼 리뷰", test: (r: HomeWorkRow) => workBucket(r) === "review" },
-  { key: "approve", label: "승인할 일", test: (r: HomeWorkRow) => workBucket(r) === "approve" },
-  { key: "draft", label: "초안 필요", test: (r: HomeWorkRow) => workBucket(r) === "draft" },
+  // The rows' own state words (2026-10-28): a chip that names its bucket differently from the badge on every row in
+  // it was a second vocabulary for one list.
+  { key: "inquiry", label: "답변 필요", test: (r: HomeWorkRow) => workBucket(r) === "inquiry" },
+  { key: "review", label: "판단 필요", test: (r: HomeWorkRow) => workBucket(r) === "review" },
+  { key: "approve", label: "확정 전", test: (r: HomeWorkRow) => workBucket(r) === "approve" },
+  { key: "draft", label: "답글 필요", test: (r: HomeWorkRow) => workBucket(r) === "draft" },
 ] as const;
 
 export type WorkFilterKey = (typeof WORK_FILTERS)[number]["key"];

@@ -1,3 +1,4 @@
+import { lastCollectedByChannel } from "../../lib/channelFreshness";
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Btn, BtnLink } from "../ui/Btn";
@@ -13,7 +14,7 @@ import { useScreenChanges } from "../../lib/screenChanges";
 import { problemLine } from "../../lib/operationsHome";
 import { RESPONSIBILITY_NAME, cadenceLabel, dataTypeKo, kstClock } from "../../lib/customerOperations";
 import { COPY, autoCheckWhat, channelShort, failureShort, gapActionKo, kstLongDate } from "../../lib/copy/customerOps";
-import { homeBriefRows, isOldBacklog, mergeHomeWork, sharedRowFacts, type HomeWork } from "../../lib/homeWork";
+import { homeBriefRows, isPraiseApproval, mergeHomeWork, sharedRowFacts, todayWork, type HomeWork } from "../../lib/homeWork";
 import { automationHealth, type HealthTone } from "../../lib/automationHealth";
 import { NO_CHANGE_TODAY, changeInsights } from "../../lib/homeInsights";
 import {
@@ -97,7 +98,8 @@ export const HOME_QUEUE_SIZE = 50;
  * the summary cell one band above — and printing it here made the first screen say 확인할 일 three times
  * and read as an abbreviation of the list beside it. These rows are a brief over the oldest of the work.
  */
-const HOME_BRIEF_TITLE = "먼저 볼 일";
+// The menu's and the queue's name for the same list (2026-10-28): 「먼저 볼 일」 sat beside the tier 「먼저 볼 리뷰」.
+const HOME_BRIEF_TITLE = "할 일";
 
 /**
  * <b>What the four rows ARE, now that they are not an age ranking</b> (product-owner decision,
@@ -202,11 +204,15 @@ export function CustomerOpsHome({
     after a year, as before), and the Home draws and counts only what is not backlog. The backlog is not hidden:
     its size is said under the list and 확인할 일 holds every row of it under 「지난 일」.
   */
-  const recent = work.rows.filter((r) => !isOldBacklog(r, now));
+  const recent = todayWork(work.rows, now);
   const past = work.rows.length - recent.length;
   const today: HomeWork = { rows: recent, truncated: work.truncated };
-  const shown = homeBriefRows(recent, visibleHomeRows(roomy));
-  const hidden = recent.length - shown.length;
+  // The thank-yous waiting only for 확정 are one line under the list, not one row each (2026-10-28); they are still
+  // counted in 할 일 above, and the line opens the screen that confirms them together.
+  const praise = recent.filter(isPraiseApproval);
+  const individual = recent.filter((r) => !isPraiseApproval(r));
+  const shown = homeBriefRows(individual, visibleHomeRows(roomy));
+  const hidden = individual.length - shown.length;
   const running = co?.status === "ACTIVE" || co?.status === "PAUSED";
   const wide = selection?.wide ?? false;
   const search = selection?.search ?? "";
@@ -215,7 +221,7 @@ export function CustomerOpsHome({
   // What every row in the WHOLE list says identically — over `work.rows`, not the six or seven drawn, because
   // this heading stands under the Pulse's 「확인할 일 11」 and a 「모두 …」 that covered only what is drawn would
   // be a claim about eleven made from six. `WorkRows` is handed the same population and hides exactly this.
-  const shared = sharedRowFacts(recent);
+  const shared = sharedRowFacts(individual);
   const sharedSaid = sharedPhrase(shared);
 
   async function act(run: () => Promise<unknown>) {
@@ -419,21 +425,24 @@ export function CustomerOpsHome({
               </Link>
             ) : null}
           </div>
-          <WorkRows
-            rows={shown}
-            selectedKey={selection?.selectedKey ?? null}
-            wide={wide}
-            search={search}
-            now={now}
-            ariaLabel={COPY.listTitle}
-            showBacklogDivider={false}
-            dense
-            sharedOver={recent}
-            // The shared facts are on the heading above. What 리뷰 counts here is a rule about the queue, and it
-            // now stands on the queue screen that owns the whole list rather than as a paragraph under a
-            // five-row brief — neither reference puts an explanatory sentence under a work list.
-            captionSaysReason
-          />
+          {shown.length > 0 ? (
+            <WorkRows
+              rows={shown}
+              selectedKey={selection?.selectedKey ?? null}
+              wide={wide}
+              search={search}
+              now={now}
+              ariaLabel={COPY.listTitle}
+              showBacklogDivider={false}
+              dense
+              sharedOver={individual}
+              // The shared facts are on the heading above. What 리뷰 counts here is a rule about the queue, and it
+              // now stands on the queue screen that owns the whole list rather than as a paragraph under a
+              // five-row brief — neither reference puts an explanatory sentence under a work list.
+              captionSaysReason
+            />
+          ) : null}
+          <PraiseBundle count={praise.length} />
           <PastWork count={past} />
         </section>
       ) : past > 0 ? (
@@ -712,18 +721,15 @@ function channelFreshness(
   now: Date,
 ): { name: string; ago: string }[] {
   if (!collection || collection.length === 0) return [];
+  const byCode = lastCollectedByChannel(collection);
   const latest = new Map<string, number | null>();
   for (const row of collection) {
-    const at = row.lastSuccessfulSyncAt ? new Date(row.lastSuccessfulSyncAt).getTime() : NaN;
-    const value = Number.isNaN(at) ? null : at;
     // The short name, which is the one every other surface on this screen uses — 「네이버 스마트스토어」
     // three times over wrapped the row onto a second line and made the question look like a report.
     // `channelShort` returns null for a name it does not recognise; the channel keeps its own name then
     // rather than disappearing from a line whose whole job is naming every channel.
     const name = channelShort(row.channelNameKo) ?? row.channelNameKo;
-    const seen2 = latest.get(name);
-    if (seen2 === undefined) latest.set(name, value);
-    else if (value !== null && (seen2 === null || value > seen2)) latest.set(name, value);
+    if (!latest.has(name)) latest.set(name, byCode.get(row.channelCode) ?? null);
   }
   return [...latest.entries()].map(([name, at]) => ({ name, ago: at === null ? "가져온 적 없음" : agoLabel(at, now) }));
 }
@@ -1620,6 +1626,31 @@ function ProblemHeading({ problems }: { problems: HomeRepeatedProblems }) {
           than beside the heading where it was the longest thing on the line. Same string, same source. */}
       <p className="mt-1 break-keep text-sm text-muted">{problemLine(problems)}</p>
     </>
+  );
+}
+
+/**
+ * <b>The thank-yous, as one line</b> (2026-10-28). Replies already written for ★4–5 reviews that report nothing,
+ * waiting only for 확정 — `isPraiseApproval`. The line says how many and opens the screen that shows each review beside
+ * its reply and confirms the ones the seller leaves ticked.
+ */
+export function PraiseBundle({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <div
+      data-testid="praise-bundle"
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-3 text-sm"
+    >
+      <span className="break-keep text-ink">
+        칭찬 리뷰 답글 <span className="font-semibold tabular-nums">{count.toLocaleString("ko-KR")}</span>건이 확정 전이에요
+      </span>
+      <Link
+        to="/reviews/confirm"
+        className="ml-auto shrink-0 font-semibold text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+      >
+        한 번에 확인하기 →
+      </Link>
+    </div>
   );
 }
 

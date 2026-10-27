@@ -34,6 +34,11 @@
 // from inside the screens that lead to them (the Home's backlog and 반복 문제 lines, a review's product, 상품·정책).
 // Deliberately absent as before: `/agent` (internal), `/customer-operations` (reached from the Home's status pill) and
 // every per-channel page (reached from 연결).
+//
+// <b>할 일 first, with its count</b> (product-owner decision, 2026-10-28, after a walk-through found the queue a seller
+// opens every morning absent from the menu, and unlit when reached). The first entry is the Home, named for what it
+// holds — the head of 할 일 — and it owns the queue screen, so 할 일 is lit on both. 반복 문제 and 리포트 stay reached from
+// inside the screens.
 
 export interface NavItem {
   to: string;
@@ -46,6 +51,8 @@ export interface NavItem {
   end?: boolean;
   /** Other routes this destination owns: 리뷰·문의 is lit on /inquiries too, 상품·정책 on /products. */
   match?: string[];
+  /** A count drawn beside the label — 「work」 is 할 일's one count (`useTodayWorkCount`). */
+  badge?: "work";
 }
 
 export interface NavGroup {
@@ -62,7 +69,7 @@ export const NAV_GROUPS: NavGroup[] = [
     heading: "메뉴",
     quiet: true,
     items: [
-      { to: "/", label: "홈", short: "홈", icon: "home", end: true },
+      { to: "/", label: "할 일", short: "할 일", icon: "home", end: true, match: ["/customer-operations/cases"], badge: "work" },
       { to: "/reviews", label: "리뷰·문의", short: "리뷰·문의", icon: "review", match: ["/inquiries", "/inbox"] },
       {
         to: "/knowledge",
@@ -94,7 +101,8 @@ export function navOwner(pathname: string): NavItem | null {
   let best: { item: NavItem; length: number } | null = null;
   for (const item of NAV_GROUPS.flatMap((group) => group.items)) {
     for (const route of [item.to, ...(item.match ?? [])]) {
-      if (item.end ? pathname !== route : !matches(route)) continue;
+      // `end` is about the item's own route — the Home is "/" exactly — never about the routes it owns.
+      if (item.end && route === item.to ? pathname !== route : !matches(route)) continue;
       if (!best || route.length > best.length) best = { item, length: route.length };
     }
   }

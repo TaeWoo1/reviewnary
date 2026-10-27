@@ -15,10 +15,10 @@ const row = (id: string, replyWorkState: ReviewReplyWorkState | null): Row => ({
 describe("reply work state", () => {
   it("names each state as an instruction, and says nothing about a row that cannot carry work", () => {
     expect(replyWorkStateLabel("AWAITING_APPROVAL")).toBe("확정 전");
-    expect(replyWorkStateLabel("DRAFT_NEEDED")).toBe("초안 필요");
+    expect(replyWorkStateLabel("DRAFT_NEEDED")).toBe("답글 필요");
     // Never 완료: the step after an approval happens in the seller center, which this product does
     // not observe.
-    expect(replyWorkStateLabel("APPROVED")).toBe("승인됨");
+    expect(replyWorkStateLabel("APPROVED")).toBe("확정함");
     expect(replyWorkStateLabel(null)).toBeNull();
     expect(replyWorkStateLabel(undefined)).toBeNull();
   });
