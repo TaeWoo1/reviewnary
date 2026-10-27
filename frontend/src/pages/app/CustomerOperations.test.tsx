@@ -57,7 +57,7 @@ function home(over: Partial<CustomerOperationsHome> = {}): CustomerOperationsHom
       rows: [
         {
           caseId: "c-1", subjectKind: "INQUIRY", channelNameKo: "카페24", title: "환불 문의", rating: null, preview: null,
-          reasonNote: "고객이 답변을 기다리는 새 문의입니다.", summary: "고객이 파손으로 환불을 요청했습니다.",
+          reasonNote: "고객이 답변을 기다리는 새 문의예요.", summary: "고객이 파손으로 환불을 요청했어요.",
           recommendedActionType: "REFUND_OR_COMPENSATION", recommendedAction: "사진을 확인하고 환불 여부를 정해 주세요.",
           missingInformation: ["파손 사진"], draftPrepared: true, decidedBy: "AGENT", openedAt: "2026-09-16T05:02:00Z", receivedOn: null, to: "/inquiries/i-1",
         },
@@ -66,7 +66,7 @@ function home(over: Partial<CustomerOperationsHome> = {}): CustomerOperationsHom
     handled: {
       since: "2026-09-15T05:30:00Z", autoResolved: 2, monitoring: 1, draftsPrepared: 1, verifying: 0,
       rows: [
-        { caseId: "h-1", subjectKind: "REVIEW", channelNameKo: "카페24", title: "잘 받았습니다", rating: 5, disposition: "AUTO_RESOLVED", decidedBy: "RULE", reasonNote: "별점 4~5점 리뷰라 따로 대응할 일이 없습니다.", summary: null, verifying: false, to: "/reviews/reply/r-1" },
+        { caseId: "h-1", subjectKind: "REVIEW", channelNameKo: "카페24", title: "잘 받았어요", rating: 5, disposition: "AUTO_RESOLVED", decidedBy: "RULE", reasonNote: "별점 4~5점 리뷰라 따로 대응할 일이 없어요.", summary: null, verifying: false, to: "/reviews/reply/r-1" },
       ],
     },
     gaps: {
@@ -144,12 +144,12 @@ describe("고객 운영 관리 page", () => {
   it("without any connected channel it cannot start, and names no channel while saying so", async () => {
     api.getCustomerOperations.mockResolvedValue(view({ eligible: false }));
     renderPage();
-    const sentence = await screen.findByText("고객 운영 관리를 시작하려면 판매 채널을 먼저 연결해 주세요.");
+    const sentence = await screen.findByText("고객 운영 관리를 시작하려면 판매 채널을 먼저 연동해 주세요.");
     expect(sentence).toBeInTheDocument();
     for (const channel of ["Cafe24", "카페24", "네이버", "쿠팡"]) {
       expect(sentence.textContent).not.toContain(channel);
     }
-    expect(screen.getByRole("link", { name: "판매 채널 연결하기" })).toHaveAttribute("href", "/connect");
+    expect(screen.getByRole("link", { name: "판매 채널 연동하기" })).toHaveAttribute("href", "/connect");
     expect(screen.queryByRole("button", { name: /시작하기/ })).toBeNull();
   });
 
@@ -168,7 +168,7 @@ describe("고객 운영 관리 page", () => {
     api.activateCustomerOperations.mockResolvedValue(view({ status: "ACTIVE", nextRunAt: "2026-09-16T07:00:00Z" }));
     renderPage();
     const job = await screen.findByRole("region", { name: "맡긴 일" });
-    expect(within(job).getByText("Reviewnary가 새 고객 문제를 확인하고, 직접 판단할 필요가 있는 일만 알려드립니다.")).toBeInTheDocument();
+    expect(within(job).getByText("Reviewnary가 새 고객 문제를 확인하고, 직접 판단할 필요가 있는 일만 알려드려요.")).toBeInTheDocument();
     expect(within(job).getByText("2시간마다")).toBeInTheDocument();
     for (const text of ["Cafe24 문의", "Cafe24 리뷰", "중요하지 않은 일 정리", "반복 문제 관찰", "필요한 정보 조사", "답변/행동 준비", "고객에게 실제 메시지 전송", "금전/보상/취소", "불확실한 판단"]) {
       expect(within(job).getByText(text)).toBeInTheDocument();
@@ -189,7 +189,7 @@ describe("고객 운영 관리 page", () => {
           rows: [
             {
               caseId: "v-1", subjectKind: "INQUIRY", channelNameKo: "카페24", title: "교환 문의", rating: null,
-              disposition: "NEEDS_DECISION", decidedBy: "AGENT", reasonNote: "답변이 필요합니다.",
+              disposition: "NEEDS_DECISION", decidedBy: "AGENT", reasonNote: "답변이 필요해요.",
               summary: null, verifying: true, to: "/inquiries/i-9",
             },
           ],
@@ -200,16 +200,16 @@ describe("고객 운영 관리 page", () => {
 
     // It left 「내 결정 필요」 the moment they acted; without this it would appear nowhere at all. The sentence is
     // the area's, said once — the row carries the word and what the case is about.
-    expect(await screen.findByText("승인한 작업의 처리 결과를 확인하고 있습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("승인한 작업의 처리 결과를 확인하고 있어요.")).toBeInTheDocument();
     // The rows sit inside a native <details>; they are in the document whether or not it is open, so this
     // asserts what the seller can reach rather than simulating a disclosure toggle.
     expect(screen.getByText("처리 확인 중")).toBeInTheDocument();
     expect(screen.getByText("교환 문의")).toBeInTheDocument();
-    expect(screen.getByText("답변이 필요합니다.")).toBeInTheDocument();
+    expect(screen.getByText("답변이 필요해요.")).toBeInTheDocument();
 
     // The execution record owns delivery, and it has not spoken yet.
     const page = document.body.textContent ?? "";
-    for (const claim of ["보냈습니다", "전송했습니다", "처리 완료", "처리했습니다", "등록했습니다"]) {
+    for (const claim of ["보냈어요", "전송했어요", "처리 완료", "처리했어요", "등록했어요"]) {
       expect(page, `the page claims ${claim} before the record said so`).not.toContain(claim);
     }
   });
@@ -221,11 +221,11 @@ describe("고객 운영 관리 page", () => {
     const { container } = renderPage();
 
     expect(await screen.findByRole("heading", { name: "내 결정 필요" })).toBeInTheDocument();
-    expect(screen.getByText("직접 판단하실 일이 1건 있습니다.")).toBeInTheDocument();
+    expect(screen.getByText("직접 판단하실 일이 1건 있어요.")).toBeInTheDocument();
     expect(screen.getByText("초안 준비됨 · 아직 보내지 않음")).toBeInTheDocument();
-    expect(screen.getByText(/따로 할 일이 없는 2건을 정리했습니다/)).toBeInTheDocument();
-    expect(screen.getByText("Cafe24 리뷰 — 연결이 만료되어 확인하지 못했습니다.")).toBeInTheDocument();
-    expect(screen.getByText(/Cafe24 리뷰 — 확인하지 못했습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/따로 할 일이 없는 2건을 정리했어요/)).toBeInTheDocument();
+    expect(screen.getByText("Cafe24 리뷰 — 연결이 만료되어 확인하지 못했어요.")).toBeInTheDocument();
+    expect(screen.getByText(/Cafe24 리뷰 — 확인하지 못했어요/)).toBeInTheDocument();
     expect(screen.queryByText(/리뷰 — 확인함 · 0건/)).toBeNull();
     expect(screen.getByText("오늘 14:02 · 일부만 확인")).toBeInTheDocument();
     await expectNoAxeViolations(container);
@@ -239,7 +239,7 @@ describe("고객 운영 관리 page", () => {
   it("an organisation the deployment has not opened the job for sees no controls", async () => {
     api.getCustomerOperations.mockResolvedValue(view({ available: false }));
     renderPage();
-    expect(await screen.findByText("이 계정에서는 아직 고객 운영 관리를 사용할 수 없습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("이 계정에서는 아직 고객 운영 관리를 사용할 수 없어요.")).toBeInTheDocument();
     expect(screen.queryByRole("button")).toBeNull();
   });
 });

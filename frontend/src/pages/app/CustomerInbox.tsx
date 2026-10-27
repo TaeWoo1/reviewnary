@@ -350,13 +350,13 @@ export function CustomerInbox() {
           with its own 「지금 처리할 일」 list — the same inquiries 확인할 일 already lists, in a second layout. */}
       {queue === null ? (
         <p className="text-sm text-warn" role="status">
-          처리할 문의 수를 불러오지 못했습니다. 아래 전체 문의는 그대로 보실 수 있습니다.
+          처리할 문의 수를 불러오지 못했어요. 아래 전체 문의는 그대로 보실 수 있어요.
         </p>
       ) : null}
 
       {productId ? (
         <div className="flex flex-wrap items-center gap-2" data-testid="record-product-scope">
-          <Status tone="info">{scopedProductName ?? "이 상품"}의 문의만 보고 있습니다</Status>
+          <Status tone="info">{scopedProductName ?? "이 상품"}의 문의만 보고 있어요</Status>
           <button
             type="button"
             onClick={() => setParam("productId", null)}
@@ -427,19 +427,19 @@ export function CustomerInbox() {
         <p className="px-1 py-6 text-sm text-muted">불러오는 중…</p>
       ) : failed ? (
         <Empty
-          title="문의를 불러오지 못했습니다"
+          title="문의를 불러오지 못했어요"
           body="연결 상태를 확인한 뒤 다시 시도해 주세요."
-          action={<BtnLink to="/connect">채널 연결 확인</BtnLink>}
+          action={<BtnLink to="/connect">채널 연동 확인</BtnLink>}
         />
       ) : (record ?? []).length === 0 ? (
         <Empty
-          title={hasNarrowing(q, channel, status, productId) ? "찾는 문의가 없습니다" : "아직 들어온 문의가 없습니다"}
+          title={hasNarrowing(q, channel, status, productId) ? "찾는 문의가 없어요" : "아직 들어온 문의가 없어요"}
           body={
             hasNarrowing(q, channel, status, productId)
               ? "다른 말로 찾거나 조건을 넓혀 보세요."
-              : "채널을 연결하거나 정기 자료 가져오기로 자료를 넘겨주시면, 채널이 달라도 같은 형태로 모아 보여드립니다."
+              : "채널을 연동하거나 정기 자료 가져오기로 자료를 넘겨주시면, 채널이 달라도 같은 형태로 모아 보여드려요."
           }
-          action={hasNarrowing(q, channel, status, productId) ? undefined : <BtnLink to="/connect">채널 연결하기</BtnLink>}
+          action={hasNarrowing(q, channel, status, productId) ? undefined : <BtnLink to="/connect">채널 연동하기</BtnLink>}
         />
       ) : (
         <>
@@ -578,9 +578,9 @@ export function CustomerInbox() {
     />
   ) : itemRef && !loading ? (
     <div>
-      <p className="break-keep font-semibold text-ink">문의를 찾을 수 없습니다</p>
+      <p className="break-keep font-semibold text-ink">문의를 찾을 수 없어요</p>
       <p className="mt-2 break-keep text-sm leading-relaxed text-muted">
-        목록에서 다시 선택해 주세요. 자료가 다시 정리되면서 항목이 바뀌었을 수 있습니다.
+        목록에서 다시 선택해 주세요. 자료가 다시 정리되면서 항목이 바뀌었을 수 있어요.
       </p>
     </div>
   ) : itemRef ? (

@@ -85,7 +85,7 @@ export function IssueDecision({
               value={note}
               onChange={(event) => onNoteChange(event.target.value)}
               rows={2}
-              placeholder="예) 접착 테이프 공급처를 바꾸고 8월 출고분부터 적용합니다."
+              placeholder="예) 접착 테이프 공급처를 바꾸고 8월 출고분부터 적용해요."
               className={`break-keep rounded-xl border border-line bg-surface p-3 text-sm leading-relaxed text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
                 page ? "min-w-0 flex-1" : "w-full"
               }`}
@@ -97,7 +97,7 @@ export function IssueDecision({
             ) : null}
           </div>
           <p className="break-keep text-xs leading-relaxed text-muted">
-            남기신 내용은 아래 기록에 그대로 남습니다.
+            남기신 내용은 아래 기록에 그대로 남아요.
           </p>
         </div>
       ) : null}

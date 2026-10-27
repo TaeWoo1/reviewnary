@@ -62,7 +62,7 @@ export function EvidenceTrend({
       </p>
       {before > 0 ? (
         <p className="mt-2 break-keep text-xs leading-relaxed text-muted">
-          이 기간 이전에도 근거가 {before.toLocaleString("ko-KR")}건 있습니다. 위 막대에는 들어 있지 않습니다.
+          이 기간 이전에도 근거가 {before.toLocaleString("ko-KR")}건 있어요. 위 막대에는 들어 있지 않아요.
         </p>
       ) : null}
     </div>

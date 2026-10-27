@@ -76,7 +76,7 @@ describe("문의·주문 자동 수집 카드 — 돌지 않는 것은 설정하
     for (const state of ["EXPIRED", "NEEDS_REAUTH", "DISCONNECTED"]) {
       expect(apiCardOf(overview(true), info, status(state))).toMatchObject({
         kind: "REAUTH",
-        primaryLabel: "연결 정보 갱신",
+        primaryLabel: "연동 정보 갱신",
       });
     }
   });

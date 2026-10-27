@@ -80,7 +80,7 @@ export function AgentPairingPanel({
     <div className="flex flex-col gap-2 border-t border-line pt-3" data-testid="agent-pairing">
       {/* Why the seller is stopped, in one line, before the fix. The dock says nothing on the screens that do
           not need the helper — this is where "the helper is needed" is said. */}
-      <p className="text-sm font-semibold text-ink" data-testid="agent-pairing-title">reviewnary 도우미가 필요합니다</p>
+      <p className="text-sm font-semibold text-ink" data-testid="agent-pairing-title">reviewnary 도우미가 필요해요</p>
       {phase === "pairing_pending" ? (
         <>
           <p className="text-sm text-ink break-keep" data-testid="agent-pairing-instruction">

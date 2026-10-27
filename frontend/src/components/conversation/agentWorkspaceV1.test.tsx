@@ -28,7 +28,7 @@ let workingSet: WorkingSetView | null = null;
 
 vi.mock("../../lib/apiClient", () => ({
   api: {
-    getInquiryDetailStrict: vi.fn().mockResolvedValue({ details: "고객이 쓴 문장입니다.", draft: null }),
+    getInquiryDetailStrict: vi.fn().mockResolvedValue({ details: "고객이 쓴 문장이에요.", draft: null }),
   },
 }));
 vi.mock("../../lib/conversation/ConversationProvider", () => ({
@@ -46,10 +46,10 @@ function inquiries(over: Partial<InquiryListArtifact> = {}): InquiryListArtifact
       key: "UNANSWERED", label: "답변 필요",
       items: [
         { workItemId: "w-1", inquiryId: "i-1", channelCode: "CAFE24", channelNameKo: "카페24", receivedAt: "2026-08-30T00:00:00Z",
-          phase: "OPEN", status: "UNANSWERED", title: "배송이 늦습니다", snippet: "언제 오나요?", productId: null,
+          phase: "OPEN", status: "UNANSWERED", title: "배송이 늦어요", snippet: "언제 오나요?", productId: null,
           productName: null, answerBasis: null, to: "/inquiries/i-1" },
         { workItemId: "w-2", inquiryId: "i-2", channelCode: "CAFE24", channelNameKo: "카페24", receivedAt: "2026-08-29T00:00:00Z",
-          phase: "OPEN", status: "UNANSWERED", title: "색상이 다릅니다", snippet: null, productId: null,
+          phase: "OPEN", status: "UNANSWERED", title: "색상이 달라요", snippet: null, productId: null,
           productName: null, answerBasis: null, to: "/inquiries/i-2" },
       ],
     }],
@@ -72,7 +72,7 @@ function reviews(): ReviewListArtifact {
     artifactId: "a-r", type: "REVIEW_LIST", title: "낮은 평점 리뷰", totalCount: 2, freshness: [],
     scope: { rating: "LOW", period: null, channelCode: null },
     items: [
-      { reviewId: "r-1", rating: 1, negative: true, preview: "배송이 열흘 걸렸습니다.", productId: "p-1",
+      { reviewId: "r-1", rating: 1, negative: true, preview: "배송이 열흘 걸렸어요.", productId: "p-1",
         productName: "실리콘 몰딩 2호", channelCode: "CAFE24", channelNameKo: "카페24", writtenOn: "2026-08-29", to: "/reviews?review=r-1" },
       { reviewId: "r-2", rating: 2, negative: true, preview: "포장이 얇아요.", productId: "p-1",
         productName: "실리콘 몰딩 2호", channelCode: "CAFE24", channelNameKo: "카페24", writtenOn: "2026-08-28", to: "/reviews?review=r-2" },
@@ -93,15 +93,15 @@ describe("§2 — a word every row shares is not a distinction", () => {
   });
 
   it("drops the state word from the rows, and says nothing when the seller ASKED for that state", () => {
-    shell(<InquiryListView artifact={inquiries({ scope: { status: "UNANSWERED" } } as never)} headline="답변 안 한 문의는 2건입니다." />);
+    shell(<InquiryListView artifact={inquiries({ scope: { status: "UNANSWERED" } } as never)} headline="답변 안 한 문의는 2건이에요." />);
     expect(screen.queryByText("답변 필요")).toBeNull();
-    expect(screen.queryByText("모두 답변이 필요한 문의입니다.")).toBeNull();
+    expect(screen.queryByText("모두 답변이 필요한 문의예요.")).toBeNull();
   });
 
   it("says it once as a caption when the sentence above did not", () => {
-    shell(<InquiryListView artifact={inquiries()} headline="문의는 2건입니다." />);
+    shell(<InquiryListView artifact={inquiries()} headline="문의는 2건이에요." />);
     expect(screen.queryByText("답변 필요")).toBeNull();
-    expect(screen.getByText(/모두 답변이 필요한 문의입니다\./)).toBeInTheDocument();
+    expect(screen.getByText(/모두 답변이 필요한 문의예요\./)).toBeInTheDocument();
   });
 });
 
@@ -116,7 +116,7 @@ describe("§1/§3 — one control per row, and the customer's words are the larg
     shell(<InquiryListView artifact={inquiries()} />);
     await userEvent.click(screen.getAllByTestId("inquiry-row-select")[0]!);
     const body = await screen.findByTestId("inquiry-row-body");
-    expect(body).toHaveTextContent("고객이 쓴 문장입니다.");
+    expect(body).toHaveTextContent("고객이 쓴 문장이에요.");
     expect(body.className).toContain("text-lg");
     expect(screen.getByRole("link", { name: "문의 화면에서 열기" })).toHaveAttribute("href", "/inquiries/i-1");
   });
@@ -173,7 +173,7 @@ describe("§4 — a product and a review are objects the conversation can stand 
 describe("§3 — the draft is the deliverable", () => {
   const draft = {
     artifactId: "a-d", type: "DRAFT", title: "답변 초안", workItemId: "w-1", version: 3,
-    comments: "확인 후 안내드리겠습니다.", channelNameKo: "카페24", productName: null, answerBasis: "GROUNDED",
+    comments: "확인 후 안내드릴게요.", channelNameKo: "카페24", productName: null, answerBasis: "GROUNDED",
     evidenceSummary: [], to: "/inquiries/i-1",
   } as unknown as DraftArtifact;
 
@@ -181,6 +181,6 @@ describe("§3 — the draft is the deliverable", () => {
     shell(<DraftView artifact={draft} />);
     const body = screen.getByTestId("draft-body");
     expect(body.className).toContain("text-lg");
-    expect(screen.getByText("아직 아무 곳에도 보내지 않았습니다.")).toBeInTheDocument();
+    expect(screen.getByText("아직 아무 곳에도 보내지 않았어요.")).toBeInTheDocument();
   });
 });

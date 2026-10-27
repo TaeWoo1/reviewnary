@@ -44,7 +44,7 @@ export function ChannelStatusSection({
         <p className="text-base text-muted">불러오는 중…</p>
       ) : error ? (
         <p className="rounded-xl bg-bad/10 px-4 py-3 text-base text-bad">
-          연결 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+          연결 상태를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
         </p>
       ) : (
         <>
@@ -178,20 +178,20 @@ export function ConnectionInfoSection({
     <>
       {isCoupang && heading !== null ? (
         <p className="mb-3 break-keep text-sm text-muted">
-          쿠팡 문의와 주문은 API로 자동 수집합니다. 상품평은 위 「상품평 가져오기」에서 따로 가져오며, 둘은
-          서로 필요하지 않습니다.
+          쿠팡 문의와 주문은 API로 자동 수집해요. 상품평은 위 「상품평 가져오기」에서 따로 가져오며, 둘은
+          서로 필요하지 않아요.
         </p>
       ) : null}
       {loading ? (
         <p className="text-base text-muted">불러오는 중…</p>
       ) : error ? (
         <p className="rounded-xl bg-bad/10 px-4 py-3 text-base text-bad">
-          연결 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+          연동 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
         </p>
       ) : info === null ? (
         <div className="space-y-4">
           <div className="space-y-2">
-            <p className="text-base font-semibold text-ink">등록된 연결 정보가 없습니다.</p>
+            <p className="text-base font-semibold text-ink">등록된 연동 정보가 없어요.</p>
             <p className="text-base text-muted">{guidance}</p>
           </div>
           {canEnter ? (
@@ -220,7 +220,7 @@ export function ConnectionInfoSection({
   if (heading === null) {
     return <div className="space-y-3">{body}</div>;
   }
-  return <Section title={heading ?? (isCoupang ? "문의·주문 자동 수집" : "연결 정보")}>{body}</Section>;
+  return <Section title={heading ?? (isCoupang ? "문의·주문 자동 수집" : "연동 정보")}>{body}</Section>;
 }
 
 // Read-only 연결에 필요한 정보 block: the backend-owned credential field shape for
@@ -239,7 +239,7 @@ function CredentialTemplateBlock({
       <div className="mt-6 border-t border-line pt-6">
         <h3 className="text-base font-bold text-ink">연결에 필요한 정보</h3>
         <p className="mt-2 rounded-xl bg-bad/10 px-4 py-3 text-base text-bad">
-          연결에 필요한 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+          연결에 필요한 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
         </p>
       </div>
     );
@@ -332,7 +332,7 @@ function ConnectionInfoDetail({
   }
   return (
     <div className="space-y-4">
-      <p className="text-base font-semibold text-good">✓ 연결 정보가 등록되어 있습니다.</p>
+      <p className="text-base font-semibold text-good">✓ 연동 정보가 등록되어 있어요.</p>
       <div className="grid grid-cols-1 gap-4 text-base md:grid-cols-3">
         <div>
           <p className="text-sm text-muted">인증 방식</p>
@@ -356,7 +356,7 @@ function ConnectionInfoDetail({
         </button>
         {canEnter ? (
           <button type="button" onClick={() => setReentering((v) => !v)} className="btn-ghost">
-            연결 정보 다시 입력
+            연동 정보 다시 입력
           </button>
         ) : null}
         {canEnter ? (
@@ -372,7 +372,7 @@ function ConnectionInfoDetail({
       </div>
       {testErrored ? (
         <div className="rounded-xl bg-bad/10 px-4 py-3">
-          <p className="text-base font-semibold text-bad">연결 확인에 실패했습니다.</p>
+          <p className="text-base font-semibold text-bad">연결 확인에 실패했어요.</p>
         </div>
       ) : testResult ? (
         <ConnectionCheckResult result={testResult} />
@@ -398,21 +398,21 @@ function ConnectionInfoDetail({
 // present in this DTO.
 function ConnectionCheckResult({ result }: { result: ConnectionTestResultView }) {
   if (result.status === "SUCCESS") {
-    return <p className="text-base font-semibold text-good">✓ 연결 정보가 확인되었습니다.</p>;
+    return <p className="text-base font-semibold text-good">✓ 연동 정보가 확인됐어요.</p>;
   }
   if (result.status === "FAILED") {
     return (
       <div className="rounded-xl bg-bad/10 px-4 py-3">
-        <p className="text-base font-semibold text-bad">연결 확인에 실패했습니다.</p>
+        <p className="text-base font-semibold text-bad">연결 확인에 실패했어요.</p>
         {result.message ? <p className="mt-1 text-sm text-muted">{result.message}</p> : null}
       </div>
     );
   }
   if (result.status === "NOT_CONFIGURED") {
-    return <p className="text-base text-muted">저장된 연결 정보가 없습니다.</p>;
+    return <p className="text-base text-muted">저장된 연동 정보가 없어요.</p>;
   }
   // UNSUPPORTED (and any unexpected status) — not-yet-supported, fixed copy.
-  return <p className="text-base text-muted">이 채널의 연결 확인은 아직 제공되지 않습니다.</p>;
+  return <p className="text-base text-muted">이 채널의 연결 확인은 아직 제공되지 않아요.</p>;
 }
 
 // 연결 정보 입력 form: renders one input per backend credential-template field
@@ -469,12 +469,12 @@ function CredentialEntryForm({
         secrets,
       });
       setValues({});
-      onReport("연결 정보가 저장되었습니다.", false);
+      onReport("연동 정보가 저장됐어요.", false);
       onChanged();
       onDone?.();
     } catch (err) {
       onReport(
-        backendMessage(err) ?? "연결 정보 저장에 실패했습니다. 입력 정보를 확인해 주세요.",
+        backendMessage(err) ?? "연동 정보 저장에 실패했어요. 입력 정보를 확인해 주세요.",
         true,
       );
     } finally {
@@ -484,7 +484,7 @@ function CredentialEntryForm({
 
   return (
     <form className="space-y-4 rounded-xl border border-line bg-canvas/40 p-4" onSubmit={submit}>
-      <h3 className="text-base font-bold text-ink">연결 정보 입력</h3>
+      <h3 className="text-base font-bold text-ink">연동 정보 입력</h3>
       {template.fields.map((field) => (
         <div key={field.key}>
           <label htmlFor={`cred-${field.key}`} className="mb-1.5 block text-base font-semibold text-ink">
@@ -506,10 +506,10 @@ function CredentialEntryForm({
         </div>
       ))}
       <p className="text-sm text-muted">
-        입력한 정보는 암호화되어 저장됩니다. 저장 후 수집 테스트는 별도 단계에서 확인합니다.
+        입력한 정보는 암호화되어 저장돼요. 저장 후 수집 테스트는 별도 단계에서 확인해요.
       </p>
       <button type="submit" disabled={saving || !requiredFilled} className="btn-primary">
-        {saving ? "저장 중…" : "연결 정보 저장"}
+        {saving ? "저장 중…" : "연동 정보 저장"}
       </button>
     </form>
   );

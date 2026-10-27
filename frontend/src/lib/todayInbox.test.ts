@@ -73,7 +73,7 @@ describe("Today — 확인이 필요한 리뷰", () => {
       { account: coupang, page: null },
     ]);
     expect(t.signal).toEqual({ kind: "READY", count: 4 });
-    expect(t.note).toBe("쿠팡은(는) 지금 확인할 수 없습니다.");
+    expect(t.note).toBe("쿠팡은(는) 지금 확인할 수 없어요.");
     expect(t.breakdown.map((b) => b.key)).toEqual(["acc-nv"]);
   });
 
@@ -116,7 +116,7 @@ describe("Today — 답변이 필요한 문의", () => {
 });
 
 describe("Today — 확인이 필요한 연결", () => {
-  const alert = { id: "al1", sellerAccountId: "a", channelId: null, channelNameKo: "쿠팡", accountAlias: null, type: "AUTH_EXPIRED", severity: "WARNING", message: "연결 정보가 만료되었습니다", createdAt: "2026-08-10T00:00:00Z", acknowledgedAt: null } as ConnectorAlertView;
+  const alert = { id: "al1", sellerAccountId: "a", channelId: null, channelNameKo: "쿠팡", accountAlias: null, type: "AUTH_EXPIRED", severity: "WARNING", message: "연동 정보가 만료됐어요", createdAt: "2026-08-10T00:00:00Z", acknowledgedAt: null } as ConnectorAlertView;
 
   it("counts interrupted channels and open alerts, each row pointing where it is handled", () => {
     const t = buildConnectionToday(
@@ -129,7 +129,7 @@ describe("Today — 확인이 필요한 연결", () => {
     expect(t.rows.map((r) => r.to)).toEqual(["/connect", "/settings/alerts"]);
   });
 
-  it("links the headline when everything is on one screen, and to 채널 연결 when quiet", () => {
+  it("links the headline when everything is on one screen, and to 채널 연동 when quiet", () => {
     expect(buildConnectionToday({ needsAttention: [], openAlerts: [alert], nothingConnected: false }, true, true).to).toBe("/settings/alerts");
     const quiet = buildConnectionToday({ needsAttention: [], openAlerts: [], nothingConnected: false }, true, true);
     expect(quiet.signal).toEqual({ kind: "READY", count: 0 });
@@ -138,6 +138,6 @@ describe("Today — 확인이 필요한 연결", () => {
 
   it("is unavailable when both reads failed, and says which half is missing when one did", () => {
     expect(buildConnectionToday({ needsAttention: [], openAlerts: [], nothingConnected: false }, false, false).signal).toEqual({ kind: "UNAVAILABLE" });
-    expect(buildConnectionToday({ needsAttention: [], openAlerts: [], nothingConnected: false }, false, true).note).toBe("채널 상태는 지금 확인할 수 없습니다.");
+    expect(buildConnectionToday({ needsAttention: [], openAlerts: [], nothingConnected: false }, false, true).note).toBe("채널 상태는 지금 확인할 수 없어요.");
   });
 });

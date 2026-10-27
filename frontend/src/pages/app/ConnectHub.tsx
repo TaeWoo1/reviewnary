@@ -230,7 +230,7 @@ export function ConnectHub() {
         const id = account?.id ?? (await api.createApiChannelAccount(channel.id)).id;
         navigate(reviewCollectionPath(id), { state: { start: true } });
       } catch {
-        setNotice("상품평 수집을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        setNotice("상품평 수집을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.");
       }
     },
     [navigate],
@@ -245,7 +245,7 @@ export function ConnectHub() {
 
   return (
     <div className="space-y-6">
-      <PageHead title="채널 연결" />
+      <PageHead title="채널 연동" />
 
       {openCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn/10 px-4 py-3">
@@ -259,7 +259,7 @@ export function ConnectHub() {
       {notice ? <div className="rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-700">{notice}</div> : null}
 
       {accountsError ? (
-        <div className="rounded-xl bg-bad/10 px-4 py-3 text-sm text-bad">연결 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>
+        <div className="rounded-xl bg-bad/10 px-4 py-3 text-sm text-bad">연결 상태를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</div>
       ) : null}
 
       <Block title="채널">
@@ -311,27 +311,27 @@ export function ConnectHub() {
         <Disclosure label="잘 안 될 때" summaryClassName="-ml-2">
           <ul className="mt-2 space-y-2 text-sm text-muted">
             <li className="break-keep border-t border-line/70 py-2">
-              <Go to="/connect/upload">파일로 넘기기</Go> — 연결이 어려운 채널은 파일로 받습니다.
+              <Go to="/connect/upload">파일로 넘기기</Go> — 연결이 어려운 채널은 파일로 받아요.
             </li>
             {sellerPc ? null : (
               <li className="break-keep border-t border-line/70 py-2">
                 <Go to="/connect/review-history">기간별로 가져오기</Go> — 지난 기간의 리뷰를 판매자센터에서 직접
-                내려받아 넘깁니다.
+                내려받아 넘겨요.
               </li>
             )}
             <li className="break-keep border-t border-line/70 py-2">
               <Go to="/connect/imports">실행 기록</Go> — 지난 실행과 구간별 이력.
             </li>
             <li className="break-keep border-t border-line/70 py-2">
-              <Go to="/connect/helper">설치·업데이트 안내</Go> — 이 Mac의 도우미를 처음 설치하거나 새로 받습니다.
+              <Go to="/connect/helper">설치·업데이트 안내</Go> — 이 Mac의 도우미를 처음 설치하거나 새로 받아요.
             </li>
           </ul>
           <ol className="mt-3 space-y-2 border-t border-line/70 pt-3 text-sm text-muted">
             {[
-              "가져올 자료를 고릅니다.",
-              "형식과 기간이 맞는지 먼저 확인합니다.",
-              "중복을 걸러내고 채널이 달라도 같은 형태로 정리합니다.",
-              "리뷰·문의 화면과 리포트에 반영됩니다.",
+              "가져올 자료를 골라요.",
+              "형식과 기간이 맞는지 먼저 확인해요.",
+              "중복을 걸러내고 채널이 달라도 같은 형태로 정리해요.",
+              "리뷰·문의 화면과 리포트에 반영돼요.",
             ].map((step, index) => (
               <li key={step} className="flex gap-2 break-keep">
                 <span className="tabular-nums text-brand-700">{index + 1}.</span>

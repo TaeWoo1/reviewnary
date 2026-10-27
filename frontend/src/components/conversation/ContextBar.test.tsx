@@ -12,7 +12,7 @@ import { ContextBar } from "./ContextBar";
 import type { CurrentContext } from "../../lib/conversation/currentContext";
 
 const anchor: CurrentContext = {
-  kind: "ANCHOR", label: "현금영수증 발행 부탁드립니다", meta: "네이버 스마트스토어 · 실리콘 몰딩 2호",
+  kind: "ANCHOR", label: "현금영수증 발행 부탁드려요", meta: "네이버 스마트스토어 · 실리콘 몰딩 2호",
   task: "답변 준비 중", to: "/inquiries/i-1", clearable: true,
 };
 
@@ -20,7 +20,7 @@ describe("ContextBar", () => {
   it("names the object, where it came from and the step in flight, and releases it on 「해제」", async () => {
     const onClear = vi.fn();
     render(<MemoryRouter><ContextBar context={anchor} onClear={onClear} /></MemoryRouter>);
-    expect(screen.getByTestId("context-bar-label")).toHaveTextContent("현금영수증 발행 부탁드립니다");
+    expect(screen.getByTestId("context-bar-label")).toHaveTextContent("현금영수증 발행 부탁드려요");
     expect(screen.getByTestId("context-bar-label")).toHaveAttribute("href", "/inquiries/i-1");
     expect(screen.getByTestId("context-bar")).toHaveTextContent("네이버 스마트스토어 · 실리콘 몰딩 2호");
     expect(screen.getByTestId("context-bar-task")).toHaveTextContent("답변 준비 중");

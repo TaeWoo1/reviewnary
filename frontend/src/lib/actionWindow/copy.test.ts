@@ -93,13 +93,13 @@ describe("FE-owned copy registry", () => {
       const id = issuanceStepDetail("actionWindow.issuance.applicationId") ?? "";
       expect(id).toMatch(/애플리케이션 ID를 직접 복사/);
       expect(id).toMatch(/바로 붙여넣어/);
-      expect(id).toMatch(/값을 읽지 않습니다/);
+      expect(id).toMatch(/값을 읽지 않아요/);
       expect(id).not.toMatch(/'보기'/); // the ID step must not send the seller to the Secret's controls
       // Secret step: view (solve NAVER's own check if shown) + copy, SellerOps reads no value / clipboard.
       const sec = issuanceStepDetail("actionWindow.issuance.applicationSecret") ?? "";
       expect(sec).toMatch(/'보기'를 눌러 시크릿을 확인/);
       expect(sec).toMatch(/자동입력 방지 확인을 띄우면 직접 풀어/);
-      expect(sec).toMatch(/시크릿 값도, 클립보드도 읽지 않습니다/);
+      expect(sec).toMatch(/시크릿 값도, 클립보드도 읽지 않아요/);
       const ret = issuanceStepDetail("actionWindow.issuance.return") ?? "";
       expect(ret).toMatch(/두 값을 붙여넣었다면/);
     });

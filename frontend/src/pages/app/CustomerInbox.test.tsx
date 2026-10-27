@@ -109,7 +109,7 @@ function renderInbox(path = "/inquiries") {
 
 const RECORD = [
   row({ inquiryId: "i1", status: "UNANSWERED", productName: "케이블 몰딩", snippet: "폭이 몇 mm인가요" }),
-  row({ inquiryId: "i2", snippet: "잘 받았습니다", channelCode: "NAVER", channelNameKo: "네이버 스마트스토어" }),
+  row({ inquiryId: "i2", snippet: "잘 받았어요", channelCode: "NAVER", channelNameKo: "네이버 스마트스토어" }),
 ];
 
 beforeEach(() => {
@@ -172,7 +172,7 @@ describe("확인할 일 — linked from the record, not drawn twice", () => {
   it("a queue read that FAILED says so — an unread queue is not an empty one", async () => {
     getInquiryQueueStrict.mockRejectedValue(new Error("down"));
     renderInbox();
-    expect(await screen.findByText(/처리할 문의 수를 불러오지 못했습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/처리할 문의 수를 불러오지 못했어요/)).toBeInTheDocument();
     // The record is a separate read and is unaffected.
     expect(screen.getByLabelText("문의 목록")).toBeInTheDocument();
   });
@@ -239,23 +239,23 @@ describe("전체 문의 — the record, filtered by the server", () => {
   it("an answered row is quieter than the work above it, and still readable", async () => {
     renderInbox();
     const record = await screen.findByLabelText("문의 목록");
-    expect(within(record).getByText("잘 받았습니다")).toBeInTheDocument();
+    expect(within(record).getByText("잘 받았어요")).toBeInTheDocument();
   });
 
   it("tells 「찾는 게 없다」 and 「아무것도 없다」 apart", async () => {
     getInquiryRowsStrict.mockResolvedValue({ items: [], totalCount: 0, limit: 50, productId: null });
     const { unmount } = renderInbox();
-    expect(await screen.findByText("아직 들어온 문의가 없습니다")).toBeInTheDocument();
+    expect(await screen.findByText("아직 들어온 문의가 없어요")).toBeInTheDocument();
     unmount();
 
     renderInbox("/inquiries?q=없는말");
-    expect(await screen.findByText("찾는 문의가 없습니다")).toBeInTheDocument();
+    expect(await screen.findByText("찾는 문의가 없어요")).toBeInTheDocument();
   });
 
   it("says the read failed rather than showing an empty record", async () => {
     getInquiryRowsStrict.mockRejectedValue(new Error("down"));
     renderInbox();
-    expect(await screen.findByText("문의를 불러오지 못했습니다")).toBeInTheDocument();
+    expect(await screen.findByText("문의를 불러오지 못했어요")).toBeInTheDocument();
   });
 });
 
@@ -345,7 +345,7 @@ describe("deep link and the exact inquiry", () => {
       ),
     );
     renderInbox("/inquiries/does-not-exist");
-    expect(await screen.findByText("문의를 찾을 수 없습니다")).toBeInTheDocument();
+    expect(await screen.findByText("문의를 찾을 수 없어요")).toBeInTheDocument();
   });
 });
 
@@ -358,15 +358,15 @@ describe("deep link and the exact inquiry", () => {
 describe("문의의 첫 시선 — 고객이 쓴 말", () => {
   it("목록은 본문을 첫 줄에, 제목은 사실 줄에 그린다", async () => {
     getInquiryRowsStrict.mockResolvedValue({
-      items: [row({ inquiryId: "i9", status: "UNANSWERED", title: "세금계산서 발행 문의", snippet: "사업자등록증 첨부했습니다" })],
+      items: [row({ inquiryId: "i9", status: "UNANSWERED", title: "세금계산서 발행 문의", snippet: "사업자등록증 첨부했어요" })],
       totalCount: 1,
       limit: 50,
       productId: null,
     });
     renderInbox("/inquiries");
-    const link = await screen.findByRole("link", { name: /사업자등록증 첨부했습니다/ });
+    const link = await screen.findByRole("link", { name: /사업자등록증 첨부했어요/ });
     // 두 칸 모두 행에 있다 — 제목은 사라지지 않고 자리를 옮겼다.
-    expect(within(link).getByText("사업자등록증 첨부했습니다")).toBeInTheDocument();
+    expect(within(link).getByText("사업자등록증 첨부했어요")).toBeInTheDocument();
     expect(within(link).getByText("제목 「세금계산서 발행 문의」")).toBeInTheDocument();
     expect(within(link).getByText(/카페24 자사몰/)).toBeInTheDocument();
     expect(within(link).getByText("답변 필요")).toBeInTheDocument();
@@ -408,7 +408,7 @@ describe("문의의 첫 시선 — 고객이 쓴 말", () => {
         row({
           inquiryId: "i9",
           status: "UNANSWERED",
-          title: "문의 드립니다",
+          title: "문의 드려요",
           snippet: "교환은 언제까지 되나요",
           productName: "선바로 전선몰드",
         }),
@@ -423,16 +423,16 @@ describe("문의의 첫 시선 — 고객이 쓴 말", () => {
     expect(within(link).queryByText(/제목 「/)).toBeNull();
   });
 
-  it("아무것도 더해 주지 않는 제목은 그리지 않는다 — 「문의 드립니다」", async () => {
+  it("아무것도 더해 주지 않는 제목은 그리지 않는다 — 「문의 드려요」", async () => {
     getInquiryRowsStrict.mockResolvedValue({
-      items: [row({ inquiryId: "i9", status: "UNANSWERED", title: "문의 드립니다", snippet: "교환은 언제까지 되나요" })],
+      items: [row({ inquiryId: "i9", status: "UNANSWERED", title: "문의 드려요", snippet: "교환은 언제까지 되나요" })],
       totalCount: 1,
       limit: 50,
       productId: null,
     });
     renderInbox("/inquiries");
     const link = await screen.findByRole("link", { name: /교환은 언제까지 되나요/ });
-    expect(within(link).queryByText(/문의 드립니다/)).toBeNull();
+    expect(within(link).queryByText(/문의 드려요/)).toBeNull();
   });
 
   it("제목이 없는 문의는 본문이 제목 자리를 대신하고, 본문을 두 번 그리지 않는다", async () => {
@@ -465,7 +465,7 @@ describe("문의의 첫 시선 — 고객이 쓴 말", () => {
 
   it("제목과 본문이 둘 다 있으면 pane은 본문을 제목으로 세우고 제목은 그 아래 한 번", async () => {
     getInquiryRowsStrict.mockResolvedValue({
-      items: [row({ inquiryId: "i9", status: "UNANSWERED", title: "세금계산서 발행 문의", snippet: "사업자등록증 첨부했습니다" })],
+      items: [row({ inquiryId: "i9", status: "UNANSWERED", title: "세금계산서 발행 문의", snippet: "사업자등록증 첨부했어요" })],
       totalCount: 1,
       limit: 50,
       productId: null,
@@ -473,7 +473,7 @@ describe("문의의 첫 시선 — 고객이 쓴 말", () => {
     renderInbox("/inquiries/i9");
     await screen.findByLabelText("선택한 항목");
     const pane = screen.getByLabelText("선택한 문의");
-    expect(within(pane).getByRole("heading", { level: 2 })).toHaveTextContent("사업자등록증 첨부했습니다");
+    expect(within(pane).getByRole("heading", { level: 2 })).toHaveTextContent("사업자등록증 첨부했어요");
     expect(within(pane).getAllByText(/제목 「세금계산서 발행 문의」/)).toHaveLength(1);
   });
 
@@ -488,8 +488,8 @@ describe("문의의 첫 시선 — 고객이 쓴 말", () => {
     await screen.findByLabelText("선택한 항목");
     // 상태와 「할 일 없음」은 한 번만 (UI audit, 2026-10-06): 그 문장이 위에 서고, 아래 줄은
     // 그 문장이 말할 수 없는 것 — 답변을 어디서 읽는지 — 만 말한다.
-    expect(screen.getByText(/하실 일은 없습니다/)).toBeInTheDocument();
-    expect(screen.getByText(/네이버 스마트스토어 판매자센터에서 확인하실 수 있습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/하실 일은 없어요/)).toBeInTheDocument();
+    expect(screen.getByText(/네이버 스마트스토어 판매자센터에서 볼 수 있어요/)).toBeInTheDocument();
     expect(screen.queryByText(/이미 답변이 등록되어 있어/)).toBeNull();
     // 「답변을 기다리는 문의에만」은 이 경우의 이유가 아니다.
     expect(screen.queryByText(/답변을 기다리는 문의에만/)).toBeNull();
@@ -503,9 +503,9 @@ describe("response workflow", () => {
     expect(screen.queryByText("응답 제안")).toBeNull();
     // 예전 문장은 「reviewnary가 답변 방향을 제안할 수 없습니다」였다 — 맞지만 이유가 없어서, 제품이
     // 이 문의를 다루지 못한다는 뜻으로 읽힌다. 이유는 규칙이다: 초안은 답변을 기다리는 문의에만 쓴다.
-    expect(screen.getByText(/답변을 기다리는 문의에만 초안을 씁니다/)).toBeInTheDocument();
+    expect(screen.getByText(/답변을 기다리는 문의에만 초안을 써요/)).toBeInTheDocument();
     // 그리고 판매자가 실제로 어디서 답하면 되는지까지.
-    expect(screen.getByText(/판매자센터에서 직접 작성/)).toBeInTheDocument();
+    expect(screen.getByText(/판매자센터에서 직접 써/)).toBeInTheDocument();
   });
 
   it("shows the customer's question and offers to draft an answer", async () => {
@@ -525,14 +525,14 @@ describe("response workflow", () => {
       expect(text).not.toContain(banned);
     }
     expect(screen.queryByRole("button", { name: /답변 보내기/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /확인, 등록합니다/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /확인, 등록해요/ })).toBeNull();
   });
 
   it("says what a draft is for before it is written — reviewed, then sent on purpose", async () => {
     getInquiryQueueStrict.mockImplementation(queueOf([queued({ workItemId: "w1", inquiryId: "i1" })]));
     renderInbox("/inquiries/i1");
     await screen.findByText("고객 문의");
-    expect(screen.getByText(/보내는 것은 확인 후 따로 누릅니다/)).toBeInTheDocument();
+    expect(screen.getByText(/보내는 것은 확인 후 따로 눌러요/)).toBeInTheDocument();
   });
 });
 
@@ -615,7 +615,7 @@ describe("문의 — the canonical decision workspace (2026-10-03)", () => {
     phase: "PROPOSED",
     status: "UNANSWERED",
     informStatus: null,
-    title: "문의 드립니다",
+    title: "문의 드려요",
     details: "교환은 언제까지 신청해야 하나요?",
     receivedAt: "2026-08-03T10:00:00Z",
     proposal: null,
@@ -624,7 +624,7 @@ describe("문의 — the canonical decision workspace (2026-10-03)", () => {
     productBinding: null,
     sourceSubtype: null,
     answerStateProven: false,
-    answerStateNote: "이 채널의 문의 수집이 최신이 아니라, 이 문의에 이미 답변이 달렸는지 지금은 확인할 수 없습니다.",
+    answerStateNote: "이 채널의 문의 수집이 최신이 아니라, 이 문의에 이미 답변이 달렸는지 지금은 확인할 수 없어요.",
     draftEvidence: [
       { kind: "ORG_POLICY", scopeLabel: "운영 정책", title: "교환·반품 기준", locator: null, sourceId: "s", chunkId: "c", snippet: "수령 후 7일 이내." },
     ],
@@ -635,7 +635,7 @@ describe("문의 — the canonical decision workspace (2026-10-03)", () => {
       version: 1,
       answerStatus: 2,
       title: "교환 신청 기한 안내",
-      comments: "수령 후 7일 이내, 개봉하지 않은 상품에 한해 교환이 가능합니다.",
+      comments: "수령 후 7일 이내, 개봉하지 않은 상품에 한해 교환이 가능해요.",
       contentFingerprint: "a".repeat(64),
       fingerprintAlgorithm: "SHA-256",
       createdAt: "2026-08-03T11:00:00Z",
@@ -653,7 +653,7 @@ describe("문의 — the canonical decision workspace (2026-10-03)", () => {
   beforeEach(() => {
     restoreWide = stubWide(true);
     getInquiryRowsStrict.mockResolvedValue({
-      items: [row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", phase: "PROPOSED", title: "문의 드립니다", snippet: "교환은 언제까지 신청해야 하나요?" })],
+      items: [row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", phase: "PROPOSED", title: "문의 드려요", snippet: "교환은 언제까지 신청해야 하나요?" })],
       totalCount: 1,
       limit: 50,
       productId: null,
@@ -678,8 +678,8 @@ describe("문의 — the canonical decision workspace (2026-10-03)", () => {
     // with no idea the channel might already carry one.
     renderInbox("/inquiries/i1");
     const dock = await screen.findByTestId("pane-footer");
-    expect(within(dock).getByText(/이미 답변이 달렸는지 지금은 확인할 수 없습니다/)).toBeInTheDocument();
-    const promise = within(dock).getByText("고객에게 나가지 않습니다");
+    expect(within(dock).getByText(/이미 답변이 달렸는지 지금은 확인할 수 없어요/)).toBeInTheDocument();
+    const promise = within(dock).getByText("고객에게 나가지 않아요");
     expect(promise).toBeInTheDocument();
     // An instruction about what the press does, not good news — it does not compete with the warning
     // beside it for the eye (2026-10-04).
@@ -705,7 +705,7 @@ describe("문의 — the canonical decision workspace (2026-10-03)", () => {
     const pane = await screen.findByLabelText("선택한 문의");
     expect(within(pane).getByRole("heading", { level: 2 })).toHaveTextContent("교환은 언제까지 신청해야 하나요?");
     // 「문의 드립니다」 adds nothing the body does not say, so it is not printed at all.
-    expect(within(pane).queryByText(/문의 드립니다/)).toBeNull();
+    expect(within(pane).queryByText(/문의 드려요/)).toBeNull();
   });
 });
 
@@ -744,7 +744,7 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
     phase: "PROPOSED",
     status: "UNANSWERED",
     informStatus: null,
-    title: "문의 드립니다",
+    title: "문의 드려요",
     details: "교환은 언제까지 신청해야 하나요?",
     receivedAt: "2026-08-03T10:00:00Z",
     proposal: null,
@@ -753,7 +753,7 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
     productBinding: null,
     sourceSubtype: null,
     answerStateProven: false,
-    answerStateNote: "이 문의에 이미 답변이 달렸는지 지금은 확인할 수 없습니다.",
+    answerStateNote: "이 문의에 이미 답변이 달렸는지 지금은 확인할 수 없어요.",
     draftEvidence: [
       { kind: "ORG_POLICY", scopeLabel: "운영 정책", title: "교환·반품 기준", locator: null, sourceId: "s", chunkId: "c", snippet: "수령 후 7일 이내." },
     ],
@@ -764,7 +764,7 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
       version: 1,
       answerStatus: 2,
       title: "교환 신청 기한 안내",
-      comments: "수령 후 7일 이내, 개봉하지 않은 상품에 한해 교환이 가능합니다.",
+      comments: "수령 후 7일 이내, 개봉하지 않은 상품에 한해 교환이 가능해요.",
       contentFingerprint: "a".repeat(64),
       fingerprintAlgorithm: "SHA-256",
       createdAt: "2026-08-03T11:00:00Z",
@@ -858,7 +858,7 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
     });
     getInquiryDetailStrict.mockResolvedValue({
       ...DRAFTED_WITH_CAPABILITY,
-      draft: { ...DRAFTED_WITH_CAPABILITY.draft, answerBasis: "GROUNDED", answerBasisNote: "답변에 필요한 정보를 확인했습니다.", answerBasisAction: null },
+      draft: { ...DRAFTED_WITH_CAPABILITY.draft, answerBasis: "GROUNDED", answerBasisNote: "답변에 필요한 정보를 확인했어요.", answerBasisAction: null },
     });
     renderInbox("/inquiries/i1");
     const object = await screen.findByTestId("prepared-answer");
@@ -867,14 +867,14 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
     expect(within(object).getByText("교환·반품 기준")).toBeInTheDocument();
     // And not a second time as a standalone sentence over the card.
     expect(screen.queryByTestId("answer-state")).toBeNull();
-    expect(screen.queryByText("답변에 필요한 정보를 확인했습니다.")).toBeNull();
+    expect(screen.queryByText("답변에 필요한 정보를 확인했어요.")).toBeNull();
   });
 
   it("the row says how long the customer waited, and the day it arrived once that is a year", async () => {
     getInquiryRowsStrict.mockResolvedValue({
       items: [
         row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", snippet: "교환은 언제까지 신청해야 하나요?", receivedAt: "2026-08-03T10:00:00Z" }),
-        row({ inquiryId: "old", snippet: "세금계산서 발행 부탁드립니다", receivedAt: "2016-09-09T10:00:00Z" }),
+        row({ inquiryId: "old", snippet: "세금계산서 발행 부탁드려요", receivedAt: "2016-09-09T10:00:00Z" }),
       ],
       totalCount: 2,
       limit: 50,
@@ -924,7 +924,7 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
     // Head, body and foot of one thing.
     expect(within(object).getByText("준비된 답변")).toBeInTheDocument();
     expect(within(object).getByText("교환 신청 기한 안내")).toBeInTheDocument();
-    expect(within(object).getByText(/개봉하지 않은 상품에 한해 교환이 가능합니다/)).toBeInTheDocument();
+    expect(within(object).getByText(/개봉하지 않은 상품에 한해 교환이 가능해요/)).toBeInTheDocument();
     expect(within(object).getByText("답변에 사용한 근거")).toBeInTheDocument();
     expect(within(object).getByText("교환·반품 기준")).toBeInTheDocument();
     // And only one of it: a second copy outside the object is the shape this replaced.
@@ -941,11 +941,11 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
     });
     renderInbox("/inquiries/i1");
     const note = await screen.findByTestId("registration-note");
-    expect(note).toHaveTextContent(/답변을 대신 등록하지 않습니다/);
+    expect(note).toHaveTextContent(/답변을 대신 등록하지 않아요/);
     // Last in the reading, so it sits against the dock rather than inside the flow.
     const article = screen.getByLabelText("선택한 항목");
     expect(article.lastElementChild).toBe(note);
     // Said once: the sentence left the answer block when it came here.
-    expect(screen.getAllByText(/답변을 대신 등록하지 않습니다/)).toHaveLength(1);
+    expect(screen.getAllByText(/답변을 대신 등록하지 않아요/)).toHaveLength(1);
   });
 });

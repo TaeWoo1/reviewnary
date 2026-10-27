@@ -90,12 +90,12 @@ export function changeOf(
 
 /** 비교가 서지 못한 이유 — 「없다」고만 적으면 읽는 사람이 제품을 의심한다. */
 export function noChangeReason(counter: ReportCounter | null | undefined): string {
-  if (ungated(counter)) return "이 판은 수집 범위를 확인하기 전에 만들어졌습니다";
+  if (ungated(counter)) return "이 판은 수집 범위를 확인하기 전에 만들어졌어요";
   if (!counter || counter.current === null || counter.current === undefined) {
-    return "이 기간의 수집 결과를 확인하지 못했습니다";
+    return "이 기간의 수집 결과를 확인하지 못했어요";
   }
-  if (counter.previous === null) return "이전 기간의 수집 결과를 확인하지 못했습니다";
-  return "이전 기간과 같습니다";
+  if (counter.previous === null) return "이전 기간의 수집 결과를 확인하지 못했어요";
+  return "이전 기간과 같아요";
 }
 
 export function counterById(counters: ReportCounter[], id: string): ReportCounter | null {

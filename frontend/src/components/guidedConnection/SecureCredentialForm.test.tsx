@@ -30,7 +30,7 @@ describe("SecureCredentialForm", () => {
     await user.type(screen.getByLabelText(/Client ID/), "  app-id-123  ");
     const secret = screen.getByLabelText(/Client Secret/) as HTMLInputElement;
     await user.type(secret, SECRET);
-    await user.click(screen.getByRole("button", { name: "연결 정보 저장" }));
+    await user.click(screen.getByRole("button", { name: "연동 정보 저장" }));
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit).toHaveBeenCalledWith({ client_id: "app-id-123", client_secret: SECRET });
@@ -45,7 +45,7 @@ describe("SecureCredentialForm", () => {
     render(<SecureCredentialForm template={NAVER_LIKE_TEMPLATE} onSubmit={vi.fn()} submitting={false} />);
     await user.type(screen.getByLabelText(/Client ID/), "app-id-123");
     await user.type(screen.getByLabelText(/Client Secret/), SECRET);
-    await user.click(screen.getByRole("button", { name: "연결 정보 저장" }));
+    await user.click(screen.getByRole("button", { name: "연동 정보 저장" }));
     for (const call of setItem.mock.calls) {
       expect(JSON.stringify(call)).not.toContain(SECRET);
     }
@@ -65,7 +65,7 @@ describe("SecureCredentialForm", () => {
   it("keeps the submit button disabled until required fields are filled", async () => {
     const user = userEvent.setup();
     render(<SecureCredentialForm template={NAVER_LIKE_TEMPLATE} onSubmit={vi.fn()} submitting={false} />);
-    const button = screen.getByRole("button", { name: "연결 정보 저장" });
+    const button = screen.getByRole("button", { name: "연동 정보 저장" });
     expect(button).toBeDisabled();
     await user.type(screen.getByLabelText(/Client ID/), "app-id");
     await user.type(screen.getByLabelText(/Client Secret/), SECRET);

@@ -50,7 +50,7 @@ export function guidedStopSentence(code: ReplyBlockerCode | null, reviewDate?: s
 export function guidedUnavailableSentence(reason: string | null | undefined): string | null {
   switch (reason) {
     case "SOURCE_NOT_EXECUTABLE":
-      return "이 리뷰는 판매자센터 화면에서 찾아 드릴 수 없어요. 채널 연동으로 가져온 리뷰만 안내할 수 있습니다. 아래 답변을 복사해 판매자센터에서 직접 등록해 주세요.";
+      return "이 리뷰는 판매자센터 화면에서 찾아 드릴 수 없어요. 채널 연동으로 가져온 리뷰만 안내할 수 있어요. 아래 답변을 복사해 판매자센터에서 직접 등록해 주세요.";
     case "CHANNEL_ALREADY_ANSWERED":
       // The screen's own long-standing sentence, moved here unchanged: the words were right, and the
       // only thing wrong was that the client re-derived the RULE behind them from `channelReplyState`.

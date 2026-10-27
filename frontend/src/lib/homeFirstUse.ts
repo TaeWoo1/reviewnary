@@ -150,8 +150,8 @@ export const DELEGABLE_WORD: Record<"ORDER" | "INQUIRY" | "REVIEW", string> = {
 export function delegableSentence(state: HomeFirstUseState): string {
   const words = state.delegable.map((t) => DELEGABLE_WORD[t]);
   return words.length > 0
-    ? `채널을 연결하시면 ${words.join(" · ")}를 대신 확인하고, 먼저 봐야 할 일을 여기에 정리해 두겠습니다.`
-    : "채널을 연결하시면 매일 할 일을 여기에 정리해 두겠습니다.";
+    ? `채널을 연동하시면 ${words.join(" · ")}를 대신 확인하고, 먼저 봐야 할 일을 여기에 정리해 둘게요.`
+    : "채널을 연동하시면 매일 할 일을 여기에 정리해 둘게요.";
 }
 
 /**
@@ -164,8 +164,8 @@ export function delegableSentence(state: HomeFirstUseState): string {
 export function noDataSentence(state: HomeFirstUseState): string {
   const names = state.connected.join(" · ");
   return state.observed
-    ? `${names} 연결은 끝났고, 아직 들어온 주문·문의·리뷰가 없습니다. 새로 들어오면 여기에 먼저 정리해 두겠습니다.`
-    : `${names} 연결은 끝났습니다. 첫 수집이 끝나면 할 일을 여기에 정리해 두겠습니다.`;
+    ? `${names} 연동은 끝났고, 아직 들어온 주문·문의·리뷰가 없어요. 새로 들어오면 여기에 먼저 정리해 둘게요.`
+    : `${names} 연동은 끝났어요. 첫 수집이 끝나면 할 일을 여기에 정리해 둘게요.`;
 }
 
 /**
@@ -183,10 +183,10 @@ export function noDataSentence(state: HomeFirstUseState): string {
 export function firstUseSteps(state: HomeFirstUseState): ReadonlyArray<{ title: string; detail: string }> {
   const where = state.connectable.length > 0 ? state.connectable.join(" · ") : "쓰고 계신 판매 채널";
   return [
-    { title: "1. 판매 채널 연결", detail: `${where} 중 쓰고 계신 곳을 고르시면, 채널별로 필요한 것만 순서대로 안내해 드립니다.` },
+    { title: "1. 판매 채널 연동", detail: `${where} 중 쓰고 계신 곳을 고르시면, 채널별로 필요한 것만 순서대로 안내해 드려요.` },
     // The WHAT is {@link delegableSentence}'s, said once, one line above these — a step that repeats
     // 「주문 · 문의 · 리뷰를 가져옵니다」 is that promise a second time in smaller type.
-    { title: "2. 자동으로 가져오기", detail: "연결이 끝나면 reviewnary가 채널에서 직접 가져와서, 새로 들어오는 것까지 계속 확인합니다." },
-    { title: "3. 먼저 하실 일 정리", detail: "그날 답해야 할 문의와 살펴볼 리뷰를 골라 두고, 답변 초안까지 준비해 둡니다. 보내는 것은 언제나 확인하신 뒤입니다." },
+    { title: "2. 자동으로 가져오기", detail: "연결이 끝나면 reviewnary가 채널에서 직접 가져와서, 새로 들어오는 것까지 계속 확인해요." },
+    { title: "3. 먼저 하실 일 정리", detail: "그날 답해야 할 문의와 살펴볼 리뷰를 골라 두고, 답변 초안까지 준비해 둬요. 보내는 것은 언제나 확인하신 뒤예요." },
   ];
 }

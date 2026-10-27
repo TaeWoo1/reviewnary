@@ -31,7 +31,7 @@ export function usableTopic(subject: string | null | undefined): string | null {
 }
 
 /** 주제를 못 믿을 때 쓰는, 주제 없는 같은 사실. */
-export const TOPICLESS_GAP_SENTENCE = "이 질문에 대해 고객에게 안내할 기준이 없습니다.";
+export const TOPICLESS_GAP_SENTENCE = "이 질문에 대해 고객에게 안내할 기준이 없어요.";
 
 /**
  * 「필요한 정보」가 세우는 한 문장. 주제를 믿을 수 있을 때만 서버가 쓴 문장을 그대로 쓴다.

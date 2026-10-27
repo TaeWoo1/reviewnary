@@ -103,7 +103,7 @@ describe("주문 상세 — 결제 단위 하나", () => {
     await screen.findByRole("heading", { level: 1, name: "31971202913784" });
 
     expect(screen.getByTestId("order-axes")).toHaveTextContent("결제확인되지 않음");
-    expect(screen.getByText("쿠팡 상태값의 뜻을 확인한 적이 없습니다")).toBeInTheDocument();
+    expect(screen.getByText("쿠팡 상태값의 뜻을 확인한 적이 없어요")).toBeInTheDocument();
 
     const history = within(screen.getByTestId("order-history")).getAllByRole("listitem");
     expect(history).toHaveLength(2);
@@ -140,14 +140,14 @@ describe("주문 상세 — 결제 단위 하나", () => {
   it("가리킨 문의가 없으면 0이라고 적는다 — 빈 자리로 두지 않는다", async () => {
     vi.mocked(api.getOrderRecordStrict).mockResolvedValue(coupang);
     mount(`/orders/COUPANG/${ACCOUNT}/31971202913784`);
-    expect(await screen.findByText("이 주문을 가리킨 문의가 없습니다")).toBeInTheDocument();
+    expect(await screen.findByText("이 주문을 가리킨 문의가 없어요")).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "문의 0" })).toBeInTheDocument();
   });
 
   it("열리지 않는 주소는 숫자를 그리지 않는다 — 다른 계정의 행으로 보충되지 않는다", async () => {
     vi.mocked(api.getOrderRecordStrict).mockRejectedValue(new Error("404"));
     mount(`/orders/NAVER/${ACCOUNT}/NO-SUCH-ORDER`);
-    expect(await screen.findByText("주문을 찾지 못했습니다")).toBeInTheDocument();
+    expect(await screen.findByText("주문을 찾지 못했어요")).toBeInTheDocument();
     expect(screen.queryByTestId("order-lines")).not.toBeInTheDocument();
   });
 });

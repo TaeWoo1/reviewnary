@@ -92,14 +92,14 @@ export function CustomerOperations({ now }: { now?: Date }) {
           ) : undefined
         }
       />
-      {view === undefined ? <p className="text-sm text-muted">불러오는 중입니다.</p> : null}
+      {view === undefined ? <p className="text-sm text-muted">불러오는 중이에요.</p> : null}
       {view === null ? (
         <p className="text-sm text-bad" role="alert">
-          {RESPONSIBILITY_NAME}를 불러오지 못했습니다.
+          {RESPONSIBILITY_NAME}를 불러오지 못했어요.
         </p>
       ) : null}
       {view && !view.available ? (
-        <p className="break-keep text-muted">이 계정에서는 아직 {RESPONSIBILITY_NAME}를 사용할 수 없습니다.</p>
+        <p className="break-keep text-muted">이 계정에서는 아직 {RESPONSIBILITY_NAME}를 사용할 수 없어요.</p>
       ) : null}
       {view && view.available ? (
         <>
@@ -123,7 +123,7 @@ export function CustomerOperations({ now }: { now?: Date }) {
                   view.status === "ACTIVE"
                     ? kstClock(view.nextRunAt, now) ?? "곧"
                     : view.status === null
-                      ? "시작하면 바로 첫 확인을 합니다"
+                      ? "시작하면 바로 첫 확인을 해요"
                       : "멈춰 있음"
                 }
               />
@@ -170,7 +170,7 @@ export function CustomerOperations({ now }: { now?: Date }) {
                     {/* The channel list, not one channel: this responsibility can start from any of the
                         channels it can collect without a person, and the connect screen is where the seller
                         chooses. Pointing at Cafe24 sent every other seller to the wrong shop. */}
-                    <BtnLink to="/connect">판매 채널 연결하기</BtnLink>
+                    <BtnLink to="/connect">판매 채널 연동하기</BtnLink>
                   </div>
                 )
               ) : null}
@@ -178,7 +178,7 @@ export function CustomerOperations({ now }: { now?: Date }) {
                 confirmStop ? (
                   <div className="flex flex-wrap items-center gap-3">
                     <p className="break-keep text-sm text-ink">
-                      중지하면 새 확인을 하지 않고, 열려 있는 확인 요청도 닫습니다. 중지할까요?
+                      중지하면 새 확인을 하지 않고, 열려 있는 확인 요청도 닫아요. 중지할까요?
                     </p>
                     <Btn variant="outline" size="sm" disabled={busy} onClick={() => act(() => api.stopCustomerOperations())}>
                       중지하기
@@ -330,5 +330,5 @@ function messageOf(e: unknown): string {
     const data = e.response?.data as { message?: unknown } | undefined;
     if (data && typeof data.message === "string" && data.message.trim()) return data.message;
   }
-  return "요청을 처리하지 못했습니다. 잠시 뒤 다시 시도해 주세요.";
+  return "요청을 처리하지 못했어요. 잠시 뒤 다시 시도해 주세요.";
 }

@@ -106,8 +106,8 @@ describe("지금 수집 — 서버가 경로를 고른다", () => {
     // 그리고 정상 상태의 그 줄은 acquisition을 설명하지 않는다. 여기 있던 「누를 때마다 판매자 센터 화면에서
     // 읽어옵니다. 자동 주기는 없습니다」는 구현 방식과 「매번 눌러야 한다」를 동시에 말했고, 둘 다 이 줄이
     // 할 말이 아니다.
-    expect(within(reviewRow()).queryByText(/화면에서 읽어옵니다/)).toBeNull();
-    expect(within(reviewRow()).queryByText(/자동 주기는 없습니다/)).toBeNull();
+    expect(within(reviewRow()).queryByText(/화면에서 읽어와요/)).toBeNull();
+    expect(within(reviewRow()).queryByText(/자동 주기는 없어요/)).toBeNull();
   });
 
   it("누르면 화면 읽기가 돌고, 끝난 결과를 판매자 문장으로 말한다", async () => {
@@ -160,7 +160,7 @@ describe("지금 수집 — 서버가 경로를 고른다", () => {
     mount();
 
     expect(await reviewButton()).toBeDisabled();
-    expect(within(reviewRow()).getByText(/이미 수집이 진행 중입니다/)).toBeInTheDocument();
+    expect(within(reviewRow()).getByText(/이미 수집이 진행 중이에요/)).toBeInTheDocument();
     // 같은 409의 두 뜻을 섞으면, 이미 연결한 판매자를 아무 일도 하지 않는 버튼으로 보낸다.
     expect(within(reviewRow()).queryByText(/연결하면/)).toBeNull();
   });
@@ -172,7 +172,7 @@ describe("지금 수집 — 서버가 경로를 고른다", () => {
     // 로그인은 판매자가 자기 브라우저에서 방금 했을 수도 있다. 막아 두면 고친 뒤에도 누를 길이 없다.
     expect(await reviewButton()).not.toBeDisabled();
     // 서버가 아는 것은 「마지막 시도가 로그인 벽에서 멈췄다」이고, 「지금 로그아웃 상태다」가 아니다.
-    expect(within(reviewRow()).getByText("최근 수집 시 로그인이 필요했습니다.")).toBeInTheDocument();
+    expect(within(reviewRow()).getByText("최근 수집 시 로그인이 필요했어요.")).toBeInTheDocument();
     expect(within(reviewRow()).queryByText(/지금.*로그인/)).toBeNull();
   });
 
@@ -180,23 +180,23 @@ describe("지금 수집 — 서버가 경로를 고른다", () => {
     readiness("READY");
     collectNow.mockRejectedValue({
       isAxiosError: true,
-      response: { status: 409, data: { code: "HELPER_BUSY", message: "이 컴퓨터에서 이미 확인 작업이 진행 중입니다." } },
+      response: { status: 409, data: { code: "HELPER_BUSY", message: "이 컴퓨터에서 이미 확인 작업이 진행 중이에요." } },
     });
     const onReport = mount();
 
     await userEvent.click(await reviewButton());
     await waitFor(() =>
-      expect(onReport).toHaveBeenCalledWith("이미 수집이 진행 중입니다. 끝난 뒤 다시 눌러 주세요.", true),
+      expect(onReport).toHaveBeenCalledWith("이미 수집이 진행 중이에요. 끝난 뒤 다시 눌러 주세요.", true),
     );
 
     collectNow.mockRejectedValue({
       isAxiosError: true,
-      response: { status: 409, data: { code: "HELPER_NOT_LINKED", message: "연결된 도우미가 없습니다." } },
+      response: { status: 409, data: { code: "HELPER_NOT_LINKED", message: "연결된 도우미가 없어요." } },
     });
     await userEvent.click(await reviewButton());
     await waitFor(() =>
       expect(onReport).toHaveBeenCalledWith(
-        "이 컴퓨터의 도우미가 아직 연결되지 않았습니다. 도우미 카드에서 [이 기기 연결]을 한 번 눌러 주세요.",
+        "이 컴퓨터의 도우미가 아직 연결되지 않았어요. 도우미 카드에서 [이 기기 연결]을 한 번 눌러 주세요.",
         true,
       ),
     );
@@ -241,7 +241,7 @@ describe("수집 입구는 자료마다 하나다", () => {
     mount();
 
     await waitFor(() => expect(within(reviewRow()).getByTestId("collect-now-REVIEW")).toBeDefined());
-    expect(within(reviewRow()).queryByText(/화면에서 읽어옵니다/)).toBeNull();
+    expect(within(reviewRow()).queryByText(/화면에서 읽어와요/)).toBeNull();
   });
 
   it("호스트가 이미 그 자료의 수집을 들고 있으면, 이 줄에는 버튼이 없다", async () => {

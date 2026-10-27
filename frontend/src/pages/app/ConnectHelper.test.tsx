@@ -17,9 +17,9 @@ describe("도우미 안내 — the steps are the installer's steps", () => {
   it("never asks the seller to type a password into the helper", () => {
     const { container } = render(<MemoryRouter><ConnectHelper /></MemoryRouter>);
     const text = container.textContent ?? "";
-    expect(text).not.toContain("비밀번호를 입력합니다");
+    expect(text).not.toContain("비밀번호를 입력해요");
     // It says the opposite, because the seller has to know the missing window is not a failure.
-    expect(text).toContain("비밀번호를 입력하지 않습니다");
+    expect(text).toContain("비밀번호를 입력하지 않아요");
     expect(text).toContain("이 기기 연결");
   });
 

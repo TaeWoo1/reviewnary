@@ -75,7 +75,7 @@ export function validateBackfill(range: DateRange, types: string[]): BackfillVal
     return { ok: false, error: "수집 기간을 선택해 주세요." };
   }
   if (range.from > range.to) {
-    return { ok: false, error: "시작일은 종료일보다 늦을 수 없습니다." };
+    return { ok: false, error: "시작일은 종료일보다 늦을 수 없어요." };
   }
   return { ok: true };
 }

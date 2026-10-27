@@ -59,7 +59,7 @@ export function ProductListArtifact({ artifact, headline }: { artifact: ProductL
               {expanded ? (
                 <div className="flex flex-wrap items-center gap-2 border-t border-line/60 bg-canvas/60 px-4 py-2.5" data-testid="product-row-detail">
                   <BtnLink to={p.to} variant="outline" size="sm" onClick={onOpen}>상품 화면에서 열기</BtnLink>
-                  <span className="text-sm text-muted">아래 입력창에 「이 상품」이라고 이어서 물어보실 수 있습니다.</span>
+                  <span className="text-sm text-muted">아래 입력창에 「이 상품」이라고 이어서 물어보실 수 있어요.</span>
                 </div>
               ) : null}
             </li>

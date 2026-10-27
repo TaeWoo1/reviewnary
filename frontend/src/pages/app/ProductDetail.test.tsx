@@ -161,7 +161,7 @@ beforeEach(() => {
     page: 0,
     size: 3,
     items: [
-      { id: "r-1", sellerAccountId: "a-1", channelCode: "NAVER", channelNameKo: "네이버 스마트스토어", writtenOn: "2026-09-02", rating: 5, negative: false, preview: "선 정리가 너무 편합니다", productId: "p-1", productName: "선바로", replyState: "PENDING", executableIdentity: "MARKETPLACE" },
+      { id: "r-1", sellerAccountId: "a-1", channelCode: "NAVER", channelNameKo: "네이버 스마트스토어", writtenOn: "2026-09-02", rating: 5, negative: false, preview: "선 정리가 너무 편해요", productId: "p-1", productName: "선바로", replyState: "PENDING", executableIdentity: "MARKETPLACE" },
     ],
   });
   getReviewIssueDetailStrict.mockResolvedValue({
@@ -312,7 +312,7 @@ describe("상품 상세 — 반복되는 문제는 제 근거로 이어진다", 
   it("반복된 것이 없으면 그렇게 말한다", async () => {
     getProductKnowledgeStrict.mockResolvedValue(view({ issueEvidence: 0 }, []));
     renderDetail();
-    expect(await screen.findByText("이 상품에서 반복 문제로 잡힌 것이 없습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("이 상품에서 반복 문제로 잡힌 것이 없어요.")).toBeInTheDocument();
   });
 });
 
@@ -347,7 +347,7 @@ describe("상품 상세 — 최근 리뷰", () => {
   it("세 줄과, 전체로 가는 문", async () => {
     renderDetail();
     const section = await screen.findByRole("region", { name: "최근 리뷰" });
-    expect(section.textContent).toContain("선 정리가 너무 편합니다");
+    expect(section.textContent).toContain("선 정리가 너무 편해요");
     expect(section.textContent).toContain("5점");
     expect(within(section).getByRole("link", { name: /리뷰 1,761건 모두 보기/ })).toHaveAttribute(
       "href",
@@ -372,7 +372,7 @@ describe("상품 상세 — 지식과 자료", () => {
     renderDetail();
     const section = await screen.findByRole("region", { name: "상품 지식" });
     expect(section.textContent).toContain("부착이 잘 떨어질 때 안내");
-    expect(section.textContent).toContain("AI가 인용할 수 없습니다");
+    expect(section.textContent).toContain("AI가 인용할 수 없어요");
   });
 
   it("자료는 수와 올리는 길을 한 줄로 말한다", async () => {
@@ -386,7 +386,7 @@ describe("상품 상세 — 지식과 자료", () => {
       { id: "c-2", scope: "PRODUCT", productId: "p-9", productName: "다른 상품", subject: "두께", content: "", origin: "DRAFT_GAP", evidenceCount: 0, state: "OPEN", sourceId: null, createdAt: "2026-09-01T00:00:00Z" },
     ]);
     renderDetail();
-    expect(await screen.findByText(/확인이 필요한 항목이 1건 있습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/확인이 필요한 항목이 1건 있어요/)).toBeInTheDocument();
   });
 
   it("후보 읽기가 실패하면 0건이라고 말하지 않는다", async () => {

@@ -57,8 +57,8 @@ export function ForgotPassword() {
           보세요.
         </AuthNotice>
         {devOutbox ? (
-          <AuthNotice title="개발 모드: 메일은 backend 로그에 출력됩니다">
-            SMTP가 설정되지 않은 로컬 환경입니다. backend 터미널의 <code>[DEV MAIL OUTBOX]</code> 줄에서 재설정 링크를
+          <AuthNotice title="개발 모드: 메일은 backend 로그에 출력돼요">
+            SMTP가 설정되지 않은 로컬 환경이에요. backend 터미널의 <code>[DEV MAIL OUTBOX]</code> 줄에서 재설정 링크를
             여세요.
           </AuthNotice>
         ) : null}

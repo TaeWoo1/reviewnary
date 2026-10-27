@@ -31,24 +31,24 @@ function detail(over: Partial<OperationsCaseDetail> = {}): OperationsCaseDetail 
     answerStateNote: null,
     rating: null,
     title: "방수 되나요?",
-    body: "욕실에 붙이려는데 방수 되는지 궁금합니다.",
-    reasonNote: "고객이 답변을 기다리고 있습니다.",
+    body: "욕실에 붙이려는데 방수 되는지 궁금해요.",
+    reasonNote: "고객이 답변을 기다리고 있어요.",
     disposition: "NEEDS_DECISION",
     // 기본은 「판매자 기준이 적용되지 않은 건」 — 정책이 테스트 주제인 케이스만 override한다.
     appliedPolicy: null,
     policyProblemKo: null,
     decidedBy: "AGENT",
-    summary: "고객이 욕실 사용 가능 여부를 묻고 있습니다.",
+    summary: "고객이 욕실 사용 가능 여부를 묻고 있어요.",
     recommendedActionType: "REPLY_TO_CUSTOMER",
     recommendedAction: "방수 여부를 확인해 답변해 주세요.",
     missingInformation: ["「방수」에 대한 판매자 안내 기준"],
-    whyDecisionNeeded: "답변에 필요한 회사 정보가 없어 Reviewnary가 답을 만들 수 없습니다.",
+    whyDecisionNeeded: "답변에 필요한 회사 정보가 없어 Reviewnary가 답을 만들 수 없어요.",
     investigated: [
       { label: "고객이 남긴 내용", results: 1 },
       { label: "회사·상품 지식", results: 0 },
     ],
     knowledgeUsed: [],
-    gap: { missingSubject: "방수", sentence: "「방수」에 대해 고객에게 안내할 기준이 없습니다.", suggestedScope: "PRODUCT" },
+    gap: { missingSubject: "방수", sentence: "「방수」에 대해 고객에게 안내할 기준이 없어요.", suggestedScope: "PRODUCT" },
     draft: null,
     to: "/inquiries/inq-1",
     ...over,
@@ -59,13 +59,13 @@ function taught(): OperationsCaseDetail {
   return detail({
     gap: null,
     missingInformation: [],
-    whyDecisionNeeded: "고객에게 무엇을 말하거나 약속할지는 판매자가 정합니다.",
+    whyDecisionNeeded: "고객에게 무엇을 말하거나 약속할지는 판매자가 정해요.",
     knowledgeUsed: [
       {
         authority: "판매자가 확정한 상품 지식",
         provenance: "판매자가 등록한 상품 지식",
         title: "방수 안내",
-        excerpt: "제품 표면은 생활 방수가 되어 욕실 벽면에도 부착하실 수 있습니다.",
+        excerpt: "제품 표면은 생활 방수가 되어 욕실 벽면에도 부착하실 수 있어요.",
         capturedOn: "2026-09-18",
         cited: true,
         scope: "PRODUCT",
@@ -76,7 +76,7 @@ function taught(): OperationsCaseDetail {
     draft: {
       version: 2,
       title: "[답변] 방수",
-      body: "생활 방수가 되어 욕실에도 사용하실 수 있습니다.",
+      body: "생활 방수가 되어 욕실에도 사용하실 수 있어요.",
       authorKind: "MODEL",
       answerBasis: "GROUNDED",
       evidence: [{ kind: "PRODUCT_KNOWLEDGE", scopeLabel: "상품 정보", title: "방수 안내", snippet: "생활 방수" }],
@@ -121,12 +121,12 @@ describe("OperationsCase", () => {
     // 자동 확인 → 내 확인 필요: what was found, then what is left and why.
     expect(screen.getByText("방수 정보 없음")).toBeTruthy();
     expect(screen.getByText("답변 확인 후 발송")).toBeTruthy();
-    expect(screen.getByText("답변에 필요한 회사 정보가 없어 Reviewnary가 답을 만들 수 없습니다.")).toBeTruthy();
+    expect(screen.getByText("답변에 필요한 회사 정보가 없어 Reviewnary가 답을 만들 수 없어요.")).toBeTruthy();
     // A check that found nothing says so instead of printing 0.
     expect(screen.getByText("회사·상품 지식 없음")).toBeTruthy();
     expect(screen.getByText("고객이 남긴 내용 1")).toBeTruthy();
     expect(screen.getByText("사용한 근거 없음")).toBeTruthy();
-    expect(screen.getByText("「방수」에 대해 고객에게 안내할 기준이 없습니다.")).toBeTruthy();
+    expect(screen.getByText("「방수」에 대해 고객에게 안내할 기준이 없어요.")).toBeTruthy();
     expect(screen.getByRole("link", { name: /원문 보기/ }).getAttribute("href")).toBe("/inquiries/inq-1");
     await expectNoAxeViolations(container);
   });
@@ -139,29 +139,29 @@ describe("OperationsCase", () => {
     renderCase();
     await user.type(
       await screen.findByLabelText("안내 내용"),
-      "제품 표면은 생활 방수가 되어 욕실 벽면에도 부착하실 수 있습니다.",
+      "제품 표면은 생활 방수가 되어 욕실 벽면에도 부착하실 수 있어요.",
     );
     await user.click(screen.getByRole("button", { name: "저장 후 초안 재작성" }));
 
     await waitFor(() =>
       expect(api.teachOperationsCase).toHaveBeenCalledWith("case-1", {
-        content: "제품 표면은 생활 방수가 되어 욕실 벽면에도 부착하실 수 있습니다.",
+        content: "제품 표면은 생활 방수가 되어 욕실 벽면에도 부착하실 수 있어요.",
         scope: "PRODUCT",
       }),
     );
     // The ask is replaced by what was saved, where, and that the answer was re-drafted from it.
     const receipt = await screen.findByRole("status", { name: "저장됨" });
     expect(within(receipt).getByText("저장됨 · 이 상품")).toBeTruthy();
-    expect(within(receipt).getByText("제품 표면은 생활 방수가 되어 욕실 벽면에도 부착하실 수 있습니다.")).toBeTruthy();
+    expect(within(receipt).getByText("제품 표면은 생활 방수가 되어 욕실 벽면에도 부착하실 수 있어요.")).toBeTruthy();
     expect(within(receipt).getByText(/초안 재작성 완료/)).toBeTruthy();
-    expect(screen.queryByText("「방수」에 대해 고객에게 안내할 기준이 없습니다.")).toBeNull();
+    expect(screen.queryByText("「방수」에 대해 고객에게 안내할 기준이 없어요.")).toBeNull();
     const draft = screen.getByRole("region", { name: "준비된 답변" });
     expect(within(draft).getByText(/생활 방수가 되어 욕실에도/)).toBeTruthy();
     expect(within(draft).getByText("미발송")).toBeTruthy();
     /* The citation moved onto the heading line and became the sentence it always was (canonical mockup,
        2026-10-02). Same source, same count — asserted where it now stands, because what this test
        protects is that the seller is told what the answer was built out of. */
-    expect(within(draft).getByText("상품 정보 1개를 근거로 준비한 답변입니다.")).toBeTruthy();
+    expect(within(draft).getByText("상품 정보 1개를 근거로 준비한 답변이에요.")).toBeTruthy();
     await user.click(evidenceToggle());
     expect(screen.getByText("판매자가 확정한 상품 지식")).toBeTruthy();
   });
@@ -174,12 +174,12 @@ describe("OperationsCase", () => {
             authority: "과거 판매자 답변",
             provenance: "문의 답변 · 채널에 등록된 답변",
             title: "[답변] 욕실 사용",
-            excerpt: "욕실 벽면에도 붙이실 수 있습니다.",
+            excerpt: "욕실 벽면에도 붙이실 수 있어요.",
             capturedOn: "2026-07-02",
             cited: false,
             scope: "PRODUCT",
             pastAnswer: true,
-            reusableText: "욕실 벽면에도 붙이실 수 있습니다. 다만 물이 직접 닿는 곳은 피해 주세요.",
+            reusableText: "욕실 벽면에도 붙이실 수 있어요. 다만 물이 직접 닿는 곳은 피해 주세요.",
           },
         ],
       }),
@@ -193,25 +193,25 @@ describe("OperationsCase", () => {
     expect(screen.getByText("과거 답변")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "과거 답변 불러오기" }));
     expect((screen.getByLabelText("안내 내용") as HTMLTextAreaElement).value).toBe(
-      "욕실 벽면에도 붙이실 수 있습니다. 다만 물이 직접 닿는 곳은 피해 주세요.",
+      "욕실 벽면에도 붙이실 수 있어요. 다만 물이 직접 닿는 곳은 피해 주세요.",
     );
     await user.click(screen.getByRole("button", { name: "저장 후 초안 재작성" }));
 
     await waitFor(() =>
       expect(api.teachOperationsCase).toHaveBeenCalledWith("case-1", {
-        content: "욕실 벽면에도 붙이실 수 있습니다. 다만 물이 직접 닿는 곳은 피해 주세요.",
+        content: "욕실 벽면에도 붙이실 수 있어요. 다만 물이 직접 닿는 곳은 피해 주세요.",
         scope: "PRODUCT",
       }),
     );
   });
 
   it("a past answer found where no knowledge was starts the seller's answer — saved as it is or edited, it is taught", async () => {
-    const past = "제품 표면은 생활 방수가 되어 욕실 벽면에도 부착하실 수 있습니다.";
+    const past = "제품 표면은 생활 방수가 되어 욕실 벽면에도 부착하실 수 있어요.";
     api.getOperationsCase.mockResolvedValue(
       detail({
         gap: {
           missingSubject: "방수",
-          sentence: "「방수」에 대해 고객에게 안내할 기준이 없습니다.",
+          sentence: "「방수」에 대해 고객에게 안내할 기준이 없어요.",
           suggestedScope: "PRODUCT",
           prefill: { text: past, strengthKo: "채널에 등록된 답변", answeredOn: "2026-07-02" },
         },
@@ -223,20 +223,20 @@ describe("OperationsCase", () => {
     const { container } = renderCase();
     const box = (await screen.findByLabelText("안내 내용")) as HTMLTextAreaElement;
     // The ask is still an ask: the gap sentence stands, and the past answer is offered as the seller's starting text.
-    expect(screen.getByText("「방수」에 대해 고객에게 안내할 기준이 없습니다.")).toBeTruthy();
+    expect(screen.getByText("「방수」에 대해 고객에게 안내할 기준이 없어요.")).toBeTruthy();
     expect(box.value).toBe(past);
-    expect(screen.getByText(/예전에 비슷한 문의에 이렇게 답하셨습니다/)).toBeTruthy();
+    expect(screen.getByText(/예전에 비슷한 문의에 이렇게 답했어요/)).toBeTruthy();
     expect(screen.getByText("과거 답변 · 채널에 등록된 답변 · 2026-07-02")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "과거 답변 불러오기" })).toBeNull();
     await expectNoAxeViolations(container);
 
     await user.clear(box);
-    await user.type(box, "생활 방수가 되어 욕실 벽면과 주방에도 부착하실 수 있습니다.");
+    await user.type(box, "생활 방수가 되어 욕실 벽면과 주방에도 부착하실 수 있어요.");
     await user.click(screen.getByRole("button", { name: "저장 후 초안 재작성" }));
 
     await waitFor(() =>
       expect(api.teachOperationsCase).toHaveBeenCalledWith("case-1", {
-        content: "생활 방수가 되어 욕실 벽면과 주방에도 부착하실 수 있습니다.",
+        content: "생활 방수가 되어 욕실 벽면과 주방에도 부착하실 수 있어요.",
         scope: "PRODUCT",
       }),
     );
@@ -244,17 +244,17 @@ describe("OperationsCase", () => {
   });
 
   it("a partly covered inquiry shows what is confirmed and asks only for what is missing (Inquiry Decision v2)", async () => {
-    const past = "연결캡과 엘보캡은 몰딩과 같은 호수로 구매하시면 됩니다.";
+    const past = "연결캡과 엘보캡은 몰딩과 같은 호수로 구매하시면 돼요.";
     api.getOperationsCase.mockResolvedValue(
       detail({
         gap: {
           missingSubject: "마감캡 끝이 뚫려 있는지",
-          sentence: "「마감캡 끝이 뚫려 있는지」에 대해 고객에게 안내할 기준이 없습니다.",
+          sentence: "「마감캡 끝이 뚫려 있는지」에 대해 고객에게 안내할 기준이 없어요.",
           suggestedScope: "PRODUCT",
           prefill: { text: past, strengthKo: null, answeredOn: null },
           needs: [
             { ask: "마감캡 끝이 뚫려 있는지", status: "UNKNOWN", statusKo: "읽지 못한 자료에 있을 수 있음", covered: false,
-              evidence: [], missing: "마감캡 구조가 등록된 자료에 없습니다.", askCustomer: null, prefill: null,
+              evidence: [], missing: "마감캡 구조가 등록된 자료에 없어요.", askCustomer: null, prefill: null,
               systemWillRead: false },
             { ask: "8.5mm 케이블에 맞는 호수", status: "FULL", statusKo: "확인됨", covered: true,
               evidence: ["상품 정보 · 선바로 내경표"], missing: null, askCustomer: null, prefill: null,
@@ -265,8 +265,8 @@ describe("OperationsCase", () => {
           ],
         },
         knowledgeUsed: [
-          { label: "과거 답변", title: "주문 발송", excerpt: "어제 발송되었습니다.", pastAnswer: true,
-            reusableText: "주문하신 상품은 어제 발송되었습니다." },
+          { label: "과거 답변", title: "주문 발송", excerpt: "어제 발송됐어요.", pastAnswer: true,
+            reusableText: "주문하신 상품은 어제 발송됐어요." },
         ],
       } as never),
     );
@@ -288,12 +288,12 @@ describe("OperationsCase", () => {
   });
 
   it("confirming the prefilled past answer unchanged is one press", async () => {
-    const past = "제품 표면은 생활 방수가 되어 욕실 벽면에도 부착하실 수 있습니다.";
+    const past = "제품 표면은 생활 방수가 되어 욕실 벽면에도 부착하실 수 있어요.";
     api.getOperationsCase.mockResolvedValue(
       detail({
         gap: {
           missingSubject: "방수",
-          sentence: "「방수」에 대해 고객에게 안내할 기준이 없습니다.",
+          sentence: "「방수」에 대해 고객에게 안내할 기준이 없어요.",
           suggestedScope: "PRODUCT",
           prefill: { text: past, strengthKo: null, answeredOn: null },
         },
@@ -321,13 +321,13 @@ describe("OperationsCase", () => {
         gap: null,
         media: [
           {
-            ordinal: 1, kind: "IMAGE", inspected: true, statusKo: "Reviewnary가 사진을 확인했습니다.",
-            depicts: "모서리가 깨진 흰색 몰딩", problemVisible: "YES", problemDescription: "한쪽 모서리가 깨져 있습니다",
+            ordinal: 1, kind: "IMAGE", inspected: true, statusKo: "Reviewnary가 사진을 확인했어요.",
+            depicts: "모서리가 깨진 흰색 몰딩", problemVisible: "YES", problemDescription: "한쪽 모서리가 깨져 있어요",
             imagePath: "/api/responsibilities/customer-operations/cases/case-1/media/1",
           },
           {
             ordinal: 2, kind: "IMAGE", inspected: false,
-            statusKo: "사진 확인 기능이 꺼져 있어 사진 내용은 보지 않았습니다.", depicts: null, problemVisible: null,
+            statusKo: "사진 확인 기능이 꺼져 있어 사진 내용은 보지 않았어요.", depicts: null, problemVisible: null,
             problemDescription: null, imagePath: "/api/responsibilities/customer-operations/cases/case-1/media/2",
           },
         ],
@@ -341,7 +341,7 @@ describe("OperationsCase", () => {
     expect(await screen.findByAltText("고객이 올린 사진 1")).toBeTruthy();
     expect(screen.getByText("분석: 모서리가 깨진 흰색 몰딩")).toBeTruthy();
     expect(screen.getByText("문제 보임")).toBeTruthy();
-    expect(screen.getByText("사진 확인 기능이 꺼져 있어 사진 내용은 보지 않았습니다.")).toBeTruthy();
+    expect(screen.getByText("사진 확인 기능이 꺼져 있어 사진 내용은 보지 않았어요.")).toBeTruthy();
     // The photo nobody looked at gets no description and no verdict.
     expect(screen.getAllByText(/^분석:/)).toHaveLength(1);
     expect(screen.getAllByText(/문제 보임|이상 없음|판단 어려움/)).toHaveLength(1);
@@ -405,14 +405,14 @@ describe("OperationsCase", () => {
     await user.click(await screen.findByRole("button", { name: "처리 변경" }));
     const form = screen.getByRole("region", { name: "처리 변경" });
     await user.selectOptions(within(form).getByLabelText("처리 방법"), "REFUND_OR_COMPENSATION");
-    await user.type(within(form).getByLabelText("메모 (선택)"), "이런 건은 환불로 처리합니다.");
+    await user.type(within(form).getByLabelText("메모 (선택)"), "이런 건은 환불로 처리해요.");
     expect((within(form).getByLabelText("유사 건에 재사용") as HTMLInputElement).checked).toBe(true);
     await user.click(within(form).getByRole("button", { name: "저장" }));
 
     await waitFor(() =>
       expect(api.correctOperationsCase).toHaveBeenCalledWith("case-1", {
         correctedActionType: "REFUND_OR_COMPENSATION",
-        note: "이런 건은 환불로 처리합니다.",
+        note: "이런 건은 환불로 처리해요.",
         remember: true,
         scope: "PRODUCT",
         // <b>The separation, pinned on the wire.</b> 「다음에도 참고」 is on and the standing rule is NOT —
@@ -459,7 +459,7 @@ describe("OperationsCase", () => {
     await user.click(within(form).getByLabelText("앞으로 같은 문제도 이렇게 처리"));
 
     // 체크한 뒤에야 범위와 무엇이 「같은 문제」인지가 나타난다.
-    expect(screen.getByText(/앞으로 「배송 지연」 건은 이 처리로 추천됩니다/)).toBeTruthy();
+    expect(screen.getByText(/앞으로 「배송 지연」 건은 이 처리로 추천돼요/)).toBeTruthy();
     await user.click(within(form).getByLabelText("회사 전체"));
     // 「유사 건에 재사용」의 scope는 PRODUCT 그대로 — 두 범위는 같은 값을 쓰지 않는다.
     await user.click(within(form).getByRole("button", { name: "저장" }));
@@ -495,7 +495,7 @@ describe("OperationsCase", () => {
     renderCase();
 
     // provenance 한 줄: 어디서 나왔는지 + 무슨 문제 + 어느 범위. 기준의 문장은 여기 없다.
-    expect(await screen.findByText(/판매자님이 정한 처리 기준이 적용됐습니다 · 배송 지연 · 이 상품/)).toBeTruthy();
+    expect(await screen.findByText(/판매자님이 정한 처리 기준이 적용됐어요 · 배송 지연 · 이 상품/)).toBeTruthy();
     // 중단 경로는 하나이고, 기존 retire 라우트다.
     await user.click(screen.getByRole("button", { name: "이 기준 사용 중단" }));
     await waitFor(() => expect(api.stopOperationsPolicy).toHaveBeenCalledWith("policy-1"));
@@ -517,22 +517,22 @@ describe("OperationsCase", () => {
     api.getOperationsCase.mockResolvedValue(
       detail({
         open: false, subjectKind: "REVIEW", rating: 5, title: null, gap: null, missingInformation: [],
-        body: "구형주택이라 전선 정리가 힘들었는데 깨끗하게 마무리 했습니다",
+        body: "구형주택이라 전선 정리가 힘들었는데 깨끗하게 마무리 했어요",
         disposition: "AUTO_RESOLVED", decidedBy: "AGENT",
-        reasonNote: "별점은 높지만 불편을 말하는 내용이 있습니다.",
-        summary: "5점 긍정 리뷰로 제품 만족도가 높습니다.",
+        reasonNote: "별점은 높지만 불편을 말하는 내용이 있어요.",
+        summary: "5점 긍정 리뷰로 제품 만족도가 높아요.",
         recommendedActionType: "NO_ACTION",
-        recommendedAction: "이번 건은 추가 조치 없이 모니터링만 하시면 됩니다.",
+        recommendedAction: "이번 건은 추가 조치 없이 모니터링만 하시면 돼요.",
         whyDecisionNeeded: null,
       }),
     );
     renderCase();
     const card = await screen.findByTestId("work-flow-card");
     expect(card).toHaveTextContent("정리함");
-    expect(card).toHaveTextContent("5점 긍정 리뷰로 제품 만족도가 높습니다.");
+    expect(card).toHaveTextContent("5점 긍정 리뷰로 제품 만족도가 높아요.");
     expect(card).toHaveTextContent("내가 할 일없음");
     // Earlier-stage text that the final state overruled is not shown anywhere on the screen.
-    expect(screen.queryByText(/불편을 말하는 내용이 있습니다/)).toBeNull();
+    expect(screen.queryByText(/불편을 말하는 내용이 있어요/)).toBeNull();
     expect(screen.queryByText(/모니터링만 하시면/)).toBeNull();
     expect(screen.queryByText("처리됨")).toBeNull();
   });
@@ -542,17 +542,17 @@ describe("OperationsCase", () => {
       detail({
         subjectKind: "REVIEW", rating: 5, title: null, gap: null, missingInformation: [], summary: null,
         body: "좋아요. 마감도 괜찮네요", disposition: "MONITORING", decidedBy: "RULE",
-        reasonNote: "별점은 높지만 글이 있어 바로 닫지 않고 지켜봅니다.",
+        reasonNote: "별점은 높지만 글이 있어 바로 닫지 않고 지켜봐요.",
         recommendedActionType: null, recommendedAction: null, whyDecisionNeeded: null, investigated: [],
       }),
     );
     renderCase();
     const card = await screen.findByTestId("work-flow-card");
     expect(card).toHaveTextContent("지켜보는 중");
-    expect(card).toHaveTextContent("별점은 높지만 글이 있어 바로 닫지 않고 지켜봅니다.");
+    expect(card).toHaveTextContent("별점은 높지만 글이 있어 바로 닫지 않고 지켜봐요.");
     expect(card).not.toHaveTextContent("판단 필요");
     // The note is said once, in the card.
-    expect(screen.getAllByText("별점은 높지만 글이 있어 바로 닫지 않고 지켜봅니다.")).toHaveLength(1);
+    expect(screen.getAllByText("별점은 높지만 글이 있어 바로 닫지 않고 지켜봐요.")).toHaveLength(1);
   });
 
   /**
@@ -583,7 +583,7 @@ describe("OperationsCase", () => {
       detail({
         knowledgeUsed: [], gap: null, missingInformation: [],
         draft: {
-          version: 1, title: "교환 신청 가능 기간 안내", body: "상품 수령 후 7일 이내입니다.",
+          version: 1, title: "교환 신청 가능 기간 안내", body: "상품 수령 후 7일 이내예요.",
           authorKind: "MODEL", answerBasis: "GROUNDED",
           evidence: [{ kind: "ORG_POLICY", scopeLabel: "운영 정책", title: "교환·반품 기준", snippet: null }],
           delivery: null,

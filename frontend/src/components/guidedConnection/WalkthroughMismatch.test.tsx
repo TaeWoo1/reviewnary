@@ -14,7 +14,7 @@ describe("WalkthroughMismatch", () => {
   it("shows the sanitized reason(s) and the fail-closed heading", () => {
     render(<WalkthroughMismatch reasons={["MISSING_URL_RUN"]} expectedUrl={BOUND} />);
     expect(screen.getByRole("alert", { name: "WALKTHROUGH_ENVIRONMENT_MISMATCH" })).toBeInTheDocument();
-    expect(screen.getByText(/이 탭의 주소에 walkthrough 실행 ID가 없습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/이 탭의 주소에 walkthrough 실행 ID가 없어요/)).toBeInTheDocument();
   });
 
   it("renders a ONE-CLICK recovery link to the exact bound URL (not just text to retype)", () => {

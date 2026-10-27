@@ -40,7 +40,7 @@ function detail(orderContext: unknown) {
     status: "UNANSWERED",
     informStatus: null,
     title: "주문 취소됐나요?",
-    details: "어제 취소 요청드렸습니다.",
+    details: "어제 취소 요청드렸어요.",
     receivedAt: "2026-08-22T00:00:00Z",
     proposal: null,
     draft: null,
@@ -96,11 +96,11 @@ describe("운영 정보 card", () => {
       detail({
         present: true,
         state: "OBSERVED_FRESH",
-        summaryKo: "이 주문은 결제가 완료된 것으로 확인됩니다. 발송 여부는 확인되지 않았습니다.",
+        summaryKo: "이 주문은 결제가 완료된 것으로 확인돼요. 발송 여부는 확인되지 않았어요.",
         paymentKo: "결제 완료",
         fulfillmentKo: "확인되지 않음",
         cancellationKo: "확인되지 않음",
-        observedKo: "방금 확인한 상태입니다.",
+        observedKo: "방금 확인한 상태예요.",
       }),
     );
 
@@ -118,11 +118,11 @@ describe("운영 정보 card", () => {
         present: true,
         state: "OBSERVED_FRESH",
         summaryKo:
-          "이 주문은 취소되지 않은 것으로 확인됩니다. 결제는 완료되었습니다. 발송은 아직 시작되지 않았습니다.",
+          "이 주문은 취소되지 않은 것으로 확인돼요. 결제는 완료됐어요. 발송은 아직 시작되지 않았어요.",
         paymentKo: "결제 완료",
         fulfillmentKo: "발송 준비 중",
         cancellationKo: "취소되지 않음",
-        observedKo: "방금 확인한 상태입니다.",
+        observedKo: "방금 확인한 상태예요.",
       }),
     );
 
@@ -134,7 +134,7 @@ describe("운영 정보 card", () => {
     // apart, which is exactly why the erasure lives in the backend record and not here.
     expect(screen.getByText("취소되지 않음")).toBeTruthy();
     expect(screen.getByText("발송 준비 중")).toBeTruthy();
-    expect(screen.getByText("방금 확인한 상태입니다.")).toBeTruthy();
+    expect(screen.getByText("방금 확인한 상태예요.")).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/\d+월 \d+일까지|도착 예정/);
   });
 
@@ -143,18 +143,18 @@ describe("운영 정보 card", () => {
       detail({
         present: true,
         state: "OBSERVED_FRESHNESS_UNPROVEN",
-        summaryKo: "이 주문은 결제가 완료된 것으로 확인됩니다. 발송 여부는 확인되지 않았습니다.",
+        summaryKo: "이 주문은 결제가 완료된 것으로 확인돼요. 발송 여부는 확인되지 않았어요.",
         paymentKo: "결제 완료",
         fulfillmentKo: "확인되지 않음",
         cancellationKo: "확인되지 않음",
-        observedKo: "마지막 확인 8월 21일 기준입니다.",
+        observedKo: "마지막 확인 8월 21일 기준이에요.",
       }),
     );
 
     render(<InquiryResponsePanel workItemId="w1" />);
     await screen.findByText("운영 정보");
 
-    expect(screen.getByText("마지막 확인 8월 21일 기준입니다.")).toBeTruthy();
+    expect(screen.getByText("마지막 확인 8월 21일 기준이에요.")).toBeTruthy();
   });
 
   it("never shows a developer enum", async () => {
@@ -162,11 +162,11 @@ describe("운영 정보 card", () => {
       detail({
         present: true,
         state: "SOURCE_UNAVAILABLE",
-        summaryKo: "이 채널의 주문 정보를 지금 확인할 수 없어, 주문 상태를 근거로 쓰지 못했습니다.",
+        summaryKo: "이 채널의 주문 정보를 지금 확인할 수 없어, 주문 상태를 근거로 쓰지 못했어요.",
         paymentKo: "확인되지 않음",
         fulfillmentKo: "확인되지 않음",
         cancellationKo: "확인되지 않음",
-        observedKo: "현재 상태를 다시 확인할 수 없습니다.",
+        observedKo: "현재 상태를 다시 확인할 수 없어요.",
       }),
     );
 

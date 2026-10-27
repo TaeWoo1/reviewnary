@@ -79,7 +79,7 @@ export function ProjectionView() {
           </div>
 
           <p className="text-xs text-muted">
-            이 화면과 입력은 <strong className="text-ink">내 PC 안에서만</strong> 처리되며 저장·전송되지 않습니다.
+            이 화면과 입력은 <strong className="text-ink">내 PC 안에서만</strong> 처리되며 저장·전송되지 않아요.
           </p>
         </div>
       )}
@@ -89,19 +89,19 @@ export function ProjectionView() {
 
 const STATUS_MESSAGE: Partial<Record<string, string>> = {
   connecting: "연결하는 중…",
-  unreachable: "reviewnary 도우미에 연결하지 못했습니다.",
+  unreachable: "reviewnary 도우미에 연결하지 못했어요.",
   unpaired: "먼저 내 PC와 연결(페어링)해 주세요.",
-  unavailable: "지금은 보여줄 브라우저 화면이 없습니다.",
+  unavailable: "지금은 보여줄 브라우저 화면이 없어요.",
   starting: "화면을 준비하는 중…",
-  disconnected: "연결이 끊어졌습니다. 다시 연결하는 중…",
-  target_closed: "브라우저 창이 닫혔습니다.",
-  incompatible: "버전이 호환되지 않습니다. 업데이트해 주세요.",
-  revoked: "연결이 해제되었습니다. 다시 연결해 주세요.",
+  disconnected: "연결이 끊어졌어요. 다시 연결하는 중…",
+  target_closed: "브라우저 창이 닫혔어요.",
+  incompatible: "버전이 호환되지 않아요. 업데이트해 주세요.",
+  revoked: "연결이 해제됐어요. 다시 연결해 주세요.",
 };
 
 function LocalOnlyBadge() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-good/15 px-2 py-0.5 text-xs font-medium text-good" title="이 화면은 내 PC 안에서만 처리됩니다">
+    <span className="inline-flex items-center gap-1 rounded-full bg-good/15 px-2 py-0.5 text-xs font-medium text-good" title="이 화면은 내 PC 안에서만 처리돼요">
       <span className="inline-block h-2 w-2 rounded-full bg-good" aria-hidden="true" />
       로컬 전용
     </span>
@@ -116,7 +116,7 @@ function ControlBadge({ control, controlling }: { control: string; controlling: 
 
 function ControlActions({ control, onRequest, onRelease }: { control: string; onRequest: () => void; onRelease: () => void }) {
   if (control === "owned") return <button className="btn-ghost" onClick={onRelease}>조작 종료</button>;
-  if (control === "held_by_other") return <span className="text-sm text-muted">다른 탭이 조작 중입니다.</span>;
+  if (control === "held_by_other") return <span className="text-sm text-muted">다른 탭이 조작 중이에요.</span>;
   if (control === "requesting") return <span className="text-sm text-muted">조작 권한 요청 중…</span>;
   return <button className="btn-primary" onClick={onRequest}>이 화면 조작하기</button>;
 }

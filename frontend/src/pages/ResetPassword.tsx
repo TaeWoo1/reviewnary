@@ -40,7 +40,7 @@ export function ResetPassword() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (tooShort) {
-      setError("비밀번호는 6자 이상이어야 합니다.");
+      setError("비밀번호는 6자 이상이어야 해요.");
       return;
     }
     if (password !== confirm) {
@@ -55,7 +55,7 @@ export function ResetPassword() {
     } catch (err) {
       const status = (err as { response?: { status?: number } } | null)?.response?.status;
       if (status === 401) setSpent(true);
-      else if (status === 400) setError("비밀번호는 6자 이상이어야 합니다.");
+      else if (status === 400) setError("비밀번호는 6자 이상이어야 해요.");
       else setError("변경하지 못했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
       setBusy(false);

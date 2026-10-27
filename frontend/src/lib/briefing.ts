@@ -12,6 +12,6 @@
  * 것이 무엇인지는 그 목록이 말한다(`docs/frontend/reviewnary_design.md` §8-A v3.3). 여기 남은 두 줄은 <b>연결이
  * 하나도 없는 아침</b>의 것이고, 그 아침에는 목록이 할 말이 없다.
  */
-export const DISCONNECTED_HEADLINE = "판매 채널을 연결하면 시작할 수 있습니다.";
+export const DISCONNECTED_HEADLINE = "판매 채널을 연동하면 시작할 수 있어요.";
 export const DISCONNECTED_SUBLINE =
-    "채널을 연결하면 주문·문의·리뷰를 대신 확인하고, 먼저 봐야 할 일을 여기에 정리해 두겠습니다.";
+    "채널을 연동하면 주문·문의·리뷰를 대신 확인하고, 먼저 봐야 할 일을 여기에 정리해 둘게요.";

@@ -147,7 +147,7 @@ describe("판매자에게 하는 말", () => {
   });
 
   it("연결이 필요할 때만 할 일이 다르고, 그 문장은 제품 언어다", () => {
-    expect(signInStartMessage("not_connected")).toBe("이 Mac의 도우미와 연결이 필요합니다.");
+    expect(signInStartMessage("not_connected")).toBe("이 Mac의 도우미와 연결이 필요해요.");
   });
 });
 

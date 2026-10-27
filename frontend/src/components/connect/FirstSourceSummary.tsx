@@ -94,7 +94,7 @@ export function FirstSourceSummary({
     >
       <div className="space-y-1">
         <h2 className="break-keep text-lg font-semibold text-ink">
-          {headline ?? `${channelNameKo} 연결이 완료되었습니다.`}
+          {headline ?? `${channelNameKo} 연동이 완료됐어요.`}
         </h2>
         {/* 채널마다 다른 약속. 고정 문장이었을 때, 리뷰를 자동으로 가져오지 않는 채널에서도 리뷰를
             이름으로 부르며 알아서 해준다고 말했다 — 바로 아래 줄이 같은 리뷰를 두고 반대로 말하는 동안. */}

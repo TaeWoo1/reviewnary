@@ -69,7 +69,7 @@ describe("the composer's conversation menu", () => {
   });
 
   it("opens an earlier thread from the sidebar and lands on the home", async () => {
-    vi.mocked(conversationClient.getConversation).mockResolvedValue({ conversationId: "c-1", createdAt: "x", updatedAt: "x", turns: [agentTurn({ conversationId: "c-1", message: "지난 답변입니다." })], workingSet: null, pendingHumanAction: null, pendingPrepared: null });
+    vi.mocked(conversationClient.getConversation).mockResolvedValue({ conversationId: "c-1", createdAt: "x", updatedAt: "x", turns: [agentTurn({ conversationId: "c-1", message: "지난 답변이에요." })], workingSet: null, pendingHumanAction: null, pendingPrepared: null });
     shell();
     await userEvent.click(screen.getByRole("button", { name: "대화 메뉴" }));
     await userEvent.click(await screen.findByRole("button", { name: /지난 리뷰 확인/ }));

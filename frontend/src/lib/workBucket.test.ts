@@ -15,7 +15,7 @@ const base: HomeWorkRow = {
   reason: REASON.reply,
   state: "REPLY_NEEDED",
   source: "카페24 자사몰 문의",
-  title: "문의 드립니다",
+  title: "문의 드려요",
   line: null,
   since: "2026-09-24",
   to: "/inquiries/1",

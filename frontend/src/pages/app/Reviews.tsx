@@ -77,9 +77,9 @@ export function Reviews() {
       <>
         <PageHead title="리뷰·문의" meta={<ReviewInquirySwitch current="reviews" />} />
         <Empty
-          title="채널 정보를 불러오지 못했습니다"
+          title="채널 정보를 불러오지 못했어요"
           body="연결 상태를 확인한 뒤 다시 시도해 주세요."
-          action={<BtnLink to="/connect">채널 연결 확인</BtnLink>}
+          action={<BtnLink to="/connect">채널 연동 확인</BtnLink>}
         />
       </>,
     );
@@ -102,9 +102,9 @@ export function Reviews() {
       <>
         <PageHead title="리뷰·문의" meta={<ReviewInquirySwitch current="reviews" />} />
         <Empty
-          title="리뷰를 볼 채널이 아직 없습니다"
-          body="네이버 스마트스토어, 쿠팡, 카페24 중 하나를 연결하면 그 채널의 리뷰가 여기에 모입니다."
-          action={<BtnLink to="/connect">채널 연결하기</BtnLink>}
+          title="리뷰를 볼 채널이 아직 없어요"
+          body="네이버 스마트스토어, 쿠팡, 카페24 중 하나를 연결하면 그 채널의 리뷰가 여기에 모여요."
+          action={<BtnLink to="/connect">채널 연동하기</BtnLink>}
         />
       </>,
     );

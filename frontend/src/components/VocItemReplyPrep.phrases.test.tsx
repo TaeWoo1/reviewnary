@@ -26,9 +26,9 @@ vi.mock("../lib/apiClient", () => ({
 
 const REVIEW = "0b6f2b1e-5f0a-4c9b-9a51-7d2f7f6e0c11";
 const REF = `review:${REVIEW}`;
-const BANNED_SENTENCE = "고객님 탓이 아니라 택배사 사정으로 늦어졌습니다.";
-const SOFT_SENTENCE = "죄송하지만 다음에는 더 빨리 보내 드리겠습니다.";
-const BODY = `늦어서 죄송합니다. ${BANNED_SENTENCE} ${SOFT_SENTENCE}`;
+const BANNED_SENTENCE = "고객님 탓이 아니라 택배사 사정으로 늦어졌어요.";
+const SOFT_SENTENCE = "죄송하지만 다음에는 더 빨리 보내 드릴게요.";
+const BODY = `늦어서 죄송해요. ${BANNED_SENTENCE} ${SOFT_SENTENCE}`;
 const FINDINGS: ReviewReplyPhraseFinding[] = [
   { kind: "FORBIDDEN", phrase: "고객님 탓", replacement: null, sentence: BANNED_SENTENCE },
   { kind: "AVOID", phrase: "죄송하지만", replacement: "번거로우시겠지만", sentence: SOFT_SENTENCE },
@@ -70,12 +70,12 @@ describe("VocItemReplyPrep · 걸린 표현", () => {
     expect(approve.getAttribute("aria-disabled")).toBe("true");
     await userEvent.click(approve);
     expect(api.decideReviewReplyApproval).not.toHaveBeenCalled();
-    expect(screen.getByText("「고객님 탓」을 고치면 승인할 수 있어요. 「죄송하지만」은 그대로 둬도 됩니다.")).toBeTruthy();
+    expect(screen.getByText("「고객님 탓」을 고치면 승인할 수 있어요. 「죄송하지만」은 그대로 둬도 돼요.")).toBeTruthy();
     await expectNoAxeViolations(container);
   });
 
   it("drops the banned sentence on the seller's press and saves it as their next version", async () => {
-    const fixed = `늦어서 죄송합니다. ${SOFT_SENTENCE}`;
+    const fixed = `늦어서 죄송해요. ${SOFT_SENTENCE}`;
     vi.mocked(api.getReviewReplyPrep).mockResolvedValueOnce(prepView(BODY, FINDINGS))
       .mockResolvedValue(prepView(fixed, [FINDINGS[1]]));
     vi.mocked(api.saveReviewReplyDraft).mockResolvedValue(undefined as never);
@@ -124,18 +124,18 @@ describe("VocItemReplyPrep · 걸린 표현", () => {
 
 describe("PhraseFindings helpers", () => {
   it("replaces the phrase however it was spaced, and drops a sentence closing the gap", () => {
-    expect(replacePhrase("죄송 하지만 다시 보내 드립니다.", "죄송하지만", "번거로우시겠지만"))
-      .toBe("번거로우시겠지만 다시 보내 드립니다.");
-    expect(withoutSentence(BODY, BANNED_SENTENCE)).toBe(`늦어서 죄송합니다. ${SOFT_SENTENCE}`);
+    expect(replacePhrase("죄송 하지만 다시 보내 드려요.", "죄송하지만", "번거로우시겠지만"))
+      .toBe("번거로우시겠지만 다시 보내 드려요.");
+    expect(withoutSentence(BODY, BANNED_SENTENCE)).toBe(`늦어서 죄송해요. ${SOFT_SENTENCE}`);
     expect(withoutSentence(BODY, "없는 문장")).toBe(BODY);
   });
 
   it("cuts the draft into plain and marked pieces, the ban winning an overlap", () => {
-    const pieces = segments("고객님 탓이 아닙니다.", [
+    const pieces = segments("고객님 탓이 아니에요.", [
       { kind: "AVOID", phrase: "탓이", replacement: null, sentence: null },
       { kind: "FORBIDDEN", phrase: "고객님 탓", replacement: null, sentence: null },
     ]);
-    expect(pieces).toEqual([{ text: "고객님 탓", kind: "FORBIDDEN" }, { text: "이 아닙니다.", kind: null }]);
+    expect(pieces).toEqual([{ text: "고객님 탓", kind: "FORBIDDEN" }, { text: "이 아니에요.", kind: null }]);
   });
 
   it("says nothing when only preferences are found, and picks each particle", () => {

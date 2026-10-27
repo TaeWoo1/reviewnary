@@ -6,7 +6,7 @@ export function agentTurn(over: Partial<TurnView> = {}): TurnView {
     turnId: "t-agent-1",
     conversationId: "c-1",
     role: "AGENT",
-    message: "이 상품에 미답변 문의는 없습니다.",
+    message: "이 상품에 미답변 문의는 없어요.",
     artifacts: [
       {
         artifactId: "a-1",

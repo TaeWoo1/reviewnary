@@ -129,7 +129,7 @@ export function CoupangRenewalGuidedWalkthrough({
     return (
       <div className="space-y-3" aria-label="쿠팡 Open API 키 갱신 (텍스트 안내)">
         <p className="text-sm text-muted break-keep">
-          화면 안내 대신 아래 순서대로 직접 진행하세요. 재발급을 마치면 새 키로 교체하는 입력 단계로 넘어갑니다.
+          화면 안내 대신 아래 순서대로 직접 진행하세요. 재발급을 마치면 새 키로 교체하는 입력 단계로 넘어가요.
         </p>
         <CoupangIssuanceTutorial
           onComplete={onComplete}
@@ -150,8 +150,8 @@ export function CoupangRenewalGuidedWalkthrough({
           쿠팡 윙에서 새 Open API 키를 재발급하도록 화면으로 안내해 드릴게요.
         </p>
         <p className="text-sm text-muted break-keep">
-          시작하면 전용 쿠팡 윙 창이 열립니다. 로그인·클릭·재발급은 직접 하시면 되고, reviewnary는 어디를 봐야
-          하는지 화면으로 안내만 합니다 — 값·클립보드·화면을 읽지 않습니다.
+          시작하면 전용 쿠팡 윙 창이 열려요. 로그인·클릭·재발급은 직접 하시면 되고, reviewnary는 어디를 봐야
+          하는지 화면으로 안내만 해요 — 값·클립보드·화면을 읽지 않아요.
         </p>
         <button
           type="button"

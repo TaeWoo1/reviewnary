@@ -150,24 +150,24 @@ export interface ProposeErrorInfo {
 export function classifyProposeError(status: number | undefined): ProposeErrorInfo {
   switch (status) {
     case 404:
-      return { message: "문의를 찾을 수 없습니다. 목록에서 사라졌을 수 있어요.", shouldRefresh: false };
+      return { message: "문의를 찾을 수 없어요. 목록에서 사라졌을 수 있어요.", shouldRefresh: false };
     case 409:
-      return { message: "문의 상태가 변경되었습니다. 최신 상태로 새로고침합니다.", shouldRefresh: true };
+      return { message: "문의 상태가 변경됐어요. 최신 상태로 새로고침해요.", shouldRefresh: true };
     case 503:
       return {
-        message: "제안 생성을 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+        message: "제안 생성을 일시적으로 사용할 수 없어요. 잠시 후 다시 시도해 주세요.",
         shouldRefresh: false,
       };
     default:
-      return { message: "제안 생성 중 문제가 발생했습니다. 다시 시도해 주세요.", shouldRefresh: false };
+      return { message: "제안 생성 중 문제가 발생했어요. 다시 시도해 주세요.", shouldRefresh: false };
   }
 }
 
 /** Detail-load failure copy: a 404 is "unavailable", anything else is a generic error. */
 export function detailErrorMessage(status: number | undefined): string {
   return status === 404
-    ? "문의를 찾을 수 없습니다. 목록에서 사라졌을 수 있어요."
-    : "문의를 불러오지 못했습니다. 다시 시도해 주세요.";
+    ? "문의를 찾을 수 없어요. 목록에서 사라졌을 수 있어요."
+    : "문의를 불러오지 못했어요. 다시 시도해 주세요.";
 }
 
 // --- Phase tabs (OPEN / PROPOSED) ---
@@ -189,15 +189,15 @@ export const INQUIRY_TABS: readonly InquiryTab[] = [
     key: "OPEN",
     phase: "OPEN",
     label: "응답 대기",
-    emptyCopy: "응답 대기 중인 문의가 없습니다.",
-    emptySubCopy: "새 문의가 수집되면 여기에 표시됩니다.",
+    emptyCopy: "응답 대기 중인 문의가 없어요.",
+    emptySubCopy: "새 문의가 수집되면 여기에 표시돼요.",
   },
   {
     key: "PROPOSED",
     phase: "PROPOSED",
     label: "제안 생성됨",
-    emptyCopy: "생성된 제안이 없습니다.",
-    emptySubCopy: "‘응답 대기’ 탭에서 제안을 생성하면 여기에 표시됩니다.",
+    emptyCopy: "생성된 제안이 없어요.",
+    emptySubCopy: "‘응답 대기’ 탭에서 제안을 생성하면 여기에 표시돼요.",
   },
 ];
 
@@ -215,7 +215,7 @@ export function emptyCopyForTab(key: InquiryTabKey): string {
  * auto-switched — this only tells the seller where to look.
  */
 export const PROPOSAL_SUCCESS_GUIDANCE =
-  "제안이 생성되었습니다. ‘제안 생성됨’ 탭에서 확인할 수 있습니다.";
+  "제안이 생성됐어요. ‘제안 생성됨’ 탭에서 확인할 수 있어요.";
 
 /**
  * The transient state to clear when the tab changes: page → 0, selection cleared,

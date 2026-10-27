@@ -52,7 +52,7 @@ describe("설정", () => {
   it("routes to the company profile, and says what it is for and what it is not", () => {
     renderSettings();
     expect(screen.getByRole("link", { name: "회사 소개 적기" })).toHaveAttribute("href", "/settings/company");
-    expect(screen.getByText(/배송·환불·규격의 근거는 아닙니다/)).toBeInTheDocument();
+    expect(screen.getByText(/배송·환불·규격의 근거는 아니에요/)).toBeInTheDocument();
   });
 
   it("routes to the alert list", () => {
@@ -86,7 +86,7 @@ describe("설정", () => {
   it("keeps the boundary that would make a row false if it were trimmed away", () => {
     renderSettings();
     // 회사 정보가 답변의 표현에만 쓰이고 배송·환불·규격의 근거가 아니라는 것은 이 줄의 뜻 자체다.
-    expect(screen.getByText(/배송·환불·규격의 근거는 아닙니다/)).toBeInTheDocument();
+    expect(screen.getByText(/배송·환불·규격의 근거는 아니에요/)).toBeInTheDocument();
     // em dash로 시작하던 설명 문장은 남지 않았다.
     expect(document.body.textContent).not.toContain("어떤 회사인지 —");
     expect(document.body.textContent).not.toContain("무엇을 안내할지 —");

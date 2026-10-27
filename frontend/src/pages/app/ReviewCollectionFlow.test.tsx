@@ -138,7 +138,7 @@ describe("리뷰 수집 셋업 — 한 걸음, 한 컨트롤", () => {
   it("장벽의 컨트롤은 판매자가 한 일의 이름을 단다", async () => {
     h.injected = { view: run({}) };
     view();
-    expect(await screen.findByTestId("flow-primary")).toHaveTextContent("상품평 목록을 열었습니다");
+    expect(await screen.findByTestId("flow-primary")).toHaveTextContent("상품평 목록을 열었어요");
     // 기술어는 이 화면에 없다.
     expect(screen.queryByText("확인 완료")).toBeNull();
     expect(screen.queryByText("직접 진행")).toBeNull();
@@ -158,7 +158,7 @@ describe("리뷰 수집 셋업 — 한 걸음, 한 컨트롤", () => {
     h.injected = { view: run({ blocker: { code: "STORE_MISMATCH", recoverable: true } as never }) };
     view();
     const failure = await screen.findByTestId("flow-failure");
-    expect(failure).toHaveTextContent("다른 판매자 계정으로 로그인되어 있습니다");
+    expect(failure).toHaveTextContent("다른 판매자 계정으로 로그인되어 있어요");
     expect(screen.getByTestId("flow-primary")).toBeInTheDocument();
   });
 
@@ -168,7 +168,7 @@ describe("리뷰 수집 셋업 — 한 걸음, 한 컨트롤", () => {
     h.injected = { view: run({ blocker: { code: "STORE_UNRESOLVED", recoverable: true } as never }) };
     view();
     expect(await screen.findByTestId("flow-store")).toHaveTextContent("A00012345");
-    expect(screen.getByTestId("flow-primary")).toHaveTextContent("이 스토어를 연결하고 가져오기");
+    expect(screen.getByTestId("flow-primary")).toHaveTextContent("이 스토어를 연동하고 가져오기");
     expect(screen.getByTestId("flow-other-store")).toBeInTheDocument();
   });
 
@@ -186,7 +186,7 @@ describe("리뷰 수집 셋업 — 한 걸음, 한 컨트롤", () => {
     view();
     await screen.findByTestId("flow-done");
     await waitFor(() =>
-      expect(screen.getByTestId("flow-done")).toHaveTextContent("새로 가져올 상품평이 없었습니다."),
+      expect(screen.getByTestId("flow-done")).toHaveTextContent("새로 가져올 상품평이 없었어요."),
     );
   });
 

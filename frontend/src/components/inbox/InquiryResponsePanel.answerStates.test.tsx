@@ -74,25 +74,25 @@ function draftRow(over: Record<string, unknown> = {}) {
     version: 1,
     answerStatus: 2,
     title: "[답변] 전선 가닥 수",
-    comments: "규격에 따라 달라집니다. 사용하실 규격을 알려주시면 정확히 안내드리겠습니다.",
+    comments: "규격에 따라 달라져요. 사용하실 규격을 알려주시면 정확히 안내드릴게요.",
     contentFingerprint: "a".repeat(64),
     fingerprintAlgorithm: "SHA-256",
     createdAt: "2026-08-24T00:00:00Z",
     authorKind: "MODEL",
     modelVersion: "test-model/v1+style/default",
     knowledgeState: "GROUNDED",
-    knowledgeNote: "판매자가 등록한 상품 정보를 근거로 썼습니다.",
+    knowledgeNote: "판매자가 등록한 상품 정보를 근거로 썼어요.",
     ...over,
   };
 }
 
 const GROUNDED = {
-  draft: draftRow({ comments: "몰딩 안쪽으로 전선 3가닥까지 들어갑니다." }),
+  draft: draftRow({ comments: "몰딩 안쪽으로 전선 3가닥까지 들어가요." }),
   authorKind: "MODEL",
   knowledgeState: "GROUNDED",
-  knowledgeNote: "판매자가 등록한 상품 정보를 근거로 썼습니다.",
+  knowledgeNote: "판매자가 등록한 상품 정보를 근거로 썼어요.",
   answerBasis: "GROUNDED",
-  answerBasisNote: "답변에 필요한 정보를 확인했습니다.",
+  answerBasisNote: "답변에 필요한 정보를 확인했어요.",
   answerBasisAction: null,
   productId: "p1",
   evidence: [
@@ -103,7 +103,7 @@ const GROUNDED = {
       locator: "product-knowledge/FAQ:1",
       sourceId: "s1",
       chunkId: "c1",
-      snippet: "몰딩 하나에 들어가는 전선은 최대 3가닥입니다.",
+      snippet: "몰딩 하나에 들어가는 전선은 최대 3가닥이에요.",
     },
   ],
   unavailableMessage: null,
@@ -113,18 +113,18 @@ const NEEDS_CLARIFICATION = {
   ...GROUNDED,
   draft: draftRow(),
   answerBasis: "NEEDS_CLARIFICATION",
-  answerBasisNote: "정확한 답변을 위해 고객에게 확인할 내용이 있습니다.",
-  answerBasisAction: "고객이 어떤 규격·옵션인지 밝히지 않았습니다. 아래 초안은 그 내용을 되묻습니다.",
+  answerBasisNote: "정확한 답변을 위해 고객에게 확인할 내용이 있어요.",
+  answerBasisAction: "고객이 어떤 규격·옵션인지 밝히지 않았어요. 아래 초안은 그 내용을 되묻어요.",
 };
 
 const NO_BASIS = {
   draft: null,
   authorKind: null,
   knowledgeState: "NO_MATCH",
-  knowledgeNote: "상품 지식·운영 정책·과거 답변 어디에도 이 질문에 해당하는 내용이 없습니다.",
+  knowledgeNote: "상품 지식·운영 정책·과거 답변 어디에도 이 질문에 해당하는 내용이 없어요.",
   answerBasis: "NO_ANSWER_BASIS",
-  answerBasisNote: "답변 기준이 필요합니다.",
-  answerBasisAction: "등록된 상품 지식·운영 정책에 「가닥」 관련 내용이 없습니다.",
+  answerBasisNote: "답변 기준이 필요해요.",
+  answerBasisAction: "등록된 상품 지식·운영 정책에 「가닥」 관련 내용이 없어요.",
   productId: "p1",
   evidence: [],
   unavailableMessage: null,
@@ -169,14 +169,14 @@ describe("the three answer states", () => {
 
     const card = await screen.findByTestId("answer-state");
     expect(card).toHaveAttribute("data-basis", "GROUNDED");
-    expect(card).toHaveTextContent("답변에 필요한 정보를 확인했습니다.");
+    expect(card).toHaveTextContent("답변에 필요한 정보를 확인했어요.");
     // The one visual difference a 50-year-old operator reads before any word: this state is not a
     // caution. It used to share the orange strip with every failure on the screen.
     expect(card.className).toContain("good");
     expect(card.className).not.toContain("warn");
 
-    expect(screen.getByText("몰딩 안쪽으로 전선 3가닥까지 들어갑니다.")).toBeInTheDocument();
-    expect(screen.getByText("몰딩 하나에 들어가는 전선은 최대 3가닥입니다.")).toBeInTheDocument();
+    expect(screen.getByText("몰딩 안쪽으로 전선 3가닥까지 들어가요.")).toBeInTheDocument();
+    expect(screen.getByText("몰딩 하나에 들어가는 전선은 최대 3가닥이에요.")).toBeInTheDocument();
     expect(screen.getByText("자주 묻는 질문 - 전선 수용")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /초안 복사/ })).toBeInTheDocument();
     // Nothing is missing, so nothing asks the seller to go and fix their library.
@@ -192,7 +192,7 @@ describe("the three answer states", () => {
     await screen.findByTestId("answer-state");
     // 「판매자가 등록한 상품 정보를 근거로 썼습니다」 says what the card and the citation below both
     // already say. Three statements of one fact is how a screen teaches people to skim (§11).
-    expect(screen.queryByText(/근거로 썼습니다/)).toBeNull();
+    expect(screen.queryByText(/근거로 썼어요/)).toBeNull();
   });
 
   it("F — NEEDS_CLARIFICATION: it says what is missing, and the draft that asks is still there", async () => {
@@ -203,8 +203,8 @@ describe("the three answer states", () => {
 
     const card = await screen.findByTestId("answer-state");
     expect(card).toHaveAttribute("data-basis", "NEEDS_CLARIFICATION");
-    expect(card).toHaveTextContent("정확한 답변을 위해 고객에게 확인할 내용이 있습니다.");
-    expect(card).toHaveTextContent("고객이 어떤 규격·옵션인지 밝히지 않았습니다.");
+    expect(card).toHaveTextContent("정확한 답변을 위해 고객에게 확인할 내용이 있어요.");
+    expect(card).toHaveTextContent("고객이 어떤 규격·옵션인지 밝히지 않았어요.");
     // The missing context, and nothing invented alongside it: no delivery window, no figure, no
     // second question the customer was never asked.
     expect(card.textContent ?? "").not.toMatch(/발송|배송|일 이내|원/);
@@ -222,8 +222,8 @@ describe("the three answer states", () => {
 
     const card = await screen.findByTestId("answer-state");
     expect(card).toHaveAttribute("data-basis", "NO_ANSWER_BASIS");
-    expect(card).toHaveTextContent("답변 기준이 필요합니다.");
-    expect(card).toHaveTextContent("「가닥」 관련 내용이 없습니다");
+    expect(card).toHaveTextContent("답변 기준이 필요해요.");
+    expect(card).toHaveTextContent("「가닥」 관련 내용이 없어요");
     expect(screen.getByRole("button", { name: "답변 기준 추가" })).toBeInTheDocument();
     // No draft was written and none is faked. The seller's own box is open instead.
     expect(screen.queryByRole("button", { name: /초안 복사/ })).toBeNull();
@@ -238,14 +238,14 @@ describe("the three answer states", () => {
     await user.click(await screen.findByRole("button", { name: "답변 기준 추가" }));
     await user.type(
       screen.getByLabelText("고객에게 안내할 내용"),
-      "몰딩 안쪽으로 전선 3가닥까지 들어갑니다.",
+      "몰딩 안쪽으로 전선 3가닥까지 들어가요.",
     );
     await user.click(screen.getByRole("button", { name: /저장하고 다시 답변 만들기/ }));
 
     await waitFor(() => expect(generateInquiryDraft).toHaveBeenCalledTimes(2));
     // The two facts, and neither more nor less. The result is the card underneath.
     expect(
-      await screen.findByText(/답변 기준을 저장했습니다\. 저장한 내용으로 답변을 다시 만들었습니다\./),
+      await screen.findByText(/답변 기준을 저장했어요\. 저장한 내용으로 답변을 다시 만들었어요\./),
     ).toBeInTheDocument();
     expect((await screen.findByTestId("answer-state"))).toHaveAttribute("data-basis", "GROUNDED");
     // §12 — the minimum path back to what they just wrote.
@@ -263,14 +263,14 @@ describe("the three answer states", () => {
     open();
     await user.click(await screen.findByRole("button", { name: /초안 만들기/ }));
     await user.click(await screen.findByRole("button", { name: "답변 기준 추가" }));
-    await user.type(screen.getByLabelText("고객에게 안내할 내용"), "설치는 벽면에 붙입니다.");
+    await user.type(screen.getByLabelText("고객에게 안내할 내용"), "설치는 벽면에 붙여요.");
     await user.click(screen.getByRole("button", { name: /저장하고 다시 답변 만들기/ }));
 
     await waitFor(() => expect(generateInquiryDraft).toHaveBeenCalledTimes(2));
     // Saved, re-run, and STILL 「답변 기준이 필요합니다」 — which is the ordinary outcome of adding
     // knowledge that does not happen to answer this question. The confirmation says what it did; it
     // does not claim the gap is closed.
-    expect(await screen.findByText(/답변 기준을 저장했습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/답변 기준을 저장했어요/)).toBeInTheDocument();
     expect(screen.getByTestId("answer-state")).toHaveAttribute("data-basis", "NO_ANSWER_BASIS");
   });
 
@@ -280,19 +280,19 @@ describe("the three answer states", () => {
     // wrote a fact, pressed save, and the screen told them only that the machinery was unavailable.
     generateInquiryDraft.mockResolvedValueOnce(NO_BASIS).mockResolvedValueOnce({
       ...NO_BASIS,
-      unavailableMessage: "AI 답변 초안 기능이 켜져 있지 않습니다.",
+      unavailableMessage: "AI 답변 초안 기능이 켜져 있지 않아요.",
     });
     const user = userEvent.setup();
     open();
     await user.click(await screen.findByRole("button", { name: /초안 만들기/ }));
     await user.click(await screen.findByRole("button", { name: "답변 기준 추가" }));
-    await user.type(screen.getByLabelText("고객에게 안내할 내용"), "몰딩 안쪽으로 전선 3가닥까지 들어갑니다.");
+    await user.type(screen.getByLabelText("고객에게 안내할 내용"), "몰딩 안쪽으로 전선 3가닥까지 들어가요.");
     await user.click(screen.getByRole("button", { name: /저장하고 다시 답변 만들기/ }));
 
     await waitFor(() => expect(generateInquiryDraft).toHaveBeenCalledTimes(2));
     // Saving is what THEY did, and it happened. One fact, and not the second one.
-    expect(await screen.findByTestId("basis-saved")).toHaveTextContent("답변 기준을 저장했습니다.");
-    expect(screen.getByTestId("basis-saved")).not.toHaveTextContent("다시 만들었습니다");
+    expect(await screen.findByTestId("basis-saved")).toHaveTextContent("답변 기준을 저장했어요.");
+    expect(screen.getByTestId("basis-saved")).not.toHaveTextContent("다시 만들었어요");
     expect(screen.queryByTestId("answer-state")).toBeNull();
   });
 
@@ -301,7 +301,7 @@ describe("the three answer states", () => {
       ...GROUNDED,
       draft: null,
       authorKind: null,
-      unavailableMessage: "오늘 사용할 수 있는 AI 사용량을 모두 썼습니다.",
+      unavailableMessage: "오늘 사용할 수 있는 AI 사용량을 모두 썼어요.",
     });
     const user = userEvent.setup();
     open();
@@ -309,7 +309,7 @@ describe("the three answer states", () => {
 
     expect(await screen.findByText(/오늘 사용할 수 있는 AI 사용량/)).toBeInTheDocument();
     expect(screen.queryByTestId("answer-state")).toBeNull();
-    expect(screen.queryByText("답변 기준이 필요합니다.")).toBeNull();
+    expect(screen.queryByText("답변 기준이 필요해요.")).toBeNull();
   });
 
   it("D — a reload states what the version WAS, read from the row rather than re-derived", async () => {
@@ -320,7 +320,7 @@ describe("the three answer states", () => {
         phase: "PROPOSED",
         draft: draftRow({
           answerBasis: "NEEDS_CLARIFICATION",
-          answerBasisNote: "정확한 답변을 위해 고객에게 확인할 내용이 있습니다.",
+          answerBasisNote: "정확한 답변을 위해 고객에게 확인할 내용이 있어요.",
           answerBasisAction: null,
         }),
         draftEvidence: GROUNDED.evidence,
@@ -344,7 +344,7 @@ describe("the three answer states", () => {
     expect(await screen.findByText(/사용하실 규격을 알려주시면/)).toBeInTheDocument();
     expect(screen.queryByTestId("answer-state")).toBeNull();
     // What the row DOES record still shows, and it is not dressed as a warning.
-    expect(screen.getByText(/근거로 썼습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/근거로 썼어요/)).toBeInTheDocument();
   });
 
   it("I — an inquiry already answered on the channel offers no send and no draft", async () => {

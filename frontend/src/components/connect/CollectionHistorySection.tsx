@@ -35,10 +35,10 @@ export function CollectionHistorySection({
         <p className="text-base text-muted">불러오는 중…</p>
       ) : error ? (
         <p className="rounded-xl bg-bad/10 px-4 py-3 text-base text-bad">
-          수집 이력을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+          수집 이력을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
         </p>
       ) : runs.length === 0 ? (
-        <p className="text-base text-muted">아직 수집 이력이 없습니다.</p>
+        <p className="text-base text-muted">아직 수집 이력이 없어요.</p>
       ) : (
         <ul className="divide-y divide-line">
           {runs.map((run) => (
@@ -83,7 +83,7 @@ function RunRow({
       );
       onChanged();
     } catch (e) {
-      onReport(backendMessage(e) ?? "다시 시도에 실패했습니다.", true);
+      onReport(backendMessage(e) ?? "다시 시도에 실패했어요.", true);
     } finally {
       setRetrying(false);
     }
@@ -147,13 +147,13 @@ function RunRow({
  * `TriggerChip` takes: a word nobody wrote a sentence for is not shown as itself.
  */
 const ACQUISITION_FAILURE_WORDS: Record<string, string> = {
-  LOGIN_REQUIRED: "쿠팡 판매자 화면에 로그인이 되어 있지 않아 상품평을 읽지 못했습니다. 로그인한 뒤 다시 동기화해 주세요.",
-  STORE_MISMATCH: "화면에 열려 있던 스토어가 이 판매 계정과 달라서 아무것도 읽지 않았습니다.",
-  STORE_UNRESOLVED: "화면의 스토어가 이 판매 계정과 같은지 확인하지 못해 아무것도 읽지 않았습니다.",
-  EXECUTOR_UNAVAILABLE: "상품평을 읽는 프로그램에 연결하지 못했습니다. 잠시 뒤 다시 동기화해 주세요.",
-  UNSUPPORTED_STATE: "상품평 목록 화면이 아니어서 읽지 못했습니다. 쿠팡 상품평 목록을 연 뒤 다시 동기화해 주세요.",
-  RUNTIME_FAULT: "상품평을 읽는 도중 오류가 나서 아무것도 저장하지 않았습니다.",
-  HANDOFF_REJECTED: "읽은 상품평을 저장하지 못했습니다. 저장된 상품평은 없습니다.",
+  LOGIN_REQUIRED: "쿠팡 판매자 화면에 로그인이 되어 있지 않아 상품평을 읽지 못했어요. 로그인한 뒤 다시 동기화해 주세요.",
+  STORE_MISMATCH: "화면에 열려 있던 스토어가 이 판매 계정과 달라서 아무것도 읽지 않았어요.",
+  STORE_UNRESOLVED: "화면의 스토어가 이 판매 계정과 같은지 확인하지 못해 아무것도 읽지 않았어요.",
+  EXECUTOR_UNAVAILABLE: "상품평을 읽는 프로그램에 연결하지 못했어요. 잠시 뒤 다시 동기화해 주세요.",
+  UNSUPPORTED_STATE: "상품평 목록 화면이 아니어서 읽지 못했어요. 쿠팡 상품평 목록을 연 뒤 다시 동기화해 주세요.",
+  RUNTIME_FAULT: "상품평을 읽는 도중 오류가 나서 아무것도 저장하지 않았어요.",
+  HANDOFF_REJECTED: "읽은 상품평을 저장하지 못했어요. 저장된 상품평은 없어요.",
 };
 
 /** The sentence for a failed screen read, or null when this row is not one (or its word has no sentence). */
@@ -174,20 +174,20 @@ function CoverageNote({ coverage }: { coverage: ReviewCoverageSignal }) {
   if (coverage === "REACHED_KNOWN_GROUND") {
     return (
       <p data-testid="coverage-note" className="text-sm text-muted">
-        읽지 못하고 남은 리뷰가 있다는 신호는 이번 수집에서 없었습니다.
+        읽지 못하고 남은 리뷰가 있다는 신호는 이번 수집에서 없었어요.
       </p>
     );
   }
   if (coverage === "BACKLOG_POSSIBLE") {
     return (
       <p data-testid="coverage-note" className="text-sm text-warn">
-        읽기 한도에서 멈췄고, 읽은 리뷰가 모두 새 리뷰였습니다. 더 이전 리뷰가 남아 있을 수 있습니다.
+        읽기 한도에서 멈췄고, 읽은 리뷰가 모두 새 리뷰였어요. 더 이전 리뷰가 남아 있을 수 있어요.
       </p>
     );
   }
   return (
     <p data-testid="coverage-note" className="text-sm text-muted">
-      이번 수집만으로는 남은 리뷰가 있는지 알 수 없습니다.
+      이번 수집만으로는 남은 리뷰가 있는지 알 수 없어요.
     </p>
   );
 }

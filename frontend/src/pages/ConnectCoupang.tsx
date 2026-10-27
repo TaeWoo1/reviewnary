@@ -624,7 +624,7 @@ export function ConnectCoupang() {
       <WalkthroughBanner context={wtContext} channelCode="COUPANG" channelCalls={coupangCalls} />
       {gate === "checking" && (
         <p className="mt-4 text-muted" role="status">
-          walkthrough 환경을 확인하는 중입니다…
+          walkthrough 환경을 확인하는 중이에요…
         </p>
       )}
       {gate === "mismatch" && (

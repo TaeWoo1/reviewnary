@@ -59,7 +59,7 @@ describe("리뷰 수집 — 한 번에 한 걸음", () => {
   it("장벽의 press는 기술 동작이 아니라 판매자가 한 일의 이름을 단다", () => {
     const s = reviewCollectionStateOf(input({ run: run({}) }));
     expect(s.step).toBe("SURFACE");
-    expect(s.primary).toEqual({ kind: "RECHECK", label: "상품평 목록을 열었습니다" });
+    expect(s.primary).toEqual({ kind: "RECHECK", label: "상품평 목록을 열었어요" });
     // 정상 상태에는 복구 UI가 없다.
     expect(s.failure).toBeNull();
   });
@@ -67,7 +67,7 @@ describe("리뷰 수집 — 한 번에 한 걸음", () => {
   it("로그인이 필요하면 같은 걸음에서 문장과 라벨만 바뀐다", () => {
     const s = reviewCollectionStateOf(input({ run: run({ blocker: { code: "LOGIN_REQUIRED", recoverable: true } }) }));
     expect(s.step).toBe("SURFACE");
-    expect(s.primary).toEqual({ kind: "RECHECK", label: "로그인했습니다" });
+    expect(s.primary).toEqual({ kind: "RECHECK", label: "로그인했어요" });
     expect(s.failure).toBeNull();
   });
 
@@ -81,7 +81,7 @@ describe("리뷰 수집 — 한 번에 한 걸음", () => {
     );
     expect(s.step).toBe("STORE");
     expect(s.confirmStore).toBe("A00000000");
-    expect(s.primary).toEqual({ kind: "CONFIRM_STORE", label: "이 스토어를 연결하고 가져오기" });
+    expect(s.primary).toEqual({ kind: "CONFIRM_STORE", label: "이 스토어를 연동하고 가져오기" });
     // 실패로 표현하지 않는다: 스토어를 「확인하지 못했다」가 아니라 「이것이 맞나요」다.
     expect(s.failure).toBeNull();
   });
@@ -108,7 +108,7 @@ describe("리뷰 수집 — 한 번에 한 걸음", () => {
   it("다른 계정으로 로그인된 것은 스토어 걸음의 실패다", () => {
     const s = reviewCollectionStateOf(input({ run: run({ blocker: { code: "STORE_MISMATCH", recoverable: true } as never }) }));
     expect(s.step).toBe("STORE");
-    expect(s.failure?.title).toBe("다른 판매자 계정으로 로그인되어 있습니다");
+    expect(s.failure?.title).toBe("다른 판매자 계정으로 로그인되어 있어요");
     expect(s.primary?.kind).toBe("RECHECK");
   });
 
@@ -207,20 +207,20 @@ describe("완료 문장 — 수를 지어내지 않는다", () => {
     expect(collectedSentence({ kind: "STORED", run: sync({ successRows: 9 }) })).toContain("9개");
   });
 
-  it("저장 0이면 「가져왔습니다」라고 말하지 않는다", () => {
+  it("저장 0이면 「가져왔어요」라고 말하지 않는다", () => {
     expect(collectedSentence({ kind: "STORED", run: sync({ successRows: 0 }) })).toBe(
-      "새로 가져올 상품평이 없었습니다.",
+      "새로 가져올 상품평이 없었어요.",
     );
   });
 
   it("기록을 읽었고 새로 생긴 것이 없으면, 없었던 것이다", () => {
-    expect(collectedSentence({ kind: "NONE" })).toBe("새로 가져올 상품평이 없었습니다.");
+    expect(collectedSentence({ kind: "NONE" })).toBe("새로 가져올 상품평이 없었어요.");
   });
 
   it("기록을 읽지 못한 것은 「없었다」가 아니다", () => {
     const said = collectedSentence({ kind: "UNKNOWN" });
     expect(said).not.toMatch(/\d/);
-    expect(said).not.toContain("없었습니다");
+    expect(said).not.toContain("없었어요");
   });
 });
 

@@ -59,7 +59,7 @@ describe("sourceSummaryLines", () => {
     const [line] = sourceSummaryLines([coverage("INQUIRY", "OBSERVED_FRESHNESS_UNPROVEN", 4000)], [], "CAFE24");
     expect(line.tone).toBe("pending");
     expect(line.count).toBeNull();
-    expect(line.sentence).toBe("문의는 아직 확인하지 못했습니다.");
+    expect(line.sentence).toBe("문의는 아직 확인하지 못했어요.");
   });
 
   it("counts what the run handed over", () => {
@@ -69,16 +69,16 @@ describe("sourceSummaryLines", () => {
       "CAFE24",
     );
     expect(line.tone).toBe("collected");
-    expect(line.sentence).toBe("문의 22건을 가져왔습니다.");
+    expect(line.sentence).toBe("문의 22건을 가져왔어요.");
   });
 
-  it("says 없습니다 only for a measured ZERO", () => {
+  it("says 없어요 only for a measured ZERO", () => {
     const zero = sourceSummaryLines([coverage("REVIEW", "ZERO")], [], "CAFE24");
-    expect(zero[0].sentence).toBe("확인된 리뷰가 없습니다.");
+    expect(zero[0].sentence).toBe("확인된 리뷰가 없어요.");
     expect(zero[0].tone).toBe("empty");
 
     const unproven = sourceSummaryLines([coverage("REVIEW", "OBSERVED_FRESHNESS_UNPROVEN")], [], "CAFE24");
-    expect(unproven[0].sentence).not.toContain("없습니다");
+    expect(unproven[0].sentence).not.toContain("없어요");
   });
 
   it("separates a channel that does not offer the type from one that is blocked", () => {
@@ -87,9 +87,9 @@ describe("sourceSummaryLines", () => {
     // 「자동 수집 대상이 아니다」는 커넥터에 대한 사실이고, 「이 채널에서 제공하지 않는다」는 판매자의
     // 가게에 대한 주장이다. 이 줄이 하던 말은 뒤쪽이었고, 그래서 NAVER 리뷰 3,858건이 이미 들어와 있는
     // 채널의 연결 완료 화면이 「리뷰는 이 채널에서 제공하지 않습니다」라고 말했다.
-    expect(unsupported[0].sentence).toContain("자동 수집 대상이 아닙니다");
-    expect(unsupported[0].sentence).not.toContain("제공하지 않습니다");
-    expect(unsupported[0].sentence).not.toContain("없습니다");
+    expect(unsupported[0].sentence).toContain("자동 수집 대상이 아니에요");
+    expect(unsupported[0].sentence).not.toContain("제공하지 않아요");
+    expect(unsupported[0].sentence).not.toContain("없어요");
 
     const blocked = sourceSummaryLines([coverage("INQUIRY", "BLOCKED")], [], "CAFE24");
     expect(blocked[0].tone).toBe("blocked");
@@ -162,7 +162,7 @@ describe("sourceSummaryLines", () => {
 describe("sourceSummaryHeadline", () => {
   it("announces collection when something was collected", () => {
     const lines = sourceSummaryLines([coverage("ORDER_SUMMARY", "OBSERVED_FRESH")], [run("ORDER_SUMMARY", 14)], "CAFE24");
-    expect(sourceSummaryHeadline("카페24", lines)).toBe("카페24에서 다음 정보를 가져왔습니다.");
+    expect(sourceSummaryHeadline("카페24", lines)).toBe("카페24에서 다음 정보를 가져왔어요.");
   });
 
   it("never adds two counts together", () => {
@@ -178,7 +178,7 @@ describe("sourceSummaryHeadline", () => {
 
   it("does not call an empty first collection a failure", () => {
     const lines = sourceSummaryLines([coverage("ORDER_SUMMARY", "ZERO")], [], "CAFE24");
-    expect(sourceSummaryHeadline("카페24", lines)).toContain("연결이 완료되었습니다");
+    expect(sourceSummaryHeadline("카페24", lines)).toContain("연동이 완료됐어요");
   });
 });
 
@@ -191,8 +191,8 @@ describe("a run that brought nothing back", () => {
       [run("INQUIRY", 0)],
       "CAFE24",
     );
-    expect(line.sentence).toBe("새로 가져온 문의는 없습니다.");
-    expect(line.sentence).not.toContain("문의가 없습니다");
+    expect(line.sentence).toBe("새로 가져온 문의는 없어요.");
+    expect(line.sentence).not.toContain("문의가 없어요");
     expect(line.tone).toBe("empty");
   });
 });

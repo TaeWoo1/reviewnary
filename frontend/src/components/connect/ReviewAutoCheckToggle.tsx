@@ -52,12 +52,12 @@ export function ReviewAutoCheckToggle({
       setView(next);
       onReport(
         next.enabled
-          ? "새 리뷰를 자동으로 확인합니다."
-          : "자동 확인을 껐습니다. 필요할 때 「지금 확인」으로 가져올 수 있습니다.",
+          ? "새 리뷰를 자동으로 확인해요."
+          : "자동 확인을 껐어요. 필요할 때 「지금 확인」으로 가져올 수 있어요.",
         false,
       );
     } catch (e) {
-      onReport(backendMessage(e) ?? "설정 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.", true);
+      onReport(backendMessage(e) ?? "설정 저장에 실패했어요. 잠시 후 다시 시도해 주세요.", true);
     } finally {
       setSaving(false);
     }
@@ -79,8 +79,8 @@ export function ReviewAutoCheckToggle({
       {view.enabled && view.paused ? (
         <p className="break-keep text-sm text-muted">
           {view.paused === "PAUSED_AUTH"
-            ? "판매자센터 로그인이 필요해 기다리고 있습니다."
-            : "이 컴퓨터의 도우미가 연결되면 이어서 확인합니다."}
+            ? "판매자센터 로그인이 필요해 기다리고 있어요."
+            : "이 컴퓨터의 도우미가 연결되면 이어서 확인해요."}
         </p>
       ) : null}
     </div>

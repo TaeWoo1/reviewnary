@@ -23,10 +23,10 @@ function item(over: Partial<ReviewMediaItemView> = {}): ReviewMediaItemView {
     ordinal: 1,
     kind: "IMAGE",
     inspected: true,
-    statusKo: "Reviewnary가 사진을 확인했습니다.",
+    statusKo: "Reviewnary가 사진을 확인했어요.",
     depicts: "몰딩 끝부분이 벌어진 모습",
     problemVisible: "YES",
-    problemDescription: "접착면이 떨어져 있습니다.",
+    problemDescription: "접착면이 떨어져 있어요.",
     imagePath: `/api/reviews/${REVIEW}/media/1`,
     ...over,
   };
@@ -45,7 +45,7 @@ describe("ReviewPhotos — a review's photos on the review screen", () => {
         item({
           ordinal: 2,
           inspected: false,
-          statusKo: "사진 확인 기능이 꺼져 있어 사진 내용은 보지 않았습니다.",
+          statusKo: "사진 확인 기능이 꺼져 있어 사진 내용은 보지 않았어요.",
           depicts: "보이면 안 되는 문장",
           problemVisible: null,
           problemDescription: null,
@@ -64,7 +64,7 @@ describe("ReviewPhotos — a review's photos on the review screen", () => {
     expect(api.getReviewMediaImage).toHaveBeenCalledWith(REVIEW, 2);
     expect(screen.getByText("분석: 몰딩 끝부분이 벌어진 모습")).toBeTruthy();
     expect(screen.getByText("문제 보임")).toBeTruthy();
-    expect(screen.getByText("사진 확인 기능이 꺼져 있어 사진 내용은 보지 않았습니다.")).toBeTruthy();
+    expect(screen.getByText("사진 확인 기능이 꺼져 있어 사진 내용은 보지 않았어요.")).toBeTruthy();
     expect(screen.queryByText(/보이면 안 되는 문장/)).toBeNull();
     // imagePath is for fetching only — never printed.
     expect(document.body.textContent).not.toContain("/api/reviews/");
@@ -72,7 +72,7 @@ describe("ReviewPhotos — a review's photos on the review screen", () => {
 
   it("labels a video in words and never asks for its bytes", async () => {
     api.getReviewMedia.mockResolvedValue({
-      items: [item({ ordinal: 1, kind: "VIDEO", inspected: false, statusKo: "영상은 확인하지 않았습니다.", imagePath: null })],
+      items: [item({ ordinal: 1, kind: "VIDEO", inspected: false, statusKo: "영상은 확인하지 않았어요.", imagePath: null })],
     });
     render(<ReviewPhotos reviewId={REVIEW} mediaCount={1} mediaCountObserved />);
     const list = await screen.findByRole("list", { name: "고객이 올린 사진" });
@@ -92,7 +92,7 @@ describe("ReviewPhotos — a review's photos on the review screen", () => {
   it("says the photos could not be loaded when the list itself fails", async () => {
     api.getReviewMedia.mockRejectedValue(new Error("500"));
     render(<ReviewPhotos reviewId={REVIEW} mediaCount={3} mediaCountObserved />);
-    expect(await screen.findByText(/사진을 불러오지 못했습니다/)).toBeTruthy();
+    expect(await screen.findByText(/사진을 불러오지 못했어요/)).toBeTruthy();
     expect(screen.queryByRole("img")).toBeNull();
   });
 

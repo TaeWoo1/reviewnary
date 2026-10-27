@@ -198,7 +198,7 @@ export function Cafe24Tutorial() {
       <div>
         <h1 className="text-2xl font-bold">카페24 첫 연결</h1>
         <p className="mt-1 text-base text-muted">
-          읽기 전용으로 안전하게 연결하고, 사용 가능한 기능을 확인합니다.
+          읽기 전용으로 안전하게 연결하고, 사용 가능한 기능을 확인해요.
         </p>
       </div>
 
@@ -235,8 +235,8 @@ export function Cafe24Tutorial() {
               <p className="font-semibold text-ink">Mall ID 찾는 방법</p>
               <p className="mt-1">
                 카페24 자사몰 주소 <span className="font-mono">mystore.cafe24.com</span> 에서 앞부분
-                <span className="font-mono"> mystore</span> 가 Mall ID입니다. 주소 전체를 붙여넣으셔도
-                알아서 앞부분만 씁니다.
+                <span className="font-mono"> mystore</span> 가 Mall ID예요. 주소 전체를 붙여넣어도
+                알아서 앞부분만 써요.
               </p>
             </div>
             {mallError ? (
@@ -263,7 +263,7 @@ export function Cafe24Tutorial() {
               <li>• 상품 정보 읽기 (mall.read_product)</li>
             </ul>
             <div className="rounded-xl bg-line/10 px-4 py-3 text-sm text-muted">
-              글쓰기·답변 등록 권한은 요청하지 않습니다. 1:1 맞춤상담 게시판은 수집하지 않습니다.
+              글쓰기·답변 등록 권한은 요청하지 않아요. 1:1 맞춤상담 게시판은 수집하지 않아요.
             </div>
             <p className="text-sm text-muted">
               확인한 Mall ID: <span className="font-mono text-ink">{state.mallId}</span>
@@ -296,11 +296,11 @@ export function Cafe24Tutorial() {
         {state.phase === "verify" ? (
           <div className="space-y-3">
             <p className="text-base text-muted">
-              {busy ? "검증 중입니다…" : "검증을 다시 시도할 수 있습니다."}
+              {busy ? "검증 중이에요…" : "검증을 다시 시도할 수 있어요."}
             </p>
             {state.verifyRetryable ? (
               <div className="rounded-xl bg-warn/10 px-4 py-3 text-warn">
-                일시적인 오류가 발생했습니다. 잠시 후 다시 검증해 주세요.
+                일시적인 오류가 발생했어요. 잠시 후 다시 검증해 주세요.
               </div>
             ) : null}
             {!busy ? (
@@ -316,12 +316,12 @@ export function Cafe24Tutorial() {
         {state.phase === "first_sync" ? (
           state.syncRequested ? (
             <p className="text-base text-muted" role="status" aria-live="polite">
-              {busy ? "주문 요약을 읽어오는 중입니다…" : "동기화 결과를 확인하고 있습니다…"}
+              {busy ? "주문 요약을 읽어오는 중이에요…" : "동기화 결과를 확인하고 있어요…"}
             </p>
           ) : (
             <div className="space-y-3">
               <p className="text-base text-ink">
-                주문 요약을 한 번만 읽어옵니다. 카페24에 아무것도 쓰지 않습니다.
+                주문 요약을 한 번만 읽어와요. 카페24에 아무것도 쓰지 않아요.
               </p>
               <div className="flex justify-end gap-2">
                 {/* Skipping still finishes the wizard: consent already connected the channel, and
@@ -357,7 +357,7 @@ export function Cafe24Tutorial() {
             <CompletionFeatures accountId={state.accountId} />
             <div className="flex justify-end">
               <button type="button" className="btn-ghost" onClick={finish}>
-                채널 연결 화면으로
+                채널 연동 화면으로
               </button>
             </div>
           </div>
@@ -370,7 +370,7 @@ export function Cafe24Tutorial() {
             </div>
             <div className="flex items-center justify-between gap-3">
               <Link to="/connect" className="btn-ghost">
-                채널 연결로 돌아가기
+                채널 연동로 돌아가기
               </Link>
               <button type="button" className="btn-primary" onClick={retry}>
                 다시 시도
@@ -441,7 +441,7 @@ function CompletionFeatures({ accountId }: { accountId: string | null }) {
   }, [accountId]);
 
   if (error) {
-    return <p className="text-base text-muted">기능 상태를 불러오지 못했습니다.</p>;
+    return <p className="text-base text-muted">기능 상태를 불러오지 못했어요.</p>;
   }
   if (!features) {
     return <p className="text-base text-muted">기능 상태를 불러오는 중…</p>;
@@ -476,9 +476,9 @@ function mallInputErrorCopy(reason: "empty" | "bad_host" | "malformed"): string 
     case "empty":
       return "쇼핑몰 주소 또는 Mall ID를 입력해 주세요.";
     case "bad_host":
-      return "카페24 자사몰 주소(*.cafe24.com)만 입력할 수 있습니다.";
+      return "카페24 자사몰 주소(*.cafe24.com)만 입력할 수 있어요.";
     case "malformed":
     default:
-      return "Mall ID 형식이 올바르지 않습니다. 영문 소문자·숫자·하이픈만 사용할 수 있습니다.";
+      return "Mall ID 형식이 올바르지 않아요. 영문 소문자·숫자·하이픈만 사용할 수 있어요.";
   }
 }

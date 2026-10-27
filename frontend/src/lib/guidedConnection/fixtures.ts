@@ -23,17 +23,17 @@ export const NAVER_LIKE_TEMPLATE: CredentialTemplateView = {
       label: "애플리케이션 ID (Client ID)",
       required: true,
       secret: false,
-      helpText: "NAVER 커머스 API 센터에서 발급된 애플리케이션 ID입니다.",
+      helpText: "NAVER 커머스 API 센터에서 발급된 애플리케이션 ID예요.",
     },
     {
       key: "client_secret",
       label: "애플리케이션 시크릿 (Client Secret)",
       required: true,
       secret: true,
-      helpText: "발급 화면에서 확인한 시크릿을 직접 입력하세요. 저장 후에는 다시 표시되지 않습니다.",
+      helpText: "발급 화면에서 확인한 시크릿을 직접 입력하세요. 저장 후에는 다시 표시되지 않아요.",
     },
   ],
-  notes: "셀러 소유 NAVER 커머스 API 애플리케이션(type=SELF) 기준입니다.",
+  notes: "셀러 소유 NAVER 커머스 API 애플리케이션(type=SELF) 기준이에요.",
 };
 
 /**

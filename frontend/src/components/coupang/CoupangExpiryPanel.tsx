@@ -87,7 +87,7 @@ export function CoupangExpiryPanel({
         <div className="space-y-2" data-testid="coupang-expiry-confirm">
           <p className="text-sm text-muted break-keep">
             쿠팡 윙 발급 화면의 유효기간(만료일)을 확인해 그대로 입력해 주세요. reviewnary는 만료일을 임의로
-            추정하지 않습니다.
+            추정하지 않아요.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <label htmlFor="coupang-completion-expiry" className="sr-only">

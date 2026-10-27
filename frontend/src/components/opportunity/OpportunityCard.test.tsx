@@ -33,7 +33,7 @@ function opportunity(over: Partial<OpportunityView> = {}): OpportunityView {
     issueTitle: "접착 탈락", aspect: "접착", problem: "탈락", severity: "NORMAL", evidenceCount: 5,
     firstEvidenceOn: "2026-08-01", lastEvidenceOn: "2026-09-01", changeLabelsKo: ["증가 중"],
     productId: "p-1", productName: "선바로 일체형 전선몰딩",
-    whyKo: ["「접착 탈락」 근거 리뷰 5건 (2026-08-01 ~ 2026-09-01).", "최근 판단: 증가 중.", "이 상품의 상품 지식 2건 중 '접착'을(를) 다룬 내용은 없습니다."],
+    whyKo: ["「접착 탈락」 근거 리뷰 5건 (2026-08-01 ~ 2026-09-01).", "최근 판단: 증가 중.", "이 상품의 상품 지식 2건 중 '접착'을(를) 다룬 내용은 없어요."],
     recommendationKo: "'접착' 관련 안내를 이 상품의 자주 묻는 질문에 추가하는 것을 검토하세요.",
     evidenceTo: "/memory/issue-1",
     knowledge: { scope: "PRODUCT", scopeLabelKo: "이 상품의 상품 지식", type: "USAGE", topicLabelKo: "접착", sources: 2, mentions: 0, excerpts: [] },
@@ -60,12 +60,12 @@ describe("개선 기회 카드 — what repeated, why, the evidence, the next ac
     renderCard(opportunity());
     expect(screen.getByText(/자주 묻는 질문에 추가하는 것을 검토하세요/)).toBeTruthy();
     expect(screen.getByText(/근거 리뷰 5건 \(2026-08-01 ~ 2026-09-01\)/)).toBeTruthy();
-    expect(screen.getByText(/'접착'을\(를\) 다룬 내용은 없습니다/)).toBeTruthy();
+    expect(screen.getByText(/'접착'을\(를\) 다룬 내용은 없어요/)).toBeTruthy();
     expect(screen.getByRole("link", { name: /근거 리뷰 5건 보기/ }).getAttribute("href")).toBe("/memory/issue-1");
     expect(screen.getByRole("button", { name: "FAQ 초안 준비" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "지금은 보류" })).toBeTruthy();
     // No cause is ever asserted by this card: the sentences are the backend's, verbatim.
-    expect(screen.queryByText(/원인입니다/)).toBeNull();
+    expect(screen.queryByText(/원인이에요/)).toBeNull();
   });
 
   it("accept prepares a draft the seller can edit and file as knowledge", async () => {
@@ -94,7 +94,7 @@ describe("개선 기회 카드 — what repeated, why, the evidence, the next ac
     await waitFor(() => expect(createProductKnowledgeSource).toHaveBeenCalled());
     expect(createProductKnowledgeSource.mock.calls[0]![0]).toBe("p-1");
     expect(createProductKnowledgeSource.mock.calls[0]![1]).toMatchObject({ sourceType: "FAQ", body: "먼지를 닦고 붙이세요." });
-    expect(await screen.findByText(/저장했습니다/)).toBeTruthy();
+    expect(await screen.findByText(/저장했어요/)).toBeTruthy();
   });
 
   it("an edited draft must be saved before it can be filed; the edit goes through the draft endpoint", async () => {
@@ -199,7 +199,7 @@ describe("적용 — the step the chain was missing (Learning & Outcome Loop v1)
     }));
 
     expect(screen.getByRole("button", { name: "메모 복사" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "적용했습니다" }));
+    fireEvent.click(screen.getByRole("button", { name: "적용했어요" }));
     await waitFor(() => expect(applyOpportunity).toHaveBeenCalledWith("issue-1", "PRODUCT_IMPROVEMENT_REVIEW", {
       artifact: "SELLER_DECLARED",
       ref: null,
@@ -209,46 +209,46 @@ describe("적용 — the step the chain was missing (Learning & Outcome Loop v1)
   it("a failed application says so, and does not claim the save did not happen", async () => {
     applyOpportunity.mockRejectedValue(new Error("boom"));
     renderCard(opportunity({ ...accepted, kind: "PRODUCT_IMPROVEMENT_REVIEW", knowledge: null }));
-    fireEvent.click(screen.getByRole("button", { name: "적용했습니다" }));
-    expect(await screen.findByText(/적용을 기록하지 못했습니다. 저장된 내용은 그대로 있습니다./)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "적용했어요" }));
+    expect(await screen.findByText(/적용을 기록하지 못했어요. 저장된 내용은 그대로 있어요./)).toBeTruthy();
   });
 
   it("an applied card shows what came of it, loses the draft editor, and claims no cause", () => {
     renderCard(opportunity({
-      status: "APPLIED", statusLabelKo: "적용했습니다",
+      status: "APPLIED", statusLabelKo: "적용했어요",
       appliedAt: "2026-09-01T00:00:00Z",
       draft: null,
       outcome: {
         kind: "FAQ_SUPPLEMENT", kindLabelKo: "FAQ 보완", scope: "PRODUCT",
         appliedOn: "2026-09-01", observedThrough: "2026-09-28",
         evidenceBefore: 12, reviewsBefore: 72, evidenceAfter: 2, reviewsAfter: 57,
-        verdict: "IMPROVED", verdictLabelKo: "근거 줄었습니다",
-        reasonLabelKo: "같은 문제가 적게 들어왔습니다", settled: true,
+        verdict: "IMPROVED", verdictLabelKo: "근거 줄었어요",
+        reasonLabelKo: "같은 문제가 적게 들어왔어요", settled: true,
       },
     }));
 
-    expect(screen.getByText("근거 줄었습니다")).toBeTruthy();
+    expect(screen.getByText("근거 줄었어요")).toBeTruthy();
     expect(screen.getByText(/적용 전 4주 12건 → 뒤 4주 2건/)).toBeTruthy();
-    expect(screen.getByText(/같은 문제가 적게 들어왔습니다/)).toBeTruthy();
+    expect(screen.getByText(/같은 문제가 적게 들어왔어요/)).toBeTruthy();
     expect(screen.queryByLabelText("초안 내용")).toBeNull();
-    expect(screen.queryByRole("button", { name: /저장|복사|적용했습니다/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /저장|복사|적용했어요/ })).toBeNull();
     // Nothing on the card says the action caused the fall.
     expect(screen.queryByText(/해결|효과/)).toBeNull();
   });
 
   it("an applied card whose window is open says when it closes, not nothing", () => {
     renderCard(opportunity({
-      status: "APPLIED", statusLabelKo: "적용했습니다", draft: null, appliedAt: "2026-09-01T00:00:00Z",
+      status: "APPLIED", statusLabelKo: "적용했어요", draft: null, appliedAt: "2026-09-01T00:00:00Z",
       outcome: {
         kind: "FAQ_SUPPLEMENT", kindLabelKo: "FAQ 보완", scope: "PRODUCT",
         appliedOn: "2026-09-01", observedThrough: "2026-09-28",
         evidenceBefore: 12, reviewsBefore: 72, evidenceAfter: null, reviewsAfter: null,
         verdict: "OBSERVING", verdictLabelKo: "확인 중",
-        reasonLabelKo: "관찰 기간이 아직 끝나지 않았습니다", settled: false,
+        reasonLabelKo: "관찰 기간이 아직 끝나지 않았어요", settled: false,
       },
     }));
     expect(screen.getByText("확인 중")).toBeTruthy();
     expect(screen.getByText(/2026-09-28/)).toBeTruthy();
-    expect(screen.getByText(/까지 리뷰를 지켜봅니다/)).toBeTruthy();
+    expect(screen.getByText(/까지 리뷰를 지켜봐요/)).toBeTruthy();
   });
 });

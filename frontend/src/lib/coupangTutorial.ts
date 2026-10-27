@@ -231,7 +231,7 @@ export interface CoupangStepView {
 export const COUPANG_STEP_LABELS: readonly string[] = [
   "API 키 발급",
   "발급 정보 확인",
-  "연결 정보 입력",
+  "연동 정보 입력",
   "첫 주문 불러오기",
   "수집 진행",
   "연결 완료",
@@ -297,7 +297,7 @@ const GENERIC_RECOVERY: CoupangRecoveryCopy = {
 
 const RECOVERY_BY_CODE: Record<CoupangReasonCode, CoupangRecoveryCopy> = {
   INVALID_CREDENTIAL: {
-    title: "연결 정보가 올바르지 않아요",
+    title: "연동 정보가 올바르지 않아요",
     body: "액세스 키·시크릿 키·업체 코드(업체 코드)를 쿠팡 윙에서 다시 확인하고 정확히 입력해 주세요.",
     showIpPanel: false,
     allowReenter: true,
@@ -305,7 +305,7 @@ const RECOVERY_BY_CODE: Record<CoupangReasonCode, CoupangRecoveryCopy> = {
   },
   CALL_ENVIRONMENT_MISMATCH: {
     title: "허용된 호출 IP와 일치하지 않아요",
-    body: "쿠팡은 등록된 호출 IP에서만 API 요청을 허용합니다. 아래 IP를 쿠팡 앱의 호출 IP에 등록한 뒤 다시 확인해 주세요.",
+    body: "쿠팡은 등록된 호출 IP에서만 API 요청을 허용해요. 아래 IP를 쿠팡 앱의 호출 IP에 등록한 뒤 다시 확인해 주세요.",
     showIpPanel: true,
     allowReenter: false,
     retestLabel: "호출 IP를 확인했어요, 다시 확인",
@@ -336,54 +336,54 @@ export function recoveryCopy(reasonCode: string | null): CoupangRecoveryCopy {
 
 /** Static copy for the tutorial surface (all seller-facing, Korean). */
 export const COUPANG_TUTORIAL_COPY = {
-  pageTitle: "쿠팡 연결",
+  pageTitle: "쿠팡 연동",
   pageIntro:
-    "쿠팡 판매자센터(쿠팡 윙)에서 발급한 Open API 키로 주문을 연동합니다. 아래 순서대로 진행하면 개발 지식 없이 연결할 수 있어요.",
-  loading: "쿠팡 연결 준비 정보를 불러오는 중…",
-  resolveError: "연결 준비 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
-  unavailableTitle: "쿠팡 연결을 준비할 수 없어요",
-  unavailableBody: "지금은 쿠팡 API 연결을 준비할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+    "쿠팡 판매자센터(쿠팡 윙)에서 발급한 Open API 키로 주문을 연동해요. 아래 순서대로 진행하면 개발 지식 없이 연결할 수 있어요.",
+  loading: "쿠팡 연동 준비 정보를 불러오는 중…",
+  resolveError: "연결 준비 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+  unavailableTitle: "쿠팡 연동을 준비할 수 없어요",
+  unavailableBody: "지금은 쿠팡 API 연결을 준비할 수 없어요. 잠시 후 다시 시도해 주세요.",
   backToChannels: "채널 목록으로",
 
   // Step 1 — API 키 발급 안내
   step1Title: "1. 쿠팡 윙에서 Open API 키 발급",
   step1Body:
-    "쿠팡 윙 › 판매자 정보 › 오픈API 키 발급에서 액세스 키·시크릿 키를 발급하세요. 발급 버튼을 누른 뒤 사용 목적 확인 → 약관 동의 → 업체 정보 입력을 거쳐, 마지막 '확인'에서 키가 만들어집니다.",
+    "쿠팡 윙 › 판매자 정보 › 오픈API 키 발급에서 액세스 키·시크릿 키를 발급하세요. 발급 버튼을 누른 뒤 사용 목적 확인 → 약관 동의 → 업체 정보 입력을 거쳐, 마지막 '확인'에서 키가 만들어져요.",
   step1SelfDev:
-    "마지막 화면의 ‘업체 입력 방식’에서 ‘자체개발(직접입력)’을 선택하세요. 솔루션사(대행) 연동이 아니라 내 시스템에서 직접 호출하는 방식입니다. 첫 화면의 ‘사용 목적’에는 이 항목이 없으니 ‘OPEN API’(기본값) 그대로 두시면 됩니다.",
+    "마지막 화면의 ‘업체 입력 방식’에서 ‘자체개발(직접입력)’을 선택하세요. 솔루션사(대행) 연동이 아니라 내 시스템에서 직접 호출하는 방식이에요. 첫 화면의 ‘사용 목적’에는 이 항목이 없으니 ‘OPEN API’(기본값) 그대로 두시면 돼요.",
 
   // Step 2 — 발급 정보 설명
   step2Title: "2. 발급받은 정보 확인",
-  step2Vendor: "업체 코드(Vendor ID): 쿠팡 윙에서 부여한 판매자 업체 코드입니다. (예: A00012345)",
-  step2AccessKey: "액세스 키(Access Key): API 요청을 식별하는 공개 키입니다.",
+  step2Vendor: "업체 코드(Vendor ID): 쿠팡 윙에서 부여한 판매자 업체 코드예요. (예: A00012345)",
+  step2AccessKey: "액세스 키(Access Key): API 요청을 식별하는 공개 키예요.",
   step2SecretKey:
-    "시크릿 키(Secret Key): 요청에 서명하는 비밀 키입니다. 발급 시 한 번만 표시되니 안전하게 보관하세요.",
-  step2CallIp: "호출 IP: 쿠팡은 등록된 IP에서만 API 요청을 허용합니다. 아래 IP를 앱의 호출 IP에 넣고 옆의 ‘추가’까지 누르세요 — 누르지 않으면 등록되지 않습니다.",
+    "시크릿 키(Secret Key): 요청에 서명하는 비밀 키예요. 발급 시 한 번만 표시되니 안전하게 보관하세요.",
+  step2CallIp: "호출 IP: 쿠팡은 등록된 IP에서만 API 요청을 허용해요. 아래 IP를 앱의 호출 IP에 넣고 옆의 ‘추가’까지 누르세요 — 누르지 않으면 등록되지 않아요.",
 
   // Step 3 — 입력
-  step3Title: "3. 연결 정보 입력",
+  step3Title: "3. 연동 정보 입력",
   step3Body:
-    "입력한 키는 암호화되어 저장되고, 즉시 연결 확인만 수행합니다. 주문 상태를 바꾸거나 어떤 것도 전송하지 않습니다.",
+    "입력한 키는 암호화되어 저장되고, 즉시 연결 확인만 수행해요. 주문 상태를 바꾸거나 어떤 것도 전송하지 않아요.",
 
   // Step 3 — submitting (the waiting screen). In-progress wording only — never "실패/오류" here.
-  verifyingStoringTitle: "연결 정보를 저장하고 있어요",
+  verifyingStoringTitle: "연동 정보를 저장하고 있어요",
   verifyingTitle: "쿠팡에 연결을 확인하고 있어요",
-  verifyingBody: "보통 몇 초 걸려요. 키는 암호화되어 저장되고, 주문 상태를 바꾸거나 어떤 것도 전송하지 않습니다.",
-  verifyingStageStore: "연결 정보 저장",
+  verifyingBody: "보통 몇 초 걸려요. 키는 암호화되어 저장되고, 주문 상태를 바꾸거나 어떤 것도 전송하지 않아요.",
+  verifyingStageStore: "연동 정보 저장",
   verifyingStageAuth: "쿠팡 인증 확인",
   verifyingStageOrders: "주문 조회 권한 확인",
 
   // Step 4 — PREPARING
-  step4Title: "연결 정보가 확인되었어요",
+  step4Title: "연동 정보가 확인되었어요",
   step4Body:
-    "키가 정상 확인되어 ‘연결 준비’ 상태예요. 아직 연결이 완료된 것은 아닙니다 — 첫 주문을 한 번 불러오면 연결이 완료됩니다.",
+    "키가 정상 확인되어 ‘연결 준비’ 상태예요. 아직 연동이 완료된 것은 아니에요 — 첫 주문을 한 번 불러오면 연동이 완료돼요.",
   step4Cta: "첫 주문 불러오기",
 
   // Step 5 — sync progress
   syncTitle: "첫 주문을 불러오고 있어요",
-  syncBody: "쿠팡에서 첫 주문을 불러오는 중이에요. 창을 닫아도 수집은 계속됩니다.",
+  syncBody: "쿠팡에서 첫 주문을 불러오는 중이에요. 창을 닫아도 수집은 계속돼요.",
   syncElapsedLabel: "경과 시간",
-  syncReassurance: "이 화면을 새로 고쳐도 같은 수집을 이어서 확인해요. 다시 시작되지 않습니다.",
+  syncReassurance: "이 화면을 새로 고쳐도 같은 수집을 이어서 확인해요. 다시 시작되지 않아요.",
   syncSlowNote: "주문이 많으면 시간이 조금 더 걸릴 수 있어요. 그대로 기다려 주세요.",
   syncStalledTitle: "아직 수집이 진행 중이에요",
   syncStalledBody: "예상보다 오래 걸리고 있어요. 상태를 한 번 더 확인해 볼까요? (새 수집을 시작하지 않아요.)",
@@ -393,8 +393,8 @@ export const COUPANG_TUTORIAL_COPY = {
   syncRetryCta: "다시 시도",
 
   // Step 6 — completed
-  connectedTitle: "쿠팡 연결이 완료됐어요",
-  connectedBody: "첫 주문 수집이 끝나 연결이 완료됐습니다. 이제 운영 화면에서 주문을 확인할 수 있어요.",
+  connectedTitle: "쿠팡 연동이 완료됐어요",
+  connectedBody: "첫 주문 수집이 끝나 연동이 완료됐어요. 이제 운영 화면에서 주문을 확인할 수 있어요.",
   goToOrders: "주문 보러 가기",
   viewChannelRuns: "연결 상태·수집 기록 보기",
   connectionStateLabel: "연결 상태",
@@ -402,5 +402,5 @@ export const COUPANG_TUTORIAL_COPY = {
   none: "아직 없음",
 
   // Recovery — re-enter option shared label
-  reenterCta: "연결 정보 다시 입력",
+  reenterCta: "연동 정보 다시 입력",
 } as const;

@@ -49,7 +49,7 @@ export function SettingsHome() {
       <Block title="AI 답변과 운영 기준">
         <Row
           label="회사 정보"
-          value="답변 표현을 고를 때 참고합니다. 배송·환불·규격의 근거는 아닙니다"
+          value="답변 표현을 고를 때 참고해요. 배송·환불·규격의 근거는 아니에요"
           action={<Go to="/settings/company">회사 소개 적기</Go>}
         />
         <Row
@@ -59,7 +59,7 @@ export function SettingsHome() {
         />
         <Row
           label="AI 답변 스타일"
-          value="말투·길이·인사·호칭. 답변 내용은 바꾸지 않습니다"
+          value="말투·길이·인사·호칭. 답변 내용은 바꾸지 않아요"
           action={<Go to="/settings/style">스타일 설정</Go>}
         />
         <Row
@@ -69,7 +69,7 @@ export function SettingsHome() {
         />
         <Row
           label="연결 알림"
-          value="연결이 끊기거나 확인이 필요할 때. 표시가 없다고 모든 연결이 정상은 아닙니다"
+          value="연결이 끊기거나 확인이 필요할 때. 표시가 없다고 모든 연결이 정상은 아니에요"
           action={<Go to="/settings/alerts">알림 보기</Go>}
         />
       </Block>
@@ -87,12 +87,12 @@ export function SettingsHome() {
       <Block title="계정">
         <Row
           label="연결된 기기"
-          value="비밀번호 대신 쓰는 연결입니다. 여기서 해제할 수 있습니다"
+          value="비밀번호 대신 쓰는 연결이에요. 여기서 해제할 수 있어요"
           action={<Go to="/settings/devices" strong>기기 보기</Go>}
         />
         <Row
           label="로그아웃"
-          value="이 브라우저에서만 나갑니다. 수집된 자료는 그대로 남습니다"
+          value="이 브라우저에서만 나가요. 수집된 자료는 그대로 남아요"
           action={
             <Btn variant="outline" size="sm" onClick={logout}>
               로그아웃

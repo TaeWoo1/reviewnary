@@ -26,8 +26,8 @@ export function ConnectionCapabilityPanel({ capability }: { capability: Connecti
       </div>
       <p className="text-sm text-muted">
         {capability.identityConfirmed
-          ? "저장한 연결 정보로 네이버 인증에 성공하고 첫 주문 수집까지 확인했습니다. (스토어 이름은 표시하지 않습니다.)"
-          : "아직 자격 증명 인증이 완료되지 않았습니다."}
+          ? "저장한 연동 정보로 네이버 인증에 성공하고 첫 주문 수집까지 확인했어요. (스토어 이름은 표시하지 않아요.)"
+          : "아직 자격 증명 인증이 완료되지 않았어요."}
       </p>
 
       <div className="flex items-center justify-between gap-3 border-t border-line pt-3">

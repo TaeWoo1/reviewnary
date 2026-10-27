@@ -38,10 +38,10 @@ describe("Agent — the runtime did not answer (§11)", () => {
     agentMock.capabilities.mockRejectedValue(new Error("connect ECONNREFUSED"));
     renderWithRouter(<Agent />);
 
-    await waitFor(() => expect(screen.getByText("AI 도우미를 시작하지 못했습니다.")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("AI 도우미를 시작하지 못했어요.")).toBeInTheDocument());
     // The draft shortcut is the one always-rendered control; it must be disabled, and no run started.
     expect(screen.getByRole("button", { name: "미답변 문의로 답변 초안 만들어 보기" })).toBeDisabled();
-    expect(screen.queryByText("요청을 처리하지 못했습니다.")).toBeNull();
+    expect(screen.queryByText("요청을 처리하지 못했어요.")).toBeNull();
     expect(agentMock.startRun).not.toHaveBeenCalled();
   });
 
@@ -51,9 +51,9 @@ describe("Agent — the runtime did not answer (§11)", () => {
 
     // Never a claim about the seller's channels: on an org with nothing connected, 「채널 연결에는
     // 문제가 없습니다」 would be false.
-    expect(screen.queryByText(/채널 연결에는 문제가 없습니다/)).toBeNull();
-    const notice = await screen.findByText(/채널 연결과는 관계없는 문제입니다/);
-    expect(notice).toHaveTextContent("문의·리뷰·주문 화면은 그대로 사용할 수 있습니다");
+    expect(screen.queryByText(/채널 연동에는 문제가 없어요/)).toBeNull();
+    const notice = await screen.findByText(/채널 연동과는 관계없는 문제예요/);
+    expect(notice).toHaveTextContent("문의·리뷰·주문 화면은 그대로 사용할 수 있어요");
     expect(screen.getByRole("link", { name: "홈으로 가기" })).toHaveAttribute("href", "/");
   });
 
@@ -61,7 +61,7 @@ describe("Agent — the runtime did not answer (§11)", () => {
     agentMock.capabilities.mockRejectedValue(new Error("connect ECONNREFUSED"));
     renderWithRouter(<Agent />);
 
-    const notice = await screen.findByText("AI 도우미를 시작하지 못했습니다.");
+    const notice = await screen.findByText("AI 도우미를 시작하지 못했어요.");
     const control = screen.getByRole("button", { name: "미답변 문의로 답변 초안 만들어 보기" });
     // Node.DOCUMENT_POSITION_FOLLOWING — the control comes after the notice in document order.
     expect(notice.compareDocumentPosition(control) & 4).toBeTruthy();
@@ -79,6 +79,6 @@ describe("Agent — the runtime did not answer (§11)", () => {
     renderWithRouter(<Agent />);
 
     await waitFor(() => expect(screen.getByRole("button", { name: "미답변 문의 처리" })).toBeEnabled());
-    expect(screen.queryByText("AI 도우미를 시작하지 못했습니다.")).toBeNull();
+    expect(screen.queryByText("AI 도우미를 시작하지 못했어요.")).toBeNull();
   });
 });

@@ -40,14 +40,14 @@ function co(over: Partial<CustomerOperationsHome> = {}): CustomerOperationsHome 
       rows: [
         {
           caseId: "c-1", subjectKind: "INQUIRY", channelNameKo: "카페24", title: "뚜껑이 깨져서 왔어요", rating: null, preview: null,
-          reasonNote: "고객이 답변을 기다립니다.", summary: "사진에서 균열이 보입니다.", recommendedActionType: "CANCEL_OR_EXCHANGE",
+          reasonNote: "고객이 답변을 기다려요.", summary: "사진에서 균열이 보여요.", recommendedActionType: "CANCEL_OR_EXCHANGE",
           recommendedAction: null, missingInformation: [], draftPrepared: true, decidedBy: "AGENT",
           openedAt: "2026-09-16T02:30:00Z",
           receivedOn: null, to: "/inquiries/i-1",
         },
         {
           caseId: "c-2", subjectKind: "INQUIRY", channelNameKo: "네이버 스마트스토어", title: "9oz 뚜껑도 파나요?", rating: null, preview: null,
-          reasonNote: "고객이 답변을 기다립니다.", summary: null, recommendedActionType: "ADD_KNOWLEDGE",
+          reasonNote: "고객이 답변을 기다려요.", summary: null, recommendedActionType: "ADD_KNOWLEDGE",
           recommendedAction: null, missingInformation: ["9oz 뚜껑 판매 여부"], draftPrepared: false, decidedBy: "AGENT",
           openedAt: "2026-09-16T00:30:00Z",
           receivedOn: null, to: "/inquiries/i-2",
@@ -379,7 +379,7 @@ describe("CustomerOpsHome", () => {
     expect(kase).toHaveTextContent("초안 준비됨");
     expect(kase).not.toHaveTextContent("초안 있음 · 미발송");
     // The second line is the case's own account of the subject — customer context, not our workflow.
-    expect(kase).toHaveTextContent("사진에서 균열이 보입니다.");
+    expect(kase).toHaveTextContent("사진에서 균열이 보여요.");
     // A case IS waiting: reviewnary opened it and the customer has had no answer.
     expect(kase).toHaveTextContent("3시간 대기");
     // The verb (「검토」, 「정보 입력」) is gone from the row: the one primary action lives in the item itself.
@@ -488,7 +488,7 @@ describe("CustomerOpsHome", () => {
     api.getInquiryQueueStrict.mockResolvedValue(queue({ content: [], totalElements: 0 }));
     draw(co({ decisions: { total: 0, rows: [] } }), null);
     // Nothing waiting is a state, and it is stated: the list's absence is not a sentence.
-    await waitFor(() => expect(screen.getByText("지금 할 일이 없습니다.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("지금 할 일이 없어요.")).toBeTruthy());
     // When there is nothing to do, the line still says the job is running — that is the whole reason the empty
     // list can be trusted. It no longer says when the next check is; that is a schedule parameter.
     expect(await screen.findByTestId("today-status")).toHaveTextContent("자동 확인 중");
@@ -578,7 +578,7 @@ describe("CustomerOpsHome", () => {
 
     // The product and the pair, never a rate.
     expect(section).toHaveTextContent("선바로 전선몰딩");
-    expect(section).toHaveTextContent("리뷰 1,761건 중 16건이 이 문제를 말했습니다");
+    expect(section).toHaveTextContent("리뷰 1,761건 중 16건이 이 문제를 말했어요");
     expect(section).not.toHaveTextContent("%");
   });
 
@@ -648,8 +648,8 @@ describe("activation card — what is being started, not the state again", () =>
     // The name — the canonical one, not a second spelling invented for this card.
     expect(within(card).getByText("고객 운영 관리")).toBeInTheDocument();
     // The cadence is the SERVER's number (`cadenceMinutes: 120` → 「2시간마다」); the sentence never spells it.
-    expect(card).toHaveTextContent("2시간마다 연결된 채널의 리뷰와 문의를 확인해, 판단이 필요한 일만 정리합니다.");
-    expect(card).toHaveTextContent("답변이나 외부 조치는 승인 전 자동 실행하지 않습니다.");
+    expect(card).toHaveTextContent("2시간마다 연동한 채널의 리뷰와 문의를 확인해, 판단이 필요한 일만 정리해요.");
+    expect(card).toHaveTextContent("답변이나 외부 조치는 승인 전 자동 실행하지 않아요.");
     expect(within(card).getByRole("button", { name: "자동 확인 시작" })).toBeEnabled();
   });
 
@@ -663,7 +663,7 @@ describe("activation card — what is being started, not the state again", () =>
   it("a 12-hour cadence says 12시간마다 — the sentence reads the view, never a constant", async () => {
     draw(co({ status: null, lastCheckedAt: null, nextCheckAt: null, cadenceMinutes: 720 }));
     const card = await screen.findByRole("region", { name: "자동 확인 꺼짐" });
-    expect(card).toHaveTextContent("12시간마다 연결된 채널의");
+    expect(card).toHaveTextContent("12시간마다 연동한 채널의");
   });
 
   it("paused keeps its own word and offers 재개 — the card still names the feature", async () => {
@@ -677,7 +677,7 @@ describe("activation card — what is being started, not the state again", () =>
     draw(co({ status: null, eligible: false, lastCheckedAt: null, nextCheckAt: null }));
     const card = await screen.findByRole("region", { name: "자동 확인 꺼짐" });
     expect(within(card).queryByRole("button", { name: "자동 확인 시작" })).toBeNull();
-    expect(within(card).getByRole("link", { name: "채널 연결" })).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "채널 연동" })).toBeInTheDocument();
   });
 
   it("pressing it activates — one call, and the page is told to re-read", async () => {

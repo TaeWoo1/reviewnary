@@ -141,7 +141,7 @@ function ChannelRow({
       case "notice":
         // Unreachable for the three product channels (each has a connect flow); kept as the honest
         // answer if the catalog ever hands this list a channel without one.
-        onNotice("이 채널은 지금 연결할 수 없습니다.");
+        onNotice("이 채널은 지금 연결할 수 없어요.");
         return;
     }
   }
@@ -152,7 +152,7 @@ function ChannelRow({
   // one fold deeper for whoever is helping them — the seller never reads a gateway code, support never
   // loses it (Local Helper Pilot Packaging v1 §7).
   const detailLines = [
-    failing ? (health?.lastErrorKo ?? "최근 수집에서 오류가 있었습니다. 연결 관리에서 확인해 주세요.") : null,
+    failing ? (health?.lastErrorKo ?? "최근 수집에서 오류가 있었어요. 연결 관리에서 확인해 주세요.") : null,
   ].filter((line): line is string => !!line);
   const diagnostic = failing && health?.lastError ? health.lastError : null;
 
@@ -245,7 +245,7 @@ function ChannelRow({
             그 뒤의 시도들은 아무것도 남기지 않았고, 그 사실이 시각 옆에 없으면 이 행은 어제 읽은 행처럼
             읽힌다 — 실측 org에서 그 뒤의 시도는 일곱 번이었다. */}
         {failing && lastCollected ? (
-          <span className="mt-0.5 block break-keep text-xs text-warn">마지막 성공 · 그 뒤로 수집되지 않았습니다</span>
+          <span className="mt-0.5 block break-keep text-xs text-warn">마지막 성공 · 그 뒤로 수집되지 않았어요</span>
         ) : null}
       </div>
       <div className={COL.action}>
@@ -345,11 +345,11 @@ export function ChannelList({
   }
   if (channels.length === 0) {
     return channelsError ? (
-      <Empty title="채널 정보를 불러오지 못했습니다" body="연결 상태를 확인한 뒤 다시 시도해 주세요." />
+      <Empty title="채널 정보를 불러오지 못했어요" body="연결 상태를 확인한 뒤 다시 시도해 주세요." />
     ) : (
       <Empty
-        title="연결할 수 있는 채널이 없습니다"
-        body="네이버 스마트스토어, 쿠팡, 카페24가 표시되어야 합니다. 잠시 후 다시 시도해 주세요."
+        title="연결할 수 있는 채널이 없어요"
+        body="네이버 스마트스토어, 쿠팡, 카페24가 표시되어야 해요. 잠시 후 다시 시도해 주세요."
       />
     );
   }

@@ -71,7 +71,7 @@ export function CollectionSettingsSection({
         동작한 것이다(커넥터가 정한 최근 구간만 다시 읽는다. Cafe24는 14일).
       */}
       <p className="break-keep text-sm leading-relaxed text-muted">
-        「지금 수집하기」는 최근 구간만 다시 확인합니다. 오래된 자료는 아래 「지난 기간 가져오기」에서
+        「지금 수집하기」는 최근 구간만 다시 확인해요. 오래된 자료는 아래 「지난 기간 가져오기」에서
         기간을 골라 가져오세요.
       </p>
       <ul className="divide-y divide-line">
@@ -169,13 +169,13 @@ function ScheduleRow({
       await api.putSchedule(accountId, { dataType, intervalMinutes: cadence, enabled: nextEnabled });
       onReport(
         nextEnabled
-          ? `${label} 자동 수집을 켰습니다. 다음 주기부터 자동으로 수집됩니다.`
-          : `${label} 자동 수집을 껐습니다.`,
+          ? `${label} 자동 수집을 켰어요. 다음 주기부터 자동으로 수집돼요.`
+          : `${label} 자동 수집을 껐어요.`,
         false,
       );
       onChanged();
     } catch (e) {
-      onReport(backendMessage(e) ?? "설정 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.", true);
+      onReport(backendMessage(e) ?? "설정 저장에 실패했어요. 잠시 후 다시 시도해 주세요.", true);
     } finally {
       setSaving(false);
     }
@@ -247,10 +247,10 @@ function ScheduleRow({
             읽지 못한 사실을 문장으로 바꾸는 것보다 적게 말하는 편이 옳다.
           */}
           {operatorRunPath
-            ? "판매자가 직접 실행하는 수집 경로라 자동 수집 주기 대상이 아닙니다."
+            ? "판매자가 직접 실행하는 수집 경로라 자동 수집 주기 대상이 아니에요."
             : sellerRepeatedPath?.method === "EXPORT"
-              ? "이 채널은 리뷰 API를 제공하지 않습니다. 판매자 센터에서 내려받은 파일을 올리는 방식이 정식 수집 경로이며, 새 데이터는 다시 올릴 때 들어옵니다."
-              : "이 데이터는 파일 업로드로 채울 수 있습니다."}
+              ? "이 채널은 리뷰 API를 제공하지 않아요. 판매자 센터에서 내려받은 파일을 올리는 방식이 정식 수집 경로이며, 새 데이터는 다시 올릴 때 들어와요."
+              : "이 데이터는 파일 업로드로 채울 수 있어요."}
         </p>
       ) : (
         <div className="flex flex-wrap items-center gap-3">

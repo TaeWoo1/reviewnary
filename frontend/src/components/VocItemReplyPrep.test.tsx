@@ -36,7 +36,7 @@ const originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard"
 function prepView(over: Partial<ReviewReplyPrep> = {}): ReviewReplyPrep {
   return {
     actionRef: REF,
-    redactedBody: "합성-리뷰-본문: 배송이 너무 늦었습니다",
+    redactedBody: "합성-리뷰-본문: 배송이 너무 늦었어요",
     bodyRedacted: false,
     triageDisposition: "RESPONSE_NEEDED",
     suggestion: {
@@ -161,7 +161,7 @@ describe("VocItemReplyPrep", () => {
 
   it("shows the whole redacted body and seeds the editor from the suggestion", async () => {
     await renderPanel();
-    expect(screen.getByText("합성-리뷰-본문: 배송이 너무 늦었습니다")).toBeTruthy();
+    expect(screen.getByText("합성-리뷰-본문: 배송이 너무 늦었어요")).toBeTruthy();
     expect(screen.getByLabelText("답글 내용")).toHaveValue("합성-추천-초안");
   });
 
@@ -181,7 +181,7 @@ describe("VocItemReplyPrep", () => {
    */
   it("never claims a draft stands on stored knowledge unless the saved version records a model", async () => {
     await renderPanel();
-    expect(screen.queryByText(/근거로 준비했습니다/)).toBeNull();
+    expect(screen.queryByText(/근거로 준비했어요/)).toBeNull();
   });
 
   /**
@@ -191,14 +191,15 @@ describe("VocItemReplyPrep", () => {
    */
   it("says what the draft stands on, and does not name a writer, when a model is recorded", async () => {
     await renderPanel(prepView({ draftAuthorKind: "MODEL" }));
-    expect(screen.getByText(/AI가 썼어요/)).toBeTruthy();
-    expect(screen.queryByText(/AI가 썼습니다/)).toBeNull();
+    expect(screen.getByText(/AI가 준비했어요/)).toBeTruthy();
+    // It says what prepared the draft, never who wrote it (§8-M).
+    expect(screen.queryByText(/AI가 썼/)).toBeNull();
   });
 
   it("says the seller wrote it, and does not ask them to check their own sentence", async () => {
     await renderPanel(prepView({ draftAuthorKind: "SELLER" }));
     expect(screen.getByText(/직접 쓴 답글이에요/)).toBeTruthy();
-    expect(screen.queryByText(/근거로 준비했습니다/)).toBeNull();
+    expect(screen.queryByText(/근거로 준비했어요/)).toBeNull();
     expect(screen.queryByText(/저장된 문구로 시작했어요/)).toBeNull();
     expect(screen.queryByText(/내용을 확인하고 직접 고쳐 주세요/)).toBeNull();
   });
@@ -215,7 +216,7 @@ describe("VocItemReplyPrep", () => {
   it("claims no author at all when the saved version records none", async () => {
     await renderPanel(prepView({ draftAuthorKind: null }));
     expect(screen.queryByText(/저장된 문구로 시작했어요/)).toBeNull();
-    expect(screen.queryByText(/근거로 준비했습니다/)).toBeNull();
+    expect(screen.queryByText(/근거로 준비했어요/)).toBeNull();
     expect(screen.queryByText(/직접 쓴 답글이에요/)).toBeNull();
     expect(screen.getByLabelText("답글 내용")).toBeTruthy();
   });
@@ -455,7 +456,7 @@ describe("VocItemReplyPrep", () => {
     expect(manual).toHaveValue("합성-승인된-답변");
     expect(screen.getByText(/직접 선택해 복사하세요/)).toBeTruthy();
     // Crucially: no success claim.
-    expect(screen.queryByText(/복사했습니다/)).toBeNull();
+    expect(screen.queryByText(/복사했어요/)).toBeNull();
   });
 
   it("offers a retry when the clipboard refuses", async () => {
@@ -464,7 +465,7 @@ describe("VocItemReplyPrep", () => {
     await renderPanel(APPROVED);
     await user.click(screen.getByRole("button", { name: "복사" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/다시 눌러 주세요/);
-    expect(screen.queryByText(/복사했습니다/)).toBeNull();
+    expect(screen.queryByText(/복사했어요/)).toBeNull();
   });
 
   it("hides the copy affordance's text when the server withholds the body", async () => {
@@ -551,7 +552,7 @@ describe("VocItemReplyPrep", () => {
     expect(inert(screen.getByRole("button", { name: "복사" }))).toBe(true);
     await user.click(screen.getByRole("button", { name: "복사" }));
     expect(writeText).not.toHaveBeenCalled();
-    expect(screen.queryByText(/복사했습니다/)).toBeNull();
+    expect(screen.queryByText(/복사했어요/)).toBeNull();
   });
 
   /**
@@ -590,7 +591,7 @@ describe("VocItemReplyPrep", () => {
     resolveWithdraw({ actionRef: REF, state: "WITHDRAWN", replayed: false });
     await waitFor(() => expect(api.getReviewReplyPrep).toHaveBeenCalledTimes(2));
     // And no success message survives the decision.
-    expect(screen.queryByText(/복사했습니다/)).toBeNull();
+    expect(screen.queryByText(/복사했어요/)).toBeNull();
   });
 
   /**
@@ -768,7 +769,7 @@ describe("VocItemReplyPrep — guided submission (v1.6)", () => {
       expect(screen.getByText("채널에 직접 답변한 것으로 기록했어요.")).toBeInTheDocument(),
     );
     expect(
-      screen.getByText("reviewnary는 답변 여부를 확인하지 않습니다(확인 안 함)."),
+      screen.getByText("reviewnary는 답변 여부를 확인하지 않아요(확인 안 함)."),
     ).toBeInTheDocument();
   });
 

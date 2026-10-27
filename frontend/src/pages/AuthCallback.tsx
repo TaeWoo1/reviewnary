@@ -66,8 +66,8 @@ export function AuthCallback() {
   if (failed) {
     return (
       <AuthCard title="로그인을 이어가지 못했어요">
-        <p className="text-base text-ink">로그인 링크가 만료되었거나 이미 사용되었습니다.</p>
-        <p className="text-sm text-muted">다시 로그인하면 됩니다. 채널 연결과 수집 설정은 그대로 남아 있습니다.</p>
+        <p className="text-base text-ink">로그인 링크가 만료되었거나 이미 사용됐어요.</p>
+        <p className="text-sm text-muted">다시 로그인하면 돼요. 채널 연동과 수집 설정은 그대로 남아 있어요.</p>
         <Link to="/login" className={`${authLink} block text-center text-base`}>
           로그인 화면으로
         </Link>

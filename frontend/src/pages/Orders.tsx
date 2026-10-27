@@ -76,7 +76,7 @@ export function Orders() {
     <div className="space-y-5">
       <PageHead
         title="주문"
-        meta={<span className="text-sm text-muted">주문 처리는 각 판매자센터에서 합니다</span>}
+        meta={<span className="text-sm text-muted">주문 처리는 각 판매자센터에서 해요</span>}
         action={<AgentLaunch context={{ surface: "orders" }} label="주문에 대해 물어보기" />}
       />
 
@@ -84,7 +84,7 @@ export function Orders() {
         <p className="text-sm text-muted">불러오는 중…</p>
       ) : records.error || !records.data || !extent ? (
         <div className="rounded-xl bg-bad/10 px-4 py-3 text-sm text-bad">
-          주문 기록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+          주문 기록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
         </div>
       ) : (
         <>
@@ -97,7 +97,7 @@ export function Orders() {
             <span className="text-sm text-muted">
               {extent.periodFrom && extent.periodTo
                 ? `${kstMonthDay(extent.periodFrom)} – ${kstMonthDay(extent.periodTo)}`
-                : "읽어 둔 주문이 없습니다"}
+                : "읽어 둔 주문이 없어요"}
             </span>
             <Figure label="문의가 가리킨 주문" value={count(extent.linkedInquiryCount)} muted />
           </div>
@@ -107,11 +107,11 @@ export function Orders() {
             note={
               read && read.daysAgo >= 1 ? (
                 <span className="font-medium text-warn">
-                  {kstDayTime(read.at)} 이후로 새로 읽은 주문이 없습니다 — 오늘까지 {read.daysAgo}일.
-                  아래 숫자는 그때까지 읽은 것입니다.
+                  {kstDayTime(read.at)} 이후로 새로 읽은 주문이 없어요 — 오늘까지 {read.daysAgo}일.
+                  아래 숫자는 그때까지 읽은 거예요.
                 </span>
               ) : (
-                <span>한 건씩 읽은 주문만 아래 목록에 섭니다.</span>
+                <span>한 건씩 읽은 주문만 아래 목록에 서요.</span>
               )
             }
           >
@@ -122,7 +122,7 @@ export function Orders() {
               <span className={READ_COL.seen}>마지막 수집</span>
             </div>
             {reads.length === 0 ? (
-              <p className="border-t border-line/70 py-3 text-sm text-muted">연결된 채널이 없습니다.</p>
+              <p className="border-t border-line/70 py-3 text-sm text-muted">연동한 채널이 없어요.</p>
             ) : (
               <ul data-testid="orders-reads">
                 {reads.map((row) => (
@@ -132,7 +132,7 @@ export function Orders() {
             )}
           </Block>
 
-          <Block title="주문" note="결제 한 건이 한 줄입니다. 상태는 채널이 보낸 값이고, 뜻을 확인한 코드만 우리 말로 옮깁니다." right="결제 시각 최신순">
+          <Block title="주문" note="결제 한 건이 한 줄여요. 상태는 채널이 보낸 값이고, 뜻을 확인한 코드만 우리 말로 옮겨요." right="결제 시각 최신순">
             <div aria-hidden="true" className="flex items-center pb-1 text-xs text-muted">
               <span className={COL.id}>주문 번호</span>
               <span className={COL.channel}>채널</span>
@@ -145,8 +145,8 @@ export function Orders() {
             {records.data.rows.length === 0 ? (
               <p className="border-t border-line/70 py-3 text-sm text-muted">
                 {reads.some((r) => wasRead(r.state))
-                  ? "읽은 범위 안에 주문이 없습니다."
-                  : "아직 읽은 주문이 없습니다. 위의 읽기 상태를 확인해 주세요."}
+                  ? "읽은 범위 안에 주문이 없어요."
+                  : "아직 읽은 주문이 없어요. 위의 읽기 상태를 확인해 주세요."}
               </p>
             ) : (
               <ul data-testid="orders-records">
@@ -163,8 +163,8 @@ export function Orders() {
             {records.data.hasMore ? (
               <p className="border-t border-line py-2.5 text-sm text-muted" data-testid="orders-has-more">
                 주문 <b className="font-semibold tabular-nums text-ink">{count(extent.paymentUnitCount)}</b>건 가운데
-                결제 시각이 가장 최근인 <b className="font-semibold tabular-nums text-ink">{count(records.data.rows.length)}</b>건입니다.
-                나머지는 아직 이 화면에서 열 수 없습니다.
+                결제 시각이 가장 최근인 <b className="font-semibold tabular-nums text-ink">{count(records.data.rows.length)}</b>건이에요.
+                나머지는 아직 이 화면에서 열 수 없어요.
               </p>
             ) : null}
           </Block>
@@ -367,7 +367,7 @@ function Sales({
           {/* 기록보다 한 단계 약하게 — 같은 굵기의 제목이 셋이면 어느 것이 이 화면의 주제인지 사라진다. */}
           <h2 className="break-keep text-base font-semibold text-muted">매출</h2>
           <span className="break-keep text-sm text-muted">
-            일자 집계입니다 — 카페24처럼 한 건씩 읽지 않는 채널까지 포함합니다.
+            일자 집계예요 — 카페24처럼 한 건씩 읽지 않는 채널까지 포함해요.
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -403,14 +403,14 @@ function Sales({
       {window.loading ? (
         <p className="text-sm text-muted">불러오는 중…</p>
       ) : window.error ? (
-        <p className="text-sm text-warn">매출 집계를 불러오지 못했습니다.</p>
+        <p className="text-sm text-warn">매출 집계를 불러오지 못했어요.</p>
       ) : (
         <>
           <p className="break-keep text-sm leading-7 text-muted" data-testid="orders-sales-line">
             {empty ? (
               <>
-                {scope}에 집계된 주문이 없습니다.
-                {periodTo ? ` 마지막으로 집계된 날은 ${kstMonthDay(periodTo)}입니다.` : ""}
+                {scope}에 집계된 주문이 없어요.
+                {periodTo ? ` 마지막으로 집계된 날은 ${kstMonthDay(periodTo)}이에요.` : ""}
               </>
             ) : (
               <>

@@ -18,16 +18,16 @@ const kpi: MetricKpi = {
 describe("the coverage qualification before the first connection (Pilot Readiness Gate v1 §4)", () => {
   it("says a seller with connections which channels are missing, in warn", () => {
     render(<Metric kpi={kpi} />);
-    const line = screen.getByText("채널 3곳이 이 숫자에 없습니다");
+    const line = screen.getByText("채널 3곳이 이 숫자에 없어요");
     expect(line.className).toContain("text-warn");
   });
 
   it("says the plainer fact, and not in warn, on an account that has connected nothing", () => {
     render(<Metric kpi={kpi} beforeFirstConnection />);
-    const line = screen.getByText("아직 연결된 채널이 없습니다");
+    const line = screen.getByText("아직 연동한 채널이 없어요");
     expect(line.className).toContain("text-muted");
     expect(line.className).not.toContain("text-warn");
     // The three-channel subtraction is not shown to somebody who has no total to subtract from.
-    expect(screen.queryByText("채널 3곳이 이 숫자에 없습니다")).toBeNull();
+    expect(screen.queryByText("채널 3곳이 이 숫자에 없어요")).toBeNull();
   });
 });

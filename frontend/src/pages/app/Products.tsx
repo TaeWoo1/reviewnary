@@ -107,15 +107,15 @@ export function Products() {
           different question. */}
       {noCatalogue ? (
         <Empty
-          title="상품 목록을 불러오지 못했습니다"
-          body="잠시 후 다시 시도해 주세요. 상품은 채널을 연결하면 자동으로 채워집니다."
-          action={<BtnLink to="/connect">채널 연결 열기</BtnLink>}
+          title="상품 목록을 불러오지 못했어요"
+          body="잠시 후 다시 시도해 주세요. 상품은 채널을 연동하면 자동으로 채워져요."
+          action={<BtnLink to="/connect">채널 연동 열기</BtnLink>}
         />
       ) : noProducts ? (
         <Empty
-          title="아직 상품이 없습니다"
-          body="채널을 연결하면 판매 중인 상품이 여기에 채워집니다."
-          action={<BtnLink to="/connect">채널 연결하기</BtnLink>}
+          title="아직 상품이 없어요"
+          body="채널을 연동하면 판매 중인 상품이 여기에 채워져요."
+          action={<BtnLink to="/connect">채널 연동하기</BtnLink>}
         />
       ) : (
         <ListBox ariaLabel="상품 목록">
@@ -142,7 +142,7 @@ export function Products() {
             <p className="px-5 py-6 text-sm text-muted">불러오는 중…</p>
           ) : rows.length === 0 ? (
             <div className="px-5 py-6">
-              <Empty compact title="찾는 상품이 없습니다" body="다른 이름이나 상품코드로 찾아보세요." />
+              <Empty compact title="찾는 상품이 없어요" body="다른 이름이나 상품코드로 찾아보세요." />
             </div>
           ) : (
             <>
@@ -163,8 +163,8 @@ export function Products() {
               {total !== null && total > rows.length ? (
                 <p className="border-t border-line bg-canvas/40 px-5 py-2.5 text-xs text-muted">
                   <b className="font-semibold text-ink">{count(total)}개</b> 가운데{" "}
-                  <b className="font-semibold text-ink">{rows.length}개</b>를 보고 있습니다. 나머지는
-                  이름이나 상품코드로 찾을 수 있습니다.
+                  <b className="font-semibold text-ink">{rows.length}개</b>를 보고 있어요. 나머지는
+                  이름이나 상품코드로 찾을 수 있어요.
                 </p>
               ) : null}
             </>

@@ -97,7 +97,7 @@ describe("CoupangRenewalFlow", () => {
 
     await fillCredentials();
     await act(async () => {
-      await userEvent.click(screen.getByRole("button", { name: "연결 정보 저장" }));
+      await userEvent.click(screen.getByRole("button", { name: "연동 정보 저장" }));
     });
 
     expect(onReplace).toHaveBeenCalledTimes(1);
@@ -107,7 +107,7 @@ describe("CoupangRenewalFlow", () => {
 
     expect(screen.getByTestId("coupang-renewal")).toHaveAttribute("data-phase", "done");
     expect(screen.getByText("키 교체가 완료됐어요")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "연결 상태 보기" }));
+    await userEvent.click(screen.getByRole("button", { name: "연동 상태 보기" }));
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
@@ -127,14 +127,14 @@ describe("CoupangRenewalFlow", () => {
     await userEvent.click(screen.getByRole("button", { name: "reviewnary로 돌아가 새 키 입력하기" }));
     await fillCredentials();
     await act(async () => {
-      await userEvent.click(screen.getByRole("button", { name: "연결 정보 저장" }));
+      await userEvent.click(screen.getByRole("button", { name: "연동 정보 저장" }));
     });
     expect(screen.getByTestId("coupang-renewal")).toHaveAttribute("data-phase", "replace_error");
     expect(screen.getByTestId("coupang-renewal-error")).toBeInTheDocument();
     // Reuses the connection-test recovery copy for the reason code (never a raw provider body).
-    expect(screen.getByText("연결 정보가 올바르지 않아요")).toBeInTheDocument();
+    expect(screen.getByText("연동 정보가 올바르지 않아요")).toBeInTheDocument();
     // The form is still available to retry.
-    expect(screen.getByRole("button", { name: "연결 정보 저장" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "연동 정보 저장" })).toBeInTheDocument();
   });
 
   it("omits tokenExpiresAt when the operator leaves the expiry blank (never estimated)", async () => {
@@ -153,7 +153,7 @@ describe("CoupangRenewalFlow", () => {
     await userEvent.click(screen.getByRole("button", { name: "reviewnary로 돌아가 새 키 입력하기" }));
     await fillCredentials();
     await act(async () => {
-      await userEvent.click(screen.getByRole("button", { name: "연결 정보 저장" }));
+      await userEvent.click(screen.getByRole("button", { name: "연동 정보 저장" }));
     });
     expect(onReplace.mock.calls[0][1]).toBeUndefined();
   });

@@ -51,9 +51,9 @@ describe("CredentialDiagnosisPanel", () => {
 
       render(<CredentialDiagnosisPanel accountId="a1" />);
 
-      expect(await screen.findByText("reviewnary 서버 설정 문제입니다")).toBeInTheDocument();
+      expect(await screen.findByText("reviewnary 서버 설정 문제예요")).toBeInTheDocument();
       expect(
-        screen.getByText(/판매자가 채널을 다시 연결해도 해결되지 않습니다/),
+        screen.getByText(/판매자가 채널을 다시 연동해도 해결되지 않아요/),
       ).toBeInTheDocument();
     },
   );
@@ -67,20 +67,20 @@ describe("CredentialDiagnosisPanel", () => {
 
       render(<CredentialDiagnosisPanel accountId="a1" />);
 
-      expect(await screen.findByText("자격 증명을 다시 확인해야 합니다")).toBeInTheDocument();
-      expect(screen.queryByText(/다시 연결해도 해결되지 않습니다/)).not.toBeInTheDocument();
+      expect(await screen.findByText("자격 증명을 다시 확인해야 해요")).toBeInTheDocument();
+      expect(screen.queryByText(/다시 연결해도 해결되지 않아요/)).not.toBeInTheDocument();
     },
   );
 
   it("a backend that does not send the verdict is read as server-side — it asks the seller for nothing", async () => {
     // Absent is not false-for-the-seller: when we cannot tell whose problem it is, sending someone to a
     // marketplace is the expensive guess. `sellerActionable` omitted entirely (older backend).
-    const { sellerActionable: _omitted, ...withoutVerdict } = diagnosis("KEY_UNVERIFIABLE", "확인이 필요합니다.");
+    const { sellerActionable: _omitted, ...withoutVerdict } = diagnosis("KEY_UNVERIFIABLE", "확인이 필요해요.");
     getCredentialDiagnosis.mockResolvedValueOnce(withoutVerdict);
 
     render(<CredentialDiagnosisPanel accountId="a1" />);
 
-    expect(await screen.findByText("reviewnary 서버 설정 문제입니다")).toBeInTheDocument();
+    expect(await screen.findByText("reviewnary 서버 설정 문제예요")).toBeInTheDocument();
   });
 
   it("stays silent when the diagnosis itself cannot be read", async () => {

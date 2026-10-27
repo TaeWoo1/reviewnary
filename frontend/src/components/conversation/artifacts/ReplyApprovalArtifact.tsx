@@ -100,8 +100,8 @@ export function ReplyApprovalArtifact({ artifact }: { artifact: ApprovalRequired
       const status = isAxiosError(e) ? e.response?.status : undefined;
       setError(
         status === 409
-          ? "이 답변이 그 사이 바뀌었습니다. 현재 내용을 다시 확인한 뒤 승인해 주세요."
-          : "승인을 기록하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+          ? "이 답변이 그 사이 바뀌었어요. 현재 내용을 다시 확인한 뒤 승인해 주세요."
+          : "승인을 기록하지 못했어요. 잠시 후 다시 시도해 주세요.",
       );
       await read();
     } finally {
@@ -115,14 +115,14 @@ export function ReplyApprovalArtifact({ artifact }: { artifact: ApprovalRequired
       .join(" · ") || artifact.channelNameKo || null;
 
   return (
-    <ArtifactCard title={approved ? "답변을 승인했습니다" : artifact.title} note={meta} testId="reply-approval-artifact" framed>
+    <ArtifactCard title={approved ? "답변을 승인했어요" : artifact.title} note={meta} testId="reply-approval-artifact" framed>
       <div className="space-y-3 px-4 pb-3">
         {!loaded ? <p className="text-sm text-muted">확인하는 중…</p> : null}
         {loaded && !prep ? (
-          <p className="break-keep text-sm text-muted">이 리뷰의 답변을 다시 읽지 못했습니다. 아래에서 확인해 주세요.</p>
+          <p className="break-keep text-sm text-muted">이 리뷰의 답변을 다시 읽지 못했어요. 아래에서 확인해 주세요.</p>
         ) : null}
         {loaded && prep && !draft ? (
-          <p className="break-keep text-sm text-muted">아직 승인할 초안이 없습니다.</p>
+          <p className="break-keep text-sm text-muted">아직 승인할 초안이 없어요.</p>
         ) : null}
 
         {/* The customer's own sentence, small and quiet: it is what the reply answers, not what the
@@ -144,7 +144,7 @@ export function ReplyApprovalArtifact({ artifact }: { artifact: ApprovalRequired
 
         {draft && moved && !approved ? (
           <p className="break-keep text-sm text-warn" role="status">
-            이 답변은 그 사이 수정되었습니다. 위 내용이 현재 저장된 초안입니다.
+            이 답변은 그 사이 수정됐어요. 위 내용이 현재 저장된 초안이에요.
           </p>
         ) : null}
         {error ? <p className="break-keep text-sm text-bad" role="alert">{error}</p> : null}
@@ -154,12 +154,12 @@ export function ReplyApprovalArtifact({ artifact }: { artifact: ApprovalRequired
             <Btn onClick={() => void approve()} disabled={busy} data-testid="reply-approval-approve">
               {busy ? "승인하는 중…" : "이 답변으로 승인"}
             </Btn>
-            <p className="break-keep text-sm text-muted">승인해도 아직 등록되지 않습니다. 등록은 판매자님이 {channel}에서 누릅니다.</p>
+            <p className="break-keep text-sm text-muted">승인해도 아직 등록되지 않아요. 등록은 판매자님이 {channel}에서 눌러요.</p>
           </div>
         ) : null}
 
         {loaded && draft && !approved && !canApprove ? (
-          <p className="break-keep text-sm text-muted">이 리뷰는 지금 승인할 수 없습니다. 아래에서 상태를 확인해 주세요.</p>
+          <p className="break-keep text-sm text-muted">이 리뷰는 지금 승인할 수 없어요. 아래에서 상태를 확인해 주세요.</p>
         ) : null}
 
         {approved ? (

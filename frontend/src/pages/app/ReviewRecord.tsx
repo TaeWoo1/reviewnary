@@ -264,7 +264,7 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
                                 review.textless ? "text-muted" : "font-medium text-ink"
                               }`}
                             >
-                              {review.textless ? "별점만 남긴 리뷰" : previewText(review.preview) || "표시할 수 있는 본문이 없습니다"}
+                              {review.textless ? "별점만 남긴 리뷰" : previewText(review.preview) || "표시할 수 있는 본문이 없어요"}
                             </span>
                             {/* 오른쪽은 한 덩어리의 주석이다 — 폭이 정해져 있고, 줄이 아니라 묶음으로 약하다. */}
                             <span className="flex shrink-0 items-center gap-3 text-xs text-muted">
@@ -396,8 +396,8 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
 
       {loadError ? (
         <Empty
-          title="리뷰를 불러오지 못했습니다"
-          body="연결 상태를 확인한 뒤 다시 시도해 주세요. 불러오지 못한 목록을 임의로 채우지는 않습니다."
+          title="리뷰를 불러오지 못했어요"
+          body="연결 상태를 확인한 뒤 다시 시도해 주세요. 불러오지 못한 목록을 임의로 채우지는 않아요."
           action={
             <Btn size="sm" onClick={() => void load(sort, listedTier, channel, pageIndex, safetyOnly, reply, days)}>
               다시 시도
@@ -409,8 +409,8 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
       ) : page && page.items.length === 0 && recordTotal === 0 && narrowed ? (
         /* 조건이 비운 목록은 빈 기록이 아니다 — 기록이 비었다고 말하면 수집을 다시 하라는 말이 된다. */
         <Empty
-          title="조건에 맞는 리뷰가 없습니다"
-          body="답변 상태나 기간을 넓히면 다른 리뷰가 보입니다."
+          title="조건에 맞는 리뷰가 없어요"
+          body="답변 상태나 기간을 넓히면 다른 리뷰가 보여요."
           action={
             <Btn size="sm" variant="outline" onClick={() => { setParams({ reply: null, days: null }); setPageIndex(0); }}>
               조건 지우기
@@ -419,11 +419,11 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
         />
       ) : page && page.items.length === 0 && recordTotal === 0 ? (
         <Empty
-          title={`아직 수집된 ${josa(WORD, "이", "가")} 없습니다`}
-          body="채널 연결에서 리뷰 수집을 한 번 실행하면 이 목록에 쌓입니다."
+          title={`아직 수집된 ${josa(WORD, "이", "가")} 없어요`}
+          body="채널 연동에서 리뷰 수집을 한 번 실행하면 이 목록에 쌓여요."
           action={
             <BtnLink to="/connect" size="sm">
-              채널 연결로
+              채널 연동로
             </BtnLink>
           }
         />
@@ -448,7 +448,7 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
               {!pageIsSafety ? (
                 <p className="px-3 py-6 text-sm text-muted">불러오는 중…</p>
               ) : page.items.length === 0 ? (
-                <p className="px-3 py-6 text-sm text-muted">안전 관련 리뷰가 없습니다.</p>
+                <p className="px-3 py-6 text-sm text-muted">안전 관련 리뷰가 없어요.</p>
               ) : (
                 <ul>{page.items.map((row) => reviewRow(row, true))}</ul>
               )}
@@ -456,7 +456,7 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
           ) : flat ? (
             <section aria-label="목록" className="-mx-3">
               {page.items.length === 0 ? (
-                <p className="px-3 py-6 text-sm text-muted">{`조건에 맞는 ${josa(WORD, "이", "가")} 없습니다.`}</p>
+                <p className="px-3 py-6 text-sm text-muted">{`조건에 맞는 ${josa(WORD, "이", "가")} 없어요.`}</p>
               ) : (
                 <ul>{page.items.map((row) => reviewRow(row, true))}</ul>
               )}
@@ -562,7 +562,7 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
             </div>
             {(page.outsideVisibleChannels ?? 0) > 0 && channel === null ? (
               <p className="break-keep leading-relaxed">
-                연결 채널(네이버·쿠팡·카페24) 기준 · 파일로 올린 다른 채널 리뷰 {page.outsideVisibleChannels}건은 상품 화면에서 봅니다
+                연결 채널(네이버·쿠팡·카페24) 기준 · 파일로 올린 다른 채널 리뷰 {page.outsideVisibleChannels}건은 상품 화면에서 봐요
               </p>
             ) : null}
             {/* What only a channel can say: an import that stopped before the end of its list. */}
@@ -571,7 +571,7 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
               .map((f) => (
                 <p key={f.channelCode} className="break-keep leading-relaxed">
                   {channelShort(f.channelCode) ?? f.channelNameKo}: 마지막 수집({formatDateTime(f.lastImportAt!)})이 목록 끝까지
-                  확인되지 않은 상태로 끝났습니다. 채널에 이보다 더 있을 수 있습니다.
+                  확인되지 않은 상태로 끝났어요. 채널에 이보다 더 있을 수 있어요.
                 </p>
               ))}
           </div>

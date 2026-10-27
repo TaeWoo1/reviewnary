@@ -37,14 +37,14 @@ const DRAFT = {
   version: 2,
   answerStatus: 0,
   title: "[답변] 배송 문의",
-  comments: "확인 후 안내드리겠습니다.",
+  comments: "확인 후 안내드릴게요.",
   contentFingerprint: "f".repeat(64),
   fingerprintAlgorithm: "SHA-256",
   createdAt: "2026-08-19T00:00:00Z",
   authorKind: "MODEL" as const,
   modelVersion: "test-model/v1",
   knowledgeState: "GROUNDED" as const,
-  knowledgeNote: "판매자가 등록한 상품 지식을 근거로 썼습니다.",
+  knowledgeNote: "판매자가 등록한 상품 지식을 근거로 썼어요.",
 };
 
 function detail(over: Record<string, unknown> = {}) {
@@ -97,7 +97,7 @@ beforeEach(() => {
     draft: { ...DRAFT, version: 3, contentFingerprint: "b".repeat(64) },
     authorKind: "MODEL",
     knowledgeState: "GROUNDED",
-    knowledgeNote: "판매자가 등록한 상품 지식을 근거로 썼습니다.",
+    knowledgeNote: "판매자가 등록한 상품 지식을 근거로 썼어요.",
     productId: "p1",
     evidence: [],
     unavailableMessage: null,
@@ -116,7 +116,7 @@ describe("InquiryResponsePanel — the send is offered only when the backend say
     await screen.findByText("준비된 답변");
     expect(screen.queryByRole("button", { name: /답변 보내기/ })).not.toBeInTheDocument();
     // …and it says WHY, rather than leaving a silent gap where a control would be.
-    expect(screen.getByText(/대신 등록하지 않습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/대신 등록하지 않아요/)).toBeInTheDocument();
   });
 
   it("offers nothing when the channel has no reply adapter, and names that channel", async () => {
@@ -135,7 +135,7 @@ describe("InquiryResponsePanel — the send is offered only when the backend say
     getInquiryPublishCapability.mockRejectedValue(new Error("down"));
     render(<InquiryResponsePanel workItemId="w1" />);
 
-    await screen.findByText(/확인하지 못했습니다/);
+    await screen.findByText(/확인하지 못했어요/);
     expect(screen.queryByRole("button", { name: /답변 보내기/ })).not.toBeInTheDocument();
   });
 
@@ -145,7 +145,7 @@ describe("InquiryResponsePanel — the send is offered only when the backend say
     await screen.findByRole("button", { name: /답변 보내기/ });
 
     await user.click(screen.getByRole("button", { name: "수정" }));
-    await user.type(screen.getByLabelText("내용"), " 추가로 적었습니다");
+    await user.type(screen.getByLabelText("내용"), " 추가로 적었어요");
 
     expect(screen.queryByRole("button", { name: /답변 보내기/ })).not.toBeInTheDocument();
     expect(screen.getByText(/편집한 내용을 먼저 저장해 주세요/)).toBeInTheDocument();
@@ -161,14 +161,14 @@ describe("InquiryResponsePanel — the press that writes", () => {
 
     // The first press only opened the confirm block. Nothing has been sent.
     expect(confirmInquiryPublish).not.toHaveBeenCalled();
-    expect(screen.getByText(/등록 후에는 취소할 수 없습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/등록 후에는 취소할 수 없어요/)).toBeInTheDocument();
     // The exact text that will be posted is shown back INSIDE the confirm block — read-only, beside
     // the destination and the version — so the seller cannot discover afterwards what was sent.
     const confirm = within(screen.getByRole("group", { name: "답변 등록 확인" }));
     expect(confirm.getByText(DRAFT.comments)).toBeInTheDocument();
     expect(confirm.getByText(/저장된 버전 2/)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /확인, 등록합니다/ }));
+    await user.click(screen.getByRole("button", { name: /확인, 등록해요/ }));
 
     await waitFor(() => expect(confirmInquiryPublish).toHaveBeenCalledTimes(1));
     const [, request] = confirmInquiryPublish.mock.calls[0]!;
@@ -186,7 +186,7 @@ describe("InquiryResponsePanel — the press that writes", () => {
     await user.click(screen.getByRole("button", { name: "취소" }));
 
     expect(confirmInquiryPublish).not.toHaveBeenCalled();
-    expect(screen.queryByText(/등록 후에는 취소할 수 없습니다/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/등록 후에는 취소할 수 없어요/)).not.toBeInTheDocument();
   });
 
   it("an open confirm exposes NOTHING that could change what is about to be sent", async () => {
@@ -194,7 +194,7 @@ describe("InquiryResponsePanel — the press that writes", () => {
     render(<InquiryResponsePanel workItemId="w1" />);
 
     await user.click(await screen.findByRole("button", { name: /답변 보내기/ }));
-    expect(screen.getByText(/등록 후에는 취소할 수 없습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/등록 후에는 취소할 수 없어요/)).toBeInTheDocument();
 
     // The old layout kept 수정 / 다시 작성 / 초안 저장 live beside an open confirm, so the draft could
     // move under an approval that was already on screen. Now the confirm block is the only thing
@@ -226,9 +226,9 @@ describe("InquiryResponsePanel — the press that writes", () => {
     render(<InquiryResponsePanel workItemId="w1" />);
 
     await user.click(await screen.findByRole("button", { name: /답변 보내기/ }));
-    await user.click(screen.getByRole("button", { name: /확인, 등록합니다/ }));
+    await user.click(screen.getByRole("button", { name: /확인, 등록해요/ }));
 
-    await screen.findByText("답변이 등록되었습니다.");
+    await screen.findByText("답변이 등록됐어요.");
     expect(screen.queryByRole("button", { name: /답변 보내기/ })).not.toBeInTheDocument();
   });
 });

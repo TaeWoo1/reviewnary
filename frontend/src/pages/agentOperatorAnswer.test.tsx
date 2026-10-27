@@ -50,7 +50,7 @@ function answer(overrides: Partial<OperatorAnswer> = {}): OperatorAnswer {
       {
         findingId: "f-e1",
         specialist: "INQUIRY_OPS",
-        statement: "답변이 필요한 문의가 3208건 있습니다.",
+        statement: "답변이 필요한 문의가 3208건 있어요.",
         evidenceIds: ["e1"],
         confidence: "SUPPORTED",
         verdict: {
@@ -108,7 +108,7 @@ describe("운영 판단 — the Operator answer", () => {
     await ask(run(answer({
       findings: [{
         findingId: "f1", specialist: "PRODUCT_OPS",
-        statement: "반복되는 문제가 있는 상품이 2개 있습니다.",
+        statement: "반복되는 문제가 있는 상품이 2개 있어요.",
         evidenceIds: ["e1", "e2"], confidence: "SUPPORTED", verdict: null, surfaceLink: null,
       }],
       evidence: [
@@ -137,7 +137,7 @@ describe("운영 판단 — the Operator answer", () => {
   it("shows a statement together with the evidence it rests on", async () => {
     await ask(run(answer()));
 
-    expect(screen.getByText("답변이 필요한 문의가 3208건 있습니다.")).toBeInTheDocument();
+    expect(screen.getByText("답변이 필요한 문의가 3208건 있어요.")).toBeInTheDocument();
     // The evidence line is what makes the number checkable rather than merely printed. What it may
     // NOT contain is the machine's own vocabulary (Core Daily Loop UX Integration v1 §4): the
     // internal evidence id and the provenance string 「inbox/SERVER:unansweredInquiries」 named a call,
@@ -152,7 +152,7 @@ describe("운영 판단 — the Operator answer", () => {
       findings: [{
         ...answer().findings[0]!,
         confidence: "NEEDS_REVIEW",
-        statement: "접착 문제가 늘고 있습니다.",
+        statement: "접착 문제가 늘고 있어요.",
         verdict: {
           hasEvidence: true, supportingEvidenceIds: ["e1"], unsafeAssertion: true,
           unsafeReason: "근거 대비 과일반화", needsMore: false, needsMoreTool: null,
@@ -172,12 +172,12 @@ describe("운영 판단 — the Operator answer", () => {
       coverage: [
         { signal: "REVIEW", coverage: "UNCERTAIN_PRODUCT_UNLINKED", linked: 0, unlinked: 980, provenance: "review-store/INGEST:canonical" },
       ],
-      note: "케이블타이 2호에 기록된 반복 문제나 미답변 문의는 없습니다.",
+      note: "케이블타이 2호에 기록된 반복 문제나 미답변 문의는 없어요.",
     })));
 
-    expect(screen.getByText("일부 데이터는 판단할 수 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("일부 데이터는 판단할 수 없어요.")).toBeInTheDocument();
     expect(screen.getByText(/연결되지 않은 자료 980건/)).toBeInTheDocument();
-    expect(screen.getByText(/비어 있는 것이 문제가 없다는 뜻은 아닙니다/)).toBeInTheDocument();
+    expect(screen.getByText(/비어 있는 것이 문제가 없다는 뜻은 아니에요/)).toBeInTheDocument();
   });
 
   it("labels the interpretation as AI, and names the plan version", async () => {
@@ -196,13 +196,13 @@ describe("운영 판단 — the Operator answer", () => {
         { id: "n1", question: "답변이 필요한 문의가 몇 건인가", status: "SATISFIED", required: true,
           evidenceIds: ["e1"] },
         { id: "n2", question: "교환 정책이 무엇인가", status: "UNSATISFIABLE", required: true,
-          evidenceIds: [], reason: "판매 정책이 저장돼 있지 않습니다." },
+          evidenceIds: [], reason: "판매 정책이 저장돼 있지 않아요." },
       ],
     })));
 
     // A run that answered one of two questions must not read as a complete reply.
     expect(screen.getByText(/확인한 항목 1\/2/)).toBeInTheDocument();
-    expect(screen.getByText(/교환 정책이 무엇인가 — 판매 정책이 저장돼 있지 않습니다./)).toBeInTheDocument();
+    expect(screen.getByText(/교환 정책이 무엇인가 — 판매 정책이 저장돼 있지 않아요./)).toBeInTheDocument();
   });
 
   it("says 'we do not hold this' for a missing product fact, never 'the product lacks it'", async () => {
@@ -212,9 +212,9 @@ describe("운영 판단 — the Operator answer", () => {
       ],
     })));
 
-    expect(screen.getByText("아직 갖고 있지 않은 상품 정보가 있습니다.")).toBeInTheDocument();
-    expect(screen.getByText(/규격·스펙: reviewnary가 이 정보를 갖고 있지 않습니다/)).toBeInTheDocument();
-    expect(screen.getByText(/상품에 그 값이 없다는 뜻은 아닙니다/)).toBeInTheDocument();
+    expect(screen.getByText("아직 갖고 있지 않은 상품 정보가 있어요.")).toBeInTheDocument();
+    expect(screen.getByText(/규격·스펙: reviewnary가 이 정보를 갖고 있지 않아요/)).toBeInTheDocument();
+    expect(screen.getByText(/상품에 그 값이 없다는 뜻은 아니에요/)).toBeInTheDocument();
   });
 
   it("renders a clarification as the answer, not as an empty result", async () => {
@@ -225,16 +225,16 @@ describe("운영 판단 — the Operator answer", () => {
     })));
 
     expect(screen.getByText("어떤 상품을 말씀하시는지 알려주세요.")).toBeInTheDocument();
-    expect(screen.queryByText("말씀드릴 만한 것을 찾지 못했습니다.")).toBeNull();
+    expect(screen.queryByText("말씀드릴 만한 것을 찾지 못했어요.")).toBeNull();
   });
 
   it("prints the note when a run stopped early, so a partial answer never looks complete", async () => {
     await ask(run(answer({
       budget: { iterations: 3, toolCalls: 12, llmCalls: 6, elapsedMs: 900, exhausted: true, stopReason: "BUDGET_EXHAUSTED" },
-      note: "조회 예산에 도달해 일부는 확인하지 못했습니다.",
+      note: "조회 예산에 도달해 일부는 확인하지 못했어요.",
     })));
 
-    expect(screen.getByText("조회 예산에 도달해 일부는 확인하지 못했습니다.")).toBeInTheDocument();
+    expect(screen.getByText("조회 예산에 도달해 일부는 확인하지 못했어요.")).toBeInTheDocument();
   });
 
   it("every offered next action is a link to an authorized screen", async () => {

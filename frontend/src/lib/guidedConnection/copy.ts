@@ -10,28 +10,28 @@ import type { GuidedActor, GuidedFailureReason, GuidedPhase } from "./types";
 
 export const PHASE_COPY: Record<GuidedPhase, { title: string; body: string }> = {
   check_saved_credential: {
-    title: "저장된 연결 정보 확인",
-    body: "reviewnary에 저장된 NAVER 연결 정보가 있는지 확인하고 있습니다. 있으면 다시 입력하지 않고 바로 연결을 확인합니다.",
+    title: "저장된 연동 정보 확인",
+    body: "reviewnary에 저장된 NAVER 연동 정보가 있는지 확인하고 있어요. 있으면 다시 입력하지 않고 바로 연결을 확인해요.",
   },
   application_path_choice: {
     title: "애플리케이션 확인",
-    body: "NAVER 커머스 API 애플리케이션 상황을 선택해 주세요. 이미 있으면 기존 앱을 그대로 재사용하고, 없을 때만 새로 발급합니다.",
+    body: "NAVER 커머스 API 애플리케이션 상황을 선택해 주세요. 이미 있으면 기존 앱을 그대로 재사용하고, 없을 때만 새로 발급해요.",
   },
   application_status_unknown: {
     title: "애플리케이션 목록 확인",
-    body: "새 앱을 발급하기 전에, NAVER 커머스 API 센터의 애플리케이션 목록을 직접 확인해 주세요. 스토어별 애플리케이션은 1개만 만들 수 있고 삭제할 수 없으므로, 이미 앱이 있으면 새로 만들지 않고 그 앱을 그대로 재사용합니다. 앱이 없을 때만 신규 발급으로 진행합니다.",
+    body: "새 앱을 발급하기 전에, NAVER 커머스 API 센터의 애플리케이션 목록을 직접 확인해 주세요. 스토어별 애플리케이션은 1개만 만들 수 있고 삭제할 수 없으므로, 이미 앱이 있으면 새로 만들지 않고 그 앱을 그대로 재사용해요. 앱이 없을 때만 신규 발급으로 진행해요.",
   },
   existing_credential_entry: {
-    title: "기존 연결 정보 입력",
-    body: "이미 발급된 애플리케이션 ID와 시크릿을 reviewnary 보안 입력란에 직접 입력해 주세요. 새 앱을 만들 필요가 없습니다. 이 시크릿은 해당 스토어 애플리케이션의 공용 자격 증명이라, 같은 앱을 쓰는 다른 프로그램과 동일한 값입니다. 나중에 시크릿을 재발급하면 그 앱을 쓰는 모든 프로그램의 연결이 함께 끊깁니다.",
+    title: "기존 연동 정보 입력",
+    body: "이미 발급된 애플리케이션 ID와 시크릿을 reviewnary 보안 입력란에 직접 입력해 주세요. 새 앱을 만들 필요가 없어요. 이 시크릿은 해당 스토어 애플리케이션의 공용 자격 증명이라, 같은 앱을 쓰는 다른 프로그램과 동일한 값이에요. 나중에 시크릿을 재발급하면 그 앱을 쓰는 모든 프로그램의 연결이 함께 끊겨요.",
   },
   credential_recovery_required: {
     title: "시크릿 재확인 필요",
-    body: "애플리케이션은 있지만 시크릿을 확보하지 못했습니다. NAVER 커머스 API 센터의 기존 애플리케이션 화면에서 시크릿을 다시 확인하거나, 확인이 어려우면 시크릿을 재발급해 주세요. 앱을 삭제할 필요는 없습니다 (NAVER는 앱 삭제 기능을 제공하지 않습니다). 다만 시크릿을 재발급하면 이 앱을 사용하는 다른 프로그램의 연결도 함께 끊기므로, 다른 프로그램에서 사용 중인지 먼저 확인해 주세요. reviewnary는 시크릿을 대신 확인하거나 재발급하지 않습니다.",
+    body: "애플리케이션은 있지만 시크릿을 확보하지 못했어요. NAVER 커머스 API 센터의 기존 애플리케이션 화면에서 시크릿을 다시 확인하거나, 확인이 어려우면 시크릿을 재발급해 주세요. 앱을 삭제할 필요는 없어요 (NAVER는 앱 삭제 기능을 제공하지 않아요). 다만 시크릿을 재발급하면 이 앱을 사용하는 다른 프로그램의 연결도 함께 끊기므로, 다른 프로그램에서 사용 중인지 먼저 확인해 주세요. reviewnary는 시크릿을 대신 확인하거나 재발급하지 않아요.",
   },
   account_store_choice_required: {
     title: "계정·스토어 선택",
-    body: "발급에 사용할 NAVER 계정과 스토어를 직접 선택해 주세요. (통합 매니저 권한이 필요합니다.)",
+    body: "발급에 사용할 NAVER 계정과 스토어를 직접 선택해 주세요. (통합 매니저 권한이 필요해요.)",
   },
   application_issuance: {
     title: "애플리케이션 발급",
@@ -39,59 +39,59 @@ export const PHASE_COPY: Record<GuidedPhase, { title: string; body: string }> = 
   },
   application_issuance_guided: {
     title: "화면 안내로 발급",
-    body: "내 PC의 reviewnary 도우미가 NAVER 커머스 API 센터를 전용 창으로 열고, 눌러야 할 위치를 단계별로 표시해 드립니다. 실제 로그인·클릭·발급은 고객님이 그 창에서 직접 진행하고, reviewnary는 화면을 대신 조작하거나 시크릿을 대신 읽지 않습니다. 도우미를 실행해 두지 않으셨다면 '직접 진행하기'로 끝까지 진행할 수 있습니다.",
+    body: "내 PC의 reviewnary 도우미가 NAVER 커머스 API 센터를 전용 창으로 열고, 눌러야 할 위치를 단계별로 표시해 드려요. 실제 로그인·클릭·발급은 고객님이 그 창에서 직접 진행하고, reviewnary는 화면을 대신 조작하거나 시크릿을 대신 읽지 않아요. 도우미를 실행해 두지 않으셨다면 '직접 진행하기'로 끝까지 진행할 수 있어요.",
   },
   credential_issued: {
     title: "발급 완료 확인",
-    body: "애플리케이션 ID와 시크릿이 발급되면 다음 단계에서 reviewnary에 안전하게 입력합니다.",
+    body: "애플리케이션 ID와 시크릿이 발급되면 다음 단계에서 reviewnary에 안전하게 입력해요.",
   },
   sellerops_credential_entry: {
-    title: "연결 정보 입력",
+    title: "연동 정보 입력",
     body: "발급 화면에서 확인한 애플리케이션 ID와 시크릿을 reviewnary 보안 입력란에 직접 입력해 주세요.",
   },
   credential_registration: {
-    title: "연결 정보 저장 중",
-    body: "입력한 연결 정보를 암호화해 저장하고 있습니다.",
+    title: "연동 정보 저장 중",
+    body: "입력한 연동 정보를 암호화해 저장하고 있어요.",
   },
   connection_testing: {
     title: "연결 확인 중",
-    body: "저장된 연결 정보로 인증만 확인합니다. (아직 데이터를 수집하지 않습니다.)",
+    body: "저장된 연동 정보로 인증만 확인해요. (아직 데이터를 수집하지 않아요.)",
   },
   permission_review_required: {
     title: "권한 확인 필요",
-    body: "연결에 필요한 API 권한이 부족할 수 있습니다. NAVER 커머스 API 센터에서 애플리케이션의 API 그룹·권한을 확인한 뒤 다시 시도해 주세요.",
+    body: "연결에 필요한 API 권한이 부족할 수 있어요. NAVER 커머스 API 센터에서 애플리케이션의 API 그룹·권한을 확인한 뒤 다시 시도해 주세요.",
   },
   call_environment_mismatch: {
     title: "호출 환경 확인 필요",
-    body: "허용된 호출 환경(예: 호출 IP)과 일치하지 않을 수 있습니다. NAVER 커머스 API 센터에서 애플리케이션의 호출 IP 설정을 확인한 뒤 다시 시도해 주세요.",
+    body: "허용된 호출 환경(예: 호출 IP)과 일치하지 않을 수 있어요. NAVER 커머스 API 센터에서 애플리케이션의 호출 IP 설정을 확인한 뒤 다시 시도해 주세요.",
   },
   order_access_denied: {
     title: "주문 API 접근 확인 필요",
-    body: "연결 정보는 정상이지만 주문 API 접근이 거부되었습니다. 애플리케이션에 주문 관련 API 그룹 권한이 있는지, 그리고 reviewnary 고정 호출 IP가 'API 호출 IP'에 등록되어 있는지 두 가지를 모두 확인한 뒤 다시 시도해 주세요.",
+    body: "연동 정보는 정상이지만 주문 API 접근이 거부됐어요. 애플리케이션에 주문 관련 API 그룹 권한이 있는지, 그리고 reviewnary 고정 호출 IP가 'API 호출 IP'에 등록되어 있는지 두 가지를 모두 확인한 뒤 다시 시도해 주세요.",
   },
   first_order_sync: {
     title: "첫 주문 수집",
-    body: "주문 요약 데이터를 처음으로 가져오고 있습니다.",
+    body: "주문 요약 데이터를 처음으로 가져오고 있어요.",
   },
   completed: {
     title: "주문 연결 완료",
-    body: "연결 정보 저장·연결 확인·첫 주문 수집이 모두 완료되었습니다.",
+    body: "연동 정보 저장·연결 확인·첫 주문 수집이 모두 완료됐어요.",
   },
   review_export_readiness: {
     title: "리뷰 수집 준비",
-    body: "리뷰는 판매자센터 공식 내보내기를 작업 창에서 직접 진행합니다. 준비되면 리뷰 내보내기로 이동하세요.",
+    body: "리뷰는 판매자센터 공식 내보내기를 작업 창에서 직접 진행해요. 준비되면 리뷰 내보내기로 이동하세요.",
   },
   recoverable_ui_drift: {
     title: "화면 확인 필요",
-    body: "NAVER 화면이 예상과 달라 진행을 멈췄습니다. 화면을 확인하고 계속할지 알려주세요.",
+    body: "NAVER 화면이 예상과 달라 진행을 멈췄어요. 화면을 확인하고 계속할지 알려주세요.",
   },
   unsupported_state: {
     title: "확인 필요",
-    body: "현재 상태를 안전하게 판단하지 못했습니다. 화면을 직접 확인한 뒤 다음 단계를 선택해 주세요.",
+    body: "현재 상태를 안전하게 판단하지 못했어요. 화면을 직접 확인한 뒤 다음 단계를 선택해 주세요.",
   },
   terminal_failure: {
     title: "연결 중단",
-    body: "연결을 완료하지 못했습니다. 잠시 후 다시 시도하거나 도움을 요청해 주세요.",
+    body: "연동을 완료하지 못했어요. 잠시 후 다시 시도하거나 도움을 요청해 주세요.",
   },
 };
 
@@ -111,7 +111,7 @@ export const ACTOR_COPY: Record<GuidedActor, string> = {
  */
 export const DISCONNECT_GUARDRAIL_COPY = {
   title: "연결 해제 안내",
-  body: "reviewnary 연결을 해제하면 reviewnary에 저장된 연결 정보만 삭제됩니다. NAVER 애플리케이션은 비활성화하거나 삭제하지 않습니다. NAVER 앱은 스토어당 1개뿐이고 삭제할 수 없으며 다른 프로그램도 함께 쓸 수 있으므로, reviewnary 연결 해제를 위해 NAVER 앱을 비활성화·삭제하지 마세요.",
+  body: "reviewnary 연결을 해제하면 reviewnary에 저장된 연동 정보만 삭제돼요. NAVER 애플리케이션은 비활성화하거나 삭제하지 않아요. NAVER 앱은 스토어당 1개뿐이고 삭제할 수 없으며 다른 프로그램도 함께 쓸 수 있으므로, reviewnary 연결 해제를 위해 NAVER 앱을 비활성화·삭제하지 마세요.",
 } as const;
 
 /**
@@ -142,32 +142,32 @@ export const DISCONNECT_GUARDRAIL_COPY = {
  * leaving it to the schedule as an equal option rather than a way out.
  */
 export const FIRST_SYNC_CHECKPOINT_COPY = {
-  heading: "연결 정보가 확인되었습니다",
-  body: "이제 최근 주문을 한 번 가져올 수 있습니다. 아래를 누르면 그때 네이버에서 주문 요약을 읽어옵니다.",
+  heading: "연동 정보가 확인됐어요",
+  body: "이제 최근 주문을 한 번 가져올 수 있어요. 아래를 누르면 그때 네이버에서 주문 요약을 읽어와요.",
   cta: "지금 첫 주문 수집",
-  note: "지금 하지 않아도 됩니다. 자동 수집 일정을 켜 두면 예정된 시각에 같은 수집이 실행됩니다.",
+  note: "지금 하지 않아도 돼요. 자동 수집 일정을 켜 두면 예정된 시각에 같은 수집이 실행돼요.",
 } as const;
 
 export const CALL_IP_COPY = {
   registerTitle: "아래 고정 IP를 애플리케이션의 'API 호출 IP'에 등록하세요.",
-  advertisedUnsetTitle: "reviewnary 고정 호출 IP가 아직 설정되지 않았습니다.",
+  advertisedUnsetTitle: "reviewnary 고정 호출 IP가 아직 설정되지 않았어요.",
   advertisedUnsetBody:
-    "준비되면 이 자리에 표시되며, 그때 애플리케이션의 'API 호출 IP'에 등록하면 됩니다. 이미 직접 등록하셨다면 아래에서 확인 표시 후 계속 진행할 수 있어요. 급하면 담당자에게 문의하세요.",
+    "준비되면 이 자리에 표시되며, 그때 애플리케이션의 'API 호출 IP'에 등록하면 돼요. 이미 직접 등록하셨다면 아래에서 확인 표시 후 계속 진행할 수 있어요. 급하면 담당자에게 문의하세요.",
   alreadyRegisteredCta: "이미 API 호출 IP를 등록했어요",
-  acknowledgedNote: "호출 IP 등록을 확인함으로 표시했어요. 실제 등록 여부는 연결 테스트로 최종 확인됩니다.",
-  readyConfirmed: "호출 IP·주문 API 접근 정상 — 첫 주문 수집까지 완료되었습니다.",
+  acknowledgedNote: "호출 IP 등록을 확인함으로 표시했어요. 실제 등록 여부는 연결 테스트로 최종 확인돼요.",
+  readyConfirmed: "호출 IP·주문 API 접근 정상 — 첫 주문 수집까지 완료됐어요.",
   // Seller-PC install (scope lock v1.14 ①): the API call leaves from THIS PC, so the address to register is the
   // seller's own public IP — there is no reviewnary address to show. The lookup is the seller's own search.
   thisPcTitle: "이 PC의 인터넷 주소(공인 IP)를 'API 호출 IP'에 등록하세요.",
   thisPcBody:
-    "reviewnary는 이 PC에서 직접 API를 호출합니다. 네이버 검색창에 '내 IP'를 검색하면 나오는 주소를 그대로 등록하면 됩니다. 인터넷 회선이나 공유기를 바꾸면 주소가 달라질 수 있고, 그때는 새 주소로 다시 등록해야 연결이 이어집니다.",
+    "reviewnary는 이 PC에서 직접 API를 호출해요. 네이버 검색창에 '내 IP'를 검색하면 나오는 주소를 그대로 등록하면 돼요. 인터넷 회선이나 공유기를 바꾸면 주소가 달라질 수 있고, 그때는 새 주소로 다시 등록해야 연결이 이어져요.",
   // The address the vendor server saw this PC call from (contract §7). Shown only when it actually answered.
-  thisPcDetectedTitle: "이 PC의 공인 IP입니다. 애플리케이션의 'API 호출 IP'에 그대로 등록하세요.",
+  thisPcDetectedTitle: "이 PC의 공인 IP예요. 애플리케이션의 'API 호출 IP'에 그대로 등록하세요.",
   thisPcChangeNote: "인터넷 회선이나 공유기를 바꾸면 주소가 달라질 수 있어요. 그때는 이 화면에서 새 주소를 확인해 다시 등록하세요.",
   // Linking this PC to the reviewnary server is what lets the address be read instead of searched for.
   linkOffer: "이 PC를 reviewnary 서버에 연결하면 주소를 자동으로 확인해 드려요.",
   linkCta: "이 PC 연결",
-  linkPending: "브라우저 새 탭에서 로그인한 뒤 '연결 허용'을 눌러 주세요. 연결되면 이 화면이 자동으로 이어집니다.",
+  linkPending: "브라우저 새 탭에서 로그인한 뒤 '연결 허용'을 눌러 주세요. 연결되면 이 화면이 자동으로 이어져요.",
   linkCodeLabel: "확인 코드",
   linkReopen: "승인 화면 다시 열기",
   linkExpired: "확인 코드가 만료됐어요. 다시 연결해 주세요.",
@@ -188,9 +188,9 @@ export const CALL_IP_COPY = {
 export const REVIEW_SETUP_COPY = {
   title: "리뷰 가져오기 설정 (선택)",
   setupRequiredBody:
-    "주문 연결은 끝났습니다. 리뷰 가져오기는 별도 단계로, 내 PC의 reviewnary 도우미를 실행·연결하고 판매자센터에 직접 로그인한 뒤 작업 창에서 공식 내보내기로 진행합니다. 지금 하지 않아도 주문 연결에는 영향이 없습니다.",
+    "주문 연결은 끝났어요. 리뷰 가져오기는 별도 단계로, 내 PC의 reviewnary 도우미를 실행·연결하고 판매자센터에 직접 로그인한 뒤 작업 창에서 공식 내보내기로 진행해요. 지금 하지 않아도 주문 연결에는 영향이 없어요.",
   readyBody:
-    "reviewnary 도우미가 연결되어 있어 리뷰 가져오기를 진행할 수 있습니다. 리뷰는 판매자센터 공식 내보내기를 작업 창에서 직접 진행합니다 (자동 수집이 아닙니다).",
+    "reviewnary 도우미가 연결되어 있어 리뷰 가져오기를 진행할 수 있어요. 리뷰는 판매자센터 공식 내보내기를 작업 창에서 직접 진행해요 (자동 수집이 아니에요).",
   cta: "리뷰 가져오기 설정으로 이동",
 } as const;
 
@@ -213,17 +213,17 @@ export const CAPABILITY_STATE_COPY: Record<string, { chip: string; tone: "good" 
 
 /** Safe reason codes → optional one-line explanation shown under a capability line. */
 export const CAPABILITY_REASON_COPY: Record<string, string> = {
-  CREDENTIAL_MISSING: "저장된 연결 정보가 없습니다.",
-  FIRST_SYNC_REQUIRED: "첫 주문 수집이 아직 완료되지 않았습니다.",
-  SYNC_FAILED: "첫 주문 수집에 실패했습니다. 다시 시도해 주세요.",
-  SYNC_IN_PROGRESS: "첫 주문 수집이 진행 중입니다.",
-  SCOPE_INSUFFICIENT: "읽기 권한(스코프)이 부족합니다. 카페24 앱의 읽기 권한 설정을 확인해 주세요.",
-  RECONNECT_REQUIRED: "연결 정보를 확인하지 못했습니다. 카페24 동의를 다시 진행해 주세요.",
-  PROVIDER_ERROR: "카페24 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요.",
-  GUIDED_EXPORT_ONLY: "네이버 리뷰는 공식 API가 없어, 작업 창에서 직접 내보내기로 가져옵니다.",
-  REVIEW_SETUP_REQUIRED: "리뷰 가져오기는 reviewnary 도우미를 연결한 뒤 작업 창에서 진행합니다.",
-  REPLY_UNVERIFIED: "리뷰 답변 자동 전송은 제공하지 않습니다.",
-  INTEGRATION_PENDING: "네이버 문의 연동은 준비 중입니다.",
+  CREDENTIAL_MISSING: "저장된 연동 정보가 없어요.",
+  FIRST_SYNC_REQUIRED: "첫 주문 수집이 아직 완료되지 않았어요.",
+  SYNC_FAILED: "첫 주문 수집에 실패했어요. 다시 시도해 주세요.",
+  SYNC_IN_PROGRESS: "첫 주문 수집이 진행 중이에요.",
+  SCOPE_INSUFFICIENT: "읽기 권한(스코프)이 부족해요. 카페24 앱의 읽기 권한 설정을 확인해 주세요.",
+  RECONNECT_REQUIRED: "연동 정보를 확인하지 못했어요. 카페24 동의를 다시 진행해 주세요.",
+  PROVIDER_ERROR: "카페24 응답이 지연되고 있어요. 잠시 후 다시 시도해 주세요.",
+  GUIDED_EXPORT_ONLY: "네이버 리뷰는 공식 API가 없어, 작업 창에서 직접 내보내기로 가져와요.",
+  REVIEW_SETUP_REQUIRED: "리뷰 가져오기는 reviewnary 도우미를 연결한 뒤 작업 창에서 진행해요.",
+  REPLY_UNVERIFIED: "리뷰 답변 자동 전송은 제공하지 않아요.",
+  INTEGRATION_PENDING: "네이버 문의 연동은 준비 중이에요.",
 };
 
 /** First ORDER_SUMMARY sync status → seller-facing line for the capability summary. */
@@ -242,30 +242,30 @@ export const SYNC_STATUS_COPY: Record<string, string> = {
  * `stalled*` copy is for a poll timeout, where we offer a re-check (poll only) — never a new collection.
  */
 export const SYNC_PROGRESS_COPY = {
-  body: "주문 요약 데이터를 처음으로 가져오고 있습니다. 주문 수에 따라 몇 분 정도 걸릴 수 있어요.",
-  reassurance: "이 화면을 그대로 두셔도 되고, 새로고침해도 같은 수집이 이어집니다. 수집이 다시 시작되지 않아요.",
+  body: "주문 요약 데이터를 처음으로 가져오고 있어요. 주문 수에 따라 몇 분 정도 걸릴 수 있어요.",
+  reassurance: "이 화면을 그대로 두셔도 되고, 새로고침해도 같은 수집이 이어져요. 수집이 다시 시작되지 않아요.",
   elapsedLabel: "경과 시간",
   slowNote: "예상보다 오래 걸리고 있어요. 수집은 계속 진행 중이니 잠시만 더 기다려 주세요.",
   stalledTitle: "아직 진행 중일 수 있어요",
-  stalledBody: "수집이 아직 끝나지 않았습니다. 새 수집을 만들지 않고 현재 진행 상태만 다시 확인합니다.",
+  stalledBody: "수집이 아직 끝나지 않았어요. 새 수집을 만들지 않고 현재 진행 상태만 다시 확인해요.",
   recheckCta: "진행 상태 다시 확인",
 } as const;
 
 export const FAILURE_COPY: Record<GuidedFailureReason, string> = {
-  INVALID_CREDENTIAL: "연결 정보가 올바르지 않습니다. 애플리케이션 ID와 시크릿을 다시 확인해 주세요.",
-  PERMISSION_INSUFFICIENT: "연결에 필요한 권한이 부족할 수 있습니다. 애플리케이션의 API 그룹·권한을 확인해 주세요.",
-  CALL_ENVIRONMENT_MISMATCH: "허용된 호출 환경과 일치하지 않을 수 있습니다. 애플리케이션의 호출 IP 설정을 확인해 주세요.",
-  ORDER_ACCESS_DENIED: "주문 API 접근이 거부되었습니다. 주문 API 그룹 권한과 reviewnary 고정 호출 IP 등록을 함께 확인해 주세요.",
-  SECRET_UNRECOVERABLE: "시크릿을 확보하지 못했습니다. 기존 애플리케이션의 시크릿을 다시 확인하거나, 확인이 어려우면 시크릿을 재발급해 주세요. (앱 삭제는 필요하지 않으며 NAVER도 제공하지 않습니다. 단, 재발급은 같은 앱을 쓰는 모든 프로그램의 연결을 함께 끊습니다.)",
-  TEMPORARY_PROVIDER_ERROR: "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
-  PROVIDER_UNAVAILABLE: "NAVER 서비스에 일시적으로 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+  INVALID_CREDENTIAL: "연동 정보가 올바르지 않아요. 애플리케이션 ID와 시크릿을 다시 확인해 주세요.",
+  PERMISSION_INSUFFICIENT: "연결에 필요한 권한이 부족할 수 있어요. 애플리케이션의 API 그룹·권한을 확인해 주세요.",
+  CALL_ENVIRONMENT_MISMATCH: "허용된 호출 환경과 일치하지 않을 수 있어요. 애플리케이션의 호출 IP 설정을 확인해 주세요.",
+  ORDER_ACCESS_DENIED: "주문 API 접근이 거부됐어요. 주문 API 그룹 권한과 reviewnary 고정 호출 IP 등록을 함께 확인해 주세요.",
+  SECRET_UNRECOVERABLE: "시크릿을 확보하지 못했어요. 기존 애플리케이션의 시크릿을 다시 확인하거나, 확인이 어려우면 시크릿을 재발급해 주세요. (앱 삭제는 필요하지 않으며 NAVER도 제공하지 않아요. 단, 재발급은 같은 앱을 쓰는 모든 프로그램의 연결을 함께 끊어요.)",
+  TEMPORARY_PROVIDER_ERROR: "일시적인 오류가 발생했어요. 잠시 후 다시 시도해 주세요.",
+  PROVIDER_UNAVAILABLE: "NAVER 서비스에 일시적으로 연결할 수 없어요. 잠시 후 다시 시도해 주세요.",
   // Deliberately does NOT say "다시 시도해 주세요": the retry cannot work until someone changes a
   // server setting, and inviting one is how a seller spends an afternoon on a problem that is not theirs.
   CREDENTIAL_UNREADABLE:
-    "reviewnary가 저장된 연결 정보를 열지 못했습니다. reviewnary 서버 설정 문제이며, 다시 연결해도 해결되지 않습니다. 담당자에게 문의해 주세요.",
-  TEST_UNSUPPORTED: "이 연결 방식은 아직 지원되지 않습니다.",
-  NOT_CONFIGURED: "저장된 연결 정보가 없습니다. 연결 정보를 입력해 주세요.",
-  SYNC_FAILED: "첫 주문 수집에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-  UI_DRIFT: "NAVER 화면이 예상과 달라졌습니다. 화면을 확인해 주세요.",
-  UNKNOWN_STATE: "상태를 확인하지 못했습니다. 화면을 직접 확인해 주세요.",
+    "reviewnary가 저장된 연동 정보를 열지 못했어요. reviewnary 서버 설정 문제이며, 다시 연결해도 해결되지 않아요. 담당자에게 문의해 주세요.",
+  TEST_UNSUPPORTED: "이 연결 방식은 아직 지원되지 않아요.",
+  NOT_CONFIGURED: "저장된 연동 정보가 없어요. 연동 정보를 입력해 주세요.",
+  SYNC_FAILED: "첫 주문 수집에 실패했어요. 잠시 후 다시 시도해 주세요.",
+  UI_DRIFT: "NAVER 화면이 예상과 달라졌어요. 화면을 확인해 주세요.",
+  UNKNOWN_STATE: "상태를 확인하지 못했어요. 화면을 직접 확인해 주세요.",
 };

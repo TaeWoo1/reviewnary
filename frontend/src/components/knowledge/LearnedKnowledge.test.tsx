@@ -22,7 +22,7 @@ function response(over: Partial<LearnedKnowledgeResponse["learned"]> = {}): Lear
           examples: [
             {
               title: "[답변] 부착",
-              excerpt: "벽지에도 부착 가능합니다.",
+              excerpt: "벽지에도 부착 가능해요.",
               provenance: "문의 답변 · 채널에 등록된 답변",
               productName: "선바로 일체형 전선몰딩",
               capturedOn: "2026-08-28",
@@ -37,14 +37,14 @@ function response(over: Partial<LearnedKnowledgeResponse["learned"]> = {}): Lear
           source: "PAST_INQUIRY_ANSWER",
           sourceLabelKo: "과거 문의 답변",
           availability: "LEARNED",
-          sentenceKo: "네이버에 등록하신 문의 답변을 가져와 비슷한 문의에 참고합니다.",
+          sentenceKo: "네이버에 등록하신 문의 답변을 가져와 비슷한 문의에 참고해요.",
         },
         {
           channelNameKo: "네이버 스마트스토어",
           source: "PAST_REVIEW_REPLY",
           sourceLabelKo: "과거 리뷰 답글",
           availability: "SCREEN_UNPROVEN",
-          sentenceKo: "네이버는 리뷰 답글 내용을 API나 내려받기 파일로 주지 않아 아직 가져오지 못합니다.",
+          sentenceKo: "네이버는 리뷰 답글 내용을 API나 내려받기 파일로 주지 않아 아직 가져오지 못해요.",
         },
       ],
       historyReads: [],
@@ -73,7 +73,7 @@ describe("LearnedKnowledge", () => {
     expect(screen.getByText(/리뷰 답글 내용을 API나 내려받기 파일로 주지 않아/)).toBeTruthy();
     expect(screen.getAllByText("못 가져옴").length).toBeGreaterThan(0);
     // 고객이 쓴 글의 토막은 더 이상 싣지 않는다 — 그 문장은 그것을 인용한 답변 옆에서 읽는다.
-    expect(screen.queryByText("「벽지에도 부착 가능합니다.」")).toBeNull();
+    expect(screen.queryByText("「벽지에도 부착 가능해요.」")).toBeNull();
     await expectNoAxeViolations(container);
   });
 

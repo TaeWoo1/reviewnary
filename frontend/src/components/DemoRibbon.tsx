@@ -18,7 +18,7 @@ export function DemoRibbon() {
       aria-label="데모 모드 안내"
       className="shrink-0 bg-ink px-4 py-2 text-center text-sm font-medium text-white md:px-8"
     >
-      데모 데이터로 둘러보는 중입니다. 화면의 수치와 항목은 실제 판매 데이터가 아닙니다.
+      데모 데이터로 둘러보는 중이에요. 화면의 수치와 항목은 실제 판매 데이터가 아니에요.
     </aside>
   );
 }

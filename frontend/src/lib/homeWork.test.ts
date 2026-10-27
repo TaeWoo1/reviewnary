@@ -155,8 +155,8 @@ describe("mergeHomeWork — the review half, whole", () => {
     } as unknown as CustomerOperationsHome);
 
     expect(mergeHomeWork(co({ title: null, summary: "케이블 한 줄 2.5 3c 폭 10mm" }), null, null, NOW).rows[0].line).toBeNull();
-    expect(mergeHomeWork(co({ title: "9oz 뚜껑도 파나요?", summary: "등록된 지식으로 답변할 수 있습니다." }), null, null, NOW).rows[0].line)
-      .toBe("등록된 지식으로 답변할 수 있습니다.");
+    expect(mergeHomeWork(co({ title: "9oz 뚜껑도 파나요?", summary: "등록된 지식으로 답변할 수 있어요." }), null, null, NOW).rows[0].line)
+      .toBe("등록된 지식으로 답변할 수 있어요.");
   });
 
   it("a case about the same review wins — one review is one row", () => {

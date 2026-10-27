@@ -34,7 +34,7 @@ export function CompletedResult({ run }: { run: ActionWindowRunView }) {
         <Link to="/reviews?tier=NEEDS_ATTENTION" className="font-medium text-ink underline underline-offset-2">
           리뷰 화면
         </Link>
-        에서 봅니다.
+        에서 봐요.
       </p>
       <dl className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
         <div className="rounded-xl bg-surface p-3">

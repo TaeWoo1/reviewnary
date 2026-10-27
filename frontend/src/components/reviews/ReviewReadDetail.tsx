@@ -181,18 +181,18 @@ export function ReviewReadDetail({
       ) : null}
       {detail.textless ? (
         <p className="break-keep leading-relaxed text-muted">
-          별점만 남기고 내용을 쓰지 않은 {word}입니다. 별점은 그대로 집계됩니다.
+          내용 없이 별점만 남겼어요. 별점은 그대로 집계돼요.
         </p>
       ) : !ownsIdentity ? null : (
         <p className="whitespace-pre-wrap break-keep leading-relaxed text-ink">
           {/* NAVER sends review bodies as HTML, so a customer's quotation mark reached this pane as
               `&ldquo;`. Presentation only — the stored row is untouched (Demo UX Polish v1). */}
-          {plainText(detail.body) || "표시할 수 있는 본문이 없습니다"}
+          {plainText(detail.body) || "표시할 수 있는 본문이 없어요"}
         </p>
       )}
       {detail.bodyRedacted ? (
         <p className="text-sm text-muted">
-          연락처·링크처럼 개인정보로 보이는 부분은 가려서 표시했습니다.
+          연락처·링크처럼 개인정보로 보이는 부분은 가려서 표시했어요.
         </p>
       ) : null}
       <ReviewPhotos reviewId={detail.id} mediaCount={detail.mediaCount} mediaCountObserved={detail.mediaCountObserved} />
@@ -271,7 +271,7 @@ export function ReviewReadDetail({
             about why. The boundary 「올리는 일은 판매자센터에서」 is stated where the approval is, which is
             through that door, not in front of it. */}
         {capability !== null && !capability.replyFlowExists ? (
-          <p className="text-sm text-muted">이 채널에서는 reviewnary가 답변을 작성하지 않습니다</p>
+          <p className="text-sm text-muted">이 채널에서는 reviewnary가 답변을 작성하지 않아요</p>
         ) : null}
         <Facts className="text-sm text-muted">
           {/* <b>Named only when there is something to name it AGAINST.</b> This line exists to show the two
@@ -339,8 +339,8 @@ export function ReviewReadDetail({
           쿠팡에서 보기
         </Btn>
         <p className="text-sm leading-relaxed text-muted">
-          쿠팡 윙의 상품평 목록 화면을 띄워 두시면, 이 상품평이 있는 줄에 테두리를 그려 드립니다. 쿠팡
-          화면에서는 아무것도 눌리거나 입력되지 않습니다.
+          쿠팡 윙의 상품평 목록 화면을 띄워 두시면, 이 상품평이 있는 줄에 테두리를 그려 드려요. 쿠팡
+          화면에서는 아무것도 눌리거나 입력되지 않아요.
         </p>
         {unavailable ? (
           <p className="text-sm leading-relaxed text-ink">{locateUnavailableText(unavailable)}</p>
@@ -377,7 +377,7 @@ export function ReviewReadDetail({
         // it reads a 56-character apology for a control that is not there. The label is the question.
         <Disclosure className="border-t border-line pt-6" label={`${word} 원문 보기`}>
           <p className="pt-1 text-sm leading-relaxed text-muted">
-            이 채널의 {josa(word, "은", "는")} reviewnary에서 원문 화면으로 바로 이동할 수 없습니다. 판매자센터에서 직접 확인해 주세요.
+            이 채널의 {josa(word, "은", "는")} reviewnary에서 원문 화면으로 바로 이동할 수 없어요. 판매자센터에서 직접 확인해 주세요.
           </p>
         </Disclosure>
       )}

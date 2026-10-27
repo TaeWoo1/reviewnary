@@ -20,7 +20,7 @@ let conversation: { workingSet: { selectedInquiry: { inquiryId: string } | null 
 };
 vi.mock("../../../lib/conversation/ConversationProvider", () => ({ useConversation: () => conversation }));
 vi.mock("../../../lib/apiClient", () => ({
-  api: { getInquiryDetailStrict: vi.fn(async () => ({ details: "고객이 쓴 문장입니다", draft: null })) },
+  api: { getInquiryDetailStrict: vi.fn(async () => ({ details: "고객이 쓴 문장이에요", draft: null })) },
 }));
 import { api } from "../../../lib/apiClient";
 
@@ -46,7 +46,7 @@ describe("row click = select + inline detail; workspace is secondary", () => {
     render(<MemoryRouter><InquiryListArtifact artifact={ARTIFACT} onPrompt={() => undefined} /></MemoryRouter>);
     await userEvent.click(screen.getByRole("button", { name: /배송 후 분실/ }));
     expect(selectEntity).toHaveBeenCalledWith({ inquiryId: "i-1", workItemId: "w-1" });
-    await waitFor(() => expect(screen.getByTestId("inquiry-row-detail")).toHaveTextContent("고객이 쓴 문장입니다"));
+    await waitFor(() => expect(screen.getByTestId("inquiry-row-detail")).toHaveTextContent("고객이 쓴 문장이에요"));
     expect(screen.getByRole("button", { name: "답변 준비" })).toBeInTheDocument();
     // The workspace stays one press away — as the secondary icon action, not the row's default.
     expect(screen.getAllByRole("link", { name: "문의 화면에서 열기" })[0]).toHaveAttribute("href", "/inquiries/i-1");

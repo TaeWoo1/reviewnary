@@ -117,7 +117,7 @@ export function KnowledgeQuickAdd({
     } catch (e) {
       // A refusal the seller can act on — 「【확인: …】 부분을 실제 내용으로 바꾼 뒤 등록해 주세요」 — is shown as written.
       const message = isAxiosError(e) && e.response?.status === 400 ? serverMessage(e.response.data) : null;
-      setError(message ?? "저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      setError(message ?? "저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
       setBusy(false);
     }
@@ -186,7 +186,7 @@ export function KnowledgeQuickAdd({
         disabled={busy}
       />
       <p className="mt-1.5 break-keep text-sm text-muted">
-        리뷰에 이 표현이 있으면 이 안내가 답글 초안의 근거로 붙습니다. 「안 떨어져요」처럼 부정하는 말에는 붙지 않습니다.
+        리뷰에 이 표현이 있으면 이 안내가 답글 초안의 근거로 붙어요. 「안 떨어져요」처럼 부정하는 말에는 붙지 않아요.
       </p>
 
       {/*
@@ -213,7 +213,7 @@ export function KnowledgeQuickAdd({
             ))}
           </select>
           <p className="mt-1.5 break-keep text-sm text-muted">
-            규격에 따라 답이 달라지면 규격을 골라 주세요. 고른 규격의 문의에만 사용합니다.
+            규격에 따라 답이 달라지면 규격을 골라 주세요. 고른 규격의 문의에만 사용해요.
           </p>
         </>
       ) : null}

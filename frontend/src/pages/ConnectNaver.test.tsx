@@ -171,7 +171,7 @@ async function guidedExisting() {
 async function enterCredentials(secret = SECRET) {
   await userEvent.type(await screen.findByLabelText(/Client ID/), "app-id-1");
   await userEvent.type(screen.getByLabelText(/Client Secret/), secret);
-  await userEvent.click(screen.getByRole("button", { name: "연결 정보 저장" }));
+  await userEvent.click(screen.getByRole("button", { name: "연동 정보 저장" }));
 }
 /** The seller releases the first ORDER_SUMMARY collection at the checkpoint. Nothing reads an order
  *  before this click — a verified credential and a collected order are separate facts. */
@@ -246,8 +246,8 @@ describe("ConnectNaver — Local-Agent-free order connection", () => {
     renderPage();
     await newAppPath();
     await enterCredentials("wrong");
-    expect(await screen.findByRole("alert")).toHaveTextContent(/연결 정보가 올바르지 않/);
-    expect(screen.getByRole("heading", { name: "연결 정보 입력" })).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/연동 정보가 올바르지 않/);
+    expect(screen.getByRole("heading", { name: "연동 정보 입력" })).toBeInTheDocument();
     expect(api.manualSync).not.toHaveBeenCalled();
   });
 
@@ -301,7 +301,7 @@ describe("ConnectNaver — page load / refresh is READ-ONLY (no test/sync re-run
     vi.mocked(api.testConnection).mockResolvedValue({ sellerAccountId: "acc-1", status: "FAILED", checkedAt: "", message: "", reasonCode: "INVALID_CREDENTIAL" });
     renderPage();
     await userEvent.click(await screen.findByRole("button", { name: "연결 확인" }));
-    expect(await screen.findByRole("heading", { name: "기존 연결 정보 입력" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "기존 연동 정보 입력" })).toBeInTheDocument();
     expect(api.manualSync).not.toHaveBeenCalled();
   });
 
@@ -325,7 +325,7 @@ describe("ConnectNaver — text fallback (Local Agent unavailable) is fail-safe,
     expect(screen.queryByRole("heading", { name: "애플리케이션 발급" })).toBeNull();
     // An existing-app seller reaches their reuse entry (with secret recovery) — never a forced second app.
     await userEvent.click(screen.getByRole("button", { name: "이미 애플리케이션이 있어요" }));
-    expect(await screen.findByRole("heading", { name: "기존 연결 정보 입력" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "기존 연동 정보 입력" })).toBeInTheDocument();
   });
 
   it("choosing to issue a new app from the fallback fork opens the static checklist + the official center in a NEW TAB", async () => {
@@ -351,7 +351,7 @@ describe("ConnectNaver — reuse an existing connection / application (§discove
     mockTestAndSyncSuccess();
     renderPage();
     await guidedExisting();
-    expect(await screen.findByRole("heading", { name: "기존 연결 정보 입력" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "기존 연동 정보 입력" })).toBeInTheDocument();
     // The post-guided input copy, not a guided/text choice.
     expect(screen.getByText("방금 복사한 애플리케이션 ID와 시크릿을 입력해 주세요.")).toBeInTheDocument();
     await enterCredentialsAndCollect();
@@ -375,7 +375,7 @@ describe("ConnectNaver — credential recovery when the Secret is lost (§flow 4
     expect(await screen.findByRole("heading", { name: "시크릿 재확인 필요" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /삭제/ })).toBeNull();
     await userEvent.click(await screen.findByRole("button", { name: "시크릿을 다시 확인했거나 재발급했어요" }));
-    expect(await screen.findByRole("heading", { name: "기존 연결 정보 입력" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "기존 연동 정보 입력" })).toBeInTheDocument();
   });
 });
 
@@ -512,8 +512,8 @@ describe("ConnectNaver — the first collection is released by the seller, never
     await newAppPath();
     await enterCredentials();
     const checkpoint = await screen.findByTestId("first-sync-checkpoint");
-    expect(checkpoint).toHaveTextContent("연결 정보가 확인되었습니다");
-    expect(checkpoint).toHaveTextContent(/지금 하지 않아도 됩니다/);
+    expect(checkpoint).toHaveTextContent("연동 정보가 확인됐어요");
+    expect(checkpoint).toHaveTextContent(/지금 하지 않아도 돼요/);
   });
 });
 
@@ -552,13 +552,13 @@ describe("ConnectNaver — refresh recovery (secret-free step restore)", () => {
     const first = renderPage();
     // existing_credential_entry (reached after the guided walk) is a restorable, secret-free step.
     await guidedExisting();
-    expect(await screen.findByRole("heading", { name: "기존 연결 정보 입력" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "기존 연동 정보 입력" })).toBeInTheDocument();
 
     first.unmount();
     renderPage();
 
     // Restored verbatim (phase+path) — no guided re-entry, and the transient guided phase is never resurfaced.
-    expect(await screen.findByRole("heading", { name: "기존 연결 정보 입력" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "기존 연동 정보 입력" })).toBeInTheDocument();
     expect(screen.queryByTestId("guided-walkthrough-stub")).toBeNull();
     const raw = sessionStorage.getItem("naver_guided_connection_v1")!;
     expect(Object.keys(JSON.parse(raw)).sort()).toEqual(["path", "phase"]);

@@ -62,7 +62,7 @@ describe("v2 app routes", () => {
     ["/inbox", "리뷰·문의"],
     ["/memory", "반복 문제"],
     ["/reports", "운영 리포트"],
-    ["/connect", "채널 연결"],
+    ["/connect", "채널 연동"],
     ["/settings", "설정"],
   ] as const) {
     it(`renders ${heading} at ${path}`, async () => {
@@ -97,10 +97,10 @@ describe("리뷰·문의 — which side the switch marks", () => {
 describe("legacy routes — live behaviour", () => {
   for (const [from, heading] of [
     ["/issues", "반복 문제"],
-    ["/settings/channels", "채널 연결"],
+    ["/settings/channels", "채널 연동"],
     // The separate channel list folded into the hub in Slice 6.
-    ["/connect/channels", "채널 연결"],
-    ["/channels", "채널 연결"],
+    ["/connect/channels", "채널 연동"],
+    ["/channels", "채널 연동"],
     // The review record moved under 리뷰 (product assembly); the old path redirects.
     ["/connect/channels/acc-1/reviews", "리뷰·문의"],
   ] as const) {
@@ -122,6 +122,6 @@ describe("the operations agent", () => {
 describe("unknown paths", () => {
   it("render a real 404 rather than a silent redirect", async () => {
     renderAt("/does-not-exist");
-    expect(await screen.findByText("페이지를 찾을 수 없습니다")).toBeInTheDocument();
+    expect(await screen.findByText("페이지를 찾을 수 없어요")).toBeInTheDocument();
   });
 });

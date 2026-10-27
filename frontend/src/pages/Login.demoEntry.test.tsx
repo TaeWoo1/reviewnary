@@ -39,7 +39,7 @@ describe("§15-C — the demo prefill follows the deployment", () => {
   it("a demo deployment prefills the fixture account and says so", async () => {
     state.value = true;
     renderLogin("/login?demo=1");
-    expect(await screen.findByText("데모 계정으로 둘러보는 중입니다")).toBeInTheDocument();
+    expect(await screen.findByText("데모 계정으로 둘러보는 중이에요")).toBeInTheDocument();
     expect(screen.getByLabelText("이메일")).toHaveValue("demo@sellerops.ai");
   });
 
@@ -49,7 +49,7 @@ describe("§15-C — the demo prefill follows the deployment", () => {
     expect(await screen.findByLabelText("이메일")).toHaveValue("");
     expect(screen.getByLabelText("비밀번호")).toHaveValue("");
     // The notice claims the form is filled in, so it may not appear where it is not.
-    expect(screen.queryByText("데모 계정으로 둘러보는 중입니다")).toBeNull();
+    expect(screen.queryByText("데모 계정으로 둘러보는 중이에요")).toBeNull();
   });
 
   it("and an unanswered deployment prefills nothing", async () => {

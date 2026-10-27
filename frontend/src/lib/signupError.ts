@@ -13,7 +13,7 @@ export interface SignupFailure {
 
 const UNREACHABLE = "reviewnary 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.";
 const SERVER = "reviewnary 서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.";
-const EMAIL_TAKEN = "이미 가입된 이메일입니다. 로그인해 주세요.";
+const EMAIL_TAKEN = "이미 가입된 이메일이에요. 로그인해 주세요.";
 const INVALID = "입력한 내용을 다시 확인해 주세요.";
 
 function statusOf(error: unknown): number | null {

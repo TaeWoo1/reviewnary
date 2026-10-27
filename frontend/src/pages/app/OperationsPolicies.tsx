@@ -59,21 +59,21 @@ export function OperationsPolicies() {
     <>
       <PageHead
         title="운영 기준"
-        description="배송·취소·교환·증빙처럼 상품과 무관한 질문에 답할 때 쓰는 기준입니다."
+        description="배송·취소·교환·증빙처럼 상품과 무관한 질문에 답할 때 쓰는 기준이에요."
       />
 
       <Panel
         title="등록된 기준"
-        description="여기에 적힌 내용만 답변의 근거로 쓰입니다. 적혀 있지 않은 조건이나 기간은 만들어 쓰지 않습니다."
+        description="여기에 적힌 내용만 답변의 근거로 쓰여요. 적혀 있지 않은 조건이나 기간은 만들어 쓰지 않아요."
       >
         {loadError ? (
-          <p className="text-warn">운영 기준을 불러오지 못했습니다.</p>
+          <p className="text-warn">운영 기준을 불러오지 못했어요.</p>
         ) : sources === null ? (
           <p className="text-muted">불러오는 중…</p>
         ) : sources.length === 0 && editing === null ? (
           <Empty
-            title="아직 등록된 기준이 없습니다"
-            body="배송·주문 취소·교환·세금계산서·현금영수증처럼 자주 묻는 것을 적어 두면, 상품과 연결되지 않은 문의에도 근거를 갖고 답할 수 있습니다."
+            title="아직 등록된 기준이 없어요"
+            body="배송·주문 취소·교환·세금계산서·현금영수증처럼 자주 묻는 것을 적어 두면, 상품과 연결되지 않은 문의에도 근거를 갖고 답할 수 있어요."
             action={<Btn onClick={() => setEditing("new")}>기준 추가</Btn>}
           />
         ) : (
@@ -94,7 +94,7 @@ export function OperationsPolicies() {
                         {source.authorName ? `${source.authorName} · ` : ""}
                         {kstDate(source.updatedAt)}
                         {source.version > 1 ? ` · ${source.version}차 개정` : ""}
-                        {source.passageCount === 0 ? " · 답변에 인용할 수 없습니다" : ""}
+                        {source.passageCount === 0 ? " · 답변에 인용할 수 없어요" : ""}
                       </p>
                     </div>
                     <button
@@ -175,7 +175,7 @@ function PolicyEditor({
     } catch {
       // Deliberately not the server's message: a failure here is one of two things a seller can act
       // on, and a transport-shaped string is neither of them.
-      setError("저장하지 못했습니다. 제목과 내용을 확인해 주세요. 같은 제목의 기준이 이미 있을 수 있습니다.");
+      setError("저장하지 못했어요. 제목과 내용을 확인해 주세요. 같은 제목의 기준이 이미 있을 수 있어요.");
     } finally {
       setSaving(false);
     }
@@ -188,7 +188,7 @@ function PolicyEditor({
       await api.deleteOrgKnowledge(source.id);
       await onDone();
     } catch {
-      setError("삭제하지 못했습니다.");
+      setError("삭제하지 못했어요.");
     } finally {
       setSaving(false);
     }
@@ -230,7 +230,7 @@ function PolicyEditor({
           onChange={(e) => setBody(e.target.value)}
           rows={8}
           placeholder={
-            "고객에게 그대로 안내할 수 있는 문장으로 적어 주세요.\n\n빈 줄로 문단을 나누면 그 단위로 인용됩니다."
+            "고객에게 그대로 안내할 수 있는 문장으로 적어 주세요.\n\n빈 줄로 문단을 나누면 그 단위로 인용돼요."
           }
           className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-base leading-relaxed focus:border-brand focus:outline-none"
         />

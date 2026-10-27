@@ -55,12 +55,12 @@ export function SegmentImportPanel({
         NAVER에서 <span className="font-semibold">{rangeText}</span> 범위를 직접 내보낸 뒤 파일을 올려 주세요.
       </p>
       <p className="mt-1 text-sm text-muted break-keep">
-        내보내기·확인 클릭은 항상 판매자가 직접 합니다(자동 클릭 없음). 내보내기 화면에서 실제 범위가
+        내보내기·확인 클릭은 항상 판매자가 직접 해요(자동 클릭 없음). 내보내기 화면에서 실제 범위가
         이 구간과 같은지 확인하세요.
       </p>
       <p className="mt-1 text-sm text-muted break-keep">
-        NAVER에서 받은 파일은 이름에 확장자가 없을 수 있습니다. 그대로 올리시면 됩니다 — 파일 내용을 보고
-        엑셀/CSV인지 확인합니다.
+        NAVER에서 받은 파일은 이름에 확장자가 없을 수 있어요. 그대로 올리시면 돼요 — 파일 내용을 보고
+        엑셀/CSV인지 확인해요.
       </p>
 
       <label className="mt-3 flex items-start gap-2 text-sm text-ink">
@@ -72,7 +72,7 @@ export function SegmentImportPanel({
           aria-describedby={`scope-confirm-help-${segment.id}`}
         />
         <span id={`scope-confirm-help-${segment.id}`} className="break-keep">
-          내보낸 실제 범위가 이 구간({rangeText})과 정확히 일치함을 확인했습니다.
+          내보낸 실제 범위가 이 구간({rangeText})과 정확히 일치함을 확인했어요.
         </span>
       </label>
 

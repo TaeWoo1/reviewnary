@@ -245,7 +245,7 @@ export function HelperStatusCard({
       return;
     }
     if (!mounted.current) return;
-    setLinkError("이 계정으로 연결을 승인하지 못했습니다. 다시 로그인한 뒤 시도해 주세요.");
+    setLinkError("이 계정으로 연결을 승인하지 못했어요. 다시 로그인한 뒤 시도해 주세요.");
     setAttempt("failed");
   }
 
@@ -295,7 +295,7 @@ export function HelperStatusCard({
       // busy: the helper is holding a grant this browser does not have the code for — an earlier attempt
       // in another tab, or one this browser forgot. It cannot be approved and it cannot be withdrawn, so
       // it is a failure with a wait, not an in-flight link.
-      setLinkError("이전 연결 요청이 아직 남아 있습니다. 잠시 뒤 다시 시도해 주세요.");
+      setLinkError("이전 연결 요청이 아직 남아 있어요. 잠시 뒤 다시 시도해 주세요.");
       setAttempt("failed");
       return;
     }
@@ -312,7 +312,7 @@ export function HelperStatusCard({
       return;
     }
     if (!mounted.current) return;
-    setLinkError("이 계정으로 연결을 승인하지 못했습니다. 다시 로그인한 뒤 시도해 주세요.");
+    setLinkError("이 계정으로 연결을 승인하지 못했어요. 다시 로그인한 뒤 시도해 주세요.");
     setAttempt("failed");
   }
 

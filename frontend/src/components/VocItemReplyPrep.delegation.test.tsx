@@ -177,7 +177,7 @@ describe("VocItemReplyPrep · delegate lane", () => {
         draft: { ...DRAFT, version: 2, body: "휴대폰에서 고친 합성 문장" },
       });
     vi.mocked(api.saveReviewReplyDraft).mockRejectedValue({
-      response: { status: 409, data: { message: "이미 최신 초안이 있습니다. 새로고침 후 다시 시도하세요." } },
+      response: { status: 409, data: { message: "이미 최신 초안이 있어요. 새로고침 후 다시 시도하세요." } },
     });
     mount();
 
@@ -225,14 +225,14 @@ describe("VocItemReplyPrep · delegate lane", () => {
       prepView({ taskState: "AWAITING_APPROVAL", editedOnMobile: false, canSend: true, canCancel: false }, false),
     );
     vi.mocked(api.handOverReviewReply).mockRejectedValue({
-      response: { status: 409, data: { message: "휴대폰에서 문장이 바뀌어 승인하지 않았습니다. 바뀐 문장을 보고 다시 누르세요." } },
+      response: { status: 409, data: { message: "휴대폰에서 문장이 바뀌어 승인하지 않았어요. 바뀐 문장을 보고 다시 누르세요." } },
     });
     mount();
 
     await user.click(await screen.findByRole("button", { name: "답글 등록 요청" }));
     expect(await screen.findByRole("alert")).toHaveProperty(
       "textContent",
-      "휴대폰에서 문장이 바뀌어 승인하지 않았습니다. 바뀐 문장을 보고 다시 누르세요.",
+      "휴대폰에서 문장이 바뀌어 승인하지 않았어요. 바뀐 문장을 보고 다시 누르세요.",
     );
     await waitFor(() => expect(api.getReviewReplyPrep).toHaveBeenCalledTimes(2));
   });
@@ -266,7 +266,7 @@ describe("VocItemReplyPrep · delegate lane", () => {
     codes: ["UNSUPPORTED_PROMISE"],
     sources: [{ kind: "ORG_POLICY", title: "교환 · 반품 안내", changedAt: "2026-10-22T06:40:00Z", removed: false }],
     promises: ["교환"],
-    sentences: ["세탁 후 수축이면 무료 교환해 드리겠습니다."],
+    sentences: ["세탁 후 수축이면 무료 교환해 드릴게요."],
   };
 
   it("says why an approval was held and marks its sentence; fixing the words, not a press, asks again", async () => {
@@ -278,8 +278,8 @@ describe("VocItemReplyPrep · delegate lane", () => {
     expect(await screen.findByText("고칠 곳 1")).toBeTruthy();
     const why = screen.getByRole("region", { name: "왜 멈췄나요" });
     expect(why.textContent).toContain("운영 정책 「교환 · 반품 안내」");
-    expect(why.textContent).toContain("답글의 「교환」 약속이 지금 근거에는 없습니다.");
-    expect(why.querySelector("mark")?.textContent).toBe("세탁 후 수축이면 무료 교환해 드리겠습니다.");
+    expect(why.textContent).toContain("답글의 「교환」 약속이 지금 근거에는 없어요.");
+    expect(why.querySelector("mark")?.textContent).toBe("세탁 후 수축이면 무료 교환해 드릴게요.");
     expect(why.textContent).toContain("문장을 고쳐 다시 승인하세요.");
     expect(screen.queryByRole("button", { name: "답글 등록 요청" })).toBeNull();
     expect(screen.getByRole("button", { name: "요청 취소" })).toBeTruthy();
@@ -296,7 +296,7 @@ describe("VocItemReplyPrep · delegate lane", () => {
     mount();
 
     expect(await screen.findByText("멈춤 요청 중")).toBeTruthy();
-    expect(screen.getByText("담당자가 등록 전인지 확인하면 바뀝니다")).toBeTruthy();
+    expect(screen.getByText("담당자가 등록 전인지 확인하면 바뀌어요")).toBeTruthy();
     expect(screen.getByRole("region", { name: "왜 멈췄나요" })).toBeTruthy();
   });
 
@@ -322,9 +322,9 @@ describe("VocItemReplyPrep · delegate lane", () => {
 
     const why = await screen.findByRole("region", { name: "왜 멈췄나요" });
     expect(why.textContent).toContain("상품 지식 「전기 주전자 · 사용 안내」");
-    expect(why.textContent).toContain("어느 문장이 달라졌는지는 아직 짚지 못합니다.");
+    expect(why.textContent).toContain("어느 문장이 달라졌는지는 아직 짚지 못해요.");
     expect(why.querySelector("mark")).toBeNull();
-    expect(screen.queryByText(/응대 기준이 바뀌어 이 초안은 승인할 수 없습니다/)).toBeNull();
+    expect(screen.queryByText(/응대 기준이 바뀌어 이 초안은 승인할 수 없어요/)).toBeNull();
   });
 
   it("keeps an approval whose cited document was only edited, with one quiet line", async () => {
@@ -348,7 +348,7 @@ describe("VocItemReplyPrep · delegate lane", () => {
     mount();
 
     expect(await screen.findByText("담당자 대기")).toBeTruthy();
-    expect(screen.getByText(/이 답글과 부딪히는 곳이 없어 승인을 그대로 둡니다/)).toBeTruthy();
+    expect(screen.getByText(/이 답글과 부딪히는 곳이 없어 승인을 그대로 둬요/)).toBeTruthy();
     expect(screen.queryByRole("region", { name: "왜 멈췄나요" })).toBeNull();
   });
 
@@ -375,7 +375,7 @@ describe("VocItemReplyPrep · delegate lane", () => {
     );
     mount();
 
-    expect(await screen.findByText(/확인하고 승인한 답글입니다 — 근거에 없는 약속 「교환」/)).toBeTruthy();
+    expect(await screen.findByText(/확인하고 승인한 답글이에요 — 근거에 없는 약속 「교환」/)).toBeTruthy();
     expect(screen.queryByRole("region", { name: "왜 멈췄나요" })).toBeNull();
     expect(screen.queryByRole("region", { name: "확인할 점" })).toBeNull();
   });
@@ -388,7 +388,7 @@ describe("VocItemReplyPrep · delegate lane", () => {
           editedOnMobile: false,
           canSend: true,
           canCancel: true,
-          note: { codes: ["FORBIDDEN_PHRASE"], sources: [], promises: [], sentences: ["고객님 탓이 아닙니다."], phrases: ["고객님 탓"] },
+          note: { codes: ["FORBIDDEN_PHRASE"], sources: [], promises: [], sentences: ["고객님 탓이 아니에요."], phrases: ["고객님 탓"] },
         },
         false,
       ),
@@ -396,10 +396,10 @@ describe("VocItemReplyPrep · delegate lane", () => {
     mount();
 
     const why = await screen.findByRole("region", { name: "왜 멈췄나요" });
-    expect(why.textContent).toContain("회사가 쓰지 않기로 한 표현이 있습니다: 「고객님 탓」");
-    expect(why.querySelector("mark")?.textContent).toBe("고객님 탓이 아닙니다.");
+    expect(why.textContent).toContain("회사가 쓰지 않기로 한 표현이 있어요: 「고객님 탓」");
+    expect(why.querySelector("mark")?.textContent).toBe("고객님 탓이 아니에요.");
     expect(why.textContent).toContain("그 표현을 빼고 문장을 고쳐 다시 승인하세요.");
-    expect(why.textContent).not.toContain("약속이 지금 근거에는 없습니다");
+    expect(why.textContent).not.toContain("약속이 지금 근거에는 없어요");
   });
 
   it("draws nothing of the lane for a review that cannot use it", async () => {

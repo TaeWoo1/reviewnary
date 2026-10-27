@@ -150,14 +150,14 @@ describe("[쿠팡에서 보기]", () => {
     await userEvent.click(screen.getByRole("button", { name: "쿠팡에서 보기" }));
 
     expect(locate.locate).toHaveBeenCalledWith("r1");
-    expect(screen.getByText(/아무것도 눌리거나 입력되지 않습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/아무것도 눌리거나 입력되지 않아요/)).toBeInTheDocument();
   });
 
   it("says the review was outlined, once it was", async () => {
     renderPage(binding({ reviewId: "r1", view: view() }));
     await selectTheReview();
 
-    expect(await screen.findByText(/테두리를 그렸습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/테두리를 그렸어요/)).toBeInTheDocument();
   });
 
   /**
@@ -210,7 +210,7 @@ describe("[쿠팡에서 보기]", () => {
     );
     await selectTheReview();
 
-    expect(await screen.findByText(/둘 이상 있어 어느 줄인지 가릴 수 없습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/둘 이상 있어 어느 줄인지 가릴 수 없어요/)).toBeInTheDocument();
   });
 
   it("says the agent is not running, rather than failing silently", async () => {
@@ -225,7 +225,7 @@ describe("[쿠팡에서 보기]", () => {
     renderPage(binding({ reviewId: "r2", view: view() }));
     await selectTheReview();
 
-    expect(screen.queryByText(/테두리를 그렸습니다/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/테두리를 그렸어요/)).not.toBeInTheDocument();
   });
 
   it("offers 다시 확인 only when the run allows it", async () => {
@@ -256,7 +256,7 @@ describe("[쿠팡에서 보기]", () => {
     renderPage(binding({ reviewId: "r1", view: view() }));
     await selectTheReview();
 
-    await waitFor(() => expect(screen.getByText(/테두리를 그렸습니다/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/테두리를 그렸어요/)).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: "다시 확인" })).not.toBeInTheDocument();
   });
 
@@ -273,7 +273,7 @@ describe("[쿠팡에서 보기]", () => {
       });
       await selectTheReview();
       expect(screen.queryByRole("button", { name: "쿠팡에서 보기" })).not.toBeInTheDocument();
-      expect(screen.getByText(/원문 화면으로 바로 이동할 수 없습니다/)).toBeInTheDocument();
+      expect(screen.getByText(/원문 화면으로 바로 이동할 수 없어요/)).toBeInTheDocument();
       unmount();
     }
   });
@@ -302,8 +302,8 @@ describe("[쿠팡에서 보기]", () => {
       // explaining the button between them. What that sentence was protecting is unchanged and is
       // exactly this: a channel with a reply flow must never be told reviewnary does not write for it,
       // which is what `replySupported` (NAVER-only) produced for Cafe24.
-      expect(screen.queryByText(/reviewnary가 답변을 작성하지 않습니다/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/reviewnary가 답변을 작성하지 않습니다/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/reviewnary가 답변을 작성하지 않아요/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/reviewnary가 답변을 작성하지 않아요/)).not.toBeInTheDocument();
       unmount();
     }
   });
@@ -316,7 +316,7 @@ describe("[쿠팡에서 보기]", () => {
         replySupported: false, replyFlowExists: false },
     });
     await selectTheReview();
-    expect(screen.getByText(/reviewnary가 답변을 작성하지 않습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/reviewnary가 답변을 작성하지 않아요/)).toBeInTheDocument();
     // The affirmative half of this pair no longer exists on any channel — see the test above.
   });
 

@@ -58,14 +58,14 @@ describe("reviewRecordSummary", () => {
 
   it("explains an empty record instead of reading as a failure", () => {
     const empty = reviewRecordSummary(0);
-    expect(empty).toContain("아직 수집된 리뷰가 없습니다");
+    expect(empty).toContain("아직 수집된 리뷰가 없어요");
     expect(empty).toContain("수집");
-    expect(reviewRecordSummary(0, "COUPANG")).toContain("아직 수집된 상품평이 없습니다");
+    expect(reviewRecordSummary(0, "COUPANG")).toContain("아직 수집된 상품평이 없어요");
   });
 
   it("admits an unreadable count while still promising the list opens", () => {
     const unknown = reviewRecordSummary(null);
-    expect(unknown).toContain("확인하지 못했습니다");
-    expect(unknown).toContain("목록은 그대로 열 수 있습니다");
+    expect(unknown).toContain("확인하지 못했어요");
+    expect(unknown).toContain("목록은 그대로 열 수 있어요");
   });
 });

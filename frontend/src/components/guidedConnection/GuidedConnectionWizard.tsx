@@ -271,7 +271,7 @@ export function GuidedConnectionWizard({
             <SecureCredentialForm template={template} onSubmit={onSubmitCredentials} submitting={busy} />
           ) : (
             <p className="text-muted" role="status">
-              연결에 필요한 정보를 불러오는 중입니다…
+              연결에 필요한 정보를 불러오는 중이에요…
             </p>
           ))}
 
@@ -306,7 +306,7 @@ export function GuidedConnectionWizard({
             </div>
           ) : (
             <p className="text-muted" role="status">
-              연결에 필요한 정보를 불러오는 중입니다…
+              연결에 필요한 정보를 불러오는 중이에요…
             </p>
           ))}
 

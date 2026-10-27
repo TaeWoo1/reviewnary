@@ -132,7 +132,7 @@ describe("이어갈 일이 있는지는 서버가 안다 — 이 탭의 기억�
     expect(collectNowResume).toHaveBeenCalledWith("acct-1", "REVIEW");
     // 새 수집을 시작하지 않는다 — 이어가기는 시작이 아니다.
     expect(collectNow).not.toHaveBeenCalled();
-    expect(onReport).toHaveBeenCalledWith("로그인 확인됨. 멈췄던 확인을 이어서 진행합니다.", false);
+    expect(onReport).toHaveBeenCalledWith("로그인 확인됨. 멈췄던 확인을 이어서 진행해요.", false);
   });
 
   it("서버에 멈춘 의도가 없으면 혼자 로그인한 것으로 수집이 시작되지 않는다", async () => {
@@ -165,7 +165,7 @@ describe("이어갈 일이 있는지는 서버가 안다 — 이 탭의 기억�
     mount();
     await userEvent.click(screen.getByTestId("sign-in-REVIEW"));
     await waitFor(() => expect(onReport).toHaveBeenCalledWith(
-      "로그인 창을 지켜보는 시간이 끝났습니다. 로그인을 마친 뒤 [판매자센터 로그인]을 다시 눌러 주세요.", true));
+      "로그인 창을 지켜보는 시간이 끝났어요. 로그인을 마친 뒤 [판매자센터 로그인]을 다시 눌러 주세요.", true));
     expect(collectNow).not.toHaveBeenCalled();
     // 로그인이 확인되지 않았으면 서버에 물어볼 일도 없다 — 이어갈 조건 자체가 성립하지 않는다.
     expect(collectNowResume).not.toHaveBeenCalled();
@@ -178,7 +178,7 @@ describe("이어갈 일이 있는지는 서버가 안다 — 이 탭의 기억�
     mount();
     await userEvent.click(screen.getByTestId("sign-in-REVIEW"));
     await waitFor(() => expect(onReport).toHaveBeenCalledWith(
-      expect.stringContaining("아직 기다리고 있습니다"), false));
+      expect.stringContaining("아직 기다리고 있어요"), false));
   });
 });
 
@@ -199,7 +199,7 @@ describe("로그인 복구 뒤 멈췄던 수집을 이어간다 — 한 번만",
     // 그리고 그것은 새 수집이 아니다: collectNow는 판매자가 누른 그 한 번뿐이다.
     expect(collectNow).toHaveBeenCalledTimes(1);
     const said = onReport.mock.calls.map((c) => String(c[0]));
-    expect(said).toContain("로그인 확인됨. 멈췄던 확인을 이어서 진행합니다.");
+    expect(said).toContain("로그인 확인됨. 멈췄던 확인을 이어서 진행해요.");
     // 이어서 할 일이 우리 쪽에 있을 때는 「다시 수집해 주세요」라고 하지 않는다.
     expect(said).not.toContain("로그인 확인됨. 다시 수집해 주세요.");
     expect(collectNowResume).toHaveBeenCalledWith("acct-1", "REVIEW");
@@ -264,7 +264,7 @@ describe("로그인 복구 뒤 멈췄던 수집을 이어간다 — 한 번만",
     await userEvent.click(screen.getByTestId("sign-in-REVIEW"));
     await waitFor(() =>
       expect(onReport).toHaveBeenCalledWith(
-        "로그인 창을 지켜보는 시간이 끝났습니다. 로그인을 마친 뒤 [판매자센터 로그인]을 다시 눌러 주세요.",
+        "로그인 창을 지켜보는 시간이 끝났어요. 로그인을 마친 뒤 [판매자센터 로그인]을 다시 눌러 주세요.",
         true,
       ),
     );
@@ -280,7 +280,7 @@ describe("로그인 복구 뒤 멈췄던 수집을 이어간다 — 한 번만",
     await waitFor(() => expect(collectNow).toHaveBeenCalledTimes(1));
     await userEvent.click(screen.getByTestId("sign-in-REVIEW"));
     await waitFor(() =>
-      expect(onReport).toHaveBeenCalledWith("이 Mac의 도우미와 연결이 필요합니다.", true),
+      expect(onReport).toHaveBeenCalledWith("이 Mac의 도우미와 연결이 필요해요.", true),
     );
     expect(awaitSignIn).not.toHaveBeenCalled();
     expect(collectNow).toHaveBeenCalledTimes(1);
@@ -295,7 +295,7 @@ describe("창을 열었다는 말을 먼저 한다", () => {
     await userEvent.click(screen.getByTestId("sign-in-REVIEW"));
     await waitFor(() => expect(onReport).toHaveBeenCalled());
     expect(onReport.mock.calls.map((c) => String(c[0]))[0])
-      .toBe("판매자센터 로그인 창을 열었습니다. 그 창에서 로그인해 주세요.");
+      .toBe("판매자센터 로그인 창을 열었어요. 그 창에서 로그인해 주세요.");
   });
 });
 

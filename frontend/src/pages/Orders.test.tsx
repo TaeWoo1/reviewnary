@@ -112,7 +112,7 @@ describe("주문 — 결제 단위 기록 목록", () => {
     expect(reads[1]).not.toHaveTextContent("0줄");
     expect(reads[1]).toHaveTextContent("—");
     // 마지막으로 읽은 시각이 오래됐으면 숫자 위에서 그렇게 말한다.
-    expect(screen.getByText(/이후로 새로 읽은 주문이 없습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/이후로 새로 읽은 주문이 없어요/)).toBeInTheDocument();
   });
 
 
@@ -160,8 +160,8 @@ describe("주문 — 결제 단위 기록 목록", () => {
     );
     mount();
     const line = await screen.findByTestId("orders-sales-line");
-    expect(line).toHaveTextContent("집계된 주문이 없습니다");
-    expect(line).toHaveTextContent("마지막으로 집계된 날은 9월 5일입니다");
+    expect(line).toHaveTextContent("집계된 주문이 없어요");
+    expect(line).toHaveTextContent("마지막으로 집계된 날은 9월 5일이에요");
     // 비어 있을 때 보여 주는 채널별 매출은 읽어 둔 기간의 것이고, 그렇게 적힌다.
     expect(await screen.findByTestId("orders-channel-share")).toHaveTextContent("네이버 스마트스토어");
     expect(screen.getByText(/채널별 매출 · 8월 16일 – 9월 5일/)).toBeInTheDocument();
@@ -178,7 +178,7 @@ describe("주문 — 결제 단위 기록 목록", () => {
   it("읽지 못하면 숫자를 그리지 않는다", async () => {
     vi.mocked(api.getOrderRecordsStrict).mockRejectedValue(new Error("down"));
     mount();
-    expect(await screen.findByText(/주문 기록을 불러오지 못했습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/주문 기록을 불러오지 못했어요/)).toBeInTheDocument();
     expect(screen.queryByTestId("orders-extent")).not.toBeInTheDocument();
   });
 });

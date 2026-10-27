@@ -54,7 +54,7 @@ describe("리포트 — honest workspace copy", () => {
     // A report that claims 매출/전환율/만족도 improvement teaches the reader to distrust the rows
     // that ARE true. Nothing in the data measures any of them.
     for (const claim of ["매출 향상", "매출 증가", "전환율", "만족도", "성과 개선"]) {
-      expect(reports, `리포트에 "${claim}" 주장이 있으면 안 됩니다`).not.toContain(claim);
+      expect(reports, `리포트에 "${claim}" 주장이 있으면 안 돼요`).not.toContain(claim);
     }
   });
 });

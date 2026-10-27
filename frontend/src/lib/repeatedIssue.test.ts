@@ -46,7 +46,7 @@ function knowledge(over: Partial<IssueKnowledgeOnHand> = {}): IssueKnowledgeOnHa
 
 describe("어디서 얼마나 반복되나", () => {
   it("states the pair and names what each number counts", () => {
-    expect(repeatLine(row())).toBe("리뷰 1,761건 중 16건이 이 문제를 말했습니다");
+    expect(repeatLine(row())).toBe("리뷰 1,761건 중 16건이 이 문제를 말했어요");
   });
 
   /**
@@ -77,7 +77,7 @@ describe("어디서 얼마나 반복되나", () => {
    */
   it("says how much evidence belongs to no product, and that it is outside the rows", () => {
     expect(unattributedLine(2)).toContain("2건");
-    expect(unattributedLine(2)).toContain("들어 있지 않습니다");
+    expect(unattributedLine(2)).toContain("들어 있지 않아요");
     expect(unattributedLine(0)).toBeNull();
   });
 });
@@ -88,11 +88,11 @@ describe("우리가 써 둔 것", () => {
    * told to go write it.
    */
   it("tells an empty library apart from one that simply does not cover this problem", () => {
-    expect(knowledgeLine(knowledge())).toBe("이 문제에 대해 등록된 안내가 아직 없습니다.");
+    expect(knowledgeLine(knowledge())).toBe("이 문제에 대해 등록된 안내가 아직 없어요.");
     expect(knowledgeLine(knowledge({ productSources: 3, orgSources: 2 })))
-      .toBe("등록된 안내 5건 가운데 이 문제를 다루는 내용은 찾지 못했습니다.");
+      .toBe("등록된 안내 5건 가운데 이 문제를 다루는 내용은 찾지 못했어요.");
     expect(knowledgeLine(knowledge({ productSources: 3, productMentions: 1, orgSources: 2 })))
-      .toBe("등록된 안내 5건 가운데 1건이 이 문제를 다룹니다.");
+      .toBe("등록된 안내 5건 가운데 1건이 이 문제를 다뤄요.");
   });
 
   it("names which library it read, and says nothing when there was no product library", () => {

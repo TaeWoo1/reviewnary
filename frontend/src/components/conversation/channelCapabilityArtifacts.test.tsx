@@ -13,9 +13,9 @@ describe("channel-capability artifacts (D5)", () => {
   it("NOT_SUPPORTED renders as a SUMMARY sentence plus the next-action chips — no draft, no CTA", async () => {
     const onPrompt = vi.fn();
     const turn = agentTurn({
-      message: "쿠팡에서는 판매자가 리뷰에 직접 답글을 남기는 기능을 지원하지 않습니다.",
+      message: "쿠팡에서는 판매자가 리뷰에 직접 답글을 남기는 기능을 지원하지 않아요.",
       artifacts: [
-        { artifactId: "s-1", type: "SUMMARY", title: "쿠팡 리뷰 답변", lines: ["쿠팡에서는 판매자가 리뷰에 직접 답글을 남기는 기능을 지원하지 않습니다."] },
+        { artifactId: "s-1", type: "SUMMARY", title: "쿠팡 리뷰 답변", lines: ["쿠팡에서는 판매자가 리뷰에 직접 답글을 남기는 기능을 지원하지 않아요."] },
       ],
       suggestedActions: [
         { label: "비슷한 리뷰 더 찾기", kind: "PROMPT", prompt: "비슷한 리뷰 더 찾아줘" },
@@ -25,7 +25,7 @@ describe("channel-capability artifacts (D5)", () => {
       ],
     });
     render(<MemoryRouter><ConversationTimeline turns={[turn]} busy={false} stages={[]} elapsed={0} error={null} onPrompt={onPrompt} onResume={() => undefined} /></MemoryRouter>);
-    expect(screen.getAllByText(/직접 답글을 남기는 기능을 지원하지 않습니다/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/직접 답글을 남기는 기능을 지원하지 않아요/).length).toBeGreaterThan(0);
     for (const name of ["비슷한 리뷰 더 찾기", "관련 문의 확인", "상품 문제 조사", "상세페이지 개선 검토"]) {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     }
@@ -39,13 +39,13 @@ describe("channel-capability artifacts (D5)", () => {
     render(
       <ProgressView
         stages={[
-          { type: "stage", stage: "PLANNED", label: "요청을 이해했습니다", at: "x" },
-          { type: "stage", stage: "REFRESHING", label: "카페24 리뷰를 새로 가져오고 있습니다", at: "x" },
+          { type: "stage", stage: "PLANNED", label: "요청을 이해했어요", at: "x" },
+          { type: "stage", stage: "REFRESHING", label: "카페24 리뷰를 새로 가져오고 있어요", at: "x" },
         ]}
         elapsed={4}
       />,
     );
-    expect(screen.getByText("카페24 리뷰를 새로 가져오고 있습니다")).toBeInTheDocument();
+    expect(screen.getByText("카페24 리뷰를 새로 가져오고 있어요")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("4초");
   });
 

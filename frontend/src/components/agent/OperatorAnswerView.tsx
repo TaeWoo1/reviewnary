@@ -63,7 +63,7 @@ export function OperatorAnswerView({ answer, compact = false }: { answer: Operat
       {answer.needs.length > 0 ? <InvestigationPlanList needs={answer.needs} /> : null}
 
       {answer.findings.length === 0 && !answer.clarification ? (
-        <p className="mt-3 text-muted">{answer.note ?? "말씀드릴 만한 것을 찾지 못했습니다."}</p>
+        <p className="mt-3 text-muted">{answer.note ?? "말씀드릴 만한 것을 찾지 못했어요."}</p>
       ) : answer.findings.length === 0 ? null : (
         <ul className="mt-3 space-y-3">
           {answer.findings.map((finding) => (
@@ -166,11 +166,11 @@ export function OperatorAnswerView({ answer, compact = false }: { answer: Operat
 
       {uncertain.length > 0 ? (
         <div className="mt-4 rounded border border-warn/40 bg-warn/5 p-3">
-          <p className="text-sm font-medium text-ink">일부 데이터는 판단할 수 없습니다.</p>
+          <p className="text-sm font-medium text-ink">일부 데이터는 판단할 수 없어요.</p>
           <ul className="mt-1 space-y-0.5">
             {uncertain.map((c) => (
               <li key={c.signal} className="text-xs text-muted">
-                {c.signal}: 연결되지 않은 자료 {c.unlinked}건. 비어 있는 것이 문제가 없다는 뜻은 아닙니다.
+                {c.signal}: 연결되지 않은 자료 {c.unlinked}건. 비어 있는 것이 문제가 없다는 뜻은 아니에요.
               </li>
             ))}
           </ul>
@@ -184,14 +184,14 @@ export function OperatorAnswerView({ answer, compact = false }: { answer: Operat
             different questions and have different remedies — "채널을 연결하세요" vs "상품 정보를
             가져오세요" — so a merged notice would leave a seller unable to act on either.
           */}
-          <p className="text-sm font-medium text-ink">아직 갖고 있지 않은 상품 정보가 있습니다.</p>
+          <p className="text-sm font-medium text-ink">아직 갖고 있지 않은 상품 정보가 있어요.</p>
           <ul className="mt-1 space-y-0.5">
             {missingKnowledge.map((c) => (
               <li key={c.facet} className="text-xs text-muted">
                 {FACET_LABEL[c.facet] ?? c.facet}:{" "}
                 {c.coverage === "STALE"
-                  ? `마지막으로 확인한 지 오래됐습니다${c.newestObservedAt ? ` (${kstDate(c.newestObservedAt)})` : ""}.`
-                  : "reviewnary가 이 정보를 갖고 있지 않습니다. 상품에 그 값이 없다는 뜻은 아닙니다."}
+                  ? `마지막으로 확인한 지 오래됐어요${c.newestObservedAt ? ` (${kstDate(c.newestObservedAt)})` : ""}.`
+                  : "reviewnary가 이 정보를 갖고 있지 않아요. 상품에 그 값이 없다는 뜻은 아니에요."}
               </li>
             ))}
           </ul>

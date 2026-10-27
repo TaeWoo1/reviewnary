@@ -23,7 +23,7 @@ import type {
  * product has not measured. The pair says what is true: this many said it, out of this many reviews.
  */
 export function repeatLine(row: IssueProductEvidenceView): string {
-  return `리뷰 ${row.productReviews.toLocaleString("ko-KR")}건 중 ${row.evidenceCount.toLocaleString("ko-KR")}건이 이 문제를 말했습니다`;
+  return `리뷰 ${row.productReviews.toLocaleString("ko-KR")}건 중 ${row.evidenceCount.toLocaleString("ko-KR")}건이 이 문제를 말했어요`;
 }
 
 /**
@@ -48,7 +48,7 @@ export function productSpanLine(row: IssueProductEvidenceView): string | null {
  */
 export function unattributedLine(unattributed: number): string | null {
   if (unattributed <= 0) return null;
-  return `어느 상품인지 확인되지 않은 근거가 ${unattributed.toLocaleString("ko-KR")}건 있습니다. 위 상품별 합계에는 들어 있지 않습니다.`;
+  return `어느 상품인지 확인되지 않은 근거가 ${unattributed.toLocaleString("ko-KR")}건 있어요. 위 상품별 합계에는 들어 있지 않아요.`;
 }
 
 /**
@@ -63,12 +63,12 @@ export function knowledgeLine(knowledge: IssueKnowledgeOnHand): string {
   const sources = knowledge.productSources + knowledge.orgSources;
   const mentions = knowledge.productMentions + knowledge.orgMentions;
   if (sources === 0) {
-    return "이 문제에 대해 등록된 안내가 아직 없습니다.";
+    return "이 문제에 대해 등록된 안내가 아직 없어요.";
   }
   if (mentions === 0) {
-    return `등록된 안내 ${sources}건 가운데 이 문제를 다루는 내용은 찾지 못했습니다.`;
+    return `등록된 안내 ${sources}건 가운데 이 문제를 다루는 내용은 찾지 못했어요.`;
   }
-  return `등록된 안내 ${sources}건 가운데 ${mentions}건이 이 문제를 다룹니다.`;
+  return `등록된 안내 ${sources}건 가운데 ${mentions}건이 이 문제를 다뤄요.`;
 }
 
 /**
@@ -80,7 +80,7 @@ export function knowledgeLine(knowledge: IssueKnowledgeOnHand): string {
  */
 export function knowledgeScopeLine(knowledge: IssueKnowledgeOnHand): string | null {
   if (!knowledge.productId || !knowledge.productName) return null;
-  return `${knowledge.productName}의 상품 지식과 회사 운영 기준을 확인했습니다.`;
+  return `${knowledge.productName}의 상품 지식과 회사 운영 기준을 확인했어요.`;
 }
 
 /**

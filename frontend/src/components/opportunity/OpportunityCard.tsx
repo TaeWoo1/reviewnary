@@ -80,7 +80,7 @@ export function OpportunityCard({
       await api.applyOpportunity(o.issueId, o.kind, { artifact, ref });
       onApplied?.();
     } catch {
-      setError("적용을 기록하지 못했습니다. 저장된 내용은 그대로 있습니다.");
+      setError("적용을 기록하지 못했어요. 저장된 내용은 그대로 있어요.");
     } finally {
       setBusy(false);
     }
@@ -141,7 +141,7 @@ export function OpportunityCard({
           <Btn
             size="sm"
             disabled={busy}
-            onClick={() => run(() => api.acceptOpportunity(o.issueId, o.kind), "초안을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.")}
+            onClick={() => run(() => api.acceptOpportunity(o.issueId, o.kind), "초안을 준비하지 못했어요. 잠시 후 다시 시도해 주세요.")}
           >
             {busy ? "준비 중…" : o.nextActionKo}
           </Btn>
@@ -149,7 +149,7 @@ export function OpportunityCard({
             size="sm"
             variant="ghost"
             disabled={busy}
-            onClick={() => run(() => api.dismissOpportunity(o.issueId, o.kind), "상태를 바꾸지 못했습니다.")}
+            onClick={() => run(() => api.dismissOpportunity(o.issueId, o.kind), "상태를 바꾸지 못했어요.")}
           >
             지금은 보류
           </Btn>
@@ -158,12 +158,12 @@ export function OpportunityCard({
 
       {o.status === "DISMISSED" ? (
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <p className="text-sm text-muted">보류한 기회입니다. 근거가 남아 있는 동안 다시 열 수 있습니다.</p>
+          <p className="text-sm text-muted">보류한 기회예요. 근거가 남아 있는 동안 다시 열 수 있어요.</p>
           <Btn
             size="sm"
             variant="outline"
             disabled={busy}
-            onClick={() => run(() => api.restoreOpportunity(o.issueId, o.kind), "상태를 바꾸지 못했습니다.")}
+            onClick={() => run(() => api.restoreOpportunity(o.issueId, o.kind), "상태를 바꾸지 못했어요.")}
           >
             되돌리기
           </Btn>
@@ -179,7 +179,7 @@ export function OpportunityCard({
             <OpportunityOutcome outcome={o.outcome} />
           ) : (
             <p className="break-keep text-sm leading-relaxed text-muted">
-              적용했습니다{o.appliedAt ? ` · ${kstDate(o.appliedAt)}` : ""}.
+              적용했어요{o.appliedAt ? ` · ${kstDate(o.appliedAt)}` : ""}.
             </p>
           )}
         </div>
@@ -214,7 +214,7 @@ export function OpportunityCard({
                 onClick={() =>
                   run(
                     () => api.updateOpportunityDraft(o.issueId, o.kind, { title, body }),
-                    "초안을 저장하지 못했습니다.",
+                    "초안을 저장하지 못했어요.",
                   )
                 }
               >
@@ -236,7 +236,7 @@ export function OpportunityCard({
                   disabled={busy || dirty}
                   onClick={() => recordApply("SELLER_DECLARED", null)}
                 >
-                  {busy ? "기록 중…" : "적용했습니다"}
+                  {busy ? "기록 중…" : "적용했어요"}
                 </Btn>
               </>
             ) : savedTo ? null : (
@@ -248,19 +248,19 @@ export function OpportunityCard({
               size="sm"
               variant="ghost"
               disabled={busy}
-              onClick={() => run(() => api.restoreOpportunity(o.issueId, o.kind), "상태를 바꾸지 못했습니다.")}
+              onClick={() => run(() => api.restoreOpportunity(o.issueId, o.kind), "상태를 바꾸지 못했어요.")}
             >
               초안 버리기
             </Btn>
           </div>
-          {dirty ? <p className="text-xs text-muted">고친 내용을 먼저 저장하면 {destination.label}가 열립니다.</p> : null}
-          {copied === "ok" ? <p className="text-sm text-good">복사했습니다.</p> : null}
+          {dirty ? <p className="text-xs text-muted">고친 내용을 먼저 저장하면 {destination.label}가 열려요.</p> : null}
+          {copied === "ok" ? <p className="text-sm text-good">복사했어요.</p> : null}
           {copied === "manual" ? (
-            <p className="text-sm text-muted">이 브라우저에서는 자동 복사가 되지 않습니다. 위 내용을 직접 복사해 주세요.</p>
+            <p className="text-sm text-muted">이 브라우저에서는 자동 복사가 되지 않아요. 위 내용을 직접 복사해 주세요.</p>
           ) : null}
           {savedTo ? (
             <p className="text-sm text-good">
-              저장했습니다.{" "}
+              저장했어요.{" "}
               <Link to={savedTo} className="font-semibold text-brand-700 hover:text-brand-800">
                 저장한 곳 보기
               </Link>

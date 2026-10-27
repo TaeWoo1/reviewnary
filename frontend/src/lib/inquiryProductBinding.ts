@@ -76,10 +76,10 @@ export function needsOverrideConfirm(
 /** What to tell the seller when a bind attempt failed. */
 export function bindErrorMessage(status: number | undefined, code?: string | null): string {
   if (code === SOURCE_BINDING_EXISTS) {
-    return "이 문의는 채널이 알려준 상품 번호로 이미 연결돼 있습니다. 바꾸려면 한 번 더 확인해 주세요.";
+    return "이 문의는 채널이 알려준 상품 번호로 이미 연결돼 있어요. 바꾸려면 한 번 더 확인해 주세요.";
   }
-  if (status === 404) return "상품 또는 문의를 찾을 수 없습니다. 목록을 새로고침해 주세요.";
-  if (status === 409) return "이 상품에는 문의를 연결할 수 없습니다.";
-  if (status === 401 || status === 403) return "권한이 없습니다. 다시 로그인해 주세요.";
-  return "상품을 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  if (status === 404) return "상품 또는 문의를 찾을 수 없어요. 목록을 새로고침해 주세요.";
+  if (status === 409) return "이 상품에는 문의를 연결할 수 없어요.";
+  if (status === 401 || status === 403) return "권한이 없어요. 다시 로그인해 주세요.";
+  return "상품을 연결하지 못했어요. 잠시 후 다시 시도해 주세요.";
 }

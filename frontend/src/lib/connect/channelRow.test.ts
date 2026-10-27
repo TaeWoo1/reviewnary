@@ -22,7 +22,7 @@ function row(over: Partial<ChannelRowInput> = {}) {
 }
 
 describe("채널 행 — 한 capability가 죽어 있다고 채널 전체를 미완성으로 부르지 않는다", () => {
-  it("브라우저 수집이 살아 있으면 행은 그것을 말한다 — 「연결 중」도, 「수집 이력 없음」도, 「연결 계속하기」도 아니다", () => {
+  it("브라우저 수집이 살아 있으면 행은 그것을 말한다 — 「연결 중」도, 「수집 이력 없음」도, 「연동 계속하기」도 아니다", () => {
     // 실측된 그 행: 상품평 9건을 가져온 계정인데 API 자격이 없어 PENDING이었다.
     const v = row();
     expect(v.state?.label).toBe("연결됨");

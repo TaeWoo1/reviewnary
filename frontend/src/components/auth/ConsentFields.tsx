@@ -44,7 +44,7 @@ export function ConsentFields({
           <Link to={PRIVACY_PATH} className={authLink} target="_blank" rel="noopener noreferrer">
             개인정보처리방침
           </Link>
-          에 동의합니다
+          에 동의해요
         </span>
       </label>
       <label className={row} htmlFor={`${idPrefix}-marketing`}>
@@ -56,7 +56,7 @@ export function ConsentFields({
           onChange={(e) => onMarketing(e.target.checked)}
         />
         <span>
-          <span className="font-semibold text-muted">(선택)</span> 새 기능·운영 팁 등 마케팅 정보를 이메일로 받습니다
+          <span className="font-semibold text-muted">(선택)</span> 새 기능·운영 팁 등 마케팅 정보를 이메일로 받아요
         </span>
       </label>
     </fieldset>

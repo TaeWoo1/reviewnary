@@ -132,7 +132,7 @@ export function phraseBlockSentence(findings: ReviewReplyPhraseFinding[]): strin
   const kept = findings.filter((f) => f.kind === "AVOID").map((f) => f.phrase);
   const quoted = (words: string[]) => words.map((w) => `「${w}」`).join(" · ");
   return `${quoted(banned)}${josa(banned[banned.length - 1], "을", "를")} 고치면 승인할 수 있어요.`
-    + (kept.length ? ` ${quoted(kept)}${josa(kept[kept.length - 1], "은", "는")} 그대로 둬도 됩니다.` : "");
+    + (kept.length ? ` ${quoted(kept)}${josa(kept[kept.length - 1], "은", "는")} 그대로 둬도 돼요.` : "");
 }
 
 /** The particle after {@code word}: the first after a final consonant, else the second. */

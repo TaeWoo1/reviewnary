@@ -321,7 +321,7 @@ describe("GuidedImportCard — completion is claimed honestly", () => {
       />,
     );
     const summary = screen.getByTestId("completion-summary");
-    expect(summary).toHaveTextContent("NAVER에서 현재 선택 가능한 기간의 리뷰 파일을 가져왔습니다.");
+    expect(summary).toHaveTextContent("NAVER에서 현재 선택 가능한 기간의 리뷰 파일을 가져왔어요.");
     expect(summary.textContent).not.toMatch(/100%|모든 리뷰|전체 리뷰/);
     expect(screen.queryByTestId("guided-import-cta")).toBeNull();
   });

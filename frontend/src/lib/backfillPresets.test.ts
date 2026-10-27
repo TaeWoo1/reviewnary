@@ -52,7 +52,7 @@ describe("validateBackfill", () => {
   it("rejects an inverted range", () => {
     const result = validateBackfill({ from: "2026-05-31", to: "2026-05-01" }, ["REVIEW"]);
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("늦을 수 없습니다");
+    expect(result.error).toContain("늦을 수 없어요");
   });
 
   it("accepts a valid selection (incl. a single-day range)", () => {

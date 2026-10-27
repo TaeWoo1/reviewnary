@@ -126,7 +126,7 @@ const DETAIL: ReviewIssueDetailView = {
       productId: null,
       productName: null,
       rating: 2,
-      quote: "한쪽이 들뜹니다.",
+      quote: "한쪽이 들떠요.",
     },
     {
       reviewId: "rev-suppressed",
@@ -303,7 +303,7 @@ describe("고객운영 메모리 — deep link", () => {
     // 말한다. 지어낸 문제를 그리느니 돌아갈 길을 준다.
     getReviewIssueDetailStrict.mockRejectedValue(new Error("gone"));
     renderMemory("/memory/nope");
-    expect(await screen.findByText("이 문제를 불러오지 못했습니다")).toBeInTheDocument();
+    expect(await screen.findByText("이 문제를 불러오지 못했어요")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "반복 문제 목록" })).toHaveAttribute("href", "/memory");
   });
 
@@ -356,8 +356,8 @@ describe("고객운영 메모리 — 어디서 얼마나 반복되나", () => {
     const section = await within(detail).findByRole("region", { name: "어디서 반복되나" });
     // 상품은 전부 이 띠에 선다 — 900px 열에는 세 줄을 접어 둘 이유가 없고, 「어디서」는 이 화면이
     // 존재하는 이유다. 둘 다 쌍을 찍고 어느 쪽도 비율을 만들지 않는다.
-    expect(within(section).getByText(/리뷰 1,761건 중 16건이 이 문제를 말했습니다/)).toBeInTheDocument();
-    expect(within(section).getByText(/리뷰 416건 중 1건이 이 문제를 말했습니다/)).toBeInTheDocument();
+    expect(within(section).getByText(/리뷰 1,761건 중 16건이 이 문제를 말했어요/)).toBeInTheDocument();
+    expect(within(section).getByText(/리뷰 416건 중 1건이 이 문제를 말했어요/)).toBeInTheDocument();
   });
 
   /**
@@ -403,7 +403,7 @@ describe("고객운영 메모리 — 우리가 써 둔 것", () => {
   it("counts what the library holds against what names this problem, and quotes the seller", async () => {
     renderMemory("/memory/issue-1");
     const section = await screen.findByLabelText("우리가 써 둔 것");
-    expect(within(section).getByText("등록된 안내 5건 가운데 1건이 이 문제를 다룹니다.")).toBeInTheDocument();
+    expect(within(section).getByText("등록된 안내 5건 가운데 1건이 이 문제를 다뤄요.")).toBeInTheDocument();
     expect(within(section).getByText(/접착 면의 먼지를 닦고/)).toBeInTheDocument();
     // Something already answers it, so the screen does not ask for work that is done.
     expect(within(section).queryByRole("link", { name: /답변 기준 채우기/ })).toBeNull();
@@ -416,7 +416,7 @@ describe("고객운영 메모리 — 우리가 써 둔 것", () => {
     });
     renderMemory("/memory/issue-1");
     const section = await screen.findByLabelText("우리가 써 둔 것");
-    expect(within(section).getByText(/이 문제를 다루는 내용은 찾지 못했습니다/)).toBeInTheDocument();
+    expect(within(section).getByText(/이 문제를 다루는 내용은 찾지 못했어요/)).toBeInTheDocument();
     expect(within(section).getByRole("link", { name: /답변 기준 채우기/ }))
       .toHaveAttribute("href", "/knowledge");
   });
@@ -457,12 +457,12 @@ describe("고객운영 메모리 — 판단과 조치", () => {
     await openIssue();
 
     fireEvent.change(screen.getByLabelText(/무엇을 하기로 하셨나요/), {
-      target: { value: "접착 테이프 공급처를 바꿉니다." },
+      target: { value: "접착 테이프 공급처를 바꿔요." },
     });
     fireEvent.click(screen.getByRole("button", { name: "조치 시작" }));
 
     await waitFor(() =>
-      expect(startReviewIssueAction).toHaveBeenCalledWith("issue-1", "접착 테이프 공급처를 바꿉니다."),
+      expect(startReviewIssueAction).toHaveBeenCalledWith("issue-1", "접착 테이프 공급처를 바꿔요."),
     );
   });
 
@@ -503,14 +503,14 @@ describe("고객운영 메모리 — 판단과 조치", () => {
     renderMemory("/memory/issue-1");
     const section = await screen.findByLabelText("판단과 조치");
     // Both, not one instead of the other: the seller is acting ahead of reviewnary and can see that.
-    expect(within(section).getByText(/먼저 확인을 권할 만큼 근거가 모이지는 않았습니다/)).toBeInTheDocument();
+    expect(within(section).getByText(/먼저 확인을 권할 만큼 근거가 모이지는 않았어요/)).toBeInTheDocument();
 
     fireEvent.change(within(section).getByLabelText(/무엇을 하기로 하셨나요/), {
-      target: { value: "공급처를 바꿉니다." },
+      target: { value: "공급처를 바꿔요." },
     });
     fireEvent.click(within(section).getByRole("button", { name: "조치 시작" }));
     await waitFor(() =>
-      expect(startReviewIssueAction).toHaveBeenCalledWith("issue-1", "공급처를 바꿉니다."),
+      expect(startReviewIssueAction).toHaveBeenCalledWith("issue-1", "공급처를 바꿔요."),
     );
   });
 });
@@ -612,13 +612,13 @@ describe("고객운영 메모리 — empty and failed states", () => {
   it("invites a connection when nothing has been recorded", async () => {
     getReviewIssuesStrict.mockResolvedValue([]);
     renderMemory();
-    expect(await screen.findByText("아직 쌓인 기록이 없습니다")).toBeInTheDocument();
+    expect(await screen.findByText("아직 쌓인 기록이 없어요")).toBeInTheDocument();
   });
 
   it("says the read failed rather than showing an empty memory", async () => {
     getReviewIssuesStrict.mockRejectedValue(new Error("down"));
     renderMemory();
-    expect(await screen.findByText("기록을 불러오지 못했습니다")).toBeInTheDocument();
+    expect(await screen.findByText("기록을 불러오지 못했어요")).toBeInTheDocument();
   });
 });
 
@@ -654,7 +654,7 @@ describe("고객운영 메모리 — the issue's opportunities live beside its e
   it("says plainly when the issue yields no opportunity", async () => {
     renderMemory(`/memory/${SURGING.id}`);
     const section = await screen.findByRole("region", { name: "개선 기회" });
-    expect(await within(section).findByText(/아직 제안할 개선 기회가 없습니다/)).toBeTruthy();
+    expect(await within(section).findByText(/아직 제안할 개선 기회가 없어요/)).toBeTruthy();
   });
 });
 
@@ -678,11 +678,11 @@ describe("반복 문제 — the canonical reading (2026-10-05)", () => {
     renderMemory("/memory/issue-1");
     const decision = await screen.findByLabelText("판단과 조치");
     fireEvent.change(within(decision).getByLabelText(/무엇을 하기로 하셨나요/), {
-      target: { value: "접착 테이프 공급처를 바꿉니다." },
+      target: { value: "접착 테이프 공급처를 바꿔요." },
     });
     fireEvent.click(within(decision).getByRole("button", { name: "조치 시작" }));
     await waitFor(() =>
-      expect(startReviewIssueAction).toHaveBeenCalledWith("issue-1", "접착 테이프 공급처를 바꿉니다."),
+      expect(startReviewIssueAction).toHaveBeenCalledWith("issue-1", "접착 테이프 공급처를 바꿔요."),
     );
   });
 
@@ -721,7 +721,7 @@ describe("반복 문제 — the canonical reading (2026-10-05)", () => {
     expect(when.compareDocumentPosition(evidence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // 별점 분포는 「언제」 쪽에 있고 상품 분포는 「어디서」 쪽에 있다.
     expect(within(when).getByRole("region", { name: "어떤 별점에서 나왔나" })).toBeInTheDocument();
-    expect(within(where).getByText(/리뷰 1,761건 중 16건이 이 문제를 말했습니다/)).toBeInTheDocument();
+    expect(within(where).getByText(/리뷰 1,761건 중 16건이 이 문제를 말했어요/)).toBeInTheDocument();
   });
 
   /** 열은 하나다 — 리뷰 상세의 canonical baseline과 같은 읽기이고, 안쪽 스크롤은 없다. */
@@ -797,7 +797,7 @@ describe("반복 문제 — the canonical reading (2026-10-05)", () => {
     });
     renderMemory("/memory/issue-1");
     const signal = await screen.findByLabelText("변화와 신호");
-    expect(within(signal).getByText("최근 판단된 변화가 없습니다.")).toBeInTheDocument();
+    expect(within(signal).getByText("최근 판단된 변화가 없어요.")).toBeInTheDocument();
   });
 
   /** Representative evidence, not eighteen quotes above a decision. The rest is one disclosure away. */

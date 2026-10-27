@@ -51,14 +51,14 @@ export function HelperDevices() {
     <div className="space-y-6">
       <PageHead
         title="연결된 기기"
-        description="이 계정에 연결된 reviewnary 도우미입니다. 도우미는 비밀번호 대신 여기서 해제할 수 있는 연결로 일합니다."
+        description="이 계정에 연결된 reviewnary 도우미예요. 도우미는 비밀번호 대신 여기서 해제할 수 있는 연결로 일해요."
       />
-      {failed ? <p className="text-sm text-bad" role="alert">연결된 기기를 불러오지 못했습니다.</p> : null}
+      {failed ? <p className="text-sm text-bad" role="alert">연결된 기기를 불러오지 못했어요.</p> : null}
       {devices && devices.length === 0 && !failed ? (
         <ListBox ariaLabel="연결된 기기 없음">
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-            <p className="break-keep text-sm text-muted">아직 연결된 도우미가 없습니다. 채널 연결 화면에서 도우미를 연결하면 여기에 보입니다.</p>
-            <BtnLink to="/connect" size="sm" variant="outline">채널 연결로 가기</BtnLink>
+            <p className="break-keep text-sm text-muted">아직 연결된 도우미가 없어요. 채널 연동 화면에서 도우미를 연결하면 여기에 보여요.</p>
+            <BtnLink to="/connect" size="sm" variant="outline">채널 연동로 가기</BtnLink>
           </div>
         </ListBox>
       ) : null}
@@ -78,7 +78,7 @@ export function HelperDevices() {
                   action={
                     confirming === d.id ? (
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="break-keep text-sm text-muted">해제하면 이 도우미는 바로 일을 멈춥니다.</span>
+                        <span className="break-keep text-sm text-muted">해제하면 이 도우미는 바로 일을 멈춰요.</span>
                         <Btn size="sm" variant="outline" onClick={() => setConfirming(null)} disabled={busy === d.id}>취소</Btn>
                         <Btn size="sm" onClick={() => void revoke(d.id)} disabled={busy === d.id} data-testid="revoke-confirm">해제 확인</Btn>
                       </div>

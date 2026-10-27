@@ -91,10 +91,10 @@ export function CommunityArticleList({
         <p className="text-base text-muted">불러오는 중…</p>
       ) : error || !data ? (
         <p className="rounded-xl bg-bad/5 px-4 py-3 text-base text-bad">
-          수집된 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+          수집된 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
         </p>
       ) : data.items.length === 0 ? (
-        <p className="text-base text-muted">아직 수집된 데이터가 없습니다.</p>
+        <p className="text-base text-muted">아직 수집된 데이터가 없어요.</p>
       ) : (
         <>
           <p className="mb-1 text-sm text-muted">총 {data.total.toLocaleString("ko-KR")}건</p>

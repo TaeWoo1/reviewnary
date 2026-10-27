@@ -94,7 +94,7 @@ export function OperationsCaseView({
     return <p className="text-muted">불러오는 중…</p>;
   }
   if (detail === null) {
-    return <p className="text-muted">해당 건을 찾을 수 없습니다.</p>;
+    return <p className="text-muted">해당 건을 찾을 수 없어요.</p>;
   }
 
   const applied = (next: OperationsCaseDetail) => {
@@ -605,8 +605,8 @@ function whyNow(detail: OperationsCaseDetail, now?: Date): { icon: "clock" | "do
       // distinction `sinceLabel` draws for the list's right-hand column.
       text:
         detail.subjectKind === "INQUIRY"
-          ? `${days.toLocaleString("ko-KR")}일 동안 답변이 등록되지 않았습니다.`
-          : `${days.toLocaleString("ko-KR")}일 전에 등록된 리뷰입니다.`,
+          ? `${days.toLocaleString("ko-KR")}일 동안 답변이 등록되지 않았어요.`
+          : `${days.toLocaleString("ko-KR")}일 전에 등록된 리뷰예요.`,
     });
   }
   const summary = statedFact(detail.summary);
@@ -1121,7 +1121,7 @@ function DraftCard({
             )}
             {flat
               ? [draftSendWord(draft.delivery), basis ? `${basis} 근거` : null].filter(Boolean).join(" · ")
-              : `${basis}를 근거로 준비한 답변입니다.`}
+              : `${basis}를 근거로 준비한 답변이에요.`}
           </span>
         ) : null}
       </div>

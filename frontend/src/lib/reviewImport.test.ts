@@ -349,7 +349,7 @@ describe("scopeEvidenceLabel", () => {
 describe("completionSummaryText", () => {
   it("claims only the selectable periods — never every review NAVER holds", () => {
     const text = completionSummaryText({ done: 3, total: 3, text: "3개 구간 중 3개 완료" });
-    expect(text).toBe("NAVER에서 현재 선택 가능한 기간의 리뷰 파일을 가져왔습니다.");
+    expect(text).toBe("NAVER에서 현재 선택 가능한 기간의 리뷰 파일을 가져왔어요.");
     expect(text).not.toMatch(/100%|모든 리뷰|전체 리뷰/);
   });
 

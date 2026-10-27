@@ -137,7 +137,7 @@ export function InquiryReply({
   // Fail closed. Without the detail there is nothing honest to offer, so the panel says so and
   // offers no controls rather than presenting an empty workflow.
   if (error || !detail) {
-    return <p className="text-base text-muted">{error ?? "문의 내용을 불러오지 못했습니다."}</p>;
+    return <p className="text-base text-muted">{error ?? "문의 내용을 불러오지 못했어요."}</p>;
   }
 
   return (
@@ -170,7 +170,7 @@ export function InquiryReply({
               </p>
             ) : null}
             <p className="mt-2 whitespace-pre-wrap break-keep text-lg leading-relaxed text-ink">
-              {plainText(detail.details) || "본문이 없습니다."}
+              {plainText(detail.details) || "본문이 없어요."}
             </p>
           </>
         )}
@@ -234,7 +234,7 @@ export function InquiryReply({
         {!draft && !answerState && !unavailable ? (
           <>
             <p className="mt-1.5 break-keep text-sm leading-relaxed text-muted">
-              문의 내용과 등록된 상품 지식을 근거로 초안을 씁니다. 보내는 것은 확인 후 따로 누릅니다.
+              문의 내용과 등록된 상품 지식을 근거로 초안을 써요. 보내는 것은 확인 후 따로 눌러요.
             </p>
             <div className="mt-4">
               <Btn onClick={onGenerateDraft} disabled={busy || !canDraft}>
@@ -243,7 +243,7 @@ export function InquiryReply({
             </div>
             {!canDraft ? (
               <p className="mt-3 break-keep text-sm text-muted">
-                지금 상태에서는 초안을 만들 수 없습니다. 목록에서 상태를 확인해 주세요.
+                지금 상태에서는 초안을 만들 수 없어요. 목록에서 상태를 확인해 주세요.
               </p>
             ) : null}
           </>
@@ -278,8 +278,8 @@ export function InquiryReply({
                 data-testid="basis-saved"
               >
                 {answerState
-                  ? "답변 기준을 저장했습니다. 저장한 내용으로 답변을 다시 만들었습니다."
-                  : "답변 기준을 저장했습니다."}
+                  ? "답변 기준을 저장했어요. 저장한 내용으로 답변을 다시 만들었어요."
+                  : "답변 기준을 저장했어요."}
               </p>
             ) : null}
             <AnswerStateCard
@@ -322,7 +322,7 @@ export function InquiryReply({
                   {unavailable}
                 </p>
                 <p className="mt-2 break-keep text-sm leading-relaxed text-muted">
-                  아래에 직접 작성하실 수 있습니다.
+                  아래에 직접 작성하실 수 있어요.
                 </p>
               </div>
             ) : null}
@@ -431,9 +431,9 @@ export function InquiryReply({
                     */
                     <div className="shrink-0 text-right">
                       <Btn onClick={onCopyDraft} disabled={busy}>
-                        {copied ? "복사했습니다" : "초안 복사"}
+                        {copied ? "복사했어요" : "초안 복사"}
                       </Btn>
-                      <p className="mt-1 break-keep text-sm text-good">고객에게 나가지 않습니다</p>
+                      <p className="mt-1 break-keep text-sm text-good">고객에게 나가지 않아요</p>
                     </div>
                   ) : null}
                 </div>
@@ -454,7 +454,7 @@ export function InquiryReply({
                 ) : null}
                 {companyContextUsed ? (
                   <p className="mt-2 break-keep text-sm text-muted" aria-label="회사 정보 참고">
-                    회사 정보를 참고해 표현했습니다. 배송·환불·규격 같은 사실의 근거는 아닙니다.
+                    회사 정보를 참고해 표현했어요. 배송·환불·규격 같은 사실의 근거는 아니에요.
                   </p>
                 ) : null}
                 </div>
@@ -515,7 +515,7 @@ export function InquiryReply({
                       {/* Not repeated here when it is the primary — it is in the draft's own header. */}
                       {!docked && publishable && draft && !editing && !draftDirty ? (
                         <Btn size="sm" variant="outline" onClick={onCopyDraft} disabled={busy}>
-                          {copied ? "복사했습니다" : "초안 복사"}
+                          {copied ? "복사했어요" : "초안 복사"}
                         </Btn>
                       ) : null}
                     </div>
@@ -550,8 +550,8 @@ export function InquiryReply({
                     aria-label="답변 등록 확인"
                   >
                     <p className="break-keep text-sm font-semibold text-ink">
-                      {detail.channelNameKo ?? "채널"}에 아래 내용을 등록합니다. 등록 후에는 취소할 수
-                      없습니다.
+                      {detail.channelNameKo ?? "채널"}에 아래 내용을 등록해요. 등록 후에는 취소할 수
+                      없어요.
                     </p>
                     <p className="mt-2 text-sm text-muted">저장된 버전 {draft.version}</p>
                     <p className="mt-2 whitespace-pre-wrap break-keep rounded-lg bg-canvas p-3 text-sm leading-relaxed text-ink">
@@ -559,7 +559,7 @@ export function InquiryReply({
                     </p>
                     <div className="mt-3 flex gap-2">
                       <Btn size="sm" onClick={onConfirmPublish} disabled={busy}>
-                        {busy ? "등록 중…" : "확인, 등록합니다"}
+                        {busy ? "등록 중…" : "확인, 등록해요"}
                       </Btn>
                       <Btn size="sm" variant="ghost" onClick={() => setConfirming(false)} disabled={busy}>
                         취소
@@ -571,7 +571,7 @@ export function InquiryReply({
                 {manualCopy !== null ? (
                   <div className="mt-3">
                     <p className="break-keep text-sm leading-relaxed text-muted">
-                      이 주소에서는 자동 복사를 쓸 수 없습니다. 아래 내용을 직접 복사해 주세요.
+                      이 주소에서는 자동 복사를 쓸 수 없어요. 아래 내용을 직접 복사해 주세요.
                     </p>
                     <textarea
                       readOnly
@@ -598,7 +598,7 @@ export function InquiryReply({
                   // A dirty editor means the fingerprint on screen is not the one that would be sent.
                   // Said while the editor is open too — that is when the seller can act on it.
                   <p className="mt-3 text-sm text-muted">
-                    편집한 내용을 먼저 저장해 주세요. 저장된 버전만 등록할 수 있습니다.
+                    편집한 내용을 먼저 저장해 주세요. 저장된 버전만 등록할 수 있어요.
                   </p>
                 ) : null}
               </div>
@@ -645,7 +645,7 @@ export function InquiryReply({
                 ) : null}
                 {publishStatus.presendStateProven === false ? (
                   <p className="mt-1 break-keep text-sm text-muted">
-                    보낼 당시 이 채널의 문의 수집이 최신이 아니었습니다.
+                    보낼 당시 이 채널의 문의 수집이 최신이 아니었어요.
                   </p>
                 ) : null}
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -739,19 +739,19 @@ function AnswerStateCard({
       */}
       <p className="break-keep text-lg font-semibold leading-relaxed text-ink">
         {noBasis && state.previouslyAnswered
-          ? "답변 기준은 추가하셨습니다."
+          ? "답변 기준은 추가했어요."
           : state.note}
       </p>
       {noBasis && state.previouslyAnswered ? (
         <p className="mt-1.5 break-keep text-base leading-relaxed text-ink">
-          다만 이 질문에 그대로 적용할 수 있는 내용은 아직 찾지 못했습니다.
+          다만 이 질문에 그대로 적용할 수 있는 내용은 아직 찾지 못했어요.
         </p>
       ) : state.action ? (
         <p className="mt-1.5 break-keep text-base leading-relaxed text-ink">{state.action}</p>
       ) : null}
       {noBasis ? (
         <p className="mt-2 break-keep text-sm leading-relaxed text-muted">
-          근거가 없는 답변은 만들지 않습니다. 아래에 직접 작성하실 수 있습니다.
+          근거가 없는 답변은 만들지 않아요. 아래에 직접 작성하실 수 있어요.
         </p>
       ) : null}
       {/*
@@ -996,7 +996,7 @@ export function InquiryReplyDock({ workspace }: { workspace: InquiryReplyWorkspa
         {/* 초록이 아니다 (2026-10-04). 이 문장은 축하가 아니라 바닥의 누름이 무엇을 하는지 말하는
             안내이고, 바로 위 경고와 색으로 겨루면 둘 다 덜 읽힌다. 초안 복사가 primary인 화면의
             dock에서는 muted가 그 자리의 색이다. */}
-        {!publishable ? <p className="break-keep text-xs text-muted">고객에게 나가지 않습니다</p> : null}
+        {!publishable ? <p className="break-keep text-xs text-muted">고객에게 나가지 않아요</p> : null}
       </div>
       <span className="shrink-0 whitespace-nowrap">
         {publishable ? (
@@ -1005,7 +1005,7 @@ export function InquiryReplyDock({ workspace }: { workspace: InquiryReplyWorkspa
           </Btn>
         ) : (
           <Btn size="sm" onClick={onCopyDraft} disabled={busy}>
-            {copied ? "복사했습니다" : "초안 복사"}
+            {copied ? "복사했어요" : "초안 복사"}
           </Btn>
         )}
       </span>

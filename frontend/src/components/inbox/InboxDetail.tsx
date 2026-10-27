@@ -176,7 +176,7 @@ export function InboxDetail({
               <p className="mt-2 break-keep text-sm leading-relaxed text-muted">{analysis.summary}</p>
               {/* Seller language, not the analyzer's name and version: the fact that matters is that this
                   is an automatic keyword classification that may be wrong. */}
-              <p className="mt-1 text-sm text-muted">키워드로 자동 분류한 것이라 정확하지 않을 수 있습니다.</p>
+              <p className="mt-1 text-sm text-muted">키워드로 자동 분류한 것이라 정확하지 않을 수 있어요.</p>
             </>
           ) : null}
         </Disclosure>

@@ -201,15 +201,15 @@ describe("§2 — three first-use mornings", () => {
     renderHome();
 
     const lead = await screen.findByTestId("first-use-no-channel");
-    expect(lead).toHaveTextContent("판매 채널을 연결하면 시작할 수 있습니다.");
+    expect(lead).toHaveTextContent("판매 채널을 연동하면 시작할 수 있어요.");
     expect(lead).toHaveTextContent("대신 확인하고");
-    expect(screen.getByRole("link", { name: "채널 연결하기" })).toHaveAttribute("href", "/connect");
+    expect(screen.getByRole("link", { name: "채널 연동하기" })).toHaveAttribute("href", "/connect");
     // The opener never claims there is nothing to check: nothing has been read.
-    expect(screen.queryByText(/지금 먼저 확인할 일은 없습니다/)).toBeNull();
+    expect(screen.queryByText(/지금 먼저 확인할 일은 없어요/)).toBeNull();
 
     // First-use v2 — the three things that happen, in order, for someone who has never seen this
     // product. The middle one is the only promise and it names what THIS seller's channels offer.
-    expect(lead).toHaveTextContent("1. 판매 채널 연결");
+    expect(lead).toHaveTextContent("1. 판매 채널 연동");
     expect(lead).toHaveTextContent("2. 자동으로 가져오기");
     expect(lead).toHaveTextContent("3. 먼저 하실 일 정리");
     // A program to install belongs to one channel's guided lanes, not to a seller who has not picked one.
@@ -225,9 +225,9 @@ describe("§2 — three first-use mornings", () => {
     renderHome();
 
     const lead = await screen.findByTestId("first-use-no-data");
-    expect(lead).toHaveTextContent("카페24 연결은 끝났습니다.");
+    expect(lead).toHaveTextContent("카페24 연동은 끝났어요.");
     expect(screen.queryByTestId("first-use-no-channel")).toBeNull();
-    expect(screen.queryByText(/지금 먼저 확인할 일은 없습니다/)).toBeNull();
+    expect(screen.queryByText(/지금 먼저 확인할 일은 없어요/)).toBeNull();
   });
 
   it("with rows, neither first-use lead is drawn and the ordinary Home runs", async () => {
@@ -237,7 +237,7 @@ describe("§2 — three first-use mornings", () => {
     // 행이 있으면 첫 사용 문장이 아니라 그 일의 목록이 화면이다 (Home은 하나다, 2026-10-06):
     // 전에는 여기서 대화 브리핑(「오늘 상태」 한 줄)이 돌았고, 지금은 같은 자리에 오늘의 골격이 선다.
     // 이 블록의 읽기는 비어 있으므로 목록은 빈 상태로 서고, 그 사실을 문장으로 적는다.
-    await waitFor(() => expect(screen.queryByText("지금 할 일이 없습니다.")).toBeTruthy());
+    await waitFor(() => expect(screen.queryByText("지금 할 일이 없어요.")).toBeTruthy());
     expect(screen.getByRole("heading", { level: 1, name: "오늘" })).toBeTruthy();
     expect(screen.queryByTestId("first-use-no-channel")).toBeNull();
     expect(screen.queryByTestId("first-use-no-data")).toBeNull();
@@ -256,9 +256,9 @@ describe("§3 — a repeated title is declared, not guessed", () => {
   });
 
   it("without the declaration the containment fallback still stands, so nothing regresses for producers that have not declared", () => {
-    const said = render(<ArtifactCard title="오늘 리뷰" headline="오늘 리뷰는 3건입니다."><p>a</p></ArtifactCard>);
+    const said = render(<ArtifactCard title="오늘 리뷰" headline="오늘 리뷰는 3건이에요."><p>a</p></ArtifactCard>);
     expect(said.container.querySelector("h3")).toBeNull();
-    const notSaid = render(<ArtifactCard title="오늘 리뷰" headline="확인한 내용입니다."><p>a</p></ArtifactCard>);
+    const notSaid = render(<ArtifactCard title="오늘 리뷰" headline="확인한 내용이에요."><p>a</p></ArtifactCard>);
     expect(notSaid.container.querySelector("h3")?.textContent).toBe("오늘 리뷰");
   });
 });

@@ -22,20 +22,20 @@ export interface LocateMessage {
 
 /** Why the press never reached a run. Each names a different thing to do about it. */
 const UNAVAILABLE_TEXT: Record<LocateUnavailable, string> = {
-  "bridge-disabled": "이 환경에서는 reviewnary 도우미 연결이 꺼져 있습니다.",
-  unpaired: "reviewnary 도우미가 필요합니다. 아직 연결되지 않았어요 — 채널 설정에서 도우미를 연결한 뒤 다시 눌러 주세요.",
-  "ticket-rejected": "reviewnary 도우미 연결이 거절되었습니다. 채널 설정에서 다시 연결해 주세요.",
-  unreachable: "reviewnary 도우미가 필요합니다. 내 PC의 도우미가 실행 중이 아니에요 — 도우미를 켠 뒤 다시 눌러 주세요.",
-  "no-announcement": "reviewnary 도우미가 응답하지 않습니다. 도우미를 다시 시작한 뒤 눌러 주세요.",
-  "transport-version-mismatch": "reviewnary 도우미 버전이 맞지 않습니다. 도우미를 업데이트해 주세요.",
+  "bridge-disabled": "이 환경에서는 reviewnary 도우미 연결이 꺼져 있어요.",
+  unpaired: "reviewnary 도우미가 필요해요. 아직 연결되지 않았어요 — 채널 설정에서 도우미를 연결한 뒤 다시 눌러 주세요.",
+  "ticket-rejected": "reviewnary 도우미 연결이 거절됐어요. 채널 설정에서 다시 연결해 주세요.",
+  unreachable: "reviewnary 도우미가 필요해요. 내 PC의 도우미가 실행 중이 아니에요 — 도우미를 켠 뒤 다시 눌러 주세요.",
+  "no-announcement": "reviewnary 도우미가 응답하지 않아요. 도우미를 다시 시작한 뒤 눌러 주세요.",
+  "transport-version-mismatch": "reviewnary 도우미 버전이 맞지 않아요. 도우미를 업데이트해 주세요.",
   // The agent is up but doing something else entirely — say that, rather than "연결할 수 없습니다".
-  "carrier-mismatch": "reviewnary 도우미가 지금 다른 작업을 하고 있어 상품평을 찾아드릴 수 없습니다.",
-  "start-refused": "reviewnary 도우미가 이 요청을 받지 않았습니다. 잠시 후 다시 눌러 주세요.",
-  "mint-failed": "이 상품평은 지금 찾아드릴 수 없습니다. 잠시 후 다시 시도해 주세요.",
+  "carrier-mismatch": "reviewnary 도우미가 지금 다른 작업을 하고 있어 상품평을 찾아드릴 수 없어요.",
+  "start-refused": "reviewnary 도우미가 이 요청을 받지 않았어요. 잠시 후 다시 눌러 주세요.",
+  "mint-failed": "이 상품평은 지금 찾아드릴 수 없어요. 잠시 후 다시 시도해 주세요.",
 };
 
 export function locateUnavailableText(reason: LocateUnavailable): string {
-  return UNAVAILABLE_TEXT[reason] ?? "상품평을 찾아드릴 수 없습니다.";
+  return UNAVAILABLE_TEXT[reason] ?? "상품평을 찾아드릴 수 없어요.";
 }
 
 /**
@@ -58,7 +58,7 @@ export function locateMessage(view: ActionWindowRunView | null, starting: boolea
     case "COMPLETED":
       return {
         tone: "done",
-        text: "쿠팡 화면에서 이 상품평에 테두리를 그렸습니다.",
+        text: "쿠팡 화면에서 이 상품평에 테두리를 그렸어요.",
         looking: false,
       };
     case "WAITING_FOR_HUMAN":
@@ -68,21 +68,21 @@ export function locateMessage(view: ActionWindowRunView | null, starting: boolea
           // The one refusal that a page turn will not fix — so it does not tell them to turn one.
           text:
             "상품·옵션·등록일·별점·내용이 모두 같은 상품평이 이 페이지에 둘 이상 있어 어느 줄인지 가릴 수 " +
-            "없습니다. 잘못된 줄을 표시하지 않기 위해 아무것도 표시하지 않았습니다.",
+            "없어요. 잘못된 줄을 표시하지 않기 위해 아무것도 표시하지 않았어요.",
           looking: false,
         };
       }
       if (code === "SURFACE_CLOSED") {
         return {
           tone: "waiting",
-          text: "쿠팡 창이 닫혔습니다. 창을 다시 열어 상품평 목록으로 이동한 뒤 [다시 확인]을 눌러 주세요.",
+          text: "쿠팡 창이 닫혔어요. 창을 다시 열어 상품평 목록으로 이동한 뒤 [다시 확인]을 눌러 주세요.",
           looking: false,
         };
       }
       if (code === "UNSUPPORTED_STATE") {
         return {
           tone: "waiting",
-          text: "쿠팡 창에 상품평 목록 화면을 띄워 주세요. 띄우시면 잠시 자동으로 다시 확인합니다.",
+          text: "쿠팡 창에 상품평 목록 화면을 띄워 주세요. 띄우시면 잠시 자동으로 다시 확인해요.",
           looking: true,
         };
       }
@@ -92,18 +92,18 @@ export function locateMessage(view: ActionWindowRunView | null, starting: boolea
         // when it ends nothing tells the seller. Promising it never stops would leave them paging at a run
         // that had quietly stopped watching — so the copy points at the button that always works.
         text:
-          "지금 보이는 쿠팡 페이지에는 이 상품평이 없습니다. 쿠팡 창에서 페이지를 넘겨 보세요 — 넘기시는 " +
-          "동안 잠시 자동으로 다시 확인합니다. 한참 뒤라면 [다시 확인]을 눌러 주세요.",
+          "지금 보이는 쿠팡 페이지에는 이 상품평이 없어요. 쿠팡 창에서 페이지를 넘겨 보세요 — 넘기시는 " +
+          "동안 잠시 자동으로 다시 확인해요. 한참 뒤라면 [다시 확인]을 눌러 주세요.",
         looking: true,
       };
     case "FAILED":
       return {
         tone: "failed",
-        text: "요청이 만료되었습니다. [쿠팡에서 보기]를 다시 눌러 주세요.",
+        text: "요청이 만료됐어요. [쿠팡에서 보기]를 다시 눌러 주세요.",
         looking: false,
       };
     case "CANCELLED":
-      return { tone: "waiting", text: "찾기를 멈췄습니다.", looking: false };
+      return { tone: "waiting", text: "찾기를 멈췄어요.", looking: false };
     default:
       return { tone: "working", text: "쿠팡 화면에서 찾는 중…", looking: true };
   }

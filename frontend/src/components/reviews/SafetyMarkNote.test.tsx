@@ -17,7 +17,7 @@ describe("SafetyMarkNote", () => {
       hit: "베 였",
       after: "어요.",
     });
-    expect(markedSentence("다른 말입니다.", "베였")).toBeNull();
+    expect(markedSentence("다른 말이에요.", "베였")).toBeNull();
   });
 
   it("says it is the review's words, and keeps the seller's word without changing the mark", async () => {

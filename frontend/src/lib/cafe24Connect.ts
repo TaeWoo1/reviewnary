@@ -57,10 +57,10 @@ export function classifyStartError(err: unknown): string {
     return response?.data?.message ?? "몰 ID를 확인해 주세요.";
   }
   if (status === 401) {
-    return "로그인이 필요합니다. 다시 로그인해 주세요.";
+    return "로그인이 필요해요. 다시 로그인해 주세요.";
   }
   if (status === 404) {
-    return "카페24 연결을 사용할 수 없습니다. 관리자에게 문의해 주세요.";
+    return "카페24 연동을 사용할 수 없어요. 관리자에게 문의해 주세요.";
   }
-  return "카페24 연결 시작에 실패했습니다. 잠시 후 다시 시도해 주세요.";
+  return "카페24 연동 시작에 실패했어요. 잠시 후 다시 시도해 주세요.";
 }

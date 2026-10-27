@@ -65,7 +65,7 @@ const GAP: KnowledgeCandidateView = {
   productId: "p-1",
   productName: "실리콘 주방매트",
   subject: "미끄럼 방지",
-  content: "「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요합니다.",
+  content: "「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요해요.",
   origin: "DRAFT_GAP",
   evidenceCount: 0,
   state: "OPEN",
@@ -403,7 +403,7 @@ describe("지식", () => {
       ...GAP,
       id: "c-3",
       subject: "접착 — 실크벽지·고르지 않은 벽",
-      content: "실크벽지·고르지 않은 벽에 붙일 때\n폼 양면테이프나 실리콘을 덧대어 고정하시길 권해 드립니다.",
+      content: "실크벽지·고르지 않은 벽에 붙일 때\n폼 양면테이프나 실리콘을 덧대어 고정하시길 권해 드려요.",
       origin: "ISSUE_GUIDANCE",
       evidenceCount: 37,
     };
@@ -424,7 +424,7 @@ describe("지식", () => {
       ...GAP,
       id: "c-4",
       subject: "마감캡 구성",
-      content: "한 세트에 【확인: 수량】개 들어 있습니다.",
+      content: "한 세트에 【확인: 수량】개 들어 있어요.",
       origin: "ISSUE_GUIDANCE",
       evidenceCount: 5,
       customerPhrases: ["마감캡", "하나만 왔"],
@@ -457,7 +457,7 @@ describe("지식", () => {
       .mockResolvedValueOnce({
         applied: false,
         changes: [{ sheet: "안내 매뉴얼", row: 3, text: "「실크벽지 부착」 새 안내 등록" }],
-        problems: [{ sheet: "안내 매뉴얼", row: 4, text: "【확인: …】이 남아 있어 「사용」으로 등록할 수 없습니다." }],
+        problems: [{ sheet: "안내 매뉴얼", row: 4, text: "【확인: …】이 남아 있어 「사용」으로 등록할 수 없어요." }],
       })
       .mockResolvedValueOnce({
         applied: true,
@@ -485,12 +485,12 @@ describe("지식", () => {
     uploadKnowledgeWorkbook.mockResolvedValueOnce({
       applied: false,
       changes: [{
-        sheet: "답변 템플릿", row: 2, text: "「별점 4~5점 기본 문구」 문구 바꿈", where: "별점이 4~5점인 리뷰에 씁니다.",
-        before: "소중한 후기 감사합니다.", after: "마음에 드셨다니 기쁩니다.",
+        sheet: "답변 템플릿", row: 2, text: "「별점 4~5점 기본 문구」 문구 바꿈", where: "별점이 4~5점인 리뷰에 써요.",
+        before: "소중한 후기 감사해요.", after: "마음에 드셨다니 기뻐요.",
       }],
       problems: [{
-        sheet: "안내 매뉴얼", row: 3, text: "「자르기」 안내 고침 — 내려받은 뒤 화면에서 바뀐 줄이라 반영하지 않았습니다.",
-        where: "상품 · 일체형 전선몰딩", before: "화면에서 고친 안내입니다.", after: null,
+        sheet: "안내 매뉴얼", row: 3, text: "「자르기」 안내 고침 — 내려받은 뒤 화면에서 바뀐 줄이라 반영하지 않았어요.",
+        where: "상품 · 일체형 전선몰딩", before: "화면에서 고친 안내예요.", after: null,
       }],
     });
     draw();
@@ -499,20 +499,20 @@ describe("지식", () => {
     const block = await screen.findByTestId("knowledge-workbook");
     await userEvent.upload(within(block).getByLabelText("엑셀 파일 고르기"), new File(["x"], "답글 기준.xlsx"));
     const change = (await within(block).findByText("「별점 4~5점 기본 문구」 문구 바꿈")).closest("li") as HTMLElement;
-    expect(change).toHaveTextContent("별점이 4~5점인 리뷰에 씁니다.");
-    expect(within(change).getByText("지금").parentElement).toHaveTextContent("소중한 후기 감사합니다.");
-    expect(within(change).getByText("바뀐 뒤").parentElement).toHaveTextContent("마음에 드셨다니 기쁩니다.");
+    expect(change).toHaveTextContent("별점이 4~5점인 리뷰에 써요.");
+    expect(within(change).getByText("지금").parentElement).toHaveTextContent("소중한 후기 감사해요.");
+    expect(within(change).getByText("바뀐 뒤").parentElement).toHaveTextContent("마음에 드셨다니 기뻐요.");
     const stale = within(block).getByText(/화면에서 바뀐 줄/).closest("li") as HTMLElement;
-    expect(within(stale).getByText("화면의 지금 내용").parentElement).toHaveTextContent("화면에서 고친 안내입니다.");
+    expect(within(stale).getByText("화면의 지금 내용").parentElement).toHaveTextContent("화면에서 고친 안내예요.");
     expect(within(stale).queryByText("바뀐 뒤")).toBeNull();
   });
 
   it("a long change folds but reads to its end on 전체 보기, both sides at once", async () => {
-    const tail = "단, 개봉 후에는 환불이 되지 않습니다.";
-    const longText = Array.from({ length: 12 }, (_, i) => `${i + 1}번째 안내 문장입니다.`).join("\n") + "\n" + tail;
+    const tail = "단, 개봉 후에는 환불이 되지 않아요.";
+    const longText = Array.from({ length: 12 }, (_, i) => `${i + 1}번째 안내 문장이에요.`).join("\n") + "\n" + tail;
     uploadKnowledgeWorkbook.mockResolvedValueOnce({
       applied: false,
-      changes: [{ sheet: "안내 매뉴얼", row: 2, text: "「환불」 안내 고침", where: "회사 전체", before: longText, after: longText.replace("되지 않습니다", "됩니다") }],
+      changes: [{ sheet: "안내 매뉴얼", row: 2, text: "「환불」 안내 고침", where: "회사 전체", before: longText, after: longText.replace("되지 않아요", "돼요") }],
       problems: [],
     });
     draw();
@@ -529,9 +529,9 @@ describe("지식", () => {
     await userEvent.click(more);
     expect(after).toHaveAttribute("data-folded", "false");
     expect(within(row).getByText("지금").nextElementSibling).toHaveAttribute("data-folded", "false");
-    expect(after).toHaveTextContent("단, 개봉 후에는 환불이 됩니다.");
+    expect(after).toHaveTextContent("단, 개봉 후에는 환불이 돼요.");
     // Only the line that changed is marked, and only on the side that changed.
-    expect(within(after).getAllByTitle("바뀐 줄").map((m) => m.textContent)).toEqual(["단, 개봉 후에는 환불이 됩니다."]);
+    expect(within(after).getAllByTitle("바뀐 줄").map((m) => m.textContent)).toEqual(["단, 개봉 후에는 환불이 돼요."]);
     expect(within(row).getByText("지금").nextElementSibling?.querySelector("mark")).toBeNull();
     expect(within(row).getByRole("button", { name: "접기" })).toHaveAttribute("aria-expanded", "true");
   });
@@ -539,7 +539,7 @@ describe("지식", () => {
   it("a short change has nothing to unfold", async () => {
     uploadKnowledgeWorkbook.mockResolvedValueOnce({
       applied: false,
-      changes: [{ sheet: "답변 템플릿", row: 2, text: "「가격 리뷰」 문구 바꿈", before: "감사합니다.", after: "고맙습니다." }],
+      changes: [{ sheet: "답변 템플릿", row: 2, text: "「가격 리뷰」 문구 바꿈", before: "감사해요.", after: "고마워요." }],
       problems: [],
     });
     draw();
@@ -566,7 +566,7 @@ describe("지식", () => {
     getKnowledgeCandidates.mockResolvedValue([GAP]);
     draw();
     const inbox = await screen.findByTestId("knowledge-inbox");
-    expect(inbox).toHaveTextContent("「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요합니다.");
+    expect(inbox).toHaveTextContent("「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요해요.");
     expect(screen.getByText("빈칸")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "적기" }));
@@ -576,11 +576,11 @@ describe("지식", () => {
     // And with nothing written there is nothing to save.
     expect(screen.getByRole("button", { name: "등록" })).toBeDisabled();
 
-    await userEvent.type(body, "실리콘 매트는 물기를 닦은 평평한 바닥에서 밀리지 않습니다.");
+    await userEvent.type(body, "실리콘 매트는 물기를 닦은 평평한 바닥에서 밀리지 않아요.");
     await userEvent.click(screen.getByRole("button", { name: "등록" }));
     await waitFor(() =>
       expect(acceptKnowledgeCandidate).toHaveBeenCalledWith("c-2", expect.objectContaining({
-        content: "실리콘 매트는 물기를 닦은 평평한 바닥에서 밀리지 않습니다.",
+        content: "실리콘 매트는 물기를 닦은 평평한 바닥에서 밀리지 않아요.",
       })),
     );
   });
@@ -686,7 +686,7 @@ describe("지식", () => {
       new Promise((_r, reject) =>
         setTimeout(() => reject({
           isAxiosError: true,
-          response: { status: 400, data: { message: "이 형식은 읽을 수 없습니다. PDF · DOCX · TXT · MD · CSV 파일을 읽을 수 있습니다." } },
+          response: { status: 400, data: { message: "이 형식은 읽을 수 없어요. PDF · DOCX · TXT · MD · CSV 파일을 읽을 수 있어요." } },
         }), 0)),
     );
     draw();
@@ -698,7 +698,7 @@ describe("지식", () => {
     // than through a pointer interaction userEvent would refuse on a display:none element.
     const input = screen.getByLabelText("올릴 파일") as HTMLInputElement;
     fireEvent.change(input, { target: { files: [new File(["x"], "manual.hwp")] } });
-    expect(await screen.findByText(/이 형식은 읽을 수 없습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/이 형식은 읽을 수 없어요/)).toBeInTheDocument();
   });
 
   it("has no accessibility violations", async () => {

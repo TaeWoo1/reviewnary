@@ -31,9 +31,9 @@ export const DECISION_ACTION_NOTE = {
   withReply:
     "「답글 달기」로 정하면 아래에서 AI 답글을 쓰고 확정할 수 있어요. 확정한 답글은 판매자센터에 직접 올려요.",
   withoutReply:
-    "이 채널에서는 reviewnary가 답변을 작성하지 않습니다. 조치는 판매자님이 직접 하시고, 여기에는 무엇으로 정했는지만 기록됩니다.",
+    "이 채널에서는 reviewnary가 답변을 작성하지 않아요. 조치는 판매자님이 직접 하시고, 여기에는 무엇으로 정했는지만 기록돼요.",
   withoutAccount:
-    "이 채널에 연결된 판매 계정이 없어 답변 초안은 준비할 수 없습니다. 조치는 판매자님이 직접 하시고, 여기에는 무엇으로 정했는지만 기록됩니다.",
+    "이 채널에 연결된 판매 계정이 없어 답변 초안은 준비할 수 없어요. 조치는 판매자님이 직접 하시고, 여기에는 무엇으로 정했는지만 기록돼요.",
 } as const;
 
 /** The short word for a recorded decision — the same three the worklist and the record use. */
@@ -159,9 +159,9 @@ export function decisionLogSentence(entry: ReviewDecisionLogEntry): string | nul
  */
 export const EVIDENCE_NOTE = {
   /** Why 「기록된 반복 문제 없음」 is not 「반복된 적 없음」, and what would change it. */
-  repeatCriterion: "같은 문제를 말한 리뷰가 쌓이면 반복 문제로 모입니다 — 위의 자동 분류와는 다른 기준입니다.",
+  repeatCriterion: "같은 문제를 말한 리뷰가 쌓이면 반복 문제로 모여요 — 위의 자동 분류와는 다른 기준이에요.",
   /** What the counts count: what is FILED, not what a draft used. */
-  countsAreFiled: "여기 있는 숫자는 등록된 자료의 수입니다.",
+  countsAreFiled: "여기 있는 숫자는 등록된 자료의 수예요.",
 } as const;
 
 /**
@@ -205,11 +205,11 @@ export function previewJudgmentTokens(
  * no-execution wording it has always been.
  */
 export const DECISION_LOG_DISCLOSURE =
-  "여기 기록한 판단과 조치는 reviewnary 안에만 남습니다. 마켓플레이스에는 아무것도 전송되지 않습니다.";
+  "여기 기록한 판단과 조치는 reviewnary 안에만 남아요. 마켓플레이스에는 아무것도 전송되지 않아요.";
 
 /** Said instead, once a reply has actually been executed at the channel from this screen's own record. */
 export const DECISION_LOG_DISCLOSURE_EXECUTED =
-  "여기 기록한 판단은 reviewnary 안에만 남습니다. 채널로 전송된 것은 아래에 기록된 답변뿐입니다.";
+  "여기 기록한 판단은 reviewnary 안에만 남아요. 채널로 전송된 것은 아래에 기록된 답변뿐이에요.";
 
 /**
  * Which of the two sentences is true for this review.
@@ -238,4 +238,4 @@ export function decisionLogDisclosure(entries: ReviewDecisionLogEntry[]): string
  * 「reviewnary 안에만 남습니다」 also rules out destinations other than the marketplace. The full case keeps
  * {@link DECISION_LOG_DISCLOSURE} whole.
  */
-export const PREVIEW_SAFETY_LINE = "마켓플레이스로는 아무것도 전송되지 않습니다.";
+export const PREVIEW_SAFETY_LINE = "마켓플레이스로는 아무것도 전송되지 않아요.";

@@ -215,7 +215,7 @@ describe("HelperStatusCard — 이 기기 연결 (Helper Device Authentication v
     const { unmount } = renderCard();
     await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결 필요"));
     fireEvent.click(screen.getByTestId("helper-link"));
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("승인하지 못했습니다"));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("승인하지 못했어요"));
     // Two ways out, and neither of them is "watch this forever".
     expect(screen.getByTestId("helper-link-retry")).toBeInTheDocument();
     expect(screen.getByTestId("helper-link-cancel")).toBeInTheDocument();
@@ -243,10 +243,10 @@ describe("HelperStatusCard — 이 기기 연결 (Helper Device Authentication v
     fireEvent.click(screen.getByTestId("helper-link"));
     // From here the helper legitimately reports a pending grant, exactly as it did live.
     deviceStatus = { linked: false, linking: "pending", verified: "UNVERIFIED" };
-    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결하지 못했습니다"));
+    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결하지 못했어요"));
     // And it stays said: the poll no longer overwrites the browser's own outcome.
     await new Promise((r) => setTimeout(r, 2600));
-    expect(screen.getByTestId("helper-state")).toHaveTextContent("연결하지 못했습니다");
+    expect(screen.getByTestId("helper-state")).toHaveTextContent("연결하지 못했어요");
 
     // 다시 시도 re-approves the code THIS browser minted — no new grant, no helper call.
     const callsBefore = fetchMock.mock.calls.filter((c) => String(c[0]).includes("/bridge/device/link")).length;
@@ -265,7 +265,7 @@ describe("HelperStatusCard — 이 기기 연결 (Helper Device Authentication v
     await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결 필요"));
     fireEvent.click(screen.getByTestId("helper-link"));
     deviceStatus = { linked: false, linking: "pending", verified: "UNVERIFIED" };
-    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결하지 못했습니다"));
+    await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결하지 못했어요"));
 
     fireEvent.click(screen.getByTestId("helper-link-cancel"));
     // Back to the ordinary state with its ordinary control — the helper's grant is left to expire, and
@@ -285,7 +285,7 @@ describe("HelperStatusCard — 이 기기 연결 (Helper Device Authentication v
     listHelperDevices.mockResolvedValue([{ id: "dev-1" }]);
     renderCard();
     await waitFor(() => expect(screen.getByTestId("helper-state")).toHaveTextContent("연결 필요"));
-    expect(screen.getByText(/다른 계정에 연결되어 있습니다/)).toBeTruthy();
+    expect(screen.getByText(/다른 계정에 연결되어 있어요/)).toBeTruthy();
     expect(screen.getByTestId("helper-link")).toBeTruthy();
     // Seller words only: no org, no token, no device id anywhere on screen.
     expect(document.body.textContent ?? "").not.toMatch(/org|token|dev-elsewhere|조직/i);

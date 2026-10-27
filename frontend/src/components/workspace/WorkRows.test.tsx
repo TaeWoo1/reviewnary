@@ -53,7 +53,7 @@ function draw(rows: HomeWorkRow[], props: Partial<Parameters<typeof WorkRows>[0]
  */
 describe("WorkRows — what every row says identically is a fact about the list", () => {
   it("lifts the shared reason, source and rating off the rows and says them once", () => {
-    draw([row(), row({ key: "review:r-2", subjectId: "r-2", title: "재단하다가 모서리가 깨졌습니다." })]);
+    draw([row(), row({ key: "review:r-2", subjectId: "r-2", title: "재단하다가 모서리가 깨졌어요." })]);
     // Not on the rows…
     const list = screen.getByLabelText("확인할 일");
     expect(within(list).queryByText("리뷰")).toBeNull();
@@ -209,7 +209,7 @@ describe("the leading slot — the state word, then the category", () => {
  */
 describe("WorkRows — the rail reading", () => {
   it("leads with the customer's words and puts the state in the line under them", () => {
-    draw([row({ said: "보관함은 좋은데 수거함은 별로예요", title: "문의 드립니다" })], { reading: "rail" });
+    draw([row({ said: "보관함은 좋은데 수거함은 별로예요", title: "문의 드려요" })], { reading: "rail" });
 
     const list = screen.getByLabelText("확인할 일");
     const link = within(list).getByRole("link");

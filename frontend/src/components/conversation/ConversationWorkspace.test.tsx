@@ -60,7 +60,7 @@ describe("conversation provider + workspace", () => {
     vi.mocked(conversationClient.getConversation).mockResolvedValue(STORED);
     render(<Shell><ConversationWorkspace surface="home" chips={[]} /></Shell>);
     expect(await screen.findByText("지난 질문")).toBeInTheDocument();
-    expect(screen.getByText("이 상품에 미답변 문의는 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("이 상품에 미답변 문의는 없어요.")).toBeInTheDocument();
     expect(conversationClient.getConversation).toHaveBeenCalledWith("c-stored");
     expect(conversationClient.createConversation).not.toHaveBeenCalled();
   });
@@ -83,7 +83,7 @@ describe("conversation provider + workspace", () => {
   it("sending appends the seller's turn, then the agent's — and shows only the stages received, in order", async () => {
     let finish!: () => void;
     vi.mocked(conversationClient.sendTurn).mockImplementation((_id, _req, onEvent: (e: ProgressEvent) => void) => {
-      onEvent({ type: "stage", stage: "UNDERSTANDING", label: "요청을 이해했습니다", at: "1" });
+      onEvent({ type: "stage", stage: "UNDERSTANDING", label: "요청을 이해했어요", at: "1" });
       onEvent({ type: "stage", stage: "READING", label: "리뷰를 읽는 중", at: "2" });
       return new Promise((resolve) => {
         finish = () => resolve(agentTurn());
@@ -98,22 +98,22 @@ describe("conversation provider + workspace", () => {
     // trail on the same line rather than a column that grows while the seller waits. Still only the
     // stages the runtime reported, still in the order it reported them.
     expect(progress).toHaveTextContent("리뷰를 읽는 중");
-    expect(progress).toHaveTextContent("요청을 이해했습니다");
+    expect(progress).toHaveTextContent("요청을 이해했어요");
     expect(progress.querySelectorAll("li")).toHaveLength(0);
-    expect(progress.textContent?.indexOf("요청을 이해했습니다")).toBeLessThan(progress.textContent!.indexOf("리뷰를 읽는 중"));
+    expect(progress.textContent?.indexOf("요청을 이해했어요")).toBeLessThan(progress.textContent!.indexOf("리뷰를 읽는 중"));
     expect(progress).not.toHaveTextContent("계획");
     // Stop is real and sits where Send was.
     // The control swaps in place with a short crossfade, so it is awaited, never assumed.
     expect(await screen.findByRole("button", { name: "중지" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "보내기" })).toBeNull();
     await act(async () => finish());
-    expect(await screen.findByText("이 상품에 미답변 문의는 없습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("이 상품에 미답변 문의는 없어요.")).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByTestId("conversation-progress")).toBeNull());
     // Evidence is folded, not first — a small 「근거 N」 affordance (Agent Interaction Model v2 §5).
     expect(screen.getByText("근거")).toBeInTheDocument();
   });
 
-  it("Stop closes the stream: the turn ends as 「요청을 중지했습니다」, nothing is claimed, the box is free again", async () => {
+  it("Stop closes the stream: the turn ends as 「요청을 중지했어요」, nothing is claimed, the box is free again", async () => {
     vi.mocked(conversationClient.sendTurn).mockImplementation((_id, _req, _onEvent, signal?: AbortSignal) =>
       new Promise((_resolve, reject) => {
         signal?.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
@@ -123,7 +123,7 @@ describe("conversation provider + workspace", () => {
     await userEvent.type(screen.getByLabelText("무엇이든 물어보세요"), "오늘 리뷰 뭐 들어왔어?");
     await userEvent.keyboard("{Enter}");
     await userEvent.click(await screen.findByRole("button", { name: "중지" }));
-    expect(await screen.findByText("요청을 중지했습니다. 이미 시작된 확인은 되돌리지 않습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("요청을 중지했어요. 이미 시작된 확인은 되돌리지 않아요.")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
     await waitFor(() => expect(screen.queryByTestId("conversation-progress")).toBeNull());
     expect(await screen.findByRole("button", { name: "보내기" })).toBeInTheDocument();
@@ -136,7 +136,7 @@ describe("conversation provider + workspace", () => {
     render(<Shell><ConversationWorkspace surface="home" chips={[]} /></Shell>);
     await userEvent.type(screen.getByLabelText("무엇이든 물어보세요"), "첫 질문");
     await userEvent.keyboard("{Enter}");
-    await screen.findByText("이 상품에 미답변 문의는 없습니다.");
+    await screen.findByText("이 상품에 미답변 문의는 없어요.");
     await userEvent.click(screen.getByRole("button", { name: "문의에서도 같은 문제가 있는지 봐줘" }));
     await waitFor(() => expect(conversationClient.sendTurn).toHaveBeenCalledTimes(2));
     expect(vi.mocked(conversationClient.sendTurn).mock.calls[1]![1].text).toBe("문의에서도 같은 문제가 있는지 봐줘");

@@ -24,17 +24,17 @@ const TYPE_META: Record<string, { label: string; tone: Tone; action: string }> =
   AUTH_EXPIRED: {
     label: "재연결 필요",
     tone: "bad",
-    action: "인증이 만료되었습니다. 채널에서 재연결해 주세요.",
+    action: "인증이 만료됐어요. 채널에서 재연결해 주세요.",
   },
   REPEATED_FAILURE: {
     label: "반복 수집 실패",
     tone: "warn",
-    action: "수집이 반복해서 실패했습니다. 연결 상태를 점검해 주세요.",
+    action: "수집이 반복해서 실패했어요. 연결 상태를 점검해 주세요.",
   },
   RATE_LIMITED: {
     label: "수집 지연 (속도 제한)",
     tone: "warn",
-    action: "잠시 후 자동으로 다시 시도합니다. 반복되면 점검이 필요합니다.",
+    action: "잠시 후 자동으로 다시 시도해요. 반복되면 점검이 필요해요.",
   },
   // Coupang credential-expiry alerts. Expiring reads as 갱신 필요 (actionable, not a failure); expired is
   // 재발급 필요 (the connection has stopped). The escalation D-30→D-14→D-7→D-1 is shown by the status
@@ -42,12 +42,12 @@ const TYPE_META: Record<string, { label: string; tone: Tone; action: string }> =
   COUPANG_CREDENTIAL_EXPIRING: {
     label: "키 갱신 필요",
     tone: "warn",
-    action: "쿠팡 API 키 유효기간이 다가옵니다. 채널에서 'WING에서 API 키 갱신하기'로 갱신해 주세요.",
+    action: "쿠팡 API 키 유효기간이 다가와요. 채널에서 'WING에서 API 키 갱신하기'로 갱신해 주세요.",
   },
   COUPANG_CREDENTIAL_EXPIRED: {
     label: "키 재발급 필요",
     tone: "bad",
-    action: "쿠팡 API 키가 만료되어 연동이 중단되었습니다. 채널에서 키를 갱신해 주세요.",
+    action: "쿠팡 API 키가 만료되어 연동이 중단됐어요. 채널에서 키를 갱신해 주세요.",
   },
 };
 
@@ -124,7 +124,7 @@ export function AlertSettings() {
     } catch {
       setList(prev); // roll back the optimistic mark
       syncOpenCount(prev);
-      setAckError("확인 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      setAckError("확인 처리에 실패했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
       setAckBusyId(null);
     }
@@ -134,7 +134,7 @@ export function AlertSettings() {
     <div className="space-y-6">
       <PageHead
         title="연결 알림"
-        description="확인 처리는 알림을 봤다는 표시이며, 연결 문제 해결을 의미하지 않습니다."
+        description="확인 처리는 알림을 봤다는 표시이며, 연결 문제 해결을 의미하지 않아요."
       />
 
       {ackError ? (
@@ -145,10 +145,10 @@ export function AlertSettings() {
         <p className="text-muted">불러오는 중…</p>
       ) : error ? (
         <div className="rounded-xl bg-bad/10 px-4 py-3 text-bad">
-          연결 알림을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+          연결 알림을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
         </div>
       ) : list.length === 0 ? (
-        <EmptyState message="현재 확인할 연결 알림이 없습니다." />
+        <EmptyState message="현재 확인할 연결 알림이 없어요." />
       ) : (
         // One list, open first — the rows of a log, not a wall of posters (Phase 4).
         <ul aria-label="연결 알림" className="divide-y divide-line/70 overflow-hidden rounded-2xl border border-line bg-surface">

@@ -288,7 +288,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
         />
       ) : null}
 
-      {work === undefined ? <p className="text-sm text-muted">불러오는 중입니다.</p> : null}
+      {work === undefined ? <p className="text-sm text-muted">불러오는 중이에요.</p> : null}
 
       {/* An account whose reply work cannot be attributed declines to answer rather than reading as 「no work」 —
           the same copy the 리뷰 screen's 「내 답변 작업」 used, moved with the work (UI/UX v2 Phase 3). */}
@@ -308,7 +308,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
           them is good news. */}
       {work === null ? (
         <p className="text-sm text-bad" role="alert">
-          할 일 목록을 불러오지 못했습니다.
+          할 일 목록을 불러오지 못했어요.
         </p>
       ) : null}
 
@@ -343,11 +343,11 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
 
       {work && allRows.length === 0 ? (
         <p className="break-keep leading-relaxed text-ink">
-          {query.trim() ? "찾으시는 내용이 있는 문의나 리뷰가 없습니다." : "지금 확인이 필요한 문의나 리뷰가 없습니다."}
+          {query.trim() ? "찾으시는 내용이 있는 문의나 리뷰가 없어요." : "지금 확인이 필요한 문의나 리뷰가 없어요."}
         </p>
       ) : null}
       {work && allRows.length > 0 && rows.length === 0 ? (
-        <p className="break-keep text-sm text-muted">이 보기에 해당하는 일이 없습니다.</p>
+        <p className="break-keep text-sm text-muted">이 보기에 해당하는 일이 없어요.</p>
       ) : null}
 
       {work && rows.length > 0 ? (
@@ -367,7 +367,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
               the total. How many more it cannot say: the reads that overflowed count different populations. */}
           {work.truncated && filter === "all" ? (
             <p className="mt-3 break-keep text-sm text-muted">
-              한 번에 {rows.length.toLocaleString("ko-KR")}건까지 보여 드립니다. 처리하시면 다음 건이 올라옵니다.
+              한 번에 {rows.length.toLocaleString("ko-KR")}건까지 보여 드려요. 처리하시면 다음 건이 올라와요.
             </p>
           ) : null}
         </section>

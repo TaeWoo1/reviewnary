@@ -30,8 +30,8 @@ export interface AttentionCard {
   hint: string;
 }
 
-const NOT_CONNECTED_HINT = "자료를 연결하면 표시됩니다";
-const UNAVAILABLE_HINT = "지금은 확인할 수 없습니다";
+const NOT_CONNECTED_HINT = "자료를 연결하면 표시돼요";
+const UNAVAILABLE_HINT = "지금은 확인할 수 없어요";
 
 export function hintFor(signal: Signal): string | null {
   switch (signal.kind) {

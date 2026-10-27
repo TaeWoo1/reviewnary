@@ -23,8 +23,8 @@ vi.mock("../../lib/apiClient", () => ({
 function template(over: Partial<ReviewReplyTemplateView> = {}): ReviewReplyTemplateView {
   return {
     key: "delivery_reply",
-    body: "기본 배송 문구입니다.",
-    defaultBody: "기본 배송 문구입니다.",
+    body: "기본 배송 문구예요.",
+    defaultBody: "기본 배송 문구예요.",
     customized: false,
     matchWords: ["배송", "택배"],
     ...over,
@@ -78,9 +78,9 @@ describe("리뷰 답변 문구", () => {
     getReviewReplyTemplates.mockResolvedValue({ templates: allTemplates() });
     renderScreen();
 
-    expect(await screen.findByText(/말투와 표현만 정합니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/말투와 표현만 정해요/)).toBeInTheDocument();
     expect(screen.getByText(/다음에 만드는 초안부터/)).toBeInTheDocument();
-    expect(screen.getByText(/이미 승인한 답변은 그대로입니다/)).toBeInTheDocument();
+    expect(screen.getByText(/이미 승인한 답변은 그대로예요/)).toBeInTheDocument();
   });
 
   it("shows the words that select a template, and nothing where there are none", async () => {
@@ -96,7 +96,7 @@ describe("리뷰 답변 문구", () => {
   it("saves the edited wording and reads the server's own text back", async () => {
     getReviewReplyTemplates.mockResolvedValue({ templates: allTemplates() });
     saveReviewReplyTemplate.mockResolvedValue(
-      template({ body: "저희가 정한 배송 문구입니다.", customized: true }),
+      template({ body: "저희가 정한 배송 문구예요.", customized: true }),
     );
     renderScreen();
 
@@ -106,8 +106,8 @@ describe("리뷰 답변 문구", () => {
     await userEvent.click(within(box.closest("section")!).getByRole("button", { name: "저장" }));
 
     await waitFor(() => expect(saveReviewReplyTemplate).toHaveBeenCalledWith("delivery_reply", "저희 배송 문구"));
-    expect(await screen.findByText("저장했습니다.")).toBeInTheDocument();
-    expect(screen.getByLabelText("배송 리뷰 문구")).toHaveValue("저희가 정한 배송 문구입니다.");
+    expect(await screen.findByText("저장했어요.")).toBeInTheDocument();
+    expect(screen.getByLabelText("배송 리뷰 문구")).toHaveValue("저희가 정한 배송 문구예요.");
     expect(within(box.closest("section")!).getByText("직접 정한 문구")).toBeInTheDocument();
   });
 
@@ -127,8 +127,8 @@ describe("리뷰 답변 문구", () => {
     await userEvent.click(within(custom).getByRole("button", { name: "기본값 복원" }));
 
     await waitFor(() => expect(resetReviewReplyTemplate).toHaveBeenCalledWith("delivery_reply"));
-    expect(await screen.findByText("기본 문구로 되돌렸습니다.")).toBeInTheDocument();
-    expect(screen.getByLabelText("배송 리뷰 문구")).toHaveValue("기본 배송 문구입니다.");
+    expect(await screen.findByText("기본 문구로 되돌렸어요.")).toBeInTheDocument();
+    expect(screen.getByLabelText("배송 리뷰 문구")).toHaveValue("기본 배송 문구예요.");
   });
 
   it("shows the backend's own refusal rather than a generic failure", async () => {
@@ -158,7 +158,7 @@ describe("리뷰 답변 문구", () => {
     getReviewReplyTemplates.mockRejectedValue(new Error("nope"));
     renderScreen();
 
-    expect(await screen.findByText("문구를 불러오지 못했습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("문구를 불러오지 못했어요.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "저장" })).not.toBeInTheDocument();
   });
 

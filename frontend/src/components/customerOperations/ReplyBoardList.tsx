@@ -99,7 +99,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export function MovingList({ rows, now = new Date() }: { rows: ReplyBoardRow[]; now?: Date }) {
-  if (rows.length === 0) return <p className="break-keep text-sm text-muted">진행 중인 일이 없습니다.</p>;
+  if (rows.length === 0) return <p className="break-keep text-sm text-muted">진행 중인 일이 없어요.</p>;
   return (
     <ul aria-label="진행 중" className="-mx-2 divide-y divide-line">
       {rows.map((r) => laneRow(r, now))}
@@ -126,7 +126,7 @@ export function FinishedList({
   const nothing = rows.length === 0 && recorded.length === 0;
   return (
     <div className="space-y-5">
-      {nothing ? <p className="break-keep text-sm text-muted">최근 30일 동안 끝난 일이 없습니다.</p> : null}
+      {nothing ? <p className="break-keep text-sm text-muted">최근 30일 동안 끝난 일이 없어요.</p> : null}
       {confirmed.length + confirmedRecorded.length > 0 ? (
         <Section title="네이버에 답글 있음">
           {confirmed.map((r) => laneRow(r, now))}

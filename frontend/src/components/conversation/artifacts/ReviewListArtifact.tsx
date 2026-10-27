@@ -58,11 +58,11 @@ export function ReviewListArtifact({ artifact, stepped = [], headline }: { artif
   // 「네이버 스마트스토어 리뷰 · 확인 기록 없음」. Channels with no step keep their as-of line.
   const raised = new Set(stepped.map((c) => c.toUpperCase()));
   const freshness = artifact.freshness.filter((f) => !raised.has(f.channelCode.toUpperCase()));
-  const note = [artifact.note, allNegative ? "모두 부정 리뷰입니다." : null].filter(Boolean).join(" ") || null;
+  const note = [artifact.note, allNegative ? "모두 부정 리뷰예요." : null].filter(Boolean).join(" ") || null;
   return (
     <ArtifactCard title={artifact.title} note={note} headline={headline} titleSaid={artifact.titleSaid}>
       {artifact.items.length === 0 ? (
-        <p className="px-4 pb-2 text-sm text-muted">보여드릴 리뷰 행이 없습니다.</p>
+        <p className="px-4 pb-2 text-sm text-muted">보여드릴 리뷰 행이 없어요.</p>
       ) : (
         <ul className="divide-y divide-line/70">
           {artifact.items.slice(0, head.shown).map((r) => {

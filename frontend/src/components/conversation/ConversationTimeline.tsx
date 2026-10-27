@@ -234,7 +234,7 @@ function AgentTurn({ turn, threadChannel: thread, compact, latest, userText, onP
   const stopped = failed && turn.failureCode === "CANCELLED";
   // A failed turn reads as its own sentence (the runtime's closed seller wording — Response Hygiene v1),
   // never as a mechanism headline (「계획을 세우지 못했습니다」) with the sentence repeated under it.
-  const headline = turn.message || turn.failureReason || "요청을 처리하지 못했습니다.";
+  const headline = turn.message || turn.failureReason || "요청을 처리하지 못했어요.";
   const detail = failed && !stopped && turn.failureReason && turn.failureReason !== turn.message ? turn.failureReason : null;
   return (
     // <b>No nameplate.</b> The ✳︎ that opened every agent turn was a label saying who was speaking,

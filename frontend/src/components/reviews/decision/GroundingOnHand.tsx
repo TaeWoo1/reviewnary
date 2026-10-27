@@ -98,8 +98,8 @@ export function GroundingOnHand({
           // counts are simply missing and has no way to learn that the answer is «not yet linked»
           // rather than «zero».
           <p className="break-keep text-sm leading-relaxed text-muted">
-            판매 채널에서 읽은 상품명입니다. 아직 상품 목록의 상품과 연결되지 않아 상품별 수치는 표시하지
-            않습니다.
+            판매 채널에서 읽은 상품명이에요. 아직 상품 목록의 상품과 연결되지 않아 상품별 수치는 표시하지
+            않아요.
           </p>
         ) : null}
 

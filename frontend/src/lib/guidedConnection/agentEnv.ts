@@ -116,7 +116,7 @@ export const AGENT_ENV_COPY: Record<AgentEnvCode, AgentEnvCopy | null> = {
   },
   SESSION_MISMATCH: {
     title: "도우미가 다른 연결 세션에 연결되어 있어요",
-    body: "도우미가 다른 실행(run)을 진행 중이에요. 도우미를 다시 시작한 뒤 이 화면에서 다시 시도해 주세요. 자동으로 실행을 바꾸지 않습니다.",
+    body: "도우미가 다른 실행(run)을 진행 중이에요. 도우미를 다시 시작한 뒤 이 화면에서 다시 시도해 주세요. 자동으로 실행을 바꾸지 않아요.",
   },
   HOST_UNAVAILABLE: {
     title: "지금은 화면 안내를 실행할 수 없어요",

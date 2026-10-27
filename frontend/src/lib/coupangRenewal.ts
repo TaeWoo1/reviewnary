@@ -69,34 +69,34 @@ export function coupangRenewalReducer(
 export const COUPANG_RENEWAL_COPY = {
   pageTitle: "쿠팡 API 키 갱신",
   pageIntro:
-    "현재 연결된 쿠팡 키의 유효기간이 다가오고 있어요. 쿠팡 윙에서 키를 재발급한 뒤, 새 키로 교체하면 주문 연동이 끊기지 않고 이어집니다. 기존 주문과 수집 기록은 그대로 유지됩니다.",
+    "현재 연결된 쿠팡 키의 유효기간이 다가오고 있어요. 쿠팡 윙에서 키를 재발급한 뒤, 새 키로 교체하면 주문 연동이 끊기지 않고 이어져요. 기존 주문과 수집 기록은 그대로 유지돼요.",
   loadError: "갱신 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
   back: "돌아가기",
 
   // guide phase
   guideIntro:
-    "쿠팡 윙에서 새 키를 재발급하도록 화면으로 안내해 드릴게요. 재발급 버튼은 반드시 직접 누르시면 됩니다.",
+    "쿠팡 윙에서 새 키를 재발급하도록 화면으로 안내해 드릴게요. 재발급 버튼은 반드시 직접 누르시면 돼요.",
 
   // replace phase — the masked credential form
   replaceTitle: "새 키로 교체",
   replaceBody:
-    "재발급한 액세스 키·시크릿 키·업체 코드를 입력하면 기존 키를 안전하게 교체합니다. 교체에 실패하면 기존 키가 그대로 유지돼요 — 연결이 끊기지 않습니다.",
+    "재발급한 액세스 키·시크릿 키·업체 코드를 입력하면 기존 키를 안전하게 교체해요. 교체에 실패하면 기존 키가 그대로 유지돼요 — 연결이 끊기지 않아요.",
   replaceHeading: "새 쿠팡 Open API 키 입력",
   replaceSubmitting: "교체하는 중…",
 
   // expiry-date confirmation (operator-confirm; never auto-estimated)
   expiryConfirmTitle: "새 키의 만료일 확인",
   expiryConfirmBody:
-    "재발급 화면에 표시된 새 키의 유효기간(만료일)을 확인해 그대로 입력해 주세요. reviewnary는 만료일을 임의로 추정하지 않습니다.",
+    "재발급 화면에 표시된 새 키의 유효기간(만료일)을 확인해 그대로 입력해 주세요. reviewnary는 만료일을 임의로 추정하지 않아요.",
   expiryConfirmLabel: "만료일을 확인해 입력",
-  expiryConfirmOptional: "만료일을 아직 확인하지 못했다면 비워 두어도 교체는 진행됩니다.",
+  expiryConfirmOptional: "만료일을 아직 확인하지 못했다면 비워 두어도 교체는 진행돼요.",
 
   // replacing / result
   replacingBody: "새 키로 연결을 확인하는 중이에요…",
   doneTitle: "키 교체가 완료됐어요",
   doneBody:
-    "새 키로 연결이 확인됐습니다. 기존 주문과 수집 기록은 그대로 유지되고, 주문 연동이 이어집니다.",
-  doneCta: "연결 상태 보기",
+    "새 키로 연결이 확인됐어요. 기존 주문과 수집 기록은 그대로 유지되고, 주문 연동이 이어져요.",
+  doneCta: "연동 상태 보기",
 
   // replace error
   errorRetryCta: "다시 교체",

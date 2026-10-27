@@ -54,7 +54,7 @@ export function ReviewRecordPanel({
     <Panel
       title={word}
       description={
-        loading ? `수집한 ${word} 수를 확인하는 중입니다.` : reviewRecordSummary(count, channelCode)
+        loading ? `수집한 ${word} 수를 확인하는 중이에요.` : reviewRecordSummary(count, channelCode)
       }
       action={
         // Outline: the panel is already the loud thing on the page — a titled region stating how many
@@ -68,7 +68,7 @@ export function ReviewRecordPanel({
         <p className="break-keep text-base leading-relaxed text-muted">{note}</p>
       ) : (
         <p className="break-keep text-base leading-relaxed text-muted">
-          이 채널에서 수집한 구매자 {word} 기록입니다.
+          이 채널에서 수집한 구매자 {word} 기록이에요.
         </p>
       )}
     </Panel>

@@ -164,12 +164,12 @@ describe("human action artifact — guided acquisition inline (EXPORT_ACTION_WIN
     // Compact before the press: title · reason · ONE primary. The guided sentence comes with the run, and
     // so do the escapes — a card with three controls at rest asks the seller to pick a strategy for a step
     // that has one way forward (Chat-first Operating Experience v3; observed live 2026-09-02).
-    expect(screen.queryByText(/판매자센터의 리뷰 내려받기 화면과 기간을 준비합니다/)).toBeNull();
+    expect(screen.queryByText(/판매자센터의 리뷰 내려받기 화면과 기간을 준비해요/)).toBeNull();
     expect(screen.queryByRole("link", { name: "파일로 올리기" })).toBeNull();
     expect(screen.queryByRole("button", { name: "계속 확인하기" })).toBeNull();
     expect(runtime.start).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "최신 상태 확인" }));
-    expect(screen.getByText(/판매자센터의 리뷰 내려받기 화면과 기간을 준비합니다/)).toBeInTheDocument();
+    expect(screen.getByText(/판매자센터의 리뷰 내려받기 화면과 기간을 준비해요/)).toBeInTheDocument();
     // …and now they are there, as what they are: the way out of a step the seller is standing in. Still a
     // text link, never a second primary.
     expect(screen.getByRole("link", { name: "파일로 올리기" })).toHaveAttribute("href", "/connect/upload?returnTo=%2F");
@@ -223,7 +223,7 @@ describe("human action artifact — guided acquisition inline (EXPORT_ACTION_WIN
     expect(launchNextReviewImportForAccount).toHaveBeenCalledWith("acc-nv");
     // The button that asked for the instruction a second time is not rendered at all.
     expect(screen.queryByRole("button", { name: "최신 상태 확인" })).toBeNull();
-    expect(screen.getByText(/판매자센터의 리뷰 내려받기 화면과 기간을 준비합니다/)).toBeInTheDocument();
+    expect(screen.getByText(/판매자센터의 리뷰 내려받기 화면과 기간을 준비해요/)).toBeInTheDocument();
   });
 
   it("without autoStart nothing starts until the seller presses — the default is unchanged", async () => {
@@ -259,7 +259,7 @@ describe("human action artifact — guided acquisition inline (EXPORT_ACTION_WIN
     await userEvent.click(screen.getByRole("button", { name: "최신 상태 확인" }));
     await waitFor(() => expect(expireReviewImportLaunch).toHaveBeenCalledWith("0f1e2d3c4b5a6978"));
     expect(launchNextReviewImportForAccount).toHaveBeenCalledWith("acc-nv");
-    expect(await screen.findByRole("status")).toHaveTextContent(/준비하지 못했습니다/);
+    expect(await screen.findByRole("status")).toHaveTextContent(/준비하지 못했어요/);
   });
 
   /**
@@ -351,7 +351,7 @@ describe("human action artifact — guided acquisition inline (EXPORT_ACTION_WIN
       </MemoryRouter>,
     );
     await userEvent.click(screen.getByRole("button", { name: "최신 상태 확인" }));
-    expect(await screen.findByText(/판매자센터 화면을 준비하지 못했습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/판매자센터 화면을 준비하지 못했어요/)).toBeInTheDocument();
     expect(runtime.start).not.toHaveBeenCalled();
   });
 
@@ -380,7 +380,7 @@ describe("human action artifact — freshness UX v1: compact, 「언제 기준�
     expect(screen.getByRole("button", { name: "최신 상태 확인" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "계속 확인하기" })).toBeNull();
     const text = screen.getByTestId("human-action-artifact").textContent ?? "";
-    expect(text).not.toMatch(/sync|coverage|SyncJob|수집 확인 안 됨|최신 상태가 아닙니다/i);
+    expect(text).not.toMatch(/sync|coverage|SyncJob|수집 확인 안 됨|최신 상태가 아니에요/i);
     expect(text.length).toBeLessThan(120);
     void reference;
   });

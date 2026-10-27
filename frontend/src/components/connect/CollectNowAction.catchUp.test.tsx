@@ -40,23 +40,23 @@ describe("밀린 리뷰를 따라잡는 중", () => {
     // 몇이든 할 일이 같다 — 기다리는 것. 그래서 걸음 수와 무관하게 한 문장이다.
     for (const done of [0, 1, 3, 6]) {
       expect(catchUpMessage(walk("RUNNING", done)), String(done)).toEqual({
-        text: "밀린 리뷰를 확인하고 있습니다.", isError: false,
+        text: "밀린 리뷰를 확인하고 있어요.", isError: false,
       });
     }
   });
 
   it("끝나면 끝났다고 말한다", () => {
     expect(catchUpMessage(walk("COMPLETE", 6, { inserted: 312 }))).toEqual({
-      text: "밀린 리뷰를 모두 확인했습니다. 새로 저장 312건", isError: false,
+      text: "밀린 리뷰를 모두 확인했어요. 새로 저장 312건", isError: false,
     });
   });
 
   it("멈춤 넷이 각자 다른 말을 한다", () => {
     expect(catchUpMessage(walk("PAUSED_AUTH", 2))!.text)
-      .toBe("판매자센터 로그인이 필요합니다. 로그인하면 이어서 확인합니다.");
+      .toBe("판매자센터 로그인이 필요해요. 로그인하면 이어서 확인해요.");
     expect(catchUpMessage(walk("STOPPED_SATURATED", 4))!.text)
       .toContain("하루에 리뷰가 아주 많은 날이 있어");
-    expect(catchUpMessage(walk("STOPPED_LIMIT", 8))!.text).toContain("이어서 확인합니다");
+    expect(catchUpMessage(walk("STOPPED_LIMIT", 8))!.text).toContain("이어서 확인해요");
     // 상한에 도달한 것은 실패가 아니다 — 다시 누르면 이어진다.
     expect(catchUpMessage(walk("STOPPED_LIMIT", 8))!.isError).toBe(false);
     // <b>그리고 어느 멈춤도 걸음 수를 꺼내지 않는다.</b> 「2개 기간을 확인했고…」는 내부 창 나누기이고,
@@ -82,7 +82,7 @@ describe("밀린 리뷰를 따라잡는 중", () => {
     // 자식 하나가 끝났어도 걸음이 돌고 있으면 「수집 완료」라고 말하지 않는다. 그게 바로 이 패키지가 한
     // 단계 위에서 고친 결함과 같은 모양이다.
     expect(screenReadMessage("리뷰", walk("RUNNING", 1, { state: "SUCCESS", inserted: 45 })).text)
-      .toBe("밀린 리뷰를 확인하고 있습니다.");
+      .toBe("밀린 리뷰를 확인하고 있어요.");
     // 걸음이 없으면 지금까지의 문장 그대로.
     expect(screenReadMessage("리뷰", read({ state: "SUCCESS", inserted: 45, changed: 0 })).text)
       .toBe("리뷰 수집 완료: 새로 저장 45 · 갱신 0");
@@ -97,7 +97,7 @@ describe("막힌 자리를 말한다 — 2026-10-08 라이브가 가르친 것",
       "RANGE_CONTROLS_AMBIGUOUS", "QUERY_CONTROL_NOT_FOUND", "QUERY_CONTROL_AMBIGUOUS",
       "RANGE_ORDER_UNKNOWN", "RANGE_NOT_SETTABLE", "CALENDAR_OPENER_NOT_FOUND",
       "CALENDAR_OPENER_AMBIGUOUS"]) {
-      expect(stopSentence(code), code).toBe("판매자센터 화면에서 기간 선택 영역을 확인하지 못했습니다.");
+      expect(stopSentence(code), code).toBe("판매자센터 화면에서 기간 선택 영역을 확인하지 못했어요.");
     }
   });
 
@@ -106,7 +106,7 @@ describe("막힌 자리를 말한다 — 2026-10-08 라이브가 가르친 것",
     // 갈 자리가 전혀 다르다. 화면 문장은 그 차이를 말하고, 어느 시험에서 멈췄는지는 기록이 들고 있는다.
     for (const code of ["PICKER_VIEW_UNREADABLE", "MONTH_NAV_NOT_FOUND", "MONTH_NAV_AMBIGUOUS",
       "MONTH_NAV_UNVERIFIED", "MONTH_NAV_EXHAUSTED", "DAY_CELL_NOT_FOUND", "DAY_CELL_AMBIGUOUS"]) {
-      expect(stopSentence(code), code).toBe("판매자센터 달력에서 날짜를 고르지 못했습니다.");
+      expect(stopSentence(code), code).toBe("판매자센터 달력에서 날짜를 고르지 못했어요.");
     }
   });
 
@@ -121,8 +121,8 @@ describe("막힌 자리를 말한다 — 2026-10-08 라이브가 가르친 것",
     // 찾지 못했습니다」가 뜨면 판매자는 할 수 있는 일이 없다고 읽는다 — 실제로는 로그인하면 되는 상황이고,
     // 그 복구 경로는 이미 있었다. 세 경우는 다음에 할 일이 다르므로 문장도 달라야 한다.
     expect(stopSentence("AUTH_REQUIRED")).toBeNull();          // 로그인 안내는 별도 경로가 띄운다
-    expect(stopSentence("ROUTE_NOT_READY")).toBe("판매자센터 리뷰 화면이 아직 열리지 않았습니다.");
-    expect(stopSentence("SURFACE_UNEXPECTED")).toBe("판매자센터 리뷰 화면을 찾지 못했습니다.");
+    expect(stopSentence("ROUTE_NOT_READY")).toBe("판매자센터 리뷰 화면이 아직 열리지 않았어요.");
+    expect(stopSentence("SURFACE_UNEXPECTED")).toBe("판매자센터 리뷰 화면을 찾지 못했어요.");
     expect(stopSentence("ROUTE_NOT_READY")).not.toBe(stopSentence("SURFACE_UNEXPECTED"));
   });
 
@@ -134,7 +134,7 @@ describe("막힌 자리를 말한다 — 2026-10-08 라이브가 가르친 것",
     }
     // 그리고 그 일반 문구에 코드가 섞여 나오지 않는다.
     const said = catchUpMessage(walk("FAILED", 0, { stopReason: "EXECUTOR_TIMEOUT" }))!.text;
-    expect(said).toBe("일부 기간을 아직 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    expect(said).toBe("일부 기간을 아직 확인하지 못했어요. 잠시 후 다시 시도해 주세요.");
     for (const term of ["EXECUTOR", "TIMEOUT", "UNAVAILABLE", "FAULT", "REFUSED"]) {
       expect(said, term).not.toContain(term);
     }
@@ -152,7 +152,7 @@ describe("막힌 자리를 말한다 — 2026-10-08 라이브가 가르친 것",
   });
 
   it("한 건 실패에도, 걸음 실패에도 같은 문장이 쓰인다 — 걸음 수와 무관하게 같다", () => {
-    const one = "판매자센터 화면에서 기간 선택 영역을 확인하지 못했습니다.";
+    const one = "판매자센터 화면에서 기간 선택 영역을 확인하지 못했어요.";
     expect(screenReadMessage("리뷰", read({ state: "FAILED", failureCode: "RANGE_CONTROLS_NOT_FOUND" })).text)
       .toBe(one);
     // 몇 걸음을 걸었든 같은 문장이다. 앞에 「N개 기간을 확인했습니다」를 붙이던 것은 내부 창 나누기를
@@ -166,10 +166,10 @@ describe("막힌 자리를 말한다 — 2026-10-08 라이브가 가르친 것",
   it("조사를 고른다 — 「리뷰을(를)」이 아니라", () => {
     // 둘 다 적어 두는 것은 둘 중 어느 것도 고르지 않은 것이고, 판매자가 읽는 것은 고르지 않은 그 모양이다.
     expect(screenReadMessage("리뷰", read({ state: "FAILED" })).text)
-      .toBe("리뷰를 수집하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      .toBe("리뷰를 수집하지 못했어요. 잠시 후 다시 시도해 주세요.");
     expect(screenReadMessage("문의", read({ state: "FAILED" })).text)
-      .toBe("문의를 수집하지 못했습니다. 잠시 후 다시 시도해 주세요.");
-    expect(screenReadMessage("주문", read({ state: "FAILED" })).text).toContain("주문을 수집하지 못했습니다");
+      .toBe("문의를 수집하지 못했어요. 잠시 후 다시 시도해 주세요.");
+    expect(screenReadMessage("주문", read({ state: "FAILED" })).text).toContain("주문을 수집하지 못했어요");
     expect(objectParticle("리뷰")).toBe("를");
     expect(objectParticle("문의")).toBe("를");
     expect(objectParticle("주문")).toBe("을");

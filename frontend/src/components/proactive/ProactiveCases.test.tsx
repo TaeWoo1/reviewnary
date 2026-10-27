@@ -35,7 +35,7 @@ function view(over: Partial<ProactiveCaseView> = {}): ProactiveCaseView {
     rating: null,
     priority: "HIGH",
     reason: "UNANSWERED_INQUIRY",
-    reasonNote: "고객이 답변을 기다리고 있습니다. 3일째 기다리고 있습니다.",
+    reasonNote: "고객이 답변을 기다리고 있어요. 3일째 기다리고 있어요.",
     evidenceState: "GROUNDED",
     evidenceCount: 2,
     knowledgeGap: null,
@@ -71,7 +71,7 @@ describe("ProactiveCases", () => {
     expect(await screen.findByText("배송 언제 되나요")).toBeInTheDocument();
     // Why now, in one line. What SellerOps DID is the badge — the seller decides from whether an
     // answer is ready to look at, not from where the case sits in SellerOps's own ranking.
-    expect(screen.getByText(/3일째 기다리고 있습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/3일째 기다리고 있어요/)).toBeInTheDocument();
     expect(screen.getByText("답변 준비됨")).toBeInTheDocument();
   });
 
@@ -118,13 +118,13 @@ describe("ProactiveCases", () => {
           rating: 1,
           priority: "HIGH",
           reason: "REPEAT_ISSUE_REVIEW",
-          reasonNote: "같은 문제가 이 상품에서 반복되고 있습니다.",
+          reasonNote: "같은 문제가 이 상품에서 반복되고 있어요.",
           evidenceState: null,
           evidenceCount: 1,
           preparedAction: "RECOMMENDATION_ONLY",
           draftVersion: null,
-          recommendation: "이 상품에서 「포장 파손」 문제가 3건 확인됐습니다.",
-          snippet: "포장이 찢어져 있었습니다",
+          recommendation: "이 상품에서 「포장 파손」 문제가 3건 확인됐어요.",
+          snippet: "포장이 찢어져 있었어요",
         }),
       ],
       total: 1,
@@ -135,7 +135,7 @@ describe("ProactiveCases", () => {
 
     expect(await screen.findByText("확인 필요")).toBeInTheDocument();
     expect(
-      screen.getByText(/같은 문제가 이 상품에서 반복되고 있습니다.*포장 파손/),
+      screen.getByText(/같은 문제가 이 상품에서 반복되고 있어요.*포장 파손/),
     ).toBeInTheDocument();
     // [확인하기] opens THIS review's decision screen. It used to open the bare list, so a card that named one
     // review handed back a page of every review — the seller still had to find it. Opening the review's own screen
@@ -150,7 +150,7 @@ describe("ProactiveCases", () => {
         view({
           evidenceState: "NO_LIBRARY",
           evidenceCount: 0,
-          knowledgeGap: "이 상품에 등록된 지식이 없습니다. 상품 정보를 한 번 적어 두세요.",
+          knowledgeGap: "이 상품에 등록된 지식이 없어요. 상품 정보를 한 번 적어 두세요.",
         }),
       ],
       total: 1,
@@ -166,7 +166,7 @@ describe("ProactiveCases", () => {
   it("never says 상품 미지정 — a line that is the same on every card is not a line", async () => {
     getProactiveCases.mockResolvedValue({
       items: [view({ evidenceState: "NO_PRODUCT", evidenceCount: 0, productName: null,
-        knowledgeGap: "이 문의가 어떤 상품에 대한 것인지 연결해 두면, 다음 초안은 상품 지식을 근거로 씁니다." })],
+        knowledgeGap: "이 문의가 어떤 상품에 대한 것인지 연결해 두면, 다음 초안은 상품 지식을 근거로 써요." })],
       total: 1,
       high: 1,
     });
@@ -179,7 +179,7 @@ describe("ProactiveCases", () => {
     // What the missing product COSTS is still said, once, as the knowledge gap below.
     const occurrences = (document.body.textContent ?? "").split("상품 미지정").length - 1;
     expect(occurrences).toBe(0);
-    expect(screen.getByText(/다음 초안은 상품 지식을 근거로 씁니다/)).toBeInTheDocument();
+    expect(screen.getByText(/다음 초안은 상품 지식을 근거로 써요/)).toBeInTheDocument();
   });
 
   it("says how much it is showing when it is showing less than it has", async () => {

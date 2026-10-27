@@ -153,7 +153,7 @@ export function ReportsV2() {
                 {report.version > 1 ? ` · ${report.version}번째` : ""}
               </>
             ) : (
-              "끝난 기간 하나를 그대로 얼려 둔 기록입니다"
+              "끝난 기간 하나를 그대로 얼려 둔 기록이에요"
             )}
           </span>
         }
@@ -175,7 +175,7 @@ export function ReportsV2() {
               {regenerating ? "다시 만드는 중…" : "지금 자료로 다시 만들기"}
             </Btn>
           }
-          note={regenerateFailed ? "새 판을 만들지 못했습니다." : null}
+          note={regenerateFailed ? "새 판을 만들지 못했어요." : null}
         />
       ) : null}
 
@@ -183,7 +183,7 @@ export function ReportsV2() {
         <p className="text-sm text-muted">기간 기록을 불러오는 중…</p>
       ) : !report || !period ? (
         <p className="text-sm text-warn" data-testid="report-unavailable">
-          {failed ? "기간 기록을 불러오지 못했습니다. 잠시 후 다시 열어 주세요." : "이 기간의 기록이 아직 없습니다."}
+          {failed ? "기간 기록을 불러오지 못했어요. 잠시 후 다시 열어 주세요." : "이 기간의 기록이 아직 없어요."}
         </p>
       ) : (
         <>
@@ -307,22 +307,22 @@ function ReadRange({
         !recorded ? (
           <span className="font-medium text-warn">
             {ungated
-              ? "이 판은 수집 범위를 확인하기 전에 만들어졌습니다 — 아래 숫자가 어디까지 읽은 것인지 기록이 없습니다."
-              : "이 판에는 읽은 범위가 기록되어 있지 않습니다."}
+              ? "이 판은 수집 범위를 확인하기 전에 만들어졌어요 — 아래 숫자가 어디까지 읽은 것인지 기록이 없어요."
+              : "이 판에는 읽은 범위가 기록되어 있지 않아요."}
           </span>
         ) : anyShort ? (
           <span className="font-medium text-warn">
-            읽지 못한 기간의 값은 0이 아니라 「확인되지 않음」으로 적습니다.
+            읽지 못한 기간의 값은 0이 아니라 「확인되지 않음」으로 적어요.
           </span>
         ) : (
-          <span>이 기간은 모든 채널이 말한 자료로 서 있습니다.</span>
+          <span>이 기간은 모든 채널이 말한 자료로 서 있어요.</span>
         )
       }
       action={action}
     >
       {!recorded ? (
         <p className="border-t border-line/70 py-2 text-sm text-warn" data-testid="report-no-read-range">
-          다시 만들면 각 숫자가 어느 채널까지 읽은 것인지 함께 기록됩니다.
+          다시 만들면 각 숫자가 어느 채널까지 읽은 것인지 함께 기록돼요.
         </p>
       ) : (
         <>
@@ -347,7 +347,7 @@ function ReadRange({
                     숫자는 저장된 집합 그대로다. */}
                 <span className={`${READ_COL.channels} text-muted`}>
                   {shownReadChannels(read).length === 0
-                    ? "연결된 채널이 없습니다"
+                    ? "연동한 채널이 없어요"
                     : shownReadChannels(read)
                         .map((c) => `${c.channelNameKo} ${dataStateLabel(c.state)}`)
                         .join(" · ")}
@@ -388,7 +388,7 @@ function Changed({ report }: { report: AgentReportView }) {
     >
       {moved.length === 0 ? (
         <p className="border-t border-line/70 py-2 text-sm text-muted" data-testid="report-no-change">
-          {first ? `달라진 것을 세울 수 없습니다 — ${noChangeReason(first)}.` : "비교할 수치가 없습니다."}
+          {first ? `달라진 것을 세울 수 없어요 — ${noChangeReason(first)}.` : "비교할 수치가 없어요."}
         </p>
       ) : (
         <ul data-testid="report-changes">
@@ -502,7 +502,7 @@ function Issues({ issues, reviewsRead }: { issues: ReportIssueFact[]; reviewsRea
         measured || issues.length === 0 ? (
           "근거 리뷰가 이 기간이나 직전 기간에 있었던 것"
         ) : (
-          <span className="text-warn">아래 건수는 이 판이 읽은 범위까지입니다</span>
+          <span className="text-warn">아래 건수는 이 판이 읽은 범위까지예요</span>
         )
       }
       right={issues.length > 0 ? `${issues.length}건` : undefined}
@@ -511,8 +511,8 @@ function Issues({ issues, reviewsRead }: { issues: ReportIssueFact[]; reviewsRea
         <p className="border-t border-line/70 py-2 text-sm text-muted" data-testid="report-no-issues">
           {/* 근거가 리뷰이므로, 리뷰를 읽지 못한 기간에는 「없었다」도 말할 수 없다. */}
           {reviewsRead
-            ? "이 기간에 근거 리뷰가 붙은 반복 문제가 없습니다."
-            : "리뷰를 이 기간까지 읽지 못해, 반복 문제가 없었는지 확인할 수 없습니다."}
+            ? "이 기간에 근거 리뷰가 붙은 반복 문제가 없어요."
+            : "리뷰를 이 기간까지 읽지 못해, 반복 문제가 없었는지 확인할 수 없어요."}
         </p>
       ) : (
         <ul data-testid="report-issues">
@@ -556,7 +556,7 @@ function Sales({ report }: { report: AgentReportView }) {
   const moved = changeOf(revenue);
 
   return (
-    <Block title="매출" note="일자 집계입니다 — 한 건씩 읽지 않는 채널까지 포함합니다" right={report.facts.period.labelKo}>
+    <Block title="매출" note="일자 집계예요 — 한 건씩 읽지 않는 채널까지 포함해요" right={report.facts.period.labelKo}>
       <ul data-testid="report-sales">
         <li className="flex items-baseline border-t border-line/70 py-2 text-sm">
           <span className={`${ROW.label} text-ink`}>기간 매출</span>
@@ -608,7 +608,7 @@ function Prepared({ report }: { report: AgentReportView }) {
       right={opportunities.length > 0 ? `${opportunities.length}건` : undefined}
     >
       {opportunities.length === 0 ? (
-        <p className="border-t border-line/70 py-2 text-sm text-muted">이 기간의 자료에서 준비된 일이 없습니다.</p>
+        <p className="border-t border-line/70 py-2 text-sm text-muted">이 기간의 자료에서 준비된 일이 없어요.</p>
       ) : (
         <ul data-testid="report-prepared">
           {opportunities.map((o) => (

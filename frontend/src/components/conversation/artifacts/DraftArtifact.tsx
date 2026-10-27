@@ -13,7 +13,7 @@ import { useContinueInPanel } from "../useContinueInPanel";
 const BASIS_WORD: Record<string, string> = {
   GROUNDED: "근거 있는 답변",
   NEEDS_CLARIFICATION: "고객에게 되묻는 답변",
-  NO_ANSWER_BASIS: "답변 기준이 필요합니다",
+  NO_ANSWER_BASIS: "답변 기준이 필요해요",
 };
 
 /** The two follow-ups a draft invites, as the sentences the conversation already understands. */
@@ -81,7 +81,7 @@ export function DraftArtifact({ artifact, onPrompt, headline }: { artifact: Draf
       action={
         body ? (
           <Btn size="sm" variant="outline" onClick={copy}>
-            {copied === "done" ? "복사했습니다" : "초안 복사"}
+            {copied === "done" ? "복사했어요" : "초안 복사"}
           </Btn>
         ) : undefined
       }
@@ -100,13 +100,13 @@ export function DraftArtifact({ artifact, onPrompt, headline }: { artifact: Draf
           <p className="whitespace-pre-wrap break-keep border-l-2 border-brand-700/30 pl-3 text-lg leading-relaxed text-ink" data-testid="draft-body">{body}</p>
         ) : noDraft ? (
           <p className="break-keep text-sm text-muted" data-testid="draft-gap">
-            {artifact.answerBasisNote ?? "초안을 만들려면 답변 기준이 하나 더 필요합니다."}
+            {artifact.answerBasisNote ?? "초안을 만들려면 답변 기준이 하나 더 필요해요."}
           </p>
         ) : !machinery ? (
           <p className="text-sm text-muted" data-testid="draft-reload">
-            {reloaded.state === "superseded" ? "이 초안은 이후 버전으로 바뀌었습니다. 최신 초안은 아래 카드에 있습니다."
-              : reloaded.state === "failed" ? "저장된 초안을 불러오지 못했습니다. 아래 화면에서 확인해 주세요."
-                : "저장된 초안을 불러오는 중입니다."}
+            {reloaded.state === "superseded" ? "이 초안은 이후 버전으로 바뀌었어요. 최신 초안은 아래 카드에 있어요."
+              : reloaded.state === "failed" ? "저장된 초안을 불러오지 못했어요. 아래 화면에서 확인해 주세요."
+                : "저장된 초안을 불러오는 중이에요."}
           </p>
         ) : null}
         {body && (basis || grounding.length > 0) ? (
@@ -116,7 +116,7 @@ export function DraftArtifact({ artifact, onPrompt, headline }: { artifact: Draf
             {grounding.length > 0 ? <span>근거 · {grounding.join(" · ")}</span> : null}
           </p>
         ) : null}
-        {copied === "failed" ? <p className="text-sm text-muted">이 브라우저에서는 복사할 수 없습니다. 아래 화면에서 옮겨 주세요.</p> : null}
+        {copied === "failed" ? <p className="text-sm text-muted">이 브라우저에서는 복사할 수 없어요. 아래 화면에서 옮겨 주세요.</p> : null}
         {body && onPrompt ? (
           <div className="flex flex-wrap gap-2" aria-label="초안 다음 단계">
             <Btn size="sm" variant="outline" onClick={() => onPrompt(REVISE_PROMPT)}>말투 다듬기</Btn>
@@ -125,7 +125,7 @@ export function DraftArtifact({ artifact, onPrompt, headline }: { artifact: Draf
         ) : null}
         {/* Two different facts, and they were running together on one line as one sentence — a link and
             a guarantee. The guarantee is the one that matters, so it gets the line. */}
-        <p className="text-sm text-muted">아직 아무 곳에도 보내지 않았습니다.</p>
+        <p className="text-sm text-muted">아직 아무 곳에도 보내지 않았어요.</p>
         <p className="text-sm">
           <Link to={artifact.to} onClick={onOpen} className="text-muted hover:text-ink hover:underline">
             {inquiryDraft ? "문의 화면에서 직접 고치기" : "리뷰 화면에서 직접 고치기"}

@@ -169,7 +169,7 @@ export function CoupangChannelView({
           testId="coupang-review-card"
           title="리뷰 수집"
           status={review.status}
-          description="로그인된 쿠팡 판매자 화면에서 상품평을 가져옵니다. API 키는 필요하지 않습니다."
+          description="로그인된 쿠팡 판매자 화면에서 상품평을 가져와요. API 키는 필요하지 않아요."
           facts={reviewFacts.length > 0 ? reviewFacts.join(" · ") : null}
           primary={
             reviewRoute.loading || reviewRoute.path !== "SCREEN_READ" ? null : (
@@ -209,7 +209,7 @@ export function CoupangChannelView({
           testId="coupang-api-card"
           title="문의·주문 자동 수집"
           status={apiCard.status}
-          description="쿠팡에서 발급한 API 키로 문의와 주문을 자동으로 가져옵니다. 리뷰와는 서로 필요하지 않습니다."
+          description="쿠팡에서 발급한 API 키로 문의와 주문을 자동으로 가져와요. 리뷰와는 서로 필요하지 않아요."
           facts={apiFacts.length > 0 ? apiFacts.join(" · ") : null}
           primary={
             apiCard.kind === "READY" ? (
@@ -239,7 +239,7 @@ export function CoupangChannelView({
           }
           advanced={
             <div className="space-y-4" ref={credentialsRef}>
-              <Disclosure label="연결 정보" open={credentialsOpen} onOpenChange={setCredentialsOpen}>
+              <Disclosure label="연동 정보" open={credentialsOpen} onOpenChange={setCredentialsOpen}>
                 <div className="pt-3">
                   <ConnectionInfoSection
                     accountId={accountId}
@@ -362,10 +362,10 @@ function ApiCollectNow({
               const started = await api.collectNow(accountId, type, requestId());
               stored += started.run?.successRows ?? 0;
             }
-            onReport(`문의·주문을 가져왔습니다. 새로 저장 ${stored}건.`, false);
+            onReport(`문의·주문을 가져왔어요. 새로 저장 ${stored}건.`, false);
             onChanged();
           } catch {
-            onReport("수집을 마치지 못했습니다. 잠시 후 다시 시도해 주세요.", true);
+            onReport("수집을 마치지 못했어요. 잠시 후 다시 시도해 주세요.", true);
           } finally {
             setBusy(false);
           }

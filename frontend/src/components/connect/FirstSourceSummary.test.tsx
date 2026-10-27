@@ -68,9 +68,9 @@ describe("FirstSourceSummary", () => {
 
     renderWithRouter(<FirstSourceSummary channelCode="CAFE24" channelNameKo="카페24" accountId="acct-1" />);
 
-    expect(await screen.findByText("카페24에서 다음 정보를 가져왔습니다.")).toBeInTheDocument();
-    expect(screen.getByText("주문 14건을 가져왔습니다.")).toBeInTheDocument();
-    expect(screen.getByText("문의 22건을 가져왔습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("카페24에서 다음 정보를 가져왔어요.")).toBeInTheDocument();
+    expect(screen.getByText("주문 14건을 가져왔어요.")).toBeInTheDocument();
+    expect(screen.getByText("문의 22건을 가져왔어요.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "오늘 할 일 확인하기" })).toHaveAttribute("href", "/");
   });
 
@@ -84,9 +84,9 @@ describe("FirstSourceSummary", () => {
 
     renderWithRouter(<FirstSourceSummary channelCode="CAFE24" channelNameKo="카페24" accountId="acct-1" />);
 
-    expect(await screen.findByText("문의는 아직 확인하지 못했습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("문의는 아직 확인하지 못했어요.")).toBeInTheDocument();
     expect(screen.queryByText(/4000|4,000/)).toBeNull();
-    expect(screen.queryByText(/없습니다/)).toBeNull();
+    expect(screen.queryByText(/없어요/)).toBeNull();
   });
 
   it("reports a measured zero as a normal outcome, not a failure (§19-C)", async () => {
@@ -95,9 +95,9 @@ describe("FirstSourceSummary", () => {
 
     renderWithRouter(<FirstSourceSummary channelCode="CAFE24" channelNameKo="카페24" accountId="acct-1" />);
 
-    expect(await screen.findByText("확인된 문의가 없습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("확인된 문의가 없어요.")).toBeInTheDocument();
     const card = screen.getByTestId("first-source-summary");
-    expect(card).toHaveTextContent("연결이 완료되었습니다");
+    expect(card).toHaveTextContent("연동이 완료됐어요");
     expect(card.textContent).not.toMatch(/실패|오류/);
   });
 
@@ -109,7 +109,7 @@ describe("FirstSourceSummary", () => {
 
     await waitFor(() => expect(screen.queryByTestId("first-source-lines")).toBeNull());
     expect(screen.getByRole("link", { name: "오늘 할 일 확인하기" })).toBeInTheDocument();
-    expect(screen.getByTestId("first-source-summary")).toHaveTextContent("카페24 연결이 완료되었습니다.");
+    expect(screen.getByTestId("first-source-summary")).toHaveTextContent("카페24 연동이 완료됐어요.");
   });
 
   it("reads no runs at all when there is no account yet", async () => {

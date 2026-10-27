@@ -96,7 +96,7 @@ export function ProductTableRowItem({ row }: { row: ProductTableRow }) {
         ))
       ) : (
         <span className="shrink-0 text-xs text-muted">
-          {f === undefined ? "확인하는 중…" : "운영 정보를 읽지 못했습니다"}
+          {f === undefined ? "확인하는 중…" : "운영 정보를 읽지 못했어요"}
         </span>
       )}
     </Link>
@@ -113,7 +113,7 @@ function Count({ label, value, emphasis }: { label: string; value: number | null
   if (value === null || value === undefined) {
     return (
       <span className={CELL}>
-        <span className="sr-only">{label} 읽지 못했습니다</span>
+        <span className="sr-only">{label} 읽지 못했어요</span>
         <span aria-hidden="true" className="text-sm text-muted">
           —
         </span>

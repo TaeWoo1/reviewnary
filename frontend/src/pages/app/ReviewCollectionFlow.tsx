@@ -172,7 +172,7 @@ export function ReviewCollectionFlow() {
           // A new walk: the ref the last one spent is single-use, and this is a new decision.
           setRunKey((k) => k + 1);
         })
-        .catch(() => setIdentityError("스토어를 저장하지 못했습니다. 다시 확인해 주세요."))
+        .catch(() => setIdentityError("스토어를 저장하지 못했어요. 다시 확인해 주세요."))
         .finally(() => setSavingIdentity(false));
     },
     [accountId],
@@ -193,7 +193,7 @@ export function ReviewCollectionFlow() {
   if (account === null) {
     return (
       <Empty
-        title="판매 계정을 찾을 수 없습니다"
+        title="판매 계정을 찾을 수 없어요"
         body="채널 목록에서 다시 선택해 주세요."
         action={<BtnLink to="/connect">채널 목록</BtnLink>}
       />
@@ -202,7 +202,7 @@ export function ReviewCollectionFlow() {
   if (readFailed || readiness?.state === "CHANNEL_NOT_SUPPORTED" || readiness?.state === "FILE_UPLOAD_ACCOUNT") {
     return (
       <Empty
-        title="이 계정은 화면에서 상품평을 가져오지 않습니다"
+        title="이 계정은 화면에서 상품평을 가져오지 않아요"
         body="채널 화면에서 이 계정이 지원하는 방법을 확인해 주세요."
         action={<BtnLink to={`/connect/channels/${accountId}`}>채널 화면</BtnLink>}
       />
@@ -229,7 +229,7 @@ export function ReviewCollectionFlow() {
         <div className="min-w-0">
           <h1 className="break-keep text-xl font-bold text-ink">리뷰 수집</h1>
           <p className="mt-1 break-keep text-sm text-muted">
-            로그인된 쿠팡 판매자 화면에서 상품평을 가져옵니다. API 키는 필요하지 않습니다.
+            로그인된 쿠팡 판매자 화면에서 상품평을 가져와요. API 키는 필요하지 않아요.
           </p>
         </div>
         <Btn variant="ghost" size="sm" onClick={leave} data-testid="flow-exit">
@@ -246,7 +246,7 @@ export function ReviewCollectionFlow() {
           <div>
             <h2 className="break-keep text-lg font-semibold text-ink">{collectedSentence(receipt)}</h2>
             <p className="mt-1.5 break-keep text-sm text-muted">
-              앞으로는 채널 화면의 [지금 가져오기]로 언제든 다시 가져올 수 있습니다.
+              앞으로는 채널 화면의 [지금 가져오기]로 언제든 다시 가져올 수 있어요.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -278,7 +278,7 @@ export function ReviewCollectionFlow() {
           {/* 확인해 주실 스토어 — 이 lane에서 판매자가 답하는 유일한 질문. */}
           {step.confirmStore ? (
             <p className="break-keep text-base text-ink" data-testid="flow-store">
-              <span className="font-semibold">{step.confirmStore}</span> 스토어의 상품평을 가져옵니다.
+              <span className="font-semibold">{step.confirmStore}</span> 스토어의 상품평을 가져와요.
             </p>
           ) : null}
 
@@ -340,7 +340,7 @@ export function ReviewCollectionFlow() {
                   onClick={() => setBootstrap({ state: "NONE" })}
                   data-testid="flow-other-store"
                 >
-                  다른 스토어입니다
+                  다른 스토어예요
                 </Btn>
               ) : null}
             </div>

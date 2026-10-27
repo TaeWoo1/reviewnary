@@ -33,18 +33,18 @@ import { channelDataTypeLabel } from "./channelVocabulary";
 const REVIEW_RECORD_CHANNELS: Record<string, { note: string }> = {
   NAVER: {
     note:
-      "수집한 리뷰를 읽고, 확인이 필요한 리뷰부터 볼 수 있습니다. " +
-      "답글은 스마트스토어센터에서 직접 작성하며, reviewnary는 대신 작성하거나 등록하지 않습니다.",
+      "수집한 리뷰를 읽고, 확인이 필요한 리뷰부터 볼 수 있어요. " +
+      "답글은 스마트스토어센터에서 직접 작성하며, reviewnary는 대신 작성하거나 등록하지 않아요.",
   },
   COUPANG: {
     note:
-      "상품평을 고르면 전체 내용을 읽고, 그 상품평이 쿠팡 화면 어디에 있는지 찾아 볼 수 있습니다. " +
-      "쿠팡은 판매자 답글 기능이 없어 답변 작성 기능은 제공하지 않습니다.",
+      "상품평을 고르면 전체 내용을 읽고, 그 상품평이 쿠팡 화면 어디에 있는지 찾아 볼 수 있어요. " +
+      "쿠팡은 판매자 답글 기능이 없어 답변 작성 기능은 제공하지 않아요.",
   },
   CAFE24: {
     note:
-      "게시판에서 수집한 리뷰를 읽고, 확인이 필요한 리뷰부터 볼 수 있습니다. " +
-      "이 화면에서는 답변을 작성하지 않습니다.",
+      "게시판에서 수집한 리뷰를 읽고, 확인이 필요한 리뷰부터 볼 수 있어요. " +
+      "이 화면에서는 답변을 작성하지 않아요.",
   },
 };
 
@@ -115,12 +115,12 @@ export function reviewEntryLabel(count: number | null | undefined, channelCode?:
 export function reviewRecordSummary(count: number | null | undefined, channelCode?: string | null): string {
   const word = reviewWord(channelCode);
   if (!isCountable(count)) {
-    return `수집한 ${word} 수를 지금 확인하지 못했습니다. 목록은 그대로 열 수 있습니다.`;
+    return `수집한 ${word} 수를 지금 확인하지 못했어요. 목록은 그대로 열 수 있어요.`;
   }
   if (count === 0) {
-    return `아직 수집된 ${josa(word, "이", "가")} 없습니다. ${word} 수집을 한 번 실행하면 이 목록에 쌓입니다.`;
+    return `아직 수집된 ${josa(word, "이", "가")} 없어요. ${word} 수집을 한 번 실행하면 이 목록에 쌓여요.`;
   }
-  return `지금까지 수집한 ${word} ${count}개를 모아 두었습니다.`;
+  return `지금까지 수집한 ${word} ${count}개를 모아 두었어요.`;
 }
 
 /** `word` + the particle that fits its last syllable — 리뷰가 / 상품평이. */

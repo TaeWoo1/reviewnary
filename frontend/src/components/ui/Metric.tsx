@@ -40,7 +40,7 @@ export function Metric({
   showFreshness?: boolean;
 }) {
   const value = kpi.unit === "원" ? wonShort(kpi.value) : count(kpi.value);
-  const caveat = beforeFirstConnection ? "아직 연결된 채널이 없습니다" : caveatFor(kpi);
+  const caveat = beforeFirstConnection ? "아직 연동한 채널이 없어요" : caveatFor(kpi);
   const big = size === "lg";
   const body = (
     <>
@@ -86,7 +86,7 @@ export function Metric({
 /** The caveat line — a channel MISSING from this total, which differs per number. */
 function caveatFor(kpi: MetricKpi): string | null {
   if (kpi.excludedChannels > 0) {
-    return `채널 ${kpi.excludedChannels}곳이 이 숫자에 없습니다`;
+    return `채널 ${kpi.excludedChannels}곳이 이 숫자에 없어요`;
   }
   return null;
 }

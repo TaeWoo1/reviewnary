@@ -65,7 +65,7 @@ describe("이 리뷰에 맞는 안내", () => {
     await userEvent.click(await screen.findByRole("button", { name: "맞아요" }));
     expect(chooseReviewGuidance).toHaveBeenCalledWith("a-1", "review:r-1", "s-adhesion", "CONFIRMED");
     expect(await screen.findByText("맞다고 확인함")).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("「다시 준비하기」를 누르면 이 안내대로 다시 씁니다");
+    expect(screen.getByRole("status")).toHaveTextContent("「다시 준비하기」를 누르면 이 안내대로 다시 써요");
   });
 
   it("아니에요 keeps it out of this review, and 되돌리기 brings it back", async () => {
@@ -76,7 +76,7 @@ describe("이 리뷰에 맞는 안내", () => {
     draw();
     await userEvent.click(await screen.findByRole("button", { name: "아니에요" }));
     expect(chooseReviewGuidance).toHaveBeenCalledWith("a-1", "review:r-1", "s-adhesion", "REJECTED");
-    expect(await screen.findByText("아직 붙은 안내가 없습니다. 맞는 안내가 있으면 골라 주세요.")).toBeInTheDocument();
+    expect(await screen.findByText("아직 붙은 안내가 없어요. 맞는 안내가 있으면 골라 주세요.")).toBeInTheDocument();
     const fold = screen.getByRole("button", { name: /이 리뷰에서 뺀 안내 1/ });
     await userEvent.click(fold);
     await userEvent.click(screen.getByRole("button", { name: "되돌리기" }));
@@ -107,7 +107,7 @@ describe("이 리뷰에 맞는 안내", () => {
   it("a failed read says so instead of an empty box", async () => {
     getReviewGuidance.mockRejectedValue(new Error("down"));
     draw();
-    expect(await screen.findByText("이 리뷰에 맞는 안내를 불러오지 못했습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("이 리뷰에 맞는 안내를 불러오지 못했어요.")).toBeInTheDocument();
   });
 
   it("has no accessibility violations", async () => {

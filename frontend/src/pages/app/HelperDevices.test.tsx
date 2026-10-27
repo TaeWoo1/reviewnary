@@ -43,14 +43,14 @@ describe("설정 › 연결된 기기", () => {
     fireEvent.click(screen.getByTestId("revoke-confirm"));
     await waitFor(() => expect(revoke).toHaveBeenCalledWith("dev-1"));
     await waitFor(() => expect(screen.queryByTestId("helper-device")).toBeNull());
-    expect(screen.getByText(/아직 연결된 도우미가 없습니다/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "채널 연결로 가기" })).toHaveAttribute("href", "/connect");
+    expect(screen.getByText(/아직 연결된 도우미가 없어요/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "채널 연동로 가기" })).toHaveAttribute("href", "/connect");
   });
 
   it("a failed read says so rather than showing an empty list as truth", async () => {
     list.mockRejectedValue(new Error("500"));
     renderPage();
-    expect(await screen.findByRole("alert")).toHaveTextContent("불러오지 못했습니다");
-    expect(screen.queryByText(/아직 연결된 도우미가 없습니다/)).toBeNull();
+    expect(await screen.findByRole("alert")).toHaveTextContent("불러오지 못했어요");
+    expect(screen.queryByText(/아직 연결된 도우미가 없어요/)).toBeNull();
   });
 });

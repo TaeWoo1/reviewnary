@@ -153,20 +153,20 @@ function AgentPanelBody({ canPin }: { canPin: boolean }) {
           disabledReason={
             runtimeDown ? (
               <p className="mb-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn" role="status">
-                AI 담당자 서비스에 연결하지 못했습니다. 채널 연결과는 관계없는 문제입니다.
+                AI 담당자 서비스에 연결하지 못했어요. 채널 연동과는 관계없는 문제예요.
               </p>
             ) : null
           }
         />
       ) : (
-        <p className="px-4 py-4 text-sm text-muted">대화는 앱 화면 안에서 이어집니다.</p>
+        <p className="px-4 py-4 text-sm text-muted">대화는 앱 화면 안에서 이어져요.</p>
       )}
 
       {/* 전체 화면 = the home conversation — the SAME thread this panel renders, at full width. It
           pointed at the legacy /agent page, which embedded a second copy of this conversation under a
           legacy form (Conversation Core v1 audit: the dead 「전체 화면」 defect). */}
       <footer className="border-t border-line px-4 py-2 text-xs text-muted">
-        확인만 합니다 · 보내는 일은 승인 뒤에 ·{" "}
+        확인만 해요 · 보내는 일은 승인 뒤에 ·{" "}
         <Link to="/" className="font-medium text-ink hover:underline">전체 화면</Link>
       </footer>
     </>

@@ -17,7 +17,7 @@ function outcome(over: Partial<OpportunityOutcomeView> = {}): OpportunityOutcome
     appliedOn: "2026-08-10", observedThrough: "2026-09-06",
     evidenceBefore: 11, reviewsBefore: 90, evidenceAfter: 0, reviewsAfter: 0,
     verdict: "INCONCLUSIVE", verdictLabelKo: "판단 보류",
-    reasonLabelKo: "그 기간에 들어온 리뷰가 없어 비교할 수 없습니다", settled: true,
+    reasonLabelKo: "그 기간에 들어온 리뷰가 없어 비교할 수 없어요", settled: true,
     ...over,
   };
 }
@@ -31,7 +31,7 @@ describe("한 일과 그 결과 — read by the problem, not by the suggestion",
 
     expect(await screen.findByText("판단 보류")).toBeTruthy();
     // The refusal is the valuable half: 판단 보류 beside nothing reads as a lost measurement.
-    expect(screen.getByText(/그 기간에 들어온 리뷰가 없어 비교할 수 없습니다/)).toBeTruthy();
+    expect(screen.getByText(/그 기간에 들어온 리뷰가 없어 비교할 수 없어요/)).toBeTruthy();
     expect(screen.getByText(/적용 전 4주 11건 → 뒤 4주 0건/)).toBeTruthy();
     expect(screen.getByText("운영 기준 보완")).toBeTruthy();
     expect(screen.getByText(/2026-08-10 적용/)).toBeTruthy();
@@ -47,20 +47,20 @@ describe("한 일과 그 결과 — read by the problem, not by the suggestion",
   it("a read that fails says so, and the rest of the page is untouched", async () => {
     getOpportunityOutcomes.mockRejectedValue(new Error("boom"));
     render(<IssueOutcomes issueId="issue-1" />);
-    expect(await screen.findByText(/적용 기록을 불러오지 못했습니다/)).toBeTruthy();
+    expect(await screen.findByText(/적용 기록을 불러오지 못했어요/)).toBeTruthy();
   });
 
   it("every verdict is about the evidence — no label claims the act worked", async () => {
     getOpportunityOutcomes.mockResolvedValue([
-      outcome({ verdict: "IMPROVED", verdictLabelKo: "근거 줄었습니다", evidenceAfter: 2, reviewsAfter: 80,
-        reasonLabelKo: "같은 문제가 적게 들어왔습니다" }),
+      outcome({ verdict: "IMPROVED", verdictLabelKo: "근거 줄었어요", evidenceAfter: 2, reviewsAfter: 80,
+        reasonLabelKo: "같은 문제가 적게 들어왔어요" }),
       outcome({ kind: "FAQ_SUPPLEMENT", kindLabelKo: "FAQ 보완", appliedOn: "2026-07-01",
-        verdict: "WORSENED", verdictLabelKo: "근거 늘었습니다", evidenceAfter: 30, reviewsAfter: 85,
-        reasonLabelKo: "같은 문제가 더 들어왔습니다" }),
+        verdict: "WORSENED", verdictLabelKo: "근거 늘었어요", evidenceAfter: 30, reviewsAfter: 85,
+        reasonLabelKo: "같은 문제가 더 들어왔어요" }),
     ]);
     render(<IssueOutcomes issueId="issue-1" />);
-    expect(await screen.findByText("근거 줄었습니다")).toBeTruthy();
-    expect(screen.getByText("근거 늘었습니다")).toBeTruthy();
+    expect(await screen.findByText("근거 줄었어요")).toBeTruthy();
+    expect(screen.getByText("근거 늘었어요")).toBeTruthy();
     expect(screen.queryByText(/해결|효과|덕분/)).toBeNull();
   });
 });

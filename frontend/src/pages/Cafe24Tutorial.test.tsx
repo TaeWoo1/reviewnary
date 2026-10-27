@@ -38,7 +38,7 @@ function verifiedView(over: Partial<Cafe24CapabilityView> = {}): Cafe24Capabilit
       { feature: "REVIEW_COLLECT", state: "AVAILABLE", label: "리뷰 수집", reason: null },
       { feature: "ISSUE_ANALYSIS", state: "AVAILABLE", label: "운영 이슈 분석", reason: null },
       { feature: "INQUIRY_REPLY", state: "NOT_ENABLED", label: "문의 답변 API (읽기 전용 연결에서는 미활성화)", reason: "READ_ONLY_CONNECTION" },
-      { feature: "ONE_TO_ONE_EXCLUDED", state: "NOT_ENABLED", label: "1:1 맞춤상담 게시판은 수집하지 않습니다", reason: null },
+      { feature: "ONE_TO_ONE_EXCLUDED", state: "NOT_ENABLED", label: "1:1 맞춤상담 게시판은 수집하지 않아요", reason: null },
     ],
     ...over,
   };
@@ -159,7 +159,7 @@ describe("Cafe24Tutorial callback resume", () => {
     vi.mocked(api.manualSync).mockResolvedValue(syncRun({ status: "FAILED" }));
     renderAt(`${ROUTE}?status=connected&accountId=acc-1`);
     await userEvent.click(await screen.findByRole("button", { name: "첫 수집 실행" }));
-    expect(await screen.findByText(/자료를 가져오지 못했습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/자료를 가져오지 못했어요/)).toBeInTheDocument();
   });
 
   it("skipping the first collection still finishes the connection", async () => {

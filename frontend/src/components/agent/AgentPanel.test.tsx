@@ -81,7 +81,7 @@ describe("contextual Agent panel — the same conversation, beside the workspace
     expect(request.productId).toBe("p-1");
     expect(request.text).toBe("이 상품 어때?");
     expect(request.text).not.toContain("p-1");
-    expect(await screen.findByText("이 상품에 미답변 문의는 없습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("이 상품에 미답변 문의는 없어요.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /선바로 몰딩/ })).toHaveAttribute("href", "/products/p-1");
   });
 
@@ -118,15 +118,15 @@ describe("contextual Agent panel — the same conversation, beside the workspace
   });
 
   it("prints the approval boundary under a sentence that asks to send; a failed plan is a real state", async () => {
-    vi.mocked(conversationClient.sendTurn).mockResolvedValue(agentTurn({ status: "FAILED", failureCode: "NO_PLAN", failureReason: "보낼 수 없습니다", artifacts: [], suggestedActions: [] }));
+    vi.mocked(conversationClient.sendTurn).mockResolvedValue(agentTurn({ status: "FAILED", failureCode: "NO_PLAN", failureReason: "보낼 수 없어요", artifacts: [], suggestedActions: [] }));
     render(<Shell><ProductPage /></Shell>);
     await userEvent.click(screen.getByRole("button", { name: "이 상품에 대해 물어보기" }));
     await userEvent.type(await screen.findByLabelText("무엇이든 물어보세요"), "답변 보내줘");
-    expect(screen.getByTestId("agent-send-fence")).toHaveTextContent("보내는 일은 AI 담당자가 하지 않습니다");
+    expect(screen.getByTestId("agent-send-fence")).toHaveTextContent("보내는 일은 AI 담당자가 하지 않아요");
     await userEvent.click(screen.getByRole("button", { name: "보내기" }));
     // Response Hygiene v1: a failed turn reads as its sentence — no 「계획을 세우지 못했습니다」 mechanism headline.
-    expect(await screen.findByText("보낼 수 없습니다")).toBeInTheDocument();
-    expect(screen.queryByText("이 요청은 계획을 세우지 못했습니다")).toBeNull();
+    expect(await screen.findByText("보낼 수 없어요")).toBeInTheDocument();
+    expect(screen.queryByText("이 요청은 계획을 세우지 못했어요")).toBeNull();
   });
 
   it("follows the page: the header reads the current surface when the route changes", async () => {
@@ -151,11 +151,11 @@ describe("contextual Agent panel — the same conversation, beside the workspace
     const boxes = screen.getAllByLabelText("무엇이든 물어보세요");
     await userEvent.type(boxes[0]!, "요즘 문제 생기는 상품 있어?");
     await userEvent.click(screen.getAllByRole("button", { name: "보내기" })[0]!);
-    await screen.findByText("이 상품에 미답변 문의는 없습니다.");
+    await screen.findByText("이 상품에 미답변 문의는 없어요.");
     await userEvent.click(screen.getByRole("button", { name: "이 상품에 대해 물어보기" }));
     const panel = await screen.findByTestId("agent-panel");
     expect(panel).toHaveTextContent("요즘 문제 생기는 상품 있어?");
-    expect(panel).toHaveTextContent("이 상품에 미답변 문의는 없습니다.");
+    expect(panel).toHaveTextContent("이 상품에 미답변 문의는 없어요.");
     expect(conversationClient.createConversation).toHaveBeenCalledTimes(1);
   });
 });

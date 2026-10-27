@@ -157,7 +157,7 @@ describe("CoupangIssuanceGuidedWalkthrough", () => {
 
   it("call-IP advisory fails safe with no advertised IP: generic note, never a fabricated IP", () => {
     render(<CoupangIssuanceGuidedWalkthrough onIssued={vi.fn()} run={issuanceRun()} onCommand={vi.fn()} />);
-    expect(screen.getByText(/아직 설정되지 않았습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/아직 설정되지 않았어요/)).toBeInTheDocument();
     expect(screen.queryByText(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)).toBeNull();
   });
 
@@ -632,13 +632,13 @@ describe("CoupangIssuanceGuidedWalkthrough — the credential handoff", () => {
     render(<CoupangIssuanceGuidedWalkthrough onIssued={vi.fn()} hostRuntime={host.runtime} ensureAccountId={async () => "acc-1"} accountReady />);
     start();
     act(() => host.publish(asking()));
-    expect(screen.getByLabelText("연결 정보 저장").textContent ?? "").toContain("[reviewnary에 연결하기]");
+    expect(screen.getByLabelText("연동 정보 저장").textContent ?? "").toContain("[reviewnary에 연결하기]");
 
     await act(async () => {
       host.publish(consented());
     });
 
-    const acting = screen.getByLabelText("연결 정보 저장").textContent ?? "";
+    const acting = screen.getByLabelText("연동 정보 저장").textContent ?? "";
     expect(acting).toContain("암호화해 저장");
     expect(acting).toContain("이 화면에 표시되지 않");
   });

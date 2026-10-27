@@ -425,7 +425,7 @@ describe("InquiryResponsePanel — 초안 복사", () => {
     expect(writeText).toHaveBeenCalledWith(
       "[답변] 사용 방법\n\n테이프를 벗기고 벽면에 붙이시면 됩니다.",
     );
-    expect(await screen.findByRole("button", { name: "복사했습니다" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "복사했어요" })).toBeInTheDocument();
   });
 
   it("is not offered while the editor is open — an unsaved keystroke is not a draft", async () => {
@@ -451,7 +451,7 @@ describe("InquiryResponsePanel — 초안 복사", () => {
     await user.click(await screen.findByRole("button", { name: /초안 만들기/ }));
     await user.click(await screen.findByRole("button", { name: "초안 복사" }));
 
-    expect(screen.queryByRole("button", { name: "복사했습니다" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "복사했어요" })).toBeNull();
     expect(await screen.findByLabelText("복사할 초안")).toHaveValue(
       "[답변] 사용 방법\n\n테이프를 벗기고 벽면에 붙이시면 됩니다.",
     );

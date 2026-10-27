@@ -99,7 +99,7 @@ describe("ChannelList — the connection state word (A5)", () => {
     // half the column cannot carry. No vendor message is surfaced — the connectors' own strings carry
     // gateway codes and HTTP statuses.
     renderList({ health: health({ state: "DEGRADED", consecutiveFailures: 7, lastError: "…" }) });
-    expect(screen.getByText(/마지막 성공 .*그 뒤로 수집되지 않았습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/마지막 성공 .*그 뒤로 수집되지 않았어요/)).toBeInTheDocument();
     expect(screen.queryByText("마지막 수집")).toBeNull();
     expect(screen.queryByText(/GW\.|HTTP/)).toBeNull();
   });
@@ -108,7 +108,7 @@ describe("ChannelList — the connection state word (A5)", () => {
     renderList();
     // 「1주 전」이 아니라 실제 시각(주문·리포트와 같은 표기).
     expect(screen.getByText(/\d+월 \d+일 \d{2}:\d{2}/)).toBeInTheDocument();
-    expect(screen.queryByText(/그 뒤로 수집되지 않았습니다/)).toBeNull();
+    expect(screen.queryByText(/그 뒤로 수집되지 않았어요/)).toBeNull();
   });
 
   /**
@@ -141,7 +141,7 @@ describe("ChannelList — the connection state word (A5)", () => {
     renderList({ health: health({ consecutiveFailures: 1 }) });
     expect(screen.getByTestId("connection-state")).toHaveTextContent("오류");
     expect(screen.getByRole("button", { name: "확인하기" })).toBeInTheDocument();
-    expect(screen.getByText(/최근 수집에서 오류가 있었습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/최근 수집에서 오류가 있었어요/)).toBeInTheDocument();
   });
 });
 

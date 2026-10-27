@@ -49,7 +49,7 @@ export function Onboarding() {
     e.preventDefault();
     if (!pending) return;
     if (!terms) {
-      setError("이용약관과 개인정보처리방침에 동의해야 가입할 수 있습니다.");
+      setError("이용약관과 개인정보처리방침에 동의해야 가입할 수 있어요.");
       return;
     }
     setBusy(true);
@@ -84,8 +84,8 @@ export function Onboarding() {
   if (expired) {
     return (
       <AuthCard title="가입 세션이 만료되었어요">
-        <AuthNotice tone="error" title="시간이 지나 가입을 이어갈 수 없습니다">
-          {providerLabel} 계정으로 다시 로그인하면 이 화면으로 돌아옵니다.
+        <AuthNotice tone="error" title="시간이 지나 가입을 이어갈 수 없어요">
+          {providerLabel} 계정으로 다시 로그인하면 이 화면으로 돌아와요.
         </AuthNotice>
         <Link to="/signup" className={`${authLink} block text-center text-base`}>
           계정 만들기로 돌아가기
@@ -95,11 +95,11 @@ export function Onboarding() {
   }
 
   return (
-    <AuthCard title="거의 다 됐어요" subtitle="스토어 이름만 알려주시면 계정이 만들어집니다">
+    <AuthCard title="거의 다 됐어요" subtitle="스토어 이름만 알려주시면 계정이 만들어져요">
       <div className="rounded-xl border border-line bg-canvas px-4 py-3 text-sm text-muted" role="status">
         <span className="font-semibold text-ink">{providerLabel} 계정</span>
         {pending.email ? <span> · {pending.email}</span> : null}
-        <span>으로 가입 중입니다.</span>
+        <span>으로 가입 중이에요.</span>
       </div>
       <form className="space-y-4" onSubmit={onSubmit} aria-label="가입 마무리">
         <div>
@@ -139,7 +139,7 @@ export function Onboarding() {
           {busy ? "계정 만드는 중…" : "시작하기"}
         </button>
         <p className="break-keep text-center text-xs leading-relaxed text-muted">
-          다음 화면에서 NAVER · Coupang · Cafe24 채널을 연결합니다. 마켓 계정 정보는 그 화면에서 채널별로 직접 입력합니다.
+          다음 화면에서 NAVER · Coupang · Cafe24 채널을 연동해요. 마켓 계정 정보는 그 화면에서 채널별로 직접 입력해요.
         </p>
       </form>
     </AuthCard>

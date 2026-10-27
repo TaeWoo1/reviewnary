@@ -68,7 +68,7 @@ export function RepeatedSignal({
             the first answers 「이 리뷰는 반복인가」. The second answers 「그럼 무슨 기준인가」, which is a
             question the seller asks second if at all, and at 77 characters it was the longest sentence
             on the screen for a section whose content is empty. */}
-        <p className="break-keep text-sm leading-relaxed text-muted">아직 반복 문제의 근거로 기록되지 않았습니다.</p>
+        <p className="break-keep text-sm leading-relaxed text-muted">아직 반복 문제의 근거로 기록되지 않았어요.</p>
         <Disclosure label="무엇을 반복으로 보나요">
           <p className="break-keep pt-1 text-sm leading-relaxed text-muted">{EVIDENCE_NOTE.repeatCriterion}</p>
         </Disclosure>
@@ -136,7 +136,7 @@ export function RepeatedSignal({
                   );
                 })()
               ) : (
-                <p className="break-keep text-sm text-muted">이 문제의 근거는 지금 보고 계신 리뷰뿐입니다.</p>
+                <p className="break-keep text-sm text-muted">이 문제의 근거는 지금 보고 계신 리뷰뿐이에요.</p>
               )}
             </div>
           );

@@ -59,8 +59,8 @@ const REVIEW: Approval = {
 function prep(approvedFingerprint = "rfp-1") {
   return {
     actionRef: "ref-1", redactedBody: null, bodyRedacted: false, triageDisposition: "RESPONSE_NEEDED",
-    suggestion: { body: "x" }, draft: { version: 1, body: "감사합니다.", contentFingerprint: approvedFingerprint, fingerprintAlgorithm: "sha256", createdAt: "x" },
-    approval: { state: "APPROVED", approvedVersion: 1, approvedFingerprint, approvedBody: "소중한 후기 감사합니다.", decidedAt: "x" },
+    suggestion: { body: "x" }, draft: { version: 1, body: "감사해요.", contentFingerprint: approvedFingerprint, fingerprintAlgorithm: "sha256", createdAt: "x" },
+    approval: { state: "APPROVED", approvedVersion: 1, approvedFingerprint, approvedBody: "소중한 후기 감사해요.", decidedAt: "x" },
     outcome: null, capabilities: { canSave: false, canApprove: false, canWithdraw: true, canCopy: true, canStartSubmissionRun: false },
     channelReplyState: null, productName: null, reviewDate: null, rating: 5,
   };
@@ -70,7 +70,7 @@ function detail(fingerprint = "fp-2") {
   return {
     workItemId: "w-1", inquiryId: "i-1", channelCode: "CAFE24", channelNameKo: "카페24 자사몰", status: "UNANSWERED", phase: "PROPOSED",
     replyCapability: null,
-    draft: { version: 2, answerStatus: 0, title: "t", comments: "안녕하세요. 확인 후 안내드리겠습니다.", contentFingerprint: fingerprint, fingerprintAlgorithm: "sha256", createdAt: "x", authorKind: "MODEL", modelVersion: null, knowledgeState: null, knowledgeNote: null, answerBasis: null, answerBasisNote: null, answerBasisAction: null },
+    draft: { version: 2, answerStatus: 0, title: "t", comments: "안녕하세요. 확인 후 안내드릴게요.", contentFingerprint: fingerprint, fingerprintAlgorithm: "sha256", createdAt: "x", authorKind: "MODEL", modelVersion: null, knowledgeState: null, knowledgeNote: null, answerBasis: null, answerBasisNote: null, answerBasisAction: null },
   };
 }
 
@@ -90,14 +90,14 @@ describe("approval artifact — the confirm step is the only way to the one writ
     render(<MemoryRouter><ApprovalArtifact artifact={ARTIFACT} /></MemoryRouter>);
     await userEvent.click(await screen.findByRole("button", { name: "답변 보내기" }));
     expect(confirmInquiryPublish).not.toHaveBeenCalled();
-    expect(screen.getByText("정말 보내시겠습니까?")).toBeInTheDocument();
+    expect(screen.getByText("정말 보낼까요?")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "승인하고 전송" }));
     await waitFor(() => expect(confirmInquiryPublish).toHaveBeenCalledTimes(1));
     const [workItemId, request] = confirmInquiryPublish.mock.calls[0] as [string, { commandId: string; expectedFingerprint: string }];
     expect(workItemId).toBe("w-1");
     expect(request.expectedFingerprint).toBe("fp-2");
     expect(request.commandId).toMatch(/[0-9a-f-]{20,}/);
-    expect(await screen.findByText("답변이 등록되었습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("답변이 등록됐어요.")).toBeInTheDocument();
     expect(screen.getByText("전송됨")).toBeInTheDocument();
   });
 
@@ -106,7 +106,7 @@ describe("approval artifact — the confirm step is the only way to the one writ
     getInquiryPublishCapability.mockResolvedValue({ executionEnabled: false, replyAdapterChannelCodes: [] });
     render(<MemoryRouter><ApprovalArtifact artifact={ARTIFACT} /></MemoryRouter>);
     expect(await screen.findByRole("button", { name: "초안 복사" })).toBeInTheDocument();
-    expect(screen.getByText(/reviewnary가 답변을 대신 등록하지 않습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/reviewnary가 답변을 대신 등록하지 않아요/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "답변 보내기" })).toBeNull();
     expect(confirmInquiryPublish).not.toHaveBeenCalled();
   });
@@ -115,7 +115,7 @@ describe("approval artifact — the confirm step is the only way to the one writ
     getInquiryDetailStrict.mockResolvedValue(detail("fp-3"));
     getInquiryPublishCapability.mockResolvedValue({ executionEnabled: true, replyAdapterChannelCodes: ["CAFE24"] });
     render(<MemoryRouter><ApprovalArtifact artifact={ARTIFACT} /></MemoryRouter>);
-    expect(await screen.findByText(/초안이 그 사이 변경되었습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/초안이 그 사이 변경됐어요/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "답변 보내기" })).toBeNull();
   });
 
@@ -123,7 +123,7 @@ describe("approval artifact — the confirm step is the only way to the one writ
     getInquiryDetailStrict.mockResolvedValue(detail());
     getInquiryPublishCapability.mockResolvedValue({ executionEnabled: true, replyAdapterChannelCodes: ["CAFE24"] });
     render(<MemoryRouter><ApprovalArtifact artifact={{ ...ARTIFACT, executableIdentity: "NONE" }} /></MemoryRouter>);
-    expect(await screen.findByText(/파일로 가져온 기록이라 채널로 보낼 수 없습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/파일로 가져온 기록이라 채널로 보낼 수 없어요/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "초안 복사" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "답변 보내기" })).toBeNull();
     expect(confirmInquiryPublish).not.toHaveBeenCalled();
@@ -135,7 +135,7 @@ describe("approval artifact — REVIEW kind (Cafe24 API execution)", () => {
     getReviewReplyPrep.mockResolvedValue(prep());
     executeReviewReply.mockResolvedValue({ status: "EXECUTED", category: "COMPLETED", verification: "VERIFIED", providerRef: "c-1" });
     render(<MemoryRouter><ApprovalArtifact artifact={REVIEW} /></MemoryRouter>);
-    expect(await screen.findByText("소중한 후기 감사합니다.")).toBeInTheDocument();
+    expect(await screen.findByText("소중한 후기 감사해요.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "답변 보내기" }));
     expect(executeReviewReply).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "승인하고 전송" }));
@@ -153,14 +153,14 @@ describe("approval artifact — REVIEW kind (Cafe24 API execution)", () => {
   it("an approval that moved since the artifact was prepared gets no send control", async () => {
     getReviewReplyPrep.mockResolvedValue(prep("rfp-9"));
     render(<MemoryRouter><ApprovalArtifact artifact={REVIEW} /></MemoryRouter>);
-    expect(await screen.findByText(/승인된 답변이 그 사이 변경되었습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/승인된 답변이 그 사이 변경됐어요/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "답변 보내기" })).toBeNull();
   });
 
   it("execution NOT_SUPPORTED / identity NONE: honest sentence + copy, no send control, no call", async () => {
     getReviewReplyPrep.mockResolvedValue(prep());
     const { unmount } = render(<MemoryRouter><ApprovalArtifact artifact={{ ...REVIEW, execution: "NOT_SUPPORTED" }} /></MemoryRouter>);
-    expect(await screen.findByText(/답글을 남기는 기능을 지원하지 않습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/답글을 남기는 기능을 지원하지 않아요/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "답변 보내기" })).toBeNull();
     unmount();
     render(<MemoryRouter><ApprovalArtifact artifact={{ ...REVIEW, executableIdentity: "NONE" }} /></MemoryRouter>);

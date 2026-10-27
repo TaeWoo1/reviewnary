@@ -438,14 +438,14 @@ export function CustomerOpsHome({
         </section>
       ) : past > 0 ? (
         <section aria-label={COPY.listTitle} className="space-y-2">
-          <p className="break-keep text-sm text-muted">새로 할 일은 없습니다.</p>
+          <p className="break-keep text-sm text-muted">새로 할 일은 없어요.</p>
           <PastWork count={past} />
         </section>
       ) : !co || (running && co.status === "ACTIVE") ? (
         // Nothing waiting is a state, and the list's absence does not state it. 「다음 확인」 is on the status
         // line above, where it was before this became one line. 자동 확인이 없는 배포에서도 같은 문장을
         // 적는다 — 빈 자리는 「없다」와 「읽지 못했다」를 구분해 주지 않는다(읽기 실패는 채널 줄이 말한다).
-        <p className="break-keep text-sm text-muted">지금 할 일이 없습니다.</p>
+        <p className="break-keep text-sm text-muted">지금 할 일이 없어요.</p>
       ) : null}
 
       {/*
@@ -1047,7 +1047,7 @@ function OperationsSummary({
       key="awaiting"
       id="awaiting"
       label="등록 중"
-      note={awaiting === null ? "자동 확인이 멈춰 있어 확인하지 못했습니다" : undefined}
+      note={awaiting === null ? "자동 확인이 멈춰 있어 확인하지 못했어요" : undefined}
     >
       {awaiting === null ? (
         <Unknown />
@@ -1072,7 +1072,7 @@ function OperationsSummary({
       label={UNANSWERED_WORD.lead}
       note={
         unanswered === null
-          ? "숫자를 읽지 못했습니다"
+          ? "숫자를 읽지 못했어요"
           : unanswered.kind === "COUNT"
             ? undefined
             : // The population is incomplete, so there is no honest count — the cause, named, and the
@@ -1437,7 +1437,7 @@ function AwaitingExecution({
           전체 보기 →
         </Link>
       </div>
-      <p className="mt-1 break-keep text-sm text-muted">이미 결정한 일입니다. 등록만 남았습니다.</p>
+      <p className="mt-1 break-keep text-sm text-muted">이미 결정한 일이에요. 등록만 남았어요.</p>
       <PreparedWorkList
         bare
         rows={shown}

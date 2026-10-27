@@ -4,8 +4,8 @@ import type { ChannelResponse, ConnectorAlertView } from "./types";
 
 describe("signal hints", () => {
   it("carries the right hint for each non-ready state", () => {
-    expect(hintFor({ kind: "NOT_CONNECTED" })).toBe("자료를 연결하면 표시됩니다");
-    expect(hintFor({ kind: "UNAVAILABLE" })).toBe("지금은 확인할 수 없습니다");
+    expect(hintFor({ kind: "NOT_CONNECTED" })).toBe("자료를 연결하면 표시돼요");
+    expect(hintFor({ kind: "UNAVAILABLE" })).toBe("지금은 확인할 수 없어요");
     expect(hintFor({ kind: "READY", count: 3 })).toBeNull();
   });
 });

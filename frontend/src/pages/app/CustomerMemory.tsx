@@ -151,18 +151,18 @@ export function CustomerMemory() {
     <>
       {head}
       <Empty
-        title="기록을 불러오지 못했습니다"
+        title="기록을 불러오지 못했어요"
         body="연결 상태를 확인한 뒤 다시 시도해 주세요."
-        action={<BtnLink to="/connect">채널 연결 확인</BtnLink>}
+        action={<BtnLink to="/connect">채널 연동 확인</BtnLink>}
       />
     </>
   ) : visible.length === 0 ? (
     <>
       {head}
       <Empty
-        title="아직 쌓인 기록이 없습니다"
-        body="문의와 리뷰가 모이면, 같은 문제가 몇 번 반복됐는지와 무엇을 근거로 그렇게 보는지를 여기에서 확인합니다."
-        action={<BtnLink to="/connect">채널 연결하기</BtnLink>}
+        title="아직 쌓인 기록이 없어요"
+        body="문의와 리뷰가 모이면, 같은 문제가 몇 번 반복됐는지와 무엇을 근거로 그렇게 보는지를 여기에서 확인해요."
+        action={<BtnLink to="/connect">채널 연동하기</BtnLink>}
       />
     </>
   ) : (
@@ -176,7 +176,7 @@ export function CustomerMemory() {
           hrefFor={(id) => `/memory/${id}${query ? `?${query}` : ""}`}
         />
       ) : (
-        <p className="text-muted">이 조건에 해당하는 문제가 없습니다.</p>
+        <p className="text-muted">이 조건에 해당하는 문제가 없어요.</p>
       )}
       {/* Totals and the honest provenance below the work, never above it. */}
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-t border-line pt-3 text-xs text-muted">

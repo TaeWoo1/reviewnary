@@ -21,7 +21,7 @@ function turnWithList(): TurnView {
               {
                 workItemId: "w-1", inquiryId: "i-1", channelCode: "NAVER", channelNameKo: "네이버 스마트스토어",
                 receivedAt: "2026-07-22T00:00:00Z", phase: "OPEN", status: "UNANSWERED",
-                title: "현금영수증 발행 부탁드립니다", snippet: "주문할 때 현금영수증 신청을 못 했는데…",
+                title: "현금영수증 발행 부탁드려요", snippet: "주문할 때 현금영수증 신청을 못 했는데…",
                 productId: "p-1", productName: "실리콘 몰딩 2호", answerBasis: null, to: "/inquiries/i-1",
               },
             ],
@@ -47,7 +47,7 @@ describe("currentContext", () => {
     const ctx = currentContext(anchored, "INSPECT", [turnWithList()]);
     expect(ctx).toEqual({
       kind: "ANCHOR",
-      label: "현금영수증 발행 부탁드립니다",
+      label: "현금영수증 발행 부탁드려요",
       meta: "네이버 스마트스토어 · 실리콘 몰딩 2호",
       // INSPECT gets NO word: the bar showing the object IS the inspection.
       task: null,

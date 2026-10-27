@@ -57,7 +57,7 @@ describe("changeInsights", () => {
     // 채널 상태's, alone.
     const broken = insight({
       key: "CHANNEL_NOT_REPORTING",
-      title: "G마켓/옥션 연결이 끊겼습니다",
+      title: "G마켓/옥션 연결이 끊겼어요",
       periodStart: null,
       periodEnd: null,
       previousPeriodStart: null,

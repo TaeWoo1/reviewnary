@@ -25,31 +25,31 @@ const HEADLINE: Record<HumanAction["actionType"], string> = {
   // A seller who asked 「오늘 네이버 리뷰 있어?」 is being offered the one thing that can answer it: a check
   // of what has arrived. 「가져오기」 described our import; 「최신 상태 확인」 describes their question.
   REVIEW_IMPORT: "리뷰 최신 상태 확인",
-  CHANNEL_CONNECT: "이 채널을 확인하려면 연결이 필요합니다",
-  KNOWLEDGE_ENTRY: "답변하려면 답변 기준이 필요합니다",
-  VARIANT_CLARIFICATION: "규격을 확인해야 정확한 답변을 준비할 수 있습니다",
+  CHANNEL_CONNECT: "이 채널을 확인하려면 연결이 필요해요",
+  KNOWLEDGE_ENTRY: "답변하려면 답변 기준이 필요해요",
+  VARIANT_CLARIFICATION: "규격을 확인해야 정확한 답변을 준비할 수 있어요",
 };
 
 const REASON: Record<HumanAction["reason"], string> = {
-  FRESHNESS_UNPROVEN: "마지막 수집이 최신인지 확인되지 않았습니다.",
-  NOT_COLLECTED: "이 기간에 수집된 기록이 없습니다.",
-  NOT_CONNECTED: "채널이 연결되어 있지 않습니다.",
-  NO_ANSWER_BASIS: "이 질문에 적용할 수 있는 답변 기준이 없습니다.",
+  FRESHNESS_UNPROVEN: "마지막 수집이 최신인지 확인되지 않았어요.",
+  NOT_COLLECTED: "이 기간에 수집된 기록이 없어요.",
+  NOT_CONNECTED: "채널이 연동되어 있지 않아요.",
+  NO_ANSWER_BASIS: "이 질문에 적용할 수 있는 답변 기준이 없어요.",
 };
 
 /** What a link-only step's button says. Absent ⇒ the generic 「직접 진행하기」. */
 const LINK_LABEL: Partial<Record<HumanAction["actionType"], string>> = {
   KNOWLEDGE_ENTRY: "답변 기준 추가",
   VARIANT_CLARIFICATION: "규격 확인",
-  CHANNEL_CONNECT: "채널 연결하기",
+  CHANNEL_CONNECT: "채널 연동하기",
 };
 
 const GUIDED_PATHS: ReadonlyArray<HumanAction["path"]> = ["EXPORT_ACTION_WINDOW", "WING_READ_ACTION_WINDOW"];
 
 /** What the guided run does, per path — the product contract's wording (a bounded set of platform confirmations, not a one-press promise). */
 const GUIDED_SENTENCE: Record<GuidedAcquisitionPath, string> = {
-  EXPORT_ACTION_WINDOW: "reviewnary가 판매자센터의 리뷰 내려받기 화면과 기간을 준비합니다. 판매자님은 화면이 요구하는 확인만 누르시면, 내려받은 파일을 reviewnary가 읽어 이 질문을 이어서 확인합니다.",
-  WING_READ_ACTION_WINDOW: "reviewnary가 판매자센터의 리뷰 화면을 준비합니다. 판매자님은 화면이 요구하는 확인과 페이지 넘기기만 하시면, reviewnary가 그 화면의 리뷰를 읽어 이 질문을 이어서 확인합니다.",
+  EXPORT_ACTION_WINDOW: "reviewnary가 판매자센터의 리뷰 내려받기 화면과 기간을 준비해요. 판매자님은 화면이 요구하는 확인만 누르시면, 내려받은 파일을 reviewnary가 읽어 이 질문을 이어서 확인해요.",
+  WING_READ_ACTION_WINDOW: "reviewnary가 판매자센터의 리뷰 화면을 준비해요. 판매자님은 화면이 요구하는 확인과 페이지 넘기기만 하시면, reviewnary가 그 화면의 리뷰를 읽어 이 질문을 이어서 확인해요.",
 };
 
 /** The card's title: the channel's own step, in four words — 「네이버 리뷰 최신 상태 확인」 / 「네이버 리뷰 · 8월 20일 기준」. */
@@ -70,7 +70,7 @@ function reasonOf(artifact: HumanAction): string | null {
   if (artifact.actionType !== "REVIEW_IMPORT") return REASON[artifact.reason];
   if (artifact.reason === "NOT_CONNECTED") return REASON.NOT_CONNECTED;
   const word = asOfWord(artifact.asOf);
-  if (artifact.optional) return word ? "지금 보이는 목록은 그때까지 확인한 것입니다." : "아직 확인한 적이 없어 목록이 비어 있을 수 있습니다.";
+  if (artifact.optional) return word ? "지금 보이는 목록은 그때까지 확인한 거예요." : "아직 확인한 적이 없어 목록이 비어 있을 수 있어요.";
   return word ? `${word} 이후 아직 확인하지 못했어요.` : "아직 확인한 적이 없어요.";
 }
 
@@ -189,7 +189,7 @@ export function HumanActionArtifact({
       {running || failed || showEscapes ? (
         <div className="space-y-3 px-4 pb-3">
           {running && guided ? <p className="break-keep text-sm text-muted">{GUIDED_SENTENCE[guided]}</p> : null}
-          {failed ? <p className="text-sm text-bad">수집을 시작하지 못했습니다. 채널 연결 화면에서 다시 시도해 주세요.</p> : null}
+          {failed ? <p className="text-sm text-bad">수집을 시작하지 못했어요. 채널 연동 화면에서 다시 시도해 주세요.</p> : null}
 
           {guided === "EXPORT_ACTION_WINDOW" && running && artifact.accountId ? (
             <NaverGuidedImportRun
@@ -329,7 +329,7 @@ function NaverGuidedImportRun({
           throw e;
         }
       } catch {
-        if (live) setError("판매자센터 화면을 준비하지 못했습니다. 아래 다른 방법으로 진행할 수 있습니다.");
+        if (live) setError("판매자센터 화면을 준비하지 못했어요. 아래 다른 방법으로 진행할 수 있어요.");
       } finally {
         if (live) setStarting(false);
       }
@@ -367,8 +367,8 @@ function NaverGuidedImportRun({
     return (
       <p className="break-keep text-sm text-warn" role="status">
         {unavailable === "wrong_carrier"
-          ? "연결된 도우미가 다른 작업을 진행 중입니다. 그 작업을 마친 뒤 다시 시도해 주세요."
-          : "내 PC의 도우미와 연결하지 못했습니다. 도우미를 실행한 뒤 다시 시도해 주세요."}
+          ? "연결된 도우미가 다른 작업을 진행 중이에요. 그 작업을 마친 뒤 다시 시도해 주세요."
+          : "내 PC의 도우미와 연결하지 못했어요. 도우미를 실행한 뒤 다시 시도해 주세요."}
       </p>
     );
   }
@@ -396,7 +396,7 @@ function NaverGuidedImportRun({
         </p>
       ) : null}
       {snapshot.status === "COMPLETED" ? (
-        <p className="break-keep text-sm text-ink" role="status">리뷰 가져오기가 끝났습니다. 이어서 확인하겠습니다.</p>
+        <p className="break-keep text-sm text-ink" role="status">리뷰 가져오기가 끝났어요. 이어서 확인할게요.</p>
       ) : null}
       {/* A run that ENDED without finishing still has somewhere to go. `COMPLETED` deliberately does not
           offer this — that run's next step is the conversation resuming, not another import. */}
@@ -417,8 +417,8 @@ function NaverGuidedImportRun({
       {refused ? (
         <p className="break-keep text-sm text-warn" role="status" data-testid="guided-import-refused">
           {refused.cause === "NOT_ALLOWED_NOW"
-            ? "지금은 이 동작을 할 수 없습니다. 화면이 바뀌면 다시 시도해 주세요."
-            : "요청이 처리되지 않았습니다. 화면을 새로 고친 뒤 다시 시도해 주세요."}
+            ? "지금은 이 동작을 할 수 없어요. 화면이 바뀌면 다시 시도해 주세요."
+            : "요청이 처리되지 않았어요. 화면을 새로 고친 뒤 다시 시도해 주세요."}
         </p>
       ) : null}
       {!terminal ? (

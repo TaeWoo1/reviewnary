@@ -99,7 +99,7 @@ describe("지켜보기를 놓쳐도 돌아오면 이어진다", () => {
     // 그리고 창을 열지 않았다: 확인은 로그인 복구 세션이 아니다.
     expect(startSignIn).not.toHaveBeenCalled();
     await waitFor(() =>
-      expect(onReport).toHaveBeenCalledWith("로그인 확인됨. 멈췄던 확인을 이어서 진행합니다.", false));
+      expect(onReport).toHaveBeenCalledWith("로그인 확인됨. 멈췄던 확인을 이어서 진행해요.", false));
   });
 
   it("아직 로그아웃이면 확인만 하고 그대로 기다린다 — read 0, resume 0", async () => {
@@ -229,7 +229,7 @@ describe("StrictMode가 한 번 더 마운트해도 답은 버려지지 않는�
     await waitFor(() => expect(checkSignIn).toHaveBeenCalledWith("NAVER"));
     await waitFor(() => expect(collectNowResume).toHaveBeenCalledWith("acct-1", "REVIEW"));
     await waitFor(() =>
-      expect(onReport).toHaveBeenCalledWith("로그인 확인됨. 멈췄던 확인을 이어서 진행합니다.", false));
+      expect(onReport).toHaveBeenCalledWith("로그인 확인됨. 멈췄던 확인을 이어서 진행해요.", false));
     // 그리고 두 번 마운트됐다고 두 번 묻지 않는다.
     expect(checkSignIn).toHaveBeenCalledTimes(1);
     expect(collectNow).not.toHaveBeenCalled();

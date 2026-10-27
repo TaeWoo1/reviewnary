@@ -138,8 +138,8 @@ describe("쿠팡 채널 화면 — 두 가지 방법, 그뿐", () => {
   it("리뷰 카드는 판매자가 하는 일로 자기를 설명하고, API 키를 요구하지 않는다고 말한다", async () => {
     view();
     const card = await screen.findByTestId("coupang-review-card");
-    expect(within(card).getByText(/로그인된 쿠팡 판매자 화면에서 상품평을 가져옵니다/)).toBeInTheDocument();
-    expect(within(card).getByText(/API 키는 필요하지 않습니다/)).toBeInTheDocument();
+    expect(within(card).getByText(/로그인된 쿠팡 판매자 화면에서 상품평을 가져와요/)).toBeInTheDocument();
+    expect(within(card).getByText(/API 키는 필요하지 않아요/)).toBeInTheDocument();
   });
 
   it("리뷰 카드의 수집 컨트롤은 「지금 수집하기」 하나이고, 그것이 /collect-now로 간다", async () => {
@@ -194,7 +194,7 @@ describe("쿠팡 채널 화면 — 두 가지 방법, 그뿐", () => {
     const card = await screen.findByTestId("coupang-review-card");
 
     await waitFor(() =>
-      expect(within(card).getByText("최근 수집 시 로그인이 필요했습니다.")).toBeInTheDocument(),
+      expect(within(card).getByText("최근 수집 시 로그인이 필요했어요.")).toBeInTheDocument(),
     );
     // 로그인은 판매자가 자기 브라우저에서 방금 했을 수도 있다. 막아 두면 고친 뒤에도 누를 길이 없다.
     expect(within(card).getByTestId("collect-now-REVIEW")).not.toBeDisabled();
@@ -207,7 +207,7 @@ describe("쿠팡 채널 화면 — 두 가지 방법, 그뿐", () => {
     const card = await screen.findByTestId("coupang-review-card");
 
     await waitFor(() => expect(within(card).getByTestId("collect-now-REVIEW")).toBeDisabled());
-    expect(within(card).getByText(/이미 수집이 진행 중입니다/)).toBeInTheDocument();
+    expect(within(card).getByText(/이미 수집이 진행 중이에요/)).toBeInTheDocument();
     expect(within(card).queryByRole("link", { name: "이 Mac 연결하기" })).toBeNull();
   });
 
@@ -279,10 +279,10 @@ describe("쿠팡 채널 화면 — 두 가지 방법, 그뿐", () => {
     expect(within(fold as HTMLElement).getByRole("button", { name: /문의/ })).toBeInTheDocument();
   });
 
-  it("「API 연결하기」는 실제로 연결 정보를 연다 — 앵커가 아니라", async () => {
+  it("「API 연결하기」는 실제로 연동 정보를 연다 — 앵커가 아니라", async () => {
     view({ connectionInfo: null });
     const cta = await screen.findByTestId("coupang-api-cta");
-    const fold = screen.getByText("연결 정보").closest("details") as HTMLDetailsElement;
+    const fold = screen.getByText("연동 정보").closest("details") as HTMLDetailsElement;
     expect(fold.open).toBe(false);
     fireEvent.click(cta);
     await waitFor(() => expect(fold.open).toBe(true));

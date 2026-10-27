@@ -46,13 +46,13 @@ describe("public routes — reachable without a token", () => {
 
   it("shows the demo notice only for the demo entry", async () => {
     renderAt("/login?demo=1");
-    expect(await screen.findByText("데모 계정으로 둘러보는 중입니다")).toBeInTheDocument();
+    expect(await screen.findByText("데모 계정으로 둘러보는 중이에요")).toBeInTheDocument();
   });
 
   it("omits the demo notice on a plain login", async () => {
     renderAt("/login");
     await screen.findByLabelText("이메일");
-    expect(screen.queryByText("데모 계정으로 둘러보는 중입니다")).toBeNull();
+    expect(screen.queryByText("데모 계정으로 둘러보는 중이에요")).toBeNull();
   });
 });
 

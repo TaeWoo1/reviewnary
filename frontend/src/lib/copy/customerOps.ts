@@ -102,7 +102,7 @@ export const COPY = {
   composer: "리뷰나 문의에 대해 물어보세요",
   // What stays with the seller, in one sentence. It promises nothing new: `DUTIES_SELLER`'s first item
   // (「고객에게 실제 메시지 전송」) is the same contract, and the approval boundary is what actually enforces it.
-  autoCheckFence: "답변이나 외부 조치는 승인 전 자동 실행하지 않습니다.",
+  autoCheckFence: "답변이나 외부 조치는 승인 전 자동 실행하지 않아요.",
   // Case
   caseChecked: "자동 확인",
   original: "원문 보기",
@@ -131,9 +131,9 @@ export const COPY = {
      나란히 서므로 문장이 그 차이를 말해야 한다: 하나는 참고, 하나는 기준. */
   applyToFuture: "앞으로 같은 문제도 이렇게 처리",
   /** 체크했을 때만 보이는 한 줄. 무엇이 「같은 문제」인지 어휘로 말한다 — 리뷰 문장이 아니라. */
-  applyToFutureNote: (problem: string) => `앞으로 「${problem}」 건은 이 처리로 추천됩니다. 실행은 그때 직접 하십니다.`,
+  applyToFutureNote: (problem: string) => `앞으로 「${problem}」 건은 이 처리로 추천돼요. 실행은 그때 직접 하세요.`,
   /** 적용된 Case에 남는 provenance 한 줄. */
-  policyApplied: "판매자님이 정한 처리 기준이 적용됐습니다",
+  policyApplied: "판매자님이 정한 처리 기준이 적용됐어요",
   policyStop: "이 기준 사용 중단",
   policyStopping: "중단 중…",
   otherHandling: "다른 처리가 필요하면",
@@ -150,8 +150,8 @@ export const COPY = {
   loadPastAnswer: "과거 답변 불러오기",
   confirmedNeeds: "이미 확인된 내용",
   missingNeeds: "알려 주셔야 하는 내용",
-  systemWillRead: "상품 상세페이지를 아직 읽지 않았습니다. Reviewnary가 읽으면 확인할 수 있을 수 있습니다.",
-  prefillNote: "예전에 비슷한 문의에 이렇게 답하셨습니다. 그대로 두거나 고쳐서 저장하면 회사 지식이 되고, 이 문의의 초안을 다시 만듭니다.",
+  systemWillRead: "상품 상세페이지를 아직 읽지 않았어요. Reviewnary가 읽으면 확인할 수 있을 수 있어요.",
+  prefillNote: "예전에 비슷한 문의에 이렇게 답했어요. 그대로 두거나 고쳐서 저장하면 회사 지식이 되고, 이 문의의 초안을 다시 만들어요.",
   saved: "저장됨",
   redrafted: "초안 재작성 완료",
   sameQuestionUses: "같은 질문에 이 기준 사용",
@@ -166,7 +166,7 @@ export const COPY = {
   held: "보유 정보",
   toEnter: "입력 필요",
   nothingCollected: "수집된 정보 없음",
-  connectChannel: "채널 연결",
+  connectChannel: "채널 연동",
   add: "+ 추가",
   sources: "출처",
   documentsTab: "자료 파일",
@@ -188,7 +188,7 @@ export const COPY = {
  * not own, which is the drift this module's header exists to prevent.
  */
 export function autoCheckWhat(cadence: string): string {
-  return `${cadence} 연결된 채널의 리뷰와 문의를 확인해, 판단이 필요한 일만 정리합니다.`;
+  return `${cadence} 연동한 채널의 리뷰와 문의를 확인해, 판단이 필요한 일만 정리해요.`;
 }
 
 /* ─────────────────────────── reason tags ─────────────────────────── */

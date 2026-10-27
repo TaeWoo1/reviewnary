@@ -29,7 +29,7 @@ describe("Case Teach — the call that re-investigates and re-drafts carries a m
   });
 
   it("teach runs with more than the ordinary ceiling", async () => {
-    await api.teachOperationsCase("case-1", { content: "생활 방수가 됩니다.", scope: "PRODUCT" });
+    await api.teachOperationsCase("case-1", { content: "생활 방수가 돼요.", scope: "PRODUCT" });
     const config = (post.mock.calls[0] as [string, unknown, { timeout?: number }])[2];
     expect(config?.timeout).toBeGreaterThan(ORDINARY_CEILING_MS);
   });

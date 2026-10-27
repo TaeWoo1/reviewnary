@@ -68,11 +68,11 @@ export function GuidedReplyAction({ target, replyRuntime }: { target: GuidedRepl
       {!engaged ? (
         <>
           <p className="break-keep text-sm text-muted">
-            reviewnary가 {channel} 판매자센터에서 이 리뷰의 답글 입력칸을 찾아 승인한 답변을 넣어 둡니다. 등록은 판매자님이 직접 누릅니다.
+            reviewnary가 {channel} 판매자센터에서 이 리뷰의 답글 입력칸을 찾아 승인한 답변을 넣어 둬요. 등록은 판매자님이 직접 눌러요.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Btn onClick={() => setEngaged(true)}>{channel}에 입력하기</Btn>
-            <span className="text-sm text-muted">내 PC의 도우미가 필요합니다.</span>
+            <span className="text-sm text-muted">내 PC의 도우미가 필요해요.</span>
           </div>
         </>
       ) : (
@@ -172,7 +172,7 @@ function GuidedReplyRun({ target, injected, onDone }: { target: GuidedReplyTarge
         handleRef.current = handle;
         setPhase({ kind: "running", stage: 0 });
       } catch {
-        if (live) setPhase({ kind: "failed", message: "답변 안내를 시작하지 못했습니다. 초안을 복사해 직접 등록해 주세요." });
+        if (live) setPhase({ kind: "failed", message: "답변 안내를 시작하지 못했어요. 초안을 복사해 직접 등록해 주세요." });
       }
     })();
     return () => {
@@ -265,7 +265,7 @@ function GuidedReplyRun({ target, injected, onDone }: { target: GuidedReplyTarge
       const view = await api.getReviewReplyExecution(target.accountId, target.actionRef).catch(() => null);
       setPhase({ kind: "done", phase: "OPERATOR_REPORTED", verification: view?.verification ?? null });
     } catch {
-      setPhase({ kind: "failed", message: "보고를 기록하지 못했습니다. 리뷰 화면에서 다시 시도해 주세요." });
+      setPhase({ kind: "failed", message: "보고를 기록하지 못했어요. 리뷰 화면에서 다시 시도해 주세요." });
     }
   }
 
@@ -319,13 +319,13 @@ function GuidedReplyRun({ target, injected, onDone }: { target: GuidedReplyTarge
     );
   }
   if (phase.kind === "aborted") {
-    return <p className="break-keep text-sm text-muted" role="status">등록하지 않고 마쳤습니다. 리뷰는 그대로 남아 있습니다.</p>;
+    return <p className="break-keep text-sm text-muted" role="status">등록하지 않고 마쳤어요. 리뷰는 그대로 남아 있어요.</p>;
   }
   if (phase.kind === "failed" || phase.kind === "no_runtime") {
     return (
       <div className="space-y-2">
         <p className="break-keep text-sm text-warn" role="status">
-          {phase.kind === "failed" ? phase.message : "연결된 도우미가 답변 안내를 지원하지 않습니다. 초안을 복사해 직접 등록해 주세요."}
+          {phase.kind === "failed" ? phase.message : "연결된 도우미가 답변 안내를 지원하지 않아요. 초안을 복사해 직접 등록해 주세요."}
         </p>
         <CopyFallback copied={copied} onCopy={copy} />
       </div>
@@ -339,11 +339,11 @@ function GuidedReplyRun({ target, injected, onDone }: { target: GuidedReplyTarge
     return (
       <div className="space-y-2" data-testid="guided-execution-filled" ref={filledRef}>
         <p className="break-keep text-lg leading-relaxed text-ink">
-          {channel} 답글 입력칸에 승인한 답변을 준비했습니다.
+          {channel} 답글 입력칸에 승인한 답변을 준비했어요.
         </p>
         <p className="flex flex-wrap items-center gap-2 text-base text-ink" role="status">
           <Status tone="warn">등록 전</Status>
-          <span className="break-keep">아직 등록하지 않았습니다.</span>
+          <span className="break-keep">아직 등록하지 않았어요.</span>
         </p>
         <p className="break-keep text-sm text-muted">열린 {channel} 창에서 내용을 확인하고, 등록은 판매자님이 눌러 주세요.</p>
         {!reporting ? (
@@ -352,13 +352,13 @@ function GuidedReplyRun({ target, injected, onDone }: { target: GuidedReplyTarge
           <div className="space-y-2" data-testid="guided-execution-report">
             {raiseFailed ? (
               <p className="break-keep text-sm text-muted" role="status">
-                창을 앞으로 가져오지 못했습니다. 열려 있는 {channel} 창을 직접 확인해 주세요.
+                창을 앞으로 가져오지 못했어요. 열려 있는 {channel} 창을 직접 확인해 주세요.
               </p>
             ) : null}
-            <p className="break-keep text-sm text-muted">확인하셨다면 결과를 기록해 두겠습니다.</p>
+            <p className="break-keep text-sm text-muted">확인하셨다면 결과를 기록해 둘게요.</p>
             <div className="flex flex-wrap gap-2">
-              <Btn variant="outline" size="sm" onClick={() => void report("submitted")}>등록을 마쳤습니다</Btn>
-              <Btn variant="ghost" size="sm" onClick={() => void report("aborted")}>등록하지 않았습니다</Btn>
+              <Btn variant="outline" size="sm" onClick={() => void report("submitted")}>등록을 마쳤어요</Btn>
+              <Btn variant="ghost" size="sm" onClick={() => void report("aborted")}>등록하지 않았어요</Btn>
             </div>
           </div>
         )}
@@ -393,7 +393,7 @@ function GuidedReplyRun({ target, injected, onDone }: { target: GuidedReplyTarge
           screen from here, and the run reports nothing while it waits: what IS true is that the window
           may open on a sign-in screen, and that signing in continues the run by itself. */}
       <p className="break-keep text-sm text-muted">
-        로그인 화면이 보이면 열린 {channel} 창에서 로그인해 주세요. 로그인하면 자동으로 이어집니다.
+        로그인 화면이 보이면 열린 {channel} 창에서 로그인해 주세요. 로그인하면 자동으로 이어져요.
       </p>
     </div>
   );
@@ -402,8 +402,8 @@ function GuidedReplyRun({ target, injected, onDone }: { target: GuidedReplyTarge
 function CopyFallback({ copied, onCopy }: { copied: "idle" | "done" | "failed"; onCopy: () => void }) {
   return (
     <div className="space-y-1">
-      <Btn variant="outline" size="sm" onClick={onCopy}>{copied === "done" ? "복사했습니다" : "승인한 답변 복사"}</Btn>
-      {copied === "failed" ? <p className="text-sm text-muted">복사할 승인 답변이 없거나 이 브라우저에서는 복사할 수 없습니다.</p> : null}
+      <Btn variant="outline" size="sm" onClick={onCopy}>{copied === "done" ? "복사했어요" : "승인한 답변 복사"}</Btn>
+      {copied === "failed" ? <p className="text-sm text-muted">복사할 승인 답변이 없거나 이 브라우저에서는 복사할 수 없어요.</p> : null}
     </div>
   );
 }

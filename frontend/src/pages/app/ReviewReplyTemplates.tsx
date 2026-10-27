@@ -50,12 +50,12 @@ export function ReviewReplyTemplates() {
     <>
       <PageHead
         title="리뷰 답변 문구"
-        description="리뷰에 답변할 때 처음 채워지는 문구입니다. 유형별로 바꿔 두시면 회사 말투로 시작할 수 있습니다."
+        description="리뷰에 답변할 때 처음 채워지는 문구예요. 유형별로 바꿔 두시면 회사 말투로 시작할 수 있어요."
       />
 
       {loadError ? (
         <Panel title="리뷰 답변 문구">
-          <p className="text-warn">문구를 불러오지 못했습니다.</p>
+          <p className="text-warn">문구를 불러오지 못했어요.</p>
         </Panel>
       ) : templates === null ? (
         <Panel title="리뷰 답변 문구">
@@ -65,9 +65,9 @@ export function ReviewReplyTemplates() {
         <div className="space-y-4">
           <Disclosure label="어떻게 쓰이나요">
             <ul className="mt-2 space-y-1.5 break-keep text-sm text-muted">
-              <li>리뷰를 열면 아래 문구가 답변 초안에 먼저 채워집니다. 보내기 전에 언제든 고치실 수 있습니다.</li>
-              <li>말투와 표현만 정합니다. 배송일·환불·교환 같은 약속은 문구가 대신 정하지 않습니다.</li>
-              <li>저장하면 <strong className="font-semibold text-ink">다음에 만드는 초안부터</strong> 반영됩니다. 이미 승인한 답변은 그대로입니다.</li>
+              <li>리뷰를 열면 아래 문구가 답변 초안에 먼저 채워져요. 보내기 전에 언제든 고치실 수 있어요.</li>
+              <li>말투와 표현만 정해요. 배송일·환불·교환 같은 약속은 문구가 대신 정하지 않아요.</li>
+              <li>저장하면 <strong className="font-semibold text-ink">다음에 만드는 초안부터</strong> 반영돼요. 이미 승인한 답변은 그대로예요.</li>
             </ul>
           </Disclosure>
 
@@ -118,7 +118,7 @@ function TemplateEditor({
       setDone(kind === "saving" ? "saved" : "restored");
     } catch (e) {
       // The backend's own sentence: it names what was refused, which is the only actionable part.
-      setError(backendMessage(e) ?? "저장하지 못했습니다. 입력하신 내용을 확인해 주세요.");
+      setError(backendMessage(e) ?? "저장하지 못했어요. 입력하신 내용을 확인해 주세요.");
     } finally {
       setBusy(null);
     }
@@ -161,9 +161,9 @@ function TemplateEditor({
           기본값 복원
         </Btn>
         {error ? <span className="break-keep text-sm text-bad">{error}</span> : null}
-        {!error && done === "saved" ? <span className="text-sm text-good">저장했습니다.</span> : null}
+        {!error && done === "saved" ? <span className="text-sm text-good">저장했어요.</span> : null}
         {!error && done === "restored" ? (
-          <span className="text-sm text-good">기본 문구로 되돌렸습니다.</span>
+          <span className="text-sm text-good">기본 문구로 되돌렸어요.</span>
         ) : null}
       </div>
       </section>

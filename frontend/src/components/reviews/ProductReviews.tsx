@@ -84,13 +84,13 @@ export function ProductReviews({
         hint={record && record.total > 0 ? shownRange(record) : undefined}
       >
         {failed ? (
-          <p className="text-sm text-muted">리뷰를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
+          <p className="text-sm text-muted">리뷰를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</p>
         ) : loading && record === null ? (
           <p className="text-sm text-muted">불러오는 중…</p>
         ) : record === null || record.items.length === 0 ? (
           <Empty
-            title="이 상품의 리뷰가 아직 없습니다"
-            body="이 상품에 연결된 리뷰가 수집되면 여기에 모입니다."
+            title="이 상품의 리뷰가 아직 없어요"
+            body="이 상품에 연결된 리뷰가 수집되면 여기에 모여요."
           />
         ) : (
           <>
@@ -126,7 +126,7 @@ function ProductScope({ name }: { name: string | null }) {
   return (
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-canvas px-4 py-3 text-sm">
       <span className="break-keep text-ink">
-        <span className="font-semibold">{name ?? "선택한 상품"}</span>의 리뷰만 보고 있습니다.
+        <span className="font-semibold">{name ?? "선택한 상품"}</span>의 리뷰만 보고 있어요.
       </span>
       <Link
         to="/reviews"

@@ -142,7 +142,7 @@ function writeCurrent(key: string | null, id: string | null): void {
 let localSeq = 0;
 
 /** Mirrors the runtime's `CANCELLED_MESSAGE` — the same sentence whether the stop is read live or after a reload. */
-export const STOPPED_MESSAGE = "요청을 중지했습니다. 이미 시작된 확인은 되돌리지 않습니다.";
+export const STOPPED_MESSAGE = "요청을 중지했어요. 이미 시작된 확인은 되돌리지 않아요.";
 
 function agentStatus(turn: TurnView): "done" | "failed" | "waiting_human" {
   if (turn.status === "FAILED") return "failed";

@@ -156,7 +156,7 @@ describe("classifyProposeError", () => {
   it("404 → unavailable, no refresh", () => {
     const r = classifyProposeError(404);
     expect(r.shouldRefresh).toBe(false);
-    expect(r.message).toContain("찾을 수 없습니다");
+    expect(r.message).toContain("찾을 수 없어요");
   });
   it("409 → phase changed, triggers refresh", () => {
     const r = classifyProposeError(409);
@@ -176,8 +176,8 @@ describe("classifyProposeError", () => {
 
 describe("detailErrorMessage", () => {
   it("distinguishes 404 (unavailable) from a generic load error", () => {
-    expect(detailErrorMessage(404)).toContain("찾을 수 없습니다");
-    expect(detailErrorMessage(500)).toContain("불러오지 못했습니다");
+    expect(detailErrorMessage(404)).toContain("찾을 수 없어요");
+    expect(detailErrorMessage(500)).toContain("불러오지 못했어요");
   });
 });
 
@@ -191,8 +191,8 @@ describe("phase tabs", () => {
   it("uses distinct empty-state copy per tab", () => {
     const open = emptyCopyForTab("OPEN");
     const proposed = emptyCopyForTab("PROPOSED");
-    expect(open).toBe("응답 대기 중인 문의가 없습니다.");
-    expect(proposed).toBe("생성된 제안이 없습니다.");
+    expect(open).toBe("응답 대기 중인 문의가 없어요.");
+    expect(proposed).toBe("생성된 제안이 없어요.");
     expect(open).not.toBe(proposed);
     // Sub-copy also differs between the tabs.
     expect(tabFor("OPEN").emptySubCopy).not.toBe(tabFor("PROPOSED").emptySubCopy);
@@ -215,6 +215,6 @@ describe("phase tabs", () => {
 
   it("proposal-success guidance points the seller to the 제안 생성됨 tab", () => {
     expect(PROPOSAL_SUCCESS_GUIDANCE).toContain("제안 생성됨");
-    expect(PROPOSAL_SUCCESS_GUIDANCE).toContain("생성되었습니다");
+    expect(PROPOSAL_SUCCESS_GUIDANCE).toContain("생성됐어요");
   });
 });

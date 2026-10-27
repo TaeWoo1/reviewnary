@@ -270,14 +270,14 @@ export function CoupangIssuanceGuidedWalkthrough({
   const handoffMirror: { title: string; body: string; offerManual: boolean } | null =
     handoff.phase === "failed"
       ? {
-          title: "연결 정보를 저장하지 못했어요.",
-          body: "쿠팡 윙 창의 값은 저장되지 않았어요. 아래에서 직접 입력해 연결을 마칠 수 있습니다.",
+          title: "연동 정보를 저장하지 못했어요.",
+          body: "쿠팡 윙 창의 값은 저장되지 않았어요. 아래에서 직접 입력해 연결을 마칠 수 있어요.",
           offerManual: true,
         }
       : handoff.phase === "working"
         ? {
-            title: "연결 정보를 저장하고 있어요…",
-            body: "쿠팡 윙 창에 표시된 값을 읽어 암호화해 저장하고, 연결이 되는지 한 번 확인합니다. 값은 이 화면에 표시되지 않아요.",
+            title: "연동 정보를 저장하고 있어요…",
+            body: "쿠팡 윙 창에 표시된 값을 읽어 암호화해 저장하고, 연결이 되는지 한 번 확인해요. 값은 이 화면에 표시되지 않아요.",
             offerManual: false,
           }
         : handoffState === "AWAITING_CONSENT"
@@ -288,8 +288,8 @@ export function CoupangIssuanceGuidedWalkthrough({
             }
           : handoffState === "CONSENTED"
             ? {
-                title: "연결 정보를 저장하고 있어요…",
-                body: "쿠팡 윙 창에 표시된 값을 읽어 암호화해 저장하고, 연결이 되는지 한 번 확인합니다. 값은 이 화면에 표시되지 않아요.",
+                title: "연동 정보를 저장하고 있어요…",
+                body: "쿠팡 윙 창에 표시된 값을 읽어 암호화해 저장하고, 연결이 되는지 한 번 확인해요. 값은 이 화면에 표시되지 않아요.",
                 offerManual: false,
               }
             : null;
@@ -312,7 +312,7 @@ export function CoupangIssuanceGuidedWalkthrough({
     return (
       <div className="space-y-3" aria-label="쿠팡 Open API 키 발급 (텍스트 안내)">
         <p className="text-sm text-muted break-keep">
-          화면 안내 대신 아래 순서대로 직접 진행하세요. 발급을 마치면 연결 정보 입력 단계로 넘어갑니다.
+          화면 안내 대신 아래 순서대로 직접 진행하세요. 발급을 마치면 연동 정보 입력 단계로 넘어가요.
         </p>
         <CoupangIssuanceTutorial
           onComplete={onIssued}
@@ -333,12 +333,12 @@ export function CoupangIssuanceGuidedWalkthrough({
   // Nothing about the guided walk changed. Which of the two is the ordinary way did.
   if (!started) {
     return (
-      <div className="space-y-3" aria-label="쿠팡 연결 안내 시작">
+      <div className="space-y-3" aria-label="쿠팡 연동 안내 시작">
         <p className="text-sm text-ink break-keep">
           쿠팡 윙에서 Open API 키를 발급하는 순서를 안내해 드릴게요.
         </p>
         <p className="text-sm text-muted break-keep">
-          직접 진행하시면 무엇을 어디서 누르는지 순서대로 알려 드립니다. 내 PC에 reviewnary 도우미를 실행해
+          직접 진행하시면 무엇을 어디서 누르는지 순서대로 알려 드려요. 내 PC에 reviewnary 도우미를 실행해
           두셨다면, 도우미가 전용 쿠팡 윙 창을 열어 눌러야 할 위치를 표시하는 화면 안내도 쓸 수 있어요.
         </p>
         <button
@@ -372,7 +372,7 @@ export function CoupangIssuanceGuidedWalkthrough({
           screen is a walk, and a walk with no issuance step in it needs to explain itself. */}
       {alreadyHadKey && (
         <p className="rounded-xl bg-ok/10 px-4 py-3 text-sm text-ink break-keep" role="status">
-          이미 발급된 Open API 키가 있어요. 새로 발급하지 않고, 연결에 필요한 정보만 확인합니다.
+          이미 발급된 Open API 키가 있어요. 새로 발급하지 않고, 연결에 필요한 정보만 확인해요.
         </p>
       )}
       {/* **The credential handoff — the last step, and the only one that moves a secret.**
@@ -385,7 +385,7 @@ export function CoupangIssuanceGuidedWalkthrough({
           one-shot capability can be minted. The values never reach it — they are read in the marketplace window
           by the local agent and put on one request; what comes back here is a status. */}
       {handoffMirror && (
-        <section className="space-y-2 rounded-xl border border-line px-4 py-3" aria-label="연결 정보 저장" role="status">
+        <section className="space-y-2 rounded-xl border border-line px-4 py-3" aria-label="연동 정보 저장" role="status">
           <p className="text-sm font-medium text-ink" data-testid="coupang-handoff-mirror">
             {handoffMirror.title}
           </p>
@@ -413,7 +413,7 @@ export function CoupangIssuanceGuidedWalkthrough({
         <p className="text-sm font-medium text-ink">API 호출 IP 등록</p>
         <p className="text-xs text-muted">
           발급 화면의 'API 호출 IP'에 reviewnary 고정 호출 IP를 등록하세요. 등록하지 않으면 첫 주문 수집이
-          호출 IP 오류로 실패할 수 있습니다.
+          호출 IP 오류로 실패할 수 있어요.
         </p>
         <AdvertisedCallIpPanel ips={advertisedEgressIps} />
       </section>
@@ -466,8 +466,8 @@ export function CoupangIssuanceGuidedWalkthrough({
                 쿠팡(윙) 창에서 화면 안내를 따라 진행하세요
               </p>
               <p className="text-xs text-muted break-keep">
-                열린 쿠팡 윙 창의 안내(하이라이트와 '다음' 버튼)를 따라가시면 됩니다. 각 단계는 윙 화면에서 직접
-                진행되고, 이 화면은 진행 상태만 보여줍니다.
+                열린 쿠팡 윙 창의 안내(하이라이트와 '다음' 버튼)를 따라가시면 돼요. 각 단계는 윙 화면에서 직접
+                진행되고, 이 화면은 진행 상태만 보여줘요.
               </p>
               {effectiveRun.progress && (
                 <p className="text-xs text-muted">
@@ -519,7 +519,7 @@ export function CoupangIssuanceGuidedWalkthrough({
               {/* COMPLETED now means the credential is IN THE VAULT — the run rests on the seller's consent
                   until the handoff stores and verifies, and only that completes it. Said out loud, because the
                   button under it used to say "돌아가 연결 정보 입력하기" and there is nothing left to type. */}
-              <p className="text-sm text-muted break-keep">연결 정보를 저장했어요.</p>
+              <p className="text-sm text-muted break-keep">연동 정보를 저장했어요.</p>
               <button
                 type="button"
                 className="btn-primary block w-full"

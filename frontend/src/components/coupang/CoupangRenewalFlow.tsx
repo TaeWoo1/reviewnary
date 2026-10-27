@@ -148,7 +148,7 @@ export function CoupangRenewalFlow({ template, onReplace, onDone, walkthroughSea
         />
       ) : (
         <p className="text-muted" role="status">
-          연결에 필요한 정보를 불러오는 중입니다…
+          연결에 필요한 정보를 불러오는 중이에요…
         </p>
       )}
     </div>

@@ -123,7 +123,7 @@ export function useRepeatedIssue(
       setNote("");
       await load();
     } catch {
-      setError("상태를 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      setError("상태를 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
       setBusy(false);
     }

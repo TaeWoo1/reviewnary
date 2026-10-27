@@ -42,7 +42,7 @@ function prep(over: Partial<ReviewReplyPrep> = {}): ReviewReplyPrep {
     bodyRedacted: false,
     triageDisposition: "RESPONSE_NEEDED",
     suggestion: { body: "제안", category: "general_reply", providerKind: "RULE_BASED", providerName: "rule", providerVersion: "v1" },
-    draft: { version: 3, body: "불편을 드려 죄송합니다. 포장을 보완하겠습니다.", contentFingerprint: "fp-3", fingerprintAlgorithm: "sha256", createdAt: "2026-09-03T00:00:00Z" },
+    draft: { version: 3, body: "불편을 드려 죄송해요. 포장을 보완할게요.", contentFingerprint: "fp-3", fingerprintAlgorithm: "sha256", createdAt: "2026-09-03T00:00:00Z" },
     approval: null,
     outcome: null,
     capabilities: { canSave: true, canApprove: true, canWithdraw: false, canCopy: false, canStartSubmissionRun: false },
@@ -58,7 +58,7 @@ const APPROVED = {
   state: "APPROVED" as const,
   approvedVersion: 3,
   approvedFingerprint: "fp-3",
-  approvedBody: "불편을 드려 죄송합니다. 포장을 보완하겠습니다.",
+  approvedBody: "불편을 드려 죄송해요. 포장을 보완할게요.",
   decidedAt: "2026-09-03T01:00:00Z",
 };
 
@@ -77,14 +77,14 @@ describe("in-chat reply approval — §1: the seller approves the exact reply wi
     draw();
 
     // What the seller must be able to read before deciding.
-    expect(await screen.findByTestId("reply-approval-draft")).toHaveTextContent("불편을 드려 죄송합니다. 포장을 보완하겠습니다.");
+    expect(await screen.findByTestId("reply-approval-draft")).toHaveTextContent("불편을 드려 죄송해요. 포장을 보완할게요.");
     expect(screen.getByTestId("reply-approval-review")).toHaveTextContent("포장이 찌그러져 왔어요");
     const card = screen.getByTestId("reply-approval-artifact");
     expect(card.textContent).toContain("전선몰딩");
     expect(card.textContent).toContain("별점 4점");
     expect(card.textContent).toContain("초안 버전 3");
     // Approving is not sending, and the card says so where the button is.
-    expect(card.textContent).toContain("승인해도 아직 등록되지 않습니다.");
+    expect(card.textContent).toContain("승인해도 아직 등록되지 않아요.");
 
     getReviewReplyPrep.mockResolvedValue(prep({ approval: APPROVED, capabilities: { canSave: false, canApprove: false, canWithdraw: true, canCopy: true, canStartSubmissionRun: true } }));
     await userEvent.click(screen.getByTestId("reply-approval-approve"));
@@ -95,17 +95,17 @@ describe("in-chat reply approval — §1: the seller approves the exact reply wi
     // §2: approval is confirmed HERE, and the one primary that follows is the guided lane.
     // The card's TITLE carries the sentence; the block under the draft carries the chip. One fact, once.
     await screen.findByTestId("reply-approval-approved");
-    expect(screen.getByTestId("reply-approval-artifact")).toHaveTextContent("답변을 승인했습니다");
+    expect(screen.getByTestId("reply-approval-artifact")).toHaveTextContent("답변을 승인했어요");
     expect(screen.getByText("승인함")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "네이버에 입력하기" })).toBeInTheDocument();
   });
 
   it("approves the version ON SCREEN, not the one the artifact was composed with", async () => {
     // The draft moved between the runtime writing the card and the seller reading it.
-    getReviewReplyPrep.mockResolvedValue(prep({ draft: { version: 4, body: "다시 쓴 답변입니다.", contentFingerprint: "fp-4", fingerprintAlgorithm: "sha256", createdAt: "x" } }));
+    getReviewReplyPrep.mockResolvedValue(prep({ draft: { version: 4, body: "다시 쓴 답변이에요.", contentFingerprint: "fp-4", fingerprintAlgorithm: "sha256", createdAt: "x" } }));
     draw();
-    expect(await screen.findByTestId("reply-approval-draft")).toHaveTextContent("다시 쓴 답변입니다.");
-    expect(screen.getByText(/그 사이 수정되었습니다/)).toBeInTheDocument();
+    expect(await screen.findByTestId("reply-approval-draft")).toHaveTextContent("다시 쓴 답변이에요.");
+    expect(screen.getByText(/그 사이 수정됐어요/)).toBeInTheDocument();
     await userEvent.click(screen.getByTestId("reply-approval-approve"));
     await waitFor(() =>
       expect(decideReviewReplyApproval).toHaveBeenCalledWith("acc-nv", "ref-1", expect.objectContaining({ baseVersion: 4 })),
@@ -148,14 +148,14 @@ describe("in-chat reply approval — §1: the seller approves the exact reply wi
     draw();
     await screen.findByTestId("reply-approval-draft");
     await userEvent.click(screen.getByTestId("reply-approval-approve"));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/그 사이 바뀌었습니다/);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/그 사이 바뀌었어요/);
     expect(decideReviewReplyApproval).toHaveBeenCalledTimes(1);
   });
 
   it("fails closed: a prep read that did not land approves nothing and offers no control", async () => {
     getReviewReplyPrep.mockRejectedValue(new Error("network"));
     draw();
-    expect(await screen.findByText(/다시 읽지 못했습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/다시 읽지 못했어요/)).toBeInTheDocument();
     expect(screen.queryByTestId("reply-approval-approve")).toBeNull();
     expect(screen.queryByRole("button", { name: "네이버에 입력하기" })).toBeNull();
   });

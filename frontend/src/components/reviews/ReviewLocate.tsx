@@ -70,7 +70,7 @@ export function ReviewLocate({
     return (
       <Disclosure className={className} label={`${word} 원문 보기`}>
         <p className="pt-1 text-sm leading-relaxed text-muted">
-          이 채널의 {josa(word, "은", "는")} reviewnary에서 원문 화면으로 바로 이동할 수 없습니다. 판매자센터에서 직접 확인해 주세요.
+          이 채널의 {josa(word, "은", "는")} reviewnary에서 원문 화면으로 바로 이동할 수 없어요. 판매자센터에서 직접 확인해 주세요.
         </p>
       </Disclosure>
     );
@@ -91,8 +91,8 @@ export function ReviewLocate({
         쿠팡에서 보기
       </Btn>
       <p className="text-sm leading-relaxed text-muted">
-        쿠팡 윙의 상품평 목록 화면을 띄워 두시면, 이 상품평이 있는 줄에 테두리를 그려 드립니다. 쿠팡 화면에서는
-        아무것도 눌리거나 입력되지 않습니다.
+        쿠팡 윙의 상품평 목록 화면을 띄워 두시면, 이 상품평이 있는 줄에 테두리를 그려 드려요. 쿠팡 화면에서는
+        아무것도 눌리거나 입력되지 않아요.
       </p>
       {unavailable ? <p className="text-sm leading-relaxed text-ink">{locateUnavailableText(unavailable)}</p> : null}
       {message ? (

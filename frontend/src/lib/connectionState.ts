@@ -49,7 +49,7 @@ export function connectionState(
 export const CONNECTION_ACTION_LABEL: Record<ConnectionStateKey, string> = {
   CONNECTED: "연결 관리",
   NEEDS_CONNECT: "연결하기",
-  PENDING: "연결 계속하기",
+  PENDING: "연동 계속하기",
   RECONNECT: "다시 연결하기",
   ERROR: "확인하기",
 };

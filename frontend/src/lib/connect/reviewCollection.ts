@@ -106,8 +106,8 @@ export interface ReviewCollectionInput {
   arrival: ReviewCollectionArrival;
 }
 
-const OPENED_LIST = "상품평 목록을 열었습니다";
-const SIGNED_IN = "로그인했습니다";
+const OPENED_LIST = "상품평 목록을 열었어요";
+const SIGNED_IN = "로그인했어요";
 
 /**
  * park한 run의 blocker를 <b>걸음</b>으로 옮긴다.
@@ -135,15 +135,15 @@ function surfaceBlocker(code: string): {
     case "SURFACE_CLOSED":
       return {
         step: "SURFACE",
-        title: "쿠팡 창이 닫혔습니다",
-        body: "다시 열고 상품평 목록을 띄우면 이어서 가져옵니다.",
+        title: "쿠팡 창이 닫혔어요",
+        body: "다시 열고 상품평 목록을 띄우면 이어서 가져와요.",
         label: "쿠팡 창 다시 열기",
         failure: true,
       };
     case "STORE_MISMATCH":
       return {
         step: "STORE",
-        title: "다른 판매자 계정으로 로그인되어 있습니다",
+        title: "다른 판매자 계정으로 로그인되어 있어요",
         body: "이 채널에 연결한 스토어로 로그인한 뒤, 상품평 목록을 열어 주세요.",
         label: OPENED_LIST,
         failure: true,
@@ -151,8 +151,8 @@ function surfaceBlocker(code: string): {
     case "EXECUTOR_UNAVAILABLE":
       return {
         step: "SURFACE",
-        title: "수집 프로그램이 실행되고 있지 않습니다",
-        body: "쿠팡 화면에는 문제가 없습니다. 도우미를 실행한 뒤 다시 눌러 주세요.",
+        title: "수집 프로그램이 실행되고 있지 않아요",
+        body: "쿠팡 화면에는 문제가 없어요. 도우미를 실행한 뒤 다시 눌러 주세요.",
         label: "다시 시도",
         failure: true,
       };
@@ -160,16 +160,16 @@ function surfaceBlocker(code: string): {
     case "INGEST_FAILED":
       return {
         step: "SURFACE",
-        title: "읽은 상품평을 저장하지 못했습니다",
-        body: "저장된 상품평은 없습니다. 잠시 뒤 다시 가져와 주세요.",
+        title: "읽은 상품평을 저장하지 못했어요",
+        body: "저장된 상품평은 없어요. 잠시 뒤 다시 가져와 주세요.",
         label: "다시 시도",
         failure: true,
       };
     case "RUNTIME_FAULT":
       return {
         step: "SURFACE",
-        title: "가져오는 중 문제가 생겼습니다",
-        body: "저장된 상품평은 없습니다. 잠시 뒤 다시 시도해 주세요.",
+        title: "가져오는 중 문제가 생겼어요",
+        body: "저장된 상품평은 없어요. 잠시 뒤 다시 시도해 주세요.",
         label: "다시 시도",
         failure: true,
       };
@@ -181,7 +181,7 @@ function surfaceBlocker(code: string): {
       // 말하고, 누가 열었는지는 말하지 않는다.
       return {
         step: "SURFACE",
-        title: "상품평 목록을 읽지 못했습니다",
+        title: "상품평 목록을 읽지 못했어요",
         body: "쿠팡 창에 상품평 목록이 열려 있는지 확인한 뒤 다시 시도해 주세요.",
         label: "다시 시도",
         failure: false,
@@ -215,7 +215,7 @@ export function reviewCollectionStateOf(input: ReviewCollectionInput): ReviewCol
   const { readiness, helperKey, run, bootstrap, unavailable, startFailed, arrival } = input;
 
   if (!readiness || !helperKey) {
-    return state("HELPER", { ...BLANK, title: "수집 준비", body: "준비 상태를 확인하고 있습니다.", busy: true });
+    return state("HELPER", { ...BLANK, title: "수집 준비", body: "준비 상태를 확인하고 있어요.", busy: true });
   }
 
   // 1) 이 PC의 도우미. 카드가 자기 말과 자기 버튼을 이미 갖고 있으므로 여기서는 그것을 가리킨다.
@@ -225,7 +225,7 @@ export function reviewCollectionStateOf(input: ReviewCollectionInput): ReviewCol
       title: "브라우저 수집 준비",
       // 「열어 둔 판매자 화면」은 판매자가 연다는 뜻이었고, 이 공급자에서는 제품이 연다. 시스템이 하는 일을
       // 판매자에게 시키는 문장은 이 lane에서 고쳐야 하는 바로 그 종류다.
-      body: "쿠팡 판매자센터 화면을 열어 상품평을 읽어 옵니다. 그 화면과 함께 일할 도우미가 필요합니다.",
+      body: "쿠팡 판매자센터 화면을 열어 상품평을 읽어 와요. 그 화면과 함께 일할 도우미가 필요해요.",
       primary: { kind: "HELPER" },
     });
   }
@@ -233,10 +233,10 @@ export function reviewCollectionStateOf(input: ReviewCollectionInput): ReviewCol
   if (unavailable && unavailable !== "ready") {
     return state("SURFACE", {
       ...BLANK,
-      title: "도우미와 연결하지 못했습니다",
+      title: "도우미와 연결하지 못했어요",
       body: "도우미가 실행 중인지 확인한 뒤 다시 시작해 주세요.",
       failure: {
-        title: unavailable === "wrong_carrier" ? "도우미가 다른 작업을 진행 중입니다" : "도우미를 찾지 못했습니다",
+        title: unavailable === "wrong_carrier" ? "도우미가 다른 작업을 진행 중이에요" : "도우미를 찾지 못했어요",
         body:
           unavailable === "wrong_carrier"
             ? "진행 중인 작업을 마친 뒤 다시 시작해 주세요."
@@ -249,8 +249,8 @@ export function reviewCollectionStateOf(input: ReviewCollectionInput): ReviewCol
     return state("SURFACE", {
       ...BLANK,
       title: "쿠팡 판매자 화면",
-      body: "쿠팡 창을 준비하지 못했습니다.",
-      failure: { title: "쿠팡 창을 열지 못했습니다", body: "잠시 뒤 다시 시작해 주세요." },
+      body: "쿠팡 창을 준비하지 못했어요.",
+      failure: { title: "쿠팡 창을 열지 못했어요", body: "잠시 뒤 다시 시작해 주세요." },
     });
   }
 
@@ -258,8 +258,8 @@ export function reviewCollectionStateOf(input: ReviewCollectionInput): ReviewCol
   if (arrival === "VISITED" && !run) {
     return state("SURFACE", {
       ...BLANK,
-      title: "상품평을 가져올 준비가 됐습니다",
-      body: "누르시면 쿠팡 판매자센터의 상품평 목록을 열어 이번 페이지를 읽어 옵니다.",
+      title: "상품평을 가져올 준비가 됐어요",
+      body: "누르시면 쿠팡 판매자센터의 상품평 목록을 열어 이번 페이지를 읽어 와요.",
       primary: { kind: "START", label: "지금 가져오기" },
     });
   }
@@ -268,8 +268,8 @@ export function reviewCollectionStateOf(input: ReviewCollectionInput): ReviewCol
   if (!run) {
     return state("SURFACE", {
       ...BLANK,
-      title: "쿠팡 판매자센터를 여는 중입니다",
-      body: "상품평 목록을 열어 이번 페이지를 읽어 옵니다.",
+      title: "쿠팡 판매자센터를 여는 중이에요",
+      body: "상품평 목록을 열어 이번 페이지를 읽어 와요.",
       busy: true,
     });
   }
@@ -282,10 +282,10 @@ export function reviewCollectionStateOf(input: ReviewCollectionInput): ReviewCol
     return state("SURFACE", {
       ...BLANK,
       title: "쿠팡 판매자 화면",
-      body: "가져오기가 끝나지 않았습니다.",
+      body: "가져오기가 끝나지 않았어요.",
       failure: blocked
         ? { title: blocked.title, body: blocked.body }
-        : { title: "가져오기를 마치지 못했습니다", body: "잠시 뒤 다시 시작해 주세요." },
+        : { title: "가져오기를 마치지 못했어요", body: "잠시 뒤 다시 시작해 주세요." },
     });
   }
 
@@ -298,9 +298,9 @@ export function reviewCollectionStateOf(input: ReviewCollectionInput): ReviewCol
         return state("STORE", {
           ...BLANK,
           title: "이 스토어가 맞나요?",
-          body: "열려 있는 쿠팡 판매자 화면에서 읽은 스토어입니다. 확인해 주시면 이 스토어의 상품평을 가져옵니다.",
+          body: "열려 있는 쿠팡 판매자 화면에서 읽은 스토어예요. 확인해 주시면 이 스토어의 상품평을 가져와요.",
           confirmStore: bootstrap.value,
-          primary: { kind: "CONFIRM_STORE", label: "이 스토어를 연결하고 가져오기" },
+          primary: { kind: "CONFIRM_STORE", label: "이 스토어를 연동하고 가져오기" },
         });
       }
       return state("STORE", {
@@ -308,8 +308,8 @@ export function reviewCollectionStateOf(input: ReviewCollectionInput): ReviewCol
         title: "스토어 확인",
         body:
           bootstrap?.state === "AMBIGUOUS"
-            ? "화면에서 스토어를 하나로 확정하지 못했습니다. 쿠팡 판매자 화면에 표시되는 업체코드를 입력해 주세요."
-            : "열려 있는 화면이 어느 스토어인지 확인하고 있습니다. 확인되지 않으면 업체코드를 직접 입력할 수 있습니다.",
+            ? "화면에서 스토어를 하나로 확정하지 못했어요. 쿠팡 판매자 화면에 표시되는 업체코드를 입력해 주세요."
+            : "열려 있는 화면이 어느 스토어인지 확인하고 있어요. 확인되지 않으면 업체코드를 직접 입력할 수 있어요.",
         askIdentity: bootstrap !== null,
         busy: bootstrap === null,
       });
@@ -319,7 +319,7 @@ export function reviewCollectionStateOf(input: ReviewCollectionInput): ReviewCol
       return state("SURFACE", {
         ...BLANK,
         title: "쿠팡 창에서 상품평 목록을 열어 주세요",
-        body: "로그인이 되어 있지 않으면 먼저 로그인해 주세요. reviewnary는 대신 클릭하거나 입력하지 않습니다.",
+        body: "로그인이 되어 있지 않으면 먼저 로그인해 주세요. reviewnary는 대신 클릭하거나 입력하지 않아요.",
         primary: { kind: "RECHECK", label: OPENED_LIST },
       });
     }
@@ -336,9 +336,9 @@ export function reviewCollectionStateOf(input: ReviewCollectionInput): ReviewCol
 
   // PREPARING · RUNNING · PROCESSING · PAUSED — 우리가 일하는 중.
   if (run.status === "PROCESSING") {
-    return state("COLLECTING", { ...BLANK, title: "가져온 상품평을 저장하는 중입니다", body: "잠시만 기다려 주세요.", busy: true });
+    return state("COLLECTING", { ...BLANK, title: "가져온 상품평을 저장하는 중이에요", body: "잠시만 기다려 주세요.", busy: true });
   }
-  return state("COLLECTING", { ...BLANK, title: "상품평을 가져오는 중입니다", body: "잠시만 기다려 주세요.", busy: true });
+  return state("COLLECTING", { ...BLANK, title: "상품평을 가져오는 중이에요", body: "잠시만 기다려 주세요.", busy: true });
 }
 
 /* ── 채널 화면이 읽는 사실 ──────────────────────────────────────────────────────── */
@@ -383,8 +383,8 @@ export type CollectionReceipt =
  */
 export function collectedSentence(receipt: CollectionReceipt): string {
   if (receipt.kind === "STORED" && receipt.run.successRows > 0) {
-    return `상품평 ${receipt.run.successRows.toLocaleString("ko-KR")}개를 가져왔습니다.`;
+    return `상품평 ${receipt.run.successRows.toLocaleString("ko-KR")}개를 가져왔어요.`;
   }
-  if (receipt.kind === "UNKNOWN") return "가져오기가 끝났습니다.";
-  return "새로 가져올 상품평이 없었습니다.";
+  if (receipt.kind === "UNKNOWN") return "가져오기가 끝났어요.";
+  return "새로 가져올 상품평이 없었어요.";
 }

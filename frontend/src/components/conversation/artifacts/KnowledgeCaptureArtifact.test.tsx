@@ -19,14 +19,14 @@ const base: Capture = {
   artifactId: "a-cap-1", type: "KNOWLEDGE_CAPTURE", title: "배송 기준으로 저장", captureId: "cap-1", state: "CANDIDATE", scope: "ORG",
   topicLabel: "배송", productId: null, productName: null, variantName: null, inquiryId: "inq-1",
   question: "이 문의에 답하려면 일반 출고 기간 기준이 필요해요. 보통 결제 후 며칠 안에 출고하시나요?",
-  content: "결제 후 보통 2~3일 안에 출고합니다.", fingerprint: "abcd1234abcd1234", existing: null, resume: null, settingsTo: "/settings/policies",
+  content: "결제 후 보통 2~3일 안에 출고해요.", fingerprint: "abcd1234abcd1234", existing: null, resume: null, settingsTo: "/settings/policies",
 };
 
 describe("KnowledgeCaptureArtifact", () => {
   it("CANDIDATE: the seller's sentence verbatim, and both controls send the bound decision", async () => {
     const onDecision = vi.fn();
     render(<MemoryRouter><KnowledgeCaptureArtifact artifact={base} onDecision={onDecision} /></MemoryRouter>);
-    expect(screen.getByTestId("capture-content")).toHaveTextContent("결제 후 보통 2~3일 안에 출고합니다.");
+    expect(screen.getByTestId("capture-content")).toHaveTextContent("결제 후 보통 2~3일 안에 출고해요.");
     await userEvent.click(screen.getByRole("button", { name: "저장하고 계속" }));
     await userEvent.click(screen.getByRole("button", { name: "취소" }));
     expect(onDecision.mock.calls).toEqual([["cap-1", "abcd1234abcd1234", "SAVE"], ["cap-1", "abcd1234abcd1234", "CANCEL"]]);
@@ -46,8 +46,8 @@ describe("KnowledgeCaptureArtifact", () => {
   });
 
   it("CONFLICT names the existing rule and offers the settings path; SAVED says what happened next", () => {
-    render(<MemoryRouter><KnowledgeCaptureArtifact artifact={{ ...base, state: "CONFLICT", fingerprint: null, existing: { title: "배송 안내", excerpt: "결제 후 1~2일 안에 출고합니다." } }} onDecision={vi.fn()} /></MemoryRouter>);
-    expect(screen.getByTestId("capture-existing")).toHaveTextContent("등록된 기준 「배송 안내」: 결제 후 1~2일 안에 출고합니다.");
+    render(<MemoryRouter><KnowledgeCaptureArtifact artifact={{ ...base, state: "CONFLICT", fingerprint: null, existing: { title: "배송 안내", excerpt: "결제 후 1~2일 안에 출고해요." } }} onDecision={vi.fn()} /></MemoryRouter>);
+    expect(screen.getByTestId("capture-existing")).toHaveTextContent("등록된 기준 「배송 안내」: 결제 후 1~2일 안에 출고해요.");
     expect(screen.getByText("기존 기준과 다름")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "저장하고 계속" })).toBeNull();
     // Working Context v1 §5: the grounded re-draft is the TURN's own sentence and the draft card below
@@ -55,7 +55,7 @@ describe("KnowledgeCaptureArtifact", () => {
     render(<MemoryRouter><KnowledgeCaptureArtifact artifact={{ ...base, artifactId: "a-cap-2", state: "SAVED", fingerprint: null, resume: "DRAFT_GROUNDED" }} /></MemoryRouter>);
     expect(screen.queryByTestId("capture-resume")).toBeNull();
     render(<MemoryRouter><KnowledgeCaptureArtifact artifact={{ ...base, artifactId: "a-cap-3", state: "SAVED", fingerprint: null, resume: "DRAFT_STILL_GAP" }} /></MemoryRouter>);
-    expect(screen.getByTestId("capture-resume")).toHaveTextContent("저장했지만 이 문의에 바로 적용할 근거로는 아직 부족합니다.");
+    expect(screen.getByTestId("capture-resume")).toHaveTextContent("저장했지만 이 문의에 바로 적용할 근거로는 아직 부족해요.");
   });
 
   it("in the timeline the controls exist only on the latest agent turn", async () => {

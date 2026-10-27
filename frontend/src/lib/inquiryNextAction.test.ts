@@ -51,7 +51,7 @@ describe("inquiryNextAction — 상태 다음에 바로 할 일이 온다", () =
   it("답변된 문의에는 할 일이 없다고 말한다", () => {
     const next = inquiryNextAction({ status: "ANSWERED" }, null);
     expect(next.state.text).toBe("답변함");
-    expect(next.sentence).toContain("하실 일은 없습니다");
+    expect(next.sentence).toContain("하실 일은 없어요");
   });
 
   it("답변 대기 중이면 어디서 이어가는지 말한다", () => {
@@ -63,7 +63,7 @@ describe("inquiryNextAction — 상태 다음에 바로 할 일이 온다", () =
   it("대기 목록에 없는 미답변 문의는 고객이 어디 서 있는지만 말한다", () => {
     const next = inquiryNextAction({ status: "UNANSWERED" }, null);
     expect(next.state.text).toBe("답변 필요");
-    expect(next.sentence).toContain("답변을 받지 못했습니다");
+    expect(next.sentence).toContain("답변을 받지 못했어요");
     // 어디서 답하면 되는지는 이유 문단의 몫이다. 둘이 같이 말하면 한 화면에 같은 지시가 두 번 적힌다 —
     // 이 패키지가 없애려던 모양 그대로.
     expect(next.sentence).not.toContain("판매자센터");
@@ -72,7 +72,7 @@ describe("inquiryNextAction — 상태 다음에 바로 할 일이 온다", () =
   it("다음 행동 줄과 이유 문단이 같은 말을 하지 않는다", () => {
     const next = inquiryNextAction({ status: "UNANSWERED" }, null);
     const reason = draftUnavailableReason({ status: "UNANSWERED" }, null, "카페24 자사몰") ?? "";
-    expect(reason).toContain("판매자센터에서 직접 작성");
+    expect(reason).toContain("판매자센터에서 직접 써");
     expect(next.sentence).not.toContain("직접 작성");
   });
 
@@ -98,17 +98,17 @@ describe("draftUnavailableReason — 「할 수 없습니다」에 이유가 붙
   it("이미 답변된 문의에는 어디서 읽는지가 이유다", () => {
     const reason = draftUnavailableReason({ status: "ANSWERED" }, null, "네이버 스마트스토어");
     expect(reason).toContain("네이버 스마트스토어 판매자센터");
-    expect(reason).toContain("확인하실 수 있습니다");
+    expect(reason).toContain("볼 수 있어요");
     // 바로 위 문장이 말하는 사실을 다른 말로 한 번 더 말하지 않는다.
     expect(reason).not.toContain("이미 답변이 등록되어 있어");
   });
 
   it("그 밖에는 규칙을 말한다 — 가능성 목록이 아니라", () => {
     const reason = draftUnavailableReason({ status: "UNANSWERED" }, null, "카페24 자사몰");
-    expect(reason).toContain("답변을 기다리는 문의에만 초안을 씁니다");
+    expect(reason).toContain("답변을 기다리는 문의에만 초안을 써요");
     expect(reason).toContain("카페24 자사몰 판매자센터");
     // 행이 담고 있지 않은 사실을 짐작해 늘어놓지 않는다. 가능성 목록은 정보가 아니라 숙제다.
-    expect(reason).not.toContain("일 수 있습니다");
+    expect(reason).not.toContain("일 수 있어요");
   });
 
   it("예전 문장으로 돌아가지 않는다", () => {

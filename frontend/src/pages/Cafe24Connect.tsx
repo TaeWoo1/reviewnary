@@ -28,7 +28,7 @@ export function Cafe24Connect() {
     }
     const mall = normalizeMallId(mallId);
     if (mall === null) {
-      setError("몰 ID 형식이 올바르지 않습니다. 영문 소문자·숫자·하이픈만 사용할 수 있습니다.");
+      setError("몰 ID 형식이 올바르지 않아요. 영문 소문자·숫자·하이픈만 사용할 수 있어요.");
       return;
     }
     setPending(true);
@@ -47,13 +47,13 @@ export function Cafe24Connect() {
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">카페24 연결</h1>
+        <h1 className="text-2xl font-bold">카페24 연동</h1>
         <p className="mt-1 text-lg text-muted">
-          카페24 자사몰의 몰 ID를 입력하고 연결을 시작하면, 카페24 로그인·동의 화면으로 이동합니다.
-          동의를 마치면 자동으로 연결됩니다.
+          카페24 자사몰의 몰 ID를 입력하고 연결을 시작하면, 카페24 로그인·동의 화면으로 이동해요.
+          동의를 마치면 자동으로 연결돼요.
         </p>
         <p className="mt-1 text-base text-muted">
-          카페24 자사몰 관리자에서 앱 연동 동의로 연결합니다.
+          카페24 자사몰 관리자에서 앱 연동 동의로 연결해요.
         </p>
       </div>
 
@@ -72,7 +72,7 @@ export function Cafe24Connect() {
             disabled={pending}
           />
           <p className="mt-2 text-sm text-muted">
-            자사몰 주소 앞부분입니다. 예: mystore.cafe24.com → mystore
+            자사몰 주소 앞부분이에요. 예: mystore.cafe24.com → mystore
           </p>
         </div>
 
@@ -80,10 +80,10 @@ export function Cafe24Connect() {
 
         <div className="flex items-center justify-between gap-3">
           <Link to="/connect" className="btn-ghost">
-            채널 연결로 돌아가기
+            채널 연동로 돌아가기
           </Link>
           <button type="submit" disabled={!canSubmit} className="btn-primary">
-            {pending ? "연결 중…" : "카페24 연결하기"}
+            {pending ? "연결 중…" : "카페24 연동하기"}
           </button>
         </div>
       </form>

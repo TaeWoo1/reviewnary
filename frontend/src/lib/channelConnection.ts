@@ -55,7 +55,7 @@ export function channelCardAction(
       // start() reuses this account and supersedes the stale OAuth state — no new
       // account, no separate resume endpoint.
       return {
-        label: "연결 계속하기",
+        label: "연동 계속하기",
         intent: channel.code === "CAFE24" ? "reconnect" : "manage",
         disabled: false,
       };

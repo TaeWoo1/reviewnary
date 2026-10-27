@@ -62,7 +62,7 @@ describe("/login social outcome notices", () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole("status")).toHaveTextContent(SOCIAL_NOTICE.email_taken.title);
-    expect(screen.getByRole("status")).toHaveTextContent("자동 연결하지 않았습니다");
+    expect(screen.getByRole("status")).toHaveTextContent("자동 연결하지 않았어요");
     expect(screen.getByLabelText("이메일")).toHaveValue("");
     await expectNoAxeViolations(document.body);
   });

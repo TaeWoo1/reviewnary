@@ -249,11 +249,11 @@ export function signInMessage(state: SignInSessionState): { text: string; isErro
       // <b>왜 끝났는지 말한다.</b> 「아직 확인되지 않았습니다」만 있으면 판매자는 자기가 뭘 잘못했는지 찾는다.
       // 끝난 이유는 지켜보는 시간이 다 된 것이고, 다음에 할 일은 로그인을 마친 뒤 그 버튼을 다시 누르는 것이다.
       return {
-        text: "로그인 창을 지켜보는 시간이 끝났습니다. 로그인을 마친 뒤 [판매자센터 로그인]을 다시 눌러 주세요.",
+        text: "로그인 창을 지켜보는 시간이 끝났어요. 로그인을 마친 뒤 [판매자센터 로그인]을 다시 눌러 주세요.",
         isError: true,
       };
     case "UNAVAILABLE":
-      return { text: "판매자센터 로그인 창을 열지 못했습니다. 잠시 후 다시 시도해 주세요.", isError: true };
+      return { text: "판매자센터 로그인 창을 열지 못했어요. 잠시 후 다시 시도해 주세요.", isError: true };
     default:
       return null;
   }
@@ -263,12 +263,12 @@ export function signInMessage(state: SignInSessionState): { text: string; isErro
 export function signInStartMessage(reason: Exclude<SignInStartResult, { ok: true }>["reason"]): string {
   switch (reason) {
     case "not_connected":
-      return "이 Mac의 도우미와 연결이 필요합니다.";
+      return "이 Mac의 도우미와 연결이 필요해요.";
     case "busy":
-      return "이 컴퓨터에서 이미 로그인 창이 열려 있습니다. 그 창에서 로그인을 마쳐 주세요.";
+      return "이 컴퓨터에서 이미 로그인 창이 열려 있어요. 그 창에서 로그인을 마쳐 주세요.";
     case "unsupported_channel":
-      return "이 채널은 판매자센터 로그인이 필요한 수집 방식이 아닙니다.";
+      return "이 채널은 판매자센터 로그인이 필요한 수집 방식이 아니에요.";
     default:
-      return "판매자센터 로그인 창을 열지 못했습니다. 잠시 후 다시 시도해 주세요.";
+      return "판매자센터 로그인 창을 열지 못했어요. 잠시 후 다시 시도해 주세요.";
   }
 }

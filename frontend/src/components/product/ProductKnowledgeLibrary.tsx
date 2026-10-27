@@ -93,14 +93,14 @@ export function ProductKnowledgeLibrary({
       />
 
       {failed ? (
-        <p className="mt-3 text-warn">상품 지식을 불러오지 못했습니다.</p>
+        <p className="mt-3 text-warn">상품 지식을 불러오지 못했어요.</p>
       ) : sources === null ? (
         <p className="mt-3 text-muted">불러오는 중…</p>
       ) : sources.length === 0 && editing === null ? (
         <div className="mt-3">
         <Empty
-          title="아직 등록된 상품 지식이 없습니다"
-          body="상품 설명·자주 묻는 질문·사용법·정책을 적어 두면, AI가 답변을 만들 때 이 내용을 근거로 사용합니다. 여기에 없는 내용은 지어내지 않습니다."
+          title="아직 등록된 상품 지식이 없어요"
+          body="상품 설명·자주 묻는 질문·사용법·정책을 적어 두면, AI가 답변을 만들 때 이 내용을 근거로 사용해요. 여기에 없는 내용은 지어내지 않아요."
           action={<Btn onClick={() => setEditing("new")}>지식 추가</Btn>}
         />
         </div>
@@ -120,7 +120,7 @@ export function ProductKnowledgeLibrary({
                 {/* 0은 사실이다 — 저장은 됐지만 AI가 끌어 쓸 수 없는 지식이 있다는 것을,
                     답변이 조용히 그것을 쓰지 않는 쪽이 아니라 여기서 알아야 한다. */}
                 {source.chunks === 0 ? (
-                  <span className="text-warn">AI가 인용할 수 없습니다</span>
+                  <span className="text-warn">AI가 인용할 수 없어요</span>
                 ) : null}
               </RowMeta>
             </RecordRow>
@@ -218,7 +218,7 @@ function KnowledgeEditor({
     } catch {
       // Deliberately not the server's message: a failure here is one of two things a seller can act
       // on, and a transport-shaped string is neither of them.
-      setError("저장하지 못했습니다. 제목과 내용을 확인해 주세요. 같은 제목의 지식이 이미 있을 수 있습니다.");
+      setError("저장하지 못했어요. 제목과 내용을 확인해 주세요. 같은 제목의 지식이 이미 있을 수 있어요.");
     } finally {
       setSaving(false);
     }
@@ -231,7 +231,7 @@ function KnowledgeEditor({
       await api.deleteProductKnowledgeSource(source.id);
       await onDone();
     } catch {
-      setError("삭제하지 못했습니다.");
+      setError("삭제하지 못했어요.");
     } finally {
       setSaving(false);
     }
@@ -288,7 +288,7 @@ function KnowledgeEditor({
           ))}
         </select>
         <span className="mt-1 block break-keep text-sm text-muted">
-          규격에 따라 답이 달라지는 내용이면 규격을 골라 주세요. 다른 규격의 문의에는 사용하지 않습니다.
+          규격에 따라 답이 달라지는 내용이면 규격을 골라 주세요. 다른 규격의 문의에는 사용하지 않아요.
         </span>
       </label>
 
@@ -298,7 +298,7 @@ function KnowledgeEditor({
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={8}
-          placeholder={"고객에게 그대로 설명할 수 있는 문장으로 적어 주세요.\n\n빈 줄로 문단을 나누면 그 단위로 인용됩니다."}
+          placeholder={"고객에게 그대로 설명할 수 있는 문장으로 적어 주세요.\n\n빈 줄로 문단을 나누면 그 단위로 인용돼요."}
           className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-base leading-relaxed focus:border-brand focus:outline-none"
         />
       </label>
@@ -314,7 +314,7 @@ function KnowledgeEditor({
           className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-base leading-relaxed focus:border-brand focus:outline-none"
         />
         <span className="mt-1 block break-keep text-sm text-muted">
-          리뷰에 이 표현이 있으면 이 내용이 답글 초안의 근거로 붙습니다. 「안 떨어져요」처럼 부정하는 말에는 붙지 않습니다.
+          리뷰에 이 표현이 있으면 이 내용이 답글 초안의 근거로 붙어요. 「안 떨어져요」처럼 부정하는 말에는 붙지 않아요.
         </span>
       </label>
 
@@ -330,7 +330,7 @@ function KnowledgeEditor({
           {/* Said plainly: SellerOps does not fetch it. Automatic acquisition is an approved action,
               never a side effect of saving a note. */}
           <span className="mt-1 block text-sm text-muted">
-            주소는 출처로만 남습니다. reviewnary가 이 주소를 열어 내용을 가져오지는 않습니다.
+            주소는 출처로만 남아요. reviewnary가 이 주소를 열어 내용을 가져오지는 않아요.
           </span>
         </label>
       ) : null}

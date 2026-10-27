@@ -251,7 +251,7 @@ export function GuidedImportCard({
    */
   const abandonPlan = useCallback(async (): Promise<void> => {
     if (!plan || abandonBusy) return;
-    if (!window.confirm("이 기간 가져오기를 그만두고 다른 기간을 선택할까요? 이미 가져온 리뷰는 그대로 남습니다.")) return;
+    if (!window.confirm("이 기간 가져오기를 그만두고 다른 기간을 선택할까요? 이미 가져온 리뷰는 그대로 남아요.")) return;
     setAbandonBusy(true);
     setError(null);
     try {
@@ -504,8 +504,8 @@ export function GuidedImportCard({
       {guided.refused ? (
         <p className="rounded-xl bg-warn/10 px-4 py-3 text-sm text-ink break-keep" role="status" data-testid="guided-import-refused">
           {guided.refused.cause === "NOT_ALLOWED_NOW"
-            ? "지금은 이 동작을 할 수 없습니다. 화면이 바뀌면 다시 시도해 주세요."
-            : "요청이 처리되지 않았습니다. 화면을 새로 고친 뒤 다시 시도해 주세요."}
+            ? "지금은 이 동작을 할 수 없어요. 화면이 바뀌면 다시 시도해 주세요."
+            : "요청이 처리되지 않았어요. 화면을 새로 고친 뒤 다시 시도해 주세요."}
         </p>
       ) : null}
 

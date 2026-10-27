@@ -95,7 +95,7 @@ export function dockView(memory: DockMemory, phase: BridgePhase): DockView {
 export const DOCK_COPY = {
   connected: "reviewnary 도우미 연결됨",
   connectedDetail: "이 브라우저가 내 PC의 reviewnary 도우미와 연결되어 있어요.",
-  noChannels: "도우미가 맡고 있는 채널 연결이 아직 없어요.",
+  noChannels: "도우미가 맡고 있는 채널 연동이 아직 없어요.",
   disconnect: "연결 해제",
   reconnect: "다시 연결",
   retrying: "다시 연결하는 중…",

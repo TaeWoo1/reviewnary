@@ -82,7 +82,7 @@ export function stopSentence(failureCode: string | null | undefined): string | n
     case "RANGE_NOT_SETTABLE":
     case "CALENDAR_OPENER_NOT_FOUND":
     case "CALENDAR_OPENER_AMBIGUOUS":
-      return "판매자센터 화면에서 기간 선택 영역을 확인하지 못했습니다.";
+      return "판매자센터 화면에서 기간 선택 영역을 확인하지 못했어요.";
     // 달력은 열렸지만 그 안을 믿을 수 없었던 경우. 판매자가 지금 할 수 있는 일은 위와 같지만, 다음에 고치러
     // 갈 자리는 전혀 다르다 — 그래서 화면 문장은 달력을 가리키고, 어느 시험에서 멈췄는지는 failureCode가
     // 기록으로 남긴다. 화면에는 내부 용어를 쓰지 않는다.
@@ -93,17 +93,17 @@ export function stopSentence(failureCode: string | null | undefined): string | n
     case "MONTH_NAV_EXHAUSTED":
     case "DAY_CELL_NOT_FOUND":
     case "DAY_CELL_AMBIGUOUS":
-      return "판매자센터 달력에서 날짜를 고르지 못했습니다.";
+      return "판매자센터 달력에서 날짜를 고르지 못했어요.";
     case "RANGE_MISMATCH":
       // 기간을 바꿨지만 화면이 그 기간을 보여주지 않았다. 판매자가 할 수 있는 일은 같다 — 그 화면을 한 번
       // 열어 보는 것.
-      return "판매자센터 화면이 요청한 기간을 보여주지 않았습니다.";
+      return "판매자센터 화면이 요청한 기간을 보여주지 않았어요.";
     case "SURFACE_UNEXPECTED":
-      return "판매자센터 리뷰 화면을 찾지 못했습니다.";
+      return "판매자센터 리뷰 화면을 찾지 못했어요.";
     case "ROUTE_NOT_READY":
       // 판매자센터는 맞았고 리뷰 화면이 끝까지 그려지지 않았다. 판매자가 할 일은 기다렸다 다시 누르는 것뿐
       // 이므로 「찾지 못했다」로 말하지 않는다 — 그건 화면을 확인하라는 뜻이 되고, 확인할 것이 없다.
-      return "판매자센터 리뷰 화면이 아직 열리지 않았습니다.";
+      return "판매자센터 리뷰 화면이 아직 열리지 않았어요.";
     default:
       return null;
   }
@@ -122,27 +122,27 @@ export function catchUpMessage(read: ScreenReadView): { text: string; isError: b
     case "RUNNING":
       // 「N개 기간 확인됨」은 내부 창 나누기를 간접적으로 꺼내 보인다 — 판매자가 쓸 수 있는 수가 아니고,
       // 그 수가 몇이든 할 일이 같다. 진행 중이라는 사실만 말한다.
-      return { text: "밀린 리뷰를 확인하고 있습니다.", isError: false };
+      return { text: "밀린 리뷰를 확인하고 있어요.", isError: false };
     case "COMPLETE":
-      return { text: `밀린 리뷰를 모두 확인했습니다. 새로 저장 ${read.inserted ?? 0}건`, isError: false };
+      return { text: `밀린 리뷰를 모두 확인했어요. 새로 저장 ${read.inserted ?? 0}건`, isError: false };
     case "PAUSED_AUTH":
       // 앞에서 끝낸 기간은 그대로 남는다 — 로그인하고 이어가면 멈춘 그 기간부터 다시 읽는다. 몇 개를
       // 끝냈는지는 판매자가 할 일을 바꾸지 않는다: 로그인하면 이어진다.
-      return { text: "판매자센터 로그인이 필요합니다. 로그인하면 이어서 확인합니다.", isError: true };
+      return { text: "판매자센터 로그인이 필요해요. 로그인하면 이어서 확인해요.", isError: true };
     case "STOPPED_SATURATED":
       return {
-        text: "일부 기간을 아직 확인하지 못했습니다. 하루에 리뷰가 아주 많은 날이 있어 그 뒤는 남겨 두었습니다.",
+        text: "일부 기간을 아직 확인하지 못했어요. 하루에 리뷰가 아주 많은 날이 있어 그 뒤는 남겨 두었어요.",
         isError: true,
       };
     case "STOPPED_LIMIT":
       return {
-        text: "일부 기간을 아직 확인하지 못했습니다. 다시 확인을 누르면 이어서 확인합니다.",
+        text: "일부 기간을 아직 확인하지 못했어요. 다시 확인을 누르면 이어서 확인해요.",
         isError: false,
       };
     default: {
       const why = stopSentence(walk.stopReason);
       return {
-        text: why ?? "일부 기간을 아직 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        text: why ?? "일부 기간을 아직 확인하지 못했어요. 잠시 후 다시 시도해 주세요.",
         isError: true,
       };
     }
@@ -162,22 +162,22 @@ export function screenReadMessage(label: string, read: ScreenReadView): { text: 
       };
     case "PARTIAL":
       return {
-        text: `${label} 수집 완료: 새로 저장 ${read.inserted ?? 0} · 갱신 ${read.changed ?? 0}. 화면에 보이는 최근 구간만 확인했습니다.`,
+        text: `${label} 수집 완료: 새로 저장 ${read.inserted ?? 0} · 갱신 ${read.changed ?? 0}. 화면에 보이는 최근 구간만 확인했어요.`,
         isError: false,
       };
     case "AUTH_REQUIRED":
       return {
-        text: `판매자 센터 로그인이 필요합니다. 로그인한 뒤 ${label} 수집을 다시 눌러 주세요.`,
+        text: `판매자 센터 로그인이 필요해요. 로그인한 뒤 ${label} 수집을 다시 눌러 주세요.`,
         isError: true,
       };
     case "RUNNING":
-      return { text: `${label} 수집이 아직 진행 중입니다. 잠시 뒤 다시 확인해 주세요.`, isError: false };
+      return { text: `${label} 수집이 아직 진행 중이에요. 잠시 뒤 다시 확인해 주세요.`, isError: false };
     default: {
       // 「리뷰을(를)」. 조사를 둘 다 적어 두는 것은 둘 중 어느 것도 고르지 않은 것이고, 판매자가 읽는 것은
       // 고르지 않은 그 모양이다. 이 제품의 자료 이름은 받침으로 끝나지 않거나(리뷰) 끝나거나(문의·주문)
       // 하므로, 마지막 글자로 고른다.
       const why = stopSentence(read.failureCode);
-      return { text: why ?? `${label}${objectParticle(label)} 수집하지 못했습니다. 잠시 후 다시 시도해 주세요.`, isError: true };
+      return { text: why ?? `${label}${objectParticle(label)} 수집하지 못했어요. 잠시 후 다시 시도해 주세요.`, isError: true };
     }
   }
 }
@@ -205,14 +205,14 @@ export function requestId(): string {
 export function deskSentence(desk: LocalAgentRunState | null): string {
   switch (desk) {
     case "UNPAIRED":
-      return "이 컴퓨터의 도우미를 한 번 연결하면 수집할 수 있습니다.";
+      return "이 컴퓨터의 도우미를 한 번 연결하면 수집할 수 있어요.";
     case "BUSY":
-      return "이미 수집이 진행 중입니다.";
+      return "이미 수집이 진행 중이에요.";
     case "AUTH_REQUIRED":
       // <b>지난 시도에 대한 문장이고, 지금의 인증 상태가 아니다.</b> 서버가 아는 것은 「마지막 수집 시도가
       // 로그인 벽에서 멈췄다」이지 「지금 로그아웃 상태다」가 아니다 — 후자는 아무도 하지 않은 실시간 확인을
       // 주장하는 말이고, 판매자가 그사이 자기 브라우저에서 로그인했을 수도 있다.
-      return "최근 수집 시 로그인이 필요했습니다.";
+      return "최근 수집 시 로그인이 필요했어요.";
     default:
       // <b>정상 상태에서는 acquisition 이야기를 하지 않는다.</b> 이 자리에 있던 문장은 「누를 때마다 판매자
       // 센터 화면에서 읽어옵니다. 자동 주기는 없습니다」였다 — 판매자에게 (a) 구현 방식과 (b) 매번 눌러야
@@ -438,7 +438,7 @@ export function CollectNowAction({
         resumed = null;
       }
       if (!live.current || !resumed) return;
-      onReport("로그인 확인됨. 멈췄던 확인을 이어서 진행합니다.", false);
+      onReport("로그인 확인됨. 멈췄던 확인을 이어서 진행해요.", false);
       await watchResumed(resumed);
     }
 
@@ -486,8 +486,8 @@ export function CollectNowAction({
         if (!live.current) return;
         // <b>몇 분을 기다리게 하면서 아무 말도 하지 않으면 멈춘 것으로 읽힌다.</b> 2026-10-09에 그렇게 읽혔다.
         onReport(round === 1
-          ? "판매자센터 로그인 창을 열었습니다. 그 창에서 로그인해 주세요."
-          : `아직 기다리고 있습니다. 로그인 창을 다시 앞으로 가져왔습니다. (${round}/${rounds})`, false);
+          ? "판매자센터 로그인 창을 열었어요. 그 창에서 로그인해 주세요."
+          : `아직 기다리고 있어요. 로그인 창을 다시 앞으로 가져왔어요. (${round}/${rounds})`, false);
       }, SIGN_IN_ROUNDS, startSignIn, awaitSignIn);
       if (!live.current) return;
       if (!watched.ok) {
@@ -534,7 +534,7 @@ export function CollectNowAction({
         onChanged?.();
         return;
       }
-      onReport("로그인 확인됨. 멈췄던 확인을 이어서 진행합니다.", false);
+      onReport("로그인 확인됨. 멈췄던 확인을 이어서 진행해요.", false);
       await watchResumed(resumed);
     } finally {
       if (live.current) setSigningIn(false);
@@ -581,7 +581,7 @@ export function CollectNowAction({
           run.status === "FAILED",
         );
       } else {
-        onReport(`${label} 수집을 시작했습니다.`, false);
+        onReport(`${label} 수집을 시작했어요.`, false);
       }
       onChanged();
     } catch (e) {
@@ -589,11 +589,11 @@ export function CollectNowAction({
       // 한다 — 한국어 문장을 맞춰보는 화면은 누군가 문장을 고치는 순간 판매자에게 엉뚱한 안내를 한다.
       const code = backendCode(e);
       if (code === "HELPER_NOT_LINKED") {
-        onReport("이 컴퓨터의 도우미가 아직 연결되지 않았습니다. 도우미 카드에서 [이 기기 연결]을 한 번 눌러 주세요.", true);
+        onReport("이 컴퓨터의 도우미가 아직 연결되지 않았어요. 도우미 카드에서 [이 기기 연결]을 한 번 눌러 주세요.", true);
       } else if (code === "HELPER_BUSY") {
-        onReport("이미 수집이 진행 중입니다. 끝난 뒤 다시 눌러 주세요.", true);
+        onReport("이미 수집이 진행 중이에요. 끝난 뒤 다시 눌러 주세요.", true);
       } else {
-        onReport(backendMessage(e) ?? "수집 실행에 실패했습니다. 잠시 후 다시 시도해 주세요.", true);
+        onReport(backendMessage(e) ?? "수집 실행에 실패했어요. 잠시 후 다시 시도해 주세요.", true);
       }
     } finally {
       setSyncing(false);

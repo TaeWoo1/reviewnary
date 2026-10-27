@@ -69,7 +69,7 @@ function overview(over: Partial<OverviewResponse["metrics"]> = {}): OverviewResp
 
 const CASE = {
   id: "case-1", subjectKind: "INQUIRY", subjectId: "i-1", workItemId: "w-1", channelId: "ch", channelNameKo: "카페24 자사몰", productId: null, productName: null,
-  snippet: "배송은 언제 되나요?", rating: null, priority: "HIGH", reason: "UNANSWERED", reasonNote: "답변 초안을 준비했습니다", evidenceState: null, evidenceCount: 1,
+  snippet: "배송은 언제 되나요?", rating: null, priority: "HIGH", reason: "UNANSWERED", reasonNote: "답변 초안을 준비했어요", evidenceState: null, evidenceCount: 1,
   knowledgeGap: null, preparedAction: "DRAFT_PREPARED", draftVersion: 1, recommendation: null, subjectReceivedAt: null, preparedAt: null,
 };
 
@@ -104,7 +104,7 @@ const HOME = {
         rating: 1,
         occurredOn: "2026-08-25",
         productName: "선바로 전선몰딩",
-        quote: "상품페이지 설명에 혼선을 줍니다.",
+        quote: "상품페이지 설명에 혼선을 줘요.",
       },
     ],
   },
@@ -186,7 +186,7 @@ afterEach(() => vi.clearAllMocks());
 
 describe("greeting — arithmetic, never a model", () => {
   it("is the hour plus the count of what was prepared; zero gets its own sentence", () => {
-    expect(greetingLine(9, 2)).toBe("좋은 아침입니다. 오늘 제가 먼저 확인한 일이 2개 있습니다.");
+    expect(greetingLine(9, 2)).toBe("좋은 아침이에요. 오늘 제가 먼저 확인한 일이 2개 있어요.");
     // §11: zero says only hello — whether anything is WAITING is the opener turn's sentence, computed
     // from the real workload, so the greeting can never contradict it.
     expect(greetingLine(15, 0)).toBe("안녕하세요.");
@@ -229,8 +229,8 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     // The same review, seen five weeks after it was written: the brief does not lead with it, 내가 할 일 does not
     // count it, and the line under the heading names it with the way to the queue that holds it.
     renderHome(new Date("2026-09-30T09:30:00+09:00"));
-    expect(await screen.findByText("새로 할 일은 없습니다.")).toBeInTheDocument();
-    expect(screen.queryByText("상품페이지 설명에 혼선을 줍니다.")).toBeNull();
+    expect(await screen.findByText("새로 할 일은 없어요.")).toBeInTheDocument();
+    expect(screen.queryByText("상품페이지 설명에 혼선을 줘요.")).toBeNull();
     expect(screen.getByText("할 일에서 보기 →").closest("p")?.textContent).toContain("지난 일 1건");
     expect(screen.getByTestId("today-summary").textContent).toMatch(/오늘 할 일\s*0/);
   });
@@ -274,7 +274,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
   it("먼저 볼 일의 리뷰 한 줄은 그 리뷰를 판단하는 화면을 연다", async () => {
     renderHome();
     await screen.findByText("먼저 볼 일");
-    const row = await screen.findByRole("link", { name: /상품페이지 설명에 혼선을 줍니다/ });
+    const row = await screen.findByRole("link", { name: /상품페이지 설명에 혼선을 줘요/ });
     // `from=work` — 이 화면에서 들어왔다는 표시. 돌아올 곳을 리뷰 화면이 안다.
     expect(row).toHaveAttribute("href", "/reviews/reply/rev-1?from=work");
   });
@@ -323,7 +323,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
       prepared: { reviewRepliesApproved: 0, inquiryDraftsReady: 0, rows: [] },
     });
     renderHome();
-    expect(await screen.findByText("지금 할 일이 없습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("지금 할 일이 없어요.")).toBeInTheDocument();
   });
 
   /**
@@ -360,8 +360,8 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
   it("before the first connection the greeting stops counting and offers the one thing to do", async () => {
     getOverviewStrict.mockResolvedValue(overview({ channels: [] }));
     renderHome();
-    expect(await screen.findByText("판매 채널을 연결하면 시작할 수 있습니다.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "채널 연결하기" })).toHaveAttribute("href", "/connect");
+    expect(await screen.findByText("판매 채널을 연동하면 시작할 수 있어요.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "채널 연동하기" })).toHaveAttribute("href", "/connect");
     expect(screen.queryByLabelText("오늘 상태")).toBeNull();
     // 첫 연결 전에는 목록이 아니라 「무엇을 연결하면 무엇을 받는가」가 화면이고, 예시 칩이 거기 선다.
     expect(screen.getByLabelText("예시 질문")).toBeInTheDocument();
@@ -393,7 +393,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     await userEvent.keyboard("{Enter}");
     await waitFor(() => expect(conversationClient.sendTurn).toHaveBeenCalledTimes(1));
     expect(vi.mocked(conversationClient.sendTurn).mock.calls[0]![1].text).toBe("오늘 리뷰 뭐 들어왔어?");
-    expect(await screen.findByText("이 상품에 미답변 문의는 없습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("이 상품에 미답변 문의는 없어요.")).toBeInTheDocument();
   });
 });
 
@@ -427,7 +427,7 @@ describe("Customer Operations v3.1 — the job's Home", () => {
     sources: [],
     decisions: { total: 1, rows: [{
       caseId: "k-1", subjectKind: "INQUIRY", channelNameKo: "카페24", title: "배송은 언제 되나요?", rating: null,
-      reasonNote: "답변 대기", summary: "출고 기준이 등록돼 있습니다.", recommendedActionType: "REPLY_TO_CUSTOMER",
+      reasonNote: "답변 대기", summary: "출고 기준이 등록돼 있어요.", recommendedActionType: "REPLY_TO_CUSTOMER",
       recommendedAction: null, missingInformation: [], draftPrepared: true, decidedBy: "AGENT",
       openedAt: "2026-08-27T00:02:00Z", to: "/inquiries/i-1",
     }] },

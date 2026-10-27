@@ -40,7 +40,7 @@ export function DecisionLog({ entries, failed }: { entries: ReviewDecisionLogEnt
   return (
     <Section title="기록" count={rows.length > 0 ? rows.length : null}>
       {rows.length === 0 ? (
-        <p className="break-keep text-sm leading-relaxed text-muted">아직 이 리뷰에 기록된 판단이 없습니다.</p>
+        <p className="break-keep text-sm leading-relaxed text-muted">아직 이 리뷰에 기록된 판단이 없어요.</p>
       ) : (
         <ListBox>
           <ul>

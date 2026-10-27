@@ -14,7 +14,7 @@ import { Status, type StatusTone } from "../ui/Status";
 // Words as mockup ③ fixed them (2026-10-25): short labels, no sentence a label can carry. An unapproved draft only
 // waiting on the phone is not a state the seller has to read — it has no chip.
 const STATE: Record<string, { word: string; tone: StatusTone; note?: string }> = {
-  RECHECK_NEEDED: { word: "다시 검사 중", tone: "neutral", note: "응대 기준이 바뀌어 이 초안을 다시 검사합니다." },
+  RECHECK_NEEDED: { word: "다시 검사 중", tone: "neutral", note: "응대 기준이 바뀌어 이 초안을 다시 검사해요." },
   APPROVED: { word: "담당자 대기", tone: "info" },
   CLAIMED: { word: "등록하는 중", tone: "info" },
   CANCEL_REQUESTED: { word: "취소 요청 중", tone: "warn", note: "담당자 응답 대기" },
@@ -24,7 +24,7 @@ const STATE: Record<string, { word: string; tone: StatusTone; note?: string }> =
   CANCELLED: { word: "요청 취소함", tone: "neutral" },
   // Owner decision 2026-10-23: an approval is held only when its words lost their ground, and says why below.
   HELD: { word: "고칠 곳", tone: "warn" },
-  HOLD_REQUESTED: { word: "멈춤 요청 중", tone: "warn", note: "담당자가 등록 전인지 확인하면 바뀝니다" },
+  HOLD_REQUESTED: { word: "멈춤 요청 중", tone: "warn", note: "담당자가 등록 전인지 확인하면 바뀌어요" },
   INVALIDATED: { word: "요청 끝남", tone: "neutral", note: "리뷰가 바뀌었거나 이미 답글이 있음" },
 };
 
@@ -70,13 +70,13 @@ function WhyStopped({ state, note }: { state: string; note: ReviewReplyDelegatio
         .join(", ");
       return (
         <p className="text-xs leading-relaxed text-muted">
-          확인하고 승인한 답글입니다 — {seen}. 응대 기준이나 답변 스타일에 맞게 고쳐 두면 다음 답글부터 걸리지 않습니다.
+          확인하고 승인한 답글이에요 — {seen}. 응대 기준이나 답변 스타일에 맞게 고쳐 두면 다음 답글부터 걸리지 않아요.
         </p>
       );
     }
     return changed ? (
       <p className="text-xs leading-relaxed text-muted">
-        근거로 쓴 {changed} 문서가 바뀌었지만, 이 답글과 부딪히는 곳이 없어 승인을 그대로 둡니다.
+        근거로 쓴 {changed} 문서가 바뀌었지만, 이 답글과 부딪히는 곳이 없어 승인을 그대로 둬요.
       </p>
     ) : null;
   }
@@ -84,7 +84,7 @@ function WhyStopped({ state, note }: { state: string; note: ReviewReplyDelegatio
   const heading = advisory ? "확인할 점" : "왜 멈췄나요";
   const todo = promise
     ? advisory
-      ? "승인하기 전에 이 약속이 맞는지 보세요. 맞다면 응대 기준에 적어 두면 근거가 생깁니다."
+      ? "승인하기 전에 이 약속이 맞는지 보세요. 맞다면 응대 기준에 적어 두면 근거가 생겨요."
       : state === "RECHECK_NEEDED"
         ? "문장을 고쳐 다시 보내세요. 그 약속이 맞다면 응대 기준에 먼저 적으세요."
         : "문장을 고쳐 다시 승인하세요. 그 약속이 맞다면 응대 기준에 먼저 적은 뒤 다시 승인하세요."
@@ -112,8 +112,8 @@ function WhyStopped({ state, note }: { state: string; note: ReviewReplyDelegatio
         <dd className="text-ink">
           {promise || forbidden ? (
             <>
-              {promise ? <span className="block">답글의 {words} 약속이 지금 근거에는 없습니다.</span> : null}
-              {forbidden ? <span className="block">회사가 쓰지 않기로 한 표현이 있습니다: {phrases}</span> : null}
+              {promise ? <span className="block">답글의 {words} 약속이 지금 근거에는 없어요.</span> : null}
+              {forbidden ? <span className="block">회사가 쓰지 않기로 한 표현이 있어요: {phrases}</span> : null}
               {note.sentences.map((s) => (
                 <mark key={s} className="mt-1 block rounded bg-warn/10 px-1.5 py-0.5 font-semibold text-ink">
                   {s}
@@ -121,7 +121,7 @@ function WhyStopped({ state, note }: { state: string; note: ReviewReplyDelegatio
               ))}
             </>
           ) : (
-            "이 초안은 그 문서를 근거로 썼습니다. 어느 문장이 달라졌는지는 아직 짚지 못합니다."
+            "이 초안은 그 문서를 근거로 썼어요. 어느 문장이 달라졌는지는 아직 짚지 못해요."
           )}
         </dd>
         <dt className="text-muted">할 일</dt>

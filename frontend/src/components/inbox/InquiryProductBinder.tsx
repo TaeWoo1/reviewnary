@@ -58,7 +58,7 @@ export function InquiryProductBinder({
       setResults(await api.searchProductsStrict(term.trim(), 20));
     } catch {
       setResults([]);
-      setError("상품을 찾지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      setError("상품을 찾지 못했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
       setSearching(false);
     }
@@ -97,7 +97,7 @@ export function InquiryProductBinder({
       <div className="mt-3 rounded-lg border border-line bg-canvas p-4">
         <p className="break-keep text-sm leading-relaxed text-ink">
           이 문의는 채널이 알려준 상품 번호로 <b>{detail.productName ?? "다른 상품"}</b>에 연결돼
-          있습니다. <b>{pendingOverride.name}</b>(으)로 바꾸시겠습니까?
+          있어요. <b>{pendingOverride.name}</b>(으)로 바꿀까요?
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Btn size="sm" onClick={() => void bind(pendingOverride, true)} disabled={busy}>
@@ -128,7 +128,7 @@ export function InquiryProductBinder({
       {error ? <p className="mt-2 break-keep text-sm text-warn">{error}</p> : null}
       {searching ? <p className="mt-2 text-sm text-muted">찾는 중…</p> : null}
       {!searching && query.trim() && results.length === 0 ? (
-        <p className="mt-2 break-keep text-sm text-muted">검색 결과가 없습니다.</p>
+        <p className="mt-2 break-keep text-sm text-muted">검색 결과가 없어요.</p>
       ) : null}
       <ul className="mt-2 space-y-1">
         {results.map((product) => (

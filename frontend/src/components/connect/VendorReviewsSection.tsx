@@ -13,18 +13,18 @@ import type {
 } from "../../lib/types";
 
 const TITLE = "담당자가 올리는 네이버 리뷰";
-const HINT = "담당자가 판매자센터 리뷰 엑셀을 reviewnary 서버에 올리면 이 PC가 받아 옵니다.";
-const OFFLINE = "reviewnary 서버에 닿지 않습니다. 인터넷 연결을 확인해 주세요. 이미 받은 리뷰는 그대로 있습니다.";
-const REVOKED = "이 PC의 연결이 해제됐습니다. 다시 연결해야 리뷰를 받을 수 있습니다.";
-const LOAD_FAILED = "리뷰 받기 상태를 불러오지 못했습니다. 이미 받은 리뷰는 그대로 있습니다.";
+const HINT = "담당자가 판매자센터 리뷰 엑셀을 reviewnary 서버에 올리면 이 PC가 받아 와요.";
+const OFFLINE = "reviewnary 서버에 닿지 않아요. 인터넷 연결을 확인해 주세요. 이미 받은 리뷰는 그대로 있어요.";
+const REVOKED = "이 PC의 연결이 해제됐어요. 다시 연결해야 리뷰를 받을 수 있어요.";
+const LOAD_FAILED = "리뷰 받기 상태를 불러오지 못했어요. 이미 받은 리뷰는 그대로 있어요.";
 /** How often an open section reads again: the scheduled pull runs every 5 minutes; a server that was away is asked sooner. */
 const REFRESH_MS = 60_000;
 const RETRY_MS = 15_000;
 
 const FAILURE: Record<NonNullable<VendorReviewStoreView["failure"]>, string> = {
-  UNREACHABLE: "마지막 받기에서 서버에 닿지 않았습니다. 다음 받기에서 다시 시도합니다.",
-  NOT_AUTHORIZED: "마지막 받기에서 서버가 이 PC의 요청을 받지 않았습니다.",
-  NOT_STORED: "마지막 받기에서 리뷰 일부를 저장하지 못했습니다. 다음 받기가 그 리뷰부터 다시 받습니다.",
+  UNREACHABLE: "마지막 받기에서 서버에 닿지 않았어요. 다음 받기에서 다시 시도해요.",
+  NOT_AUTHORIZED: "마지막 받기에서 서버가 이 PC의 요청을 받지 않았어요.",
+  NOT_STORED: "마지막 받기에서 리뷰 일부를 저장하지 못했어요. 다음 받기가 그 리뷰부터 다시 받아요.",
 };
 
 /**
@@ -236,18 +236,18 @@ export function VendorReviewsSection() {
         <>
           <p className="border-t border-line/70 py-2 text-sm text-ink">
             {link.state === "CODE_EXPIRED"
-              ? "연결 코드의 시간이 지났습니다. 「이 PC 연결」을 다시 눌러 주세요."
-              : "이 PC가 아직 reviewnary 서버에 연결되지 않았습니다. 연결하면 받을 스토어가 여기에 보입니다."}
+              ? "연결 코드의 시간이 지났어요. 「이 PC 연결」을 다시 눌러 주세요."
+              : "이 PC가 아직 reviewnary 서버에 연결되지 않았어요. 연결하면 받을 스토어가 여기에 보여요."}
           </p>
           <p className="break-keep text-xs text-muted">
-            「이 PC 연결」은 이 브라우저에서 가입한 계정으로 로그인해 허용하는 한 번의 단계입니다. 네이버 연결 화면의 그 버튼과 같습니다.
+            「이 PC 연결」은 이 브라우저에서 가입한 계정으로 로그인해 허용하는 한 번의 단계예요. 네이버 연동 화면의 그 버튼과 같아요.
           </p>
         </>
       ) : null}
 
       {link.state === "PENDING" ? (
         <div className="space-y-1 border-t border-line/70 py-2" data-testid="vendor-reviews-pending">
-          <p className="text-sm text-ink">브라우저에서 이 PC를 허용하면 연결됩니다.</p>
+          <p className="text-sm text-ink">브라우저에서 이 PC를 허용하면 연결돼요.</p>
           {link.userCode ? (
             <p className="text-xs text-muted">
               연결 코드{" "}
@@ -295,7 +295,7 @@ export function VendorReviewsSection() {
 
           {reachable && overview.stores.length === 0 ? (
             <p className="border-t border-line/70 py-2 text-sm text-ink">
-              이 계정에 아직 스토어가 없습니다. 스토어는 reviewnary 운영자가 만들어 드립니다.
+              이 계정에 아직 스토어가 없어요. 스토어는 reviewnary 운영자가 만들어 드려요.
             </p>
           ) : null}
 
@@ -313,9 +313,9 @@ export function VendorReviewsSection() {
           {reachable && unstarted.length > 0 ? (
             <p className="break-keep text-xs text-muted" data-testid="vendor-reviews-start-note">
               「리뷰 받기 시작」을 누르면 위의 「아직 받지 않음」 스토어 {unstarted.length}곳(
-              {unstarted.map((s) => s.label).join(", ")})의 리뷰를 「{overview.organisation ?? "-"}」 작업 계정으로 받습니다. 시작한
-              스토어는 이 PC가 켜져 있는 동안 5분마다 자동으로 받습니다. 나중에 생기는 스토어는 여기에 따로 보이고, 시작하기 전에는 받지
-              않습니다.
+              {unstarted.map((s) => s.label).join(", ")})의 리뷰를 「{overview.organisation ?? "-"}」 작업 계정으로 받아요. 시작한
+              스토어는 이 PC가 켜져 있는 동안 5분마다 자동으로 받아요. 나중에 생기는 스토어는 여기에 따로 보이고, 시작하기 전에는 받지
+              않아요.
             </p>
           ) : null}
           {started.length > 0 ? (
@@ -327,7 +327,7 @@ export function VendorReviewsSection() {
               >
                 리뷰
               </Link>{" "}
-              화면에 다른 채널 리뷰와 함께 보입니다. 이 PC가 꺼져 있던 동안 올라온 리뷰는 다음에 켜질 때 받습니다.
+              화면에 다른 채널 리뷰와 함께 보여요. 이 PC가 꺼져 있던 동안 올라온 리뷰는 다음에 켜질 때 받아요.
             </p>
           ) : null}
         </>
@@ -413,6 +413,6 @@ function pulledLine(result: VendorReviewPullResult): string {
   const inserted = ran.reduce((n, s) => n + s.inserted, 0);
   const updated = ran.reduce((n, s) => n + s.updated, 0);
   const failedStores = ran.filter((s) => s.failed > 0).map((s) => s.label);
-  const line = `새 리뷰 ${inserted.toLocaleString("ko-KR")}건 · 바뀐 리뷰 ${updated.toLocaleString("ko-KR")}건을 받았습니다.`;
-  return failedStores.length > 0 ? `${line} ${failedStores.join(", ")}은(는) 일부를 받지 못했습니다.` : line;
+  const line = `새 리뷰 ${inserted.toLocaleString("ko-KR")}건 · 바뀐 리뷰 ${updated.toLocaleString("ko-KR")}건을 받았어요.`;
+  return failedStores.length > 0 ? `${line} ${failedStores.join(", ")}은(는) 일부를 받지 못했어요.` : line;
 }

@@ -26,7 +26,7 @@ function policy(over: Partial<OrgKnowledgeView> = {}): OrgKnowledgeView {
     knowledgeType: "CASH_RECEIPT",
     typeLabel: "현금영수증",
     title: "현금영수증 발급 안내",
-    body: "결제 완료 후 현금영수증 발급을 요청하실 수 있습니다.",
+    body: "결제 완료 후 현금영수증 발급을 요청하실 수 있어요.",
     sourceUrl: null,
     authorName: "데모 운영자",
     version: 1,
@@ -63,7 +63,7 @@ describe("운영 정책 / 답변 기준", () => {
     listOrgKnowledge.mockResolvedValue([policy({ passageCount: 0 })]);
     renderScreen();
 
-    expect(await screen.findByText(/답변에 인용할 수 없습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/답변에 인용할 수 없어요/)).toBeInTheDocument();
   });
 
   it("never prints our word for a chunk beside the rule", async () => {
@@ -86,8 +86,8 @@ describe("운영 정책 / 답변 기준", () => {
     listOrgKnowledge.mockResolvedValue([]);
     renderScreen();
 
-    expect(await screen.findByText("아직 등록된 기준이 없습니다")).toBeInTheDocument();
-    expect(screen.getByText(/상품과 연결되지 않은 문의에도 근거를 갖고 답할 수 있습니다/))
+    expect(await screen.findByText("아직 등록된 기준이 없어요")).toBeInTheDocument();
+    expect(screen.getByText(/상품과 연결되지 않은 문의에도 근거를 갖고 답할 수 있어요/))
       .toBeInTheDocument();
   });
 
@@ -98,14 +98,14 @@ describe("운영 정책 / 답변 기준", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "기준 추가" }));
     await userEvent.type(screen.getByLabelText("제목"), "현금영수증 발급 안내");
-    await userEvent.type(screen.getByLabelText("내용"), "결제 완료 후 요청하실 수 있습니다.");
+    await userEvent.type(screen.getByLabelText("내용"), "결제 완료 후 요청하실 수 있어요.");
     await userEvent.click(screen.getByRole("button", { name: "저장" }));
 
     await waitFor(() =>
       expect(createOrgKnowledge).toHaveBeenCalledWith({
         knowledgeType: "SHIPPING_POLICY",
         title: "현금영수증 발급 안내",
-        body: "결제 완료 후 요청하실 수 있습니다.",
+        body: "결제 완료 후 요청하실 수 있어요.",
         sourceUrl: null,
       }),
     );
@@ -119,10 +119,10 @@ describe("운영 정책 / 답변 기준", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "기준 추가" }));
     await userEvent.type(screen.getByLabelText("제목"), "배송 안내");
-    await userEvent.type(screen.getByLabelText("내용"), "영업일 기준 2일 이내 출고됩니다.");
+    await userEvent.type(screen.getByLabelText("내용"), "영업일 기준 2일 이내 출고돼요.");
     await userEvent.click(screen.getByRole("button", { name: "저장" }));
 
-    expect(await screen.findByText(/같은 제목의 기준이 이미 있을 수 있습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/같은 제목의 기준이 이미 있을 수 있어요/)).toBeInTheDocument();
     expect(screen.queryByText(/status code 409/)).not.toBeInTheDocument();
   });
 
@@ -130,7 +130,7 @@ describe("운영 정책 / 답변 기준", () => {
     listOrgKnowledge.mockRejectedValue(new Error("boom"));
     renderScreen();
 
-    expect(await screen.findByText("운영 기준을 불러오지 못했습니다.")).toBeInTheDocument();
-    expect(screen.queryByText("아직 등록된 기준이 없습니다")).not.toBeInTheDocument();
+    expect(await screen.findByText("운영 기준을 불러오지 못했어요.")).toBeInTheDocument();
+    expect(screen.queryByText("아직 등록된 기준이 없어요")).not.toBeInTheDocument();
   });
 });

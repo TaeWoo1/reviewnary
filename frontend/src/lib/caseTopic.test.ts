@@ -44,7 +44,7 @@ describe("gapSentence — 못 믿을 이름은 인용하지 않는다", () => {
       TOPICLESS_GAP_SENTENCE,
     );
     // 사실은 지워지지 않는다 — 주제만 빠진다.
-    expect(TOPICLESS_GAP_SENTENCE).toContain("기준이 없습니다");
+    expect(TOPICLESS_GAP_SENTENCE).toContain("기준이 없어요");
   });
 
   it("주제가 없으면 서버 문장을 그대로 쓴다 — 같은 뜻의 문장을 두 벌 두지 않는다", () => {

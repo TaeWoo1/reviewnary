@@ -279,13 +279,13 @@ describe("provenance", () => {
   it("says 규칙 기반 and never AI", () => {
     const line = provenanceKo(issue());
     expect(line).toContain("규칙 기반");
-    expect(line).toContain("최종 진단이 아닙니다");
+    expect(line).toContain("최종 진단이 아니에요");
     expect(line).not.toContain("AI");
   });
 
   it("still refuses to claim a diagnosis for an unknown extractor", () => {
     const line = provenanceKo(issue({ extractorKind: "SOMETHING_ELSE" }));
-    expect(line).toContain("최종 진단이 아닙니다");
+    expect(line).toContain("최종 진단이 아니에요");
     expect(line).not.toContain("AI");
   });
 });

@@ -545,17 +545,17 @@ export function ConnectNaver() {
 
   const wizardBlock = (
     <>
-      {loading && <p className="text-muted">연결 준비 정보를 불러오는 중입니다…</p>}
+      {loading && <p className="text-muted">연결 준비 정보를 불러오는 중이에요…</p>}
       {resolveError && (
         <p className="card p-5 text-bad" role="alert">
-          연결 준비 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+          연결 준비 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
         </p>
       )}
       {!loading && !resolveError && (
         <>
           {credentialUnavailable && (
             <p className="card p-5 text-muted" role="status">
-              NAVER 채널 준비가 필요합니다. 연결 정보를 입력하려면 먼저 채널을 준비해 주세요.
+              NAVER 채널 준비가 필요해요. 연동 정보를 입력하려면 먼저 채널을 준비해 주세요.
             </p>
           )}
           <GuidedConnectionWizard
@@ -584,15 +584,15 @@ export function ConnectNaver() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="NAVER 스마트스토어 연결"
-        description="주문은 공식 API로 연결합니다. 연결하면 새 리뷰를 자동으로 확인합니다 — 설정에서 언제든 끌 수 있습니다."
+        title="NAVER 스마트스토어 연동"
+        description="주문은 공식 API로 연결해요. 연결하면 새 리뷰를 자동으로 확인해요 — 설정에서 언제든 끌 수 있어요."
       />
 
       {walkthrough && <WalkthroughBanner context={wtContext} channelCode="NAVER" channelCalls={naverCalls} />}
 
       {walkthrough && gate === "checking" && (
         <p className="text-muted" role="status">
-          walkthrough 환경을 확인하는 중입니다…
+          walkthrough 환경을 확인하는 중이에요…
         </p>
       )}
       {walkthrough && gate === "mismatch" && (

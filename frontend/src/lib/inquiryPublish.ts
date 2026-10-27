@@ -64,14 +64,14 @@ export function publishUnavailableReason(
   // 판매자센터에서 답변해 주세요" about a question that has already been answered sends them to do
   // work that no longer exists.
   if (answeredElsewhere(detail)) {
-    return "이미 답변된 문의입니다. 판매자님이 채널에서 직접 답변하신 내용이 확인되었습니다.";
+    return "이미 답변된 문의예요. 판매자님이 채널에서 직접 답변하신 내용이 확인됐어요.";
   }
   const channel = detail.channelNameKo ?? "이 채널";
   if (!capability) {
-    return "답변 등록이 가능한지 확인하지 못했습니다. 답변은 판매자센터에서 직접 등록해 주세요.";
+    return "답변 등록이 가능한지 확인하지 못했어요. 답변은 판매자센터에서 직접 등록해 주세요.";
   }
   if (!capability.executionEnabled) {
-    return "지금은 reviewnary가 답변을 대신 등록하지 않습니다. [초안 복사]로 옮겨 판매자센터에 등록해 주세요.";
+    return "지금은 reviewnary가 답변을 대신 등록하지 않아요. [초안 복사]로 옮겨 판매자센터에 등록해 주세요.";
   }
   // The audited answer for THIS channel and THIS source resource, when the server sent one. It says
   // whose limitation this is, and that is the part a seller acts on: told "네이버는 지원하지 않습니다"
@@ -81,7 +81,7 @@ export function publishUnavailableReason(
   if (audited) {
     return `${audited} [초안 복사]로 옮겨 판매자센터에 등록해 주세요.`;
   }
-  return `${channel} 문의는 판매자센터에서 직접 답변해 주세요. [초안 복사]로 옮겨 쓰실 수 있습니다.`;
+  return `${channel} 문의는 판매자센터에서 직접 답변해 주세요. [초안 복사]로 옮겨 쓰실 수 있어요.`;
 }
 
 /** Whether a draft version may still be edited — once an approval is bound, the content is frozen. */
@@ -99,17 +99,17 @@ export function canEditDraft(status: PublishStatusView | null): boolean {
 export function publishCategoryLabel(category: PublishOutcomeCategory | string): string {
   switch (category) {
     case "PENDING":
-      return "승인은 끝났고 아직 등록되지 않았습니다.";
+      return "승인은 끝났고 아직 등록되지 않았어요.";
     case "PUBLISHING":
-      return "등록 중입니다. 잠시 후 상태를 확인해 주세요.";
+      return "등록 중이에요. 잠시 후 상태를 확인해 주세요.";
     case "COMPLETED":
-      return "답변이 등록되었습니다.";
+      return "답변이 등록됐어요.";
     case "CHECKING_REQUIRED":
-      return "등록 여부를 확인하는 중입니다. 다시 보내지 않고 채널 상태만 다시 조회합니다.";
+      return "등록 여부를 확인하는 중이에요. 다시 보내지 않고 채널 상태만 다시 조회해요.";
     case "RETRYABLE_FAILURE":
-      return "일시적인 문제로 등록되지 않았습니다. 다시 시도할 수 있습니다.";
+      return "일시적인 문제로 등록되지 않았어요. 다시 시도할 수 있어요.";
     case "PERMANENT_FAILURE":
-      return "등록할 수 없습니다. 판매자센터에서 직접 답변해 주세요.";
+      return "등록할 수 없어요. 판매자센터에서 직접 답변해 주세요.";
     default:
       // A token this build does not know — a newer backend, or a vocabulary that drifted again.
       //
@@ -121,7 +121,7 @@ export function publishCategoryLabel(category: PublishOutcomeCategory | string):
       //
       // So it says the only thing that is certainly true — this screen cannot read the state — and
       // points at the surface that can. It claims neither success nor failure, and prints no token.
-      return "등록 상태를 이 화면에서 확인하지 못했습니다. 판매자센터에서 확인해 주세요.";
+      return "등록 상태를 이 화면에서 확인하지 못했어요. 판매자센터에서 확인해 주세요.";
   }
 }
 
@@ -183,8 +183,8 @@ export function canVerifyPublish(status: { category: PublishOutcomeCategory | st
 export function deliveryVerificationLabel(delivery: { verified: boolean | null } | null): string | null {
   if (!delivery || delivery.verified === null) return null;
   return delivery.verified
-    ? "채널에서 답변이 등록된 것을 확인했습니다."
-    : "채널에서 등록 여부를 아직 확인하지 못했습니다.";
+    ? "채널에서 답변이 등록된 것을 확인했어요."
+    : "채널에서 등록 여부를 아직 확인하지 못했어요.";
 }
 
 /**
@@ -197,15 +197,15 @@ export function deliveryVerificationLabel(delivery: { verified: boolean | null }
 export function classifyPublishError(status: number | undefined): { message: string; shouldRefresh: boolean } {
   if (status === 409) {
     return {
-      message: "초안이 그 사이 변경되었습니다. 내용을 다시 확인한 뒤 등록해 주세요.",
+      message: "초안이 그 사이 변경됐어요. 내용을 다시 확인한 뒤 등록해 주세요.",
       shouldRefresh: true,
     };
   }
   if (status === 404) {
-    return { message: "이 문의를 찾을 수 없습니다. 목록에서 다시 열어 주세요.", shouldRefresh: true };
+    return { message: "이 문의를 찾을 수 없어요. 목록에서 다시 열어 주세요.", shouldRefresh: true };
   }
   if (status === 503) {
-    return { message: "지금은 답변을 등록할 수 없습니다. 판매자센터에서 직접 등록해 주세요.", shouldRefresh: false };
+    return { message: "지금은 답변을 등록할 수 없어요. 판매자센터에서 직접 등록해 주세요.", shouldRefresh: false };
   }
-  return { message: "답변을 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.", shouldRefresh: false };
+  return { message: "답변을 등록하지 못했어요. 잠시 후 다시 시도해 주세요.", shouldRefresh: false };
 }

@@ -100,7 +100,7 @@ export function Upload() {
       return;
     }
     if (!hasAllowedExtension(f.name)) {
-      setError("CSV 또는 XLSX 파일만 올릴 수 있습니다.");
+      setError("CSV 또는 XLSX 파일만 올릴 수 있어요.");
       return;
     }
     setError(null);
@@ -130,7 +130,7 @@ export function Upload() {
       setResult(res);
       loadJobs();
     } catch (e) {
-      setError(backendMessage(e) ?? "업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      setError(backendMessage(e) ?? "업로드에 실패했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
       setBusy(false);
     }
@@ -138,7 +138,7 @@ export function Upload() {
 
   return (
     <div className="space-y-6">
-      <PageHead title="자료 업로드" description="리뷰·문의·주문/매출 파일을 올리면 리뷰·문의·주문 화면에 반영됩니다." />
+      <PageHead title="자료 업로드" description="리뷰·문의·주문/매출 파일을 올리면 리뷰·문의·주문 화면에 반영돼요." />
 
       {/* The form is the page — a section titled 「업로드」 under a page titled 「자료 업로드」 said it twice. */}
       <section aria-label="업로드" className="rounded-2xl border border-line bg-surface p-5">
@@ -216,7 +216,7 @@ export function Upload() {
                   <span className="text-muted">{COLUMN_HELP[uploadType].optional}</span>
                 </p>
                 <p className="mt-1 text-sm text-muted">
-                  머리글은 한글 또는 영문 모두 인식합니다. 같은 파일을 다시 올려도 중복은 자동으로 건너뜁니다.
+                  머리글은 한글 또는 영문 모두 인식해요. 같은 파일을 다시 올려도 중복은 자동으로 건너뛰어요.
                 </p>
                 <button
                   type="button"
@@ -246,10 +246,10 @@ export function Upload() {
       <Section title="최근 업로드 내역">
         {jobsError ? (
           <p className="text-base text-bad">
-            업로드 내역을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+            업로드 내역을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
           </p>
         ) : jobs.length === 0 ? (
-          <p className="text-base text-muted">아직 업로드 내역이 없습니다.</p>
+          <p className="text-base text-muted">아직 업로드 내역이 없어요.</p>
         ) : (
           <ul className="divide-y divide-line">
             {jobs.map((j) => (

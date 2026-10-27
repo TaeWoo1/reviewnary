@@ -39,7 +39,7 @@ export function IssueOutcomes({ issueId }: { issueId: string }) {
   if (failed) {
     return (
       <PaneBlock label="한 일과 그 결과">
-        <p className="text-xs text-muted">적용 기록을 불러오지 못했습니다.</p>
+        <p className="text-xs text-muted">적용 기록을 불러오지 못했어요.</p>
       </PaneBlock>
     );
   }

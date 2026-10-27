@@ -35,7 +35,7 @@ vi.mock("../../lib/apiClient", () => ({
   getToken: () => null,
 }));
 
-const FALLBACK = "정확한 확인이 필요한 내용입니다. 확인 후 다시 안내드리겠습니다.";
+const FALLBACK = "정확한 확인이 필요한 내용이에요. 확인 후 다시 안내드릴게요.";
 
 function detail() {
   return {
@@ -50,7 +50,7 @@ function detail() {
     status: "UNANSWERED",
     informStatus: null,
     title: "포장은 어떻게 되나요?",
-    details: "포장 상태가 궁금합니다.",
+    details: "포장 상태가 궁금해요.",
     receivedAt: "2026-08-22T00:00:00Z",
     proposal: null,
     draft: null,
@@ -75,14 +75,14 @@ const WITH_FALLBACK = {
     authorKind: "SELLER_APPROVED_FALLBACK",
     modelVersion: "style/v1",
     knowledgeState: "NO_MATCH",
-    knowledgeNote: "이 질문에 해당하는 내용이 없습니다.",
+    knowledgeNote: "이 질문에 해당하는 내용이 없어요.",
   },
   authorKind: "SELLER_APPROVED_FALLBACK",
   knowledgeState: "NO_MATCH",
-  knowledgeNote: "상품 지식·운영 정책·과거 답변 어디에도 이 질문에 해당하는 내용이 없습니다.",
+  knowledgeNote: "상품 지식·운영 정책·과거 답변 어디에도 이 질문에 해당하는 내용이 없어요.",
   answerBasis: "NO_ANSWER_BASIS",
-  answerBasisNote: "답변 기준이 필요합니다.",
-  answerBasisAction: "등록된 상품 지식·운영 정책에 「포장」 관련 내용이 없습니다.",
+  answerBasisNote: "답변 기준이 필요해요.",
+  answerBasisAction: "등록된 상품 지식·운영 정책에 「포장」 관련 내용이 없어요.",
   productId: "p1",
   evidence: [],
   unavailableMessage: null,
@@ -119,7 +119,7 @@ describe("InquiryResponsePanel — the seller-approved fallback", () => {
 
     expect(await screen.findByText(FALLBACK)).toBeInTheDocument();
     // A deferral must not read as an answer: the gap sentence and its way out stay on the screen.
-    expect(screen.getByText("답변 기준이 필요합니다.")).toBeInTheDocument();
+    expect(screen.getByText("답변 기준이 필요해요.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "답변 기준 추가" })).toBeInTheDocument();
     expect(confirmInquiryPublish).not.toHaveBeenCalled();
   });
@@ -127,11 +127,11 @@ describe("InquiryResponsePanel — the seller-approved fallback", () => {
   it("a grounded draft says nothing about a missing basis", async () => {
     generateInquiryDraft.mockResolvedValue({
       ...WITH_FALLBACK,
-      draft: { ...WITH_FALLBACK.draft, comments: "몰딩 뒷면 테이프를 벗기고 붙이시면 됩니다.", authorKind: "MODEL" },
+      draft: { ...WITH_FALLBACK.draft, comments: "몰딩 뒷면 테이프를 벗기고 붙이시면 돼요.", authorKind: "MODEL" },
       authorKind: "MODEL",
       knowledgeState: "GROUNDED",
       answerBasis: "GROUNDED",
-      answerBasisNote: "등록된 근거로 답변할 수 있습니다.",
+      answerBasisNote: "등록된 근거로 답변할 수 있어요.",
       answerBasisAction: null,
     });
     const user = userEvent.setup();
@@ -140,7 +140,7 @@ describe("InquiryResponsePanel — the seller-approved fallback", () => {
     await user.click(await screen.findByRole("button", { name: /초안 만들기/ }));
 
     expect(await screen.findByText(/테이프를 벗기고/)).toBeInTheDocument();
-    expect(screen.queryByText("답변 기준이 필요합니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("답변 기준이 필요해요.")).not.toBeInTheDocument();
   });
 
   it("a banned phrase refuses the draft, and the reason is operational — not a missing basis", async () => {
@@ -149,7 +149,7 @@ describe("InquiryResponsePanel — the seller-approved fallback", () => {
       draft: null,
       authorKind: null,
       unavailableMessage:
-        "사용하지 않기로 한 표현이 들어가 초안을 저장하지 않았습니다. 다시 생성해 보시거나, 설정에서 그 표현을 확인해 주세요.",
+        "사용하지 않기로 한 표현이 들어가 초안을 저장하지 않았어요. 다시 생성해 보시거나, 설정에서 그 표현을 확인해 주세요.",
     });
     const user = userEvent.setup();
     render(<InquiryResponsePanel workItemId="w1" />);
@@ -157,6 +157,6 @@ describe("InquiryResponsePanel — the seller-approved fallback", () => {
     await user.click(await screen.findByRole("button", { name: /초안 만들기/ }));
 
     expect(await screen.findByText(/사용하지 않기로 한 표현/)).toBeInTheDocument();
-    expect(screen.queryByText("답변 기준이 필요합니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("답변 기준이 필요해요.")).not.toBeInTheDocument();
   });
 });

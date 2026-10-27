@@ -107,8 +107,8 @@ describe("an unknown token never produces an empty screen", () => {
 
   it("claims neither success nor failure", () => {
     const sentence = publishCategoryLabel(UNKNOWN);
-    expect(sentence).not.toContain("등록되었습니다");
-    expect(sentence).not.toContain("등록할 수 없습니다");
+    expect(sentence).not.toContain("등록됐어요");
+    expect(sentence).not.toContain("등록할 수 없어요");
   });
 
   it("offers the read-only check and never the resend", () => {
@@ -147,7 +147,7 @@ describe("PENDING — bound, and nothing has left", () => {
   });
 
   it("does not claim the answer was registered", () => {
-    expect(publishCategoryLabel("PENDING")).not.toContain("등록되었습니다");
+    expect(publishCategoryLabel("PENDING")).not.toContain("등록됐어요");
   });
 });
 

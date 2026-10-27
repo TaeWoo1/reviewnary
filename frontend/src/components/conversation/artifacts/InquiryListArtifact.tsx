@@ -20,11 +20,11 @@ import { useContinueInPanel } from "../useContinueInPanel";
  * becomes one sentence about the list (`sharedWord.ts`).
  */
 const STATE: Record<InquiryGroupKey, { word: string; tone: StatusTone; all: string }> = {
-  DRAFT_READY: { word: "초안 준비됨", tone: "info", all: "모두 초안이 준비돼 있습니다." },
-  NEEDS_CLARIFICATION: { word: "되묻는 초안", tone: "warn", all: "모두 고객에게 되묻는 초안입니다." },
-  KNOWLEDGE_MISSING: { word: "답변 기준 필요", tone: "warn", all: "모두 답변 기준이 필요합니다." },
-  UNANSWERED: { word: "답변 필요", tone: "warn", all: "모두 답변이 필요한 문의입니다." },
-  ANSWERED: { word: "답변함", tone: "good", all: "모두 답변한 문의입니다." },
+  DRAFT_READY: { word: "초안 준비됨", tone: "info", all: "모두 초안이 준비돼 있어요." },
+  NEEDS_CLARIFICATION: { word: "되묻는 초안", tone: "warn", all: "모두 고객에게 되묻는 초안이에요." },
+  KNOWLEDGE_MISSING: { word: "답변 기준 필요", tone: "warn", all: "모두 답변 기준이 필요해요." },
+  UNANSWERED: { word: "답변 필요", tone: "warn", all: "모두 답변이 필요한 문의예요." },
+  ANSWERED: { word: "답변함", tone: "good", all: "모두 답변한 문의예요." },
 };
 
 /** Which group a `scope.status` produces — so a list the seller ASKED for by state says nothing extra. */
@@ -251,13 +251,13 @@ function RowDetail({ item, onOpen, onPrompt }: { item: InquiryItem; onOpen: () =
   return (
     <div className="space-y-2 border-t border-line/60 bg-canvas/60 px-4 py-2.5" data-testid="inquiry-row-detail">
       {detail.state === "loading" && !detail.body ? (
-        <p className="text-sm text-muted">문의 내용을 불러오는 중입니다.</p>
+        <p className="text-sm text-muted">문의 내용을 불러오는 중이에요.</p>
       ) : detail.body ? (
         // The customer's own words, at the size the design contract gives them (§1 `lg`) — the largest
         // text in the turn, because it is the thing the seller opened the row to read.
         <p className="whitespace-pre-wrap break-keep text-lg font-medium leading-relaxed text-ink" data-testid="inquiry-row-body">{previewText(detail.body)}</p>
       ) : detail.state === "failed" ? (
-        <p className="text-sm text-muted">문의 내용을 불러오지 못했습니다. 문의 화면에서 확인해 주세요.</p>
+        <p className="text-sm text-muted">문의 내용을 불러오지 못했어요. 문의 화면에서 확인해 주세요.</p>
       ) : null}
       {/* One primary per row. The workspace is a text link, not a second button: the card's own footer
           already offers the LIST's screen with an almost identical label, and two buttons of equal

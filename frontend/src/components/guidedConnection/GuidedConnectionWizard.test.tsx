@@ -105,7 +105,7 @@ describe("GuidedConnectionWizard — per-phase actions dispatch sanitized events
     expect(screen.getByRole("heading", { name: "애플리케이션 ID·시크릿 입력" })).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText(/Client ID/), "app-id");
     await userEvent.type(screen.getByLabelText(/Client Secret/), "the-secret");
-    await userEvent.click(screen.getByRole("button", { name: "연결 정보 저장" }));
+    await userEvent.click(screen.getByRole("button", { name: "연동 정보 저장" }));
     expect(props.onSubmitCredentials).toHaveBeenCalledWith({ client_id: "app-id", client_secret: "the-secret" });
     // The secret never reached the reducer/dispatch.
     expect(props.dispatch).not.toHaveBeenCalled();
@@ -113,7 +113,7 @@ describe("GuidedConnectionWizard — per-phase actions dispatch sanitized events
 
   it("sellerops_credential_entry without a template → a calm loading message, no form", () => {
     renderWizard(stateAt("sellerops_credential_entry"), { template: null });
-    expect(screen.queryByRole("button", { name: "연결 정보 저장" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "연동 정보 저장" })).toBeNull();
     expect(screen.getByText(/불러오는 중/)).toBeInTheDocument();
   });
 
@@ -137,7 +137,7 @@ describe("GuidedConnectionWizard — per-phase actions dispatch sanitized events
   it("first_order_sync in progress → shows elapsed + resume reassurance, NO retry (never a percentage)", () => {
     renderWizard(stateAt("first_order_sync"), { syncProgress: { elapsedMs: 42_000, stalled: false } });
     expect(screen.getByText(/경과 시간: 0:42/)).toBeInTheDocument();
-    expect(screen.getByText(/새로고침해도 같은 수집이 이어집니다/)).toBeInTheDocument();
+    expect(screen.getByText(/새로고침해도 같은 수집이 이어져요/)).toBeInTheDocument();
     expect(screen.queryByText(/%/)).toBeNull();
     // While actively running, there is no retry button (a second trigger would only duplicate work).
     expect(screen.queryByRole("button", { name: "다시 시도" })).toBeNull();
@@ -237,7 +237,7 @@ describe("GuidedConnectionWizard — discovery / reuse / recovery phases", () =>
 
   it("existing_credential_entry → the secure form, existing-app guidance, and a 'secret not found' exit", async () => {
     const { props } = renderWizard(stateAt("existing_credential_entry"));
-    expect(screen.getByRole("button", { name: "연결 정보 저장" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "연동 정보 저장" })).toBeInTheDocument();
     // Existing-app guidance: check the existing app's API group (never nudged to create a second app).
     expect(screen.getByText("기존 앱에서 어디를 확인하나요?")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "시크릿을 찾지 못했어요" }));
@@ -248,7 +248,7 @@ describe("GuidedConnectionWizard — discovery / reuse / recovery phases", () =>
     renderWizard(stateAt("existing_credential_entry"));
     // Reached after the guided walk found the values — this is the input screen.
     expect(screen.getByText("방금 복사한 애플리케이션 ID와 시크릿을 입력해 주세요.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "연결 정보 저장" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "연동 정보 저장" })).toBeInTheDocument();
     // The removed co-equal offer must not resurface here.
     expect(screen.queryByRole("button", { name: "화면을 보며 확인" })).toBeNull();
     expect(screen.queryByRole("button", { name: "텍스트로 직접 확인" })).toBeNull();

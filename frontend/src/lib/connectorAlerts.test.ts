@@ -11,7 +11,7 @@ function alert(over: Partial<ConnectorAlertView> = {}): ConnectorAlertView {
     accountAlias: null,
     type: "REPEATED_FAILURE",
     severity: "WARNING",
-    message: "최근 수집이 반복해서 실패했습니다.",
+    message: "최근 수집이 반복해서 실패했어요.",
     createdAt: "2026-08-18T13:52:56Z",
     acknowledgedAt: null,
     recoveredAt: null,
@@ -63,7 +63,7 @@ describe("what the history screen says about a recovered alert", () => {
    */
   it("says when collection worked again", () => {
     expect(recoveredNote(alert({ recoveredAt: "2026-09-08T03:06:57Z" })))
-      .toBe("2026-09-08에 수집이 다시 성공했습니다.");
+      .toBe("2026-09-08에 수집이 다시 성공했어요.");
   });
 
   it("says nothing while the alert is still current", () => {

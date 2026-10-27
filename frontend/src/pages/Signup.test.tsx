@@ -24,7 +24,7 @@ function renderSignup() {
     <MemoryRouter initialEntries={["/signup"]}>
       <Routes>
         <Route path="/signup" element={<Signup />} />
-        <Route path={FIRST_RUN_PATH} element={<p>채널 연결 화면</p>} />
+        <Route path={FIRST_RUN_PATH} element={<p>채널 연동 화면</p>} />
         <Route path="/login" element={<Login />} />
       </Routes>
     </MemoryRouter>,
@@ -46,12 +46,12 @@ afterEach(() => vi.clearAllMocks());
  * (through the auth context), ends signed in, and lands on 채널 연결 — the one thing a fresh org can do.
  */
 describe("회원가입", () => {
-  it("submits the four backend fields and lands on 채널 연결", async () => {
+  it("submits the four backend fields and lands on 채널 연동", async () => {
     signup.mockResolvedValue(undefined);
     renderSignup();
     fill();
     fireEvent.click(screen.getByRole("button", { name: "계정 만들기" }));
-    await waitFor(() => expect(screen.getByText("채널 연결 화면")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("채널 연동 화면")).toBeInTheDocument());
     expect(signup).toHaveBeenCalledWith({
       email: "seller@example.test",
       password: "secret123",
@@ -90,7 +90,7 @@ describe("회원가입", () => {
   });
 
   it("says the email is taken on a 409 and never blames the connection", async () => {
-    signup.mockRejectedValue({ response: { status: 409, data: { message: "이미 등록된 이메일입니다." } } });
+    signup.mockRejectedValue({ response: { status: 409, data: { message: "이미 등록된 이메일이에요." } } });
     renderSignup();
     fill();
     fireEvent.click(screen.getByRole("button", { name: "계정 만들기" }));
@@ -112,8 +112,8 @@ describe("signupFailure", () => {
   it("separates no-answer from the server's answer", () => {
     expect(signupFailure(new Error("Network Error"))).toEqual({ message: SIGNUP_FAILURE_COPY.UNREACHABLE, input: false });
     expect(signupFailure({ response: { status: 409 } })).toEqual({ message: SIGNUP_FAILURE_COPY.EMAIL_TAKEN, input: true });
-    expect(signupFailure({ response: { status: 400, data: { message: "email: 올바른 형식의 이메일 주소여야 합니다" } } }).message)
-        .toBe("email: 올바른 형식의 이메일 주소여야 합니다");
+    expect(signupFailure({ response: { status: 400, data: { message: "email: 올바른 형식의 이메일 주소여야 해요" } } }).message)
+        .toBe("email: 올바른 형식의 이메일 주소여야 해요");
     expect(signupFailure({ response: { status: 400 } })).toEqual({ message: SIGNUP_FAILURE_COPY.INVALID, input: true });
     expect(signupFailure({ response: { status: 502 } })).toEqual({ message: SIGNUP_FAILURE_COPY.SERVER, input: false });
   });

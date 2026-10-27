@@ -118,7 +118,7 @@ describe("로그인을 여러 회차에 걸쳐 지켜본다", () => {
 
   it("시간이 끝났다는 것을 문장이 말한다 — 판매자가 자기 잘못을 찾게 두지 않는다", () => {
     const said = signInMessage("NOT_SIGNED_IN")!;
-    expect(said.text).toContain("시간이 끝났습니다");
+    expect(said.text).toContain("시간이 끝났어요");
     expect(said.text).toContain("판매자센터 로그인");
     for (const term of ["session", "timeout", "bound", "poll", "NOT_SIGNED_IN"]) {
       expect(said.text, term).not.toContain(term);

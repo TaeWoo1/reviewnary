@@ -57,7 +57,7 @@ describe("새 리뷰 자동 확인 — 설정 하나", () => {
     expect(setReviewAutoCheck).toHaveBeenCalledWith("acct-1", false);
     await waitFor(() => expect(screen.getByTestId("review-auto-check-toggle")).toHaveTextContent("자동 확인 꺼짐"));
     expect(onReport).toHaveBeenCalledWith(
-      "자동 확인을 껐습니다. 필요할 때 「지금 확인」으로 가져올 수 있습니다.", false);
+      "자동 확인을 껐어요. 필요할 때 「지금 확인」으로 가져올 수 있어요.", false);
   });
 
   it("읽을 화면이 없는 채널에서는 아무것도 그리지 않는다 — 「꺼짐」은 누군가 끈 것처럼 읽힌다", async () => {
@@ -73,7 +73,7 @@ describe("새 리뷰 자동 확인 — 설정 하나", () => {
     mount();
 
     await waitFor(() => expect(screen.getByTestId("review-auto-check-toggle")).toHaveTextContent("자동 확인 켜짐"));
-    expect(screen.getByText("판매자센터 로그인이 필요해 기다리고 있습니다.")).toBeInTheDocument();
+    expect(screen.getByText("판매자센터 로그인이 필요해 기다리고 있어요.")).toBeInTheDocument();
   });
 
   it("도우미가 없으면 사람이 할 일을 지시하지 않는다 — 연결되면 이어진다고만 말한다", async () => {
@@ -81,7 +81,7 @@ describe("새 리뷰 자동 확인 — 설정 하나", () => {
     mount();
 
     await waitFor(() =>
-      expect(screen.getByText("이 컴퓨터의 도우미가 연결되면 이어서 확인합니다.")).toBeInTheDocument());
+      expect(screen.getByText("이 컴퓨터의 도우미가 연결되면 이어서 확인해요.")).toBeInTheDocument());
   });
 
   it("설정을 읽지 못하면 아무 말도 하지 않는다 — 읽기 실패는 꺼짐이 아니다", async () => {

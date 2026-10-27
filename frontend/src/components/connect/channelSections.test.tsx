@@ -87,7 +87,7 @@ describe("연결 상태 섹션", () => {
         <ChannelStatusSection accountId="acct-1" status={null} loading={false} error={true} />
       </MemoryRouter>,
     );
-    expect(screen.getByText(/연결 상태를 불러오지 못했습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/연결 상태를 불러오지 못했어요/)).toBeInTheDocument();
     // A failed read must not render as a healthy channel.
     expect(screen.queryByText("마지막 수집")).toBeNull();
   });
@@ -96,13 +96,13 @@ describe("연결 상태 섹션", () => {
     wrap(
       <ChannelStatusSection
         accountId="acct-1"
-        status={{ ...STATUS, consecutiveFailures: 3, lastError: "인증이 만료되었습니다" } as ConnectionStatusView}
+        status={{ ...STATUS, consecutiveFailures: 3, lastError: "인증이 만료됐어요" } as ConnectionStatusView}
         loading={false}
         error={false}
       />,
     );
     expect(screen.getByText("3회")).toBeInTheDocument();
-    expect(screen.getByText("인증이 만료되었습니다")).toBeInTheDocument();
+    expect(screen.getByText("인증이 만료됐어요")).toBeInTheDocument();
   });
 
   it("has no axe violations", async () => {
@@ -365,7 +365,7 @@ describe("수집 이력 섹션", () => {
     const { rerender } = wrap(
       <CollectionHistorySection runs={[screenRead({})]} loading={false} error={false} onChanged={vi.fn()} onReport={vi.fn()} />,
     );
-    expect(screen.getByTestId("coverage-note")).toHaveTextContent("신호는 이번 수집에서 없었습니다");
+    expect(screen.getByTestId("coverage-note")).toHaveTextContent("신호는 이번 수집에서 없었어요");
     expect(document.body.textContent).not.toMatch(/모두 수집|전체 리뷰를 수집|수집 완료/);
 
     rerender(
@@ -379,7 +379,7 @@ describe("수집 이력 섹션", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByTestId("coverage-note")).toHaveTextContent("더 이전 리뷰가 남아 있을 수 있습니다");
+    expect(screen.getByTestId("coverage-note")).toHaveTextContent("더 이전 리뷰가 남아 있을 수 있어요");
 
     rerender(
       <MemoryRouter>
@@ -392,7 +392,7 @@ describe("수집 이력 섹션", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByTestId("coverage-note")).toHaveTextContent("알 수 없습니다");
+    expect(screen.getByTestId("coverage-note")).toHaveTextContent("알 수 없어요");
   });
 
   it("prints no internal word: the stop reason is replaced by the coverage sentence, the trigger by a label", () => {
@@ -478,7 +478,7 @@ describe("수집 이력 섹션", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByText(/수집 이력을 불러오지 못했습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/수집 이력을 불러오지 못했어요/)).toBeInTheDocument();
 
     rerender(
       <MemoryRouter>
@@ -492,7 +492,7 @@ describe("수집 이력 섹션", () => {
       </MemoryRouter>,
     );
     // "No history yet" and "could not read" are different sentences on purpose.
-    expect(screen.getByText("아직 수집 이력이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("아직 수집 이력이 없어요.")).toBeInTheDocument();
 
     rerender(
       <MemoryRouter>
@@ -505,7 +505,7 @@ describe("수집 이력 섹션", () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.queryByText("아직 수집 이력이 없습니다.")).toBeNull();
+    expect(screen.queryByText("아직 수집 이력이 없어요.")).toBeNull();
   });
 });
 

@@ -105,7 +105,7 @@ export function ConversationWorkspace({
         <div className={compact ? "" : quietDock ? "w-full max-w-content" : "mx-auto w-full max-w-thread"}>
           {conversation.plannerOff ? (
             <p className="mb-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn" role="status">
-              이 계정에서는 자유 문장 요청이 아직 열려 있지 않습니다.
+              이 계정에서는 자유 문장 요청이 아직 열려 있지 않아요.
             </p>
           ) : null}
           {disabledReason}

@@ -51,7 +51,7 @@ export function ReviewGuidance({
       setChanged(true);
       onChanged?.();
     } catch {
-      setError("저장하지 못했습니다 · 다시 시도");
+      setError("저장하지 못했어요 · 다시 시도");
     } finally {
       setBusy(null);
     }
@@ -62,7 +62,7 @@ export function ReviewGuidance({
     act(o.sourceId, () => api.clearReviewGuidance(accountId, actionRef, o.sourceId));
 
   if (failed) {
-    return <p className="text-sm text-muted">이 리뷰에 맞는 안내를 불러오지 못했습니다.</p>;
+    return <p className="text-sm text-muted">이 리뷰에 맞는 안내를 불러오지 못했어요.</p>;
   }
   // 등록된 안내가 하나도 없는 회사에는 고를 것도 물을 것도 없다 — 빈 상자를 그리지 않는다.
   if (!options || (options.attached.length === 0 && options.rejected.length === 0 && options.pickable.length === 0)) {
@@ -85,7 +85,7 @@ export function ReviewGuidance({
       </div>
 
       {options.attached.length === 0 ? (
-        <p className="break-keep text-sm text-muted">아직 붙은 안내가 없습니다. 맞는 안내가 있으면 골라 주세요.</p>
+        <p className="break-keep text-sm text-muted">아직 붙은 안내가 없어요. 맞는 안내가 있으면 골라 주세요.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {options.attached.map((o) => (
@@ -156,7 +156,7 @@ export function ReviewGuidance({
       ) : null}
       {changed ? (
         <p className="break-keep text-xs text-muted" role="status">
-          저장했습니다. 「다시 준비하기」를 누르면 이 안내대로 다시 씁니다.
+          저장했어요. 「다시 준비하기」를 누르면 이 안내대로 다시 써요.
         </p>
       ) : null}
     </section>

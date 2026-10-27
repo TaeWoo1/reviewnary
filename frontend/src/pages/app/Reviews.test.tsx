@@ -114,7 +114,7 @@ function renderAt(path: string) {
       <Routes>
         <Route path="/reviews" element={<><Reviews /><LocationProbe /></>} />
         <Route path="/reviews/:accountId" element={<Reviews />} />
-        <Route path="/connect" element={<h1>채널 연결</h1>} />
+        <Route path="/connect" element={<h1>채널 연동</h1>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -299,18 +299,18 @@ describe("리뷰 — the workflow surface", () => {
     expect(within(filter).queryByText("G마켓")).toBeNull();
   });
 
-  it("points at 채널 연결 when no review-capable channel is connected", async () => {
+  it("points at 채널 연동 when no review-capable channel is connected", async () => {
     getSellerAccountsStrict.mockResolvedValue([]);
     renderAt("/reviews");
-    expect(await screen.findByText("리뷰를 볼 채널이 아직 없습니다")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "채널 연결하기" })).toHaveAttribute("href", "/connect");
+    expect(await screen.findByText("리뷰를 볼 채널이 아직 없어요")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "채널 연동하기" })).toHaveAttribute("href", "/connect");
     expect(getChannelReviewsStrict).not.toHaveBeenCalled();
   });
 
   it("says so when the channel reads fail, and invents no list", async () => {
     getSellerAccountsStrict.mockRejectedValue(new Error("down"));
     renderAt("/reviews");
-    expect(await screen.findByText("채널 정보를 불러오지 못했습니다")).toBeInTheDocument();
+    expect(await screen.findByText("채널 정보를 불러오지 못했어요")).toBeInTheDocument();
     expect(getChannelReviewsStrict).not.toHaveBeenCalled();
   });
 
@@ -356,7 +356,7 @@ describe("리뷰 목록의 자리", () => {
 describe("리뷰 — narrowed to one product", () => {
   it("states the scope, offers the way out, and drops the channel switcher", async () => {
     renderAt("/reviews?productId=p-1");
-    expect(await screen.findByText(/의 리뷰만 보고 있습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/의 리뷰만 보고 있어요/)).toBeInTheDocument();
     // The product name arrives with the product-scoped record read, which resolves after the scope
     // sentence — awaited, because under load (two full suites running beside this one, 2026-09-04) the
     // synchronous lookup ran between the two renders and failed twice in a row while passing alone.
@@ -367,7 +367,7 @@ describe("리뷰 — narrowed to one product", () => {
 
   it("reads the product's own record — never an account's, and never the window read", async () => {
     renderAt("/reviews?productId=p-1");
-    await screen.findByText(/의 리뷰만 보고 있습니다/);
+    await screen.findByText(/의 리뷰만 보고 있어요/);
     expect(getProductReviews).toHaveBeenCalledWith("p-1", expect.objectContaining({ page: 0 }));
     // The per-account record is the OTHER question; asking it here would answer a narrower one.
     expect(getChannelReviewsStrict).not.toHaveBeenCalled();

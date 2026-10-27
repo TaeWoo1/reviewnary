@@ -14,4 +14,4 @@ export function asksToSend(text: string): boolean {
   return SEND_WORDS.some((w) => t.includes(w));
 }
 
-export const SEND_FENCE_COPY = "보내는 일은 AI 담당자가 하지 않습니다. 초안을 확인한 뒤 문의 화면의 승인 단계에서 보냅니다.";
+export const SEND_FENCE_COPY = "보내는 일은 AI 담당자가 하지 않아요. 초안을 확인한 뒤 문의 화면의 승인 단계에서 보내요.";

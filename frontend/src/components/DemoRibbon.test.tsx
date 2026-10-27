@@ -25,7 +25,7 @@ describe("DemoRibbon", () => {
     render(<DemoRibbon />);
     const notice = screen.getByLabelText("데모 모드 안내");
     expect(notice.textContent).toContain("데모 데이터");
-    expect(notice.textContent).toContain("실제 판매 데이터가 아닙니다");
+    expect(notice.textContent).toContain("실제 판매 데이터가 아니에요");
   });
 
   it("cannot be dismissed", () => {

@@ -19,7 +19,7 @@ export function OpportunityListArtifact({ artifact, headline }: { artifact: Oppo
   return (
     <ArtifactCard title={artifact.title} note={artifact.note} headline={headline} titleSaid={artifact.titleSaid} testId="opportunity-list">
       {artifact.items.length === 0 ? (
-        <p className="px-4 pb-2 text-sm text-muted">지금 제안할 개선 기회가 없습니다.</p>
+        <p className="px-4 pb-2 text-sm text-muted">지금 제안할 개선 기회가 없어요.</p>
       ) : null}
       <ul className="divide-y divide-line/70">
         {artifact.items.map((o) => (

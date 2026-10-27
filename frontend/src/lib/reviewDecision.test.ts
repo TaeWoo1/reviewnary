@@ -80,7 +80,7 @@ describe("decisionLogSentence", () => {
       .toBe(DECISION_LOG_DISCLOSURE);
     expect(decisionLogDisclosure([entry({ kind: "REPLY_EXECUTION", from: "POSTED", to: "VERIFIED" })]))
       .toBe(DECISION_LOG_DISCLOSURE_EXECUTED);
-    expect(DECISION_LOG_DISCLOSURE_EXECUTED).not.toContain("아무것도 전송되지 않습니다");
+    expect(DECISION_LOG_DISCLOSURE_EXECUTED).not.toContain("아무것도 전송되지 않아요");
   });
 
   it("renders nothing for a value it cannot name — never the raw token", () => {

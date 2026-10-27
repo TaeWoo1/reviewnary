@@ -122,7 +122,7 @@ export function GuidedAcquisitionRun({
           throw e;
         }
       } catch {
-        if (live) setError("판매자센터 화면을 준비하지 못했습니다. 아래 다른 방법으로 진행할 수 있습니다.");
+        if (live) setError("판매자센터 화면을 준비하지 못했어요. 아래 다른 방법으로 진행할 수 있어요.");
       } finally {
         if (live) setStarting(false);
       }
@@ -164,8 +164,8 @@ export function GuidedAcquisitionRun({
     return (
       <p className="break-keep text-sm text-warn" role="status">
         {unavailable === "wrong_carrier"
-          ? "연결된 도우미가 다른 작업을 진행 중입니다. 그 작업을 마친 뒤 다시 시도해 주세요."
-          : "내 PC의 도우미와 연결하지 못했습니다. 도우미를 실행한 뒤 다시 시도해 주세요."}
+          ? "연결된 도우미가 다른 작업을 진행 중이에요. 그 작업을 마친 뒤 다시 시도해 주세요."
+          : "내 PC의 도우미와 연결하지 못했어요. 도우미를 실행한 뒤 다시 시도해 주세요."}
       </p>
     );
   }
@@ -183,7 +183,7 @@ export function GuidedAcquisitionRun({
       ) : null}
       {view.status === "WAITING_FOR_HUMAN" ? <HumanCheckpointCard run={view} onCommand={send} /> : null}
       {view.status === "COMPLETED" ? (
-        <p className="break-keep text-sm text-ink" role="status">리뷰 가져오기가 끝났습니다. 이어서 확인하겠습니다.</p>
+        <p className="break-keep text-sm text-ink" role="status">리뷰 가져오기가 끝났어요. 이어서 확인할게요.</p>
       ) : null}
       {!terminal ? (
         <ActionWindowControlPanel run={view} onCommand={send} exclude={view.status === "WAITING_FOR_HUMAN" ? CHECKPOINT_COMMANDS : []} />

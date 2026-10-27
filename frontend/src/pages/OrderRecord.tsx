@@ -42,8 +42,8 @@ export function OrderRecord() {
   if (error || !data) {
     return (
       <Empty
-        title="주문을 찾지 못했습니다"
-        body="이 주소가 가리키는 주문이 없거나, 이 계정의 주문이 아닙니다."
+        title="주문을 찾지 못했어요"
+        body="이 주소가 가리키는 주문이 없거나, 이 계정의 주문이 아니에요."
         action={<BtnLink to="/orders">주문 기록으로</BtnLink>}
       />
     );
@@ -125,7 +125,7 @@ export function OrderRecord() {
         }
       >
         {data.inquiries.length === 0 ? (
-          <p className="text-sm text-muted">이 주문을 가리킨 문의가 없습니다</p>
+          <p className="text-sm text-muted">이 주문을 가리킨 문의가 없어요</p>
         ) : (
           <ul className="space-y-4">
             {data.inquiries.map((inquiry) => (
@@ -144,7 +144,7 @@ export function OrderRecord() {
               <OrderStatusText raw={shared.rawStatusCode} labelKo={shared.confirmedStatusLabelKo} />
             </>
           ) : (
-            <span className="text-muted">줄마다 채널 상태가 다릅니다</span>
+            <span className="text-muted">줄마다 채널 상태가 달라요</span>
           )}
           {shared.paidAt ? ` · ${kstDateTime(shared.paidAt)} 결제` : null}
         </p>
@@ -187,7 +187,7 @@ export function OrderRecord() {
 
       <Block title={`상태 이력 ${count(data.statusHistory.length)}`} right="오래된 순">
         {data.statusHistory.length === 0 ? (
-          <p className="text-sm text-muted">기록된 상태 변경이 없습니다.</p>
+          <p className="text-sm text-muted">기록된 상태 변경이 없어요.</p>
         ) : (
           <>
             <div aria-hidden="true" className="flex items-center pb-1 text-xs text-muted">
@@ -308,12 +308,12 @@ function limitSentence(detail: OrderRecordDetail, channelName: string): string {
     return "";
   }
   if (detail.statusVaries) {
-    return "줄마다 채널 상태가 달라, 이 주문 전체의 상태로 말할 수 있는 것이 없습니다";
+    return "줄마다 채널 상태가 달라, 이 주문 전체의 상태로 말할 수 있는 것이 없어요";
   }
   if (missing.length === 3) {
-    return `${channelName} 상태값의 뜻을 확인한 적이 없습니다`;
+    return `${channelName} 상태값의 뜻을 확인한 적이 없어요`;
   }
-  return `${channelName} 주문 읽기에 ${missing.join("·")} 상태가 없습니다`;
+  return `${channelName} 주문 읽기에 ${missing.join("·")} 상태가 없어요`;
 }
 
 /** 마지막으로 본 날로부터 며칠 — 「32일 전」의 그 수. */

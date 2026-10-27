@@ -112,13 +112,13 @@ describe("guided execution artifact — NAVER review reply, seller submits", () 
     act(() => runtime.emit({ type: "COMPOSER_FILLED", stepId: "aw.user_reply_submit" }));
     // §4: the filled state says the two facts and NOTHING that reads as sent.
     const filled = await screen.findByTestId("guided-execution-filled");
-    expect(filled.textContent).toContain("네이버 답글 입력칸에 승인한 답변을 준비했습니다.");
-    expect(filled.textContent).toContain("아직 등록하지 않았습니다.");
-    for (const word of ["전송", "발송", "완료했습니다", "등록했습니다"]) {
+    expect(filled.textContent).toContain("네이버 답글 입력칸에 승인한 답변을 준비했어요.");
+    expect(filled.textContent).toContain("아직 등록하지 않았어요.");
+    for (const word of ["전송", "발송", "완료했어요", "등록했어요"]) {
       expect(filled.textContent).not.toContain(word);
     }
     // The report controls are a RECOVERY surface: not in the happy path until the seller goes to look.
-    expect(screen.queryByRole("button", { name: "등록을 마쳤습니다" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "등록을 마쳤어요" })).toBeNull();
     expect(screen.getByRole("button", { name: "네이버 창 앞으로" })).toBeInTheDocument();
     expect(runtime.calls).toEqual(["START_RUN"]);
   });
@@ -139,7 +139,7 @@ describe("guided execution artifact — NAVER review reply, seller submits", () 
     expect(runtime.calls).toEqual(["START_RUN", "FIND_CURRENT_STEP"]);
     // The ask succeeded, so the card claims nothing about the window — it only opens the next step.
     expect(await screen.findByTestId("guided-execution-report")).toBeInTheDocument();
-    expect(screen.queryByText(/가져오지 못했습니다/)).toBeNull();
+    expect(screen.queryByText(/가져오지 못했어요/)).toBeNull();
   });
 
   it("a runtime that cannot ask says the seller must find the window themselves", async () => {
@@ -151,7 +151,7 @@ describe("guided execution artifact — NAVER review reply, seller submits", () 
     act(() => runtime.emit({ type: "COMPOSER_FILLED", stepId: "aw.user_reply_submit" }));
     await screen.findByTestId("guided-execution-filled");
     await userEvent.click(screen.getByRole("button", { name: "네이버 창 앞으로" }));
-    expect(await screen.findByText(/창을 앞으로 가져오지 못했습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/창을 앞으로 가져오지 못했어요/)).toBeInTheDocument();
     expect(runtime.calls).toEqual(["START_RUN"]);
   });
 
@@ -163,13 +163,13 @@ describe("guided execution artifact — NAVER review reply, seller submits", () 
     act(() => runtime.emit({ type: "SELLER_SUBMISSION_OBSERVED", stepId: "aw.user_reply_submit" }));
     expect(await screen.findByTestId("guided-execution-result")).toBeInTheDocument();
     expect(screen.getByText("등록 확인")).toBeInTheDocument();
-    expect(screen.getByText(/등록된 내용이 초안과 같은지는 확인하지 않습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/등록된 내용이 초안과 같은지는 확인하지 않아요/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "리뷰 화면에서 확인" })).toHaveAttribute("href", "/reviews/rv-1");
     // No report command was sent by the client for an observed submit.
     expect(runtime.report).not.toHaveBeenCalled();
   });
 
-  it("「등록하지 않았습니다」 reports the abort through the runtime (intent, not completion) and records nothing as sent", async () => {
+  it("「등록하지 않았어요」 reports the abort through the runtime (intent, not completion) and records nothing as sent", async () => {
     const runtime = fakeRuntime();
     render(<MemoryRouter><GuidedExecutionArtifact artifact={ARTIFACT} replyRuntime={runtime} /></MemoryRouter>);
     await userEvent.click(screen.getByRole("button", { name: "네이버에 입력하기" }));
@@ -177,9 +177,9 @@ describe("guided execution artifact — NAVER review reply, seller submits", () 
     act(() => runtime.emit({ type: "COMPOSER_FILLED", stepId: "aw.user_reply_submit" }));
     await screen.findByTestId("guided-execution-filled");
     await userEvent.click(screen.getByRole("button", { name: "네이버 창 앞으로" }));
-    await userEvent.click(screen.getByRole("button", { name: "등록하지 않았습니다" }));
+    await userEvent.click(screen.getByRole("button", { name: "등록하지 않았어요" }));
     await waitFor(() => expect(runtime.report).toHaveBeenCalledWith("run_abc", "SUBMISSION_ABORTED"));
-    expect(await screen.findByText(/등록하지 않고 마쳤습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/등록하지 않고 마쳤어요/)).toBeInTheDocument();
     expect(recordReviewReplyOutcome.mock.calls[0]![2]).toMatchObject({ submissionRef: "sub-1", operatorOutcome: "SUBMISSION_ABORTED", awRunRef: "run_abc" });
   });
 
@@ -188,7 +188,7 @@ describe("guided execution artifact — NAVER review reply, seller submits", () 
     const runtime = fakeRuntime();
     render(<MemoryRouter><GuidedExecutionArtifact artifact={ARTIFACT} replyRuntime={runtime} /></MemoryRouter>);
     await userEvent.click(screen.getByRole("button", { name: "네이버에 입력하기" }));
-    expect(await screen.findByText(/답변 안내를 시작하지 못했습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/답변 안내를 시작하지 못했어요/)).toBeInTheDocument();
     expect(runtime.start).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "승인한 답변 복사" })).toBeInTheDocument();
   });

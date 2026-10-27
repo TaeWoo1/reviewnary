@@ -33,9 +33,9 @@ const STATE_WORD: Record<Capture["state"], { word: string; tone: "good" | "warn"
  * outcomes that the sentence does NOT cover keep their line, because nothing else says them.
  */
 const RESUME_LINE: Partial<Record<NonNullable<Capture["resume"]>, string>> = {
-  DRAFT_STILL_GAP: "저장했지만 이 문의에 바로 적용할 근거로는 아직 부족합니다.",
-  INQUIRY_NOT_ACTIONABLE: "이 문의는 이미 처리되어 기준만 저장했습니다.",
-  PENDING_RESUME: "저장한 기준으로 원래 요청을 다시 확인합니다.",
+  DRAFT_STILL_GAP: "저장했지만 이 문의에 바로 적용할 근거로는 아직 부족해요.",
+  INQUIRY_NOT_ACTIONABLE: "이 문의는 이미 처리되어 기준만 저장했어요.",
+  PENDING_RESUME: "저장한 기준으로 원래 요청을 다시 확인해요.",
 };
 
 export function KnowledgeCaptureArtifact({ artifact, onDecision }: {

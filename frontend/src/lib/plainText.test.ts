@@ -4,8 +4,8 @@ import { plainText, previewText } from "./plainText";
 describe("plainText", () => {
   it("removes the markup Cafe24 actually sends", () => {
     // The literal opening of the first inquiry on this org's 문의 screen.
-    expect(plainText('<meta charset="utf-8">안녕하세요.\n연동 테스트 중입니다.')).toBe(
-      "안녕하세요.\n연동 테스트 중입니다.",
+    expect(plainText('<meta charset="utf-8">안녕하세요.\n연동 테스트 중이에요.')).toBe(
+      "안녕하세요.\n연동 테스트 중이에요.",
     );
   });
 
@@ -44,7 +44,7 @@ describe("plainText", () => {
     expect(plainText("주문번호 &lt;20260923-0000001&gt; 확인해주세요")).toBe(
       "주문번호 <20260923-0000001> 확인해주세요",
     );
-    expect(plainText("&lt;급함&gt; 답변 부탁드립니다")).toBe("<급함> 답변 부탁드립니다");
+    expect(plainText("&lt;급함&gt; 답변 부탁드려요")).toBe("<급함> 답변 부탁드려요");
     expect(plainText("가격이 &lt;3만원 이하였으면")).toBe("가격이 <3만원 이하였으면");
   });
 

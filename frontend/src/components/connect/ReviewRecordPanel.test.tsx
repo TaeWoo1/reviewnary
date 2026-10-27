@@ -58,7 +58,7 @@ describe("상품평 패널 — the entry point", () => {
     renderPanel();
     const link = await screen.findByRole("link", { name: "상품평 22개 보기" });
     expect(link).toHaveAttribute("href", "/reviews/acc-cp");
-    expect(screen.getByText(/22개를 모아 두었습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/22개를 모아 두었어요/)).toBeInTheDocument();
   });
 
   it("asks the server for the total only, not for a screenful of what buyers wrote", async () => {
@@ -75,7 +75,7 @@ describe("상품평 패널 — the entry point", () => {
       "href",
       "/reviews/acc-cp",
     );
-    expect(screen.getByText(/아직 수집된 상품평이 없습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/아직 수집된 상품평이 없어요/)).toBeInTheDocument();
   });
 
   it("keeps the way in when the count cannot be read at all", async () => {
@@ -84,7 +84,7 @@ describe("상품평 패널 — the entry point", () => {
     const link = await screen.findByRole("link", { name: "상품평 보기" });
     expect(link).toHaveAttribute("href", "/reviews/acc-cp");
     // No fabricated total, and no claim the record is empty — a failed read is not zero reviews.
-    expect(await screen.findByText(/확인하지 못했습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/확인하지 못했어요/)).toBeInTheDocument();
     expect(screen.queryByText(/0개/)).toBeNull();
   });
 
@@ -93,14 +93,14 @@ describe("상품평 패널 — the entry point", () => {
     renderPanel();
     expect(screen.getByRole("link", { name: "상품평 보기" })).toBeInTheDocument();
     // Loading is not the same admission as a failed read; it must not accuse the backend early.
-    expect(screen.queryByText(/확인하지 못했습니다/)).toBeNull();
+    expect(screen.queryByText(/확인하지 못했어요/)).toBeNull();
   });
 
   it("promises no reply affordance the channel does not have", async () => {
     getChannelReviewsStrict.mockResolvedValue(page(22));
     renderPanel();
     await screen.findByRole("link", { name: "상품평 22개 보기" });
-    expect(screen.getByText(/답변 작성 기능은 제공하지 않습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/답변 작성 기능은 제공하지 않아요/)).toBeInTheDocument();
   });
 
   it("makes no channel-specific claim about a channel it was not told", async () => {
@@ -110,7 +110,7 @@ describe("상품평 패널 — the entry point", () => {
     renderPanel({ channelCode: "NAVER" });
     await screen.findByRole("link", { name: "리뷰 22개 보기" });
     expect(screen.queryByText(/쿠팡/)).toBeNull();
-    expect(screen.queryByText(/답변 작성 기능은 제공하지 않습니다/)).toBeNull();
+    expect(screen.queryByText(/답변 작성 기능은 제공하지 않아요/)).toBeNull();
     expect(screen.getByText(/스마트스토어센터에서 직접 작성/)).toBeInTheDocument();
   });
 
@@ -118,7 +118,7 @@ describe("상품평 패널 — the entry point", () => {
     getChannelReviewsStrict.mockResolvedValue(page(22));
     renderPanel({ channelCode: null });
     await screen.findByRole("link", { name: "리뷰 22개 보기" });
-    expect(screen.getByText(/이 채널에서 수집한 구매자 리뷰 기록입니다/)).toBeInTheDocument();
+    expect(screen.getByText(/이 채널에서 수집한 구매자 리뷰 기록이에요/)).toBeInTheDocument();
   });
 
   it("stops stating the old total once a re-read fails", async () => {
@@ -136,7 +136,7 @@ describe("상품평 패널 — the entry point", () => {
         <ReviewRecordPanel accountId="acc-cp" channelCode="COUPANG" refreshKey={1} />
       </MemoryRouter>,
     );
-    await waitFor(() => expect(screen.getByText(/확인하지 못했습니다/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/확인하지 못했어요/)).toBeInTheDocument());
     expect(screen.getByRole("link", { name: "상품평 보기" })).toBeInTheDocument();
     expect(screen.queryByText(/22개/)).toBeNull();
   });
@@ -152,7 +152,7 @@ describe("상품평 패널 — the entry point", () => {
         <ReviewRecordPanel accountId="acc-other" channelCode="COUPANG" />
       </MemoryRouter>,
     );
-    await waitFor(() => expect(screen.getByText(/확인하지 못했습니다/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/확인하지 못했어요/)).toBeInTheDocument());
     // The link now points at a different record; stating the first account's total beside it would
     // be a number about one seller account printed under another.
     expect(screen.getByRole("link", { name: "상품평 보기" })).toHaveAttribute(

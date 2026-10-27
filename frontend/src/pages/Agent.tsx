@@ -221,7 +221,7 @@ export function Agent() {
           준비합니다」 is a description of an execution graph (Executive-friendly UX Redesign v1). */}
       <PageHeader
         title="정해진 작업"
-        description="버튼 한 번으로 도는 정해진 확인 작업입니다."
+        description="버튼 한 번으로 도는 정해진 확인 작업이에요."
         meta={caps.data ? <CapabilityMeta /> : undefined}
       />
 
@@ -233,7 +233,7 @@ export function Agent() {
       <p className="text-base text-muted">
         문장으로 물어보는 대화는{" "}
         <Link to="/" className="font-semibold text-brand-700 hover:underline">홈 대화</Link>
-        에서 이어집니다.
+        에서 이어져요.
       </p>
 
       {/* The Dashboard-lane capabilities (button lanes) and the single-run lane they came with.
@@ -245,9 +245,9 @@ export function Agent() {
         <div className="space-y-3" aria-label="정해진 작업 실행">
           {runtimeUnavailable ? (
             <div id="agent-runtime-off" className="rounded-xl border border-warn/40 bg-warn/5 p-3" role="status">
-              <p className="text-base font-semibold text-ink">AI 도우미를 시작하지 못했습니다.</p>
+              <p className="text-base font-semibold text-ink">AI 도우미를 시작하지 못했어요.</p>
               <p className="mt-1 break-keep text-sm text-muted">
-                채널 연결과는 관계없는 문제입니다. 문의·리뷰·주문 화면은 그대로 사용할 수 있습니다.
+                채널 연동과는 관계없는 문제예요. 문의·리뷰·주문 화면은 그대로 사용할 수 있어요.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <BtnLink to="/" size="sm" variant="outline">
@@ -265,7 +265,7 @@ export function Agent() {
           {caps.data ? <ExampleChips onRunIntent={runIntent} busy={busy || Boolean(runtimeUnavailable)} /> : null}
           {busy ? (
             <p className="break-keep text-sm text-muted" role="status">
-              확인하고 있습니다 · {elapsed}초 경과
+              확인하고 있어요 · {elapsed}초 경과
             </p>
           ) : null}
           <Disclosure label="판매 계정 선택 (리뷰 답변을 준비할 때만 필요)" summaryClassName="px-0">
@@ -311,13 +311,13 @@ export function Agent() {
             explained where the generation method is recorded and that the draft is for review —
             both of which the result card itself states, in place, when a draft exists. */}
         <p className="text-sm text-muted">
-          초안만 만듭니다 <span className="text-good">(외부 발송 없음)</span>.
+          초안만 만들어요 <span className="text-good">(외부 발송 없음)</span>.
         </p>
       </div>
 
       {error ? (
         <div role="alert" className="card border-bad/40 text-bad">
-          <p className="font-medium">요청을 처리하지 못했습니다.</p>
+          <p className="font-medium">요청을 처리하지 못했어요.</p>
           <p className="mt-1 text-sm text-muted">{error}</p>
         </div>
       ) : null}
@@ -345,7 +345,7 @@ export function Agent() {
 function CapabilityMeta() {
   return (
     <span className="rounded-full bg-good/10 px-2 py-0.5 text-xs font-medium text-good">
-      고객에게 대신 보내지 않습니다
+      고객에게 대신 보내지 않아요
     </span>
   );
 }
@@ -428,7 +428,7 @@ function RunView({
         */
         <div role="status" className="rounded-xl border border-warn/40 bg-warn/5 p-3">
           <p className="break-keep leading-relaxed text-ink">
-            {run.failureReason ?? "요청을 처리하지 못했습니다."}
+            {run.failureReason ?? "요청을 처리하지 못했어요."}
           </p>
         </div>
       ) : null}
@@ -497,7 +497,7 @@ function InquiryCheckpointCard({
   return (
     <div className="rounded-2xl border border-line bg-surface p-4" role="group" aria-label="문의 답변 승인">
       <p className="text-sm text-muted">
-        {draftKindLabel(checkpoint.provenance)} 초안입니다. 고객 원문은
+        {draftKindLabel(checkpoint.provenance)} 초안이에요. 고객 원문은
         <Link to="/inquiries" className="mx-1 text-brand underline">
           문의 응답
         </Link>
@@ -518,7 +518,7 @@ function InquiryCheckpointCard({
         />
       ) : (
         <p className="mt-3 text-sm text-muted">
-          초안 본문은 새로고침 후에는 다시 표시되지 않습니다. 명령을 다시 실행하면 초안을 볼 수 있습니다.
+          초안 본문은 새로고침 후에는 다시 표시되지 않아요. 명령을 다시 실행하면 초안을 볼 수 있어요.
         </p>
       )}
       <div className="mt-3 flex gap-2">
@@ -574,7 +574,7 @@ function InquiryDraftPreparationCard({
     return (
       <div className="rounded-2xl border border-line bg-surface p-4" role="group" aria-label="문의 답변 초안">
         <p className="text-ink">
-          {picked ? (prep.note ?? "답변 기준이 필요합니다.") : "지금 초안을 만들 미답변 문의가 없습니다."}
+          {picked ? (prep.note ?? "답변 기준이 필요해요.") : "지금 초안을 만들 미답변 문의가 없어요."}
         </p>
         {picked && prep.inquiryId ? (
           <Link to={`/inquiries/${prep.inquiryId}`} className="mt-2 inline-block text-sm text-brand underline">
@@ -632,11 +632,11 @@ function InquiryDraftPreparationCard({
       </dl>
 
       <p className="mt-3 text-sm text-muted">
-        {draftKindLabel(prep.provenance)} 초안입니다. 고객 원문은
+        {draftKindLabel(prep.provenance)} 초안이에요. 고객 원문은
         <Link to={prep.inquiryId ? `/inquiries/${prep.inquiryId}` : "/inquiries"} className="mx-1 text-brand underline">
           문의 응답
         </Link>
-        화면에서 확인하세요.{prep.draftVersion != null ? ` 같은 초안(v${prep.draftVersion})이 그 화면에 저장돼 있습니다.` : ""}
+        화면에서 확인하세요.{prep.draftVersion != null ? ` 같은 초안(v${prep.draftVersion})이 그 화면에 저장돼 있어요.` : ""}
       </p>
       <DraftBasisLine
         answerBasis={prep.answerBasis}
@@ -655,15 +655,15 @@ function InquiryDraftPreparationCard({
       />
 
       <p className="mt-2 text-sm font-medium text-good">
-        초안만 생성되었습니다. {channel}에는 아직 전송되지 않았습니다.
+        초안만 생성됐어요. {channel}에는 아직 전송되지 않았어요.
       </p>
       <p className="mt-1 text-xs text-muted">
-        reviewnary가 대신 전송하지 않습니다. 검토 후 채널에 직접 붙여넣어 답변하세요.
+        reviewnary가 대신 전송하지 않아요. 검토 후 채널에 직접 붙여넣어 답변하세요.
       </p>
 
       {confirmRegen ? (
         <div role="alert" className="mt-3 rounded-xl border border-warn/40 bg-warn/5 p-3 text-sm">
-          <p className="text-ink">다시 만들면 편집한 초안이 사라집니다. 계속할까요?</p>
+          <p className="text-ink">다시 만들면 편집한 초안이 사라져요. 계속할까요?</p>
           <div className="mt-2 flex gap-2">
             <button type="button" className="btn-primary" disabled={busy} onClick={regenerate}>
               계속
@@ -683,7 +683,7 @@ function InquiryDraftPreparationCard({
           </button>
         </div>
       )}
-      {copied ? <p className="mt-2 text-sm text-good">복사했습니다. {channel}에 직접 붙여넣으세요.</p> : null}
+      {copied ? <p className="mt-2 text-sm text-good">복사했어요. {channel}에 직접 붙여넣으세요.</p> : null}
     </div>
   );
 }
@@ -712,7 +712,7 @@ function ReviewCheckpointCard({
         <Link to="/reviews" className="mx-1 text-brand underline">
           리뷰
         </Link>
-        화면에서 확인·수정하세요. 여기서는 저장된 버전(v{checkpoint.draftVersion})을 승인/거절만 합니다.
+        화면에서 확인·수정하세요. 여기서는 저장된 버전(v{checkpoint.draftVersion})을 승인/거절만 해요.
       </p>
       <div className="mt-3 flex gap-2">
         <button className="btn-primary" disabled={busy} onClick={() => onDecide(threadId, true)}>
@@ -737,28 +737,28 @@ function OutcomeCard({ domain, outcome }: { domain: string; outcome: InquiryOutc
       : decision === "REJECTED"
         ? "거절 기록됨"
         : domain === "REVIEW"
-          ? "새로 준비할 리뷰가 없습니다"
+          ? "새로 준비할 리뷰가 없어요"
           : "처리할 항목 없음";
   return (
     <div className="rounded-2xl border border-line bg-surface p-4" role="group" aria-label="실행 결과">
       <p className="font-medium text-ink">{label}</p>
-      <p className="mt-1 text-sm text-good">외부로 발송된 내용은 없습니다 (외부 발송 없음).</p>
+      <p className="mt-1 text-sm text-good">외부로 발송된 내용은 없어요 (외부 발송 없음).</p>
       {domain === "REVIEW" && decision === "NONE" ? (
         <p className="mt-1 text-sm text-muted">
           준비·승인된 답변은
           <Link to="/reviews" className="mx-1 text-brand underline">
             리뷰
           </Link>
-          에서 등록합니다.
+          에서 등록해요.
         </p>
       ) : null}
       {domain === "REVIEW" && outcome && "guidedSessionPrepared" in outcome && outcome.guidedSessionPrepared ? (
         <p className="mt-1 text-sm text-muted">
-          안내형 등록 준비가 완료되었습니다.
+          안내형 등록 준비가 완료됐어요.
           <Link to="/reviews" className="mx-1 text-brand underline">
             리뷰
           </Link>
-          에서 사람이 직접 등록합니다.
+          에서 사람이 직접 등록해요.
         </p>
       ) : null}
     </div>
@@ -769,14 +769,14 @@ function IssueBriefCard({ brief }: { brief: IssueOperationsBrief }) {
   if (brief.selectedCount === 0) {
     return (
       <div className="rounded-2xl border border-line bg-surface p-4" role="group" aria-label="운영 이슈 브리핑">
-        <p className="text-ink">{brief.note ?? "지금 확인할 운영 이슈가 없습니다."}</p>
+        <p className="text-ink">{brief.note ?? "지금 확인할 운영 이슈가 없어요."}</p>
       </div>
     );
   }
   return (
     <div className="space-y-3" role="group" aria-label="운영 이슈 브리핑">
       <p className="text-sm text-muted">
-        활성 이슈 {brief.totalActiveIssues}건 중 우선순위 {brief.selectedCount}건입니다.
+        활성 이슈 {brief.totalActiveIssues}건 중 우선순위 {brief.selectedCount}건이에요.
       </p>
       <ol className="space-y-3">
         {brief.entries.map((e) => (

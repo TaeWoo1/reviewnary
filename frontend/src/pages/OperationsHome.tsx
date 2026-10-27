@@ -66,7 +66,7 @@ export function OperationsHome() {
     <div className="flex flex-col gap-6">
       <PageHead
         title="네이버 리뷰 기간별 가져오기"
-        description="판매자센터에서 리뷰 파일을 내려받는 작업을 단계별로 안내합니다. 리뷰를 읽고 답변하는 일은 리뷰 화면에서 합니다."
+        description="판매자센터에서 리뷰 파일을 내려받는 작업을 단계별로 안내해요. 리뷰를 읽고 답변하는 일은 리뷰 화면에서 해요."
         action={
           <BtnLink to="/reviews" size="sm" variant="ghost">
             리뷰 화면으로
@@ -156,7 +156,7 @@ export function OperationsHome() {
 
       {!liveActions ? (
         <p role="note" className="break-keep text-sm text-muted">
-          reviewnary 도우미가 필요합니다. 도우미가 연결되어 있지 않아 지금은 수집을 시작할 수 없어요. 지금까지 가져온 기록은 아래에서 볼 수 있어요.
+          reviewnary 도우미가 필요해요. 도우미가 연결되어 있지 않아 지금은 수집을 시작할 수 없어요. 지금까지 가져온 기록은 아래에서 볼 수 있어요.
         </p>
       ) : null}
 

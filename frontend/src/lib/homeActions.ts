@@ -37,7 +37,7 @@ export function buildHomeOperatingItems(data: OrderSummaryResponse): OperatingIt
       to: "/orders",
     });
   } else {
-    items.push({ id: "no-orders", text: "오늘 아직 주문이 없습니다." });
+    items.push({ id: "no-orders", text: "오늘 아직 주문이 없어요." });
   }
 
   items.push({

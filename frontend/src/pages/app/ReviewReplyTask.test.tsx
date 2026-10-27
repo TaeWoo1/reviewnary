@@ -251,8 +251,8 @@ describe("리뷰 처리 — the decision workspace", () => {
     getReviewReplyPrep.mockResolvedValue(prep());
     renderTask();
 
-    expect(await screen.findByText(/아직 반복 문제의 근거로 기록되지 않았습니다/)).toBeInTheDocument();
-    expect(screen.queryByText(/반복된 적 없습니다/)).toBeNull();
+    expect(await screen.findByText(/아직 반복 문제의 근거로 기록되지 않았어요/)).toBeInTheDocument();
+    expect(screen.queryByText(/반복된 적 없어요/)).toBeNull();
   });
 
   it("keeps the decision available when the context read fails — it loses context, not the choice", async () => {
@@ -277,7 +277,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     // The reply work is unaffected: the context read is separate for exactly this reason.
     await waitFor(() => expect(screen.getByText("괜찮긴한데 자꾸 떨어져요")).toBeInTheDocument());
     expect(screen.queryByText("반복 신호")).toBeNull();
-    expect(screen.queryByText(/기록되지 않았습니다/)).toBeNull();
+    expect(screen.queryByText(/기록되지 않았어요/)).toBeNull();
     expect(await screen.findByDisplayValue("판매자가 고쳐 쓴 합성 초안")).toBeInTheDocument();
   });
 
@@ -300,8 +300,8 @@ describe("리뷰 처리 — the decision workspace", () => {
     expect(screen.getByText(/채우지 않은 내용이 3건 있어요/)).toBeInTheDocument();
     // The note that keeps these four numbers honest. Its second clause pointed at 「아래 초안」 — absent in
     // a preview, and unasked-for by a seller still reading the counts — and was dropped (2026-10-01).
-    expect(screen.getByText(/여기 있는 숫자는 등록된 자료의 수입니다/)).toBeInTheDocument();
-    expect(screen.queryByText(/아래 초안에 인용으로 나옵니다/)).not.toBeInTheDocument();
+    expect(screen.getByText(/여기 있는 숫자는 등록된 자료의 수예요/)).toBeInTheDocument();
+    expect(screen.queryByText(/아래 초안에 인용으로 나와요/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "답변 기준 보기" })).toHaveAttribute("href", "/knowledge");
   });
 
@@ -465,7 +465,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     await waitFor(() => expect(recordReviewDecision).toHaveBeenCalled());
     expect(recordReviewDecision.mock.calls[0][0]).toBe(REVIEW);
     // A channel with no reply flow still gets a decision, and is told plainly what it does NOT get.
-    expect(within(step).getByText(/reviewnary가 답변을 작성하지 않습니다/)).toBeInTheDocument();
+    expect(within(step).getByText(/reviewnary가 답변을 작성하지 않아요/)).toBeInTheDocument();
     expect(getReviewReplyPrep).not.toHaveBeenCalled();
   });
 
@@ -542,7 +542,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     getReviewWorkspace.mockResolvedValue(detail({ replyWork: null }));
     renderTask();
     await waitFor(() =>
-      expect(screen.getByText("이 채널에서는 reviewnary가 답변을 작성하지 않습니다.")).toBeInTheDocument(),
+      expect(screen.getByText("이 채널에서는 reviewnary가 답변을 작성하지 않아요.")).toBeInTheDocument(),
     );
     expect(getReviewReplyPrep).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "답글 확정" })).not.toBeInTheDocument();
@@ -565,7 +565,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     expect(rows[0]).toHaveTextContent("답글을 확정함");
     expect(rows[1]).toHaveTextContent("처리 방법을 답글 달기로 정함");
     expect(rows[2]).toHaveTextContent("분류를 먼저 볼 리뷰로 바꿈");
-    expect(within(log).getByText(/마켓플레이스에는 아무것도 전송되지 않습니다/)).toBeInTheDocument();
+    expect(within(log).getByText(/마켓플레이스에는 아무것도 전송되지 않아요/)).toBeInTheDocument();
   });
 
   it("draws no row for an entry this build cannot name", async () => {
@@ -578,7 +578,7 @@ describe("리뷰 처리 — the decision workspace", () => {
 
     const log = await screen.findByLabelText("기록");
     expect(within(log).queryByText(/SOMETHING_NEW/)).toBeNull();
-    expect(within(log).getByText("아직 이 리뷰에 기록된 판단이 없습니다.")).toBeInTheDocument();
+    expect(within(log).getByText("아직 이 리뷰에 기록된 판단이 없어요.")).toBeInTheDocument();
   });
 
   it("says nothing about history when the log read fails", async () => {
@@ -611,7 +611,7 @@ describe("리뷰 처리 — the decision workspace", () => {
   it("fails closed when the review cannot be read — never an invented review", async () => {
     getReviewWorkspace.mockRejectedValue(new Error("nope"));
     renderTask();
-    expect(await screen.findByText("이 리뷰를 불러오지 못했습니다")).toBeInTheDocument();
+    expect(await screen.findByText("이 리뷰를 불러오지 못했어요")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "답글 확정" })).not.toBeInTheDocument();
   });
 
@@ -629,7 +629,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     getReviewDecisionContext.mockResolvedValue(context({ currentDecision: null }));
     renderTask();
 
-    expect(await screen.findByText("채널에 이미 답변이 등록된 리뷰입니다")).toBeInTheDocument();
+    expect(await screen.findByText("채널에 이미 답변이 등록된 리뷰예요")).toBeInTheDocument();
     // The channel's statement is NOT the seller's decision: the choice is still open, and nothing
     // claims the review has been handled.
     expect(screen.getByRole("button", { name: /답글 달기/ })).toBeInTheDocument();
@@ -726,9 +726,9 @@ describe("리뷰 처리 — a review with no seller account", () => {
     getReviewWorkspace.mockResolvedValue(accountLess());
     renderTask();
 
-    expect(await screen.findByText(/연결된 판매 계정이 없어 답변을 준비할 수 없습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/연결된 판매 계정이 없어 답변을 준비할 수 없어요/)).toBeInTheDocument();
     // The other sentence is a claim about the marketplace and would be false here.
-    expect(screen.queryByText(/reviewnary가 답변을 작성하지 않습니다/)).toBeNull();
+    expect(screen.queryByText(/reviewnary가 답변을 작성하지 않아요/)).toBeNull();
     expect(getReviewReplyPrep).not.toHaveBeenCalled();
   });
 
@@ -792,7 +792,7 @@ describe("리뷰 처리 — 작업에서 제외", () => {
     await userEvent.click(await screen.findByTestId("reply-work-dismiss"));
     const confirm = await screen.findByTestId("reply-work-dismiss-confirm");
     expect(confirm).toHaveTextContent("저장한 초안과 기록은 그대로 남고");
-    expect(confirm).toHaveTextContent("답변한 것으로 기록되지 않습니다");
+    expect(confirm).toHaveTextContent("답변한 것으로 기록되지 않아요");
     expect(dismissReplyWork).not.toHaveBeenCalled();
   });
 
@@ -815,7 +815,7 @@ describe("리뷰 처리 — 작업에서 제외", () => {
     expect(ref).toBe(`review:${REVIEW}`);
     expect((body as { commandId: string }).commandId).toBeTruthy();
     const notice = await screen.findByTestId("reply-work-dismissed-notice");
-    expect(notice).toHaveTextContent("저장한 초안과 기록은 그대로 있습니다");
+    expect(notice).toHaveTextContent("저장한 초안과 기록은 그대로 있어요");
     expect(notice).not.toHaveTextContent("완료");
   });
 });
@@ -948,12 +948,12 @@ describe("리뷰 미리보기 — 고객 원문 → 왜 → 근거 → 판단 �
     renderPreview();
 
     await waitFor(() => expect(screen.getByLabelText("현재 판단")).toBeTruthy());
-    const note = screen.getByText("마켓플레이스로는 아무것도 전송되지 않습니다.");
+    const note = screen.getByText("마켓플레이스로는 아무것도 전송되지 않아요.");
     expect(note).toBeTruthy();
     // Said once — not the pair it used to print one block apart, and not twice over.
     expect(screen.getAllByText(/마켓플레이스/)).toHaveLength(1);
-    expect(screen.queryByText(/마켓플레이스에는 아무것도 전송되지 않습니다/)).toBeNull();
-    expect(screen.queryByText(/여기에는 무엇으로 정했는지만 기록됩니다/)).toBeNull();
+    expect(screen.queryByText(/마켓플레이스에는 아무것도 전송되지 않아요/)).toBeNull();
+    expect(screen.queryByText(/여기에는 무엇으로 정했는지만 기록돼요/)).toBeNull();
   });
 
   /**
@@ -988,7 +988,7 @@ describe("리뷰 미리보기 — 고객 원문 → 왜 → 근거 → 판단 �
     // <b>The explanations moved, they were not dropped.</b> The full case renders every one of them; this is
     // the assertion that they are no longer between one fact and the next.
     expect(evidence).not.toHaveTextContent("같은 문제를 말한 리뷰가 쌓이면");
-    expect(evidence).not.toHaveTextContent("여기 있는 숫자는 등록된 자료의 수입니다.");
+    expect(evidence).not.toHaveTextContent("여기 있는 숫자는 등록된 자료의 수예요.");
   });
 
   it("counts open asks only when there are any, and says a missing figure is not a zero", async () => {
@@ -1219,11 +1219,11 @@ describe("리뷰 pane — 반복 신호가 pane의 중심 object", () => {
     expect(rows[0].textContent).toContain("본드로 붙여버렸어요");
     expect(rows[0].textContent).toContain("★5 · 2026-08-18");
     // A quote masking took away says so, rather than leaving an empty cell.
-    expect(rows[1].textContent).toContain("내용이 가려진 근거입니다");
+    expect(rows[1].textContent).toContain("내용이 가려진 근거예요");
     expect(rows[1].textContent).toContain("평점 없음 · 2026-04-26");
 
     // …and the rows are never read as the whole set: the memory's count stands against them.
-    expect(object.textContent).toContain("근거 7건 가운데 최근 2건입니다.");
+    expect(object.textContent).toContain("근거 7건 가운데 최근 2건이에요.");
   });
 
   /**
@@ -1247,8 +1247,8 @@ describe("리뷰 pane — 반복 신호가 pane의 중심 object", () => {
     renderPreview("full");
 
     const empty = await screen.findByRole("region", { name: "반복 신호" });
-    expect(empty.textContent).toContain("아직 반복 문제의 근거로 기록되지 않았습니다.");
-    expect(empty.textContent).not.toContain("반복된 적 없습니다");
+    expect(empty.textContent).toContain("아직 반복 문제의 근거로 기록되지 않았어요.");
+    expect(empty.textContent).not.toContain("반복된 적 없어요");
   });
 
   it("drops 상품 맥락 and 판단과 조치 to prose — no label column, no table", async () => {
@@ -1263,8 +1263,8 @@ describe("리뷰 pane — 반복 신호가 pane의 중심 object", () => {
     const { container } = renderPreview("full");
 
     const grounding = await screen.findByRole("region", { name: "이 상품에 대해 우리가 아는 것" });
-    expect(grounding.textContent).toContain("리뷰 12건 가운데 부정이 3건입니다.");
-    expect(grounding.textContent).toContain("등록된 상품 지식 3건과 회사 운영 기준 2건이 있습니다.");
+    expect(grounding.textContent).toContain("리뷰 12건 가운데 부정이 3건이에요.");
+    expect(grounding.textContent).toContain("등록된 상품 지식 3건과 회사 운영 기준 2건이 있어요.");
     expect(grounding.textContent).toContain("부착이 잘 떨어질 때 안내");
     expect(grounding.textContent).toContain("아직 채우지 않은 내용이 1건 있어요.");
 

@@ -215,7 +215,7 @@ export function Operations() {
 
       {!liveActions ? (
         <p role="note" className="break-keep text-sm text-muted">
-          reviewnary 도우미가 필요합니다. 도우미가 연결되어 있지 않아 지금은 작업을 시작하거나 조작할 수 없어요.
+          reviewnary 도우미가 필요해요. 도우미가 연결되어 있지 않아 지금은 작업을 시작하거나 조작할 수 없어요.
         </p>
       ) : null}
 

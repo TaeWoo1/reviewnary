@@ -36,12 +36,12 @@ const STATE_LABEL: Record<BridgeConnectionState, string> = {
 };
 
 const ACTION_LABEL: Record<BridgePendingUserAction, string> = {
-  select_saved_credential: "저장된 로그인 선택이 필요합니다",
-  enter_missing_username: "아이디 입력이 필요합니다",
-  complete_manual_login: "직접 로그인이 필요합니다",
-  complete_additional_authentication: "추가 인증이 필요합니다",
-  provide_api_credential: "연결 정보 입력이 필요합니다",
-  reauthorize_api_access: "연결 권한 재승인이 필요합니다",
+  select_saved_credential: "저장된 로그인 선택이 필요해요",
+  enter_missing_username: "아이디 입력이 필요해요",
+  complete_manual_login: "직접 로그인이 필요해요",
+  complete_additional_authentication: "추가 인증이 필요해요",
+  provide_api_credential: "연동 정보 입력이 필요해요",
+  reauthorize_api_access: "연결 권한 재승인이 필요해요",
 };
 
 /** How often, while unpaired, the dock looks for a pairing another screen (the 도우미 panel) just completed. */

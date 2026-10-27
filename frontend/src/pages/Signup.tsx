@@ -36,11 +36,11 @@ export function Signup() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (passwordTooShort) {
-      setError("비밀번호는 6자 이상이어야 합니다.");
+      setError("비밀번호는 6자 이상이어야 해요.");
       return;
     }
     if (!terms) {
-      setError("이용약관과 개인정보처리방침에 동의해야 가입할 수 있습니다.");
+      setError("이용약관과 개인정보처리방침에 동의해야 가입할 수 있어요.");
       return;
     }
     setBusy(true);
@@ -67,7 +67,7 @@ export function Signup() {
   return (
     <AuthCard
       title="계정 만들기"
-      subtitle="계정을 만들고 첫 채널을 연결해 보세요"
+      subtitle="계정을 만들고 첫 채널을 연동해 보세요"
       footer={
         <>
           이미 계정이 있으신가요?{" "}
@@ -150,7 +150,7 @@ export function Signup() {
           {busy ? "계정 만드는 중…" : "계정 만들기"}
         </button>
         <p className="break-keep text-center text-xs leading-relaxed text-muted">
-          가입하면 바로 채널 연결 화면으로 이동합니다. 마켓 계정 정보는 그 화면에서 채널별로 직접 입력합니다.
+          가입하면 바로 채널 연동 화면으로 이동해요. 마켓 계정 정보는 그 화면에서 채널별로 직접 입력해요.
         </p>
       </form>
     </AuthCard>

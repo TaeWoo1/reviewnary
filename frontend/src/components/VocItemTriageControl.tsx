@@ -217,7 +217,7 @@ export function VocItemTriageControl({
         // A capability limit, not a failure: says what is wrong and does NOT invite a
         // retry, because no number of retries can mint a command id on this origin.
         <p role="alert" className="text-sm text-bad">
-          이 환경에서는 처리 상태를 기록할 수 없습니다. 보안 연결(HTTPS)로 접속해 주세요.
+          이 환경에서는 처리 상태를 기록할 수 없어요. 보안 연결(HTTPS)로 접속해 주세요.
         </p>
       ) : null}
       {failed != null && !unavailable ? (
@@ -225,7 +225,7 @@ export function VocItemTriageControl({
         // has just been told, visually, that nothing changed, and a silent revert is how
         // someone concludes they already decided.
         <p role="alert" className="text-sm text-bad">
-          처리 상태를 저장하지 못했습니다. 다시 시도해 주세요.
+          처리 상태를 저장하지 못했어요. 다시 시도해 주세요.
         </p>
       ) : null}
     </div>

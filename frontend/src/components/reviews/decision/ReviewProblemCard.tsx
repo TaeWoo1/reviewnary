@@ -110,13 +110,13 @@ export function ReviewProblemCard({
           seller opened the screen to read. A textless review says what it is rather than implying that
           reviewnary lost something. */}
       {!showBody ? null : detail.textless || body.length === 0 ? (
-        <p className="break-keep text-base leading-relaxed text-muted">별점만 남긴 {word}입니다.</p>
+        <p className="break-keep text-base leading-relaxed text-muted">내용 없이 별점만 남겼어요.</p>
       ) : (
         <p className="whitespace-pre-wrap break-keep text-lg leading-relaxed text-ink">{body}</p>
       )}
       {detail.bodyRedacted ? (
         <p className="break-keep text-sm text-muted">
-          개인정보로 보이는 부분은 가려서 보여드립니다. 원문은 판매자센터에서 확인하실 수 있습니다.
+          개인정보로 보이는 부분은 가려서 보여드려요. 원문은 판매자센터에서 확인하실 수 있어요.
         </p>
       ) : null}
 

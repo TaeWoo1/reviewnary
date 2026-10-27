@@ -71,7 +71,7 @@ describe("NaverIssuanceTutorial", () => {
   it("fails safe when no IP is advertised: generic guidance, never a fabricated IP", () => {
     render(<NaverIssuanceTutorial steps={NAVER_ISSUANCE_TUTORIAL} advertisedEgressIps={[]} />);
     // Our-side "not configured yet" note — distinct from the seller-must-register phrasing, never fabricated.
-    expect(screen.getByText(/아직 설정되지 않았습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/아직 설정되지 않았어요/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "복사" })).toBeNull();
     // No dotted-quad fabricated anywhere in the rendered checklist.
     expect(screen.queryByText(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/)).toBeNull();

@@ -51,12 +51,12 @@ export function CredentialDiagnosisPanel({ accountId }: { accountId: string }) {
       role="status"
     >
       <p className="font-semibold">
-        {serverSide ? "reviewnary 서버 설정 문제입니다" : "자격 증명을 다시 확인해야 합니다"}
+        {serverSide ? "reviewnary 서버 설정 문제예요" : "자격 증명을 다시 확인해야 해요"}
       </p>
       {diagnosis.remedy ? <p className="mt-1 text-sm">{diagnosis.remedy}</p> : null}
       {serverSide ? (
         <p className="mt-2 text-sm">
-          판매자가 채널을 다시 연결해도 해결되지 않습니다. 담당자에게 이 화면을 알려 주세요.
+          판매자가 채널을 다시 연동해도 해결되지 않아요. 담당자에게 이 화면을 알려 주세요.
         </p>
       ) : null}
     </div>

@@ -71,7 +71,7 @@ describe("로그인 복구 — 판매자가 직접 로그인하고, 제품은 �
     mount();
     // 로그인이 만료됐다는 소식이, 9월 2일에 읽은 것을 없애지는 않는다. 한 칸으로 합쳐 두었을 때 제품은
     // 실제로 읽은 채널을 「확인된 적 없음」이라고 말했다.
-    expect(screen.getByText("최근 수집 시 로그인이 필요했습니다.")).toBeInTheDocument();
+    expect(screen.getByText("최근 수집 시 로그인이 필요했어요.")).toBeInTheDocument();
     // 신선도 한 줄. 「언제 봤는가」는 로그인이 만료됐다는 소식에 지워지지 않는다 — 9월 2일에 읽은 것은
     // 읽은 것이다. 한 칸으로 합쳐 두었을 때 제품은 실제로 읽은 채널을 「확인된 적 없음」이라고 말했다.
     expect(screen.getByText("9월 2일 확인")).toBeInTheDocument();
@@ -142,7 +142,7 @@ describe("로그인 복구 — 판매자가 직접 로그인하고, 제품은 �
     // 서버는 이것을 저장하지 않는다. 새로고침 뒤 화면은 마지막 수집 시도의 사실로 돌아가고, 그 문장은
     // 다음 수집까지 참이다 — 몇 분 전 probe를 근거로 「지금 로그인되어 있습니다」라고 하는 쪽이 거짓이다.
     mount();
-    expect(screen.getByText("최근 수집 시 로그인이 필요했습니다.")).toBeInTheDocument();
+    expect(screen.getByText("최근 수집 시 로그인이 필요했어요.")).toBeInTheDocument();
     expect(screen.queryByText("로그인 확인됨.")).toBeNull();
   });
 
@@ -155,7 +155,7 @@ describe("로그인 복구 — 판매자가 직접 로그인하고, 제품은 �
     // MFA는 어떤 bound보다 오래 걸릴 수 있다. 그건 고장이 아니다.
     await waitFor(() =>
       expect(onReport).toHaveBeenCalledWith(
-        "로그인 창을 지켜보는 시간이 끝났습니다. 로그인을 마친 뒤 [판매자센터 로그인]을 다시 눌러 주세요.",
+        "로그인 창을 지켜보는 시간이 끝났어요. 로그인을 마친 뒤 [판매자센터 로그인]을 다시 눌러 주세요.",
         true,
       ),
     );
@@ -168,7 +168,7 @@ describe("로그인 복구 — 판매자가 직접 로그인하고, 제품은 �
 
     await userEvent.click(screen.getByTestId("sign-in-REVIEW"));
     await waitFor(() =>
-      expect(onReport).toHaveBeenCalledWith("이 Mac의 도우미와 연결이 필요합니다.", true),
+      expect(onReport).toHaveBeenCalledWith("이 Mac의 도우미와 연결이 필요해요.", true),
     );
     const said = onReport.mock.calls.map((c) => String(c[0])).join(" ");
     for (const term of ["pairing", "bridge", "carrier", "device grant", "토큰", "bearer"]) {
@@ -189,7 +189,7 @@ describe("로그인 복구 — 판매자가 직접 로그인하고, 제품은 �
 
     await waitFor(() => expect(awaitSignIn).toHaveBeenCalled());
     expect(onReport).not.toHaveBeenCalledWith(
-      "이 컴퓨터에서 이미 로그인 창이 열려 있습니다. 그 창에서 로그인을 마쳐 주세요.",
+      "이 컴퓨터에서 이미 로그인 창이 열려 있어요. 그 창에서 로그인을 마쳐 주세요.",
       true,
     );
   });
@@ -231,7 +231,7 @@ describe("로그인 복구 — 판매자가 직접 로그인하고, 제품은 �
   it("채널을 모르면 로그인 버튼을 그리지 않는다 — 어느 판매자센터인지 추측하지 않는다", () => {
     mount({ channelCode: null });
     expect(screen.queryByTestId("sign-in-REVIEW")).toBeNull();
-    expect(screen.getByText("최근 수집 시 로그인이 필요했습니다.")).toBeInTheDocument();
+    expect(screen.getByText("최근 수집 시 로그인이 필요했어요.")).toBeInTheDocument();
   });
 
   it("마지막 성공 수집이 없으면 그 줄을 지어내지 않는다", () => {

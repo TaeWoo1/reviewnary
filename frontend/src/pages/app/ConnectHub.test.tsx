@@ -114,11 +114,11 @@ function renderHub() {
   );
 }
 
-describe("채널 연결 — the hub", () => {
+describe("채널 연동 — the hub", () => {
   it("carries two things: the channels, and this Mac", async () => {
     renderHub();
     expect(
-      await screen.findByRole("heading", { level: 1, name: "채널 연결" }),
+      await screen.findByRole("heading", { level: 1, name: "채널 연동" }),
     ).toBeInTheDocument();
     // 2026-10-08: 세 번째 구역 「자료 가져오기」가 접힌 보조 영역이 되었다. 그 이름은 수집처럼 들렸고 그 안에
     // 있던 것은 파일 업로드·기간별 안내·실행 기록·「작업 화면 열기」 — 우리 쪽 작업의 이름들이었다. 같은
@@ -189,7 +189,7 @@ describe("채널 연결 — the hub", () => {
  * the data was there — the API answered with the full total — and the person in front of the screen
  * still had to be told the URL. These tests hold the row's way in.
  */
-describe("채널 연결 — the 상품평 entry", () => {
+describe("채널 연동 — the 상품평 entry", () => {
   it("puts the record one click from the hub, with the count on the button", async () => {
     getChannels.mockResolvedValue([COUPANG]);
     getSellerAccountsStrict.mockResolvedValue([coupangAccount()]);
@@ -282,7 +282,7 @@ describe("채널 연결 — the 상품평 entry", () => {
   });
 });
 
-describe("채널 연결 — honesty", () => {
+describe("채널 연동 — honesty", () => {
   it("makes no automatic-integration claim", async () => {
     renderHub();
     await screen.findByLabelText("채널 목록");
@@ -337,7 +337,7 @@ describe("채널 연결 — honesty", () => {
   });
 });
 
-describe("채널 연결 — on the seller-PC install", () => {
+describe("채널 연동 — on the seller-PC install", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
@@ -353,7 +353,7 @@ describe("채널 연결 — on the seller-PC install", () => {
   });
 });
 
-describe("채널 연결 — accessibility", () => {
+describe("채널 연동 — accessibility", () => {
   it("has no axe violations", async () => {
     const { container } = renderHub();
     await screen.findByLabelText("채널 목록");

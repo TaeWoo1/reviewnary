@@ -71,7 +71,7 @@ describe("NAVER issuance tutorial content", () => {
     for (const walk of [NAVER_ISSUANCE_TUTORIAL, NAVER_EXISTING_APP_TUTORIAL]) {
       const step = walk.find((s) => s.id === "app_usage_check")!;
       expect(step.hint).toMatch(/다시사용/); // points the seller at the reactivate control
-      expect(step.hint).toMatch(/단정하지는 않습니다/); // and does NOT assert the app is active
+      expect(step.hint).toMatch(/단정하지는 않아요/); // and does NOT assert the app is active
       expect(step.opensCenter).not.toBe(true); // text-only advisory — never the tab-opening step
     }
   });
@@ -128,12 +128,12 @@ describe("Coupang WING issuance checklist content", () => {
     for (const step of COUPANG_ISSUANCE_TUTORIAL.slice(0, at("vendor_method"))) {
       const text = `${step.title} ${step.hint}`;
       // An earlier step may NAME 자체개발 only to say the screen has none — never to ask for it.
-      if (/자체개발/.test(text)) expect(text).toMatch(/자체개발.*없습니다/);
+      if (/자체개발/.test(text)) expect(text).toMatch(/자체개발.*없어요/);
     }
     // …and the purpose step says so out loud, because a seller who has read the old wording will look.
     const purpose = COUPANG_ISSUANCE_TUTORIAL[at("confirm_purpose")]!;
     expect(purpose.hint).toMatch(/OPEN API/);
-    expect(purpose.hint).toMatch(/자체개발.*없습니다/);
+    expect(purpose.hint).toMatch(/자체개발.*없어요/);
   });
 
   it("names 자체개발(직접입력) with its measured label, on the 업체 입력 방식 screen", () => {
@@ -153,8 +153,8 @@ describe("Coupang WING issuance checklist content", () => {
     expect(at("issue_checkpoint")).toBeGreaterThan(at("register_call_ip"));
     expect(at("issue_checkpoint")).toBeLessThan(at("copy_keys"));
     const step = COUPANG_ISSUANCE_TUTORIAL[at("issue_checkpoint")]!;
-    expect(`${step.title} ${step.hint}`).toMatch(/발급됩니다|발급되어/); // the one place that claims it
-    expect(step.hint).toMatch(/reviewnary는 대신 누르지 않습니다/); // …and never on the seller's behalf
+    expect(`${step.title} ${step.hint}`).toMatch(/발급돼요|발급되어/); // the one place that claims it
+    expect(step.hint).toMatch(/reviewnary는 대신 누르지 않아요/); // …and never on the seller's behalf
   });
 
   it("registers the call IP on the screen that actually has the field, and requires the '추가' press", () => {

@@ -18,7 +18,7 @@ export function OrderSummaryArtifact({ artifact }: { artifact: OrderSummary }) {
   return (
     <ArtifactCard
       title={artifact.title}
-      note={[artifact.note, artifact.exampleDataIncluded ? "예시 데이터가 포함된 숫자입니다" : null].filter(Boolean).join(" · ") || null}
+      note={[artifact.note, artifact.exampleDataIncluded ? "예시 데이터가 포함된 숫자예요" : null].filter(Boolean).join(" · ") || null}
       action={<Link to={artifact.to} onClick={onOpen} className="text-xs font-semibold text-brand-700 hover:underline">주문 화면</Link>}
     >
       <div className="grid grid-cols-2 gap-3 px-4 pb-3">

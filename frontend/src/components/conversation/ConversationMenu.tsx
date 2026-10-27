@@ -107,7 +107,7 @@ export function ConversationMenu() {
             {items === null ? (
               <p className="py-1 text-sm text-muted">불러오는 중…</p>
             ) : items.length === 0 ? (
-              <p className="py-1 text-sm text-muted">지난 대화가 없습니다.</p>
+              <p className="py-1 text-sm text-muted">지난 대화가 없어요.</p>
             ) : (
               <ul className="space-y-0.5" aria-label="지난 대화">
                 {items.map((h) => {

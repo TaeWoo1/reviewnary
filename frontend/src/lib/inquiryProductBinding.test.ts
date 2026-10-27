@@ -52,7 +52,7 @@ describe("문의 상품 연결 — 사람이 정한 것과 채널이 정한 것"
     expect(bindErrorMessage(409, SOURCE_BINDING_EXISTS)).toContain("한 번 더 확인");
     // A different 409 is a real refusal and must not borrow that sentence.
     expect(bindErrorMessage(409, null)).not.toContain("한 번 더 확인");
-    expect(bindErrorMessage(404)).toContain("찾을 수 없습니다");
+    expect(bindErrorMessage(404)).toContain("찾을 수 없어요");
     expect(bindErrorMessage(undefined)).toContain("다시 시도");
   });
 });

@@ -104,7 +104,7 @@ export function apiCardOf(
   }
   const state = status?.state;
   if (state === "EXPIRED" || state === "NEEDS_REAUTH" || state === "DISCONNECTED") {
-    return { status: { tone: "bad", label: "다시 연결 필요" }, kind: "REAUTH", primaryLabel: "연결 정보 갱신" };
+    return { status: { tone: "bad", label: "다시 연결 필요" }, kind: "REAUTH", primaryLabel: "연동 정보 갱신" };
   }
   return { status: { tone: "good", label: "연결됨" }, kind: "READY", primaryLabel: "지금 가져오기" };
 }

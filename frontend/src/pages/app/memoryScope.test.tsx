@@ -104,7 +104,7 @@ describe("고객운영 메모리 — v1 scope fence", () => {
   it("renders no search control in the empty state", async () => {
     getReviewIssuesStrict.mockResolvedValue([]);
     const { container } = renderMemory();
-    await screen.findByText("아직 쌓인 기록이 없습니다");
+    await screen.findByText("아직 쌓인 기록이 없어요");
     expect(container.querySelectorAll("input")).toHaveLength(0);
     expect(container.querySelectorAll("form")).toHaveLength(0);
   });
@@ -155,6 +155,6 @@ describe("고객운영 메모리 — v1 scope fence", () => {
     // and the problems. What a seller cannot infer — that these are candidates and not a diagnosis —
     // stays, below the list where the counts are.
     expect(screen.queryByText(/반복해서 말한 문제와 그 근거/)).toBeNull();
-    expect(await screen.findByText(/최종 진단이 아닙니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/최종 진단이 아니에요/)).toBeInTheDocument();
   });
 });

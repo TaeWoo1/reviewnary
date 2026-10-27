@@ -19,15 +19,15 @@ import { SocialSignInButtons } from "../components/auth/SocialSignInButtons";
 export const SOCIAL_NOTICE: Record<string, { title: string; body: string }> = {
   email_taken: {
     title: "이미 이 이메일로 가입된 계정이 있어요",
-    body: "같은 이메일의 이메일·비밀번호 계정이 있어 소셜 로그인으로 자동 연결하지 않았습니다. 아래에서 이메일과 비밀번호로 로그인해 주세요.",
+    body: "같은 이메일의 이메일·비밀번호 계정이 있어 소셜 로그인으로 자동 연결하지 않았어요. 아래에서 이메일과 비밀번호로 로그인해 주세요.",
   },
   email_missing: {
     title: "이메일 정보를 받지 못했어요",
-    body: "소셜 계정에서 이메일 제공에 동의해야 reviewnary 계정을 만들 수 있습니다. 동의 후 다시 시도하거나 이메일로 가입해 주세요.",
+    body: "소셜 계정에서 이메일 제공에 동의해야 reviewnary 계정을 만들 수 있어요. 동의 후 다시 시도하거나 이메일로 가입해 주세요.",
   },
   failed: {
     title: "소셜 로그인이 완료되지 않았어요",
-    body: "로그인이 취소되었거나 확인에 실패했습니다. 다시 시도하거나 이메일로 로그인해 주세요.",
+    body: "로그인이 취소되었거나 확인에 실패했어요. 다시 시도하거나 이메일로 로그인해 주세요.",
   },
 };
 
@@ -113,9 +113,9 @@ export function Login() {
       }
     >
       {sessionExpired ? (
-        <AuthNotice title="세션이 만료되었습니다">
-          오래 사용하지 않아 로그인 상태가 풀렸습니다. 다시 로그인하면 하던 자리로 이어집니다. 채널 연결과 수집 설정은
-          그대로 남아 있습니다.
+        <AuthNotice title="세션이 만료됐어요">
+          오래 사용하지 않아 로그인 상태가 풀렸어요. 다시 로그인하면 하던 자리로 이어져요. 채널 연동과 수집 설정은
+          그대로 남아 있어요.
         </AuthNotice>
       ) : null}
 
@@ -131,8 +131,8 @@ export function Login() {
 
       {/* The notice says the form is prefilled, so it may only appear where it actually is. */}
       {demoEntry ? (
-        <AuthNotice title="데모 계정으로 둘러보는 중입니다">
-          계정 정보가 미리 입력되어 있습니다. 화면에 보이는 내용은 실제 판매 데이터가 아닙니다.
+        <AuthNotice title="데모 계정으로 둘러보는 중이에요">
+          계정 정보가 미리 입력되어 있어요. 화면에 보이는 내용은 실제 판매 데이터가 아니에요.
         </AuthNotice>
       ) : null}
 

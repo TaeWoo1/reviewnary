@@ -133,7 +133,7 @@ export function DecisionActionStep({
                 </Btn>
               ))}
             </div>
-            {failed ? <p className="text-sm text-bad">기록하지 못했습니다. 잠시 후 다시 시도해 주세요.</p> : null}
+            {failed ? <p className="text-sm text-bad">기록하지 못했어요. 잠시 후 다시 시도해 주세요.</p> : null}
           </DoneRecord>
       ) : null}
     </div>

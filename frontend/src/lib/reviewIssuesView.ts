@@ -145,7 +145,7 @@ export function nextActionKo(state: IssueLifecycleState): string | null {
 export function waitingNoteKo(state: IssueLifecycleState): string | null {
   switch (state) {
     case "OBSERVING":
-      return "reviewnary가 먼저 확인을 권할 만큼 근거가 모이지는 않았습니다.";
+      return "reviewnary가 먼저 확인을 권할 만큼 근거가 모이지는 않았어요.";
     case "VERIFYING":
       return "조치 이후 리뷰 변화를 지켜보고 있어요.";
     case "RESOLVED":
@@ -246,6 +246,6 @@ export function suppressedQuoteCount(evidence: IssueEvidenceView[]): number {
 /** Honest provenance line. Never says AI, because it is not. */
 export function provenanceKo(issue: ReviewIssueView): string {
   return issue.extractorKind === "RULE_BASED"
-    ? "규칙 기반 분석으로 모은 이슈 후보입니다. 최종 진단이 아닙니다."
-    : "이슈 후보입니다. 최종 진단이 아닙니다.";
+    ? "규칙 기반 분석으로 모은 이슈 후보여요. 최종 진단이 아니에요."
+    : "이슈 후보여요. 최종 진단이 아니에요.";
 }

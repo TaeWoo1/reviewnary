@@ -19,7 +19,7 @@ function audited(over: Partial<InquiryReplyCapabilityView>): InquiryReplyCapabil
     channelCode: "NAVER",
     sourceSubtype: null,
     transport: "PLATFORM_SUPPORTED_NOT_IMPLEMENTED",
-    reasonKo: "네이버는 상품 문의 답변 등록 API를 제공하지만, reviewnary가 아직 연결하지 않았습니다.",
+    reasonKo: "네이버는 상품 문의 답변 등록 API를 제공하지만, reviewnary가 아직 연결하지 않았어요.",
     evidence: "공식: PUT /v1/contents/qnas/{questionId}",
     ...over,
   };
@@ -43,7 +43,7 @@ describe("publishUnavailableReason", () => {
       detail({ replyCapability: audited({ sourceSubtype: "NAVER_PRODUCT_QNA" }) }),
       capability(),
     );
-    expect(reason).toContain("reviewnary가 아직 연결하지 않았습니다");
+    expect(reason).toContain("reviewnary가 아직 연결하지 않았어요");
     // The transport name is an internal vocabulary; a seller reads what it means for them.
     expect(reason).not.toContain("PLATFORM_SUPPORTED_NOT_IMPLEMENTED");
   });
@@ -53,12 +53,12 @@ describe("publishUnavailableReason", () => {
       detail({
         replyCapability: audited({
           transport: "UNSUPPORTED",
-          reasonKo: "톡톡 문의는 커머스 API에 답변 등록 경로가 없습니다.",
+          reasonKo: "톡톡 문의는 커머스 API에 답변 등록 경로가 없어요.",
         }),
       }),
       capability(),
     );
-    expect(reason).toContain("답변 등록 경로가 없습니다");
+    expect(reason).toContain("답변 등록 경로가 없어요");
     expect(reason).not.toContain("아직 연결하지");
   });
 
@@ -70,12 +70,12 @@ describe("publishUnavailableReason", () => {
         replyCapability: audited({
           channelCode: "CAFE24",
           transport: "NEEDS_VERIFICATION",
-          reasonKo: "카페24 문의 답변 등록 경로는 아직 확인하지 않았습니다. 지원하지 않는다는 뜻은 아닙니다.",
+          reasonKo: "카페24 문의 답변 등록 경로는 아직 확인하지 않았어요. 지원하지 않는다는 뜻은 아니에요.",
         }),
       }),
       capability(),
     );
-    expect(reason).toContain("지원하지 않는다는 뜻은 아닙니다");
+    expect(reason).toContain("지원하지 않는다는 뜻은 아니에요");
   });
 
   it("falls back to the generic sentence when no audit row came back", () => {
@@ -90,7 +90,7 @@ describe("publishUnavailableReason", () => {
       detail({ replyCapability: audited({}) }),
       capability({ executionEnabled: false }),
     );
-    expect(reason).toContain("지금은 reviewnary가 답변을 대신 등록하지 않습니다");
+    expect(reason).toContain("지금은 reviewnary가 답변을 대신 등록하지 않아요");
   });
 });
 
@@ -113,7 +113,7 @@ describe("already answered on the channel", () => {
       detail({ channelCode: "CAFE24", status: "ANSWERED" }),
       sendable(),
     );
-    expect(reason).toContain("이미 답변된 문의입니다");
+    expect(reason).toContain("이미 답변된 문의예요");
     // Sending them to the seller center would be work that no longer exists.
     expect(reason).not.toContain("판매자센터에서 직접 답변");
   });

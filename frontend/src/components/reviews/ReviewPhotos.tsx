@@ -196,17 +196,17 @@ export function ReviewPhotos({
   if (state.kind === "loading") {
     return announced ? (
       <p className="text-sm text-muted" role="status">
-        사진을 불러오는 중입니다
+        사진을 불러오는 중이에요
       </p>
     ) : null;
   }
   if (state.kind === "failed") {
-    return announced ? <p className="break-keep text-sm text-muted">사진을 불러오지 못했습니다. 잠시 후 다시 열어 주세요.</p> : null;
+    return announced ? <p className="break-keep text-sm text-muted">사진을 불러오지 못했어요. 잠시 후 다시 열어 주세요.</p> : null;
   }
   if (state.items.length === 0) {
     return announced ? (
       <p className="break-keep text-sm text-muted">
-        채널에 사진·영상 {mediaCount}개가 있다고 기록돼 있지만, 아직 가져오지 않았습니다.
+        채널에 사진·영상 {mediaCount}개가 있다고 기록돼 있지만, 아직 가져오지 않았어요.
       </p>
     ) : null;
   }

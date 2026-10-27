@@ -63,7 +63,7 @@ const h = vi.hoisted(() => ({
     sellerAccountId: "acc-new",
     status: "SUCCESS",
     checkedAt: "2026-08-06T00:00:00Z",
-    message: "연결 정보가 확인되었습니다.",
+    message: "연동 정보가 확인됐어요.",
     reasonCode: null,
   } as ConnectionTestResultView,
   syncRun: run({ status: "SUCCESS" }) as SyncRunView,
@@ -154,7 +154,7 @@ describe("ConnectCoupang tutorial", () => {
       sellerAccountId: "acc-new",
       status: "SUCCESS",
       checkedAt: "2026-08-06T00:00:00Z",
-      message: "연결 정보가 확인되었습니다.",
+      message: "연동 정보가 확인됐어요.",
       reasonCode: null,
     };
     h.syncRun = run({ status: "SUCCESS" });
@@ -191,7 +191,7 @@ describe("ConnectCoupang tutorial", () => {
     renderPage();
     await skipIssuance(user);
     expect(await screen.findByTestId("coupang-prereqs")).toBeInTheDocument();
-    expect(await screen.findByText(/아직 설정되지 않았습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/아직 설정되지 않았어요/)).toBeInTheDocument();
   });
 
   it("while the submit is in flight the page shows the IN-PROGRESS waiting screen (save → verify), never the form or an error", async () => {
@@ -204,13 +204,13 @@ describe("ConnectCoupang tutorial", () => {
     await skipIssuance(user);
     await screen.findByTestId("coupang-prereqs");
     await fillCredentials(user);
-    await user.click(screen.getByRole("button", { name: "연결 정보 저장" }));
+    await user.click(screen.getByRole("button", { name: "연동 정보 저장" }));
     // Stored → now verifying against Coupang: the waiting panel names the current stage.
     const waiting = await screen.findByTestId("coupang-verifying");
     await waitFor(() => expect(waiting).toHaveTextContent("쿠팡에 연결을 확인하고 있어요"));
     expect(waiting).toHaveAttribute("role", "status");
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.queryByRole("button", { name: "연결 정보 저장" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "연동 정보 저장" })).toBeNull();
     finishTest();
     expect(await screen.findByTestId("coupang-preparing")).toBeInTheDocument();
     expect(screen.queryByTestId("coupang-verifying")).toBeNull();
@@ -222,7 +222,7 @@ describe("ConnectCoupang tutorial", () => {
     await skipIssuance(user);
     await screen.findByTestId("coupang-prereqs");
     await fillCredentials(user);
-    await user.click(screen.getByRole("button", { name: "연결 정보 저장" }));
+    await user.click(screen.getByRole("button", { name: "연동 정보 저장" }));
 
     expect(await screen.findByTestId("coupang-preparing")).toBeInTheDocument();
     expect(h.createApiChannelAccount).toHaveBeenCalledWith("coupang-ch");
@@ -234,7 +234,7 @@ describe("ConnectCoupang tutorial", () => {
     });
     expect(h.testConnection).toHaveBeenCalledWith("acc-new");
     // Honest two-signal: a passing test is NOT a completed connection, and NO sync auto-started.
-    expect(screen.getByText(/첫 주문을 한 번 불러오면 연결이 완료됩니다/)).toBeInTheDocument();
+    expect(screen.getByText(/첫 주문을 한 번 불러오면 연동이 완료돼요/)).toBeInTheDocument();
     expect(h.manualSync).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "첫 주문 불러오기" })).toBeInTheDocument();
   });
@@ -245,7 +245,7 @@ describe("ConnectCoupang tutorial", () => {
     await skipIssuance(user);
     await screen.findByTestId("coupang-prereqs");
     await fillCredentials(user);
-    await user.click(screen.getByRole("button", { name: "연결 정보 저장" }));
+    await user.click(screen.getByRole("button", { name: "연동 정보 저장" }));
 
     // PREPARING → the explicit first-sync CTA.
     const cta = await screen.findByRole("button", { name: "첫 주문 불러오기" });
@@ -307,7 +307,7 @@ describe("ConnectCoupang tutorial", () => {
       sellerAccountId: "acc-new",
       status: "FAILED",
       checkedAt: "2026-08-06T00:00:00Z",
-      message: "허용된 호출 환경(호출 IP)과 일치하지 않을 수 있습니다.",
+      message: "허용된 호출 환경(호출 IP)과 일치하지 않을 수 있어요.",
       reasonCode: "CALL_ENVIRONMENT_MISMATCH",
     };
     const user = userEvent.setup();
@@ -315,7 +315,7 @@ describe("ConnectCoupang tutorial", () => {
     await skipIssuance(user);
     await screen.findByTestId("coupang-prereqs");
     await fillCredentials(user);
-    await user.click(screen.getByRole("button", { name: "연결 정보 저장" }));
+    await user.click(screen.getByRole("button", { name: "연동 정보 저장" }));
 
     const banner = await screen.findByTestId("coupang-connect-error");
     expect(banner).toHaveTextContent(/허용된 호출 IP와 일치하지 않아요/);
@@ -335,7 +335,7 @@ describe("ConnectCoupang tutorial", () => {
       sellerAccountId: "acc-new",
       status: "FAILED",
       checkedAt: "2026-08-06T00:00:00Z",
-      message: "연결 정보가 올바르지 않습니다.",
+      message: "연동 정보가 올바르지 않아요.",
       reasonCode: "INVALID_CREDENTIAL",
     };
     const user = userEvent.setup();
@@ -343,11 +343,11 @@ describe("ConnectCoupang tutorial", () => {
     await skipIssuance(user);
     await screen.findByTestId("coupang-prereqs");
     await fillCredentials(user);
-    await user.click(screen.getByRole("button", { name: "연결 정보 저장" }));
+    await user.click(screen.getByRole("button", { name: "연동 정보 저장" }));
 
     const banner = await screen.findByTestId("coupang-connect-error");
-    expect(banner).toHaveTextContent(/연결 정보가 올바르지 않아요/);
-    await user.click(screen.getByRole("button", { name: "연결 정보 다시 입력" }));
+    expect(banner).toHaveTextContent(/연동 정보가 올바르지 않아요/);
+    await user.click(screen.getByRole("button", { name: "연동 정보 다시 입력" }));
     // Back to the form.
     expect(await screen.findByTestId("coupang-prereqs")).toBeInTheDocument();
   });
@@ -357,7 +357,7 @@ describe("ConnectCoupang tutorial", () => {
       sellerAccountId: "acc-new",
       status: "FAILED",
       checkedAt: "2026-08-06T00:00:00Z",
-      message: "연결을 확인하지 못했습니다.",
+      message: "연결을 확인하지 못했어요.",
       reasonCode: "PROVIDER_UNAVAILABLE",
     };
     const user = userEvent.setup();
@@ -365,7 +365,7 @@ describe("ConnectCoupang tutorial", () => {
     await skipIssuance(user);
     await screen.findByTestId("coupang-prereqs");
     await fillCredentials(user);
-    await user.click(screen.getByRole("button", { name: "연결 정보 저장" }));
+    await user.click(screen.getByRole("button", { name: "연동 정보 저장" }));
     await screen.findByTestId("coupang-connect-error");
     expect(document.body.textContent).not.toMatch(/returnShippingCenter|ordersheet/i);
     expect(document.body.textContent).not.toMatch(/\b400\b/);
@@ -378,7 +378,7 @@ describe("ConnectCoupang tutorial", () => {
     await skipIssuance(user);
     await screen.findByTestId("coupang-prereqs");
     await fillCredentials(user);
-    await user.click(screen.getByRole("button", { name: "연결 정보 저장" }));
+    await user.click(screen.getByRole("button", { name: "연동 정보 저장" }));
     await user.click(await screen.findByRole("button", { name: "첫 주문 불러오기" }));
 
     expect(await screen.findByTestId("coupang-sync-error")).toBeInTheDocument();

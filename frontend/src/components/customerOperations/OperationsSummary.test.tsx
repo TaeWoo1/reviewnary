@@ -315,7 +315,7 @@ describe("the band — obligations only", () => {
     api.getInquiryQueueStrict.mockResolvedValue({
       content: [
         { workItemId: "w1", inquiryId: "i1", status: "OPEN", channelCode: "cafe24", channelNameKo: "카페24 자사몰",
-          title: "세금계산서 발행 문의", snippet: "사업자등록증 첨부했습니다", receivedAt: "2026-09-14T00:00:00Z",
+          title: "세금계산서 발행 문의", snippet: "사업자등록증 첨부했어요", receivedAt: "2026-09-14T00:00:00Z",
           productName: null, productId: null, waitedLabel: "2일" },
       ],
       totalElements: 1, page: 0, size: 50,
@@ -422,7 +422,7 @@ describe("the band — obligations only", () => {
     // a claim about their channels and no read supports it here, so a failed request says only that the
     // number was not read.
     expect(cell).toHaveTextContent("—");
-    expect(cell).toHaveTextContent("숫자를 읽지 못했습니다");
+    expect(cell).toHaveTextContent("숫자를 읽지 못했어요");
     expect(cell).not.toHaveTextContent("최근에 가져왔는지 몰라요");
     expect(cell.textContent).not.toMatch(/\d/);
   });
@@ -547,7 +547,7 @@ describe("the band — obligations only", () => {
     // seller to infer it from a gap in the row.
     expect(cell.textContent).not.toMatch(/\d/);
     expect(cell).toHaveTextContent("—");
-    expect(cell).toHaveTextContent("자동 확인이 멈춰 있어 확인하지 못했습니다");
+    expect(cell).toHaveTextContent("자동 확인이 멈춰 있어 확인하지 못했어요");
   });
 });
 

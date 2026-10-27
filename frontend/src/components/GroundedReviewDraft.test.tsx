@@ -31,7 +31,7 @@ function grounded(): GeneratedReviewDraftView {
     draft: DRAFT,
     authorKind: "MODEL",
     answerBasis: "GROUNDED",
-    answerBasisNote: "판매자가 등록한 근거를 사용해 썼습니다.",
+    answerBasisNote: "판매자가 등록한 근거를 사용해 썼어요.",
     evidence: [
       {
         kind: "PRODUCT_KNOWLEDGE",
@@ -52,17 +52,17 @@ function grounded(): GeneratedReviewDraftView {
 
 function floor(): GeneratedReviewDraftView {
   return {
-    draft: { ...DRAFT, version: 4, body: "저희 제품을 이용해 주셔서 감사합니다." },
+    draft: { ...DRAFT, version: 4, body: "저희 제품을 이용해 주셔서 감사해요." },
     authorKind: "RULE",
     answerBasis: "NO_ANSWER_BASIS",
-    answerBasisNote: "이 후기에 해당하는 근거를 찾지 못해, 저장된 문구로 안전한 기본 답글만 준비했습니다.",
+    answerBasisNote: "이 후기에 해당하는 근거를 찾지 못해, 저장된 문구로 안전한 기본 답글만 준비했어요.",
     evidence: [],
     knowledgeGaps: [
       {
         scope: "PRODUCT",
         subject: "괜찮긴한데 잘떨어지네요",
         subjectKind: "REVIEW_TEXT",
-        question: "'괜찮긴한데 잘떨어지네요'에 대해 고객에게 안내하는 공식 기준이 있나요? 이 상품에 저장된 지식에서 찾지 못했습니다.",
+        question: "'괜찮긴한데 잘떨어지네요'에 대해 고객에게 안내하는 공식 기준이 있나요? 이 상품에 저장된 지식에서 찾지 못했어요.",
         productId: "p-1",
         candidateId: null,
       },
@@ -121,18 +121,18 @@ describe("Grounded Review Drafting v1 — the draft first, then why, then what i
    * recomputed: two of the retrieval's three stages are model calls made afresh on every search.
    */
   it("shows the stored version's basis on a reopen, in the screen's own words", async () => {
-    draw([], vi.fn(), { basis: "GROUNDED", note: "판매자가 등록한 근거를 사용해 썼습니다." });
+    draw([], vi.fn(), { basis: "GROUNDED", note: "판매자가 등록한 근거를 사용해 썼어요." });
     // No button was pressed and no request was made.
     expect(generateReviewReplyDraft).not.toHaveBeenCalled();
     // Grounded with no passage listed still says what it stood on; the server's paragraph is not drawn (§12).
     expect(screen.getByTestId("grounded-review-basis")).toHaveTextContent("가게 자료를 참고해 썼어요.");
-    expect(document.body.textContent).not.toContain("판매자가 등록한 근거를 사용해 썼습니다.");
+    expect(document.body.textContent).not.toContain("판매자가 등록한 근거를 사용해 썼어요.");
   });
 
   it("a draft written from a past reply's wording says so, apart from both 근거 있음 and 기본 문구", () => {
     draw([], vi.fn(), {
       basis: "PAST_ANSWER",
-      note: "비슷한 후기에 판매자가 승인했던 답글의 말투를 참고해 썼습니다. 지금 근거가 없어 사실이나 약속은 넣지 않았습니다.",
+      note: "비슷한 후기에 판매자가 승인했던 답글의 말투를 참고해 썼어요. 지금 근거가 없어 사실이나 약속은 넣지 않았어요.",
     });
     const basis = screen.getByTestId("grounded-review-basis");
     expect(basis).toHaveTextContent("지난 답글 말투를 참고했어요.");
@@ -184,8 +184,8 @@ describe("Grounded Review Drafting v1 — the draft first, then why, then what i
     generateReviewReplyDraft.mockResolvedValue({
       ...grounded(),
       authorKind: "RULE",
-      draft: { ...DRAFT, body: "저희 제품을 이용해 주셔서 감사합니다." },
-      unavailableMessage: "근거에 없는 교환·환불·보상 약속이 들어가 AI 초안을 저장하지 않았습니다. 저장된 문구로 초안을 준비했습니다.",
+      draft: { ...DRAFT, body: "저희 제품을 이용해 주셔서 감사해요." },
+      unavailableMessage: "근거에 없는 교환·환불·보상 약속이 들어가 AI 초안을 저장하지 않았어요. 저장된 문구로 초안을 준비했어요.",
     });
     draw();
     await userEvent.click(screen.getByTestId("grounded-review-generate"));

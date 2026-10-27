@@ -136,7 +136,7 @@ export function CoupangConnectTutorial({
 function StepIndicator({ steps }: { steps: ReturnType<typeof stepModel> }) {
   const current = steps.find((s) => s.state === "current");
   return (
-    <nav aria-label="쿠팡 연결 단계">
+    <nav aria-label="쿠팡 연동 단계">
       <p className="sr-only" role="status" aria-live="polite">
         {current ? `${current.n}단계: ${current.label}` : "연결 완료"}
       </p>
@@ -214,7 +214,7 @@ function ConnectStage({
         </div>
       </section>
 
-      <section aria-label="연결 정보 입력" className="space-y-2">
+      <section aria-label="연동 정보 입력" className="space-y-2">
         <h3 className="text-base font-bold text-ink">{C.step3Title}</h3>
         <p className="text-sm text-muted break-keep">{C.step3Body}</p>
         {template ? (
@@ -227,7 +227,7 @@ function ConnectStage({
           />
         ) : (
           <p className="text-muted" role="status">
-            연결에 필요한 정보를 불러오는 중입니다…
+            연결에 필요한 정보를 불러오는 중이에요…
           </p>
         )}
       </section>

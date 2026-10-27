@@ -87,7 +87,7 @@ describe("per-channel display", () => {
     for (const c of channels) {
       for (const text of allStrings(c)) {
         expect(text).not.toContain("연결 확인 가능");
-        expect(text).not.toContain("연결 정보 저장 가능");
+        expect(text).not.toContain("연동 정보 저장 가능");
       }
     }
   });

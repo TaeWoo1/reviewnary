@@ -72,10 +72,10 @@ export function SecureCredentialForm({
         </div>
       ))}
       <p className="text-sm text-muted">
-        입력한 정보는 암호화되어 저장됩니다. 시크릿은 저장 후 다시 표시되지 않으며, 화면·로그에 남지 않습니다.
+        입력한 정보는 암호화되어 저장돼요. 시크릿은 저장 후 다시 표시되지 않으며, 화면·로그에 남지 않아요.
       </p>
       <button type="submit" disabled={submitting || !requiredFilled} className="btn-primary">
-        {submitting ? "저장 중…" : "연결 정보 저장"}
+        {submitting ? "저장 중…" : "연동 정보 저장"}
       </button>
     </form>
   );

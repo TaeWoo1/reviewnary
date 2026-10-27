@@ -73,7 +73,7 @@ export function SafetyMarkNote({ reviewId, mark, body }: { reviewId: string; mar
             표시가 맞지 않음
           </button>
         )}
-        {sent === "failed" ? <span role="alert" className="ml-1 text-bad">남기지 못했습니다. 다시 눌러 주세요.</span> : null}
+        {sent === "failed" ? <span role="alert" className="ml-1 text-bad">남기지 못했어요. 다시 눌러 주세요.</span> : null}
       </p>
     </div>
   );

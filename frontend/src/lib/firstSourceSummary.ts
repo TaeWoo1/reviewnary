@@ -85,14 +85,14 @@ function lineFor(
     return { ...base, tone: "unsupported", count: null, sentence: unsupportedSentence(label, paths) };
   }
   if (row.state === "BLOCKED") {
-    return { ...base, tone: "blocked", count: null, sentence: `${label}를 가져오지 못하고 있습니다. 연결을 다시 확인해 주세요.` };
+    return { ...base, tone: "blocked", count: null, sentence: `${label}를 가져오지 못하고 있어요. 연결을 다시 확인해 주세요.` };
   }
   if (row.state === "NOT_CONNECTED") {
-    return { ...base, tone: "pending", count: null, sentence: `${label}는 아직 연결되지 않았습니다.` };
+    return { ...base, tone: "pending", count: null, sentence: `${label}는 아직 연결되지 않았어요.` };
   }
   if (row.state === "ZERO") {
     // The only honest 「없습니다」 in this file: collection is running and it found nothing.
-    return { ...base, tone: "empty", count: 0, sentence: `확인된 ${label}가 없습니다.` };
+    return { ...base, tone: "empty", count: 0, sentence: `확인된 ${label}가 없어요.` };
   }
   // OBSERVED_FRESH / OBSERVED_FRESHNESS_UNPROVEN. A finished run gives a number, and the verb has to
   // match what the number counts: `successRows` is what THIS run brought in, not what the channel
@@ -101,13 +101,13 @@ function lineFor(
   // (observed, Demo Org, 2026-08-27). 「가져왔습니다」 is true in both readings.
   if (run) {
     if (run.successRows > 0) {
-      return { ...base, tone: "collected", count: run.successRows, sentence: `${label} ${run.successRows}건을 가져왔습니다.` };
+      return { ...base, tone: "collected", count: run.successRows, sentence: `${label} ${run.successRows}건을 가져왔어요.` };
     }
     // A finished run that brought nothing back. That is a fact about the collection, not about the
     // shop — it may not become 「문의가 없습니다」, which is a claim only ZERO gets to make.
-    return { ...base, tone: "empty", count: 0, sentence: `새로 가져온 ${label}는 없습니다.` };
+    return { ...base, tone: "empty", count: 0, sentence: `새로 가져온 ${label}는 없어요.` };
   }
-  return { ...base, tone: "pending", count: null, sentence: `${label}는 아직 확인하지 못했습니다.` };
+  return { ...base, tone: "pending", count: null, sentence: `${label}는 아직 확인하지 못했어요.` };
 }
 
 /**
@@ -144,14 +144,14 @@ export function sourceSummaryLines(
  * this product can stand behind — never to 「제공하지 않습니다」, which is the claim that started this.
  */
 function unsupportedSentence(label: string, paths: readonly AcquisitionPathView[]): string {
-  const not_auto = `${label}는 자동 수집 대상이 아닙니다.`;
+  const not_auto = `${label}는 자동 수집 대상이 아니에요.`;
   if (paths.some((p) => p.method === "ACTION_WINDOW")) {
-    return `${not_auto} 판매자센터 화면에서 직접 실행해 가져옵니다.`;
+    return `${not_auto} 판매자센터 화면에서 직접 실행해 가져와요.`;
   }
   if (paths.some((p) => p.method === "EXPORT")) {
-    return `${not_auto} 판매자센터에서 내려받은 파일을 올리면 같은 형태로 정리해 드립니다.`;
+    return `${not_auto} 판매자센터에서 내려받은 파일을 올리면 같은 형태로 정리해 드려요.`;
   }
-  return `${not_auto} 자료 업로드로 채울 수 있습니다.`;
+  return `${not_auto} 자료 업로드로 채울 수 있어요.`;
 }
 
 /**
@@ -163,12 +163,12 @@ function unsupportedSentence(label: string, paths: readonly AcquisitionPathView[
 export function sourceSummaryHeadline(channelNameKo: string, lines: readonly SourceSummaryLine[]): string {
   const collected = lines.filter((line) => line.tone === "collected");
   if (collected.length > 0) {
-    return `${channelNameKo}에서 다음 정보를 가져왔습니다.`;
+    return `${channelNameKo}에서 다음 정보를 가져왔어요.`;
   }
   if (lines.some((line) => line.tone === "blocked")) {
-    return `${channelNameKo} 연결은 되었지만, 아직 가져오지 못한 정보가 있습니다.`;
+    return `${channelNameKo} 연동은 됐지만, 아직 가져오지 못한 정보가 있어요.`;
   }
-  return `${channelNameKo} 연결이 완료되었습니다. 정보는 순서대로 확인합니다.`;
+  return `${channelNameKo} 연동이 완료됐어요. 정보는 순서대로 확인해요.`;
 }
 
 /**
@@ -193,11 +193,11 @@ export function sourceSummarySubtitle(lines: readonly SourceSummaryLine[]): stri
 
   const first =
     automatic.length > 0
-      ? `앞으로는 새 ${names(automatic)}${objectParticle(names(automatic))} 알아서 확인해 정리해 드립니다.`
-      : "가져온 자료는 채널이 달라도 같은 형태로 정리해 드립니다.";
+      ? `앞으로는 새 ${names(automatic)}${objectParticle(names(automatic))} 알아서 확인해 정리해 드려요.`
+      : "가져온 자료는 채널이 달라도 같은 형태로 정리해 드려요.";
   // 판매자가 해야 하는 일은 약속 뒤에 붙인다 — 약속 안에 섞으면 그것도 자동인 줄로 읽힌다.
   return sellerRun.length > 0
-    ? `${first} ${names(sellerRun)}${topicParticle(names(sellerRun))} 판매자센터에서 가져오실 때 함께 정리해 드립니다.`
+    ? `${first} ${names(sellerRun)}${topicParticle(names(sellerRun))} 판매자센터에서 가져오실 때 함께 정리해 드려요.`
     : first;
 }
 

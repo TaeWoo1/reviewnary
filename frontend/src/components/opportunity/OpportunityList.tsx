@@ -33,7 +33,7 @@ export function OpportunityList({ issueId, onCount }: { issueId: string; onCount
   }, [load]);
 
   if (failed) {
-    return <p className="mt-2 text-muted">개선 기회를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>;
+    return <p className="mt-2 text-muted">개선 기회를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</p>;
   }
   if (items == null) {
     return <p className="mt-2 text-muted">개선 기회를 확인하는 중…</p>;
@@ -41,7 +41,7 @@ export function OpportunityList({ issueId, onCount }: { issueId: string; onCount
   if (items.length === 0) {
     return (
       <p className="mt-2 break-keep text-muted">
-        이 문제에서는 아직 제안할 개선 기회가 없습니다. 근거가 더 쌓이거나 문제 유형이 안내로 답할 수 있는 것일 때 제안됩니다.
+        이 문제에서는 아직 제안할 개선 기회가 없어요. 근거가 더 쌓이거나 문제 유형이 안내로 답할 수 있는 것일 때 제안돼요.
       </p>
     );
   }

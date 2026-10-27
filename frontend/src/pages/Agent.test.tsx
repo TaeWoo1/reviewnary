@@ -52,7 +52,7 @@ const INQUIRY_AWAITING: AgentRunView = {
     priorityBucket: "HIGH",
     category: "exchange_return_reply",
     provenance: { providerKind: "LLM", name: "inquiry-draft-composer", version: "composer/v1" },
-    replyDraft: "안녕하세요, 문의해 주셔서 감사합니다.",
+    replyDraft: "안녕하세요, 문의해 주셔서 감사해요.",
     answerBasis: "GROUNDED",
     draftVersion: 1,
     evidenceSummary: [{ scopeLabel: "상품 정보", count: 2 }],
@@ -139,7 +139,7 @@ const DRAFT_PREPARED: AgentRunView = {
     informStatus: "N",
     isSecret: true,
     generatedAt: "2026-07-31T00:00:00.000Z",
-    replyDraft: "안녕하세요, 문의해 주셔서 감사합니다. 배송 진행 상황을 확인하여 빠르게 안내드리겠습니다.",
+    replyDraft: "안녕하세요, 문의해 주셔서 감사해요. 배송 진행 상황을 확인하여 빠르게 안내드릴게요.",
   },
 };
 
@@ -188,7 +188,7 @@ describe("운영 에이전트 page", () => {
       expect(agentMock.resumeRun).toHaveBeenCalledWith("t-inq", expect.objectContaining({ approved: true, approvedBy: "SELLER:u1" })),
     );
     expect(await screen.findByText("승인 기록됨")).toBeInTheDocument();
-    expect(screen.getByText(/외부로 발송된 내용은 없습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/외부로 발송된 내용은 없어요/)).toBeInTheDocument();
   });
 
   it("issue: renders the quote-free brief with a link to 상품 이슈", async () => {
@@ -204,11 +204,11 @@ describe("운영 에이전트 page", () => {
   });
 
   it("re-seeds the inquiry draft when a new AWAITING run replaces an unapproved one (no stale carry-over)", async () => {
-    const runA = INQUIRY_AWAITING; // thread t-inq, draft "안녕하세요, 문의해 주셔서 감사합니다."
+    const runA = INQUIRY_AWAITING; // thread t-inq, draft "안녕하세요, 문의해 주셔서 감사해요."
     const runB: AgentRunView = {
       ...INQUIRY_AWAITING,
       threadId: "t-inq-2",
-      checkpoint: { ...INQUIRY_AWAITING.checkpoint!, replyDraft: "다른 초안 내용입니다." } as typeof INQUIRY_AWAITING.checkpoint,
+      checkpoint: { ...INQUIRY_AWAITING.checkpoint!, replyDraft: "다른 초안 내용이에요." } as typeof INQUIRY_AWAITING.checkpoint,
     };
     agentMock.startRun.mockResolvedValueOnce(runA).mockResolvedValueOnce(runB);
     renderWithRouter(<Agent />);
@@ -221,7 +221,7 @@ describe("운영 에이전트 page", () => {
     await userEvent.click(screen.getByRole("button", { name: "미답변 문의 처리" }));
     // The editor must show run B's fresh draft, not the stale edit from run A.
     const editor2 = (await screen.findByLabelText("답변 초안")) as HTMLTextAreaElement;
-    expect(editor2.value).toBe("다른 초안 내용입니다.");
+    expect(editor2.value).toBe("다른 초안 내용이에요.");
     expect(editor2.value).not.toContain("운영자가 A를 수정함");
   });
 
@@ -241,7 +241,7 @@ describe("운영 에이전트 page", () => {
     // Knowledge Context v1-A: what the draft stood on, as counts per lane — never the passage text.
     expect(screen.getByLabelText("초안 근거")).toHaveTextContent("근거 · 상품 정보 2 · 운영 정책 1");
     // The explicit not-sent status line for the target channel.
-    expect(screen.getByText(/초안만 생성되었습니다\. 카페24에는 아직 전송되지 않았습니다\./)).toBeInTheDocument();
+    expect(screen.getByText(/초안만 생성됐어요\. 카페24에는 아직 전송되지 않았어요\./)).toBeInTheDocument();
     // NO send/전송/발송 control and NO approve/reject — this run already finished at the checkpoint.
     expect(screen.queryByRole("button", { name: /전송|발송|등록|Cafe24로/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "승인 (기록)" })).toBeNull();
@@ -260,7 +260,7 @@ describe("운영 에이전트 page", () => {
 
     // First click surfaces the overwrite warning — it does NOT regenerate yet.
     await userEvent.click(screen.getByRole("button", { name: "초안 다시 만들기" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("편집한 초안이 사라집니다");
+    expect(screen.getByRole("alert")).toHaveTextContent("편집한 초안이 사라져요");
     expect(agentMock.startRun).toHaveBeenCalledTimes(1);
 
     // Confirming regenerates (a fresh draft run).
@@ -296,7 +296,7 @@ describe("운영 에이전트 page", () => {
     });
     renderWithRouter(<Agent />);
     await userEvent.click(await screen.findByRole("button", { name: "미답변 문의로 답변 초안 만들어 보기" }));
-    expect(await screen.findByText("지금 초안을 만들 미답변 문의가 없습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("지금 초안을 만들 미답변 문의가 없어요.")).toBeInTheDocument();
     expect(screen.queryByLabelText("답변 초안")).toBeNull();
   });
 

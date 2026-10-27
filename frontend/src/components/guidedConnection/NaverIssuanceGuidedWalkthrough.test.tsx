@@ -118,7 +118,7 @@ describe("NaverIssuanceGuidedWalkthrough", () => {
 
   it("call-IP advisory fails safe with no advertised IP: generic note, never a fabricated IP", () => {
     render(<NaverIssuanceGuidedWalkthrough dispatch={vi.fn()} run={issuanceRun()} onCommand={vi.fn()} />);
-    expect(screen.getByText(/아직 설정되지 않았습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/아직 설정되지 않았어요/)).toBeInTheDocument();
     expect(screen.queryByText(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)).toBeNull();
   });
 
@@ -169,7 +169,7 @@ describe("NaverIssuanceGuidedWalkthrough", () => {
         onCommand={vi.fn()}
       />,
     );
-    await userEvent.click(screen.getByRole("button", { name: "연결 정보 입력하기" }));
+    await userEvent.click(screen.getByRole("button", { name: "연동 정보 입력하기" }));
     expect(dispatch).toHaveBeenCalledWith({ type: "ISSUANCE_COMPLETE" });
   });
 
@@ -183,7 +183,7 @@ describe("NaverIssuanceGuidedWalkthrough", () => {
     );
     expect(screen.getByText("애플리케이션 발급 완료")).toBeInTheDocument();
     // The shared CTA is path-agnostic.
-    expect(screen.getByRole("button", { name: "연결 정보 입력하기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "연동 정보 입력하기" })).toBeInTheDocument();
   });
 
   it("existing/saved completion reads 확인 완료 with NO '발급' anywhere on the completion screen", () => {
@@ -196,7 +196,7 @@ describe("NaverIssuanceGuidedWalkthrough", () => {
       />,
     );
     expect(screen.getByText("기존 애플리케이션 확인 완료")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "연결 정보 입력하기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "연동 정보 입력하기" })).toBeInTheDocument();
     // The existing-app guided completion never says 발급 (label, CTA, or the container aria-label).
     expect(container.textContent ?? "").not.toContain("발급");
     expect(screen.queryByLabelText("화면 안내 발급")).toBeNull();
@@ -293,7 +293,7 @@ describe("NaverIssuanceGuidedWalkthrough", () => {
       expect(host.ensureCalls()).toBe(1);
       // The resync adopts the run the agent already finished — the hand-off, not a new walk.
       act(() => host.publish(issuanceRun({ status: "COMPLETED", allowedCommands: [], appBranch: "existing" })));
-      expect(screen.getByRole("button", { name: "연결 정보 입력하기" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "연동 정보 입력하기" })).toBeInTheDocument();
       expect(dispatch).toHaveBeenCalledWith({ type: "ISSUANCE_APP_BRANCH_OBSERVED", branch: "existing" });
       expect(host.ensureCalls()).toBe(1);
     });
@@ -493,7 +493,7 @@ describe("NaverIssuanceGuidedWalkthrough — an ENDED walk is never a dead end (
         onCommand={vi.fn()}
       />,
     );
-    expect(screen.getByRole("button", { name: "연결 정보 입력하기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "연동 정보 입력하기" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "직접 진행하기" })).toBeNull();
   });
 });

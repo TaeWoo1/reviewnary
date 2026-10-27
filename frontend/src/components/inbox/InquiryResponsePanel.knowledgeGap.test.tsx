@@ -68,11 +68,11 @@ const NO_BASIS = {
   draft: null,
   authorKind: null,
   knowledgeState: "NO_MATCH",
-  knowledgeNote: "상품 지식·운영 정책·과거 답변 어디에도 이 질문에 해당하는 내용이 없습니다.",
+  knowledgeNote: "상품 지식·운영 정책·과거 답변 어디에도 이 질문에 해당하는 내용이 없어요.",
   answerBasis: "NO_ANSWER_BASIS",
-  answerBasisNote: "답변 기준이 필요합니다.",
+  answerBasisNote: "답변 기준이 필요해요.",
   answerBasisAction:
-    "등록된 상품 지식·운영 정책에 「가닥」 관련 내용이 없습니다. 규격에 따라 답이 달라진다면 규격별로 등록할 수 있습니다.",
+    "등록된 상품 지식·운영 정책에 「가닥」 관련 내용이 없어요. 규격에 따라 답이 달라진다면 규격별로 등록할 수 있어요.",
   productId: "p1",
   evidence: [],
   unavailableMessage: null,
@@ -132,8 +132,8 @@ describe("InquiryResponsePanel — the missing answer basis", () => {
 
     await user.click(await screen.findByRole("button", { name: /초안 만들기/ }));
 
-    expect(await screen.findByText("답변 기준이 필요합니다.")).toBeInTheDocument();
-    expect(screen.getByText(/「가닥」 관련 내용이 없습니다/)).toBeInTheDocument();
+    expect(await screen.findByText("답변 기준이 필요해요.")).toBeInTheDocument();
+    expect(screen.getByText(/「가닥」 관련 내용이 없어요/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "답변 기준 추가" })).toBeInTheDocument();
   });
 
@@ -142,7 +142,7 @@ describe("InquiryResponsePanel — the missing answer basis", () => {
       ...NO_BASIS,
       knowledgeState: "NO_PRODUCT",
       productId: null,
-      answerBasisAction: "이 문의가 어떤 상품에 대한 것인지 연결하면 근거를 찾을 수 있습니다.",
+      answerBasisAction: "이 문의가 어떤 상품에 대한 것인지 연결하면 근거를 찾을 수 있어요.",
     });
     const user = userEvent.setup();
     render(
@@ -153,7 +153,7 @@ describe("InquiryResponsePanel — the missing answer basis", () => {
 
     await user.click(await screen.findByRole("button", { name: /초안 만들기/ }));
 
-    expect(await screen.findByText("답변 기준이 필요합니다.")).toBeInTheDocument();
+    expect(await screen.findByText("답변 기준이 필요해요.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "답변 기준 추가" })).not.toBeInTheDocument();
   });
 
@@ -169,7 +169,7 @@ describe("InquiryResponsePanel — the missing answer basis", () => {
 
     await user.type(
       screen.getByLabelText("고객에게 안내할 내용"),
-      "3호 몰딩에는 전선을 4가닥까지 넣을 수 있습니다.",
+      "3호 몰딩에는 전선을 4가닥까지 넣을 수 있어요.",
     );
     await waitFor(() => expect(screen.getByRole("option", { name: "3호" })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText("규격"), "v3");
@@ -178,8 +178,8 @@ describe("InquiryResponsePanel — the missing answer basis", () => {
     await waitFor(() =>
       expect(createProductKnowledgeSource).toHaveBeenCalledWith("p1", {
         sourceType: "DESCRIPTION",
-        title: "3호 몰딩에는 전선을 4가닥까지 넣을 수 있습니다.",
-        body: "3호 몰딩에는 전선을 4가닥까지 넣을 수 있습니다.",
+        title: "3호 몰딩에는 전선을 4가닥까지 넣을 수 있어요.",
+        body: "3호 몰딩에는 전선을 4가닥까지 넣을 수 있어요.",
         variantId: "v3",
       }),
     );
@@ -201,13 +201,13 @@ describe("InquiryResponsePanel — the missing answer basis", () => {
     );
     await user.click(await screen.findByRole("button", { name: /초안 만들기/ }));
     await user.click(await screen.findByRole("button", { name: "답변 기준 추가" }));
-    await user.type(screen.getByLabelText("고객에게 안내할 내용"), "몰딩 안쪽으로 전선 3가닥까지 들어갑니다.");
+    await user.type(screen.getByLabelText("고객에게 안내할 내용"), "몰딩 안쪽으로 전선 3가닥까지 들어가요.");
     await user.click(screen.getByRole("button", { name: /저장하고 다시 답변 만들기/ }));
 
     await waitFor(() =>
       expect(acceptKnowledgeCandidate).toHaveBeenCalledWith(
         "cand-1",
-        expect.objectContaining({ content: "몰딩 안쪽으로 전선 3가닥까지 들어갑니다." }),
+        expect.objectContaining({ content: "몰딩 안쪽으로 전선 3가닥까지 들어가요." }),
       ),
     );
     // Exactly one write — the ordinary source path is not also taken.
@@ -226,7 +226,7 @@ describe("InquiryResponsePanel — the missing answer basis", () => {
     await user.click(await screen.findByRole("button", { name: /초안 만들기/ }));
     await user.click(await screen.findByRole("button", { name: "답변 기준 추가" }));
 
-    await user.type(screen.getByLabelText("고객에게 안내할 내용"), "몰딩 안에는 전선을 3가닥까지 넣을 수 있습니다.");
+    await user.type(screen.getByLabelText("고객에게 안내할 내용"), "몰딩 안에는 전선을 3가닥까지 넣을 수 있어요.");
     await user.click(screen.getByRole("button", { name: /저장하고 다시 답변 만들기/ }));
 
     await waitFor(() =>

@@ -33,8 +33,8 @@ function row(over: Partial<CustomerOperationsDecisionRow> = {}): CustomerOperati
     title: "교환 신청은 언제까지 가능한가요?",
     preview: null,
     rating: null,
-    reasonNote: "고객이 답변을 기다리고 있습니다",
-    summary: "등록된 지식으로 답변할 수 있는 문의입니다.",
+    reasonNote: "고객이 답변을 기다리고 있어요",
+    summary: "등록된 지식으로 답변할 수 있는 문의예요.",
     recommendedActionType: "REPLY_TO_CUSTOMER",
     recommendedAction: null,
     missingInformation: [],
@@ -54,7 +54,7 @@ const REVIEW = row({
   title: "배송이 너무 늦었어요",
   preview: null,
   rating: 2,
-  reasonNote: "확인이 필요한 리뷰입니다",
+  reasonNote: "확인이 필요한 리뷰예요",
   summary: null,
   recommendedActionType: null,
   draftPrepared: false,
@@ -205,14 +205,14 @@ describe("OperationsCaseQueue", () => {
     api.getInquiryQueueStrict.mockRejectedValue(new Error("boom"));
     api.getCustomerOperationsDecisions.mockRejectedValue(new Error("boom"));
     const failed = draw();
-    expect(await screen.findByRole("alert")).toHaveTextContent("불러오지 못했습니다");
-    expect(screen.queryByText(/확인이 필요한 문의나 리뷰가 없습니다/)).toBeNull();
+    expect(await screen.findByRole("alert")).toHaveTextContent("불러오지 못했어요");
+    expect(screen.queryByText(/확인이 필요한 문의나 리뷰가 없어요/)).toBeNull();
     failed.unmount();
 
     reads();
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 0, rows: [] });
     draw();
-    expect(await screen.findByText(/확인이 필요한 문의나 리뷰가 없습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/확인이 필요한 문의나 리뷰가 없어요/)).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -224,8 +224,8 @@ describe("OperationsCaseQueue", () => {
     await screen.findByRole("list", { name: "할 일" });
     // It says the depth it reached, not a total: the reads that overflow count different populations, and their
     // sum is a number nobody measured.
-    const note = screen.getByText(/2건까지 보여 드립니다/);
-    expect(note).toHaveTextContent("처리하시면 다음 건이 올라옵니다");
+    const note = screen.getByText(/2건까지 보여 드려요/);
+    expect(note).toHaveTextContent("처리하시면 다음 건이 올라와요");
     expect(note.textContent).not.toMatch(/문의 화면|리뷰 화면/);
   });
 
@@ -241,7 +241,7 @@ describe("OperationsCaseQueue", () => {
         {
           ...REVIEW,
           recommendedAction:
-            "이 상품에서 「포장 파손」 문제가 3건 확인됐습니다. 개별 응대보다 상품 설명이나 운영 기준을 함께 손보는 편이 빠릅니다.",
+            "이 상품에서 「포장 파손」 문제가 3건 확인됐어요. 개별 응대보다 상품 설명이나 운영 기준을 함께 손보는 편이 빠라요.",
         },
       ],
     });
@@ -260,7 +260,7 @@ describe("OperationsCaseQueue", () => {
     */
     expect(list).toHaveTextContent("리뷰");
     expect(list).not.toHaveTextContent("판단 보류");
-    expect(list).not.toHaveTextContent(/「포장 파손」 문제가 3건 확인됐습니다/);
+    expect(list).not.toHaveTextContent(/「포장 파손」 문제가 3건 확인됐어요/);
   });
 
   /**
@@ -311,7 +311,7 @@ describe("OperationsCaseQueue", () => {
     expect(list).toHaveTextContent("살펴볼 일");
     expect(list).not.toHaveTextContent("먼저 볼 리뷰");
     expect(list).toHaveTextContent("배송이 너무 늦었어요");
-    expect(list).not.toHaveTextContent("확인이 필요한 리뷰입니다");
+    expect(list).not.toHaveTextContent("확인이 필요한 리뷰예요");
   });
 
   it("행마다 버튼이 없다 — 넓은 화면에서 행은 선택이고, 한 가지 주 행동은 오른쪽 상세에 있다", async () => {
@@ -601,8 +601,8 @@ describe("OperationsCaseQueue — views of the one list (UI/UX v2 Phase 4)", () 
     api.getCustomerOperationsDecisions.mockResolvedValue({
       total: 2,
       rows: [
-        row({ caseId: "c-1", title: "문의 드립니다", preview: "수령한 상품을 교환하려면 언제까지 신청해야 하나요?", to: "/inquiries/i-1" }),
-        row({ caseId: "c-2", title: "문의 드립니다", preview: "박스가 찌그러져 왔는데 교환이 되나요?", to: "/inquiries/i-2" }),
+        row({ caseId: "c-1", title: "문의 드려요", preview: "수령한 상품을 교환하려면 언제까지 신청해야 하나요?", to: "/inquiries/i-1" }),
+        row({ caseId: "c-2", title: "문의 드려요", preview: "박스가 찌그러져 왔는데 교환이 되나요?", to: "/inquiries/i-2" }),
       ],
     });
     draw();
@@ -611,7 +611,7 @@ describe("OperationsCaseQueue — views of the one list (UI/UX v2 Phase 4)", () 
     expect(within(list).getByRole("link", { name: /수령한 상품을 교환하려면/ })).toBeInTheDocument();
     expect(within(list).getByRole("link", { name: /박스가 찌그러져 왔는데/ })).toBeInTheDocument();
     // The subject line is not drawn twice beside the sentence it was standing in for.
-    expect(within(list).queryByText("문의 드립니다")).toBeNull();
+    expect(within(list).queryByText("문의 드려요")).toBeNull();
   });
 
   /**
@@ -627,13 +627,13 @@ describe("OperationsCaseQueue — views of the one list (UI/UX v2 Phase 4)", () 
     reads();
     api.getCustomerOperationsDecisions.mockResolvedValue({
       total: 1,
-      rows: [row({ title: "문의 드립니다", preview: "박스가 찌그러져 왔는데 교환이 되나요?", summary: "등록된 지식으로 답변할 수 있는 문의입니다." })],
+      rows: [row({ title: "문의 드려요", preview: "박스가 찌그러져 왔는데 교환이 되나요?", summary: "등록된 지식으로 답변할 수 있는 문의예요." })],
     });
     draw();
 
     const list = await screen.findByRole("list", { name: "할 일" });
     expect(within(list).getByRole("link", { name: /박스가 찌그러져 왔는데/ })).toBeInTheDocument();
-    expect(list).not.toHaveTextContent("등록된 지식으로 답변할 수 있는 문의입니다.");
+    expect(list).not.toHaveTextContent("등록된 지식으로 답변할 수 있는 문의예요.");
     // What the row keeps: where it came from and what state it is in.
     expect(list).toHaveTextContent("카페24");
     expect(list).toHaveTextContent("초안 준비됨");

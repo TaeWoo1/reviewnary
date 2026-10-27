@@ -67,7 +67,7 @@ export function TrendChart({ primary, secondary, height = 160, onSelectDate, sel
   );
 
   if (points.length === 0) {
-    return <p className="py-8 text-center text-muted">표시할 기간이 없습니다.</p>;
+    return <p className="py-8 text-center text-muted">표시할 기간이 없어요.</p>;
   }
 
   const stepX = points.length > 1 ? width / (points.length - 1) : 0;

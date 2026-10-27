@@ -184,7 +184,7 @@ export function KnowledgeDocumentAdd({
       </select>
       <p className="mt-1.5 break-keep text-sm text-muted">
         {scope === "PRODUCT" ? "이 상품에만 써요." : "가게 전체에 써요."} PDF · DOCX · TXT ·
-        MD · CSV를 읽습니다.
+        MD · CSV를 읽어요.
       </p>
       <input
         ref={input}

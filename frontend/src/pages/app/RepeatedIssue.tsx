@@ -82,8 +82,8 @@ export function RepeatedIssue() {
       <div className="space-y-4">
         {nav}
         <Empty
-          title="이 문제를 불러오지 못했습니다"
-          body="연결 상태를 확인한 뒤 다시 시도해 주세요. 목록에서 다시 선택하실 수도 있습니다."
+          title="이 문제를 불러오지 못했어요"
+          body="연결 상태를 확인한 뒤 다시 시도해 주세요. 목록에서 다시 선택하실 수도 있어요."
           action={<BtnLink to={back}>반복 문제 목록</BtnLink>}
         />
       </div>
@@ -165,7 +165,7 @@ export function RepeatedIssue() {
                 {surge ? <span className="text-sm tabular-nums text-muted">{surge}</span> : null}
               </p>
             ) : (
-              <p className="break-keep text-base leading-relaxed text-muted">최근 판단된 변화가 없습니다.</p>
+              <p className="break-keep text-base leading-relaxed text-muted">최근 판단된 변화가 없어요.</p>
             )}
             {hint ? <p className="break-keep leading-relaxed text-ink">{hint}</p> : null}
           </section>
@@ -213,10 +213,10 @@ export function RepeatedIssue() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-muted">표시할 수 있는 인용이 없습니다.</p>
+                <p className="text-muted">표시할 수 있는 인용이 없어요.</p>
               )}
               {suppressed > 0 ? (
-                <p className="text-xs text-muted">인용을 표시할 수 없는 근거가 {suppressed}건 더 있습니다.</p>
+                <p className="text-xs text-muted">인용을 표시할 수 없는 근거가 {suppressed}건 더 있어요.</p>
               ) : null}
               {restQuotes.length > 0 ? (
                 <Disclosure
@@ -272,7 +272,7 @@ export function RepeatedIssue() {
               ))}
             </ul>
           ) : (
-            <p className="text-xs text-muted">아직 기록된 상태 변화가 없습니다.</p>
+            <p className="text-xs text-muted">아직 기록된 상태 변화가 없어요.</p>
           )}
           <p className="break-keep text-xs leading-relaxed text-muted">{provenanceKo(issue)}</p>
         </PaneBlock>

@@ -93,7 +93,7 @@ describe("nav.v2 — mobile derives from the same model", () => {
     }
   });
 
-  it("keeps setup work (채널 연결, 설정) out of the tab bar", () => {
+  it("keeps setup work (채널 연동, 설정) out of the tab bar", () => {
     expect(MOBILE_TABS.map((tab) => tab.to)).not.toContain("/connect");
     expect(MOBILE_TABS.map((tab) => tab.to)).not.toContain("/settings");
   });

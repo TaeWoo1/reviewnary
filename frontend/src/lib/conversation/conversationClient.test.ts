@@ -11,7 +11,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe("conversation client — SSE", () => {
   it("parses stage / turn / error blocks and ignores heartbeats", () => {
     expect(parseSseBlock(': keep-alive')).toBeNull();
-    expect(parseSseBlock('event: stage\ndata: {"stage":"PLANNED","label":"계획을 세웠습니다","at":"x"}')).toEqual({ type: "stage", stage: "PLANNED", label: "계획을 세웠습니다", at: "x" });
+    expect(parseSseBlock('event: stage\ndata: {"stage":"PLANNED","label":"계획을 세웠어요","at":"x"}')).toEqual({ type: "stage", stage: "PLANNED", label: "계획을 세웠어요", at: "x" });
     expect(parseSseBlock(`event: turn\ndata: ${JSON.stringify(TURN)}`)).toEqual({ type: "turn", turn: TURN });
     expect(parseSseBlock('event: error\ndata: {"code":"NO_PLAN","message":"x"}')).toEqual({ type: "error", code: "NO_PLAN", message: "x" });
   });

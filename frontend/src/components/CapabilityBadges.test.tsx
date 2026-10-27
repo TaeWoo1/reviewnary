@@ -249,7 +249,7 @@ describe("수집 가능 데이터 — the acquisition axis", () => {
   it("fails closed on a dead backend rather than showing a capability", async () => {
     getChannelCapabilityOverview.mockRejectedValue(new Error("backend down"));
     renderBadges();
-    expect(await screen.findByText(/불러오지 못했습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/불러오지 못했어요/)).toBeInTheDocument();
     expect(screen.queryByText(/Action Window/)).toBeNull();
   });
 
@@ -277,21 +277,21 @@ describe("CapabilityBadges — a switched-off deployment is not an unsupported c
   it("says the channel supports it and this environment has it off — never that the channel does not support it", async () => {
     getChannelCapabilityOverview.mockResolvedValue(unresolved("OFF_IN_THIS_DEPLOYMENT"));
     const { container } = renderBadges("NAVER");
-    expect(await screen.findByTestId("capability-deployment-off")).toHaveTextContent("자동 수집이 꺼져 있습니다");
-    expect(container.textContent).not.toMatch(/지원하지 않습니다/);
+    expect(await screen.findByTestId("capability-deployment-off")).toHaveTextContent("자동 수집이 꺼져 있어요");
+    expect(container.textContent).not.toMatch(/지원하지 않아요/);
     await expectNoAxeViolations(container);
   });
 
   it("keeps the unsupported sentence for a channel the product has no connector for", async () => {
     getChannelCapabilityOverview.mockResolvedValue({ ...unresolved("NO_OFFICIAL_CONNECTOR"), channelCode: "GMARKET" });
     renderBadges("GMARKET");
-    expect(await screen.findByText(/이 채널은 자동 수집을 지원하지 않습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/이 채널은 자동 수집을 지원하지 않아요/)).toBeInTheDocument();
   });
 
   it("claims no reason when none was stated", async () => {
     getChannelCapabilityOverview.mockResolvedValue(unresolved(undefined));
     const { container } = renderBadges("NAVER");
-    expect(await screen.findByText(/자동으로 수집하지 않습니다/)).toBeInTheDocument();
-    expect(container.textContent).not.toMatch(/지원하지 않습니다/);
+    expect(await screen.findByText(/자동으로 수집하지 않아요/)).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/지원하지 않아요/);
   });
 });

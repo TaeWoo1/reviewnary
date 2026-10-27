@@ -22,13 +22,13 @@ const PHASE_WORD: Record<string, { word: string; tone: "good" | "warn" | "info" 
  * a composer that was filled or a submit that was seen is progress, not proof of what was posted.
  */
 export const VERIFICATION_WORD: Record<string, { word: string; sentence: string; tone: "good" | "warn" | "info" | "neutral" }> = {
-  VERIFIED: { word: "확인됨", sentence: "채널에서 등록된 답변을 다시 읽어 승인한 내용과 같은지 확인했습니다.", tone: "good" },
-  STATUS_UNRESOLVED: { word: "등록됨", sentence: "답변은 등록됐고 완료 표시만 아직 확인하지 못했습니다. 다시 보내지 않습니다.", tone: "info" },
-  DELIVERY_UNKNOWN: { word: "확인 필요", sentence: "등록 여부를 확인하지 못했습니다. 채널 화면에서 확인해 주세요.", tone: "warn" },
-  UNVERIFIABLE: { word: "확인 불가", sentence: "채널을 다시 읽지 못해 등록 여부를 확인할 수 없었습니다.", tone: "warn" },
-  COMPOSER_FILLED: { word: "초안 채움", sentence: "답변란에 승인한 초안을 채웠습니다. 등록은 판매자님이 누릅니다.", tone: "info" },
-  SELLER_SUBMISSION_OBSERVED: { word: "등록 확인", sentence: "판매자님이 등록을 누른 것을 확인했습니다. 등록된 내용이 초안과 같은지는 확인하지 않습니다.", tone: "info" },
-  SUBMISSION_OBSERVED_CONTENT_UNVERIFIED: { word: "답변 있음", sentence: "채널에 답변이 있는 것을 확인했습니다. 내용이 초안과 같은지는 확인하지 않습니다.", tone: "info" },
+  VERIFIED: { word: "확인됨", sentence: "채널에서 등록된 답변을 다시 읽어 승인한 내용과 같은지 확인했어요.", tone: "good" },
+  STATUS_UNRESOLVED: { word: "등록됨", sentence: "답변은 등록됐고 완료 표시만 아직 확인하지 못했어요. 다시 보내지 않아요.", tone: "info" },
+  DELIVERY_UNKNOWN: { word: "확인 필요", sentence: "등록 여부를 확인하지 못했어요. 채널 화면에서 확인해 주세요.", tone: "warn" },
+  UNVERIFIABLE: { word: "확인 불가", sentence: "채널을 다시 읽지 못해 등록 여부를 확인할 수 없었어요.", tone: "warn" },
+  COMPOSER_FILLED: { word: "초안 채움", sentence: "답변란에 승인한 초안을 채웠어요. 등록은 판매자님이 눌러요.", tone: "info" },
+  SELLER_SUBMISSION_OBSERVED: { word: "등록 확인", sentence: "판매자님이 등록을 누른 것을 확인했어요. 등록된 내용이 초안과 같은지는 확인하지 않아요.", tone: "info" },
+  SUBMISSION_OBSERVED_CONTENT_UNVERIFIED: { word: "답변 있음", sentence: "채널에 답변이 있는 것을 확인했어요. 내용이 초안과 같은지는 확인하지 않아요.", tone: "info" },
 };
 
 // The category vocabulary is NOT repeated here. This file used to keep its own allow-list of the

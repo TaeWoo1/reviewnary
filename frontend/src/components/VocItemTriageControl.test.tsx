@@ -307,7 +307,7 @@ describe("VocItemTriageControl", () => {
     await userEvent.click(option("답글 달기"));
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("저장하지 못했습니다");
+    expect(alert).toHaveTextContent("저장하지 못했어요");
     // The prior state stands. A silent flip to the requested value would tell the operator
     // a decision was recorded that the server never took.
     expect(current()).toBe("나중에 보기");
@@ -339,7 +339,7 @@ describe("VocItemTriageControl", () => {
     await userEvent.click(option("답글 달기"));
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("이 환경에서는 처리 상태를 기록할 수 없습니다");
+    expect(alert).toHaveTextContent("이 환경에서는 처리 상태를 기록할 수 없어요");
     // Distinct from the retryable failure, in the words the operator reads.
     expect(alert).not.toHaveTextContent("다시 시도해 주세요");
     // Nothing was attempted, and nothing is shown as decided.
@@ -365,7 +365,7 @@ describe("VocItemTriageControl", () => {
     expect(current()).toBeNull();
     // Exactly one alert, still the capability one — not a retry message.
     expect(screen.getAllByRole("alert")).toHaveLength(1);
-    expect(screen.getByRole("alert")).toHaveTextContent("이 환경에서는 처리 상태를 기록할 수 없습니다");
+    expect(screen.getByRole("alert")).toHaveTextContent("이 환경에서는 처리 상태를 기록할 수 없어요");
   });
 
   // --- a 200 the client cannot trust -----------------------------------------
@@ -384,7 +384,7 @@ describe("VocItemTriageControl", () => {
     await userEvent.click(option("답글 달기"));
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("저장하지 못했습니다");
+    expect(alert).toHaveTextContent("저장하지 못했어요");
     // The prior decision stands — nothing about the response justified moving it.
     expect(current()).toBe("나중에 보기");
     expect(inert(option("답글 달기"))).toBe(false);

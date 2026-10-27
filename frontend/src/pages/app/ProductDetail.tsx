@@ -89,8 +89,8 @@ export function ProductDetail() {
   if (error || !data) {
     return (
       <Empty
-        title="상품을 불러오지 못했습니다"
-        body="이 상품이 없거나 정보를 읽는 중 문제가 생겼습니다."
+        title="상품을 불러오지 못했어요"
+        body="이 상품이 없거나 정보를 읽는 중 문제가 생겼어요."
         action={<BtnLink to="/products">상품 목록으로</BtnLink>}
       />
     );
@@ -189,7 +189,7 @@ export function ProductDetail() {
               }
             />
             {issues.length === 0 ? (
-              <p className="mt-3 text-muted">이 상품에서 반복 문제로 잡힌 것이 없습니다.</p>
+              <p className="mt-3 text-muted">이 상품에서 반복 문제로 잡힌 것이 없어요.</p>
             ) : (
               <>
                 <RecordRows>
@@ -535,7 +535,7 @@ function ProductKnowledgeGaps({ productId }: { productId: string }) {
   return (
     <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
       <span className="break-keep text-ink">
-        이 상품에 대해 확인이 필요한 항목이 {count(open.length)}건 있습니다.
+        이 상품에 대해 확인이 필요한 항목이 {count(open.length)}건 있어요.
       </span>
       <Link
         to="/knowledge"
@@ -566,7 +566,7 @@ function ProductDocumentsLine({
   return (
     <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
       <span className="break-keep">
-        자료 {count(documents.length)}건 — 사용설명서·FAQ 같은 파일을 올리면 답변 근거로 씁니다.
+        자료 {count(documents.length)}건 — 사용설명서·FAQ 같은 파일을 올리면 답변 근거로 써요.
       </span>
       <KnowledgeDocumentAdd scope="PRODUCT" productId={productId} onImported={onImported} />
     </div>

@@ -334,8 +334,8 @@ export function ReviewCaseView({
         {back}
         {pane ? null : <PageHead title="리뷰 처리" compact />}
         <Empty
-          title="이 리뷰를 불러오지 못했습니다"
-          body="연결 상태를 확인한 뒤 다시 시도해 주세요. 불러오지 못한 리뷰를 임의로 채우지는 않습니다."
+          title="이 리뷰를 불러오지 못했어요"
+          body="연결 상태를 확인한 뒤 다시 시도해 주세요. 불러오지 못한 리뷰를 임의로 채우지는 않아요."
           action={<Btn size="sm" onClick={bump}>다시 시도</Btn>}
         />
       </div>
@@ -752,10 +752,10 @@ export function ReviewCaseView({
             <div className="space-y-1">
               <p className="break-keep text-sm leading-relaxed text-muted">
                 {detail.replyUnavailableReason === "NO_SELLER_ACCOUNT"
-                  ? "이 채널에 연결된 판매 계정이 없어 답변을 준비할 수 없습니다."
-                  : "이 채널에서는 reviewnary가 답변을 작성하지 않습니다."}
+                  ? "이 채널에 연결된 판매 계정이 없어 답변을 준비할 수 없어요."
+                  : "이 채널에서는 reviewnary가 답변을 작성하지 않아요."}
               </p>
-              <p className="break-keep text-sm leading-relaxed text-muted">판단과 조치는 위에 기록됩니다.</p>
+              <p className="break-keep text-sm leading-relaxed text-muted">판단과 조치는 위에 기록돼요.</p>
             </div>
           ) : null}
         </>
@@ -900,7 +900,7 @@ function SetAsideFromWork({ accountId, actionRef, onDone }: { accountId: string;
   if (state === "done") {
     return (
       <p role="status" className="mt-3 border-t border-line pt-3 text-sm text-ink" data-testid="reply-work-dismissed-notice">
-        리뷰를 답변 작업 목록에서 제외했어요. 저장한 초안과 기록은 그대로 있습니다.
+        리뷰를 답변 작업 목록에서 제외했어요. 저장한 초안과 기록은 그대로 있어요.
       </p>
     );
   }
@@ -909,8 +909,8 @@ function SetAsideFromWork({ accountId, actionRef, onDone }: { accountId: string;
       {confirming ? (
         <div role="group" aria-label="작업에서 제외 확인" className="space-y-2" data-testid="reply-work-dismiss-confirm">
           <p className="break-keep text-sm text-muted">
-            이 리뷰를 할 일에서만 제외합니다. 저장한 초안과 기록은 그대로 남고, 답변한 것으로 기록되지 않습니다.
-            제외한 리뷰는 할 일의 「끝난 일」에서 다시 보고 되돌릴 수 있습니다.
+            이 리뷰를 할 일에서만 제외해요. 저장한 초안과 기록은 그대로 남고, 답변한 것으로 기록되지 않아요.
+            제외한 리뷰는 할 일의 「끝난 일」에서 다시 보고 되돌릴 수 있어요.
           </p>
           <div className="flex flex-wrap gap-2">
             <Btn
@@ -947,7 +947,7 @@ function SetAsideFromWork({ accountId, actionRef, onDone }: { accountId: string;
           작업에서 제외
         </button>
       )}
-      {state === "failed" ? <p className="mt-2 text-sm text-bad">제외하지 못했습니다. 잠시 후 다시 시도해 주세요.</p> : null}
+      {state === "failed" ? <p className="mt-2 text-sm text-bad">제외하지 못했어요. 잠시 후 다시 시도해 주세요.</p> : null}
     </div>
   );
 }
@@ -979,7 +979,7 @@ function RepeatedSignalObject({ problems, failed }: { problems: ReviewDecisionPr
       <section aria-label="반복 신호" className="border-t border-line pt-4">
         <h3 className="text-sm font-bold text-muted">반복 신호</h3>
         {/* A statement about our RECORDS, never 「반복된 적 없습니다」. */}
-        <p className="mt-1 break-keep text-sm leading-relaxed text-muted">아직 반복 문제의 근거로 기록되지 않았습니다.</p>
+        <p className="mt-1 break-keep text-sm leading-relaxed text-muted">아직 반복 문제의 근거로 기록되지 않았어요.</p>
       </section>
     );
   }
@@ -1016,7 +1016,7 @@ function RepeatedSignalObject({ problems, failed }: { problems: ReviewDecisionPr
             </div>
 
             {problem.similar.length === 0 ? (
-              <p className="break-keep py-3 text-sm text-muted">이 문제의 근거는 지금 보고 계신 리뷰뿐입니다.</p>
+              <p className="break-keep py-3 text-sm text-muted">이 문제의 근거는 지금 보고 계신 리뷰뿐이에요.</p>
             ) : (
               <>
                 <ul>
@@ -1032,7 +1032,7 @@ function RepeatedSignalObject({ problems, failed }: { problems: ReviewDecisionPr
                           <p>One line per review. The quote is masked at read time and null when masking
                           took the whole of it — then the row says so rather than drawing an empty cell. */}
                       <span className={`min-w-0 flex-1 truncate text-sm ${similar.quote ? "text-ink" : "text-muted"}`}>
-                        {similar.quote ?? "내용이 가려진 근거입니다"}
+                        {similar.quote ?? "내용이 가려진 근거예요"}
                       </span>
                       <span className="shrink-0 text-xs tabular-nums text-muted">
                         {`${similar.rating === null ? "평점 없음" : `★${similar.rating}`} · ${similar.occurredOn ?? "날짜 없음"}`}
@@ -1042,7 +1042,7 @@ function RepeatedSignalObject({ problems, failed }: { problems: ReviewDecisionPr
                 </ul>
                 {/* What the rows are, against what the memory holds — so the list is never read as the set. */}
                 <p className="break-keep py-2 text-xs leading-relaxed text-muted">
-                  근거 {problem.evidenceCount}건 가운데 최근 {problem.similar.length}건입니다.
+                  근거 {problem.evidenceCount}건 가운데 최근 {problem.similar.length}건이에요.
                 </p>
               </>
             )}
@@ -1088,16 +1088,16 @@ function ProductContextLines({ context }: { context: ReviewDecisionContext }) {
         {productSignal ? (
           <>
             리뷰 <strong className="font-semibold tabular-nums text-ink">{productSignal.reviews}건</strong> 가운데 부정이{" "}
-            <strong className="font-semibold tabular-nums text-ink">{productSignal.negativeReviews}건</strong>입니다.{" "}
+            <strong className="font-semibold tabular-nums text-ink">{productSignal.negativeReviews}건</strong>이에요.{" "}
           </>
         ) : null}
         답할 때 쓸 수 있는 자료로 등록된 상품 지식 {knowledge.productSources}건과 회사 운영 기준{" "}
-        {knowledge.orgSources}건이 있습니다.
+        {knowledge.orgSources}건이 있어요.
         {knowledge.productTitles.length > 0 ? ` ${knowledge.productTitles.join(" · ")}` : ""}
       </p>
       {unlinked ? (
         <p className="mt-2 max-w-thread break-keep text-sm leading-relaxed text-muted">
-          판매 채널에서 읽은 상품명입니다. 아직 상품 목록의 상품과 연결되지 않아 상품별 수치는 표시하지 않습니다.
+          판매 채널에서 읽은 상품명이에요. 아직 상품 목록의 상품과 연결되지 않아 상품별 수치는 표시하지 않아요.
         </p>
       ) : null}
       {/* The honest half: a thin draft usually has a reason, and it is one click from being fixed. */}
@@ -1239,7 +1239,7 @@ function RecordTrail({
     <section aria-label="기록" className="border-t border-line pt-3">
       {titled ? <h2 className="mb-1 text-sm font-bold text-muted">기록</h2> : null}
       {rows.length === 0 ? (
-        <p className="break-keep text-sm leading-relaxed text-muted">아직 이 리뷰에 기록된 판단이 없습니다.</p>
+        <p className="break-keep text-sm leading-relaxed text-muted">아직 이 리뷰에 기록된 판단이 없어요.</p>
       ) : (
         <ul>
           {rows.map(({ entry, sentence }, index) => (

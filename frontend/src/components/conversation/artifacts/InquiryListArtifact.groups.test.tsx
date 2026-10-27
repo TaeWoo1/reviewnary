@@ -25,7 +25,7 @@ const runs: List = {
   groups: [
     { key: "UNANSWERED", label: "답변 필요", items: [item("i-1", "소득공제 신청 확인", "UNANSWERED")] },
     { key: "ANSWERED", label: "답변함", items: [item("i-2", "처리됐나요", "ANSWERED")] },
-    { key: "UNANSWERED", label: "답변 필요", items: [item("i-3", "발행 부탁드립니다", "UNANSWERED")] },
+    { key: "UNANSWERED", label: "답변 필요", items: [item("i-3", "발행 부탁드려요", "UNANSWERED")] },
   ],
 };
 
@@ -35,7 +35,7 @@ describe("InquiryListArtifact — consecutive runs", () => {
     render(<MemoryRouter><InquiryListArtifact artifact={runs} /></MemoryRouter>);
     expect(screen.getByText("소득공제 신청 확인")).toBeInTheDocument();
     expect(screen.getByText("처리됐나요")).toBeInTheDocument();
-    expect(screen.getByText("발행 부탁드립니다")).toBeInTheDocument();
+    expect(screen.getByText("발행 부탁드려요")).toBeInTheDocument();
     // Duplicate React keys warn on `console.error`; three sections, three unique keys.
     expect(warn.mock.calls.flat().join(" ")).not.toMatch(/same key/);
     warn.mockRestore();

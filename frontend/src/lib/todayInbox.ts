@@ -130,7 +130,7 @@ export function buildReviewToday(sources: readonly ReviewSource[] | null): Today
   const total = loaded.reduce((sum, s) => sum + s.page.total, 0);
   const note =
     failed.length > 0
-      ? `${failed.map((s) => s.account.channel.nameKo).join(", ")}은(는) 지금 확인할 수 없습니다.`
+      ? `${failed.map((s) => s.account.channel.nameKo).join(", ")}은(는) 지금 확인할 수 없어요.`
       : null;
   return item(
     "reviews",
@@ -224,9 +224,9 @@ export function buildConnectionToday(
   const targets = new Set(rows.map((row) => row.to));
   const to = targets.size === 1 ? [...targets][0] : count === 0 ? "/connect" : null;
   const note = !channelsLoaded
-    ? "채널 상태는 지금 확인할 수 없습니다."
+    ? "채널 상태는 지금 확인할 수 없어요."
     : !alertsLoaded
-      ? "연결 알림은 지금 확인할 수 없습니다."
+      ? "연결 알림은 지금 확인할 수 없어요."
       : null;
   return item("connections", label, { kind: "READY", count }, to, [], rows, note);
 }

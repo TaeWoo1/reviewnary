@@ -22,7 +22,7 @@ function renderOnboarding() {
     <MemoryRouter initialEntries={["/onboarding"]}>
       <Routes>
         <Route path="/onboarding" element={<Onboarding />} />
-        <Route path={FIRST_RUN_PATH} element={<p>채널 연결 화면</p>} />
+        <Route path={FIRST_RUN_PATH} element={<p>채널 연동 화면</p>} />
         <Route path="/signup" element={<p>계정 만들기 화면</p>} />
       </Routes>
     </MemoryRouter>,
@@ -59,7 +59,7 @@ describe("/onboarding", () => {
     expect(complete).not.toHaveBeenCalled();
     fireEvent.click(screen.getByLabelText(/\(필수\)/));
     fireEvent.click(screen.getByRole("button", { name: "시작하기" }));
-    await waitFor(() => expect(screen.getByText("채널 연결 화면")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("채널 연동 화면")).toBeInTheDocument());
     expect(complete).toHaveBeenCalledWith({
       onboardingToken: "tok-1", orgName: "우리 스토어", name: "A", termsAccepted: true, marketingConsent: false,
     });
@@ -91,7 +91,7 @@ describe("/onboarding", () => {
 
   it("an email collision at completion is the backend's sentence (fail closed), and the form stays", async () => {
     savePendingOnboarding(pending);
-    complete.mockRejectedValue({ response: { status: 409, data: { message: "이미 가입된 이메일입니다. 이메일과 비밀번호로 로그인해 주세요." } } });
+    complete.mockRejectedValue({ response: { status: 409, data: { message: "이미 가입된 이메일이에요. 이메일과 비밀번호로 로그인해 주세요." } } });
     renderOnboarding();
     fireEvent.change(screen.getByLabelText(/상호/), { target: { value: "스토어" } });
     fireEvent.click(screen.getByLabelText(/\(필수\)/));

@@ -62,7 +62,7 @@ describe("Sentry — env-gated, scrubbed", () => {
     expect(crumb!.data).toEqual({ from: "/auth/callback", to: "/" });
     expect(opts.beforeBreadcrumb!({ category: "console", message: "x" }, {})).toBeNull();
     expect(event.contexts).toEqual({ browser: { name: "Chrome" } });
-    expect(scrubText("이메일 또는 비밀번호가 올바르지 않습니다")).toBe("이메일 또는 비밀번호가 올바르지 않습니다");
+    expect(scrubText("이메일 또는 비밀번호가 올바르지 않아요")).toBe("이메일 또는 비밀번호가 올바르지 않아요");
     expect(stripQuery(undefined)).toBeUndefined();
   });
 

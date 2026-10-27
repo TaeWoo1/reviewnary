@@ -53,13 +53,13 @@ export function inquiryNextAction(
       state: WORK_STATE.ANSWERED,
       // 「완료」가 아니라 「답변함」이다. 보낸 것을 확인한 것과 고객이 만족한 것은 다른 사실이고,
       // 이 화면이 아는 것은 앞쪽뿐이다.
-      sentence: "답변이 등록된 문의입니다. 따로 하실 일은 없습니다.",
+      sentence: "답변이 등록된 문의예요. 따로 하실 일은 없어요.",
     };
   }
   if (workItemId !== null) {
     return {
       state: WORK_STATE.REPLY_NEEDED,
-      sentence: "고객이 답변을 기다리고 있습니다. 아래에서 답변을 준비하세요.",
+      sentence: "고객이 답변을 기다리고 있어요. 아래에서 답변을 준비하세요.",
     };
   }
   return {
@@ -67,7 +67,7 @@ export function inquiryNextAction(
     // 고객이 어디 서 있는지만 말한다. <b>어디서 답하면 되는지는 여기서 말하지 않는다</b> —
     // {@link draftUnavailableReason}이 바로 아래에서 그 말을 하고, 둘이 같이 나오면 한 화면에
     // 「판매자센터에서 직접 작성」이 두 번 적힌다. 이 패키지가 없애려던 바로 그 모양이다.
-    sentence: "고객이 아직 답변을 받지 못했습니다.",
+    sentence: "고객이 아직 답변을 받지 못했어요.",
   };
 }
 
@@ -97,7 +97,7 @@ export function draftUnavailableReason(
       없음」을 뒤 문장이 다른 말로 한 번 더 말한다. 남기는 것은 앞 문장이 말할 수 없는 하나, <b>어디서
       읽는가</b>이다.
     */
-    return `답변 내용은 ${sellerCenter(channelNameKo)}에서 확인하실 수 있습니다.`;
+    return `답변 내용은 ${sellerCenter(channelNameKo)}에서 볼 수 있어요.`;
   }
   return draftRuleNotice(channelNameKo);
 }
@@ -110,7 +110,7 @@ export function draftUnavailableReason(
  * 다른 말로 설명하기 시작하면 판매자가 두 제품을 쓰는 셈이 되기 때문이다.
  */
 export function draftRuleNotice(channelNameKo?: string | null): string {
-  return `reviewnary는 답변을 기다리는 문의에만 초안을 씁니다. 이 문의는 그 목록에 없어서 초안을 만들지 않았습니다. 답변은 ${sellerCenter(channelNameKo)}에서 직접 작성해 주세요.`;
+  return `reviewnary는 답변을 기다리는 문의에만 초안을 써요. 이 문의는 그 목록에 없어서 초안을 만들지 않았어요. 답변은 ${sellerCenter(channelNameKo)}에서 직접 써 주세요.`;
 }
 
 /** 모르는 채널 이름을 지어내지 않는다. */

@@ -90,24 +90,24 @@ describe("changeOf — 비교는 서버가 두 창을 다 측정했을 때만 �
   it("관문 이전의 delta는 읽지 않은 창과의 비교일 수 있으므로 세우지 않는다", () => {
     const legacy = { id: "c-inquiries", labelKo: "받은 문의", periodic: true, current: 0, previous: 4, delta: -4, to: null };
     expect(changeOf(legacy as ReportCounter)).toBeNull();
-    expect(noChangeReason(legacy as ReportCounter)).toBe("이 판은 수집 범위를 확인하기 전에 만들어졌습니다");
+    expect(noChangeReason(legacy as ReportCounter)).toBe("이 판은 수집 범위를 확인하기 전에 만들어졌어요");
   });
 
   it("관측된 결함: 읽지 않은 창에서 「4건 줄음」이 나오지 않는다", () => {
     const unread = counter({ id: "c-inquiries", current: null, previous: 4, delta: null });
     expect(changeOf(unread)).toBeNull();
-    expect(noChangeReason(unread)).toBe("이 기간의 수집 결과를 확인하지 못했습니다");
+    expect(noChangeReason(unread)).toBe("이 기간의 수집 결과를 확인하지 못했어요");
   });
 
   it("이전 창을 측정하지 못했으면 비교가 아니라 기준이 없는 것이다", () => {
     const noBase = counter({ previous: null, delta: null });
     expect(changeOf(noBase)).toBeNull();
-    expect(noChangeReason(noBase)).toBe("이전 기간의 수집 결과를 확인하지 못했습니다");
+    expect(noChangeReason(noBase)).toBe("이전 기간의 수집 결과를 확인하지 못했어요");
   });
 
   it("둘 다 측정됐고 움직이지 않았으면 그것도 사실이다", () => {
     expect(changeOf(counter({ current: 17, delta: 0 }))).toEqual({ current: 17, previous: 17, delta: 0 });
-    expect(noChangeReason(counter({ current: 17, delta: 0 }))).toBe("이전 기간과 같습니다");
+    expect(noChangeReason(counter({ current: 17, delta: 0 }))).toBe("이전 기간과 같아요");
   });
 });
 
@@ -155,7 +155,7 @@ describe("readVerdict — 이 판이 이 종류를 어디까지 셌는가", () =
   it("전부 포함 · 채널 N곳 빠짐 · 확인 못 함 · 기록 없음", () => {
     expect(readVerdict(read())).toEqual({ text: "전부 포함", warn: false });
     expect(
-      readVerdict(read({ excluded: [{ ...read().included[0], channelCode: "CAFE24", reasonKo: "연결이 끊겨 수집이 멈췄습니다" }] })),
+      readVerdict(read({ excluded: [{ ...read().included[0], channelCode: "CAFE24", reasonKo: "연결이 끊겨 수집이 멈췄어요" }] })),
     ).toEqual({ text: "채널 1곳 빠짐", warn: true });
     expect(readVerdict(read({ measured: false, included: [] }))).toEqual({ text: "확인 못 함", warn: true });
     // 기록이 아예 없는 판 — 오늘의 수집 상태로 보완하지 않는다.
@@ -174,7 +174,7 @@ describe("hasReadRange — 옛 판에는 읽은 범위가 없다", () => {
 
 describe("readChannels — 센 채널과 빠진 채널을 한 줄로", () => {
   it("센 쪽이 먼저, 빠진 쪽은 이유와 함께 뒤에", () => {
-    const excluded = { ...read().included[0], channelCode: "CAFE24", channelNameKo: "카페24 자사몰", reasonKo: "연결되어 있지 않습니다" };
+    const excluded = { ...read().included[0], channelCode: "CAFE24", channelNameKo: "카페24 자사몰", reasonKo: "연결되어 있지 않아요" };
     expect(readChannels(read({ excluded: [excluded] })).map((c) => c.channelCode)).toEqual(["NAVER", "CAFE24"]);
     expect(readChannels(null)).toEqual([]);
   });
@@ -191,7 +191,7 @@ describe("shownReadChannels — 노출 채널만 이름으로 선다", () => {
     ...read().included[0],
     channelCode: code,
     channelNameKo: name,
-    reasonKo: "연결되어 있지 않습니다",
+    reasonKo: "연결되어 있지 않아요",
   });
 
   it("관측된 네 채널 가운데 제품이 가진 셋만 남고, 순서는 저장된 그대로다", () => {

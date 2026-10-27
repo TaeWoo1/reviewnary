@@ -247,10 +247,10 @@ export function NaverIssuanceGuidedWalkthrough({
   // one is telling the seller something about their own machine that is not true.
   if (!started) {
     return (
-      <div className="space-y-3" aria-label="네이버 연결 안내 시작">
-        <p className="text-sm text-ink break-keep">네이버 API 센터에서 연결 정보를 확인하도록 안내해 드릴게요.</p>
+      <div className="space-y-3" aria-label="네이버 연동 안내 시작">
+        <p className="text-sm text-ink break-keep">네이버 API 센터에서 연동 정보를 확인하도록 안내해 드릴게요.</p>
         <p className="text-sm text-muted break-keep">
-          직접 진행하시면 무엇을 어디서 확인하는지 순서대로 알려 드립니다. 내 PC에 reviewnary 도우미를
+          직접 진행하시면 무엇을 어디서 확인하는지 순서대로 알려 드려요. 내 PC에 reviewnary 도우미를
           실행해 두셨다면, 도우미가 전용 NAVER 창을 열어 눌러야 할 위치를 표시하는 화면 안내도 쓸 수 있어요.
         </p>
         <button type="button" className="btn-primary block w-full" onClick={toText} disabled={busy}>
@@ -276,7 +276,7 @@ export function NaverIssuanceGuidedWalkthrough({
         <p className="text-sm font-medium text-ink">API 호출 IP 등록</p>
         <p className="text-xs text-muted">
           애플리케이션 설정의 'API 호출 IP'에 reviewnary 고정 호출 IP를 등록하세요. 등록하지 않으면 첫 주문 수집이
-          호출 IP 오류로 실패할 수 있습니다.
+          호출 IP 오류로 실패할 수 있어요.
         </p>
         <AdvertisedCallIpPanel ips={advertisedEgressIps} />
       </section>
@@ -321,7 +321,7 @@ export function NaverIssuanceGuidedWalkthrough({
           left reading a step counter with no control under it. */}
       {walkEnded && (
         <p className="rounded-xl bg-canvas px-4 py-3 text-sm text-ink break-keep" role="status">
-          화면 안내를 끝냈어요. 아래에서 텍스트 안내로 계속 진행하실 수 있습니다.
+          화면 안내를 끝냈어요. 아래에서 텍스트 안내로 계속 진행하실 수 있어요.
         </p>
       )}
 
@@ -349,8 +349,8 @@ export function NaverIssuanceGuidedWalkthrough({
                 네이버 창에서 화면 안내를 따라 진행하세요
               </p>
               <p className="text-xs text-muted break-keep">
-                열린 네이버 커머스 API 창의 안내(하이라이트와 '다음' 버튼)를 따라가시면 됩니다. 각 단계는 그
-                화면에서 직접 진행되고, 이 화면은 진행 상태만 보여줍니다.
+                열린 네이버 커머스 API 창의 안내(하이라이트와 '다음' 버튼)를 따라가시면 돼요. 각 단계는 그
+                화면에서 직접 진행되고, 이 화면은 진행 상태만 보여줘요.
               </p>
               {effectiveRun.progress && (
                 <p className="text-xs text-muted">
@@ -367,7 +367,7 @@ export function NaverIssuanceGuidedWalkthrough({
               <div className="space-y-2">
                 <p className="text-sm text-ink break-keep">
                   네이버 창에서 복사한 값을 바로 아래에 붙여넣어 주세요. 애플리케이션 ID를 먼저 붙여넣은 뒤 시크릿을
-                  복사하면 됩니다.
+                  복사하면 돼요.
                 </p>
                 <SecureCredentialForm template={credentialTemplate} onSubmit={onSubmitCredentials} submitting={busy === true} />
               </div>
@@ -397,7 +397,7 @@ export function NaverIssuanceGuidedWalkthrough({
                   one would be the fake capability the walk's own panel is careful not to claim. So the walk
                   finishes by bringing the seller to the form they fill in themselves. */}
               <p className="text-sm text-muted break-keep">
-                복사해 두신 애플리케이션 ID와 시크릿을 입력하면 연결이 끝납니다.
+                복사해 두신 애플리케이션 ID와 시크릿을 입력하면 연결이 끝나요.
               </p>
               <button
                 type="button"
@@ -405,7 +405,7 @@ export function NaverIssuanceGuidedWalkthrough({
                 onClick={() => dispatch({ type: "ISSUANCE_COMPLETE" })}
                 disabled={busy}
               >
-                연결 정보 입력하기
+                연동 정보 입력하기
               </button>
             </div>
           )}

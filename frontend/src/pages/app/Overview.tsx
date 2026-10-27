@@ -61,15 +61,15 @@ export function Overview() {
 
   return (
     <div className="space-y-6">
-      <PageHead title="운영 숫자" meta={<span className="text-sm text-muted">홈의 숫자를 기간·추이·채널별로 자세히 봅니다</span>} />
+      <PageHead title="운영 숫자" meta={<span className="text-sm text-muted">홈의 숫자를 기간·추이·채널별로 자세히 봐요</span>} />
 
       {loading ? <p className="text-sm text-muted">불러오는 중…</p> : null}
 
       {!loading && (error || !data) ? (
         <Empty
-          title="운영 현황을 불러오지 못했습니다"
-          body="집계를 읽는 중 문제가 생겼습니다. 잠시 후 다시 시도해 주세요."
-          action={<BtnLink to="/connect">채널 연결 열기</BtnLink>}
+          title="운영 현황을 불러오지 못했어요"
+          body="집계를 읽는 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요."
+          action={<BtnLink to="/connect">채널 연동 열기</BtnLink>}
         />
       ) : null}
 
@@ -81,7 +81,7 @@ export function Overview() {
             hint={
               <>
                 {`최근 ${data.metrics.period.days}일 기준`}
-                {data.metrics.exampleDataIncluded ? " · 이 기간에는 실제 데이터가 없어 예시 데이터를 보여드립니다" : ""}
+                {data.metrics.exampleDataIncluded ? " · 이 기간에는 실제 데이터가 없어 예시 데이터를 보여드려요" : ""}
                 {anyFreshnessUnproven && !beforeFirstConnection ? (
                   <span className="text-warn"> · 일부 채널 최신 수집 확인 필요</span>
                 ) : null}
@@ -130,14 +130,14 @@ export function Overview() {
                 left to decide which screen is wrong. */}
             {waiting.some((kpi) => kpi.key === "unansweredInquiries") ? (
               <p className="break-keep text-sm text-muted">
-                「현재 미답변 문의」는 채널에서 아직 답변되지 않은 문의 전체입니다. 오늘의 「할 일」은 판매자님의
-                결정을 기다리는 문의와 리뷰를 세므로 두 수는 다를 수 있습니다.
+                「현재 미답변 문의」는 채널에서 아직 답변되지 않은 문의 전체예요. 오늘의 「할 일」은 판매자님의
+                결정을 기다리는 문의와 리뷰를 세므로 두 수는 다를 수 있어요.
               </p>
             ) : null}
             <MetricLine kpis={context.filter((kpi) => kpi.key !== "revenue")} />
           </Section>
 
-          <Section title="추이" hint={`최근 ${data.metrics.period.days}일, 하루 단위 · 점을 누르면 그 날의 주문을 봅니다`}>
+          <Section title="추이" hint={`최근 ${data.metrics.period.days}일, 하루 단위 · 점을 누르면 그 날의 주문을 봐요`}>
             <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
               {/* A day on the sales chart is a day the orders screen can show (`?date=`); the inquiry and
                   review lists have no day filter, so those cards link to their screen and their points
@@ -247,9 +247,9 @@ function ChannelBreakdown({ rows, days }: { rows: ChannelMetricRow[]; days: numb
   if (rows.length === 0) {
     return (
       <Empty
-        title="연결된 채널이 없습니다"
-        body="채널을 연결하면 이 자리에 채널별 매출·문의·리뷰가 표시됩니다."
-        action={<BtnLink to="/connect">채널 연결하기</BtnLink>}
+        title="연동한 채널이 없어요"
+        body="채널을 연동하면 이 자리에 채널별 매출·문의·리뷰가 표시돼요."
+        action={<BtnLink to="/connect">채널 연동하기</BtnLink>}
       />
     );
   }

@@ -118,7 +118,7 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
       key: "UPDATE",
       label: "업데이트 필요",
       tone: "warn",
-      note: "설치된 도우미가 이 화면보다 오래된 버전입니다. 새 버전을 설치하면 이어서 쓸 수 있습니다.",
+      note: "설치된 도우미가 이 화면보다 오래된 버전이에요. 새 버전을 설치하면 이어서 쓸 수 있어요.",
       action: { kind: "update", label: "업데이트 방법 보기" },
     };
   }
@@ -129,9 +129,9 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
     if (input.device !== "linked" && input.attempt === "failed") {
       return {
         key: "LINK_FAILED",
-        label: "연결하지 못했습니다",
+        label: "연결하지 못했어요",
         tone: "warn",
-        note: "이 계정으로 도우미를 연결하지 못했습니다. 다시 시도하거나, 연결을 취소할 수 있습니다.",
+        note: "이 계정으로 도우미를 연결하지 못했어요. 다시 시도하거나, 연결을 취소할 수 있어요.",
         action: { kind: "linkRetry", label: "다시 시도" },
         secondary: { kind: "linkCancel", label: "연결 취소" },
       };
@@ -150,7 +150,7 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
           key: "LINKING",
           label: "연결 확인 중",
           tone: "info",
-          note: "이 계정과 연결하는 중입니다. 잠시만 기다려 주세요.",
+          note: "이 계정과 연결하는 중이에요. 잠시만 기다려 주세요.",
           action: null,
         };
       case "foreign":
@@ -160,7 +160,7 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
           tone: "warn",
           // The seller's words for it, and no further: which account, which token, which organisation are
           // all facts about our plumbing. What they can act on is the one button beside this sentence.
-          note: "다른 계정에 연결되어 있습니다. 이 계정에 다시 연결해 주세요.",
+          note: "다른 계정에 연결되어 있어요. 이 계정에 다시 연결해 주세요.",
           action: { kind: "link", label: "연결" },
         };
       case "unreachable":
@@ -168,15 +168,15 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
           key: "LINK_SERVER",
           label: "서버 연결 확인 필요",
           tone: "warn",
-          note: "서버에 닿지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
+          note: "서버에 닿지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
           action: { kind: "link", label: "다시 시도" },
         };
       default: {
         const note = device === "denied"
-          ? "연결이 거부됐습니다. 다시 연결해 주세요."
+          ? "연결이 거부됐어요. 다시 연결해 주세요."
           : device === "expired"
-            ? "연결 요청 시간이 지났습니다. 다시 연결해 주세요."
-            : "아직 이 계정과 연결되지 않았습니다. 연결하면 비밀번호 없이 쓸 수 있습니다.";
+            ? "연결 요청 시간이 지났어요. 다시 연결해 주세요."
+            : "아직 이 계정과 연결되지 않았어요. 연결하면 비밀번호 없이 쓸 수 있어요.";
         return { key: "LINK", label: "연결 필요", tone: "warn", note, action: { kind: "link", label: "연결" } };
       }
     }
@@ -194,12 +194,12 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
   }
   if (phase === "unpaired" || phase === "pairing_denied" || phase === "revoked") {
     const note = input.pairingHint === "no_response"
-      ? "승인 창에 응답이 없어 연결이 취소됐습니다. 다시 연결하면 창이 한 번 더 열립니다."
+      ? "승인 창에 응답이 없어 연결이 취소됐어요. 다시 연결하면 창이 한 번 더 열려요."
       : phase === "pairing_denied"
-        ? "연결이 거부됐습니다. 다시 연결하고, 내 PC에 열리는 창에서 허용을 눌러 주세요."
+        ? "연결이 거부됐어요. 다시 연결하고, 내 PC에 열리는 창에서 허용을 눌러 주세요."
         : phase === "revoked"
-          ? "연결이 해제됐습니다. 다시 연결해 주세요."
-          : "도우미가 실행 중입니다. 연결해 주세요.";
+          ? "연결이 해제됐어요. 다시 연결해 주세요."
+          : "도우미가 실행 중이에요. 연결해 주세요.";
     // 「다시」 only when there was a first time. A seller two minutes into the product, whose helper
     // has never been paired with any browser, read 「다시 연결 필요」 as an instruction about something
     // they had already done (Full Pilot Walkthrough v1, 2026-09-05). Same key, same action.
@@ -224,7 +224,7 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
       key: "START",
       label: "실행 필요",
       tone: "warn",
-      note: `도우미가 실행되고 있지 않습니다. Mac에 다시 로그인하거나 설치 파일을 한 번 더 실행하면 시작됩니다.${lna}`,
+      note: `도우미가 실행되고 있지 않아요. Mac에 다시 로그인하거나 설치 파일을 한 번 더 실행하면 시작돼요.${lna}`,
       action: { kind: "retry", label: "다시 찾기" },
     };
   }
@@ -232,7 +232,7 @@ export function helperStatusOf(input: HelperStatusInput): HelperState {
     key: "INSTALL",
     label: "설치 필요",
     tone: "neutral",
-    note: `이 PC에서 도우미를 찾지 못했습니다. 설치하면 이어서 쓸 수 있습니다.${lna}`,
+    note: `이 PC에서 도우미를 찾지 못했어요. 설치하면 이어서 쓸 수 있어요.${lna}`,
     action: { kind: "install", label: "설치 안내" },
   };
 }
@@ -270,7 +270,7 @@ export function naverSessionOf(sessionReadiness: string | null | undefined): Nav
         key: "LOGIN_REQUIRED",
         label: "로그인 필요",
         tone: "warn",
-        note: "도우미가 여는 창에서 한 번 로그인하면 이후에는 유지됩니다.",
+        note: "도우미가 여는 창에서 한 번 로그인하면 이후에는 유지돼요.",
         action: { label: "네이버 로그인" },
       };
     case "TWO_FACTOR_REQUIRED":
@@ -278,7 +278,7 @@ export function naverSessionOf(sessionReadiness: string | null | undefined): Nav
         key: "AUTH_CHALLENGE",
         label: "추가 인증 필요",
         tone: "warn",
-        note: "네이버가 추가 인증을 요구합니다. 도우미가 여는 창에서 인증을 마쳐 주세요.",
+        note: "네이버가 추가 인증을 요구해요. 도우미가 여는 창에서 인증을 마쳐 주세요.",
         action: { label: "네이버 로그인" },
       };
     case "ACCOUNT_AMBIGUOUS":
@@ -286,7 +286,7 @@ export function naverSessionOf(sessionReadiness: string | null | undefined): Nav
         key: "ACCOUNT_AMBIGUOUS",
         label: "계정 선택 필요",
         tone: "warn",
-        note: "여러 계정 중 어느 스토어인지 정해지지 않았습니다. 도우미가 여는 창에서 계정을 골라 주세요.",
+        note: "여러 계정 중 어느 스토어인지 정해지지 않았어요. 도우미가 여는 창에서 계정을 골라 주세요.",
         action: { label: "네이버 로그인" },
       };
     default:

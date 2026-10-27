@@ -120,7 +120,7 @@ export function BackfillPanel({
           dataType: t.value,
           label: t.label,
           ok: false,
-          detail: backendMessage(e) ?? "수집에 실패했습니다.",
+          detail: backendMessage(e) ?? "수집에 실패했어요.",
         });
       }
     }
@@ -135,8 +135,8 @@ export function BackfillPanel({
         {/* 두 동작의 차이를 이 패널 안에서 한 번 말한다. 「지금 수집하기」를 눌러도 오래된 자료가 들어오지
             않는 이유를 판매자가 알 수 있는 자리는 여기뿐이다. */}
         <p className="break-keep text-sm leading-relaxed text-muted">
-          고른 기간을 한 번 읽어옵니다. 「지금 수집하기」는 최근 구간만 다시 확인하므로, 오래된 자료는
-          여기서 기간을 골라 가져오세요. 이미 가져온 자료는 중복으로 저장되지 않습니다.
+          고른 기간을 한 번 읽어와요. 「지금 수집하기」는 최근 구간만 다시 확인하므로, 오래된 자료는
+          여기서 기간을 골라 가져오세요. 이미 가져온 자료는 중복으로 저장되지 않아요.
         </p>
         <div>
           <p className="mb-2 text-sm font-semibold text-muted">수집 기간</p>

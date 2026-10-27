@@ -67,28 +67,28 @@ const UNREAD_READS: ReportRead[] = ["REVIEW", "INQUIRY", "ORDER_SUMMARY"].map((d
       channelNameKo: "네이버 스마트스토어",
       state: "OBSERVED_FRESHNESS_UNPROVEN",
       lastReadAt: "2026-09-26T18:31:17Z",
-      reasonKo: "최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했습니다",
+      reasonKo: "최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했어요",
     },
     {
       channelCode: "GMARKET",
       channelNameKo: "G마켓/옥션",
       state: "NOT_CONNECTED",
       lastReadAt: null,
-      reasonKo: "연결되어 있지 않습니다",
+      reasonKo: "연결되어 있지 않아요",
     },
     {
       channelCode: "CAFE24",
       channelNameKo: "카페24 자사몰",
       state: "OBSERVED_FRESHNESS_UNPROVEN",
       lastReadAt: "2026-09-26T18:31:17Z",
-      reasonKo: "최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했습니다",
+      reasonKo: "최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했어요",
     },
     {
       channelCode: "COUPANG",
       channelNameKo: "쿠팡",
       state: "OBSERVED_FRESHNESS_UNPROVEN",
       lastReadAt: "2026-09-26T18:31:17Z",
-      reasonKo: "최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했습니다",
+      reasonKo: "최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했어요",
     },
   ],
 }));
@@ -204,7 +204,7 @@ const REPORT: AgentReportView = {
   summary: {
     lines: [
       {
-        text: "2026년 9월 28일 ~ 10월 4일의 수집 결과를 확인하지 못해, 이 기간에 무엇이 들어왔는지 알 수 없습니다.",
+        text: "2026년 9월 28일 ~ 10월 4일의 수집 결과를 확인하지 못해, 이 기간에 무엇이 들어왔는지 알 수 없어요.",
         kind: "LIMIT",
         factIds: ["c-reviews", "c-inquiries"],
       },
@@ -337,7 +337,7 @@ describe("운영 리포트 — 읽은 범위가 숫자 위에 선다", () => {
     // 관측된 결함 그 자체: 0건도, 「4건 줄음」도 서지 않는다.
     expect(screen.getAllByText("확인되지 않음").length).toBeGreaterThanOrEqual(3);
     expect(screen.queryByText(/4건 줄음/)).toBeNull();
-    expect(screen.getByTestId("report-no-change")).toHaveTextContent("이 기간의 수집 결과를 확인하지 못했습니다");
+    expect(screen.getByTestId("report-no-change")).toHaveTextContent("이 기간의 수집 결과를 확인하지 못했어요");
 
     // 기간과 무관한 지금 수치는 읽기와 무관하게 사실이고, 열 것이 있으므로 문이다.
     expect(screen.getByRole("link", { name: "만든 시점 답변이 필요했던 문의" })).toHaveAttribute(
@@ -349,9 +349,9 @@ describe("운영 리포트 — 읽은 범위가 숫자 위에 선다", () => {
     expect(screen.getByTestId("report-inquiries")).not.toHaveTextContent("지금 수치");
 
     // 반복 문제가 비어 있어도 「없었다」고 말하지 않는다 — 근거인 리뷰를 읽지 못했기 때문이다.
-    expect(screen.getByTestId("report-no-issues")).toHaveTextContent("반복 문제가 없었는지 확인할 수 없습니다");
+    expect(screen.getByTestId("report-no-issues")).toHaveTextContent("반복 문제가 없었는지 확인할 수 없어요");
     // 요약 문장은 저장된 것이고, 읽지 못한 창에 대해 「0건」을 말하지 않는다.
-    expect(REPORT.summary.lines[0].text).toContain("무엇이 들어왔는지 알 수 없습니다");
+    expect(REPORT.summary.lines[0].text).toContain("무엇이 들어왔는지 알 수 없어요");
     await expectNoAxeViolations(container);
   });
 
@@ -389,7 +389,7 @@ describe("운영 리포트 — 읽은 범위가 숫자 위에 선다", () => {
 
     // 기간과 무관한 지금 수치, 비교가 서지 못한 이유 — 둘 다 이 변경 이전과 같다.
     expect(screen.getByTestId("report-inquiries")).toHaveTextContent("27건");
-    expect(screen.getByTestId("report-no-change")).toHaveTextContent("이 기간의 수집 결과를 확인하지 못했습니다");
+    expect(screen.getByTestId("report-no-change")).toHaveTextContent("이 기간의 수집 결과를 확인하지 못했어요");
     expect(screen.getByTestId("report-reads")).toHaveTextContent("9월 27일 03:31");
   });
 
@@ -445,7 +445,7 @@ describe("운영 리포트 — 읽은 범위가 숫자 위에 선다", () => {
     expect(UNMEASURED_ISSUES.facts.issues[0].delta).toBe(3);
     expect(issues).not.toHaveTextContent("3 늘음");
     expect(issues).toHaveTextContent("보통");
-    expect(screen.getByLabelText("반복 문제")).toHaveTextContent("아래 건수는 이 판이 읽은 범위까지입니다");
+    expect(screen.getByLabelText("반복 문제")).toHaveTextContent("아래 건수는 이 판이 읽은 범위까지예요");
   });
 
   /**
@@ -457,7 +457,7 @@ describe("운영 리포트 — 읽은 범위가 숫자 위에 선다", () => {
     renderReports();
     await screen.findByTestId("report-reviews");
 
-    expect(screen.getByLabelText("읽은 범위")).toHaveTextContent("수집 범위를 확인하기 전에 만들어졌습니다");
+    expect(screen.getByLabelText("읽은 범위")).toHaveTextContent("수집 범위를 확인하기 전에 만들어졌어요");
     expect(screen.getByTestId("report-no-read-range")).toHaveTextContent("다시 만들면");
     // 오늘의 수집 상태로 과거 판을 보완하지 않으므로, 읽은 범위 표 자체가 서지 않는다.
     expect(screen.queryByTestId("report-reads")).toBeNull();
@@ -466,7 +466,7 @@ describe("운영 리포트 — 읽은 범위가 숫자 위에 선다", () => {
     // 저장된 delta는 −4지만 비교는 서지 않는다.
     expect(LEGACY.facts.counters[2].delta).toBe(-4);
     expect(screen.queryByTestId("report-changes")).toBeNull();
-    expect(screen.getByTestId("report-no-change")).toHaveTextContent("수집 범위를 확인하기 전에 만들어졌습니다");
+    expect(screen.getByTestId("report-no-change")).toHaveTextContent("수집 범위를 확인하기 전에 만들어졌어요");
   });
 
   it("매출은 기간이 비면 0원을 그리지 않는다 — 수집이 멈춘 날 가장 쉬운 거짓말이다", async () => {

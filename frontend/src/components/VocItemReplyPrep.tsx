@@ -96,7 +96,7 @@ export function draftProvenanceNote(authorKind: string | null, approved: boolean
   // `draftAuthorKind`는 그대로 MODEL이고, 세 갈래가 네 갈래로 늘지도 줄지도 않았다 — 문구 하나만 바뀐다.
   // MODEL no longer means 「저장된 지식 위에」: since 2026-10-26 the model also writes with no evidence (thanks and
   // empathy only), and a past answer was never 「지식」 either. What it stood on is the basis chip's to say, once.
-  if (authorKind === "MODEL") return "AI가 썼어요.";
+  if (authorKind === "MODEL") return "AI가 준비했어요.";
   if (authorKind === "SELLER") return "직접 쓴 답글이에요.";
   if (authorKind === "RULE") return "저장된 문구로 시작했어요.";
   return null;
@@ -1071,7 +1071,7 @@ export function VocItemReplyPrep({
           <p className="text-sm font-semibold text-ink">네이버에서 직접 답변하기</p>
           <p className="text-sm text-muted">
             복사한 답변을 네이버 판매자센터 답변란에 붙여넣고 <strong className="font-semibold">직접</strong>{" "}
-            답변해 주세요. reviewnary가 대신 하지 않으며, 답변 여부도 확인하지 않습니다.
+            답변해 주세요. reviewnary가 대신 하지 않으며, 답변 여부도 확인하지 않아요.
           </p>
           {/* The overclaim this slice removes. Without a runtime nothing opens the seller center,
               nothing finds the row, nothing watches the post — so the panel must not imply it does.
@@ -1190,7 +1190,7 @@ export function VocItemReplyPrep({
               ? "채널에 직접 답변한 것으로 기록했어요."
               : "답변하지 않은 것으로 기록했어요."}
           </p>
-          <p className="text-sm text-muted">reviewnary는 답변 여부를 확인하지 않습니다(확인 안 함).</p>
+          <p className="text-sm text-muted">reviewnary는 답변 여부를 확인하지 않아요(확인 안 함).</p>
         </div>
       ) : null}
 
@@ -1202,7 +1202,7 @@ export function VocItemReplyPrep({
         {busy === "withdrawing" ? "승인 해제 중…" : ""}
         {/* Honest about who sends. The product does not post this anywhere, and the moment
             it would be easiest to imply otherwise is the moment the copy succeeds. */}
-        {!working && copied ? "복사했습니다. 채널에 직접 붙여넣으세요." : ""}
+        {!working && copied ? "복사했어요. 채널에 직접 붙여넣으세요." : ""}
       </p>
 
       {manualCopy != null && canCopy ? (
@@ -1219,7 +1219,7 @@ export function VocItemReplyPrep({
         // operator was mid-way through using.
         <div role="group" aria-label="승인된 답변" className="flex flex-col gap-1">
           <p className="text-sm text-bad">
-            이 환경에서는 자동 복사를 할 수 없습니다. 아래 내용을 직접 선택해 복사하세요.
+            이 환경에서는 자동 복사를 할 수 없어요. 아래 내용을 직접 선택해 복사하세요.
           </p>
           <textarea
             readOnly
@@ -1233,7 +1233,7 @@ export function VocItemReplyPrep({
 
       {unavailable ? (
         <p role="alert" className="text-sm text-bad">
-          이 환경에서는 승인을 기록할 수 없습니다. 보안 연결(HTTPS)로 접속해 주세요.
+          이 환경에서는 승인을 기록할 수 없어요. 보안 연결(HTTPS)로 접속해 주세요.
         </p>
       ) : null}
       {failed != null && !unavailable ? (

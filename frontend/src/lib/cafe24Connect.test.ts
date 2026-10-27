@@ -71,12 +71,12 @@ describe("classifyStartError", () => {
   });
 
   it("classifies by HTTP status", () => {
-    expect(classifyStartError(err(400, "몰 ID 형식이 올바르지 않습니다."))).toBe(
-      "몰 ID 형식이 올바르지 않습니다.",
+    expect(classifyStartError(err(400, "몰 ID 형식이 올바르지 않아요."))).toBe(
+      "몰 ID 형식이 올바르지 않아요.",
     );
     expect(classifyStartError(err(400))).toContain("몰 ID");
     expect(classifyStartError(err(401))).toContain("로그인");
-    expect(classifyStartError(err(404))).toContain("사용할 수 없습니다");
+    expect(classifyStartError(err(404))).toContain("사용할 수 없어요");
   });
 
   it("falls back for network / unknown failures", () => {

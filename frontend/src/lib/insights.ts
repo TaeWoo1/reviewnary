@@ -29,7 +29,7 @@ export function buildOrderInsights(
     return [
       {
         id: "empty",
-        text: "선택한 기간에 집계된 주문이 없습니다. 기간을 늘리거나 채널 필터를 해제해 보세요.",
+        text: "선택한 기간에 집계된 주문이 없어요. 기간을 늘리거나 채널 필터를 해제해 보세요.",
       },
     ];
   }
@@ -42,7 +42,7 @@ export function buildOrderInsights(
     id: "summary",
     text: `최근 ${range}일간 주문 ${count(data.totalOrders7d)}건 · 매출 ${wonShort(
       data.totalSales7d,
-    )}원, 하루 평균 약 ${count(dailyAvg)}건입니다.`,
+    )}원, 하루 평균 약 ${count(dailyAvg)}건이에요.`,
   });
 
   const top = data.channelShare[0];
@@ -52,7 +52,7 @@ export function buildOrderInsights(
     // R2 — top channel by sales share.
     insights.push({
       id: "top-channel",
-      text: `${top.channelNameKo} 채널이 매출의 ${top.percent}%로 가장 큽니다.`,
+      text: `${top.channelNameKo} 채널이 매출의 ${top.percent}%로 가장 커요.`,
     });
 
     // R3 — concentration warning (needs ≥2 channels to be meaningful).
@@ -60,7 +60,7 @@ export function buildOrderInsights(
       insights.push({
         id: "concentration",
         tone: "warn",
-        text: `${top.channelNameKo} 채널 의존도가 높습니다 (${top.percent}%). 채널 다변화를 검토해 볼 수 있습니다.`,
+        text: `${top.channelNameKo} 채널 의존도가 높아요 (${top.percent}%). 채널 다변화를 검토해 볼 수 있어요.`,
       });
     }
   }
@@ -69,7 +69,7 @@ export function buildOrderInsights(
   if (filtered) {
     insights.push({
       id: "filter-context",
-      text: `현재 ${channelName} 채널만 보고 있습니다. 전체 추세는 ‘전체 채널’에서 확인하세요.`,
+      text: `현재 ${channelName} 채널만 보고 있어요. 전체 추세는 ‘전체 채널’에서 확인하세요.`,
     });
   }
 

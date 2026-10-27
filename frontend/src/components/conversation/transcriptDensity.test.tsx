@@ -49,7 +49,7 @@ const reviewList = (id: string, n: number) => ({
 
 describe("transcript density", () => {
   it("a list answers with four rows and offers the rest", async () => {
-    const turn = agentTurn({ message: "최근 리뷰입니다.", artifacts: [reviewList("a", 24)] });
+    const turn = agentTurn({ message: "최근 리뷰예요.", artifacts: [reviewList("a", 24)] });
     render(<MemoryRouter><ConversationTimeline turns={[turn]} busy={false} stages={[]} elapsed={0} error={null} onPrompt={() => undefined} onResume={() => undefined} /></MemoryRouter>);
 
     expect(screen.getAllByText(/리뷰 본문/)).toHaveLength(4);
@@ -59,12 +59,12 @@ describe("transcript density", () => {
   });
 
   it("an OLDER turn folds its list to one line, and the count is still stated", async () => {
-    const older = agentTurn({ turnId: "t1", message: "최근 리뷰입니다.", artifacts: [reviewList("a", 24)] });
-    const latest = agentTurn({ turnId: "t2", message: "이 상품이 반복해서 문제입니다." });
+    const older = agentTurn({ turnId: "t1", message: "최근 리뷰예요.", artifacts: [reviewList("a", 24)] });
+    const latest = agentTurn({ turnId: "t2", message: "이 상품이 반복해서 문제예요." });
     render(<MemoryRouter><ConversationTimeline turns={[older, latest]} busy={false} stages={[]} elapsed={0} error={null} onPrompt={() => undefined} onResume={() => undefined} /></MemoryRouter>);
 
     // The older turn's answer is still there; its rows are not.
-    expect(screen.getByText("최근 리뷰입니다.")).toBeInTheDocument();
+    expect(screen.getByText("최근 리뷰예요.")).toBeInTheDocument();
     expect(screen.queryByText(/리뷰 본문/)).toBeNull();
     const fold = screen.getByRole("button", { name: "리뷰 24건 다시 보기" });
     await userEvent.click(fold);
@@ -73,8 +73,8 @@ describe("transcript density", () => {
   });
 
   it("leaves a short list alone — folding three rows into 'three rows' saves nothing", () => {
-    const older = agentTurn({ turnId: "t1", message: "최근 리뷰입니다.", artifacts: [reviewList("a", 3)] });
-    const latest = agentTurn({ turnId: "t2", message: "다음 질문에 답합니다." });
+    const older = agentTurn({ turnId: "t1", message: "최근 리뷰예요.", artifacts: [reviewList("a", 3)] });
+    const latest = agentTurn({ turnId: "t2", message: "다음 질문에 답해요." });
     render(<MemoryRouter><ConversationTimeline turns={[older, latest]} busy={false} stages={[]} elapsed={0} error={null} onPrompt={() => undefined} onResume={() => undefined} /></MemoryRouter>);
 
     expect(screen.getAllByText(/리뷰 본문/)).toHaveLength(3);

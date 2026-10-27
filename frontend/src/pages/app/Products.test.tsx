@@ -138,7 +138,7 @@ describe("상품 목록 — 한 상품을 여는 색인", () => {
     expect(within(r).getByText("답변 대기")).toBeInTheDocument();
     // 상품 지식은 읽지 못했다. 못 읽은 수량은 끝까지 0이라고 적지 않는다.
     expect(within(r).getByText("—")).toBeInTheDocument();
-    expect(within(r).getByText("상품 지식 읽지 못했습니다")).toBeInTheDocument();
+    expect(within(r).getByText("상품 지식 읽지 못했어요")).toBeInTheDocument();
   });
 
   it("채널과 상품코드는 수량이 아니라 신원이라 이름 아래에 선다", async () => {
@@ -162,7 +162,7 @@ describe("상품 목록 — 한 상품을 여는 색인", () => {
     seed([product()], { p1: {} });
     draw();
     const r = await row("선바로 전선몰딩");
-    expect(within(r).getByText("운영 정보를 읽지 못했습니다")).toBeInTheDocument();
+    expect(within(r).getByText("운영 정보를 읽지 못했어요")).toBeInTheDocument();
     expect(within(r).queryByText("0")).toBeNull();
   });
 
@@ -224,7 +224,7 @@ describe("상품 목록 — 한 상품을 여는 색인", () => {
     // 정렬 기준은 목록 위에, 범위는 목록 아래에. 둘 다 같은 상자 안이다.
     // 적힌 순서는 서버가 카탈로그 전체를 줄 세운 바로 그 순서다 — ProductCatalogOrderingContractTest.
     expect(screen.getByText(/→ 문제 근거 → 리뷰 순/)).toBeInTheDocument();
-    const extent = screen.getByText(/를 보고 있습니다/);
+    const extent = screen.getByText(/를 보고 있어요/);
     expect(extent.textContent).toContain("294개");
     expect(extent.textContent).toContain("2개");
   });
@@ -233,7 +233,7 @@ describe("상품 목록 — 한 상품을 여는 색인", () => {
     seed([product()], { p1: { sig: signals(), sources: 0 } });
     draw();
     await screen.findByText("선바로 전선몰딩");
-    expect(screen.queryByText(/를 보고 있습니다/)).toBeNull();
+    expect(screen.queryByText(/를 보고 있어요/)).toBeNull();
   });
 
   it("찾는 중에는 순서를 말하지 않는다 — 그 행들은 다른 질문의 답이다", async () => {
@@ -256,14 +256,14 @@ describe("상품 목록 — 한 상품을 여는 색인", () => {
     await screen.findByText("선바로 전선몰딩");
 
     await userEvent.type(screen.getByLabelText("상품 이름 또는 상품코드로 검색"), "없는상품");
-    await screen.findByText("찾는 상품이 없습니다");
+    await screen.findByText("찾는 상품이 없어요");
     expect(screen.getByLabelText("상품 이름 또는 상품코드로 검색")).toBeInTheDocument();
   });
 
   it("상품이 하나도 없으면 비어 있음이 곧 화면이다 — 찾을 것이 없는 자리에 찾는 칸을 두지 않는다", async () => {
     seed([], {}, 0);
     draw();
-    await screen.findByText("아직 상품이 없습니다");
+    await screen.findByText("아직 상품이 없어요");
     expect(screen.queryByLabelText("상품 이름 또는 상품코드로 검색")).toBeNull();
   });
 

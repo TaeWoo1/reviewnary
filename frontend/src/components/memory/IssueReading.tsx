@@ -108,7 +108,7 @@ export function IssueReading({
               ))}
               {badges.length === 0 ? (
                 <li className="break-keep leading-relaxed text-muted">
-                  최근 판단된 변화는 없지만 관련 리뷰가 기록되어 있습니다.
+                  최근 판단된 변화는 없지만 관련 리뷰가 기록되어 있어요.
                 </li>
               ) : null}
             </ul>
@@ -125,7 +125,7 @@ export function IssueReading({
             {loading ? (
               <p className="text-muted">근거를 불러오는 중…</p>
             ) : failed ? (
-              <p className="text-muted">근거를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
+              <p className="text-muted">근거를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</p>
             ) : shownQuotes.length > 0 ? (
               <ul className="space-y-2 border-l-2 border-line pl-3">
                 {shownQuotes.map((row) => (
@@ -133,11 +133,11 @@ export function IssueReading({
                 ))}
               </ul>
             ) : (
-              <p className="text-muted">표시할 수 있는 인용이 없습니다.</p>
+              <p className="text-muted">표시할 수 있는 인용이 없어요.</p>
             )}
 
             {suppressed > 0 ? (
-              <p className="text-xs text-muted">인용을 표시할 수 없는 근거가 {suppressed}건 더 있습니다.</p>
+              <p className="text-xs text-muted">인용을 표시할 수 없는 근거가 {suppressed}건 더 있어요.</p>
             ) : null}
 
             {moreToSee ? (
@@ -190,7 +190,7 @@ export function IssueReading({
                 ))}
               </ul>
             ) : (
-              <p className="text-xs text-muted">아직 기록된 상태 변화가 없습니다.</p>
+              <p className="text-xs text-muted">아직 기록된 상태 변화가 없어요.</p>
             )}
             <p className="break-keep text-xs leading-relaxed text-muted">{provenanceKo(issue)}</p>
           </PaneBlock>

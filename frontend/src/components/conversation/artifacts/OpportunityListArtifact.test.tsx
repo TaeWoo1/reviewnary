@@ -30,6 +30,6 @@ describe("개선 기회 artifact — the same object the workspace shows, as row
 
   it("says so when there is nothing", () => {
     render(<MemoryRouter><OpportunityListArtifact artifact={{ ...base, items: [] }} /></MemoryRouter>);
-    expect(screen.getByText("지금 제안할 개선 기회가 없습니다.")).toBeTruthy();
+    expect(screen.getByText("지금 제안할 개선 기회가 없어요.")).toBeTruthy();
   });
 });

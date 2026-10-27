@@ -22,7 +22,7 @@ export const SUPPORT_COPY = {
   fileUploadQualifier: "리뷰·문의·주문 양식은 채널별 확인 필요",
   naverVerifiedUpload: "네이버 리뷰 export 업로드 지원",
   preparing: "지금은 연결할 수 없음",
-  footnote: "수집 가능 여부는 채널별 지원 상태에 따라 다릅니다.",
+  footnote: "수집 가능 여부는 채널별 지원 상태에 따라 달라요.",
 } as const;
 
 /** Strings that must never render in channel-coverage UI (over-claim / roadmap language). */

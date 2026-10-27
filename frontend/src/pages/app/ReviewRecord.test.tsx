@@ -81,7 +81,7 @@ const PAGE: ChannelReviewPageView = {
       writtenOn: "2026-08-01",
       rating: 1,
       negative: true,
-      preview: "생각보다 크기가 작아서 아쉬웠습니다",
+      preview: "생각보다 크기가 작아서 아쉬웠어요",
       productName: "무선 이어폰",
       productId: "15411270785",
       vendorItemId: null,
@@ -92,7 +92,7 @@ const PAGE: ChannelReviewPageView = {
         tier: "NEEDS_ATTENTION",
         reason: "1점 · 설치 · 같은 분류 11건",
         tags: ["설치"],
-        recommendedAction: "같은 분류의 상품평이 반복됩니다. 상품·포장 상태를 확인해 보세요.",
+        recommendedAction: "같은 분류의 상품평이 반복돼요. 상품·포장 상태를 확인해 보세요.",
       },
     aiMark: null,
     sellerCorrection: null,
@@ -365,7 +365,7 @@ describe("a review the buyer rated without writing", () => {
     renderPage();
 
     expect(await screen.findByText("별점만 남긴 리뷰")).toBeInTheDocument();
-    expect(screen.queryByText(/표시할 수 있는 본문이 없습니다/)).toBeNull();
+    expect(screen.queryByText(/표시할 수 있는 본문이 없어요/)).toBeNull();
   });
 
 });
@@ -375,7 +375,7 @@ describe("the page refuses to imply what it does not know", () => {
     getChannelReviewsStrict.mockResolvedValue({ ...PAGE, lastImportComplete: false });
     renderPage();
 
-    expect(await screen.findByText(/목록 끝까지 확인되지 않은 상태로 끝났습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/목록 끝까지 확인되지 않은 상태로 끝났어요/)).toBeInTheDocument();
   });
 
   it("does not warn when the import covered the list", async () => {
@@ -390,7 +390,7 @@ describe("the page refuses to imply what it does not know", () => {
     renderPage();
 
     // Before a page has loaded there is no channel, so the product word (리뷰), not Coupang's.
-    expect(await screen.findByText("리뷰를 불러오지 못했습니다")).toBeInTheDocument();
+    expect(await screen.findByText("리뷰를 불러오지 못했어요")).toBeInTheDocument();
     expect(screen.queryByText("배송도 빠르고 포장도 꼼꼼했어요")).toBeNull();
   });
 
@@ -404,7 +404,7 @@ describe("the page refuses to imply what it does not know", () => {
     });
     renderPage();
 
-    expect(await screen.findByText("아직 수집된 리뷰가 없습니다")).toBeInTheDocument();
+    expect(await screen.findByText("아직 수집된 리뷰가 없어요")).toBeInTheDocument();
   });
 });
 
@@ -560,7 +560,7 @@ describe("triage", () => {
     expect(screen.queryByText("같은 자동 분류가 많은 리뷰")).toBeNull();
     expect(screen.queryByText(/설치 11건/)).toBeNull();
     // Nothing above the rows: the first thing under the filter is the list itself.
-    expect(screen.queryByText(/자동 분류한 것이라 정확하지 않을 수 있습니다/)).toBeNull();
+    expect(screen.queryByText(/자동 분류한 것이라 정확하지 않을 수 있어요/)).toBeNull();
   });
 
   /**
@@ -609,7 +609,7 @@ describe("triage", () => {
     await userEvent.click(screen.getByRole("button", { name: /먼저 볼 리뷰\s*0/ }));
 
     expect(await screen.findByText(/먼저 볼 리뷰가 없어요/)).toBeInTheDocument();
-    expect(screen.queryByText("아직 수집된 리뷰가 없습니다")).toBeNull();
+    expect(screen.queryByText("아직 수집된 리뷰가 없어요")).toBeNull();
   });
 
   it("renders the rows in the order the backend sent them", async () => {
@@ -651,7 +651,7 @@ describe("triage", () => {
       triageSummary: { needsAttention: 1, watch: 3, fyi: 18, repeatedCategories: [] },
     });
     renderPage();
-    await screen.findByText("생각보다 크기가 작아서 아쉬웠습니다");
+    await screen.findByText("생각보다 크기가 작아서 아쉬웠어요");
 
     // The WHOLE record, which is not the filtered count — that distinction is this test's point.
     expect(screen.getByText("총 22개")).toBeInTheDocument();
@@ -677,7 +677,7 @@ describe("triage", () => {
       ],
     });
     renderPage("/reviews?tier=FYI");
-    await screen.findByText("생각보다 크기가 작아서 아쉬웠습니다");
+    await screen.findByText("생각보다 크기가 작아서 아쉬웠어요");
 
     const list = screen.getByRole("region", { name: "목록" });
     expect(within(list).getByRole("button", { name: /일반 리뷰\s*1/ })).toBeInTheDocument();
@@ -801,7 +801,7 @@ describe("the AI pilot's mark and the feedback spine (RUBRIC v2 §13.7)", () => 
     ]));
     // The recorder is DOWN, and the list is still there.
     expect(screen.getByText("배송도 빠르고 포장도 꼼꼼했어요")).toBeInTheDocument();
-    expect(screen.queryByText(/불러오지 못했습니다/)).toBeNull();
+    expect(screen.queryByText(/불러오지 못했어요/)).toBeNull();
   });
 });
 
@@ -956,7 +956,7 @@ describe("the reply and period filters", () => {
     renderPage();
     const answered = (await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("a")!;
     expect(answered).toHaveTextContent("답변함");
-    expect(screen.getByText("생각보다 크기가 작아서 아쉬웠습니다").closest("a")!).not.toHaveTextContent("답변");
+    expect(screen.getByText("생각보다 크기가 작아서 아쉬웠어요").closest("a")!).not.toHaveTextContent("답변");
   });
 
   it("asks for the last 7 days from the address, and counts what the condition holds", async () => {
@@ -978,8 +978,8 @@ describe("the reply and period filters", () => {
     });
     renderPage("/reviews?reply=answered&days=7");
 
-    expect(await screen.findByText("조건에 맞는 리뷰가 없습니다")).toBeInTheDocument();
-    expect(screen.queryByText("아직 수집된 리뷰가 없습니다")).toBeNull();
+    expect(await screen.findByText("조건에 맞는 리뷰가 없어요")).toBeInTheDocument();
+    expect(screen.queryByText("아직 수집된 리뷰가 없어요")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "조건 지우기" }));
     await waitFor(() => expect(screen.getByTestId("location").textContent).not.toMatch(/reply=|days=/));
   });
@@ -1022,11 +1022,11 @@ describe("an open list changes by itself (2026-10-27)", () => {
     expect(await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).toBeInTheDocument();
     const reads = getChannelReviewsStrict.mock.calls.length;
 
-    const arrived = { ...PAGE.items[0], id: "r9", preview: "방금 올라온 리뷰입니다" };
+    const arrived = { ...PAGE.items[0], id: "r9", preview: "방금 올라온 리뷰예요" };
     getChannelReviewsStrict.mockResolvedValue({ ...PAGE, total: 3, items: [arrived, ...PAGE.items] });
     await live.change();
 
-    expect(await screen.findByText("방금 올라온 리뷰입니다")).toBeInTheDocument();
+    expect(await screen.findByText("방금 올라온 리뷰예요")).toBeInTheDocument();
     expect(getChannelReviewsStrict.mock.calls.length).toBe(reads + 1);
     expect(screen.queryByText("불러오는 중…")).toBeNull();
   });
@@ -1041,6 +1041,6 @@ describe("an open list changes by itself (2026-10-27)", () => {
     await waitFor(() => expect(getChannelReviewsStrict).toHaveBeenCalledTimes(2));
 
     expect(screen.getByText("배송도 빠르고 포장도 꼼꼼했어요")).toBeInTheDocument();
-    expect(screen.queryByText("리뷰를 불러오지 못했습니다")).toBeNull();
+    expect(screen.queryByText("리뷰를 불러오지 못했어요")).toBeNull();
   });
 });

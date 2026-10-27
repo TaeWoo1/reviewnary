@@ -57,7 +57,7 @@ export function RepeatByProduct({
     <>
       {evidence.byProduct.length === 0 ? (
         <p className="break-keep leading-relaxed text-muted">
-          이 문제의 근거가 어느 상품에도 연결되어 있지 않습니다.
+          이 문제의 근거가 어느 상품에도 연결되어 있지 않아요.
         </p>
       ) : (
         <ul className="divide-y divide-line">

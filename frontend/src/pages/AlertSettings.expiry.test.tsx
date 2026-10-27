@@ -32,7 +32,7 @@ function expiring(over: Partial<ConnectorAlertView> = {}): ConnectorAlertView {
     accountAlias: null,
     type: "COUPANG_CREDENTIAL_EXPIRING",
     severity: "WARNING",
-    message: "쿠팡 API 키 유효기간이 14일 남았습니다.",
+    message: "쿠팡 API 키 유효기간이 14일 남았어요.",
     createdAt: "2026-08-06T00:00:00Z",
     acknowledgedAt: null,
     recoveredAt: null,
@@ -63,7 +63,7 @@ describe("AlertSettings — Coupang expiry alerts", () => {
   });
 
   it("renders the EXPIRED alert as 재발급 필요", async () => {
-    h.alerts = [expiring({ id: "al-2", type: "COUPANG_CREDENTIAL_EXPIRED", severity: "CRITICAL", message: "쿠팡 API 키가 만료되었습니다." })];
+    h.alerts = [expiring({ id: "al-2", type: "COUPANG_CREDENTIAL_EXPIRED", severity: "CRITICAL", message: "쿠팡 API 키가 만료됐어요." })];
     renderPage();
     expect(await screen.findByText("키 재발급 필요")).toBeInTheDocument();
   });

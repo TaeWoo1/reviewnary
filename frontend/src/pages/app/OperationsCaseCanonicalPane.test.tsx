@@ -43,13 +43,13 @@ function detail(over: Partial<OperationsCaseDetail> = {}): OperationsCaseDetail 
     rating: null,
     title: "문의 드립니다",
     body: "포장을 뜯지 않은 경우도 교환이 가능한가요?",
-    reasonNote: "고객이 답변을 기다리고 있습니다.",
+    reasonNote: "고객이 답변을 기다리고 있어요.",
     disposition: "NEEDS_DECISION",
     // 기본은 「판매자 기준이 적용되지 않은 건」 — 정책이 테스트 주제인 케이스만 override한다.
     appliedPolicy: null,
     policyProblemKo: null,
     decidedBy: "AGENT",
-    summary: "등록된 운영 정책으로 답변할 수 있는 문의입니다.",
+    summary: "등록된 운영 정책으로 답변할 수 있는 문의예요.",
     recommendedActionType: "REPLY_TO_CUSTOMER",
     recommendedAction: null,
     missingInformation: [],
@@ -83,7 +83,7 @@ function detail(over: Partial<OperationsCaseDetail> = {}): OperationsCaseDetail 
     draft: {
       version: 1,
       title: "[답변] 교환",
-      body: "수령 후 7일 이내, 미개봉 상태라면 교환이 가능합니다.",
+      body: "수령 후 7일 이내, 미개봉 상태라면 교환이 가능해요.",
       authorKind: "MODEL",
       answerBasis: "GROUNDED",
       evidence: [
@@ -131,8 +131,8 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
     drawPane();
 
     const why = await screen.findByRole("region", { name: "왜 지금 볼 일인가" });
-    expect(within(why).getByText("8일 동안 답변이 등록되지 않았습니다.")).toBeTruthy();
-    expect(within(why).getByText("등록된 운영 정책으로 답변할 수 있는 문의입니다.")).toBeTruthy();
+    expect(within(why).getByText("8일 동안 답변이 등록되지 않았어요.")).toBeTruthy();
+    expect(within(why).getByText("등록된 운영 정책으로 답변할 수 있는 문의예요.")).toBeTruthy();
     // Two facts, not three: no read on this screen returns a similar-inquiry count, so no line claims one.
     expect(within(why).getAllByRole("listitem")).toHaveLength(2);
   });
@@ -162,7 +162,7 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
     drawPane();
 
     const answer = await screen.findByRole("region", { name: "준비된 답변" });
-    expect(within(answer).getByText("수령 후 7일 이내, 미개봉 상태라면 교환이 가능합니다.")).toBeTruthy();
+    expect(within(answer).getByText("수령 후 7일 이내, 미개봉 상태라면 교환이 가능해요.")).toBeTruthy();
     expect(within(answer).queryByRole("textbox")).toBeNull();
     /* The basis is still said once, beside the heading, off `draft.evidence` — it is now the metadata
        line 「미발송 · 운영 정책 2개 근거」 rather than the sentence 「…를 근거로 준비한 답변입니다」
@@ -218,12 +218,12 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
    */
   it("왜 지금 볼 일인가 drops our own ranking clause and keeps the sentence it qualified", async () => {
     api.getOperationsCase.mockResolvedValue(
-      detail({ summary: "등록된 지식으로 답변할 수 있는 문의입니다. (확인한 요청 2건 중 가장 먼저 해결해야 하는 항목 기준입니다.)" }),
+      detail({ summary: "등록된 지식으로 답변할 수 있는 문의예요. (확인한 요청 2건 중 가장 먼저 해결해야 하는 항목 기준이에요.)" }),
     );
     drawPane();
 
     const why = await screen.findByRole("region", { name: "왜 지금 볼 일인가" });
-    expect(within(why).getByText("등록된 지식으로 답변할 수 있는 문의입니다.")).toBeTruthy();
+    expect(within(why).getByText("등록된 지식으로 답변할 수 있는 문의예요.")).toBeTruthy();
     expect(why.textContent).not.toMatch(/확인한 요청|가장 먼저/);
   });
 
@@ -268,7 +268,7 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
     expect(box).not.toMatch(/ring|rounded-\[16px\]|shadow-\[/);
     expect(box).toMatch(/border-t/);
     // And the answer itself is read, not a filled field waiting to be typed in.
-    const body = within(answer).getByText("수령 후 7일 이내, 미개봉 상태라면 교환이 가능합니다.");
+    const body = within(answer).getByText("수령 후 7일 이내, 미개봉 상태라면 교환이 가능해요.");
     expect(body.className).toMatch(/text-prose/);
     expect(body.className).not.toMatch(/bg-/);
   });
@@ -284,7 +284,7 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
    * anywhere but beside the control that opens it is a warning the seller reads after deciding.
    */
   it("draws the answer-state warning in the dock, above the control it qualifies", async () => {
-    const note = "이 채널의 문의 수집이 최신이 아니라, 이 문의에 이미 답변이 달렸는지 지금은 확인할 수 없습니다.";
+    const note = "이 채널의 문의 수집이 최신이 아니라, 이 문의에 이미 답변이 달렸는지 지금은 확인할 수 없어요.";
     api.getOperationsCase.mockResolvedValue(detail({ answerStateNote: note }));
     drawPane();
 
@@ -300,7 +300,7 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
     drawPane();
 
     const dock = await screen.findByTestId("pane-footer");
-    expect(dock.textContent).not.toMatch(/확인할 수 없습니다/);
+    expect(dock.textContent).not.toMatch(/확인할 수 없어요/);
   });
   /**
    * <b>Core Operations polish, 2026-10-06 — 내부 조각이 회사의 기준 이름으로 나가지 않는다.</b>
@@ -326,7 +326,7 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
     drawPane();
 
     const need = await screen.findByRole("region", { name: "필요한 정보" });
-    expect(within(need).getByText("이 질문에 대해 고객에게 안내할 기준이 없습니다.")).toBeTruthy();
+    expect(within(need).getByText("이 질문에 대해 고객에게 안내할 기준이 없어요.")).toBeTruthy();
     expect(screen.queryByText(/드립니다/)).toBeNull();
     // 확인한 내용의 칩도 같은 규칙을 쓴다 — 주제가 없으면 사실만 말한다.
     expect(screen.getByText("안내 기준 없음")).toBeTruthy();
@@ -339,7 +339,7 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
         knowledgeUsed: [],
         gap: {
           missingSubject: "교환 가능 기간",
-          sentence: "「교환 가능 기간」에 대해 고객에게 안내할 기준이 없습니다.",
+          sentence: "「교환 가능 기간」에 대해 고객에게 안내할 기준이 없어요.",
           suggestedScope: "ORG",
         },
       }),
@@ -347,7 +347,7 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
     drawPane();
 
     const need = await screen.findByRole("region", { name: "필요한 정보" });
-    expect(within(need).getByText("「교환 가능 기간」에 대해 고객에게 안내할 기준이 없습니다.")).toBeTruthy();
+    expect(within(need).getByText("「교환 가능 기간」에 대해 고객에게 안내할 기준이 없어요.")).toBeTruthy();
     expect(screen.getByText("교환 가능 기간 기준 없음")).toBeTruthy();
   });
 
@@ -360,7 +360,7 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
       detail({
         draft: null,
         knowledgeUsed: [],
-        gap: { missingSubject: "교환 가능 기간", sentence: "「교환 가능 기간」에 대해 고객에게 안내할 기준이 없습니다.", suggestedScope: "ORG" },
+        gap: { missingSubject: "교환 가능 기간", sentence: "「교환 가능 기간」에 대해 고객에게 안내할 기준이 없어요.", suggestedScope: "ORG" },
       }),
     );
     drawPane();
@@ -378,20 +378,20 @@ describe("확인할 일 pane — canonical mockup semantics", () => {
    * 들고 있는 말을 한 번 더 하지 않는다. 측정된 세 줄 중 둘이 같은 사실이었다.
    */
   it("필요한 정보가 서 있으면 같은 말을 왜 지금 볼 일인가에서 반복하지 않는다", async () => {
-    const recommendation = "답변에 필요한 회사 정보가 없어 답을 만들 수 없습니다. 정보를 알려 주시면 다시 준비합니다.";
+    const recommendation = "답변에 필요한 회사 정보가 없어 답을 만들 수 없어요. 정보를 알려 주시면 다시 준비해요.";
     api.getOperationsCase.mockResolvedValue(
       detail({
         draft: null,
         knowledgeUsed: [],
         whyDecisionNeeded: recommendation,
-        gap: { missingSubject: "교환 가능 기간", sentence: "「교환 가능 기간」에 대해 고객에게 안내할 기준이 없습니다.", suggestedScope: "ORG" },
+        gap: { missingSubject: "교환 가능 기간", sentence: "「교환 가능 기간」에 대해 고객에게 안내할 기준이 없어요.", suggestedScope: "ORG" },
       }),
     );
     drawPane();
 
     const why = await screen.findByRole("region", { name: "왜 지금 볼 일인가" });
     // 기다린 날수와 서버가 쓴 사실 한 줄은 그대로 선다.
-    expect(within(why).getByText(/8일 동안 답변이 등록되지 않았습니다/)).toBeTruthy();
+    expect(within(why).getByText(/8일 동안 답변이 등록되지 않았어요/)).toBeTruthy();
     expect(why.textContent).not.toContain(recommendation);
   });
 });

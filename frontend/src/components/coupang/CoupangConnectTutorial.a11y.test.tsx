@@ -75,12 +75,12 @@ describe("CoupangConnectTutorial — axe a11y scans", () => {
     const { container, rerender } = renderPhase({ phase: "submitting", reasonCode: null }, { submitStage: "storing" });
     const status = screen.getByTestId("coupang-verifying");
     expect(status).toHaveAttribute("role", "status");
-    expect(status).toHaveTextContent("연결 정보를 저장하고 있어요");
+    expect(status).toHaveTextContent("연동 정보를 저장하고 있어요");
     expect(within(status).getByTestId("spinner")).toBeInTheDocument();
     // Nothing on the waiting screen reads as a failure, and the form is gone (no second submit).
     expect(screen.queryByRole("alert")).toBeNull();
     expect(status).not.toHaveTextContent(/실패|오류|못했/);
-    expect(screen.queryByRole("button", { name: "연결 정보 저장" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "연동 정보 저장" })).toBeNull();
     await expectNoAxeViolations(container);
     rerender(
       <CoupangConnectTutorial
@@ -101,7 +101,7 @@ describe("CoupangConnectTutorial — axe a11y scans", () => {
       />,
     );
     expect(screen.getByTestId("coupang-verifying")).toHaveTextContent("쿠팡에 연결을 확인하고 있어요");
-    expect(screen.getByTestId("coupang-verifying")).toHaveTextContent("✓ 연결 정보 저장");
+    expect(screen.getByTestId("coupang-verifying")).toHaveTextContent("✓ 연동 정보 저장");
   });
 
   it("the three async faces are visually distinct: in-progress (brand), error (bad/alert), success (good/status)", () => {

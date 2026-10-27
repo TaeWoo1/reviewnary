@@ -189,7 +189,7 @@ export function ChannelWorkspace() {
         // Fail closed: without capability info the controls stay disabled.
         if (active) {
           setCapabilities(null);
-          setError("수집 지원 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+          setError("수집 지원 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
         }
       });
     // Credential field shape (연결에 필요한 정보), loaded independently and fail-soft.
@@ -218,7 +218,7 @@ export function ChannelWorkspace() {
   if (metaError) {
     return (
       <Empty
-        title="채널 정보를 불러오지 못했습니다"
+        title="채널 정보를 불러오지 못했어요"
         body="잠시 후 다시 시도해 주세요."
         action={<BtnLink to="/connect">채널 목록</BtnLink>}
       />
@@ -227,7 +227,7 @@ export function ChannelWorkspace() {
   if (accounts && !account) {
     return (
       <Empty
-        title="판매 계정을 찾을 수 없습니다"
+        title="판매 계정을 찾을 수 없어요"
         body="목록에서 다시 선택해 주세요."
         action={<BtnLink to="/connect">채널 목록</BtnLink>}
       />
@@ -321,7 +321,7 @@ export function ChannelWorkspace() {
       </div>
 
       <div ref={credentialRef}>
-        <Disclosure label="연결 정보" note="인증 · 연결 상태" open={openFold === "info"} onOpenChange={(o) => setOpenFold(o ? "info" : null)}>
+        <Disclosure label="연동 정보" note="인증 · 연결 상태" open={openFold === "info"} onOpenChange={(o) => setOpenFold(o ? "info" : null)}>
           <div className="mt-3 space-y-6">
             <ChannelStatusSection
               accountId={accountId}
@@ -383,7 +383,7 @@ export function ChannelWorkspace() {
         <Link to={`/connect/upload?channelId=${account?.channelId ?? ""}`} className="font-semibold text-ink underline underline-offset-4">
           자료 업로드
         </Link>
-        로 채울 수 있습니다. 같은 자료를 다시 넘겨도 중복은 건너뜁니다.
+        로 채울 수 있어요. 같은 자료를 다시 넘겨도 중복은 건너뛰어요.
       </p>
     </div>
   );

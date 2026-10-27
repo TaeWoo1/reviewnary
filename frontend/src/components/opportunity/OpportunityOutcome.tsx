@@ -40,7 +40,7 @@ export function OpportunityOutcome({ outcome }: { outcome: OpportunityOutcomeVie
           </>
         ) : (
           <>
-            <span className="tabular-nums">{outcome.observedThrough}</span>까지 리뷰를 지켜봅니다 · 적용 전 4주{" "}
+            <span className="tabular-nums">{outcome.observedThrough}</span>까지 리뷰를 지켜봐요 · 적용 전 4주{" "}
             <span className="tabular-nums">{count(outcome.evidenceBefore)}건</span>
           </>
         )}

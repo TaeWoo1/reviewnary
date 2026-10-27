@@ -84,7 +84,7 @@ describe("VendorReviewsSection", () => {
     getVendorLink.mockResolvedValue(linkStatus("UNLINKED"));
     renderSection();
     expect(await screen.findByTestId("vendor-reviews-link")).toBeInTheDocument();
-    expect(screen.getByText(/아직 reviewnary 서버에 연결되지 않았습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/아직 reviewnary 서버에 연결되지 않았어요/)).toBeInTheDocument();
     expect(getVendorReviewsOverview).not.toHaveBeenCalled();
   });
 
@@ -106,7 +106,7 @@ describe("VendorReviewsSection", () => {
 
     fireEvent.click(screen.getByTestId("vendor-reviews-start"));
     await waitFor(() => expect(startVendorReviews).toHaveBeenCalledWith(["s-1", "s-2"]));
-    expect(await screen.findByText("새 리뷰 6건 · 바뀐 리뷰 0건을 받았습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("새 리뷰 6건 · 바뀐 리뷰 0건을 받았어요.")).toBeInTheDocument();
     expect(screen.getByText("받는 중")).toBeInTheDocument();
     expect(screen.queryByText("아직 받지 않음")).toBeNull();
   });
@@ -127,7 +127,7 @@ describe("VendorReviewsSection", () => {
       .toHaveTextContent("서버 확인 방금 전 · 담당자 마지막 업로드 2일 전 · 받은 리뷰 128건");
     expect(within(rows[0]).queryByTestId("vendor-store-failure")).toBeNull();
     expect(within(rows[1]).getByText("받지 못함")).toBeInTheDocument();
-    expect(within(rows[1]).getByTestId("vendor-store-failure")).toHaveTextContent("리뷰 일부를 저장하지 못했습니다");
+    expect(within(rows[1]).getByTestId("vendor-store-failure")).toHaveTextContent("리뷰 일부를 저장하지 못했어요");
     expect(within(rows[2]).getByText("아직 받지 않음")).toBeInTheDocument();
     expect(within(rows[2]).getByTestId("vendor-store-facts")).toHaveTextContent("담당자 마지막 업로드 아직 없음");
     expect(screen.getByTestId("vendor-reviews-start")).toBeInTheDocument();
@@ -153,7 +153,7 @@ describe("VendorReviewsSection", () => {
       store({ standing: "RECEIVING", lastCheckedAt: ago(2 * HOUR), received: 128 }),
     ], "UNREACHABLE"));
     renderSection();
-    expect(await screen.findByRole("alert")).toHaveTextContent("reviewnary 서버에 닿지 않습니다");
+    expect(await screen.findByRole("alert")).toHaveTextContent("reviewnary 서버에 닿지 않아요");
     expect(screen.getByTestId("vendor-store-facts")).toHaveTextContent("서버 확인 2시간 전");
     expect(screen.queryByTestId("vendor-reviews-start")).toBeNull();
     expect(screen.queryByRole("button", { name: "지금 받기" })).toBeNull();
@@ -165,7 +165,7 @@ describe("VendorReviewsSection", () => {
     getVendorReviewsOverview.mockResolvedValue(overview([store({ standing: "RECEIVING", lastCheckedAt: ago(0) })]));
     renderSection();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("리뷰 받기 상태를 불러오지 못했습니다");
+    expect(await screen.findByRole("alert")).toHaveTextContent("리뷰 받기 상태를 불러오지 못했어요");
     fireEvent.click(screen.getByRole("button", { name: "다시 확인" }));
     expect(await screen.findByTestId("vendor-store")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
@@ -178,7 +178,7 @@ describe("VendorReviewsSection", () => {
     getVendorReviewsOverview.mockResolvedValueOnce(away).mockResolvedValueOnce(away).mockResolvedValue(back);
     renderSection();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("reviewnary 서버에 닿지 않습니다");
+    expect(await screen.findByRole("alert")).toHaveTextContent("reviewnary 서버에 닿지 않아요");
     fireEvent.click(screen.getByRole("button", { name: "다시 확인" }));
     await waitFor(() => expect(getVendorReviewsOverview).toHaveBeenCalledTimes(2));
     expect(screen.getByRole("alert")).toBeInTheDocument();
@@ -229,7 +229,7 @@ describe("VendorReviewsSection", () => {
     fireEvent(window, new Event("focus"));
     await waitFor(() => expect(getVendorReviewsOverview).toHaveBeenCalledTimes(2));
     fireEvent.click(pullNow);
-    expect(await screen.findByText("새 리뷰 6건 · 바뀐 리뷰 0건을 받았습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("새 리뷰 6건 · 바뀐 리뷰 0건을 받았어요.")).toBeInTheDocument();
     expect(screen.getByTestId("vendor-store-facts")).toHaveTextContent("받은 리뷰 12건");
 
     answerOld(overview([store({ standing: "RECEIVING", lastCheckedAt: ago(0), received: 6 })]));

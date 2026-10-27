@@ -21,7 +21,7 @@ import type { StatusTone } from "../components/ui/Status";
 
 export const RESPONSIBILITY_NAME = "고객 운영 관리";
 export const RESPONSIBILITY_DESCRIPTION =
-  "Reviewnary가 새 고객 문제를 확인하고, 직접 판단할 필요가 있는 일만 알려드립니다.";
+  "Reviewnary가 새 고객 문제를 확인하고, 직접 판단할 필요가 있는 일만 알려드려요.";
 
 /** What Reviewnary does, and what stays with the seller — the job's contract, stated as it is enforced. */
 export const DUTIES_REVIEWNARY = ["중요하지 않은 일 정리", "반복 문제 관찰", "필요한 정보 조사", "답변/행동 준비"];
@@ -35,7 +35,7 @@ export const DUTIES_SELLER = ["고객에게 실제 메시지 전송", "금전/�
  * sells on NAVER was being told to connect a shop they do not have. The server's `NO_ELIGIBLE_SOURCE` sentence is
  * the same one, for the same reason.
  */
-export const NO_ELIGIBLE_SOURCE_SENTENCE = "고객 운영 관리를 시작하려면 판매 채널을 먼저 연결해 주세요.";
+export const NO_ELIGIBLE_SOURCE_SENTENCE = "고객 운영 관리를 시작하려면 판매 채널을 먼저 연동해 주세요.";
 
 export function statusWord(status: ResponsibilityStatus | null): { label: string; tone: StatusTone } {
   switch (status) {
@@ -107,19 +107,19 @@ export function kstClock(iso: string | null, now: Date = new Date()): string | n
 }
 
 const FAILURE_KO: Record<string, string> = {
-  AUTH_REQUIRED: "연결이 만료되어 다시 연결이 필요합니다",
-  NOT_CONNECTED: "연결이 끊겨 다시 연결이 필요합니다",
-  TIMEOUT: "채널 응답이 늦었습니다",
-  RATE_LIMITED: "채널의 요청 한도에 걸렸습니다",
-  EXECUTION_FAILED: "확인 중 오류가 났습니다",
-  INTERRUPTED: "확인이 중간에 멈췄습니다",
-  CONNECTOR_UNAVAILABLE: "이 서비스에서 아직 확인할 수 없는 채널입니다",
-  CONFIGURATION_REQUIRED: "확인에 필요한 설정이 빠져 있습니다",
-  CANCELLED: "고객 운영 관리가 멈춰 확인을 끝내지 않았습니다",
+  AUTH_REQUIRED: "연결이 만료되어 다시 연결이 필요해요",
+  NOT_CONNECTED: "연결이 끊겨 다시 연결이 필요해요",
+  TIMEOUT: "채널 응답이 늦었어요",
+  RATE_LIMITED: "채널의 요청 한도에 걸렸어요",
+  EXECUTION_FAILED: "확인 중 오류가 났어요",
+  INTERRUPTED: "확인이 중간에 멈췄어요",
+  CONNECTOR_UNAVAILABLE: "이 서비스에서 아직 확인할 수 없는 채널이에요",
+  CONFIGURATION_REQUIRED: "확인에 필요한 설정이 빠져 있어요",
+  CANCELLED: "고객 운영 관리가 멈춰 확인을 끝내지 않았어요",
 };
 
 export function failureKo(reason: string | null): string {
-  return (reason && FAILURE_KO[reason]) || "끝까지 확인하지 못했습니다";
+  return (reason && FAILURE_KO[reason]) || "끝까지 확인하지 못했어요";
 }
 
 /**
@@ -140,17 +140,17 @@ export function sourceHealthLine(source: CustomerOperationsSourceHealth): { text
     }
     case "BOUNDED":
       return {
-        text: `${name} — 일부 범위만 확인했습니다${
+        text: `${name} — 일부 범위만 확인했어요${
           source.observedCount !== null ? ` · ${source.observedCount.toLocaleString("ko-KR")}건 읽음` : ""
         }`,
         tone: "warn",
       };
     case "PARTIAL":
-      return { text: `${name} — 일부만 확인했습니다 · ${failureKo(source.failureReason)}`, tone: "warn" };
+      return { text: `${name} — 일부만 확인했어요 · ${failureKo(source.failureReason)}`, tone: "warn" };
     case "NONE":
-      return { text: `${name} — 확인하지 못했습니다 · ${failureKo(source.failureReason)}`, tone: source.sellerActionRequired ? "bad" : "warn" };
+      return { text: `${name} — 확인하지 못했어요 · ${failureKo(source.failureReason)}`, tone: source.sellerActionRequired ? "bad" : "warn" };
     default:
-      return { text: `${name} — 확인 중입니다`, tone: "neutral" };
+      return { text: `${name} — 확인 중이에요`, tone: "neutral" };
   }
 }
 
@@ -169,26 +169,26 @@ export function lastRunWord(status: string | null): string | null {
 
 export function decisionsLine(total: number): string {
   return total > 0
-    ? `직접 판단하실 일이 ${total.toLocaleString("ko-KR")}건 있습니다.`
-    : "지금 직접 판단하실 일은 없습니다.";
+    ? `직접 판단하실 일이 ${total.toLocaleString("ko-KR")}건 있어요.`
+    : "지금 직접 판단하실 일은 없어요.";
 }
 
 /** ②, as separate facts. Nothing is summed: a closed case, a watched case and a draft are three different things. */
 export function handledLine(handled: CustomerOperationsHome["handled"]): string {
   const parts: string[] = [];
-  if (handled.autoResolved > 0) parts.push(`따로 할 일이 없는 ${handled.autoResolved.toLocaleString("ko-KR")}건을 정리했습니다`);
-  if (handled.monitoring > 0) parts.push(`${handled.monitoring.toLocaleString("ko-KR")}건을 지켜보고 있습니다`);
+  if (handled.autoResolved > 0) parts.push(`따로 할 일이 없는 ${handled.autoResolved.toLocaleString("ko-KR")}건을 정리했어요`);
+  if (handled.monitoring > 0) parts.push(`${handled.monitoring.toLocaleString("ko-KR")}건을 지켜보고 있어요`);
   if (handled.draftsPrepared > 0) {
-    parts.push(`답변 초안 ${handled.draftsPrepared.toLocaleString("ko-KR")}건을 준비했습니다(아직 보내지 않았습니다)`);
+    parts.push(`답변 초안 ${handled.draftsPrepared.toLocaleString("ko-KR")}건을 준비했어요(아직 보내지 않았어요)`);
   }
   if (handled.verifying > 0) {
     // Never «보냈습니다» or «처리했습니다»: the execution record owns that sentence, and it has not said it yet.
-    parts.push("승인한 작업의 처리 결과를 확인하고 있습니다");
+    parts.push("승인한 작업의 처리 결과를 확인하고 있어요");
   }
   const checked = handled.checked ?? 0;
-  const lead = checked > 0 ? `최근 24시간 동안 ${checked.toLocaleString("ko-KR")}건을 확인했습니다. ` : "";
+  const lead = checked > 0 ? `최근 24시간 동안 ${checked.toLocaleString("ko-KR")}건을 확인했어요. ` : "";
   return parts.length === 0
-    ? `${lead}최근 24시간 동안 정리하거나 준비한 일은 없습니다.`
+    ? `${lead}최근 24시간 동안 정리하거나 준비한 일은 없어요.`
     : `${lead}${parts.join(" · ")}.`;
 }
 
@@ -201,15 +201,15 @@ export const VERIFYING_WORD: { label: string; tone: StatusTone } = { label: "처
 /** ③ — gaps the seller can fix, then what the last check could not finish on its own. */
 export function unobservedLine(home: Pick<CustomerOperationsHome, "gaps" | "sources" | "lastCheckedAt">): string {
   if (home.gaps.total > 0) {
-    return `다시 연결해야 확인할 수 있는 곳이 ${home.gaps.total.toLocaleString("ko-KR")}곳 있습니다.`;
+    return `다시 연결해야 확인할 수 있는 곳이 ${home.gaps.total.toLocaleString("ko-KR")}곳 있어요.`;
   }
   if (home.sources.length === 0) {
-    return home.lastCheckedAt ? "지난 확인에서 확인한 대상이 없습니다." : "아직 첫 확인이 끝나지 않았습니다.";
+    return home.lastCheckedAt ? "지난 확인에서 확인한 대상이 없어요." : "아직 첫 확인이 끝나지 않았어요.";
   }
   if (home.sources.some((s) => s.completeness !== "COMPLETE")) {
-    return "지난 확인에서 끝까지 보지 못한 곳이 있습니다. 다음 확인에서 다시 봅니다.";
+    return "지난 확인에서 끝까지 보지 못한 곳이 있어요. 다음 확인에서 다시 봐요.";
   }
-  return "지난 확인에서 모든 대상을 끝까지 확인했습니다.";
+  return "지난 확인에서 모든 대상을 끝까지 확인했어요.";
 }
 
 /**
@@ -227,7 +227,7 @@ export function gapRowLine(row: CustomerOperationsGapRow): string {
   const channel = row.channelCode ? CHANNEL_LABEL[row.channelCode] ?? row.channelNameKo : row.channelNameKo;
   const types = row.dataTypes.map(dataTypeKo).join("·") || "자료";
   const why = GAP_WHY[row.reason] ?? "확인하지 못해";
-  return `${channel ?? "채널"} ${types} — ${why} 확인하지 못했습니다.`;
+  return `${channel ?? "채널"} ${types} — ${why} 확인하지 못했어요.`;
 }
 
 const ACTION_KO: Record<string, string> = {

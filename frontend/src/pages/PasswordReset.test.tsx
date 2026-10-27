@@ -66,7 +66,7 @@ describe("password reset", () => {
     fireEvent.click(screen.getByRole("button", { name: "재설정 링크 보내기" }));
     expect(await screen.findByText(FORGOT_SENT_TITLE)).toBeInTheDocument();
     expect(forgotPassword).toHaveBeenCalledWith("nobody@x.io");
-    expect(await screen.findByText(/개발 모드: 메일은 backend 로그에 출력됩니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/개발 모드: 메일은 backend 로그에 출력돼요/)).toBeInTheDocument();
     await expectNoAxeViolations(document.body);
   });
 

@@ -26,31 +26,31 @@ const LABELS: Record<string, ReviewReplyTemplateLabel> = {
     // and a topic word — so naming this "praise" promises the seller a judgement nobody made. It is
     // what a high-rated review gets, said plainly.
     name: "별점 4~5점 기본 문구",
-    when: "별점이 4~5점인 리뷰에 씁니다. 아래 유형의 낱말이 있어도 별점이 높으면 이 문구를 씁니다.",
+    when: "별점이 4~5점인 리뷰에 써요. 아래 유형의 낱말이 있어도 별점이 높으면 이 문구를 써요.",
   },
   quality_reply: {
     name: "불량 · 파손 리뷰",
-    when: "상품이 불량이거나 깨지고 고장 났다는 리뷰에 씁니다.",
+    when: "상품이 불량이거나 깨지고 고장 났다는 리뷰에 써요.",
   },
   delivery_reply: {
     name: "배송 리뷰",
-    when: "배송이나 발송이 늦었다는 리뷰에 씁니다.",
+    when: "배송이나 발송이 늦었다는 리뷰에 써요.",
   },
   packaging_reply: {
     name: "포장 리뷰",
-    when: "포장이나 박스 상태를 지적한 리뷰에 씁니다.",
+    when: "포장이나 박스 상태를 지적한 리뷰에 써요.",
   },
   product_info_reply: {
     name: "상품 설명과 다르다는 리뷰",
-    when: "설명이나 사진과 실제가 다르다는 리뷰에 씁니다.",
+    when: "설명이나 사진과 실제가 다르다는 리뷰에 써요.",
   },
   pricing_reply: {
     name: "가격 리뷰",
-    when: "가격이 비싸다거나 가성비를 말한 리뷰에 씁니다.",
+    when: "가격이 비싸다거나 가성비를 말한 리뷰에 써요.",
   },
   general_reply: {
     name: "그 밖의 리뷰",
-    when: "별점이 4점 미만이고 위 유형의 낱말도 없는 리뷰에 씁니다.",
+    when: "별점이 4점 미만이고 위 유형의 낱말도 없는 리뷰에 써요.",
   },
 };
 

@@ -385,7 +385,7 @@ export function useInquiryReply(workItemId: string | null) {
       setManualCopy(text);
       return;
     }
-    setActionError("복사하지 못했습니다. 다시 시도해 주세요.");
+    setActionError("복사하지 못했어요. 다시 시도해 주세요.");
   }
 
 

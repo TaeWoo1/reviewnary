@@ -37,5 +37,5 @@ export function activeAlerts(
  */
 export function recoveredNote(alert: ConnectorAlertView): string | null {
   if (alert.recoveredAt == null) return null;
-  return `${alert.recoveredAt.slice(0, 10)}에 수집이 다시 성공했습니다.`;
+  return `${alert.recoveredAt.slice(0, 10)}에 수집이 다시 성공했어요.`;
 }

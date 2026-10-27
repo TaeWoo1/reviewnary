@@ -118,8 +118,8 @@ export function aspectChoices(issues: readonly ReviewIssueView[]): string[] {
 export function listProvenanceKo(issues: readonly ReviewIssueView[]): string {
   const allRuleBased = issues.length > 0 && issues.every((issue) => issue.extractorKind === "RULE_BASED");
   return allRuleBased
-    ? "규칙 기반 분석으로 모은 이슈 후보입니다. 최종 진단이 아닙니다."
-    : "이슈 후보입니다. 최종 진단이 아닙니다.";
+    ? "규칙 기반 분석으로 모은 이슈 후보여요. 최종 진단이 아니에요."
+    : "이슈 후보여요. 최종 진단이 아니에요.";
 }
 
 /**

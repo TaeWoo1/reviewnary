@@ -564,7 +564,7 @@ export function completionSummaryText(progress: ImportProgress): string {
   if (progress.done < progress.total) {
     return `${progress.text} · 남은 구간을 이어서 가져올 수 있어요.`;
   }
-  return "NAVER에서 현재 선택 가능한 기간의 리뷰 파일을 가져왔습니다.";
+  return "NAVER에서 현재 선택 가능한 기간의 리뷰 파일을 가져왔어요.";
 }
 
 /* ─────────────────── The repeated loop's 완료 결과 + 변화 요약 ─────────────────── */

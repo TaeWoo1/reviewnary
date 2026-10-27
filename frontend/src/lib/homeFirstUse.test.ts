@@ -136,7 +136,7 @@ describe("the three-state rule, shared with agent-runtime's SellerReadiness", ()
     expect(homeFirstUseState([uploadedOnto(0)]).kind).toBe("NO_CHANNEL");
   });
 
-  it("keeps 「연결된 채널이 없습니다」 truthful — holding uploads is not having connected", () => {
+  it("keeps 「연동한 채널이 없어요」 truthful — holding uploads is not having connected", () => {
     // The two questions came apart here, so the boolean stops borrowing the first-use kind.
     expect(hasAnyConnectedChannel([uploadedOnto(2)])).toBe(false);
   });

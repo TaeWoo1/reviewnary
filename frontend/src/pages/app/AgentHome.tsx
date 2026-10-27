@@ -193,7 +193,7 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
       const key = matchCommandIntent(text);
       if (!key) return false;
       if (key === "TODAY") {
-        conversation.addLocalTurn(text, { message: "오늘 할 일은 이 대화 맨 위에 정리해 두었습니다.", artifacts: [] });
+        conversation.addLocalTurn(text, { message: "오늘 할 일은 이 대화 맨 위에 정리해 두었어요.", artifacts: [] });
         return true;
       }
       if (key === "UNANSWERED_INQUIRIES") {
@@ -231,9 +231,9 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
               ],
               more: { label: "문의 화면에서 전체 보기", to: INQUIRY_NEEDS_REPLY_PATH },
             };
-            conversation.addLocalTurn(text, { message: "바로 보여드립니다.", artifacts: [artifact] });
+            conversation.addLocalTurn(text, { message: "바로 보여드려요.", artifacts: [artifact] });
           })
-          .catch(() => conversation.addLocalTurn(text, { message: "문의를 읽지 못했습니다. 문의 화면에서 확인해 주세요.", artifacts: [] }));
+          .catch(() => conversation.addLocalTurn(text, { message: "문의를 읽지 못했어요. 문의 화면에서 확인해 주세요.", artifacts: [] }));
         return true;
       }
       return false;
@@ -276,7 +276,7 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
             ))}
           </ol>
           <div className="pt-3">
-            <BtnLink to="/connect">채널 연결하기</BtnLink>
+            <BtnLink to="/connect">채널 연동하기</BtnLink>
           </div>
         </section>
       ) : firstUse?.kind === "NO_DATA" ? (
@@ -286,7 +286,7 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
         <section className="space-y-1" aria-label="오늘의 브리핑" data-testid="first-use-no-data">
           <p className="break-keep text-xl font-bold leading-tight text-ink" aria-live="polite">{noDataSentence(firstUse)}</p>
           <div className="pt-3">
-            <BtnLink to="/connect" variant="outline">채널 연결 상태 보기</BtnLink>
+            <BtnLink to="/connect" variant="outline">채널 연동 상태 보기</BtnLink>
           </div>
         </section>
       ) : null}
@@ -317,7 +317,7 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
         </p>
       ) : overview.error ? (
         <p className="text-sm text-muted">
-          운영 숫자를 읽지 못했습니다. <Link to="/overview" className="font-semibold text-brand-700 hover:underline">자세한 숫자 보기</Link>
+          운영 숫자를 읽지 못했어요. <Link to="/overview" className="font-semibold text-brand-700 hover:underline">자세한 숫자 보기</Link>
         </p>
       ) : null}
 
@@ -374,9 +374,9 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
  * greeting never contradicts it.
  */
 export function greetingLine(hour: number, count: number | null): string {
-  const hello = hour < 12 ? "좋은 아침입니다." : "안녕하세요.";
+  const hello = hour < 12 ? "좋은 아침이에요." : "안녕하세요.";
   if (count === null || count === 0) return hello;
-  return `${hello} 오늘 제가 먼저 확인한 일이 ${count}개 있습니다.`;
+  return `${hello} 오늘 제가 먼저 확인한 일이 ${count}개 있어요.`;
 }
 
 const STRIP_ROUTE: Record<string, string> = {

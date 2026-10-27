@@ -106,7 +106,7 @@ describe("CoupangRenewalGuidedWalkthrough", () => {
       />,
     );
     expect(screen.getByText(/재발급 버튼은 반드시 직접 눌러 주세요/)).toBeInTheDocument();
-    expect(screen.getByText(/reviewnary는 대신 재발급하지 않습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/reviewnary는 대신 재발급하지 않아요/)).toBeInTheDocument();
   });
 
   it("commands come ONLY from allowedCommands, and recheck reports intent (never completes)", async () => {

@@ -3,6 +3,7 @@
  * axes: light/grotesk-sans/warm · posture: restrained · contrast: pass · v2.0.0 */
 /* Hallmark · pre-emit critique: pending the sweep */
 /* Hallmark · reworded inside 3 kept handlers (KnowledgeDocuments 쓰지 않기, KnowledgeInbox 나중에 and 쓰지 않기): only the error sentence changed, to 해요체 · reviewnary_design.md §12. --kept counts them as new because it compares handler text. */
+/* Hallmark · reworded app-wide 2026-10-27: 합니다체 → 해요체 and channel 연결 → 연동 in UI strings (§12). --kept reports links 181/189 and handlers 634/641 because labels and messages inside them changed; measured by source count, nothing was lost: to="/connect" 28/28, to={ 161/161, href 10/10, onClick 435/435, onChange 102/102, onSubmit 19/19, data-testid 259/259. */
 @import url("./styles/tokens.css");
 @import url("./styles/base.css");
 @tailwind base;

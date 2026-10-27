@@ -51,7 +51,7 @@ describe("AgentDock", () => {
     expect(screen.queryByTestId("agent-dock")).toBeNull();
     phase("unpaired");
     expect(screen.queryByTestId("agent-dock")).toBeNull();
-    expect(document.body.textContent).not.toMatch(/내 PC 연결|연결하지 못했습니다|로컬 에이전트/);
+    expect(document.body.textContent).not.toMatch(/내 PC 연결|연결하지 못했어요|로컬 에이전트/);
   });
 
   it("connected → a small chip; tapping it shows the detail with 연결 해제; disconnecting goes quiet again", async () => {
