@@ -148,7 +148,7 @@ export function ReviewProblemCard({
       )}
 
       {detail.triage.tags.length > 0 ? (
-        <Disclosure label="자동 분류" note={detail.triage.tags.join(" · ")}>
+        <Disclosure label="키워드" note={detail.triage.tags.join(", ")}>
           <p className="break-keep px-2 pb-2 text-sm leading-relaxed text-muted">{TRIAGE_TAG_DISCLOSURE}</p>
         </Disclosure>
       ) : null}

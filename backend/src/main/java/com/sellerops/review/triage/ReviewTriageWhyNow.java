@@ -19,7 +19,8 @@ package com.sellerops.review.triage;
  * {@link ReviewTriageNote#action} — so there is exactly one place the wording lives and one place a
  * test can sweep it.
  *
- * <p><b>It states; it does not instruct.</b> Every sentence here is of the form 「…이며, …있습니다」.
+ * <p><b>It states; it does not instruct.</b> Every sentence here is two short 해요체 statements, 「…예요. …있어요.」
+ * (screen words, reviewnary_design.md §12 — the 합니다체 「…이며, …있습니다」 read as machine-written).
  * The same two prohibitions as the note apply and for the same reasons:
  *
  * <ul>
@@ -51,20 +52,20 @@ public final class ReviewTriageWhyNow {
         boolean textless = ReviewTriageRules.isTextless(body);
         boolean grouped = ReviewTriageNote.tagOf(category) != null && categoryCount >= ReviewTriageNote.REPEAT_MIN;
         String subject = textless
-                ? "별점만 남긴 " + rated(rating) + "이며"
-                : rated(rating) + "이며";
+                ? "별점만 남긴 " + rated(rating) + "예요."
+                : rated(rating) + "예요.";
 
         return switch (tier) {
             // 1–2점 with text. NEEDS_ATTENTION is unreachable for a textless review
             // ({@link ReviewTriageRules#tier}), so the textless wording below never applies to it.
             case NEEDS_ATTENTION -> grouped
-                    ? subject + ", 같은 자동 분류의 상품평이 여러 건 있습니다."
-                    : subject + ", 상품 상태를 확인할 내용이 있습니다.";
+                    ? subject + " 같은 분류의 리뷰가 여러 건 있어요."
+                    : subject + " 상품 상태를 봐야 할 내용이 있어요.";
             case WATCH -> textless
-                    ? subject + ", 읽을 본문이 없습니다."
+                    ? subject + " 읽을 본문은 없어요."
                     : grouped
-                            ? subject + ", 같은 자동 분류의 상품평이 여러 건 있습니다."
-                            : subject + ", 같은 분류가 늘어나는지 볼 내용이 있습니다.";
+                            ? subject + " 같은 분류의 리뷰가 여러 건 있어요."
+                            : subject + " 같은 분류가 늘어나는지 지켜볼 내용이 있어요.";
             // 참고 gets nothing, exactly as {@code recommendedAction} does. A review with nothing to
             // look at should say nothing; a filler sentence would make every review look like work.
             case FYI -> null;

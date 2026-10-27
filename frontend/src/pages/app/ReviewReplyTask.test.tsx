@@ -58,7 +58,7 @@ function detail(over: Partial<ChannelReviewDetailView> = {}): ChannelReviewDetai
     textless: false,
     isNew: false,
     triage: { tier: "FYI", reason: "같은 분류가 늘어나는지 지켜보세요.", tags: ["설치"], recommendedAction: null },
-    whyNow: "4점 리뷰이며, 같은 분류가 늘어나는지 볼 내용이 있습니다.",
+    whyNow: "4점 리뷰예요. 같은 분류가 늘어나는지 지켜볼 내용이 있어요.",
     aiMark: null,
     sellerCorrection: null,
     locateTarget: { productId: null, vendorItemId: null, writtenOn: null, rating: null },
@@ -171,7 +171,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     // 그리고 왜 지금 앞에 있는지가 본문과 함께 서 있다 — 「자동 분류」 아래가 아니라.
     // 2026-10-06부터 그 문장은 서버의 것(`ReviewTriageWhyNow`)이고, 목록이 쓰는 `triage.reason`·
     // `recommendedAction`과 다른 문장이다. 상세가 두 조각을 이어 만들지 않는다는 것이 계약이다.
-    expect(screen.getByText("4점 리뷰이며, 같은 분류가 늘어나는지 볼 내용이 있습니다.")).toBeInTheDocument();
+    expect(screen.getByText("4점 리뷰예요. 같은 분류가 늘어나는지 지켜볼 내용이 있어요.")).toBeInTheDocument();
     // The tier chip is on the problem card; 판매자 판단 names it again on purpose, as the thing
     // the seller is agreeing or disagreeing with.
     expect(screen.getAllByText("일반 리뷰").length).toBeGreaterThan(0);
@@ -191,7 +191,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     const fold = container.querySelector("details");
     expect(fold).not.toBeNull();
     expect(fold!.open).toBe(false);
-    expect(within(fold!).getByText("자동 분류")).toBeInTheDocument();
+    expect(within(fold!).getByText("키워드")).toBeInTheDocument();
     expect(within(fold!).getByText(/틀릴 수 있어요/)).toBeInTheDocument();
   });
 
@@ -412,7 +412,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     getReviewReplyPrep.mockResolvedValue(prep());
     const { unmount } = renderTask();
     const none = await screen.findByLabelText("판매자 판단");
-    expect(within(none).queryByRole("button", { name: "수정 되돌리기" })).toBeNull();
+    expect(within(none).queryByRole("button", { name: "자동 분류로 되돌리기" })).toBeNull();
     unmount();
 
     getReviewWorkspace.mockResolvedValue(
@@ -433,7 +433,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     renderTask();
 
     const block = await screen.findByLabelText("판매자 판단");
-    await userEvent.click(within(block).getByRole("button", { name: "수정 되돌리기" }));
+    await userEvent.click(within(block).getByRole("button", { name: "자동 분류로 되돌리기" }));
     await waitFor(() => expect(withdrawReviewTriageCorrection).toHaveBeenCalledWith(REVIEW));
     // The system's judgment is untouched by a withdrawal — only the seller's half goes.
     expect(within(block).getByText("자동 분류")).toBeInTheDocument();
@@ -739,7 +739,7 @@ describe("리뷰 처리 — a review with no seller account", () => {
     await screen.findByText("괜찮긴한데 자꾸 떨어져요");
     expect(screen.queryByRole("link", { name: "리뷰 기록에서 보기" })).toBeNull();
     // The way back is the index, which exists for every review.
-    expect(screen.getByRole("link", { name: /리뷰 기록으로/ })).toHaveAttribute("href", "/reviews");
+    expect(screen.getByRole("link", { name: /리뷰·문의/ })).toHaveAttribute("href", "/reviews");
   });
 });
 
@@ -872,7 +872,7 @@ describe("리뷰 미리보기 — 고객 원문 → 왜 → 근거 → 판단 �
     await waitFor(() => expect(screen.getByText("같은 분류가 늘어나는지 지켜보세요.")).toBeTruthy());
     expect(folds(container)).not.toContain("왜 올라왔나요");
     expect(folds(container)).not.toContain("반복 신호");
-    expect(folds(container)).not.toContain("이 리뷰의 중요도");
+    expect(folds(container)).not.toContain("이 리뷰의 분류");
     /* <b>And the label over it is gone with the fold</b> (canonical mockup, 2026-10-03). Two lines
        directly under the customer's sentence, answering it — a bold label in a 112px column was a step
        the eye took before the thing it came for. The region keeps the name it always had. */
@@ -1097,8 +1097,8 @@ describe("리뷰 pane — 판단과 조치는 읽기 전용", () => {
     const recorded = await screen.findByRole("region", { name: "판단과 조치" });
     expect(within(recorded).queryByRole("button")).toBeNull();
     // Two lines, not a three-row table: the stored tier and disposition, then the system's own judgement.
-    expect(recorded.textContent).toContain("중요도 일반 리뷰");
-    expect(recorded.textContent).toContain("처리 상태 답글 달기");
+    expect(recorded.textContent).toContain("분류 일반 리뷰");
+    expect(recorded.textContent).toContain("처리 방법 답글 달기");
     expect(recorded.textContent).toContain("자동 분류는 일반 리뷰예요.");
   });
 
@@ -1109,7 +1109,7 @@ describe("리뷰 pane — 판단과 조치는 읽기 전용", () => {
     const { unmount } = renderPreview("full");
 
     let recorded = await screen.findByRole("region", { name: "판단과 조치" });
-    await waitFor(() => expect(within(recorded).getByText("판단 전")).toBeTruthy());
+    await waitFor(() => expect(within(recorded).getByText("아직 안 정함")).toBeTruthy());
     unmount();
 
     getReviewWorkspace.mockResolvedValue(detail());
@@ -1136,7 +1136,7 @@ describe("리뷰 pane — 판단과 조치는 읽기 전용", () => {
 
     let recorded = await screen.findByRole("region", { name: "판단과 조치" });
     // The correction wins the headline value; the system's own tier is still said, under it.
-    await waitFor(() => expect(recorded.textContent).toContain("중요도 먼저 볼 리뷰"));
+    await waitFor(() => expect(recorded.textContent).toContain("분류 먼저 볼 리뷰"));
     expect(recorded.textContent).toContain("자동 분류는 일반 리뷰예요. 사장님이 먼저 볼 리뷰로 바꾼 기록이 함께 있어요.");
     unmount();
 
@@ -1305,7 +1305,7 @@ describe("리뷰 pane — 반복 신호가 pane의 중심 object", () => {
  * 가진 물건이 여전히 하나라는 것.
  */
 describe("리뷰 상세 — the one object and the one column (2026-10-06)", () => {
-  const WHY = "4점 리뷰이며, 같은 분류가 늘어나는지 볼 내용이 있습니다.";
+  const WHY = "4점 리뷰예요. 같은 분류가 늘어나는지 지켜볼 내용이 있어요.";
 
   it("prints the server's own sentence, and never joins the list's two strings into one", async () => {
     getReviewWorkspace.mockResolvedValue(
@@ -1344,8 +1344,8 @@ describe("리뷰 상세 — the one object and the one column (2026-10-06)", () 
 
     await screen.findByRole("region", { name: "왜 올라왔나요" });
     const header = document.querySelector("header");
-    expect(header?.textContent).toContain("중요도");
-    expect(header?.textContent).toContain("처리 상태");
+    expect(header?.textContent).toContain("분류");
+    expect(header?.textContent).toContain("처리 방법");
     // 머리말은 읽는 자리다. 바꾸는 두 컨트롤은 판매자의 결정 안에 그대로 있다 — 속성으로 옮겼다고
     // 능력이 사라지면 그것은 정리가 아니라 삭제다.
     const decided = screen.getByRole("region", { name: "판매자의 결정" });

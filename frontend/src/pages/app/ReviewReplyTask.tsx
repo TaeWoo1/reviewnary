@@ -300,11 +300,11 @@ export function ReviewCaseView({
         </Link>
       ) : from === "record" ? (
         <Link to="/reviews" className="text-sm font-semibold text-muted hover:text-ink hover:underline">
-          ← 리뷰
+          ← 리뷰·문의
         </Link>
       ) : (
         <Link to={recordPath} className="text-sm font-semibold text-muted hover:text-ink hover:underline">
-          ← 리뷰 기록으로
+          ← 리뷰·문의
         </Link>
       )}
       {/* The conversation that sent the seller here is still the one at `/` — the pointer is stored per
@@ -444,7 +444,7 @@ export function ReviewCaseView({
             to={`${reviewRecordPath(detail.sellerAccountId)}?review=${detail.id}`}
             className="rounded font-semibold text-muted hover:text-ink hover:underline"
           >
-            리뷰 기록에서 보기
+            목록에서 보기
           </Link>
         ) : undefined
       }
@@ -629,7 +629,7 @@ export function ReviewCaseView({
                    컨트롤도 글도 그대로이고 라벨만 왼쪽 112px로 옮겨 간다 — 확인할 일의 pane이 이미 쓰는
                    모양(`CaseBlock columns`)이고, 새로 만든 것이 아니다. */
                 <>
-                  <PropertyRow label="중요도" ariaLabel="판매자 판단 영역">
+                  <PropertyRow label="분류" ariaLabel="판매자 판단 영역">
                     <SellerCorrectionControls
                       reviewId={detail.id}
                       word={word}
@@ -667,7 +667,7 @@ export function ReviewCaseView({
                 </>
               ) : paneEvidenceFolded ? (
                 <Disclosure
-                  label="이 리뷰의 중요도"
+                  label="이 리뷰의 분류"
                   note={<TriageTierChip tier={detail.sellerCorrection?.correctedTier ?? detail.triage.tier} />}
                   summaryClassName="-ml-2"
                 >
@@ -684,7 +684,7 @@ export function ReviewCaseView({
                   </div>
                 </Disclosure>
               ) : (
-                <Section title="이 리뷰의 중요도" ariaLabel="판매자 판단 영역">
+                <Section title="이 리뷰의 분류" ariaLabel="판매자 판단 영역">
                   <SellerCorrectionControls
                     reviewId={detail.id}
                     word={word}
@@ -1194,11 +1194,16 @@ function JudgementProperties({
 }) {
   const correction = detail.sellerCorrection;
   return (
-    <p className={`break-keep text-sm leading-relaxed text-muted ${className}`}>
-      중요도 <strong className="font-bold text-ink">{TRIAGE_TIER_LABEL[correction?.correctedTier ?? detail.triage.tier]}</strong>{" "}
-      {correction ? "내가 바꿈" : "자동 분류"}
-      <span aria-hidden="true"> · </span>
-      처리 상태 <strong className="font-bold text-ink">{triageDispositionLabel(decision)}</strong>
+    // Two facts of different kinds, so two places rather than one dot-joined string (§12-3). The automatic tier is
+    // the default and says nothing about itself; only the seller's own change is named.
+    <p className={`flex flex-wrap gap-x-5 gap-y-1 break-keep text-sm leading-relaxed text-muted ${className}`}>
+      <span>
+        분류 <strong className="font-bold text-ink">{TRIAGE_TIER_LABEL[correction?.correctedTier ?? detail.triage.tier]}</strong>
+        {correction ? " (내가 바꿈)" : null}
+      </span>
+      <span>
+        처리 방법 <strong className="font-bold text-ink">{triageDispositionLabel(decision)}</strong>
+      </span>
     </p>
   );
 }

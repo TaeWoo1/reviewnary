@@ -98,8 +98,8 @@ export const TRIAGE_CORRECTION_LABEL: Record<ReviewTriageTier, string> = TRIAGE_
 
 /** What the correction block asks, and what it says once the seller has answered. */
 export const TRIAGE_CORRECTION_COPY = {
-  prompt: "중요도를 판매자님은 어떻게 보시나요?",
-  withdraw: "수정 되돌리기",
+  prompt: "어떤 리뷰로 볼까요?",
+  withdraw: "자동 분류로 되돌리기",
   systemPrefix: "자동 분류",
   sellerPrefix: "내가 바꿈",
   /**

@@ -119,7 +119,7 @@ export function SellerCorrectionControls({
             <span aria-hidden="true">·</span>
             <span>{TRIAGE_CORRECTION_COPY.sellerPrefix}</span>
             <TriageTierChip tier={answer} />
-            {changes > 1 ? <span className="text-xs">{changes}번 수정</span> : null}
+            {changes > 1 ? <span className="text-xs">{changes}번 바꿈</span> : null}
           </>
         ) : null}
       </p>
@@ -145,10 +145,10 @@ export function SellerCorrectionControls({
       {/* Folded, not dropped (Review Decision UX v3.2). It is the sentence that keeps the control honest —
           and it answers a question the seller asks AFTER pressing, not before: three lines of standing
           explanation above the primary action is three lines the action pays for. */}
-      <Disclosure label="이 판단은 어떻게 쓰이나요" summaryClassName="-ml-2">
+      <Disclosure label="바꾸면 어떻게 되나요" summaryClassName="-ml-2">
         <p className="pt-2 text-sm leading-relaxed text-muted">{TRIAGE_CORRECTION_COPY.disclosure}</p>
       </Disclosure>
-      {failed ? <p className="text-sm text-bad">기록하지 못했습니다. 잠시 후 다시 시도해 주세요.</p> : null}
+      {failed ? <p className="text-sm text-bad">기록하지 못했어요. 잠시 뒤 다시 눌러 주세요.</p> : null}
     </div>
   );
 }

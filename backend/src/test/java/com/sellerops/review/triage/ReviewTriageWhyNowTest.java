@@ -60,7 +60,7 @@ class ReviewTriageWhyNowTest {
     void everySentenceStatesRatherThanInstructs() {
         for (String text : emitted()) {
             // 평서형 종결 하나뿐 — 「…있습니다」와 「…없습니다」. 「확인해 보세요」 같은 꼴이 끼어들 자리가 없다.
-            assertThat(text).endsWith("습니다.");
+            assertThat(text).endsWith("요.");
             assertThat(text).doesNotContain("주세요").doesNotContain("보세요").doesNotContain("하세요");
         }
     }
@@ -80,24 +80,24 @@ class ReviewTriageWhyNowTest {
     @DisplayName("확인 필요는 별점과 확인할 내용을 한 문장으로 말한다")
     void needsAttentionNamesTheRatingAndWhatThereIsToCheck() {
         assertThat(ReviewTriageWhyNow.of(2, BODY, null, 0))
-                .isEqualTo("2점 리뷰이며, 상품 상태를 확인할 내용이 있습니다.");
+                .isEqualTo("2점 리뷰예요. 상품 상태를 봐야 할 내용이 있어요.");
         assertThat(ReviewTriageWhyNow.of(1, BODY, null, 0))
-                .isEqualTo("1점 리뷰이며, 상품 상태를 확인할 내용이 있습니다.");
+                .isEqualTo("1점 리뷰예요. 상품 상태를 봐야 할 내용이 있어요.");
         // 같은 분류가 쌓이면 그 사실이 확인할 내용의 자리를 가져간다.
         assertThat(ReviewTriageWhyNow.of(2, BODY, "설치", ReviewTriageNote.REPEAT_MIN))
-                .isEqualTo("2점 리뷰이며, 같은 자동 분류의 상품평이 여러 건 있습니다.");
+                .isEqualTo("2점 리뷰예요. 같은 분류의 리뷰가 여러 건 있어요.");
         // 세 건 미만은 아직 묶음이 아니다 — REPEAT_MIN의 선언이 그 이유를 가지고 있다.
         assertThat(ReviewTriageWhyNow.of(2, BODY, "설치", ReviewTriageNote.REPEAT_MIN - 1))
-                .isEqualTo("2점 리뷰이며, 상품 상태를 확인할 내용이 있습니다.");
+                .isEqualTo("2점 리뷰예요. 상품 상태를 봐야 할 내용이 있어요.");
     }
 
     @Test
     @DisplayName("본문이 없으면 없다고 말한다 — 별점만 남긴 리뷰는 지켜보기에만 있다")
     void atextlessReviewSaysSo() {
         assertThat(ReviewTriageWhyNow.of(1, "", null, 0))
-                .isEqualTo("별점만 남긴 1점 리뷰이며, 읽을 본문이 없습니다.");
+                .isEqualTo("별점만 남긴 1점 리뷰예요. 읽을 본문은 없어요.");
         assertThat(ReviewTriageWhyNow.of(null, "   ", null, 0))
-                .isEqualTo("별점만 남긴 평점 없는 리뷰이며, 읽을 본문이 없습니다.");
+                .isEqualTo("별점만 남긴 평점 없는 리뷰예요. 읽을 본문은 없어요.");
         // ReviewTriageRules: 1–2점 무본문은 지켜보기다. 확인 필요에서는 이 문장이 닿을 수 없다.
         for (Integer rating : RATINGS) {
             for (String body : new String[] {null, "", "   "}) {
@@ -110,7 +110,7 @@ class ReviewTriageWhyNowTest {
     @DisplayName("평점이 없으면 0점이라고 꾸미지 않는다")
     void anAbsentRatingIsSaidAsAbsent() {
         assertThat(ReviewTriageWhyNow.of(null, BODY, null, 0))
-                .isEqualTo("평점 없는 리뷰이며, 같은 분류가 늘어나는지 볼 내용이 있습니다.");
+                .isEqualTo("평점 없는 리뷰예요. 같은 분류가 늘어나는지 지켜볼 내용이 있어요.");
         for (String text : emitted()) {
             assertThat(text).doesNotContain("0점").doesNotContain("null");
         }
