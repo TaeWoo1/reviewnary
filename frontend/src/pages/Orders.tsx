@@ -21,21 +21,27 @@ function parsePreset(raw: string | null): Preset {
   return (PRESETS as readonly number[]).includes(n) ? (n as Preset) : 30;
 }
 
-/** 한 열에 여럿이 서는 자리의 폭 — 목록이 표로 읽히려면 열이 자기 자리를 지켜야 한다. */
+/**
+ * 한 열에 여럿이 서는 자리의 폭 — 목록이 표로 읽히려면 열이 자기 자리를 지켜야 한다.
+ *
+ * <p><b>좁아지면 덜 쓰는 열부터 접는다</b> (2026-10-28 화면 점검: 980폭에서 결제 시각 열이 잘렸다). 고정 폭의 합이
+ * 812px이었고 980폭의 본문은 740px이다. 주문 번호 · 결제 금액 · 결제 시각은 어느 폭에서나 서고, 상품주문과 채널
+ * 상태는 `md`, 채널은 `lg`, 마지막 확인은 `xl`부터 선다 — 숨긴 열은 주문 한 건의 화면에 다 있다.
+ */
 const COL = {
   id: "min-w-0 flex-1 truncate pr-4 tabular-nums",
-  channel: "w-[170px] shrink-0 truncate pr-4",
-  lines: "w-[72px] shrink-0 pr-4 text-right tabular-nums",
-  amount: "w-[130px] shrink-0 pr-4 text-right tabular-nums",
-  status: "w-[210px] shrink-0 truncate pr-4",
-  paid: "w-[130px] shrink-0 pr-4 text-right tabular-nums",
-  seen: "w-[100px] shrink-0 text-right tabular-nums",
+  channel: "hidden w-[130px] shrink-0 truncate pr-4 lg:block",
+  lines: "hidden w-[72px] shrink-0 pr-4 text-right tabular-nums md:block",
+  amount: "w-[110px] shrink-0 pr-4 text-right tabular-nums",
+  status: "hidden w-[160px] shrink-0 truncate pr-4 md:block",
+  paid: "w-[120px] shrink-0 text-right tabular-nums xl:pr-4",
+  seen: "hidden w-[100px] shrink-0 text-right tabular-nums xl:block",
 };
 const READ_COL = {
   channel: "min-w-0 flex-1 truncate pr-4",
-  state: "w-[150px] shrink-0 truncate pr-4",
-  lines: "w-[150px] shrink-0 pr-4 text-right tabular-nums",
-  seen: "w-[170px] shrink-0 text-right tabular-nums",
+  state: "w-[120px] shrink-0 truncate pr-4 md:w-[150px]",
+  lines: "hidden w-[150px] shrink-0 pr-4 text-right tabular-nums md:block",
+  seen: "w-[120px] shrink-0 text-right tabular-nums md:w-[170px]",
 };
 
 /**

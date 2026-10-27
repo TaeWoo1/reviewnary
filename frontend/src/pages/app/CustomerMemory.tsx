@@ -113,12 +113,13 @@ export function CustomerMemory() {
   );
 
   const controls = (
-    <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-b border-line">
-      <div className="flex flex-wrap items-center gap-6" role="group" aria-label="상태 필터">
+    <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+      <div className="-mx-1 flex flex-wrap items-center gap-1" role="group" aria-label="상태 필터">
         {ISSUE_GROUP_ORDER.map((key) => (
           <FilterTab
             key={key}
             pressed={group === key}
+            empty={issuesInGroup(visible, key).length === 0}
             onClick={() => setFilter({ group: key })}
           >
             {ISSUE_GROUP_LABEL[key]} {issuesInGroup(visible, key).length}

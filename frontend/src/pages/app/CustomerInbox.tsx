@@ -377,9 +377,14 @@ export function CustomerInbox() {
       */}
       {/* 탭 줄은 탭만 든다 (2026-10-04). 316px rail에서 탭 셋과 채널 select가 한 줄을 다투면 세 번째 탭이
           select 옆으로 내려가, 목록의 축이 두 줄로 쪼개진 채 읽힌다. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line" data-testid="record-tabs">
+      <div className="-mx-1 flex flex-wrap items-center gap-1" data-testid="record-tabs">
         {RECORD_STATUS_OPTIONS.map((option) => (
-          <FilterTab key={option.value} pressed={status === option.value} onClick={() => setParam("status", option.value)}>
+          <FilterTab
+            key={option.value}
+            pressed={status === option.value}
+            empty={COUNT_OF[option.value](counts) === 0}
+            onClick={() => setParam("status", option.value)}
+          >
             {option.label}
             {COUNT_OF[option.value](counts) != null ? (
               <span className="ml-1.5 tabular-nums">{COUNT_OF[option.value](counts)!.toLocaleString("ko-KR")}</span>

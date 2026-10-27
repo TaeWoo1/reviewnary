@@ -304,11 +304,13 @@ function ChannelRow({
  * 그래서 같은 화면에서 상태가 두 군데, 시각이 두 군데에 있었다. 폭은 여기서만 정해지고 그 구역이 가져다
  * 쓴다 — 두 벌이 생기면 두 벌이 어긋난다.
  */
+// Below `md` the 「마지막으로 가져온 때」 column folds and the action goes to its own line under the row (2026-10-28):
+// the four fixed columns were 520px on a 358px screen.
 export const COL = {
   name: "min-w-0 flex-1 pr-4",
   state: "w-[110px] shrink-0 pr-4",
-  read: "w-[220px] shrink-0 pr-4 text-right tabular-nums",
-  action: "flex w-[190px] shrink-0 flex-wrap items-center justify-end gap-2",
+  read: "hidden w-[220px] shrink-0 pr-4 text-right tabular-nums md:block",
+  action: "flex w-full shrink-0 flex-wrap items-center justify-end gap-2 pt-1 md:w-[190px] md:pt-0",
 };
 
 /**
@@ -369,7 +371,7 @@ export function ChannelList({
   return (
     <>
       {/* aria-hidden: 각 행이 제 이름을 달고 있다. 열 이름은 눈으로 비교하는 쪽을 위한 것이다. */}
-      <div aria-hidden="true" className="flex items-center pb-1 text-xs text-muted">
+      <div aria-hidden="true" className="hidden items-center pb-1 text-xs text-muted md:flex">
         <span className={COL.name}>채널</span>
         <span className={COL.state}>연동</span>
         <span className={COL.read}>마지막으로 가져온 때</span>

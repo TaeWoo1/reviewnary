@@ -827,8 +827,14 @@ describe("리뷰 목록 — the Linear grouping (2026-10-05)", () => {
     const rating = row.firstElementChild as HTMLElement;
     expect(rating).toHaveTextContent("★5");
     expect(rating).toHaveAccessibleName(/5점/);
-    expect(rating.className).toContain("text-muted");
-    expect(rating.nextElementSibling).toBe(sentence);
+    // A ★4–5 is the quiet grey; ★1–2 take 위험 and ★3 주의 (`Stars`, 2026-10-28).
+    expect(rating.querySelector("[aria-hidden] > span")?.className).toContain("text-muted");
+    // The day sits between them in the source — at the end of the first line on a phone, in its own column on a wide
+    // screen (`md:order-last`) — and is written one way (2026-10-28).
+    const day = rating.nextElementSibling as HTMLElement;
+    expect(day.className).toContain("md:order-last");
+    expect(day.nextElementSibling).toBe(sentence);
+    expect(sentence.className).toContain("line-clamp-2");
     // And the whole right-hand cluster is one weak block, not a column of competing ranks.
     const meta = row.lastElementChild as HTMLElement;
     expect(meta.className).toContain("text-xs");

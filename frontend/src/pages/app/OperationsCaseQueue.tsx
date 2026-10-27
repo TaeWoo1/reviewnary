@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { FilterTab } from "../../components/ui/FilterTab";
 import { useLocation, useSearchParams } from "react-router-dom";
-import type { ReactNode } from "react";
 import { MasterDetail, useWideLayout } from "../../components/workspace/MasterDetail";
 import { WorkRows } from "../../components/workspace/WorkRows";
 import { WorkItemPane } from "../../components/workspace/WorkItemPane";
@@ -25,30 +25,6 @@ type View = (typeof VIEWS)[number]["key"];
 
 /** One name for one list: the nav entry, this page's title and the Home's section all say 확인할 일 (UI/UX v2). */
 const TITLE = COPY.listTitle;
-/**
- * <b>확인할 일's views</b> (canonical redesign, 2026-10-03) — the bucket's name with its count, the
- * pressed one filled in the brand tint.
- *
- * <p>They were underline tabs sharing one rule, and a rule only works along a line: in a 316px rail the
- * five of them take three rows, and a bottom border under the third row is a divider with two rows of
- * tabs floating above it. The reference's own filter row is a row of small chips for the same reason —
- * a chip carries its own edge, so the group wraps without the group's shape breaking.
- */
-function Chip({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      onClick={onClick}
-      className={`whitespace-nowrap rounded-lg px-2 py-1 text-xs tabular-nums transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
-        pressed ? "bg-brand-50 font-semibold text-brand-700" : "text-muted hover:text-ink"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
 /**
  * <b>Narrowing the list by what is written in it</b> (canonical mockup, 2026-10-02).
  *
@@ -244,7 +220,8 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
         ) : null}
       </div>
 
-      <div role="group" aria-label="할 일 나누어 보기" className="flex w-max gap-1 rounded-xl bg-canvas p-1">
+      {/* A switch between three views of 할 일 — the groove, as 리뷰 | 문의 (2026-10-28). */}
+      <div role="group" aria-label="할 일 나누어 보기" className="flex w-max gap-0.5 rounded-xl bg-well p-0.5 shadow-[var(--press-groove)]">
         {VIEWS.map((v) => {
           const count = v.key === "todo" ? (work ? today.length : null) : v.key === "moving" ? (board?.moving.length ?? null) : null;
           return (
@@ -253,8 +230,8 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
               type="button"
               aria-pressed={view === v.key}
               onClick={() => setView(v.key)}
-              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
-                view === v.key ? "bg-surface text-ink ring-1 ring-line" : "text-muted hover:text-ink"
+              className={`whitespace-nowrap rounded-lg px-3 py-1 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
+                view === v.key ? "bg-surface font-semibold text-ink shadow-card" : "font-medium text-muted hover:text-ink"
               }`}
             >
               {v.label}
@@ -344,9 +321,9 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       {work && allRows.length > 0 ? (
         <div className="-mx-2 flex flex-wrap items-center gap-1" role="group" aria-label="할 일 보기">
           {WORK_FILTERS.map((f) => (
-            <Chip key={f.key} pressed={filter === f.key} onClick={() => setFilter(f.key)}>
+            <FilterTab key={f.key} pressed={filter === f.key} empty={today.filter(f.test).length === 0} onClick={() => setFilter(f.key)}>
               {f.label} {today.filter(f.test).length.toLocaleString("ko-KR")}
-            </Chip>
+            </FilterTab>
           ))}
         </div>
       ) : null}

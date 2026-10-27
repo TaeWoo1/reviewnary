@@ -30,7 +30,14 @@ import type { OperatingRuleRow, ProductFactRow } from "../../lib/types";
  */
 
 const USED = "w-[88px] shrink-0 text-right tabular-nums";
-const WHEN = "w-[96px] shrink-0 text-right tabular-nums text-xs text-muted";
+// 「마지막으로 쓰인 날」 folds below `sm` (2026-10-28): at 390 the two fixed columns pushed the table 194px past the
+// screen. How often it was used stays; when is on the knowledge's own screen.
+const WHEN = "hidden w-[96px] shrink-0 text-right tabular-nums text-xs text-muted sm:block";
+// 출처 · 종류 · 상품 fold as the screen narrows (2026-10-28): they are facts about a row, not the row. The head said 170px
+// and the rows drew 150px for the same 출처 column; one width now, from one constant.
+const SOURCE = "hidden w-[150px] shrink-0 lg:block";
+const KIND = "hidden w-[110px] shrink-0 lg:block";
+const PRODUCT = "hidden w-[230px] shrink-0 md:block";
 /*
  * 머리는 바탕색도 테두리도 갖지 않는다 — 첫 행의 윗선이 머리와 본문을 가른다. 전에는 표가 둥근 상자
  * 안에 있었고 머리에 회색 바탕이 깔려 있어서, 격자를 세 번(상자 테두리 · 머리 바탕 · 행 구분선) 그렸다.
@@ -74,7 +81,7 @@ export function OperatingRuleTable({ rules }: { rules: OperatingRuleRow[] }) {
       <div aria-hidden="true" className={HEAD}>
         <span className="w-[150px] shrink-0">주제</span>
         <span className="min-w-0 flex-1">기준</span>
-        <span className="w-[170px] shrink-0">출처</span>
+        <span className={SOURCE}>출처</span>
         <span className={USED}>쓰인 답변</span>
         <span className={WHEN}>마지막으로 쓰인 날</span>
       </div>
@@ -88,7 +95,7 @@ export function OperatingRuleTable({ rules }: { rules: OperatingRuleRow[] }) {
               <span className="min-w-0 flex-1">
                 <span className="sr-only">적어 둔 기준 없음</span>
               </span>
-              <span className="w-[170px] shrink-0" />
+              <span className={SOURCE} />
               <Used label={`${topic.label} 쓰인 답변`} value={0} />
               <span className={WHEN} />
             </li>
@@ -124,9 +131,9 @@ export function ProductFactTable({ facts }: { facts: ProductFactRow[] }) {
     <>
       <div aria-hidden="true" className={HEAD}>
         <span className="min-w-0 flex-1">내용</span>
-        <span className="w-[110px] shrink-0">종류</span>
-        <span className="w-[230px] shrink-0">상품</span>
-        <span className="w-[150px] shrink-0">출처</span>
+        <span className={KIND}>종류</span>
+        <span className={PRODUCT}>상품</span>
+        <span className={SOURCE}>출처</span>
         <span className={USED}>쓰인 답변</span>
         <span className={WHEN}>마지막으로 쓰인 날</span>
       </div>
@@ -150,12 +157,12 @@ export function ProductFactTable({ facts }: { facts: ProductFactRow[] }) {
                 {fact.active ? null : <span className="ml-2 text-xs text-muted">쓰지 않음</span>}
               </span>
             )}
-            <span className="w-[110px] shrink-0 truncate text-xs text-muted">
+            <span className={`${KIND} truncate text-xs text-muted`}>
               {topicLabel(fact.sourceType) ?? ""}
             </span>
             {/* 빈 칸이 아니라 문장이다. 이 열의 빈 칸은 「상품이 없다」로 읽히는데, 사실은 지식은 한
                 상품에 붙어 있고 그 상품을 이 화면이 이름으로 부를 수 없다는 뜻이다. */}
-            <span className="w-[230px] shrink-0 truncate text-xs text-muted">
+            <span className={`${PRODUCT} truncate text-xs text-muted`}>
               {fact.productName ?? "이름을 알 수 없는 상품"}
             </span>
             <Origin documentName={fact.documentName} />
@@ -173,7 +180,7 @@ export function ProductFactTable({ facts }: { facts: ProductFactRow[] }) {
 /** 손으로 쓴 것인지, 넘긴 파일에서 온 것인지. 파일이면 그 파일 이름을 말한다 — 인용이 그렇게 말하므로. */
 function Origin({ documentName }: { documentName: string | null }) {
   return (
-    <span className="w-[150px] shrink-0 truncate text-xs text-muted" title={documentName ?? undefined}>
+    <span className={`${SOURCE} truncate text-xs text-muted`} title={documentName ?? undefined}>
       {documentName ? `파일 「${documentName}」` : "직접 씀"}
     </span>
   );

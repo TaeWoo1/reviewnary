@@ -60,12 +60,17 @@ export interface ProductTableRow {
 }
 
 const CELL = "shrink-0 w-[84px] text-right tabular-nums";
+/**
+ * Below `md` only the product and the first two counts stand — 답변 대기 and 문제 근거, the ones that ask for the seller
+ * (2026-10-28: five 84px columns ran 180px past a phone). The rest are on the product's own screen.
+ */
+const NARROW = "[&>*:nth-child(n+4)]:hidden md:[&>*:nth-child(n+4)]:block";
 
 export function ProductTableHead() {
   return (
     // aria-hidden: each cell below carries its own label for a screen reader, which reads a row as one
     // object rather than asking the listener to hold five column positions in their head.
-    <div aria-hidden="true" className="flex items-center gap-4 border-b border-line bg-canvas/40 px-5 py-2.5 text-xs text-muted">
+    <div aria-hidden="true" className={`flex items-center gap-4 border-b border-line bg-canvas/40 px-5 py-2.5 text-xs text-muted ${NARROW}`}>
       <span className="min-w-0 flex-1">상품</span>
       {PRODUCT_COLUMNS.map((column) => (
         <span key={column.key} className={CELL}>
@@ -81,7 +86,7 @@ export function ProductTableRowItem({ row }: { row: ProductTableRow }) {
   return (
     <Link
       to={`/products/${row.id}`}
-      className="flex items-center gap-4 px-5 py-2.5 transition hover:bg-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700"
+      className={`flex items-center gap-4 px-5 py-2.5 transition hover:bg-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${NARROW}`}
     >
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium text-ink">{row.name}</span>

@@ -15,18 +15,30 @@ export function FilterTab({
   pressed,
   onClick,
   children,
+  empty = false,
 }: {
   pressed: boolean;
   onClick: () => void;
   children: ReactNode;
+  /** The view holds nothing — drawn quieter, still pressable (2026-10-28). */
+  empty?: boolean;
 }) {
   return (
+    /*
+      <b>The one filter chip</b> (2026-10-28 walk-through: five shapes of tab and filter — a bordered pill, a grey chip,
+      a groove, an underline and a black fill). A filter narrows the list in front of you, and it is this chip on every
+      screen; a switch between two views is the groove (`ReviewInquirySwitch`, 할 일's views, 주간 · 월간).
+    */
     <button
       type="button"
       aria-pressed={pressed}
       onClick={onClick}
-      className={`-mb-px min-h-[40px] border-b-2 px-1 pb-3 text-base tabular-nums transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
-        pressed ? "border-brand-700 font-semibold text-ink" : "border-transparent text-muted hover:text-ink"
+      className={`min-h-[32px] whitespace-nowrap rounded-lg px-2.5 text-sm tabular-nums transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${
+        pressed
+          ? "bg-surface font-semibold text-ink ring-1 ring-line"
+          : empty
+            ? "text-muted/60 hover:text-ink"
+            : "text-muted hover:bg-surface/60 hover:text-ink"
       }`}
     >
       {children}

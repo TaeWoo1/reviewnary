@@ -89,6 +89,20 @@ export function kstToday(now: Date = new Date()): string {
 }
 
 /**
+ * <b>One way to write a day in a list</b> (2026-10-28): 「오늘」 and 「N일 전」 for the last seven days, the date itself
+ * after that. The review list mixed 「7일 전」, 「2026-07-23」 and 「10월 25일 14:38」 on one screen. Takes a `YYYY-MM-DD`
+ * day as the record carries it (KST); anything else comes back as given.
+ */
+export function listDay(day: string | null | undefined, now: Date = new Date()): string {
+  if (!day) return "날짜 없음";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return day;
+  const days = Math.round((Date.parse(kstToday(now)) - Date.parse(day)) / 86_400_000);
+  if (days === 0) return "오늘";
+  if (days > 0 && days <= 7) return `${days}일 전`;
+  return day;
+}
+
+/**
  * A calendar date the seller would write, from an instant — in the seller's own day, not UTC's.
  *
  * `iso.slice(0, 10)` on a stored instant is the UTC date, which is yesterday for anything that happened

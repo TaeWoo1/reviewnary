@@ -1,3 +1,5 @@
+import { Stars } from "../../components/reviews/Stars";
+import { listDay } from "../../lib/format";
 import { mergeHomeWork, todayWork } from "../../lib/homeWork";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { safetyLabel } from "../../lib/safetyLabel";
@@ -238,12 +240,18 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
    */
   const reviewRow = ({ channelCode, channelNameKo, review, safety }: ReviewRecordRow, withGroup: boolean) => (
                         <li key={review.id}>
+                          {/* <b>Fixed columns, two lines of the customer, one way to write a day</b> (2026-10-28 walk-through).
+                              The notes had no width of their own, so 「답변함」 on one row pushed the product and date
+                              of that row out of line with the next; the sentence was cut at about fifteen characters
+                              while the product column was wider; and below `md` the sentence column measured 0px wide.
+                              Now the notes and product hold fixed widths on a wide screen, the sentence takes two lines,
+                              and on a phone the row stacks — stars and day, the sentence, then product and notes. */}
                           <Link
                             to={`/reviews/reply/${review.id}?from=record`}
-                            className="flex items-center gap-4 rounded-lg py-3 pl-3 pr-3 transition hover:bg-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700"
+                            className="flex flex-wrap items-start gap-x-4 gap-y-1 rounded-lg py-3 pl-3 pr-3 transition hover:bg-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 md:flex-nowrap"
                           >
                             {withGroup ? (
-                              <span className="flex w-[5.5rem] shrink-0 items-center gap-2 text-sm">
+                              <span className="flex w-[5.5rem] shrink-0 items-center gap-2 pt-0.5 text-sm">
                                 <TierDot tier={review.triage.tier} />
                                 <span
                                   className={`truncate ${
@@ -255,23 +263,26 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
                               </span>
                             ) : null}
                             {/* <b>별점은 한 글자와 숫자다</b> (리뷰 canonical mockup, 2026-10-05). 읽어 주는 쪽에는 원래
-                                문장이 그대로 간다. */}
-                            <span
-                              className="w-8 shrink-0 text-sm tabular-nums text-muted"
-                              aria-label={ratingLabel(review.rating)}
-                            >
-                              <span aria-hidden>★{review.rating}</span>
+                                문장이 그대로 간다. 색은 별점의 무게를 따라간다(2026-10-28). */}
+                            <span className="w-8 shrink-0 pt-0.5 text-sm" aria-label={ratingLabel(review.rating)}>
+                              <span aria-hidden>
+                                {review.rating != null ? <Stars rating={review.rating} /> : "★–"}
+                              </span>
+                            </span>
+                            {/* The day, at the end of the first line on a phone; in its own column on a wide screen. */}
+                            <span className="ml-auto shrink-0 pt-0.5 text-xs tabular-nums text-muted md:order-last md:ml-0 md:w-20 md:text-right">
+                              {listDay(review.writtenOn)}
                             </span>
                             <span
-                              className={`min-w-0 flex-1 truncate break-keep text-base leading-snug ${
+                              className={`line-clamp-2 min-w-0 basis-full break-keep text-base leading-snug md:basis-auto md:flex-1 ${
                                 review.textless ? "text-muted" : "font-medium text-ink"
                               }`}
                             >
                               {review.textless ? "별점만 남긴 리뷰" : previewText(review.preview) || "표시할 수 있는 본문이 없어요"}
                             </span>
                             {/* 오른쪽은 한 덩어리의 주석이다 — 폭이 정해져 있고, 줄이 아니라 묶음으로 약하다. */}
-                            <span className="flex shrink-0 items-center gap-3 text-xs text-muted">
-                              <span className="flex max-w-[16rem] items-center gap-2 overflow-hidden">
+                            <span className="flex min-w-0 basis-full items-center gap-3 pt-0.5 text-xs text-muted md:basis-auto md:shrink-0">
+                              <span className="flex min-w-0 items-center gap-2 overflow-hidden md:w-36 md:shrink-0">
                                 {/* <b>한 행에 상태 단어는 하나다</b> (UI audit, 2026-10-06). 판매자 수정이 있으면 AI 표시는
                                     서지 않는다 — 두 사실 모두 상세에 그대로 있다. */}
                                 {safety ? (
@@ -296,8 +307,7 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
                               {manyChannels ? (
                                 <span className="w-12 shrink-0 truncate">{channelShort(channelCode) ?? channelNameKo ?? "채널 미상"}</span>
                               ) : null}
-                              <span className="w-44 shrink-0 truncate">{review.productName ?? review.productId ?? "상품 정보 없음"}</span>
-                              <span className="w-20 shrink-0 text-right tabular-nums">{review.writtenOn ?? "날짜 없음"}</span>
+                              <span className="min-w-0 truncate md:w-36 md:shrink-0">{review.productName ?? review.productId ?? "상품 정보 없음"}</span>
                             </span>
                           </Link>
                         </li>

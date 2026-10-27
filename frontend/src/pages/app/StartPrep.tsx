@@ -90,7 +90,9 @@ export function StartPrep() {
         <Step n={3} title="준비된 답변 확인" state={open.length === 0 && candidates !== null ? "now" : "later"} note="리뷰·문의에서 확인해요" />
       </ol>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
+      {/* `grid-cols-1` is `minmax(0, 1fr)`: without it the one implicit column sized itself to its content and the
+          page ran 300px past a phone's edge (2026-10-28). */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
         <section aria-label="답에 필요한데 아직 없는 것" className="space-y-2">
           <SectionHeader
             title="답에 필요한데 아직 없는 것"

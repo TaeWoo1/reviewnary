@@ -275,11 +275,12 @@ function Value({ f, unit = "건" }: { f: Figure; unit?: string }) {
   );
 }
 
+// Narrow screens keep the type and the period; when it was read last and the channel list fold (2026-10-28).
 const READ_COL = {
   type: "w-[110px] shrink-0 pr-4",
-  last: "w-[180px] shrink-0 pr-4 tabular-nums",
+  last: "hidden w-[180px] shrink-0 pr-4 tabular-nums md:block",
   period: "w-[130px] shrink-0 pr-4",
-  channels: "min-w-0 flex-1 truncate",
+  channels: "hidden min-w-0 flex-1 truncate sm:block",
 };
 
 /**
@@ -366,10 +367,11 @@ function ReadRange({
   );
 }
 
+// The comparison column narrows and then folds (2026-10-28): 200 + 300px fixed was wider than a phone.
 const ROW = {
   label: "min-w-0 flex-1 truncate pr-4",
-  value: "w-[200px] shrink-0 pr-4 text-right",
-  against: "w-[300px] shrink-0 text-right",
+  value: "w-[120px] shrink-0 pr-4 text-right md:w-[200px]",
+  against: "hidden w-[300px] shrink-0 text-right md:block",
 };
 
 /**
