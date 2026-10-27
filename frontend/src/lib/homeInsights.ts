@@ -65,4 +65,4 @@ export function changeInsights(
  * <p>It ends in a full stop because it is the section's whole BODY now, not a fragment beside other
  * clauses — the same shape as 「이미 결정한 일입니다. 등록만 남았습니다.」 one section down.
  */
-export const NO_CHANGE_TODAY = "오늘 새로 확인된 변화는 없습니다.";
+export const NO_CHANGE_TODAY = "오늘 새로 바뀐 것은 없어요.";

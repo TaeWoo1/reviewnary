@@ -97,7 +97,7 @@ export const HOME_QUEUE_SIZE = 50;
  * the summary cell one band above — and printing it here made the first screen say 확인할 일 three times
  * and read as an abbreviation of the list beside it. These rows are a brief over the oldest of the work.
  */
-const HOME_BRIEF_TITLE = "오늘 먼저 볼 일";
+const HOME_BRIEF_TITLE = "먼저 볼 일";
 
 /**
  * <b>What the four rows ARE, now that they are not an age ranking</b> (product-owner decision,
@@ -113,7 +113,8 @@ const HOME_BRIEF_TITLE = "오늘 먼저 볼 일";
  * selection rather than the whole list — which is what the 전체 보기 beside it is for. The order is
  * not spelled out here; the 2026-10-22 mockup changed the order and the mark, not this sentence.
  */
-const HOME_BRIEF_NOTE = "문의와 리뷰에서 먼저 볼 것을 모았습니다.";
+// No sentence: it narrated the heading (§12-3, 「Remove empty sentences」). What every row shares is still said once.
+const HOME_BRIEF_NOTE = "";
 
 /** Whether the Home is drawn as 고객 운영 관리's (v3.1) — the job is open for this org and has something to say. */
 export function coHomeApplies(co: CustomerOperationsHome | null | undefined): co is CustomerOperationsHome {
@@ -403,8 +404,7 @@ export function CustomerOpsHome({
             <span className="break-keep text-sm text-muted">
               {/* The order, which is the only thing the seller has to know to read the four rows — and
                   what every row says identically, said once instead of twice on each of them. */}
-              {HOME_BRIEF_NOTE}
-              {sharedSaid ? ` · ${sharedSaid}` : ""}
+              {[HOME_BRIEF_NOTE, sharedSaid].filter(Boolean).join(" ")}
             </span>
             {/* <b>The breakdown is the queue's, not the brief's</b> (product-owner decision, 2026-10-01).
                 Measured at 1600×1000 this heading read 「확인할 일 오래된 순 정보 부족 1 · 답변 필요 25 ·
@@ -484,6 +484,17 @@ export function CustomerOpsHome({
       </div>
 
       <ChannelState warnings={warnings} unproven={freshnessUnproven(metrics)} collection={ops?.collection} now={now} />
+
+      {/* <b>The screens the menu no longer names</b> (menu decision, 2026-10-27). 할 일 and 반복 문제 are reached from
+          the lines above; 주문 and 리포트 had only the menu, and a route nobody can reach is a removed feature. */}
+      <nav aria-label="다른 화면" className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+        <Link to="/orders" className="font-semibold text-muted hover:text-ink hover:underline">
+          주문 보기
+        </Link>
+        <Link to="/reports" className="font-semibold text-muted hover:text-ink hover:underline">
+          리포트 보기
+        </Link>
+      </nav>
     </div>
   );
 }
@@ -518,14 +529,14 @@ function WhatChanged({
     if (context === null) return null;
   }
   return (
-    <section aria-label="오늘 달라진 점">
+    <section aria-label="오늘 바뀐 것">
       {/* The heading, its note and the ONE way out. <b>Two links at most in this section</b>
           (product-owner decision, 2026-10-01): it carried three — 자세한 숫자 보기 inside the note,
           「N건 전체 보기」 here, and the insight's own action on the row — and the first two went to the
           same screen. The note's link is gone; what remains is one navigation and one contextual
           action, which is the ceiling. */}
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-section font-bold tracking-tight text-ink">오늘 달라진 점</h2>
+        <h2 className="text-section font-bold tracking-tight text-ink">오늘 바뀐 것</h2>
         {context}
         {/*
           <b>The count is CHANGES, and only the ones this cap hid</b> (product-owner decision,
@@ -635,7 +646,7 @@ function ChannelState({
       {/* The question, named. Without it this row is an orange sentence floating under the work, and the
           seller has to infer that it is about their channels. It is a label, not a heading: the two
           sections above are work and this is the frame they were read inside. */}
-      <span className="shrink-0 font-semibold text-ink">채널</span>
+      <span className="shrink-0 font-semibold text-ink">연동</span>
       {warnings.length > 0 ? (
         // The row names the question; this list keeps the name it has always had, because what it holds is
         // narrower than the question — the places a figure above does not cover.
@@ -650,13 +661,12 @@ function ChannelState({
         <p className="flex flex-wrap items-center gap-x-2 break-keep text-muted">
           {/* Muted, never warn (§8-B′): it qualifies the figures above and is read in the same breath as
               them. The warn colour is for a channel the seller can go and fix. */}
-          <span>{unproven ? "일부 채널 최신 수집 확인 필요" : "확인된 수집 문제 없음"}</span>
-          <Sep />
+          <span>{unproven ? "최근에 가져왔는지 모르는 곳이 있어요" : "가져오는 데 문제없어요"}</span>
           <Link
             to="/connect"
             className="font-semibold text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
           >
-            연결 상태 보기
+            연동 상태 보기
           </Link>
         </p>
       )}
@@ -712,7 +722,7 @@ function channelFreshness(
     if (seen2 === undefined) latest.set(name, value);
     else if (value !== null && (seen2 === null || value > seen2)) latest.set(name, value);
   }
-  return [...latest.entries()].map(([name, at]) => ({ name, ago: at === null ? "수집 기록 없음" : agoLabel(at, now) }));
+  return [...latest.entries()].map(([name, at]) => ({ name, ago: at === null ? "가져온 적 없음" : agoLabel(at, now) }));
 }
 
 /** 「N분 전」 — the same thresholds {@link waitLabel} uses, said about a read instead of about a wait. */
@@ -1067,7 +1077,7 @@ function OperationsSummary({
             ? undefined
             : // The population is incomplete, so there is no honest count — the cause, named, and the
               // same words the channel row at the foot of the screen uses for it.
-              "수집 상태 확인 필요"
+              "최근에 가져왔는지 몰라요"
       }
     >
       {unanswered?.kind === "COUNT" ? (
@@ -1622,13 +1632,12 @@ function PastWork({ count }: { count: number }) {
       <span>
         지난 일 <span className="font-semibold tabular-nums text-ink">{count.toLocaleString("ko-KR")}</span>건
       </span>
-      <span aria-hidden="true">·</span>
-      <span>2주 넘은 리뷰 · 1년 넘은 문의</span>
+      <span>(2주 넘은 리뷰, 1년 넘은 문의)</span>
       <Link
         to="/customer-operations/cases"
         className="ml-auto font-semibold text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
       >
-        확인할 일에서 보기 →
+        할 일에서 보기 →
       </Link>
     </p>
   );

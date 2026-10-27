@@ -99,7 +99,7 @@ export const COPY = {
   // <b>What the box takes, in the seller's own nouns</b> (Home visual target, 2026-10-01). 「질문이나
   // 지시」 names the two shapes of a sentence; it never says what the sentence may be ABOUT, and on a screen
   // whose every row is a review or an inquiry that is the only thing a first-time seller needs told.
-  composer: "리뷰나 문의를 자연어로 요청해보세요",
+  composer: "리뷰나 문의에 대해 물어보세요",
   // What stays with the seller, in one sentence. It promises nothing new: `DUTIES_SELLER`'s first item
   // (「고객에게 실제 메시지 전송」) is the same contract, and the approval boundary is what actually enforces it.
   autoCheckFence: "답변이나 외부 조치는 승인 전 자동 실행하지 않습니다.",

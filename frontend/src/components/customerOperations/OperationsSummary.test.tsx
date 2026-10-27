@@ -78,7 +78,7 @@ function ops(): OperationsHome {
 /**
  * `insights` defaults to `[]` — a read that LANDED and found nothing, which is the ordinary case and
  * the one these fixtures are about. Passing nothing would be a read that did not land, and the
- * 오늘 달라진 점 section says nothing at all then (a failed request is not 「변화 없음」).
+ * 오늘 바뀐 것 section says nothing at all then (a failed request is not 「변화 없음」).
  */
 function draw(home = co(), m: OperationsMetrics | null = metrics(), insights: OperationsInsight[] | null = []) {
   return render(
@@ -117,7 +117,7 @@ describe("오늘 들어온 것 — a number only when it is a measured fact", ()
     await waitFor(() => expect(line).toHaveTextContent("오늘 들어온 것"));
     expect(line).toHaveTextContent("리뷰 3");
     expect(line).toHaveTextContent("문의 5");
-    expect(line).not.toHaveTextContent("수집 확인 필요");
+    expect(line).not.toHaveTextContent("가져왔는지 몰라요");
   });
 
 /**
@@ -141,8 +141,8 @@ describe("오늘 들어온 것 — a number only when it is a measured fact", ()
     // The withheld lane prints no number — the rule, unchanged.
     expect(line).not.toHaveTextContent("리뷰 3");
     // And no reason either: that sentence belongs to the channel row at the foot of the screen.
-    expect(line).not.toHaveTextContent("수집 확인 필요");
-    expect(await channels()).toHaveTextContent("일부 채널 최신 수집 확인 필요");
+    expect(line).not.toHaveTextContent("가져왔는지 몰라요");
+    expect(await channels()).toHaveTextContent("최근에 가져왔는지 모르는 곳이 있어요");
   });
 
   it("inquiry lane stale, review fresh: the mirror case", async () => {
@@ -150,7 +150,7 @@ describe("오늘 들어온 것 — a number only when it is a measured fact", ()
     const line = await context();
     await waitFor(() => expect(line).toHaveTextContent("리뷰 3"));
     expect(line).not.toHaveTextContent("문의 5");
-    expect(line).not.toHaveTextContent("수집 확인 필요");
+    expect(line).not.toHaveTextContent("가져왔는지 몰라요");
   });
 
   it("both stale: the group disappears rather than printing a cause this line does not own", async () => {
@@ -163,13 +163,13 @@ describe("오늘 들어온 것 — a number only when it is a measured fact", ()
     );
     // Nothing measured and nothing opened, so the note has no facts and renders itself away. The
     // section it belongs to then says the one sentence it exists for.
-    const section = await screen.findByLabelText("오늘 달라진 점");
-    await waitFor(() => expect(section).toHaveTextContent("오늘 새로 확인된 변화는 없습니다."));
+    const section = await screen.findByLabelText("오늘 바뀐 것");
+    await waitFor(() => expect(section).toHaveTextContent("오늘 새로 바뀐 것은 없어요."));
     expect(screen.queryByTestId("today-context")).toBeNull();
     // Still no digits anywhere: an unobserved zero never becomes 「0」.
     expect(section.textContent).not.toMatch(/리뷰 \d|문의 \d/);
     // The cause is stated once, where the question is asked.
-    expect(await channels()).toHaveTextContent("일부 채널 최신 수집 확인 필요");
+    expect(await channels()).toHaveTextContent("최근에 가져왔는지 모르는 곳이 있어요");
   });
 
   it("a measured zero IS printed — that is the difference the state words exist to keep", async () => {
@@ -177,7 +177,7 @@ describe("오늘 들어온 것 — a number only when it is a measured fact", ()
     const line = await context();
     await waitFor(() => expect(line).toHaveTextContent("리뷰 0"));
     expect(line).toHaveTextContent("문의 0");
-    expect(line).not.toHaveTextContent("수집 확인 필요");
+    expect(line).not.toHaveTextContent("가져왔는지 몰라요");
   });
 
   it("names no channel it was not given — the summary never invents where a gap is", async () => {
@@ -195,7 +195,7 @@ describe("오늘 들어온 것 — a number only when it is a measured fact", ()
     await waitFor(() => expect(line).toHaveTextContent("최근 24시간"));
     expect(line).not.toHaveTextContent("오늘 들어온 것");
     // A failed read is not a collection finding, and this line would not be the place to say so anyway.
-    expect(line).not.toHaveTextContent("수집 확인 필요");
+    expect(line).not.toHaveTextContent("가져왔는지 몰라요");
   });
 
   it("example data is shown and labelled — a DEMO_SEED count may never read as the seller's", async () => {
@@ -247,7 +247,7 @@ describe("최근 24시간 — what we opened, never what was completed", () => {
       here: <b>nothing opened never becomes 「새로 확인 0」</b> — three zeros where one honest clause
       belonged, and now where no clause belongs at all.
     */
-    await waitFor(() => expect(screen.getByLabelText("오늘 달라진 점")).toHaveTextContent("오늘 달라진 점"));
+    await waitFor(() => expect(screen.getByLabelText("오늘 바뀐 것")).toHaveTextContent("오늘 바뀐 것"));
     expect(line).not.toHaveTextContent("최근 24시간");
     expect(line.textContent).not.toMatch(/새로 확인 0/);
     expect(line).not.toHaveTextContent("새로 확인한 일 없음");
@@ -380,7 +380,7 @@ describe("the band — obligations only", () => {
     // here would be the `contextStrip` defect again.
     expect(cell).not.toHaveTextContent("4");
     expect(cell).toHaveTextContent("—");
-    expect(cell).toHaveTextContent("수집 상태 확인 필요");
+    expect(cell).toHaveTextContent("최근에 가져왔는지 몰라요");
     // And the cause is still carried by the surfaces whose job IS collection state, exactly once between
     // them. Which sentence they use depends on WHICH lane is unproven (a withheld inflow lane names itself
     // on the context line; otherwise the channel row's freshness clause speaks), so the assertion is on the
@@ -390,7 +390,7 @@ describe("the band — obligations only", () => {
     // is the qualification OF THIS FIGURE, in the slot that exists to qualify it. A seller reading 「—」
     // without it would be looking at an unexplained blank.
     const said = [(await context()).textContent, (await channels()).textContent].join(" ");
-    expect(said.match(/수집 (상태|확인) 확인 필요|최신 수집 확인 필요/g) ?? []).toHaveLength(1);
+    expect(said.match(/최근에 가져왔는지 (몰라요|모르는 곳이 있어요)/g) ?? []).toHaveLength(1);
   });
 
   /**
@@ -407,8 +407,8 @@ describe("the band — obligations only", () => {
     }));
     const ctx = await context();
     await waitFor(() => expect(ctx).toHaveTextContent("최근 24시간"));
-    expect(ctx).not.toHaveTextContent("수집 확인 필요");
-    expect(await channels()).toHaveTextContent("일부 채널 최신 수집 확인 필요");
+    expect(ctx).not.toHaveTextContent("가져왔는지 몰라요");
+    expect(await channels()).toHaveTextContent("최근에 가져왔는지 모르는 곳이 있어요");
   });
 
   it("says 현재 미답변 could not be read, and says nothing about the channels", async () => {
@@ -418,12 +418,12 @@ describe("the band — obligations only", () => {
     await waitFor(() => expect(band).toHaveTextContent("할 일"));
     const cell = band.querySelector("[data-testid='pulse-unanswered']")!;
     // A failed request still does not say zero. What it now also does not do is vanish: the slot stands
-    // and names its own cause. <b>And the cause is OURS, not the seller's</b> — 「수집 상태 확인 필요」 is
+    // and names its own cause. <b>And the cause is OURS, not the seller's</b> — 「최근에 가져왔는지 몰라요」 is
     // a claim about their channels and no read supports it here, so a failed request says only that the
     // number was not read.
     expect(cell).toHaveTextContent("—");
     expect(cell).toHaveTextContent("숫자를 읽지 못했습니다");
-    expect(cell).not.toHaveTextContent("수집 상태 확인 필요");
+    expect(cell).not.toHaveTextContent("최근에 가져왔는지 몰라요");
     expect(cell.textContent).not.toMatch(/\d/);
   });
 
@@ -555,7 +555,7 @@ describe("the band — obligations only", () => {
 describe("the context line", () => {
   /**
    * <b>Re-pointed: the way to the numbers is the section's, not this line's</b> (product-owner
-   * decision, 2026-10-01 — 오늘 달라진 점 carries at most two CTAs). 「자세한 숫자 보기」 pointed at
+   * decision, 2026-10-01 — 오늘 바뀐 것 carries at most two CTAs). 「자세한 숫자 보기」 pointed at
    * `/overview` while the heading this line is the note OF carries 「N건 전체 보기 →」 to the same
    * screen, on the same row, plus the insight's own action: three competing links in one section.
    *
@@ -582,8 +582,8 @@ describe("the context line", () => {
   it("never carries channel freshness itself — that question is asked at the foot of the screen", async () => {
     draw(co({ checked: 1 }), metrics({ kpis: [kpi("reviews"), kpi("inquiries"), kpi("unansweredInquiries", { freshnessUnproven: true })] }));
     const row = await channels();
-    await waitFor(() => expect(row).toHaveTextContent("일부 채널 최신 수집 확인 필요"));
-    expect(await context()).not.toHaveTextContent("일부 채널 최신 수집 확인 필요");
+    await waitFor(() => expect(row).toHaveTextContent("최근에 가져왔는지 모르는 곳이 있어요"));
+    expect(await context()).not.toHaveTextContent("최근에 가져왔는지 모르는 곳이 있어요");
     // Secondary disclosure (§8-B'): it qualifies the figures above and is read in the same breath as
     // them. The warn colour is for a channel the seller can go and fix, and would otherwise spend the
     // page's strongest signal on machinery.
@@ -598,7 +598,7 @@ describe("the channel row", () => {
   it("answers when the answer is yes — silence cannot be told from «we did not look»", async () => {
     draw(co({ checked: 1 }), metrics({ kpis: [kpi("reviews"), kpi("inquiries")] }));
     const row = await channels();
-    await waitFor(() => expect(row).toHaveTextContent("확인된 수집 문제 없음"));
+    await waitFor(() => expect(row).toHaveTextContent("가져오는 데 문제없어요"));
     // It claims exactly what the reads support — no gap row, no incomplete source, no unproven figure —
     // and never that every channel is up to date, which nothing on this screen measures.
     expect(row).not.toHaveTextContent("최신");

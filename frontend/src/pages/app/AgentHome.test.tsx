@@ -231,16 +231,16 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     renderHome(new Date("2026-09-30T09:30:00+09:00"));
     expect(await screen.findByText("새로 할 일은 없습니다.")).toBeInTheDocument();
     expect(screen.queryByText("상품페이지 설명에 혼선을 줍니다.")).toBeNull();
-    expect(screen.getByText("확인할 일에서 보기 →").closest("p")?.textContent).toContain("지난 일 1건");
+    expect(screen.getByText("할 일에서 보기 →").closest("p")?.textContent).toContain("지난 일 1건");
     expect(screen.getByTestId("today-summary").textContent).toMatch(/오늘 할 일\s*0/);
   });
 
-  it("골격이 선다 — 오늘 · 숫자 · 오늘 먼저 볼 일 · 반복 문제 · 채널, 그리고 그 아래 한 줄 입력", async () => {
+  it("골격이 선다 — 오늘 · 숫자 · 먼저 볼 일 · 반복 문제 · 채널, 그리고 그 아래 한 줄 입력", async () => {
     renderHome();
     const title = await screen.findByRole("heading", { level: 1, name: "오늘" });
     expect(title.className).toContain("text-title");
-    expect(screen.getByText("오늘 먼저 볼 일")).toBeInTheDocument();
-    expect(screen.getByLabelText("오늘 달라진 점")).toBeInTheDocument();
+    expect(screen.getByText("먼저 볼 일")).toBeInTheDocument();
+    expect(screen.getByLabelText("오늘 바뀐 것")).toBeInTheDocument();
     expect(screen.getByLabelText("반복 문제")).toBeInTheDocument();
     expect(screen.getByLabelText("채널 상태")).toBeInTheDocument();
     expect(screen.getByRole("form", { name: "AI 담당자에게 요청" })).toBeInTheDocument();
@@ -273,7 +273,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
 
   it("먼저 볼 일의 리뷰 한 줄은 그 리뷰를 판단하는 화면을 연다", async () => {
     renderHome();
-    await screen.findByText("오늘 먼저 볼 일");
+    await screen.findByText("먼저 볼 일");
     const row = await screen.findByRole("link", { name: /상품페이지 설명에 혼선을 줍니다/ });
     // `from=work` — 이 화면에서 들어왔다는 표시. 돌아올 곳을 리뷰 화면이 안다.
     expect(row).toHaveAttribute("href", "/reviews/reply/rev-1?from=work");
@@ -297,7 +297,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
   it("채널 상태는 수집을 기술 이름 없이 말한다", async () => {
     renderHome();
     const area = await screen.findByLabelText("채널 상태");
-    expect(within(area).getByRole("link", { name: "연결 상태 보기" })).toHaveAttribute("href", "/connect");
+    expect(within(area).getByRole("link", { name: "연동 상태 보기" })).toHaveAttribute("href", "/connect");
     expect(area.textContent ?? "").not.toMatch(/NAVER|ORDER_SUMMARY|REVIEW|GW\./);
   });
 
@@ -335,7 +335,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     getCustomerOperationsHome.mockRejectedValue(new Error("responsibility down"));
     renderHome();
     await screen.findByRole("heading", { level: 1, name: "오늘" });
-    expect(screen.getByText("오늘 먼저 볼 일")).toBeInTheDocument();
+    expect(screen.getByText("먼저 볼 일")).toBeInTheDocument();
     expect(screen.getByLabelText("채널 상태")).toBeInTheDocument();
     // 네 개의 성긴 영역도, 그 아래 「지금 처리할 일이 N건」 대화 턴도 없다.
     expect(screen.queryByLabelText("오늘 확인할 것")).toBeNull();
@@ -416,7 +416,7 @@ describe("return-visit signal", () => {
     renderHome();
     await screen.findByRole("heading", { name: "오늘" });
     // The screen the seller came for is drawn exactly as it is when the signal succeeds.
-    expect(await screen.findByText("오늘 먼저 볼 일")).toBeTruthy();
+    expect(await screen.findByText("먼저 볼 일")).toBeTruthy();
   });
 });
 
@@ -463,7 +463,7 @@ describe("Customer Operations v3.1 — the job's Home", () => {
     expect(screen.queryByText("AI가 먼저 확인한 일")).toBeNull();
     expect(screen.queryByText("지금 살펴볼 리뷰")).toBeNull();
     // The composer's own string, not a copy of it: the placeholder changed with the Home visual target
-    // (「리뷰나 문의를 자연어로 요청해보세요」) and a second spelling of it here is exactly the kind of
+    // (「리뷰나 문의에 대해 물어보세요」) and a second spelling of it here is exactly the kind of
     // literal that makes a copy change look like a regression.
     expect(screen.getByPlaceholderText(COPY.composer)).toBeInTheDocument();
   });

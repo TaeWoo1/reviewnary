@@ -3,7 +3,7 @@ import { NO_CHANGE_TODAY, changeInsights } from "./homeInsights";
 import type { OperationsInsight } from "./types";
 
 /**
- * <b>오늘 달라진 점 shows changes, and a change is two windows compared</b> (product-owner decision,
+ * <b>오늘 바뀐 것 shows changes, and a change is two windows compared</b> (product-owner decision,
  * 2026-10-01).
  *
  * <p>Two regressions are pinned here because both were on screen. The first was a five-month lifetime
@@ -115,6 +115,6 @@ describe("changeInsights", () => {
 
   it("names the empty day without claiming anything about tomorrow", () => {
     // A full stop: it is the section's whole body now, not a clause beside others.
-    expect(NO_CHANGE_TODAY).toBe("오늘 새로 확인된 변화는 없습니다.");
+    expect(NO_CHANGE_TODAY).toBe("오늘 새로 바뀐 것은 없어요.");
   });
 });

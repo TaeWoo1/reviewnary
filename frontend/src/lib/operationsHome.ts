@@ -19,11 +19,11 @@ export function problemLine(problems: HomeRepeatedProblems): string {
     // they are two facts the server returns separately and documents as un-addable — 「2건」 would be the sum this
     // line has never been allowed to print.
     const watching =
-      problems.observing > 0 ? ` ${problems.observing.toLocaleString("ko-KR")}건은 지켜보고 있습니다.` : "";
-    return `지금 판단이 필요한 반복 문제가 ${problems.decidable.toLocaleString("ko-KR")}건 있습니다.${watching}`;
+      problems.observing > 0 ? ` ${problems.observing.toLocaleString("ko-KR")}건은 지켜보고 있어요.` : "";
+    return `지금 정해야 할 반복 문제가 ${problems.decidable.toLocaleString("ko-KR")}건 있어요.${watching}`;
   }
   if (problems.observing > 0) {
-    return `지금 판단이 필요한 반복 문제는 없습니다. ${problems.observing.toLocaleString("ko-KR")}건을 지켜보고 있습니다.`;
+    return `지금 정해야 할 반복 문제는 없어요. ${problems.observing.toLocaleString("ko-KR")}건을 지켜보고 있어요.`;
   }
   // Nothing is happening now, but something happened. The Home only carries problems whose evidence is still
   // inside the observation window, so an org whose problems all went quiet would otherwise read
@@ -33,9 +33,9 @@ export function problemLine(problems: HomeRepeatedProblems): string {
   // that number is `ReviewIssueThresholds.PERSIST_LOOKBACK_WEEKS`, and a second copy of it in Korean prose is
   // the copy that goes stale the day the threshold moves.
   if (problems.dormant > 0) {
-    return `최근에 다시 확인된 반복 문제는 없습니다. 이전에 모인 ${problems.dormant.toLocaleString("ko-KR")}건은 고객운영 메모리에 있습니다.`;
+    return `최근에 다시 생긴 반복 문제는 없어요. 전에 모인 ${problems.dormant.toLocaleString("ko-KR")}건은 반복 문제 화면에 있어요.`;
   }
-  return "아직 모인 반복 문제가 없습니다.";
+  return "아직 없어요.";
 }
 
 /** 준비된 작업, or null when nothing is prepared — this area never grows to fill the space. */

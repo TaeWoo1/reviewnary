@@ -309,11 +309,11 @@ describe("CustomerOpsHome", () => {
     // <b>The count moved up one line</b> (product-owner decision, 2026-09-26): it is 「지금 볼 것」 of the
     // summary, and the heading no longer repeats it 12px below. Same number, same `work`, one place.
     await waitFor(() => expect(summary).toHaveTextContent("할 일 4"));
-    // The brief's heading is 「오늘 먼저 볼 일」 since the Home visual target: 할 일 names the QUEUE —
+    // The brief's heading is 「먼저 볼 일」 since the Home visual target: 할 일 names the QUEUE —
     // the rail item, the screen it links to, and the summary cell above — and printing it here was the
     // third copy. What is asserted is unchanged and is the point of the re-point: the count lives in the
     // band, once, and the heading of the rows does not repeat it.
-    const heading = await screen.findByRole("heading", { name: /오늘 먼저 볼 일/ });
+    const heading = await screen.findByRole("heading", { name: /먼저 볼 일/ });
     expect(heading).not.toHaveTextContent("4");
     // <b>The breakdown is the queue's, not the brief's</b> (product-owner decision, 2026-10-01). It used to
     // stand here: 「교환·환불 1 · 정보 부족 1 · 답변 필요 1 · 리뷰 1」, four tallies over a list showing four
@@ -329,7 +329,8 @@ describe("CustomerOpsHome", () => {
       FOUR ROWS ARE — a seller must not have to guess why these four — and that is asserted on the
       sentence the rows can prove.
     */
-    expect(heading.parentElement).toHaveTextContent(/문의와 리뷰에서 먼저 볼 것/);
+    // Since 2026-10-27 the heading itself says it (「먼저 볼 일」) and the narrating sentence is gone (§12-3).
+    expect(heading).toHaveTextContent("먼저 볼 일");
     expect(heading.parentElement).not.toHaveTextContent(/오래 기다린 .*부터/);
     expect(heading.parentElement).not.toHaveTextContent(/교환·환불 1|정보 부족 1/);
     await expectNoAxeViolations(container);
@@ -586,7 +587,7 @@ describe("CustomerOpsHome", () => {
     const section = await screen.findByRole("region", { name: "반복 문제" });
 
     // decidable = 1, observing = 1. The old line printed 「관찰 중 2」 — a sum under one part's name.
-    expect(section).toHaveTextContent("지금 판단이 필요한 반복 문제가 1건 있습니다.");
+    expect(section).toHaveTextContent("지금 정해야 할 반복 문제가 1건 있어요.");
     expect(section).not.toHaveTextContent("관찰 중 2");
   });
 
@@ -856,6 +857,15 @@ describe("오늘 — an inbox, not a dashboard", () => {
  * two gave way and how: <b>a row is whole or it is absent</b>, and the visible limit is a named function of the
  * layout rather than a measurement taken at render time.
  */
+describe("오늘 — the screens the menu no longer names", () => {
+  it("keeps a way to 주문 and 리포트, whose only door was the menu (menu decision, 2026-10-27)", async () => {
+    draw();
+    const other = await screen.findByRole("navigation", { name: "다른 화면" });
+    expect(within(other).getByRole("link", { name: "주문 보기" })).toHaveAttribute("href", "/orders");
+    expect(within(other).getByRole("link", { name: "리포트 보기" })).toHaveAttribute("href", "/reports");
+  });
+});
+
 describe("visible rows — the Pulse's cost, paid in whole rows", () => {
   beforeEach(() => {
     vi.clearAllMocks();

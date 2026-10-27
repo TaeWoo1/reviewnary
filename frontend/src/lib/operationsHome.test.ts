@@ -21,8 +21,8 @@ describe("반복 문제", () => {
    */
   it("names both populations it draws, and never their sum", () => {
     const line = problemLine(problems());
-    expect(line).toContain("판단이 필요한 반복 문제가 1건");
-    expect(line).toContain("19건은 지켜보고 있습니다");
+    expect(line).toContain("정해야 할 반복 문제가 1건");
+    expect(line).toContain("19건은 지켜보고 있어요");
     expect(line).not.toContain("20건");
   });
 
@@ -37,8 +37,8 @@ describe("반복 문제", () => {
    */
   it("reports 관찰 중 as watching, and only once nothing needs a decision", () => {
     const line = problemLine(problems({ decidable: 0 }));
-    expect(line).toContain("판단이 필요한 반복 문제는 없습니다");
-    expect(line).toContain("19건을 지켜보고 있습니다");
+    expect(line).toContain("정해야 할 반복 문제는 없어요");
+    expect(line).toContain("19건을 지켜보고 있어요");
   });
 
   /**
@@ -49,9 +49,9 @@ describe("반복 문제", () => {
    */
   it("separates 「아직 없다」 from 「최근에 없다」, because only one of them is an empty library", () => {
     const quiet = problemLine(problems({ decidable: 0, observing: 0, dormant: 19 }));
-    expect(quiet).toContain("최근에 다시 확인된 반복 문제는 없습니다");
-    expect(quiet).toContain("이전에 모인 19건");
-    expect(quiet).toContain("고객운영 메모리");
+    expect(quiet).toContain("최근에 다시 생긴 반복 문제는 없어요");
+    expect(quiet).toContain("전에 모인 19건");
+    expect(quiet).toContain("반복 문제 화면");
     // Never the sentence for an org that has none at all.
     expect(quiet).not.toContain("아직 모인");
     // It says how many and where, never which — naming them here would be listing them, which is what the
@@ -63,6 +63,6 @@ describe("반복 문제", () => {
   });
 
   it("says nothing has gathered only when there is genuinely nothing", () => {
-    expect(problemLine(problems({ decidable: 0, observing: 0, dormant: 0 }))).toBe("아직 모인 반복 문제가 없습니다.");
+    expect(problemLine(problems({ decidable: 0, observing: 0, dormant: 0 }))).toBe("아직 없어요.");
   });
 });

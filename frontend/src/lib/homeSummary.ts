@@ -116,15 +116,15 @@ export const INFLOW_WORD = {
   lead: "오늘 들어온 것",
   reviews: "리뷰",
   inquiries: "문의",
-  reviewsUnqualified: "리뷰 수집 확인 필요",
-  inquiriesUnqualified: "문의 수집 확인 필요",
+  reviewsUnqualified: "리뷰를 최근에 가져왔는지 몰라요",
+  inquiriesUnqualified: "문의를 최근에 가져왔는지 몰라요",
   /**
    * Both lanes withheld. Rendered <b>instead of</b> the two lane sentences, which are the same five
    * syllables twice — and the claim is identical either way: we cannot vouch for today's arrivals.
    * The moment one lane qualifies this collapses back, because then the two lanes differ and saying
    * so is the whole point.
    */
-  bothUnqualified: "수집 상태 확인 필요",
+  bothUnqualified: "최근에 가져왔는지 몰라요",
   exampleData: "예시 데이터",
 } as const;
 
@@ -187,7 +187,7 @@ export const UNANSWERED_WORD = {
   /** The noun the 문의 screen and `/overview` already use, so one number has one name. */
   lead: "미답변",
   /** Some channel is missing from the population — the figure would be a floor presented as a total. */
-  unqualified: "수집 상태 확인 필요",
+  unqualified: "최근에 가져왔는지 몰라요",
 } as const;
 
 export const RECENT_WORD = {
