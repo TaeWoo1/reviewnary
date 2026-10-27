@@ -39,7 +39,7 @@ const ALL_DAYS = "ALL";
 
 /** The three orders, in the words the control has always used. */
 const SORTS: readonly { value: Sort; label: string }[] = [
-  { value: "attention", label: "확인 필요순" },
+  { value: "attention", label: "먼저 볼 순" },
   { value: "newest", label: "최신순" },
   { value: "lowest", label: "낮은 평점순" },
 ];
@@ -494,7 +494,7 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
                     /* <b>빈 묶음은 빈 기록이 아니다.</b> 그래서 이 말은 목록을 대신하지 않고 묶음 안에 선다 —
                        다른 두 묶음의 이름과 수가 바로 위아래에 그대로 있어야, 어디가 비었는지가 말이 된다. */
                     <p className="px-3 py-6 pl-12 text-sm text-muted">
-                      {`${TRIAGE_TIER_LABEL[value]}에 해당하는 ${josa(WORD, "이", "가")} 없습니다. 다른 묶음을 열어 보세요.`}
+                      {`${TRIAGE_TIER_LABEL[value]}가 없어요. 다른 묶음을 열어 보세요.`}
                     </p>
                   ) : open ? (
                     <ul>

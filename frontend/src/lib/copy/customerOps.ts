@@ -60,6 +60,8 @@ export const COPY = {
   // last 24 hours, and 「자동 확인 · 24시간」 put the two numbers side by side with nothing saying which was which.
   checkedLabel: "최근 24시간 자동 확인",
   mineLabel: "내가 할 일",
+  /** The Home's first figure (owner decision 2026-10-27): the day's count, where a case screen says 내가 할 일. */
+  todayLabel: "오늘 할 일",
   listTitle: "할 일",
   /*
     <b>The list no longer has ONE order to name</b> (product-owner decision, 2026-10-01). It said
@@ -207,7 +209,7 @@ export const REASON = {
   reply: { tag: "답변 필요", tone: "gray", icon: "chat" },
   withheld: { tag: "판단 보류", tone: "gray", icon: "scale" },
   // The seller's own reply work (UI/UX v2 Phase 3) — the words `lib/workState.ts` already uses for it.
-  approve: { tag: "승인 대기", tone: "blue", icon: "star" },
+  approve: { tag: "확정 전", tone: "blue", icon: "star" },
   draft: { tag: "초안 필요", tone: "gray", icon: "star" },
 } as const satisfies Record<string, Reason>;
 

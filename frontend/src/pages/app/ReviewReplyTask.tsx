@@ -1103,7 +1103,7 @@ function ProductContextLines({ context }: { context: ReviewDecisionContext }) {
       {/* The honest half: a thin draft usually has a reason, and it is one click from being fixed. */}
       {knowledge.openAsks > 0 ? (
         <p className="mt-2 max-w-thread break-keep text-sm leading-relaxed text-warn">
-          아직 답하지 않은 확인 필요가 {knowledge.openAsks}건 있습니다. 채우면 다음 초안이 더 말할 수 있습니다.
+          아직 채우지 않은 내용이 {knowledge.openAsks}건 있어요. 채우면 다음 AI 답글이 더 자세해져요.
         </p>
       ) : null}
     </section>
@@ -1136,8 +1136,8 @@ function RecordedStatus({
       <h3 className="text-sm font-bold text-muted">판단과 조치</h3>
       <JudgementProperties detail={detail} decision={decision} className="mt-1 text-base leading-snug" />
       <p className="mt-1 max-w-thread break-keep text-sm leading-relaxed text-muted">
-        시스템 판단은 {TRIAGE_TIER_LABEL[detail.triage.tier]}입니다.
-        {correction ? ` 판매자 수정으로 ${TRIAGE_TIER_LABEL[correction.correctedTier]}가 함께 기록돼 있습니다.` : ""}
+        자동 분류는 {TRIAGE_TIER_LABEL[detail.triage.tier]}예요.
+        {correction ? ` 사장님이 ${TRIAGE_TIER_LABEL[correction.correctedTier]}로 바꾼 기록이 함께 있어요.` : ""}
       </p>
     </section>
   );
@@ -1196,7 +1196,7 @@ function JudgementProperties({
   return (
     <p className={`break-keep text-sm leading-relaxed text-muted ${className}`}>
       중요도 <strong className="font-bold text-ink">{TRIAGE_TIER_LABEL[correction?.correctedTier ?? detail.triage.tier]}</strong>{" "}
-      {correction ? "판매자 수정" : "시스템 판단"}
+      {correction ? "내가 바꿈" : "자동 분류"}
       <span aria-hidden="true"> · </span>
       처리 상태 <strong className="font-bold text-ink">{triageDispositionLabel(decision)}</strong>
     </p>

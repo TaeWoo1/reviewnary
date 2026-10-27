@@ -29,7 +29,7 @@ import { TRIAGE_OPTIONS } from "./vocItems";
  */
 export const DECISION_ACTION_NOTE = {
   withReply:
-    "「대응 필요」로 정하면 아래에서 답변 초안을 준비하고 승인할 수 있습니다. 승인한 답변은 판매자님이 판매자센터에 직접 올리십니다.",
+    "「답글 달기」로 정하면 아래에서 AI 답글을 쓰고 확정할 수 있어요. 확정한 답글은 판매자센터에 직접 올려요.",
   withoutReply:
     "이 채널에서는 reviewnary가 답변을 작성하지 않습니다. 조치는 판매자님이 직접 하시고, 여기에는 무엇으로 정했는지만 기록됩니다.",
   withoutAccount:
@@ -61,13 +61,13 @@ const ACTION_KIND_WORD: Record<string, string> = {
   ACTION_STARTED: "조치를 시작했다고 기록",
   ACTION_COMPLETED: "조치를 완료했다고 기록",
   ACTION_NOT_NEEDED: "조치가 필요 없다고 기록",
-  REPLY_DRAFTED: "답변 초안을 작성했다고 기록",
-  REPLY_SUBMITTED: "답변을 올렸다고 기록",
+  REPLY_DRAFTED: "답글을 썼다고 기록",
+  REPLY_SUBMITTED: "답글을 올렸다고 기록",
 };
 
 const APPROVAL_WORD: Record<string, string> = {
-  APPROVED: "답변을 승인",
-  WITHDRAWN: "답변 승인을 되돌림",
+  APPROVED: "답글을 확정함",
+  WITHDRAWN: "답글 확정을 풀었음",
 };
 
 const OUTCOME_WORD: Record<string, string> = {
@@ -94,10 +94,21 @@ const EXECUTION_WORD: Record<string, string> = {
   UNVERIFIABLE: "채널에 답변을 보냈지만 확인 자체를 하지 못함",
   COMPOSER_FILLED: "판매자센터 답변창에 승인한 답변을 넣음",
   SELLER_SUBMISSION_OBSERVED: "판매자센터에서 판매자가 등록을 누른 것을 확인함",
-  SUBMISSION_OBSERVED_CONTENT_UNVERIFIED: "채널에 답변이 생긴 것을 확인함 — 내용은 확인하지 못함",
+  SUBMISSION_OBSERVED_CONTENT_UNVERIFIED: "채널에 답변이 생긴 것을 확인함. 내용은 확인하지 못함",
   // Statuses (`to`, where there was nothing to confirm)
   REFUSED: "답변을 보내지 않음",
 };
+
+/**
+ * `word` + 「로」 or 「으로」 as Korean needs it: 로 after a vowel or ㄹ, 으로 after any other final consonant. The
+ * log used to print 「(으)로」, the form a template falls back to when it cannot choose, and that reads machine-made.
+ */
+function ro(word: string): string {
+  const last = word.charCodeAt(word.length - 1);
+  if (last < 0xac00 || last > 0xd7a3) return `${word}로`;
+  const final = (last - 0xac00) % 28;
+  return `${word}${final === 0 || final === 8 ? "로" : "으로"}`;
+}
 
 function tierWord(value: string | null): string | null {
   if (!value) return null;
@@ -118,13 +129,13 @@ export function decisionLogSentence(entry: ReviewDecisionLogEntry): string | nul
       const to = tierWord(entry.to);
       if (!to) return null;
       const from = tierWord(entry.from);
-      return from ? `판매자 판단을 ${from}에서 ${to}로 바꿈` : `판매자 판단을 ${to}(으)로 기록`;
+      return from ? `분류를 ${from}에서 ${ro(to)} 바꿈` : `분류를 ${ro(to)} 바꿈`;
     }
     case "SELLER_JUDGMENT_WITHDRAWN":
-      return "판매자 판단을 되돌림";
+      return "바꾼 분류를 되돌림";
     case "ACTION_CHOSEN": {
       const to = entry.to ? DECISION_ACTION_WORD[entry.to as TriageDisposition] : null;
-      return to ? `조치를 ${to}(으)로 정함` : null;
+      return to ? `처리 방법을 ${ro(to)} 정함` : null;
     }
     case "ACTION_RECORDED":
       return entry.to ? (ACTION_KIND_WORD[entry.to] ?? null) : null;

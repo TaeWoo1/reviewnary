@@ -25,17 +25,19 @@ function entry(over: Partial<ReviewDecisionLogEntry>): ReviewDecisionLogEntry {
 describe("decisionLogSentence", () => {
   it("says what the seller decided, naming the value they left when there was one", () => {
     expect(decisionLogSentence(entry({ kind: "SELLER_JUDGMENT_SET", to: "NEEDS_ATTENTION" })))
-      .toBe("판매자 판단을 확인 필요(으)로 기록");
+      .toBe("분류를 먼저 볼 리뷰로 바꿈");
     expect(decisionLogSentence(entry({ kind: "SELLER_JUDGMENT_SET", from: "FYI", to: "NEEDS_ATTENTION" })))
-      .toBe("판매자 판단을 참고에서 확인 필요로 바꿈");
+      .toBe("분류를 일반 리뷰에서 먼저 볼 리뷰로 바꿈");
     expect(decisionLogSentence(entry({ kind: "SELLER_JUDGMENT_WITHDRAWN", from: "FYI" })))
-      .toBe("판매자 판단을 되돌림");
+      .toBe("바꾼 분류를 되돌림");
     expect(decisionLogSentence(entry({ kind: "ACTION_CHOSEN", to: "MONITOR" })))
-      .toBe("조치를 두고 보기(으)로 정함");
+      .toBe("처리 방법을 나중에 보기로 정함");
+    // 으로 after a final consonant other than ㄹ: 「(으)로」 was the template's way of not choosing.
+    expect(decisionLogSentence(entry({ kind: "ACTION_CHOSEN", to: "NO_ACTION" }))).toBe("처리 방법을 답글 안 함으로 정함");
     expect(decisionLogSentence(entry({ kind: "ACTION_RECORDED", to: "ACTION_COMPLETED" })))
       .toBe("조치를 완료했다고 기록");
     expect(decisionLogSentence(entry({ kind: "REPLY_APPROVAL", to: "APPROVED" })))
-      .toBe("답변을 승인");
+      .toBe("답글을 확정함");
     expect(decisionLogSentence(entry({ kind: "REPLY_OUTCOME", to: "OPERATOR_REPORTED_SUBMITTED" })))
       .toBe("판매자센터에 올렸다고 기록");
   });
@@ -58,7 +60,7 @@ describe("decisionLogSentence", () => {
       kind: "REPLY_EXECUTION",
       from: "SELLER_SUBMISSION_OBSERVED",
       to: "SUBMISSION_OBSERVED_CONTENT_UNVERIFIED",
-    }))).toBe("채널에 답변이 생긴 것을 확인함 — 내용은 확인하지 못함");
+    }))).toBe("채널에 답변이 생긴 것을 확인함. 내용은 확인하지 못함");
     expect(decisionLogSentence(entry({ kind: "REPLY_EXECUTION", to: "SOMETHING_NEW" }))).toBeNull();
   });
 

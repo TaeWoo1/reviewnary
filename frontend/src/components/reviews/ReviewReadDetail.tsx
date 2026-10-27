@@ -291,10 +291,10 @@ export function ReviewReadDetail({
             // says in a sentence which mechanism spoke.
             <>
               <span className="inline-flex items-center gap-1.5">
-                시스템 판단 <TriageTierChip tier={detail.triage.tier} quiet />
+                자동 분류 <TriageTierChip tier={detail.triage.tier} quiet />
               </span>
               <span className="inline-flex items-center gap-1.5">
-                판매자 수정 <TriageTierChip tier={detail.sellerCorrection.correctedTier} quiet />
+                내가 바꿈 <TriageTierChip tier={detail.sellerCorrection.correctedTier} quiet />
               </span>
             </>
           ) : null}

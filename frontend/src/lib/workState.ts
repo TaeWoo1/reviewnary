@@ -88,7 +88,7 @@ export const WORK_STATE: Record<WorkStateKey, WorkStateWord> = {
   LOOK_INTO: { text: "살펴볼 일", tone: "warn" },
   DRAFT_READY: { text: "초안 준비됨", tone: "info" },
   DRAFT_NEEDED: { text: "초안 필요", tone: "warn" },
-  AWAITING_APPROVAL: { text: "승인 대기", tone: "info" },
+  AWAITING_APPROVAL: { text: "확정 전", tone: "info" },
   APPROVED: { text: "승인됨", tone: "neutral" },
   ANSWERED: { text: "답변함", tone: "neutral" },
   // The review panel's words for the same states (`DelegatedReplyControls`), cut to fit the Home's 104px lead

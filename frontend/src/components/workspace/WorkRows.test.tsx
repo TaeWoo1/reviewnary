@@ -156,7 +156,7 @@ describe("the leading slot — the state word, then the category", () => {
       ["NEEDS_LOOK", "확인 필요"],
       ["DRAFT_READY", "초안 준비됨"],
       ["DRAFT_NEEDED", "초안 필요"],
-      ["AWAITING_APPROVAL", "승인 대기"],
+      ["AWAITING_APPROVAL", "확정 전"],
     ] as const) {
       cleanup();
       draw([row({ state: key })]);

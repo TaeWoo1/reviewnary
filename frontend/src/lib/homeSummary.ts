@@ -185,7 +185,7 @@ export function freshnessUnproven(metrics: OperationsMetrics | null | undefined)
 
 export const UNANSWERED_WORD = {
   /** The noun the 문의 screen and `/overview` already use, so one number has one name. */
-  lead: "현재 미답변",
+  lead: "미답변",
   /** Some channel is missing from the population — the figure would be a floor presented as a total. */
   unqualified: "수집 상태 확인 필요",
 } as const;

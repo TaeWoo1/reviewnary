@@ -201,7 +201,7 @@ export function caseWorkRow(row: CustomerOperationsDecisionRow): HomeWorkRow {
 }
 
 /** The 리뷰 screen's group names. */
-const TIER_NAME: Record<string, string> = { NEEDS_ATTENTION: "확인 필요", WATCH: "지켜보기", FYI: "참고" };
+const TIER_NAME: Record<string, string> = { NEEDS_ATTENTION: "먼저 볼 리뷰", WATCH: "지켜볼 리뷰", FYI: "일반 리뷰" };
 
 export function mergeHomeWork(
   co: CustomerOperationsHome | null | undefined,

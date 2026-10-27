@@ -174,7 +174,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     expect(screen.getByText("4점 리뷰이며, 같은 분류가 늘어나는지 볼 내용이 있습니다.")).toBeInTheDocument();
     // The tier chip is on the problem card; 판매자 판단 names it again on purpose, as the thing
     // the seller is agreeing or disagreeing with.
-    expect(screen.getAllByText("참고").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("일반 리뷰").length).toBeGreaterThan(0);
 
     // The work still ends where it used to: the draft, and the approve control as the page's primary.
     expect(await screen.findByDisplayValue("판매자가 고쳐 쓴 합성 초안")).toBeInTheDocument();
@@ -192,7 +192,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     expect(fold).not.toBeNull();
     expect(fold!.open).toBe(false);
     expect(within(fold!).getByText("자동 분류")).toBeInTheDocument();
-    expect(within(fold!).getByText(/정확하지 않을 수 있습니다/)).toBeInTheDocument();
+    expect(within(fold!).getByText(/틀릴 수 있어요/)).toBeInTheDocument();
   });
 
   it("does not put a review list on the screen — there is exactly one review here", async () => {
@@ -263,7 +263,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     renderTask();
 
     const step = await screen.findByLabelText("조치 선택");
-    await userEvent.click(within(step).getByRole("button", { name: /두고 보기/ }));
+    await userEvent.click(within(step).getByRole("button", { name: /나중에 보기/ }));
     await waitFor(() => expect(recordReviewDecision).toHaveBeenCalled());
     expect(recordReviewDecision.mock.calls[0][0]).toBe(REVIEW);
   });
@@ -297,7 +297,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     expect(await screen.findByText("등록된 상품 지식 2건")).toBeInTheDocument();
     expect(screen.getByText("회사 운영 기준 5건")).toBeInTheDocument();
     expect(screen.getByText("부착 안내 · 규격표")).toBeInTheDocument();
-    expect(screen.getByText(/확인 필요가 3건 있습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/채우지 않은 내용이 3건 있어요/)).toBeInTheDocument();
     // The note that keeps these four numbers honest. Its second clause pointed at 「아래 초안」 — absent in
     // a preview, and unasked-for by a seller still reading the counts — and was dropped (2026-10-01).
     expect(screen.getByText(/여기 있는 숫자는 등록된 자료의 수입니다/)).toBeInTheDocument();
@@ -353,8 +353,8 @@ describe("리뷰 처리 — the decision workspace", () => {
     renderTask();
 
     const judgment = await screen.findByLabelText("판매자 판단");
-    expect(within(judgment).getByText("시스템 판단")).toBeInTheDocument();
-    await userEvent.click(within(judgment).getByRole("button", { name: "확인 필요" }));
+    expect(within(judgment).getByText("자동 분류")).toBeInTheDocument();
+    await userEvent.click(within(judgment).getByRole("button", { name: "먼저 볼 리뷰" }));
 
     await waitFor(() =>
       expect(correctReviewTriage).toHaveBeenCalledWith(REVIEW, {
@@ -362,7 +362,7 @@ describe("리뷰 처리 — the decision workspace", () => {
         reasonCode: null,
       }),
     );
-    expect(within(judgment).getByText(/덮어쓰지 않고 함께 기록됩니다/)).toBeInTheDocument();
+    expect(within(judgment).getByText(/자동 분류와 함께 기록돼요/)).toBeInTheDocument();
   });
 
   /**
@@ -376,9 +376,9 @@ describe("리뷰 처리 — the decision workspace", () => {
     renderTask();
 
     const block = await screen.findByLabelText("판매자 판단");
-    expect(within(block).getByRole("button", { name: "확인 필요" })).toBeInTheDocument();
-    expect(within(block).getByRole("button", { name: "지켜보기" })).toBeInTheDocument();
-    expect(within(block).getByRole("button", { name: "참고" })).toBeInTheDocument();
+    expect(within(block).getByRole("button", { name: "먼저 볼 리뷰" })).toBeInTheDocument();
+    expect(within(block).getByRole("button", { name: "지켜볼 리뷰" })).toBeInTheDocument();
+    expect(within(block).getByRole("button", { name: "일반 리뷰" })).toBeInTheDocument();
   });
 
   it("reads a standing correction back from the store and shows BOTH judgments", async () => {
@@ -402,9 +402,9 @@ describe("리뷰 처리 — the decision workspace", () => {
     const block = await screen.findByLabelText("판매자 판단");
     // Nothing was pressed in this session — this is the stored answer, rendered from the read.
     expect(correctReviewTriage).not.toHaveBeenCalled();
-    expect(within(block).getByRole("button", { name: "참고" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(block).getByText("시스템 판단")).toBeInTheDocument();
-    expect(within(block).getByText("판매자 수정")).toBeInTheDocument();
+    expect(within(block).getByRole("button", { name: "일반 리뷰" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(block).getByText("자동 분류")).toBeInTheDocument();
+    expect(within(block).getByText("내가 바꿈")).toBeInTheDocument();
   });
 
   it("되돌리기 appears only once a correction stands, and clears the seller's half alone", async () => {
@@ -436,7 +436,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     await userEvent.click(within(block).getByRole("button", { name: "수정 되돌리기" }));
     await waitFor(() => expect(withdrawReviewTriageCorrection).toHaveBeenCalledWith(REVIEW));
     // The system's judgment is untouched by a withdrawal — only the seller's half goes.
-    expect(within(block).getByText("시스템 판단")).toBeInTheDocument();
+    expect(within(block).getByText("자동 분류")).toBeInTheDocument();
   });
 
   it("asks for the seller's judgment with the AI pilot silent — the pilot is not permission to disagree", async () => {
@@ -445,7 +445,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     renderTask();
 
     const block = await screen.findByLabelText("판매자 판단");
-    expect(within(block).getByRole("button", { name: "확인 필요" })).toBeInTheDocument();
+    expect(within(block).getByRole("button", { name: "먼저 볼 리뷰" })).toBeInTheDocument();
     expect(within(block).queryByText("AI 확인 필요")).toBeNull();
   });
 
@@ -460,7 +460,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     renderTask();
 
     const step = await screen.findByLabelText("조치 선택");
-    await userEvent.click(within(step).getByRole("button", { name: /두고 보기/ }));
+    await userEvent.click(within(step).getByRole("button", { name: /나중에 보기/ }));
 
     await waitFor(() => expect(recordReviewDecision).toHaveBeenCalled());
     expect(recordReviewDecision.mock.calls[0][0]).toBe(REVIEW);
@@ -562,9 +562,9 @@ describe("리뷰 처리 — the decision workspace", () => {
 
     const log = await screen.findByLabelText("기록");
     const rows = within(log).getAllByRole("listitem");
-    expect(rows[0]).toHaveTextContent("답변을 승인");
-    expect(rows[1]).toHaveTextContent("조치를 대응 필요(으)로 정함");
-    expect(rows[2]).toHaveTextContent("판매자 판단을 확인 필요(으)로 기록");
+    expect(rows[0]).toHaveTextContent("답글을 확정함");
+    expect(rows[1]).toHaveTextContent("처리 방법을 답글 달기로 정함");
+    expect(rows[2]).toHaveTextContent("분류를 먼저 볼 리뷰로 바꿈");
     expect(within(log).getByText(/마켓플레이스에는 아무것도 전송되지 않습니다/)).toBeInTheDocument();
   });
 
@@ -632,7 +632,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     expect(await screen.findByText("채널에 이미 답변이 등록된 리뷰입니다")).toBeInTheDocument();
     // The channel's statement is NOT the seller's decision: the choice is still open, and nothing
     // claims the review has been handled.
-    expect(screen.getByRole("button", { name: /대응 필요/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /답글 달기/ })).toBeInTheDocument();
     // And no way to start a reply the server would refuse (2026-10-26): the statement stands in its place.
     expect(screen.queryByTestId("reply-starter")).toBeNull();
     expect(screen.queryByText(/처리 완료/)).toBeNull();
@@ -699,7 +699,7 @@ describe("리뷰 처리 — a review with no seller account", () => {
 
     expect(await screen.findByText("괜찮긴한데 자꾸 떨어져요")).toBeInTheDocument();
     const step = await screen.findByLabelText("조치 선택");
-    await userEvent.click(within(step).getByRole("button", { name: /두고 보기/ }));
+    await userEvent.click(within(step).getByRole("button", { name: /나중에 보기/ }));
     await waitFor(() => expect(recordReviewDecision).toHaveBeenCalled());
     expect(recordReviewDecision.mock.calls[0][0]).toBe(REVIEW);
   });
@@ -718,7 +718,7 @@ describe("리뷰 처리 — a review with no seller account", () => {
     renderTask();
 
     const judgment = await screen.findByLabelText("판매자 판단");
-    await userEvent.click(within(judgment).getByRole("button", { name: /지켜보기/ }));
+    await userEvent.click(within(judgment).getByRole("button", { name: /지켜볼 리뷰/ }));
     await waitFor(() => expect(correctReviewTriage).toHaveBeenCalledWith(REVIEW, expect.anything()));
   });
 
@@ -913,7 +913,7 @@ describe("리뷰 미리보기 — 고객 원문 → 왜 → 근거 → 판단 �
     // Both facts, as tokens: what is decided, when the newest record was, and that the trail is longer
     // (reference-based hierarchy v2, 2026-09-26). The entry's own SENTENCE is the full case's — `DecisionLog`
     // prints the whole trail there — and this preview's one action is what opens it.
-    await waitFor(() => expect(judgment).toHaveTextContent("대응 필요"));
+    await waitFor(() => expect(judgment).toHaveTextContent("답글 달기"));
     expect(judgment).toHaveTextContent("최근 기록 2026-09-02");
     expect(judgment).toHaveTextContent("외 1건");
     // The prose it replaced, in either direction.
@@ -929,7 +929,7 @@ describe("리뷰 미리보기 — 고객 원문 → 왜 → 근거 → 판단 �
 
     const judgment = await screen.findByLabelText("현재 판단");
     // The decision alone. A log that could not be read is not an empty log, so the preview claims neither.
-    await waitFor(() => expect(judgment).toHaveTextContent("대응 필요"));
+    await waitFor(() => expect(judgment).toHaveTextContent("답글 달기"));
     expect(judgment).not.toHaveTextContent("판단 기록 없음");
     expect(judgment).not.toHaveTextContent("최근 기록");
   });
@@ -1000,7 +1000,7 @@ describe("리뷰 미리보기 — 고객 원문 → 왜 → 근거 → 판단 �
     renderPreview();
 
     const evidence = await screen.findByLabelText("근거");
-    expect(within(evidence).getByText("답 없는 확인 필요").parentElement).toHaveTextContent("4");
+    expect(within(evidence).getByText("채울 내용").parentElement).toHaveTextContent("4");
     // A review whose product this catalogue does not hold has no figure to print — and a 0 would answer a
     // question nobody asked. The dash keeps the row's baseline and the full case explains why it is there.
     expect(within(evidence).getByText("상품 미연결").parentElement).toHaveTextContent("—");
@@ -1097,9 +1097,9 @@ describe("리뷰 pane — 판단과 조치는 읽기 전용", () => {
     const recorded = await screen.findByRole("region", { name: "판단과 조치" });
     expect(within(recorded).queryByRole("button")).toBeNull();
     // Two lines, not a three-row table: the stored tier and disposition, then the system's own judgement.
-    expect(recorded.textContent).toContain("중요도 참고");
-    expect(recorded.textContent).toContain("처리 상태 대응 필요");
-    expect(recorded.textContent).toContain("시스템 판단은 참고입니다.");
+    expect(recorded.textContent).toContain("중요도 일반 리뷰");
+    expect(recorded.textContent).toContain("처리 상태 답글 달기");
+    expect(recorded.textContent).toContain("자동 분류는 일반 리뷰예요.");
   });
 
   it("shows the stored handling word, and 판단 전 when nothing is stored", async () => {
@@ -1116,7 +1116,7 @@ describe("리뷰 pane — 판단과 조치는 읽기 전용", () => {
     getReviewDecisionContext.mockResolvedValue(context({ currentDecision: "RESPONSE_NEEDED" }));
     renderPreview("full");
     recorded = await screen.findByRole("region", { name: "판단과 조치" });
-    await waitFor(() => expect(within(recorded).getByText("대응 필요")).toBeTruthy());
+    await waitFor(() => expect(within(recorded).getByText("답글 달기")).toBeTruthy());
   });
 
   it("names the seller's own correction beside the system's, and only when one is stored", async () => {
@@ -1136,15 +1136,15 @@ describe("리뷰 pane — 판단과 조치는 읽기 전용", () => {
 
     let recorded = await screen.findByRole("region", { name: "판단과 조치" });
     // The correction wins the headline value; the system's own tier is still said, under it.
-    await waitFor(() => expect(recorded.textContent).toContain("중요도 확인 필요"));
-    expect(recorded.textContent).toContain("시스템 판단은 참고입니다. 판매자 수정으로 확인 필요가 함께 기록돼 있습니다.");
+    await waitFor(() => expect(recorded.textContent).toContain("중요도 먼저 볼 리뷰"));
+    expect(recorded.textContent).toContain("자동 분류는 일반 리뷰예요. 사장님이 먼저 볼 리뷰로 바꾼 기록이 함께 있어요.");
     unmount();
 
     getReviewWorkspace.mockResolvedValue(detail());
     renderPreview("full");
     recorded = await screen.findByRole("region", { name: "판단과 조치" });
-    await waitFor(() => expect(recorded.textContent).toContain("시스템 판단은 참고입니다."));
-    expect(recorded.textContent).not.toContain("판매자 수정으로");
+    await waitFor(() => expect(recorded.textContent).toContain("자동 분류는 일반 리뷰예요."));
+    expect(recorded.textContent).not.toContain("바꾼 기록이");
   });
 
   it("the only primary in the column is the dock's way out", async () => {
@@ -1266,7 +1266,7 @@ describe("리뷰 pane — 반복 신호가 pane의 중심 object", () => {
     expect(grounding.textContent).toContain("리뷰 12건 가운데 부정이 3건입니다.");
     expect(grounding.textContent).toContain("등록된 상품 지식 3건과 회사 운영 기준 2건이 있습니다.");
     expect(grounding.textContent).toContain("부착이 잘 떨어질 때 안내");
-    expect(grounding.textContent).toContain("아직 답하지 않은 확인 필요가 1건 있습니다.");
+    expect(grounding.textContent).toContain("아직 채우지 않은 내용이 1건 있어요.");
 
     // Neither secondary block is a table any more — that is the whole of this change.
     expect(grounding.querySelectorAll("dl,dt,dd")).toHaveLength(0);
@@ -1372,7 +1372,7 @@ describe("리뷰 상세 — the one object and the one column (2026-10-06)", () 
     // 접힌 안쪽에 실제로 블록이 들어 있다 — 라벨만 남기고 내용을 버린 접힘이 아니다.
     expect(fold!.textContent).toContain("등록된 상품 지식 3건");
     // 그리고 지금 할 일을 바꾸는 사실 하나는 접힘 바깥에 선다.
-    const ask = screen.getByText(/아직 답하지 않은 확인 필요가 1건 있습니다/);
+    const ask = screen.getByText(/아직 채우지 않은 내용이 1건 있어요/);
     expect(fold!.contains(ask)).toBe(false);
   });
 

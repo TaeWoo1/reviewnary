@@ -845,7 +845,7 @@ export function VocItemReplyPrep({
           // is mounted on every reply surface and mounted BEFORE this panel is. Saying it twice on
           // one screen is the other way to get it wrong.
           <p className="text-sm text-muted">
-            '대응 필요'로 정한 리뷰에만 답글을 쓸 수 있어요.
+            「답글 달기」로 정한 리뷰에만 답글을 쓸 수 있어요.
           </p>
         ) : null}
       </div>
@@ -972,7 +972,7 @@ export function VocItemReplyPrep({
 
         {approved && !canCopy ? (
           <span className="text-sm text-muted">
-            '대응 필요'로 되돌리면 복사할 수 있어요.
+            「답글 달기」로 되돌리면 복사할 수 있어요.
           </span>
         ) : null}
       </div>

@@ -65,9 +65,9 @@ afterEach(() => {
 
 describe("VocItemTriageControl", () => {
   it.each([
-    ["대응 필요", "RESPONSE_NEEDED"],
-    ["두고 보기", "MONITOR"],
-    ["조치 불필요", "NO_ACTION"],
+    ["답글 달기", "RESPONSE_NEEDED"],
+    ["나중에 보기", "MONITOR"],
+    ["답글 안 함", "NO_ACTION"],
   ])("records %s as %s and shows it only after the server confirms", async (label, value) => {
     const spy = vi.spyOn(api, "recordReviewDecision").mockResolvedValue({
       actionRef: ACTION_REF,
@@ -98,7 +98,7 @@ describe("VocItemTriageControl", () => {
 
   it("seeds from the row's already-recorded decision", () => {
     renderControl("MONITOR");
-    expect(current()).toBe("두고 보기");
+    expect(current()).toBe("나중에 보기");
     expect(screen.queryByText("판단 전")).not.toBeInTheDocument();
   });
 
@@ -112,9 +112,9 @@ describe("VocItemTriageControl", () => {
     });
     renderControl();
 
-    await userEvent.click(option("대응 필요"));
+    await userEvent.click(option("답글 달기"));
 
-    await waitFor(() => expect(current()).toBe("조치 불필요"));
+    await waitFor(() => expect(current()).toBe("답글 안 함"));
   });
 
   // --- focus survives a decision ---------------------------------------------
@@ -131,10 +131,10 @@ describe("VocItemTriageControl", () => {
     });
     renderControl();
 
-    const target = option("두고 보기");
+    const target = option("나중에 보기");
     target.focus();
     await userEvent.click(target);
-    await waitFor(() => expect(current()).toBe("두고 보기"));
+    await waitFor(() => expect(current()).toBe("나중에 보기"));
 
     // Still focused AFTER the write settled and the option became the current choice.
     expect(document.activeElement).toBe(target);
@@ -143,7 +143,7 @@ describe("VocItemTriageControl", () => {
 
   it("keeps the current choice focusable so a keyboard operator can move on", () => {
     renderControl("MONITOR");
-    const currentOption = option("두고 보기");
+    const currentOption = option("나중에 보기");
 
     // Inert, but not removed from the focus order: it is the answer, not a dead control.
     expect(inert(currentOption)).toBe(true);
@@ -156,7 +156,7 @@ describe("VocItemTriageControl", () => {
     vi.spyOn(api, "recordReviewDecision").mockRejectedValue(new Error("network"));
     renderControl();
 
-    const target = option("대응 필요");
+    const target = option("답글 달기");
     target.focus();
     await userEvent.click(target);
     await screen.findByRole("alert");
@@ -183,7 +183,7 @@ describe("VocItemTriageControl", () => {
     expect(region).not.toBeNull();
     expect(region).toBeEmptyDOMElement();
 
-    await userEvent.click(option("대응 필요"));
+    await userEvent.click(option("답글 달기"));
 
     // The SAME node now carries the text: an update to a registered region, not a new one.
     await waitFor(() => expect(region).toHaveTextContent("저장 중…"));
@@ -197,20 +197,20 @@ describe("VocItemTriageControl", () => {
 
   it("keeps each option's accessible name stable while it is saving", async () => {
     // The pending marker is decoration and must stay out of the accessible name. Appending
-    // it — "대응 필요" → "대응 필요…" — renames the control mid-interaction, which a screen
+    // it — "답글 달기" → "대응 필요…" — renames the control mid-interaction, which a screen
     // reader announces as a different button and which makes the element unfindable by the
     // name it had a moment ago. aria-busy carries the state instead.
     const { promise, release } = deferred();
     vi.spyOn(api, "recordReviewDecision").mockReturnValue(promise);
     renderControl();
 
-    await userEvent.click(option("대응 필요"));
-    await waitFor(() => expect(option("대응 필요")).toHaveAttribute("aria-busy", "true"));
+    await userEvent.click(option("답글 달기"));
+    await waitFor(() => expect(option("답글 달기")).toHaveAttribute("aria-busy", "true"));
 
     // Same name, before and during. Only the busy one is marked.
-    expect(option("두고 보기")).toHaveAttribute("aria-busy", "false");
+    expect(option("나중에 보기")).toHaveAttribute("aria-busy", "false");
     release({ actionRef: ACTION_REF, disposition: "RESPONSE_NEEDED", replayed: false });
-    await waitFor(() => expect(option("대응 필요")).toHaveAttribute("aria-busy", "false"));
+    await waitFor(() => expect(option("답글 달기")).toHaveAttribute("aria-busy", "false"));
   });
 
   it("marks every option inert while a write is in flight", async () => {
@@ -218,7 +218,7 @@ describe("VocItemTriageControl", () => {
     vi.spyOn(api, "recordReviewDecision").mockReturnValue(promise);
     renderControl();
 
-    await userEvent.click(option("대응 필요"));
+    await userEvent.click(option("답글 달기"));
     await waitFor(() => expect(screen.getByText("저장 중…")).toBeInTheDocument());
 
     for (const button of screen.getAllByRole("button")) {
@@ -226,7 +226,7 @@ describe("VocItemTriageControl", () => {
     }
 
     release({ actionRef: ACTION_REF, disposition: "RESPONSE_NEEDED", replayed: false });
-    await waitFor(() => expect(current()).toBe("대응 필요"));
+    await waitFor(() => expect(current()).toBe("답글 달기"));
   });
 
   it("sends nothing on a second click during flight, even though the button still takes clicks", async () => {
@@ -237,13 +237,13 @@ describe("VocItemTriageControl", () => {
     const spy = vi.spyOn(api, "recordReviewDecision").mockReturnValue(promise);
     renderControl();
 
-    await userEvent.click(option("대응 필요"));
-    await userEvent.click(option("두고 보기"));
-    await userEvent.click(option("대응 필요"));
+    await userEvent.click(option("답글 달기"));
+    await userEvent.click(option("나중에 보기"));
+    await userEvent.click(option("답글 달기"));
 
     expect(spy).toHaveBeenCalledTimes(1);
     release({ actionRef: ACTION_REF, disposition: "RESPONSE_NEEDED", replayed: false });
-    await waitFor(() => expect(current()).toBe("대응 필요"));
+    await waitFor(() => expect(current()).toBe("답글 달기"));
   });
 
   it("sends nothing on rapid synchronous clicks in a single tick", async () => {
@@ -254,14 +254,14 @@ describe("VocItemTriageControl", () => {
     const spy = vi.spyOn(api, "recordReviewDecision").mockReturnValue(promise);
     renderControl();
 
-    const target = option("조치 불필요");
+    const target = option("답글 안 함");
     target.click();
     target.click();
     target.click();
 
     expect(spy).toHaveBeenCalledTimes(1);
     release({ actionRef: ACTION_REF, disposition: "NO_ACTION", replayed: false });
-    await waitFor(() => expect(current()).toBe("조치 불필요"));
+    await waitFor(() => expect(current()).toBe("답글 안 함"));
   });
 
   // --- the confirmed choice is inert ------------------------------------------
@@ -270,14 +270,14 @@ describe("VocItemTriageControl", () => {
     const spy = vi.spyOn(api, "recordReviewDecision");
     renderControl("MONITOR");
 
-    const currentOption = option("두고 보기");
+    const currentOption = option("나중에 보기");
     expect(inert(currentOption)).toBe(true);
     await userEvent.click(currentOption);
 
     // Re-sending would append an audit row for a transition from a value to itself —
     // noise in a trail whose whole job is to answer what changed and when.
     expect(spy).not.toHaveBeenCalled();
-    expect(current()).toBe("두고 보기");
+    expect(current()).toBe("나중에 보기");
   });
 
   it("keeps the other options actionable while one is current", async () => {
@@ -288,14 +288,14 @@ describe("VocItemTriageControl", () => {
     });
     renderControl("MONITOR");
 
-    expect(option("두고 보기")).toHaveAttribute("aria-pressed", "true");
-    expect(inert(option("대응 필요"))).toBe(false);
-    expect(inert(option("조치 불필요"))).toBe(false);
+    expect(option("나중에 보기")).toHaveAttribute("aria-pressed", "true");
+    expect(inert(option("답글 달기"))).toBe(false);
+    expect(inert(option("답글 안 함"))).toBe(false);
 
     // ...and changing your mind still works.
-    await userEvent.click(option("조치 불필요"));
-    await waitFor(() => expect(current()).toBe("조치 불필요"));
-    expect(inert(option("두고 보기"))).toBe(false);
+    await userEvent.click(option("답글 안 함"));
+    await waitFor(() => expect(current()).toBe("답글 안 함"));
+    expect(inert(option("나중에 보기"))).toBe(false);
   });
 
   // --- error + retry ---------------------------------------------------------
@@ -304,14 +304,14 @@ describe("VocItemTriageControl", () => {
     vi.spyOn(api, "recordReviewDecision").mockRejectedValue(new Error("network"));
     renderControl("MONITOR");
 
-    await userEvent.click(option("대응 필요"));
+    await userEvent.click(option("답글 달기"));
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("저장하지 못했습니다");
     // The prior state stands. A silent flip to the requested value would tell the operator
     // a decision was recorded that the server never took.
-    expect(current()).toBe("두고 보기");
-    expect(inert(option("대응 필요"))).toBe(false);
+    expect(current()).toBe("나중에 보기");
+    expect(inert(option("답글 달기"))).toBe(false);
   });
 
   it("leaks no server or network detail into the error", async () => {
@@ -320,7 +320,7 @@ describe("VocItemTriageControl", () => {
     );
     renderControl();
 
-    await userEvent.click(option("두고 보기"));
+    await userEvent.click(option("나중에 보기"));
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent ?? "").not.toMatch(/409|http|localhost|api\/|Error/i);
@@ -336,7 +336,7 @@ describe("VocItemTriageControl", () => {
     const spy = vi.spyOn(api, "recordReviewDecision");
     renderControl();
 
-    await userEvent.click(option("대응 필요"));
+    await userEvent.click(option("답글 달기"));
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("이 환경에서는 처리 상태를 기록할 수 없습니다");
@@ -356,10 +356,10 @@ describe("VocItemTriageControl", () => {
     const spy = vi.spyOn(api, "recordReviewDecision");
     renderControl();
 
-    await userEvent.click(option("대응 필요"));
+    await userEvent.click(option("답글 달기"));
     await screen.findByRole("alert");
-    await userEvent.click(option("두고 보기"));
-    await userEvent.click(option("조치 불필요"));
+    await userEvent.click(option("나중에 보기"));
+    await userEvent.click(option("답글 안 함"));
 
     expect(spy).not.toHaveBeenCalled();
     expect(current()).toBeNull();
@@ -381,13 +381,13 @@ describe("VocItemTriageControl", () => {
     vi.spyOn(api, "recordReviewDecision").mockResolvedValue(body as never);
     renderControl("MONITOR");
 
-    await userEvent.click(option("대응 필요"));
+    await userEvent.click(option("답글 달기"));
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("저장하지 못했습니다");
     // The prior decision stands — nothing about the response justified moving it.
-    expect(current()).toBe("두고 보기");
-    expect(inert(option("대응 필요"))).toBe(false);
+    expect(current()).toBe("나중에 보기");
+    expect(inert(option("답글 달기"))).toBe(false);
   });
 
   it("retries an unreadable response with the SAME command id", async () => {
@@ -399,10 +399,10 @@ describe("VocItemTriageControl", () => {
       .mockResolvedValueOnce({ actionRef: ACTION_REF, disposition: "RESPONSE_NEEDED", replayed: true });
     renderControl();
 
-    await userEvent.click(option("대응 필요"));
+    await userEvent.click(option("답글 달기"));
     await screen.findByRole("alert");
-    await userEvent.click(option("대응 필요"));
-    await waitFor(() => expect(current()).toBe("대응 필요"));
+    await userEvent.click(option("답글 달기"));
+    await waitFor(() => expect(current()).toBe("답글 달기"));
 
     const [first, second] = spy.mock.calls;
     expect(second[1].commandId).toBe(first[1].commandId);
@@ -420,9 +420,9 @@ describe("VocItemTriageControl", () => {
     });
     renderControl();
 
-    await userEvent.click(option("두고 보기"));
+    await userEvent.click(option("나중에 보기"));
 
-    await waitFor(() => expect(current()).toBe("두고 보기"));
+    await waitFor(() => expect(current()).toBe("나중에 보기"));
     expect(spy.mock.calls[0][1].commandId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );
@@ -437,10 +437,10 @@ describe("VocItemTriageControl", () => {
       .mockResolvedValueOnce({ actionRef: ACTION_REF, disposition: "RESPONSE_NEEDED", replayed: true });
     renderControl();
 
-    await userEvent.click(option("대응 필요"));
+    await userEvent.click(option("답글 달기"));
     await screen.findByRole("alert");
-    await userEvent.click(option("대응 필요"));
-    await waitFor(() => expect(current()).toBe("대응 필요"));
+    await userEvent.click(option("답글 달기"));
+    await waitFor(() => expect(current()).toBe("답글 달기"));
 
     // The whole point of the key: a retry is the SAME decision arriving twice, which the
     // backend answers as a replay. A fresh id would make it a second, independent decision
@@ -457,10 +457,10 @@ describe("VocItemTriageControl", () => {
       .mockResolvedValueOnce({ actionRef: ACTION_REF, disposition: "MONITOR", replayed: false });
     renderControl();
 
-    await userEvent.click(option("대응 필요"));
+    await userEvent.click(option("답글 달기"));
     await screen.findByRole("alert");
-    await userEvent.click(option("두고 보기"));
-    await waitFor(() => expect(current()).toBe("두고 보기"));
+    await userEvent.click(option("나중에 보기"));
+    await waitFor(() => expect(current()).toBe("나중에 보기"));
 
     // A different disposition is a different intent. Reusing the id would be a 409 — the
     // backend refuses one command id spent on two decisions.
@@ -479,12 +479,12 @@ describe("VocItemTriageControl", () => {
       .mockResolvedValueOnce({ actionRef: ACTION_REF, disposition: "RESPONSE_NEEDED", replayed: false });
     renderControl();
 
-    await userEvent.click(option("대응 필요"));
+    await userEvent.click(option("답글 달기"));
     await screen.findByRole("alert");
-    await userEvent.click(option("두고 보기"));
+    await userEvent.click(option("나중에 보기"));
     await screen.findByRole("alert");
-    await userEvent.click(option("대응 필요"));
-    await waitFor(() => expect(current()).toBe("대응 필요"));
+    await userEvent.click(option("답글 달기"));
+    await waitFor(() => expect(current()).toBe("답글 달기"));
 
     const [first, , third] = spy.mock.calls;
     expect(third[1].commandId).not.toBe(first[1].commandId);
@@ -498,7 +498,7 @@ describe("VocItemTriageControl", () => {
       .mockResolvedValue({ actionRef: ACTION_REF, disposition: "MONITOR", replayed: false });
     renderControl();
 
-    await userEvent.click(option("두고 보기"));
+    await userEvent.click(option("나중에 보기"));
 
     // The route names the review, so there is no ref to round-trip and none to compose. The server
     // still echoes the address it minted; this layer neither reads it nor sends it back.

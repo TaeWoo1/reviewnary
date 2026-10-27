@@ -30,7 +30,7 @@ import { ReviewGuidance } from "./reviews/ReviewGuidance";
  */
 export function generateFailureMessage(status: number | undefined): string {
   return status === 409
-    ? "확정한 답글이 있거나 '대응 필요'로 정하지 않은 리뷰라 AI 답글을 쓸 수 없어요."
+    ? "확정한 답글이 있거나 「답글 달기」로 정하지 않은 리뷰라 AI 답글을 쓸 수 없어요."
     : "AI 답글을 쓰지 못했어요. 잠시 뒤 다시 눌러 주세요.";
 }
 

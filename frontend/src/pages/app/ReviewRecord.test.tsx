@@ -285,7 +285,7 @@ describe("deep-link seams the home relies on", () => {
   it("the URL is the open group, both ways: pressing a group header writes ?tier and asks for that tier", async () => {
     renderPage();
     await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
-    await userEvent.click(screen.getByRole("button", { name: /^▸?\s*지켜보기/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^▸?\s*지켜볼 리뷰/ }));
     expect(screen.getByTestId("location")).toHaveTextContent("/reviews?tier=WATCH");
     expect(getChannelReviewsStrict).toHaveBeenLastCalledWith("acc-1", expect.objectContaining({ tier: "WATCH" }));
   });
@@ -308,7 +308,7 @@ describe("deep-link seams the home relies on", () => {
     await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
     const list = screen.getByRole("region", { name: "목록" });
     const labels = within(list).getAllByRole("button").map((b) => b.textContent?.replace(/[▾▸]/g, "").replace(/\s*[\d,]+$/, "").trim());
-    expect(labels).toEqual(["확인 필요", "지켜보기", "참고"]);
+    expect(labels).toEqual(["먼저 볼 리뷰", "지켜볼 리뷰", "일반 리뷰"]);
   });
 
   /** 확인 필요 is where a seller's attention belongs, so it is what the screen opens on when nothing says otherwise. */
@@ -538,10 +538,10 @@ describe("triage", () => {
   it("says which tier a review is in on the group header, not twenty times on the rows", async () => {
     renderPage();
     const list = await screen.findByRole("region", { name: "목록" });
-    expect(within(list).getByRole("button", { name: /확인 필요\s*1/ })).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: /먼저 볼 리뷰\s*1/ })).toBeInTheDocument();
     const row = screen.getByText("배송도 빠르고 포장도 꼼꼼했어요").closest("li")!;
-    expect(within(row).queryByText("확인 필요")).toBeNull();
-    expect(within(row).queryByText("참고")).toBeNull();
+    expect(within(row).queryByText("먼저 볼 리뷰")).toBeNull();
+    expect(within(row).queryByText("일반 리뷰")).toBeNull();
   });
 
 
@@ -580,11 +580,11 @@ describe("triage", () => {
     expect(screen.getByTestId("location").textContent).toContain("sort=newest");
     const list = screen.getByRole("region", { name: "목록" });
     // No group headers: one list.
-    expect(within(list).queryByRole("button", { name: /지켜보기/ })).toBeNull();
+    expect(within(list).queryByRole("button", { name: /지켜볼 리뷰/ })).toBeNull();
     const rows = within(list).getAllByRole("link");
-    expect(rows[0]).toHaveTextContent("참고");
-    expect(rows[1]).toHaveTextContent("확인 필요");
-    expect(within(rows[1]).getByText("확인 필요").className).toContain("text-bad");
+    expect(rows[0]).toHaveTextContent("일반 리뷰");
+    expect(rows[1]).toHaveTextContent("먼저 볼 리뷰");
+    expect(within(rows[1]).getByText("먼저 볼 리뷰").className).toContain("text-bad");
 
     await userEvent.selectOptions(screen.getByLabelText("정렬"), "attention");
     await waitFor(() =>
@@ -606,9 +606,9 @@ describe("triage", () => {
     renderPage();
     await waitFor(() => expect(getChannelReviewsStrict).toHaveBeenCalled());
 
-    await userEvent.click(screen.getByRole("button", { name: /확인 필요\s*0/ }));
+    await userEvent.click(screen.getByRole("button", { name: /먼저 볼 리뷰\s*0/ }));
 
-    expect(await screen.findByText(/확인 필요에 해당하는 리뷰가 없습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/먼저 볼 리뷰가 없어요/)).toBeInTheDocument();
     expect(screen.queryByText("아직 수집된 리뷰가 없습니다")).toBeNull();
   });
 
@@ -680,8 +680,8 @@ describe("triage", () => {
     await screen.findByText("생각보다 크기가 작아서 아쉬웠습니다");
 
     const list = screen.getByRole("region", { name: "목록" });
-    expect(within(list).getByRole("button", { name: /참고\s*1/ })).toBeInTheDocument();
-    expect(within(list).getByRole("button", { name: /확인 필요\s*0/ })).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: /일반 리뷰\s*1/ })).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: /먼저 볼 리뷰\s*0/ })).toBeInTheDocument();
   });
 });
 
@@ -708,7 +708,7 @@ describe("the AI pilot's mark and the feedback spine (RUBRIC v2 §13.7)", () => 
     expect(within(row).getByText("판매자 확인 필요")).toBeInTheDocument();
     expect(within(row).queryByText(/AI/)).toBeNull();
     const list = screen.getByRole("region", { name: "목록" });
-    expect(within(list).getByRole("button", { name: /확인 필요\s*2/ })).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: /먼저 볼 리뷰\s*2/ })).toBeInTheDocument();
   });
 
   it("an org NOT opted in gets the pre-pilot list: no silver, even if a mark arrived", async () => {
@@ -754,7 +754,7 @@ describe("the AI pilot's mark and the feedback spine (RUBRIC v2 §13.7)", () => 
     renderPage();
     const row = (await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요")).closest("li")!;
 
-    expect(within(row).getByText("판매자 수정 확인 필요")).toBeInTheDocument();
+    expect(within(row).getByText("내가 바꿈 먼저 볼 리뷰")).toBeInTheDocument();
     expect(within(row).queryByText("판매자 확인 필요")).toBeNull();
   });
 
@@ -778,7 +778,7 @@ describe("the AI pilot's mark and the feedback spine (RUBRIC v2 §13.7)", () => 
     });
     renderPage();
     await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
-    expect(screen.getByText("판매자 수정 참고")).toBeInTheDocument();
+    expect(screen.getByText("내가 바꿈 일반 리뷰")).toBeInTheDocument();
     const rows = within(screen.getByRole("region", { name: "목록" })).getAllByRole("link").map((b) => b.textContent ?? "");
     expect(rows.findIndex((t) => t.includes("배송도 빠르고 포장도 꼼꼼했어요")))
       .toBeLessThan(rows.findIndex((t) => t.includes(PAGE.items[1].preview ?? "")));
@@ -845,7 +845,7 @@ describe("리뷰 목록 — the Linear grouping (2026-10-05)", () => {
   it("keeps the open group's header in view while its rows scroll past", async () => {
     renderPage();
     await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
-    const header = screen.getByRole("button", { name: /확인 필요\s*1/ });
+    const header = screen.getByRole("button", { name: /먼저 볼 리뷰\s*1/ });
     expect(header.className).toContain("sticky");
   });
 
@@ -853,7 +853,7 @@ describe("리뷰 목록 — the Linear grouping (2026-10-05)", () => {
     renderPage();
     await screen.findByText("배송도 빠르고 포장도 꼼꼼했어요");
     const list = screen.getByRole("region", { name: "목록" });
-    const watch = within(list).getByRole("button", { name: /지켜보기/ });
+    const watch = within(list).getByRole("button", { name: /지켜볼 리뷰/ });
     expect(watch).toHaveAttribute("aria-expanded", "false");
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
   });
@@ -888,7 +888,7 @@ describe("the safety filter", () => {
 
     const filter = await screen.findByRole("button", { name: "안전 관련만 보기 1" });
     expect(filter).toHaveAttribute("aria-pressed", "false");
-    const head = screen.getByRole("button", { name: /확인 필요/ });
+    const head = screen.getByRole("button", { name: /먼저 볼 리뷰/ });
     expect(head).toHaveTextContent("· 안전 관련 1");
     const row = screen.getByRole("link", { name: /생각보다 크기가 작아서/ });
     expect(within(row).getByText("부상 언급").className).toContain("text-bad");
@@ -917,7 +917,7 @@ describe("the safety filter", () => {
     const only = within(list).getAllByRole("link");
     expect(only).toHaveLength(1);
     expect(only[0]).toHaveTextContent("부상 언급");
-    expect(only[0]).toHaveTextContent("확인 필요");
+    expect(only[0]).toHaveTextContent("먼저 볼 리뷰");
     expect(screen.getByTestId("location").textContent).toContain("safety=1");
 
     await user.click(screen.getByRole("button", { name: /안전 관련만 보기 1/ }));

@@ -1015,7 +1015,7 @@ function OperationsSummary({
     neighbouring read, a previous window, or a partial population.
   */
   const cells: ReactNode[] = [
-    <Cell key="work" id="work" label={COPY.mineLabel}>
+    <Cell key="work" id="work" label={COPY.todayLabel}>
       {/* A measured zero is a figure: the list read landed and found nothing. The server saying there are
           more than it sent makes this total a floor — 「11+」건. */}
       <Big value={work.rows.length} suffix={work.truncated ? "+" : ""} unit={COUNT_UNIT} />
@@ -1036,7 +1036,7 @@ function OperationsSummary({
     <Cell
       key="awaiting"
       id="awaiting"
-      label="실행 대기"
+      label="등록 중"
       note={awaiting === null ? "자동 확인이 멈춰 있어 확인하지 못했습니다" : undefined}
     >
       {awaiting === null ? (
@@ -1049,7 +1049,7 @@ function OperationsSummary({
         // number. The noun rides with it.
         <a
           href="#실행-대기"
-          aria-label={`실행 대기 ${awaiting.toLocaleString("ko-KR")}${COUNT_UNIT}`}
+          aria-label={`등록 중 ${awaiting.toLocaleString("ko-KR")}${COUNT_UNIT}`}
           className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
         >
           <Big value={awaiting} unit={COUNT_UNIT} />
@@ -1403,7 +1403,7 @@ function AwaitingExecution({
   const selectedId = selection?.selectedKey?.startsWith(PREPARED) ? selection.selectedKey.slice(PREPARED.length) : null;
 
   return (
-    <section aria-label="실행 대기" id="실행-대기" className="rounded-2xl border border-line bg-surface p-3">
+    <section aria-label="등록 중" id="실행-대기" className="rounded-2xl border border-line bg-surface p-3">
       {/* The badge that used to sit here said 「승인함 · 등록 전」 over every row. It is what a standing
           review approval is, and what an inquiry row is not — those arrive with the work item still
           PROPOSED and no approval anywhere. One badge cannot be true of both, so the state moved onto
@@ -1414,7 +1414,7 @@ function AwaitingExecution({
           first two and says so; the number the seller owes is the section's, not the list's, and it is the
           same figure the summary band's own cell links down to. */}
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <h2 className="text-section font-bold tracking-tight text-ink">실행 대기</h2>
+        <h2 className="text-section font-bold tracking-tight text-ink">등록 중</h2>
         <span className="break-keep text-sm tabular-nums text-muted">
           {count > shown.length
             ? `${count.toLocaleString("ko-KR")}건 중 ${shown.length.toLocaleString("ko-KR")}건`

@@ -327,8 +327,8 @@ describe("the band — obligations only", () => {
     draw(co({ checked: 12, autoResolved: 3, draftsPrepared: 2 }));
     const band = await summary();
     await waitFor(() => expect(band).toHaveTextContent("할 일"));
-    expect(band).toHaveTextContent("실행 대기");
-    expect(band).toHaveTextContent("현재 미답변");
+    expect(band).toHaveTextContent("등록 중");
+    expect(band).toHaveTextContent("미답변");
     // The two facts that moved. Both are still on the screen — on the quiet line — and neither may be
     // drawn at the weight of an obligation.
     expect(band).not.toHaveTextContent("오늘 들어온 것");
@@ -350,10 +350,10 @@ describe("the band — obligations only", () => {
     withWork();
     draw(co({ checked: 1 }));
     const band = await summary();
-    await waitFor(() => expect(band).toHaveTextContent("현재 미답변"));
+    await waitFor(() => expect(band).toHaveTextContent("미답변"));
     const text = band.textContent ?? "";
-    expect(text.indexOf("할 일")).toBeLessThan(text.indexOf("실행 대기"));
-    expect(text.indexOf("실행 대기")).toBeLessThan(text.indexOf("현재 미답변"));
+    expect(text.indexOf("할 일")).toBeLessThan(text.indexOf("등록 중"));
+    expect(text.indexOf("등록 중")).toBeLessThan(text.indexOf("미답변"));
   });
 
   it("현재 미답변 says it is unknown rather than printing the qualified figure", async () => {
@@ -375,7 +375,7 @@ describe("the band — obligations only", () => {
     const band = await summary();
     await waitFor(() => expect(band).toHaveTextContent("할 일"));
     const cell = band.querySelector("[data-testid='pulse-unanswered']")!;
-    expect(cell).toHaveTextContent("현재 미답변");
+    expect(cell).toHaveTextContent("미답변");
     // <b>The figure is never floored.</b> 4 is what the qualified population counted, and printing it
     // here would be the `contextStrip` defect again.
     expect(cell).not.toHaveTextContent("4");

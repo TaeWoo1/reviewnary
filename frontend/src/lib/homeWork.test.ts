@@ -68,8 +68,8 @@ describe("mergeHomeWork — the review half, whole", () => {
     expect(WORK_STATE[byId["r-held"].state].text).toBe("고칠 곳");
     expect(WORK_STATE[byId["r-failed"].state].text).toBe("등록 못 함");
     // Waiting on the phone is every draft now (2026-10-25): plain 승인 대기, not a lane word.
-    expect(WORK_STATE[byId["r-phone"].state].text).toBe("승인 대기");
-    expect(WORK_STATE[byId["r-here"].state].text, "no lane state: the draft read stands").toBe("승인 대기");
+    expect(WORK_STATE[byId["r-phone"].state].text).toBe("확정 전");
+    expect(WORK_STATE[byId["r-here"].state].text, "no lane state: the draft read stands").toBe("확정 전");
     expect(work.rows.map(workBucket)).toEqual(["approve", "approve", "approve", "approve"]);
   });
 
@@ -90,7 +90,7 @@ describe("mergeHomeWork — the review half, whole", () => {
       reviewWork([], 0, [todo("r-draft", "DRAFT_NEEDED"), todo("r-approve", "AWAITING_APPROVAL")]));
     const byId = Object.fromEntries(work.rows.map((r) => [r.subjectId, r]));
     expect(byId["r-draft"].reason.tag).toBe("초안 필요");
-    expect(byId["r-approve"].reason.tag).toBe("승인 대기");
+    expect(byId["r-approve"].reason.tag).toBe("확정 전");
     /*
       <b>Re-pointed to where 「미발송」 now stands</b> (product-owner decision, 2026-10-01: the row's
       second line is customer context only). The guarantee has not moved — a prepared reply must not

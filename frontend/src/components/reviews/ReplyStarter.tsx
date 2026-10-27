@@ -74,7 +74,7 @@ export function ReplyStarter({
           <Btn size="sm" variant="outline" onClick={() => void start(false)} disabled={busy !== null || unavailable}>
             직접 쓰기
           </Btn>
-          <span className="break-keep text-xs text-muted">누르면 이 리뷰를 「대응 필요」로 기록해요.</span>
+          <span className="break-keep text-xs text-muted">누르면 이 리뷰를 「답글 달기」로 기록해요.</span>
         </div>
       </div>
       {failed ? (

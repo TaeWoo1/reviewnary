@@ -15,9 +15,9 @@ import type { ReviewTriageTier } from "./types";
  * widening `Chip` to make that argument would remove the fence for everyone else.
  */
 export const TRIAGE_TIER_LABEL: Record<ReviewTriageTier, string> = {
-  NEEDS_ATTENTION: "확인 필요",
-  WATCH: "지켜보기",
-  FYI: "참고",
+  NEEDS_ATTENTION: "먼저 볼 리뷰",
+  WATCH: "지켜볼 리뷰",
+  FYI: "일반 리뷰",
 };
 
 export const TRIAGE_TIER_CLASS: Record<ReviewTriageTier, string> = {
@@ -43,7 +43,7 @@ export const TRIAGE_TIERS: ReviewTriageTier[] = ["NEEDS_ATTENTION", "WATCH", "FY
  * authority — the same posture applied to the same kind of unmeasured output.
  */
 export const TRIAGE_TAG_DISCLOSURE =
-  "분류는 본문 키워드로 자동 분류한 것이라 정확하지 않을 수 있습니다. 확인 필요 여부는 별점과 본문 유무로만 판단합니다.";
+  "분류는 본문 키워드로 자동으로 나눈 것이라 틀릴 수 있어요. 먼저 볼 리뷰인지는 별점과 본문이 있는지로만 정해요.";
 
 /**
  * The pilot's mark, RUBRIC v2 §13.7 — and the sentence that keeps it honest.
@@ -100,19 +100,19 @@ export const TRIAGE_CORRECTION_LABEL: Record<ReviewTriageTier, string> = TRIAGE_
 export const TRIAGE_CORRECTION_COPY = {
   prompt: "중요도를 판매자님은 어떻게 보시나요?",
   withdraw: "수정 되돌리기",
-  systemPrefix: "시스템 판단",
-  sellerPrefix: "판매자 수정",
+  systemPrefix: "자동 분류",
+  sellerPrefix: "내가 바꿈",
   /**
    * The one sentence that keeps the control honest. A seller who corrects a review and watches the
    * list stay exactly as it was deserves to know that is the design, not a failure.
    */
   disclosure:
-    "판매자님 판단은 시스템 판단을 덮어쓰지 않고 함께 기록됩니다. 목록 순서는 바뀌지 않으며, 다음 분류 기준을 검토할 때 근거로 씁니다.",
+    "사장님이 바꾼 분류는 자동 분류와 함께 기록돼요. 목록 순서는 바뀌지 않고, 다음에 분류 기준을 고칠 때 참고해요.",
 } as const;
 
 /** The action controls' words. Unchanged — these are statements about what the seller did off-screen. */
 export const TRIAGE_FEEDBACK_LABEL = {
   started: "조치 시작",
   completed: "조치 완료",
-  actionNotNeeded: "조치 불필요",
+  actionNotNeeded: "답글 안 함",
 } as const;

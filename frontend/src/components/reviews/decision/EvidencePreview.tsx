@@ -56,7 +56,7 @@ export function EvidencePreview({ context }: { context: ReviewDecisionContext })
         <Cell n={knowledge.orgSources} label="회사 운영 기준" />
         {/* Only when there are any. A zero here would answer a question the seller did not ask, and the row
             that explains what filling them buys is in the full case. */}
-        {knowledge.openAsks > 0 ? <Cell n={knowledge.openAsks} label="답 없는 확인 필요" /> : null}
+        {knowledge.openAsks > 0 ? <Cell n={knowledge.openAsks} label="채울 내용" /> : null}
       </div>
 
       {/* A row of its own: these leave the panel, and everything above it does not. */}

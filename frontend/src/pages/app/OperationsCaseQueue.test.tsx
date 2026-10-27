@@ -309,7 +309,7 @@ describe("OperationsCaseQueue", () => {
     */
     // A case is something reviewnary opened to look at: 살펴볼 일 — 확인 필요 is the 리뷰 screen's group name.
     expect(list).toHaveTextContent("살펴볼 일");
-    expect(list).not.toHaveTextContent("확인 필요");
+    expect(list).not.toHaveTextContent("먼저 볼 리뷰");
     expect(list).toHaveTextContent("배송이 너무 늦었어요");
     expect(list).not.toHaveTextContent("확인이 필요한 리뷰입니다");
   });
@@ -532,7 +532,7 @@ describe("OperationsCaseQueue — the seller's own reply work (UI/UX v2 Phase 3)
     );
     const list = await screen.findByRole("list", { name: "할 일" });
     const row = within(list).getByRole("link", { name: /잘 떨어져요/ });
-    expect(row).toHaveTextContent("승인 대기");
+    expect(row).toHaveTextContent("확정 전");
     expect(row).toHaveAttribute("href", "/reviews/reply/r-1?from=work");
     expect(screen.getByTestId("reply-work-coverage-uncertain")).toHaveTextContent("안전하게 판단할 수 없어요");
   });

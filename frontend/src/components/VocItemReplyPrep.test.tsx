@@ -279,7 +279,7 @@ describe("VocItemReplyPrep", () => {
     expect(screen.getByLabelText("답글 내용")).toHaveAttribute("readonly");
     expect(screen.queryByTestId("draft-status")).toBeNull();
     // The reason is stated, not left as a dead control.
-    expect(screen.getByText(/'대응 필요'로 정한 리뷰에만/)).toBeTruthy();
+    expect(screen.getByText(/「답글 달기」로 정한 리뷰에만/)).toBeTruthy();
   });
 
   it("does not offer a save the server would refuse", async () => {
@@ -477,7 +477,7 @@ describe("VocItemReplyPrep", () => {
       }),
     );
     expect(inert(screen.getByRole("button", { name: "복사" }))).toBe(true);
-    expect(screen.getByText(/'대응 필요'로 되돌리면 복사할 수 있어요/)).toBeTruthy();
+    expect(screen.getByText(/「답글 달기」로 되돌리면 복사할 수 있어요/)).toBeTruthy();
   });
 
   // --- the read goes stale when a sibling moves the decision -------------------------
@@ -516,7 +516,7 @@ describe("VocItemReplyPrep", () => {
 
     expect(screen.getByLabelText("답글 내용")).toHaveAttribute("readonly");
     // The reason renders — it used to be gated on the very flag that was stale.
-    expect(screen.getByText(/'대응 필요'로 정한 리뷰에만/)).toBeTruthy();
+    expect(screen.getByText(/「답글 달기」로 정한 리뷰에만/)).toBeTruthy();
 
     await user.click(screen.getByLabelText("답글 내용"));
     await user.tab();
@@ -618,7 +618,7 @@ describe("VocItemReplyPrep", () => {
     expect(screen.queryByText(/직접 선택해 복사하세요/)).toBeNull();
     // The button's own refusal is what the operator sees instead — one message, not two
     // contradicting each other.
-    expect(screen.getByText(/'대응 필요'로 되돌리면 복사할 수 있어요/)).toBeTruthy();
+    expect(screen.getByText(/「답글 달기」로 되돌리면 복사할 수 있어요/)).toBeTruthy();
   });
 
   /** The exit is never gated — withdrawal does not depend on the disposition. */

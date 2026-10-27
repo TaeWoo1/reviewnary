@@ -202,7 +202,7 @@ describe("greeting — arithmetic, never a model", () => {
    */
   it("the context strip carries the waiting work and nothing else", () => {
     const strip = contextStrip(overview());
-    expect(strip.map((k) => k.label)).toEqual(["현재 미답변"]);
+    expect(strip.map((k) => k.label)).toEqual(["미답변"]);
     // The same noun the other Home's band uses for the same fact — one product, one word.
     expect(strip.map((k) => k.label)).not.toContain("현재 미답변 문의");
     expect(contextStrip(overview(), false, 22).map((k) => k.label)).toEqual(["할 일"]);
@@ -232,7 +232,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     expect(await screen.findByText("새로 할 일은 없습니다.")).toBeInTheDocument();
     expect(screen.queryByText("상품페이지 설명에 혼선을 줍니다.")).toBeNull();
     expect(screen.getByText("확인할 일에서 보기 →").closest("p")?.textContent).toContain("지난 일 1건");
-    expect(screen.getByTestId("today-summary").textContent).toMatch(/내가 할 일\s*0/);
+    expect(screen.getByTestId("today-summary").textContent).toMatch(/오늘 할 일\s*0/);
   });
 
   it("골격이 선다 — 오늘 · 숫자 · 오늘 먼저 볼 일 · 반복 문제 · 채널, 그리고 그 아래 한 줄 입력", async () => {
@@ -288,7 +288,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
 
   it("실행 대기는 승인해 둔 것을 한 건씩 이름으로 부른다", async () => {
     renderHome();
-    const area = await screen.findByLabelText("실행 대기");
+    const area = await screen.findByLabelText("등록 중");
     const link = within(area).getByRole("link", { name: /선바로 전선몰딩/ });
     expect(link).toHaveAttribute("href", "/reviews/reply/rev-9");
     expect(area.textContent ?? "").not.toContain("6건");
@@ -311,7 +311,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     renderHome();
     await screen.findByRole("heading", { level: 1, name: "오늘" });
     expect(screen.getByLabelText("채널 상태")).toBeInTheDocument();
-    expect(screen.queryByLabelText("실행 대기")).toBeNull();
+    expect(screen.queryByLabelText("등록 중")).toBeNull();
     expect(screen.queryByText(/반복 문제 0건/)).toBeNull();
   });
 

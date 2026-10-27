@@ -152,7 +152,7 @@ export function OpenAskNote({ knowledge }: { knowledge: ReviewDecisionContext["k
   if (knowledge.openAsks <= 0) return null;
   return (
     <p className="break-keep text-sm leading-relaxed text-ink">
-      아직 답하지 않은 확인 필요가 {knowledge.openAsks}건 있습니다. 채우면 다음 초안이 더 말할 수 있습니다.
+      아직 채우지 않은 내용이 {knowledge.openAsks}건 있어요. 채우면 다음 AI 답글이 더 자세해져요.
     </p>
   );
 }
