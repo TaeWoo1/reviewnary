@@ -5,7 +5,7 @@ import { Dot } from "../../components/ui/ObjectRow";
 import { ConversationWorkspace } from "../../components/conversation/ConversationWorkspace";
 import { FIRST_USE_PROMPTS, HOME_PROMPTS } from "../../components/conversation/surfacePrompts";
 import { useConversation } from "../../lib/conversation/ConversationProvider";
-import { useAgentSurface } from "../../lib/agentPanel";
+import { useAgentPanel, useAgentSurface } from "../../lib/agentPanel";
 import { useApiData } from "../../lib/useApiData";
 import { useScreenChanges } from "../../lib/screenChanges";
 import { api } from "../../lib/apiClient";
@@ -52,6 +52,7 @@ import type { InquiryQueueResponse, MetricKpi, OperationsHome, OverviewResponse,
 export function AgentHome({ now = new Date() }: { now?: Date }) {
   useAgentSurface({ surface: "home", label: "오늘의 운영" });
   const conversation = useConversation();
+  const panel = useAgentPanel();
   // What arrived since this screen opened — a delegate's upload, a phone's approval — redraws it by itself; each read
   // below runs again quietly when this moves, and a failed re-read keeps what is on screen (lib/screenChanges.tsx).
   const changes = useScreenChanges();
@@ -191,6 +192,15 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
     (text: string): boolean => {
       if (!conversation) return false;
       const key = matchCommandIntent(text);
+      // <b>On 오늘 the conversation opens beside the work, never over it</b> (2026-10-28). The sentence goes to the
+      // contextual panel — the same thread — and this screen stays the work list.
+      if (workspace && panel) {
+        if (!key) {
+          panel.openPanel({ goal: text }, { autorun: true });
+          return true;
+        }
+        panel.openPanel();
+      }
       if (!key) return false;
       if (key === "TODAY") {
         conversation.addLocalTurn(text, { message: "오늘 할 일은 이 대화 맨 위에 정리해 두었어요.", artifacts: [] });
@@ -238,7 +248,7 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
       }
       return false;
     },
-    [conversation, data],
+    [conversation, data, workspace, panel],
   );
 
   // What an EMPTY thread opens with: the greeting (arithmetic, never a model) and — as a secondary,
@@ -345,6 +355,7 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
       onBeforeSend={onBeforeSend}
       // 오늘 (Home v3.1): the list is the subject here, so the box gives up the shell's one elevation.
       quietDock={workspace}
+      keepLayout={workspace}
       // 오늘 (UI/UX v2 Phase 1): the job's Home is a work list with the selected item beside it, and the box sits
       // under the list. The first sentence turns it back into the transcript. Example prompts are left out here —
       // four chips under the box every morning were the same four sentences, and the box already says what it takes.

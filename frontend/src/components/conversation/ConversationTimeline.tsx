@@ -29,6 +29,7 @@ export function ConversationTimeline({
   onPrompt,
   onResume,
   onCaptureDecision,
+  onRetry,
 }: {
   turns: DisplayTurn[];
   busy: boolean;
@@ -46,6 +47,8 @@ export function ConversationTimeline({
   onResume: (turnId: string) => void;
   /** Knowledge Capture v1: the candidate card's 「저장하고 계속」 / 「취소」. Absent ⇒ the card shows no controls. */
   onCaptureDecision?: (captureId: string, fingerprint: string, decision: "SAVE" | "CANCEL") => void;
+  /** Present when the failed turn can be sent again — drawn as 「다시 시도」 beside the error (2026-10-28). */
+  onRetry?: () => void;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -89,7 +92,18 @@ export function ConversationTimeline({
           </motion.div>
         ) : null}
         {error ? (
-          <motion.p key="error" variants={MESSAGE} initial="hidden" animate="shown" exit="gone" className="break-keep border-l-2 border-bad/40 pl-3 text-sm text-bad" role="alert">{error}</motion.p>
+          <motion.div key="error" variants={MESSAGE} initial="hidden" animate="shown" exit="gone" className="flex flex-wrap items-center gap-x-3 gap-y-1 border-l-2 border-bad/40 pl-3" role="alert">
+            <p className="break-keep text-sm text-bad">{error}</p>
+            {onRetry ? (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="rounded-lg px-2 py-1 text-sm font-semibold text-ink ring-1 ring-line hover:bg-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+              >
+                다시 시도
+              </button>
+            ) : null}
+          </motion.div>
         ) : null}
       </AnimatePresence>
       <div ref={endRef} />

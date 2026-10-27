@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { AgentPanelDock } from "../../components/agent/AgentPanel";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { render, screen, waitFor, within } from "@testing-library/react";
@@ -81,6 +82,8 @@ function renderHome(now = MORNING) {
       <AgentPanelProvider>
         <ConversationProvider>
           <AgentHome now={now} />
+          {/* The shell's panel: 오늘 sends its sentences there (2026-10-28). */}
+          <AgentPanelDock />
         </ConversationProvider>
       </AgentPanelProvider>
     </MemoryRouter>,
@@ -381,6 +384,9 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     await userEvent.type(screen.getByPlaceholderText(COPY.composer), "미답변 문의 보여줘");
     await userEvent.keyboard("{Enter}");
     await screen.findByText("답변이 필요한 문의 22건");
+    // Answered in the panel beside 오늘, which keeps its work list (2026-10-28).
+    expect(within(screen.getByTestId("agent-panel")).getByText("답변이 필요한 문의 22건")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "오늘" })).toBeInTheDocument();
     const turns = screen.getAllByTestId("agent-turn");
     const answer = turns[turns.length - 1]!;
     expect(within(answer).getByRole("button", { name: /배송 언제 되나요/ })).toBeInTheDocument();
@@ -396,6 +402,9 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     await waitFor(() => expect(conversationClient.sendTurn).toHaveBeenCalledTimes(1));
     expect(vi.mocked(conversationClient.sendTurn).mock.calls[0]![1].text).toBe("오늘 리뷰 뭐 들어왔어?");
     expect(await screen.findByText("이 상품에 미답변 문의는 없어요.")).toBeInTheDocument();
+    // The answer is in the panel; 오늘 is still the work list, not a transcript (2026-10-28).
+    expect(within(screen.getByTestId("agent-panel")).getByText("이 상품에 미답변 문의는 없어요.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "오늘" })).toBeInTheDocument();
   });
 });
 

@@ -4,7 +4,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { ConversationProvider } from "../../lib/conversation/ConversationProvider";
-import { AgentPanelProvider } from "../../lib/agentPanel";
+import { AgentPanelProvider, useAgentPanel } from "../../lib/agentPanel";
 import { ConversationMenu } from "./ConversationMenu";
 import { agentTurn } from "../../test/conversationFixtures";
 
@@ -26,6 +26,9 @@ import { conversationClient } from "../../lib/conversation/conversationClient";
 function Where() {
   return <p data-testid="where">{useLocation().pathname}</p>;
 }
+function PanelState() {
+  return <p data-testid="panel">{useAgentPanel()?.open ? "open" : "closed"}</p>;
+}
 function shell(path = "/reviews") {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -33,6 +36,7 @@ function shell(path = "/reviews") {
         <ConversationProvider>
           <ConversationMenu />
           <Routes><Route path="*" element={<Where />} /></Routes>
+          <PanelState />
         </ConversationProvider>
       </AgentPanelProvider>
     </MemoryRouter>,
@@ -55,42 +59,46 @@ beforeEach(() => {
  * which is why that test presses 「대화 메뉴」.
  */
 describe("the composer's conversation menu", () => {
-  it("lists the threads with the current one marked, and 「새 대화」 is an icon control that goes home", async () => {
+  // 2026-10-28: a thread opens in the AI 담당자 panel beside the page — 오늘 keeps its work list — so 「새 대화」 and an
+  // earlier thread open the panel where the seller is, instead of taking them home.
+  it("lists the threads with the current one marked, and 「새 대화」 opens a fresh thread in the panel", async () => {
     window.localStorage.setItem("reviewnary.conversation.current.org-t", "c-1");
     vi.mocked(conversationClient.getConversation).mockResolvedValue({ conversationId: "c-1", createdAt: "x", updatedAt: "x", turns: [agentTurn({ conversationId: "c-1" })], workingSet: null, pendingHumanAction: null, pendingPrepared: null });
     shell();
-    await userEvent.click(screen.getByRole("button", { name: "대화 메뉴" }));
+    await userEvent.click(screen.getByRole("button", { name: "대화 기록" }));
     const current = await screen.findByRole("button", { name: /지난 리뷰 확인/ });
     await waitFor(() => expect(current).toHaveAttribute("aria-current", "true"));
     expect(screen.getByRole("button", { name: /제목 없는 대화/ })).not.toHaveAttribute("aria-current");
     await userEvent.click(screen.getByRole("button", { name: "새 대화" }));
-    expect(screen.getByTestId("where")).toHaveTextContent("/");
+    expect(screen.getByTestId("panel")).toHaveTextContent("open");
+    expect(screen.getByTestId("where")).toHaveTextContent("/reviews");
     expect(window.localStorage.getItem("reviewnary.conversation.current.org-t")).toBeNull();
   });
 
-  it("opens an earlier thread from the sidebar and lands on the home", async () => {
+  it("opens an earlier thread in the panel, where the seller is", async () => {
     vi.mocked(conversationClient.getConversation).mockResolvedValue({ conversationId: "c-1", createdAt: "x", updatedAt: "x", turns: [agentTurn({ conversationId: "c-1", message: "지난 답변이에요." })], workingSet: null, pendingHumanAction: null, pendingPrepared: null });
     shell();
-    await userEvent.click(screen.getByRole("button", { name: "대화 메뉴" }));
+    await userEvent.click(screen.getByRole("button", { name: "대화 기록" }));
     await userEvent.click(await screen.findByRole("button", { name: /지난 리뷰 확인/ }));
     await waitFor(() => expect(window.localStorage.getItem("reviewnary.conversation.current.org-t")).toBe("c-1"));
-    expect(screen.getByTestId("where")).toHaveTextContent("/");
+    expect(screen.getByTestId("panel")).toHaveTextContent("open");
+    expect(screen.getByTestId("where")).toHaveTextContent("/reviews");
   });
 
   it("shows and hides the list — the collapse chevron's guarantee, now the menu's own toggle", async () => {
     shell();
     // Closed at rest: the box is the subject, and the history is one press away rather than always up.
     expect(screen.queryByRole("list", { name: "지난 대화" })).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "대화 메뉴", expanded: false }));
+    await userEvent.click(screen.getByRole("button", { name: "대화 기록", expanded: false }));
     expect(await screen.findByRole("list", { name: "지난 대화" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "대화 메뉴", expanded: true }));
+    await userEvent.click(screen.getByRole("button", { name: "대화 기록", expanded: true }));
     await waitFor(() => expect(screen.queryByRole("list", { name: "지난 대화" })).toBeNull());
   });
 
   it("reads no history until it is opened — the rail fetched eight summaries on every screen", async () => {
     shell();
     expect(conversationClient.listConversations).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: "대화 메뉴" }));
+    await userEvent.click(screen.getByRole("button", { name: "대화 기록" }));
     await waitFor(() => expect(conversationClient.listConversations).toHaveBeenCalled());
   });
 });

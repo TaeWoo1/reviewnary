@@ -35,6 +35,7 @@ export function ConversationWorkspace({
   footer,
   onBeforeSend,
   emptyLayout,
+  keepLayout = false,
   quietDock = false,
 }: {
   surface: ConversationSurface;
@@ -58,6 +59,12 @@ export function ConversationWorkspace({
    * The first sentence the seller sends turns it back into the transcript — the same thread, the same send path.
    */
   emptyLayout?: (dock: ReactNode) => ReactNode;
+  /**
+   * Keep {@link emptyLayout} after the first sentence (2026-10-28): the page stays the page, and the conversation goes
+   * on in the contextual panel. A walk-through sent one question from 오늘 and could not get the work list back —
+   * the 할 일 menu entry opened the same transcript.
+   */
+  keepLayout?: boolean;
   /** {@link Composer}'s 「quiet」 — for a surface where the list, not the box, is the subject. */
   quietDock?: boolean;
 }) {
@@ -121,7 +128,10 @@ export function ConversationWorkspace({
             disabled={blocked}
             attachedTop={context != null}
             placeholder={askedPlaceholder ?? placeholder ?? placeholderFor(registered?.label)}
-            initialText={initialText}
+            // The sentence whose send failed comes back to the box (2026-10-28) — it was lost with the error.
+            // …in the box where the thread is: on a page that keeps its layout the thread is in the panel, so the page's
+            // own box stays empty rather than holding the same sentence twice.
+            initialText={keepLayout ? initialText : (conversation.failedText ?? initialText)}
             autoFocus={autoFocus}
             chips={empty ? (chips ?? promptsFor(registered?.surface)) : []}
             compact={compact}
@@ -138,7 +148,7 @@ export function ConversationWorkspace({
     </>
   );
 
-  if (empty && emptyLayout) {
+  if (emptyLayout && (empty || keepLayout)) {
     return (
       <div className="flex min-h-0 flex-1 flex-col" data-testid="conversation-workspace">
         {emptyLayout(dock)}
@@ -176,6 +186,7 @@ export function ConversationWorkspace({
             onPrompt={send}
             onResume={(turnId) => void conversation.resume(turnId)}
             onCaptureDecision={(captureId, fingerprint, decision) => void conversation.decideCapture(captureId, fingerprint, decision)}
+            onRetry={conversation.failedText ? () => void conversation.retry() : undefined}
           />
         </div>
       </div>

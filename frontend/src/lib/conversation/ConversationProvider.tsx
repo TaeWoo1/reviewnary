@@ -73,6 +73,13 @@ export interface ConversationState {
   /** Only the stages the runtime reported for the turn in flight, in arrival order. */
   readonly stages: ProgressStageEvent[];
   readonly error: string | null;
+  /**
+   * The sentence whose send just failed (2026-10-28), so the screen can put it back in the box and offer 「다시 시도」 —
+   * a walk-through lost the typed question to 「에이전트 서비스에 연결하지 못했어요」 with no way on. Null otherwise.
+   */
+  readonly failedText: string | null;
+  /** Send the failed sentence again, in place of its first bubble. Does nothing when nothing failed. */
+  retry(): Promise<void>;
   readonly pendingHumanAction: PendingHumanAction | null;
   readonly workingSet: WorkingSetView | null;
   /** Agent Interaction Model v2 §1-C: the task in flight for the selected object, as the runtime last said. */
@@ -206,6 +213,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
   const [elapsed, setElapsed] = useState(0);
   const [stages, setStages] = useState<ProgressStageEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [failedSend, setFailedSend] = useState<{ text: string; hints: TurnHints; surface: ConversationSurface } | null>(null);
   const [pendingHumanAction, setPending] = useState<PendingHumanAction | null>(null);
   const [workingSet, setWorkingSet] = useState<WorkingSetView | null>(null);
   const [activeTask, setActiveTask] = useState<ActiveTask | null>(null);
@@ -235,7 +243,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     setPending(null);
     setWorkingSet(null);
     setActiveTask(null);
-    setError(null);
+    setError(null); setFailedSend(null);
     const id = readCurrent(storageKey);
     if (!id) return;
     let live = true;
@@ -298,8 +306,8 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
      *     which guided path the runtime may name, and no hint outranks showing someone their own words.
      */
     async (request: StartTurnRequest, userText: string | null,
-           enrich?: (r: StartTurnRequest) => Promise<StartTurnRequest>) => {
-      if (busy) return;
+           enrich?: (r: StartTurnRequest) => Promise<StartTurnRequest>): Promise<boolean> => {
+      if (busy) return true;
       setBusy(true);
       setError(null);
       setStages([]);
@@ -338,6 +346,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
           if (event.type === "stage") setStages((prev) => [...prev, event]);
         }, controller.signal);
         appendAgent(turn);
+        return true;
       } catch (err) {
         if (controller.signal.aborted) {
           // The seller's own Stop — a recorded fact in the thread, not an error to read.
@@ -348,8 +357,10 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
             status: "FAILED", failureCode: "CANCELLED", createdAt: new Date().toISOString(), local: true,
           }]);
           analytics.track("conversation_turn_stopped");
+          return true;
         } else {
           setError(explainAgentError(err));
+          return false;
         }
       } finally {
         abortRef.current = null;
@@ -366,7 +377,8 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
       const trimmed = text.trim();
       if (!trimmed) return;
       analytics.track("conversation_turn_sent", { surface });
-      await run(
+      setFailedSend(null);
+      const ok = await run(
         {
           text: trimmed,
           ...(hints.productId ? { productId: hints.productId } : {}),
@@ -380,9 +392,23 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
         // The helper probe — a hint, sent as one. Nothing is paired or opened here.
         async (request) => ({ ...request, localAgent: await probeLocalAgent().catch(() => "UNKNOWN" as const) }),
       );
+      if (!ok) setFailedSend({ text: trimmed, hints, surface });
     },
     [run],
   );
+
+  const retry = useCallback(async () => {
+    if (!failedSend) return;
+    // The first attempt's bubble goes; the retry draws the same sentence again — one question on screen, not two.
+    setTurns((prev) => {
+      const at = [...prev].reverse().findIndex((t) => t.role === "USER" && t.local && t.text === failedSend.text);
+      if (at < 0) return prev;
+      const index = prev.length - 1 - at;
+      return [...prev.slice(0, index), ...prev.slice(index + 1)];
+    });
+    setError(null);
+    await send(failedSend.text, failedSend.hints, failedSend.surface);
+  }, [failedSend, send]);
 
   const resume = useCallback(
     async (turnId: string) => {
@@ -413,7 +439,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     setPending(null);
     setWorkingSet(null);
     setActiveTask(null);
-    setError(null);
+    setError(null); setFailedSend(null);
   }, []);
 
   const loadHistory = useCallback((limit = 10) => conversationClient.listConversations(limit), []);
@@ -465,7 +491,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
       const view = await conversationClient.getConversation(id);
       idRef.current = view.conversationId;
       adopt(view);
-      setError(null);
+      setError(null); setFailedSend(null);
       setHistoryVersion((v) => v + 1);
     },
     [adopt],
@@ -543,6 +569,8 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
       elapsed,
       stages,
       error,
+      failedText: failedSend?.text ?? null,
+      retry,
       pendingHumanAction,
       workingSet,
       activeTask,
@@ -559,7 +587,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
       openConversation,
       addLocalTurn,
     }),
-    [conversationId, turns, busy, elapsed, stages, error, pendingHumanAction, workingSet, activeTask, plannerOff, send, resume, decideCapture, selectEntity, clearSelection, stop, historyVersion, newConversation, loadHistory, openConversation, addLocalTurn],
+    [conversationId, turns, busy, elapsed, stages, error, failedSend, retry, pendingHumanAction, workingSet, activeTask, plannerOff, send, resume, decideCapture, selectEntity, clearSelection, stop, historyVersion, newConversation, loadHistory, openConversation, addLocalTurn],
   );
   return <ConversationContext.Provider value={value}>{children}</ConversationContext.Provider>;
 }

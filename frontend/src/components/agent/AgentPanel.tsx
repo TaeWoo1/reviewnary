@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { useAgentPanel } from "../../lib/agentPanel";
 import { agentRuntime } from "../../lib/agentRuntime/agentClient";
 import { useConversation } from "../../lib/conversation/ConversationProvider";
@@ -165,10 +164,8 @@ function AgentPanelBody({ canPin }: { canPin: boolean }) {
       {/* 전체 화면 = the home conversation — the SAME thread this panel renders, at full width. It
           pointed at the legacy /agent page, which embedded a second copy of this conversation under a
           legacy form (Conversation Core v1 audit: the dead 「전체 화면」 defect). */}
-      <footer className="border-t border-line px-4 py-2 text-xs text-muted">
-        확인만 해요 · 보내는 일은 승인 뒤에 ·{" "}
-        <Link to="/" className="font-medium text-ink hover:underline">전체 화면</Link>
-      </footer>
+      {/* 「전체 화면」 is gone (2026-10-28): 오늘 keeps its work list and the conversation lives here. */}
+      <footer className="border-t border-line px-4 py-2 text-xs text-muted">확인만 해요 · 마켓에 보내는 일은 확정 뒤에</footer>
     </>
   );
 }

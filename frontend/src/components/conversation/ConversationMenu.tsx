@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useConversation } from "../../lib/conversation/ConversationProvider";
+import { useAgentPanel } from "../../lib/agentPanel";
 import { NavIcon } from "../icons/NavIcon";
 import { relativeTime } from "../../lib/format";
 import type { ConversationSummary } from "../../lib/conversation/types";
@@ -22,6 +23,7 @@ import type { ConversationSummary } from "../../lib/conversation/types";
  */
 export function ConversationMenu() {
   const conversation = useConversation();
+  const panel = useAgentPanel();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -60,7 +62,13 @@ export function ConversationMenu() {
   }, [open]);
 
   if (!conversation) return null;
+  // The thread opens in the AI 담당자 panel beside the page (2026-10-28) — 오늘 stays the work list. Without a panel
+  // (a page outside the shell), the conversation's own screen is still `/`.
   const goHome = () => {
+    if (panel) {
+      panel.openPanel();
+      return;
+    }
     if (location.pathname !== "/") navigate("/");
   };
 
@@ -70,11 +78,12 @@ export function ConversationMenu() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label="대화 메뉴"
-        title="대화 메뉴"
+        aria-label="대화 기록"
+        title="대화 기록"
         className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted transition hover:bg-surface hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
       >
-        <NavIcon name="compose" className="h-5 w-5" />
+        {/* A history mark, not a pencil (2026-10-28): the pencil read as 「새로 쓰기」 and nobody found the way out. */}
+        <NavIcon name="history" className="h-5 w-5" />
       </button>
       {open ? (
         /*
