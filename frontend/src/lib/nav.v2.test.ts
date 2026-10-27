@@ -6,59 +6,39 @@ import {
   NAV_GROUPS,
   NAV_ITEMS,
   navGroupLabel,
+  navItemOwns,
 } from "./nav.v2";
 import { isNavIconName } from "../components/icons/NavIcon";
 
 describe("nav.v2 — structure", () => {
-  it("declares the IA — 운영 / 데이터 / Reviewnary / 설정 (product-owner decision, 2026-10-01)", () => {
-    // The names say what each group IS rather than what the seller came to do with it: 일 / 기록 / 준비
-    // was a good axis for the first group and a strained one for 리뷰·문의·상품·주문, which are the
-    // objects the product operates on and are opened to change as often as to read.
-    expect(NAV_GROUPS.map((group) => group.heading)).toEqual(["운영", "데이터", "Reviewnary", "설정"]);
-  });
-
-  it("draws no group label that only repeats its own single destination", () => {
-    // 설정 is a group of one whose item carries the group's name, so the rail would print the word twice
-    // 4px apart. Every other group names something its items do not.
-    expect(NAV_GROUPS.map(navGroupLabel)).toEqual(["운영", "데이터", "Reviewnary", null]);
-  });
-
-  it("declares the destinations, in order — 오늘 · 할 일 · 반복 문제 / 리뷰 · 문의 · 상품 · 주문 · 리포트 / 지식 · 연결 / 설정", () => {
-    // <b>The destinations and their order did not move</b>; the grouping did. 오늘 joined 운영 because it
-    // is the answer to 운영's own question, and a heading-less group of one put the most-visited screen
-    // outside the structure that names it. 설정 left 준비 because it is not something reviewnary needs.
+  it("declares three destinations and 연결 · 설정 at the foot (product-owner decision, 2026-10-27)", () => {
+    // The menu had grown to eleven places and the pipeline could not be seen in it. The groups are quiet: the
+    // rail draws no group names, the foot group is pinned to the bottom.
     expect(NAV_GROUPS.map((group) => group.items.map((item) => item.to))).toEqual([
-      // 운영: the morning, the work waiting for a decision, and what keeps coming back.
-      ["/", "/customer-operations/cases", "/memory"],
-      // 데이터: the objects the product operates on. 리포트 is one too — a period, recorded.
-      ["/reviews", "/inquiries", "/products", "/orders", "/reports"],
-      // Reviewnary: what the product needs from the seller before it can do any of the above.
-      ["/knowledge", "/connect"],
-      ["/settings"],
+      ["/", "/reviews", "/knowledge"],
+      ["/connect", "/settings"],
     ]);
+    expect(NAV_GROUPS.map((group) => !!group.foot)).toEqual([false, true]);
+    expect(NAV_GROUPS.map(navGroupLabel)).toEqual([null, null]);
   });
 
   it("labels every destination in seller language", () => {
-    expect(NAV_ITEMS.map((item) => item.label)).toEqual([
-      "오늘",
-      "할 일",
-      "반복 문제",
-      "리뷰",
-      "문의",
-      "상품",
-      "주문",
-      "리포트",
-      "지식",
-      "연결",
-      "설정",
-    ]);
+    expect(NAV_ITEMS.map((item) => item.label)).toEqual(["홈", "리뷰·문의", "상품·정책", "연결", "설정"]);
   });
 
-  it("상품 is reachable from the menu — the backend served it all along and no screen did", () => {
-    // The gap this closes was not a decision: `/api/products` predates the v2 shell, this org holds
-    // 300 real products, and until Demo Core Experience v1 the only thing that could see the
-    // catalogue was the Agent (docs/frontend/frontend_ux_audit_v1.md §1).
-    expect(NAV_ITEMS.map((item) => item.to)).toContain("/products");
+  it("keeps the routes the menu no longer names, owned by the destination that leads to them", () => {
+    // 할 일, 반복 문제, 주문 and 리포트 left the menu; their routes did not. 문의 and 상품 are lit under the
+    // destination that now holds them, so a seller on /inquiries still sees where they are.
+    const owner = (path: string) => NAV_ITEMS.filter((item) => navItemOwns(item, path)).map((item) => item.label);
+    expect(owner("/inquiries")).toEqual(["리뷰·문의"]);
+    expect(owner("/inquiries/abc")).toEqual(["리뷰·문의"]);
+    expect(owner("/reviews/reply/r1")).toEqual(["리뷰·문의"]);
+    expect(owner("/products/p1")).toEqual(["상품·정책"]);
+    // Under /settings, but 정책 is 상품·정책's: the longest owned route wins, so exactly one row is lit.
+    expect(owner("/settings/policies")).toEqual(["상품·정책"]);
+    expect(owner("/settings/alerts")).toEqual(["설정"]);
+    expect(owner("/")).toEqual(["홈"]);
+    expect(owner("/orders")).toEqual([]);
   });
 
   it("names no channel — a channel is a filter inside a screen, never a destination", () => {
@@ -102,9 +82,9 @@ describe("nav.v2 — the operations agent is not a destination", () => {
 });
 
 describe("nav.v2 — mobile derives from the same model", () => {
-  it("uses the four 운영 destinations plus a 더보기 trigger", () => {
-    expect(MOBILE_TAB_ROUTES).toEqual(["/", "/reviews", "/inquiries", "/orders"]);
-    expect(MOBILE_TABS).toHaveLength(4);
+  it("uses the three destinations plus a 더보기 trigger", () => {
+    expect(MOBILE_TAB_ROUTES).toEqual(["/", "/reviews", "/knowledge"]);
+    expect(MOBILE_TABS).toHaveLength(3);
   });
 
   it("never re-declares a tab — every tab is the side-nav item itself", () => {
@@ -121,7 +101,8 @@ describe("nav.v2 — mobile derives from the same model", () => {
   it("gives every destination a short label for the narrow bar", () => {
     for (const item of NAV_ITEMS) {
       expect(item.short, `${item.label} has no short label`).toBeTruthy();
-      expect((item.short as string).length).toBeLessThanOrEqual(4);
+      // Five: 「리뷰·문의」 and 「상품·정책」 are whole names, and the bar now holds four buttons, not five.
+      expect((item.short as string).length).toBeLessThanOrEqual(5);
     }
   });
 });

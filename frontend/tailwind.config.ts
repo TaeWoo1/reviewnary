@@ -1,59 +1,38 @@
 import type { Config } from "tailwindcss";
 
-// The accent, named once. `boxShadow.selected` below is made of this exact value, and a token that
-// restates a colour is a token that drifts from it — that is how the app surface ended up with a
-// selection bar written as `shadow-[inset_3px_0_0_#1B64DA]` in four separate files
-// (docs/frontend/reviewnary_ui_system_audit_v1.md §4).
-const BRAND_700 = "#1B64DA";
+// Every colour is a Coral token from src/styles/tokens.css (Hallmark, theme dealt 2026-10-27), read through its
+// oklch channels so the /10 tints keep working. The names stay the ones the screens already use, so the system
+// changes in one place and no component had to be touched to take it.
+const lch = (name: string) => `oklch(var(--lch-${name}) / <alpha-value>)`;
 
-// Toss-like clean foundation: large readable type, soft cards, calm palette.
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
+        // The action colour is Coral's ink board, not a blue: the primary button is dark stock with its
+        // label pressed in, and coral itself is kept for the one settled state (`paid`) and focus.
         brand: {
-          DEFAULT: "#3182F6",
-          50: "#EAF2FE",
-          600: "#2272EB",
-          700: BRAND_700,
-          // The HOVER value for a solid primary, and it is darker than the resting one on purpose.
-          // `brand-600` was the hover, and white on #2272EB measures 4.49:1 — under AA by a hundredth,
-          // on the most-pressed control in the product. A hover that lightens a solid button has to
-          // walk toward the text colour; darkening walks away from it, so the state that invites the
-          // press is also the readable one. #1550B5 measures 7.38:1 against white.
-          800: "#1550B5",
+          DEFAULT: lch("board"),
+          50: lch("paper-2"),
+          600: lch("ink-2"),
+          700: lch("board"),
+          // Hover goes darker than rest, as before: the state that invites the press stays the readable one.
+          800: lch("board-hover"),
         },
-        surface: "#FFFFFF",
-        canvas: "#F2F4F6",
-        ink: "#191F28",
-        // Darkened from #6B7684 (Executive-friendly UX Redesign v1). The old value measures
-        // 4.19:1 against `canvas` (#F2F4F6) — below WCAG AA 4.5:1 — and nearly every supporting
-        // sentence in the product is muted-on-canvas. #4E5968 measures 7.0:1 on surface and
-        // 6.3:1 on canvas, so the same words survive a 50-year-old pair of eyes.
-        muted: "#4E5968",
-        line: "#E5E8EB",
-        // Darkened from #15803D for the same reason `warn` was (Executive Readiness Fix v1): the
-        // green words in this product sit on a `good/10` tint — 「연결됨」, 「최신」, 「외부 발송 없음」
-        // — and there the old value measured 4.0:1 against a canvas card, under AA. #12662F measures
-        // 7.1:1 on surface and 5.6:1 on its own tint over canvas.
-        good: "#12662F",
-        // Darkened from #B45309 (Executive Readiness Fix v1). The old value is fine as text on a
-        // plain surface (5.0:1) but the product's attention words sit on a `warn/10` tint — the
-        // 「확인 필요」 chip, the connection signal — and there it measured 4.39:1, under AA. It was
-        // the badge introduced by the previous package that failed. #92400E measures 7.1:1 on
-        // surface, 6.4:1 on canvas and 6.2:1 on its own tint, so one token closes every case.
-        warn: "#92400E",
-        // Darkened from #DC2626 for the third time in this family's story and the same reason
-        // (Agent Object + First-use Closure v1): the negative words sit on a `bad/10` tint — the
-        // 「부정」 chip on a review row — and there the old value measured 4.49:1 against canvas,
-        // under AA by a hundredth. It surfaced the moment a review list drew a negative row beside
-        // the anchored review. #B91C1C measures 6.5:1 on surface, 6.1:1 on canvas and 5.2:1 on its
-        // own tint, so one token closes the chip, the word and the bar.
-        bad: "#B91C1C",
+        surface: lch("cotton"),
+        canvas: lch("paper"),
+        ink: lch("ink"),
+        muted: lch("muted"),
+        line: lch("rule"),
+        paid: lch("paid"),
+        good: lch("good"),
+        warn: lch("warn"),
+        bad: lch("bad"),
       },
       fontFamily: {
         sans: [
+          "Pretendard Variable",
           "Pretendard",
           "-apple-system",
           "BlinkMacSystemFont",
@@ -139,7 +118,7 @@ export default {
         thread: "720px",
       },
       boxShadow: {
-        card: "0 1px 3px rgba(0,0,0,0.04), 0 6px 16px rgba(0,0,0,0.04)",
+        card: "var(--shadow-card), var(--cast-stock)",
         // Reviewnary Visual System v1 §7 — elevation is not decoration here, it is the mark of the
         // ONE live element on the page. The conversation is paper and every object is set into it
         // with rules; the box the seller types in is the only thing that sits ON the paper.
@@ -147,7 +126,7 @@ export default {
         // The selected row of a list, as an inset bar in the accent. A selected row is not elevated
         // and takes no border — §4 allows no shadow on a resting surface — so this is the one
         // `boxShadow` the app surface spends on state rather than on floating.
-        selected: `inset 3px 0 0 ${BRAND_700}`,
+        selected: "inset 3px 0 0 oklch(var(--lch-board))",
       },
     },
   },

@@ -1,6 +1,6 @@
 # reviewnary Design Contract v3
 
-**Status:** 2026-09-01, amended 2026-10-26 (§8-M seller-PC overhaul) · Reviewnary Product UI Redesign v1 + Contextual Agent Workspace & Interactive UX QA v1 (§8-A, §8-B) + Frontend-first Agent Workspace Redesign v1 (§8-B′, §8-K) + **Agent Object + First-use Closure v1** (§8-K, §8-L, colour `bad`) · `frontend/` only · **source of truth for new UI**
+**Status:** 2026-09-01, amended 2026-10-26 (§8-M seller-PC overhaul), **2026-10-27 (§4·§5·§1 Coral system, §0·§2 menu, §12 말 — product-owner decision: design through skills, rules may be re-set)** · Reviewnary Product UI Redesign v1 + Contextual Agent Workspace & Interactive UX QA v1 (§8-A, §8-B) + Frontend-first Agent Workspace Redesign v1 (§8-B′, §8-K) + **Agent Object + First-use Closure v1** (§8-K, §8-L, colour `bad`) · `frontend/` only · **source of truth for new UI**
 
 v1 of this document was a record of what the code already did. v2 is the other thing: the contract the
 code is built to. Where the code and this document disagree, the code is wrong.
@@ -22,11 +22,9 @@ Every screen must answer its one question **in five seconds, without reading a p
 | Screen | Question |
 |---|---|
 | 홈 | 오늘 무엇을 해야 하지? |
-| 상품 | 어떤 상품에 문제가 있지? |
-| 리뷰 | 어떤 리뷰를 봐야 하지? |
-| 문의 | 어떤 문의부터 처리하지? |
-| 주문 | 지금 판매 상황은 어떻지? |
-| 채널 연결 | 어디 연결에 문제가 있지? |
+| 리뷰·문의 | 어떤 리뷰·문의에 답해야 하지? AI 답글을 이대로 올려도 되나? |
+| 상품·정책 | 답이 기대는 내용이 맞나? 무엇이 비어 있지? |
+| 연결 | 어디 연결에 문제가 있지? |
 | 설정 | 어디서 무엇을 바꾸지? |
 
 Two rules that outrank the rest of this document:
@@ -41,7 +39,9 @@ Two rules that outrank the rest of this document:
 
 ## 1. Typography
 
-One family: **Pretendard** → platform Korean sans. No monospace in product UI.
+One family: **Pretendard**, now actually loaded (`pretendard@1.3.9`, the variable dynamic subset, bundled — the CSP
+allows no font host). Until 2026-10-27 it was named in the Tailwind config and never loaded, so every screen fell
+back to Apple SD Gothic Neo. No monospace in product UI.
 
 | Token | Size / line | Weight | Used for |
 |---|---|---|---|
@@ -102,6 +102,11 @@ content's min-content width, so one long unbroken Korean line would push the pan
 viewport falls back to single-pane; it never squeezes the detail.
 (`docs/frontend/reviewnary_ui_system_audit_v1.md` §7, §10.2.)
 
+**Menu (product-owner decision, 2026-10-27):** three destinations — 홈 · 리뷰·문의 · 상품·정책 — and 연결 · 설정
+pinned to the foot of the rail, inside the same 「주 메뉴」 landmark. 할 일, 반복 문제, 주문 and 리포트 left the menu,
+not the product: their routes stay and are opened from the screens that lead to them. Exactly one row is lit — the
+destination whose own or owned route is the longest match (`navOwner`, `lib/nav.v2.ts`).
+
 Breakpoints: default (mobile) · `sm` 640 · `md` 768 (sidebar appears) · `lg` 1024 (two-pane) · `xl` 1280.
 No custom breakpoints. The page body never scrolls horizontally; wide tables scroll inside their own
 container.
@@ -124,37 +129,42 @@ A page is `space-y-6`. Anything larger than 32px is empty space that has to just
 
 ## 4. Surfaces, borders, radius
 
-| Token | Value | Means |
+**Coral** (Hallmark theme, dealt 2026-10-27, `frontend/src/styles/tokens.css`): warm grey paper, cotton stock,
+one daylight from the left. The app takes its palette, faces, radius and surfaces — never its layout or ornament
+(Hallmark § App screens). The Tailwind names the screens already use now read these tokens through their oklch
+channels (`tailwind.config.ts`), so the system lives in one file.
+
+| Token | Coral token | Means |
 |---|---|---|
-| `canvas` | `#F2F4F6` | the page ground; also an inset panel inside a card |
-| `surface` | `#FFFFFF` | a card or a list container — something with its own edge |
-| `line` | `#E5E8EB` | card edge, row rule |
+| `canvas` | `--color-paper` | the page ground; also an inset panel inside a card |
+| `surface` | `--color-cotton` | a card or a list container — something with its own edge |
+| `line` | `--color-rule` | card edge, row rule |
 
 - **Level 0** canvas → **Level 1** surface card (1px line) → **Level 2** canvas inset inside a card. Never
-  a card inside a card; never a shadow on a resting card. Shadow (`shadow-card`) only on things that
-  float (drawer, popover).
-- Radius: **8px** controls and inputs, **10px** rows and chips' container, **12px** cards. Nothing rounder
-  in the app surface. Chips are `rounded-full`.
+  a card inside a card. `shadow-card` is Coral's stock edge and cast; it is for things that sit on the paper.
+- Radius: 8px controls and cards (`--radius-card`, `--radius-stock`), 6px inputs, chips `rounded-full`.
 - A list is **one bordered container with rows**, never N bordered cards. Five findings are five rows.
 
 ---
 
 ## 5. Colour
 
-Accent `brand-700` `#1B64DA` is spent on **actions and the active nav item** and nowhere else. No brand
-fills on cards, no gradients, no glow, no glass.
+The action colour is **Coral's ink board** (`brand-700` → `--lch-board`): the primary button is dark stock with its
+label pressed in, links are ink with an underline, and the active menu row is raised paper. Coral itself
+(`paid`, `--color-paid`) is spent on **one settled state** — 등록됨 — and on focus. No blue anywhere, no gradients,
+no glow, no glass.
 
 | Tone | Text | Tint | Means |
 |---|---|---|---|
-| `GOOD` | `good` `#12662F` | `good/10` | settled, grounded, connected — a **proven** state only |
-| `WARN` | `warn` `#92400E` | `warn/10` | look at this before acting |
-| `BAD` | `bad` `#B91C1C` | `bad/10` | failed, negative, disconnected |
-| `INFO` | `brand-700` | `brand-50` | reviewnary prepared something |
-| neutral | `muted` `#4E5968` | `canvas` | reference |
+| settled | `paid` | — | the one finished state (답글 등록됨), pressed into the stock |
+| `GOOD` | `good` | `good/10` | connected, grounded — a **proven** state only |
+| `WARN` | `warn` | `warn/10` | look at this before acting |
+| `BAD` | `bad` | `bad/10` | failed, negative, disconnected |
+| neutral | `muted` | `canvas` | reference |
 
 - Colour is never the only carrier: every coloured state has a word.
-- A coloured word is checked **on its own tint**, and in **hover**, in a real browser. `brand-700` on
-  `brand/15` measures 4.16:1 — use `brand-800` there. Solid primaries hover **darker** (`brand-800`).
+- A coloured word is checked **on its own tint**, and in **hover**, in a real browser (§10). The Coral values were
+  re-measured at the sweep; the hex history this section used to carry belongs to the retired blue system.
 - `warn` is not a default. A qualification that applies to everything (before the first connection) is
   `muted`; a global count in the chrome is a **secondary** status, not the loudest thing on every page.
 
@@ -473,7 +483,86 @@ A chart is an operational control or it is decoration; this product ships only t
 
 ## 11. What this document does not authorise
 
-- A new palette, a new font, a component library, landing-page patterns inside the app.
+- A palette, a font or a component library that is not in §1, §4, §5 — the Coral system is the one in
+  `frontend/src/styles/tokens.css`, re-set through the design skills (`docs/pilot/design_skills_bootstrap.md`).
+  Landing-page patterns inside the app stay forbidden.
 - A visual that claims work that did not happen (a progress bar nobody measured, an 「AI 분석 중」
   animation with no model running, a green check for a local save).
 - A card framework. The primitives in §6 are the framework.
+
+---
+
+## 12. 말 — 화면 문구 규칙 (2026-10-27, product-owner 결정에 따른 레퍼런스 조사)
+
+사장님 판정: 지금 화면의 문장과 단어는 「일반적인 서비스 같지 않고 AI 같다」. 그래서 세 갈래를 조사했다
+— 국내 판매자 도구의 실제 화면 단어(브이리뷰·리펀디·크리마·알파리뷰·배민 셀프서비스·쿠팡 Wing·
+카페24·채널톡 ALF), 공개된 한국어 UX 라이팅 원칙(토스 앱인토스 라이팅 가이드·toss.tech 8원칙·배민
+B컷), 해외 AI 답변 도구의 구조(Gorgias·Intercom Fin·Zendesk·Front·Help Scout·Shopify Inbox·Okendo).
+이 절은 그 결과다. 출처 URL은 맨 아래에 있다.
+
+### 12-1. 문체
+
+- **해요체 하나로 쓴다.** 한 화면 안에서 해요체와 합니다체를 섞는 것이 AI 같다는 인상의 가장 큰
+  원인이었다(현재 화면 문구 3,388개 중 합니다체 787 · 해요체 604가 섞여 있다). 제한·경고도 해요체로
+  분명히 쓴다(토스 규칙). 마켓 공지 원문을 인용할 때만 원문 문체를 둔다.
+- **과한 경어를 뺀다.** 「~하시겠습니까?」「~하실 수 있습니다」 → 「~할까요?」「~할 수 있어요」.
+- **능동형으로 쓴다.** 「업데이트되었습니다」 → 「새로 가져왔어요」. 연결이 끊김·만료처럼 사장님에게
+  닥친 일만 수동형을 허용한다.
+- **본문은 끝맺은 문장, 명사형은 제목·라벨·칩에만.** 「답글 등록 완료」(문장 자리) → 「답글을 올렸어요」.
+- **만능 동사·한자어 명사 쌓기를 쓰지 않는다.** 「진행」「처리」「여부」「필요」로 끝나는 상태,
+  「{명사}+{명사}」 연쇄. 무엇을 해야 하는지가 보이게 쓴다.
+
+### 12-2. 단어 — 국내 판매자 도구가 실제로 쓰는 말로
+
+| 개념 | 쓰는 말 | 쓰지 않는 말 | 근거 |
+|---|---|---|---|
+| 메뉴 | 홈 · 리뷰·문의 · 상품·정책 | 오늘 · 할 일 · 반복 문제 · 지식 · 응대 기록 | 사장님 결정 2026-10-27, 「리뷰 관리」「문의 관리」가 국내 표준 |
+| 답 상태 | 미답변 · 답변완료 | 처리 필요 · 확인 필요 · 승인 대기 | 쿠팡·배민·리펀디 공통 |
+| AI가 쓴 답 | AI 답글 · 추천 답글 | 초안 · 드래프트 · 준비된 답변 | 「초안」 라벨은 조사한 곳에 없음. 제안·추천·도우미 |
+| 올리기 | 답글 등록 · 이대로 등록 | 승인 · 승인하고 맡기기 | 「승인」 버튼 0건. 검토 후 게시도 「등록」 |
+| 답의 바탕 | 참고한 내용 · 출처 | 근거 · 기준 후보 · 인용 | 채널톡 「참조」「출처 표기」 |
+| 가게가 아는 것 | 상품 정보 · 정책 · 자주 쓰는 답 · 말투 | 지식 · 운영 기준 · 상품 지식 · 안내 제안 | 채널톡 「지식」(설정 안), 브이리뷰 「지침」, 카페24 「자주 쓰는 답변」 |
+| 빈칸 | 채울 내용 · 아직 없어요 | 정보 부족 · 확인 필요 | 결과로 말한다: 「이 내용이 없어서 감사 인사만 써요」 |
+| 마켓 연결 | (사장님 결정 대기) 연동 · 연결 | — | 국내는 「마켓 연동」이 압도적, 지금 메뉴는 「연결」 |
+| 리뷰에 다는 글 | (사장님 결정 대기) 답글 · 댓글 | — | 배민·크리마·브이리뷰는 「댓글」, 문의는 「답변」 |
+
+### 12-3. 모양
+
+- **가운뎃점(·)은 같은 종류를 나열할 때만.** 「네이버 · 리뷰 · 별점 2 · 사진 있음 · 3일 전」처럼
+  종류가 다른 정보를 잇지 않는다. 판단에 필요한 것만 남기고, 자리(열·줄)로 나눈다. Hallmark Floor 10.
+- **설명 부제를 달지 않는다.** 제목이 말한 것을 되풀이하거나 빈자리를 채우는 문장은 지운다(토스
+  「Remove empty sentences」). §1의 「Tiny helper copy is not a layer」를 문구로 다시 확인한 것이다.
+- **버튼은 다음에 일어날 일을 말한다.** 「확인」「적용」「진행」 대신 「답글 등록」「답글 고치기」.
+  다이얼로그의 닫는 버튼은 「닫기」(「취소」는 하던 일이 취소된다고 읽힌다).
+- **겁주지 않고 사실로 말한다.** 「지금 답하지 않으면 평점이 떨어질 수 있습니다」 → 「3일 넘은 문의가
+  2개 있어요」.
+- **오류는 무엇이·왜·어떻게, 버튼과 함께.** 「네이버에서 리뷰를 못 가져왔어요. 다시 연동하면 이어서
+  가져와요」 + [다시 연동].
+
+### 12-4. 구조 — 해외 AI 답변 도구에서 가져온 것
+
+- **AI 답글은 답장 칸 안에 미리 채워 둔다.** 누르면 「등록」이고, 고치려면 그 자리에서 고친다
+  (Zendesk·Front·Shopify Inbox). 「이 리뷰에 맞는 안내」 같은 검색 결과 고르기는 매일 쓰는 칸에 두지
+  않는다.
+- **참고한 내용은 작은 표시 하나로 접는다.** 「참고 2」를 누르면 원문 발췌가 열리고, 원문 그대로인지
+  요약인지 함께 적는다(Front 「# sources」, Zendesk 출처 배너, Intercom 「Add to composer」).
+- **검색·근거 진단은 상품·정책 화면으로 보낸다.** 받은 리뷰 화면에는 두지 않는다(Gorgias 「Show
+  reasoning」, Zendesk는 상담원 화면에서 아예 숨김). AI 답글이 없으면 이유 한 줄과 다음 행동만 둔다.
+- **고친 말이 규칙이 될 때 범위를 그 자리에서 묻고, 기본은 좁게(이 상품만).** 되돌리기를 함께 둔다
+  (Gorgias 「Was something missing?」, Help Scout 「Improve」, Intercom 「Audience」와 「Roll back」).
+- **가져온 자료는 읽기 전용으로 보여 주고 원래 자리에서 고치게 한다. 사장님이 보탤 칸은 따로 둔다**
+  (Gorgias 상품 화면: 「Store website」 읽기 전용 + 「Custom product information」).
+- **채울 내용은 영향받는 리뷰 수 순으로 늘어놓는다.** 처음 준비할 때 남은 질문은 상품·정책 화면의 같은
+  목록으로 이어진다(Gorgias 「Opportunities」, Intercom 「Recommendations」). 처음부터 빠진 사실만 묻는
+  흐름은 조사한 제품에 선례가 없다 — 우리 쪽의 차별점이자 검증이 덜 된 부분이다.
+
+### 12-5. 출처
+
+- 토스: developers-apps-in-toss.toss.im (UX 라이팅) · toss.tech/article/8-writing-principles-of-toss ·
+  toss.tech/article/1st_uxwriter · 배민: bcut.baemin.com/6287 · ceo.baemin.com/guide/11082
+- 국내 판매자 도구: guide.vreview.tv (AI 댓글 매니저) · docs.channel.io/oms_refundy (문의관리) ·
+  cre.ma/blog/ai-reviewmanager · docs.channel.io/alfv2 (지식·규칙) · developers.coupang.com (온라인 문의)
+- 해외: docs.gorgias.com (AI Agent·Knowledge·Opportunities) · intercom.com/help (Copilot·Guidance·
+  Recommendations) · support.zendesk.com (Suggested first replies·auto assist) · help.front.com ·
+  docs.helpscout.com (AI Drafts) · help.shopify.com (Shopify Magic) · support.okendo.io
+- 읽지 못한 곳: 스마트스토어센터 도움말(차단), 쿠팡 Wing(로그인), 카페24 지원(403 — 검색 요약만).

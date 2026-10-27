@@ -1,3 +1,9 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Coral (deal 1/3, seed korean-seller-back-office-1756·24f565c7·2026-10-27·r0) · redesign: full
+ * nav: 홈 · 리뷰·문의 · 상품·정책, then 연결 · 설정 at the foot · signature: the reply card (the customer's line, the AI reply under it, one 등록) · states: loading, empty, error, full
+ * axes: light/grotesk-sans/warm · posture: restrained · contrast: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: pending the sweep */
+@import url("./styles/tokens.css");
+@import url("./styles/base.css");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

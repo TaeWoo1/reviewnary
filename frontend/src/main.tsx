@@ -8,6 +8,7 @@ import { initSentryFromEnv } from "./lib/telemetry/sentry";
 import { ConsentProvider } from "./lib/consent/ConsentProvider";
 import { RootErrorBoundary } from "./components/app/RootErrorBoundary";
 import { captureUrlSecrets } from "./lib/urlSecrets";
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./index.css";
 
 // FIRST: a one-time code / reset token in the URL leaves the address bar before any vendor can see it

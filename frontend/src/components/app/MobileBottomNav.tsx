@@ -1,5 +1,5 @@
-import { NavLink } from "react-router-dom";
-import { MOBILE_TABS } from "../../lib/nav.v2";
+import { NavLink, useLocation } from "react-router-dom";
+import { MOBILE_TABS, navItemOwns } from "../../lib/nav.v2";
 import { NavIcon } from "../icons/NavIcon";
 
 const TAB_BASE =
@@ -13,6 +13,7 @@ const TAB_BASE =
  * navigating; that keeps the bar at five targets without inventing a fifth destination.
  */
 export function MobileBottomNav({ onMore }: { onMore: () => void }) {
+  const { pathname } = useLocation();
   return (
     <nav
       aria-label="모바일 메뉴"
@@ -23,8 +24,8 @@ export function MobileBottomNav({ onMore }: { onMore: () => void }) {
           key={tab.to}
           to={tab.to}
           end={tab.end}
-          className={({ isActive }) =>
-            `${TAB_BASE} ${isActive ? "text-brand-700" : "text-muted"}`
+          className={() =>
+            `${TAB_BASE} ${navItemOwns(tab, pathname) ? "text-brand-700" : "text-muted"}`
           }
         >
           <NavIcon name={tab.icon} />

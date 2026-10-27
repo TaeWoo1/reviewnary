@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LEGACY_REDIRECTS, resolveLegacyTarget } from "./legacyRoutes";
-import { NAV_ITEMS } from "./nav.v2";
+import { NAV_ITEMS, navItemOwns } from "./nav.v2";
 
 describe("legacy redirects — the mapping", () => {
   it("covers every pre-v2 path the old IA exposed", () => {
@@ -20,9 +20,9 @@ describe("legacy redirects — the mapping", () => {
     ]);
   });
 
-  it("no longer redirects /inquiries — it is the 문의 destination of the workflow IA", () => {
+  it("no longer redirects /inquiries — it is a screen of 리뷰·문의", () => {
     expect(LEGACY_REDIRECTS.map((r) => r.from)).not.toContain("/inquiries");
-    expect(NAV_ITEMS.map((item) => item.to)).toContain("/inquiries");
+    expect(NAV_ITEMS.filter((item) => navItemOwns(item, "/inquiries")).map((item) => item.label)).toEqual(["리뷰·문의"]);
   });
 
   it("never redirects to another legacy path", () => {

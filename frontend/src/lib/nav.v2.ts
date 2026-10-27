@@ -28,9 +28,12 @@
 // 설정's overflow. It answers 운영's question for the patterns rather than the items: what keeps coming back.
 // 홈 became 오늘 in the same decision: the first screen is named for the question it answers.
 //
-// Deliberately absent from the menu: `/agent` (an internal route — kept, never deleted), `/customer-operations`
-// (the control for the handed-over job, reached from 오늘's status pill — Phase 4 audit), and every per-channel page
-// (`/connect/channels/:accountId`, the connect wizards) — those are reached from 채널 연결.
+// <b>Three destinations</b> (product-owner decision, 2026-10-27, after the three-screen flow mockups). The menu had grown
+// to eleven places and the seller could not see the pipeline in it: 홈 → 리뷰·문의 → 상품·정책, with 연결 · 설정 at the
+// foot. Nothing behind the old entries was removed: 할 일, 반복 문제, 주문 and 리포트 keep their routes and are opened
+// from inside the screens that lead to them (the Home's backlog and 반복 문제 lines, a review's product, 상품·정책).
+// Deliberately absent as before: `/agent` (internal), `/customer-operations` (reached from the Home's status pill) and
+// every per-channel page (reached from 연결).
 
 export interface NavItem {
   to: string;
@@ -41,62 +44,67 @@ export interface NavItem {
   icon: string;
   /** Exact-match highlight. Only the home route needs it. */
   end?: boolean;
+  /** Other routes this destination owns: 리뷰·문의 is lit on /inquiries too, 상품·정책 on /products. */
+  match?: string[];
 }
 
 export interface NavGroup {
   heading: string;
   items: NavItem[];
+  /** The group's name is for the drawer and the keys, not drawn in the rail. */
+  quiet?: boolean;
+  /** Pinned to the foot of the rail. */
+  foot?: boolean;
 }
 
 export const NAV_GROUPS: NavGroup[] = [
-  // <b>운영 / 데이터 / Reviewnary / 설정</b> (product-owner decision, 2026-10-01 — Home visual target).
-  //
-  // The destinations and their order are UI/UX v2 Phase 4's and do not move; the four GROUP NAMES do.
-  // 일 / 기록 / 준비 named what the seller comes to DO, which is a good axis for the first group and a
-  // strained one for the other three: 리뷰·문의·상품·주문·리포트 are not 「기록을 찾으러」 — they are the
-  // objects the product operates on, and a seller opens 상품 to change it as often as to read it. The
-  // names now say what each group IS. 지식·연결 are what reviewnary needs from the seller, so the group
-  // takes the product's own name, and 설정 stops being the odd third item under it.
-  //
-  // 오늘 joins 운영 rather than standing alone above the labels: it is the answer to 운영's question, and
-  // a heading-less group of one put the most-visited destination outside the structure that names it.
   {
-    heading: "운영",
+    heading: "메뉴",
+    quiet: true,
     items: [
-      { to: "/", label: "오늘", short: "오늘", icon: "home", end: true },
-      { to: "/customer-operations/cases", label: "할 일", short: "할 일", icon: "inbox" },
-      { to: "/memory", label: "반복 문제", short: "반복", icon: "memory" },
+      { to: "/", label: "홈", short: "홈", icon: "home", end: true },
+      { to: "/reviews", label: "리뷰·문의", short: "리뷰·문의", icon: "review", match: ["/inquiries", "/inbox"] },
+      {
+        to: "/knowledge",
+        label: "상품·정책",
+        short: "상품·정책",
+        icon: "product",
+        match: ["/products", "/settings/policies"],
+      },
     ],
   },
   {
-    heading: "데이터",
+    heading: "연결·설정",
+    quiet: true,
+    foot: true,
     items: [
-      { to: "/reviews", label: "리뷰", short: "리뷰", icon: "review" },
-      { to: "/inquiries", label: "문의", short: "문의", icon: "mail" },
-      { to: "/products", label: "상품", short: "상품", icon: "product" },
-      { to: "/orders", label: "주문", short: "주문", icon: "orders" },
-      // 리포트 joins the menu with Phase 4: it is a record of a period, and 설정 was never its home.
-      { to: "/reports", label: "리포트", short: "리포트", icon: "report" },
-    ],
-  },
-  {
-    heading: "Reviewnary",
-    items: [
-      // Knowledge Sources & Acquisition v1: what reviewnary knows is SETUP, not a daily destination —
-      // a seller visits it when they have material to hand over or something to confirm, and the rest
-      // of the time the knowledge reaches them inside the draft that used it.
-      { to: "/knowledge", label: "지식", short: "지식", icon: "list" },
       { to: "/connect", label: "연결", short: "연결", icon: "link" },
+      { to: "/settings", label: "설정", short: "설정", icon: "settings" },
     ],
-  },
-  {
-    // 설정 is not something reviewnary needs from the seller, and it is not an object either. It is the
-    // one destination that belongs to no group, so it is its own — which is also where the target draws
-    // it, separated from the rest by the group gap rather than by a rule.
-    heading: "설정",
-    items: [{ to: "/settings", label: "설정", short: "설정", icon: "settings" }],
   },
 ];
+
+/**
+ * The one destination lit for `pathname`: the item whose own route or owned route is the LONGEST match.
+ * /settings/policies belongs to 상품·정책 although it sits under 설정 — two lit rows would say the seller is
+ * in two places.
+ */
+export function navOwner(pathname: string): NavItem | null {
+  const matches = (route: string) => pathname === route || (route !== "/" && pathname.startsWith(`${route}/`));
+  let best: { item: NavItem; length: number } | null = null;
+  for (const item of NAV_GROUPS.flatMap((group) => group.items)) {
+    for (const route of [item.to, ...(item.match ?? [])]) {
+      if (item.end ? pathname !== route : !matches(route)) continue;
+      if (!best || route.length > best.length) best = { item, length: route.length };
+    }
+  }
+  return best?.item ?? null;
+}
+
+/** True when `item` is the destination lit for `pathname`. */
+export function navItemOwns(item: NavItem, pathname: string): boolean {
+  return navOwner(pathname) === item;
+}
 
 /**
  * The heading a renderer should DRAW for a group — null when drawing it would say nothing.
@@ -107,7 +115,7 @@ export const NAV_GROUPS: NavGroup[] = [
  * written as an empty string so the group keeps an identity for the drawer, the keys and this file.
  */
 export function navGroupLabel(group: NavGroup): string | null {
-  if (!group.heading) return null;
+  if (!group.heading || group.quiet) return null;
   if (group.items.length === 1 && group.items[0]!.label === group.heading) return null;
   return group.heading;
 }
@@ -119,11 +127,10 @@ export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
 export const ALERTS_ROUTE = "/settings/alerts";
 
 /**
- * Mobile bottom-tab destinations, in order. Four routes plus a "더보기" trigger (which is not a
- * route) make the five-tab bar. The four are the daily 운영 destinations; 채널 연결 and 설정 are
- * setup work and live in the drawer.
+ * Mobile bottom-tab destinations, in order: the three destinations plus a "더보기" trigger (which is not a
+ * route). 연결 and 설정 are setup work and live in the drawer.
  */
-export const MOBILE_TAB_ROUTES = ["/", "/reviews", "/inquiries", "/orders"] as const;
+export const MOBILE_TAB_ROUTES = ["/", "/reviews", "/knowledge"] as const;
 
 /** Derived, never re-declared — a tab is the same item the side nav renders. */
 export const MOBILE_TABS: NavItem[] = MOBILE_TAB_ROUTES.map((route) => {
