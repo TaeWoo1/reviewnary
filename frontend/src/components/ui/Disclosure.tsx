@@ -47,24 +47,30 @@ export function Disclosure({
       <summary
         className={`inline-flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-semibold text-muted transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700 ${summaryClassName}`}
       >
-        <svg
-          viewBox="0 0 20 20"
-          aria-hidden="true"
-          className="h-4 w-4 shrink-0 transition-transform group-open:rotate-90"
-        >
-          <path
-            d="M7.5 4.5 13 10l-5.5 5.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <Chevron />
         {label}
         {note ? <span className="font-normal">{note}</span> : null}
       </summary>
       {children}
     </details>
+  );
+}
+
+/**
+ * <b>The one open/closed mark</b> (2026-10-28 walk-through: ›, ▶ and ▾ on one screen, and a closed 「무엇을 반복으로
+ * 보나요」 pointing down). Inside a `<summary>` it turns with ITS details only — the old `group-open` turned with any
+ * open ancestor, so a fold inside an open fold looked open. Elsewhere `open` says the state.
+ */
+export function Chevron({ open, className = "h-4 w-4" }: { open?: boolean; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      className={`${className} shrink-0 transition-transform ${
+        open === undefined ? "[details[open]>summary>&]:rotate-90" : open ? "rotate-90" : ""
+      }`}
+    >
+      <path d="M7.5 4.5 13 10l-5.5 5.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

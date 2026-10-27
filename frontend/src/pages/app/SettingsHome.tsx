@@ -69,7 +69,7 @@ export function SettingsHome() {
         />
         <Row
           label="연동 알림"
-          value="연결이 끊기거나 확인이 필요할 때. 표시가 없다고 모든 연결이 정상은 아니에요"
+          value="연동이 끊기거나 확인이 필요할 때 알려요"
           action={<Go to="/settings/alerts">알림 보기</Go>}
         />
       </Block>
@@ -122,7 +122,9 @@ function Block({ title, children }: { title: string; children: ReactNode }) {
  */
 function Row({ label, value, action }: { label: string; value: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-line/70 py-2 text-sm">
+    // The first row draws no rule of its own (2026-10-28): the section header's line is already above it, and the two
+    // stood 9px apart under every title.
+    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-line/70 py-2 text-sm first:border-t-0">
       <span className="w-[150px] shrink-0 break-keep font-medium text-ink">{label}</span>
       <span className="min-w-0 flex-1 break-keep break-all text-muted">{value}</span>
       {action ? <span className="shrink-0 text-right">{action}</span> : null}

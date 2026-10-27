@@ -1,3 +1,4 @@
+import { Chevron } from "../../components/ui/Disclosure";
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
@@ -258,7 +259,8 @@ export function KnowledgeHome() {
           매일 읽을 것이 아니다. 엑셀은 이미 엑셀로 관리하는 가게를 위한 보조 수단이라 첫 화면에서 내려왔다. 접혀 있을 뿐
           빠진 것은 없다. */}
       <details className="rounded-xl border border-line bg-surface px-4 py-3" data-testid="knowledge-originals">
-        <summary className="cursor-pointer select-none text-base font-semibold text-ink">
+        <summary className="flex cursor-pointer list-none select-none items-center gap-1.5 text-base font-semibold text-ink">
+          <Chevron />
           원본 자료
           <span className="ml-2 text-sm font-normal text-muted">파일, 엑셀, 채널에서 읽어 온 것</span>
         </summary>

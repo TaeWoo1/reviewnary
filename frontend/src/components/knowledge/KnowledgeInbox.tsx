@@ -119,7 +119,7 @@ function CandidateRow({
     .join(" · ");
 
   return (
-    <li className="border-t border-line/70 py-2">
+    <li className="border-t border-line/70 py-2 first:border-t-0">
       <div className="flex items-start gap-3">
         <Tag tone={isGap ? "info" : "neutral"}>{isGap ? "빈칸" : isGuidance ? "제안" : "자주 쓴 답"}</Tag>
         <span className="min-w-0 flex-1">

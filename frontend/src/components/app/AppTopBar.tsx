@@ -10,7 +10,11 @@ export function AppTopBar() {
   const { user } = useAuth();
   return (
     <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-4 md:hidden">
-      <p className="min-w-0 truncate text-base font-bold text-ink">{user?.orgName ?? "내 스토어"}</p>
+      {/* The wordmark leads on a phone as it does in the rail (2026-10-28): the bar named the store and nothing else. */}
+      <p className="flex min-w-0 items-baseline gap-2">
+        <span className="shrink-0 text-base font-bold tracking-tight text-ink">reviewnary</span>
+        <span className="min-w-0 truncate text-sm text-muted">{user?.orgName ?? "내 스토어"}</span>
+      </p>
       <ConnectionSignal />
     </header>
   );

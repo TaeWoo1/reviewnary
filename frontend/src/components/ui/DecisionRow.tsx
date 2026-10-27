@@ -368,7 +368,9 @@ export function DecisionRow({
       metaBelow ? "px-4 py-4" : "rounded-lg px-3 py-3"
     } ${selected ? "!border-transparent bg-brand-50 shadow-selected" : "hover:bg-canvas"}`;
     return (
-      <li className={`${metaBelow ? "" : "px-1.5"} [&+&>*]:border-t [&+&>*]:border-line`}>
+      // The hairline is the item's, not the rounded row's (2026-10-28): drawn on a rounded-corner link, its two ends
+      // curved up into the corners on every row of the Home.
+      <li className={`${metaBelow ? "" : "px-1.5"} [&+&]:border-t [&+&]:border-line ${selected ? "!border-transparent" : ""}`}>
         {to ? (
           <Link to={to} state={state} aria-current={selected ? "true" : undefined} className={`group ${shape}`}>
             {inner}

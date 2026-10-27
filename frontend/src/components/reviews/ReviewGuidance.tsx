@@ -1,3 +1,4 @@
+import { Chevron } from "../ui/Disclosure";
 import { useEffect, useState } from "react";
 import { Btn } from "../ui/Btn";
 import { api } from "../../lib/apiClient";
@@ -133,7 +134,10 @@ export function ReviewGuidance({
             aria-expanded={showRejected}
             className="self-start rounded px-1 text-xs text-muted hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
-            {showRejected ? "▾" : "▸"} 이 리뷰에서 뺀 안내 {options.rejected.length}
+            <span className="inline-flex items-center gap-1">
+              <Chevron open={showRejected} className="h-3.5 w-3.5" />
+              이 리뷰에서 뺀 안내 {options.rejected.length}
+            </span>
           </button>
           {showRejected ? (
             <ul className="flex flex-col gap-2">

@@ -114,7 +114,7 @@ function Press({ disabled, onClick, children }: { disabled: boolean; onClick: ()
       aria-disabled={disabled}
       onClick={() => !disabled && onClick()}
       className={`rounded-lg px-2.5 py-1 text-sm font-semibold ring-1 ring-line ${
-        disabled ? "bg-canvas text-muted opacity-40" : "bg-white text-ink"
+        disabled ? "bg-canvas text-muted ring-1 ring-line" : "bg-white text-ink"
       }`}
     >
       {children}

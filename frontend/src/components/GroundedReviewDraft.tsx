@@ -1,3 +1,4 @@
+import { Chevron } from "./ui/Disclosure";
 import { useEffect, useRef, useState } from "react";
 import { isAxiosError } from "axios";
 import type { DraftEvidenceView, GeneratedReviewDraftView, ReviewKnowledgeGapView } from "../lib/types";
@@ -138,7 +139,9 @@ export function GroundedReviewDraft({
             className="rounded px-1 py-0.5 font-semibold text-ink underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             data-testid="grounded-review-why"
           >
-            참고 {evidence.length} {showEvidence ? "▾" : "▸"}
+            <span className="inline-flex items-center gap-1">
+              참고 {evidence.length} <Chevron open={showEvidence} className="h-3.5 w-3.5" />
+            </span>
           </button>
         ) : null}
         {said ? (
@@ -188,7 +191,8 @@ export function GroundedReviewDraft({
       {/* 다음 답글이 쓸 안내를 고르는 자리 (2026-10-27). 매일 보는 칸에서는 접혀 있고 (§12-4 — 검색 결과를 고르는 일은
           받은 리뷰 화면의 일이 아니다), 참고한 내용이 틀렸다고 생각할 때 펼친다. */}
       <details className="text-sm" data-testid="grounded-review-guidance">
-        <summary className="cursor-pointer select-none rounded px-1 py-0.5 text-muted hover:text-ink">
+        <summary className="inline-flex cursor-pointer list-none select-none items-center gap-1 rounded px-1 py-0.5 text-muted hover:text-ink">
+          <Chevron className="h-3.5 w-3.5" />
           참고할 안내 고르기
         </summary>
         <div className="pt-2">

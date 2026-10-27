@@ -154,3 +154,32 @@ export const MOBILE_TABS: NavItem[] = MOBILE_TAB_ROUTES.map((route) => {
   }
   return item;
 });
+
+/** Screens the menu does not name, by route prefix — longest first wins. */
+const SCREEN_NAMES: [string, string][] = [
+  ["/reviews/reply/", "리뷰 답글"],
+  ["/reviews/confirm", "칭찬 리뷰 답글 확인"],
+  ["/customer-operations/cases", "할 일"],
+  ["/customer-operations", "고객 운영 관리"],
+  ["/inquiries", "문의"],
+  ["/reviews", "리뷰"],
+  ["/products", "상품"],
+  ["/orders", "주문"],
+  ["/reports", "리포트"],
+  ["/memory", "반복 문제"],
+  ["/start", "답변 준비"],
+  ["/overview", "숫자"],
+  ["/settings/policies", "가게 기준"],
+];
+
+/**
+ * <b>The browser tab names the screen</b> (2026-10-28 walk-through: every tab read 「reviewnary — 판매자를 위한 AI
+ * 고객운영」). The screen's own name where the menu does not carry one, else the lit menu entry; `/` is 오늘.
+ */
+export function documentTitleFor(pathname: string): string {
+  const owns = (prefix: string) =>
+    prefix.endsWith("/") ? pathname.startsWith(prefix) : pathname === prefix || pathname.startsWith(`${prefix}/`);
+  const own = SCREEN_NAMES.filter(([prefix]) => owns(prefix)).sort((a, b) => b[0].length - a[0].length)[0]?.[1];
+  const name = pathname === "/" ? "오늘" : (own ?? navOwner(pathname)?.label ?? null);
+  return name ? `${name} · reviewnary` : "reviewnary";
+}

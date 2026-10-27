@@ -1,3 +1,4 @@
+import { Chevron } from "./ui/Disclosure";
 import { useCallback, useEffect, useState } from "react";
 import { ReplyWorkRow } from "./reviews/ReplyWorkRow";
 import { api } from "../lib/apiClient";
@@ -89,7 +90,7 @@ export function DismissedReplyWork({
         onClick={() => setExpanded((v) => !v)}
         data-testid="dismissed-work-toggle"
       >
-        <span aria-hidden="true">{expanded ? "▾" : "▸"}</span>
+        <Chevron open={expanded} />
         할 일에서 뺀 리뷰
       </button>
 

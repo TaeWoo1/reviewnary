@@ -85,6 +85,9 @@ export function KnowledgeQuickAdd({
   const [variants, setVariants] = useState<ProductVariantView[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // What the seller wrote into each 【확인: …】 blank, by its place in the text (2026-10-28).
+  const [fills, setFills] = useState<string[]>([]);
+  const blanks = blanksIn(text);
 
   useEffect(() => {
     if (scope !== "PRODUCT" || !productId || !variantsAllowed) {
@@ -102,7 +105,14 @@ export function KnowledgeQuickAdd({
   }, [scope, productId, variantsAllowed]);
 
   async function save() {
-    const written = text.trim();
+    // <b>A blank is a field, and it is filled before saving</b> (2026-10-28 walk-through: 「등록」 was pressable over a
+    // proposal still holding 【확인: …】). The server refuses it on the same check; this says so before the press.
+    const open = blanks.filter((_, i) => !(fills[i] ?? "").trim()).length;
+    if (open > 0) {
+      setError(`빈칸 ${open}개를 채워 주세요.`);
+      return;
+    }
+    const written = fillBlanks(text, fills).trim();
     if (!written) return;
     setBusy(true);
     setError(null);
@@ -172,6 +182,31 @@ export function KnowledgeQuickAdd({
         onChange={(e) => setText(e.target.value)}
         disabled={busy}
       />
+
+      {blanks.length > 0 ? (
+        <fieldset className="mt-3 space-y-2 rounded-lg bg-well px-3 py-2" data-testid="quick-add-blanks">
+          <legend className="sr-only">채울 빈칸</legend>
+          <p className="text-sm font-semibold text-ink">채울 빈칸 {blanks.length}개</p>
+          {blanks.map((prompt, i) => (
+            <label key={`${i}-${prompt}`} className="block text-sm text-muted">
+              {prompt}
+              <input
+                type="text"
+                value={fills[i] ?? ""}
+                onChange={(e) =>
+                  setFills((current) => {
+                    const next = [...current];
+                    next[i] = e.target.value;
+                    return next;
+                  })
+                }
+                disabled={busy}
+                className="mt-1 block w-full rounded-lg border border-line bg-surface p-2 text-base text-ink"
+              />
+            </label>
+          ))}
+        </fieldset>
+      ) : null}
 
       <label className="mt-3 block text-sm font-medium text-ink" htmlFor="quick-add-phrases">
         고객은 이렇게 말해요
@@ -258,4 +293,20 @@ export function titleFor(body: string): string {
   const first = body.split("\n").map((line) => line.trim()).find((line) => line.length > 0);
   if (!first) return "답변 기준";
   return first.length > 60 ? `${first.slice(0, 60)}…` : first;
+}
+
+const BLANK = /【확인:\s*([^】]*)】/g;
+
+/** The prompts of the 【확인: …】 blanks in `text`, in order. */
+export function blanksIn(text: string): string[] {
+  return [...text.matchAll(BLANK)].map((m) => m[1]!.trim());
+}
+
+/** `text` with each blank replaced, in order, by what the seller wrote for it. */
+export function fillBlanks(text: string, fills: readonly string[]): string {
+  let i = 0;
+  return text.replace(BLANK, (whole) => {
+    const value = (fills[i++] ?? "").trim();
+    return value || whole;
+  });
 }

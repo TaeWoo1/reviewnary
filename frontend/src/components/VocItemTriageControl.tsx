@@ -187,7 +187,7 @@ export function VocItemTriageControl({
                    one used a borderless `bg-canvas` fill, for the same job one hairline apart. Same
                    primitive now, same two states. Only the inert dimming is this control's own — it
                    has a state `Btn` has no word for, 「already recorded, so pressing changes nothing」. */
-                className={!isRecorded && inert ? "opacity-40" : undefined}
+                className={!isRecorded && inert ? "text-muted" : undefined}
               >
                 {option.label}
                 {/* aria-hidden, so the pending marker stays out of the accessible NAME.

@@ -972,7 +972,7 @@ export function VocItemReplyPrep({
             aria-disabled={!canCopy || working}
             onClick={() => void copy()}
             className={`rounded-lg px-2.5 py-1 text-sm font-semibold ${
-              canCopy && !working ? "bg-brand-700 text-white" : "bg-canvas text-muted opacity-40"
+              canCopy && !working ? "bg-brand-700 text-white" : "bg-canvas text-muted ring-1 ring-line"
             }`}
           >
             복사
@@ -988,7 +988,7 @@ export function VocItemReplyPrep({
             aria-busy={busy === "starting"}
             onClick={() => void startHandoff()}
             className={`rounded-lg px-2.5 py-1 text-sm font-semibold ${
-              canStart && !working ? "bg-canvas text-ink ring-1 ring-line" : "bg-canvas text-muted opacity-40"
+              canStart && !working ? "bg-canvas text-ink ring-1 ring-line" : "bg-canvas text-muted ring-1 ring-line"
             }`}
           >
             {canGuide ? "네이버에서 직접 답변하기(가이드)" : "직접 답변하고 기록하기"}
@@ -1061,7 +1061,7 @@ export function VocItemReplyPrep({
             aria-busy={busy === "approving"}
             onClick={() => void decide("APPROVED")}
             className={`rounded px-1 py-0.5 font-semibold underline underline-offset-2 ${
-              approvable && !working ? "text-ink" : "text-muted opacity-40"
+              approvable && !working ? "text-ink" : "text-muted"
             }`}
           >
             답글 확정
@@ -1168,7 +1168,7 @@ export function VocItemReplyPrep({
                 aria-busy={busy === "starting"}
                 onClick={() => void startHandoff({ restart: true })}
                 className={`rounded-lg px-2.5 py-1 text-sm font-semibold ${
-                  working ? "bg-canvas text-muted opacity-40" : "bg-brand-700 text-white"
+                  working ? "bg-canvas text-muted ring-1 ring-line" : "bg-brand-700 text-white"
                 }`}
               >
                 다시 시도
@@ -1181,7 +1181,7 @@ export function VocItemReplyPrep({
                   aria-busy={busy === "reporting"}
                   onClick={() => void report("OPERATOR_REPORTED_SUBMITTED")}
                   className={`rounded-lg px-2.5 py-1 text-sm font-semibold ${
-                    working ? "bg-canvas text-muted opacity-40" : "bg-brand/10 text-brand-700"
+                    working ? "bg-canvas text-muted ring-1 ring-line" : "bg-brand/10 text-brand-700"
                   }`}
                 >
                   답변함으로 기록

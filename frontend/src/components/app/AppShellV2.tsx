@@ -1,3 +1,4 @@
+import { documentTitleFor } from "../../lib/nav.v2";
 import { useEffect, useState } from "react";
 import { MotionConfig } from "motion/react";
 import { Outlet, useLocation } from "react-router-dom";
@@ -46,6 +47,11 @@ export function AppShellV2() {
   // Master-detail (UI/UX v2 Phase 1): the list and the selected item's detail each own their scroll, so the shell
   // gives these pages the full column and no outer scroll — the same arrangement the conversation has.
   const workspace = MASTER_DETAIL_ROUTES.some((route) => route.test(location.pathname));
+
+  // The tab names the screen (`documentTitleFor`, 2026-10-28).
+  useEffect(() => {
+    document.title = documentTitleFor(location.pathname);
+  }, [location.pathname]);
 
   // Close the drawer on any navigation, including a tap on the item that is already active.
   useEffect(() => {

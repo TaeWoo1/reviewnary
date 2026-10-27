@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Btn } from "../ui/Btn";
-import { Disclosure } from "../ui/Disclosure";
 import { AiMarkChip, TriageTierChip } from "./TriageTierChip";
 import { api } from "../../lib/apiClient";
 import {
@@ -142,12 +141,10 @@ export function SellerCorrectionControls({
           </Btn>
         ) : null}
       </div>
-      {/* Folded, not dropped (Review Decision UX v3.2). It is the sentence that keeps the control honest —
-          and it answers a question the seller asks AFTER pressing, not before: three lines of standing
-          explanation above the primary action is three lines the action pays for. */}
-      <Disclosure label="바꾸면 어떻게 되나요" summaryClassName="-ml-2">
-        <p className="pt-2 text-sm leading-relaxed text-muted">{TRIAGE_CORRECTION_COPY.disclosure}</p>
-      </Disclosure>
+      {/* <b>Said after the press, beside it — not a fold before it</b> (2026-10-28 walk-through: seven folds on one
+          review, 「바꾸면 어떻게 되나요」 among them). It answers a question the seller asks AFTER pressing, so it
+          stands only once a correction does. */}
+      {answer ? <p className="break-keep text-sm text-muted">{TRIAGE_CORRECTION_COPY.disclosure}</p> : null}
       {failed ? <p className="text-sm text-bad">기록하지 못했어요. 잠시 뒤 다시 눌러 주세요.</p> : null}
     </div>
   );

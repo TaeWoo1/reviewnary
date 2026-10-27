@@ -442,11 +442,17 @@ describe("지식", () => {
     const phrases = screen.getByLabelText("고객은 이렇게 말해요") as HTMLTextAreaElement;
     expect(phrases.value).toBe("마감캡\n하나만 왔");
     await userEvent.type(phrases, "\n두 개가 필요");
-    await userEvent.click(within(screen.getByTestId("knowledge-quick-add")).getByRole("button", { name: "등록" }));
+    const editor = screen.getByTestId("knowledge-quick-add");
+    // The blank is a field of its own, and an empty one stops the press before the server (2026-10-28).
+    await userEvent.click(within(editor).getByRole("button", { name: "등록" }));
+    expect(acceptKnowledgeCandidate).not.toHaveBeenCalled();
+    expect(within(editor).getByRole("alert")).toHaveTextContent("빈칸 1개를 채워 주세요.");
+    await userEvent.type(within(screen.getByTestId("quick-add-blanks")).getByLabelText("수량"), "2");
+    await userEvent.click(within(editor).getByRole("button", { name: "등록" }));
     await waitFor(() =>
       expect(acceptKnowledgeCandidate).toHaveBeenCalledWith(
         "c-4",
-        expect.objectContaining({ customerPhrases: ["마감캡", "하나만 왔", "두 개가 필요"] }),
+        expect.objectContaining({ content: "한 세트에 2개 들어 있어요.", customerPhrases: ["마감캡", "하나만 왔", "두 개가 필요"] }),
       ),
     );
     expect(await screen.findByRole("alert")).toHaveTextContent("【확인: …】 부분을 실제 내용으로 바꾼 뒤 등록해 주세요.");

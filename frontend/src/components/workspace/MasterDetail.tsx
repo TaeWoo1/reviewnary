@@ -171,6 +171,18 @@ export function MasterDetail({
 }) {
   const open = wide && detail !== null;
   const scroller = useRef<HTMLDivElement | null>(null);
+  // The list's scrollbar width, handed to the docked composer below it so the two end on one edge (2026-10-28: the
+  // box ran 15px past the list on a browser with classic scrollbars). 0 where scrollbars overlay.
+  const [gutter, setGutter] = useState(0);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => setGutter(Math.max(0, el.offsetWidth - el.clientWidth));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     const el = scroller.current;
     if (!scrollKey || !el) return;
@@ -212,7 +224,10 @@ export function MasterDetail({
       {/* `min-w-0 flex-1` is the flex spelling of the `minmax(0,1fr)` track the decision names: without
           `min-w-0` a flex item floors at its content's min-content width, and one long unbroken Korean
           line would push the 440px pane off screen. */}
-      <div className={rail ? "flex w-[316px] min-w-[316px] shrink-0 flex-col" : "flex min-w-0 flex-1 flex-col"}>
+      <div
+        className={rail ? "flex w-[316px] min-w-[316px] shrink-0 flex-col" : "flex min-w-0 flex-1 flex-col"}
+        style={{ ["--list-gutter" as string]: `${gutter}px` }}
+      >
         {/* `relative`: each scroller is the containing block of what it holds. Without it an absolutely positioned
             descendant (an sr-only label) is placed against the document and stretches the PAGE past the viewport. */}
         <div

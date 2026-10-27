@@ -106,11 +106,9 @@ export function DecisionActionStep({
             this screen exists for. The other two are not instructions but FACTS about this channel and
             this seller's setup: they explain why there is no draft, and an explanation that is folded
             leaves an absence looking like an oversight. */}
-        {replySupported ? (
-          <Disclosure label="정하면 어떻게 되나요" summaryClassName="-ml-2">
-            <p className="break-keep pt-2 text-sm leading-relaxed text-muted">{DECISION_ACTION_NOTE.withReply}</p>
-          </Disclosure>
-        ) : (
+        {/* Where a reply can follow, the reply area stands beside these choices and says the rest — 「정하면 어떻게
+            되나요」 was a fold explaining the column next to it (2026-10-28). Where none can, the reason stays. */}
+        {replySupported ? null : (
           <p className="break-keep text-sm leading-relaxed text-muted">
             {replyUnavailableReason === "NO_SELLER_ACCOUNT"
               ? DECISION_ACTION_NOTE.withoutAccount

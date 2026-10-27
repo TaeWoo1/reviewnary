@@ -37,10 +37,10 @@ export type BtnVariant = "solid" | "selected" | "outline" | "ghost";
 export type BtnSize = "md" | "sm";
 
 const VARIANT: Record<BtnVariant, string> = {
-  solid: "bg-brand-700 text-white hover:bg-brand-800 disabled:opacity-50",
-  selected: "border border-brand-700 bg-brand/10 text-brand-700 hover:bg-brand/10 disabled:opacity-50",
-  outline: "border border-line bg-surface text-ink hover:bg-canvas disabled:opacity-50",
-  ghost: "text-muted hover:text-ink hover:bg-canvas disabled:opacity-50",
+  solid: "bg-brand-700 text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-70",
+  selected: "border border-brand-700 bg-brand/10 text-brand-700 hover:bg-brand/10 disabled:cursor-not-allowed disabled:opacity-70",
+  outline: "border border-line bg-surface text-ink hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-70",
+  ghost: "text-muted hover:text-ink hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-70",
 };
 
 const SIZE: Record<BtnSize, string> = {

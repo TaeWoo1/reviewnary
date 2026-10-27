@@ -233,7 +233,7 @@ export function DelegatedReplyControls({
               aria-busy={busy === "handOver"}
               onClick={() => void press("handOver")}
               className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
-                canSend && !working ? "bg-brand-700 text-white hover:bg-brand-800" : "bg-canvas text-muted opacity-40"
+                canSend && !working ? "bg-brand-700 text-white hover:bg-brand-800" : "bg-canvas text-muted ring-1 ring-line"
               }`}
             >
               답글 등록 요청

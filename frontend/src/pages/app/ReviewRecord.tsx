@@ -1,3 +1,4 @@
+import { Chevron } from "../../components/ui/Disclosure";
 import { Stars } from "../../components/reviews/Stars";
 import { listDay } from "../../lib/format";
 import { mergeHomeWork, todayWork } from "../../lib/homeWork";
@@ -493,7 +494,9 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
                          같은 크기여서 묶음과 행이 한 층으로 읽혔다. 펼침 표시와 수는 그대로다. */
                       className="sticky top-0 z-10 flex w-full items-center gap-2 border-b border-line bg-canvas px-3 py-3 text-left transition hover:bg-line/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700"
                     >
-                      <span aria-hidden className="w-3 shrink-0 text-xs leading-none text-muted">{open ? "▾" : "▸"}</span>
+                      <span className="text-muted">
+                        <Chevron open={open} />
+                      </span>
                       <TierDot tier={value} />
                       <span className="text-lg font-semibold text-ink">{TRIAGE_TIER_LABEL[value]}</span>
                       <span className="text-sm tabular-nums text-muted">{tierCount(page, value).toLocaleString("ko-KR")}</span>

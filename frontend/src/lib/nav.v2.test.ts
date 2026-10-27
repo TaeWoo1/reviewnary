@@ -7,6 +7,7 @@ import {
   NAV_ITEMS,
   navGroupLabel,
   navItemOwns,
+  documentTitleFor,
 } from "./nav.v2";
 import { isNavIconName } from "../components/icons/NavIcon";
 
@@ -110,5 +111,16 @@ describe("nav.v2 — mobile derives from the same model", () => {
       // Five: 「리뷰·문의」 and 「상품·정책」 are whole names, and the bar now holds four buttons, not five.
       expect((item.short as string).length).toBeLessThanOrEqual(5);
     }
+  });
+});
+
+describe("the browser tab names the screen (2026-10-28)", () => {
+  it("says which screen, never the same line everywhere", () => {
+    expect(documentTitleFor("/")).toBe("오늘 · reviewnary");
+    expect(documentTitleFor("/reviews/reply/r1")).toBe("리뷰 답글 · reviewnary");
+    expect(documentTitleFor("/inquiries/abc")).toBe("문의 · reviewnary");
+    expect(documentTitleFor("/customer-operations/cases")).toBe("할 일 · reviewnary");
+    expect(documentTitleFor("/knowledge")).toBe("상품·정책 · reviewnary");
+    expect(documentTitleFor("/connect/naver")).toBe("연동 · reviewnary");
   });
 });

@@ -109,7 +109,7 @@ export function ConversationWorkspace({
             `mx-auto` at 1160px while the list column above it is `max-w-content` left-aligned, so the box a
             seller types into started 28px right of the rows it is about and ended past their right edge. One
             token, one alignment: the composer is now exactly as wide as the work it sits under. */}
-        <div className={compact ? "" : quietDock ? "w-full max-w-content" : "mx-auto w-full max-w-thread"}>
+        <div className={compact ? "" : quietDock ? "w-[calc(100%-var(--list-gutter,0px))] max-w-content" : "mx-auto w-full max-w-thread"}>
           {conversation.plannerOff ? (
             <p className="mb-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn" role="status">
               이 계정에서는 자유 문장 요청이 아직 열려 있지 않아요.
