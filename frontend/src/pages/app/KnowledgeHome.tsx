@@ -148,6 +148,7 @@ export function KnowledgeHome() {
           넷은 모두 이 회사가 가진 지식이고, 해 온 일은 한 칸도 섞이지 않는다. */}
       <PageHead
         title={COPY.knowledgeTitle}
+        action={<Go to="/start">답변 준비 화면</Go>}
         meta={
           <span aria-label="이 가게가 적어 둔 것" className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
             <Figure label="상품 정보" value={inventory?.productKnowledgeTotal ?? null} />

@@ -488,6 +488,9 @@ export function CustomerOpsHome({
       {/* <b>The screens the menu no longer names</b> (menu decision, 2026-10-27). 할 일 and 반복 문제 are reached from
           the lines above; 주문 and 리포트 had only the menu, and a route nobody can reach is a removed feature. */}
       <nav aria-label="다른 화면" className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+        <Link to="/start" className="font-semibold text-muted hover:text-ink hover:underline">
+          답변 준비
+        </Link>
         <Link to="/orders" className="font-semibold text-muted hover:text-ink hover:underline">
           주문 보기
         </Link>

@@ -26,6 +26,7 @@ import { ProductDetail } from "./pages/app/ProductDetail";
 import { Reviews } from "./pages/app/Reviews";
 import { ReviewReplyTask, ReviewReplyTaskLegacyEntry } from "./pages/app/ReviewReplyTask";
 import { CustomerInbox } from "./pages/app/CustomerInbox";
+import { StartPrep } from "./pages/app/StartPrep";
 import { InboxItemRedirect } from "./pages/app/InboxItemRedirect";
 import { CustomerMemory } from "./pages/app/CustomerMemory";
 import { RepeatedIssue } from "./pages/app/RepeatedIssue";
@@ -187,6 +188,7 @@ export function App() {
         <Route path="/settings" element={<SettingsHome />} />
         <Route path="/settings/alerts" element={<AlertSettings />} />
         <Route path="/knowledge" element={<KnowledgeHome />} />
+        <Route path="/start" element={<StartPrep />} />
         <Route path="/settings/policies" element={<OperationsPolicies />} />
         <Route path="/settings/style" element={<AnswerStyle />} />
         <Route path="/settings/review-templates" element={<ReviewReplyTemplates />} />

@@ -75,27 +75,27 @@ public final class ChannelHistoryCapability {
 
     private static final List<Row> ROWS = List.of(
             new Row("NAVER", HistorySource.PAST_INQUIRY_ANSWER, Availability.LEARNED,
-                    "네이버에 등록하신 문의 답변을 가져와 비슷한 문의에 참고합니다."),
+                    "네이버에 등록한 문의 답변을 가져와 비슷한 문의에 참고해요."),
             // Was SCREEN_UNPROVEN while its own sentence said the opposite, so the knowledge screen drew
             // 「가져오지 못함」 beside 「읽어 옵니다」 on one line. The read landed on 2026-09-18 (M5): the reply
             // is stored on the canonical review (`seller_reply_body`, source NAVER_REVIEW_DETAIL_V1) and
             // LearnedKnowledgeService quotes it back. The value now says which of the two is true.
             new Row("NAVER", HistorySource.PAST_REVIEW_REPLY, Availability.SCREEN_READ,
-                    "네이버는 리뷰 답글 내용을 API나 내려받기 파일로 주지 않아, 도우미로 판매자센터의 리뷰 상세를 열어 읽어 옵니다."),
+                    "네이버는 리뷰 답글 내용을 API나 내려받기 파일로 주지 않아, 도우미로 판매자센터의 리뷰 상세를 열어 읽어 와요."),
             new Row("NAVER", HistorySource.PRODUCT_DETAIL, Availability.LEARNED,
-                    "상품 상세페이지의 글과 옵션을 상품별로 읽어 둡니다. 글 대신 이미지로 된 상세페이지는 읽지 못합니다."),
+                    "상품 상세페이지의 글과 옵션을 상품별로 읽어 둬요. 글 대신 이미지로 된 상세페이지는 읽지 못해요."),
             new Row("CAFE24", HistorySource.PAST_INQUIRY_ANSWER, Availability.NOT_PROMOTED,
-                    "카페24 답변은 누가 썼는지 확인할 수 없어 회사 답변으로 쓰지 않습니다."),
+                    "카페24 답변은 누가 썼는지 확인할 수 없어 회사 답변으로 쓰지 않아요."),
             new Row("CAFE24", HistorySource.PAST_REVIEW_REPLY, Availability.NOT_WIRED,
-                    "카페24 리뷰 댓글은 아직 가져오지 않습니다."),
+                    "카페24 리뷰 댓글은 아직 가져오지 않아요."),
             new Row("CAFE24", HistorySource.PRODUCT_DETAIL, Availability.LEARNED,
-                    "상품 설명과 사양을 상품 정보 수집 때 함께 가져옵니다."),
+                    "상품 설명과 사양을 상품 정보 수집 때 함께 가져와요."),
             new Row("COUPANG", HistorySource.PAST_INQUIRY_ANSWER, Availability.NOT_PROMOTED,
-                    "쿠팡은 답변을 누가 썼는지 알려주지 않아 회사 답변으로 쓰지 않습니다."),
+                    "쿠팡은 답변을 누가 썼는지 알려주지 않아 회사 답변으로 쓰지 않아요."),
             new Row("COUPANG", HistorySource.PAST_REVIEW_REPLY, Availability.NOT_AVAILABLE,
-                    "쿠팡은 판매자 리뷰 답글 기능이 없습니다."),
+                    "쿠팡은 판매자 리뷰 답글 기능이 없어요."),
             new Row("COUPANG", HistorySource.PRODUCT_DETAIL, Availability.LEARNED,
-                    "상품 사양과 분류를 상품 정보 수집 때 함께 가져옵니다."));
+                    "상품 사양과 분류를 상품 정보 수집 때 함께 가져와요."));
 
     private ChannelHistoryCapability() {
     }
@@ -104,7 +104,7 @@ public final class ChannelHistoryCapability {
         String code = channelCode == null ? "" : channelCode.toUpperCase(Locale.ROOT);
         return ROWS.stream().filter(r -> r.channelCode().equals(code) && r.source() == source).findFirst()
                 .orElse(new Row(code, source, Availability.NOT_AVAILABLE,
-                        source.labelKo() + " — 이 채널에서는 가져올 방법이 없습니다."));
+                        "이 채널에서는 " + source.labelKo() + " 항목을 가져올 방법이 없어요."));
     }
 
     /** Whether the history bootstrap has a bounded READ to run for this channel's past inquiry answers. */

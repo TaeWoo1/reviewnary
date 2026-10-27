@@ -69,7 +69,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "상품·정책",
         short: "상품·정책",
         icon: "product",
-        match: ["/products", "/settings/policies"],
+        match: ["/products", "/settings/policies", "/start"],
       },
     ],
   },

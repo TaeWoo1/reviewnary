@@ -105,7 +105,11 @@ viewport falls back to single-pane; it never squeezes the detail.
 **Menu (product-owner decision, 2026-10-27):** three destinations — 홈 · 리뷰·문의 · 상품·정책 — and 연동 · 설정
 pinned to the foot of the rail, inside the same 「주 메뉴」 landmark. 할 일, 반복 문제, 주문 and 리포트 left the menu,
 not the product: their routes stay and are opened from the screens that lead to them. Exactly one row is lit — the
-destination whose own or owned route is the longest match (`navOwner`, `lib/nav.v2.ts`). 리뷰·문의 is one destination over
+destination whose own or owned route is the longest match (`navOwner`, `lib/nav.v2.ts`). 답변 준비 (`/start`,
+`StartPrep`) is the first-use screen of the approved three: not in the menu, reached from 홈 and 상품·정책, lit under
+상품·정책; it asks only for 채울 내용 (most reviews first, five at a time) and shows 가져온 자료 with the channel's own
+reason where nothing could be read. It offers no source that is not wired (no watched folder) and never blocks:
+「나중에 하기」 is always there. 리뷰·문의 is one destination over
 two record screens: both heads read 「리뷰·문의」 with a 리뷰 | 문의 switch (`ReviewInquirySwitch`, a groove in the
 `well` tone with a card in the chosen stop); /reviews and /inquiries stay two routes.
 
