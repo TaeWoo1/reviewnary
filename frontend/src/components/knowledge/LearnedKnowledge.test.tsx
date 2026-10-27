@@ -96,12 +96,12 @@ describe("LearnedKnowledge", () => {
     const user = userEvent.setup();
     render(<LearnedKnowledge />);
 
-    await user.click(await screen.findByRole("button", { name: "과거 운영 기록에서 배우기" }));
+    await user.click(await screen.findByRole("button", { name: "지난 기록 읽어 오기" }));
 
     await waitFor(() => expect(api.learnFromHistory).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText("네이버 스마트스토어: 2026-06-20부터 문의 41건을 읽었습니다.")).toBeTruthy();
-    expect(screen.getByText("기억하고 있는 지난 문의 답변은 22건입니다.")).toBeTruthy();
-    expect(screen.getByText("상품 상세 읽기는 지금 꺼져 있습니다.")).toBeTruthy();
+    expect(await screen.findByText("네이버 스마트스토어: 2026-06-20부터 문의 41건을 읽었어요.")).toBeTruthy();
+    expect(screen.getByText("기억하는 지난 문의 답변은 22건이에요.")).toBeTruthy();
+    expect(screen.getByText("상품 상세 읽기는 지금 꺼져 있어요.")).toBeTruthy();
   });
 
   it("offers no history read when no connected channel can give one", async () => {
@@ -109,6 +109,6 @@ describe("LearnedKnowledge", () => {
     render(<LearnedKnowledge />);
 
     expect(await screen.findByText("20")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "과거 운영 기록에서 배우기" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "지난 기록 읽어 오기" })).toBeNull();
   });
 });

@@ -18,11 +18,11 @@ import type { KnowledgeSourceType, OrgKnowledgeType } from "./types";
  * to had become 「운영 기준」, which is the exact drift this module was written to end.
  */
 export const KNOWLEDGE_NOUN = {
-  needsConfirmation: "확인 필요",
-  productKnowledge: "상품 지식",
-  operatingRules: "운영 기준",
-  documents: "자료",
-  pastAnswers: "과거 고객 응답",
+  needsConfirmation: "채울 내용",
+  productKnowledge: "상품 정보",
+  operatingRules: "가게 기준",
+  documents: "자료 파일",
+  pastAnswers: "지난 답변",
 } as const;
 
 /** A stored type token — one of the two enums, depending on the corpus. */
@@ -93,8 +93,8 @@ export function scopeLabel(scope: string, productName: string | null | undefined
  * 「확인할 후보」 is a sentence the seller has already written many times, and they confirm it.
  */
 export function originLabel(origin: string): string {
-  if (origin === "DRAFT_GAP") return "정보 필요";
-  if (origin === "REPEATED_ANSWER") return "확인할 후보";
-  if (origin === "ISSUE_GUIDANCE") return "안내 제안";
-  return "확인 필요";
+  if (origin === "DRAFT_GAP") return "빈칸";
+  if (origin === "REPEATED_ANSWER") return "자주 쓴 답";
+  if (origin === "ISSUE_GUIDANCE") return "제안";
+  return "채울 내용";
 }

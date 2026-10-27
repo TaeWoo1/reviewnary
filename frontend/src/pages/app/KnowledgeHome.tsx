@@ -67,9 +67,9 @@ type Part = "documents" | "candidates" | "inventory" | "summary";
 const PARTS: Part[] = ["candidates", "inventory", "documents", "summary"];
 const PART_NAMES: Record<Part, string> = {
   candidates: KNOWLEDGE_NOUN.needsConfirmation,
-  inventory: "운영 기준 · 상품 지식",
+  inventory: "가게 기준과 상품 정보",
   documents: COPY.documentsTab,
-  summary: "과거 답변",
+  summary: "지난 답변",
 };
 
 export function KnowledgeHome() {
@@ -121,9 +121,9 @@ export function KnowledgeHome() {
     try {
       const next = await api.proposeKnowledgeCandidates();
       setCandidates(next);
-      setNotice(next.length === 0 ? "반복 문장 없음" : `기준 후보 ${next.length}건`);
+      setNotice(next.length === 0 ? "되풀이해 쓴 문장이 없어요." : `자주 쓴 답 ${next.length}건을 찾았어요.`);
     } catch {
-      setError("과거 답변 확인 실패 · 다시 시도");
+      setError("지난 답변을 확인하지 못했어요. 다시 눌러 주세요.");
     } finally {
       setBusy(false);
     }
@@ -149,9 +149,9 @@ export function KnowledgeHome() {
       <PageHead
         title={COPY.knowledgeTitle}
         meta={
-          <span aria-label="이 회사가 가진 지식" className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
-            <Figure label="운영 기준" value={inventory ? rules.length : null} />
-            <Figure label="상품 지식" value={inventory?.productKnowledgeTotal ?? null} />
+          <span aria-label="이 가게가 적어 둔 것" className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
+            <Figure label="상품 정보" value={inventory?.productKnowledgeTotal ?? null} />
+            <Figure label="가게 기준" value={inventory ? rules.length : null} />
             <Figure label={COPY.documentsTab} value={documents?.length ?? null} />
             <Figure label={KNOWLEDGE_NOUN.needsConfirmation} value={pending} warn />
           </span>
@@ -161,9 +161,9 @@ export function KnowledgeHome() {
       {failed.length > 0 ? (
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 break-keep text-sm text-bad" role="alert">
           <span>
-            불러오지 못했습니다 · {failed.map((part) => PART_NAMES[part]).join(" · ")}
+            불러오지 못한 것: {failed.map((part) => PART_NAMES[part]).join(", ")}.
             {/* 전에 한 번 불러온 것이 남아 있으면 그것이 지금이 아니라는 것을 말한다. */}
-            {failed.some((part) => held[part]) ? " (아래는 이전에 불러온 내용입니다)" : null}
+            {failed.some((part) => held[part]) ? " 아래는 전에 불러온 내용이에요." : null}
           </span>
           <Btn size="sm" variant="outline" onClick={() => void load()}>
             다시 불러오기
@@ -192,15 +192,9 @@ export function KnowledgeHome() {
         )}
       </Block>
 
-      {/* 말투 · 답변 템플릿 · 안내 매뉴얼을 한 파일로 (2026-10-27) — 확인 필요 바로 아래, 그 안의 제안을 한 번에
-          읽고 고치는 길이기 때문이다. */}
-      <Block title="엑셀로 관리" note="말투 · 답변 템플릿 · 안내 매뉴얼을 한 파일로">
-        <KnowledgeWorkbook onChanged={load} />
-      </Block>
-
       <Block
-        title="운영 기준"
-        note={inventory ? `주제 ${ORG_TOPICS.length}가지 가운데 ${writtenTopics}가지` : undefined}
+        title="가게 기준"
+        note={inventory ? `주제 ${ORG_TOPICS.length}가지 중 ${writtenTopics}가지를 적었어요` : undefined}
         action={<Go to="/settings/policies">기준 추가</Go>}
       >
         {inventory === null ? (
@@ -213,11 +207,11 @@ export function KnowledgeHome() {
                 않으므로 판매자가 다른 어디에서도 볼 수 없다. 어떤 기준이었는지는 말하지 않는다:
                 evidence의 locator에서 이름을 되찾는 것은 외래 키가 받쳐 주지 않는 주장이다. */}
             <Foot>
-              적혀 있지 않은 기준은 답변에 쓰이지 않습니다.
+              적어 두지 않은 기준은 답변에 쓰이지 않아요.
               {inventory.orphanRuleCitations > 0 ? (
                 <>
-                  {" · "}목록에 없는 기준을 인용한 답변 근거{" "}
-                  <b className="font-semibold text-ink">{count(inventory.orphanRuleCitations)}건</b>
+                  {" "}지금 목록에 없는 기준을 참고한 답변이{" "}
+                  <b className="font-semibold text-ink">{count(inventory.orphanRuleCitations)}건</b> 있어요.
                 </>
               ) : null}
             </Foot>
@@ -225,15 +219,15 @@ export function KnowledgeHome() {
         )}
       </Block>
 
-      <Block title="상품 지식" action={<Go to="/products">상품에서 추가</Go>}>
+      <Block title="상품 정보" action={<Go to="/products">상품에서 추가</Go>}>
         {inventory === null ? (
           <Waiting failed={failed.includes("inventory")} />
         ) : facts.length === 0 ? (
           <div className="py-4">
             <Empty
               compact
-              title="아직 적어 둔 상품 지식이 없습니다"
-              body="상품 화면에서 설명·자주 묻는 질문·사용법·정책을 적어 두면, 답변이 그 내용을 근거로 씁니다."
+              title="아직 적어 둔 상품 정보가 없어요"
+              body="상품 화면에서 설명, 자주 묻는 질문, 사용법, 정책을 적어 두면 답변이 그 내용을 참고해요."
             />
           </div>
         ) : (
@@ -242,40 +236,53 @@ export function KnowledgeHome() {
             <Foot>
               {showingAll ? null : (
                 <>
-                  <b className="font-semibold text-ink">{count(inventory.productKnowledgeTotal)}건</b> 가운데{" "}
-                  <b className="font-semibold text-ink">{count(facts.length)}건</b>을 보고 있습니다.{" "}
+                  <b className="font-semibold text-ink">{count(inventory.productKnowledgeTotal)}건</b> 중{" "}
+                  <b className="font-semibold text-ink">{count(facts.length)}건</b>을 보고 있어요.{" "}
                 </>
               )}
               {showingAll && unused > 0 ? (
                 <>
-                  <b className="font-semibold text-ink">{count(unused)}건</b>은 아직 답변 근거로 쓰인 적이 없고,{" "}
+                  <b className="font-semibold text-ink">{count(unused)}건</b>은 아직 답변에 쓰인 적이 없어요.{" "}
                 </>
               ) : null}
-              상품 <b className="font-semibold text-ink">{count(inventory.products)}개</b> 가운데{" "}
-              <b className="font-semibold text-ink">{count(inventory.productsWithKnowledge)}개</b>에 상품 지식이
-              있습니다.
+              상품 <b className="font-semibold text-ink">{count(inventory.products)}개</b> 중{" "}
+              <b className="font-semibold text-ink">{count(inventory.productsWithKnowledge)}개</b>에 상품 정보가
+              있어요.
             </Foot>
           </>
         )}
       </Block>
 
-      <Block
-        title={COPY.documentsTab}
-        note="여기서 읽은 내용이 위의 기준과 지식이 됩니다"
-        action={<KnowledgeDocumentAdd scope="ORG" onImported={load} label={COPY.addDocument} />}
-      >
-        {documents === null ? (
-          <Waiting failed={failed.includes("documents")} />
-        ) : (
-          <KnowledgeDocumentList documents={documents} onChanged={load} />
-        )}
-      </Block>
+      {/* <b>원본 자료 — 필요할 때만</b> (2026-10-27, §12-4). 파일, 엑셀, 채널에서 읽어 온 것은 위의 내용이 어디서 왔는지이지
+          매일 읽을 것이 아니다. 엑셀은 이미 엑셀로 관리하는 가게를 위한 보조 수단이라 첫 화면에서 내려왔다. 접혀 있을 뿐
+          빠진 것은 없다. */}
+      <details className="rounded-xl border border-line bg-surface px-4 py-3" data-testid="knowledge-originals">
+        <summary className="cursor-pointer select-none text-base font-semibold text-ink">
+          원본 자료
+          <span className="ml-2 text-sm font-normal text-muted">파일, 엑셀, 채널에서 읽어 온 것</span>
+        </summary>
+        <div className="space-y-6 pt-3">
+          <Block
+            title={COPY.documentsTab}
+            note="여기서 읽은 내용이 위의 기준과 상품 정보가 돼요"
+            action={<KnowledgeDocumentAdd scope="ORG" onImported={load} label={COPY.addDocument} />}
+          >
+            {documents === null ? (
+              <Waiting failed={failed.includes("documents")} />
+            ) : (
+              <KnowledgeDocumentList documents={documents} onChanged={load} />
+            )}
+          </Block>
 
-      {/* 위의 셋은 이 회사가 가진 지식이고 이것은 참고일 뿐이다 — 같은 무게로 읽히지 않도록 이름만
-          한 단계 조용히 둔다. */}
-      <Block title="채널에서 읽어 온 것" note="공식 기준이 아니라, 답변을 만들 때 참고만 합니다">
-        <LearnedKnowledge />
-      </Block>
+          <Block title="엑셀로 한 번에 고치기" note="말투, 답변 문구, 안내를 한 파일로">
+            <KnowledgeWorkbook onChanged={load} />
+          </Block>
+
+          <Block title="채널에서 읽어 온 것" note="가게 기준이 아니라, 답변을 쓸 때 참고만 해요">
+            <LearnedKnowledge />
+          </Block>
+        </div>
+      </details>
     </div>
   );
 }
@@ -309,7 +316,7 @@ function Foot({ children }: { children: ReactNode }) {
 
 /** 아직 없는 목록의 자리 — 오는 중인지, 오지 못했는지. 「없음」은 목록이 와서 비어 있을 때만 그 목록이 말한다. */
 function Waiting({ failed, loading = "불러오는 중…" }: { failed: boolean; loading?: string }) {
-  return <p className={`py-2 text-sm ${failed ? "text-bad" : "text-muted"}`}>{failed ? "불러오지 못했습니다" : loading}</p>;
+  return <p className={`py-2 text-sm ${failed ? "text-bad" : "text-muted"}`}>{failed ? "불러오지 못했어요" : loading}</p>;
 }
 
 /** 머리의 수 하나. 지금 사람을 기다리는 하나에만 색이 있다. 모르는 수는 0이 아니라 「–」다. */

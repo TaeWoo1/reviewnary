@@ -35,7 +35,7 @@ export function KnowledgeDocumentList({
   if (documents.length === 0) {
     return (
       <p className="break-keep py-4 text-sm text-muted">
-        사용설명서·FAQ·배송/교환 정책처럼 이미 쓰고 계신 자료를 올리면 답변 근거로 씁니다.
+        사용설명서, 자주 묻는 질문, 배송·교환 정책처럼 이미 쓰는 파일을 올리면 답변이 참고해요.
       </p>
     );
   }
@@ -84,7 +84,7 @@ export function KnowledgeDocumentList({
                   await api.setKnowledgeDocumentActive(document.sourceId, !document.active);
                   await onChanged();
                 } catch {
-                  setError("자료 상태를 바꾸지 못했습니다.");
+                  setError("바꾸지 못했어요. 다시 눌러 주세요.");
                 } finally {
                   setBusy(null);
                 }
@@ -92,7 +92,7 @@ export function KnowledgeDocumentList({
             >
               {/* The label is the ACTION: three rows all captioned 「사용 안 함」 read as three retired
                   documents rather than three buttons that would retire them. */}
-              {document.active ? "사용 중지" : "다시 사용"}
+              {document.active ? "쓰지 않기" : "다시 켜기"}
             </Btn>
           </li>
         ))}
@@ -149,7 +149,7 @@ export function KnowledgeDocumentAdd({
       // The backend's own sentence: it says which of the four refusals happened, and the seller can
       // act on each one differently.
       const message = isAxiosError(e) ? (e.response?.data as { message?: string })?.message : null;
-      setError(message ?? "자료를 가져오지 못했습니다.");
+      setError(message ?? "파일을 가져오지 못했어요.");
     } finally {
       setBusy(false);
       if (input.current) input.current.value = "";
@@ -183,7 +183,7 @@ export function KnowledgeDocumentAdd({
         ))}
       </select>
       <p className="mt-1.5 break-keep text-sm text-muted">
-        {scope === "PRODUCT" ? "이 상품에만 적용됩니다." : "회사 전체에 적용됩니다."} PDF · DOCX · TXT ·
+        {scope === "PRODUCT" ? "이 상품에만 써요." : "가게 전체에 써요."} PDF · DOCX · TXT ·
         MD · CSV를 읽습니다.
       </p>
       <input
@@ -191,7 +191,7 @@ export function KnowledgeDocumentAdd({
         type="file"
         accept=".pdf,.docx,.txt,.md,.csv"
         className="hidden"
-        aria-label="자료 파일"
+        aria-label="올릴 파일"
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) void upload(file);

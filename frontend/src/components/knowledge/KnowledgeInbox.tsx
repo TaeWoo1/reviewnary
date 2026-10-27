@@ -39,8 +39,11 @@ export function KnowledgeInbox({
   onChanged: () => Promise<void> | void;
 }) {
   const [error, setError] = useState<string | null>(null);
-  const gaps = candidates.filter((c) => c.origin === "DRAFT_GAP");
-  const repeats = candidates.filter((c) => c.origin !== "DRAFT_GAP");
+  // Most reviews affected first (Gorgias 「Opportunities」, Intercom 「Recommendations」, §12-4): the order says where an
+  // answer pays most. A stable sort keeps the server's order among equals.
+  const byReach = (a: KnowledgeCandidateView, b: KnowledgeCandidateView) => b.evidenceCount - a.evidenceCount;
+  const gaps = candidates.filter((c) => c.origin === "DRAFT_GAP").sort(byReach);
+  const repeats = candidates.filter((c) => c.origin !== "DRAFT_GAP").sort(byReach);
   const unusable = documents.filter((d) => d.active && d.passages === 0);
 
   if (gaps.length === 0 && repeats.length === 0 && unusable.length === 0) {
@@ -67,7 +70,7 @@ export function KnowledgeInbox({
           ))}
           {unusable.map((document) => (
             <li key={document.sourceId} className="flex items-center gap-3 border-t border-line/70 py-2">
-              <Tag tone="warn">자료 문제</Tag>
+              <Tag tone="warn">읽을 수 없는 파일</Tag>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-ink">{document.fileName ?? document.title}</span>
                 <span className="block truncate text-xs text-muted">
@@ -82,7 +85,7 @@ export function KnowledgeInbox({
                     await api.setKnowledgeDocumentActive(document.sourceId, false);
                     await onChanged();
                   } catch {
-                    setError("상태 변경 실패 · 다시 시도");
+                    setError("바꾸지 못했어요. 다시 눌러 주세요.");
                   }
                 }}
               >
@@ -118,14 +121,14 @@ function CandidateRow({
   return (
     <li className="border-t border-line/70 py-2">
       <div className="flex items-start gap-3">
-        <Tag tone={isGap ? "info" : "neutral"}>{isGap ? "정보 부족" : isGuidance ? "안내 제안" : "기준 후보"}</Tag>
+        <Tag tone={isGap ? "info" : "neutral"}>{isGap ? "빈칸" : isGuidance ? "제안" : "자주 쓴 답"}</Tag>
         <span className="min-w-0 flex-1">
           {/* 질문은 잘라내지 않는다 — 여기 적힌 것을 읽어야 답을 쓸 수 있다. 두 줄에서 접는다. */}
           <span className="line-clamp-2 break-keep text-sm leading-relaxed text-ink">{candidate.content}</span>
           <span className="block truncate text-xs text-muted">
             {source}
             {!isGap && candidate.evidenceCount > 0
-              ? ` · ${isGuidance ? "같은 문제 리뷰" : "과거 답변"} ${candidate.evidenceCount}건`
+              ? ` · ${isGuidance ? "같은 문제 리뷰" : "지난 답변"} ${candidate.evidenceCount}건`
               : null}
           </span>
         </span>
@@ -143,7 +146,7 @@ function CandidateRow({
                   await onChanged();
                 } catch (e) {
                   onError(
-                    isAxiosError(e) && e.response?.status === 409 ? "이미 처리한 항목" : "처리 실패 · 다시 시도",
+                    isAxiosError(e) && e.response?.status === 409 ? "이미 처리했어요." : "처리하지 못했어요. 다시 눌러 주세요.",
                   );
                 } finally {
                   setBusy(false);

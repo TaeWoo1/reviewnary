@@ -59,7 +59,7 @@ export function LearnedKnowledge() {
     return <p className="px-1 py-2 text-sm text-muted">확인하는 중…</p>;
   }
   if (learned === null) {
-    return <p className="px-1 py-2 text-sm text-muted">배운 내용을 불러오지 못했습니다.</p>;
+    return <p className="px-1 py-2 text-sm text-muted">읽어 온 내용을 불러오지 못했어요.</p>;
   }
 
   return (
@@ -86,7 +86,7 @@ export function LearnedKnowledge() {
           <ul className="space-y-0.5 text-xs text-muted">
             {learned.historyReads.map((read) => (
               <li key={`${read.channelNameKo}-${read.readOn}`} className="break-keep">
-                {read.channelNameKo}의 과거 문의를 {read.readOn ?? "이전에"} 읽었습니다 · {read.rowsRead}건
+                {read.channelNameKo}의 지난 문의 {read.rowsRead}건을 {read.readOn ?? "전에"} 읽었어요
               </li>
             ))}
           </ul>
@@ -95,14 +95,14 @@ export function LearnedKnowledge() {
           <>
             <div className="flex flex-wrap items-center gap-3">
               <Btn size="sm" variant="outline" onClick={learn} disabled={busy}>
-                {busy ? "과거 기록을 읽는 중…" : "과거 운영 기록에서 배우기"}
+                {busy ? "지난 기록을 읽는 중…" : "지난 기록 읽어 오기"}
               </Btn>
               <p className="min-w-0 flex-1 break-keep text-xs text-muted">
-                연결된 채널의 지난 문의와 답변, 고객이 이야기한 상품의 상세 정보를 읽습니다. 채널에 아무것도 쓰거나
-                보내지 않습니다.
+                연동한 채널의 지난 문의와 답변, 고객이 말한 상품의 상세 정보를 읽어요. 채널에 아무것도 쓰거나
+                보내지 않아요.
               </p>
             </div>
-            {failed ? <p className="text-sm text-bad">과거 기록을 읽지 못했습니다. 잠시 뒤 다시 시도해 주세요.</p> : null}
+            {failed ? <p className="text-sm text-bad">지난 기록을 읽지 못했어요. 잠시 뒤 다시 눌러 주세요.</p> : null}
             {lastRun ? <RunSummary run={lastRun} /> : null}
           </>
         ) : null}
@@ -156,10 +156,10 @@ function SourceRow({ source, lines }: { source: LearnedKnowledgeSource; lines: L
 /** Why the product-detail pass stopped early — the channel refused this connection, not any one product. */
 const STOPPED_BY: Record<string, string> = {
   ENVIRONMENT_NOT_ALLOWED:
-    "채널이 지금 연결 환경을 허용하지 않아 상품 상세를 읽지 못했습니다. 판매자센터 애플리케이션의 'API 호출 IP'를 확인해 주세요.",
-  PERMISSION: "채널 애플리케이션에 상품 API 권한이 없어 상품 상세를 읽지 못했습니다.",
-  CREDENTIAL: "채널 연결 정보가 더 이상 유효하지 않아 상품 상세를 읽지 못했습니다. 채널을 다시 연결해 주세요.",
-  CHANNEL_REFUSED: "채널이 요청을 거절해 상품 상세를 읽지 못했습니다.",
+    "채널이 지금 이 연결을 허용하지 않아서 상품 상세를 읽지 못했어요. 판매자센터 애플리케이션의 'API 호출 IP'를 봐 주세요.",
+  PERMISSION: "채널 애플리케이션에 상품 API 권한이 없어서 상품 상세를 읽지 못했어요.",
+  CREDENTIAL: "채널 연동 정보가 만료돼서 상품 상세를 읽지 못했어요. 채널을 다시 연동해 주세요.",
+  CHANNEL_REFUSED: "채널이 요청을 거절해서 상품 상세를 읽지 못했어요.",
 };
 
 function RunSummary({ run }: { run: KnowledgeBootstrapReport }) {
@@ -167,30 +167,30 @@ function RunSummary({ run }: { run: KnowledgeBootstrapReport }) {
   for (const history of run.inquiryHistory) {
     const channel = history.channelNameKo ?? "채널";
     if (history.status === "READ") {
-      lines.push(`${channel}: ${history.from}부터 문의 ${history.rowsRead}건을 읽었습니다.`);
+      lines.push(`${channel}: ${history.from}부터 문의 ${history.rowsRead}건을 읽었어요.`);
     } else if (history.status === "ALREADY_READ") {
-      lines.push(`${channel}: 과거 문의는 이미 읽었습니다.`);
+      lines.push(`${channel}: 지난 문의는 이미 읽었어요.`);
     } else if (history.status === "IN_PROGRESS") {
-      lines.push(`${channel}: 다른 수집이 진행 중이라 끝난 뒤 다시 시도해 주세요.`);
+      lines.push(`${channel}: 다른 수집이 돌고 있어요. 끝난 뒤 다시 눌러 주세요.`);
     } else {
-      lines.push(`${channel}: 과거 문의를 읽지 못했습니다.`);
+      lines.push(`${channel}: 지난 문의를 읽지 못했어요.`);
     }
   }
-  lines.push(`기억하고 있는 지난 문의 답변은 ${run.answersRemembered}건입니다.`);
+  lines.push(`기억하는 지난 문의 답변은 ${run.answersRemembered}건이에요.`);
   for (const read of run.catalogue ?? []) {
     const channel = read.channelNameKo ?? "채널";
     if (read.status === "READ") {
-      lines.push(`${channel}: 판매 상품 목록을 새로 읽었습니다.`);
+      lines.push(`${channel}: 판매 상품 목록을 새로 읽었어요.`);
     } else if (read.status === "FAILED") {
-      lines.push(`${channel}: 판매 상품 목록을 읽지 못해 저장된 목록으로 진행했습니다.`);
+      lines.push(`${channel}: 판매 상품 목록을 읽지 못해서 저장된 목록으로 읽었어요.`);
     }
   }
   if (!run.productDetail.enabled) {
-    lines.push("상품 상세 읽기는 지금 꺼져 있습니다.");
+    lines.push("상품 상세 읽기는 지금 꺼져 있어요.");
   } else if (run.productDetail.considered > 0) {
-    const parts = [`상품 ${run.productDetail.considered}개를 확인해 상세 글 ${run.productDetail.indexed}개를 읽었습니다`];
+    const parts = [`상품 ${run.productDetail.considered}개를 보고 상세 글 ${run.productDetail.indexed}개를 읽었어요`];
     if (run.productDetail.imageOnly > 0) {
-      parts.push(`이미지로만 된 상세페이지 ${run.productDetail.imageOnly}개는 읽지 못했습니다`);
+      parts.push(`그림으로만 된 상세페이지 ${run.productDetail.imageOnly}개는 읽지 못했어요`);
     }
     lines.push(`${parts.join(" · ")}.`);
   }
@@ -199,9 +199,9 @@ function RunSummary({ run }: { run: KnowledgeBootstrapReport }) {
     lines.push(stopped);
   }
   if (run.productDetail.enabled && (run.productDetail.onSaleCatalogue ?? 0) > 0) {
-    let line = `판매 중인 상품 ${run.productDetail.onSaleCatalogue}개 중 ${run.productDetail.covered}개의 상세·옵션·속성을 알고 있습니다.`;
+    let line = `판매 중인 상품 ${run.productDetail.onSaleCatalogue}개 중 ${run.productDetail.covered}개의 상세, 옵션, 속성을 알고 있어요.`;
     if ((run.productDetail.remaining ?? 0) > 0) {
-      line += ` 나머지 ${run.productDetail.remaining}개는 다음 번에 읽습니다.`;
+      line += ` 나머지 ${run.productDetail.remaining}개는 다음에 읽어요.`;
     }
     lines.push(line);
   }

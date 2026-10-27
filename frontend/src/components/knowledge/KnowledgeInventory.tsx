@@ -75,8 +75,8 @@ export function OperatingRuleTable({ rules }: { rules: OperatingRuleRow[] }) {
         <span className="w-[150px] shrink-0">주제</span>
         <span className="min-w-0 flex-1">기준</span>
         <span className="w-[170px] shrink-0">출처</span>
-        <span className={USED}>답변 근거</span>
-        <span className={WHEN}>마지막 사용</span>
+        <span className={USED}>쓰인 답변</span>
+        <span className={WHEN}>마지막으로 쓰인 날</span>
       </div>
       <ul>
         {topics.map((topic) =>
@@ -86,10 +86,10 @@ export function OperatingRuleTable({ rules }: { rules: OperatingRuleRow[] }) {
               {/* 빈 줄. 「없음」이라고 적지 않는 이유는 표의 빈 칸이 이미 그 뜻이기 때문이고, 여덟 줄
                   가운데 여섯 줄에 같은 단어를 적으면 적혀 있는 둘이 묻히기 때문이다. */}
               <span className="min-w-0 flex-1">
-                <span className="sr-only">적혀 있는 기준 없음</span>
+                <span className="sr-only">적어 둔 기준 없음</span>
               </span>
               <span className="w-[170px] shrink-0" />
-              <Used label={`${topic.label} 답변 근거`} value={0} />
+              <Used label={`${topic.label} 쓰인 답변`} value={0} />
               <span className={WHEN} />
             </li>
           ) : (
@@ -103,10 +103,10 @@ export function OperatingRuleTable({ rules }: { rules: OperatingRuleRow[] }) {
                   className="min-w-0 flex-1 truncate rounded text-sm font-medium text-ink underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
                 >
                   {rule.title}
-                  {rule.active ? null : <span className="ml-2 text-xs text-muted">사용 안 함</span>}
+                  {rule.active ? null : <span className="ml-2 text-xs text-muted">쓰지 않음</span>}
                 </Link>
                 <Origin documentName={rule.documentName} />
-                <Used label={`${topic.label} 답변 근거`} value={rule.citations} />
+                <Used label={`${topic.label} 쓰인 답변`} value={rule.citations} />
                 <When at={rule.lastUsedAt} />
               </li>
             ))
@@ -123,12 +123,12 @@ export function ProductFactTable({ facts }: { facts: ProductFactRow[] }) {
   return (
     <>
       <div aria-hidden="true" className={HEAD}>
-        <span className="min-w-0 flex-1">지식</span>
+        <span className="min-w-0 flex-1">내용</span>
         <span className="w-[110px] shrink-0">종류</span>
         <span className="w-[230px] shrink-0">상품</span>
         <span className="w-[150px] shrink-0">출처</span>
-        <span className={USED}>답변 근거</span>
-        <span className={WHEN}>마지막 사용</span>
+        <span className={USED}>쓰인 답변</span>
+        <span className={WHEN}>마지막으로 쓰인 날</span>
       </div>
       <ul>
         {facts.map((fact) => (
@@ -142,12 +142,12 @@ export function ProductFactTable({ facts }: { facts: ProductFactRow[] }) {
                 className="min-w-0 flex-1 truncate rounded text-sm font-medium text-ink underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
               >
                 {fact.title}
-                {fact.active ? null : <span className="ml-2 text-xs text-muted">사용 안 함</span>}
+                {fact.active ? null : <span className="ml-2 text-xs text-muted">쓰지 않음</span>}
               </Link>
             ) : (
               <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
                 {fact.title}
-                {fact.active ? null : <span className="ml-2 text-xs text-muted">사용 안 함</span>}
+                {fact.active ? null : <span className="ml-2 text-xs text-muted">쓰지 않음</span>}
               </span>
             )}
             <span className="w-[110px] shrink-0 truncate text-xs text-muted">
@@ -156,10 +156,10 @@ export function ProductFactTable({ facts }: { facts: ProductFactRow[] }) {
             {/* 빈 칸이 아니라 문장이다. 이 열의 빈 칸은 「상품이 없다」로 읽히는데, 사실은 지식은 한
                 상품에 붙어 있고 그 상품을 이 화면이 이름으로 부를 수 없다는 뜻이다. */}
             <span className="w-[230px] shrink-0 truncate text-xs text-muted">
-              {fact.productName ?? "상품을 확인할 수 없음"}
+              {fact.productName ?? "이름을 알 수 없는 상품"}
             </span>
             <Origin documentName={fact.documentName} />
-            <Used label="답변 근거" value={fact.citations} />
+            <Used label="쓰인 답변" value={fact.citations} />
             <When at={fact.lastUsedAt} />
           </li>
         ))}
@@ -174,7 +174,7 @@ export function ProductFactTable({ facts }: { facts: ProductFactRow[] }) {
 function Origin({ documentName }: { documentName: string | null }) {
   return (
     <span className="w-[150px] shrink-0 truncate text-xs text-muted" title={documentName ?? undefined}>
-      {documentName ? `자료 · ${documentName}` : "직접 작성"}
+      {documentName ? `파일 「${documentName}」` : "직접 씀"}
     </span>
   );
 }
@@ -189,7 +189,7 @@ function Used({ label, value }: { label: string; value: number | null }) {
   if (value === null || value === undefined) {
     return (
       <span className={USED}>
-        <span className="sr-only">{label} 읽지 못했습니다</span>
+        <span className="sr-only">{label} 읽지 못했어요</span>
         <span aria-hidden="true" className="text-sm text-muted">
           —
         </span>

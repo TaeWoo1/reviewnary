@@ -38,7 +38,7 @@ export function KnowledgeWorkbook({ onChanged }: { onChanged: () => Promise<void
       link.click();
       URL.revokeObjectURL(url);
     } catch {
-      setError("내려받지 못했습니다 · 다시 시도");
+      setError("내려받지 못했어요. 다시 눌러 주세요.");
     } finally {
       setBusy(false);
     }
@@ -58,7 +58,7 @@ export function KnowledgeWorkbook({ onChanged }: { onChanged: () => Promise<void
       const message =
         isAxiosError(e) && e.response?.status === 400 && typeof e.response.data?.message === "string"
           ? e.response.data.message
-          : "파일을 읽지 못했습니다 · 다시 시도";
+          : "파일을 읽지 못했어요. 다시 눌러 주세요.";
       setError(message);
     } finally {
       setBusy(false);
@@ -90,7 +90,7 @@ export function KnowledgeWorkbook({ onChanged }: { onChanged: () => Promise<void
           }}
         />
         <span className="break-keep text-xs text-muted">
-          「사용」으로 적은 줄만 답글에 쓰입니다. 「확인 전」은 쓰이지 않습니다.
+          「사용」으로 적은 줄만 답글에 쓰여요. 「확인 전」은 쓰이지 않아요.
         </span>
       </div>
 
@@ -104,16 +104,16 @@ export function KnowledgeWorkbook({ onChanged }: { onChanged: () => Promise<void
         <div className="rounded-xl border border-line bg-surface p-4" role="status">
           <p className="break-keep text-sm font-semibold text-ink">
             {result.applied
-              ? `반영했습니다 · ${result.changes.length}건`
+              ? `${result.changes.length}건을 반영했어요`
               : result.changes.length === 0
-                ? "바뀌는 것이 없습니다"
-                : `올리면 바뀌는 것 · ${result.changes.length}건`}
+                ? "바뀌는 것이 없어요"
+                : `올리면 바뀌는 것 ${result.changes.length}건`}
           </p>
           <Lines lines={result.changes} />
           {result.problems.length > 0 ? (
             <>
               <p className="mt-3 break-keep text-sm font-semibold text-warn">
-                반영하지 않는 줄 · {result.problems.length}건
+                반영하지 않는 줄 {result.problems.length}건
               </p>
               <Lines lines={result.problems} />
             </>
