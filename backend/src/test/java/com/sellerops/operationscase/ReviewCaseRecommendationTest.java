@@ -180,14 +180,17 @@ class ReviewCaseRecommendationTest {
     @Test
     @DisplayName("the queue has a standing door, and it is not two doors")
     void theQueueIsReachable() throws IOException {
-        // Product-owner decision 2026-10-27: the menu is 홈 / 리뷰·문의 / 상품·정책, and 할 일 left it. The queue
-        // keeps its route; its standing door is the Home, which opens it from the brief (전체 보기) and from the
-        // backlog line (할 일에서 보기). A menu entry back would be a second, unrequested door.
+        // Product-owner decision 2026-10-28 (replacing 2026-10-27's 「할 일 left the menu」): the menu is 할 일 / 리뷰·문의 /
+        // 상품·정책, and 할 일 is the Home entry that OWNS the queue's route — lit there, never a second entry for it. The
+        // Home still opens the queue from the brief (전체 보기) and from the backlog line (할 일에서 보기).
         String nav = code(NAV);
         String home = code(HOME);
 
-        assertThat(count(nav, "/customer-operations/cases"))
-                .as("the menu no longer names the queue")
+        assertThat(count(nav, "match: [\"/customer-operations/cases\"]"))
+                .as("할 일 owns the queue's route")
+                .isEqualTo(1);
+        assertThat(count(nav, "to: \"/customer-operations/cases\""))
+                .as("and no menu entry of its own points there")
                 .isZero();
         assertThat(count(home, "to=\"/customer-operations/cases\""))
                 .as("the Home is the door: the brief's 전체 보기 and the backlog's 할 일에서 보기")
