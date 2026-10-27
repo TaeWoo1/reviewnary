@@ -14,7 +14,7 @@ const TAB_BASE =
  * navigating; that keeps the bar at five targets without inventing a fifth destination.
  */
 export function MobileBottomNav({ onMore }: { onMore: () => void }) {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const work = useTodayWorkCount();
   return (
     <nav
@@ -27,7 +27,7 @@ export function MobileBottomNav({ onMore }: { onMore: () => void }) {
           to={tab.to}
           end={tab.end}
           className={() =>
-            `${TAB_BASE} ${navItemOwns(tab, pathname) ? "text-brand-700" : "text-muted"}`
+            `${TAB_BASE} ${navItemOwns(tab, pathname, search) ? "text-brand-700" : "text-muted"}`
           }
         >
           <span className="relative">

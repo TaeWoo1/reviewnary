@@ -25,7 +25,8 @@ const MASTER_DETAIL_ROUTES = [
   // 반복 문제의 목록만 — 문제 하나는 제 페이지이고 페이지 스크롤을 쓴다 (canonical, 2026-10-05).
   /^\/memory\/?$/,
   /^\/inquiries(\/[^/]+)?\/?$/,
-  /^\/reviews(\/[^/]+)?\/?$/,
+  // /reviews/{account} is the record; /reviews/confirm is an ordinary page (2026-10-28), not a list beside a pane.
+  /^\/reviews(\/(?!confirm\/?$)[^/]+)?\/?$/,
 ];
 
 /**

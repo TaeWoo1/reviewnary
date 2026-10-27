@@ -154,5 +154,13 @@ public record ReviewReplyPrepView(
          * would rather avoid. Empty when there is no draft or nothing is marked. A {@code FORBIDDEN} entry is why
          * approval and sending stay shut until the text is fixed — the server refuses them on the same check.
          */
-        java.util.List<ReviewReplyPhraseFindingView> phraseFindings) {
+        java.util.List<ReviewReplyPhraseFindingView> phraseFindings,
+        /**
+         * Why {@code capabilities.canApprove} is false, in the server's own words (2026-10-28), so the review page can
+         * keep 「답글 확정」 pressable and say the one thing in the way instead of drawing a dead button: {@code APPROVED}
+         * (one already stands), {@code NOT_RESPONSE_NEEDED}, {@code CHANNEL_ANSWERED}, {@code NO_DRAFT}, or
+         * {@code DELEGATED} (a delegate holds the reply). Null whenever approving is open. The first that applies, in
+         * that order — the same order {@code compose} closes the road in.
+         */
+        String approveUnavailableReason) {
 }

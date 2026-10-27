@@ -788,6 +788,32 @@ class ReviewReplyServiceTest {
         assertThat(view().capabilities().canApprove()).isTrue();
     }
 
+    /** The page says why 「답글 확정」 is closed in the server's words; the reason tracks the flag step by step. */
+    @Test
+    void theReasonApprovingIsClosedFollowsTheFlag() {
+        assertThat(view().approveUnavailableReason()).isEqualTo("NOT_RESPONSE_NEEDED");
+        triage(TriageDisposition.RESPONSE_NEEDED);
+        assertThat(view().approveUnavailableReason()).isEqualTo("NO_DRAFT");
+        service.saveDraft(org, account, ref, "합성-답변 초안", 0, user);
+        ReviewReplyPrepView open = view();
+        assertThat(open.capabilities().canApprove()).isTrue();
+        assertThat(open.approveUnavailableReason()).isNull();
+    }
+
+    @Test
+    void theReasonNamesTheFirstClosedStepInComposeOrder() {
+        assertThat(ReviewReplyService.approveUnavailableReason(true, false, true, false, true, false)).isNull();
+        assertThat(ReviewReplyService.approveUnavailableReason(false, true, true, true, true, true)).isEqualTo("APPROVED");
+        assertThat(ReviewReplyService.approveUnavailableReason(false, false, false, true, true, true))
+                .isEqualTo("NOT_RESPONSE_NEEDED");
+        assertThat(ReviewReplyService.approveUnavailableReason(false, false, true, true, false, true))
+                .isEqualTo("CHANNEL_ANSWERED");
+        assertThat(ReviewReplyService.approveUnavailableReason(false, false, true, false, false, true))
+                .isEqualTo("NO_DRAFT");
+        assertThat(ReviewReplyService.approveUnavailableReason(false, false, true, false, true, true))
+                .isEqualTo("DELEGATED");
+    }
+
     /**
      * The invariant that makes triage a record rather than a filter: an operator who changes
      * their mind never loses the work they already did.

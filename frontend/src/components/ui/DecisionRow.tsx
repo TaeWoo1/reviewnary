@@ -1,3 +1,4 @@
+import { starTone } from "../reviews/Stars";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { ReasonIcon, ReasonTone } from "../../lib/copy/customerOps";
@@ -246,7 +247,9 @@ export function DecisionRow({
             right-hand group both hold their width, and at phone width together they left the sentence a
             column one syllable wide. So under 640px the sentence takes its own line beneath them — the same
             facts in the same order of reading; at `sm` and up nothing changes. */}
-        {leadBadge && !metaBelow ? <span className="w-[104px] shrink-0 max-sm:w-auto">{leadBadge}</span> : null}
+        {/* 84px, not 104 (2026-10-28): the widest state word is 76px, and the extra 28 read as a gap between the badge and
+            the sentence it belongs to. */}
+        {leadBadge && !metaBelow ? <span className="w-[84px] shrink-0 max-sm:w-auto">{leadBadge}</span> : null}
         <span className={`min-w-0 flex-1 ${metaBelow ? "" : "max-sm:order-last max-sm:basis-full"}`}>
           <span
             className={`block min-w-0 max-w-[62ch] break-keep font-semibold leading-snug text-ink [overflow-wrap:anywhere] ${
@@ -298,7 +301,7 @@ export function DecisionRow({
               {category ? <Fact fixed>{category}</Fact> : null}
               {star ? (
                 <Fact fixed>
-                  <span aria-label={`별점 ${rating}점`}>{star}</span>
+                  <span aria-label={`별점 ${rating}점`} className={rating != null ? starTone(rating) : undefined}>{star}</span>
                 </Fact>
               ) : null}
               {product ? <Fact>{product}</Fact> : null}
@@ -313,7 +316,16 @@ export function DecisionRow({
           >
             {meta && !metaBelow ? (
               <span className="whitespace-nowrap max-sm:min-w-0 max-sm:truncate" aria-label={star ? `${meta.replace(star, `별점 ${rating}점`)}` : undefined}>
-                {meta}
+                {/* The stars in their tone (2026-10-28): ★1 and ★5 were the same grey down the Home's list. */}
+                {star && rating != null && meta.includes(star) ? (
+                  <>
+                    {meta.slice(0, meta.indexOf(star))}
+                    <span className={`font-semibold ${starTone(rating)}`}>{star}</span>
+                    {meta.slice(meta.indexOf(star) + star.length)}
+                  </>
+                ) : (
+                  meta
+                )}
               </span>
             ) : null}
             {/* Fixed width and right-aligned, so the sort key this list is ordered by lines up down the

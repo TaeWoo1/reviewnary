@@ -42,6 +42,8 @@ describe("nav.v2 — structure", () => {
     expect(owner("/customer-operations/cases")).toEqual(["할 일"]);
     expect(owner("/customer-operations/cases/c1")).toEqual(["할 일"]);
     expect(owner("/customer-operations")).toEqual([]);
+    // A screen opened from 할 일 stays lit as 할 일 — its own way back says 「← 할 일」.
+    expect(NAV_ITEMS.filter((item) => navItemOwns(item, "/reviews/reply/r1", "?from=work")).map((i) => i.label)).toEqual(["할 일"]);
     expect(owner("/orders")).toEqual([]);
   });
 

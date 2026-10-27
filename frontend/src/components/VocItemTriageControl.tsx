@@ -25,8 +25,14 @@ export function VocItemTriageControl({
   reviewId,
   disposition,
   onRecorded,
+  replyClosed = false,
 }: {
   reviewId: string;
+  /**
+   * The channel already shows a reply on this review (2026-10-28): 「답글 달기」 is not offered — it led to a reply area the
+   * server keeps shut — unless it is the decision already recorded, which stays visible as the record.
+   */
+  replyClosed?: boolean;
   disposition: TriageDisposition | null;
   /**
    * The server-CONFIRMED decision, announced to whoever owns the row.
@@ -155,7 +161,7 @@ export function VocItemTriageControl({
             says the same thing a radio's checked state would — this is the current
             choice — without the promise. */}
         <div role="group" aria-labelledby={labelId} className="flex flex-wrap gap-1.5">
-          {TRIAGE_OPTIONS.map((option) => {
+          {TRIAGE_OPTIONS.filter((option) => !(replyClosed && option.value === "RESPONSE_NEEDED" && recorded !== "RESPONSE_NEEDED")).map((option) => {
             const isRecorded = recorded === option.value;
             const isPending = pending === option.value;
             // Inert while a write is in flight, on the choice already held, and forever if

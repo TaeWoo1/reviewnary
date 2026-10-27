@@ -1497,6 +1497,11 @@ export interface ReviewReplyPrep {
    */
   phraseFindings?: ReviewReplyPhraseFinding[];
   /**
+   * Why `capabilities.canApprove` is false, in the server's words (2026-10-28) — the page keeps 「답글 확정」 pressable and
+   * says this beside it. Null when approving is open; absent from an older server.
+   */
+  approveUnavailableReason?: "APPROVED" | "NOT_RESPONSE_NEEDED" | "CHANNEL_ANSWERED" | "NO_DRAFT" | "DELEGATED" | null;
+  /**
    * What wrote the head draft — `MODEL`, `RULE`, or null for a version written before reviewnary
    * recorded an author (Grounded Review Drafting v1). Null is "not recorded", never "a person typed
    * it": the screen says nothing rather than guessing.

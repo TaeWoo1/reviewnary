@@ -629,10 +629,12 @@ describe("리뷰 처리 — the decision workspace", () => {
     getReviewDecisionContext.mockResolvedValue(context({ currentDecision: null }));
     renderTask();
 
-    expect(await screen.findByText("채널에 이미 답변이 등록된 리뷰예요")).toBeInTheDocument();
+    expect(await screen.findByText("채널에 이미 답글이 달린 리뷰예요")).toBeInTheDocument();
     // The channel's statement is NOT the seller's decision: the choice is still open, and nothing
-    // claims the review has been handled.
-    expect(screen.getByRole("button", { name: /답글 달기/ })).toBeInTheDocument();
+    // claims the review has been handled — but 「답글 달기」 is not among the choices (2026-10-28): it led to a reply
+    // area the server keeps shut, beside a sentence saying so.
+    expect(screen.getByRole("button", { name: /나중에 보기/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /답글 달기/ })).toBeNull();
     // And no way to start a reply the server would refuse (2026-10-26): the statement stands in its place.
     expect(screen.queryByTestId("reply-starter")).toBeNull();
     expect(screen.queryByText(/처리 완료/)).toBeNull();
@@ -1376,7 +1378,8 @@ describe("리뷰 상세 — the one object and the one column (2026-10-06)", () 
     expect(fold!.contains(ask)).toBe(false);
   });
 
-  it("stands the prepared reply between the why-now line and the judgement controls", async () => {
+  /** 2026-10-28 (owner-approved walk-through fix): the review and the judgement on the left, the reply on the right. */
+  it("puts the customer's review and the judgement in the left column and the reply in the right one", async () => {
     getReviewWorkspace.mockResolvedValue(detail({ whyNow: WHY }));
     getReviewReplyPrep.mockResolvedValue(prep());
     renderTask();
@@ -1384,9 +1387,15 @@ describe("리뷰 상세 — the one object and the one column (2026-10-06)", () 
     const why = await screen.findByRole("region", { name: "왜 올라왔나요" });
     const draft = await screen.findByLabelText("답글 내용");
     const decided = screen.getByRole("region", { name: "판매자의 결정" });
-    const order = (el: Element) => (why.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-    expect(order(draft)).toBe(true);
-    expect(draft.compareDocumentPosition(decided) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const reply = screen.getByRole("region", { name: "답글 준비" });
+    // The customer's words are a quote at the head of the left column, not the page's headline.
+    const quote = screen.getByRole("figure", { name: /고객이 쓴/ });
+    expect(quote.querySelector("blockquote")?.textContent).toContain("괜찮긴한데 자꾸 떨어져요");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).not.toContain("괜찮긴한데 자꾸 떨어져요");
+    const after = (a: Element, b: Element) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(after(quote, why) && after(why, decided)).toBe(true);
+    expect(reply.contains(draft)).toBe(true);
+    expect(decided.contains(draft)).toBe(false);
   });
 
   /**
@@ -1415,7 +1424,7 @@ describe("리뷰 상세 — the one object and the one column (2026-10-06)", () 
     expect(screen.getByRole("region", { name: "판매자의 결정" }).contains(setAside)).toBe(true);
   });
 
-  it("has one column and one surfaced object", async () => {
+  it("has two columns and one surfaced object", async () => {
     getReviewWorkspace.mockResolvedValue(detail({ whyNow: WHY }));
     getReviewReplyPrep.mockResolvedValue(prep());
     // 기록이 비어 있으면 그 블록은 상자를 그리지 않는다 — 빈 로그로 재면 둘째 상자를 놓친다.
@@ -1428,9 +1437,9 @@ describe("리뷰 상세 — the one object and the one column (2026-10-06)", () 
     await screen.findByRole("region", { name: "왜 올라왔나요" });
     await screen.findByLabelText("답글 내용");
 
-    // 둘째 열이 없다 — rail="none".
-    expect(container.querySelector('[class*="lg:grid-cols-"]')).toBeNull();
-    expect(container.querySelector('[data-case-variant="page"]')?.className).toContain("max-w-[900px]");
+    // 두 열 — rail="split" (2026-10-28): 리뷰와 판단이 왼쪽, 답글이 오른쪽.
+    expect(container.querySelector('[class*="lg:grid-cols-2"]')).not.toBeNull();
+    expect(container.querySelector('[data-case-variant="page"]')?.className).toContain("max-w-[1240px]");
     // 그리고 면을 가진 물건은 준비된 답변 하나뿐이다.
     //
     // <b>왜 ring만 세면 안 되는가</b>: 실측(2026-10-06, 1600×1000)에서 이 화면의 상자는 둘이었다 —
@@ -1463,7 +1472,7 @@ describe("리뷰 처리 — the reply area before a decision", () => {
     channelReplyState: "PENDING",
   } as const;
 
-  it("shows the empty reply area with 「AI 초안 준비」 at once, above the judgement controls, and calls nothing", async () => {
+  it("shows the empty reply area with 「AI 초안 준비」 at once, in the reply column beside the judgement, and calls nothing", async () => {
     getReviewWorkspace.mockResolvedValue(detail({ replyWork: UNDECIDED }));
     getReviewDecisionContext.mockResolvedValue(context({ currentDecision: null }));
     renderTask();
@@ -1472,7 +1481,8 @@ describe("리뷰 처리 — the reply area before a decision", () => {
     expect(within(starter).getByRole("button", { name: "AI 답글 쓰기" })).toBeInTheDocument();
     expect(within(starter).getByRole("button", { name: "직접 쓰기" })).toBeInTheDocument();
     const controls = screen.getByLabelText("조치 선택");
-    expect(starter.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("region", { name: "답글 준비" }).contains(starter)).toBe(true);
+    expect(screen.getByRole("region", { name: "판매자의 결정" }).contains(controls)).toBe(true);
     expect(getReviewReplyPrep).not.toHaveBeenCalled();
     expect(generateReviewReplyDraft).not.toHaveBeenCalled();
     expect(recordReviewDecision).not.toHaveBeenCalled();

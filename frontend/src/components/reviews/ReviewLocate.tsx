@@ -1,7 +1,5 @@
 import { useEffect, useRef } from "react";
 import { Btn } from "../ui/Btn";
-import { Disclosure } from "../ui/Disclosure";
-import { josa } from "./recordParts";
 import { locateMessage, locateUnavailableText } from "../../lib/actionWindow/locate/locateCopy";
 import { useReviewLocate } from "../../lib/actionWindow/locate/useReviewLocate";
 import type { ReviewChannelCapabilityView, TriageBehaviorEvent } from "../../lib/types";
@@ -22,7 +20,6 @@ import type { ReviewChannelCapabilityView, TriageBehaviorEvent } from "../../lib
 export function ReviewLocate({
   reviewId,
   accountId,
-  word,
   capability,
   pilotOn,
   raised,
@@ -64,17 +61,10 @@ export function ReviewLocate({
   const canRecheck = run?.allowedCommands.includes("REQUEST_STEP_RECHECK") ?? false;
   const canRaise = run?.allowedCommands.includes("FIND_CURRENT_STEP") ?? false;
 
-  if (!canLocate) {
-    // Folded, because it answers 「원문은 어디서 보나」 — and a seller who has not asked it reads a
-    // 56-character apology for a control that is not there. The label is the question.
-    return (
-      <Disclosure className={className} label={`${word} 원문 보기`}>
-        <p className="pt-1 text-sm leading-relaxed text-muted">
-          이 채널의 {josa(word, "은", "는")} reviewnary에서 원문 화면으로 바로 이동할 수 없어요. 판매자센터에서 직접 확인해 주세요.
-        </p>
-      </Disclosure>
-    );
-  }
+  // Nothing to offer, nothing drawn (2026-10-28). It used to be a fold named 「원문 보기」 that opened onto 「여기서는 볼 수
+  // 없어요」 — the review's whole text already stands on the page, and a label that promises the original and holds an
+  // apology was the one dead end on it.
+  if (!canLocate) return null;
 
   return (
     <div className={`space-y-2 ${className ?? ""}`}>

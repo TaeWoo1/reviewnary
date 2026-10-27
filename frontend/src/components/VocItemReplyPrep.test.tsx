@@ -198,7 +198,7 @@ describe("VocItemReplyPrep", () => {
 
   it("says the seller wrote it, and does not ask them to check their own sentence", async () => {
     await renderPanel(prepView({ draftAuthorKind: "SELLER" }));
-    expect(screen.getByText(/직접 쓴 답글이에요/)).toBeTruthy();
+    expect(screen.getByText(/직접 쓰거나 고친 답글이에요/)).toBeTruthy();
     expect(screen.queryByText(/근거로 준비했어요/)).toBeNull();
     expect(screen.queryByText(/저장된 문구로 시작했어요/)).toBeNull();
     expect(screen.queryByText(/내용을 확인하고 직접 고쳐 주세요/)).toBeNull();
@@ -217,7 +217,7 @@ describe("VocItemReplyPrep", () => {
     await renderPanel(prepView({ draftAuthorKind: null }));
     expect(screen.queryByText(/저장된 문구로 시작했어요/)).toBeNull();
     expect(screen.queryByText(/근거로 준비했어요/)).toBeNull();
-    expect(screen.queryByText(/직접 쓴 답글이에요/)).toBeNull();
+    expect(screen.queryByText(/직접 쓰거나 고친 답글이에요/)).toBeNull();
     expect(screen.getByLabelText("답글 내용")).toBeTruthy();
   });
 
@@ -428,10 +428,49 @@ describe("VocItemReplyPrep", () => {
 
     await user.type(screen.getByLabelText("답글 내용"), "-수정");
 
-    expect(inert(approve)).toBe(true);
     expect(screen.getByTestId("draft-status").textContent).toBe("저장 중…");
+    // Still pressable (2026-10-28): the press refuses and says why, beside itself.
+    expect(inert(approve)).toBe(false);
     await user.click(approve);
     expect(api.decideReviewReplyApproval).not.toHaveBeenCalled();
+    expect(screen.getByTestId("approve-blocked")).toHaveTextContent("저장되면 다시 눌러 주세요");
+  });
+
+  /** 2026-10-28: a closed 「답글 확정」 stays pressable and says the server's reason beside itself — never a dead grey. */
+  it("says why it cannot confirm, in the server's words, and sends nothing", async () => {
+    const user = userEvent.setup();
+    await renderPanel(
+      prepView({
+        draft: { version: 1, body: "합성-초안", contentFingerprint: "x", fingerprintAlgorithm: "review-reply-v1", createdAt: "2026-07-17T00:00:00Z" },
+        capabilities: { canSave: true, canApprove: false, canWithdraw: false, canCopy: false, canStartSubmissionRun: false },
+        approveUnavailableReason: "DELEGATED",
+      }),
+    );
+    expect(screen.queryByTestId("approve-blocked")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "답글 확정" }));
+    expect(screen.getByTestId("approve-blocked")).toHaveTextContent("담당자에게 맡긴 리뷰예요");
+    expect(api.decideReviewReplyApproval).not.toHaveBeenCalled();
+  });
+
+  it("walks on only after the approval is recorded", async () => {
+    const user = userEvent.setup();
+    const onApproved = vi.fn();
+    const view = prepView({
+      draft: { version: 3, body: "합성-초안", contentFingerprint: "x", fingerprintAlgorithm: "review-reply-v1", createdAt: "2026-07-17T00:00:00Z" },
+      capabilities: { canSave: true, canApprove: true, canWithdraw: false, canCopy: false, canStartSubmissionRun: false },
+    });
+    vi.mocked(api.getReviewReplyPrep).mockResolvedValue(view);
+    vi.mocked(api.decideReviewReplyApproval).mockRejectedValueOnce(new Error("down"));
+    render(
+      <VocItemReplyPrep accountId={ACCOUNT} actionRef={REF} disposition="RESPONSE_NEEDED" confirmLabel="확정하고 다음 →" onApproved={onApproved} />,
+    );
+    const press = await screen.findByRole("button", { name: "확정하고 다음 →" });
+    await user.click(press);
+    await waitFor(() => expect(api.decideReviewReplyApproval).toHaveBeenCalledTimes(1));
+    expect(onApproved, "a refused write does not walk on").not.toHaveBeenCalled();
+    vi.mocked(api.decideReviewReplyApproval).mockResolvedValueOnce({ state: "APPROVED" } as ReviewReplyApprovalResponse);
+    await user.click(press);
+    await waitFor(() => expect(onApproved).toHaveBeenCalledTimes(1));
   });
 
   it("is honest about who sends after a copy", async () => {

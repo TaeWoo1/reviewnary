@@ -25,6 +25,7 @@ import { Products } from "./pages/app/Products";
 import { ProductDetail } from "./pages/app/ProductDetail";
 import { Reviews } from "./pages/app/Reviews";
 import { ReviewReplyTask, ReviewReplyTaskLegacyEntry } from "./pages/app/ReviewReplyTask";
+import { PraiseConfirm } from "./pages/app/PraiseConfirm";
 import { CustomerInbox } from "./pages/app/CustomerInbox";
 import { StartPrep } from "./pages/app/StartPrep";
 import { InboxItemRedirect } from "./pages/app/InboxItemRedirect";
@@ -139,6 +140,7 @@ export function App() {
             authorization, and a review nobody acquired through a connected account — every manual
             upload — has no account id to put in a path. */}
         <Route path="/reviews/reply/:reviewId" element={<ReviewReplyTask />} />
+        <Route path="/reviews/confirm" element={<PraiseConfirm />} />
         <Route path="/reviews/:accountId/reply/:reviewId" element={<ReviewReplyTaskLegacyEntry />} />
         <Route path="/reviews/:accountId" element={<Reviews />} />
         {/* 문의: the customer inbox scoped to inquiries. */}

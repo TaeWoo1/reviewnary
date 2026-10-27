@@ -97,7 +97,9 @@ export function draftProvenanceNote(authorKind: string | null, approved: boolean
   // MODEL no longer means 「저장된 지식 위에」: since 2026-10-26 the model also writes with no evidence (thanks and
   // empathy only), and a past answer was never 「지식」 either. What it stood on is the basis chip's to say, once.
   if (authorKind === "MODEL") return "AI가 준비했어요.";
-  if (authorKind === "SELLER") return "직접 쓴 답글이에요.";
+  // 「직접 쓴」 read as 「not the AI's」 over a reply the seller had only edited (2026-10-28): SELLER is stamped on any
+  // version a person saved, typed or corrected.
+  if (authorKind === "SELLER") return "직접 쓰거나 고친 답글이에요.";
   if (authorKind === "RULE") return "저장된 문구로 시작했어요.";
   return null;
 }
@@ -167,8 +169,14 @@ export function VocItemReplyPrep({
   subjectShownAbove = false,
   unboxed = false,
   autoDraft = false,
+  confirmLabel = "답글 확정",
+  onApproved,
 }: {
   accountId: string;
+  /** The confirm press's words — 「확정하고 다음 →」 where the page walks on to the next reply (2026-10-28). */
+  confirmLabel?: string;
+  /** Fired once an approval the seller pressed for has been recorded — never on the press itself. */
+  onApproved?: () => void;
   actionRef: string;
   /**
    * The heading level 「답변 준비」 renders at.
@@ -280,6 +288,8 @@ export function VocItemReplyPrep({
   const [loadFailed, setLoadFailed] = useState(false);
   const [busy, setBusy] = useState<Busy>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  // What stood in the way of the last 「답글 확정」 press, said beside it (2026-10-28) instead of a dead 40% button.
+  const [blocked, setBlocked] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [copied, setCopied] = useState(false);
   // The approved text, revealed for manual copying when this origin has no clipboard API.
@@ -536,14 +546,26 @@ export function VocItemReplyPrep({
   }
 
   async function decide(state: "APPROVED" | "WITHDRAWN") {
-    if (inFlight.current || unavailable) {
+    if (unavailable) {
       return;
     }
-    if (state === "APPROVED" ? !approvable : !capabilities.canWithdraw) {
+    // Before the in-flight guard: a press while the autosave is running is exactly the unsaved case, and it gets its
+    // sentence rather than nothing. Refusing sends nothing, so it needs no guard of its own.
+    if (state === "APPROVED" && !approvable) {
+      // Pressable, and the press says what is in the way (2026-10-28) — the walk-through met a greyed 「답글 확정」 with
+      // no reason. The refusal itself is unchanged: nothing is sent.
+      setBlocked(approveBlockedSentence({ dirty, phraseBlock, responseNeeded, reason: prep?.approveUnavailableReason }));
+      return;
+    }
+    if (inFlight.current) {
+      return;
+    }
+    if (state === "WITHDRAWN" && !capabilities.canWithdraw) {
       // Enforced, not merely advertised by aria-disabled: the buttons stay focusable, so
       // they still receive clicks.
       return;
     }
+    setBlocked(null);
     // Reuse the command id ONLY when retrying the same failed intent — a retry is one
     // decision reaching the server twice, which it answers as a replay. A fresh id would
     // make it a second, independent decision. Changing the intent takes a new id.
@@ -576,6 +598,7 @@ export function VocItemReplyPrep({
       // Re-read rather than trust the write's echo: the approved BODY only ever comes from
       // the prep read, so there is exactly one way to obtain copyable text.
       await refresh();
+      if (state === "APPROVED") onApproved?.();
     } catch {
       setFailed(
         state === "APPROVED"
@@ -902,7 +925,10 @@ export function VocItemReplyPrep({
         {(capabilities.canApprove || (!approved && draft != null)) && !laneHolds && delegation == null ? (
           <button
             type="button"
-            aria-disabled={!approvable || working || unavailable}
+            // Disabled only while something is in flight (2026-10-28): a confirm that cannot go through is still pressed,
+            // and the press answers with why — `blocked` below — rather than the control refusing to be pressed.
+            aria-disabled={working || unavailable}
+            aria-describedby={blocked != null ? "approve-blocked" : undefined}
             aria-busy={busy === "approving"}
             onClick={() => void decide("APPROVED")}
             /* THE primary action of every reply-work surface (Approval Path v1 §4). It was a tint —
@@ -911,16 +937,21 @@ export function VocItemReplyPrep({
                was the quietest control in the panel. Solid `brand-700` is the product's measured
                primary (5.41:1, 7.38:1 on hover). It never competes with 복사: 복사 exists only once an
                approval stands, and this button is gone by then. */
+            /* Always drawn as the screen's one main action (2026-10-28): a press that cannot go through says why
+               beside itself (`blocked`) rather than fading to 40%, which read as 「broken」 with no reason. */
             className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
-              approvable && !working
-                ? delegation != null
-                  ? "bg-surface text-ink ring-1 ring-line"
-                  : "bg-brand-700 text-white hover:bg-brand-800"
-                : "bg-canvas text-muted opacity-40"
-            }`}
+              delegation != null
+                ? "bg-surface text-ink ring-1 ring-line"
+                : "bg-brand-700 text-white hover:bg-brand-800"
+            } ${working ? "opacity-70" : ""}`}
           >
-            답글 확정
+            {confirmLabel}
           </button>
+        ) : null}
+        {blocked != null && !approved && blocked !== phraseBlock ? (
+          <span id="approve-blocked" role="status" className="break-keep text-sm text-ink" data-testid="approve-blocked">
+            {blocked}
+          </span>
         ) : null}
         {approved ? (
           /* 되돌리기이지 다음에 할 일이 아니다. 면을 가진 단추로 그리면 복사 옆에서 같은 무게를 갖고,
@@ -1243,4 +1274,37 @@ export function VocItemReplyPrep({
       ) : null}
     </section>
   );
+}
+
+/**
+ * <b>What is in the way of 「답글 확정」</b>, in one sentence (2026-10-28). The panel's own facts first — unsaved typing, a
+ * banned phrase, a review not set to 답글 달기 — then the server's reason for `canApprove` being false. An older server
+ * sends no reason; then the sentence says only that it cannot be confirmed now, never a guessed cause.
+ */
+export function approveBlockedSentence({
+  dirty,
+  phraseBlock,
+  responseNeeded,
+  reason,
+}: {
+  dirty: boolean;
+  phraseBlock: string | null;
+  responseNeeded: boolean;
+  reason: ReviewReplyPrep["approveUnavailableReason"];
+}): string {
+  if (dirty) return "고친 내용을 저장하고 있어요. 저장되면 다시 눌러 주세요.";
+  if (phraseBlock != null) return phraseBlock;
+  if (!responseNeeded || reason === "NOT_RESPONSE_NEEDED") return "「답글 달기」로 정한 리뷰만 확정할 수 있어요.";
+  switch (reason) {
+    case "APPROVED":
+      return "이미 확정한 답글이에요.";
+    case "CHANNEL_ANSWERED":
+      return "채널에 이미 답글이 있어서 새 답글은 확정하지 않아요.";
+    case "NO_DRAFT":
+      return "먼저 답글을 써 주세요.";
+    case "DELEGATED":
+      return "담당자에게 맡긴 리뷰예요. 여기서는 확정하지 않아요.";
+    default:
+      return "지금은 확정할 수 없어요.";
+  }
 }

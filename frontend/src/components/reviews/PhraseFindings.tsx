@@ -66,7 +66,7 @@ export function PhraseFindings({
             <div className="min-w-0 flex-1">
               <p className="break-keep text-ink">
                 {f.kind === "FORBIDDEN"
-                  ? `「${f.phrase}」 — 이 문장을 고쳐야 승인할 수 있어요.`
+                  ? `「${f.phrase}」 — 이 문장을 고쳐야 확정할 수 있어요.`
                   : f.replacement
                     ? `「${f.phrase}」 → 「${f.replacement}」`
                     : `「${f.phrase}」 — 되도록 피하기로 한 표현이에요.`}
@@ -131,7 +131,7 @@ export function phraseBlockSentence(findings: ReviewReplyPhraseFinding[]): strin
   if (banned.length === 0) return null;
   const kept = findings.filter((f) => f.kind === "AVOID").map((f) => f.phrase);
   const quoted = (words: string[]) => words.map((w) => `「${w}」`).join(" · ");
-  return `${quoted(banned)}${josa(banned[banned.length - 1], "을", "를")} 고치면 승인할 수 있어요.`
+  return `${quoted(banned)}${josa(banned[banned.length - 1], "을", "를")} 고치면 확정할 수 있어요.`
     + (kept.length ? ` ${quoted(kept)}${josa(kept[kept.length - 1], "은", "는")} 그대로 둬도 돼요.` : "");
 }
 

@@ -742,6 +742,21 @@ public class ReviewReplyService {
                 .orElse(null);
     }
 
+    /**
+     * The first reason approving is closed, in {@link #compose}'s own order — or null when it is open. Read from the
+     * same booleans that set {@code canApprove}, so the sentence and the flag cannot disagree.
+     */
+    static String approveUnavailableReason(boolean canApprove, boolean approved, boolean responseNeeded,
+            boolean channelAnswered, boolean hasDraft, boolean delegated) {
+        if (canApprove) return null;
+        if (approved) return "APPROVED";
+        if (!responseNeeded) return "NOT_RESPONSE_NEEDED";
+        if (channelAnswered) return "CHANNEL_ANSWERED";
+        if (!hasDraft) return "NO_DRAFT";
+        if (delegated) return "DELEGATED";
+        return null;
+    }
+
     private ReviewReplyPrepView compose(UUID orgId, Review review, String actionRef) {
         RedactedBody body = VocPreviewSanitizer.redactFullBody(review.getBody());
         TriageDisposition triage = disposition(orgId, review.getId()).orElse(null);
@@ -849,7 +864,9 @@ public class ReviewReplyService {
                         : styleGuard.findings(head.getBody(), orgId).stream()
                                 .map(f -> new ReviewReplyPhraseFindingView(f.kind().name(), f.phrase(),
                                         f.replacement(), f.sentence()))
-                                .toList());
+                                .toList(),
+                approveUnavailableReason(capabilities.canApprove(), approved, responseNeeded, channelAnswered,
+                        head != null, delegatedNow));
     }
 
     /**

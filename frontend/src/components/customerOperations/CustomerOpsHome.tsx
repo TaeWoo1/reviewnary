@@ -1645,7 +1645,7 @@ export function PraiseBundle({ count }: { count: number }) {
         칭찬 리뷰 답글 <span className="font-semibold tabular-nums">{count.toLocaleString("ko-KR")}</span>건이 확정 전이에요
       </span>
       <Link
-        to="/reviews/confirm"
+        to="/reviews/confirm?from=work"
         className="ml-auto shrink-0 font-semibold text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
       >
         한 번에 확인하기 →

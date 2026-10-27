@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { SafetyMarkNote } from "../../components/reviews/SafetyMarkNote";
-import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PageHead } from "../../components/ui/PageHead";
 import { Empty } from "../../components/ui/Empty";
 import { Facts } from "../../components/ui/ObjectRow";
@@ -24,6 +24,9 @@ import { COPY, sourceLabel } from "../../lib/copy/customerOps";
 import { Disclosure } from "../../components/ui/Disclosure";
 import { CaseLayout, DecisionCard, Eyebrow, type CaseVariant, type PaneDepth } from "../../components/workspace/CaseLayout";
 import { ReviewLocate } from "../../components/reviews/ReviewLocate";
+import { Stars } from "../../components/reviews/Stars";
+import { useWorkNeighbours, type WorkNeighbours } from "../../lib/workList";
+import type { HomeWorkRow } from "../../lib/homeWork";
 import {
   PREVIEW_SAFETY_LINE,
   decisionLogDisclosure,
@@ -284,6 +287,10 @@ export function ReviewCaseView({
   }, [reviewId, version]);
 
   const word = reviewWord(context?.channelCode ?? null);
+  const navigate = useNavigate();
+  // 「확정하고 다음」 and J/K walk 할 일 in its own order (2026-10-28). Only on the page: a pane is already beside its list.
+  const walk = useWorkNeighbours(variant === "page" ? `/reviews/reply/${reviewId}` : null);
+  useWalkKeys(walk, navigate);
 
   // The channel record is an ACCOUNT-shaped surface: it lists what one connected account holds. A
   // review this org uploaded has no such page, so the way back is the index rather than a link into a
@@ -370,8 +377,8 @@ export function ReviewCaseView({
          240px rail에 남아 있던 것은 사실 두 개였다. 사실 두 개를 담으려고 페이지 높이만큼 세로줄을 긋는
          것은, 제목 아래 한 줄이 할 일을 기둥으로 하는 것이고, 「면을 가진 물건은 하나」인 화면에 두 번째
          모서리를 그리는 것이다. 두 사실은 머리말의 평문 속성으로 올라가고 읽는 열은 792 → 900을 되찾는다. */
-      rail={variant === "page" ? "none" : undefined}
-      decisionLabel="판매자의 결정"
+      rail={variant === "page" ? "split" : undefined}
+      decisionLabel={variant === "page" ? "답글 준비" : "판매자의 결정"}
       nav={back}
       /* <b>페이지에서는 제목 위에 아무것도 없다</b> (리뷰 canonical mockup, 2026-10-06). 고객이 쓴
          문장이 먼저 오고, 그것이 어떤 리뷰인지는 바로 아래 한 줄이 말한다 — Front가 제목과 chip strip을
@@ -397,26 +404,23 @@ export function ReviewCaseView({
           ) : undefined
         ) : (
           <>
-            <Facts>
-              <span>{sourceLabel(context?.channelCode ?? null, "REVIEW", detail.rating)}</span>
-              <span className="tabular-nums">{detail.writtenOn ?? "날짜 없음"}</span>
-              {detail.productName ? (
-                context?.productId ? (
-                  <Link to={`/products/${context.productId}`} className="hover:text-ink hover:underline">
-                    {detail.productName}
-                  </Link>
-                ) : (
-                  <span>{detail.productName}</span>
-                )
+            {/* The channel, rating and date stand on the quote now (2026-10-28); the head keeps the two properties and
+                the way to the product. */}
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <JudgementProperties detail={detail} decision={decision} />
+              {context?.productId ? (
+                <Link to={`/products/${context.productId}`} className="hover:text-ink hover:underline">
+                  상품 정보 보기
+                </Link>
               ) : null}
-            </Facts>
-            {/* rail이 들고 있던 두 사실. 여기서는 읽는 것이고, 바꾸는 컨트롤은 아래 판매자의 결정에 있다. */}
-            <JudgementProperties detail={detail} decision={decision} className="mt-1.5" />
+            </div>
           </>
         )
       }
       depth={depth}
-      title={title}
+      /* <b>On the page, the customer's words are a quote, not the headline</b> (2026-10-28). They stood as a 2xl H1 and
+         nothing else; the page is now the product it is about, and the review reads in full in the left column. */
+      title={variant === "page" ? (detail.productName ?? `${word} 답글`) : title}
       /* <b>확인할 일's docked floor, for a review</b> (product-owner decision, 2026-10-03). The queue's
          other two kinds end in a primary at the pane's floor; a review ended in nothing, because the
          judgement this pane holds is recorded in several steps rather than pressed once.
@@ -439,14 +443,9 @@ export function ReviewCaseView({
           <Link to={`/reviews/reply/${detail.id}?from=work`} className="rounded font-semibold text-muted hover:text-ink hover:underline">
             전체 화면으로
           </Link>
-        ) : detail.sellerAccountId ? (
-          <Link
-            to={`${reviewRecordPath(detail.sellerAccountId)}?review=${detail.id}`}
-            className="rounded font-semibold text-muted hover:text-ink hover:underline"
-          >
-            목록에서 보기
-          </Link>
         ) : undefined
+        /* 「목록에서 보기」 is gone from the page (2026-10-28): with 「← 할 일」 or 「← 리뷰·문의」 above and the menu beside,
+           it was a third way back. */
       }
       subject={
         // The customer's sentence is the title above; this block is what the RULES said about it.
@@ -499,7 +498,16 @@ export function ReviewCaseView({
              이어 붙이면 어느 쪽도 하려던 적 없는 주장이 생기고, 그 문장을 검사할 자리가 없다. 밑줄 하나로
              여기까지가 「무엇이고 왜 지금인가」임을 닫고, 그 아래부터가 준비된 답변이다. */
           <>
-            <section aria-label="왜 올라왔나요" className="border-b border-line pb-5">
+            <ReviewQuote
+              body={detail.textless || body.length === 0 ? null : body}
+              word={word}
+              rating={detail.rating}
+              source={sourceLabel(context?.channelCode ?? null, "REVIEW", null)}
+              writtenOn={detail.writtenOn}
+            />
+            {/* No rule under it (2026-10-28): the judgement card below draws its own, and the two hairlines stood 14px
+                apart under the quote. */}
+            <section aria-label="왜 올라왔나요">
               <ReviewProblemCard
                 detail={detail}
                 word={word}
@@ -515,53 +523,6 @@ export function ReviewCaseView({
                 </div>
               ) : null}
             </section>
-            {/* <b>첫 화면의 중심 물건</b> (리뷰 canonical mockup, 2026-10-06 — Front conversation detail).
-                Front의 대화 상세에서 면을 가진 것은 제안된 답장 하나이고, 그것은 한 줄짜리 요약 바로 아래
-                선다. 같은 자리다: 리뷰 → 왜 지금 한 줄 → 준비된 답변. 아직 아무것도 정하지 않은 리뷰에는
-                초안이 없고, 그때는 아래 판단 컨트롤이 그 자리에 온다 — 둘 중 하나는 늘 거기 있다.
-                슬롯이 아니라 이 블록 안에 두는 이유: CaseLayout은 자리만 소유하므로(그 docblock) 한
-                화면을 위해 새 자리를 파기보다 이미 있는 자리의 순서를 쓰는 편이 가볍다. */}
-            {/* <b>면은 하나, 그러나 강한 테두리는 아니다</b> (Front conversation detail, 2026-10-06).
-                Front의 제안된 답장은 가는 회색 테두리 하나로 서 있고, 존재감은 테두리가 아니라 그 안의
-                문장이 화면에서 가장 큰 글이라는 데서 나온다. 브랜드 ring은 「다음에 누를 것」을 가리키는
-                표시인데, 승인이 이미 서 있는 리뷰에서 다음에 누를 것은 복사 하나이고 그것은 제 색을 가지고
-                있다. 확인할 일의 pane은 여러 물건 사이에서 이것을 가리켜야 하므로 ring을 유지한다. */}
-            {/* The channel's own statement, said before the reply area it closes (2026-10-26: the reply area now
-                stands first, so this moved up with it). */}
-            {variant === "page" ? <ChannelAnsweredState state={replyWork?.channelReplyState ?? null} /> : null}
-            {offerStart ? (
-              <DecisionCard primary>
-                <ReplyStarter
-                  key={`start-${detail.id}`}
-                  reviewId={detail.id}
-                  onStarted={(withAi) => {
-                    setAutoDraft(withAi);
-                    setDecision("RESPONSE_NEEDED");
-                    bump();
-                  }}
-                />
-              </DecisionCard>
-            ) : null}
-            {showDraft && replyWork ? (
-              <DecisionCard>
-                <VocItemReplyPrep
-                  key={`prep-${replyWork.actionRef}`}
-                  accountId={replyAccountId}
-                  actionRef={replyWork.actionRef}
-                  disposition={decision}
-                  onPrepared={() => setPrepared(true)}
-                  onOutcomeRecorded={bump}
-                  onLocalWork={setLocalWork}
-                  headingLevel={2}
-                  subjectShownAbove
-                  unboxed
-                  autoDraft={autoDraft}
-                />
-                {/* 작업에서 제외는 이 상자 밖으로 나갔다 — 아래 워크플로 영역. 답변에 대한 동작이 아니라
-                    이 리뷰를 할 일 목록에서 빼는 동작이고, 상자가 「이것이 답변이다」라고 말하려면 안에
-                    남는 것은 답변과 답변에 대한 동작뿐이어야 한다. */}
-              </DecisionCard>
-            ) : null}
           </>
         )
       }
@@ -594,6 +555,106 @@ export function ReviewCaseView({
           </>
         ) : (
         <>
+          <WalkBar walk={walk} />
+            {/* The channel's own statement, said before the reply area it closes (2026-10-26: the reply area now
+                stands first, so this moved up with it). */}
+            {variant === "page" ? <ChannelAnsweredState state={replyWork?.channelReplyState ?? null} /> : null}
+            {offerStart ? (
+              <DecisionCard primary>
+                <ReplyStarter
+                  key={`start-${detail.id}`}
+                  reviewId={detail.id}
+                  onStarted={(withAi) => {
+                    setAutoDraft(withAi);
+                    setDecision("RESPONSE_NEEDED");
+                    bump();
+                  }}
+                />
+              </DecisionCard>
+            ) : null}
+            {showDraft && replyWork ? (
+              <DecisionCard>
+                <VocItemReplyPrep
+                  key={`prep-${replyWork.actionRef}`}
+                  accountId={replyAccountId}
+                  actionRef={replyWork.actionRef}
+                  disposition={decision}
+                  onPrepared={() => setPrepared(true)}
+                  onOutcomeRecorded={bump}
+                  onLocalWork={setLocalWork}
+                  headingLevel={2}
+                  subjectShownAbove
+                  unboxed
+                  autoDraft={autoDraft}
+                  confirmLabel={walk?.next ? "확정하고 다음 →" : "답글 확정"}
+                  onApproved={walk?.next ? () => navigate(walkHref(walk.next!)) : undefined}
+                />
+                {/* 작업에서 제외는 이 상자 밖으로 나갔다 — 아래 워크플로 영역. 답변에 대한 동작이 아니라
+                    이 리뷰를 할 일 목록에서 빼는 동작이고, 상자가 「이것이 답변이다」라고 말하려면 안에
+                    남는 것은 답변과 답변에 대한 동작뿐이어야 한다. */}
+              </DecisionCard>
+            ) : null}
+        </>
+        )
+      }
+      context={
+        // <b>Folded in the full pane, open on the page and in the preview.</b> 확인한 사실 comes before
+        // 판매자 판단 now (Review Decision UX v3.2), and in a 556px column these two sections measure
+        // 644px — so keeping them open moved 「AI 초안 준비」 to y=1,351, three folds down. Folded they are
+        // 72px and the decision is back on the first screen, which is the promise the new order was
+        // allowed to make. Same blocks, same reads, one press; 왜 올라왔나요 has been folded here since
+        // Home v3 for the same reason. The PAGE has a second column for them and the Home preview offers
+        // no forms to push down, so neither folds.
+        paneEvidenceFolded ? (
+          <>
+            <Disclosure
+              label="반복 신호"
+              note={
+                (context?.repeatedProblems.length ?? 0) > 0 ? `${context!.repeatedProblems.length}` : undefined
+              }
+              summaryClassName="-ml-2"
+            >
+              <div className="pt-1">
+                <RepeatedSignal
+                  problems={context?.repeatedProblems ?? []}
+                  failed={contextFailed || context === null}
+                  titled={false}
+                />
+              </div>
+            </Disclosure>
+            {context ? (
+              <Disclosure label="이 상품에 대해 우리가 아는 것" summaryClassName="-ml-2">
+                <div className="pt-1">
+                  <GroundingOnHand context={context} titled={false} flat />
+                </div>
+              </Disclosure>
+            ) : null}
+          </>
+        ) : preview ? (
+          // <b>근거 — five figures and the way to them.</b> One component draws the whole group, because the
+          // numbers it lines up come from two reads (issue memory and the knowledge library) and a grid composed
+          // by two components is a grid whose columns can disagree. A failed context read renders nothing at
+          // all: a panel that could not see the evidence has nothing to say about it.
+          context ? <EvidencePreview context={context} /> : null
+        ) : docked ? (
+          <>
+            <RepeatedSignalObject
+              problems={context?.repeatedProblems ?? []}
+              failed={contextFailed || context === null}
+            />
+            {context ? <ProductContextLines context={context} /> : null}
+          </>
+        ) : (
+          /* <b>근거는 접히고, 지금 중요한 사실만 밖에 남는다</b> (리뷰 canonical mockup, 2026-10-06 —
+              Front의 `Sources (2)`). 준비된 답변이 이미 「저장된 지식을 근거로 준비했습니다」라고 말하므로
+              그 아래 숫자·제목·반복 신호는 그 주장을 펼쳐 보는 것이다. 펼치면 전과 똑같은 블록이고, 접어도
+              사라지는 사실은 없다 — 단 하나, 「아직 답하지 않은 확인 필요」는 지금 할 일을 바꾸므로 밖에 선다. */
+          <div className="space-y-2">
+            {/* <b>The review and what the seller decides about it stand on the left; the reply is the right column</b>
+                (2026-10-28, owner-approved walk-through fix). It is the `context` slot, so on one column (a phone) it comes after the reply — the thing to do — and on two it is the left column under the quote. The page used to stack review → reply → judgement in one
+                900px column, so confirming forty-nine replies meant scrolling between the customer's words and the
+                answer to them. */}
+            <section aria-label="판매자의 결정" className="flex flex-col gap-3">
           {/* The channel's own statement, said BEFORE anyone decides anything — on the page it now stands above the
               reply area instead (2026-10-26), and is not said twice. */}
           {variant === "page" ? null : <ChannelAnsweredState state={replyWork?.channelReplyState ?? null} />}
@@ -646,6 +707,7 @@ export function ReviewCaseView({
                       decision={decision}
                       replySupported={replyWork !== null}
                       replyUnavailableReason={detail.replyUnavailableReason}
+                      channelAnswered={replyWork?.channelReplyState === "ANSWERED"}
                       title="처리 방법"
                       quiet
                       onDecided={(next) => {
@@ -758,62 +820,7 @@ export function ReviewCaseView({
               <p className="break-keep text-sm leading-relaxed text-muted">판단과 조치는 위에 기록돼요.</p>
             </div>
           ) : null}
-        </>
-        )
-      }
-      context={
-        // <b>Folded in the full pane, open on the page and in the preview.</b> 확인한 사실 comes before
-        // 판매자 판단 now (Review Decision UX v3.2), and in a 556px column these two sections measure
-        // 644px — so keeping them open moved 「AI 초안 준비」 to y=1,351, three folds down. Folded they are
-        // 72px and the decision is back on the first screen, which is the promise the new order was
-        // allowed to make. Same blocks, same reads, one press; 왜 올라왔나요 has been folded here since
-        // Home v3 for the same reason. The PAGE has a second column for them and the Home preview offers
-        // no forms to push down, so neither folds.
-        paneEvidenceFolded ? (
-          <>
-            <Disclosure
-              label="반복 신호"
-              note={
-                (context?.repeatedProblems.length ?? 0) > 0 ? `${context!.repeatedProblems.length}` : undefined
-              }
-              summaryClassName="-ml-2"
-            >
-              <div className="pt-1">
-                <RepeatedSignal
-                  problems={context?.repeatedProblems ?? []}
-                  failed={contextFailed || context === null}
-                  titled={false}
-                />
-              </div>
-            </Disclosure>
-            {context ? (
-              <Disclosure label="이 상품에 대해 우리가 아는 것" summaryClassName="-ml-2">
-                <div className="pt-1">
-                  <GroundingOnHand context={context} titled={false} flat />
-                </div>
-              </Disclosure>
-            ) : null}
-          </>
-        ) : preview ? (
-          // <b>근거 — five figures and the way to them.</b> One component draws the whole group, because the
-          // numbers it lines up come from two reads (issue memory and the knowledge library) and a grid composed
-          // by two components is a grid whose columns can disagree. A failed context read renders nothing at
-          // all: a panel that could not see the evidence has nothing to say about it.
-          context ? <EvidencePreview context={context} /> : null
-        ) : docked ? (
-          <>
-            <RepeatedSignalObject
-              problems={context?.repeatedProblems ?? []}
-              failed={contextFailed || context === null}
-            />
-            {context ? <ProductContextLines context={context} /> : null}
-          </>
-        ) : (
-          /* <b>근거는 접히고, 지금 중요한 사실만 밖에 남는다</b> (리뷰 canonical mockup, 2026-10-06 —
-              Front의 `Sources (2)`). 준비된 답변이 이미 「저장된 지식을 근거로 준비했습니다」라고 말하므로
-              그 아래 숫자·제목·반복 신호는 그 주장을 펼쳐 보는 것이다. 펼치면 전과 똑같은 블록이고, 접어도
-              사라지는 사실은 없다 — 단 하나, 「아직 답하지 않은 확인 필요」는 지금 할 일을 바꾸므로 밖에 선다. */
-          <div className="space-y-2">
+            </section>
             <Disclosure
               label="근거와 상품 정보"
               note={context ? `등록된 지식 ${context.knowledge.productSources + context.knowledge.orgSources}건` : undefined}
@@ -1257,4 +1264,90 @@ function RecordTrail({
       </p>
     </section>
   );
+}
+
+/**
+ * <b>The customer's review, as a quote</b> (2026-10-28). The whole text, at reading size, with where it came from and
+ * its stars — a low rating in the 위험 colour so ★1 and ★5 are not the same grey.
+ */
+function ReviewQuote({
+  body,
+  word,
+  rating,
+  source,
+  writtenOn,
+}: {
+  body: string | null;
+  word: string;
+  rating: number | null;
+  source: string;
+  writtenOn: string | null;
+}) {
+  return (
+    <figure className="space-y-2" aria-label={`고객이 쓴 ${word}`}>
+      <figcaption className="flex flex-wrap items-baseline gap-x-3 text-sm text-muted">
+        <span>{source}</span>
+        {rating != null ? <Stars rating={rating} /> : null}
+        <span className="tabular-nums">{writtenOn ?? "날짜 없음"}</span>
+      </figcaption>
+      <blockquote className="whitespace-pre-wrap break-keep border-l-2 border-line pl-4 text-lg leading-relaxed text-ink [overflow-wrap:anywhere]">
+        {body ?? <span className="text-muted">별점만 남긴 {word}예요.</span>}
+      </blockquote>
+    </figure>
+  );
+}
+
+
+/** Where 「다음」 goes — the item's own screen, still read as reached from 할 일. */
+function walkHref(row: HomeWorkRow): string {
+  return row.to.includes("?") ? `${row.to}&from=work` : `${row.to}?from=work`;
+}
+
+/**
+ * <b>이전 · n / N · 다음</b> over the reply (2026-10-28), for the item's bucket in 할 일 — 확정 전 next to 확정 전. Absent when
+ * the review is not in 할 일 (opened from the record, or already done).
+ */
+function WalkBar({ walk }: { walk: WorkNeighbours | null }) {
+  if (!walk || walk.total < 2) return null;
+  const step = "rounded px-1.5 py-0.5 font-semibold text-muted hover:text-ink hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700";
+  return (
+    <nav aria-label="할 일에서 이동" className="flex items-center gap-3 text-sm">
+      {walk.prev ? (
+        <Link to={walkHref(walk.prev)} className={step} aria-keyshortcuts="k">
+          ← 이전
+        </Link>
+      ) : (
+        <span className="px-1.5 text-muted/60">← 이전</span>
+      )}
+      <span className="tabular-nums text-muted">
+        {walk.position.toLocaleString("ko-KR")} / {walk.total.toLocaleString("ko-KR")}
+      </span>
+      {walk.next ? (
+        <Link to={walkHref(walk.next)} className={step} aria-keyshortcuts="j">
+          다음 →
+        </Link>
+      ) : (
+        <span className="px-1.5 text-muted/60">다음 →</span>
+      )}
+      <span className="ml-auto hidden text-xs text-muted lg:inline">J 다음 · K 이전</span>
+    </nav>
+  );
+}
+
+/** J / K walk to the next / previous item — never while the seller is typing. */
+function useWalkKeys(walk: WorkNeighbours | null, navigate: (to: string) => void) {
+  useEffect(() => {
+    if (!walk) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      const to = e.key === "j" ? walk.next : e.key === "k" ? walk.prev : null;
+      if (!to) return;
+      e.preventDefault();
+      navigate(walkHref(to));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [walk, navigate]);
 }

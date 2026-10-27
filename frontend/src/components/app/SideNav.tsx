@@ -27,7 +27,7 @@ function itemClass(isActive: boolean): string {
  */
 export function SideNav() {
   const { user, logout } = useAuth();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const work = useTodayWorkCount();
   const groups = (foot: boolean) => NAV_GROUPS.filter((group) => !!group.foot === foot);
   const renderGroup = (group: NavGroup) => (
@@ -42,8 +42,8 @@ export function SideNav() {
             <NavLink
               to={item.to}
               end={item.end}
-              className={() => itemClass(navItemOwns(item, pathname))}
-              aria-current={navItemOwns(item, pathname) ? "page" : undefined}
+              className={() => itemClass(navItemOwns(item, pathname, search))}
+              aria-current={navItemOwns(item, pathname, search) ? "page" : undefined}
             >
               <NavIcon name={item.icon} className="h-[18px] w-[18px]" />
               <span className="truncate">{item.label}</span>

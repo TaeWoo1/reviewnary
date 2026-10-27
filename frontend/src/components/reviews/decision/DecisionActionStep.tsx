@@ -37,6 +37,7 @@ export function DecisionActionStep({
   decision,
   replySupported,
   replyUnavailableReason,
+  channelAnswered = false,
   onDecided,
   onRecorded,
   title = "무엇을 할까요?",
@@ -53,6 +54,8 @@ export function DecisionActionStep({
    * component never infers which from the channel code.
    */
   replyUnavailableReason: "CHANNEL_HAS_NO_REPLY_FLOW" | "NO_SELLER_ACCOUNT" | null;
+  /** The channel already shows a reply here: 「답글 달기」 is not offered (2026-10-28). */
+  channelAnswered?: boolean;
   onDecided: (next: TriageDisposition) => void;
   /** An act was recorded, so the log below can re-read. */
   onRecorded: () => void;
@@ -95,6 +98,7 @@ export function DecisionActionStep({
           reviewId={reviewId}
           disposition={decision}
           onRecorded={onDecided}
+          replyClosed={channelAnswered}
         />
         {/* <b>Folded when a draft can follow, stated when one cannot</b> (Review Decision UX v3.2).
             `withReply` describes what the next press does and the next press is right below it — three

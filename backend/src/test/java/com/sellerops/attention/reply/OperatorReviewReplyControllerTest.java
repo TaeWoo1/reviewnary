@@ -99,7 +99,7 @@ class OperatorReviewReplyControllerTest {
                 "a".repeat(64),
                 1,
                 "PENDING", null, null, null, java.util.List.of(), null, null, "SOURCE_NOT_EXECUTABLE", null,
-                java.util.List.of());
+                java.util.List.of(), "APPROVED");
     }
 
     @Test

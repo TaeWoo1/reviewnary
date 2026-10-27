@@ -88,6 +88,11 @@ export interface HomeWorkRow {
   /** For an inquiry row, the work item its response panel is addressed by. */
   workItemId: string | null;
   /**
+   * For the seller's own reply work: the account and the reply lane's address, so a screen can read and confirm the
+   * reply without opening the review first (`/reviews/confirm`, 2026-10-28). Absent on every other row.
+   */
+  reply?: { accountId: string; actionRef: string } | null;
+  /**
    * The channel's short name, for a row that has one — <b>carried, never parsed back out of {@link source}</b>,
    * for the same reason {@link rating} is.
    *
@@ -300,6 +305,7 @@ export function mergeHomeWork(
         subject: "REVIEW",
         subjectId: item.reviewId,
         workItemId: null,
+        reply: item.actionRef ? { accountId: account.accountId, actionRef: item.actionRef } : null,
         safety: safetyReviews.has(item.reviewId),
         safetyReading: !safetyReviews.has(item.reviewId) ? null
           : worryReviews.has(item.reviewId) ? "WORRY" : "OCCURRENCE",

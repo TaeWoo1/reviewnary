@@ -109,8 +109,12 @@ export function navOwner(pathname: string): NavItem | null {
   return best?.item ?? null;
 }
 
-/** True when `item` is the destination lit for `pathname`. */
-export function navItemOwns(item: NavItem, pathname: string): boolean {
+/**
+ * True when `item` is the destination lit for `pathname`. A screen opened from 할 일 (`?from=work`) is lit as 할 일
+ * (2026-10-28): the page said 「← 할 일」 while the menu lit 리뷰·문의, two answers to 「where am I」.
+ */
+export function navItemOwns(item: NavItem, pathname: string, search = ""): boolean {
+  if (new URLSearchParams(search).get("from") === "work") return item.badge === "work";
   return navOwner(pathname) === item;
 }
 

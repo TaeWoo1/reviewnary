@@ -64,13 +64,14 @@ describe("VocItemReplyPrep · 걸린 표현", () => {
     const block = await screen.findByLabelText("걸린 표현");
     expect(within(block).getByText("고객님 탓").getAttribute("data-kind")).toBe("FORBIDDEN");
     expect(within(block).getByText("죄송하지만").getAttribute("data-kind")).toBe("AVOID");
-    expect(within(block).getByText("「고객님 탓」 — 이 문장을 고쳐야 승인할 수 있어요.")).toBeTruthy();
+    expect(within(block).getByText("「고객님 탓」 — 이 문장을 고쳐야 확정할 수 있어요.")).toBeTruthy();
     expect(within(block).getByText("「죄송하지만」 → 「번거로우시겠지만」")).toBeTruthy();
     const approve = screen.getByRole("button", { name: "답글 확정" });
-    expect(approve.getAttribute("aria-disabled")).toBe("true");
+    // Pressable (2026-10-28) — the press refuses, sends nothing, and the ban's own sentence says why.
+    expect(approve.getAttribute("aria-disabled")).toBe("false");
     await userEvent.click(approve);
     expect(api.decideReviewReplyApproval).not.toHaveBeenCalled();
-    expect(screen.getByText("「고객님 탓」을 고치면 승인할 수 있어요. 「죄송하지만」은 그대로 둬도 돼요.")).toBeTruthy();
+    expect(screen.getByText("「고객님 탓」을 고치면 확정할 수 있어요. 「죄송하지만」은 그대로 둬도 돼요.")).toBeTruthy();
     await expectNoAxeViolations(container);
   });
 
@@ -84,7 +85,7 @@ describe("VocItemReplyPrep · 걸린 표현", () => {
     await userEvent.click(await screen.findByRole("button", { name: "이 문장 빼기" }));
     expect(api.saveReviewReplyDraft).toHaveBeenCalledWith("mock-acct-1", REF, { body: fixed, baseVersion: 3 });
     await waitFor(() => expect(screen.getByRole("button", { name: "답글 확정" }).getAttribute("aria-disabled")).toBe("false"));
-    expect(screen.queryByText(/을 고치면 승인할 수 있어요/)).toBeNull();
+    expect(screen.queryByText(/을 고치면 확정할 수 있어요/)).toBeNull();
   });
 
   it("swaps in the seller's own replacement, or keeps the phrase — a preference stops nothing", async () => {
@@ -118,7 +119,7 @@ describe("VocItemReplyPrep · 걸린 표현", () => {
     expect(screen.getByTestId("draft-status").textContent).toBe("고칠 곳 1");
     await userEvent.click(handOver);
     expect(api.handOverReviewReply).not.toHaveBeenCalled();
-    expect(screen.getAllByText(/을 고치면 승인할 수 있어요/)).toHaveLength(1);
+    expect(screen.getAllByText(/을 고치면 확정할 수 있어요/)).toHaveLength(1);
   });
 });
 
@@ -141,6 +142,6 @@ describe("PhraseFindings helpers", () => {
   it("says nothing when only preferences are found, and picks each particle", () => {
     expect(phraseBlockSentence([FINDINGS[1]])).toBeNull();
     expect(phraseBlockSentence([{ kind: "FORBIDDEN", phrase: "무조건 회수", replacement: null, sentence: null }]))
-      .toBe("「무조건 회수」를 고치면 승인할 수 있어요.");
+      .toBe("「무조건 회수」를 고치면 확정할 수 있어요.");
   });
 });

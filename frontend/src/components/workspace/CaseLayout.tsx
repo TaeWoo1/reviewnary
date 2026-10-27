@@ -154,8 +154,12 @@ export function CaseLayout({
    * point is that ONE object has an edge. The facts moved into the header as plain properties and the
    * reading column took the width back: 792 → 900, the measure the draft is actually read at. Every
    * block the caller passes then stacks in that one column, in the order it passes them.
+   *
+   * <p>`"split"` is two equal columns (2026-10-28, owner-approved walk-through fix): the customer's review on the left,
+   * the reply being written on the right, sticky, so the seller reads one beside the other and confirms without
+   * scrolling between them. `subject`, `context` and `more` stand in the left column; `decision` is the right one.
    */
-  rail?: "decision" | "properties" | "none";
+  rail?: "decision" | "properties" | "none" | "split";
   /** The pane's accessible name. */
   label?: string;
 }) {
@@ -263,7 +267,7 @@ export function CaseLayout({
           ) : null}
         </article>
       ) : (
-        <div className={`mx-auto w-full space-y-4 ${rail === "none" ? "max-w-[900px]" : "max-w-[1080px]"}`}
+        <div className={`mx-auto w-full space-y-4 ${rail === "none" ? "max-w-[900px]" : rail === "split" ? "max-w-[1240px]" : "max-w-[1080px]"}`}
           data-case-variant="page">
           {nav}
           {header}
@@ -283,6 +287,8 @@ export function CaseLayout({
                 ? "max-w-[560px]"
                 : rail === "none"
                   ? ""
+                  : rail === "split"
+                    ? "lg:grid-cols-2 lg:grid-rows-[auto_auto_1fr] lg:gap-x-8"
                   : rail === "properties"
                     ? "lg:grid-cols-[minmax(0,1fr)_240px] lg:grid-rows-[auto_auto_1fr] lg:gap-x-12"
                     : "lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_auto_1fr] lg:gap-x-6"
