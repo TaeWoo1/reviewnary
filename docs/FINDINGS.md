@@ -1296,6 +1296,17 @@
 - **출처** — `backend/src/main/java/com/sellerops/operations/ReviewWorkController.java` `WITH_THE_DELEGATE`,
   `DelegatedReplyLane.statesOf`, 2026-10-24.
 
+### 일괄 처리는 한 건 화면의 주 버튼과 같은 길을 타야 한다 (2026-10-28)
+
+- **했던 것** — 「칭찬 리뷰 답글 한 번에 확인」을 만들면서 모든 리뷰를 `decideReviewReplyApproval`(답글 확정 = 직접 복사 길)로
+  처리했다. 판정용 복사본은 공급자 서버에 연결돼 있지 않아 화면과 테스트 어디에서도 드러나지 않았다.
+- **사실** — 담당자가 연결된 PC에서 확정은 휴대폰에 올라간 초안을 먼저 거둔다(`yieldToApprovalHere`). 리뷰 한 건 화면의 주 버튼은
+  그 PC에서 「답글 등록 요청」이고 확정은 보조 링크다. 그대로 두었다면 「고른 26건 확정」이 담당자에게 갈 초안 26건을 취소하고
+  사장님이 직접 붙여 넣을 일로 바꿨다. 사장님의 질문으로 잡았다.
+- **다음에** — 여러 건을 한 번에 처리하는 화면은 **리뷰마다 그 리뷰 화면이 주 버튼으로 하는 쓰기를 그대로** 한다. 길이 둘인 쓰기는
+  연결된 PC 상황을 테스트로 만들어 확인한다 — 연결 안 된 복사본에서 「잘 된다」는 증거가 아니다.
+- **출처** — `frontend/src/pages/app/PraiseConfirm.tsx` `planFor`, `DelegatedReplyControls` `onHandedOver`, 2026-10-28.
+
 ---
 
 ## 어디에 무엇이 있나

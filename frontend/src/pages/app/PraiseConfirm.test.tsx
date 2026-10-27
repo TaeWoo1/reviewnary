@@ -15,6 +15,7 @@ vi.mock("../../lib/apiClient", () => ({
     getReviewWorkStrict: vi.fn(),
     getReviewReplyPrep: vi.fn(),
     decideReviewReplyApproval: vi.fn(),
+    handOverReviewReply: vi.fn(),
   },
 }));
 
@@ -79,5 +80,45 @@ describe("칭찬 리뷰 답글, 한 번에 확인 (2026-10-28)", () => {
     const [account, ref, body] = vi.mocked(api.decideReviewReplyApproval).mock.calls[0]!;
     expect([account, ref, body.state, body.baseVersion]).toEqual(["acc", "review:p1", "APPROVED", 7]);
     expect(await screen.findByText("확정함")).toBeTruthy();
+  });
+
+  /**
+   * 2026-10-28 (owner): on a PC linked to the delegate lane the page's own press is 「답글 등록 요청」. Approving on the
+   * copy road instead would take every draft back from the delegate's phone (`yieldToApprovalHere`).
+   */
+  it("hands a reply over to the delegate where the lane holds it, and never approves it on the copy road", async () => {
+    const lane = { taskState: "AWAITING_APPROVAL", editedOnMobile: false, canSend: true, canCancel: false };
+    vi.mocked(api.getReviewReplyPrep).mockImplementation(async (_account, ref) => {
+      const id = ref.slice("review:".length);
+      if (id === "ban") return prep(id, { phraseFindings: [{ kind: "FORBIDDEN", phrase: "환불 불가", replacement: null, sentence: null }] });
+      if (id === "p1") return prep(id, { delegation: lane });
+      if (id === "p2") return prep(id, { delegation: { ...lane, setAside: { version: 6, body: "PC 문장", writtenAt: null } } });
+      return prep(id);
+    });
+    vi.mocked(api.handOverReviewReply).mockResolvedValue({} as never);
+    const user = userEvent.setup();
+    draw();
+    await screen.findByText("답글 p1");
+    await waitFor(() => expect(screen.getAllByRole("checkbox")).toHaveLength(1));
+    // The one whose words differ between phone and PC is opened on its own, not decided here.
+    expect(within(screen.getAllByTestId("praise-row")[1]!).getByText(/휴대폰과 PC의 문장이 달라요/)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "고른 1건 등록 요청" }));
+    await waitFor(() => expect(api.handOverReviewReply).toHaveBeenCalledWith("p1", 7));
+    expect(api.decideReviewReplyApproval).not.toHaveBeenCalled();
+    expect(await screen.findByText("요청함")).toBeTruthy();
+  });
+
+  it("says both roads when the list holds both", async () => {
+    vi.mocked(api.getReviewReplyPrep).mockImplementation(async (_account, ref) => {
+      const id = ref.slice("review:".length);
+      return id === "p1"
+        ? prep(id, { delegation: { taskState: null, editedOnMobile: false, canSend: true, canCancel: false } })
+        : prep(id);
+    });
+    draw();
+    await screen.findByText("답글 p2");
+    await waitFor(() => expect(screen.getAllByRole("checkbox")).toHaveLength(3));
+    expect(screen.getByRole("status")).toHaveTextContent("담당자 등록 요청 1건 · 직접 확정 2건");
+    expect(screen.getByRole("button", { name: "고른 3건 처리" })).toBeTruthy();
   });
 });

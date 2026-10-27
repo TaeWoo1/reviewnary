@@ -14,7 +14,51 @@ import type { ReviewReplyPrep } from "../../lib/types";
 /** How many replies are read at once — the reads are one per review. */
 const READS_AT_ONCE = 4;
 
-type Outcome = { kind: "done" } | { kind: "failed"; sentence: string };
+type Outcome = { kind: "done"; road: Road } | { kind: "failed"; sentence: string };
+
+/**
+ * <b>Which way this reply goes on</b> (2026-10-28, owner — found in review). The same press the review's own page
+ * makes, per review:
+ * <ul>
+ *   <li>{@code HAND_OVER} — on a PC linked to the delegate lane the draft is already on the delegate's phone, and the
+ *       page's main press is 「답글 등록 요청」: the delegate posts it. The first version of this screen approved every
+ *       review on the copy road instead, and approving here takes the phone's draft back first
+ *       (`yieldToApprovalHere`) — 26 thank-yous meant for the delegate would have been cancelled on their phone and
+ *       left for the seller to paste by hand.</li>
+ *   <li>{@code APPROVE} — no lane: 「답글 확정」, then the seller copies it to the seller center.</li>
+ * </ul>
+ */
+type Road = "HAND_OVER" | "APPROVE";
+
+interface Plan {
+  road: Road | null;
+  /** Why it cannot go on from here — open it on its own page. Null when it can. */
+  why: string | null;
+}
+
+export function planFor(prep: ReviewReplyPrep): Plan {
+  if (!prep.draft) return { road: null, why: "먼저 답글을 써 주세요." };
+  if ((prep.phraseFindings ?? []).some((f) => f.kind === "FORBIDDEN")) {
+    return { road: null, why: "쓰지 않기로 한 표현이 있어요. 열어서 고쳐 주세요." };
+  }
+  const lane = prep.delegation ?? null;
+  if (lane) {
+    if (lane.setAside) return { road: null, why: "휴대폰과 PC의 문장이 달라요. 열어서 어느 쪽을 쓸지 골라 주세요." };
+    return lane.canSend
+      ? { road: "HAND_OVER", why: null }
+      : { road: null, why: "담당자 쪽에서 진행 중이에요. 열어서 상태를 확인해 주세요." };
+  }
+  if (prep.capabilities.canApprove) return { road: "APPROVE", why: null };
+  return {
+    road: null,
+    why: approveBlockedSentence({
+      dirty: false,
+      phraseBlock: null,
+      responseNeeded: prep.triageDisposition === "RESPONSE_NEEDED",
+      reason: prep.approveUnavailableReason,
+    }),
+  };
+}
 
 interface Item {
   row: HomeWorkRow;
@@ -65,30 +109,61 @@ export function PraiseConfirm() {
   }, []);
 
   const ready = useMemo(
-    () => (items ?? []).filter((item) => item.prep && readyToConfirm(item.prep) && !outcomes.has(item.row.key)),
+    () => (items ?? []).filter((item) => item.prep && planFor(item.prep).road && !outcomes.has(item.row.key)),
     [items, outcomes],
   );
   const chosen = ready.filter((item) => !unticked.has(item.row.key));
-  const done = [...outcomes.values()].filter((o) => o.kind === "done").length;
+  const handOver = chosen.filter((item) => planFor(item.prep!).road === "HAND_OVER").length;
+  const approve = chosen.length - handOver;
+  const doneOutcomes = [...outcomes.values()].filter((o): o is Extract<Outcome, { kind: "done" }> => o.kind === "done");
+  const anyLane = (items ?? []).some((item) => item.prep?.delegation);
 
   async function confirmChosen() {
     if (running) return;
     setRunning(true);
     for (const item of chosen) {
       const prep = item.prep!;
+      const road = planFor(prep).road!;
       try {
-        await api.decideReviewReplyApproval(item.row.reply!.accountId, item.row.reply!.actionRef, {
-          commandId: newCommandId(),
-          state: "APPROVED",
-          baseVersion: prep.draft!.version,
-        });
-        setOutcomes((m) => new Map(m).set(item.row.key, { kind: "done" }));
+        if (road === "HAND_OVER") {
+          // The review page's 「답글 등록 요청」, bound to the version shown here.
+          await api.handOverReviewReply(item.row.subjectId, prep.draft!.version);
+        } else {
+          await api.decideReviewReplyApproval(item.row.reply!.accountId, item.row.reply!.actionRef, {
+            commandId: newCommandId(),
+            state: "APPROVED",
+            baseVersion: prep.draft!.version,
+          });
+        }
+        setOutcomes((m) => new Map(m).set(item.row.key, { kind: "done", road }));
       } catch {
-        setOutcomes((m) => new Map(m).set(item.row.key, { kind: "failed", sentence: "확정하지 못했어요. 이 리뷰를 열어 확인해 주세요." }));
+        setOutcomes((m) =>
+          new Map(m).set(item.row.key, {
+            kind: "failed",
+            sentence: road === "HAND_OVER" ? "등록을 요청하지 못했어요. 이 리뷰를 열어 확인해 주세요." : "확정하지 못했어요. 이 리뷰를 열어 확인해 주세요.",
+          }),
+        );
       }
     }
     setRunning(false);
   }
+
+  const pressLabel = running
+    ? "보내는 중…"
+    : handOver > 0 && approve > 0
+      ? `고른 ${chosen.length.toLocaleString("ko-KR")}건 처리`
+      : handOver > 0
+        ? `고른 ${handOver.toLocaleString("ko-KR")}건 등록 요청`
+        : `고른 ${approve.toLocaleString("ko-KR")}건 확정`;
+  const doneSentence = (() => {
+    const asked = doneOutcomes.filter((o) => o.road === "HAND_OVER").length;
+    const confirmed = doneOutcomes.length - asked;
+    const parts = [
+      asked > 0 ? `${asked.toLocaleString("ko-KR")}건 등록 요청했어요` : null,
+      confirmed > 0 ? `${confirmed.toLocaleString("ko-KR")}건 확정했어요` : null,
+    ].filter(Boolean);
+    return parts.length > 0 ? `${parts.join(" · ")}. ` : "";
+  })();
 
   const back = (
     <Link to="/customer-operations/cases" className="text-sm font-semibold text-muted hover:text-ink hover:underline">
@@ -122,7 +197,10 @@ export function PraiseConfirm() {
       {back}
       <PageHead title="칭찬 리뷰 답글 확인" />
       <p className="break-keep text-sm text-muted">
-        ★4–5 리뷰에 써 둔 답글이에요. 읽어 보고, 따로 볼 것은 체크를 풀어 주세요. 확정해도 마켓에 바로 올라가지 않아요.
+        ★4–5 리뷰에 써 둔 답글이에요. 읽어 보고, 따로 볼 것은 체크를 풀어 주세요.{" "}
+        {anyLane
+          ? "담당자가 연결된 리뷰는 담당자에게 등록을 요청하고, 나머지는 확정만 해요 — 확정한 답글은 직접 복사해 올려요."
+          : "확정해도 마켓에 바로 올라가지 않아요 — 확정한 답글은 직접 복사해 올려요."}
       </p>
 
       <ul aria-label="칭찬 리뷰와 답글" className="divide-y divide-line border-y border-line">
@@ -148,22 +226,21 @@ export function PraiseConfirm() {
       {/* The one press, on the floor of the screen while the list scrolls under it. */}
       <div className="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-line bg-canvas py-3 after:absolute after:inset-x-0 after:top-full after:h-8 after:bg-canvas after:content-['']">
         <span className="text-sm text-ink" role="status">
-          {done > 0 ? `${done.toLocaleString("ko-KR")}건 확정했어요. ` : ""}
-          {chosen.length > 0 ? `${chosen.length.toLocaleString("ko-KR")}건 골랐어요` : "고른 답글이 없어요"}
+          {doneSentence}
+          {chosen.length === 0
+            ? "고른 답글이 없어요"
+            : handOver > 0 && approve > 0
+              ? `담당자 등록 요청 ${handOver.toLocaleString("ko-KR")}건 · 직접 확정 ${approve.toLocaleString("ko-KR")}건`
+              : `${chosen.length.toLocaleString("ko-KR")}건 골랐어요`}
         </span>
         <Btn className="ml-auto" disabled={running || chosen.length === 0} onClick={() => void confirmChosen()}>
-          {running ? "확정하는 중…" : `고른 ${chosen.length.toLocaleString("ko-KR")}건 확정`}
+          {pressLabel}
         </Btn>
       </div>
     </div>
   );
 }
 
-/** A reply that can be confirmed as shown: a saved draft, open to approval, nothing banned in it. */
-function readyToConfirm(prep: ReviewReplyPrep): boolean {
-  const banned = (prep.phraseFindings ?? []).some((f) => f.kind === "FORBIDDEN");
-  return prep.capabilities.canApprove && prep.draft != null && !banned;
-}
 
 function PraiseRow({
   item,
@@ -179,28 +256,15 @@ function PraiseRow({
   onToggle: () => void;
 }) {
   const { row, prep } = item;
-  const ready = prep != null && readyToConfirm(prep);
-  const why =
-    prep === undefined
-      ? "답글을 읽는 중이에요."
-      : prep === null
-        ? "답글을 읽지 못했어요."
-        : ready
-          ? null
-          : (prep.phraseFindings ?? []).some((f) => f.kind === "FORBIDDEN")
-            ? "쓰지 않기로 한 표현이 있어요. 열어서 고쳐 주세요."
-            : approveBlockedSentence({
-                dirty: false,
-                phraseBlock: null,
-                responseNeeded: prep.triageDisposition === "RESPONSE_NEEDED",
-                reason: prep.approveUnavailableReason,
-              });
+  const plan = prep ? planFor(prep) : null;
+  const ready = plan?.road != null;
+  const why = prep === undefined ? "답글을 읽는 중이에요." : prep === null ? "답글을 읽지 못했어요." : plan!.why;
   const checkId = `praise-${row.subjectId}`;
   return (
     <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 py-4 md:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] md:gap-x-6" data-testid="praise-row">
       <div className="pt-0.5">
         {outcome?.kind === "done" ? (
-          <span className="text-sm font-semibold text-good">확정함</span>
+          <span className="text-sm font-semibold text-good">{outcome.road === "HAND_OVER" ? "요청함" : "확정함"}</span>
         ) : ready ? (
           <input
             id={checkId}
@@ -209,7 +273,7 @@ function PraiseRow({
             disabled={disabled}
             onChange={onToggle}
             className="h-5 w-5 accent-[oklch(var(--lch-board))]"
-            aria-label={`확정할 답글로 고르기: ${row.title}`}
+            aria-label={`${plan?.road === "HAND_OVER" ? "등록 요청할" : "확정할"} 답글로 고르기: ${row.title}`}
           />
         ) : (
           <span aria-hidden="true" className="inline-block h-5 w-5" />
@@ -230,6 +294,9 @@ function PraiseRow({
       <div className="col-start-2 min-w-0 rounded-lg bg-surface px-3 py-2 ring-1 ring-line md:col-start-auto">
         {prep?.draft ? (
           <p className="whitespace-pre-wrap break-keep text-sm leading-relaxed text-ink">{prep.draft.body}</p>
+        ) : null}
+        {plan?.road === "HAND_OVER" && outcome == null ? (
+          <p className="pt-1 text-xs text-muted">담당자가 휴대폰에서 등록해요</p>
         ) : null}
         {why ? <p className="break-keep text-sm text-muted">{why}</p> : null}
         {outcome?.kind === "failed" ? <p className="break-keep text-sm text-bad">{outcome.sentence}</p> : null}

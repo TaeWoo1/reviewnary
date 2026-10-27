@@ -1047,6 +1047,10 @@ export function VocItemReplyPrep({
           disabled={working}
           blocked={phraseBlock}
           onChanged={refresh}
+          // Where the page walks on, the delegate's road walks on too (2026-10-28): 「확정하고 다음」 is the copy road's
+          // press, and on a linked PC the main press is this one.
+          handOverLabel={onApproved ? "등록 요청하고 다음 →" : "답글 등록 요청"}
+          onHandedOver={onApproved}
         />
       ) : null}
 

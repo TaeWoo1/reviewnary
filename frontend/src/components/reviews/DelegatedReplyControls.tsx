@@ -150,6 +150,8 @@ export function DelegatedReplyControls({
   disabled,
   blocked = null,
   onChanged,
+  handOverLabel = "답글 등록 요청",
+  onHandedOver,
 }: {
   delegation: ReviewReplyDelegation;
   reviewId: string;
@@ -166,6 +168,10 @@ export function DelegatedReplyControls({
   blocked?: string | null;
   /** Re-read the panel: the server's verdicts (this lane's and the reply lane's) moved. */
   onChanged: () => Promise<unknown> | void;
+  /** The hand-over press's words — 「등록 요청하고 다음 →」 where the page walks on (2026-10-28). */
+  handOverLabel?: string;
+  /** Fired once a hand-over was accepted by the server — never on a refusal. */
+  onHandedOver?: () => void;
 }) {
   const [busy, setBusy] = useState<Press | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -183,9 +189,11 @@ export function DelegatedReplyControls({
     inFlight.current = true;
     setBusy(which);
     setFailed(null);
+    let accepted = false;
     try {
       if (which === "handOver") await api.handOverReviewReply(reviewId, baseVersion);
       else await api.cancelReviewReplyDelegation(reviewId);
+      accepted = which === "handOver";
     } catch (e) {
       setFailed(refusal(e));
     } finally {
@@ -194,6 +202,7 @@ export function DelegatedReplyControls({
       inFlight.current = false;
       setBusy(null);
     }
+    if (accepted) onHandedOver?.();
   }
 
   return (
@@ -236,7 +245,7 @@ export function DelegatedReplyControls({
                 canSend && !working ? "bg-brand-700 text-white hover:bg-brand-800" : "bg-canvas text-muted ring-1 ring-line"
               }`}
             >
-              답글 등록 요청
+              {handOverLabel}
             </button>
           ) : null}
           {delegation.canCancel ? (

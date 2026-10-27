@@ -89,6 +89,24 @@ describe("VocItemReplyPrep · delegate lane", () => {
     await expectNoAxeViolations(container);
   });
 
+  /** 2026-10-28: on a linked PC the walk goes on from the delegate's press, not from a copy-road approval. */
+  it("walks on after an accepted hand-over, and stays after a refused one", async () => {
+    const user = userEvent.setup();
+    const onApproved = vi.fn();
+    vi.mocked(api.getReviewReplyPrep).mockResolvedValue(prepView(READY));
+    vi.mocked(api.handOverReviewReply).mockRejectedValueOnce(new Error("refused")).mockResolvedValueOnce({
+      reviewId: REVIEW, state: "APPROVED", draftVersion: 1, editedOnMobile: false, outcomeRecorded: false,
+    });
+    render(<VocItemReplyPrep accountId="mock-acct-1" actionRef={REF} disposition="RESPONSE_NEEDED" onApproved={onApproved} confirmLabel="확정하고 다음 →" />);
+    const press = await screen.findByRole("button", { name: "등록 요청하고 다음 →" });
+    await user.click(press);
+    await waitFor(() => expect(api.handOverReviewReply).toHaveBeenCalledTimes(1));
+    expect(onApproved).not.toHaveBeenCalled();
+    await user.click(await screen.findByRole("button", { name: "등록 요청하고 다음 →" }));
+    await waitFor(() => expect(onApproved).toHaveBeenCalledTimes(1));
+    expect(api.decideReviewReplyApproval).not.toHaveBeenCalled();
+  });
+
   it("hands over the review by its id and re-reads the panel", async () => {
     const user = userEvent.setup();
     vi.mocked(api.getReviewReplyPrep).mockResolvedValueOnce(prepView(READY)).mockResolvedValue(
