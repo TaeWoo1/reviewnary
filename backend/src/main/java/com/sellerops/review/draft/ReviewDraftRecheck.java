@@ -132,6 +132,8 @@ public class ReviewDraftRecheck {
         // And its yes or no: an edit that turns the policy's 「불가」 into 「가능」 keeps every word (2026-10-27 review).
         ReviewClaimGuard.contradictedPromises(body, license).stream()
                 .filter(c -> !promises.contains(c)).forEach(promises::add);
+        ReviewClaimGuard.undecidedPromises(body, license).stream()
+                .filter(c -> !promises.contains(c)).forEach(promises::add);
         if (!promises.isEmpty()) {
             codes.add(UNSUPPORTED_PROMISE);
         }

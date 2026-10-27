@@ -485,6 +485,53 @@ describe("지식", () => {
     expect(within(stale).queryByText("바뀐 뒤")).toBeNull();
   });
 
+  it("a long change folds but reads to its end on 전체 보기, both sides at once", async () => {
+    const tail = "단, 개봉 후에는 환불이 되지 않습니다.";
+    const longText = Array.from({ length: 12 }, (_, i) => `${i + 1}번째 안내 문장입니다.`).join("\n") + "\n" + tail;
+    uploadKnowledgeWorkbook.mockResolvedValueOnce({
+      applied: false,
+      changes: [{ sheet: "안내 매뉴얼", row: 2, text: "「환불」 안내 고침", where: "회사 전체", before: longText, after: longText.replace("되지 않습니다", "됩니다") }],
+      problems: [],
+    });
+    draw();
+    const block = await screen.findByTestId("knowledge-workbook");
+    await userEvent.upload(within(block).getByLabelText("엑셀 파일 고르기"), new File(["x"], "답글 기준.xlsx"));
+    const row = (await within(block).findByText("「환불」 안내 고침")).closest("li") as HTMLElement;
+    const after = within(row).getByText("바뀐 뒤").nextElementSibling as HTMLElement;
+    expect(after.className).toContain("line-clamp-6");
+    const more = within(row).getByRole("button", { name: "전체 보기" });
+    expect(more).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(more);
+    expect(after.className).not.toContain("line-clamp-6");
+    expect((within(row).getByText("지금").nextElementSibling as HTMLElement).className).not.toContain("line-clamp-6");
+    expect(after).toHaveTextContent("단, 개봉 후에는 환불이 됩니다.");
+    expect(within(row).getByRole("button", { name: "접기" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("a short change has nothing to unfold", async () => {
+    uploadKnowledgeWorkbook.mockResolvedValueOnce({
+      applied: false,
+      changes: [{ sheet: "답변 템플릿", row: 2, text: "「가격 리뷰」 문구 바꿈", before: "감사합니다.", after: "고맙습니다." }],
+      problems: [],
+    });
+    draw();
+    const block = await screen.findByTestId("knowledge-workbook");
+    await userEvent.upload(within(block).getByLabelText("엑셀 파일 고르기"), new File(["x"], "답글 기준.xlsx"));
+    await within(block).findByText("「가격 리뷰」 문구 바꿈");
+    expect(within(block).queryByRole("button", { name: "전체 보기" })).toBeNull();
+  });
+
+  it("a reload that fails after a good one says the list below is the earlier one", async () => {
+    draw();
+    await screen.findByTestId("knowledge-inbox");
+    getKnowledgeCandidates.mockRejectedValueOnce(new Error("down"));
+    // Any write reloads the screen; 보류 is the cheapest one.
+    await userEvent.click(screen.getByRole("button", { name: "보류" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("불러오지 못했습니다 · 확인 필요");
+    expect(alert).toHaveTextContent("아래는 이전에 불러온 내용입니다");
+  });
+
   it("a drafting gap is a QUESTION — the editor opens empty and the question is never saved as an answer", async () => {
     getKnowledgeCandidates.mockResolvedValue([GAP]);
     draw();

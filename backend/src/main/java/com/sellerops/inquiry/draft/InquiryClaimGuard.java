@@ -120,6 +120,10 @@ public final class InquiryClaimGuard {
         for (String remedy : ReviewClaimGuard.contradictedPromises(body, evidence)) {
             found.add(new Violation(Kind.REMEDY, remedy));
         }
+        // …or one it answers both ways, with nothing in the reply saying which case this is.
+        for (String remedy : ReviewClaimGuard.undecidedPromises(body, evidence)) {
+            found.add(new Violation(Kind.REMEDY, remedy));
+        }
         // Numbers are read from the text as written: squashing 「10 20」 would read one number that nobody wrote.
         // What authorizes a figure is any number the source wrote, with or without its unit.
         Set<String> known = numbers(ANY_NUMBER, join(evidence) + " " + (asked == null ? "" : asked));

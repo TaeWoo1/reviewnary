@@ -172,4 +172,41 @@ class ReviewClaimGuardTest {
         assertThat(ReviewClaimGuard.contradictedPromises("소중한 후기 감사합니다.",
                 List.of("교환은 불가합니다."))).isEmpty();
     }
+
+    // ---- the yes that answers a different case does not license this one (2026-10-27 second review) ----
+
+    @Test
+    void a_grant_for_another_period_does_not_license_a_refused_one() {
+        List<String> policy = List.of("7일 이내 교환 가능. 14일 이후 교환 불가.");
+        assertThat(ReviewClaimGuard.contradictedPromises("14일 이후에도 교환 가능합니다.", policy))
+                .containsExactly("교환");
+        assertThat(ReviewClaimGuard.contradictedPromises("7일 이내 교환 가능합니다.", policy)).isEmpty();
+    }
+
+    @Test
+    void a_grant_for_another_reason_does_not_license_a_refused_one() {
+        List<String> policy = List.of("고객 과실 파손은 무료 교환 불가. 초기 불량은 무료 교환 가능.");
+        assertThat(ReviewClaimGuard.contradictedPromises("고객 과실로 파손된 상품도 무료 교환 가능합니다.", policy))
+                .containsExactly("교환");
+        assertThat(ReviewClaimGuard.contradictedPromises("초기 불량이라 무료 교환해 드리겠습니다.", policy)).isEmpty();
+    }
+
+    @Test
+    void a_promise_the_mixed_evidence_cannot_place_is_left_for_review_not_passed() {
+        List<String> policy = List.of("7일 이내 교환 가능. 14일 이후 교환 불가.");
+        // Neither case is named: the draft says yes where the seller says both.
+        assertThat(ReviewClaimGuard.contradictedPromises("교환해 드리겠습니다.", policy)).isEmpty();
+        assertThat(ReviewClaimGuard.undecidedPromises("교환해 드리겠습니다.", policy)).containsExactly("교환");
+        assertThat(ReviewClaimGuard.undecidedPromises("7일 이내 교환 가능합니다.", policy)).isEmpty();
+        assertThat(ReviewClaimGuard.undecidedPromises("14일 이후에도 교환 가능합니다.", policy)).isEmpty();
+    }
+
+    @Test
+    void a_refused_exchange_is_not_a_refund_once_the_spaces_are_gone() {
+        // 「교환 불가」 squashed is 「교환불가」, which holds 「환불」 — a word nobody wrote, on either side.
+        assertThat(ReviewClaimGuard.unsupportedClaims("환불해 드리겠습니다.", List.of("단순 변심은 교환 불가합니다.")))
+                .containsExactly("환불");
+        assertThat(ReviewClaimGuard.unsupportedClaims("교환은 불가합니다.", List.of("교환은 불가합니다."))).isEmpty();
+        assertThat(ReviewClaimGuard.remediesIn("교환불가합니다")).containsExactly("교환");
+    }
 }

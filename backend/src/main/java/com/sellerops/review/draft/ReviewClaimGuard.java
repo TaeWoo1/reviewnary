@@ -90,6 +90,12 @@ public final class ReviewClaimGuard {
     static final List<String> REFUSALS = List.of(
             "불가", "어렵", "어려운", "안됩", "안되", "안돼", "않", "못합", "못하", "못드", "수없", "제외", "불허", "금지");
 
+    /**
+     * Which way of reading a promise this is — a change to how a clause is matched changes what waiting drafts are
+     * held to, so it is part of {@code ReviewDraftBasis}' policy fingerprint like the word lists are.
+     */
+    static final String READING = "clauses-v2:cases,no-overlap";
+
     /** How much of a clause's end is its predicate. */
     static final int ENDING = 8;
 
@@ -102,43 +108,117 @@ public final class ReviewClaimGuard {
     /**
      * The remedies the draft promises — or refuses — the opposite of what the evidence says, in the order the draft
      * says them. A clause counts when it names a {@link #COMMITMENT_TERMS} noun, or follows one in the same sentence
-     * (「…가능하며, 단순 변심은 불가합니다」), and it refuses when its ending carries a {@link #REFUSALS} word. It is
-     * contradicted when an evidence clause about one of its remedies states
-     * every {@link #CONDITION_TERMS} term it states and says the opposite, while no such clause says the same.
+     * (「…가능하며, 단순 변심은 불가합니다」), and it refuses when its ending carries a {@link #REFUSALS} word.
+     *
+     * <p>When every evidence clause about the remedy answers one way, a draft clause answering the other way is
+     * contradicted if those clauses state every {@link #CONDITION_TERMS} term it states. When the evidence answers
+     * both ways — 「7일 이내 가능 · 14일 이후 불가」, 「초기 불량은 가능 · 고객 과실은 불가」 — a yes about one case does not
+     * license the other (2026-10-27 second review): the draft clause is read against the evidence clause whose own
+     * wording (period, reason, scope) it shares most, and is contradicted when that clause says the opposite. A draft
+     * the evidence cannot place either way is {@link #undecidedPromises}, never passed.
      *
      * @param body     the reply
      * @param evidence the passage texts that may authorize a promise — the same ones {@link #unsupportedClaims} reads
      */
     public static List<String> contradictedPromises(String body, List<String> evidence) {
+        return judged(body, evidence).contradicted();
+    }
+
+    /**
+     * The remedies the draft answers where the evidence answers the same remedy both ways and nothing in the draft's
+     * clause says which case it is — 「교환해 드리겠습니다」 against 「7일 이내 가능 · 14일 이후 불가」. Not a contradiction
+     * the guard can prove, and not a promise it can pass: a reply that needs the seller's eyes.
+     */
+    public static List<String> undecidedPromises(String body, List<String> evidence) {
+        return judged(body, evidence).undecided();
+    }
+
+    private record Judged(List<String> contradicted, List<String> undecided) {
+    }
+
+    private static Judged judged(String body, List<String> evidence) {
         if (body == null || body.isBlank() || evidence == null || evidence.isEmpty()) {
-            return List.of();
+            return new Judged(List.of(), List.of());
         }
         List<Clause> grounds = new ArrayList<>();
         for (String passage : evidence) {
             grounds.addAll(clausesOf(passage));
         }
-        Set<String> found = new LinkedHashSet<>();
+        Set<String> contradicted = new LinkedHashSet<>();
+        Set<String> undecided = new LinkedHashSet<>();
         for (Clause said : clausesOf(body)) {
-            List<String> terms = CONDITION_TERMS.stream().filter(t -> has(said.text(), t)).toList();
-            boolean same = false;
-            boolean opposite = false;
-            for (Clause ground : grounds) {
-                if (ground.remedies().stream().noneMatch(said.remedies()::contains)
-                        || !terms.stream().allMatch(t -> has(ground.text(), t))) {
-                    continue;
-                }
-                same |= ground.refusal() == said.refusal();
-                opposite |= ground.refusal() != said.refusal();
+            List<Clause> about = grounds.stream()
+                    .filter(g -> g.remedies().stream().anyMatch(said.remedies()::contains)).toList();
+            boolean yes = about.stream().anyMatch(g -> g.refusal() == said.refusal());
+            boolean no = about.stream().anyMatch(g -> g.refusal() != said.refusal());
+            if (!no) {
+                continue;
             }
-            if (opposite && !same) {
-                found.addAll(said.remedies());
+            if (!yes) {
+                // One answer only: opposite under the same stated terms is a contradiction; a draft naming a term the
+                // evidence never speaks to is unsupportedConditions' finding.
+                List<String> terms = CONDITION_TERMS.stream().filter(t -> has(said.text(), t)).toList();
+                if (about.stream().anyMatch(g -> terms.stream().allMatch(t -> has(g.text(), t)))) {
+                    contradicted.addAll(said.remedies());
+                }
+                continue;
+            }
+            // Both answers: which case is the draft about? The wording no clause about this remedy shares with all of
+            // them — 「14일 이후」, 「고객 과실」 — and the clause the draft shares most of it with.
+            Set<String> common = null;
+            for (Clause g : about) {
+                if (common == null) {
+                    common = new java.util.HashSet<>(g.wording());
+                } else {
+                    common.retainAll(g.wording());
+                }
+            }
+            int same = 0;
+            int opposite = 0;
+            for (Clause g : about) {
+                Set<String> own = new java.util.HashSet<>(g.wording());
+                own.removeAll(common);
+                own.retainAll(said.wording());
+                if (g.refusal() == said.refusal()) {
+                    same = Math.max(same, own.size());
+                } else {
+                    opposite = Math.max(opposite, own.size());
+                }
+            }
+            if (opposite > same) {
+                contradicted.addAll(said.remedies());
+            } else if (opposite == same) {
+                undecided.addAll(said.remedies());
             }
         }
-        return List.copyOf(found);
+        return new Judged(List.copyOf(contradicted), List.copyOf(undecided));
     }
 
-    /** One remedy clause: its text without whitespace, the remedies it is about, and whether it refuses them. */
-    private record Clause(String text, List<String> remedies, boolean refusal) {
+    /**
+     * The two-letter pieces of how a yes or a no is said — 「가능합니다」, 「불가하며」, 「드리겠습니다」. They tell the two
+     * answers apart and nothing about which case a clause is about, so case matching never counts them.
+     */
+    private static final Set<String> PREDICATE_PIECES = bigrams(String.join("|", List.of(
+            "가능합니다", "가능하며", "가능해요", "가능하고", "불가합니다", "불가하며", "불가능합니다", "어렵습니다", "어려운",
+            "안됩니다", "안되며", "안돼요", "되지않습니다", "하지않습니다", "못합니다", "못드립니다", "할수없습니다",
+            "제외됩니다", "드립니다", "드리겠습니다", "해드립니다", "해드리겠습니다", "도와드리겠습니다", "됩니다", "입니다")));
+
+    private static Set<String> bigrams(String text) {
+        Set<String> out = new LinkedHashSet<>();
+        for (int i = 0; i + 2 <= text.length(); i++) {
+            String piece = text.substring(i, i + 2);
+            if (piece.indexOf('|') < 0) {
+                out.add(piece);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * One remedy clause: its text without whitespace, the remedies it is about, whether it refuses them, and its
+     * wording — the two-letter pieces of what it says apart from the remedy nouns and the yes or no itself.
+     */
+    private record Clause(String text, List<String> remedies, boolean refusal, Set<String> wording) {
     }
 
     private static List<Clause> clausesOf(String text) {
@@ -147,16 +227,22 @@ public final class ReviewClaimGuard {
             List<String> carried = List.of();
             for (String part : CLAUSE.split(sentence)) {
                 String squashed = normalize(part);
-                List<String> named = COMMITMENT_TERMS.stream().filter(squashed::contains).toList();
+                List<String> named = remediesIn(squashed);
                 List<String> remedies = named.isEmpty() ? carried : named;
                 if (remedies.isEmpty()) {
                     continue;
                 }
                 // The predicate: the clause's ending, after the last noun it names — 「불가 품목은 교환」 ends on a grant.
                 String plain = normalize(part.replaceAll("\\([^)]*\\)", "")).replaceAll("[.!?。,~…]+$", "");
-                int from = named.stream().filter(plain::contains).mapToInt(r -> plain.lastIndexOf(r) + r.length()).max().orElse(0);
+                int from = lastRemedyEnd(plain);
                 String ending = plain.substring(Math.max(Math.max(from, 0), plain.length() - ENDING));
-                out.add(new Clause(squashed, remedies, REFUSALS.stream().anyMatch(ending::contains)));
+                String bare = plain;
+                for (String r : COMMITMENT_TERMS) {
+                    bare = bare.replace(r, "|");
+                }
+                Set<String> wording = bigrams(bare);
+                wording.removeAll(PREDICATE_PIECES);
+                out.add(new Clause(squashed, remedies, REFUSALS.stream().anyMatch(ending::contains), wording));
                 carried = remedies;
             }
         }
@@ -183,10 +269,11 @@ public final class ReviewClaimGuard {
         Set<String> found = new LinkedHashSet<>();
         for (String sentence : body.split("(?<=[.!?。])\\s+|\\n+")) {
             String squashed = normalize(sentence);
-            List<String> remedies = COMMITMENT_TERMS.stream().filter(squashed::contains).toList();
+            List<String> remedies = remediesIn(squashed);
             // No remedy, nothing promised; a remedy the evidence does not name at all is unsupportedClaims' finding,
             // and its terms add nothing to it.
-            if (remedies.isEmpty() || remedies.stream().anyMatch(r -> !grounds.contains(r))) {
+            Set<String> grounded = remediesOf(evidence);
+            if (remedies.isEmpty() || remedies.stream().anyMatch(r -> !grounded.contains(r))) {
                 continue;
             }
             Matcher figure = FIGURE.matcher(sentence);
@@ -236,15 +323,61 @@ public final class ReviewClaimGuard {
         if (body == null || body.isBlank()) {
             return List.of();
         }
-        String draft = normalize(body);
-        String grounds = evidence == null ? "" : normalize(String.join(" ", evidence));
+        List<String> said = remediesIn(normalize(body));
+        Set<String> granted = remediesOf(evidence);
         List<String> found = new ArrayList<>();
         for (String term : COMMITMENT_TERMS) {
-            if (draft.contains(term) && !grounds.contains(term)) {
+            if (said.contains(term) && !granted.contains(term)) {
                 found.add(term);
             }
         }
         return List.copyOf(found);
+    }
+
+    /**
+     * The remedy nouns {@code squashed} names, in declaration order — read left to right, each from where the last one
+     * ended. With whitespace gone, 「교환 불가」 is 「교환불가」 and holds 「환불」; that 환불 was never written, and reading it
+     * made a policy that refuses exchanges authorize a refund (2026-10-27 second review).
+     */
+    static List<String> remediesIn(String squashed) {
+        Set<String> found = new LinkedHashSet<>();
+        scan(squashed, (term, end) -> found.add(term));
+        return COMMITMENT_TERMS.stream().filter(found::contains).toList();
+    }
+
+    /** The remedy nouns any of {@code texts} names, each text read on its own so no noun spans two of them. */
+    private static Set<String> remediesOf(List<String> texts) {
+        Set<String> out = new LinkedHashSet<>();
+        if (texts != null) {
+            texts.forEach(t -> out.addAll(remediesIn(normalize(t == null ? "" : t))));
+        }
+        return out;
+    }
+
+    /** Where the last remedy noun {@code squashed} names ends, or 0 when it names none. */
+    private static int lastRemedyEnd(String squashed) {
+        int[] last = {0};
+        scan(squashed, (term, end) -> last[0] = end);
+        return last[0];
+    }
+
+    private static void scan(String squashed, java.util.function.ObjIntConsumer<String> each) {
+        int i = 0;
+        while (i < squashed.length()) {
+            String hit = null;
+            for (String term : COMMITMENT_TERMS) {
+                if (squashed.startsWith(term, i)) {
+                    hit = term;
+                    break;
+                }
+            }
+            if (hit == null) {
+                i++;
+            } else {
+                i += hit.length();
+                each.accept(hit, i);
+            }
+        }
     }
 
     /** Whitespace collapsed and lower-cased, so spacing between a noun and its particle cannot hide it. */

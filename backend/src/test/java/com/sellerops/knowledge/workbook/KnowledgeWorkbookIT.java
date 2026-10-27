@@ -310,6 +310,55 @@ class KnowledgeWorkbookIT {
         assertThat(productSources.findById(cutting.getId()).orElseThrow().getBody()).isEqualTo("화면에서 고친 안내입니다.");
     }
 
+    @Test
+    @DisplayName("an existing row with no 변경 확인 is not applied, and a new row naming an existing 주제 is not turned into an edit")
+    void noCheckValueAndADuplicateTopicAreRefused() throws IOException {
+        library.create(org, productId, new KnowledgeSourceRequest(KnowledgeSourceType.USAGE, "자르기",
+                "커터칼로 자르세요.", null, null, List.of()), null, "판매자");
+        byte[] file = edited(book -> {
+            Sheet manual = book.getSheet(KnowledgeWorkbookService.SHEET_MANUAL);
+            Row cutting = rowWith(manual, 5, "자르기");
+            cutting.getCell(6).setCellValue("오래된 파일의 문장입니다.");
+            // A file from before the check column, or one whose hidden cell was cleared.
+            cutting.getCell(KnowledgeWorkbookService.MANUAL_HEADERS.indexOf("변경 확인")).setCellValue("");
+            Row fresh = manual.getRow(cutting.getRowNum() + 1);
+            fresh.getCell(1).setCellValue("상품");
+            fresh.getCell(3).setCellValue("일체형 전선몰딩");
+            fresh.getCell(5).setCellValue("자르기");
+            fresh.getCell(6).setCellValue("관리번호 없이 같은 주제로 쓴 문장입니다.");
+            fresh.getCell(8).setCellValue("사용");
+        });
+
+        KnowledgeWorkbookService.Result done = workbook.read(org, new ByteArrayInputStream(file), true, null, "판매자");
+
+        assertThat(done.changes()).isEmpty();
+        assertThat(done.problems()).extracting(KnowledgeWorkbookService.Line::text)
+                .anyMatch(t -> t.contains(KnowledgeWorkbookService.NO_BASE))
+                .anyMatch(t -> t.contains("같은 주제의 안내가 이미 있습니다"));
+        assertThat(productSources.findAll()).singleElement().extracting(ProductKnowledgeSource::getBody)
+                .isEqualTo("커터칼로 자르세요.");
+    }
+
+    @Test
+    @DisplayName("a screen save between the preview and 적용 is caught when the change runs")
+    void aSaveBetweenThePlanAndTheWriteIsCaught() throws IOException {
+        ProductKnowledgeSource cutting = productSources.findById(library.create(org, productId,
+                new KnowledgeSourceRequest(KnowledgeSourceType.USAGE, "자르기", "커터칼로 자르세요.", null, null,
+                        List.of()), null, "판매자").id()).orElseThrow();
+        byte[] file = edited(book -> rowWith(book.getSheet(KnowledgeWorkbookService.SHEET_MANUAL), 5, "자르기")
+                .getCell(6).setCellValue("파일에서 고친 안내입니다."));
+        // The plan is made, and before its change runs, a screen saves the same row.
+        workbook.setBeforeApply(() -> library.update(org, cutting.getId(), new KnowledgeSourceRequest(
+                KnowledgeSourceType.USAGE, "자르기", "화면에서 고친 안내입니다.", null, null, null)));
+
+        KnowledgeWorkbookService.Result done = workbook.read(org, new ByteArrayInputStream(file), true, null, "판매자");
+
+        assertThat(done.changes()).isEmpty();
+        assertThat(done.problems()).singleElement().extracting(KnowledgeWorkbookService.Line::text)
+                .satisfies(t -> assertThat(t).contains(KnowledgeWorkbookService.STALE));
+        assertThat(productSources.findById(cutting.getId()).orElseThrow().getBody()).isEqualTo("화면에서 고친 안내입니다.");
+    }
+
     /** The org's workbook as downloaded now, edited by {@code edit}, as the bytes a seller would upload. */
     private byte[] edited(java.util.function.Consumer<Workbook> edit) throws IOException {
         try (Workbook book = new XSSFWorkbook(new ByteArrayInputStream(workbook.export(org)))) {

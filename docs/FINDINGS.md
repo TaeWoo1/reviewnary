@@ -714,6 +714,18 @@
   본다(CLAUDE.md 「검사 도구의 실패는 초록색으로 나타난다」 4).
 - **출처** — 2026-10-27, `ReviewDraftComposer.refusalOf`, `ReviewDraftComposerTest.aRetryWithABlankIsNotTaken`.
 
+### B36. 띄어쓰기를 지운 문장에서 낱말을 찾아, 「교환 불가」가 「환불」을 허락했다
+
+- **했던 것** — `ReviewClaimGuard`는 띄어쓰기와 조사에 흔들리지 않으려고 공백을 지운 뒤 `contains`로 약속 낱말을 찾았다(2026-09-03부터).
+- **사실** — 「교환 불가」는 공백을 지우면 「교환불가」이고, 그 안에 아무도 쓰지 않은 「환불」이 있다. 그래서 「단순 변심은 교환 불가합니다」라는
+  기준이 초안의 「환불해 드리겠습니다」를 근거 있는 약속으로 통과시켰고, 「가능/불가」를 읽는 새 검사는 「14일 이후 교환 불가」의 마지막
+  낱말을 「환불」로 잡아 거절을 못 읽었다. 외부 검토의 예시를 시험으로 옮기다가 드러났다. 지금은 왼쪽부터 겹치지 않게 읽고
+  (`remediesIn`), 근거는 문단마다 따로 읽는다.
+- **다음에** — 공백을 지운 글에서 `contains`로 찾으면 **두 낱말에 걸친 가짜 낱말**이 나온다. 낱말은 앞에서부터 겹치지 않게 읽고, 여러 글을
+  이어 붙인 뒤에 찾지 않는다.
+- **출처** — 2026-10-27, `ReviewClaimGuard.remediesIn` · `remediesOf`,
+  `ReviewClaimGuardTest.a_refused_exchange_is_not_a_refund_once_the_spaces_are_gone`.
+
 ---
 
 ## C. 증거 · 계약

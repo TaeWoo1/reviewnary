@@ -97,6 +97,13 @@ public class ReviewDraftComposer {
     static final String CONTRADICTED_CLAIM =
             "근거와 반대로 교환·환불·보상을 해 준다거나 안 된다고 적어 AI 초안을 저장하지 않았습니다. "
                     + "저장된 문구로 초안을 준비했습니다.";
+    /**
+     * A promise the seller's text answers both ways — 「7일 이내 가능 · 14일 이후 불가」 — with nothing in the reply saying
+     * which case it is (2026-10-27 second review). Not passed: the seller decides.
+     */
+    static final String UNDECIDED_CLAIM =
+            "근거에 교환·환불·보상이 되는 경우와 안 되는 경우가 함께 있는데, 초안이 어느 경우인지 말하지 않아 AI 초안을 "
+                    + "저장하지 않았습니다. 저장된 문구로 초안을 준비했습니다.";
     /** The draft is kept with the phrase marked; approval waits for the seller's fix (2026-10-23). */
     static String forbiddenLeft(List<String> phrases) {
         return "회사가 쓰지 않기로 한 표현이 남아 있습니다: " + String.join(" · ", phrases.stream()
@@ -499,7 +506,8 @@ public class ReviewDraftComposer {
      *   <li>A remedy, or a term of one (「7일 이내」 · 「무료」), that {@code current} does not state (2026-10-23 external
      *       review).</li>
      *   <li>A remedy granted where {@code current} refuses it under the same terms, or refused where it grants
-     *       ({@link ReviewClaimGuard#contradictedPromises}, 2026-10-27 review).</li>
+     *       ({@link ReviewClaimGuard#contradictedPromises}, 2026-10-27 review) — or answered where {@code current} answers
+     *       it both ways and the reply does not say which case ({@link ReviewClaimGuard#undecidedPromises}).</li>
      * </ol>
      */
     static String refusalOf(String candidate, List<String> current, String reviewBody) {
@@ -512,6 +520,9 @@ public class ReviewDraftComposer {
         }
         if (!ReviewClaimGuard.contradictedPromises(candidate, current).isEmpty()) {
             return CONTRADICTED_CLAIM;
+        }
+        if (!ReviewClaimGuard.undecidedPromises(candidate, current).isEmpty()) {
+            return UNDECIDED_CLAIM;
         }
         return null;
     }

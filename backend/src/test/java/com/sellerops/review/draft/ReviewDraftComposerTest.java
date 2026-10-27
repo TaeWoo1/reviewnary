@@ -357,6 +357,19 @@ class ReviewDraftComposerTest {
     }
 
     @Test
+    @DisplayName("a promise the evidence answers both ways, with no case named, is left to the seller")
+    void anUndecidedPromiseFallsBackToTheTemplate() {
+        retrieval(DraftKnowledgeState.GROUNDED, productPassage("7일 이내 교환 가능. 14일 이후 교환 불가."));
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), any(), any(), any()))
+                .thenReturn(Optional.of("불편을 드려 죄송합니다. 교환해 드리겠습니다."));
+
+        GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
+
+        assertThat(view.draft().body()).doesNotContain("교환해 드리겠습니다");
+        assertThat(view.unavailableMessage()).isEqualTo(ReviewDraftComposer.UNDECIDED_CLAIM);
+    }
+
+    @Test
     @DisplayName("an unsupported promise is REFUSED, not edited — the template floor is saved instead")
     void anUnsupportedPromiseFallsBackToTheTemplate() {
         retrieval(DraftKnowledgeState.GROUNDED,

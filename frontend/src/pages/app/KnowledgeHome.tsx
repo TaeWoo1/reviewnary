@@ -130,6 +130,12 @@ export function KnowledgeHome() {
   }
 
   const pending = candidates?.length ?? null;
+  const held: Record<Part, boolean> = {
+    documents: documents !== null,
+    candidates: candidates !== null,
+    inventory: inventory !== null,
+    summary: summary !== null,
+  };
   const rules = inventory?.rules ?? [];
   const facts = inventory?.productKnowledge ?? [];
   const writtenTopics = topicsOf(rules).filter((topic) => topic.rules.length > 0).length;
@@ -154,7 +160,11 @@ export function KnowledgeHome() {
 
       {failed.length > 0 ? (
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 break-keep text-sm text-bad" role="alert">
-          <span>불러오지 못했습니다 · {failed.map((part) => PART_NAMES[part]).join(" · ")}</span>
+          <span>
+            불러오지 못했습니다 · {failed.map((part) => PART_NAMES[part]).join(" · ")}
+            {/* 전에 한 번 불러온 것이 남아 있으면 그것이 지금이 아니라는 것을 말한다. */}
+            {failed.some((part) => held[part]) ? " (아래는 이전에 불러온 내용입니다)" : null}
+          </span>
           <Btn size="sm" variant="outline" onClick={() => void load()}>
             다시 불러오기
           </Btn>

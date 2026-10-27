@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
@@ -124,6 +125,9 @@ public class KnowledgeWorkbookService {
 
     /** A row changed on a screen after the file was downloaded. */
     static final String STALE = "내려받은 뒤 화면에서 바뀐 줄이라 반영하지 않았습니다. 새로 내려받아 다시 고쳐 주세요.";
+    /** An existing guidance row with no 「변경 확인」 — a file from before it existed, or a cell someone cleared. */
+    static final String NO_BASE = "내려받은 때의 내용을 확인할 수 없는 줄이라 반영하지 않았습니다(예전 파일이거나 숨은 칸이 지워졌습니다). "
+            + "새로 내려받아 다시 고쳐 주세요.";
 
     private final AnswerStyleService styles;
     private final ReviewReplyTemplateService templates;
@@ -415,6 +419,7 @@ public class KnowledgeWorkbookService {
         if (!apply) {
             return new Result(false, plan.changes(), List.copyOf(plan.problems));
         }
+        beforeApply.run();
         List<Line> done = new ArrayList<>();
         for (Step step : plan.steps) {
             try {
@@ -425,6 +430,13 @@ public class KnowledgeWorkbookService {
             }
         }
         return new Result(true, List.copyOf(done), List.copyOf(plan.problems));
+    }
+
+    /** Runs between planning and the first write — where a test puts the screen save that 적용 must not overwrite. */
+    private Runnable beforeApply = () -> { };
+
+    void setBeforeApply(Runnable beforeApply) {
+        this.beforeApply = beforeApply;
     }
 
     private record Step(Line line, Runnable action) {
@@ -442,14 +454,23 @@ public class KnowledgeWorkbookService {
             steps.add(new Step(new Line(sheet, row, text, where, before, after), action));
         }
 
-        /** The change, or — when the row's server copy moved since the download — the conflict, with what it says now. */
-        void changeUnlessStale(boolean stale, String sheet, int row, String text, String where, String before,
-                               String after, Runnable action) {
-            if (stale) {
-                problems.add(new Line(sheet, row, text + " — " + STALE, where, before, null));
-            } else {
-                change(sheet, row, text, where, before, after, action);
+        /**
+         * The change — or, when {@code conflict} names one, the conflict with what the row says now. The change checks
+         * again when it runs, since a screen can save between this read and 적용: {@code unchanged} false then refuses it
+         * on its row.
+         */
+        void guarded(String conflict, BooleanSupplier unchanged, String sheet, int row, String text, String where,
+                     String before, String after, Runnable action) {
+            if (conflict != null) {
+                problems.add(new Line(sheet, row, text + " — " + conflict, where, before, null));
+                return;
             }
+            change(sheet, row, text, where, before, after, () -> {
+                if (!unchanged.getAsBoolean()) {
+                    throw ApiException.conflict(text + " — " + STALE);
+                }
+                action.run();
+            });
         }
 
         void problem(String sheet, int row, String text) {
@@ -598,10 +619,12 @@ public class KnowledgeWorkbookService {
             String label = TEMPLATE_NAMES.get(key.get())[0];
             String where = TEMPLATE_NAMES.get(key.get())[1];
             String current = templates.bodyFor(orgId, key.get()).strip();
-            boolean stale = col.containsKey("지금 문구") && !text(row, col.get("지금 문구")).equals(current);
+            String conflict = !col.containsKey("지금 문구") ? NO_BASE
+                    : text(row, col.get("지금 문구")).equals(current) ? null : STALE;
+            BooleanSupplier unchanged = () -> templates.bodyFor(orgId, key.get()).strip().equals(current);
             if (DEFAULT.equals(status)) {
                 if (templates.isCustomized(orgId, key.get())) {
-                    plan.changeUnlessStale(stale, SHEET_TEMPLATES, r + 1, "「" + label + "」 기본 문구로 되돌림", where,
+                    plan.guarded(conflict, unchanged, SHEET_TEMPLATES, r + 1, "「" + label + "」 기본 문구로 되돌림", where,
                             current, "(기본 문구)", () -> templates.reset(orgId, key.get().category()));
                 }
                 continue;
@@ -622,7 +645,7 @@ public class KnowledgeWorkbookService {
             if (body.equals(current)) {
                 continue;
             }
-            plan.changeUnlessStale(stale, SHEET_TEMPLATES, r + 1, "「" + label + "」 문구 바꿈", where, current, body,
+            plan.guarded(conflict, unchanged, SHEET_TEMPLATES, r + 1, "「" + label + "」 문구 바꿈", where, current, body,
                     () -> templates.save(orgId, key.get().category(), body, actorUserId));
         }
     }
@@ -693,12 +716,15 @@ public class KnowledgeWorkbookService {
             return;
         }
         ProductKnowledgeSource s = found.get();
-        boolean stale = !base.isEmpty() && !base.equals(fingerprint(s));
+        String seen = fingerprint(s);
+        String conflict = base.isEmpty() ? NO_BASE : base.equals(seen) ? null : STALE;
+        BooleanSupplier unchanged = () -> productSources.findByIdAndOrgId(id, orgId)
+                .map(KnowledgeWorkbookService::fingerprint).orElse("").equals(seen);
         String where = SCOPE_PRODUCT + " · " + nameOf(products.findById(s.getProductId()).orElse(null));
         String was = shown(s.getBody(), s.getCustomerPhrases());
         if (OFF.equals(status)) {
             if (s.isActive()) {
-                plan.changeUnlessStale(stale, SHEET_MANUAL, at, label + " 안내를 끔", where, was, "(쓰지 않음)", () -> {
+                plan.guarded(conflict, unchanged, SHEET_MANUAL, at, label + " 안내를 끔", where, was, "(쓰지 않음)", () -> {
                     s.setActive(false);
                     productSources.save(s);
                 });
@@ -722,7 +748,7 @@ public class KnowledgeWorkbookService {
         if (same) {
             return;
         }
-        plan.changeUnlessStale(stale, SHEET_MANUAL, at, label + (s.isActive() ? " 안내 고침" : " 안내를 다시 켜고 고침"),
+        plan.guarded(conflict, unchanged, SHEET_MANUAL, at, label + (s.isActive() ? " 안내 고침" : " 안내를 다시 켜고 고침"),
                 where, was, shown(body, CustomerPhrases.store(phrases)), () -> {
             productLibrary.update(orgId, s.getId(), new KnowledgeSourceRequest(s.getSourceType(), title, body,
                     s.getSourceUrl(), s.getVariantId(), phrases));
@@ -743,11 +769,14 @@ public class KnowledgeWorkbookService {
             return;
         }
         OrgKnowledgeSource s = found.get();
-        boolean stale = !base.isEmpty() && !base.equals(fingerprint(s));
+        String seen = fingerprint(s);
+        String conflict = base.isEmpty() ? NO_BASE : base.equals(seen) ? null : STALE;
+        BooleanSupplier unchanged = () -> orgSources.findByIdAndOrgId(id, orgId)
+                .map(KnowledgeWorkbookService::fingerprint).orElse("").equals(seen);
         String was = shown(s.getBody(), s.getCustomerPhrases());
         if (OFF.equals(status)) {
             if (s.isActive()) {
-                plan.changeUnlessStale(stale, SHEET_MANUAL, at, label + " 안내를 끔", SCOPE_ORG, was, "(쓰지 않음)", () -> {
+                plan.guarded(conflict, unchanged, SHEET_MANUAL, at, label + " 안내를 끔", SCOPE_ORG, was, "(쓰지 않음)", () -> {
                     s.setActive(false);
                     orgSources.save(s);
                 });
@@ -771,7 +800,7 @@ public class KnowledgeWorkbookService {
         if (same) {
             return;
         }
-        plan.changeUnlessStale(stale, SHEET_MANUAL, at, label + (s.isActive() ? " 안내 고침" : " 안내를 다시 켜고 고침"),
+        plan.guarded(conflict, unchanged, SHEET_MANUAL, at, label + (s.isActive() ? " 안내 고침" : " 안내를 다시 켜고 고침"),
                 SCOPE_ORG, was, shown(body, CustomerPhrases.store(phrases)), () -> {
             orgKnowledge.update(orgId, s.getId(), new OrgKnowledgeRequest(s.getKnowledgeType(), title, body,
                     s.getSourceUrl(), phrases));
@@ -798,13 +827,16 @@ public class KnowledgeWorkbookService {
         }
         KnowledgeCandidate c = found.get();
         boolean product = "PRODUCT".equals(c.getScope());
-        boolean stale = !base.isEmpty() && !base.equals(fingerprint(c));
+        String seen = fingerprint(c);
+        String conflict = base.isEmpty() ? NO_BASE : base.equals(seen) ? null : STALE;
+        BooleanSupplier unchanged = () -> candidateRows.findByIdAndOrgId(id, orgId)
+                .map(KnowledgeWorkbookService::fingerprint).orElse("").equals(seen);
         String where = product && c.getProductId() != null
                 ? SCOPE_PRODUCT + " · " + nameOf(products.findById(c.getProductId()).orElse(null)) : SCOPE_ORG;
         String was = shown(c.getContent(), c.getCustomerPhrases());
         String now = shown(body.isEmpty() ? c.getContent() : body, CustomerPhrases.store(phrases));
         if (OFF.equals(status)) {
-            plan.changeUnlessStale(stale, SHEET_MANUAL, at, label + " 제안을 보류", where, was, "(보류)",
+            plan.guarded(conflict, unchanged, SHEET_MANUAL, at, label + " 제안을 보류", where, was, "(보류)",
                     () -> candidateService.dismiss(orgId, id, actorName));
             return;
         }
@@ -816,7 +848,7 @@ public class KnowledgeWorkbookService {
             }
             KnowledgeSourceType productType = product ? sourceType(kind) : null;
             OrgKnowledgeType orgType = product ? null : orgType(kind);
-            plan.changeUnlessStale(stale, SHEET_MANUAL, at, label + " 제안을 안내로 등록", where, was, now,
+            plan.guarded(conflict, unchanged, SHEET_MANUAL, at, label + " 제안을 안내로 등록", where, was, now,
                     () -> candidateService.accept(orgId, id,
                     subject.isEmpty() ? null : subject, body, productType, orgType, null, phrases, actorUserId,
                     actorName));
@@ -825,7 +857,7 @@ public class KnowledgeWorkbookService {
         boolean edited = (!body.isEmpty() && !body.equals(c.getContent()))
                 || !Objects.equals(CustomerPhrases.store(phrases), CustomerPhrases.normalized(c.getCustomerPhrases()));
         if (edited) {
-            plan.changeUnlessStale(stale, SHEET_MANUAL, at, label + " 제안 고침 (확인 전)", where, was, now,
+            plan.guarded(conflict, unchanged, SHEET_MANUAL, at, label + " 제안 고침 (확인 전)", where, was, now,
                     () -> candidateService.revise(orgId, id, body, phrases));
         }
     }
@@ -852,25 +884,22 @@ public class KnowledgeWorkbookService {
         }
         UUID target = productId;
         boolean blank = KnowledgeBlanks.carries(body);
+        // A new row whose 주제 a guidance already has is not quietly turned into an edit of it: an edit needs the row's
+        // 관리번호 and what it said when downloaded, and this row has neither (2026-10-27 second review).
+        Optional<String> taken = target == null
+                ? orgSources.findAllByOrgIdOrderByCreatedAtAsc(orgId).stream()
+                        .filter(s -> s.getTitle().equals(subject) && personWritten(s.getAuthoredOrigin(),
+                                s.getDocumentName())).map(s -> "O-" + s.getId()).findFirst()
+                : productSources.findAllByOrgIdAndProductIdOrderByCreatedAtAsc(orgId, target).stream()
+                        .filter(s -> s.getTitle().equals(subject) && s.getVariantId() == null
+                                && personWritten(s.getAuthoredOrigin(), s.getDocumentName()))
+                        .map(s -> "P-" + s.getId()).findFirst();
+        if (taken.isPresent()) {
+            plan.problem(SHEET_MANUAL, at, label + " — 같은 주제의 안내가 이미 있습니다(관리번호 " + taken.get()
+                    + "). 그 줄을 고치시거나, 다른 안내라면 주제를 바꿔 주세요.");
+            return;
+        }
         if (USE.equals(status) && !blank) {
-            Optional<ProductKnowledgeSource> sameProduct = target == null ? Optional.empty()
-                    : productSources.findAllByOrgIdAndProductIdOrderByCreatedAtAsc(orgId, target).stream()
-                            .filter(s -> s.getTitle().equals(subject) && personWritten(s.getAuthoredOrigin(),
-                                    s.getDocumentName()))
-                            .findFirst();
-            Optional<OrgKnowledgeSource> sameOrg = target != null ? Optional.empty()
-                    : orgSources.findAllByOrgIdOrderByCreatedAtAsc(orgId).stream()
-                            .filter(s -> s.getTitle().equals(subject) && personWritten(s.getAuthoredOrigin(),
-                                    s.getDocumentName()))
-                            .findFirst();
-            if (sameProduct.isPresent()) {
-                existingProduct(orgId, sameProduct.get().getId(), subject, body, phrases, USE, at, label, "", plan);
-                return;
-            }
-            if (sameOrg.isPresent()) {
-                existingOrg(orgId, sameOrg.get().getId(), subject, body, phrases, USE, at, label, "", plan);
-                return;
-            }
             plan.change(SHEET_MANUAL, at, label + " 새 안내 등록", target == null ? SCOPE_ORG
                     : SCOPE_PRODUCT + " · " + nameOf(owned.get(target)), null,
                     shown(body, CustomerPhrases.store(phrases)), () -> {

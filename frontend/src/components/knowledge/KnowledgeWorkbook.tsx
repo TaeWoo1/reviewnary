@@ -147,32 +147,74 @@ function Lines({ lines }: { lines: KnowledgeWorkbookLine[] }) {
   return (
     <ul className="mt-1.5 space-y-2">
       {lines.map((line, i) => (
-        <li key={`${line.sheet}-${line.row}-${i}`} className="flex gap-2 break-keep text-sm text-ink">
-          <span className="shrink-0 text-xs tabular-nums text-muted">
-            {line.sheet} {line.row}줄
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block">{line.text}</span>
-            {line.where ? <span className="block text-xs text-muted">{line.where}</span> : null}
-            {line.before != null || line.after != null ? (
-              <span className="mt-1 grid gap-1 sm:grid-cols-2">
-                <Version label={line.after != null ? "지금" : "화면의 지금 내용"} text={line.before} />
-                {line.after != null ? <Version label="바뀐 뒤" text={line.after} strong /> : null}
-              </span>
-            ) : null}
-          </span>
-        </li>
+        <LineRow key={`${line.sheet}-${line.row}-${i}`} line={line} />
       ))}
     </ul>
   );
 }
 
+/** 이만큼 넘으면 접어 둔다 — 그래도 끝까지 읽을 길은 늘 있다. */
+const FOLD_CHARS = 180;
+const FOLD_LINES = 6;
+
+function long(text?: string | null) {
+  return !!text && (text.length > FOLD_CHARS || text.split("\n").length > FOLD_LINES);
+}
+
+/**
+ * 한 줄. 긴 문장은 처음엔 접어 두지만 「전체 보기」로 끝까지 펼친다(2026-10-27 두 번째 검토) — 긴 매뉴얼의 마지막 조건이
+ * 바뀌었는데 그 부분을 읽지 못한 채 「적용」을 누르는 일이 없어야 한다. 펼치면 지금과 바뀐 뒤가 함께 펼쳐진다.
+ */
+function LineRow({ line }: { line: KnowledgeWorkbookLine }) {
+  const [open, setOpen] = useState(false);
+  const foldable = long(line.before) || long(line.after);
+  return (
+    <li className="flex gap-2 break-keep text-sm text-ink">
+      <span className="shrink-0 text-xs tabular-nums text-muted">
+        {line.sheet} {line.row}줄
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block">{line.text}</span>
+        {line.where ? <span className="block text-xs text-muted">{line.where}</span> : null}
+        {line.before != null || line.after != null ? (
+          <>
+            <span className="mt-1 grid gap-1 sm:grid-cols-2">
+              <Version label={line.after != null ? "지금" : "화면의 지금 내용"} text={line.before} open={open} />
+              {line.after != null ? <Version label="바뀐 뒤" text={line.after} open={open} strong /> : null}
+            </span>
+            {foldable ? (
+              <button
+                type="button"
+                className="mt-1 rounded text-xs font-semibold text-brand-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+                aria-expanded={open}
+                onClick={() => setOpen((v) => !v)}
+              >
+                {open ? "접기" : "전체 보기"}
+              </button>
+            ) : null}
+          </>
+        ) : null}
+      </span>
+    </li>
+  );
+}
+
 /** 한쪽 문장. 빈 것은 「(없음)」이라고 말한다 — 빈 칸은 「안 보여 줬다」와 구별되지 않는다. */
-function Version({ label, text, strong = false }: { label: string; text?: string | null; strong?: boolean }) {
+function Version({
+  label,
+  text,
+  open,
+  strong = false,
+}: {
+  label: string;
+  text?: string | null;
+  open: boolean;
+  strong?: boolean;
+}) {
   return (
     <span className={`block rounded-lg border px-2.5 py-1.5 ${strong ? "border-brand-700/30 bg-brand-700/5" : "border-line bg-canvas"}`}>
       <span className="block text-xs font-semibold text-muted">{label}</span>
-      <span className="line-clamp-6 block whitespace-pre-line text-sm text-ink">{text ? text : "(없음)"}</span>
+      <span className={`block whitespace-pre-line text-sm text-ink ${open ? "" : "line-clamp-6"}`}>{text ? text : "(없음)"}</span>
     </span>
   );
 }
