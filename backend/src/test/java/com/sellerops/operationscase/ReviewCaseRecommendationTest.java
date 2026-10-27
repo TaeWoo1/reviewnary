@@ -31,6 +31,7 @@ class ReviewCaseRecommendationTest {
     private static final Path HOME_WORK = Paths.get("../frontend/src/lib/homeWork.ts");
     private static final Path COPY = Paths.get("../frontend/src/lib/copy/customerOps.ts");
     private static final Path NAV = Paths.get("../frontend/src/lib/nav.v2.ts");
+    private static final Path HOME = Paths.get("../frontend/src/components/customerOperations/CustomerOpsHome.tsx");
     /** Where the prepared recommendation is read now that the queue row carries customer context only. */
     private static final Path CASE_SCREEN = Paths.get("../frontend/src/pages/app/OperationsCase.tsx");
 
@@ -179,13 +180,20 @@ class ReviewCaseRecommendationTest {
     @Test
     @DisplayName("the queue has a standing door, and it is not two doors")
     void theQueueIsReachable() throws IOException {
+        // Product-owner decision 2026-10-27: the menu is 홈 / 리뷰·문의 / 상품·정책, and 할 일 left it. The queue
+        // keeps its route; its standing door is the Home, which opens it from the brief (전체 보기) and from the
+        // backlog line (할 일에서 보기). A menu entry back would be a second, unrequested door.
         String nav = code(NAV);
+        String home = code(HOME);
 
         assertThat(count(nav, "/customer-operations/cases"))
-                .as("one menu entry for one screen")
-                .isEqualTo(1);
-        assertThat(nav)
+                .as("the menu no longer names the queue")
+                .isZero();
+        assertThat(count(home, "to=\"/customer-operations/cases\""))
+                .as("the Home is the door: the brief's 전체 보기 and the backlog's 할 일에서 보기")
+                .isEqualTo(2);
+        assertThat(home)
                 .as("named for the seller's work (2026-10-25: 할 일 — 「확인」 is only the channel's evidence)")
-                .contains("label: \"할 일\"");
+                .contains("할 일에서 보기");
     }
 }

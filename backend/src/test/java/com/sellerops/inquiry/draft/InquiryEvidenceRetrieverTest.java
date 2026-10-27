@@ -229,7 +229,7 @@ class InquiryEvidenceRetrieverTest {
         // The base sentence for these states ends 「과거 답변에도 해당 내용이 없어」 — which is false
         // here, with that very answer printed underneath it.
         assertThat(message).doesNotContain("과거 답변에도 해당 내용이 없어");
-        assertThat(message).contains("과거 답변").contains("확인이 필요합니다");
+        assertThat(message).contains("과거 답변").contains("확인이 필요해요");
     }
 
     @Test

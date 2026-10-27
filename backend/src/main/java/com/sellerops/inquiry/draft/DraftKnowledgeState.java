@@ -49,12 +49,12 @@ public enum DraftKnowledgeState {
     public String messageKo() {
         return switch (this) {
             case NO_PRODUCT -> "이 문의는 상품과 연결되지 않았고, 운영 정책·과거 답변에도 해당 내용이 없어 "
-                    + "문의 내용만 보고 쓴 초안입니다.";
+                    + "문의 내용만 보고 쓴 초안이에요.";
             case NO_LIBRARY -> "이 상품에 등록된 지식이 없고, 운영 정책·과거 답변에도 해당 내용이 없어 "
-                    + "문의 내용만 보고 쓴 초안입니다.";
+                    + "문의 내용만 보고 쓴 초안이에요.";
             case NO_MATCH -> "상품 지식·운영 정책·과거 답변 어디에도 이 질문에 해당하는 내용이 없어, "
-                    + "문의 내용만 보고 쓴 초안입니다.";
-            case GROUNDED -> "판매자가 등록한 근거를 사용해 썼습니다.";
+                    + "문의 내용만 보고 쓴 초안이에요.";
+            case GROUNDED -> "판매자가 등록한 근거를 사용해 썼어요.";
         };
     }
 
@@ -76,11 +76,11 @@ public enum DraftKnowledgeState {
             // what is actually true: there is no current basis, and the old answer is a reference
             // whose continued correctness nobody has checked.
             return scopes.stream().noneMatch(scope -> !scope.current()) ? messageKo()
-                    : "현재 상품 지식·운영 정책에는 이 질문에 해당하는 내용이 없습니다. "
-                            + "아래 과거 답변은 참고용이며, 그때의 안내가 지금도 맞는지 확인이 필요합니다.";
+                    : "현재 상품 지식·운영 정책에는 이 질문에 해당하는 내용이 없어요. "
+                            + "아래 과거 답변은 참고용이며, 그때의 안내가 지금도 맞는지 확인이 필요해요.";
         }
         String named = scopes.stream().map(KnowledgeScope::labelKo).collect(Collectors.joining("·"));
-        return "판매자가 등록한 " + named + objectParticle(named) + " 근거로 썼습니다.";
+        return "판매자가 등록한 " + named + objectParticle(named) + " 근거로 썼어요.";
     }
 
     /**

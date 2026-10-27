@@ -78,11 +78,11 @@ import org.springframework.stereotype.Service;
 public class ReviewDraftComposer {
 
     /** The operational sentences. None of them says anything about the seller's knowledge. */
-    static final String CAPABILITY_OFF = "AI 답변 초안 기능이 켜져 있지 않습니다. 저장된 문구로 초안을 준비했습니다.";
-    static final String MODEL_FAILED = "AI 초안을 생성하지 못했습니다. 저장된 문구로 초안을 준비했습니다.";
+    static final String CAPABILITY_OFF = "AI 답변 초안 기능이 켜져 있지 않아요. 저장된 문구로 초안을 준비했어요.";
+    static final String MODEL_FAILED = "AI 초안을 생성하지 못했어요. 저장된 문구로 초안을 준비했어요.";
     /** A reply that carries a 【확인: …】 blank — a fact the owner has not confirmed (2026-10-27). */
     static final String UNCONFIRMED_TEXT =
-            "확인 전 안내(【확인: …】)가 들어가 AI 초안을 저장하지 않았습니다. 저장된 문구로 초안을 준비했습니다.";
+            "확인 전 안내(【확인: …】)가 들어가 AI 초안을 저장하지 않았어요. 저장된 문구로 초안을 준비했어요.";
     /**
      * The refusal that only this lane has.
      *
@@ -91,35 +91,35 @@ public class ReviewDraftComposer {
      * wrong when it is not, and the sentence a seller needs is which of those happened.
      */
     static final String UNSUPPORTED_CLAIM =
-            "근거에 없는 교환·환불·보상 약속이나 조건(기간·금액·대상)이 들어가 AI 초안을 저장하지 않았습니다. "
-                    + "저장된 문구로 초안을 준비했습니다.";
+            "근거에 없는 교환·환불·보상 약속이나 조건(기간·금액·대상)이 들어가 AI 초안을 저장하지 않았어요. "
+                    + "저장된 문구로 초안을 준비했어요.";
     /** A promise that says yes where the seller's own text says no, or no where it says yes (2026-10-27). */
     static final String CONTRADICTED_CLAIM =
-            "근거와 반대로 교환·환불·보상을 해 준다거나 안 된다고 적어 AI 초안을 저장하지 않았습니다. "
-                    + "저장된 문구로 초안을 준비했습니다.";
+            "근거와 반대로 교환·환불·보상을 해 준다거나 안 된다고 적어 AI 초안을 저장하지 않았어요. "
+                    + "저장된 문구로 초안을 준비했어요.";
     /**
      * A promise the seller's text answers both ways — 「7일 이내 가능 · 14일 이후 불가」 — with nothing in the reply saying
      * which case it is (2026-10-27 second review). Not passed: the seller decides.
      */
     static final String UNDECIDED_CLAIM =
             "근거에 교환·환불·보상이 되는 경우와 안 되는 경우가 함께 있는데, 초안이 어느 경우인지 말하지 않아 AI 초안을 "
-                    + "저장하지 않았습니다. 저장된 문구로 초안을 준비했습니다.";
+                    + "저장하지 않았어요. 저장된 문구로 초안을 준비했어요.";
     /** The draft is kept with the phrase marked; approval waits for the seller's fix (2026-10-23). */
     static String forbiddenLeft(List<String> phrases) {
-        return "회사가 쓰지 않기로 한 표현이 남아 있습니다: " + String.join(" · ", phrases.stream()
-                .map(p -> "「" + p + "」").toList()) + ". 고친 뒤에 승인하거나 보낼 수 있습니다.";
+        return "회사가 쓰지 않기로 한 표현이 남아 있어요: " + String.join(" · ", phrases.stream()
+                .map(p -> "「" + p + "」").toList()) + ". 고친 뒤에 승인하거나 보낼 수 있어요.";
     }
 
     /** The sentences the seller reads above the draft, per basis. */
-    static final String BASIS_GROUNDED_NOTE = "판매자가 등록한 근거를 사용해 썼습니다.";
+    static final String BASIS_GROUNDED_NOTE = "판매자가 등록한 근거를 사용해 썼어요.";
     static final String BASIS_NONE_NOTE =
-            "이 후기에 해당하는 근거를 찾지 못해, 저장된 문구로 안전한 기본 답글만 준비했습니다.";
+            "이 후기에 해당하는 근거를 찾지 못해, 저장된 문구로 안전한 기본 답글만 준비했어요.";
     static final String BASIS_PAST_ANSWER_NOTE =
-            "비슷한 후기에 판매자가 승인했던 답글의 말투를 참고해 썼습니다. 지금 근거가 없어 사실이나 약속은 넣지 않았습니다.";
+            "비슷한 후기에 판매자가 승인했던 답글의 말투를 참고해 썼어요. 지금 근거가 없어 사실이나 약속은 넣지 않았어요.";
     /** The basis of a draft written from a past answer's wording alone — no current evidence behind it. */
     static final String BASIS_PAST_ANSWER = "PAST_ANSWER";
     static final String BASIS_THANKS_NOTE =
-            "등록된 근거가 없어 감사와 공감만 담아 썼습니다. 사실이나 약속은 넣지 않았습니다.";
+            "등록된 근거가 없어 감사와 공감만 담아 썼어요. 사실이나 약속은 넣지 않았어요.";
     /**
      * The basis of a draft the model wrote with NO evidence at all: thanks and empathy only (owner decision
      * 2026-10-26). Before, this case saved the template floor verbatim, and the floor is picked by a topic keyword
@@ -441,7 +441,7 @@ public class ReviewDraftComposer {
     public CustomerPhraseLane.Options chooseGuidance(UUID orgId, Review review, String redactedBody, UUID sourceId,
                                                      String choice, UUID actorUserId) {
         if (phraseLane == null) {
-            throw com.sellerops.common.ApiException.conflict("안내 선택을 저장할 수 없습니다.");
+            throw com.sellerops.common.ApiException.conflict("안내 선택을 저장할 수 없어요.");
         }
         UUID productId = retriever.namedProduct(orgId, review.getProductId());
         phraseLane.choose(orgId, review.getId(), productId, redactedBody, sourceId, choice, actorUserId, null);
@@ -703,7 +703,7 @@ public class ReviewDraftComposer {
         if (need.asks() && productId != null && !hasProductPassage) {
             gaps.add(new ReviewKnowledgeGapView("PRODUCT", subject.text(), subject.kind(),
                     "'" + subject.text() + "'에 대해 고객에게 안내하는 공식 기준이 있나요? "
-                            + "이 상품에 저장된 지식에서 찾지 못했습니다.",
+                            + "이 상품에 저장된 지식에서 찾지 못했어요.",
                     productId.toString(), null));
         }
         // The ONE topic use of the template key, and it is a legitimate one: 「배송」 is a company
@@ -712,7 +712,7 @@ public class ReviewDraftComposer {
         // shipping standard written down?». It is unreachable at ★4+, where POSITIVE wins.
         if (key == ReviewReplyTemplateKey.DELIVERY && !hasPolicyPassage) {
             gaps.add(new ReviewKnowledgeGapView("ORG", "배송", "TOPIC",
-                    "배송에 대해 고객에게 안내하는 회사 기준이 있나요? 저장된 운영 정책에서 찾지 못했습니다.",
+                    "배송에 대해 고객에게 안내하는 회사 기준이 있나요? 저장된 운영 정책에서 찾지 못했어요.",
                     null, null));
         }
         return List.copyOf(gaps);

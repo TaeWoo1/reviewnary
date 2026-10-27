@@ -108,9 +108,9 @@ public class InquiryDraftComposer {
      * and none of them is 「답변 기준이 필요합니다」 — that sentence belongs to
      * {@link AnswerBasisState#NO_ANSWER_BASIS} alone.
      */
-    static final String CAPABILITY_OFF = "AI 답변 초안 기능이 켜져 있지 않습니다.";
-    static final String MODEL_FAILED = "답변 초안을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-    static final String DETAIL_READ_FAILED = "상품 상세 정보를 확인하지 못했습니다.";
+    static final String CAPABILITY_OFF = "AI 답변 초안 기능이 켜져 있지 않아요.";
+    static final String MODEL_FAILED = "답변 초안을 생성하지 못했어요. 잠시 후 다시 시도해 주세요.";
+    static final String DETAIL_READ_FAILED = "상품 상세 정보를 확인하지 못했어요.";
     /**
      * The third answer, and the first one with a producer.
      *
@@ -118,7 +118,7 @@ public class InquiryDraftComposer {
      * learning something about a product — so this sentence would have been a state nobody sets, and
      * it was deliberately not written. A picture whose reading is in flight is that moment.
      */
-    static final String DETAIL_READ_PENDING = "상품 상세 정보를 확인 중입니다.";
+    static final String DETAIL_READ_PENDING = "상품 상세 정보를 확인 중이에요.";
     /**
      * The fifth, and the only one caused by the company's own setting.
      *
@@ -126,13 +126,13 @@ public class InquiryDraftComposer {
      * Deleting the words out of the sentence would leave a reply whose meaning nobody chose, and
      * saving it anyway would make 「사용하지 않을 표현」 a preference rather than a rule.
      */
-    static final String UNSUPPORTED_CLAIM = "근거에 없는 약속이나 요청이 들어가 초안을 저장하지 않았습니다. "
+    static final String UNSUPPORTED_CLAIM = "근거에 없는 약속이나 요청이 들어가 초안을 저장하지 않았어요. "
             + "다시 생성해 보시거나 직접 작성해 주세요.";
     /**
      * A reply that carries a 【확인: …】 blank — the owner's open question, not an answer (2026-10-27). The retriever drops
      * every passage that carries one, so this is the last door, as it is in the review lane.
      */
-    static final String UNCONFIRMED_TEXT = "확인 전 안내(【확인: …】)가 들어가 초안을 저장하지 않았습니다. "
+    static final String UNCONFIRMED_TEXT = "확인 전 안내(【확인: …】)가 들어가 초안을 저장하지 않았어요. "
             + "다시 생성해 보시거나 직접 작성해 주세요.";
 
     /**
@@ -157,7 +157,7 @@ public class InquiryDraftComposer {
     }
 
     static final String STYLE_FORBIDDEN_PHRASE = "사용하지 않기로 한 표현이 들어가 초안을 저장하지 "
-            + "않았습니다. 다시 생성해 보시거나, 설정에서 그 표현을 확인해 주세요.";
+            + "않았어요. 다시 생성해 보시거나, 설정에서 그 표현을 확인해 주세요.";
 
     /**
      * 확인 필요 — where an ask that a draft could not answer is filed. Optional: a knowledge inbox
@@ -327,7 +327,7 @@ public class InquiryDraftComposer {
         String scope = catalogue || gap.productId() == null ? "ORG" : "PRODUCT";
         String question = catalogue
                 ? "「" + subject + "」" + objectParticle(subject) + " 판매하시는지 알려 주세요."
-                : "「" + subject + "」에 대해 고객에게 안내할 공식 기준이 필요합니다.";
+                : "「" + subject + "」에 대해 고객에게 안내할 공식 기준이 필요해요.";
         try {
             UUID scopedProduct = "ORG".equals(scope) ? null : gap.productId();
             KnowledgeCandidate filed = candidates.noteGap(orgId, scope, scopedProduct, subject, question);
@@ -361,10 +361,10 @@ public class InquiryDraftComposer {
     private GeneratedDraftView composeDraft(UUID orgId, UUID workItemId, String actor, ToneHint tone) {
         InquiryWorkItem workItem = workItems.findById(workItemId)
                 .filter(w -> w.getOrgId().equals(orgId))
-                .orElseThrow(() -> ApiException.notFound("문의 작업을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("문의 작업을 찾을 수 없어요."));
         Inquiry inquiry = inquiries.findById(workItem.getInquiryId())
                 .filter(i -> i.getOrgId().equals(orgId))
-                .orElseThrow(() -> ApiException.notFound("문의를 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("문의를 찾을 수 없어요."));
 
         // The question, as a person wrote it — the stored body may be a mail thread wrapped in markup.
         String title = MarkupText.toPlainText(inquiry.getTitle());
@@ -504,7 +504,7 @@ public class InquiryDraftComposer {
     }
 
     public static final String DECISION_UNAVAILABLE =
-            "문의를 항목별로 확인하지 못해 자동 초안을 만들지 않았습니다. 잠시 후 다시 준비해 보시거나 직접 작성해 주세요.";
+            "문의를 항목별로 확인하지 못해 자동 초안을 만들지 않았어요. 잠시 후 다시 준비해 보시거나 직접 작성해 주세요.";
 
     /**
      * Inquiry Decision v2 reached no decision (the planner or the judge did not answer): that is an operational fact,
@@ -672,7 +672,7 @@ public class InquiryDraftComposer {
     public List<DraftEvidenceView> evidenceFor(UUID orgId, UUID workItemId, int version) {
         workItems.findById(workItemId)
                 .filter(w -> w.getOrgId().equals(orgId))
-                .orElseThrow(() -> ApiException.notFound("문의 작업을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("문의 작업을 찾을 수 없어요."));
         return snippets.viewsOf(
                 evidence.findAllByWorkItemIdAndDraftVersionOrderByOrdinalAsc(workItemId, version));
     }
@@ -684,7 +684,7 @@ public class InquiryDraftComposer {
     }
 
     /** The knowledge note when the seller's catalogue, and nothing in this product's own library, answered. */
-    static final String CATALOGUE_GROUNDED = "판매자가 지금 판매 중인 상품 정보를 근거로 썼습니다.";
+    static final String CATALOGUE_GROUNDED = "판매자가 지금 판매 중인 상품 정보를 근거로 썼어요.";
 
     /** The draft's knowledge state: GROUNDED when the catalogue answered, the lanes' own state otherwise. */
     private static DraftKnowledgeState knowledgeStateOf(InquiryKnowledgeAssessor.Assessment assessment) {

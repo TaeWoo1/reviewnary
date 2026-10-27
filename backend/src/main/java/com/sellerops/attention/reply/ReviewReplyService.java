@@ -184,7 +184,7 @@ public class ReviewReplyService {
         }
         java.util.List<String> found = styleGuard.forbiddenIn(text, orgId);
         if (!found.isEmpty()) {
-            throw ApiException.conflict("회사가 쓰지 않기로 한 표현이 있어 승인할 수 없습니다: "
+            throw ApiException.conflict("회사가 쓰지 않기로 한 표현이 있어 승인할 수 없어요: "
                     + String.join(" · ", found.stream().map(p -> "「" + p + "」").toList()) + ". 문장을 고친 뒤 승인하세요.");
         }
     }
@@ -204,7 +204,7 @@ public class ReviewReplyService {
     /** Approving here or starting a guided run while a delegate holds the reply would be a second public reply. */
     private void requireNotDelegated(UUID orgId, UUID reviewId) {
         if (delegatedOpen(orgId, reviewId)) {
-            throw ApiException.conflict("담당자에게 맡긴 리뷰입니다. 여기서 승인하거나 등록하지 않습니다.");
+            throw ApiException.conflict("담당자에게 맡긴 리뷰예요. 여기서 승인하거나 등록하지 않아요.");
         }
     }
 
@@ -256,7 +256,7 @@ public class ReviewReplyService {
         requireNotFrozen(orgId, review.getId());
         requireChannelNotAnswered(review);
         if (composer == null) {
-            throw ApiException.conflict("AI 초안 기능을 사용할 수 없습니다.");
+            throw ApiException.conflict("AI 초안 기능을 사용할 수 없어요.");
         }
         // Plain text AND redacted, in that order, from one call: the sanitizer strips the markup
         // itself now (2026-10-05). Channels hand reviews over wrapped in it — measured on this
@@ -279,7 +279,7 @@ public class ReviewReplyService {
                                                                                              String actionRef) {
         Review review = authorize(orgId, accountId, actionRef);
         if (composer == null) {
-            throw ApiException.conflict("AI 초안 기능을 사용할 수 없습니다.");
+            throw ApiException.conflict("AI 초안 기능을 사용할 수 없어요.");
         }
         return composer.groundsFor(orgId, review, VocPreviewSanitizer.redactFullBody(review.getBody()).text());
     }
@@ -309,7 +309,7 @@ public class ReviewReplyService {
 
     private com.sellerops.review.draft.ReviewDraftComposer composerOrConflict() {
         if (composer == null) {
-            throw ApiException.conflict("AI 초안 기능을 사용할 수 없습니다.");
+            throw ApiException.conflict("AI 초안 기능을 사용할 수 없어요.");
         }
         return composer;
     }
@@ -352,7 +352,7 @@ public class ReviewReplyService {
             // shape for it — the caller asked for a state that already holds.
             gateOrReplay(orgId, reviewId, command, () -> {
                 if (approvals.current(orgId, reviewId).isEmpty()) {
-                    throw ApiException.conflict("승인된 초안이 없습니다.");
+                    throw ApiException.conflict("승인된 초안이 없어요.");
                 }
             });
             return approvals.decide(orgId, reviewId, actionRef, target, null, null, command, actor);
@@ -361,10 +361,10 @@ public class ReviewReplyService {
         // The binding is the version the CLIENT named, resolved before any gate so that a replay
         // can be compared against the same binding a fresh write would have produced.
         if (baseVersion == null) {
-            throw ApiException.badRequest("승인할 초안 버전(baseVersion)이 필요합니다.");
+            throw ApiException.badRequest("승인할 초안 버전(baseVersion)이 필요해요.");
         }
         ReviewReplyDraft bound = drafts.version(reviewId, baseVersion)
-                .orElseThrow(() -> ApiException.conflict("승인할 초안이 없습니다. 먼저 초안을 저장하세요."));
+                .orElseThrow(() -> ApiException.conflict("승인할 초안이 없어요. 먼저 초안을 저장하세요."));
 
         gateOrReplay(orgId, reviewId, command, () -> {
             requireResponseNeeded(orgId, reviewId);
@@ -391,7 +391,7 @@ public class ReviewReplyService {
             // comparison to be about the number.
             int headVersion = drafts.latest(reviewId).map(ReviewReplyDraft::getVersion).orElse(0);
             if (baseVersion.intValue() != headVersion) {
-                throw ApiException.conflict("이미 최신 초안이 있습니다. 새로고침 후 다시 시도하세요.");
+                throw ApiException.conflict("이미 최신 초안이 있어요. 새로고침 후 다시 시도하세요.");
             }
             // The same draft waits on the phone (2026-10-25); approving here takes it back from there first.
             if (delegated != null) {
@@ -454,18 +454,18 @@ public class ReviewReplyService {
         // run against a review the channel already answered. A guided run is the step immediately
         // before a public post, and the post cannot be taken back.
         if (review.getReplyState() == ReviewReplyState.ANSWERED) {
-            throw ApiException.conflict("채널에 이미 답변이 등록된 리뷰입니다. 가이드형 답변을 시작할 수 없습니다.");
+            throw ApiException.conflict("채널에 이미 답변이 등록된 리뷰예요. 가이드형 답변을 시작할 수 없어요.");
         }
         // Enforced server-side for the same reason the line above is: the capability object renders
         // affordances, and a client that ignores it must still not start a seller-center handoff for a
         // channel whose approved reply does not travel that way.
         if (!guidedLane(review.getChannelId())) {
-            throw ApiException.conflict("이 채널은 판매자센터에서 직접 답변하는 방식이 아닙니다. 승인한 답변을 복사해 사용하세요.");
+            throw ApiException.conflict("이 채널은 판매자센터에서 직접 답변하는 방식이 아니에요. 승인한 답변을 복사해 사용하세요.");
         }
         requireNotDelegated(orgId, reviewId);
         ReviewReplyApproval approval = approvals.current(orgId, reviewId)
                 .filter(a -> a.getState() == ReviewReplyApprovalState.APPROVED)
-                .orElseThrow(() -> ApiException.conflict("승인된 답변이 없습니다. 먼저 답변을 승인하세요."));
+                .orElseThrow(() -> ApiException.conflict("승인된 답변이 없어요. 먼저 답변을 승인하세요."));
 
         // Guided: derive AND validate the hint BEFORE minting, so a review that cannot produce a valid hint
         // never leaves an unusable spent ref.
@@ -476,7 +476,7 @@ public class ReviewReplyService {
             Integer rating = review.getRating();
             String body = review.getBody();
             if (rating == null || rating < 1 || rating > 5 || body == null || body.isBlank()) {
-                throw ApiException.conflict("이 리뷰로는 제출 대상 힌트를 만들 수 없어 제출을 시작할 수 없습니다.");
+                throw ApiException.conflict("이 리뷰로는 제출 대상 힌트를 만들 수 없어 제출을 시작할 수 없어요.");
             }
             targetHint = new ReviewReplyTargetHintView(rating,
                     ReviewRecencyBucket.of(review.getReceivedAt(), asOf).name(),
@@ -521,7 +521,7 @@ public class ReviewReplyService {
 
         ReviewReplySubmissionRef binding = outcomes.binding(orgId, ref)
                 .filter(b -> b.getReviewId().equals(reviewId))
-                .orElseThrow(() -> ApiException.conflict("유효하지 않은 제출 참조입니다. 다시 시작해 주세요."));
+                .orElseThrow(() -> ApiException.conflict("유효하지 않은 제출 참조예요. 다시 시작해 주세요."));
 
         gateOrReplayOutcome(orgId, command, () -> {
             requireResponseNeeded(orgId, reviewId);
@@ -531,10 +531,10 @@ public class ReviewReplyService {
             if (approval == null || approval.getApprovedVersion() == null
                     || approval.getApprovedVersion().intValue() != binding.getBoundVersion().intValue()
                     || !approval.getApprovedFingerprint().equals(binding.getBoundFingerprint())) {
-                throw ApiException.conflict("승인 상태가 바뀌었습니다. 답변 제출을 다시 시작해 주세요.");
+                throw ApiException.conflict("승인 상태가 바뀌었어요. 답변 제출을 다시 시작해 주세요.");
             }
             if (outcomes.isSpent(ref)) {
-                throw ApiException.conflict("이미 결과가 기록된 제출입니다. 다시 시작해 주세요.");
+                throw ApiException.conflict("이미 결과가 기록된 제출이에요. 다시 시작해 주세요.");
             }
         });
 
@@ -559,7 +559,7 @@ public class ReviewReplyService {
 
     private static String requireSubmissionRef(String submissionRef) {
         if (submissionRef == null || !submissionRef.strip().matches("[0-9a-f]{16}")) {
-            throw ApiException.badRequest("유효하지 않은 제출 참조입니다.");
+            throw ApiException.badRequest("유효하지 않은 제출 참조예요.");
         }
         return submissionRef.strip();
     }
@@ -582,7 +582,7 @@ public class ReviewReplyService {
         }
         String ref = awRunRef.strip();
         if (ref.length() > 128) {
-            throw ApiException.badRequest("실행 참조가 너무 깁니다.");
+            throw ApiException.badRequest("실행 참조가 너무 겨요.");
         }
         return ref;
     }
@@ -626,7 +626,7 @@ public class ReviewReplyService {
     private Review authorize(UUID orgId, UUID accountId, String actionRef) {
         UUID reviewId = VocItemRef.parseReviewId(actionRef);
         SellerAccount account = sellerAccounts.findByIdAndOrgId(accountId, orgId)
-                .orElseThrow(() -> ApiException.notFound("판매 계정을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("판매 계정을 찾을 수 없어요."));
         Review review = reviews.findByIdAndOrgId(reviewId, orgId)
                 .orElseThrow(ReviewReplyService::unaddressable);
         if (account.getChannelId() == null || !account.getChannelId().equals(review.getChannelId())) {
@@ -648,7 +648,7 @@ public class ReviewReplyService {
         }
         String code = channels.findById(channelId).map(c -> c.getCode()).orElse(null);
         if (code != null && !ReviewTriageChannelCapability.of(code).replyFlowExists()) {
-            throw ApiException.conflict("이 채널에서는 판매자가 리뷰에 직접 답글을 남길 수 없습니다.");
+            throw ApiException.conflict("이 채널에서는 판매자가 리뷰에 직접 답글을 남길 수 없어요.");
         }
     }
 
@@ -682,7 +682,7 @@ public class ReviewReplyService {
 
     private void requireResponseNeeded(UUID orgId, UUID reviewId) {
         if (disposition(orgId, reviewId).orElse(null) != TriageDisposition.RESPONSE_NEEDED) {
-            throw ApiException.conflict("'대응 필요'로 기록된 리뷰만 답변을 준비할 수 있습니다.");
+            throw ApiException.conflict("'대응 필요'로 기록된 리뷰만 답변을 준비할 수 있어요.");
         }
     }
 
@@ -696,7 +696,7 @@ public class ReviewReplyService {
      */
     private void requireChannelNotAnswered(Review review) {
         if (review.getReplyState() == ReviewReplyState.ANSWERED) {
-            throw ApiException.conflict("채널에 이미 답변이 등록된 리뷰입니다. 새 답변은 준비하지 않습니다.");
+            throw ApiException.conflict("채널에 이미 답변이 등록된 리뷰예요. 새 답변은 준비하지 않아요.");
         }
     }
 
@@ -716,7 +716,7 @@ public class ReviewReplyService {
 
     private void requireNotFrozen(UUID orgId, UUID reviewId) {
         if (isApproved(orgId, reviewId)) {
-            throw ApiException.conflict("승인된 초안은 수정할 수 없습니다. 승인을 해제한 뒤 수정하세요.");
+            throw ApiException.conflict("승인된 초안은 수정할 수 없어요. 승인을 해제한 뒤 수정하세요.");
         }
     }
 
@@ -905,6 +905,6 @@ public class ReviewReplyService {
      * cross-org review, and a review on another account's channel.
      */
     private static ApiException unaddressable() {
-        return ApiException.notFound("해당 항목을 찾을 수 없습니다.");
+        return ApiException.notFound("해당 항목을 찾을 수 없어요.");
     }
 }

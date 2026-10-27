@@ -311,7 +311,7 @@ class InquiryDraftComposerTest {
                 .generate(org, wi.getId(), user);
 
         assertThat(view.answerBasis()).isEqualTo(AnswerBasisState.NO_ANSWER_BASIS.name());
-        assertThat(view.answerBasisNote()).isEqualTo("답변 기준이 필요합니다.");
+        assertThat(view.answerBasisNote()).isEqualTo("답변 기준이 필요해요.");
         assertThat(view.unavailableMessage()).as("nothing failed — the library is simply empty")
                 .isNull();
     }
@@ -340,7 +340,7 @@ class InquiryDraftComposerTest {
         GeneratedDraftView view = composer(StubLibrary.empty(0), model).generate(org, wi.getId(), user);
 
         assertThat(view.answerBasis()).isEqualTo(AnswerBasisState.NO_ANSWER_BASIS.name());
-        assertThat(view.answerBasisNote()).isEqualTo("답변 기준이 필요합니다.");
+        assertThat(view.answerBasisNote()).isEqualTo("답변 기준이 필요해요.");
         assertThat(view.answerBasisAction()).as("what the seller can do about it")
                 .contains("어떤 상품");
         assertThat(model.sawTitle).as("the model is not asked to write a reply with no basis").isNull();
@@ -368,8 +368,8 @@ class InquiryDraftComposerTest {
         // the line says what was NOT checked instead of claiming the customer said nothing (Full
         // Pilot Walkthrough v1: a customer who wrote 「2호」 was being told they had not said which).
         assertThat(view.answerBasisAction())
-                .isEqualTo("이 상품에 등록된 규격 목록이 없어 고객이 말한 규격을 확인하지 못했습니다. 아래 초안은 규격을 되묻습니다.");
-        assertThat(view.answerBasisNote()).isEqualTo("정확한 답변을 위해 고객에게 확인할 내용이 있습니다.");
+                .isEqualTo("이 상품에 등록된 규격 목록이 없어 고객이 말한 규격을 확인하지 못했어요. 아래 초안은 규격을 되물어요.");
+        assertThat(view.answerBasisNote()).isEqualTo("정확한 답변을 위해 고객에게 확인할 내용이 있어요.");
     }
 
     @Test
@@ -392,7 +392,7 @@ class InquiryDraftComposerTest {
 
         assertThat(view.answerBasis()).isEqualTo(AnswerBasisState.NEEDS_CLARIFICATION.name());
         assertThat(view.answerBasisAction())
-                .isEqualTo("고객이 어떤 규격·옵션인지 밝히지 않았습니다. 아래 초안은 그 내용을 되묻습니다.");
+                .isEqualTo("고객이 어떤 규격·옵션인지 밝히지 않았어요. 아래 초안은 그 내용을 되물어요.");
     }
 
     @Test
@@ -478,7 +478,7 @@ class InquiryDraftComposerTest {
         GeneratedDraftView view = composer(StubLibrary.empty(0), model).generate(org, wi.getId(), user);
 
         assertThat(view.answerBasis()).isEqualTo(AnswerBasisState.NO_ANSWER_BASIS.name());
-        assertThat(view.answerBasisNote()).isEqualTo("답변 기준이 필요합니다.");
+        assertThat(view.answerBasisNote()).isEqualTo("답변 기준이 필요해요.");
         assertThat(model.calls).as("the summary is never shown to a model that has no evidence to write from").isZero();
         assertThat(view.draft()).isNull();
         assertThat(view.companyContextUsed()).isFalse();

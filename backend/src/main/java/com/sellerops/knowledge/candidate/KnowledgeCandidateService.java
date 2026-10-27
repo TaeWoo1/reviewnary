@@ -248,7 +248,7 @@ public class KnowledgeCandidateService {
             throw ApiException.badRequest("제안할 주제와 안내 문장을 적어 주세요.");
         }
         if (productId != null && products.findById(productId).filter(p -> p.getOrgId().equals(orgId)).isEmpty()) {
-            throw ApiException.notFound("상품을 찾을 수 없습니다.");
+            throw ApiException.notFound("상품을 찾을 수 없어요.");
         }
         String scope = productId == null ? "ORG" : "PRODUCT";
         String key = dedupeKey(scope, productId, ORIGIN_ISSUE_GUIDANCE + "|" + subject.strip());
@@ -339,9 +339,9 @@ public class KnowledgeCandidateService {
                                          UUID variantId, List<String> customerPhrases, UUID actorUserId,
                                          String actorName) {
         KnowledgeCandidate row = candidates.findByIdAndOrgId(candidateId, orgId)
-                .orElseThrow(() -> ApiException.notFound("확인할 항목을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("확인할 항목을 찾을 수 없어요."));
         if (!STATE_OPEN.equals(row.getState())) {
-            throw ApiException.conflict("이미 처리한 항목입니다.");
+            throw ApiException.conflict("이미 처리한 항목이에요.");
         }
         boolean written = content != null && !content.isBlank();
         if (!written && ORIGIN_DRAFT_GAP.equals(row.getOrigin())) {
@@ -358,7 +358,7 @@ public class KnowledgeCandidateService {
         if ("PRODUCT".equals(row.getScope()) && row.getProductId() != null) {
             Product product = products.findById(row.getProductId())
                     .filter(p -> p.getOrgId().equals(orgId))
-                    .orElseThrow(() -> ApiException.notFound("상품을 찾을 수 없습니다."));
+                    .orElseThrow(() -> ApiException.notFound("상품을 찾을 수 없어요."));
             ProductKnowledgeSource source = new ProductKnowledgeSource();
             source.setOrgId(orgId);
             source.setProductId(product.getId());
@@ -402,7 +402,7 @@ public class KnowledgeCandidateService {
         }
         ProductVariant variant = variants.findById(variantId)
                 .filter(v -> orgId.equals(v.getOrgId()) && productId.equals(v.getProductId()))
-                .orElseThrow(() -> ApiException.badRequest("이 상품의 규격이 아닙니다."));
+                .orElseThrow(() -> ApiException.badRequest("이 상품의 규격이 아니에요."));
         return variant.getId();
     }
 
@@ -426,7 +426,7 @@ public class KnowledgeCandidateService {
         }
         boolean product = "PRODUCT".equals(scope);
         if (product && productId == null) {
-            throw ApiException.badRequest("상품이 연결되지 않은 건은 회사 전체 기준으로만 저장할 수 있습니다.");
+            throw ApiException.badRequest("상품이 연결되지 않은 건은 회사 전체 기준으로만 저장할 수 있어요.");
         }
         String heading = subject == null || subject.isBlank() ? "고객 안내 기준" : subject.strip() + " 안내";
         KnowledgeCandidate row = new KnowledgeCandidate();
@@ -458,9 +458,9 @@ public class KnowledgeCandidateService {
     @Transactional
     public KnowledgeCandidateView dismiss(UUID orgId, UUID candidateId, String actorName) {
         KnowledgeCandidate row = candidates.findByIdAndOrgId(candidateId, orgId)
-                .orElseThrow(() -> ApiException.notFound("확인할 항목을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("확인할 항목을 찾을 수 없어요."));
         if (!STATE_OPEN.equals(row.getState())) {
-            throw ApiException.conflict("이미 처리한 항목입니다.");
+            throw ApiException.conflict("이미 처리한 항목이에요.");
         }
         row.setState(STATE_DISMISSED);
         row.setDecidedAt(Instant.now());
@@ -475,9 +475,9 @@ public class KnowledgeCandidateService {
     @Transactional
     public KnowledgeCandidateView revise(UUID orgId, UUID candidateId, String content, List<String> customerPhrases) {
         KnowledgeCandidate row = candidates.findByIdAndOrgId(candidateId, orgId)
-                .orElseThrow(() -> ApiException.notFound("확인할 항목을 찾을 수 없습니다."));
+                .orElseThrow(() -> ApiException.notFound("확인할 항목을 찾을 수 없어요."));
         if (!STATE_OPEN.equals(row.getState())) {
-            throw ApiException.conflict("이미 처리한 항목입니다.");
+            throw ApiException.conflict("이미 처리한 항목이에요.");
         }
         if (content != null && !content.isBlank()) {
             row.setContent(content.strip());

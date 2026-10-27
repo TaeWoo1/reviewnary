@@ -114,7 +114,7 @@ const NEEDS_CLARIFICATION = {
   draft: draftRow(),
   answerBasis: "NEEDS_CLARIFICATION",
   answerBasisNote: "정확한 답변을 위해 고객에게 확인할 내용이 있어요.",
-  answerBasisAction: "고객이 어떤 규격·옵션인지 밝히지 않았어요. 아래 초안은 그 내용을 되묻어요.",
+  answerBasisAction: "고객이 어떤 규격·옵션인지 밝히지 않았어요. 아래 초안은 그 내용을 되물어요.",
 };
 
 const NO_BASIS = {

@@ -124,9 +124,9 @@ public class KnowledgeWorkbookService {
             "고객은 이렇게 말해요", "상태", "같은 문제 리뷰", "메모", "변경 확인");
 
     /** A row changed on a screen after the file was downloaded. */
-    static final String STALE = "내려받은 뒤 화면에서 바뀐 줄이라 반영하지 않았습니다. 새로 내려받아 다시 고쳐 주세요.";
+    static final String STALE = "내려받은 뒤 화면에서 바뀐 줄이라 반영하지 않았어요. 새로 내려받아 다시 고쳐 주세요.";
     /** An existing guidance row with no 「변경 확인」 — a file from before it existed, or a cell someone cleared. */
-    static final String NO_BASE = "내려받은 때의 내용을 확인할 수 없는 줄이라 반영하지 않았습니다(예전 파일이거나 숨은 칸이 지워졌습니다). "
+    static final String NO_BASE = "내려받은 때의 내용을 확인할 수 없는 줄이라 반영하지 않았어요(예전 파일이거나 숨은 칸이 지워졌어요). "
             + "새로 내려받아 다시 고쳐 주세요.";
 
     private final AnswerStyleService styles;
@@ -184,11 +184,11 @@ public class KnowledgeWorkbookService {
         EMOJI("이모지", "사용하지 않음 · 가끔 한 개 중 하나"),
         ADDRESS("고객 호칭", "예: 고객님"),
         GREETING("첫 인사", "예: 안녕하세요, ○○입니다."),
-        CLOSING("끝 인사", "예: 감사합니다. 불만이 담긴 후기에는 밝은 인사 대신 차분하게 끝맺습니다."),
-        REQUIRED("꼭 넣을 표현", "한 줄에 하나. 사실(기간·금액·무료 등)을 약속하는 표현은 넣을 수 없습니다."),
-        FORBIDDEN("절대 쓰지 않을 표현", "한 줄에 하나. 이 표현이 든 초안은 고친 뒤에만 승인할 수 있습니다."),
-        AVOID("되도록 피할 표현", "한 줄에 하나, 「피할 말 → 대신 쓸 말」. 초안에 표시만 합니다."),
-        FALLBACK("답을 모를 때 문구", "문의 답변에서 근거가 없을 때 쓰는 문장입니다.");
+        CLOSING("끝 인사", "예: 감사해요. 불만이 담긴 후기에는 밝은 인사 대신 차분하게 끝맺어요."),
+        REQUIRED("꼭 넣을 표현", "한 줄에 하나. 사실(기간·금액·무료 등)을 약속하는 표현은 넣을 수 없어요."),
+        FORBIDDEN("절대 쓰지 않을 표현", "한 줄에 하나. 이 표현이 든 초안은 고친 뒤에만 승인할 수 있어요."),
+        AVOID("되도록 피할 표현", "한 줄에 하나, 「피할 말 → 대신 쓸 말」. 초안에 표시만 해요."),
+        FALLBACK("답을 모를 때 문구", "문의 답변에서 근거가 없을 때 쓰는 문장이에요.");
 
         final String label;
         final String help;
@@ -229,19 +229,19 @@ public class KnowledgeWorkbookService {
 
     static {
         TEMPLATE_NAMES.put(ReviewReplyTemplateKey.POSITIVE, new String[] {"별점 4~5점 기본 문구",
-                "별점이 4~5점인 리뷰에 씁니다."});
+                "별점이 4~5점인 리뷰에 써요."});
         TEMPLATE_NAMES.put(ReviewReplyTemplateKey.QUALITY, new String[] {"불량 · 파손 리뷰",
-                "상품이 불량이거나 깨지고 고장 났다는 리뷰에 씁니다."});
+                "상품이 불량이거나 깨지고 고장 났다는 리뷰에 써요."});
         TEMPLATE_NAMES.put(ReviewReplyTemplateKey.DELIVERY, new String[] {"배송 리뷰",
-                "배송이나 발송이 늦었다는 리뷰에 씁니다."});
+                "배송이나 발송이 늦었다는 리뷰에 써요."});
         TEMPLATE_NAMES.put(ReviewReplyTemplateKey.PACKAGING, new String[] {"포장 리뷰",
-                "포장이나 박스 상태를 지적한 리뷰에 씁니다."});
+                "포장이나 박스 상태를 지적한 리뷰에 써요."});
         TEMPLATE_NAMES.put(ReviewReplyTemplateKey.PRODUCT_INFO, new String[] {"상품 설명과 다르다는 리뷰",
-                "설명이나 사진과 실제가 다르다는 리뷰에 씁니다."});
+                "설명이나 사진과 실제가 다르다는 리뷰에 써요."});
         TEMPLATE_NAMES.put(ReviewReplyTemplateKey.PRICING, new String[] {"가격 리뷰",
-                "가격이 비싸다거나 가성비를 말한 리뷰에 씁니다."});
+                "가격이 비싸다거나 가성비를 말한 리뷰에 써요."});
         TEMPLATE_NAMES.put(ReviewReplyTemplateKey.GENERAL, new String[] {"그 밖의 리뷰",
-                "별점이 4점 미만이고 위 유형의 낱말도 없는 리뷰에 씁니다."});
+                "별점이 4점 미만이고 위 유형의 낱말도 없는 리뷰에 써요."});
     }
 
     /* ═══════════════════════════════════ download ═══════════════════════════════════ */
@@ -264,18 +264,18 @@ public class KnowledgeWorkbookService {
     private static void writeGuide(Workbook book, Styles look) {
         Sheet sheet = book.createSheet(SHEET_GUIDE);
         String[] lines = {
-                "이 파일로 답글의 말투 · 답변 템플릿 · 안내 매뉴얼을 한 번에 관리합니다.",
+                "이 파일로 답글의 말투 · 답변 템플릿 · 안내 매뉴얼을 한 번에 관리해요.",
                 "",
-                "1. 고칠 줄의 「새 값」 · 「새 문구」 · 「안내 문장」을 고치고, 그 줄의 「상태」를 「사용」으로 바꿉니다.",
-                "2. 「확인 전」인 줄은 답글에 쓰이지 않습니다. 안내 매뉴얼의 「확인 전」 줄은 「지식 → 확인 필요」에 제안으로 들어갑니다.",
-                "3. 【확인: …】이 남아 있는 줄은 「사용」으로 등록할 수 없습니다. 사장님만 아는 내용으로 바꿔 주세요.",
-                "4. 「사용 안 함」은 안내를 지우지 않고 끕니다. 나중에 「사용」으로 되돌릴 수 있습니다.",
-                "5. 「고객은 이렇게 말해요」에는 고객이 그 문제를 말하는 표현을 한 줄에 하나씩 적습니다. "
-                        + "리뷰에 이 표현이 있으면 그 안내가 답글 초안의 근거로 붙습니다. 「안 떨어져요」처럼 부정하는 말은 붙지 않습니다.",
-                "6. 새 안내는 맨 아래 빈 줄에 적습니다. 관리번호는 비워 두세요. 상품 안내는 상품번호나 상품명이 있어야 합니다.",
-                "7. 지식 화면의 「엑셀 올리기」로 올리면, 바뀌는 내용을 먼저 보여 드리고 「적용」을 눌러야 반영됩니다.",
+                "1. 고칠 줄의 「새 값」 · 「새 문구」 · 「안내 문장」을 고치고, 그 줄의 「상태」를 「사용」으로 바꿔요.",
+                "2. 「확인 전」인 줄은 답글에 쓰이지 않아요. 안내 매뉴얼의 「확인 전」 줄은 「지식 → 확인 필요」에 제안으로 들어가요.",
+                "3. 【확인: …】이 남아 있는 줄은 「사용」으로 등록할 수 없어요. 사장님만 아는 내용으로 바꿔 주세요.",
+                "4. 「사용 안 함」은 안내를 지우지 않고 꺼요. 나중에 「사용」으로 되돌릴 수 있어요.",
+                "5. 「고객은 이렇게 말해요」에는 고객이 그 문제를 말하는 표현을 한 줄에 하나씩 적어요. "
+                        + "리뷰에 이 표현이 있으면 그 안내가 답글 초안의 근거로 붙어요. 「안 떨어져요」처럼 부정하는 말은 붙지 않아요.",
+                "6. 새 안내는 맨 아래 빈 줄에 적어요. 관리번호는 비워 두세요. 상품 안내는 상품번호나 상품명이 있어야 해요.",
+                "7. 지식 화면의 「엑셀 올리기」로 올리면, 바뀌는 내용을 먼저 보여 드리고 「적용」을 눌러야 반영돼요.",
                 "",
-                "관리번호 · 관리키 칸은 고치지 마세요. 어느 안내인지 찾는 데 씁니다."};
+                "관리번호 · 관리키 칸은 고치지 마세요. 어느 안내인지 찾는 데 써요."};
         for (int i = 0; i < lines.length; i++) {
             Cell cell = sheet.createRow(i).createCell(0);
             cell.setCellValue(lines[i]);
@@ -348,7 +348,7 @@ public class KnowledgeWorkbookService {
                     product ? refOf(orgId, c.getProductId()) : "", product ? nameOf(owned.get(c.getProductId())) : "",
                     "", c.getSubject(), c.getContent(), lines(c.getCustomerPhrases()), PENDING,
                     String.valueOf(c.getEvidenceCount()),
-                    KnowledgeBlanks.carries(c.getContent()) ? "【확인】을 채워야 사용할 수 있습니다" : "", fingerprint(c)});
+                    KnowledgeBlanks.carries(c.getContent()) ? "【확인】을 채워야 사용할 수 있어요" : "", fingerprint(c)});
         }
         rows.sort(Comparator.<String[], Integer>comparing(row -> SCOPE_PRODUCT.equals(row[1]) ? 0 : 1)
                 .thenComparing(row -> row[3])
@@ -361,7 +361,7 @@ public class KnowledgeWorkbookService {
             for (int c = 0; c < values.length; c++) {
                 String value = values[c];
                 if (c == 6 && tooLong) {
-                    value = "(본문이 길어 엑셀에 싣지 않았습니다. 지식 화면에서 고쳐 주세요.)";
+                    value = "(본문이 길어 엑셀에 싣지 않았어요. 지식 화면에서 고쳐 주세요.)";
                 } else if (c == 8 && tooLong) {
                     value = SCREEN;
                 }
@@ -394,7 +394,7 @@ public class KnowledgeWorkbookService {
         try {
             book = WorkbookFactory.create(file);
         } catch (IOException | RuntimeException e) {
-            throw ApiException.badRequest("엑셀 파일을 읽지 못했습니다. 지식 화면에서 내려받은 .xlsx 파일을 올려 주세요.");
+            throw ApiException.badRequest("엑셀 파일을 읽지 못했어요. 지식 화면에서 내려받은 .xlsx 파일을 올려 주세요.");
         }
         Plan plan = new Plan();
         try (book) {
@@ -402,7 +402,7 @@ public class KnowledgeWorkbookService {
             Sheet templateSheet = book.getSheet(SHEET_TEMPLATES);
             Sheet manual = book.getSheet(SHEET_MANUAL);
             if (style == null && templateSheet == null && manual == null) {
-                throw ApiException.badRequest("「말투」 · 「답변 템플릿」 · 「안내 매뉴얼」 시트가 없습니다. 지식 화면에서 내려받은 파일을 써 주세요.");
+                throw ApiException.badRequest("「말투」 · 「답변 템플릿」 · 「안내 매뉴얼」 시트가 없어요. 지식 화면에서 내려받은 파일을 써 주세요.");
             }
             if (style != null) {
                 readStyle(orgId, style, plan, actorUserId);
@@ -414,7 +414,7 @@ public class KnowledgeWorkbookService {
                 readManual(orgId, manual, plan, actorUserId, actorName);
             }
         } catch (IOException e) {
-            throw ApiException.badRequest("엑셀 파일을 읽지 못했습니다.");
+            throw ApiException.badRequest("엑셀 파일을 읽지 못했어요.");
         }
         if (!apply) {
             return new Result(false, plan.changes(), List.copyOf(plan.problems));
@@ -485,7 +485,7 @@ public class KnowledgeWorkbookService {
     private void readStyle(UUID orgId, Sheet sheet, Plan plan, UUID actorUserId) {
         Map<String, Integer> col = columns(sheet, STYLE_HEADERS);
         if (col == null) {
-            plan.problem(SHEET_STYLE, 1, "머리줄(항목 · 새 값 · 상태)이 없어 이 시트를 읽지 않았습니다.");
+            plan.problem(SHEET_STYLE, 1, "머리줄(항목 · 새 값 · 상태)이 없어 이 시트를 읽지 않았어요.");
             return;
         }
         AnswerStyleProfile now = styles.profileFor(orgId);
@@ -514,7 +514,7 @@ public class KnowledgeWorkbookService {
             }
             Optional<StyleField> field = StyleField.of(label);
             if (field.isEmpty()) {
-                plan.problem(SHEET_STYLE, r + 1, "「" + label + "」은 알 수 없는 항목입니다.");
+                plan.problem(SHEET_STYLE, r + 1, "「" + label + "」은 알 수 없는 항목이에요.");
                 continue;
             }
             if (!USE.equals(status) && !DEFAULT.equals(status)) {
@@ -523,7 +523,7 @@ public class KnowledgeWorkbookService {
             }
             boolean reset = DEFAULT.equals(status);
             if (!reset && value.isEmpty()) {
-                plan.problem(SHEET_STYLE, r + 1, "「새 값」이 비어 있습니다. 비우려면 상태를 「기본값으로」로 적어 주세요.");
+                plan.problem(SHEET_STYLE, r + 1, "「새 값」이 비어 있어요. 비우려면 상태를 「기본값으로」로 적어 주세요.");
                 continue;
             }
             if (!reset && KnowledgeBlanks.carries(value)) {
@@ -599,7 +599,7 @@ public class KnowledgeWorkbookService {
     private void readTemplates(UUID orgId, Sheet sheet, Plan plan, UUID actorUserId) {
         Map<String, Integer> col = columns(sheet, TEMPLATE_HEADERS);
         if (col == null) {
-            plan.problem(SHEET_TEMPLATES, 1, "머리줄(유형 · 새 문구 · 상태)이 없어 이 시트를 읽지 않았습니다.");
+            plan.problem(SHEET_TEMPLATES, 1, "머리줄(유형 · 새 문구 · 상태)이 없어 이 시트를 읽지 않았어요.");
             return;
         }
         for (int r = 1; r <= sheet.getLastRowNum(); r++) {
@@ -613,7 +613,7 @@ public class KnowledgeWorkbookService {
                     .or(() -> TEMPLATE_NAMES.entrySet().stream().filter(e -> e.getValue()[0].equals(name))
                             .map(Map.Entry::getKey).findFirst());
             if (key.isEmpty()) {
-                plan.problem(SHEET_TEMPLATES, r + 1, "어느 유형인지 알 수 없습니다. 「유형」과 「관리키」를 고치지 말아 주세요.");
+                plan.problem(SHEET_TEMPLATES, r + 1, "어느 유형인지 알 수 없어요. 「유형」과 「관리키」를 고치지 말아 주세요.");
                 continue;
             }
             String label = TEMPLATE_NAMES.get(key.get())[0];
@@ -635,7 +635,7 @@ public class KnowledgeWorkbookService {
             }
             String body = text(row, col.get("새 문구"));
             if (body.isEmpty()) {
-                plan.problem(SHEET_TEMPLATES, r + 1, "「새 문구」가 비어 있습니다.");
+                plan.problem(SHEET_TEMPLATES, r + 1, "「새 문구」가 비어 있어요.");
                 continue;
             }
             if (KnowledgeBlanks.carries(body)) {
@@ -653,7 +653,7 @@ public class KnowledgeWorkbookService {
     private void readManual(UUID orgId, Sheet sheet, Plan plan, UUID actorUserId, String actorName) {
         Map<String, Integer> col = columns(sheet, MANUAL_HEADERS);
         if (col == null) {
-            plan.problem(SHEET_MANUAL, 1, "머리줄(관리번호 · 주제 · 안내 문장 · 상태 …)이 없어 이 시트를 읽지 않았습니다.");
+            plan.problem(SHEET_MANUAL, 1, "머리줄(관리번호 · 주제 · 안내 문장 · 상태 …)이 없어 이 시트를 읽지 않았어요.");
             return;
         }
         Map<UUID, Product> owned = new HashMap<>();
@@ -681,13 +681,13 @@ public class KnowledgeWorkbookService {
             }
             String label = "「" + (subject.isEmpty() ? "제목 없음" : subject) + "」";
             if (CustomerPhrases.overflows(rawPhrases)) {
-                plan.problem(SHEET_MANUAL, at, "고객 표현은 " + CustomerPhrases.MAX_PHRASES + "개까지만 저장됩니다. 앞의 "
-                        + CustomerPhrases.MAX_PHRASES + "개만 씁니다.");
+                plan.problem(SHEET_MANUAL, at, "고객 표현은 " + CustomerPhrases.MAX_PHRASES + "개까지만 저장돼요. 앞의 "
+                        + CustomerPhrases.MAX_PHRASES + "개만 써요.");
             }
             if (id.startsWith("P-") || id.startsWith("O-") || id.startsWith("C-")) {
                 UUID ref = uuid(id.substring(2));
                 if (ref == null) {
-                    plan.problem(SHEET_MANUAL, at, "관리번호를 읽지 못했습니다. 새 안내라면 관리번호를 비워 주세요.");
+                    plan.problem(SHEET_MANUAL, at, "관리번호를 읽지 못했어요. 새 안내라면 관리번호를 비워 주세요.");
                     continue;
                 }
                 if (id.startsWith("P-")) {
@@ -701,7 +701,7 @@ public class KnowledgeWorkbookService {
                 continue;
             }
             if (!id.isEmpty()) {
-                plan.problem(SHEET_MANUAL, at, "관리번호를 읽지 못했습니다. 새 안내라면 관리번호를 비워 주세요.");
+                plan.problem(SHEET_MANUAL, at, "관리번호를 읽지 못했어요. 새 안내라면 관리번호를 비워 주세요.");
                 continue;
             }
             newRow(orgId, owned, row, col, subject, body, phrases, status, at, label, plan, actorUserId, actorName);
@@ -712,7 +712,7 @@ public class KnowledgeWorkbookService {
                                  String status, int at, String label, String base, Plan plan) {
         Optional<ProductKnowledgeSource> found = productSources.findByIdAndOrgId(id, orgId);
         if (found.isEmpty()) {
-            plan.problem(SHEET_MANUAL, at, "관리번호에 맞는 안내가 없습니다. 새 안내라면 관리번호를 비워 주세요.");
+            plan.problem(SHEET_MANUAL, at, "관리번호에 맞는 안내가 없어요. 새 안내라면 관리번호를 비워 주세요.");
             return;
         }
         ProductKnowledgeSource s = found.get();
@@ -733,13 +733,13 @@ public class KnowledgeWorkbookService {
         }
         if (!USE.equals(status)) {
             if (PENDING.equals(status)) {
-                plan.problem(SHEET_MANUAL, at, "이미 등록된 안내입니다. 「사용」이나 「사용 안 함」으로 적어 주세요.");
+                plan.problem(SHEET_MANUAL, at, "이미 등록된 안내예요. 「사용」이나 「사용 안 함」으로 적어 주세요.");
             }
             return;
         }
         if (body.isEmpty() || KnowledgeBlanks.carries(body)) {
-            plan.problem(SHEET_MANUAL, at, label + " — " + (body.isEmpty() ? "「안내 문장」이 비어 있습니다."
-                    : "【확인: …】이 남아 있어 「사용」으로 등록할 수 없습니다."));
+            plan.problem(SHEET_MANUAL, at, label + " — " + (body.isEmpty() ? "「안내 문장」이 비어 있어요."
+                    : "【확인: …】이 남아 있어 「사용」으로 등록할 수 없어요."));
             return;
         }
         String title = subject.isEmpty() ? s.getTitle() : subject;
@@ -765,7 +765,7 @@ public class KnowledgeWorkbookService {
                              int at, String label, String base, Plan plan) {
         Optional<OrgKnowledgeSource> found = orgSources.findByIdAndOrgId(id, orgId);
         if (found.isEmpty()) {
-            plan.problem(SHEET_MANUAL, at, "관리번호에 맞는 안내가 없습니다. 새 안내라면 관리번호를 비워 주세요.");
+            plan.problem(SHEET_MANUAL, at, "관리번호에 맞는 안내가 없어요. 새 안내라면 관리번호를 비워 주세요.");
             return;
         }
         OrgKnowledgeSource s = found.get();
@@ -785,13 +785,13 @@ public class KnowledgeWorkbookService {
         }
         if (!USE.equals(status)) {
             if (PENDING.equals(status)) {
-                plan.problem(SHEET_MANUAL, at, "이미 등록된 안내입니다. 「사용」이나 「사용 안 함」으로 적어 주세요.");
+                plan.problem(SHEET_MANUAL, at, "이미 등록된 안내예요. 「사용」이나 「사용 안 함」으로 적어 주세요.");
             }
             return;
         }
         if (body.isEmpty() || KnowledgeBlanks.carries(body)) {
-            plan.problem(SHEET_MANUAL, at, label + " — " + (body.isEmpty() ? "「안내 문장」이 비어 있습니다."
-                    : "【확인: …】이 남아 있어 「사용」으로 등록할 수 없습니다."));
+            plan.problem(SHEET_MANUAL, at, label + " — " + (body.isEmpty() ? "「안내 문장」이 비어 있어요."
+                    : "【확인: …】이 남아 있어 「사용」으로 등록할 수 없어요."));
             return;
         }
         String title = subject.isEmpty() ? s.getTitle() : subject;
@@ -818,11 +818,11 @@ public class KnowledgeWorkbookService {
                                    String actorName, String kind) {
         Optional<KnowledgeCandidate> found = candidateRows.findByIdAndOrgId(id, orgId);
         if (found.isEmpty()) {
-            plan.problem(SHEET_MANUAL, at, "관리번호에 맞는 제안이 없습니다. 이 회사에서 내려받은 파일인지 확인해 주세요.");
+            plan.problem(SHEET_MANUAL, at, "관리번호에 맞는 제안이 없어요. 이 회사에서 내려받은 파일인지 확인해 주세요.");
             return;
         }
         if (!"OPEN".equals(found.get().getState())) {
-            plan.problem(SHEET_MANUAL, at, "이미 처리한 제안입니다. 새로 내려받은 파일로 다시 해 주세요.");
+            plan.problem(SHEET_MANUAL, at, "이미 처리한 제안이에요. 새로 내려받은 파일로 다시 해 주세요.");
             return;
         }
         KnowledgeCandidate c = found.get();
@@ -842,8 +842,8 @@ public class KnowledgeWorkbookService {
         }
         if (USE.equals(status)) {
             if (body.isEmpty() || KnowledgeBlanks.carries(body)) {
-                plan.problem(SHEET_MANUAL, at, label + " — " + (body.isEmpty() ? "「안내 문장」이 비어 있습니다."
-                        : "【확인: …】이 남아 있어 「사용」으로 등록할 수 없습니다. 사장님만 아는 내용으로 바꿔 주세요."));
+                plan.problem(SHEET_MANUAL, at, label + " — " + (body.isEmpty() ? "「안내 문장」이 비어 있어요."
+                        : "【확인: …】이 남아 있어 「사용」으로 등록할 수 없어요. 사장님만 아는 내용으로 바꿔 주세요."));
                 return;
             }
             KnowledgeSourceType productType = product ? sourceType(kind) : null;
@@ -866,7 +866,7 @@ public class KnowledgeWorkbookService {
                         String body, List<String> phrases, String status, int at, String label, Plan plan,
                         UUID actorUserId, String actorName) {
         if (subject.isEmpty() || body.isEmpty()) {
-            plan.problem(SHEET_MANUAL, at, "새 안내는 「주제」와 「안내 문장」이 모두 있어야 합니다.");
+            plan.problem(SHEET_MANUAL, at, "새 안내는 「주제」와 「안내 문장」이 모두 있어야 해요.");
             return;
         }
         if (OFF.equals(status)) {
@@ -878,7 +878,7 @@ public class KnowledgeWorkbookService {
         if (!org) {
             productId = productOf(orgId, owned, text(row, col.get("상품번호")), text(row, col.get("상품명")));
             if (productId == null) {
-                plan.problem(SHEET_MANUAL, at, "상품을 찾지 못했습니다. 상품번호나 상품명을 확인하시거나, 회사 전체 안내라면 범위를 「회사 전체」로 적어 주세요.");
+                plan.problem(SHEET_MANUAL, at, "상품을 찾지 못했어요. 상품번호나 상품명을 확인하시거나, 회사 전체 안내라면 범위를 「회사 전체」로 적어 주세요.");
                 return;
             }
         }
@@ -895,7 +895,7 @@ public class KnowledgeWorkbookService {
                                 && personWritten(s.getAuthoredOrigin(), s.getDocumentName()))
                         .map(s -> "P-" + s.getId()).findFirst();
         if (taken.isPresent()) {
-            plan.problem(SHEET_MANUAL, at, label + " — 같은 주제의 안내가 이미 있습니다(관리번호 " + taken.get()
+            plan.problem(SHEET_MANUAL, at, label + " — 같은 주제의 안내가 이미 있어요(관리번호 " + taken.get()
                     + "). 그 줄을 고치시거나, 다른 안내라면 주제를 바꿔 주세요.");
             return;
         }
@@ -914,7 +914,7 @@ public class KnowledgeWorkbookService {
             return;
         }
         if (USE.equals(status)) {
-            plan.problem(SHEET_MANUAL, at, label + " — 【확인: …】이 남아 있어 「사용」으로 등록하지 않고 확인 필요에 제안으로 넣습니다.");
+            plan.problem(SHEET_MANUAL, at, label + " — 【확인: …】이 남아 있어 「사용」으로 등록하지 않고 확인 필요에 제안으로 넣어요.");
         }
         int evidence = number(text(row, col.get("같은 문제 리뷰")));
         plan.change(SHEET_MANUAL, at, label + " 확인 필요에 제안으로 넣음 (확인 전)", target == null ? SCOPE_ORG

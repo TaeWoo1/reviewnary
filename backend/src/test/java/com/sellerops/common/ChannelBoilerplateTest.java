@@ -129,10 +129,10 @@ class ChannelBoilerplateTest {
     void stripsTheRedactedAndTruncatedShape() {
         // 지식 후보 하나가 실제로 들고 있는 문장 (데모 org, 2026-09-03 생성).
         String stored = "'늘 만족하며 잘 쓰고 있어요 ([번호] 12:36:41 에 등록된 네…'에 대해 고객에게 "
-                + "안내하는 공식 기준이 있나요? 이 상품에 저장된 지식에서 찾지 못했습니다.";
+                + "안내하는 공식 기준이 있나요? 이 상품에 저장된 지식에서 찾지 못했어요.";
         assertThat(ChannelBoilerplate.strip(stored))
                 .isEqualTo("'늘 만족하며 잘 쓰고 있어요'에 대해 고객에게 안내하는 공식 기준이 있나요? "
-                        + "이 상품에 저장된 지식에서 찾지 못했습니다.");
+                        + "이 상품에 저장된 지식에서 찾지 못했어요.");
         // 인용부호 없이 글 끝에서 잘린 꼴도 같다.
         assertThat(ChannelBoilerplate.strip("늘 만족하며 잘 쓰고 있어요 ([번호] 12:36:41 에 등록된 네…"))
                 .isEqualTo("늘 만족하며 잘 쓰고 있어요");

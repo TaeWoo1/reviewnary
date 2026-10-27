@@ -45,32 +45,32 @@ public final class AttentionSignalRules {
         if (snapshot.unansweredInquiries() > 0) {
             signals.add(signal(AttentionSignalType.UNANSWERED_INQUIRY, AttentionSeverity.HIGH,
                     snapshot.unansweredInquiries(), "답변 필요 문의",
-                    "미답변 상태의 문의입니다. 우선 확인해 주세요.", SOURCE_INQUIRY, channel));
+                    "미답변 상태의 문의예요. 우선 확인해 주세요.", SOURCE_INQUIRY, channel));
         }
         if (snapshot.lowRatingReviews() > 0) {
             signals.add(signal(AttentionSignalType.LOW_RATING_REVIEW, AttentionSeverity.HIGH,
                     snapshot.lowRatingReviews(), "낮은 평점(1~2점) 리뷰",
-                    "불만족 리뷰입니다. 내용을 확인하고 대응을 검토하세요.", SOURCE_REVIEW, channel));
+                    "불만족 리뷰예요. 내용을 확인하고 대응을 검토하세요.", SOURCE_REVIEW, channel));
         }
         if (snapshot.midRatingReviews() > 0) {
             signals.add(signal(AttentionSignalType.LOW_RATING_REVIEW, AttentionSeverity.MEDIUM,
                     snapshot.midRatingReviews(), "보통 평점(3점) 리뷰",
-                    "개선 여지가 있는 리뷰입니다. 확인을 권장합니다.", SOURCE_REVIEW, channel));
+                    "개선 여지가 있는 리뷰예요. 확인을 권장해요.", SOURCE_REVIEW, channel));
         }
         if (snapshot.newInquiries() > 0) {
             signals.add(signal(AttentionSignalType.NEW_INQUIRY, AttentionSeverity.MEDIUM,
                     snapshot.newInquiries(), "신규 문의",
-                    "기간 내 새로 수집된 문의입니다.", SOURCE_INQUIRY, channel));
+                    "기간 내 새로 수집된 문의예요.", SOURCE_INQUIRY, channel));
         }
         if (snapshot.unknownReplyInquiries() > 0) {
             signals.add(signal(AttentionSignalType.UNKNOWN_REPLY_STATUS, AttentionSeverity.MEDIUM,
                     snapshot.unknownReplyInquiries(), "답변 상태 확인 필요",
-                    "답변 여부를 판별하지 못한 문의입니다. 직접 확인이 필요합니다.", SOURCE_INQUIRY, channel));
+                    "답변 여부를 판별하지 못한 문의예요. 직접 확인이 필요해요.", SOURCE_INQUIRY, channel));
         }
         if (snapshot.newReviews() > 0) {
             signals.add(signal(AttentionSignalType.NEW_REVIEW, AttentionSeverity.LOW,
                     snapshot.newReviews(), "신규 리뷰",
-                    "기간 내 새로 수집된 리뷰입니다.", SOURCE_REVIEW, channel));
+                    "기간 내 새로 수집된 리뷰예요.", SOURCE_REVIEW, channel));
         }
 
         // Volume-change lenses: current window vs the immediately preceding equal-length
@@ -107,7 +107,7 @@ public final class AttentionSignalRules {
         AttentionSeverity severity = (current >= SPIKE_HIGH_CURRENT && current >= previous * SPIKE_HIGH_RATIO)
                 ? AttentionSeverity.HIGH : AttentionSeverity.MEDIUM;
         String description = "선택 기간 " + noun + "가 " + current + "건으로 직전 동일 기간 "
-                + previous + "건보다 증가했습니다.";
+                + previous + "건보다 증가했어요.";
         // Same aggregate numbers as the description, exposed as structured metadata so the
         // UI can render a quantified line without parsing prose. previous >= 1 here.
         SpikeComparison comparison = new SpikeComparison(previous, current - previous, (double) current / previous);

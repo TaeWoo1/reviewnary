@@ -140,7 +140,7 @@ class ReportFactsBuilderCoverageTest {
             assertThat(r.included()).isEmpty();
             assertThat(r.excluded()).hasSize(2);
             assertThat(r.excluded()).allSatisfy(c ->
-                    assertThat(c.reasonKo()).isEqualTo("최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했습니다"));
+                    assertThat(c.reasonKo()).isEqualTo("최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했어요"));
         });
         assertThat(inquiries.excludedChannels()).isEqualTo(2);
     }
@@ -278,7 +278,7 @@ class ReportFactsBuilderCoverageTest {
         });
         assertThat(review.excluded()).singleElement().satisfies(c -> {
             assertThat(c.channelCode()).isEqualTo("CAFE24");
-            assertThat(c.reasonKo()).isEqualTo("최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했습니다");
+            assertThat(c.reasonKo()).isEqualTo("최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했어요");
         });
         // 읽은 적 없는 종류는 시각이 없다 — 0이 아니라 없음이다.
         assertThat(facts.reads()).extracting(ReportFacts.Read::dataType)

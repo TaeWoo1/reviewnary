@@ -186,7 +186,7 @@ class ReviewReplyServiceTest {
                 UUID.randomUUID().toString(), user);
         assertThatThrownBy(() -> service.saveDraft(org, coupangAccount, coupangRef, "합성-쿠팡 답글", 0, user))
                 .isInstanceOf(ApiException.class)
-                .hasMessageContaining("직접 답글을 남길 수 없습니다");
+                .hasMessageContaining("직접 답글을 남길 수 없어요");
         assertThatThrownBy(() -> service.decideApproval(org, coupangAccount, coupangRef, "APPROVED", 1,
                 UUID.randomUUID().toString(), user))
                 .isInstanceOf(ApiException.class);
@@ -858,7 +858,7 @@ class ReviewReplyServiceTest {
         assertThatThrownBy(() -> service.generateDraft(org, account, ref, user))
                 .isInstanceOf(ApiException.class)
                 // The APPROVAL is why, not a missing capability — the message names the way out.
-                .hasMessageContaining("승인된 초안은 수정할 수 없습니다");
+                .hasMessageContaining("승인된 초안은 수정할 수 없어요");
 
         // Untouched: same version, same bytes, same approval.
         assertThat(view().draft().version()).isEqualTo(1);

@@ -41,7 +41,7 @@ final class ReportFixtures {
         List<ReportFacts.ReadChannel> excluded = java.util.Arrays.stream(excludedCodes)
                 .map(code -> new ReportFacts.ReadChannel(code, code, ChannelDataState.OBSERVED_FRESHNESS_UNPROVEN,
                         Instant.parse("2026-08-30T03:00:00Z"),
-                        "최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했습니다"))
+                        "최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했어요"))
                 .toList();
         List<ReportFacts.ReadChannel> included = measured
                 ? List.of(new ReportFacts.ReadChannel("NAVER", "네이버 스마트스토어", ChannelDataState.OBSERVED_FRESH,

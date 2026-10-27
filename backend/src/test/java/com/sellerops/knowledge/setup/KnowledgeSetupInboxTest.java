@@ -40,7 +40,7 @@ import org.springframework.test.context.ActiveProfiles;
  *
  * <p><b>§3 A question is never an answer.</b> The measured defect: 「답변 기준으로 등록」 on a
  * drafting-gap card wrote the candidate's stored text — which for a gap is 「'…'에 대해 고객에게
- * 안내하는 공식 기준이 있나요? 이 상품에 저장된 지식에서 찾지 못했습니다.」 — into the company's
+ * 안내하는 공식 기준이 있나요? 이 상품에 저장된 지식에서 찾지 못했어요.」 — into the company's
  * product knowledge as an indexed, citable FAQ. The next customer to ask would have been answered
  * with reviewnary's own confusion. A repeated ANSWER may still be accepted unedited, because that
  * text is a sentence the seller has already written to customers many times.
@@ -102,7 +102,7 @@ class KnowledgeSetupInboxTest {
     @Test
     @DisplayName("an answered ask is REPORTED as answered, not merely not-refiled")
     void anAnsweredAskSaysSo() {
-        String question = "「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요합니다.";
+        String question = "「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요해요.";
         UUID candidateId = candidates.noteGap(org, "PRODUCT", productId, "미끄럼 방지", question).getId();
 
         // Before the seller answers it, nothing claims they did.
@@ -122,8 +122,8 @@ class KnowledgeSetupInboxTest {
     @Test
     @DisplayName("a different ask is a different question — identity, never resemblance")
     void anotherAskIsUntouched() {
-        String answered = "「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요합니다.";
-        String other = "「두께」에 대해 고객에게 안내할 공식 기준이 필요합니다.";
+        String answered = "「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요해요.";
+        String other = "「두께」에 대해 고객에게 안내할 공식 기준이 필요해요.";
         UUID id = candidates.noteGap(org, "PRODUCT", productId, "미끄럼 방지", answered).getId();
         candidates.accept(org, id, "미끄럼 방지 안내", "실리콘 도트로 고정됩니다.",
                 KnowledgeSourceType.USAGE, null, null, null, "판매자");
@@ -138,7 +138,7 @@ class KnowledgeSetupInboxTest {
     void aGapIsNeverItsOwnAnswer() {
         UUID candidateId = candidates
                 .noteGap(org, "PRODUCT", productId, "미끄럼 방지",
-                        "「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요합니다.")
+                        "「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요해요.")
                 .getId();
 
         assertThatThrownBy(() -> candidates.accept(org, candidateId, null, null, null, null, null, "판매자"))
@@ -156,7 +156,7 @@ class KnowledgeSetupInboxTest {
     void aGapWithASentenceIsFiled() {
         UUID candidateId = candidates
                 .noteGap(org, "PRODUCT", productId, "미끄럼 방지",
-                        "「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요합니다.")
+                        "「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요해요.")
                 .getId();
 
         candidates.accept(org, candidateId, "미끄럼 방지",
@@ -203,11 +203,11 @@ class KnowledgeSetupInboxTest {
     void answeringOneAskClosesOnlyIt() {
         UUID answered = candidates
                 .noteGap(org, "PRODUCT", productId, "미끄럼 방지",
-                        "「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요합니다.")
+                        "「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요해요.")
                 .getId();
         UUID similar = candidates
                 .noteGap(org, "PRODUCT", productId, "미끄럼",
-                        "「미끄럼」에 대해 고객에게 안내할 공식 기준이 필요합니다.")
+                        "「미끄럼」에 대해 고객에게 안내할 공식 기준이 필요해요.")
                 .getId();
         UUID spec = variant("60x90cm / 5mm");
 
@@ -238,7 +238,7 @@ class KnowledgeSetupInboxTest {
     @Test
     @DisplayName("§C — the same ask is not filed again after it has been answered")
     void anAnsweredAskIsNotRefiled() {
-        String question = "「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요합니다.";
+        String question = "「미끄럼 방지」에 대해 고객에게 안내할 공식 기준이 필요해요.";
         UUID first = candidates.noteGap(org, "PRODUCT", productId, "미끄럼 방지", question).getId();
         candidates.accept(org, first, null, "밀리지 않습니다.", KnowledgeSourceType.FAQ, null,
                 null, null, "판매자");
@@ -250,7 +250,7 @@ class KnowledgeSetupInboxTest {
 
         // A DIFFERENT question about the same product is still filed — this is identity, not topic.
         assertThat(candidates.noteGap(org, "PRODUCT", productId, "내열",
-                "「내열」에 대해 고객에게 안내할 공식 기준이 필요합니다.")).isNotNull();
+                "「내열」에 대해 고객에게 안내할 공식 기준이 필요해요.")).isNotNull();
         assertThat(candidateRows.countByOrgIdAndState(org, KnowledgeCandidateService.STATE_OPEN))
                 .isEqualTo(1);
     }
@@ -258,7 +258,7 @@ class KnowledgeSetupInboxTest {
     @Test
     @DisplayName("§C — a dismissed ask may still be noticed again: 「아니요」 means «not this, now»")
     void aDismissedAskMayReturn() {
-        String question = "「내열」에 대해 고객에게 안내할 공식 기준이 필요합니다.";
+        String question = "「내열」에 대해 고객에게 안내할 공식 기준이 필요해요.";
         UUID first = candidates.noteGap(org, "PRODUCT", productId, "내열", question).getId();
         candidates.dismiss(org, first, "판매자");
 
@@ -289,7 +289,7 @@ class KnowledgeSetupInboxTest {
         assertThatThrownBy(() -> candidates.accept(org, candidateId, null, "밀리지 않습니다.",
                 KnowledgeSourceType.FAQ, null, foreignId, null, "판매자"))
                 .isInstanceOf(ApiException.class)
-                .hasMessageContaining("이 상품의 규격이 아닙니다");
+                .hasMessageContaining("이 상품의 규격이 아니에요");
         assertThat(candidateRows.findById(candidateId).orElseThrow().getState())
                 .isEqualTo(KnowledgeCandidateService.STATE_OPEN);
     }

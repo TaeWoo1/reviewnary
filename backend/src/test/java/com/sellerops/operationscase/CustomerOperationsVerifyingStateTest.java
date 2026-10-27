@@ -77,9 +77,11 @@ class CustomerOperationsVerifyingStateTest {
     void theCopyNeverClaimsDelivery() throws IOException {
         String copy = code(COPY);
 
-        assertThat(copy).contains("승인한 작업의 처리 결과를 확인하고 있습니다");
+        assertThat(copy).contains("승인한 작업의 처리 결과를 확인하고 있어요");
         assertThat(copy).contains("처리 확인 중");
-        for (String forbidden : List.of("보냈습니다", "전송했습니다", "처리 완료", "처리했습니다", "등록했습니다")) {
+        // Both registers: the screens speak 해요체 since 2026-10-27, and the claim is the same claim in either.
+        for (String forbidden : List.of("보냈습니다", "전송했습니다", "처리 완료", "처리했습니다", "등록했습니다",
+                "보냈어요", "전송했어요", "처리했어요", "등록했어요")) {
             assertThat(copy).as("this state may not say %s — the execution record owns that sentence", forbidden)
                     .doesNotContain(forbidden);
         }

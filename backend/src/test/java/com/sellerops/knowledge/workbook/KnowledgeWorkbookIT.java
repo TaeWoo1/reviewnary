@@ -261,7 +261,7 @@ class KnowledgeWorkbookIT {
         assertThat(changes).filteredOn(l -> l.text().contains("별점 4~5점")).singleElement().satisfies(l -> {
             assertThat(l.before()).isEqualTo(positiveNow.strip());
             assertThat(l.after()).isEqualTo("마음에 드셨다니 기쁩니다.");
-            assertThat(l.where()).isEqualTo("별점이 4~5점인 리뷰에 씁니다.");
+            assertThat(l.where()).isEqualTo("별점이 4~5점인 리뷰에 써요.");
         });
         assertThat(changes).filteredOn(l -> l.text().contains("자르기")).singleElement().satisfies(l -> {
             assertThat(l.where()).isEqualTo("상품 · 일체형 전선몰딩");
@@ -334,7 +334,7 @@ class KnowledgeWorkbookIT {
         assertThat(done.changes()).isEmpty();
         assertThat(done.problems()).extracting(KnowledgeWorkbookService.Line::text)
                 .anyMatch(t -> t.contains(KnowledgeWorkbookService.NO_BASE))
-                .anyMatch(t -> t.contains("같은 주제의 안내가 이미 있습니다"));
+                .anyMatch(t -> t.contains("같은 주제의 안내가 이미 있어요"));
         assertThat(productSources.findAll()).singleElement().extracting(ProductKnowledgeSource::getBody)
                 .isEqualTo("커터칼로 자르세요.");
     }

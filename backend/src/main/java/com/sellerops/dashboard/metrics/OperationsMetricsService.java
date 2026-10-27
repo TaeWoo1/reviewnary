@@ -59,7 +59,7 @@ public class OperationsMetricsService {
      * distinct order id). None of the three subtracts a later cancellation or return.
      */
     static final String REVENUE_BASIS =
-            "결제 시점 기준 결제금액 합계입니다. 취소·반품은 차감되지 않았고, 채널마다 금액 산정 기준이 조금씩 다릅니다.";
+            "결제 시점 기준 결제금액 합계예요. 취소·반품은 차감되지 않았고, 채널마다 금액 산정 기준이 조금씩 달라요.";
 
     /**
      * What the order COUNT is — and the warning that the three channels do not count the same thing.
@@ -69,7 +69,7 @@ public class OperationsMetricsService {
      * than silently added up under one noun.
      */
     static final String ORDER_COUNT_BASIS =
-            "채널마다 세는 단위가 다릅니다 — 네이버는 상품주문, 쿠팡은 배송건, 카페24는 주문 기준입니다.";
+            "채널마다 세는 단위가 달라요 — 네이버는 상품주문, 쿠팡은 배송건, 카페24는 주문 기준이에요.";
 
     private final ChannelRepository channels;
     private final ChannelCoverageService coverage;
@@ -333,12 +333,12 @@ public class OperationsMetricsService {
      */
     public static String exclusionReasonKo(ChannelDataState state) {
         return switch (state) {
-            case NOT_CONNECTED -> "연결되어 있지 않습니다";
-            case BLOCKED -> "연결이 끊겨 수집이 멈췄습니다";
-            case NOT_SUPPORTED -> "이 채널에는 자동 수집 경로가 없습니다";
-            case OBSERVED_FRESHNESS_UNPROVEN -> "최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했습니다";
+            case NOT_CONNECTED -> "연결되어 있지 않아요";
+            case BLOCKED -> "연결이 끊겨 수집이 멈췄어요";
+            case NOT_SUPPORTED -> "이 채널에는 자동 수집 경로가 없어요";
+            case OBSERVED_FRESHNESS_UNPROVEN -> "최근 자동 수집이 성공하지 못해 이 기간을 확인하지 못했어요";
             // OBSERVED_FRESH / ZERO are always counted, so reaching here would be a bug, not a state.
-            default -> "이 기간의 수집 결과를 확인하지 못했습니다";
+            default -> "이 기간의 수집 결과를 확인하지 못했어요";
         };
     }
 
@@ -418,7 +418,7 @@ public class OperationsMetricsService {
         if (value instanceof java.sql.Date sqlDate) {
             return sqlDate.toLocalDate();
         }
-        throw new IllegalStateException("집계 날짜 형식을 해석할 수 없습니다: " + value.getClass());
+        throw new IllegalStateException("집계 날짜 형식을 해석할 수 없어요: " + value.getClass());
     }
 
     private static String key(String channelCode, String dataType) {

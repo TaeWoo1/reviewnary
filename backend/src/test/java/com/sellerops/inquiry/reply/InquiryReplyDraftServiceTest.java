@@ -294,7 +294,7 @@ class InquiryReplyDraftServiceTest {
                         com.sellerops.inquiry.draft.AnswerBasisState.NEEDS_CLARIFICATION));
 
         assertThat(asked.answerBasis()).isEqualTo("NEEDS_CLARIFICATION");
-        assertThat(asked.answerBasisNote()).isEqualTo("정확한 답변을 위해 고객에게 확인할 내용이 있습니다.");
+        assertThat(asked.answerBasisNote()).isEqualTo("정확한 답변을 위해 고객에게 확인할 내용이 있어요.");
         assertThat(asked.knowledgeState()).isEqualTo("GROUNDED");
         assertThat(service.latestView(wi.getId()).answerBasis()).isEqualTo("NEEDS_CLARIFICATION");
 
@@ -307,7 +307,7 @@ class InquiryReplyDraftServiceTest {
 
         // Same knowledge state, different answer state. Only the stamp can tell these apart.
         assertThat(answered.answerBasis()).isEqualTo("GROUNDED");
-        assertThat(answered.answerBasisNote()).isEqualTo("답변에 필요한 정보를 확인했습니다.");
+        assertThat(answered.answerBasisNote()).isEqualTo("답변에 필요한 정보를 확인했어요.");
         assertThat(answered.answerBasisAction()).isNull();
     }
 
