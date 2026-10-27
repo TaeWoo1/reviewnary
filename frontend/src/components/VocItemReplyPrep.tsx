@@ -90,15 +90,15 @@ interface OutcomeAttempt {
  * and `ReviewReplyPrepView.draftAuthorKind` says the same thing on its own side of the wire.
  */
 export function draftProvenanceNote(authorKind: string | null, approved: boolean): string | null {
-  const check = approved ? "" : " 내용을 확인하고 직접 고쳐 주세요.";
+  void approved;
   // <b>누가 썼는지가 아니라 무엇에 근거했는지</b> (리뷰 canonical mockup, 2026-10-06 — 승인된 copy).
   // 판매자가 이 줄에서 확인할 것은 이 문장이 회사가 적어 둔 것 위에 서 있는가이지, 기계가 썼는가가 아니다.
   // `draftAuthorKind`는 그대로 MODEL이고, 세 갈래가 네 갈래로 늘지도 줄지도 않았다 — 문구 하나만 바뀐다.
   // MODEL no longer means 「저장된 지식 위에」: since 2026-10-26 the model also writes with no evidence (thanks and
   // empathy only), and a past answer was never 「지식」 either. What it stood on is the basis chip's to say, once.
-  if (authorKind === "MODEL") return `아래 초안은 AI가 준비했습니다.${check}`;
-  if (authorKind === "SELLER") return "아래 초안은 판매자가 직접 쓴 문장입니다.";
-  if (authorKind === "RULE") return `아래 초안은 저장된 문구에서 시작합니다.${check}`;
+  if (authorKind === "MODEL") return "AI가 썼어요.";
+  if (authorKind === "SELLER") return "직접 쓴 답글이에요.";
+  if (authorKind === "RULE") return "저장된 문구로 시작했어요.";
   return null;
 }
 
@@ -126,7 +126,7 @@ function DraftStatus({
   if (saveFailed) {
     content = (
       <span className="inline-flex items-center gap-1.5 text-bad">
-        {dot("bg-bad")}저장 실패 ·{" "}
+        {dot("bg-bad")}저장하지 못했어요{" "}
         <button type="button" onClick={onRetry} className="underline underline-offset-2">
           다시 시도
         </button>
@@ -145,7 +145,8 @@ function DraftStatus({
       </span>
     );
   } else {
-    content = <span className="inline-flex items-center gap-1.5 text-good">{dot("bg-good")}검사 통과</span>;
+    // Checked and nothing to fix: said by saying nothing (§9). 「검사 통과」 was a green word on every reply.
+    content = null;
   }
   return (
     <span aria-live="polite" className="text-xs font-semibold" data-testid="draft-status">
@@ -398,7 +399,7 @@ export function VocItemReplyPrep({
   if (loadFailed) {
     return (
       <p role="alert" className="text-sm text-bad">
-        답변 준비 정보를 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.
+        답글 칸을 불러오지 못했어요. 새로고침해 주세요.
       </p>
     );
   }
@@ -521,7 +522,7 @@ export function VocItemReplyPrep({
       try {
         await api.dropReplySetAside(reviewId);
       } catch {
-        setFailed("처리하지 못했습니다. 다시 시도해 주세요.");
+        setFailed("처리하지 못했어요. 다시 눌러 주세요.");
       }
       await refresh();
     }
@@ -578,8 +579,8 @@ export function VocItemReplyPrep({
     } catch {
       setFailed(
         state === "APPROVED"
-          ? "승인하지 못했습니다. 다시 시도해 주세요."
-          : "승인을 해제하지 못했습니다. 다시 시도해 주세요.",
+          ? "확정하지 못했어요. 다시 눌러 주세요."
+          : "확정을 풀지 못했어요. 다시 눌러 주세요.",
       );
     } finally {
       inFlight.current = false;
@@ -625,7 +626,7 @@ export function VocItemReplyPrep({
       setManualCopy(text);
       return;
     }
-    setFailed("복사하지 못했습니다. 다시 시도해 주세요.");
+    setFailed("복사하지 못했어요. 다시 눌러 주세요.");
   }
 
   async function startHandoff(options?: { restart?: boolean }) {
@@ -664,7 +665,7 @@ export function VocItemReplyPrep({
         setUnavailable(true);
         setFailed(null);
       } else {
-        setFailed("답변 준비를 시작하지 못했습니다. 다시 시도해 주세요.");
+        setFailed("시작하지 못했어요. 다시 눌러 주세요.");
       }
     } finally {
       inFlight.current = false;
@@ -722,7 +723,7 @@ export function VocItemReplyPrep({
       // Re-read so the recorded outcome (operatorOutcome + verification, as a pair) shows.
       await refresh();
     } catch {
-      setFailed("기록하지 못했습니다. 다시 시도해 주세요.");
+      setFailed("기록하지 못했어요. 다시 눌러 주세요.");
     } finally {
       inFlight.current = false;
       setBusy(null);
@@ -736,7 +737,7 @@ export function VocItemReplyPrep({
        블록 사이를 12 → 8로 좁힌다. 글도 컨트롤도 그대로이고 여백만 한 단계다. */
     <section aria-labelledby={headingId} className={`flex flex-col gap-2 ${unboxed ? "" : "rounded-xl bg-canvas p-3"}`}>
       <Heading id={headingId} className="text-sm font-semibold text-ink">
-        답변 준비
+        답글
       </Heading>
 
       {/* The review, in full. Not the list's 60-char preview — an operator cannot answer a
@@ -747,10 +748,10 @@ export function VocItemReplyPrep({
         <Disclosure label="고객 리뷰 다시 보기" summaryClassName="-ml-2">
           <div className="flex flex-col gap-1 pt-2">
             <p className="whitespace-pre-wrap text-sm text-ink">
-              {prep.redactedBody ? plainText(prep.redactedBody) : <span className="italic text-muted">내용 없음</span>}
+              {prep.redactedBody ? plainText(prep.redactedBody) : <span className="text-muted">내용이 없어요</span>}
             </p>
             {prep.bodyRedacted ? (
-              <p className="text-sm text-muted">개인정보로 보이는 부분은 가려서 표시했습니다.</p>
+              <p className="text-sm text-muted">개인정보로 보이는 부분은 가렸어요.</p>
             ) : null}
           </div>
         </Disclosure>
@@ -762,39 +763,18 @@ export function VocItemReplyPrep({
           {prep.redactedBody ? (
             plainText(prep.redactedBody)
           ) : (
-            <span className="italic text-muted">내용 없음</span>
+            <span className="text-muted">내용이 없어요</span>
           )}
         </p>
         {prep.bodyRedacted ? (
           // Said out loud rather than left as a mystery: the operator is about to send this
           // to a customer, and an unexplained [번호] in their source text is worth a
           // sentence.
-          <p className="text-sm text-muted">개인정보로 보이는 부분은 가려서 표시했습니다.</p>
+          <p className="text-sm text-muted">개인정보로 보이는 부분은 가렸어요.</p>
         ) : null}
       </div>
       )}
 
-      {/* Grounded Review Drafting v1: the seller asks for a draft written from what this company
-          actually knows. It writes into the editor below and does nothing else — the save, the
-          approval and the send are the same three controls they were before. */}
-      {canSave ? (
-        <GroundedReviewDraft
-          accountId={accountId}
-          actionRef={actionRef}
-          storedEvidence={prep.draftEvidence ?? []}
-          storedBasis={prep.draftAnswerBasis ?? null}
-          storedBasisNote={prep.draftAnswerBasisNote ?? null}
-          hasStoredDraft={prep.draft !== null}
-          autoStart={autoDraft}
-          onDrafted={(generated) => {
-            setBody(generated);
-            setDirty(false);
-            // The panel re-reads its own state (the head version, its author, its citations) beside
-            // the draft rather than in front of it.
-            void refresh();
-          }}
-        />
-      ) : null}
 
       <div className="flex flex-col gap-1">
         {/* <b>승인된 답변은 읽을 것이지 고칠 것이 아니다</b> (Front conversation detail, 2026-10-06).
@@ -807,8 +787,10 @@ export function VocItemReplyPrep({
             `<label>`이 그대로 선다. 읽어 주는 이름은 양쪽 다 「답변 초안」으로 남는다. */}
         {approved ? null : (
           <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor={editorId} className="text-sm font-semibold text-muted">
-              답변 초안
+            {/* Named for a screen reader only: the card's own 「답글」 head already says what the box is, and a second
+                visible name over the same box was the third stacked line above the reply. */}
+            <label htmlFor={editorId} className="sr-only">
+              답글 내용
             </label>
             {canSave ? (
               <DraftStatus
@@ -827,7 +809,7 @@ export function VocItemReplyPrep({
         ) : null}
         {approved ? (
           <p
-            aria-label="답변 초안"
+            aria-label="답글 내용"
             className="mt-1 whitespace-pre-wrap break-keep text-base leading-relaxed text-ink"
           >
             {body}
@@ -849,7 +831,7 @@ export function VocItemReplyPrep({
             // Typing goes on while the panel saves itself: a save only takes what was in the box when it began.
             readOnly={!canSave || (working && busy !== "saving")}
             rows={5}
-            className="w-full rounded-lg border border-line bg-white p-2 text-sm text-ink"
+            className="w-full rounded-lg border border-line bg-surface p-2 text-base leading-relaxed text-ink"
           />
         )}
         {!approved && !canSave && prep.channelReplyState !== "ANSWERED" ? (
@@ -863,10 +845,32 @@ export function VocItemReplyPrep({
           // is mounted on every reply surface and mounted BEFORE this panel is. Saying it twice on
           // one screen is the other way to get it wrong.
           <p className="text-sm text-muted">
-            '대응 필요'로 기록된 리뷰만 답변을 준비할 수 있습니다.
+            '대응 필요'로 정한 리뷰에만 답글을 쓸 수 있어요.
           </p>
         ) : null}
       </div>
+
+      {/* Grounded Review Drafting v1, under the reply since 2026-10-27 (§12-4): the reply is the thing on this card, and
+          what it leaned on, 「다시 쓰기」 and the guidance picker are one quiet row below it. It writes into the editor
+          above and does nothing else. */}
+      {canSave ? (
+        <GroundedReviewDraft
+          accountId={accountId}
+          actionRef={actionRef}
+          storedEvidence={prep.draftEvidence ?? []}
+          storedBasis={prep.draftAnswerBasis ?? null}
+          storedBasisNote={prep.draftAnswerBasisNote ?? null}
+          hasStoredDraft={prep.draft !== null}
+          autoStart={autoDraft}
+          onDrafted={(generated) => {
+            setBody(generated);
+            setDirty(false);
+            // The panel re-reads its own state (the head version, its author, its citations) beside
+            // the draft rather than in front of it.
+            void refresh();
+          }}
+        />
+      ) : null}
 
       {findings.length > 0 && canSave ? (
         <PhraseFindings
@@ -910,12 +914,12 @@ export function VocItemReplyPrep({
             className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
               approvable && !working
                 ? delegation != null
-                  ? "bg-white text-ink ring-1 ring-line"
+                  ? "bg-surface text-ink ring-1 ring-line"
                   : "bg-brand-700 text-white hover:bg-brand-800"
                 : "bg-canvas text-muted opacity-40"
             }`}
           >
-            승인
+            답글 확정
           </button>
         ) : null}
         {approved ? (
@@ -928,7 +932,7 @@ export function VocItemReplyPrep({
             onClick={() => void decide("WITHDRAWN")}
             className="rounded px-1 py-1 text-sm font-semibold text-muted underline-offset-2 hover:text-ink hover:underline"
           >
-            승인 해제
+            확정 풀기
           </button>
         ) : null}
         {approved ? (
@@ -968,7 +972,7 @@ export function VocItemReplyPrep({
 
         {approved && !canCopy ? (
           <span className="text-sm text-muted">
-            '대응 필요'로 되돌리면 복사할 수 있습니다.
+            '대응 필요'로 되돌리면 복사할 수 있어요.
           </span>
         ) : null}
       </div>
@@ -1029,7 +1033,7 @@ export function VocItemReplyPrep({
               approvable && !working ? "text-ink" : "text-muted opacity-40"
             }`}
           >
-            승인
+            답글 확정
           </button>
         </p>
       ) : null}
@@ -1051,7 +1055,7 @@ export function VocItemReplyPrep({
               {guidedUnavailable}
             </p>
           ) : null}
-          {approved ? <p>승인된 초안은 수정할 수 없습니다. 고치려면 승인을 해제하세요.</p> : null}
+          {approved ? <p>확정한 답글은 고칠 수 없어요. 고치려면 확정을 풀어 주세요.</p> : null}
         </div>
       ) : null}
 

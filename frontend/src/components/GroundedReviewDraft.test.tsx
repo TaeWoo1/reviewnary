@@ -104,7 +104,9 @@ describe("Grounded Review Drafting v1 — the draft first, then why, then what i
     await userEvent.click(screen.getByTestId("grounded-review-generate"));
     await waitFor(() => expect(generateReviewReplyDraft).toHaveBeenCalledWith("acc-1", "review:r-1"));
     expect(onDrafted).toHaveBeenCalledWith(DRAFT.body);
-    expect(screen.getByText("근거 있음")).toBeInTheDocument();
+    // Grounded, with its passages: 「참고 N」 says it, and no second sentence repeats it.
+    expect(screen.getByTestId("grounded-review-why")).toHaveTextContent(/^참고 \d+/);
+    expect(screen.queryByTestId("grounded-review-basis")).toBeNull();
     // Nothing on this card sends, approves or posts.
     expect(document.body.textContent).not.toMatch(/전송|발송|게시하기/);
   });
@@ -118,14 +120,13 @@ describe("Grounded Review Drafting v1 — the draft first, then why, then what i
    * this company's knowledge or its safe default. It is read back from the stored version, never
    * recomputed: two of the retrieval's three stages are model calls made afresh on every search.
    */
-  it("shows the stored version's basis on a reopen, and nothing when none was recorded", async () => {
+  it("shows the stored version's basis on a reopen, in the screen's own words", async () => {
     draw([], vi.fn(), { basis: "GROUNDED", note: "판매자가 등록한 근거를 사용해 썼습니다." });
     // No button was pressed and no request was made.
     expect(generateReviewReplyDraft).not.toHaveBeenCalled();
-    expect(screen.getByTestId("grounded-review-basis")).toHaveTextContent("근거 있음");
-    expect(screen.getByTestId("grounded-review-basis")).toHaveTextContent(
-      "판매자가 등록한 근거를 사용해 썼습니다.",
-    );
+    // Grounded with no passage listed still says what it stood on; the server's paragraph is not drawn (§12).
+    expect(screen.getByTestId("grounded-review-basis")).toHaveTextContent("가게 자료를 참고해 썼어요.");
+    expect(document.body.textContent).not.toContain("판매자가 등록한 근거를 사용해 썼습니다.");
   });
 
   it("a draft written from a past reply's wording says so, apart from both 근거 있음 and 기본 문구", () => {
@@ -134,8 +135,8 @@ describe("Grounded Review Drafting v1 — the draft first, then why, then what i
       note: "비슷한 후기에 판매자가 승인했던 답글의 말투를 참고해 썼습니다. 지금 근거가 없어 사실이나 약속은 넣지 않았습니다.",
     });
     const basis = screen.getByTestId("grounded-review-basis");
-    expect(basis).toHaveTextContent("과거 답글 참고");
-    expect(basis).toHaveTextContent("사실이나 약속은 넣지 않았습니다");
+    expect(basis).toHaveTextContent("지난 답글 말투를 참고했어요.");
+    expect(basis).toHaveTextContent("사실이나 약속은 넣지 않았어요");
     expect(basis).not.toHaveTextContent(/근거 있음|기본 문구/);
   });
 
@@ -143,7 +144,7 @@ describe("Grounded Review Drafting v1 — the draft first, then why, then what i
     draw();
     expect(screen.queryByTestId("grounded-review-basis")).toBeNull();
     // "not recorded" is a third statement, and the card makes none of the three.
-    expect(document.body.textContent).not.toMatch(/근거 있음|기본 문구/);
+    expect(document.body.textContent).not.toMatch(/근거 있음|기본 문구|참고해 썼어요|참고한 내용이 없어서/);
   });
 
   it("「왜 이렇게 썼어요?」 shows the passage the drafter was actually shown, not just its title", async () => {
@@ -166,16 +167,16 @@ describe("Grounded Review Drafting v1 — the draft first, then why, then what i
     draw();
     await userEvent.click(screen.getByTestId("grounded-review-generate"));
     const gaps = await screen.findByTestId("grounded-review-gaps");
-    expect(gaps).toHaveTextContent("더 정확한 답변을 위해 정보가 필요합니다.");
+    expect(gaps).toHaveTextContent("이 내용이 있으면 더 정확히 답할 수 있어요.");
     expect(gaps).toHaveTextContent("'괜찮긴한데 잘떨어지네요'에 대해");
-    expect(screen.getByText("기본 문구")).toBeInTheDocument();
+    expect(screen.getByTestId("grounded-review-basis")).toHaveTextContent("참고한 내용이 없어서 기본 문구로 썼어요.");
     // The way to answer it is right there — the same quick-add the inquiry screen uses.
     expect(screen.getByRole("button", { name: "답변 기준 추가" })).toBeInTheDocument();
   });
 
   it("the stored version's citations answer 「왜 이렇게 썼어요?」 after a reload, before anything is generated", () => {
     draw(grounded().evidence);
-    expect(screen.getByTestId("grounded-review-why")).toHaveTextContent("근거 1");
+    expect(screen.getByTestId("grounded-review-why")).toHaveTextContent("참고 1");
     expect(generateReviewReplyDraft).not.toHaveBeenCalled();
   });
 
@@ -196,9 +197,9 @@ describe("Grounded Review Drafting v1 — the draft first, then why, then what i
     // handled rejection as an unhandled one — the runner's behaviour, not the component's, and not
     // worth reshaping the component around. The refusal itself is proven live (409 on an approved
     // review); what this pins is which sentence each status produces.
-    expect(generateFailureMessage(409)).toContain("승인된 답변이 있거나");
-    expect(generateFailureMessage(500)).toContain("잠시 후 다시 시도해 주세요");
-    expect(generateFailureMessage(undefined)).toContain("잠시 후 다시 시도해 주세요");
+    expect(generateFailureMessage(409)).toContain("확정한 답글이 있거나");
+    expect(generateFailureMessage(500)).toContain("잠시 뒤 다시 눌러 주세요");
+    expect(generateFailureMessage(undefined)).toContain("잠시 뒤 다시 눌러 주세요");
   });
 
 });
@@ -212,12 +213,12 @@ describe("Grounded Review Drafting v1 — the draft first, then why, then what i
 describe("the prepare control names what is already there", () => {
   it("offers a FIRST draft only when none is saved", () => {
     draw([], vi.fn(), { basis: null, note: null }, false);
-    expect(screen.getByTestId("grounded-review-generate")).toHaveTextContent("AI 초안 준비");
+    expect(screen.getByTestId("grounded-review-generate")).toHaveTextContent("AI 답글 쓰기");
   });
 
   it("offers to prepare AGAIN when a draft is already saved — before anything is pressed", () => {
     draw([], vi.fn(), { basis: null, note: null }, true);
-    expect(screen.getByTestId("grounded-review-generate")).toHaveTextContent("다시 준비하기");
-    expect(screen.getByTestId("grounded-review-generate")).not.toHaveTextContent("AI 초안 준비");
+    expect(screen.getByTestId("grounded-review-generate")).toHaveTextContent("다시 쓰기");
+    expect(screen.getByTestId("grounded-review-generate")).not.toHaveTextContent("AI 답글 쓰기");
   });
 });

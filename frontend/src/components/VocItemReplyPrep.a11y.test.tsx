@@ -76,7 +76,7 @@ describe("VocItemReplyPrep a11y", () => {
         disposition={view.triageDisposition}
       />,
     );
-    await screen.findByRole("heading", { name: "답변 준비" });
+    await screen.findByRole("heading", { name: "답글" });
     await expectNoAxeViolations(container);
   }
 

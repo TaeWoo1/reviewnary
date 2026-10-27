@@ -3,7 +3,6 @@ import { isAxiosError } from "axios";
 import type { DraftEvidenceView, GeneratedReviewDraftView, ReviewKnowledgeGapView } from "../lib/types";
 import { api } from "../lib/apiClient";
 import { Btn } from "./ui/Btn";
-import { Status } from "./ui/Status";
 import { AnswerBasisQuickAdd } from "./inbox/AnswerBasisQuickAdd";
 import { ReviewGuidance } from "./reviews/ReviewGuidance";
 
@@ -31,8 +30,8 @@ import { ReviewGuidance } from "./reviews/ReviewGuidance";
  */
 export function generateFailureMessage(status: number | undefined): string {
   return status === 409
-    ? "승인된 답변이 있거나 '대응 필요' 상태가 아니어서 초안을 만들 수 없습니다."
-    : "초안을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.";
+    ? "확정한 답글이 있거나 '대응 필요'로 정하지 않은 리뷰라 AI 답글을 쓸 수 없어요."
+    : "AI 답글을 쓰지 못했어요. 잠시 뒤 다시 눌러 주세요.";
 }
 
 export function GroundedReviewDraft({
@@ -92,7 +91,9 @@ export function GroundedReviewDraft({
   // version's own record. The basis is the fact that decides whether the text in the editor is this
   // company's knowledge or its safe default, so it has to survive a reload — before this it did not.
   const basis = result ? result.answerBasis : storedBasis;
-  const basisNote = result ? result.answerBasisNote : storedBasisNote;
+  // The server's own sentence (`answerBasisNote`) is not drawn: the screen owns its words (§12), and one line said
+  // in the product's voice replaces a chip and a server paragraph that said the same thing twice.
+  void storedBasisNote;
 
   const autoStarted = useRef(false);
   useEffect(() => {
@@ -123,26 +124,41 @@ export function GroundedReviewDraft({
     }
   }
 
+  const said = basisSentence(basis, evidence.length);
+  const hasDraft = !!result || hasStoredDraft;
   return (
-    <section aria-label="AI 답변 준비" className="flex flex-col gap-2" data-testid="grounded-review-draft">
-      <div className="flex flex-wrap items-center gap-2">
-        <Btn size="sm" onClick={() => void generate()} disabled={busy} data-testid="grounded-review-generate">
-          {busy ? "준비하는 중…" : result || hasStoredDraft ? "다시 준비하기" : "AI 초안 준비"}
+    <section aria-label="AI 답글" className="flex flex-col gap-2" data-testid="grounded-review-draft">
+      {/* Under the reply, not above it (§12-4): the reply is the thing; what it leaned on is one quiet line. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        {evidence.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setShowEvidence((open) => !open)}
+            aria-expanded={showEvidence}
+            className="rounded px-1 py-0.5 font-semibold text-ink underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            data-testid="grounded-review-why"
+          >
+            참고 {evidence.length} {showEvidence ? "▾" : "▸"}
+          </button>
+        ) : null}
+        {said ? (
+          <span className="break-keep text-muted" role="status" data-testid="grounded-review-basis">
+            {said}
+          </span>
+        ) : null}
+        <Btn
+          size="sm"
+          variant={hasDraft ? "ghost" : "solid"}
+          onClick={() => void generate()}
+          disabled={busy}
+          data-testid="grounded-review-generate"
+          className="ml-auto"
+        >
+          {busy ? "쓰는 중…" : hasDraft ? "다시 쓰기" : "AI 답글 쓰기"}
         </Btn>
-        {/* Said where the button is: a draft is a draft, and this one is not sent by pressing it. */}
-        <span className="text-sm text-muted">저장된 지식을 근거로 초안만 만듭니다.</span>
       </div>
 
       {error ? <p className="break-keep text-sm text-bad" role="alert">{error}</p> : null}
-
-      {basis ? (
-        <p className="flex flex-wrap items-center gap-2 text-sm" role="status" data-testid="grounded-review-basis">
-          <Status tone={basis === "GROUNDED" ? "good" : "neutral"}>
-            {basisLabel(basis)}
-          </Status>
-          {basisNote ? <span className="break-keep text-muted">{basisNote}</span> : null}
-        </p>
-      ) : null}
 
       {/* An operational fact, kept apart from anything about the seller's knowledge — the budget, the
           capability, the vendor, or a promise the evidence did not support. */}
@@ -150,45 +166,39 @@ export function GroundedReviewDraft({
         <p className="break-keep text-sm text-warn" role="status">{result.unavailableMessage}</p>
       ) : null}
 
-      {/* 다음 초안이 쓸 안내를 판매자가 정하는 자리 (2026-10-27) — 근거 목록 위에 선다: 「왜 이렇게 썼어요?」는 지난
-          초안의 기록이고, 이것은 다음 초안의 재료다. */}
-      <ReviewGuidance accountId={accountId} actionRef={actionRef} />
-
-      {evidence.length > 0 ? (
-        <div className="flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={() => setShowEvidence((open) => !open)}
-            aria-expanded={showEvidence}
-            className="self-start rounded-lg px-1 py-0.5 text-sm text-muted hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-            data-testid="grounded-review-why"
-          >
-            {showEvidence ? "▾" : "▸"} 왜 이렇게 썼어요? · 근거 {evidence.length}
-          </button>
-          {showEvidence ? (
-            <ul className="flex flex-col gap-2 border-l-2 border-line pl-3" data-testid="grounded-review-evidence">
-              {evidence.map((row, i) => (
-                <li key={`${row.sourceId ?? row.kind}-${i}`} className="flex flex-col gap-0.5">
-                  <span className="text-sm font-semibold text-ink">
-                    {row.scopeLabel ?? row.kind}
-                    {row.title ? ` · ${row.title}` : ""}
-                  </span>
-                  {/* The sentence the drafter was actually shown. A title is a pointer; this is the check. */}
-                  {row.snippet ? (
-                    <span className="break-keep text-sm text-muted">{row.snippet}</span>
-                  ) : (
-                    <span className="text-sm text-muted">저장된 지식이 삭제되어 내용을 볼 수 없습니다.</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
+      {showEvidence ? (
+        <ul className="flex flex-col gap-2 border-l-2 border-line pl-3" data-testid="grounded-review-evidence">
+          {evidence.map((row, i) => (
+            <li key={`${row.sourceId ?? row.kind}-${i}`} className="flex flex-col gap-0.5">
+              <span className="text-sm font-semibold text-ink">
+                {row.scopeLabel ?? row.kind}
+                {row.title ? ` 「${row.title}」` : ""}
+              </span>
+              {/* The sentence the drafter was actually shown. A title is a pointer; this is the check. */}
+              {row.snippet ? (
+                <span className="break-keep text-sm text-muted">{row.snippet}</span>
+              ) : (
+                <span className="text-sm text-muted">지워진 자료라 내용을 볼 수 없어요.</span>
+              )}
+            </li>
+          ))}
+        </ul>
       ) : null}
+
+      {/* 다음 답글이 쓸 안내를 고르는 자리 (2026-10-27). 매일 보는 칸에서는 접혀 있고 (§12-4 — 검색 결과를 고르는 일은
+          받은 리뷰 화면의 일이 아니다), 참고한 내용이 틀렸다고 생각할 때 펼친다. */}
+      <details className="text-sm" data-testid="grounded-review-guidance">
+        <summary className="cursor-pointer select-none rounded px-1 py-0.5 text-muted hover:text-ink">
+          참고할 안내 고르기
+        </summary>
+        <div className="pt-2">
+          <ReviewGuidance accountId={accountId} actionRef={actionRef} />
+        </div>
+      </details>
 
       {gaps.length > 0 ? (
         <div className="flex flex-col gap-2 rounded-xl border border-line bg-canvas p-3" data-testid="grounded-review-gaps">
-          <p className="break-keep text-sm font-semibold text-ink">더 정확한 답변을 위해 정보가 필요합니다.</p>
+          <p className="break-keep text-sm font-semibold text-ink">이 내용이 있으면 더 정확히 답할 수 있어요.</p>
           {gaps.map((gap) => (
             <Gap key={`${gap.scope}-${gap.subject}`} gap={gap} onSaved={generate} />
           ))}
@@ -222,13 +232,17 @@ function Gap({ gap, onSaved }: { gap: ReviewKnowledgeGapView; onSaved: () => voi
 }
 
 /**
- * The chip for a draft's basis. PAST_ANSWER (2026-10-22): written from the wording of a reply the seller once
- * approved for a review like this one, with no current evidence — not "근거 있음", and not the template either.
+ * What the reply leaned on, in one sentence — or nothing, when 「참고 N」 beside it already says it. PAST_ANSWER
+ * (2026-10-22): written from a reply the seller once approved for a review like this one, with no current evidence.
+ * THANKS_ONLY (owner decision 2026-10-26): written by the model with no evidence, thanks and empathy only.
  */
-function basisLabel(basis: string): string {
-  if (basis === "GROUNDED") return "근거 있음";
-  if (basis === "PAST_ANSWER") return "과거 답글 참고";
-  // Written by the model with no evidence: thanks and empathy only (owner decision 2026-10-26).
-  if (basis === "THANKS_ONLY") return "감사 인사";
-  return "기본 문구";
+function basisSentence(basis: string | null, cited: number): string | null {
+  if (basis == null) return null;
+  // Grounded with its passages listed: 「참고 N」 beside this line already says it. Grounded with none listed (an old
+  // version, a deleted source) still says what it stood on.
+  if (basis === "GROUNDED") return cited > 0 ? null : "가게 자료를 참고해 썼어요.";
+  // What the server's note said and the chip did not: nothing factual came from the old reply.
+  if (basis === "PAST_ANSWER") return "지난 답글 말투를 참고했어요. 사실이나 약속은 넣지 않았어요.";
+  if (basis === "THANKS_ONLY") return "참고한 내용이 없어서 감사 인사만 썼어요.";
+  return "참고한 내용이 없어서 기본 문구로 썼어요.";
 }

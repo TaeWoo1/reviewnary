@@ -178,7 +178,7 @@ describe("리뷰 처리 — the decision workspace", () => {
 
     // The work still ends where it used to: the draft, and the approve control as the page's primary.
     expect(await screen.findByDisplayValue("판매자가 고쳐 쓴 합성 초안")).toBeInTheDocument();
-    const approve = await screen.findByRole("button", { name: "승인" });
+    const approve = await screen.findByRole("button", { name: "답글 확정" });
     expect(approve.className).toContain("bg-brand-700");
   });
 
@@ -514,7 +514,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     renderTask();
 
     await screen.findByLabelText("조치 선택");
-    expect(screen.queryByText("답변 준비")).toBeNull();
+    expect(screen.queryByText("답글")).toBeNull();
     expect(getReviewReplyPrep).not.toHaveBeenCalled();
   });
 
@@ -545,7 +545,7 @@ describe("리뷰 처리 — the decision workspace", () => {
       expect(screen.getByText("이 채널에서는 reviewnary가 답변을 작성하지 않습니다.")).toBeInTheDocument(),
     );
     expect(getReviewReplyPrep).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: "승인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "답글 확정" })).not.toBeInTheDocument();
   });
 
   /* ── 8 · the log ───────────────────────────────────────────────────── */
@@ -612,7 +612,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     getReviewWorkspace.mockRejectedValue(new Error("nope"));
     renderTask();
     expect(await screen.findByText("이 리뷰를 불러오지 못했습니다")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "승인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "답글 확정" })).not.toBeInTheDocument();
   });
 
   it("says the channel already answered, before anyone decides anything", async () => {
@@ -1382,7 +1382,7 @@ describe("리뷰 상세 — the one object and the one column (2026-10-06)", () 
     renderTask();
 
     const why = await screen.findByRole("region", { name: "왜 올라왔나요" });
-    const draft = await screen.findByLabelText("답변 초안");
+    const draft = await screen.findByLabelText("답글 내용");
     const decided = screen.getByRole("region", { name: "판매자의 결정" });
     const order = (el: Element) => (why.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
     expect(order(draft)).toBe(true);
@@ -1400,15 +1400,15 @@ describe("리뷰 상세 — the one object and the one column (2026-10-06)", () 
     getReviewWorkspace.mockResolvedValue(detail({ whyNow: WHY }));
     getReviewReplyPrep.mockResolvedValue(prep());
     const { container } = renderTask();
-    await screen.findByLabelText("답변 초안");
+    await screen.findByLabelText("답글 내용");
 
     const page = container.querySelector('[data-case-variant="page"]')!;
     const card = [...page.querySelectorAll("div")].find(
       (e) => /\brounded-2xl\b/.test(e.className) && !e.closest("button,a,summary"),
     )!;
     // 답변과 그 동작은 안에 있다 (이 fixture는 승인 전이라 승인이 그 동작이다 — 저장은 스스로 한다, 2026-10-25).
-    expect(within(card as HTMLElement).getByLabelText("답변 초안")).toBeTruthy();
-    expect(within(card as HTMLElement).getByRole("button", { name: "승인" })).toBeTruthy();
+    expect(within(card as HTMLElement).getByLabelText("답글 내용")).toBeTruthy();
+    expect(within(card as HTMLElement).getByRole("button", { name: "답글 확정" })).toBeTruthy();
     // 할 일에서 빼는 길은 밖에 있다 — 사라지지는 않았다.
     const setAside = screen.getByRole("button", { name: "작업에서 제외" });
     expect(card.contains(setAside)).toBe(false);
@@ -1426,7 +1426,7 @@ describe("리뷰 상세 — the one object and the one column (2026-10-06)", () 
     ] as never);
     const { container } = renderTask();
     await screen.findByRole("region", { name: "왜 올라왔나요" });
-    await screen.findByLabelText("답변 초안");
+    await screen.findByLabelText("답글 내용");
 
     // 둘째 열이 없다 — rail="none".
     expect(container.querySelector('[class*="lg:grid-cols-"]')).toBeNull();
@@ -1441,7 +1441,7 @@ describe("리뷰 상세 — the one object and the one column (2026-10-06)", () 
       (e) => /\brounded-2xl\b/.test(e.className) && !e.closest("button,a,summary"),
     );
     expect(cards).toHaveLength(1);
-    expect(within(cards[0] as HTMLElement).getByLabelText("답변 초안")).toBeTruthy();
+    expect(within(cards[0] as HTMLElement).getByLabelText("답글 내용")).toBeTruthy();
     // <b>그 하나도 강한 테두리로 존재감을 만들지 않는다</b> (Front conversation detail, 2026-10-06).
     // Front의 제안된 답장은 가는 회색 테두리 하나이고, 무게는 그 안의 문장이 화면에서 가장 큰 글이라는
     // 데서 온다. 브랜드 ring은 「다음에 누를 것」의 표시이고, 여기서 다음에 누를 것은 복사 하나다.
@@ -1469,7 +1469,7 @@ describe("리뷰 처리 — the reply area before a decision", () => {
     renderTask();
 
     const starter = await screen.findByTestId("reply-starter");
-    expect(within(starter).getByRole("button", { name: "AI 초안 준비" })).toBeInTheDocument();
+    expect(within(starter).getByRole("button", { name: "AI 답글 쓰기" })).toBeInTheDocument();
     expect(within(starter).getByRole("button", { name: "직접 쓰기" })).toBeInTheDocument();
     const controls = screen.getByLabelText("조치 선택");
     expect(starter.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -1505,7 +1505,7 @@ describe("리뷰 처리 — the reply area before a decision", () => {
     // From here on the server reads 대응 필요, as it would after the press.
     getReviewWorkspace.mockResolvedValue(detail({ replyWork: { ...UNDECIDED, triageDisposition: "RESPONSE_NEEDED" } }));
     getReviewDecisionContext.mockResolvedValue(context({ currentDecision: "RESPONSE_NEEDED" }));
-    await userEvent.click(within(starter).getByRole("button", { name: "AI 초안 준비" }));
+    await userEvent.click(within(starter).getByRole("button", { name: "AI 답글 쓰기" }));
 
     await waitFor(() => expect(recordReviewDecision).toHaveBeenCalledTimes(1));
     expect(recordReviewDecision).toHaveBeenCalledWith(REVIEW, {
@@ -1540,12 +1540,12 @@ describe("리뷰 처리 — the reply area before a decision", () => {
     renderTask();
 
     const starter = await screen.findByTestId("reply-starter");
-    await userEvent.click(within(starter).getByRole("button", { name: "AI 초안 준비" }));
-    expect(await screen.findByText("답변 준비를 시작하지 못했습니다. 다시 눌러 주세요.")).toBeInTheDocument();
+    await userEvent.click(within(starter).getByRole("button", { name: "AI 답글 쓰기" }));
+    expect(await screen.findByText("시작하지 못했어요. 다시 눌러 주세요.")).toBeInTheDocument();
     expect(getReviewReplyPrep).not.toHaveBeenCalled();
 
     recordReviewDecision.mockResolvedValue({ disposition: "RESPONSE_NEEDED", replayed: true });
-    await userEvent.click(within(screen.getByTestId("reply-starter")).getByRole("button", { name: "AI 초안 준비" }));
+    await userEvent.click(within(screen.getByTestId("reply-starter")).getByRole("button", { name: "AI 답글 쓰기" }));
     await waitFor(() => expect(recordReviewDecision).toHaveBeenCalledTimes(2));
     expect(recordReviewDecision.mock.calls[1][1].commandId).toBe(recordReviewDecision.mock.calls[0][1].commandId);
   });

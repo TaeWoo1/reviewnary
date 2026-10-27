@@ -121,7 +121,7 @@ async function renderPanel(
       onOutcomeRecorded={onOutcomeRecorded}
     />,
   );
-  await screen.findByRole("heading", { name: "답변 준비" });
+  await screen.findByRole("heading", { name: "답글" });
 }
 
 /** The two API stubs a guided run needs, in the shape the panel expects. */
@@ -162,7 +162,7 @@ describe("VocItemReplyPrep", () => {
   it("shows the whole redacted body and seeds the editor from the suggestion", async () => {
     await renderPanel();
     expect(screen.getByText("합성-리뷰-본문: 배송이 너무 늦었습니다")).toBeTruthy();
-    expect(screen.getByLabelText("답변 초안")).toHaveValue("합성-추천-초안");
+    expect(screen.getByLabelText("답글 내용")).toHaveValue("합성-추천-초안");
   });
 
   /**
@@ -191,21 +191,21 @@ describe("VocItemReplyPrep", () => {
    */
   it("says what the draft stands on, and does not name a writer, when a model is recorded", async () => {
     await renderPanel(prepView({ draftAuthorKind: "MODEL" }));
-    expect(screen.getByText(/AI가 준비했습니다/)).toBeTruthy();
+    expect(screen.getByText(/AI가 썼어요/)).toBeTruthy();
     expect(screen.queryByText(/AI가 썼습니다/)).toBeNull();
   });
 
   it("says the seller wrote it, and does not ask them to check their own sentence", async () => {
     await renderPanel(prepView({ draftAuthorKind: "SELLER" }));
-    expect(screen.getByText(/판매자가 직접 쓴 문장입니다/)).toBeTruthy();
+    expect(screen.getByText(/직접 쓴 답글이에요/)).toBeTruthy();
     expect(screen.queryByText(/근거로 준비했습니다/)).toBeNull();
-    expect(screen.queryByText(/저장된 문구에서 시작합니다/)).toBeNull();
+    expect(screen.queryByText(/저장된 문구로 시작했어요/)).toBeNull();
     expect(screen.queryByText(/내용을 확인하고 직접 고쳐 주세요/)).toBeNull();
   });
 
   it("keeps the template sentence for a draft the template floor actually wrote", async () => {
     await renderPanel(prepView({ draftAuthorKind: "RULE" }));
-    expect(screen.getByText(/저장된 문구에서 시작합니다/)).toBeTruthy();
+    expect(screen.getByText(/저장된 문구로 시작했어요/)).toBeTruthy();
   });
 
   /**
@@ -214,15 +214,15 @@ describe("VocItemReplyPrep", () => {
    */
   it("claims no author at all when the saved version records none", async () => {
     await renderPanel(prepView({ draftAuthorKind: null }));
-    expect(screen.queryByText(/저장된 문구에서 시작합니다/)).toBeNull();
+    expect(screen.queryByText(/저장된 문구로 시작했어요/)).toBeNull();
     expect(screen.queryByText(/근거로 준비했습니다/)).toBeNull();
-    expect(screen.queryByText(/판매자가 직접 쓴 문장입니다/)).toBeNull();
-    expect(screen.getByLabelText("답변 초안")).toBeTruthy();
+    expect(screen.queryByText(/직접 쓴 답글이에요/)).toBeNull();
+    expect(screen.getByLabelText("답글 내용")).toBeTruthy();
   });
 
   it("says so when something was hidden, so a token is not a mystery", async () => {
     await renderPanel(prepView({ bodyRedacted: true }));
-    expect(screen.getByText(/가려서 표시했습니다/)).toBeTruthy();
+    expect(screen.getByText(/가렸어요/)).toBeTruthy();
   });
 
   it("seeds the editor from a saved draft in preference to the suggestion", async () => {
@@ -238,7 +238,7 @@ describe("VocItemReplyPrep", () => {
         capabilities: { canSave: true, canApprove: true, canWithdraw: false, canCopy: false, canStartSubmissionRun: false },
       }),
     );
-    expect(screen.getByLabelText("답변 초안")).toHaveValue("합성-저장된-초안");
+    expect(screen.getByLabelText("답글 내용")).toHaveValue("합성-저장된-초안");
   });
 
   it("saves the draft on the current base version", async () => {
@@ -256,7 +256,7 @@ describe("VocItemReplyPrep", () => {
       }),
     );
     expect(screen.queryByRole("button", { name: "초안 저장" })).toBeNull();
-    await user.type(screen.getByLabelText("답변 초안"), "-수정");
+    await user.type(screen.getByLabelText("답글 내용"), "-수정");
     // Leaving the box saves at once; otherwise the editor saves itself after a pause.
     await user.tab();
     await waitFor(() =>
@@ -276,10 +276,10 @@ describe("VocItemReplyPrep", () => {
         capabilities: { canSave: false, canApprove: false, canWithdraw: false, canCopy: false, canStartSubmissionRun: false },
       }),
     );
-    expect(screen.getByLabelText("답변 초안")).toHaveAttribute("readonly");
+    expect(screen.getByLabelText("답글 내용")).toHaveAttribute("readonly");
     expect(screen.queryByTestId("draft-status")).toBeNull();
     // The reason is stated, not left as a dead control.
-    expect(screen.getByText(/'대응 필요'로 기록된 리뷰만/)).toBeTruthy();
+    expect(screen.getByText(/'대응 필요'로 정한 리뷰에만/)).toBeTruthy();
   });
 
   it("does not offer a save the server would refuse", async () => {
@@ -289,7 +289,7 @@ describe("VocItemReplyPrep", () => {
         capabilities: { canSave: false, canApprove: false, canWithdraw: false, canCopy: false, canStartSubmissionRun: false },
       }),
     );
-    await user.click(screen.getByLabelText("답변 초안"));
+    await user.click(screen.getByLabelText("답글 내용"));
     await user.tab();
     expect(api.saveReviewReplyDraft).not.toHaveBeenCalled();
   });
@@ -308,7 +308,7 @@ describe("VocItemReplyPrep", () => {
         capabilities: { canSave: true, canApprove: true, canWithdraw: false, canCopy: false, canStartSubmissionRun: false },
       }),
     );
-    await user.click(screen.getByRole("button", { name: "승인" }));
+    await user.click(screen.getByRole("button", { name: "답글 확정" }));
     await waitFor(() => expect(api.decideReviewReplyApproval).toHaveBeenCalled());
     const body = vi.mocked(api.decideReviewReplyApproval).mock.calls[0][2];
     expect(body.state).toBe("APPROVED");
@@ -325,17 +325,17 @@ describe("VocItemReplyPrep", () => {
    */
   it("shows the approved reply as text rather than an editor, and says the way out", async () => {
     await renderPanel(APPROVED);
-    const shown = screen.getByLabelText("답변 초안");
+    const shown = screen.getByLabelText("답글 내용");
     expect(shown.tagName).toBe("P");
     expect(document.querySelector("textarea")).toBeNull();
-    expect(screen.getByText(/승인을 해제하세요/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "승인 해제" })).toBeTruthy();
+    expect(screen.getByText(/확정을 풀어 주세요/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "확정 풀기" })).toBeTruthy();
   });
 
   it("withdraws with a null baseVersion (a withdrawal binds nothing)", async () => {
     const user = userEvent.setup();
     await renderPanel(APPROVED);
-    await user.click(screen.getByRole("button", { name: "승인 해제" }));
+    await user.click(screen.getByRole("button", { name: "확정 풀기" }));
     await waitFor(() => expect(api.decideReviewReplyApproval).toHaveBeenCalled());
     const body = vi.mocked(api.decideReviewReplyApproval).mock.calls[0][2];
     expect(body.state).toBe("WITHDRAWN");
@@ -351,7 +351,7 @@ describe("VocItemReplyPrep", () => {
         capabilities: { canSave: false, canApprove: false, canWithdraw: true, canCopy: false, canStartSubmissionRun: false },
       }),
     );
-    expect(inert(screen.getByRole("button", { name: "승인 해제" }))).toBe(false);
+    expect(inert(screen.getByRole("button", { name: "확정 풀기" }))).toBe(false);
   });
 
   // --- the copy contract ------------------------------------------------------------
@@ -395,7 +395,7 @@ describe("VocItemReplyPrep", () => {
       }),
     );
     // 화면이 그리는 것은 저장된 draft의 본문이고, 그것은 승인된 본문과 다른 문자열이다.
-    expect(screen.getByLabelText("답변 초안").textContent).toBe("합성-편집-버퍼");
+    expect(screen.getByLabelText("답글 내용").textContent).toBe("합성-편집-버퍼");
 
     await user.click(screen.getByRole("button", { name: "복사" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
@@ -422,10 +422,10 @@ describe("VocItemReplyPrep", () => {
         capabilities: { canSave: true, canApprove: true, canWithdraw: false, canCopy: false, canStartSubmissionRun: false },
       }),
     );
-    const approve = screen.getByRole("button", { name: "승인" });
+    const approve = screen.getByRole("button", { name: "답글 확정" });
     expect(inert(approve)).toBe(false);
 
-    await user.type(screen.getByLabelText("답변 초안"), "-수정");
+    await user.type(screen.getByLabelText("답글 내용"), "-수정");
 
     expect(inert(approve)).toBe(true);
     expect(screen.getByTestId("draft-status").textContent).toBe("저장 중…");
@@ -463,7 +463,7 @@ describe("VocItemReplyPrep", () => {
     stubClipboard({ writeText: vi.fn().mockRejectedValue(new Error("NotAllowedError")) });
     await renderPanel(APPROVED);
     await user.click(screen.getByRole("button", { name: "복사" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/다시 시도해 주세요/);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/다시 눌러 주세요/);
     expect(screen.queryByText(/복사했습니다/)).toBeNull();
   });
 
@@ -477,7 +477,7 @@ describe("VocItemReplyPrep", () => {
       }),
     );
     expect(inert(screen.getByRole("button", { name: "복사" }))).toBe(true);
-    expect(screen.getByText(/'대응 필요'로 되돌리면 복사할 수 있습니다/)).toBeTruthy();
+    expect(screen.getByText(/'대응 필요'로 되돌리면 복사할 수 있어요/)).toBeTruthy();
   });
 
   // --- the read goes stale when a sibling moves the decision -------------------------
@@ -503,7 +503,7 @@ describe("VocItemReplyPrep", () => {
   async function renderStale(view: ReviewReplyPrep) {
     vi.mocked(api.getReviewReplyPrep).mockResolvedValue(view);
     render(<VocItemReplyPrep accountId={ACCOUNT} actionRef={REF} disposition="MONITOR" />);
-    await screen.findByRole("heading", { name: "답변 준비" });
+    await screen.findByRole("heading", { name: "답글" });
   }
 
   /**
@@ -514,11 +514,11 @@ describe("VocItemReplyPrep", () => {
     const user = userEvent.setup();
     await renderStale(STALE_SAVEABLE);
 
-    expect(screen.getByLabelText("답변 초안")).toHaveAttribute("readonly");
+    expect(screen.getByLabelText("답글 내용")).toHaveAttribute("readonly");
     // The reason renders — it used to be gated on the very flag that was stale.
-    expect(screen.getByText(/'대응 필요'로 기록된 리뷰만/)).toBeTruthy();
+    expect(screen.getByText(/'대응 필요'로 정한 리뷰에만/)).toBeTruthy();
 
-    await user.click(screen.getByLabelText("답변 초안"));
+    await user.click(screen.getByLabelText("답글 내용"));
     await user.tab();
     expect(api.saveReviewReplyDraft).not.toHaveBeenCalled();
   });
@@ -526,7 +526,7 @@ describe("VocItemReplyPrep", () => {
   it("refuses to approve on a stale canApprove", async () => {
     const user = userEvent.setup();
     await renderStale(STALE_SAVEABLE);
-    await user.click(screen.getByRole("button", { name: "승인" }));
+    await user.click(screen.getByRole("button", { name: "답글 확정" }));
     expect(api.decideReviewReplyApproval).not.toHaveBeenCalled();
   });
 
@@ -581,7 +581,7 @@ describe("VocItemReplyPrep", () => {
     // learns the approval is gone. The window under test is before that.
     await renderPanel(APPROVED);
 
-    await user.click(screen.getByRole("button", { name: "승인 해제" }));
+    await user.click(screen.getByRole("button", { name: "확정 풀기" }));
     // Mid-flight: the button is still on screen (prep has not refreshed) and still clickable.
     await user.click(screen.getByRole("button", { name: "복사" }));
 
@@ -606,7 +606,7 @@ describe("VocItemReplyPrep", () => {
     const { rerender } = render(
       <VocItemReplyPrep accountId={ACCOUNT} actionRef={REF} disposition="RESPONSE_NEEDED" />,
     );
-    await screen.findByRole("heading", { name: "답변 준비" });
+    await screen.findByRole("heading", { name: "답글" });
 
     await user.click(screen.getByRole("button", { name: "복사" }));
     expect(await screen.findByLabelText("승인된 답변 (직접 복사)")).toHaveValue("합성-승인된-답변");
@@ -618,7 +618,7 @@ describe("VocItemReplyPrep", () => {
     expect(screen.queryByText(/직접 선택해 복사하세요/)).toBeNull();
     // The button's own refusal is what the operator sees instead — one message, not two
     // contradicting each other.
-    expect(screen.getByText(/'대응 필요'로 되돌리면 복사할 수 있습니다/)).toBeTruthy();
+    expect(screen.getByText(/'대응 필요'로 되돌리면 복사할 수 있어요/)).toBeTruthy();
   });
 
   /** The exit is never gated — withdrawal does not depend on the disposition. */
@@ -631,8 +631,8 @@ describe("VocItemReplyPrep", () => {
     });
     await renderStale(APPROVED);
 
-    expect(inert(screen.getByRole("button", { name: "승인 해제" }))).toBe(false);
-    await user.click(screen.getByRole("button", { name: "승인 해제" }));
+    expect(inert(screen.getByRole("button", { name: "확정 풀기" }))).toBe(false);
+    await user.click(screen.getByRole("button", { name: "확정 풀기" }));
     await waitFor(() => expect(api.decideReviewReplyApproval).toHaveBeenCalled());
   });
 
@@ -651,7 +651,7 @@ describe("VocItemReplyPrep", () => {
     );
     await renderPanel();
 
-    const editor = await screen.findByLabelText("답변 초안");
+    const editor = await screen.findByLabelText("답글 내용");
     await user.type(editor, "-가");
     await user.tab();
     await waitFor(() => expect(api.saveReviewReplyDraft).toHaveBeenCalledTimes(1));
@@ -674,10 +674,10 @@ describe("VocItemReplyPrep", () => {
     const user = userEvent.setup();
     vi.mocked(api.saveReviewReplyDraft).mockRejectedValue(new Error("409 stale base"));
     await renderPanel();
-    await user.type(screen.getByLabelText("답변 초안"), "-수정");
+    await user.type(screen.getByLabelText("답글 내용"), "-수정");
     await user.tab();
     const status = screen.getByTestId("draft-status");
-    await waitFor(() => expect(status.textContent).toBe("저장 실패 · 다시 시도"));
+    await waitFor(() => expect(status.textContent).toBe("저장하지 못했어요 다시 시도"));
     expect(status.textContent).not.toMatch(/409|stale/);
     await user.click(screen.getByRole("button", { name: "다시 시도" }));
     await waitFor(() => expect(api.saveReviewReplyDraft).toHaveBeenCalledTimes(2));
@@ -686,9 +686,9 @@ describe("VocItemReplyPrep", () => {
   it("fails closed when the prep read fails", async () => {
     vi.mocked(api.getReviewReplyPrep).mockRejectedValue(new Error("boom"));
     render(<VocItemReplyPrep accountId={ACCOUNT} actionRef={REF} disposition="RESPONSE_NEEDED" />);
-    expect(await screen.findByRole("alert")).toHaveTextContent(/불러오지 못했습니다/);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/불러오지 못했어요/);
     // No editor, no suggestion, no copy — nothing invented to fill the gap.
-    expect(screen.queryByLabelText("답변 초안")).toBeNull();
+    expect(screen.queryByLabelText("답글 내용")).toBeNull();
   });
 
   /** No control here may read as sending — the product does not post this anywhere. */
@@ -838,7 +838,7 @@ describe("VocItemReplyPrep — guided submission (v1.6)", () => {
     // No replyRuntime prop and DEV stubbed off — exactly what a shipped build resolves to.
     vi.stubEnv("DEV", false);
     render(<VocItemReplyPrep accountId={ACCOUNT} actionRef={REF} disposition="RESPONSE_NEEDED" />);
-    await screen.findByRole("heading", { name: "답변 준비" });
+    await screen.findByRole("heading", { name: "답글" });
 
     // The button does NOT promise guidance.
     const start = screen.getByRole("button", { name: "직접 답변하고 기록하기" });
@@ -868,7 +868,7 @@ describe("VocItemReplyPrep — guided submission (v1.6)", () => {
     });
     vi.mocked(api.getReviewReplyPrep).mockResolvedValue(APPROVED);
     render(<VocItemReplyPrep accountId={ACCOUNT} actionRef={REF} disposition="RESPONSE_NEEDED" />);
-    await screen.findByRole("heading", { name: "답변 준비" });
+    await screen.findByRole("heading", { name: "답글" });
     await userEvent.setup().click(screen.getByRole("button", { name: "직접 답변하고 기록하기" }));
 
     const panel = await screen.findByRole("group", { name: "네이버에서 직접 답변하기" });
@@ -902,14 +902,14 @@ describe("VocItemReplyPrep — guided submission (v1.6)", () => {
         replyRuntime={hangingRuntime}
       />,
     );
-    await screen.findByRole("heading", { name: "답변 준비" });
+    await screen.findByRole("heading", { name: "답글" });
     await user.click(screen.getByRole("button", { name: "네이버에서 직접 답변하기(가이드)" }));
     await screen.findByRole("group", { name: "네이버에서 직접 답변하기" });
 
     await user.click(screen.getByRole("button", { name: "답변함으로 기록" }));
 
     // Released: an actionable failure, and the control is live again.
-    expect(await screen.findByText("기록하지 못했습니다. 다시 시도해 주세요.")).toBeInTheDocument();
+    expect(await screen.findByText("기록하지 못했어요. 다시 눌러 주세요.")).toBeInTheDocument();
     const retry = screen.getByRole("button", { name: "답변함으로 기록" });
     expect(retry).toHaveAttribute("aria-disabled", "false");
     // And nothing was recorded — a report that never terminated must not look like one that did.
@@ -942,7 +942,7 @@ describe("VocItemReplyPrep — guided submission (v1.6)", () => {
     render(
       <VocItemReplyPrep accountId={ACCOUNT} actionRef={REF} disposition="RESPONSE_NEEDED" replyRuntime={runtime} />,
     );
-    await screen.findByRole("heading", { name: "답변 준비" });
+    await screen.findByRole("heading", { name: "답글" });
     await user.click(screen.getByRole("button", { name: "네이버에서 직접 답변하기(가이드)" }));
     await screen.findByRole("group", { name: "네이버에서 직접 답변하기" });
 
@@ -981,7 +981,7 @@ describe("VocItemReplyPrep — guided submission (v1.6)", () => {
     render(
       <VocItemReplyPrep accountId={ACCOUNT} actionRef={REF} disposition="RESPONSE_NEEDED" replyRuntime={runtime} />,
     );
-    await screen.findByRole("heading", { name: "답변 준비" });
+    await screen.findByRole("heading", { name: "답글" });
     await user.click(screen.getByRole("button", { name: "네이버에서 직접 답변하기(가이드)" }));
     const panel = await screen.findByRole("group", { name: "네이버에서 직접 답변하기" });
     expect(panel.textContent).toContain("조회 기간");
@@ -1051,7 +1051,7 @@ describe("VocItemReplyPrep — the channel already answered", () => {
 
   it("a review the guided run cannot locate says so, and points at the copy that CAN be sent", async () => {
     // The dead end this closes: the control was offered, the press minted nothing, and the seller read
-    // 「답변 준비를 시작하지 못했습니다. 다시 시도해 주세요.」 — a retry that could never succeed.
+    // 「시작하지 못했어요. 다시 눌러 주세요.」 — a retry that could never succeed.
     await renderPanel({
       ...APPROVED,
       capabilities: { ...APPROVED.capabilities, canStartSubmissionRun: false, canCopy: true },

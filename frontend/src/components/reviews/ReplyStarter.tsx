@@ -63,28 +63,28 @@ export function ReplyStarter({
   return (
     <section aria-labelledby={`reply-start-${reviewId}`} className="space-y-3" data-testid="reply-starter">
       <h2 id={`reply-start-${reviewId}`} className="text-sm font-semibold text-ink">
-        답변 준비
+        답글
       </h2>
       <div className="rounded-lg bg-canvas px-4 py-5">
-        <p className="break-keep text-sm text-muted">아직 답변 초안이 없습니다.</p>
+        <p className="break-keep text-sm text-muted">아직 답글이 없어요.</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Btn size="sm" onClick={() => void start(true)} disabled={busy !== null || unavailable}>
-            {busy === "ai" ? "준비하는 중…" : "AI 초안 준비"}
+            {busy === "ai" ? "쓰는 중…" : "AI 답글 쓰기"}
           </Btn>
           <Btn size="sm" variant="outline" onClick={() => void start(false)} disabled={busy !== null || unavailable}>
             직접 쓰기
           </Btn>
-          <span className="break-keep text-xs text-muted">누르면 이 리뷰가 「대응 필요」로 기록됩니다.</span>
+          <span className="break-keep text-xs text-muted">누르면 이 리뷰를 「대응 필요」로 기록해요.</span>
         </div>
       </div>
       {failed ? (
         <p role="alert" className="break-keep text-sm text-bad">
-          답변 준비를 시작하지 못했습니다. 다시 눌러 주세요.
+          시작하지 못했어요. 다시 눌러 주세요.
         </p>
       ) : null}
       {unavailable ? (
         <p role="alert" className="break-keep text-sm text-bad">
-          이 브라우저에서는 기록을 남길 수 없어 답변 준비를 시작할 수 없습니다.
+          이 브라우저에서는 기록을 남길 수 없어서 시작할 수 없어요.
         </p>
       ) : null}
     </section>

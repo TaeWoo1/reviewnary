@@ -139,7 +139,7 @@ function refusal(e: unknown): string {
   if ((response?.status === 409 || response?.status === 503) && response.data?.message) {
     return response.data.message;
   }
-  return "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  return "요청하지 못했어요. 잠시 뒤 다시 눌러 주세요.";
 }
 
 export function DelegatedReplyControls({
@@ -258,10 +258,10 @@ export function DelegatedReplyControls({
       ) : null}
       {delegation.canSend ? (
         // What the press means, in the line under it (spec §10-2, 2026-10-25 exception) — and nothing it cannot keep.
-        <p className="text-xs leading-relaxed text-muted">이 문장 그대로 승인 · 담당자가 네이버에 등록</p>
+        <p className="text-xs leading-relaxed text-muted">누르면 이 답글로 확정되고, 담당자가 네이버에 등록해요.</p>
       ) : null}
       {state != null && (WITH_THE_DELEGATE.has(state) || state === "POSTED") ? (
-        <p className="text-xs leading-relaxed text-muted">중복 방지로 여기서 따로 승인·등록하지 않음</p>
+        <p className="text-xs leading-relaxed text-muted">같은 답글이 두 번 올라가지 않게, 여기서는 따로 확정하지 않아요.</p>
       ) : null}
       {failed != null ? (
         <p role="alert" className="text-sm text-bad">

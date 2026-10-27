@@ -82,9 +82,9 @@ describe("VocItemReplyPrep · delegate lane", () => {
     expect(handOver.className).toContain("bg-brand-700");
     expect(screen.queryByRole("button", { name: /휴대폰/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "초안 저장" })).toBeNull();
-    expect(screen.getByText("이 문장 그대로 승인 · 담당자가 네이버에 등록")).toBeTruthy();
-    expect(screen.getByTestId("draft-status").textContent).toBe("검사 통과");
-    expect(screen.getByRole("button", { name: "승인" }).className).not.toContain("bg-brand-700");
+    expect(screen.getByText("누르면 이 답글로 확정되고, 담당자가 네이버에 등록해요.")).toBeTruthy();
+    expect(screen.getByTestId("draft-status").textContent).toBe(""); // checked, nothing to fix: silence (§9)
+    expect(screen.getByRole("button", { name: "답글 확정" }).className).not.toContain("bg-brand-700");
     expect(api.handOverReviewReply).not.toHaveBeenCalled();
     await expectNoAxeViolations(container);
   });
@@ -106,7 +106,7 @@ describe("VocItemReplyPrep · delegate lane", () => {
     await user.click(await screen.findByRole("button", { name: "답글 등록 요청" }));
     expect(api.handOverReviewReply).toHaveBeenCalledWith(REVIEW, 1);
     expect(await screen.findByText("담당자 대기")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "승인" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "답글 확정" })).toBeNull();
     expect(screen.queryByRole("button", { name: "답글 등록 요청" })).toBeNull();
     expect(screen.getByRole("button", { name: "요청 취소" })).toBeTruthy();
   });
@@ -117,7 +117,7 @@ describe("VocItemReplyPrep · delegate lane", () => {
     vi.mocked(api.saveReviewReplyDraft).mockResolvedValue({ ...DRAFT, version: 2 });
     mount();
 
-    const editor = await screen.findByLabelText("답변 초안");
+    const editor = await screen.findByLabelText("답글 내용");
     await user.type(editor, " 추가");
     expect(screen.getByTestId("draft-status").textContent).toBe("저장 중…");
     const handOver = screen.getByRole("button", { name: "답글 등록 요청" });
@@ -181,7 +181,7 @@ describe("VocItemReplyPrep · delegate lane", () => {
     });
     mount();
 
-    const editor = await screen.findByLabelText("답변 초안");
+    const editor = await screen.findByLabelText("답글 내용");
     await user.type(editor, " 추가");
     await user.tab();
 
@@ -198,7 +198,7 @@ describe("VocItemReplyPrep · delegate lane", () => {
     vi.mocked(api.decideReviewReplyApproval).mockReturnValue(new Promise(() => {}));
     mount();
 
-    await user.click(await screen.findByRole("button", { name: "승인" }));
+    await user.click(await screen.findByRole("button", { name: "답글 확정" }));
     const handOver = screen.getByRole("button", { name: "답글 등록 요청" });
     await waitFor(() => expect(handOver.getAttribute("aria-disabled")).toBe("true"));
     await user.click(handOver);
@@ -215,7 +215,7 @@ describe("VocItemReplyPrep · delegate lane", () => {
     const chip = await screen.findByText("등록함 · 네이버 확인 전");
     expect(chip.className).not.toContain("text-good");
     expect(screen.getByText("담당자의 보고 · 다음 엑셀에서 네이버 확인")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "승인" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "답글 확정" })).toBeNull();
     await expectNoAxeViolations(container);
   });
 
@@ -406,7 +406,7 @@ describe("VocItemReplyPrep · delegate lane", () => {
     vi.mocked(api.getReviewReplyPrep).mockResolvedValue(prepView(null));
     mount();
 
-    expect((await screen.findByRole("button", { name: "승인" })).className).toContain("bg-brand-700");
+    expect((await screen.findByRole("button", { name: "답글 확정" })).className).toContain("bg-brand-700");
     expect(screen.queryByTestId("delegated-reply")).toBeNull();
   });
 });

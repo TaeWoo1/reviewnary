@@ -66,7 +66,7 @@ describe("VocItemReplyPrep · 걸린 표현", () => {
     expect(within(block).getByText("죄송하지만").getAttribute("data-kind")).toBe("AVOID");
     expect(within(block).getByText("「고객님 탓」 — 이 문장을 고쳐야 승인할 수 있어요.")).toBeTruthy();
     expect(within(block).getByText("「죄송하지만」 → 「번거로우시겠지만」")).toBeTruthy();
-    const approve = screen.getByRole("button", { name: "승인" });
+    const approve = screen.getByRole("button", { name: "답글 확정" });
     expect(approve.getAttribute("aria-disabled")).toBe("true");
     await userEvent.click(approve);
     expect(api.decideReviewReplyApproval).not.toHaveBeenCalled();
@@ -83,7 +83,7 @@ describe("VocItemReplyPrep · 걸린 표현", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "이 문장 빼기" }));
     expect(api.saveReviewReplyDraft).toHaveBeenCalledWith("mock-acct-1", REF, { body: fixed, baseVersion: 3 });
-    await waitFor(() => expect(screen.getByRole("button", { name: "승인" }).getAttribute("aria-disabled")).toBe("false"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "답글 확정" }).getAttribute("aria-disabled")).toBe("false"));
     expect(screen.queryByText(/을 고치면 승인할 수 있어요/)).toBeNull();
   });
 
@@ -92,7 +92,7 @@ describe("VocItemReplyPrep · 걸린 표현", () => {
     vi.mocked(api.saveReviewReplyDraft).mockResolvedValue(undefined as never);
     mount();
 
-    expect((await screen.findByRole("button", { name: "승인" })).getAttribute("aria-disabled")).toBe("false");
+    expect((await screen.findByRole("button", { name: "답글 확정" })).getAttribute("aria-disabled")).toBe("false");
     await userEvent.click(screen.getByRole("button", { name: "그대로 두기" }));
     expect(screen.queryByLabelText("걸린 표현")).toBeNull();
     expect(api.saveReviewReplyDraft).not.toHaveBeenCalled();
@@ -103,7 +103,7 @@ describe("VocItemReplyPrep · 걸린 표현", () => {
     mount();
 
     await userEvent.click(await screen.findByRole("button", { name: "직접 고치기" }));
-    const editor = screen.getByLabelText("답변 초안") as HTMLTextAreaElement;
+    const editor = screen.getByLabelText("답글 내용") as HTMLTextAreaElement;
     expect(document.activeElement).toBe(editor);
     expect(editor.value.slice(editor.selectionStart, editor.selectionEnd)).toBe("고객님 탓");
   });
