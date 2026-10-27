@@ -113,4 +113,63 @@ class ReviewClaimGuardTest {
         assertThat(ReviewClaimGuard.unsupportedClaims(null, List.of())).isEmpty();
         assertThat(ReviewClaimGuard.unsupportedClaims("   ", List.of())).isEmpty();
     }
+
+    // ---- a promise is also its yes or no (2026-10-27 review) ----
+
+    @Test
+    void a_grant_the_policy_refuses_under_the_same_terms_is_contradicted() {
+        String policy = "단순 변심은 무료 교환이 불가합니다.";
+        String draft = "단순 변심도 무료 교환이 가능합니다.";
+        // Every word and every term is in the policy — the two older checks pass the reversal.
+        assertThat(ReviewClaimGuard.unsupportedClaims(draft, List.of(policy))).isEmpty();
+        assertThat(ReviewClaimGuard.unsupportedConditions(draft, List.of(policy), "")).isEmpty();
+        assertThat(ReviewClaimGuard.contradictedPromises(draft, List.of(policy))).containsExactly("교환");
+    }
+
+    @Test
+    void a_refusal_the_policy_grants_under_the_same_terms_is_contradicted_too() {
+        assertThat(ReviewClaimGuard.contradictedPromises("단순 변심 환불은 어렵습니다.",
+                List.of("단순 변심도 수령 후 7일 이내 환불해 드립니다."))).containsExactly("환불");
+    }
+
+    @Test
+    void the_same_yes_under_the_same_terms_stands() {
+        assertThat(ReviewClaimGuard.contradictedPromises("불량 제품은 무료 교환해 드리겠습니다.",
+                List.of("단순 변심은 무료 교환이 불가합니다. 불량은 무료 교환해 드립니다."))).isEmpty();
+        assertThat(ReviewClaimGuard.contradictedPromises("단순 변심 교환은 어렵습니다.",
+                List.of("단순 변심 교환은 불가합니다."))).isEmpty();
+    }
+
+    @Test
+    void a_no_joined_to_a_yes_in_one_sentence_is_read_clause_by_clause() {
+        List<String> policy = List.of("교환은 수령 후 7일 이내 가능하며, 단순 변심은 불가합니다.");
+        assertThat(ReviewClaimGuard.contradictedPromises("수령 후 7일 이내 교환 가능합니다.", policy)).isEmpty();
+        // The second clause names no remedy; it is about the one before it.
+        assertThat(ReviewClaimGuard.contradictedPromises("단순 변심도 교환해 드립니다.", policy))
+                .containsExactly("교환");
+    }
+
+    @Test
+    void a_negative_word_before_the_remedy_or_inside_the_terms_is_not_a_refusal() {
+        // The condition is negative; the promise is not.
+        assertThat(ReviewClaimGuard.contradictedPromises("작동이 안 되는 제품은 교환해 드립니다.",
+                List.of("제품 불량 시 교환해 드립니다."))).isEmpty();
+        // A policy that qualifies its grant is still a grant.
+        assertThat(ReviewClaimGuard.contradictedPromises("교환해 드리겠습니다.",
+                List.of("교환은 개봉하지 않은 상품에 한해 가능합니다."))).isEmpty();
+        assertThat(ReviewClaimGuard.contradictedPromises("교환해 드리겠습니다.",
+                List.of("교환은 수령 후 7일(주말 제외) 이내 가능합니다."))).isEmpty();
+        assertThat(ReviewClaimGuard.contradictedPromises("추가 비용 없이 교환해 드립니다.",
+                List.of("불량은 추가 비용 없이 교환해 드립니다."))).isEmpty();
+    }
+
+    @Test
+    void a_policy_that_never_speaks_to_the_stated_terms_is_not_a_contradiction() {
+        // 「단순 변심」 is not in the policy at all: that is unsupportedConditions' finding, not a reversal.
+        assertThat(ReviewClaimGuard.contradictedPromises("단순 변심 환불은 어렵습니다.",
+                List.of("수령 후 7일 이내 환불해 드립니다."))).isEmpty();
+        assertThat(ReviewClaimGuard.contradictedPromises("환불해 드리겠습니다.", List.of())).isEmpty();
+        assertThat(ReviewClaimGuard.contradictedPromises("소중한 후기 감사합니다.",
+                List.of("교환은 불가합니다."))).isEmpty();
+    }
 }

@@ -128,6 +128,12 @@ public class InquiryDraftComposer {
      */
     static final String UNSUPPORTED_CLAIM = "근거에 없는 약속이나 요청이 들어가 초안을 저장하지 않았습니다. "
             + "다시 생성해 보시거나 직접 작성해 주세요.";
+    /**
+     * A reply that carries a 【확인: …】 blank — the owner's open question, not an answer (2026-10-27). The retriever drops
+     * every passage that carries one, so this is the last door, as it is in the review lane.
+     */
+    static final String UNCONFIRMED_TEXT = "확인 전 안내(【확인: …】)가 들어가 초안을 저장하지 않았습니다. "
+            + "다시 생성해 보시거나 직접 작성해 주세요.";
 
     /**
      * What a model's reply claims that nothing it was shown supports (Inquiry Claim Guard v1). The evidence is the
@@ -446,6 +452,9 @@ public class InquiryDraftComposer {
                         AnswerStyleInstruction.of(style), company);
                 if (written.isEmpty()) {
                     unavailable = MODEL_FAILED;
+                } else if (com.sellerops.knowledge.KnowledgeBlanks.carries(written.get().comments())) {
+                    written = Optional.empty();
+                    unavailable = UNCONFIRMED_TEXT;
                 } else if (!AnswerStyleInstruction
                         .forbiddenPresentIn(written.get().comments(), style).isEmpty()) {
                     // The prompt asked; this checks. A style line is a request to a model, and a

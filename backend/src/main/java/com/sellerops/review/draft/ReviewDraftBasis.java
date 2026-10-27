@@ -28,8 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <ul>
  *   <li><b>knowledge</b> — the product knowledge library: every source's product, variant, type, title, body and
  *       whether it is retired.</li>
- *   <li><b>policy</b> — the company's operating rules (org knowledge) the same way, and the commitment terms
- *       {@link ReviewClaimGuard} holds a reply to.</li>
+ *   <li><b>policy</b> — the company's operating rules (org knowledge) the same way, and the commitment terms,
+ *       condition terms and refusal words {@link ReviewClaimGuard} holds a reply to.</li>
  *   <li><b>voice</b> — the review reply wording per template key, the seller's own or the shipped default.</li>
  * </ul>
  *
@@ -85,6 +85,7 @@ public class ReviewDraftBasis {
                 .forEach(s -> policy.add(s.getId(), s.getKnowledgeType(), s.isActive(), s.getTitle(), s.getBody()));
         policy.add("guard", String.join(",", ReviewClaimGuard.COMMITMENT_TERMS));
         policy.add("conditions", ReviewClaimGuard.FIGURE.pattern(), String.join(",", ReviewClaimGuard.CONDITION_TERMS));
+        policy.add("refusals", String.join(",", ReviewClaimGuard.REFUSALS), String.valueOf(ReviewClaimGuard.ENDING));
         Digest voice = new Digest();
         for (ReviewReplyTemplateKey key : ReviewReplyTemplateKey.values()) {
             voice.add(key.category(), templates.bodyFor(orgId, key));

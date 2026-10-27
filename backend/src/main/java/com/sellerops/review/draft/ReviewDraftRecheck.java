@@ -129,6 +129,9 @@ public class ReviewDraftRecheck {
         List<String> promises = new java.util.ArrayList<>(ReviewClaimGuard.unsupportedClaims(body, license));
         ReviewClaimGuard.unsupportedConditions(body, license, redactedBody).stream()
                 .filter(c -> !promises.contains(c)).forEach(promises::add);
+        // And its yes or no: an edit that turns the policy's 「불가」 into 「가능」 keeps every word (2026-10-27 review).
+        ReviewClaimGuard.contradictedPromises(body, license).stream()
+                .filter(c -> !promises.contains(c)).forEach(promises::add);
         if (!promises.isEmpty()) {
             codes.add(UNSUPPORTED_PROMISE);
         }

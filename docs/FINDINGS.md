@@ -704,6 +704,16 @@
   DB의 `customer_phrases` 줄 수가 20이었다.
 - **출처** — 2026-10-27, `CustomerPhrases.MAX_PHRASES` · `overflows`, `KnowledgeWorkbookService`, 판정용 복사본.
 
+### B35. 최종 검사를 출구 하나에만 달아, 다시 생성한 초안은 【확인】 검사를 건너뛰었다
+
+- **했던 것** — 【확인: …】이 든 모델 답을 거절하는 검사를 `ReviewDraftComposer.writeGrounded`의 첫 답 뒤에 넣었다(`35086608`).
+- **사실** — 같은 함수에는 금지 표현이 남았을 때 한 번 더 생성하는 두 번째 출구가 있었고, 그 결과는 약속 검사만 거쳐 채택됐다 — 외부
+  검토가 찾았다. 검사를 `refusalOf` 하나로 묶어 두 출구가 같은 함수를 부르게 했다. 그 수정을 증명하는 시험도 처음엔 틀렸다: 재생성
+  문장에 「교환」이 들어 있어서 옛 약속 검사가 먼저 거절했고, 검사를 빼도 시험이 초록이었다.
+- **다음에** — 검사를 더할 때는 **결과가 저장되는 모든 출구**를 먼저 센다. 증명용 문장은 새 검사**만** 걸리도록 고르고, 빼 보고 빨개지는지
+  본다(CLAUDE.md 「검사 도구의 실패는 초록색으로 나타난다」 4).
+- **출처** — 2026-10-27, `ReviewDraftComposer.refusalOf`, `ReviewDraftComposerTest.aRetryWithABlankIsNotTaken`.
+
 ---
 
 ## C. 증거 · 계약

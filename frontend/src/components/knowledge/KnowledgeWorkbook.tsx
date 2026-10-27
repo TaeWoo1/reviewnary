@@ -15,6 +15,9 @@ export const WORKBOOK_FILE_NAME = "답글 기준.xlsx";
  *
  * <p>「확인 전」인 줄은 답글에 쓰이지 않는다. 안내 매뉴얼의 「확인 전」 줄은 확인 필요에 제안으로 들어가고,
  * 【확인: …】이 남은 줄은 「사용」으로 등록되지 않는다 — 이 규칙은 서버가 지키고, 이 화면은 그 결과를 읽어 줄 뿐이다.
+ *
+ * <p><b>「적용」은 글을 보고 누른다</b> (2026-10-27 검토). 바뀌는 줄마다 어디에 쓰이는지, 지금 문장과 바뀔 문장을 나란히
+ * 보인다. 내려받은 뒤 화면에서 바뀐 줄은 서버가 반영하지 않고, 여기에는 그 줄이 지금 무엇이라고 적혀 있는지가 선다.
  */
 export function KnowledgeWorkbook({ onChanged }: { onChanged: () => Promise<void> | void }) {
   const input = useRef<HTMLInputElement>(null);
@@ -142,15 +145,34 @@ export function KnowledgeWorkbook({ onChanged }: { onChanged: () => Promise<void
 function Lines({ lines }: { lines: KnowledgeWorkbookLine[] }) {
   if (lines.length === 0) return null;
   return (
-    <ul className="mt-1.5 space-y-1">
+    <ul className="mt-1.5 space-y-2">
       {lines.map((line, i) => (
         <li key={`${line.sheet}-${line.row}-${i}`} className="flex gap-2 break-keep text-sm text-ink">
           <span className="shrink-0 text-xs tabular-nums text-muted">
             {line.sheet} {line.row}줄
           </span>
-          <span className="min-w-0">{line.text}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block">{line.text}</span>
+            {line.where ? <span className="block text-xs text-muted">{line.where}</span> : null}
+            {line.before != null || line.after != null ? (
+              <span className="mt-1 grid gap-1 sm:grid-cols-2">
+                <Version label={line.after != null ? "지금" : "화면의 지금 내용"} text={line.before} />
+                {line.after != null ? <Version label="바뀐 뒤" text={line.after} strong /> : null}
+              </span>
+            ) : null}
+          </span>
         </li>
       ))}
     </ul>
+  );
+}
+
+/** 한쪽 문장. 빈 것은 「(없음)」이라고 말한다 — 빈 칸은 「안 보여 줬다」와 구별되지 않는다. */
+function Version({ label, text, strong = false }: { label: string; text?: string | null; strong?: boolean }) {
+  return (
+    <span className={`block rounded-lg border px-2.5 py-1.5 ${strong ? "border-brand-700/30 bg-brand-700/5" : "border-line bg-canvas"}`}>
+      <span className="block text-xs font-semibold text-muted">{label}</span>
+      <span className="line-clamp-6 block whitespace-pre-line text-sm text-ink">{text ? text : "(없음)"}</span>
+    </span>
   );
 }

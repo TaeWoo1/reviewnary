@@ -231,6 +231,95 @@ class KnowledgeWorkbookIT {
         assertThat(lane.hits(org, productId, "자르기 어려워요")).isEmpty();
     }
 
+    @Test
+    @DisplayName("the preview says where each change applies and what the text is now and will be")
+    void thePreviewShowsBeforeAndAfter() throws IOException {
+        library.create(org, productId, new KnowledgeSourceRequest(KnowledgeSourceType.USAGE, "자르기",
+                "커터칼로 자르세요.", null, null, List.of()), null, "판매자");
+        String positiveNow = templates.bodyFor(org, ReviewReplyTemplateKey.POSITIVE);
+        byte[] file = edited(book -> {
+            Row tone = rowWith(book.getSheet(KnowledgeWorkbookService.SHEET_STYLE), 0, "말투");
+            tone.getCell(2).setCellValue("친근하게");
+            tone.getCell(3).setCellValue("사용");
+            Row positive = rowWith(book.getSheet(KnowledgeWorkbookService.SHEET_TEMPLATES), 5,
+                    ReviewReplyTemplateKey.POSITIVE.category());
+            positive.getCell(3).setCellValue("마음에 드셨다니 기쁩니다.");
+            positive.getCell(4).setCellValue("사용");
+            Row cutting = rowWith(book.getSheet(KnowledgeWorkbookService.SHEET_MANUAL), 5, "자르기");
+            cutting.getCell(6).setCellValue("커터칼로 여러 번 그어 자르세요.");
+            cutting.getCell(7).setCellValue("잘 안 잘려요");
+        });
+
+        List<KnowledgeWorkbookService.Line> changes = workbook.read(org, new ByteArrayInputStream(file), false, null,
+                "판매자").changes();
+
+        assertThat(changes).filteredOn(l -> l.text().startsWith("말투")).singleElement().satisfies(l -> {
+            assertThat(l.before()).isEqualTo("말투: 정중하게");
+            assertThat(l.after()).isEqualTo("말투: 친근하게");
+            assertThat(l.where()).isEqualTo("문의 답변 · 리뷰 답글");
+        });
+        assertThat(changes).filteredOn(l -> l.text().contains("별점 4~5점")).singleElement().satisfies(l -> {
+            assertThat(l.before()).isEqualTo(positiveNow.strip());
+            assertThat(l.after()).isEqualTo("마음에 드셨다니 기쁩니다.");
+            assertThat(l.where()).isEqualTo("별점이 4~5점인 리뷰에 씁니다.");
+        });
+        assertThat(changes).filteredOn(l -> l.text().contains("자르기")).singleElement().satisfies(l -> {
+            assertThat(l.where()).isEqualTo("상품 · 일체형 전선몰딩");
+            assertThat(l.before()).isEqualTo("커터칼로 자르세요.");
+            assertThat(l.after()).isEqualTo("커터칼로 여러 번 그어 자르세요.\n고객은 이렇게 말해요: 잘 안 잘려요");
+        });
+    }
+
+    @Test
+    @DisplayName("an old file does not overwrite what was changed on a screen after it was downloaded")
+    void anOldFileDoesNotOverwriteANewerScreen() throws IOException {
+        ProductKnowledgeSource cutting = productSources.findById(library.create(org, productId,
+                new KnowledgeSourceRequest(KnowledgeSourceType.USAGE, "자르기", "커터칼로 자르세요.", null, null,
+                        List.of()), null, "판매자").id()).orElseThrow();
+        byte[] old = edited(book -> {
+            Row tone = rowWith(book.getSheet(KnowledgeWorkbookService.SHEET_STYLE), 0, "말투");
+            tone.getCell(2).setCellValue("간결하게");
+            tone.getCell(3).setCellValue("사용");
+            Row positive = rowWith(book.getSheet(KnowledgeWorkbookService.SHEET_TEMPLATES), 5,
+                    ReviewReplyTemplateKey.POSITIVE.category());
+            positive.getCell(3).setCellValue("파일에서 고친 문구입니다.");
+            positive.getCell(4).setCellValue("사용");
+            rowWith(book.getSheet(KnowledgeWorkbookService.SHEET_MANUAL), 5, "자르기").getCell(6)
+                    .setCellValue("파일에서 고친 안내입니다.");
+            Row pricing = rowWith(book.getSheet(KnowledgeWorkbookService.SHEET_TEMPLATES), 5,
+                    ReviewReplyTemplateKey.PRICING.category());
+            pricing.getCell(3).setCellValue("가격 리뷰에 감사드립니다.");
+            pricing.getCell(4).setCellValue("사용");
+        });
+        // After the download, on the screens:
+        styles.save(org, new com.sellerops.knowledge.style.dto.AnswerStyleRequest(AnswerTone.FRIENDLY, null, null,
+                null, null, null, List.of(), List.of(), null), null);
+        templates.save(org, ReviewReplyTemplateKey.POSITIVE.category(), "화면에서 고친 문구입니다.", null);
+        library.update(org, cutting.getId(), new KnowledgeSourceRequest(KnowledgeSourceType.USAGE, "자르기",
+                "화면에서 고친 안내입니다.", null, null, null));
+
+        KnowledgeWorkbookService.Result done = workbook.read(org, new ByteArrayInputStream(old), true, null, "판매자");
+
+        assertThat(done.changes()).as("only the row nobody touched since").extracting(KnowledgeWorkbookService.Line::text)
+                .containsExactly("「가격 리뷰」 문구 바꿈");
+        assertThat(done.problems()).filteredOn(l -> l.text().contains(KnowledgeWorkbookService.STALE)).hasSize(3)
+                .extracting(KnowledgeWorkbookService.Line::before)
+                .containsExactlyInAnyOrder("친근하게", "화면에서 고친 문구입니다.", "화면에서 고친 안내입니다.");
+        assertThat(styles.profileFor(org).tone()).isEqualTo(AnswerTone.FRIENDLY);
+        assertThat(templates.bodyFor(org, ReviewReplyTemplateKey.POSITIVE)).isEqualTo("화면에서 고친 문구입니다.");
+        assertThat(productSources.findById(cutting.getId()).orElseThrow().getBody()).isEqualTo("화면에서 고친 안내입니다.");
+    }
+
+    /** The org's workbook as downloaded now, edited by {@code edit}, as the bytes a seller would upload. */
+    private byte[] edited(java.util.function.Consumer<Workbook> edit) throws IOException {
+        try (Workbook book = new XSSFWorkbook(new ByteArrayInputStream(workbook.export(org)))) {
+            edit.accept(book);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            book.write(out);
+            return out.toByteArray();
+        }
+    }
+
     private static Row rowWith(Sheet sheet, int column, String value) {
         for (Row row : sheet) {
             if (row.getCell(column) != null && value.equals(row.getCell(column).getStringCellValue())) {

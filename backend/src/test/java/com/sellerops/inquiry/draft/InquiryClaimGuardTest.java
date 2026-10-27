@@ -127,4 +127,12 @@ public class InquiryClaimGuardTest {
     void aClarifyingQuestionPasses() {
         assertThat(check("어떤 규격을 쓰실지 알려주시면 그에 맞춰 말씀드리겠습니다.", List.of(KNOWLEDGE), List.of())).isEmpty();
     }
+
+    @Test
+    @DisplayName("a remedy answered the other way from the evidence is refused — 「불가」 written up as 「가능」")
+    void aReversedRemedy() {
+        assertThat(InquiryClaimGuard.unsupportedClaims("단순 변심도 무료 교환이 가능합니다.",
+                List.of("단순 변심은 무료 교환이 불가합니다."), List.of(), "교환되나요?"))
+                .extracting(Violation::matched).containsExactly("교환");
+    }
 }

@@ -209,6 +209,32 @@ describe("지식", () => {
     expect(screen.getByRole("heading", { level: 1, name: "지식" })).toBeInTheDocument();
   });
 
+  it("a part that failed to load is never drawn as zero — it says so and offers a retry", async () => {
+    getKnowledgeCandidates.mockRejectedValueOnce(new Error("down"));
+    getKnowledgeInventory.mockRejectedValueOnce(new Error("down"));
+    draw();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("불러오지 못했습니다");
+    expect(alert).toHaveTextContent("확인 필요");
+    expect(alert).toHaveTextContent("운영 기준 · 상품 지식");
+    const strip = screen.getByLabelText("이 회사가 가진 지식");
+    for (const label of ["운영 기준", "상품 지식", "확인 필요"]) {
+      expect(within(strip).getByText(label).parentElement).toHaveTextContent("–");
+      expect(within(strip).getByText(label).parentElement).not.toHaveTextContent("0");
+    }
+    // The documents did load, and say what they are.
+    expect(within(strip).getByText("자료").parentElement).toHaveTextContent("1");
+    // 「없음」 is what an empty list says; a list that never came says it never came.
+    expect(screen.queryByText("확인 필요 없음")).toBeNull();
+    expect(within(screen.getByLabelText("상품 지식")).getByText("불러오지 못했습니다")).toBeInTheDocument();
+    expect(screen.queryByText("아직 적어 둔 상품 지식이 없습니다")).toBeNull();
+
+    await userEvent.click(within(alert).getByRole("button", { name: "다시 불러오기" }));
+    await waitFor(() => expect(screen.queryByText(/불러오지 못했습니다/)).toBeNull());
+    expect(within(strip).getByText("확인 필요").parentElement).toHaveTextContent("1");
+    expect(within(strip).getByText("상품 지식").parentElement).toHaveTextContent("3");
+  });
+
   it("적혀 있지 않은 주제가 빈 줄로 선다 — 비어 있다는 사실이 이 화면의 절반이다", async () => {
     const rows = await rowsOf("운영 기준");
     // 여덟 주제 전부가 줄을 가진다. 적힌 둘만 그리면 비어 있다는 사실이 화면에서 사라진다.
@@ -433,6 +459,30 @@ describe("지식", () => {
     await userEvent.click(within(block).getByRole("button", { name: "적용" }));
     await waitFor(() => expect(uploadKnowledgeWorkbook).toHaveBeenLastCalledWith(file, true));
     expect(await within(block).findByText("반영했습니다 · 1건")).toBeInTheDocument();
+  });
+
+  it("the workbook preview shows where a change applies and its before and after; a stale row shows the screen's text", async () => {
+    uploadKnowledgeWorkbook.mockResolvedValueOnce({
+      applied: false,
+      changes: [{
+        sheet: "답변 템플릿", row: 2, text: "「별점 4~5점 기본 문구」 문구 바꿈", where: "별점이 4~5점인 리뷰에 씁니다.",
+        before: "소중한 후기 감사합니다.", after: "마음에 드셨다니 기쁩니다.",
+      }],
+      problems: [{
+        sheet: "안내 매뉴얼", row: 3, text: "「자르기」 안내 고침 — 내려받은 뒤 화면에서 바뀐 줄이라 반영하지 않았습니다.",
+        where: "상품 · 일체형 전선몰딩", before: "화면에서 고친 안내입니다.", after: null,
+      }],
+    });
+    draw();
+    const block = await screen.findByTestId("knowledge-workbook");
+    await userEvent.upload(within(block).getByLabelText("엑셀 파일 고르기"), new File(["x"], "답글 기준.xlsx"));
+    const change = (await within(block).findByText("「별점 4~5점 기본 문구」 문구 바꿈")).closest("li") as HTMLElement;
+    expect(change).toHaveTextContent("별점이 4~5점인 리뷰에 씁니다.");
+    expect(within(change).getByText("지금").parentElement).toHaveTextContent("소중한 후기 감사합니다.");
+    expect(within(change).getByText("바뀐 뒤").parentElement).toHaveTextContent("마음에 드셨다니 기쁩니다.");
+    const stale = within(block).getByText(/화면에서 바뀐 줄/).closest("li") as HTMLElement;
+    expect(within(stale).getByText("화면의 지금 내용").parentElement).toHaveTextContent("화면에서 고친 안내입니다.");
+    expect(within(stale).queryByText("바뀐 뒤")).toBeNull();
   });
 
   it("a drafting gap is a QUESTION — the editor opens empty and the question is never saved as an answer", async () => {

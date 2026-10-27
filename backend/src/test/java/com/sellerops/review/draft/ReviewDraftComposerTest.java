@@ -325,6 +325,38 @@ class ReviewDraftComposerTest {
     }
 
     @Test
+    @DisplayName("the retry passes the same final check as the first answer — a retry with a 【확인】 blank is not taken")
+    void aRetryWithABlankIsNotTaken() {
+        com.sellerops.knowledge.style.AnswerStyleService styles = mock(com.sellerops.knowledge.style.AnswerStyleService.class);
+        when(styles.profileFor(ORG)).thenReturn(new com.sellerops.knowledge.style.AnswerStyleProfile(null, null, null,
+                null, null, null, List.of(), List.of("고객님 탓"), null, 1));
+        composer.setStyleGuard(new ReviewStyleGuard(styles));
+        retrieval(DraftKnowledgeState.GROUNDED,
+                productPassage("표면의 먼지와 기름기를 닦아낸 뒤 눌러 붙여 주세요."));
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of("고객님 탓")), eq(AgentDraftGenerator.ReviewMood.UNSTATED), any()))
+                .thenReturn(Optional.of("고객님 탓이 아닙니다. 표면의 먼지를 닦아 주세요."),
+                        Optional.of("불편을 드려 죄송합니다. 【확인: 부착 시간】 동안 눌러 붙여 주세요."));
+
+        GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
+
+        assertThat(view.draft().body()).doesNotContain("【확인").contains("고객님 탓이 아닙니다");
+        assertThat(view.unavailableMessage()).isEqualTo(ReviewDraftComposer.forbiddenLeft(List.of("고객님 탓")));
+    }
+
+    @Test
+    @DisplayName("a promise that reverses the seller's own yes or no is refused for the template")
+    void aReversedPromiseFallsBackToTheTemplate() {
+        retrieval(DraftKnowledgeState.GROUNDED, productPassage("단순 변심은 무료 교환이 불가합니다."));
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), any(), any(), any()))
+                .thenReturn(Optional.of("불편을 드려 죄송합니다. 단순 변심도 무료 교환이 가능합니다."));
+
+        GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
+
+        assertThat(view.draft().body()).doesNotContain("무료 교환이 가능");
+        assertThat(view.unavailableMessage()).isEqualTo(ReviewDraftComposer.CONTRADICTED_CLAIM);
+    }
+
+    @Test
     @DisplayName("an unsupported promise is REFUSED, not edited — the template floor is saved instead")
     void anUnsupportedPromiseFallsBackToTheTemplate() {
         retrieval(DraftKnowledgeState.GROUNDED,

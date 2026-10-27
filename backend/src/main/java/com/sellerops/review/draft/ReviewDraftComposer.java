@@ -93,6 +93,10 @@ public class ReviewDraftComposer {
     static final String UNSUPPORTED_CLAIM =
             "근거에 없는 교환·환불·보상 약속이나 조건(기간·금액·대상)이 들어가 AI 초안을 저장하지 않았습니다. "
                     + "저장된 문구로 초안을 준비했습니다.";
+    /** A promise that says yes where the seller's own text says no, or no where it says yes (2026-10-27). */
+    static final String CONTRADICTED_CLAIM =
+            "근거와 반대로 교환·환불·보상을 해 준다거나 안 된다고 적어 AI 초안을 저장하지 않았습니다. "
+                    + "저장된 문구로 초안을 준비했습니다.";
     /** The draft is kept with the phrase marked; approval waits for the seller's fix (2026-10-23). */
     static String forbiddenLeft(List<String> phrases) {
         return "회사가 쓰지 않기로 한 표현이 남아 있습니다: " + String.join(" · ", phrases.stream()
@@ -459,29 +463,22 @@ public class ReviewDraftComposer {
             return new Written(null, MODEL_FAILED);
         }
         String candidate = written.get();
-        // A 【확인: …】 blank in a reply is the owner's open question sent to a customer (2026-10-27). No passage carries
-        // one any more (the retriever drops them), so this is the last door, not the first.
-        if (com.sellerops.knowledge.KnowledgeBlanks.carries(candidate)) {
-            return new Written(null, UNCONFIRMED_TEXT);
-        }
         // Only CURRENT evidence may authorize a promise. A past answer is shown to the model for its wording, and an
         // exchange the seller once granted is not a policy (2026-10-22 review).
         List<String> current = passages.stream().filter(p -> p.scope().current()).map(ScopedPassage::text).toList();
-        // The promise's terms as well as its word: 「7일 이내 무료 교환」 needs the 7 days and the 무료 in the evidence
-        // too (2026-10-23 external review).
-        if (!ReviewClaimGuard.unsupportedClaims(candidate, current).isEmpty()
-                || !ReviewClaimGuard.unsupportedConditions(candidate, current, reviewBody).isEmpty()) {
-            return new Written(null, UNSUPPORTED_CLAIM);
+        String refused = refusalOf(candidate, current, reviewBody);
+        if (refused != null) {
+            return new Written(null, refused);
         }
         // A banned phrase: one more try with the bans in the request. Still there, the draft is kept — not dropped,
         // not edited by us (deleting words is how a reply comes to say the opposite) — and approval waits for the
-        // seller's fix, which the approval gate enforces on whatever text is approved (2026-10-23).
+        // seller's fix, which the approval gate enforces on whatever text is approved (2026-10-23). The second answer
+        // passes the same final check as the first, or the first stands (2026-10-27 review: it skipped the blank).
         List<String> found = styleGuard == null ? List.of() : styleGuard.forbiddenIn(candidate, orgId);
         if (!found.isEmpty() && quota.consume(orgId, AgentUsageKind.DRAFT, null).allowed()) {
             Optional<String> again = model.draftReviewReply(orgId, reviewBody, passagesFor(passages), voice,
                     styleGuard.enforced(orgId), mood, manner);
-            if (again.isPresent() && ReviewClaimGuard.unsupportedClaims(again.get(), current).isEmpty()
-                    && ReviewClaimGuard.unsupportedConditions(again.get(), current, reviewBody).isEmpty()) {
+            if (again.isPresent() && refusalOf(again.get(), current, reviewBody) == null) {
                 candidate = again.get();
                 found = styleGuard.forbiddenIn(candidate, orgId);
             }
@@ -490,6 +487,33 @@ public class ReviewDraftComposer {
             return new Written(candidate, forbiddenLeft(found));
         }
         return new Written(candidate, null);
+    }
+
+    /**
+     * <b>The one final check every model answer passes before it can be kept</b> — the first and the retry alike. The
+     * reason it is refused, or null when it may be kept.
+     *
+     * <ol>
+     *   <li>A 【확인: …】 blank is the owner's open question sent to a customer (2026-10-27). No passage carries one any
+     *       more (the retriever drops them), so this is the last door, not the first.</li>
+     *   <li>A remedy, or a term of one (「7일 이내」 · 「무료」), that {@code current} does not state (2026-10-23 external
+     *       review).</li>
+     *   <li>A remedy granted where {@code current} refuses it under the same terms, or refused where it grants
+     *       ({@link ReviewClaimGuard#contradictedPromises}, 2026-10-27 review).</li>
+     * </ol>
+     */
+    static String refusalOf(String candidate, List<String> current, String reviewBody) {
+        if (com.sellerops.knowledge.KnowledgeBlanks.carries(candidate)) {
+            return UNCONFIRMED_TEXT;
+        }
+        if (!ReviewClaimGuard.unsupportedClaims(candidate, current).isEmpty()
+                || !ReviewClaimGuard.unsupportedConditions(candidate, current, reviewBody).isEmpty()) {
+            return UNSUPPORTED_CLAIM;
+        }
+        if (!ReviewClaimGuard.contradictedPromises(candidate, current).isEmpty()) {
+            return CONTRADICTED_CLAIM;
+        }
+        return null;
     }
 
     /**

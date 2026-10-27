@@ -62,6 +62,16 @@ import {
  * <p><b>내부 어휘는 끝까지 나오지 않는다.</b> chunk도, passage도, enum도 없다 —
  * `lib/knowledgeWords.ts`가 판매자가 읽는 말을 전부 쥐고 있고, 이름이 없는 토큰은 아무것도 그리지 않는다.
  */
+/** What this screen fetches, each on its own: one failing leaves the others standing. */
+type Part = "documents" | "candidates" | "inventory" | "summary";
+const PARTS: Part[] = ["candidates", "inventory", "documents", "summary"];
+const PART_NAMES: Record<Part, string> = {
+  candidates: KNOWLEDGE_NOUN.needsConfirmation,
+  inventory: "운영 기준 · 상품 지식",
+  documents: COPY.documentsTab,
+  summary: "과거 답변",
+};
+
 export function KnowledgeHome() {
   const [documents, setDocuments] = useState<KnowledgeDocumentView[] | null>(null);
   const [candidates, setCandidates] = useState<KnowledgeCandidateView[] | null>(null);
@@ -76,17 +86,28 @@ export function KnowledgeHome() {
   // catalogue, so a document id would be a hint no tool could turn into a fact.
   useAgentSurface({ surface: "knowledge", label: COPY.knowledgeTitle });
 
+  // A part that did not load is not a part with nothing in it (2026-10-27 review): 「확인 필요 0」 on a failed fetch
+  // tells the seller there is nothing waiting. Each part keeps what it last showed, and the ones that failed say so,
+  // with a retry, in place of a number or a list.
+  const [failed, setFailed] = useState<Part[]>([]);
   const load = useCallback(async () => {
+    const lost: Part[] = [];
+    const settle = <T,>(part: Part, request: Promise<T>) =>
+      request.catch(() => {
+        lost.push(part);
+        return null;
+      });
     const [docs, cands, inv, sum] = await Promise.all([
-      api.getKnowledgeDocuments().catch(() => null),
-      api.getKnowledgeCandidates().catch(() => null),
-      api.getKnowledgeInventory().catch(() => null),
-      api.getKnowledgeSummary().catch(() => null),
+      settle("documents", api.getKnowledgeDocuments()),
+      settle("candidates", api.getKnowledgeCandidates()),
+      settle("inventory", api.getKnowledgeInventory()),
+      settle("summary", api.getKnowledgeSummary()),
     ]);
-    setDocuments(docs ?? []);
-    setCandidates(cands ?? []);
-    setInventory(inv);
-    setSummary(sum);
+    if (docs) setDocuments(docs);
+    if (cands) setCandidates(cands);
+    if (inv) setInventory(inv);
+    if (sum) setSummary(sum);
+    setFailed(PARTS.filter((part) => lost.includes(part)));
   }, []);
 
   useEffect(() => {
@@ -108,7 +129,7 @@ export function KnowledgeHome() {
     }
   }
 
-  const pending = candidates?.length ?? 0;
+  const pending = candidates?.length ?? null;
   const rules = inventory?.rules ?? [];
   const facts = inventory?.productKnowledge ?? [];
   const writtenTopics = topicsOf(rules).filter((topic) => topic.rules.length > 0).length;
@@ -123,14 +144,22 @@ export function KnowledgeHome() {
         title={COPY.knowledgeTitle}
         meta={
           <span aria-label="이 회사가 가진 지식" className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
-            <Figure label="운영 기준" value={rules.length} />
-            <Figure label="상품 지식" value={inventory?.productKnowledgeTotal ?? 0} />
-            <Figure label={COPY.documentsTab} value={documents?.length ?? 0} />
+            <Figure label="운영 기준" value={inventory ? rules.length : null} />
+            <Figure label="상품 지식" value={inventory?.productKnowledgeTotal ?? null} />
+            <Figure label={COPY.documentsTab} value={documents?.length ?? null} />
             <Figure label={KNOWLEDGE_NOUN.needsConfirmation} value={pending} warn />
           </span>
         }
       />
 
+      {failed.length > 0 ? (
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 break-keep text-sm text-bad" role="alert">
+          <span>불러오지 못했습니다 · {failed.map((part) => PART_NAMES[part]).join(" · ")}</span>
+          <Btn size="sm" variant="outline" onClick={() => void load()}>
+            다시 불러오기
+          </Btn>
+        </p>
+      ) : null}
       {error ? <p className="break-keep text-sm text-bad" role="alert">{error}</p> : null}
       {notice ? <p className="break-keep text-sm text-muted" role="status">{notice}</p> : null}
 
@@ -147,7 +176,7 @@ export function KnowledgeHome() {
         }
       >
         {documents === null || candidates === null ? (
-          <p className="py-2 text-sm text-muted">확인 중…</p>
+          <Waiting failed={failed.includes("documents") || failed.includes("candidates")} loading="확인 중…" />
         ) : (
           <KnowledgeInbox candidates={candidates} documents={documents} onChanged={load} />
         )}
@@ -165,7 +194,7 @@ export function KnowledgeHome() {
         action={<Go to="/settings/policies">기준 추가</Go>}
       >
         {inventory === null ? (
-          <p className="py-2 text-sm text-muted">불러오는 중…</p>
+          <Waiting failed={failed.includes("inventory")} />
         ) : (
           <>
             <OperatingRuleTable rules={rules} />
@@ -188,7 +217,7 @@ export function KnowledgeHome() {
 
       <Block title="상품 지식" action={<Go to="/products">상품에서 추가</Go>}>
         {inventory === null ? (
-          <p className="py-2 text-sm text-muted">불러오는 중…</p>
+          <Waiting failed={failed.includes("inventory")} />
         ) : facts.length === 0 ? (
           <div className="py-4">
             <Empty
@@ -226,7 +255,7 @@ export function KnowledgeHome() {
         action={<KnowledgeDocumentAdd scope="ORG" onImported={load} label={COPY.addDocument} />}
       >
         {documents === null ? (
-          <p className="py-2 text-sm text-muted">불러오는 중…</p>
+          <Waiting failed={failed.includes("documents")} />
         ) : (
           <KnowledgeDocumentList documents={documents} onChanged={load} />
         )}
@@ -268,13 +297,23 @@ function Foot({ children }: { children: ReactNode }) {
   return <p className="break-keep border-t border-line py-2 text-xs text-muted">{children}</p>;
 }
 
-/** 머리의 수 하나. 지금 사람을 기다리는 하나에만 색이 있다. */
-function Figure({ label, value, warn = false }: { label: string; value: number; warn?: boolean }) {
-  const on = warn && value > 0;
+/** 아직 없는 목록의 자리 — 오는 중인지, 오지 못했는지. 「없음」은 목록이 와서 비어 있을 때만 그 목록이 말한다. */
+function Waiting({ failed, loading = "불러오는 중…" }: { failed: boolean; loading?: string }) {
+  return <p className={`py-2 text-sm ${failed ? "text-bad" : "text-muted"}`}>{failed ? "불러오지 못했습니다" : loading}</p>;
+}
+
+/** 머리의 수 하나. 지금 사람을 기다리는 하나에만 색이 있다. 모르는 수는 0이 아니라 「–」다. */
+function Figure({ label, value, warn = false }: { label: string; value: number | null; warn?: boolean }) {
+  const on = warn && value !== null && value > 0;
   return (
     <span className={`inline-flex items-baseline gap-1.5 ${on ? "font-semibold text-warn" : "text-muted"}`}>
       <span>{label}</span>
-      <b className={`font-bold tabular-nums ${on ? "text-warn" : "text-ink"}`}>{count(value)}</b>
+      <b
+        className={`font-bold tabular-nums ${on ? "text-warn" : "text-ink"}`}
+        aria-label={value === null ? "모름" : undefined}
+      >
+        {value === null ? "–" : count(value)}
+      </b>
     </span>
   );
 }

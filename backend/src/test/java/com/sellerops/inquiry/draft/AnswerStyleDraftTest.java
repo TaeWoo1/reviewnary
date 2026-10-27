@@ -200,6 +200,19 @@ class AnswerStyleDraftTest {
     // ---------------------------------------------------------------- D
 
     @Test
+    @DisplayName("D0 — a reply carrying a 【확인: …】 blank is refused: it is the owner's open question, not an answer")
+    void aBlankRefusesTheDraft() {
+        UUID work = groundedInquiry();
+        StubModel model = StubModel.writing("답변", "교환은 【확인: 교환 기간】 안에 가능합니다.");
+
+        GeneratedDraftView view = composer(model).generate(org, work, user);
+
+        assertThat(model.calls).isEqualTo(1);
+        assertThat(view.draft()).isNull();
+        assertThat(view.unavailableMessage()).isEqualTo(InquiryDraftComposer.UNCONFIRMED_TEXT);
+    }
+
+    @Test
     @DisplayName("D — a forbidden phrase in the generated reply refuses the draft; it is not edited out")
     void aForbiddenPhraseRefusesTheDraft() {
         UUID work = groundedInquiry();

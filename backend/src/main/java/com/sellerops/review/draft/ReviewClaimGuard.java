@@ -41,6 +41,14 @@ import java.util.regex.Pattern;
  * short list, checked against the evidence, never a meaning test. It cannot see a term written in words it does not
  * list, nor a term the evidence states somewhere unrelated to the promise.
  *
+ * <p><b>A promise is also its yes or no</b> (2026-10-27 review). 「단순 변심은 무료 교환이 불가합니다」 holds every word
+ * and term of 「단순 변심도 무료 교환이 가능합니다」, so both checks above pass the reversal.
+ * {@link #contradictedPromises} reads each remedy clause as a grant or a refusal — a refusal word written after the
+ * remedy noun, where Korean puts its predicate — and refuses a draft clause when the evidence has a clause about the same
+ * remedy under the same stated terms that says the opposite, and none that says the same. Same closed shape again: it
+ * reads the clause's ending only, so it cannot see a refusal in words {@link #REFUSALS} does not list, nor one that
+ * ends on something else (「교환이 어려운 점 양해 부탁드립니다」).
+ *
  * <p>Pure: no I/O, no model, no state.
  */
 public final class ReviewClaimGuard {
@@ -73,7 +81,86 @@ public final class ReviewClaimGuard {
             "단순변심", "변심", "개봉", "미개봉", "사용후", "미사용", "착용", "미착용", "세탁후", "포장훼손",
             "모든상품", "전상품", "전제품");
 
+    /**
+     * The words that make a remedy clause a refusal — read only in its ending ({@value #ENDING} characters, whitespace
+     * and brackets removed, after the last remedy noun), where Korean puts the yes or no. Anywhere else they qualify:
+     * 「개봉하지 않은 상품에 한해 가능합니다」 and 「7일(주말 제외) 이내 가능합니다」 grant. Not 「없」 on its own:
+     * 「추가 비용 없이 교환」 and 「배송비 부담은 없습니다」 grant; 「할 수 없」 refuses.
+     */
+    static final List<String> REFUSALS = List.of(
+            "불가", "어렵", "어려운", "안됩", "안되", "안돼", "않", "못합", "못하", "못드", "수없", "제외", "불허", "금지");
+
+    /** How much of a clause's end is its predicate. */
+    static final int ENDING = 8;
+
+    /** A clause boundary inside a sentence: a Korean connective that can join a yes to a no. */
+    private static final Pattern CLAUSE = Pattern.compile("(?<=며|지만|으나|하고)[,\\s]+|(?<=나,)\\s*");
+
     private ReviewClaimGuard() {
+    }
+
+    /**
+     * The remedies the draft promises — or refuses — the opposite of what the evidence says, in the order the draft
+     * says them. A clause counts when it names a {@link #COMMITMENT_TERMS} noun, or follows one in the same sentence
+     * (「…가능하며, 단순 변심은 불가합니다」), and it refuses when its ending carries a {@link #REFUSALS} word. It is
+     * contradicted when an evidence clause about one of its remedies states
+     * every {@link #CONDITION_TERMS} term it states and says the opposite, while no such clause says the same.
+     *
+     * @param body     the reply
+     * @param evidence the passage texts that may authorize a promise — the same ones {@link #unsupportedClaims} reads
+     */
+    public static List<String> contradictedPromises(String body, List<String> evidence) {
+        if (body == null || body.isBlank() || evidence == null || evidence.isEmpty()) {
+            return List.of();
+        }
+        List<Clause> grounds = new ArrayList<>();
+        for (String passage : evidence) {
+            grounds.addAll(clausesOf(passage));
+        }
+        Set<String> found = new LinkedHashSet<>();
+        for (Clause said : clausesOf(body)) {
+            List<String> terms = CONDITION_TERMS.stream().filter(t -> has(said.text(), t)).toList();
+            boolean same = false;
+            boolean opposite = false;
+            for (Clause ground : grounds) {
+                if (ground.remedies().stream().noneMatch(said.remedies()::contains)
+                        || !terms.stream().allMatch(t -> has(ground.text(), t))) {
+                    continue;
+                }
+                same |= ground.refusal() == said.refusal();
+                opposite |= ground.refusal() != said.refusal();
+            }
+            if (opposite && !same) {
+                found.addAll(said.remedies());
+            }
+        }
+        return List.copyOf(found);
+    }
+
+    /** One remedy clause: its text without whitespace, the remedies it is about, and whether it refuses them. */
+    private record Clause(String text, List<String> remedies, boolean refusal) {
+    }
+
+    private static List<Clause> clausesOf(String text) {
+        List<Clause> out = new ArrayList<>();
+        for (String sentence : text.split("(?<=[.!?。])\\s+|\\n+")) {
+            List<String> carried = List.of();
+            for (String part : CLAUSE.split(sentence)) {
+                String squashed = normalize(part);
+                List<String> named = COMMITMENT_TERMS.stream().filter(squashed::contains).toList();
+                List<String> remedies = named.isEmpty() ? carried : named;
+                if (remedies.isEmpty()) {
+                    continue;
+                }
+                // The predicate: the clause's ending, after the last noun it names — 「불가 품목은 교환」 ends on a grant.
+                String plain = normalize(part.replaceAll("\\([^)]*\\)", "")).replaceAll("[.!?。,~…]+$", "");
+                int from = named.stream().filter(plain::contains).mapToInt(r -> plain.lastIndexOf(r) + r.length()).max().orElse(0);
+                String ending = plain.substring(Math.max(Math.max(from, 0), plain.length() - ENDING));
+                out.add(new Clause(squashed, remedies, REFUSALS.stream().anyMatch(ending::contains)));
+                carried = remedies;
+            }
+        }
+        return out;
     }
 
     /**

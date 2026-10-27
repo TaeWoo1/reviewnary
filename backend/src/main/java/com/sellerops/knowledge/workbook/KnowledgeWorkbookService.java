@@ -34,9 +34,13 @@ import com.sellerops.product.library.dto.KnowledgeSourceRequest;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +86,14 @@ import org.springframework.stereotype.Service;
  * template service, the knowledge services and the candidate inbox — so every validation those screens enforce holds
  * here too, and a refusal from one of them is reported against its row rather than failing the file.
  *
+ * <p><b>What changes is shown as it is and as it will be</b> (2026-10-27 review): every planned change carries where it
+ * applies and its before and after, so 적용 is pressed on the text, not on 「안내 고침」.
+ *
+ * <p><b>An old file does not overwrite a newer screen.</b> Each row carries what it was when downloaded — the
+ * 「지금 값」 · 「지금 문구」 columns, and a hidden 「변경 확인」 fingerprint on 안내 매뉴얼 rows. A row whose server copy has
+ * changed since is not applied; it is reported, with what it says now, and the seller downloads again. A file from
+ * before the fingerprint existed has no 「변경 확인」 and its manual rows are not checked.
+ *
  * <p>Only what a person wrote is in the file: a document uploaded as a file or read from a channel stays on its own
  * screen.
  */
@@ -108,7 +120,10 @@ public class KnowledgeWorkbookService {
     static final List<String> STYLE_HEADERS = List.of("항목", "지금 값", "새 값", "상태", "설명");
     static final List<String> TEMPLATE_HEADERS = List.of("유형", "언제 쓰나요", "지금 문구", "새 문구", "상태", "관리키");
     static final List<String> MANUAL_HEADERS = List.of("관리번호", "범위", "상품번호", "상품명", "종류", "주제", "안내 문장",
-            "고객은 이렇게 말해요", "상태", "같은 문제 리뷰", "메모");
+            "고객은 이렇게 말해요", "상태", "같은 문제 리뷰", "메모", "변경 확인");
+
+    /** A row changed on a screen after the file was downloaded. */
+    static final String STALE = "내려받은 뒤 화면에서 바뀐 줄이라 반영하지 않았습니다. 새로 내려받아 다시 고쳐 주세요.";
 
     private final AnswerStyleService styles;
     private final ReviewReplyTemplateService templates;
@@ -141,8 +156,15 @@ public class KnowledgeWorkbookService {
         this.listings = listings;
     }
 
-    /** One line of what an upload would do, or did, or could not do — against the sheet row the seller sees. */
-    public record Line(String sheet, int row, String text) {
+    /**
+     * One line of what an upload would do, or did, or could not do — against the sheet row the seller sees. A change
+     * says where it applies and what the text is now and will be; a problem may say what the text is now.
+     */
+    public record Line(String sheet, int row, String text, String where, String before, String after) {
+
+        public Line(String sheet, int row, String text) {
+            this(sheet, row, text, null, null, null);
+        }
     }
 
     /** What reading a workbook found: the changes (planned, or made when {@code applied}) and the problems. */
@@ -289,7 +311,9 @@ public class KnowledgeWorkbookService {
 
     private void writeManual(Workbook book, Styles look, UUID orgId) {
         Sheet sheet = header(book, look, SHEET_MANUAL, MANUAL_HEADERS,
-                new int[] {14, 10, 14, 28, 12, 30, 70, 30, 12, 10, 30});
+                new int[] {14, 10, 14, 28, 12, 30, 70, 30, 12, 10, 30, 10});
+        // Not for people: what the row was when downloaded, so an old file cannot overwrite a newer screen.
+        sheet.setColumnHidden(MANUAL_HEADERS.indexOf("변경 확인"), true);
         Map<UUID, Product> owned = new HashMap<>();
         products.findAllByOrgId(orgId).forEach(p -> owned.put(p.getId(), p));
         List<String[]> rows = new ArrayList<>();
@@ -300,14 +324,14 @@ public class KnowledgeWorkbookService {
             Product product = owned.get(s.getProductId());
             rows.add(new String[] {"P-" + s.getId(), SCOPE_PRODUCT, refOf(orgId, s.getProductId()),
                     nameOf(product), typeLabel(s.getSourceType()), s.getTitle(), s.getBody(),
-                    lines(s.getCustomerPhrases()), s.isActive() ? USE : OFF, "", ""});
+                    lines(s.getCustomerPhrases()), s.isActive() ? USE : OFF, "", "", fingerprint(s)});
         }
         for (OrgKnowledgeSource s : orgSources.findAllByOrgIdOrderByCreatedAtAsc(orgId)) {
             if (!personWritten(s.getAuthoredOrigin(), s.getDocumentName())) {
                 continue;
             }
             rows.add(new String[] {"O-" + s.getId(), SCOPE_ORG, "", "", s.getKnowledgeType().labelKo(), s.getTitle(),
-                    s.getBody(), lines(s.getCustomerPhrases()), s.isActive() ? USE : OFF, "", ""});
+                    s.getBody(), lines(s.getCustomerPhrases()), s.isActive() ? USE : OFF, "", "", fingerprint(s)});
         }
         for (KnowledgeCandidate c : candidateRows.findAllByOrgIdAndStateOrderByEvidenceCountDescCreatedAtDesc(orgId,
                 "OPEN")) {
@@ -320,7 +344,7 @@ public class KnowledgeWorkbookService {
                     product ? refOf(orgId, c.getProductId()) : "", product ? nameOf(owned.get(c.getProductId())) : "",
                     "", c.getSubject(), c.getContent(), lines(c.getCustomerPhrases()), PENDING,
                     String.valueOf(c.getEvidenceCount()),
-                    KnowledgeBlanks.carries(c.getContent()) ? "【확인】을 채워야 사용할 수 있습니다" : ""});
+                    KnowledgeBlanks.carries(c.getContent()) ? "【확인】을 채워야 사용할 수 있습니다" : "", fingerprint(c)});
         }
         rows.sort(Comparator.<String[], Integer>comparing(row -> SCOPE_PRODUCT.equals(row[1]) ? 0 : 1)
                 .thenComparing(row -> row[3])
@@ -414,6 +438,20 @@ public class KnowledgeWorkbookService {
             steps.add(new Step(new Line(sheet, row, text), action));
         }
 
+        void change(String sheet, int row, String text, String where, String before, String after, Runnable action) {
+            steps.add(new Step(new Line(sheet, row, text, where, before, after), action));
+        }
+
+        /** The change, or — when the row's server copy moved since the download — the conflict, with what it says now. */
+        void changeUnlessStale(boolean stale, String sheet, int row, String text, String where, String before,
+                               String after, Runnable action) {
+            if (stale) {
+                problems.add(new Line(sheet, row, text + " — " + STALE, where, before, null));
+            } else {
+                change(sheet, row, text, where, before, after, action);
+            }
+        }
+
         void problem(String sheet, int row, String text) {
             problems.add(new Line(sheet, row, text));
         }
@@ -441,12 +479,15 @@ public class KnowledgeWorkbookService {
         List<String> forbidden = now.forbiddenPhrases();
         List<AvoidPhrase> avoid = now.avoidPhrases();
         List<String> said = new ArrayList<>();
+        List<String> before = new ArrayList<>();
+        List<String> after = new ArrayList<>();
         int firstRow = 0;
         for (int r = 1; r <= sheet.getLastRowNum(); r++) {
             Row row = sheet.getRow(r);
             String label = text(row, col.get("항목"));
             String status = status(text(row, col.get("상태")));
             String value = text(row, col.get("새 값"));
+            String seen = text(row, col.get("지금 값"));
             if (label.isEmpty() || status.isEmpty() || PENDING.equals(status)) {
                 continue;
             }
@@ -466,6 +507,15 @@ public class KnowledgeWorkbookService {
             }
             if (!reset && KnowledgeBlanks.carries(value)) {
                 plan.problem(SHEET_STYLE, r + 1, "【확인: …】을 채운 뒤 「사용」으로 적어 주세요.");
+                continue;
+            }
+            String current = field.get().valueOf(now).strip();
+            if (!reset && value.equals(current)) {
+                continue;
+            }
+            // 「지금 값」 is what the row said when it was downloaded; a different value now is someone else's newer save.
+            if (col.containsKey("지금 값") && !seen.equals(current)) {
+                plan.problems.add(new Line(SHEET_STYLE, r + 1, "「" + label + "」 — " + STALE, "말투", current, null));
                 continue;
             }
             switch (field.get()) {
@@ -504,6 +554,8 @@ public class KnowledgeWorkbookService {
                         .toList();
             }
             said.add(label);
+            before.add(label + ": " + (current.isEmpty() ? "(없음)" : current));
+            after.add(label + ": " + (reset ? "(기본값)" : value));
             if (firstRow == 0) {
                 firstRow = r + 1;
             }
@@ -513,8 +565,14 @@ public class KnowledgeWorkbookService {
         }
         AnswerStyleRequest request = new AnswerStyleRequest(tone, length, emoji, greeting, closing, address, required,
                 forbidden, fallback, avoid);
-        plan.change(SHEET_STYLE, firstRow, "말투 바꿈 — " + String.join(" · ", said),
-                () -> styles.save(orgId, request, actorUserId));
+        AnswerStyleRequest asSaved = new AnswerStyleRequest(now.tone(), now.length(), now.emoji(), now.greeting(),
+                now.closing(), now.customerAddress(), now.requiredPhrases(), now.forbiddenPhrases(),
+                now.unknownFallback(), now.avoidPhrases());
+        if (request.equals(asSaved)) {
+            return;
+        }
+        plan.change(SHEET_STYLE, firstRow, "말투 바꿈 — " + String.join(" · ", said), "문의 답변 · 리뷰 답글",
+                String.join("\n", before), String.join("\n", after), () -> styles.save(orgId, request, actorUserId));
     }
 
     private void readTemplates(UUID orgId, Sheet sheet, Plan plan, UUID actorUserId) {
@@ -538,10 +596,13 @@ public class KnowledgeWorkbookService {
                 continue;
             }
             String label = TEMPLATE_NAMES.get(key.get())[0];
+            String where = TEMPLATE_NAMES.get(key.get())[1];
+            String current = templates.bodyFor(orgId, key.get()).strip();
+            boolean stale = col.containsKey("지금 문구") && !text(row, col.get("지금 문구")).equals(current);
             if (DEFAULT.equals(status)) {
                 if (templates.isCustomized(orgId, key.get())) {
-                    plan.change(SHEET_TEMPLATES, r + 1, "「" + label + "」 기본 문구로 되돌림",
-                            () -> templates.reset(orgId, key.get().category()));
+                    plan.changeUnlessStale(stale, SHEET_TEMPLATES, r + 1, "「" + label + "」 기본 문구로 되돌림", where,
+                            current, "(기본 문구)", () -> templates.reset(orgId, key.get().category()));
                 }
                 continue;
             }
@@ -558,10 +619,10 @@ public class KnowledgeWorkbookService {
                 plan.problem(SHEET_TEMPLATES, r + 1, "「" + label + "」 — 【확인: …】을 채운 뒤 「사용」으로 적어 주세요.");
                 continue;
             }
-            if (body.equals(templates.bodyFor(orgId, key.get()))) {
+            if (body.equals(current)) {
                 continue;
             }
-            plan.change(SHEET_TEMPLATES, r + 1, "「" + label + "」 문구 바꿈",
+            plan.changeUnlessStale(stale, SHEET_TEMPLATES, r + 1, "「" + label + "」 문구 바꿈", where, current, body,
                     () -> templates.save(orgId, key.get().category(), body, actorUserId));
         }
     }
@@ -583,6 +644,7 @@ public class KnowledgeWorkbookService {
             List<String> phrases = CustomerPhrases.parse(rawPhrases);
             String rawStatus = text(row, col.get("상태"));
             String status = status(rawStatus);
+            String base = text(row, col.get("변경 확인"));
             int at = r + 1;
             if (id.isEmpty() && subject.isEmpty() && body.isEmpty()) {
                 continue;
@@ -606,11 +668,11 @@ public class KnowledgeWorkbookService {
                     continue;
                 }
                 if (id.startsWith("P-")) {
-                    existingProduct(orgId, ref, subject, body, phrases, status, at, label, plan);
+                    existingProduct(orgId, ref, subject, body, phrases, status, at, label, base, plan);
                 } else if (id.startsWith("O-")) {
-                    existingOrg(orgId, ref, subject, body, phrases, status, at, label, plan);
+                    existingOrg(orgId, ref, subject, body, phrases, status, at, label, base, plan);
                 } else {
-                    existingCandidate(orgId, ref, subject, body, phrases, status, at, label, plan, actorUserId,
+                    existingCandidate(orgId, ref, subject, body, phrases, status, at, label, base, plan, actorUserId,
                             actorName, text(row, col.get("종류")));
                 }
                 continue;
@@ -624,16 +686,19 @@ public class KnowledgeWorkbookService {
     }
 
     private void existingProduct(UUID orgId, UUID id, String subject, String body, List<String> phrases,
-                                 String status, int at, String label, Plan plan) {
+                                 String status, int at, String label, String base, Plan plan) {
         Optional<ProductKnowledgeSource> found = productSources.findByIdAndOrgId(id, orgId);
         if (found.isEmpty()) {
             plan.problem(SHEET_MANUAL, at, "관리번호에 맞는 안내가 없습니다. 새 안내라면 관리번호를 비워 주세요.");
             return;
         }
         ProductKnowledgeSource s = found.get();
+        boolean stale = !base.isEmpty() && !base.equals(fingerprint(s));
+        String where = SCOPE_PRODUCT + " · " + nameOf(products.findById(s.getProductId()).orElse(null));
+        String was = shown(s.getBody(), s.getCustomerPhrases());
         if (OFF.equals(status)) {
             if (s.isActive()) {
-                plan.change(SHEET_MANUAL, at, label + " 안내를 끔", () -> {
+                plan.changeUnlessStale(stale, SHEET_MANUAL, at, label + " 안내를 끔", where, was, "(쓰지 않음)", () -> {
                     s.setActive(false);
                     productSources.save(s);
                 });
@@ -657,7 +722,8 @@ public class KnowledgeWorkbookService {
         if (same) {
             return;
         }
-        plan.change(SHEET_MANUAL, at, label + (s.isActive() ? " 안내 고침" : " 안내를 다시 켜고 고침"), () -> {
+        plan.changeUnlessStale(stale, SHEET_MANUAL, at, label + (s.isActive() ? " 안내 고침" : " 안내를 다시 켜고 고침"),
+                where, was, shown(body, CustomerPhrases.store(phrases)), () -> {
             productLibrary.update(orgId, s.getId(), new KnowledgeSourceRequest(s.getSourceType(), title, body,
                     s.getSourceUrl(), s.getVariantId(), phrases));
             if (!s.isActive()) {
@@ -670,16 +736,18 @@ public class KnowledgeWorkbookService {
     }
 
     private void existingOrg(UUID orgId, UUID id, String subject, String body, List<String> phrases, String status,
-                             int at, String label, Plan plan) {
+                             int at, String label, String base, Plan plan) {
         Optional<OrgKnowledgeSource> found = orgSources.findByIdAndOrgId(id, orgId);
         if (found.isEmpty()) {
             plan.problem(SHEET_MANUAL, at, "관리번호에 맞는 안내가 없습니다. 새 안내라면 관리번호를 비워 주세요.");
             return;
         }
         OrgKnowledgeSource s = found.get();
+        boolean stale = !base.isEmpty() && !base.equals(fingerprint(s));
+        String was = shown(s.getBody(), s.getCustomerPhrases());
         if (OFF.equals(status)) {
             if (s.isActive()) {
-                plan.change(SHEET_MANUAL, at, label + " 안내를 끔", () -> {
+                plan.changeUnlessStale(stale, SHEET_MANUAL, at, label + " 안내를 끔", SCOPE_ORG, was, "(쓰지 않음)", () -> {
                     s.setActive(false);
                     orgSources.save(s);
                 });
@@ -703,7 +771,8 @@ public class KnowledgeWorkbookService {
         if (same) {
             return;
         }
-        plan.change(SHEET_MANUAL, at, label + (s.isActive() ? " 안내 고침" : " 안내를 다시 켜고 고침"), () -> {
+        plan.changeUnlessStale(stale, SHEET_MANUAL, at, label + (s.isActive() ? " 안내 고침" : " 안내를 다시 켜고 고침"),
+                SCOPE_ORG, was, shown(body, CustomerPhrases.store(phrases)), () -> {
             orgKnowledge.update(orgId, s.getId(), new OrgKnowledgeRequest(s.getKnowledgeType(), title, body,
                     s.getSourceUrl(), phrases));
             if (!s.isActive()) {
@@ -716,7 +785,7 @@ public class KnowledgeWorkbookService {
     }
 
     private void existingCandidate(UUID orgId, UUID id, String subject, String body, List<String> phrases,
-                                   String status, int at, String label, Plan plan, UUID actorUserId,
+                                   String status, int at, String label, String base, Plan plan, UUID actorUserId,
                                    String actorName, String kind) {
         Optional<KnowledgeCandidate> found = candidateRows.findByIdAndOrgId(id, orgId);
         if (found.isEmpty()) {
@@ -729,8 +798,14 @@ public class KnowledgeWorkbookService {
         }
         KnowledgeCandidate c = found.get();
         boolean product = "PRODUCT".equals(c.getScope());
+        boolean stale = !base.isEmpty() && !base.equals(fingerprint(c));
+        String where = product && c.getProductId() != null
+                ? SCOPE_PRODUCT + " · " + nameOf(products.findById(c.getProductId()).orElse(null)) : SCOPE_ORG;
+        String was = shown(c.getContent(), c.getCustomerPhrases());
+        String now = shown(body.isEmpty() ? c.getContent() : body, CustomerPhrases.store(phrases));
         if (OFF.equals(status)) {
-            plan.change(SHEET_MANUAL, at, label + " 제안을 보류", () -> candidateService.dismiss(orgId, id, actorName));
+            plan.changeUnlessStale(stale, SHEET_MANUAL, at, label + " 제안을 보류", where, was, "(보류)",
+                    () -> candidateService.dismiss(orgId, id, actorName));
             return;
         }
         if (USE.equals(status)) {
@@ -741,7 +816,8 @@ public class KnowledgeWorkbookService {
             }
             KnowledgeSourceType productType = product ? sourceType(kind) : null;
             OrgKnowledgeType orgType = product ? null : orgType(kind);
-            plan.change(SHEET_MANUAL, at, label + " 제안을 안내로 등록", () -> candidateService.accept(orgId, id,
+            plan.changeUnlessStale(stale, SHEET_MANUAL, at, label + " 제안을 안내로 등록", where, was, now,
+                    () -> candidateService.accept(orgId, id,
                     subject.isEmpty() ? null : subject, body, productType, orgType, null, phrases, actorUserId,
                     actorName));
             return;
@@ -749,7 +825,7 @@ public class KnowledgeWorkbookService {
         boolean edited = (!body.isEmpty() && !body.equals(c.getContent()))
                 || !Objects.equals(CustomerPhrases.store(phrases), CustomerPhrases.normalized(c.getCustomerPhrases()));
         if (edited) {
-            plan.change(SHEET_MANUAL, at, label + " 제안 고침 (확인 전)",
+            plan.changeUnlessStale(stale, SHEET_MANUAL, at, label + " 제안 고침 (확인 전)", where, was, now,
                     () -> candidateService.revise(orgId, id, body, phrases));
         }
     }
@@ -788,14 +864,16 @@ public class KnowledgeWorkbookService {
                                     s.getDocumentName()))
                             .findFirst();
             if (sameProduct.isPresent()) {
-                existingProduct(orgId, sameProduct.get().getId(), subject, body, phrases, USE, at, label, plan);
+                existingProduct(orgId, sameProduct.get().getId(), subject, body, phrases, USE, at, label, "", plan);
                 return;
             }
             if (sameOrg.isPresent()) {
-                existingOrg(orgId, sameOrg.get().getId(), subject, body, phrases, USE, at, label, plan);
+                existingOrg(orgId, sameOrg.get().getId(), subject, body, phrases, USE, at, label, "", plan);
                 return;
             }
-            plan.change(SHEET_MANUAL, at, label + " 새 안내 등록", () -> {
+            plan.change(SHEET_MANUAL, at, label + " 새 안내 등록", target == null ? SCOPE_ORG
+                    : SCOPE_PRODUCT + " · " + nameOf(owned.get(target)), null,
+                    shown(body, CustomerPhrases.store(phrases)), () -> {
                 if (target != null) {
                     productLibrary.create(orgId, target, new KnowledgeSourceRequest(sourceType(kind), subject, body,
                             null, null, phrases), actorUserId, actorName);
@@ -810,7 +888,9 @@ public class KnowledgeWorkbookService {
             plan.problem(SHEET_MANUAL, at, label + " — 【확인: …】이 남아 있어 「사용」으로 등록하지 않고 확인 필요에 제안으로 넣습니다.");
         }
         int evidence = number(text(row, col.get("같은 문제 리뷰")));
-        plan.change(SHEET_MANUAL, at, label + " 확인 필요에 제안으로 넣음 (확인 전)",
+        plan.change(SHEET_MANUAL, at, label + " 확인 필요에 제안으로 넣음 (확인 전)", target == null ? SCOPE_ORG
+                        : SCOPE_PRODUCT + " · " + nameOf(owned.get(target)), null,
+                shown(body, CustomerPhrases.store(phrases)),
                 () -> candidateService.suggestGuidance(orgId, target, subject, body, evidence, phrases));
     }
 
@@ -927,6 +1007,42 @@ public class KnowledgeWorkbookService {
             return UUID.fromString(raw.strip());
         } catch (IllegalArgumentException e) {
             return null;
+        }
+    }
+
+    /** A guidance as the preview shows it: its sentence, and the customer phrases under it when it has any. */
+    private static String shown(String body, String storedPhrases) {
+        List<String> phrases = CustomerPhrases.parse(storedPhrases);
+        return phrases.isEmpty() ? nz(body)
+                : nz(body) + "\n고객은 이렇게 말해요: " + String.join(", ", phrases);
+    }
+
+    /** What a row was when it was downloaded — written to 「변경 확인」 and compared on upload. */
+    static String fingerprint(ProductKnowledgeSource s) {
+        return digest(s.getTitle(), s.getBody(), CustomerPhrases.normalized(s.getCustomerPhrases()),
+                String.valueOf(s.isActive()));
+    }
+
+    static String fingerprint(OrgKnowledgeSource s) {
+        return digest(s.getTitle(), s.getBody(), CustomerPhrases.normalized(s.getCustomerPhrases()),
+                String.valueOf(s.isActive()));
+    }
+
+    static String fingerprint(KnowledgeCandidate c) {
+        return digest(c.getSubject(), c.getContent(), CustomerPhrases.normalized(c.getCustomerPhrases()), c.getState());
+    }
+
+    private static String digest(String... fields) {
+        try {
+            MessageDigest sha = MessageDigest.getInstance("SHA-256");
+            for (String field : fields) {
+                byte[] bytes = nz(field).getBytes(StandardCharsets.UTF_8);
+                sha.update((bytes.length + ":").getBytes(StandardCharsets.US_ASCII));
+                sha.update(bytes);
+            }
+            return HexFormat.of().formatHex(sha.digest()).substring(0, 16);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
         }
     }
 

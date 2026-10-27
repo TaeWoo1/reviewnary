@@ -27,7 +27,8 @@ import java.util.regex.Pattern;
  *   <li>{@link Kind#CUSTOMER_ACTION} — the customer asked to send or attach something: 사진·영상·주문번호·송장 + 보내·첨부·
  *   올려. Authorized by the evidence or the seller's approved sentences.</li>
  *   <li>{@link Kind#REMEDY} — a named remedy (환불·교환·보상…), by {@link ReviewClaimGuard#unsupportedClaims}'s own list,
- *   authorized by the evidence alone. Reused, not copied, and that class is not changed.</li>
+ *   authorized by the evidence alone — and answered the way the evidence answers it, by
+ *   {@link ReviewClaimGuard#contradictedPromises}. Reused, not copied, and that class is not changed.</li>
  *   <li>{@link Kind#FIGURE} — a number the reply states. Authorized by the evidence, the order's own sentence, or the
  *   customer's question (repeating 「10mm」 back to the person who wrote it is not inventing it).</li>
  * </ul>
@@ -113,6 +114,10 @@ public final class InquiryClaimGuard {
             }
         }
         for (String remedy : ReviewClaimGuard.unsupportedClaims(body, evidence)) {
+            found.add(new Violation(Kind.REMEDY, remedy));
+        }
+        // A remedy the evidence names but answers the other way — 「불가」 written up as 「가능」 (2026-10-27 review).
+        for (String remedy : ReviewClaimGuard.contradictedPromises(body, evidence)) {
             found.add(new Violation(Kind.REMEDY, remedy));
         }
         // Numbers are read from the text as written: squashing 「10 20」 would read one number that nobody wrote.

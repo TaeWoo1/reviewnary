@@ -1718,6 +1718,12 @@ export interface KnowledgeWorkbookLine {
   sheet: string;
   row: number;
   text: string;
+  /** Where the change applies — 「상품 · …」, 「회사 전체」, or when a template is used. */
+  where?: string | null;
+  /** The text as it stands now; on a problem, what the screen says now. */
+  before?: string | null;
+  /** The text as it will be. */
+  after?: string | null;
 }
 
 /** Mirrors KnowledgeWorkbookService.Result. `applied` false is a preview: nothing was written. */
