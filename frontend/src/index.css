@@ -2,6 +2,7 @@
  * nav: 홈 · 리뷰·문의 · 상품·정책, then 연결 · 설정 at the foot · signature: the reply card (the customer's line, the AI reply under it, one 등록) · states: loading, empty, error, full
  * axes: light/grotesk-sans/warm · posture: restrained · contrast: pass · v2.0.0 */
 /* Hallmark · pre-emit critique: pending the sweep */
+/* Hallmark · reworded inside 3 kept handlers (KnowledgeDocuments 쓰지 않기, KnowledgeInbox 나중에 and 쓰지 않기): only the error sentence changed, to 해요체 · reviewnary_design.md §12. --kept counts them as new because it compares handler text. */
 @import url("./styles/tokens.css");
 @import url("./styles/base.css");
 @tailwind base;
