@@ -19,7 +19,8 @@ import java.util.Set;
  * <p><b>Stored as one phrase per line.</b> Commas split too, because that is how people type a list into one cell of a
  * spreadsheet. Matching ignores spaces and letter case, so 「접착력 약해요」 also finds 「접착력약해요」.
  *
- * <p><b>One guard, and only one.</b> A phrase right after 「안」 or a few syllables before 「지 않」 is a denial —
+ * <p><b>One guard, and only one.</b> A phrase right after 「안」, a few syllables before 「지 않」, or followed at once by
+ * 「없」 (「떨어짐 없이」) is a denial —
  * 「안 떨어져요」, 「떨어지지 않아요」, 「잘 떨어지지 않고」 — and is not a hit. A phrase that itself starts with 안 (「안 붙어요」) is read as written. Nothing else
  * is guessed: a seller whose phrase still catches praise makes the phrase longer.
  */
@@ -110,8 +111,17 @@ public final class CustomerPhrases {
         // The few syllables after the phrase, so 「잘 떨어」 + 「지지 않고」 is a denial as 「떨어지」 + 「지 않고」 is.
         String after = haystack.substring(at + needle.length(), Math.min(haystack.length(),
                 at + needle.length() + DENIAL_WINDOW));
-        return before || after.contains("지않") || after.contains("진않") || after.contains("지는않");
+        return before || after.contains("지않") || after.contains("진않") || after.contains("지는않")
+                || ABSENT.matcher(after).lookingAt();
     }
+
+    /**
+     * 「떨어짐 없이」, 「들뜸이 없어요」: the problem named and then said to be absent — right after the phrase, or after the
+     * one syllable that makes it a noun and a particle (2026-10-27 evaluation: 「떨어짐없이 사용중」 was answered as an
+     * adhesion complaint). Only there: 「약해서 걱정 없이」 is still the complaint it starts as.
+     */
+    private static final java.util.regex.Pattern ABSENT =
+            java.util.regex.Pattern.compile("(?:짐|림|음|임|기)?(?:이|가|은|는|도)?없");
 
     /** How far after a phrase a 「지 않」 still belongs to it: 「떨어」 + 「지지않」. */
     static final int DENIAL_WINDOW = 5;
