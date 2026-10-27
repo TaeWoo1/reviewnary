@@ -14,7 +14,7 @@ import { useScreenChanges } from "../../lib/screenChanges";
 import { problemLine } from "../../lib/operationsHome";
 import { RESPONSIBILITY_NAME, cadenceLabel, dataTypeKo, kstClock } from "../../lib/customerOperations";
 import { COPY, autoCheckWhat, channelShort, failureShort, gapActionKo, kstLongDate } from "../../lib/copy/customerOps";
-import { homeBriefRows, isPraiseApproval, mergeHomeWork, sharedRowFacts, todayWork, type HomeWork } from "../../lib/homeWork";
+import { homeBriefRows, isLowRatedReview, isOldBacklog, isPraiseApproval, mergeHomeWork, sharedRowFacts, todayWork, type HomeWork } from "../../lib/homeWork";
 import { automationHealth, type HealthTone } from "../../lib/automationHealth";
 import { NO_CHANGE_TODAY, changeInsights } from "../../lib/homeInsights";
 import {
@@ -443,12 +443,12 @@ export function CustomerOpsHome({
             />
           ) : null}
           <PraiseBundle count={praise.length} />
-          <PastWork count={past} />
+          <PastWork count={past} low={work.rows.filter((r) => isOldBacklog(r, now) && isLowRatedReview(r)).length} />
         </section>
       ) : past > 0 ? (
         <section aria-label={COPY.listTitle} className="space-y-2">
           <p className="break-keep text-sm text-muted">새로 할 일은 없어요.</p>
-          <PastWork count={past} />
+          <PastWork count={past} low={work.rows.filter((r) => isOldBacklog(r, now) && isLowRatedReview(r)).length} />
         </section>
       ) : !co || (running && co.status === "ACTIVE") ? (
         // Nothing waiting is a state, and the list's absence does not state it. 「다음 확인」 is on the status
@@ -1659,7 +1659,7 @@ export function PraiseBundle({ count }: { count: number }) {
  * link — not rows: the brief answers 「오늘 무엇을 해야 하지?」, and a year of undecided reviews is not that answer,
  * but it is still real work, so its size is said and the queue that holds every row is one press away.
  */
-function PastWork({ count }: { count: number }) {
+function PastWork({ count, low = 0 }: { count: number; /** Of them, ★1–2 reviews (`isLowRatedReview`). */ low?: number }) {
   if (count <= 0) return null;
   return (
     <p className="mt-2 flex flex-wrap items-center gap-x-2 break-keep text-sm text-muted">
@@ -1667,6 +1667,14 @@ function PastWork({ count }: { count: number }) {
         지난 일 <span className="font-semibold tabular-nums text-ink">{count.toLocaleString("ko-KR")}</span>건
       </span>
       <span>(2주 넘은 리뷰, 1년 넘은 문의)</span>
+      {/* The complaints among them, named (owner decision 2026-10-28): the two-week rule keeps the list about this
+          morning, and this keeps a ★1 from a month ago from disappearing under it. */}
+      {low > 0 ? (
+        <span data-testid="past-low-rated">
+          · 그중 <span className="font-semibold text-bad">★1–2</span> 리뷰{" "}
+          <span className="font-semibold tabular-nums text-ink">{low.toLocaleString("ko-KR")}</span>건
+        </span>
+      ) : null}
       <Link
         to="/customer-operations/cases"
         className="ml-auto font-semibold text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"

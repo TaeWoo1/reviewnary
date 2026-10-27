@@ -3,7 +3,7 @@ import { safetyLabel, safetyTone } from "../../lib/safetyLabel";
 import { DecisionList, DecisionRow } from "../ui/DecisionRow";
 import { WORK_STATE } from "../../lib/workState";
 import { selectionHref } from "./MasterDetail";
-import { isOldBacklog, sharedRowFacts, type HomeWorkRow } from "../../lib/homeWork";
+import { isLowRatedReview, isOldBacklog, sharedRowFacts, type HomeWorkRow } from "../../lib/homeWork";
 import { elapsedLabel } from "../../lib/copy/customerOps";
 import type { CaseQueueState } from "../../pages/app/OperationsCase";
 
@@ -87,6 +87,8 @@ export function WorkRows({
   const shared = sharedRowFacts(sharedOver ?? rows);
   const firstOld = showBacklogDivider ? rows.findIndex((r) => isOldBacklog(r, now ?? new Date())) : -1;
   const oldCount = firstOld >= 0 ? rows.length - firstOld : 0;
+  // The ★1–2 reviews among 지난 일, said on the divider as the Home says them (owner decision 2026-10-28).
+  const oldLow = firstOld >= 0 ? rows.slice(firstOld).filter(isLowRatedReview).length : 0;
 
   const queue = reading === "queue";
   const rail = reading === "rail";
@@ -159,6 +161,7 @@ export function WorkRows({
         ariaLabel={ariaLabel}
         firstOld={firstOld}
         oldCount={oldCount}
+        oldLow={oldLow}
       />
     );
   }
@@ -183,7 +186,10 @@ export function WorkRows({
         {rows.slice(0, firstOld).map(draw)}
       </DecisionList>
       <p className="flex items-center gap-3 text-sm font-semibold text-muted" role="separator">
-        <span>지난 일 {oldCount.toLocaleString("ko-KR")}건</span>
+        <span>
+          지난 일 {oldCount.toLocaleString("ko-KR")}건
+          {oldLow > 0 ? <> · 그중 <span className="text-bad">★1–2</span> 리뷰 {oldLow.toLocaleString("ko-KR")}건</> : null}
+        </span>
         <span aria-hidden="true" className="h-px flex-1 bg-line" />
       </p>
       <DecisionList ariaLabel={`${ariaLabel} · 지난 일`} plain={dense}>
@@ -274,6 +280,7 @@ function RailRows({
   ariaLabel,
   firstOld,
   oldCount,
+  oldLow,
 }: {
   rows: HomeWorkRow[];
   selectedKey: string | null;
@@ -283,6 +290,7 @@ function RailRows({
   ariaLabel: string;
   firstOld: number;
   oldCount: number;
+  oldLow: number;
 }) {
   const list = (label: string, slice: HomeWorkRow[]) => (
     <ul aria-label={label} className="-mx-2 divide-y divide-line">
@@ -359,7 +367,10 @@ function RailRows({
     <div className="space-y-4">
       {list(ariaLabel, rows.slice(0, firstOld))}
       <p className="flex items-center gap-3 text-xs font-semibold text-muted" role="separator">
-        <span>지난 일 {oldCount.toLocaleString("ko-KR")}건</span>
+        <span>
+          지난 일 {oldCount.toLocaleString("ko-KR")}건
+          {oldLow > 0 ? <> · 그중 <span className="text-bad">★1–2</span> 리뷰 {oldLow.toLocaleString("ko-KR")}건</> : null}
+        </span>
         <span aria-hidden="true" className="h-px flex-1 bg-line" />
       </p>
       {list(`${ariaLabel} · 지난 일`, rows.slice(firstOld))}

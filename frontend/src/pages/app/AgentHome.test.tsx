@@ -232,6 +232,8 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     expect(await screen.findByText("새로 할 일은 없어요.")).toBeInTheDocument();
     expect(screen.queryByText("상품페이지 설명에 혼선을 줘요.")).toBeNull();
     expect(screen.getByText("할 일에서 보기 →").closest("p")?.textContent).toContain("지난 일 1건");
+    // And it is a ★1, so the line names it as one (owner, 2026-10-28): under the rule, not buried by it.
+    expect(screen.getByTestId("past-low-rated").textContent).toMatch(/그중 ★1–2 리뷰\s*1건/);
     expect(screen.getByTestId("today-summary").textContent).toMatch(/오늘 할 일\s*0/);
   });
 

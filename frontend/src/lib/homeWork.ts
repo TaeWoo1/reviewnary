@@ -432,6 +432,15 @@ export function isPraiseApproval(r: HomeWorkRow): boolean {
 }
 
 /**
+ * <b>A ★1–2 review</b> — the rating the channel gave, read as it stands. Used to say how many of 지난 일 are complaints
+ * (product-owner decision, 2026-10-28): the two-week rule keeps them under the backlog line, and the line names them
+ * so they are not buried there.
+ */
+export function isLowRatedReview(r: HomeWorkRow): boolean {
+  return r.subject === "REVIEW" && r.rating != null && r.rating <= 2;
+}
+
+/**
  * <b>할 일's one count</b> (2026-10-28). The Home said 49, the queue 54 and the 리뷰 screen 54 on the same morning,
  * because only the Home left out the backlog. Every count of 할 일 — the menu's badge, the Home, the queue's tab, the
  * 리뷰 screen's link — is now this: the rows that are not 지난 일. The backlog is still listed, under its own line
