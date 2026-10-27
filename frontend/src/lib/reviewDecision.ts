@@ -31,9 +31,9 @@ export const DECISION_ACTION_NOTE = {
   withReply:
     "「답글 달기」로 정하면 아래에서 AI 답글을 쓰고 확정할 수 있어요. 확정한 답글은 판매자센터에 직접 올려요.",
   withoutReply:
-    "이 채널에서는 reviewnary가 답변을 작성하지 않아요. 조치는 판매자님이 직접 하시고, 여기에는 무엇으로 정했는지만 기록돼요.",
+    "이 채널에서는 reviewnary가 답변을 작성하지 않아요. 조치는 판매자님이 직접 하고, 여기에는 무엇으로 정했는지만 기록돼요.",
   withoutAccount:
-    "이 채널에 연결된 판매 계정이 없어 답변 초안은 준비할 수 없어요. 조치는 판매자님이 직접 하시고, 여기에는 무엇으로 정했는지만 기록돼요.",
+    "이 채널에 연결된 판매 계정이 없어 답변 초안은 준비할 수 없어요. 조치는 판매자님이 직접 하고, 여기에는 무엇으로 정했는지만 기록돼요.",
 } as const;
 
 /** The short word for a recorded decision — the same three the worklist and the record use. */

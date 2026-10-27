@@ -338,8 +338,8 @@ export function CoupangIssuanceGuidedWalkthrough({
           쿠팡 윙에서 Open API 키를 발급하는 순서를 안내해 드릴게요.
         </p>
         <p className="text-sm text-muted break-keep">
-          직접 진행하시면 무엇을 어디서 누르는지 순서대로 알려 드려요. 내 PC에 reviewnary 도우미를 실행해
-          두셨다면, 도우미가 전용 쿠팡 윙 창을 열어 눌러야 할 위치를 표시하는 화면 안내도 쓸 수 있어요.
+          직접 진행하면 무엇을 어디서 누르는지 순서대로 알려 드려요. 내 PC에 reviewnary 도우미를 실행해
+          뒀다면, 도우미가 전용 쿠팡 윙 창을 열어 눌러야 할 위치를 표시하는 화면 안내도 쓸 수 있어요.
         </p>
         <button
           type="button"
@@ -466,7 +466,7 @@ export function CoupangIssuanceGuidedWalkthrough({
                 쿠팡(윙) 창에서 화면 안내를 따라 진행하세요
               </p>
               <p className="text-xs text-muted break-keep">
-                열린 쿠팡 윙 창의 안내(하이라이트와 '다음' 버튼)를 따라가시면 돼요. 각 단계는 윙 화면에서 직접
+                열린 쿠팡 윙 창의 안내(하이라이트와 '다음' 버튼)를 따라가면 돼요. 각 단계는 윙 화면에서 직접
                 진행되고, 이 화면은 진행 상태만 보여줘요.
               </p>
               {effectiveRun.progress && (

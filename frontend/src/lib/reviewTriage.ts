@@ -79,7 +79,7 @@ export const AI_TRIAGE_MARK_CLASS = "bg-warn/10 text-warn ring-1 ring-warn/40";
  * still invited, because a mark the seller cannot contradict is a verdict.
  */
 export const AI_TRIAGE_DISCLOSURE =
-  "별점과 본문만 보면 확인 대상이 아니지만, 내용을 읽어 보니 판매자님이 확인하실 만한 것이 있어 올렸어요. 아니라면 바로잡아 주세요.";
+  "별점과 본문만 보면 확인 대상이 아니지만, 내용을 읽어 보니 판매자님이 확인할 만한 것이 있어 올렸어요. 아니라면 바로잡아 주세요.";
 
 /**
  * The correction controls' words — the seller's own judgment, in the same three words the tier chips

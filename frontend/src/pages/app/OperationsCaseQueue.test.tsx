@@ -225,7 +225,7 @@ describe("OperationsCaseQueue", () => {
     // It says the depth it reached, not a total: the reads that overflow count different populations, and their
     // sum is a number nobody measured.
     const note = screen.getByText(/2건까지 보여 드려요/);
-    expect(note).toHaveTextContent("처리하시면 다음 건이 올라와요");
+    expect(note).toHaveTextContent("처리하면 다음 건이 올라와요");
     expect(note.textContent).not.toMatch(/문의 화면|리뷰 화면/);
   });
 

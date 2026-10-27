@@ -259,7 +259,7 @@ export function reviewCollectionStateOf(input: ReviewCollectionInput): ReviewCol
     return state("SURFACE", {
       ...BLANK,
       title: "상품평을 가져올 준비가 됐어요",
-      body: "누르시면 쿠팡 판매자센터의 상품평 목록을 열어 이번 페이지를 읽어 와요.",
+      body: "누르면 쿠팡 판매자센터의 상품평 목록을 열어 이번 페이지를 읽어 와요.",
       primary: { kind: "START", label: "지금 가져오기" },
     });
   }

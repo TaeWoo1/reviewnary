@@ -355,7 +355,7 @@ function GuidedReplyRun({ target, injected, onDone }: { target: GuidedReplyTarge
                 창을 앞으로 가져오지 못했어요. 열려 있는 {channel} 창을 직접 확인해 주세요.
               </p>
             ) : null}
-            <p className="break-keep text-sm text-muted">확인하셨다면 결과를 기록해 둘게요.</p>
+            <p className="break-keep text-sm text-muted">확인했다면 결과를 기록해 둘게요.</p>
             <div className="flex flex-wrap gap-2">
               <Btn variant="outline" size="sm" onClick={() => void report("submitted")}>등록을 마쳤어요</Btn>
               <Btn variant="ghost" size="sm" onClick={() => void report("aborted")}>등록하지 않았어요</Btn>

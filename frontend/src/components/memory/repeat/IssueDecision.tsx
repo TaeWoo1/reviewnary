@@ -77,7 +77,7 @@ export function IssueDecision({
       {actionable ? (
         <div className="space-y-2">
           <label htmlFor="issue-decision-note" className="block text-xs font-semibold text-muted">
-            무엇을 하기로 하셨나요 (선택)
+            무엇을 하기로 했나요 (선택)
           </label>
           <div className={page ? "flex items-start gap-3" : "space-y-2"}>
             <textarea

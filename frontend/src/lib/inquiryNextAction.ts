@@ -53,7 +53,7 @@ export function inquiryNextAction(
       state: WORK_STATE.ANSWERED,
       // 「완료」가 아니라 「답변함」이다. 보낸 것을 확인한 것과 고객이 만족한 것은 다른 사실이고,
       // 이 화면이 아는 것은 앞쪽뿐이다.
-      sentence: "답변이 등록된 문의예요. 따로 하실 일은 없어요.",
+      sentence: "답변이 등록된 문의예요. 따로 할 일은 없어요.",
     };
   }
   if (workItemId !== null) {

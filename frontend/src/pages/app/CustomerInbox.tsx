@@ -350,7 +350,7 @@ export function CustomerInbox() {
           with its own 「지금 처리할 일」 list — the same inquiries 확인할 일 already lists, in a second layout. */}
       {queue === null ? (
         <p className="text-sm text-warn" role="status">
-          처리할 문의 수를 불러오지 못했어요. 아래 전체 문의는 그대로 보실 수 있어요.
+          처리할 문의 수를 불러오지 못했어요. 아래 전체 문의는 그대로 볼 수 있어요.
         </p>
       ) : null}
 

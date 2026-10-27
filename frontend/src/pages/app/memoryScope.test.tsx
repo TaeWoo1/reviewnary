@@ -142,7 +142,7 @@ describe("고객운영 메모리 — v1 scope fence", () => {
     const fields = Array.from(container.querySelectorAll("textarea"));
     expect(fields).toHaveLength(1);
     expect(fields[0].getAttribute("id")).toBe("issue-decision-note");
-    expect(screen.getByLabelText(/무엇을 하기로 하셨나요/)).toBe(fields[0]);
+    expect(screen.getByLabelText(/무엇을 하기로 했나요/)).toBe(fields[0]);
     expect(fields[0].getAttribute("placeholder") ?? "").not.toMatch(/검색|찾기|물어|질문/);
   });
 

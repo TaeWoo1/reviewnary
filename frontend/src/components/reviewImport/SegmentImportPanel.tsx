@@ -59,7 +59,7 @@ export function SegmentImportPanel({
         이 구간과 같은지 확인하세요.
       </p>
       <p className="mt-1 text-sm text-muted break-keep">
-        NAVER에서 받은 파일은 이름에 확장자가 없을 수 있어요. 그대로 올리시면 돼요 — 파일 내용을 보고
+        NAVER에서 받은 파일은 이름에 확장자가 없을 수 있어요. 그대로 올리면 돼요 — 파일 내용을 보고
         엑셀/CSV인지 확인해요.
       </p>
 

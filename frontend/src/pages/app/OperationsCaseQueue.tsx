@@ -343,7 +343,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
 
       {work && allRows.length === 0 ? (
         <p className="break-keep leading-relaxed text-ink">
-          {query.trim() ? "찾으시는 내용이 있는 문의나 리뷰가 없어요." : "지금 확인이 필요한 문의나 리뷰가 없어요."}
+          {query.trim() ? "찾는 내용이 있는 문의나 리뷰가 없어요." : "지금 확인이 필요한 문의나 리뷰가 없어요."}
         </p>
       ) : null}
       {work && allRows.length > 0 && rows.length === 0 ? (
@@ -367,7 +367,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
               the total. How many more it cannot say: the reads that overflowed count different populations. */}
           {work.truncated && filter === "all" ? (
             <p className="mt-3 break-keep text-sm text-muted">
-              한 번에 {rows.length.toLocaleString("ko-KR")}건까지 보여 드려요. 처리하시면 다음 건이 올라와요.
+              한 번에 {rows.length.toLocaleString("ko-KR")}건까지 보여 드려요. 처리하면 다음 건이 올라와요.
             </p>
           ) : null}
         </section>

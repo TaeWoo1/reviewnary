@@ -51,7 +51,7 @@ describe("inquiryNextAction — 상태 다음에 바로 할 일이 온다", () =
   it("답변된 문의에는 할 일이 없다고 말한다", () => {
     const next = inquiryNextAction({ status: "ANSWERED" }, null);
     expect(next.state.text).toBe("답변함");
-    expect(next.sentence).toContain("하실 일은 없어요");
+    expect(next.sentence).toContain("할 일은 없어요");
   });
 
   it("답변 대기 중이면 어디서 이어가는지 말한다", () => {

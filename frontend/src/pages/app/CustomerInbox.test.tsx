@@ -488,7 +488,7 @@ describe("문의의 첫 시선 — 고객이 쓴 말", () => {
     await screen.findByLabelText("선택한 항목");
     // 상태와 「할 일 없음」은 한 번만 (UI audit, 2026-10-06): 그 문장이 위에 서고, 아래 줄은
     // 그 문장이 말할 수 없는 것 — 답변을 어디서 읽는지 — 만 말한다.
-    expect(screen.getByText(/하실 일은 없어요/)).toBeInTheDocument();
+    expect(screen.getByText(/할 일은 없어요/)).toBeInTheDocument();
     expect(screen.getByText(/네이버 스마트스토어 판매자센터에서 볼 수 있어요/)).toBeInTheDocument();
     expect(screen.queryByText(/이미 답변이 등록되어 있어/)).toBeNull();
     // 「답변을 기다리는 문의에만」은 이 경우의 이유가 아니다.

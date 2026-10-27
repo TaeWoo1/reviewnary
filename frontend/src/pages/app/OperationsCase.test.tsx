@@ -522,7 +522,7 @@ describe("OperationsCase", () => {
         reasonNote: "별점은 높지만 불편을 말하는 내용이 있어요.",
         summary: "5점 긍정 리뷰로 제품 만족도가 높아요.",
         recommendedActionType: "NO_ACTION",
-        recommendedAction: "이번 건은 추가 조치 없이 모니터링만 하시면 돼요.",
+        recommendedAction: "이번 건은 추가 조치 없이 모니터링만 하면 돼요.",
         whyDecisionNeeded: null,
       }),
     );
@@ -533,7 +533,7 @@ describe("OperationsCase", () => {
     expect(card).toHaveTextContent("내가 할 일없음");
     // Earlier-stage text that the final state overruled is not shown anywhere on the screen.
     expect(screen.queryByText(/불편을 말하는 내용이 있어요/)).toBeNull();
-    expect(screen.queryByText(/모니터링만 하시면/)).toBeNull();
+    expect(screen.queryByText(/모니터링만 하면/)).toBeNull();
     expect(screen.queryByText("처리됨")).toBeNull();
   });
 

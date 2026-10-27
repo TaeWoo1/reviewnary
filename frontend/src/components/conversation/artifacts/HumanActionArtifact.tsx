@@ -48,8 +48,8 @@ const GUIDED_PATHS: ReadonlyArray<HumanAction["path"]> = ["EXPORT_ACTION_WINDOW"
 
 /** What the guided run does, per path — the product contract's wording (a bounded set of platform confirmations, not a one-press promise). */
 const GUIDED_SENTENCE: Record<GuidedAcquisitionPath, string> = {
-  EXPORT_ACTION_WINDOW: "reviewnary가 판매자센터의 리뷰 내려받기 화면과 기간을 준비해요. 판매자님은 화면이 요구하는 확인만 누르시면, 내려받은 파일을 reviewnary가 읽어 이 질문을 이어서 확인해요.",
-  WING_READ_ACTION_WINDOW: "reviewnary가 판매자센터의 리뷰 화면을 준비해요. 판매자님은 화면이 요구하는 확인과 페이지 넘기기만 하시면, reviewnary가 그 화면의 리뷰를 읽어 이 질문을 이어서 확인해요.",
+  EXPORT_ACTION_WINDOW: "reviewnary가 판매자센터의 리뷰 내려받기 화면과 기간을 준비해요. 판매자님은 화면이 요구하는 확인만 누르면, 내려받은 파일을 reviewnary가 읽어 이 질문을 이어서 확인해요.",
+  WING_READ_ACTION_WINDOW: "reviewnary가 판매자센터의 리뷰 화면을 준비해요. 판매자님은 화면이 요구하는 확인과 페이지 넘기기만 하면, reviewnary가 그 화면의 리뷰를 읽어 이 질문을 이어서 확인해요.",
 };
 
 /** The card's title: the channel's own step, in four words — 「네이버 리뷰 최신 상태 확인」 / 「네이버 리뷰 · 8월 20일 기준」. */

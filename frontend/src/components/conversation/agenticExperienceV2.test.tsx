@@ -86,7 +86,7 @@ describe("§2 — the answer and its limits are read apart", () => {
 
 describe("§5 — a ranking opens the row it judged first", () => {
   it("the top row of a RANKED list is expanded on arrival; the rest are not", async () => {
-    timeline(turn({ message: "먼저 보실 것은 「현금영수증 발행 부탁드려요」입니다 — 40일째 대기 중이에요.", artifacts: [rankedList()] }));
+    timeline(turn({ message: "먼저 볼 것은 「현금영수증 발행 부탁드려요」입니다 — 40일째 대기 중이에요.", artifacts: [rankedList()] }));
     const rows = await screen.findAllByTestId("inquiry-row-select");
     expect(rows[0]).toHaveAttribute("aria-expanded", "true");
     expect(rows[1]).toHaveAttribute("aria-expanded", "false");

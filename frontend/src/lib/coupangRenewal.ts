@@ -75,7 +75,7 @@ export const COUPANG_RENEWAL_COPY = {
 
   // guide phase
   guideIntro:
-    "쿠팡 윙에서 새 키를 재발급하도록 화면으로 안내해 드릴게요. 재발급 버튼은 반드시 직접 누르시면 돼요.",
+    "쿠팡 윙에서 새 키를 재발급하도록 화면으로 안내해 드릴게요. 재발급 버튼은 반드시 직접 누르면 돼요.",
 
   // replace phase — the masked credential form
   replaceTitle: "새 키로 교체",

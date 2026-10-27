@@ -76,8 +76,8 @@ describe("고객 운영 관리 — copy invariants", () => {
   });
 
   it("the three areas speak of their own population only", () => {
-    expect(decisionsLine(0)).toBe("지금 직접 판단하실 일은 없어요.");
-    expect(decisionsLine(2)).toBe("직접 판단하실 일이 2건 있어요.");
+    expect(decisionsLine(0)).toBe("지금 직접 판단할 일은 없어요.");
+    expect(decisionsLine(2)).toBe("직접 판단할 일이 2건 있어요.");
     expect(unobservedLine({ gaps: { total: 1, rows: [] }, sources: [], lastCheckedAt: null })).toBe(
       "다시 연결해야 확인할 수 있는 곳이 1곳 있어요.",
     );

@@ -204,7 +204,7 @@ describe("반복 문제 — 목록은 목록이다 (canonical, 2026-10-05)", () 
       expect(screen.queryByText(/왼쪽에서 이슈를 고르면/)).toBeNull();
       expect(within(list).getAllByRole("link").filter((a) => a.getAttribute("aria-current") === "true")).toHaveLength(0);
       // 결정은 문제의 페이지에서 내린다 — 목록에는 쓸 것이 없다.
-      expect(screen.queryByLabelText(/무엇을 하기로 하셨나요/)).toBeNull();
+      expect(screen.queryByLabelText(/무엇을 하기로 했나요/)).toBeNull();
     } finally {
       restore();
     }
@@ -456,7 +456,7 @@ describe("고객운영 메모리 — 판단과 조치", () => {
     renderMemory("/memory/issue-1");
     await openIssue();
 
-    fireEvent.change(screen.getByLabelText(/무엇을 하기로 하셨나요/), {
+    fireEvent.change(screen.getByLabelText(/무엇을 하기로 했나요/), {
       target: { value: "접착 테이프 공급처를 바꿔요." },
     });
     fireEvent.click(screen.getByRole("button", { name: "조치 시작" }));
@@ -485,7 +485,7 @@ describe("고객운영 메모리 — 판단과 조치", () => {
     renderMemory("/memory/issue-2");
     const section = await screen.findByLabelText("판단과 조치");
     expect(within(section).queryByRole("button")).toBeNull();
-    expect(within(section).queryByLabelText(/무엇을 하기로 하셨나요/)).toBeNull();
+    expect(within(section).queryByLabelText(/무엇을 하기로 했나요/)).toBeNull();
   });
 
   /**
@@ -505,7 +505,7 @@ describe("고객운영 메모리 — 판단과 조치", () => {
     // Both, not one instead of the other: the seller is acting ahead of reviewnary and can see that.
     expect(within(section).getByText(/먼저 확인을 권할 만큼 근거가 모이지는 않았어요/)).toBeInTheDocument();
 
-    fireEvent.change(within(section).getByLabelText(/무엇을 하기로 하셨나요/), {
+    fireEvent.change(within(section).getByLabelText(/무엇을 하기로 했나요/), {
       target: { value: "공급처를 바꿔요." },
     });
     fireEvent.click(within(section).getByRole("button", { name: "조치 시작" }));
@@ -668,7 +668,7 @@ describe("반복 문제 — the canonical reading (2026-10-05)", () => {
     renderMemory("/memory/issue-1");
     const decision = await screen.findByLabelText("판단과 조치");
     expect(within(decision).getByRole("button", { name: "조치 시작" })).toBeInTheDocument();
-    expect(within(decision).getByLabelText(/무엇을 하기로 하셨나요/)).toBeInTheDocument();
+    expect(within(decision).getByLabelText(/무엇을 하기로 했나요/)).toBeInTheDocument();
     expect(screen.queryByTestId("pane-footer")).toBeNull();
     expect(screen.getAllByRole("button", { name: /조치/ })).toHaveLength(1);
   });
@@ -677,7 +677,7 @@ describe("반복 문제 — the canonical reading (2026-10-05)", () => {
     startReviewIssueAction.mockResolvedValue({ ...SURGING, lifecycleState: "ACTING", lifecycleLabelKo: "조치 중" });
     renderMemory("/memory/issue-1");
     const decision = await screen.findByLabelText("판단과 조치");
-    fireEvent.change(within(decision).getByLabelText(/무엇을 하기로 하셨나요/), {
+    fireEvent.change(within(decision).getByLabelText(/무엇을 하기로 했나요/), {
       target: { value: "접착 테이프 공급처를 바꿔요." },
     });
     fireEvent.click(within(decision).getByRole("button", { name: "조치 시작" }));

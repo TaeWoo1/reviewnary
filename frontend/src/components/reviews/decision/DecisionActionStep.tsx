@@ -39,7 +39,7 @@ export function DecisionActionStep({
   replyUnavailableReason,
   onDecided,
   onRecorded,
-  title = "무엇을 하시겠어요?",
+  title = "무엇을 할까요?",
   quiet = false,
 }: {
   reviewId: string;

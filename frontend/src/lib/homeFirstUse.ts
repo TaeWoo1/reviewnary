@@ -150,8 +150,8 @@ export const DELEGABLE_WORD: Record<"ORDER" | "INQUIRY" | "REVIEW", string> = {
 export function delegableSentence(state: HomeFirstUseState): string {
   const words = state.delegable.map((t) => DELEGABLE_WORD[t]);
   return words.length > 0
-    ? `채널을 연동하시면 ${words.join(" · ")}를 대신 확인하고, 먼저 봐야 할 일을 여기에 정리해 둘게요.`
-    : "채널을 연동하시면 매일 할 일을 여기에 정리해 둘게요.";
+    ? `채널을 연동하면 ${words.join(" · ")}를 대신 확인하고, 먼저 봐야 할 일을 여기에 정리해 둘게요.`
+    : "채널을 연동하면 매일 할 일을 여기에 정리해 둘게요.";
 }
 
 /**
@@ -183,10 +183,10 @@ export function noDataSentence(state: HomeFirstUseState): string {
 export function firstUseSteps(state: HomeFirstUseState): ReadonlyArray<{ title: string; detail: string }> {
   const where = state.connectable.length > 0 ? state.connectable.join(" · ") : "쓰고 계신 판매 채널";
   return [
-    { title: "1. 판매 채널 연동", detail: `${where} 중 쓰고 계신 곳을 고르시면, 채널별로 필요한 것만 순서대로 안내해 드려요.` },
+    { title: "1. 판매 채널 연동", detail: `${where} 중 쓰고 계신 곳을 고르면, 채널별로 필요한 것만 순서대로 안내해 드려요.` },
     // The WHAT is {@link delegableSentence}'s, said once, one line above these — a step that repeats
     // 「주문 · 문의 · 리뷰를 가져옵니다」 is that promise a second time in smaller type.
     { title: "2. 자동으로 가져오기", detail: "연결이 끝나면 reviewnary가 채널에서 직접 가져와서, 새로 들어오는 것까지 계속 확인해요." },
-    { title: "3. 먼저 하실 일 정리", detail: "그날 답해야 할 문의와 살펴볼 리뷰를 골라 두고, 답변 초안까지 준비해 둬요. 보내는 것은 언제나 확인하신 뒤예요." },
+    { title: "3. 먼저 할 일 정리", detail: "그날 답해야 할 문의와 살펴볼 리뷰를 골라 두고, 답변 초안까지 준비해 둬요. 보내는 것은 언제나 확인하신 뒤예요." },
   ];
 }

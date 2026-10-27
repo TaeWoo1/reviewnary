@@ -39,7 +39,7 @@ export const PHASE_COPY: Record<GuidedPhase, { title: string; body: string }> = 
   },
   application_issuance_guided: {
     title: "화면 안내로 발급",
-    body: "내 PC의 reviewnary 도우미가 NAVER 커머스 API 센터를 전용 창으로 열고, 눌러야 할 위치를 단계별로 표시해 드려요. 실제 로그인·클릭·발급은 고객님이 그 창에서 직접 진행하고, reviewnary는 화면을 대신 조작하거나 시크릿을 대신 읽지 않아요. 도우미를 실행해 두지 않으셨다면 '직접 진행하기'로 끝까지 진행할 수 있어요.",
+    body: "내 PC의 reviewnary 도우미가 NAVER 커머스 API 센터를 전용 창으로 열고, 눌러야 할 위치를 단계별로 표시해 드려요. 실제 로그인·클릭·발급은 고객님이 그 창에서 직접 진행하고, reviewnary는 화면을 대신 조작하거나 시크릿을 대신 읽지 않아요. 도우미를 실행해 두지 않았다면 '직접 진행하기'로 끝까지 진행할 수 있어요.",
   },
   credential_issued: {
     title: "발급 완료 확인",
@@ -152,7 +152,7 @@ export const CALL_IP_COPY = {
   registerTitle: "아래 고정 IP를 애플리케이션의 'API 호출 IP'에 등록하세요.",
   advertisedUnsetTitle: "reviewnary 고정 호출 IP가 아직 설정되지 않았어요.",
   advertisedUnsetBody:
-    "준비되면 이 자리에 표시되며, 그때 애플리케이션의 'API 호출 IP'에 등록하면 돼요. 이미 직접 등록하셨다면 아래에서 확인 표시 후 계속 진행할 수 있어요. 급하면 담당자에게 문의하세요.",
+    "준비되면 이 자리에 표시되며, 그때 애플리케이션의 'API 호출 IP'에 등록하면 돼요. 이미 직접 등록했다면 아래에서 확인 표시 후 계속 진행할 수 있어요. 급하면 담당자에게 문의하세요.",
   alreadyRegisteredCta: "이미 API 호출 IP를 등록했어요",
   acknowledgedNote: "호출 IP 등록을 확인함으로 표시했어요. 실제 등록 여부는 연결 테스트로 최종 확인돼요.",
   readyConfirmed: "호출 IP·주문 API 접근 정상 — 첫 주문 수집까지 완료됐어요.",

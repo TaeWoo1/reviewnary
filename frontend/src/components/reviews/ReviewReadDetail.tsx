@@ -339,7 +339,7 @@ export function ReviewReadDetail({
           쿠팡에서 보기
         </Btn>
         <p className="text-sm leading-relaxed text-muted">
-          쿠팡 윙의 상품평 목록 화면을 띄워 두시면, 이 상품평이 있는 줄에 테두리를 그려 드려요. 쿠팡
+          쿠팡 윙의 상품평 목록 화면을 띄워 두면, 이 상품평이 있는 줄에 테두리를 그려 드려요. 쿠팡
           화면에서는 아무것도 눌리거나 입력되지 않아요.
         </p>
         {unavailable ? (

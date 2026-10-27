@@ -116,7 +116,7 @@ export function ReviewProblemCard({
       )}
       {detail.bodyRedacted ? (
         <p className="break-keep text-sm text-muted">
-          개인정보로 보이는 부분은 가려서 보여드려요. 원문은 판매자센터에서 확인하실 수 있어요.
+          개인정보로 보이는 부분은 가려서 보여드려요. 원문은 판매자센터에서 확인할 수 있어요.
         </p>
       ) : null}
 

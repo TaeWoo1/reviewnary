@@ -83,7 +83,7 @@ export function RepeatedIssue() {
         {nav}
         <Empty
           title="이 문제를 불러오지 못했어요"
-          body="연결 상태를 확인한 뒤 다시 시도해 주세요. 목록에서 다시 선택하실 수도 있어요."
+          body="연결 상태를 확인한 뒤 다시 시도해 주세요. 목록에서 다시 선택할 수도 있어요."
           action={<BtnLink to={back}>반복 문제 목록</BtnLink>}
         />
       </div>

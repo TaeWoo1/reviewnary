@@ -264,7 +264,7 @@ export const PHASE_COPY: Record<TutorialPhase, { title: string; body: string }> 
   },
   first_sync: {
     title: "자료 가져오기",
-    body: "연결됐어요. 아래를 누르면 주문 내역을 한 번 가져와 잘 들어오는지 확인해요. 나중에 하셔도 돼요.",
+    body: "연결됐어요. 아래를 누르면 주문 내역을 한 번 가져와 잘 들어오는지 확인해요. 나중에 해도 돼요.",
   },
   done: {
     title: "연결 완료",

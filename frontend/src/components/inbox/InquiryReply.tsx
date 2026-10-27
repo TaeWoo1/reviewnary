@@ -322,7 +322,7 @@ export function InquiryReply({
                   {unavailable}
                 </p>
                 <p className="mt-2 break-keep text-sm leading-relaxed text-muted">
-                  아래에 직접 작성하실 수 있어요.
+                  아래에 직접 작성할 수 있어요.
                 </p>
               </div>
             ) : null}
@@ -751,7 +751,7 @@ function AnswerStateCard({
       ) : null}
       {noBasis ? (
         <p className="mt-2 break-keep text-sm leading-relaxed text-muted">
-          근거가 없는 답변은 만들지 않아요. 아래에 직접 작성하실 수 있어요.
+          근거가 없는 답변은 만들지 않아요. 아래에 직접 작성할 수 있어요.
         </p>
       ) : null}
       {/*

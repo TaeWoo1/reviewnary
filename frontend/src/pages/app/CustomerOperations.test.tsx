@@ -221,7 +221,7 @@ describe("고객 운영 관리 page", () => {
     const { container } = renderPage();
 
     expect(await screen.findByRole("heading", { name: "내 결정 필요" })).toBeInTheDocument();
-    expect(screen.getByText("직접 판단하실 일이 1건 있어요.")).toBeInTheDocument();
+    expect(screen.getByText("직접 판단할 일이 1건 있어요.")).toBeInTheDocument();
     expect(screen.getByText("초안 준비됨 · 아직 보내지 않음")).toBeInTheDocument();
     expect(screen.getByText(/따로 할 일이 없는 2건을 정리했어요/)).toBeInTheDocument();
     expect(screen.getByText("Cafe24 리뷰 — 연결이 만료되어 확인하지 못했어요.")).toBeInTheDocument();

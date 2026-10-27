@@ -211,7 +211,7 @@ describe("§2 — three first-use mornings", () => {
     // product. The middle one is the only promise and it names what THIS seller's channels offer.
     expect(lead).toHaveTextContent("1. 판매 채널 연동");
     expect(lead).toHaveTextContent("2. 자동으로 가져오기");
-    expect(lead).toHaveTextContent("3. 먼저 하실 일 정리");
+    expect(lead).toHaveTextContent("3. 먼저 할 일 정리");
     // A program to install belongs to one channel's guided lanes, not to a seller who has not picked one.
     expect(lead.textContent ?? "").not.toContain("도우미");
     // And the empty thread offers only what this org can actually have answered: every HOME_PROMPT is

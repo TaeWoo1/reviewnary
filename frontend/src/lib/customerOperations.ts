@@ -169,8 +169,8 @@ export function lastRunWord(status: string | null): string | null {
 
 export function decisionsLine(total: number): string {
   return total > 0
-    ? `직접 판단하실 일이 ${total.toLocaleString("ko-KR")}건 있어요.`
-    : "지금 직접 판단하실 일은 없어요.";
+    ? `직접 판단할 일이 ${total.toLocaleString("ko-KR")}건 있어요.`
+    : "지금 직접 판단할 일은 없어요.";
 }
 
 /** ②, as separate facts. Nothing is summed: a closed case, a watched case and a draft are three different things. */

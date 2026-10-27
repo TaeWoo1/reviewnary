@@ -50,7 +50,7 @@ export function ReviewReplyTemplates() {
     <>
       <PageHead
         title="리뷰 답변 문구"
-        description="리뷰에 답변할 때 처음 채워지는 문구예요. 유형별로 바꿔 두시면 회사 말투로 시작할 수 있어요."
+        description="리뷰에 답변할 때 처음 채워지는 문구예요. 유형별로 바꿔 두면 회사 말투로 시작할 수 있어요."
       />
 
       {loadError ? (

@@ -250,8 +250,8 @@ export function NaverIssuanceGuidedWalkthrough({
       <div className="space-y-3" aria-label="네이버 연동 안내 시작">
         <p className="text-sm text-ink break-keep">네이버 API 센터에서 연동 정보를 확인하도록 안내해 드릴게요.</p>
         <p className="text-sm text-muted break-keep">
-          직접 진행하시면 무엇을 어디서 확인하는지 순서대로 알려 드려요. 내 PC에 reviewnary 도우미를
-          실행해 두셨다면, 도우미가 전용 NAVER 창을 열어 눌러야 할 위치를 표시하는 화면 안내도 쓸 수 있어요.
+          직접 진행하면 무엇을 어디서 확인하는지 순서대로 알려 드려요. 내 PC에 reviewnary 도우미를
+          실행해 뒀다면, 도우미가 전용 NAVER 창을 열어 눌러야 할 위치를 표시하는 화면 안내도 쓸 수 있어요.
         </p>
         <button type="button" className="btn-primary block w-full" onClick={toText} disabled={busy}>
           직접 진행하기
@@ -321,7 +321,7 @@ export function NaverIssuanceGuidedWalkthrough({
           left reading a step counter with no control under it. */}
       {walkEnded && (
         <p className="rounded-xl bg-canvas px-4 py-3 text-sm text-ink break-keep" role="status">
-          화면 안내를 끝냈어요. 아래에서 텍스트 안내로 계속 진행하실 수 있어요.
+          화면 안내를 끝냈어요. 아래에서 텍스트 안내로 계속 진행할 수 있어요.
         </p>
       )}
 
@@ -349,7 +349,7 @@ export function NaverIssuanceGuidedWalkthrough({
                 네이버 창에서 화면 안내를 따라 진행하세요
               </p>
               <p className="text-xs text-muted break-keep">
-                열린 네이버 커머스 API 창의 안내(하이라이트와 '다음' 버튼)를 따라가시면 돼요. 각 단계는 그
+                열린 네이버 커머스 API 창의 안내(하이라이트와 '다음' 버튼)를 따라가면 돼요. 각 단계는 그
                 화면에서 직접 진행되고, 이 화면은 진행 상태만 보여줘요.
               </p>
               {effectiveRun.progress && (
