@@ -726,6 +726,14 @@
 - **출처** — 2026-10-27, `ReviewClaimGuard.remediesIn` · `remediesOf`,
   `ReviewClaimGuardTest.a_refused_exchange_is_not_a_refund_once_the_spaces_are_gone`.
 
+### B37. 「접힌다」를 class 이름으로 시험해, 실제 창에서는 접히지 않는 미리보기가 초록이었다
+
+- **했던 것** — 엑셀 미리보기의 긴 문장을 `line-clamp-6`로 접고 「전체 보기」를 달았다. 시험은 접힘을 `className`에 `line-clamp-6`이 있는지로 봤다.
+- **사실** — 바뀐 줄을 표시하려고 줄마다 블록으로 나누자 `line-clamp`가 아무것도 접지 못했다. jsdom은 CSS를 그리지 않으니 시험은 계속
+  통과했고, 판정용 복사본의 실제 창 캡처에서 접힌 화면과 펼친 화면이 똑같았다. 높이로 접도록 바꾸고 시험은 `data-folded`를 본다.
+- **다음에** — 보이고 안 보이고는 jsdom 시험이 증명하지 못한다. 접기 · 숨기기 · 잘라내기를 바꾸면 **실제 창에서 두 상태를 캡처해 비교한다.**
+- **출처** — 2026-10-27, `frontend/src/components/knowledge/KnowledgeWorkbook.tsx` `Version`, 판정용 복사본 캡처.
+
 ---
 
 ## C. 증거 · 계약

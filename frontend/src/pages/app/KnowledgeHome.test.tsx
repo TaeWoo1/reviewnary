@@ -498,13 +498,17 @@ describe("지식", () => {
     await userEvent.upload(within(block).getByLabelText("엑셀 파일 고르기"), new File(["x"], "답글 기준.xlsx"));
     const row = (await within(block).findByText("「환불」 안내 고침")).closest("li") as HTMLElement;
     const after = within(row).getByText("바뀐 뒤").nextElementSibling as HTMLElement;
-    expect(after.className).toContain("line-clamp-6");
-    const more = within(row).getByRole("button", { name: "전체 보기" });
+    expect(after).toHaveAttribute("data-folded", "true");
+    // Folded, the changed line may sit below the fold — the control says there is one.
+    const more = within(row).getByRole("button", { name: "전체 보기 · 바뀐 줄 1개" });
     expect(more).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(more);
-    expect(after.className).not.toContain("line-clamp-6");
-    expect((within(row).getByText("지금").nextElementSibling as HTMLElement).className).not.toContain("line-clamp-6");
+    expect(after).toHaveAttribute("data-folded", "false");
+    expect(within(row).getByText("지금").nextElementSibling).toHaveAttribute("data-folded", "false");
     expect(after).toHaveTextContent("단, 개봉 후에는 환불이 됩니다.");
+    // Only the line that changed is marked, and only on the side that changed.
+    expect(within(after).getAllByTitle("바뀐 줄").map((m) => m.textContent)).toEqual(["단, 개봉 후에는 환불이 됩니다."]);
+    expect(within(row).getByText("지금").nextElementSibling?.querySelector("mark")).toBeNull();
     expect(within(row).getByRole("button", { name: "접기" })).toHaveAttribute("aria-expanded", "true");
   });
 

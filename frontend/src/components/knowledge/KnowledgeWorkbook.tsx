@@ -168,6 +168,7 @@ function long(text?: string | null) {
 function LineRow({ line }: { line: KnowledgeWorkbookLine }) {
   const [open, setOpen] = useState(false);
   const foldable = long(line.before) || long(line.after);
+  const changed = changedLines(line.before, line.after);
   return (
     <li className="flex gap-2 break-keep text-sm text-ink">
       <span className="shrink-0 text-xs tabular-nums text-muted">
@@ -180,7 +181,9 @@ function LineRow({ line }: { line: KnowledgeWorkbookLine }) {
           <>
             <span className="mt-1 grid gap-1 sm:grid-cols-2">
               <Version label={line.after != null ? "지금" : "화면의 지금 내용"} text={line.before} open={open} />
-              {line.after != null ? <Version label="바뀐 뒤" text={line.after} open={open} strong /> : null}
+              {line.after != null ? (
+                <Version label="바뀐 뒤" text={line.after} open={open} strong against={line.before} />
+              ) : null}
             </span>
             {foldable ? (
               <button
@@ -189,7 +192,7 @@ function LineRow({ line }: { line: KnowledgeWorkbookLine }) {
                 aria-expanded={open}
                 onClick={() => setOpen((v) => !v)}
               >
-                {open ? "접기" : "전체 보기"}
+                {open ? "접기" : changed > 0 ? `전체 보기 · 바뀐 줄 ${changed}개` : "전체 보기"}
               </button>
             ) : null}
           </>
@@ -199,22 +202,54 @@ function LineRow({ line }: { line: KnowledgeWorkbookLine }) {
   );
 }
 
-/** 한쪽 문장. 빈 것은 「(없음)」이라고 말한다 — 빈 칸은 「안 보여 줬다」와 구별되지 않는다. */
+/** 바뀐 뒤에만 있는 줄의 수 — 접혀 있어도 무엇이 바뀌었는지 있다는 것은 보이게. */
+function changedLines(before?: string | null, after?: string | null) {
+  if (!before || !after) return 0;
+  const was = new Set(before.split("\n").map((l) => l.trim()));
+  return after.split("\n").filter((l) => l.trim() !== "" && !was.has(l.trim())).length;
+}
+
+/**
+ * 한쪽 문장. 빈 것은 「(없음)」이라고 말한다 — 빈 칸은 「안 보여 줬다」와 구별되지 않는다. {@code against}가 있으면 그 글에
+ * 없던 줄을 표시한다 — 긴 매뉴얼에서 바뀐 한 줄을 눈으로 찾게 두지 않는다.
+ */
 function Version({
   label,
   text,
   open,
   strong = false,
+  against,
 }: {
   label: string;
   text?: string | null;
   open: boolean;
   strong?: boolean;
+  against?: string | null;
 }) {
+  const was = new Set((against ?? "").split("\n").map((l) => l.trim()));
+  const marking = against != null && against !== "";
   return (
     <span className={`block rounded-lg border px-2.5 py-1.5 ${strong ? "border-brand-700/30 bg-brand-700/5" : "border-line bg-canvas"}`}>
       <span className="block text-xs font-semibold text-muted">{label}</span>
-      <span className={`block whitespace-pre-line text-sm text-ink ${open ? "" : "line-clamp-6"}`}>{text ? text : "(없음)"}</span>
+      {/* 줄마다 제 블록이라 line-clamp는 접지 못한다 — 높이로 접는다(text-sm 한 줄 1.25rem × 6). */}
+      <span
+        className={`block text-sm text-ink ${open ? "" : "max-h-[7.5rem] overflow-hidden"}`}
+        data-folded={open ? "false" : "true"}
+      >
+        {text
+          ? text.split("\n").map((l, i) =>
+              marking && l.trim() !== "" && !was.has(l.trim()) ? (
+                <mark key={i} className="block rounded bg-warn/10 px-0.5 text-ink" title="바뀐 줄">
+                  {l}
+                </mark>
+              ) : (
+                <span key={i} className="block">
+                  {l === "" ? "\u00a0" : l}
+                </span>
+              ),
+            )
+          : "(없음)"}
+      </span>
     </span>
   );
 }
