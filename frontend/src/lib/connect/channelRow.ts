@@ -54,8 +54,8 @@ export interface ChannelRowView {
   primary: ChannelRowPrimary;
 }
 
-const REVIEW_LANE_READY: ConnectionState = { key: "CONNECTED", label: "연결됨", tone: "good" };
-const REVIEW_LANE_SETUP: ConnectionState = { key: "NEEDS_CONNECT", label: "연결 필요", tone: "warn" };
+const REVIEW_LANE_READY: ConnectionState = { key: "CONNECTED", label: "연동됨", tone: "good" };
+const REVIEW_LANE_SETUP: ConnectionState = { key: "NEEDS_CONNECT", label: "연동 필요", tone: "warn" };
 
 /** API lane이 실제로 서 있는가 — 「연결됨」이거나 고칠 것이 있는 상태(둘 다 그 lane에 대한 참이다). */
 function apiLaneStands(api: ConnectionState): boolean {

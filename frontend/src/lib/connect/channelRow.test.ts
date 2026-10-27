@@ -3,9 +3,9 @@ import { channelRowOf, type ChannelRowInput } from "./channelRow";
 import type { ConnectionState } from "../connectionState";
 
 const API: Record<string, ConnectionState> = {
-  none: { key: "NEEDS_CONNECT", label: "연결 필요", tone: "warn" },
+  none: { key: "NEEDS_CONNECT", label: "연동 필요", tone: "warn" },
   pending: { key: "PENDING", label: "연결 중", tone: "warn" },
-  connected: { key: "CONNECTED", label: "연결됨", tone: "good" },
+  connected: { key: "CONNECTED", label: "연동됨", tone: "good" },
   reconnect: { key: "RECONNECT", label: "재연결 필요", tone: "bad" },
   error: { key: "ERROR", label: "오류", tone: "bad" },
 };
@@ -25,7 +25,7 @@ describe("채널 행 — 한 capability가 죽어 있다고 채널 전체를 미
   it("브라우저 수집이 살아 있으면 행은 그것을 말한다 — 「연결 중」도, 「수집 이력 없음」도, 「연동 계속하기」도 아니다", () => {
     // 실측된 그 행: 상품평 9건을 가져온 계정인데 API 자격이 없어 PENDING이었다.
     const v = row();
-    expect(v.state?.label).toBe("연결됨");
+    expect(v.state?.label).toBe("연동됨");
     expect(v.reviewLine).toBe("리뷰 수집 · 마지막 수집");
     expect(v.showApiCollectionLine).toBe(false);
     expect(v.primary).toEqual({ kind: "MANAGE", label: "관리" });
@@ -49,7 +49,7 @@ describe("채널 행 — 한 capability가 죽어 있다고 채널 전체를 미
 
   it("어느 lane도 서 있지 않으면 다음 걸음은 키 발급이 아니라 상품평 수집 연결이다", () => {
     const v = row({ reviewReadiness: "HELPER_NOT_LINKED", api: API.pending!, lastScreenReadAt: null });
-    expect(v.state?.label).toBe("연결 필요");
+    expect(v.state?.label).toBe("연동 필요");
     expect(v.primary).toEqual({ kind: "REVIEW_SETUP", label: "리뷰 수집 연결하기" });
   });
 
@@ -75,7 +75,7 @@ describe("채널 행 — 한 capability가 죽어 있다고 채널 전체를 미
   it("준비 상태를 읽지 못한 계정은 아무것도 주장하지 않는다", () => {
     const v = row({ reviewReadiness: null, api: API.pending!, lastScreenReadAt: null });
     // 읽지 못한 것은 「준비됨」이 아니다 — 행은 셋업을 내밀되 연결됐다고 말하지 않는다.
-    expect(v.state?.label).toBe("연결 필요");
+    expect(v.state?.label).toBe("연동 필요");
     expect(v.reviewLine).toBeNull();
   });
 });

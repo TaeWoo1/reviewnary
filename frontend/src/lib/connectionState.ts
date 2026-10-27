@@ -16,8 +16,8 @@ export interface ConnectionState {
 }
 
 const STATES: Record<ConnectionStateKey, ConnectionState> = {
-  CONNECTED: { key: "CONNECTED", label: "연결됨", tone: "good" },
-  NEEDS_CONNECT: { key: "NEEDS_CONNECT", label: "연결 필요", tone: "muted" },
+  CONNECTED: { key: "CONNECTED", label: "연동됨", tone: "good" },
+  NEEDS_CONNECT: { key: "NEEDS_CONNECT", label: "연동 필요", tone: "muted" },
   PENDING: { key: "PENDING", label: "연결 중", tone: "warn" },
   RECONNECT: { key: "RECONNECT", label: "재연결 필요", tone: "bad" },
   ERROR: { key: "ERROR", label: "오류", tone: "warn" },
@@ -47,8 +47,8 @@ export function connectionState(
 
 /** What the row's primary button says for a state. Verbs, in seller language, one per state. */
 export const CONNECTION_ACTION_LABEL: Record<ConnectionStateKey, string> = {
-  CONNECTED: "연결 관리",
-  NEEDS_CONNECT: "연결하기",
+  CONNECTED: "연동 관리",
+  NEEDS_CONNECT: "연동하기",
   PENDING: "연동 계속하기",
   RECONNECT: "다시 연결하기",
   ERROR: "확인하기",

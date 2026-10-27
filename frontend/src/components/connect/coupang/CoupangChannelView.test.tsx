@@ -246,7 +246,7 @@ describe("쿠팡 채널 화면 — 두 가지 방법, 그뿐", () => {
     view({ connectionInfo: null });
     const api = await screen.findByTestId("coupang-api-card");
     const review = await screen.findByTestId("coupang-review-card");
-    expect(solidIn(api).map((c) => c.textContent)).toEqual(["API 연결하기"]);
+    expect(solidIn(api).map((c) => c.textContent)).toEqual(["API 연동하기"]);
     expect(solidIn(review)).toHaveLength(0);
   });
 

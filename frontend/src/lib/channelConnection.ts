@@ -72,7 +72,7 @@ export function channelCardAction(
     // The verb matches the state chip (`connectionState`): an erroring connection is something to
     // 확인, a healthy one something to 관리. Both open the account's own page.
     return {
-      label: collectionFailing ? "확인하기" : "연결 관리",
+      label: collectionFailing ? "확인하기" : "연동 관리",
       intent: "manage",
       disabled: false,
     };
@@ -83,19 +83,19 @@ export function channelCardAction(
   // marks CONNECTED reads "관리" over a button that starts a first connection.
   const prepping = channel.status === "PREPARING";
   if (channel.code === "CAFE24") {
-    return { label: "연결하기", intent: "connect-cafe24", disabled: prepping };
+    return { label: "연동하기", intent: "connect-cafe24", disabled: prepping };
   }
   if (channel.code === "NAVER") {
     // First-time NAVER: the guided-connection wizard (§16.10) is the primary path — it connects
     // orders via the official API and hands off to Action Window review export. Upload stays
     // reachable from the channel detail.
-    return { label: "연결하기", intent: "connect-naver", disabled: prepping };
+    return { label: "연동하기", intent: "connect-naver", disabled: prepping };
   }
   if (channel.code === "COUPANG") {
     // First-time Coupang: the connection setup surface shows the official prerequisites (issue the WING
     // API key, grant order-API access, register the deployment calling IP) then hosts credential entry +
     // the connection test. Orders connect via the official Coupang Open API.
-    return { label: "연결하기", intent: "connect-coupang", disabled: prepping };
+    return { label: "연동하기", intent: "connect-coupang", disabled: prepping };
   }
   if (canUpload) {
     return { label: channel.actionLabel, intent: "upload", disabled: false };

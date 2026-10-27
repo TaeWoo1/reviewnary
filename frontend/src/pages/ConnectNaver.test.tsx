@@ -127,7 +127,7 @@ beforeEach(() => {
   sessionStorage.clear();
   h.bridge = AGENT_DOWN; // default: NO local agent — the order flow must still complete
   vi.mocked(api.getChannelsStrict).mockResolvedValue([
-    { id: "ch-naver", code: "NAVER", nameKo: "네이버", status: "AVAILABLE", dataBadges: [], lastSyncedAt: null, actionLabel: "연결하기", support: {} as never },
+    { id: "ch-naver", code: "NAVER", nameKo: "네이버", status: "AVAILABLE", dataBadges: [], lastSyncedAt: null, actionLabel: "연동하기", support: {} as never },
   ]);
   vi.mocked(api.getSellerAccountsStrict).mockResolvedValue([
     { id: "acc-1", channelId: "ch-naver", channelNameKo: "네이버", alias: null, connectionStatus: "PENDING", lastSyncedAt: null, fileUpload: false },
@@ -451,7 +451,7 @@ describe("ConnectNaver — completion surfaces capability + review handoff", () 
     const panel = await screen.findByRole("status", { name: "연결 역량 결과" });
     expect(panel).toHaveTextContent("자격 증명 인증됨");
     expect(panel).toHaveTextContent("주문 조회");
-    expect(panel).toHaveTextContent("연결됨");
+    expect(panel).toHaveTextContent("연동됨");
     expect(panel).toHaveTextContent("설정 필요");
     expect(panel).toHaveTextContent("미활성화");
     expect(panel).toHaveTextContent("연동 준비 중");

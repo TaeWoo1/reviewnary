@@ -203,7 +203,7 @@ export const REVIEW_SETUP_COPY = {
  * order connection screen never mixes in the review Action Window.
  */
 export const CAPABILITY_STATE_COPY: Record<string, { chip: string; tone: "good" | "muted" | "warn" }> = {
-  AVAILABLE: { chip: "연결됨", tone: "good" },
+  AVAILABLE: { chip: "연동됨", tone: "good" },
   SETUP_REQUIRED: { chip: "설정 필요", tone: "muted" },
   GUIDED_CONFIRMATION: { chip: "작업 창에서 직접 진행", tone: "muted" },
   NOT_ENABLED: { chip: "미활성화", tone: "muted" },

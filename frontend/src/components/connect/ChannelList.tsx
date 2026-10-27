@@ -358,8 +358,8 @@ export function ChannelList({
       {/* aria-hidden: 각 행이 제 이름을 달고 있다. 열 이름은 눈으로 비교하는 쪽을 위한 것이다. */}
       <div aria-hidden="true" className="flex items-center pb-1 text-xs text-muted">
         <span className={COL.name}>채널</span>
-        <span className={COL.state}>연결</span>
-        <span className={COL.read}>마지막 수집 성공</span>
+        <span className={COL.state}>연동</span>
+        <span className={COL.read}>마지막으로 가져온 때</span>
         <span className={COL.action} />
       </div>
       <ul aria-label="채널 목록">

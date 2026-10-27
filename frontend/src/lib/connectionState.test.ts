@@ -11,7 +11,7 @@ function health(over: Partial<ConnectionStatusView>): ConnectionStatusView {
 
 describe("connectionState — one word per channel row", () => {
   it("no account → 연결 필요; a started connect → 연결 중", () => {
-    expect(connectionState(null, null).label).toBe("연결 필요");
+    expect(connectionState(null, null).label).toBe("연동 필요");
     expect(connectionState(account("PENDING"), null).label).toBe("연결 중");
   });
 
@@ -26,14 +26,14 @@ describe("connectionState — one word per channel row", () => {
     expect(connectionState(account("CONNECTED"), health({ consecutiveFailures: 2 })).label).toBe("오류");
     expect(connectionState(account("CONNECTED"), health({ lastError: "timeout" })).label).toBe("오류");
     expect(connectionState(account("CONNECTED"), health({ state: "DEGRADED" })).label).toBe("오류");
-    expect(connectionState(account("CONNECTED"), health({})).label).toBe("연결됨");
-    expect(connectionState(account("CONNECTED"), null).label).toBe("연결됨");
+    expect(connectionState(account("CONNECTED"), health({})).label).toBe("연동됨");
+    expect(connectionState(account("CONNECTED"), null).label).toBe("연동됨");
   });
 
   it("names one verb per state", () => {
     expect(CONNECTION_ACTION_LABEL).toEqual({
-      CONNECTED: "연결 관리",
-      NEEDS_CONNECT: "연결하기",
+      CONNECTED: "연동 관리",
+      NEEDS_CONNECT: "연동하기",
       PENDING: "연동 계속하기",
       RECONNECT: "다시 연결하기",
       ERROR: "확인하기",

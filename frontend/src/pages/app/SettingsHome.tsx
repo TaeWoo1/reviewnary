@@ -43,7 +43,7 @@ export function SettingsHome() {
         <Row label="스토어" value={user?.orgName ?? "내 스토어"} />
         <Row label="사용 중인 계정" value={user?.name ?? "운영자"} />
         {user?.email ? <Row label="이메일" value={user.email} /> : null}
-        <Row label="표시 중인 자료" value={onDemoData ? "데모 데이터" : "연결된 자료"} />
+        <Row label="표시 중인 자료" value={onDemoData ? "데모 데이터" : "연동한 자료"} />
       </Block>
 
       <Block title="AI 답변과 운영 기준">
@@ -68,7 +68,7 @@ export function SettingsHome() {
           action={<Go to="/settings/review-templates">문구 설정</Go>}
         />
         <Row
-          label="연결 알림"
+          label="연동 알림"
           value="연결이 끊기거나 확인이 필요할 때. 표시가 없다고 모든 연결이 정상은 아니에요"
           action={<Go to="/settings/alerts">알림 보기</Go>}
         />

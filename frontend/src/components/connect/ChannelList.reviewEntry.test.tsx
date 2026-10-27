@@ -85,11 +85,11 @@ function renderList(options: {
 describe("ChannelList — the connection state word (A5)", () => {
   it("shows 연결됨 on a healthy connected row and 연결 필요 with 연결하기 when there is no account", () => {
     renderList();
-    expect(screen.getByTestId("connection-state")).toHaveTextContent("연결됨");
+    expect(screen.getByTestId("connection-state")).toHaveTextContent("연동됨");
     renderList({ channels: [NAVER], accounts: [] });
     const pills = screen.getAllByTestId("connection-state");
-    expect(pills[pills.length - 1]).toHaveTextContent("연결 필요");
-    expect(screen.getByRole("button", { name: "연결하기" })).toBeInTheDocument();
+    expect(pills[pills.length - 1]).toHaveTextContent("연동 필요");
+    expect(screen.getByRole("button", { name: "연동하기" })).toBeInTheDocument();
   });
 
   it("a failing row says what its timestamp IS — the last success, and that nothing has landed since", () => {
@@ -173,7 +173,7 @@ describe("ChannelList — the 상품평 entry", () => {
       channels: [{ ...NAVER, code: "GMARKET", nameKo: "G마켓" }],
       accounts: [{ ...ACCOUNT, id: "acc-gm", channelId: "naver-ch", channelNameKo: "G마켓" }],
     });
-    expect(screen.getByRole("button", { name: "연결 관리" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "연동 관리" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /상품평|리뷰/ })).toBeNull();
   });
 
@@ -196,7 +196,7 @@ describe("ChannelList — the 상품평 entry", () => {
     // as a link — never solid, never hidden.
     const link = screen.getByRole("link", { name: "쿠팡 상품평 22개 보기" });
     expect(link.className).not.toContain("bg-brand-700");
-    expect(screen.getByRole("button", { name: "연결 관리" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "연동 관리" })).toBeInTheDocument();
   });
 
   it("steps back when collection is failing, without going away", () => {

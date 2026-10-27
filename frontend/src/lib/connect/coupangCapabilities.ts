@@ -56,11 +56,11 @@ export function reviewCardOf(readiness: AcquisitionReadinessView | null): Review
     return null;
   }
   if (readiness.state === "READY") {
-    return { status: { tone: "good", label: "연결됨" }, kind: "READY" };
+    return { status: { tone: "good", label: "연동됨" }, kind: "READY" };
   }
   // HELPER_NOT_LINKED · STORE_IDENTITY_UNKNOWN — 둘 다 셋업이 답한다. 어느 쪽인지는 셋업의 첫 걸음이
   // 스스로 알아내므로, 카드가 그 둘을 구별해 말할 이유가 없다.
-  return { status: { tone: "warn", label: "연결 필요" }, kind: "SETUP" };
+  return { status: { tone: "warn", label: "연동 필요" }, kind: "SETUP" };
 }
 
 /**
@@ -100,13 +100,13 @@ export function apiCardOf(
 ): ApiCardView | null {
   if (!overview || !overview.autoCollectSupported) return null;
   if (!info) {
-    return { status: { tone: "warn", label: "연결 필요" }, kind: "SETUP", primaryLabel: "API 연결하기" };
+    return { status: { tone: "warn", label: "연동 필요" }, kind: "SETUP", primaryLabel: "API 연동하기" };
   }
   const state = status?.state;
   if (state === "EXPIRED" || state === "NEEDS_REAUTH" || state === "DISCONNECTED") {
     return { status: { tone: "bad", label: "다시 연결 필요" }, kind: "REAUTH", primaryLabel: "연동 정보 갱신" };
   }
-  return { status: { tone: "good", label: "연결됨" }, kind: "READY", primaryLabel: "지금 가져오기" };
+  return { status: { tone: "good", label: "연동됨" }, kind: "READY", primaryLabel: "지금 가져오기" };
 }
 
 /** 이 채널의 리뷰 수집 화면 경로. 한 정의 — 카드와 라우트가 서로 다른 문자열을 쓰지 않는다. */

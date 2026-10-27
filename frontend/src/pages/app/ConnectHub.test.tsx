@@ -147,13 +147,13 @@ describe("채널 연동 — the hub", () => {
   it("surfaces connection alerts only when there are some", async () => {
     renderHub();
     await screen.findByLabelText("채널 목록");
-    expect(screen.queryByText(/확인이 필요한 연결 알림/)).toBeNull();
+    expect(screen.queryByText(/확인이 필요한 연동 알림/)).toBeNull();
   });
 
   it("links the alert banner into the alert list when alerts exist", async () => {
     openCount.mockReturnValue(2);
     renderHub();
-    expect(await screen.findByText("확인이 필요한 연결 알림 2건")).toBeInTheDocument();
+    expect(await screen.findByText("확인이 필요한 연동 알림 2건")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "확인하기" })).toHaveAttribute(
       "href",
       "/settings/alerts",

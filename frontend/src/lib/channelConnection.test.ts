@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { channelCardAction, selectChannelAccount } from "./channelConnection";
 import type { ChannelStatus, SellerAccountResponse } from "./types";
 
-const cafe24 = { code: "CAFE24", status: "AVAILABLE" as ChannelStatus, actionLabel: "연결하기" };
-const naver = { code: "NAVER", status: "AVAILABLE" as ChannelStatus, actionLabel: "연결하기" };
+const cafe24 = { code: "CAFE24", status: "AVAILABLE" as ChannelStatus, actionLabel: "연동하기" };
+const naver = { code: "NAVER", status: "AVAILABLE" as ChannelStatus, actionLabel: "연동하기" };
 const fileChan = {
   code: "FILE_UPLOAD",
   status: "FILE_UPLOAD_SUPPORTED" as ChannelStatus,
@@ -24,7 +24,7 @@ const acc = (over: Partial<SellerAccountResponse> = {}): SellerAccountResponse =
 describe("channelCardAction — driven by real account status", () => {
   it("no Cafe24 account → 연결하기 (start OAuth)", () => {
     expect(channelCardAction(cafe24, null, false, false)).toEqual({
-      label: "연결하기",
+      label: "연동하기",
       intent: "connect-cafe24",
       disabled: false,
     });
@@ -58,7 +58,7 @@ describe("channelCardAction — driven by real account status", () => {
 
   it("CONNECTED → 연결 관리", () => {
     expect(channelCardAction(cafe24, acc({ connectionStatus: "CONNECTED" }), false, false)).toEqual({
-      label: "연결 관리",
+      label: "연동 관리",
       intent: "manage",
       disabled: false,
     });
@@ -89,9 +89,9 @@ describe("channelCardAction — driven by real account status", () => {
   });
 
   it("no Coupang account → connect-coupang (the Coupang connection setup surface)", () => {
-    const coupang = { code: "COUPANG", status: "AVAILABLE" as ChannelStatus, actionLabel: "연결하기" };
+    const coupang = { code: "COUPANG", status: "AVAILABLE" as ChannelStatus, actionLabel: "연동하기" };
     expect(channelCardAction(coupang, null, false, false)).toEqual({
-      label: "연결하기",
+      label: "연동하기",
       intent: "connect-coupang",
       disabled: false,
     });

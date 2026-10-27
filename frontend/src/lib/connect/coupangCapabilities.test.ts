@@ -36,9 +36,9 @@ describe("리뷰 수집 카드", () => {
       expect(Object.keys(card!).sort()).toEqual(["kind", "status"]);
     }
     expect(reviewCardOf({ state: "READY", channelCode: "COUPANG" }))
-      .toEqual({ status: { tone: "good", label: "연결됨" }, kind: "READY" });
+      .toEqual({ status: { tone: "good", label: "연동됨" }, kind: "READY" });
     expect(reviewCardOf({ state: "HELPER_NOT_LINKED", channelCode: "COUPANG" }))
-      .toEqual({ status: { tone: "warn", label: "연결 필요" }, kind: "SETUP" });
+      .toEqual({ status: { tone: "warn", label: "연동 필요" }, kind: "SETUP" });
   });
 });
 
@@ -69,7 +69,7 @@ describe("문의·주문 자동 수집 카드 — 돌지 않는 것은 설정하
   });
 
   it("자격이 없으면 연결이 다음 걸음이다", () => {
-    expect(apiCardOf(overview(true), null, null)).toMatchObject({ kind: "SETUP", primaryLabel: "API 연결하기" });
+    expect(apiCardOf(overview(true), null, null)).toMatchObject({ kind: "SETUP", primaryLabel: "API 연동하기" });
   });
 
   it("만료·끊김은 다시 연결이고, 그것은 처음 연결과 다른 문장이다", () => {

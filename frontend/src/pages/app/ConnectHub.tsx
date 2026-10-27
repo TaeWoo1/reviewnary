@@ -249,7 +249,7 @@ export function ConnectHub() {
 
       {openCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn/10 px-4 py-3">
-          <span className="text-sm font-semibold text-warn">확인이 필요한 연결 알림 {openCount}건</span>
+          <span className="text-sm font-semibold text-warn">확인이 필요한 연동 알림 {openCount}건</span>
           <BtnLink to="/settings/alerts" size="sm" variant="outline">
             확인하기
           </BtnLink>

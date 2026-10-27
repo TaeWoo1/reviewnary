@@ -194,7 +194,7 @@ export function buildInquiryToday(
  * 확인이 필요한 연결.
  *
  * Interrupted channels (their own status) + unacknowledged alerts. `channels`/`alerts` null means
- * that read failed. Rows link to where each is handled: a channel to 채널 연결, an alert to 연결 알림.
+ * that read failed. Rows link to where each is handled: a channel to 채널 연결, an alert to 연동 알림.
  * The headline is a link only when everything points at one screen.
  */
 export function buildConnectionToday(
@@ -216,7 +216,7 @@ export function buildConnectionToday(
     ...summary.openAlerts.map((alert) => ({
       key: `alert:${alert.id}`,
       title: alert.message,
-      meta: alert.channelNameKo ?? "연결 알림",
+      meta: alert.channelNameKo ?? "연동 알림",
       to: "/settings/alerts",
     })),
   ];
@@ -226,7 +226,7 @@ export function buildConnectionToday(
   const note = !channelsLoaded
     ? "채널 상태는 지금 확인할 수 없어요."
     : !alertsLoaded
-      ? "연결 알림은 지금 확인할 수 없어요."
+      ? "연동 알림은 지금 확인할 수 없어요."
       : null;
   return item("connections", label, { kind: "READY", count }, to, [], rows, note);
 }

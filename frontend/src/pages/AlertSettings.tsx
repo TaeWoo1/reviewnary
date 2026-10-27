@@ -133,7 +133,7 @@ export function AlertSettings() {
   return (
     <div className="space-y-6">
       <PageHead
-        title="연결 알림"
+        title="연동 알림"
         description="확인 처리는 알림을 봤다는 표시이며, 연결 문제 해결을 의미하지 않아요."
       />
 
@@ -145,13 +145,13 @@ export function AlertSettings() {
         <p className="text-muted">불러오는 중…</p>
       ) : error ? (
         <div className="rounded-xl bg-bad/10 px-4 py-3 text-bad">
-          연결 알림을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
+          연동 알림을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
         </div>
       ) : list.length === 0 ? (
-        <EmptyState message="현재 확인할 연결 알림이 없어요." />
+        <EmptyState message="현재 확인할 연동 알림이 없어요." />
       ) : (
         // One list, open first — the rows of a log, not a wall of posters (Phase 4).
-        <ul aria-label="연결 알림" className="divide-y divide-line/70 overflow-hidden rounded-2xl border border-line bg-surface">
+        <ul aria-label="연동 알림" className="divide-y divide-line/70 overflow-hidden rounded-2xl border border-line bg-surface">
           {list.map((alert) => (
             <AlertCard
               key={alert.id}

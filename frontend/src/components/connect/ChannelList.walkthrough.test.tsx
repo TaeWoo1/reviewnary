@@ -21,7 +21,7 @@ const NAVER: ChannelResponse = {
   status: "SUPPORTED",
   dataBadges: [],
   lastSyncedAt: null,
-  actionLabel: "연결하기",
+  actionLabel: "연동하기",
   support: {
     fileUploadSupported: false,
     fileUploadDataTypes: [],
@@ -66,7 +66,7 @@ describe("ChannelList — NAVER entry preserves the walkthrough run id", () => {
     vi.stubEnv("VITE_WALKTHROUGH_MODE", "true");
     vi.stubEnv("VITE_WALKTHROUGH_RUN_ID", "wt-abc123");
     const { getByRole } = renderList();
-    getByRole("button", { name: "연결하기" }).click();
+    getByRole("button", { name: "연동하기" }).click();
     expect(await screen.findByTestId("loc")).toHaveTextContent(
       "/connect/naver?walkthroughRun=wt-abc123",
     );
@@ -76,7 +76,7 @@ describe("ChannelList — NAVER entry preserves the walkthrough run id", () => {
     vi.stubEnv("VITE_WALKTHROUGH_MODE", "false");
     vi.stubEnv("VITE_WALKTHROUGH_RUN_ID", "");
     const { getByRole } = renderList();
-    getByRole("button", { name: "연결하기" }).click();
+    getByRole("button", { name: "연동하기" }).click();
     const loc = await screen.findByTestId("loc");
     expect(loc).toHaveTextContent("/connect/naver");
     expect(loc.textContent).not.toContain("walkthroughRun");
@@ -86,7 +86,7 @@ describe("ChannelList — NAVER entry preserves the walkthrough run id", () => {
     vi.stubEnv("VITE_WALKTHROUGH_MODE", "true");
     vi.stubEnv("VITE_WALKTHROUGH_RUN_ID", "");
     const { getByRole } = renderList();
-    getByRole("button", { name: "연결하기" }).click();
+    getByRole("button", { name: "연동하기" }).click();
     const loc = await screen.findByTestId("loc");
     expect(loc.textContent).not.toContain("walkthroughRun");
   });
