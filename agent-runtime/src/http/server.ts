@@ -7,6 +7,7 @@
  *   GET  /health                                 liveness (public) — the process is up
  *   GET  /ready                                  readiness (public) — deps OK (backend reachable); 503 if not
  *   GET  /capabilities                           service metadata (public; no seller data)
+ *   POST /api/reply-runs                          run the reply agent for one backend-minted run (Reply Agent v1)
  *   POST /api/agent-runs                          start a run (bearer required)
  *   POST /api/agent-runs/{threadId}/resume        resume at a checkpoint (bearer required)
  *   GET  /api/agent-runs/{threadId}               read a run's sanitized status (bearer required)
@@ -34,6 +35,9 @@ import type { AgentRunService } from "./AgentRunService";
 import type { ConversationService } from "../conversation/ConversationService";
 import { CONVERSATION_ID, StartTurnRequestSchema } from "../conversation/contract";
 import type { ProgressEvent } from "../conversation/contract";
+import { z } from "zod";
+import { ReplySpringClient } from "../reply/ReplySpringClient";
+import { runReply } from "../reply/replyGraph";
 
 const MAX_BODY_BYTES = 128 * 1024;
 const READINESS_TIMEOUT_MS = 2000;
@@ -49,6 +53,11 @@ export interface ServerDeps {
   /** The conversation lane. Absent ⇒ its routes answer 503, so a deployment without it fails loudly. */
   readonly conversations?: ConversationService;
 }
+
+/** A reply-agent run: the backend's run id and the run token (`rvr_…`). A seller's login is not accepted here. */
+const ReplyRunRequestSchema = z
+  .object({ runId: z.string().uuid(), token: z.string().regex(/^rvr_[A-Za-z0-9_-]{16,200}$/) })
+  .strict();
 
 interface HandlerContext {
   readonly service: AgentRunService;
@@ -223,6 +232,18 @@ async function route(ctx: HandlerContext, req: IncomingMessage, res: ServerRespo
 
   if (method === "GET" && path === "/capabilities") {
     sendJson(res, 200, ctx.service.capabilities());
+    return;
+  }
+
+  // Reply Agent v1 (2026-10-28, docs/standing/reply_agent_v1.md §2). The backend starts every run and hands over the
+  // run's own token — never a seller's login. The token is used for that run's requests and kept nowhere: not logged,
+  // not in graph state, not checkpointed.
+  if (method === "POST" && path === "/api/reply-runs") {
+    const parsed = ReplyRunRequestSchema.safeParse(await readJsonBody(req));
+    if (!parsed.success) throw new HttpError(400, "INVALID_REQUEST", "invalid reply-run request");
+    const report = await runReply(new ReplySpringClient(ctx.config.backendBaseUrl, parsed.data.token));
+    log("reply_run", { outcome: report.outcome, category: report.category, reason: report.reason });
+    sendJson(res, 200, report);
     return;
   }
 

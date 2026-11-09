@@ -21,6 +21,8 @@ describe("classification", () => {
     expect(classify({ phase: "PROPOSED", hasDraft: false }, null).group).toBe("UNANSWERED");
     expect(classify({ phase: "PROPOSED", hasDraft: true }, detail("GROUNDED")).group).toBe("DRAFT_READY");
     expect(classify({ phase: "PROPOSED", hasDraft: true }, detail("NEEDS_CLARIFICATION")).group).toBe("NEEDS_CLARIFICATION");
+    // A partial draft (2026-11-01 tenth review) is never counted as ready.
+    expect(classify({ phase: "PROPOSED", hasDraft: true }, detail("PARTIAL_ANSWER")).group).toBe("KNOWLEDGE_MISSING");
     expect(classify({ phase: "PROPOSED", hasDraft: true }, detail("NO_ANSWER_BASIS")).group).toBe("KNOWLEDGE_MISSING");
     expect(classify({ phase: "PROPOSED", hasDraft: true }, detail(null))).toEqual({ group: "DRAFT_READY", answerBasis: "GROUNDED" });
     // The queue says a draft exists but the detail read did not happen (budget) or failed: the row is

@@ -138,6 +138,8 @@ export function classify(
   const basis = draft?.answerBasis ?? null;
   if (basis === "NEEDS_CLARIFICATION") return { group: "NEEDS_CLARIFICATION", answerBasis: basis };
   if (basis === "NO_ANSWER_BASIS") return { group: "KNOWLEDGE_MISSING", answerBasis: basis };
+  // A draft that answers part of what was asked (2026-11-01 tenth review) is not ready: the rest is the seller's to supply.
+  if (basis === "PARTIAL_ANSWER") return { group: "KNOWLEDGE_MISSING", answerBasis: basis };
   // The draft exists — either read here, or reported by the queue. A basis it did not record is a
   // draft that is ready to be read, not one that is missing.
   return { group: "DRAFT_READY", answerBasis: basis ?? (draft ? "GROUNDED" : null) };
