@@ -39,10 +39,10 @@ live proof · selector calibration · audit · closure record는 여기 올라�
 - `docs/demo_core_experience_v1.md` — Demo Core Experience v1 — SellerOps 데모 제품 정의
 - `docs/demo_runbook_v1.md` — SellerOps Demo Runbook v1 (product assembly A7 — 2026-08-18)
 - `docs/multi-channel-connector-roadmap.md` — Multi-Channel Connector Roadmap
-- `docs/product-scope-v1.md` — Product Scope v1.14 — Drift Guard
+- `docs/product-scope-v1.md` — Product Scope v1.15 — Drift Guard
 - `docs/product_assembly_ia_v1.md` — Product Assembly v1 — 목표 IA와 화면 책임 (정본)
 - `docs/product_operating_model.md` — SellerOps — Product Operating Model
-- `docs/reviewnary_product_architecture_proposal_v1.md` — Reviewnary 제품 구조 v1 — §17 판매자 자체 운영형 로컬 구조 + 네이버 리뷰 사람 대행·교환 서비스, §17.9 서버·PC 책임 분할 (2026-10-16, scope lock v1.14의 정본), §18 Claude 개발 인계·계약 충돌·전환 단계; 외부 허가·구현 상태와 구분
+- `docs/reviewnary_product_architecture_proposal_v1.md` — Reviewnary 제품 구조 v1 — §17 판매자 자체 운영형 로컬 구조 + 네이버 리뷰 사람 대행·교환 서비스, §17.9 서버·PC 책임 분할 (2026-10-16, scope lock v1.14의 정본), §18 Claude 개발 인계·계약 충돌·전환 단계, **§19 서버 중심 웹 서비스 전환 (2026-10-31, scope lock v1.15의 정본)**; 외부 허가·구현 상태와 구분
 - `docs/vendor_server_contract_v1.md` — 공급자 서버 범위와 API 계약 v1 (2026-10-17 초안): 리뷰 교환 열 제거 · 모바일 승인 상태 머신 · Cafe24 토큰 중계 · 공인 IP · 라이선스 · 보유와 삭제·백업; §0 오너 결정(scope lock v1.14 ⑧-3), 실제 내보내기 구조 확인(사진은 첨부 주소 1개); §11 구현 상태(`vendor-server/` 뼈대)
 - `docs/sellerops_canonical_reference.md` — SellerOps — Canonical Reference: Product, Strategy, State
 - `docs/frontend/sellerops_frontend_spec.md` — SellerOps Frontend Spec — 통합 셀러센터 리디자인 정본
@@ -50,6 +50,7 @@ live proof · selector calibration · audit · closure record는 여기 올라�
 
 ### Standing contracts and ADRs
 
+- `docs/standing/server_operation_boundary_v1.md` — 서버 운영 경계 v1 — 조직 단위 연결 · 고객별 권한 · 승인 책임 · AI 전송 보호 · 단일 계정(서버 간 인증 + 판매자·스토어 매핑) · 공식 연동 인증 (2026-10-31, scope lock v1.15)
 - `docs/standing/auth_growth_instrumentation_v1.md` — Auth + Growth Instrumentation v1 — contract
 - `docs/standing/coupang_review_policy_gate_v1.md` — Coupang WING Review — Policy Gate v1
 - `docs/standing/coupang_guided_issuance_credential_lifecycle_scope_v1.md` — Coupang Guided Issuance + Credential Lifecycle — Canonical Scope v1
@@ -62,6 +63,7 @@ live proof · selector calibration · audit · closure record는 여기 올라�
 - `docs/standing/order_context_foundation_v1.md` — Order Context Foundation v1 — 주문이 자기 상품과 도착을 알게 된다
 - `docs/standing/proactive_operations_agent_v1.md` — Proactive Operations Agent v1
 - `docs/standing/responsibility_runtime_v1.md` — Responsibility Runtime v1
+- `docs/standing/reply_agent_v1.md` — Reply Agent v1 — 답글 에이전트(LangGraph · 1회용 실행 토큰), PD-5를 다시 연다 · 기준 `contracts/reply-standard/v1`
 - `docs/standing/self_pilot_runtime_v1.md` — Self-Pilot Runtime v1 — audit, design, implementation (2026-08-18)
 - `docs/standing/sellerops_live_approval_contract.md` — SellerOps Live-Run Approval Contract (canonical) — v1
 - `docs/standing/sellerops_local_agent_runtime_adr.md` — ADR — SellerOps Local Agent Runtime & Guided-Connection Architecture
@@ -178,7 +180,6 @@ live proof · selector calibration · audit · closure record는 여기 올라�
 - `docs/pilot/pilot_host_provisioning_v1.md` — Pilot Host Provisioning v1 — PREPARE
 - `docs/pilot/pilot_readiness_closure_v1.md` — Pilot Readiness Closure v1
 - `docs/pilot/pilot_readiness_gate_v1.md` — Pilot Readiness Gate v1
-- `docs/pilot/pilot_readiness_v2.md` — Pilot Readiness v2 — 첫 외부 판매자를 받을 수 있는가
 - `docs/pilot/pilot_readiness_v3.md` — Pilot Readiness v3 — Cafe24 Inquiry 파일럿 (**v2보다 최신**)
 - `docs/pilot/pilot_release_closure_v1.md` — Pilot Release Closure v1
 - `docs/pilot/pilot_runtime_foundation_v1.md` — Pilot Runtime Foundation v1
@@ -194,6 +195,7 @@ live proof · selector calibration · audit · closure record는 여기 올라�
 
 ### Evidence and workstream homes
 
+- `docs/workstreams/reviewnary_demo_and_ai_readability_goals_v1.md` — Reviewnary 단기·중단기 목표 (2026-10-25 오너 결정): 다음 외부 데모의 사용 지표·박람회 영업 준비, 11월 30일까지 상품 페이지 AI 판독 진단 실험 데모; 구현·측정·정식 출시와 구분
 - `docs/action-window-runtime/HANDOFF.md` — HANDOFF — Action Window Runtime (NAVER / Coupang)
 - `docs/evidence/INDEX.md` — Live-proof evidence index
 - `docs/slices/README.md` — Slice index
