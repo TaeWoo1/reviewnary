@@ -189,3 +189,6 @@ tools/soak/.run/
 # tools/review-triage-calibration/draw-sample.mjs. Never committed; see that
 # directory README and contracts/review-eval/naver/v2/RUBRIC.md section 5.
 tools/review-triage-calibration/worksheet/
+
+# TypeScript incremental build output (tsc -b)
+*.tsbuildinfo
