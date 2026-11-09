@@ -23,6 +23,8 @@
 # (sellerpc_judge, copied once on the first `up`) — for judging the reviews' groups and drafts on real reviews without
 # writing into the kept demo. No vendor server, no pull, its own keys: whatever the copy holds sealed stays sealed.
 #
+# SELLER_PC_SCREEN=built serves the screen the way the install will: a production build of the frontend in the run
+# folder, served by the PC backend itself on its own address (LocalSellerScreenConfiguration) — no vite, one origin.
 # Mail runs in dev-outbox mode: a PC-link code lands in vendor.log, never in a mailbox.
 #
 # Delegates sign in with Google through the web demo's own Google client (SELLEROPS_OAUTH_GOOGLE_* in
@@ -41,6 +43,10 @@ case "$NAME" in
   *) echo "SELLER_PC_DEMO is demo, qa or judge"; exit 2 ;;
 esac
 VENDOR_DB="vendor_$NAME" PC_DB="sellerpc_$NAME"
+BUILT_SCREEN="${SELLER_PC_SCREEN:-}"
+[[ -z "$BUILT_SCREEN" || "$BUILT_SCREEN" == built ]] || { echo "SELLER_PC_SCREEN is built or unset"; exit 2; }
+SCREEN_URL="http://127.0.0.1:$SCREEN_PORT"
+[[ "$BUILT_SCREEN" == built ]] && SCREEN_URL="http://127.0.0.1:$PC_PORT"
 mkdir -p "$RUN" && chmod 700 "$RUN"
 export JAVA_HOME="${JAVA_HOME_17:-/opt/homebrew/opt/openjdk@17}" PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"
 PG_BIN="${PG_BIN:-/opt/homebrew/opt/postgresql@15/bin}"
@@ -133,6 +139,10 @@ up() {
   [[ "$NAME" == judge ]] || wait_for "http://127.0.0.1:$VENDOR_PORT/health" 120 \
     || { echo "vendor server did not start (see $RUN/vendor.log)"; exit 1; }
 
+  if [[ "$BUILT_SCREEN" == built ]] && ! alive pc; then
+    ( cd "$REPO/frontend" && VITE_LOCAL_SELLER=true npx vite build --outDir "$RUN/screen" --emptyOutDir ) \
+      >> "$RUN/screen.log" 2>&1 || { echo "screen build failed (see $RUN/screen.log)"; exit 1; }
+  fi
   if ! alive pc; then
     ( eval "$(draft_env)"
       export SELLEROPS_AGENT_DRAFT_ORG_IDS='*'   # one seller on this PC
@@ -141,9 +151,10 @@ up() {
       export SPRING_PROFILES_ACTIVE=local-seller SERVER_PORT=$PC_PORT \
         SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/$PC_DB" SPRING_DATASOURCE_USERNAME=sellerops \
         SPRING_DATASOURCE_PASSWORD= SELLEROPS_JWT_SECRET="$PC_JWT_SECRET" \
-        SELLEROPS_CORS_ORIGIN="http://127.0.0.1:$SCREEN_PORT" SELLEROPS_VAULT_MASTER_KEY="$PC_VAULT_KEY" \
+        SELLEROPS_CORS_ORIGIN="$SCREEN_URL" SELLEROPS_VAULT_MASTER_KEY="$PC_VAULT_KEY" \
         SELLEROPS_VAULT_KEY_ID=seller-pc-$NAME-1 SELLEROPS_SEED_ENABLED=true \
         SELLEROPS_VENDOR_LINK_BASE_URL="http://127.0.0.1:$VENDOR_PORT" SELLEROPS_VENDOR_REVIEW_PULL_INTERVAL_MS=$PULL_MS
+      [[ "$BUILT_SCREEN" == built ]] && export SELLEROPS_LOCAL_SELLER_SCREEN_DIR="$RUN/screen"
       if [[ "$NAME" == judge ]]; then
         export SELLEROPS_VENDOR_LINK_BASE_URL= SELLEROPS_VENDOR_REVIEW_PULL_ENABLED=false
       fi
@@ -155,12 +166,12 @@ up() {
     sleep 1
   done
 
-  if ! alive screen; then
+  if [[ "$BUILT_SCREEN" != built ]] && ! alive screen; then
     ( cd "$REPO/frontend" && VITE_LOCAL_SELLER=true SELLEROPS_BACKEND_ORIGIN="http://127.0.0.1:$PC_PORT" \
         exec npx vite --port $SCREEN_PORT --strictPort --host 127.0.0.1 ) >> "$RUN/screen.log" 2>&1 &
     echo $! > "$RUN/screen.pid"
   fi
-  wait_for "http://127.0.0.1:$SCREEN_PORT/" 60 || { echo "PC screen did not start (see $RUN/screen.log)"; exit 1; }
+  wait_for "$SCREEN_URL/" 60 || { echo "PC screen did not start (see $RUN/screen.log)"; exit 1; }
   status
 }
 
@@ -176,13 +187,14 @@ down() {
 status() {
   if [[ "$NAME" == judge ]]; then
     for s in pc screen; do printf '%-7s %s\n' "$s" "$(alive "$s" && echo up || echo down)"; done
-    echo "PC screen      http://127.0.0.1:$SCREEN_PORT (a copy of the kept demo; nothing here reaches it)"
+    echo "PC screen      $SCREEN_URL (a copy of the kept demo; nothing here reaches it)"
     return
   fi
-  for s in vendor pc screen; do printf '%-7s %s\n' "$s" "$(alive "$s" && echo up || echo down)"; done
+  for s in vendor pc screen; do printf '%-7s %s\n' "$s" "$(alive "$s" && echo up || echo down)"; done \
+    | { [[ "$BUILT_SCREEN" == built ]] && sed 's/^screen  down$/screen  served by pc/' || cat; }
   printf '%-7s %s\n' google "$(curl -s "http://127.0.0.1:$VENDOR_PORT/v1/delegate/auth/methods" | grep -q '"google":true' \
     && echo "sign-in on" || echo "sign-in off (no Google client in backend/.env.local or $RUN/google-client.json)")"
-  echo "PC screen      http://127.0.0.1:$SCREEN_PORT"
+  echo "PC screen      $SCREEN_URL"
   echo "delegate desk  http://127.0.0.1:$VENDOR_PORT/delegate/"
   echo "phone page     http://127.0.0.1:$VENDOR_PORT/replies"
 }
