@@ -8,6 +8,7 @@ import com.sellerops.vendor.install.Installs;
 import com.sellerops.vendor.retention.Retention;
 import com.sellerops.vendor.store.Stores;
 import com.sellerops.vendor.task.ReplyTasks;
+import com.sellerops.vendor.workspace.WorkspaceLinks;
 import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.List;
@@ -54,7 +55,8 @@ public final class OpsCommands {
     public static final Set<String> NAMES = Set.of("invite", "suspend", "reinstate", "end-sessions",
             "invite-delegate", "suspend-delegate", "reinstate-delegate", "add-store", "assign", "unassign", "purge",
             "in-doubt", "settle", "checklist", "check-owner", "check-assignment", "recover-seller", "installs",
-            "revoke-install", "unconfirmed");
+            "revoke-install", "unconfirmed", "new-workspace-token", "link-workspace", "unlink-workspace",
+            "workspace-links");
 
     static final String USAGE = "usage: invite|suspend|reinstate|end-sessions <email> · "
             + "invite-delegate <email> [admin] · "
@@ -63,7 +65,9 @@ public final class OpsCommands {
             + "settle <task-id> posted|not-posted <admin-email> · checklist · "
             + "check-owner <store-id> seller-center-screen|submanager-invite <admin-email> · "
             + "check-assignment <delegate-email> <store-id> <admin-email> · "
-            + "recover-seller <email> [new-email] · installs <seller-email> · revoke-install <seller-email> <install-id>";
+            + "recover-seller <email> [new-email] · installs <seller-email> · revoke-install <seller-email> <install-id> · "
+            + "new-workspace-token · link-workspace <seller-email> <org-id> [create] · unlink-workspace <org-id> · "
+            + "workspace-links";
 
     /** The page a delegate's invite link opens; the code follows {@code #}. */
     public static final String JOIN_PATH = "/delegate/join#";
@@ -74,7 +78,14 @@ public final class OpsCommands {
     /** The services the commands act on, and the server's public address ({@code ""} when not set). */
     public record Services(SellerAccounts accounts, Delegates delegates, Stores stores,
                            SessionRevocations revocations, Retention retention, ReplyTasks tasks, Installs installs,
-                           String publicUrl) {}
+                           String publicUrl, WorkspaceLinks workspace) {
+
+        /** Without the workspace links — for the commands that never touch them. */
+        public Services(SellerAccounts accounts, Delegates delegates, Stores stores, SessionRevocations revocations,
+                        Retention retention, ReplyTasks tasks, Installs installs, String publicUrl) {
+            this(accounts, delegates, stores, revocations, retention, tasks, installs, publicUrl, null);
+        }
+    }
 
     private OpsCommands() {
     }
@@ -115,9 +126,22 @@ public final class OpsCommands {
         if (args.length == 3 && "revoke-install".equals(args[0])) {
             return revokeInstall(services, args, out);
         }
+        if (args.length == 1 && "new-workspace-token".equals(args[0])) {
+            return newWorkspaceToken(out);
+        }
+        if ((args.length == 3 || (args.length == 4 && "create".equals(args[3]))) && "link-workspace".equals(args[0])) {
+            return linkWorkspace(services, args, out);
+        }
+        if (args.length == 2 && "unlink-workspace".equals(args[0])) {
+            return unlinkWorkspace(services, args[1], out);
+        }
+        if (args.length == 1 && "workspace-links".equals(args[0])) {
+            return workspaceLinks(services, out);
+        }
         if (args.length < 2 || !NAMES.contains(args[0])
                 || Set.of("purge", "in-doubt", "settle", "checklist", "check-owner", "check-assignment",
-                        "recover-seller", "installs", "revoke-install", "unconfirmed").contains(args[0])) {
+                        "recover-seller", "installs", "revoke-install", "unconfirmed", "new-workspace-token",
+                        "link-workspace", "unlink-workspace", "workspace-links").contains(args[0])) {
             out.println(USAGE);
             return 2;
         }
@@ -363,6 +387,66 @@ public final class OpsCommands {
 
     private static String basisWord(Stores.OwnerBasis basis) {
         return basis == Stores.OwnerBasis.SELLER_CENTER_SCREEN ? "seller-center-screen" : "submanager-invite";
+    }
+
+    /**
+     * A fresh service token for the workspace server and the digest this server is configured with
+     * ({@code VENDOR_WORKSPACE_TOKEN_SHA256}). The token is printed once, here; nothing stores it.
+     */
+    private static int newWorkspaceToken(PrintStream out) {
+        String token = WorkspaceLinks.newServiceToken();
+        out.println("workspace server token (SELLEROPS_VENDOR_SERVICE_TOKEN on the workspace server): " + token);
+        out.println("this server's VENDOR_WORKSPACE_TOKEN_SHA256: " + WorkspaceLinks.hashOf(token));
+        return 0;
+    }
+
+    /**
+     * Links an organisation of the workspace server to one seller account — the seller · store permission mapping
+     * (owner decision 2026-10-31). {@code create} makes the account, without a password, when the address has none.
+     * The account's stores still need {@code check-owner} before a delegate may work on them.
+     */
+    private static int linkWorkspace(Services services, String[] args, PrintStream out) {
+        Optional<UUID> org = uuid(args[2]);
+        if (org.isEmpty()) {
+            out.println("not an organisation id");
+            return 2;
+        }
+        try {
+            WorkspaceLinks.Link link = services.workspace().link(args[1], org.get(), args.length == 4);
+            out.println("linked organisation " + link.orgId() + " → " + link.email() + " (since " + link.linkedAt()
+                    + ")");
+            return 0;
+        } catch (WorkspaceLinks.LinkException e) {
+            out.println(switch (e.failure()) {
+                case NO_SUCH_ACCOUNT -> "no such account (add `create` to make one without a password)";
+                case ACCOUNT_LINKED_ELSEWHERE -> "that account is linked to another organisation";
+                case ORGANISATION_LINKED_ELSEWHERE -> "that organisation is linked to another account";
+            });
+            return 1;
+        } catch (IllegalArgumentException e) {
+            out.println("not an e-mail address");
+            return 2;
+        }
+    }
+
+    private static int unlinkWorkspace(Services services, String raw, PrintStream out) {
+        Optional<UUID> org = uuid(raw);
+        if (org.isEmpty()) {
+            out.println("not an organisation id");
+            return 2;
+        }
+        return done(out, services.workspace().unlink(org.get()), "unlinked", "no such link");
+    }
+
+    private static int workspaceLinks(Services services, PrintStream out) {
+        List<WorkspaceLinks.Link> links = services.workspace().all();
+        if (links.isEmpty()) {
+            out.println("no linked organisations");
+        }
+        for (WorkspaceLinks.Link link : links) {
+            out.println("organisation " + link.orgId() + " → " + link.email() + " · since " + link.linkedAt());
+        }
+        return 0;
     }
 
     private static Optional<UUID> uuid(String raw) {

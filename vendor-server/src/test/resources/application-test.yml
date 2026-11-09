@@ -17,3 +17,6 @@ vendor:
   # Step-up codes and new-PC notices land in the in-memory outbox, where tests read them.
   mail:
     mode: dev-outbox
+  # The workspace server's service token in tests is rvw_test-only-workspace-service-token; this is its SHA-256.
+  workspace:
+    service-token-sha256: 4a474d1f9365547617b06574e4164bf34a735c4b7d57274eb48956345b2c99b6

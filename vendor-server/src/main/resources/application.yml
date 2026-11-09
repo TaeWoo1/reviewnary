@@ -41,6 +41,10 @@ vendor:
     # redirect URI is <public-url>/v1/delegate/auth/google/callback. Off unless both are set AND public-url is set.
     client-id: ${VENDOR_GOOGLE_CLIENT_ID:}
     client-secret: ${VENDOR_GOOGLE_CLIENT_SECRET:}
+  workspace:
+    # The Reviewnary workspace server's service token, as its lowercase hex SHA-256 (64 characters) — the token itself
+    # lives only on the workspace server. Unset: no workspace call is accepted. Operator: `new-workspace-token`.
+    service-token-sha256: ${VENDOR_WORKSPACE_TOKEN_SHA256:}
   totp:
     # AES-256 key (base64, 32 bytes) that seals delegates' TOTP secrets — required; TotpSecretBox refuses to start
     # without it. Separate from the session key: one leaking does not give the other.

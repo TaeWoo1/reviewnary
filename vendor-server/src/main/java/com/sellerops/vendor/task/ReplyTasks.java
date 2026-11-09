@@ -478,6 +478,13 @@ public class ReplyTasks {
     /** Approves exactly {@code version} with {@code fingerprint}. The same {@code commandId} again is a no-op. */
     @Transactional
     public TaskView approve(UUID taskId, UUID accountId, int version, String fingerprint, String commandId) {
+        return approve(taskId, accountId, version, fingerprint, commandId, null);
+    }
+
+    /** {@code approvedByRef}: the approving person as the calling server names them (V15), or null. */
+    @Transactional
+    public TaskView approve(UUID taskId, UUID accountId, int version, String fingerprint, String commandId,
+                            String approvedByRef) {
         Optional<TaskView> repeat = repeated(commandId, taskId, "APPROVE");
         if (repeat.isPresent()) {
             return repeat.get();
@@ -503,8 +510,8 @@ public class ReplyTasks {
         }
         Instant now = clock.instant();
         if (!transition(task, State.AWAITING_APPROVAL, State.APPROVED, ", approved_version = ?, "
-                + "approved_fingerprint = ?, approved_by = ?, approved_at = ?", now, version, fingerprint, accountId,
-                ts(now))) {
+                + "approved_fingerprint = ?, approved_by = ?, approved_at = ?, approved_by_ref = ?", now, version,
+                fingerprint, accountId, ts(now), approvedByRef)) {
             throw new TaskException(Failure.STALE);
         }
         remember(commandId, taskId, "APPROVE", now);

@@ -49,7 +49,14 @@ public class TaskController {
 
     public record PolicyRequest(@NotBlank String knowledgeFp, @NotBlank String policyFp, @NotBlank String voiceFp) {}
 
-    public record ApproveRequest(@NotNull Integer version, @NotBlank String fingerprint, @NotBlank String commandId) {}
+    /**
+     * {@code approvedBy}: who pressed approve, as the caller knows them — the workspace server sends
+     * {@code workspace-user:<its user id>} (boundary §3). Opaque here: no name, no address. A seller's own session
+     * names its person by the session itself, so it sends none.
+     */
+    public record ApproveRequest(@NotNull Integer version, @NotBlank String fingerprint, @NotBlank String commandId,
+                                 @jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9:_-]{1,80}")
+                                 String approvedBy) {}
 
     public record CancelRequest(@NotBlank String commandId) {}
 
@@ -139,7 +146,7 @@ public class TaskController {
                                        @RequestBody @Valid ApproveRequest request) {
         ownTask(caller, taskId);
         return tasks.approve(taskId, caller.accountId(), request.version(), request.fingerprint(),
-                request.commandId());
+                request.commandId(), caller.installId() == null ? null : request.approvedBy());
     }
 
     @PostMapping("/v1/tasks/{taskId}/cancel")

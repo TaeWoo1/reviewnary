@@ -211,6 +211,22 @@ class ReplyTasksTest {
         assertThat(tasks.get(one.id()).orElseThrow().confirmOverdue()).isTrue();
     }
 
+    /** The approving person as the calling server names them — kept as given, beside the account (V15, boundary §3). */
+    @Test
+    void anApprovalKeepsTheCallersReferenceToWhoApproved() {
+        TaskView draft = submit("1", "초안");
+        tasks.approve(draft.id(), account, 1, draft.draftFingerprint(), command(), "workspace-user:42");
+        assertThat(jdbc.sql("select approved_by_ref from reply_tasks where id = ?").param(draft.id())
+                .query(String.class).single()).isEqualTo("workspace-user:42");
+        assertThat(jdbc.sql("select approved_by from reply_tasks where id = ?").param(draft.id())
+                .query(java.util.UUID.class).single()).isEqualTo(account);
+
+        TaskView other = submit("2", "다른 초안");
+        tasks.approve(other.id(), account, 1, other.draftFingerprint(), command());
+        assertThat(jdbc.sql("select approved_by_ref from reply_tasks where id = ?").param(other.id())
+                .query(String.class).optional()).isEmpty();
+    }
+
     @Test
     void aSentTwiceCommandHappensOnceAndACommandIdIsNotReused() {
         TaskView draft = submit("1", "초안");

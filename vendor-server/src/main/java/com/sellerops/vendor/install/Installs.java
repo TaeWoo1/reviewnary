@@ -17,7 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * <b>Seller PCs registered to an account</b> — contract §2. A PC {@link #start starts} a grant with its public key,
+ * <b>Seller PCs registered to an account</b> — contract §2. (The same table also holds the workspace server's links,
+ * kind {@code WORKSPACE}, made by {@code WorkspaceLinks}; nothing here lists, starts or revokes those.) A PC {@link #start starts} a grant with its public key,
  * the seller {@link #approve approves} the user code from a logged-in session, the PC {@link #redeem redeems} the
  * device code for an opaque token, and every later request is one {@link #authenticate lookup} by hash.
  *
@@ -177,7 +178,8 @@ public class Installs {
     @Transactional(readOnly = true)
     public List<View> list(UUID accountId) {
         return jdbc.sql("select id, device_name, app_version, created_at, last_used_at, expires_at from installs "
-                        + "where account_id = ? and revoked_at is null and expires_at > ? order by created_at desc")
+                        + "where account_id = ? and kind = 'PC' and revoked_at is null and expires_at > ? "
+                        + "order by created_at desc")
                 .params(accountId, ts(clock.instant()))
                 .query((rs, n) -> new View(rs.getObject("id", UUID.class), rs.getString("device_name"),
                         rs.getString("app_version"), instant(rs.getTimestamp("created_at")),
@@ -185,9 +187,16 @@ public class Installs {
                 .list();
     }
 
+    /** One live install of the account — a PC, or the workspace server's link ({@code WorkspaceLinks}). */
     @Transactional(readOnly = true)
     public Optional<View> view(UUID accountId, UUID installId) {
-        return list(accountId).stream().filter(v -> v.id().equals(installId)).findFirst();
+        return jdbc.sql("select id, device_name, app_version, created_at, last_used_at, expires_at from installs "
+                        + "where id = ? and account_id = ? and revoked_at is null and expires_at > ?")
+                .params(installId, accountId, ts(clock.instant()))
+                .query((rs, n) -> new View(rs.getObject("id", UUID.class), rs.getString("device_name"),
+                        rs.getString("app_version"), instant(rs.getTimestamp("created_at")),
+                        instant(rs.getTimestamp("last_used_at")), instant(rs.getTimestamp("expires_at"))))
+                .optional();
     }
 
     /**
@@ -196,7 +205,8 @@ public class Installs {
      */
     @Transactional
     public boolean revoke(UUID accountId, UUID installId) {
-        int owned = jdbc.sql("select count(*) from installs where id = ? and account_id = ?")
+        // A seller revokes their PCs. The workspace server's link is the operator's (WorkspaceLinks.unlink).
+        int owned = jdbc.sql("select count(*) from installs where id = ? and account_id = ? and kind = 'PC'")
                 .params(installId, accountId).query(Integer.class).single();
         if (owned == 0) {
             return false;

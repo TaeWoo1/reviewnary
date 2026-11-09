@@ -184,6 +184,23 @@ public class SellerAccounts {
         return accountId;
     }
 
+    /**
+     * An account with no password, for a seller who works through the Reviewnary workspace server and never signs in
+     * here (owner decision 2026-10-31; {@code WorkspaceLinks}). An operator makes it; nothing a seller presses does.
+     */
+    @Transactional
+    public UUID createWithoutPassword(String rawEmail) {
+        String email = normalizeEmail(rawEmail);
+        if (!EMAIL.matcher(email).matches()) {
+            throw new IllegalArgumentException("invalid email");
+        }
+        UUID id = UUID.randomUUID();
+        jdbc.sql("insert into seller_accounts (id, email, password_hash, status, created_at) values (?, ?, null, ?, ?)")
+                .params(id, email, Status.ACTIVE.name(), ts(clock.instant()))
+                .update();
+        return id;
+    }
+
     /** The account a correct, active login names; empty for every failure alike. */
     @Transactional(readOnly = true)
     public Optional<UUID> login(String rawEmail, String password) {
@@ -195,6 +212,11 @@ public class SellerAccounts {
                         rs.getString("status")))
                 .optional();
         if (row.isEmpty()) {
+            passwords.matches(given, decoyHash);
+            return Optional.empty();
+        }
+        if (row.get().passwordHash() == null) {
+            // An account an operator made for the workspace server (WorkspaceLinks): it never signs in here.
             passwords.matches(given, decoyHash);
             return Optional.empty();
         }

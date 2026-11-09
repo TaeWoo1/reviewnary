@@ -4,10 +4,12 @@ import com.sellerops.vendor.account.SellerAccounts;
 import com.sellerops.vendor.auth.BearerAuthFilter;
 import com.sellerops.vendor.auth.BearerAuthFilter.DelegatePrincipal;
 import com.sellerops.vendor.auth.BearerAuthFilter.Principal;
+import com.sellerops.vendor.auth.BearerAuthFilter.WorkspaceService;
 import com.sellerops.vendor.auth.SessionRevocations;
 import com.sellerops.vendor.auth.SessionTokens;
 import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.install.Installs;
+import com.sellerops.vendor.workspace.WorkspaceLinks;
 import jakarta.servlet.DispatcherType;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
@@ -41,6 +43,10 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
  *       saved; submitting reply
  *       drafts, syncing their changes, reporting policy and a knowledge-based recheck.</li>
  *   <li>Seller session or install token: reading, editing, approving and cancelling reply tasks.</li>
+ *   <li>Workspace server for a linked organisation ({@link Principal#WORKSPACE}): every install-token route above
+ *       except the PC's own ({@code GET /v1/ip}, {@code DELETE /v1/installs/me}), as that organisation's account.
+ *       Naming no organisation ({@link WorkspaceService#WORKSPACE_SERVICE}): only the list of linked
+ *       organisations.</li>
  *   <li>Delegate session only ({@link DelegatePrincipal#DELEGATE}): everything under {@code /v1/delegate/} that is
  *       not sign-in.</li>
  *   <li>Everything else: refused — 401 without a credential, 403 with one.</li>
@@ -58,10 +64,14 @@ public class SecurityConfig {
     private static final String INSTALL = Principal.INSTALL.substring("ROLE_".length());
     private static final String SELLER = Principal.SELLER.substring("ROLE_".length());
     private static final String DELEGATE = DelegatePrincipal.DELEGATE.substring("ROLE_".length());
+    private static final String WORKSPACE = Principal.WORKSPACE.substring("ROLE_".length());
+    private static final String WORKSPACE_SERVICE =
+            WorkspaceService.WORKSPACE_SERVICE.substring("ROLE_".length());
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http, Installs installs, SessionTokens sessions,
-                                    SellerAccounts accounts, Delegates delegates, SessionRevocations revocations)
+                                    SellerAccounts accounts, Delegates delegates, SessionRevocations revocations,
+                                    WorkspaceLinks workspace)
             throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -81,7 +91,7 @@ public class SecurityConfig {
                                 + "base-uri 'none'; form-action 'none'; object-src 'none'"))
                         .referrerPolicy(r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
                 .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
-                .addFilterBefore(new BearerAuthFilter(installs, sessions, accounts, delegates, revocations),
+                .addFilterBefore(new BearerAuthFilter(installs, sessions, accounts, delegates, revocations, workspace),
                         UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(a -> a
                         // Spring's error page renders a status and nothing else (application.yml server.error).
@@ -95,7 +105,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/v1/auth/logout").hasRole(SELLER)
                         .requestMatchers(HttpMethod.POST, "/v1/installs/code", "/v1/installs/token").permitAll()
                         .requestMatchers(HttpMethod.GET, "/v1/ip").hasRole(INSTALL)
-                        .requestMatchers(HttpMethod.GET, "/v1/installs/me").hasRole(INSTALL)
+                        // The workspace server reads which account its organisation is linked to; it never unlinks
+                        // itself (an operator does, WorkspaceLinks.unlink) and has no public IP to learn.
+                        .requestMatchers(HttpMethod.GET, "/v1/installs/me").hasAnyRole(INSTALL, WORKSPACE)
+                        .requestMatchers(HttpMethod.GET, "/v1/workspace/organisations").hasRole(WORKSPACE_SERVICE)
                         .requestMatchers(HttpMethod.DELETE, "/v1/installs/me").hasRole(INSTALL)
                         .requestMatchers(HttpMethod.GET, "/link", "/link/*", "/replies", "/replies/*", "/delegate",
                                 "/delegate/*", "/join", "/join/*", "/assets/*").permitAll()
@@ -106,7 +119,7 @@ public class SecurityConfig {
                                 "/v1/installs/step-up", "/v1/installs/step-up/verify").hasRole(SELLER)
                         .requestMatchers(HttpMethod.GET, "/v1/installs").hasRole(SELLER)
                         .requestMatchers(HttpMethod.DELETE, "/v1/installs/*").hasRole(SELLER)
-                        .requestMatchers(HttpMethod.GET, "/v1/stores").hasAnyRole(SELLER, INSTALL)
+                        .requestMatchers(HttpMethod.GET, "/v1/stores").hasAnyRole(SELLER, INSTALL, WORKSPACE)
                         .requestMatchers(HttpMethod.POST, "/v1/delegate/auth/invites/peek",
                                 "/v1/delegate/auth/invites/stage", "/v1/delegate/auth/invites/confirm", "/v1/delegate/auth/login",
                                 "/v1/delegate/auth/google/start", "/v1/delegate/auth/google/finish").permitAll()
@@ -115,19 +128,20 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/v1/delegate/auth/logout").hasRole(DELEGATE)
                         .requestMatchers(HttpMethod.GET, "/v1/delegate/me").hasRole(DELEGATE)
                         .requestMatchers(HttpMethod.POST, "/v1/delegate/stores/*/review-uploads").hasRole(DELEGATE)
-                        .requestMatchers(HttpMethod.POST, "/v1/reviews/wait").hasRole(INSTALL)
-                        .requestMatchers(HttpMethod.GET, "/v1/stores/*/reviews").hasRole(INSTALL)
-                        .requestMatchers(HttpMethod.POST, "/v1/stores/*/reviews/ack").hasRole(INSTALL)
+                        .requestMatchers(HttpMethod.POST, "/v1/reviews/wait").hasAnyRole(INSTALL, WORKSPACE)
+                        .requestMatchers(HttpMethod.GET, "/v1/stores/*/reviews").hasAnyRole(INSTALL, WORKSPACE)
+                        .requestMatchers(HttpMethod.POST, "/v1/stores/*/reviews/ack").hasAnyRole(INSTALL, WORKSPACE)
                         .requestMatchers(HttpMethod.POST, "/v1/stores/*/reviews/*/disposition")
-                        .hasAnyRole(SELLER, INSTALL)
+                        .hasAnyRole(SELLER, INSTALL, WORKSPACE)
                         // Reply tasks (contract §4.3). The PC's own calls first, then what the seller or the PC may do.
                         .requestMatchers(HttpMethod.POST, "/v1/stores/*/tasks", "/v1/stores/*/tasks/policy-check",
-                                "/v1/tasks/*/pc-recheck", "/v1/tasks/*/approved-check").hasRole(INSTALL)
-                        .requestMatchers(HttpMethod.GET, "/v1/stores/*/tasks/changes").hasRole(INSTALL)
-                        .requestMatchers(HttpMethod.GET, "/v1/stores/*/tasks", "/v1/tasks/*").hasAnyRole(SELLER, INSTALL)
-                        .requestMatchers(HttpMethod.PUT, "/v1/tasks/*/draft").hasAnyRole(SELLER, INSTALL)
+                                "/v1/tasks/*/pc-recheck", "/v1/tasks/*/approved-check").hasAnyRole(INSTALL, WORKSPACE)
+                        .requestMatchers(HttpMethod.GET, "/v1/stores/*/tasks/changes").hasAnyRole(INSTALL, WORKSPACE)
+                        .requestMatchers(HttpMethod.GET, "/v1/stores/*/tasks", "/v1/tasks/*")
+                        .hasAnyRole(SELLER, INSTALL, WORKSPACE)
+                        .requestMatchers(HttpMethod.PUT, "/v1/tasks/*/draft").hasAnyRole(SELLER, INSTALL, WORKSPACE)
                         .requestMatchers(HttpMethod.POST, "/v1/tasks/*/approve", "/v1/tasks/*/cancel")
-                        .hasAnyRole(SELLER, INSTALL)
+                        .hasAnyRole(SELLER, INSTALL, WORKSPACE)
                         .requestMatchers(HttpMethod.GET, "/v1/delegate/tasks", "/v1/delegate/tasks/*/preflight")
                         .hasRole(DELEGATE)
                         .requestMatchers(HttpMethod.POST, "/v1/delegate/tasks/*/claim", "/v1/delegate/tasks/*/report",

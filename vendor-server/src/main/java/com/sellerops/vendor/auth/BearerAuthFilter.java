@@ -4,6 +4,7 @@ import com.sellerops.vendor.account.SellerAccounts;
 import com.sellerops.vendor.delegate.Delegates;
 import com.sellerops.vendor.install.InstallTokens;
 import com.sellerops.vendor.install.Installs;
+import com.sellerops.vendor.workspace.WorkspaceLinks;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,8 +23,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * <b>One bearer, one kind of caller, no fallback</b> — contract §2.
  *
  * <ol>
- *   <li>A bearer starting with {@link InstallTokens#PREFIX} is an install token, looked up by hash. Anything else
- *       is treated as a session JWT, whose signed {@code typ} claim says whether it is a seller's or a delegate's.
+ *   <li>A bearer starting with {@link InstallTokens#PREFIX} is an install token, looked up by hash. One starting
+ *       with {@link WorkspaceLinks#PREFIX} is the workspace server's service token: with the organisation it names in
+ *       {@link WorkspaceLinks#ORG_HEADER} it acts as that organisation's linked account ({@link Principal#WORKSPACE});
+ *       without one it may only ask which organisations are linked ({@link WorkspaceService#WORKSPACE_SERVICE}).
+ *       Anything else is treated as a session JWT, whose signed {@code typ} claim says whether it is a seller's or a delegate's.
  *       The kind is decided by the prefix and that claim, never by trying one and then the other.</li>
  *   <li>A bearer that does not authenticate ends the request with 401 here. It does not fall through to see
  *       whether some other rule admits it — that is how a revoked credential quietly becomes a working one.</li>
@@ -46,6 +50,13 @@ public class BearerAuthFilter extends OncePerRequestFilter {
     public record Principal(UUID accountId, UUID installId, String sessionId) {
         public static final String SELLER = "ROLE_SELLER";
         public static final String INSTALL = "ROLE_INSTALL";
+        /** The workspace server for one linked organisation: what a PC of that account may do, minus the PC's own. */
+        public static final String WORKSPACE = "ROLE_WORKSPACE";
+    }
+
+    /** The workspace server naming no organisation. */
+    public record WorkspaceService() {
+        public static final String WORKSPACE_SERVICE = "ROLE_WORKSPACE_SERVICE";
     }
 
     /** A signed-in delegate (vendor staff). {@code admin} is the role, carried for the routes that will need it. */
@@ -58,9 +69,11 @@ public class BearerAuthFilter extends OncePerRequestFilter {
     private final SellerAccounts accounts;
     private final Delegates delegates;
     private final SessionRevocations revocations;
+    private final WorkspaceLinks workspace;
 
     public BearerAuthFilter(Installs installs, SessionTokens sessions, SellerAccounts accounts, Delegates delegates,
-                            SessionRevocations revocations) {
+                            SessionRevocations revocations, WorkspaceLinks workspace) {
+        this.workspace = workspace;
         this.installs = installs;
         this.sessions = sessions;
         this.accounts = accounts;
@@ -77,16 +90,42 @@ public class BearerAuthFilter extends OncePerRequestFilter {
             return;
         }
         String bearer = header.substring(7).trim();
-        Optional<UsernamePasswordAuthenticationToken> auth = InstallTokens.looksLikeInstallToken(bearer)
-                ? installs.authenticate(bearer).map(i -> token(new Principal(i.accountId(), i.installId(), null),
-                        Principal.INSTALL))
-                : sessions.verifyAny(bearer).filter(revocations::live).flatMap(this::session);
+        Optional<UsernamePasswordAuthenticationToken> auth;
+        if (InstallTokens.looksLikeInstallToken(bearer)) {
+            auth = installs.authenticate(bearer).map(i -> token(new Principal(i.accountId(), i.installId(), null),
+                    Principal.INSTALL));
+        } else if (WorkspaceLinks.looksLikeServiceToken(bearer)) {
+            auth = workspace(bearer, request.getHeader(WorkspaceLinks.ORG_HEADER));
+        } else {
+            auth = sessions.verifyAny(bearer).filter(revocations::live).flatMap(this::session);
+        }
         if (auth.isEmpty()) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
             return;
         }
         SecurityContextHolder.getContext().setAuthentication(auth.get());
         chain.doFilter(request, response);
+    }
+
+    /**
+     * The service token, then the organisation. A wrong token, a malformed organisation or one no operator linked all
+     * end in 401 alike — the caller learns nothing about which organisations exist.
+     */
+    private Optional<UsernamePasswordAuthenticationToken> workspace(String bearer, String orgHeader) {
+        if (!workspace.isServiceToken(bearer)) {
+            return Optional.empty();
+        }
+        if (orgHeader == null) {
+            return Optional.of(token(new WorkspaceService(), WorkspaceService.WORKSPACE_SERVICE));
+        }
+        UUID orgId;
+        try {
+            orgId = UUID.fromString(orgHeader.trim());
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
+        }
+        return workspace.authenticate(orgId)
+                .map(i -> token(new Principal(i.accountId(), i.installId(), null), Principal.WORKSPACE));
     }
 
     private Optional<UsernamePasswordAuthenticationToken> session(SessionTokens.Session session) {

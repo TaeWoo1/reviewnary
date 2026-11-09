@@ -8,6 +8,7 @@ import com.sellerops.vendor.ops.OpsCommands;
 import com.sellerops.vendor.retention.Retention;
 import com.sellerops.vendor.store.Stores;
 import com.sellerops.vendor.task.ReplyTasks;
+import com.sellerops.vendor.workspace.WorkspaceLinks;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -34,7 +35,8 @@ public class VendorServerApplication {
                         context.getBean(Delegates.class), context.getBean(Stores.class),
                         context.getBean(SessionRevocations.class), context.getBean(Retention.class),
                         context.getBean(ReplyTasks.class), context.getBean(Installs.class),
-                        context.getEnvironment().getProperty("vendor.public-url", "")), args, System.out);
+                        context.getEnvironment().getProperty("vendor.public-url", ""),
+                        context.getBean(WorkspaceLinks.class)), args, System.out);
             }
             System.exit(code);
         }
