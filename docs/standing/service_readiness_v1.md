@@ -203,3 +203,98 @@ route changes the container needs a **History Change** trigger on the GA4 config
 PostHog stores `$initial_utm_*` from the same landing URL at `init`. Verified in the walkthrough by the
 `dataLayer` order (consent default → `gtm.js` → events) and by `page_location` on the landing entry; the GTM /
 GA4 property side (key events, History Change trigger) is container configuration and is listed in §7.
+
+## 9. Hackle (2026-11-07) — test only, not in the business app
+
+**State, owner decision 2026-11-07.** Hackle is **held back from the business app's ordinary runs and deployments**:
+the browser SDK (12.2.1) cannot be limited in what it collects by itself, such as the page address and search terms.
+Each event carries the full URL with query and hash, the previous page's address, the document title and `utm_*`.
+There is no config option to leave them out (`docs/FINDINGS.md` B116), and our URLs carry order, review and case ids
+and the inbox search `q`. **Owner decision: connection verification is complete; operational adoption will be
+reconsidered when an analytics tool is actually selected (GA4 or another tool included).** Further vendor inquiries,
+SDK changes and URL changes are deferred, not prerequisites for continuing the product work.
+
+| Item | State |
+|---|---|
+| Connection (dev key, SDK pinned 12.2.1, loaded from our own origin after consent) | done |
+| Consent: nothing before it, opt-out by default, collection on only after the user sync | done |
+| User identity: created with the current user, no previous visitor in any request | done (B114, B115) |
+| Withdrawal: no **new** events after it (already-batched ones flush; one device-id lookup) | done (B113, B115) |
+| Real browser check (synthetic accounts, headless Chrome) | done (B115) |
+| Dev console check | done (B116) |
+| The 13:20–13:21 run's 7 events, answered 204 but not in either console | closed, cause unknown; not reproduced (B116) |
+| Business-app production use | **deferred** until analytics-tool selection; ordinary runs and deployments remain off |
+
+**How it stays off.** The key lives only in `frontend/.env.hackle.local` (git-ignored, `.env.*.local`), which Vite reads
+only in `--mode hackle`. To use it, run `npm run dev:hackle` or `npm run build:hackle`. `vite.config.ts` refuses a
+`VITE_HACKLE_SDK_KEY` in any other mode (`lib/security/hackleMode.ts`), so a key in `.env.local`, a shell or a CI
+secret stops the dev server or the build. `frontend/.dockerignore` keeps local env files out of the image, and the
+Dockerfile passes no Hackle argument. The consent, identity and withdrawal code is unchanged.
+
+## 10. Runyour synthetic connection check — one synthetic call passed (2026-11-08)
+
+Runyour remains evaluation-only; production and pilot factories still refuse it. This does not move the core
+reply models to Runyour. `RunyourSyntheticSmokeIT` is a test-source-only, opt-in connection check with no Spring
+context, database or marketplace: rating 2 and the fixed synthetic review 「포장이 찌그러져서 왔어요」.
+
+- Default: skipped. Requires `RUN_RUNYOUR_SYNTHETIC_SMOKE=true`, explicit `RUNYOUR_SMOKE_MODEL`, and the existing
+  `RUNYOUR_API_KEY` delivered to the process without printing it. It does not read env files itself.
+- One API call, no retry, temperature omitted, requested output cap of 300 tokens (enforcement not established). Errors do not trigger a fallback.
+- Output is only status, tier, reason code, fixed-phrase failure reason and call count; no raw vendor response or credentials.
+- Offline wiring is tested by `RunyourSyntheticSmokeTest`. This is connection verification, not quality evaluation.
+- **Before a paid run:** verify the exact model ID and Runyour's applicable input/output prices, calculate the
+  one-call ceiling and obtain the scoped call approval. A token cap is not a dollar-budget guarantee. No paid call
+  was made while preparing this check, and no real-review evaluation permission was expanded.
+
+The existing `LlmTriageEvalIT` reads real customer reviews: limiting its row count is **not** a synthetic smoke test.
+
+Model/price source: [Runyour's model-selection guide](https://www.runyour.ai/en/blog/runyour-tuto-4) directs users to
+the console's API Router → View Supported Models for exact model IDs and input/output costs. No model-specific rate
+was independently established from that public guide, so earlier model names and dollar estimates remain unverified.
+
+**Checked 2026-11-07 from public docs only (no key used, no request sent).** Runyour's user guide
+([모델 선택하기](https://runyourai.gitbook.io/userguide/api/guide/models.md)) lists the Anthropic IDs
+`anthropic/claude-sonnet-4-6`, `anthropic/claude-haiku-4-5`, `anthropic/claude-opus-4-8` and older. It does **not**
+list `anthropic/claude-sonnet-5-5`, the name in the code comment and tests. It publishes no per-token price. Its call
+example ([모델 호출하기](https://runyourai.gitbook.io/userguide/runyour-agent/workspace/api/call.md)) shows `max_tokens`
+and `temperature` only. Neither `max_completion_tokens` (what this check sends) nor `response_format` is documented,
+so the 300-token cap is not proven to reach the model. The live list is `GET https://api.runyour.ai/v1/models`.
+
+**Live model list, 2026-11-07 (owner-approved, one `GET /v1/models`, HTTP 200, no generation call).** It returned 41 IDs,
+including `anthropic/claude-sonnet-5-5`, `anthropic/claude-haiku-5-5`, `anthropic/claude-opus-5-5` and
+`anthropic/claude-fable-5-1`. **So the public guide's list is stale**: the earlier "not listed" applied to that guide
+only. Each entry carries only `id`, `name`, `object`, `created` and `owned_by`, with **no price and no token limit**.
+Candidate for the connection check: `anthropic/claude-haiku-5-5`. The rates come from the console only. The credits
+guide ([크레딧 이해하기](https://runyourai.gitbook.io/userguide/runyour-agent/get-started/credits.md)) rounds a
+charge under 1 credit **up** to 1 credit.
+
+**Prepared, 2026-11-07: offline ready; no generation call until the console price is checked.** Runyour now sends
+the output cap as `max_tokens: 300`, the name in its call example. OpenAI keeps `max_completion_tokens` and the
+Anthropic wire is unchanged. Runyour stays evaluation-only. Offline tests in `com.sellerops.review.triage.*`:
+254 run, 0 failures, 8 opt-in ITs skipped. The candidate model is `anthropic/claude-haiku-5-5`.
+
+How to report the one call:
+- Output of 300 tokens or fewer does **not** prove the cap was applied; it may simply be a short answer.
+- A success shows only that **this request shape returned a classification for the synthetic review**. It does not
+  show that any single setting is supported (system message, `response_format`, `max_tokens`). It says nothing
+  about classification quality or stability.
+- On failure: no automatic retry, no model or setting change. Report the fixed-phrase `failureReason` and stop. The smoke report now also carries the classifier's fixed-phrase `failureReason`
+(an HTTP status, a stop enum or an exception class name), so a failed call can name its cause without vendor text.
+
+**Executed 2026-11-08, one owner-requested synthetic generation call.** Source baseline `99b37d0f8cb6` plus the
+existing uncommitted worktree changes; Java 17, `RunyourSyntheticSmokeIT` only, Gradle offline dependency resolution
+and a fresh test execution with `--no-daemon`. Model: `anthropic/claude-haiku-5-5`; Runyour request used
+`max_tokens: 300`, no temperature. Only `RUNYOUR_API_KEY` was loaded into the process from the local env file;
+the file was not sourced and no key or raw response was displayed. No database or marketplace was accessed.
+
+- Result: **1 test, 0 failures, 0 skipped; calls=1, status=OK, tier=NEEDS_ATTENTION,
+  reasonCode=PACKAGING_PROBLEM, failureReason=null.** No retry or model/setting change.
+- Claim: this request shape returned a classification for the fixed synthetic review. This is not evidence of
+  classification quality/stability, individual parameter enforcement, or production readiness. Runyour remains
+  evaluation-only; the core reply models and Hackle activation are unchanged.
+- Pricing supplied by the owner from the console on 2026-11-08: input KRW 152 / million tokens, output KRW 761 /
+  million tokens. At the assumed 3,100 input and 300 output tokens, the arithmetic estimate is KRW 0.6995 before
+  credit rounding. Actual usage/credit deduction was not captured by this smoke and is **not confirmed**.
+  A presumed 4,000-token fallback is not an enforced cost ceiling.
+- Evidence: `backend/build/test-results/test/TEST-com.sellerops.review.triage.llm.RunyourSyntheticSmokeIT.xml`
+  (local generated test report; subsequent Gradle test runs can replace it). No commit was made.

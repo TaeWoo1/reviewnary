@@ -49,13 +49,19 @@ one place on disk and are **not** recoverable from git.
 - `frontend/` — React/Vite operations UI.
 - `collector/` — TypeScript local agent: channel acquisition + Action Window (NAVER, ESM, Cafe24).
 - `agent-runtime/` — standalone Node/TS **LangGraph** orchestration service: the `OperatorGraph`
-  over four compiled graphs with human `interrupt`/resume, whose contracts are unchanged. What it is
+  over four compiled graphs with human `interrupt`/resume, whose contracts are unchanged, and — beside
+  it, not inside it — the **reply graph** (`src/reply/`, `docs/standing/reply_agent_v1.md`). What it is
   and how it connects: `docs/architecture.md`, then **`docs/standing/sellerops_operator_graph_v2.md`** (정본
   제품 행동 계약) · `docs/standing/sellerops_operator_graph_v1.md` (구현·라이브 증명 기록; runtime semantics는
-  v2가 대체) · `docs/standing/agent-runtime-langgraph-llm-split.md`. Four fences live here:
-  - It **holds no credential of any kind.** The draft, planner and judge models are all BACKEND
-    capabilities reached with the operator's forwarded bearer, so "the backend is the only LLM
-    egress" is still the property to check here.
+  v2가 대체) · `docs/standing/agent-runtime-langgraph-llm-split.md`. Five fences live here:
+  - It **holds no long-lived credential and no model or channel key.** The draft, planner, judge and
+    reply-agent models are all BACKEND capabilities, so "the backend is the only LLM egress" is still the
+    property to check here. The Operator acts with the operator's forwarded bearer. The reply graph holds
+    one **run token** per run, in memory only: minted by the backend, 10 minutes, one org and one review,
+    good only on `/api/agent/reply/run/**`, closed when the run finishes (`ReplyRunTokenAuthFilter`).
+  - **The reply graph writes one thing: a reply draft into this backend** (its `save` step), under the
+    same gates a seller's draft passes. It never approves, registers or reaches a marketplace — a draft
+    still waits for the seller.
   - **The Operator's tool catalogue is 100% READ — there is no WRITE tool and a structural test
     refuses one** (`OperatorToolRegistry`, `operatorToolRegistry.test.ts`). Credential handoff,
     Action Window commands and guided-submission mints are deliberately absent (`privilegedPlaneFence`).
@@ -157,7 +163,7 @@ document is not on this path and nothing here links to it, it does not carry cur
 | # | Stop | Owns | Document |
 |---|---|---|---|
 | 0 | orientation | what SellerOps is, who for, channel posture, user journey — **points, owns nothing** | `docs/product_operating_model.md` |
-| 1 | **product scope / journeys** | identity, strategy, honest state, authority · the scope contract | `docs/sellerops_canonical_reference.md` · `docs/product-scope-v1.md` (**scope lock v1.14**) |
+| 1 | **product scope / journeys** | identity, strategy, honest state, authority · the scope contract | `docs/sellerops_canonical_reference.md` · `docs/product-scope-v1.md` (**scope lock v1.15**) |
 | 2 | **architecture** | the five runtimes, how they connect, the fail-closed gates — **a pointer page** | `docs/architecture.md` |
 | 3 | **capability truth** | channel × DataType × method × status — **the single declaration** | `docs/multi-channel-connector-roadmap.md` §4.1 |
 | 4 | **decisions** | ADRs and standing contracts | `docs/standing/` · the contracts in `docs/INDEX.md` — the *Standing contracts and ADRs* group, plus the lane documents under *Inquiry* / *Review* / *Knowledge and retrieval*, which are contracts rather than history |

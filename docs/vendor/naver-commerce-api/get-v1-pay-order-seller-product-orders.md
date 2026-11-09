@@ -50,3 +50,23 @@
 curl -X GET 'https://api.commerce.naver.com/external/v1/pay-order/seller/product-orders?from={from}' \
   -H 'Authorization: Bearer {access_token}'
 ```
+
+### 보충 (2026-10-28, 같은 문서의 공식 화면에서 확인)
+
+`rangeType`과 응답 구조는 위 사본에 비어 있어서, 공식 문서 화면
+(`https://apicenter.commerce.naver.com/docs/commerce-api/current/seller-get-product-orders-with-conditions-pay-order-seller`)이
+싣는 OpenAPI 정의에서 옮겼다.
+
+- `rangeType` — 「조회 기준 유형. 생략 시 PAYED_DATETIME(결제 일시)으로 자동 지정」. 값: `PAYED_DATETIME`(결제일시),
+  `ORDERED_DATETIME`(주문일시), `DISPATCHED_DATETIME`(발송처리일시), `PURCHASE_DECIDED_DATETIME`(구매확정일시),
+  `CLAIM_REQUESTED_DATETIME`(클레임요청일시), `CLAIM_COMPLETED_DATETIME`(클레임완료일시),
+  `COLLECT_COMPLETED_DATETIME`(수거완료일시), `GIFT_RECEIVED_DATETIME`(선물수락일시),
+  `HOPE_DELIVERY_INFO_CHANGED_DATETIME`(배송희망일변경일시).
+- `productOrderStatuses` 값: `PAYMENT_WAITING`, `PAYED`, `DELIVERING`, `DELIVERED`, `PURCHASE_DECIDED`, `EXCHANGED`,
+  `CANCELED`, `RETURNED`, `CANCELED_BY_NOPAYMENT`.
+- 응답: `data.contents[]` = `{ productOrderId, content: { order: { orderId, orderDate, paymentDate, … },
+  productOrder: { productOrderId, productOrderStatus, initialPaymentAmount, productId, claimStatus, … }, … } }`,
+  `data.pagination` = `{ page, size, hasNext }`.
+- SellerOps는 주문 요약의 기간 지정 읽기(backfill)에 이 endpoint를 `rangeType=PAYED_DATETIME`, KST 하루 창으로 쓴다
+  (`NaverOrdersClient#CONDITIONAL_PATH`, `docs/FINDINGS.md` A8).
+

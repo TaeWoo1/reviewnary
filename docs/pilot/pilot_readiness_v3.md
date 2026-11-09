@@ -21,7 +21,7 @@
 모델 호출 0 · DB 변경 0 · push 0.** §8이 그 감사가 낸 코드 blocker를 닫은 기록(`f85ac7f2`)이며,
 그 작업도 **인프라 0 · 마켓플레이스 0 · 모델 0 · 마이그레이션 0 · push 0**이다.
 
-이 문서는 `docs/pilot/pilot_readiness_v2.md`(2026-09-13, `READY_PENDING_HOST`)를 **대체한다**. 그 판정은
+이 문서는 `docs/archive/2026-q3/pilot_readiness_v2.md`(2026-09-13, `READY_PENDING_HOST`)를 **대체한다**. 그 판정은
 「코드 쪽에 남은 파일럿 blocker는 없다」였고, 그 뒤 **149 커밋**이 착지했다(Full MVP Stage 1~3,
 Review Decision Workspace, Customer Operations). CLAUDE.md의 assumption rule대로 인용하지 않고
 현 커밋에서 다시 도출했으며, **결론이 달라졌다.**

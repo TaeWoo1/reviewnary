@@ -78,3 +78,4 @@ load-bearing하게 만들고 있다. 목록은 `docs/lineage_index.md`에 있다
 | `pilot_provisioning_plan_v1.md` | 2026-09-26 | 395 | Pilot Provisioning Plan v1 — B4 public host · B5 off-host backup |
 | `cafe24_first_live_baseline_v1.md` | 2026-09-30 | 242 | Cafe24 First Live Baseline v1 — 2026-09-30 |
 | `naver_inquiry_first_live_baseline_v1.md` | 2026-09-30 | 299 | NAVER Inquiry — First Live Baseline v1 (2026-09-30) |
+| `pilot_readiness_v2.md` | 2026-10-12 | 179 | Pilot Readiness v2 — 첫 외부 판매자를 받을 수 있는가 (2026-10-28 이동: `docs/pilot/pilot_readiness_v3.md` §24가 대체) |
