@@ -353,9 +353,9 @@ public class ChannelReviewService {
         List<ReviewRecordPageView.ChannelFacts> facts = new java.util.ArrayList<>();
         for (Channel ch : byId.values()) {
             List<SellerAccount> held = accounts.findAllByOrgIdAndChannelId(orgId, ch.getId());
-            // One account or none: with two on one channel there is no way to say which one a row belongs to,
-            // exactly as the review workspace's own reply-account rule says.
-            SellerAccount only = held.size() == 1 ? held.get(0) : null;
+            // The account that answers, by the review workspace's own reply-account rule: the store's own connection,
+            // or the delegate's route when it is all there is; none for two own connections.
+            SellerAccount only = SellerAccount.answering(held);
             Optional<SyncJob> last = lastReviewImport(orgId, ch.getId());
             facts.add(new ReviewRecordPageView.ChannelFacts(ch.getCode(), ch.getNameKo(),
                     only == null ? null : only.getId(),
@@ -627,18 +627,17 @@ public class ChannelReviewService {
     }
 
     /**
-     * The single account this org holds on this review's channel, or null.
+     * The account a reply on this review's channel is from, or null — {@link SellerAccount#answering}.
      *
-     * <p>Null for none AND for more than one: with two accounts on one channel there is no way to say
-     * from a review which of them a reply would be from, and picking the older one would answer a
-     * question nobody asked. Fail-closed, exactly as the ingested-review attention source does.
+     * <p>Null for none AND for two of the store's own connections: then there is no way to say from a review which
+     * of them a reply would be from, and picking the older one would answer a question nobody asked. A route attached
+     * to the store (the delegate's uploads, V163) yields to the store's own connection instead of making two.
      */
     private SellerAccount replyAccountFor(UUID orgId, Review review) {
         if (review.getChannelId() == null) {
             return null;
         }
-        List<SellerAccount> found = accounts.findAllByOrgIdAndChannelId(orgId, review.getChannelId());
-        return found.size() == 1 ? found.get(0) : null;
+        return SellerAccount.answering(accounts.findAllByOrgIdAndChannelId(orgId, review.getChannelId()));
     }
 
     /**
@@ -652,7 +651,9 @@ public class ChannelReviewService {
         Product product = review.getProductId() == null ? null
                 : products.findAllByOrgIdAndIdIn(orgId, List.of(review.getProductId()))
                         .stream().findFirst().orElse(null);
-        RedactedBody body = VocPreviewSanitizer.redactFullBody(review.getBody());
+        // The review's own screen shows what the customer wrote, whole (owner, 2026-10-28) — the seller opened it to
+        // answer it. Lists and previews keep the redaction; so does every model payload, which never reads this view.
+        RedactedBody body = VocPreviewSanitizer.plainFullBody(review.getBody());
         Instant newSince = channelId == null ? null
                 : lastReviewImport(orgId, channelId).map(SyncJob::getStartedAt).orElse(null);
         // No account, no reply work — and it is refused HERE rather than inside the lookup, which

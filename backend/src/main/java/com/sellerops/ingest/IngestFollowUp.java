@@ -95,6 +95,7 @@ public class IngestFollowUp {
         analyze(orgId, REVIEW, insertedIds);
         indexReviews(orgId, insertedIds);
         publishReviewSegment(orgId, channelId, insertedIds.size());
+        publishNewWork(orgId, NewWorkIngestedEvent.Kind.REVIEW, insertedIds);
         // NOTE the order: analysis first, then indexing. The customer-memory index copies the topic
         // off the analysis row, so indexing before analysing would store a null topic for every row
         // and only the NEXT ingest would look classified. The dependency is real, not incidental.
@@ -113,6 +114,7 @@ public class IngestFollowUp {
         analyze(orgId, INQUIRY, insertedIds);
         indexInquiries(orgId, insertedIds);
         importAnswers(orgId);
+        publishNewWork(orgId, NewWorkIngestedEvent.Kind.INQUIRY, insertedIds);
     }
 
     /**
@@ -177,6 +179,23 @@ public class IngestFollowUp {
      * memory. The reference date is UTC today, matching {@code ReviewImportRunService} and
      * {@code Cafe24ReviewIssueBridge} — the two publishers that already existed.
      */
+    /**
+     * Say which rows just landed, so the AI judgement and the drafts written ahead start from this sync rather than
+     * from the next automatic check (owner, 2026-10-28). The listener runs after the commit and off this thread: a
+     * sync never waits for a model.
+     */
+    private void publishNewWork(UUID orgId, NewWorkIngestedEvent.Kind kind, List<UUID> ids) {
+        if (events == null) {
+            return;
+        }
+        try {
+            events.publishEvent(new NewWorkIngestedEvent(orgId, kind, ids));
+        } catch (RuntimeException e) {
+            log.warn("ingest follow-up: new-work event publish failed org={} kind={} count={}: {}",
+                    orgId, kind, ids.size(), e.toString());
+        }
+    }
+
     private void publishReviewSegment(UUID orgId, UUID channelId, int count) {
         if (events == null) {
             return;

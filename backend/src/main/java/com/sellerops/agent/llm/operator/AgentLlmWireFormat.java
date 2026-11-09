@@ -1,9 +1,9 @@
 package com.sellerops.agent.llm.operator;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.sellerops.agent.llm.provider.LlmRequest;
+import com.sellerops.agent.llm.provider.LlmVendor;
+import com.sellerops.agent.llm.provider.LlmWire;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -24,28 +24,33 @@ import java.util.Map;
  */
 public final class AgentLlmWireFormat {
 
-    /** Which wire format to speak. Nothing else differs between them. */
+    /** Which wire format to speak — the shared model connection's vendor, under the name these callers use. */
     public enum Vendor {
-        ANTHROPIC("https://api.anthropic.com/v1/messages"),
-        OPENAI("https://api.openai.com/v1/chat/completions");
+        ANTHROPIC(LlmVendor.ANTHROPIC),
+        OPENAI(LlmVendor.OPENAI);
 
-        private final String endpoint;
+        private final LlmVendor vendor;
 
-        Vendor(String endpoint) {
-            this.endpoint = endpoint;
+        Vendor(LlmVendor vendor) {
+            this.vendor = vendor;
         }
 
         public java.net.URI endpoint() {
-            return java.net.URI.create(endpoint);
+            return LlmWire.of(vendor).endpoint();
         }
 
-        /** {@code ANTHROPIC} when the configured name says so; OpenAI otherwise — the draft capability's rule. */
+        public LlmVendor vendor() {
+            return vendor;
+        }
+
+        /**
+         * The configured name; blank is OpenAI. <b>An unknown name refuses</b> (2026-10-29) — it used to become OpenAI,
+         * which would send a capability's payload to a vendor nobody chose the day a third one is named.
+         */
         public static Vendor of(String name) {
-            return "ANTHROPIC".equalsIgnoreCase(name) ? ANTHROPIC : OPENAI;
+            return LlmVendor.parse(name) == LlmVendor.ANTHROPIC ? ANTHROPIC : OPENAI;
         }
     }
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private AgentLlmWireFormat() {
     }
@@ -71,41 +76,23 @@ public final class AgentLlmWireFormat {
      */
     public static String body(Vendor vendor, String modelId, String system, String user,
                               int maxOutputTokens, String reasoningEffort, ObjectNode responseFormat) {
-        ObjectNode root = MAPPER.createObjectNode();
-        root.put("model", modelId);
-        ArrayNode messages = root.putArray("messages");
-        ObjectNode userTurn = messages.addObject();
-        userTurn.put("role", "user");
-        userTurn.put("content", user);
-        if (vendor == Vendor.ANTHROPIC) {
-            root.put("max_tokens", maxOutputTokens);
-            root.put("system", system);
-        } else {
-            root.put("max_completion_tokens", maxOutputTokens);
-            if (responseFormat == null) {
-                root.putObject("response_format").put("type", "json_object");
-            } else {
-                root.set("response_format", responseFormat);
-            }
-            if (reasoningEffort != null) {
-                root.put("reasoning_effort", reasoningEffort);
-            }
-            ObjectNode systemTurn = messages.insertObject(0);
-            systemTurn.put("role", "system");
-            systemTurn.put("content", system);
+        return LlmWire.of(vendor.vendor()).body(LlmRequest.of(modelId, system, user, maxOutputTokens, reasoningEffort,
+                LlmRequest.Format.fromOpenAiResponseFormat(responseFormat)));
+    }
+
+    /**
+     * The configured effort, in Anthropic's spelling. Kept for callers that write their own Anthropic body; the shared
+     * wire ({@code AnthropicMessagesWire}) applies the same rule.
+     */
+    public static void putAnthropicEffort(ObjectNode root, String reasoningEffort) {
+        String effort = com.sellerops.agent.llm.provider.AnthropicMessagesWire.effortOf(reasoningEffort);
+        if (effort != null) {
+            root.putObject("output_config").put("effort", effort);
         }
-        return root.toString();
     }
 
     /** Auth headers for the vendor. The key is never logged and never reaches a result object. */
     public static Map<String, String> headers(Vendor vendor, String apiKey) {
-        Map<String, String> headers = new LinkedHashMap<>();
-        if (vendor == Vendor.ANTHROPIC) {
-            headers.put("x-api-key", apiKey);
-            headers.put("anthropic-version", "2023-06-01");
-        } else {
-            headers.put("Authorization", "Bearer " + apiKey);
-        }
-        return headers;
+        return LlmWire.of(vendor.vendor()).headers(apiKey);
     }
 }

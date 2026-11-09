@@ -134,7 +134,8 @@ class CoverageJudgeV2Test {
                 Map.of("N1", v2("N1", NeedStatus.FULL, List.of("E1"), List.of(), List.of(), List.of()),
                         "N2", v2("N2", NeedStatus.FULL, List.of("E1"), List.of(), List.of(), List.of("짐작"))),
                 pool(own("E1")), Map.of(), DetailCapability.READABLE, PRODUCT);
-        assertThat(NeedAggregation.basis(results)).isEqualTo(AnswerBasisState.NO_ANSWER_BASIS);
+        // Still not a complete answer: the enforced need is left to the seller, and the send waits for it (tenth review).
+        assertThat(NeedAggregation.basis(results)).isEqualTo(AnswerBasisState.PARTIAL_ANSWER);
     }
 
     // ── another listing's evidence ──────────────────────────────────────────────────────────────────────────────
@@ -170,10 +171,10 @@ class CoverageJudgeV2Test {
     // ── the prompt and the switch ───────────────────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("the judge instruction is selectable, v2 by default, and an unknown name refuses to boot")
+    @DisplayName("the judge instruction is selectable, v6 by default since 2026-11-06, and an unknown name refuses to boot")
     void judgePromptSelection() {
         InquiryDecisionProperties defaults = new InquiryDecisionProperties(true, "", "m", "k", 1, 1, "minimal");
-        assertThat(defaults.judgePrompt()).isEqualTo(InquiryDecisionPrompt.JUDGE_V2);
+        assertThat(defaults.judgePrompt()).isEqualTo(InquiryDecisionPrompt.JUDGE_V6);
         assertThat(defaults.judgeReasoningEffort()).as("the judge follows the plan's effort unless told").isEqualTo("minimal");
         InquiryDecisionProperties armC = new InquiryDecisionProperties(true, "", "m", "k", 1, 1, "minimal",
                 InquiryDecisionPrompt.JUDGE_V2, "low");

@@ -139,6 +139,18 @@ class ReviewSafetySignalTest {
     }
 
     @Test
+    void clearInjuryPhrasingsTheFirstListMissed() {
+        // Synthetic (review 2026-10-28): plain past-tense harm, each a report rather than a worry.
+        assertThat(ReviewSafetySignal.of("뚜껑 모서리에 손가락을 베었어요")).contains(Kind.INJURY);
+        assertThat(ReviewSafetySignal.of("뜨거운 물에 손을 데었어요")).contains(Kind.INJURY);
+        assertThat(ReviewSafetySignal.of("철사에 찔려서 피났어요")).contains(Kind.INJURY);
+        assertThat(ReviewSafetySignal.of("바르고 나서 진물이 나요")).contains(Kind.BODY_REACTION);
+        assertThat(ReviewSafetySignal.of("충전하다가 합선돼서 꺼졌어요")).contains(Kind.PRODUCT_HAZARD);
+        assertThat(ReviewSafetySignal.in("포장이 꼼꼼해서 상처 하나 없이 왔어요")).as("a scratch-free parcel is not a harm")
+                .isFalse();
+    }
+
+    @Test
     void aNegatedFirstMentionDoesNotHideALaterReport() {
         assertThat(ReviewSafetySignal.in("다칠 걱정 없다고 해서 샀는데 결국 다쳤어요")).isTrue();
         // The same word twice: the first is negated, the second is the report.

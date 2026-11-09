@@ -79,6 +79,10 @@ public class ReviewDetailService {
                 : products.findAllByOrgIdAndIdIn(orgId, List.of(review.getProductId())).stream().findFirst().orElse(null);
         // The whole sentence, with volatile PII-shaped spans tokenized — the seller is reading what a
         // customer wrote, not recognising a row (`RedactedBody` explains why this is not the 60-char preview).
+        //
+        // Still redacted after 2026-10-28, when the review's own screen began showing the text whole: this read also
+        // serves the AI 담당자's review card and the Operator's review tool, whose output can reach a model. The screen
+        // a seller opens is the workspace read ({@code ChannelReviewService#detail}), not this one.
         RedactedBody body = VocPreviewSanitizer.redactFullBody(review.getBody());
         ExecutableIdentity executable = identity.forReviews(orgId, List.of(review))
                 .getOrDefault(review.getId(), ExecutableIdentity.NONE);

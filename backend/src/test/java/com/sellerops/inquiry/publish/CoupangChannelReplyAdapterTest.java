@@ -172,12 +172,13 @@ class CoupangChannelReplyAdapterTest {
         assertThat(replyClient.sentInquiryId).isNull();
     }
 
+    /** No length SellerOps made up (2026-11-02): the 상품별 고객문의 contract states none, so the platform decides. */
     @Test
-    void a_reply_over_the_documented_limit_is_permanent_so_the_seller_can_edit_it() {
-        String tooLong = "가".repeat(CoupangChannelReplyAdapter.CONTENT_MAX_BYTES); // 3 bytes each in UTF-8
+    void a_long_reply_is_sent_because_the_contract_states_no_limit() {
+        String longer = "가".repeat(1000); // 3,000 bytes — over the 1000 bytes this adapter used to refuse
 
-        assertThat(publish(tooLong).kind()).isEqualTo(ReplyPublishResult.Kind.PERMANENT_FAILURE);
-        assertThat(replyClient.sentInquiryId).isNull();
+        assertThat(publish(longer).kind()).isNotEqualTo(ReplyPublishResult.Kind.PERMANENT_FAILURE);
+        assertThat(replyClient.sentInquiryId).as("sent to the platform").isNotNull();
     }
 
     @Test

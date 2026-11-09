@@ -47,6 +47,10 @@ import java.time.Instant;
  * means the source declares no order lane at all (file upload, ESM, NAVER 상품 문의); {@link
  * ChannelOrderRef#absent()} means the source has one and this row carries nothing. Buyer identity is
  * not carried here under any name.
+ *
+ * <p>{@code commentCheck} is what the comment lane found for this row — see {@link CommentAnswerCheck}. {@code null}
+ * means the lane did not run for it, and ingestion then keeps whatever was stored. Only the Cafe24 board-6 mapper sets
+ * it, and only on a ROOT article.
  */
 public record CanonicalInquiry(
         String productName,
@@ -66,7 +70,20 @@ public record CanonicalInquiry(
         Instant answeredAt,
         ChannelOrderRef orderRef,
         SourceThreadRole threadRole,
-        String threadParentExternalId) {
+        String threadParentExternalId,
+        CommentAnswerCheck commentCheck) {
+
+    /** Back-compat: every source whose collection does not look for comment answers (all but Cafe24 board 6). */
+    public CanonicalInquiry(String productName, String sku, String author, String body,
+                            String status, Instant receivedAt, String externalId, int sourceRow,
+                            String title, String informStatus, Boolean isSecret, String sourceSubtype,
+                            ChannelProductRef productRef, String answerBody, Instant answeredAt,
+                            ChannelOrderRef orderRef, SourceThreadRole threadRole,
+                            String threadParentExternalId) {
+        this(productName, sku, author, body, status, receivedAt, externalId, sourceRow, title,
+                informStatus, isSecret, sourceSubtype, productRef, answerBody, answeredAt, orderRef,
+                threadRole, threadParentExternalId, null);
+    }
 
     /** Back-compat: every source that publishes no thread structure. */
     public CanonicalInquiry(String productName, String sku, String author, String body,

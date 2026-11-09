@@ -55,6 +55,7 @@ public class Cafe24BoardCommentsClient {
      * The comments on one article, projected to structure plus the one actor boolean.
      *
      * @throws Cafe24RateLimitedException on HTTP 429, carrying the official resumption hint
+     * @throws Cafe24ReadFailedException on any other unusable answer, with its kind
      */
     public List<Cafe24BoardCommentRow> fetchComments(String accessToken, String mallId, int boardNo,
                                                      long articleNo) {
@@ -65,12 +66,12 @@ public class Cafe24BoardCommentsClient {
             throw Cafe24RateLimitedException.fromResponse(response);
         }
         if (response.statusCode() == 404) {
-            // An article with no comment resource is an article with no comments. Absence is read as
-            // absence and never as an error the caller has to interpret.
-            return List.of();
+            // An unavailable resource does not prove an empty comment list.
+            throw Cafe24ReadFailedException.forStatus(404, "카페24 댓글을 확인하지 못했습니다 (HTTP 404).");
         }
         if (response.statusCode() != 200) {
-            throw new IllegalStateException(
+            // The status travels as a value: a 401/403 is the account's, not this article's.
+            throw Cafe24ReadFailedException.forStatus(response.statusCode(),
                     "카페24 댓글 조회에 실패했습니다 (HTTP " + response.statusCode() + ").");
         }
         return parse(response.body(), mallId);
@@ -105,16 +106,20 @@ public class Cafe24BoardCommentsClient {
     private List<Cafe24BoardCommentRow> parse(String body, String mallId) {
         try {
             CommentsResponse parsed = mapper.readValue(body, CommentsResponse.class);
+            if (parsed == null || parsed.comments() == null) {
+                throw new IllegalStateException("댓글 목록이 없습니다.");
+            }
             List<Cafe24BoardCommentRow> out = new ArrayList<>();
-            for (RawComment raw : parsed.comments() == null ? List.<RawComment>of() : parsed.comments()) {
+            for (RawComment raw : parsed.comments()) {
                 out.add(new Cafe24BoardCommentRow(raw.commentNo(), raw.articleNo(),
                         raw.createdDate(), authoredByMall(raw.memberId(), mallId),
-                        contentHash(raw.content())));
+                        contentHash(raw.content()), raw.memberId() != null && !raw.memberId().isBlank()));
             }
             return List.copyOf(out);
         } catch (Exception e) {
             // The body carries a customer's words — it never reaches a message.
-            throw new IllegalStateException("카페24 댓글 응답을 해석할 수 없습니다.");
+            throw new Cafe24ReadFailedException(Cafe24ReadFailedException.Kind.UNREADABLE_BODY, 200,
+                    "카페24 댓글 응답을 해석할 수 없습니다.");
         }
     }
 

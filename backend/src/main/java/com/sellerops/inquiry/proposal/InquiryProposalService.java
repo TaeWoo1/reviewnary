@@ -171,7 +171,11 @@ public class InquiryProposalService {
                 OrderContextView.of(orderFacts.read(orgId, inquiry, OrderFactLookup.EXACT_ALLOWED)),
                 // What became of the send, read back from the rows the publish package wrote. Present
                 // on the DETAIL so the outcome survives the reload that used to lose it.
-                deliveries == null ? null : deliveries.view(orgId, workItemId).orElse(null));
+                deliveries == null ? null : deliveries.view(orgId, workItemId).orElse(null),
+                // What the channel itself shows as the answer — collected, never ours (2026-11-06 sixteenth review).
+                com.sellerops.inquiry.proposal.dto.ChannelAnswerView.of(inquiry, draft),
+                // Whether a collection looked for a shop comment answer (V184) — told to the seller, never a gate.
+                com.sellerops.inquiry.proposal.dto.CommentCheckView.of(inquiry, channelCode));
     }
 
     /**

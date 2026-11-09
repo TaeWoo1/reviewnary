@@ -16,10 +16,19 @@ import java.util.List;
  * @param askCustomer    what to ask the customer (for CONDITIONAL_ON_CUSTOMER)
  * @param precedents     precedent ids ({@code P…}) the judge proposes for this need — a general answer, not a statement
  *                       about one order or one moment
+ * @param settledBy      (coverage-judge/v6) the seller's record ({@code E…}) saying the action this need asks about was
+ *                       already carried out for this order — what is missing was only needed to decide whether to do it.
+ *                       The judge's word only: code accepts it under its own conditions ({@link NeedAggregation#enforce})
  */
 public record NeedVerdict(String needId, NeedStatus status, List<String> evidence, List<String> missingInfo,
                           List<String> customerInput, List<String> assumptions, String askCustomer,
-                          List<String> precedents) {
+                          List<String> precedents, String settledBy) {
+
+    public NeedVerdict(String needId, NeedStatus status, List<String> evidence, List<String> missingInfo,
+                       List<String> customerInput, List<String> assumptions, String askCustomer,
+                       List<String> precedents) {
+        this(needId, status, evidence, missingInfo, customerInput, assumptions, askCustomer, precedents, null);
+    }
 
     public NeedVerdict {
         evidence = evidence == null ? List.of() : List.copyOf(evidence);
@@ -27,6 +36,7 @@ public record NeedVerdict(String needId, NeedStatus status, List<String> evidenc
         customerInput = customerInput == null ? List.of() : List.copyOf(customerInput);
         assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
         precedents = precedents == null ? List.of() : List.copyOf(precedents);
+        settledBy = settledBy == null || settledBy.isBlank() ? null : settledBy.strip();
     }
 
     /** The v1 shape: one missing sentence, no structured reasons. */

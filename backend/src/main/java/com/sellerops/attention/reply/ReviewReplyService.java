@@ -16,6 +16,7 @@ import com.sellerops.attention.triage.ReviewTriage;
 import com.sellerops.attention.triage.ReviewTriageRepository;
 import com.sellerops.attention.triage.TriageDisposition;
 import com.sellerops.common.ApiException;
+import com.sellerops.replyhold.ReplyHoldService;
 import com.sellerops.review.draft.ReviewDraftComposer;
 import com.sellerops.review.draft.dto.GeneratedReviewDraftView;
 import com.sellerops.common.RedactedBody;
@@ -189,12 +190,183 @@ public class ReviewReplyService {
         }
     }
 
+    /**
+     * The web recheck ({@link ReplyHoldService}, 2026-11-01), looked up when used: it reads this service's own lane, so a
+     * constructor reference would be a cycle. Null in a context that wires this service by hand.
+     */
+    private org.springframework.beans.factory.ObjectProvider<ReplyHoldService> holds;
+
+    @Autowired(required = false)
+    public void setReplyHolds(org.springframework.beans.factory.ObjectProvider<ReplyHoldService> holds) {
+        this.holds = holds;
+    }
+
+    /**
+     * <b>An approved reply that no longer stands is not registered</b> (2026-11-01; approved-reply hold, 2026-10-23). A
+     * changed citation alone does not hold it; any other finding does, and the reply is never rewritten: the seller
+     * fixes it and approves again, or confirms past what may be confirmed.
+     */
+    void requireStillStands(UUID orgId, Review review, ReviewReplyApproval approval) {
+        if (approval.getApprovedVersion() != null) {
+            drafts.version(review.getId(), approval.getApprovedVersion())
+                    .ifPresent(v -> requireWithinChannelLimit(review, v.getBody()));
+        }
+        ReplyHoldService holdService = holds == null ? null : holds.getIfAvailable();
+        if (holdService != null) {
+            holdService.registrationBlock(orgId, review, approval).ifPresent(reason -> {
+                throw ApiException.conflict(reason);
+            });
+        }
+    }
+
+    /** Refuses a text longer than the review's channel takes ({@link ChannelReplyLimit}). */
+    void requireWithinChannelLimit(Review review, String body) {
+        String code = review.getChannelId() == null ? null
+                : channels.findById(review.getChannelId()).map(c -> c.getCode()).orElse(null);
+        ChannelReplyLimit.refusal(code, body).ifPresent(reason -> {
+            throw ApiException.conflict(reason);
+        });
+    }
+
     /** The vendor's delegate lane, or null in a context that has none ({@link DelegatedReplyLane}). */
     private DelegatedReplyLane delegated;
 
     @Autowired(required = false)
     public void setDelegatedReplyLane(DelegatedReplyLane delegated) {
         this.delegated = delegated;
+    }
+
+    /** Records 「대응 필요」 when the seller approves a draft written ahead; null where no writer is wired. */
+    private com.sellerops.attention.triage.ReviewTriageWriter triageWriter;
+
+    @Autowired(required = false)
+    public void setTriageWriter(com.sellerops.attention.triage.ReviewTriageWriter triageWriter) {
+        this.triageWriter = triageWriter;
+    }
+
+    /** The seller's set-asides, so a draft is never prepared ahead for a review they put away; null in a test seam. */
+    private ReviewReplyWorkDismissalRepository dismissals;
+
+    /** The reply agent, when this deployment has one — the seller's press runs it (owner, 2026-10-28). */
+    private com.sellerops.agent.reply.ReplyRunStarter agentRuns;
+
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    public void setAgentRuns(com.sellerops.agent.reply.ReplyRunStarter agentRuns) {
+        this.agentRuns = agentRuns;
+    }
+
+    @Autowired(required = false)
+    public void setDismissals(ReviewReplyWorkDismissalRepository dismissals) {
+        this.dismissals = dismissals;
+    }
+
+    /** The author of a draft written ahead of the seller (2026-10-28) — the responsibility's own actor. */
+    public static final String PREPARED_AHEAD_ACTOR = "SYSTEM:RESPONSIBILITY";
+
+    /**
+     * <b>Write a review's first draft before the seller opens it</b> (product-owner, 2026-10-28: 「리뷰에는 응대가 필요한
+     * 경우 초안을 두기로」) — through the same composer the seller's press runs, and refused by every gate that press
+     * keeps except one.
+     *
+     * <p>The one it does not keep is 「대응 필요」. That record is a person's judgement and stays one: a draft written
+     * here is only a draft, and the seller's approval of it is what records 「대응 필요」, as the seller's own act
+     * ({@link #decideApproval}). A review the seller has already judged otherwise — 지켜보기, 할 일 없음 — or set
+     * aside is never drafted. Neither is one whose channel shows a reply, one with any draft already (a version the
+     * seller wrote is never stacked on), one with an approval, one a delegate holds, or one on a channel where a seller
+     * cannot reply.
+     *
+     * @return the draft written, or empty when a gate said no (never throws for a gate)
+     */
+    public Optional<GeneratedReviewDraftView> prepareAhead(UUID orgId, Review review) {
+        UUID reviewId = review.getId();
+        // The single-call drafter: never on an install, where only the reply agent writes review replies.
+        if (composer == null || (agentRuns != null && agentRuns.required()) || !mayWriteAhead(orgId, review)) {
+            return Optional.empty();
+        }
+        RedactedBody body = VocPreviewSanitizer.redactFullBody(review.getBody());
+        GeneratedReviewDraftView generated = composer.compose(orgId, review, body.text(), PREPARED_AHEAD_ACTOR);
+        draftSaved(orgId, reviewId);
+        return Optional.of(generated);
+    }
+
+    /**
+     * Every gate {@link #prepareAhead} keeps, as a question — also asked by the reply agent just before it saves a draft
+     * no seller asked for, so a draft written in the meantime is never stacked on.
+     */
+    public boolean mayWriteAhead(UUID orgId, Review review) {
+        UUID reviewId = review.getId();
+        if (review.getReplyState() == ReviewReplyState.ANSWERED) {
+            return false;
+        }
+        TriageDisposition decided = disposition(orgId, reviewId).orElse(null);
+        if (decided != null && decided != TriageDisposition.RESPONSE_NEEDED) {
+            return false;
+        }
+        if (drafts.currentVersion(reviewId) > 0 || approvals.current(orgId, reviewId).isPresent()
+                || delegatedOpen(orgId, reviewId)
+                || (dismissals != null && dismissals.existsByOrgIdAndReviewId(orgId, reviewId))) {
+            return false;
+        }
+        try {
+            requireReplyFlow(review.getChannelId());
+        } catch (ApiException noReplyFlow) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Whether a review the agent handed off at {@code handedOffAt} is still waiting for a person. It stops waiting when
+     * someone acted on it after the handoff — a reply on the channel, an approval, a draft a person wrote or edited, a
+     * delegate holding it, the work dismissed, or a decision that it needs no reply. A draft that already existed is not
+     * an answer (review 2026-10-28, second pass: an earlier draft made a safety handoff vanish from the list).
+     */
+    public boolean stillWaitingAfterHandoff(UUID orgId, Review review, java.time.Instant handedOffAt) {
+        UUID reviewId = review.getId();
+        TriageDisposition decided = disposition(orgId, reviewId).orElse(null);
+        return review.getReplyState() != ReviewReplyState.ANSWERED
+                && approvals.current(orgId, reviewId).isEmpty()
+                && !drafts.writtenByAPersonSince(reviewId, handedOffAt)
+                && !delegatedOpen(orgId, reviewId)
+                && (dismissals == null || !dismissals.existsByOrgIdAndReviewIdAndDismissedAtAfter(orgId, reviewId,
+                        handedOffAt))
+                && (decided == null || decided == TriageDisposition.RESPONSE_NEEDED);
+    }
+
+    /** The version the seller approved and when, if one stands — for the agent's outcome report. */
+    public java.util.Optional<java.util.Map.Entry<Integer, java.time.Instant>> approvedVersion(UUID orgId, UUID reviewId) {
+        return approvals.current(orgId, reviewId).filter(a -> a.getApprovedVersion() != null)
+                .map(a -> java.util.Map.entry(a.getApprovedVersion(), a.getDecidedAt()));
+    }
+
+    /** Who wrote a version — SELLER or MODEL — for telling a seller's edit from a rewrite by the AI. */
+    public java.util.Optional<String> draftAuthorKind(UUID reviewId, int version) {
+        return drafts.version(reviewId, version).map(ReviewReplyDraft::getAuthorKind);
+    }
+
+    /** When a version was written, for the time from the agent's draft to the seller's approval. */
+    public java.util.Optional<java.time.Instant> draftWrittenAt(UUID reviewId, int version) {
+        return drafts.version(reviewId, version).map(ReviewReplyDraft::getCreatedAt);
+    }
+
+    /** Whether the review has a draft from before — shown with the handoff so it is checked, not sent as it stands. */
+    public boolean hasDraft(UUID reviewId) {
+        return drafts.currentVersion(reviewId) > 0;
+    }
+
+    /** The seller-press gates for a run a seller started: 대응 필요 (or a prepared draft), no approval, not answered. */
+    public boolean maySellerWrite(UUID orgId, Review review) {
+        TriageDisposition decided = disposition(orgId, review.getId()).orElse(null);
+        try {
+            // A channel where a seller cannot reply (Coupang) gets no draft from any door (review 2026-10-28).
+            requireReplyFlow(review.getChannelId());
+        } catch (ApiException noReplyFlow) {
+            return false;
+        }
+        return review.getReplyState() != ReviewReplyState.ANSWERED
+                && approvals.current(orgId, review.getId()).isEmpty()
+                && (decided == null || decided == TriageDisposition.RESPONSE_NEEDED);
     }
 
     private boolean delegatedOpen(UUID orgId, UUID reviewId) {
@@ -223,7 +395,7 @@ public class ReviewReplyService {
     public ReviewReplyDraftView saveDraft(UUID orgId, UUID accountId, String actionRef, String body,
                                           Integer baseVersion, UUID actorUserId) {
         Review review = authorize(orgId, accountId, actionRef);
-        requireResponseNeeded(orgId, review.getId());
+        requireResponseNeededOrJudge(orgId, review, ACTOR_PREFIX + actorUserId);
         requireNotFrozen(orgId, review.getId());
         requireChannelNotAnswered(review);
         ReviewReplyDraftView saved = drafts.save(orgId, review.getId(), ACTOR_PREFIX + actorUserId, body, baseVersion);
@@ -252,7 +424,7 @@ public class ReviewReplyService {
     public GeneratedReviewDraftView generateDraft(UUID orgId, UUID accountId, String actionRef,
                                                   UUID actorUserId) {
         Review review = authorize(orgId, accountId, actionRef);
-        requireResponseNeeded(orgId, review.getId());
+        requireResponseNeededOrJudge(orgId, review, ACTOR_PREFIX + actorUserId);
         requireNotFrozen(orgId, review.getId());
         requireChannelNotAnswered(review);
         if (composer == null) {
@@ -265,9 +437,75 @@ public class ReviewReplyService {
         // part of what the customer wrote, and a knowledge request that quotes them back is
         // unreadable to the seller.
         RedactedBody body = VocPreviewSanitizer.redactFullBody(review.getBody());
+        if (agentRuns != null && (agentRuns.available(orgId) || agentRuns.required())) {
+            return generateByAgent(orgId, review, actorUserId);
+        }
         GeneratedReviewDraftView generated = composer.compose(orgId, review, body.text(), ACTOR_PREFIX + actorUserId);
         draftSaved(orgId, review.getId());
         return generated;
+    }
+
+    /**
+     * <b>The seller's press, through the reply agent</b> (owner, 2026-10-28 — the deferred items; second review: the
+     * screen's 「초안 생성 · 다시 쓰기」 still ran the old drafter, so pressing it said nothing about the agent). When the
+     * agent is on for the org, the press runs it — judge, draft, critique, one revision, save as this seller — and
+     * shows the version it saved, or why there is none. It never falls back to the old drafter: a press must say which
+     * path wrote what the seller reads. With the agent off, the old drafter runs as before.
+     */
+    private GeneratedReviewDraftView generateByAgent(UUID orgId, Review review, UUID actorUserId) {
+        java.util.Optional<com.sellerops.agent.reply.ReplyRunStarter.Started> started =
+                agentRuns.startReviewRun(orgId, review.getId(), "SELLER", actorUserId);
+        if (started.isEmpty()) {
+            // Only an install gets here: the agent is required and could not start (off for the org, or no runtime).
+            return ReviewDraftComposer.agentNoDraft(AGENT_NOT_RUNNING);
+        }
+        java.util.Optional<com.sellerops.agent.reply.AgentRuntimeClient.RunReport> report =
+                started.flatMap(com.sellerops.agent.reply.ReplyRunStarter.Started::report);
+        if (report.isPresent() && "SAVED".equals(report.get().outcome()) && report.get().version() != null) {
+            draftSaved(orgId, review.getId());
+            return composer.agentDraftView(orgId, review.getId(), report.get().version());
+        }
+        String reason = report.map(com.sellerops.agent.reply.AgentRuntimeClient.RunReport::reason).orElse(null);
+        String outcome = report.map(com.sellerops.agent.reply.AgentRuntimeClient.RunReport::outcome).orElse("FAILED");
+        return ReviewDraftComposer.agentNoDraft(agentNoDraftMessage(outcome, reason));
+    }
+
+    static final String AGENT_NOT_RUNNING = "AI 답글 에이전트가 이 PC에서 켜져 있지 않아 초안을 만들지 않았어요. 프로그램 상태를 "
+            + "확인해 주세요.";
+
+    /** Why the agent left no draft, in the seller's words — never the review, never a vendor message. */
+    static String agentNoDraftMessage(String outcome, String reason) {
+        String r = reason == null ? "" : reason;
+        if ("HANDOFF".equals(outcome)) {
+            return switch (r) {
+                case "CATEGORY_S" -> "안전 관련 리뷰라 AI가 답글을 쓰지 않았어요. 직접 확인해 주세요. 상품에 따라 법정 보고 의무가 "
+                        + "있을 수 있어요.";
+                case "CATEGORY_L" -> "분쟁 신호가 있는 리뷰라 AI가 답글을 쓰지 않았어요. 직접 확인해 주세요.";
+                case "CATEGORY_X" -> "신고 대상일 수 있는 리뷰예요. 답글보다 플랫폼 신고를 먼저 검토해 주세요.";
+                case "SAFETY_SIGNAL" -> "리뷰에 다침·이물·신고 같은 말이 있어 AI가 답글을 쓰지 않았어요. 직접 확인해 주세요.";
+                case "PERSON_REVIEW" -> "AI가 답글보다 판매자가 먼저 볼 리뷰로 판단했어요. 직접 확인해 주세요.";
+                case "UNSURE_AMBIGUOUS" -> "고객이 무엇을 말하는지 AI가 정하지 못했어요. 문제없다는 뜻이 아니니 읽고 답해 주세요.";
+                case "UNSURE_PRODUCT" -> "어떤 상품·옵션 이야기인지 연결되지 않았어요. 상품을 확인한 뒤 작성해 주세요.";
+                case "TOO_MANY_POINTS" -> "리뷰가 말한 문제·질문이 많아 답글 하나로 빠짐없이 다루기 어려워요. 직접 정리해 주세요.";
+                case "QUESTION_NO_FACTS" -> "리뷰의 질문에 답할 상품 정보·정책이 등록돼 있지 않아요. 답을 정한 뒤 작성해 주세요.";
+                case "KNOWLEDGE_MISSING" -> "등록된 정보가 이 리뷰의 질문·문제에 답하지 못해요. 답을 정한 뒤 작성해 주세요.";
+                case "KNOWLEDGE_NOT_SHOWN" -> "등록된 자료가 많아 AI가 일부만 보고 답을 찾지 못했어요. 자료가 없다는 뜻은 아니니 "
+                        + "상품·정책을 확인해 작성해 주세요.";
+                case "POLICY_CONFLICT" -> "등록된 정보끼리 서로 다르게 적혀 있어요. 어느 쪽이 맞는지 정리한 뒤 작성해 주세요.";
+                default -> "AI가 기준에 맞는 답글을 쓰지 못했어요. 직접 작성해 주세요.";
+            };
+        }
+        if ("PENDING".equals(outcome)) {
+            return "오늘 AI 사용량 상한에 닿아 초안을 검토하지 못했어요. 초안은 「검토 대기」로 보관했고, 한도가 풀리면 새로 "
+                    + "쓰지 않고 검토부터 이어서 해요.";
+        }
+        if ("SKIPPED".equals(outcome) && "NO_RESPONSE_NEEDED".equals(r)) {
+            return "AI가 이 리뷰는 답글이 없어도 남는 문제가 없다고 봤어요. 그래도 답하시려면 직접 작성해 주세요.";
+        }
+        if ("SKIPPED".equals(outcome)) {
+            return "그 사이 리뷰나 근거가 바뀌어 초안을 저장하지 않았어요. 다시 눌러 주세요.";
+        }
+        return "AI 답글 에이전트가 지금 초안을 만들지 못했어요. 잠시 뒤 다시 시도하거나 직접 작성해 주세요.";
     }
 
     /**
@@ -366,8 +604,14 @@ public class ReviewReplyService {
         ReviewReplyDraft bound = drafts.version(reviewId, baseVersion)
                 .orElseThrow(() -> ApiException.conflict("승인할 초안이 없어요. 먼저 초안을 저장하세요."));
 
+        // A draft the automatic check wrote ahead, on a review nobody has judged yet, is approved as the seller's
+        // judgement that it needs a response (owner, 2026-10-28). A review someone judged 지켜보기 or 할 일 없음 is
+        // still refused, as before — the exception is only for a review nobody has judged.
+        boolean judgedNow = preparedAheadUndecided(orgId, reviewId, bound);
         gateOrReplay(orgId, reviewId, command, () -> {
-            requireResponseNeeded(orgId, reviewId);
+            if (!judgedNow) {
+                requireResponseNeeded(orgId, reviewId);
+            }
             // Approving is forward motion, so a standing approval freezes it exactly as it
             // freezes saving. Without this, re-approving succeeded while `canApprove` reported
             // false — and the capability object's promise that the server enforces the rules it
@@ -379,6 +623,16 @@ public class ReviewReplyService {
             // …and the seller already approved it for a delegate, here or on the phone.
             requireNotDelegated(orgId, reviewId);
             requireNoForbiddenPhrase(orgId, bound.getBody());
+            // A channel's length limit is not a style: a text over it is kept to fix, never approved (seventh review).
+            requireWithinChannelLimit(review, bound.getBody());
+            // Checked again against the knowledge and policy as they are now (2026-11-01): a draft written before a policy
+            // change is not approved on the old basis, whoever wrote it — fixed first, or confirmed past with a record.
+            ReplyHoldService holdService = holds == null ? null : holds.getIfAvailable();
+            if (holdService != null) {
+                holdService.approvalBlock(orgId, review, bound).ifPresent(reason -> {
+                    throw ApiException.conflict(reason);
+                });
+            }
             // Approve the version you actually saw. If the head moved on, binding to the newer
             // text would approve words the operator never read.
             //
@@ -392,6 +646,13 @@ public class ReviewReplyService {
             int headVersion = drafts.latest(reviewId).map(ReviewReplyDraft::getVersion).orElse(0);
             if (baseVersion.intValue() != headVersion) {
                 throw ApiException.conflict("이미 최신 초안이 있어요. 새로고침 후 다시 시도하세요.");
+            }
+            // Every other gate has passed, so the seller's approval is also their 「대응 필요」 — recorded as them, before
+            // the approval row, so every reader that asks for 대응 필요 finds it.
+            if (judgedNow) {
+                triageWriter.applyDecision(orgId, reviewId, review.getChannelId(), TriageDisposition.RESPONSE_NEEDED,
+                        UUID.nameUUIDFromBytes(("prepared-approval:" + orgId + ":" + command)
+                                .getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString(), actor);
             }
             // The same draft waits on the phone (2026-10-25); approving here takes it back from there first.
             if (delegated != null) {
@@ -466,6 +727,7 @@ public class ReviewReplyService {
         ReviewReplyApproval approval = approvals.current(orgId, reviewId)
                 .filter(a -> a.getState() == ReviewReplyApprovalState.APPROVED)
                 .orElseThrow(() -> ApiException.conflict("승인된 답변이 없어요. 먼저 답변을 승인하세요."));
+        requireStillStands(orgId, review, approval);
 
         // Guided: derive AND validate the hint BEFORE minting, so a review that cannot produce a valid hint
         // never leaves an unusable spent ref.
@@ -680,6 +942,27 @@ public class ReviewReplyService {
         return triages.findByOrgIdAndReviewId(orgId, reviewId).map(ReviewTriage::getDisposition);
     }
 
+    /**
+     * Whether the head draft was written ahead and nobody has judged the review yet (2026-10-28) — the one state in
+     * which the seller's next forward act on the draft (edit, rewrite, approve) is also their 「대응 필요」.
+     */
+    private boolean preparedAheadUndecided(UUID orgId, UUID reviewId, ReviewReplyDraft head) {
+        return triageWriter != null && head != null && PREPARED_AHEAD_ACTOR.equals(head.getCreatedBy())
+                && disposition(orgId, reviewId).isEmpty();
+    }
+
+    /**
+     * The 대응 필요 gate, where the seller working on a draft written ahead IS the decision: it is recorded as them,
+     * then the gate reads it. Anything else is the gate as it always was.
+     */
+    private void requireResponseNeededOrJudge(UUID orgId, Review review, String actor) {
+        if (preparedAheadUndecided(orgId, review.getId(), drafts.latest(review.getId()).orElse(null))) {
+            triageWriter.applyDecision(orgId, review.getId(), review.getChannelId(), TriageDisposition.RESPONSE_NEEDED,
+                    UUID.randomUUID().toString(), actor);
+        }
+        requireResponseNeeded(orgId, review.getId());
+    }
+
     private void requireResponseNeeded(UUID orgId, UUID reviewId) {
         if (disposition(orgId, reviewId).orElse(null) != TriageDisposition.RESPONSE_NEEDED) {
             throw ApiException.conflict("'대응 필요'로 기록된 리뷰만 답변을 준비할 수 있어요.");
@@ -763,7 +1046,10 @@ public class ReviewReplyService {
         ReviewReplyDraft head = drafts.latest(review.getId()).orElse(null);
         ReviewReplyApproval approval = approvals.current(orgId, review.getId()).orElse(null);
 
-        boolean responseNeeded = triage == TriageDisposition.RESPONSE_NEEDED;
+        // A draft written ahead, on a review nobody has judged, reads as 대응 필요: the seller's first act on it records
+        // the decision as theirs ({@link #requireResponseNeededOrJudge}), so the flags say what the guards will allow.
+        boolean responseNeeded = triage == TriageDisposition.RESPONSE_NEEDED
+                || preparedAheadUndecided(orgId, review.getId(), head);
         boolean approved = approval != null
                 && approval.getState() == ReviewReplyApprovalState.APPROVED;
         // The channel says this review already has a reply.

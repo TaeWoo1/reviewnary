@@ -96,22 +96,86 @@ public class InquiryClaimGuardTest {
     }
 
     @Nested
-    @DisplayName("figures")
+    @DisplayName("figures — the certain half in code, meaning to the model")
     class Figures {
 
+        private List<String> toVerify(String body, List<String> evidence, String asked) {
+            return InquiryClaimGuard.figuresToVerify(body, evidence, asked, null).stream()
+                    .map(InquiryClaimGuard.FigureClaim::value).toList();
+        }
+
         @Test
-        @DisplayName("a delivery window the evidence does not state is refused")
+        @DisplayName("a delivery window the evidence does not state is refused without a model")
         void anInventedWindow() {
             assertThat(check("주문 후 1~2일 내 출고됩니다.", List.of(KNOWLEDGE), List.of()))
                     .extracting(Violation::matched).containsExactly("1", "2");
         }
 
         @Test
-        @DisplayName("a number the customer wrote may be repeated back to them")
-        void theCustomersOwnNumber() {
-            assertThat(InquiryClaimGuard.unsupportedClaims("10mm 전선 두 줄이라면 3호부터 들어갑니다.",
-                    List.of("지름 10mm 전선 두 가닥을 나란히 넣으려면 3호부터 가능합니다."), List.of(),
-                    "10mm 전선 두 줄 넣으려면 몇 호예요?")).isEmpty();
+        @DisplayName("the same number only in another unit is refused without a model — 폭 10mm, 폭은 10cm")
+        void anotherUnit() {
+            List<String> spec = List.of("폭 10mm, 길이 2m입니다.");
+            assertThat(InquiryClaimGuard.unsupportedClaims("폭은 10cm입니다.", spec, List.of(), "폭이 얼마예요?"))
+                    .extracting(Violation::matched).containsExactly("10");
+            assertThat(InquiryClaimGuard.unsupportedClaims("폭은 10 센티예요.", List.of("폭 10cm"), List.of(), ""))
+                    .as("a unit written two ways is one unit").isEmpty();
+        }
+
+        @Test
+        @DisplayName("an exact conversion is code's arithmetic — 10mm and 1cm are one amount, handed to the model to read")
+        void anExactConversion() {
+            assertThat(InquiryClaimGuard.unsupportedClaims("폭은 1cm입니다.", List.of("폭 10mm"), List.of(), "")).isEmpty();
+            assertThat(toVerify("폭은 1cm입니다.", List.of("폭 10mm"), "")).containsExactly("1");
+            assertThat(InquiryClaimGuard.unsupportedClaims("용량은 0.5L입니다.", List.of("용량 500ml"), List.of(), "")).isEmpty();
+            assertThat(InquiryClaimGuard.unsupportedClaims("폭은 2cm입니다.", List.of("폭 10mm"), List.of(), ""))
+                    .as("a different amount in a convertible unit").extracting(Violation::matched).containsExactly("2");
+            assertThat(InquiryClaimGuard.unsupportedClaims("무게는 10cm입니다.", List.of("무게 10g"), List.of(), ""))
+                    .as("no conversion across kinds").extracting(Violation::matched).containsExactly("10");
+        }
+
+        @Test
+        @DisplayName("whether a written figure is about the same thing is not decided by words — it is handed over")
+        void meaningIsHandedToTheModel() {
+            // The second review's cases (2026-10-28). Each value is written in the evidence, so the text cannot settle
+            // them either way: none is refused here, and every one is listed for the figure check.
+            assertThat(check("상품 높이는 10mm입니다.", List.of("상품 폭 10mm"), List.of())).isEmpty();
+            assertThat(toVerify("상품 높이는 10mm입니다.", List.of("상품 폭 10mm"), "")).containsExactly("10");
+            assertThat(toVerify("평일 배송은 7일 걸립니다.", List.of("평일 배송 2일, 제주 배송 7일"), "")).containsExactly("7");
+            assertThat(toVerify("폭은 10cm입니다.", List.of("폭: 10"), "")).as("no unit written: the model reads it")
+                    .containsExactly("10");
+            assertThat(toVerify("너비는 10mm입니다.", List.of("폭 10mm"), "")).as("a paraphrase is the model's to accept")
+                    .containsExactly("10");
+        }
+
+        @Test
+        @DisplayName("a number only the customer wrote is handed over as theirs — the model must call it said back")
+        void theCustomersNumber() {
+            List<InquiryClaimGuard.FigureClaim> claims = InquiryClaimGuard.figuresToVerify("문의하신 20가닥까지 가능합니다.",
+                    List.of("최대 10가닥까지 넣을 수 있습니다."), "20가닥도 가능한가요?", null);
+            assertThat(claims).singleElement().satisfies(c -> {
+                assertThat(c.value()).isEqualTo("20");
+                assertThat(c.questionOnly()).isTrue();
+            });
+            assertThat(check("네, 30가닥까지 가능합니다.", List.of("최대 10가닥"), List.of()))
+                    .as("a number nobody wrote is still refused in code").extracting(Violation::matched).containsExactly("30");
+        }
+
+        @Test
+        @DisplayName("the order's own sentence counts as a written figure")
+        void theOrderSentence() {
+            assertThat(InquiryClaimGuard.unsupportedClaims("주문하신 2개 모두 오늘 출고됩니다.", List.of(), List.of(), "",
+                    "이 주문은 2개 상품이 오늘 출고 예정입니다.")).isEmpty();
+        }
+
+        @Test
+        @DisplayName("a range and a dimension list carry their last unit")
+        void rangesAndLists() {
+            assertThat(InquiryClaimGuard.unsupportedClaims("크기는 10 x 20mm예요.", List.of("크기 10×20 mm"), List.of(), ""))
+                    .isEmpty();
+            assertThat(InquiryClaimGuard.unsupportedClaims("출고는 1~2일 걸려요.", List.of("출고는 1~2일 소요됩니다."), List.of(),
+                    "")).isEmpty();
+            assertThat(InquiryClaimGuard.unsupportedClaims("가격은 1,500원이에요.", List.of("가격 1500원"), List.of(), ""))
+                    .isEmpty();
         }
 
         @Test
@@ -119,6 +183,7 @@ public class InquiryClaimGuardTest {
         void aListMarker() {
             assertThat(check("1. 파이프 부분을 잡아 주세요. 2. 뚜껑처럼 돌려 빼 주세요.", List.of(KNOWLEDGE), List.of()))
                     .isEmpty();
+            assertThat(toVerify("1. 파이프 부분을 잡아 주세요.", List.of(KNOWLEDGE), "")).isEmpty();
         }
     }
 
@@ -134,5 +199,45 @@ public class InquiryClaimGuardTest {
         assertThat(InquiryClaimGuard.unsupportedClaims("단순 변심도 무료 교환이 가능합니다.",
                 List.of("단순 변심은 무료 교환이 불가합니다."), List.of(), "교환되나요?"))
                 .extracting(Violation::matched).containsExactly("교환");
+    }
+
+    /**
+     * The expression rules restated in the 2026-11-01 review: a saying only the seller can stand behind is written only
+     * when the seller's material or own sentences carry it — whoever its grammatical subject is.
+     */
+    @Nested
+    class SayingsTheSellerStandsBehind {
+
+        @Test
+        void aServiceThatNobodyConfirmedIsNotWrittenWhateverItsSubject() {
+            for (String draft : List.of("교환 방법은 따로 안내받으실 수 있습니다.", "자세한 사항은 상담받으실 수 있어요.",
+                    "필요하시면 처리 방법을 안내해 드릴 수 있습니다.")) {
+                assertThat(InquiryClaimGuard.unbackedSayings(draft, List.of())).as(draft).isNotEmpty();
+            }
+        }
+
+        @Test
+        void anOperatingClaimNeedsTheSellersWord() {
+            String draft = "고객님의 후기 하나하나 확인하고 있습니다.";
+            assertThat(InquiryClaimGuard.unbackedSayings(draft, List.of())).isNotEmpty();
+            assertThat(InquiryClaimGuard.unbackedSayings(draft, List.of("저희는 모든 후기를 하나하나 확인하고 있습니다.")))
+                    .isEmpty();
+        }
+
+        @Test
+        void lookingIntoItIsNotADefaultClose() {
+            assertThat(InquiryClaimGuard.unbackedSayings("말씀하신 부분 잘 살펴보겠습니다.", List.of())).isNotEmpty();
+            assertThat(InquiryClaimGuard.unbackedSayings("소중한 후기 감사합니다. 불편을 드려 죄송합니다.", List.of()))
+                    .isEmpty();
+        }
+
+        @Test
+        void onlyAContactPathTheMaterialNamesIsGiven() {
+            assertThat(InquiryClaimGuard.unbackedSayings("고객센터로 연락 주시면 도와드릴게요.", List.of())).isNotEmpty();
+            assertThat(InquiryClaimGuard.unbackedSayings("톡톡으로 문의 주세요.", List.of("교환은 톡톡으로 접수합니다.")))
+                    .isEmpty();
+            assertThat(InquiryClaimGuard.unsupportedClaims("1:1 문의로 남겨 주세요.", List.of(), List.of(), "교환되나요?"))
+                    .extracting(Violation::kind).contains(Kind.SELLER_PROMISE);
+        }
     }
 }

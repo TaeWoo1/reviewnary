@@ -33,6 +33,40 @@ public class AiTriagePilotProperties {
     private final String reasoningEffort;
     private final int maxPerRun;
 
+    /**
+     * The dev-only fake model (2026-10-29) replaces the shared model transport, and this classifier is not on it — it
+     * builds its own HTTP client. So with the fake on, the classifier refuses to start rather than reach a vendor the
+     * fake run means to keep out (outside review, 2026-10-29). Field-injected so hand-built properties stay as they are.
+     */
+    @Value("${sellerops.dev.fake-llm:false}")
+    private boolean fakeLlm;
+
+    @jakarta.annotation.PostConstruct
+    void refuseAFakeRun() {
+        refuseAFakeRun(enabled, fakeLlm);
+        refuseAnEvalOnlyVendor(enabled, vendor);
+    }
+
+    /**
+     * {@code RUNYOUR} (2026-11-06) is wired for the offline eval harness only: a pilot run sends real sellers' review
+     * bodies, and a router in front of the model vendors is a processor the privacy policy and the seller agreement do
+     * not yet name, nor is where it forwards a body (and whether the body leaves Korea) confirmed. So the pilot refuses
+     * to start on it rather than let one property change reroute production traffic (review of 2026-11-06).
+     */
+    static void refuseAnEvalOnlyVendor(boolean pilotEnabled, String vendor) {
+        if (pilotEnabled && vendor != null && vendor.trim().equalsIgnoreCase("RUNYOUR")) {
+            throw new IllegalStateException("sellerops.triage.ai-pilot.vendor=RUNYOUR is eval-harness only: "
+                    + "the pilot sends real review bodies and the router is not yet a disclosed processor");
+        }
+    }
+
+    static void refuseAFakeRun(boolean pilotEnabled, boolean fakeLlm) {
+        if (pilotEnabled && fakeLlm) {
+            throw new IllegalStateException("sellerops.triage.ai-pilot.enabled cannot run with sellerops.dev.fake-llm: "
+                    + "the triage classifier has its own connection the fake does not replace");
+        }
+    }
+
     public AiTriagePilotProperties(
             @Value("${sellerops.triage.ai-pilot.enabled:false}") boolean enabled,
             @Value("${sellerops.triage.ai-pilot.enabled-org-ids:}") String enabledOrgIds,

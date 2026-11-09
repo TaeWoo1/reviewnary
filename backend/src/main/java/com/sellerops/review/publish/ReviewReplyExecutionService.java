@@ -100,6 +100,15 @@ public class ReviewReplyExecutionService {
         this.settledEvents = settledEvents;
     }
 
+    /** The web recheck (2026-11-01), looked up when used; null in a context wired by hand. */
+    private org.springframework.beans.factory.ObjectProvider<com.sellerops.replyhold.ReplyHoldService> holds;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setReplyHolds(
+            org.springframework.beans.factory.ObjectProvider<com.sellerops.replyhold.ReplyHoldService> holds) {
+        this.holds = holds;
+    }
+
     @org.springframework.beans.factory.annotation.Autowired
     public ReviewReplyExecutionService(ReviewRepository reviews, SellerAccountRepository accounts,
                                        ChannelRepository channels, ReviewReplyApprovalRepository approvals,
@@ -151,6 +160,22 @@ public class ReviewReplyExecutionService {
             // public reply is the one outcome this whole seam exists to prevent.
             throw ApiException.conflict("채널에 이미 답변이 등록된 리뷰입니다. 답변을 보낼 수 없습니다.");
         }
+        // An approved reply that no longer stands against today's knowledge and policy is held, never rewritten: the
+        // seller fixes it and approves again, or confirms past what may be confirmed (2026-11-01). A replay is not new.
+        com.sellerops.replyhold.ReplyHoldService holdService = holds == null ? null : holds.getIfAvailable();
+        if (holdService != null) {
+            holdService.registrationBlock(orgId, scope.review(), approval).ifPresent(reason -> {
+                throw ApiException.conflict(reason);
+            });
+        }
+        // The channel's length limit, on the very text that would be sent — whoever wrote it (seventh review).
+        drafts.version(scope.review().getId(), approval.getApprovedVersion()).ifPresent(v -> {
+            String code = scope.review().getChannelId() == null ? null
+                    : channels.findById(scope.review().getChannelId()).map(c -> c.getCode()).orElse(null);
+            com.sellerops.attention.reply.ChannelReplyLimit.refusal(code, v.getBody()).ifPresent(reason -> {
+                throw ApiException.conflict(reason);
+            });
+        });
         String actor = ACTOR_PREFIX + actorUserId;
         // Identity before capability: a row that is not a marketplace object has no channel to send to,
         // whatever the channel's switches say.

@@ -41,6 +41,17 @@ class ReviewKnowledgeNeedTest {
     }
 
     @Test
+    @DisplayName("a ★3 whose words only praise asks for nothing; one with a reservation still asks (owner, 2026-10-28)")
+    void aThreeStarPraiseAsksForNothing() {
+        assertThat(ReviewKnowledgeNeed.of(false, true, 3, false, false, true)).isEqualTo(ReviewKnowledgeNeed.NO_EVIDENCE);
+        assertThat(ReviewKnowledgeNeed.of(false, true, 3, false, false, false)).isEqualTo(ReviewKnowledgeNeed.KNOWLEDGE_NEEDED);
+        // The exception is ★3's alone: ★1–2 owe an answer whatever the words, and a question or an issue still asks.
+        assertThat(ReviewKnowledgeNeed.of(false, true, 2, false, false, true)).isEqualTo(ReviewKnowledgeNeed.KNOWLEDGE_NEEDED);
+        assertThat(ReviewKnowledgeNeed.of(false, true, 3, false, true, true)).isEqualTo(ReviewKnowledgeNeed.KNOWLEDGE_NEEDED);
+        assertThat(ReviewKnowledgeNeed.of(false, true, 3, true, false, true)).isEqualTo(ReviewKnowledgeNeed.KNOWLEDGE_NEEDED);
+    }
+
+    @Test
     @DisplayName("a review recorded as evidence for a repeated problem asks whatever its rating")
     void aRepeatedProblemAsks() {
         assertThat(need(5, true, false)).isEqualTo(ReviewKnowledgeNeed.KNOWLEDGE_NEEDED);

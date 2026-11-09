@@ -61,7 +61,7 @@ class InquiryDecisionPayloadFloorTest {
     @DisplayName("the instructions carry no product vocabulary — the judgements are about texts, not a domain")
     void noDomainWords() {
         for (String prompt : List.of(InquiryDecisionPrompt.planSystem(), InquiryDecisionPrompt.judgeSystem(),
-                InquiryDecisionPrompt.judgeSystemV2())) {
+                InquiryDecisionPrompt.judgeSystemV2(), InquiryDecisionPrompt.judgeSystemV4())) {
             for (String word : List.of("몰딩", "디스펜서", "전선", "종이컵", "호수별", "선바로", "mm")) {
                 assertThat(prompt).as(word).doesNotContain(word);
             }

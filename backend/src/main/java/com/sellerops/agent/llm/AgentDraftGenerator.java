@@ -1,12 +1,9 @@
 package com.sellerops.agent.llm;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.net.URI;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import com.sellerops.agent.llm.provider.LlmReply;
+import com.sellerops.agent.llm.provider.LlmRequest;
+import com.sellerops.agent.llm.provider.LlmVendor;
+import com.sellerops.agent.llm.provider.LlmWire;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,22 +34,22 @@ import java.util.Optional;
  */
 public class AgentDraftGenerator {
 
-    /** Which wire format to speak. Nothing else differs between them. */
+    /** Which wire format to speak — the shared model connection's vendor (2026-10-29). Nothing else differs. */
     public enum Vendor {
-        ANTHROPIC(URI.create("https://api.anthropic.com/v1/messages")),
-        OPENAI(URI.create("https://api.openai.com/v1/chat/completions"));
+        ANTHROPIC(LlmVendor.ANTHROPIC),
+        OPENAI(LlmVendor.OPENAI);
 
-        private final URI endpoint;
+        private final LlmVendor vendor;
 
-        Vendor(URI endpoint) {
-            this.endpoint = endpoint;
+        Vendor(LlmVendor vendor) {
+            this.vendor = vendor;
         }
     }
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
     private final AgentLlmTransport http;
     private final Vendor vendor;
+    /** The vendor's spelling of every call this generator makes (shared model connection, 2026-10-29). */
+    private final LlmWire wire;
     private final String modelId;
     private final String apiKey;
     private final int maxOutputTokens;
@@ -63,6 +60,7 @@ public class AgentDraftGenerator {
                                int maxOutputTokens, String reasoningEffort) {
         this.http = http;
         this.vendor = vendor;
+        this.wire = LlmWire.of(vendor.vendor);
         this.modelId = modelId;
         this.apiKey = apiKey;
         this.maxOutputTokens = maxOutputTokens;
@@ -223,7 +221,13 @@ public class AgentDraftGenerator {
         /** 1–2★: the customer is unhappy, whatever words they chose. */
         COMPLAINT,
         /** 3★ with a reservation in its words: something pleased and something did not. */
-        MIXED
+        MIXED,
+        /**
+         * 3★ with no reservation in its words (owner, 2026-10-28: 「★3 칭찬은 질문보다는 더 친절하게 응대」). The
+         * customer chose a middling number and wrote nothing against the product, so the reply is a warmer thank-you —
+         * never an apology, and never a reason to ask the seller for a standard.
+         */
+        MILD_PRAISE
     }
 
     /**
@@ -245,32 +249,100 @@ public class AgentDraftGenerator {
      * inquiry floor is asserted on its bytes: an intention is not a boundary.
      */
     String reviewRequestBody(ReviewInput input) {
-        ObjectNode root = MAPPER.createObjectNode();
-        root.put("model", modelId);
-        ArrayNode messages = root.putArray("messages");
-        ObjectNode user = messages.addObject();
-        user.put("role", "user");
-        user.put("content",
-                AgentDraftPrompt.reviewUser(input.knowledge(), input.reviewBody(), input.style(), input.banned(),
-                        input.mood(), input.manner()));
-        if (vendor == Vendor.ANTHROPIC) {
-            root.put("max_tokens", maxOutputTokens);
-            root.put("system", AgentDraftPrompt.reviewSystem());
-        } else {
-            root.put("max_completion_tokens", maxOutputTokens);
-            root.putObject("response_format").put("type", "json_object");
-            if (reasoningEffort != null) {
-                root.put("reasoning_effort", reasoningEffort);
-            }
-            ObjectNode system = messages.insertObject(0);
-            system.put("role", "system");
-            system.put("content", AgentDraftPrompt.reviewSystem());
-        }
-        return root.toString();
+        return wire.body(LlmRequest.of(modelId, AgentDraftPrompt.reviewSystem(), AgentDraftPrompt.reviewUser(input.knowledge(),
+                input.reviewBody(), input.style(), input.banned(), input.mood(), input.manner()), maxOutputTokens, reasoningEffort,
+                LlmRequest.Format.jsonObject()));
     }
 
     public Result generate(Input input) {
         return send(requestBody(input), AgentDraftResponseParser::parse);
+    }
+
+    /**
+     * One figure the model was asked about, and what it said: SUPPORTED · SAID_BACK · NOT_SUPPORTED · CONFLICT — and,
+     * since {@code inquiry-claim-check/v6} (2026-11-01 third review), what it read the number from: {@code passage}, the
+     * 1-based number of the evidence line, or null; {@code source} {@code 근거} · {@code 주문} · {@code 문의} or null;
+     * {@code about}, what the number is about in the evidence's own words; {@code when}, the condition it holds under.
+     */
+    public record FigureVerdict(int n, String verdict, Integer passage, String source, String about, String when) {
+        public FigureVerdict(int n, String verdict) {
+            this(n, verdict, null, null, null, null);
+        }
+    }
+
+    /** One fact, condition or promise the claim check found in the draft, with its verdict. */
+    public record ClaimVerdict(String text, String verdict) {
+    }
+
+    /** The claim check's answer — a verdict for every figure asked and every claim found, or empty with the reason. */
+    /**
+     * @param covered need id → ANSWERED · ASKED · NOT_COVERED, for the needs the drafter was told to take up (v11); empty
+     *                when no need list was sent.
+     */
+    public record FigureResult(Optional<List<FigureVerdict>> verdicts, String reason, AgentLlmCallMetrics metrics,
+                               List<ClaimVerdict> claims, boolean answered, java.util.Map<String, String> covered) {
+        public FigureResult(Optional<List<FigureVerdict>> verdicts, String reason, AgentLlmCallMetrics metrics,
+                            List<ClaimVerdict> claims, boolean answered) {
+            this(verdicts, reason, metrics, claims, answered, java.util.Map.of());
+        }
+
+        public FigureResult(Optional<List<FigureVerdict>> verdicts, String reason, AgentLlmCallMetrics metrics) {
+            this(verdicts, reason, metrics, List.of());
+        }
+
+        /** {@code answered}: whether the draft tries to answer the question (v7); a check that does not say is read as yes. */
+        public FigureResult(Optional<List<FigureVerdict>> verdicts, String reason, AgentLlmCallMetrics metrics,
+                            List<ClaimVerdict> claims) {
+            this(verdicts, reason, metrics, claims, true);
+        }
+    }
+
+    /**
+     * What the figure check sends: the same question, passages, order sentence and 규격 line the draft was written over
+     * (the line since v8 — 2026-11-01 ninth review: whether a caution was asked for is the check's to know, not a pass
+     * this backend grants after it).
+     */
+    public record FigureInput(String question, List<Passage> evidence, String orderSentence, String draft,
+                              List<String> figures, String specLine, String answerScope) {
+        public FigureInput(String question, List<Passage> evidence, String orderSentence, String draft,
+                           List<String> figures) {
+            this(question, evidence, orderSentence, draft, figures, null, null);
+        }
+
+        public FigureInput(String question, List<Passage> evidence, String orderSentence, String draft,
+                           List<String> figures, String specLine) {
+            this(question, evidence, orderSentence, draft, figures, specLine, null);
+        }
+    }
+
+    /** The figure check (owner, 2026-10-28): same transport, model and key as the draft — its own prompt and parser. */
+    public FigureResult checkFigures(FigureInput input) {
+        Text text = postForText(figureRequestBody(input));
+        if (text.text().isEmpty()) {
+            return new FigureResult(Optional.empty(), text.reason(), text.metrics());
+        }
+        Optional<List<FigureVerdict>> verdicts = AgentDraftResponseParser.parseFigureVerdicts(text.text().get(),
+                input.figures().size());
+        Optional<List<ClaimVerdict>> claims = verdicts.isEmpty() ? Optional.empty()
+                : AgentDraftResponseParser.parseClaimVerdicts(text.text().get());
+        Optional<Boolean> answered = claims.isEmpty() ? Optional.empty()
+                : AgentDraftResponseParser.parseAnswered(text.text().get());
+        // With a need list the item-by-item answer is required too (v11): without it nothing says what the draft dropped.
+        boolean scoped = input.answerScope() != null && !input.answerScope().isBlank();
+        Optional<java.util.Map<String, String>> covered = answered.isEmpty() ? Optional.empty()
+                : scoped ? AgentDraftResponseParser.parseCovered(text.text().get()) : Optional.of(java.util.Map.of());
+        if (verdicts.isEmpty() || claims.isEmpty() || answered.isEmpty() || covered.isEmpty()) {
+            return new FigureResult(Optional.empty(), "off_schema", text.metrics());
+        }
+        return new FigureResult(verdicts, "ok", text.metrics(), claims.get(), answered.get(), covered.get());
+    }
+
+    /** The serialized figure-check request — the inquiry payload floor plus the draft this backend wrote. */
+    String figureRequestBody(FigureInput input) {
+        return wire.body(LlmRequest.of(modelId, AgentDraftPrompt.figureSystem(), AgentDraftPrompt.figureUser(input.question(),
+                input.evidence(), input.orderSentence(), input.specLine(), input.answerScope(), input.draft(),
+                input.figures()), maxOutputTokens, reasoningEffort,
+                LlmRequest.Format.jsonObject()));
     }
 
     /**
@@ -281,33 +353,12 @@ public class AgentDraftGenerator {
      * vendor and is identical whichever contract we asked for.
      */
     private Result send(String body, java.util.function.Function<String, Optional<AgentDraftResponseParser.ParsedDraft>> parser) {
-        AgentLlmTransport.Response response = http.post(vendor.endpoint, headers(), body);
-        AgentLlmCallMetrics metrics = AgentLlmCallMetrics.of(response);
-        if (response.status() == 0) {
-            // Transport-level: connect failure, timeout, interruption. The marker is the exception TYPE.
-            return Result.failed(version, "transport:" + response.body(), metrics);
+        Text answered = postForText(body);
+        AgentLlmCallMetrics metrics = answered.metrics();
+        if (answered.text().isEmpty()) {
+            return Result.failed(version, answered.reason(), metrics);
         }
-        if (!response.ok()) {
-            // The status only. A vendor error body can quote the request, and the request contains the inquiry.
-            return Result.failed(version, "http:" + response.status(), metrics);
-        }
-        JsonNode envelope;
-        try {
-            envelope = MAPPER.readTree(response.body());
-        } catch (Exception e) {
-            return Result.failed(version, "unreadable_envelope", metrics);
-        }
-        String stop = stopReason(envelope);
-        if ("length".equals(stop) || "max_tokens".equals(stop)) {
-            // Named rather than left to surface as "empty response": on a reasoning model the output budget is
-            // shared with internal reasoning, so this is the difference between "the model cannot do this" and
-            // "the budget was too small" — and one of those is fixable by raising max-output-tokens.
-            return Result.failed(version, "budget_exhausted", metrics);
-        }
-        Optional<String> text = AgentDraftResponseParser.assistantText(response.body());
-        if (text.isEmpty()) {
-            return Result.failed(version, "no_message_text", metrics);
-        }
+        Optional<String> text = answered.text();
         Optional<AgentDraftResponseParser.ParsedDraft> parsed = parser.apply(text.get());
         if (parsed.isEmpty()) {
             // Off-schema, unknown category, blank field, or over-long. No repair pass and no second call: a
@@ -318,15 +369,35 @@ public class AgentDraftGenerator {
         return new Result(parsed, "ok", version, metrics);
     }
 
-    private Map<String, String> headers() {
-        Map<String, String> headers = new LinkedHashMap<>();
-        if (vendor == Vendor.ANTHROPIC) {
-            headers.put("x-api-key", apiKey);
-            headers.put("anthropic-version", "2023-06-01");
-        } else {
-            headers.put("Authorization", "Bearer " + apiKey);
+    /** The assistant's text, or the reason there is none — shared by every call this generator makes. */
+    private record Text(Optional<String> text, String reason, AgentLlmCallMetrics metrics) {
+    }
+
+    private Text postForText(String body) {
+        AgentLlmTransport.Response response = http.post(wire.endpoint(), wire.headers(apiKey), body);
+        AgentLlmCallMetrics metrics = AgentLlmCallMetrics.of(response);
+        if (response.status() == 0) {
+            // Transport-level: connect failure, timeout, interruption. The marker is the exception TYPE.
+            return new Text(Optional.empty(), "transport:" + response.body(), metrics);
         }
-        return headers;
+        if (!response.ok()) {
+            // The status only. A vendor error body can quote the request, and the request contains the inquiry.
+            return new Text(Optional.empty(), "http:" + response.status(), metrics);
+        }
+        LlmReply reply = wire.read(response);
+        if (reply.answered()) {
+            return new Text(Optional.of(reply.content()), "ok", metrics);
+        }
+        return new Text(Optional.empty(), switch (reply.failure()) {
+            // Named rather than left to surface as "empty response": on a reasoning model the output budget is shared
+            // with internal reasoning, so this is the difference between "the model cannot do this" and "the budget
+            // was too small" — and one of those is fixable by raising max-output-tokens.
+            case "TRUNCATED" -> "budget_exhausted";
+            // The vendor's safety classifier declined: no answer, named so the run says why.
+            case "REFUSAL" -> "refusal";
+            case "UNPARSEABLE" -> "unreadable_envelope";
+            default -> "no_message_text";
+        }, metrics);
     }
 
     /**
@@ -338,35 +409,9 @@ public class AgentDraftGenerator {
      * "for correlation".
      */
     String requestBody(Input input) {
-        ObjectNode root = MAPPER.createObjectNode();
-        root.put("model", modelId);
-        ArrayNode messages = root.putArray("messages");
-        ObjectNode user = messages.addObject();
-        user.put("role", "user");
-        user.put("content", AgentDraftPrompt.user(input.title(), input.details(), input.knowledge(),
-                input.orderState(), input.specScope(), input.style(), input.companyContext(), input.answerScope()));
-        if (vendor == Vendor.ANTHROPIC) {
-            root.put("max_tokens", maxOutputTokens);
-            root.put("system", AgentDraftPrompt.system());
-        } else {
-            root.put("max_completion_tokens", maxOutputTokens);
-            // The structured-output contract, stated to the vendor as well as in the prompt. The parser still
-            // validates every field: `json_object` guarantees syntax, not the schema this graph needs.
-            root.putObject("response_format").put("type", "json_object");
-            if (reasoningEffort != null) {
-                root.put("reasoning_effort", reasoningEffort);
-            }
-            ObjectNode system = messages.insertObject(0);
-            system.put("role", "system");
-            system.put("content", AgentDraftPrompt.system());
-        }
-        return root.toString();
-    }
-
-    /** Why the model stopped, from whichever field the vendor calls it. A vendor-controlled enum, not free text. */
-    private String stopReason(JsonNode envelope) {
-        return vendor == Vendor.ANTHROPIC
-                ? envelope.path("stop_reason").asText(null)
-                : envelope.path("choices").path(0).path("finish_reason").asText(null);
+        return wire.body(LlmRequest.of(modelId, AgentDraftPrompt.system(), AgentDraftPrompt.user(input.title(), input.details(),
+                input.knowledge(), input.orderState(), input.specScope(), input.style(), input.companyContext(),
+                input.answerScope()), maxOutputTokens, reasoningEffort,
+                LlmRequest.Format.jsonObject()));
     }
 }

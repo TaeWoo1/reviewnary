@@ -38,14 +38,24 @@ public class KnowledgeQuestionIntentProperties implements AgentCapabilityGate {
     private final String apiKey;
     private final int maxOutputTokens;
     private final String reasoningEffort;
+    private final com.sellerops.agent.llm.provider.LlmVendor vendor;
 
+    /** The shape before the shared model connection (2026-10-29): OpenAI. */
+    public KnowledgeQuestionIntentProperties(boolean enabled, String enabledOrgIds, String model, String apiKey, int maxOutputTokens, String reasoningEffort) {
+        this(enabled, enabledOrgIds, model, apiKey, maxOutputTokens, reasoningEffort, "OPENAI");
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
     public KnowledgeQuestionIntentProperties(
             @Value("${sellerops.knowledge.intent.enabled:false}") boolean enabled,
             @Value("${sellerops.knowledge.intent.enabled-org-ids:}") String enabledOrgIds,
             @Value("${sellerops.knowledge.intent.model:gpt-5-2025-08-07}") String model,
             @Value("${sellerops.knowledge.intent.api-key:}") String apiKey,
             @Value("${sellerops.knowledge.intent.max-output-tokens:400}") int maxOutputTokens,
-            @Value("${sellerops.knowledge.intent.reasoning-effort:minimal}") String reasoningEffort) {
+            @Value("${sellerops.knowledge.intent.reasoning-effort:minimal}") String reasoningEffort,
+            @Value("${sellerops.knowledge.intent.vendor:OPENAI}") String vendor) {
+        // OPENAI | ANTHROPIC (2026-10-29); an unknown name refuses to boot.
+        this.vendor = com.sellerops.agent.llm.provider.LlmVendor.parse(vendor);
         this.enabled = enabled;
         this.allOrgs = enabledOrgIds != null && enabledOrgIds.trim().equals("*");
         this.enabledOrgIds = allOrgs ? List.of() : parseIds(enabledOrgIds);
@@ -116,5 +126,9 @@ public class KnowledgeQuestionIntentProperties implements AgentCapabilityGate {
 
     public String reasoningEffort() {
         return reasoningEffort;
+    }
+
+    public com.sellerops.agent.llm.provider.LlmVendor vendor() {
+        return vendor;
     }
 }

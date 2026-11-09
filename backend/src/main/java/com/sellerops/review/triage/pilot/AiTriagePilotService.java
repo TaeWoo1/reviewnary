@@ -187,6 +187,87 @@ public class AiTriagePilotService {
         return properties.isEnabledFor(orgId) && gate != null;
     }
 
+    /**
+     * <b>Whether one review needs a response, in the classifier's own words</b> (owner, 2026-10-28: 「1~5점 전부 일관된
+     * 기준으로 llm이 심사해야해」) — the judgement drafting ahead reads.
+     *
+     * <p>The verdict this classifier already stored for the review under the current version, or one classification
+     * now, recorded exactly as a pilot run records it. The answer is the <b>model's own</b> tier, never the guarded one:
+     * the guard ({@link com.sellerops.review.triage.llm.AdditiveTriageDecision}) lifts a low rating to 확인 필요 by
+     * rule, and a judgement that is the same for every rating cannot carry a floor that only some ratings get.
+     *
+     * @return empty when the classifier is off for this org, refused the channel, or failed — the caller waits, it does
+     *         not guess
+     */
+    public java.util.Optional<Boolean> needsResponse(UUID orgId, Review review) {
+        if (!isEnabledFor(orgId)) {
+            return java.util.Optional.empty();
+        }
+        com.sellerops.review.triage.feedback.TriagePrediction latest = feedback.latest(review.getId()).orElse(null);
+        if (latest == null || !gate.version().equals(latest.getClassifierVersion())) {
+            // Under the org's actual AI ceiling like every call (owner, 2026-10-29): refused, the caller waits.
+            java.util.Optional<UUID> charged = chargeClassify(orgId);
+            if (charged == null) {
+                return java.util.Optional.empty();
+            }
+            String channelCode = channels.findById(review.getChannelId()).map(Channel::getCode).orElse("UNKNOWN");
+            long started = System.nanoTime();
+            ReviewTriageClassifier.Result result = gate.classify(channelCode, review.getRating(), review.getBody());
+            charged.ifPresent(id -> quota.recordOutcome(id, (System.nanoTime() - started) / 1_000_000, null, null));
+            latest = feedback.record(orgId, review.getId(), review.getRating(), review.getBody(), properties.model(),
+                    result);
+        }
+        return verdictOf(latest);
+    }
+
+    private com.sellerops.agent.quota.AgentQuotaService quota;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setQuota(com.sellerops.agent.quota.AgentQuotaService quota) {
+        this.quota = quota;
+    }
+
+    /**
+     * Charge one classification against the org's actual AI ceiling, as the automatic work it is. Null when the ceiling
+     * refused it; an empty id when there is no meter to write on.
+     */
+    private java.util.Optional<UUID> chargeClassify(UUID orgId) {
+        if (quota == null) {
+            return java.util.Optional.empty();
+        }
+        com.sellerops.agent.quota.AgentQuotaService.Charge c = quota.chargeCheck(orgId,
+                com.sellerops.agent.quota.AgentUsageKind.TRIAGE, "CLASSIFY", com.sellerops.agent.quota.AgentUsageActor.RUN);
+        if (c.decision() != null && !c.decision().allowed()) {
+            return null;
+        }
+        return java.util.Optional.ofNullable(c.usageId());
+    }
+
+    /**
+     * The verdict already stored for the review under the current version — never a new classification. Empty when
+     * there is none (미평가): a reader that must not spend a model call, such as the judgement comparison, reads this.
+     */
+    public java.util.Optional<Boolean> storedVerdict(UUID orgId, Review review) {
+        if (gate == null) {
+            return java.util.Optional.empty();
+        }
+        return feedback.latest(review.getId()).filter(p -> gate.version().equals(p.getClassifierVersion()))
+                .flatMap(AiTriagePilotService::verdictOf);
+    }
+
+    /**
+     * 「응대가 필요하다」 from one stored answer: the model said 확인 필요, or it named answering the buyer or a remedy as
+     * the thing to do. 지켜보기 and 참고 with any other action are not a response owed.
+     */
+    public static java.util.Optional<Boolean> verdictOf(com.sellerops.review.triage.feedback.TriagePrediction p) {
+        if (p == null || p.getStatus() != ReviewTriageClassifier.Status.OK || p.getModelTier() == null) {
+            return java.util.Optional.empty();
+        }
+        return java.util.Optional.of(p.getModelTier() == com.sellerops.review.triage.ReviewTriageTier.NEEDS_ATTENTION
+                || p.getSuggestedNextAction() == com.sellerops.review.triage.llm.TriageSuggestedAction.REPLY_TO_BUYER
+                || p.getSuggestedNextAction() == com.sellerops.review.triage.llm.TriageSuggestedAction.OFFER_REMEDY);
+    }
+
     /** The version a run would stamp, or null while the pilot is off. */
     public String classifierVersion() {
         return gate == null ? null : gate.version();
@@ -240,6 +321,10 @@ public class AiTriagePilotService {
         int failed = 0;
         int refused = 0;
         for (Review review : pending) {
+            if (chargeClassify(orgId) == null) {
+                // The day's AI ceiling: the rest of the batch waits for tomorrow's budget.
+                break;
+            }
             ReviewTriageClassifier.Result result = gate.classify(channelCode, review.getRating(), review.getBody());
             feedback.record(orgId, review.getId(), review.getRating(), review.getBody(),
                     properties.model(), result);

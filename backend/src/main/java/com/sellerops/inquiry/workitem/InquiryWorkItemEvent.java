@@ -26,5 +26,12 @@ public enum InquiryWorkItemEvent {
      */
     EXECUTION_REARMED,
     VERIFICATION_RECORDED,
-    WORK_ITEM_DISMISSED
+    WORK_ITEM_DISMISSED,
+    /**
+     * The seller took an approved answer back before it was registered (2026-11-05 seventh review), because the record it
+     * was written from is no longer the one that stands. The approval moved, field for field, to
+     * {@code inquiry_approval_withdrawn}; the reply went back to {@code PROPOSED}. Later approvals of the same work item
+     * suffix their own audit ids by the number of these, so a second approval is a second row, never a refused insert.
+     */
+    APPROVAL_WITHDRAWN
 }

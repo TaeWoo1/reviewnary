@@ -94,6 +94,12 @@ public class TriageFeedbackService {
      * nowhere else, which meant every stored row stamped {@code +additive-guard/v1} onto a tier the
      * guard had never seen.
      */
+    /** The latest thing the classifier said about one review, whatever version said it. */
+    @Transactional(readOnly = true)
+    public java.util.Optional<TriagePrediction> latest(UUID reviewId) {
+        return predictions.findFirstByReviewIdOrderByPredictedAtDesc(reviewId);
+    }
+
     @Transactional
     public TriagePrediction record(UUID orgId, UUID reviewId, Integer rating, String body,
                                    String modelId, ReviewTriageClassifier.Result result) {

@@ -21,10 +21,24 @@ public record ReviewReplyDraftView(
         String body,
         String contentFingerprint,
         String fingerprintAlgorithm,
-        Instant createdAt) {
+        Instant createdAt,
+        String polishNote,
+        java.util.List<String> openQuestions) {
+
+    public ReviewReplyDraftView(int version, String body, String contentFingerprint, String fingerprintAlgorithm,
+                                Instant createdAt) {
+        this(version, body, contentFingerprint, fingerprintAlgorithm, createdAt, null, java.util.List.of());
+    }
+
+    public ReviewReplyDraftView(int version, String body, String contentFingerprint, String fingerprintAlgorithm,
+                                Instant createdAt, String polishNote) {
+        this(version, body, contentFingerprint, fingerprintAlgorithm, createdAt, polishNote, java.util.List.of());
+    }
 
     public static ReviewReplyDraftView of(ReviewReplyDraft d) {
         return new ReviewReplyDraftView(d.getVersion(), d.getBody(), d.getContentFingerprint(),
-                d.getFingerprintAlgorithm(), d.getCreatedAt());
+                d.getFingerprintAlgorithm(), d.getCreatedAt(), d.getPolishNote(),
+                d.getOpenQuestions() == null || d.getOpenQuestions().isBlank() ? java.util.List.of()
+                        : java.util.List.of(d.getOpenQuestions().split("\n")));
     }
 }

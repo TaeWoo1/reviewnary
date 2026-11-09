@@ -35,6 +35,20 @@ public record EvidenceScope(Kind kind, String id) {
         return key == null ? null : key.channelId() + "|" + key.orderRef();
     }
 
+    /**
+     * The order a Case is about, as the decision holds order evidence to it (2026-11-02 seller-check review): the channel's
+     * own order reference when the channel named one, otherwise this inquiry itself — 「the order this customer is asking
+     * about」, which only the seller can look up. Only the seller's own record ({@link EvidenceCandidate.Kind#SELLER_CHECK})
+     * is ever attributed to the second form; the channel's order facts need the first.
+     */
+    public static String caseOrderKey(com.sellerops.inquiry.Inquiry inquiry) {
+        if (inquiry == null) {
+            return null;
+        }
+        String channel = orderKey(PrecedentReuse.OrderKey.of(inquiry));
+        return channel != null ? channel : inquiry.getId() == null ? null : "inquiry:" + inquiry.getId();
+    }
+
     /** The Case's instances: the listing and the order it is about, when known. */
     public record CaseScope(UUID productId, String orderKey) {
         public static final CaseScope NONE = new CaseScope(null, null);

@@ -2,7 +2,6 @@ package com.sellerops.inquiry.decision;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sellerops.agent.llm.AgentLlmCallMetrics;
 import com.sellerops.inquiry.authority.CapabilitySnapshot;
@@ -10,7 +9,10 @@ import com.sellerops.inquiry.resolution.ResolutionPlan;
 import com.sellerops.inquiry.resolution.ResolutionPlanParser;
 import com.sellerops.inquiry.resolution.ResolutionPlannerPrompt;
 import com.sellerops.agent.llm.AgentLlmTransport;
-import java.net.URI;
+import com.sellerops.agent.llm.provider.LlmReply;
+import com.sellerops.agent.llm.provider.LlmRequest;
+import com.sellerops.agent.llm.provider.LlmVendor;
+import com.sellerops.agent.llm.provider.LlmWire;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -34,24 +36,29 @@ import org.slf4j.LoggerFactory;
  */
 public class InquiryDecisionGenerator {
 
-    private static final URI ENDPOINT = URI.create("https://api.openai.com/v1/chat/completions");
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Logger log = LoggerFactory.getLogger(InquiryDecisionGenerator.class);
     static final int MAX_ASK = 120;
 
     private final AgentLlmTransport transport;
     private final InquiryDecisionProperties properties;
+    /** The vendor's spelling of the call (2026-10-29): the prompts, schemas and parsers below are the capability's own. */
+    private final LlmWire wire;
 
     InquiryDecisionGenerator(AgentLlmTransport transport, InquiryDecisionProperties properties) {
         this.transport = transport;
         this.properties = properties;
+        this.wire = LlmWire.of(properties.vendor());
+    }
+
+    private AgentLlmTransport.Response post(String body) {
+        return transport.post(wire.endpoint(), wire.headers(properties.apiKey()), body);
     }
 
     InquiryDecisionModel.Answer<List<InquiryNeed>> plan(UUID orgId, String body) {
-        AgentLlmTransport.Response response = transport.post(ENDPOINT,
-                Map.of("Authorization", "Bearer " + properties.apiKey()), body);
+        AgentLlmTransport.Response response = post(body);
         AgentLlmCallMetrics metrics = AgentLlmCallMetrics.of(response);
-        Envelope env = Envelope.of(response);
+        Envelope env = Envelope.of(wire, response);
         List<InquiryNeed> needs = env.failure() == null ? parsePlan(env.content()) : null;
         String failure = env.failure() != null ? env.failure() : needs == null ? "UNPARSEABLE" : null;
         log.info("inquiry_decision phase=plan orgId={} format={} answered={} failure={} finish={} needs={} {}", orgId,
@@ -66,11 +73,12 @@ public class InquiryDecisionGenerator {
      */
     InquiryDecisionModel.Answer<Map<String, NeedVerdict>> judge(UUID orgId, String body, List<String> needIds,
                                                                 int evidence, int precedents) {
-        AgentLlmTransport.Response response = transport.post(ENDPOINT,
-                Map.of("Authorization", "Bearer " + properties.apiKey()), body);
+        AgentLlmTransport.Response response = post(body);
         AgentLlmCallMetrics metrics = AgentLlmCallMetrics.of(response);
-        Envelope env = Envelope.of(response);
-        Judged judged = env.failure() == null ? parseJudge(env.content(), needIds) : new Judged(null, env.failure());
+        Envelope env = Envelope.of(wire, response);
+        Judged judged = env.failure() != null ? new Judged(null, env.failure())
+                : InquiryDecisionPrompt.JUDGE_V3.equals(properties.judgePrompt()) ? parseKeyedJudge(env.content(), needIds)
+                : parseJudge(env.content(), needIds);
         log.info("inquiry_decision phase=judge orgId={} prompt={} effort={} format={} answered={} failure={} finish={}"
                         + " needs={} evidence={} precedents={} verdicts={} {}", orgId, properties.judgePrompt(),
                 properties.judgeReasoningEffort(), properties.outputFormat(), judged.failure() == null,
@@ -85,10 +93,9 @@ public class InquiryDecisionGenerator {
      * the model actually said, and an observation nobody can re-derive is the one thing a re-run cannot replace.
      */
     ResolutionPlanCall resolutionPlan(UUID orgId, String body) {
-        AgentLlmTransport.Response response = transport.post(ENDPOINT,
-                Map.of("Authorization", "Bearer " + properties.apiKey()), body);
+        AgentLlmTransport.Response response = post(body);
         AgentLlmCallMetrics metrics = AgentLlmCallMetrics.of(response);
-        Envelope env = Envelope.of(response);
+        Envelope env = Envelope.of(wire, response);
         ResolutionPlanParser.Parsed parsed = env.failure() == null ? ResolutionPlanParser.parse(env.content())
                 : ResolutionPlanParser.failed(env.failure());
         log.info("inquiry_decision phase=resolution_plan orgId={} prompt={} format={} answered={} failure={} finish={}"
@@ -135,36 +142,17 @@ public class InquiryDecisionGenerator {
      * of a half-written plan is not a smaller version of the right answer — it is an unknown one.
      */
     record Envelope(String content, String said, String finish, String failure) {
+        /** OpenAI's reading — what every recorded run used. */
         static Envelope of(AgentLlmTransport.Response response) {
-            if (response == null) {
-                return new Envelope(null, null, null, "TRANSPORT");
-            }
-            if (!response.ok()) {
-                // the vendor's own error body is the only evidence of an HTTP failure, so that is what `said` carries
-                return new Envelope(null, blankToNull(response.body()), null,
-                        response.status() == 0 ? "TRANSPORT" : "HTTP_" + response.status());
-            }
-            try {
-                JsonNode choice = MAPPER.readTree(response.body()).path("choices").path(0);
-                String finish = choice.path("finish_reason").asText(null);
-                String said = choice.path("message").path("content").asText("");
-                JsonNode refusal = choice.path("message").path("refusal");
-                if (refusal.isTextual() && !refusal.asText().isBlank()) {
-                    return new Envelope(null, refusal.asText(), finish, "REFUSAL");
-                }
-                if ("length".equals(finish)) {
-                    return new Envelope(null, blankToNull(said), finish, "TRUNCATED");
-                }
-                return said.isBlank() ? new Envelope(null, null, finish, "EMPTY")
-                        : new Envelope(said, said, finish, null);
-            } catch (Exception e) {
-                return new Envelope(null, blankToNull(response.body()), null, "UNPARSEABLE");
-            }
+            return of(LlmWire.of(LlmVendor.OPENAI), response);
         }
 
-        private static String blankToNull(String s) {
-            return s == null || s.isBlank() ? null : s;
+        /** The vendor's reading, as this capability's four facts — the same closed failure words for every vendor. */
+        static Envelope of(LlmWire wire, AgentLlmTransport.Response response) {
+            LlmReply reply = wire.read(response);
+            return new Envelope(reply.content(), reply.said(), reply.finish(), reply.failure());
         }
+
     }
 
     /** A verdict set, or why there is none. */
@@ -243,6 +231,46 @@ public class InquiryDecisionGenerator {
         return new Judged(parseJudge(content), null);
     }
 
+    /** Rejects a field written twice — in v3 a need answered twice is a doubled key, which a lenient reader would hide. */
+    private static final ObjectMapper STRICT = new ObjectMapper()
+            .enable(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
+
+    /**
+     * <b>v3's answer: verdicts keyed by need id</b>. Read into v2's list form and held to the same strict set check
+     * ({@link #parseJudge(String, List)}): the schema makes a missing, doubled or invented need impossible where the
+     * vendor enforces it, and this still refuses one where it did not. A need answered twice is a duplicate key —
+     * {@code VERDICT_SET}, as a doubled list entry is in v2.
+     */
+    static Judged parseKeyedJudge(String content, List<String> needIds) {
+        if (content == null || content.isBlank()) {
+            return new Judged(null, "EMPTY");
+        }
+        JsonNode verdicts;
+        try {
+            verdicts = STRICT.readTree(content).path("verdicts");
+        } catch (com.fasterxml.jackson.core.JsonParseException e) {
+            return new Judged(null, e.getOriginalMessage() != null && e.getOriginalMessage().startsWith("Duplicate field")
+                    ? "VERDICT_SET" : "UNPARSEABLE");
+        } catch (Exception e) {
+            return new Judged(null, "UNPARSEABLE");
+        }
+        if (!verdicts.isObject()) {
+            return new Judged(null, "UNPARSEABLE");
+        }
+        com.fasterxml.jackson.databind.node.ArrayNode list = MAPPER.createArrayNode();
+        verdicts.fields().forEachRemaining(e -> {
+            com.fasterxml.jackson.databind.node.ObjectNode v = MAPPER.createObjectNode().put("need", e.getKey());
+            if (e.getValue().isObject()) {
+                v.setAll((com.fasterxml.jackson.databind.node.ObjectNode) e.getValue());
+                v.put("need", e.getKey());
+            }
+            list.add(v);
+        });
+        com.fasterxml.jackson.databind.node.ObjectNode asList = MAPPER.createObjectNode();
+        asList.set("verdicts", list);
+        return parseJudge(asList.toString(), needIds);
+    }
+
     /** Lenient reading of one answer's verdicts, by id — the strict set check is {@link #parseJudge(String, List)}. */
     static Map<String, NeedVerdict> parseJudge(String content) {
         try {
@@ -262,7 +290,7 @@ public class InquiryDecisionGenerator {
                 }
                 out.put(need, new NeedVerdict(need, status, strings(v.path("evidence")), phrases(v.path("missing")),
                         strings(v.path("customer_input")), strings(v.path("assumptions")), text(v, "ask_customer"),
-                        strings(v.path("precedents"))));
+                        strings(v.path("precedents")), text(v, "settled_by")));
             }
             return out;
         } catch (Exception e) {
@@ -306,8 +334,14 @@ public class InquiryDecisionGenerator {
 
     String judgeBody(String question, List<InquiryNeed> needs, List<EvidenceCandidate> evidence,
                      List<PrecedentCandidate> precedents) {
+        return judgeBody(question, needs, evidence, precedents, null);
+    }
+
+    /** The same, with when the inquiry arrived ({@link InquiryMoment}) — none when null. */
+    String judgeBody(String question, List<InquiryNeed> needs, List<EvidenceCandidate> evidence,
+                     List<PrecedentCandidate> precedents, String received) {
         return body(InquiryDecisionPrompt.judgeSystem(properties.judgePrompt()),
-                InquiryDecisionPrompt.judgeUser(question, needs, evidence, precedents),
+                InquiryDecisionPrompt.judgeUser(question, needs, evidence, precedents, received),
                 properties.judgeMaxOutputTokens(), properties.judgeReasoningEffort(),
                 InquiryDecisionPrompt.judgeSchema(properties.judgePrompt(), needs.stream().map(InquiryNeed::id).toList(),
                         evidence.stream().map(EvidenceCandidate::id).toList(),
@@ -315,20 +349,9 @@ public class InquiryDecisionGenerator {
     }
 
     private String body(String system, String user, int maxTokens, String reasoningEffort, ObjectNode schema) {
-        ObjectNode root = MAPPER.createObjectNode();
-        root.put("model", properties.model());
-        ArrayNode messages = root.putArray("messages");
-        messages.addObject().put("role", "system").put("content", system);
-        messages.addObject().put("role", "user").put("content", user);
-        root.put("max_completion_tokens", maxTokens);
-        if (InquiryDecisionProperties.FORMAT_JSON_OBJECT.equals(properties.outputFormat())) {
-            root.putObject("response_format").put("type", "json_object"); // the v2 / apr-c8715d20 request shape
-        } else {
-            root.set("response_format", schema);
-        }
-        if (reasoningEffort != null) {
-            root.put("reasoning_effort", reasoningEffort);
-        }
-        return root.toString();
+        LlmRequest.Format format = InquiryDecisionProperties.FORMAT_JSON_OBJECT.equals(properties.outputFormat())
+                ? LlmRequest.Format.jsonObject() // the v2 / apr-c8715d20 request shape
+                : LlmRequest.Format.fromOpenAiResponseFormat(schema);
+        return wire.body(LlmRequest.of(properties.model(), system, user, maxTokens, reasoningEffort, format));
     }
 }

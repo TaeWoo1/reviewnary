@@ -233,10 +233,12 @@ class OperatorCapabilityChainTest {
 
         ingestReview(product.getId(), ADHESION_REVIEW, 1);
 
-        assertThat(published)
+        assertThat(published.stream().filter(e -> e instanceof com.sellerops.reviewimport.ReviewSegmentIngestedEvent))
                 .as("defect C: Coupang acquisition and upload ingest published nothing, so the repeated-"
                         + "issue memory was permanently blind to both")
                 .hasSize(1);
+        // …and the same ingest starts the AI judgement and the drafts written ahead (owner, 2026-10-28).
+        assertThat(published.stream().filter(e -> e instanceof NewWorkIngestedEvent)).hasSize(1);
     }
 
     @Test

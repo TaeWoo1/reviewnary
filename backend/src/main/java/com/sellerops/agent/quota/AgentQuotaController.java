@@ -22,6 +22,21 @@ public class AgentQuotaController {
         this.quota = quota;
     }
 
+    /** One day's usage by kind · step · trigger · actor (2026-10-28). {@code date} is a KST day; today when absent. */
+    @GetMapping("/usage")
+    public AgentQuotaService.UsageReport usage(@AuthenticationPrincipal AuthPrincipal principal,
+                                               @org.springframework.web.bind.annotation.RequestParam(required = false)
+                                               String date) {
+        java.time.LocalDate day;
+        try {
+            day = date == null || date.isBlank() ? java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"))
+                    : java.time.LocalDate.parse(date.strip());
+        } catch (java.time.format.DateTimeParseException e) {
+            throw com.sellerops.common.ApiException.badRequest("날짜는 YYYY-MM-DD로 보내 주세요.");
+        }
+        return quota.report(principal.orgId(), day);
+    }
+
     @GetMapping
     public AgentQuotaService.AgentQuotaStatus status(@AuthenticationPrincipal AuthPrincipal principal) {
         return quota.status(principal.orgId());

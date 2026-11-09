@@ -85,6 +85,9 @@ public class ReviewDraftBasis {
                 .forEach(s -> policy.add(s.getId(), s.getKnowledgeType(), s.isActive(), s.getTitle(), s.getBody()));
         policy.add("guard", String.join(",", ReviewClaimGuard.COMMITMENT_TERMS));
         policy.add("conditions", ReviewClaimGuard.FIGURE.pattern(), String.join(",", ReviewClaimGuard.CONDITION_TERMS));
+        // How a term is read as the same cost, and a state as set aside (2026-11-01): a change to either changes holds.
+        policy.add("same-term", new java.util.TreeMap<>(ReviewClaimGuard.SAME_TERM).toString(),
+                ReviewClaimGuard.REGARDLESS.pattern());
         policy.add("refusals", String.join(",", ReviewClaimGuard.REFUSALS), String.valueOf(ReviewClaimGuard.ENDING),
                 ReviewClaimGuard.READING);
         Digest voice = new Digest();

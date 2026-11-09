@@ -44,10 +44,75 @@ import java.util.UUID;
  *                         nothing, so when this is set the screen shows the operational sentence and
  *                         must NOT show 「답변 기준이 필요합니다」 — that sentence belongs to the one
  *                         case where retrieval actually settled with no usable evidence
+ * @param unavailableKind  that reason as a closed word — HELD_BY_CHECK · WAITING_FOR_CHECK · NOT_RUN — or null
+ * @param openQuestions    what this draft did not answer and left to the seller (tenth review) — empty when it answers
+ *                         everything asked; while one is open the reply is not sent
+ * @param rewrite          the one rewrite (2026-11-02), as a closed word — null when the first draft was not rewritten,
+ *                         {@code PASSED} when the rewrite passed every check, {@code REFUSED} when a check refused it too,
+ *                         {@code PENDING} when the rewrite is held for its check's budget (검토 대기 — not a refusal),
+ *                         {@code NOT_WRITTEN} when the rewrite call wrote nothing. A held rewrite resumed later still says
+ *                         {@code PASSED} or {@code REFUSED} (2026-11-02, fifth review). An evaluation reads it to tell a
+ *                         first try from a second; the screen does not
+ * @param sellerCheckAsk   what the seller is asked to check on the seller centre (2026-11-02 seller-check review) — the
+ *                         system's reading of the inquiry, never a verified one: {@code ORDER_ACTION} (something to be done
+ *                         to this order — a refund, a cancellation), {@code ORDER_STATE} (how this order stands), or null
+ *                         when no order need is left open. The screen asks for a record ({@code …/seller-check}) on it
  */
 public record GeneratedDraftView(ReplyDraftView draft, String authorKind, String knowledgeState,
                                  String knowledgeNote, String answerBasis, String answerBasisNote,
                                  String answerBasisAction, UUID productId,
                                  List<DraftEvidenceView> evidence, boolean companyContextUsed,
-                                 String unavailableMessage, KnowledgeGapView knowledgeGap) {
+                                 String unavailableMessage, KnowledgeGapView knowledgeGap,
+                                 String unavailableKind, List<String> openQuestions, String rewrite,
+                                 String sellerCheckAsk) {
+
+    public GeneratedDraftView(ReplyDraftView draft, String authorKind, String knowledgeState, String knowledgeNote,
+                              String answerBasis, String answerBasisNote, String answerBasisAction, UUID productId,
+                              List<DraftEvidenceView> evidence, boolean companyContextUsed, String unavailableMessage,
+                              KnowledgeGapView knowledgeGap, String unavailableKind, List<String> openQuestions,
+                              String rewrite) {
+        this(draft, authorKind, knowledgeState, knowledgeNote, answerBasis, answerBasisNote, answerBasisAction, productId,
+                evidence, companyContextUsed, unavailableMessage, knowledgeGap, unavailableKind, openQuestions, rewrite,
+                null);
+    }
+
+    /** The same view, naming what the seller is asked to check (null leaves it as it is). */
+    public GeneratedDraftView withSellerCheckAsk(String ask) {
+        return ask == null ? this : new GeneratedDraftView(draft, authorKind, knowledgeState, knowledgeNote,
+                answerBasis, answerBasisNote, answerBasisAction, productId, evidence, companyContextUsed,
+                unavailableMessage, knowledgeGap, unavailableKind, openQuestions, rewrite, ask);
+    }
+
+    public GeneratedDraftView(ReplyDraftView draft, String authorKind, String knowledgeState, String knowledgeNote,
+                              String answerBasis, String answerBasisNote, String answerBasisAction, UUID productId,
+                              List<DraftEvidenceView> evidence, boolean companyContextUsed, String unavailableMessage,
+                              KnowledgeGapView knowledgeGap, String unavailableKind, List<String> openQuestions) {
+        this(draft, authorKind, knowledgeState, knowledgeNote, answerBasis, answerBasisNote, answerBasisAction, productId,
+                evidence, companyContextUsed, unavailableMessage, knowledgeGap, unavailableKind, openQuestions, null);
+    }
+
+    /** The same view, saying how the one rewrite went. */
+    public GeneratedDraftView withRewrite(String outcome) {
+        return outcome == null ? this : new GeneratedDraftView(draft, authorKind, knowledgeState, knowledgeNote,
+                answerBasis, answerBasisNote, answerBasisAction, productId, evidence, companyContextUsed,
+                unavailableMessage, knowledgeGap, unavailableKind, openQuestions, outcome, sellerCheckAsk);
+    }
+
+    public GeneratedDraftView(ReplyDraftView draft, String authorKind, String knowledgeState, String knowledgeNote,
+                              String answerBasis, String answerBasisNote, String answerBasisAction, UUID productId,
+                              List<DraftEvidenceView> evidence, boolean companyContextUsed, String unavailableMessage,
+                              KnowledgeGapView knowledgeGap, String unavailableKind) {
+        this(draft, authorKind, knowledgeState, knowledgeNote, answerBasis, answerBasisNote, answerBasisAction, productId,
+                evidence, companyContextUsed, unavailableMessage, knowledgeGap, unavailableKind, List.of());
+    }
+
+    /** {@code unavailableKind} is read off the sentence — {@code InquiryDraftComposer#unavailableKind}. */
+    public GeneratedDraftView(ReplyDraftView draft, String authorKind, String knowledgeState, String knowledgeNote,
+                              String answerBasis, String answerBasisNote, String answerBasisAction, UUID productId,
+                              List<DraftEvidenceView> evidence, boolean companyContextUsed, String unavailableMessage,
+                              KnowledgeGapView knowledgeGap) {
+        this(draft, authorKind, knowledgeState, knowledgeNote, answerBasis, answerBasisNote, answerBasisAction, productId,
+                evidence, companyContextUsed, unavailableMessage, knowledgeGap,
+                com.sellerops.inquiry.draft.InquiryDraftComposer.unavailableKind(unavailableMessage));
+    }
 }

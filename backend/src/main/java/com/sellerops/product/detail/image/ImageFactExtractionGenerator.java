@@ -1,14 +1,16 @@
 package com.sellerops.product.detail.image;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sellerops.agent.llm.AgentLlmCallMetrics;
+import com.sellerops.agent.llm.provider.LlmReply;
+import com.sellerops.agent.llm.provider.LlmRequest;
+import com.sellerops.agent.llm.provider.LlmVendor;
+import com.sellerops.agent.llm.provider.LlmWire;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sellerops.agent.llm.AgentLlmTransport;
-import java.net.URI;
 import java.util.Base64;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -36,19 +38,20 @@ import java.util.Optional;
  */
 public class ImageFactExtractionGenerator {
 
-    /** Which wire format to speak. Nothing else differs between them. */
+    /** Which wire format to speak — the shared model connection's vendor (2026-10-29). Nothing else differs. */
     public enum Vendor {
-        ANTHROPIC(URI.create("https://api.anthropic.com/v1/messages")),
-        OPENAI(URI.create("https://api.openai.com/v1/chat/completions"));
+        ANTHROPIC(LlmVendor.ANTHROPIC),
+        OPENAI(LlmVendor.OPENAI);
 
-        private final URI endpoint;
+        private final LlmVendor vendor;
 
-        Vendor(URI endpoint) {
-            this.endpoint = endpoint;
+        Vendor(LlmVendor vendor) {
+            this.vendor = vendor;
         }
 
+        /** Blank is OpenAI; an unknown name refuses (2026-10-29) instead of quietly becoming OpenAI. */
         public static Vendor of(String name) {
-            return "ANTHROPIC".equalsIgnoreCase(name) ? ANTHROPIC : OPENAI;
+            return LlmVendor.parse(name) == LlmVendor.ANTHROPIC ? ANTHROPIC : OPENAI;
         }
     }
 
@@ -65,11 +68,13 @@ public class ImageFactExtractionGenerator {
     private final int maxOutputTokens;
     private final String reasoningEffort;
     private final String version;
+    private final LlmWire wire;
 
     public ImageFactExtractionGenerator(AgentLlmTransport http, Vendor vendor, String modelId,
                                         String apiKey, int maxOutputTokens, String reasoningEffort) {
         this.http = http;
         this.vendor = vendor;
+        this.wire = LlmWire.of(vendor.vendor);
         this.modelId = modelId;
         this.apiKey = apiKey;
         this.maxOutputTokens = maxOutputTokens;
@@ -122,47 +127,36 @@ public class ImageFactExtractionGenerator {
         }
         String body = requestBody(imageBytes, contentType);
         // The seller's own product-page image: the one image kind a seller-PC install sends unchecked (LlmSendGate).
-        AgentLlmTransport.Response response = http.postProductImages(vendor.endpoint, headers(), body);
+        AgentLlmTransport.Response response = http.postProductImages(wire.endpoint(), wire.headers(apiKey), body);
         if (response.status() == 0) {
             return Result.failed("transport:" + response.body());
         }
         if (!response.ok()) {
             return Result.failed("http:" + response.status());
         }
-        JsonNode envelope;
-        try {
-            envelope = MAPPER.readTree(response.body());
-        } catch (Exception e) {
+        LlmReply reply = wire.read(response);
+        if ("UNPARSEABLE".equals(reply.failure())) {
             return Result.failed("unreadable_envelope");
         }
-        Usage usage = usageOf(envelope);
-        String stop = stopReason(envelope);
-        if ("length".equals(stop) || "max_tokens".equals(stop)) {
+        AgentLlmCallMetrics metrics = AgentLlmCallMetrics.of(response);
+        Usage usage = new Usage(Math.max(0, metrics.promptTokens()), Math.max(0, metrics.completionTokens()));
+        if ("TRUNCATED".equals(reply.failure())) {
             // Named rather than surfacing as an empty answer: this is the difference between "the
             // picture states nothing" and "the budget was too small to say what it states", and only
             // one of those is a finding about the seller's page.
             return new Result(Optional.empty(), "budget_exhausted", usage);
         }
-        Optional<String> text = ImageFactResponseParser.assistantText(response.body());
-        if (text.isEmpty()) {
+        if ("REFUSAL".equals(reply.failure())) {
+            return new Result(Optional.empty(), "refusal", usage);
+        }
+        if (!reply.answered()) {
             return new Result(Optional.empty(), "no_message_text", usage);
         }
-        Optional<ExtractedImageFacts> parsed = ImageFactResponseParser.parse(text.get());
+        Optional<ExtractedImageFacts> parsed = ImageFactResponseParser.parse(reply.content());
         if (parsed.isEmpty()) {
             return new Result(Optional.empty(), "off_schema", usage);
         }
         return new Result(parsed, "ok", usage);
-    }
-
-    private Map<String, String> headers() {
-        Map<String, String> headers = new LinkedHashMap<>();
-        if (vendor == Vendor.ANTHROPIC) {
-            headers.put("x-api-key", apiKey);
-            headers.put("anthropic-version", "2023-06-01");
-        } else {
-            headers.put("Authorization", "Bearer " + apiKey);
-        }
-        return headers;
     }
 
     /**
@@ -175,40 +169,11 @@ public class ImageFactExtractionGenerator {
      * is reused exactly as it is; no endpoint migration rides in on this package.
      */
     String requestBody(byte[] imageBytes, String contentType) {
-        String dataUrl = "data:" + (contentType == null || contentType.isBlank() ? "image/jpeg" : contentType)
-                + ";base64," + Base64.getEncoder().encodeToString(imageBytes);
-        ObjectNode root = MAPPER.createObjectNode();
-        root.put("model", modelId);
-        ArrayNode messages = root.putArray("messages");
-        if (vendor == Vendor.ANTHROPIC) {
-            root.put("max_tokens", maxOutputTokens);
-            root.put("system", ImageFactExtractionPrompt.system());
-            ObjectNode user = messages.addObject();
-            user.put("role", "user");
-            ObjectNode part = user.putArray("content").addObject();
-            part.put("type", "image");
-            ObjectNode src = part.putObject("source");
-            src.put("type", "base64");
-            src.put("media_type", contentType);
-            src.put("data", Base64.getEncoder().encodeToString(imageBytes));
-        } else {
-            ObjectNode system = messages.addObject();
-            system.put("role", "system");
-            system.put("content", ImageFactExtractionPrompt.system());
-            ObjectNode user = messages.addObject();
-            user.put("role", "user");
-            ObjectNode part = user.putArray("content").addObject();
-            part.put("type", "image_url");
-            ObjectNode image = part.putObject("image_url");
-            image.put("url", dataUrl);
-            image.put("detail", ImageKnowledgeProperties.DETAIL);
-            root.put("max_completion_tokens", maxOutputTokens);
-            root.set("response_format", responseFormat());
-            if (reasoningEffort != null) {
-                root.put("reasoning_effort", reasoningEffort);
-            }
-        }
-        return root.toString();
+        String mediaType = contentType == null || contentType.isBlank() ? "image/jpeg" : contentType;
+        return wire.body(new LlmRequest(modelId, ImageFactExtractionPrompt.system(), null,
+                List.of(new LlmRequest.Image(mediaType, Base64.getEncoder().encodeToString(imageBytes),
+                        ImageKnowledgeProperties.DETAIL)),
+                maxOutputTokens, reasoningEffort, LlmRequest.Format.fromOpenAiResponseFormat(responseFormat())));
     }
 
     /** {@code json_schema} + {@code strict}: a closed object, all fields required, no extras. */
@@ -236,19 +201,5 @@ public class ImageFactExtractionGenerator {
         return format;
     }
 
-    private Usage usageOf(JsonNode envelope) {
-        JsonNode usage = envelope.path("usage");
-        if (usage.isMissingNode()) {
-            return Usage.NONE;
-        }
-        int prompt = usage.path("prompt_tokens").asInt(usage.path("input_tokens").asInt(0));
-        int completion = usage.path("completion_tokens").asInt(usage.path("output_tokens").asInt(0));
-        return new Usage(prompt, completion);
-    }
 
-    private String stopReason(JsonNode envelope) {
-        return vendor == Vendor.ANTHROPIC
-                ? envelope.path("stop_reason").asText(null)
-                : envelope.path("choices").path(0).path("finish_reason").asText(null);
-    }
 }

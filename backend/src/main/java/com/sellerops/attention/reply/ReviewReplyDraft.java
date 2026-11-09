@@ -95,6 +95,17 @@ public class ReviewReplyDraft {
     @Column(name = "product_id")
     private UUID productId;
 
+    /** The reply agent's note when only the form wants work — 「문장 다듬기 필요」 (V169); null otherwise. */
+    @Column(name = "polish_note", length = 300)
+    private String polishNote;
+
+    /**
+     * The customer's questions this version leaves unanswered — the store's material had no answer, the rest of the reply
+     * stands (V170, eighth review). One per line; shown to the seller beside the draft; null when none.
+     */
+    @Column(name = "open_questions", length = 500)
+    private String openQuestions;
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) {

@@ -32,16 +32,29 @@ public final class AgentOperatorResponseParser {
     private AgentOperatorResponseParser() {
     }
 
-    /** The assistant text out of either vendor's envelope (Anthropic {@code content[0].text} / OpenAI). */
+    /** The assistant text out of either vendor's envelope (Anthropic's {@code text} blocks / OpenAI). */
     public static Optional<String> assistantText(String body) {
         if (body == null || body.isBlank()) {
             return Optional.empty();
         }
         try {
             JsonNode root = MAPPER.readTree(body);
-            JsonNode anthropic = root.path("content").path(0).path("text");
-            if (anthropic.isTextual()) {
-                return Optional.of(anthropic.asText());
+            // Anthropic: the text blocks, in order. A current model thinks before it answers, so the first block is
+            // usually a thinking block, not the answer (2026-10-29: reading content[0] would find no text on every call).
+            JsonNode content = root.path("content");
+            if (content.isArray()) {
+                StringBuilder text = new StringBuilder();
+                boolean any = false;
+                for (JsonNode block : content) {
+                    if ("text".equals(block.path("type").asText()) && block.path("text").isTextual()) {
+                        text.append(block.path("text").asText());
+                        any = true;
+                    }
+                }
+                if (any) {
+                    return Optional.of(text.toString());
+                }
+                return Optional.empty();
             }
             JsonNode openai = root.path("choices").path(0).path("message").path("content");
             if (openai.isTextual()) {

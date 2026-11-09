@@ -302,6 +302,65 @@ class InquiryProposalServiceTest {
     }
 
     @Test
+    void detailCarriesTheCommentLookOnCafe24AndNothingElsewhere() {
+        UUID cafe24 = catalogChannel("CAFE24", "카페24");
+        UUID naver = catalogChannel("NAVER", "네이버");
+        Instant monday = Instant.parse("2026-11-02T02:00:00Z");
+        Instant friday = Instant.parse("2026-11-06T02:00:00Z");
+
+        UUID failedAfterSuccess = seedCollected(cafe24, q -> {
+            q.setCommentCheck(com.sellerops.ingest.canonical.CommentAnswerCheck.Result.NOT_CHECKED);
+            q.setCommentCheckAttemptedAt(friday);
+            q.setCommentCheckedAt(monday);
+        });
+        UUID neverLooked = seedCollected(cafe24, q -> { });
+        UUID otherChannel = seedCollected(naver, q -> { });
+
+        InquiryProposalService service = service(new FakeProvider());
+        assertThat(service.detail(org, failedAfterSuccess).commentCheck())
+                .isEqualTo(new com.sellerops.inquiry.proposal.dto.CommentCheckView("NOT_CHECKED", friday, monday));
+        assertThat(service.detail(org, neverLooked).commentCheck())
+                .isEqualTo(new com.sellerops.inquiry.proposal.dto.CommentCheckView("NO_RECORD", null, null));
+        assertThat(service.detail(org, otherChannel).commentCheck()).isNull();
+        // Told, never enforced: the detail's own answer-state fields do not change with it.
+        assertThat(service.detail(org, failedAfterSuccess).answerStateNote())
+                .isEqualTo(service.detail(org, neverLooked).answerStateNote());
+    }
+
+    private UUID catalogChannel(String code, String nameKo) {
+        com.sellerops.channel.Channel ch = new com.sellerops.channel.Channel();
+        ch.setCode(code);
+        ch.setNameKo(nameKo);
+        ch.setStatus(com.sellerops.channel.ChannelStatus.AVAILABLE);
+        ch.setSupportsInquiry(true);
+        ch.setSortOrder(1);
+        return channels.save(ch).getId();
+    }
+
+    /** A connector-written inquiry (seller account stamped) with an OPEN work item; returns the work item id. */
+    private UUID seedCollected(UUID channelId, java.util.function.Consumer<Inquiry> record) {
+        UUID accountId = UUID.randomUUID();
+        Inquiry q = new Inquiry();
+        q.setOrgId(org);
+        q.setChannelId(channelId);
+        q.setSellerAccountId(accountId);
+        q.setThreadRole("ROOT");
+        q.setTitle("합성 제목");
+        q.setBody("합성 본문");
+        q.setStatus("UNANSWERED");
+        q.setReceivedAt(Instant.parse("2026-11-01T00:00:00Z"));
+        record.accept(q);
+        UUID inquiryId = inquiries.save(q).getId();
+        InquiryWorkItem wi = new InquiryWorkItem();
+        wi.setOrgId(org);
+        wi.setInquiryId(inquiryId);
+        wi.setSellerAccountId(accountId);
+        wi.setChannelId(channelId);
+        wi.setPhase(InquiryWorkItemPhase.OPEN);
+        return workItems.save(wi).getId();
+    }
+
+    @Test
     void detailChannelLabelsAreNullWhenTheCatalogRowIsAbsent() {
         // seedOpen uses a random channelId with no channels row → fail-open to null labels.
         InquiryWorkItem wi = seedOpen(org, "일반 문의", "본문", null);

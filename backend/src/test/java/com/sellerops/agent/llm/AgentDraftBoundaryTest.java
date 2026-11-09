@@ -100,7 +100,11 @@ class AgentDraftBoundaryTest {
             // The FOURTEENTH: the Customer Goal interpreter (Inquiry v3.5 §29). Its payload is one customer
             // sentence and two constants — no order, no product, no knowledge, no resolution state — and its
             // answer is a closed goal vocabulary the vendor enforces as strict Structured Outputs.
-            new String[] {"InquiryGoalGenerator", "InquiryGoalService.java", "InquiryGoalGenerator.java"});
+            new String[] {"InquiryGoalGenerator", "InquiryGoalService.java", "InquiryGoalGenerator.java"},
+            // The FIFTEENTH: the reply agent (Reply Agent v1, 2026-10-28). One redacted review, the seller's passages, wording
+            // and bans, and — on the critique and the revision — the draft this backend wrote. Its own flag and door; it is
+            // reached by a reply-agent run token as well as a seller's press.
+            new String[] {"ReplyAgentGenerator", "ReplyAgentService.java", "ReplyAgentGenerator.java"});
 
     /**
      * The classes allowed to name {@code AgentLlmTransport} beside a {@code .post(} call: the three
@@ -114,7 +118,7 @@ class AgentDraftBoundaryTest {
             "KnowledgeEligibilityGenerator.java", "AgentReportNarrativeGenerator.java",
             "AgentConverseGenerator.java", "CaseInvestigationGenerator.java", "ReviewMediaVisionGenerator.java",
             "InquiryDecisionGenerator.java",
-            "InquiryGoalGenerator.java",
+            "InquiryGoalGenerator.java", "ReplyAgentGenerator.java",
             "JdkAgentLlmTransport.java", "AgentLlmConfiguration.java");
 
     /** Either way into the transport — {@code postProductImages} is a {@code .post} too (LlmSendGate). */
@@ -182,7 +186,8 @@ class AgentDraftBoundaryTest {
                 new String[] {"sellerops.responsibility.investigation.", "CaseInvestigationProperties.java"},
                 new String[] {"sellerops.review.media-vision.", "ReviewMediaVisionProperties.java"},
                 new String[] {"sellerops.inquiry-decision.", "InquiryDecisionProperties.java"},
-                new String[] {"sellerops.inquiry-goal.", "InquiryGoalProperties.java"});
+                new String[] {"sellerops.inquiry-goal.", "InquiryGoalProperties.java"},
+                new String[] {"sellerops.reply-agent.", "ReplyAgentProperties.java"});
         try (Stream<Path> walk = Files.walk(MAIN)) {
             for (Path source : walk.filter(p -> p.toString().endsWith(".java")).toList()) {
                 String name = source.getFileName().toString();

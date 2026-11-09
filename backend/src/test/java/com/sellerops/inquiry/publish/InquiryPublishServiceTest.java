@@ -55,6 +55,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 class InquiryPublishServiceTest {
 
     @Autowired InquiryWorkItemRepository workItems;
+    @Autowired com.sellerops.openquestion.OpenQuestionRepository openQuestions;
+    @Autowired com.sellerops.openquestion.OpenQuestionEventRepository openQuestionEvents;
     @Autowired InquiryReplyDraftRepository drafts;
     @Autowired InquiryRepository inquiries;
     @Autowired InquiryApprovalRepository approvals;
@@ -266,6 +268,89 @@ class InquiryPublishServiceTest {
         // not having bound anything.
         InquiryReplyDraftService draftService = new InquiryReplyDraftService(workItems, drafts);
         assertThat(draftService.save(org, wi.getId(), user, "새 제목", "새 내용", 1).version()).isEqualTo(2);
+    }
+
+    /**
+     * <b>A draft that answered only part of what was asked is not sent while a question it left is open</b> (2026-11-01
+     * tenth review: 「필수 미해결 항목이 남으면 전송 보류」). Refused before anything is bound; once the seller handles it,
+     * the same confirm goes through.
+     */
+    @Test
+    void aPartialDraftWaitsForEveryOpenQuestion() {
+        InquiryWorkItem wi = seedServed();
+        com.sellerops.openquestion.OpenQuestionService open =
+                new com.sellerops.openquestion.OpenQuestionService(openQuestions, openQuestionEvents);
+        open.replace(org, "INQUIRY", wi.getId(), List.of("대량 구매 할인"), true, "inquiry-draft:t:1", "SYSTEM");
+        InquiryPublishService service = withAdapter();
+        org.springframework.beans.factory.support.StaticListableBeanFactory beans =
+                new org.springframework.beans.factory.support.StaticListableBeanFactory();
+        beans.addBean("openQuestions", open);
+        service.setOpenQuestions(beans.getBeanProvider(com.sellerops.openquestion.OpenQuestionService.class));
+
+        assertThatThrownBy(() -> service.confirmAndPublish(org, wi.getId(), user, "cmd1", approvedFingerprint()))
+                .isInstanceOfSatisfying(ApiException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(e.getMessage()).contains("답하지 못한 질문 1개");
+                });
+        assertThat(approvals.findByWorkItemId(wi.getId())).as("nothing is bound").isEmpty();
+
+        open.handle(org, open.list(org, "INQUIRY", wi.getId()).get(0).id(), "ANSWERED", null, "SELLER:" + user);
+        service.confirmAndPublish(org, wi.getId(), user, "cmd1", approvedFingerprint());
+        assertThat(approvals.findByWorkItemId(wi.getId())).isPresent();
+    }
+
+    /**
+     * An answer longer than its channel's stated limit is kept and never cut, and the confirm does not send it — it says how
+     * long it is, under its own code (2026-11-02). ESM states 1000 bytes.
+     */
+    @Test
+    void anAnswerTooLongForTheChannelIsNotSent() {
+        UUID gmarket = channels.findAll().stream().filter(c -> "GMARKET".equals(c.getCode())).map(Channel::getId)
+                .findFirst().orElseGet(() -> seedChannel("GMARKET"));
+        InquiryWorkItem wi = seedProposedWithDraft(org, gmarket);
+        String tooLong = "가".repeat(340); // 1020 bytes, over ESM's 1000
+        saveVersion2(wi, tooLong);
+        InquiryPublishService service = withAdapter();
+
+        assertThatThrownBy(() -> service.confirmAndPublish(org, wi.getId(), user, "cmd1",
+                ReplyDraftFingerprint.of(APPROVED_TITLE, tooLong)))
+                .isInstanceOfSatisfying(ApiException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(e.getCode()).as("its own code, not a changed draft").isEqualTo(
+                            InquiryPublishService.REPLY_TOO_LONG);
+                    assertThat(e.getMessage()).contains("이 채널의 길이 한도(1,000바이트)").contains("지금 1,020바이트")
+                            .contains("자동으로 잘라 보내지 않아요");
+                });
+        assertThat(approvals.findByWorkItemId(wi.getId())).as("nothing is bound").isEmpty();
+        assertThat(drafts.findTopByWorkItemIdOrderByVersionDesc(wi.getId()).orElseThrow().getComments())
+                .as("kept as written").isEqualTo(tooLong);
+    }
+
+    /** Coupang 상품별 고객문의 states no length: a long answer is not refused for one SellerOps made up (2026-11-02). */
+    @Test
+    void aLongCoupangAnswerIsNotRefusedForLength() {
+        InquiryWorkItem wi = seedServed();
+        String longer = "가".repeat(340); // 1020 bytes — refused here before
+        saveVersion2(wi, longer);
+
+        withAdapter().confirmAndPublish(org, wi.getId(), user, "cmd1", ReplyDraftFingerprint.of(APPROVED_TITLE, longer));
+
+        assertThat(approvals.findByWorkItemId(wi.getId())).as("bound").isPresent();
+        assertThat(adapter.published).as("sent to the channel, which decides").hasSize(1);
+    }
+
+    private void saveVersion2(InquiryWorkItem wi, String comments) {
+        InquiryReplyDraft longer = new InquiryReplyDraft();
+        longer.setOrgId(org);
+        longer.setWorkItemId(wi.getId());
+        longer.setVersion(2);
+        longer.setAnswerStatus(2);
+        longer.setTitle(APPROVED_TITLE);
+        longer.setComments(comments);
+        longer.setContentFingerprint(ReplyDraftFingerprint.of(APPROVED_TITLE, comments));
+        longer.setFingerprintAlgorithm(EsmAnswerValidation.FINGERPRINT_ALGORITHM);
+        longer.setCreatedBy("MODEL");
+        drafts.save(longer);
     }
 
     @Test

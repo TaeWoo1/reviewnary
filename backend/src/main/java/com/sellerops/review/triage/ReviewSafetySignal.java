@@ -111,16 +111,23 @@ public final class ReviewSafetySignal {
 
     private static Map<String, Kind> terms() {
         Map<String, Kind> t = new LinkedHashMap<>();
-        for (String s : List.of("다쳤", "다쳐", "다치", "다칠", "부상", "화상", "데였", "데어서", "베였", "베여서", "피가났",
-                "피가나", "멍이들", "멍들었")) {
+        // Clear injury phrasings a synthetic check found missing (review 2026-10-28) — each an event, not a worry, and
+        // none whose two-letter stem is everyday words (피부 · 손가 · 목에 · 녹아) or hyperbole (기절 · 쇼크): the stem is
+        // also a 참고-blocking reservation marker. The list stays an auxiliary net: a review it misses still reaches the
+        // reply agent's own judge, which can say S.
+        for (String s : List.of("다쳤", "다쳐", "다치", "다칠", "부상", "화상", "데였", "데었", "데어서", "베였", "베었",
+                "베여서", "베어서", "찔렸", "찔려서", "피가났", "피가나", "피났", "멍이들", "멍들었", "상처가났", "상처났",
+                "상처가생", "물집이", "깁스", "꿰맸", "봉합")) {
             t.put(s, Kind.INJURY);
         }
         for (String s : List.of("알레르기", "알러지", "두드러기", "발진", "식중독", "배탈", "설사를", "설사가", "설사했",
-                "설사해", "구토", "토했", "병원에갔", "병원갔", "병원다녀", "병원진료", "응급실")) {
+                "설사해", "구토", "토했", "병원에갔", "병원갔", "병원다녀", "병원진료", "응급실", "진물", "염증이생",
+                "염증이났", "호흡곤란", "숨막혀")) {
             t.put(s, Kind.BODY_REACTION);
         }
         for (String s : List.of("이물질", "벌레가나", "벌레가있", "벌레가들어", "벌레나왔", "곰팡이", "변질", "감전", "누전",
-                "불이났", "불이붙", "불꽃", "타는냄새", "연기가나", "연기가났", "폭발했", "폭발해")) {
+                "불이났", "불이붙", "불꽃", "타는냄새", "연기가나", "연기가났", "폭발했", "폭발해", "합선", "과열돼", "과열되",
+                "질식")) {
             t.put(s, Kind.PRODUCT_HAZARD);
         }
         for (String s : List.of("신고했", "신고할", "신고하겠", "신고합니다", "고소하겠", "고소할", "고소장", "고발", "소송",

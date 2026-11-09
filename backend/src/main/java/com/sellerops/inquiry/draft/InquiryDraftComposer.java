@@ -89,6 +89,8 @@ public class InquiryDraftComposer {
     // when there was one lane and this class WAS the retrieval.
 
     private final InquiryWorkItemRepository workItems;
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(InquiryDraftComposer.class);
+
     private final InquiryRepository inquiries;
     private final InquiryReplyDraftService drafts;
     private final InquiryDraftEvidenceRepository evidence;
@@ -128,6 +130,351 @@ public class InquiryDraftComposer {
      */
     static final String UNSUPPORTED_CLAIM = "근거에 없는 약속이나 요청이 들어가 초안을 저장하지 않았어요. "
             + "다시 생성해 보시거나 직접 작성해 주세요.";
+
+    /** A grant that leaves out the state the seller's policy limits it to — 「미개봉」 (2026-10-31, C06). */
+    static final String DROPPED_CONDITION = "근거에 있는 교환·반품 조건(미개봉 등)을 빼고 된다고 적어 초안을 저장하지 "
+            + "않았어요. 다시 생성해 보시거나 직접 작성해 주세요.";
+
+    /** The policy applied where the law does not let it apply — 「미개봉 상품만 반품」, a fault held to 단순 변심 (2026-11-01). */
+    static final String LAW_CONFLICT = "반품·환불을 개봉 여부로 제한하거나, 불량·오배송에 단순 변심 조건을 붙여 법정 청약철회 "
+            + "기준과 맞지 않을 수 있어 초안을 저장하지 않았어요. 반품 조건을 확인한 뒤 직접 작성해 주세요.";
+
+    private DraftReviewPendingRepository pending;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setPending(DraftReviewPendingRepository pending) {
+        this.pending = pending;
+    }
+
+    /** What each figure of a saved draft was written from (V166); null where a test wires the composer without it. */
+    private InquiryFigureGrounds figureGrounds;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setFigureGrounds(InquiryFigureGrounds figureGrounds) {
+        this.figureGrounds = figureGrounds;
+    }
+
+    /**
+     * Keep a draft the ceiling stopped from being checked — one per work item, the latest — with which try it is and why
+     * the first was refused (2026-11-02, fifth review): a resume carries on from that try, never from the first again.
+     */
+    private void hold(UUID orgId, UUID workItemId, AgentDraftResponseParser.ParsedDraft draft, String inputsHash,
+                      int attempt, String rewriteBecause) {
+        hold(orgId, workItemId, draft, inputsHash, attempt, rewriteBecause, DraftReviewPending.CHECK);
+    }
+
+    /** As above, with what the held text is waiting for — the first check, or only the one second look (V181). */
+    private void hold(UUID orgId, UUID workItemId, AgentDraftResponseParser.ParsedDraft draft, String inputsHash,
+                      int attempt, String rewriteBecause, String awaiting) {
+        if (pending == null) {
+            return;
+        }
+        DraftReviewPending row = pending.findByOrgIdAndWorkItemId(orgId, workItemId).orElseGet(DraftReviewPending::new);
+        row.setOrgId(orgId);
+        row.setWorkItemId(workItemId);
+        row.setCategory(draft.category());
+        row.setTitle(draft.title());
+        row.setBody(draft.comments());
+        row.setInputsHash(inputsHash);
+        row.setAttempt(attempt);
+        row.setRewriteBecause(rewriteBecause);
+        row.setAwaiting(awaiting);
+        pending.save(row);
+    }
+
+    /**
+     * What a held draft was written over: the question, every passage shown, the order sentence, the model, and every
+     * instruction the draft call was given (규격 line, style, company description, answer scope).
+     */
+    static String pendingInputsHash(String title, String details, List<AgentDraftGenerator.Passage> shown,
+                                    String orderSentence, String modelVersion, List<String> instructions) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(title).append('\u0001').append(details).append('\u0001').append(orderSentence).append('\u0001')
+                .append(modelVersion).append('\u0002');
+        for (String instruction : instructions) {
+            sb.append(instruction).append('\u0001');
+        }
+        sb.append('\u0002');
+        for (AgentDraftGenerator.Passage p : shown) {
+            sb.append(p.scopeLabel()).append('\u0001').append(p.heading()).append('\u0001').append(p.text())
+                    .append('\u0002');
+        }
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** A figure the evidence does not write, or writes only in another unit (review 2026-10-28). */
+    static String unsupportedFigure(List<InquiryClaimGuard.Violation> claims) {
+        return "숫자 " + String.join(", ", claims.stream().map(InquiryClaimGuard.Violation::matched).distinct().toList())
+                + "이(가) 근거에 없거나 단위가 달라 초안을 저장하지 않았어요. 근거를 확인하고 직접 작성해 주세요.";
+    }
+
+    /** A figure the model did not confirm is about the same thing under the same condition — or could not check. */
+    static String unconfirmedFigure(List<String> values) {
+        return "숫자 " + String.join(", ", values) + "이(가) 근거와 같은 대상·조건의 값인지 확인되지 않아 초안을 "
+                + "저장하지 않았어요. 근거를 확인하고 직접 작성해 주세요.";
+    }
+
+    /**
+     * The day's AI ceiling was reached before the draft could be checked (owner, 2026-10-29): the draft is held, not
+     * thrown away and not shown unchecked — the next generate checks it without writing it again.
+     */
+    static final String REVIEW_PENDING = "오늘 AI 사용량 상한에 닿아 초안 내용을 근거와 대조하지 못했어요. 초안은 "
+            + "「검토 대기」로 보관했고, 한도가 풀린 뒤 다시 누르면 새로 쓰지 않고 검토부터 이어서 해요.";
+
+    /**
+     * The first check ran and left an item out, and the ceiling stopped the one second look (2026-11-05 eleventh review):
+     * the draft is kept as 「추가 검사 대기」 and a resume runs only that look — never a new draft, never the first check
+     * again, never a third.
+     */
+    static final String RECHECK_PENDING = "초안을 근거와 한 번 대조했지만 확인이 끝나지 않았고, 오늘 AI 사용량 상한에 닿아 한 번 더 "
+            + "대조하지 못했어요. 초안은 「추가 검사 대기」로 보관했고, 한도가 풀린 뒤 다시 누르면 새로 쓰지 않고 그 검사만 이어서 해요.";
+
+    static final String CLAIM_CHECK_UNAVAILABLE = "초안의 내용을 근거와 대조하지 못해 저장하지 않았어요. 다시 생성해 "
+            + "보시거나 직접 작성해 주세요.";
+
+    /** The meter's step names of the one rewrite (2026-11-02): the draft written again, and its check. */
+    public static final String REDRAFT_STEP = "REDRAFT";
+    public static final String REDRAFT_CHECK_STEP = "REDRAFT_CHECK";
+    /** The one second look at a check that came back incomplete (2026-11-05 tenth review) — its own step, so it is seen. */
+    public static final String RECHECK_STEP = "CLAIM_RECHECK";
+
+    private static final String REWRITE_HEAD = "- 다시 쓰기: 앞 초안은 아래 이유로 저장되지 않았습니다. 같은 근거, 같은 답변 범위로 다시 "
+            + "씁니다. 지적된 부분만 고치고, 근거로 답한 부분은 그대로 둡니다.\n  - 이유: ";
+
+    static final String REWRITE_BLANK = REWRITE_HEAD + "【확인: …】 표시를 썼습니다. 그런 표시 없이, 근거가 답하는 데까지만 씁니다";
+
+    static final String REWRITE_NO_ANSWER = REWRITE_HEAD + "문의에 대한 답이 없었습니다. 「이번 답변이 다룰 내용」의 각 항목에 근거로 "
+            + "답합니다";
+
+    static String rewriteForbidden(List<String> phrases) {
+        return REWRITE_HEAD + "회사가 쓰지 않기로 한 표현(" + phrases.stream().map(x -> "「" + x + "」")
+                .collect(java.util.stream.Collectors.joining(", ")) + ")을 썼습니다. 그 표현 없이 씁니다";
+    }
+
+    static String rewriteUnsupported(String statement) {
+        return REWRITE_HEAD + "「" + statement + "」은(는) 보여 드린 근거로 확인되지 않습니다. 근거에 없는 내용이면 쓰지 않고, "
+                + "근거에 있는 내용이면 근거에 적힌 대로 씁니다. 판매자가 따로 안내하거나 확인한다는 말도 새로 쓰지 않습니다";
+    }
+
+    /**
+     * What a rewrite is told about the guard's refusal — or null when a rewrite cannot fix it: a number the evidence does
+     * not carry may be an answer the evidence lacks, and a condition against the law is the seller's to settle.
+     */
+    public static String rewriteClaims(List<InquiryClaimGuard.Violation> claims) {
+        if (claims.stream().anyMatch(c -> c.kind() == InquiryClaimGuard.Kind.FIGURE
+                || c.kind() == InquiryClaimGuard.Kind.LAW)) {
+            return null;
+        }
+        List<String> parts = new ArrayList<>();
+        List<String> said = claims.stream().filter(c -> c.kind() != InquiryClaimGuard.Kind.CONDITION)
+                .map(c -> "「" + c.matched() + "」").distinct().toList();
+        if (!said.isEmpty()) {
+            parts.add("근거에 없는 후속 약속 · 요청 · 보상(" + String.join(", ", said) + ")을 썼습니다. 그 말을 빼고, 판매자 쪽 후속 "
+                    + "안내도 새로 약속하지 않습니다");
+        }
+        List<String> dropped = claims.stream().filter(c -> c.kind() == InquiryClaimGuard.Kind.CONDITION)
+                .map(c -> "「" + c.matched() + "」").distinct().toList();
+        if (!dropped.isEmpty()) {
+            parts.add("근거가 붙인 조건을 빼고 썼습니다(" + String.join(", ", dropped) + "). 근거의 조건을 함께 씁니다");
+        }
+        return REWRITE_HEAD + String.join(" / ", parts);
+    }
+
+    /** The drafter's call, its tokens on the row charged for it. */
+    private Optional<AgentDraftResponseParser.ParsedDraft> writeDraft(
+            UUID orgId, String title, String details, List<AgentDraftGenerator.Passage> shown,
+            InquiryEvidenceRetriever.InquiryEvidence retrieved, String specSentence, AnswerStyleProfile style, String company,
+            com.sellerops.inquiry.decision.NeedDecision needDecision, String scope, UUID usageId) {
+        com.sellerops.agent.llm.AgentLlmCallCapture.Captured<Optional<AgentDraftResponseParser.ParsedDraft>> call =
+                com.sellerops.agent.llm.AgentLlmCallCapture.capture(() -> needDecision != null
+                        ? model.draft(orgId, title, details, shown, retrieved.order().messageKo(), specSentence,
+                        AnswerStyleInstruction.of(style), company, scope)
+                        : model.draft(orgId, title, details, shown, retrieved.order().messageKo(), specSentence,
+                        AnswerStyleInstruction.of(style), company));
+        if (call.metrics() != null) {
+            quota.recordOutcome(usageId, call.metrics().elapsedMs(), call.metrics().promptTokens(),
+                    call.metrics().completionTokens());
+        }
+        return call.value();
+    }
+
+    static String unsupportedStatement(String excerpt) {
+        return "초안의 「" + excerpt + "」이(가) 등록된 근거로 확인되지 않아 저장하지 않았어요. 근거를 확인하고 직접 작성해 "
+                + "주세요.";
+    }
+
+    /**
+     * Why no draft came back, as a closed word beside the sentence (2026-11-01 eighth review: an evaluation that reads
+     * only the sentence cannot tell a draft the checks refused from a run that never reached a model).
+     * <ul>
+     *   <li>{@code HELD_BY_CHECK} — a model wrote a draft and a check refused it: a promise, a condition, the law, a number,
+     *       a banned phrase, a blank, two sources that disagree, a statement the evidence does not confirm;</li>
+     *   <li>{@code WAITING_FOR_CHECK} — the draft is kept until the day's ceiling lets it be checked;</li>
+     *   <li>{@code NOT_RUN} — the machinery did not finish: the switch, the vendor, the ceiling, a detail read, the
+     *       claim check or the needs judge that did not answer.</li>
+     * </ul>
+     * Null when nothing was unavailable.
+     */
+    public static String unavailableKind(String message) {
+        if (message == null) {
+            return null;
+        }
+        if (REVIEW_PENDING.equals(message) || RECHECK_PENDING.equals(message)) {
+            return "WAITING_FOR_CHECK";
+        }
+        if (java.util.Set.of(UNSUPPORTED_CLAIM, DROPPED_CONDITION, LAW_CONFLICT, STYLE_FORBIDDEN_PHRASE, UNCONFIRMED_TEXT,
+                CONFLICTING_EVIDENCE, NO_ANSWER_IN_DRAFT, COMPLETION_NOT_RECORDED, UNREQUESTED_ASK).contains(message)
+                || message.endsWith(unsupportedStatement("").substring(unsupportedStatement("").indexOf("」") + 1))
+                || message.startsWith("숫자 ") && message.endsWith("근거를 확인하고 직접 작성해 주세요.")) {
+            return "HELD_BY_CHECK";
+        }
+        return "NOT_RUN";
+    }
+
+    static final String CONFLICTING_EVIDENCE = "등록된 근거끼리 서로 다르게 적혀 있어 어느 쪽으로 답할지 정할 수 없어요. "
+            + "근거를 정리한 뒤 다시 생성하거나 직접 작성해 주세요.";
+
+    /**
+     * <b>The claim check</b> on a model-written inquiry draft (owner, 2026-10-28; second outside review): every number the
+     * text cannot settle, and every other fact, condition or promise the draft states, read against the evidence by
+     * {@link AgentDraftService#checkFigures} — one call on the draft's own door, metered but not counted against the
+     * day (it is part of the draft), on the check model when one is set. Returns the seller's sentence for why the draft
+     * is not saved, or null when everything was confirmed. No answer, or an unreadable one, confirms nothing.
+     */
+    String uncheckedClaims(UUID orgId, String body, List<AgentDraftGenerator.Passage> shown, String title,
+                           String details, String orderSentence) {
+        return uncheckedClaims(orgId, body, shown, title, details, orderSentence,
+                com.sellerops.agent.quota.AgentUsageActor.USER);
+    }
+
+    /**
+     * Whose day a draft is charged to: the seller's own press ({@code SELLER:…}) is the seller's; every other author — the
+     * Proactive agent, the responsibility investigation — is automatic work (sixth outside review, 2026-10-29: background
+     * drafts were recorded as the seller's and could spend the seller's reserve).
+     */
+    static com.sellerops.agent.quota.AgentUsageActor usageActorOf(String actor) {
+        return actor != null && actor.startsWith("SELLER:") ? com.sellerops.agent.quota.AgentUsageActor.USER
+                : com.sellerops.agent.quota.AgentUsageActor.RUN;
+    }
+
+    String uncheckedClaims(UUID orgId, String body, List<AgentDraftGenerator.Passage> shown, String title,
+                           String details, String orderSentence, com.sellerops.agent.quota.AgentUsageActor actor) {
+        return checkClaims(orgId, body, shown, title, details, orderSentence, actor, null, null).refusal();
+    }
+
+    /**
+     * The claim check's answer: why the draft is not saved (null when everything was confirmed), and for each figure it
+     * confirmed, what it read it from — kept with the draft so a recheck reads the same claim against the same ground
+     * (2026-11-01 third review).
+     */
+    /**
+     * @param covered need id → ANSWERED · ASKED · NOT_COVERED for the needs the drafter was told to take up (v11), empty
+     *                without a need list
+     */
+    /** @param unsupported the statement the check did not confirm, when that is the refusal — what a rewrite is told */
+    record ClaimCheck(String refusal, List<InquiryFigureGrounds.Link> links, boolean statedNothing,
+                      java.util.Map<String, String> covered, String unsupported) {
+        ClaimCheck(String refusal, List<InquiryFigureGrounds.Link> links) {
+            this(refusal, links, false, java.util.Map.of(), null);
+        }
+
+        static ClaimCheck refused(String why) {
+            return new ClaimCheck(why, List.of());
+        }
+    }
+
+    /**
+     * A reply that does not answer (2026-11-01 eighth review, synthetic Q3: two exchange periods that disagree, and the
+     * drafter wrote thanks and the customer's words back, which every check passed). Whether a draft tries to answer —
+     * an answer, a reason it cannot be done, or asking for what decides it — is read by the claim check's model (v7), not
+     * by counting facts: a number the code already matched never reaches that model.
+     */
+    static final String NO_ANSWER_IN_DRAFT = "초안에 문의에 대한 답이 없어 저장하지 않았어요. 다시 생성하거나 직접 작성해 주세요.";
+
+    ClaimCheck checkClaims(UUID orgId, String body, List<AgentDraftGenerator.Passage> shown, String title,
+                           String details, String orderSentence, com.sellerops.agent.quota.AgentUsageActor actor,
+                           String specLine, String answerScope) {
+        return checkClaims(orgId, body, shown, title, details, orderSentence, actor, specLine, answerScope,
+                AgentQuotaService.CHECK_STEP);
+    }
+
+    /**
+     * The same check of the same draft, once more, on {@link #RECHECK_STEP}. A charge the ceiling refuses comes back as
+     * {@link #REVIEW_PENDING}; the caller then keeps the draft as 「추가 검사 대기」 ({@link #RECHECK_PENDING}).
+     */
+    ClaimCheck recheckClaims(UUID orgId, String body, List<AgentDraftGenerator.Passage> shown, String title,
+                             String details, String orderSentence, com.sellerops.agent.quota.AgentUsageActor actor,
+                             String specLine, String answerScope) {
+        return checkClaims(orgId, body, shown, title, details, orderSentence, actor, specLine, answerScope, RECHECK_STEP);
+    }
+
+    /** As above, metered on {@code step} — a rewrite's check on its own, so what the rewrite costs can be told apart. */
+    ClaimCheck checkClaims(UUID orgId, String body, List<AgentDraftGenerator.Passage> shown, String title,
+                           String details, String orderSentence, com.sellerops.agent.quota.AgentUsageActor actor,
+                           String specLine, String answerScope, String step) {
+        String question = String.join(" ", title == null ? "" : title, details == null ? "" : details).strip();
+        List<InquiryClaimGuard.FigureClaim> toVerify = InquiryClaimGuard.figuresToVerify(body,
+                shown.stream().map(AgentDraftGenerator.Passage::text).toList(), question, orderSentence);
+        List<String> asked = toVerify.stream().map(c -> c.index() + ". " + c.value() + (c.unit() == null ? "" : c.unit())
+                + (c.questionOnly() ? " (고객 문의에만 있는 숫자)" : "") + " — 문장: " + c.sentence()).toList();
+        // Counted against the actual AI ceiling like every call (owner, 2026-10-29); not a new piece of the seller's work.
+        AgentQuotaService.Charge charge = quota.chargeCheck(orgId, AgentUsageKind.DRAFT, step, actor);
+        if (charge != null && charge.decision() != null && !charge.decision().allowed()) {
+            return ClaimCheck.refused(REVIEW_PENDING);
+        }
+        UUID usageId = charge == null ? null : charge.usageId();
+        // The 규格 line the drafter was given goes with the draft (v8, 2026-11-01 ninth review): the check itself knows a
+        // caution was asked for, and still reads every fact said beside it — no sentence is waved through after it.
+        // …and the need list it was given (v10, 2026-11-02): a partial draft is judged on what it was asked to answer.
+        AgentDraftGenerator.FigureResult checked = model.checkFiguresMetered(orgId, question, shown, orderSentence,
+                specLine, answerScope, body, asked);
+        if (checked.metrics() != null) {
+            quota.recordOutcome(usageId, checked.metrics().elapsedMs(), checked.metrics().promptTokens(),
+                    checked.metrics().completionTokens());
+        }
+        if (checked.verdicts().isEmpty()) {
+            // The check did not answer — a send the gate held, a transport failure, an unreadable reply. That says nothing
+            // about any number in the draft (case-eval-r12: a held check request reached the seller as 「숫자 20이 …
+            // 확인되지 않아」 for a 20 the question and the policy both carry). Refused all the same, and named as what it is.
+            log.info("inquiry_claim_check_unanswered orgId={} reason={} figures={}", orgId, checked.reason(),
+                    toVerify.size());
+            return ClaimCheck.refused(CLAIM_CHECK_UNAVAILABLE);
+        }
+        boolean conflict = false;
+        List<String> figures = new ArrayList<>();
+        List<InquiryFigureGrounds.Link> links = new ArrayList<>();
+        for (InquiryClaimGuard.FigureClaim claim : toVerify) {
+            AgentDraftGenerator.FigureVerdict v = checked.verdicts().get().get(claim.index() - 1);
+            String verdict = v.verdict();
+            conflict |= "CONFLICT".equals(verdict);
+            boolean confirmed = "SUPPORTED".equals(verdict) || "SAID_BACK".equals(verdict) && claim.inQuestion();
+            if (!confirmed && !figures.contains(claim.value())) {
+                figures.add(claim.value());
+            }
+            if (confirmed) {
+                links.add(new InquiryFigureGrounds.Link(claim.value(), claim.unit(), claim.sentence(), verdict,
+                        v.passage(), v.source(), v.about(), v.when()));
+            }
+        }
+        for (AgentDraftGenerator.ClaimVerdict c : checked.claims()) {
+            conflict |= "CONFLICT".equals(c.verdict());
+        }
+        if (conflict) {
+            return ClaimCheck.refused(CONFLICTING_EVIDENCE);
+        }
+        if (!figures.isEmpty()) {
+            return ClaimCheck.refused(unconfirmedFigure(figures));
+        }
+        String unsupported = checked.claims().stream().filter(c -> !"SUPPORTED".equals(c.verdict())).findFirst()
+                .map(AgentDraftGenerator.ClaimVerdict::text).orElse(null);
+        return new ClaimCheck(unsupported == null ? null : unsupportedStatement(unsupported), List.copyOf(links),
+                !checked.answered(), checked.covered() == null ? java.util.Map.of() : checked.covered(), unsupported);
+    }
     /**
      * A reply that carries a 【확인: …】 blank — the owner's open question, not an answer (2026-10-27). The retriever drops
      * every passage that carries one, so this is the last door, as it is in the review lane.
@@ -138,7 +485,8 @@ public class InquiryDraftComposer {
     /**
      * What a model's reply claims that nothing it was shown supports (Inquiry Claim Guard v1). The evidence is the
      * passage list the model was actually given; the seller's approved sentences may authorize a follow-up or a
-     * request; the customer's question and the order sentence may authorize a number.
+     * request; the order sentence authorizes a number as the evidence does, and the customer's question only one the
+     * reply says back as theirs.
      */
     static List<InquiryClaimGuard.Violation> unsupportedClaims(String body, List<AgentDraftGenerator.Passage> shown,
                                                                AnswerStyleProfile style, String title, String details,
@@ -152,8 +500,40 @@ public class InquiryDraftComposer {
         }
         return InquiryClaimGuard.unsupportedClaims(body,
                 shown.stream().map(AgentDraftGenerator.Passage::text).toList(), voice,
-                String.join(" ", title == null ? "" : title, details == null ? "" : details,
-                        orderSentence == null ? "" : orderSentence));
+                String.join(" ", title == null ? "" : title, details == null ? "" : details), orderSentence);
+    }
+
+    /** 2026-11-02 seller-check review: the seller recorded the action as not finished, and the draft said it was. */
+    static final String COMPLETION_NOT_RECORDED = "판매자가 기록한 결과는 아직 끝난 일이 아닌데 초안이 끝났다고 써서 "
+            + "저장하지 않았어요. 다시 생성해 보시거나 직접 작성해 주세요.";
+
+    static final String UNREQUESTED_ASK = "초안이 판정에 없는 내용을 고객에게 묻고 있어 저장하지 않았어요. 다시 생성해 보시거나 "
+            + "직접 작성해 주세요.";
+
+    static String rewriteUnrequestedAsk(List<String> asks) {
+        return REWRITE_HEAD + asks.stream().map(x -> "「" + x + "」").collect(java.util.stream.Collectors.joining(", "))
+                + "처럼 고객에게 묻는 말을 썼습니다. 이번 답변에는 고객에게 확인할 항목이 없습니다. 묻는 문장은 빼고, 나머지는 "
+                + "그대로 씁니다";
+    }
+
+    static String rewriteCompletion(List<String> phrases, String recordedKo) {
+        return REWRITE_HEAD + "판매자가 기록한 결과는 「" + recordedKo + "」입니다. " + phrases.stream()
+                .map(x -> "「" + x + "」").collect(java.util.stream.Collectors.joining(", "))
+                + "처럼 끝난 일로 쓰지 않고, 기록된 상태 그대로 안내합니다. 기록에 없는 날짜·기한도 쓰지 않습니다";
+    }
+
+    private com.sellerops.inquiry.sellercheck.InquirySellerCheckRepository sellerChecks;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSellerChecks(com.sellerops.inquiry.sellercheck.InquirySellerCheckRepository sellerChecks) {
+        this.sellerChecks = sellerChecks;
+    }
+
+    /** The outcome the seller recorded for this inquiry, or null when there is no current record. */
+    private com.sellerops.inquiry.sellercheck.InquirySellerCheck currentRecord(UUID orgId, UUID workItemId) {
+        return sellerChecks == null ? null : sellerChecks
+                .findFirstByOrgIdAndWorkItemIdAndSupersededAtIsNullOrderByRecordedAtDesc(orgId, workItemId)
+                .orElse(null);
     }
 
     static final String STYLE_FORBIDDEN_PHRASE = "사용하지 않기로 한 표현이 들어가 초안을 저장하지 "
@@ -277,7 +657,16 @@ public class InquiryDraftComposer {
      * fail a draft.
      */
     private GeneratedDraftView compose(UUID orgId, UUID workItemId, String actor, ToneHint tone) {
-        GeneratedDraftView view = composeDraft(orgId, workItemId, actor, tone);
+        // The search helpers' calls inside this draft are charged to who asked for it (2026-10-31).
+        java.util.concurrent.atomic.AtomicReference<com.sellerops.inquiry.decision.NeedDecision> decided =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        GeneratedDraftView view = com.sellerops.agent.quota.AgentUsageScope.as(usageActorOf(actor),
+                () -> composeDraft(orgId, workItemId, actor, tone, decided))
+                .withSellerCheckAsk(sellerCheckAsk(decided.get()));
+        if (decided.get() != null) {
+            keepSellerCheckAsk(orgId, workItemId, view.sellerCheckAsk());
+            keepJudgedKind(orgId, workItemId, decided.get());
+        }
         KnowledgeGapView gap = markGap(orgId, view.knowledgeGap());
         // The id travels back with the gap so that answering THIS ask on THIS screen closes THIS row
         // (Knowledge Gap Continuity v1). When the seller already answered this exact ask and the draft
@@ -285,7 +674,80 @@ public class InquiryDraftComposer {
         return gap == view.knowledgeGap() ? view : new GeneratedDraftView(view.draft(), view.authorKind(),
                 view.knowledgeState(), view.knowledgeNote(), view.answerBasis(), view.answerBasisNote(),
                 view.answerBasisAction(), view.productId(), view.evidence(), view.companyContextUsed(),
-                view.unavailableMessage(), gap);
+                view.unavailableMessage(), gap, view.unavailableKind(), view.openQuestions(), view.rewrite(),
+                view.sellerCheckAsk());
+    }
+
+    /**
+     * What the seller is asked to check on the seller centre, read off the needs left open (2026-11-02 seller-check
+     * review): an action on this order before its state, since an action asked for is the larger job. Null when no order
+     * need is open — a covered one was answered, by the seller's record or the channel's own facts.
+     */
+    private void keepSellerCheckAsk(UUID orgId, UUID workItemId, String ask) {
+        // Kept on the work item so a reload asks for the same check; a failure to keep it never fails the draft.
+        try {
+            workItems.findById(workItemId).filter(w -> orgId.equals(w.getOrgId()))
+                    .filter(w -> !java.util.Objects.equals(w.getSellerCheckAsk(), ask))
+                    .ifPresent(w -> {
+                        w.setSellerCheckAsk(ask);
+                        workItems.save(w);
+                    });
+        } catch (RuntimeException e) {
+            log.warn("seller-check ask not kept workItem={} cause={}", workItemId, e.getClass().getSimpleName());
+        }
+    }
+
+    private com.sellerops.inquiry.sellercheck.InquiryKindCorrectionRepository kindCorrections;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setKindCorrections(com.sellerops.inquiry.sellercheck.InquiryKindCorrectionRepository kindCorrections) {
+        this.kindCorrections = kindCorrections;
+    }
+
+    /**
+     * The service's own reading of what kind of inquiry this is — kept only from a decision no seller correction shaped,
+     * so 「서비스 판단」 on screen is never the seller's word read back (2026-11-05). A plan that produced no needs keeps the
+     * last reading; a failure to keep it never fails the draft.
+     */
+    /** The standing kind correction's id, or null when none stands (or the repository is not wired). */
+    private UUID currentKindCorrection(UUID orgId, UUID workItemId) {
+        return kindCorrections == null ? null : kindCorrections
+                .findFirstByOrgIdAndWorkItemIdAndSupersededAtIsNullOrderByCorrectedAtDesc(orgId, workItemId)
+                .map(com.sellerops.inquiry.sellercheck.InquiryKindCorrection::getId).orElse(null);
+    }
+
+    private void keepJudgedKind(UUID orgId, UUID workItemId, com.sellerops.inquiry.decision.NeedDecision decision) {
+        try {
+            if (kindCorrections != null && kindCorrections
+                    .findFirstByOrgIdAndWorkItemIdAndSupersededAtIsNullOrderByCorrectedAtDesc(orgId, workItemId)
+                    .isPresent()) {
+                return;
+            }
+            com.sellerops.inquiry.decision.InquiryKind kind = decision.needs() == null ? null
+                    : com.sellerops.inquiry.decision.InquiryKind.of(decision.needs().stream()
+                            .map(com.sellerops.inquiry.decision.NeedResult::need).toList());
+            if (kind == null) {
+                return;
+            }
+            workItems.findById(workItemId).filter(w -> orgId.equals(w.getOrgId()))
+                    .filter(w -> !kind.name().equals(w.getJudgedKind()))
+                    .ifPresent(w -> {
+                        w.setJudgedKind(kind.name());
+                        workItems.save(w);
+                    });
+        } catch (RuntimeException e) {
+            log.warn("judged kind not kept workItem={} cause={}", workItemId, e.getClass().getSimpleName());
+        }
+    }
+
+    static String sellerCheckAsk(com.sellerops.inquiry.decision.NeedDecision decision) {
+        if (decision == null || decision.needs() == null) {
+            return null;
+        }
+        List<com.sellerops.inquiry.decision.NeedType> open = decision.unresolved().stream()
+                .map(n -> n.need().type()).toList();
+        return open.contains(com.sellerops.inquiry.decision.NeedType.ORDER_ACTION) ? "ORDER_ACTION"
+                : open.contains(com.sellerops.inquiry.decision.NeedType.ORDER_STATE) ? "ORDER_STATE" : null;
     }
 
     /**
@@ -358,7 +820,9 @@ public class InquiryDraftComposer {
     /** The retrieval outcome that means "this lane has nothing about it" — {@code RetrievalOutcome.ABSENT}. */
     private static final String ABSENT = RetrievalOutcome.ABSENT.name();
 
-    private GeneratedDraftView composeDraft(UUID orgId, UUID workItemId, String actor, ToneHint tone) {
+    private GeneratedDraftView composeDraft(UUID orgId, UUID workItemId, String actor, ToneHint tone,
+                                            java.util.concurrent.atomic.AtomicReference<
+                                                    com.sellerops.inquiry.decision.NeedDecision> decided) {
         InquiryWorkItem workItem = workItems.findById(workItemId)
                 .filter(w -> w.getOrgId().equals(orgId))
                 .orElseThrow(() -> ApiException.notFound("문의 작업을 찾을 수 없어요."));
@@ -380,11 +844,19 @@ public class InquiryDraftComposer {
         // It runs BEFORE the retrieval rather than after it, which is the 2026-08-27 change: a
         // document written about 2호 is not weak evidence about a customer who said 3호, and a filter
         // applied to the results would already have let it take one of the four slots.
+        // The seller's record this run had in front of it — read once, before drafting, and named on the version, so a
+        // record corrected while this draft was being written is caught before it is approved (2026-11-03).
+        com.sellerops.inquiry.sellercheck.InquirySellerCheck seenRecord = currentRecord(orgId, workItemId);
+        // And the kind correction it plans under (2026-11-05 eighth review), named on the version the same way: a
+        // correction made while this was being written leaves the version naming the older one, and it is not approved.
+        UUID seenKind = currentKindCorrection(orgId, workItemId);
         // Computed ONCE, by the assessment the case investigator also reads: the 규격 verdict (before retrieval), the
         // Knowledge Spine retrieval, and the basis. Two computations of the same classification would be two chances
         // for the screen, the prompt and the investigation to disagree.
         InquiryKnowledgeAssessor.Assessment assessment =
-                assessor.assess(orgId, inquiry, com.sellerops.order.fact.OrderFactLookup.EXACT_ALLOWED);
+                assessor.assess(orgId, inquiry, com.sellerops.order.fact.OrderFactLookup.EXACT_ALLOWED,
+                        usageActorOf(actor));
+        decided.set(assessment.decision());
         SpecApplicability.Verdict verdict = assessment.verdict();
         SpecApplicability.Applicability applicability = verdict.applicability();
         InquiryEvidenceRetriever.InquiryEvidence retrieved = assessment.retrieved();
@@ -423,50 +895,238 @@ public class InquiryDraftComposer {
         // never sees it, so a summary alone can never turn NO_ANSWER_BASIS into a draft.
         String company = companyContextFor(orgId);
         String unavailable = null;
+        // How the one rewrite went, when there was one — a closed word on the view (GeneratedDraftView#rewrite).
+        String rewriteOutcome = null;
         Optional<AgentDraftResponseParser.ParsedDraft> written = Optional.empty();
+        List<InquiryClaimGuard.Violation> claims;
+        // What the claim check read each confirmed figure from — kept with the draft below.
+        List<InquiryFigureGrounds.Link> figureLinks = List.of();
+        // The needs the drafter was told to take up and the claim check found the draft did not (v11).
+        List<com.sellerops.inquiry.decision.NeedResult> notTakenUp = List.of();
+        // The check's item-by-item answer for the saved draft — what closes a settled need (fourteenth review).
+        java.util.Map<String, String> checkedCovered = java.util.Map.of();
         String modelVersion = model.versionFor(orgId);
+        // A draft held for review over these same inputs is checked, not written again (owner, 2026-10-29).
+        com.sellerops.inquiry.decision.NeedDecision needDecisionEarly = assessment.decision();
+        // The need list the drafter and the claim check both read, with when the inquiry arrived (2026-11-02): a date the
+        // seller's side knows is not a question for the customer.
+        // …and the send limit of this inquiry kind (2026-11-02): a draft longer than it is kept but cannot be sent as written.
+        String draftScope = needDecisionEarly == null ? null : withLine(withMoment(needDecisionEarly.answerScope(),
+                com.sellerops.inquiry.decision.InquiryMoment.of(inquiry.getReceivedAt())),
+                com.sellerops.inquiry.reply.InquiryReplyLength.draftLine(channelCodeOf(inquiry.getChannelId()),
+                        inquiry.getSourceSubtype()));
+        List<AgentDraftGenerator.Passage> shownEarly = needDecisionEarly != null ? needDecisionEarly.passages()
+                : passagesFor(assessment.catalogue(), retrieved.passages(), context);
+        // Everything the draft call is given (third outside review, 2026-10-29): a held draft resumes only while none of it
+        // changed — the question, the passages, the order sentence, the 규격 line, the company's style instruction, its
+        // own description, the answer scope, and the model.
+        // The 규격 line the drafter and the claim check both read — asking back only when the seller's evidence leaves the
+        // 규격 open (2026-11-01 ninth review: 「모든 옵션의 길이는 2.4m」 is answered, one value seen is still asked).
+        String specSentence = applicability.messageKo(retrieved.figuresUnaided(), retrieved.variantSpecific(),
+                SpecApplicability.coversEveryOption(shownEarly.stream().map(AgentDraftGenerator.Passage::text).toList(),
+                        verdict.topicWord()));
+        String heldInputs = pendingInputsHash(title, details, shownEarly, retrieved.order().messageKo(), modelVersion,
+                List.of(specSentence,
+                        String.valueOf(AnswerStyleInstruction.of(style)), String.valueOf(company),
+                        needDecisionEarly == null ? "" : String.valueOf(draftScope)));
+        DraftReviewPending held = pending == null ? null : pending.findByOrgIdAndWorkItemId(orgId, workItemId)
+                .filter(p -> heldInputs.equals(p.getInputsHash())).orElse(null);
         if (!model.isEnabledFor(orgId)) {
             unavailable = CAPABILITY_OFF;
         } else {
-            QuotaDecision decision = quota.consume(orgId, AgentUsageKind.DRAFT, null);
+            // Charged to who asked (sixth outside review, 2026-10-29): a background draft is automatic work and stops at the
+            // seller's reserve. It starts only when its claim check fits too.
+            AgentQuotaService.Charge draftCharge = held != null
+                    ? new AgentQuotaService.Charge(QuotaDecision.passWithoutCharge(), null)
+                    : quota.consumeCharge(orgId, AgentUsageKind.DRAFT, null, usageActorOf(actor), 1);
+            QuotaDecision decision = draftCharge.decision();
             if (decision.allowed()) {
                 // Inquiry Decision v2: the drafter sees the evidence of the covered needs and nothing a need did not
                 // cite, and is told which needs to answer and which to ask the customer about.
-                com.sellerops.inquiry.decision.NeedDecision needDecision = assessment.decision();
-                List<AgentDraftGenerator.Passage> shown = needDecision != null ? needDecision.passages()
-                        : passagesFor(assessment.catalogue(), retrieved.passages(), context);
+                com.sellerops.inquiry.decision.NeedDecision needDecision = needDecisionEarly;
+                List<AgentDraftGenerator.Passage> shown = shownEarly;
                 // The rule-based 규격 line stays even when the decision says GROUNDED. The first real-model run
                 // (apr-c8715d20) found the judge calling spec-dependent answers FULL (「몇 가닥 들어가나요」 against a FAQ
                 // written per product, not per 호) — dropping the line then would let a draft close on a figure the
-                // customer's 규격 decides, the 2026-08-26 incident. Over-asking is the safe side of that trade.
-                SpecApplicability.Applicability specLine = applicability;
-                written = needDecision != null ? model.draft(orgId, title, details, shown,
-                        retrieved.order().messageKo(),
-                        specLine.messageKo(retrieved.figuresUnaided(), retrieved.variantSpecific()),
-                        AnswerStyleInstruction.of(style), company, needDecision.answerScope())
-                        : model.draft(orgId, title, details,
-                        shown,
-                        retrieved.order().messageKo(),
-                        applicability.messageKo(retrieved.figuresUnaided(),
-                                retrieved.variantSpecific()),
-                        AnswerStyleInstruction.of(style), company);
-                if (written.isEmpty()) {
-                    unavailable = MODEL_FAILED;
-                } else if (com.sellerops.knowledge.KnowledgeBlanks.carries(written.get().comments())) {
-                    written = Optional.empty();
-                    unavailable = UNCONFIRMED_TEXT;
-                } else if (!AnswerStyleInstruction
-                        .forbiddenPresentIn(written.get().comments(), style).isEmpty()) {
-                    // The prompt asked; this checks. A style line is a request to a model, and a
-                    // rule the company set is not satisfied by having asked politely.
-                    written = Optional.empty();
-                    unavailable = STYLE_FORBIDDEN_PHRASE;
-                } else if (!unsupportedClaims(written.get().comments(), shown, style, title, details,
-                        retrieved.order().messageKo()).isEmpty()) {
-                    // The same relationship, with the evidence: the prompt forbids inventing a follow-up, a request of
-                    // the customer, a remedy or a figure; this refuses a reply that did. Refused, never edited.
-                    written = Optional.empty();
-                    unavailable = UNSUPPORTED_CLAIM;
+                // customer's 규격 decides, the 2026-08-26 incident. Over-asking is the safe side of that trade; only the
+                // seller's own statement that the value holds for every 규격 lifts it (specSentence).
+                if (held != null) {
+                    written = Optional.of(new AgentDraftResponseParser.ParsedDraft(held.getCategory(), held.getTitle(),
+                            held.getBody()));
+                } else {
+                    written = writeDraft(orgId, title, details, shown, retrieved, specSentence, style, company,
+                            needDecision, draftScope, draftCharge.usageId());
+                }
+                // One rewrite (2026-11-02, fourth review): a draft refused for something a sentence can fix is written
+                // once more from the same evidence and the same scope, told what was wrong, and checked again in full.
+                // Q1 wrote two drafts the checks passed and one with a follow-up promise from identical inputs — that one
+                // need not become the seller's work. Never for what a rewrite cannot fix: a number, the law, evidence that
+                // disagrees, a check that did not finish (a held send among them), the ceiling.
+                // A held draft resumes at the try it was (2026-11-02, fifth review): a rewrite held for its check and
+                // resumed is still the rewrite — checked, and on a refusal handed to the seller, never written a third time.
+                String rewriteBecause = held != null && held.getAttempt() > 1 ? held.getRewriteBecause() : null;
+                com.sellerops.inquiry.sellercheck.SellerCheckOutcome recorded =
+                        seenRecord == null ? null : seenRecord.outcomeValue();
+                boolean heldNow = false;
+                // A draft held at its second look resumes there and nowhere else (2026-11-05 eleventh review).
+                boolean awaitingRecheck = held != null && DraftReviewPending.RECHECK.equals(held.getAwaiting());
+                for (int attempt = held != null && held.getAttempt() > 1 ? 2 : 1; ; attempt++) {
+                    boolean rewritten = attempt > 1;
+                    String fix = null;
+                    String because = null;
+                    if (written.isEmpty()) {
+                        unavailable = MODEL_FAILED;
+                    } else if (com.sellerops.knowledge.KnowledgeBlanks.carries(written.get().comments())) {
+                        written = Optional.empty();
+                        unavailable = UNCONFIRMED_TEXT;
+                        fix = REWRITE_BLANK;
+                        because = "BLANK";
+                    } else if (!AnswerStyleInstruction
+                            .forbiddenPresentIn(written.get().comments(), style).isEmpty()) {
+                        // The prompt asked; this checks. A style line is a request to a model, and a
+                        // rule the company set is not satisfied by having asked politely.
+                        fix = rewriteForbidden(AnswerStyleInstruction.forbiddenPresentIn(written.get().comments(), style));
+                        because = "STYLE";
+                        written = Optional.empty();
+                        unavailable = STYLE_FORBIDDEN_PHRASE;
+                    } else if (recorded != null && !com.sellerops.inquiry.sellercheck.SellerCheckGuard
+                            .unrecordedCompletions(written.get().comments(), recorded).isEmpty()) {
+                        // The seller recorded it as not finished; the reply may not say it is (2026-11-02).
+                        List<String> finished = com.sellerops.inquiry.sellercheck.SellerCheckGuard
+                                .unrecordedCompletions(written.get().comments(), recorded);
+                        log.info("inquiry_draft_refused orgId={} kinds=[COMPLETION_NOT_RECORDED] attempt={}", orgId,
+                                attempt);
+                        written = Optional.empty();
+                        unavailable = COMPLETION_NOT_RECORDED;
+                        fix = rewriteCompletion(finished, recorded.labelKo());
+                        because = "COMPLETION";
+                    } else if (!CustomerAskGuard.unrequestedAsks(written.get().comments(), needDecision, recorded,
+                            specSentence).isEmpty()) {
+                        // Asking back is not a claim, but only what the judgement left for the customer may be asked
+                        // (2026-11-06 thirteenth review); with nothing left, a question is one nobody judged necessary.
+                        List<String> asks = CustomerAskGuard.unrequestedAsks(written.get().comments(), needDecision,
+                                recorded, specSentence);
+                        log.info("inquiry_draft_refused orgId={} kinds=[UNREQUESTED_ASK] attempt={}", orgId, attempt);
+                        written = Optional.empty();
+                        unavailable = UNREQUESTED_ASK;
+                        fix = rewriteUnrequestedAsk(asks);
+                        because = "UNREQUESTED_ASK";
+                    } else if (!(claims = unsupportedClaims(written.get().comments(), shown, style, title, details,
+                            retrieved.order().messageKo())).isEmpty()) {
+                        // The same relationship, with the evidence: the prompt forbids inventing a follow-up, a request of
+                        // the customer, a remedy or a figure; this refuses a reply that did. Refused, never edited — and a
+                        // figure the check could not match says so, so the seller knows what to look at. The kinds go to
+                        // the log — never the matched text — so a refusal can be told apart afterwards (case-eval-r10: three
+                        // refusals said only 「약속이나 요청」 and nothing recorded which).
+                        log.info("inquiry_draft_refused orgId={} kinds={} answerScope={} attempt={}", orgId,
+                                claims.stream().map(c -> c.kind().name()).distinct().toList(),
+                                needDecision == null ? "NONE" : needDecision.basis(), attempt);
+                        written = Optional.empty();
+                        unavailable = claims.stream().allMatch(c -> c.kind() == InquiryClaimGuard.Kind.FIGURE)
+                                ? unsupportedFigure(claims)
+                                : claims.stream().anyMatch(c -> c.kind() == InquiryClaimGuard.Kind.LAW) ? LAW_CONFLICT
+                                : claims.stream().allMatch(c -> c.kind() == InquiryClaimGuard.Kind.CONDITION)
+                                ? DROPPED_CONDITION : UNSUPPORTED_CLAIM;
+                        fix = rewriteClaims(claims);
+                        because = fix == null ? null : "GUARD";
+                    } else {
+                        ClaimCheck claimCheck;
+                        boolean recheckWaits = false;
+                        if (awaitingRecheck) {
+                            // Held at the second look: the first check already ran and came back incomplete. Only the
+                            // one look that is left runs — the count is the calls made, and a resume grants no new one.
+                            awaitingRecheck = false;
+                            claimCheck = recheckClaims(orgId, written.get().comments(), shown, title, details,
+                                    retrieved.order().messageKo(), usageActorOf(actor), specSentence, draftScope);
+                            recheckWaits = REVIEW_PENDING.equals(claimCheck.refusal());
+                            log.info("inquiry_claim_recheck orgId={} resumed=true complete={}", orgId,
+                                    claimCheck.refusal() == null && coverageAnswered(needDecision, claimCheck.covered()));
+                        } else {
+                            claimCheck = checkClaims(orgId, written.get().comments(), shown, title, details,
+                                    retrieved.order().messageKo(), usageActorOf(actor), specSentence, draftScope,
+                                    rewritten ? REDRAFT_CHECK_STEP : AgentQuotaService.CHECK_STEP);
+                            if (claimCheck.refusal() == null && !claimCheck.statedNothing()
+                                    && !coverageAnswered(needDecision, claimCheck.covered())) {
+                                // An incomplete answer and nothing else found (2026-11-05 tenth review, K3): the same
+                                // draft, need list and evidence are checked once more — never rewritten for it. Once per
+                                // text: a finding in the first answer is never re-asked away. Metered like any check; a
+                                // look the ceiling stops is kept for later, not lost (eleventh review).
+                                ClaimCheck second = recheckClaims(orgId, written.get().comments(), shown, title, details,
+                                        retrieved.order().messageKo(), usageActorOf(actor), specSentence, draftScope);
+                                recheckWaits = REVIEW_PENDING.equals(second.refusal());
+                                log.info("inquiry_claim_recheck orgId={} resumed=false complete={} waits={}", orgId,
+                                        second.refusal() == null && coverageAnswered(needDecision, second.covered()),
+                                        recheckWaits);
+                                claimCheck = second;
+                            }
+                        }
+                        String unchecked = recheckWaits ? RECHECK_PENDING
+                                : claimCheck.refusal() == null && claimCheck.statedNothing() ? NO_ANSWER_IN_DRAFT
+                                : claimCheck.refusal();
+                        if (claimCheck.refusal() == null && !coverageAnswered(needDecision, claimCheck.covered())) {
+                            // An item-by-item answer that leaves out a need the drafter was told to take up, or names one
+                            // it was never sent, is a check that did not finish — not a draft that dropped nothing
+                            // (2026-11-02 review: {} for N1 · N2 read as 「누락 0」).
+                            log.info("inquiry_claim_check_incomplete orgId={} expected={} got={}", orgId,
+                                    needDecision.toTakeUp().stream().map(n -> n.need().id()).toList(),
+                                    claimCheck.covered().keySet());
+                            unchecked = CLAIM_CHECK_UNAVAILABLE;
+                        }
+                        figureLinks = claimCheck.links();
+                        notTakenUp = notTakenUp(needDecision, claimCheck.covered());
+                        checkedCovered = claimCheck.covered() == null ? java.util.Map.of() : claimCheck.covered();
+                        if (REVIEW_PENDING.equals(unchecked) || RECHECK_PENDING.equals(unchecked)) {
+                            hold(orgId, workItemId, written.get(), heldInputs, attempt, rewriteBecause,
+                                    recheckWaits ? DraftReviewPending.RECHECK : DraftReviewPending.CHECK);
+                            heldNow = true;
+                        } else if (pending != null) {
+                            // Checked now, one way or the other: the hold has done its work.
+                            pending.findByOrgIdAndWorkItemId(orgId, workItemId).ifPresent(pending::delete);
+                        }
+                        if (unchecked != null) {
+                            // Whether a figure is about the same thing, and whether a fact, condition or promise the draft
+                            // states is what the evidence says, is read by the model; what it does not confirm stays out.
+                            written = Optional.empty();
+                            unavailable = unchecked;
+                            if (NO_ANSWER_IN_DRAFT.equals(unchecked)) {
+                                fix = REWRITE_NO_ANSWER;
+                                because = "NO_ANSWER";
+                            } else if (claimCheck.unsupported() != null
+                                    && unchecked.equals(unsupportedStatement(claimCheck.unsupported()))) {
+                                fix = rewriteUnsupported(claimCheck.unsupported());
+                                because = "UNSUPPORTED_STATEMENT";
+                            }
+                        }
+                    }
+                    if (rewritten) {
+                        // Waiting for the check's budget is not a refusal (fifth review): PENDING, and the resume says how
+                        // the same rewrite ended.
+                        rewriteOutcome = written.isPresent() ? "PASSED" : heldNow ? "PENDING" : "REFUSED";
+                        log.info("inquiry_draft_rewrite orgId={} because={} outcome={} resumed={}", orgId, rewriteBecause,
+                                written.isPresent() ? "PASSED" : heldNow ? "PENDING" : unavailableKind(unavailable),
+                                held != null);
+                    }
+                    if (written.isPresent() || fix == null || rewritten || needDecision == null) {
+                        break;
+                    }
+                    // Metered on its own step, counted against the ceiling like any call and never as new work; no room,
+                    // no rewrite — the first refusal stands.
+                    AgentQuotaService.Charge again = quota.chargeCheck(orgId, AgentUsageKind.DRAFT, REDRAFT_STEP,
+                            usageActorOf(actor));
+                    if (again != null && again.decision() != null && !again.decision().allowed()) {
+                        break;
+                    }
+                    rewriteBecause = because;
+                    Optional<AgentDraftResponseParser.ParsedDraft> second = writeDraft(orgId, title, details, shown,
+                            retrieved, specSentence, style, company, needDecision, withLine(draftScope, fix),
+                            again == null ? null : again.usageId());
+                    if (second.isEmpty()) {
+                        rewriteOutcome = "NOT_WRITTEN";
+                        log.info("inquiry_draft_rewrite orgId={} because={} outcome=NOT_WRITTEN", orgId, because);
+                        break; // the first refusal says more than 「생성하지 못했어요」
+                    }
+                    written = second;
+                    unavailable = null;
                 }
             } else {
                 unavailable = decision.messageKo();
@@ -478,7 +1138,7 @@ public class InquiryDraftComposer {
             // question IS grounded, and overwriting that with NO_ANSWER_BASIS would be a second
             // false statement laid on top of the first — and the operational reason travels beside it.
             return noBasis(retrieved, basis, verdict, assessment.asked(), assessment.named(), unavailable,
-                    assessment.gap());
+                    assessment.gap()).withRewrite(rewriteOutcome);
         }
 
         AgentDraftResponseParser.ParsedDraft parsed = written.get();
@@ -486,21 +1146,181 @@ public class InquiryDraftComposer {
                 ? defaultTitle(title) : parsed.title();
         String replyBody = parsed.comments();
 
+        // A need the draft dropped goes to the seller's list, never nowhere (2026-11-02): the version is a partial one and
+        // its send waits for that question like any other the evidence left open.
+        if (!notTakenUp.isEmpty()) {
+            log.info("inquiry_draft_dropped_needs orgId={} needs={}", orgId,
+                    notTakenUp.stream().map(n -> n.need().id()).toList());
+            if (basis == AnswerBasisState.GROUNDED || basis == AnswerBasisState.NEEDS_CLARIFICATION) {
+                basis = AnswerBasisState.PARTIAL_ANSWER;
+            }
+        }
+
         int base = drafts.currentVersion(workItemId);
         ReplyDraftView saved = drafts.saveAs(orgId, workItemId, actor, replyTitle, replyBody, base,
                 new InquiryReplyDraftService.Provenance(DraftAuthorKind.MODEL,
                         stamped(modelVersion, style), knowledgeStateOf(assessment), retrieved.productId(),
-                        basis));
+                        basis, seenRecord == null ? null : seenRecord.getId(), seenKind));
 
-        List<DraftEvidenceView> views = recordEvidence(orgId, workItemId, saved.version(),
-                catalogueMatches(assessment.catalogue()), retrieved.passages(), context, retrieved.order());
+        // What the draft cites is what its writer was shown: with a need decision, the covered needs' evidence — the
+        // lexical lanes may have found nothing the decision's own collection did (2026-10-31: a draft written from two
+        // rules cited none of them, and its state said 「맞는 자료 없음」).
+        List<DraftEvidenceView> views = needDecisionEarly != null
+                ? recordDecisionEvidence(orgId, workItemId, saved.version(), needDecisionEarly.shownEvidence(),
+                        retrieved.order())
+                : recordEvidence(orgId, workItemId, saved.version(),
+                        catalogueMatches(assessment.catalogue()), retrieved.passages(), context, retrieved.order());
+        // …and what each of its numbers was written from — the passage the claim check named for it, line for line with
+        // the list it was shown — so a recheck reads the same claim against the same ground (2026-11-01 reviews).
+        if (figureGrounds != null) {
+            figureGrounds.record(orgId, workItemId, saved.version(), replyBody,
+                    needDecisionEarly != null ? shownOf(needDecisionEarly.shownEvidence())
+                            : shownOf(catalogueMatches(assessment.catalogue()), retrieved.passages(), context),
+                    retrieved.order().messageKo(),
+                    String.join(" ", title == null ? "" : title, details == null ? "" : details), figureLinks);
+        }
+        // …and the sentence above it names what was cited, not what the lexical lanes found (2026-10-31: a draft citing two
+        // rules said 「어디에도 해당하는 내용이 없어」 above them).
+        boolean decisionCited = needDecisionEarly != null && !needDecisionEarly.shownEvidence().isEmpty();
+        // What this version leaves to the seller (tenth review): stated beside it, one question at a time, and the send
+        // waits for each — a version that answers everything closes what an earlier one left.
+        List<String> open = new ArrayList<>(needDecisionEarly == null ? List.of() : needDecisionEarly.openQuestions());
+        // A need the seller's completed action settled closes only when the reply answered the customer's question
+        // (fourteenth review, 2026-11-06): the check reads the draft, not the record. Otherwise it is the seller's again,
+        // with what deciding it would take — the question as the judge left it, not 「초안이 다루지 않았어요」.
+        List<com.sellerops.openquestion.OpenQuestionService.Settled> settled = new ArrayList<>();
+        java.util.Map<String, com.sellerops.inquiry.decision.NeedStatus> notSettled = new java.util.HashMap<>();
+        for (com.sellerops.inquiry.decision.NeedResult n : needDecisionEarly == null
+                ? List.<com.sellerops.inquiry.decision.NeedResult>of() : needDecisionEarly.settledByAction()) {
+            com.sellerops.inquiry.decision.EvidenceCandidate record = n.settlingRecord();
+            if (record != null && record.sourceId() != null && "ANSWERED".equals(checkedCovered.get(n.need().id()))) {
+                settled.add(new com.sellerops.openquestion.OpenQuestionService.Settled(n.need().ask(),
+                        "seller-check:" + record.sourceId()));
+            } else {
+                open.add(n.need().ask() + (n.missing() == null || n.missing().isBlank() ? "" : " — " + n.missing().strip()));
+                notSettled.put(n.need().id(), n.judged() == null ? com.sellerops.inquiry.decision.NeedStatus.NONE : n.judged());
+            }
+        }
+        for (com.sellerops.inquiry.decision.NeedResult n : notTakenUp) {
+            if (n.settledByAction()) {
+                continue;
+            }
+            // A need answered only in part is listed already, with what the evidence left: one row, told both — never a
+            // second row for the same question (2026-11-06: the seller handled 「배송비」 twice).
+            int listed = open.indexOf(n.need().ask() + (n.status() != com.sellerops.inquiry.decision.NeedStatus.PARTIAL
+                    || n.missing() == null || n.missing().isBlank() ? "" : " — " + n.missing().strip()));
+            if (listed >= 0) {
+                open.set(listed, open.get(listed) + " · " + DROPPED_BY_DRAFT);
+            } else {
+                open.add(n.need().ask() + " — " + DROPPED_BY_DRAFT);
+            }
+        }
+        if (openQuestions != null) {
+            // What the seller's completed action made moot is closed first, by name and on its record — never left to
+            // read as an answer, and never asked of the seller again (2026-11-06 thirteenth review).
+            openQuestions.settle(orgId, com.sellerops.openquestion.OpenQuestionService.INQUIRY, workItemId, settled,
+                    "inquiry-draft:" + workItemId + ":" + saved.version(), actor);
+            openQuestions.replace(orgId, com.sellerops.openquestion.OpenQuestionService.INQUIRY, workItemId, open, true,
+                    "inquiry-draft:" + workItemId + ":" + saved.version(), actor);
+        }
         return new GeneratedDraftView(saved, DraftAuthorKind.MODEL.name(), knowledgeStateOf(assessment).name(),
                 assessment.groundedByCatalogue() ? CATALOGUE_GROUNDED
-                        : retrieved.state().messageKo(retrieved.scopes()), basis.name(), basis.messageKo(),
+                        : decisionCited ? DraftKnowledgeState.GROUNDED.messageKo(scopesOf(needDecisionEarly.shownEvidence()))
+                        : retrieved.state().messageKo(retrieved.scopes()), basis.name(),
+                basis.messageKo(),
                 basis.actionKo(retrieved.state(), verdict.topicWord(), applicability,
                         retrieved.productOutcome(), retrieved.policyOutcome(), assessment.asked(),
                         retrieved.policyDeclares(assessment.asked()), verdict.optionsRegistered()),
-                retrieved.productId(), views, company != null, null, assessment.gap());
+                retrieved.productId(), views, company != null, null, unsettled(assessment.gap(), notSettled), null, open)
+                .withRewrite(rewriteOutcome);
+    }
+
+    private com.sellerops.openquestion.OpenQuestionService openQuestions;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setOpenQuestions(com.sellerops.openquestion.OpenQuestionService openQuestions) {
+        this.openQuestions = openQuestions;
+    }
+
+    /**
+     * The need list as the seller should read it once the reply was checked: a need the decision settled by a completed
+     * action that the reply did not answer is shown as the judge left it, not as 「조치 완료로 판단 불필요」 beside an open
+     * question for the same need.
+     */
+    static com.sellerops.inquiry.draft.dto.KnowledgeGapView unsettled(com.sellerops.inquiry.draft.dto.KnowledgeGapView gap,
+            java.util.Map<String, com.sellerops.inquiry.decision.NeedStatus> notSettled) {
+        if (gap == null || gap.needs() == null || notSettled.isEmpty()) {
+            return gap;
+        }
+        return gap.withNeeds(gap.needs().stream().map(v -> {
+            com.sellerops.inquiry.decision.NeedStatus was = notSettled.get(v.id());
+            return was == null ? v : new com.sellerops.inquiry.draft.dto.NeedCoverageView(v.id(), v.ask(), v.type(),
+                    was.name(), was.labelKo(), v.evidence(), v.missing(), v.askCustomer(), v.precedents(), v.acquirable());
+        }).toList());
+    }
+
+    /** Beside a question the draft left out though the evidence answers it — the seller adds it before sending. */
+    static final String DROPPED_BY_DRAFT = "자료로 답할 수 있는데 초안이 다루지 않았어요";
+
+    private com.sellerops.channel.ChannelRepository channels;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setChannels(com.sellerops.channel.ChannelRepository channels) {
+        this.channels = channels;
+    }
+
+    private String channelCodeOf(UUID channelId) {
+        return channels == null || channelId == null ? null
+                : channels.findById(channelId).map(com.sellerops.channel.Channel::getCode).orElse(null);
+    }
+
+    /** One more line under the need list, when there is one to add. */
+    static String withLine(String scope, String line) {
+        if (line == null || line.isEmpty()) {
+            return scope;
+        }
+        return scope == null || scope.isBlank() ? line : scope + "\n" + line;
+    }
+
+    /** The need list with the received line after it — the same text to the drafter and the claim check. */
+    static String withMoment(String scope, String moment) {
+        String line = com.sellerops.inquiry.decision.InquiryMoment.scopeLine(moment);
+        if (line.isEmpty()) {
+            return scope;
+        }
+        return scope == null || scope.isBlank() ? line : scope + "\n" + line;
+    }
+
+    /**
+     * Whether the check's item-by-item answer is whole: it names every need the drafter was told to take up, and no id
+     * outside the list it was sent. A need it was told to leave to the seller may be named or not — it was sent, and
+     * nothing is read from it. Always whole without a need decision.
+     */
+    static boolean coverageAnswered(com.sellerops.inquiry.decision.NeedDecision decision,
+                                    java.util.Map<String, String> covered) {
+        if (decision == null) {
+            return true;
+        }
+        java.util.Set<String> got = covered == null ? java.util.Set.of() : covered.keySet();
+        java.util.Set<String> sent = decision.needs().stream().map(n -> n.need().id())
+                .collect(java.util.stream.Collectors.toSet());
+        return sent.containsAll(got) && got.containsAll(decision.toTakeUp().stream().map(n -> n.need().id()).toList());
+    }
+
+    /**
+     * What the draft did not take up: a need it was told to answer, answer in part or ask about, that the check calls
+     * NOT_COVERED. Read only after {@link #coverageAnswered} — a need the answer does not name is a check that did not
+     * finish, not a dropped need.
+     */
+    static List<com.sellerops.inquiry.decision.NeedResult> notTakenUp(
+            com.sellerops.inquiry.decision.NeedDecision decision, java.util.Map<String, String> covered) {
+        if (decision == null || covered == null) {
+            return List.of();
+        }
+        return decision.toTakeUp().stream().filter(n -> {
+            String c = covered.get(n.need().id());
+            return !"ANSWERED".equals(c) && !"ASKED".equals(c);
+        }).toList();
     }
 
     public static final String DECISION_UNAVAILABLE =
@@ -686,9 +1506,15 @@ public class InquiryDraftComposer {
     /** The knowledge note when the seller's catalogue, and nothing in this product's own library, answered. */
     static final String CATALOGUE_GROUNDED = "판매자가 지금 판매 중인 상품 정보를 근거로 썼어요.";
 
-    /** The draft's knowledge state: GROUNDED when the catalogue answered, the lanes' own state otherwise. */
-    private static DraftKnowledgeState knowledgeStateOf(InquiryKnowledgeAssessor.Assessment assessment) {
-        return assessment.groundedByCatalogue() ? DraftKnowledgeState.GROUNDED : assessment.retrieved().state();
+    /**
+     * The draft's knowledge state: GROUNDED when the catalogue answered or the need decision gave the writer evidence of
+     * the covered needs, the lanes' own state otherwise — the state says what the draft was written from.
+     */
+    static DraftKnowledgeState knowledgeStateOf(InquiryKnowledgeAssessor.Assessment assessment) {
+        com.sellerops.inquiry.decision.NeedDecision decision = assessment.decision();
+        boolean decisionGrounded = decision != null && !decision.shownEvidence().isEmpty();
+        return assessment.groundedByCatalogue() || decisionGrounded ? DraftKnowledgeState.GROUNDED
+                : assessment.retrieved().state();
     }
 
     /** Catalogue statements a draft is shown. Enough to name what is on sale; not a product list. */
@@ -727,6 +1553,58 @@ public class InquiryDraftComposer {
     static String contextLabel(com.sellerops.knowledge.spine.KnowledgeEntry entry) {
         return entry.sourceType() == com.sellerops.knowledge.spine.SpineSourceType.SELLER_GUIDANCE
                 ? InquiryDraftEvidence.LABEL_SELLER_GUIDANCE : KnowledgeScope.PRODUCT.labelKo();
+    }
+
+    /**
+     * The material a need decision's drafter was shown, as {@link InquiryFigureGrounds} reads it again — line for line with
+     * {@link com.sellerops.inquiry.decision.NeedDecision#passages}, so the claim check's 「근거 n」 names the n-th; null
+     * where a line is not the seller's material.
+     */
+    static List<InquiryFigureGrounds.Shown> shownOf(List<com.sellerops.inquiry.decision.EvidenceCandidate> shown) {
+        List<InquiryFigureGrounds.Shown> out = new ArrayList<>();
+        for (com.sellerops.inquiry.decision.EvidenceCandidate e : shown) {
+            InquiryDraftFigure.Ground kind = switch (e.kind()) {
+                case ORG_KNOWLEDGE -> InquiryDraftFigure.Ground.ORG_POLICY;
+                case PRODUCT_KNOWLEDGE -> InquiryDraftFigure.Ground.PRODUCT_KNOWLEDGE;
+                case PRODUCT_FACTS, OPTIONS, ADDONS -> InquiryDraftFigure.Ground.PRODUCT_FACTS;
+                // The order sentence is looked up as itself, after the seller's material.
+                case ORDER_FACT -> null;
+                case SELLER_CHECK -> InquiryDraftFigure.Ground.SELLER_CHECK;
+            };
+            out.add(kind == null ? null : new InquiryFigureGrounds.Shown(kind, e.sourceId(), e.productId(), e.text()));
+        }
+        return out;
+    }
+
+    /**
+     * The material the lexical lanes' drafter was shown, likewise, line for line with {@link #passagesFor}. A past answer
+     * is not material a figure can rest on: its line is null.
+     */
+    static List<InquiryFigureGrounds.Shown> shownOf(List<CatalogueInvestigator.Statement> catalogue,
+                                                    List<InquiryEvidenceRetriever.ScopedPassage> passages,
+                                                    List<com.sellerops.knowledge.spine.KnowledgeEntry> context) {
+        List<InquiryFigureGrounds.Shown> out = new ArrayList<>();
+        for (CatalogueInvestigator.Statement s : catalogue) {
+            out.add(new InquiryFigureGrounds.Shown(InquiryDraftFigure.Ground.PRODUCT_FACTS, null, s.productId(), s.text()));
+        }
+        for (InquiryEvidenceRetriever.ScopedPassage p : passages) {
+            if (p.scope() == KnowledgeScope.PRODUCT) {
+                out.add(new InquiryFigureGrounds.Shown(InquiryDraftFigure.Ground.PRODUCT_KNOWLEDGE, p.sourceId(), null,
+                        p.text()));
+            } else if (p.scope() == KnowledgeScope.ORG_OPERATIONS) {
+                out.add(new InquiryFigureGrounds.Shown(InquiryDraftFigure.Ground.ORG_POLICY, p.sourceId(), null, p.text()));
+            } else {
+                out.add(null);
+            }
+        }
+        for (com.sellerops.knowledge.spine.KnowledgeEntry entry : context) {
+            boolean guidance = entry.sourceType() == com.sellerops.knowledge.spine.SpineSourceType.SELLER_GUIDANCE;
+            out.add(new InquiryFigureGrounds.Shown(guidance ? InquiryDraftFigure.Ground.SELLER_GUIDANCE
+                    : InquiryDraftFigure.Ground.PRODUCT_FACTS,
+                    guidance && !entry.sourceRefs().isEmpty() ? entry.sourceRefs().get(0).id() : null,
+                    entry.productId(), entry.text()));
+        }
+        return out;
     }
 
     private List<DraftEvidenceView> recordEvidence(UUID orgId, UUID workItemId, int version,
@@ -803,6 +1681,75 @@ public class InquiryDraftComposer {
             // No excerpt: an order fact points at a moment, not a document.
             views.add(new DraftEvidenceView(row.getKind(), KnowledgeScope.ORDER_STATE.labelKo(),
                     row.getTitle(), row.getLocator(), null, null, null));
+        }
+        return views;
+    }
+
+    /**
+     * The citations of a draft written from a need decision: every candidate the writer was shown, in the order it was
+     * shown. A rule or product passage keeps its source and passage ids, so the excerpt can be read back; a catalogue
+     * candidate points at its listing; an order fact is cited only when an order was actually resolved.
+     */
+    /** Where the need decision's cited evidence lives, as the seller names it (상품 정보 · 운영 정책 · 주문 상태). */
+    static java.util.Set<com.sellerops.knowledge.KnowledgeScope> scopesOf(
+            List<com.sellerops.inquiry.decision.EvidenceCandidate> shown) {
+        java.util.Set<com.sellerops.knowledge.KnowledgeScope> scopes =
+                java.util.EnumSet.noneOf(com.sellerops.knowledge.KnowledgeScope.class);
+        for (com.sellerops.inquiry.decision.EvidenceCandidate e : shown) {
+            com.sellerops.knowledge.KnowledgeScope scope = switch (e.kind()) {
+                case ORG_KNOWLEDGE -> com.sellerops.knowledge.KnowledgeScope.ORG_OPERATIONS;
+                case PRODUCT_KNOWLEDGE, PRODUCT_FACTS, OPTIONS, ADDONS -> com.sellerops.knowledge.KnowledgeScope.PRODUCT;
+                case ORDER_FACT -> com.sellerops.knowledge.KnowledgeScope.ORDER_STATE;
+                // The seller's record is not a library and not the channel's order state: it is named by its own
+                // evidence row (판매자 확인), never folded into one of these.
+                case SELLER_CHECK -> null;
+            };
+            if (scope != null) {
+                scopes.add(scope);
+            }
+        }
+        return scopes;
+    }
+
+    private List<DraftEvidenceView> recordDecisionEvidence(UUID orgId, UUID workItemId, int version,
+                                                           List<com.sellerops.inquiry.decision.EvidenceCandidate> shown,
+                                                           OrderFact order) {
+        List<DraftEvidenceView> views = new ArrayList<>(shown.size());
+        int ordinal = 0;
+        for (com.sellerops.inquiry.decision.EvidenceCandidate e : shown) {
+            String kind = switch (e.kind()) {
+                case ORG_KNOWLEDGE -> InquiryDraftEvidence.KIND_ORG_POLICY;
+                case PRODUCT_KNOWLEDGE -> InquiryDraftEvidence.KIND_PRODUCT_KNOWLEDGE;
+                case PRODUCT_FACTS, OPTIONS, ADDONS -> InquiryDraftEvidence.KIND_PRODUCT_FACT;
+                case ORDER_FACT -> InquiryDraftEvidence.KIND_ORDER_FACT;
+                case SELLER_CHECK -> InquiryDraftEvidence.KIND_SELLER_CHECK;
+            };
+            if (e.kind() == com.sellerops.inquiry.decision.EvidenceCandidate.Kind.ORDER_FACT
+                    && (order == null || !order.available())) {
+                continue;
+            }
+            InquiryDraftEvidence row = new InquiryDraftEvidence();
+            row.setOrgId(orgId);
+            row.setWorkItemId(workItemId);
+            row.setDraftVersion(version);
+            row.setOrdinal(ordinal++);
+            row.setKind(kind);
+            boolean knowledge = e.kind() == com.sellerops.inquiry.decision.EvidenceCandidate.Kind.ORG_KNOWLEDGE
+                    || e.kind() == com.sellerops.inquiry.decision.EvidenceCandidate.Kind.PRODUCT_KNOWLEDGE;
+            row.setSourceId(knowledge || e.sourceId() != null ? e.sourceId() : e.productId());
+            row.setChunkId(knowledge ? e.chunkId() : null);
+            row.setTitle(e.label());
+            row.setLocator(e.kind() == com.sellerops.inquiry.decision.EvidenceCandidate.Kind.ORDER_FACT
+                    ? orderLocator(order)
+                    : e.kind() == com.sellerops.inquiry.decision.EvidenceCandidate.Kind.SELLER_CHECK
+                    ? "seller-check/" + e.factKey()
+                    : "need-decision/" + e.kind().name().toLowerCase(java.util.Locale.ROOT)
+                            + (e.factKey() == null ? "" : ":" + e.factKey()));
+            evidence.save(row);
+            views.add(new DraftEvidenceView(row.getKind(), e.kind().scopeLabelKo(), row.getTitle(), row.getLocator(),
+                    row.getSourceId(), row.getChunkId(),
+                    e.kind() == com.sellerops.inquiry.decision.EvidenceCandidate.Kind.ORDER_FACT ? null
+                            : DraftEvidenceView.snippetOf(e.text())));
         }
         return views;
     }

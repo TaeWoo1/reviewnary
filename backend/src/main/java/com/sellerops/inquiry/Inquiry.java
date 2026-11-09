@@ -234,6 +234,15 @@ public class Inquiry extends BaseEntity {
     @Column(name = "answer_body", columnDefinition = "text")
     private String answerBody;
 
+    /**
+     * When a collection last <b>carried</b> {@link #answerBody} — not when it last showed this inquiry ({@link
+     * #lastSeenAt}). A collection that brings only the answered status leaves the body as it was and this as it was, so a
+     * body read on Monday is never shown as checked on Friday (2026-11-06 seventeenth review). Null for every body stored
+     * before V183: when it was read is not known, and is not guessed.
+     */
+    @Column(name = "answer_body_seen_at")
+    private Instant answerBodySeenAt;
+
     /** When the source says that answer was registered. Null when the source states none. */
     @Column(name = "answered_at")
     private Instant answeredAt;
@@ -276,4 +285,40 @@ public class Inquiry extends BaseEntity {
      */
     @Column(name = "last_seen_at")
     private Instant lastSeenAt;
+
+    /**
+     * The last result of looking for a shop answer written as a Cafe24 board COMMENT (V184, 2026-11-08). Null = never
+     * looked: every row before V184, every other channel, every thread reply. {@code NOT_CHECKED} records a failed look
+     * and is never evidence that the shop has not answered. Written only by {@code IngestionService}, and only from a
+     * collection whose comment lane actually ran for this row.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "comment_check", length = 16)
+    private com.sellerops.ingest.canonical.CommentAnswerCheck.Result commentCheck;
+
+    /** When {@link #commentCheck} was produced, whatever it was. Not a confirmation time — see {@link #commentCheckedAt}. */
+    @Column(name = "comment_check_attempted_at")
+    private Instant commentCheckAttemptedAt;
+
+    /**
+     * The last time a comment look actually succeeded ({@code SHOP_ANSWERED} or {@code NO_SHOP_COMMENT}). A
+     * {@code NOT_CHECKED} look leaves it where it was, so a failure is never read as "checked just now".
+     */
+    @Column(name = "comment_checked_at")
+    private Instant commentCheckedAt;
+
+    /**
+     * How many open-inquiry rechecks in a row failed for a reason that is <b>this inquiry's</b> (V185, 2026-11-08) — its
+     * comment read gave a 404, a 500 or an unreadable body, its comments proved no answer, or the source did not return it
+     * by number. Zero after a successful look. An account-side failure (429, 401/403, outage, unknown kind) and a request
+     * the limit refused leave it as it is. Read-only here: only {@link InquiryRepository#countRecheckFailure} and
+     * {@link InquiryRepository#clearRecheckFailures} write it, so no entity save can overwrite a count with a stale one.
+     */
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Column(name = "answer_recheck_failures", nullable = false, insertable = false, updatable = false)
+    private int answerRecheckFailures;
+
+    /** When the last of those failures happened; null exactly when the count is zero. The retry interval runs from it. */
+    @Column(name = "answer_recheck_failed_at", insertable = false, updatable = false)
+    private Instant answerRecheckFailedAt;
 }

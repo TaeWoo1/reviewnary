@@ -71,7 +71,7 @@ class AgentDraftResponseParserTest {
     @Test
     @DisplayName("both vendors' envelopes are read — the vendor is configuration, not whoever was written first")
     void readsBothEnvelopes() {
-        assertThat(AgentDraftResponseParser.assistantText("{\"content\":[{\"text\":\"hi\"}]}")).contains("hi");
+        assertThat(AgentDraftResponseParser.assistantText("{\"content\":[{\"type\":\"text\",\"text\":\"hi\"}]}")).contains("hi");
         assertThat(AgentDraftResponseParser.assistantText("{\"choices\":[{\"message\":{\"content\":\"hi\"}}]}"))
                 .contains("hi");
         assertThat(AgentDraftResponseParser.assistantText("{\"unexpected\":true}")).isEmpty();

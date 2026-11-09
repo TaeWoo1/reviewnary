@@ -27,7 +27,14 @@ public enum AgentUsageActor {
     QA,
 
     /** A benchmark arm. Metered, never enforced against. */
-    BENCHMARK;
+    BENCHMARK,
+
+    /**
+     * A reply-agent run started with no seller present (2026-10-28, {@code docs/standing/reply_agent_v1.md}) — after a
+     * sync, or by the automatic check. Metered, and not compared against the seller's own limit: what bounds it is the
+     * share of the day drafting ahead may spend ({@code ReviewDraftPreparer}).
+     */
+    RUN;
 
     /** The header value a deployment may send, or USER for anything absent or unrecognised. */
     public static AgentUsageActor parse(String raw) {

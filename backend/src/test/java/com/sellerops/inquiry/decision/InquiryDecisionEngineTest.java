@@ -102,7 +102,8 @@ class InquiryDecisionEngineTest {
     class Regressions {
 
         @Test
-        @DisplayName("R 77a91fab — three questions, evidence for one: never GROUNDED")
+        @DisplayName("R 77a91fab — three questions, evidence for one: never GROUNDED — a partial answer with the other two "
+                + "left to the seller (owner, 2026-11-01 tenth review)")
         void threeNeedsOneCovered() {
             ScriptedModel model = new ScriptedModel(
                     List.of(need("N1", "마감캡 끝이 뚫려 있는지", NeedType.PRODUCT_SPEC),
@@ -112,7 +113,8 @@ class InquiryDecisionEngineTest {
                             verdict("N3", NeedStatus.PARTIAL, "E1")));
             NeedDecision d = decide(model, List.of(WIDTH_TABLE), List.of(), DetailCapability.IMAGE_ONLY);
 
-            assertThat(d.basis()).isEqualTo(AnswerBasisState.NO_ANSWER_BASIS);
+            assertThat(d.basis()).isEqualTo(AnswerBasisState.PARTIAL_ANSWER);
+            assertThat(d.openQuestions()).hasSize(2);
             assertThat(d.covered()).extracting(n -> n.need().id()).containsExactly("N2");
             assertThat(d.needs()).extracting(NeedResult::status)
                     .containsExactly(NeedStatus.UNKNOWN, NeedStatus.FULL, NeedStatus.UNKNOWN);
@@ -127,7 +129,20 @@ class InquiryDecisionEngineTest {
                     verdicts(verdict("N1", NeedStatus.PARTIAL, "E1", "E2")));
             NeedDecision d = decide(model, List.of(SHIPPING, order), List.of(), DetailCapability.NOT_ACQUIRED);
 
-            assertThat(d.basis()).isEqualTo(AnswerBasisState.NO_ANSWER_BASIS);
+            // The rule is said as a rule; when THIS order ships stays open, and the reply waits for the seller.
+            assertThat(d.basis()).isEqualTo(AnswerBasisState.PARTIAL_ANSWER);
+            assertThat(d.openQuestions()).containsExactly("이 주문이 언제 발송되는지 — 부족한 내용");
+            assertThat(d.answerScope()).contains("근거가 답하는 데까지만");
+            // …and says nothing about the rest: no 「확인 후 안내」, no 「확정해 드리기 어렵습니다」 (case-eval-r10: all four held
+            // partial drafts were refused for one). The seller handles the open question before sending.
+            assertThat(d.answerScope()).contains("나중에 안내하겠다는 말도 쓰지 않습니다")
+                    .contains("판매자가 초안을 보고 직접 덧붙입니다");
+            // …except what the evidence itself says cannot be settled yet, as written; never 「not in the evidence」 turned
+            // into 「cannot be known」 (2026-11-05 re-eval: the seller recorded the arrival day as not yet fixed, and the
+            // draft said nothing of it).
+            assertThat(d.answerScope()).contains("확정하기 어렵다는 말은 근거(판매자 확인 기록 포함)에 그렇게 적혀 있을 때만")
+                    .contains("근거에 없다는 이유로 쓰지 않습니다");
+            assertThat(d.openQuestions()).as("saying so closes nothing").isNotEmpty();
             assertThat(d.needs().get(0).status()).as("an order need is not the listing's — no detail gap applies")
                     .isEqualTo(NeedStatus.PARTIAL);
             assertThat(d.acquisitionPlanned()).isFalse();
@@ -141,7 +156,8 @@ class InquiryDecisionEngineTest {
                     verdicts(verdict("N1", NeedStatus.PARTIAL, "E1")));
             NeedDecision d = decide(model, List.of(WIDTH_TABLE), List.of(), DetailCapability.NOT_ACQUIRED);
 
-            assertThat(d.basis()).isEqualTo(AnswerBasisState.NO_ANSWER_BASIS);
+            assertThat(d.basis()).isEqualTo(AnswerBasisState.PARTIAL_ANSWER);
+            assertThat(d.openQuestions()).hasSize(1);
             assertThat(d.needs().get(0).acquirable()).as("the listing's detail was never read — a system step")
                     .isTrue();
             assertThat(d.acquisitionPlanned()).isTrue();
@@ -212,7 +228,8 @@ class InquiryDecisionEngineTest {
             NeedDecision d = decide(model, List.of(WIDTH_TABLE), List.of(), DetailCapability.READABLE);
 
             assertThat(d.needs().get(1).status()).isEqualTo(NeedStatus.NONE);
-            assertThat(d.basis()).isEqualTo(AnswerBasisState.NO_ANSWER_BASIS);
+            assertThat(d.basis()).isEqualTo(AnswerBasisState.PARTIAL_ANSWER);
+            assertThat(d.openQuestions()).containsExactly("b");
         }
 
         @Test

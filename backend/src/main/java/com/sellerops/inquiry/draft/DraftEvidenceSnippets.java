@@ -1,6 +1,8 @@
 package com.sellerops.inquiry.draft;
 
 import com.sellerops.inquiry.draft.dto.DraftEvidenceView;
+import com.sellerops.inquiry.sellercheck.InquirySellerCheckRepository;
+import com.sellerops.inquiry.sellercheck.InquirySellerCheckService;
 import com.sellerops.knowledge.memory.AnswerMemory;
 import com.sellerops.knowledge.memory.AnswerMemoryRepository;
 import com.sellerops.knowledge.org.OrgKnowledgeChunk;
@@ -37,6 +39,8 @@ public class DraftEvidenceSnippets {
     private final ProductKnowledgeChunkRepository productChunks;
     private final OrgKnowledgeChunkRepository orgChunks;
     private final AnswerMemoryRepository memories;
+    /** The seller's records (2026-11-02); null where a test wires the reader without them. */
+    private InquirySellerCheckRepository sellerChecks;
 
     public DraftEvidenceSnippets(ProductKnowledgeChunkRepository productChunks,
                                  OrgKnowledgeChunkRepository orgChunks,
@@ -46,6 +50,11 @@ public class DraftEvidenceSnippets {
         this.memories = memories;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSellerChecks(InquirySellerCheckRepository sellerChecks) {
+        this.sellerChecks = sellerChecks;
+    }
+
     /** Every stored row for one draft version, as views carrying their excerpt. */
     public List<DraftEvidenceView> viewsOf(List<InquiryDraftEvidence> rows) {
         return rows.stream().map(this::viewOf).toList();
@@ -53,9 +62,7 @@ public class DraftEvidenceSnippets {
 
     /** One stored row as a view carrying its excerpt. */
     public DraftEvidenceView viewOf(InquiryDraftEvidence row) {
-        return new DraftEvidenceView(row.getKind(), InquiryDraftEvidence.scopeLabelOf(row.getKind()),
-                row.getTitle(), row.getLocator(), row.getSourceId(), row.getChunkId(),
-                DraftEvidenceView.snippetOf(textOf(row)));
+        return viewOf(row.getKind(), row.getSourceId(), row.getChunkId(), row.getTitle(), row.getLocator());
     }
 
     /**
@@ -68,12 +75,17 @@ public class DraftEvidenceSnippets {
      */
     public DraftEvidenceView viewOf(String kind, UUID sourceId, UUID chunkId, String title,
                                     String locator) {
+        String text = textOf(kind, sourceId, chunkId);
         return new DraftEvidenceView(kind, InquiryDraftEvidence.scopeLabelOf(kind), title, locator,
-                sourceId, chunkId, DraftEvidenceView.snippetOf(textOf(kind, sourceId, chunkId)));
+                sourceId, chunkId, DraftEvidenceView.snippetOf(text), text == null && hadPassage(kind, sourceId, chunkId));
     }
 
-    private String textOf(InquiryDraftEvidence row) {
-        return textOf(row.getKind(), row.getSourceId(), row.getChunkId());
+    /** Whether this citation pointed at a passage that could be read back — so a null read means it changed or went. */
+    private static boolean hadPassage(String kind, UUID sourceId, UUID chunkId) {
+        if (InquiryDraftEvidence.KIND_PRODUCT_KNOWLEDGE.equals(kind) || InquiryDraftEvidence.KIND_ORG_POLICY.equals(kind)) {
+            return chunkId != null;
+        }
+        return InquiryDraftEvidence.KIND_ANSWER_MEMORY.equals(kind) && sourceId != null;
     }
 
     private String textOf(String kind, UUID sourceId, UUID chunkId) {
@@ -86,6 +98,12 @@ public class DraftEvidenceSnippets {
         if (InquiryDraftEvidence.KIND_ANSWER_MEMORY.equals(kind)) {
             // A past answer is stored whole rather than chunked, so the citation names the memory.
             return chunk(sourceId, memories, AnswerMemory::getAnswerBody);
+        }
+        if (InquiryDraftEvidence.KIND_SELLER_CHECK.equals(kind) && sellerChecks != null && sourceId != null) {
+            // The seller's record is never deleted, only closed by a correction: the draft cites what it was written from,
+            // and a closed one says so rather than passing for what the seller says now.
+            return sellerChecks.findById(sourceId).map(c -> (c.getSupersededAt() == null ? "" : "(이후 고친 이전 기록) ")
+                    + InquirySellerCheckService.evidenceText(c)).orElse(null);
         }
         return null;
     }

@@ -148,4 +148,46 @@ class RetrievalQueryTest {
         assertThat(RetrievalQuery.quotableSubject(null)).isNull();
         assertThat(RetrievalQuery.quotableSubject("   ")).isNull();
     }
+
+    /** Synthetic product A of the case evaluation (tools/eval/case-eval/synthetic_store.py) — fifteen notes, one each. */
+    private static final String[][] PRODUCT_A = {{"모서리", "모서리는 45도로 잘라 맞추면 틈이 적습니다."},
+            {"청소", "물걸레로 가볍게 닦아 주세요. 세제는 쓰지 마세요."}, {"두께", "두께는 8mm입니다."},
+            {"겨울철 부착", "기온이 10도 이하이면 접착력이 약해질 수 있어 실내를 데운 뒤 붙여 주세요."},
+            {"떼어낼 때", "떼어낼 때는 드라이어로 데운 뒤 천천히 떼어 주세요."}, {"수량", "한 박스에 10줄이 들어 있습니다."},
+            {"포장", "포장은 종이 박스이며 완충재가 들어 있습니다."}, {"부착 전 준비", "부착 전 벽면의 먼지를 마른 천으로 닦아 주세요."},
+            {"보관 방법", "직사광선을 피해 서늘한 곳에 보관해 주세요."}, {"길이", "한 줄의 길이는 2.4m입니다."},
+            {"색상", "색상은 화이트 · 그레이 · 우드 세 가지입니다."}, {"자르기", "몰딩은 커터칼로 여러 번 그어 자르면 깔끔하게 잘립니다."},
+            {"무게", "한 줄의 무게는 120g입니다."}, {"인증", "실내용 접착제를 사용했습니다."},
+            {"도배지에 붙일 때", "실크 벽지처럼 표면이 매끄럽지 않은 도배지에서는 접착이 약할 수 있습니다."}};
+
+    /** The first candidate that finds anything, as the product library's search tries them. */
+    private static List<String> firstHit(String need) {
+        List<KnowledgeRetriever.Candidate<String>> corpus = new java.util.ArrayList<>();
+        for (String[] note : PRODUCT_A) {
+            corpus.add(new KnowledgeRetriever.Candidate<>(note[0],
+                    KnowledgeText.normalize(note[0]) + KnowledgeText.normalize(note[1])));
+        }
+        for (RetrievalQuery.Candidate c : RetrievalQuery.ofText(need).candidates()) {
+            List<String> found = KnowledgeRetriever.rank(c.text(), corpus, "몰딩").stream()
+                    .map(KnowledgeRetriever.Hit::ref).toList();
+            if (!found.isEmpty()) {
+                return found;
+            }
+        }
+        return List.of();
+    }
+
+    @Test
+    @DisplayName("a planner's 「선택 가능한 색상 종류」 finds the seller's 색상 note — the listing words do not count as its topic")
+    void listingWordsDoNotSinkTheTopic() {
+        // case-eval-r10 synthetic Q5: fifteen notes is over the whole-library limit, so the need's own search had to find
+        // 색상, and 「선택 색상 종류」 (색상 two of six characters) fell under the askable bar.
+        assertThat(RetrievalQuery.subjectOf("선택 가능한 색상 종류")).isEqualTo("색상");
+        assertThat(firstHit("선택 가능한 색상 종류")).containsExactly("색상");
+        assertThat(firstHit("선택 가능한 색상 목록")).containsExactly("색상");
+        assertThat(firstHit("색상 옵션 종류")).containsExactly("색상");
+        // The absence gate is unchanged: a topic the library never wrote about still finds nothing.
+        assertThat(firstHit("욕실 방수 가능 여부")).isEmpty();
+        assertThat(firstHit("선택 가능한 사이즈 종류")).isEmpty();
+    }
 }

@@ -13,4 +13,9 @@ public interface ReviewReplyWorkDismissalRepository
      * idempotency key; see {@link ReviewReplyWorkDismissal}.
      */
     Optional<ReviewReplyWorkDismissal> findByOrgIdAndCommandId(UUID orgId, String commandId);
+
+    /** Whether the seller ever set this review's reply work aside — a draft is never prepared ahead for one. */
+    boolean existsByOrgIdAndReviewId(UUID orgId, UUID reviewId);
+
+    boolean existsByOrgIdAndReviewIdAndDismissedAtAfter(UUID orgId, UUID reviewId, java.time.Instant at);
 }

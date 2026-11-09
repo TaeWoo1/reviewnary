@@ -57,7 +57,7 @@ class EvidenceScopeInvariantTest {
             assertThat(r.status()).as(type.name()).isEqualTo(NeedStatus.PARTIAL);
             assertThat(r.judged()).isEqualTo(NeedStatus.FULL);
             assertThat(r.enforcement()).isEqualTo(NeedResult.Enforcement.SCOPE_UNATTRIBUTED);
-            assertThat(NeedAggregation.basis(List.of(r))).isEqualTo(AnswerBasisState.NO_ANSWER_BASIS);
+            assertThat(NeedAggregation.basis(List.of(r))).isEqualTo(AnswerBasisState.PARTIAL_ANSWER);
         }
     }
 

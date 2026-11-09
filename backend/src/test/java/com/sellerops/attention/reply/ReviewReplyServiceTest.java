@@ -326,6 +326,25 @@ class ReviewReplyServiceTest {
         assertThat(head.getAnswerBasis()).isNull();
     }
 
+    @Test
+    @org.junit.jupiter.api.DisplayName("the questions left to the seller survive an edit of the reply (ninth review)")
+    void theQuestionsLeftToTheSellerSurviveAnEdit() {
+        triage(TriageDisposition.RESPONSE_NEEDED);
+        new ReviewReplyDraftService(draftRepo).saveAs(org, review.getId(), "SELLER:" + user,
+                "합성-모델이 쓴 초안", 0,
+                new ReviewReplyDraftService.Provenance("MODEL", "gpt-합성", "GROUNDED", "GROUNDED", null));
+        ReviewReplyDraft first = draftRepo.findTopByReviewIdOrderByVersionDesc(review.getId()).orElseThrow();
+        first.setOpenQuestions("합성-다음 입고는 언제인가요?");
+        draftRepo.save(first);
+
+        service.saveDraft(org, account, ref, "합성-감사 문장만 고친 답변", 1, user);
+
+        ReviewReplyDraft head = draftRepo.findTopByReviewIdOrderByVersionDesc(review.getId()).orElseThrow();
+        assertThat(head.getVersion()).isEqualTo(2);
+        assertThat(head.getOpenQuestions()).isEqualTo("합성-다음 입고는 언제인가요?");
+        assertThat(view().draft().openQuestions()).containsExactly("합성-다음 입고는 언제인가요?");
+    }
+
     /**
      * <b>What the head version recorded about its own basis reaches the panel</b> — Retrieval
      * Runtime Closure v1 §1.
@@ -358,6 +377,20 @@ class ReviewReplyServiceTest {
         // The body and the version are the stored ones — nothing was regenerated to answer this.
         assertThat(reopened.draft().body()).isEqualTo("합성-기본-문구");
         assertThat(reopened.draft().version()).isEqualTo(2);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("a NAVER reply over 200 characters is kept to fix and never approved, whoever wrote it (seventh review)")
+    void aReplyOverTheChannelLimitIsKeptButNotApproved() {
+        triage(TriageDisposition.RESPONSE_NEEDED);
+        String long1 = "합성-" + "가".repeat(198);
+        service.saveDraft(org, account, ref, long1, 0, user);
+        assertThatThrownBy(() -> service.decideApproval(org, account, ref, "APPROVED", 1,
+                UUID.randomUUID().toString(), user)).isInstanceOf(com.sellerops.common.ApiException.class)
+                .hasMessageContaining("200자까지").hasMessageContaining("201자");
+        assertThat(service.view(org, account, ref).draft().body()).as("kept to fix").isEqualTo(long1);
+        service.saveDraft(org, account, ref, "합성-" + "가".repeat(196), 1, user);
+        service.decideApproval(org, account, ref, "APPROVED", 2, UUID.randomUUID().toString(), user);
     }
 
     private void approveHead() {

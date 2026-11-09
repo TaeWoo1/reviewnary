@@ -47,6 +47,11 @@ public class ReviewReplyDraftService {
 
     /** The current draft for a review (assumes the caller already authorized it). */
     /** The head version, or 0 when none — the {@code baseVersion} the next save must pass. */
+    /** Whether a person — not the system drafting ahead — wrote or edited a version after {@code at}. */
+    public boolean writtenByAPersonSince(UUID reviewId, java.time.Instant at) {
+        return at != null && drafts.existsByReviewIdAndCreatedAtAfterAndCreatedByNotLike(reviewId, at, "SYSTEM:%");
+    }
+
     public int currentVersion(UUID reviewId) {
         return latest(reviewId).map(ReviewReplyDraft::getVersion).orElse(0);
     }
@@ -162,6 +167,10 @@ public class ReviewReplyDraftService {
             draft.setAnswerBasis(provenance.basis());
             draft.setProductId(provenance.productId());
         }
+        // The questions the reply agent left to the seller stay until a run judges the review again (2026-11-01 ninth
+        // review: editing the thank-you sentence dropped them though nothing answered them). Changing a word is not
+        // settling the work; the agent's save replaces them with its own answer, whatever it is.
+        latest.map(ReviewReplyDraft::getOpenQuestions).ifPresent(draft::setOpenQuestions);
         try {
             return ReviewReplyDraftView.of(drafts.save(draft));
         } catch (DataIntegrityViolationException race) {

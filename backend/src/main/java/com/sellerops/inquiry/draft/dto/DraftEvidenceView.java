@@ -20,9 +20,22 @@ import java.util.UUID;
  *
  * <p>It is a short excerpt, not the document: enough to recognise, and the seller's knowledge screen
  * still owns the whole text. {@code sourceId} remains so a screen can link there.
+ *
+ * <p><b>{@code gone}: the passage the drafter was shown no longer exists as it was</b> (2026-10-28 evaluation). A
+ * document's passages are re-cut whenever it is edited and removed when it is deleted, so a citation whose passage
+ * cannot be read back points at text that has since changed or gone — and the draft written from it may now say
+ * something the seller's knowledge no longer says. A draft whose policy had been deleted still sat waiting for
+ * approval with nothing on screen saying so. Read at display time, never stored; never true of an order fact, which
+ * has no passage to lose.
  */
 public record DraftEvidenceView(String kind, String scopeLabel, String title, String locator,
-                                UUID sourceId, UUID chunkId, String snippet) {
+                                UUID sourceId, UUID chunkId, String snippet, boolean gone) {
+
+    /** A citation whose passage was not looked up — the moment a draft is written, it is the passage it was shown. */
+    public DraftEvidenceView(String kind, String scopeLabel, String title, String locator,
+                             UUID sourceId, UUID chunkId, String snippet) {
+        this(kind, scopeLabel, title, locator, sourceId, chunkId, snippet, false);
+    }
 
     /** How much of a passage a seller needs in order to recognise it. Two or three sentences. */
     public static final int SNIPPET_CHARS = 240;

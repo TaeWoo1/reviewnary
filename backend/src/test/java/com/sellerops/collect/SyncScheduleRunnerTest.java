@@ -119,14 +119,18 @@ class SyncScheduleRunnerTest {
     }
 
     private SyncScheduleRunner runnerWith(PullConnector connector) {
+        return runnerWith(connector, List.of());
+    }
+
+    private SyncScheduleRunner runnerWith(PullConnector connector, List<ScheduledCollectionFollowUp> followUps) {
         ConnectorRegistry registry = new ConnectorRegistry(List.of(connector));
         IngestionService ingestion = new IngestionService(reviews, inquiries, orders, new ProductService(products), communityArticles, channels, new InquiryWorkItemWriter(inquiries, workItems, audits, txManager));
         com.sellerops.order.ChannelOrderIngestionService orderIngestion =
                 new com.sellerops.order.ChannelOrderIngestionService(channelOrders, channelOrderStatusEvents, channels, txManager);
         SyncRunExecutor executor = new SyncRunExecutor(
                 sellerAccounts, channels, registry, ingestion, orderIngestion, syncJobs, cursors, connectionStatus);
-        return new SyncScheduleRunner(
-                new SyncScheduleClaimer(schedules), executor, schedules, syncJobs, connectionStatus, alerts);
+        return new SyncScheduleRunner(new SyncScheduleClaimer(schedules), executor, schedules, syncJobs,
+                connectionStatus, alerts, null, followUps);
     }
 
     private SellerAccount account(String channelCode) {
@@ -207,6 +211,42 @@ class SyncScheduleRunnerTest {
         // Claimed forward — a second tick at the same instant runs nothing.
         assertThat(runner.runDueSchedules(now, SyncScheduler.BATCH_LIMIT)).isEmpty();
         assertThat(syncJobs.count()).isEqualTo(1);
+    }
+
+    @Test
+    void everyExecutedScheduledRunIsHandedToTheFollowUpsFinishedAndOneThatThrowsStopsNothing() {
+        SellerAccount acc = account("GMARKET");
+        intervalSchedule(acc, DataType.INQUIRY, now, true);
+        intervalSchedule(acc, DataType.REVIEW, now, true);
+        List<SyncJob> handed = new java.util.ArrayList<>();
+        ScheduledCollectionFollowUp throwing = job -> {
+            throw new IllegalStateException("follow-up trouble");
+        };
+        SyncScheduleRunner withFollowUps = runnerWith(mock, List.of(throwing, handed::add));
+
+        List<SyncJob> jobs = withFollowUps.runDueSchedules(now, SyncScheduler.BATCH_LIMIT);
+
+        assertThat(jobs).hasSize(2);
+        assertThat(handed).extracting(SyncJob::getId)
+                .containsExactlyInAnyOrderElementsOf(jobs.stream().map(SyncJob::getId).toList());
+        assertThat(handed).allSatisfy(job -> {
+            assertThat(job.getTrigger()).isEqualTo("SCHEDULED");
+            assertThat(job.getStatus()).as("handed over finished, not running").isEqualTo("SUCCESS");
+            assertThat(job.getSellerAccountId()).isEqualTo(acc.getId());
+            assertThat(job.getChannelId()).isEqualTo(acc.getChannelId());
+        });
+    }
+
+    @Test
+    void aScheduleThatNeverExecutedHasNoFollowUp() {
+        SellerAccount acc = account("GMARKET");
+        SyncSchedule broken = intervalSchedule(acc, DataType.INQUIRY, now, true);
+        broken.setDataType("NOT_A_DATA_TYPE");
+        schedules.save(broken);
+        List<SyncJob> handed = new java.util.ArrayList<>();
+
+        assertThat(runnerWith(mock, List.of(handed::add)).runDueSchedules(now, SyncScheduler.BATCH_LIMIT)).isEmpty();
+        assertThat(handed).isEmpty();
     }
 
     @Test

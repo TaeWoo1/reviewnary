@@ -31,12 +31,53 @@ public class JdkVendorServerClient implements VendorServerClient {
     static final Duration WAIT_TIMEOUT = Duration.ofSeconds(35);
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    /** The vendor server's header naming the organisation a workspace call is for (vendor {@code WorkspaceLinks}). */
+    static final String ORG_HEADER = "X-Reviewnary-Org";
+
     private final URI base;
+    private final String serviceToken;
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
 
+    /** A seller PC: each call carries the install token it is given. */
     public JdkVendorServerClient(URI base) {
+        this(base, null);
+    }
+
+    /**
+     * The workspace server ({@code docs/standing/server_operation_boundary_v1.md} §5): every call carries this
+     * server's service token, and the per-call credential it is given is the organisation the call is for. The
+     * vendor server answers for that organisation only when an operator linked it to a seller account.
+     */
+    public JdkVendorServerClient(URI base, String serviceToken) {
         String s = base.toString();
         this.base = URI.create(s.endsWith("/") ? s : s + "/");
+        this.serviceToken = serviceToken == null || serviceToken.isBlank() ? null : serviceToken.trim();
+    }
+
+    /** The headers that prove a call: the install token, or the service token and the organisation. */
+    private String[] credential(String perCall) {
+        if (serviceToken == null) {
+            return new String[] {"Authorization", "Bearer " + perCall};
+        }
+        return new String[] {"Authorization", "Bearer " + serviceToken, ORG_HEADER, perCall};
+    }
+
+    @Override
+    public List<UUID> workspaceOrganisations() {
+        if (serviceToken == null) {
+            throw new Refused();
+        }
+        Answer a = relay(HttpRequest.newBuilder(base.resolve("v1/workspace/organisations")).timeout(REQUEST_TIMEOUT)
+                .header("Authorization", "Bearer " + serviceToken).header("Accept", "application/json").GET().build());
+        List<UUID> orgs = new ArrayList<>();
+        for (JsonNode id : a.json().path("organisations")) {
+            try {
+                orgs.add(UUID.fromString(id.asText()));
+            } catch (IllegalArgumentException e) {
+                throw new Unreachable();
+            }
+        }
+        return orgs;
     }
 
     @Override
@@ -81,7 +122,7 @@ public class JdkVendorServerClient implements VendorServerClient {
     @Override
     public PublicIp publicIp(String installToken) {
         Answer a = send(HttpRequest.newBuilder(base.resolve("v1/ip")).timeout(REQUEST_TIMEOUT)
-                .header("Authorization", "Bearer " + installToken).header("Accept", "application/json")
+                .headers(credential(installToken)).header("Accept", "application/json")
                 .GET().build());
         return switch (a.status()) {
             case 200 -> new Ipv4(text(a.json(), "ipv4"));
@@ -99,13 +140,13 @@ public class JdkVendorServerClient implements VendorServerClient {
     @Override
     public void unlink(String installToken) {
         send(HttpRequest.newBuilder(base.resolve("v1/installs/me")).timeout(REQUEST_TIMEOUT)
-                .header("Authorization", "Bearer " + installToken).DELETE().build());
+                .headers(credential(installToken)).DELETE().build());
     }
 
     @Override
     public List<Store> stores(String installToken) {
         Answer a = relay(HttpRequest.newBuilder(base.resolve("v1/stores")).timeout(REQUEST_TIMEOUT)
-                .header("Authorization", "Bearer " + installToken).header("Accept", "application/json")
+                .headers(credential(installToken)).header("Accept", "application/json")
                 .GET().build());
         if (!a.json().isArray()) {
             throw new Unreachable();
@@ -121,7 +162,7 @@ public class JdkVendorServerClient implements VendorServerClient {
     @Override
     public Optional<String> accountEmail(String installToken) {
         Answer a = relay(HttpRequest.newBuilder(base.resolve("v1/installs/me")).timeout(REQUEST_TIMEOUT)
-                .header("Authorization", "Bearer " + installToken).header("Accept", "application/json")
+                .headers(credential(installToken)).header("Accept", "application/json")
                 .GET().build());
         return Optional.ofNullable(optionalText(a.json(), "accountEmail"));
     }
@@ -130,7 +171,7 @@ public class JdkVendorServerClient implements VendorServerClient {
     public FeedPage reviewFeed(String installToken, UUID storeId, long cursor, int limit) {
         Answer a = relay(HttpRequest.newBuilder(base.resolve("v1/stores/" + storeId + "/reviews?cursor=" + cursor
                         + "&limit=" + limit)).timeout(REQUEST_TIMEOUT)
-                .header("Authorization", "Bearer " + installToken).header("Accept", "application/json")
+                .headers(credential(installToken)).header("Accept", "application/json")
                 .GET().build());
         JsonNode events = a.json().path("events");
         if (!events.isArray() || !a.json().path("cursor").canConvertToLong()) {
@@ -162,7 +203,7 @@ public class JdkVendorServerClient implements VendorServerClient {
         Answer a;
         try {
             a = relay(HttpRequest.newBuilder(base.resolve("v1/reviews/wait")).timeout(WAIT_TIMEOUT)
-                    .header("Authorization", "Bearer " + installToken).header("Accept", "application/json")
+                    .headers(credential(installToken)).header("Accept", "application/json")
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(Map.of("cursors", named)),
                             StandardCharsets.UTF_8))
@@ -189,7 +230,7 @@ public class JdkVendorServerClient implements VendorServerClient {
     public void ackReviews(String installToken, UUID storeId, long cursor) {
         try {
             relay(HttpRequest.newBuilder(base.resolve("v1/stores/" + storeId + "/reviews/ack"))
-                    .timeout(REQUEST_TIMEOUT).header("Authorization", "Bearer " + installToken)
+                    .timeout(REQUEST_TIMEOUT).headers(credential(installToken))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(Map.of("cursor", cursor)),
                             StandardCharsets.UTF_8))
@@ -221,10 +262,19 @@ public class JdkVendorServerClient implements VendorServerClient {
 
     @Override
     public TaskSnapshot approve(String installToken, UUID taskId, int version, String fingerprint, String commandId) {
+        return approve(installToken, taskId, version, fingerprint, commandId, null);
+    }
+
+    @Override
+    public TaskSnapshot approve(String installToken, UUID taskId, int version, String fingerprint, String commandId,
+                                String approvedBy) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("version", version);
         request.put("fingerprint", fingerprint);
         request.put("commandId", commandId);
+        if (approvedBy != null) {
+            request.put("approvedBy", approvedBy);
+        }
         return task(taskCall(jsonPost("v1/tasks/" + taskId + "/approve", installToken, request)).json());
     }
 
@@ -239,7 +289,7 @@ public class JdkVendorServerClient implements VendorServerClient {
     public TaskChanges taskChanges(String installToken, UUID storeId, long cursor, int limit) {
         Answer a = relay(HttpRequest.newBuilder(base.resolve("v1/stores/" + storeId + "/tasks/changes?cursor="
                         + cursor + "&limit=" + limit)).timeout(REQUEST_TIMEOUT)
-                .header("Authorization", "Bearer " + installToken).header("Accept", "application/json")
+                .headers(credential(installToken)).header("Accept", "application/json")
                 .GET().build());
         JsonNode changes = a.json().path("changes");
         if (!changes.isArray() || !a.json().path("cursor").canConvertToLong()) {
@@ -258,7 +308,7 @@ public class JdkVendorServerClient implements VendorServerClient {
     @Override
     public TaskSnapshot task(String installToken, UUID taskId) {
         return task(taskCall(HttpRequest.newBuilder(base.resolve("v1/tasks/" + taskId)).timeout(REQUEST_TIMEOUT)
-                .header("Authorization", "Bearer " + installToken).header("Accept", "application/json")
+                .headers(credential(installToken)).header("Accept", "application/json")
                 .GET().build()).json());
     }
 
@@ -344,7 +394,7 @@ public class JdkVendorServerClient implements VendorServerClient {
     private HttpRequest jsonPost(String path, String installToken, Map<String, Object> body) {
         try {
             return HttpRequest.newBuilder(base.resolve(path)).timeout(REQUEST_TIMEOUT)
-                    .header("Authorization", "Bearer " + installToken).header("Content-Type", "application/json")
+                    .headers(credential(installToken)).header("Content-Type", "application/json")
                     .header("Accept", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body), StandardCharsets.UTF_8))
                     .build();

@@ -2,6 +2,7 @@ package com.sellerops.vendorlink;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -25,6 +26,8 @@ import org.junit.jupiter.api.Test;
 class VendorReviewArrivalWatchTest {
 
     private static final UUID STORE = UUID.fromString("6f1c2a3b-0000-4000-8000-000000000001");
+    private static final UUID ORG = UUID.fromString("6f1c2a3b-0000-4000-8000-00000000a001");
+    private static final UUID OTHER_ORG = UUID.fromString("6f1c2a3b-0000-4000-8000-00000000b002");
 
     private final VendorReviewPullService pulls = mock(VendorReviewPullService.class);
     private final StepClock clock = new StepClock();
@@ -32,51 +35,74 @@ class VendorReviewArrivalWatchTest {
 
     @Test
     void aReadyStoreIsPulledAndTheNextQuestionGoesOutAtOnce() {
-        when(pulls.receivingCursors()).thenReturn(Map.of(STORE, 10L), Map.of(STORE, 5010L));
-        when(pulls.waitForNews(Map.of(STORE, 10L))).thenReturn(List.of(STORE));
+        when(pulls.receivingCursors(ORG)).thenReturn(Map.of(STORE, 10L), Map.of(STORE, 5010L));
+        when(pulls.waitForNews(ORG, Map.of(STORE, 10L))).thenReturn(List.of(STORE));
 
-        assertThat(watch.step()).isZero();
-        verify(pulls).pullBound();
+        assertThat(watch.step(ORG)).isZero();
+        verify(pulls).pullBound(ORG);
     }
 
     @Test
     void aPullThatMovesNothingRestsInsteadOfAskingAgain() {
-        when(pulls.receivingCursors()).thenReturn(Map.of(STORE, 10L));
-        when(pulls.waitForNews(any())).thenReturn(List.of(STORE));
+        when(pulls.receivingCursors(ORG)).thenReturn(Map.of(STORE, 10L));
+        when(pulls.waitForNews(eq(ORG), any())).thenReturn(List.of(STORE));
 
-        assertThat(watch.step()).isEqualTo(VendorReviewArrivalWatch.REST);
-        verify(pulls).pullBound();
+        assertThat(watch.step(ORG)).isEqualTo(VendorReviewArrivalWatch.REST);
+        verify(pulls).pullBound(ORG);
     }
 
     @Test
     void aHoldThatRanOutAsksAgainAtOnceButAFastEmptyAnswerRests() {
-        when(pulls.receivingCursors()).thenReturn(Map.of(STORE, 10L));
-        when(pulls.waitForNews(any())).thenAnswer(i -> {
+        when(pulls.receivingCursors(ORG)).thenReturn(Map.of(STORE, 10L));
+        when(pulls.waitForNews(eq(ORG), any())).thenAnswer(i -> {
             clock.advance(Duration.ofSeconds(25));
             return List.of();
         });
-        assertThat(watch.step()).isZero();
+        assertThat(watch.step(ORG)).isZero();
 
-        when(pulls.waitForNews(any())).thenAnswer(i -> {
+        when(pulls.waitForNews(eq(ORG), any())).thenAnswer(i -> {
             clock.advance(Duration.ofMillis(40));
             return List.of();
         });
-        assertThat(watch.step()).isEqualTo(VendorReviewArrivalWatch.REST);
-        verify(pulls, never()).pullBound();
+        assertThat(watch.step(ORG)).isEqualTo(VendorReviewArrivalWatch.REST);
+        verify(pulls, never()).pullBound(ORG);
     }
 
     @Test
     void notLinkedUnreachableOrRefusedRestsWithoutPulling() {
-        when(pulls.receivingCursors()).thenReturn(Map.of());
-        assertThat(watch.step()).isEqualTo(VendorReviewArrivalWatch.REST);
-        verify(pulls, never()).waitForNews(any());
+        when(pulls.receivingCursors(ORG)).thenReturn(Map.of());
+        assertThat(watch.step(ORG)).isEqualTo(VendorReviewArrivalWatch.REST);
+        verify(pulls, never()).waitForNews(any(), any());
 
-        when(pulls.receivingCursors()).thenReturn(Map.of(STORE, 10L));
-        doThrow(new VendorServerClient.Unreachable()).when(pulls).waitForNews(any());
-        assertThat(watch.step()).isEqualTo(VendorReviewArrivalWatch.REST);
-        doThrow(new VendorServerClient.Refused()).when(pulls).waitForNews(any());
-        assertThat(watch.step()).isEqualTo(VendorReviewArrivalWatch.REST);
+        when(pulls.receivingCursors(ORG)).thenReturn(Map.of(STORE, 10L));
+        doThrow(new VendorServerClient.Unreachable()).when(pulls).waitForNews(any(), any());
+        assertThat(watch.step(ORG)).isEqualTo(VendorReviewArrivalWatch.REST);
+        doThrow(new VendorServerClient.Refused()).when(pulls).waitForNews(any(), any());
+        assertThat(watch.step(ORG)).isEqualTo(VendorReviewArrivalWatch.REST);
+        verify(pulls, never()).pullBound(ORG);
+    }
+
+    /** One organisation's question names its stores only, and its news pulls that organisation only. */
+    @Test
+    void aQuestionAndItsPullBelongToOneOrganisation() {
+        when(pulls.receivingCursors(ORG)).thenReturn(Map.of(STORE, 10L), Map.of(STORE, 5010L));
+        when(pulls.waitForNews(ORG, Map.of(STORE, 10L))).thenReturn(List.of(STORE));
+
+        watch.step(ORG);
+        verify(pulls).pullBound(ORG);
+        verify(pulls, never()).pullBound(OTHER_ORG);
         verify(pulls, never()).pullBound();
+        verify(pulls, never()).waitForNews(eq(OTHER_ORG), any());
+    }
+
+    /** A watcher for each linked organisation; none when nothing is linked. */
+    @Test
+    void eachLinkedOrganisationGetsItsOwnWatcher() {
+        when(pulls.linkedOrganisations()).thenReturn(List.of());
+        assertThat(watch.ensureWatchers()).isEmpty();
+
+        when(pulls.linkedOrganisations()).thenReturn(List.of(ORG, OTHER_ORG));
+        assertThat(watch.ensureWatchers()).containsExactly(ORG, OTHER_ORG);
     }
 
     /** A clock that moves only when told to. */

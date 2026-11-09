@@ -104,7 +104,9 @@ public class InquiryDetailController {
                                     @PathVariable UUID workItemId,
                                     @RequestBody ReplyDraftRequest request) {
         return drafts.save(principal.orgId(), workItemId, principal.userId(),
-                request.title(), request.comments(), request.baseVersion());
+                request.title(), request.comments(), request.baseVersion(),
+                com.sellerops.inquiry.reply.InquiryReplyDraftService.Provenance.seller(request.sellerCheckId(),
+                        request.kindCorrectionId()));
     }
 
     /**

@@ -96,13 +96,31 @@ class LlmSendGateTest {
     @Test
     void anAddressIsHeldNotRewritten() {
         for (String address : List.of("서울시 강남구 테헤란로 123", "성남시 분당구 판교역로 235", "중앙로 45번길 12",
-                "산 12-3번지", "래미안 101동 1203호")) {
+                "산 12-3번지", "래미안 101동 1203호",
+                // A word after the building number that starts like a unit is still a building (2026-11-02 review).
+                "서울시 강남구 테헤란로 123 원룸", "서울시 강남구 테헤란로 123원룸", "서울시 강남구 테헤란로 12 장미아파트",
+                "서울시 강남구 테헤란로 12 주공아파트 3층", "서울시 강남구 테헤란로 123, 4층",
+                // A clear address is held whatever follows the number — the quantity exception never undoes it.
+                "서울시 강남구 테헤란로 123장안빌라", "강남구 테헤란로 123원이빌딩", "부산시 중구 중앙대로 12개나리빌라",
+                "중구 중앙로 12장미맨션", "성남시 분당구 판교역로 235 3층",
+                // …whatever names the district: the building word is what makes it clear (2026-11-02, second review).
+                "수원시 팔달로 12장안빌라", "양평군 중앙로 3일도주택")) {
             Prepared p = check("주소는 " + address + " 입니다");
             assertThat(p.sendable()).as(address).isFalse();
             assertThat(p.held()).as(address).containsExactly(Finding.ADDRESS);
             assertThat(p.body()).as("a held request has no body to send").isNull();
         }
-        for (String prose : List.of("택배로 3개 보냈어요", "서울로 2박 3일 여행", "길이 10cm 짧아요", "3동 매장")) {
+        for (String prose : List.of("택배로 3개 보냈어요", "서울로 2박 3일 여행", "길이 10cm 짧아요", "3동 매장",
+                // Policy wording a draft and its check carry (2026-11-02, case-eval-r12): a quantity, not a building.
+                "대량 구매 시 기준으로 20박스 이상이면 할인됩니다", "교환 시 수령일로 7일 이내", "결제 시 오후로 2시간 안에",
+                "구매 시 기준으로 20박스이상", "교환 시 수령일로 7일이내", "주문 시 택배로 3개입니다", "구매 시 택배로 5,000원",
+                "결제 시 오후로 2시간", "주문 시 박스로 10kg까지",
+                // 시 · 구 as words of their own, or the end of an everyday word, are not a district.
+                "혹시 택배로 3개 보내 드릴까요", "다시 택배로 2개 보내 드려요", "가구 택배로 2개까지",
+                // 「…시」 glued to its noun means "when", and has the letters of 성남시 (2026-11-02, second review).
+                "교환시 택배로 3개 보내주세요", "구매시 택배로 3개 배송됩니다", "주문시 택배로 2개입니다", "반품시 택배로 1개씩",
+                "구매시 추가로 2개 보내 드려요", "결제시 오후로 2시간 안에", "교환시 택배로 3개 아파트 경비실에 맡겨요",
+                "원목가구 택배로 2개까지", "사무용품구 택배로 5개")) {
             assertThat(check(prose).sendable()).as(prose).isTrue();
         }
     }

@@ -222,6 +222,39 @@ public final class VocPreviewSanitizer {
      * mostly sensitive. {@link RedactedBody#redacted()} is how the surface says so out loud.
      * The one null case is a null/blank source: nothing in, nothing out.
      */
+    /**
+     * <b>The whole body as the customer wrote it, for the seller who opened the review</b> (product-owner, 2026-10-28:
+     * 「홈 화면에 표시할 때는 처리하는 데 동의하지만, 해당 리뷰를 클릭해서 들어갈 경우는 그냥 보이는 게 좋겠어」).
+     *
+     * <p>The same markup, boilerplate and whitespace handling as {@link #redactFullBody} — only the redaction is not
+     * applied, so the two bodies of one review differ in nothing but the tokens. It is for a review's own screen, opened
+     * by the seller it was written to: lists, previews, logs and every model payload keep {@link #sanitize} or
+     * {@link #redactFullBody}. {@link RedactedBody#redacted()} is always false here.
+     */
+    public static RedactedBody plainFullBody(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return RedactedBody.empty();
+        }
+        // CR/CRLF fold into \n BEFORE the markup pass, so a Windows line ending stays a line ending
+        // rather than becoming the space MarkupText turns a lone \r into.
+        //
+        // Then markup, unbounded: this is the body the seller reads in order to answer it, and
+        // SCAN_LIMIT is a throughput bound for lists — MarkupText#toPlainText(String, int) says why.
+        String plain = ChannelBoilerplate.strip(MarkupText.toPlainText(
+                raw.replace("\r\n", "\n").replace("\r", "\n"), Integer.MAX_VALUE));
+        if (plain.isBlank()) {
+            return RedactedBody.empty();
+        }
+        // Same normalization as the preview, differing only in which single character a
+        // whitespace run collapses to — see normalizeForRedaction.
+        String normalized = normalizeForRedaction(plain, true);
+        if (normalized.isEmpty()) {
+            return RedactedBody.empty();
+        }
+
+        return new RedactedBody(normalized, false);
+    }
+
     public static RedactedBody redactFullBody(String raw) {
         if (raw == null || raw.isBlank()) {
             return RedactedBody.empty();

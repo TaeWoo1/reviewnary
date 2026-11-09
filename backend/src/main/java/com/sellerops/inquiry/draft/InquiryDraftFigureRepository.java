@@ -1,0 +1,10 @@
+package com.sellerops.inquiry.draft;
+
+import java.util.List;
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface InquiryDraftFigureRepository extends JpaRepository<InquiryDraftFigure, UUID> {
+
+    List<InquiryDraftFigure> findAllByWorkItemIdAndDraftVersionOrderByOrdinalAsc(UUID workItemId, int draftVersion);
+}

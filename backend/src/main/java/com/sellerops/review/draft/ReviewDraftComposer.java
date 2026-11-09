@@ -101,6 +101,21 @@ public class ReviewDraftComposer {
      * A promise the seller's text answers both ways — 「7일 이내 가능 · 14일 이후 불가」 — with nothing in the reply saying
      * which case it is (2026-10-27 second review). Not passed: the seller decides.
      */
+    /** A grant that leaves out the state the seller's text limits it to — 「미개봉」 (2026-10-31). */
+    static final String DROPPED_CONDITION =
+            "근거에 있는 교환·반품 조건(미개봉 등)을 빼고 된다고 적어 AI 초안을 저장하지 않았어요. "
+                    + "저장된 문구로 초안을 준비했어요.";
+    /** A saying only the seller can stand behind, still there after the retry (2026-11-01). */
+    static final String UNBACKED_SAYING = "판매자 자료에 없는 안내·운영 설명·문의 경로(「안내받으실 수 있습니다」, 「살펴보겠습니다」 "
+            + "같은 말)가 들어가 AI 초안을 저장하지 않았어요. 저장된 문구로 초안을 준비했어요.";
+
+    /**
+     * A return applied to an unopened-only rule or refused for opening, or a fault held to change-of-mind terms — the
+     * policy applied where the law does not let it apply ({@link ReviewClaimGuard#lawConflicts}, 2026-11-01).
+     */
+    static final String LAW_CONFLICT =
+            "반품·환불을 개봉 여부로 제한하거나, 불량·오배송에 단순 변심 조건을 붙여 법정 청약철회 기준과 맞지 않을 수 있어 "
+                    + "AI 초안을 저장하지 않았어요. 저장된 문구로 초안을 준비했어요. 반품 조건은 판매자 확인이 필요해요.";
     static final String UNDECIDED_CLAIM =
             "근거에 교환·환불·보상이 되는 경우와 안 되는 경우가 함께 있는데, 초안이 어느 경우인지 말하지 않아 AI 초안을 "
                     + "저장하지 않았어요. 저장된 문구로 초안을 준비했어요.";
@@ -255,7 +270,7 @@ public class ReviewDraftComposer {
         List<ScopedPassage> cited = List.of();
 
         if (grounded || pastAnswerOnly) {
-            Written written = writeGrounded(orgId, redactedBody, retrieved.passages(), both.candidates(),
+            Written written = writeGrounded(orgId, usageActorOf(actor), redactedBody, retrieved.passages(), both.candidates(),
                     template.body(), mood);
             unavailable = written.unavailable();
             if (written.body() != null) {
@@ -272,7 +287,7 @@ public class ReviewDraftComposer {
             // chosen by topic, not by what the customer felt. Nothing it could promise survives: the guard is shown
             // no current evidence, so every remedy is refused and the floor is saved instead, as when the model is
             // off or fails.
-            Written written = writeGrounded(orgId, redactedBody, List.of(), java.util.Set.of(), template.body(), mood);
+            Written written = writeGrounded(orgId, usageActorOf(actor), redactedBody, List.of(), java.util.Set.of(), template.body(), mood);
             unavailable = written.unavailable();
             if (written.body() != null) {
                 body = written.body();
@@ -320,6 +335,315 @@ public class ReviewDraftComposer {
         return retrieveWith(orgId, review, redactedBody, productId).evidence();
     }
 
+    /**
+     * <b>What the reply agent's steps read for one review</b> (2026-10-28, {@code docs/standing/reply_agent_v1.md}) — the
+     * same retrieval, company wording, manner and bans a seller's press reads, so the agent and the press stand on one
+     * library. The passages are as the model sees them (scope label, heading, text: no ids, no scores).
+     */
+    public record AgentInputs(String redactedBody, List<AgentDraftGenerator.Passage> passages, List<String> currentTexts,
+                              String voice, String manner, List<String> banned, UUID productId, String knowledgeState,
+                              List<ScopedPassage> cited, List<ReviewEvidenceBundle.Item> bundle, int policiesLeftOut,
+                              int productLeftOut) {
+        public AgentInputs {
+            bundle = bundle == null ? List.of() : bundle;
+        }
+
+        public AgentInputs(String redactedBody, List<AgentDraftGenerator.Passage> passages, List<String> currentTexts,
+                           String voice, String manner, List<String> banned, UUID productId, String knowledgeState,
+                           List<ScopedPassage> cited, List<ReviewEvidenceBundle.Item> bundle) {
+            this(redactedBody, passages, currentTexts, voice, manner, banned, productId, knowledgeState, cited, bundle, 0, 0);
+        }
+
+        public AgentInputs(String redactedBody, List<AgentDraftGenerator.Passage> passages, List<String> currentTexts,
+                           String voice, String manner, List<String> banned, UUID productId, String knowledgeState,
+                           List<ScopedPassage> cited) {
+            this(redactedBody, passages, currentTexts, voice, manner, banned, productId, knowledgeState, cited, List.of());
+        }
+
+        /**
+         * These inputs narrowed to the passages the writer cited ({@link ReviewEvidenceBundle#chosen}): they are the
+         * reply's ground for every step after the writer — the checks, the critique, the saved citations (2026-11-01
+         * third review: 「고른 근거를 초안 · 검토 · 저장 · 재검사까지 동일하게 유지」). Past answers stay as wording.
+         */
+        /** These inputs with no store facts offered at all — none left out for want of room, none shown. */
+        public AgentInputs withoutBundle() {
+            AgentInputs none = chosen(List.of());
+            return new AgentInputs(none.redactedBody(), none.passages(), none.currentTexts(), voice, manner, banned,
+                    productId, knowledgeState, none.cited(), List.of(), 0, 0);
+        }
+
+        public AgentInputs chosen(List<String> ids) {
+            List<ReviewEvidenceBundle.Item> items = ReviewEvidenceBundle.named(bundle, ids);
+            List<AgentDraftGenerator.Passage> shown = new ArrayList<>(items.stream().map(ReviewDraftComposer::shownAs)
+                    .toList());
+            passages.stream().filter(p -> KnowledgeScope.PAST_ANSWER.labelKo().equals(p.scopeLabel())).forEach(shown::add);
+            List<ScopedPassage> grounds = items.stream().map(ReviewEvidenceBundle.Item::passage).toList();
+            return new AgentInputs(redactedBody, List.copyOf(shown), grounds.stream().map(ScopedPassage::text).toList(),
+                    voice, manner, banned, productId, knowledgeState, grounds, items, policiesLeftOut, productLeftOut);
+        }
+    }
+
+    /** A bundle passage as the writer and the critique see it: its name first, then its scope, heading and text. */
+    public static AgentDraftGenerator.Passage shownAs(ReviewEvidenceBundle.Item item) {
+        return new AgentDraftGenerator.Passage(item.id() + " · " + item.passage().scope().labelKo(),
+                item.passage().heading(), item.passage().text());
+    }
+
+    /** The material a bundle is filled from; null where a context wires the composer without it (no bundle then). */
+    private com.sellerops.product.library.ProductKnowledgeSourceRepository bundleProducts;
+    private com.sellerops.product.library.ProductKnowledgeChunkRepository bundleProductChunks;
+    private com.sellerops.knowledge.org.OrgKnowledgeSourceRepository bundlePolicies;
+    private com.sellerops.knowledge.org.OrgKnowledgeChunkRepository bundlePolicyChunks;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setBundleSources(com.sellerops.product.library.ProductKnowledgeSourceRepository products,
+                                 com.sellerops.product.library.ProductKnowledgeChunkRepository productChunks,
+                                 com.sellerops.knowledge.org.OrgKnowledgeSourceRepository policies,
+                                 com.sellerops.knowledge.org.OrgKnowledgeChunkRepository policyChunks) {
+        this.bundleProducts = products;
+        this.bundleProductChunks = productChunks;
+        this.bundlePolicies = policies;
+        this.bundlePolicyChunks = policyChunks;
+    }
+
+    /**
+     * The bundle for one review: what the word search found, then the review's product's passages in use, then the org's
+     * operating policies in use ({@link ReviewEvidenceBundle}). Org-scoped by every lookup; the product lane is empty
+     * when the review names no product.
+     */
+    private ReviewEvidenceBundle.Built bundleFor(UUID orgId, UUID productId, List<ScopedPassage> found, String question) {
+        List<ScopedPassage> product = new ArrayList<>();
+        List<ScopedPassage> policies = new ArrayList<>();
+        if (bundleProducts != null && productId != null) {
+            for (var source : bundleProducts.findAllByOrgIdAndProductIdOrderByCreatedAtAsc(orgId, productId)) {
+                if (!source.isActive()) {
+                    continue;
+                }
+                bundleProductChunks.findAllBySourceId(source.getId()).stream()
+                        .filter(c -> orgId.equals(c.getOrgId()))
+                        .sorted(java.util.Comparator.comparingInt(
+                                com.sellerops.product.library.ProductKnowledgeChunk::getOrdinal))
+                        .forEach(c -> product.add(new ScopedPassage(KnowledgeScope.PRODUCT, source.getTitle(),
+                                c.getContent(), source.getId(), c.getId(), null, 0)));
+            }
+        }
+        if (bundlePolicies != null) {
+            for (var source : bundlePolicies.findAllByOrgIdOrderByCreatedAtAsc(orgId)) {
+                if (!source.isActive()) {
+                    continue;
+                }
+                bundlePolicyChunks.findAllBySourceId(source.getId()).stream()
+                        .filter(c -> orgId.equals(c.getOrgId()))
+                        .sorted(java.util.Comparator.comparingInt(com.sellerops.knowledge.org.OrgKnowledgeChunk::getOrdinal))
+                        .forEach(c -> policies.add(new ScopedPassage(KnowledgeScope.ORG_OPERATIONS, source.getTitle(),
+                                c.getContent(), source.getId(), c.getId(), null, 0)));
+            }
+        }
+        return ReviewEvidenceBundle.assemble(found.stream().filter(p -> p.scope().current()).toList(), product, policies,
+                question);
+    }
+
+    /**
+     * The promise words {@code draft} states that a document in use says otherwise of, each read on its own and whatever
+     * the draft cited ({@link ReviewDraftRecheck#otherRulesAgainst}, 2026-11-01 fourth review) — the same reading the
+     * recheck gives the saved version, given before it is saved. Empty where the composer has no access to the documents.
+     */
+    public List<ReviewDraftRecheck.Against> againstRules(UUID orgId, UUID productId, String draft, AgentInputs ground) {
+        if (bundlePolicies == null) {
+            return List.of();
+        }
+        List<ReviewDraftRecheck.Rule> rules = new ArrayList<>();
+        for (var s : bundlePolicies.findAllByOrgIdOrderByCreatedAtAsc(orgId)) {
+            if (s.isActive() && s.getBody() != null) {
+                rules.add(new ReviewDraftRecheck.Rule(InquiryDraftEvidence.KIND_ORG_POLICY, s.getTitle(), s.getBody()));
+            }
+        }
+        if (productId != null && bundleProducts != null) {
+            for (var s : bundleProducts.findAllByOrgIdAndProductIdOrderByCreatedAtAsc(orgId, productId)) {
+                if (s.isActive() && s.getBody() != null) {
+                    rules.add(new ReviewDraftRecheck.Rule(InquiryDraftEvidence.KIND_PRODUCT_KNOWLEDGE, s.getTitle(),
+                            s.getBody()));
+                }
+            }
+        }
+        return ReviewDraftRecheck.otherRulesAgainst(draft, ground.currentTexts(), rules, ground.redactedBody());
+    }
+
+    public AgentInputs agentInputs(UUID orgId, Review review) {
+        return agentInputs(orgId, review, List.of());
+    }
+
+    /**
+     * As {@link #agentInputs(UUID, Review)}, with the points the judgement read in the review — the bundle is ranked by the
+     * review and those points together (2026-11-01 sixth review), so a run's every step after the judgement reads the
+     * same bundle.
+     */
+    public AgentInputs agentInputs(UUID orgId, Review review, List<String> points) {
+        String redactedBody = com.sellerops.common.VocPreviewSanitizer.redactFullBody(review.getBody()).text();
+        String body = redactedBody == null ? "" : redactedBody;
+        UUID productId = retriever.namedProduct(orgId, review.getProductId());
+        Retrieved both = retrieveWith(orgId, review, body, productId);
+        InquiryEvidenceRetriever.InquiryEvidence found = both.evidence();
+        ReviewReplyTemplateKey key = RuleBasedReviewReplyProvider.keyFor(
+                new ReviewReplyContext(orgId, review.getId(), body, review.getRating()));
+        String voice = templates.resolve(orgId, key).body();
+        List<String> current = found.passages().stream().filter(p -> p.scope().current()).map(ScopedPassage::text).toList();
+        if (bundlePolicies == null) {
+            return new AgentInputs(body, passagesFor(found.passages(), both.candidates()), current, voice,
+                    styleGuard == null ? null : styleGuard.manner(orgId),
+                    styleGuard == null ? List.of() : styleGuard.enforced(orgId), productId, found.state().name(),
+                    found.passages());
+        }
+        // The writer sees the bundle, each passage by name, and the past answers as wording (2026-11-01): what it
+        // cites from the bundle is the reply's ground from here on ({@link AgentInputs#chosen}).
+        // Whether praise needs no store facts is the judgement's to say, not a word list's (2026-11-01 fifth round: 「다만
+        // 겨울이라 잘 안 붙네요」 read as praise by the word list and got an empty bundle). The run narrows the bundle away
+        // for a review judged praise or before-use only ({@code ReplyRunService#offered}).
+        String question = body + (points == null || points.isEmpty() ? "" : "\n" + String.join("\n", points));
+        ReviewEvidenceBundle.Built built = bundleFor(orgId, productId, found.passages(), question);
+        List<ReviewEvidenceBundle.Item> bundle = built.items();
+        List<AgentDraftGenerator.Passage> shown = new ArrayList<>();
+        for (ReviewEvidenceBundle.Item item : bundle) {
+            AgentDraftGenerator.Passage p = shownAs(item);
+            boolean candidate = item.passage().sourceId() != null && both.candidates().contains(item.passage().sourceId());
+            shown.add(candidate ? new AgentDraftGenerator.Passage(p.scopeLabel() + " · " + CANDIDATE_LABEL, p.heading(),
+                    p.text()) : p);
+        }
+        found.passages().stream().filter(p -> p.scope() == KnowledgeScope.PAST_ANSWER)
+                .forEach(p -> shown.add(new AgentDraftGenerator.Passage(p.scope().labelKo(), p.heading(), p.text())));
+        return new AgentInputs(body, List.copyOf(shown), current, voice,
+                styleGuard == null ? null : styleGuard.manner(orgId),
+                styleGuard == null ? List.of() : styleGuard.enforced(orgId), productId,
+                bundle.isEmpty() ? found.state().name() : DraftKnowledgeState.GROUNDED.name(), found.passages(), bundle,
+                built.policiesLeftOut(), built.productLeftOut());
+    }
+
+    /** One deterministic check the reply agent's draft failed: the standard's rule id, and what to fix, in a sentence. */
+    public record AgentCheck(String id, String note) {
+    }
+
+    private static final java.util.regex.Pattern REVIEW_INCENTIVE = java.util.regex.Pattern.compile(
+            "(리뷰|후기|평가|별점)[^.!?\\n]{0,15}(수정|삭제|지워|지우|내려|바꿔|올려)"
+                    + "|(적립금|포인트|쿠폰|사은품|할인)[^.!?\\n]{0,20}(리뷰|후기)|(리뷰|후기)[^.!?\\n]{0,20}(적립금|포인트|쿠폰|사은품)");
+    private static final java.util.regex.Pattern THREAT_OR_BLAME = java.util.regex.Pattern.compile(
+            "(삭제|신고|법적\\s*조치|고소|차단)\\s*(하겠|할\\s*예정|조치하겠|처리하겠|드리겠|요청하겠)"
+                    + "|허위\\s*(리뷰|후기)|거짓|악의적|블랙\\s*컨슈머");
+    private static final java.util.regex.Pattern RETURN_LAW = java.util.regex.Pattern.compile(
+            "개봉[^.!?\\n]{0,15}(반품|교환|환불)[^.!?\\n]{0,10}(불가|안\\s*되|안\\s*돼|어렵|못)"
+                    + "|(?<!\\d)[1-6]\\s*일\\s*(이내|안에|까지)[^.!?\\n]{0,15}(반품|교환|환불)");
+
+    /**
+     * <b>The reply agent's draft against what code can check</b> (review 2026-10-28): the legal and platform rules a
+     * model must not be trusted alone with. Each failure is the standard's rule id with a note the revision reads.
+     * <ul>
+     *   <li>N2 (and N1) — the redactor finds a phone, an e-mail, a link, an account, a messenger id or an address in it;</li>
+     *   <li>N3 — a reward tied to a review, or a request to change or remove one;</li>
+     *   <li>N7 — a threat to delete or report, or calling the customer a liar;</li>
+     *   <li>N8 — 「opened ⇒ no return」 or a return window under seven days, <i>whatever the seller's policy text says</i>:
+     *       the law's minimum is not a fact the seller's own wording can lower;</li>
+     *   <li>N9 — a promise no current evidence authorizes ({@link #refusalOf});</li>
+     *   <li>F1 — longer than the channel allows ({@code maxLength});</li>
+     *   <li>F-STYLE — a phrase the company never uses.</li>
+     * </ul>
+     * Doubt fails: a false alarm costs one revision, a missed one is a public reply.
+     */
+    public List<AgentCheck> agentFindings(UUID orgId, String candidate, AgentInputs in, int maxLength) {
+        List<AgentCheck> failed = new ArrayList<>();
+        if (candidate == null || candidate.isBlank()) {
+            failed.add(new AgentCheck("BLANK", "답글이 비어 있어요."));
+            return failed;
+        }
+        if (com.sellerops.common.VocPreviewSanitizer.redactFullBody(candidate).redacted()) {
+            failed.add(new AgentCheck("N2", "전화번호·이메일·링크·계좌·주소 같은 연락처나 개인정보를 빼고, 연락은 플랫폼 안 문의로만 안내하세요."));
+        }
+        if (REVIEW_INCENTIVE.matcher(candidate).find()) {
+            failed.add(new AgentCheck("N3", "리뷰 수정·삭제 요청이나 리뷰 대가(적립금·쿠폰 등) 언급을 빼세요."));
+        }
+        if (THREAT_OR_BLAME.matcher(candidate).find()) {
+            failed.add(new AgentCheck("N7", "삭제·신고하겠다는 말이나 고객을 거짓·악의로 보는 표현을 빼세요."));
+        }
+        if (RETURN_LAW.matcher(candidate).find()) {
+            failed.add(new AgentCheck("N8", "개봉하면 반품이 안 된다거나 7일보다 짧은 반품 기한은 쓰지 마세요."));
+        }
+        String refused = refusalOf(candidate, in.currentTexts(), in.redactedBody());
+        List<String> law = ReviewClaimGuard.lawConflicts(candidate, in.currentTexts(), in.redactedBody());
+        if (law.contains(ReviewClaimGuard.LAW_FAULT)) {
+            failed.add(new AgentCheck("N8", "고객이 불량·오배송·표시와 다른 상품을 말했어요. 미개봉·단순 변심 같은 조건을 붙이거나 "
+                    + "개봉을 이유로 안 된다고 쓰지 마세요. 근거에 그 경우의 안내가 있으면 그것으로, 없으면 경로 안내에서 멈추세요."));
+        } else if (law.contains(ReviewClaimGuard.LAW_WITHDRAWAL)) {
+            failed.add(new AgentCheck("N8", "반품·환불은 개봉만으로 막을 수 없어요(내용 확인을 위한 개봉은 청약철회를 막지 "
+                    + "못함). 반품·환불을 미개봉으로 한정하거나 개봉을 이유로 안 된다고 쓰지 마세요. 판매자 정책이 반품을 미개봉으로 "
+                    + "한정하면 반품 조건은 쓰지 말고 경로 안내에서 멈추세요."));
+        } else if (DROPPED_CONDITION.equals(refused) && !ReviewClaimGuard.leftStates(in.redactedBody()).isEmpty()) {
+            // Seller decision 2026-11-01: a customer who said theirs is opened is never told yes on a condition they fail.
+            failed.add(new AgentCheck("N9", "고객이 이미 개봉·사용했다고 했는데, 근거는 교환·반품을 미개봉 같은 조건에서만 "
+                    + "허용해요. 된다고 쓰지 마세요. 근거에 그 경우에 맞는 다른 사유(불량 · 표시와 다른 상품 등)가 있으면 그것으로 "
+                    + "답하고, 없으면 근거의 조건을 그대로 알린 뒤 경로 안내에서 멈추세요. 개봉했다는 이유만으로 안 된다고 "
+                    + "단정하지도 마세요(N8)."));
+        } else if (DROPPED_CONDITION.equals(refused)) {
+            failed.add(new AgentCheck("N9", "근거가 교환·반품을 미개봉 같은 조건에서만 허용해요. 그 조건을 함께 쓰거나, "
+                    + "된다는 말을 빼고 경로 안내에서 멈추세요."));
+        } else if (refused != null) {
+            // The words the check refused, named (2026-10-31: a generic note left 「반품」 in the revision three times running).
+            List<String> words = new ArrayList<>(ReviewClaimGuard.unsupportedClaims(candidate, in.currentTexts(),
+                    in.redactedBody()));
+            ReviewClaimGuard.unsupportedConditions(candidate, in.currentTexts(), in.redactedBody()).stream()
+                    .filter(w -> !words.contains(w)).forEach(words::add);
+            failed.add(new AgentCheck("N9", (words.isEmpty() ? ""
+                    : String.join("·", words.stream().map(w -> "「" + w + "」").toList())
+                            + "은 등록된 정책 근거가 없어 쓸 수 없어요. 그 말을 문장째 빼세요. ")
+                    + "판매자 정책이나 등록된 안내에 없는 약속(보상·교환·재발송·날짜·조치 완료)을 빼고 경로 안내에서 멈추세요."));
+        }
+        List<String> authorizing = new ArrayList<>(in.currentTexts() == null ? List.of() : in.currentTexts());
+        if (in.voice() != null) {
+            authorizing.add(in.voice());
+        }
+        List<String> followUps = failed.stream().anyMatch(f -> "N9".equals(f.id())) ? List.of()
+                : com.sellerops.inquiry.draft.InquiryClaimGuard.unauthorizedFollowUps(candidate, authorizing);
+        if (!followUps.isEmpty()) {
+            // A follow-up nobody on the seller's side agreed to (「확인 후 연락드리겠습니다」) is a promise too (N9).
+            failed.add(new AgentCheck("N9", "「" + followUps.get(0) + "」 같은 나중 약속은 판매자가 정한 문구에 없으면 빼세요. "
+                    + "근거나 회사 문구에 적힌 경로가 있을 때만 그 경로를 안내하고, 없으면 감사·공감으로 마무리하세요."));
+        }
+        List<String> sayings = failed.stream().anyMatch(f -> "N9".equals(f.id())) ? List.of()
+                : com.sellerops.inquiry.draft.InquiryClaimGuard.unbackedSayings(candidate, authorizing);
+        if (!sayings.isEmpty()) {
+            // A service, an operating claim, 「살펴보겠습니다」 or a contact path the seller never wrote (2026-11-01).
+            failed.add(new AgentCheck("N9", "「" + sayings.get(0) + "」 같은 안내 · 운영 설명 · 문의 경로는 근거나 회사 "
+                    + "문구에 있을 때만 씁니다. 빼고 감사·공감으로 마무리하세요."));
+        }
+        if (maxLength > 0 && candidate.strip().length() > maxLength) {
+            // The channel's limit, not a style rule (seventh review): its own code, so it is never polished past.
+            failed.add(new AgentCheck(com.sellerops.attention.reply.ChannelReplyLimit.CHANNEL_LENGTH_EXCEEDED,
+                    maxLength + "자 안으로 줄이세요. 이 채널은 그보다 긴 답글을 받지 않아요."));
+        }
+        if (styleGuard != null) {
+            List<String> banned = styleGuard.forbiddenIn(candidate, orgId);
+            if (!banned.isEmpty()) {
+                failed.add(new AgentCheck("F-STYLE", "회사가 쓰지 않는 표현을 빼세요: "
+                        + String.join(", ", banned.stream().map(p -> "「" + p + "」").toList())));
+            }
+        }
+        return failed;
+    }
+
+    /** The same checks as rule ids only. */
+    public List<String> agentChecks(UUID orgId, String candidate, AgentInputs in) {
+        return agentFindings(orgId, candidate, in, 0).stream().map(AgentCheck::id).toList();
+    }
+
+    /** Save the reply agent's text as one draft version, with the passages it was written from as its evidence. */
+    public ReviewReplyDraftView saveAgentDraft(UUID orgId, Review review, String body, AgentInputs in, String actor,
+                                               String modelVersion) {
+        int base = drafts.currentVersion(review.getId());
+        ReviewReplyDraftView saved = drafts.saveAs(orgId, review.getId(), actor, body, base,
+                new ReviewReplyDraftService.Provenance(DraftAuthorKind.MODEL.name(), modelVersion, in.knowledgeState(),
+                        in.cited().stream().anyMatch(p -> p.scope().current()) ? "GROUNDED" : BASIS_THANKS_ONLY,
+                        in.productId()));
+        recordEvidence(orgId, review.getId(), saved.version(), in.cited());
+        return saved;
+    }
+
     /** The retrieval, and which of its passages only the customer's words attached — candidates to the model. */
     record Retrieved(InquiryEvidenceRetriever.InquiryEvidence evidence, java.util.Set<UUID> candidates) {
     }
@@ -334,9 +658,7 @@ public class ReviewDraftComposer {
                 : spine.retrieveForProduct(orgId, productId, question, KnowledgeVariantScope.unresolved(),
                         precedent.forReviewRated(orgId, review.getRating())))
                 .lanes();
-        boolean praise = complaints.isEmpty()
-                && moodOf(review.getRating(), redactedBody) == AgentDraftGenerator.ReviewMood.UNSTATED
-                && !com.sellerops.knowledge.QuestionShape.asks(redactedBody);
+        boolean praise = praiseOnly(review.getRating(), redactedBody);
         // The seller's own expressions are read even on praise: a review that says 「떨어져요」 is not only praise, and a
         // denial (「안 떨어져요」) is not a hit (CustomerPhrases). What the seller chose for this review comes first, and a
         // guidance they refused for it is not given — not by the phrase lane, not by the scorer (2026-10-27).
@@ -457,21 +779,24 @@ public class ReviewDraftComposer {
     }
 
     /**
-     * The texts that may license a promise in a reply to this review NOW: the current evidence the same retrieval
-     * finds today, and the seller's own saved wording for this kind of review (never checked when a draft is written
-     * from it, so it is the seller's standing word). What {@link ReviewDraftRecheck} holds a sent-back reply to —
-     * asked here, so a review still has exactly one place that retrieves for it. No draft is written and no model
-     * writes anything; the retrieval is the draft's own, semantic lanes included when they are turned on.
+     * The texts that may license a promise in a reply to this review NOW: the current evidence the same retrieval finds
+     * today — the seller's product knowledge and operating policies, never a past reply. What {@link ReviewDraftRecheck}
+     * holds a sent-back reply to — asked here, so a review still has exactly one place that retrieves for it. No draft is
+     * written and no model writes anything; the retrieval is the draft's own, semantic lanes included when they are on.
+     *
+     * <p><b>The seller's saved wording is not in it</b> (2026-11-01 third review: 「말투 · 인사 템플릿: 사실이나 보상의
+     * 근거가 되지 않음」). A reply template says how the seller sounds ({@code ReviewReplyTemplateKey}: 「A template says
+     * how the seller sounds, never what is true」) — the drafter has never been allowed to take a remedy from it, and now
+     * the recheck does not either. A service the seller offers as standing — 「사이즈가 맞지 않으면 교환해 드립니다」 — is an
+     * operating standard with a scope and conditions, and is registered as one (운영 정책), where it licenses like any
+     * policy. A past reply, or an exception made once, is never promoted to either.
      */
     public List<String> currentLicense(UUID orgId, Review review, String redactedBody) {
         UUID productId = retriever.namedProduct(orgId, review.getProductId());
-        List<String> license = new ArrayList<>(retrieve(orgId, review, redactedBody, productId).passages().stream()
+        return new ArrayList<>(retrieve(orgId, review, redactedBody, productId).passages().stream()
                 .filter(p -> p.scope().current())
                 .map(ScopedPassage::text)
                 .toList());
-        license.add(templates.resolve(orgId, RuleBasedReviewReplyProvider.keyFor(
-                new ReviewReplyContext(orgId, review.getId(), redactedBody, review.getRating()))).body());
-        return license;
     }
 
     /**
@@ -513,12 +838,19 @@ public class ReviewDraftComposer {
      * pass and no second call: a draft that promised something the seller never agreed to is not
      * improved by asking again with the same evidence.
      */
-    private Written writeGrounded(UUID orgId, String reviewBody, List<ScopedPassage> passages, java.util.Set<UUID> candidates,
+    /** The seller's own press is the seller's; drafting ahead is automatic work and leaves the seller's reserve. */
+    static com.sellerops.agent.quota.AgentUsageActor usageActorOf(String actor) {
+        return actor != null && actor.startsWith("SELLER:") ? com.sellerops.agent.quota.AgentUsageActor.USER
+                : com.sellerops.agent.quota.AgentUsageActor.RUN;
+    }
+
+    private Written writeGrounded(UUID orgId, com.sellerops.agent.quota.AgentUsageActor actor, String reviewBody,
+                                  List<ScopedPassage> passages, java.util.Set<UUID> candidates,
                                   String voice, AgentDraftGenerator.ReviewMood mood) {
         if (!model.isEnabledFor(orgId)) {
             return new Written(null, CAPABILITY_OFF);
         }
-        QuotaDecision decision = quota.consume(orgId, AgentUsageKind.DRAFT, null);
+        QuotaDecision decision = quota.consume(orgId, AgentUsageKind.DRAFT, null, actor);
         if (!decision.allowed()) {
             return new Written(null, decision.messageKo());
         }
@@ -545,13 +877,27 @@ public class ReviewDraftComposer {
         // seller's fix, which the approval gate enforces on whatever text is approved (2026-10-23). The second answer
         // passes the same final check as the first, or the first stands (2026-10-27 review: it skipped the blank).
         List<String> found = styleGuard == null ? List.of() : styleGuard.forbiddenIn(candidate, orgId);
-        if (!found.isEmpty() && quota.consume(orgId, AgentUsageKind.DRAFT, null).allowed()) {
+        // A saying only the seller can stand behind — a service, an operating claim, 「살펴보겠습니다」, a contact path —
+        // that neither the evidence nor the seller's wording carries (2026-11-01): the same one retry, with it named.
+        List<String> backing = new ArrayList<>(current);
+        if (voice != null) {
+            backing.add(voice);
+        }
+        List<String> sayings = com.sellerops.inquiry.draft.InquiryClaimGuard.unbackedSayings(candidate, backing);
+        if ((!found.isEmpty() || !sayings.isEmpty()) && quota.consume(orgId, AgentUsageKind.DRAFT, null, actor).allowed()) {
+            List<String> bans = new ArrayList<>(styleGuard == null ? List.of() : styleGuard.enforced(orgId));
+            bans.addAll(sayings);
             Optional<String> again = model.draftReviewReply(orgId, reviewBody, passagesFor(passages, candidates), voice,
-                    styleGuard.enforced(orgId), mood, manner);
-            if (again.isPresent() && refusalOf(again.get(), current, reviewBody) == null) {
+                    bans, mood, manner);
+            if (again.isPresent() && refusalOf(again.get(), current, reviewBody) == null
+                    && com.sellerops.inquiry.draft.InquiryClaimGuard.unbackedSayings(again.get(), backing).isEmpty()) {
                 candidate = again.get();
-                found = styleGuard.forbiddenIn(candidate, orgId);
+                found = styleGuard == null ? List.of() : styleGuard.forbiddenIn(candidate, orgId);
+                sayings = List.of();
             }
+        }
+        if (!sayings.isEmpty()) {
+            return new Written(null, UNBACKED_SAYING);
         }
         if (!found.isEmpty()) {
             return new Written(candidate, forbiddenLeft(found));
@@ -571,13 +917,22 @@ public class ReviewDraftComposer {
      *   <li>A remedy granted where {@code current} refuses it under the same terms, or refused where it grants
      *       ({@link ReviewClaimGuard#contradictedPromises}, 2026-10-27 review) — or answered where {@code current} answers
      *       it both ways and the reply does not say which case ({@link ReviewClaimGuard#undecidedPromises}).</li>
+     *   <li>A remedy granted without the state {@code current} limits every grant of it to — 「미개봉」 left out of 「7일
+     *       이내 반품 가능」 — when the customer did not say theirs is in it ({@link ReviewClaimGuard#droppedConditions},
+     *       2026-10-31).</li>
      * </ol>
+     * A remedy noun the customer named and the reply only says back (「반품까지 고민하게 해 드린 점」) is not a promise
+     * here (2026-10-31); whether a sentence is the seller's promise beyond that is the critique's N9.
      */
     static String refusalOf(String candidate, List<String> current, String reviewBody) {
         if (com.sellerops.knowledge.KnowledgeBlanks.carries(candidate)) {
             return UNCONFIRMED_TEXT;
         }
-        if (!ReviewClaimGuard.unsupportedClaims(candidate, current).isEmpty()
+        // Whether the policy may be applied at all comes before whether the reply follows it (2026-11-01).
+        if (!ReviewClaimGuard.lawConflicts(candidate, current, reviewBody).isEmpty()) {
+            return LAW_CONFLICT;
+        }
+        if (!ReviewClaimGuard.unsupportedClaims(candidate, current, reviewBody).isEmpty()
                 || !ReviewClaimGuard.unsupportedConditions(candidate, current, reviewBody).isEmpty()) {
             return UNSUPPORTED_CLAIM;
         }
@@ -586,6 +941,9 @@ public class ReviewDraftComposer {
         }
         if (!ReviewClaimGuard.undecidedPromises(candidate, current).isEmpty()) {
             return UNDECIDED_CLAIM;
+        }
+        if (!ReviewClaimGuard.droppedConditions(candidate, current, reviewBody).isEmpty()) {
+            return DROPPED_CONDITION;
         }
         return null;
     }
@@ -602,10 +960,27 @@ public class ReviewDraftComposer {
         if (rating <= 2) {
             return AgentDraftGenerator.ReviewMood.COMPLAINT;
         }
-        if (rating == 3 && !com.sellerops.review.triage.ReviewTriageRules.reservationFree(body)) {
-            return AgentDraftGenerator.ReviewMood.MIXED;
+        if (rating == 3) {
+            return com.sellerops.review.triage.ReviewTriageRules.reservationFree(body)
+                    ? AgentDraftGenerator.ReviewMood.MILD_PRAISE : AgentDraftGenerator.ReviewMood.MIXED;
         }
         return AgentDraftGenerator.ReviewMood.UNSTATED;
+    }
+
+    /**
+     * <b>Whether a review only praises</b> — no complaint clause, no reservation in its mood, no question: the drafter's
+     * own test for 「a thank-you needs no facts」. Whether a review needs a response at all is not this test's question
+     * — that is the AI judge's ({@code AiTriagePilotService#needsResponse}).
+     */
+    static boolean praiseOnly(Integer rating, String redactedBody) {
+        return ReviewComplaintClauses.of(redactedBody).isEmpty()
+                && isPraiseMood(moodOf(rating, redactedBody))
+                && !com.sellerops.knowledge.QuestionShape.asks(redactedBody);
+    }
+
+    /** No complaint in the mood: ★4+ (or no rating), and a ★3 whose words carry no reservation. */
+    static boolean isPraiseMood(AgentDraftGenerator.ReviewMood mood) {
+        return mood == AgentDraftGenerator.ReviewMood.UNSTATED || mood == AgentDraftGenerator.ReviewMood.MILD_PRAISE;
     }
 
     /** The passages as the model sees them: scope label, heading, text. No ids, no scores. */
@@ -647,6 +1022,25 @@ public class ReviewDraftComposer {
                     DraftEvidenceView.snippetOf(passage.text())));
         }
         return List.copyOf(views);
+    }
+
+    /**
+     * A version the reply agent saved, as the review screen shows a generated draft: the text, its stored basis and
+     * its citations read back. No retrieval and no model — the run already did both.
+     */
+    public GeneratedReviewDraftView agentDraftView(UUID orgId, UUID reviewId, int version) {
+        com.sellerops.attention.reply.ReviewReplyDraft row = drafts.version(reviewId, version)
+                .orElseThrow(() -> com.sellerops.common.ApiException.notFound("초안을 찾을 수 없어요."));
+        List<DraftEvidenceView> views = evidenceFor(orgId, reviewId, version);
+        String basis = row.getAnswerBasis() == null ? BASIS_THANKS_ONLY : row.getAnswerBasis();
+        return new GeneratedReviewDraftView(ReviewReplyDraftView.of(row), row.getAuthorKind(), basis,
+                basisNoteOf(basis, !views.isEmpty()), views, List.of(), null, null, null);
+    }
+
+    /** No draft from the reply agent, and why — in the seller's words; the reason itself is a closed word. */
+    public static GeneratedReviewDraftView agentNoDraft(String message) {
+        return new GeneratedReviewDraftView(null, DraftAuthorKind.MODEL.name(), null, null, List.of(), List.of(), null,
+                null, message);
     }
 
     /**
@@ -697,14 +1091,22 @@ public class ReviewDraftComposer {
         ReviewKnowledgeNeed need = ReviewKnowledgeNeed.of(hasProductPassage || hasPolicyPassage,
                 productId != null, review.getRating(),
                 issueTitleFor(orgId, review.getId()) != null,
-                com.sellerops.knowledge.QuestionShape.asks(redactedBody));
+                com.sellerops.knowledge.QuestionShape.asks(redactedBody),
+                moodOf(review.getRating(), redactedBody) == AgentDraftGenerator.ReviewMood.MILD_PRAISE);
         List<ReviewKnowledgeGapView> gaps = new ArrayList<>();
         Subject subject = subjectFor(orgId, review, redactedBody);
         if (need.asks() && productId != null && !hasProductPassage) {
             gaps.add(new ReviewKnowledgeGapView("PRODUCT", subject.text(), subject.kind(),
-                    "'" + subject.text() + "'에 대해 고객에게 안내하는 공식 기준이 있나요? "
-                            + "이 상품에 저장된 지식에서 찾지 못했어요.",
-                    productId.toString(), null));
+                    productQuestion(subject.text()), productId.toString(), null));
+        } else if (productId != null && "REVIEW_TEXT".equals(subject.kind()) && candidates != null) {
+            // This review no longer asks — it praises, or the library now answers it. An ask an earlier draft of it
+            // filed is closed here rather than left open on every review of the product (2026-10-28). Only an ask in
+            // the review's own words: one about a repeated problem belongs to every review of that problem.
+            try {
+                candidates.withdrawGap(orgId, "PRODUCT", productId, productQuestion(subject.text()));
+            } catch (RuntimeException e) {
+                // Never fails the draft: the seller can still close it by hand.
+            }
         }
         // The ONE topic use of the template key, and it is a legitimate one: 「배송」 is a company
         // matter whether the customer praised the delivery or complained about it, so a keyword that
@@ -716,6 +1118,20 @@ public class ReviewDraftComposer {
                     null, null));
         }
         return List.copyOf(gaps);
+    }
+
+    /** The one sentence a product ask is filed under — its identity, so it can be closed by the same words. */
+    static String productQuestion(String subject) {
+        return "'" + subject + "'에 대해 고객에게 안내하는 공식 기준이 있나요? 이 상품에 저장된 지식에서 찾지 못했어요.";
+    }
+
+    /**
+     * The subject an ask about THIS review is filed under when no repeated problem names it — the review's own
+     * opening words, redacted exactly as a draft reads them — so a screen can count this review's asks and not its
+     * product's.
+     */
+    public static String ownWordsSubject(String rawBody) {
+        return excerpt(com.sellerops.common.VocPreviewSanitizer.redactFullBody(rawBody).text());
     }
 
     /** What the ask is about, and which of the three shipped signals named it. */

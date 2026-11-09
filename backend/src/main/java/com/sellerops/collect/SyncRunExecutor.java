@@ -376,12 +376,17 @@ public class SyncRunExecutor {
         int inserted = 0;
         boolean timedOut = false;
         boolean pageLimited = false;
+        // A secondary read beside a page's records that stopped on the account's side (2026-11-09) — the first one.
+        String accountSideStop = null;
 
         try {
             while (hasMore && guard++ < MAX_PAGES) {
                 FetchPage page = connector.fetch(new FetchRequest(
                         orgId, account.getId(), channel.getCode(), dataType, cursorValue, PAGE_LIMIT));
 
+                if (accountSideStop == null) {
+                    accountSideStop = page.accountSideStop();
+                }
                 if (page.rateLimited()) {
                     // Stop paging and keep the connector's retry-after hint; the
                     // scheduled runner (Slice 4) decides when to come back.
@@ -446,6 +451,8 @@ public class SyncRunExecutor {
             job.setNextRetryAt(Instant.now().plusSeconds(retryAfterSeconds));
         }
         job.setInsertedRows(inserted);
+        job.setAccountSideStop(accountSideStop);
+        job.setAccountSideKnown(true);
         job.setFailureCode(failureCodeOf(authFailure != null, approvalMissing, rateLimited, pageLimited,
                 timedOut, errored, failed));
         finishJob(job, success, skipped, failed, status, errorMessage, rateLimited);

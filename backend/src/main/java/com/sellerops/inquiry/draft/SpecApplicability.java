@@ -125,12 +125,33 @@ public enum SpecApplicability {
          *                                  bound to a single 규격
          */
         public String messageKo(boolean figuresUnaided, boolean evidenceIsVariantSpecific) {
+            return messageKo(figuresUnaided, evidenceIsVariantSpecific, false);
+        }
+
+        /**
+         * The line, when the seller's own evidence says the value is the same for every 규격 (2026-11-01 ninth review:
+         * 「모든 옵션의 길이는 2.4m」라는 근거라면 바로 답할 수 있다). Only an unresolved question changes, only with
+         * figures typed by a person and none written about one 규격 — and the drafter is told not to ask back. A store that
+         * registered no option is NOT such a statement: one value seen where collection may be incomplete still asks.
+         *
+         * @param evidenceCoversEveryOption {@link #coversEveryOption} over the passages the drafter is shown
+         */
+        public String messageKo(boolean figuresUnaided, boolean evidenceIsVariantSpecific,
+                                boolean evidenceCoversEveryOption) {
+            if (this == VARIANT_UNRESOLVED && evidenceCoversEveryOption && figuresUnaided && !evidenceIsVariantSpecific) {
+                return EVERY_OPTION_LINE;
+            }
             String base = baseMessageKo(figuresUnaided);
             if (!evidenceIsVariantSpecific || this == VARIANT_NAMED) {
                 return base;
             }
             return base + " 근거 중 일부는 특정 규격에만 해당하는 내용이므로, 그 수치를 이 고객의 "
                     + "규격에 대한 사실로 쓰지 말고 어떤 규격인지 되물으세요.";
+        }
+
+        /** Whether this line asks the drafter to say the answer may vary and to ask which 규격 — what the claim check reads. */
+        public static boolean asksBack(String line) {
+            return line != null && line.contains("확정되지 않았습니다");
         }
 
         private String baseMessageKo(boolean figuresUnaided) {
@@ -142,6 +163,88 @@ public enum SpecApplicability {
                     + "규격을 되물으세요."
                     + (this == VARIANT_UNRESOLVED ? " 어떤 규격인지도 확정되지 않았습니다." : "");
         }
+    }
+
+    /** What the drafter is shown when the evidence itself says the value holds for every 규격 · 옵션. */
+    static final String EVERY_OPTION_LINE = "이 질문은 규격·옵션에 따라 답이 달라질 수 있는 내용이지만, 판매자의 근거가 그 값이 "
+            + "모든 규격·옵션에 같다고 밝히고 있습니다. 근거의 수치로 바로 답하고 규격을 되묻지 마세요. 근거끼리 값이 다르면 "
+            + "단정하지 마세요.";
+
+    /** A passage saying its value is the same whatever is chosen: 「모든 옵션」, 「전 규격」, 「사이즈 공통」, 「옵션과 관계없이」. */
+    private static final java.util.regex.Pattern EVERY_OPTION = java.util.regex.Pattern.compile(
+            "(?<![가-힣])(모든|전|전체)\\s*(옵션|규격|사이즈|색상|컬러|호수|모델)"
+                    + "|(옵션|규격|사이즈|색상|컬러|호수|모델)\\s*(공통|무관|구분\\s*없이)"
+                    + "|(옵션|규격|사이즈|색상|컬러|호수|모델)[과와에]?\\s*(관계|상관)\\s*없이"
+                    + "|단일\\s*(옵션|규격|사이즈)");
+    /** A passage saying the value moves with the choice — then no passage settles it for every option. */
+    private static final java.util.regex.Pattern PER_OPTION = java.util.regex.Pattern.compile(
+            "(옵션|규격|사이즈|색상|컬러|호수|모델)\\s*(별|마다)|(옵션|규격|사이즈|호수|모델)에\\s*따라\\s*(다|달라)");
+
+    /** A number with the unit written after it — what two sentences are compared on. */
+    private static final java.util.regex.Pattern MEASURE = java.util.regex.Pattern.compile(
+            "(\\d+(?:[.,]\\d+)?)\\s*(mm|cm|m|kg|g|ml|l|개|줄|가닥|매|장|%)?", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Whether the seller's own passages say the asked value is the same for every 규격 (2026-11-01 ninth review). Read
+     * from what the seller wrote, never from how many options were collected. One SENTENCE has to carry all of it — the
+     * every-option words, the number, and the property asked when the question named one — so 「모든 옵션 무료배송 …
+     * 길이 2.4m」 in one passage does not lend the shipping sentence's scope to the length (tenth review). And it must be
+     * the only value: no sentence anywhere says the value moves with the option, and no other sentence about the same
+     * property gives a different number in the same unit. Deterministic and narrow on purpose: missing it costs a
+     * question back, which is today's behaviour; reading it wrongly would state one 규격's figure as every 규격's.
+     */
+    public static boolean coversEveryOption(List<String> passages, String topicWord) {
+        if (passages == null || passages.isEmpty()) {
+            return false;
+        }
+        List<String> sentences = new java.util.ArrayList<>();
+        for (String text : passages) {
+            if (text != null) {
+                for (String sentence : text.split("(?<=[.!?。])\\s+|\\n+|(?<=[다요])\\.")) {
+                    if (!sentence.isBlank()) {
+                        sentences.add(sentence.strip());
+                    }
+                }
+            }
+        }
+        java.util.Set<String> stated = new java.util.HashSet<>();
+        for (String sentence : sentences) {
+            if (PER_OPTION.matcher(sentence).find()) {
+                return false;
+            }
+            if (EVERY_OPTION.matcher(sentence).find() && (topicWord == null || sentence.contains(topicWord))) {
+                stated.addAll(measures(sentence));
+            }
+        }
+        if (stated.isEmpty()) {
+            return false;
+        }
+        java.util.Set<String> units = new java.util.HashSet<>();
+        stated.forEach(m -> units.add(m.substring(m.indexOf('|') + 1)));
+        for (String sentence : sentences) {
+            boolean aboutIt = topicWord != null ? sentence.contains(topicWord) : true;
+            if (!aboutIt) {
+                continue;
+            }
+            for (String m : measures(sentence)) {
+                String unit = m.substring(m.indexOf('|') + 1);
+                if (units.contains(unit) && !stated.contains(m)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /** Each number of a sentence with its unit, as 「2.4|m」 — a comma decimal read as a point. */
+    private static java.util.Set<String> measures(String sentence) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        java.util.regex.Matcher m = MEASURE.matcher(sentence);
+        while (m.find()) {
+            String unit = m.group(2) == null ? "" : m.group(2).toLowerCase(Locale.ROOT);
+            out.add(m.group(1).replace(',', '.') + "|" + unit);
+        }
+        return out;
     }
 
     /**

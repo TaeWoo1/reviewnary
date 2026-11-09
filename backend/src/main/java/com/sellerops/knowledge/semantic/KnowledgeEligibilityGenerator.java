@@ -2,11 +2,12 @@ package com.sellerops.knowledge.semantic;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sellerops.agent.llm.AgentLlmCallMetrics;
 import com.sellerops.agent.llm.AgentLlmTransport;
-import java.net.URI;
+import com.sellerops.agent.llm.provider.LlmReply;
+import com.sellerops.agent.llm.provider.LlmRequest;
+import com.sellerops.agent.llm.provider.LlmVendor;
+import com.sellerops.agent.llm.provider.LlmWire;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,17 +29,23 @@ import org.slf4j.LoggerFactory;
  */
 public class KnowledgeEligibilityGenerator {
 
-    private static final URI ENDPOINT = URI.create("https://api.openai.com/v1/chat/completions");
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Logger log = LoggerFactory.getLogger(KnowledgeEligibilityGenerator.class);
 
     private final AgentLlmTransport transport;
     private final KnowledgeEligibilityProperties properties;
 
+    /** The vendor's spelling of the call (shared model connection, 2026-10-29); prompt and reading stay here. */
+    private final LlmWire wire;
+
+    /** The AI meter (2026-10-31): set by {@link KnowledgeEvidenceEligibility} when the context has one. */
+    final SemanticMeter meter = new SemanticMeter();
+
     KnowledgeEligibilityGenerator(AgentLlmTransport transport,
                                   KnowledgeEligibilityProperties properties) {
         this.transport = transport;
         this.properties = properties;
+        this.wire = LlmWire.of(properties == null ? LlmVendor.OPENAI : properties.vendor());
     }
 
     /**
@@ -48,22 +55,22 @@ public class KnowledgeEligibilityGenerator {
      *         and then nothing is refused, because a judge that did not answer has no opinion
      */
     Map<Integer, Boolean> judge(UUID orgId, String question, List<String> passages) {
-        AgentLlmTransport.Response response = transport.post(ENDPOINT,
-                Map.of("Authorization", "Bearer " + properties.apiKey()),
-                requestBody(question, passages));
+        AgentLlmTransport.Response response = meter.post(orgId, SemanticMeter.ELIGIBILITY_STEP,
+                () -> transport.post(wire.endpoint(), wire.headers(properties.apiKey()), requestBody(question, passages)));
+        if (response == null) {
+            // The day's AI ceiling refused the call: no opinion, so nothing is refused.
+            return Map.of();
+        }
         // Metadata only — see the note in KnowledgeQuestionIntentGenerator. The passage COUNT is a
         // fact about this capability's bound; the passages themselves never appear.
         log.info("knowledge_eligibility orgId={} passages={} answered={} {}", orgId, passages.size(),
                 response.ok(), AgentLlmCallMetrics.of(response).toLogFields());
-        if (!response.ok()) {
+        LlmReply reply = wire.read(response);
+        if (!reply.answered()) {
             return Map.of();
         }
         try {
-            String content = MAPPER.readTree(response.body())
-                    .path("choices").path(0).path("message").path("content").asText("");
-            if (content.isBlank()) {
-                return Map.of();
-            }
+            String content = reply.content();
             Map<Integer, Boolean> out = new HashMap<>();
             for (JsonNode verdict : MAPPER.readTree(content).path("verdicts")) {
                 int index = verdict.path("i").asInt(-1);
@@ -79,20 +86,8 @@ public class KnowledgeEligibilityGenerator {
 
     /** Package-visible so the payload floor test can assert the exact bytes that leave. */
     String requestBody(String question, List<String> passages) {
-        ObjectNode root = MAPPER.createObjectNode();
-        root.put("model", properties.model());
-        ArrayNode messages = root.putArray("messages");
-        ObjectNode system = messages.addObject();
-        system.put("role", "system");
-        system.put("content", KnowledgeEligibilityPrompt.system());
-        ObjectNode user = messages.addObject();
-        user.put("role", "user");
-        user.put("content", KnowledgeEligibilityPrompt.user(question, passages));
-        root.put("max_completion_tokens", properties.maxOutputTokens());
-        root.putObject("response_format").put("type", "json_object");
-        if (properties.reasoningEffort() != null) {
-            root.put("reasoning_effort", properties.reasoningEffort());
-        }
-        return root.toString();
+        return wire.body(LlmRequest.of(properties.model(), KnowledgeEligibilityPrompt.system(),
+                KnowledgeEligibilityPrompt.user(question, passages), properties.maxOutputTokens(),
+                properties.reasoningEffort(), LlmRequest.Format.jsonObject()));
     }
 }

@@ -230,6 +230,7 @@ public class KnowledgeAcquisitionController {
     @PostMapping("/candidates/propose")
     public List<KnowledgeCandidateView> propose(@AuthenticationPrincipal AuthPrincipal principal) {
         candidates.proposeFromAnswers(principal.orgId());
+        candidates.proposeFromPastAnswers(principal.orgId());
         return candidates.open(principal.orgId());
     }
 

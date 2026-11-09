@@ -407,14 +407,37 @@ class AnswerStyleDraftTest {
     private static AgentQuotaService allowingQuota() {
         return new AgentQuotaService(null, null) {
             @Override
-            public QuotaDecision consume(UUID orgId, AgentUsageKind kind, String runId) {
-                return new QuotaDecision(true, null, 0, 0);
+            public Charge consumeCharge(UUID orgId, AgentUsageKind kind, String runId,
+                                         com.sellerops.agent.quota.AgentUsageActor actor, int ahead) {
+                return new Charge(new QuotaDecision(true, null, 0, 0), null);
             }
         };
     }
 
     /** A model that records exactly what it was told, including the style section. */
     static final class StubModel extends AgentDraftService {
+
+        /** The figure check: confirms every figure — SAID_BACK for the customer's own — unless a test sets it. */
+        java.util.function.Function<java.util.List<String>,
+                java.util.Optional<java.util.List<com.sellerops.agent.llm.AgentDraftGenerator.FigureVerdict>>> figureCheck =
+                figures -> java.util.Optional.of(java.util.stream.IntStream.range(0, figures.size())
+                        .mapToObj(i -> new com.sellerops.agent.llm.AgentDraftGenerator.FigureVerdict(i + 1,
+                                figures.get(i).contains("고객 문의에만") ? "SAID_BACK" : "SUPPORTED")).toList());
+        java.util.List<String> sawFigures = new java.util.ArrayList<>();
+
+        @Override
+        public com.sellerops.agent.llm.AgentDraftGenerator.FigureResult checkFiguresMetered(
+                java.util.UUID orgId, String question, java.util.List<com.sellerops.agent.llm.AgentDraftGenerator.Passage> evidence,
+                String orderSentence, String specLine, String answerScope, String draft, java.util.List<String> figures) {
+            sawFigures.addAll(figures);
+            checks++;
+            return new com.sellerops.agent.llm.AgentDraftGenerator.FigureResult(figureCheck.apply(figures), "stub", null,
+                    claimsAnswer);
+        }
+
+        /** The claims the check reports — none unless a test sets them. */
+        java.util.List<com.sellerops.agent.llm.AgentDraftGenerator.ClaimVerdict> claimsAnswer = java.util.List.of();
+        int checks;
         private final AgentDraftResponseParser.ParsedDraft answer;
         final List<AgentDraftGenerator.Passage> sawKnowledge = new ArrayList<>();
         String sawTitle;

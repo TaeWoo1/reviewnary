@@ -98,6 +98,13 @@ public interface ReviewReplyApprovalRepository extends JpaRepository<ReviewReply
      * posts the reply nor withdraws the approval. The text still stands, approved and unposted, which is precisely
      * what this list is for. Measured on the live org: one approval carried four aborted attempts and nothing else.
      *
+     * <p><b>And not one whose review the channel already shows answered</b> (2026-10-28 evaluation). An approval made
+     * in July stayed in 등록 대기 after the channel's own record said the review had a reply — posted on the
+     * marketplace by hand, by another tool, or by this one without a report. Waiting means nothing is on the channel
+     * yet; once the channel says something is, there is nothing left to register. The approval itself is untouched
+     * — it is still the record of what the seller decided — it is only no longer offered as waiting. {@code PENDING}
+     * and {@code UNKNOWN} keep the row: a channel that has not said is not a reply.
+     *
      * <p><b>Matched on the fingerprint, not merely on the review.</b> A reply reported as sent, then edited and
      * approved again, is a different text waiting to go out; excluding by review id alone would retire it for good.
      * A null approved fingerprint matches no outcome and so keeps the row — the safe direction, because the failure
@@ -110,6 +117,8 @@ public interface ReviewReplyApprovalRepository extends JpaRepository<ReviewReply
             + "where o.orgId = a.orgId and o.reviewId = a.reviewId "
             + "and o.operatorOutcome = com.sellerops.attention.reply.OperatorOutcome.OPERATOR_REPORTED_SUBMITTED "
             + "and o.recordedFingerprint = a.approvedFingerprint) "
+            + "and not exists (select 1 from Review r where r.id = a.reviewId and r.orgId = a.orgId "
+            + "and r.replyState = com.sellerops.review.ReviewReplyState.ANSWERED) "
             + "order by a.decidedAt desc, a.reviewId asc")
     List<ReviewReplyApproval> findStandingByOrgId(@Param("orgId") UUID orgId, Pageable pageable);
 
@@ -120,6 +129,8 @@ public interface ReviewReplyApprovalRepository extends JpaRepository<ReviewReply
             + "and not exists (select 1 from ReviewReplyOutcome o "
             + "where o.orgId = a.orgId and o.reviewId = a.reviewId "
             + "and o.operatorOutcome = com.sellerops.attention.reply.OperatorOutcome.OPERATOR_REPORTED_SUBMITTED "
-            + "and o.recordedFingerprint = a.approvedFingerprint)")
+            + "and o.recordedFingerprint = a.approvedFingerprint) "
+            + "and not exists (select 1 from Review r where r.id = a.reviewId and r.orgId = a.orgId "
+            + "and r.replyState = com.sellerops.review.ReviewReplyState.ANSWERED)")
     long countStandingByOrgId(@Param("orgId") UUID orgId);
 }

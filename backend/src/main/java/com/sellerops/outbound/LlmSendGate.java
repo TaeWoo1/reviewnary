@@ -34,8 +34,11 @@ import java.util.regex.Pattern;
  * finding none of the patterns here is not proof the text is clean. The field floors of each payload (author, ids,
  * timestamps never sent) remain the first boundary, and this gate is the second — not a replacement for either.
  *
- * <p><b>Off unless {@link OutboundGate} is armed</b>, i.e. only in a seller-PC install: every existing deployment
- * and every payload-floor test sees its body byte-for-byte unchanged.
+ * <p><b>On in a seller-PC install</b> (when {@link OutboundGate} is armed) <b>and on the Reviewnary server</b>
+ * ({@link #arm}, from {@code sellerops.llm.send-gate.enabled}, default true — {@code LlmSendGateConfiguration}):
+ * the server holds every seller's customers' text, so the same check stands at its transports
+ * ({@code docs/standing/server_operation_boundary_v1.md} §4.1-1, 2026-10-31). Off only where a profile turns it off on
+ * purpose — the hermetic test profile, so every payload-floor test still sees its body byte-for-byte unchanged.
  */
 public final class LlmSendGate {
 
@@ -93,9 +96,34 @@ public final class LlmSendGate {
     /** Hyphen-grouped numbers of ten digits or more in total — bank accounts, registration numbers. */
     private static final Pattern GROUPED = Pattern.compile("(?<![0-9-])[0-9]{2,6}(?:-[0-9]{1,8}){1,4}(?![0-9-])");
 
-    /** Road-name address after a city/county/district: {@code …구 테헤란로 123}. */
-    private static final Pattern ROAD =
-            Pattern.compile("(?:시|군|구)\\s+[가-힣0-9]{1,20}(?:로|길)\\s?[0-9]{1,5}");
+    /**
+     * Road-name address after a city/county/district: {@code …구 테헤란로 123}. Not a quantity in policy prose, which has
+     * the same letters (2026-11-02, case-eval-r12: a claim check was held for 「구매 시 기준으로 20박스」 — 「교환 시
+     * 수령일로 7일」 has the shape too): no road name ends in 「…으로」, and a building number is not followed by a unit.
+     *
+     * <p>A unit is a whole word, not the first letter of one (2026-11-02 review: 「테헤란로 123 원룸」 was let through as
+     * 123원): a one-letter unit sits right against the number, and any unit ends there or runs into a particle — 「7일
+     * 이내」 · 「3개입니다」 · 「20박스이상」 are quantities, 「123 원룸」 · 「123원룸」 · 「12 장미아파트」 are buildings.
+     * A thousands separator is a price, not a building number (「택배로 5,000원」).
+     */
+    private static final String UNIT_END = "(?=$|[^가-힣]|(?:이내|이상|이하|미만|초과|까지|부터|짜리|정도|가량|입니다|이에요|예요"
+            + "|이며|이고|안|내|째|간|당|씩|전|후|이|가|은|는|을|를|의|에|도|만|과|와|로))";
+    private static final Pattern ROAD = Pattern.compile("(?:시|군|구)\\s+[가-힣0-9]{1,20}(?<!으)(?:로|길)\\s?[0-9]{1,5}"
+            + "(?![0-9]|,[0-9]{3}|\\s?(?:영업일|개월|시간|박스|세트|가닥|번째|퍼센트)" + UNIT_END
+            + "|(?:일|개|분|원|장|매|회|주|년|배|명)" + UNIT_END + "|\\s?(?:%|cm|mm|kg|ml)(?![A-Za-z]))");
+    /**
+     * A road-name address whose building number runs into a building's name — 「테헤란로 123장안빌라」, 「중앙대로
+     * 12개나리빌라」, 「테헤란로 123원이빌딩」: held even though the number is followed by what reads as a unit (123장 + the
+     * particle 안). The quantity exception above never undoes this (2026-11-02 review).
+     *
+     * <p>What makes it clear is the building, not the district (2026-11-02, second review): a district read as a place's
+     * name held 「교환시 택배로 3개 보내주세요」 and 「구매시 택배로 3개 배송됩니다」, because 구매시 · 교환시 have the letters
+     * of 성남시. A quantity is followed by prose; an address by a building-type word, up to ten letters on. An address
+     * whose number runs into a unit-shaped name with no building word after it (「…로 12장안」) is not caught here.
+     */
+    private static final Pattern ROAD_BUILDING = Pattern.compile("(?:시|군|구)\\s+[가-힣0-9]{1,20}(?<!으)(?:로|길)\\s?"
+            + "[0-9]{1,5}\\s?[가-힣]{0,10}?(?:빌라|빌딩|맨션|아파트|오피스|하이츠|원룸|주택|상가|타워|프라자|플라자|팰리스|캐슬"
+            + "|빌리지|레지던스|타운)");
     /** {@code …번길 12}. */
     private static final Pattern ROAD_BRANCH = Pattern.compile("[가-힣0-9]{1,20}번길\\s?[0-9]{1,5}");
     /** Lot-number address: {@code 123-4번지}. */
@@ -103,12 +131,24 @@ public final class LlmSendGate {
     /** Apartment unit: {@code 101동 1203호}. */
     private static final Pattern UNIT = Pattern.compile("[0-9]{1,4}\\s?동\\s?[0-9]{1,5}\\s?호");
 
+    private static volatile boolean armed;
+
     private LlmSendGate() {
+    }
+
+    /** Armed on the server by {@code LlmSendGateConfiguration}; the seller-PC install arms it through OutboundGate. */
+    public static void arm(boolean on) {
+        armed = on;
+    }
+
+    /** Whether the check runs: on the server by its own setting, on a seller PC with the outbound gate. */
+    public static boolean armed() {
+        return armed || OutboundGate.armed();
     }
 
     /** The one call each LLM transport makes before sending; identity when the gate is not armed. */
     public static Prepared prepare(String jsonBody, Images images) {
-        if (!OutboundGate.armed()) {
+        if (!armed()) {
             return new Prepared(jsonBody, Set.of(), Set.of());
         }
         return inspect(jsonBody, images);
@@ -185,7 +225,7 @@ public final class LlmSendGate {
             }
             return null;
         }
-        if (ROAD.matcher(text).find() || ROAD_BRANCH.matcher(text).find()
+        if (ROAD_BUILDING.matcher(text).find() || ROAD.matcher(text).find() || ROAD_BRANCH.matcher(text).find()
                 || LOT.matcher(text).find() || UNIT.matcher(text).find()) {
             found.add(Finding.ADDRESS);
         }

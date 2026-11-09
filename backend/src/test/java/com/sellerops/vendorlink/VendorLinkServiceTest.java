@@ -50,6 +50,8 @@ class VendorLinkServiceTest {
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
             30, 31, 32});
     private static final String TOKEN = "rvi_synthetic-install-token-for-tests";
+    private static final UUID ORG = UUID.fromString("00000000-0000-0000-0000-00000000a001");
+    private static final UUID OTHER_ORG = UUID.fromString("00000000-0000-0000-0000-00000000b002");
 
     @Autowired
     private VendorInstallLinkRepository links;
@@ -72,21 +74,21 @@ class VendorLinkServiceTest {
 
     @Test
     void offUnlessSellerPcConfiguredServerAndVaultKeyAllHold() {
-        assertThat(new VendorLinkService(links, sealer(KEY), server, false, clock).status().offReason())
+        assertThat(new VendorLinkService(links, sealer(KEY), server, false, clock).status(ORG).offReason())
                 .isEqualTo(OffReason.NOT_LOCAL_SELLER);
-        assertThat(new VendorLinkService(links, sealer(KEY), null, true, clock).status().offReason())
+        assertThat(new VendorLinkService(links, sealer(KEY), null, true, clock).status(ORG).offReason())
                 .isEqualTo(OffReason.NOT_CONFIGURED);
         VendorLinkService noKey = new VendorLinkService(links, sealer(""), server, true, clock);
-        assertThat(noKey.status().offReason()).isEqualTo(OffReason.NO_VAULT_KEY);
-        assertThatThrownBy(noKey::start).isInstanceOf(ApiException.class);
-        assertThat(noKey.publicIp().reason()).isEqualTo(NoIpReason.NOT_LINKED);
+        assertThat(noKey.status(ORG).offReason()).isEqualTo(OffReason.NO_VAULT_KEY);
+        assertThatThrownBy(() -> noKey.start(ORG)).isInstanceOf(ApiException.class);
+        assertThat(noKey.publicIp(ORG).reason()).isEqualTo(NoIpReason.NOT_LINKED);
         assertThat(server.calls).as("an install that is off never calls the server").isEmpty();
-        assertThat(service.status().state()).isEqualTo(State.UNLINKED);
+        assertThat(service.status(ORG).state()).isEqualTo(State.UNLINKED);
     }
 
     @Test
     void startSendsAFreshPublicKeyAndAPlatformNameNeverTheHostName() throws Exception {
-        VendorLinkService.Status pending = service.start();
+        VendorLinkService.Status pending = service.start(ORG);
         assertThat(pending.state()).isEqualTo(State.PENDING);
         assertThat(pending.userCode()).isEqualTo("BCDFGHJK");
         assertThat(pending.approvalUrl()).isEqualTo("http://127.0.0.1:8090/link?code=BCDFGHJK");
@@ -98,10 +100,10 @@ class VendorLinkServiceTest {
 
     @Test
     void linkingSealsTheTokenAndAPrivateKeyThatMatchesTheRegisteredPublicKey() throws Exception {
-        service.start();
-        assertThat(service.poll().state()).isEqualTo(State.PENDING);
+        service.start(ORG);
+        assertThat(service.poll(ORG).state()).isEqualTo(State.PENDING);
         server.approved = true;
-        VendorLinkService.Status linked = service.poll();
+        VendorLinkService.Status linked = service.poll(ORG);
         assertThat(linked.state()).isEqualTo(State.LINKED);
         assertThat(linked.userCode()).isNull();
         assertThat(linked.approvalUrl()).isNull();
@@ -114,43 +116,43 @@ class VendorLinkServiceTest {
         assertThat(sealer(KEY).open(row.getEncryptionKeyId(), row.getTokenEnc()).map(b -> new String(b,
                 StandardCharsets.UTF_8))).hasValue(TOKEN);
 
-        assertThatThrownBy(service::start).as("a linked PC must unlink first").isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service.start(ORG)).as("a linked PC must unlink first").isInstanceOf(ApiException.class);
     }
 
     @Test
     void anExpiredCodeEndsThePendingGrant() {
-        service.start();
+        service.start(ORG);
         clock.advance(Duration.ofMinutes(11));
-        assertThat(service.poll().state()).isEqualTo(State.CODE_EXPIRED);
-        assertThat(service.status().state()).isEqualTo(State.UNLINKED);
-        service.start();
+        assertThat(service.poll(ORG).state()).isEqualTo(State.CODE_EXPIRED);
+        assertThat(service.status(ORG).state()).isEqualTo(State.UNLINKED);
+        service.start(ORG);
         server.expired = true;
-        assertThat(service.poll().state()).isEqualTo(State.CODE_EXPIRED);
+        assertThat(service.poll(ORG).state()).isEqualTo(State.CODE_EXPIRED);
     }
 
     @Test
     void theLinkedPcLearnsItsIpv4AndReusesTheAnswerForAMinute() {
         link();
         server.ip = new VendorServerClient.Ipv4("203.0.113.7");
-        assertThat(service.publicIp()).isEqualTo(new VendorLinkService.PublicIpView("203.0.113.7", null));
+        assertThat(service.publicIp(ORG)).isEqualTo(new VendorLinkService.PublicIpView("203.0.113.7", null));
         assertThat(server.lastBearer).isEqualTo(TOKEN);
         int calls = server.ipCalls;
-        service.publicIp();
+        service.publicIp(ORG);
         assertThat(server.ipCalls).isEqualTo(calls);
         clock.advance(VendorLinkService.PUBLIC_IP_REUSE);
         server.ip = new VendorServerClient.NoIpv4();
-        assertThat(service.publicIp().reason()).isEqualTo(NoIpReason.IPV6_ONLY);
+        assertThat(service.publicIp(ORG).reason()).isEqualTo(NoIpReason.IPV6_ONLY);
         clock.advance(VendorLinkService.PUBLIC_IP_REUSE);
         server.ip = new VendorServerClient.NotAuthorized();
-        assertThat(service.publicIp().reason()).isEqualTo(NoIpReason.NOT_AUTHORIZED);
+        assertThat(service.publicIp(ORG).reason()).isEqualTo(NoIpReason.NOT_AUTHORIZED);
         clock.advance(VendorLinkService.PUBLIC_IP_REUSE);
         server.unreachable = true;
-        assertThat(service.publicIp()).isEqualTo(new VendorLinkService.PublicIpView(null, NoIpReason.UNREACHABLE));
+        assertThat(service.publicIp(ORG)).isEqualTo(new VendorLinkService.PublicIpView(null, NoIpReason.UNREACHABLE));
     }
 
     @Test
     void withoutALinkThereIsNoAddressAndNoRequest() {
-        assertThat(service.publicIp().reason()).isEqualTo(NoIpReason.NOT_LINKED);
+        assertThat(service.publicIp(ORG).reason()).isEqualTo(NoIpReason.NOT_LINKED);
         assertThat(server.ipCalls).isZero();
     }
 
@@ -158,16 +160,125 @@ class VendorLinkServiceTest {
     void unlinkingDropsTheLocalRecordEvenWhenTheServerCannotBeReached() {
         link();
         server.unreachable = true;
-        assertThat(service.unlink().state()).isEqualTo(State.UNLINKED);
+        assertThat(service.unlink(ORG).state()).isEqualTo(State.UNLINKED);
         assertThat(links.count()).isZero();
         assertThat(server.calls).contains("unlink");
     }
 
-    private void link() {
-        service.start();
+    /**
+     * Two organisations on one backend: each links with its own code, keeps its own token, and never gets the
+     * other's — the single-install assumption this service had until 2026-10-31 (V161).
+     */
+    @Test
+    void eachOrganisationLinksAndUsesOnlyItsOwnRegistration() {
+        link();
+        assertThat(service.status(OTHER_ORG).state()).as("one organisation's link is not another's")
+                .isEqualTo(State.UNLINKED);
+        assertThat(service.installToken(OTHER_ORG)).isEmpty();
+        assertThat(service.publicIp(OTHER_ORG).reason()).isEqualTo(NoIpReason.NOT_LINKED);
+
+        VendorLinkService.Status pending = service.start(OTHER_ORG);
+        assertThat(pending.state()).isEqualTo(State.PENDING);
+        assertThat(service.status(ORG).state()).as("a pending code elsewhere leaves this link alone")
+                .isEqualTo(State.LINKED);
+        service.poll(OTHER_ORG);
+        assertThat(service.status(OTHER_ORG).state()).isEqualTo(State.LINKED);
+
+        assertThat(links.count()).isEqualTo(2);
+        assertThat(service.installToken(ORG)).hasValue(TOKEN);
+        assertThat(service.installToken(OTHER_ORG)).hasValueSatisfying(t -> assertThat(t).isNotEqualTo(TOKEN));
+        assertThat(service.linkedOrganisations()).containsExactlyInAnyOrder(ORG, OTHER_ORG);
+
+        service.publicIp(OTHER_ORG);
+        assertThat(server.lastBearer).as("the address is asked with the asking organisation's token")
+                .isNotEqualTo(TOKEN);
+
+        service.unlink(OTHER_ORG);
+        assertThat(server.unlinked).singleElement().isNotEqualTo(TOKEN);
+        assertThat(service.status(ORG).state()).as("unlinking one leaves the other").isEqualTo(State.LINKED);
+        assertThat(service.installToken(ORG)).hasValue(TOKEN);
+        assertThat(service.linkedOrganisations()).containsExactly(ORG);
+    }
+
+    @Test
+    void twoOrganisationsCanWaitOnCodesAtTheSameTime() {
+        service.start(ORG);
+        service.start(OTHER_ORG);
         server.approved = true;
-        service.poll();
-        assertThat(service.status().state()).isEqualTo(State.LINKED);
+        assertThat(service.poll(ORG).state()).as("the second code did not replace the first")
+                .isEqualTo(State.LINKED);
+        assertThat(service.poll(OTHER_ORG).state()).isEqualTo(State.LINKED);
+        assertThat(service.installToken(ORG)).hasValue(TOKEN);
+        assertThat(service.installToken(OTHER_ORG)).hasValueSatisfying(t -> assertThat(t).isNotEqualTo(TOKEN));
+    }
+
+    @Test
+    void relinkingReplacesOnlyTheOrganisationsOwnRow() {
+        link();
+        service.start(OTHER_ORG);
+        service.poll(OTHER_ORG);
+        service.unlink(ORG);
+        link();
+        assertThat(links.count()).isEqualTo(2);
+        assertThat(links.findByOrgId(OTHER_ORG)).isPresent();
+    }
+
+    /**
+     * The workspace server (boundary §5): no approval code, no sealed token, no public IP — an organisation is linked
+     * exactly when the vendor server lists it, and each call is for the organisation it names.
+     */
+    @Test
+    void onTheWorkspaceServerAnOrganisationIsLinkedWhenTheVendorServerListsIt() {
+        VendorLinkService workspace = new VendorLinkService(links, sealer(""), server, false,
+                VendorLinkService.Mode.WORKSPACE, clock);
+        server.organisations = List.of(ORG);
+
+        assertThat(workspace.status(ORG).state()).isEqualTo(State.LINKED);
+        assertThat(workspace.status(ORG).mode()).isEqualTo(VendorLinkService.Mode.WORKSPACE);
+        assertThat(workspace.status(OTHER_ORG).state()).isEqualTo(State.UNLINKED);
+        assertThat(workspace.installToken(ORG)).as("the call names the organisation").hasValue(ORG.toString());
+        assertThat(workspace.installToken(OTHER_ORG)).isEmpty();
+        assertThat(workspace.linkedOrganisations()).containsExactly(ORG);
+        assertThat(workspace.publicIp(ORG).reason()).isEqualTo(NoIpReason.NOT_LINKED);
+
+        assertThatThrownBy(() -> workspace.start(OTHER_ORG)).as("nothing for a seller to approve")
+                .isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> workspace.unlink(ORG)).isInstanceOf(ApiException.class);
+        assertThat(server.calls).as("no code asked, no IP asked").doesNotContain("code", "ip");
+        assertThat(links.count()).as("nothing sealed here").isZero();
+
+        // The list is reused briefly, then asked again: an operator's new link shows within the reuse window.
+        int asked = server.organisationCalls;
+        workspace.status(ORG);
+        assertThat(server.organisationCalls).isEqualTo(asked);
+        server.organisations = List.of(ORG, OTHER_ORG);
+        clock.advance(VendorLinkService.ORGANISATIONS_REUSE);
+        assertThat(workspace.status(OTHER_ORG).state()).isEqualTo(State.LINKED);
+
+        // The vendor server unreachable: what was known stays; refused: nothing is linked.
+        clock.advance(VendorLinkService.ORGANISATIONS_REUSE);
+        server.unreachable = true;
+        assertThat(workspace.linkedOrganisations()).containsExactly(ORG, OTHER_ORG);
+        server.unreachable = false;
+        server.refuseOrganisations = true;
+        clock.advance(VendorLinkService.ORGANISATIONS_REUSE);
+        assertThat(workspace.linkedOrganisations()).isEmpty();
+        assertThat(workspace.installToken(ORG)).isEmpty();
+    }
+
+    @Test
+    void theWorkspaceServerIsOffWithoutAClient() {
+        VendorLinkService workspace = new VendorLinkService(links, sealer(""), null, false,
+                VendorLinkService.Mode.WORKSPACE, clock);
+        assertThat(workspace.status(ORG).offReason()).isEqualTo(OffReason.NOT_CONFIGURED);
+        assertThat(workspace.linkedOrganisations()).isEmpty();
+    }
+
+    private void link() {
+        service.start(ORG);
+        server.approved = true;
+        service.poll(ORG);
+        assertThat(service.status(ORG).state()).isEqualTo(State.LINKED);
     }
 
     private static boolean agree(byte[] pkcs8, String rawPublicBase64) throws Exception {
@@ -212,13 +323,37 @@ class VendorLinkServiceTest {
         boolean unreachable;
         int ipCalls;
         PublicIp ip = new Ipv4("203.0.113.7");
+        List<UUID> organisations = List.of();
+        int organisationCalls;
+        boolean refuseOrganisations;
 
+        @Override
+        public List<UUID> workspaceOrganisations() {
+            organisationCalls++;
+            if (unreachable) {
+                throw new Unreachable();
+            }
+            if (refuseOrganisations) {
+                throw new Refused();
+            }
+            return organisations;
+        }
+
+        int codes;
+        final java.util.Map<String, String> tokens = new java.util.HashMap<>();
+        final List<String> unlinked = new ArrayList<>();
+
+        /** The first code redeems to {@link #TOKEN}; each later one to a token of its own. */
         @Override
         public Code requestCode(String deviceName, String appVersion, String publicKeyBase64) {
             calls.add("code");
             this.deviceName = deviceName;
             this.publicKey = publicKeyBase64;
-            return new Code("device-code", "BCDFGHJK", Instant.parse("2026-10-17T00:10:00Z"), 3);
+            codes++;
+            String deviceCode = "device-code-" + codes;
+            tokens.put(deviceCode, codes == 1 ? TOKEN : TOKEN + "-" + codes);
+            return new Code(deviceCode, codes == 1 ? "BCDFGHJK" : "BCDFGHJ" + "LMNPQRSTVWXZ".charAt(codes % 12),
+                    Instant.parse("2026-10-17T00:10:00Z"), 3);
         }
 
         @Override
@@ -227,8 +362,8 @@ class VendorLinkServiceTest {
             if (expired) {
                 return new Expired();
             }
-            return approved ? new Linked(TOKEN, UUID.randomUUID(), Instant.parse("2027-04-15T00:00:00Z"))
-                    : new Pending();
+            return approved ? new Linked(tokens.get(deviceCode), UUID.randomUUID(),
+                    Instant.parse("2027-04-15T00:00:00Z")) : new Pending();
         }
 
         @Override
@@ -250,6 +385,7 @@ class VendorLinkServiceTest {
         @Override
         public void unlink(String installToken) {
             calls.add("unlink");
+            unlinked.add(installToken);
             if (unreachable) {
                 throw new Unreachable();
             }

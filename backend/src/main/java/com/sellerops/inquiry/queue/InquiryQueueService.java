@@ -86,6 +86,14 @@ public class InquiryQueueService {
                 com.sellerops.identity.ExecutableIdentityResolver.unresolved(), null);
     }
 
+    /** Nullable: without it no row says a seller check is still asked — the screen falls back to the inquiry. */
+    private com.sellerops.inquiry.sellercheck.InquirySellerCheckRepository sellerChecks;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSellerChecks(com.sellerops.inquiry.sellercheck.InquirySellerCheckRepository sellerChecks) {
+        this.sellerChecks = sellerChecks;
+    }
+
     /** One phase. Kept for the callers that mean exactly one — a phase tab is a real question. */
     public InquiryQueueResponse queue(UUID orgId, InquiryWorkItemPhase phase, int page, int size) {
         return queue(orgId, java.util.Set.of(phase), page, size);
@@ -136,6 +144,15 @@ public class InquiryQueueService {
         java.util.Set<UUID> drafted = drafts == null || pageWorkItemIds.isEmpty()
                 ? java.util.Set.of()
                 : java.util.Set.copyOf(drafts.findWorkItemIdsWithDraft(pageWorkItemIds));
+        // Which asked rows already have a record — one query for the page, only when some row asks.
+        List<UUID> asking = workItemPage.getContent().stream().filter(w -> w.getSellerCheckAsk() != null)
+                .map(InquiryWorkItem::getId).toList();
+        java.util.Set<UUID> recorded = sellerChecks == null || asking.isEmpty()
+                ? java.util.Set.of()
+                : sellerChecks.findByWorkItemIdInAndSupersededAtIsNull(asking).stream()
+                        .filter(c -> orgId.equals(c.getOrgId()))
+                        .map(com.sellerops.inquiry.sellercheck.InquirySellerCheck::getWorkItemId)
+                        .collect(java.util.stream.Collectors.toSet());
 
         List<InquiryQueueItem> content = workItemPage.getContent().stream()
                 // A work item whose inquiry is not operational is dropped, not rendered blank: a row
@@ -143,7 +160,8 @@ public class InquiryQueueService {
                 .filter(w -> byId.containsKey(w.getInquiryId()))
                 .map(w -> toItem(w, byId.get(w.getInquiryId()), channelsById, productNames,
                         identities.getOrDefault(w.getInquiryId(), com.sellerops.identity.ExecutableIdentity.NONE),
-                        drafted.contains(w.getId())))
+                        drafted.contains(w.getId()),
+                        sellerChecks == null || recorded.contains(w.getId()) ? null : w.getSellerCheckAsk()))
                 .toList();
 
         return new InquiryQueueResponse(content, workItemPage.getNumber(), workItemPage.getSize(),
@@ -163,7 +181,7 @@ public class InquiryQueueService {
                                            Map<UUID, Channel> channelsById,
                                            Map<UUID, String> productNames,
                                            com.sellerops.identity.ExecutableIdentity executableIdentity,
-                                           boolean hasDraft) {
+                                           boolean hasDraft, String sellerCheckAsk) {
         // inquiry is always present (FK-consistent), but stay null-safe on the read.
         String status = inquiry == null ? null : inquiry.getStatus();
         String title = inquiry == null ? null : inquiry.getTitle();
@@ -190,6 +208,7 @@ public class InquiryQueueService {
                 receivedAt,
                 hasDraft,
                 inquiry == null ? null : inquiry.getSourceSubtype(),
-                executableIdentity.name());
+                executableIdentity.name(),
+                sellerCheckAsk);
     }
 }

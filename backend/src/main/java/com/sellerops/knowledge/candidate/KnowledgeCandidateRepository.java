@@ -24,6 +24,14 @@ public interface KnowledgeCandidateRepository extends JpaRepository<KnowledgeCan
     long countByOrgIdAndProductIdAndState(UUID orgId, UUID productId, String state);
 
     /**
+     * The asks still waiting that are about ONE review — its own words, or a repeated problem it is evidence for
+     * (2026-10-28). The product-wide count above put 「채울 내용 1」 beside all 1,897 reviews of a product because one
+     * of them had once been asked about.
+     */
+    long countByOrgIdAndProductIdAndStateAndSubjectIn(UUID orgId, UUID productId, String state,
+                                                      java.util.Collection<String> subjects);
+
+    /**
      * Whether this org has already ANSWERED this exact ask.
      *
      * <p>Knowledge Gap Continuity v1: a regenerate re-runs the gap detection, so without this a

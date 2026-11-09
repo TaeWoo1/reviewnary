@@ -88,7 +88,11 @@ final class QueryTokens {
             "등록", "작성", "관련", "해당",
             // Relations, and the "before" and "what" of a what-did-we-say question — the record, not the topic.
             "대해", "대한", "대하여", "관해", "관한", "통해", "위해", "경우", "때문",
-            "예전", "이전", "과거", "전에", "뭐라고", "뭐라", "뭐래", "문의", "리뷰", "사례", "참고");
+            "예전", "이전", "과거", "전에", "뭐라고", "뭐라", "뭐래", "문의", "리뷰", "사례", "참고",
+            // The listing of a topic, not the topic (2026-11-01 case-eval-r10): a planner asks 「선택 가능한 색상 종류」, a
+            // seller writes 「색상은 화이트 · 그레이 · 우드」 — 색상 is two of six characters, under the askable bar. 옵션
+            // stays a topic: a seller writes notes about their options.
+            "종류", "목록", "리스트", "선택");
 
     /** Which class this (already lower-cased, letter/digit-only) token belongs to. */
     static Kind classify(String word) {

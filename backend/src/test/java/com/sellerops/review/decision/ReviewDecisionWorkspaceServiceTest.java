@@ -177,7 +177,7 @@ class ReviewDecisionWorkspaceServiceTest {
         productSource(product, "옛 부착 안내", false);
         orgSource("배송 기준", true);
         orgSource("폐기된 반품 기준", false);
-        openAsk(product);
+        openAsk(product, "접착이 약합니다");
 
         ReviewDecisionContextView view = service.context(org, subject.getId());
 
@@ -185,6 +185,30 @@ class ReviewDecisionWorkspaceServiceTest {
         assertThat(view.knowledge().orgSources()).isEqualTo(1);
         assertThat(view.knowledge().productTitles()).containsExactly("부착 안내");
         assertThat(view.knowledge().openAsks()).isEqualTo(1);
+    }
+
+    @Test
+    void an_ask_about_another_review_of_the_product_is_not_counted_beside_this_one() {
+        // 2026-10-28 evaluation: one compliment's stale ask put 「채울 내용 1」 beside all 1,897 reviews of its product.
+        Product product = product("선바로 전선몰딩");
+        Review praise = review("항상 만족하며 잘 사용하고 있어요", 5, product);
+        Review complaint = review("<p>접착이 약합니다</p>", 2, product);
+        openAsk(product, "접착이 약합니다");
+
+        assertThat(service.context(org, praise.getId()).knowledge().openAsks()).isZero();
+        // The subject is the review's own words as the drafter reads them — markup stripped — so this one counts.
+        assertThat(service.context(org, complaint.getId()).knowledge().openAsks()).isEqualTo(1);
+    }
+
+    @Test
+    void an_ask_about_a_repeated_problem_counts_beside_every_review_that_is_evidence_for_it() {
+        Product product = product("선바로 전선몰딩");
+        Review subject = review("하루 만에 떨어졌어요", 2, product);
+        ReviewIssue issue = issue("접착력 약함");
+        link(issue, subject, product);
+        openAsk(product, "접착력 약함");
+
+        assertThat(service.context(org, subject.getId()).knowledge().openAsks()).isEqualTo(1);
     }
 
     /**
@@ -366,12 +390,12 @@ class ReviewDecisionWorkspaceServiceTest {
         orgKnowledge.save(row);
     }
 
-    private void openAsk(Product product) {
+    private void openAsk(Product product, String subject) {
         KnowledgeCandidate row = new KnowledgeCandidate();
         row.setOrgId(org);
         row.setScope("PRODUCT");
         row.setProductId(product.getId());
-        row.setSubject("접착");
+        row.setSubject(subject);
         row.setContent("질문");
         row.setOrigin(KnowledgeCandidateService.ORIGIN_DRAFT_GAP);
         row.setEvidenceCount(1);

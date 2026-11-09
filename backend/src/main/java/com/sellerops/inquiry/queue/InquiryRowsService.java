@@ -60,6 +60,9 @@ public class InquiryRowsService {
      */
     private static final ZoneId SELLER_ZONE = ZoneId.of("Asia/Seoul");
     private static final EnumSet<InquiryWorkItemPhase> WORKABLE = EnumSet.of(InquiryWorkItemPhase.OPEN, InquiryWorkItemPhase.PROPOSED);
+    /** A reply the seller decided: it is not work to draft, but the inquiry still opens on it (2026-11-03 sixth review). */
+    private static final EnumSet<InquiryWorkItemPhase> DECIDED = EnumSet.of(InquiryWorkItemPhase.APPROVED,
+            InquiryWorkItemPhase.ACTION_PENDING, InquiryWorkItemPhase.EXECUTED, InquiryWorkItemPhase.COMPLETED);
 
     private final InquiryRepository inquiries;
     private final InquiryWorkItemRepository workItems;
@@ -188,16 +191,20 @@ public class InquiryRowsService {
         // The open/proposed work item per inquiry, when one exists. Terminal work items (answered,
         // dismissed) are not "the seller's next act" and are left off the row.
         Map<UUID, InquiryWorkItem> workable = new HashMap<>();
+        Map<UUID, UUID> decided = new HashMap<>();
         for (InquiryWorkItem w : workItems.findByInquiryIdIn(rows.stream().map(Inquiry::getId).toList())) {
             if (WORKABLE.contains(w.getPhase())) {
                 workable.put(w.getInquiryId(), w);
+            } else if (DECIDED.contains(w.getPhase()) && orgId.equals(w.getOrgId())) {
+                decided.put(w.getInquiryId(), w.getId());
             }
         }
         Map<UUID, com.sellerops.identity.ExecutableIdentity> identities = identity.forInquiries(orgId, rows);
 
         List<InquiryRowItem> items = rows.stream()
                 .map(q -> toItem(q, channelsById.get(q.getChannelId()), productNames, workable.get(q.getId()),
-                        identities.getOrDefault(q.getId(), com.sellerops.identity.ExecutableIdentity.NONE)))
+                        identities.getOrDefault(q.getId(), com.sellerops.identity.ExecutableIdentity.NONE),
+                        decided.get(q.getId())))
                 .toList();
         return new InquiryRowsResponse(from, toDate, channelCode, statusToken, oldest ? "OLDEST" : "NEWEST",
                 size, term, productId, pageIndex, total, items);
@@ -205,7 +212,8 @@ public class InquiryRowsService {
 
     private static InquiryRowItem toItem(Inquiry q, Channel channel, Map<UUID, String> productNames,
                                          InquiryWorkItem workItem,
-                                         com.sellerops.identity.ExecutableIdentity executableIdentity) {
+                                         com.sellerops.identity.ExecutableIdentity executableIdentity,
+                                         UUID decidedWorkItemId) {
         String productName = q.getProductId() == null ? null : productNames.get(q.getProductId());
         return new InquiryRowItem(
                 q.getId(),
@@ -223,7 +231,8 @@ public class InquiryRowsService {
                 q.getReceivedAt(),
                 q.getAnsweredAt(),
                 q.getSourceSubtype(),
-                executableIdentity.name());
+                executableIdentity.name(),
+                decidedWorkItemId);
     }
 
     /** The longest subject word this read accepts. A sentence is not a subject; it is refused, not cut. */

@@ -42,19 +42,47 @@ class InquiryReplyDraftServiceTest {
     @Autowired InquiryReplyDraftRepository drafts;
     @Autowired InquiryWorkItemAuditRepository audits;
 
-    private InquiryReplyDraftService service;
-    private final UUID org = UUID.randomUUID();
-    private final UUID user = UUID.randomUUID();
+    @Autowired com.sellerops.organization.OrganizationRepository organizations;
+    @Autowired com.sellerops.channel.ChannelRepository channels;
+    @Autowired com.sellerops.selleraccount.SellerAccountRepository sellerAccounts;
 
+    private InquiryReplyDraftService service;
+    private UUID org;
+    private final UUID user = UUID.randomUUID();
+    private UUID channelId;
+    private UUID sellerAccountId;
+
+    /**
+     * Real rows for the foreign keys PostgreSQL enforces (2026-11-03). The fixture used random ids for the org, the
+     * channel and the seller account, which H2's test schema accepts and PostgreSQL refuses — so 8 of 15 save tests
+     * never ran against the database the product uses.
+     */
     @BeforeEach
     void setUp() {
         service = new InquiryReplyDraftService(workItems, drafts);
+        com.sellerops.organization.Organization o = new com.sellerops.organization.Organization();
+        o.setName("초안 저장 QA");
+        org = organizations.save(o).getId();
+        channelId = channels.findByCode("REPLY-DRAFT-QA").orElseGet(() -> {
+            com.sellerops.channel.Channel c = new com.sellerops.channel.Channel();
+            c.setCode("REPLY-DRAFT-QA");
+            c.setNameKo("초안 저장 QA");
+            c.setStatus(com.sellerops.channel.ChannelStatus.AVAILABLE);
+            c.setSortOrder(0);
+            return channels.save(c);
+        }).getId();
+        com.sellerops.selleraccount.SellerAccount a = new com.sellerops.selleraccount.SellerAccount();
+        a.setOrgId(org);
+        a.setChannelId(channelId);
+        a.setConnectionStatus(com.sellerops.channel.ChannelStatus.PENDING);
+        a.setFileUpload(false);
+        sellerAccountId = sellerAccounts.save(a).getId();
     }
 
     private InquiryWorkItem seedProposed(UUID orgId) {
         Inquiry q = new Inquiry();
         q.setOrgId(orgId);
-        q.setChannelId(UUID.randomUUID());
+        q.setChannelId(channelId);
         q.setTitle("t");
         q.setBody("b");
         q.setStatus("UNANSWERED");
@@ -64,7 +92,7 @@ class InquiryReplyDraftServiceTest {
         InquiryWorkItem wi = new InquiryWorkItem();
         wi.setOrgId(orgId);
         wi.setInquiryId(inquiryId);
-        wi.setSellerAccountId(UUID.randomUUID());
+        wi.setSellerAccountId(sellerAccountId);
         wi.setChannelId(q.getChannelId());
         wi.setPhase(InquiryWorkItemPhase.PROPOSED);
         return workItems.save(wi);
@@ -195,17 +223,17 @@ class InquiryReplyDraftServiceTest {
     }
 
     @Test
-    void koreanUtf8CommentsAllowed999And1000ButRejected1001() {
-        String c999 = korean(333); // 999 bytes
-        String c1000 = korean(333) + "a"; // 1000 bytes
+    void anAnswerLongerThanAChannelTakesIsStillKeptUpToTheInternalCap() {
+        // A channel's answer limit is the confirm's to enforce, not the save's (2026-11-02: two checked drafts were lost at
+        // ESM's 1000 bytes). Only the internal cap bounds what is kept.
         String c1001 = korean(333) + "aa"; // 1001 bytes
-        assertThat(c999.getBytes(StandardCharsets.UTF_8).length).isEqualTo(999);
-        assertThat(c1000.getBytes(StandardCharsets.UTF_8).length).isEqualTo(1000);
         assertThat(c1001.getBytes(StandardCharsets.UTF_8).length).isEqualTo(1001);
+        String atCap = "a".repeat(InquiryReplyLength.STORAGE_MAX_BYTES);
+        String overCap = atCap + "a";
 
-        assertThat(service.save(org, seedProposed(org).getId(), user, "제목", c999, 0).version()).isEqualTo(1);
-        assertThat(service.save(org, seedProposed(org).getId(), user, "제목", c1000, 0).version()).isEqualTo(1);
-        assertThatThrownBy(() -> service.save(org, seedProposed(org).getId(), user, "제목", c1001, 0))
+        assertThat(service.save(org, seedProposed(org).getId(), user, "제목", c1001, 0).version()).isEqualTo(1);
+        assertThat(service.save(org, seedProposed(org).getId(), user, "제목", atCap, 0).version()).isEqualTo(1);
+        assertThatThrownBy(() -> service.save(org, seedProposed(org).getId(), user, "제목", overCap, 0))
                 .isInstanceOfSatisfying(ApiException.class,
                         e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
     }

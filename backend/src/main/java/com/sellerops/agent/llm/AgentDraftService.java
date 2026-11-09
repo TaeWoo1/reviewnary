@@ -145,6 +145,7 @@ public class AgentDraftService {
                 orgId, result.draft().isPresent(), knowledge == null ? 0 : knowledge.size(),
                 style != null && !style.isBlank(), companyContext != null && !companyContext.isBlank(),
                 result.reason(), result.metrics().toLogFields());
+        AgentLlmCallCapture.report(result.metrics());
         return result.draft();
     }
 
@@ -198,6 +199,63 @@ public class AgentDraftService {
                 style != null && !style.isBlank(), manner != null && !manner.isBlank(), mood, result.reason(),
                 result.metrics().toLogFields());
         return written;
+    }
+
+    /**
+     * <b>The figure check</b> for an inquiry draft (owner, 2026-10-28): the same door, flag, key and model as the draft
+     * it checks, so turning drafting off turns this off and nothing new leaves — the question, the passages and the order
+     * sentence the drafter was shown, and the draft this backend got back. Empty means "not confirmed": the caller
+     * refuses the draft rather than let an unverified figure through.
+     */
+    public Optional<List<AgentDraftGenerator.FigureVerdict>> checkFigures(UUID orgId, String question,
+                                                                         List<AgentDraftGenerator.Passage> evidence,
+                                                                         String orderSentence, String draft,
+                                                                         List<String> figures) {
+        return checkFiguresMetered(orgId, question, evidence, orderSentence, draft, figures).verdicts();
+    }
+
+    /** As {@link #checkFigures}, with what the call took — the caller writes it on the usage meter. */
+    public AgentDraftGenerator.FigureResult checkFiguresMetered(UUID orgId, String question,
+                                                                List<AgentDraftGenerator.Passage> evidence,
+                                                                String orderSentence, String draft,
+                                                                List<String> figures) {
+        return checkFiguresMetered(orgId, question, evidence, orderSentence, null, draft, figures);
+    }
+
+    /** The same, told the 규격 line the drafter was given — whether it was asked to say the answer may vary. */
+    public AgentDraftGenerator.FigureResult checkFiguresMetered(UUID orgId, String question,
+                                                                List<AgentDraftGenerator.Passage> evidence,
+                                                                String orderSentence, String specLine, String draft,
+                                                                List<String> figures) {
+        return checkFiguresMetered(orgId, question, evidence, orderSentence, specLine, null, draft, figures);
+    }
+
+    /** The same, told the need list the drafter was given — what a partial draft was asked to answer (v10). */
+    public AgentDraftGenerator.FigureResult checkFiguresMetered(UUID orgId, String question,
+                                                                List<AgentDraftGenerator.Passage> evidence,
+                                                                String orderSentence, String specLine,
+                                                                String answerScope, String draft,
+                                                                List<String> figures) {
+        if (!access.allows(properties, orgId) || figures == null) {
+            return new AgentDraftGenerator.FigureResult(Optional.empty(), "not_called", null);
+        }
+        AgentDraftGenerator.Vendor vendor = "ANTHROPIC".equalsIgnoreCase(properties.vendor())
+                ? AgentDraftGenerator.Vendor.ANTHROPIC
+                : AgentDraftGenerator.Vendor.OPENAI;
+        AgentDraftGenerator.FigureResult result = new AgentDraftGenerator(transport, vendor, properties.checkModel(),
+                properties.apiKey(), properties.checkMaxOutputTokens(), properties.checkReasoningEffort())
+                .checkFigures(new AgentDraftGenerator.FigureInput(question, evidence, orderSentence, draft, figures, specLine,
+                        answerScope));
+        // Counts only, never the draft: enough to tell a refusal for an unbacked claim from one for an unanswered
+        // question afterwards (case-eval-r11t: five holds, and only the screen's sentence said which).
+        log.info("agent_figure_check orgId={} figures={} answered={} reason={} draftAnswers={} claims={} "
+                        + "claimsNotSupported={} scoped={} notCovered={} {}", orgId, figures.size(),
+                result.verdicts().isPresent(), result.reason(), result.answered(), result.claims().size(),
+                result.claims().stream().filter(c -> !"SUPPORTED".equals(c.verdict())).count(),
+                answerScope != null && !answerScope.isBlank(),
+                result.covered().values().stream().filter("NOT_COVERED"::equals).count(),
+                result.metrics() == null ? "" : result.metrics().toLogFields());
+        return result;
     }
 
     /**

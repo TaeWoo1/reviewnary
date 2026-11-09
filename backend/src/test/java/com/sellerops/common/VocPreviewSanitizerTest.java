@@ -288,4 +288,25 @@ class VocPreviewSanitizerTest {
         assertThat(VocPreviewSanitizer.redactFullBody("   \n  ").text()).isNull();
         assertThat(VocPreviewSanitizer.redactFullBody(null).redacted()).isFalse();
     }
+
+    /**
+     * The review's own screen reads the body whole (owner, 2026-10-28); lists and previews keep the redaction. The two
+     * differ in nothing but the tokens.
+     */
+    @Test
+    void theReviewScreenReadsTheBodyWholeWhileListsStayRedacted() {
+        String raw = "<p>배송 늦어요.\r\n010-1234-5678 로 연락 주세요. 주문번호 2026102812345678</p>";
+
+        RedactedBody whole = VocPreviewSanitizer.plainFullBody(raw);
+        assertThat(whole.text()).contains("010-1234-5678").contains("2026102812345678").doesNotContain("<p>");
+        assertThat(whole.redacted()).isFalse();
+
+        RedactedBody redacted = VocPreviewSanitizer.redactFullBody(raw);
+        assertThat(redacted.text()).doesNotContain("010-1234-5678").contains("[전화번호]")
+                // The order number is a number, not a phone number.
+                .contains("[번호]").doesNotContain("[전화번호] [전화번호]");
+        assertThat(redacted.text().split("\\[전화번호\\]", -1)).hasSize(2);
+        assertThat(VocPreviewSanitizer.sanitize(raw).text()).doesNotContain("010-1234-5678");
+        assertThat(VocPreviewSanitizer.plainFullBody(null).text()).isNull();
+    }
 }

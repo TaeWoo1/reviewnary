@@ -160,4 +160,21 @@ public class SyncJob extends BaseEntity {
      */
     @Transient
     private Integer insertedRows;
+
+    /**
+     * A secondary read this run's pages made beside their records — Cafe24's comment look for a shop answer — stopped on
+     * the account's or the channel's side ({@code FetchPage#accountSideStop}, 2026-11-09): the observer's reason name, or
+     * null when none did. Set by {@code SyncRunExecutor} on the instance it returns, not persisted, and meaningful only
+     * when {@link #accountSideKnown} is true.
+     */
+    @Transient
+    private String accountSideStop;
+
+    /**
+     * True only on the instance a run that just finished in this process returned — the one place
+     * {@link #accountSideStop} is known. A job read back from the database, or built anywhere else, says false, and a
+     * caller that needs a clean account (the open-inquiry recheck) treats that as not clean: unknown is not clean.
+     */
+    @Transient
+    private boolean accountSideKnown;
 }

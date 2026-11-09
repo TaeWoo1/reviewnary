@@ -316,15 +316,21 @@ class ChannelReviewServiceTest {
         assertThat(detail.bodyRedacted()).isFalse();
     }
 
+    /**
+     * The review's own screen shows what the customer wrote, whole (owner, 2026-10-28: 「해당 리뷰를 클릭해서 들어갈 경우는
+     * 그냥 보이는 게 좋겠어」). It replaced 「redacts the full body and says that it did」 — the list and the preview still
+     * redact, which {@code VocPreviewSanitizerTest} holds.
+     */
     @Test
-    void redacts_the_full_body_and_says_that_it_did() {
+    void the_review_screen_shows_the_body_as_the_customer_wrote_it() {
         Product p = product("무선 이어폰", "15411270785");
-        Review stored = review("문의는 010-1234-5678 로 주세요", 2, LocalDate.of(2026, 8, 11), p, Instant.now());
+        Review stored = review("문의는 010-1234-5678 로 주세요. 주문번호 2026102812345678", 2,
+                LocalDate.of(2026, 8, 11), p, Instant.now());
 
         ChannelReviewDetailView detail = service.detail(org, account.getId(), stored.getId());
 
-        assertThat(detail.body()).doesNotContain("010-1234-5678");
-        assertThat(detail.bodyRedacted()).isTrue();
+        assertThat(detail.body()).contains("010-1234-5678").contains("2026102812345678");
+        assertThat(detail.bodyRedacted()).isFalse();
     }
 
     /* ─────────────────────────── reply work (A6) ─────────────────────────── */

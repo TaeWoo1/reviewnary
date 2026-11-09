@@ -139,8 +139,8 @@ abstract class VendorReplyTaskScenarios {
         vendor = new FakeVendorServer(UUID.randomUUID());
         VendorLinkService link = new VendorLinkService(links,
                 new LocalSecretSealer(new VaultKeyRing(KEY, "test-key-1", "")), vendor, true, CLOCK);
-        link.start();
-        link.poll();
+        link.start(org);
+        link.poll(org);
         tasks = new VendorReplyTaskService(link, bindings, refs, taskCopies, reviews, drafts, approvals, outcomes,
                 triageRows, CLOCK);
         tasks.setAnswerMemory(answerMemoryHook);
@@ -210,6 +210,39 @@ abstract class VendorReplyTaskScenarios {
             assertThat(t.draftVersion()).as("the edit here is the phone's next version").isEqualTo(2);
             assertThat(t.draftBody()).isEqualTo("빠른 배송으로 만족하셨다니 정말 기쁩니다.");
         });
+    }
+
+    /**
+     * The approval is the signed-in person's (boundary §3, external review 2026-10-31): recorded here with that user,
+     * the organisation, the approved version and text and the time; the vendor server hears only an opaque reference
+     * to the user — never the account it maps the organisation to, never a name or an address.
+     */
+    @Test
+    void aHandOverRecordsWhoApprovedWhichVersionAndWhenAndTellsTheServerOnlyAReference() {
+        UUID review = pulledReview("v1", "9100000199", "튼튼해요");
+        needsReply(review);
+        drafts.save(org, review, "SELLER:" + seller, "튼튼하다고 해 주셔서 감사합니다.", 0);
+        int version = drafts.currentVersion(review);
+
+        tasks.handOver(org, seller, review, version);
+
+        VendorReplyTask copy = taskCopies.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(org, review).orElseThrow();
+        assertThat(copy.getState()).isEqualTo("APPROVED");
+        assertThat(copy.getOrgId()).isEqualTo(org);
+        assertThat(copy.getApprovedByUserId()).isEqualTo(seller);
+        assertThat(copy.getApprovedLocallyAt()).isEqualTo(CLOCK.instant());
+        assertThat(copy.getApprovedDraftVersion()).isEqualTo(version);
+        assertThat(copy.getApprovedFingerprint())
+                .isEqualTo(com.sellerops.attention.reply.ReviewReplyFingerprint.of("튼튼하다고 해 주셔서 감사합니다."));
+        assertThat(vendor.approvers).containsExactly("workspace-user:" + seller);
+
+        UUID other = pulledReview("v2", "9100000198", "좋아요");
+        needsReply(other);
+        drafts.save(org, other, "SELLER:" + seller, "감사합니다. 또 찾아 주세요.", 0);
+        handOver(other);
+        assertThat(taskCopies.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(org, other).orElseThrow()
+                .getApprovedByUserId()).as("a hand-over with no person named records none").isNull();
+        assertThat(vendor.approvers).last().isEqualTo("null");
     }
 
     @Test
@@ -729,7 +762,7 @@ abstract class VendorReplyTaskScenarios {
     }
 
     @Test
-    void theSellersOwnWordingIsTheirStandingWordNotAnUnsupportedPromise() {
+    void aServiceOnlyInTheSavedWordingIsNotAGroundButTheSameServiceAsAPolicyIs() {
         tasks.setDraftBasis(draftBasis, draftRecheck);
         String own = "찾아 주셔서 감사합니다. 사이즈가 맞지 않으면 교환해 드립니다.";
         com.sellerops.attention.reply.ReviewReplyTemplate template = new com.sellerops.attention.reply.ReviewReplyTemplate();
@@ -747,8 +780,20 @@ abstract class VendorReplyTaskScenarios {
                 "문의는 평일 10시부터 17시까지 받습니다.", null), null, "합성 판매자");
         pull.pullFor(org);
 
-        assertThat(vendor.tasks.get(task).state()).isEqualTo("AWAITING_APPROVAL");
-        assertThat(vendor.rechecks).isEmpty();
+        // A reply template says how the seller sounds, not what they offer (2026-11-01 third review): the exchange in it is
+        // no ground, and the reply is sent back for the seller, as any unbacked promise is.
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("RECHECK_NEEDED");
+
+        // The same service registered as an operating standard — with its scope — is a ground like any policy.
+        companyRules.create(org, new com.sellerops.knowledge.org.dto.OrgKnowledgeRequest(
+                com.sellerops.knowledge.org.OrgKnowledgeType.EXCHANGE_REFUND_POLICY, "사이즈 교환",
+                "사이즈가 맞지 않으면 교환해 드립니다.", null), null, "합성 판매자");
+        UUID asked = pulledReview("v2", "9100000399", "사이즈가 맞지 않아요. 교환 되나요");
+        needsReply(asked);
+        drafts.save(org, asked, "SELLER:" + seller, own, 0);
+        UUID second = vendorTaskOf(tasks.upload(org, asked));
+        pull.pullFor(org);
+        assertThat(vendor.tasks.get(second).state()).isEqualTo("AWAITING_APPROVAL");
     }
 
     @Test
@@ -1186,7 +1231,7 @@ abstract class VendorReplyTaskScenarios {
     }
 
     @Test
-    void aPhoneEditIsCheckedBeforeApprovalAndAPromiseTheSellerApprovedAnywayIsNotHeldAgain() {
+    void aPhoneEditIsCheckedBeforeApprovalAndAPromiseTheSellerApprovedAnywayIsStillHeld() {
         tasks.setDraftBasis(draftBasis, draftRecheck);
         UUID review = pulledReview("v1", "9100000313", "사이즈가 안 맞아요");
         needsReply(review);
@@ -1212,12 +1257,17 @@ abstract class VendorReplyTaskScenarios {
                 "문의는 평일 10시부터 17시까지 받습니다.", null), null, "합성 판매자");
         pull.pullFor(org);
 
-        assertThat(vendor.approvedChecks).as("the same promise is the seller's word, not a new conflict").isEmpty();
-        assertThat(vendor.tasks.get(task).state()).isEqualTo("APPROVED");
+        // Until 2026-11-01 the seller's approval made the promise their word. An approval is not a decision on a promise
+        // nothing backs (owner: 「UNSUPPORTED_PROMISE를 일반 확인으로 우회하지 못하게」): it is held before the delegate posts.
+        assertThat(vendor.approvedChecks).singleElement().satisfies(c -> {
+            assertThat(c.hold()).isTrue();
+            assertThat(c.note().promises()).containsExactly("교환");
+        });
+        assertThat(vendor.tasks.get(task).state()).isEqualTo("HELD");
     }
 
     @Test
-    void aPromiseThatLosesItsGroundAfterApprovalIsHeldEvenBesideOneTheSellerAccepted() {
+    void aPromiseThatLosesItsGroundAfterApprovalIsHeldBesideOneTheSellerApprovedPastAFlag() {
         tasks.setDraftBasis(draftBasis, draftRecheck);
         var exchanges = exchangeRule();
         UUID review = pulledReview("v1", "9100000314", "사이즈 교환 되나요");
@@ -1236,7 +1286,8 @@ abstract class VendorReplyTaskScenarios {
 
         assertThat(vendor.approvedChecks).singleElement().satisfies(c -> {
             assertThat(c.hold()).isTrue();
-            assertThat(c.note().promises()).as("only the promise that lost its ground since").containsExactly("교환");
+            assertThat(c.note().promises()).as("the one that lost its ground, and the one approved past a flag")
+                    .containsExactly("환불", "교환");
         });
         assertThat(vendor.tasks.get(task).state()).isEqualTo("HELD");
     }

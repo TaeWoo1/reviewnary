@@ -55,6 +55,12 @@ import java.util.TreeMap;
  * {@link #DAY_TOTAL_RETENTION_DAYS} carry lets the first window emit totals for the two days
  * BEFORE the range, counting only the orders that happened to change inside it — and ingestion
  * overwrites daily totals by (channel, date), so a partial recount would replace a complete one.
+ *
+ * <p><b>{@code paidPage}</b> — the page a bounded backfill is on inside its current day (2026-10-28). The
+ * backfill lane does not read the change feed: {@code last-changed-statuses} filtered to {@code PAYED}
+ * answers only orders whose LAST change is still the payment, so a past week read today came back
+ * empty (FINDINGS A8). It reads the conditional product-order list by payment date instead, one KST day
+ * per window, paged by number. Null on the routine lane, and between days.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 record NaverOrdersCursor(
@@ -65,7 +71,8 @@ record NaverOrdersCursor(
         Map<String, DayTotal> dayTotals,
         List<String> dedupeIds,
         List<String> edgeIds,
-        Bounds bounds) {
+        Bounds bounds,
+        Integer paidPage) {
 
     /**
      * What a cursor may write, and how far it may walk.
@@ -157,7 +164,7 @@ record NaverOrdersCursor(
     static NaverOrdersCursor probeWindow(Instant now, ZoneId zone, Duration span) {
         Instant from = now.minus(span);
         return new NaverOrdersCursor(
-                iso(from, zone), iso(now, zone), null, null, Map.of(), List.of(), List.of(), null);
+                iso(from, zone), iso(now, zone), null, null, Map.of(), List.of(), List.of(), null, null);
     }
 
     /**
@@ -178,7 +185,7 @@ record NaverOrdersCursor(
         }
         return new NaverOrdersCursor(
                 iso(from, zone), iso(windowEnd(from, toExclusive), zone), null, null,
-                Map.of(), List.of(), List.of(), new Bounds(startDate.toString(), iso(toExclusive, zone)));
+                Map.of(), List.of(), List.of(), new Bounds(startDate.toString(), iso(toExclusive, zone)), null);
     }
 
     /**
@@ -207,7 +214,7 @@ record NaverOrdersCursor(
         Instant from = startDate.atStartOfDay(zone).toInstant();
         return new NaverOrdersCursor(
                 iso(from, zone), iso(windowEnd(from, now), zone), null, null,
-                Map.of(), List.of(), List.of(), new Bounds(startDate.toString(), null));
+                Map.of(), List.of(), List.of(), new Bounds(startDate.toString(), null), null);
     }
 
     /** First-ever cursor: one backfill window ending now. */
@@ -215,7 +222,7 @@ record NaverOrdersCursor(
         Instant from = now.minus(INITIAL_BACKFILL);
         return new NaverOrdersCursor(
                 iso(from, zone), iso(windowEnd(from, now), zone), null, null,
-                Map.of(), List.of(), List.of(), null);
+                Map.of(), List.of(), List.of(), null, null);
     }
 
     /**
@@ -232,7 +239,7 @@ record NaverOrdersCursor(
                                 Map<String, DayTotal> mergedTotals,
                                 List<String> newEdgeIds, List<String> nextDedupeIds) {
         return new NaverOrdersCursor(windowFrom, windowTo, nextMoreFrom, nextMoreSequence,
-                mergedTotals, nextDedupeIds, union(edgeIds, newEdgeIds), bounds);
+                mergedTotals, nextDedupeIds, union(edgeIds, newEdgeIds), bounds, null);
     }
 
     /**
@@ -247,7 +254,28 @@ record NaverOrdersCursor(
         Map<String, DayTotal> pruned = new TreeMap<>(mergedTotals);
         pruned.keySet().removeIf(date -> LocalDate.parse(date).isBefore(pruneBefore));
         return new NaverOrdersCursor(iso(nextFrom, zone), iso(nextTo, zone), null, null,
-                pruned, union(edgeIds, newEdgeIds), List.of(), bounds);
+                pruned, union(edgeIds, newEdgeIds), List.of(), bounds, null);
+    }
+
+    /**
+     * The backfill lane's next page inside the same day. {@code seenIds} is every product order this day
+     * has counted so far — a list read by page number can shift while it is read, and an order that moves
+     * across a page boundary must not be counted twice.
+     */
+    NaverOrdersCursor paidContinued(int nextPage, Map<String, DayTotal> mergedTotals, List<String> seenIds) {
+        return new NaverOrdersCursor(windowFrom, windowTo, null, null, mergedTotals, seenIds, List.of(), bounds,
+                nextPage);
+    }
+
+    /** The backfill lane's day is read to its last page: the next day, its first page, nothing carried. */
+    NaverOrdersCursor paidAdvanced(Instant now, ZoneId zone, Map<String, DayTotal> mergedTotals) {
+        Instant nextFrom = windowToInstant();
+        Instant nextTo = windowEnd(nextFrom, limit(now));
+        LocalDate pruneBefore = nextFrom.atZone(zone).toLocalDate().minusDays(DAY_TOTAL_RETENTION_DAYS);
+        Map<String, DayTotal> pruned = new TreeMap<>(mergedTotals);
+        pruned.keySet().removeIf(date -> LocalDate.parse(date).isBefore(pruneBefore));
+        return new NaverOrdersCursor(iso(nextFrom, zone), iso(nextTo, zone), null, null, pruned, List.of(),
+                List.of(), bounds, null);
     }
 
     /**
@@ -263,7 +291,7 @@ record NaverOrdersCursor(
     NaverOrdersCursor withWindowThrough(Instant now, ZoneId zone) {
         Instant from = windowFromInstant();
         return new NaverOrdersCursor(iso(from, zone), iso(windowEnd(from, limit(now)), zone),
-                moreFrom, moreSequence, dayTotals, dedupeIds, edgeIds, bounds);
+                moreFrom, moreSequence, dayTotals, dedupeIds, edgeIds, bounds, paidPage);
     }
 
     /** How far this cursor may read: "now", or the operator's end bound when it is nearer. */
@@ -302,7 +330,7 @@ record NaverOrdersCursor(
     }
 
     boolean isContinuation() {
-        return moreSequence != null && !moreSequence.isBlank();
+        return (moreSequence != null && !moreSequence.isBlank()) || paidPage != null;
     }
 
     /** True when this cursor has caught up to {@code now} (nothing to query yet). */
@@ -340,6 +368,11 @@ record NaverOrdersCursor(
     /** The one place an outside instant enters this cursor's arithmetic. See {@link #WIRE_RESOLUTION}. */
     static Instant atWireResolution(Instant instant) {
         return instant.truncatedTo(WIRE_RESOLUTION);
+    }
+
+    /** This cursor's wire format for an instant it did not store — the backfill lane's inclusive day end. */
+    static String wire(Instant instant, ZoneId zone) {
+        return iso(instant, zone);
     }
 
     private static String iso(Instant instant, ZoneId zone) {

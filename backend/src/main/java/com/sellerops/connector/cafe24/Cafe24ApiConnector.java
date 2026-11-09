@@ -282,7 +282,7 @@ public class Cafe24ApiConnector implements PullConnector {
      */
     private FetchPage fetchReviewArticles(FetchRequest request) {
         return fetchArticlePage(request,
-                (boardNo, row, sourceRow, ignoredCommentAnswer) ->
+                (boardNo, row, sourceRow, ignoredCommentCheck, ignoredCheckedAt) ->
                         Cafe24BoardArticleMapper.toCanonical(boardNo, row, sourceRow),
                 true);
     }
@@ -456,7 +456,13 @@ public class Cafe24ApiConnector implements PullConnector {
             // not carry. Candidates are only the rows this page would store as 미답변: an article the
             // source already calls answered needs no second opinion, and a thread REPLY is not a
             // question anyone is waiting on.
-            Map<Long, Instant> commentAnswered = Map.of();
+            //
+            // Every candidate gets one of three outcomes (2026-11-08), and the outcome travels with the row so the
+            // inquiry keeps a record of the look — including "could not look". A row that was not a candidate gets
+            // no outcome at all, which ingestion reads as "this collection did not look" and leaves the stored
+            // record alone.
+            Map<Long, Cafe24InquiryAnswerObserver.CommentCheck> commentChecks = Map.of();
+            Instant commentCheckedAt = null;
             if (observeCommentAnswers && answerObserver != null) {
                 Set<Long> candidates = new LinkedHashSet<>();
                 for (KeptRow k : kept) {
@@ -466,12 +472,14 @@ public class Cafe24ApiConnector implements PullConnector {
                         candidates.add(k.row().articleNo());
                     }
                 }
-                commentAnswered = answerObserver.observe(auth.accessToken(), auth.mallId(), boardNo,
+                commentChecks = answerObserver.observeChecks(auth.accessToken(), auth.mallId(), boardNo,
                         cursor.windowStart(), cursor.windowEnd(), candidates);
+                commentCheckedAt = clock.instant();
             }
             for (KeptRow k : kept) {
                 records.add(mapper.map(boardNo, k.row(), k.position(),
-                        commentAnswered.get(k.row().articleNo())));
+                        provableInDiscoveryWindow(commentChecks.get(k.row().articleNo()), k.row(), cursor),
+                        commentCheckedAt));
             }
             if (excludedSecret > 0) {
                 // Sanitized metric only — a count, never an article id/title/content/writer.
@@ -517,7 +525,18 @@ public class Cafe24ApiConnector implements PullConnector {
             Cafe24ArticleCursor next = cursor.routine() && !hasMore
                     ? routineWindowFor(boardNo, today)
                     : cursor.advance(rows.size());
-            return FetchPage.of(request.dataType(), records, next.encode(), hasMore, KIND);
+            FetchPage page = FetchPage.of(request.dataType(), records, next.encode(), hasMore, KIND);
+            // The page's articles are good and are kept, with the comment outcomes as they are. But a comment look the
+            // account or the channel cut off (401/403, 429, 5xx) is carried on the page (2026-11-09), so a run that ends
+            // SUCCESS by its articles alone is not taken as proof the account answers — the open-inquiry recheck that
+            // would follow it waits for a later collection. One article's own trouble is not carried.
+            Cafe24InquiryAnswerObserver.Reason accountSide =
+                    Cafe24InquiryAnswerObserver.accountSideReason(commentChecks.values());
+            if (accountSide != null) {
+                log.info("카페24 댓글 답변 관측 계정·채널 쪽 중단: board={} 사유={}", boardNo, accountSide);
+                page = page.withAccountSideStop(accountSide.name());
+            }
+            return page;
         } catch (Cafe24RateLimitedException e) {
             // Cursor unchanged → the next run re-requests the same offset.
             return rateLimited(request, e);
@@ -585,12 +604,35 @@ public class Cafe24ApiConnector implements PullConnector {
     /**
      * Maps one board-article row to its canonical record (community article or inquiry).
      *
-     * <p>{@code commentAnsweredAt} is non-null only when the comment lane PROVED the shop answered
-     * this article there; the review mapper ignores it, because board 4 has no answer semantics.
+     * <p>{@code commentCheck} is the comment lane's outcome for this article, or null when the lane did not look at
+     * it; only {@code SHOP_ANSWERED} carries a time. The review mapper ignores both, because board 4 has no answer
+     * semantics.
      */
     @FunctionalInterface
     private interface ArticleRecordMapper {
-        Object map(int boardNo, Cafe24BoardArticleRow row, int sourceRow, Instant commentAnsweredAt);
+        Object map(int boardNo, Cafe24BoardArticleRow row, int sourceRow,
+                   Cafe24InquiryAnswerObserver.CommentCheck commentCheck, Instant commentCheckedAt);
+    }
+
+    /**
+     * A {@code NO_SHOP_COMMENT} that rests on the discovery list is only as good as the window that list covered.
+     *
+     * <p>The routine lane keeps a row whose {@code created_date} cannot be read (see {@link #withinWindow}), and the
+     * {@code comment=T} discovery is asked by that same window — so for such a row "absent from the list" proves
+     * nothing. It is recorded as {@code NOT_CHECKED} instead. The same holds for any row the window does not provably
+     * contain. A proven shop answer is kept: it was read off the article's own comments, by number.
+     */
+    private static Cafe24InquiryAnswerObserver.CommentCheck provableInDiscoveryWindow(
+            Cafe24InquiryAnswerObserver.CommentCheck check, Cafe24BoardArticleRow row, Cafe24ArticleCursor cursor) {
+        if (check == null || check.state() != Cafe24InquiryAnswerObserver.CheckState.NO_SHOP_COMMENT) {
+            return check;
+        }
+        LocalDate created = Cafe24BoardArticleMapper.parseKstDate(row.createdDate());
+        boolean inside = created != null && cursor.hasWindow()
+                && !created.isBefore(cursor.windowStart()) && !created.isAfter(cursor.windowEnd());
+        return inside ? check
+                : new Cafe24InquiryAnswerObserver.CommentCheck(Cafe24InquiryAnswerObserver.CheckState.NOT_CHECKED, null,
+                        Cafe24InquiryAnswerObserver.Reason.DISCOVERY_INCOMPLETE);
     }
 
     /** One row that passed every exclusion, with the page position it will be reported under. */

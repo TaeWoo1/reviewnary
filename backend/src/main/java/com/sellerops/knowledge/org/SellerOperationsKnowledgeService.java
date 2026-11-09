@@ -55,6 +55,8 @@ public class SellerOperationsKnowledgeService {
     private final OrgKnowledgeChunkRepository chunks;
     private final KnowledgeSemanticSearch semanticSearch;
     private final KnowledgeEvidenceEligibility eligibility;
+    /** Where a rule's past revisions go (V164); null in a bare test, which keeps no history. */
+    private OrgKnowledgeRevisionRepository revisions;
 
     public SellerOperationsKnowledgeService(OrgKnowledgeSourceRepository sources,
                                             OrgKnowledgeChunkRepository chunks) {
@@ -71,6 +73,11 @@ public class SellerOperationsKnowledgeService {
         this.chunks = chunks;
         this.semanticSearch = semanticSearch;
         this.eligibility = eligibility;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setRevisions(OrgKnowledgeRevisionRepository revisions) {
+        this.revisions = revisions;
     }
 
     @Transactional(readOnly = true)
@@ -102,14 +109,20 @@ public class SellerOperationsKnowledgeService {
      * <p>The version rises only when the BODY changed. Renaming a document or re-filing it under a
      * different type does not make last week's citation stale, and a version that ticked on every
      * save would say it did.
+     *
+     * <p>When it rises, the revision it replaces is kept as it stood ({@link OrgKnowledgeRevision}, seller decision
+     * 2026-11-01): a draft that cited version 1 can still be read against what version 1 said.
      */
     @Transactional
     public OrgKnowledgeView update(UUID orgId, UUID sourceId, OrgKnowledgeRequest request) {
         OrgKnowledgeSource source = sources.findByIdAndOrgId(sourceId, orgId)
                 .orElseThrow(() -> ApiException.notFound("운영 정책을 찾을 수 없습니다."));
-        String before = source.getBody();
+        OrgKnowledgeRevision before = OrgKnowledgeRevision.of(source, java.time.Instant.now());
         apply(source, request);
-        if (!source.getBody().equals(before)) {
+        if (!source.getBody().equals(before.getBody())) {
+            if (revisions != null) {
+                revisions.save(before);
+            }
             source.setVersion(source.getVersion() + 1);
         }
         OrgKnowledgeSource saved = sources.save(source);

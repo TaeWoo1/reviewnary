@@ -31,6 +31,9 @@ public interface ReviewReplyDraftRepository extends JpaRepository<ReviewReplyDra
 
     long countByReviewId(UUID reviewId);
 
+    /** A version created after {@code at} by an author whose id does not start with {@code systemPrefix}. */
+    boolean existsByReviewIdAndCreatedAtAfterAndCreatedByNotLike(UUID reviewId, java.time.Instant at, String systemPrefix);
+
     /**
      * Which of these reviews have any draft — ONE batch query per drill-down page, never a
      * per-row lookup, matching how {@code IngestedReviewVocItemSource} resolves product names
@@ -48,4 +51,8 @@ public interface ReviewReplyDraftRepository extends JpaRepository<ReviewReplyDra
             + "where d.orgId = :orgId and d.reviewId in :reviewIds")
     List<UUID> findReviewIdsWithDraft(@Param("orgId") UUID orgId,
                                       @Param("reviewIds") Collection<UUID> reviewIds);
+
+    /** Every review of one org that has a draft — what a recheck sweep walks (V165). */
+    @Query("select distinct d.reviewId from ReviewReplyDraft d where d.orgId = :orgId")
+    List<UUID> findReviewIdsByOrgId(@Param("orgId") UUID orgId);
 }

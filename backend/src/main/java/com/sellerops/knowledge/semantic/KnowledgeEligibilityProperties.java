@@ -32,14 +32,24 @@ public class KnowledgeEligibilityProperties implements AgentCapabilityGate {
     private final String apiKey;
     private final int maxOutputTokens;
     private final String reasoningEffort;
+    private final com.sellerops.agent.llm.provider.LlmVendor vendor;
 
+    /** The shape before the shared model connection (2026-10-29): OpenAI. */
+    public KnowledgeEligibilityProperties(boolean enabled, String enabledOrgIds, String model, String apiKey, int maxOutputTokens, String reasoningEffort) {
+        this(enabled, enabledOrgIds, model, apiKey, maxOutputTokens, reasoningEffort, "OPENAI");
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
     public KnowledgeEligibilityProperties(
             @Value("${sellerops.knowledge.eligibility.enabled:false}") boolean enabled,
             @Value("${sellerops.knowledge.eligibility.enabled-org-ids:}") String enabledOrgIds,
             @Value("${sellerops.knowledge.eligibility.model:gpt-5-2025-08-07}") String model,
             @Value("${sellerops.knowledge.eligibility.api-key:}") String apiKey,
             @Value("${sellerops.knowledge.eligibility.max-output-tokens:600}") int maxOutputTokens,
-            @Value("${sellerops.knowledge.eligibility.reasoning-effort:minimal}") String reasoningEffort) {
+            @Value("${sellerops.knowledge.eligibility.reasoning-effort:minimal}") String reasoningEffort,
+            @Value("${sellerops.knowledge.eligibility.vendor:OPENAI}") String vendor) {
+        // OPENAI | ANTHROPIC (2026-10-29); an unknown name refuses to boot.
+        this.vendor = com.sellerops.agent.llm.provider.LlmVendor.parse(vendor);
         this.enabled = enabled;
         this.allOrgs = enabledOrgIds != null && enabledOrgIds.trim().equals("*");
         this.enabledOrgIds = allOrgs ? List.of() : parseIds(enabledOrgIds);
@@ -110,5 +120,9 @@ public class KnowledgeEligibilityProperties implements AgentCapabilityGate {
 
     public String reasoningEffort() {
         return reasoningEffort;
+    }
+
+    public com.sellerops.agent.llm.provider.LlmVendor vendor() {
+        return vendor;
     }
 }

@@ -49,6 +49,22 @@ import java.util.regex.Pattern;
  * reads the clause's ending only, so it cannot see a refusal in words {@link #REFUSALS} does not list, nor one that
  * ends on something else (「교환이 어려운 점 양해 부탁드립니다」).
  *
+ * <p><b>A promise is also what it leaves out</b> (2026-10-31, first real-model round, C06). The policy said 「수령 후 7일
+ * 이내, 미개봉 상품에 한해 반품 가능」 and the draft said 「수령 후 7일 이내 반품 가능」 — every word it wrote is in the
+ * evidence, so every check above passed a reply that grants a return for an opened product. {@link #droppedConditions}
+ * reads the state a grant is limited to (미개봉 · 미사용 · 미착용) when EVERY evidence clause granting that remedy states it,
+ * and refuses a draft that grants the remedy without saying it anywhere — unless the customer already said theirs is in
+ * that state. A customer who said theirs is OUT of it (「개봉했는데」) gets the state in every granting clause itself, not
+ * just somewhere (seller decision 2026-11-01). Same closed shape: three states and the ways a Korean seller or customer
+ * writes them.
+ *
+ * <p><b>Saying back is not promising</b> (2026-10-31, C03). A customer who wrote 「반품하려다가 그냥 쓰려고요」 was answered
+ * 「반품까지 고민하게 해 드린 점 아쉽게 생각합니다」, and the noun test refused it as an unsupported return. The three-argument
+ * {@link #unsupportedClaims(String, List, String)} passes a remedy noun only where it is the customer's own experience
+ * said back: the customer named that remedy, every sentence of the draft naming it puts it in a weighing verb
+ * (고민 · 생각 · 하려 · 망설), and none of those sentences grants, offers or routes anything. Whether a sentence the code
+ * cannot settle is the seller's promise is the critique's to read (N9), not this list's.
+ *
  * <p>Pure: no I/O, no model, no state.
  */
 public final class ReviewClaimGuard {
@@ -94,7 +110,36 @@ public final class ReviewClaimGuard {
      * Which way of reading a promise this is — a change to how a clause is matched changes what waiting drafts are
      * held to, so it is part of {@code ReviewDraftBasis}' policy fingerprint like the word lists are.
      */
-    static final String READING = "clauses-v2:cases,no-overlap";
+    static final String READING = "clauses-v5:cases,no-overlap,kept-states,said-back,left-states,return-law";
+
+    /**
+     * The states a grant can be limited to, each with the ways it is written — by the seller (「미개봉 상품에 한해」) or by a
+     * customer saying theirs is in it (「아직 뜯지 않았어요」). Matched with whitespace removed.
+     */
+    static final java.util.Map<String, List<String>> KEPT_STATES = java.util.Map.of(
+            "미개봉", List.of("미개봉", "개봉하지않", "개봉안한", "개봉안했", "개봉전", "뜯지않", "안뜯", "포장그대로"),
+            "미사용", List.of("미사용", "사용하지않", "사용안한", "사용안했", "사용전", "쓰지않", "안쓴", "안썼"),
+            "미착용", List.of("미착용", "착용하지않", "착용안한", "착용안했", "착용전", "입지않", "안입은", "안입었"));
+
+    /**
+     * The ways a customer says theirs is NOT in a kept state — 「개봉했는데」, 「한 번 썼어요」 (seller decision 2026-11-01).
+     * Read only after the kept forms are taken out, so 「안 뜯었어요」 is never read as 「뜯었」. 「개봉한 상품도 되나요?」 counts
+     * too: whether or not it is theirs yet, it asks about exactly the case the condition is for. Matched with whitespace
+     * removed.
+     */
+    static final java.util.Map<String, List<String>> LEFT_STATES = java.util.Map.of(
+            "미개봉", List.of("개봉했", "개봉한", "개봉후", "개봉하고", "뜯었", "뜯은", "뜯어보", "뜯고"),
+            "미사용", List.of("사용했", "사용한", "사용후", "사용하고", "써봤", "써본", "썼는데", "썼어", "쓰다가", "쓰던"),
+            "미착용", List.of("착용했", "착용한", "착용후", "착용하고", "입어봤", "입어본", "입었"));
+
+    /** A remedy noun in a weighing verb — the customer's 「반품까지 고민」, 「교환할까 생각」, 「환불하려다」. */
+    private static final Pattern WEIGHED = Pattern.compile(
+            "(?:을|를|까지|도|이나|할까|하실까|해야하나|할지)?(?:고민|생각|하려|하실려|할려|망설|결심)");
+
+    /** What turns a sentence into the seller granting, offering or routing a remedy — never a saying-back. */
+    private static final List<String> OFFERS = List.of(
+            "드리겠", "드릴게", "드릴수", "해드립", "해드릴", "도와드", "가능", "진행", "처리", "접수", "보내드", "신청",
+            "하실수", "해주겠", "해줄", "받아드", "됩니다", "돼요", "되세요");
 
     /** How much of a clause's end is its predicate. */
     static final int ENDING = 8;
@@ -287,13 +332,24 @@ public final class ReviewClaimGuard {
             for (String term : stated) {
                 // 「단순 변심」 is one term, not two: the shorter one inside a longer stated term is not reported again.
                 boolean inside = stated.stream().anyMatch(o -> o.length() > term.length() && o.contains(term));
-                if (!inside && !has(grounds, term)) {
+                if (!inside && !has(grounds, term) && SAME_TERM.getOrDefault(term, List.of()).stream()
+                        .noneMatch(grounds::contains)) {
                     found.add(term);
                 }
             }
         }
         return List.copyOf(found);
     }
+
+    /**
+     * The same cost written another way (2026-11-01, fifth round: 「반품에 드는 비용은 판매자가 부담」 in the policy did not
+     * back 「반품 비용은 판매자가 부담」). Matched on text with whitespace removed; a short list, not a thesaurus.
+     */
+    static final java.util.Map<String, List<String>> SAME_TERM = java.util.Map.of(
+            "반품비", List.of("반품비용", "반품에드는비용", "반품배송비", "반품택배비", "반환에필요한비용", "반환비용"),
+            "교환비", List.of("교환비용", "교환에드는비용", "교환배송비", "교환택배비"),
+            "택배비", List.of("배송비"),
+            "배송비", List.of("택배비"));
 
     /** Whether {@code text} states the figure itself — 「7일」 is not inside 「17일」, nor 「1000원」 inside 「11,000원」. */
     private static boolean statesFigure(String text, String figure) {
@@ -309,6 +365,220 @@ public final class ReviewClaimGuard {
             }
         }
         return false;
+    }
+
+    /**
+     * The states the evidence limits a granted remedy to that the draft's grant leaves out — 「미개봉」 for 「7일 이내 반품
+     * 가능」 against 「7일 이내 미개봉 상품에 한해 반품 가능」. A state counts only when every evidence clause granting that
+     * remedy states it: where one grant is unlimited, which case the draft is about is the claim check's to read. The draft
+     * keeps the state if it says it anywhere (「단, 개봉하지 않은 상품만」 as the next sentence is fine); the customer keeps
+     * it if they said theirs is in it.
+     *
+     * <p><b>A customer who said theirs is out of it</b> (seller decision 2026-11-01: 「이미 개봉했다고 밝혔다면 교환 가능으로
+     * 단정하지 않는다」). Then saying the state somewhere is not enough: 「교환 가능합니다. 미개봉 상품 기준입니다」 still tells
+     * them yes. Every clause granting that remedy must state it itself — 「미개봉 상품에 한해 교환 가능합니다」 is the policy
+     * read to them, not a yes. Whether another reason applies (a defect, a mismatch with the listing) is the evidence's
+     * to say: where one grant of the remedy is unlimited, this list stays out of it as above.
+     *
+     * @param asked the customer's own words — 「아직 뜯지 않았는데」 makes 「7일 이내 반품 가능」 the right answer
+     */
+    public static List<String> droppedConditions(String body, List<String> evidence, String asked) {
+        if (body == null || body.isBlank() || evidence == null || evidence.isEmpty()) {
+            return List.of();
+        }
+        List<Clause> grounds = new ArrayList<>();
+        for (String passage : evidence) {
+            if (passage != null) {
+                grounds.addAll(clausesOf(passage));
+            }
+        }
+        String draft = normalize(body);
+        String customer = normalize(asked == null ? "" : asked);
+        if (faultReported(customer)) {
+            // A change-of-mind condition does not govern a defect or a wrong item: that is lawConflicts' case, not this.
+            return List.of();
+        }
+        Set<String> dropped = new LinkedHashSet<>();
+        for (Clause said : clausesOf(body)) {
+            if (said.refusal()) {
+                continue;
+            }
+            for (String remedy : said.remedies()) {
+                List<Clause> grants = grounds.stream()
+                        .filter(g -> !g.refusal() && g.remedies().contains(remedy)).toList();
+                if (grants.isEmpty()) {
+                    continue;
+                }
+                KEPT_STATES.forEach((state, forms) -> {
+                    boolean everyGrant = grants.stream().allMatch(g -> states(g.text(), forms));
+                    boolean kept = left(customer, state) ? states(said.text(), forms)
+                            : states(draft, forms) || states(customer, forms);
+                    if (everyGrant && !kept) {
+                        dropped.add(state);
+                    }
+                });
+            }
+        }
+        return KEPT_STATES.keySet().stream().sorted().filter(dropped::contains).toList();
+    }
+
+    private static boolean states(String squashed, List<String> forms) {
+        return forms.stream().anyMatch(squashed::contains);
+    }
+
+    /**
+     * The kept states the customer said theirs is out of — 「미개봉」 for 「개봉했는데 교환되나요?」. For the notes a revision
+     * reads; {@link #droppedConditions} applies it itself.
+     */
+    public static List<String> leftStates(String asked) {
+        String customer = normalize(asked == null ? "" : asked);
+        return KEPT_STATES.keySet().stream().sorted().filter(state -> left(customer, state)).toList();
+    }
+
+    private static boolean left(String squashed, String state) {
+        String rest = squashed;
+        for (String form : KEPT_STATES.get(state)) {
+            rest = rest.replace(form, "|");
+        }
+        String remaining = rest;
+        return LEFT_STATES.get(state).stream().anyMatch(remaining::contains);
+    }
+
+    /** A return applied to the seller's own unopened-only rule, or refused for opening — 청약철회 (전자상거래법 §17②1). */
+    public static final String LAW_WITHDRAWAL = "WITHDRAWAL";
+    /** A defect, wrong item or listing mismatch held to change-of-mind terms (미개봉 · 단순 변심) — §17③. */
+    public static final String LAW_FAULT = "FAULT";
+
+    /** The remedies that are the customer's statutory withdrawal, not the seller's service: a return and a refund. */
+    static final List<String> WITHDRAWALS = List.of("반품", "환불");
+
+    /** What opening is written as — in a refusal or a limit. 「미개봉」 contains it too. Matched with whitespace removed. */
+    static final List<String> OPENING = List.of("개봉", "뜯", "포장훼손", "포장을훼손", "포장이훼손");
+
+    /** What a customer reporting a fault says, by closed list — never a meaning test. Matched with whitespace removed. */
+    static final List<String> FAULTS = List.of(
+            "불량", "하자", "파손", "깨져", "깨진", "깨졌", "고장", "작동안", "작동하지않", "오배송", "잘못왔", "잘못온",
+            "잘못배송", "다른상품이", "다른제품이", "다른색이", "사진과달", "사진이랑달", "설명과달", "상세페이지와달",
+            "표시와달", "누락", "빠져있", "빠진채");
+
+    /** Change-of-mind terms: what a seller's own policy limits a service to, and never a fault. */
+    static final List<String> CHANGE_OF_MIND = List.of("단순변심", "변심");
+
+    /**
+     * <b>Whether the seller's condition may be applied to this case at all</b> (2026-11-01 review, after the seller's
+     * 「개봉하지 않은 상품에 한해」 decision). {@link #droppedConditions} holds a reply to the seller's policy; this holds the
+     * policy's application to the law, and the two are not the same check. Closed shapes, each a clear case:
+     *
+     * <ul>
+     *   <li>{@link #LAW_WITHDRAWAL} — a draft clause that limits a return or refund to an unopened product, refuses one for
+     *       opening, or grants one where every evidence grant of it is limited to unopened. A customer may withdraw within
+     *       7 days even after opening the packaging to see the contents (전자상거래법 제17조 제2항 제1호 단서), and a term
+     *       worse for them than the statute is void (제35조) — so a return answer standing on that policy is the seller's
+     *       to confirm, not the model's to write. An exchange for change of mind is the seller's own service: its unopened
+     *       limit stays {@link #droppedConditions}' to keep.</li>
+     *   <li>{@link #LAW_FAULT} — the customer reports a defect, a wrong item or a mismatch with the listing ({@link #FAULTS})
+     *       and a draft clause about any remedy applies an unopened, unused or change-of-mind term to it, or refuses it for
+     *       opening (제17조 제3항: such goods may be withdrawn within 3 months).</li>
+     * </ul>
+     * Saying back is not applying: a clause in a weighing verb that grants nothing (「반품까지 고민하게 해 드린 점」) is
+     * skipped as {@link #unsupportedClaims(String, List, String)} skips it. Whether a use that reduced the product's value
+     * allows a refusal (제17조 제2항 제2호) is not read here — it is the seller's call, never a list's.
+     */
+    public static List<String> lawConflicts(String body, List<String> evidence, String asked) {
+        if (body == null || body.isBlank()) {
+            return List.of();
+        }
+        List<Clause> grounds = new ArrayList<>();
+        for (String passage : evidence == null ? List.<String>of() : evidence) {
+            if (passage != null) {
+                grounds.addAll(clausesOf(passage));
+            }
+        }
+        boolean fault = faultReported(normalize(asked == null ? "" : asked));
+        List<String> unopened = KEPT_STATES.get("미개봉");
+        Set<String> found = new LinkedHashSet<>();
+        for (Clause said : clausesOf(body)) {
+            if (WEIGHED.matcher(said.text()).find() && OFFERS.stream().noneMatch(said.text()::contains)) {
+                continue;
+            }
+            // 「개봉 여부와 관계없이」 names opening to set it aside, not to apply it (2026-11-01, fifth round: the statute's
+            // own wording for a defect was held as an unopened term put on a fault).
+            String applied = REGARDLESS.matcher(said.text()).replaceAll("·");
+            boolean opening = states(applied, OPENING);
+            if (fault && (opening || states(applied, CHANGE_OF_MIND)
+                    || KEPT_STATES.values().stream().anyMatch(forms -> states(applied, forms)))) {
+                found.add(LAW_FAULT);
+            }
+            for (String remedy : said.remedies()) {
+                if (!WITHDRAWALS.contains(remedy)) {
+                    continue;
+                }
+                List<Clause> grants = grounds.stream()
+                        .filter(g -> !g.refusal() && g.remedies().contains(remedy)).toList();
+                boolean policyLimits = !grants.isEmpty() && grants.stream().allMatch(g -> states(g.text(), unopened));
+                if (said.refusal() ? opening : states(applied, unopened) || (policyLimits && !fault)) {
+                    found.add(LAW_WITHDRAWAL);
+                }
+            }
+        }
+        return List.copyOf(found);
+    }
+
+    /**
+     * A state named to set it aside — 「개봉 여부와 관계없이」, 「사용하셨더라도」 — matched on text with whitespace removed.
+     * What it names does not limit the remedy, so the law check does not read it as a limit.
+     */
+    static final Pattern REGARDLESS = Pattern.compile(
+            "(미?개봉|뜯|포장훼손|미?사용|미?착용|단순변심|변심)(여부|유무|상태)?(와|과|에)?(관계|상관)없이"
+                    + "|(개봉|뜯|사용|착용)(을|를)?(하셨|하신|했|한|하|해)?(더라도|어도|해도|셔도|하셔도)");
+
+    static boolean faultReported(String squashed) {
+        return states(squashed, FAULTS);
+    }
+
+    /**
+     * As {@link #unsupportedClaims(String, List)}, except a remedy noun the customer named and the draft only says back —
+     * every draft sentence naming it weighs it (「반품까지 고민하게 해 드린 점」) and grants, offers or routes nothing.
+     *
+     * @param reviewText the customer's own words; null or blank passes nothing back
+     */
+    public static List<String> unsupportedClaims(String body, List<String> evidence, String reviewText) {
+        List<String> found = unsupportedClaims(body, evidence);
+        if (found.isEmpty() || reviewText == null || reviewText.isBlank()) {
+            return found;
+        }
+        List<String> named = remediesIn(normalize(reviewText));
+        List<String> sentences = new ArrayList<>();
+        for (String sentence : body.split("(?<=[.!?。])\\s+|\\n+")) {
+            sentences.add(normalize(sentence));
+        }
+        return found.stream().filter(term -> !(named.contains(term) && saidBack(term, sentences))).toList();
+    }
+
+    private static boolean saidBack(String term, List<String> sentences) {
+        boolean any = false;
+        for (String sentence : sentences) {
+            if (!remediesIn(sentence).contains(term)) {
+                continue;
+            }
+            any = true;
+            if (OFFERS.stream().anyMatch(sentence::contains)) {
+                return false;
+            }
+            boolean weighed = false;
+            for (int i = sentence.indexOf(term); i >= 0; i = sentence.indexOf(term, i + 1)) {
+                Matcher m = WEIGHED.matcher(sentence);
+                m.region(i + term.length(), sentence.length());
+                if (!m.lookingAt()) {
+                    return false;
+                }
+                weighed = true;
+            }
+            if (!weighed) {
+                return false;
+            }
+        }
+        return any;
     }
 
     /**

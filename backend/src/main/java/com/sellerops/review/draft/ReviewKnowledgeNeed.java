@@ -78,6 +78,20 @@ public enum ReviewKnowledgeNeed {
      */
     public static ReviewKnowledgeNeed of(boolean grounded, boolean hasProduct, Integer rating,
                                          boolean boundToIssue, boolean asksSomething) {
+        return of(grounded, hasProduct, rating, boundToIssue, asksSomething, false);
+    }
+
+    /**
+     * The same, told whether a ★3 review's words carry no reservation ({@code ReviewTriageRules.reservationFree}).
+     *
+     * <p><b>A ★3 that only praises owes no answer</b> (owner, 2026-10-28). The rating clause read 「★3 is below the
+     * praise threshold, so an answer was owed」 and asked the seller for a standard about 「디자인이 이뻐서 좋아요」. The
+     * drafter already read that review as praise and kept no fact for it; the two halves of one draft disagreed. A ★3
+     * whose words say nothing against the product is answered with a warmer thank-you instead, and asks for nothing.
+     * ★1–2 still owe an answer whatever the words say, as does a ★3 with a reservation.
+     */
+    public static ReviewKnowledgeNeed of(boolean grounded, boolean hasProduct, Integer rating,
+                                         boolean boundToIssue, boolean asksSomething, boolean praiseOnlyAtThree) {
         if (grounded) {
             return GROUNDED;
         }
@@ -91,7 +105,7 @@ public enum ReviewKnowledgeNeed {
         // state of the library is not a fourth — it says nothing about whether an answer was owed.
         boolean owed = asksSomething
                 || boundToIssue
-                || (rating != null && rating < PRAISE_MIN_RATING);
+                || (rating != null && rating < PRAISE_MIN_RATING && !(rating == 3 && praiseOnlyAtThree));
         return owed ? KNOWLEDGE_NEEDED : NO_EVIDENCE;
     }
 

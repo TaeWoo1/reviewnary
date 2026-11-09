@@ -10,8 +10,9 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * <b>This PC's registration with the vendor server</b> — at most one row ({@link VendorLinkService} replaces it).
- * Contract {@code docs/vendor_server_contract_v1.md} §2.
+ * <b>One organisation's registration with the vendor server</b> — at most one row per organisation
+ * ({@link VendorLinkService} replaces it; V161). Contract {@code docs/vendor_server_contract_v1.md} §2; why per
+ * organisation: {@code docs/standing/server_operation_boundary_v1.md} §1.
  *
  * <p>The install token and the install's X25519 private key are both sealed under the vault key ring
  * ({@code LocalSecretSealer}); neither exists here in plain text. The public half was registered with the server
@@ -22,6 +23,10 @@ import lombok.Setter;
 @Entity
 @Table(name = "vendor_install_link")
 public class VendorInstallLink extends BaseEntity {
+
+    /** The organisation this registration speaks for. Its install token is never used for another one. */
+    @Column(name = "org_id", nullable = false, updatable = false)
+    private UUID orgId;
 
     /** The server's id for this install; not a secret. */
     @Column(name = "install_id", nullable = false)

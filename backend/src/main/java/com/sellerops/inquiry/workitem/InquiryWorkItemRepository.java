@@ -155,4 +155,7 @@ public interface InquiryWorkItemRepository extends JpaRepository<InquiryWorkItem
     List<UUID> findInquiryIdsByOrgIdAndPhaseAndDisposition(@Param("orgId") UUID orgId,
                                                            @Param("phase") InquiryWorkItemPhase phase,
                                                            @Param("disposition") InquiryWorkItemDisposition disposition);
+
+    /** One org's work items in the given phases — the waiting drafts a recheck sweep walks (V165). */
+    List<InquiryWorkItem> findByOrgIdAndPhaseIn(UUID orgId, Collection<InquiryWorkItemPhase> phases);
 }

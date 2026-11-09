@@ -216,6 +216,94 @@ class IdentifierProductAttributionTest {
     }
 
     @Test
+    @DisplayName("a read that brings only the answered status keeps the old answer text and its own read time; a read "
+            + "that brings the text, the same or edited, moves it (2026-11-06 seventeenth review)")
+    void theAnswerTextKeepsItsOwnReadTime() {
+        listing("4444444444", "원터치 디스펜서");
+        java.util.function.BiFunction<String, String, CanonicalInquiry> readWith = (body, token) -> new CanonicalInquiry(
+                null, null, null, "언제 오나요?", "ANSWERED", Instant.parse("2026-08-20T01:00:00Z"),
+                "naver-payinq:21", 1, "배송 문의", token, null,
+                InquirySourceSubtype.NAVER_CUSTOMER_INQUIRY, ChannelProductRef.of("4444444444"),
+                body, Instant.parse("2026-08-21T02:00:00Z"));
+        java.util.function.Function<String, CanonicalInquiry> read = body -> readWith.apply(body, null);
+
+        service.ingestInquiries(org, channel, account, List.of(read.apply("내일 출고됩니다.")));
+        Inquiry monday = inquiries.findAll().get(0);
+        Instant bodyRead = monday.getAnswerBodySeenAt();
+        assertThat(bodyRead).as("the read carried the text").isNotNull().isEqualTo(monday.getLastSeenAt());
+
+        tick();
+        service.ingestInquiries(org, channel, account, List.of(read.apply(null)));
+        Inquiry friday = inquiries.findAll().get(0);
+        assertThat(friday.getAnswerBody()).as("a status-only read is not a deletion").isEqualTo("내일 출고됩니다.");
+        assertThat(friday.getAnswerBodySeenAt()).as("…and does not lend the old text its date").isEqualTo(bodyRead);
+        assertThat(friday.getLastSeenAt()).isAfter(bodyRead);
+
+        // A status-only read that changes something else takes the update path, not the unchanged one — same rule.
+        tick();
+        service.ingestInquiries(org, channel, account, List.of(readWith.apply(null, "ANSWER_COMPLETED")));
+        Inquiry changed = inquiries.findAll().get(0);
+        assertThat(changed.getInformStatus()).isEqualTo("ANSWER_COMPLETED");
+        assertThat(changed.getAnswerBody()).isEqualTo("내일 출고됩니다.");
+        assertThat(changed.getAnswerBodySeenAt()).isEqualTo(bodyRead);
+        assertThat(changed.getLastSeenAt()).isAfter(bodyRead);
+
+        tick();
+        service.ingestInquiries(org, channel, account, List.of(read.apply("오늘 출고했습니다.")));
+        Inquiry edited = inquiries.findAll().get(0);
+        assertThat(edited.getAnswerBody()).as("an answer edited on the channel replaces the stored one")
+                .isEqualTo("오늘 출고했습니다.");
+        assertThat(edited.getAnswerBodySeenAt()).isEqualTo(edited.getLastSeenAt());
+
+        Instant before = edited.getAnswerBodySeenAt();
+        tick();
+        service.ingestInquiries(org, channel, account, List.of(read.apply("오늘 출고했습니다.")));
+        Inquiry again = inquiries.findAll().get(0);
+        assertThat(again.getAnswerBodySeenAt()).as("the same text read again is a fresh look at it")
+                .isAfter(before).isEqualTo(again.getLastSeenAt());
+    }
+
+    @Test
+    @DisplayName("an answer re-dated on the channel with the same text moves the stored answer time; a read without a "
+            + "time keeps it (2026-11-06 eighteenth review)")
+    void anAnswerTimeThatAloneChangedIsTaken() {
+        listing("4444444444", "원터치 디스펜서");
+        java.util.function.Function<Instant, CanonicalInquiry> readAt = at -> new CanonicalInquiry(
+                null, null, null, "언제 오나요?", "ANSWERED", Instant.parse("2026-08-20T01:00:00Z"),
+                "naver-payinq:22", 1, "배송 문의", null, null,
+                InquirySourceSubtype.NAVER_CUSTOMER_INQUIRY, ChannelProductRef.of("4444444444"),
+                "내일 출고됩니다.", at);
+        Instant first = Instant.parse("2026-08-21T02:00:00Z");
+        Instant redated = Instant.parse("2026-08-23T05:30:00Z");
+
+        service.ingestInquiries(org, channel, account, List.of(readAt.apply(first)));
+        var same = service.ingestInquiries(org, channel, account, List.of(readAt.apply(first)));
+        assertThat(same.skipped()).as("the same time read again is still nothing new").isEqualTo(1);
+
+        var moved = service.ingestInquiries(org, channel, account, List.of(readAt.apply(redated)));
+        assertThat(moved.success()).as("a new time alone is a change").isEqualTo(1);
+        assertThat(inquiries.findAll().get(0).getAnsweredAt()).isEqualTo(redated);
+
+        service.ingestInquiries(org, channel, account, List.of(readAt.apply(null)));
+        assertThat(inquiries.findAll().get(0).getAnsweredAt()).as("no time from the channel is not a cleared time")
+                .isEqualTo(redated);
+
+        // Finer than the column keeps is the same time, not a change on every read.
+        service.ingestInquiries(org, channel, account, List.of(readAt.apply(redated.plusNanos(300))));
+        var finer = service.ingestInquiries(org, channel, account, List.of(readAt.apply(redated.plusNanos(300))));
+        assertThat(finer.skipped()).isEqualTo(1);
+    }
+
+    /** Two reads in one test must not land on the same clock tick, or "kept its own time" proves nothing. */
+    private static void tick() {
+        try {
+            Thread.sleep(5);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    @Test
     @DisplayName("re-collecting the same page changes nothing and still records that we looked")
     void reCollectionIsIdempotent() {
         listing("5555555555", "판도리 조립형");

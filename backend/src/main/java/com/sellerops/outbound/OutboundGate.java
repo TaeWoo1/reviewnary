@@ -48,6 +48,11 @@ public final class OutboundGate {
          * cannot point this anywhere else.
          */
         VENDOR,
+        /**
+         * The agent runtime the reply agent's runs start on (2026-10-28, {@code docs/standing/reply_agent_v1.md}). On a
+         * seller's PC it runs on the same machine: loopback only, no outside host.
+         */
+        AGENT_RUNTIME,
         /** Channels outside the seller-visible set (NAVER/Coupang/Cafe24) — refused on a seller's PC. */
         ESM,
         ELEVENST,
@@ -111,7 +116,7 @@ public final class OutboundGate {
             case LLM -> LLM_HOSTS.contains(host);
             case PRODUCT_IMAGE -> true;
             case VENDOR -> VENDOR_HOSTS.contains(host);
-            case ESM, ELEVENST, SSG -> false;
+            case AGENT_RUNTIME, ESM, ELEVENST, SSG -> false;
         };
     }
 

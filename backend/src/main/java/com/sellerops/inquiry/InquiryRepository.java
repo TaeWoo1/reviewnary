@@ -6,8 +6,10 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface InquiryRepository extends JpaRepository<Inquiry, UUID> {
 
@@ -42,6 +44,23 @@ public interface InquiryRepository extends JpaRepository<Inquiry, UUID> {
             + ACTIVE + "order by q.id asc")
     List<Inquiry> findActiveUnansweredForAccount(@Param("orgId") UUID orgId,
                                                  @Param("sellerAccountId") UUID sellerAccountId);
+
+    /**
+     * One more recheck failure that is this inquiry's own (V185, 2026-11-08, open-inquiry recheck). A single statement, so
+     * the count is never read, raised in memory and written back over a newer one. Returns the rows changed (0 or 1).
+     */
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update Inquiry q set q.answerRecheckFailures = q.answerRecheckFailures + 1, q.answerRecheckFailedAt = :at "
+            + "where q.id = :id")
+    int countRecheckFailure(@Param("id") UUID id, @Param("at") Instant at);
+
+    /** A successful look: no failures in a row any more, and so no wait. Touches only a row that had some. */
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update Inquiry q set q.answerRecheckFailures = 0, q.answerRecheckFailedAt = null "
+            + "where q.id = :id and q.answerRecheckFailures > 0")
+    int clearRecheckFailures(@Param("id") UUID id);
 
     /**
      * The rows one connection has already been PROVEN to be source thread replies — the exact,

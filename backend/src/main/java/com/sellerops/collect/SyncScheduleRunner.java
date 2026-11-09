@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -42,6 +43,10 @@ import org.springframework.stereotype.Service;
  * email/SMS/push delivery in this slice. Spam guards: DEGRADED alerts fire only
  * at the threshold crossing, and at most one unacknowledged alert of a type
  * exists per seller account.
+ *
+ * <p>After each executed run: every {@link ScheduledCollectionFollowUp} bean, in order, with the finished job (2026-11-08
+ * — the open-inquiry recheck hangs here, off unless its own flag is set). A follow-up that throws is logged by type and
+ * skipped.
  */
 @Service
 public class SyncScheduleRunner {
@@ -67,6 +72,8 @@ public class SyncScheduleRunner {
      * one owner per source, so no double collection. Null in the older test wiring (nothing is owned).
      */
     private final ResponsibilitySourceOwnership ownership;
+    /** What runs after each executed scheduled run. Empty in the older test wiring. */
+    private final List<ScheduledCollectionFollowUp> followUps;
 
     public SyncScheduleRunner(SyncScheduleClaimer claimer, SyncRunExecutor executor,
                               SyncScheduleRepository schedules, SyncJobRepository syncJobs,
@@ -75,11 +82,29 @@ public class SyncScheduleRunner {
         this(claimer, executor, schedules, syncJobs, connectionStatus, alerts, null);
     }
 
-    @Autowired
     public SyncScheduleRunner(SyncScheduleClaimer claimer, SyncRunExecutor executor,
                               SyncScheduleRepository schedules, SyncJobRepository syncJobs,
                               ChannelConnectionStatusRepository connectionStatus,
                               ConnectorAlertRepository alerts, ResponsibilitySourceOwnership ownership) {
+        this(claimer, executor, schedules, syncJobs, connectionStatus, alerts, ownership, List.of());
+    }
+
+    @Autowired
+    public SyncScheduleRunner(SyncScheduleClaimer claimer, SyncRunExecutor executor,
+                              SyncScheduleRepository schedules, SyncJobRepository syncJobs,
+                              ChannelConnectionStatusRepository connectionStatus,
+                              ConnectorAlertRepository alerts, ResponsibilitySourceOwnership ownership,
+                              ObjectProvider<ScheduledCollectionFollowUp> followUps) {
+        this(claimer, executor, schedules, syncJobs, connectionStatus, alerts, ownership,
+                followUps.orderedStream().toList());
+    }
+
+    public SyncScheduleRunner(SyncScheduleClaimer claimer, SyncRunExecutor executor,
+                              SyncScheduleRepository schedules, SyncJobRepository syncJobs,
+                              ChannelConnectionStatusRepository connectionStatus,
+                              ConnectorAlertRepository alerts, ResponsibilitySourceOwnership ownership,
+                              List<ScheduledCollectionFollowUp> followUps) {
+        this.followUps = List.copyOf(followUps);
         this.claimer = claimer;
         this.executor = executor;
         this.schedules = schedules;
@@ -138,8 +163,21 @@ public class SyncScheduleRunner {
 
         if (job != null) {
             escalate(claimed, job);
+            followUp(job);
         }
         return job;
+    }
+
+    private void followUp(SyncJob job) {
+        for (ScheduledCollectionFollowUp f : followUps) {
+            try {
+                f.afterScheduledCollection(job);
+            } catch (RuntimeException e) {
+                // One follow-up's trouble must not stop the batch or the other follow-ups. Type only: no payload.
+                log.warn("Scheduled follow-up {} failed for job {}: {}", f.getClass().getSimpleName(), job.getId(),
+                        e.getClass().getSimpleName());
+            }
+        }
     }
 
     /** Outcome-aware next run: cadence on success, rate-limit delay, or bounded backoff. */

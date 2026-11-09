@@ -26,7 +26,11 @@ import lombok.Setter;
 @Getter
 @Setter
 @Entity
-@Table(name = "inquiry_draft_evidence")
+// The production slot index (V67 uq_inquiry_draft_evidence_slot), declared here too so the H2 schema the tests build
+// refuses a second row in one slot as PostgreSQL does (2026-11-02: without it a test saw two rows where production
+// returned HTTP 500). ddl-auto is none outside tests, so this changes no deployed schema.
+@Table(name = "inquiry_draft_evidence", uniqueConstraints = @jakarta.persistence.UniqueConstraint(
+        name = "uq_inquiry_draft_evidence_slot", columnNames = {"work_item_id", "draft_version", "ordinal"}))
 public class InquiryDraftEvidence {
 
     @Id
@@ -103,6 +107,14 @@ public class InquiryDraftEvidence {
     public static final String LABEL_SELLER_GUIDANCE = "판매자 지침";
 
     /**
+     * 판매자가 판매자센터에서 확인해 이 문의에 남긴 결과(2026-11-02) — 이 문의의 근거일 뿐, 회사 지식도 채널이 확인한 사실도 아니다.
+     * {@code source_id}가 그 기록을 가리키고, locator에 결과 종류가 남는다.
+     */
+    public static final String KIND_SELLER_CHECK = "SELLER_CHECK";
+
+    public static final String LABEL_SELLER_CHECK = "판매자 확인";
+
+    /**
      * 판매 중인 다른 상품 — a statement in the seller's own catalogue about ANOTHER product, cited for a question about
      * what the seller sells. Its source is that product; it is never evidence about the product the inquiry is on.
      */
@@ -163,6 +175,9 @@ public class InquiryDraftEvidence {
         }
         if (KIND_CATALOGUE_PRODUCT.equals(kind)) {
             return LABEL_CATALOGUE_PRODUCT;
+        }
+        if (KIND_SELLER_CHECK.equals(kind)) {
+            return LABEL_SELLER_CHECK;
         }
         KnowledgeScope scope = scopeOf(kind);
         return scope == null ? kind : scope.labelKo();

@@ -55,9 +55,30 @@ class InquiryRowsServiceTest {
     void setUp() {
         service = new InquiryRowsService(inquiries, workItems, channels, products,
                 com.sellerops.identity.ExecutableIdentityResolver.unresolved(), CLOCK);
-        org = UUID.randomUUID();
+        org = newOrg();
         naver = channels.findByCode("NAVER").map(Channel::getId).orElseGet(() -> channel("NAVER", "네이버"));
         cafe24 = channels.findByCode("CAFE24").map(Channel::getId).orElseGet(() -> channel("CAFE24", "카페24"));
+    }
+
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final java.util.Map<String, UUID> accounts = new java.util.HashMap<>();
+
+    /** A real organisation (2026-11-05): PostgreSQL's foreign keys refuse rows for one that does not exist. */
+    private UUID newOrg() {
+        UUID id = UUID.randomUUID();
+        jdbc.update("insert into organizations (id, name, created_at, updated_at) values (?, '목록 QA', current_timestamp, "
+                + "current_timestamp)", id);
+        return id;
+    }
+
+    /** One real seller account per organisation and channel, as the product has. */
+    private UUID account(UUID orgId, UUID channelId) {
+        return accounts.computeIfAbsent(orgId + ":" + channelId, k -> {
+            UUID id = UUID.randomUUID();
+            jdbc.update("insert into seller_accounts (id, org_id, channel_id, connection_status, is_file_upload, created_at, "
+                    + "updated_at) values (?, ?, ?, 'PENDING', false, current_timestamp, current_timestamp)", id, orgId, channelId);
+            return id;
+        });
     }
 
     private UUID channel(String code, String name) {
@@ -89,7 +110,7 @@ class InquiryRowsServiceTest {
         InquiryWorkItem wi = new InquiryWorkItem();
         wi.setOrgId(org);
         wi.setInquiryId(inquiryId);
-        wi.setSellerAccountId(UUID.randomUUID());
+        wi.setSellerAccountId(account(org, channelId));
         wi.setChannelId(channelId);
         wi.setPhase(phase);
         return workItems.save(wi).getId();
@@ -256,7 +277,7 @@ class InquiryRowsServiceTest {
         assertThat(hit.totalCount()).isEqualTo(1);
         // Still org-scoped: another org's product with the same name narrows nothing here.
         com.sellerops.product.Product other = new com.sellerops.product.Product();
-        other.setOrgId(UUID.randomUUID());
+        other.setOrgId(newOrg());
         other.setName("몰딩 전용");
         other.setStatus("ACTIVE");
         products.save(other);

@@ -47,6 +47,12 @@ public class KnowledgeEmbeddingService {
         this.generator = new KnowledgeEmbeddingGenerator(transport, properties);
     }
 
+    /** The AI meter (2026-10-31, {@code docs/standing/reply_agent_v1.md} §8 ②). Optional: a context without one is unmetered. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setQuota(com.sellerops.agent.quota.AgentQuotaService quota) {
+        generator.meter.use(quota);
+    }
+
     /**
      * Whether this organisation may use semantic retrieval at all.
      *
@@ -75,7 +81,7 @@ public class KnowledgeEmbeddingService {
         }
         Map<String, float[]> byHash = new HashMap<>();
         for (KnowledgeEmbedding row : repository.findAllByOrgIdAndModelAndDimensionsAndContentSha256In(
-                orgId, properties.model(), properties.dimensions(),
+                orgId, properties.storedModel(), properties.dimensions(),
                 new LinkedHashSet<>(hashOf.values()))) {
             byHash.put(row.getContentSha256(), Vectors.decode(row.getVector()));
         }
@@ -100,7 +106,7 @@ public class KnowledgeEmbeddingService {
         }
         Map<String, float[]> byHash = new HashMap<>();
         for (KnowledgeEmbedding row : repository.findAllByOrgIdAndModelAndDimensionsAndContentSha256In(
-                orgId, properties.model(), properties.dimensions(),
+                orgId, properties.storedModel(), properties.dimensions(),
                 new LinkedHashSet<>(hashOf.values()))) {
             byHash.put(row.getContentSha256(), Vectors.decode(row.getVector()));
         }
@@ -128,7 +134,7 @@ public class KnowledgeEmbeddingService {
                 KnowledgeEmbedding row = new KnowledgeEmbedding();
                 row.setOrgId(orgId);
                 row.setContentSha256(hash);
-                row.setModel(properties.model());
+                row.setModel(properties.storedModel());
                 row.setDimensions(properties.dimensions());
                 row.setVector(Vectors.encode(vectors.get(j)));
                 rows.add(row);
@@ -158,7 +164,7 @@ public class KnowledgeEmbeddingService {
         if (!enabledFor(orgId) || question == null || question.isBlank()) {
             return null;
         }
-        String key = Vectors.sha256(orgId + "\n" + properties.model() + "\n"
+        String key = Vectors.sha256(orgId + "\n" + properties.storedModel() + "\n"
                 + properties.dimensions() + "\n" + question);
         return questions.get(key, () -> {
             List<float[]> vectors = generator.embed(orgId,

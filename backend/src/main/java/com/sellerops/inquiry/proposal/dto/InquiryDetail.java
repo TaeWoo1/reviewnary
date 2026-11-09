@@ -91,5 +91,16 @@ public record InquiryDetail(
          * {@code status} stays {@code UNANSWERED} until a verified read-back or the next collection —
          * precisely the window in which a seller wants to ask whether their answer went out.
          */
-        AnswerDeliveryView delivery) {
+        AnswerDeliveryView delivery,
+        /**
+         * The answer as the channel shows it, read by a collection — never our draft (2026-11-06 sixteenth review). Null
+         * when no collection carried an answer body; see {@link ChannelAnswerView}.
+         */
+        ChannelAnswerView channelAnswer,
+        /**
+         * Whether a collection looked for a shop answer left as a Cafe24 board comment, and what it found (V184) — shown
+         * before approval and registration, never enforced. Null where the question does not arise; see
+         * {@link CommentCheckView}.
+         */
+        CommentCheckView commentCheck) {
 }

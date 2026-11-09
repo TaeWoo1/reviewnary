@@ -93,8 +93,8 @@ class VendorRelayWireIT {
                 System.getenv("VENDOR_E2E_TOKEN"));
         VendorLinkService link = new VendorLinkService(links,
                 new LocalSecretSealer(new VaultKeyRing(KEY, "test-key-1", "")), wire, true, Clock.systemUTC());
-        link.start();
-        link.poll();
+        link.start(org);
+        link.poll(org);
         VendorReplyTaskService replyTasks = new VendorReplyTaskService(link, bindings, refs, taskCopies, reviews, drafts,
                 approvals, outcomes, triageRows, Clock.systemUTC());
         replyTasks.setAfter(r -> {});

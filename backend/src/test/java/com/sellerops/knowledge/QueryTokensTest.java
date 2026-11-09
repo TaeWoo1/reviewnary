@@ -36,6 +36,17 @@ class QueryTokensTest {
     }
 
     @Test
+    @DisplayName("the words that list a topic (종류 · 목록 · 선택) are META; 옵션 and 종류별 stay topic words")
+    void listingWordsAreMeta() {
+        for (String w : new String[] {"종류", "종류는", "종류가", "목록", "목록을", "리스트", "선택", "선택한", "선택지"}) {
+            assertThat(QueryTokens.classify(w)).as(w).isEqualTo(QueryTokens.Kind.META);
+        }
+        for (String w : new String[] {"옵션", "옵션은", "종류별", "선택사항없음", "색상"}) {
+            assertThat(QueryTokens.classify(w)).as(w).isEqualTo(QueryTokens.Kind.TOPIC);
+        }
+    }
+
+    @Test
     @DisplayName("a topic word that happens to start like a stem or a meta noun is still a topic word")
     void nounsAreNotEatenByPrefix() {
         for (String w : new String[] {"확인서", "설명서", "반품", "조건", "조건이", "배송", "기간", "가능성", "필요성",

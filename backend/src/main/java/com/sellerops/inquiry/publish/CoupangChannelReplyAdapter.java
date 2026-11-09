@@ -46,15 +46,9 @@ public class CoupangChannelReplyAdapter implements ChannelReplyAdapter {
      */
     static final String ONLINE_INQUIRY_PREFIX = "onlineInquiry:";
 
-    /**
-     * Coupang's documented answer-length ceiling.
-     *
-     * <p>Bounded here rather than at the transport so an over-long draft is a PERMANENT failure the
-     * seller can see and edit, instead of a rejected write they have to interpret. The value is from
-     * the public API reference and has never been exercised live; a real rejection carrying a
-     * different limit is the evidence that would correct it.
-     */
-    static final int CONTENT_MAX_BYTES = 1000;
+    // No length ceiling here (2026-11-02, fourth review). The 1000 bytes this class enforced was not Coupang's: the
+    // 상품별 고객문의 answer contract states no length, and the 1,000자 of 고객센터 문의답변 belongs to another resource.
+    // A rejection the platform makes is its own answer — PERMANENT, the draft kept (docs/FINDINGS.md B86 · B90).
 
     private final CoupangInquiryReplyClient replyClient;
     private final CredentialVault vault;
@@ -92,10 +86,6 @@ public class CoupangChannelReplyAdapter implements ChannelReplyAdapter {
         if (content == null || content.isBlank()) {
             return ReplyPublishResult.retryableFailure();
         }
-        if (CoupangInquiryReplyClient.utf8Bytes(content) > CONTENT_MAX_BYTES) {
-            return ReplyPublishResult.permanentFailure(null); // never sendable as written
-        }
-
         DecryptedCredential credential = vault.open(command.orgId(), command.sellerAccountId());
         String accessKey = credential.secrets().get("access_key");
         String secretKey = credential.secrets().get("secret_key");

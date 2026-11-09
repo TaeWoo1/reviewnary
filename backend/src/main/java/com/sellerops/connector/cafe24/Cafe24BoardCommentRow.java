@@ -16,9 +16,19 @@ package com.sellerops.connector.cafe24;
  * <p>{@code createdDate} is the source's own string; parsing is
  * {@link Cafe24BoardArticleMapper#parseOffsetInstant} like every other Cafe24 timestamp — a
  * timezone-less value stays unknown rather than being assumed KST.
+ *
+ * <p>{@code authorKnown} preserves whether the private wire row carried a nonblank author identity,
+ * without retaining it. A known non-shop author and an unknown author cannot prove the same thing
+ * when deciding whether a shop comment is absent.
  */
 public record Cafe24BoardCommentRow(Long commentNo, Long articleNo, String createdDate,
-                                    boolean authoredByMall, String contentHash) {
+                                    boolean authoredByMall, String contentHash, boolean authorKnown) {
+
+    /** Legacy projections prove a shop author only; false alone cannot prove a customer author. */
+    public Cafe24BoardCommentRow(Long commentNo, Long articleNo, String createdDate,
+                                boolean authoredByMall, String contentHash) {
+        this(commentNo, articleNo, createdDate, authoredByMall, contentHash, authoredByMall);
+    }
 
     /** The pre-hash shape, kept for every reader that never needed a comparison value. */
     public Cafe24BoardCommentRow(Long commentNo, Long articleNo, String createdDate, boolean authoredByMall) {

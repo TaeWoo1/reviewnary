@@ -24,6 +24,24 @@ public interface InquiryDecisionModel {
                                            List<EvidenceCandidate> evidence, List<PrecedentCandidate> precedents);
 
     /**
+     * The same, told when the inquiry arrived ({@link InquiryMoment}, 2026-11-02) — a day of the week is not a value to
+     * ask the customer for. A model that cannot use it judges without it.
+     */
+    default Answer<Map<String, NeedVerdict>> judge(UUID orgId, String question, List<InquiryNeed> needs,
+                                                   List<EvidenceCandidate> evidence, List<PrecedentCandidate> precedents,
+                                                   String received) {
+        return judge(orgId, question, needs, evidence, precedents);
+    }
+
+    /**
+     * The same model, its calls charged to {@code actor} — the seller who pressed, or a run nobody started. A model that
+     * meters nothing returns itself.
+     */
+    default InquiryDecisionModel chargedTo(com.sellerops.agent.quota.AgentUsageActor actor) {
+        return this;
+    }
+
+    /**
      * A value (or null for no opinion), what getting it cost, and — when there is no value — why, as a closed word
      * ({@code HTTP_<status>}, {@code TRANSPORT}, {@code REFUSAL}, {@code TRUNCATED}, {@code EMPTY}, {@code UNPARSEABLE},
      * {@code VERDICT_SET}). Returned, never kept on a shared object.

@@ -27,15 +27,38 @@ import java.util.Map;
  */
 public class ApiTriageClassifier implements ReviewTriageClassifier {
 
-    /** Which wire format to speak. Nothing else differs between them. */
+    /**
+     * Which wire format to speak. Nothing else differs between them.
+     *
+     * <p>{@code RUNYOUR} (2026-11-06) is the Runyour AI API router: it speaks the OpenAI Chat Completions format and
+     * forwards to the model named in the request ({@code anthropic/claude-sonnet-5-5}, {@code openai/gpt-6.1-sol},
+     * {@code gemini/gemini-3.8-flash} …), so it takes the OpenAI branch everywhere below. The vendor name is part of
+     * {@link #version()}, so a Runyour run is never filed under a direct-vendor candidate. Most routed models reject a
+     * pinned temperature with a 400: run it with {@code LLM_TRIAGE_OMIT_TEMPERATURE=true}. Eval harness only: it is
+     * not on {@code OutboundGate}'s LLM allow-list (so not from a seller's PC), and the server-side pilot refuses to
+     * start on it ({@code AiTriagePilotProperties.refuseAnEvalOnlyVendor}). Tests use a fake transport, so whether a
+     * routed model accepts {@code response_format} and the token cap is proven only by a live one-row run.
+     */
     public enum Vendor {
         ANTHROPIC(URI.create("https://api.anthropic.com/v1/messages")),
-        OPENAI(URI.create("https://api.openai.com/v1/chat/completions"));
+        OPENAI(URI.create("https://api.openai.com/v1/chat/completions")),
+        RUNYOUR(URI.create("https://api.runyour.ai/v1/chat/completions"));
 
         private final URI endpoint;
 
         Vendor(URI endpoint) {
             this.endpoint = endpoint;
+        }
+
+        /**
+         * True for a vendor that may classify the evaluation corpus and nothing else (2026-11-07). Runyour is a third-party
+         * relay in front of the model vendors: a seller's review sent through it reaches one more company than the
+         * seller agreed to. {@link ReviewTriageChannelGate#forApi} — the only production way to build this classifier
+         * ({@code ClassifierBoundaryTest}) — refuses it, on the web server as well as on a seller's PC, where
+         * {@code OutboundGate} already would.
+         */
+        public boolean evalOnly() {
+            return this == RUNYOUR;
         }
     }
 
@@ -171,7 +194,10 @@ public class ApiTriageClassifier implements ReviewTriageClassifier {
             root.put("max_tokens", tuning.maxOutputTokens());
             root.put("system", TriagePrompt.SYSTEM);
         } else {
-            root.put("max_completion_tokens", tuning.maxOutputTokens());
+            // Runyour's published call example names the output cap `max_tokens` and never mentions
+            // `max_completion_tokens` (owner, 2026-11-07), so the relay gets the name its own docs use. OpenAI keeps
+            // `max_completion_tokens`. This sets which field is sent; whether the relay applies it is not shown here.
+            root.put(vendor == Vendor.RUNYOUR ? "max_tokens" : "max_completion_tokens", tuning.maxOutputTokens());
             root.putObject("response_format").put("type", "json_object");
             if (tuning.reasoningEffort() != null) {
                 root.put("reasoning_effort", tuning.reasoningEffort());

@@ -164,6 +164,97 @@ public class KnowledgeCandidateService {
         return filed;
     }
 
+    /** A proposal built from the seller's own past answers on one operating topic (2026-11-01 tenth review). */
+    public static final String ORIGIN_PAST_ANSWERS = "PAST_ANSWERS";
+
+    /** The topics a proposal is drafted for from past answers: 증빙 발급 — where the real inquiries had no rule at all. */
+    static final List<com.sellerops.knowledge.KnowledgeTopic> PAST_ANSWER_TOPICS = List.of(
+            com.sellerops.knowledge.KnowledgeTopic.CASH_RECEIPT, com.sellerops.knowledge.KnowledgeTopic.TAX_INVOICE);
+
+    static final int MAX_PAST_ANSWER_SENTENCES = 8;
+
+    /** A sentence about one order, one day or one customer — that answer's circumstance, never a rule. */
+    private static final java.util.regex.Pattern ONE_CASE = java.util.regex.Pattern.compile(
+            "\\d|오늘|내일|어제|방금|금일|주문하신|고객님의? 주문|말씀하신|요청하신");
+    /** A greeting or a thank-you — how the answer was said, not what the store does. */
+    private static final java.util.regex.Pattern COURTESY = java.util.regex.Pattern.compile(
+            "감사합니다|감사드립니다|안녕하세요|좋은 하루|행복한 하루|문의 주셔서|이용해 주셔서");
+
+    /**
+     * Draft a guidance for each 증빙 topic out of what this seller has actually answered (2026-11-01 tenth review: 「기존
+     * 답글로 초안을 만들고 판매자는 사실을 확인한다」 · 「과거 답변은 기존 응대의 증거다. 오래된 답변을 곧바로 현재 정책으로
+     * 확정해서는 안 된다」).
+     *
+     * <p>Read from Answer Memory only, which holds nothing but the seller's own acts (an approved or verified reply, a
+     * collected channel answer), so an answer whose author is not proven never gets here. The sentences are the
+     * seller's, verbatim and masked — nothing is paraphrased, because a paraphrase of a policy is a different policy —
+     * and a sentence about one order or one day is left out. The proposal opens with a blank asking whether this is
+     * still how they do it, and two more for what past answers cannot settle: the legal basis for issuing, and how and
+     * when a customer asks. Blanks keep it out of use until the seller fills them ({@link #accept} refuses one). Calls no
+     * model and reaches no channel.
+     *
+     * @return how many proposals were newly filed
+     */
+    @Transactional
+    public int proposeFromPastAnswers(UUID orgId) {
+        List<AnswerMemory> all = memories.findAllByOrgId(orgId);
+        int filed = 0;
+        for (com.sellerops.knowledge.KnowledgeTopic topic : PAST_ANSWER_TOPICS) {
+            Map<String, Repeat> sentences = new LinkedHashMap<>();
+            int answers = 0;
+            for (AnswerMemory memory : all) {
+                if (!com.sellerops.knowledge.KnowledgeTopic.of(memory.getAnswerBody()).contains(topic)) {
+                    continue;
+                }
+                answers++;
+                for (String sentence : sentencesOf(memory.getAnswerBody())) {
+                    if (ONE_CASE.matcher(sentence).find() || COURTESY.matcher(sentence).find()) {
+                        continue;
+                    }
+                    String masked = com.sellerops.common.PiiMasker.maskText(sentence);
+                    sentences.computeIfAbsent(KnowledgeText.normalize(masked), k -> new Repeat(masked)).count++;
+                }
+            }
+            if (sentences.isEmpty()) {
+                continue;
+            }
+            List<Repeat> ranked = new ArrayList<>(sentences.values());
+            ranked.sort((a, b) -> Integer.compare(b.count, a.count));
+            StringBuilder body = new StringBuilder(BLANK_OPEN)
+                    .append(" 지난 답변에서 쓰신 문장이에요. 지금도 이렇게 안내하시는지 확인하고, 바뀐 부분은 고쳐 주세요.】\n");
+            for (Repeat r : ranked.subList(0, Math.min(MAX_PAST_ANSWER_SENTENCES, ranked.size()))) {
+                body.append("- ").append(r.sentence).append(r.count > 1 ? " (" + r.count + "번)" : "").append('\n');
+            }
+            body.append('\n').append(BLANK_OPEN)
+                    .append(" 발급 기준 — 사업자 유형 · 거래 조건에 따른 법정 기준은 국세청 안내로 확인해 적어 주세요.】\n")
+                    .append(BLANK_OPEN).append(" 신청 방법과 시점 — 고객이 어디서 · 언제까지 신청하고, 언제 발급되는지.】");
+            String key = dedupeKey("ORG", null, ORIGIN_PAST_ANSWERS + "|" + topic.name());
+            if (candidates.existsByOrgIdAndDedupeKeyAndState(orgId, key, STATE_ACCEPTED)) {
+                continue;
+            }
+            java.util.Optional<KnowledgeCandidate> openRow = candidates.findByOrgIdAndDedupeKeyAndState(orgId, key,
+                    STATE_OPEN);
+            KnowledgeCandidate row = openRow.orElseGet(() -> {
+                KnowledgeCandidate fresh = new KnowledgeCandidate();
+                fresh.setOrgId(orgId);
+                fresh.setScope("ORG");
+                fresh.setOrigin(ORIGIN_PAST_ANSWERS);
+                fresh.setDedupeKey(key);
+                return fresh;
+            });
+            row.setSubject(topic.labelKo() + " 안내");
+            row.setContent(body.toString());
+            row.setEvidenceCount(answers);
+            try {
+                candidates.save(row);
+                filed += openRow.isPresent() ? 0 : 1;
+            } catch (DataIntegrityViolationException race) {
+                // Filed by a concurrent run — the same proposal.
+            }
+        }
+        return filed;
+    }
+
     /**
      * Whether this org has already ANSWERED this exact ask.
      *
@@ -196,6 +287,35 @@ public class KnowledgeCandidateService {
      * @return the open candidate, or <b>null</b> when this exact ask has already been accepted —
      *         the screen then shows the gap with no inbox row behind it, which is the truth
      */
+    /**
+     * <b>Close an ask the drafter no longer makes</b> (2026-10-28 evaluation). A gap was filed by one draft and closed
+     * only by the seller — accept, teach or dismiss — so an ask an older rule raised (a ★5 compliment asked for a
+     * standard before 2026-09-06), or one a later draft of the same review answered from the library, stayed open and
+     * was counted on every review of its product. When the same review is drafted again and no longer asks, its own
+     * open ask is dismissed, by identity: the same scope, product and question. Only an ask a draft filed; a proposal
+     * the seller's own repeated answers made is not the drafter's to withdraw. {@code DISMISSED}, because the same
+     * ask may be noticed again if a later draft needs it.
+     *
+     * @return whether an open ask was closed
+     */
+    @Transactional
+    public boolean withdrawGap(UUID orgId, String scope, UUID productId, String question) {
+        String key = dedupeKey(scope, productId, question);
+        return candidates.findByOrgIdAndDedupeKeyAndState(orgId, key, STATE_OPEN)
+                .filter(row -> ORIGIN_DRAFT_GAP.equals(row.getOrigin()))
+                .map(row -> {
+                    row.setState(STATE_DISMISSED);
+                    row.setDecidedAt(Instant.now());
+                    row.setDecidedBy(WITHDRAWN_BY_DRAFT);
+                    candidates.save(row);
+                    return true;
+                })
+                .orElse(false);
+    }
+
+    /** Who closed an ask the drafter withdrew — not a person, and said so. */
+    public static final String WITHDRAWN_BY_DRAFT = "SYSTEM:DRAFT_NO_LONGER_ASKS";
+
     @Transactional
     public KnowledgeCandidate noteGap(UUID orgId, String scope, UUID productId, String subject,
                                       String question) {

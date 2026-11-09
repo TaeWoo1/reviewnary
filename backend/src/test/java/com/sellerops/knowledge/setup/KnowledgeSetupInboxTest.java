@@ -99,6 +99,40 @@ class KnowledgeSetupInboxTest {
         return variantRows.save(v).getId();
     }
 
+    private void answered(String body) {
+        com.sellerops.knowledge.memory.AnswerMemory m = new com.sellerops.knowledge.memory.AnswerMemory();
+        m.setOrgId(org);
+        m.setOriginRef("inquiry-approved:" + UUID.randomUUID());
+        m.setStrength(com.sellerops.knowledge.memory.AnswerMemoryStrength.USER_APPROVED);
+        m.setAnswerTitle("증빙 문의");
+        m.setAnswerBody(body);
+        m.setTopicSignature("증빙");
+        m.setNormalized(body);
+        m.setOriginInquiryId(UUID.randomUUID());
+        memories.save(m);
+    }
+
+    @Test
+    @DisplayName("past answers about 현금영수증 become one proposal in the seller's own words, with what they cannot settle "
+            + "left blank — never a rule until filled (2026-11-01 tenth review)")
+    void pastReceiptAnswersBecomeAProposalToConfirm() {
+        answered("현금영수증은 결제하실 때 신청하실 수 있습니다. 오늘 주문하신 건은 바로 발급해 드렸어요.");
+        answered("현금영수증은 결제하실 때 신청하실 수 있습니다. 감사합니다 고객님 좋은 하루 보내세요.");
+        answered("배송은 평일 기준 이틀 정도 걸리는 편이며 지역마다 조금 다를 수 있습니다.");
+
+        assertThat(candidates.proposeFromPastAnswers(org)).isEqualTo(1);
+        assertThat(candidates.proposeFromPastAnswers(org)).as("a second run files nothing twice").isZero();
+
+        var proposal = candidates.open(org).stream().filter(c -> "현금영수증 안내".equals(c.subject())).findFirst()
+                .orElseThrow();
+        assertThat(proposal.content()).contains("- 현금영수증은 결제하실 때 신청하실 수 있습니다. (2번)")
+                .as("one order's circumstance is not a rule").doesNotContain("오늘 주문하신")
+                .doesNotContain("배송은").doesNotContain("좋은 하루").contains("【확인:").contains("국세청");
+        assertThatThrownBy(() -> candidates.accept(org, proposal.id(), proposal.subject(), proposal.content(), null,
+                com.sellerops.knowledge.org.OrgKnowledgeType.CASH_RECEIPT, null, "판매자"))
+                .as("blanks keep it out of use").hasMessageContaining("【확인: …】");
+    }
+
     @Test
     @DisplayName("an answered ask is REPORTED as answered, not merely not-refiled")
     void anAnsweredAskSaysSo() {

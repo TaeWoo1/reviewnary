@@ -111,7 +111,7 @@ public record ReviewDecisionContextView(
      * down about this», which is a question about the library; what a DRAFT actually stood on is the
      * draft's own citations, read back from the source at display time.
      *
-     * <p>{@code openAsks} is how many 확인 필요 rows are waiting for this product — the things
+     * <p>{@code openAsks} is how many 확인 필요 rows are waiting about THIS review (its own words or a repeated problem it is evidence for, 2026-10-28) — the things
      * reviewnary has already asked and nobody has answered. It is the reason a draft may say less
      * than the seller expects, and it is one click from being fixed.
      */

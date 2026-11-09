@@ -82,6 +82,14 @@ public class Cafe24OnboardingService {
     private volatile BiConsumer<UUID, UUID> onConnected = (org, account) -> { };
 
     /** Register the post-connect hook (see {@link #onConnected}). */
+    /** Which channels' official connections are open (proposal §19.4 T1); null in a bare test. */
+    private com.sellerops.channel.activation.ChannelActivation activation;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setActivation(com.sellerops.channel.activation.ChannelActivation activation) {
+        this.activation = activation;
+    }
+
     public void onConnected(BiConsumer<UUID, UUID> hook) {
         this.onConnected = hook == null ? (org, account) -> { } : hook;
     }
@@ -139,6 +147,10 @@ public class Cafe24OnboardingService {
     private StartResult start(UUID orgId, UUID userId, String mallId, String requestedScopes) {
         if (!Cafe24OAuthClient.isValidMallId(mallId)) {
             throw ApiException.badRequest("카페24 mall_id 형식이 올바르지 않습니다.");
+        }
+        if (activation != null) {
+            // Before the seller is sent to Cafe24's consent page: a connection that could not be used is not offered.
+            activation.require(orgId, Cafe24ApiConnector.CHANNEL_CODE);
         }
         Channel channel = channels.findByCode(Cafe24ApiConnector.CHANNEL_CODE)
                 .orElseThrow(() -> ApiException.notFound("채널을 찾을 수 없습니다."));

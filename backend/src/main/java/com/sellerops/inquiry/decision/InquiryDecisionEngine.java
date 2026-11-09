@@ -66,6 +66,15 @@ public final class InquiryDecisionEngine {
                                       Function<List<InquiryNeed>, Pool> collect, DetailCapability detail,
                                       EvidenceScope.CaseScope caseScope,
                                       com.sellerops.inquiry.authority.AuthorityFence.Context authority) {
+        return decide(orgId, question, model, collect, detail, caseScope, authority, null);
+    }
+
+    /** @param received when the inquiry arrived ({@link InquiryMoment#of}), or null — told to the judge only. */
+    public static NeedDecision decide(UUID orgId, String question, InquiryDecisionModel model,
+                                      Function<List<InquiryNeed>, Pool> collect, DetailCapability detail,
+                                      EvidenceScope.CaseScope caseScope,
+                                      com.sellerops.inquiry.authority.AuthorityFence.Context authority,
+                                      String received) {
         InquiryDecisionModel.Answer<List<InquiryNeed>> planned = model.plan(orgId, question);
         InquiryDecisionModel.CallCost cost = planned.cost();
         List<InquiryNeed> needs = planned.value();
@@ -96,7 +105,7 @@ public final class InquiryDecisionEngine {
             precedents.put(id, new PrecedentCandidate(id, p.memoryId(), p.text()));
         }
         InquiryDecisionModel.Answer<Map<String, NeedVerdict>> judged = model.judge(orgId, question, needs,
-                new ArrayList<>(evidence.values()), new ArrayList<>(precedents.values()));
+                new ArrayList<>(evidence.values()), new ArrayList<>(precedents.values()), received);
         cost = cost.plus(judged.cost());
         if (judged.value() == null) {
             return NeedDecision.failed(NeedDecision.Outcome.JUDGE_FAILED, cost, detail);

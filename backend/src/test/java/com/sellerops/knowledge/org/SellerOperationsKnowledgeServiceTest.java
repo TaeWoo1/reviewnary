@@ -35,6 +35,7 @@ class SellerOperationsKnowledgeServiceTest {
     @Autowired OrgKnowledgeSourceRepository sources;
     @Autowired OrgKnowledgeChunkRepository chunks;
     @Autowired OrganizationRepository organizations;
+    @Autowired OrgKnowledgeRevisionRepository revisions;
 
     private SellerOperationsKnowledgeService service;
     private UUID org;
@@ -42,6 +43,7 @@ class SellerOperationsKnowledgeServiceTest {
     @BeforeEach
     void setUp() {
         service = new SellerOperationsKnowledgeService(sources, chunks);
+        service.setRevisions(revisions);
         Organization o = new Organization();
         o.setName("테스트 상점");
         org = organizations.save(o).getId();
@@ -96,6 +98,36 @@ class SellerOperationsKnowledgeServiceTest {
         OrgKnowledgeView revised = service.update(org, first.id(), new OrgKnowledgeRequest(
                 OrgKnowledgeType.SHIPPING_POLICY, "배송 정책 안내", "영업일 기준 3일 이내 출고됩니다.", null));
         assertThat(revised.version()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("a revised policy keeps the revision it replaced; a rename keeps nothing new")
+    void aRevisionIsKeptAsItStood() {
+        // Seller decision 2026-11-01: 「unused」 corrected to 「unopened」, the old text kept as history.
+        OrgKnowledgeView first = write(OrgKnowledgeType.SHIPPING_POLICY, "배송교환정책",
+                "Exchanges are accepted within 7 days of delivery when the product is unused.");
+        service.update(org, first.id(), new OrgKnowledgeRequest(OrgKnowledgeType.SHIPPING_POLICY, "배송교환정책",
+                "Exchanges are accepted within 7 days of delivery when the product is unused.", null));
+        assertThat(revisions.findAllByOrgIdAndSourceIdOrderByVersionAsc(org, first.id()))
+                .as("the same text saved again is no revision").isEmpty();
+
+        OrgKnowledgeView revised = service.update(org, first.id(), new OrgKnowledgeRequest(
+                OrgKnowledgeType.SHIPPING_POLICY, "배송교환정책",
+                "Exchanges are accepted within 7 days of delivery when the product is unopened.", null));
+
+        assertThat(revised.version()).isEqualTo(2);
+        assertThat(revised.body()).endsWith("unopened.");
+        assertThat(revisions.findAllByOrgIdAndSourceIdOrderByVersionAsc(org, first.id()))
+                .singleElement().satisfies(past -> {
+                    assertThat(past.getVersion()).isOne();
+                    assertThat(past.getBody()).endsWith("unused.");
+                    assertThat(past.getTitle()).isEqualTo("배송교환정책");
+                    assertThat(past.getReplacedAt()).isNotNull();
+                });
+        assertThat(service.search(org, "unused", 5).passages())
+                .as("a past revision is a record, never something an answer quotes").isEmpty();
+        assertThat(revisions.findAllByOrgIdAndSourceIdOrderByVersionAsc(UUID.randomUUID(), first.id()))
+                .as("another org reads none of it").isEmpty();
     }
 
     @Test

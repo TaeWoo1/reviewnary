@@ -64,7 +64,7 @@ public class Cafe24BoardArticlesClient {
             throw Cafe24RateLimitedException.fromResponse(response);
         }
         if (response.statusCode() != 200) {
-            throw new IllegalStateException(
+            throw Cafe24ReadFailedException.forStatus(response.statusCode(),
                     "카페24 게시글 조회에 실패했습니다 (HTTP " + response.statusCode() + ").");
         }
         return parse(response.body());
@@ -94,7 +94,7 @@ public class Cafe24BoardArticlesClient {
             throw Cafe24RateLimitedException.fromResponse(response);
         }
         if (response.statusCode() != 200) {
-            throw new IllegalStateException(
+            throw Cafe24ReadFailedException.forStatus(response.statusCode(),
                     "카페24 게시글 조회에 실패했습니다 (HTTP " + response.statusCode() + ").");
         }
         return parse(response.body());
@@ -126,13 +126,10 @@ public class Cafe24BoardArticlesClient {
             throw Cafe24RateLimitedException.fromResponse(response);
         }
         if (response.statusCode() != 200) {
-            throw new IllegalStateException(
+            throw Cafe24ReadFailedException.forStatus(response.statusCode(),
                     "카페24 게시글 조회에 실패했습니다 (HTTP " + response.statusCode() + ").");
         }
-        return parse(response.body()).stream()
-                .map(Cafe24BoardArticleRow::articleNo)
-                .filter(no -> no != null && no > 0)
-                .toList();
+        return parseCommentedNumbers(response.body());
     }
 
     /**
@@ -163,13 +160,28 @@ public class Cafe24BoardArticlesClient {
             throw Cafe24RateLimitedException.fromResponse(response);
         }
         if (response.statusCode() != 200) {
-            throw new IllegalStateException(
+            throw Cafe24ReadFailedException.forStatus(response.statusCode(),
                     "카페24 게시글 조회에 실패했습니다 (HTTP " + response.statusCode() + ").");
         }
-        return parse(response.body()).stream()
-                .map(Cafe24BoardArticleRow::articleNo)
-                .filter(no -> no != null && no > 0)
-                .toList();
+        return parseCommentedNumbers(response.body());
+    }
+
+    /** Missing or unusable discovery rows cannot prove that an article has no comments. */
+    private List<Long> parseCommentedNumbers(String body) {
+        try {
+            ArticlesResponse parsed = mapper.readValue(body, ArticlesResponse.class);
+            if (parsed == null || parsed.articles() == null) {
+                throw new IllegalStateException("게시글 목록이 없습니다.");
+            }
+            return parsed.articles().stream().map(row -> {
+                if (row == null || row.articleNo() == null || row.articleNo() <= 0) {
+                    throw new IllegalStateException("게시글 번호가 없습니다.");
+                }
+                return row.articleNo();
+            }).toList();
+        } catch (Exception e) {
+            throw new IllegalStateException("카페24 댓글 보유 목록을 해석할 수 없습니다.");
+        }
     }
 
     static URI commentedArticlesByNumberUri(String mallId, int boardNo, List<Long> articleNos) {

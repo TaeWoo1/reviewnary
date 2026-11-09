@@ -103,6 +103,14 @@ public class InquiryEvidenceCollector {
         this.inquiries = inquiries;
     }
 
+    private com.sellerops.inquiry.sellercheck.InquirySellerCheckRepository sellerChecks;
+
+    /** What the seller found on the seller centre for an inquiry (2026-11-02). Absent, nothing of the kind is offered. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSellerChecks(com.sellerops.inquiry.sellercheck.InquirySellerCheckRepository sellerChecks) {
+        this.sellerChecks = sellerChecks;
+    }
+
     /** Evaluation only: read reuse scopes from human annotations instead of the column (Eval v1's 23). */
     public void setScopeSource(java.util.function.Function<com.sellerops.knowledge.memory.AnswerMemory,
             com.sellerops.knowledge.memory.AnswerMemoryReuseScope> source) {
@@ -116,6 +124,9 @@ public class InquiryEvidenceCollector {
                                               List<InquiryNeed> needs) {
         Map<String, EvidenceCandidate> evidence = new LinkedHashMap<>();
         Map<UUID, PrecedentCandidate> precedents = new LinkedHashMap<>();
+        // The seller's own record first (2026-11-02 seller-check review): it is the one thing the seller did for THIS
+        // inquiry, and the pool is cut at its ceiling from the end.
+        addSellerCheck(orgId, inquiry, evidence);
         addLanes(whole, evidence, precedents);
         for (InquiryNeed need : needs) {
             addLanes(retriever.retrieve(orgId, inquiry, RetrievalQuery.ofText(need.search()), OrderFactLookup.STORED_ONLY,
@@ -131,6 +142,17 @@ public class InquiryEvidenceCollector {
         }
         return new InquiryDecisionEngine.Pool(List.copyOf(evidence.values()),
                 admissible(inquiry, precedents.values()));
+    }
+
+    private void addSellerCheck(UUID orgId, Inquiry inquiry, Map<String, EvidenceCandidate> evidence) {
+        if (sellerChecks == null || inquiry == null || inquiry.getId() == null) {
+            return;
+        }
+        sellerChecks.findCurrentByInquiry(orgId, inquiry.getId()).stream().findFirst().ifPresent(c ->
+                put(evidence, new EvidenceCandidate(null, EvidenceCandidate.Kind.SELLER_CHECK,
+                        com.sellerops.inquiry.sellercheck.InquirySellerCheckService.evidenceLabel(c),
+                        com.sellerops.inquiry.sellercheck.InquirySellerCheckService.evidenceText(c), c.getId(), null,
+                        c.getOutcome(), EvidenceScope.order(EvidenceScope.caseOrderKey(inquiry)))));
     }
 
     /**
@@ -200,7 +222,8 @@ public class InquiryEvidenceCollector {
             } else if (p.scope().current()) {
                 EvidenceCandidate.Kind kind = p.scope() == KnowledgeScope.ORG_OPERATIONS
                         ? EvidenceCandidate.Kind.ORG_KNOWLEDGE : EvidenceCandidate.Kind.PRODUCT_KNOWLEDGE;
-                put(evidence, new EvidenceCandidate(null, kind, p.heading(), p.text(), p.sourceId(), null, null));
+                put(evidence, new EvidenceCandidate(null, kind, p.heading(), p.text(), p.sourceId(), null, null)
+                        .withChunk(p.chunkId()));
             }
         }
     }
@@ -221,7 +244,8 @@ public class InquiryEvidenceCollector {
             if (!chunks.isEmpty() && chunks.size() <= WHOLE_LIBRARY_PASSAGES) {
                 for (ProductKnowledgeChunk c : chunks) {
                     put(evidence, new EvidenceCandidate(null, EvidenceCandidate.Kind.PRODUCT_KNOWLEDGE,
-                            byId.get(c.getSourceId()).getTitle(), c.getContent(), c.getSourceId(), null, null));
+                            byId.get(c.getSourceId()).getTitle(), c.getContent(), c.getSourceId(), null, null)
+                            .withChunk(c.getId()));
                 }
             }
         }
@@ -237,7 +261,8 @@ public class InquiryEvidenceCollector {
         if (!ruleChunks.isEmpty() && ruleChunks.size() <= WHOLE_LIBRARY_PASSAGES) {
             for (OrgKnowledgeChunk c : ruleChunks) {
                 put(evidence, new EvidenceCandidate(null, EvidenceCandidate.Kind.ORG_KNOWLEDGE,
-                        rules.get(c.getSourceId()).getTitle(), c.getContent(), c.getSourceId(), null, null));
+                        rules.get(c.getSourceId()).getTitle(), c.getContent(), c.getSourceId(), null, null)
+                        .withChunk(c.getId()));
             }
         }
     }

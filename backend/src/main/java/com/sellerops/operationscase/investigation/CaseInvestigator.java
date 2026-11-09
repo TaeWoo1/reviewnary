@@ -376,6 +376,7 @@ public class CaseInvestigator {
         return switch (knowledge.basis()) {
             case "GROUNDED" -> "판매자가 등록한 근거로 답할 수 있습니다.";
             case "NEEDS_CLARIFICATION" -> "근거는 있지만 고객이 어떤 규격·옵션인지 확인해야 합니다.";
+            case "PARTIAL_ANSWER" -> "일부만 답할 수 있습니다 — 판매자 근거가 문의의 일부 질문에만 답합니다.";
             case "NO_ANSWER_BASIS" -> knowledge.missingSubject() == null
                     ? "부족합니다 — 이 문의에 답할 판매자 안내 기준이 등록되어 있지 않습니다."
                     : "부족합니다 — 「" + knowledge.missingSubject() + "」에 대한 판매자 안내 기준이 등록되어 있지 않습니다.";

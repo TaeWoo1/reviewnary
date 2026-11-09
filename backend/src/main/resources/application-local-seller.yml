@@ -10,6 +10,9 @@ server:
 sellerops:
   local-seller:
     enabled: true
+    # The built screen (frontend/dist of a VITE_LOCAL_SELLER=true build) the backend serves on its own address.
+    # Blank = no screen here (a developer runs vite beside it). LocalSellerScreenConfiguration.
+    screen-dir: ${SELLEROPS_LOCAL_SELLER_SCREEN_DIR:}
   vendor-link:
     review-pull:
       enabled: ${SELLEROPS_VENDOR_REVIEW_PULL_ENABLED:true}

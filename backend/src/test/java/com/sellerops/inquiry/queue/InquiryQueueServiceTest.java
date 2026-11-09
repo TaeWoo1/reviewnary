@@ -48,8 +48,30 @@ class InquiryQueueServiceTest {
         return seed(org, sellerAccountId, channelId, phase, title, DataOrigin.REAL);
     }
 
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    /**
+     * Real rows behind the ids a test makes up (2026-11-05), so the class runs on PostgreSQL, whose foreign keys refuse
+     * an inquiry for an organisation, channel or account that does not exist — as it does on H2. Each is written once.
+     */
+    private void ensure(UUID org, UUID sellerAccountId, UUID channelId) {
+        jdbc.update("insert into organizations (id, name, created_at, updated_at) select ?, '대기열 QA', current_timestamp, "
+                + "current_timestamp where not exists (select 1 from organizations where id = ?)", org, org);
+        String code = "QQ-" + channelId.toString().substring(0, 13);
+        jdbc.update("insert into channels (id, code, name_ko, status, supports_inquiry, supports_review, supports_order, "
+                + "supports_sales, supports_product, sort_order, created_at, updated_at) select ?, ?, '대기열 QA', 'AVAILABLE', "
+                + "false, false, false, false, false, 0, current_timestamp, current_timestamp "
+                + "where not exists (select 1 from channels where id = ?)",
+                channelId, code, channelId);
+        jdbc.update("insert into seller_accounts (id, org_id, channel_id, connection_status, is_file_upload, created_at, "
+                + "updated_at) select ?, ?, ?, 'PENDING', false, current_timestamp, current_timestamp "
+                + "where not exists (select 1 from seller_accounts where id = ?)", sellerAccountId, org, channelId,
+                sellerAccountId);
+    }
+
     private UUID seed(UUID org, UUID sellerAccountId, UUID channelId,
                       InquiryWorkItemPhase phase, String title, DataOrigin origin) {
+        ensure(org, sellerAccountId, channelId);
         Inquiry q = new Inquiry();
         q.setOrgId(org);
         q.setChannelId(channelId);

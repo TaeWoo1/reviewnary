@@ -233,6 +233,54 @@ class InquiryPreSendCheckTest {
         assertThat(executions.findByWorkItemId(wi.getId()).orElseThrow().getPresendStateProven()).isFalse();
     }
 
+    @Autowired jakarta.persistence.EntityManager em;
+    @Autowired com.sellerops.inquiry.sellercheck.InquiryKindCorrectionRepository kindRows;
+
+    private InquiryPublishService withKinds(InquiryPublishService service) {
+        com.sellerops.inquiry.sellercheck.InquiryKindCorrectionService kinds =
+                new com.sellerops.inquiry.sellercheck.InquiryKindCorrectionService(em, kindRows, workItems);
+        kinds.setDrafts(drafts);
+        org.springframework.beans.factory.support.StaticListableBeanFactory beans =
+                new org.springframework.beans.factory.support.StaticListableBeanFactory();
+        beans.addBean("kinds", kinds);
+        service.setKinds(beans.getBeanProvider(com.sellerops.inquiry.sellercheck.InquiryKindCorrectionService.class));
+        return service;
+    }
+
+    private UUID corrected(InquiryWorkItem wi, Instant at) {
+        com.sellerops.inquiry.sellercheck.InquiryKindCorrection c = new com.sellerops.inquiry.sellercheck.InquiryKindCorrection();
+        c.setOrgId(org);
+        c.setWorkItemId(wi.getId());
+        c.setKind("ORDER_STATE");
+        c.setJudgedKind("HOW_TO");
+        c.setCorrectedBy("SELLER:" + user);
+        c.setCorrectedAt(at);
+        return kindRows.saveAndFlush(c).getId();
+    }
+
+    @Test
+    @DisplayName("an answer that names another kind correction than the standing one is not approved, however late it "
+            + "was saved; one that names the standing correction is (2026-11-05 eighth review)")
+    void anAnswerWrittenUnderTheCorrectedReadingIsNotApproved() {
+        InquiryWorkItem stale = seed();
+        // Corrected a minute BEFORE the answer was saved: a save time would wave it through; the id does not.
+        corrected(stale, Instant.now().minusSeconds(60));
+        assertThatThrownBy(() -> withKinds(service(PreSendCheck.proven()))
+                .confirmAndPublish(org, stale.getId(), user, "cmd-kind-stale", fingerprint()))
+                .hasMessage(InquiryPublishService.KIND_CORRECTED);
+        assertThat(adapter.published).isEmpty();
+        assertThat(approvals.findByWorkItemId(stale.getId())).isEmpty();
+
+        InquiryWorkItem fresh = seedOn(channelId, EXTERNAL_ID + "-2", null);
+        UUID standing = corrected(fresh, Instant.now().minusSeconds(60));
+        InquiryReplyDraft head = drafts.findTopByWorkItemIdOrderByVersionDesc(fresh.getId()).orElseThrow();
+        head.setKindCorrectionId(standing);
+        drafts.saveAndFlush(head);
+        withKinds(service(PreSendCheck.proven())).confirmAndPublish(org, fresh.getId(), user, "cmd-kind-fresh",
+                fingerprint());
+        assertThat(approvals.findByWorkItemId(fresh.getId())).isPresent();
+    }
+
     @Test
     @DisplayName("a fresh channel records the proof, so the two cases are distinguishable afterwards")
     void freshStateIsRecorded() {

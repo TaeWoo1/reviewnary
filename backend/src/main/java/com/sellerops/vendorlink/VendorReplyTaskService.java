@@ -118,6 +118,9 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
     static final Set<String> UNAPPROVED = Set.of("AWAITING_APPROVAL", "RECHECK_NEEDED");
     /** Who wrote a draft version this PC took over from the phone. */
     static final String PHONE_ACTOR = "SELLER_PHONE";
+
+    /** How a hand-over names its approver to the vendor server: this server's user id, nothing about the person. */
+    static final String APPROVER_PREFIX = "workspace-user:";
     /** How long a review's panel read waits before asking the server about it again. */
     static final java.time.Duration ASK_AGAIN = java.time.Duration.ofSeconds(20);
     /** Approved texts this PC checks again when what replies are written from changed. */
@@ -241,7 +244,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             return;
         }
         VendorReplyTask task = open.get();
-        String token = link.installToken()
+        String token = link.installToken(orgId)
                 .orElseThrow(() -> ApiException.conflict("공급자 서버에 연결된 PC가 아니라 휴대폰의 초안을 거둘 수 없습니다."));
         try {
             TaskSnapshot now = link.client().task(token, task.getVendorTaskId());
@@ -265,7 +268,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
     /** A save here: the phone's copy follows soon, off this thread. */
     @Override
     public void draftSaved(UUID orgId, UUID reviewId) {
-        if (link.installToken().isEmpty() || refs.findByReviewId(reviewId).isEmpty()) {
+        if (link.installToken(orgId).isEmpty() || refs.findByReviewId(reviewId).isEmpty()) {
             return;
         }
         askedAt.put(reviewId, clock.instant());
@@ -289,7 +292,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
 
     @Override
     public ReviewReplyDelegationView describe(UUID orgId, UUID reviewId, boolean draftReady) {
-        if (link.installToken().isEmpty() || refs.findByReviewId(reviewId).isEmpty()) {
+        if (link.installToken(orgId).isEmpty() || refs.findByReviewId(reviewId).isEmpty()) {
             return null;
         }
         Optional<VendorReplyTask> task = tasks.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(orgId, reviewId);
@@ -330,7 +333,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
 
     @Override
     public Map<UUID, String> statesOf(UUID orgId, Collection<UUID> reviewIds) {
-        if (reviewIds.isEmpty() || link.installToken().isEmpty()) {
+        if (reviewIds.isEmpty() || link.installToken(orgId).isEmpty()) {
             return Map.of();
         }
         Map<UUID, VendorReplyTask> newest = new HashMap<>();
@@ -375,6 +378,15 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
      * read. If the approval is refused after the draft went, the task stays waiting and the seller is told so.
      */
     public synchronized TaskView handOver(UUID orgId, UUID reviewId, int baseVersion) {
+        return handOver(orgId, null, reviewId, baseVersion);
+    }
+
+    /**
+     * {@link #handOver(UUID, UUID, int)} by the signed-in {@code userId}: the approval is recorded here with that
+     * person, the organisation, the approved text's version and fingerprint and the time, and the vendor server is told
+     * only an opaque reference to them (boundary §3, external review 2026-10-31).
+     */
+    public synchronized TaskView handOver(UUID orgId, UUID userId, UUID reviewId, int baseVersion) {
         int head = drafts.latest(reviewId).map(ReviewReplyDraft::getVersion).orElse(0);
         if (head != baseVersion) {
             throw ApiException.conflict(CHANGED);
@@ -400,7 +412,8 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         TaskSnapshot approved;
         try {
             approved = link.client().approve(sent.token(), submitted.id(), submitted.draftVersion(),
-                    submitted.draftFingerprint(), "pc-approve:" + submitted.id() + ":" + submitted.draftVersion());
+                    submitted.draftFingerprint(), "pc-approve:" + submitted.id() + ":" + submitted.draftVersion(),
+                    userId == null ? null : APPROVER_PREFIX + userId);
         } catch (VendorServerClient.TaskRefused e) {
             throw ApiException.conflict("답글은 올렸지만 승인하지 못했습니다. 다시 누르거나 휴대폰에서 승인하세요.");
         } catch (VendorServerClient.Refused e) {
@@ -409,7 +422,16 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE,
                     "답글은 보냈지만 승인 결과를 받지 못했습니다. 잠시 후 다시 확인하세요.");
         }
-        return TaskView.of(apply(orgId, reviewId, sent.binding().getVendorStoreId(), approved));
+        VendorReplyTask recorded = apply(orgId, reviewId, sent.binding().getVendorStoreId(), approved);
+        if (userId != null && "APPROVED".equals(approved.state())) {
+            recorded.setApprovedByUserId(userId);
+            recorded.setApprovedLocallyAt(clock.instant());
+            if (recorded.getApprovedDraftVersion() == null) {
+                recorded.setApprovedDraftVersion(head);
+            }
+            recorded = tasks.save(recorded);
+        }
+        return TaskView.of(recorded);
     }
 
     /** 「요청 취소」 (D10): ends the task at once until a delegate claims it; after that, asks the delegate to stop. */
@@ -417,7 +439,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         VendorReplyTask task = tasks.findFirstByOrgIdAndReviewIdOrderByCreatedAtDesc(orgId, reviewId)
                 .filter(t -> CANCELLABLE.contains(t.getState()))
                 .orElseThrow(() -> ApiException.conflict("취소할 수 있는 요청이 없습니다."));
-        String token = link.installToken()
+        String token = link.installToken(orgId)
                 .orElseThrow(() -> ApiException.conflict("공급자 서버에 연결된 PC가 아닙니다."));
         TaskSnapshot snapshot;
         try {
@@ -479,7 +501,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             throw ApiException.conflict("회사가 쓰지 않기로 한 표현이 있어 보낼 수 없습니다: "
                     + String.join(" · ", banned.stream().map(p -> "「" + p + "」").toList()) + ". 문장을 고친 뒤 보내세요.");
         }
-        String token = link.installToken()
+        String token = link.installToken(orgId)
                 .orElseThrow(() -> ApiException.conflict("공급자 서버에 연결된 PC가 아닙니다."));
         TaskSnapshot snapshot;
         try {
@@ -561,7 +583,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
 
     /** One review brought together now — after a save here, a hand-over, or a seller opening it. */
     synchronized Mirrored mirrorReview(UUID orgId, UUID reviewId) {
-        Optional<String> token = link.installToken();
+        Optional<String> token = link.installToken(orgId);
         VendorReviewRef ref = refs.findByReviewId(reviewId).orElse(null);
         VendorStoreBinding binding = ref == null ? null : bindings.findByVendorStoreId(ref.getVendorStoreId())
                 .filter(b -> orgId.equals(b.getOrgId())).orElse(null);
@@ -865,24 +887,6 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
     }
 
     /**
-     * The promise words a PC flagged on {@code current}'s approved version before it was approved — what the seller
-     * was shown and approved anyway. Forbidden phrases are never in it: they are absolute.
-     */
-    private static Set<String> knownFindings(TaskSnapshot current) {
-        if (current.pcRecheck() == null || !current.pcRecheck().startsWith("FLAGGED")
-                || current.basisNoteJson() == null
-                || !java.util.Objects.equals(current.pcRecheckVersion(), current.approvedVersion())) {
-            return Set.of();
-        }
-        ReviewReplyDelegationView.Note seen = note(current.basisNoteJson());
-        if (seen == null) {
-            return Set.of();
-        }
-        // Promises only. A forbidden phrase is an absolute ban: approved past a flag or not, it is held (2026-10-23).
-        return seen.promises() == null ? Set.of() : Set.copyOf(seen.promises());
-    }
-
-    /**
      * One approved text checked; the server's answer, or null when nothing was sent. A refusal is the caller's: it is
      * not a check.
      */
@@ -905,11 +909,12 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         if (result.passed()) {
             return null;
         }
-        // A promise or phrase the seller was shown and approved anyway is their word, not a new conflict. A promise
-        // that lost its ground, or a phrase banned since, is.
-        Set<String> known = knownFindings(current);
-        List<String> fresh = result.promises().stream().filter(p -> !known.contains(p)).toList();
-        List<String> banned = result.phrases().stream().filter(p -> !known.contains(p)).toList();
+        // An approval is not a decision on a promise nothing backs (2026-11-01: 「UNSUPPORTED_PROMISE를 일반 확인으로
+        // 우회하지 못하게」). Until 2026-11-01 the promise words a PC flagged and the seller approved anyway were taken as
+        // their word here; now every one is held until the evidence is added or the sentence changed, as a banned phrase
+        // always was. This lane has no exception decision of its own (the web hold's is bound to the web's versions).
+        List<String> fresh = result.promises();
+        List<String> banned = result.phrases();
         boolean hold = !fresh.isEmpty() || !banned.isEmpty();
         boolean sourceChanged = result.codes().contains(ReviewDraftRecheck.SOURCE_CHANGED);
         if (!hold && !sourceChanged) {
@@ -989,7 +994,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
      * Failed, held and waiting tasks are the seller's, and are the to-do's to show.
      */
     public Board board(UUID orgId) {
-        if (link.installToken().isEmpty()) {
+        if (link.installToken(orgId).isEmpty()) {
             return new Board(List.of(), List.of(), false);
         }
         Map<UUID, VendorReplyTask> newest = new HashMap<>();

@@ -37,13 +37,24 @@ public class KnowledgeEmbeddingProperties implements AgentCapabilityGate {
     private final String model;
     private final String apiKey;
     private final int dimensions;
+    private final com.sellerops.agent.llm.provider.LlmVendor vendor;
 
+    /** The shape before the shared model connection (2026-10-29): OpenAI. */
+    public KnowledgeEmbeddingProperties(boolean enabled, String enabledOrgIds, String model, String apiKey, int dimensions) {
+        this(enabled, enabledOrgIds, model, apiKey, dimensions, "OPENAI");
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
     public KnowledgeEmbeddingProperties(
             @Value("${sellerops.knowledge.embedding.enabled:false}") boolean enabled,
             @Value("${sellerops.knowledge.embedding.enabled-org-ids:}") String enabledOrgIds,
             @Value("${sellerops.knowledge.embedding.model:text-embedding-3-large}") String model,
             @Value("${sellerops.knowledge.embedding.api-key:}") String apiKey,
-            @Value("${sellerops.knowledge.embedding.dimensions:1024}") int dimensions) {
+            @Value("${sellerops.knowledge.embedding.dimensions:1024}") int dimensions,
+            @Value("${sellerops.knowledge.embedding.vendor:OPENAI}") String vendor) {
+        // Its own vendor, apart from every chat capability (2026-10-29). Anthropic has no embedding API: refused at boot.
+        this.vendor = com.sellerops.agent.llm.provider.LlmVendor.parse(vendor);
+        com.sellerops.agent.llm.provider.EmbeddingWire.of(this.vendor);
         this.enabled = enabled;
         this.allOrgs = enabledOrgIds != null && enabledOrgIds.trim().equals("*");
         this.enabledOrgIds = allOrgs ? List.of() : parseIds(enabledOrgIds);
@@ -115,5 +126,19 @@ public class KnowledgeEmbeddingProperties implements AgentCapabilityGate {
      */
     public int dimensions() {
         return dimensions;
+    }
+
+    public com.sellerops.agent.llm.provider.LlmVendor vendor() {
+        return vendor;
+    }
+
+    /**
+     * The model name vectors are stored and looked up under. OpenAI keeps the bare name every stored vector already
+     * carries; another vendor's is prefixed with the vendor, so its vectors are never compared with OpenAI's — a vendor
+     * change re-embeds rather than mixing two spaces.
+     */
+    public String storedModel() {
+        return vendor == com.sellerops.agent.llm.provider.LlmVendor.OPENAI ? model
+                : vendor.name().toLowerCase(java.util.Locale.ROOT) + ":" + model;
     }
 }

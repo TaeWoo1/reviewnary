@@ -38,4 +38,25 @@ public class AgentLlmUsage extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "actor", nullable = false, length = 16)
     private AgentUsageActor actor = AgentUsageActor.USER;
+
+    /** The reply agent's step (CLASSIFY · DRAFT · CRITIQUE · REVISE); null for a call that is not one. */
+    @Column(name = "step", length = 16)
+    private String step;
+
+    /** What started the run: SELLER · INGEST · SCHEDULED; null for a call that does not say. */
+    @Column(name = "trigger_kind", length = 16)
+    private String triggerKind;
+
+    /** This row opens one piece of work the seller asked for — the seller-facing count; every row is a model call. */
+    @Column(name = "counts_as_item", nullable = false)
+    private boolean countsAsItem;
+
+    @Column(name = "elapsed_ms")
+    private Integer elapsedMs;
+
+    @Column(name = "input_tokens")
+    private Integer inputTokens;
+
+    @Column(name = "output_tokens")
+    private Integer outputTokens;
 }

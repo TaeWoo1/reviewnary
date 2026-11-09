@@ -127,26 +127,55 @@ class NaverOrdersClientTest {
      * cursor from wherever it stood. On the canonical demo org that meant walking 70 days forward
      * from a position frozen in June to answer a question about this week.
      */
+    // --- the backfill lane: the conditional list by payment date (2026-10-28, FINDINGS A8) ---
+
+    private static String paidItem(String productOrderId, String orderId, String paymentDate, Long amount,
+                                   String status) {
+        return "{\"productOrderId\":\"" + productOrderId + "\",\"content\":{"
+                + "\"order\":{\"orderId\":\"" + orderId + "\""
+                + (paymentDate != null ? ",\"paymentDate\":\"" + paymentDate + "\"" : "")
+                + ",\"ordererName\":\"홍길동\"},"
+                + "\"productOrder\":{\"productOrderId\":\"" + productOrderId + "\""
+                + ",\"productOrderStatus\":\"" + status + "\""
+                + (amount != null ? ",\"initialPaymentAmount\":" + amount : "")
+                + ",\"productId\":\"9000001\"}}}";
+    }
+
+    private static String paidBody(boolean hasNext, String... items) {
+        return "{\"data\":{\"contents\":[" + String.join(",", items) + "],"
+                + "\"pagination\":{\"page\":1,\"size\":300,\"hasNext\":" + hasNext + "}}}";
+    }
+
+    /**
+     * The defect this lane replaces. The change feed filtered to {@code PAYED} answers orders whose LAST
+     * change is still the payment; a past day read today has dispatched and confirmed them all, and the
+     * 2026-10-28 backfill of 38 days came back with 0 rows. A bounded run must therefore never ask it.
+     */
     @Test
-    void aBoundedWindowStartsAtTheRequestedDateAndStopsAtIt() {
-        // NOW is 2026-06-12 15:00 KST. Ask for a two-day range that ENDS before now.
+    void aBoundedWindowReadsTheListByPaymentDateNeverTheChangeFeed() {
         String seed = client.boundedWindowSeed(LocalDate.of(2026, 6, 9), LocalDate.of(2026, 6, 10));
-        http.enqueue(FakeNaverHttpClient.ok(lcsBody(null)));
+        http.enqueue(FakeNaverHttpClient.ok(paidBody(false)));
 
         FetchPage first = client.fetchOrderSummaryPage(TOKEN, seed);
 
-        // It starts at the requested date's first KST instant — not at "now minus 24h".
-        assertThat(http.sent.get(0).uri().getQuery())
-                .contains("lastChangedFrom=2026-06-09T00:00:00.000+09:00");
-        // Two days of 24h windows: one more to walk.
-        assertThat(first.hasMore()).isTrue();
+        FakeNaverHttpClient.Sent sent = http.sent.get(0);
+        assertThat(sent.uri().getPath()).isEqualTo("/external/v1/pay-order/seller/product-orders");
+        assertThat(sent.uri().getQuery())
+                .contains("from=2026-06-09T00:00:00.000+09:00")
+                .contains("to=2026-06-09T23:59:59.999+09:00") // inclusive: the next day opens at 00:00
+                .contains("rangeType=PAYED_DATETIME")
+                .contains("pageSize=300")
+                .contains("page=1")
+                .doesNotContain("lastChanged");
+        assertThat(first.hasMore()).as("one more day to read").isTrue();
 
-        http.enqueue(FakeNaverHttpClient.ok(lcsBody(null)));
+        http.enqueue(FakeNaverHttpClient.ok(paidBody(false)));
         FetchPage second = client.fetchOrderSummaryPage(TOKEN, first.nextCursorValue());
 
         assertThat(http.sent.get(1).uri().getQuery())
-                .contains("lastChangedFrom=2026-06-10T00:00:00.000+09:00")
-                .contains("lastChangedTo=2026-06-11T00:00:00.000+09:00");
+                .contains("from=2026-06-10T00:00:00.000+09:00")
+                .contains("to=2026-06-10T23:59:59.999+09:00")
+                .contains("page=1");
         // And it STOPS at the end of the requested range rather than continuing to "now".
         assertThat(second.hasMore()).isFalse();
     }
@@ -154,37 +183,93 @@ class NaverOrdersClientTest {
     @Test
     void aBoundedWindowReachingTodayStopsAtNowRatherThanAskingForTheFuture() {
         String seed = client.boundedWindowSeed(LocalDate.of(2026, 6, 12), LocalDate.of(2026, 6, 12));
-        http.enqueue(FakeNaverHttpClient.ok(lcsBody(null)));
+        http.enqueue(FakeNaverHttpClient.ok(paidBody(false)));
 
         FetchPage page = client.fetchOrderSummaryPage(TOKEN, seed);
 
         assertThat(http.sent.get(0).uri().getQuery())
-                .contains("lastChangedFrom=2026-06-12T00:00:00.000+09:00")
-                .contains("lastChangedTo=2026-06-12T15:00:00.000+09:00"); // = NOW, not tomorrow
+                .contains("from=2026-06-12T00:00:00.000+09:00")
+                .contains("to=2026-06-12T14:59:59.999+09:00"); // NOW minus one millisecond, not tomorrow
         assertThat(page.hasMore()).isFalse();
     }
 
     /**
-     * Ingestion overwrites daily totals by (channel, date). A bounded run that emitted the two days
-     * BEFORE its range — which the routine two-day carry would have it do — would replace whatever
-     * is stored for those dates with a count of only the orders that changed inside the range.
+     * Every order paid that day counts, whatever it became since — the whole point of the lane. An order
+     * with no payment time was never paid; one paid outside the window is not this day's to write.
      */
     @Test
-    void aBoundedWindowNeverWritesADailyTotalBeforeItsOwnStartDate() {
+    void aDayCountsEveryOrderPaidInItWhateverItsStatusIsNow() {
         String seed = client.boundedWindowSeed(LocalDate.of(2026, 6, 10), LocalDate.of(2026, 6, 10));
-        // Two orders changed inside the window: one placed inside the range, one placed before it.
-        http.enqueue(FakeNaverHttpClient.ok(lcsBody(null,
-                lcsItem("PO-IN", "O-1", "2026-06-10T09:00:00.000+09:00"),
-                lcsItem("PO-BEFORE", "O-2", "2026-06-08T09:00:00.000+09:00"))));
-        http.enqueue(FakeNaverHttpClient.ok(detailBody(
-                detailItem("PO-IN", 12000L), detailItem("PO-BEFORE", 34000L))));
+        http.enqueue(FakeNaverHttpClient.ok(paidBody(false,
+                paidItem("PO-1", "O-1", "2026-06-10T09:00:00.000+09:00", 12000L, "PURCHASE_DECIDED"),
+                paidItem("PO-2", "O-1", "2026-06-10T09:00:00.000+09:00", 3000L, "DELIVERED"),
+                paidItem("PO-3", "O-2", "2026-06-10T23:10:00.000+09:00", 5000L, "CANCELED"),
+                paidItem("PO-UNPAID", "O-3", null, 7000L, "CANCELED_BY_NOPAYMENT"),
+                paidItem("PO-OTHER-DAY", "O-4", "2026-06-11T00:00:00.000+09:00", 9000L, "PAYED"),
+                paidItem("PO-1", "O-1", "2026-06-10T09:00:00.000+09:00", 12000L, "PURCHASE_DECIDED"))));
 
         FetchPage page = client.fetchOrderSummaryPage(TOKEN, seed);
 
-        assertThat(page.records()).hasSize(1);
-        CanonicalOrderSummary only = (CanonicalOrderSummary) page.records().get(0);
-        assertThat(only.summaryDate()).isEqualTo(LocalDate.of(2026, 6, 10));
-        assertThat(only.orderCount()).isEqualTo(1);
+        List<CanonicalOrderSummary> days = page.records().stream()
+                .map(CanonicalOrderSummary.class::cast).toList();
+        assertThat(days).hasSize(1);
+        assertThat(days.get(0).summaryDate()).isEqualTo(LocalDate.of(2026, 6, 10));
+        assertThat(days.get(0).orderCount()).isEqualTo(3);
+        assertThat(days.get(0).salesAmount()).isEqualTo(20000L);
+        List<CanonicalOrder> orders = page.orders().stream().map(CanonicalOrder.class::cast).toList();
+        assertThat(orders).extracting(CanonicalOrder::externalOrderId).containsExactly("PO-1", "PO-2", "PO-3");
+        assertThat(orders).extracting(CanonicalOrder::rawStatusCode)
+                .containsExactly("PURCHASE_DECIDED", "DELIVERED", "CANCELED");
+        assertThat(orders.get(0).paidAt()).isEqualTo(Instant.parse("2026-06-10T00:00:00Z"));
+    }
+
+    /**
+     * Ingestion overwrites a day's total by (channel, date), so a day read over two pages must emit the
+     * running total on the second page, and an order that moved across the page boundary must not count
+     * twice.
+     */
+    @Test
+    void aDayReadOverTwoPagesEmitsItsRunningTotalAndCountsAMovedOrderOnce() {
+        String seed = client.boundedWindowSeed(LocalDate.of(2026, 6, 10), LocalDate.of(2026, 6, 10));
+        http.enqueue(FakeNaverHttpClient.ok(paidBody(true,
+                paidItem("PO-1", "O-1", "2026-06-10T09:00:00.000+09:00", 1000L, "PAYED"),
+                paidItem("PO-2", "O-2", "2026-06-10T10:00:00.000+09:00", 2000L, "PAYED"))));
+        FetchPage first = client.fetchOrderSummaryPage(TOKEN, seed);
+        assertThat(first.hasMore()).isTrue();
+
+        http.enqueue(FakeNaverHttpClient.ok(paidBody(false,
+                paidItem("PO-2", "O-2", "2026-06-10T10:00:00.000+09:00", 2000L, "PAYED"),
+                paidItem("PO-3", "O-3", "2026-06-10T11:00:00.000+09:00", 4000L, "PAYED"))));
+        FetchPage second = client.fetchOrderSummaryPage(TOKEN, first.nextCursorValue());
+
+        assertThat(http.sent.get(1).uri().getQuery())
+                .contains("from=2026-06-10T00:00:00.000+09:00").contains("page=2");
+        CanonicalOrderSummary day = (CanonicalOrderSummary) second.records().get(0);
+        assertThat(day.orderCount()).isEqualTo(3);
+        assertThat(day.salesAmount()).isEqualTo(7000L);
+        assertThat(second.orders().stream().map(CanonicalOrder.class::cast))
+                .extracting(CanonicalOrder::externalOrderId).containsExactly("PO-3");
+        assertThat(second.hasMore()).isFalse();
+    }
+
+    @Test
+    void aPaidOrderWithoutItsAmountFailsThePageRatherThanWritingAWrongTotal() {
+        String seed = client.boundedWindowSeed(LocalDate.of(2026, 6, 10), LocalDate.of(2026, 6, 10));
+        http.enqueue(FakeNaverHttpClient.ok(paidBody(false,
+                paidItem("PO-1", "O-1", "2026-06-10T09:00:00.000+09:00", null, "PAYED"))));
+
+        assertThatThrownBy(() -> client.fetchOrderSummaryPage(TOKEN, seed))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("initialPaymentAmount");
+    }
+
+    @Test
+    void aBoundedRunThrottledByTheChannelKeepsItsPlace() {
+        String seed = client.boundedWindowSeed(LocalDate.of(2026, 6, 10), LocalDate.of(2026, 6, 10));
+        http.enqueue(FakeNaverHttpClient.rateLimited429());
+
+        assertThatThrownBy(() -> client.fetchOrderSummaryPage(TOKEN, seed))
+                .isInstanceOf(NaverRateLimitedException.class);
     }
 
     // --- routine lane freshness (the schedule's contract) ---
@@ -266,12 +351,12 @@ class NaverOrdersClientTest {
     @Test
     void anOperatorsBoundedWindowIsNeverRestartedNoMatterHowFarBackItReaches() {
         String seed = client.boundedWindowSeed(LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 2));
-        http.enqueue(FakeNaverHttpClient.ok(lcsBody(null)));
+        http.enqueue(FakeNaverHttpClient.ok(paidBody(false)));
 
         client.fetchOrderSummaryPage(TOKEN, seed);
 
         assertThat(http.sent.get(0).uri().getQuery())
-                .contains("lastChangedFrom=2026-04-01T00:00:00.000+09:00");
+                .contains("from=2026-04-01T00:00:00.000+09:00");
     }
 
     /**

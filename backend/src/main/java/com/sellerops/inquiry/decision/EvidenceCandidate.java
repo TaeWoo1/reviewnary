@@ -14,9 +14,16 @@ import java.util.UUID;
  * @param productId the listing it is about, for catalogue kinds (never sent)
  * @param factKey   the fact key, for a single catalogue fact (never sent)
  * @param scope     the entity instance it is attributed to (never sent) — Inquiry Decision v2.2
+ * @param chunkId   the knowledge passage it is, for the knowledge kinds (never sent) — so a draft written from it can
+ *                  cite the passage it was shown (2026-10-31: a draft cited nothing while its decision cited two rules)
  */
 public record EvidenceCandidate(String id, Kind kind, String label, String text, UUID sourceId, UUID productId,
-                                String factKey, EvidenceScope scope) {
+                                String factKey, EvidenceScope scope, UUID chunkId) {
+
+    public EvidenceCandidate(String id, Kind kind, String label, String text, UUID sourceId, UUID productId,
+                             String factKey, EvidenceScope scope) {
+        this(id, kind, label, text, sourceId, productId, factKey, scope, null);
+    }
 
     /**
      * Scope derived from where the candidate came from: listing kinds to their listing (unattributed when the listing
@@ -27,12 +34,18 @@ public record EvidenceCandidate(String id, Kind kind, String label, String text,
         this(id, kind, label, text, sourceId, productId, factKey, switch (kind) {
             case PRODUCT_KNOWLEDGE, PRODUCT_FACTS, OPTIONS, ADDONS -> EvidenceScope.product(productId);
             case ORG_KNOWLEDGE -> EvidenceScope.ORG;
-            case ORDER_FACT -> EvidenceScope.order(null);
+            case ORDER_FACT, SELLER_CHECK -> EvidenceScope.order(null);
         });
     }
 
     public enum Kind {
-        PRODUCT_KNOWLEDGE, ORG_KNOWLEDGE, PRODUCT_FACTS, OPTIONS, ADDONS, ORDER_FACT;
+        PRODUCT_KNOWLEDGE, ORG_KNOWLEDGE, PRODUCT_FACTS, OPTIONS, ADDONS, ORDER_FACT,
+        /**
+         * What the seller found on the seller centre for THIS inquiry (2026-11-02 seller-check review) — the seller's word,
+         * never the channel's, and never anything but this inquiry's. Attributed to the order this inquiry is about
+         * ({@link EvidenceScope#caseOrderKey}).
+         */
+        SELLER_CHECK;
 
         public String scopeLabelKo() {
             return switch (this) {
@@ -40,15 +53,20 @@ public record EvidenceCandidate(String id, Kind kind, String label, String text,
                 case ORG_KNOWLEDGE -> "운영 정책";
                 case PRODUCT_FACTS, OPTIONS, ADDONS -> "상품 등록 정보";
                 case ORDER_FACT -> "주문 정보";
+                case SELLER_CHECK -> "판매자 확인";
             };
         }
     }
 
     public EvidenceCandidate withScope(EvidenceScope newScope) {
-        return new EvidenceCandidate(id, kind, label, text, sourceId, productId, factKey, newScope);
+        return new EvidenceCandidate(id, kind, label, text, sourceId, productId, factKey, newScope, chunkId);
     }
 
     public EvidenceCandidate withId(String newId) {
-        return new EvidenceCandidate(newId, kind, label, text, sourceId, productId, factKey, scope);
+        return new EvidenceCandidate(newId, kind, label, text, sourceId, productId, factKey, scope, chunkId);
+    }
+
+    public EvidenceCandidate withChunk(UUID newChunkId) {
+        return new EvidenceCandidate(id, kind, label, text, sourceId, productId, factKey, scope, newChunkId);
     }
 }

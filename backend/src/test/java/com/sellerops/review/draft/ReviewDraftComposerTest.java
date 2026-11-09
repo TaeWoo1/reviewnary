@@ -63,6 +63,7 @@ class ReviewDraftComposerTest {
     private ReviewDraftComposer composer;
     private ReviewIssueEvidenceRepository issueEvidenceRepo;
     private ReviewIssueRepository issueRepo;
+    private com.sellerops.knowledge.candidate.KnowledgeCandidateService gapInbox;
 
     @BeforeEach
     void setUp() {
@@ -86,12 +87,114 @@ class ReviewDraftComposerTest {
                         "review-reply-v1", Instant.parse("2026-09-03T00:00:00Z")));
         when(model.isEnabledFor(ORG)).thenReturn(true);
         when(model.versionFor(ORG)).thenReturn("test-model");
-        when(quota.consume(eq(ORG), eq(AgentUsageKind.DRAFT), any())).thenReturn(new QuotaDecision(true, null, 1, 200));
+        when(quota.consume(eq(ORG), eq(AgentUsageKind.DRAFT), any(), any())).thenReturn(new QuotaDecision(true, null, 1, 200));
         when(issueEvidence.findByOrgIdAndReviewId(ORG, REVIEW)).thenReturn(List.of());
 
+        gapInbox = mock(com.sellerops.knowledge.candidate.KnowledgeCandidateService.class);
         composer = new ReviewDraftComposer(retriever, drafts, evidence, templates, model, quota,
-                mock(DraftEvidenceSnippets.class), issueEvidence, issues,
-                mock(com.sellerops.knowledge.candidate.KnowledgeCandidateService.class));
+                mock(DraftEvidenceSnippets.class), issueEvidence, issues, gapInbox);
+    }
+
+    private static ReviewDraftComposer.AgentInputs inputs(String... policy) {
+        return new ReviewDraftComposer.AgentInputs("하루 만에 떨어졌어요", List.of(), List.of(policy), null, null, List.of(), null,
+                "GROUNDED", List.of());
+    }
+
+    private List<String> findings(String draft, ReviewDraftComposer.AgentInputs in) {
+        return composer.agentFindings(ORG, draft, in, 200).stream().map(ReviewDraftComposer.AgentCheck::id).toList();
+    }
+
+    @Test
+    @DisplayName("the agent's draft is checked by code for what a model must not be trusted alone with (review 2026-10-28)")
+    void theAgentsDraftIsCheckedByCode() {
+        assertThat(findings("불편을 드려 죄송합니다. 문의로 알려 주시면 확인하겠습니다.", inputs())).isEmpty();
+        assertThat(findings("010-1234-5678로 연락 주세요.", inputs())).contains("N2");
+        assertThat(findings("자세한 내용은 https://example.com 에서 확인해 주세요.", inputs())).contains("N2");
+        assertThat(findings("리뷰를 수정해 주시면 적립금을 드리겠습니다.", inputs())).contains("N3");
+        assertThat(findings("허위 리뷰로 보여 신고하겠습니다.", inputs())).contains("N7");
+        assertThat(findings("가".repeat(201), inputs())).as("the channel's limit, not the style rule F1")
+                .contains("CHANNEL_LENGTH_EXCEEDED").doesNotContain("F1");
+        assertThat(findings(" ", inputs())).containsExactly("BLANK");
+    }
+
+    @Test
+    @DisplayName("an N9 note names what was refused, so the revision knows what to take out (2026-10-31)")
+    void anN9NoteNamesTheRefusedWords() {
+        List<ReviewDraftComposer.AgentCheck> checks = composer.agentFindings(ORG,
+                "불편을 드려 죄송합니다. 원하시면 반품 도와드리겠습니다.", inputs(), 200);
+        assertThat(checks).filteredOn(c -> "N9".equals(c.id())).singleElement()
+                .satisfies(c -> assertThat(c.note()).startsWith("「반품」은 등록된 정책 근거가 없어"));
+        assertThat(composer.agentFindings(ORG, "죄송합니다. 확인 후 연락드리겠습니다.", inputs(), 200))
+                .filteredOn(c -> "N9".equals(c.id())).singleElement()
+                .satisfies(c -> assertThat(c.note()).startsWith("「확인후연락」 같은 나중 약속은")
+                        .doesNotContain("(문의 · 교환 신청)"));
+    }
+
+    @Test
+    @DisplayName("a follow-up the seller never set is a promise (N9); the seller's own wording authorizes it for this check")
+    void anUnagreedFollowUpIsAPromise() {
+        assertThat(findings("불편을 드려 죄송합니다. 확인 후 연락드리겠습니다.", inputs())).contains("N9");
+        assertThat(findings("죄송합니다. 확인해서 안내드리겠습니다.", inputs())).contains("N9");
+        // The seller's own wording authorizes the follow-up for this check (the older promise check may still refuse the
+        // sentence on its own grounds — that stays the stricter of the two).
+        assertThat(com.sellerops.inquiry.draft.InquiryClaimGuard.unauthorizedFollowUps("확인 후 연락드리겠습니다.",
+                List.of("파손 문의는 사진을 확인 후 연락드리겠습니다."))).isEmpty();
+        assertThat(com.sellerops.inquiry.draft.InquiryClaimGuard.unauthorizedFollowUps("확인 후 연락드리겠습니다.",
+                List.of("교환은 문의 게시판으로 접수합니다."))).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("「opened ⇒ no return」 fails even when the seller's own policy says it — the law's minimum is not wording")
+    void theReturnLawIsNotLoweredByPolicyText() {
+        ReviewDraftComposer.AgentInputs policy = inputs("개봉 시 반품 불가합니다. 3일 이내 교환만 가능합니다.");
+        assertThat(findings("죄송합니다. 개봉 시 반품이 불가합니다.", policy)).contains("N8");
+        assertThat(findings("3일 이내에 교환 신청해 주세요.", policy)).contains("N8");
+        assertThat(findings("수령 후 7일 이내에 문의로 교환을 신청하실 수 있습니다.", policy)).doesNotContain("N8");
+    }
+
+    @Test
+    @DisplayName("a review that no longer asks closes the ask an earlier draft of it filed (2026-10-28)")
+    void aReviewThatNoLongerAsksWithdrawsItsOwnAsk() {
+        // An ask an older rule raised for a compliment stayed open and was counted beside every review of the product.
+        retrieval(DraftKnowledgeState.NO_LIBRARY);
+        composer.compose(ORG, review(), BODY, "SELLER:u1");
+
+        String question = ReviewDraftComposer.productQuestion(ReviewDraftComposer.excerpt(BODY));
+        org.mockito.Mockito.verify(gapInbox).withdrawGap(ORG, "PRODUCT", PRODUCT, question);
+        org.mockito.Mockito.verify(gapInbox, org.mockito.Mockito.never())
+                .noteGap(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("a ★3 whose words only praise is a warmer thank-you and asks the seller for nothing (owner, 2026-10-28)")
+    void aThreeStarPraiseIsAWarmerThankYouAndAsksNothing() {
+        retrieval(DraftKnowledgeState.NO_LIBRARY);
+        Review review = review();
+        review.setRating(3);
+        review.setBody("디자인이 이뻐서 좋아요.");
+        when(model.draftReviewReply(eq(ORG), eq("디자인이 이뻐서 좋아요."), any(), eq(TEMPLATE), eq(List.of()),
+                eq(AgentDraftGenerator.ReviewMood.MILD_PRAISE), any()))
+                .thenReturn(Optional.of("안녕하세요, 고객님. 디자인을 마음에 들어 해 주셔서 정말 감사합니다."));
+
+        GeneratedReviewDraftView view = composer.compose(ORG, review, "디자인이 이뻐서 좋아요.", "SELLER:u1");
+
+        assertThat(view.knowledgeGaps()).isEmpty();
+        assertThat(view.draft().body()).contains("정말 감사합니다");
+        org.mockito.Mockito.verify(gapInbox, org.mockito.Mockito.never())
+                .noteGap(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("a ★3 with a reservation still asks — the exception is praise, not the number")
+    void aThreeStarWithAReservationStillAsks() {
+        retrieval(DraftKnowledgeState.NO_LIBRARY);
+        Review review = review();
+        review.setRating(3);
+        review.setBody("재구매 좋은데 접착력이 .. 따로 접착제 사용");
+
+        GeneratedReviewDraftView view = composer.compose(ORG, review, "재구매 좋은데 접착력이 .. 따로 접착제 사용", "SELLER:u1");
+
+        assertThat(view.knowledgeGaps()).extracting(com.sellerops.review.draft.dto.ReviewKnowledgeGapView::scope).containsExactly("PRODUCT");
     }
 
     private static Review review() {
@@ -394,7 +497,7 @@ class ReviewDraftComposerTest {
     @DisplayName("a spent budget is an operational fact, never a statement about the seller's knowledge")
     void anExhaustedBudgetFallsBackWithoutBlamingTheLibrary() {
         retrieval(DraftKnowledgeState.GROUNDED, productPassage("표면을 닦아낸 뒤 붙여 주세요."));
-        when(quota.consume(eq(ORG), eq(AgentUsageKind.DRAFT), any()))
+        when(quota.consume(eq(ORG), eq(AgentUsageKind.DRAFT), any(), any()))
                 .thenReturn(new QuotaDecision(false, QuotaDecision.Reason.DAILY_LLM_CALLS, 200, 200));
 
         GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
@@ -498,7 +601,7 @@ class ReviewDraftComposerTest {
         // The 3★ split is the triage rule's: a reservation in the words is 지켜보기 there and mixed here.
         assertThat(ReviewDraftComposer.moodOf(3, "재구매 좋은데 접착력이 .. 따로 접착제 사용"))
                 .isEqualTo(AgentDraftGenerator.ReviewMood.MIXED);
-        assertThat(ReviewDraftComposer.moodOf(3, "디자인이 이뻐서 좋아요.")).isEqualTo(AgentDraftGenerator.ReviewMood.UNSTATED);
+        assertThat(ReviewDraftComposer.moodOf(3, "디자인이 이뻐서 좋아요.")).isEqualTo(AgentDraftGenerator.ReviewMood.MILD_PRAISE);
         assertThat(ReviewDraftComposer.moodOf(5, "너무 많이 컵이 빠져요 ㅎㅎ")).isEqualTo(AgentDraftGenerator.ReviewMood.UNSTATED);
         assertThat(ReviewDraftComposer.moodOf(null, "괜찮아요")).isEqualTo(AgentDraftGenerator.ReviewMood.UNSTATED);
 
@@ -567,5 +670,75 @@ class ReviewDraftComposerTest {
 
         assertThat(shown.get(0).scopeLabel()).isEqualTo(KnowledgeScope.PRODUCT.labelKo() + " · 후보");
         assertThat(shown.get(1).scopeLabel()).isEqualTo(KnowledgeScope.PRODUCT.labelKo());
+    }
+
+    @Test
+    @DisplayName("the reply agent's bundle: the product's knowledge in use and the policies in use, this org's only")
+    void theBundleCarriesTheProductAndPolicies() {
+        var products = mock(com.sellerops.product.library.ProductKnowledgeSourceRepository.class);
+        var productChunks = mock(com.sellerops.product.library.ProductKnowledgeChunkRepository.class);
+        var policies = mock(com.sellerops.knowledge.org.OrgKnowledgeSourceRepository.class);
+        var policyChunks = mock(com.sellerops.knowledge.org.OrgKnowledgeChunkRepository.class);
+        composer.setBundleSources(products, productChunks, policies, policyChunks);
+        var guide = new com.sellerops.product.library.ProductKnowledgeSource();
+        guide.setId(UUID.randomUUID());
+        guide.setTitle("부착이 잘 떨어질 때 안내");
+        guide.setActive(true);
+        var retired = new com.sellerops.product.library.ProductKnowledgeSource();
+        retired.setId(UUID.randomUUID());
+        retired.setActive(false);
+        when(products.findAllByOrgIdAndProductIdOrderByCreatedAtAsc(ORG, PRODUCT)).thenReturn(List.of(guide, retired));
+        var chunk = new com.sellerops.product.library.ProductKnowledgeChunk();
+        chunk.setId(UUID.randomUUID());
+        chunk.setOrgId(ORG);
+        chunk.setSourceId(guide.getId());
+        chunk.setContent("부착면을 마른 천으로 닦고 30초 이상 눌러 고정해 주세요.");
+        when(productChunks.findAllBySourceId(guide.getId())).thenReturn(List.of(chunk));
+        var otherOrgs = new com.sellerops.product.library.ProductKnowledgeChunk();
+        otherOrgs.setId(UUID.randomUUID());
+        otherOrgs.setOrgId(UUID.randomUUID());
+        otherOrgs.setSourceId(guide.getId());
+        otherOrgs.setContent("다른 가게의 안내입니다.");
+        when(productChunks.findAllBySourceId(retired.getId())).thenReturn(List.of(otherOrgs));
+        var rule = new com.sellerops.knowledge.org.OrgKnowledgeSource();
+        rule.setId(UUID.randomUUID());
+        rule.setTitle("교환 안내");
+        rule.setActive(true);
+        when(policies.findAllByOrgIdOrderByCreatedAtAsc(ORG)).thenReturn(List.of(rule));
+        var ruleChunk = new com.sellerops.knowledge.org.OrgKnowledgeChunk();
+        ruleChunk.setId(UUID.randomUUID());
+        ruleChunk.setOrgId(ORG);
+        ruleChunk.setSourceId(rule.getId());
+        ruleChunk.setContent("수령 후 7일 이내, 개봉하지 않은 상품에 한해 교환 가능합니다.");
+        when(policyChunks.findAllBySourceId(rule.getId())).thenReturn(List.of(ruleChunk));
+        when(retriever.retrieveFor(eq(ORG), eq(PRODUCT), any(), any(), any())).thenReturn(nothingFound());
+        when(retriever.retrieveFor(eq(ORG), eq(PRODUCT), any(), any())).thenReturn(nothingFound());
+
+        Review complaint = review(2, BODY);
+        assertThat(composer.agentInputs(ORG, complaint).bundle()).extracting(i -> i.passage().text())
+                .containsExactly(chunk.getContent(), ruleChunk.getContent());
+        assertThat(composer.agentInputs(ORG, complaint).passages()).extracting(
+                com.sellerops.agent.llm.AgentDraftGenerator.Passage::scopeLabel).containsExactly("근거 1 · 상품 정보",
+                "근거 2 · 운영 정책");
+
+        // Whether praise needs the facts is the judgement's, read in the run (ReplyRunService#offered), not a word list's.
+        Review praise = review(5, "잘 붙어요 좋아요");
+        assertThat(composer.agentInputs(ORG, praise).bundle()).isNotEmpty();
+    }
+
+    private static Review review(int rating, String body) {
+        Review r = new Review();
+        r.setId(REVIEW);
+        r.setOrgId(ORG);
+        r.setProductId(PRODUCT);
+        r.setRating(rating);
+        r.setBody(body);
+        return r;
+    }
+
+    private static InquiryEvidenceRetriever.InquiryEvidence nothingFound() {
+        return new InquiryEvidenceRetriever.InquiryEvidence(PRODUCT, com.sellerops.inquiry.draft.DraftKnowledgeState.NO_MATCH,
+                List.of(), com.sellerops.order.fact.OrderFact.unavailable(
+                        com.sellerops.order.fact.OrderFactState.NO_ORDER_REFERENCE, null, null), 0);
     }
 }

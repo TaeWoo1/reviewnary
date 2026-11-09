@@ -37,6 +37,13 @@ public enum AnswerBasisState {
      */
     NEEDS_CLARIFICATION,
 
+    /**
+     * Evidence answers some of what was asked and not all of it (owner, 2026-11-01 tenth review). A draft is written for
+     * the part it answers; each question it leaves is the seller's to handle one by one, and the reply is not sent while
+     * one is open. Never counted as a draft that is ready — it is an unfinished answer with its gaps named.
+     */
+    PARTIAL_ANSWER,
+
     /** No current evidence. Nothing is generated; the seller writes the reply. */
     NO_ANSWER_BASIS;
 
@@ -58,6 +65,17 @@ public enum AnswerBasisState {
                 ? NEEDS_CLARIFICATION : GROUNDED;
     }
 
+    /**
+     * The same, when the evidence says the value holds for every 규격 (2026-11-01 ninth review): then the question is
+     * answered, not asked back — {@link SpecApplicability#coversEveryOption}, read from current passages with figures a
+     * person typed and none written about one 규격.
+     */
+    public static AnswerBasisState of(DraftKnowledgeState knowledge, SpecApplicability.Applicability applicability,
+                                      boolean evidenceCoversEveryOption) {
+        AnswerBasisState basis = of(knowledge, applicability);
+        return basis == NEEDS_CLARIFICATION && evidenceCoversEveryOption ? GROUNDED : basis;
+    }
+
     /** Whether a model may be asked to write this draft at all. */
     public boolean mayGenerate() {
         return this != NO_ANSWER_BASIS;
@@ -68,6 +86,7 @@ public enum AnswerBasisState {
         return switch (this) {
             case GROUNDED -> "답변에 필요한 정보를 확인했어요.";
             case NEEDS_CLARIFICATION -> "정확한 답변을 위해 고객에게 확인할 내용이 있어요.";
+            case PARTIAL_ANSWER -> "일부 질문에만 답한 초안이에요. 아래 남은 질문을 하나씩 처리해야 보낼 수 있어요.";
             case NO_ANSWER_BASIS -> "답변 기준이 필요해요.";
         };
     }

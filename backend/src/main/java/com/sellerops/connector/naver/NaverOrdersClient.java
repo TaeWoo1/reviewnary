@@ -65,6 +65,24 @@ public class NaverOrdersClient {
 
     static final String LAST_CHANGED_PATH = "/external/v1/pay-order/seller/product-orders/last-changed-statuses";
     static final String DETAIL_QUERY_PATH = "/external/v1/pay-order/seller/product-orders/query";
+    /**
+     * The conditional product-order list — the backfill lane's source (2026-10-28, FINDINGS A8).
+     *
+     * <p>{@code last-changed-statuses?lastChangedType=PAYED} is a change feed whose filter is the LAST change
+     * ({@code 최종 변경 구분}): an order that has since been dispatched or confirmed is no longer «last changed:
+     * PAYED», so reading a past week with it returns almost nothing — the 2026-10-28 run read 38 days and got
+     * 0 rows, and a «recent 14 days» run got only its last two. This list is a current-state snapshot queried
+     * by a date of the caller's choice; with {@code rangeType=PAYED_DATETIME} a day's window returns every
+     * product order paid that day, whatever happened to it afterwards. The official doc recommends the change
+     * feed for synchronisation, which is why the routine lane keeps it.
+     */
+    static final String CONDITIONAL_PATH = "/external/v1/pay-order/seller/product-orders";
+    /** {@code rangeType} value: the window is over the payment time (official enum, `PAYED_DATETIME` = 결제일시). */
+    static final String RANGE_PAYED = "PAYED_DATETIME";
+    /** The conditional list's documented page-size ceiling. */
+    static final int CONDITIONAL_PAGE_SIZE = 300;
+    /** A day this store could fill is a few hundred orders; a page number past this is a list that does not end. */
+    static final int MAX_PAID_PAGES = 1000;
     /** Only payment-completed transitions feed the sales summary. */
     static final String LAST_CHANGED_TYPE = "PAYED";
     /**
@@ -143,6 +161,9 @@ public class NaverOrdersClient {
         Instant now = now();
         NaverOrdersCursor cursor = parseCursor(cursorValue, now);
         cursor = withRoutineFreshnessFloor(cursor, now);
+        if (!cursor.isRoutine()) {
+            return fetchPaidDayPage(accessToken, cursor, now);
+        }
         if (cursor.isCaughtUp(now)) {
             // Caught up to "now": nothing to query until time passes.
             return FetchPage.of(DataType.ORDER_SUMMARY, List.of(), serialize(cursor), false,
@@ -174,6 +195,95 @@ public class NaverOrdersClient {
         return FetchPage.ofWithOrders(DataType.ORDER_SUMMARY,
                 summaries(merged, countable.touchedDates()),
                 perOrderRecords(countable.items(), amounts),
+                serialize(next), hasMore, NaverApiConnector.KIND);
+    }
+
+    /**
+     * <b>One page of an operator's bounded backfill</b> — the product orders PAID inside the cursor's current
+     * KST day, read from the conditional list ({@link #CONDITIONAL_PATH}), whatever their status is now.
+     *
+     * <p>A day's window is complete once its last page is read, so the cumulative total this emits for that
+     * day converges to the whole day — the same overwrite contract the routine lane keeps
+     * ({@link NaverOrdersCursor}). An order without a payment time was never paid and is not counted; one whose
+     * payment falls outside the window or before the emission floor is skipped rather than written to a day
+     * this window does not own.
+     */
+    private FetchPage fetchPaidDayPage(String accessToken, NaverOrdersCursor cursor, Instant now) {
+        if (cursor.isCaughtUp(now)) {
+            return FetchPage.of(DataType.ORDER_SUMMARY, List.of(), serialize(cursor), false,
+                    NaverApiConnector.KIND);
+        }
+        int page = cursor.paidPage() == null ? 1 : cursor.paidPage();
+        if (page > MAX_PAID_PAGES) {
+            throw new IllegalStateException("네이버 주문 목록이 끝나지 않습니다 (페이지 " + MAX_PAID_PAGES + " 초과).");
+        }
+        Instant from = cursor.windowFromInstant();
+        Instant toExclusive = cursor.windowToInstant();
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("from", cursor.windowFrom());
+        // `to` is inclusive; the next day's window opens at this window's end instant.
+        params.put("to", NaverOrdersCursor.wire(toExclusive.minusMillis(1), KST));
+        params.put("rangeType", RANGE_PAYED);
+        params.put("pageSize", String.valueOf(CONDITIONAL_PAGE_SIZE));
+        params.put("page", String.valueOf(page));
+        NaverHttpClient.Response response = http.get(uri(CONDITIONAL_PATH, params), accessToken);
+        if (response.statusCode() == 429) {
+            throw NaverRateLimitedException.fromResponse(response);
+        }
+        if (response.statusCode() != 200) {
+            throw new IllegalStateException(
+                    "네이버 결제일 기준 주문 조회에 실패했습니다 (HTTP " + response.statusCode() + ")"
+                            + httpErrorDetail(response.body()) + ".");
+        }
+        ConditionalEnvelope envelope = read(response.body(), ConditionalEnvelope.class,
+                "네이버 결제일 기준 주문 응답을 해석할 수 없습니다.");
+        ConditionalData data = envelope.data();
+        List<ConditionalItem> contents = data == null || data.contents() == null ? List.of() : data.contents();
+
+        LocalDate horizon = cursor.emissionHorizon(KST);
+        LinkedHashSet<String> seen = new LinkedHashSet<>(cursor.dedupeIds());
+        Map<String, NaverOrdersCursor.DayTotal> merged = new TreeMap<>(cursor.dayTotals());
+        LinkedHashSet<String> touchedDates = new LinkedHashSet<>();
+        List<CanonicalOrder> orders = new ArrayList<>();
+        int row = 1;
+        for (ConditionalItem item : contents) {
+            ConditionalContent content = item.content();
+            ConditionalProductOrder po = content == null ? null : content.productOrder();
+            String id = blankToNull(po != null && po.productOrderId() != null ? po.productOrderId() : item.productOrderId());
+            if (id == null || !seen.add(id)) {
+                continue;
+            }
+            Instant paidAt = content == null || content.order() == null ? null
+                    : parseInstantOrNull(content.order().paymentDate());
+            if (paidAt == null || paidAt.isBefore(from) || !paidAt.isBefore(toExclusive)) {
+                continue;
+            }
+            LocalDate date = paidAt.atZone(KST).toLocalDate();
+            if (date.isBefore(horizon)) {
+                continue;
+            }
+            if (po == null || po.initialPaymentAmount() == null) {
+                throw new IllegalStateException("네이버 주문 응답에 결제 금액(initialPaymentAmount)이 없습니다.");
+            }
+            if (po.productOrderStatus() == null || po.productOrderStatus().isBlank()) {
+                throw new IllegalStateException("네이버 주문 응답에 주문 상태(productOrderStatus)가 없습니다.");
+            }
+            merged.merge(date.toString(), new NaverOrdersCursor.DayTotal(1, po.initialPaymentAmount()),
+                    (total, one) -> total.plus(one.orders(), one.amount()));
+            touchedDates.add(date.toString());
+            String productNo = blankToNull(po.productId());
+            orders.add(new CanonicalOrder(id, blankToNull(content.order().orderId()), po.productOrderStatus(),
+                    po.initialPaymentAmount(), date, paidAt,
+                    // This list states the current status, not when it changed.
+                    null, row++, productNo == null ? List.of() : List.of(ChannelProductRef.of(productNo))));
+        }
+        boolean dayContinues = data != null && data.pagination() != null
+                && Boolean.TRUE.equals(data.pagination().hasNext());
+        NaverOrdersCursor next = dayContinues
+                ? cursor.paidContinued(page + 1, merged, new ArrayList<>(seen))
+                : cursor.paidAdvanced(now, KST, merged);
+        boolean hasMore = dayContinues || !next.isCaughtUp(now);
+        return FetchPage.ofWithOrders(DataType.ORDER_SUMMARY, summaries(merged, touchedDates), orders,
                 serialize(next), hasMore, NaverApiConnector.KIND);
     }
 
@@ -708,6 +818,38 @@ public class NaverOrdersClient {
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     record DetailProductOrder(String productOrderId, Long initialPaymentAmount, String productId) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ConditionalEnvelope(ConditionalData data) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ConditionalData(List<ConditionalItem> contents, Pagination pagination) {
+    }
+
+    /** One product order of the conditional list; the official schema nests its detail under {@code content}. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ConditionalItem(String productOrderId, ConditionalContent content) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ConditionalContent(ConditionalOrder order, ConditionalProductOrder productOrder) {
+    }
+
+    /** Only the payment-unit id and the payment time — the buyer fields beside them are never bound. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ConditionalOrder(String orderId, String paymentDate) {
+    }
+
+    /** Same amount basis and product number as {@link DetailProductOrder}. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ConditionalProductOrder(String productOrderId, String productOrderStatus, Long initialPaymentAmount,
+                                   String productId) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record Pagination(Integer page, Integer size, Boolean hasNext) {
     }
 
     /** Internal pair: one page of changed orders plus its continuation block. */

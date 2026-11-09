@@ -72,6 +72,7 @@ abstract class VendorReviewPullScenarios {
     @Autowired IngestionService ingestion;
     @Autowired IngestFollowUp followUp;
     @Autowired SyncJobRepository syncJobs;
+    @Autowired com.sellerops.selleraccount.SellerAccountRepository sellerAccounts;
 
     private FakeVendorServer vendor;
     private VendorLinkService link;
@@ -99,8 +100,8 @@ abstract class VendorReviewPullScenarios {
         vendor = new FakeVendorServer(store);
         link = new VendorLinkService(links, new LocalSecretSealer(new VaultKeyRing(KEY, "test-key-1", "")), vendor,
                 true, CLOCK);
-        link.start();
-        link.poll();
+        link.start(org);
+        link.poll(org);
         pull = new VendorReviewPullService(link, bindings, refs, reviews, channels, ingestion, followUp, syncJobs,
                 CLOCK);
     }
@@ -186,12 +187,97 @@ abstract class VendorReviewPullScenarios {
 
         pull.start(org, List.of(store));
         UUID other = organization("다른 판매자");
+        assertThat(pull.pullFor(other)).as("no registration of its own: not even the store list")
+                .satisfies(r -> assertThat(r.state()).isEqualTo(State.NOT_LINKED))
+                .satisfies(r -> assertThat(r.stores()).isEmpty());
+        assertThat(pull.overview(other).state()).isEqualTo(State.NOT_LINKED);
+
+        // The other organisation links the same server account with a code of its own: it sees the store, as taken.
+        link.start(other);
+        link.poll(other);
         StoreResult refused = pull.pullFor(other).stores().get(0);
         assertThat(refused.otherOrganisation()).isTrue();
         assertThat(reviews.findAll()).noneMatch(r -> other.equals(r.getOrgId()));
+        assertThat(pull.overview(other).stores()).singleElement()
+                .satisfies(v -> assertThat(v.standing()).isEqualTo(Standing.OTHER_ORGANISATION));
 
         vendor.event("NEW", review("v2", "9000000022", "다음 리뷰", 5, false, "노출"));
-        assertThat(pull.pullBound().stores().get(0).inserted()).as("bound: the schedule follows").isEqualTo(1);
+        vendor.feedBearers.clear();
+        PullResult scheduled = pull.pullBound();
+        assertThat(scheduled.stores()).filteredOn(s -> !s.otherOrganisation()).singleElement()
+                .satisfies(s -> assertThat(s.inserted()).as("bound: the schedule follows").isEqualTo(1));
+        assertThat(vendor.feedBearers).as("the store's feed is read with its own organisation's token only")
+                .isNotEmpty().containsOnly(TOKEN);
+        assertThat(reviews.findAll()).noneMatch(r -> other.equals(r.getOrgId()));
+    }
+
+    /**
+     * A seller who gets NAVER reviews only from the delegate has no NAVER account, and every reply is addressed by one.
+     * The first start gives the organisation a connected file-upload account — no credential, nothing scheduled — and
+     * an organisation that has any NAVER account keeps it as it is (owner decision 2026-10-31, web sellers).
+     */
+    @Test
+    void theFirstStartGivesTheOrganisationAnAccountToAnswerThrough() {
+        pull.setSellerAccounts(sellerAccounts);
+        UUID naver = channels.findByCode("NAVER").orElseThrow().getId();
+        assertThat(sellerAccounts.findAllByOrgIdAndChannelId(org, naver)).isEmpty();
+
+        vendor.event("NEW", review("v1", "9000000091", "합성 리뷰", 5, false, "노출"));
+        pull.start(org, List.of(store));
+        assertThat(sellerAccounts.findAllByOrgIdAndChannelId(org, naver)).singleElement().satisfies(a -> {
+            assertThat(a.isFileUpload()).isTrue();
+            assertThat(a.getConnectionStatus()).isEqualTo(ChannelStatus.CONNECTED);
+            assertThat(a.getAlias()).isEqualTo(VendorReviewPullService.DELEGATED_ACCOUNT_ALIAS);
+            assertThat(a.getReviewRoute()).as("a route attached to the store, not its own connection")
+                    .isEqualTo(com.sellerops.selleraccount.SellerAccount.ROUTE_DELEGATE_UPLOAD);
+        });
+        pull.start(org, List.of(store));
+        assertThat(sellerAccounts.findAllByOrgIdAndChannelId(org, naver)).as("made once").hasSize(1);
+
+        UUID other = organization("API 연결 판매자");
+        com.sellerops.selleraccount.SellerAccount api = new com.sellerops.selleraccount.SellerAccount();
+        api.setOrgId(other);
+        api.setChannelId(naver);
+        api.setConnectionStatus(ChannelStatus.PENDING);
+        api.setFileUpload(false);
+        sellerAccounts.save(api);
+        UUID otherStore = UUID.randomUUID();
+        vendor.laterStores.add(new VendorServerClient.Store(otherStore, "NAVER", "다른 스토어", null));
+        link.start(other);
+        link.poll(other);
+        pull.start(other, List.of(otherStore));
+        assertThat(sellerAccounts.findAllByOrgIdAndChannelId(other, naver)).as("an existing account is kept as it is")
+                .singleElement().satisfies(a -> assertThat(a.isFileUpload()).isFalse());
+    }
+
+    /**
+     * Two organisations on one backend, each with its own registration: the scheduled pull asks for each one's
+     * waiting cursors and reads each store with that organisation's token, and an organisation without a store of its
+     * own is asked for nothing (V161, {@code docs/standing/server_operation_boundary_v1.md} §1).
+     */
+    @Test
+    void eachLinkedOrganisationIsPulledAndWatchedWithItsOwnTokenOnly() {
+        vendor.event("NEW", review("v1", "9000000081", "합성 리뷰", 5, false, "노출"));
+        pull.start(org, List.of(store));
+        UUID other = organization("다른 판매자");
+        link.start(other);
+        link.poll(other);
+
+        assertThat(pull.linkedOrganisations()).containsExactlyInAnyOrder(org, other);
+        assertThat(pull.receivingCursors(org)).containsOnlyKeys(store);
+        assertThat(pull.receivingCursors(other)).as("no store of its own: nothing to wait on").isEmpty();
+
+        vendor.event("NEW", review("v2", "9000000082", "다음 리뷰", 5, false, "노출"));
+        vendor.feedBearers.clear();
+        assertThat(pull.pullBound(other).stores()).singleElement()
+                .satisfies(s -> assertThat(s.otherOrganisation()).isTrue());
+        assertThat(vendor.feedBearers).as("the other organisation's pull never reads this store").isEmpty();
+        assertThat(pull.pullBound(org).stores().get(0).inserted()).isEqualTo(1);
+        assertThat(vendor.feedBearers).isNotEmpty().containsOnly(TOKEN);
+
+        link.unlink(org);
+        assertThat(pull.linkedOrganisations()).containsExactly(other);
+        assertThat(pull.receivingCursors(org)).as("unlinked: nothing is asked for it").isEmpty();
     }
 
     @Test
@@ -233,11 +319,11 @@ abstract class VendorReviewPullScenarios {
 
     @Test
     void anUnlinkedPcOrARefusedTokenPullsNothing() {
-        link.unlink();
+        link.unlink(org);
         assertThat(pull.pullFor(org).state()).isEqualTo(State.NOT_LINKED);
 
-        link.start();
-        link.poll();
+        link.start(org);
+        link.poll(org);
         vendor.refuse = true;
         assertThat(pull.pullFor(org).state()).isEqualTo(State.NOT_AUTHORIZED);
         assertThat(bindings.findByVendorStoreId(store)).isEmpty();

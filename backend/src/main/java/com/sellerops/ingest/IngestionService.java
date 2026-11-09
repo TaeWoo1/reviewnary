@@ -301,13 +301,21 @@ public class IngestionService {
                             // row and a deleted row left exactly the same trace (none), which is why no
                             // absence-based reconciliation could be built on top of this path. Recording
                             // it costs one column write; not recording it costs the distinction.
-                            existing.setLastSeenAt(Instant.now());
+                            Instant readAt = Instant.now();
+                            existing.setLastSeenAt(readAt);
+                            // The same answer text came again: that is a fresh look at the body too, and only then.
+                            if (row.answerBody() != null) {
+                                existing.setAnswerBodySeenAt(readAt);
+                            }
                             // The row's CONTENT is unchanged, but our catalogue may not be: a listing
                             // collected since the last read can attribute a row that arrived before it
                             // existed. This branch already writes, so the repair is free here and
                             // would otherwise never happen for a backlog that never changes again.
                             repairAttribution(existing, row, productId);
                             applyThreadRole(existing, row);
+                            // The text and status did not change, but the comment lane looked again — and what it
+                            // found (or failed to find) is this read's own fact, not the inquiry's.
+                            applyCommentCheck(existing, row);
                             // Same reasoning as the attribution repair above: the CONTENT is
                             // unchanged, but a work item left mid-workflow on an already-answered row
                             // is a lifecycle the source has already settled. This branch writes
@@ -317,10 +325,12 @@ public class IngestionService {
                             tally.skip();
                             continue;
                         }
-                        applyInquirySource(existing, row);
+                        Instant readAt = Instant.now();
+                        applyInquirySource(existing, row, readAt);
                         repairAttribution(existing, row, productId);
                         applyThreadRole(existing, row);
-                        existing.setLastSeenAt(Instant.now());
+                        applyCommentCheck(existing, row);
+                        existing.setLastSeenAt(readAt);
                         // Answered NOW, not "answered as of this sweep". The transition-only form
                         // could never close a row that turned ANSWERED while its work item sat in
                         // PROPOSED, because that row's next sweep is no longer a transition.
@@ -344,12 +354,14 @@ public class IngestionService {
                 entity.setSourceProductRef(sourceProductRef(row));
                 applyOrderRef(entity, row);
                 applyThreadRole(entity, row);
+                applyCommentCheck(entity, row);
                 // Buyer PII (row.author()) is intentionally NOT persisted.
-                applyInquirySource(entity, row);
-                entity.setReceivedAt(row.receivedAt() != null ? row.receivedAt() : Instant.now());
+                Instant readAt = Instant.now();
+                applyInquirySource(entity, row, readAt);
+                entity.setReceivedAt(row.receivedAt() != null ? row.receivedAt() : readAt);
                 entity.setExternalId(hasExternal ? row.externalId() : null);
                 entity.setContentHash(hash);
-                entity.setLastSeenAt(Instant.now());
+                entity.setLastSeenAt(readAt);
                 // A work item is a seller task: open one only for an actionable
                 // (UNANSWERED) inquiry on an exact connection. Already-answered
                 // inquiries are stored as history without opening a task — and a row the SOURCE says
@@ -464,7 +476,7 @@ public class IngestionService {
      * reply-state guard), so a stale export cannot reopen it. {@code is_secret} is preserved
      * from the source ({@code null} for sources that do not classify secrecy).
      */
-    private void applyInquirySource(Inquiry entity, CanonicalInquiry row) {
+    private void applyInquirySource(Inquiry entity, CanonicalInquiry row, Instant readAt) {
         entity.setTitle(row.title());
         entity.setBody(row.body());
         // informStatus records the latest raw source token verbatim; canonical status is
@@ -477,8 +489,13 @@ public class IngestionService {
         // The platform's own answer, when the source carries one. Only ever written FROM the source:
         // a row that stops carrying an answer is a source that does not publish answer bodies, not a
         // seller who deleted one, so an existing stored answer is never cleared by a null.
+        //
+        // And the time the body was read moves only with a body (2026-11-06 seventeenth review): a status-only read keeps
+        // the old text, and must not lend it today's date. {@code readAt} is the same instant this read stamps on
+        // last_seen_at, so "the last read carried the body" is an equality, not a guess about how close two clocks were.
         if (row.answerBody() != null) {
             entity.setAnswerBody(row.answerBody());
+            entity.setAnswerBodySeenAt(readAt);
         }
         if (row.answeredAt() != null) {
             entity.setAnsweredAt(row.answeredAt());
@@ -515,6 +532,60 @@ public class IngestionService {
         inquiries.save(entity);
     }
 
+    /**
+     * Record what the comment lane found for this inquiry on this read (Cafe24 board 6, 2026-11-08).
+     *
+     * <p><b>A row that did not look writes nothing.</b> {@code commentCheck == null} is every other channel, every
+     * article the source already called answered, and every collection without the lane; overwriting on it would
+     * turn "we did not look this time" into "we never looked".
+     *
+     * <p><b>A failed look is recorded as a failure, and only as one.</b> {@code NOT_CHECKED} moves the result and the
+     * attempt time; the success-only time stays where it was, so a failure is never read as "checked just now". No
+     * result here touches {@code status} or the work item: a proven shop answer has already widened the canonical
+     * status upstream (the mapper) and reaches the work item through the existing answered path, and the other two
+     * results neither close a task nor reopen an answered inquiry.
+     *
+     * <p>A thread reply is not a question anyone waits on, so it never carries the record — the mapper refuses to
+     * attach one, and this refuses to store one on a row already known to be a reply.
+     */
+    /**
+     * <b>A look that could not find the article at all</b> (2026-11-08, open-inquiry recheck). The recheck names an
+     * article we hold and asks the source about it; when the source returns no such article, there is no row to ingest
+     * and no answer to read — only the fact that this look failed. Recorded exactly as a failed look is everywhere else:
+     * {@code NOT_CHECKED} and its time, the success-only time left where it was. Nothing else moves — not the status, not
+     * the work item, not {@code last_seen_at}: an absent article is not a deletion and not an answer.
+     *
+     * @return whether a stored, non-reply row of this org and channel received the record
+     */
+    public boolean recordFailedCommentLook(UUID orgId, UUID channelId, String externalId, java.time.Instant attemptedAt) {
+        if (orgId == null || channelId == null || externalId == null || attemptedAt == null) {
+            return false;
+        }
+        Optional<Inquiry> stored = inquiries.findByOrgIdAndChannelIdAndExternalId(orgId, channelId, externalId);
+        if (stored.isEmpty()
+                || stored.get().threadRole() == com.sellerops.ingest.canonical.SourceThreadRole.REPLY) {
+            return false;
+        }
+        Inquiry entity = stored.get();
+        entity.setCommentCheck(com.sellerops.ingest.canonical.CommentAnswerCheck.Result.NOT_CHECKED);
+        entity.setCommentCheckAttemptedAt(attemptedAt);
+        inquiries.save(entity);
+        return true;
+    }
+
+    private static void applyCommentCheck(Inquiry entity, CanonicalInquiry row) {
+        com.sellerops.ingest.canonical.CommentAnswerCheck check = row.commentCheck();
+        if (check == null
+                || entity.threadRole() == com.sellerops.ingest.canonical.SourceThreadRole.REPLY) {
+            return;
+        }
+        entity.setCommentCheck(check.result());
+        entity.setCommentCheckAttemptedAt(check.attemptedAt());
+        if (check.result().confirmed()) {
+            entity.setCommentCheckedAt(check.attemptedAt());
+        }
+    }
+
     private void applyThreadRole(Inquiry entity, CanonicalInquiry row) {
         if (row.threadRole() == null) {
             return;
@@ -549,10 +620,21 @@ public class IngestionService {
                 && java.util.Objects.equals(existing.getSecret(), row.isSecret())
                 && (row.answerBody() == null
                         || java.util.Objects.equals(existing.getAnswerBody(), row.answerBody()))
+                // The answer time is a fact of its own (2026-11-06 eighteenth review): a channel that re-dates an answer
+                // — an edit, a re-registration — while the text and status stay the same was read as "nothing changed"
+                // and the stored time stayed on the first one. A read that carries no time claims nothing and keeps it.
+                && (row.answeredAt() == null || sameInstant(existing.getAnsweredAt(), row.answeredAt()))
                 // A row whose text never changes still CHANGES for us the first time the source's
                 // structural role is read off it. Leaving it out of this comparison is what would let
                 // the historical backlog keep a classification made before the field was projected.
                 && (row.threadRole() == null || row.threadRole() == existing.threadRole());
+    }
+
+    /** Equal at the precision the column keeps (microseconds), so a source with finer clocks is not "changed" forever. */
+    private static boolean sameInstant(Instant stored, Instant read) {
+        return stored != null && read != null
+                && stored.truncatedTo(java.time.temporal.ChronoUnit.MICROS)
+                        .equals(read.truncatedTo(java.time.temporal.ChronoUnit.MICROS));
     }
 
     public IngestOutcome ingestOrderSummaries(UUID orgId, UUID channelId, List<CanonicalOrderSummary> rows) {

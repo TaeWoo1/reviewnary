@@ -41,6 +41,13 @@ public class KnowledgeQuestionIntent {
         this.generator = new KnowledgeQuestionIntentGenerator(transport, properties);
     }
 
+
+    /** The AI meter (2026-10-31, {@code docs/standing/reply_agent_v1.md} §8 ②). Optional: a context without one is unmetered. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setQuota(com.sellerops.agent.quota.AgentQuotaService quota) {
+        generator.meter.use(quota);
+    }
+
     /** A capability that is not present — what a unit test and a context without it get. */
     public static KnowledgeQuestionIntent disabled() {
         return new KnowledgeQuestionIntent(null, null, null);

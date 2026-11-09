@@ -9,9 +9,14 @@ package com.sellerops.agent.quota;
  */
 public record QuotaDecision(boolean allowed, Reason reason, long used, int limit) {
 
-    public enum Reason { DAILY_RUNS, DAILY_LLM_CALLS }
+    public enum Reason { DAILY_RUNS, DAILY_LLM_CALLS, DAILY_ITEMS, AUTOMATIC_SHARE }
 
     static QuotaDecision pass() {
+        return new QuotaDecision(true, null, 0, 0);
+    }
+
+    /** No call is about to be made (a held draft is resumed), so nothing is charged and nothing refuses. */
+    public static QuotaDecision passWithoutCharge() {
         return new QuotaDecision(true, null, 0, 0);
     }
 
@@ -26,6 +31,11 @@ public record QuotaDecision(boolean allowed, Reason reason, long used, int limit
                     + " 화면의 숫자와 목록은 그대로 이용할 수 있습니다.";
             case DAILY_LLM_CALLS -> "오늘 사용할 수 있는 AI 처리량을 모두 썼습니다. 내일 다시 사용할 수 있고,"
                     + " 화면의 숫자와 목록은 그대로 이용할 수 있습니다.";
+            case DAILY_ITEMS -> "오늘 AI에게 맡길 수 있는 건수를 모두 썼습니다. 내일 다시 맡길 수 있고,"
+                    + " 이미 시작한 일과 화면의 목록은 그대로 이용할 수 있습니다.";
+            // Automatic work only: the rest of the day is kept for the seller's own presses (2026-10-29).
+            case AUTOMATIC_SHARE -> "오늘 자동 작업에 쓸 AI 처리량을 다 써서 미리 쓰지 않았습니다. 남은 처리량은 판매자가 직접"
+                    + " 요청할 때 쓸 수 있습니다.";
         };
     }
 }

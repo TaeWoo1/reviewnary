@@ -119,7 +119,11 @@ public class InquiryPublishBindingWriter {
 
             audit(orgId, workItemId, commandId, InquiryWorkItemEvent.APPROVAL_GRANTED,
                     InquiryWorkItemPhase.PROPOSED, InquiryWorkItemPhase.APPROVED, actor);
-            audit(orgId, workItemId, "intent:" + workItemId, InquiryWorkItemEvent.ACTION_INTENT_CREATED,
+            // A work item approved again after an approval was taken back writes a second intent row: its audit id is
+            // suffixed, as the first approval's stays bare, so the insert is never refused by the first one.
+            long taken = audits.countByWorkItemIdAndEventType(workItemId, InquiryWorkItemEvent.APPROVAL_WITHDRAWN);
+            audit(orgId, workItemId, taken == 0 ? "intent:" + workItemId : "intent:" + workItemId + "#" + (taken + 1),
+                    InquiryWorkItemEvent.ACTION_INTENT_CREATED,
                     InquiryWorkItemPhase.APPROVED, InquiryWorkItemPhase.ACTION_PENDING, actor);
 
             return savedExecution;

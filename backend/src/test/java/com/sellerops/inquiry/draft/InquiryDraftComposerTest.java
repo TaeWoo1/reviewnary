@@ -74,6 +74,7 @@ class InquiryDraftComposerTest {
     @Autowired InquiryRepository inquiries;
     @Autowired InquiryReplyDraftRepository draftRows;
     @Autowired InquiryDraftEvidenceRepository evidence;
+    @Autowired DraftReviewPendingRepository pendingDrafts;
     @Autowired ProductRepository products;
     @Autowired com.sellerops.product.ProductVariantRepository variants;
     @Autowired OrgKnowledgeSourceRepository orgSources;
@@ -118,6 +119,148 @@ class InquiryDraftComposerTest {
     }
 
     @Test
+    @DisplayName("a figure the evidence writes is confirmed by the model's figure check before the draft is saved")
+    void aWrittenFigureIsConfirmedByTheModel() {
+        UUID productId = seedProduct();
+        StubLibrary library = StubLibrary.returning(passage("규격", "상품 폭 10mm, 평일 배송 2일, 제주 배송 7일"));
+
+        StubModel wrong = StubModel.writing("[답변] 규격", "상품 높이는 10mm입니다.");
+        wrong.figureCheck = figures -> java.util.Optional.of(List.of(
+                new AgentDraftGenerator.FigureVerdict(1, "NOT_SUPPORTED")));
+        GeneratedDraftView refused = composer(library, wrong).generate(org, seedProposed(productId).getId(), user);
+        assertThat(refused.draft()).as("about another thing — not saved").isNull();
+        assertThat(refused.unavailableMessage()).contains("숫자 10").contains("같은 대상·조건");
+        assertThat(wrong.sawFigures).singleElement().asString().contains("10mm").contains("상품 높이는 10mm입니다");
+
+        StubModel silent = StubModel.writing("[답변] 규격", "상품 폭은 10mm입니다.");
+        silent.figureCheck = figures -> java.util.Optional.empty();
+        assertThat(composer(library, silent).generate(org, seedProposed(productId).getId(), user).draft())
+                .as("a check that did not answer confirms nothing").isNull();
+
+        StubModel right = StubModel.writing("[답변] 규격", "상품 폭은 10mm입니다.");
+        assertThat(composer(library, right).generate(org, seedProposed(productId).getId(), user).draft())
+                .as("confirmed — saved").isNotNull();
+
+        StubModel none = StubModel.writing("[답변] 규격", "벽면에 붙이시면 됩니다.");
+        composer(library, none).generate(org, seedProposed(productId).getId(), user);
+        assertThat(none.sawFigures).as("no figure to list").isEmpty();
+        assertThat(none.checks).as("but its facts are still checked").isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("a draft the day's AI ceiling stopped from being checked is held, then checked without being written again")
+    void aDraftTheCeilingStoppedIsHeldThenResumed() {
+        UUID productId = seedProduct();
+        StubLibrary library = StubLibrary.returning(passage("사용법", "흐르는 물에 손으로 세척해 주세요."));
+        InquiryWorkItem wi = seedProposed(productId);
+        boolean[] ceiling = {true};
+        int[] draftCharges = {0};
+        AgentQuotaService quota = new AgentQuotaService(null, null) {
+            @Override
+            public Charge consumeCharge(UUID orgId, AgentUsageKind kind, String runId,
+                                         com.sellerops.agent.quota.AgentUsageActor actor, int ahead) {
+                draftCharges[0]++;
+                return new Charge(new QuotaDecision(true, null, 0, 0), null);
+            }
+
+            @Override
+            public Charge chargeCheck(UUID orgId, AgentUsageKind kind, String step,
+                                      com.sellerops.agent.quota.AgentUsageActor actor) {
+                return new Charge(ceiling[0] ? new QuotaDecision(false, QuotaDecision.Reason.DAILY_LLM_CALLS, 9, 9)
+                        : new QuotaDecision(true, null, 0, 0), null);
+            }
+        };
+        StubModel model = StubModel.writing("[답변] 세척", "흐르는 물에 손으로 세척해 주세요.");
+        InquiryDraftComposer composer = composer(library, model, quota);
+        composer.setPending(pendingDrafts);
+
+        GeneratedDraftView held = composer.generate(org, wi.getId(), user);
+        assertThat(held.draft()).as("not shown unchecked").isNull();
+        assertThat(held.unavailableMessage()).contains("검토 대기");
+        assertThat(pendingDrafts.findByOrgIdAndWorkItemId(org, wi.getId())).as("and not thrown away").isPresent();
+        assertThat(model.checks).isZero();
+
+        ceiling[0] = false;
+        GeneratedDraftView resumed = composer.generate(org, wi.getId(), user);
+        assertThat(resumed.draft()).as("checked now, and saved").isNotNull();
+        assertThat(resumed.draft().comments()).isEqualTo("흐르는 물에 손으로 세척해 주세요.");
+        assertThat(draftCharges[0]).as("the held text is not written — or charged — again").isEqualTo(1);
+        assertThat(model.calls).isEqualTo(1);
+        assertThat(model.checks).isEqualTo(1);
+        assertThat(pendingDrafts.findByOrgIdAndWorkItemId(org, wi.getId())).as("the hold is done").isEmpty();
+    }
+
+    @Test
+    @DisplayName("the drafter's own time and tokens are written on the usage row charged for the draft")
+    void theDraftersTokensReachItsUsageRow() {
+        UUID productId = seedProduct();
+        StubLibrary library = StubLibrary.returning(passage("사용법", "흐르는 물에 손으로 세척해 주세요."));
+        UUID draftRow = UUID.randomUUID();
+        List<Object[]> recorded = new java.util.ArrayList<>();
+        AgentQuotaService quota = new AgentQuotaService(null, null) {
+            @Override
+            public Charge consumeCharge(UUID orgId, AgentUsageKind kind, String runId,
+                                         com.sellerops.agent.quota.AgentUsageActor actor, int ahead) {
+                return new Charge(new QuotaDecision(true, null, 0, 0), draftRow);
+            }
+
+            @Override
+            public Charge chargeCheck(UUID orgId, AgentUsageKind kind, String step,
+                                      com.sellerops.agent.quota.AgentUsageActor actor) {
+                return new Charge(new QuotaDecision(true, null, 0, 0), null);
+            }
+
+            @Override
+            public void recordOutcome(UUID usageId, long elapsedMs, Integer inputTokens, Integer outputTokens) {
+                recorded.add(new Object[] {usageId, elapsedMs, inputTokens, outputTokens});
+            }
+        };
+        StubModel model = StubModel.writing("[답변] 세척", "흐르는 물에 손으로 세척해 주세요.");
+        model.reports = new com.sellerops.agent.llm.AgentLlmCallMetrics(2535L, 4613, 158, -1);
+
+        GeneratedDraftView view = composer(library, model, quota).generate(org, seedProposed(productId).getId(), user);
+
+        assertThat(view.draft()).isNotNull();
+        assertThat(recorded).as("the drafter's row, with what the call reported")
+                .anySatisfy(r -> assertThat(r).containsExactly(draftRow, 2535L, 4613, 158));
+    }
+
+    @Test
+    @DisplayName("a held draft resumes only while every input of its draft call is the same — style, company, scope too")
+    void aHeldDraftResumesOnlyOverTheSameInputs() {
+        List<AgentDraftGenerator.Passage> shown = List.of(new AgentDraftGenerator.Passage("상품 정보", "사용법", "손세척"));
+        List<String> instructions = List.of("규격 무관", "합니다체로", "회사 소개", "ANSWER_ALL");
+        String base = InquiryDraftComposer.pendingInputsHash("t", "d", shown, "주문 없음", "m1", instructions);
+        assertThat(InquiryDraftComposer.pendingInputsHash("t", "d", shown, "주문 없음", "m1", instructions)).isEqualTo(base);
+        for (int i = 0; i < instructions.size(); i++) {
+            List<String> changed = new java.util.ArrayList<>(instructions);
+            changed.set(i, changed.get(i) + " (바뀜)");
+            assertThat(InquiryDraftComposer.pendingInputsHash("t", "d", shown, "주문 없음", "m1", changed))
+                    .as("instruction %d changed", i).isNotEqualTo(base);
+        }
+        assertThat(InquiryDraftComposer.pendingInputsHash("t", "d", shown, "주문 없음", "m2", instructions))
+                .as("another model").isNotEqualTo(base);
+    }
+
+    @Test
+    @DisplayName("a fact with no number in it is checked too — 「식기세척기 사용 가능」 the evidence never says is not saved")
+    void aFactWithoutANumberIsChecked() {
+        UUID productId = seedProduct();
+        StubLibrary library = StubLibrary.returning(passage("사용법", "흐르는 물에 손으로 세척해 주세요."));
+        StubModel model = StubModel.writing("[답변] 세척", "식기세척기에 넣어 세척하셔도 됩니다.");
+        model.claimsAnswer = List.of(new AgentDraftGenerator.ClaimVerdict("식기세척기에 넣어 세척하셔도 됩니다",
+                "NOT_SUPPORTED"));
+        GeneratedDraftView refused = composer(library, model).generate(org, seedProposed(productId).getId(), user);
+        assertThat(refused.draft()).isNull();
+        assertThat(refused.unavailableMessage()).contains("「식기세척기에 넣어 세척하셔도 됩니다」");
+
+        StubModel conflicting = StubModel.writing("[답변] 세척", "손세척을 권해 드립니다.");
+        conflicting.claimsAnswer = List.of(new AgentDraftGenerator.ClaimVerdict("손세척을 권해 드립니다", "CONFLICT"));
+        assertThat(composer(library, conflicting).generate(org, seedProposed(productId).getId(), user)
+                .unavailableMessage()).contains("근거끼리 서로 다르게");
+    }
+
+    @Test
     @DisplayName("a citation carries the sentence the drafter was shown, not only its title")
     void citationsCarryACheckableExcerpt() {
         // The 2026-08-26 defect: the source's TITLE is about 접착, the passage that grounded the
@@ -127,7 +270,7 @@ class InquiryDraftComposerTest {
         String faq = "Q. 떼었다가 다시 붙일 수 있나요?\nA. 기본 양면테이프는 1회용입니다.\n"
                 + "Q. 몇 가닥까지 들어가나요?\nA. 일반 가전 전선 기준으로 3~4가닥이 여유 있게 들어갑니다.";
         GeneratedDraftView view = composer(StubLibrary.returning(passage("자주 묻는 질문 - 접착과 재부착", faq)),
-                StubModel.writing("[답변] 문의", "확인해 안내드리겠습니다.")).generate(org, wi.getId(), user);
+                StubModel.writing("[답변] 문의", "부착면을 닦은 뒤 다시 붙여 주세요.")).generate(org, wi.getId(), user);
 
         assertThat(view.evidence()).singleElement().satisfies(e -> {
             assertThat(e.title()).isEqualTo("자주 묻는 질문 - 접착과 재부착");
@@ -146,7 +289,7 @@ class InquiryDraftComposerTest {
         // than from anything the citation row holds.
         KnowledgePassage stored = seedChunk(productId, "자주 묻는 질문", "A. 3~4가닥이 여유 있게 들어갑니다.");
         GeneratedDraftView view = composer(StubLibrary.returning(stored),
-                StubModel.writing("[답변] 문의", "확인해 안내드리겠습니다.")).generate(org, wi.getId(), user);
+                StubModel.writing("[답변] 문의", "부착면을 닦은 뒤 다시 붙여 주세요.")).generate(org, wi.getId(), user);
 
         // The generate path holds the passage text; the read path has to go and get it. Both must
         // put the same thing in front of the seller, or the citation changes when the page reloads.
@@ -172,6 +315,61 @@ class InquiryDraftComposerTest {
         assertThat(model.sawKnowledge).as("the evidence is still retrieved and still shown").hasSize(1);
         assertThat(model.sawSpecScope).isEqualTo(
                 SpecApplicability.Applicability.VARIANT_UNRESOLVED.messageKo());
+    }
+
+    @Test
+    @DisplayName("the claim check is told the 규격 line the drafter had, and a fact said beside the caution is still refused "
+            + "(2026-11-01 ninth review)")
+    void theClaimCheckReadsTheCautionItselfAndStillRefusesWhatIsBesideIt() {
+        UUID productId = seedProduct();
+        StubLibrary library = StubLibrary.returning(passage("자주 묻는 질문",
+                "Q. 몇 가닥까지 들어가나요? A. 일반 가전 전선 기준으로 3~4가닥이 여유 있게 들어갑니다."));
+        StubModel model = StubModel.writing("[답변] 문의",
+                "일반 가전 전선 기준으로 3~4가닥이 들어갑니다. 규격·옵션에 따라 달라질 수 있어 쓰실 규격을 알려 주세요.");
+        GeneratedDraftView kept = composer(library, model)
+                .generate(org, seedAsking(productId, "문의", "전선이 몇 가닥까지 들어가나요?").getId(), user);
+        assertThat(kept.draft()).isNotNull();
+        assertThat(model.sawCheckSpecLine).isEqualTo(model.sawSpecScope).contains("확정되지 않았습니다");
+
+        StubModel beside = StubModel.writing("[답변] 문의",
+                "일반 가전 전선 기준으로 3~4가닥이 들어갑니다. 옵션에 따라 다를 수 있고 어린이가 사용해도 안전합니다.");
+        beside.claimsAnswer = List.of(new AgentDraftGenerator.ClaimVerdict(
+                "옵션에 따라 다를 수 있고 어린이가 사용해도 안전합니다", "NOT_SUPPORTED"));
+        GeneratedDraftView refused = composer(library, beside)
+                .generate(org, seedAsking(productId, "문의", "전선이 몇 가닥까지 들어가나요?").getId(), user);
+        assertThat(refused.draft()).as("nothing this backend reads waves a sentence through after the check").isNull();
+    }
+
+    @Test
+    @DisplayName("evidence that says the value holds for every option is answered without asking back; one value seen "
+            + "with no such statement still asks (2026-11-01 ninth review)")
+    void everyOptionEvidenceIsAnsweredWithoutAskingBack() {
+        UUID productId = seedProduct();
+        StubModel model = StubModel.writing("[답변] 길이", "한 줄 길이는 2.4m입니다.");
+        GeneratedDraftView answered = composer(StubLibrary.returning(passage("규격", "모든 옵션 공통으로 한 줄 길이는 2.4m입니다.")),
+                model).generate(org, seedAsking(productId, "길이", "한 줄 길이가 몇 m인가요?").getId(), user);
+        assertThat(answered.draft()).isNotNull();
+        assertThat(model.sawSpecScope).isEqualTo(SpecApplicability.EVERY_OPTION_LINE);
+        assertThat(model.sawCheckSpecLine).isEqualTo(SpecApplicability.EVERY_OPTION_LINE);
+
+        StubModel one = StubModel.writing("[답변] 길이", "한 줄 길이는 2.4m입니다.");
+        composer(StubLibrary.returning(passage("규격", "한 줄의 길이는 2.4m입니다.")), one)
+                .generate(org, seedAsking(productId, "길이", "한 줄 길이가 몇 m인가요?").getId(), user);
+        assertThat(one.sawSpecScope).contains("확정되지 않았습니다");
+    }
+
+    @Test
+    @DisplayName("a reply the claim check reads as not answering — thanks and the customer's words back — is not saved "
+            + "(2026-11-01 eighth review, synthetic Q3)")
+    void aGroundedReplyThatStatesNothingIsNotSaved() {
+        UUID productId = seedProduct();
+        StubLibrary library = StubLibrary.returning(passage("사용법", "흐르는 물에 손으로 세척해 주세요."));
+        StubModel model = StubModel.writing("[답변] 세척", "문의 남겨 주셔서 감사합니다. 말씀 잘 전달받았습니다.");
+        model.answeredAnswer = false;
+        GeneratedDraftView refused = composer(library, model).generate(org, seedProposed(productId).getId(), user);
+        assertThat(refused.draft()).isNull();
+        assertThat(refused.unavailableMessage()).isEqualTo(InquiryDraftComposer.NO_ANSWER_IN_DRAFT);
+        assertThat(refused.unavailableKind()).isEqualTo("HELD_BY_CHECK");
     }
 
     @Test
@@ -517,6 +715,19 @@ class InquiryDraftComposerTest {
     /** 회사 정보 (Seller Context v1-B). Null = no profile service, the state before the package. */
     private com.sellerops.organization.profile.SellerProfileService profiles;
 
+    @Test
+    @DisplayName("a background draft is charged as automatic work; the seller's press as the seller's (2026-10-29)")
+    void aBackgroundDraftIsAutomaticWork() {
+        assertThat(InquiryDraftComposer.usageActorOf("SELLER:" + UUID.randomUUID()))
+                .isEqualTo(com.sellerops.agent.quota.AgentUsageActor.USER);
+        assertThat(InquiryDraftComposer.usageActorOf(com.sellerops.proactive.ProactiveInquiryInvestigator.ACTOR))
+                .isEqualTo(com.sellerops.agent.quota.AgentUsageActor.RUN);
+        assertThat(InquiryDraftComposer.usageActorOf(
+                com.sellerops.operationscase.investigation.CaseDraftPreparer.ACTOR))
+                .isEqualTo(com.sellerops.agent.quota.AgentUsageActor.RUN);
+        assertThat(InquiryDraftComposer.usageActorOf(null)).isEqualTo(com.sellerops.agent.quota.AgentUsageActor.RUN);
+    }
+
     private InquiryDraftComposer composer(StubLibrary library, StubModel model, AgentQuotaService quota) {
         // The 상세페이지 trigger, switched off: a disabled trigger returns before it touches a
         // repository, which is also the assertion that the draft path behaves identically in a
@@ -647,8 +858,9 @@ class InquiryDraftComposerTest {
     private static AgentQuotaService allowingQuota() {
         return new AgentQuotaService(null, null) {
             @Override
-            public QuotaDecision consume(UUID orgId, AgentUsageKind kind, String runId) {
-                return new QuotaDecision(true, null, 0, 0);
+            public Charge consumeCharge(UUID orgId, AgentUsageKind kind, String runId,
+                                         com.sellerops.agent.quota.AgentUsageActor actor, int ahead) {
+                return new Charge(new QuotaDecision(true, null, 0, 0), null);
             }
         };
     }
@@ -656,8 +868,9 @@ class InquiryDraftComposerTest {
     private static AgentQuotaService exhaustedQuota() {
         return new AgentQuotaService(null, null) {
             @Override
-            public QuotaDecision consume(UUID orgId, AgentUsageKind kind, String runId) {
-                return new QuotaDecision(false, QuotaDecision.Reason.DAILY_LLM_CALLS, 5, 5);
+            public Charge consumeCharge(UUID orgId, AgentUsageKind kind, String runId,
+                                         com.sellerops.agent.quota.AgentUsageActor actor, int ahead) {
+                return new Charge(new QuotaDecision(false, QuotaDecision.Reason.DAILY_LLM_CALLS, 5, 5), null);
             }
         };
     }
@@ -705,6 +918,34 @@ class InquiryDraftComposerTest {
 
     /** A model that either writes a fixed draft or is off, recording exactly what it was shown. */
     static final class StubModel extends AgentDraftService {
+
+        /** The figure check: confirms every figure — SAID_BACK for the customer's own — unless a test sets it. */
+        java.util.function.Function<java.util.List<String>,
+                java.util.Optional<java.util.List<com.sellerops.agent.llm.AgentDraftGenerator.FigureVerdict>>> figureCheck =
+                figures -> java.util.Optional.of(java.util.stream.IntStream.range(0, figures.size())
+                        .mapToObj(i -> new com.sellerops.agent.llm.AgentDraftGenerator.FigureVerdict(i + 1,
+                                figures.get(i).contains("고객 문의에만") ? "SAID_BACK" : "SUPPORTED")).toList());
+        java.util.List<String> sawFigures = new java.util.ArrayList<>();
+
+        @Override
+        public com.sellerops.agent.llm.AgentDraftGenerator.FigureResult checkFiguresMetered(
+                java.util.UUID orgId, String question, java.util.List<com.sellerops.agent.llm.AgentDraftGenerator.Passage> evidence,
+                String orderSentence, String specLine, String answerScope, String draft, java.util.List<String> figures) {
+            sawFigures.addAll(figures);
+            sawCheckSpecLine = specLine;
+            checks++;
+            return new com.sellerops.agent.llm.AgentDraftGenerator.FigureResult(figureCheck.apply(figures), "stub", null,
+                    claimsAnswer, answeredAnswer);
+        }
+
+        /** Whether the check reads the draft as an answer — yes unless a test says otherwise. */
+        boolean answeredAnswer = true;
+        /** The 규격 line the claim check was told the drafter had. */
+        String sawCheckSpecLine;
+
+        /** The claims the check reports — none unless a test sets them. */
+        java.util.List<com.sellerops.agent.llm.AgentDraftGenerator.ClaimVerdict> claimsAnswer = java.util.List.of();
+        int checks;
         private final AgentDraftResponseParser.ParsedDraft answer;
         /**
          * Separate from {@code answer != null} since 2026-08-27, because the two failures it used to
@@ -769,7 +1010,13 @@ class InquiryDraftComposerTest {
             sawKnowledge.addAll(knowledge);
             sawOrderState = orderState;
             sawSpecScope = specScope;
+            if (reports != null) {
+                com.sellerops.agent.llm.AgentLlmCallCapture.report(reports);
+            }
             return Optional.ofNullable(answer);
         }
+
+        /** What this fake's call says it cost, as the real drafter reports it; null reports nothing. */
+        com.sellerops.agent.llm.AgentLlmCallMetrics reports;
     }
 }

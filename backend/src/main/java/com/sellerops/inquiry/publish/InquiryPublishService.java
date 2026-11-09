@@ -108,6 +108,40 @@ public class InquiryPublishService {
                 adapters, targetState, capabilities, channels, null, identity, null);
     }
 
+    /** The web recheck (2026-11-01), looked up when used; null in a context wired by hand. */
+    private org.springframework.beans.factory.ObjectProvider<com.sellerops.replyhold.ReplyHoldService> holds;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setReplyHolds(
+            org.springframework.beans.factory.ObjectProvider<com.sellerops.replyhold.ReplyHoldService> holds) {
+        this.holds = holds;
+    }
+
+    /** The code of a confirm refused for the answer's length — the screen shows its message instead of "changed". */
+    public static final String REPLY_TOO_LONG = "REPLY_TOO_LONG";
+
+    /** The answer was written before the seller corrected what kind of inquiry this is (2026-11-05). */
+    public static final String KIND_CORRECTED = "판단을 고치기 전에 만든 답변이에요. 고친 판단으로 답변을 다시 만든 뒤 보내 주세요.";
+
+    private org.springframework.beans.factory.ObjectProvider<
+            com.sellerops.inquiry.sellercheck.InquiryKindCorrectionService> kinds;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setKinds(org.springframework.beans.factory.ObjectProvider<
+            com.sellerops.inquiry.sellercheck.InquiryKindCorrectionService> kinds) {
+        this.kinds = kinds;
+    }
+
+    static final String OPEN_QUESTIONS_LEFT = "답하지 못한 질문 %d개가 남아 있어요. 질문마다 「처리함」을 눌러 처리한 뒤 보내 주세요.";
+
+    private org.springframework.beans.factory.ObjectProvider<com.sellerops.openquestion.OpenQuestionService> openQuestions;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setOpenQuestions(
+            org.springframework.beans.factory.ObjectProvider<com.sellerops.openquestion.OpenQuestionService> openQuestions) {
+        this.openQuestions = openQuestions;
+    }
+
     /** Confirm the exact draft version, bind immutably, create the intent, and (if a channel adapter exists) dispatch. */
     public PublishStatusView confirmAndPublish(UUID orgId, UUID workItemId, UUID sellerUserId,
                                                String commandId, String expectedFingerprint) {
@@ -137,13 +171,53 @@ public class InquiryPublishService {
             if (!head.getContentFingerprint().equals(expectedFingerprint)) {
                 throw ApiException.conflict("초안이 변경되었습니다. 최신 초안을 확인하세요.");
             }
+            // A draft that answered only part of what was asked waits for the seller to handle each question it left
+            // (tenth review: 「필수 미해결 항목이 남으면 전송 보류」) — whoever wrote the version being confirmed.
+            com.sellerops.openquestion.OpenQuestionService open = openQuestions == null ? null
+                    : openQuestions.getIfAvailable();
+            long left = open == null ? 0 : open.openRequired(orgId,
+                    com.sellerops.openquestion.OpenQuestionService.INQUIRY, workItemId);
+            if (left > 0) {
+                throw ApiException.conflict(OPEN_QUESTIONS_LEFT.formatted(left));
+            }
+            // Written under the reading the seller corrected: drafted for another kind of inquiry, not this one.
+            com.sellerops.inquiry.sellercheck.InquiryKindCorrectionService kindService = kinds == null ? null
+                    : kinds.getIfAvailable();
+            if (kindService != null) {
+                kindService.standingFor(orgId, workItemId)
+                        .filter(c -> Boolean.FALSE.equals(kindService.writtenUnder(workItemId, c)))
+                        .ifPresent(c -> {
+                            throw ApiException.conflict(KIND_CORRECTED);
+                        });
+            }
             Inquiry target = loadInquiry(orgId, workItem.getInquiryId());
+            // Longer than this inquiry's send limit: kept, never cut, not sent — the seller is told how long it is, how
+            // long it may be and what to do, under its own code so the screen does not read it as a changed draft
+            // (2026-11-02).
+            Optional<com.sellerops.inquiry.reply.InquiryReplyLength.Limit> limit = com.sellerops.inquiry.reply
+                    .InquiryReplyLength.forInquiry(channelCode(workItem.getChannelId()), target.getSourceSubtype());
+            if (limit.isPresent()) {
+                int length = com.sellerops.inquiry.reply.InquiryReplyLength.length(limit.get(), head.getComments());
+                if (length > limit.get().max()) {
+                    throw ApiException.conflict(REPLY_TOO_LONG,
+                            com.sellerops.inquiry.reply.InquiryReplyLength.overLimitKo(limit.get(), length));
+                }
+            }
             if (target.getExternalId() == null || target.getExternalId().isBlank()) {
                 // Nothing to bind an approval TO. Refuse at approval time rather than accepting a
                 // confirmation the dispatch could only fail on.
                 throw ApiException.badRequest("이 문의에는 채널이 알아볼 수 있는 식별자가 없어 답변을 등록할 수 없습니다.");
             }
             assertCarriable(workItem, target);
+            // Confirming is approving and sending in one step, so it is the one place a draft written before a policy
+            // change is checked again before it leaves (2026-11-01) — whoever wrote it.
+            com.sellerops.replyhold.ReplyHoldService holdService = holds == null ? null : holds.getIfAvailable();
+            if (holdService != null) {
+                InquiryWorkItem item = workItem;
+                holdService.inquiryApprovalBlock(item, head).ifPresent(reason -> {
+                    throw ApiException.conflict(reason);
+                });
+            }
             binding.bind(workItem, head,
                     new InquiryPublishBindingWriter.ApprovalTarget(
                             workItem.getSellerAccountId(), workItem.getChannelId(),
@@ -319,6 +393,14 @@ public class InquiryPublishService {
         // Defense: publish exactly the approved payload.
         if (!approved.getContentFingerprint().equals(approval.getApprovedFingerprint())) {
             return PublishOutcomeCategory.RETRYABLE_FAILURE;
+        }
+        // An approved answer that no longer stands against today's knowledge is not sent, and not rewritten: the seller
+        // fixes it, or confirms past what may be confirmed (2026-11-01). A changed citation alone does not hold it.
+        com.sellerops.replyhold.ReplyHoldService holdService = holds == null ? null : holds.getIfAvailable();
+        if (holdService != null) {
+            holdService.inquiryRegistrationBlock(workItem, approved).ifPresent(reason -> {
+                throw ApiException.conflict(reason);
+            });
         }
 
         // The last gate before the only marketplace WRITE in the product: is this still the target
@@ -650,8 +732,10 @@ public class InquiryPublishService {
     }
 
     private String attemptSuffixed(String base, InquiryWorkItem workItem) {
+        // A re-armed attempt and an approval taken back and given again are both a later attempt (2026-11-05).
         long attempt = 1 + audits.countByWorkItemIdAndEventType(
-                workItem.getId(), InquiryWorkItemEvent.EXECUTION_REARMED);
+                workItem.getId(), InquiryWorkItemEvent.EXECUTION_REARMED)
+                + audits.countByWorkItemIdAndEventType(workItem.getId(), InquiryWorkItemEvent.APPROVAL_WITHDRAWN);
         return attempt == 1 ? base : base + "#" + attempt;
     }
 

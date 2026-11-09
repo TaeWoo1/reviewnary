@@ -30,5 +30,11 @@ public record InquiryRowItem(
         Instant receivedAt,
         Instant answeredAt,
         String sourceSubtype,
-        String executableIdentity) {
+        String executableIdentity,
+        /**
+         * The work item whose reply the seller already decided — approved, registering, or registered — so the same
+         * inquiry opens again with its approved answer and the seller's record (2026-11-03 sixth review). Deliberately not
+         * {@code workItemId}, which still means 「a row the seller can draft on」; null otherwise.
+         */
+        UUID decidedWorkItemId) {
 }

@@ -107,4 +107,32 @@ public class AgentDraftProperties implements AgentCapabilityGate {
     public String reasoningEffort() {
         return reasoningEffort;
     }
+
+    /*
+     * The figure check's own model and budget (owner, 2026-10-28: 「숫자가 든 문의 초안은 AI를 두 번 불러 사용량을 두 배로
+     * 쓴다」). It is a short classification — three closed words per figure — so a smaller, cheaper model on the SAME
+     * vendor and key is the natural setting. Blank = the draft's own model and budget. Field-injected so a test or a
+     * deployment that never names them keeps the draft's settings.
+     */
+    @Value("${sellerops.agent.draft.check-model:}")
+    private String checkModel = "";
+
+    @Value("${sellerops.agent.draft.check-max-output-tokens:0}")
+    private int checkMaxOutputTokens;
+
+    @Value("${sellerops.agent.draft.check-reasoning-effort:}")
+    private String checkReasoningEffort = "";
+
+    public String checkModel() {
+        return checkModel == null || checkModel.isBlank() ? model : checkModel.strip();
+    }
+
+    public int checkMaxOutputTokens() {
+        return checkMaxOutputTokens > 0 ? checkMaxOutputTokens : maxOutputTokens;
+    }
+
+    public String checkReasoningEffort() {
+        return checkReasoningEffort == null || checkReasoningEffort.isBlank() ? reasoningEffort
+                : checkReasoningEffort.strip();
+    }
 }

@@ -44,7 +44,7 @@ public class ReviewMediaInspector {
     public ReviewMediaInspector(ReviewMediaVisionProperties properties, ReviewMediaRepository media,
                                 ReviewRepository reviews, AgentLlmTransport transport) {
         this(properties, media, reviews,
-                new ReviewMediaVisionGenerator(transport, properties.model(), properties.apiKey(),
+                new ReviewMediaVisionGenerator(transport, properties.vendor(), properties.model(), properties.apiKey(),
                         properties.maxOutputTokens(), properties.reasoningEffort()),
                 // Constructed here, not injected: a container-wide fetcher bean would make credential-free URL egress
                 // available to every class (DetailImageFetchBoundaryTest names this holder).

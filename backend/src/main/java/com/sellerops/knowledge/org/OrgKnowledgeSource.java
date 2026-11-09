@@ -27,8 +27,8 @@ import org.hibernate.annotations.Filter;
  *
  * <p><b>{@link #version} is not an audit trail and does not pretend to be one.</b> It says which
  * revision of the policy a draft was grounded in, so a citation recorded last week can be read as
- * "판매자가 그때 그렇게 정해 두었다" rather than as today's text. The previous body is not kept here;
- * when that is needed it is a separate append-only table, not a column.
+ * "판매자가 그때 그렇게 정해 두었다" rather than as today's text. The previous body is not kept here: it is
+ * {@link OrgKnowledgeRevision}, a separate append-only table, not a column (V164).
  */
 @Getter
 @Setter

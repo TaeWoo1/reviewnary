@@ -32,14 +32,24 @@ public class ReviewMediaVisionProperties {
     private final String apiKey;
     private final int maxOutputTokens;
     private final String reasoningEffort;
+    private final com.sellerops.agent.llm.provider.LlmVendor vendor;
 
+    /** The shape before the shared model connection (2026-10-29): OpenAI. */
+    public ReviewMediaVisionProperties(boolean enabled, String enabledOrgIds, String model, String apiKey, int maxOutputTokens, String reasoningEffort) {
+        this(enabled, enabledOrgIds, model, apiKey, maxOutputTokens, reasoningEffort, "OPENAI");
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
     public ReviewMediaVisionProperties(
             @Value("${sellerops.review.media-vision.enabled:false}") boolean enabled,
             @Value("${sellerops.review.media-vision.enabled-org-ids:}") String enabledOrgIds,
             @Value("${sellerops.review.media-vision.model:gpt-5.6-terra}") String model,
             @Value("${sellerops.review.media-vision.api-key:}") String apiKey,
             @Value("${sellerops.review.media-vision.max-output-tokens:600}") int maxOutputTokens,
-            @Value("${sellerops.review.media-vision.reasoning-effort:none}") String reasoningEffort) {
+            @Value("${sellerops.review.media-vision.reasoning-effort:none}") String reasoningEffort,
+            @Value("${sellerops.review.media-vision.vendor:OPENAI}") String vendor) {
+        // OPENAI | ANTHROPIC (2026-10-29); an unknown name refuses to boot.
+        this.vendor = com.sellerops.agent.llm.provider.LlmVendor.parse(vendor);
         this.enabled = enabled;
         this.allOrgs = enabledOrgIds != null && enabledOrgIds.trim().equals("*");
         this.enabledOrgIds = allOrgs ? List.of() : parseIds(enabledOrgIds);
@@ -77,5 +87,9 @@ public class ReviewMediaVisionProperties {
 
     public String reasoningEffort() {
         return reasoningEffort;
+    }
+
+    public com.sellerops.agent.llm.provider.LlmVendor vendor() {
+        return vendor;
     }
 }

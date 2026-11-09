@@ -62,6 +62,16 @@ public class VendorReplyTask extends BaseEntity {
     private Integer approvedDraftVersion;
 
     /**
+     * Who pressed 「답글 등록 요청」 here — this server's user, never the vendor server's account — and when the vendor
+     * server took that approval (V162, boundary §3). Null for an approval made elsewhere.
+     */
+    @Column(name = "approved_by_user_id")
+    private UUID approvedByUserId;
+
+    @Column(name = "approved_locally_at")
+    private java.time.Instant approvedLocallyAt;
+
+    /**
      * The draft version this PC last checked again after the task was sent back, and the fingerprints it checked it
      * under ({@code ReviewDraftBasis.Fingerprints#combined}). A version held for the seller is not checked again
      * until its text or the seller's knowledge, policy or wording changes.

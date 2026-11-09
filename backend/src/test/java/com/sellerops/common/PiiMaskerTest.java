@@ -61,4 +61,16 @@ class PiiMaskerTest {
         assertThat(PiiMasker.maskName(null)).isNull();
         assertThat(PiiMasker.maskName("")).isEqualTo("");
     }
+
+    /** 2026-10-28: an order number read as 「[전화번호]」 — the phone shapes matched inside a longer digit run. */
+    @org.junit.jupiter.api.Test
+    void aNumberThatRunsOnIsNotAPhoneNumber() {
+        assertThat(PiiMasker.maskText("주문번호 2026102812345678 확인 부탁드려요")).doesNotContain("[전화번호]")
+                .contains("2026102812345678");
+        assertThat(PiiMasker.maskText("주문 20241015010123456789")).doesNotContain("[전화번호]");
+        // A phone number is still one, with or without separators, at the start, end or beside words.
+        assertThat(PiiMasker.maskText("010-1234-5678로 연락 주세요")).isEqualTo("[전화번호]로 연락 주세요");
+        assertThat(PiiMasker.maskText("연락처01012345678")).isEqualTo("연락처[전화번호]");
+        assertThat(PiiMasker.maskText("매장 02-123-4567")).isEqualTo("매장 [전화번호]");
+    }
 }

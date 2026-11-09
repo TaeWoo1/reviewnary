@@ -36,6 +36,7 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final ObjectProvider<CredentialHandoffCapabilityFilter> credentialHandoffCapabilityFilter;
     private final ObjectProvider<HelperDeviceAuthFilter> helperDeviceAuthFilter;
+    private final ObjectProvider<com.sellerops.auth.runtoken.ReplyRunTokenAuthFilter> replyRunTokenAuthFilter;
     private final String corsOrigin;
     private final ObjectProvider<ClientRegistrationRepository> clientRegistrations;
     private final ObjectProvider<SocialLoginSuccessHandler> socialSuccess;
@@ -44,6 +45,7 @@ public class SecurityConfig {
     public SecurityConfig(JwtAuthFilter jwtAuthFilter,
                           ObjectProvider<CredentialHandoffCapabilityFilter> credentialHandoffCapabilityFilter,
                           ObjectProvider<HelperDeviceAuthFilter> helperDeviceAuthFilter,
+                          ObjectProvider<com.sellerops.auth.runtoken.ReplyRunTokenAuthFilter> replyRunTokenAuthFilter,
                           @Value("${sellerops.cors.origin}") String corsOrigin,
                           ObjectProvider<ClientRegistrationRepository> clientRegistrations,
                           ObjectProvider<SocialLoginSuccessHandler> socialSuccess,
@@ -52,6 +54,7 @@ public class SecurityConfig {
         this.corsOrigin = corsOrigin;
         this.credentialHandoffCapabilityFilter = credentialHandoffCapabilityFilter;
         this.helperDeviceAuthFilter = helperDeviceAuthFilter;
+        this.replyRunTokenAuthFilter = replyRunTokenAuthFilter;
         this.clientRegistrations = clientRegistrations;
         this.socialSuccess = socialSuccess;
         this.socialFailure = socialFailure;
@@ -114,6 +117,12 @@ public class SecurityConfig {
         HelperDeviceAuthFilter deviceFilter = helperDeviceAuthFilter.getIfAvailable();
         if (deviceFilter != null) {
             http.addFilterBefore(deviceFilter, JwtAuthFilter.class);
+        }
+        // Same shape for the reply agent's run token (2026-10-28, docs/standing/reply_agent_v1.md §2): it owns every bearer
+        // with the run prefix, opens the reply-run routes or ends the request 401, and never reaches the JWT filter.
+        com.sellerops.auth.runtoken.ReplyRunTokenAuthFilter runFilter = replyRunTokenAuthFilter.getIfAvailable();
+        if (runFilter != null) {
+            http.addFilterBefore(runFilter, JwtAuthFilter.class);
         }
         // oauth2Login only when the deployer configured a provider — the existing email/password/JWT system
         // is untouched either way; success mints a one-time code, never a session or a JWT in a URL

@@ -7,9 +7,9 @@ import java.util.UUID;
 /**
  * One channel review, read in full — and the target that finds it again on the seller's own screen.
  *
- * <p>{@code body} is the redacted full text ({@code VocPreviewSanitizer.redactFullBody}): line structure
- * kept, nothing truncated, volatile PII-shaped spans tokenized. {@code bodyRedacted} says whether anything
- * was replaced, so the operator knows they are reading a redaction rather than wondering.
+ * <p>{@code body} is the full text as the customer wrote it ({@code VocPreviewSanitizer.plainFullBody}, owner
+ * 2026-10-28): line structure kept, nothing truncated, nothing tokenized — this is the review's own screen, opened by
+ * the seller it was written to. Lists and previews keep the redaction. {@code bodyRedacted} is therefore false.
  *
  * <p><b>{@code locateTarget} is what the seller is shown about how the review is identified</b> — the
  * 노출상품ID and 옵션ID the 상세 panel prints, beside the date and rating it already shows.

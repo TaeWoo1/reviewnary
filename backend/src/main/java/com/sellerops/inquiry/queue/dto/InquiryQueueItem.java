@@ -48,5 +48,19 @@ public record InquiryQueueItem(
         /** Which resource of the channel produced the row ({@code InquirySourceSubtype} name), or null. */
         String sourceSubtype,
         /** {@code MARKETPLACE} | {@code NONE} — see {@code InquiryDetail.executableIdentity}. */
-        String executableIdentity) {
+        String executableIdentity,
+        /**
+         * What the seller is asked to check on the seller centre ({@code ORDER_ACTION} · {@code ORDER_STATE}) while nothing
+         * is recorded yet — the Home's 「이 내용만 알려주세요」 (2026-11-03 sixth review). Null once a record stands, and null
+         * when nothing is asked.
+         */
+        String sellerCheckAsk) {
+
+    public InquiryQueueItem(UUID workItemId, UUID inquiryId, UUID sellerAccountId, UUID channelId, String channelCode,
+                            String channelNameKo, UUID productId, String productName, String phase, String status,
+                            String title, String snippet, Instant receivedAt, boolean hasDraft, String sourceSubtype,
+                            String executableIdentity) {
+        this(workItemId, inquiryId, sellerAccountId, channelId, channelCode, channelNameKo, productId, productName, phase,
+                status, title, snippet, receivedAt, hasDraft, sourceSubtype, executableIdentity, null);
+    }
 }

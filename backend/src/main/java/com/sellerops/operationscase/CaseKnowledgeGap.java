@@ -61,7 +61,9 @@ public record CaseKnowledgeGap(String basis, String missingSubject, String sugge
 
     /** Null unless the draft path refused for lack of an answer basis — a switched-off model is not a knowledge gap. */
     public static CaseKnowledgeGap fromDraft(CaseDraftPreparer.Prepared prepared) {
-        if (!AnswerBasisState.NO_ANSWER_BASIS.name().equals(prepared.answerBasis())) {
+        // A partial answer is missing knowledge too — the questions it left are what the seller can teach (tenth review).
+        if (!AnswerBasisState.NO_ANSWER_BASIS.name().equals(prepared.answerBasis())
+                && !AnswerBasisState.PARTIAL_ANSWER.name().equals(prepared.answerBasis())) {
             return null;
         }
         return of(prepared.answerBasis(), prepared.gap(), null, "DRAFT");

@@ -35,6 +35,8 @@ class StandingApprovalExcludesReportedTest {
 
     @Autowired ReviewReplyApprovalRepository approvals;
     @Autowired ReviewReplyOutcomeRepository outcomes;
+    @Autowired com.sellerops.review.ReviewRepository reviews;
+    @Autowired com.sellerops.channel.ChannelRepository channels;
 
     private final UUID org = UUID.randomUUID();
     private static final Instant WHEN = Instant.parse("2026-09-05T00:00:00Z");
@@ -96,6 +98,62 @@ class StandingApprovalExcludesReportedTest {
                 .as("the count and the list are one predicate, or the Home's number describes a different set "
                         + "than its rows")
                 .isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("a review the channel already shows answered is not waiting to be registered (2026-10-28)")
+    void aReviewTheChannelShowsAnsweredLeavesTheList() {
+        // An approval made in July stayed in 등록 대기 after the channel's own record said the review had a reply.
+        UUID answered = approveOn(review(com.sellerops.review.ReviewReplyState.ANSWERED));
+        UUID pending = approveOn(review(com.sellerops.review.ReviewReplyState.PENDING));
+        UUID unknown = approveOn(review(com.sellerops.review.ReviewReplyState.UNKNOWN));
+
+        assertThat(standing())
+                .as("a channel that has not said there is a reply is not a reply")
+                .containsExactlyInAnyOrder(pending, unknown)
+                .doesNotContain(answered);
+        assertThat(approvals.countStandingByOrgId(org)).isEqualTo(2);
+        // The approval itself is untouched: it is still the record of what the seller decided.
+        assertThat(approvals.findAll().stream().filter(x -> x.getReviewId().equals(answered)))
+                .singleElement().extracting(ReviewReplyApproval::getState).isEqualTo(ReviewReplyApprovalState.APPROVED);
+    }
+
+    private com.sellerops.review.Review review(com.sellerops.review.ReviewReplyState state) {
+        com.sellerops.channel.Channel ch = new com.sellerops.channel.Channel();
+        ch.setCode("NAVER" + UUID.randomUUID().toString().substring(0, 6));
+        ch.setNameKo("네이버");
+        ch.setStatus(com.sellerops.channel.ChannelStatus.AVAILABLE);
+        ch.setSupportsInquiry(true);
+        ch.setSupportsReview(true);
+        ch.setSupportsOrder(true);
+        ch.setSupportsSales(true);
+        ch.setSupportsProduct(true);
+        ch.setSortOrder(0);
+        channels.save(ch);
+        com.sellerops.review.Review r = new com.sellerops.review.Review();
+        r.setOrgId(org);
+        r.setChannelId(ch.getId());
+        r.setBody("본문");
+        r.setRating(1);
+        r.setNegative(true);
+        r.setReceivedAt(WHEN);
+        r.setContentHash(UUID.randomUUID().toString());
+        r.setDedupKeyVersion(2);
+        r.setReplyState(state);
+        return reviews.save(r);
+    }
+
+    private UUID approveOn(com.sellerops.review.Review review) {
+        ReviewReplyApproval a = new ReviewReplyApproval();
+        a.setOrgId(org);
+        a.setReviewId(review.getId());
+        a.setState(ReviewReplyApprovalState.APPROVED);
+        a.setApprovedVersion(1);
+        a.setApprovedFingerprint("fp-1");
+        a.setDecidedBy("operator@example.com");
+        a.setDecidedAt(WHEN);
+        approvals.save(a);
+        return review.getId();
     }
 
     @Test

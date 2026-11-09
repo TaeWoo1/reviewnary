@@ -32,14 +32,32 @@ public final class NeedAggregation {
         if (needs == null || needs.isEmpty()) {
             return AnswerBasisState.NO_ANSWER_BASIS;
         }
+        // Owner, 2026-11-01 tenth review: a message whose needs the store answers only in part is drafted for the part it
+        // answers, and the rest is left to the seller one question at a time — never sent as if complete (the inquiry's
+        // send is held while a required question is open, OpenQuestionService). Before, one uncovered need sent the whole
+        // message to the seller: 「두 질문에만 답한 답변은 세 질문 모두에 답한 것처럼 읽힌다」 — the hold answers that.
         boolean conditional = false;
+        boolean answerable = false;
+        boolean open = false;
         for (NeedResult n : needs) {
-            if (!n.status().covered()) {
-                return AnswerBasisState.NO_ANSWER_BASIS;
-            }
+            answerable |= answersSomething(n);
+            open |= !n.status().covered();
             conditional |= n.status() == NeedStatus.CONDITIONAL_ON_CUSTOMER;
         }
-        return conditional ? AnswerBasisState.NEEDS_CLARIFICATION : AnswerBasisState.GROUNDED;
+        if (!answerable) {
+            return AnswerBasisState.NO_ANSWER_BASIS;
+        }
+        return open ? AnswerBasisState.PARTIAL_ANSWER
+                : conditional ? AnswerBasisState.NEEDS_CLARIFICATION : AnswerBasisState.GROUNDED;
+    }
+
+    /**
+     * Whether a reply can say anything true about this need: it is covered, or the evidence answers part of it (a
+     * shipping rule for 「언제 출고되나요」 with no order to confirm it by — the rule is said as a rule, and what it does not
+     * settle stays open). A need with nothing cited answers nothing.
+     */
+    public static boolean answersSomething(NeedResult n) {
+        return n.status().covered() || n.status() == NeedStatus.PARTIAL && !n.evidence().isEmpty();
     }
 
     /**
@@ -87,6 +105,8 @@ public final class NeedAggregation {
                                            EvidenceScope.CaseScope caseScope) {
         EvidenceScope.CaseScope scope = caseScope == null ? EvidenceScope.CaseScope.NONE : caseScope;
         List<NeedResult> out = new ArrayList<>(needs.size());
+        // What a need would be without the settlement, by position — restored when no action of this inquiry was done.
+        Map<Integer, NeedResult> unsettled = new java.util.HashMap<>();
         for (InquiryNeed need : needs) {
             NeedVerdict v = verdicts.get(need.id());
             NeedStatus judged = v == null ? null : v.status();
@@ -130,6 +150,19 @@ public final class NeedAggregation {
                 status = NeedStatus.CONDITIONAL_ON_CUSTOMER;
                 why = NeedResult.Enforcement.DECLARED_CUSTOMER_INPUT;
             }
+            // Settled, not answered (2026-11-06 thirteenth review): the judge says the seller's record of an action already
+            // carried out made this need's open part moot; code accepts that only under its own conditions.
+            EvidenceCandidate settling = status.covered() ? null : settlingRecord(need, v, evidence, scope);
+            NeedStatus beforeSettling = status;
+            NeedResult.Enforcement whyBefore = why;
+            List<EvidenceCandidate> citedBefore = List.copyOf(cited);
+            if (settling != null) {
+                if (!cited.contains(settling)) {
+                    cited.add(settling);
+                }
+                status = NeedStatus.FULL;
+                why = NeedResult.Enforcement.SETTLED_BY_ACTION;
+            }
             boolean acquirable = false;
             if (!status.covered() && need.type() != null && need.type().aboutTheListing()) {
                 if (detail != null && detail.unreadable()) {
@@ -155,7 +188,59 @@ public final class NeedAggregation {
             }
             out.add(new NeedResult(judged, need, status, List.copyOf(cited), List.copyOf(offered),
                     v == null ? null : v.missing(), askCustomer, acquirable, status == judged ? null : why));
+            if (settling != null) {
+                unsettled.put(out.size() - 1, new NeedResult(judged, need, beforeSettling, citedBefore,
+                        List.copyOf(offered), v == null ? null : v.missing(), null, acquirable,
+                        beforeSettling == judged ? null : whyBefore));
+            }
+        }
+        // The action has to be one THIS inquiry asked for (fourteenth review, 2026-11-06): a settlement stands only beside
+        // an order-action need the same record answers in full. A refund done does not settle what an exchange needed.
+        for (Map.Entry<Integer, NeedResult> e : unsettled.entrySet()) {
+            EvidenceCandidate record = out.get(e.getKey()).settlingRecord();
+            boolean actionDone = out.stream().anyMatch(r -> r.need().type() == NeedType.ORDER_ACTION
+                    && r.status() == NeedStatus.FULL && !r.settledByAction() && r.evidence().contains(record));
+            if (!actionDone) {
+                out.set(e.getKey(), e.getValue());
+            }
         }
         return List.copyOf(out);
+    }
+
+    /**
+     * The need types a completed action can make moot: whether it can be done (a rule). Never an action request itself —
+     * the record answers it or it stays open; another action asked in the same message is never settled by this one.
+     */
+    static final java.util.Set<NeedType> SETTLEABLE = java.util.EnumSet.of(NeedType.POLICY);
+
+    /**
+     * The record that settles {@code need}, or null. All of it must hold — the judge naming a record is not enough:
+     * <ul>
+     *   <li>the need is about a rule ({@link #SETTLEABLE}) — never an action request, an order's state (a date, an
+     *       amount), a listing's fact, or a decision that is the seller's own; those the customer asked, and a finished
+     *       action does not answer them;</li>
+     *   <li>the record named is the seller's own record for this inquiry ({@code SELLER_CHECK}), attributed to this
+     *       Case's order, and says 처리 완료 — an action under way or refused settles nothing;</li>
+     *   <li>(after the loop, {@link #enforce}) an order-action need of this inquiry is answered in full by that same
+     *       record — the action done is one this inquiry asked for.</li>
+     * </ul>
+     * Even then the customer's question is not closed here: the composer closes it only when the claim check says the
+     * reply answered it (a rule asked separately — who pays the return shipping — is not answered by 「발송했습니다」).
+     * What this settles is the system's own open part of the need: what deciding the action would have taken.
+     */
+    static EvidenceCandidate settlingRecord(InquiryNeed need, NeedVerdict v, Map<String, EvidenceCandidate> evidence,
+                                            EvidenceScope.CaseScope scope) {
+        if (v == null || v.settledBy() == null || need.type() == null || !SETTLEABLE.contains(need.type())) {
+            return null;
+        }
+        EvidenceCandidate c = evidence.get(v.settledBy());
+        String order = scope == null ? null : scope.idOf(EvidenceScope.Kind.ORDER);
+        if (c == null || c.kind() != EvidenceCandidate.Kind.SELLER_CHECK
+                || !com.sellerops.inquiry.sellercheck.SellerCheckOutcome.DONE.name().equals(c.factKey())
+                || order == null || c.scope() == null || c.scope().kind() != EvidenceScope.Kind.ORDER
+                || !order.equals(c.scope().id())) {
+            return null;
+        }
+        return c;
     }
 }

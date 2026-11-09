@@ -11,7 +11,8 @@ import java.util.UUID;
 
 /**
  * The vendor server, holding one NAVER store: its review feed, its reply tasks and what the PC told it. The grant
- * answers with {@link #TOKEN} at once. {@code JdkVendorServerClientTest} holds the wire shapes; this holds behaviour.
+ * answers at once — with {@link #TOKEN} for the first code and a token of its own for each later one, as for a second
+ * organisation linking the same server account. {@code JdkVendorServerClientTest} holds the wire shapes; this holds behaviour.
  */
 final class FakeVendorServer implements VendorServerClient {
 
@@ -94,14 +95,25 @@ final class FakeVendorServer implements VendorServerClient {
                 t.draftBasis(), t.basisNoteJson(), t.pcRecheckVersion(), t.pcRecheck(), true));
     }
 
+    /** How many codes were asked for. The first redeems to {@link #TOKEN}, each later one to its own token. */
+    int codes;
+    /** The bearer of every feed read, in order — whose token read {@link #store}'s reviews. */
+    final List<String> feedBearers = new ArrayList<>();
+
+    static String tokenOf(int code) {
+        return code == 1 ? TOKEN : TOKEN + "-" + code;
+    }
+
     @Override
     public Code requestCode(String deviceName, String appVersion, String publicKeyBase64) {
-        return new Code("device-code", "BCDFGHJK", Instant.parse("2026-10-21T00:10:00Z"), 3);
+        codes++;
+        return new Code("device-code-" + codes, "BCDFGHJK", Instant.parse("2026-10-21T00:10:00Z"), 3);
     }
 
     @Override
     public Poll poll(String deviceCode) {
-        return new Linked(TOKEN, UUID.randomUUID(), Instant.parse("2027-04-15T00:00:00Z"));
+        int code = Integer.parseInt(deviceCode.substring("device-code-".length()));
+        return new Linked(tokenOf(code), UUID.randomUUID(), Instant.parse("2027-04-15T00:00:00Z"));
     }
 
     @Override
@@ -141,6 +153,7 @@ final class FakeVendorServer implements VendorServerClient {
     @Override
     public FeedPage reviewFeed(String installToken, UUID storeId, long cursor, int limit) {
         bearers.add(installToken);
+        feedBearers.add(installToken);
         if (!store.equals(storeId)) {
             return new FeedPage(List.of(), cursor, false);
         }
@@ -202,6 +215,16 @@ final class FakeVendorServer implements VendorServerClient {
     }
 
     /** As the server: only the latest version and its exact text, and only while it awaits approval. */
+    @Override
+    public TaskSnapshot approve(String installToken, UUID taskId, int version, String fingerprint, String commandId,
+                                String approvedBy) {
+        approvers.add(String.valueOf(approvedBy));
+        return approve(installToken, taskId, version, fingerprint, commandId);
+    }
+
+    /** Who each approval named (V15 on the vendor server), "null" when none — in order. */
+    final List<String> approvers = new ArrayList<>();
+
     @Override
     public TaskSnapshot approve(String installToken, UUID taskId, int version, String fingerprint, String commandId) {
         bearers.add(installToken);

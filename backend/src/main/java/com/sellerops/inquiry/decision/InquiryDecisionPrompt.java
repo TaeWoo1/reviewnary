@@ -19,6 +19,42 @@ public final class InquiryDecisionPrompt {
     /** The coverage judge's instruction, selectable so the calibration can compare v1 and v2 on identical inputs. */
     public static final String JUDGE_V1 = "coverage-judge/v1";
     public static final String JUDGE_V2 = "coverage-judge/v2";
+    /**
+     * <b>v2's instruction, answered keyed by need id</b> (owner, 2026-10-29: 「v3 구조로 만들고 v2와 비교해 줘」). v2 asks for
+     * a LIST of exactly one verdict per need and states the count as {@code minItems = maxItems}; Claude's structured
+     * outputs do not take array counts, so on Claude nothing enforced it and a missing or doubled verdict failed the call
+     * ({@code VERDICT_SET}). v3 makes each need id a REQUIRED property of one object with no other property allowed — a
+     * shape both vendors enforce — so one verdict per need, none missing, none invented, is the schema itself. The rules
+     * are v2's word for word: only the answer's shape differs, so a comparison measures the shape.
+     */
+    public static final String JUDGE_V3 = "coverage-judge/v3";
+    /**
+     * <b>v2's rules, held to what the customer asked</b> (2026-11-02, after case-eval-r11u). v2 reads 「the answer is
+     * fixed」 against everything a reply about the need might go on to say: 「20박스 사면 할인되나요」 against a rule that
+     * grants it from 20 boxes came back PARTIAL in two rounds of three, missing 「할인율 · 적용 방법」 — details the customer
+     * never asked for. And its seller-decision rule kept a decision the seller had already written down, with its
+     * condition, from closing a need whose case the customer's own message settles. v4 adds the first rule and narrows
+     * the second; every other line is v2's, and so is the answer's shape, so a comparison measures the rules.
+     */
+    public static final String JUDGE_V4 = "coverage-judge/v4";
+    /**
+     * <b>v4, and a value the evidence says is not settled yet</b> (2026-11-05, after the eleventh review's re-eval). A seller
+     * record that says 「새 상품 도착일은 아직 정할 수 없음」 answers that the day is open — not the day. Read as FULL it closes
+     * the customer's question with an explanation; read as NONE the drafter may not say what the seller wrote. v5 adds one
+     * rule: when the need asks for the value itself, PARTIAL, the 「not yet」 cited, the value still missing; when it asks
+     * whether the value is settled, 「not yet」 is its answer (twelfth review). A value merely absent from the evidence is
+     * never read as 「not yet」. Every other line, and the answer's shape, is v4's.
+     */
+    public static final String JUDGE_V5 = "coverage-judge/v5";
+    /**
+     * <b>v5, and a need the seller's completed action made moot</b> (2026-11-06 thirteenth review). The seller recorded
+     * 「교환 상품 발송함」 and the need 「can this be exchanged」 still came back PARTIAL for want of the rule that would have
+     * decided it — so the seller was asked to decide again what they had already done. v6 adds one rule and one field:
+     * {@code settled_by}, the seller's record of the action already carried out, for a need that asks whether that action
+     * can be done. The status is still judged from the evidence as before; code decides whether the record settles the
+     * need ({@link NeedAggregation#settlingRecord}). Every other line is v5's.
+     */
+    public static final String JUDGE_V6 = "coverage-judge/v6";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private InquiryDecisionPrompt() {
@@ -44,7 +80,79 @@ public final class InquiryDecisionPrompt {
     }
 
     static String judgeSystem(String version) {
-        return JUDGE_V1.equals(version) ? judgeSystem() : judgeSystemV2();
+        if (JUDGE_V1.equals(version)) {
+            return judgeSystem();
+        }
+        if (JUDGE_V4.equals(version)) {
+            return judgeSystemV4();
+        }
+        if (JUDGE_V5.equals(version)) {
+            return judgeSystemV5();
+        }
+        if (JUDGE_V6.equals(version)) {
+            return judgeSystemV6();
+        }
+        return JUDGE_V3.equals(version) ? judgeSystemV3() : judgeSystemV2();
+    }
+
+    /** v2 with the asked-scope rule added and the seller-decision rule narrowed (see {@link #JUDGE_V4}). */
+    static String judgeSystemV4() {
+        String v2 = judgeSystemV2();
+        String sellerRule = "- 이 고객의 개별 주문 상태나 판매자의 판단이 있어야 답이 되는 need는, 일반 기준이 있어도 FULL이 아닙니다.\n";
+        String asked = "- 확신이 없으면 FULL이 아니라 PARTIAL이나 NONE을 고릅니다.\n";
+        if (!v2.contains(sellerRule) || !v2.contains(asked)) {
+            throw new IllegalStateException("coverage-judge/v4 is written against v2's rules, and they changed");
+        }
+        return v2.replace(sellerRule, "- 이 고객의 개별 주문 상태나 판매자의 판단이 있어야 답이 되는 need는, 일반 기준이 있어도 FULL이 아닙니다. "
+                        + "다만 판매자가 그 판단을 조건과 함께 기준으로 적어 두었고, 문의에 밝힌 사실만으로 이 고객이 그 조건에 "
+                        + "들어맞는지 정해지면, 판매자의 판단이 근거에 있는 것입니다.\n")
+                .replace(asked, asked + "- received(문의 받은 때)가 주어지면 그 날짜 · 요일 · 주말 여부는 판매자 쪽이 아는 사실입니다. "
+                        + "고객에게서 받을 값(customer_input)이 아니고, 그것만으로 답이 정해지면 그 사실로 판정합니다. 공휴일인지는 "
+                        + "주어지지 않으니 평일이 영업일이라고 가정하지 않습니다.\n"
+                        + "- need가 묻는 것까지만 판정합니다. 고객이 묻지 않은 세부(얼마인지·언제인지·어떻게 하는지처럼 "
+                        + "다음에 물을 법한 것)가 근거에 없다는 이유로 FULL을 낮추지 않고, missing에도 쓰지 않습니다. "
+                        + "되는지를 물었으면, 되는지와 그 조건이 답입니다.\n");
+    }
+
+    /** v4 with the 「not settled yet」 rule added (see {@link #JUDGE_V5}). */
+    static String judgeSystemV5() {
+        String v4 = judgeSystemV4();
+        String anchor = "- 확신이 없으면 FULL이 아니라 PARTIAL이나 NONE을 고릅니다.\n";
+        if (!v4.contains(anchor)) {
+            throw new IllegalStateException("coverage-judge/v5 is written against v4's rules, and they changed");
+        }
+        return v4.replace(anchor, anchor + "- need가 값 자체(언제 · 얼마 · 어느 것)를 묻는데 근거(판매자 확인 기록 포함)가 그 값이 아직 "
+                + "정해지지 않았다고 적고 있으면 그 need는 PARTIAL입니다. 정해지지 않았다는 사실은 근거가 답하는 것이니 evidence에 그 "
+                + "근거를 넣고, 아직 남은 그 값은 missing에 씁니다. need가 정해졌는지 여부를 묻는다면 「아직 정해지지 않았다」가 그 답이므로 "
+                + "이 규칙으로 낮추지 않습니다. 근거에 값이 없다는 것만으로는 정해지지 않았다고 보지 않습니다.\n");
+    }
+
+    /** v5 with the settled-by-action rule and its field added (see {@link #JUDGE_V6}). */
+    static String judgeSystemV6() {
+        String v5 = judgeSystemV5();
+        String anchor = "- 확신이 없으면 FULL이 아니라 PARTIAL이나 NONE을 고릅니다.\n";
+        String field = "- precedents: need가 FULL이나 CONDITIONAL_ON_CUSTOMER가 아닐 때, 예전 답변 중 이 need에 대한 일반적인 답으로 다시 쓸 수 있는 P id. 특정 주문·특정 시점·그 대화에만 해당하는 답은 넣지 않습니다.\n";
+        String output = "\"ask_customer\":\"...\",\"precedents\":[\"P1\"]}]}";
+        if (!v5.contains(anchor) || !v5.contains(field) || !v5.contains(output)) {
+            throw new IllegalStateException("coverage-judge/v6 is written against v5's rules, and they changed");
+        }
+        return v5.replace(anchor, anchor + "- 판매자 확인 기록이 고객이 요청한 조치를 이 주문에 이미 했다고(처리 완료) 적고 있고, need가 그 조치를 "
+                        + "할 수 있는지를 묻는 것이라면, 그 조치를 할지는 판매자가 이미 정한 것입니다. 그 need의 settled_by에 그 기록의 "
+                        + "E id를 씁니다. status · evidence · missing은 이 규칙과 상관없이 위 규칙대로 판정합니다. 그 조치와 다른 것 — 원인 · "
+                        + "안전 · 시점 · 금액처럼 고객이 따로 물은 것 — 을 묻는 need이거나, 기록이 접수 · 진행 중 · 처리 불가라고 적고 있으면 "
+                        + "settled_by는 null입니다.\n")
+                .replace(field, field + "- settled_by: 위 규칙에 해당할 때 그 판매자 확인 기록의 E id. 해당하지 않으면 null.\n")
+                .replace(output, "\"ask_customer\":\"...\",\"precedents\":[\"P1\"],\"settled_by\":null}]}");
+    }
+
+    /** v2's rules; the answer keyed by need id, one object per need, every need present (see {@link #JUDGE_V3}). */
+    static String judgeSystemV3() {
+        String v2 = judgeSystemV2();
+        String v2Output = v2.substring(v2.indexOf("출력은 "));
+        return v2.replace(v2Output, "출력은 need id를 키로 하는 객체 하나입니다. 받은 need마다 정확히 한 번, 받은 id만 씁니다. "
+                + "{\"verdicts\":{\"N1\":{\"status\":\"...\",\"evidence\":[\"E1\"],\"missing\":[],"
+                + "\"customer_input\":[],\"assumptions\":[],\"ask_customer\":\"...\",\"precedents\":[\"P1\"]}}} "
+                + "형식의 JSON만.");
     }
 
     static String judgeSystem() {
@@ -112,12 +220,15 @@ public final class InquiryDecisionPrompt {
     static ObjectNode judgeSchema(String version, List<String> needIds, List<String> evidenceIds,
                                   List<String> precedentIds) {
         boolean v2 = !JUDGE_V1.equals(version);
+        boolean keyed = JUDGE_V3.equals(version);
         ObjectNode item = MAPPER.createObjectNode();
         item.put("type", "object").put("additionalProperties", false);
         ObjectNode props = item.putObject("properties");
         ArrayNode required = item.putArray("required");
-        ObjectNode need = props.putObject("need").put("type", "string");
-        needIds.forEach(need.putArray("enum")::add);
+        if (!keyed) {
+            ObjectNode need = props.putObject("need").put("type", "string");
+            needIds.forEach(need.putArray("enum")::add);
+        }
         ObjectNode status = props.putObject("status").put("type", "string");
         for (String st : List.of("FULL", "CONDITIONAL_ON_CUSTOMER", "PARTIAL", "NONE")) {
             status.withArray("enum").add(st);
@@ -132,14 +243,30 @@ public final class InquiryDecisionPrompt {
         }
         props.putObject("ask_customer").putArray("type").add("string").add("null");
         props.set("precedents", idArray(precedentIds));
+        if (JUDGE_V6.equals(version)) {
+            props.putObject("settled_by").putArray("type").add("string").add("null");
+        }
         props.fieldNames().forEachRemaining(required::add);
         ObjectNode root = MAPPER.createObjectNode();
         root.put("type", "object").put("additionalProperties", false);
         root.putArray("required").add("verdicts");
         ObjectNode verdicts = root.putObject("properties").putObject("verdicts");
+        if (keyed) {
+            // One required property per need id and nothing else: the count is the shape, which both vendors enforce.
+            verdicts.put("type", "object").put("additionalProperties", false);
+            ObjectNode byNeed = verdicts.putObject("properties");
+            ArrayNode requiredNeeds = verdicts.putArray("required");
+            for (String id : needIds) {
+                byNeed.set(id, item.deepCopy());
+                requiredNeeds.add(id);
+            }
+            return format("coverage_judge_v3", root);
+        }
         verdicts.put("type", "array").put("minItems", needIds.size()).put("maxItems", needIds.size());
         verdicts.set("items", item);
-        return format(v2 ? "coverage_judge_v2" : "coverage_judge_v1", root);
+        return format(JUDGE_V6.equals(version) ? "coverage_judge_v6" : JUDGE_V4.equals(version) ? "coverage_judge_v4"
+                        : v2 ? "coverage_judge_v2" : "coverage_judge_v1",
+                root);
     }
 
     /** The planner's shape: ids are renumbered by code, the type is one of the eight. */
@@ -189,8 +316,20 @@ public final class InquiryDecisionPrompt {
     /** Needs, evidence and past answers by POSITION — no database id, no organisation, no customer identifier. */
     static String judgeUser(String question, List<InquiryNeed> needs, List<EvidenceCandidate> evidence,
                             List<PrecedentCandidate> precedents) {
+        return judgeUser(question, needs, evidence, precedents, null);
+    }
+
+    /**
+     * The same, with when the inquiry arrived — a date, a day of the week and whether it is a weekend, written by code
+     * ({@link InquiryMoment}); omitted when null so a request without it is byte-identical to before.
+     */
+    static String judgeUser(String question, List<InquiryNeed> needs, List<EvidenceCandidate> evidence,
+                            List<PrecedentCandidate> precedents, String received) {
         ObjectNode root = MAPPER.createObjectNode();
         root.put("customer", question);
+        if (received != null && !received.isBlank()) {
+            root.put("received", received);
+        }
         ArrayNode n = root.putArray("needs");
         for (InquiryNeed need : needs) {
             n.addObject().put("id", need.id()).put("ask", need.ask()).put("type", need.type().name());

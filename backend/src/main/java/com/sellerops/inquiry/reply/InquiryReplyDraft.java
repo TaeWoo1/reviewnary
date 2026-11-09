@@ -115,6 +115,21 @@ public class InquiryReplyDraft {
     @Column(name = "product_id")
     private UUID productId;
 
+    /**
+     * The seller's record (2026-11-03) its writer had in front of them — the one the composer read before drafting, or
+     * the one the screen showed when the seller saved. Null when none was shown. Compared with the record that stands
+     * before this version is approved or sent.
+     */
+    @Column(name = "seller_check_id")
+    private UUID sellerCheckId;
+
+    /**
+     * The kind correction (V178) this version's writer had in front of them, or null when none stood (V179). Checked
+     * against the standing correction before approval — never a save time.
+     */
+    @Column(name = "kind_correction_id")
+    private UUID kindCorrectionId;
+
     /** System/actor tag of who saved this version (e.g. {@code SELLER:<userId>}) — no PII. */
     @Column(name = "created_by", nullable = false, length = 120)
     private String createdBy;

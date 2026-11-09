@@ -198,43 +198,61 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
                     and locate('고소', r.body) = 0
                     and locate('곰팡', r.body) = 0
                     and locate('공정', r.body) = 0
+                    and locate('과열', r.body) = 0
                     and locate('구토', r.body) = 0
+                    and locate('깁스', r.body) = 0
+                    and locate('꿰맸', r.body) = 0
                     and locate('누전', r.body) = 0
                     and locate('다쳐', r.body) = 0
                     and locate('다쳤', r.body) = 0
                     and locate('다치', r.body) = 0
                     and locate('다칠', r.body) = 0
                     and locate('데어', r.body) = 0
+                    and locate('데었', r.body) = 0
                     and locate('데였', r.body) = 0
                     and locate('두드', r.body) = 0
                     and locate('멍들', r.body) = 0
                     and locate('멍이', r.body) = 0
+                    and locate('물집', r.body) = 0
                     and locate('발진', r.body) = 0
                     and locate('배탈', r.body) = 0
                     and locate('벌레', r.body) = 0
+                    and locate('베어', r.body) = 0
+                    and locate('베었', r.body) = 0
                     and locate('베여', r.body) = 0
                     and locate('베였', r.body) = 0
                     and locate('변질', r.body) = 0
                     and locate('변호', r.body) = 0
                     and locate('병원', r.body) = 0
+                    and locate('봉합', r.body) = 0
                     and locate('부상', r.body) = 0
                     and locate('불꽃', r.body) = 0
                     and locate('불이', r.body) = 0
+                    and locate('상처', r.body) = 0
                     and locate('설사', r.body) = 0
                     and locate('소비', r.body) = 0
                     and locate('소송', r.body) = 0
+                    and locate('숨막', r.body) = 0
                     and locate('식약', r.body) = 0
                     and locate('식중', r.body) = 0
                     and locate('신고', r.body) = 0
                     and locate('알러', r.body) = 0
                     and locate('알레', r.body) = 0
                     and locate('연기', r.body) = 0
+                    and locate('염증', r.body) = 0
                     and locate('응급', r.body) = 0
                     and locate('이물', r.body) = 0
+                    and locate('진물', r.body) = 0
+                    and locate('질식', r.body) = 0
+                    and locate('찔려', r.body) = 0
+                    and locate('찔렸', r.body) = 0
                     and locate('타는', r.body) = 0
                     and locate('토했', r.body) = 0
                     and locate('폭발', r.body) = 0
                     and locate('피가', r.body) = 0
+                    and locate('피났', r.body) = 0
+                    and locate('합선', r.body) = 0
+                    and locate('호흡', r.body) = 0
                     and locate('화상', r.body) = 0
             """;
 
@@ -1372,16 +1390,21 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
      */
     String SAFETY_STEM_PREDICATE = """
             (r.body like '%감전%' or r.body like '%고발%' or r.body like '%고소%' or r.body like '%곰팡%'
-             or r.body like '%공정%' or r.body like '%구토%' or r.body like '%누전%' or r.body like '%다쳐%'
-             or r.body like '%다쳤%' or r.body like '%다치%' or r.body like '%다칠%' or r.body like '%데어%'
+             or r.body like '%공정%' or r.body like '%과열%' or r.body like '%구토%' or r.body like '%깁스%'
+             or r.body like '%꿰맸%' or r.body like '%누전%' or r.body like '%다쳐%' or r.body like '%다쳤%'
+             or r.body like '%다치%' or r.body like '%다칠%' or r.body like '%데어%' or r.body like '%데었%'
              or r.body like '%데였%' or r.body like '%두드%' or r.body like '%멍들%' or r.body like '%멍이%'
-             or r.body like '%발진%' or r.body like '%배탈%' or r.body like '%벌레%' or r.body like '%베여%'
-             or r.body like '%베였%' or r.body like '%변질%' or r.body like '%변호%' or r.body like '%병원%'
-             or r.body like '%부상%' or r.body like '%불꽃%' or r.body like '%불이%' or r.body like '%설사%'
-             or r.body like '%소비%' or r.body like '%소송%' or r.body like '%식약%' or r.body like '%식중%'
-             or r.body like '%신고%' or r.body like '%알러%' or r.body like '%알레%' or r.body like '%연기%'
-             or r.body like '%응급%' or r.body like '%이물%' or r.body like '%타는%' or r.body like '%토했%'
-             or r.body like '%폭발%' or r.body like '%피가%' or r.body like '%화상%')
+             or r.body like '%물집%' or r.body like '%발진%' or r.body like '%배탈%' or r.body like '%벌레%'
+             or r.body like '%베어%' or r.body like '%베었%' or r.body like '%베여%' or r.body like '%베였%'
+             or r.body like '%변질%' or r.body like '%변호%' or r.body like '%병원%' or r.body like '%봉합%'
+             or r.body like '%부상%' or r.body like '%불꽃%' or r.body like '%불이%' or r.body like '%상처%'
+             or r.body like '%설사%' or r.body like '%소비%' or r.body like '%소송%' or r.body like '%숨막%'
+             or r.body like '%식약%' or r.body like '%식중%' or r.body like '%신고%' or r.body like '%알러%'
+             or r.body like '%알레%' or r.body like '%연기%' or r.body like '%염증%' or r.body like '%응급%'
+             or r.body like '%이물%' or r.body like '%진물%' or r.body like '%질식%' or r.body like '%찔려%'
+             or r.body like '%찔렸%' or r.body like '%타는%' or r.body like '%토했%' or r.body like '%폭발%'
+             or r.body like '%피가%' or r.body like '%피났%' or r.body like '%합선%' or r.body like '%호흡%'
+             or r.body like '%화상%')
             """;
 
     /**

@@ -25,6 +25,12 @@ import java.util.Set;
  *   <li>a SELLER_DECISION need is SELLER — no evidence closes it;</li>
  *   <li>a listing or policy need is KNOWLEDGE — an order fact alone does not close it.</li>
  * </ul>
+ * <b>The seller's own record</b> (2026-11-02 seller-check review): an order state, an order action or a seller decision
+ * the seller checked on the seller centre and recorded for THIS inquiry ({@code SELLER_CHECK}) is closed by the SELLER
+ * authority — recorded as such, never as the order entity or an executed procedure, so a later official read or executor
+ * can take the same place under its own name. It never closes a KNOWLEDGE need: one customer's result is not the rule.
+ * The one exception is not a close by knowledge: a need the seller's completed action made moot
+ * ({@link NeedResult.Enforcement#SETTLED_BY_ACTION}, 2026-11-06) is left resolved by the SELLER, under that name.
  * An unavailable authority is never substituted by another: it becomes {@link ResolutionState#CAPABILITY_GAP} with a
  * reason, and that is recorded apart from {@link ResolutionState#NEEDS_SELLER}.
  *
@@ -61,7 +67,12 @@ public final class AuthorityFence {
 
     /** Which authority a piece of v2 evidence speaks with — from its kind, i.e. its provenance, never its text. */
     public static Authority authorityOf(EvidenceCandidate.Kind kind) {
-        return kind == EvidenceCandidate.Kind.ORDER_FACT ? Authority.ENTITY_STATE : Authority.KNOWLEDGE;
+        return kind == EvidenceCandidate.Kind.ORDER_FACT ? Authority.ENTITY_STATE
+                : kind == EvidenceCandidate.Kind.SELLER_CHECK ? Authority.SELLER : Authority.KNOWLEDGE;
+    }
+
+    private static boolean citesSellerCheck(NeedResult r) {
+        return r.evidence().stream().anyMatch(e -> e.kind() == EvidenceCandidate.Kind.SELLER_CHECK);
     }
 
     public static List<NeedResult> apply(List<NeedResult> results, Context ctx) {
@@ -74,6 +85,15 @@ public final class AuthorityFence {
 
     static NeedResult apply(NeedResult r, Context ctx) {
         CapabilityId capability = planned(r.need().type());
+        if (r.settledByAction() && citesSellerCheck(r)) {
+            // Not a rule learned from one customer (a KNOWLEDGE need is still never closed by a record): the seller did
+            // the action this need was deciding, so there is nothing left to decide — closed by the seller, by name.
+            return r.withAuthority(r.status(), r.enforcement(), Resolution.of(CapabilityId.SELLER, ResolutionState.RESOLVED));
+        }
+        if (capability.authority() != Authority.KNOWLEDGE && r.status().covered() && citesSellerCheck(r)) {
+            // The seller looked and said so, for this inquiry: resolved by the seller, under the seller's name.
+            return r.withAuthority(r.status(), r.enforcement(), Resolution.of(CapabilityId.SELLER, ResolutionState.RESOLVED));
+        }
         return switch (capability.authority()) {
             case KNOWLEDGE -> knowledge(r, capability);
             case ENTITY_STATE -> order(r, ctx);

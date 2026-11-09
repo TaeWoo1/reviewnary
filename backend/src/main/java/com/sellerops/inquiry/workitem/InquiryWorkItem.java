@@ -61,4 +61,18 @@ public class InquiryWorkItem extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "disposition")
     private InquiryWorkItemDisposition disposition;
+
+    /**
+     * What the seller is asked to check on the seller centre — {@code ORDER_ACTION} · {@code ORDER_STATE} · null — as the
+     * last draft attempt read the inquiry (2026-11-02 seller-check review). The system's reading, never a verified one.
+     */
+    @Column(name = "seller_check_ask", length = 24)
+    private String sellerCheckAsk;
+
+    /**
+     * What kind of inquiry the service read this as at the last decided draft, before any seller correction (V178):
+     * {@code HOW_TO} · {@code ORDER_STATE} · {@code ORDER_ACTION}, or null before one. A correction never writes it.
+     */
+    @Column(name = "judged_kind", length = 16)
+    private String judgedKind;
 }

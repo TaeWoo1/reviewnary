@@ -59,6 +59,21 @@ server:
   forward-headers-strategy: ${SELLEROPS_FORWARD_HEADERS_STRATEGY:native}
 
 sellerops:
+  # Where the backend starts reply-agent runs (docs/standing/reply_agent_v1.md §2). Blank = no runs; the drafting-ahead
+  # path then keeps its single-call drafter.
+  agent-runtime:
+    base-url: ${SELLEROPS_AGENT_RUNTIME_URL:}
+  # ── Reply Agent v1 (2026-10-28, docs/standing/reply_agent_v1.md): judge · draft · critique · revise ──────
+  # Its own switch, off by default. Vendor, model, key and org list fall back to the draft capability's values so a
+  # deployment that drafts today can turn this on alone; set SELLEROPS_AGENT_REPLY_* to give it its own.
+  reply-agent:
+    enabled: ${SELLEROPS_AGENT_REPLY_ENABLED:false}
+    enabled-org-ids: ${SELLEROPS_AGENT_REPLY_ORG_IDS:${SELLEROPS_AGENT_DRAFT_ORG_IDS:}}
+    vendor: ${SELLEROPS_AGENT_REPLY_VENDOR:${SELLEROPS_AGENT_DRAFT_VENDOR:OPENAI}}
+    model: ${SELLEROPS_AGENT_REPLY_MODEL:${SELLEROPS_AGENT_DRAFT_MODEL:gpt-5-2025-08-07}}
+    api-key: ${SELLEROPS_AGENT_REPLY_API_KEY:${SELLEROPS_AGENT_DRAFT_API_KEY:}}
+    max-output-tokens: ${SELLEROPS_AGENT_REPLY_MAX_OUTPUT_TOKENS:4000}
+    reasoning-effort: ${SELLEROPS_AGENT_REPLY_REASONING_EFFORT:low}
   # Seller-PC install (scope lock v1.14 ①·⑤, docs/product-scope-v1.md). Off by default: every existing
   # deployment boots unchanged. The `local-seller` profile (application-local-seller.yml) turns it on, which
   # arms LocalSellerConfigValidator (refuses a non-loopback bind/DB/origin, the shipped JWT secret, Sentry,
@@ -74,8 +89,30 @@ sellerops:
   # The vendor server a seller PC registers with (docs/vendor_server_contract_v1.md §2 · §7). Empty = off: the
   # connection screen keeps its manual call-IP guidance. Only used in a seller-PC install, and OutboundGate admits
   # only the vendor server's own host (VENDOR) or loopback, whatever this names.
+  channel-activation:
+    # Which channels' official connections are open (proposal §19.4 T1, boundary §6). Off here = every connection a
+    # local or demo backend had stays. The server deployment sets enforced=true; then each channel is OFF unless named
+    # SELF (only self-org-ids, the operator's own stores) or ALL (after the platform approved the service).
+    # The workspace server (vendor-link.mode=WORKSPACE) refuses to boot with this off (WorkspaceServerConfigValidator).
+    enforced: ${SELLEROPS_CHANNEL_ACTIVATION_ENFORCED:false}
+    self-org-ids: ${SELLEROPS_CHANNEL_ACTIVATION_SELF_ORG_IDS:}
+    naver: ${SELLEROPS_CHANNEL_ACTIVATION_NAVER:OFF}
+    coupang: ${SELLEROPS_CHANNEL_ACTIVATION_COUPANG:OFF}
+    cafe24: ${SELLEROPS_CHANNEL_ACTIVATION_CAFE24:OFF}
+  llm:
+    send-gate:
+      # The check before every model call (phone · e-mail · long numbers removed; address · undeclared image ·
+      # unreadable body held) — on the server as on a seller PC (docs/standing/server_operation_boundary_v1.md §4.1-1).
+      # Only the hermetic test profile turns it off.
+      enabled: ${SELLEROPS_LLM_SEND_GATE_ENABLED:true}
   vendor-link:
     base-url: ${SELLEROPS_VENDOR_LINK_BASE_URL:}
+    # INSTALL (a seller PC links itself) | WORKSPACE (this server, for every organisation an operator linked on the
+    # vendor server — the web seller never signs in there or approves a PC; docs/standing/server_operation_boundary_v1.md
+    # §5). WORKSPACE needs the service token below and the review pull turned on.
+    mode: ${SELLEROPS_VENDOR_LINK_MODE:INSTALL}
+    # The workspace server's service token (rvw_…). A secret: environment only; the vendor server keeps its SHA-256.
+    service-token: ${SELLEROPS_VENDOR_SERVICE_TOKEN:}
     # The review relay (§3.2): pull the vendor server's review feed into this PC's review lane. Off by default; the
     # local-seller profile turns it on. Inert until the PC is linked and its seller has pulled once.
     review-pull:
@@ -185,7 +222,15 @@ sellerops:
       # off, every call is charged to the seller however it is labelled.
       trust-actor-header: ${SELLEROPS_AGENT_QUOTA_TRUST_ACTOR_HEADER:false}
       daily-runs-per-org: ${SELLEROPS_AGENT_QUOTA_DAILY_RUNS_PER_ORG:200}
+      # The org's ACTUAL AI ceiling (2026-10-29): every model call by the seller or by automatic runs — judgements,
+      # drafts, critiques, revisions, retries, fact checks, the triage classifier.
       daily-llm-calls-per-org: ${SELLEROPS_AGENT_QUOTA_DAILY_LLM_CALLS_PER_ORG:1000}
+      # The seller-facing count's limit: pieces of work the seller asked for, however many calls each took.
+      daily-items-per-org: ${SELLEROPS_AGENT_QUOTA_DAILY_ITEMS_PER_ORG:300}
+      # Of the ceiling, the calls automatic work leaves for the seller's own presses (sixth outside review, 2026-10-29):
+      # judgements, drafting ahead and background inquiry drafts stop at ceiling − reserve. Provisional — to be set from
+      # the calls a piece of work actually takes, measured in the real-model evaluation.
+      daily-seller-reserve-calls: ${SELLEROPS_AGENT_QUOTA_DAILY_SELLER_RESERVE_CALLS:300}
     draft:
       enabled: ${SELLEROPS_AGENT_DRAFT_ENABLED:false}
       # Comma-separated org UUIDs, or "*" for every org in this backend (local single-user deployment —
@@ -199,6 +244,12 @@ sellerops:
       # uselessly, a rule-based fallback on every inquiry.
       max-output-tokens: ${SELLEROPS_AGENT_DRAFT_MAX_OUTPUT_TOKENS:4000}
       reasoning-effort: ${SELLEROPS_AGENT_DRAFT_REASONING_EFFORT:low}
+      # The figure check on an inquiry draft with a number (2026-10-28): same vendor and key, its own model and budget.
+      # A short classification, so a smaller model is the natural setting. Blank = the draft's model and budget. The
+      # check is metered (step FIGURE_CHECK) but not counted against the day's limit — it is part of the draft.
+      check-model: ${SELLEROPS_AGENT_DRAFT_CHECK_MODEL:}
+      check-max-output-tokens: ${SELLEROPS_AGENT_DRAFT_CHECK_MAX_OUTPUT_TOKENS:0}
+      check-reasoning-effort: ${SELLEROPS_AGENT_DRAFT_CHECK_REASONING_EFFORT:}
     # ── Operator Graph v1 (2026-08-21): goal interpretation and evidence judging ──────────────────
     #
     # TWO MORE separate switches and separate keys, for the reason the draft one is separate from the
@@ -326,6 +377,22 @@ sellerops:
         # the target article's own `shop_no` (an approved bounded READ), so that an unobserved shop
         # can never be mistaken for a decided one.
         shop-no: ${SELLEROPS_INQUIRY_PUBLISH_CAFE24_SHOP_NO:0}
+    recheck:
+      # Re-asking Cafe24 about old open inquiries the routine sweep no longer reads (inquiry_operational_truth_v1 §10).
+      # OFF by default: with it off no recheck bean exists and nothing runs. On, it runs at the end of each SUCCESSFUL
+      # scheduled Cafe24 INQUIRY collection (Cafe24AnswerRecheckAfterCollection) — so the collect scheduler and the
+      # Cafe24 connector must be on too. Reads only; it never writes to the channel.
+      auto-enabled: ${SELLEROPS_INQUIRY_RECHECK_AUTO_ENABLED:false}
+      # Every number below is PROVISIONAL — the pilot's starting point, not an operating value (§10.3 · §10.5).
+      # HTTP requests per seller account per Korean day: token refresh, re-reads, comment reads, failed ones included.
+      daily-request-limit: ${SELLEROPS_INQUIRY_RECHECK_DAILY_REQUEST_LIMIT:20}
+      # Korean days an inquiry waits after its 1st, 2nd, 3rd, … own failure in a row; the last value repeats.
+      retry-after-days: ${SELLEROPS_INQUIRY_RECHECK_RETRY_AFTER_DAYS:1,2,4,7}
+      # How long one run holds its account between requests; a run that died lets go after this.
+      run-lease-minutes: ${SELLEROPS_INQUIRY_RECHECK_RUN_LEASE_MINUTES:10}
+      # Minutes an account rests after its 1st, 2nd, 3rd, … account-side stop in a row (429, refused token or
+      # permission, no token, outage); the last value repeats.
+      account-wait-minutes: ${SELLEROPS_INQUIRY_RECHECK_ACCOUNT_WAIT_MINUTES:120,240,480}
     signature:
       enabled: ${SELLEROPS_INQUIRY_SIGNATURE_ENABLED:false}
       enabled-org-ids: ${SELLEROPS_INQUIRY_SIGNATURE_ORG_IDS:}
@@ -422,6 +489,8 @@ sellerops:
     embedding:
       enabled: ${SELLEROPS_KNOWLEDGE_EMBEDDING_ENABLED:false}
       enabled-org-ids: ${SELLEROPS_KNOWLEDGE_EMBEDDING_ORG_IDS:}
+      # OPENAI only — Anthropic has no embedding API; its own setting, apart from the chat vendors (2026-10-29)
+      vendor: ${SELLEROPS_KNOWLEDGE_EMBEDDING_VENDOR:OPENAI}
       model: ${SELLEROPS_KNOWLEDGE_EMBEDDING_MODEL:text-embedding-3-large}
       api-key: ${SELLEROPS_KNOWLEDGE_EMBEDDING_API_KEY:}
       dimensions: ${SELLEROPS_KNOWLEDGE_EMBEDDING_DIMENSIONS:1024}
@@ -437,6 +506,8 @@ sellerops:
     intent:
       enabled: ${SELLEROPS_KNOWLEDGE_INTENT_ENABLED:false}
       enabled-org-ids: ${SELLEROPS_KNOWLEDGE_INTENT_ORG_IDS:}
+      # OPENAI | ANTHROPIC — the shared model connection (2026-10-29); the key below is that vendor's
+      vendor: ${SELLEROPS_KNOWLEDGE_INTENT_VENDOR:OPENAI}
       model: ${SELLEROPS_KNOWLEDGE_INTENT_MODEL:gpt-5-2025-08-07}
       api-key: ${SELLEROPS_KNOWLEDGE_INTENT_API_KEY:}
       max-output-tokens: ${SELLEROPS_KNOWLEDGE_INTENT_MAX_OUTPUT_TOKENS:400}
@@ -453,6 +524,8 @@ sellerops:
     eligibility:
       enabled: ${SELLEROPS_KNOWLEDGE_ELIGIBILITY_ENABLED:false}
       enabled-org-ids: ${SELLEROPS_KNOWLEDGE_ELIGIBILITY_ORG_IDS:}
+      # OPENAI | ANTHROPIC — the shared model connection (2026-10-29); the key below is that vendor's
+      vendor: ${SELLEROPS_KNOWLEDGE_ELIGIBILITY_VENDOR:OPENAI}
       model: ${SELLEROPS_KNOWLEDGE_ELIGIBILITY_MODEL:gpt-5-2025-08-07}
       api-key: ${SELLEROPS_KNOWLEDGE_ELIGIBILITY_API_KEY:}
       max-output-tokens: ${SELLEROPS_KNOWLEDGE_ELIGIBILITY_MAX_OUTPUT_TOKENS:600}
@@ -477,6 +550,11 @@ sellerops:
     # every stored credential: a row is opened with the key that sealed IT, not with whatever this
     # runtime writes with today. Empty by default.
     key-ring: ${SELLEROPS_VAULT_KEY_RING:}
+  reply-hold:
+    # Waiting replies checked again when knowledge, policy or wording changes (ReplyHoldService, V165, 2026-11-01). No
+    # model and no channel: on by default. The approval and registration gates run whether or not this sweep is on.
+    sweep-enabled: ${SELLEROPS_REPLY_HOLD_SWEEP_ENABLED:true}
+    sweep-interval-ms: ${SELLEROPS_REPLY_HOLD_SWEEP_INTERVAL_MS:300000}
   responsibility:
     # Responsibility Runtime v1 (docs/standing/responsibility_runtime_v1.md). Off by default — no window is materialized
     # and no run executes until ops flips this. The cadence is NOT here: CUSTOMER_OPERATIONS_V1 works fixed 2-hour
@@ -851,14 +929,20 @@ sellerops:
   inquiry-decision:
     enabled: ${SELLEROPS_INQUIRY_DECISION_ENABLED:false}
     enabled-org-ids: ${SELLEROPS_INQUIRY_DECISION_ORG_IDS:}
+    # OPENAI | ANTHROPIC — the shared model connection (2026-10-29); the key below is that vendor's.
+    vendor: ${SELLEROPS_INQUIRY_DECISION_VENDOR:OPENAI}
     model: ${SELLEROPS_INQUIRY_DECISION_MODEL:gpt-5-2025-08-07}
     api-key: ${SELLEROPS_INQUIRY_DECISION_API_KEY:}
     plan-max-output-tokens: ${SELLEROPS_INQUIRY_DECISION_PLAN_MAX_OUTPUT_TOKENS:800}
     judge-max-output-tokens: ${SELLEROPS_INQUIRY_DECISION_JUDGE_MAX_OUTPUT_TOKENS:2400}
     reasoning-effort: ${SELLEROPS_INQUIRY_DECISION_REASONING_EFFORT:minimal}
-    # CoverageJudge instruction (coverage-judge/v1 | coverage-judge/v2) and the judge's own effort (blank = the plan's).
+    # CoverageJudge instruction (coverage-judge/v1 | v2 | v3 | v4 | v5 | v6) and the judge's own effort (blank = the plan's).
+    # v4 (2026-11-02) is v2 held to what the customer asked — InquiryDecisionPrompt.JUDGE_V4. v5 (2026-11-05) adds one
+    # rule: evidence that says a value is not settled yet is PARTIAL, never FULL — InquiryDecisionPrompt.JUDGE_V5. v6
+    # (2026-11-06) adds settled_by: the seller's record of an action already done, for a need asking whether it can be
+    # done — accepted only by code's own conditions (NeedAggregation.settlingRecord). Not yet run on a real model.
     # Separate knobs so a calibration can change the judge and nothing else (docs/lineage/inquiry_decision_v2_1.md).
-    judge-prompt: ${SELLEROPS_INQUIRY_DECISION_JUDGE_PROMPT:coverage-judge/v2}
+    judge-prompt: ${SELLEROPS_INQUIRY_DECISION_JUDGE_PROMPT:coverage-judge/v6}
     judge-reasoning-effort: ${SELLEROPS_INQUIRY_DECISION_JUDGE_REASONING_EFFORT:}
     # json_schema = Structured Outputs, strict (need ids an enum of the ids sent); json_object = the pre-audit JSON mode.
     output-format: ${SELLEROPS_INQUIRY_DECISION_OUTPUT_FORMAT:json_schema}
@@ -1000,6 +1084,8 @@ sellerops:
     media-vision:
       enabled: ${SELLEROPS_REVIEW_MEDIA_VISION_ENABLED:false}
       enabled-org-ids: ${SELLEROPS_REVIEW_MEDIA_VISION_ORG_IDS:}
+      # OPENAI | ANTHROPIC — the shared model connection (2026-10-29); the key below is that vendor's
+      vendor: ${SELLEROPS_REVIEW_MEDIA_VISION_VENDOR:OPENAI}
       model: ${SELLEROPS_REVIEW_MEDIA_VISION_MODEL:gpt-5.6-terra}
       api-key: ${SELLEROPS_REVIEW_MEDIA_VISION_API_KEY:}
       max-output-tokens: ${SELLEROPS_REVIEW_MEDIA_VISION_MAX_OUTPUT_TOKENS:600}

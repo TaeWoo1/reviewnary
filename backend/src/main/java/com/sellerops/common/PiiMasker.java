@@ -23,13 +23,18 @@ public final class PiiMasker {
             Pattern.compile("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}");
 
     // Korean mobile: 010/011/016/017/018/019 with optional - . or space separators.
+    //
+    // Bounded by non-digits on both sides (2026-10-28): unbounded, the pattern found a «phone number» inside any longer
+    // digit run — an order number such as 2026102812345678 holds 0281234 5678 — and a seller read 「[전화번호]」 where the
+    // customer had written their order number. A number that runs on is not a phone number; the generic long-number
+    // rule after this one still tokenizes it where a surface redacts.
     private static final Pattern MOBILE =
-            Pattern.compile("01[016789][-.\\s]?\\d{3,4}[-.\\s]?\\d{4}");
+            Pattern.compile("(?<!\\d)01[016789][-.\\s]?\\d{3,4}[-.\\s]?\\d{4}(?!\\d)");
 
-    // Landline: leading-0 area code (1-2 digits) + 3-4 + 4, optional separators.
+    // Landline: leading-0 area code (1-2 digits) + 3-4 + 4, optional separators. Same boundaries, same reason.
     // Runs after MOBILE so 01x numbers are already tokenized.
     private static final Pattern LANDLINE =
-            Pattern.compile("0\\d{1,2}[-.\\s]?\\d{3,4}[-.\\s]?\\d{4}");
+            Pattern.compile("(?<!\\d)0\\d{1,2}[-.\\s]?\\d{3,4}[-.\\s]?\\d{4}(?!\\d)");
 
     private PiiMasker() {
     }

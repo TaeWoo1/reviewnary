@@ -204,6 +204,57 @@ class AgentReviewDraftPayloadFloorTest {
         // 2026-10-27 evaluation: a phrase match said 「두 개씩」 about the customer's previous dispenser.
         assertThat(AgentDraftPrompt.reviewSystem()).contains("「후보」가 붙은 것")
                 .contains("예전에 쓰던 다른 제품 이야기이거나, 그 문제가 없었다고 말하면 쓰지 마세요");
-        assertThat(AgentDraftPrompt.PROMPT_VERSION).isEqualTo("agent-draft-prompt/v15");
+        // 2026-10-31 evaluation (C06): 「미개봉 상품에 한해」 was dropped from a 7-day return answer.
+        assertThat(AgentDraftPrompt.system()).contains("그 조건과 함께 쓰세요").contains("뭉뚱그리지 말고 근거에 적힌 말로");
+        // Seller decision 2026-11-01: a customer who said theirs is opened is not told yes on that condition.
+        assertThat(AgentDraftPrompt.system()).contains("고객이 이미 개봉 · 사용 · 착용했다고 밝혔으면");
+        // 2026-11-01 review: the unopened limit is for a change-of-mind exchange, never a return or a fault.
+        assertThat(AgentDraftPrompt.system()).contains("반품 · 환불은 개봉만으로 막지 마세요")
+                .contains("미개봉 조건은 단순 변심 교환에만 씁니다");
+        // 2026-11-01 tenth review (synthetic Q3): a conclusion that holds under every disagreeing policy is answered,
+        // the value they disagree on is not.
+        assertThat(AgentDraftPrompt.system()).contains("다른 근거 모두에서 같은 결론이면").contains("그 다른 값은 쓰지 마세요");
+        assertThat(AgentDraftPrompt.figureSystem()).contains("모든 근거에서 성립하는 말이면 CONFLICT가 아니다")
+                .contains("도착을 확정한 말");
+        // 2026-11-06 thirteenth review: only what the judgement left for the customer is asked back.
+        assertThat(AgentDraftPrompt.system()).contains("고객에게 묻는 것은 「고객에게 확인」이 붙은 항목")
+                .contains("그 밖의 것은 자연스러워 보여도 묻지 마세요").contains("이미 끝난 조치도 다시 묻지 않습니다");
+        assertThat(AgentDraftPrompt.PROMPT_VERSION).isEqualTo("agent-draft-prompt/v25");
+    }
+
+    @Test
+    @DisplayName("a saying only the seller can stand behind is written only from the seller's material (2026-11-01)")
+    void aSayingTheSellerDidNotWriteIsNotGenerated() {
+        for (String prompt : java.util.List.of(AgentDraftPrompt.system(), AgentDraftPrompt.reviewSystem())) {
+            assertThat(prompt).contains("주어를 바꿔도 같은 약속입니다").contains("「안내받으실 수 있습니다」")
+                    .contains("하나하나 확인하고").contains("「잘 살펴보겠습니다」는 쓰지 말고").contains("적힌 경로만");
+        }
+        // The return rule no longer names a path nobody verified.
+        assertThat(AgentDraftPrompt.system()).doesNotContain("플랫폼 문의하기를 안내하세요");
+    }
+
+    @Test
+    @DisplayName("what the customer already tried is not recommended back, in either lane (2026-10-28 evaluation)")
+    void whatTheCustomerAlreadyTriedIsNotRecommendedAgain() {
+        // A review that said it had already used the extra tape was answered with 「테이프를 함께 쓰세요」.
+        assertThat(AgentDraftPrompt.reviewSystem()).contains("고객이 이미 해 본 방법").contains("다시 권하지 마세요");
+        assertThat(AgentDraftPrompt.system()).contains("이미 해 보았다고 적은 방법").contains("다시 권하지 마세요");
+    }
+
+    @Test
+    @DisplayName("two passages that state one condition differently are neither merged nor chosen between")
+    void conflictingPassagesAreNotMerged() {
+        // 2026-10-28 evaluation: one document said 미개봉, another 미사용, and the draft blended them.
+        assertThat(AgentDraftPrompt.reviewSystem()).contains("근거끼리 같은 항목(기간·조건·대상·수치)을 다르게 적고 있으면");
+        assertThat(AgentDraftPrompt.system()).contains("근거끼리 같은 항목(기간·조건·대상·수치)을 다르게 적고 있으면");
+    }
+
+    @Test
+    @DisplayName("a ★3 that only praises is told as a warmer thank-you, and the rating still never leaves")
+    void aMildPraiseIsAWarmerThankYou() {
+        String request = AgentDraftPrompt.reviewUser(java.util.List.of(), "디자인이 예뻐서 좋아요", null,
+                java.util.List.of(), AgentDraftGenerator.ReviewMood.MILD_PRAISE);
+        assertThat(request).contains(AgentDraftPrompt.MOOD_MILD_PRAISE).doesNotContain("3").doesNotContain("별점");
+        assertThat(AgentDraftPrompt.MOOD_MILD_PRAISE).contains("더 따뜻하게 감사").contains("사과하거나");
     }
 }

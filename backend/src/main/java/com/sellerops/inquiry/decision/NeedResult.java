@@ -78,6 +78,30 @@ public record NeedResult(NeedStatus judged, InquiryNeed need, NeedStatus status,
          */
         WRONG_AUTHORITY,
         /** The right authority was cited and could not close the need here — stale, unbound, or a conditional order. */
-        AUTHORITY_UNRESOLVED
+        AUTHORITY_UNRESOLVED,
+        /**
+         * <b>Not answered — no longer needed</b> (2026-11-06 thirteenth review). The need asked whether an action could be
+         * done to this order, what it lacked was only what deciding that would take, and the seller's own record says the
+         * action was carried out ({@code SELLER_CHECK}, 처리 완료, this order). Closed as 「조치 완료로 판단 불필요」 with the
+         * record named — never as an answer, and never for a need about anything else (a cause, a date, an amount, a
+         * product fact, the seller's own decision). The one enforcement that widens: by a record, never by the judge alone.
+         */
+        SETTLED_BY_ACTION;
+
+        /** What the seller reads beside a need closed this way. */
+        public static final String SETTLED_BY_ACTION_KO = "조치 완료로 판단 불필요";
+    }
+
+    /** Closed because the seller already did what deciding it was for ({@link Enforcement#SETTLED_BY_ACTION}). */
+    public boolean settledByAction() {
+        return enforcement == Enforcement.SETTLED_BY_ACTION;
+    }
+
+    /** The seller's record that settled it, when {@link #settledByAction()}. */
+    public EvidenceCandidate settlingRecord() {
+        if (!settledByAction()) {
+            return null;
+        }
+        return evidence.stream().filter(e -> e.kind() == EvidenceCandidate.Kind.SELLER_CHECK).findFirst().orElse(null);
     }
 }

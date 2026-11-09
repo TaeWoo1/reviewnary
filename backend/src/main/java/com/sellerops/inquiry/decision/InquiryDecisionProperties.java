@@ -32,6 +32,7 @@ public class InquiryDecisionProperties implements AgentCapabilityGate {
     private final String judgePrompt;
     private final String judgeReasoningEffort;
     private final String outputFormat;
+    private final com.sellerops.agent.llm.provider.LlmVendor vendor;
 
     /** Structured Outputs, strict schema — the default since the v2.1 audit. */
     public static final String FORMAT_JSON_SCHEMA = "json_schema";
@@ -42,7 +43,7 @@ public class InquiryDecisionProperties implements AgentCapabilityGate {
     public InquiryDecisionProperties(boolean enabled, String enabledOrgIds, String model, String apiKey,
                                      int planMaxOutputTokens, int judgeMaxOutputTokens, String reasoningEffort) {
         this(enabled, enabledOrgIds, model, apiKey, planMaxOutputTokens, judgeMaxOutputTokens, reasoningEffort,
-                InquiryDecisionPrompt.JUDGE_V2, "");
+                InquiryDecisionPrompt.JUDGE_V6, "");
     }
 
     public InquiryDecisionProperties(boolean enabled, String enabledOrgIds, String model, String apiKey,
@@ -50,6 +51,14 @@ public class InquiryDecisionProperties implements AgentCapabilityGate {
                                      String judgePrompt, String judgeReasoningEffort) {
         this(enabled, enabledOrgIds, model, apiKey, planMaxOutputTokens, judgeMaxOutputTokens, reasoningEffort,
                 judgePrompt, judgeReasoningEffort, FORMAT_JSON_SCHEMA);
+    }
+
+    /** Every shape before the shared model connection (2026-10-29): OpenAI. */
+    public InquiryDecisionProperties(boolean enabled, String enabledOrgIds, String model, String apiKey,
+                                     int planMaxOutputTokens, int judgeMaxOutputTokens, String reasoningEffort,
+                                     String judgePrompt, String judgeReasoningEffort, String outputFormat) {
+        this(enabled, enabledOrgIds, model, apiKey, planMaxOutputTokens, judgeMaxOutputTokens, reasoningEffort,
+                judgePrompt, judgeReasoningEffort, outputFormat, "OPENAI");
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -61,10 +70,13 @@ public class InquiryDecisionProperties implements AgentCapabilityGate {
             @Value("${sellerops.inquiry-decision.plan-max-output-tokens:800}") int planMaxOutputTokens,
             @Value("${sellerops.inquiry-decision.judge-max-output-tokens:2400}") int judgeMaxOutputTokens,
             @Value("${sellerops.inquiry-decision.reasoning-effort:minimal}") String reasoningEffort,
-            @Value("${sellerops.inquiry-decision.judge-prompt:coverage-judge/v2}") String judgePrompt,
+            @Value("${sellerops.inquiry-decision.judge-prompt:coverage-judge/v6}") String judgePrompt,
             @Value("${sellerops.inquiry-decision.judge-reasoning-effort:}") String judgeReasoningEffort,
-            @Value("${sellerops.inquiry-decision.output-format:json_schema}") String outputFormat) {
+            @Value("${sellerops.inquiry-decision.output-format:json_schema}") String outputFormat,
+            @Value("${sellerops.inquiry-decision.vendor:OPENAI}") String vendor) {
         this.enabled = enabled;
+        // Which vendor's wire (2026-10-29). An unknown name refuses to boot rather than send to a vendor nobody chose.
+        this.vendor = com.sellerops.agent.llm.provider.LlmVendor.parse(vendor);
         this.allOrgs = enabledOrgIds != null && enabledOrgIds.trim().equals("*");
         this.enabledOrgIds = allOrgs ? List.of() : parseIds(enabledOrgIds);
         this.model = model;
@@ -73,12 +85,16 @@ public class InquiryDecisionProperties implements AgentCapabilityGate {
         this.judgeMaxOutputTokens = judgeMaxOutputTokens <= 0 ? 2400 : judgeMaxOutputTokens;
         this.reasoningEffort = reasoningEffort == null || reasoningEffort.isBlank() ? null : reasoningEffort;
         if (judgePrompt != null && !judgePrompt.isBlank() && !InquiryDecisionPrompt.JUDGE_V1.equals(judgePrompt.trim())
-                && !InquiryDecisionPrompt.JUDGE_V2.equals(judgePrompt.trim())) {
+                && !InquiryDecisionPrompt.JUDGE_V2.equals(judgePrompt.trim())
+                && !InquiryDecisionPrompt.JUDGE_V3.equals(judgePrompt.trim())
+                && !InquiryDecisionPrompt.JUDGE_V4.equals(judgePrompt.trim())
+                && !InquiryDecisionPrompt.JUDGE_V5.equals(judgePrompt.trim())
+                && !InquiryDecisionPrompt.JUDGE_V6.equals(judgePrompt.trim())) {
             // An unknown instruction name is a refusal to boot, not a silent fallback: an eval arm label must describe
             // the instruction the process actually sent.
             throw new IllegalArgumentException("sellerops.inquiry-decision.judge-prompt: unknown " + judgePrompt);
         }
-        this.judgePrompt = judgePrompt == null || judgePrompt.isBlank() ? InquiryDecisionPrompt.JUDGE_V2
+        this.judgePrompt = judgePrompt == null || judgePrompt.isBlank() ? InquiryDecisionPrompt.JUDGE_V6
                 : judgePrompt.trim();
         // The judge's effort defaults to the plan's: one knob, unless an evaluation separates them.
         this.judgeReasoningEffort = judgeReasoningEffort == null || judgeReasoningEffort.isBlank()
@@ -155,6 +171,10 @@ public class InquiryDecisionProperties implements AgentCapabilityGate {
 
     public String judgeReasoningEffort() {
         return judgeReasoningEffort;
+    }
+
+    public com.sellerops.agent.llm.provider.LlmVendor vendor() {
+        return vendor;
     }
 
     public String outputFormat() {

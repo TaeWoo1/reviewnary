@@ -206,6 +206,14 @@ public class OperationsCaseProcessor {
         this.autoChecks = autoChecks;
     }
 
+    /** Review drafts written ahead by the seller's 리뷰 응대 기준 (2026-10-28); null in a context without one. */
+    private com.sellerops.review.response.ReviewDraftPreparer reviewDrafts;
+
+    @Autowired(required = false)
+    public void setReviewDrafts(com.sellerops.review.response.ReviewDraftPreparer reviewDrafts) {
+        this.reviewDrafts = reviewDrafts;
+    }
+
     @Autowired
     public OperationsCaseProcessor(ResponsibilityRunRepository runs, ResponsibilityRepository responsibilities,
                                    ResponsibilityRunSourceRepository sourceRows, ResponsibilitySources sources,
@@ -272,6 +280,8 @@ public class OperationsCaseProcessor {
         /** Legacy proactive cards closed because this responsibility took their subject over. */
         int handedOff;
         int investigationsStarted;
+        /** The run's reviews, in the order seen, for {@link #prepareAhead}. */
+        final List<Review> aheadCandidates = new java.util.ArrayList<>();
 
         Report report() {
             return new Report(acted, closed, unchanged, opened, updated, ruleDecided, policyDecided, investigated,
@@ -295,6 +305,7 @@ public class OperationsCaseProcessor {
         k.closed = reconciled.closed();
         observeGaps(run, k);
         discover(run, responsibility, stop, k);
+        prepareAhead(run, stop, k);
         Report report = k.report();
         log.info("responsibility cases run={} 재확인(판매자조치/종료)={}/{} 변화없음={} 새Case={} 갱신={} 규칙={} "
                         + "판매자기준={} 조사={} 조사실패={} 조사생략={} 다음run으로={} 초안={} 장애열림={} 장애반복={} "
@@ -619,6 +630,33 @@ public class OperationsCaseProcessor {
         handle(run, responsibility, OperationsSubjectKind.REVIEW, review.getId(), OperationsSignal.reviewState(review),
                 OperationsCaseRules.forReview(review.getRating(), review.getBody(), review.getReplyState()),
                 review.getChannelId(), review.getProductId(), null, review, k);
+        // Kept for the reply drafted ahead, which waits until the run has seen every review ({@link #prepareAhead}).
+        k.aheadCandidates.add(review);
+    }
+
+    /**
+     * <b>The replies drafted ahead, when the seller's rule says so</b> (owner, 2026-10-28) — once, after discovery, so the
+     * run drafts its complaints before its thank-yous whatever order the channels were read in (owner, the same day:
+     * 「바쁜 날엔 칭찬 리뷰가 그 절반을 먼저 다 쓸 수 있어요」). Independent of the cases: a case says what a review needs;
+     * the draft is the seller's head start on answering it, and every gate on writing one — a decision otherwise, a
+     * draft already there, the channel's own reply — is the reply service's.
+     */
+    private void prepareAhead(ResponsibilityRun run, BooleanSupplier stop, Counters k) {
+        if (reviewDrafts == null || k.aheadCandidates.isEmpty()) {
+            return;
+        }
+        // The automatic check reaches what a sync did not: judged first, then drafted by those judgements (§3-4).
+        if (judges != null) {
+            judges.judgeAll(run.getOrgId(), List.copyOf(k.aheadCandidates), "SCHEDULED");
+        }
+        k.drafts += reviewDrafts.prepareAll(run.getOrgId(), k.aheadCandidates, clock.instant(), stop);
+    }
+
+    private com.sellerops.review.judgement.ReviewJudgeService judges;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setJudges(com.sellerops.review.judgement.ReviewJudgeService judges) {
+        this.judges = judges;
     }
 
     private void handle(ResponsibilityRun run, Responsibility responsibility, OperationsSubjectKind kind,

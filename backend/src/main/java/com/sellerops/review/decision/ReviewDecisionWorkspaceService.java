@@ -181,7 +181,7 @@ public class ReviewDecisionWorkspaceService {
                 ReviewProductLabel.displayName(review, product == null ? null : product.getName()),
                 repeatedProblems(orgId, review),
                 signalOf(orgId, product),
-                knowledgeOnHand(orgId, product));
+                knowledgeOnHand(orgId, product, review));
     }
 
     /**
@@ -392,7 +392,7 @@ public class ReviewDecisionWorkspaceService {
      * <p>Active sources only. A retired document cannot ground anything, so counting it would tell the
      * seller they have knowledge the drafter cannot see.
      */
-    private ReviewDecisionContextView.KnowledgeOnHand knowledgeOnHand(UUID orgId, Product product) {
+    private ReviewDecisionContextView.KnowledgeOnHand knowledgeOnHand(UUID orgId, Product product, Review review) {
         long orgSources = orgKnowledge.countByOrgIdAndActiveTrue(orgId);
         if (product == null) {
             return new ReviewDecisionContextView.KnowledgeOnHand(0, orgSources, List.of(), 0);
@@ -407,8 +407,23 @@ public class ReviewDecisionWorkspaceService {
                 productKnowledge.countByOrgIdAndProductIdAndActiveTrue(orgId, product.getId()),
                 orgSources,
                 titles,
-                candidates.countByOrgIdAndProductIdAndState(orgId, product.getId(),
-                        KnowledgeCandidateService.STATE_OPEN));
+                candidates.countByOrgIdAndProductIdAndStateAndSubjectIn(orgId, product.getId(),
+                        KnowledgeCandidateService.STATE_OPEN, askSubjects(orgId, review)));
+    }
+
+    /**
+     * What an ask about THIS review is filed under (2026-10-28): its own words, or a repeated problem it is evidence
+     * for — the two subjects the drafter files a review's ask under. Counting the product's asks put 「채울 내용 1」
+     * beside every review of a product because one review had once been asked about.
+     */
+    private List<String> askSubjects(UUID orgId, Review review) {
+        List<String> subjects = new java.util.ArrayList<>();
+        subjects.add(com.sellerops.review.draft.ReviewDraftComposer.ownWordsSubject(review.getBody()));
+        for (ReviewIssueEvidence row : issueEvidence.findByOrgIdAndReviewId(orgId, review.getId())) {
+            issues.findById(row.getIssueId()).filter(issue -> !issue.isDismissed())
+                    .ifPresent(issue -> subjects.add(issue.getTitle()));
+        }
+        return subjects;
     }
 
     /**

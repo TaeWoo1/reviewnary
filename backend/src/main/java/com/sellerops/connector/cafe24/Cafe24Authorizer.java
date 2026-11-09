@@ -64,10 +64,21 @@ public class Cafe24Authorizer {
      * single-use token (see class doc).
      */
     public Authorized authorize(UUID orgId, UUID sellerAccountId) {
-        return refreshLocks.withAccountLock(sellerAccountId, () -> doAuthorize(orgId, sellerAccountId));
+        return authorize(orgId, sellerAccountId, tokenClient);
     }
 
-    private Authorized doAuthorize(UUID orgId, UUID sellerAccountId) {
+    /**
+     * The same refresh, under the same per-account lock, with the token request sent through {@code tokenClientForThisCall}
+     * (2026-11-08). For a caller that must count every HTTP request it makes — the open-inquiry recheck counts the token
+     * refresh against its request limit like any other call. The lock is this instance's, so the refresh still never races
+     * the routine sweep's.
+     */
+    public Authorized authorize(UUID orgId, UUID sellerAccountId, Cafe24TokenClient tokenClientForThisCall) {
+        return refreshLocks.withAccountLock(sellerAccountId,
+                () -> doAuthorize(orgId, sellerAccountId, tokenClientForThisCall));
+    }
+
+    private Authorized doAuthorize(UUID orgId, UUID sellerAccountId, Cafe24TokenClient tokenClient) {
         DecryptedCredential credential = vault.open(orgId, sellerAccountId);
         String mallId = credential.secrets().get("mall_id");
         String refreshToken = credential.secrets().get("refresh_token");

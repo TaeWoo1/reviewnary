@@ -37,6 +37,7 @@ class NaverReadOnlyFenceTest {
             "/external/v1/oauth2/token",                                            // credential proof
             "/external/v1/pay-order/seller/product-orders/last-changed-statuses",   // changed orders
             "/external/v1/pay-order/seller/product-orders/query",                   // order detail (read)
+            "/external/v1/pay-order/seller/product-orders",                         // 결제일 기준 주문 목록 (GET, read)
             "/external/v1/products/search",                                         // catalogue read
             "/external/v1/contents/qnas",                                           // 상품 문의 (read)
             "/external/v1/pay-user/inquiries",                                      // 고객 문의 (read)

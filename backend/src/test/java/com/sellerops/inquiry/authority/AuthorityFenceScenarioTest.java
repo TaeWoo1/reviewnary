@@ -139,10 +139,10 @@ class AuthorityFenceScenarioTest {
             NeedDecision with = InquiryDecisionEngine.decide(ORG, "q", model,
                     needs -> new InquiryDecisionEngine.Pool(List.of(policy), List.of()), DetailCapability.READABLE,
                     new EvidenceScope.CaseScope(AuthorityScenarios.PRODUCT, null), ctx);
-            assertThat(with.basis()).as(judged + " with the fence").isEqualTo(AnswerBasisState.NO_ANSWER_BASIS);
+            assertThat(with.basis()).as(judged + " with the fence").isEqualTo(AnswerBasisState.PARTIAL_ANSWER);
             assertThat(with.needs().get(0).resolution().gap()).isEqualTo(GapReason.UNBOUND);
             assertThat(without.basis()).as(judged + " v2.2").isEqualTo(judged == NeedStatus.FULL
-                    ? AnswerBasisState.NO_ANSWER_BASIS : AnswerBasisState.NEEDS_CLARIFICATION);
+                    ? AnswerBasisState.PARTIAL_ANSWER : AnswerBasisState.NEEDS_CLARIFICATION);
             assertThat(without.needs().get(0).resolution()).isNull();
         }
     }

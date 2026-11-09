@@ -4,6 +4,7 @@ import com.sellerops.community.CommunityReplyStatus;
 import com.sellerops.ingest.canonical.CanonicalInquiry;
 import com.sellerops.ingest.canonical.ChannelOrderRef;
 import com.sellerops.ingest.canonical.ChannelProductRef;
+import com.sellerops.ingest.canonical.CommentAnswerCheck;
 import com.sellerops.ingest.canonical.SourceThreadRole;
 
 /**
@@ -107,6 +108,32 @@ final class Cafe24InquiryArticleMapper {
      */
     static CanonicalInquiry toCanonicalInquiry(int boardNo, Cafe24BoardArticleRow row, int sourceRow,
                                                java.time.Instant commentAnsweredAt) {
+        return build(boardNo, row, sourceRow, commentAnsweredAt, null);
+    }
+
+    /**
+     * As above, from the comment lane's whole outcome for this article (2026-11-08).
+     *
+     * <p>{@code check} null means the lane did not look at this article — not a candidate, or no lane — and the row
+     * then carries no comment record at all, so ingestion keeps what was stored. Only {@code SHOP_ANSWERED} widens the
+     * status, exactly as the instant-only form above does; {@code NO_SHOP_COMMENT} and {@code NOT_CHECKED} change
+     * nothing about the inquiry and are carried only as the record of the look. A thread REPLY never carries one.
+     */
+    static CanonicalInquiry toCanonicalInquiry(int boardNo, Cafe24BoardArticleRow row, int sourceRow,
+                                               Cafe24InquiryAnswerObserver.CommentCheck check,
+                                               java.time.Instant checkAttemptedAt) {
+        if (check == null || check.notAttempted()) {
+            // Not looked at, or no request went out for it (a request limit): no record, the stored one stays.
+            return build(boardNo, row, sourceRow, null, null);
+        }
+        CommentAnswerCheck record = row.isThreadReply()
+                ? null
+                : new CommentAnswerCheck(CommentAnswerCheck.Result.valueOf(check.state().name()), checkAttemptedAt);
+        return build(boardNo, row, sourceRow, check.answeredAt(), record);
+    }
+
+    private static CanonicalInquiry build(int boardNo, Cafe24BoardArticleRow row, int sourceRow,
+                                          java.time.Instant commentAnsweredAt, CommentAnswerCheck commentCheck) {
         // Cafe24 uses 0 as "no product" on some board rows; only a positive number is an identity.
         String productNo = row.productNo() == null || row.productNo() <= 0
                 ? null : Long.toString(row.productNo());
@@ -150,7 +177,9 @@ final class Cafe24InquiryArticleMapper {
                 role,
                 role == SourceThreadRole.REPLY && row.parentArticleNo() != null
                         ? externalId(boardNo, row.parentArticleNo())
-                        : null);
+                        : null,
+                // What the comment lane found, or null when it did not look. Never on a REPLY (see above).
+                role == SourceThreadRole.ROOT ? commentCheck : null);
     }
 
     /** Stable Cafe24-native dedup key preserving the mall's own board+article identity. */

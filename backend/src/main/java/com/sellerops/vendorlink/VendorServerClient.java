@@ -36,6 +36,14 @@ public interface VendorServerClient {
     /** The install token was refused — revoked, expired, or the account is suspended. */
     record NotAuthorized() implements PublicIp {}
 
+    /**
+     * The workspace server's organisations an operator linked on the vendor server (server mode only,
+     * {@code docs/standing/server_operation_boundary_v1.md} §5). A seller PC's client has none to ask about.
+     */
+    default List<UUID> workspaceOrganisations() {
+        throw new Refused();
+    }
+
     Code requestCode(String deviceName, String appVersion, String publicKeyBase64);
 
     Poll poll(String deviceCode);
@@ -159,6 +167,15 @@ public interface VendorServerClient {
 
     /** Approves the task's exact version and text (contract §4.3) — the seller pressing it on this PC. */
     TaskSnapshot approve(String installToken, UUID taskId, int version, String fingerprint, String commandId);
+
+    /**
+     * {@link #approve} naming who pressed it, as an opaque reference ({@code workspace-user:<user id>}) — no name, no
+     * address (boundary §3). A client that cannot send it approves without it.
+     */
+    default TaskSnapshot approve(String installToken, UUID taskId, int version, String fingerprint, String commandId,
+                                 String approvedBy) {
+        return approve(installToken, taskId, version, fingerprint, commandId);
+    }
 
     /** Cancels the task, or asks its delegate to stop once claimed (§4.2). */
     TaskSnapshot cancel(String installToken, UUID taskId, String commandId);

@@ -37,18 +37,37 @@ public class AgentQuotaProperties {
     private final boolean trustActorHeader;
     private final int dailyRunsPerOrg;
     private final int dailyLlmCallsPerOrg;
+    private final int dailyItemsPerOrg;
+    private final int dailySellerReserveCalls;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public AgentQuotaProperties(
             @Value("${sellerops.agent.quota.enabled:true}") boolean enabled,
             @Value("${sellerops.agent.quota.enforced:true}") boolean enforced,
             @Value("${sellerops.agent.quota.trust-actor-header:false}") boolean trustActorHeader,
             @Value("${sellerops.agent.quota.daily-runs-per-org:200}") int dailyRunsPerOrg,
-            @Value("${sellerops.agent.quota.daily-llm-calls-per-org:1000}") int dailyLlmCallsPerOrg) {
+            @Value("${sellerops.agent.quota.daily-llm-calls-per-org:1000}") int dailyLlmCallsPerOrg,
+            @Value("${sellerops.agent.quota.daily-items-per-org:300}") int dailyItemsPerOrg,
+            @Value("${sellerops.agent.quota.daily-seller-reserve-calls:300}") int dailySellerReserveCalls) {
         this.enabled = enabled;
         this.enforced = enforced;
         this.trustActorHeader = trustActorHeader;
         this.dailyRunsPerOrg = dailyRunsPerOrg;
         this.dailyLlmCallsPerOrg = dailyLlmCallsPerOrg;
+        this.dailyItemsPerOrg = dailyItemsPerOrg;
+        this.dailySellerReserveCalls = Math.max(0, dailySellerReserveCalls);
+    }
+
+    /** The six-argument shape tests build by hand: no seller reserve, so automatic work meets the ceiling itself. */
+    public AgentQuotaProperties(boolean enabled, boolean enforced, boolean trustActorHeader, int dailyRunsPerOrg,
+                                int dailyLlmCallsPerOrg, int dailyItemsPerOrg) {
+        this(enabled, enforced, trustActorHeader, dailyRunsPerOrg, dailyLlmCallsPerOrg, dailyItemsPerOrg, 0);
+    }
+
+    /** The five-argument shape older callers and tests use: the item limit at its default, no seller reserve. */
+    public AgentQuotaProperties(boolean enabled, boolean enforced, boolean trustActorHeader, int dailyRunsPerOrg,
+                                int dailyLlmCallsPerOrg) {
+        this(enabled, enforced, trustActorHeader, dailyRunsPerOrg, dailyLlmCallsPerOrg, 300, 0);
     }
 
     public boolean isEnabled() {
@@ -74,7 +93,31 @@ public class AgentQuotaProperties {
         return dailyRunsPerOrg;
     }
 
+    /**
+     * <b>The org's actual AI ceiling</b> (owner, 2026-10-29): every model call of the day by the seller or by a run no
+     * seller started — judgements, drafts, critiques, revisions, retries, fact checks, the triage classifier.
+     */
     public int llmCalls() {
         return dailyLlmCallsPerOrg;
+    }
+
+    /** The seller-facing count's limit: pieces of work the seller asked for, however many calls each took. */
+    public int items() {
+        return dailyItemsPerOrg;
+    }
+
+    /**
+     * <b>The calls automatic work leaves for the seller</b> (sixth outside review, 2026-10-29). Judgements, drafting
+     * ahead and background inquiry drafts stop at {@code llmCalls() - reserve}; the seller's own presses may use the whole
+     * ceiling. The default (300 of 1,000) is provisional: it is to be set from the calls a piece of work actually takes,
+     * measured in the real-model evaluation.
+     */
+    public int sellerReserve() {
+        return Math.min(dailySellerReserveCalls, Math.max(0, dailyLlmCallsPerOrg));
+    }
+
+    /** Where automatic work stops: the ceiling less the seller's reserve. */
+    public int automaticCalls() {
+        return Math.max(0, dailyLlmCallsPerOrg - sellerReserve());
     }
 }

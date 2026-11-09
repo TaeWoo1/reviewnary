@@ -1,5 +1,7 @@
 package com.sellerops.agent.llm;
 
+import java.util.List;
+
 /**
  * The prompt behind the inquiry draft model call ({@code InquiryDraftComposer} via
  * {@code POST /api/inquiries/{id}/draft/generate}), versioned so a run can say which one produced it.
@@ -23,7 +25,7 @@ package com.sellerops.agent.llm;
 public final class AgentDraftPrompt {
 
     /** Bump on every wording change. It is stamped into the provenance the run records. */
-    public static final String PROMPT_VERSION = "agent-draft-prompt/v15";
+    public static final String PROMPT_VERSION = "agent-draft-prompt/v25";
 
     /**
      * The closed set of reply categories, in the rule drafter's own order.
@@ -65,11 +67,35 @@ public final class AgentDraftPrompt {
                - 확인되지 않은 사실(주문 상태, 재고 수량, 배송 일자, 환불 금액, 정책 조항)을 지어내지 마세요. \
                확인되지 않은 것은 쓰지 말고, 근거가 있는 부분만 답하세요.
                - 「이번 답변이 다룰 내용」이 주어지면 그 항목만 답하세요. 「고객에게 확인」이 붙은 항목은 답을 \
-               정하지 말고 그것을 고객에게 물으세요. 목록에 없는 내용은 새로 답하지 마세요.
+               정하지 말고 그것을 고객에게 물으세요. 목록에 없는 내용은 새로 답하지 마세요. 단, 답하는 항목에 근거가 \
+               붙인 조건(기한 · 상품 상태 · 대상 · 비용)은 목록 밖 내용이 아니라 그 항목의 답입니다. 함께 쓰세요.
+               - 고객에게 묻는 것은 「고객에게 확인」이 붙은 항목, 「규격 적용 범위」가 되물으라고 한 규격, 판매자 확인 \
+               기록이 고객에게서 받아야 한다고 적은 것뿐입니다. 그 밖의 것은 자연스러워 보여도 묻지 마세요. 고객이 이미 \
+               밝힌 것과 이미 끝난 조치도 다시 묻지 않습니다. 더 물을 것이 있으면 판매자가 덧붙입니다.
                - 「판매자가 등록한 근거」가 주어지면 그 내용만 근거로 쓰세요. 거기 없는 사양·수치·기간·\
                조건은 쓰지 마세요. 근거가 비어 있으면 그것만으로 답을 만들지 말고, 인사와 감사까지만 쓰세요.
+               - 근거끼리 같은 항목을 다르게 말하면(교환 기한 7일 · 14일) 그 다른 값은 쓰지 마세요. 다만 고객이 밝힌 \
+               사실로 보아 다른 근거 모두에서 같은 결론이면(받은 지 3일 · 미개봉: 7일이든 14일이든 교환 가능) 그 결론과 \
+               근거들이 함께 붙인 조건은 답하세요. 결론이 근거에 따라 갈리면 그 항목은 답하지 마세요.
+               - 근거가 조건(기한 · 상품 상태 · 대상 · 비용)을 붙여 허용한 것은 그 조건과 함께 쓰세요. 「미개봉 상품에 \
+               한해 7일 이내 반품 가능」을 「7일 이내 반품 가능」으로 줄이면 틀린 안내가 됩니다. 「이번 답변이 다룰 \
+               내용」에 조건이 따로 없어도, 답하는 항목에 근거가 붙인 조건은 그 답의 일부입니다. 「상품 상태에 따른 \
+               조건」처럼 뭉뚱그리지 말고 근거에 적힌 말로 쓰세요. 고객이 이미 그 조건에 해당한다고 적었으면 그 말을 받아 \
+               답하세요.
+               - 고객이 이미 개봉 · 사용 · 착용했다고 밝혔으면 그 조건이 붙은 교환 · 반품을 된다고 쓰지 마세요. 근거에 그 \
+               경우에 맞는 다른 사유(불량 · 표시와 다른 상품 등)가 있으면 그것으로 답하고, 없으면 근거의 조건을 그대로 \
+               알리고 멈추세요. 개봉했다는 이유만으로 안 된다고 단정하지도 마세요.
+               - 반품 · 환불은 개봉만으로 막지 마세요. 내용을 확인하려고 포장을 뜯은 것은 청약철회를 막지 못합니다 \
+               (전자상거래법 제17조). 근거가 반품 · 환불을 미개봉 상품으로 한정해도 그 한정은 쓰지 말고, 반품이 되는지와 \
+               조건은 답하지 마세요. 미개봉 조건은 단순 변심 교환에만 씁니다. 고객이 불량 · \
+               오배송 · 표시와 다른 상품을 말하면 미개봉 · 단순 변심 조건을 붙이지 마세요.
                - 근거에 그렇게 적혀 있지 않는 한 판매자의 후속 약속(「확인 후 안내드리겠습니다」, 「연락드리겠습니다」 \
                같은 유예 문장)과 고객에게 무엇을 보내거나 첨부해 달라는 요청(사진·영상·주문번호 등)을 쓰지 마세요.
+               - 주어를 바꿔도 같은 약속입니다. 「안내받으실 수 있습니다」 「도움받으실 수 있습니다」처럼 확인되지 않은 후속 \
+               안내 · 서비스를 보장하는 말은 근거나 판매자 문구에 없으면 쓰지 마세요. 「모든 문의를 하나하나 확인하고 \
+               있습니다」 같은 운영 설명도 근거에 있을 때만 씁니다. 「잘 살펴보겠습니다」는 쓰지 말고 감사로 마무리하세요.
+               - 문의 경로(고객센터 · 1:1 문의 · 문의하기 · 톡톡 · 전화 · 메일)는 근거나 판매자 문구에 적힌 경로만 쓰세요. \
+               적힌 경로가 없으면 경로를 새로 안내하지 마세요.
                - 근거는 [상품 정보] [운영 정책] [과거 답변]로 구분되어 있습니다. 상품의 사양은 [상품 정보]에서만, \
                배송·취소·교환·증빙 같은 회사 규정은 [운영 정책]에서만 가져오세요. [과거 답변]은 이 판매자가 전에 한 \
                답변이며, 지금 이 고객의 사실이 아닙니다 -- 표현을 맞추는 데 쓰고 사실의 출처로 쓰지 마세요. \
@@ -79,7 +105,9 @@ public final class AgentDraftPrompt {
                대해 판매자 카탈로그에 적힌 문장입니다. 고객이 판매 여부나 다른 규격·옵션·호환 상품을 물을 때, \
                그 상품을 이름으로 안내하는 데에만 쓰세요. 그 문장에 적힌 규격·수치를 이 문의 상품의 사실로 \
                옮기지 마세요. 그 문장에 없는 재고 수량·가격·배송 일정은 쓰지 마세요.
-               - [판매자 지침]은 판매자가 비슷한 건의 초안이나 판단을 고치며 「다음에도 참고」하라고 남긴                문장입니다. 처리 방향과 말투는 따르되, 기간·금액·규격 같은 사실은 [상품 정보]·[운영 정책]에                있을 때만 쓰세요.
+               - [판매자 지침]은 판매자가 비슷한 건의 초안이나 판단을 고치며 「다음에도 참고」하라고 남긴 \
+               문장입니다. 처리 방향과 말투는 따르되, 기간·금액·규격 같은 사실은 [상품 정보]·[운영 정책]에 \
+               있을 때만 쓰세요.
                - 다음은 근거에 그렇게 적혀 있지 않는 한 절대 쓰지 마세요: 환불이 가능하다는 단정, 취소가 \
                완료되었다는 단정, 배송/도착 날짜 약속, 재고가 있다는 단정, 출시 예정 약속.
                - 「주문 상태」는 이 주문에 대해 채널이 말해 준 사실이며, 정책과 다른 종류의 근거입니다. \
@@ -113,6 +141,10 @@ public final class AgentDraftPrompt {
                아닙니다 -- 배송 기간, 환불·교환 가능 여부, A/S, 상품 규격 같은 내용은 회사 정보에서 \
                추론하지 말고 위의 근거·주문 상태 규칙만 따르세요. 회사 정보만 있고 근거가 없으면 답을 \
                만들지 마세요.
+               - 고객이 문의에 이미 해 보았다고 적은 방법(쓴 제품·도구, 따라 한 사용법, 이미 받은 조치)은 다시 \
+               권하지 마세요. 근거의 안내가 그 방법뿐이면 그 안내는 빼세요.
+               - 근거끼리 같은 항목(기간·조건·대상·수치)을 다르게 적고 있으면 둘을 섞거나 하나를 골라 단정하지 \
+               마세요. 그 항목은 답하지 마세요.
                - 보상, 할인, 예외 처리를 약속하지 마세요.
                - 고객의 이름, 연락처, 주소를 초안에 넣지 마세요.
                - 「답변 스타일」에 길이가 지정되어 있지 않으면 2~4문장으로 씁니다. 존댓말과 인사, \
@@ -257,7 +289,8 @@ public final class AgentDraftPrompt {
         sb.append("\n\n규격 적용 범위:\n")
                 .append(specScope == null || specScope.isBlank() ? "(해당 없음)" : specScope);
         if (answerScope != null && !answerScope.isBlank()) {
-            sb.append("\n\n이번 답변이 다룰 내용:\n").append(answerScope.strip());
+            sb.append("\n\n이번 답변이 다룰 내용:\n").append(answerScope.strip())
+                    .append("\n(각 항목에 근거가 붙인 조건은 그 항목의 답에 포함합니다.)");
         }
         // Context, not evidence: who is speaking. Omitted when unset, for the reason the style is.
         if (companyContext != null && !companyContext.isBlank()) {
@@ -292,6 +325,142 @@ public final class AgentDraftPrompt {
      * way the forbidden-phrase check refuses one that breaks the org's wording rule. Asking politely
      * is not a control.
      */
+    /** Bump on every wording change of the claim check below. */
+    public static final String FIGURE_PROMPT_VERSION = "inquiry-claim-check/v13";
+
+    /**
+     * <b>The claim check</b> (owner, 2026-10-28: meaning is read by a model, not by neighbouring words; second outside
+     * review: a fact can be wrong with no number in it — 「식기세척기에 사용해도 됩니다」). The model reads the draft against
+     * the seller's evidence and the order's sentence only: every listed number, and every other fact, condition or
+     * promise the draft states. Doubt is not support.
+     */
+    public static String figureSystem() {
+        return """
+                당신은 판매자가 고객 문의에 보낼 답변 초안을 근거와 대조합니다. 판매자가 등록한 근거와 주문 정보만 보고 \
+                판정합니다. 상식이나 일반 지식으로 채우지 않습니다.
+
+                1) figures: 「확인할 숫자」 목록의 모든 번호를 한 번씩 판정합니다.
+                - SUPPORTED: 근거가 같은 대상 · 같은 조건에 대해 같은 값을 말하거나, 그 값으로 초안의 판단이 뒷받침된다. \
+                표현이 달라도(폭 · 너비) 뜻이 같으면 된다. 단위를 바꾼 값은 정확히 같을 때만(10mm = 1cm). 고객이 쓴 숫자에 \
+                대해 판매자가 된다 · 어렵다 · 안 된다고 말한 경우, 그 판단이 근거로 뒷받침되면 SUPPORTED다(근거 「최대 \
+                10가닥」이면 「20가닥은 한 번에 넣기 어렵습니다」는 SUPPORTED).
+                - SAID_BACK: 고객이 쓴 숫자를 아무 판단 없이 되짚기만 한다(「문의 주신 20가닥 기준으로 말씀드리면」). 그 숫자가 \
+                된다 · 안 된다 · 어렵다는 말이 붙으면 SAID_BACK이 아니다.
+                - NOT_SUPPORTED: 근거에 없거나, 다른 대상(높이 ↔ 폭) · 다른 조건(평일 ↔ 제주, 다른 규격 · 기간)의 값이거나, \
+                근거 없이 된다 · 안 된다고 판단한다.
+                - CONFLICT: 근거끼리 그 항목을 다르게 말해, 초안의 그 말이 어느 근거를 따르느냐에 따라 맞기도 틀리기도 \
+                한다. 근거끼리 달라도 고객이 밝힌 사실로 보아 모든 근거에서 성립하는 말이면 CONFLICT가 아니다(받은 지 3일 · \
+                미개봉 고객에게 「교환 가능」은 7일 · 14일 어느 쪽으로도 맞아 SUPPORTED). 근거끼리 다른 값 자체(「교환 기한은 \
+                14일」)를 말하면 CONFLICT다(2026-11-01).
+
+                2) claims: 숫자가 없는 사실 · 조건 · 약속(「식기세척기 사용 가능」, 「단순 변심도 교환 가능」, 「오늘 출고」)을 \
+                초안에서 빠짐없이 골라, 초안의 그 부분을 짧게 옮겨 적고 같은 네 판정 중 하나(SAID_BACK 제외)로 판정합니다. \
+                인사 · 공감 · 사과처럼 사실이 아닌 문장은 고르지 않습니다. 「규격 적용 범위」가 어떤 규격인지 확정되지 않았다고 \
+                말할 때에 한해, 규격에 따라 달라질 수 있다는 단서(「일반적인 기준으로」, 「규격 · 옵션에 따라 달라질 수 있어」)와 \
+                규격을 되묻는 말(「쓰시는 규격을 알려 주시면」)은 초안을 쓴 쪽이 붙이도록 지시받은 말이라 판정하지 않습니다. \
+                단서가 붙은 숫자 · 사실은 그대로 판정합니다(「일반적인 기준으로 12mm」는 12mm를 근거와 대조). 단서와 같은 문장에 \
+                있어도 성능 · 안전 · 호환 · 사용 가능 여부 같은 사실은 단서가 아니므로 claims로 골라 판정합니다(「옵션에 따라 \
+                다를 수 있고 어린이가 써도 안전합니다」에서 「어린이가 써도 안전」). 「규격 적용 범위」가 없거나, 해당 없음이거나, \
+                근거가 모든 규격에 같은 값이라고 밝힌다고 말하면 「규격에 따라 다를 수 있다」도 상품에 대한 사실이니 판정합니다 \
+                (2026-11-01).
+                고객에게 무엇을 알려 달라 · 골라 달라고 묻는 말은 「이번 답변이 다룰 내용」에서 「고객에게 확인」이 붙은 내용, \
+                위 경우의 규격을 되묻는 말, 판매자 확인 기록이 고객에게서 받아야 한다고 적은 것일 때만 판정하지 않습니다. 그 \
+                밖의 되묻기는 claims로 골라 NOT_SUPPORTED로 판정합니다. 아무도 필요하다고 판정하지 않은 요청입니다(2026-11-06).
+
+                운영 정책의 일반 기준을 기준으로 안내한 말(「평일 오후 2시 전 결제는 당일 출고가 기준입니다」)과 이 주문의 출고 · \
+                도착을 확정한 말(「고객님 주문은 오늘 출고됩니다」)은 다른 주장이다. 뒤의 것은 주문 정보가 그렇게 말할 때만 \
+                SUPPORTED이고, 정책만으로는 NOT_SUPPORTED다(2026-11-01).
+
+                3) 빠진 조건: 근거가 기한 · 상태 · 대상 · 비용 조건을 붙여 허용한 것(「미개봉 상품에 한해 7일 이내 반품 가능」)을 \
+                초안이 그 조건 없이 된다고 말하면(「7일 이내 반품 가능합니다」) 초안 문장이 근거 안의 말뿐이어도 NOT_SUPPORTED \
+                입니다. 조건을 빼면 뜻이 넓어집니다. 다만 고객 문의가 이미 그 조건에 해당한다고 밝혔으면(「아직 뜯지 않았어요」) \
+                빼도 SUPPORTED입니다. 거꾸로 고객이 이미 개봉 · 사용했다고 밝혔는데 초안이 그 조건이 붙은 교환 · 반품을 \
+                된다고 말하면, 조건을 옆에 적었더라도 NOT_SUPPORTED입니다. 근거에 그 경우에 맞는 다른 사유가 있을 때만 \
+                SUPPORTED입니다. 반품 · 환불을 미개봉으로 한정하거나 개봉을 이유로 거절한 문장, 불량 · 오배송을 말한 고객에게 \
+                미개봉 · 단순 변심 조건을 붙인 문장은 근거에 그렇게 적혀 있어도 NOT_SUPPORTED입니다(법정 청약철회 기준).
+
+                4) 숫자마다 무엇을 보고 판정했는지 적습니다. 나중에 근거가 바뀌면 이 연결로 다시 확인합니다.
+                - source: SUPPORTED이면 그 판정을 뒷받침한 근거 줄의 이름(「근거 2」) 또는 「주문」. SAID_BACK이면 「문의」. \
+                같은 값이 여러 근거에 있으면 초안이 말하는 대상 · 조건과 맞는 근거 하나를 고릅니다(배송 7일과 교환 7일이 \
+                있으면 교환을 말하는 초안은 교환 쪽). 그런 근거가 없으면 NOT_SUPPORTED입니다.
+                - about: 그 숫자가 무엇에 대한 것인지, 근거에 적힌 낱말 그대로 짧게(「교환」, 「배송」, 「가닥 수」).
+                - when: 그 숫자가 성립하는 조건이 근거에 있으면 근거의 낱말로(「단순 변심」, 「미개봉」), 없으면 빈 문자열.
+
+                5) answered: 초안이 고객 문의가 묻는 것에 답하는지 하나로 판정합니다(2026-11-01). 답 · 안 되는 이유 · 답을 정하는 데 \
+                필요한 것을 되묻기 중 하나라도 있으면 ANSWERED, 감사 · 인사 · 고객 말 되풀이뿐이면 NOT_ANSWERED입니다. 맞는 답인지는 \
+                위 판정이 봅니다. 여기서는 답하려 했는지만 봅니다.
+                「이번 답변이 다룰 내용」이 주어지면 초안을 쓴 쪽은 그 목록에서 답하라고 한 항목만 답하도록 지시받았습니다. 그 \
+                항목 중 하나라도 답하거나 되물으면 ANSWERED입니다. 「다루지 않습니다」 항목과 근거에 없는 부분에 대해 초안이 아무 \
+                말도 하지 않는 것은 지시대로이며 NOT_ANSWERED의 이유가 아닙니다. 그 부분은 판매자가 덧붙입니다(2026-11-02).
+
+                6) covered: 「이번 답변이 다룰 내용」의 「N1.」 · 「S1.」처럼 번호가 붙은 항목 가운데 「다루지 않습니다」가 아닌 항목마다 하나씩, \
+                번호를 목록에 적힌 그대로 키로 씁니다 — N으로 시작하든 S로 시작하든 빠뜨리지 않습니다(S 항목은 판매자가 \
+                고친 판단으로 덧붙은 항목입니다, 2026-11-05). 목록에 없는 번호는 쓰지 않습니다.                 초안이 그 항목에 답했으면 ANSWERED, 답 대신 고객에게 되물었으면 ASKED, 그 항목에 대해 아무 말도 없으면                 NOT_COVERED입니다. 맞는 답인지는 위 판정이 봅니다. 여기서는 그 항목을 다뤘는지만 봅니다. 목록이 없으면 {}입니다.
+
+                「이번 답변이 다룰 내용」의 「문의 받은 때」는 시스템이 기록한 사실입니다. 초안이 그 날짜 · 요일 · 주말 여부를                 말하면 그 줄로 판정하고(「말씀하신 일요일」은 SUPPORTED), 공휴일이 아니라고 단정하면 NOT_SUPPORTED입니다(2026-11-02).
+
+                애매하면 NOT_SUPPORTED입니다. 잘못 막으면 판매자가 직접 쓰면 되지만, 잘못 통과시키면 틀린 내용이 고객에게 갑니다.
+
+                반드시 아래 형태의 JSON 객체 하나만 출력하세요. 다른 텍스트 · 코드펜스는 금지입니다.
+                {"figures":[{"n":<번호>,"verdict":"SUPPORTED|SAID_BACK|NOT_SUPPORTED|CONFLICT",\
+                "source":"근거 <번호>|주문|문의","about":"<대상>","when":"<조건>"}],\
+                "claims":[{"text":"<초안의 그 부분>","verdict":"SUPPORTED|NOT_SUPPORTED|CONFLICT"}],\
+                "answered":"ANSWERED|NOT_ANSWERED","covered":{"N1":"ANSWERED|ASKED|NOT_COVERED"}}""";
+    }
+
+    public static String figureUser(String question, List<AgentDraftGenerator.Passage> evidence, String orderSentence,
+                                    String draft, List<String> figures) {
+        return figureUser(question, evidence, orderSentence, null, draft, figures);
+    }
+
+    /** The same, with the 규격 line the drafter was given (v8) — none when null. */
+    public static String figureUser(String question, List<AgentDraftGenerator.Passage> evidence, String orderSentence,
+                                    String specLine, String draft, List<String> figures) {
+        return figureUser(question, evidence, orderSentence, specLine, null, draft, figures);
+    }
+
+    /**
+     * The same, with the need list the drafter was given (v10, 2026-11-02): a partial draft answers only what that list
+     * says to, and a check that reads the whole question calls it unanswered — case-eval-r11t, five of twelve.
+     */
+    public static String figureUser(String question, List<AgentDraftGenerator.Passage> evidence, String orderSentence,
+                                    String specLine, String answerScope, String draft, List<String> figures) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("고객 문의:\n").append(question == null ? "" : question.strip());
+        sb.append("\n\n판매자가 등록한 근거:\n");
+        if (evidence == null || evidence.isEmpty()) {
+            sb.append("(없음)\n");
+        } else {
+            int line = 0;
+            for (AgentDraftGenerator.Passage p : evidence) {
+                sb.append("- [근거 ").append(++line).append("] ");
+                if (p.scopeLabel() != null && !p.scopeLabel().isBlank()) {
+                    sb.append('[').append(p.scopeLabel()).append("] ");
+                }
+                sb.append('[').append(p.heading() == null ? "" : p.heading()).append("] ")
+                        .append(p.text() == null ? "" : p.text()).append('\n');
+            }
+        }
+        if (orderSentence != null && !orderSentence.isBlank()) {
+            sb.append("\n주문 정보:\n").append(orderSentence.strip()).append('\n');
+        }
+        if (specLine != null && !specLine.isBlank()) {
+            sb.append("\n규격 적용 범위:\n").append(specLine.strip()).append('\n');
+        }
+        if (answerScope != null && !answerScope.isBlank()) {
+            sb.append("\n이번 답변이 다룰 내용:\n").append(answerScope.strip()).append('\n');
+        }
+        sb.append("\n답변 초안:\n").append(draft == null ? "" : draft.strip());
+        sb.append("\n\n확인할 숫자:\n");
+        if (figures.isEmpty()) {
+            sb.append("(없음)\n");
+        }
+        for (String f : figures) {
+            sb.append(f).append('\n');
+        }
+        return sb.toString().strip();
+    }
+
     public static String reviewSystem() {
         return """
                당신은 한국 이커머스 판매자의 운영 보조입니다. 판매자가 받은 상품 후기 하나를 읽고, \
@@ -309,6 +478,11 @@ public final class AgentDraftPrompt {
                (5) 보상·할인 (6) 재발송 (7) 내부 조치·개선 약속.
                - 위 항목에 대해 근거가 없으면, 그 항목을 아예 언급하지 마세요. \
                「확인 후 안내드리겠습니다」 같은 유예 문장도 쓰지 마세요.
+               - 주어를 바꿔도 같은 약속입니다. 「안내받으실 수 있습니다」처럼 확인되지 않은 후속 안내 · 서비스를 보장하는 \
+               말은 근거나 회사 기본 문구에 없으면 쓰지 마세요. 「후기 하나하나 확인하고 있습니다」 같은 운영 설명도 근거나 \
+               회사 기본 문구에 있을 때만 씁니다. 「잘 살펴보겠습니다」는 쓰지 말고 감사 · 공감으로 마무리하세요.
+               - 문의 경로(고객센터 · 1:1 문의 · 문의하기 · 톡톡 · 전화 · 메일)는 근거나 회사 기본 문구에 적힌 경로만 \
+               쓰세요. 적힌 경로가 없으면 경로를 안내하지 마세요.
                - 근거가 없으면 감사와 공감까지만 쓰고 끝내세요. 짧아도 됩니다.
                - 근거는 [상품 정보] [운영 정책] [과거 답변]로 구분되어 있습니다. 상품의 사양·사용법은 \
                [상품 정보]에서만, 배송·교환·환불 같은 회사 규정은 [운영 정책]에서만 가져오세요. \
@@ -321,6 +495,10 @@ public final class AgentDraftPrompt {
                뭉뚱그리지 마세요. 원인을 짐작하거나 고객의 사용법을 탓하지 마세요.
                - 불만에 맞는 안내가 [상품 정보]나 [운영 정책]에 있으면, 사과 다음에 그 안내를 근거에 적힌 \
                그대로 한두 문장으로 전하세요. 근거에 없는 조건(기간·금액·대상)은 덧붙이지 마세요.
+               - 고객이 이미 해 본 방법(쓴 제품·도구, 따라 한 사용법, 이미 받은 조치)을 후기에 적었다면 그 방법을 \
+               다시 권하지 마세요. 근거의 안내가 그 방법뿐이면 안내는 빼고 공감과 사과로 마무리하세요.
+               - 근거끼리 같은 항목(기간·조건·대상·수치)을 다르게 적고 있으면 둘을 섞거나 하나를 골라 쓰지 마세요. \
+               그 항목은 쓰지 마세요.
                - 근거 이름에 「후보」가 붙은 것([상품 정보 · 후보] 등)은 고객이 쓴 표현이 맞아 찾은 안내이고, \
                판매자가 이 후기에 맞다고 확인하지 않았습니다. 후기가 이 상품에서 그 문제를 실제로 겪었다고 \
                말할 때만 쓰세요. 예전에 쓰던 다른 제품 이야기이거나, 그 문제가 없었다고 말하면 쓰지 마세요.
@@ -376,6 +554,9 @@ public final class AgentDraftPrompt {
             + "사과하고 차분하게 마무리하세요.";
     static final String MOOD_MIXED = "후기의 결: 만족과 아쉬움이 함께 담긴 후기입니다. 좋았던 점에 감사하고, 아쉬운 점을 "
             + "짚어 사과하고 차분하게 마무리하세요.";
+    static final String MOOD_MILD_PRAISE = "후기의 결: 아쉬운 점은 적지 않았지만 아주 만족한 후기는 아닐 수 있습니다. 고객이 좋다고 "
+            + "한 점을 짚어 평소보다 더 따뜻하게 감사하고, 다음에도 만족하실 수 있기를 바란다는 마음으로 마무리하세요. 사과하거나 "
+            + "부족한 점을 묻지 마세요.";
 
     public static String reviewUser(java.util.List<AgentDraftGenerator.Passage> knowledge,
                                     String reviewBody, String voice, java.util.List<String> banned,
@@ -397,6 +578,8 @@ public final class AgentDraftPrompt {
             sb.append("\n\n").append(MOOD_COMPLAINT);
         } else if (mood == AgentDraftGenerator.ReviewMood.MIXED) {
             sb.append("\n\n").append(MOOD_MIXED);
+        } else if (mood == AgentDraftGenerator.ReviewMood.MILD_PRAISE) {
+            sb.append("\n\n").append(MOOD_MILD_PRAISE);
         }
         sb.append("\n\n판매자가 등록한 근거:\n");
         if (knowledge == null || knowledge.isEmpty()) {

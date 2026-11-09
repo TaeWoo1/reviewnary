@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The seller PC's vendor-server link, for the connection screen — contract §2 · §7. Behind the ordinary seller
- * session; on a seller PC the backend answers loopback only ({@code LoopbackRequestGuard}). No response carries the
+ * The signed-in organisation's vendor-server link, for the connection screen — contract §2 · §7. Every route acts for
+ * the session's organisation and no other. Behind the ordinary seller session; on a seller PC the backend answers loopback only ({@code LoopbackRequestGuard}). No response carries the
  * install token, the device code or a key.
  */
 @RestController
@@ -44,28 +44,28 @@ public class VendorLinkController {
     }
 
     @GetMapping
-    public VendorLinkService.Status status() {
-        return service.status();
+    public VendorLinkService.Status status(@AuthenticationPrincipal AuthPrincipal principal) {
+        return service.status(principal.orgId());
     }
 
     @PostMapping("/start")
-    public VendorLinkService.Status start() {
-        return service.start();
+    public VendorLinkService.Status start(@AuthenticationPrincipal AuthPrincipal principal) {
+        return service.start(principal.orgId());
     }
 
     @PostMapping("/poll")
-    public VendorLinkService.Status poll() {
-        return service.poll();
+    public VendorLinkService.Status poll(@AuthenticationPrincipal AuthPrincipal principal) {
+        return service.poll(principal.orgId());
     }
 
     @DeleteMapping
-    public VendorLinkService.Status unlink() {
-        return service.unlink();
+    public VendorLinkService.Status unlink(@AuthenticationPrincipal AuthPrincipal principal) {
+        return service.unlink(principal.orgId());
     }
 
     @GetMapping("/public-ip")
-    public VendorLinkService.PublicIpView publicIp() {
-        return service.publicIp();
+    public VendorLinkService.PublicIpView publicIp(@AuthenticationPrincipal AuthPrincipal principal) {
+        return service.publicIp(principal.orgId());
     }
 
     /** The 「담당자가 올리는 네이버 리뷰」 section: whose server account, into which organisation, each store (§3.2). */
@@ -111,7 +111,7 @@ public class VendorLinkController {
     public VendorReplyTaskService.TaskView handOver(@AuthenticationPrincipal AuthPrincipal principal,
                                                     @PathVariable UUID reviewId,
                                                     @RequestBody @jakarta.validation.Valid HandOverRequest request) {
-        return replyTasks.handOver(principal.orgId(), reviewId, request.baseVersion());
+        return replyTasks.handOver(principal.orgId(), principal.userId(), reviewId, request.baseVersion());
     }
 
     /** 「휴대폰 문장 쓰기」: the phone's edit stays the draft, and this PC's set-aside version is no longer offered. */

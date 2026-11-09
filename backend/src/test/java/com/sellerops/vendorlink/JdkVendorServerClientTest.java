@@ -94,6 +94,46 @@ class JdkVendorServerClientTest {
                 "DELETE /v1/installs/me auth=true ");
     }
 
+    /**
+     * The workspace server's client: every call carries the service token and names the organisation it is for; the
+     * per-call credential is never sent as a bearer of its own (owner decision 2026-10-31, boundary §5).
+     */
+    @Test
+    void theWorkspaceClientSendsItsServiceTokenAndTheOrganisationOnEveryCall() {
+        List<String> headers = new ArrayList<>();
+        String org = "6f1c2a3b-0000-4000-8000-00000000a001";
+        stub.createContext("/v1/stores", exchange -> {
+            headers.add(exchange.getRequestHeaders().getFirst("Authorization") + " | "
+                    + exchange.getRequestHeaders().getFirst("X-Reviewnary-Org"));
+            byte[] out = "[]".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, out.length);
+            exchange.getResponseBody().write(out);
+            exchange.close();
+        });
+        stub.createContext("/v1/workspace/organisations", exchange -> {
+            headers.add(exchange.getRequestHeaders().getFirst("Authorization") + " | "
+                    + exchange.getRequestHeaders().getFirst("X-Reviewnary-Org"));
+            byte[] out = ("{\"organisations\":[\"" + org + "\"]}").getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, out.length);
+            exchange.getResponseBody().write(out);
+            exchange.close();
+        });
+        JdkVendorServerClient workspace = new JdkVendorServerClient(base, "rvw_service");
+
+        assertThat(workspace.workspaceOrganisations()).containsExactly(java.util.UUID.fromString(org));
+        assertThat(workspace.stores(org)).isEmpty();
+        assertThat(workspace.accountEmail(org)).contains("seller@example.com");
+        assertThat(headers).containsExactly("Bearer rvw_service | null", "Bearer rvw_service | " + org);
+        assertThat(seen).last().asString().startsWith("GET /v1/installs/me auth=true");
+
+        JdkVendorServerClient pc = new JdkVendorServerClient(base);
+        headers.clear();
+        pc.stores("rvi_x");
+        assertThat(headers).as("a PC's client names no organisation").containsExactly("Bearer rvi_x | null");
+        assertThatThrownBy(pc::workspaceOrganisations).as("a PC has no organisations to ask about")
+                .isInstanceOf(VendorServerClient.Refused.class);
+    }
+
     @Test
     void aConfiguredHostOtherThanTheVendorsIsRefusedBeforeAnythingIsSent() {
         OutboundGate.arm(true);

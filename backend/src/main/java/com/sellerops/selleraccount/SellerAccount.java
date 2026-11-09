@@ -62,4 +62,27 @@ public class SellerAccount extends BaseEntity {
      */
     @Column(name = "store_identity", length = 64)
     private String storeIdentity;
+
+    /** This account's route when it is one attached to the store rather than the store's own connection (V163). */
+    public static final String ROUTE_DELEGATE_UPLOAD = "DELEGATE_UPLOAD";
+
+    /**
+     * Null for the store's own connection (official API, the seller's own file upload). {@link #ROUTE_DELEGATE_UPLOAD}
+     * for the account 「리뷰 받기 시작」 makes so delegate-uploaded NAVER reviews have one to be answered through —
+     * a route attached to the store, which yields to the store's own connection when there is one ({@link #answering}).
+     */
+    @Column(name = "review_route", length = 24)
+    private String reviewRoute;
+
+    /**
+     * <b>One store, several routes; one account answers</b> (boundary §5, 2026-10-31). Of an organisation's accounts
+     * on one channel, the store's own connection answers; a route attached to it (the delegate's uploads) answers only
+     * when it is all there is. Still null for none, and for two own connections — a reply from either is a question
+     * nobody asked. The route a review came in by stays the review's (its provenance), not the account's.
+     */
+    public static SellerAccount answering(java.util.List<SellerAccount> onChannel) {
+        java.util.List<SellerAccount> own = onChannel.stream().filter(a -> a.getReviewRoute() == null).toList();
+        java.util.List<SellerAccount> pick = own.isEmpty() ? onChannel : own;
+        return pick.size() == 1 ? pick.get(0) : null;
+    }
 }

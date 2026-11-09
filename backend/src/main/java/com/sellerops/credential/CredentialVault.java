@@ -42,6 +42,24 @@ public class CredentialVault {
     private final ObjectMapper objectMapper;
     private final VaultKeyRing keyRing;
 
+    /**
+     * Which channels' official connections are open (proposal §19.4 T1): every credential the official API is reached
+     * with passes here, so a channel that is not open is neither connected, collected from nor sent to. Null in a
+     * bare test, which then gates nothing.
+     */
+    private com.sellerops.channel.activation.ChannelActivation activation;
+
+    @Autowired(required = false)
+    public void setActivation(com.sellerops.channel.activation.ChannelActivation activation) {
+        this.activation = activation;
+    }
+
+    private void requireOpen(UUID orgId, UUID sellerAccountId) {
+        if (activation != null) {
+            activation.requireForAccount(orgId, sellerAccountId);
+        }
+    }
+
     @Autowired
     public CredentialVault(ConnectorCredentialRepository credentials,
                            ObjectMapper objectMapper,
@@ -75,6 +93,7 @@ public class CredentialVault {
     public CredentialMetadata store(UUID orgId, UUID sellerAccountId, String connectorClass,
                                     String authType, Map<String, String> secrets,
                                     String refreshToken, Instant tokenExpiresAt, UUID createdBy) {
+        requireOpen(orgId, sellerAccountId);
         requireText(connectorClass, "커넥터 종류는 필수입니다.");
         requireText(authType, "인증 방식은 필수입니다.");
         if (secrets == null || secrets.isEmpty()) {
@@ -125,6 +144,7 @@ public class CredentialVault {
      */
     public CredentialMetadata rotateSecrets(UUID orgId, UUID sellerAccountId,
                                             Map<String, String> secrets) {
+        requireOpen(orgId, sellerAccountId);
         if (secrets == null || secrets.isEmpty()) {
             throw ApiException.badRequest("자격 증명 값이 비어 있습니다.");
         }
@@ -193,6 +213,7 @@ public class CredentialVault {
      * the duration of a run — callers must not persist, log, or serialize it.
      */
     public DecryptedCredential open(UUID orgId, UUID sellerAccountId) {
+        requireOpen(orgId, sellerAccountId);
         ConnectorCredential row = load(orgId, sellerAccountId);
         byte[] masterKey = openingKey(row);
         Map<String, String> secrets;

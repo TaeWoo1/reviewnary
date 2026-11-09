@@ -27,6 +27,14 @@ public class SellerAccountService {
         this.channels = channels;
     }
 
+    /** A channel whose official connection is not open gets no API account to fill (proposal §19.4 T1). */
+    private com.sellerops.channel.activation.ChannelActivation activation;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setActivation(com.sellerops.channel.activation.ChannelActivation activation) {
+        this.activation = activation;
+    }
+
     @Transactional(readOnly = true)
     public List<SellerAccountResponse> listForOrg(UUID orgId) {
         Map<UUID, String> channelNames = channels.findAll().stream()
@@ -80,6 +88,9 @@ public class SellerAccountService {
         // second row. (File-upload accounts are not covered — ESM holds several per channel by identity.)
         Channel channel = channels.findByIdForUpdate(req.channelId())
                 .orElseThrow(() -> ApiException.notFound("채널을 찾을 수 없습니다."));
+        if (activation != null) {
+            activation.require(orgId, channel.getCode());
+        }
 
         SellerAccount existing = accounts
                 .findFirstByOrgIdAndChannelIdAndFileUploadOrderByCreatedAtAsc(orgId, channel.getId(), false)

@@ -108,6 +108,33 @@ public class InquiryKnowledgeAssessor {
     private com.sellerops.inquiry.authority.CapabilityRegistry registry;
     private com.sellerops.inquiry.authority.AuthorityFenceProperties fence;
 
+    private com.sellerops.inquiry.sellercheck.InquiryKindCorrectionRepository kindCorrections;
+    private com.sellerops.inquiry.workitem.InquiryWorkItemRepository kindWorkItems;
+
+    /**
+     * The seller's correction of what kind of inquiry this is (2026-11-05 seventh review). While one stands, the needs are
+     * planned under it ({@link com.sellerops.inquiry.decision.InquiryKind#apply}) here — the one place every caller's
+     * decision is made — so the draft, the case reading and the investigation read the same inquiry. Optional: without
+     * it nothing is corrected.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setKindCorrections(com.sellerops.inquiry.sellercheck.InquiryKindCorrectionRepository kindCorrections,
+                                   com.sellerops.inquiry.workitem.InquiryWorkItemRepository kindWorkItems) {
+        this.kindCorrections = kindCorrections;
+        this.kindWorkItems = kindWorkItems;
+    }
+
+    /** The kind the seller set for this inquiry, or null when none stands. */
+    private com.sellerops.inquiry.decision.InquiryKind correctedKind(UUID orgId, Inquiry inquiry) {
+        if (kindCorrections == null || kindWorkItems == null || inquiry == null || inquiry.getId() == null) {
+            return null;
+        }
+        return kindWorkItems.findByInquiryId(inquiry.getId()).filter(w -> orgId.equals(w.getOrgId()))
+                .flatMap(w -> kindCorrections
+                        .findFirstByOrgIdAndWorkItemIdAndSupersededAtIsNullOrderByCorrectedAtDesc(orgId, w.getId()))
+                .map(c -> com.sellerops.inquiry.decision.InquiryKind.parse(c.getKind())).orElse(null);
+    }
+
     private com.sellerops.inquiry.resolve.CustomerGoalInterpretation goals;
 
     /**
@@ -156,6 +183,12 @@ public class InquiryKnowledgeAssessor {
     }
 
     public Assessment assess(UUID orgId, Inquiry inquiry, OrderFactLookup lookup) {
+        return assess(orgId, inquiry, lookup, com.sellerops.agent.quota.AgentUsageActor.USER);
+    }
+
+    /** The same, with the decision's model calls charged to {@code actor} — who asked for this assessment. */
+    public Assessment assess(UUID orgId, Inquiry inquiry, OrderFactLookup lookup,
+                             com.sellerops.agent.quota.AgentUsageActor actor) {
         String title = MarkupText.toPlainText(inquiry.getTitle());
         String details = MarkupText.toPlainText(inquiry.getBody());
         // The 규격 is resolved BEFORE the retrieval it scopes (2026-08-27): a document about 2호 is not weak evidence
@@ -164,7 +197,8 @@ public class InquiryKnowledgeAssessor {
         SpecApplicability.Verdict verdict = SpecApplicability.classify(title, details, optionsFor(orgId, productId));
         SpineRetrieval found = spine.retrieveForInquiry(orgId, inquiry, RetrievalQuery.ofCustomer(title, details),
                 lookup, KnowledgeVariantScope.of(verdict.variantId()));
-        AnswerBasisState basis = AnswerBasisState.of(found.lanes().state(), verdict.applicability());
+        AnswerBasisState basis = AnswerBasisState.of(found.lanes().state(), verdict.applicability(),
+                coversEveryOption(found.lanes(), verdict));
         Set<KnowledgeTopic> named = namedTopics(inquiry);
         KnowledgeTopic asked = named.size() == 1 ? named.iterator().next() : null;
         // Seller-wide catalogue discovery, for a question about what the seller sells (「9oz 디스펜서도 판매하시나요」).
@@ -191,7 +225,8 @@ public class InquiryKnowledgeAssessor {
         if (decisionModel == null || collector == null || !decisionModel.enabledFor(orgId)) {
             return new Assessment(productId, verdict, found, basis, asked, named, gap, subject, catalogueFinding);
         }
-        return decide(orgId, inquiry, title, details, productId, verdict, found, asked, named, catalogueFinding, lookup);
+        return decide(orgId, inquiry, title, details, productId, verdict, found, asked, named, catalogueFinding, lookup,
+                actor);
     }
 
     /**
@@ -203,7 +238,8 @@ public class InquiryKnowledgeAssessor {
     private Assessment decide(UUID orgId, Inquiry inquiry, String title, String details, UUID productId,
                               SpecApplicability.Verdict verdict, SpineRetrieval found, KnowledgeTopic asked,
                               Set<KnowledgeTopic> named, CatalogueInvestigator.Finding catalogueFinding,
-                              OrderFactLookup lookup) {
+                              OrderFactLookup lookup,
+                              com.sellerops.agent.quota.AgentUsageActor actor) {
         String question = ((title == null ? "" : title) + "\n" + (details == null ? "" : details)).strip();
         com.sellerops.inquiry.decision.DetailCapability detail = collector.detail(orgId, productId);
         com.sellerops.product.library.KnowledgeVariantScope scope =
@@ -216,29 +252,44 @@ public class InquiryKnowledgeAssessor {
                         registry.snapshot(orgId, inquiry, productId, detail, lookup),
                         found.lanes() == null ? null : found.lanes().order(), orderKey);
         com.sellerops.inquiry.decision.NeedDecision decision = com.sellerops.inquiry.decision.InquiryDecisionEngine
-                .decide(orgId, question, decisionModel,
+                .decide(orgId, question, com.sellerops.inquiry.decision.InquiryKind.correcting(
+                                decisionModel.chargedTo(actor), correctedKind(orgId, inquiry)),
                         needs -> collector.collect(orgId, inquiry, productId, found.lanes(), catalogueFinding, scope,
                                 needs), detail, new com.sellerops.inquiry.decision.EvidenceScope.CaseScope(productId,
-                        orderKey), authority);
+                        // The order this Case is about — the channel's, or this inquiry's as the seller checked it.
+                        com.sellerops.inquiry.decision.EvidenceScope.caseOrderKey(inquiry)), authority,
+                com.sellerops.inquiry.decision.InquiryMoment.of(inquiry == null ? null : inquiry.getReceivedAt()));
         AnswerBasisState basis = decision.basis();
         List<com.sellerops.inquiry.decision.NeedResult> open = decision.unresolved();
-        String subject = basis != AnswerBasisState.NO_ANSWER_BASIS ? null
+        // A partial answer still names what is missing, so the seller can add it (tenth review).
+        boolean short_ = basis == AnswerBasisState.NO_ANSWER_BASIS || basis == AnswerBasisState.PARTIAL_ANSWER;
+        String subject = !short_ ? null
                 : !open.isEmpty() ? open.get(0).need().ask()
                 : GapSubject.of(verdict, title, details, productName(orgId, productId), asked,
                         goalsOf(orgId, inquiry));
         KnowledgeGapView gap = KnowledgeGapView.of(found.lanes(), verdict, asked, named).asking(subject)
                 .withNeeds(views(decision));
-        if (basis == AnswerBasisState.NO_ANSWER_BASIS) {
+        if (short_) {
             gap = gap.withPrecedent(open.stream().flatMap(n -> n.precedents().stream())
                     .map(com.sellerops.inquiry.decision.PrecedentCandidate::memoryId).findFirst().orElse(null));
         }
         return new Assessment(productId, verdict, found, basis, asked, named, gap, subject, catalogueFinding, decision);
     }
 
+    /** Whether the current evidence says the asked value holds for every 규격 — as the composer's 규격 line reads it. */
+    static boolean coversEveryOption(InquiryEvidenceRetriever.InquiryEvidence lanes, SpecApplicability.Verdict verdict) {
+        return lanes != null && lanes.figuresUnaided() && !lanes.variantSpecific()
+                && SpecApplicability.coversEveryOption(lanes.passages().stream().filter(p -> p.scope().current())
+                        .map(InquiryEvidenceRetriever.ScopedPassage::text).toList(), verdict.topicWord());
+    }
+
     static List<com.sellerops.inquiry.draft.dto.NeedCoverageView> views(
             com.sellerops.inquiry.decision.NeedDecision decision) {
         return decision.needs().stream().map(n -> new com.sellerops.inquiry.draft.dto.NeedCoverageView(
-                n.need().id(), n.need().ask(), n.need().type().name(), n.status().name(), n.status().labelKo(),
+                n.need().id(), n.need().ask(), n.need().type().name(), n.status().name(),
+                // Covered for the seller's work, but never read as answered (2026-11-06 thirteenth review).
+                n.settledByAction() ? com.sellerops.inquiry.decision.NeedResult.Enforcement.SETTLED_BY_ACTION_KO
+                        : n.status().labelKo(),
                 n.evidence().stream().map(e -> e.kind().scopeLabelKo() + " · " + e.label()).distinct().toList(),
                 n.missing(), n.askCustomer(),
                 n.precedents().stream().map(com.sellerops.inquiry.decision.PrecedentCandidate::memoryId).toList(),

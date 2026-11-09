@@ -131,6 +131,20 @@ public class VendorReviewPullService {
         this.reviewLinks = reviewLinks;
     }
 
+    /**
+     * The org's accounts, to give a store's reviews an account to be answered through; null in a bare test, which then
+     * binds without one (the reply tests make their own).
+     */
+    private com.sellerops.selleraccount.SellerAccountRepository sellerAccounts;
+
+    @Autowired(required = false)
+    public void setSellerAccounts(com.sellerops.selleraccount.SellerAccountRepository sellerAccounts) {
+        this.sellerAccounts = sellerAccounts;
+    }
+
+    /** What the account made for delegate-uploaded reviews is called on the connection list. */
+    static final String DELEGATED_ACCOUNT_ALIAS = "네이버 리뷰 (담당자 업로드)";
+
     @Autowired
     public VendorReviewPullService(VendorLinkService link, VendorStoreBindingRepository bindings,
                                    VendorReviewRefRepository refs, ReviewRepository reviews,
@@ -169,10 +183,10 @@ public class VendorReviewPullService {
      */
     public synchronized PullResult start(UUID orgId, List<UUID> storeIds) {
         Objects.requireNonNull(orgId);
-        if (link.client() == null || link.status().state() == VendorLinkService.State.OFF) {
+        if (link.client() == null || link.off()) {
             return PullResult.of(State.OFF);
         }
-        Optional<String> token = link.installToken();
+        Optional<String> token = link.installToken(orgId);
         if (token.isEmpty()) {
             return PullResult.of(State.NOT_LINKED);
         }
@@ -215,10 +229,10 @@ public class VendorReviewPullService {
 
     /** What the section shows. Asks the server for the store list and the account; stores nothing but their ages. */
     public synchronized Overview overview(UUID orgId) {
-        if (link.client() == null || link.status().state() == VendorLinkService.State.OFF) {
+        if (link.client() == null || link.off()) {
             return new Overview(State.OFF, null, List.of());
         }
-        Optional<String> token = link.installToken();
+        Optional<String> token = link.installToken(Objects.requireNonNull(orgId));
         if (token.isEmpty()) {
             return new Overview(State.NOT_LINKED, null, List.of());
         }
@@ -266,17 +280,24 @@ public class VendorReviewPullService {
                 b.getLastFailure() == null ? null : Failure.valueOf(b.getLastFailure()), b.getLastFailureAt());
     }
 
+    /** The organisations with a registration of their own — each is pulled and watched with its own token only. */
+    public List<UUID> linkedOrganisations() {
+        if (link.client() == null || link.off()) {
+            return List.of();
+        }
+        return link.linkedOrganisations();
+    }
+
     /**
-     * What a waiting question names ({@link VendorReviewArrivalWatch}): each store this PC receives — not a stopped one
-     * — with the cursor stored for it. Empty when the link is off or not made.
+     * What a waiting question names ({@link VendorReviewArrivalWatch}): each store the organisation receives — not a
+     * stopped one — with the cursor stored for it. Empty when the link is off or the organisation has none.
      */
-    public Map<UUID, Long> receivingCursors() {
-        if (link.client() == null || link.status().state() == VendorLinkService.State.OFF
-                || link.installToken().isEmpty()) {
+    public Map<UUID, Long> receivingCursors(UUID orgId) {
+        if (link.client() == null || link.off() || link.installToken(Objects.requireNonNull(orgId)).isEmpty()) {
             return Map.of();
         }
         Map<UUID, Long> cursors = new LinkedHashMap<>();
-        for (VendorStoreBinding binding : bindings.findAll()) {
+        for (VendorStoreBinding binding : bindings.findAllByOrgIdOrderByCreatedAt(orgId)) {
             if (!binding.isPaused()) {
                 cursors.put(binding.getVendorStoreId(), binding.getReviewCursor());
             }
@@ -285,28 +306,54 @@ public class VendorReviewPullService {
     }
 
     /**
-     * Asks the server to say when one of these stores has news, and waits for the answer (up to about 25 s; empty when
-     * nothing came). Deliberately not under this service's lock: the screen and a pull must not queue behind a wait.
+     * Asks the server, with the organisation's own token, to say when one of these stores has news, and waits for the
+     * answer (up to about 25 s; empty when nothing came). Deliberately not under this service's lock: the screen and a
+     * pull must not queue behind a wait.
      */
-    public List<UUID> waitForNews(Map<UUID, Long> cursors) {
+    public List<UUID> waitForNews(UUID orgId, Map<UUID, Long> cursors) {
         VendorServerClient client = link.client();
-        Optional<String> token = link.installToken();
+        Optional<String> token = link.installToken(Objects.requireNonNull(orgId));
         if (client == null || token.isEmpty() || cursors.isEmpty()) {
             return List.of();
         }
         return client.waitForReviews(token.get(), cursors);
     }
 
-    /** The scheduled pull: every bound store (a stopped one for its reply tasks only), binding nothing new. */
+    /**
+     * The scheduled pull: every linked organisation in turn, each with its own token and only its own bound stores (a
+     * stopped one for its reply tasks only), binding nothing new. One organisation's failure — a revoked install, a
+     * refusal — does not hold the others back; the result carries the first failure's state.
+     */
     public synchronized PullResult pullBound() {
-        return pull(null, "SCHEDULED");
+        if (link.client() == null || link.off()) {
+            return PullResult.of(State.OFF);
+        }
+        List<UUID> orgs = link.linkedOrganisations();
+        if (orgs.isEmpty()) {
+            return PullResult.of(State.NOT_LINKED);
+        }
+        List<StoreResult> all = new ArrayList<>();
+        State state = State.PULLED;
+        for (UUID orgId : orgs) {
+            PullResult one = pull(orgId, "SCHEDULED");
+            all.addAll(one.stores());
+            if (state == State.PULLED && one.state() != State.PULLED) {
+                state = one.state();
+            }
+        }
+        return new PullResult(state, all);
+    }
+
+    /** The scheduled pull of one organisation — what the arrival watch runs when that organisation's store has news. */
+    public synchronized PullResult pullBound(UUID orgId) {
+        return pull(Objects.requireNonNull(orgId), "SCHEDULED");
     }
 
     private PullResult pull(UUID sellerOrg, String trigger) {
-        if (link.client() == null || link.status().state() == VendorLinkService.State.OFF) {
+        if (link.client() == null || link.off()) {
             return PullResult.of(State.OFF);
         }
-        Optional<String> token = link.installToken();
+        Optional<String> token = link.installToken(sellerOrg);
         if (token.isEmpty()) {
             return PullResult.of(State.NOT_LINKED);
         }
@@ -336,8 +383,8 @@ public class VendorReviewPullService {
                 continue;
             }
             VendorStoreBinding binding = bound.get();
-            if (sellerOrg != null && !sellerOrg.equals(binding.getOrgId())) {
-                // Bound to another organisation on this PC: its reviews are not this seller's to pull.
+            if (!sellerOrg.equals(binding.getOrgId())) {
+                // Bound to another organisation here: its reviews are not this seller's to pull.
                 results.add(new StoreResult(store.id(), store.label(), true, true, 0, 0, 0, 0,
                         binding.getReviewCursor(), false, 0, 0, false));
                 continue;
@@ -386,7 +433,30 @@ public class VendorReviewPullService {
         bindings.save(binding);
     }
 
+    /**
+     * The org's NAVER reviews are answered through an account on that channel — the reply screen and every reply
+     * endpoint are addressed by one. A seller who receives NAVER reviews only from the delegate has none: nothing else
+     * made one (on the web service, owner decision 2026-10-31, that is every new seller until NAVER's official
+     * connection is approved). The first 「리뷰 받기 시작」 makes the account such reviews are: a file-upload account
+     * — the delegate's export is a file — connected, with no credential and nothing scheduled. An org that already
+     * has any NAVER account keeps it as it is.
+     */
+    private void ensureAnsweringAccount(UUID orgId, UUID channelId) {
+        if (sellerAccounts == null || !sellerAccounts.findAllByOrgIdAndChannelId(orgId, channelId).isEmpty()) {
+            return;
+        }
+        com.sellerops.selleraccount.SellerAccount account = new com.sellerops.selleraccount.SellerAccount();
+        account.setOrgId(orgId);
+        account.setChannelId(channelId);
+        account.setAlias(DELEGATED_ACCOUNT_ALIAS);
+        account.setConnectionStatus(com.sellerops.channel.ChannelStatus.CONNECTED);
+        account.setFileUpload(true);
+        account.setReviewRoute(com.sellerops.selleraccount.SellerAccount.ROUTE_DELEGATE_UPLOAD);
+        sellerAccounts.save(account);
+    }
+
     private VendorStoreBinding bind(Store store, UUID orgId, UUID channelId) {
+        ensureAnsweringAccount(orgId, channelId);
         VendorStoreBinding binding = new VendorStoreBinding();
         binding.setVendorStoreId(store.id());
         binding.setOrgId(orgId);
