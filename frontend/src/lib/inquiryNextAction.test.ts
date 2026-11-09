@@ -184,4 +184,12 @@ describe("inquiryReading — 제목은 더해 줄 것이 있을 때만 남는다
       titleContext: null,
     });
   });
+
+  it("a decided reply is not 「할 일 없음」 and not 「답변을 준비하세요」 (2026-11-03 sixth review)", () => {
+    expect(inquiryNextAction({ status: "ANSWERED" }, "w1", "COMPLETED").sentence).toContain("남은 일");
+    expect(inquiryNextAction({ status: "ANSWERED" }, "w1", "COMPLETED").sentence).not.toContain("할 일은 없어요");
+    expect(inquiryNextAction({ status: "UNANSWERED" }, "w1", "ACTION_PENDING").sentence).toContain("등록하고 있어요");
+    expect(inquiryNextAction({ status: "UNANSWERED" }, "w1", "PROPOSED").sentence).toContain("답변을 준비하세요");
+    expect(inquiryNextAction({ status: "ANSWERED" }, null, null).sentence).toContain("할 일은 없어요");
+  });
 });

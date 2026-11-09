@@ -1,5 +1,7 @@
+import type { ReactNode } from "react";
 import { AnswerBasisQuickAdd } from "./AnswerBasisQuickAdd";
 import { waitedLabel } from "../../lib/inquiryWorkflow";
+import { AUTO_DRAFT_REACH_DAYS, waitDays } from "../../lib/copy/customerOps";
 import {
   canVerifyPublish,
   canResumePublish,
@@ -11,12 +13,18 @@ import { bindingLabel, canBindProduct, productLabel } from "../../lib/inquiryPro
 import { InquiryProductBinder } from "./InquiryProductBinder";
 import { answerStateIsGood, type AnswerStateView } from "../../lib/answerState";
 import { Btn } from "../ui/Btn";
+import { OpenQuestionList } from "../OpenQuestionList";
 import { Facts } from "../ui/ObjectRow";
 import { Disclosure } from "../ui/Disclosure";
 import { plainText } from "../../lib/plainText";
 import { draftProvenanceLine, draftSectionHeading } from "../../lib/draftProvenance";
 import { Link } from "react-router-dom";
 import type { InquiryReplyWorkspace } from "./useInquiryReply";
+import { ReplyHoldNotice } from "../ReplyHoldNotice";
+import { HeldTakeBack } from "./HeldTakeBack";
+import { SellerCheckPanel, sellerCheckLeads, formatAt } from "./SellerCheckPanel";
+import { answerRecordOf, draftStepsAside, registeredTextIsOurs, type AnswerRecord } from "../../lib/inquiryAnswerRecord";
+import { commentCheckFact, commentCheckWarning } from "../../lib/commentCheck";
 
 
 /**
@@ -129,6 +137,32 @@ export function InquiryReply({
    * 편집 중이 아닐 때. 편집 중에는 그 자리가 입력란이라 머리를 붙일 물건이 없다.
    */
   const objectHead = docked && Boolean(workspace.draft) && !workspace.editing;
+  /**
+   * 판매자 확인이 이 답변 영역을 이끌 때(2026-11-02 판매자 확인 리뷰 · 2026-11-03 실제 화면 점검): 기록을 묻는 중이거나, 기록은
+   * 있는데 그 기록으로 쓴 답변이 없을 때. 그때 「답변 기준이 필요합니다 · 기준 추가」는 따라 해도 이 문의를 끝낼 수 없는
+   * 안내이고(FINDINGS §B95), 「AI 답변 초안 만들기」는 위 버튼과 같은 일이라 그리지 않는다.
+   */
+  const approvedPhase = !!detail && ["APPROVED", "ACTION_PENDING", "EXECUTED", "COMPLETED"].includes(detail.phase);
+  const sellerCheckAsked = sellerCheckLeads({
+    ask: workspace.sellerCheck?.ask ?? null,
+    check: workspace.sellerCheck?.check ?? null,
+    approved: approvedPhase,
+    draftMatches: workspace.sellerCheck?.draftMatches ?? null,
+    draftState: workspace.sellerDraftState,
+  });
+  const registeredAnswer = !!detail && (detail.delivery?.verified === true || detail.status === "ANSWERED");
+  // A decided reply is not 「준비된 답변」 any more (2026-11-03 sixth review: the inquiry reopens after approval).
+  // What the channel shows is the answer; our draft beside it is ours (2026-11-06 sixteenth review). It never takes the
+  // name 「등록한 답변」 unless SellerOps registered that very text itself.
+  const answerRecord = answerRecordOf(detail);
+  const draftAside = draftStepsAside(answerRecord);
+  const decidedHeading = draftAside
+    ? DRAFT_ASIDE_LABEL
+    : approvedPhase
+      ? (registeredAnswer ? "등록한 답변" : "승인한 답변")
+      : null;
+  // Registered and read back: copying it again would invite a second paste of an answer already there.
+  const registeredDone = detail?.phase === "COMPLETED";
 
   if (loading) {
     return <p className="text-base text-muted">문의 내용을 불러오는 중…</p>;
@@ -198,6 +232,9 @@ export function InquiryReply({
           />
         ) : null}
         <OperationalContext context={detail.orderContext} />
+        {/* 카페24 댓글 답변을 확인했는가 (2026-11-08) — 이 문의에 대한 사실이라 dock이 있든 없든 여기 선다. 누름 앞의
+            안내({@link CommentCheckWarning})와는 다른 문장이다: 여기는 무엇을 언제 확인했는지, 거기는 무엇을 해 달라는지. */}
+        <CommentCheckLine detail={detail} />
       </section>
 
       {/* 2 — THE ANSWER. One section, whatever state it is in. */}
@@ -207,6 +244,43 @@ export function InquiryReply({
         가진 것은 <b>초안 하나</b>뿐이다: 판매자가 복사해서 내보낼 바로 그 문장. 나머지는 구분선과 글자다.
       */}
       <section>
+        {workspace.hold != null ? (
+          <div className="mb-3">
+            <ReplyHoldNotice
+              hold={workspace.hold}
+              onConfirmed={(next) => workspace.setHold(next)}
+              onRegenerate={!workspace.hold.approved && canDraft && !busy && !sellerCheckAsked ? onGenerateDraft : undefined}
+            />
+            {workspace.hold.approved && workspace.sellerCheck?.answered ? (
+              <HeldTakeBack answered={workspace.sellerCheck.answered} busy={busy} onWithdraw={workspace.onWithdrawHeld} />
+            ) : null}
+          </div>
+        ) : null}
+        <SellerCheckPanel
+          ask={workspace.sellerCheck?.ask ?? null}
+          check={workspace.sellerCheck?.check ?? null}
+          loadFailed={workspace.sellerCheckLoadFailed}
+          onReload={() => void workspace.loadSellerCheck()}
+          draftMatches={workspace.sellerCheck?.draftMatches ?? null}
+          hasDraft={Boolean(draft)}
+          draftState={workspace.sellerDraftState}
+          draftReason={workspace.sellerDraftReason}
+          approved={approvedPhase}
+          registered={registeredAnswer}
+          registeredTextIsOurs={registeredTextIsOurs(answerRecord)}
+          busy={busy}
+          error={workspace.sellerCheckError}
+          onRecord={workspace.onRecordSellerCheck}
+          onRedraft={() => void workspace.onRedraftSellerCheck()}
+          onSetNextCheck={workspace.onSetNextCheck}
+          answered={workspace.sellerCheck?.answered ?? null}
+          onReopen={workspace.onReopenSellerCheck}
+          onCloseToldBehind={workspace.onCloseToldBehind}
+          reopened={workspace.reopened}
+          kind={workspace.sellerCheck?.kind ?? null}
+          onCorrectKind={workspace.onCorrectKind}
+          onRedraftKind={canDraft && !busy ? onGenerateDraft : undefined}
+        />
         {/*
           <b>The heading names the version's AUTHOR, not the section's intent</b> (Pilot QA, 2026-09-06).
           It said 「AI가 준비한 답변」 unconditionally, so a version the seller had rewritten was handed
@@ -220,9 +294,10 @@ export function InquiryReply({
           읽힌다 — 그래서 그 제목은 물건의 머리가 들고, 여기서는 그리지 않는다. dock이 없는 호출부는
           예전처럼 블록 위의 작은 제목으로 남는다.
         */}
-        {objectHead ? null : (
+        <ChannelAnswer record={answerRecord} />
+        {objectHead || (draftAside && draft) ? null : (
           <h3 className="text-sm font-semibold text-muted">
-            {draftSectionHeading(draft?.authorKind, Boolean(draft))}
+            {decidedHeading ?? draftSectionHeading(draft?.authorKind, Boolean(draft))}
           </h3>
         )}
 
@@ -231,11 +306,20 @@ export function InquiryReply({
           DECLINED to write one is a third, and folding it into the first would put the seller back
           in front of the same button with no answer to what they just pressed.
         */}
-        {!draft && !answerState && !unavailable ? (
+        {/* A decided reply is never drafted again from here (2026-11-03 sixth review). */}
+        {!draft && !answerState && !unavailable && (sellerCheckAsked || approvedPhase) ? null : !draft && !answerState && !unavailable ? (
           <>
             <p className="mt-1.5 break-keep text-sm leading-relaxed text-muted">
               문의 내용과 등록된 상품 지식을 근거로 초안을 써요. 보내는 것은 확인 후 따로 눌러요.
             </p>
+            {/* Why no draft is waiting (owner, 2026-10-28): drafts are prepared ahead only within the reach the
+                automatic check re-reads; an older inquiry is drafted when the seller asks, and the screen says so
+                rather than leaving a missing draft unexplained. */}
+            {detail && detail.status === "UNANSWERED" && (waitDays(detail.receivedAt) ?? 0) > AUTO_DRAFT_REACH_DAYS ? (
+              <p className="mt-1 break-keep text-sm text-muted" data-testid="draft-on-request">
+                {AUTO_DRAFT_REACH_DAYS}일이 지난 문의라 미리 초안을 만들어 두지 않았어요. 필요하면 아래 버튼으로 만들어 주세요.
+              </p>
+            ) : null}
             <div className="mt-4">
               <Btn onClick={onGenerateDraft} disabled={busy || !canDraft}>
                 {busy ? "쓰는 중…" : "AI 답변 초안 만들기"}
@@ -283,7 +367,7 @@ export function InquiryReply({
               </p>
             ) : null}
             <AnswerStateCard
-              state={answerState}
+              state={sellerCheckAsked ? null : answerState}
               justSaved={basisSaved}
               onSavedBasis={onBasisSaved}
               quiet={docked}
@@ -299,7 +383,7 @@ export function InquiryReply({
               look at. What survives is the reload case, where nothing computed a state this session
               and the stored sentence is the only thing that can speak.
             */}
-            {knowledgeNote && !answerState ? (
+            {knowledgeNote && !answerState && !sellerCheckAsked ? (
               <p
                 className={`mt-2 break-keep border-l-2 pl-3 text-base leading-relaxed text-ink ${
                   knowledgeGrounded ? "border-line" : "border-warn"
@@ -316,7 +400,7 @@ export function InquiryReply({
               knowledge they were told to add already existed. This card says what did not run and
               leaves their library alone.
             */}
-            {unavailable ? (
+            {unavailable && !sellerCheckAsked ? (
               <div className="mt-3 border-l-2 border-warn pl-3">
                 <p className="break-keep text-lg font-semibold leading-relaxed text-ink">
                   {unavailable}
@@ -380,6 +464,7 @@ export function InquiryReply({
                 <p>dock이 없는 호출부는 예전 그대로 canvas 면이다 — 그 화면에서는 근거가 초안과 「그 초안으로
                 할 수 있는 일」 다음에 와야 하고, 그 순서가 그 화면의 질문 순서다.
               */
+              <FoldWhen fold={draftAside}>
               <div
                 className={
                   objectHead
@@ -391,7 +476,7 @@ export function InquiryReply({
                 {objectHead ? (
                   <div className="flex items-baseline gap-3 border-b border-line bg-brand-50 px-4 py-3">
                     <h3 className="shrink-0 text-sm font-bold text-ink">
-                      {draftSectionHeading(draft.authorKind, true)}
+                      {decidedHeading ?? draftSectionHeading(draft.authorKind, true)}
                     </h3>
                     <p className="min-w-0 flex-1 truncate break-keep text-sm text-muted">{draft.title}</p>
                   </div>
@@ -415,7 +500,7 @@ export function InquiryReply({
                 */}
                 <div className="flex items-start justify-between gap-3">
                   <p className="min-w-0 break-keep font-semibold text-ink">{draft.title}</p>
-                  {!docked && !publishable && !draftDirty ? (
+                  {!docked && !publishable && !draftDirty && !registeredDone ? (
                     /*
                       THE GUARANTEE TRAVELS WITH THE BUTTON (Executive Readiness Fix v1).
 
@@ -430,7 +515,7 @@ export function InquiryReply({
                       would be a false promise, and 「답변 보내기」 owns that path with its own confirm.
                     */
                     <div className="shrink-0 text-right">
-                      <Btn onClick={onCopyDraft} disabled={busy}>
+                      <Btn onClick={onCopyDraft} disabled={busy || workspace.copyBlocked}>
                         {copied ? "복사했어요" : "초안 복사"}
                       </Btn>
                       <p className="mt-1 break-keep text-sm text-good">고객에게 나가지 않아요</p>
@@ -460,6 +545,7 @@ export function InquiryReply({
                 </div>
                 {objectHead ? <DraftEvidence evidence={evidence} inset /> : null}
               </div>
+              </FoldWhen>
             )}
 
 
@@ -491,6 +577,8 @@ export function InquiryReply({
                     {detail.answerStateNote}
                   </p>
                 ) : null}
+                {/* 댓글 확인이 실패했거나 기록이 없으면 누르기 전에 말한다 — 막지는 않는다 (2026-11-08). */}
+                {!docked ? <CommentCheckWarning detail={detail} className="mb-3 text-sm leading-relaxed" /> : null}
 
                 {!confirming || !draft ? (
                   /*
@@ -508,13 +596,18 @@ export function InquiryReply({
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
                       {!docked && publishable && !draftDirty && !editing ? (
-                        <Btn onClick={() => setConfirming(true)} disabled={busy}>
+                        <Btn onClick={() => setConfirming(true)} disabled={busy || workspace.openLeft > 0 || workspace.kindStale}>
                           답변 보내기
                         </Btn>
                       ) : null}
+                      {!docked && publishable && workspace.openLeft > 0 ? (
+                        <span className="break-keep text-sm text-warn" data-testid="open-questions-hold">
+                          남은 질문 {workspace.openLeft}개를 처리해야 보낼 수 있어요.
+                        </span>
+                      ) : null}
                       {/* Not repeated here when it is the primary — it is in the draft's own header. */}
-                      {!docked && publishable && draft && !editing && !draftDirty ? (
-                        <Btn size="sm" variant="outline" onClick={onCopyDraft} disabled={busy}>
+                      {!docked && publishable && draft && !editing && !draftDirty && !registeredDone ? (
+                        <Btn size="sm" variant="outline" onClick={onCopyDraft} disabled={busy || workspace.copyBlocked}>
                           {copied ? "복사했어요" : "초안 복사"}
                         </Btn>
                       ) : null}
@@ -557,6 +650,9 @@ export function InquiryReply({
                     <p className="mt-2 whitespace-pre-wrap break-keep rounded-lg bg-canvas p-3 text-sm leading-relaxed text-ink">
                       {draft.comments}
                     </p>
+                    {/* 두 번째 누름 바로 앞에서도 (2026-11-08). 등록은 되돌릴 수 없으니, 이미 댓글로 답했을 수 있다는 말은
+                        이 블록 안에 있어야 한다. 막지 않는다. */}
+                    <CommentCheckWarning detail={detail} className="mt-3 text-sm leading-relaxed" />
                     <div className="mt-3 flex gap-2">
                       <Btn size="sm" onClick={onConfirmPublish} disabled={busy}>
                         {busy ? "등록 중…" : "확인, 등록해요"}
@@ -611,6 +707,18 @@ export function InquiryReply({
             */}
             {/* 물건이 자기 발로 근거를 들고 있으면 여기서 또 그리지 않는다 ({@code objectHead}). */}
             {editing || !draft || objectHead ? null : <DraftEvidence evidence={evidence} />}
+
+            {/* What a partial draft left, one question at a time, with a reason each (tenth review). */}
+            {workspace.workItemId ? (
+              <div className="mt-4">
+                <OpenQuestionList
+                  lane="INQUIRY"
+                  subjectId={workspace.workItemId}
+                  refreshKey={draft?.version ?? null}
+                  onChange={workspace.setOpenLeft}
+                />
+              </div>
+            ) : null}
 
             {/* The outcome of the one marketplace WRITE this product performs, read back from the rows
                 rather than remembered from the press. The local inquiry stays UNANSWERED until a
@@ -875,6 +983,9 @@ function InquiryMeta({
   );
 }
 
+/** The line a citation whose passage changed or went takes in place of its excerpt. */
+export const GONE_NOTE = "답변을 쓴 뒤로 바뀌었거나 지워진 근거예요.";
+
 /**
  * What the draft was grounded in.
  *
@@ -897,6 +1008,7 @@ function DraftEvidence({ evidence, inset = false }: { evidence: DraftEvidenceVie
   }
   const [lead, ...rest] = evidence;
   const leadLabel = lead.scopeLabel ?? lead.kind;
+  const gone = evidence.filter((item) => item.gone).length;
   // 「상품 정보 2개 · 과거 답변 1개」 — the summary the fold is decided from.
   const summary = groups.map((group) => `${group.label} ${group.items.length}개`).join(" · ");
   return (
@@ -921,11 +1033,20 @@ function DraftEvidence({ evidence, inset = false }: { evidence: DraftEvidenceVie
     /* `inset`: 준비된 답변이라는 한 물건의 발이라 자기 여백을 쓰지 않고 그 면의 안쪽 여백을 쓴다. */
     <div className={inset ? "border-t border-line px-4 py-3" : "mt-4 border-t border-line pt-3"}>
       <p className="text-sm font-medium text-muted">답변에 사용한 근거</p>
+      {/* A passage the draft stood on was edited or deleted since (2026-10-28): the answer may now say what the
+          seller's knowledge no longer says. Said once, above the list, before anything is approved. */}
+      {gone > 0 ? (
+        <p className="mt-1 break-keep text-sm font-semibold text-warn" role="status" data-testid="draft-evidence-gone">
+          이 답변을 쓴 뒤로 근거 {gone}개가 바뀌었거나 지워졌어요. 등록하기 전에 내용을 다시 확인해 주세요.
+        </p>
+      ) : null}
       <div className="mt-1.5 border-l-2 border-line pl-3">
         <p className="text-sm text-muted">{leadLabel}</p>
         <p className="mt-0.5 break-keep font-medium text-ink">{lead.title ?? leadLabel}</p>
         {lead.snippet ? (
           <p className="mt-1 break-keep text-sm leading-relaxed text-ink">{lead.snippet}</p>
+        ) : lead.gone ? (
+          <p className="mt-1 break-keep text-sm text-muted">{GONE_NOTE}</p>
         ) : null}
       </div>
       {rest.length > 0 ? (
@@ -942,6 +1063,8 @@ function DraftEvidence({ evidence, inset = false }: { evidence: DraftEvidenceVie
                 </p>
                 {item.snippet ? (
                   <p className="mt-1 break-keep text-sm leading-relaxed text-ink">{item.snippet}</p>
+                ) : item.gone ? (
+                  <p className="mt-1 break-keep text-sm text-muted">{GONE_NOTE}</p>
                 ) : null}
               </div>
             ))}
@@ -985,6 +1108,8 @@ export function InquiryReplyDock({ workspace }: { workspace: InquiryReplyWorkspa
   // dock은 아무것도 주장하지 않는다. 저장되지 않은 버퍼를 복사하거나 보내는 길은 여기에도 없다.
   if (!detail || !draft) return null;
   if (publishStatus || priorDelivery) return null;
+  // Registered and read back: nothing left to press on the answer (reopened after approval, 2026-11-03).
+  if (detail.phase === "COMPLETED") return null;
   if (confirming || editing || draftDirty) return null;
   return (
     <div className="-mb-6 flex items-center justify-between gap-4 border-t border-line bg-surface pb-6 pt-4">
@@ -993,6 +1118,8 @@ export function InquiryReplyDock({ workspace }: { workspace: InquiryReplyWorkspa
         {detail.answerStateNote ? (
           <p className="break-keep text-xs leading-snug text-warn">{detail.answerStateNote}</p>
         ) : null}
+        {/* 댓글 확인 안내 — 보내기든 복사든 1차 행동 바로 앞 (2026-11-08). */}
+        <CommentCheckWarning detail={detail} className="text-xs leading-snug" />
         {/* 초록이 아니다 (2026-10-04). 이 문장은 축하가 아니라 바닥의 누름이 무엇을 하는지 말하는
             안내이고, 바로 위 경고와 색으로 겨루면 둘 다 덜 읽힌다. 초안 복사가 primary인 화면의
             dock에서는 muted가 그 자리의 색이다. */}
@@ -1000,15 +1127,127 @@ export function InquiryReplyDock({ workspace }: { workspace: InquiryReplyWorkspa
       </div>
       <span className="shrink-0 whitespace-nowrap">
         {publishable ? (
-          <Btn size="sm" onClick={() => setConfirming(true)} disabled={busy}>
+          <Btn size="sm" onClick={() => setConfirming(true)} disabled={busy || workspace.openLeft > 0 || workspace.kindStale}
+            title={workspace.openLeft > 0 ? `남은 질문 ${workspace.openLeft}개를 처리해야 보낼 수 있어요.` : undefined}>
             답변 보내기
           </Btn>
         ) : (
-          <Btn size="sm" onClick={onCopyDraft} disabled={busy}>
+          <Btn size="sm" onClick={onCopyDraft} disabled={busy || workspace.copyBlocked}>
             {copied ? "복사했어요" : "초안 복사"}
           </Btn>
         )}
       </span>
     </div>
   );
+}
+
+const DRAFT_ASIDE_LABEL = "Reviewnary에서 준비한 초안";
+
+/**
+ * 카페24 댓글 답변 확인 — 이 문의에 대해 확인한 것 (2026-11-08). 「확인 못 함」만 경고색이고, 기록 없음 · 댓글 없음 ·
+ * 댓글 답변 확인은 조용한 글자다. 문장과 시각은 `lib/commentCheck`가 정한다.
+ */
+function CommentCheckLine({ detail }: { detail: InquiryDetail }) {
+  const fact = commentCheckFact(detail);
+  if (!fact) return null;
+  return (
+    <p
+      className={`mt-3 break-keep text-sm leading-relaxed ${fact.tone === "warn" ? "text-warn" : "text-muted"}`}
+      data-testid={`comment-check-${fact.kind}`}
+    >
+      {fact.lead}
+      {fact.when ? <span className="text-muted">{` ${fact.when}`}</span> : null}
+    </p>
+  );
+}
+
+/** The sentence before approval and registration, when the look failed or never happened. Never disables anything. */
+function CommentCheckWarning({ detail, className }: { detail: InquiryDetail; className: string }) {
+  const text = commentCheckWarning(detail);
+  if (!text) return null;
+  return (
+    <p className={`break-keep text-warn ${className}`} data-testid="comment-check-warning">
+      {text}
+    </p>
+  );
+}
+
+/** Our draft, folded under what the channel shows — kept, never in its place (2026-11-06 sixteenth review). */
+function FoldWhen({ fold, children }: { fold: boolean; children: ReactNode }) {
+  if (!fold) return <>{children}</>;
+  return (
+    <div className="mt-3" data-testid="draft-aside">
+      <Disclosure label={DRAFT_ASIDE_LABEL}>{children}</Disclosure>
+    </div>
+  );
+}
+
+/**
+ * The answer as the channel shows it — what was actually confirmed, and nothing more (2026-11-06 sixteenth review).
+ * A collected text is shown as the answer with when it was read; a registration with no text says so. A text that differs
+ * from our draft is shown, not corrected: nothing is overwritten and nothing is sent again.
+ */
+/**
+ * When a text the last collection did not carry was read, and when the status was (2026-11-06 seventeenth review). The two
+ * are never merged: the status read on Friday says nothing about a text read on Monday.
+ */
+function AnswerReadTimes({ record }: { record: Extract<AnswerRecord, { kind: "COLLECTED" }> }) {
+  const body = record.bodyCheckedAt ? formatAt(record.bodyCheckedAt) : null;
+  const status = record.statusCheckedAt ? formatAt(record.statusCheckedAt) : null;
+  return (
+    <p className="mt-1 break-keep text-sm text-muted" data-testid="channel-answer-read-times">
+      <span data-testid="channel-answer-body-read">
+        {body ? `답변 본문 ${body} 확인` : "답변 본문을 언제 확인했는지는 기록이 없어요"}
+      </span>
+      {status ? <span data-testid="channel-answer-status-read">{` · 등록 상태 ${status} 확인`}</span> : null}
+      {body ? <span>{". 그 뒤 수집에서는 등록 상태만 확인했어요."}</span> : null}
+    </p>
+  );
+}
+
+export function ChannelAnswer({ record }: { record: AnswerRecord }) {
+  if (record.kind === "COLLECTED") {
+    return (
+      <div className="mb-4" data-testid="channel-answer">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <h3 className="text-sm font-semibold text-muted">
+            {record.latest ? "채널에서 확인한 답변" : "마지막으로 수집한 답변"}
+          </h3>
+          {record.latest && record.bodyCheckedAt && formatAt(record.bodyCheckedAt) ? (
+            <span className="text-sm text-muted" data-testid="channel-answer-checked">
+              {formatAt(record.bodyCheckedAt)} 확인
+            </span>
+          ) : null}
+        </div>
+        {record.latest ? null : <AnswerReadTimes record={record} />}
+        <p className="mt-2 whitespace-pre-wrap break-keep rounded-2xl border border-line px-4 py-4 text-lg leading-relaxed text-ink">
+          {record.body}
+        </p>
+        {record.sameAsDraft === true ? (
+          <p className="mt-2 break-keep text-sm text-muted" data-testid="channel-answer-same">
+            Reviewnary에서 준비한 초안과 같은 내용이에요.
+          </p>
+        ) : record.sameAsDraft === false ? (
+          <p className="mt-2 break-keep text-sm text-muted" data-testid="channel-answer-differs">
+            {record.latest
+              ? "Reviewnary에서 준비한 초안과 내용이 달라요. 고객에게는 채널에 등록된 이 답변이 보여요. 초안은 아래에 그대로 두었고, 다시 보내지 않아요."
+              : "Reviewnary에서 준비한 초안과 내용이 달라요. 마지막으로 수집했을 때 채널에 등록돼 있던 답변이에요. 초안은 아래에 그대로 두었고, 다시 보내지 않아요."}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+  if (record.kind === "STATUS_ONLY" && !record.sentByUs) {
+    return (
+      <div className="mb-4" data-testid="channel-answer-status-only">
+        <p className="break-keep text-base font-medium leading-relaxed text-ink">
+          답변 등록은 확인했어요. 본문은 확인하지 못했어요.
+        </p>
+        <p className="mt-1 break-keep text-sm text-muted">
+          등록된 답변의 내용은 판매자센터에서 볼 수 있어요. Reviewnary에서 준비한 초안은 아래에 그대로 두었어요.
+        </p>
+      </div>
+    );
+  }
+  return null;
 }

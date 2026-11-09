@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPraiseApproval, mergeHomeWork, todayWork, workBucket } from "./homeWork";
+import { homeBriefRows, isOldBacklog, isPraiseApproval, mergeHomeWork, todayWork, toldBehindLine, workBucket } from "./homeWork";
 import { WORK_STATE } from "./workState";
 import type { OperationsHome, OperatorVocItem, ReviewWorkView } from "./types";
 import type { CustomerOperationsHome } from "./customerOperationsTypes";
@@ -211,5 +211,100 @@ describe("할 일 — risk first, one count, praise folded", () => {
       [{ ...attention("fresh"), occurredOn: "2026-09-20" }, { ...attention("stale"), occurredOn: "2026-06-01" }], 2, []));
     expect(work.rows).toHaveLength(2);
     expect(todayWork(work.rows, NOW).map((r) => r.subjectId)).toEqual(["fresh"]);
+  });
+
+  /**
+   * <b>Answering is not finishing</b> (2026-11-03 sixth review). An inquiry whose answer waits on what only the seller can
+   * see says so (「이 내용만 알려주세요」), and one whose next-check day has come is back as a check — with the seller's
+   * own words from the record, never the customer's, and never twice.
+   */
+  it("asks for the seller centre on an asked row, and brings a due check back once", () => {
+    const row = (over: Record<string, unknown>) => ({
+      workItemId: "w", inquiryId: "i", sellerAccountId: "a", channelId: "c", channelCode: "CAFE24",
+      channelNameKo: "카페24", productId: null, productName: null, phase: "PROPOSED", status: "UNANSWERED",
+      title: "환불 요청", snippet: "사이즈를 잘못 골랐어요", receivedAt: "2026-09-20T00:00:00Z", hasDraft: false, ...over,
+    });
+    const queue = (rows: unknown[]) => ({ content: rows, page: 0, size: 50, totalElements: rows.length, totalPages: 1 } as never);
+    const asked = mergeHomeWork(null, null, queue([row({ sellerCheckAsk: "ORDER_ACTION" })]), NOW).rows[0];
+    expect(asked.state).toBe("SELLER_CHECK");
+    expect(WORK_STATE[asked.state].text).toBe("알려주세요");
+    expect(asked.line).toContain("판매자센터");
+    expect(asked.line).not.toContain("사이즈");
+    expect(mergeHomeWork(null, null, queue([row({ sellerCheckAsk: null })]), NOW).rows[0].state).toBe("REPLY_NEEDED");
+
+    const due = {
+      workItemId: "w2", inquiryId: "i2", subject: "환불 진행 확인", channelCode: "CAFE24", waitingOn: "ACTION" as const,
+      due: true, outcome: "IN_PROGRESS" as const, outcomeKo: "접수·진행 중", note: "반품 상품 도착 확인, 환불 대기",
+      nextCheckOn: "2026-09-22", phase: "COMPLETED", since: "2026-09-20T05:00:00Z", to: "/inquiries/i2",
+    };
+    const followUps = { due: [due], dueTotal: 1, waiting: [], waitingTotal: 0, today: "2026-09-22" };
+    const back = mergeHomeWork(null, null, queue([]), NOW, null, followUps).rows;
+    expect(back).toHaveLength(1);
+    expect(back[0].state).toBe("CHECK_AGAIN");
+    expect(WORK_STATE[back[0].state].text).toBe("다시 확인");
+    expect(back[0].line).toBe("9월 22일에 다시 확인하기로 한 일 · 지난 기록: 반품 상품 도착 확인, 환불 대기");
+    expect(back[0].to).toBe("/inquiries/i2");
+    // Already in the queue (a reply reopened, say): one row, the queue's.
+    const once = mergeHomeWork(null, null, queue([row({ inquiryId: "i2", workItemId: "w2" })]), NOW, null, followUps).rows;
+    expect(once).toHaveLength(1);
+    expect(once[0].state).toBe("REPLY_NEEDED");
+    // Waiting rows are not work.
+    expect(mergeHomeWork(null, null, queue([]), NOW, null, { ...followUps, due: [], dueTotal: 0,
+      waiting: [{ ...due, due: false }], waitingTotal: 1 }).rows).toHaveLength(0);
+  });
+
+  /**
+   * Tenth review (2026-11-05): the registered answer said 「진행 중」 and the seller then recorded 「처리 완료」. The Home
+   * says it in the seller's terms — never the customer's words — and opening it is where it is closed.
+   */
+  it("brings a registered answer behind its record back as 「안내 확인」", () => {
+    const behind = {
+      workItemId: "w3", inquiryId: "i3", subject: "환불 요청", channelCode: "CAFE24", waitingOn: "TOLD_BEHIND" as const,
+      due: true, outcome: "DONE" as const, outcomeKo: "처리 완료", note: "카드 결제 취소로 환불 처리", nextCheckOn: null,
+      phase: "COMPLETED", since: "2026-09-21T05:00:00Z", to: "/inquiries/i3", toldOutcome: "IN_PROGRESS" as const,
+      toldOutcomeKo: "접수·진행 중", checkId: "c3",
+    };
+    const queue = { content: [], page: 0, size: 50, totalElements: 0, totalPages: 1 } as never;
+    const rows = mergeHomeWork(null, null, queue, NOW, null,
+      { due: [behind], dueTotal: 1, waiting: [], waitingTotal: 0, today: "2026-09-22" }).rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].state).toBe("TOLD_BEHIND");
+    expect(WORK_STATE[rows[0].state].text).toBe("안내 확인");
+    expect(rows[0].line).toBe("처리는 완료됐지만 고객에게는 진행 중으로 안내했어요");
+    expect(rows[0].to).toBe("/inquiries/i3");
+    expect(toldBehindLine(null)).toBe("처리는 완료됐지만 고객에게는 아직 완료를 안내하지 않았어요");
+  });
+
+  /**
+   * Sixteenth review (2026-11-06): a check recorded long ago whose day is today is today's work — in the count, in the
+   * Home's first rows and above the 지난 일 line — while the row keeps the record's own time.
+   */
+  it("a check whose day has come is today's work however old its record", () => {
+    const old = {
+      workItemId: "w9", inquiryId: "i9", subject: "환불 진행 확인", channelCode: "CAFE24", waitingOn: "ACTION" as const,
+      due: true, outcome: "IN_PROGRESS" as const, outcomeKo: "접수·진행 중", note: "환불 대기",
+      nextCheckOn: "2026-09-22", phase: "COMPLETED", since: "2026-08-01T05:00:00Z", to: "/inquiries/i9",
+    };
+    const inquiry = (id: string, receivedAt: string) => ({
+      workItemId: `w-${id}`, inquiryId: id, sellerAccountId: "a", channelId: "c", channelCode: "CAFE24",
+      channelNameKo: "카페24", productId: null, productName: null, phase: "PROPOSED", status: "UNANSWERED",
+      title: `문의 ${id}`, snippet: null, receivedAt, hasDraft: false,
+    });
+    const rows5 = [1, 2, 3, 4, 5].map((n) => inquiry(`q${n}`, `2026-09-${10 + n}T00:00:00Z`));
+    const queue = { content: rows5, page: 0, size: 50, totalElements: rows5.length, totalPages: 1 } as never;
+    const stale = { ...old, workItemId: "w8", inquiryId: "i8", to: "/inquiries/i8", nextCheckOn: null, due: false };
+    const rows = mergeHomeWork(null, null, queue, NOW, null,
+      { due: [old], dueTotal: 1, waiting: [stale], waitingTotal: 1, today: "2026-09-22" }).rows;
+    const back = rows.find((r) => r.to === "/inquiries/i9")!;
+    expect(back.since).toBe("2026-08-01T05:00:00Z");
+    expect(isOldBacklog(back, NOW)).toBe(false);
+    expect(todayWork(rows, NOW).map((r) => r.to)).toContain("/inquiries/i9");
+    expect(todayWork(rows, NOW)).toHaveLength(6);
+    // Longest waiting first among inquiries: the record's own time puts it in the Home's first four.
+    expect(homeBriefRows(todayWork(rows, NOW), 4).map((r) => r.to)).toContain("/inquiries/i9");
+    // A waiting check is not work, and an old inquiry with no check still ages out.
+    expect(rows.some((r) => r.to === "/inquiries/i8")).toBe(false);
+    const aged = mergeHomeWork(null, null, { ...(queue as object), content: [inquiry("q0", "2026-08-01T00:00:00Z")] } as never, NOW).rows;
+    expect(isOldBacklog(aged[0], NOW)).toBe(true);
   });
 });

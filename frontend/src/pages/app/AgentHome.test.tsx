@@ -37,6 +37,12 @@ vi.mock("../../lib/apiClient", () => ({
   },
   getToken: () => null,
 }));
+// The AI 담당자 panel asks the runtime once per open; unmocked, that request reached whatever was listening on this
+// machine, and the two panel tests passed only while the local stack was up (2026-10-28).
+vi.mock("../../lib/agentRuntime/agentClient", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/agentRuntime/agentClient")>()),
+  agentRuntime: { capabilities: vi.fn(async () => ({})), startRun: vi.fn(), resumeRun: vi.fn(), getRun: vi.fn() },
+}));
 vi.mock("../../lib/conversation/conversationClient", () => ({
   conversationClient: {
     createConversation: vi.fn(async () => ({ conversationId: "c-1", createdAt: "x" })),
@@ -240,7 +246,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     expect(screen.getByTestId("today-summary").textContent).toMatch(/오늘 할 일\s*0/);
   });
 
-  it("골격이 선다 — 오늘 · 숫자 · 먼저 볼 일 · 반복 문제 · 채널, 그리고 그 아래 한 줄 입력", async () => {
+  it("골격이 선다 — 오늘 · 숫자 · 먼저 볼 일 · 반복 문제 · 채널, 그리고 대화는 오른쪽 패널에서", async () => {
     renderHome();
     const title = await screen.findByRole("heading", { level: 1, name: "오늘" });
     expect(title.className).toContain("text-title");
@@ -248,7 +254,11 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     expect(screen.getByLabelText("오늘 바뀐 것")).toBeInTheDocument();
     expect(screen.getByLabelText("반복 문제")).toBeInTheDocument();
     expect(screen.getByLabelText("채널 상태")).toBeInTheDocument();
-    expect(screen.getByRole("form", { name: "AI 담당자에게 요청" })).toBeInTheDocument();
+    // The box moved into the AI 담당자 panel on the right (owner, 2026-10-28): 오늘 draws no box of its own, and its
+    // 「AI에게 묻기」 opens the panel with the box focused.
+    expect(screen.queryByRole("form", { name: "AI 담당자에게 요청" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "AI에게 묻기" }));
+    expect(within(screen.getByTestId("agent-panel")).getByRole("form", { name: "AI 담당자에게 요청" })).toBeInTheDocument();
     // 두 번째 Home은 없다 — 같은 아침이 두 가지 모양을 갖지 않는다.
     expect(screen.queryByLabelText("오늘 확인할 것")).toBeNull();
     expect(screen.queryByLabelText("지금 살펴볼 리뷰")).toBeNull();
@@ -293,7 +303,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
 
   it("실행 대기는 승인해 둔 것을 한 건씩 이름으로 부른다", async () => {
     renderHome();
-    const area = await screen.findByLabelText("등록 중");
+    const area = await screen.findByLabelText("등록 대기");
     const link = within(area).getByRole("link", { name: /선바로 전선몰딩/ });
     expect(link).toHaveAttribute("href", "/reviews/reply/rev-9");
     expect(area.textContent ?? "").not.toContain("6건");
@@ -316,7 +326,7 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     renderHome();
     await screen.findByRole("heading", { level: 1, name: "오늘" });
     expect(screen.getByLabelText("채널 상태")).toBeInTheDocument();
-    expect(screen.queryByLabelText("등록 중")).toBeNull();
+    expect(screen.queryByLabelText("등록 대기")).toBeNull();
     expect(screen.queryByText(/반복 문제 0건/)).toBeNull();
   });
 
@@ -381,7 +391,8 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     });
     renderHome();
     await screen.findByRole("heading", { level: 1, name: "오늘" });
-    await userEvent.type(screen.getByPlaceholderText(COPY.composer), "미답변 문의 보여줘");
+    await userEvent.click(screen.getByRole("button", { name: "AI에게 묻기" }));
+    await userEvent.type(within(screen.getByTestId("agent-panel")).getByRole("textbox"), "미답변 문의 보여줘");
     await userEvent.keyboard("{Enter}");
     await screen.findByText("답변이 필요한 문의 22건");
     // Answered in the panel beside 오늘, which keeps its work list (2026-10-28).
@@ -397,7 +408,8 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     vi.mocked(conversationClient.sendTurn).mockResolvedValue(agentTurn());
     renderHome();
     await screen.findByRole("heading", { level: 1, name: "오늘" });
-    await userEvent.type(screen.getByPlaceholderText(COPY.composer), "오늘 리뷰 뭐 들어왔어?");
+    await userEvent.click(screen.getByRole("button", { name: "AI에게 묻기" }));
+    await userEvent.type(within(screen.getByTestId("agent-panel")).getByRole("textbox"), "오늘 리뷰 뭐 들어왔어?");
     await userEvent.keyboard("{Enter}");
     await waitFor(() => expect(conversationClient.sendTurn).toHaveBeenCalledTimes(1));
     expect(vi.mocked(conversationClient.sendTurn).mock.calls[0]![1].text).toBe("오늘 리뷰 뭐 들어왔어?");
@@ -476,7 +488,9 @@ describe("Customer Operations v3.1 — the job's Home", () => {
     // The composer's own string, not a copy of it: the placeholder changed with the Home visual target
     // (「리뷰나 문의에 대해 물어보세요」) and a second spelling of it here is exactly the kind of
     // literal that makes a copy change look like a regression.
-    expect(screen.getByPlaceholderText(COPY.composer)).toBeInTheDocument();
+    // The conversation is one press away, in the panel on the right — not a box under the list (owner, 2026-10-28).
+    expect(screen.queryByPlaceholderText(COPY.composer)).toBeNull();
+    expect(screen.getByRole("button", { name: "AI에게 묻기" })).toBeInTheDocument();
   });
 });
 

@@ -94,6 +94,8 @@ export function ThisPcCallIp({ ackSlot }: { ackSlot?: ReactNode }) {
     );
   }
 
+  // The workspace server has no PC to link: its call address is fixed and registered by the operator.
+  if (link?.mode === "WORKSPACE") return null;
   const canLink = link !== null && link.state !== "OFF";
   const pending = link?.state === "PENDING" ? link : null;
   const reasonLine =

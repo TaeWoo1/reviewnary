@@ -13,6 +13,7 @@ import { HomeReviewOpsCard } from "../../components/actionWindow/HomeReviewOpsCa
 import { useOperationsStore } from "../../hooks/useOperationsStore";
 import { isFixturePreviewEnabled } from "../../lib/actionWindow/devMode";
 import { isLocalSellerBuild } from "../../lib/security/localSellerMode";
+import { useServiceMode } from "../../lib/serviceMode";
 import { useOpenAlerts } from "../../lib/openAlerts";
 import { api } from "../../lib/apiClient";
 import { selectChannelAccount } from "../../lib/channelConnection";
@@ -48,6 +49,11 @@ import type {
  */
 export function ConnectHub() {
   const sellerPc = isLocalSellerBuild();
+  // The helper section and its guides belong to a confirmed install only (lib/serviceMode.ts): the web service asks
+  // nothing of a PC, and a page that has not heard — or could not — waits or offers to ask again, never an install
+  // guide (owner decision and external review 2026-10-31).
+  const { mode, retry: retryMode } = useServiceMode();
+  const helperHere = mode === "install" && !sellerPc;
   const [channels, setChannels] = useState<ChannelResponse[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(true);
   const [channelsError, setChannelsError] = useState(false);
@@ -294,7 +300,7 @@ export function ConnectHub() {
         />
       </Block>
 
-      {/* 담당자가 서버에 올린 리뷰를 이 PC가 받는 길 — 판매자 PC 설치에서만 보인다 (2026-10-22 시안 확인). */}
+      {/* 담당자가 서버에 올린 리뷰를 받는 길 — 판매자 PC 설치(2026-10-22 시안 확인)와 웹 서비스(2026-10-31, PC 문구 없이). */}
       <VendorReviewsSection />
 
       {/*
@@ -318,11 +324,24 @@ export function ConnectHub() {
         네이버 로그인 · 리뷰 수집)는 범위 밖이고(v1.14 ⑦), 도우미는 판매자가 시작하는 API 발급 안내에만 쓰인다 —
         그 안내는 각 채널의 연결 화면에서 따로 들어간다. 그래서 구역도, 이 구역이 하던 1.5초마다의 탐색도 없다.
       */}
-      {sellerPc ? null : (
+      {helperHere ? (
         <HelperStatusCard section naverHealth={naverHealth}>
           <HomeReviewOpsCard run={liveRun} />
         </HelperStatusCard>
-      )}
+      ) : null}
+      {mode === "unknown" && !sellerPc ? (
+        <p className="py-2 text-sm text-muted" data-testid="service-mode-wait">
+          불러오는 중…
+        </p>
+      ) : null}
+      {mode === "error" && !sellerPc ? (
+        <div className="flex flex-wrap items-center gap-2 py-2 text-sm text-muted" data-testid="service-mode-error">
+          <span>이 화면의 일부를 불러오지 못했어요.</span>
+          <button type="button" className="btn-ghost text-sm" onClick={retryMode}>
+            다시 확인
+          </button>
+        </div>
+      ) : null}
 
       <section aria-label="잘 안 될 때" className="space-y-2">
         <Disclosure label="잘 안 될 때" summaryClassName="-ml-2">
@@ -330,18 +349,20 @@ export function ConnectHub() {
             <li className="break-keep border-t border-line/70 py-2">
               <Go to="/connect/upload">파일로 넘기기</Go> — 연결이 어려운 채널은 파일로 받아요.
             </li>
-            {sellerPc ? null : (
+            {helperHere ? (
               <li className="break-keep border-t border-line/70 py-2">
                 <Go to="/connect/review-history">기간별로 가져오기</Go> — 지난 기간의 리뷰를 판매자센터에서 직접
                 내려받아 넘겨요.
               </li>
-            )}
+            ) : null}
             <li className="break-keep border-t border-line/70 py-2">
               <Go to="/connect/imports">실행 기록</Go> — 지난 실행과 구간별 이력.
             </li>
-            <li className="break-keep border-t border-line/70 py-2">
-              <Go to="/connect/helper">설치·업데이트 안내</Go> — 이 Mac의 도우미를 처음 설치하거나 새로 받아요.
-            </li>
+            {mode === "install" ? (
+              <li className="break-keep border-t border-line/70 py-2">
+                <Go to="/connect/helper">설치·업데이트 안내</Go> — 이 Mac의 도우미를 처음 설치하거나 새로 받아요.
+              </li>
+            ) : null}
           </ul>
           <ol className="mt-3 space-y-2 border-t border-line/70 pt-3 text-sm text-muted">
             {[

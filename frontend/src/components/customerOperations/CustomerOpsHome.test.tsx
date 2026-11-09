@@ -235,8 +235,8 @@ describe("mergeHomeWork — one list from three reads", () => {
    * <b>Longest-waiting-first, applied INSIDE two groups rather than across them.</b> Measured on the demo org, the
    * five rows this Home briefs were five Cafe24 questions from 2016 — 「3838일 대기」 — while the case Reviewnary
    * investigated last night, the three reviews it flagged and the inquiries from this month all sat under 「+22」.
-   * The predicate is `/inquiries`'s own {@code isOldBacklog}, imported rather than restated, so the two lists cannot
-   * disagree about which rows are this morning's work.
+   * Since 2026-10-28 the boundary is two weeks for every kind (`homeWork.isOldBacklog`); the 문의 screen keeps its
+   * own year rule, because it is the record of every question rather than this morning's list.
    *
    * <p>Nothing is hidden or dropped: the old rows keep their place in the same single list, after the recent ones.
    *
@@ -293,8 +293,8 @@ describe("CustomerOpsHome", () => {
     // 2026-09-30) — the seller already decided it and it is not finished. It is never a pill, and it is
     // never on the date line, which answers 「자동 확인이 돌고 있나」 and nothing else.
     const summary = await screen.findByTestId("today-summary");
-    expect(within(summary).getByRole("link", { name: /등록 중/ })).toHaveAttribute("href", "#실행-대기");
-    expect(within(status).queryByRole("link", { name: /등록 중/ })).toBeNull();
+    expect(within(summary).getByRole("link", { name: /등록 대기/ })).toHaveAttribute("href", "#실행-대기");
+    expect(within(status).queryByRole("link", { name: /등록 대기/ })).toBeNull();
     // A dot and a word, not a filled capsule: nothing on this line has both a pill radius and pill padding.
     expect(status.querySelectorAll("[class*='rounded-full'][class*='px-']")).toHaveLength(0);
     // 반복 문제 is a pattern, not a customer waiting: not up here, and not hidden either.
@@ -496,6 +496,16 @@ describe("CustomerOpsHome", () => {
     expect(screen.queryByRole("list", { name: "할 일" })).toBeNull();
   });
 
+  it("a stalled check says its gap before 「할 일 없음」, and the empty list carries its scope", async () => {
+    api.getInquiryQueueStrict.mockResolvedValue(queue({ content: [], totalElements: 0 }));
+    // 2시간마다 확인하는 일이 9월 12일에 마지막으로 끝났다 — 나흘 동안 아무것도 읽지 않았다.
+    draw(co({ decisions: { total: 0, rows: [] }, lastCheckedAt: "2026-09-12T05:02:00Z" }), null);
+    expect(
+      await screen.findByText("최신 문의·리뷰는 9월 12일 14:02 이후로 확인하지 못했어요. 그때까지 가져온 자료로는 새로 할 일이 없어요."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("지금 할 일이 없어요.")).toBeNull();
+  });
+
   it("a paused job says so and resumes on one press", async () => {
     api.resumeCustomerOperations.mockResolvedValue({});
     const { onChanged } = draw(co({ status: "PAUSED" }));
@@ -505,7 +515,7 @@ describe("CustomerOpsHome", () => {
     expect(onChanged).toHaveBeenCalled();
     // The status line is the date and the state; what the job did and what waits belong to a running job.
     const status = screen.getByTestId("today-status");
-    expect(status).not.toHaveTextContent("등록 중");
+    expect(status).not.toHaveTextContent("등록 대기");
     expect(status).not.toHaveTextContent("최근 24시간 자동 확인");
   });
 
@@ -516,7 +526,7 @@ describe("CustomerOpsHome", () => {
    */
   it("shows approved-but-unposted work and opens the screen that finishes it", async () => {
     draw();
-    const section = await screen.findByRole("region", { name: "등록 중" });
+    const section = await screen.findByRole("region", { name: "등록 대기" });
 
     expect(within(section).getByRole("link", { name: /컵 뚜껑 12oz/ }))
       .toHaveAttribute("href", "/reviews/reply/rev-approved");
@@ -525,7 +535,7 @@ describe("CustomerOpsHome", () => {
 
   it("does not offer anything 확인 필요 is already offering", async () => {
     draw();
-    const section = await screen.findByRole("region", { name: "등록 중" });
+    const section = await screen.findByRole("region", { name: "등록 대기" });
     const queueList = await screen.findByRole("region", { name: "할 일" });
 
     // The draft-ready inquiry is AWAITING_SELLER, so it is a 확인 필요 row — with 「초안 있음 · 미발송」 on it,
@@ -544,7 +554,7 @@ describe("CustomerOpsHome", () => {
 
   it("never dispatches: it links, and it holds no control that could post anything", async () => {
     draw();
-    const section = await screen.findByRole("region", { name: "등록 중" });
+    const section = await screen.findByRole("region", { name: "등록 대기" });
 
     expect(within(section).queryByRole("button")).toBeNull();
     expect(section).not.toHaveTextContent("보내기");
@@ -555,7 +565,7 @@ describe("CustomerOpsHome", () => {
   it("renders nothing when the operations read failed, rather than claiming nothing is waiting", async () => {
     draw(co(), null);
     await screen.findByRole("region", { name: "할 일" });
-    expect(screen.queryByRole("region", { name: "등록 중" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "등록 대기" })).toBeNull();
   });
 
   /*
@@ -808,18 +818,18 @@ describe("오늘 — an inbox, not a dashboard", () => {
     // as either a counted figure or 「—」, and a measured zero belongs firmly on the figure side — the job
     // IS running and it found nothing pending. Spelling it as a word put it in the same visual class as
     // the unmeasured cells beside it, which is the one distinction this band exists to keep.
-    expect(summary).toHaveTextContent("등록 중 0건");
-    expect(summary).not.toHaveTextContent("등록 중 —");
-    expect(within(summary).queryByRole("link", { name: /등록 중/ })).toBeNull();
+    expect(summary).toHaveTextContent("등록 대기 0건");
+    expect(summary).not.toHaveTextContent("등록 대기 —");
+    expect(within(summary).queryByRole("link", { name: /등록 대기/ })).toBeNull();
   });
 
   it("실행 대기 > 0 is its own obligation cell and the pointer to its section", async () => {
     draw();
     const summary = await screen.findByTestId("today-summary");
-    expect(within(summary).getByRole("link", { name: /등록 중/ })).toHaveAttribute("href", "#실행-대기");
-    expect(summary).toHaveTextContent("등록 중 2");
+    expect(within(summary).getByRole("link", { name: /등록 대기/ })).toHaveAttribute("href", "#실행-대기");
+    expect(summary).toHaveTextContent("등록 대기 2");
     // Promotion is the section existing, not a cell up here.
-    expect(screen.getByRole("heading", { name: "등록 중" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "등록 대기" })).toBeTruthy();
   });
 
   it("the way to the rest of the list stands on the heading, before the rows", async () => {

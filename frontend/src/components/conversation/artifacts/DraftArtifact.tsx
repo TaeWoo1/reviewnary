@@ -13,6 +13,7 @@ import { useContinueInPanel } from "../useContinueInPanel";
 const BASIS_WORD: Record<string, string> = {
   GROUNDED: "근거 있는 답변",
   NEEDS_CLARIFICATION: "고객에게 되묻는 답변",
+  PARTIAL_ANSWER: "일부 질문에만 답한 초안",
   NO_ANSWER_BASIS: "답변 기준이 필요해요",
 };
 

@@ -3,6 +3,7 @@ import { useAgentPanel } from "../../lib/agentPanel";
 import { agentRuntime } from "../../lib/agentRuntime/agentClient";
 import { useConversation } from "../../lib/conversation/ConversationProvider";
 import { ConversationWorkspace } from "../conversation/ConversationWorkspace";
+import { answerCommandIntent } from "../../lib/commandShortcuts";
 
 /**
  * The contextual Agent panel (docs/frontend/reviewnary_design.md §8-A) — since Agentic Operating Workspace v2
@@ -147,6 +148,8 @@ function AgentPanelBody({ canPin }: { canPin: boolean }) {
           surface="panel"
           compact
           autoFocus
+          // The exact shortcuts answer here too, now that this is the box 오늘 opens (2026-10-28).
+          onBeforeSend={(text) => answerCommandIntent(text, conversation)}
           initialText={initialText}
           disabled={runtimeDown}
           disabledReason={

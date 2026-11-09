@@ -3,6 +3,7 @@ import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { buildCsp } from "./src/lib/security/csp";
 import { localSellerBuildProblems } from "./src/lib/security/localSellerBuild";
+import { HACKLE_MODE, hackleKeyOutsideItsMode } from "./src/lib/security/hackleMode";
 
 // Dev API proxy target. The frontend calls SAME-ORIGIN `/api/*` (see apiClient.ts BASE_URL), and the dev
 // server forwards those to the backend here. Overriding the port for a disposable/walkthrough backend is
@@ -52,6 +53,14 @@ export default defineConfig(({ mode }) => {
   if (localSellerProblems.length > 0) {
     throw new Error(
       `판매자 PC 빌드(VITE_LOCAL_SELLER=true)에 PC 밖으로 나가는 설정이 있습니다: ${localSellerProblems.join(", ")}`,
+    );
+  }
+  // Hackle is test-only (docs/FINDINGS.md B116): its key may reach a build or a dev server only in the explicit
+  // `--mode hackle` (`npm run dev:hackle` · `build:hackle`, reading frontend/.env.hackle.local). Names the variable only.
+  if (hackleKeyOutsideItsMode(mode, env)) {
+    throw new Error(
+      `핵클 키(VITE_HACKLE_SDK_KEY)는 테스트 모드(--mode ${HACKLE_MODE})에서만 씁니다. 지금 모드: ${mode}. ` +
+        "키는 frontend/.env.hackle.local에 두고 npm run dev:hackle 또는 npm run build:hackle로 실행하세요.",
     );
   }
   return {

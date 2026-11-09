@@ -116,6 +116,9 @@ describe("already answered on the channel", () => {
     expect(reason).toContain("이미 답변된 문의예요");
     // Sending them to the seller center would be work that no longer exists.
     expect(reason).not.toContain("판매자센터에서 직접 답변");
+    // Who registered it is not known from the status (2026-11-05 eleventh review): only what was confirmed.
+    expect(reason).toBe("이미 답변된 문의예요. 채널에 답변이 등록된 것을 확인했어요.");
+    expect(reason).not.toContain("판매자님이");
   });
 
   it("still publishes normally when the source has not been answered", () => {

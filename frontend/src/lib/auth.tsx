@@ -24,6 +24,23 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+/**
+ * Product analytics identity = the opaque internal user id (never email/name/상호), told at the moment the session
+ * changes — inside the same call that sets it, before the caller goes on (2026-11-07).
+ *
+ * <p>It used to be a `useEffect` on `user`, which runs only after React commits the new user. But `Login` tracks
+ * `login` right after `await login()` returns, and the home screen tracks `today_inbox_viewed` while it renders — both
+ * before that effect — so both reached the sinks under the previous (signed-out) identity and Hackle recorded them as
+ * anonymous (browser check, 2026-11-07). Telling the identity here puts it ahead of anything the caller does next.
+ *
+ * <p>Only once the session is known: before hydration finishes, "no user" means "still loading", and telling a sink
+ * "signed out" then would let a vendor send events under whoever it restored from an earlier visit. A failed login
+ * changes nothing and tells nothing. `analytics.identify` ignores a repeat of the same id.
+ */
+function tellIdentity(user: UserView | null) {
+  analytics.identify(user ? user.id : null);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserView | null>(null);
   const [ready, setReady] = useState(false);
@@ -32,16 +49,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true;
     async function hydrate() {
       if (!getToken()) {
+        tellIdentity(null);
         setReady(true);
         return;
       }
       try {
         const me = await api.getMe();
         if (active) {
+          tellIdentity(me);
           setUser(me);
         }
       } catch {
         clearToken();
+        if (active) tellIdentity(null);
       } finally {
         if (active) {
           setReady(true);
@@ -54,11 +74,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Product analytics identity = the opaque internal user id (never email/name/상호) — and cleared on sign-out.
-  useEffect(() => {
-    analytics.identify(user ? user.id : null);
-  }, [user]);
-
   const value = useMemo<AuthState>(
     () => ({
       user,
@@ -66,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async login(email: string, password: string) {
         const res = await api.login(email, password);
         setToken(res.token);
+        tellIdentity(res.user);
         setUser(res.user);
       },
       // Sign-up ends signed in: the backend answers with the same token+user shape as login, so the new
@@ -73,10 +89,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async signup(input) {
         const res = await api.signup(input);
         setToken(res.token);
+        tellIdentity(res.user);
         setUser(res.user);
       },
       acceptSession(session) {
         setToken(session.token);
+        tellIdentity(session.user);
         setUser(session.user);
       },
       logout() {
@@ -85,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // identity, which may be a different organization on this machine.
         clearToken();
         clearSessionScopedState();
+        tellIdentity(null);
         setUser(null);
       },
     }),

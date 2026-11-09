@@ -21,7 +21,7 @@ import { api } from "../../lib/apiClient";
 import { analysisKey, buildAnalysisIndex } from "../../lib/inboxView";
 import { plainText, previewText } from "../../lib/plainText";
 import { kstDate } from "../../lib/format";
-import { elapsedLabel, waitIsDated } from "../../lib/copy/customerOps";
+import { inquiryAgeLabel, waitIsDated } from "../../lib/copy/customerOps";
 import { productChannelLabel } from "../../lib/productRows";
 import {
   RECORD_STATUS_OPTIONS,
@@ -255,7 +255,15 @@ export function CustomerInbox() {
     const fromQueue = (queue ?? []).find((row) => row.inquiryId === itemRef);
     if (fromQueue) return fromQueue.workItemId;
     const fromRecord = (record ?? []).find((row) => row.inquiryId === itemRef);
-    return fromRecord?.workItemId ?? linked?.workItemId ?? null;
+    // A decided reply is no longer work to draft, but the same inquiry still opens on it — its approved answer, its
+    // registration and the seller's record (2026-11-03 sixth review: 승인 뒤에도 같은 문의를 다시 열 수 있어야 한다).
+    return (
+      fromRecord?.workItemId ??
+      linked?.workItemId ??
+      fromRecord?.decidedWorkItemId ??
+      (linked?.inquiryId === itemRef ? linked?.decidedWorkItemId : null) ??
+      null
+    );
   }, [itemRef, queue, record, linked]);
 
   const focused = workItemId != null;
@@ -536,10 +544,10 @@ export function CustomerInbox() {
                         </span>
                         {/* <b>이 문의가 언제 것인가 — 기다린 날수로, 1년이 넘으면 접수일로</b> (문의
                             redesign, 2026-10-04). 행이 날짜만 들고 있던 동안 11일 기다린 문의와 어제 들어온
-                            문의는 같은 모양이었다. 단어의 주인은 {@link elapsedLabel}이라 pane이 옆에서
+                            문의는 같은 모양이었다. 단어의 주인은 {@link inquiryAgeLabel}이라 pane이 옆에서
                             말하는 것과 같은 수가 나온다. */}
                         <span className="shrink-0 pt-1 text-sm tabular-nums text-muted">
-                          {elapsedLabel(row.receivedAt, "INQUIRY") ?? kstDate(row.receivedAt)}
+                          {inquiryAgeLabel(row.receivedAt, row.status) ?? kstDate(row.receivedAt)}
                         </span>
                       </span>
                     </Link>
@@ -681,7 +689,7 @@ function InquiryCasePane({
     목록의 행과 같은 주인, 같은 단어 — 그것이 elapsed 계약이다. 1년이 넘은 문의에서 그 단어는 접수일 자체가
     되므로, 바로 왼쪽의 날짜와 같은 사실을 두 번 말하게 된다. 그때는 날짜만 남긴다.
   */
-  const waited = waitIsDated(item.receivedAt) ? null : elapsedLabel(item.receivedAt, "INQUIRY");
+  const waited = waitIsDated(item.receivedAt) ? null : inquiryAgeLabel(item.receivedAt, item.status);
   const state = recordRowState(item);
   return (
     <CaseLayout

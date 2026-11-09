@@ -8,7 +8,8 @@ import type { AnalyticsSink, ConsentGrant } from "./sink";
  *
  * Consent (docs/standing/service_readiness_v1.md §2-4): a sink starts only once 분석 consent is granted. Before a decision
  * events are buffered (≤ MAX_BUFFER, this page load) and flushed on grant; a refusal drops them. Withdrawing
- * consent later tells the sinks to stop.
+ * consent later tells the sinks to stop; an identify while withdrawn is kept here only, and a re-grant hands the
+ * sinks the user signed in at that moment.
  *
  * `once` events (per session): the same event+props pair fires at most once per page load — used for
  * `first_sync_completed`, whose polling source could otherwise repeat it.
@@ -37,7 +38,8 @@ export function createAnalytics(warn: (message: string) => void = defaultWarn): 
   let started = false;
   let grant: ConsentGrant | null = null;
   const seen = new Set<string>();
-  let identified: string | null = null;
+  /** undefined = the app has not said who is signed in yet (auth still loading) — not the same as null = signed out. */
+  let identified: string | null | undefined = undefined;
   const emitted: Array<{ event: AnalyticsEventName; props: Record<string, string> }> = [];
   const buffer: Array<{ event: AnalyticsEventName; props: Record<string, string> }> = [];
 
@@ -53,7 +55,7 @@ export function createAnalytics(warn: (message: string) => void = defaultWarn): 
         // a vendor that fails to load must never break the product
       }
     }
-    if (identified !== null) deliverIdentify(identified);
+    if (identified !== undefined) deliverIdentify(identified);
     for (const item of buffer.splice(0)) deliver(item.event, item.props);
   }
 
@@ -145,6 +147,10 @@ export function createAnalytics(warn: (message: string) => void = defaultWarn): 
           }
         }
       }
+      // A re-grant after a withdrawal: an identify made while withdrawn reached no sink (nothing about the user leaves
+      // without consent), so the sinks may still hold the user from before it — or none, if it cleared on withdrawal.
+      // Tell them who is signed in NOW, after they have opted back in (2026-11-07).
+      if (before?.analytics === false && identified !== undefined) deliverIdentify(identified);
     },
     track(event, props) {
       emit(event, props as Record<string, unknown> | undefined);
@@ -156,7 +162,7 @@ export function createAnalytics(warn: (message: string) => void = defaultWarn): 
       emit(event, props as Record<string, unknown> | undefined);
     },
     identify(userId) {
-      // Idempotent: the auth context calls this on every user change, including the initial "no user yet";
+      // Idempotent: the auth context calls this once the session is known and on every user change after;
       // a sink hears about a change of identity, not about every render.
       if (userId === identified) return;
       identified = userId;

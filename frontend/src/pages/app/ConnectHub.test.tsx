@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ConnectHub } from "./ConnectHub";
+import { resetServiceModeForTests } from "../../lib/serviceMode";
 import { expectNoAxeViolations } from "../../test/axe";
 import type { ChannelResponse, ChannelReviewPageView, SellerAccountResponse } from "../../lib/types";
 
@@ -10,6 +11,12 @@ const getChannels = vi.fn();
 const getSellerAccountsStrict = vi.fn();
 const getConnectionStatusStrict = vi.fn();
 const getChannelReviewsStrict = vi.fn();
+// An install by default (the backend's vendor link answers INSTALL): the hub keeps every surface it had.
+const INSTALL_LINK = {
+  state: "OFF", offReason: "NOT_LOCAL_SELLER", userCode: null, codeExpiresAt: null, pollIntervalSeconds: null,
+  approvalUrl: null, deviceName: null, linkedAt: null, mode: "INSTALL",
+};
+const getVendorLink = vi.fn((): Promise<unknown> => Promise.resolve(INSTALL_LINK));
 
 vi.mock("../../lib/apiClient", () => ({
   api: {
@@ -17,6 +24,7 @@ vi.mock("../../lib/apiClient", () => ({
     getSellerAccountsStrict: () => getSellerAccountsStrict(),
     getConnectionStatusStrict: (id: string) => getConnectionStatusStrict(id),
     getChannelReviewsStrict: (id: string, params: unknown) => getChannelReviewsStrict(id, params),
+    getVendorLink: () => getVendorLink(),
   },
   getToken: () => null,
 }));
@@ -106,6 +114,8 @@ vi.mock("../../hooks/useBridge", () => ({
   }),
 }));
 
+beforeEach(() => resetServiceModeForTests());
+
 function renderHub() {
   return render(
     <MemoryRouter>
@@ -128,6 +138,43 @@ describe("채널 연동 — the hub", () => {
     }
     expect(screen.queryByRole("heading", { name: "자료 가져오기" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "reviewnary 도우미" })).toBeNull();
+  });
+
+  // The web service asks nothing of a PC (owner decision 2026-10-31): no 「이 Mac」, no helper guides.
+  it("on the web service there is no PC helper section and no helper guide", async () => {
+    getVendorLink.mockResolvedValue({
+      state: "UNLINKED", offReason: null, userCode: null, codeExpiresAt: null, pollIntervalSeconds: null,
+      approvalUrl: null, deviceName: null, linkedAt: null, mode: "WORKSPACE",
+    } as never);
+    renderHub();
+    expect(await screen.findByRole("heading", { level: 1, name: "채널 연동" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "이 Mac" })).toBeNull());
+    expect(screen.queryByText("설치·업데이트 안내")).toBeNull();
+    expect(screen.queryByText("기간별로 가져오기")).toBeNull();
+    expect(screen.getByText("파일로 넘기기")).toBeInTheDocument();
+    getVendorLink.mockImplementation(() => Promise.resolve(INSTALL_LINK));
+  });
+
+  // External review 2026-10-31: until the service is known, and when it cannot be read, no install guide and no
+  // reaching for a helper — a waiting line, or a line that offers to ask again.
+  it("while the service is not known it waits, and a failed read offers to ask again instead of the helper", async () => {
+    getVendorLink.mockImplementation(() => new Promise(() => undefined));
+    const first = renderHub();
+    expect(await screen.findByTestId("service-mode-wait")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "이 Mac" })).toBeNull();
+    expect(screen.queryByText("설치·업데이트 안내")).toBeNull();
+    first.unmount();
+
+    resetServiceModeForTests();
+    getVendorLink.mockImplementation(() => Promise.reject(new Error("down")));
+    renderHub();
+    const failed = await screen.findByTestId("service-mode-error");
+    expect(screen.queryByRole("heading", { name: "이 Mac" })).toBeNull();
+    expect(screen.queryByText("설치·업데이트 안내")).toBeNull();
+
+    getVendorLink.mockImplementation(() => Promise.resolve(INSTALL_LINK));
+    act(() => within(failed).getByRole("button", { name: "다시 확인" }).click());
+    expect(await screen.findByRole("heading", { name: "이 Mac" })).toBeInTheDocument();
   });
 
   it("holds the channel list itself rather than pointing at a separate page", async () => {

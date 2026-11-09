@@ -5,6 +5,8 @@ import { SectionHeader } from "../../components/ui/SectionHeader";
 import { Btn } from "../../components/ui/Btn";
 import { useAuth } from "../../lib/auth";
 import { KNOWLEDGE_NOUN } from "../../lib/knowledgeWords";
+import { useOptionalConsent, type ConsentState } from "../../lib/consent/ConsentProvider";
+import { PRIVACY_PATH } from "../../lib/legal";
 
 /**
  * 설정 — 네 구역, 한 줄에 한 항목 (docs/frontend/reviewnary_design.md §7).
@@ -63,6 +65,21 @@ export function SettingsHome() {
           action={<Go to="/settings/style">스타일 설정</Go>}
         />
         <Row
+          label="AI 사용량"
+          value="하루 동안 AI를 몇 번, 무엇에 썼는지 단계와 계기별로"
+          action={<Go to="/settings/ai-usage">사용량 보기</Go>}
+        />
+        <Row
+          label="PC 알림"
+          value="안전 관련 리뷰는 하나씩, 나머지 리뷰·문의는 묶어서 이 컴퓨터에 알림"
+          action={<Go to="/settings/notifications">알림 설정</Go>}
+        />
+        <Row
+          label="리뷰 응대 기준"
+          value="어떤 리뷰에 답글 초안을 미리 써 둘지 별점대마다"
+          action={<Go to="/settings/review-response">기준 설정</Go>}
+        />
+        <Row
           label="리뷰 답변 문구"
           value="리뷰 답변이 처음 채워지는 문구를 유형별로"
           action={<Go to="/settings/review-templates">문구 설정</Go>}
@@ -100,7 +117,57 @@ export function SettingsHome() {
           }
         />
       </Block>
+
+      <PrivacyBlock />
     </div>
+  );
+}
+
+/**
+ * 개인정보 — 분석 동의의 지금 값과 그것을 거두는 길 (2026-11-07).
+ *
+ * <p>배너는 「언제든 바꿀 수 있습니다」라고 약속하지만, 로그인한 화면에는 공개 화면의 바닥글이 없어서 그
+ * 약속을 지킬 곳이 없었다. 여기서 거두면 배너에서 분석을 끈 것과 같은 결정이 저장되고, 분석 도구는 그
+ * 순간부터 새 이벤트를 보내지 않는다(이미 묶여 있던 것까지 거두지는 못한다). 다시 켜는 길은 배너다 —
+ * 동의는 설명을 읽는 화면에서 받는다.
+ *
+ * <p>분석 도구가 하나도 설정되지 않은 배포(`not-applicable`)에는 거둘 동의가 없으므로 이 구역도 없다.
+ */
+function PrivacyBlock() {
+  const consent = useOptionalConsent();
+  if (!consent || consent.policy !== "banner") return null;
+  return (
+    <Block title="개인정보">
+      <Row label="분석 도구 동의" value={consentSummary(consent)} action={<ConsentAction consent={consent} />} />
+      <Row
+        label="개인정보처리방침"
+        value="무엇을 왜 수집하고 누구에게 맡기는지"
+        action={<Go to={PRIVACY_PATH}>방침 보기</Go>}
+      />
+    </Block>
+  );
+}
+
+function consentSummary({ decision }: ConsentState): string {
+  if (!decision) return "아직 고르지 않았어요. 화면 아래 안내에서 고를 수 있어요";
+  const since = decision.decidedAt.slice(0, 10);
+  return decision.analytics ? `이용 통계 수집에 동의함 (${since})` : `이용 통계를 보내지 않아요 (${since}에 고름)`;
+}
+
+function ConsentAction({ consent }: { consent: ConsentState }) {
+  const { decision } = consent;
+  if (!decision) return null;
+  if (decision.analytics) {
+    return (
+      <Btn variant="outline" size="sm" onClick={() => consent.decide({ analytics: false, marketing: decision.marketing })}>
+        동의 철회
+      </Btn>
+    );
+  }
+  return (
+    <Btn variant="outline" size="sm" onClick={consent.reopen}>
+      다시 고르기
+    </Btn>
   );
 }
 

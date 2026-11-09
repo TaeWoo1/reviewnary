@@ -4,6 +4,7 @@ import { isAxiosError } from "axios";
 import type { DraftEvidenceView, GeneratedReviewDraftView, ReviewKnowledgeGapView } from "../lib/types";
 import { api } from "../lib/apiClient";
 import { Btn } from "./ui/Btn";
+import { OpenQuestionList } from "./OpenQuestionList";
 import { AnswerBasisQuickAdd } from "./inbox/AnswerBasisQuickAdd";
 import { ReviewGuidance } from "./reviews/ReviewGuidance";
 
@@ -42,8 +43,11 @@ export function GroundedReviewDraft({
   storedBasis,
   storedBasisNote,
   hasStoredDraft,
+  storedPolishNote = null,
+  storedOpenQuestions = [],
   onDrafted,
   autoStart = false,
+  regenerate = 0,
 }: {
   accountId: string;
   actionRef: string;
@@ -56,6 +60,16 @@ export function GroundedReviewDraft({
    */
   storedBasis: string | null;
   storedBasisNote: string | null;
+  /**
+   * The head version's 「문장 다듬기 필요」 note (2026-11-01 sixth review): the agent saved it rather than hand it over,
+   * because only its form wants work. Not a judgement the seller owes — a sentence to tidy.
+   */
+  storedPolishNote?: string | null;
+  /**
+   * The head version's unanswered questions (2026-11-01 eighth review): the agent answered what the store's material
+   * answers and left these to the seller. The reply is partial — the seller adds the answer or decides to leave it.
+   */
+  storedOpenQuestions?: string[];
   /**
    * Whether a draft version is already SAVED for this review — the persisted head, not this session.
    *
@@ -77,6 +91,11 @@ export function GroundedReviewDraft({
    * {@code ReplyStarter}). Generate once on mount, exactly as that press would here; never over a stored draft.
    */
   autoStart?: boolean;
+  /**
+   * Bumped by 「답변 다시 만들기」 on a held reply (2026-11-01): each new value writes a draft once, as the press here
+   * would — over the stored one, which is what the seller asked for.
+   */
+  regenerate?: number;
 }) {
   const [result, setResult] = useState<GeneratedReviewDraftView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -104,6 +123,12 @@ export function GroundedReviewDraft({
     // Once per mount: the press it stands for happened once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (regenerate > 0) void generate();
+    // Once per press of the hold's 「답변 다시 만들기」.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regenerate]);
 
   async function generate() {
     if (busy) return;
@@ -163,6 +188,25 @@ export function GroundedReviewDraft({
 
       {error ? <p className="break-keep text-sm text-bad" role="alert">{error}</p> : null}
 
+      {(result ? result.draft?.polishNote : storedPolishNote) ? (
+        <p className="break-keep text-sm text-muted" role="status" data-testid="grounded-review-polish">
+          <span className="font-semibold text-ink">문장 다듬기 필요</span>
+          <span aria-hidden="true"> · </span>
+          {result ? result.draft?.polishNote : storedPolishNote}
+        </p>
+      ) : null}
+
+      {/* The questions the agent left, one by one with a reason and a history (2026-11-01 tenth review). They belong to
+          the review, not this version: rewording the reply leaves them. */}
+      {actionRef.startsWith("review:") ? (
+        <OpenQuestionList
+          lane="REVIEW"
+          subjectId={actionRef.slice("review:".length)}
+          refreshKey={result?.draft?.version ?? null}
+          fallback={(result ? result.draft?.openQuestions : storedOpenQuestions) ?? []}
+        />
+      ) : null}
+
       {/* An operational fact, kept apart from anything about the seller's knowledge — the budget, the
           capability, the vendor, or a promise the evidence did not support. */}
       {result?.unavailableMessage ? (
@@ -181,7 +225,7 @@ export function GroundedReviewDraft({
               {row.snippet ? (
                 <span className="break-keep text-sm text-muted">{row.snippet}</span>
               ) : (
-                <span className="text-sm text-muted">지워진 자료라 내용을 볼 수 없어요.</span>
+                <span className="text-sm text-muted">답글을 쓴 뒤로 바뀌었거나 지워진 자료라 지금 내용을 볼 수 없어요.</span>
               )}
             </li>
           ))}

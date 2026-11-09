@@ -96,5 +96,6 @@ export function originLabel(origin: string): string {
   if (origin === "DRAFT_GAP") return "빈칸";
   if (origin === "REPEATED_ANSWER") return "자주 쓴 답";
   if (origin === "ISSUE_GUIDANCE") return "제안";
+  if (origin === "PAST_ANSWERS") return "지난 답변 정리";
   return "채울 내용";
 }

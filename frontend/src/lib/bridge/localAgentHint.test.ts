@@ -2,10 +2,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { probeLocalAgent, resetLocalAgentHintForTests } from "./localAgentHint";
 import { BRIDGE_TOKEN_KEY } from "./bridgeClient";
+import { resetServiceModeForTests } from "../serviceMode";
+
+vi.mock("../apiClient", () => ({ api: { getVendorLink: () => new Promise(() => undefined) } }));
 
 const realFetch = globalThis.fetch;
 
 beforeEach(() => {
+  resetServiceModeForTests("install");
   resetLocalAgentHintForTests();
   window.localStorage.clear();
 });
@@ -14,6 +18,22 @@ afterEach(() => {
 });
 
 describe("local agent hint — a health probe, never a pairing", () => {
+  // Only a confirmed install is probed (external review 2026-10-31): the web service has no helper to offer, and a
+  // page that does not know yet says UNKNOWN without touching this machine.
+  it("probes nothing on the web service or before the service is known", async () => {
+    globalThis.fetch = vi.fn(async () => ({ ok: true })) as unknown as typeof fetch;
+    window.localStorage.setItem(BRIDGE_TOKEN_KEY, "t");
+    resetServiceModeForTests("web");
+    expect(await probeLocalAgent(1_000)).toBe("ABSENT");
+    resetLocalAgentHintForTests();
+    resetServiceModeForTests("unknown");
+    expect(await probeLocalAgent(1_000)).toBe("UNKNOWN");
+    resetLocalAgentHintForTests();
+    resetServiceModeForTests("error");
+    expect(await probeLocalAgent(1_000)).toBe("UNKNOWN");
+    expect((globalThis.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(0);
+  });
+
   it("PAIRED only when the agent answers AND a pairing token is held", async () => {
     globalThis.fetch = vi.fn(async () => ({ ok: true })) as unknown as typeof fetch;
     window.localStorage.setItem(BRIDGE_TOKEN_KEY, "t");

@@ -1,14 +1,18 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { GroundedReviewDraft, generateFailureMessage } from "./GroundedReviewDraft";
 import type { GeneratedReviewDraftView } from "../lib/types";
 
 const generateReviewReplyDraft = vi.fn();
+const listOpenQuestions = vi.fn(async (..._a: unknown[]) => [] as unknown[]);
+const handleOpenQuestion = vi.fn(async (..._a: unknown[]) => ({}));
 vi.mock("../lib/apiClient", () => ({
   api: {
+    listOpenQuestions: (...a: unknown[]) => listOpenQuestions(...a),
+    handleOpenQuestion: (...a: unknown[]) => handleOpenQuestion(...a),
     // 「이 리뷰에 맞는 안내」 (2026-10-27): nothing registered, so the block draws nothing.
     getReviewGuidance: () => Promise.resolve({ attached: [], rejected: [], pickable: [] }),
     generateReviewReplyDraft: (...a: unknown[]) => generateReviewReplyDraft(...a),
@@ -220,5 +224,50 @@ describe("the prepare control names what is already there", () => {
     draw([], vi.fn(), { basis: null, note: null }, true);
     expect(screen.getByTestId("grounded-review-generate")).toHaveTextContent("다시 쓰기");
     expect(screen.getByTestId("grounded-review-generate")).not.toHaveTextContent("AI 답글 쓰기");
+  });
+
+  it("says 「문장 다듬기 필요」 with the note when the agent saved a draft only its form wants work on (2026-11-01)", async () => {
+    generateReviewReplyDraft.mockResolvedValue({
+      ...grounded(),
+      draft: { ...DRAFT, polishNote: "같은 감사 문장을 되풀이하지 마세요." },
+    });
+    draw();
+    expect(screen.queryByTestId("grounded-review-polish")).toBeNull();
+    fireEvent.click(screen.getByTestId("grounded-review-generate"));
+    await waitFor(() =>
+      expect(screen.getByTestId("grounded-review-polish")).toHaveTextContent("문장 다듬기 필요 · 같은 감사 문장을 되풀이하지 마세요."),
+    );
+  });
+  it("lists the questions a partial draft leaves, and closes each with a reason it keeps (2026-11-01 tenth review)", async () => {
+    const open = { id: "q-1", question: "세탁 방법 질문", required: false, state: "OPEN", resolution: null, note: null,
+      createdAt: "2026-11-01T00:00:00Z", closedAt: null };
+    listOpenQuestions.mockResolvedValue([]);
+    generateReviewReplyDraft.mockResolvedValue({ ...grounded(), draft: { ...DRAFT, openQuestions: ["세탁 방법 질문"] } });
+    draw();
+    await waitFor(() => expect(listOpenQuestions).toHaveBeenCalledWith("REVIEW", "r-1"));
+    expect(screen.queryByTestId("open-questions")).toBeNull();
+    listOpenQuestions.mockResolvedValue([open]);
+    fireEvent.click(screen.getByTestId("grounded-review-generate"));
+    await waitFor(() => expect(screen.getByTestId("open-questions")).toHaveTextContent("답하지 못한 질문 1개"));
+    expect(screen.getByTestId("open-question")).toHaveTextContent("세탁 방법 질문");
+
+    fireEvent.click(screen.getByRole("button", { name: "처리함" }));
+    expect(screen.getByRole("button", { name: "확인" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("radio", { name: "답하지 않아도 됨" }));
+    listOpenQuestions.mockResolvedValue([{ ...open, state: "HANDLED", resolution: "NOT_NEEDED", closedAt: "2026-11-01T01:00:00Z" }]);
+    fireEvent.click(screen.getByRole("button", { name: "확인" }));
+    await waitFor(() => expect(handleOpenQuestion).toHaveBeenCalledWith("q-1", "NOT_NEEDED", undefined));
+    await waitFor(() => expect(screen.getByTestId("open-questions-closed")).toHaveTextContent("처리한 질문 1개"));
+    expect(screen.getByTestId("open-questions-closed")).toHaveTextContent("세탁 방법 질문 · 답하지 않아도 됨");
+    expect(screen.queryByTestId("open-question")).toBeNull();
+  });
+
+  it("falls back to the version's stored questions when the list cannot be read", async () => {
+    listOpenQuestions.mockRejectedValue(new Error("down"));
+    generateReviewReplyDraft.mockResolvedValue({ ...grounded(), draft: { ...DRAFT, openQuestions: ["세탁 방법 질문"] } });
+    draw();
+    fireEvent.click(screen.getByTestId("grounded-review-generate"));
+    await waitFor(() => expect(screen.getByTestId("open-questions")).toHaveTextContent("세탁 방법 질문"));
+    expect(screen.queryByRole("button", { name: "처리함" })).toBeNull();
   });
 });

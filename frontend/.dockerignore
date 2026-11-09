@@ -1,3 +1,7 @@
 node_modules
 dist
 .vite
+# Local env files never enter an image: the Dockerfile passes every build value as an ARG.
+.env
+.env.local
+.env.*.local

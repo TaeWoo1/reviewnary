@@ -39,10 +39,11 @@ import { VendorReviewsSection } from "./VendorReviewsSection";
 const HOUR = 3600 * 1000;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 
-function linkStatus(state: VendorLinkStatus["state"]): VendorLinkStatus {
+function linkStatus(state: VendorLinkStatus["state"], mode: VendorLinkStatus["mode"] = "INSTALL"): VendorLinkStatus {
   return {
     state, offReason: null, userCode: null, codeExpiresAt: null, pollIntervalSeconds: null,
-    approvalUrl: "http://127.0.0.1:8090/link?code=BCDFGHJK", deviceName: null, linkedAt: null,
+    approvalUrl: mode === "INSTALL" ? "http://127.0.0.1:8090/link?code=BCDFGHJK" : null, deviceName: null,
+    linkedAt: null, mode,
   };
 }
 
@@ -86,6 +87,47 @@ describe("VendorReviewsSection", () => {
     expect(await screen.findByTestId("vendor-reviews-link")).toBeInTheDocument();
     expect(screen.getByText(/아직 reviewnary 서버에 연결되지 않았어요/)).toBeInTheDocument();
     expect(getVendorReviewsOverview).not.toHaveBeenCalled();
+  });
+
+  // The Reviewnary server (boundary §5, 2026-10-31): one account, nothing to link, no other sign-in.
+  it("on the Reviewnary server an unconnected account waits for the operator and is asked to do nothing", async () => {
+    getVendorLink.mockResolvedValue(linkStatus("UNLINKED", "WORKSPACE"));
+    renderSection();
+    expect(await screen.findByTestId("vendor-reviews-awaiting-operator")).toHaveTextContent(
+      "운영팀이 이 계정에 스토어를 연결하면");
+    expect(screen.queryByTestId("vendor-reviews-link")).toBeNull();
+    expect(screen.queryByText(/이 PC/)).toBeNull();
+    expect(getVendorReviewsOverview).not.toHaveBeenCalled();
+  });
+
+  it("on the Reviewnary server a connected account starts its stores with no PC words", async () => {
+    getVendorLink.mockResolvedValue(linkStatus("LINKED", "WORKSPACE"));
+    getVendorReviewsOverview.mockResolvedValueOnce(overview([
+      store({ storeId: "s-1", label: "데모 스토어" }),
+      store({ storeId: "s-3", label: "본점", standing: "OTHER_ORGANISATION" }),
+    ]));
+    getVendorReviewsOverview.mockResolvedValue(overview([store({ standing: "RECEIVING", lastCheckedAt: ago(0) })]));
+    startVendorReviews.mockResolvedValue(pulled);
+    renderSection();
+
+    expect(await screen.findByTestId("vendor-reviews-route")).toHaveTextContent("받는 작업 계정 데모 제조사");
+    expect(screen.getByTestId("vendor-reviews-start-note")).toHaveTextContent("담당자가 엑셀을 올리면 자동으로 받아요");
+    expect(screen.getByText("다른 작업 계정이 받는 중")).toBeInTheDocument();
+    expect(screen.queryByText(/이 PC/)).toBeNull();
+    expect(screen.queryByText(/seller@example.com/)).toBeNull();
+
+    fireEvent.click(screen.getByTestId("vendor-reviews-start"));
+    await waitFor(() => expect(startVendorReviews).toHaveBeenCalledWith(["s-1"]));
+    expect(await screen.findByText("새 리뷰 6건 · 바뀐 리뷰 0건을 받았어요.")).toBeInTheDocument();
+    expect(screen.queryByText(/이 PC/)).toBeNull();
+  });
+
+  it("on the Reviewnary server a stopped connection points to the operator, not to relinking", async () => {
+    getVendorLink.mockResolvedValue(linkStatus("LINKED", "WORKSPACE"));
+    getVendorReviewsOverview.mockResolvedValue(overview([], "NOT_AUTHORIZED"));
+    renderSection();
+    expect(await screen.findByText(/운영팀에 문의해 주세요/)).toBeInTheDocument();
+    expect(screen.queryByText("이 PC 다시 연결")).toBeNull();
   });
 
   it("names the route and starts exactly the stores it shows", async () => {

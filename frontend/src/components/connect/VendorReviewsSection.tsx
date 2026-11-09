@@ -13,19 +13,44 @@ import type {
 } from "../../lib/types";
 
 const TITLE = "담당자가 올리는 네이버 리뷰";
-const HINT = "담당자가 판매자센터 리뷰 엑셀을 reviewnary 서버에 올리면 이 PC가 받아 와요.";
-const OFFLINE = "reviewnary 서버에 닿지 않아요. 인터넷 연결을 확인해 주세요. 이미 받은 리뷰는 그대로 있어요.";
-const REVOKED = "이 PC의 연결이 해제됐어요. 다시 연결해야 리뷰를 받을 수 있어요.";
 const LOAD_FAILED = "리뷰 받기 상태를 불러오지 못했어요. 이미 받은 리뷰는 그대로 있어요.";
 /** How often an open section reads again: the scheduled pull runs every 5 minutes; a server that was away is asked sooner. */
 const REFRESH_MS = 60_000;
 const RETRY_MS = 15_000;
 
-const FAILURE: Record<NonNullable<VendorReviewStoreView["failure"]>, string> = {
-  UNREACHABLE: "마지막 받기에서 서버에 닿지 않았어요. 다음 받기에서 다시 시도해요.",
-  NOT_AUTHORIZED: "마지막 받기에서 서버가 이 PC의 요청을 받지 않았어요.",
-  NOT_STORED: "마지막 받기에서 리뷰 일부를 저장하지 못했어요. 다음 받기가 그 리뷰부터 다시 받아요.",
-};
+/**
+ * The words that differ by where this runs. A seller PC links itself to the reviewnary server; on the Reviewnary
+ * server itself (`WORKSPACE`) the seller has one account and nothing to link — an operator connects the delegate's
+ * stores to it (boundary §5, owner decision 2026-10-31).
+ */
+const WORDS = {
+  INSTALL: {
+    hint: "담당자가 판매자센터 리뷰 엑셀을 reviewnary 서버에 올리면 이 PC가 받아 와요.",
+    offline: "reviewnary 서버에 닿지 않아요. 인터넷 연결을 확인해 주세요. 이미 받은 리뷰는 그대로 있어요.",
+    revoked: "이 PC의 연결이 해제됐어요. 다시 연결해야 리뷰를 받을 수 있어요.",
+    refused: "마지막 받기에서 서버가 이 PC의 요청을 받지 않았어요.",
+    otherOrganisation: "이 PC의 다른 계정이 받는 중",
+    automatic: "시작한 스토어는 이 PC가 켜져 있는 동안 5분마다 자동으로 받아요.",
+    whileOff: " 이 PC가 꺼져 있던 동안 올라온 리뷰는 다음에 켜질 때 받아요.",
+  },
+  WORKSPACE: {
+    hint: "담당자가 판매자센터 리뷰 엑셀을 올리면 이 계정으로 받아 와요.",
+    offline: "담당자 리뷰 서버에 잠시 닿지 않아요. 다시 닿으면 이어서 받아요. 이미 받은 리뷰는 그대로 있어요.",
+    revoked: "이 계정의 담당자 리뷰 연결이 멈췄어요. 운영팀에 문의해 주세요.",
+    refused: "마지막 받기에서 담당자 리뷰 서버가 이 계정의 요청을 받지 않았어요.",
+    otherOrganisation: "다른 작업 계정이 받는 중",
+    automatic: "시작한 스토어는 담당자가 엑셀을 올리면 자동으로 받아요.",
+    whileOff: "",
+  },
+} as const;
+
+type Words = (typeof WORDS)[keyof typeof WORDS];
+
+function failureLine(failure: NonNullable<VendorReviewStoreView["failure"]>, words: Words): string {
+  if (failure === "UNREACHABLE") return "마지막 받기에서 서버에 닿지 않았어요. 다음 받기에서 다시 시도해요.";
+  if (failure === "NOT_AUTHORIZED") return words.refused;
+  return "마지막 받기에서 리뷰 일부를 저장하지 못했어요. 다음 받기가 그 리뷰부터 다시 받아요.";
+}
 
 /**
  * **「담당자가 올리는 네이버 리뷰」 — the seller-PC side of the vendor relay** (docs/vendor_server_contract_v1.md §3.2;
@@ -43,7 +68,8 @@ const FAILURE: Record<NonNullable<VendorReviewStoreView["failure"]>, string> = {
  * It stays current without a reload: it reads again every minute while shown, sooner while the server is away, and
  * when the tab comes back; a read that fails says so with 「다시 확인」 instead of leaving the section empty.
  *
- * Hidden entirely where the PC cannot link (`OFF`: not a seller-PC install).
+ * Hidden entirely where the link is off (`OFF`). On the Reviewnary server (`WORKSPACE`) there is no 「이 PC 연결」:
+ * until an operator connects the account the section says so, and nothing here asks the seller to sign in elsewhere.
  */
 export function VendorReviewsSection() {
   const [link, setLink] = useState<VendorLinkStatus | null>(null);
@@ -159,7 +185,7 @@ export function VendorReviewsSection() {
       const next = await api.getVendorReviewsOverview();
       if (!mounted.current) return;
       setOverview(next);
-      if (result) setNotice(pulledLine(result));
+      if (result) setNotice(pulledLine(result, link?.mode === "WORKSPACE" ? WORDS.WORKSPACE : WORDS.INSTALL));
     } catch {
       if (mounted.current) setFailed(true);
     } finally {
@@ -178,7 +204,7 @@ export function VendorReviewsSection() {
     // Nothing read yet. A first read that failed is said, not hidden; until then there is nothing to show.
     return failed ? (
       <section aria-label={TITLE} className="space-y-2" data-testid="vendor-reviews">
-        <SectionHeader title={TITLE} hint={HINT} />
+        <SectionHeader title={TITLE} hint={WORDS.INSTALL.hint} />
         <Banner tone="bad">
           {LOAD_FAILED}
           {retryButton}
@@ -190,13 +216,15 @@ export function VendorReviewsSection() {
     return null;
   }
 
+  const server = link.mode === "WORKSPACE";
+  const words = server ? WORDS.WORKSPACE : WORDS.INSTALL;
   const unstarted = overview?.stores.filter((s) => s.standing === "NOT_RECEIVING") ?? [];
   const started = overview?.stores.filter((s) => s.standing === "RECEIVING" || s.standing === "PAUSED") ?? [];
   const linked = link.state === "LINKED";
   const reachable = overview?.state === "PULLED";
 
   let action = null;
-  if (!linked && link.state !== "PENDING") {
+  if (!linked && link.state !== "PENDING" && !server) {
     action = (
       <Btn size="sm" disabled={busy} onClick={() => void startLink(false)} data-testid="vendor-reviews-link">
         이 PC 연결
@@ -223,7 +251,7 @@ export function VendorReviewsSection() {
 
   return (
     <section aria-label={TITLE} className="space-y-2" data-testid="vendor-reviews">
-      <SectionHeader title={TITLE} hint={HINT} action={action} />
+      <SectionHeader title={TITLE} hint={words.hint} action={action} />
 
       {failed ? (
         <Banner tone="bad">
@@ -232,7 +260,13 @@ export function VendorReviewsSection() {
         </Banner>
       ) : null}
 
-      {!linked && link.state !== "PENDING" ? (
+      {!linked && server ? (
+        <p className="border-t border-line/70 py-2 text-sm text-ink" data-testid="vendor-reviews-awaiting-operator">
+          담당자 리뷰는 운영팀이 이 계정에 스토어를 연결하면 여기에 보여요. 따로 로그인하거나 연결할 것은 없어요.
+        </p>
+      ) : null}
+
+      {!linked && !server && link.state !== "PENDING" ? (
         <>
           <p className="border-t border-line/70 py-2 text-sm text-ink">
             {link.state === "CODE_EXPIRED"
@@ -272,24 +306,34 @@ export function VendorReviewsSection() {
         <>
           {overview.state === "UNREACHABLE" && !failed ? (
             <Banner tone="bad">
-              {OFFLINE}
+              {words.offline}
               {retryButton}
             </Banner>
           ) : null}
           {overview.state === "NOT_AUTHORIZED" ? (
             <Banner tone="bad">
-              {REVOKED}{" "}
-              <Btn size="sm" variant="outline" className="ml-2" disabled={busy} onClick={() => void startLink(true)}>
-                이 PC 다시 연결
-              </Btn>
+              {words.revoked}
+              {server ? null : (
+                <>
+                  {" "}
+                  <Btn size="sm" variant="outline" className="ml-2" disabled={busy} onClick={() => void startLink(true)}>
+                    이 PC 다시 연결
+                  </Btn>
+                </>
+              )}
             </Banner>
           ) : null}
           {notice ? <Banner tone="info">{notice}</Banner> : null}
 
-          {reachable ? (
+          {reachable && !server ? (
             <p className="break-keep text-sm text-muted" data-testid="vendor-reviews-route">
               서버의 판매자 계정 <span className="font-semibold text-ink">{overview.accountEmail ?? "-"}</span>
               {" → "}이 PC의 작업 계정 <span className="font-semibold text-ink">{overview.organisation ?? "-"}</span>
+            </p>
+          ) : null}
+          {reachable && server ? (
+            <p className="break-keep text-sm text-muted" data-testid="vendor-reviews-route">
+              받는 작업 계정 <span className="font-semibold text-ink">{overview.organisation ?? "-"}</span>
             </p>
           ) : null}
 
@@ -304,6 +348,7 @@ export function VendorReviewsSection() {
               <StoreRow
                 key={store.storeId}
                 store={store}
+                words={words}
                 busy={busy}
                 onPause={(paused) => void run(() => api.setVendorStorePaused(store.storeId, paused))}
               />
@@ -313,9 +358,8 @@ export function VendorReviewsSection() {
           {reachable && unstarted.length > 0 ? (
             <p className="break-keep text-xs text-muted" data-testid="vendor-reviews-start-note">
               「리뷰 받기 시작」을 누르면 위의 「아직 받지 않음」 스토어 {unstarted.length}곳(
-              {unstarted.map((s) => s.label).join(", ")})의 리뷰를 「{overview.organisation ?? "-"}」 작업 계정으로 받아요. 시작한
-              스토어는 이 PC가 켜져 있는 동안 5분마다 자동으로 받아요. 나중에 생기는 스토어는 여기에 따로 보이고, 시작하기 전에는 받지
-              않아요.
+              {unstarted.map((s) => s.label).join(", ")})의 리뷰를 「{overview.organisation ?? "-"}」 작업 계정으로 받아요.{" "}
+              {words.automatic} 나중에 생기는 스토어는 여기에 따로 보이고, 시작하기 전에는 받지 않아요.
             </p>
           ) : null}
           {started.length > 0 ? (
@@ -327,7 +371,7 @@ export function VendorReviewsSection() {
               >
                 리뷰
               </Link>{" "}
-              화면에 다른 채널 리뷰와 함께 보여요. 이 PC가 꺼져 있던 동안 올라온 리뷰는 다음에 켜질 때 받아요.
+              화면에 다른 채널 리뷰와 함께 보여요.{words.whileOff}
             </p>
           ) : null}
         </>
@@ -338,10 +382,12 @@ export function VendorReviewsSection() {
 
 function StoreRow({
   store,
+  words,
   busy,
   onPause,
 }: {
   store: VendorReviewStoreView;
+  words: Words;
   busy: boolean;
   onPause: (paused: boolean) => void;
 }) {
@@ -358,7 +404,7 @@ function StoreRow({
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="break-keep font-medium text-ink">{store.label}</span>
-          <StandingChip store={store} />
+          <StandingChip store={store} words={words} />
         </div>
         {facts.length > 0 ? (
           <p className="mt-0.5 break-keep text-xs text-muted" data-testid="vendor-store-facts">
@@ -367,7 +413,7 @@ function StoreRow({
         ) : null}
         {ours && store.failure ? (
           <p className="mt-0.5 break-keep text-xs text-warn" data-testid="vendor-store-failure">
-            {FAILURE[store.failure]}
+            {failureLine(store.failure, words)}
             {store.failedAt ? ` (${relativeTime(store.failedAt)})` : ""}
           </p>
         ) : null}
@@ -386,8 +432,8 @@ function StoreRow({
   );
 }
 
-function StandingChip({ store }: { store: VendorReviewStoreView }) {
-  if (store.standing === "OTHER_ORGANISATION") return <Chip>이 PC의 다른 계정이 받는 중</Chip>;
+function StandingChip({ store, words }: { store: VendorReviewStoreView; words: Words }) {
+  if (store.standing === "OTHER_ORGANISATION") return <Chip>{words.otherOrganisation}</Chip>;
   if (store.standing === "NOT_RECEIVING") return <Chip>아직 받지 않음</Chip>;
   if (store.standing === "PAUSED") return <Chip>받기 멈춤</Chip>;
   if (store.failure) return <Chip tone="attention">받지 못함</Chip>;
@@ -406,9 +452,9 @@ function Banner({ tone, children }: { tone: "info" | "bad"; children: ReactNode 
 }
 
 /** One line for what a pull brought, and which stores it could not finish. */
-function pulledLine(result: VendorReviewPullResult): string {
-  if (result.state === "UNREACHABLE") return OFFLINE;
-  if (result.state === "NOT_AUTHORIZED") return REVOKED;
+function pulledLine(result: VendorReviewPullResult, words: Words): string {
+  if (result.state === "UNREACHABLE") return words.offline;
+  if (result.state === "NOT_AUTHORIZED") return words.revoked;
   const ran = result.stores.filter((s) => s.bound && !s.otherOrganisation && !s.paused);
   const inserted = ran.reduce((n, s) => n + s.inserted, 0);
   const updated = ran.reduce((n, s) => n + s.updated, 0);

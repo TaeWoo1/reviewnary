@@ -327,7 +327,7 @@ describe("the band — obligations only", () => {
     draw(co({ checked: 12, autoResolved: 3, draftsPrepared: 2 }));
     const band = await summary();
     await waitFor(() => expect(band).toHaveTextContent("할 일"));
-    expect(band).toHaveTextContent("등록 중");
+    expect(band).toHaveTextContent("등록 대기");
     expect(band).toHaveTextContent("미답변");
     // The two facts that moved. Both are still on the screen — on the quiet line — and neither may be
     // drawn at the weight of an obligation.
@@ -352,8 +352,8 @@ describe("the band — obligations only", () => {
     const band = await summary();
     await waitFor(() => expect(band).toHaveTextContent("미답변"));
     const text = band.textContent ?? "";
-    expect(text.indexOf("할 일")).toBeLessThan(text.indexOf("등록 중"));
-    expect(text.indexOf("등록 중")).toBeLessThan(text.indexOf("미답변"));
+    expect(text.indexOf("할 일")).toBeLessThan(text.indexOf("등록 대기"));
+    expect(text.indexOf("등록 대기")).toBeLessThan(text.indexOf("미답변"));
   });
 
   it("현재 미답변 says it is unknown rather than printing the qualified figure", async () => {

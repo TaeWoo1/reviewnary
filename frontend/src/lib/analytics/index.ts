@@ -1,6 +1,7 @@
 import { createAnalytics } from "./analytics";
 import { createGtmSink, isValidGtmId } from "./gtmSink";
 import { createPosthogSink, POSTHOG_DEFAULT_HOST } from "./posthogSink";
+import { createHackleSink } from "./hackleSink";
 import type { AnalyticsSink, ConsentGrant } from "./sink";
 import { consentPolicy, readConsent, type ConsentEnv } from "../consent/consent";
 
@@ -16,10 +17,12 @@ export interface AnalyticsEnv extends ConsentEnv {
   VITE_GTM_ID?: string;
   VITE_POSTHOG_KEY?: string;
   VITE_POSTHOG_HOST?: string;
+  VITE_HACKLE_SDK_KEY?: string;
 }
 
 /**
- * Sinks from env — GTM when `VITE_GTM_ID` is a container id, PostHog when `VITE_POSTHOG_KEY` is set. Both absent
+ * Sinks from env — GTM when `VITE_GTM_ID` is a container id, PostHog when `VITE_POSTHOG_KEY` is set, Hackle when
+ * `VITE_HACKLE_SDK_KEY` (its browser key) is set. All absent
  * (the local/dev default) → no sinks → OFF. Nothing else can turn a vendor on.
  */
 export function sinksFromEnv(env: AnalyticsEnv): AnalyticsSink[] {
@@ -28,6 +31,8 @@ export function sinksFromEnv(env: AnalyticsEnv): AnalyticsSink[] {
   if (isValidGtmId(gtm)) sinks.push(createGtmSink(gtm));
   const phKey = env.VITE_POSTHOG_KEY?.trim();
   if (phKey) sinks.push(createPosthogSink(phKey, env.VITE_POSTHOG_HOST?.trim() || POSTHOG_DEFAULT_HOST));
+  const hackleKey = env.VITE_HACKLE_SDK_KEY?.trim();
+  if (hackleKey) sinks.push(createHackleSink(hackleKey));
   return sinks;
 }
 

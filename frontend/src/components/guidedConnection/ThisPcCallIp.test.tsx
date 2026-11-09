@@ -30,7 +30,7 @@ const APPROVAL = "http://127.0.0.1:8090/link?code=BCDFGHJK";
 function status(state: VendorLinkStatus["state"], over: Partial<VendorLinkStatus> = {}): VendorLinkStatus {
   return {
     state, offReason: null, userCode: null, codeExpiresAt: null, pollIntervalSeconds: null, approvalUrl: null,
-    deviceName: null, linkedAt: null, ...over,
+    deviceName: null, linkedAt: null, mode: "INSTALL", ...over,
   };
 }
 
@@ -80,6 +80,15 @@ describe("ThisPcCallIp", () => {
     });
     expect(await screen.findByText("203.0.113.7")).toBeInTheDocument();
     expect(pollVendorLink).toHaveBeenCalled();
+  });
+
+  it("is not shown on the Reviewnary server, which has no PC to link", async () => {
+    getVendorLink.mockResolvedValue(status("UNLINKED", { mode: "WORKSPACE" }));
+    getVendorPublicIp.mockResolvedValue({ ipv4: null, reason: "NOT_LINKED" });
+    const { container } = render(<ThisPcCallIp />);
+    await waitFor(() => expect(getVendorLink).toHaveBeenCalled());
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    expect(screen.queryByTestId("vendor-link-start")).toBeNull();
   });
 
   it("an install with the link off keeps the manual guidance and offers no link", async () => {

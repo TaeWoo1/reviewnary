@@ -355,6 +355,30 @@ export function elapsedLabel(
 }
 
 /**
+ * <b>How far back drafts are prepared ahead</b> — the backend's {@code OperationsCaseProcessor.ACQUISITION_REACH} (15
+ * days, the reach the automatic check re-reads). An older unanswered inquiry is drafted when the seller asks (owner,
+ * 2026-10-28), and its screen says why no draft is waiting.
+ */
+export const AUTO_DRAFT_REACH_DAYS = 15;
+
+/**
+ * <b>An inquiry's age — 대기 only while it is unanswered</b> (2026-10-28 review: an answered inquiry read 「5일 대기」).
+ *
+ * <p>{@link elapsedLabel} counted from receipt whatever the status, so a row already marked 답변함 still claimed the
+ * customer was waiting. An answered inquiry says when it came in instead — 「5일 전 접수」, or the date past a year —
+ * and only an open one says 대기. Both the list row and the pane call this, so they cannot disagree.
+ */
+export function inquiryAgeLabel(
+  receivedAt: string | null | undefined,
+  status: string | null | undefined,
+  now: Date = new Date(),
+): string | null {
+  if (status !== "ANSWERED" || waitIsDated(receivedAt, now)) return waitLabel(receivedAt, now);
+  const ago = sinceLabel(receivedAt, now);
+  return ago ? `${ago} 접수` : null;
+}
+
+/**
  * <b>How many whole days ago, in the seller's own calendar</b> — the number {@link waitLabel} composes its
  * label out of, exposed so a sentence can be built around it rather than by slicing that label apart.
  *

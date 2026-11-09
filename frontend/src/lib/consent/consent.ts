@@ -23,13 +23,15 @@ export type ConsentPolicy = "banner" | "not-applicable";
 export interface ConsentEnv {
   VITE_GTM_ID?: string;
   VITE_POSTHOG_KEY?: string;
+  VITE_HACKLE_SDK_KEY?: string;
   VITE_CONSENT_BANNER?: string;
 }
 
 export function consentPolicy(env: ConsentEnv): ConsentPolicy {
   if (env.VITE_CONSENT_BANNER?.trim() === "always") return "banner";
   // The same validity rule as `sinksFromEnv`: a malformed GTM id builds no sink, so it asks for no consent.
-  return isValidGtmId(env.VITE_GTM_ID?.trim()) || env.VITE_POSTHOG_KEY?.trim() ? "banner" : "not-applicable";
+  return isValidGtmId(env.VITE_GTM_ID?.trim()) || env.VITE_POSTHOG_KEY?.trim() || env.VITE_HACKLE_SDK_KEY?.trim()
+    ? "banner" : "not-applicable";
 }
 
 interface StorageLike {

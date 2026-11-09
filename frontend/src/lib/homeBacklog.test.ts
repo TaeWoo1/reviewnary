@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isOldBacklog, REVIEW_RECENT_DAYS, type HomeWorkRow } from "./homeWork";
+import { isOldBacklog, RECENT_DAYS, REVIEW_RECENT_DAYS, type HomeWorkRow } from "./homeWork";
 import { unansweredNow } from "./homeSummary";
 import type { OperationsMetrics } from "./types";
 
@@ -14,27 +14,37 @@ function daysAgo(n: number): string {
 }
 
 /**
- * Owner decision 2026-10-26: after a year-long first upload the Home led with 88–116-day-old reviews. An undecided
- * review is this morning's work for {@link REVIEW_RECENT_DAYS} days; the seller's own started reply and an inquiry
- * keep the year rule.
+ * Owner decisions: 2026-10-26 aged an undecided review out of 할 일 after two weeks; 2026-10-28 made it two weeks for
+ * every kind — after a year of NAVER inquiries was read in, all eleven rows of 할 일 were 35–286 days old. A row
+ * marked 「안전 관련 확인」 stays however old it is.
  */
 describe("isOldBacklog — how long a row is this morning's work", () => {
   it("an undecided review ages out after two weeks", () => {
     expect(REVIEW_RECENT_DAYS).toBe(14);
+    expect(RECENT_DAYS).toBe(14);
     expect(isOldBacklog(row({ since: daysAgo(13) }), NOW)).toBe(false);
     expect(isOldBacklog(row({ since: daysAgo(15) }), NOW)).toBe(true);
     expect(isOldBacklog(row({ since: "2026-07-30" }), NOW)).toBe(true);
   });
 
-  it("a reply the seller started does not age out with it", () => {
-    expect(isOldBacklog(row({ state: "DRAFT_NEEDED", since: daysAgo(90) }), NOW)).toBe(false);
-    expect(isOldBacklog(row({ state: "AWAITING_APPROVAL", since: daysAgo(90) }), NOW)).toBe(false);
+  it("a reply the seller started ages out the same way", () => {
+    expect(isOldBacklog(row({ state: "DRAFT_NEEDED", since: daysAgo(13) }), NOW)).toBe(false);
+    expect(isOldBacklog(row({ state: "DRAFT_NEEDED", since: daysAgo(90) }), NOW)).toBe(true);
+    expect(isOldBacklog(row({ state: "AWAITING_APPROVAL", since: daysAgo(90) }), NOW)).toBe(true);
   });
 
-  it("an inquiry keeps the year rule", () => {
+  it("an inquiry and a case age out after two weeks too — not a year", () => {
     const inquiry = { kind: "INQUIRY", subject: "INQUIRY", state: "REPLY_NEEDED" } as const;
-    expect(isOldBacklog(row({ ...inquiry, since: daysAgo(90) }), NOW)).toBe(false);
-    expect(isOldBacklog(row({ ...inquiry, since: daysAgo(400) }), NOW)).toBe(true);
+    expect(isOldBacklog(row({ ...inquiry, since: daysAgo(13) }), NOW)).toBe(false);
+    expect(isOldBacklog(row({ ...inquiry, since: daysAgo(90) }), NOW)).toBe(true);
+    const kase = { kind: "CASE", subject: "INQUIRY", state: "LOOK_INTO" } as const;
+    expect(isOldBacklog(row({ ...kase, since: daysAgo(35) }), NOW)).toBe(true);
+  });
+
+  it("a possible safety report stays in 할 일 however old it is", () => {
+    expect(isOldBacklog(row({ safety: true, since: daysAgo(200) }), NOW)).toBe(false);
+    expect(isOldBacklog(row({ kind: "INQUIRY", subject: "INQUIRY", state: "REPLY_NEEDED", safety: true, since: daysAgo(400) }), NOW))
+      .toBe(false);
   });
 
   it("a row with no date is never backlog", () => {

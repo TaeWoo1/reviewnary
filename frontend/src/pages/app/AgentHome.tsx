@@ -12,13 +12,12 @@ import { api } from "../../lib/apiClient";
 import { analytics } from "../../lib/analytics";
 import { DISCONNECTED_HEADLINE } from "../../lib/briefing";
 import { delegableSentence, firstUseSteps, homeFirstUseState, noDataSentence } from "../../lib/homeFirstUse";
-import { matchCommandIntent, INTENT_HEADING } from "../../lib/commandIntents";
-import { INQUIRY_NEEDS_REPLY_PATH } from "../../lib/todayInbox";
+import { matchCommandIntent } from "../../lib/commandIntents";
+import { answerCommandIntent } from "../../lib/commandShortcuts";
 import { CustomerOpsHome, TodayWorkspace, coHomeApplies } from "../../components/customerOperations/CustomerOpsHome";
 import { COPY } from "../../lib/copy/customerOps";
 import { UNANSWERED_WORD } from "../../lib/homeSummary";
 import type { CustomerOperationsHome } from "../../lib/customerOperationsTypes";
-import type { InquiryListArtifact } from "../../lib/conversation/types";
 import type { InquiryQueueResponse, MetricKpi, OperationsHome, OverviewResponse, ReviewIssueView } from "../../lib/types";
 
 /**
@@ -202,51 +201,7 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
         panel.openPanel();
       }
       if (!key) return false;
-      if (key === "TODAY") {
-        conversation.addLocalTurn(text, { message: "오늘 할 일은 이 대화 맨 위에 정리해 두었어요.", artifacts: [] });
-        return true;
-      }
-      if (key === "UNANSWERED_INQUIRIES") {
-        // 「답변이 필요한 문의」 is ONE question, so the heading, the count, the rows and the destination
-        // all come from ONE read. It used to title the answer with the freshness-qualified KPI and fill
-        // it with the OPEN work queue — two different sets under one sentence, so the number never
-        // described the rows beneath it and neither described the screen the 전체 보기 opened.
-        void api
-          .getInquiryRowsStrict({ status: "UNANSWERED", order: "OLDEST", limit: 5 })
-          .then((page) => {
-            const artifact: InquiryListArtifact = {
-              artifactId: "local-inquiries",
-              type: "INQUIRY_LIST",
-              title: `${INTENT_HEADING.UNANSWERED_INQUIRIES} ${page.totalCount}건`,
-              totalCount: page.totalCount,
-              groups: [
-                {
-                  key: "UNANSWERED",
-                  label: "답변 필요",
-                  items: page.items.map((item) => ({
-                    workItemId: item.workItemId,
-                    inquiryId: item.inquiryId,
-                    channelCode: item.channelCode,
-                    channelNameKo: item.channelNameKo,
-                    receivedAt: item.receivedAt,
-                    phase: item.phase,
-                    status: item.status,
-                    title: item.title,
-                    productId: item.productId,
-                    productName: item.productName,
-                    answerBasis: null,
-                    to: `/inquiries/${item.inquiryId}`,
-                  })),
-                },
-              ],
-              more: { label: "문의 화면에서 전체 보기", to: INQUIRY_NEEDS_REPLY_PATH },
-            };
-            conversation.addLocalTurn(text, { message: "바로 보여드려요.", artifacts: [artifact] });
-          })
-          .catch(() => conversation.addLocalTurn(text, { message: "문의를 읽지 못했어요. 문의 화면에서 확인해 주세요.", artifacts: [] }));
-        return true;
-      }
-      return false;
+      return answerCommandIntent(text, conversation);
     },
     [conversation, data, workspace, panel],
   );
@@ -370,7 +325,9 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
                 onProblemChanged={onProblemChanged}
                 metrics={data?.metrics ?? null}
                 insights={data?.insights ?? null}
-                dock={dock}
+                // The box lives in the AI 담당자 panel on the right (owner, 2026-10-28) — 오늘 keeps the list and opens
+                // the panel from its 「AI에게 묻기」. A shell without the panel keeps the box here.
+                dock={panel ? null : dock}
               />
             )
           : undefined

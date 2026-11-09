@@ -48,7 +48,22 @@ export type WorkStateKey =
    */
   | "DELEGATE_RECHECK"
   | "DELEGATE_HELD"
-  | "DELEGATE_FAILED";
+  | "DELEGATE_FAILED"
+  /**
+   * 판매자센터에서 확인해 달라는 문의 — the inquiry's draft attempt left an order action or state only the seller can see
+   * (`InquiryQueueItem.sellerCheckAsk`), and nothing is recorded yet. The Home's 「이 내용만 알려주세요」.
+   */
+  | "SELLER_CHECK"
+  /**
+   * 다시 확인할 날이 됐다 — the reply was decided, the action is still in progress, and the seller's own next-check day
+   * has come (`InquiryFollowUpRow.due`). A check for the seller; nothing is sent because a day passed.
+   */
+  | "CHECK_AGAIN"
+  /**
+   * 처리는 끝났는데 고객에게는 덜 안내했다 — the registered answer was written before the seller recorded 「처리 완료」
+   * (`InquiryFollowUpRow.waitingOn` `TOLD_BEHIND`). A check until the seller closes it; nothing is sent.
+   */
+  | "TOLD_BEHIND";
 
 export interface WorkStateWord {
   text: string;
@@ -98,6 +113,9 @@ export const WORK_STATE: Record<WorkStateKey, WorkStateWord> = {
   DELEGATE_RECHECK: { text: "다시 검사", tone: "warn" },
   DELEGATE_HELD: { text: "고칠 곳", tone: "warn" },
   DELEGATE_FAILED: { text: "등록 못 함", tone: "warn" },
+  SELLER_CHECK: { text: "알려주세요", tone: "warn" },
+  CHECK_AGAIN: { text: "다시 확인", tone: "warn" },
+  TOLD_BEHIND: { text: "안내 확인", tone: "warn" },
 };
 
 /** A lane state from `ReviewWorkView.delegatedStates`, as a work word; anything else is not the lane's to say. */

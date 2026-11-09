@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { SettingsHome } from "./SettingsHome";
 import { expectNoAxeViolations } from "../../test/axe";
+import { ConsentProvider } from "../../lib/consent/ConsentProvider";
+import { readConsent, writeConsent } from "../../lib/consent/consent";
+import { analytics } from "../../lib/analytics";
 
 const logout = vi.fn();
 vi.mock("../../lib/auth", () => ({
@@ -122,3 +125,48 @@ describe("설정", () => {
     await expectNoAxeViolations(container);
   });
 });
+
+describe("설정 — 분석 동의를 확인하고 거두는 길 (2026-11-07)", () => {
+  function renderWithConsent(env: Record<string, string>) {
+    return render(
+      <MemoryRouter>
+        <ConsentProvider env={env}>
+          <SettingsHome />
+        </ConsentProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  afterEach(() => localStorage.clear());
+
+  it("no analytics vendor configured: nothing to withdraw, no 개인정보 구역", () => {
+    renderWithConsent({});
+    expect(screen.queryByRole("region", { name: "개인정보" })).toBeNull();
+  });
+
+  it("granted → 동의 철회 stores the refusal and tells the analytics layer at once", () => {
+    writeConsent({ analytics: true, marketing: false });
+    analytics.setConsent({ analytics: true, marketing: false });
+    renderWithConsent({ VITE_CONSENT_BANNER: "always" });
+    expect(screen.getByText(/이용 통계 수집에 동의함/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "동의 철회" }));
+    expect(readConsent()).toMatchObject({ analytics: false, marketing: false });
+    expect(analytics.consent).toEqual({ analytics: false, marketing: false });
+    expect(screen.getByText(/이용 통계를 보내지 않아요/)).toBeInTheDocument();
+  });
+
+  it("withdrawn → 다시 고르기 forgets the decision so the banner asks again", () => {
+    writeConsent({ analytics: false, marketing: false });
+    renderWithConsent({ VITE_CONSENT_BANNER: "always" });
+    fireEvent.click(screen.getByRole("button", { name: "다시 고르기" }));
+    expect(readConsent()).toBeNull();
+    expect(screen.getByText(/아직 고르지 않았어요/)).toBeInTheDocument();
+  });
+
+  it("links to the privacy policy", () => {
+    writeConsent({ analytics: true, marketing: false });
+    renderWithConsent({ VITE_CONSENT_BANNER: "always" });
+    expect(screen.getByRole("link", { name: "방침 보기" })).toHaveAttribute("href", "/legal/privacy");
+  });
+});
+

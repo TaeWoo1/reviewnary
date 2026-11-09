@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { elapsedLabel, elapsedSource } from "./copy/customerOps";
+import { elapsedLabel, elapsedSource, inquiryAgeLabel } from "./copy/customerOps";
 import { caseWorkRow } from "./homeWork";
 import type { CustomerOperationsDecisionRow } from "./customerOperationsTypes";
 
@@ -93,5 +93,18 @@ describe("elapsed time — one source", () => {
     const row = decision({ receivedOn: null });
     expect(caseWorkRow(row).since).toBe(elapsedSource(row.receivedOn, row.openedAt));
     expect(elapsedLabel(caseWorkRow(row).since, "INQUIRY", NOW)).toBe("7일 대기");
+  });
+});
+
+describe("an inquiry's age — 대기 only while it is unanswered", () => {
+  it("an answered inquiry says when it came in, an open one how long it has waited", () => {
+    expect(inquiryAgeLabel("2026-09-26T23:00:00Z", "ANSWERED", NOW)).toBe("5일 전 접수");
+    expect(inquiryAgeLabel("2026-09-26T23:00:00Z", "UNANSWERED", NOW)).toBe("5일 대기");
+    expect(inquiryAgeLabel("2026-09-26T23:00:00Z", null, NOW)).toBe("5일 대기");
+  });
+
+  it("past a year both say the date, and no date says nothing", () => {
+    expect(inquiryAgeLabel("2024-09-01", "ANSWERED", NOW)).toBe("2024-09-01 접수");
+    expect(inquiryAgeLabel(null, "ANSWERED", NOW)).toBeNull();
   });
 });

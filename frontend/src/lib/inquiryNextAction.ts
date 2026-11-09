@@ -32,6 +32,9 @@ export function isAnswered(item: Pick<FeedItem, "status">): boolean {
   return item.status === "ANSWERED";
 }
 
+/** Phases whose reply the seller already decided. */
+const DECIDED_PHASES: readonly string[] = ["APPROVED", "ACTION_PENDING", "EXECUTED", "COMPLETED"];
+
 export interface InquiryNextAction {
   /** 제품의 업무 어휘 한 단어. */
   readonly state: WorkStateWord;
@@ -47,7 +50,23 @@ export interface InquiryNextAction {
 export function inquiryNextAction(
   item: Pick<FeedItem, "status">,
   workItemId: string | null,
+  /** The work item's phase when the screen read it — a decided reply is not 「답변을 준비하세요」. */
+  phase?: string | null,
 ): InquiryNextAction {
+  const decided = workItemId !== null && !!phase && DECIDED_PHASES.includes(phase);
+  if (isAnswered(item) && decided) {
+    return {
+      state: WORK_STATE.ANSWERED,
+      // 답변을 등록했다고 일이 끝난 것은 아니다(2026-11-03 여섯째 리뷰) — 진행 중인 조치가 남아 있을 수 있다.
+      sentence: "답변이 등록된 문의예요. 아래에서 확인한 결과와 남은 일을 볼 수 있어요.",
+    };
+  }
+  if (decided) {
+    return {
+      state: WORK_STATE.APPROVED,
+      sentence: "승인한 답변을 등록하고 있어요. 아래에서 등록 상태를 볼 수 있어요.",
+    };
+  }
   if (isAnswered(item)) {
     return {
       state: WORK_STATE.ANSWERED,

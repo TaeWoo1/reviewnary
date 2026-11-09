@@ -68,7 +68,7 @@ export function InboxDetail({
   // The reply block owns 고객 문의 — title, body, channel, product and the 상품 지정 control — whenever
   // it renders. Repeating any of it here would be the same fact twice on one screen.
   const panelOwnsTheQuestion = !!workItemId && isInquiry;
-  const next = isInquiry ? inquiryNextAction(item, workItemId) : null;
+  const next = isInquiry ? inquiryNextAction(item, workItemId, workspace?.detail?.phase ?? null) : null;
   const reason = isInquiry ? draftUnavailableReason(item, workItemId, item.channelNameKo) : null;
   const draft = workspace?.draft ?? null;
   /**

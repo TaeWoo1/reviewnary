@@ -2,9 +2,8 @@ import { REASON, channelShort, elapsedSource, reasonOfCase, sourceLabel, waitSin
 import { onlySharedWord } from "./sharedWord";
 import { DELEGATED_WORK, type WorkStateKey } from "./workState";
 import { subjectFallback } from "./customerOperations";
-import { isOldBacklog as isOldInquiryBacklog } from "./inquiryWorkspace";
 import type { CustomerOperationsDecisionRow, CustomerOperationsHome } from "./customerOperationsTypes";
-import type { InquiryQueueResponse, OperationsHome, ReviewWorkView } from "./types";
+import type { InquiryFollowUps, InquiryQueueResponse, OperationsHome, ReviewWorkView } from "./types";
 
 /**
  * <b>「확인 필요」 on the Home — one list, not three</b> (Customer Operations v3.1).
@@ -61,6 +60,12 @@ export interface HomeWorkRow {
    */
   group?: string | null;
   since: string | null;
+  /**
+   * <b>The seller set today as the day to look again</b> (2026-11-06 sixteenth review) — a follow-up check whose day has
+   * come. It is this morning's work however old {@link since} is; `since` stays the record's own time, so the row still
+   * says how long the matter has run. Absent on every other row.
+   */
+  dueToday?: boolean;
   /** Where the row opens: the case screen for a case, the owning screen otherwise. */
   to: string;
   /**
@@ -220,6 +225,8 @@ export function mergeHomeWork(
    * what it was.
    */
   reviewWork?: ReviewWorkView | null,
+  /** What is still open after a reply was decided; its `due` rows — checks whose day has come — join the list. */
+  followUps?: InquiryFollowUps | null,
 ): HomeWork {
   const byOwner = new Map<string, HomeWorkRow>();
   const settled = new Set<string>((co?.handled.rows ?? []).map((r) => r.to));
@@ -321,12 +328,15 @@ export function mergeHomeWork(
     // subject at all, so the body is BOTH lines unless the preview is compared against what the row
     // will actually draw. Measured live at 1600×1000 — 「케이블 한 줄 2.5 3c 폭 10mm…」, twice.
     const inquiryTitle = row.title?.trim() || row.snippet?.trim() || subjectFallback("INQUIRY");
+    // 「이 내용만 알려주세요」 (2026-11-03 sixth review): the answer waits on what only the seller can see, so the row
+    // says that instead of the customer's first lines — opening it lands on the one question the seller is asked.
+    const asked = row.sellerCheckAsk ? SELLER_CHECK_LINE[row.sellerCheckAsk] : undefined;
     byOwner.set(owner, {
       key: `inquiry:${row.inquiryId}`,
       reason: REASON.reply,
       // `hasDraft` is a draft VERSION, not a phase — the distinction that caught 「초안 준비됨」 being read
       // off a work-item phase, where eight of the demo org's ten rows had no draft at all.
-      state: row.hasDraft ? "DRAFT_READY" : "REPLY_NEEDED",
+      state: asked ? "SELLER_CHECK" : row.hasDraft ? "DRAFT_READY" : "REPLY_NEEDED",
       source: sourceLabel(row.channelCode ?? row.channelNameKo, "INQUIRY"),
       channel: channelShort(row.channelCode ?? row.channelNameKo),
       rating: null,
@@ -346,7 +356,7 @@ export function mergeHomeWork(
         lengths — different strings, identical on screen. Either being a prefix of the other means the
         second line is the first line again.
       */
-      line: preview(row.snippet, inquiryTitle),
+      line: asked ?? preview(row.snippet, inquiryTitle),
       since: row.receivedAt,
       to: owner,
       owner,
@@ -360,6 +370,44 @@ export function mergeHomeWork(
     });
   }
   if (queue && queue.totalElements > queue.content.length) truncated = true;
+
+  // 다시 확인할 날이 된 일 (2026-11-03 sixth review). The reply was decided and the action is still in progress; the day the
+  // seller set has come, so the inquiry is a check for them again — opening it shows the record and 「결과 고치기」. It is
+  // never a send: nothing here, and nothing on the server, writes a reply because a date passed.
+  for (const row of followUps?.due ?? []) {
+    const owner = row.to;
+    if (byOwner.has(owner) || settled.has(owner)) continue;
+    const day = row.nextCheckOn ? dayWord(row.nextCheckOn) : null;
+    const behind = row.waitingOn === "TOLD_BEHIND";
+    byOwner.set(owner, {
+      key: `follow:${row.inquiryId}`,
+      reason: REASON.reply,
+      state: behind ? "TOLD_BEHIND" : "CHECK_AGAIN",
+      source: sourceLabel(row.channelCode, "INQUIRY"),
+      channel: channelShort(row.channelCode),
+      rating: null,
+      title: row.subject?.trim() || subjectFallback("INQUIRY"),
+      // The seller's own words from their record, never the customer's.
+      line: behind
+        ? toldBehindLine(row.toldOutcome ?? null)
+        : [day ? `${day}에 다시 확인하기로 한 일` : "다시 확인하기로 한 일", row.note ? `지난 기록: ${row.note}` : null]
+            .filter(Boolean)
+            .join(" · "),
+      since: row.since,
+      // The day has come: today's work, not 지난 일, whenever the record was written (2026-11-06 sixteenth review).
+      dueToday: true,
+      to: owner,
+      owner,
+      caseId: null,
+      verb: "확인",
+      kind: "INQUIRY",
+      subject: "INQUIRY",
+      subjectId: row.inquiryId,
+      workItemId: row.workItemId,
+      safety: false,
+    });
+  }
+  if (followUps && followUps.dueTotal > followUps.due.length) truncated = true;
 
   /*
     <b>One order of importance, not three lanes</b> (product-owner decisions, 2026-10-22 — interview
@@ -406,6 +454,34 @@ export function mergeHomeWork(
     ...ordered.filter((r) => isOldBacklog(r, now)),
   ];
   return { rows, truncated };
+}
+
+const SELLER_CHECK_LINE: Record<string, string> = {
+  ORDER_ACTION: "판매자센터에서 요청된 조치를 확인하고 결과를 알려주세요",
+  ORDER_STATE: "판매자센터에서 이 주문의 상태를 확인하고 알려주세요",
+};
+
+/** 「11월 5일」 from the seller's `YYYY-MM-DD`. */
+/**
+ * 「처리는 완료됐지만 고객에게는 … 안내했어요」 — what the registered answer told the customer, against the record that
+ * now says 「처리 완료」 (2026-11-05 tenth review). The seller's own fact, never the customer's words.
+ */
+export function toldBehindLine(told: string | null): string {
+  switch (told) {
+    case "IN_PROGRESS":
+      return "처리는 완료됐지만 고객에게는 진행 중으로 안내했어요";
+    case "NEEDS_CUSTOMER_INFO":
+      return "처리는 완료됐지만 고객에게는 정보를 더 요청했어요";
+    case "CANNOT":
+      return "처리는 완료됐지만 고객에게는 처리할 수 없다고 안내했어요";
+    default:
+      return "처리는 완료됐지만 고객에게는 아직 완료를 안내하지 않았어요";
+  }
+}
+
+function dayWord(day: string): string {
+  const [, m, d] = day.split("-").map(Number);
+  return `${m}월 ${d}일`;
 }
 
 /** 0 — to judge, or ★1–2; 1 — ★3; 2 — everything else. */
@@ -467,43 +543,42 @@ export function homeBriefRows(rows: readonly HomeWorkRow[], limit: number): Home
 }
 
 /**
- * Whether this row is year-plus backlog — <b>the 문의 화면's rule, read here rather than restated.</b>
+ * Whether this row has left this morning's work for 「지난 일」 — <b>two weeks, for every kind</b> (product-owner
+ * decision, 2026-10-28).
  *
  * <p>Longest-waiting-first is the one urgency criterion this product has, and applied across a whole list it is the
  * wrong shape: measured on this org, the Home's five briefed rows were five Cafe24 questions from 2016 — 「3838일
- * 대기」 — while the case Reviewnary investigated last night, the three reviews it flagged and the inquiry that
- * arrived this month all sat under 「+22」. A briefing whose visible half is a decade old answers 「오늘 무엇을
- * 해야 하는가」 with 「2016년에 놓친 것」.
+ * 대기」 — while the case Reviewnary investigated last night sat under 「+22」. So the criterion is applied INSIDE two
+ * groups: this morning's work, then 「지난 일」. <b>Nothing is hidden, dropped or reordered away</b>: the old rows keep
+ * their place in the same single list, after the recent ones, and the counts above still count all of them.
  *
- * <p>So the criterion is applied INSIDE two groups instead of across them, exactly as `/inquiries` has since
- * Operational Workspace UX System v1 — {@link isOldBacklog} is that screen's own predicate, imported so the two
- * lists cannot disagree about which rows are this morning's work. <b>Nothing is hidden, dropped or reordered
- * away</b>: the old rows keep their place in the same single list, after the recent ones, and the counts above
- * still count all of them.
+ * <p>Until 2026-10-28 only an undecided review aged out in two weeks; an inquiry, a case and a reply the seller had
+ * started kept the 문의 screen's one-year rule. After a year of NAVER inquiries was read in, every one of the eleven
+ * rows in 할 일 was 35–286 days old and none was from the last two weeks — the owner asked why the old ones were not
+ * set aside, as agreed. One window now: {@link RECENT_DAYS} days from the customer's own event, whatever the kind.
+ *
+ * <p>The one exception is a row marked 「안전 관련 확인」: a possible safety report stays in 할 일 however old it is,
+ * because it is the one thing the order of importance puts above everything else (2026-10-22).
+ *
+ * <p>The 문의 screen keeps its own year rule (`inquiryWorkspace.isOldBacklog`) — that screen is the record of every
+ * question, not this morning's list.
  *
  * <p>A row with no timestamp is not backlog: absence of a date is not evidence of age.
+ *
+ * <p>Nor is a check whose day the seller set has come ({@link HomeWorkRow.dueToday}, 2026-11-06 sixteenth review): a
+ * refund recorded three weeks ago as 「진행 중」 and set to be looked at today is today's work. Its record's age is not
+ * how long it has been left.
  */
 export function isOldBacklog(row: HomeWorkRow, now: Date): boolean {
-  if (row.since == null) return false;
-  if (row.kind === "REVIEW" && row.state === "NEEDS_LOOK") {
-    const at = Date.parse(row.since);
-    return Number.isFinite(at) && now.getTime() - at > REVIEW_RECENT_DAYS * DAY_MS;
-  }
-  return isOldInquiryBacklog({ receivedAt: row.since }, now);
+  if (row.since == null || row.safety || row.dueToday) return false;
+  const at = Date.parse(row.since);
+  return Number.isFinite(at) && now.getTime() - at > RECENT_DAYS * DAY_MS;
 }
 
-/**
- * <b>A review the seller has not looked at is this morning's work for two weeks, not a year</b> (product-owner
- * decision, 2026-10-26).
- *
- * <p>The year rule above is the 문의 screen's, and an inquiry is a customer waiting for an answer. A review is a
- * verdict already published. On the seller-PC run the first upload was a year of NAVER reviews; the Home then led
- * with 1–2★ reviews written 88–116 days earlier and counted them in 내가 할 일 — the owner read it as 「오래된 것밖에
- * 안 보인다」. Older undecided reviews are not hidden: they stand after the recent work under 「지난 일」 on 확인할
- * 일, and the Home names how many there are in one line. Only the triage's 「지금 확인」 rows age out this way — a
- * reply the seller has started, or a case reviewnary opened, keeps the year rule.
- */
-export const REVIEW_RECENT_DAYS = 14;
+/** How long a row is this morning's work — two weeks, every kind (product-owner decision, 2026-10-28). */
+export const RECENT_DAYS = 14;
+/** The name the 2026-10-26 rule had when it covered undecided reviews only. Same value. */
+export const REVIEW_RECENT_DAYS = RECENT_DAYS;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**

@@ -64,7 +64,10 @@ export function publishUnavailableReason(
   // 판매자센터에서 답변해 주세요" about a question that has already been answered sends them to do
   // work that no longer exists.
   if (answeredElsewhere(detail)) {
-    return "이미 답변된 문의예요. 판매자님이 채널에서 직접 답변하신 내용이 확인됐어요.";
+    // Who registered it is not known from the status alone — the service's own registration reads back the same way as a
+    // seller's hand copy (2026-11-05 eleventh review: 「판매자님이 직접 답변하신」 on an answer the service registered
+    // told the history wrong). Say only what was confirmed.
+    return "이미 답변된 문의예요. 채널에 답변이 등록된 것을 확인했어요.";
   }
   const channel = detail.channelNameKo ?? "이 채널";
   if (!capability) {
@@ -187,6 +190,9 @@ export function deliveryVerificationLabel(delivery: { verified: boolean | null }
     : "채널에서 등록 여부를 아직 확인하지 못했어요.";
 }
 
+/** The backend's code for a confirm refused for the answer's length (`InquiryPublishService.REPLY_TOO_LONG`). */
+export const REPLY_TOO_LONG = "REPLY_TOO_LONG";
+
 /**
  * Classify a confirm-publish failure into what the seller should do.
  *
@@ -194,7 +200,21 @@ export function deliveryVerificationLabel(delivery: { verified: boolean | null }
  * after they read it, so the approval they just gave describes content that is no longer there. The
  * only correct response is to re-read the draft and approve the version actually on screen.
  */
-export function classifyPublishError(status: number | undefined): { message: string; shouldRefresh: boolean } {
+export function classifyPublishError(
+  status: number | undefined,
+  body?: unknown,
+): { message: string; shouldRefresh: boolean } {
+  // Too long for the channel (2026-11-02) is a 409 too, but nothing moved: the draft is the one on screen and is kept.
+  // Reading it as "changed" sent the seller to re-read a draft that was never going to be sent. The backend's sentence
+  // carries the current length, the allowed length and what to do, so it is shown as it is.
+  const named = (body ?? null) as { code?: unknown; message?: unknown } | null;
+  if (status === 409 && named?.code === REPLY_TOO_LONG) {
+    const said = typeof named.message === "string" ? named.message.trim() : "";
+    return {
+      message: said || "답변이 이 채널에 보낼 수 있는 길이를 넘어요. 줄여서 저장한 뒤 다시 보내 주세요.",
+      shouldRefresh: false,
+    };
+  }
   if (status === 409) {
     return {
       message: "초안이 그 사이 변경됐어요. 내용을 다시 확인한 뒤 등록해 주세요.",

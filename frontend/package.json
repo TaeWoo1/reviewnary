@@ -6,12 +6,15 @@
   "scripts": {
     "dev": "vite",
     "dev:bridge": "VITE_ENABLE_AGENT_BRIDGE=true VITE_AW_BRIDGE=1 vite",
+    "dev:hackle": "vite --mode hackle",
     "build": "tsc --noEmit && vite build",
+    "build:hackle": "tsc --noEmit && vite build --mode hackle",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
+    "@hackler/javascript-sdk": "12.2.1",
     "@sentry/react": "^10.70.0",
     "axios": "^1.7.7",
     "motion": "^12.43.0",

@@ -12,6 +12,7 @@ import { ProjectionView } from "../bridge/ProjectionView";
 import { AgentPanelProvider } from "../../lib/agentPanel";
 import { AgentPanelDock } from "../agent/AgentPanel";
 import { ConversationProvider } from "../../lib/conversation/ConversationProvider";
+import { WorkNotifier } from "./WorkNotifier";
 
 // Opt-in guided-connection infrastructure surfaces. Absent from the default app; they mount only
 // when explicitly enabled and do not participate in navigation. Carried over from the previous
@@ -63,6 +64,8 @@ export function AppShellV2() {
     <AgentPanelProvider>
     <ConversationProvider>
     <div className="flex h-full flex-col">
+      {/* PC 알림 (2026-10-28): a leaf that draws nothing and reads only when the seller turned it on. */}
+      <WorkNotifier />
       {/* Without this, a keyboard user tabs through all seven nav destinations and the sign-out
           button before reaching page content — on every screen. Hidden until focused. */}
       <a

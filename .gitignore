@@ -16,6 +16,8 @@ env/
 # Real local env files are never committed; only *.example templates are.
 .env
 .env.local
+# Vite mode files (`vite --mode <m>` reads .env.<m>.local), e.g. frontend/.env.hackle.local.
+.env.*.local
 
 # IDE
 .vscode/

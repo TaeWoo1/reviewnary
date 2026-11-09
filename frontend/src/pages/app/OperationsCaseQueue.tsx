@@ -106,7 +106,11 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       ),
       // 진행 중 · 끝난 일 from the delegate lane; an install without one reads as empty lists.
       nothing<ReplyBoard>()(Promise.resolve().then(() => api.getReplyBoard())),
-    ]).then(([co, decisions, ops, queue, reviewWork, board]) => {
+      // Inquiries whose next-check day has come (2026-11-03 sixth review) — a check, never a send.
+      nothing<Awaited<ReturnType<typeof api.getInquiryFollowUps>>>()(
+        Promise.resolve().then(() => api.getInquiryFollowUps()),
+      ),
+    ]).then(([co, decisions, ops, queue, reviewWork, board, followUps]) => {
       if (!live) return;
       setBoard(board);
       if (!co && !decisions && !ops && !queue && !reviewWork) {
@@ -115,7 +119,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       }
       // The deep case list replaces the Home's briefing slice; everything else is read exactly as the Home reads it.
       const merged = co ? (decisions ? { ...co, decisions } : co) : null;
-      setWork(mergeHomeWork(merged, ops, queue, now, reviewWork));
+      setWork(mergeHomeWork(merged, ops, queue, now, reviewWork, followUps));
       setReviewWork(reviewWork);
     });
     return () => {

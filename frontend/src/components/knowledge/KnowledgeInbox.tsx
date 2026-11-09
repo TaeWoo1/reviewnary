@@ -112,7 +112,9 @@ function CandidateRow({
   const isGap = candidate.origin === "DRAFT_GAP";
   // 반복되는 리뷰 문제에 대한 안내 제안(2026-10-27). 편집기는 제안 문장을 담은 채 열리고, 【확인: …】 칸은
   // 사장님이 채워야 등록된다 — 서버가 빈칸이 남은 등록을 거절한다.
-  const isGuidance = candidate.origin === "ISSUE_GUIDANCE";
+  // 지난 답변을 모은 안내안(2026-11-01 열 번째 검토)도 같은 편집기로 연다 — 지금도 그렇게 하는지 사장님이 확인해야 등록된다.
+  const pastAnswers = candidate.origin === "PAST_ANSWERS";
+  const isGuidance = candidate.origin === "ISSUE_GUIDANCE" || pastAnswers;
   const scope = candidate.scope === "PRODUCT" && candidate.productId ? "PRODUCT" : "ORG";
   const source = [scopeLabel(candidate.scope, candidate.productName), shortDate(candidate.createdAt)]
     .filter(Boolean)
@@ -121,14 +123,14 @@ function CandidateRow({
   return (
     <li className="border-t border-line/70 py-2 first:border-t-0">
       <div className="flex items-start gap-3">
-        <Tag tone={isGap ? "info" : "neutral"}>{isGap ? "빈칸" : isGuidance ? "제안" : "자주 쓴 답"}</Tag>
+        <Tag tone={isGap ? "info" : "neutral"}>{isGap ? "빈칸" : pastAnswers ? "지난 답변 정리" : isGuidance ? "제안" : "자주 쓴 답"}</Tag>
         <span className="min-w-0 flex-1">
           {/* 질문은 잘라내지 않는다 — 여기 적힌 것을 읽어야 답을 쓸 수 있다. 두 줄에서 접는다. */}
           <span className="line-clamp-2 break-keep text-sm leading-relaxed text-ink">{candidate.content}</span>
           <span className="block truncate text-xs text-muted">
             {source}
             {!isGap && candidate.evidenceCount > 0
-              ? ` · ${isGuidance ? "관련 리뷰" : "지난 답변"} ${candidate.evidenceCount}건`
+              ? ` · ${isGuidance && !pastAnswers ? "관련 리뷰" : "지난 답변"} ${candidate.evidenceCount}건`
               : null}
           </span>
         </span>

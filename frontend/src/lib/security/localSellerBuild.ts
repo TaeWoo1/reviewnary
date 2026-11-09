@@ -12,13 +12,14 @@ export interface LocalSellerBuildEnv {
   VITE_SENTRY_DSN?: string;
   VITE_GTM_ID?: string;
   VITE_POSTHOG_KEY?: string;
+  VITE_HACKLE_SDK_KEY?: string;
   VITE_API_BASE_URL?: string;
   VITE_AGENT_RUNTIME_URL?: string;
   VITE_BRIDGE_URL?: string;
 }
 
 /** Variables that turn on a destination off the PC merely by being non-empty. */
-const OFF_PC_WHEN_SET = ["VITE_SENTRY_DSN", "VITE_GTM_ID", "VITE_POSTHOG_KEY"] as const;
+const OFF_PC_WHEN_SET = ["VITE_SENTRY_DSN", "VITE_GTM_ID", "VITE_POSTHOG_KEY", "VITE_HACKLE_SDK_KEY"] as const;
 
 /** Addresses the app calls; each must be empty (the code default / same origin) or a loopback http(s) URL. */
 const MUST_BE_LOCAL = ["VITE_API_BASE_URL", "VITE_AGENT_RUNTIME_URL", "VITE_BRIDGE_URL"] as const;

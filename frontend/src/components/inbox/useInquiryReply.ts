@@ -11,6 +11,7 @@ import {
   answeredElsewhere,
   canPublishReply,
   classifyPublishError,
+  REPLY_TOO_LONG,
   publishUnavailableReason,
 } from "../../lib/inquiryPublish";
 import type {
@@ -18,7 +19,13 @@ import type {
   InquiryDetail,
   PublishCapabilityView,
   PublishStatusView,
+  GeneratedDraftView,
   ReplyDraftView,
+  ReplyHold,
+  SellerCheckOutcome,
+  InquiryKindName,
+  SellerCheckRecordResponse,
+  SellerCheckState,
 } from "../../lib/types";
 import { answerStateOf, type AnswerStateView } from "../../lib/answerState";
 import { copyText } from "../../lib/clipboard";
@@ -147,6 +154,73 @@ export function useInquiryReply(workItemId: string | null) {
     void load();
   }, [load]);
 
+  // A hold the recheck put on this answer (2026-11-01): drawn above it with its reasons and what to do. Read with the
+  // detail, and again after a refused 확정 or 재시도 — the press itself records a hold the sweep had not yet.
+  const [hold, setHold] = useState<ReplyHold | null>(null);
+  // Required questions a partial draft left open (2026-11-01 tenth review) — the send waits for each; the backend refuses too.
+  const [openLeft, setOpenLeft] = useState(0);
+  const loadHold = useCallback(async () => {
+    if (workItemId === null) {
+      setHold(null);
+      return;
+    }
+    try {
+      setHold(await api.getReplyHold("INQUIRY", workItemId));
+    } catch {
+      // Unreadable leaves the screen as it was; the server still refuses what it holds.
+    }
+  }, [workItemId]);
+  const holdKey = `${detail?.draft?.version ?? ""}|${detail?.phase ?? ""}`;
+  useEffect(() => {
+    void loadHold();
+  }, [loadHold, holdKey]);
+
+  // The seller's record of what they found on the seller centre, and what they are asked to check (2026-11-02). Read
+  // beside the detail; unreadable draws no panel, and the server still refuses a reply the record does not back.
+  const [sellerCheck, setSellerCheck] = useState<SellerCheckState | null>(null);
+  /** The record could not be read — said on screen with a way to read it again, never drawn as 「no record」. */
+  const [sellerCheckLoadFailed, setSellerCheckLoadFailed] = useState(false);
+  /** How the last record or redraft press went in this session — saved and drafted are two answers. */
+  const [sellerDraftState, setSellerDraftState] = useState<"READY" | "NOT_WRITTEN" | "FAILED" | "KEPT" | null>(null);
+  const [sellerDraftReason, setSellerDraftReason] = useState<string | null>(null);
+  const [sellerCheckError, setSellerCheckError] = useState<string | null>(null);
+  const loadSellerCheck = useCallback(async () => {
+    if (workItemId === null) {
+      setSellerCheck(null);
+      return;
+    }
+    try {
+      setSellerCheck(await api.getSellerCheck(workItemId));
+      setSellerCheckLoadFailed(false);
+    } catch {
+      setSellerCheck(null);
+      setSellerCheckLoadFailed(true);
+    }
+  }, [workItemId]);
+  useEffect(() => {
+    void loadSellerCheck();
+  }, [loadSellerCheck]);
+
+  /** The answer is held and not yet decided — it is neither sent nor copied out. */
+  // Written before the seller corrected what kind of inquiry this is (2026-11-05): the server refuses to approve it, and
+  // the screen does not hand it out by copy either.
+  const kindStale = sellerCheck?.kind?.draftMatches === false;
+  const copyBlocked = (hold != null && (hold.needs === "FIX" || !hold.confirmed)) || kindStale;
+
+  /** A 409 that is a recheck hold: its reasons are above the answer, so the line beside the button points there. */
+  async function heldBy(e: unknown): Promise<boolean> {
+    const data = isAxiosError(e) ? (e.response?.data as { code?: string; message?: string } | undefined) : undefined;
+    // A length refusal is not a hold: nothing needs re-checking, the answer only has to be shorter.
+    if (data?.code === REPLY_TOO_LONG) return false;
+    const message = isAxiosError(e) && e.response?.status === 409 ? (data?.message ?? "") : "";
+    if (!message.includes("다시 확인") && !message.includes("확인하고 진행") && !message.includes("고친 뒤")) {
+      return false;
+    }
+    await loadHold();
+    setActionError("다시 확인이 필요해 보내지 않았어요. 위의 안내를 확인해 주세요.");
+    return true;
+  }
+
   useEffect(() => {
     // Read once per panel. A failure leaves `capability` null, which `canPublishReply` treats as "no"
     // — offering a marketplace write on a guess is the one thing this surface must never do.
@@ -169,7 +243,9 @@ export function useInquiryReply(workItemId: string | null) {
   const publishable = detail ? canPublishReply(detail, capability) : false;
   const unavailableReason = detail ? publishUnavailableReason(detail, capability) : null;
   const draftDirty = !!draft && (draft.title !== replyTitle || draft.comments !== replyComments);
-  const draftEditable = canEditDraft(publishStatus);
+  // A decided reply is kept as it was approved (2026-11-03 sixth review): reopening it never offers a new version.
+  const draftEditable =
+    canEditDraft(publishStatus) && !(detail && ["APPROVED", "ACTION_PENDING", "EXECUTED", "COMPLETED"].includes(detail.phase));
   /**
    * What a PREVIOUS session's send left behind, when this one has not sent anything.
    *
@@ -202,6 +278,10 @@ export function useInquiryReply(workItemId: string | null) {
         // draft having moved (another tab, another device), which is a 409 rather than a silent
         // overwrite of whichever version they did not see.
         baseVersion: draft?.version ?? 0,
+        // The record the seller has in front of them now — the version names it (2026-11-03).
+        sellerCheckId: sellerCheck?.check?.id ?? null,
+        // And the kind correction it is shown under — a later save time is not having seen it (2026-11-05).
+        kindCorrectionId: sellerCheck?.kind?.correctionId ?? null,
       });
       setDetail((current) => (current ? { ...current, draft: saved } : current));
       setReplyTitle(saved.title);
@@ -219,6 +299,7 @@ export function useInquiryReply(workItemId: string | null) {
       // A saved draft is a NEW version with a new fingerprint, so any confirm block that was open is
       // now about content that no longer exists. Close it rather than let a stale approval be pressed.
       setConfirming(false);
+      if (sellerCheck?.check || sellerCheck?.kind?.correctionId) void loadSellerCheck();
     } catch (e) {
       const info = classifyPublishError(isAxiosError(e) ? e.response?.status : undefined);
       setActionError(info.message);
@@ -249,7 +330,10 @@ export function useInquiryReply(workItemId: string | null) {
       setConfirming(false);
       setDetail((current) => (current ? { ...current, phase: status.phase } : current));
     } catch (e) {
-      const info = classifyPublishError(isAxiosError(e) ? e.response?.status : undefined);
+      if (await heldBy(e)) return;
+      const info = isAxiosError(e)
+        ? classifyPublishError(e.response?.status, e.response?.data)
+        : classifyPublishError(undefined);
       setActionError(info.message);
       if (info.shouldRefresh) await load();
     } finally {
@@ -279,6 +363,7 @@ export function useInquiryReply(workItemId: string | null) {
     try {
       setPublishStatus(await api.resumeInquiryPublish(workItemId));
     } catch (e) {
+      if (await heldBy(e)) return;
       setActionError(classifyPublishError(isAxiosError(e) ? e.response?.status : undefined).message);
     } finally {
       setBusy(false);
@@ -309,34 +394,9 @@ export function useInquiryReply(workItemId: string | null) {
         );
       }
       const generated = await api.generateInquiryDraft(workItemId);
-      setEvidence(generated.evidence);
-      setKnowledgeNote(generated.knowledgeNote);
-      setCompanyContextUsed(generated.companyContextUsed === true);
-      setKnowledgeGrounded(generated.knowledgeState === "GROUNDED");
-      setUnavailable(generated.unavailableMessage);
-      // Which of the three states this generate landed in — computed once and applied whether or not
-      // something was written. A draft can exist WITH no answer basis: the company's own pre-approved
-      // sentence for 「확인 후 안내드리겠습니다」 (AI 답변 스타일). That is a deferral, not an answer,
-      // so the seller must still see what is missing and still be able to add it.
-      const state = answerStateOf(generated);
-      if (!generated.draft) {
-        // Nothing was composed, on purpose. Leave whatever the seller had typed exactly as it is —
-        // clearing their box because the AI declined would be the worst of both behaviours — and
-        // say which basis is missing so the sentence is actionable rather than an apology.
-        setAnswerState(state);
-        setEditing(true);
-        return;
-      }
-      setAnswerState(state);
-      setUnavailable(null);
-      const written = generated.draft;
-      setDetail((current) => (current ? { ...current, draft: written, phase } : current));
-      setReplyTitle(written.title);
-      setReplyComments(written.comments);
-      setEditing(false);
-      // A new version has a new fingerprint, so an open confirm is about content that no longer
-      // exists. Close it rather than let a stale approval be pressed.
-      setConfirming(false);
+      applyGenerated(generated, phase);
+      // A decided draft wrote the service's reading of what kind of inquiry this is (2026-11-05): read it with the record.
+      void loadSellerCheck();
     } catch (e) {
       const info = classifyProposeError(isAxiosError(e) ? e.response?.status : undefined);
       setActionError(info.message);
@@ -344,6 +404,289 @@ export function useInquiryReply(workItemId: string | null) {
     } finally {
       setBusy(false);
     }
+  }
+
+  /** What one generate wrote — or why it wrote nothing — onto this screen. Shared by 「AI 답변 초안 만들기」 and the record. */
+  function applyGenerated(generated: GeneratedDraftView, phase: string) {
+    setSellerCheck((current) => ({
+      check: current?.check ?? null,
+      ask: generated.sellerCheckAsk ?? null,
+      draftMatches: current?.draftMatches ?? null,
+      answered: current?.answered ?? null,
+      kind: current?.kind ?? null,
+    }));
+    setEvidence(generated.evidence);
+    setKnowledgeNote(generated.knowledgeNote);
+    setCompanyContextUsed(generated.companyContextUsed === true);
+    setKnowledgeGrounded(generated.knowledgeState === "GROUNDED");
+    setUnavailable(generated.unavailableMessage);
+    // Which of the three states this generate landed in — computed once and applied whether or not
+    // something was written. A draft can exist WITH no answer basis: the company's own pre-approved
+    // sentence for 「확인 후 안내드리겠습니다」 (AI 답변 스타일). That is a deferral, not an answer,
+    // so the seller must still see what is missing and still be able to add it.
+    const state = answerStateOf(generated);
+    if (!generated.draft) {
+      // Nothing was composed, on purpose. Leave whatever the seller had typed exactly as it is —
+      // clearing their box because the AI declined would be the worst of both behaviours — and
+      // say which basis is missing so the sentence is actionable rather than an apology.
+      setAnswerState(state);
+      setEditing(true);
+      return;
+    }
+    setAnswerState(state);
+    setUnavailable(null);
+    const written = generated.draft;
+    setDetail((current) => (current ? { ...current, draft: written, phase } : current));
+    setReplyTitle(written.title);
+    setReplyComments(written.comments);
+    setEditing(false);
+    // A new version has a new fingerprint, so an open confirm is about content that no longer
+    // exists. Close it rather than let a stale approval be pressed.
+    setConfirming(false);
+  }
+
+  /**
+   * 「기록하고 답변 만들기」 — the record is kept first, then a draft is written from it. Returns whether the record was
+   * kept. A record changed on another device meanwhile is refused (409) and the record that stands is read again.
+   */
+  async function onRecordSellerCheck(outcome: SellerCheckOutcome, note: string): Promise<boolean> {
+    if (!detail || workItemId === null || busy) return false;
+    setBusy(true);
+    setSellerCheckError(null);
+    setActionError(null);
+    try {
+      let phase = detail.phase;
+      if (canGenerateProposal(phase)) {
+        const proposed = await api.generateInquiryProposal(workItemId);
+        phase = proposed.phase;
+        setDetail((current) =>
+          current ? { ...current, phase: proposed.phase, proposal: proposed.proposal } : current,
+        );
+      }
+      const result = await api.recordSellerCheck(workItemId, {
+        outcome,
+        note,
+        replaces: sellerCheck?.check?.id ?? null,
+      });
+      await settleSellerCheck(result, phase);
+      return true;
+    } catch (e) {
+      await refusedSellerCheck(e);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** 「이 기록으로 답변 다시 만들기」 — from the record on screen; writes no record. */
+  async function onRedraftSellerCheck() {
+    const checkId = sellerCheck?.check?.id;
+    if (!detail || workItemId === null || !checkId || busy) return;
+    setBusy(true);
+    setSellerCheckError(null);
+    setActionError(null);
+    try {
+      await settleSellerCheck(await api.redraftFromSellerCheck(workItemId, checkId), detail.phase);
+    } catch (e) {
+      await refusedSellerCheck(e);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * 「이 날로 정하기」 — the seller's next look at an action still in progress. The record stays the record (no new version,
+   * nothing held, nothing sent); only its day moves. Returns whether it moved.
+   */
+  async function onSetNextCheck(nextCheckOn: string): Promise<boolean> {
+    const checkId = sellerCheck?.check?.id;
+    if (workItemId === null || !checkId || busy) return false;
+    setBusy(true);
+    setSellerCheckError(null);
+    try {
+      const moved = await api.setSellerCheckNextCheck(workItemId, checkId, nextCheckOn);
+      setSellerCheck((current) => (current ? { ...current, check: moved } : current));
+      return true;
+    } catch (e) {
+      await refusedSellerCheck(e);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * 「이 판단으로 답변 다시 만들기」 (2026-11-05 seventh review) — the seller says what kind of inquiry this is, and the reply
+   * is drafted again under it. The correction is kept even when drafting fails. Returns whether it was kept.
+   */
+  async function onCorrectKind(kind: InquiryKindName): Promise<boolean> {
+    if (!detail || workItemId === null || busy) return false;
+    setBusy(true);
+    setSellerCheckError(null);
+    setActionError(null);
+    try {
+      let phase = detail.phase;
+      if (canGenerateProposal(phase)) {
+        const proposed = await api.generateInquiryProposal(workItemId);
+        phase = proposed.phase;
+        setDetail((current) =>
+          current ? { ...current, phase: proposed.phase, proposal: proposed.proposal } : current,
+        );
+      }
+      const result = await api.correctInquiryKind(workItemId, {
+        kind,
+        replaces: sellerCheck?.kind?.correctionId ?? null,
+      });
+      if (result.draft) applyGenerated(result.draft, phase);
+      setSellerCheck((current) => ({
+        check: current?.check ?? null,
+        ask: result.ask ?? null,
+        // A record on screen is matched by the new draft only when one was written from it.
+        draftMatches: current?.check ? result.draftState === "READY" : (current?.draftMatches ?? null),
+        answered: current?.answered ?? null,
+        kind: result.kind,
+      }));
+      setHold(result.hold);
+      if (result.draftState === "FAILED") {
+        setSellerCheckError("판단은 고쳤어요. 답변은 아직 준비하지 못했어요. 「AI 답변 초안 만들기」로 다시 만들어 주세요.");
+        await load();
+      }
+      return true;
+    } catch (e) {
+      await refusedSellerCheck(e);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Set once an approval was taken back in this session: the new answer waits for the seller's own approval. */
+  const [reopened, setReopened] = useState(false);
+
+  /**
+   * 「승인 거두고 이 기록으로 새 답변 만들기」 (2026-11-05 seventh review) — an approved answer the record has outrun, not
+   * on the channel, and the seller confirmed they did not post it by hand. The approval is kept on the server as taken
+   * back; the reply returns to the seller and is drafted from the record on screen. Nothing is sent.
+   */
+  async function onReopenSellerCheck(): Promise<boolean> {
+    const checkId = sellerCheck?.check?.id;
+    const approvedFingerprint = sellerCheck?.answered?.fingerprint;
+    if (!detail || workItemId === null || !checkId || !approvedFingerprint || busy) return false;
+    setBusy(true);
+    setSellerCheckError(null);
+    setActionError(null);
+    try {
+      const result = await api.reopenFromSellerCheck(workItemId, { checkId, approvedFingerprint, notRegistered: true });
+      setReopened(true);
+      setPublishStatus(null);
+      setConfirming(false);
+      setDetail((current) => (current ? { ...current, phase: "PROPOSED" } : current));
+      await settleSellerCheck(result, "PROPOSED");
+      setSellerCheck((current) => (current ? { ...current, answered: null } : current));
+      // The detail (phase, delivery, the version now at the head) is the server's: read it again.
+      await load();
+      return true;
+    } catch (e) {
+      await refusedSellerCheck(e);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * 「승인 거두고 고치기」 (2026-11-05 tenth review) — an approved answer held for something a person must fix (a policy
+   * conflict, a forbidden phrase, a changed figure), not on the channel, and the seller confirmed they did not post it by
+   * hand. Nothing is drafted and nothing is resolved: the answer is the seller's again with its reason, and approving it
+   * again runs every check.
+   */
+  async function onWithdrawHeld(): Promise<boolean> {
+    const approvedFingerprint = sellerCheck?.answered?.fingerprint;
+    const holdCheckId = sellerCheck?.answered?.holdCheckId;
+    if (!detail || workItemId === null || !approvedFingerprint || !holdCheckId || busy) return false;
+    setBusy(true);
+    setSellerCheckError(null);
+    setActionError(null);
+    try {
+      const result = await api.withdrawHeldApproval(workItemId, { approvedFingerprint, holdCheckId, notRegistered: true });
+      setReopened(true);
+      setPublishStatus(null);
+      setConfirming(false);
+      setDetail((current) => (current ? { ...current, phase: result.phase ?? "PROPOSED" } : current));
+      setHold(result.hold ?? null);
+      setSellerCheck((current) => (current ? { ...current, answered: null } : current));
+      await load();
+      return true;
+    } catch (e) {
+      await refusedSellerCheck(e);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** 「따로 안내함」 · 「안내 필요 없음」 — closes 「완료됐지만 고객에게는 … 안내했어요」 for the record on screen. Sends nothing. */
+  async function onCloseToldBehind(closure: "TOLD_SEPARATELY" | "NOT_NEEDED"): Promise<boolean> {
+    const checkId = sellerCheck?.check?.id;
+    if (workItemId === null || !checkId) return false;
+    setSellerCheckError(null);
+    try {
+      const closed = await api.closeToldBehind(workItemId, { checkId, closure });
+      setSellerCheck((current) =>
+        current?.answered
+          ? { ...current, answered: { ...current.answered, closure: closed.closure, closedAt: closed.closedAt } }
+          : current,
+      );
+      return true;
+    } catch (e) {
+      await refusedSellerCheck(e);
+      return false;
+    }
+  }
+
+  async function settleSellerCheck(
+    result: SellerCheckRecordResponse,
+    phase: string,
+  ) {
+    setSellerDraftState(result.draftState);
+    // Why nothing was written, when the machinery says why. Never the knowledge-library sentence (「기준을 등록하면…」):
+    // that is the errand this flow replaced (FINDINGS §B95, 2026-11-03 real-screen check).
+    setSellerDraftReason(result.draft?.unavailableMessage ?? null);
+    if (result.draft) {
+      applyGenerated(result.draft, phase);
+      // Nothing new was written: the version on screen is the earlier one, shown as text under its hold — not opened
+      // for editing as if it were the answer to this record (2026-11-03 real-screen check).
+      if (!result.draft.draft && detail?.draft) setEditing(false);
+    }
+    setSellerCheck((current) => ({
+      check: result.check,
+      ask: result.draft ? (result.draft.sellerCheckAsk ?? null) : (current?.ask ?? null),
+      draftMatches: result.draftState === "READY",
+      answered: current?.answered ?? null,
+      kind: current?.kind ?? null,
+    }));
+    setSellerCheckLoadFailed(false);
+    // Approved already: which record the customer's answer was written from, against the record just kept, is the
+    // server's to say (2026-11-05) — read it again rather than keep what was on screen before the record changed.
+    if (result.draftState === "KEPT") void loadSellerCheck();
+    // The answer waiting below is checked against the record now: an older draft written from another record is held,
+    // and the hold says so — it is never shown as the new result.
+    setHold(result.hold);
+    if (result.draftState === "FAILED") {
+      // Nothing came back to draw: read the answer that waits now, which the hold above speaks for.
+      await load();
+    }
+  }
+
+  async function refusedSellerCheck(e: unknown) {
+    const status = isAxiosError(e) ? e.response?.status : undefined;
+    const message = isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined;
+    if (status === 409 || status === 400) {
+      setSellerCheckError(message ?? "기록하지 못했어요. 다시 시도해 주세요.");
+      if (status === 409) await loadSellerCheck();
+      return;
+    }
+    setSellerCheckError("기록하지 못했어요. 연결을 확인한 뒤 다시 시도해 주세요.");
   }
 
   /**
@@ -372,6 +715,12 @@ export function useInquiryReply(workItemId: string | null) {
     if (!draft || draftDirty || editing) {
       return;
     }
+    // A held answer is not copied out either (2026-11-03 real-screen check): pasting it into the seller centre by hand
+    // would send exactly what the hold stopped.
+    if (copyBlocked) {
+      setActionError("다시 확인이 필요한 답변이라 복사하지 않았어요. 위의 안내를 먼저 확인해 주세요.");
+      return;
+    }
     const text = [draft.title, draft.comments].filter(Boolean).join("\n\n");
     setActionError(null);
     const result = await copyText(text);
@@ -391,6 +740,8 @@ export function useInquiryReply(workItemId: string | null) {
 
   return {
     workItemId,
+    openLeft,
+    setOpenLeft,
     detail,
     setDetail,
     loading,
@@ -433,6 +784,24 @@ export function useInquiryReply(workItemId: string | null) {
     onGenerateDraft,
     onBasisSaved,
     onCopyDraft,
+    hold,
+    setHold,
+    copyBlocked,
+    sellerCheck,
+    sellerCheckLoadFailed,
+    loadSellerCheck,
+    sellerDraftState,
+    sellerDraftReason,
+    sellerCheckError,
+    onRecordSellerCheck,
+    onRedraftSellerCheck,
+    onSetNextCheck,
+    onReopenSellerCheck,
+    onWithdrawHeld,
+    onCloseToldBehind,
+    reopened,
+    onCorrectKind,
+    kindStale,
   };
 }
 

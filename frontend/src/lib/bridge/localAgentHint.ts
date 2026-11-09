@@ -13,6 +13,7 @@
  */
 import type { LocalAgentHint } from "../conversation/types";
 import { BRIDGE_TOKEN_KEY } from "./bridgeClient";
+import { localHelperAllowed, serviceMode } from "../serviceMode";
 
 const PROBE_TIMEOUT_MS = 1_500;
 const CACHE_MS = 30_000;
@@ -40,6 +41,10 @@ export async function probeLocalAgent(now = Date.now()): Promise<LocalAgentHint>
     cached = { at: now, hint: "ABSENT" };
     return "ABSENT";
   }
+  // Nothing on this machine is looked for until this is known to be an install that may have a helper; on the web
+  // service there is none to offer (lib/serviceMode.ts, boundary §5).
+  if (serviceMode() === "web") return "ABSENT";
+  if (!localHelperAllowed()) return "UNKNOWN";
   if (typeof fetch !== "function" || typeof AbortController !== "function") return "UNKNOWN";
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);

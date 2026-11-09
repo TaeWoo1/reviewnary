@@ -1,11 +1,19 @@
 import axios, { isAxiosError } from "axios";
 import type {
+  OpenQuestionItem,
+  OpenQuestionResolution,
+  ReplyHold,
   AgentReportListItem,
   AgentReportView,
   ReportKind,
   AgentQuotaStatus,
+  AgentUsageReport,
+  ReplyOutcomeView,
+  ReplyHandoffView,
   AnswerStyleRequest,
   AnswerStyleView,
+  ReviewResponseRuleRequest,
+  ReviewResponseRuleView,
   ReviewReplyTemplateView,
   ReviewReplyTemplatesView,
   SellerProfileRequest,
@@ -75,6 +83,15 @@ import type {
   InquiryDetail,
   ReviewDetailResponse,
   GeneratedDraftView,
+  SellerCheckOutcome,
+  SellerCheckRecordResponse,
+  HeldWithdrawResponse,
+  ToldBehindResponse,
+  InquiryKindName,
+  InquiryKindResponse,
+  SellerCheckView,
+  InquiryFollowUps,
+  SellerCheckState,
   InquiryReplyCapabilityView,
   PublishCapabilityView,
   PublishStatusView,
@@ -548,6 +565,34 @@ export const api = {
     });
     return data.version;
   },
+  /** The hold standing on one reply after a recheck, or null (an empty body). */
+  async getReplyHold(lane: "REVIEW" | "INQUIRY", subjectId: string): Promise<ReplyHold | null> {
+    if (USE_MOCKS) {
+      return null;
+    }
+    const { data } = await http.get<ReplyHold | "">(`/api/reply-holds/${lane}/${encodeURIComponent(subjectId)}`);
+    return data === "" || data == null ? null : data;
+  },
+  /**
+   * 「확인하고 진행」 or 「이번 건만 예외」: recorded against the check the seller read ({@code checkId}). 409 when the reply must
+   * be fixed first, when the decision is not the one the finding takes, or when the reasons changed meanwhile.
+   */
+  async confirmReplyHold(
+    lane: "REVIEW" | "INQUIRY",
+    subjectId: string,
+    draftVersion: number,
+    checkId: string,
+    decision: "CONFIRM" | "EXCEPTION" = "CONFIRM",
+  ): Promise<ReplyHold | null> {
+    const { data } = await http.post<ReplyHold | "">("/api/reply-holds/confirm", {
+      lane,
+      subjectId,
+      draftVersion,
+      checkId,
+      decision,
+    });
+    return data === "" || data == null ? null : data;
+  },
   /** 「휴대폰 문장 쓰기」: the phone's edit stays, and this PC's set-aside version is no longer offered. */
   async dropReplySetAside(reviewId: string): Promise<void> {
     await http.post(`/api/local/vendor-link/reviews/${reviewId}/set-aside/drop`);
@@ -979,6 +1024,117 @@ export const api = {
    * was reading — and, because a new version has a new fingerprint, any approval bound to the
    * previous one can no longer be spent. It reaches no marketplace.
    */
+  /** The questions a draft left to the seller for one review or inquiry, open ones first, with what was done with the rest. */
+  async listOpenQuestions(lane: "REVIEW" | "INQUIRY", subjectId: string): Promise<OpenQuestionItem[]> {
+    const { data } = await http.get<OpenQuestionItem[]>(`/api/open-questions`, { params: { lane, subjectId } });
+    return data;
+  },
+
+  /** 「처리함」 on one question, with why. A question already closed is a 409. */
+  async handleOpenQuestion(id: string, resolution: OpenQuestionResolution, note?: string): Promise<OpenQuestionItem> {
+    const { data } = await http.post<OpenQuestionItem>(`/api/open-questions/${id}/handle`, { resolution, note: note ?? null });
+    return data;
+  },
+
+  /** The seller's current record for this inquiry and what they are asked to check (2026-11-02). */
+  async getSellerCheck(workItemId: string): Promise<SellerCheckState> {
+    if (USE_MOCKS) {
+      return { check: null, ask: null, draftMatches: null };
+    }
+    const { data } = await http.get<SellerCheckState>(`/api/inquiries/${workItemId}/seller-check`);
+    return data ?? { check: null, ask: null, draftMatches: null };
+  },
+
+  /**
+   * Record what the seller found, then draft from it. `replaces` is the record the screen was showing (null when none):
+   * a record changed elsewhere in the meantime is a 409, never an overwrite.
+   */
+  async recordSellerCheck(
+    workItemId: string,
+    body: { outcome: SellerCheckOutcome; note: string; replaces: string | null; nextCheckOn?: string | null },
+  ): Promise<SellerCheckRecordResponse> {
+    const { data } = await http.post<SellerCheckRecordResponse>(`/api/inquiries/${workItemId}/seller-check`, body,
+      { timeout: MODEL_TIMEOUT_MS });
+    return data;
+  },
+
+  /**
+   * 「이 날로 정하기」 — moves the next-check day of the record on screen. No new record, no draft, nothing sent.
+   */
+  async setSellerCheckNextCheck(workItemId: string, checkId: string, nextCheckOn: string): Promise<SellerCheckView> {
+    const { data } = await http.put<SellerCheckView>(`/api/inquiries/${workItemId}/seller-check/next-check`,
+      { checkId, nextCheckOn });
+    return data;
+  },
+
+  /**
+   * What is still open after a reply was decided — 「기다리는 일」 and the checks whose day has come. Read-only. Throws on
+   * a failed read so the Home can say it could not read rather than show an empty list.
+   */
+  async getInquiryFollowUps(): Promise<InquiryFollowUps> {
+    if (USE_MOCKS) {
+      return { due: [], dueTotal: 0, waiting: [], waitingTotal: 0, today: "" };
+    }
+    const { data } = await http.get<InquiryFollowUps>("/api/inquiries/follow-ups");
+    return data;
+  },
+
+  /** Draft again from the record the screen shows, writing no record. */
+  async redraftFromSellerCheck(workItemId: string, checkId: string): Promise<SellerCheckRecordResponse> {
+    const { data } = await http.post<SellerCheckRecordResponse>(`/api/inquiries/${workItemId}/seller-check/draft`,
+      { checkId }, { timeout: MODEL_TIMEOUT_MS });
+    return data;
+  },
+
+  /**
+   * 「승인 거두고 이 기록으로 새 답변 만들기」 (2026-11-05) — takes back an approved answer the record has outrun, once the
+   * seller confirmed they did not post it by hand, and drafts from the record on screen. Nothing is sent; the new answer
+   * waits for its own approval.
+   */
+  /**
+   * 「승인 거두고 고치기」 (2026-11-05 tenth review) — an approved answer held at registration for something a person must
+   * fix is taken back, once nothing was sent. Nothing is drafted: the answer is the seller's again, with its reason.
+   */
+  async withdrawHeldApproval(
+    workItemId: string,
+    request: { approvedFingerprint: string; holdCheckId: string; notRegistered: boolean },
+  ): Promise<HeldWithdrawResponse> {
+    const { data } = await http.post<HeldWithdrawResponse>(`/api/inquiries/${workItemId}/approval/withdraw`, request);
+    return data;
+  },
+
+  /** 「따로 안내함」 · 「안내 필요 없음」 — closes 「완료됐지만 고객에게는 … 안내했어요」 for the record on screen. Sends nothing. */
+  async closeToldBehind(
+    workItemId: string,
+    request: { checkId: string; closure: "TOLD_SEPARATELY" | "NOT_NEEDED" },
+  ): Promise<ToldBehindResponse> {
+    const { data } = await http.post<ToldBehindResponse>(`/api/inquiries/${workItemId}/told-behind/close`, request);
+    return data;
+  },
+
+  async reopenFromSellerCheck(
+    workItemId: string,
+    request: { checkId: string; approvedFingerprint: string; notRegistered: boolean },
+  ): Promise<SellerCheckRecordResponse> {
+    const { data } = await http.post<SellerCheckRecordResponse>(`/api/inquiries/${workItemId}/seller-check/reopen`,
+      request, { timeout: MODEL_TIMEOUT_MS });
+    return data;
+  },
+
+  /**
+   * 「이 판단으로 답변 다시 만들기」 (2026-11-05) — the seller says what kind of inquiry this is; the reply is drafted again
+   * under it. `replaces` is the standing correction on screen (null when none), so a correction made on another device
+   * first is refused rather than overwritten.
+   */
+  async correctInquiryKind(
+    workItemId: string,
+    request: { kind: InquiryKindName; replaces: string | null },
+  ): Promise<InquiryKindResponse> {
+    const { data } = await http.post<InquiryKindResponse>(`/api/inquiries/${workItemId}/kind`, request,
+      { timeout: MODEL_TIMEOUT_MS });
+    return data;
+  },
+
   async generateInquiryDraft(workItemId: string): Promise<GeneratedDraftView> {
     const { data } = await http.post<GeneratedDraftView>(`/api/inquiries/${workItemId}/draft/generate`,
       undefined, { timeout: MODEL_TIMEOUT_MS });
@@ -992,7 +1148,18 @@ export const api = {
    */
   async saveInquiryReplyDraft(
     workItemId: string,
-    request: { title: string; comments: string; baseVersion: number },
+    /**
+     * `sellerCheckId`: the seller's record the screen was showing (2026-11-03), or null. The version names it, and it is
+     * checked against the record that stands before approval — a later save time is not having seen the record.
+     * `kindCorrectionId`: the kind correction the screen was showing (2026-11-05), or null — named and checked the same way.
+     */
+    request: {
+      title: string;
+      comments: string;
+      baseVersion: number;
+      sellerCheckId?: string | null;
+      kindCorrectionId?: string | null;
+    },
   ): Promise<ReplyDraftView> {
     const { data } = await http.put<ReplyDraftView>(`/api/inquiries/${workItemId}/draft`, request);
     return data;
@@ -2773,6 +2940,17 @@ export const api = {
     return data;
   },
 
+  /** 리뷰 응대 기준 — which rating bands get a reply draft written ahead (owner, 2026-10-28). Org-scoped from the token. */
+  async getReviewResponseRule(): Promise<ReviewResponseRuleView> {
+    const { data } = await http.get<ReviewResponseRuleView>("/api/review-response-rule");
+    return data;
+  },
+
+  async saveReviewResponseRule(rule: ReviewResponseRuleRequest): Promise<ReviewResponseRuleView> {
+    const { data } = await http.put<ReviewResponseRuleView>("/api/review-response-rule", rule);
+    return data;
+  },
+
   /**
    * 리뷰 답변 문구 — every review reply template with its effective wording, in the order the
    * product decides between them. Org-scoped from the token, like the answer style.
@@ -2814,6 +2992,23 @@ export const api = {
   /** Today's Agent budget for this org. Read-only; asking never spends any of it. */
   async getAgentQuotaStrict(): Promise<AgentQuotaStatus> {
     const { data } = await http.get<AgentQuotaStatus>("/api/agent/quota");
+    return data;
+  },
+
+  /** Reviews the reply agent handed to a person and nobody has answered yet (2026-10-28). Redacted previews only. */
+  async getReplyHandoffsStrict(): Promise<ReplyHandoffView[]> {
+    const { data } = await http.get<ReplyHandoffView[]>("/api/agent/reply/handoffs");
+    return data;
+  },
+
+  /** One KST day's AI usage by kind · step · trigger · actor (2026-10-28). Read-only; counts only. */
+  async getAgentUsageStrict(date?: string): Promise<AgentUsageReport> {
+    const { data } = await http.get<AgentUsageReport>("/api/agent/quota/usage", { params: date ? { date } : undefined });
+    return data;
+  },
+  /** What the reply agent's runs came to over the last `days` — counts only. */
+  async getReplyOutcomesStrict(days = 7): Promise<ReplyOutcomeView> {
+    const { data } = await http.get<ReplyOutcomeView>("/api/agent/reply/outcomes", { params: { days } });
     return data;
   },
 };

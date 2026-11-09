@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ProjectionClient, makeProjectionClient, type ProjectionState } from "../lib/bridge/projectionClient";
 import type { ProjectionInput } from "../lib/bridge/projectionProtocol";
+import { useServiceMode } from "../lib/serviceMode";
 
 const INITIAL: ProjectionState = { phase: "connecting", control: "available", droppedFrames: 0, localOnly: true };
 
@@ -26,7 +27,11 @@ export function useProjection(): {
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
   const prevUrlRef = useRef<string | null>(null);
 
+  // Only on a confirmed install (lib/serviceMode.ts): the web service never looks for a helper on this machine.
+  const { mode } = useServiceMode();
+
   useEffect(() => {
+    if (mode !== "install") return undefined;
     const client = makeProjectionClient({
       onFrame: (_header, bytes) => {
         // One live object URL at a time; the previous is revoked on the next image load (onImageLoad).
@@ -49,7 +54,7 @@ export function useProjection(): {
       client.stop();
       if (prevUrlRef.current) { URL.revokeObjectURL(prevUrlRef.current); prevUrlRef.current = null; }
     };
-  }, []);
+  }, [mode]);
 
   // Called by the <img> onLoad: the new frame is painted → revoke the previous URL and pump any pending frame.
   const onImageLoad = useCallback(() => {

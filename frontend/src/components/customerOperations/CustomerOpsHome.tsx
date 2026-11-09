@@ -9,11 +9,15 @@ import { WorkItemPane, workItemFullScreen } from "../workspace/WorkItemPane";
 import { IssueDetailPanel } from "../memory/IssueDetailPanel";
 import { ReviewCaseView } from "../../pages/app/ReviewReplyTask";
 import { PreparedWorkList } from "../home/PreparedWorkList";
+import { WaitingWork } from "../home/WaitingWork";
 import { api } from "../../lib/apiClient";
 import { useScreenChanges } from "../../lib/screenChanges";
 import { problemLine } from "../../lib/operationsHome";
 import { RESPONSIBILITY_NAME, cadenceLabel, dataTypeKo, kstClock } from "../../lib/customerOperations";
 import { COPY, autoCheckWhat, channelShort, failureShort, gapActionKo, kstLongDate } from "../../lib/copy/customerOps";
+import { RecentArrivals } from "./RecentArrivals";
+import { AgentHandoffs } from "./AgentHandoffs";
+import { useAgentPanel } from "../../lib/agentPanel";
 import { homeBriefRows, isLowRatedReview, isOldBacklog, isPraiseApproval, mergeHomeWork, sharedRowFacts, todayWork, type HomeWork } from "../../lib/homeWork";
 import { automationHealth, type HealthTone } from "../../lib/automationHealth";
 import { NO_CHANGE_TODAY, changeInsights } from "../../lib/homeInsights";
@@ -32,6 +36,7 @@ import type {
   ChannelCoverageRowView,
   HomePreparedItem,
   HomeRepeatedProblems,
+  InquiryFollowUps,
   InquiryQueueResponse,
   OperationsHome,
   OperationsInsight,
@@ -145,6 +150,7 @@ export function CustomerOpsHome({
   insights,
   sharedQueue,
   sharedReviewWork,
+  sharedFollowUps,
   selection,
 }: {
   /**
@@ -177,6 +183,8 @@ export function CustomerOpsHome({
   sharedQueue?: { value: InquiryQueueResponse | null | undefined };
   /** The review half of 확인할 일, when the page around this list already read it. */
   sharedReviewWork?: { value: ReviewWorkView | null | undefined };
+  /** What is still open after a reply was decided, when the page around this list already read it. */
+  sharedFollowUps?: { value: InquiryFollowUps | null | undefined };
   /** Master-detail selection. Absent: every row opens its own screen, as on a narrow page. */
   selection?: HomeSelection;
 }) {
@@ -184,10 +192,13 @@ export function CustomerOpsHome({
   const queue = sharedQueue ? sharedQueue.value : ownQueue;
   const ownReviewWork = useReviewWork(sharedReviewWork === undefined);
   const reviewWork = sharedReviewWork ? sharedReviewWork.value : ownReviewWork;
+  const ownFollowUps = useFollowUps(sharedFollowUps === undefined);
+  const followUps = sharedFollowUps ? sharedFollowUps.value : ownFollowUps;
   const [busy, setBusy] = useState(false);
+  const agentPanel = useAgentPanel();
   const [error, setError] = useState<string | null>(null);
 
-  const work = mergeHomeWork(co, ops, queue, now, reviewWork);
+  const work = mergeHomeWork(co, ops, queue, now, reviewWork, followUps);
   // The row limit asks the layout, not the caller: `selection` is absent on pages that do not select in
   // place, and defaulting to narrow there would drop a row on a 1440 screen that has the space.
   const roomy = useWideLayout();
@@ -200,8 +211,8 @@ export function CustomerOpsHome({
   /*
     <b>The brief is this morning's work; the rest is one line</b> (product-owner decision, 2026-10-26). After a
     first upload of a year of reviews the brief led with 88–116-day-old reviews and 내가 할 일 counted them — the
-    owner: 「오래된 것밖에 안 보인다」. `isOldBacklog` now ages an unlooked-at review out after two weeks (an inquiry
-    after a year, as before), and the Home draws and counts only what is not backlog. The backlog is not hidden:
+    owner: 「오래된 것밖에 안 보인다」. `isOldBacklog` ages every row out after two weeks (2026-10-28 — it was reviews only
+    until a year of inquiries filled 할 일 with 35–286-day-old rows), and the Home draws and counts only what is not backlog. The backlog is not hidden:
     its size is said under the list and 확인할 일 holds every row of it under 「지난 일」.
   */
   const recent = todayWork(work.rows, now);
@@ -335,10 +346,19 @@ export function CustomerOpsHome({
               ) : null}
             </p>
           </div>
-          <Btn variant="outline" size="sm" className="shrink-0" disabled={busy} onClick={onChanged}>
-            <RefreshIcon />
-            새로고침
-          </Btn>
+          <div className="flex shrink-0 items-center gap-2">
+            {/* The conversation lives in the AI 담당자 panel on the right (owner, 2026-10-28); the Home keeps no box. */}
+            {agentPanel ? (
+              <Btn variant="outline" size="sm" onClick={() => agentPanel.openPanel()} data-testid="home-ask">
+                <AskIcon />
+                AI에게 묻기
+              </Btn>
+            ) : null}
+            <Btn variant="outline" size="sm" disabled={busy} onClick={onChanged}>
+              <RefreshIcon />
+              새로고침
+            </Btn>
+          </div>
         </div>
       </header>
       {/* 실행 대기는 판매자가 승인해 둔 것이고 자동 확인의 소유가 아니다 — 그 일이 열려 있지 않아도 센다.
@@ -349,6 +369,8 @@ export function CustomerOpsHome({
         awaiting={co ? (co.status === "ACTIVE" ? awaiting.count : null) : ops ? awaiting.count : null}
         unanswered={unansweredNow(metrics)}
       />
+      {/* What the reply agent would not draft (2026-10-28) — a harm or a legal signal first — until it is answered. */}
+      <AgentHandoffs />
 
 
       {/* 이 일을 시작하는 카드는 시작할 수 있는 배포에서만 선다. 책임 런타임이 열려 있지 않은 곳에서
@@ -447,15 +469,17 @@ export function CustomerOpsHome({
         </section>
       ) : past > 0 ? (
         <section aria-label={COPY.listTitle} className="space-y-2">
-          <p className="break-keep text-sm text-muted">새로 할 일은 없어요.</p>
+          <p className="break-keep text-sm text-muted">{nothingNew(health, lastChecked, "새로 할 일은 없어요.")}</p>
           <PastWork count={past} low={work.rows.filter((r) => isOldBacklog(r, now) && isLowRatedReview(r)).length} />
         </section>
       ) : !co || (running && co.status === "ACTIVE") ? (
         // Nothing waiting is a state, and the list's absence does not state it. 「다음 확인」 is on the status
         // line above, where it was before this became one line. 자동 확인이 없는 배포에서도 같은 문장을
         // 적는다 — 빈 자리는 「없다」와 「읽지 못했다」를 구분해 주지 않는다(읽기 실패는 채널 줄이 말한다).
-        <p className="break-keep text-sm text-muted">지금 할 일이 없어요.</p>
+        <p className="break-keep text-sm text-muted">{nothingNew(health, lastChecked, "지금 할 일이 없어요.")}</p>
       ) : null}
+      {/* Nothing new to do: what came in last, so an empty morning still shows the store (owner, 2026-10-28). */}
+      {recent.length === 0 ? <RecentArrivals now={now} /> : null}
 
       {/*
         <b>「Reviewnary가 무엇을 준비했나」 and 「무엇이 반복되나」 are one band, not two stacked sections</b>
@@ -489,6 +513,8 @@ export function CustomerOpsHome({
 
       <div className="grid gap-x-6 gap-y-6 md:grid-cols-2">
         <AwaitingExecution awaiting={awaiting} selection={selection} />
+        {/* 답변은 정했고 끝나지 않은 일 (2026-11-03 sixth review) — beside what is waiting to be registered. */}
+        <WaitingWork followUps={followUps} />
         <RepeatedProblems ops={ops} selection={selection} />
       </div>
 
@@ -605,6 +631,15 @@ function WhatChanged({
         </ul>
       )}
     </section>
+  );
+}
+
+/** The AI에게 묻기 mark — a speech bubble, stroke-only on `currentColor` like {@link RefreshIcon}. */
+function AskIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true" className="h-4 w-4">
+      <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h9A1.5 1.5 0 0 1 16 5.5v6a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 3v-3h0A1.5 1.5 0 0 1 4 11.5z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
   );
 }
 
@@ -790,6 +825,27 @@ export function useMovingCount(): number | null {
   return value;
 }
 
+/**
+ * What is still open after a reply was decided (2026-11-03 sixth review) — 「기다리는 일」 and the checks whose day has
+ * come. `null` = the read failed; `undefined` = not read yet.
+ */
+export function useFollowUps(enabled = true): InquiryFollowUps | null | undefined {
+  const [value, setValue] = useState<InquiryFollowUps | null | undefined>(undefined);
+  const changes = useScreenChanges();
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+    Promise.resolve()
+      .then(() => api.getInquiryFollowUps())
+      .then((r) => live && setValue(r))
+      .catch(() => live && setValue((current) => (current === undefined ? null : current)));
+    return () => {
+      live = false;
+    };
+  }, [enabled, changes]);
+  return value;
+}
+
 /** The queue read the Home's list needs. `enabled` false when the page around it already made the same read. */
 export function useHomeQueue(enabled = true): InquiryQueueResponse | null | undefined {
   const [queue, setQueue] = useState<InquiryQueueResponse | null | undefined>(undefined);
@@ -857,7 +913,8 @@ export function TodayWorkspace({
   const [params] = useSearchParams();
   const queue = useHomeQueue();
   const reviewWork = useReviewWork();
-  const work = mergeHomeWork(co, ops, queue, now, reviewWork);
+  const followUps = useFollowUps();
+  const work = mergeHomeWork(co, ops, queue, now, reviewWork, followUps);
   const key = params.get("item");
 
   let detail: ReactNode = null;
@@ -925,6 +982,7 @@ export function TodayWorkspace({
           insights={insights}
           sharedQueue={{ value: queue }}
           sharedReviewWork={{ value: reviewWork }}
+          sharedFollowUps={{ value: followUps }}
           selection={{ wide, selectedKey, search: location.search }}
         />
       }
@@ -1055,7 +1113,7 @@ function OperationsSummary({
     <Cell
       key="awaiting"
       id="awaiting"
-      label="등록 중"
+      label="등록 대기"
       note={awaiting === null ? "자동 확인이 멈춰 있어 확인하지 못했어요" : undefined}
     >
       {awaiting === null ? (
@@ -1068,7 +1126,7 @@ function OperationsSummary({
         // number. The noun rides with it.
         <a
           href="#실행-대기"
-          aria-label={`등록 중 ${awaiting.toLocaleString("ko-KR")}${COUNT_UNIT}`}
+          aria-label={`등록 대기 ${awaiting.toLocaleString("ko-KR")}${COUNT_UNIT}`}
           className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
         >
           <Big value={awaiting} unit={COUNT_UNIT} />
@@ -1422,7 +1480,7 @@ function AwaitingExecution({
   const selectedId = selection?.selectedKey?.startsWith(PREPARED) ? selection.selectedKey.slice(PREPARED.length) : null;
 
   return (
-    <section aria-label="등록 중" id="실행-대기" className="rounded-2xl border border-line bg-surface p-3">
+    <section aria-label="등록 대기" id="실행-대기" className="rounded-2xl border border-line bg-surface p-3">
       {/* The badge that used to sit here said 「승인함 · 등록 전」 over every row. It is what a standing
           review approval is, and what an inquiry row is not — those arrive with the work item still
           PROPOSED and no approval anywhere. One badge cannot be true of both, so the state moved onto
@@ -1433,7 +1491,7 @@ function AwaitingExecution({
           first two and says so; the number the seller owes is the section's, not the list's, and it is the
           same figure the summary band's own cell links down to. */}
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <h2 className="text-section font-bold tracking-tight text-ink">등록 중</h2>
+        <h2 className="text-section font-bold tracking-tight text-ink">등록 대기</h2>
         <span className="break-keep text-sm tabular-nums text-muted">
           {count > shown.length
             ? `${count.toLocaleString("ko-KR")}건 중 ${shown.length.toLocaleString("ko-KR")}건`
@@ -1460,6 +1518,18 @@ function AwaitingExecution({
           section, which is where the target puts them. */}
     </section>
   );
+}
+
+/**
+ * <b>「할 일 없음」 says how far it reaches</b> (2026-10-28 review). On a stalled or failed check the empty list is
+ * only the list of what was read before it stopped, and 「지금 할 일이 없어요」 alone read as 「안심해도 돼요」. The gap
+ * is said first, then the empty list with its scope.
+ */
+function nothingNew(health: ReturnType<typeof automationHealth> | null, lastChecked: string | null, plain: string): string {
+  if (!health || (health.tone !== "warn" && health.tone !== "bad")) return plain;
+  return lastChecked
+    ? `최신 문의·리뷰는 ${lastChecked} 이후로 확인하지 못했어요. 그때까지 가져온 자료로는 새로 할 일이 없어요.`
+    : "최신 문의·리뷰는 아직 확인하지 못했어요. 저장된 자료로는 새로 할 일이 없어요.";
 }
 
 /** The latest run failed: the 24-hour tally above stands, and this names the check it does not include. */
@@ -1666,7 +1736,7 @@ function PastWork({ count, low = 0 }: { count: number; /** Of them, ★1–2 rev
       <span>
         지난 일 <span className="font-semibold tabular-nums text-ink">{count.toLocaleString("ko-KR")}</span>건
       </span>
-      <span>(2주 넘은 리뷰, 1년 넘은 문의)</span>
+      <span>(2주 넘은 일)</span>
       {/* The complaints among them, named (owner decision 2026-10-28): the two-week rule keeps the list about this
           morning, and this keeps a ★1 from a month ago from disappearing under it. */}
       {low > 0 ? (

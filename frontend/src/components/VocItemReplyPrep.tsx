@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { isAxiosError } from "axios";
 import { PhraseFindings, phraseBlockSentence } from "./reviews/PhraseFindings";
 import { GroundedReviewDraft } from "./GroundedReviewDraft";
+import { ReplyHoldNotice } from "./ReplyHoldNotice";
 import { DelegatedReplyControls } from "./reviews/DelegatedReplyControls";
 import { Disclosure } from "./ui/Disclosure";
 import { api } from "../lib/apiClient";
 import { copyText } from "../lib/clipboard";
 import { SecureRandomUnavailableError, newCommandId } from "../lib/commandId";
-import type { OperatorOutcomeName, ReviewReplyPrep, TriageDisposition } from "../lib/types";
+import type { OperatorOutcomeName, ReplyHold, ReviewReplyPrep, TriageDisposition } from "../lib/types";
 import {
   startReplySubmission,
   type ReplyBlockerCode,
@@ -406,6 +408,23 @@ export function VocItemReplyPrep({
     return () => clearInterval(timer);
   }, [linked]);
 
+  // A hold the recheck put on this reply (2026-11-01): shown above the reply with its reasons and what to do. Read on
+  // mount, after every re-read, and after a refused 확정 — the press itself records a hold the sweep had not yet.
+  const holdSubject = actionRef.startsWith("review:") ? actionRef.slice("review:".length) : null;
+  const [hold, setHold] = useState<ReplyHold | null>(null);
+  const [regenerate, setRegenerate] = useState(0);
+  const loadHold = useCallback(async () => {
+    if (holdSubject == null) return;
+    try {
+      setHold(await api.getReplyHold("REVIEW", holdSubject));
+    } catch {
+      // A hold that cannot be read leaves the panel as it was; the server still refuses what it holds.
+    }
+  }, [holdSubject]);
+  useEffect(() => {
+    void loadHold();
+  }, [loadHold]);
+
   if (loadFailed) {
     return (
       <p role="alert" className="text-sm text-bad">
@@ -471,6 +490,7 @@ export function VocItemReplyPrep({
     if (next != null && !dirtyRef.current) {
       setBody(next.draft?.body ?? next.suggestion.body);
     }
+    void loadHold();
   }
   refreshRef.current = refresh;
 
@@ -599,11 +619,20 @@ export function VocItemReplyPrep({
       // the prep read, so there is exactly one way to obtain copyable text.
       await refresh();
       if (state === "APPROVED") onApproved?.();
-    } catch {
+    } catch (e) {
+      // A recheck hold answers 409 with its reasons; they are drawn above the reply, so the line here only points there.
+      const held = state === "APPROVED" && isAxiosError(e) && e.response?.status === 409
+        && ((e.response?.data as { message?: string } | undefined)?.message ?? "").includes("확인");
+      if (held) {
+        attempt.current = null;
+        await loadHold();
+      }
       setFailed(
-        state === "APPROVED"
-          ? "확정하지 못했어요. 다시 눌러 주세요."
-          : "확정을 풀지 못했어요. 다시 눌러 주세요.",
+        held
+          ? "다시 확인이 필요해 확정하지 않았어요. 위의 안내를 확인해 주세요."
+          : state === "APPROVED"
+            ? "확정하지 못했어요. 다시 눌러 주세요."
+            : "확정을 풀지 못했어요. 다시 눌러 주세요.",
       );
     } finally {
       inFlight.current = false;
@@ -799,6 +828,17 @@ export function VocItemReplyPrep({
       )}
 
 
+      {hold != null ? (
+        <ReplyHoldNotice
+          hold={hold}
+          onConfirmed={(next) => {
+            setHold(next);
+            setFailed(null);
+          }}
+          onRegenerate={canSave ? () => setRegenerate((n) => n + 1) : undefined}
+        />
+      ) : null}
+
       <div className="flex flex-col gap-1">
         {/* <b>승인된 답변은 읽을 것이지 고칠 것이 아니다</b> (Front conversation detail, 2026-10-06).
             Front의 제안된 답장은 상자 안에서 그냥 문장으로 서 있다 — 편집기 테두리도, 회색 입력면도
@@ -884,7 +924,10 @@ export function VocItemReplyPrep({
           storedBasis={prep.draftAnswerBasis ?? null}
           storedBasisNote={prep.draftAnswerBasisNote ?? null}
           hasStoredDraft={prep.draft !== null}
+          storedPolishNote={prep.draft?.polishNote ?? null}
+          storedOpenQuestions={prep.draft?.openQuestions ?? []}
           autoStart={autoDraft}
+          regenerate={regenerate}
           onDrafted={(generated) => {
             setBody(generated);
             setDirty(false);

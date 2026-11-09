@@ -13,14 +13,15 @@ export const WORK_QUEUE_SIZE = 50;
  */
 export async function loadWork(now: Date = new Date()): Promise<HomeWork | null> {
   const quiet = <T,>(read: () => Promise<T>) => Promise.resolve().then(read).catch(() => null);
-  const [co, ops, queue, reviewWork] = await Promise.all([
+  const [co, ops, queue, reviewWork, followUps] = await Promise.all([
     quiet(() => api.getCustomerOperationsHome()),
     quiet(() => api.getOperationsHomeStrict()),
     quiet(() => api.getInquiryQueueStrict({ size: WORK_QUEUE_SIZE })),
     quiet(() => api.getReviewWorkStrict()),
+    quiet(() => api.getInquiryFollowUps()),
   ]);
   if (!co && !ops && !queue && !reviewWork) return null;
-  return mergeHomeWork(co, ops, queue, now, reviewWork);
+  return mergeHomeWork(co, ops, queue, now, reviewWork, followUps);
 }
 
 export interface WorkNeighbours {

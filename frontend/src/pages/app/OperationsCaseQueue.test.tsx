@@ -541,10 +541,15 @@ describe("OperationsCaseQueue — the seller's own reply work (UI/UX v2 Phase 3)
 describe("OperationsCaseQueue — views of the one list (UI/UX v2 Phase 4)", () => {
   beforeEach(() => vi.resetAllMocks());
 
+  function daysBefore(n: number): string {
+    return new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  }
+
   function replyItem(reviewId: string, state: "AWAITING_APPROVAL" | "DRAFT_NEEDED", preview: string) {
     return {
       channelCode: "NAVER", channelNameKo: "네이버 스마트스토어", sourceType: "REVIEW", productName: "선바로",
-      rating: 3, replyStatus: "PENDING", sourceCreatedDate: "2026-08-28", collectedDate: "2026-08-29",
+      // Recent on the real clock this screen reads: 할 일 holds two weeks of every kind (owner decision 2026-10-28).
+      rating: 3, replyStatus: "PENDING", sourceCreatedDate: daysBefore(3), collectedDate: daysBefore(2),
       signalType: "LOW_RATING_REVIEW", safePreview: preview, actionRef: `review:${reviewId}`, reviewId,
       triageDisposition: "RESPONSE_NEEDED", hasReplyPreparation: state === "AWAITING_APPROVAL", replyWorkState: state,
       category: null, hasReportedSubmission: false,

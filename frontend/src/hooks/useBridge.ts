@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BridgeClient, makeBridgeClient, type BridgeState } from "../lib/bridge/bridgeClient";
 import { isLocalSellerBuild } from "../lib/security/localSellerMode";
+import { useServiceMode } from "../lib/serviceMode";
 
 /**
  * React binding for the Local Agent Bridge client. Owns the client lifecycle, drives the pairing poll while
@@ -38,7 +39,10 @@ export function useBridge(
   const clientRef = useRef<BridgeClient | null>(null);
   const [state, setState] = useState<BridgeState>({ phase: "connecting", maybeNeedsLocalNetworkAccess: false });
 
-  const open = enabled && (!isLocalSellerBuild() || options.purpose === "issuance");
+  // Only on a confirmed install: the web service — and a page that has not yet heard which one it is, or could not —
+  // never reaches for a helper on this machine (lib/serviceMode.ts).
+  const { mode } = useServiceMode();
+  const open = enabled && mode === "install" && (!isLocalSellerBuild() || options.purpose === "issuance");
 
   useEffect(() => {
     if (!open) {

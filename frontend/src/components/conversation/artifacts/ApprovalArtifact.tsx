@@ -124,7 +124,9 @@ function InquiryApproval({ artifact }: { artifact: Approval }) {
       setStatus({ phase: view.phase, category: view.category });
       setConfirming(false);
     } catch (e) {
-      setError(classifyPublishError(isAxiosError(e) ? e.response?.status : undefined).message);
+      setError((isAxiosError(e)
+        ? classifyPublishError(e.response?.status, e.response?.data)
+        : classifyPublishError(undefined)).message);
     } finally {
       setBusy(false);
     }

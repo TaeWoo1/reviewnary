@@ -134,6 +134,42 @@ describe("InquiryResponsePanel — the generated draft", () => {
     expect(screen.queryByText(/product-knowledge\/USAGE/)).toBeNull();
   });
 
+  it("an unanswered inquiry past the auto-draft reach says why no draft is waiting; a recent one does not (owner, 2026-10-28)", async () => {
+    getInquiryDetailStrict.mockResolvedValue(detail({ receivedAt: new Date(Date.now() - 20 * 86_400_000).toISOString() }));
+    const { unmount } = render(<InquiryResponsePanel workItemId="w1" />);
+    expect(await screen.findByTestId("draft-on-request")).toHaveTextContent("15일이 지난 문의라 미리 초안을 만들어 두지 않았어요");
+    unmount();
+
+    getInquiryDetailStrict.mockResolvedValue(detail({ receivedAt: new Date(Date.now() - 2 * 86_400_000).toISOString() }));
+    render(<InquiryResponsePanel workItemId="w1" />);
+    expect(await screen.findByRole("button", { name: /초안 만들기/ })).toBeInTheDocument();
+    expect(screen.queryByTestId("draft-on-request")).toBeNull();
+  });
+
+  it("a citation whose passage changed or went since the draft says so, before anything is approved (2026-10-28)", async () => {
+    generateInquiryDraft.mockResolvedValue(generated({
+      evidence: [
+        { kind: "ORG_POLICY", scopeLabel: "운영 정책", title: "교환 및 반품", locator: "l2", sourceId: "s2", chunkId: "c2", snippet: null, gone: true },
+        { kind: "PRODUCT_KNOWLEDGE", scopeLabel: "상품 정보", title: "사용법", locator: "l1", sourceId: "s1", chunkId: "c1", snippet: "테이프를 벗기고 붙입니다." },
+      ],
+    }));
+    const user = userEvent.setup();
+    render(<InquiryResponsePanel workItemId="w1" />);
+
+    await user.click(await screen.findByRole("button", { name: /초안 만들기/ }));
+
+    expect(await screen.findByTestId("draft-evidence-gone")).toHaveTextContent("근거 1개가 바뀌었거나 지워졌어요");
+    expect(screen.getByText("답변을 쓴 뒤로 바뀌었거나 지워진 근거예요.")).toBeInTheDocument();
+  });
+
+  it("a draft whose citations are all still there says nothing about change", async () => {
+    const user = userEvent.setup();
+    render(<InquiryResponsePanel workItemId="w1" />);
+    await user.click(await screen.findByRole("button", { name: /초안 만들기/ }));
+    expect(await screen.findByText("답변에 사용한 근거")).toBeInTheDocument();
+    expect(screen.queryByTestId("draft-evidence-gone")).toBeNull();
+  });
+
   it("folds everything after the lead citation, so four passages are not four cards", async () => {
     generateInquiryDraft.mockResolvedValue(generated({
       evidence: [

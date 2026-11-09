@@ -11,6 +11,7 @@ export interface CspEnv {
   VITE_GTM_ID?: string;
   VITE_POSTHOG_KEY?: string;
   VITE_POSTHOG_HOST?: string;
+  VITE_HACKLE_SDK_KEY?: string;
   VITE_SENTRY_DSN?: string;
   VITE_API_BASE_URL?: string;
   VITE_AGENT_RUNTIME_URL?: string;
@@ -24,6 +25,11 @@ export const BRIDGE_DEFAULT = "http://127.0.0.1:47615";
 const GA_ORIGINS = ["https://*.google-analytics.com", "https://*.analytics.google.com", "https://*.googletagmanager.com"];
 const GTM_SCRIPT = "https://www.googletagmanager.com";
 const POSTHOG_DEFAULT = "https://us.i.posthog.com";
+/**
+ * Mirrors `HACKLE_ORIGINS` in analytics/hackleSink.ts: the two hosts the SDK calls. No script origin — the SDK is the
+ * pinned npm package, bundled as this app's own chunk (2026-11-07; the CDN path answered 301 to another host).
+ */
+const HACKLE_CONNECT = ["https://sdk-api.hackle.io", "https://event-api.hackle.io"];
 
 export function originOf(raw: string | undefined | null): string | null {
   if (typeof raw !== "string" || !raw.trim()) return null;
@@ -58,6 +64,9 @@ export function buildCsp(env: CspEnv): string {
     const host = originOf(env.VITE_POSTHOG_HOST) ?? POSTHOG_DEFAULT;
     script.add(host);
     connect.add(host);
+  }
+  if (env.VITE_HACKLE_SDK_KEY?.trim()) {
+    for (const o of HACKLE_CONNECT) connect.add(o);
   }
   const sentry = sentryIngestOrigin(env.VITE_SENTRY_DSN);
   if (sentry) connect.add(sentry);

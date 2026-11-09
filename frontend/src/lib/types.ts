@@ -168,6 +168,11 @@ export interface VendorLinkStatus {
   approvalUrl: string | null;
   deviceName: string | null;
   linkedAt: string | null;
+  /**
+   * `INSTALL`: a seller PC that links itself. `WORKSPACE`: the Reviewnary server, whose organisations an operator links
+   * on the vendor server — the seller never signs in there or approves a PC (boundary §5, 2026-10-31).
+   */
+  mode: "INSTALL" | "WORKSPACE";
 }
 
 /** Whether a vendor-server store is received here, and into which organisation (backend `Standing`). */
@@ -1319,6 +1324,13 @@ export interface ReviewReplyDraft {
   contentFingerprint: string;
   fingerprintAlgorithm: string;
   createdAt: string;
+  /** The reply agent's note when only the form wants work (length, a repeated sentence) — 「문장 다듬기 필요」. */
+  polishNote?: string | null;
+  /**
+   * The customer's questions this version leaves to the seller: the store's material had no answer, the rest of the reply
+   * stands (eighth review). A partial answer — never a complete one.
+   */
+  openQuestions?: string[];
 }
 
 // Mirrors dto.ReviewReplyApprovalView. Absent entirely until the operator has approved
@@ -1709,7 +1721,7 @@ export interface KnowledgeCandidateView {
   productName: string | null;
   subject: string;
   content: string;
-  origin: "REPEATED_ANSWER" | "DRAFT_GAP" | "ISSUE_GUIDANCE" | string;
+  origin: "REPEATED_ANSWER" | "DRAFT_GAP" | "ISSUE_GUIDANCE" | "PAST_ANSWERS" | string;
   evidenceCount: number;
   state: string;
   sourceId: string | null;
@@ -1917,6 +1929,11 @@ export interface InquiryQueueItem {
    * a sentence nobody wrote — eight of the demo org's ten such rows had no draft.
    */
   hasDraft: boolean;
+  /**
+   * What the seller is asked to check on the seller centre while nothing is recorded yet — the Home's 「이 내용만
+   * 알려주세요」 (2026-11-03 sixth review). Null once a record stands; absent from an older server.
+   */
+  sellerCheckAsk?: SellerCheckAsk | null;
 }
 
 // Mirrors com.sellerops.inquiry.queue.dto.InquiryQueueResponse.
@@ -1951,6 +1968,11 @@ export interface InquiryRowItem {
   answeredAt: string | null;
   sourceSubtype: string | null;
   executableIdentity: string | null;
+  /**
+   * The work item whose reply was already decided (approved, registering, registered) — so the inquiry opens again on its
+   * approved answer and the seller's record (2026-11-03 sixth review). Not `workItemId`, which means 「draftable」.
+   */
+  decidedWorkItemId?: string | null;
 }
 
 // Mirrors com.sellerops.inquiry.queue.dto.InquiryRowsResponse.
@@ -2084,6 +2106,44 @@ export interface InquiryDetail {
    * which a seller wants to ask whether their answer went out.
    */
   delivery: AnswerDeliveryView | null;
+  /**
+   * The answer as the channel shows it, read by a collection — never our draft (2026-11-06 sixteenth review). Absent when
+   * no collection carried an answer body, which is not 「unanswered」. Mirrors `ChannelAnswerView`.
+   */
+  channelAnswer?: ChannelAnswerView | null;
+  /**
+   * Whether a collection looked for a shop answer left as a Cafe24 board comment, and what it found (V184, 2026-11-08).
+   * Absent or null where the question does not arise — another channel, a thread reply, a row no connector wrote. Shown
+   * before approval and registration, never a gate. Mirrors `CommentCheckView`; read through `lib/commentCheck`.
+   */
+  commentCheck?: CommentCheckView | null;
+}
+
+/**
+ * Mirrors com.sellerops.inquiry.proposal.dto.CommentCheckView. `NOT_CHECKED` is a failed or incomplete look, never 「no
+ * answer」; `NO_RECORD` is nothing ever recorded. `attemptedAt` is when the last result was produced; `lastCheckedAt` the last
+ * look that succeeded, kept through a later failure. Neither is filled from the other.
+ */
+export interface CommentCheckView {
+  state: "SHOP_ANSWERED" | "NO_SHOP_COMMENT" | "NOT_CHECKED" | "NO_RECORD" | string;
+  attemptedAt: string | null;
+  lastCheckedAt: string | null;
+}
+
+/**
+ * Mirrors com.sellerops.inquiry.proposal.dto.ChannelAnswerView. `sameAsDraft` null: no draft to compare.
+ *
+ * Two check times (2026-11-06 seventeenth review): `bodyCheckedAt` is when a collection last carried this text (null: not
+ * recorded — said as unknown, never guessed); `statusCheckedAt` is when a collection last showed the inquiry. `latest`
+ * false: the last read brought no text, so this is the last answer collected, not necessarily what the channel shows now.
+ */
+export interface ChannelAnswerView {
+  body: string;
+  answeredAt: string | null;
+  bodyCheckedAt: string | null;
+  statusCheckedAt: string | null;
+  latest: boolean;
+  sameAsDraft: boolean | null;
 }
 
 /**
@@ -2150,6 +2210,12 @@ export interface DraftEvidenceView {
    * seller has since deleted, where the row is still a true record of what the draft stood on.
    */
   snippet: string | null;
+  /**
+   * The passage the drafter was shown no longer exists as it was — the document was edited (its passages re-cut) or
+   * deleted since (2026-10-28). Read at display time. Optional so an older server's payload reads as «not known
+   * gone».
+   */
+  gone?: boolean;
 }
 
 /** The closed set of operating-rule kinds. Mirrors com.sellerops.knowledge.org.OrgKnowledgeType. */
@@ -2220,7 +2286,8 @@ export interface GeneratedDraftView {
   authorKind: "MODEL" | "RULE" | "SELLER" | "SELLER_APPROVED_FALLBACK" | null;
   knowledgeState: "NO_PRODUCT" | "NO_LIBRARY" | "NO_MATCH" | "GROUNDED";
   knowledgeNote: string;
-  answerBasis: "GROUNDED" | "NEEDS_CLARIFICATION" | "NO_ANSWER_BASIS";
+  /** `PARTIAL_ANSWER` (2026-11-01 tenth review): the draft answers part of what was asked; `openQuestions` names the rest. */
+  answerBasis: "GROUNDED" | "NEEDS_CLARIFICATION" | "PARTIAL_ANSWER" | "NO_ANSWER_BASIS";
   answerBasisNote: string;
   answerBasisAction: string | null;
   productId: string | null;
@@ -2228,6 +2295,17 @@ export interface GeneratedDraftView {
   /** Seller Context v1-B: the registered 회사 정보 was read as wording context. A flag, never the text. */
   companyContextUsed?: boolean;
   unavailableMessage: string | null;
+  /** `unavailableMessage` as a closed word: a draft the checks refused, one waiting for the ceiling, or a run that did not finish. */
+  unavailableKind?: "HELD_BY_CHECK" | "WAITING_FOR_CHECK" | "NOT_RUN" | null;
+  /** What this draft left to the seller — the reply is not sent while one is open (tenth review). */
+  openQuestions?: string[];
+  /** The one rewrite (2026-11-02): null when the first draft was kept or refused without one. Read by evaluation only. */
+  rewrite?: "PASSED" | "REFUSED" | "PENDING" | "NOT_WRITTEN" | null;
+  /**
+   * What the seller is asked to check on the seller centre (2026-11-02 seller-check review) — the system's reading of
+   * the inquiry, never a verified one. `ORDER_ACTION`: something to be done to this order; `ORDER_STATE`: how it stands.
+   */
+  sellerCheckAsk?: SellerCheckAsk | null;
   /**
    * What the retrieval established, as closed values — mirrors `KnowledgeGapView`.
    *
@@ -2323,10 +2401,31 @@ export interface ReplyDraftView {
    * version written before 2026-08-27 and on seller-typed versions — "not recorded" is a different
    * statement from any of the three states, and the screen says nothing rather than guessing.
    */
-  answerBasis: "GROUNDED" | "NEEDS_CLARIFICATION" | "NO_ANSWER_BASIS" | null;
+  answerBasis: "GROUNDED" | "NEEDS_CLARIFICATION" | "PARTIAL_ANSWER" | "NO_ANSWER_BASIS" | null;
   answerBasisNote: string | null;
   answerBasisAction: string | null;
 }
+
+/**
+ * One question a draft could not answer from the store's material — mirrors
+ * com.sellerops.openquestion.OpenQuestionService.OpenQuestionView (2026-11-01 tenth review). It belongs to the work, not
+ * to a draft version, and closes only when the seller handles it with a reason or a new judgement no longer asks it.
+ */
+export interface OpenQuestionItem {
+  id: string;
+  question: string;
+  /** Whether the reply waits for it: every inquiry question; never a review's (approving stays the seller's). */
+  required: boolean;
+  state: "OPEN" | "HANDLED" | "SUPERSEDED";
+  resolution: OpenQuestionResolution | "REJUDGED" | "SETTLED_BY_ACTION" | null;
+  note: string | null;
+  createdAt: string;
+  closedAt: string | null;
+  /** The record a system close rests on — `seller-check:<id>` when the seller's completed action made it moot. */
+  basisRef?: string | null;
+}
+
+export type OpenQuestionResolution = "ANSWERED" | "NOT_NEEDED" | "ELSEWHERE";
 
 /**
  * Mirrors com.sellerops.inquiry.publish.dto.PublishCapabilityView — the fail-closed capability read.
@@ -3629,6 +3728,55 @@ export interface OpportunityView {
   outcome: OpportunityOutcomeView | null;
 }
 
+/** Mirrors `ReplyStartController.HandoffView` — one review the reply agent handed to a person. */
+export interface ReplyHandoffView {
+  reviewId: string;
+  /** S · L · X · R … — the reply standard's category. */
+  category: string | null;
+  /** CATEGORY_S · CATEGORY_L · CATEGORY_X · STILL_FAILS · … */
+  reason: string | null;
+  at: string | null;
+  rating: number | null;
+  /** The redacted preview — never the full text. */
+  preview: string | null;
+  /** A draft from before the handoff exists — shown so it is checked, never taken as the handoff's answer. */
+  earlierDraft?: boolean;
+  /** What the customer raised, as the agent's judge read it — model words over the redacted review. */
+  points?: string[];
+  /** For STILL_FAILS: what the last check could not fix, one seller sentence per rule. */
+  unmet?: string[];
+}
+
+/** Mirrors `AgentQuotaService.UsageRow` — one group of one day's model calls. */
+export interface AgentUsageRow {
+  kind: string;
+  /** The reply agent's step: CLASSIFY · DRAFT · CRITIQUE · REVISE; null for a call that is not one. */
+  step: string | null;
+  /** What started the run: SELLER · INGEST · SCHEDULED; null when the call does not say. */
+  trigger: string | null;
+  actor: string;
+  calls: number;
+  runs: number;
+  elapsedMs: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/** Mirrors `AgentQuotaService.UsageReport`. */
+export interface AgentUsageReport {
+  date: string;
+  enabled: boolean;
+  llmCallsLimit: number;
+  sellerAndRunCalls: number;
+  rows: AgentUsageRow[];
+  /** The seller-facing count's limit — pieces of work asked for, however many calls each took. Absent: older server. */
+  itemsLimit?: number;
+  sellerItems?: number;
+  /** Where automatic work stops — the ceiling less the calls kept for the seller's own presses. Absent: older server. */
+  automaticCallsLimit?: number;
+  automaticCalls?: number;
+}
+
 export interface AgentQuotaStatus {
   enabled: boolean;
   /** Whether the ceiling may refuse, or only counts. Off on local/QA/benchmark deployments. */
@@ -3843,6 +3991,26 @@ export interface ReviewReplyTemplateView {
 
 export interface ReviewReplyTemplatesView {
   templates: ReviewReplyTemplateView[];
+}
+
+/**
+ * When a band's reply draft is written: ahead by the automatic check, ahead only for a review that names a problem or
+ * asks something, or when the seller asks.
+ */
+export type ReviewResponseMode = "AHEAD" | "ISSUES_ONLY" | "ON_REQUEST";
+
+/** Mirrors `ReviewResponseRuleService.View` — ★1–2 · ★3 (and no rating) · ★4–5, and whether the seller set them. */
+export interface ReviewResponseRuleView {
+  low: ReviewResponseMode;
+  mid: ReviewResponseMode;
+  high: ReviewResponseMode;
+  customized: boolean;
+}
+
+export interface ReviewResponseRuleRequest {
+  low: ReviewResponseMode;
+  mid: ReviewResponseMode;
+  high: ReviewResponseMode;
 }
 
 export interface AnswerStyleView {
@@ -4268,4 +4436,224 @@ export interface ReviewGuidanceOptions {
   attached: ReviewGuidanceOption[];
   rejected: ReviewGuidanceOption[];
   pickable: ReviewGuidanceOption[];
+}
+
+/** What the reply agent's runs came to over a window (2026-10-28) — counts only, no text. */
+export interface ReplyOutcomeView {
+  days: number;
+  runs: number;
+  byOutcome: Record<string, number>;
+  handoffReasons: Record<string, number>;
+  saved: number;
+  approvedAsWritten: number;
+  approvedAfterEdit: number;
+  /** Approved a newer version the AI wrote again — not the seller's edit. */
+  approvedAfterRewrite: number;
+  waiting: number;
+  medianMinutesToApproval: number | null;
+}
+
+/**
+ * A reply held after a recheck against the seller's current policy and material (2026-11-01). `needs`: `FIX` — the text
+ * must change first (a banned phrase, a condition the law does not allow, a number now wrong); `CONFIRM` — may go on once
+ * the seller confirms, recorded. Same check whoever wrote the reply.
+ */
+export interface ReplyHoldFigure {
+  /** The number as the reply states it, e.g. 「7일」. */
+  figure: string;
+  verdict: "FIGURE_CHANGED" | "FIGURE_UNVERIFIED";
+  /** The clause of the seller's material it was written from, or null. */
+  was: string | null;
+  source: string | null;
+}
+
+/** What the seller is asked to check on the seller centre for one inquiry. */
+export type SellerCheckAsk = "ORDER_ACTION" | "ORDER_STATE";
+
+/** The four results a seller can record after checking the seller centre. Never preselected. */
+export type SellerCheckOutcome = "DONE" | "IN_PROGRESS" | "CANNOT" | "NEEDS_CUSTOMER_INFO";
+
+/**
+ * The seller's record of what they found, for this inquiry only (2026-11-02). `confirmedBy` is `SELLER` — it is not
+ * something the channel confirmed.
+ */
+export interface SellerCheckView {
+  id: string;
+  outcome: SellerCheckOutcome;
+  outcomeKo: string;
+  note: string;
+  confirmedBy: string;
+  recordedBy: string;
+  recordedAt: string;
+  /**
+   * For 「접수·진행 중」, the seller's own next look (`YYYY-MM-DD`, the seller's day) — never a promise to the customer.
+   * Null on any other outcome.
+   */
+  nextCheckOn?: string | null;
+}
+
+/** `GET /api/inquiries/{id}/seller-check`. */
+export interface SellerCheckState {
+  check: SellerCheckView | null;
+  ask: SellerCheckAsk | null;
+  /**
+   * Whether the newest answer version was written from `check` (null with no record). False after a reload is how the
+   * screen still offers 「이 기록으로 답변 만들기」 when the last draft attempt failed.
+   */
+  draftMatches?: boolean | null;
+  /**
+   * The approved answer against the record (2026-11-05 seventh review); null until an answer is approved. What the
+   * customer was told is the record the approved version was written from — never read it off `check`.
+   */
+  answered?: SellerCheckAnswered | null;
+  /** What kind of inquiry this is — the service's reading and the seller's correction (2026-11-05); null before either. */
+  kind?: InquiryKindView | null;
+}
+
+/** 방법 안내 · 상태 확인 · 조치 요청 — what kind of inquiry this is, for the one distinction the seller can correct. */
+export type InquiryKindName = "HOW_TO" | "ORDER_STATE" | "ORDER_ACTION";
+
+/** The service's reading (`judged`, null before a decided draft) and the seller's standing correction, if any. */
+export interface InquiryKindView {
+  judged: InquiryKindName | null;
+  judgedKo: string | null;
+  corrected: InquiryKindName | null;
+  correctedKo: string | null;
+  /** The standing correction a new one must name; null when none stands. */
+  correctionId: string | null;
+  /**
+   * Whether the newest answer was written after the standing correction — null with no correction or no answer. False:
+   * written under the reading the seller corrected away, so it is not copied or sent until written again.
+   */
+  draftMatches?: boolean | null;
+}
+
+/** The answer to 「이 판단으로 답변 다시 만들기」: the kind kept, what is asked now, and the redraft's result. */
+export interface InquiryKindResponse {
+  kind: InquiryKindView;
+  ask: SellerCheckAsk | null;
+  draft: GeneratedDraftView | null;
+  draftState: "READY" | "NOT_WRITTEN" | "FAILED" | "KEPT";
+  hold: ReplyHold | null;
+  /**
+   * With `FAILED` only, why — a fixed code (2026-11-06 seventeenth review). `PREPARE_FAILED`: the server's preparation of
+   * an OPEN inquiry failed; `NOT_DRAFTABLE`: not in a state a draft can be saved in, found before any model call;
+   * `DRAFT_REFUSED`: the drafting path refused; `DRAFT_ERROR`: drafting broke. The record is kept in every one.
+   */
+  draftFailure?: "PREPARE_FAILED" | "NOT_DRAFTABLE" | "DRAFT_REFUSED" | "DRAFT_ERROR" | null;
+}
+
+/**
+ * Which record the approved answer was written from, and whether it may be taken back. `outcome` null: written before
+ * any record. `reopen`: `MATCHES` (written from the record that stands) · `OFFERED` (the record moved on and nothing was
+ * sent — may be taken back) · `REGISTERED` (on the channel) · `UNSETTLED` (a send whose result is not read yet).
+ */
+export interface SellerCheckAnswered {
+  version: number;
+  fingerprint: string;
+  outcome: SellerCheckOutcome | null;
+  outcomeKo: string | null;
+  recordedAt: string | null;
+  current: boolean;
+  /** `UNCONFIRMED`: nothing was sent, but the channel was not read after the approval — whether it is on it is not known. */
+  reopen: "MATCHES" | "OFFERED" | "REGISTERED" | "UNSETTLED" | "UNCONFIRMED";
+  /** When the service last read this inquiry from the channel. */
+  channelReadAt: string | null;
+  /**
+   * Why it may be taken back: `RECORD` — the seller's record moved on from it · `HOLD` — it is held at registration for
+   * something a person must fix (a policy conflict, a forbidden phrase, a changed figure) · null — nothing to take back.
+   */
+  because?: "RECORD" | "HOLD" | null;
+  /** The fix-first hold on the approved version, sent back with 「승인 거두고 고치기」. */
+  holdCheckId?: string | null;
+  holdCodes?: string[];
+  /** Registered, and the record now says 「처리 완료」 while the answer was written from another record. */
+  toldBehind?: boolean;
+  /** How the seller closed that for the record that stands: `TOLD_SEPARATELY` · `NOT_NEEDED` · null. */
+  closure?: "TOLD_SEPARATELY" | "NOT_NEEDED" | null;
+  closedAt?: string | null;
+}
+
+/** 「승인 거두고 고치기」: the reply is the seller's again (`phase`), with the hold it now carries as a draft. */
+export interface HeldWithdrawResponse {
+  phase: string | null;
+  hold: ReplyHold | null;
+}
+
+export interface ToldBehindResponse {
+  checkId: string;
+  closure: "TOLD_SEPARATELY" | "NOT_NEEDED";
+  closedAt: string;
+}
+
+/**
+ * The answer to 「기록하고 답변 만들기」 and 「이 기록으로 답변 다시 만들기」: the record is kept first, so whether a draft
+ * was written is a separate answer — `READY`, `NOT_WRITTEN` (the draft view says why), or `FAILED`.
+ */
+export interface SellerCheckRecordResponse {
+  check: SellerCheckView;
+  draft: GeneratedDraftView | null;
+  /** `KEPT`: the reply was already approved, so nothing was drafted and the approved answer stays as it is. */
+  draftState: "READY" | "NOT_WRITTEN" | "FAILED" | "KEPT";
+  hold: ReplyHold | null;
+}
+
+/**
+ * One inquiry still open after its reply was decided (`GET /api/inquiries/follow-ups`, 2026-11-03 sixth review).
+ * Answering the customer and finishing the action are two facts: `waitingOn` says which is still open.
+ */
+export interface InquiryFollowUpRow {
+  workItemId: string;
+  inquiryId: string;
+  subject: string | null;
+  channelCode: string | null;
+  /** `REGISTRATION` — approved, registration not yet confirmed · `ACTION` — registered, action in progress · `CUSTOMER` — registered, waiting for the customer. */
+  /** `TOLD_BEHIND` — registered, the record now says 「처리 완료」, and the answer told the customer less (always due). */
+  waitingOn: "REGISTRATION" | "ACTION" | "CUSTOMER" | "TOLD_BEHIND";
+  /** The next-check day has come: a check for the seller today. Never a send. */
+  due: boolean;
+  outcome: SellerCheckOutcome | null;
+  outcomeKo: string | null;
+  note: string | null;
+  nextCheckOn: string | null;
+  phase: string;
+  since: string | null;
+  to: string;
+  /** For `TOLD_BEHIND`: what the registered answer was written from, and the record it is behind. */
+  toldOutcome?: SellerCheckOutcome | null;
+  toldOutcomeKo?: string | null;
+  checkId?: string | null;
+}
+
+export interface InquiryFollowUps {
+  due: InquiryFollowUpRow[];
+  dueTotal: number;
+  waiting: InquiryFollowUpRow[];
+  waitingTotal: number;
+  /** The seller's day the split was made on (`YYYY-MM-DD`). */
+  today: string;
+}
+
+export interface ReplyHold {
+  lane: "REVIEW" | "INQUIRY";
+  subjectId: string;
+  draftVersion: number;
+  approved: boolean;
+  codes: string[];
+  /** FIX: change the text or the policy first · EXCEPTION: a promise nothing backs — add a ground, edit, or decide this one · CONFIRM. */
+  needs: "FIX" | "EXCEPTION" | "CONFIRM";
+  /** The seller's decision on this very check is on record. */
+  confirmed: boolean;
+  headline: string;
+  reasons: string[];
+  changed: string[];
+  sentences: string[];
+  figures: ReplyHoldFigure[];
+  checkedAt: string;
+  /** Names the check shown — version, basis, approval state and finding. A decision is sent with it. */
+  checkId: string;
+  /** Promise words nothing registered backs — what an exception is decided for. */
+  unbacked: string[];
+  /** Promise words a policy says otherwise of. */
+  conflicts: string[];
 }
