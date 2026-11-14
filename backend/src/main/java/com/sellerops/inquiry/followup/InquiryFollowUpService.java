@@ -161,6 +161,59 @@ public class InquiryFollowUpService {
 
     @Transactional(readOnly = true)
     public FollowUps followUps(UUID orgId, LocalDate today) {
+        return followUps(orgId, today, MAX_ROWS);
+    }
+
+    /**
+     * Every row, uncut — what the Home's one count and its server-sorted list read (2026-11-09, demo handoff §7.12).
+     * Same classification and the same order as {@link #followUps(UUID)}; only the cut is gone.
+     */
+    @Transactional(readOnly = true)
+    public FollowUps allFollowUps(UUID orgId) {
+        return followUps(orgId, sellerChecks.today(), Integer.MAX_VALUE);
+    }
+
+    /**
+     * <b>Checks whose day has come on a reply still the seller's to write</b> (2026-11-10 review of §7.12). A record of
+     * 「접수·진행 중」 can be kept before the reply is approved; {@link #classify} reads only replies in registration or
+     * done, so on its check day this check was in no list at all. Each row is that check — its work item, its record,
+     * its day — for the Home to put on the inquiry's own row. Same day rule as {@link #classify}; nothing is written.
+     */
+    @Transactional(readOnly = true)
+    public List<FollowUpRow> dueBeforeReply(UUID orgId) {
+        LocalDate today = sellerChecks.today();
+        List<InquirySellerCheck> open = checks.findByOrgIdAndSupersededAtIsNullAndOutcomeIn(orgId,
+                Set.of(SellerCheckOutcome.IN_PROGRESS.name())).stream()
+                .filter(c -> c.getNextCheckOn() == null || !c.getNextCheckOn().isAfter(today)).toList();
+        if (open.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, InquiryWorkItem> items = workItems.findAllById(open.stream().map(InquirySellerCheck::getWorkItemId)
+                        .distinct().toList()).stream()
+                .filter(w -> orgId.equals(w.getOrgId()) && InquiryWorkItemPhase.AWAITING_SELLER.contains(w.getPhase()))
+                .collect(Collectors.toMap(InquiryWorkItem::getId, Function.identity()));
+        Map<UUID, Inquiry> byInquiry = inquiries.findAllById(items.values().stream().map(InquiryWorkItem::getInquiryId)
+                .toList()).stream().collect(Collectors.toMap(Inquiry::getId, Function.identity()));
+        Map<UUID, String> codes = channels.findAllById(items.values().stream().map(InquiryWorkItem::getChannelId)
+                .distinct().toList()).stream().collect(Collectors.toMap(Channel::getId, Channel::getCode));
+        List<FollowUpRow> rows = new ArrayList<>();
+        for (InquirySellerCheck c : open) {
+            InquiryWorkItem w = items.get(c.getWorkItemId());
+            Inquiry q = w == null ? null : byInquiry.get(w.getInquiryId());
+            if (q == null || q.getDataOrigin() != com.sellerops.common.DataOrigin.REAL) {
+                continue;
+            }
+            String subject = q.getTitle() == null || q.getTitle().isBlank() ? null : q.getTitle();
+            rows.add(new FollowUpRow(w.getId(), w.getInquiryId(), subject, codes.get(w.getChannelId()), ACTION, true,
+                    c.getOutcome(), c.outcomeValue().labelKo(), c.getNote(), c.getNextCheckOn(), w.getPhase().name(),
+                    c.getRecordedAt(), "/inquiries/" + w.getInquiryId(), null, null, c.getId()));
+        }
+        rows.sort(Comparator.comparing(FollowUpRow::nextCheckOn, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(FollowUpRow::since, Comparator.nullsLast(Comparator.naturalOrder())));
+        return List.copyOf(rows);
+    }
+
+    private FollowUps followUps(UUID orgId, LocalDate today, int limit) {
         // Two bounded reads: replies in registration, and records still open. A registered reply with a finished record
         // or no record is never read at all.
         Map<UUID, InquiryWorkItem> items = new LinkedHashMap<>();
@@ -252,7 +305,7 @@ public class InquiryFollowUpService {
         waiting.sort(Comparator.comparingInt((FollowUpRow r) -> List.of(REGISTRATION, ACTION, CUSTOMER).indexOf(r.waitingOn()))
                 .thenComparing(FollowUpRow::nextCheckOn, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(FollowUpRow::since, Comparator.nullsLast(Comparator.naturalOrder())));
-        return new FollowUps(due.stream().limit(MAX_ROWS).toList(), due.size(),
-                waiting.stream().limit(MAX_ROWS).toList(), waiting.size(), today);
+        return new FollowUps(due.stream().limit(limit).toList(), due.size(),
+                waiting.stream().limit(limit).toList(), waiting.size(), today);
     }
 }

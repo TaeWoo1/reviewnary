@@ -59,6 +59,17 @@ public final class GoalSmokeInputs {
     public static final String HOLDOUT = "inquiry-goal-holdout/v1/cases.jsonl";
 
     /** Which durable file answers for an id, and under which key its text is written. Namespaced, not guessed. */
+    /**
+     * The one command that puts a store file here: {@code <dataset>/<version>/<file>} is restored as {@code <dataset>
+     * <version>} ({@code tools/eval-store/README.md}). The missing-store line names it, as it did before the holdout set
+     * made the line name its file too (2026-09-21, {@code 4022d85a}); a machine without the store (CI, a fresh clone) is
+     * told how to get it, never handed an invented row.
+     */
+    static String restoreOf(String storeFile) {
+        String[] parts = storeFile.split("/");
+        return "node tools/eval-store/store.mjs restore " + parts[0] + " " + parts[1];
+    }
+
     private static String[] sourceOf(String id) {
         return id.startsWith("H:") ? new String[] {HOLDOUT, "text"} : new String[] {CAPTURE, "question"};
     }
@@ -256,7 +267,8 @@ public final class GoalSmokeInputs {
                 Path file = storeRoot == null ? null : storeRoot.resolve(sourceOf(id)[0]);
                 missing.add(file != null && Files.exists(file)
                         ? id + " — the store is present and does not carry this case"
-                        : id + " — the durable eval store is not restored here; " + sourceOf(id)[0] + " is absent");
+                        : id + " — the durable eval store is not restored here; " + sourceOf(id)[0] + " is absent; run `"
+                                + restoreOf(sourceOf(id)[0]) + "`");
             } else {
                 inputs.add(new Input(id, message, true, null, true));
             }

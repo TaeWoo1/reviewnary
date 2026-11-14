@@ -61,12 +61,15 @@ public class ReviewWorkController {
     private final SellerAccountRepository accounts;
     private final ChannelRepository channels;
 
+    private final ReviewWorkReader reader;
+
     public ReviewWorkController(OperationsHomeService home, OperatorAttentionService attention,
                                 SellerAccountRepository accounts, ChannelRepository channels) {
         this.home = home;
         this.attention = attention;
         this.accounts = accounts;
         this.channels = channels;
+        this.reader = new ReviewWorkReader(home, attention, accounts, channels);
     }
 
     /** The vendor's delegate lane, or null in a context that has none — then every row stands as its draft read says. */
@@ -75,61 +78,11 @@ public class ReviewWorkController {
     @Autowired(required = false)
     public void setDelegatedReplyLane(DelegatedReplyLane delegated) {
         this.delegated = delegated;
+        reader.setDelegatedReplyLane(delegated);
     }
 
     @GetMapping("/review-work")
     public ReviewWorkView reviewWork(@AuthenticationPrincipal AuthPrincipal principal) {
-        UUID orgId = principal.orgId();
-        Map<UUID, Channel> byId = channels.findAll().stream()
-                .collect(Collectors.toMap(Channel::getId, Function.identity(), (a, b) -> a));
-        List<ReviewWorkView.AccountWork> committed = new ArrayList<>();
-        for (SellerAccount account : accounts.findAllByOrgId(orgId)) {
-            Channel channel = byId.get(account.getChannelId());
-            if (channel == null || !ReviewTriageChannelCapability.of(channel.getCode()).replyFlowExists()) {
-                continue;
-            }
-            var work = attention.replyWork(orgId, account.getId(), MAX_TODO, RECENT);
-            committed.add(new ReviewWorkView.AccountWork(account.getId(), channel.getCode(), channel.getNameKo(),
-                    work.coverage() == null ? null : work.coverage().name(),
-                    work.todo().stream().filter(t -> STILL_THE_SELLERS.contains(t.replyWorkState())).toList(),
-                    work.recentlyReported()));
-        }
-        Map<UUID, String> lane = delegated == null ? Map.of() : delegated.statesOf(orgId, reviewsOf(committed));
-        committed = committed.stream().map(a -> new ReviewWorkView.AccountWork(a.accountId(), a.channelCode(),
-                a.channelNameKo(), a.coverage(),
-                a.todo().stream().filter(t -> !withTheDelegate(lane, t)).toList(),
-                a.recentlyReported())).toList();
-        Set<UUID> todoReviews = reviewsOf(committed);
-        Map<UUID, String> delegatedStates = lane.entrySet().stream()
-                .filter(e -> todoReviews.contains(e.getKey()) && BACK_WITH_THE_SELLER.contains(e.getValue()))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        return new ReviewWorkView(home.undecidedAttentionCount(orgId), home.undecidedAttention(orgId, MAX_ATTENTION),
-                committed, home.safetyAmong(orgId, todoReviews), home.safetyWorryAmong(orgId, todoReviews),
-                delegatedStates, home.safetyKindsAmong(orgId, todoReviews));
-    }
-
-    private static boolean withTheDelegate(Map<UUID, String> lane, OperatorVocItem item) {
-        UUID reviewId = reviewIdOf(item.reviewId());
-        // Both guards, because Map.of() and Set.of() refuse a null rather than answer it.
-        String state = reviewId == null ? null : lane.get(reviewId);
-        return state != null && WITH_THE_DELEGATE.contains(state);
-    }
-
-    private static Set<UUID> reviewsOf(List<ReviewWorkView.AccountWork> committed) {
-        return committed.stream().flatMap(a -> a.todo().stream())
-                .map(OperatorVocItem::reviewId).map(ReviewWorkController::reviewIdOf).filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-    }
-
-    /** A row's id is ours and a uuid; anything else names no review, and asks nothing. */
-    private static UUID reviewIdOf(String raw) {
-        if (raw == null) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException notOurs) {
-            return null;
-        }
+        return reader.read(principal.orgId(), MAX_ATTENTION, MAX_TODO);
     }
 }

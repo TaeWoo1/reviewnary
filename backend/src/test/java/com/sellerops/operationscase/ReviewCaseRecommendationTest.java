@@ -31,7 +31,9 @@ class ReviewCaseRecommendationTest {
     private static final Path HOME_WORK = Paths.get("../frontend/src/lib/homeWork.ts");
     private static final Path COPY = Paths.get("../frontend/src/lib/copy/customerOps.ts");
     private static final Path NAV = Paths.get("../frontend/src/lib/nav.v2.ts");
-    private static final Path HOME = Paths.get("../frontend/src/components/customerOperations/CustomerOpsHome.tsx");
+    /** 홈 = CS 현황 since the 2026-11-13 product-owner decision; 할 일 (the list) moved from 「/」 to 「/work」. */
+    private static final Path HOME = Paths.get("../frontend/src/pages/app/CsHome.tsx");
+    private static final Path ROUTES = Paths.get("../frontend/src/App.tsx");
     /** Where the prepared recommendation is read now that the queue row carries customer context only. */
     private static final Path CASE_SCREEN = Paths.get("../frontend/src/pages/app/OperationsCase.tsx");
 
@@ -180,23 +182,31 @@ class ReviewCaseRecommendationTest {
     @Test
     @DisplayName("the queue has a standing door, and it is not two doors")
     void theQueueIsReachable() throws IOException {
-        // Product-owner decision 2026-10-28 (replacing 2026-10-27's 「할 일 left the menu」): the menu is 할 일 / 리뷰·문의 /
-        // 상품·정책, and 할 일 is the Home entry that OWNS the queue's route — lit there, never a second entry for it. The
-        // Home still opens the queue from the brief (전체 보기) and from the backlog line (할 일에서 보기).
+        // Product-owner decision 2026-10-28 (replacing 2026-10-27's 「할 일 left the menu」): 할 일 is the menu entry that
+        // OWNS the queue's route — lit there, never a second entry for it. 2026-11-13: 홈 became CS 현황 and 할 일 — the
+        // list and the item beside it — moved from 「/」 to 「/work」 unchanged; the list on /work now holds every row
+        // itself, so the old brief's 전체 보기 and the backlog's 할 일에서 보기 went with the brief. The doors are now the
+        // menu's 할 일 and 홈's numbers, each opening /work. This reads where they point, not the words around them.
         String nav = code(NAV);
         String home = code(HOME);
+        String routes = code(ROUTES);
 
+        assertThat(count(nav, "to: \"/work\", label: \"할 일\""))
+                .as("할 일 is one menu entry, named for the seller's work (2026-10-25), and it opens the list")
+                .isEqualTo(1);
         assertThat(count(nav, "match: [\"/customer-operations/cases\"]"))
-                .as("할 일 owns the queue's route")
+                .as("할 일 owns the case queue's route")
                 .isEqualTo(1);
         assertThat(count(nav, "to: \"/customer-operations/cases\""))
                 .as("and no menu entry of its own points there")
                 .isZero();
-        assertThat(count(home, "to=\"/customer-operations/cases\""))
-                .as("the Home is the door: the brief's 전체 보기 and the backlog's 할 일에서 보기")
-                .isEqualTo(2);
         assertThat(home)
-                .as("named for the seller's work (2026-10-25: 할 일 — 「확인」 is only the channel's evidence)")
-                .contains("할 일에서 보기");
+                .as("홈 is a door: its 답할 일 number opens that view of the list, and its button opens the whole list")
+                .contains("to=\"/work?work=answer\"")
+                .contains("to=\"/work\"");
+        assertThat(routes)
+                .as("neither the list nor the case queue lost its route")
+                .contains("<Route path=\"/work\" element={<AgentHome />} />")
+                .contains("<Route path=\"/customer-operations/cases\" element={<OperationsCaseQueue />} />");
     }
 }

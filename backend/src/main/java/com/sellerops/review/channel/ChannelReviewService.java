@@ -128,8 +128,11 @@ public class ChannelReviewService {
             "answered", com.sellerops.review.ReviewReplyState.ANSWERED,
             "unknown", com.sellerops.review.ReviewReplyState.UNKNOWN);
 
-    /** The 기간 filter: the last N days in Korea, today included. Anything else is a 400, like an unknown sort. */
-    static final java.util.Set<Integer> PERIOD_DAYS = java.util.Set.of(7, 30);
+    /**
+     * The 기간 filter: the last N days in Korea, today included. Anything else is a 400, like an unknown sort. {@code 1} is
+     * 「오늘」 — the list 홈's 「오늘 접수」 opens (2026-11-13), the same KST day {@code /api/dashboard/overview?days=1} counts.
+     */
+    static final java.util.Set<Integer> PERIOD_DAYS = java.util.Set.of(1, 7, 30);
 
     private static final java.time.ZoneId SEOUL = java.time.ZoneId.of("Asia/Seoul");
 

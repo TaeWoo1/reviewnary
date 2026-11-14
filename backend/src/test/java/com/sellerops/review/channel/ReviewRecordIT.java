@@ -276,6 +276,17 @@ class ReviewRecordIT {
                 .isInstanceOf(ApiException.class);
     }
 
+    /** 「오늘」 (2026-11-13): 홈's 「오늘 접수」 opens days=1 — the same KST day the overview counts with days=1. */
+    @Test
+    void theTodayPeriodIsTheKoreanDay() {
+        service.useClock(java.time.Clock.fixed(Instant.parse("2026-10-26T03:00:00Z"), ZoneOffset.UTC));
+        Review today = review(naver, 5, "오늘 받았어요", LocalDate.of(2026, 10, 26));
+        review(naver, 4, "어제 받았어요", LocalDate.of(2026, 10, 25));
+
+        ReviewRecordPageView day = service.record(org, null, "newest", null, 0, 20, false, null, 1);
+        assertThat(day.items()).extracting(r -> r.review().id()).containsExactly(today.getId());
+    }
+
     private Channel channel(String code, String name) {
         return channels.findByCode(code).orElseGet(() -> {
             Channel ch = new Channel();

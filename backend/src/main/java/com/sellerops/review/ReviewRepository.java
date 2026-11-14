@@ -1347,6 +1347,11 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
      * <p>{@link #NOT_DISMISSED_PREDICATE} applies for the same reason it does on the work queue: a
      * seller who put a review away has decided about it, and a Home that raised it again would be
      * overruling them.
+     *
+     * <p><b>A review the channel says is already answered is not undecided work</b> (2026-11-11, first real-store
+     * import: 4 of 13 ★1–2 reviews already had a seller reply in Seller Center and still sat in 먼저 볼 리뷰 and
+     * in 지난 일). {@link ReviewReplyState#ANSWERED} is "the only value that excludes a review from the queue";
+     * this list now honours it like the reply work queue does. UNKNOWN and PENDING stay — never guessed answered.
      */
     @Query("""
             select r from Review r
@@ -1357,6 +1362,7 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
               = :tierRank
               and not exists (select 1 from ReviewTriage t
                               where t.orgId = r.orgId and t.reviewId = r.id)
+              and r.replyState <> com.sellerops.review.ReviewReplyState.ANSWERED
               and
             """ + NOT_DISMISSED_PREDICATE + """
             order by r.receivedAt desc, r.id asc
@@ -1376,6 +1382,7 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
               = :tierRank
               and not exists (select 1 from ReviewTriage t
                               where t.orgId = r.orgId and t.reviewId = r.id)
+              and r.replyState <> com.sellerops.review.ReviewReplyState.ANSWERED
               and
             """ + NOT_DISMISSED_PREDICATE + """
             """)
@@ -1425,6 +1432,7 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
             """ + SAFETY_STEM_PREDICATE + """
               and not exists (select 1 from ReviewTriage t
                               where t.orgId = r.orgId and t.reviewId = r.id)
+              and r.replyState <> com.sellerops.review.ReviewReplyState.ANSWERED
               and
             """ + NOT_DISMISSED_PREDICATE + """
             order by r.receivedAt desc, r.id asc

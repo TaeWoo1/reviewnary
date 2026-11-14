@@ -64,7 +64,7 @@ public class CustomerOperationsHomeService {
      * asked for — not a cap on what the seller may see. It is deliberately the same number for the briefing and the
      * queue: a `total` counted over a different depth than the rows is a total about a different question.
      */
-    static final int SCAN = 200;
+    public static final int SCAN = 200;
     static final int MAX_QUEUE_ROWS = SCAN;
     static final Duration HANDLED_PERIOD = Duration.ofHours(24);
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -178,6 +178,48 @@ public class CustomerOperationsHomeService {
                 .collect(Collectors.toMap(Channel::getId, c -> c, (a, b) -> a));
         List<OperationsCase> waiting = waiting(orgId, found.get());
         return new CustomerOperationsHomeView.Decisions(waiting.size(), rowsOf(waiting, size, channelById));
+    }
+
+    /**
+     * Every case the Home counts, in one read (2026-11-09, demo handoff §7.12): the cases waiting for a decision — all of
+     * them the open-case scan holds, not the Home's five — and the screens of the cases that already settled their
+     * subject, so the raw review or inquiry beside one is not offered again as work. {@code complete} is false when
+     * either scan was full — more open or auto-resolved cases may exist beyond it.
+     */
+    public record HomeCases(List<CustomerOperationsHomeView.DecisionRow> decisions, java.util.Set<String> settled,
+                            boolean complete) {
+    }
+
+    @Transactional(readOnly = true)
+    public HomeCases homeCases(UUID orgId) {
+        if (!rollout.allows(orgId)) {
+            return new HomeCases(List.of(), java.util.Set.of(), true);
+        }
+        Optional<Responsibility> found = responsibilities.findByOrgIdAndTemplateCode(
+                orgId, ResponsibilityTemplate.CUSTOMER_OPERATIONS_V1);
+        if (found.isEmpty()) {
+            return new HomeCases(List.of(), java.util.Set.of(), true);
+        }
+        Responsibility r = found.get();
+        // The queue's own read, at the queue's own depth — the one selection and the one row mapping stay single.
+        CustomerOperationsHomeView.Decisions waiting = decisions(orgId, SCAN);
+        List<OperationsCase> open = cases.findByOrgIdAndResponsibilityIdAndCaseKindAndStatusOrderByCreatedAtDesc(
+                orgId, r.getId(), OperationsCaseKind.CUSTOMER_WORK, OperationsCaseStatus.PREPARED,
+                PageRequest.of(0, SCAN));
+        java.util.Set<UUID> waitingIds = waiting.rows().stream().map(CustomerOperationsHomeView.DecisionRow::caseId)
+                .collect(Collectors.toSet());
+        java.util.Set<String> settled = new java.util.HashSet<>();
+        open.stream().filter(c -> !waitingIds.contains(c.getId()))
+                .filter(c -> c.getDisposition() == CaseDisposition.MONITORING
+                        || c.getDisposition() == CaseDisposition.NEEDS_DECISION)
+                .map(CustomerOperationsHomeService::linkOf).forEach(settled::add);
+        List<OperationsCase> resolved =
+                cases.findByOrgIdAndResponsibilityIdAndDispositionAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        orgId, r.getId(), CaseDisposition.AUTO_RESOLVED, clock.instant().minus(HANDLED_PERIOD),
+                        PageRequest.of(0, SCAN));
+        resolved.stream().map(CustomerOperationsHomeService::linkOf).forEach(settled::add);
+        // Either scan full means a settled subject may be missing, and its raw item would be offered again as work.
+        return new HomeCases(waiting.rows(), settled, open.size() < SCAN && resolved.size() < SCAN);
     }
 
     private CustomerOperationsHomeView.Decisions decisions(UUID orgId, Responsibility r, Map<UUID, Channel> channelById) {

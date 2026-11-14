@@ -20,6 +20,7 @@ import com.sellerops.organization.OrganizationRepository;
 import com.sellerops.product.ProductRepository;
 import com.sellerops.repeatedissue.RepeatedIssueWorkspaceService;
 import com.sellerops.review.Review;
+import com.sellerops.review.ReviewReplyState;
 import com.sellerops.review.ReviewRepository;
 import com.sellerops.review.triage.pilot.AiTriagePilotService;
 import com.sellerops.reviewissue.ReviewIssueQueryService;
@@ -129,6 +130,29 @@ class HomeSafetyReviewTest {
 
         assertThat(home.undecidedAttention(org, 10)).isEmpty();
         assertThat(home.undecidedAttentionCount(org)).isZero();
+    }
+
+    /**
+     * 2026-11-11, first real-store import: reviews the seller had already answered in Seller Center stayed in 먼저 볼
+     * 리뷰 and in 지난 일. The channel's own ANSWERED leaves the list and its count — a low rating and a safety report
+     * alike; a reply state nobody stated (UNKNOWN) is never guessed answered and stays.
+     */
+    @Test
+    void aReviewTheChannelSaysIsAnsweredIsNotRaised() {
+        Review answeredLow = review(org, 1, "색이 사진이랑 너무 달라요");
+        answeredLow.setReplyState(ReviewReplyState.ANSWERED);
+        reviews.saveAndFlush(answeredLow);
+        Review answeredHarm = review(org, 5, "사용하다 손에 화상을 입었어요");
+        answeredHarm.setReplyState(ReviewReplyState.ANSWERED);
+        reviews.saveAndFlush(answeredHarm);
+        Review pending = review(org, 2, "생각보다 약해요");
+        pending.setReplyState(ReviewReplyState.PENDING);
+        reviews.saveAndFlush(pending);
+        Review unstated = review(org, 1, "포장이 터져서 왔어요");
+
+        assertThat(home.undecidedAttention(org, 10)).extracting(AttentionReview::reviewId)
+                .containsExactly(unstated.getId(), pending.getId());
+        assertThat(home.undecidedAttentionCount(org)).isEqualTo(2);
     }
 
     @Test

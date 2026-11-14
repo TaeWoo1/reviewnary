@@ -116,6 +116,27 @@ public class OperatorAttentionService {
     }
 
     /**
+     * The same worklist with the screen's page cap lifted to {@code ceiling} — what the Home's one count reads (2026-11-09,
+     * demo handoff §7.12). The caller says whether the ceiling was reached; this does not pretend it was not.
+     */
+    @Transactional(readOnly = true)
+    public OperatorReplyWorkView replyWorkUpTo(UUID orgId, UUID accountId, int ceiling) {
+        SellerAccount account = requireAccount(orgId, accountId);
+        Channel channel = channels.findById(account.getChannelId()).orElse(null);
+        String channelCode = channel == null ? null : channel.getCode();
+        String channelNameKo = channel == null ? null : channel.getNameKo();
+        var source = sources.forChannel(channelCode);
+        AttentionCoverage coverage = source.map(s -> s.coverage(orgId, accountId))
+                .orElse(AttentionCoverage.UNCERTAIN_UNSUPPORTED_CHANNEL);
+        ReplyWorkSlice slice = coverage.isUncertain() ? ReplyWorkSlice.empty()
+                : source.filter(IngestedReviewVocItemSource.class::isInstance)
+                        .map(IngestedReviewVocItemSource.class::cast)
+                        .map(s -> s.replyWork(orgId, accountId, channelCode, channelNameKo, Math.max(1, ceiling), 1, null))
+                        .orElse(ReplyWorkSlice.empty());
+        return new OperatorReplyWorkView(accountId, channelNameKo, coverage, slice.todo(), slice.recentlyReported());
+    }
+
+    /**
      * The same worklist, narrowed to one product when the caller names one — the 리뷰 surface scoped by
      * a doorway from 상품. {@code null} is every product, byte-identical to the read above.
      *

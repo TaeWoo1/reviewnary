@@ -114,8 +114,23 @@ public class InquiryQueueService {
                                       int page, int size) {
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
         int safePage = Math.max(page, 0);
-        Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return read(orgId, phases, PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt")));
+    }
 
+    /**
+     * The same queue, every row up to {@code max}, in <b>one</b> read (2026-11-10, demo handoff §7.12 review).
+     *
+     * <p>The Home's one count used to walk {@link #queue} page by page. An offset page over a live table can skip
+     * a row: an inquiry approved between two page reads moves every later row up by one, and the row that crossed
+     * the boundary is read by neither page. One page holding everything has no boundary. {@code totalElements}
+     * against {@code max} says whether anything was left out. Same filter, same projection, same order.
+     */
+    public InquiryQueueResponse queueUpTo(UUID orgId, java.util.Set<InquiryWorkItemPhase> phases, int max) {
+        return read(orgId, phases, PageRequest.of(0, Math.max(max, 1),
+                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"))));
+    }
+
+    private InquiryQueueResponse read(UUID orgId, java.util.Set<InquiryWorkItemPhase> phases, Pageable pageable) {
         Page<InquiryWorkItem> workItemPage = workItems.findOperationalByOrgIdAndPhaseIn(orgId, phases, pageable);
 
         // Load the referenced inquiries in one query, then project in page order.
