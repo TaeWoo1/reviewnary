@@ -398,9 +398,35 @@ public class ReviewReplyService {
         requireResponseNeededOrJudge(orgId, review, ACTOR_PREFIX + actorUserId);
         requireNotFrozen(orgId, review.getId());
         requireChannelNotAnswered(review);
-        ReviewReplyDraftView saved = drafts.save(orgId, review.getId(), ACTOR_PREFIX + actorUserId, body, baseVersion);
+        ReviewReplyDraftView saved = unchangedSuggestion(orgId, review, body)
+                .map(rule -> drafts.saveAs(orgId, review.getId(), ACTOR_PREFIX + actorUserId, body, baseVersion, rule))
+                .orElseGet(() -> drafts.save(orgId, review.getId(), ACTOR_PREFIX + actorUserId, body, baseVersion));
         draftSaved(orgId, review.getId());
         return saved;
+    }
+
+    /**
+     * <b>The template, saved as it came, is the template's — not the seller's</b> (2026-11-09,
+     * {@code docs/pilot/demo_seller_validation_v1.md} §7.11). The reply panel saves the rule-based suggestion it put in
+     * the editor before anyone typed; stamped {@code SELLER}, that sentence read as 「직접 쓰거나 고친 답글이에요」, was
+     * counted as a person's reply and could be remembered as the company's own answer to a review like it. A body
+     * that is exactly this review's suggestion is stamped {@code RULE} with the template's version instead, whoever's
+     * session saved it. The first word a person changes makes the next version theirs, as before.
+     */
+    private java.util.Optional<ReviewReplyDraftService.Provenance> unchangedSuggestion(UUID orgId, Review review,
+                                                                                       String body) {
+        if (body == null) {
+            return java.util.Optional.empty();
+        }
+        RedactedBody text = VocPreviewSanitizer.redactFullBody(review.getBody());
+        ReviewReplyProposalProvider.Suggestion suggestion = provider.suggest(
+                new ReviewReplyProposalProvider.ReviewReplyContext(orgId, review.getId(), text.text(), review.getRating()));
+        if (suggestion == null || suggestion.body() == null
+                || !ReviewReplyValidation.normalize(suggestion.body()).equals(ReviewReplyValidation.normalize(body))) {
+            return java.util.Optional.empty();
+        }
+        return java.util.Optional.of(new ReviewReplyDraftService.Provenance(
+                com.sellerops.inquiry.draft.DraftAuthorKind.RULE.name(), suggestion.providerVersion(), null, null, null));
     }
 
     /** The phone shows the same draft (2026-10-25); bringing it up to date never fails the write that moved it. */
@@ -453,9 +479,18 @@ public class ReviewReplyService {
      * path wrote what the seller reads. With the agent off, the old drafter runs as before.
      */
     private GeneratedReviewDraftView generateByAgent(UUID orgId, Review review, UUID actorUserId) {
+        // A run of this review is still drafting — the screen that started it stopped waiting, the run did not
+        // (2026-11-09). Say so instead of starting a second, paid run that would race the first to the save.
+        if (agentRuns.available(orgId) && agentRuns.running(orgId, review.getId())) {
+            return ReviewDraftComposer.agentNoDraft(AGENT_STILL_RUNNING);
+        }
         java.util.Optional<com.sellerops.agent.reply.ReplyRunStarter.Started> started =
                 agentRuns.startReviewRun(orgId, review.getId(), "SELLER", actorUserId);
         if (started.isEmpty()) {
+            // Another press got its run open between the check above and this start.
+            if (agentRuns.available(orgId) && agentRuns.running(orgId, review.getId())) {
+                return ReviewDraftComposer.agentNoDraft(AGENT_STILL_RUNNING);
+            }
             // Only an install gets here: the agent is required and could not start (off for the org, or no runtime).
             return ReviewDraftComposer.agentNoDraft(AGENT_NOT_RUNNING);
         }
@@ -470,8 +505,12 @@ public class ReviewReplyService {
         return ReviewDraftComposer.agentNoDraft(agentNoDraftMessage(outcome, reason));
     }
 
-    static final String AGENT_NOT_RUNNING = "AI 답글 에이전트가 이 PC에서 켜져 있지 않아 초안을 만들지 않았어요. 프로그램 상태를 "
-            + "확인해 주세요.";
+    static final String AGENT_STILL_RUNNING = "이 리뷰의 AI 답글을 아직 쓰고 있어요. 새로 시작하지 않았어요. 잠시 뒤 화면을 새로 고쳐 "
+            + "저장된 초안을 확인해 주세요.";
+
+    // Not 「이 PC에서」 (2026-11-09, §7.11): the same refusal is reached on a server, where there is no PC to check.
+    static final String AGENT_NOT_RUNNING = "AI 답글 에이전트를 지금 쓸 수 없어 초안을 만들지 않았어요. 직접 작성하거나 잠시 뒤 "
+            + "다시 눌러 주세요.";
 
     /** Why the agent left no draft, in the seller's words — never the review, never a vendor message. */
     static String agentNoDraftMessage(String outcome, String reason) {
@@ -1152,7 +1191,8 @@ public class ReviewReplyService {
                                         f.replacement(), f.sentence()))
                                 .toList(),
                 approveUnavailableReason(capabilities.canApprove(), approved, responseNeeded, channelAnswered,
-                        head != null, delegatedNow));
+                        head != null, delegatedNow),
+                agentRuns == null ? null : agentRuns.handoffReason(orgId, review.getId()).orElse(null));
     }
 
     /**

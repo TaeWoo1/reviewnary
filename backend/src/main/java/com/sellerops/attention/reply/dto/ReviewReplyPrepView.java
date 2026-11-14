@@ -162,5 +162,30 @@ public record ReviewReplyPrepView(
          * {@code DELEGATED} (a delegate holds the reply). Null whenever approving is open. The first that applies, in
          * that order — the same order {@code compose} closes the road in.
          */
-        String approveUnavailableReason) {
+        String approveUnavailableReason,
+        /**
+         * Why the reply agent's latest run of this review handed it to a person — its closed reason code
+         * ({@code CATEGORY_S}, {@code UNSURE_AMBIGUOUS}, …) — or null when the latest run did not end with a person, or
+         * no run has (2026-11-09, {@code docs/pilot/demo_seller_validation_v1.md} §7.11). The panel keeps the reason on
+         * screen and does not put the template in the editor by itself: a review handed to a person is the person's to
+         * write, and a template saved without their input is not their reply.
+         */
+        String agentHandoffReason) {
+
+    /** The shape before {@code agentHandoffReason} — no run handed this review to a person. */
+    public ReviewReplyPrepView(String actionRef, String redactedBody, boolean bodyRedacted, String triageDisposition,
+                               ReviewReplySuggestionView suggestion, ReviewReplyDraftView draft,
+                               ReviewReplyApprovalView approval, ReviewReplyOutcomeView outcome,
+                               ReviewReplyCapabilities capabilities, String externalIdFingerprint, Integer rating,
+                               String channelReplyState, String productName, String reviewDate, String draftAuthorKind,
+                               java.util.List<com.sellerops.inquiry.draft.dto.DraftEvidenceView> draftEvidence,
+                               String draftAnswerBasis, String draftAnswerBasisNote, String guidedUnavailableReason,
+                               ReviewReplyDelegationView delegation,
+                               java.util.List<ReviewReplyPhraseFindingView> phraseFindings,
+                               String approveUnavailableReason) {
+        this(actionRef, redactedBody, bodyRedacted, triageDisposition, suggestion, draft, approval, outcome, capabilities,
+                externalIdFingerprint, rating, channelReplyState, productName, reviewDate, draftAuthorKind, draftEvidence,
+                draftAnswerBasis, draftAnswerBasisNote, guidedUnavailableReason, delegation, phraseFindings,
+                approveUnavailableReason, null);
+    }
 }

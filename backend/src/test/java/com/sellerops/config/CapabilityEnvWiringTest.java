@@ -58,7 +58,10 @@ class CapabilityEnvWiringTest {
             // The fourth, found the same way one package later. `CaseInvestigationProperties` is an
             // AgentCapabilityGate too — this list simply did not name it, which is the whole failure
             // mode this class exists for, repeated on the capability that runs with nobody watching.
-            "SELLEROPS_RESPONSIBILITY_INVESTIGATION");
+            "SELLEROPS_RESPONSIBILITY_INVESTIGATION",
+            // The fifth (2026-11-09 demo audit): the review reply agent. Its key and org list fall back to the
+            // draft capability's, so compose passes them nested — the name still has to reach the container.
+            "SELLEROPS_AGENT_REPLY");
 
     /** Review AI triage: the same three facts under names that do not share the triple's shape. */
     private static final List<String> AI_TRIAGE = List.of(
@@ -232,5 +235,22 @@ class CapabilityEnvWiringTest {
         String compose = Files.readString(COMPOSE);
         assertThat(compose).doesNotContain("SELLEROPS_REVIEW_REPLY_PROVIDER: $");
         assertThat(compose).contains("SELLEROPS_REVIEW_REPLY_PROVIDER is deliberately NOT passed through");
+    }
+
+    /**
+     * The reply agent runs only where the backend knows the runtime's address. Unpassed, every deployed host fell back to
+     * the single-call drafter with the switch on — the silent shape this class exists for (2026-11-09).
+     */
+    @Test
+    @DisplayName("the agent-runtime address reaches the backend, and the reply agent keeps the draft fallback")
+    void theReplyAgentCanFindItsRuntime() throws Exception {
+        String compose = Files.readString(COMPOSE);
+        String yml = Files.readString(APPLICATION_YML);
+        assertThat(yml).contains("${SELLEROPS_AGENT_RUNTIME_URL:");
+        assertThat(compose).contains("SELLEROPS_AGENT_RUNTIME_URL: ${SELLEROPS_AGENT_RUNTIME_URL:-http://agent-runtime:8787}");
+        // Off unless asked: the address alone starts nothing.
+        assertThat(compose).contains("SELLEROPS_AGENT_REPLY_ENABLED: ${SELLEROPS_AGENT_REPLY_ENABLED:-false}");
+        assertThat(compose).contains("SELLEROPS_AGENT_REPLY_API_KEY: ${SELLEROPS_AGENT_REPLY_API_KEY:-${SELLEROPS_AGENT_DRAFT_API_KEY:-}}");
+        assertThat(compose).contains("SELLEROPS_AGENT_REPLY_ORG_IDS: ${SELLEROPS_AGENT_REPLY_ORG_IDS:-${SELLEROPS_AGENT_DRAFT_ORG_IDS:-}}");
     }
 }

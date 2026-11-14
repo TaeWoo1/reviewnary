@@ -119,6 +119,17 @@ services:
       SELLEROPS_AGENT_REPORT_ENABLED: ${SELLEROPS_AGENT_REPORT_ENABLED:-false}
       SELLEROPS_AGENT_REPORT_API_KEY: ${SELLEROPS_AGENT_REPORT_API_KEY:-}
       SELLEROPS_AGENT_REPORT_ORG_IDS: ${SELLEROPS_AGENT_REPORT_ORG_IDS:-}
+      # ── Reply agent (docs/standing/reply_agent_v1.md): judge · draft · critique · revise in agent-runtime ──
+      # The fifth time this file missed a capability (2026-11-09 demo audit): none of these names reached the
+      # container, so a deployed host drafted every review reply with the single-call drafter however its env file
+      # was written. The runtime address is this compose network's own service — a topology fact, not a switch:
+      # with SELLEROPS_AGENT_REPLY_ENABLED=false (the default) no run starts and the single-call drafter stays.
+      # Key and org list fall back to the draft capability's, exactly as application.yml does — passed nested,
+      # because `${NAME:-}` would hand the container an empty string and erase that fallback.
+      SELLEROPS_AGENT_RUNTIME_URL: ${SELLEROPS_AGENT_RUNTIME_URL:-http://agent-runtime:8787}
+      SELLEROPS_AGENT_REPLY_ENABLED: ${SELLEROPS_AGENT_REPLY_ENABLED:-false}
+      SELLEROPS_AGENT_REPLY_API_KEY: ${SELLEROPS_AGENT_REPLY_API_KEY:-${SELLEROPS_AGENT_DRAFT_API_KEY:-}}
+      SELLEROPS_AGENT_REPLY_ORG_IDS: ${SELLEROPS_AGENT_REPLY_ORG_IDS:-${SELLEROPS_AGENT_DRAFT_ORG_IDS:-}}
       SELLEROPS_KNOWLEDGE_EMBEDDING_ENABLED: ${SELLEROPS_KNOWLEDGE_EMBEDDING_ENABLED:-false}
       SELLEROPS_KNOWLEDGE_EMBEDDING_API_KEY: ${SELLEROPS_KNOWLEDGE_EMBEDDING_API_KEY:-}
       SELLEROPS_KNOWLEDGE_EMBEDDING_ORG_IDS: ${SELLEROPS_KNOWLEDGE_EMBEDDING_ORG_IDS:-}

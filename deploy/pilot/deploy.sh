@@ -110,6 +110,14 @@ for cap in AGENT_PLAN AGENT_DRAFT AGENT_JUDGE AGENT_CONVERSE AGENT_REPORT INQUIR
   o="SELLEROPS_${cap}_ORG_IDS"
   [[ "${!o:-}" != "*" ]] || fail "$o=* would admit every organisation on this host"
 done
+# The review reply agent borrows the draft capability's key and org list when its own are blank
+# (application.yml, docker-compose.yml), so its check reads both — the same «on with no key» and «*» refusals.
+if [[ "${SELLEROPS_AGENT_REPLY_ENABLED:-false}" == "true" ]]; then
+  [[ -n "${SELLEROPS_AGENT_REPLY_API_KEY:-${SELLEROPS_AGENT_DRAFT_API_KEY:-}}" ]] \
+    || fail "SELLEROPS_AGENT_REPLY_ENABLED=true but neither SELLEROPS_AGENT_REPLY_API_KEY nor SELLEROPS_AGENT_DRAFT_API_KEY is set"
+  [[ "${SELLEROPS_AGENT_REPLY_ORG_IDS:-${SELLEROPS_AGENT_DRAFT_ORG_IDS:-}}" != "*" ]] \
+    || fail "SELLEROPS_AGENT_REPLY_ORG_IDS=* would admit every organisation on this host"
+fi
 # Review AI triage is not an AgentCapabilityGate — it predates the interface and carries its own
 # enabled / key / org-list triple — so the backend's boot validator does not see it and nothing else
 # would notice a pilot that turned it on with no key. It does not fail: it classifies nothing, the

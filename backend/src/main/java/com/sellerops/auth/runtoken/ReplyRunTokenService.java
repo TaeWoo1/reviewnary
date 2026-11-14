@@ -63,6 +63,27 @@ public class ReplyRunTokenService {
         return new Minted(saved.getId(), token, saved.getExpiresAt());
     }
 
+    /**
+     * <b>Mint a review's run only when none of its runs is open</b> — the check and the insert under one lock (2026-11-09,
+     * {@code docs/FINDINGS.md} §B126). A look for an open run followed by a separate mint is not a lock: two presses that
+     * look together both see none and both start a paid run. So this takes the review's own row
+     * ({@code SELECT … FOR UPDATE}) first; a second start for the same review waits on it, then sees the run the first one
+     * committed. Other reviews and other orgs never wait on it. The lock is held only for this short transaction — the open
+     * run row, not the lock, is what keeps the review busy while the runtime drafts.
+     *
+     * @return empty when a run of this review is still open, or when the review is not this org's (fail closed)
+     */
+    @Transactional
+    public Optional<Minted> mintIfIdle(UUID orgId, UUID reviewId, String trigger, UUID startedBy) {
+        if (runs.lockReviewRow(orgId, reviewId).isEmpty()) {
+            return Optional.empty();
+        }
+        if (runs.existsByOrgIdAndSubjectIdAndFinishedAtIsNullAndExpiresAtAfter(orgId, reviewId, clock.instant())) {
+            return Optional.empty();
+        }
+        return Optional.of(mint(orgId, "REVIEW", reviewId, trigger, startedBy));
+    }
+
     public static boolean looksLikeRunToken(String bearer) {
         return bearer != null && bearer.startsWith(PREFIX);
     }

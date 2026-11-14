@@ -31,8 +31,18 @@ public interface ReviewReplyDraftRepository extends JpaRepository<ReviewReplyDra
 
     long countByReviewId(UUID reviewId);
 
-    /** A version created after {@code at} by an author whose id does not start with {@code systemPrefix}. */
-    boolean existsByReviewIdAndCreatedAtAfterAndCreatedByNotLike(UUID reviewId, java.time.Instant at, String systemPrefix);
+    /**
+     * Whether a version created after {@code at} answers a handoff: saved by someone other than the system, and not an
+     * untouched template.
+     *
+     * <p>Only {@code RULE} is left out (2026-11-09/10, {@code docs/FINDINGS.md} §B127): loading 「기본 문구」 and the
+     * editor's auto-save store the template under the seller's press, and that alone must not take a handed-off review
+     * out of the waiting list. Every other author — the seller's own words, a model draft the seller asked for, a row
+     * from before V90 recorded no author — answers it exactly as before.
+     */
+    @Query("select count(d) > 0 from ReviewReplyDraft d where d.reviewId = :reviewId and d.createdAt > :at "
+            + "and d.createdBy not like 'SYSTEM:%' and (d.authorKind is null or d.authorKind <> 'RULE')")
+    boolean existsPersonWrittenSince(@Param("reviewId") UUID reviewId, @Param("at") java.time.Instant at);
 
     /**
      * Which of these reviews have any draft — ONE batch query per drill-down page, never a

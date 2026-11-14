@@ -35,6 +35,16 @@ public class ReplyRunStarter {
         return runs.existsByOrgIdAndSubjectIdAndOutcome(orgId, reviewId, "HANDOFF");
     }
 
+    /**
+     * Why the latest run of this review handed it to a person, or empty when that run ended otherwise or none ran
+     * (2026-11-09). The reply panel keeps the reason in view and does not seed the template over it.
+     */
+    public Optional<String> handoffReason(UUID orgId, UUID reviewId) {
+        return runs.findFirstByOrgIdAndSubjectIdOrderByCreatedAtDesc(orgId, reviewId)
+                .filter(run -> "HANDOFF".equals(run.getOutcome()))
+                .map(run -> run.getHandoffReason() == null ? "PERSON_REVIEW" : run.getHandoffReason());
+    }
+
     /** Whether a run can start for this org: the capability is on and a runtime is configured. */
     public boolean available(UUID orgId) {
         return runtime.isConfigured() && agent.isEnabledFor(orgId);
@@ -57,11 +67,25 @@ public class ReplyRunStarter {
     public record Started(UUID runId, Optional<AgentRuntimeClient.RunReport> report) {
     }
 
+    /**
+     * Whether a run of this review is still drafting (2026-11-09). The press that started it may have stopped waiting on
+     * the screen while the run goes on and saves; a second press must see that run, not start another.
+     */
+    public boolean running(UUID orgId, UUID reviewId) {
+        return runs.existsByOrgIdAndSubjectIdAndFinishedAtIsNullAndExpiresAtAfter(orgId, reviewId, java.time.Instant.now());
+    }
+
     public Optional<Started> startReviewRun(UUID orgId, UUID reviewId, String trigger, UUID startedBy) {
         if (!available(orgId)) {
             return Optional.empty();
         }
-        ReplyRunTokenService.Minted run = tokens.mint(orgId, "REVIEW", reviewId, trigger, startedBy);
+        // Never two runs of one review at once: drafting ahead and a second press both stop here while one is open. The
+        // look and the mint are one locked step (§B126) — two presses arriving together cannot both find none.
+        Optional<ReplyRunTokenService.Minted> minted = tokens.mintIfIdle(orgId, reviewId, trigger, startedBy);
+        if (minted.isEmpty()) {
+            return Optional.empty();
+        }
+        ReplyRunTokenService.Minted run = minted.get();
         Optional<AgentRuntimeClient.RunReport> report = runtime.runReply(run.runId(), run.token());
         // A runtime that did not finish the run leaves it open until the token expires; close it now.
         tokens.finish(run.runId(), report.map(AgentRuntimeClient.RunReport::outcome).orElse("FAILED"));

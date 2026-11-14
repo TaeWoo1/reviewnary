@@ -47,9 +47,12 @@ public class ReviewReplyDraftService {
 
     /** The current draft for a review (assumes the caller already authorized it). */
     /** The head version, or 0 when none — the {@code baseVersion} the next save must pass. */
-    /** Whether a person — not the system drafting ahead — wrote or edited a version after {@code at}. */
+    /**
+     * Whether a person wrote, edited or asked for a version after {@code at} — not the system drafting ahead, and not an
+     * untouched template that loading 「기본 문구」 or the auto-save stored under a seller's press (§B127: RULE only).
+     */
     public boolean writtenByAPersonSince(UUID reviewId, java.time.Instant at) {
-        return at != null && drafts.existsByReviewIdAndCreatedAtAfterAndCreatedByNotLike(reviewId, at, "SYSTEM:%");
+        return at != null && drafts.existsPersonWrittenSince(reviewId, at);
     }
 
     public int currentVersion(UUID reviewId) {

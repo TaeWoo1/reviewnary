@@ -59,6 +59,7 @@ import org.springframework.transaction.annotation.Transactional;
 @ActiveProfiles("test")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@org.springframework.context.annotation.Import(com.sellerops.auth.runtoken.ReplyRunTokenService.class)
 class ReviewDraftAheadTest {
 
     @DynamicPropertySource
@@ -81,6 +82,8 @@ class ReviewDraftAheadTest {
     @Autowired SellerAccountRepository sellerAccounts;
     @Autowired ChannelRepository channels;
     @Autowired PlatformTransactionManager txManager;
+    @Autowired com.sellerops.auth.runtoken.ReplyAgentRunRepository agentRunRepo;
+    @Autowired com.sellerops.auth.runtoken.ReplyRunTokenService runTokens;
 
     private ReviewReplyService service;
     private ReviewDraftComposer composer;
@@ -119,6 +122,7 @@ class ReviewDraftAheadTest {
 
     @AfterEach
     void cleanUp() {
+        agentRunRepo.deleteAll();
         outcomeRepo.deleteAll();
         submissionRefRepo.deleteAll();
         approvalAudits.deleteAll();
@@ -270,6 +274,222 @@ class ReviewDraftAheadTest {
         assertThat(service.generateDraft(org, account, ref, user).unavailableMessage())
                 .as("a runtime that did not answer is said, not covered by the old drafter").contains("만들지 못했어요");
         verify(composer, never()).compose(any(), any(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("a second press while a run of the review is open says so and starts no second run (2026-11-09)")
+    void aSecondPressWhileARunIsOpenStartsNoSecondRun() {
+        Review review = review(naver, 1, ReviewReplyState.PENDING);
+        String ref = VocItemRef.forReview(review.getId());
+        triageService.decide(org, account, ref, TriageDisposition.RESPONSE_NEEDED.name(), UUID.randomUUID().toString(),
+                user);
+        com.sellerops.agent.reply.ReplyRunStarter agent = mock(com.sellerops.agent.reply.ReplyRunStarter.class);
+        when(agent.available(org)).thenReturn(true);
+        when(agent.running(org, review.getId())).thenReturn(true);
+        service.setAgentRuns(agent);
+
+        GeneratedReviewDraftView press = service.generateDraft(org, account, ref, user);
+
+        assertThat(press.draft()).isNull();
+        assertThat(press.unavailableMessage()).isEqualTo(ReviewReplyService.AGENT_STILL_RUNNING);
+        verify(agent, never()).startReviewRun(any(), any(), anyString(), any());
+        verify(composer, never()).compose(any(), any(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("a run is open while it is unfinished and its token unexpired — and only for its own review (2026-11-09)")
+    void aRunIsOpenOnlyWhileUnfinishedAndUnexpired() {
+        UUID reviewId = review(naver, 1, ReviewReplyState.PENDING).getId();
+        com.sellerops.agent.reply.ReplyAgentService replyAgent = mock(com.sellerops.agent.reply.ReplyAgentService.class);
+        when(replyAgent.isEnabledFor(org)).thenReturn(true);
+        java.util.concurrent.atomic.AtomicInteger runtimeCalls = new java.util.concurrent.atomic.AtomicInteger();
+        com.sellerops.agent.reply.ReplyRunStarter starter = new com.sellerops.agent.reply.ReplyRunStarter(runTokens,
+                countingRuntime(runtimeCalls), replyAgent, agentRunRepo);
+        assertThat(starter.running(org, reviewId)).isFalse();
+
+        com.sellerops.auth.runtoken.ReplyAgentRun open = run(reviewId, java.time.Instant.now().plusSeconds(300));
+        assertThat(starter.running(org, reviewId)).isTrue();
+        assertThat(starter.running(org, UUID.randomUUID())).as("another review").isFalse();
+        assertThat(starter.running(UUID.randomUUID(), reviewId)).as("another org").isFalse();
+        assertThat(starter.startReviewRun(org, reviewId, "SELLER", user)).isEmpty();
+        assertThat(runtimeCalls.get()).as("refused before the runtime is called").isZero();
+        assertThat(agentRunRepo.count()).as("and before a run is minted").isEqualTo(1);
+
+        open.setFinishedAt(java.time.Instant.now());
+        open.setOutcome("SAVED");
+        agentRunRepo.save(open);
+        assertThat(starter.running(org, reviewId)).as("finished").isFalse();
+
+        run(reviewId, java.time.Instant.now().minusSeconds(1));
+        assertThat(starter.running(org, reviewId)).as("expired token, never finished").isFalse();
+
+        // Nothing open any more: the next press starts exactly one run, and closes it.
+        assertThat(starter.startReviewRun(org, reviewId, "SELLER", user)).isPresent();
+        assertThat(runtimeCalls.get()).isEqualTo(1);
+        assertThat(starter.running(org, reviewId)).as("closed after the runtime returned").isFalse();
+    }
+
+    @Test
+    @DisplayName("a review that is not this org's starts no run — the lock finds no row and fails closed (2026-11-09)")
+    void aReviewOfAnotherOrgStartsNoRun() {
+        UUID reviewId = review(naver, 1, ReviewReplyState.PENDING).getId();
+        UUID otherOrg = UUID.randomUUID();
+        com.sellerops.agent.reply.ReplyAgentService replyAgent = mock(com.sellerops.agent.reply.ReplyAgentService.class);
+        when(replyAgent.isEnabledFor(otherOrg)).thenReturn(true);
+        java.util.concurrent.atomic.AtomicInteger runtimeCalls = new java.util.concurrent.atomic.AtomicInteger();
+        com.sellerops.agent.reply.ReplyRunStarter starter = new com.sellerops.agent.reply.ReplyRunStarter(runTokens,
+                countingRuntime(runtimeCalls), replyAgent, agentRunRepo);
+
+        assertThat(starter.startReviewRun(otherOrg, reviewId, "SELLER", user)).isEmpty();
+        assertThat(runtimeCalls.get()).isZero();
+        assertThat(agentRunRepo.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("the template saved as it came is the template's, not the seller's; the first changed word is theirs (2026-11-09)")
+    void anUnchangedSuggestionIsSavedAsTheTemplate() {
+        Review review = review(naver, 1, ReviewReplyState.PENDING);
+        String ref = VocItemRef.forReview(review.getId());
+        triageService.decide(org, account, ref, TriageDisposition.RESPONSE_NEEDED.name(), UUID.randomUUID().toString(),
+                user);
+        String suggestion = service.view(org, account, ref).suggestion().body();
+
+        service.saveDraft(org, account, ref, suggestion, 0, user);
+        assertThat(service.view(org, account, ref).draftAuthorKind()).isEqualTo("RULE");
+
+        service.saveDraft(org, account, ref, suggestion + " 합성-판매자가 한 문장 더했어요.", 1, user);
+        assertThat(service.view(org, account, ref).draftAuthorKind()).isEqualTo("SELLER");
+    }
+
+    @Test
+    @DisplayName("a handoff stays waiting when only the template was loaded and auto-saved — the seller's edit ends it (§B127)")
+    void aLoadedTemplateDoesNotAnswerAHandoff() throws InterruptedException {
+        Review review = review(naver, 1, ReviewReplyState.PENDING);
+        String ref = VocItemRef.forReview(review.getId());
+        triageService.decide(org, account, ref, TriageDisposition.RESPONSE_NEEDED.name(), UUID.randomUUID().toString(),
+                user);
+        Instant handedOff = Instant.now();
+        Thread.sleep(5);
+        String template = service.view(org, account, ref).suggestion().body();
+
+        // 「기본 문구 불러오기」 then the editor's auto-save: the seller pressed, but the words are the template's.
+        service.saveDraft(org, account, ref, template, 0, user);
+        assertThat(draftRepo.findAll()).singleElement().satisfies(d -> {
+            assertThat(d.getCreatedBy()).as("the seller pressed save").startsWith("SELLER:");
+            assertThat(d.getAuthorKind()).isEqualTo("RULE");
+        });
+        assertThat(service.stillWaitingAfterHandoff(org, review, handedOff))
+                .as("an untouched template saved from the seller's press is not a person's answer").isTrue();
+
+        // One word changed is the seller's sentence.
+        service.saveDraft(org, account, ref, template + " 합성-판매자가 고친 문장.", 1, user);
+        assertThat(draftRepo.findAll()).extracting(d -> d.getAuthorKind()).containsExactlyInAnyOrder("RULE", "SELLER");
+        assertThat(service.stillWaitingAfterHandoff(org, review, handedOff)).as("the seller edited it").isFalse();
+    }
+
+    @Test
+    @DisplayName("an AI draft the seller asked for still answers a handoff, recorded as MODEL — unchanged by §B127")
+    void aSellerRequestedModelDraftAnswersAHandoffAsBefore() throws InterruptedException {
+        Review review = review(naver, 1, ReviewReplyState.PENDING);
+        Instant handedOff = Instant.now();
+        Thread.sleep(5);
+
+        // What the reply agent's save step writes for a seller's press (ReplyRunService: actor SELLER:<user>).
+        new ReviewReplyDraftService(draftRepo).saveAs(org, review.getId(), "SELLER:" + user, "합성-모델 초안 문장입니다.", 0,
+                new ReviewReplyDraftService.Provenance("MODEL", "fake/v1", null, null, null));
+
+        assertThat(draftRepo.findAll()).singleElement().extracting(d -> d.getAuthorKind())
+                .as("the AI draft keeps its own author — never relabelled SELLER").isEqualTo("MODEL");
+        assertThat(service.stillWaitingAfterHandoff(org, review, handedOff)).as("as before §B127").isFalse();
+    }
+
+    @Test
+    @DisplayName("a draft the system wrote after a handoff — model or template — does not answer it, as before (§B127)")
+    void aSystemDraftAfterAHandoffDoesNotAnswerIt() throws InterruptedException {
+        Review review = review(naver, 1, ReviewReplyState.PENDING);
+        Instant handedOff = Instant.now();
+        Thread.sleep(5);
+        ReviewReplyDraftService drafts = new ReviewReplyDraftService(draftRepo);
+
+        drafts.saveAs(org, review.getId(), ReviewReplyService.PREPARED_AHEAD_ACTOR, "합성-자동 실행 초안입니다.", 0,
+                new ReviewReplyDraftService.Provenance("MODEL", "fake/v1", null, null, null));
+        assertThat(service.stillWaitingAfterHandoff(org, review, handedOff)).as("the automatic run's model text").isTrue();
+
+        drafts.saveAs(org, review.getId(), ReviewReplyService.PREPARED_AHEAD_ACTOR, "합성-자동 기본 문구입니다.", 1,
+                new ReviewReplyDraftService.Provenance("RULE", "template/v1", null, null, null));
+        assertThat(service.stillWaitingAfterHandoff(org, review, handedOff)).as("the system's template").isTrue();
+    }
+
+    @Test
+    @DisplayName("approving the untouched template still ends the wait — a person decided (§B127)")
+    void approvingTheTemplateAnswersAHandoff() throws InterruptedException {
+        Review review = review(naver, 1, ReviewReplyState.PENDING);
+        String ref = VocItemRef.forReview(review.getId());
+        triageService.decide(org, account, ref, TriageDisposition.RESPONSE_NEEDED.name(), UUID.randomUUID().toString(),
+                user);
+        Instant handedOff = Instant.now();
+        Thread.sleep(5);
+        service.saveDraft(org, account, ref, service.view(org, account, ref).suggestion().body(), 0, user);
+        assertThat(service.stillWaitingAfterHandoff(org, review, handedOff)).isTrue();
+
+        service.decideApproval(org, account, ref, "APPROVED", 1, UUID.randomUUID().toString(), user);
+        assertThat(service.stillWaitingAfterHandoff(org, review, handedOff)).as("the seller approved it").isFalse();
+    }
+
+    @Test
+    @DisplayName("the panel reads why the latest run handed the review to a person — and nothing once a later run saved (2026-11-09)")
+    void thePrepCarriesTheLatestHandoffReason() throws InterruptedException {
+        Review review = review(naver, 1, ReviewReplyState.PENDING);
+        String ref = VocItemRef.forReview(review.getId());
+        triageService.decide(org, account, ref, TriageDisposition.RESPONSE_NEEDED.name(), UUID.randomUUID().toString(),
+                user);
+        com.sellerops.agent.reply.ReplyAgentService replyAgent = mock(com.sellerops.agent.reply.ReplyAgentService.class);
+        service.setAgentRuns(new com.sellerops.agent.reply.ReplyRunStarter(runTokens,
+                new com.sellerops.agent.reply.AgentRuntimeClient(""), replyAgent, agentRunRepo));
+        assertThat(service.view(org, account, ref).agentHandoffReason()).as("no run yet").isNull();
+
+        com.sellerops.auth.runtoken.ReplyAgentRun handed = run(review.getId(), java.time.Instant.now().plusSeconds(300));
+        handed.setFinishedAt(java.time.Instant.now());
+        handed.setOutcome("HANDOFF");
+        handed.setHandoffReason("CATEGORY_S");
+        agentRunRepo.save(handed);
+        assertThat(service.view(org, account, ref).agentHandoffReason()).isEqualTo("CATEGORY_S");
+        assertThat(service.view(org, account, ref).draft()).as("handing off writes no draft").isNull();
+        Thread.sleep(20); // the later run is later by its own created_at
+
+        com.sellerops.auth.runtoken.ReplyAgentRun later = run(review.getId(), java.time.Instant.now().plusSeconds(300));
+        later.setFinishedAt(java.time.Instant.now());
+        later.setOutcome("SAVED");
+        agentRunRepo.save(later);
+        assertThat(service.view(org, account, ref).agentHandoffReason()).as("a later run saved").isNull();
+    }
+
+    /** A runtime that is configured, answers SAVED and counts its calls — no model, no network. */
+    private static com.sellerops.agent.reply.AgentRuntimeClient countingRuntime(
+            java.util.concurrent.atomic.AtomicInteger calls) {
+        return new com.sellerops.agent.reply.AgentRuntimeClient("http://127.0.0.1:1") {
+            @Override
+            public boolean isConfigured() {
+                return true;
+            }
+
+            @Override
+            public java.util.Optional<RunReport> runReply(UUID runId, String token) {
+                calls.incrementAndGet();
+                return java.util.Optional.empty();
+            }
+        };
+    }
+
+    private com.sellerops.auth.runtoken.ReplyAgentRun run(UUID reviewId, java.time.Instant expiresAt) {
+        com.sellerops.auth.runtoken.ReplyAgentRun run = new com.sellerops.auth.runtoken.ReplyAgentRun();
+        run.setOrgId(org);
+        run.setSubjectKind("REVIEW");
+        run.setSubjectId(reviewId);
+        run.setTriggerKind("SELLER");
+        run.setTokenHash("test-" + UUID.randomUUID());
+        run.setExpiresAt(expiresAt);
+        return agentRunRepo.save(run);
     }
 
     @Test
