@@ -1,5 +1,7 @@
 # Product Assembly v1 — 목표 IA와 화면 책임 (정본)
 
+> **시점·적용 범위 안내 (2026-11-12).** 업무 중심·노출 채널의 원칙과 초기 A7 IA를 보존한다. 이후 승인된 홈·메뉴·디자인 변경은 `docs/frontend/reviewnary_design.md`와 `docs/pilot/demo_seller_validation_v1.md` §7의 해당 절을 함께 읽는다. A7 고정을 이유로 이후 오너 결정을 무효화하지 않는다. 새 시안의 작성과 오너 최종 승인은 별개다.
+
 > **Status: CANONICAL (product IA & screen responsibility).** 2026-08-17, 제품 오너 결정.
 > SellerOps는 이 시점에 **"기능 개발" 단계에서 "제품 조립" 단계로 전환**한다. 이 문서는 사용자에게 보이는
 > 제품의 **정보 구조(IA)·화면 책임·노출 채널**의 단일 정본이다. 프론트 상세 원칙(상태 규칙·언어 사전·

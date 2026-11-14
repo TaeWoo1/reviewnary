@@ -1,5 +1,7 @@
 # Decision — SellerOps Local-to-Pilot Connectivity (NAVER egress IP · Cafe24 callback)
 
+> **시점·적용 범위 안내 (2026-11-12).** 로컬→파일럿 연결 결정의 당시 근거·절차를 보존한다. 현재 서버 중심 구조는 `docs/reviewnary_product_architecture_proposal_v1.md` §19와 `docs/standing/server_operation_boundary_v1.md`를 먼저 읽는다. 아래 「현재 미프로비저닝」은 작성 당시 상태이며 지금의 클라우드 상태를 확인한 말이 아니다.
+
 > Status: **ACCEPTED (operations decision), 2026-08-05.** 이 문서는 **개발·내부 테스트 단계부터
 > pilot 전환까지** SellerOps의 두 외부 연결 결정 — ① **NAVER API egress(공인 IP)**, ② **Cafe24 OAuth
 > callback URL** — 의 정본이다. 토폴로지 결정(단일 production host + 고정 공인 IPv4, AWS면 EC2/Lightsail

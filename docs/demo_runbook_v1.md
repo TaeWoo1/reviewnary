@@ -1,5 +1,7 @@
 # SellerOps Demo Runbook v1 (product assembly A7 — 2026-08-18)
 
+> **시점·적용 범위 안내 (2026-11-12).** A7(2026-08-18) 후보의 절차 이력이다. 현재 서버 중심 데모를 이 명령으로 바로 기동하지 않는다. 현재 준비·과업·실행 조건은 `docs/pilot/demo_seller_validation_v1.md` §7에서 확인하고 해당 후보의 실행 환경과 대조한다.
+
 > **What this is.** The one procedure for showing the assembled product (홈 / 리뷰 / 문의 / 주문 ·
 > 채널 연결 / 설정) to someone who has never seen it, on a local machine, from the code on
 > `feat/product-assembly-ia-v1`. It records what is **live-proven / test-proven / not proven** so the

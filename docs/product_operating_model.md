@@ -1,5 +1,7 @@
 # SellerOps — Product Operating Model
 
+> **현재 구조 안내 (2026-11-12).** 서버 중심 웹 서비스는 `docs/product-scope-v1.md` v1.15와 `docs/reviewnary_product_architecture_proposal_v1.md` §19를 따른다. 아래 Action Window·로컬 에이전트 설명은 그 경로를 쓸 때의 원칙이며 모든 판매자에게 PC 설치를 요구한다는 뜻이 아니다. 현재 화면·데모·중기 목표는 `docs/INDEX.md`에서 각각 찾아간다.
+
 > **Purpose.** This document exists to stop context drift. It is the short, stable answer to
 > "what is SellerOps, who is it for, and how does it actually operate across channels" — written
 > so that a fresh session, a new contributor, or a future you does **not** re-collapse SellerOps
@@ -18,7 +20,7 @@
 
 **SellerOps is a multi-channel commerce operations AI agent for SME sellers / manufacturers.**
 It carries operational work *between* human decisions — normalizing reviews, inquiries, orders,
-and operational risk across **every channel the seller actually sells on** — and hands a human a
+and operational risk across supported channels, with the longer-term goal of covering the channels the seller actually uses — and hands a human a
 *decision*, never the whole workflow.
 
 It is **not**:
@@ -26,7 +28,7 @@ It is **not**:
 - a scraper / scraper dump,
 - an automatic downloader or click-bot,
 - a browser-automation macro,
-- a 3-channel (NAVER / Coupang / ESM+) tool — those are the **first** channels, never the boundary,
+- a fixed three-channel strategy — the current product surface is NAVER / Coupang / Cafe24; expansion needs its own support proof,
 - a VOC / cardnews / market-intelligence project (that is a separate, long-fenced Manufacturer Track),
 - an ERP / settlement (정산) product,
 - a dashboard the seller "checks."

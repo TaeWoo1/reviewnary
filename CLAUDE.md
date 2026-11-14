@@ -13,15 +13,18 @@ It carries operational work between human decisions — normalizing reviews, inq
 reports across the seller's channels. It is **not** a scraper dump, a browser click-bot, or a
 VOC/cardnews project.
 
-**Product assembly (2026-08-17, product-owner decision):** the product is **workflow-centric**
-(홈 / 리뷰 / 문의 / 주문 / 채널 연결), not channel-centric; channel expansion is **paused** and the
+**Product assembly:** the product is **workflow-centric**, not channel-centric;
+current navigation/design is routed through `docs/frontend/reviewnary_design.md`; channel expansion is **paused** and the
 seller-visible channel set is exactly **NAVER / Coupang / Cafe24** (a channel on screen is a channel
 that is actually usable — `ProductChannels.java`, `lib/productChannels.ts`). Canonical:
 `docs/product_assembly_ia_v1.md`.
 
-Canonical product / strategy / state reference: `docs/sellerops_canonical_reference.md` (re-derive
-state before citing at any later commit). **FE/IA is frozen as of A7 (2026-08-18)** —
-`docs/product_assembly_ia_v1.md` §8; the local demo procedure is `docs/demo_runbook_v1.md`.
+Start with `docs/INDEX.md` → **먼저 찾을 곳** for the current document map.
+Product / strategy reference: `docs/sellerops_canonical_reference.md` (its old commit anchor is history).
+Current scope is v1.15 and server-first structure is `docs/reviewnary_product_architecture_proposal_v1.md` §19.
+A7 (2026-08-18) is a historical FE baseline, followed by owner-approved changes; do not use that freeze
+to discard later decisions. Current demo preparation: `docs/pilot/demo_seller_validation_v1.md` §7;
+measurement: `docs/pilot/pilot_usage_loop_v1.md` §9. The A7 runbook remains historical procedure.
 
 ## Where development happens
 
@@ -70,7 +73,8 @@ one place on disk and are **not** recoverable from git.
   - **Two lanes, and they are not the same product:** a button sends a closed `intent` and runs
     deterministically; a typed sentence is planned by the LLM or the run **fails**.
 - `contracts/` — shared contracts (Action Window, review fingerprint).
-- `vendor-server/` — the seller-PC product's central service (scope lock v1.14 ⑧-3): a separate Spring Boot build
+- `vendor-server/` — the separate delegate/exchange service (originated in scope lock v1.14 ⑧-3;
+  server-first WORKSPACE topology: product proposal §19 and server-operation boundary §5): a separate Spring Boot build
   that holds **no channel client, no channel credential and no model call** — `VendorServerScopeFenceTest`.
   Contract: `docs/vendor_server_contract_v1.md`.
 - `tools/` — dev/support tooling.
@@ -169,9 +173,10 @@ document is not on this path and nothing here links to it, it does not carry cur
 | 4 | **decisions** | ADRs and standing contracts | `docs/standing/` · the contracts in `docs/INDEX.md` — the *Standing contracts and ADRs* group, plus the lane documents under *Inquiry* / *Review* / *Knowledge and retrieval*, which are contracts rather than history |
 | 5 | **evidence** | every live run: date, channel, capability, commit, approval id, outcome | `docs/evidence/INDEX.md` |
 
-**Demo 제품 정의:** `docs/demo_core_experience_v1.md` owns **데모로 보여줄 SellerOps** — 화면과 경험의 순서를
-정하고 기존 canonical technical 문서를 덮어쓰지 않는다. 로컬 데모 절차는 `docs/demo_runbook_v1.md`.
-**FE/IA는 A7(2026-08-18) 기준으로 frozen** — `docs/product_assembly_ia_v1.md` §8. `frontend/` 디자인 계약은
+**Demo 읽기:** 현재 후보·과업·검증은 `docs/pilot/demo_seller_validation_v1.md` §7, 효율 지표는
+`docs/pilot/pilot_usage_loop_v1.md` §9. `docs/demo_core_experience_v1.md`와 `docs/demo_runbook_v1.md`의
+초기 경험·A7 절차는 해당 시점의 이력이며 현재 권한·실행 상태를 덮어쓰지 않는다.
+**FE/IA:** A7 이후 오너 승인 변경은 해당 현역 문서에서 읽는다. `frontend/` 디자인 계약은
 `docs/frontend/reviewnary_design.md`이고, 거기 없는 색·서체·컴포넌트 라이브러리는 허가되지 않는다.
 
 **Evidence rule.** Every live run gets a row in `docs/evidence/INDEX.md` in the same PR that lands its
@@ -192,7 +197,8 @@ ESM live capture → `docs/esm/` (`live-capture-checklist.md`); review operation
 2. `docs/product-scope-v1.md`
 3. `docs/product_assembly_ia_v1.md` (IA / screens / visible channels), then `docs/frontend/sellerops_frontend_spec.md`
    (frontend principles)
-4. `docs/standing/sellerops_local_agent_runtime_adr.md`
+4. `docs/reviewnary_product_architecture_proposal_v1.md` §19 / `docs/standing/server_operation_boundary_v1.md`
+   (server-first default); `docs/standing/sellerops_local_agent_runtime_adr.md` for the retained local-agent path
 5. `docs/multi-channel-connector-roadmap.md` §4.1 (living capability table)
 6. the active slice document (`docs/slices/*` — index: `docs/slices/README.md`)
 7. current implementation evidence
@@ -201,6 +207,11 @@ ESM live capture → `docs/esm/` (`live-capture-checklist.md`); review operation
 Implementation evidence may reveal docs are stale, but must not silently redefine product intent —
 **report the conflict** instead. That is exactly how the Coupang `ORDER_SUMMARY` correction happened.
 For Action Window *status*, `docs/action-window-runtime/HANDOFF.md` wins.
+
+**목표와 권한:** `docs/reviewnary_implementation_goals_draft_v1.md`는 질문별 오너 결정 이력이다.
+질문 78-80의 유형별 자동 발송 위임은 장기 목표로 이미 합의됐다. 현재 개별 승인 계약과 구분하고,
+라이브 권한으로 승격하지 않는다. 콘셉트 평가의 시간축은 오너가 정한 시점으로 유지한다.
+가상 패널 반응은 실제 고객·매출·KPI 증거가 아니다. 자세한 입구는 `docs/INDEX.md`.
 
 ### 기능은 사라지지 않는다 (정리 · 리팩터 게이트)
 

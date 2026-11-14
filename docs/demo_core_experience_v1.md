@@ -1,5 +1,7 @@
 # Demo Core Experience v1 — SellerOps 데모 제품 정의
 
+> **시점·적용 범위 안내 (2026-11-12).** 초기 경험 원칙과 당시 구현 한계를 보존한 문서다. 현재 데모 후보·과업·기기 검증은 `docs/pilot/demo_seller_validation_v1.md` §7, 효율 측정은 `docs/pilot/pilot_usage_loop_v1.md` §9를 먼저 읽는다. 아래 초기 「미구현」이나 등록 방식은 현재 전체 기능의 판정이 아니다.
+
 Status: **CANONICAL (제품 정의)** · 2026-08-24 · 소유: 이 문서
 Scope lock 위치: `docs/product-scope-v1.md` v1.14 항목 · IA: `docs/product_assembly_ia_v1.md`
 

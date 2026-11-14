@@ -155,7 +155,7 @@ V162로 추가했다. 공급자 서버에는 그 사용자를 가리키는 불�
 **사실 [REPO].**
 - 모델로 가는 요청은 전부 backend의 두 전송기(`JdkAgentLlmTransport`, `JdkLlmHttpClient`)를 지난다.
 - 기능마다 입력 하한(payload floor)이 있다.
-- 전화 · 이메일 · 긴 숫자를 지우고 주소 · 불명 이미지 · 못 읽는 본문을 보류하는 `LlmSendGate`는 **판매자 PC 모드에서만** 켜진다(`OutboundGate`가 켜졌을 때). 지금 서버 배포에서는 꺼져 있다.
+- **현재 코드 재확인 (2026-11-12):** 전화·이메일·긴 숫자 제거와 주소·불명 이미지·읽을 수 없는 본문 보류를 담당하는 `LlmSendGate`는 서버에서도 기본 활성화된다(`LlmSendGateConfiguration`, `application.yml`). 로컬 `OutboundGate` 활성화도 이 검사를 강제한다. 이전 「PC에서만 켜짐」은 원래 감사 당시의 결함이며 현재 코드 설명이 아니다. 실제 배포 환경의 값은 이번 문서 정리에서 조회하지 않았다.
 
 ### 4.1 규칙
 

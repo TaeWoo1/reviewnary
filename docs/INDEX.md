@@ -3,11 +3,42 @@
 `CLAUDE.md`가 가리키는 지도다. **요약이 아니라 지도** — 패키지의 추론·측정·결정은 그 패키지의
 문서에 있고, 이 파일은 그것을 옮겨 적지 않는다. 규칙은 전부 `CLAUDE.md`에 있고 여기엔 없다.
 
+## 먼저 찾을 곳 - 2026-11-12 문서 정리 기준
+
+문서의 **등록 여부는 찾는 경로**를 뜻한다. 등록된 파일의 모든 문장·옛 검증 결과가 지금도 유효하다는 뜻은 아니다.
+아래 입구에서 해당 **절의 날짜·상태·소유 범위**를 확인한다. 최신 파일명이나 큰 버전 번호만으로 우선순위를 정하지 않는다.
+
+| 알고 싶은 것 | 먼저 읽을 정본 / 절 | 읽을 때 구분할 것 |
+|---|---|---|
+| 구상 중인 아이템 전체·시뮬레이션으로 평가할 가치와 맹점 | `docs/sellerops_canonical_reference.md` 맨 앞 「현재 아이템 기준」 | 아이템 설명의 단일 갱신처. 회차별 피치는 평가 입력, 미래 확장은 인터뷰 후보이며 현재 개발 범위가 아님 |
+| 지금 만들고 운영하는 제품의 범위 | `docs/product-scope-v1.md` v1.15 → `docs/reviewnary_product_architecture_proposal_v1.md` §19 | 서버 중심 웹 서비스. 이전 PC 설치형 기본 구조는 전환 이력 |
+| 이미 합의한 목표·아직 열린 결정 | `docs/reviewnary_implementation_goals_draft_v1.md` 질문 76-80 및 각 질문의 날짜 → 제품 구조 §12·§19 | 인터뷰의 확인된 방향과 미정 수치 구분. 목표 합의 ≠ 구현·실행 승인 |
+| 운영 기록을 잇는 중기 방향 | `docs/standing/operational_knowledge_direction_v1.md` → 위 질문 76-80 | 출처·적용 범위·최신성, 업무별 위임. 독립된 약속 이행 추적·외부 AI 쓰기 권한은 완료로 간주하지 않음 |
+| 이번 데모의 준비와 잔여 과제 | `docs/pilot/demo_seller_validation_v1.md` §7 | §1-6의 과거 계획과 최신 후보 구분. 합성 시연 ≠ 실제 채널·AI·기기 검증 |
+| 효율 KPI와 관찰 방법 | `docs/pilot/pilot_usage_loop_v1.md` §9 (특히 §9.5) | 같은 품질의 직접 작업시간, 대기, 운영자 대행 노동을 분리 |
+| 현재 홈·FE 디자인 | `docs/frontend/reviewnary_design.md` → 데모 검증 §7의 해당 QA | A7 고정은 과거 기준. 이후 오너 승인 변경과 아직 검수 중인 시안을 구분 |
+| 문의·리뷰가 실제로 하는 일 | 아래 Inquiry / Review / Knowledge 묶음의 레인 정본 | 소스 존재 / 합성 시험 / 실제 모델 / 실제 채널 / 배포 적용은 서로 다른 상태 |
+| 채널별 실제 지원 | `docs/multi-channel-connector-roadmap.md` §4.1 → `docs/evidence/INDEX.md` | 채널명이 아닌 채널 × 자료 × 동작, 증거 날짜·후보·권한 확인 |
+| 라이브 실행 허용 여부 | `docs/standing/sellerops_live_approval_contract.md` | 목표 문서·과거 승인·데모 성공은 새 실행 권한이 아님 |
+| 핵클·Runyour의 현재 위치 | `docs/standing/service_readiness_v1.md` §9·§10 | 분석 운영 적용 보류 / Runyour 평가 전용. 계획을 호출 완료로 읽지 않음 |
+| 전체 실행 구조 | `docs/architecture.md` → 제품 구조 §19 및 각 런타임 계약 | 서버 기본과 선택적 로컬 경로를 구분 |
+
+### 결정·가정·증거를 섞지 않는 법
+
+- **현재 계약:** scope v1.15와 해당 레인 계약이 지금 허용하는 동작이다.
+- **오너 목표:** 날짜가 붙은 합의다. 구현 방식·수치가 미정이어도 방향까지 미정으로 되돌리지 않는다.
+- **구현·검증:** 커밋/미커밋 후보, 환경, 실행일, 결과를 함께 읽는다. 머리 주석만으로 완료 판정하지 않는다.
+- **콘셉트 가정:** 데모 이후 제품·가격·알림·자동화 가정이다. 현재 제공 기능이나 고객 약속으로 승격하지 않는다.
+- **과거 이력:** 당시 입력과 결과를 보존한다. 현재 작업은 최신 입구를 이용한다. PDF와 저장소 밖 founder 시뮬레이션은 정본 계약을 대신하지 않는다.
+
+서로 어긋나면 `CLAUDE.md`의 우선순위를 적용하고, **계약 변경인지 / 구현 불일치인지 / 시점 차이인지**를 먼저 밝힌다.
+새 요약본을 정본으로 더 만들기보다 이 지도와 해당 레인 소유 절을 함께 갱신한다.
+
 ## 폴더 지도
 
 | 폴더 | 무엇이 있나 |
 |---|---|
-| `docs/` (루트 12개) | `CLAUDE.md`가 이름으로 부르는 문서 — reading path 6정점 · 이 색인 · `FINDINGS.md` · `lineage_index.md` |
+| `docs/` (루트) | `CLAUDE.md`가 이름으로 부르는 문서 — reading path 6정점 · 이 색인 · `FINDINGS.md` · `lineage_index.md` |
 | `docs/standing/` | standing contracts · ADR (`docs/decisions/`를 2026-10-12에 흡수) |
 | `docs/inquiry/` `docs/review/` | 문의 · 리뷰 레인 |
 | `docs/agent/` | agent runtime · conversation |
@@ -20,24 +51,25 @@
 | `docs/evidence/` | 라이브 실행 이력 (한 런 = 한 행) |
 | `docs/slices/` `docs/workstreams/` `docs/action-window-runtime/` `docs/esm/` `docs/vendor/` | 기존 구조 그대로 |
 
-여기 적힌 문서만 **현재 진실을 싣는다.** `docs/` 아래 나머지는 lineage 아니면 evidence다:
+아래 목록은 **현역 계약·방향·이력의 진입점**이다. 각 항목의 성격을 구분한다. `docs/` 아래 미등록 파일은 lineage 아니면 evidence다:
 
-- `docs/lineage_index.md` — 소스가 주석으로 인용해서 제자리에 남은 과거 기록 43개
-- `docs/archive/2026-q3/MANIFEST.md` — 2026 Q3 1회성 기록 63개
+- `docs/lineage_index.md` — 소스가 주석으로 인용해서 제자리에 남은 과거 기록
+- `docs/archive/2026-q3/MANIFEST.md` — 2026 Q3 1회성 기록
 - `docs/archive/` — 그 이전 lineage
 - `docs/evidence/INDEX.md` — 라이브 실행 이력 (**모든 라이브 런은 여기 한 행을 갖는다**)
 - `docs/vendor/` — 채널 API 원문 사본 (NAVER / Coupang / Cafe24)
 - `docs/slices/README.md` — slice 색인
 
-파일을 여기 추가하는 것은 **그 문서가 현재 진실을 싣는다는 선언**이다. 1회성 기록 ·
+파일을 여기 추가할 때는 **무엇을 소유하는 현역 계약인지, 목표 기록인지, 또는 찾기 위한 이력 입구인지**를 명시한다. 1회성 기록 ·
 live proof · selector calibration · audit · closure record는 여기 올라오지 않는다 —
 `docs/evidence/INDEX.md`의 행이 그 자리다.
 
 ### Orientation, scope, architecture
 
+- `docs/reviewnary_implementation_goals_draft_v1.md` — **오너 인터뷰·목표 결정 이력의 입구**. 파일 전체가 승인된 구현 계약은 아님. 질문별 확인/미정 구분; 질문 78-80은 유형별 자동 발송 위임의 장기 방향, 실제 실행은 scope v1.15와 별도 계약을 따름
 - `docs/architecture.md` — SellerOps architecture — the map
-- `docs/demo_core_experience_v1.md` — Demo Core Experience v1 — SellerOps 데모 제품 정의
-- `docs/demo_runbook_v1.md` — SellerOps Demo Runbook v1 (product assembly A7 — 2026-08-18)
+- `docs/demo_core_experience_v1.md` — 초기 데모 경험 원칙과 이력. 현재 데모 후보·검증은 `docs/pilot/demo_seller_validation_v1.md` §7
+- `docs/demo_runbook_v1.md` — A7(2026-08-18) 로컬 시연 절차 이력; 최신 절차로 자동 간주하지 않음
 - `docs/multi-channel-connector-roadmap.md` — Multi-Channel Connector Roadmap
 - `docs/product-scope-v1.md` — Product Scope v1.15 — Drift Guard
 - `docs/product_assembly_ia_v1.md` — Product Assembly v1 — 목표 IA와 화면 책임 (정본)

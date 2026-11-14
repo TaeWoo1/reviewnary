@@ -1,5 +1,97 @@
 # SellerOps — Canonical Reference: Product, Strategy, State
 
+## 현재 아이템 기준 — 여기만 갱신 (2026-11-12)
+
+**이 절이 구상 중인 아이템 설명의 단일 원본이다.** 다음 논의에서 고객·문제·가치·확장 방향이 바뀌면 이 절을 고친다.
+회차별 피치·브리프는 여기서 만든 평가용 입력이며, 실행한 입력과 결과는 당시 상태로 보존한다.
+아래 과거 전략·구현 목표 인터뷰·기술 방향 문서는 근거와 이력이다. 최신 아이템 정의를 따로 만들지 않는다.
+현재 구현·운영 범위는 scope v1.15와 레인별 증거가 소유하며, 이 절의 목표 설명으로 바뀌지 않는다.
+
+### 1. 지금 정리하는 목적
+
+**대표가 구상한 목표 제품을 시뮬레이션에서 평가하고, 매력적인 부분과 사업의 맹점을 찾는다.**
+이번 과제는 개발 완료 감사나 당장 진행할 개발 목록 확정이 아니다. 좋은 평가를 받도록 조건을 유리하게 바꾸기보다,
+어떤 고객·문제·제공 조건에서 긍정/부정 판단이 나오는지 본다. 가상 반응은 실제 구매·매출·효율의 증거가 아니다.
+
+### 2. 누구의 어떤 일을 줄이는가
+
+- **중심 고객:** 여러 판매 채널을 운영하는 중소 판매자·제조사·브랜드의 대표와 실무 담당자. CS 전담자뿐 아니라 사무 업무 전반을 함께 처리하는 직원도 포함한다.
+- **중심 문제:** 판매자센터 순회, 자료·과거 대응 찾기, 답 작성·승인·등록, 교환·환불 등 남은 일 확인이 끊어져 반복 노동과 누락이 생긴다.
+- **확장 고객 가설:** 주문은 있지만 리뷰가 적거나 고객 관리 체계가 약한 판매자도 도울 수 있는지 인터뷰한다. 주문 자체가 적은 판매자의 유입 문제까지 해결한다고 확정하지 않는다.
+
+### 3. 목표 제품 — 초안 작성에서 끝나지 않는 고객 운영 AI
+
+**Reviewnary는 여러 판매 채널의 고객 업무를 모으고, 가게의 기준과 처리 기록을 이어 써서 필요한 응대를 준비·처리하며, 답변 뒤 남은 일까지 챙기는 AI 서비스다.**
+
+1. 채널에 흩어진 문의·리뷰를 모아 급한 일과 담당자가 결정할 일을 보여 준다.
+2. 상품·정책, 확인 가능한 주문·배송 사실, 이전 안내와 판매자의 처리 기록을 연결해 답을 준비한다. 모르는 사실은 확인할 일로 남긴다.
+3. 승인·등록과 실제 교환·환불 등의 완료를 구분하고, 진행 중이면 다음 확인할 일로 이어 준다.
+4. 검증된 반복 업무는 판매자가 맡긴 유형부터 매번 승인하지 않아도 처리하는 방향이다. 유형의 품질과 개별 건의 근거·최신성·권한을 함께 보고, 오류 시 해당 범위를 멈추고 판매자가 재개한다.
+
+**카카오톡 알림도 제품 방향에 포함한다 (2026-11-12 오너 재확인).** 새 문의나 확인할 일의 발견, 결정·승인이 필요한 일, 등록 결과 등을 앱 밖에서 알 수 있게 하는 방향이다.
+예전 피치에 승인·등록 알림만 적혔다고 해서 다른 업무 알림을 제품에서 제외한 결정으로 읽지 않는다.
+어떤 사건을 언제 알릴지·묶음/중복 처리·수신 설정·구현 방식은 구체화할 항목이며, 「즉시·무누락」 성능을 약속한 것은 아니다. 현재 카톡 연동이 완료됐다는 뜻도 아니다.
+
+예: 「교환 상품 오늘 보내주시나요?」에 출고 사실을 모르면 확인을 요청하고, 발송 기록이 생기면 그 근거로 답한다.
+아직 진행 중이면 완료라고 답하지 않고 다음 확인일을 남긴다. 과거 출고 약속과 실제 이행의 자동 대조는 별도 고도화 목표다.
+
+**차별화 가설:** 가게별 운영 맥락을 이어 써서 자료 찾기·반복 확인·예외 처리·후속 관리까지 줄이는 것.
+운영 기록을 연결하는 구조는 그 수단이다. 다른 AI가 맥락을 못 본다거나, 기록이 쌓이기만 하면 해자가 된다고 단정하지 않는다.
+현재 눈에 보이는 채널 범위는 NAVER·Coupang·Cafe24이며, 모든 자료·동작이 세 채널에서 같은 수준으로 지원되는 것은 아니다.
+
+### 4. 앞단·뒷단 확장 — 향후 2~3단계 방향, 지금은 인터뷰
+
+멘토링 뒤 오너가 추가한 방향은 **리뷰·문의가 많은 고객에만 갇히지 않도록 구매 전후로 가치를 넓히는 것**이다.
+아래 기능은 구체화를 위한 후보이며, 출시 범위·개발 순서·자동 실행 권한을 정한 것이 아니다.
+여기서 2~3단계는 향후 제품 발전 단계이며 시뮬레이션 2·3차를 뜻하지 않는다.
+
+| 구간 | 인터뷰할 기능 후보 | 확인할 가치와 남은 질문 |
+|---|---|---|
+| 구매 전 | 반복 질문을 상품 FAQ·설명 개선으로 연결; SEO·AEO·GEO 활용 검토 | 고객의 구매 판단·발견을 돕는가? 유입 개선이 필요한 고객과 응대 개선 고객이 같은가? 노출·매출 효과는 미검증 |
+| 구매 후 | CRM을 통한 사용 안내·리뷰 요청·재구매 안내 | 리뷰가 적은 판매자에게도 유료 가치가 있는가? 고객 식별·연락 권한·채널 제약·기존 도구와 중복은? |
+| 운영 개선 | 반복 불만·문의의 원인을 찾아 상품 설명·운영 기준 개선과 후속 확인으로 연결 | 보고서 열람을 넘어 실제 개선 행동과 반복 문제 감소로 이어지는가? |
+
+SEO·AEO·GEO·CRM은 오너가 제시한 탐색 축이다. 표의 구체적인 기능 묶음은 검토 후보이며 채택 확정이 아니다.
+경쟁사 기능을 더하는 것만으로 차별화라고 하지 않는다. 현재는 인터뷰로 문제·기존 지출·우선순위를 확인한다.
+이번 목표 제품 평가에 어디까지 넣을지는 평가 입력에서 명시하며, 미래 후보를 모두 기본 제공하는 패키지로 섞지 않는다.
+
+### 5. 기대 성과와 시뮬레이션에서 드러낼 맹점
+
+기대 성과는 **업무시간 감소 + 응대 속도·품질 개선 + 실제 반복 사용**이다.
+측정 후보는 직접 작업·자료 찾기·재작업 시간, 문의 접수부터 첫 실질 답변 등록까지의 중앙값/P90,
+오래 남은 미답변, 사실·정책 오류, 실제 업무 처리 비중, DAU/WAU/MAU와 유지다.
+로그인만 한 사용과 업무를 처리한 사용을 나누고, 업무가 없거나 자동화된 날의 낮은 방문을 곧 실패로 보지 않는다.
+매출·리뷰 확보·재구매 성과는 확장 기능 검증 항목이며 현재 효과로 주장하지 않는다. 수치 목표는 아직 정하지 않았다.
+
+시뮬레이션에서는 다음을 숨기지 않고 질문한다. 과거 결과는 맹점 후보를 찾는 데 쓰되 새 평가자에게 정답으로 주입하지 않는다.
+
+- **구매 이유:** 초안·통합 목록만으로 기존 도구를 바꿀 만큼 절실한가? 어느 업무량·직원 구조에서 필요한가?
+- **승인 부담:** AI가 시간을 줄이는가, 확인할 화면과 승인만 늘리는가?
+- **도입·신뢰:** 연결 권한·자료 준비·가게 기준 설정의 부담, 오답·최신성·등록 오류에 대한 우려는?
+- **원가·확장성:** 판매자 시간 절감이 우리 대행 노동으로 옮겨진 것은 아닌가? 초기 설정·등록·복구·모델 비용을 포함해 수익이 나는가?
+- **차별화·집중:** 기록 재사용이 반복 노동을 줄이는가? CRM·마케팅 확장이 가치를 강화하는가, 제품을 흐리는가?
+- **사업 조건:** 무료 기간·가격·연락 수단 등은 평가용 제공 가정이며 수치는 저장소 밖에 둔다. 실제 가격·구현 완료·수요로 읽지 않는다.
+
+**시뮬레이션 해석:** 5차의 가상 buy 2/pass 18은 실제 고객 수가 아니며, 「승인 11」은 주요 거절자 수가 아닌 단어 언급 집계다.
+같은 페르소나·seed는 사람 카드만 맞춘다. 모델 판단이나 인과 비교를 보장하지 않는다. 긍정 평가와 치명적인 미해결 조건을 함께 보고한다.
+
+### 6. 이 문서와 연결된 자료의 역할
+
+- **실사용 계획 (2026-11-12 오너 확인):** 오너 회사 1곳에서 실사용할 예정이며, 2026-11-13 대표와 협의한다. 시작일·범위·조건은 협의 전이다. 이미 사용 중인 고객·유료 고객·성과 확보로 집계하지 않는다.
+- **아이템 정의·미래 방향:** 이 절에서 계속 갱신한다. 이번에 새 개발이나 시뮬레이션 실행을 승인하지 않는다.
+- **오너 결정 원문:** [구현 목표 인터뷰](reviewnary_implementation_goals_draft_v1.md), 특히 질문 76-82. 기술 설계는 [운영 지식 방향](standing/operational_knowledge_direction_v1.md).
+- **현재 제공 범위·증거:** [문서 지도](INDEX.md)에서 scope·채널·레인별 문서를 찾는다. 이 절에서 완료 현황을 복제하지 않는다.
+- **6차 평가 조건·피치:** 저장소 밖 `../founder/round6/concept.md`와 `../founder/round6/pitch-draft.md`. 확정한 입력은 회차 안에 고정하고, 차기 구상은 이 절로 돌려쓴다.
+- **변경 근거 (2026-11-12):** 오너가 시뮬레이션의 목적을 아이템 평가·맹점 발견으로 재확인하고, 문서 한 곳에서 구상을 갱신하도록 요청했다. 멘토링 확장은 인터뷰 단계다.
+
+---
+
+**아래는 기존 제품 원칙·과거 전략과 근거다. 구상 중인 아이템은 위 「현재 아이템 기준」부터 읽는다.**
+
+> **현재 읽기 기준 (2026-11-12).** 이 파일은 제품 정체성과 정본 경로를 안내한다. 아래 `ca470e2`와 §2-§5의 단계·상태는 **과거 스냅샷**이다. 현재 범위는 `docs/product-scope-v1.md` v1.15, 서버 중심 구조는 `docs/reviewnary_product_architecture_proposal_v1.md` §19, 최신 작업별 입구는 `docs/INDEX.md`의 「먼저 찾을 곳」을 따른다. 코드 존재·과거 통과·현재 배포를 서로 대신하지 않는다.
+>
+> **중기 목표와 현재 권한을 분리한다.** 오너 인터뷰 `docs/reviewnary_implementation_goals_draft_v1.md` 질문 76-80에는 판매자별 기록 재사용과 업무 유형별 자동 발송 위임의 방향이 이미 있다. 현재 개별 승인 계약을 이유로 그 목표를 취소하거나 새 결정으로 되묻지 않는다. 반대로 목표를 현재 자동 발송·외부 AI 쓰기 권한으로 읽지도 않는다.
+
 > **This document is the canonical Product / Strategy / Current State reference for SellerOps.**
 > It carries **identity, direction, honest state, authority, and standing fences**. It does not
 > carry runtime status, capability tables, slice contracts, or execution plans — those live in
@@ -48,10 +140,10 @@ later commit. A recorded SHA is a snapshot, not a fact — including this one.
 - **Not a history.** Executed records stay frozen; later truth arrives as a forward-pointer,
   never as an edit.
 
-### Relationship to `docs/sellerops_canonical_reference.md`
+### Relationship to the historical predecessor
 
-**`docs/sellerops_canonical_reference.md` is no longer the canonical Product / Strategy / Current State
-authority. This document is.**
+**The former `sellerops_current_state.md` is a historical handoff, not current product authority.**
+This file routes product identity and strategy; current state must be derived from the latest lane evidence.
 
 `sellerops_current_state.md` is left **untouched and unrebased by deliberate decision**. Its §1
 baseline is 2026-07-08 with two stacked partial-update banners; its §10 "Active slice" names
@@ -91,7 +183,8 @@ OBSERVE → ACQUIRE → NORMALIZE → UNDERSTAND → PRIORITIZE → ACT → ESCA
 (Canonical definition: `docs/product-scope-v1.md` §1.6.)
 
 A **human checkpoint hands back a decision, never the whole workflow.** `ACT` is bounded in v1 —
-preparation and guided execution only, no autonomous outbound write.
+preparation and explicitly approved execution through the permitted lane, no autonomous outbound write.
+The older guided-only description does not cancel the API/delegate paths in scope v1.15 and proposal §19.
 
 ### 1.2 How agentic value is measured
 
@@ -121,9 +214,9 @@ whole (`docs/product-scope-v1.md` §1.4):
 
 `AUTOMATIC_OPERATION` · `ACTION_WINDOW` · `FILE_IMPORT` · `INTEGRATION_PENDING`
 
-**Default production review-acquisition mode = `ACTION_WINDOW`**
-(`docs/multi-channel-connector-roadmap.md` §5.1). This is an approved default **design**; it is
-realized today on NAVER only.
+**Historical default (at the anchor): `ACTION_WINDOW`.** Do not use it as the current default
+for every review channel. Current NAVER review handling and server/API/delegate boundaries follow
+`docs/product-scope-v1.md` v1.15, proposal §19 and the capability table (§4.1).
 
 ### 1.5 Product-canon update (2026-07-26) — pull-first, Agent-first
 

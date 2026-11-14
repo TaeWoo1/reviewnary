@@ -1,5 +1,7 @@
 # ADR — SellerOps Local Agent Runtime & Guided-Connection Architecture
 
+> **시점·적용 범위 안내 (2026-11-12).** 이 ADR은 로컬 에이전트 경로의 경계를 소유한다. 현재 제품의 기본 실행 위치는 scope v1.15와 `docs/reviewnary_product_architecture_proposal_v1.md` §19의 서버 중심 구조다. 아래 당시 미구현 목록·로컬 전제는 지금 전체 서비스의 최신 상태를 뜻하지 않는다.
+
 > Status: **ACCEPTED (architecture decision), 2026-07-07.** 이 문서는 로컬 에이전트 런타임과 가이드
 > 연결의 **아키텍처 경계 결정**의 정본이다. 제품 원칙은 `docs/product-scope-v1.md` §1.2·§6.1,
 > 프론트 화면·상호작용은 `docs/frontend/sellerops_frontend_spec.md` §16, 커넥터 레벨 규칙은
