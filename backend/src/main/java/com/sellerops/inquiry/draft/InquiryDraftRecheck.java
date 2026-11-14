@@ -12,6 +12,7 @@ import com.sellerops.knowledge.org.OrgKnowledgeSourceRepository;
 import com.sellerops.knowledge.style.AnswerStyleInstruction;
 import com.sellerops.knowledge.style.AnswerStyleProfile;
 import com.sellerops.knowledge.style.AnswerStyleService;
+import com.sellerops.product.library.ProductKnowledgeSource;
 import com.sellerops.product.library.ProductKnowledgeSourceRepository;
 import com.sellerops.review.draft.ReviewDraftRecheck;
 import java.util.ArrayList;
@@ -88,10 +89,26 @@ public class InquiryDraftRecheck {
     /** What the check found; empty lists and no codes when the version still stands. */
     public record Result(List<String> codes, List<String> changed, List<String> promises, List<String> phrases,
                          List<FigureNote> figures, List<String> conflicts, List<ReviewDraftRecheck.Against> against,
-                         SellerCheckNote sellerCheck) {
+                         SellerCheckNote sellerCheck, List<String> retired, List<String> withdrawals) {
         public Result {
             conflicts = conflicts == null ? List.of() : conflicts;
             against = against == null ? List.of() : against;
+            retired = retired == null ? List.of() : retired;
+            withdrawals = withdrawals == null ? List.of() : withdrawals;
+        }
+
+        /** Retired titles without their moments — a caller that does not bind a decision to one. */
+        public Result(List<String> codes, List<String> changed, List<String> promises, List<String> phrases,
+                      List<FigureNote> figures, List<String> conflicts, List<ReviewDraftRecheck.Against> against,
+                      SellerCheckNote sellerCheck, List<String> retired) {
+            this(codes, changed, promises, phrases, figures, conflicts, against, sellerCheck, retired, List.of());
+        }
+
+        /** Without retired titles — every caller written before {@code retired} existed. */
+        public Result(List<String> codes, List<String> changed, List<String> promises, List<String> phrases,
+                      List<FigureNote> figures, List<String> conflicts, List<ReviewDraftRecheck.Against> against,
+                      SellerCheckNote sellerCheck) {
+            this(codes, changed, promises, phrases, figures, conflicts, against, sellerCheck, List.of());
         }
 
         public Result(List<String> codes, List<String> changed, List<String> promises, List<String> phrases,
@@ -195,6 +212,12 @@ public class InquiryDraftRecheck {
             cited = evidence.findAllByWorkItemIdAndDraftVersionOrderByOrdinalAsc(item.getId(), cites);
         }
         Set<String> changed = new LinkedHashSet<>();
+        // The cited documents the seller turned off or deleted since — a subset of changed (owner, 2026-11-14) — and, for
+        // each, the moment it was withdrawn: turning a document back on and off again is a new withdrawal, and a decision
+        // on the first must not stand for it (2026-11-15). The moment is the document's last save, which every
+        // 사용 / 사용 안 함 change bumps.
+        Set<String> retired = new LinkedHashSet<>();
+        Set<String> withdrawals = new LinkedHashSet<>();
         List<String> current = new ArrayList<>();
         for (InquiryDraftEvidence row : cited) {
             DraftEvidenceView view = snippets.viewOf(row);
@@ -205,13 +228,27 @@ public class InquiryDraftRecheck {
                 continue;
             }
             if (InquiryDraftEvidence.KIND_ORG_POLICY.equals(row.getKind())) {
-                orgSources.findById(row.getSourceId()).filter(OrgKnowledgeSource::isActive)
-                        .ifPresentOrElse(s -> current.add(s.getTitle() + "\n" + s.getBody()),
-                                () -> changed.add(row.getTitle() == null ? "" : row.getTitle()));
+                java.util.Optional<OrgKnowledgeSource> source = orgSources.findById(row.getSourceId());
+                if (source.filter(OrgKnowledgeSource::isActive).isPresent()) {
+                    current.add(source.get().getTitle() + "\n" + source.get().getBody());
+                } else {
+                    String title = row.getTitle() == null ? "" : row.getTitle();
+                    changed.add(title);
+                    retired.add(title);
+                    withdrawals.add(withdrawal(row.getSourceId(), source.map(OrgKnowledgeSource::getUpdatedAt)));
+                }
             } else if (InquiryDraftEvidence.KIND_PRODUCT_KNOWLEDGE.equals(row.getKind())) {
-                productSources.findById(row.getSourceId())
-                        .ifPresentOrElse(s -> current.add(s.getTitle() + "\n" + s.getBody()),
-                                () -> changed.add(row.getTitle() == null ? "" : row.getTitle()));
+                // A product document turned off (사용 안 함) stands for nothing, as a company one does — the review recheck
+                // has read it so all along (2026-11-14 manual eval F3: a draft citing a retired product manual was approved).
+                java.util.Optional<ProductKnowledgeSource> source = productSources.findById(row.getSourceId());
+                if (source.filter(ProductKnowledgeSource::isActive).isPresent()) {
+                    current.add(source.get().getTitle() + "\n" + source.get().getBody());
+                } else {
+                    String title = row.getTitle() == null ? "" : row.getTitle();
+                    changed.add(title);
+                    retired.add(title);
+                    withdrawals.add(withdrawal(row.getSourceId(), source.map(ProductKnowledgeSource::getUpdatedAt)));
+                }
             }
         }
         // The seller's record the version stands on is evidence like a cited passage: a refund the record says was done is
@@ -234,16 +271,6 @@ public class InquiryDraftRecheck {
         List<String> promises = InquiryClaimGuard.unsupportedClaims(text, current, voice, asked).stream()
                 .filter(v -> v.kind() != InquiryClaimGuard.Kind.FIGURE)
                 .map(InquiryClaimGuard.Violation::matched).distinct().toList();
-        List<String> phrases = AnswerStyleInstruction.forbiddenPresentIn(text, style);
-        List<FigureNote> figures = grounds == null ? List.of()
-                : figures(item, version, cites, text, authorKind, !changed.isEmpty());
-        List<String> codes = new ArrayList<>();
-        if (!changed.isEmpty()) {
-            codes.add(ReviewDraftRecheck.SOURCE_CHANGED);
-        }
-        if (!promises.isEmpty()) {
-            codes.add(ReviewDraftRecheck.UNSUPPORTED_PROMISE);
-        }
         // Which of them a policy says otherwise, read as the review recheck reads it (2026-11-01: 근거 없음 ≠ 정책 충돌).
         // Against every document in use as well as the cited ones: a policy the draft did not cite has not said nothing —
         // and read on its own, whatever the cited ones found (2026-11-01 fourth review), as the review recheck reads it.
@@ -258,10 +285,28 @@ public class InquiryDraftRecheck {
                     .forEach(s -> rules.add(new ReviewDraftRecheck.Rule(InquiryDraftEvidence.KIND_PRODUCT_KNOWLEDGE,
                             s.getTitle(), s.getBody())));
         }
+        // Who pays is settled against them all before anything is called unbacked (2026-11-10, F5) — as on reviews.
+        ReviewDraftRecheck.CostReading costs = ReviewDraftRecheck.settleCosts(promises, text, current, rules);
+        promises = costs.promises();
+        List<String> phrases = AnswerStyleInstruction.forbiddenPresentIn(text, style);
+        List<FigureNote> figures = grounds == null ? List.of()
+                : figures(item, version, cites, text, authorKind, !changed.isEmpty());
+        List<String> codes = new ArrayList<>();
+        if (!changed.isEmpty()) {
+            codes.add(ReviewDraftRecheck.SOURCE_CHANGED);
+        }
+        if (!retired.isEmpty()) {
+            codes.add(ReviewDraftRecheck.SOURCE_RETIRED);
+        }
+        if (!promises.isEmpty()) {
+            codes.add(ReviewDraftRecheck.UNSUPPORTED_PROMISE);
+        }
         List<String> everyRule = new ArrayList<>(current);
         rules.forEach(r -> everyRule.add(r.title() + "\n" + r.text()));
         List<String> conflicts = new ArrayList<>(ReviewDraftRecheck.conflictsAmong(promises, text, everyRule, asked));
-        List<ReviewDraftRecheck.Against> against = ReviewDraftRecheck.otherRulesAgainst(text, current, rules, asked);
+        List<ReviewDraftRecheck.Against> against = new ArrayList<>(
+                ReviewDraftRecheck.otherRulesAgainst(text, current, rules, asked));
+        against.addAll(costs.against());
         List<String> allPromises = new ArrayList<>(promises);
         for (ReviewDraftRecheck.Against a : against) {
             if (!conflicts.contains(a.word())) {
@@ -289,7 +334,13 @@ public class InquiryDraftRecheck {
         }
         codes.addAll(sellerCodes);
         return new Result(List.copyOf(codes), List.copyOf(changed), promises, List.copyOf(phrases), figures,
-                List.copyOf(conflicts), against, record == null ? null : record.note());
+                List.copyOf(conflicts), against, record == null ? null : record.note(), List.copyOf(retired),
+                List.copyOf(withdrawals));
+    }
+
+    /** One withdrawal as a decision is bound to it: which document, and when it was turned off (or that it was deleted). */
+    static String withdrawal(java.util.UUID sourceId, java.util.Optional<java.time.Instant> at) {
+        return sourceId + "@" + at.map(java.time.Instant::toString).orElse("deleted");
     }
 
     /**

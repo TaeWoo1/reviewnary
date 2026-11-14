@@ -48,6 +48,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReviewDraftRecheck {
 
     public static final String SOURCE_CHANGED = "SOURCE_CHANGED";
+    /**
+     * A cited document was put out of use (사용 안 함) or deleted since the version was written — always with
+     * {@link #SOURCE_CHANGED}. Kept apart because the send of an approved reply treats them differently (owner, 2026-11-14):
+     * a document's wording changing does not by itself stop the send, a document the seller withdrew does, until the
+     * seller confirms. Every other check is unchanged either way.
+     */
+    public static final String SOURCE_RETIRED = "SOURCE_RETIRED";
     public static final String UNSUPPORTED_PROMISE = "UNSUPPORTED_PROMISE";
     public static final String FORBIDDEN_PHRASE = "FORBIDDEN_PHRASE";
     /**
@@ -157,6 +164,9 @@ public class ReviewDraftRecheck {
         if (!changed.isEmpty()) {
             codes.add(SOURCE_CHANGED);
         }
+        if (changed.stream().anyMatch(Changed::removed)) {
+            codes.add(SOURCE_RETIRED);
+        }
         // A version written here from the bundle is read against what it cited, as it stands now — the same ground its
         // writer, its critique and its save used (2026-11-01 third review). Anything else — a seller's own text, a
         // version that cited nothing — against what the review's retrieval finds today.
@@ -178,17 +188,22 @@ public class ReviewDraftRecheck {
         // And what it leaves out: a grant without the state the policy limits it to (2026-10-31).
         ReviewClaimGuard.droppedConditions(body, license, redactedBody).stream()
                 .filter(c -> !promises.contains(c)).forEach(promises::add);
-        if (!promises.isEmpty()) {
-            codes.add(UNSUPPORTED_PROMISE);
-        }
         // Read against every policy in use, not only what the retrieval found: a policy the search missed has not said
         // nothing (2026-11-01 third review). Only what it found licenses a promise; any of them can contradict one.
         List<Rule> rules = rulesInUse(orgId, review.getProductId());
+        // Who pays is settled against them all before anything is called unbacked (2026-11-10, F5).
+        CostReading costs = settleCosts(promises, body, license, rules);
+        promises.clear();
+        promises.addAll(costs.promises());
+        if (!promises.isEmpty()) {
+            codes.add(UNSUPPORTED_PROMISE);
+        }
         List<String> conflicts = new java.util.ArrayList<>(conflictsAmong(promises, body,
                 rules.stream().map(r -> r.title() + "\n" + r.text()).toList(), redactedBody));
         // …and independently of whether the cited ground found anything (fourth review): a reply that follows the
         // passage it cited can still contradict another document in use — 「교환 가능」 cited, 「교환 불가」 elsewhere.
-        List<Against> against = otherRulesAgainst(body, license, rules, redactedBody);
+        List<Against> against = new java.util.ArrayList<>(otherRulesAgainst(body, license, rules, redactedBody));
+        against.addAll(costs.against());
         for (Against a : against) {
             if (!conflicts.contains(a.word())) {
                 conflicts.add(a.word());
@@ -210,6 +225,37 @@ public class ReviewDraftRecheck {
         List<String> marked = new java.util.ArrayList<>(promises);
         marked.addAll(phrases);
         return Result.of(codes, changed, promises, sentencesWith(body, marked), phrases, conflicts, against);
+    }
+
+    /** What a reply says about who pays, settled against every document in use: its promise words and its conflicts. */
+    public record CostReading(List<String> promises, List<Against> against) {
+    }
+
+    /**
+     * <b>Who pays, read against every document in use</b> (2026-11-10, F5). The term checks named a bearer statement the
+     * cited ground alone does not back; here it is read again against the documents in use as well — one that agrees backs
+     * it, one that says the other way is a conflict ({@link Against}, fixed first), and what neither settles stays unbacked
+     * for the 「이번 건만 예외」 decision. Shared by both lanes' rechecks, so a model's draft and a seller's text are read alike.
+     */
+    public static CostReading settleCosts(List<String> promises, String body, List<String> license, List<Rule> rules) {
+        List<String> provisional = CostBearerCheck.notStanding(CostBearerCheck.judge(body, license, List.of()));
+        List<String> out = new java.util.ArrayList<>(promises);
+        out.removeAll(provisional);
+        List<Against> against = new java.util.ArrayList<>();
+        List<CostBearerCheck.Source> sources = rules == null ? List.of()
+                : rules.stream().map(r -> new CostBearerCheck.Source(r.title() == null ? "" : r.title(), r.text())).toList();
+        for (CostBearerCheck.Finding f : CostBearerCheck.judge(body, license, sources)) {
+            if (f.verdict() == CostBearerCheck.Verdict.BACKED) {
+                continue;
+            }
+            if (!out.contains(f.word())) {
+                out.add(f.word());
+            }
+            if (f.verdict() == CostBearerCheck.Verdict.CONFLICT) {
+                against.add(new Against(f.word(), f.title(), f.clash()));
+            }
+        }
+        return new CostReading(List.copyOf(out), List.copyOf(against));
     }
 
     /**

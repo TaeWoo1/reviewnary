@@ -764,7 +764,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
                         passed += "AWAITING_APPROVAL".equals(after.state()) ? 1 : 0;
                     } else {
                         after = link.client().pcRecheck(token, current.id(), current.draftVersion(), false,
-                                result.codes(), note(result));
+                                pcCodes(result), note(result));
                     }
                 } catch (VendorServerClient.TaskRefused e) {
                     // Not recorded on the server, so not checked: the next pull asks again (2026-10-23 review).
@@ -871,7 +871,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
                     VocPreviewSanitizer.redactFullBody(review.getBody()).text(), current.draftBody());
             try {
                 TaskSnapshot after = link.client().pcRecheck(token, current.id(), current.draftVersion(),
-                        result.passed(), result.codes(), result.passed() ? null : note(result));
+                        result.passed(), pcCodes(result), result.passed() ? null : note(result));
                 task = apply(orgId, task.getReviewId(), storeId, after);
                 checked = true;
             } catch (VendorServerClient.TaskRefused e) {
@@ -904,7 +904,7 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             // A phone version approved before any check, under a basis that has since moved: this is its first check,
             // the one the delegate waits for. Passed frees it; a finding holds it on the server — nothing was seen.
             return link.client().pcRecheck(token, current.id(), current.draftVersion(), result.passed(),
-                    result.codes(), result.passed() ? null : note(result));
+                    pcCodes(result), result.passed() ? null : note(result));
         }
         if (result.passed()) {
             return null;
@@ -947,8 +947,17 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
 
     /** What the seller is shown about a finding: the server's note. */
     private static VendorServerClient.BasisNote note(ReviewDraftRecheck.Result result) {
-        return new VendorServerClient.BasisNote(result.codes(), sources(result), result.promises(), result.sentences(),
+        return new VendorServerClient.BasisNote(pcCodes(result), sources(result), result.promises(), result.sentences(),
                 result.phrases());
+    }
+
+    /**
+     * The codes the PC lane is told. {@link ReviewDraftRecheck#SOURCE_RETIRED} (2026-11-14) is the web hold's distinction
+     * between a withdrawn document and a reworded one; the PC lane already reads that from each source's {@code removed}
+     * and has no confirmation of its own to answer a new code with, so it is not sent — this lane behaves as before.
+     */
+    private static List<String> pcCodes(ReviewDraftRecheck.Result result) {
+        return result.codes().stream().filter(c -> !ReviewDraftRecheck.SOURCE_RETIRED.equals(c)).toList();
     }
 
     private static List<VendorServerClient.ChangedSource> sources(ReviewDraftRecheck.Result result) {

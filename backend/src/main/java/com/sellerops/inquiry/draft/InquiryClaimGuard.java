@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
  * and a follow-up nobody on the seller's side agreed to. Both were invented, and both would have gone out in the
  * seller's voice.
  *
- * <p><b>Six closed shapes, each checked against the evidence rather than banned outright.</b> A shape is a violation
+ * <p><b>Seven closed shapes, each checked against the evidence rather than banned outright.</b> A shape is a violation
  * only when the draft has it and the text that may authorize it does not:
  * <ul>
  *   <li>{@link Kind#SELLER_PROMISE} — a follow-up the seller commits to: 「확인 후 안내드리겠습니다」, 「연락드리겠습니다」,
@@ -36,6 +36,8 @@ import java.util.regex.Pattern;
  *   <li>{@link Kind#LAW} — the policy applied where the law does not let it apply: a return or refund limited to an
  *   unopened product or refused for opening, or a defect held to change-of-mind terms —
  *   {@link ReviewClaimGuard#lawConflicts} (2026-11-01). It holds the policy's application, not the reply's fidelity.</li>
+ *   <li>{@link Kind#COST} — who bears an exchange's or a return's shipping, for which case, said where the evidence does
+ *   not say it or says the other way — {@link com.sellerops.review.draft.CostBearerCheck} (2026-11-10, F5).</li>
  *   <li>{@link Kind#FIGURE} — a number the reply states that the text alone can refuse: written nowhere in the evidence,
  *   the order's sentence or the customer's question, or only in another unit. Whether a figure that IS written there is
  *   about the same thing under the same condition is not decided here — {@link #figuresToVerify} hands those to the
@@ -54,7 +56,7 @@ import java.util.regex.Pattern;
  */
 public final class InquiryClaimGuard {
 
-    public enum Kind { SELLER_PROMISE, CUSTOMER_ACTION, REMEDY, FIGURE, CONDITION, LAW }
+    public enum Kind { SELLER_PROMISE, CUSTOMER_ACTION, REMEDY, FIGURE, CONDITION, LAW, COST }
 
     /** One unsupported claim: its kind and the text that matched. */
     public record Violation(Kind kind, String matched) {
@@ -237,6 +239,12 @@ public final class InquiryClaimGuard {
         // …or one it grants only for a state (미개봉) the reply leaves out and the customer did not claim (2026-10-31).
         for (String state : ReviewClaimGuard.droppedConditions(body, evidence, asked)) {
             found.add(new Violation(Kind.CONDITION, state));
+        }
+        // …or who pays a cost the evidence does not say, or says the other way (2026-11-10, F5) — {@link CostBearerCheck}.
+        // The evidence only: the question and the seller's standing sentences are not where a bearer is decided.
+        for (String cost : com.sellerops.review.draft.CostBearerCheck.notStanding(
+                com.sellerops.review.draft.CostBearerCheck.judge(body, evidence, List.of()))) {
+            found.add(new Violation(Kind.COST, cost));
         }
         // Only the certain part is decided here; whether a figure is about the same thing is the model's (below).
         for (FigureClaim claim : figureClaims(body, evidence, asked, orderSentence)) {

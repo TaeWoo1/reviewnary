@@ -165,6 +165,14 @@ public class InquiryFigureGrounds {
             row.setReplyClause(cut(f.clause().strip(), MAX_CLAUSE));
             row.setGroundKind(InquiryDraftFigure.Ground.NONE.name());
             Link link = linkFor(f, links == null ? List.of() : links);
+            // A confirmation that names no passage, no source and no said-back (2026-11-10 rehearsal: a seller's record
+            // date stayed 「근거 없음」 behind one) says nothing about where the figure came from: it is grounded by the text
+            // below, as with no link. A link that names something still decides, right or wrong.
+            if (link != null && link.passage() == null && link.source() == null && !"SAID_BACK".equals(link.verdict())) {
+                row.setAbout(link.about() == null ? null : cut(link.about(), 80));
+                row.setConditionText(link.when() == null ? null : cut(link.when(), 120));
+                link = null;
+            }
             if (link != null) {
                 row.setAbout(link.about() == null ? null : cut(link.about(), 80));
                 row.setConditionText(link.when() == null ? null : cut(link.when(), 120));

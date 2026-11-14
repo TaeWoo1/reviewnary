@@ -82,9 +82,15 @@ public final class ReviewClaimGuard {
     /**
      * A period or an amount a promise states: a number with its unit. Read from the sentence as written — squashing
      * 「1 7일」 would read a number nobody wrote.
+     *
+     * <p><b>The day of a date is not a period</b> (2026-11-10 rehearsal): in 「11월 11일 출고」 the 「11일」 is the date's, and
+     * read as a period it was held against a policy's 「7일 안에」. A day right after 「N월」 is skipped; 「3개월 7일」 (a unit
+     * ending in 월) and an amount after a month (「12월 3만원」) are still read. The pattern is part of
+     * {@code ReviewDraftBasis}' fingerprint, so waiting drafts are checked again under it.
      */
     static final Pattern FIGURE = Pattern.compile(
-            "\\d+(?:[.,]\\d+)*\\s*(?:영업일|일|시간|개월|주|년|만원|원|%|퍼센트|회|번)");
+            "(?<!\\d)(?:(?<!\\d\\s{0,2}월\\s{0,2})\\d+(?:[.,]\\d+)*\\s*일"
+                    + "|\\d+(?:[.,]\\d+)*\\s*(?:영업일|시간|개월|주|년|만원|원|%|퍼센트|회|번))");
 
     /**
      * The terms of a promise in words, by what a Korean seller writes — when (no number), how much, and for what.
@@ -110,7 +116,7 @@ public final class ReviewClaimGuard {
      * Which way of reading a promise this is — a change to how a clause is matched changes what waiting drafts are
      * held to, so it is part of {@code ReviewDraftBasis}' policy fingerprint like the word lists are.
      */
-    static final String READING = "clauses-v5:cases,no-overlap,kept-states,said-back,left-states,return-law";
+    static final String READING = "clauses-v6:cases,no-overlap,kept-states,said-back,left-states,return-law,cost-bearer";
 
     /**
      * The states a grant can be limited to, each with the ways it is written — by the seller (「미개봉 상품에 한해」) or by a
@@ -328,7 +334,11 @@ public final class ReviewClaimGuard {
                     found.add(f);
                 }
             }
-            List<String> stated = CONDITION_TERMS.stream().filter(t -> has(squashed, t)).toList();
+            // A clause saying who pays a cost is read whole by CostBearerCheck below (2026-11-10, F5): the word 「배송비」
+            // in a ground that assigns it the other way is not its backing.
+            boolean bearerClause = CostBearerCheck.covers(sentence);
+            List<String> stated = CONDITION_TERMS.stream().filter(t -> has(squashed, t))
+                    .filter(t -> !bearerClause || !CostBearerCheck.COST_TERMS.contains(t)).toList();
             for (String term : stated) {
                 // 「단순 변심」 is one term, not two: the shorter one inside a longer stated term is not reported again.
                 boolean inside = stated.stream().anyMatch(o -> o.length() > term.length() && o.contains(term));
@@ -338,6 +348,8 @@ public final class ReviewClaimGuard {
                 }
             }
         }
+        // Who pays, against the same ground — the customer's words are never a ground for it.
+        found.addAll(CostBearerCheck.notStanding(CostBearerCheck.judge(body, evidence, List.of())));
         return List.copyOf(found);
     }
 

@@ -423,4 +423,60 @@ class InquiryProposalServiceTest {
             inquiries.deleteById(inquiryId);
         }
     }
+
+    private void saveVersion(InquiryWorkItem wi, int version, String authorKind, String comments) {
+        com.sellerops.inquiry.reply.InquiryReplyDraft d = new com.sellerops.inquiry.reply.InquiryReplyDraft();
+        d.setOrgId(wi.getOrgId());
+        d.setWorkItemId(wi.getId());
+        d.setVersion(version);
+        d.setAnswerStatus(2);
+        d.setTitle("답변");
+        d.setComments(comments);
+        d.setContentFingerprint(com.sellerops.inquiry.reply.ReplyDraftFingerprint.of("답변", comments));
+        d.setFingerprintAlgorithm("esm-answer-v1");
+        d.setAuthorKind(authorKind);
+        d.setCreatedBy("판매자");
+        drafts.save(d);
+    }
+
+    private void cite(InquiryWorkItem wi, int version, String title) {
+        com.sellerops.inquiry.draft.InquiryDraftEvidence row = new com.sellerops.inquiry.draft.InquiryDraftEvidence();
+        row.setOrgId(wi.getOrgId());
+        row.setWorkItemId(wi.getId());
+        row.setDraftVersion(version);
+        row.setOrdinal(0);
+        row.setKind(com.sellerops.inquiry.draft.InquiryDraftEvidence.KIND_ORG_POLICY);
+        row.setSourceId(UUID.randomUUID());
+        row.setTitle(title);
+        row.setLocator("need-decision/org_knowledge");
+        draftEvidence.save(row);
+    }
+
+    /**
+     * A seller's edit has no citations of its own; the screen shows those of the version it was edited from — what the
+     * approval and send recheck reads it against (2026-11-14 manual eval: the edit showed no basis while the recheck held
+     * it for a retired one). A version with citations of its own shows only those.
+     */
+    @Test
+    void aSellersEditShowsTheCitationsItIsCheckedAgainst() {
+        InquiryWorkItem wi = seedOpen(org, "세척 문의", "식기세척기에 넣어도 되나요", "구매자");
+        saveVersion(wi, 1, "MODEL", "식기세척기 사용은 권하지 않아요.");
+        cite(wi, 1, "텀블러 안내");
+        saveVersion(wi, 2, "SELLER", "식기세척기는 권하지 않아요. 손으로 씻어 주세요.");
+
+        assertThat(service(new FakeProvider()).detail(org, wi.getId()).draftEvidence())
+                .extracting(com.sellerops.inquiry.draft.dto.DraftEvidenceView::title).containsExactly("텀블러 안내");
+
+        saveVersion(wi, 3, "MODEL", "다시 쓴 답변이에요.");
+        cite(wi, 3, "세척 안내");
+        assertThat(service(new FakeProvider()).detail(org, wi.getId()).draftEvidence())
+                .extracting(com.sellerops.inquiry.draft.dto.DraftEvidenceView::title).containsExactly("세척 안내");
+    }
+
+    @Test
+    void aDraftTheSellerWroteFromNothingShowsNoCitations() {
+        InquiryWorkItem wi = seedOpen(org, "세척 문의", "식기세척기에 넣어도 되나요", "구매자");
+        saveVersion(wi, 1, "SELLER", "확인해서 알려 드릴게요.");
+        assertThat(service(new FakeProvider()).detail(org, wi.getId()).draftEvidence()).isEmpty();
+    }
 }

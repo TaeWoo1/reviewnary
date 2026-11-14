@@ -161,9 +161,7 @@ public class InquiryProposalService {
                 identity.forInquiry(inquiry).name(),
                 answerState.stateProven(),
                 answerStateNote(answerState),
-                draft == null ? List.<DraftEvidenceView>of()
-                        : snippets.viewsOf(draftEvidence.findAllByWorkItemIdAndDraftVersionOrderByOrdinalAsc(
-                                workItemId, draft.version())),
+                draft == null ? List.<DraftEvidenceView>of() : snippets.viewsOf(citedBy(workItemId, draft.version())),
                 capabilities.capability(channelCode, inquiry.getSourceSubtype()),
                 // The deterministic fast path. "이 주문 상태가 뭐야?" on the detail screen is a join,
                 // not a plan — an LLM planner has nothing to contribute to reading one row and would
@@ -281,5 +279,22 @@ public class InquiryProposalService {
                 p.getId(), p.getWorkItemId(), p.getInquiryId(), p.getActionKind(),
                 p.getSummaryCategory(), p.isRequiresApproval(), p.getProposedBy(),
                 p.getProviderKind(), p.getProviderName(), p.getProviderVersion());
+    }
+
+    /**
+     * The citations a version stands on: its own, or — for a seller's edit, which has none of its own — those of the
+     * version it was edited from, read exactly as the approval and send recheck reads them (InquiryDraftRecheck). Without
+     * this the screen showed a seller's edit with no basis at all while the recheck held it for a retired one (2026-11-14
+     * manual eval), so the seller could not see what had changed under it.
+     */
+    private List<com.sellerops.inquiry.draft.InquiryDraftEvidence> citedBy(UUID workItemId, int version) {
+        int cites = version;
+        List<com.sellerops.inquiry.draft.InquiryDraftEvidence> cited =
+                draftEvidence.findAllByWorkItemIdAndDraftVersionOrderByOrdinalAsc(workItemId, cites);
+        while (cited.isEmpty() && cites > 1) {
+            cites--;
+            cited = draftEvidence.findAllByWorkItemIdAndDraftVersionOrderByOrdinalAsc(workItemId, cites);
+        }
+        return cited;
     }
 }

@@ -8,7 +8,12 @@ import com.sellerops.inquiry.draft.dto.DraftEvidenceView;
 import com.sellerops.knowledge.memory.AnswerMemoryRepository;
 import com.sellerops.knowledge.org.OrgKnowledgeChunk;
 import com.sellerops.knowledge.org.OrgKnowledgeChunkRepository;
+import com.sellerops.knowledge.org.OrgKnowledgeSource;
+import com.sellerops.knowledge.org.OrgKnowledgeSourceRepository;
+import com.sellerops.product.library.ProductKnowledgeChunk;
 import com.sellerops.product.library.ProductKnowledgeChunkRepository;
+import com.sellerops.product.library.ProductKnowledgeSource;
+import com.sellerops.product.library.ProductKnowledgeSourceRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -52,5 +57,46 @@ class DraftEvidenceGoneTest {
         assertThat(snippets.viewOf(InquiryDraftEvidence.KIND_ORDER_FACT, null, null, "주문", "loc").gone()).isFalse();
         assertThat(snippets.viewOf(InquiryDraftEvidence.KIND_PRODUCT_KNOWLEDGE, UUID.randomUUID(), null, "t", "l").gone())
                 .isFalse();
+    }
+
+    @Test
+    @DisplayName("a citation of a document the seller turned off is gone and shows no excerpt — product and company alike")
+    void aRetiredDocumentIsGone() {
+        ProductKnowledgeSourceRepository productSources = mock(ProductKnowledgeSourceRepository.class);
+        OrgKnowledgeSourceRepository orgSources = mock(OrgKnowledgeSourceRepository.class);
+        snippets.setSources(productSources, orgSources);
+        UUID manualId = UUID.randomUUID();
+        UUID manualChunk = UUID.randomUUID();
+        UUID policyId = UUID.randomUUID();
+        UUID policyChunk = UUID.randomUUID();
+        ProductKnowledgeChunk passage = new ProductKnowledgeChunk();
+        passage.setContent("식기세척기 사용은 권하지 않습니다.");
+        when(productChunks.findById(manualChunk)).thenReturn(Optional.of(passage));
+        OrgKnowledgeChunk rule = new OrgKnowledgeChunk();
+        rule.setContent("수령 후 7일 안에 교환할 수 있어요.");
+        when(orgChunks.findById(policyChunk)).thenReturn(Optional.of(rule));
+        ProductKnowledgeSource manual = new ProductKnowledgeSource();
+        manual.setActive(true);
+        OrgKnowledgeSource policy = new OrgKnowledgeSource();
+        policy.setActive(true);
+        when(productSources.findById(manualId)).thenReturn(Optional.of(manual));
+        when(orgSources.findById(policyId)).thenReturn(Optional.of(policy));
+
+        assertThat(snippets.viewOf(InquiryDraftEvidence.KIND_PRODUCT_KNOWLEDGE, manualId, manualChunk, "안내", "l").gone())
+                .isFalse();
+        assertThat(snippets.viewOf(InquiryDraftEvidence.KIND_ORG_POLICY, policyId, policyChunk, "교환", "l").gone())
+                .isFalse();
+
+        manual.setActive(false);
+        policy.setActive(false);
+        DraftEvidenceView product = snippets.viewOf(InquiryDraftEvidence.KIND_PRODUCT_KNOWLEDGE, manualId, manualChunk,
+                "안내", "l");
+        DraftEvidenceView company = snippets.viewOf(InquiryDraftEvidence.KIND_ORG_POLICY, policyId, policyChunk, "교환", "l");
+        // The passages are still stored — reading them alone said 「current」 (2026-11-14 manual eval F3).
+        assertThat(product.gone()).isTrue();
+        assertThat(product.snippet()).isNull();
+        assertThat(product.title()).isEqualTo("안내");
+        assertThat(company.gone()).isTrue();
+        assertThat(company.snippet()).isNull();
     }
 }
