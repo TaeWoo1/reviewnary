@@ -43,6 +43,17 @@ public interface ChannelReplyAdapter {
         return sourceSubtype == null;
     }
 
+    /**
+     * Whether this adapter only simulates the channel — a development stand-in that opens no connection and reaches no
+     * customer ({@link FakeChannelReplyAdapter}). Real adapters keep the default {@code false}. The capability read reports
+     * simulated channels apart from {@code executionEnabled}, so a screen can offer a <i>mock</i> registration through the
+     * ordinary approval API while every reader of {@code executionEnabled} still sees that nothing real can be sent
+     * (2026-11-09, demo §7.10 3A).
+     */
+    default boolean simulated() {
+        return false;
+    }
+
     /** Publish the approved reply; returns a channel-neutral {@link ReplyPublishResult}. */
     ReplyPublishResult publish(ReplyPublishCommand command);
 

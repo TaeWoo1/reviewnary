@@ -212,12 +212,15 @@ public class ReviewReplyExecutionService {
         Cafe24ReviewCommentAdapter.PostResult posted = adapter.post(scope.review().getOrgId(),
                 scope.account().getId(), scope.review().getExternalId(), body);
         String actor = ACTOR_PREFIX + actorUserId;
+        // The Cafe24 comment client has one destination, the shop's own cafe24api.com host — there is no development
+        // simulation on this lane — so a request it made went to the real channel.
+        com.sellerops.common.DeliveryMode real = com.sellerops.common.DeliveryMode.REAL;
         return switch (posted.kind()) {
             case REFUSED -> record(scope, approval, command, ReviewExecutionLane.API,
                     ReviewExecutionStatus.REFUSED, null, posted.reason(), null, null, actor);
             case DELIVERY_UNKNOWN -> record(scope, approval, command, ReviewExecutionLane.API,
                     ReviewExecutionStatus.DELIVERY_UNKNOWN, null, null,
-                    ReviewExecutionVerification.DELIVERY_UNKNOWN, Instant.now(), actor);
+                    ReviewExecutionVerification.DELIVERY_UNKNOWN, Instant.now(), actor, real);
             case ACCEPTED -> {
                 // The read-back is the verification; a 2xx is only "the channel took the request".
                 ReviewExecutionVerification verification = adapter.verify(scope.review().getOrgId(),
@@ -225,7 +228,7 @@ public class ReviewReplyExecutionService {
                 ReviewExecutionView recorded = record(scope, approval, command, ReviewExecutionLane.API,
                         ReviewExecutionStatus.POSTED,
                         posted.commentNo() == null ? null : String.valueOf(posted.commentNo()), null,
-                        verification, Instant.now(), actor);
+                        verification, Instant.now(), actor, real);
                 rememberVerified(scope, approval, verification, actorUserId);
                 yield recorded;
             }
@@ -381,8 +384,21 @@ public class ReviewReplyExecutionService {
                                        ReviewExecutionLane lane, ReviewExecutionStatus status, String providerRef,
                                        ReviewExecutionReason reason, ReviewExecutionVerification verification,
                                        Instant observedAt, String actor) {
+        return record(scope, approval, command, lane, status, providerRef, reason, verification, observedAt, actor,
+                com.sellerops.common.DeliveryMode.UNKNOWN);
+    }
+
+    /**
+     * As above, stating where the request went (V187). Only a request this lane actually made to the channel carries
+     * a route; a refusal before any request stays {@code UNKNOWN}, because nothing was sent anywhere.
+     */
+    private ReviewExecutionView record(Scope scope, ReviewReplyApproval approval, String command,
+                                       ReviewExecutionLane lane, ReviewExecutionStatus status, String providerRef,
+                                       ReviewExecutionReason reason, ReviewExecutionVerification verification,
+                                       Instant observedAt, String actor, com.sellerops.common.DeliveryMode mode) {
         ReviewReplyExecution row = newRow(scope, approval.getApprovedVersion(), approval.getApprovedFingerprint(),
                 command, lane, status, providerRef, reason, verification, observedAt, actor);
+        row.setDeliveryMode(mode);
         return persist(row, scope.review().getId(), false);
     }
 

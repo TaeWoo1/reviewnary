@@ -45,6 +45,12 @@ public final class FakeChannelReplyAdapter implements ChannelReplyAdapter {
         return channelCode;
     }
 
+    /** A stand-in, never a channel: reported apart from real execution on the capability read. */
+    @Override
+    public boolean simulated() {
+        return true;
+    }
+
     @Override
     public ReplyPublishResult publish(ReplyPublishCommand command) {
         String key = command.channelId() + ":" + command.externalId();

@@ -53,6 +53,11 @@ public class ReviewReplyExecution {
     @Column(name = "channel_code", nullable = false, length = 32)
     private String channelCode;
 
+    /** Where this execution was sent, fixed at creation (V187). Never updated: see {@link com.sellerops.common.DeliveryMode}. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "delivery_mode", nullable = false, updatable = false, length = 16)
+    private com.sellerops.common.DeliveryMode deliveryMode = com.sellerops.common.DeliveryMode.UNKNOWN;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "lane", nullable = false, length = 16)
     private ReviewExecutionLane lane;

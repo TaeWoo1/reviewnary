@@ -82,6 +82,11 @@ public class InquiryExecution {
     @Column(name = "presend_note", length = 60)
     private String presendNote;
 
+    /** Where this execution was sent, fixed at creation (V187). Never updated: see {@link com.sellerops.common.DeliveryMode}. */
+    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+    @Column(name = "delivery_mode", nullable = false, updatable = false, length = 16)
+    private com.sellerops.common.DeliveryMode deliveryMode = com.sellerops.common.DeliveryMode.UNKNOWN;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

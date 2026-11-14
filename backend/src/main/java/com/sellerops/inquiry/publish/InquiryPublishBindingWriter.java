@@ -79,6 +79,16 @@ public class InquiryPublishBindingWriter {
      */
     public InquiryExecution bind(InquiryWorkItem workItem, InquiryReplyDraft approvedDraft,
                                  ApprovalTarget target, String commandId, String actor) {
+        return bind(workItem, approvedDraft, target, commandId, actor, com.sellerops.common.DeliveryMode.UNKNOWN);
+    }
+
+    /**
+     * As above, recording where the execution will be sent — the route resolved at approval, written once on the row
+     * (V187). The dispatch refuses to send through a route that differs from it.
+     */
+    public InquiryExecution bind(InquiryWorkItem workItem, InquiryReplyDraft approvedDraft,
+                                 ApprovalTarget target, String commandId, String actor,
+                                 com.sellerops.common.DeliveryMode deliveryMode) {
         return tx.execute(status -> {
             UUID workItemId = workItem.getId();
             UUID orgId = workItem.getOrgId();
@@ -112,6 +122,7 @@ public class InquiryPublishBindingWriter {
             execution.setDispatchKey(dispatchKey(workItemId, fingerprint));
             execution.setStatus(InquiryExecutionStatus.ACTION_PENDING);
             execution.setVerifyAttempts(0);
+            execution.setDeliveryMode(deliveryMode == null ? com.sellerops.common.DeliveryMode.UNKNOWN : deliveryMode);
             InquiryExecution savedExecution = executions.save(execution);
 
             workItem.setPhase(InquiryWorkItemPhase.ACTION_PENDING);

@@ -12,5 +12,15 @@ import java.util.List;
  */
 public record PublishCapabilityView(
         boolean executionEnabled,
-        List<String> replyAdapterChannelCodes) {
+        List<String> replyAdapterChannelCodes,
+        /*
+         * Channels served only by a development simulation (2026-11-09) — a subset of replyAdapterChannelCodes, empty
+         * outside {@code sellerops.dev.fake-channel}. executionEnabled stays false beside it: nothing real can be sent.
+         */
+        List<String> simulatedChannelCodes) {
+
+    /** The real-execution shape: no simulated channel. */
+    public PublishCapabilityView(boolean executionEnabled, List<String> replyAdapterChannelCodes) {
+        this(executionEnabled, replyAdapterChannelCodes, List.of());
+    }
 }

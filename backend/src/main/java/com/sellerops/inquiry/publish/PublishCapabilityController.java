@@ -94,6 +94,10 @@ public class PublishCapabilityController {
     public PublishCapabilityView capability() {
         List<String> codes = new ArrayList<>(adapters.registeredChannelCodes());
         codes.sort(String::compareTo);
-        return new PublishCapabilityView(executionEnabled, codes);
+        // A simulated channel cannot sit beside real execution (FakeChannelWiring refuses to start), and if it ever
+        // did, the real reading wins: a screen must not call a send that could be real a mock.
+        List<String> simulated = executionEnabled ? List.of()
+                : adapters.simulatedChannelCodes().stream().sorted().toList();
+        return new PublishCapabilityView(executionEnabled, codes, simulated);
     }
 }

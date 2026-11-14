@@ -222,7 +222,8 @@ public class InquiryPublishService {
                     new InquiryPublishBindingWriter.ApprovalTarget(
                             workItem.getSellerAccountId(), workItem.getChannelId(),
                             target.getExternalId(), target.getSourceSubtype()),
-                    commandId, "SELLER:" + sellerUserId);
+                    commandId, "SELLER:" + sellerUserId,
+                    deliveryModeOf(adapters.resolve(workItem.getChannelId(), target.getSourceSubtype())));
             // The approval is the seller stating what this company says. Recorded AFTER the binding,
             // so a refused approval never leaves a memory of an answer nobody approved.
             if (answerMemory != null) {
@@ -433,6 +434,14 @@ public class InquiryPublishService {
         if (adapter.isEmpty()) {
             return null; // fail closed: stays ACTION_PENDING
         }
+        // The route was written on the row when the seller approved (V187). A deployment that now resolves a different
+        // one — a mock where a real adapter was, or the reverse — does not send under the old record: it waits, as for
+        // no adapter. A row from before V187 (UNKNOWN) is sent as before and stays UNKNOWN; it is never rewritten.
+        com.sellerops.common.DeliveryMode recorded = execution.getDeliveryMode();
+        if (recorded != null && recorded != com.sellerops.common.DeliveryMode.UNKNOWN
+                && recorded != deliveryModeOf(adapter)) {
+            return null; // fail closed: stays ACTION_PENDING
+        }
 
         // Not a refusal — a recorded ignorance. See PreSendCheck.
         execution.setPresendStateProven(check.stateProven());
@@ -539,11 +548,11 @@ public class InquiryPublishService {
     private void assertCarriable(InquiryWorkItem workItem, Inquiry inquiry) {
         if (!capabilities.isImplemented(channelCode(workItem.getChannelId()), inquiry.getSourceSubtype())) {
             throw ApiException.conflict(
-                    "이 채널의 문의는 reviewnary가 답변을 대신 등록할 수 없습니다. 판매자센터에서 직접 등록해 주세요.");
+                    "이 채널의 이 문의 유형은 reviewnary에서 답변을 등록하는 경로가 없어요. 판매자센터에서 직접 등록해 주세요.");
         }
         if (adapters.resolve(workItem.getChannelId(), inquiry.getSourceSubtype()).isEmpty()) {
             throw ApiException.conflict(
-                    "지금은 답변 등록 기능이 켜져 있지 않습니다. 초안을 복사해 판매자센터에 등록해 주세요.");
+                    "현재 이 환경에서는 이 채널의 답변 등록 기능이 꺼져 있어요. 초안을 복사해 판매자센터에 등록해 주세요.");
         }
     }
 
@@ -603,6 +612,12 @@ public class InquiryPublishService {
             return PreSendCheck.refuse(PreSendCheck.OVERWRITE_WITHOUT_PROOF);
         }
         return state;
+    }
+
+    /** The route an adapter sends through: a development simulation, a real channel, or none resolved. */
+    static com.sellerops.common.DeliveryMode deliveryModeOf(Optional<ChannelReplyAdapter> adapter) {
+        return adapter.map(a -> a.simulated() ? com.sellerops.common.DeliveryMode.SIMULATED
+                : com.sellerops.common.DeliveryMode.REAL).orElse(com.sellerops.common.DeliveryMode.UNKNOWN);
     }
 
     /** The channel's stable code, or null when the channel row is gone (which reads as unsupported). */

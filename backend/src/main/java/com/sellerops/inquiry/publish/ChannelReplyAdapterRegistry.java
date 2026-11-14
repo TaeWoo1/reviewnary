@@ -72,4 +72,16 @@ public class ChannelReplyAdapterRegistry {
     public java.util.Set<String> registeredChannelCodes() {
         return byCode.keySet();
     }
+
+    /**
+     * The channel codes whose every registered adapter is a development simulation ({@link ChannelReplyAdapter#simulated()}).
+     * A code with any real adapter is never in this set — a mixed code must read as real, which is the reading that asks
+     * for the most care. Empty unless {@code sellerops.dev.fake-channel} is on.
+     */
+    public java.util.Set<String> simulatedChannelCodes() {
+        return byCode.entrySet().stream()
+                .filter(e -> !e.getValue().isEmpty() && e.getValue().stream().allMatch(ChannelReplyAdapter::simulated))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toUnmodifiableSet());
+    }
 }
