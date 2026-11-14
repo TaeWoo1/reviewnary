@@ -15,6 +15,6 @@ export function useContinueInPanel(type?: ArtifactType): () => void {
   const { pathname } = useLocation();
   return useCallback(() => {
     if (type) analytics.track("artifact_opened", { type: type.toLowerCase() as Lowercase<ArtifactType> });
-    if (panel && !panel.open && (pathname === "/" || pathname === "/agent")) panel.openPanel();
+    if (panel && !panel.open && (pathname === "/work" || pathname === "/agent")) panel.openPanel();
   }, [panel, pathname, type]);
 }

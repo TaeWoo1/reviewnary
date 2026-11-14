@@ -20,10 +20,35 @@ describe("AI가 사람에게 넘긴 리뷰 (review 2026-10-28)", () => {
     const links = within(section).getAllByRole("link");
     expect(links.map((a) => a.getAttribute("href"))).toEqual(["/reviews/reply/r-1", "/reviews/reply/r-2"]);
     expect(links[0]).toHaveTextContent("안전 관련");
-    expect(links[0]).toHaveTextContent("법정 보고 의무가 있을 수 있어");
+    expect(links[0]).toHaveTextContent("넘기기 전 초안");
     expect(links[1]).toHaveTextContent("직접 작성 필요");
-    expect(links[0]).toHaveTextContent("넘기기 전에 만든 초안이 있어요");
-    expect(links[1]).not.toHaveTextContent("넘기기 전에 만든 초안");
+    expect(links[1]).not.toHaveTextContent("초안");
+    // The duty is said once, under the harms — not inside every row.
+    expect(within(section).getByTestId("handoff-duty")).toHaveTextContent("법정 보고 의무가 있을 수 있어");
+    expect(links[0]).not.toHaveTextContent("법정 보고 의무");
+  });
+
+  it("the Home stays short: harms on their own lines, one duty sentence, everything else folded with its notes kept (2026-11-10)", async () => {
+    const harm = (id: string) => ({ reviewId: id, category: "S", reason: "CATEGORY_S", at: null, rating: 1, preview: `합성-다침 ${id}`, points: ["부상"] });
+    api.getReplyHandoffsStrict.mockResolvedValue([
+      harm("r-1"),
+      harm("r-2"),
+      { reviewId: "r-3", category: "D", reason: "KNOWLEDGE_MISSING", at: null, rating: 3, preview: "합성-질문" },
+      { reviewId: "r-4", category: null, reason: "UNSURE_AMBIGUOUS", at: null, rating: 3, preview: "합성-모호" },
+    ]);
+    render(<MemoryRouter><AgentHandoffs /></MemoryRouter>);
+    const section = await screen.findByRole("region", { name: "AI가 사람에게 넘긴 리뷰" });
+    expect(section).toHaveTextContent("4건");
+    const duty = within(section).getByTestId("handoff-duty");
+    expect(duty.textContent!.match(/법정 보고 의무/g)).toHaveLength(1);
+    const rest = within(section).getByTestId("handoff-rest");
+    expect(rest).not.toHaveAttribute("open");
+    expect(rest.querySelector("summary")).toHaveTextContent("다른 이유로 넘긴 리뷰 2건근거 부족 1 · 표현이 모호함 1");
+    // Folded, not dropped: every row still opens its review and keeps its note behind the fold.
+    expect(within(section).getAllByRole("link", { hidden: true }).map((a) => a.getAttribute("href"))).toEqual(
+      ["/reviews/reply/r-1", "/reviews/reply/r-2", "/reviews/reply/r-3", "/reviews/reply/r-4"],
+    );
+    expect(rest).toHaveTextContent("문제없다는 뜻이 아니니");
   });
 
   it("「can't tell」 and a question with no fact say what the seller has to do", async () => {

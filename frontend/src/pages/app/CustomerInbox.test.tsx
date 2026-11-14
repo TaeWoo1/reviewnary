@@ -140,6 +140,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  // The wait-label test pins the clock; a failure inside it must not leave the rest of the file on that date.
+  vi.useRealTimers();
 });
 
 /*
@@ -562,6 +564,28 @@ describe("master-detail (UI/UX v2 Phase 2) — the list and the chosen inquiry, 
     }
   });
 
+  it("on a narrow screen 물어보기 stands once: the open inquiry's own, or the list's when only the list is shown", async () => {
+    getInquiryRowsStrict.mockResolvedValue({
+      items: [row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", snippet: "교환은 언제까지 신청해야 하나요?" })],
+      totalCount: 1,
+      limit: 50,
+      productId: null,
+    });
+    const detail = renderInbox("/inquiries/i1");
+    await screen.findByRole("link", { name: "← 문의 목록" });
+    // Phone check, 2026-11-14: the page head kept its own copy beside the inquiry's, so the button stood twice.
+    const launches = screen.getAllByTestId("agent-launch");
+    expect(launches).toHaveLength(1);
+    expect(launches[0]).toHaveTextContent("이 문의에 대해 물어보기");
+    detail.unmount();
+    // The list keeps its way in.
+    renderInbox("/inquiries");
+    await screen.findByLabelText("문의 목록");
+    const listLaunches = screen.getAllByTestId("agent-launch");
+    expect(listLaunches).toHaveLength(1);
+    expect(listLaunches[0]).toHaveTextContent("문의에 대해 물어보기");
+  });
+
   it("on a narrow screen the chosen inquiry takes the column, with the way back to the list", async () => {
     renderInbox("/inquiries/i1");
     expect(await screen.findByRole("link", { name: "← 문의 목록" })).toHaveAttribute("href", "/inquiries");
@@ -786,6 +810,20 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
   });
   afterEach(() => restoreWide());
 
+  it("on a narrow screen the answer's own action follows the inquiry (2026-11-10 same-Wi-Fi phone check)", async () => {
+    restoreWide();
+    const restoreNarrow = stubWide(false);
+    try {
+      getInquiryPublishCapability.mockResolvedValue({ executionEnabled: true, replyAdapterChannelCodes: ["CAFE24"] });
+      renderInbox("/inquiries/i1");
+      const dock = await screen.findByTestId("narrow-reply-dock");
+      expect(await within(dock).findByRole("button", { name: "답변 보내기" })).toBeEnabled();
+    } finally {
+      restoreNarrow();
+      restoreWide = stubWide(true);
+    }
+  });
+
   it("the selected row is neutral — no accent fill and no accent bar", async () => {
     getInquiryRowsStrict.mockResolvedValue({
       items: [row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", snippet: "교환은 언제까지 신청해야 하나요?" })],
@@ -871,6 +909,11 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
   });
 
   it("the row says how long the customer waited, and the day it arrived once that is a year", async () => {
+    // A fixed clock (2026-11-14): this test read the real one, and on 2026-11-11 its "recent" row turned 100 days old
+    // and broke the three-digit check below, with the product doing exactly what it should. Only Date is faked —
+    // the screen's own timers and promises run as usual.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-04T03:00:00Z"));
     getInquiryRowsStrict.mockResolvedValue({
       items: [
         row({ inquiryId: "i1", workItemId: "w1", status: "UNANSWERED", snippet: "교환은 언제까지 신청해야 하나요?", receivedAt: "2026-08-03T10:00:00Z" }),
@@ -882,9 +925,9 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
     });
     renderInbox("/inquiries/i1");
     const list = await screen.findByLabelText("문의 목록");
-    // The recent one is a count — the exact number moves with the clock, the shape does not.
-    expect(within(list).getByText(/^\d+일 대기$/)).toBeInTheDocument();
-    // 2016 is a year past under any clock this product runs on.
+    // The recent one is a count: 2026-08-03 10:00Z to 2026-10-04 03:00Z is 61 whole days.
+    expect(within(list).getByText("61일 대기")).toBeInTheDocument();
+    // 2016 is past the year, so it is told as the day it arrived, not a count.
     expect(within(list).getByText("2016-09-09 접수")).toBeInTheDocument();
     expect(within(list).queryByText(/^\d{3,}일 대기$/)).toBeNull();
   });
@@ -941,11 +984,11 @@ describe("문의 redesign — the 1600 mockup (2026-10-04)", () => {
     });
     renderInbox("/inquiries/i1");
     const note = await screen.findByTestId("registration-note");
-    expect(note).toHaveTextContent(/답변을 대신 등록하지 않아요/);
+    expect(note).toHaveTextContent(/현재 이 환경에서는 답변 등록 기능이 꺼져 있어요/);
     // Last in the reading, so it sits against the dock rather than inside the flow.
     const article = screen.getByLabelText("선택한 항목");
     expect(article.lastElementChild).toBe(note);
     // Said once: the sentence left the answer block when it came here.
-    expect(screen.getAllByText(/답변을 대신 등록하지 않아요/)).toHaveLength(1);
+    expect(screen.getAllByText(/현재 이 환경에서는 답변 등록 기능이 꺼져 있어요/)).toHaveLength(1);
   });
 });

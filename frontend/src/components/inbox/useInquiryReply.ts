@@ -1,3 +1,4 @@
+import { SecureRandomUnavailableError, newCommandId } from "../../lib/commandId";
 import { useCallback, useEffect, useState } from "react";
 import { isAxiosError } from "axios";
 import { api } from "../../lib/apiClient";
@@ -10,7 +11,9 @@ import {
   canEditDraft,
   answeredElsewhere,
   canPublishReply,
+  isSimulatedPublish,
   classifyPublishError,
+  classifySaveDraftError,
   REPLY_TOO_LONG,
   publishUnavailableReason,
 } from "../../lib/inquiryPublish";
@@ -206,6 +209,13 @@ export function useInquiryReply(workItemId: string | null) {
   // the screen does not hand it out by copy either.
   const kindStale = sellerCheck?.kind?.draftMatches === false;
   const copyBlocked = (hold != null && (hold.needs === "FIX" || !hold.confirmed)) || kindStale;
+  /**
+   * The send waits for the same hold (2026-11-10 rehearsal, F6): under 「고쳐야 해요」 the press only came back refused. A
+   * hold on an approved answer is the resume path's, not this button's. The server still refuses either way.
+   */
+  const sendHeld = hold != null && !hold.approved && (hold.needs === "FIX" || !hold.confirmed);
+  const sendHeldReason = !sendHeld ? null
+    : hold?.needs === "FIX" ? "위 안내대로 고친 뒤 보낼 수 있어요." : "위 안내에서 확인하거나 결정한 뒤 보낼 수 있어요.";
 
   /** A 409 that is a recheck hold: its reasons are above the answer, so the line beside the button points there. */
   async function heldBy(e: unknown): Promise<boolean> {
@@ -217,6 +227,9 @@ export function useInquiryReply(workItemId: string | null) {
       return false;
     }
     await loadHold();
+    // The confirm block is about a send the hold now stops: closed, so the button beside the answer — waiting for the
+    // hold, with its reason — is what is left (2026-11-10, F6).
+    setConfirming(false);
     setActionError("다시 확인이 필요해 보내지 않았어요. 위의 안내를 확인해 주세요.");
     return true;
   }
@@ -240,8 +253,11 @@ export function useInquiryReply(workItemId: string | null) {
   }, [workItemId]);
 
   const draft = detail?.draft ?? null;
-  const publishable = detail ? canPublishReply(detail, capability) : false;
-  const unavailableReason = detail ? publishUnavailableReason(detail, capability) : null;
+  // The inquiry screen labels a mock registration as one (InquiryReply / InquiryReplyDock), so it may offer it.
+  const publishable = detail ? canPublishReply(detail, capability, { allowSimulated: true }) : false;
+  // A property of this deployment and channel, not of the moment: it still labels the outcome after the send.
+  const simulatedPublish = !!detail && isSimulatedPublish(detail, capability);
+  const unavailableReason = detail ? publishUnavailableReason(detail, capability, { allowSimulated: true }) : null;
   const draftDirty = !!draft && (draft.title !== replyTitle || draft.comments !== replyComments);
   // A decided reply is kept as it was approved (2026-11-03 sixth review): reopening it never offers a new version.
   const draftEditable =
@@ -301,9 +317,9 @@ export function useInquiryReply(workItemId: string | null) {
       setConfirming(false);
       if (sellerCheck?.check || sellerCheck?.kind?.correctionId) void loadSellerCheck();
     } catch (e) {
-      const info = classifyPublishError(isAxiosError(e) ? e.response?.status : undefined);
-      setActionError(info.message);
-      if (info.shouldRefresh) await load();
+      // Not the registration's sentence, and no reload: a reload seeds the editor from the saved version and would erase
+      // what the seller just typed (classifySaveDraftError).
+      setActionError(classifySaveDraftError(isAxiosError(e) ? e.response?.status : undefined).message);
     } finally {
       setBusy(false);
     }
@@ -323,13 +339,19 @@ export function useInquiryReply(workItemId: string | null) {
     setActionError(null);
     try {
       const status = await api.confirmInquiryPublish(workItemId, {
-        commandId: crypto.randomUUID(),
+        // Not crypto.randomUUID(): it is undefined on a LAN address (http://192.168.x.x), where the same-Wi-Fi demo runs.
+        commandId: newCommandId(),
         expectedFingerprint: draft.contentFingerprint,
       });
       setPublishStatus(status);
       setConfirming(false);
       setDetail((current) => (current ? { ...current, phase: status.phase } : current));
+      await settleRegistered(status);
     } catch (e) {
+      if (e instanceof SecureRandomUnavailableError) {
+        setActionError("이 브라우저에서는 등록 요청을 만들 수 없어요. 다른 브라우저로 열어 주세요. 아무것도 보내지 않았어요.");
+        return;
+      }
       if (await heldBy(e)) return;
       const info = isAxiosError(e)
         ? classifyPublishError(e.response?.status, e.response?.data)
@@ -341,13 +363,30 @@ export function useInquiryReply(workItemId: string | null) {
     }
   }
 
+  /**
+   * A registration the channel confirmed changes what this inquiry IS (2026-11-10 rehearsal, F2): the screen said 「답변
+   * 필요 · 등록하고 있어요」 beside 「답변이 등록됐어요」 until a reload. The detail is read again — quietly, keeping the editor
+   * and the outcome on screen — and the newer status is the one the header and the next action say.
+   */
+  async function settleRegistered(status: PublishStatusView) {
+    if (status.category !== "COMPLETED" || workItemId === null) return;
+    try {
+      const next = await api.getInquiryDetailStrict(workItemId);
+      setDetail((current) => (current && current.workItemId === next.workItemId ? next : current));
+    } catch {
+      // Unreadable leaves the screen as it was; a reload reads it again.
+    }
+  }
+
   /** Verify-only. It re-queries the channel's own status and NEVER resends — that is the whole point. */
   async function onVerifyPublish() {
     if (workItemId === null) return;
     setBusy(true);
     setActionError(null);
     try {
-      setPublishStatus(await api.verifyInquiryPublish(workItemId));
+      const status = await api.verifyInquiryPublish(workItemId);
+      setPublishStatus(status);
+      await settleRegistered(status);
     } catch (e) {
       setActionError(classifyPublishError(isAxiosError(e) ? e.response?.status : undefined).message);
     } finally {
@@ -361,7 +400,9 @@ export function useInquiryReply(workItemId: string | null) {
     setBusy(true);
     setActionError(null);
     try {
-      setPublishStatus(await api.resumeInquiryPublish(workItemId));
+      const status = await api.resumeInquiryPublish(workItemId);
+      setPublishStatus(status);
+      await settleRegistered(status);
     } catch (e) {
       if (await heldBy(e)) return;
       setActionError(classifyPublishError(isAxiosError(e) ? e.response?.status : undefined).message);
@@ -772,6 +813,7 @@ export function useInquiryReply(workItemId: string | null) {
     load,
     draft,
     publishable,
+    simulatedPublish,
     unavailableReason,
     draftDirty,
     draftEditable,
@@ -787,6 +829,8 @@ export function useInquiryReply(workItemId: string | null) {
     hold,
     setHold,
     copyBlocked,
+    sendHeld,
+    sendHeldReason,
     sellerCheck,
     sellerCheckLoadFailed,
     loadSellerCheck,

@@ -26,15 +26,38 @@ import type { InquiryDetail, PublishCapabilityView, PublishOutcomeCategory, Publ
 export function canPublishReply(
   detail: Pick<InquiryDetail, "channelCode" | "status">,
   capability: PublishCapabilityView | null,
+  options: { allowSimulated?: boolean } = {},
 ): boolean {
   // Already answered on the marketplace, by anyone. The backend refuses this at the last gate before
   // the write (ALREADY_ANSWERED), so offering the button here would walk the seller through approval
   // only to fail — and if a stale AI draft is sitting there, it invites them to answer a customer
   // twice. Checked first because no capability makes a second answer correct.
   if (answeredElsewhere(detail)) return false;
-  if (!capability || !capability.executionEnabled) return false;
+  if (!capability) return false;
+  // Real execution off and no mock asked for: nothing to read further (the pre-2026-11-09 order, kept so a capability of
+  // an unexpected shape still answers 「no」 instead of throwing).
+  if (capability.executionEnabled !== true && !options.allowSimulated) return false;
   const code = detail.channelCode;
-  return !!code && capability.replyAdapterChannelCodes.includes(code);
+  const adapters = Array.isArray(capability.replyAdapterChannelCodes) ? capability.replyAdapterChannelCodes : [];
+  if (!code || !adapters.includes(code)) return false;
+  if (capability.executionEnabled === true) return true;
+  // A development stand-in (2026-11-09, demo §7.10 3A): the same approval API and checks, a channel that reaches no
+  // customer. Offered only where the caller says it labels the press as a mock, so no surface can show it as a real send.
+  return !!options.allowSimulated && isSimulatedPublish(detail, capability);
+}
+
+/**
+ * Whether registering this inquiry would go to a development simulation rather than a channel. True only when real
+ * execution is off and the server names this channel as simulated — never inferred from anything else.
+ */
+export function isSimulatedPublish(
+  detail: Pick<InquiryDetail, "channelCode">,
+  capability: PublishCapabilityView | null,
+): boolean {
+  if (!capability || capability.executionEnabled !== false) return false;
+  const code = detail.channelCode;
+  const simulated = Array.isArray(capability.simulatedChannelCodes) ? capability.simulatedChannelCodes : [];
+  return !!code && simulated.includes(code);
 }
 
 /**
@@ -58,8 +81,9 @@ export function answeredElsewhere(detail: Pick<InquiryDetail, "status">): boolea
 export function publishUnavailableReason(
   detail: Pick<InquiryDetail, "channelCode" | "channelNameKo" | "replyCapability" | "status">,
   capability: PublishCapabilityView | null,
+  options: { allowSimulated?: boolean } = {},
 ): string | null {
-  if (canPublishReply(detail, capability)) return null;
+  if (canPublishReply(detail, capability, options)) return null;
   // First, because it is about the customer rather than about us. Telling someone "이 채널은
   // 판매자센터에서 답변해 주세요" about a question that has already been answered sends them to do
   // work that no longer exists.
@@ -70,21 +94,31 @@ export function publishUnavailableReason(
     return "이미 답변된 문의예요. 채널에 답변이 등록된 것을 확인했어요.";
   }
   const channel = detail.channelNameKo ?? "이 채널";
+  // Four different facts, four sentences (2026-11-09, demo_seller_validation_v1 §7.11). None of them may read as
+  // 「reviewnary cannot register answers」 in general: a channel that has no path, an environment where the switch is
+  // off, a read that did not land and a development mock are each true of one thing only.
+  //
+  // 1. This channel and inquiry type have no registration path — true whatever the environment, so said first. Only a
+  //    non-DIRECT_API row carries a reason that is a limitation; a DIRECT_API row says it CAN register, and printing it
+  //    above 「판매자센터에 등록해 주세요」 contradicted itself.
+  const audited = detail.replyCapability;
+  if (audited && audited.transport !== "DIRECT_API" && audited.reasonKo) {
+    return `${audited.reasonKo} [초안 복사]로 옮겨 판매자센터에 등록해 주세요.`;
+  }
+  // 2. The capability read did not land: say that, not 「꺼져 있어요」 or 「지원하지 않아요」.
   if (!capability) {
-    return "답변 등록이 가능한지 확인하지 못했어요. 답변은 판매자센터에서 직접 등록해 주세요.";
+    return "답변 등록이 가능한지 확인하지 못했어요. 새로고침하면 다시 확인해요. 그동안 [초안 복사]로 옮겨 판매자센터에 등록할 수도 있어요.";
   }
+  // 3. A development mock this surface does not offer (the chat card): point to the screen that labels it as one.
+  if (!options.allowSimulated && isSimulatedPublish(detail, capability)) {
+    return "개발용 모의 등록은 문의 화면에서 할 수 있어요. 실제 채널과 고객에게는 나가지 않아요.";
+  }
+  // 4. This environment's switch is off — a deployment fact, not the channel's.
   if (!capability.executionEnabled) {
-    return "지금은 reviewnary가 답변을 대신 등록하지 않아요. [초안 복사]로 옮겨 판매자센터에 등록해 주세요.";
+    return "현재 이 환경에서는 답변 등록 기능이 꺼져 있어요. [초안 복사]로 옮겨 판매자센터에 등록해 주세요.";
   }
-  // The audited answer for THIS channel and THIS source resource, when the server sent one. It says
-  // whose limitation this is, and that is the part a seller acts on: told "네이버는 지원하지 않습니다"
-  // they conclude their channel cannot do it and stop asking, when the endpoint exists and SellerOps
-  // simply has not connected it. The transport NAME is never shown — only what it means for them.
-  const audited = detail.replyCapability?.reasonKo;
-  if (audited) {
-    return `${audited} [초안 복사]로 옮겨 판매자센터에 등록해 주세요.`;
-  }
-  return `${channel} 문의는 판매자센터에서 직접 답변해 주세요. [초안 복사]로 옮겨 쓰실 수 있어요.`;
+  // 5. Registration is on here, but not for this channel (its own connection or flag is not set up).
+  return `현재 이 환경에서는 ${channel} 답변 등록이 켜져 있지 않아요. [초안 복사]로 옮겨 판매자센터에 등록해 주세요.`;
 }
 
 /** Whether a draft version may still be edited — once an approval is bound, the content is frozen. */
@@ -228,4 +262,25 @@ export function classifyPublishError(
     return { message: "지금은 답변을 등록할 수 없어요. 판매자센터에서 직접 등록해 주세요.", shouldRefresh: false };
   }
   return { message: "답변을 등록하지 못했어요. 잠시 후 다시 시도해 주세요.", shouldRefresh: false };
+}
+
+/**
+ * A refused 초안 저장 says the press that failed — saving, not registering (휴대폰 실기기 점검, 2026-11-14: a refused save read
+ * 「답변을 등록하지 못했어요」, about a registration nobody had asked for). And the text the seller typed stays in the box:
+ * nothing here asks for a reload, because a reload seeds the editor from the saved version and would erase it.
+ *
+ * <p>409 is the server's stale base (`InquiryDetailController` PUT draft): the draft moved somewhere else since this
+ * screen read it, so the same save would be refused again. The seller is told that, and that their words are still
+ * there to keep before they reopen it.
+ */
+export function classifySaveDraftError(status: number | undefined): { message: string } {
+  if (status === 409) {
+    return {
+      message: "초안을 저장하지 못했어요. 그 사이 다른 곳에서 이 초안이 바뀌었어요. 입력한 내용은 그대로 두었어요. 복사해 둔 뒤 새로 고쳐 다시 저장해 주세요.",
+    };
+  }
+  if (status === 404) {
+    return { message: "초안을 저장하지 못했어요. 이 문의를 찾을 수 없어요. 입력한 내용은 그대로 두었어요." };
+  }
+  return { message: "초안을 저장하지 못했어요. 입력한 내용은 그대로 두었어요. 잠시 후 다시 저장해 주세요." };
 }

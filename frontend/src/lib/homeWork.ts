@@ -2,8 +2,12 @@ import { REASON, channelShort, elapsedSource, reasonOfCase, sourceLabel, waitSin
 import { onlySharedWord } from "./sharedWord";
 import { DELEGATED_WORK, type WorkStateKey } from "./workState";
 import { subjectFallback } from "./customerOperations";
+import type { RowWork } from "./homeBoard";
 import type { CustomerOperationsDecisionRow, CustomerOperationsHome } from "./customerOperationsTypes";
-import type { InquiryFollowUps, InquiryQueueResponse, OperationsHome, ReviewWorkView } from "./types";
+import type {
+  HomeAttentionReview, InquiryFollowUpRow, InquiryFollowUps, InquiryQueueItem, InquiryQueueResponse, OperationsHome,
+  OperatorVocItem, ReviewWorkView,
+} from "./types";
 
 /**
  * <b>「확인 필요」 on the Home — one list, not three</b> (Customer Operations v3.1).
@@ -127,6 +131,15 @@ export interface HomeWorkRow {
   safetyReading?: "OCCURRENCE" | "WORRY" | null;
   /** Which kind of harm when `safety` (2026-10-25) — what the label names: 부상 언급 · 몸 반응 언급 …. */
   safetyKind?: "INJURY" | "BODY_REACTION" | "PRODUCT_HAZARD" | "LEGAL" | null;
+  /**
+   * Other work on the same customer item whose day has come — a check the seller set, riding on this row rather than
+   * standing as a second row of the same item (server `HomeWorkRow.also`, 2026-11-10). Only from the server read.
+   */
+  also?: RowWork[];
+  /** A thank-you reply waiting only for 확정 — the server's own flag (`isPraiseApproval` is the screen-merge's). */
+  praise?: boolean;
+  /** 지난 일 by the server's two-week rule — only from the server read. */
+  past?: boolean;
 }
 
 export interface HomeWork {
@@ -241,30 +254,7 @@ export function mergeHomeWork(
   for (const row of attentionRows) {
     const owner = `/reviews/reply/${row.reviewId}`;
     if (byOwner.has(owner) || settled.has(owner)) continue;
-    byOwner.set(owner, {
-      key: `review:${row.reviewId}`,
-      reason: REASON.review,
-      // The triage tier said 「지금 확인」 and the seller has not decided yet. `NEEDS_LOOK`'s definition
-      // is that tier, read and never computed.
-      state: "NEEDS_LOOK",
-      source: sourceLabel(row.channelCode, "REVIEW"),
-      channel: channelShort(row.channelCode),
-      rating: row.rating ?? null,
-      title: row.quote?.trim() || "본문 없는 리뷰",
-      line: row.productName,
-      since: row.occurredOn,
-      to: owner,
-      owner,
-      caseId: null,
-      verb: "검토",
-      kind: "REVIEW",
-      subject: "REVIEW",
-      subjectId: row.reviewId,
-      workItemId: null,
-      safety: row.safety === true,
-      safetyReading: row.safety === true ? (row.safetyReading ?? null) : null,
-      safetyKind: row.safety === true ? (row.safetyKind ?? null) : null,
-    });
+    byOwner.set(owner, attentionWorkRow(row));
   }
 
   if (reviewWork && reviewWork.attentionTotal > reviewWork.attention.length) truncated = true;
@@ -279,95 +269,20 @@ export function mergeHomeWork(
       if (!item.reviewId) continue;
       const owner = `/reviews/reply/${item.reviewId}`;
       if (byOwner.has(owner) || settled.has(owner)) continue;
-      const awaiting = item.replyWorkState === "AWAITING_APPROVAL";
-      // A reply that went to the delegate and came back says where it came back from; it is still the seller's to
-      // approve or send again, so it stays under 승인할 일.
-      const lane = DELEGATED_WORK[delegated[item.reviewId] ?? ""];
-      byOwner.set(owner, {
-        key: `review:${item.reviewId}`,
-        reason: awaiting || lane ? REASON.approve : REASON.draft,
-        // `replyWorkState` is the fact for both: a saved draft with no standing approval, or reply work
-        // the seller committed to and has not written anything for yet. These two are deliberately not
-        // merged with 답변 필요 — that one is about the customer, these are about the seller's own work.
-        state: lane ?? (awaiting ? "AWAITING_APPROVAL" : "DRAFT_NEEDED"),
-        source: sourceLabel(item.channelCode ?? account.channelCode, "REVIEW"),
-        channel: channelShort(item.channelCode ?? account.channelCode),
-        rating: item.rating ?? null,
-        title: item.safePreview?.trim() || "본문 없는 리뷰",
-        /*
-          <b>Customer context only</b> (product-owner decision, 2026-10-01).
-
-          <p>This line read 「대응 필요 · 초안 없음 · {상품명}」 — and before that
-          「대응 필요로 정함 · 답변 초안 없음」 — under a lead badge already saying 초안 필요 or 승인 대기
-          off the same `replyWorkState`. The state is told once, by the badge that owns it; the line
-          is the review's product, which is the fact that tells one of these rows from the next.
-        */
-        line: item.productName,
-        since: item.sourceCreatedDate,
-        to: owner,
-        owner,
-        caseId: null,
-        verb: "검토",
-        kind: "REVIEW",
-        subject: "REVIEW",
-        subjectId: item.reviewId,
-        workItemId: null,
-        reply: item.actionRef ? { accountId: account.accountId, actionRef: item.actionRef } : null,
+      const reviewId = item.reviewId;
+      byOwner.set(owner, committedWorkRow(account, { ...item, reviewId }, {
         safety: safetyReviews.has(item.reviewId),
-        safetyReading: !safetyReviews.has(item.reviewId) ? null
-          : worryReviews.has(item.reviewId) ? "WORRY" : "OCCURRENCE",
-        safetyKind: safetyReviews.has(item.reviewId) ? (reviewWork?.safetyKinds?.[item.reviewId] ?? null) : null,
-      });
+        worry: worryReviews.has(item.reviewId),
+        safetyKind: reviewWork?.safetyKinds?.[item.reviewId] ?? null,
+        delegated: delegated[item.reviewId] ?? null,
+      }));
     }
   }
 
   for (const row of queue?.content ?? []) {
     const owner = `/inquiries/${row.inquiryId}`;
     if (byOwner.has(owner) || settled.has(owner)) continue;
-    // Resolved first, because `title` falls back to the snippet: a NAVER product inquiry carries no
-    // subject at all, so the body is BOTH lines unless the preview is compared against what the row
-    // will actually draw. Measured live at 1600×1000 — 「케이블 한 줄 2.5 3c 폭 10mm…」, twice.
-    const inquiryTitle = row.title?.trim() || row.snippet?.trim() || subjectFallback("INQUIRY");
-    // 「이 내용만 알려주세요」 (2026-11-03 sixth review): the answer waits on what only the seller can see, so the row
-    // says that instead of the customer's first lines — opening it lands on the one question the seller is asked.
-    const asked = row.sellerCheckAsk ? SELLER_CHECK_LINE[row.sellerCheckAsk] : undefined;
-    byOwner.set(owner, {
-      key: `inquiry:${row.inquiryId}`,
-      reason: REASON.reply,
-      // `hasDraft` is a draft VERSION, not a phase — the distinction that caught 「초안 준비됨」 being read
-      // off a work-item phase, where eight of the demo org's ten rows had no draft at all.
-      state: asked ? "SELLER_CHECK" : row.hasDraft ? "DRAFT_READY" : "REPLY_NEEDED",
-      source: sourceLabel(row.channelCode ?? row.channelNameKo, "INQUIRY"),
-      channel: channelShort(row.channelCode ?? row.channelNameKo),
-      rating: null,
-      title: inquiryTitle,
-      /*
-        <b>The inquiry's own body, which was never drawn</b> (product-owner decision, 2026-10-01).
-
-        <p>This slot held 「초안 없음」 / 「초안 있음 · 미발송」 — the lead badge's own fact, restated —
-        so an inquiry row on 오늘 carried no customer context at all while a review row beside it
-        carried its product. `snippet` is the channel's own first lines of the question and has been
-        on the wire the whole time (`InquiryQueueItem.snippet`); the queue screen reads it, the Home
-        did not.
-
-        <p><b>Dropped when it adds nothing, which is a PREFIX test and not equality.</b> Measured at
-        1600×1000 on the live org: one row drew 「케이블 한 줄 2.5 3c 폭 10mm…」 as both its title and
-        its line, because the two strings are the channel's own long question cut at different
-        lengths — different strings, identical on screen. Either being a prefix of the other means the
-        second line is the first line again.
-      */
-      line: asked ?? preview(row.snippet, inquiryTitle),
-      since: row.receivedAt,
-      to: owner,
-      owner,
-      caseId: null,
-      verb: "검토",
-      kind: "INQUIRY",
-      subject: "INQUIRY",
-      subjectId: row.inquiryId,
-      workItemId: row.workItemId,
-      safety: false,
-    });
+    byOwner.set(owner, inquiryWorkRow(row));
   }
   if (queue && queue.totalElements > queue.content.length) truncated = true;
 
@@ -377,35 +292,7 @@ export function mergeHomeWork(
   for (const row of followUps?.due ?? []) {
     const owner = row.to;
     if (byOwner.has(owner) || settled.has(owner)) continue;
-    const day = row.nextCheckOn ? dayWord(row.nextCheckOn) : null;
-    const behind = row.waitingOn === "TOLD_BEHIND";
-    byOwner.set(owner, {
-      key: `follow:${row.inquiryId}`,
-      reason: REASON.reply,
-      state: behind ? "TOLD_BEHIND" : "CHECK_AGAIN",
-      source: sourceLabel(row.channelCode, "INQUIRY"),
-      channel: channelShort(row.channelCode),
-      rating: null,
-      title: row.subject?.trim() || subjectFallback("INQUIRY"),
-      // The seller's own words from their record, never the customer's.
-      line: behind
-        ? toldBehindLine(row.toldOutcome ?? null)
-        : [day ? `${day}에 다시 확인하기로 한 일` : "다시 확인하기로 한 일", row.note ? `지난 기록: ${row.note}` : null]
-            .filter(Boolean)
-            .join(" · "),
-      since: row.since,
-      // The day has come: today's work, not 지난 일, whenever the record was written (2026-11-06 sixteenth review).
-      dueToday: true,
-      to: owner,
-      owner,
-      caseId: null,
-      verb: "확인",
-      kind: "INQUIRY",
-      subject: "INQUIRY",
-      subjectId: row.inquiryId,
-      workItemId: row.workItemId,
-      safety: false,
-    });
+    byOwner.set(owner, followUpWorkRow(row));
   }
   if (followUps && followUps.dueTotal > followUps.due.length) truncated = true;
 
@@ -416,7 +303,8 @@ export function mergeHomeWork(
     <ol>
       <li><b>A review that reports a safety or legal problem</b> ({@link HomeWorkRow.safety}) — the
           one exception to inquiries first, whatever its rating. Newest first among them.</li>
-      <li><b>The inquiries, and the cases about one</b> — longest waiting first. Time urgency is the
+      <li><b>The inquiries, and the cases about one</b> — <b>newest first since 2026-11-09</b> (the owner's
+          decision; what follows is the 2026-10-22 reading it replaced) — was: longest waiting first. Time urgency is the
           importance the owner named, and no channel tells us an inquiry's reply deadline, so the one
           that has waited longest is read as the one nearest it (option A of the 2026-10-22 mockup).
           This is the reading `/inquiries` has used since Operational Workspace UX System v1.</li>
@@ -447,13 +335,216 @@ export function mergeHomeWork(
   const ordered = [...byOwner.values()].sort((a, b) => {
     if (group(a) !== group(b)) return group(a) - group(b);
     if (group(a) === 2 && reviewRisk(a) !== reviewRisk(b)) return reviewRisk(a) - reviewRisk(b);
-    return group(a) === 1 ? timed(at(a), at(b)) : timed(-at(a), -at(b));
+    // Inquiries are newest first too since 2026-11-09 (product-owner decision, demo handoff §7.12): equal
+    // importance is broken by recency in both groups, and 「오래 기다린 순」 is a sort the seller picks — served by the
+    // server's whole-list read (`GET /api/operations/work?sort=longest`), never a slice re-sorted here.
+    return timed(-at(a), -at(b));
   });
   const rows = [
     ...ordered.filter((r) => !isOldBacklog(r, now)),
     ...ordered.filter((r) => isOldBacklog(r, now)),
   ];
   return { rows, truncated };
+}
+
+/**
+ * <b>One row per source record — the only place each becomes a row</b> (2026-11-10, Home FE connection). Moved out of
+ * {@link mergeHomeWork} unchanged so the Home's server-read list (`lib/homeBoard.ts`) draws a row from the record it was
+ * read from with the very function that drew it before: one source of wording, whichever read made the list.
+ */
+export function attentionWorkRow(row: HomeAttentionReview): HomeWorkRow {
+  const owner = `/reviews/reply/${row.reviewId}`;
+  return {
+    key: `review:${row.reviewId}`,
+    reason: REASON.review,
+    // The triage tier said 「지금 확인」 and the seller has not decided yet. `NEEDS_LOOK`'s definition
+    // is that tier, read and never computed.
+    state: "NEEDS_LOOK",
+    source: sourceLabel(row.channelCode, "REVIEW"),
+    channel: channelShort(row.channelCode),
+    rating: row.rating ?? null,
+    title: row.quote?.trim() || "본문 없는 리뷰",
+    line: row.productName,
+    since: row.occurredOn,
+    to: owner,
+    owner,
+    caseId: null,
+    verb: "검토",
+    kind: "REVIEW",
+    subject: "REVIEW",
+    subjectId: row.reviewId,
+    workItemId: null,
+    safety: row.safety === true,
+    safetyReading: row.safety === true ? (row.safetyReading ?? null) : null,
+    safetyKind: row.safety === true ? (row.safetyKind ?? null) : null,
+  };
+}
+
+/** The facts about a review that the review read keeps beside its list rather than on the item. */
+export interface CommittedFacts {
+  safety: boolean;
+  worry: boolean;
+  safetyKind: HomeWorkRow["safetyKind"];
+  delegated: string | null;
+}
+
+/** The seller's own reply work before approval — see {@link attentionWorkRow}. */
+export function committedWorkRow(
+  account: { accountId: string; channelCode: string | null },
+  item: OperatorVocItem & { reviewId: string },
+  facts: CommittedFacts,
+): HomeWorkRow {
+  const owner = `/reviews/reply/${item.reviewId}`;
+  const awaiting = item.replyWorkState === "AWAITING_APPROVAL";
+  // A reply that went to the delegate and came back says where it came back from; it is still the seller's to
+  // approve or send again, so it stays under 승인할 일.
+  const lane = DELEGATED_WORK[facts.delegated ?? ""];
+  return {
+    key: `review:${item.reviewId}`,
+    reason: awaiting || lane ? REASON.approve : REASON.draft,
+    // `replyWorkState` is the fact for both: a saved draft with no standing approval, or reply work
+    // the seller committed to and has not written anything for yet. These two are deliberately not
+    // merged with 답변 필요 — that one is about the customer, these are about the seller's own work.
+    state: lane ?? (awaiting ? "AWAITING_APPROVAL" : "DRAFT_NEEDED"),
+    source: sourceLabel(item.channelCode ?? account.channelCode, "REVIEW"),
+    channel: channelShort(item.channelCode ?? account.channelCode),
+    rating: item.rating ?? null,
+    title: item.safePreview?.trim() || "본문 없는 리뷰",
+    /*
+      <b>Customer context only</b> (product-owner decision, 2026-10-01).
+
+      <p>This line read 「대응 필요 · 초안 없음 · {상품명}」 — and before that
+      「대응 필요로 정함 · 답변 초안 없음」 — under a lead badge already saying 초안 필요 or 승인 대기
+      off the same `replyWorkState`. The state is told once, by the badge that owns it; the line
+      is the review's product, which is the fact that tells one of these rows from the next.
+    */
+    line: item.productName,
+    since: item.sourceCreatedDate,
+    to: owner,
+    owner,
+    caseId: null,
+    verb: "검토",
+    kind: "REVIEW",
+    subject: "REVIEW",
+    subjectId: item.reviewId,
+    workItemId: null,
+    reply: item.actionRef ? { accountId: account.accountId, actionRef: item.actionRef } : null,
+    safety: facts.safety,
+    safetyReading: !facts.safety ? null : facts.worry ? "WORRY" : "OCCURRENCE",
+    safetyKind: facts.safety ? facts.safetyKind : null,
+  };
+}
+
+/** One row of the inquiry work queue — see {@link attentionWorkRow}. */
+export function inquiryWorkRow(row: InquiryQueueItem): HomeWorkRow {
+  const owner = `/inquiries/${row.inquiryId}`;
+  // Resolved first, because `title` falls back to the snippet: a NAVER product inquiry carries no
+  // subject at all, so the body is BOTH lines unless the preview is compared against what the row
+  // will actually draw. Measured live at 1600×1000 — 「케이블 한 줄 2.5 3c 폭 10mm…」, twice.
+  const inquiryTitle = row.title?.trim() || row.snippet?.trim() || subjectFallback("INQUIRY");
+  // 「이 내용만 알려주세요」 (2026-11-03 sixth review): the answer waits on what only the seller can see, so the row
+  // says that instead of the customer's first lines — opening it lands on the one question the seller is asked.
+  const asked = row.sellerCheckAsk ? SELLER_CHECK_LINE[row.sellerCheckAsk] : undefined;
+  return {
+    key: `inquiry:${row.inquiryId}`,
+    reason: REASON.reply,
+    // `hasDraft` is a draft VERSION, not a phase — the distinction that caught 「초안 준비됨」 being read
+    // off a work-item phase, where eight of the demo org's ten rows had no draft at all.
+    state: asked ? "SELLER_CHECK" : row.hasDraft ? "DRAFT_READY" : "REPLY_NEEDED",
+    source: sourceLabel(row.channelCode ?? row.channelNameKo, "INQUIRY"),
+    channel: channelShort(row.channelCode ?? row.channelNameKo),
+    rating: null,
+    title: inquiryTitle,
+    /*
+      <b>The inquiry's own body, which was never drawn</b> (product-owner decision, 2026-10-01).
+
+      <p>This slot held 「초안 없음」 / 「초안 있음 · 미발송」 — the lead badge's own fact, restated —
+      so an inquiry row on 오늘 carried no customer context at all while a review row beside it
+      carried its product. `snippet` is the channel's own first lines of the question and has been
+      on the wire the whole time (`InquiryQueueItem.snippet`); the queue screen reads it, the Home
+      did not.
+
+      <p><b>Dropped when it adds nothing, which is a PREFIX test and not equality.</b> Measured at
+      1600×1000 on the live org: one row drew 「케이블 한 줄 2.5 3c 폭 10mm…」 as both its title and
+      its line, because the two strings are the channel's own long question cut at different
+      lengths — different strings, identical on screen. Either being a prefix of the other means the
+      second line is the first line again.
+    */
+    line: asked ?? preview(row.snippet, inquiryTitle),
+    since: row.receivedAt,
+    to: owner,
+    owner,
+    caseId: null,
+    verb: "검토",
+    kind: "INQUIRY",
+    subject: "INQUIRY",
+    subjectId: row.inquiryId,
+    workItemId: row.workItemId,
+    safety: false,
+  };
+}
+
+/** A check whose day has come — see {@link attentionWorkRow}. */
+export function followUpWorkRow(row: InquiryFollowUpRow): HomeWorkRow {
+  const owner = row.to;
+  const day = row.nextCheckOn ? dayWord(row.nextCheckOn) : null;
+  const behind = row.waitingOn === "TOLD_BEHIND";
+  return {
+    key: `follow:${row.inquiryId}`,
+    reason: REASON.reply,
+    state: behind ? "TOLD_BEHIND" : "CHECK_AGAIN",
+    source: sourceLabel(row.channelCode, "INQUIRY"),
+    channel: channelShort(row.channelCode),
+    rating: null,
+    title: row.subject?.trim() || subjectFallback("INQUIRY"),
+    // The seller's own words from their record, never the customer's.
+    line: behind
+      ? toldBehindLine(row.toldOutcome ?? null)
+      : [day ? `${day}에 다시 확인하기로 한 일` : "다시 확인하기로 한 일", row.note ? `지난 기록: ${row.note}` : null]
+          .filter(Boolean)
+          .join(" · "),
+    since: row.since,
+    // The day has come: today's work, not 지난 일, whenever the record was written (2026-11-06 sixteenth review).
+    dueToday: true,
+    to: owner,
+    owner,
+    caseId: null,
+    verb: "확인",
+    kind: "INQUIRY",
+    subject: "INQUIRY",
+    subjectId: row.inquiryId,
+    workItemId: row.workItemId,
+    safety: false,
+  };
+}
+
+/**
+ * <b>An approved answer whose registration the last check stopped</b> (2026-11-14): nothing was sent, and it cannot go on
+ * until the seller fixes it or decides on what the check found. The inquiry screen shows the reasons and the decision;
+ * this row only says that it stopped and that it is theirs to move.
+ */
+export function heldRegistrationRow(row: InquiryFollowUpRow): HomeWorkRow {
+  const owner = row.to;
+  return {
+    key: `held:${row.inquiryId}`,
+    reason: REASON.reply,
+    state: "REGISTRATION_HELD",
+    source: sourceLabel(row.channelCode, "INQUIRY"),
+    channel: channelShort(row.channelCode),
+    rating: null,
+    title: row.subject?.trim() || subjectFallback("INQUIRY"),
+    line: "확정한 답변이 등록 직전 검사에서 멈췄어요. 이유를 보고 고치거나 결정해 주세요",
+    since: row.since,
+    to: owner,
+    owner,
+    caseId: null,
+    verb: "확인",
+    kind: "INQUIRY",
+    subject: "INQUIRY",
+    subjectId: row.inquiryId,
+    workItemId: row.workItemId,
+    safety: false,
+  };
 }
 
 const SELLER_CHECK_LINE: Record<string, string> = {

@@ -300,8 +300,11 @@ describe("할 일 — risk first, one count, praise folded", () => {
     expect(isOldBacklog(back, NOW)).toBe(false);
     expect(todayWork(rows, NOW).map((r) => r.to)).toContain("/inquiries/i9");
     expect(todayWork(rows, NOW)).toHaveLength(6);
-    // Longest waiting first among inquiries: the record's own time puts it in the Home's first four.
-    expect(homeBriefRows(todayWork(rows, NOW), 4).map((r) => r.to)).toContain("/inquiries/i9");
+    // Newest first among inquiries (owner, 2026-11-09): its record is the oldest, so it stands last — still today's
+    // work and still counted, never moved under 지난 일.
+    const today = todayWork(rows, NOW);
+    expect(today[today.length - 1].to).toBe("/inquiries/i9");
+    expect(homeBriefRows(todayWork(rows, NOW), 6).map((r) => r.to)).toContain("/inquiries/i9");
     // A waiting check is not work, and an old inquiry with no check still ages out.
     expect(rows.some((r) => r.to === "/inquiries/i8")).toBe(false);
     const aged = mergeHomeWork(null, null, { ...(queue as object), content: [inquiry("q0", "2026-08-01T00:00:00Z")] } as never, NOW).rows;

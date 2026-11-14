@@ -1,3 +1,4 @@
+import { newCommandId } from "../../lib/commandId";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { SafetyMarkNote } from "../../components/reviews/SafetyMarkNote";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -318,7 +319,7 @@ export function ReviewCaseView({
           org and restored on mount, so this link returns to the same thread rather than starting one.
           Rendered only when a conversation actually sent them. */}
       {from === "chat" ? (
-        <Link to="/" className="text-sm font-semibold text-muted hover:text-ink hover:underline">
+        <Link to="/work" className="text-sm font-semibold text-muted hover:text-ink hover:underline">
           대화로 돌아가기
         </Link>
       ) : null}
@@ -927,7 +928,7 @@ function SetAsideFromWork({ accountId, actionRef, onDone }: { accountId: string;
               onClick={async () => {
                 setBusy(true);
                 try {
-                  await api.dismissReplyWork(accountId, actionRef, { commandId: crypto.randomUUID() });
+                  await api.dismissReplyWork(accountId, actionRef, { commandId: newCommandId() });
                   setState("done");
                   onDone();
                 } catch {

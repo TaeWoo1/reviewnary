@@ -113,6 +113,10 @@ export function CustomerInbox() {
   const channel = searchParams.get("channel");
   const productId = searchParams.get("productId");
   const q = searchParams.get("q") ?? "";
+  // 받은 날 (2026-11-13): 홈's 「오늘 접수」 opens `?from=<day>&to=<day>` — the same Korean day, ACTIVE and REAL rows,
+  // the number counted. Anything that is not an ISO date is ignored rather than sent.
+  const from = isoDay(searchParams.get("from"));
+  const to = isoDay(searchParams.get("to"));
   const [draftQuery, setDraftQuery] = useState(q);
   useEffect(() => setDraftQuery(q), [q]);
 
@@ -172,6 +176,8 @@ export function CustomerInbox() {
             ...(channel ? { channel } : {}),
             ...(productId ? { productId } : {}),
             ...(q.trim() ? { q: q.trim() } : {}),
+            ...(from ? { from } : {}),
+            ...(to ? { to } : {}),
           }),
         ),
       );
@@ -183,11 +189,11 @@ export function CustomerInbox() {
     } finally {
       setLoading(false);
     }
-  }, [status, channel, productId, q, recordPages]);
+  }, [status, channel, productId, q, from, to, recordPages]);
 
   // A new question starts at its first page. Without this, changing a filter would ask for pages 2..n
   // of a list that no longer exists.
-  useEffect(() => setRecordPages(1), [status, channel, productId, q]);
+  useEffect(() => setRecordPages(1), [status, channel, productId, q, from, to]);
 
   useEffect(() => {
     void loadQueue();
@@ -227,6 +233,8 @@ export function CustomerInbox() {
           ...(channel ? { channel } : {}),
           ...(productId ? { productId } : {}),
           ...(q.trim() ? { q: q.trim() } : {}),
+          ...(from ? { from } : {}),
+          ...(to ? { to } : {}),
         })
         .then((page) => page.totalCount)
         .catch(() => null);
@@ -236,7 +244,7 @@ export function CustomerInbox() {
     return () => {
       live = false;
     };
-  }, [channel, productId, q]);
+  }, [channel, productId, q, from, to]);
 
   const analysisIndex = useMemo(() => buildAnalysisIndex(analyses), [analyses]);
   const wide = useWideLayout();
@@ -341,7 +349,9 @@ export function CustomerInbox() {
         <p>rail이 아닌 좁은 화면에는 pane이 없다 — 목록만 보고 있을 때 물어볼 길이 사라지면 안 되므로
         거기서는 머리에 그대로 남는다. 그 화면의 머리는 폭이 모자라지 않는다.
       */
-      action={wide ? undefined : agentLaunch}
+      /* 좁은 화면에서 문의 하나를 열었을 때도 머리에서 뺀다 (2026-11-14): 그 문의의 머리(InquiryCasePane)가 같은
+         「이 문의에 대해 물어보기」를 이미 들고 있어, 휴대폰 상세에 같은 버튼이 두 번 섰다. 목록만 볼 때는 그대로다. */
+      action={wide || itemRef ? undefined : agentLaunch}
       /* No meta: the section below is titled 「지금 처리할 일」 and carries the same count, and the two
          sat 80px apart saying the same words twice. The section owns it, because it owns the rows. */
     />
@@ -362,6 +372,29 @@ export function CustomerInbox() {
         <p className="text-sm text-warn" role="status">
           처리할 문의 수를 불러오지 못했어요. 아래 전체 문의는 그대로 볼 수 있어요.
         </p>
+      ) : null}
+
+      {from || to ? (
+        <div className="flex flex-wrap items-center gap-2" data-testid="record-day-scope">
+          <Status tone="info">{dayScopeLabel(from, to)} 받은 문의만 보고 있어요</Status>
+          <button
+            type="button"
+            onClick={() =>
+              setSearchParams(
+                (prev) => {
+                  const next = new URLSearchParams(prev);
+                  next.delete("from");
+                  next.delete("to");
+                  return next;
+                },
+                { replace: true },
+              )
+            }
+            className="rounded-md text-sm font-medium text-muted underline underline-offset-2 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+          >
+            전체 기간 보기
+          </button>
+        </div>
       ) : null}
 
       {productId ? (
@@ -612,6 +645,14 @@ export function CustomerInbox() {
           ← 문의 목록
         </Link>
         {detail}
+        {/* The answer's own action, where the pane footer would be (2026-11-10 same-Wi-Fi phone check): the detail is
+            drawn docked, so without this a phone had no 「모의 등록」 / 「답변 보내기」 anywhere. In the flow, not
+            pinned — the bottom navigation is fixed there. */}
+        {shownItem && shownWorkItemId ? (
+          <div className="mt-6" data-testid="narrow-reply-dock">
+            <InquiryReplyDock workspace={workspace} />
+          </div>
+        ) : null}
       </>
     ) : (
       <>
@@ -689,8 +730,11 @@ function InquiryCasePane({
     목록의 행과 같은 주인, 같은 단어 — 그것이 elapsed 계약이다. 1년이 넘은 문의에서 그 단어는 접수일 자체가
     되므로, 바로 왼쪽의 날짜와 같은 사실을 두 번 말하게 된다. 그때는 날짜만 남긴다.
   */
-  const waited = waitIsDated(item.receivedAt) ? null : inquiryAgeLabel(item.receivedAt, item.status);
-  const state = recordRowState(item);
+  // This inquiry's own read is newer than the list's row (2026-11-10, F2): a registration the channel confirmed makes it
+  // 답변함 here at once, while the row beside it waits for the list to be read again.
+  const status = detail?.status ?? item.status;
+  const waited = waitIsDated(item.receivedAt) ? null : inquiryAgeLabel(item.receivedAt, status);
+  const state = recordRowState({ ...item, status });
   return (
     <CaseLayout
       key={item.id}
@@ -699,7 +743,7 @@ function InquiryCasePane({
       decisionLabel="답변"
       meta={
         <Facts>
-          <span className={`font-semibold ${item.status === "ANSWERED" ? "text-muted" : "text-brand-700"}`}>
+          <span className={`font-semibold ${status === "ANSWERED" ? "text-muted" : "text-brand-700"}`}>
             {state.text}
           </span>
           <span>{item.channelNameKo}</span>
@@ -787,4 +831,21 @@ function InquiryEmpty({ cause }: { cause: EmptyCause | null }) {
       action={<BtnLink to="/connect">채널 연동하기</BtnLink>}
     />
   );
+}
+
+/** An ISO calendar day (`2026-11-13`), or null. */
+function isoDay(value: string | null): string | null {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+/** 「11월 13일에」 for one day, 「11월 1일부터 11월 13일까지」 for a span. */
+function dayScopeLabel(from: string | null, to: string | null): string {
+  const say = (day: string) => {
+    const [, m, d] = day.split("-").map(Number);
+    return `${m}월 ${d}일`;
+  };
+  if (from && to && from === to) return `${say(from)}에`;
+  if (from && to) return `${say(from)}부터 ${say(to)}까지`;
+  if (from) return `${say(from)}부터`;
+  return `${say(to!)}까지`;
 }

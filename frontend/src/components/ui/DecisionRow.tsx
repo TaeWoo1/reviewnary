@@ -58,6 +58,7 @@ export function DecisionRow({
   children,
   selected = false,
   dense = false,
+  oneLine = false,
   rating = null,
   tagHidden = false,
   metaBelow = false,
@@ -114,6 +115,14 @@ export function DecisionRow({
    * three-line reading, where the extra air is the point.
    */
   dense?: boolean;
+  /**
+   * The sentence on one line, cut with 「…」 and whole in the tooltip (홈 CS 현황, 2026-11-13): a short preview of the
+   * list whose height must not depend on how long a customer wrote. The list itself never sets it. The preview's rows
+   * also stand closer (12px less air each), so four of them and the whole CS 현황 fit a 1280×720 laptop as the mockup does.
+   * <b>From `sm` up only.</b> A phone scrolls, so there the sentence and its line wrap whole — a phone's first screen is
+   * never bought by cutting what the customer wrote (2026-11-14).
+   */
+  oneLine?: boolean;
   /** The star rating, drawn above the wait in the right-hand column. Carried by the row; never parsed out of
       `source`, which is why `sourceLabel` stops composing it for these lists. Null when every row in the list
       carries the same one and the list has said it once (`sharedRowFacts`). */
@@ -254,7 +263,8 @@ export function DecisionRow({
           <span
             className={`block min-w-0 max-w-[62ch] break-keep font-semibold leading-snug text-ink [overflow-wrap:anywhere] ${
               metaBelow ? "text-lg" : "text-sm"
-            }`}
+            } ${oneLine ? "sm:truncate" : ""}`}
+            title={oneLine && typeof title === "string" ? title : undefined}
           >
             {alertMark}
             {title}
@@ -265,7 +275,7 @@ export function DecisionRow({
               2px to its right was smaller than both. Measured, it is also the 6px per row that lands the
               four of them on the target's 70px pitch. */}
           {line ? (
-            <span className={`block truncate text-muted ${metaBelow ? "mt-1 text-sm" : "mt-0.5 text-xs"}`}>{line}</span>
+            <span className={`block truncate text-muted ${metaBelow ? "mt-1 text-sm" : "mt-0.5 text-xs"} ${oneLine ? "max-sm:whitespace-normal max-sm:break-keep" : ""}`}>{line}</span>
           ) : null}
           {hasProvenance ? (
             /* <b>One line, truncated — never wrapped</b> (measured at 1600×1000 with the 576px pane,
@@ -365,7 +375,7 @@ export function DecisionRow({
        only thing that marks it. §4's 8px edge belongs to the Home's reading, where the row is one of
        five on a page of cards. */
     const shape = `flex items-start gap-3 ${metaBelow ? "" : "max-sm:flex-wrap max-sm:gap-y-2"} transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700 ${
-      metaBelow ? "px-4 py-4" : "rounded-lg px-3 py-3"
+      metaBelow ? "px-4 py-4" : oneLine ? "rounded-lg px-3 py-1.5" : "rounded-lg px-3 py-3"
     } ${selected ? "!border-transparent bg-brand-50 shadow-selected" : "hover:bg-canvas"}`;
     return (
       // The hairline is the item's, not the rounded row's (2026-10-28): drawn on a rounded-corner link, its two ends

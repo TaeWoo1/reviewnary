@@ -9,6 +9,9 @@ import { expectNoAxeViolations } from "../../test/axe";
 
 const api = vi.hoisted(() => ({
   getInquiryQueueStrict: vi.fn(),
+  // The Home's own two reads (2026-11-10) — served from the fixtures by `serveFromReads` in `draw`.
+  getHomeBoard: vi.fn(),
+  getHomeWork: vi.fn(),
   activateCustomerOperations: vi.fn(),
   resumeCustomerOperations: vi.fn(),
   // The repeated-problem pane's own two reads. 오늘 opens the same reading 반복 문제 does, so the Home's
@@ -22,6 +25,7 @@ vi.mock("../../lib/apiClient", () => ({ api, getToken: () => null }));
 import { CustomerOpsHome, HOME_ROWS, HOME_ROWS_NARROW, TodayWorkspace, coHomeApplies, visibleHomeRows } from "./CustomerOpsHome";
 import { mergeHomeWork } from "../../lib/homeWork";
 import { waitLabel } from "../../lib/copy/customerOps";
+import { serveFromReads } from "../../test/homeBoardFake";
 
 const NOW = new Date("2026-09-16T05:30:00Z"); // 14:30 KST
 
@@ -138,6 +142,7 @@ function queue(over: Partial<InquiryQueueResponse> = {}): InquiryQueueResponse {
 
 function draw(home = co(), operations: OperationsHome | null = ops(), path = "/") {
   const onChanged = vi.fn();
+  serveFromReads(api as never, () => ({ co: home, ops: operations, now: NOW }));
   const view = render(
     <MemoryRouter initialEntries={[path]}>
       <CustomerOpsHome co={home} ops={operations} now={NOW} onChanged={onChanged} />
@@ -165,10 +170,12 @@ describe("mergeHomeWork — one list from three reads", () => {
    * review's authoring date is never ranked against an inquiry's receipt, because the groups are
    * concatenated, not merged.
    */
-  it("inquiries and the cases about them first, longest waiting first; then reviews", () => {
+  it("inquiries and the cases about them first, newest first (owner, 2026-11-09); then reviews", () => {
     const work = mergeHomeWork(co(), ops(), queue());
-    // c-2 opened 00:30, c-1 02:30, i-3 arrived 04:30 — and the review, a day old, after all three.
-    expect(work.rows.map((r) => r.key)).toEqual(["case:c-2", "case:c-1", "inquiry:i-3", "review:r-1"]);
+    // i-3 arrived 04:30, c-1 opened 02:30, c-2 00:30 — and the review, a day old, after all three.
+    // Until 2026-11-09 this group was longest waiting first; that is now a sort the seller picks, served whole by
+    // the server (`/api/operations/work?sort=longest`), not this merge.
+    expect(work.rows.map((r) => r.key)).toEqual(["inquiry:i-3", "case:c-1", "case:c-2", "review:r-1"]);
   });
 
   it("reviews are newest first: nobody is waiting on one, so equal importance is broken by recency", () => {
@@ -208,11 +215,11 @@ describe("mergeHomeWork — one list from three reads", () => {
   it("an inquiry has no safety exception, and a row with no time goes last in its group", () => {
     const untimed = { ...queue().content[1], workItemId: "w-u", inquiryId: "i-untimed", receivedAt: null };
     const work = mergeHomeWork(null, null, queue({ content: [untimed as never, ...queue().content] }), NOW);
-    expect(work.rows.map((r) => r.key)).toEqual(["inquiry:i-1", "inquiry:i-3", "inquiry:i-untimed"]);
+    expect(work.rows.map((r) => r.key)).toEqual(["inquiry:i-3", "inquiry:i-1", "inquiry:i-untimed"]);
     expect(work.rows.every((r) => r.safety === false)).toBe(true);
   });
 
-  it("orders the inquiry lane oldest-first — the SLA reading, restated because the read is newest-first", () => {
+  it("orders the inquiry lane newest first — the owner's tie rule since 2026-11-09, not the SLA reading", () => {
     const older = {
       workItemId: "w-8", inquiryId: "i-older", sellerAccountId: "a", channelId: "ch", channelCode: "CAFE24",
       channelNameKo: "카페24", productId: null, productName: null, phase: "OPEN" as const,
@@ -222,12 +229,12 @@ describe("mergeHomeWork — one list from three reads", () => {
     // Handed in newest-first, which is how `InquiryQueueService` sorts it (`createdAt desc`).
     const work = mergeHomeWork(null, null, queue({ content: [...queue().content, older] }), NOW);
     const inquiries = work.rows.filter((r) => r.kind === "INQUIRY").map((r) => r.key);
-    expect(inquiries).toEqual(["inquiry:i-older", "inquiry:i-1", "inquiry:i-3"]);
+    expect(inquiries).toEqual(["inquiry:i-3", "inquiry:i-1", "inquiry:i-older"]);
   });
 
   it("a read that failed is absent, not zero — and the count is what was drawn", () => {
     const work = mergeHomeWork(co(), ops(), null);
-    expect(work.rows.map((r) => r.key)).toEqual(["case:c-2", "case:c-1", "review:r-1"]);
+    expect(work.rows.map((r) => r.key)).toEqual(["case:c-1", "case:c-2", "review:r-1"]);
     expect(work.truncated).toBe(false);
   });
 
@@ -257,7 +264,7 @@ describe("mergeHomeWork — one list from three reads", () => {
     expect(keys).toContain("inquiry:i-2016");
     expect(keys[keys.length - 1]).toBe("inquiry:i-2016");
     // And this morning's work still leads, in the order of importance.
-    expect(keys.slice(0, 4)).toEqual(["case:c-2", "case:c-1", "inquiry:i-3", "review:r-1"]);
+    expect(keys.slice(0, 4)).toEqual(["inquiry:i-3", "case:c-1", "case:c-2", "review:r-1"]);
   });
 
   it("says when a read knows of more than it returned", () => {
@@ -289,10 +296,10 @@ describe("CustomerOpsHome", () => {
     expect(status).not.toHaveTextContent("초안 9");
     expect(status).not.toHaveTextContent("다음 확인");
     expect(status).not.toHaveTextContent("주기");
-    // 실행 대기 is an obligation and stands as its own cell in the band (product-owner decision,
-    // 2026-09-30) — the seller already decided it and it is not finished. It is never a pill, and it is
-    // never on the date line, which answers 「자동 확인이 돌고 있나」 and nothing else.
-    const summary = await screen.findByTestId("today-summary");
+    // 실행 대기 stands in the line under the band (2026-11-10 — the band is 할 일 · 기다리는 일 · 지난 일), still the
+    // pointer to its section. It is never a pill, and it is never on the date line, which answers 「자동 확인이 돌고
+    // 있나」 and nothing else.
+    const summary = await screen.findByTestId("today-side");
     expect(within(summary).getByRole("link", { name: /등록 대기/ })).toHaveAttribute("href", "#실행-대기");
     expect(within(status).queryByRole("link", { name: /등록 대기/ })).toBeNull();
     // A dot and a word, not a filled capsule: nothing on this line has both a pill radius and pill padding.
@@ -308,7 +315,7 @@ describe("CustomerOpsHome", () => {
     ).toHaveAttribute("href", "/memory");
     // <b>The count moved up one line</b> (product-owner decision, 2026-09-26): it is 「지금 볼 것」 of the
     // summary, and the heading no longer repeats it 12px below. Same number, same `work`, one place.
-    await waitFor(() => expect(summary).toHaveTextContent("할 일 4"));
+    await waitFor(() => expect(screen.getByTestId("pulse-work")).toHaveTextContent("할 일 4"));
     // The brief's heading is 「먼저 볼 일」 since the Home visual target: 할 일 names the QUEUE —
     // the rail item, the screen it links to, and the summary cell above — and printing it here was the
     // third copy. What is asserted is unchanged and is the point of the re-point: the count lives in the
@@ -397,16 +404,18 @@ describe("CustomerOpsHome", () => {
    * 2026-10-01 quota Review 2 / Inquiry 1 / Case 1). Under the quota a second inquiry could never reach the
    * brief however long it had waited, and a review reporting a burn could lose its slot to two newer reviews.
    */
-  it("briefs the inquiries before a review, and a review reporting harm before both", async () => {
+  it("lists the inquiries before a review, and a review reporting harm before both — in the server's order", async () => {
     draw();
     const list = await screen.findByRole("list", { name: "할 일" });
-    await waitFor(() => expect(within(list).getAllByRole("link")).toHaveLength(visibleHomeRows(false)));
+    // The whole page, not a brief of the first few (2026-11-10): c-1, c-2, i-3 and the review.
+    await waitFor(() => expect(within(list).getAllByRole("link")).toHaveLength(4));
     const inquiry = within(list).getByRole("link", { name: /주문 취소 가능할까요/ });
     expect(inquiry).toHaveAttribute("href", "/inquiries/i-3");
     // The inquiry's second line is the customer's own words — the slot that used to read 「초안 없음」.
     expect(inquiry).not.toHaveTextContent("초안 없음");
     expect(within(list).getByRole("link", { name: /뚜껑이 깨져서 왔어요/ })).toBeInTheDocument();
-    expect(within(list).queryByRole("link", { name: /뚜껑이 컵에 잘 안 맞아요/ })).toBeNull();
+    const links = within(list).getAllByRole("link");
+    expect(links[links.length - 1]).toHaveTextContent("뚜껑이 컵에 잘 안 맞아요");
     expect(list).not.toHaveTextContent("안전 확인");
 
     cleanup();
@@ -414,7 +423,7 @@ describe("CustomerOpsHome", () => {
     const burned = { ...o.reviews.rows[0], reviewId: "r-burn", rating: 5, quote: "손잡이가 뜨거워 화상을 입었어요", safety: true };
     draw(co(), { ...o, reviews: { ...o.reviews, rows: [...o.reviews.rows, burned] } } as never);
     const again = await screen.findByRole("list", { name: "할 일" });
-    await waitFor(() => expect(within(again).getAllByRole("link")).toHaveLength(visibleHomeRows(false)));
+    await waitFor(() => expect(within(again).getAllByRole("link")).toHaveLength(5));
     const first = within(again).getAllByRole("link")[0];
     expect(first).toHaveTextContent("화상을 입었어요");
     // No kind from this older fixture: still a mention, never 「안전 확인」 (mockup ②, 2026-10-25).
@@ -453,16 +462,20 @@ describe("CustomerOpsHome", () => {
     expect(within(gaps).getByRole("link", { name: "로그인" })).toHaveAttribute("href", "/connect/naver");
   });
 
-  it("a list read that failed counts what loaded and says the count is partial — never 「N+」", async () => {
+  it("a list read that failed: what loaded is a floor 「N+」, the rows stay, and the list says what is missing", async () => {
     api.getInquiryQueueStrict.mockRejectedValue(new Error("down"));
     draw();
     const gaps = await screen.findByLabelText("집계에서 빠진 곳");
     await waitFor(() => expect(gaps).toHaveTextContent("문의 목록 읽기 실패 · 부분 집계"));
     expect(gaps).not.toHaveTextContent("리뷰 목록 읽기 실패");
-    // c-1, c-2 and the review — what loaded, with no 「+」.
+    // c-1, c-2 and the review were read; the inquiries were not — so three is a floor, never an exact 3 (2026-11-10:
+    // the server's count rule; it said 「할 일 3」 while the list merged on this screen).
     const summary = screen.getByTestId("today-summary");
-    expect(summary).toHaveTextContent("할 일 3");
-    expect(summary).not.toHaveTextContent("3+");
+    await waitFor(() => expect(summary).toHaveTextContent("할 일 3+"));
+    const notice = await screen.findByTestId("home-work-partial");
+    expect(notice).toHaveTextContent("문의를 불러오지 못해서 그 일은 지금 목록에 없어요");
+    expect(notice).not.toHaveTextContent(/INQUIRIES|출처|상한/);
+    expect(within(await screen.findByRole("list", { name: "할 일" })).getAllByRole("link")).toHaveLength(3);
   });
 
   it("「N+」 only when a read reports more than it returned", async () => {
@@ -789,13 +802,17 @@ describe("오늘 — an inbox, not a dashboard", () => {
     expect(summary.className).toContain("grid-cols-3");
     // The third slot stands and says it could not be measured, rather than leaving a third of a ruled
     // band blank — see `OperationsSummary.test.tsx` for the per-cause wording.
-    expect(summary.querySelector("[data-testid='pulse-unanswered']")).toHaveTextContent("—");
+    // 현재 미답변 moved to the line under the band (2026-11-10) and still says it could not be measured.
+    expect(screen.getByTestId("today-side").querySelector("[data-testid='pulse-unanswered']")).toHaveTextContent("—");
+    // The three cells are the mockup's: 할 일 · 기다리는 일 · 지난 일.
+    expect([...summary.querySelectorAll("[data-testid^='pulse-']")].map((c) => c.getAttribute("data-testid"))).toEqual(["pulse-work", "pulse-waiting", "pulse-past"]);
     expect(summary.className).not.toContain("bg-canvas");
     expect(summary.className).not.toMatch(/rounded|shadow|gradient/);
     const cells = [...summary.querySelectorAll("[data-testid^='pulse-']")] as HTMLElement[];
     expect(cells.length).toBeGreaterThan(0);
     for (const cell of cells) expect(cell.className).not.toMatch(/border|bg-|rounded|shadow/);
     expect(summary.querySelectorAll("[class*='rounded'],[class*='border'],[class*='shadow']")).toHaveLength(0);
+    // The 지난 일 cell is a way in, not a control that decides anything.
     // Every cell answers its question at the same size, number or sentence, and nothing on this surface
     // is larger — the customers' sentences below stay the subject of the screen, and the band is read
     // before them, not instead of them.
@@ -813,7 +830,7 @@ describe("오늘 — an inbox, not a dashboard", () => {
 
   it("실행 대기 0 is a quiet fact and not a control — there is nothing to point at", async () => {
     draw(co(), noAwaiting());
-    const summary = await screen.findByTestId("today-summary");
+    const summary = await screen.findByTestId("today-side");
     // <b>「0건」, not 「없음」</b> (product-owner decision, 2026-10-01). Every slot in this band now reads
     // as either a counted figure or 「—」, and a measured zero belongs firmly on the figure side — the job
     // IS running and it found nothing pending. Spelling it as a word put it in the same visual class as
@@ -825,37 +842,33 @@ describe("오늘 — an inbox, not a dashboard", () => {
 
   it("실행 대기 > 0 is its own obligation cell and the pointer to its section", async () => {
     draw();
-    const summary = await screen.findByTestId("today-summary");
+    const summary = await screen.findByTestId("today-side");
     expect(within(summary).getByRole("link", { name: /등록 대기/ })).toHaveAttribute("href", "#실행-대기");
     expect(summary).toHaveTextContent("등록 대기 2");
     // Promotion is the section existing, not a cell up here.
     expect(screen.getByRole("heading", { name: "등록 대기" })).toBeTruthy();
   });
 
-  it("the way to the rest of the list stands on the heading, before the rows", async () => {
-    // Enough that the list is certainly longer than it draws, whatever `HOME_ROWS` is: the assertion below is
-    // about what the link SAYS, and it must not become vacuous the next time that constant moves.
-    const extra = Array.from({ length: HOME_ROWS + 2 }, (_, i) => ({
+  it("the rest of the list is a page away: 다음 opens it, 이전 comes back, and no row is drawn twice", async () => {
+    const extra = Array.from({ length: 12 }, (_, i) => ({
       workItemId: `w-${i + 4}`, inquiryId: `i-${i + 4}`, sellerAccountId: "a", channelId: "ch", channelCode: "CAFE24",
       channelNameKo: "카페24", productId: null, productName: null, phase: "OPEN", status: "UNANSWERED",
       title: `추가 문의 ${i + 1}`, snippet: null, receivedAt: `2026-09-16T04:${31 + i}:00Z`, hasDraft: false,
     }));
-    api.getInquiryQueueStrict.mockResolvedValue(queue({ content: [...queue().content, ...extra] as never }));
+    api.getInquiryQueueStrict.mockResolvedValue(queue({ content: [...queue().content, ...extra] as never, totalElements: 14 }));
     draw();
-    // <b>The link is a destination and names no number</b> (product-owner decision, 2026-09-26). The total is
-    // the Pulse's, once, in one form including 「N+」; saying it again here put the same fact twice on one screen
-    // and made the control change its wording for a reason no seller could see.
-    // Scoped to the brief: since the target gave 실행 대기 and 반복 문제 the same three-slot header, three
-    // sections on this screen carry a 「전체 보기 →」, and an unscoped query would be asking the page which
-    // one it meant. The assertion is the brief's and is unchanged.
-    const brief = await screen.findByRole("region", { name: "할 일" });
-    const more = within(brief).getByRole("link", { name: "전체 보기 →" });
-    expect(more).toHaveAttribute("href", "/customer-operations/cases");
-    expect(more.textContent).not.toMatch(/\d/);
-    // The Pulse still owns it, and still marks a floor as a floor.
-    expect(screen.getByTestId("pulse-work")).toHaveTextContent(/할 일 \d/);
-    const firstRow = screen.getByText("뚜껑이 깨져서 왔어요");
-    expect(more.compareDocumentPosition(firstRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const list = await screen.findByRole("list", { name: "할 일" });
+    await waitFor(() => expect(within(list).getAllByRole("link")).toHaveLength(10));
+    const firstPage = within(list).getAllByRole("link").map((a) => a.getAttribute("href"));
+    expect(screen.getByTestId("home-work-pager")).toHaveTextContent("1–10 · 전체 16건");
+    await userEvent.click(screen.getByTestId("home-work-next"));
+    await waitFor(() => expect(screen.getByTestId("home-work-pager")).toHaveTextContent("11–16 · 전체 16건"));
+    const secondPage = within(screen.getByRole("list", { name: "할 일" })).getAllByRole("link").map((a) => a.getAttribute("href"));
+    expect(secondPage).toHaveLength(6);
+    expect(secondPage.filter((h) => firstPage.includes(h))).toEqual([]);
+    expect(screen.queryByTestId("home-work-next")).toBeNull();
+    await userEvent.click(screen.getByTestId("home-work-prev"));
+    await waitFor(() => expect(screen.getByTestId("home-work-pager")).toHaveTextContent("1–10 · 전체 16건"));
   });
 });
 
@@ -889,32 +902,23 @@ describe("visible rows — the Pulse's cost, paid in whole rows", () => {
     expect(HOME_ROWS_NARROW).toBe(HOME_ROWS - 1);
   });
 
-  it("an environment that cannot measure says narrow — it under-fills a wide screen, it never clips a narrow one", async () => {
-    // jsdom answers `matches: false` to every width query, which is the same answer a server render gives.
-    // The safe direction is the short one: a missing row is visibly missing, a clipped row pretends to be there.
-    const extra = Array.from({ length: HOME_ROWS + 4 }, (_, i) => ({
+  it("a page is ten rows whatever the layout — the list is paged, not cut to what one screen holds", async () => {
+    const extra = Array.from({ length: HOME_ROWS + 14 }, (_, i) => ({
       workItemId: `w-${i + 40}`, inquiryId: `i-${i + 40}`, sellerAccountId: "a", channelId: "ch", channelCode: "CAFE24",
       channelNameKo: "카페24", productId: null, productName: null, phase: "OPEN", status: "UNANSWERED",
       title: `줄 세우기 ${i + 1}`, snippet: null, receivedAt: `2026-09-16T04:${10 + i}:00Z`, hasDraft: false,
     }));
     api.getInquiryQueueStrict.mockResolvedValue(queue({ content: [...queue().content, ...extra] as never }));
     draw();
-    // Both the section and its list carry the canonical noun, which is the point of the naming decision;
-    // the rows are the list's.
-    const list = (await screen.findAllByLabelText("할 일")).find((el) => el.tagName === "UL");
-    await waitFor(() => expect(list?.querySelectorAll("li").length).toBe(HOME_ROWS_NARROW));
+    const list = await screen.findByRole("list", { name: "할 일" });
+    await waitFor(() => expect(within(list).getAllByRole("link")).toHaveLength(10));
   });
 
-  it("the way out says where it goes and names no number, floor or not", async () => {
-    // The total is the Pulse's, in one form. This link used to say 「전체 11건 보기」 and fall silent on 「N+」,
-    // so the same control changed its wording for a reason no seller could see.
+  it("a read that holds more than it returned is a floor, and the list says more may follow", async () => {
     api.getInquiryQueueStrict.mockResolvedValue(queue({ totalElements: 80 }));
     draw();
-    const brief = await screen.findByRole("region", { name: "할 일" });
-    const more = within(brief).getByRole("link", { name: "전체 보기 →" });
-    expect(more).toHaveAttribute("href", "/customer-operations/cases");
-    expect(more.textContent).not.toMatch(/\d/);
-    expect(screen.getByTestId("pulse-work")).toHaveTextContent("할 일 4+");
+    await waitFor(() => expect(screen.getByTestId("pulse-work")).toHaveTextContent("할 일 4+"));
+    expect(await screen.findByTestId("home-work-partial")).toHaveTextContent("문의가 많아 일부만 불러왔어요");
   });
 });
 

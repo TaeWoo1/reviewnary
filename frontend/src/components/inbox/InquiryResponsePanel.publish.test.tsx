@@ -116,7 +116,7 @@ describe("InquiryResponsePanel — the send is offered only when the backend say
     await screen.findByText("준비된 답변");
     expect(screen.queryByRole("button", { name: /답변 보내기/ })).not.toBeInTheDocument();
     // …and it says WHY, rather than leaving a silent gap where a control would be.
-    expect(screen.getByText(/대신 등록하지 않아요/)).toBeInTheDocument();
+    expect(screen.getByText(/현재 이 환경에서는 답변 등록 기능이 꺼져 있어요/)).toBeInTheDocument();
   });
 
   it("offers nothing when the channel has no reply adapter, and names that channel", async () => {
@@ -126,8 +126,8 @@ describe("InquiryResponsePanel — the send is offered only when the backend say
     });
     render(<InquiryResponsePanel workItemId="w1" />);
 
-    await screen.findByText(/판매자센터에서 직접 답변해 주세요/);
-    expect(screen.getByText(/쿠팡 문의는/)).toBeInTheDocument();
+    // Registration is on in this environment, just not for this channel — said for the channel, never as a global limit.
+    await screen.findByText(/현재 이 환경에서는 쿠팡 답변 등록이 켜져 있지 않아요/);
     expect(screen.queryByRole("button", { name: /답변 보내기/ })).not.toBeInTheDocument();
   });
 
@@ -205,6 +205,14 @@ describe("InquiryResponsePanel — the press that writes", () => {
     expect(confirmInquiryPublish).not.toHaveBeenCalled();
   });
 
+  // 수정 was 36px on a Galaxy S24 (2026-11-14): a 44px target on a phone, the same small button from sm up.
+  it("수정 is a 44px target on a phone and unchanged from sm up", async () => {
+    render(<InquiryResponsePanel workItemId="w1" />);
+    const edit = await screen.findByRole("button", { name: "수정" });
+    expect(edit.className.split(" ")).toContain("max-sm:min-h-11");
+    expect(edit.className.split(" ")).not.toContain("min-h-11");
+  });
+
   it("an edit produces a NEW version, and the confirm then restates that new one", async () => {
     const user = userEvent.setup();
     render(<InquiryResponsePanel workItemId="w1" />);
@@ -219,6 +227,27 @@ describe("InquiryResponsePanel — the press that writes", () => {
     // Version 3, not the version 2 the seller was reading before they edited — which is exactly why
     // an approval bound to version 2's fingerprint can no longer be spent.
     expect(confirm.getByText(/저장된 버전 3/)).toBeInTheDocument();
+  });
+
+  /**
+   * A refused save (휴대폰 실기기 점검, 2026-11-14) read 「답변을 등록하지 못했어요」 and, on a 409 or 404, reloaded the
+   * inquiry — which seeds the editor from the saved version and erased what the seller had typed.
+   */
+  it.each([403, 409])("a refused save (%s) says the save failed and keeps the typed text in the open editor", async (status) => {
+    saveInquiryReplyDraft.mockRejectedValueOnce(Object.assign(new Error("refused"), { isAxiosError: true, response: { status, data: {} } }));
+    const user = userEvent.setup();
+    render(<InquiryResponsePanel workItemId="w1" />);
+
+    await user.click(await screen.findByRole("button", { name: "수정" }));
+    await user.type(screen.getByLabelText("내용"), " 추가로 적은 문장");
+    await user.click(screen.getByRole("button", { name: /초안 저장/ }));
+
+    expect(await screen.findByText(/^초안을 저장하지 못했어요\./)).toBeInTheDocument();
+    expect(screen.queryByText(/답변을 등록하지 못했어요/)).toBeNull();
+    expect(screen.getByLabelText("내용")).toHaveValue("확인 후 안내드릴게요. 추가로 적은 문장");
+    expect(screen.getByRole("button", { name: /초안 저장/ })).toBeInTheDocument();
+    // No reload over the editor: the detail was read once, when the panel opened.
+    expect(getInquiryDetailStrict).toHaveBeenCalledTimes(1);
   });
 
   it("reports the outcome in the seller's words, and stops offering to send again", async () => {

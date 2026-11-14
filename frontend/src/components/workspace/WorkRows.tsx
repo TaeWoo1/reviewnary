@@ -5,6 +5,7 @@ import { WORK_STATE } from "../../lib/workState";
 import { selectionHref } from "./MasterDetail";
 import { isLowRatedReview, isOldBacklog, sharedRowFacts, type HomeWorkRow } from "../../lib/homeWork";
 import { elapsedLabel } from "../../lib/copy/customerOps";
+import { AttachedChecks } from "../home/AttachedChecks";
 import type { CaseQueueState } from "../../pages/app/OperationsCase";
 
 /**
@@ -39,11 +40,15 @@ export function WorkRows({
   ariaLabel,
   showBacklogDivider = true,
   dense = false,
+  oneLine = false,
   captionSaysReason = false,
   sharedOver,
   reading = "home",
+  highlightAlso = false,
 }: {
   rows: HomeWorkRow[];
+  /** The 「오늘 확인」 view: the checks riding on rows are what the seller opened it for, so they are marked. */
+  highlightAlso?: boolean;
   selectedKey: string | null;
   wide: boolean;
   /** The page's current query string, kept on every selection link. */
@@ -54,6 +59,8 @@ export function WorkRows({
   /** {@link DecisionRow}'s two-line reading. Both lists use it: on the queue scrolling IS the work, and on 오늘
       the three-line reading spent 60% of the viewport on five rows and pushed the list's own exit under the dock. */
   dense?: boolean;
+  /** Each row's sentence on one line (`DecisionRow.oneLine`) — for a short preview of this list, never the list. */
+  oneLine?: boolean;
   /** The screen's own heading already names what every row shares (오늘 prints it beside the count). Then this
       list does not print a second caption for it. */
   captionSaysReason?: boolean;
@@ -142,11 +149,14 @@ export function WorkRows({
         state={!wide && row.caseId ? ({ caseIds } satisfies CaseQueueState) : undefined}
         selected={wide && row.key === selectedKey}
         dense={dense}
+        oneLine={oneLine}
         metaBelow={queue}
         product={product}
         alert={safetyMark(row)?.text ?? null}
         alertTone={safetyMark(row)?.tone}
-      />
+      >
+        {row.also && row.also.length > 0 ? <AttachedChecks also={row.also} highlight={highlightAlso} /> : null}
+      </DecisionRow>
     );
   };
 

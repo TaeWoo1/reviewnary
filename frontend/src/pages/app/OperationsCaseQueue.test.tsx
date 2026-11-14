@@ -17,10 +17,17 @@ const api = vi.hoisted(() => ({
   getReplyBoard: vi.fn((): Promise<unknown> => Promise.reject(new Error("not in this test"))),
   getDismissedReplyWork: vi.fn(() => new Promise(() => undefined)),
   restoreReplyWork: vi.fn(),
+  getInquiryFollowUps: vi.fn(),
+  // The Home's two reads (2026-11-10): 내가 할 일 is the same server list — served from the fixtures by `serveFromReads`.
+  getHomeBoard: vi.fn(),
+  getHomeWork: vi.fn(),
 }));
 vi.mock("../../lib/apiClient", () => ({ api, getToken: () => null }));
 
 import { OperationsCaseQueue } from "./OperationsCaseQueue";
+import { fixture, serveFromReads } from "../../test/homeBoardFake";
+import type { CustomerOperationsHome } from "../../lib/customerOperationsTypes";
+import type { OperationsHome } from "../../lib/types";
 import { REASON, reasonOfCase } from "../../lib/copy/customerOps";
 
 const NOW = new Date("2026-09-22T05:30:00Z"); // 14:30 KST
@@ -86,6 +93,19 @@ function reads(over: { co?: unknown; ops?: unknown; queue?: unknown } = {}) {
   api.getInquiryQueueStrict.mockResolvedValue(over.queue ?? { content: [], totalElements: 0 });
 }
 
+/** The server's board, built at call time from this test's own reads — the deep case list included, as the server reads it. */
+function serveTheBoard() {
+  serveFromReads(api as never, async () => {
+    const co = await fixture<CustomerOperationsHome>(api.getCustomerOperationsHome);
+    const decisions = await fixture<CustomerOperationsHome["decisions"]>(api.getCustomerOperationsDecisions);
+    return {
+      co: co ? (decisions ? { ...co, decisions } : co) : null,
+      ops: await fixture<OperationsHome>(api.getOperationsHomeStrict),
+      now: NOW,
+    };
+  });
+}
+
 function draw() {
   return render(
     <MemoryRouter>
@@ -95,7 +115,10 @@ function draw() {
 }
 
 describe("OperationsCaseQueue", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    serveTheBoard();
+  });
 
   /**
    * <b>Re-pointed: the order is each lane's own, not one wait across all of them</b> (product-owner
@@ -199,34 +222,45 @@ describe("OperationsCaseQueue", () => {
   });
 
   it("읽지 못한 목록과 빈 목록은 다른 문장이다", async () => {
+    // Since 2026-11-10 the list is the server's: a failed list read is the failure, said as the Home says it.
     reads();
-    api.getCustomerOperationsHome.mockRejectedValue(new Error("boom"));
-    api.getOperationsHomeStrict.mockRejectedValue(new Error("boom"));
-    api.getInquiryQueueStrict.mockRejectedValue(new Error("boom"));
-    api.getCustomerOperationsDecisions.mockRejectedValue(new Error("boom"));
+    api.getHomeWork.mockRejectedValue(new Error("boom"));
     const failed = draw();
-    expect(await screen.findByRole("alert")).toHaveTextContent("불러오지 못했어요");
+    expect(await screen.findByRole("alert")).toHaveTextContent("할 일 목록을 불러오지 못했어요. 할 일이 없다는 뜻은 아니에요.");
     expect(screen.queryByText(/확인이 필요한 문의나 리뷰가 없어요/)).toBeNull();
     failed.unmount();
 
     reads();
+    serveTheBoard();
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 0, rows: [] });
+    api.getReviewWorkStrict.mockResolvedValue({ attentionTotal: 0, attention: [], committed: [] });
+    api.getInquiryFollowUps.mockResolvedValue({ due: [], waiting: [], waitingTotal: 0 });
     draw();
     expect(await screen.findByText(/확인이 필요한 문의나 리뷰가 없어요/)).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("한 번에 읽는 깊이보다 많으면 그렇게 말하고, 다른 화면으로 보내지 않는다", async () => {
+  /**
+   * <b>Re-pointed (2026-11-10): the rest is a page away, not a sentence.</b> This said 「한 번에 N건까지 보여 드려요」 when
+   * the screen's own reads reported more than they returned. The list is now the server's, read whole and paged: a page
+   * here is fifty rows, the pager says where it is in the whole, and 「다음」 brings the rest — still on this screen.
+   */
+  it("한 페이지보다 많으면 다음 페이지로 이어지고, 다른 화면으로 보내지 않는다", async () => {
     reads();
-    api.getCustomerOperationsDecisions.mockResolvedValue({ total: 80, rows: [row(), REVIEW] });
+    const many = Array.from({ length: 52 }, (_, i) =>
+      row({ caseId: `c-${i}`, title: `합성 문의 ${i}`, to: `/inquiries/i-${i}`, openedAt: "2026-09-21T04:00:00Z" }),
+    );
+    api.getCustomerOperationsDecisions.mockResolvedValue({ total: 52, rows: many });
     draw();
 
-    await screen.findByRole("list", { name: "할 일" });
-    // It says the depth it reached, not a total: the reads that overflow count different populations, and their
-    // sum is a number nobody measured.
-    const note = screen.getByText(/2건까지 보여 드려요/);
-    expect(note).toHaveTextContent("처리하면 다음 건이 올라와요");
-    expect(note.textContent).not.toMatch(/문의 화면|리뷰 화면/);
+    const list = await screen.findByRole("list", { name: "할 일" });
+    expect(within(list).getAllByRole("link")).toHaveLength(50);
+    const pager = screen.getByTestId("home-work-pager");
+    expect(pager).toHaveTextContent("1–50 · 전체 52건");
+    await userEvent.click(within(pager).getByRole("button", { name: "다음 50건 ›" }));
+    await screen.findByText(/51–52/);
+    expect(within(screen.getByRole("list", { name: "할 일" })).getAllByRole("link")).toHaveLength(2);
+    expect(screen.queryByText(/문의 화면에서|리뷰 화면에서/)).toBeNull();
   });
 
   it("리뷰 행도 무엇을 하면 되는지 말한다 — 「판단 보류」로 비워 두지 않는다", async () => {
@@ -407,12 +441,14 @@ describe("OperationsCaseQueue", () => {
        second such control beside the title — the search toggle, which narrows the same rows. So the
        check names both populations rather than the one container they used to share, and nothing that
        resolves, dismisses or sends has a way onto this screen. */
-    const views = screen.getByRole("group", { name: "할 일 보기" });
+    // The list's own chips and its pager (the Home's list, 2026-11-10) — both only change which rows are drawn.
+    const views = screen.getByRole("group", { name: "할 일 묶음" });
+    const pager = screen.queryByRole("navigation", { name: "할 일 페이지" });
     // The three views of the place (mockup ③, 2026-10-25) only change what is drawn, too.
     const parts = screen.getByRole("group", { name: "할 일 나누어 보기" });
     const search = screen.getByRole("button", { name: "검색" });
     for (const button of screen.queryAllByRole("button")) {
-      if (button === search || parts.contains(button)) continue;
+      if (button === search || parts.contains(button) || pager?.contains(button)) continue;
       expect(views).toContainElement(button);
     }
   });
@@ -525,12 +561,15 @@ describe("OperationsCaseQueue — the seller's own reply work (UI/UX v2 Phase 3)
         { accountId: "acc-2", channelCode: "CAFE24", channelNameKo: "카페24", coverage: "UNCERTAIN_MULTI_ACCOUNT", todo: [], recentlyReported: [] },
       ],
     });
+    serveTheBoard();
     render(
       <MemoryRouter>
         <OperationsCaseQueue />
       </MemoryRouter>,
     );
-    const list = await screen.findByRole("list", { name: "할 일" });
+    // Written 2026-08-28, so older than two weeks: it is in 지난 일, one press away on the same list (2026-11-10).
+    await userEvent.click(await screen.findByTestId("home-work-past-open"));
+    const list = await screen.findByRole("list", { name: "지난 일 1건" });
     const row = within(list).getByRole("link", { name: /잘 떨어져요/ });
     expect(row).toHaveTextContent("확정 전");
     expect(row).toHaveAttribute("href", "/reviews/reply/r-1?from=work");
@@ -539,7 +578,10 @@ describe("OperationsCaseQueue — the seller's own reply work (UI/UX v2 Phase 3)
 });
 
 describe("OperationsCaseQueue — views of the one list (UI/UX v2 Phase 4)", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    serveTheBoard();
+  });
 
   function daysBefore(n: number): string {
     return new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -572,21 +614,23 @@ describe("OperationsCaseQueue — views of the one list (UI/UX v2 Phase 4)", () 
     });
     draw();
 
-    const views = await screen.findByRole("group", { name: "할 일 보기" });
-    // Every view says how many rows it holds, out of the same four.
-    expect(within(views).getByRole("button", { name: "전체 4" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(views).getByRole("button", { name: "답변 필요 1" })).toBeInTheDocument();
-    expect(within(views).getByRole("button", { name: "판단 필요 1" })).toBeInTheDocument();
-    expect(within(views).getByRole("button", { name: "확정 전 1" })).toBeInTheDocument();
-    expect(within(views).getByRole("button", { name: "답글 필요 1" })).toBeInTheDocument();
+    const views = await screen.findByRole("group", { name: "할 일 묶음" });
+    // The Home's buckets (2026-11-10): every chip says how many rows it holds, out of the same four.
+    const chip = (name: string) => within(views).findByRole("button", { name });
+    expect(await chip("전체 4")).toHaveAttribute("aria-pressed", "true");
+    expect(await chip("승인 가능 2")).toBeInTheDocument();
+    expect(await chip("답변 필요 1")).toBeInTheDocument();
+    expect(await chip("판단 필요 1")).toBeInTheDocument();
 
-    await userEvent.click(within(views).getByRole("button", { name: "확정 전 1" }));
-    const list = screen.getByRole("list", { name: "할 일" });
-    expect(within(list).getAllByRole("link")).toHaveLength(1);
-    expect(within(list).getByRole("link", { name: /승인을 기다리는 답변/ })).toBeInTheDocument();
+    await userEvent.click(await chip("승인 가능 2"));
+    await screen.findByRole("list", { name: "승인 가능 2건" });
+    const approvable = screen.getByRole("list", { name: "승인 가능 2건" });
+    expect(within(approvable).getAllByRole("link")).toHaveLength(2);
+    expect(within(approvable).getByRole("link", { name: /승인을 기다리는 답변/ })).toBeInTheDocument();
 
-    await userEvent.click(within(views).getByRole("button", { name: "답변 필요 1" }));
-    expect(within(screen.getByRole("list", { name: "할 일" })).getByRole("link", { name: /교환 신청/ })).toBeInTheDocument();
+    await userEvent.click(await chip("답변 필요 1"));
+    const reply = await screen.findByRole("list", { name: "답변 필요 1건" });
+    expect(within(reply).getByRole("link", { name: /초안이 필요한 답변/ })).toBeInTheDocument();
 
     // 「내가 할 일」 still counts the whole list: a view never passes itself off as the total.
     expect(screen.getByRole("button", { name: "내가 할 일 4" })).toBeInTheDocument();
@@ -660,14 +704,18 @@ describe("OperationsCaseQueue — views of the one list (UI/UX v2 Phase 4)", () 
 });
 
 describe("OperationsCaseQueue — 진행 중 · 끝난 일 (mockup ③, 2026-10-25)", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    serveTheBoard();
+  });
 
   const ROW = { channelAnswered: false, confirmOverdue: false, rating: 2 };
 
   it("counts what others are finishing beside the seller's own work, and never adds the two", async () => {
     reads();
     api.getCustomerOperationsDecisions.mockResolvedValue({ total: 0, rows: [] });
-    api.getReviewWorkStrict.mockRejectedValue(new Error("none"));
+    api.getReviewWorkStrict.mockResolvedValue({ attentionTotal: 0, attention: [], committed: [] });
+    api.getInquiryFollowUps.mockResolvedValue({ due: [], waiting: [], waitingTotal: 0 });
     api.getReplyBoard.mockResolvedValue({
       moving: [
         { ...ROW, reviewId: "r-a", state: "APPROVED", since: "2026-09-10T01:12:00Z", preview: "색이 사진과 같아요" },

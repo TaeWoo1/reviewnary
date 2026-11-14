@@ -23,6 +23,7 @@ import type { InquiryReplyWorkspace } from "./useInquiryReply";
 import { ReplyHoldNotice } from "../ReplyHoldNotice";
 import { HeldTakeBack } from "./HeldTakeBack";
 import { SellerCheckPanel, sellerCheckLeads, formatAt } from "./SellerCheckPanel";
+import { SellerCheckFocus } from "./SellerCheckFocus";
 import { answerRecordOf, draftStepsAside, registeredTextIsOurs, type AnswerRecord } from "../../lib/inquiryAnswerRecord";
 import { commentCheckFact, commentCheckWarning } from "../../lib/commentCheck";
 
@@ -256,6 +257,11 @@ export function InquiryReply({
             ) : null}
           </div>
         ) : null}
+        {/* Opened from the Home's 「진행 결과 적기」 (`?focus=seller-check`): land on the record (2026-11-10). */}
+        <SellerCheckFocus
+          ready={workspace.sellerCheck != null || workspace.sellerCheckLoadFailed}
+          currentCheckId={workspace.sellerCheck?.check?.id ?? null}
+        >
         <SellerCheckPanel
           ask={workspace.sellerCheck?.ask ?? null}
           check={workspace.sellerCheck?.check ?? null}
@@ -281,6 +287,7 @@ export function InquiryReply({
           onCorrectKind={workspace.onCorrectKind}
           onRedraftKind={canDraft && !busy ? onGenerateDraft : undefined}
         />
+        </SellerCheckFocus>
         {/*
           <b>The heading names the version's AUTHOR, not the section's intent</b> (Pilot QA, 2026-09-06).
           It said 「AI가 준비한 답변」 unconditionally, so a version the seller had rewritten was handed
@@ -435,13 +442,14 @@ export function InquiryReply({
                   disabled={busy}
                 />
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Btn size="sm" onClick={onSaveDraft} disabled={busy || !replyComments.trim()}>
+                  <Btn size="sm" className="max-sm:min-h-11" onClick={onSaveDraft} disabled={busy || !replyComments.trim()}>
                     {busy ? "저장 중…" : "초안 저장"}
                   </Btn>
                   {draft ? (
                     <Btn
                       size="sm"
                       variant="ghost"
+                      className="max-sm:min-h-11"
                       onClick={() => {
                         setEditing(false);
                         setReplyTitle(draft.title);
@@ -596,14 +604,17 @@ export function InquiryReply({
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
                       {!docked && publishable && !draftDirty && !editing ? (
-                        <Btn onClick={() => setConfirming(true)} disabled={busy || workspace.openLeft > 0 || workspace.kindStale}>
-                          답변 보내기
+                        <Btn onClick={() => setConfirming(true)}
+                          disabled={busy || workspace.openLeft > 0 || workspace.kindStale || workspace.sendHeld}>
+                          {workspace.simulatedPublish ? "모의 등록" : "답변 보내기"}
                         </Btn>
                       ) : null}
                       {!docked && publishable && workspace.openLeft > 0 ? (
                         <span className="break-keep text-sm text-warn" data-testid="open-questions-hold">
                           남은 질문 {workspace.openLeft}개를 처리해야 보낼 수 있어요.
                         </span>
+                      ) : !docked && publishable && workspace.sendHeldReason ? (
+                        <span className="break-keep text-sm text-warn" data-testid="send-held">{workspace.sendHeldReason}</span>
                       ) : null}
                       {/* Not repeated here when it is the primary — it is in the draft's own header. */}
                       {!docked && publishable && draft && !editing && !draftDirty && !registeredDone ? (
@@ -614,7 +625,7 @@ export function InquiryReply({
                     </div>
                     {!editing && draftEditable ? (
                       <div className="flex flex-wrap items-center gap-1">
-                        <Btn size="sm" variant="ghost" onClick={() => setEditing(true)} disabled={busy}>
+                        <Btn size="sm" variant="ghost" onClick={() => setEditing(true)} disabled={busy} className="max-sm:min-h-11">
                           수정
                         </Btn>
                         {/* 다시 작성 is gated on the SAME condition as the first generate. It was not,
@@ -642,10 +653,17 @@ export function InquiryReply({
                     role="group"
                     aria-label="답변 등록 확인"
                   >
-                    <p className="break-keep text-sm font-semibold text-ink">
-                      {detail.channelNameKo ?? "채널"}에 아래 내용을 등록해요. 등록 후에는 취소할 수
-                      없어요.
-                    </p>
+                    {workspace.simulatedPublish ? (
+                      /* 모의 등록 (2026-11-09): 같은 승인 API·검사를 지나지만 개발용 가짜 채널에만 남는다. 실제 등록처럼 말하지 않는다. */
+                      <p className="break-keep text-sm font-semibold text-ink" data-testid="simulated-publish-note">
+                        개발용 모의 채널에 아래 내용을 등록해요. 실제 {detail.channelNameKo ?? "채널"}과 고객에게는 나가지 않아요.
+                      </p>
+                    ) : (
+                      <p className="break-keep text-sm font-semibold text-ink">
+                        {detail.channelNameKo ?? "채널"}에 아래 내용을 등록해요. 등록 후에는 취소할 수
+                        없어요.
+                      </p>
+                    )}
                     <p className="mt-2 text-sm text-muted">저장된 버전 {draft.version}</p>
                     <p className="mt-2 whitespace-pre-wrap break-keep rounded-lg bg-canvas p-3 text-sm leading-relaxed text-ink">
                       {draft.comments}
@@ -654,10 +672,10 @@ export function InquiryReply({
                         이 블록 안에 있어야 한다. 막지 않는다. */}
                     <CommentCheckWarning detail={detail} className="mt-3 text-sm leading-relaxed" />
                     <div className="mt-3 flex gap-2">
-                      <Btn size="sm" onClick={onConfirmPublish} disabled={busy}>
-                        {busy ? "등록 중…" : "확인, 등록해요"}
+                      <Btn size="sm" className="max-sm:min-h-11" onClick={onConfirmPublish} disabled={busy || workspace.sendHeld}>
+                        {busy ? "등록 중…" : workspace.simulatedPublish ? "확인, 모의 등록해요" : "확인, 등록해요"}
                       </Btn>
-                      <Btn size="sm" variant="ghost" onClick={() => setConfirming(false)} disabled={busy}>
+                      <Btn size="sm" variant="ghost" className="max-sm:min-h-11" onClick={() => setConfirming(false)} disabled={busy}>
                         취소
                       </Btn>
                     </div>
@@ -727,6 +745,11 @@ export function InquiryReply({
             {!publishStatus && priorDelivery ? (
               <div className="mt-5 rounded-xl border border-line bg-surface p-4">
                 <p className="break-keep text-sm text-ink">{publishCategoryLabel(priorDelivery.category)}</p>
+                {workspace.simulatedPublish ? (
+                  <p className="mt-1 break-keep text-sm text-muted" data-testid="simulated-publish-outcome">
+                    개발용 모의 채널의 결과예요. 실제 채널과 고객에게는 나가지 않았어요.
+                  </p>
+                ) : null}
                 {deliveryVerificationLabel(priorDelivery) ? (
                   <p className="mt-1 break-keep text-sm text-muted">{deliveryVerificationLabel(priorDelivery)}</p>
                 ) : null}
@@ -748,6 +771,11 @@ export function InquiryReply({
             {publishStatus ? (
               <div className="mt-5 rounded-xl border border-line bg-surface p-4">
                 <p className="break-keep text-sm text-ink">{publishCategoryLabel(publishStatus.category)}</p>
+                {workspace.simulatedPublish ? (
+                  <p className="mt-1 break-keep text-sm text-muted" data-testid="simulated-publish-outcome">
+                    개발용 모의 채널의 결과예요. 실제 채널과 고객에게는 나가지 않았어요.
+                  </p>
+                ) : null}
                 {publishStatus.approvedDraftVersion !== null ? (
                   <p className="mt-1 text-sm text-muted">등록한 버전 {publishStatus.approvedDraftVersion}</p>
                 ) : null}
@@ -984,7 +1012,7 @@ function InquiryMeta({
 }
 
 /** The line a citation whose passage changed or went takes in place of its excerpt. */
-export const GONE_NOTE = "답변을 쓴 뒤로 바뀌었거나 지워진 근거예요.";
+export const GONE_NOTE = "답변을 쓴 뒤로 바뀌었거나, 지워졌거나, 사용 중지된 근거예요.";
 
 /**
  * What the draft was grounded in.
@@ -1037,7 +1065,7 @@ function DraftEvidence({ evidence, inset = false }: { evidence: DraftEvidenceVie
           seller's knowledge no longer says. Said once, above the list, before anything is approved. */}
       {gone > 0 ? (
         <p className="mt-1 break-keep text-sm font-semibold text-warn" role="status" data-testid="draft-evidence-gone">
-          이 답변을 쓴 뒤로 근거 {gone}개가 바뀌었거나 지워졌어요. 등록하기 전에 내용을 다시 확인해 주세요.
+          이 답변을 쓴 뒤로 근거 {gone}개가 바뀌었거나, 지워졌거나, 사용 중지됐어요. 등록하기 전에 내용을 다시 확인해 주세요.
         </p>
       ) : null}
       <div className="mt-1.5 border-l-2 border-line pl-3">
@@ -1120,19 +1148,25 @@ export function InquiryReplyDock({ workspace }: { workspace: InquiryReplyWorkspa
         ) : null}
         {/* 댓글 확인 안내 — 보내기든 복사든 1차 행동 바로 앞 (2026-11-08). */}
         <CommentCheckWarning detail={detail} className="text-xs leading-snug" />
+        {/* The button below waits for the hold above (2026-11-10, F6) — said where the button is, not only in a tooltip. */}
+        {publishable && workspace.openLeft === 0 && workspace.sendHeldReason ? (
+          <p className="break-keep text-xs leading-snug text-warn" data-testid="send-held">{workspace.sendHeldReason}</p>
+        ) : null}
         {/* 초록이 아니다 (2026-10-04). 이 문장은 축하가 아니라 바닥의 누름이 무엇을 하는지 말하는
             안내이고, 바로 위 경고와 색으로 겨루면 둘 다 덜 읽힌다. 초안 복사가 primary인 화면의
             dock에서는 muted가 그 자리의 색이다. */}
-        {!publishable ? <p className="break-keep text-xs text-muted">고객에게 나가지 않아요</p> : null}
+        {!publishable || workspace.simulatedPublish ? <p className="break-keep text-xs text-muted">고객에게 나가지 않아요</p> : null}
       </div>
       <span className="shrink-0 whitespace-nowrap">
         {publishable ? (
-          <Btn size="sm" onClick={() => setConfirming(true)} disabled={busy || workspace.openLeft > 0 || workspace.kindStale}
-            title={workspace.openLeft > 0 ? `남은 질문 ${workspace.openLeft}개를 처리해야 보낼 수 있어요.` : undefined}>
-            답변 보내기
+          <Btn size="sm" className="max-sm:min-h-11" onClick={() => setConfirming(true)}
+            disabled={busy || workspace.openLeft > 0 || workspace.kindStale || workspace.sendHeld}
+            title={workspace.openLeft > 0 ? `남은 질문 ${workspace.openLeft}개를 처리해야 보낼 수 있어요.`
+              : workspace.sendHeldReason ?? undefined}>
+            {workspace.simulatedPublish ? "모의 등록" : "답변 보내기"}
           </Btn>
         ) : (
-          <Btn size="sm" onClick={onCopyDraft} disabled={busy || workspace.copyBlocked}>
+          <Btn size="sm" className="max-sm:min-h-11" onClick={onCopyDraft} disabled={busy || workspace.copyBlocked}>
             {copied ? "복사했어요" : "초안 복사"}
           </Btn>
         )}

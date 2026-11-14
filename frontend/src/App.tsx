@@ -21,6 +21,7 @@ import { PRIVACY_PATH, TERMS_PATH } from "./lib/legal";
 // v2 app surface
 import { Overview } from "./pages/app/Overview";
 import { AgentHome } from "./pages/app/AgentHome";
+import { CsHome } from "./pages/app/CsHome";
 import { Products } from "./pages/app/Products";
 import { ProductDetail } from "./pages/app/ProductDetail";
 import { Reviews } from "./pages/app/Reviews";
@@ -128,7 +129,9 @@ export function App() {
         {/* 운영 — the workflow surfaces: 홈 / 리뷰 / 문의 / 주문 (docs/product_assembly_ia_v1.md §3) */}
         {/* 홈 is the Agent operating workspace (Agentic Operating Workspace v2); the dashboard it
             links to as 「자세한 숫자 보기」 keeps every number at /overview. */}
-        <Route path="/" element={<AgentHome />} />
+        {/* 홈 = CS 현황 (product-owner decision 2026-11-13); 할 일 — the list and the item beside it — is /work. */}
+        <Route path="/" element={<CsHome />} />
+        <Route path="/work" element={<AgentHome />} />
         <Route path="/overview" element={<Overview />} />
         {/* 상품: the catalogue and everything SellerOps knows about one product — the surface the
             backend has served since before the v2 shell and the frontend never had. */}

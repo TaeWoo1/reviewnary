@@ -34,7 +34,6 @@ import { resolve } from "node:path";
  */
 const ON_THE_SYSTEM = [
   "components/app/AppShellV2.tsx",
-  "components/app/SideNav.tsx",
   "components/app/AppTopBar.tsx",
   "components/workspace/MasterDetail.tsx",
   "components/workspace/CaseLayout.tsx",

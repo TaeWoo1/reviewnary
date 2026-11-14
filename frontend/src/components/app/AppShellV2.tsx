@@ -2,7 +2,6 @@ import { documentTitleFor } from "../../lib/nav.v2";
 import { useEffect, useState } from "react";
 import { MotionConfig } from "motion/react";
 import { Outlet, useLocation } from "react-router-dom";
-import { SideNav } from "./SideNav";
 import { AppTopBar } from "./AppTopBar";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { MoreDrawer } from "./MoreDrawer";
@@ -44,7 +43,8 @@ export function AppShellV2() {
   // Conversation-first (Chat UI v1): the home IS the thread. It owns its scroll area and docks its
   // composer at the bottom of the viewport, so the shell gives it the full column — no page padding,
   // no content-width cap, no outer scroll. Every other page keeps the work-surface layout.
-  const chat = location.pathname === "/";
+  // 할 일 (/work) carries the conversation dock since 홈 became CS 현황 (2026-11-13); 홈 is an ordinary page.
+  const chat = location.pathname === "/work";
   // Master-detail (UI/UX v2 Phase 1): the list and the selected item's detail each own their scroll, so the shell
   // gives these pages the full column and no outer scroll — the same arrangement the conversation has.
   const workspace = MASTER_DETAIL_ROUTES.some((route) => route.test(location.pathname));
@@ -66,7 +66,7 @@ export function AppShellV2() {
     <div className="flex h-full flex-col">
       {/* PC 알림 (2026-10-28): a leaf that draws nothing and reads only when the seller turned it on. */}
       <WorkNotifier />
-      {/* Without this, a keyboard user tabs through all seven nav destinations and the sign-out
+      {/* Without this, a keyboard user tabs through every nav destination and the sign-out
           button before reaching page content — on every screen. Hidden until focused. */}
       <a
         href="#main-content"
@@ -75,11 +75,11 @@ export function AppShellV2() {
         본문으로 건너뛰기
       </a>
       <DemoRibbon />
+      {/* One bar across the top on every width (2026-11-12): the desktop rail is gone, the page has the full width. */}
+      <AppTopBar />
 
       <div className="flex min-h-0 flex-1">
-        <SideNav />
         <div className="flex min-w-0 flex-1 flex-col">
-          <AppTopBar />
           {/* pb-28 on mobile keeps content clear of the fixed tab bar. */}
           {chat ? (
             // Reviewnary Visual System v1 §1 — the conversation is PAPER. Everything else in this
@@ -97,8 +97,11 @@ export function AppShellV2() {
             <main
               id="main-content"
               tabIndex={-1}
-              className="relative flex-1 overflow-y-auto px-4 pb-28 pt-4 outline-none md:px-8 md:pb-8 md:pt-6"
+              className="relative flex-1 scroll-pb-20 overflow-y-auto px-4 pb-28 pt-4 outline-none md:scroll-pb-0 md:px-8 md:pb-8 md:pt-6"
             >
+              {/* `scroll-pb-20`: this scroller runs under the phone's fixed bottom menu (56px), so whatever the browser
+                  scrolls into view on its own — keyboard focus, find-in-page — stopped behind the menu (measured at
+                  390×844, 2026-11-14). The padding makes it stop above. */}
               {/* Left-aligned content column, 1120px (docs/frontend/reviewnary_design.md §2): a work surface reads
                   from the top-left, and a centred column on a wide monitor floats the page away from the
                   navigation that names it. */}

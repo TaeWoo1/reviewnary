@@ -111,7 +111,8 @@ describe("상품평 패널 — the entry point", () => {
     await screen.findByRole("link", { name: "리뷰 22개 보기" });
     expect(screen.queryByText(/쿠팡/)).toBeNull();
     expect(screen.queryByText(/답변 작성 기능은 제공하지 않아요/)).toBeNull();
-    expect(screen.getByText(/스마트스토어센터에서 직접 작성/)).toBeInTheDocument();
+    // 2026-11-09 (§7.11): the draft is prepared here; only the registration happens in the seller center.
+    expect(screen.getByText(/네이버 리뷰 답글 등록은 스마트스토어센터에서 직접 해요/)).toBeInTheDocument();
   });
 
   it("falls back to the generic sentence for a channel with no note of its own", async () => {

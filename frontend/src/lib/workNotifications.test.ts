@@ -22,7 +22,7 @@ describe("PC 알림 planning", () => {
     });
     expect(notices.filter((n) => n.urgent).map((n) => n.href)).toEqual(["/reviews/reply/r1", "/reviews/reply/r4"]);
     expect(notices[0].body).toContain("손을 베임");
-    expect(notices.find((n) => !n.urgent)).toMatchObject({ title: "확인할 일 4건", href: "/" });
+    expect(notices.find((n) => !n.urgent)).toMatchObject({ title: "확인할 일 4건", href: "/work" });
   });
 
   it("one review in two lists is one notice, by its most important reason (third review, 2026-10-28)", () => {

@@ -71,7 +71,7 @@ describe("FirstSourceSummary", () => {
     expect(await screen.findByText("카페24에서 다음 정보를 가져왔어요.")).toBeInTheDocument();
     expect(screen.getByText("주문 14건을 가져왔어요.")).toBeInTheDocument();
     expect(screen.getByText("문의 22건을 가져왔어요.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "오늘 할 일 확인하기" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "오늘 할 일 확인하기" })).toHaveAttribute("href", "/work");
   });
 
   it("does not turn stored rows into a collection claim (§19-D)", async () => {

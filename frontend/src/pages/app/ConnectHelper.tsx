@@ -30,7 +30,7 @@ export function ConnectHelper() {
           <li className="break-keep">판매자센터 화면을 내 PC에서 열고, 눌러야 할 곳을 표시하고, 내가 누른 결과를 확인해요.</li>
           <li className="break-keep">네이버 로그인은 내가 직접 해요. 한 번 로그인하면 이후 작업에서는 유지돼요.</li>
           <li className="break-keep">
-            대신 등록하거나 대신 보내지 않아요 — 답변 등록 같은 마지막 단계는 언제나 내가 눌러요.
+            도우미는 판매자센터 화면에서 대신 누르거나 보내지 않아요 — 그 화면의 마지막 단계는 언제나 내가 눌러요.
           </li>
         </ul>
       </Section>

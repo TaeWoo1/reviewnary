@@ -117,7 +117,7 @@ export function planNotices(input: {
       key: `batch:${input.now}`,
       title: `확인할 일 ${ordinary.length.toLocaleString("ko-KR")}건`,
       body: input.hidePreview ? "확인할 일이 있어요. 눌러서 열어 주세요." : "답글·답변 승인이나 직접 확인이 필요한 일이 새로 생겼어요.",
-      href: "/",
+      href: "/work",
       urgent: false,
       covers: ordinary,
     });

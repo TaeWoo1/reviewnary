@@ -158,8 +158,8 @@ describe("InquiryResponsePanel — the generated draft", () => {
 
     await user.click(await screen.findByRole("button", { name: /초안 만들기/ }));
 
-    expect(await screen.findByTestId("draft-evidence-gone")).toHaveTextContent("근거 1개가 바뀌었거나 지워졌어요");
-    expect(screen.getByText("답변을 쓴 뒤로 바뀌었거나 지워진 근거예요.")).toBeInTheDocument();
+    expect(await screen.findByTestId("draft-evidence-gone")).toHaveTextContent("근거 1개가 바뀌었거나, 지워졌거나, 사용 중지됐어요");
+    expect(screen.getByText("답변을 쓴 뒤로 바뀌었거나, 지워졌거나, 사용 중지된 근거예요.")).toBeInTheDocument();
   });
 
   it("a draft whose citations are all still there says nothing about change", async () => {

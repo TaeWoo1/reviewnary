@@ -119,7 +119,7 @@ export function FirstSourceSummary({
       {/* The one control. 「채널 화면으로」 sent a seller who had just connected their shop back to
           the list of things to connect; the work they came for is on 홈. */}
       <div className="pt-1">
-        <BtnLink to="/">오늘 할 일 확인하기</BtnLink>
+        <BtnLink to="/work">오늘 할 일 확인하기</BtnLink>
       </div>
     </section>
   );

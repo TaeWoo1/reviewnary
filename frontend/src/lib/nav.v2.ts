@@ -69,7 +69,10 @@ export const NAV_GROUPS: NavGroup[] = [
     heading: "메뉴",
     quiet: true,
     items: [
-      { to: "/", label: "할 일", short: "할 일", icon: "home", end: true, match: ["/customer-operations/cases"], badge: "work" },
+      // 홈 = CS 현황 (product-owner decision 2026-11-13): the store's whole CS state across channels, every number a
+      // doorway. 할 일 — the list and the item beside it — moved from 「/」 to 「/work」 unchanged.
+      { to: "/", label: "홈", short: "홈", icon: "home", end: true },
+      { to: "/work", label: "할 일", short: "할 일", icon: "inbox", match: ["/customer-operations/cases"], badge: "work" },
       { to: "/reviews", label: "리뷰·문의", short: "리뷰·문의", icon: "review", match: ["/inquiries", "/inbox"] },
       {
         to: "/knowledge",
@@ -139,10 +142,10 @@ export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
 export const ALERTS_ROUTE = "/settings/alerts";
 
 /**
- * Mobile bottom-tab destinations, in order: the three destinations plus a "더보기" trigger (which is not a
+ * Mobile bottom-tab destinations, in order: the four destinations plus a "더보기" trigger (which is not a
  * route). 연결 and 설정 are setup work and live in the drawer.
  */
-export const MOBILE_TAB_ROUTES = ["/", "/reviews", "/knowledge"] as const;
+export const MOBILE_TAB_ROUTES = ["/", "/work", "/reviews", "/knowledge"] as const;
 
 /** Derived, never re-declared — a tab is the same item the side nav renders. */
 export const MOBILE_TABS: NavItem[] = MOBILE_TAB_ROUTES.map((route) => {
@@ -180,6 +183,6 @@ export function documentTitleFor(pathname: string): string {
   const owns = (prefix: string) =>
     prefix.endsWith("/") ? pathname.startsWith(prefix) : pathname === prefix || pathname.startsWith(`${prefix}/`);
   const own = SCREEN_NAMES.filter(([prefix]) => owns(prefix)).sort((a, b) => b[0].length - a[0].length)[0]?.[1];
-  const name = pathname === "/" ? "오늘" : (own ?? navOwner(pathname)?.label ?? null);
+  const name = pathname === "/" ? "홈" : pathname === "/work" ? "할 일" : (own ?? navOwner(pathname)?.label ?? null);
   return name ? `${name} · reviewnary` : "reviewnary";
 }

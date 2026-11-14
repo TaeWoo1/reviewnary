@@ -52,7 +52,9 @@ describe("v2 app routes", () => {
   for (const [path, heading] of [
     // The menu item is 홈; the page's own headline is what it shows. Demo Core Experience v1 made
     // that an operations dashboard rather than a to-do list (docs/demo_core_experience_v1.md §3).
-    ["/", "오늘"],
+    // 홈 is CS 현황 (2026-11-13); the work list and its conversation dock moved to /work unchanged.
+    ["/", "CS 현황"],
+    ["/work", "오늘"],
     ["/products", "상품"],
     // 리뷰 / 문의 are the workflow doors; memory/reports stay as routes.
     // 리뷰·문의 is one destination over two record screens (menu decision, 2026-10-27); the switch below says which.
@@ -73,7 +75,7 @@ describe("v2 app routes", () => {
 
   it("mounts the v2 shell around app pages", async () => {
     renderAt("/");
-    await screen.findByRole("heading", { level: 1, name: "오늘" });
+    await screen.findByRole("heading", { level: 1, name: "CS 현황" });
     expect(screen.getByRole("navigation", { name: "주 메뉴" })).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "모바일 메뉴" })).toBeInTheDocument();
   });

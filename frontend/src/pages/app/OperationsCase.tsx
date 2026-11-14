@@ -154,7 +154,7 @@ export function OperationsCaseView({
       nav={
         pane ? undefined : (
           <nav aria-label="위치" className="flex items-center gap-2 text-sm text-muted">
-            <Link to="/" className="rounded hover:text-ink hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700">
+            <Link to="/work" className="rounded hover:text-ink hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700">
               {COPY.homeTitle}
             </Link>
             <span aria-hidden="true">›</span>

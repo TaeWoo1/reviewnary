@@ -4,12 +4,14 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router-do
 import { Btn, BtnLink } from "../ui/Btn";
 import { RepeatedProblemList } from "../home/RepeatedProblemList";
 import { MasterDetail, selectionHref, useWideLayout } from "../workspace/MasterDetail";
-import { WorkRows, sharedPhrase } from "../workspace/WorkRows";
 import { WorkItemPane, workItemFullScreen } from "../workspace/WorkItemPane";
 import { IssueDetailPanel } from "../memory/IssueDetailPanel";
 import { ReviewCaseView } from "../../pages/app/ReviewReplyTask";
 import { PreparedWorkList } from "../home/PreparedWorkList";
 import { WaitingWork } from "../home/WaitingWork";
+import { HomeWorkList } from "../home/HomeWorkList";
+import { useHomeBoard, type HomeBoardState, type Read } from "../../lib/useHomeBoard";
+import { tallyAny, tallyKnown, tallyText, tallyWithUnit, todoBreakdown, type HomeBoardView, type Tally } from "../../lib/homeBoard";
 import { api } from "../../lib/apiClient";
 import { useScreenChanges } from "../../lib/screenChanges";
 import { problemLine } from "../../lib/operationsHome";
@@ -18,7 +20,7 @@ import { COPY, autoCheckWhat, channelShort, failureShort, gapActionKo, kstLongDa
 import { RecentArrivals } from "./RecentArrivals";
 import { AgentHandoffs } from "./AgentHandoffs";
 import { useAgentPanel } from "../../lib/agentPanel";
-import { homeBriefRows, isLowRatedReview, isOldBacklog, isPraiseApproval, mergeHomeWork, sharedRowFacts, todayWork, type HomeWork } from "../../lib/homeWork";
+import { mergeHomeWork, type HomeWork } from "../../lib/homeWork";
 import { automationHealth, type HealthTone } from "../../lib/automationHealth";
 import { NO_CHANGE_TODAY, changeInsights } from "../../lib/homeInsights";
 import {
@@ -96,32 +98,6 @@ const FULL_SCREEN = { review: "전체 화면에서 판단하기", other: "전체
 /** How many queue rows the Home asks for — enough to fold out, bounded. */
 export const HOME_QUEUE_SIZE = 50;
 
-/**
- * <b>The brief's own name</b> (Home visual target, 2026-10-01).
- *
- * <p>Not {@link COPY.listTitle}: that string names the QUEUE — the rail item, the screen it links to, and
- * the summary cell one band above — and printing it here made the first screen say 확인할 일 three times
- * and read as an abbreviation of the list beside it. These rows are a brief over the oldest of the work.
- */
-// The menu's and the queue's name for the same list (2026-10-28): 「먼저 볼 일」 sat beside the tier 「먼저 볼 리뷰」.
-const HOME_BRIEF_TITLE = "할 일";
-
-/**
- * <b>What the four rows ARE, now that they are not an age ranking</b> (product-owner decision,
- * 2026-10-01).
- *
- * <p>It said 「오래 기다린 문의와 리뷰부터 보여드립니다」, and that was an accurate description of the
- * single age comparator this brief used to be sliced from — the one the visual QA removed. The rows
- * are the head of one order of importance now (product-owner decision, 2026-10-22: a review reporting
- * harm, then inquiries longest-waiting first, then reviews newest first — {@link mergeHomeWork}), so
- * 「오래 기다린 … 부터」 would still describe only one of its three groups.
- *
- * <p>The sentence says what IS true of every row: it is drawn from both kinds of work, and it is a
- * selection rather than the whole list — which is what the 전체 보기 beside it is for. The order is
- * not spelled out here; the 2026-10-22 mockup changed the order and the mark, not this sentence.
- */
-// No sentence: it narrated the heading (§12-3, 「Remove empty sentences」). What every row shares is still said once.
-const HOME_BRIEF_NOTE = "";
 
 /** Whether the Home is drawn as 고객 운영 관리's (v3.1) — the job is open for this org and has something to say. */
 export function coHomeApplies(co: CustomerOperationsHome | null | undefined): co is CustomerOperationsHome {
@@ -151,6 +127,7 @@ export function CustomerOpsHome({
   sharedQueue,
   sharedReviewWork,
   sharedFollowUps,
+  sharedBoard,
   selection,
 }: {
   /**
@@ -185,9 +162,13 @@ export function CustomerOpsHome({
   sharedReviewWork?: { value: ReviewWorkView | null | undefined };
   /** What is still open after a reply was decided, when the page around this list already read it. */
   sharedFollowUps?: { value: InquiryFollowUps | null | undefined };
+  /** The server's board and the page on screen, when the page around this list already read them. */
+  sharedBoard?: { value: HomeBoardState };
   /** Master-detail selection. Absent: every row opens its own screen, as on a narrow page. */
   selection?: HomeSelection;
 }) {
+  const ownBoard = useHomeBoard(sharedBoard === undefined);
+  const board = sharedBoard ? sharedBoard.value : ownBoard;
   const ownQueue = useHomeQueue(sharedQueue === undefined);
   const queue = sharedQueue ? sharedQueue.value : ownQueue;
   const ownReviewWork = useReviewWork(sharedReviewWork === undefined);
@@ -199,41 +180,11 @@ export function CustomerOpsHome({
   const [error, setError] = useState<string | null>(null);
 
   const work = mergeHomeWork(co, ops, queue, now, reviewWork, followUps);
-  // The row limit asks the layout, not the caller: `selection` is absent on pages that do not select in
-  // place, and defaulting to narrow there would drop a row on a 1440 screen that has the space.
-  const roomy = useWideLayout();
-  /*
-    <b>The head of the list's own order</b> (product-owner decision, 2026-10-22, replacing the 2026-10-01
-    quota Review 2 / Inquiry 1 / Case 1). The quota existed because one age order had filled the brief
-    with old reviews; the order is now one of importance, in which a review cannot outrank a waiting
-    inquiry unless it reports harm, so the brief and 확인할 일 read the same first rows.
-  */
-  /*
-    <b>The brief is this morning's work; the rest is one line</b> (product-owner decision, 2026-10-26). After a
-    first upload of a year of reviews the brief led with 88–116-day-old reviews and 내가 할 일 counted them — the
-    owner: 「오래된 것밖에 안 보인다」. `isOldBacklog` ages every row out after two weeks (2026-10-28 — it was reviews only
-    until a year of inquiries filled 할 일 with 35–286-day-old rows), and the Home draws and counts only what is not backlog. The backlog is not hidden:
-    its size is said under the list and 확인할 일 holds every row of it under 「지난 일」.
-  */
-  const recent = todayWork(work.rows, now);
-  const past = work.rows.length - recent.length;
-  const today: HomeWork = { rows: recent, truncated: work.truncated };
-  // The thank-yous waiting only for 확정 are one line under the list, not one row each (2026-10-28); they are still
-  // counted in 할 일 above, and the line opens the screen that confirms them together.
-  const praise = recent.filter(isPraiseApproval);
-  const individual = recent.filter((r) => !isPraiseApproval(r));
-  const shown = homeBriefRows(individual, visibleHomeRows(roomy));
-  const hidden = individual.length - shown.length;
   const running = co?.status === "ACTIVE" || co?.status === "PAUSED";
   const wide = selection?.wide ?? false;
   const search = selection?.search ?? "";
   const awaiting = awaitingRows(ops, work);
   const moving = useMovingCount();
-  // What every row in the WHOLE list says identically — over `work.rows`, not the six or seven drawn, because
-  // this heading stands under the Pulse's 「확인할 일 11」 and a 「모두 …」 that covered only what is drawn would
-  // be a claim about eleven made from six. `WorkRows` is handed the same population and hides exactly this.
-  const shared = sharedRowFacts(individual);
-  const sharedSaid = sharedPhrase(shared);
 
   async function act(run: () => Promise<unknown>) {
     setBusy(true);
@@ -354,7 +305,16 @@ export function CustomerOpsHome({
                 AI에게 묻기
               </Btn>
             ) : null}
-            <Btn variant="outline" size="sm" disabled={busy} onClick={onChanged}>
+            {/* 새로고침 re-reads the list too, and the badge follows the list (2026-11-10). */}
+            <Btn
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                board.reload();
+                onChanged();
+              }}
+            >
               <RefreshIcon />
               새로고침
             </Btn>
@@ -364,7 +324,8 @@ export function CustomerOpsHome({
       {/* 실행 대기는 판매자가 승인해 둔 것이고 자동 확인의 소유가 아니다 — 그 일이 열려 있지 않아도 센다.
           다만 보유 읽기가 실패했으면 0이 아니라 아무 말도 하지 않는다(null). */}
       <OperationsSummary
-        work={today}
+        board={board.board}
+        onOpenPast={() => board.setView("past")}
         moving={moving}
         awaiting={co ? (co.status === "ACTIVE" ? awaiting.count : null) : ops ? awaiting.count : null}
         unanswered={unansweredNow(metrics)}
@@ -417,69 +378,27 @@ export function CustomerOpsHome({
         </section>
       )}
 
-      {recent.length > 0 ? (
-        <section aria-label={COPY.listTitle}>
-          {/* Count and order on the heading, the way out on the right, one hairline under it — the list header
-              both references draw (Intercom: 「5 Open ⌄」 / 「Newest ⌄」). No box, no pill, no second number: the
-              count lives on the heading of the thing it counts. */}
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line pb-2">
-            {/* <b>The brief is named for what it is, not for the screen it draws from</b> (Home visual
-                target, 2026-10-01). It was 「확인할 일」 — the name of the queue in the rail, of the queue
-                screen, and of the summary cell 40px above — so the first screen carried the same four
-                syllables three times and read as an abbreviated copy of the list it links to. These four
-                rows are a brief: the oldest of the work, drawn here so the morning starts somewhere. */}
-            <h2 className="text-section font-bold tracking-tight text-ink">{HOME_BRIEF_TITLE}</h2>
-            <span className="break-keep text-sm text-muted">
-              {/* The order, which is the only thing the seller has to know to read the four rows — and
-                  what every row says identically, said once instead of twice on each of them. */}
-              {[HOME_BRIEF_NOTE, sharedSaid].filter(Boolean).join(" ")}
-            </span>
-            {/* <b>The breakdown is the queue's, not the brief's</b> (product-owner decision, 2026-10-01).
-                Measured at 1600×1000 this heading read 「확인할 일 오래된 순 정보 부족 1 · 답변 필요 25 ·
-                리뷰 12 · 승인 대기 4 · 초안 필요 4」 — five tallies over a list showing five rows, and every
-                one of them is a filter chip on 확인할 일, drawn there as a control a seller can press. */}
-            {hidden > 0 || work.truncated ? (
-              <Link
-                to="/customer-operations/cases"
-                className="ml-auto shrink-0 text-sm font-semibold text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-              >
-                전체 보기 →
-              </Link>
-            ) : null}
-          </div>
-          {shown.length > 0 ? (
-            <WorkRows
-              rows={shown}
-              selectedKey={selection?.selectedKey ?? null}
-              wide={wide}
-              search={search}
-              now={now}
-              ariaLabel={COPY.listTitle}
-              showBacklogDivider={false}
-              dense
-              sharedOver={individual}
-              // The shared facts are on the heading above. What 리뷰 counts here is a rule about the queue, and it
-              // now stands on the queue screen that owns the whole list rather than as a paragraph under a
-              // five-row brief — neither reference puts an explanatory sentence under a work list.
-              captionSaysReason
-            />
-          ) : null}
-          <PraiseBundle count={praise.length} />
-          <PastWork count={past} low={work.rows.filter((r) => isOldBacklog(r, now) && isLowRatedReview(r)).length} />
-        </section>
-      ) : past > 0 ? (
-        <section aria-label={COPY.listTitle} className="space-y-2">
-          <p className="break-keep text-sm text-muted">{nothingNew(health, lastChecked, "새로 할 일은 없어요.")}</p>
-          <PastWork count={past} low={work.rows.filter((r) => isOldBacklog(r, now) && isLowRatedReview(r)).length} />
-        </section>
-      ) : !co || (running && co.status === "ACTIVE") ? (
-        // Nothing waiting is a state, and the list's absence does not state it. 「다음 확인」 is on the status
-        // line above, where it was before this became one line. 자동 확인이 없는 배포에서도 같은 문장을
-        // 적는다 — 빈 자리는 「없다」와 「읽지 못했다」를 구분해 주지 않는다(읽기 실패는 채널 줄이 말한다).
-        <p className="break-keep text-sm text-muted">{nothingNew(health, lastChecked, "지금 할 일이 없어요.")}</p>
-      ) : null}
+      {/*
+        <b>할 일 is the server's list</b> (2026-11-10, Home FE connection — mockup v5). The server reads every source whole,
+        dedupes, buckets, sorts and pages; this draws one view and one page of it. The brief of the newest few rows and
+        its 「전체 보기」 are replaced by the list itself with its pages — the same rows, all reachable, in one order.
+      */}
+      <HomeWorkList
+        state={board}
+        selection={{ wide, selectedKey: selection?.selectedKey ?? null, search }}
+        now={now}
+        // With 지난 일 under it, 「없어요」 alone would read as a clear desk; 「새로」 keeps the backlog in view (2026-10-26).
+        emptySentence={nothingNew(
+          health,
+          lastChecked,
+          board.board && tallyKnown(board.board.past.total) && board.board.past.total.count === 0 ? "지금 할 일이 없어요." : "새로 할 일은 없어요.",
+        )}
+      />
+      {board.view === "all" && board.board ? <PraiseBundle count={board.board.todo.praiseApprovable.count ?? 0} /> : null}
       {/* Nothing new to do: what came in last, so an empty morning still shows the store (owner, 2026-10-28). */}
-      {recent.length === 0 ? <RecentArrivals now={now} /> : null}
+      {board.view === "all" && board.board && tallyKnown(board.board.todo.total) && board.board.todo.total.count === 0 ? (
+        <RecentArrivals now={now} />
+      ) : null}
 
       {/*
         <b>「Reviewnary가 무엇을 준비했나」 and 「무엇이 반복되나」 are one band, not two stacked sections</b>
@@ -914,6 +833,7 @@ export function TodayWorkspace({
   const queue = useHomeQueue();
   const reviewWork = useReviewWork();
   const followUps = useFollowUps();
+  const board = useHomeBoard();
   const work = mergeHomeWork(co, ops, queue, now, reviewWork, followUps);
   const key = params.get("item");
 
@@ -946,7 +866,8 @@ export function TodayWorkspace({
     } else if (key) {
       // Only what the address names. 확인할 일 kept a first-row fallback when this was written; it does not
       // any more (Review Decision UX v3.2), so both screens now answer 「선택 없음」 the same way.
-      const chosen = work.rows.find((r) => r.key === key) ?? null;
+      // The page on screen first — it is what the seller clicked — then the rest of the screen's own rows.
+      const chosen = board.rows.find((r) => r.key === key) ?? work.rows.find((r) => r.key === key) ?? null;
       if (chosen) {
         selectedKey = chosen.key;
         detail = <WorkItemPane row={chosen} now={now} depth="preview" />;
@@ -983,6 +904,7 @@ export function TodayWorkspace({
           sharedQueue={{ value: queue }}
           sharedReviewWork={{ value: reviewWork }}
           sharedFollowUps={{ value: followUps }}
+          sharedBoard={{ value: board }}
           selection={{ wide, selectedKey, search: location.search }}
         />
       }
@@ -1030,154 +952,205 @@ function Sep() {
 const PULSE_LABEL = "지금 해야 할 일";
 
 /**
- * <b>세 개의 의무, 한 줄로.</b> 확인할 일 · 실행 대기 · 현재 미답변 — and nothing else
- * (product-owner decision, 2026-09-30).
+ * <b>할 일 · 기다리는 일 · 지난 일, then the channel's facts in one smaller line</b> (2026-11-10, mockup v5 — the reviewer:
+ * 「이번 시안에서 벗어난 선택」, replacing the 2026-09-30 band 확인할 일 · 실행 대기 · 현재 미답변).
  *
- * <p>The data contract is `docs/pilot/pilot_usage_loop_v1.md` §8 and it does not move: <b>no new read</b>, no
- * KPI card, no tile, no chart. 매출 · 주문량 · 추이 · 채널별 수치 stay owned by `/overview` — the defect
- * this repository has fixed several times is the same number living in two places under two definitions
- * (`docs/frontend/reviewnary_design.md` §8-A).
+ * <p>The three cells are the three places the Home's one server read puts every piece of work: the seller's turn now,
+ * not yet their turn, and older than two weeks. Each is the server's count — 「N+」 when it vouches only for a floor, 「—」
+ * with its reason when not even that — and never a zero it did not count. 지난 일 always keeps its way in while the board
+ * is read, so an unconfirmed count can still be opened and looked at.
  *
- * <p><b>Why these three and not others.</b> An obligation is something that is waiting for the seller.
- * 확인할 일 is our queue of decisions; 실행 대기 is what they already decided and has not been posted;
- * 현재 미답변 is the channel's own fact — a customer without an answer. 반복 문제 is NOT here: it is a
- * pattern, not a customer waiting, and it has its own section below the work, which is where a pattern
- * belongs.
- *
- * <p><b>확인할 일 and 현재 미답변 are not a subset relation</b>, which is why both are drawn and neither is
- * derived from the other — see {@link unansweredNow}. Each cell's note line carries its own qualification,
- * so a figure that counts fewer channels than the seller has says so beside itself.
- *
- * <p><b>Three tiers per cell, and the middle tier is one type size whatever it holds</b> — 질문 / 지금 상태 /
- * 그 상태를 한정하는 사실. A count and a withheld count are both answers; a band that grows only when the
- * answer is a number shrinks precisely when the seller needs to notice something. What separates them is
- * <b>ink</b>: a measured figure is ink and semibold, every other word is the ordinary muted weight. No warn
- * colour, no icon, no tint — a band that turns orange when a channel is quiet trains a seller to stop
- * reading the band.
- *
- * <p><b>One surface, not three cards</b> (product-owner decision: compact summary strip). The surface is
- * the width of what it holds (`max-w-3xl`) rather than of the page, the columns are thirds of it, and the
- * two hairlines are the cheapest way to say 「these three belong to one reading」. No shadow, no gradient,
- * and the cells carry no fill, border or radius of their own.
- *
- * <p>A cell with nothing true to say renders nothing, and when no cell has, neither does the surface. That
- * is not tidiness: a read that failed, a job that is not running and an org with no window yet are three
- * different silences, and none of them is 「0」. The grid is sized to the cells it actually has, so two
- * facts are two columns rather than two columns and a gap.
+ * <p>진행 중 · 등록 대기 · 미답변 문의 are not dropped: they are facts beside the work, not the work, so they stand in the
+ * one quieter line under the band, each with the way in it had and the same 「—」 rule when it has no honest number.
  */
 function OperationsSummary({
-  work,
+  board,
+  onOpenPast,
   moving = null,
   awaiting,
   unanswered,
 }: {
-  work: HomeWork;
+  /** The Home's server board: `undefined` — not read yet; `null` — the read failed. */
+  board: Read<HomeBoardView>;
+  /** Open the 지난 일 view of the Home's own list. */
+  onOpenPast: () => void;
   /** 할 일's 진행 중, shown beside the seller's own count and never added to it; `null` = no such lane here. */
   moving?: number | null;
   /** `null` when the job is not running — 실행 대기 is a fact about a job that is looking. */
   awaiting: number | null;
-  /** `null` when the metrics read did not land; `NO_LANE` drops the cell — no channel collects inquiries. */
+  /** `null` when the metrics read did not land; `NO_LANE` drops the fact — no channel collects inquiries. */
   unanswered: UnansweredFact | null;
 }) {
-  /*
-    <b>Three columns, always, and an unmeasured one says so</b> (product-owner decision, 2026-10-01).
+  const failed = board === null;
+  const todo = board?.todo;
+  const waiting = board?.waiting.total;
+  const past = board?.past;
+  const unsure = (t: Tally | undefined) => t != null && t.count == null && t.atLeast === 0;
 
-    <p>Each cell used to be dropped when its fact was not a number, which left the band with a track of
-    empty page where a figure belongs — and an empty slot is the one thing a seller cannot read. It looks
-    like a value that has not loaded, like a zero, or like nothing at all, and the three are different
-    facts. The cell now always stands and says which: a measured figure, or 「—」 with the reason under it.
-
-    <p><b>No cell ever estimates.</b> 「—」 is the only thing that may stand where a count would, and the
-    note is the sentence the product already uses for that cause — never a figure derived from a
-    neighbouring read, a previous window, or a partial population.
-  */
   const cells: ReactNode[] = [
-    <Cell key="work" id="work" label={COPY.todayLabel}>
-      {/* A measured zero is a figure: the list read landed and found nothing. The server saying there are
-          more than it sent makes this total a floor — 「11+」건. */}
-      <Big value={work.rows.length} suffix={work.truncated ? "+" : ""} unit={COUNT_UNIT} />
-    </Cell>,
-    ...(moving === null
-      ? []
-      : [
-          <Cell key="moving" id="moving" label="진행 중">
-            <Link
-              to="/customer-operations/cases?view=moving"
-              aria-label={`진행 중 ${moving.toLocaleString("ko-KR")}${COUNT_UNIT}`}
-              className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-            >
-              <Big value={moving} unit={COUNT_UNIT} />
-            </Link>
-          </Cell>,
-        ]),
     <Cell
-      key="awaiting"
-      id="awaiting"
-      label="등록 대기"
-      note={awaiting === null ? "자동 확인이 멈춰 있어 확인하지 못했어요" : undefined}
+      key="work"
+      id="work"
+      label={COPY.todayLabel}
+      note={
+        failed ? (
+          "할 일을 불러오지 못했어요"
+        ) : todo && unsure(todo.total) ? (
+          "다 확인하지 못해 세지 않았어요"
+        ) : todo && todoBreakdown(todo) ? (
+          // On a phone the chips right under the band say the same (2026-11-10 review: the first screen must reach the work).
+          <span data-testid="home-work-breakdown" className="hidden sm:inline">{todoBreakdown(todo)}</span>
+        ) : undefined
+      }
     >
-      {awaiting === null ? (
-        <Unknown />
-      ) : awaiting === 0 ? (
-        // A measured zero, not an unknown: the job is running and it found nothing pending.
-        <Big value={0} unit={COUNT_UNIT} />
+      <Count tally={todo?.total} />
+    </Cell>,
+    <Cell
+      key="waiting"
+      id="waiting"
+      label="기다리는 일"
+      note={
+        failed
+          ? "불러오지 못했어요"
+          : waiting && unsure(waiting)
+            ? "다 확인하지 못했어요"
+            : waiting && tallyKnown(waiting) && waiting.count === 0
+              ? "지금 기다리는 일 없음"
+              : waiting
+                ? "정한 날이 되면 할 일로 와요"
+                : undefined
+      }
+    >
+      {waiting && tallyAny(waiting) ? (
+        <a
+          href="#기다리는-일"
+          aria-label={`기다리는 일 ${tallyWithUnit(waiting)}`}
+          className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+        >
+          <Count tally={waiting} />
+        </a>
       ) : (
-        // The label above is a separate span, so without a name of its own this link announces a bare
-        // number. The noun rides with it.
+        <Count tally={waiting} />
+      )}
+    </Cell>,
+    <Cell
+      key="past"
+      id="past"
+      label="지난 일"
+      note={
+        failed ? (
+          "불러오지 못했어요"
+        ) : past && unsure(past.total) ? (
+          "다 확인하지 못했어요"
+        ) : past ? (
+          <>
+            2주 넘게 남은 일
+            {tallyAny(past.lowRatedReviews) ? (
+              <span data-testid="past-low-rated" className="whitespace-nowrap">
+                {" · "}
+                <span className="font-semibold text-bad">★1–2</span> 리뷰 {tallyText(past.lowRatedReviews)}
+              </span>
+            ) : null}
+          </>
+        ) : undefined
+      }
+    >
+      {/* The way in stays whenever the board was read and the count is not a measured zero — an unconfirmed 「—」 is
+          exactly when the seller needs to look (2026-11-10 review: it used to read as 0 and hide the link). */}
+      {past && !(tallyKnown(past.total) && past.total.count === 0) ? (
+        <button
+          type="button"
+          onClick={onOpenPast}
+          data-testid="past-open"
+          aria-label={`지난 일 ${tallyWithUnit(past.total)} 보기`}
+          className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+        >
+          <Count tally={past.total} />
+          <span className="ml-1 text-sm font-semibold text-brand-700">보기 ›</span>
+        </button>
+      ) : (
+        <Count tally={past?.total} />
+      )}
+    </Cell>,
+  ];
+
+  const side: ReactNode[] = [
+    moving === null ? null : (
+      <Link
+        key="moving"
+        to="/customer-operations/cases?view=moving"
+        data-testid="pulse-moving"
+        className="whitespace-nowrap hover:text-ink hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+      >
+        진행 중 <span className="font-semibold tabular-nums text-ink">{moving.toLocaleString("ko-KR")}</span>
+        {COUNT_UNIT}
+      </Link>
+    ),
+    <span key="awaiting" data-testid="pulse-awaiting" className="whitespace-nowrap">
+      {awaiting === null ? (
+        <>
+          등록 대기 <Unknown /> <span>(자동 확인이 멈춰 있어 확인하지 못했어요)</span>
+        </>
+      ) : awaiting === 0 ? (
+        <>
+          등록 대기 <span className="font-semibold tabular-nums text-ink">0</span>
+          {COUNT_UNIT}
+        </>
+      ) : (
         <a
           href="#실행-대기"
           aria-label={`등록 대기 ${awaiting.toLocaleString("ko-KR")}${COUNT_UNIT}`}
-          className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+          className="hover:text-ink hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
         >
-          <Big value={awaiting} unit={COUNT_UNIT} />
+          등록 대기 <span className="font-semibold tabular-nums text-ink">{awaiting.toLocaleString("ko-KR")}</span>
+          {COUNT_UNIT}
         </a>
       )}
-    </Cell>,
-    ...(unanswered?.kind === "NO_LANE" ? [] : [<Cell
-      key="unanswered"
-      id="unanswered"
-      label={UNANSWERED_WORD.lead}
-      note={
-        unanswered === null
-          ? "숫자를 읽지 못했어요"
-          : unanswered.kind === "COUNT"
-            ? undefined
-            : // The population is incomplete, so there is no honest count — the cause, named, and the
-              // same words the channel row at the foot of the screen uses for it.
-              "최근에 가져왔는지 몰라요"
-      }
-    >
-      {unanswered?.kind === "COUNT" ? (
-        <Link
-          to="/inquiries"
-          aria-label={`${UNANSWERED_WORD.lead} ${unanswered.value.toLocaleString("ko-KR")}${COUNT_UNIT}`}
-          className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-        >
-          <Big value={unanswered.value} unit={COUNT_UNIT} />
-        </Link>
-      ) : (
-        <Unknown />
-      )}
-    </Cell>]),
+    </span>,
+    unanswered?.kind === "NO_LANE" ? null : (
+      <span key="unanswered" data-testid="pulse-unanswered">
+        {unanswered?.kind === "COUNT" ? (
+          <Link
+            to="/inquiries"
+            aria-label={`${UNANSWERED_WORD.lead} ${unanswered.value.toLocaleString("ko-KR")}${COUNT_UNIT}`}
+            className="whitespace-nowrap hover:text-ink hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+          >
+            {UNANSWERED_WORD.lead} <span className="font-semibold tabular-nums text-ink">{unanswered.value.toLocaleString("ko-KR")}</span>
+            {COUNT_UNIT}
+          </Link>
+        ) : (
+          <>
+            <span className="whitespace-nowrap">
+              {UNANSWERED_WORD.lead} <Unknown />
+            </span>{" "}
+            <span>({unanswered === null ? "숫자를 읽지 못했어요" : "최근에 가져왔는지 몰라요"})</span>
+          </>
+        )}
+      </span>
+    ),
   ];
 
   return (
-    /*
-      <b>The band is ruled, not filled</b> (Home visual target, 2026-10-01).
-
-      <p>It was a `bg-canvas rounded-xl` box at `max-w-3xl` — a grey card two thirds of the way across a
-      1120px column, which is the one shape §8-A spends on 「대시보드」 and the one thing the composition
-      pass was asked to keep off this screen. The target draws the same three cells as a full-width strip
-      between two hairlines: no fill, no radius, no inset of its own.
-    */
-    <section
-      data-testid="today-summary"
-      aria-label={PULSE_LABEL}
-      className={`grid ${COLUMNS[cells.length] ?? "grid-cols-3"} divide-x divide-line border-b border-line pb-4`}
-    >
-      {cells}
-    </section>
+    <div className="space-y-2">
+      <section
+        data-testid="today-summary"
+        aria-label={PULSE_LABEL}
+        className="grid grid-cols-3 divide-x divide-line border-b border-line pb-3"
+      >
+        {cells}
+      </section>
+      <p data-testid="today-side" className="break-keep text-sm text-muted">
+        {dotted(side)}
+      </p>
+    </div>
   );
+}
+
+/** A server count at the band's size: the figure, 「N+」 for a vouched floor, or 「—」 — never a zero it did not count. */
+function Count({ tally }: { tally: Tally | null | undefined }) {
+  if (tally && tally.count != null) return <Big value={tally.count} unit={COUNT_UNIT} />;
+  if (tally && tally.atLeast > 0) return <Big value={tally.atLeast} suffix="+" unit={COUNT_UNIT} />;
+  return <Unknown />;
 }
 
 /**
@@ -1340,7 +1313,7 @@ function Cell({ id, label, note, children }: { id: string; label: string; note?:
   return (
     <p
       data-testid={`pulse-${id}`}
-      className="min-w-0 break-keep px-6 text-sm text-muted first:pl-0 last:pr-0"
+      className="min-w-0 break-keep px-3 text-sm text-muted first:pl-0 last:pr-0 sm:px-6"
     >
       <span className="block leading-[18px]">{label}</span>{" "}
       <span className="mt-1 block text-title">{children}</span>
@@ -1724,36 +1697,3 @@ export function PraiseBundle({ count }: { count: number }) {
   );
 }
 
-/**
- * The backlog the brief leaves out, as one line with its way in (product-owner decision, 2026-10-26). A count and a
- * link — not rows: the brief answers 「오늘 무엇을 해야 하지?」, and a year of undecided reviews is not that answer,
- * but it is still real work, so its size is said and the queue that holds every row is one press away.
- */
-function PastWork({ count, low = 0 }: { count: number; /** Of them, ★1–2 reviews (`isLowRatedReview`). */ low?: number }) {
-  if (count <= 0) return null;
-  return (
-    <p className="mt-2 flex flex-wrap items-center gap-x-2 break-keep text-sm text-muted">
-      <span>
-        지난 일 <span className="font-semibold tabular-nums text-ink">{count.toLocaleString("ko-KR")}</span>건
-      </span>
-      <span>(2주 넘은 일)</span>
-      {/* The complaints among them, named (owner decision 2026-10-28): the two-week rule keeps the list about this
-          morning, and this keeps a ★1 from a month ago from disappearing under it. */}
-      {low > 0 ? (
-        <span data-testid="past-low-rated">
-          · 그중 <span className="font-semibold text-bad">★1–2</span> 리뷰{" "}
-          <span className="font-semibold tabular-nums text-ink">{low.toLocaleString("ko-KR")}</span>건
-        </span>
-      ) : null}
-      <Link
-        to="/customer-operations/cases"
-        className="ml-auto font-semibold text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-      >
-        할 일에서 보기 →
-      </Link>
-    </p>
-  );
-}
-
-/** The strip is as wide as the cells it has (static class names, for Tailwind). */
-const COLUMNS: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" };

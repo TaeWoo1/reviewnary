@@ -1,4 +1,6 @@
 import axios, { isAxiosError } from "axios";
+import { isWorkWrite, noteWorkWrite } from "./workChanges";
+import type { HomeBoardView, WorkPage, WorkSort, WorkView } from "./homeBoard";
 import type {
   OpenQuestionItem,
   OpenQuestionResolution,
@@ -238,6 +240,18 @@ const http = axios.create({ baseURL: BASE_URL, timeout: 8000 });
  * to accommodate the two calls that talk to a vendor is the wrong trade.
  */
 const MODEL_TIMEOUT_MS = 60_000;
+/**
+ * A review reply drafted by the reply agent (2026-11-09): the backend waits up to 330 s for the runtime's five model
+ * steps (`AgentRuntimeClient.TIMEOUT`). Sixty seconds here left the screen saying 「쓰지 못했어요」 while the run went
+ * on and saved. The bound is the backend's plus its save; past it the run is finished or failed on the server too.
+ */
+export const REVIEW_AGENT_TIMEOUT_MS = 340_000;
+
+// A write that succeeded may have moved 할 일: the Home's board and the menu badge read again (2026-11-10).
+http.interceptors.response.use((response) => {
+  if (isWorkWrite(response.config?.method, response.config?.url)) noteWorkWrite();
+  return response;
+});
 
 http.interceptors.request.use((config) => {
   const token = getToken();
@@ -941,6 +955,10 @@ export const api = {
       inquiryId?: string;
       /** Which page of `limit` rows, 0-based. Absent = the first, exactly as before. */
       page?: number;
+      /** Received on or after this Korean day (ISO date). With `to`, 홈's 「오늘 접수」 opens one day. */
+      from?: string;
+      /** Received on or before this Korean day (ISO date). Absent = today, the server's own default. */
+      to?: string;
     } = {},
   ): Promise<InquiryRowsResponse> {
     const search = new URLSearchParams();
@@ -1843,7 +1861,7 @@ export const api = {
     const { data } = await http.post<GeneratedReviewDraftView>(
       `/api/seller-accounts/${accountId}/attention/items/${encodeURIComponent(actionRef)}/reply/draft/generate`,
       {},
-      { timeout: MODEL_TIMEOUT_MS },
+      { timeout: REVIEW_AGENT_TIMEOUT_MS },
     );
     return data;
   },
@@ -2269,6 +2287,28 @@ export const api = {
    * the number a person acts on first, and it would be the first thing they saw. A failed read leaves
    * the areas unrendered and the conversation below untouched.
    */
+  /**
+   * The Home's board — every count, from one server read of the whole work (2026-11-10, demo handoff §7.12). Strict:
+   * a failed read throws, so the screen can say 「불러오지 못했어요」 instead of drawing zeros.
+   */
+  async getHomeBoard(): Promise<HomeBoardView> {
+    const { data } = await http.get<HomeBoardView>("/api/operations/home-board");
+    return data;
+  },
+
+  /** One page of one view of the Home's work, sorted on the server before it is cut. Strict, like the board. */
+  async getHomeWork(params: { bucket: WorkView; sort: WorkSort; cursor?: string | null; size?: number }): Promise<WorkPage> {
+    const { data } = await http.get<WorkPage>("/api/operations/work", {
+      params: {
+        bucket: params.bucket,
+        sort: params.sort,
+        size: params.size ?? 10,
+        ...(params.cursor ? { cursor: params.cursor } : {}),
+      },
+    });
+    return data;
+  },
+
   async getOperationsHomeStrict(): Promise<OperationsHome> {
     const { data } = await http.get<OperationsHome>("/api/operations/home");
     return data;
@@ -2627,8 +2667,8 @@ export const api = {
       safety?: boolean;
       /** The channel's reply statement (2026-10-26): 미답변 · 답변함 · 모름. Absent = every state. */
       reply?: "pending" | "answered" | "unknown";
-      /** Received in the last N days in Korea, today included. Absent = the whole record. */
-      days?: 7 | 30;
+      /** Received in the last N days in Korea, today included. Absent = the whole record. 1 = 오늘 (홈's 「오늘 접수」). */
+      days?: 1 | 7 | 30;
     } = {},
   ): Promise<ReviewRecordPageView> {
     const query = new URLSearchParams();

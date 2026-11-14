@@ -30,10 +30,23 @@ import { ReviewGuidance } from "./reviews/ReviewGuidance";
  *
  * <p>Exported and pure so the mapping is checkable: the component's catch is one line over it.
  */
-export function generateFailureMessage(status: number | undefined): string {
-  return status === 409
-    ? "확정한 답글이 있거나 「답글 달기」로 정하지 않은 리뷰라 AI 답글을 쓸 수 없어요."
-    : "AI 답글을 쓰지 못했어요. 잠시 뒤 다시 눌러 주세요.";
+export function generateFailureMessage(status: number | undefined, code?: string): string {
+  if (status === 409) return "확정한 답글이 있거나 「답글 달기」로 정하지 않은 리뷰라 AI 답글을 쓸 수 없어요.";
+  // The screen stopped waiting; the server may not have (2026-11-09). Not 「실패」, and not 「다시 눌러」 — a saved draft
+  // is read on reload, and a second press while the run is open is answered with 「아직 쓰고 있어요」, not a second run.
+  if (status === undefined && (code === "ECONNABORTED" || code === "ETIMEDOUT")) {
+    return "화면이 기다리기를 먼저 멈췄어요. AI는 아직 쓰고 있을 수 있어요. 잠시 뒤 화면을 새로 고쳐 저장된 초안을 확인해 주세요.";
+  }
+  return "AI 답글을 쓰지 못했어요. 잠시 뒤 다시 눌러 주세요.";
+}
+
+/**
+ * What a finished generation means for the editor (2026-11-09): hand the body over when there is one; otherwise the
+ * server's reason stands alone, or — when it gave none — one plain sentence. Pure, so the no-draft shapes are checkable.
+ */
+export function generatedOutcome(view: GeneratedReviewDraftView): { body: string | null; note: string | null } {
+  if (view.draft) return { body: view.draft.body, note: view.unavailableMessage };
+  return { body: null, note: view.unavailableMessage ?? "AI가 이번에는 초안을 저장하지 않았어요. 직접 작성하거나 다시 눌러 주세요." };
 }
 
 export function GroundedReviewDraft({
@@ -142,16 +155,22 @@ export function GroundedReviewDraft({
       // in hand; whatever the panel does next to re-read its own state must not be able to hold this
       // control in 「준비하는 중…」 — measured 2026-09-03, a refresh that did not settle left the
       // button spinning over a draft that had already arrived and was already in the editor.
-      onDrafted(view.draft.body);
+      // No draft (handed to a person, held, still running): the editor keeps what it has, and the reason is shown.
+      const outcome = generatedOutcome(view);
+      if (outcome.body !== null) onDrafted(outcome.body);
     } catch (e) {
-      setError(generateFailureMessage(isAxiosError(e) ? e.response?.status : undefined));
+      setError(isAxiosError(e)
+        ? generateFailureMessage(e.response?.status, e.code)
+        : generateFailureMessage(undefined));
     } finally {
       setBusy(false);
     }
   }
 
   const said = basisSentence(basis, evidence.length);
-  const hasDraft = !!result || hasStoredDraft;
+  // A generation that saved nothing does not make 「다시 쓰기」 true — only a draft does.
+  const hasDraft = !!result?.draft || hasStoredDraft;
+  const resultNote = result ? generatedOutcome(result).note : null;
   return (
     <section aria-label="AI 답글" className="flex flex-col gap-2" data-testid="grounded-review-draft">
       {/* Under the reply, not above it (§12-4): the reply is the thing; what it leaned on is one quiet line. */}
@@ -209,8 +228,8 @@ export function GroundedReviewDraft({
 
       {/* An operational fact, kept apart from anything about the seller's knowledge — the budget, the
           capability, the vendor, or a promise the evidence did not support. */}
-      {result?.unavailableMessage ? (
-        <p className="break-keep text-sm text-warn" role="status">{result.unavailableMessage}</p>
+      {resultNote ? (
+        <p className="break-keep text-sm text-warn" role="status" data-testid="grounded-review-unavailable">{resultNote}</p>
       ) : null}
 
       {showEvidence ? (
@@ -225,7 +244,7 @@ export function GroundedReviewDraft({
               {row.snippet ? (
                 <span className="break-keep text-sm text-muted">{row.snippet}</span>
               ) : (
-                <span className="text-sm text-muted">답글을 쓴 뒤로 바뀌었거나 지워진 자료라 지금 내용을 볼 수 없어요.</span>
+                <span className="text-sm text-muted">답글을 쓴 뒤로 바뀌었거나, 지워졌거나, 사용 중지된 자료라 지금 내용을 볼 수 없어요.</span>
               )}
             </li>
           ))}

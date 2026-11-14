@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { FilterTab } from "../../components/ui/FilterTab";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { MasterDetail, useWideLayout } from "../../components/workspace/MasterDetail";
-import { WorkRows } from "../../components/workspace/WorkRows";
 import { WorkItemPane } from "../../components/workspace/WorkItemPane";
 import { api } from "../../lib/apiClient";
-import { isPraiseApproval, mergeHomeWork, todayWork, WORK_FILTERS, workFilterOf, type HomeWork, type HomeWorkRow } from "../../lib/homeWork";
-import { HOME_QUEUE_SIZE, PraiseBundle } from "../../components/customerOperations/CustomerOpsHome";
+import { PraiseBundle } from "../../components/customerOperations/CustomerOpsHome";
+import { HomeWorkList } from "../../components/home/HomeWorkList";
+import { useHomeBoard } from "../../lib/useHomeBoard";
+import { tallyText } from "../../lib/homeBoard";
 import { COPY } from "../../lib/copy/customerOps";
 import { FinishedList, MovingList } from "../../components/customerOperations/ReplyBoardList";
 import { attentionUncertaintyCopy } from "../../lib/attention";
@@ -25,20 +25,6 @@ type View = (typeof VIEWS)[number]["key"];
 
 /** One name for one list: the nav entry, this page's title and the Home's section all say 확인할 일 (UI/UX v2). */
 const TITLE = COPY.listTitle;
-/**
- * <b>Narrowing the list by what is written in it</b> (canonical mockup, 2026-10-02).
- *
- * <p>Over the rows this screen already holds, and over the three strings a row draws — the customer's
- * sentence, the line reviewnary adds, and where it came from. It is not a server search: this screen
- * reads a bounded slice (see {@code truncated}), and a box that searched beyond what the list holds
- * would return rows the count above it does not cover.
- */
-function matches(row: HomeWorkRow, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  return [row.title, row.said, row.line, row.source].some((v) => (v ?? "").toLowerCase().includes(q));
-}
-
 /**
  * <b>The queue</b> — everything waiting for the seller's decision, in one list.
  *
@@ -75,8 +61,15 @@ function matches(row: HomeWorkRow, query: string): boolean {
  * the Home now: no {@code item} is closed, {@code item=<key>} is that row, a key that matches nothing is closed,
  * and 닫기/Esc put it back. Closed, the list takes the width the pane was holding.
  */
+/** Rows per page here: deeper than the Home's ten, as deep as this screen's one read used to reach. */
+export const QUEUE_PAGE_SIZE = 50;
+
 export function OperationsCaseQueue({ now }: { now?: Date }) {
-  const [work, setWork] = useState<HomeWork | null | undefined>(undefined);
+  /* <b>내가 할 일 is the Home's list</b> (2026-11-10 review: 「홈에서 20건을 보고 메뉴의 ‘할 일’을 눌렀는데 다른 목록·숫자가
+     나오면 혼란스럽다」). It merged six reads on the screen while the Home read the server's board; now both read the
+     same board and the same pages — the same rows, counts, buckets, 「—」 and 「N+」. Only the depth differs: a page here
+     is {@link QUEUE_PAGE_SIZE} rows. The view and the order are the Home's own address keys (`?work=`, `?workSort=`). */
+  const work = useHomeBoard(true, QUEUE_PAGE_SIZE);
   const [reviewWork, setReviewWork] = useState<ReviewWorkView | null>(null);
   const [board, setBoard] = useState<ReplyBoard | null>(null);
   // Bumped when a set-aside review is restored below, so it comes back into this list without a reload.
@@ -91,48 +84,22 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
 
   useEffect(() => {
     let live = true;
-    const nothing = <T,>() => (p: Promise<T>) => p.catch(() => null);
-    Promise.all([
-      nothing<Awaited<ReturnType<typeof api.getCustomerOperationsHome>>>()(api.getCustomerOperationsHome()),
-      nothing<Awaited<ReturnType<typeof api.getCustomerOperationsDecisions>>>()(api.getCustomerOperationsDecisions()),
-      nothing<Awaited<ReturnType<typeof api.getOperationsHomeStrict>>>()(api.getOperationsHomeStrict()),
-      nothing<Awaited<ReturnType<typeof api.getInquiryQueueStrict>>>()(
-        api.getInquiryQueueStrict({ size: HOME_QUEUE_SIZE }),
-      ),
-      // The review half, whole (UI/UX v2 Phase 3): every undecided 확인 필요 review, and the seller's own reply work
-      // before approval — the items the 리뷰 screen's 「내 답변 작업」 used to be the only home of.
-      nothing<Awaited<ReturnType<typeof api.getReviewWorkStrict>>>()(
-        Promise.resolve().then(() => api.getReviewWorkStrict()),
-      ),
-      // 진행 중 · 끝난 일 from the delegate lane; an install without one reads as empty lists.
-      nothing<ReplyBoard>()(Promise.resolve().then(() => api.getReplyBoard())),
-      // Inquiries whose next-check day has come (2026-11-03 sixth review) — a check, never a send.
-      nothing<Awaited<ReturnType<typeof api.getInquiryFollowUps>>>()(
-        Promise.resolve().then(() => api.getInquiryFollowUps()),
-      ),
-    ]).then(([co, decisions, ops, queue, reviewWork, board, followUps]) => {
-      if (!live) return;
-      setBoard(board);
-      if (!co && !decisions && !ops && !queue && !reviewWork) {
-        setWork(null);
-        return;
-      }
-      // The deep case list replaces the Home's briefing slice; everything else is read exactly as the Home reads it.
-      const merged = co ? (decisions ? { ...co, decisions } : co) : null;
-      setWork(mergeHomeWork(merged, ops, queue, now, reviewWork, followUps));
-      setReviewWork(reviewWork);
-    });
+    // The seller's own reply work is read for two facts beside the list: an account whose work cannot be attributed
+    // (it declines rather than reading as none), and the accounts 끝난 일 restores into. The rows come from the board.
+    void Promise.resolve()
+      .then(() => api.getReviewWorkStrict())
+      .then((v) => live && setReviewWork(v))
+      .catch(() => live && setReviewWork(null));
+    // 진행 중 · 끝난 일 from the delegate lane; an install without one reads as empty lists.
+    void Promise.resolve()
+      .then(() => api.getReplyBoard())
+      .then((v) => live && setBoard(v))
+      .catch(() => live && setBoard(null));
     return () => {
       live = false;
     };
-  }, [now, reloadKey]);
+  }, [reloadKey]);
 
-  /* The search narrows the POPULATION, not just what is drawn: the count beside the title and the number on
-     every tab are claims about this list, and a list that draws three rows under 「46건」 is two answers to one
-     question. Same reason the tabs count what they will show. */
-  const allRows = (work?.rows ?? []).filter((r) => matches(r, query));
-  // A view of the one list (UI/UX v2 Phase 4): the same rows in the same order, narrowed by a fact each row carries.
-  const filter = workFilterOf(params.get("filter"));
   const view: View = VIEWS.find((v) => v.key === params.get("view"))?.key ?? "todo";
   const setView = (key: View) =>
     setParams(
@@ -141,18 +108,14 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
         if (key === "todo") next.delete("view");
         else next.set("view", key);
         next.delete("item");
-        next.delete("filter");
         return next;
       },
       { replace: true },
     );
-  const rows = allRows.filter(WORK_FILTERS.find((f) => f.key === filter)!.test);
-  // The counts are 할 일's one count (`todayWork`): the backlog is listed below its own line, never in the numbers.
-  const today = todayWork(allRows, now ?? new Date());
   const key = params.get("item");
   // Only what the address names — see the docblock. The first-row fallback this screen used is gone, and with
   // it the last caller of the helper that held it.
-  const selected = wide && key ? (rows.find((r) => r.key === key) ?? null) : null;
+  const selected = wide && key ? (work.rows.find((r) => r.key === key) ?? null) : null;
   const close = () =>
     setParams(
       (prev) => {
@@ -162,18 +125,6 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       },
       { replace: true },
     );
-  const setFilter = (key: string) =>
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (key === "all") next.delete("filter");
-        else next.set("filter", key);
-        next.delete("item");
-        return next;
-      },
-      { replace: true },
-    );
-
   // MasterDetail과 같은 술어다: rail은 옆에 페이지가 서 있을 때만 rail이다 ({@code LayoutKind}).
   const rail = wide && selected !== null;
 
@@ -196,7 +147,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
             rail이 되고, 거기서 28px은 세 줄짜리 행 위의 현판이 된다 — 문의가 {@code compact}로 같은
             전환을 이미 한다. 한 규칙이고, 두 치수가 아니다. */}
         <h1 className={`font-bold tracking-tight text-ink ${rail ? "text-section" : "text-title"}`}>{TITLE}</h1>
-        {view === "todo" && work && (work.rows.length > 0 || query) ? (
+        {view === "todo" && (work.rows.length > 0 || query) ? (
           <button
             type="button"
             aria-label={searching ? "검색 닫기" : "검색"}
@@ -227,7 +178,8 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
       {/* A switch between three views of 할 일 — the groove, as 리뷰 | 문의 (2026-10-28). */}
       <div role="group" aria-label="할 일 나누어 보기" className="flex w-max gap-0.5 rounded-xl bg-well p-0.5 shadow-[var(--press-groove)]">
         {VIEWS.map((v) => {
-          const count = v.key === "todo" ? (work ? today.length : null) : v.key === "moving" ? (board?.moving.length ?? null) : null;
+          // 내가 할 일 says the Home's number, with the Home's 「N+」 and 「—」.
+          const count = v.key === "todo" ? (work.board ? tallyText(work.board.todo.total) : null) : v.key === "moving" ? (board?.moving.length.toLocaleString("ko-KR") ?? null) : null;
           return (
             <button
               key={v.key}
@@ -240,10 +192,7 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
             >
               {v.label}
               {count != null ? (
-                <span className="ml-1 font-medium tabular-nums">
-                  {count.toLocaleString("ko-KR")}
-                  {v.key === "todo" && work?.truncated ? "+" : ""}
-                </span>
+                <span className="ml-1 font-medium tabular-nums">{count}</span>
               ) : null}
             </button>
           );
@@ -255,7 +204,10 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
         <FinishedList
           rows={board?.done ?? []}
           accounts={reviewWork?.committed ?? []}
-          onRestored={() => setReloadKey((n) => n + 1)}
+          onRestored={() => {
+            setReloadKey((n) => n + 1);
+            work.reload();
+          }}
           now={now}
         />
       ) : null}
@@ -279,7 +231,6 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
         />
       ) : null}
 
-      {work === undefined ? <p className="text-sm text-muted">불러오는 중이에요.</p> : null}
 
       {/* An account whose reply work cannot be attributed declines to answer rather than reading as 「no work」 —
           the same copy the 리뷰 screen's 「내 답변 작업」 used, moved with the work (UI/UX v2 Phase 3). */}
@@ -295,92 +246,21 @@ export function OperationsCaseQueue({ now }: { now?: Date }) {
         ) : null;
       })}
 
-      {/* A failed read says so. An empty list and a list we could not read are different sentences, and only one of
-          them is good news. */}
-      {work === null ? (
-        <p className="text-sm text-bad" role="alert">
-          할 일 목록을 불러오지 못했어요.
-        </p>
+      {/* Praise approvals are approved together, from the same count the Home shows (2026-11-10). */}
+      {!query.trim() && (work.view === "all" || work.view === "approvable") && work.board ? (
+        <PraiseBundle count={work.board.todo.praiseApprovable.count ?? 0} />
       ) : null}
 
-      {/* What 리뷰 counts in this list. It used to stand as a paragraph under the Home's five-row brief, where
-          neither reference puts an explanatory sentence; the rule is about the whole queue, so it stands on the
-          screen that owns the whole queue — beside the chips that count it. Nothing about the rule changed. */}
-      {/*
-        <b>Removed, not folded</b> (visual review, 1366×768, 2026-10-01).
-
-        <p>A sentence used to stand here: 「리뷰는 확인 필요 중 아직 판단하지 않은 것과, 답변하기로 정했지만
-        아직 승인하지 않은 것을 셉니다.」 Measured on the rendered screen, it and the scope line above it
-        pushed the first row to y=258 — a third of a 768px fold spent on explanation before any work.
-
-        <p>Folding it was tried first and made it WORSE: a disclosure summary row is taller than the one
-        line of text it replaced (y=258 → y=271). Then the real answer showed itself — <b>the sentence is
-        the chips</b>. It says 리뷰 counts 미판단 확인 필요 plus 답변 정함 미승인, and the chips two rows
-        below decompose exactly that: 리뷰 확인 12 · 승인 대기 4 · 초안 필요 4. §8-A-2 is explicit that the
-        population breakdown is the filter chips' alone, because a second decomposition in prose makes the
-        seller do arithmetic to confirm two lines describe one list. The prose was that second
-        decomposition, and it is gone. Nothing a seller can act on was in it.
-      */}
-
-      {work && allRows.length > 0 ? (
-        <div className="-mx-2 flex flex-wrap items-center gap-1" role="group" aria-label="할 일 보기">
-          {WORK_FILTERS.map((f) => (
-            <FilterTab key={f.key} pressed={filter === f.key} empty={today.filter(f.test).length === 0} onClick={() => setFilter(f.key)}>
-              {f.label} {today.filter(f.test).length.toLocaleString("ko-KR")}
-            </FilterTab>
-          ))}
-        </div>
-      ) : null}
-
-      {work && allRows.length === 0 ? (
-        <p className="break-keep leading-relaxed text-ink">
-          {query.trim() ? "찾는 내용이 있는 문의나 리뷰가 없어요." : "지금 확인이 필요한 문의나 리뷰가 없어요."}
-        </p>
-      ) : null}
-      {work && allRows.length > 0 && rows.length === 0 ? (
-        // A search that found rows outside the chip says where they are (2026-10-28) — 「이 보기에 해당하는 일이
-        // 없어요」 under a search with three matches in 전체 read as 「찾는 것이 없다」.
-        query.trim() ? (
-          <p className="break-keep text-sm text-muted">
-            이 보기에는 없고, 전체에서 {allRows.length.toLocaleString("ko-KR")}건 찾았어요.{" "}
-            <button
-              type="button"
-              onClick={() => setFilter("all")}
-              className="font-semibold text-brand-700 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
-            >
-              전체에서 보기
-            </button>
-          </p>
-        ) : (
-          <p className="break-keep text-sm text-muted">이 보기에 해당하는 일이 없어요.</p>
-        )
-      ) : null}
-      {work && !query.trim() && (filter === "all" || filter === "approve") ? (
-        <PraiseBundle count={today.filter(isPraiseApproval).length} />
-      ) : null}
-
-      {work && rows.length > 0 ? (
-        <section aria-label={TITLE}>
-          <WorkRows
-            rows={rows}
-            selectedKey={selected?.key ?? null}
-            wide={wide}
-            search={location.search}
-            now={now}
-            ariaLabel={TITLE}
-            dense
-            reading="rail"
-          />
-          {/* A read that reported more than it returned. The shortfall means this list is deeper than one read
-              reaches — not that the rest is somewhere else — so it says so instead of passing its length off as
-              the total. How many more it cannot say: the reads that overflowed count different populations. */}
-          {work.truncated && filter === "all" ? (
-            <p className="mt-3 break-keep text-sm text-muted">
-              한 번에 {rows.length.toLocaleString("ko-KR")}건까지 보여 드려요. 처리하면 다음 건이 올라와요.
-            </p>
-          ) : null}
-        </section>
-      ) : null}
+      {/* The Home's list itself: its chips, 「오늘 확인 모두」, pages, failure and partial notices — one read, one answer. */}
+      <HomeWorkList
+        state={work}
+        selection={{ wide, selectedKey: selected?.key ?? null, search: location.search }}
+        now={now ?? new Date()}
+        emptySentence="지금 확인이 필요한 문의나 리뷰가 없어요."
+        query={query}
+        reading="rail"
+        title={null}
+      />
 
       </>
       ) : null}

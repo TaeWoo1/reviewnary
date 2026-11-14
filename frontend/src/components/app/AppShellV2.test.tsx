@@ -30,7 +30,7 @@ afterEach(() => {
 });
 
 describe("AppShellV2 — navigation surfaces", () => {
-  it("renders the side nav from the shared model", () => {
+  it("renders the top bar menu from the shared model", () => {
     renderShell();
     const sideNav = screen.getByRole("navigation", { name: "주 메뉴" });
     for (const item of NAV_ITEMS) {

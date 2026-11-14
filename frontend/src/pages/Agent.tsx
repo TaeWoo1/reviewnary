@@ -232,7 +232,7 @@ export function Agent() {
           conversation deliberately does not own. */}
       <p className="text-base text-muted">
         문장으로 물어보는 대화는{" "}
-        <Link to="/" className="font-semibold text-brand-700 hover:underline">홈 대화</Link>
+        <Link to="/work" className="font-semibold text-brand-700 hover:underline">할 일 화면의 대화</Link>
         에서 이어져요.
       </p>
 

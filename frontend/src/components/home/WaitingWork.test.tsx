@@ -42,7 +42,7 @@ describe("기다리는 일", () => {
     expect(links[1]).toHaveTextContent("조치 진행 중");
     expect(links[1]).toHaveTextContent("11월 5일 (목) 다시 확인");
     expect(links[2]).toHaveTextContent("고객 회신 대기");
-    expect(screen.getByText(/지금은 사장님 차례가 아니에요/)).toBeInTheDocument();
+    expect(screen.getByText(/답변 등록이나 후속 처리가 남은 일이에요/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /보내|등록하기|답변/ })).toBeNull();
   });
 

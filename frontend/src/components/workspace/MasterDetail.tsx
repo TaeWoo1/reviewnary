@@ -236,7 +236,9 @@ export function MasterDetail({
             // Under a docked composer the bottom air is twice its 32px fade (2026-10-28): at md:pb-8 the Home's last
             // links ended inside the fade, half hidden and covered when focused — the rule ConversationWorkspace's own
             // scroller already keeps.
-            rail ? "px-4 pb-8 pt-6" : `px-4 pb-28 pt-4 md:px-8 md:pt-6 ${footer ? "md:pb-16" : "md:pb-8"}`
+            // `scroll-pb-20` below md: the phone's fixed bottom menu (56px) covers this scroller's foot, so what the
+            // browser scrolls into view by itself (keyboard focus, find-in-page) stopped behind it (390×844, 2026-11-14).
+            rail ? "px-4 pb-8 pt-6" : `scroll-pb-20 px-4 pb-28 pt-4 md:scroll-pb-0 md:px-8 md:pt-6 ${footer ? "md:pb-16" : "md:pb-8"}`
           }`}
           data-testid="master-list"
         >

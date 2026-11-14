@@ -1533,6 +1533,12 @@ export interface ReviewReplyPrep {
   draftAnswerBasis: string | null;
   /** The seller-facing sentence for `draftAnswerBasis`, chosen by the backend. Null when it is. */
   draftAnswerBasisNote: string | null;
+  /**
+   * Why the reply agent's latest run handed this review to a person (`CATEGORY_S`, `UNSURE_AMBIGUOUS`, …), or null
+   * (2026-11-09). With no draft, the panel keeps this reason in view and leaves the editor empty: the template goes in
+   * only when the seller asks for it. Absent from an older server.
+   */
+  agentHandoffReason?: string | null;
 }
 
 /**
@@ -1774,7 +1780,12 @@ export interface ReviewKnowledgeGapView {
  * vendor, a refused promise) and never a statement about the seller's knowledge.
  */
 export interface GeneratedReviewDraftView {
-  draft: ReviewReplyDraft;
+  /**
+   * Null when the reply agent wrote no draft — handed to a person, held, skipped, still running or failed — and then
+   * `unavailableMessage` says why (`ReviewDraftComposer.agentNoDraft`). Typed non-null before 2026-11-09, which let the
+   * screen read a body that was not there and print 「쓰지 못했어요」 beside the real reason.
+   */
+  draft: ReviewReplyDraft | null;
   authorKind: string;
   answerBasis: "GROUNDED" | "PAST_ANSWER" | "THANKS_ONLY" | "NO_ANSWER_BASIS" | string;
   answerBasisNote: string;
@@ -2436,6 +2447,11 @@ export type OpenQuestionResolution = "ANSWERED" | "NOT_NEEDED" | "ELSEWHERE";
 export interface PublishCapabilityView {
   executionEnabled: boolean;
   replyAdapterChannelCodes: string[];
+  /**
+   * Channels served only by a development simulation (`sellerops.dev.fake-channel`, 2026-11-09) — a subset of
+   * `replyAdapterChannelCodes`. `executionEnabled` stays false beside it. Absent on an older backend: read as none.
+   */
+  simulatedChannelCodes?: string[];
 }
 
 /**

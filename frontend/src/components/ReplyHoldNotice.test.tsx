@@ -42,8 +42,8 @@ const unbacked: ReplyHold = {
   ...base,
   codes: ["UNSUPPORTED_PROMISE"],
   needs: "EXCEPTION",
-  headline: "등록된 정책·자료에 근거가 없는 약속이 있어요.",
-  reasons: ["지금 등록된 정책·안내에는 「무료 반품」 부분의 근거가 없어요."],
+  headline: "답변에 연결된 근거로 확인되지 않은 약속이 있어요.",
+  reasons: ["답변에 연결된 근거 자료에서 「무료 반품」 부분을 확인하지 못했어요."],
   figures: [],
   unbacked: ["무료 반품"],
 };

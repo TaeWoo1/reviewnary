@@ -5,6 +5,7 @@ import { GroundedReviewDraft } from "./GroundedReviewDraft";
 import { ReplyHoldNotice } from "./ReplyHoldNotice";
 import { DelegatedReplyControls } from "./reviews/DelegatedReplyControls";
 import { Disclosure } from "./ui/Disclosure";
+import { HANDOFF_WORD } from "./customerOperations/AgentHandoffs";
 import { api } from "../lib/apiClient";
 import { copyText } from "../lib/clipboard";
 import { SecureRandomUnavailableError, newCommandId } from "../lib/commandId";
@@ -91,6 +92,50 @@ interface OutcomeAttempt {
  * (no stored draft, so no author) got it too. Silence is the honest report for an unrecorded author,
  * and `ReviewReplyPrepView.draftAuthorKind` says the same thing on its own side of the wire.
  */
+
+/**
+ * The line under 확정 / 확정 풀기 when the server refused (2026-11-09). A 409 is the review's own state, and every one the
+ * backend raises here is a sentence written for the seller — 「채널에 이미 답변이 등록된 리뷰예요」, 「이미 최신 초안이
+ * 있어요」, 「담당자에게 맡긴 리뷰예요」, a forbidden phrase. Before this only a message containing 「확인」 was treated as
+ * one, and every other refusal read 「확정하지 못했어요. 다시 눌러 주세요」 — a press that cannot work. A recheck hold's
+ * reasons are drawn above the reply, so for those the line only points there. Anything else is the network: press again.
+ */
+export function approvalFailureMessage(state: "APPROVED" | "WITHDRAWN" | string, status: number | undefined,
+  message: string | undefined): string {
+  const said = (message ?? "").trim();
+  if (status === 409 && state === "APPROVED" && said.includes("확인")) {
+    return "다시 확인이 필요해 확정하지 않았어요. 위의 안내를 확인해 주세요.";
+  }
+  if (status === 409 && said) return said;
+  if (status === 409) {
+    return state === "APPROVED"
+      ? "이 리뷰의 상태가 바뀌어 확정하지 않았어요. 새로고침해 확인해 주세요."
+      : "이 리뷰의 상태가 바뀌어 확정을 풀지 않았어요. 새로고침해 확인해 주세요.";
+  }
+  return state === "APPROVED" ? "확정하지 못했어요. 다시 눌러 주세요." : "확정을 풀지 못했어요. 다시 눌러 주세요.";
+}
+
+/**
+ * What the editor starts with (2026-11-09, demo_seller_validation_v1 §7.11): the saved draft; else the rule-based
+ * suggestion — except on a review the reply agent handed to a person, where the editor starts empty and the template
+ * goes in only when the seller asks for it. A template that filled itself in and saved itself there was shown as the
+ * seller's own reply.
+ */
+export function seededBody(prep: Pick<ReviewReplyPrep, "draft" | "suggestion" | "agentHandoffReason">): string {
+  if (prep.draft != null) return prep.draft.body;
+  if (prep.agentHandoffReason) return "";
+  return prep.suggestion.body;
+}
+
+/** Whether the panel saves the suggestion it seeded before anyone typed — never on a review handed to a person. */
+export function savesSeededSuggestion(
+  prep: Pick<ReviewReplyPrep, "draft" | "suggestion" | "agentHandoffReason" | "capabilities">,
+  disposition: TriageDisposition | null | undefined,
+): boolean {
+  return prep.draft == null && !prep.agentHandoffReason && prep.capabilities.canSave
+    && disposition === "RESPONSE_NEEDED" && prep.suggestion.body.trim() !== "";
+}
+
 export function draftProvenanceNote(authorKind: string | null, approved: boolean): string | null {
   void approved;
   // <b>누가 썼는지가 아니라 무엇에 근거했는지</b> (리뷰 canonical mockup, 2026-10-06 — 승인된 copy).
@@ -379,10 +424,11 @@ export function VocItemReplyPrep({
       }
       // Seed the editor once: the saved draft if there is one, else the suggestion. Never
       // over an edit in progress — see `dirty`.
-      setBody((current) => (current === "" ? (next.draft?.body ?? next.suggestion.body) : current));
-      // A suggestion nobody saved is saved like any edit: the service prepares the draft, the seller only judges it.
-      if (next.draft == null && next.capabilities.canSave && dispositionRef.current === "RESPONSE_NEEDED"
-          && next.suggestion.body.trim() !== "") {
+      setBody((current) => (current === "" ? seededBody(next) : current));
+      // A suggestion nobody saved is saved like any edit: the service prepares the draft, the seller only judges it. The
+      // server stamps an unchanged template as the template's, not the seller's (2026-11-09) — and a review the agent
+      // handed to a person gets no template unless the seller asks for one.
+      if (savesSeededSuggestion(next, dispositionRef.current)) {
         setDirty(true);
       }
     })();
@@ -488,7 +534,7 @@ export function VocItemReplyPrep({
   async function refresh() {
     const next = await load();
     if (next != null && !dirtyRef.current) {
-      setBody(next.draft?.body ?? next.suggestion.body);
+      setBody(seededBody(next));
     }
     void loadHold();
   }
@@ -620,20 +666,15 @@ export function VocItemReplyPrep({
       await refresh();
       if (state === "APPROVED") onApproved?.();
     } catch (e) {
-      // A recheck hold answers 409 with its reasons; they are drawn above the reply, so the line here only points there.
-      const held = state === "APPROVED" && isAxiosError(e) && e.response?.status === 409
-        && ((e.response?.data as { message?: string } | undefined)?.message ?? "").includes("확인");
-      if (held) {
+      const status = isAxiosError(e) ? e.response?.status : undefined;
+      const message = isAxiosError(e) ? (e.response?.data as { message?: string } | undefined)?.message : undefined;
+      // Any 409 is the review's own state, not the network: the same press cannot succeed, so this attempt is spent and
+      // the hold is re-read — a recheck hold draws its reasons above the reply.
+      if (status === 409) {
         attempt.current = null;
-        await loadHold();
+        if (state === "APPROVED") await loadHold();
       }
-      setFailed(
-        held
-          ? "다시 확인이 필요해 확정하지 않았어요. 위의 안내를 확인해 주세요."
-          : state === "APPROVED"
-            ? "확정하지 못했어요. 다시 눌러 주세요."
-            : "확정을 풀지 못했어요. 다시 눌러 주세요.",
-      );
+      setFailed(approvalFailureMessage(state, status, message));
     } finally {
       inFlight.current = false;
       setBusy(null);
@@ -869,6 +910,32 @@ export function VocItemReplyPrep({
         )}
         {draftProvenanceNote(prep.draftAuthorKind, approved) ? (
           <p className="text-sm text-muted">{draftProvenanceNote(prep.draftAuthorKind, approved)}</p>
+        ) : null}
+        {!approved && draft == null && prep.agentHandoffReason ? (
+          <div data-testid="handoff-no-template" role="note" className="flex flex-col gap-2 rounded-lg border border-line p-3">
+            <p className="text-sm text-ink">
+              AI가 이 리뷰를 사람에게 넘겼어요 · {(HANDOFF_WORD[prep.agentHandoffReason] ?? HANDOFF_WORD.PERSON_REVIEW).label}.{" "}
+              {(HANDOFF_WORD[prep.agentHandoffReason] ?? HANDOFF_WORD.PERSON_REVIEW).note}
+            </p>
+            <p className="text-sm text-muted">
+              기본 문구를 자동으로 넣지 않았어요. 직접 쓰거나, 기본 문구를 불러와 고쳐 써 주세요.
+            </p>
+            {canSave && body === "" && prep.suggestion.body.trim() !== "" ? (
+              <button
+                type="button"
+                data-testid="handoff-load-template"
+                onClick={() => {
+                  setBody(prep.suggestion.body);
+                  setDirty(true);
+                  setSaveFailed(false);
+                  editorRef.current?.focus();
+                }}
+                className="self-start rounded-lg border border-line px-3 py-1.5 text-sm text-ink"
+              >
+                기본 문구 불러오기
+              </button>
+            ) : null}
+          </div>
         ) : null}
         {approved ? (
           <p

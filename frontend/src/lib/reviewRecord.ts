@@ -34,7 +34,7 @@ const REVIEW_RECORD_CHANNELS: Record<string, { note: string }> = {
   NAVER: {
     note:
       "수집한 리뷰를 읽고, 확인이 필요한 리뷰부터 볼 수 있어요. " +
-      "답글은 스마트스토어센터에서 직접 작성하며, reviewnary는 대신 작성하거나 등록하지 않아요.",
+      "답글 초안은 여기서 준비하고, 네이버 리뷰 답글 등록은 스마트스토어센터에서 직접 해요.",
   },
   COUPANG: {
     note:

@@ -70,6 +70,12 @@ const FALLBACK = { label: "직접 확인 필요", note: "AI가 이 리뷰를 사
  * <b>「AI가 사람에게 넘긴 리뷰」</b> (review 2026-10-28: 「넘긴 리뷰가 화면에 안 보인다」). What the reply agent would not
  * draft — a harm, a legal signal, a review to report, or a draft that still failed the standard — stays here until the
  * seller answers it. Drawn only when there is something; a failed read draws nothing.
+ *
+ * <p><b>Short on the Home, whole one press away</b> (2026-11-10 review: on a phone this section filled the first screen,
+ * and the same reviews are listed again in 할 일 below). A harm or a legal signal keeps its own line, at the top, and
+ * the duty it may carry is said once under them — not once per review. Every other reason is folded into one line that
+ * names how many and why, and opens to the same rows with their notes. Nothing is dropped: each row still opens its
+ * review, and every note is still on the screen behind the fold.
  */
 export function AgentHandoffs() {
   const [rows, setRows] = useState<ReplyHandoffView[] | null>(null);
@@ -87,43 +93,87 @@ export function AgentHandoffs() {
   }, []);
 
   if (!rows || rows.length === 0) return null;
-  const ordered = [...rows].sort(
-    (a, b) => Number((HANDOFF_WORD[b.reason ?? ""] ?? FALLBACK).urgent) - Number((HANDOFF_WORD[a.reason ?? ""] ?? FALLBACK).urgent),
+  const wordOf = (row: ReplyHandoffView) => HANDOFF_WORD[row.reason ?? ""] ?? FALLBACK;
+  const urgent = rows.filter((row) => wordOf(row).urgent);
+  const rest = rows.filter((row) => !wordOf(row).urgent);
+  // The duty each urgent reason carries, said once however many reviews share it.
+  const duties = [...new Map(urgent.map((row) => [wordOf(row).label, wordOf(row).note])).entries()];
+  const drafted = urgent.some((row) => row.earlierDraft);
+  const restKinds = [...new Map(rest.map((row) => [wordOf(row).label, 0])).keys()].map(
+    (label) => `${label} ${rest.filter((row) => wordOf(row).label === label).length}`,
   );
+
   return (
     <section aria-label="AI가 사람에게 넘긴 리뷰" className="rounded-2xl border border-line bg-surface p-3" data-testid="agent-handoffs">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <h2 className="text-section font-bold tracking-tight text-ink">AI가 사람에게 넘긴 리뷰</h2>
         <span className="text-sm tabular-nums text-muted">{rows.length.toLocaleString("ko-KR")}건</span>
       </div>
-      <ul className="mt-2 divide-y divide-line">
-        {ordered.map((row) => {
-          const word = HANDOFF_WORD[row.reason ?? ""] ?? FALLBACK;
-          return (
-            <li key={row.reviewId}>
-              <Link
-                to={`/reviews/reply/${row.reviewId}`}
-                className="block break-keep py-2 text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700"
-              >
-                <span className="flex items-baseline gap-2">
-                  <span className={`shrink-0 text-sm font-semibold ${word.urgent ? "text-bad" : "text-brand-700"}`}>{word.label}</span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-muted">{row.preview ?? ""}</span>
-                  <span className="shrink-0 text-muted" aria-hidden="true">›</span>
-                </span>
-                {row.points && row.points.length > 0 ? (
-                  <span className="mt-0.5 block text-sm text-ink">AI가 읽은 점: {row.points.join(" · ")}</span>
-                ) : null}
-                <span className="mt-0.5 block text-sm text-muted">
-                  {row.unmet && row.unmet.length > 0 ? row.unmet.join(" ") : word.note}
-                </span>
-                {row.earlierDraft ? (
-                  <span className="mt-0.5 block text-sm text-muted">넘기기 전에 만든 초안이 있어요. 그대로 쓰기 전에 다시 확인해 주세요.</span>
-                ) : null}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      {urgent.length > 0 ? (
+        <>
+          <ul className="mt-1 divide-y divide-line">
+            {urgent.map((row) => (
+              <li key={row.reviewId}>
+                <HandoffLink row={row} word={wordOf(row)} />
+              </li>
+            ))}
+          </ul>
+          <div className="mt-1 space-y-0.5 break-keep rounded-lg bg-bad/5 px-3 py-2 text-sm text-ink" data-testid="handoff-duty">
+            {duties.map(([label, note]) => (
+              <p key={label}>
+                <span className="font-semibold text-bad">{label}</span> {note}
+              </p>
+            ))}
+            {/* A phone keeps the tag, which names itself; the sentence is the PC's longer reading of it. */}
+            {drafted ? <p className="hidden text-muted sm:block">「넘기기 전 초안」은 사람에게 넘기기 전에 만든 초안이에요. 그대로 쓰기 전에 다시 확인해 주세요.</p> : null}
+          </div>
+        </>
+      ) : null}
+      {rest.length > 0 ? (
+        <details className="group mt-1" data-testid="handoff-rest" open={urgent.length === 0 && rest.length <= 2 ? true : undefined}>
+          <summary className="flex cursor-pointer list-none items-baseline gap-2 py-2 text-sm text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700">
+            <span className="shrink-0 font-semibold text-ink">
+              {urgent.length > 0 ? "다른 이유로 넘긴 리뷰" : "넘긴 리뷰"} {rest.length.toLocaleString("ko-KR")}건
+            </span>
+            <span className="min-w-0 flex-1 truncate">{restKinds.join(" · ")}</span>
+            <span className="shrink-0 font-semibold text-brand-700 group-open:hidden">펼치기</span>
+            <span className="hidden shrink-0 font-semibold text-brand-700 group-open:inline">접기</span>
+          </summary>
+          <ul className="divide-y divide-line">
+            {rest.map((row) => (
+              <li key={row.reviewId}>
+                <HandoffLink row={row} word={wordOf(row)} withNote />
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </section>
+  );
+}
+
+function HandoffLink({ row, word, withNote = false }: { row: ReplyHandoffView; word: { label: string; note: string; urgent: boolean }; withNote?: boolean }) {
+  return (
+    <Link
+      to={`/reviews/reply/${row.reviewId}`}
+      className="block break-keep py-2 text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700"
+    >
+      <span className="flex items-baseline gap-2">
+        <span className={`shrink-0 text-sm font-semibold ${word.urgent ? "text-bad" : "text-brand-700"}`}>{word.label}</span>
+        <span className="min-w-0 flex-1 truncate text-sm text-muted">{row.preview ?? ""}</span>
+        {row.earlierDraft ? <span className="shrink-0 rounded bg-canvas px-1.5 text-xs text-muted">넘기기 전 초안</span> : null}
+        <span className="shrink-0 text-muted" aria-hidden="true">›</span>
+      </span>
+      {row.points && row.points.length > 0 ? (
+        // What the AI read is on the review's own screen; a phone keeps the label and the customer's words only.
+        <span className="mt-0.5 hidden text-sm text-muted sm:block">AI가 읽은 점: {row.points.join(" · ")}</span>
+      ) : null}
+      {withNote ? (
+        <span className="mt-0.5 block text-sm text-muted">{row.unmet && row.unmet.length > 0 ? row.unmet.join(" ") : word.note}</span>
+      ) : null}
+      {withNote && row.earlierDraft ? (
+        <span className="mt-0.5 block text-sm text-muted">넘기기 전에 만든 초안이 있어요. 그대로 쓰기 전에 다시 확인해 주세요.</span>
+      ) : null}
+    </Link>
   );
 }

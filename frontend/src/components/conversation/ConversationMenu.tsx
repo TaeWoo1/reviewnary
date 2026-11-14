@@ -63,13 +63,13 @@ export function ConversationMenu() {
 
   if (!conversation) return null;
   // The thread opens in the AI 담당자 panel beside the page (2026-10-28) — 오늘 stays the work list. Without a panel
-  // (a page outside the shell), the conversation's own screen is still `/`.
+  // (a page outside the shell), the conversation's own screen is `/work` (할 일; 홈 is CS 현황 since 2026-11-13).
   const goHome = () => {
     if (panel) {
       panel.openPanel();
       return;
     }
-    if (location.pathname !== "/") navigate("/");
+    if (location.pathname !== "/work") navigate("/work");
   };
 
   return (

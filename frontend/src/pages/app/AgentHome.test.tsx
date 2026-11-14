@@ -11,6 +11,9 @@ import { AgentHome, greetingLine, contextStrip } from "./AgentHome";
 import { agentTurn } from "../../test/conversationFixtures";
 import type { MetricKpi, OverviewResponse } from "../../lib/types";
 import { COPY } from "../../lib/copy/customerOps";
+import { fixture, serveFromReads } from "../../test/homeBoardFake";
+import type { CustomerOperationsHome } from "../../lib/customerOperationsTypes";
+import type { OperationsHome } from "../../lib/types";
 
 const getOverviewStrict = vi.fn();
 const getProactiveCases = vi.fn();
@@ -20,6 +23,8 @@ const getReviewIssuesStrict = vi.fn();
 const getOperationsHomeStrict = vi.fn();
 const recordHomeOpened = vi.fn();
 const getCustomerOperationsHome = vi.fn();
+// The Home's own two reads (2026-11-10), served from the fixtures each test sets up — see `serveFromReads`.
+const board = vi.hoisted(() => ({ getHomeBoard: vi.fn(), getHomeWork: vi.fn() }));
 vi.mock("../../../lib/bridge/localAgentHint", () => ({ probeLocalAgent: async () => "PAIRED" }));
 vi.mock("../../lib/apiClient", () => ({
   api: {
@@ -34,6 +39,8 @@ vi.mock("../../lib/apiClient", () => ({
     // The return-visit signal: fire-and-forget, awaited by nothing, rendered by nothing.
     recordHomeOpened: () => recordHomeOpened(),
     getCustomerOperationsHome: () => getCustomerOperationsHome(),
+    getHomeBoard: () => board.getHomeBoard(),
+    getHomeWork: (p: unknown) => board.getHomeWork(p),
   },
   getToken: () => null,
 }));
@@ -82,7 +89,9 @@ const CASE = {
 
 const MORNING = new Date("2026-08-27T09:30:00+09:00");
 
+let shownNow = MORNING;
 function renderHome(now = MORNING) {
+  shownNow = now;
   return render(
     <MemoryRouter>
       <AgentPanelProvider>
@@ -176,6 +185,15 @@ const HOME = {
 } as never;
 
 beforeEach(() => {
+  // The Home's board, served from the same three reads the rest of this file sets up (2026-11-10).
+  serveFromReads({ ...board, getInquiryQueueStrict } as never, async () => {
+    const co = await fixture<CustomerOperationsHome>(getCustomerOperationsHome);
+    return {
+      co: co && (co as { available?: boolean }).available !== false && "decisions" in co ? co : null,
+      ops: await fixture<OperationsHome>(getOperationsHomeStrict),
+      now: shownNow,
+    };
+  });
   window.localStorage.clear();
   getOverviewStrict.mockResolvedValue(overview());
   getProactiveCases.mockResolvedValue({ items: [CASE, { ...CASE, id: "case-2", subjectId: "i-2", snippet: "교환 가능한가요?" }], total: 2, high: 2 });
@@ -240,9 +258,11 @@ describe("home — 연결된 org이 보는 하나의 Home", () => {
     renderHome(new Date("2026-09-30T09:30:00+09:00"));
     expect(await screen.findByText("새로 할 일은 없어요.")).toBeInTheDocument();
     expect(screen.queryByText("합성-상품 설명이 헷갈려요.")).toBeNull();
-    expect(screen.getByText("할 일에서 보기 →").closest("p")?.textContent).toContain("지난 일 1건");
-    // And it is a ★1, so the line names it as one (owner, 2026-10-28): under the rule, not buried by it.
-    expect(screen.getByTestId("past-low-rated").textContent).toMatch(/그중 ★1–2 리뷰\s*1건/);
+    // The line opens the 지난 일 view of the Home's own list now (2026-11-10), rather than another screen.
+    // The band's 지난 일 cell (2026-11-10, mockup v5) carries the count and the way in.
+    expect(await screen.findByTestId("past-open")).toHaveAccessibleName("지난 일 1건 보기");
+    // And it is a ★1, so the cell names it as one (owner, 2026-10-28): under the rule, not buried by it.
+    expect(screen.getByTestId("past-low-rated").textContent).toMatch(/★1–2\s*리뷰\s*1/);
     expect(screen.getByTestId("today-summary").textContent).toMatch(/오늘 할 일\s*0/);
   });
 

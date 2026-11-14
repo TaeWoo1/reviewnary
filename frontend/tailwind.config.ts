@@ -91,12 +91,6 @@ export default {
         xl: "10px",
         "2xl": "12px",
       },
-      width: {
-        // 240 (UI System v2, Home visual target 2026-10-01). 232 was the contract's own figure and the
-        // target mockup measures 241 — one step on the 8px grid, and the rail now divides the 1600px
-        // screen where the mockup divides it.
-        sidebar: "240px",
-      },
       maxWidth: {
         /*
           <b>1280, not 1120</b> (product-owner decision, 2026-10-01; `docs/frontend/reviewnary_design.md` §2

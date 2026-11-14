@@ -46,6 +46,12 @@ vi.mock("../../lib/apiClient", () => ({
     markProactiveCaseOpened: vi.fn(),
     // The return-visit signal: fire-and-forget, awaited by nothing, rendered by nothing.
     recordHomeOpened: vi.fn(async () => {}),
+    // The Home's own two reads (2026-11-10): read whole, and nothing in them — an empty list that the server vouches for.
+    getHomeBoard: vi.fn(async () => (await import("../../test/homeBoardFake")).boardFrom([])),
+    getHomeWork: vi.fn(async (p: { bucket: never; sort: string }) => {
+      const fake = await import("../../test/homeBoardFake");
+      return fake.pageFrom([], fake.boardFrom([]), p);
+    }),
   },
   getToken: () => null,
 }));

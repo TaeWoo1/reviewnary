@@ -34,7 +34,7 @@ const WORD = "리뷰";
 
 type Sort = "attention" | "newest" | "lowest";
 type Reply = "pending" | "answered" | "unknown";
-type Days = 7 | 30;
+type Days = 1 | 7 | 30;
 
 /** The 답변 상태 filter: the channel's own statement, in the words the 문의 screen uses for the same fact. */
 const REPLY_WORD: Record<Reply, string> = { pending: "미답변", answered: "답변함", unknown: "답변 여부 모름" };
@@ -377,6 +377,8 @@ export function ReviewRecord({ targets, head }: { targets: ReviewAccount[]; head
           value={days === null ? ALL_DAYS : String(days)}
           options={[
             { value: ALL_DAYS, label: "전체 기간" },
+            // 「오늘」 is the list 홈's 「오늘 접수」 opens (2026-11-13): the same Korean day the number counts.
+            { value: "1", label: "오늘" },
             { value: "7", label: "최근 7일" },
             { value: "30", label: "최근 30일" },
           ]}
@@ -661,7 +663,7 @@ function parseReply(value: string | null): Reply | null {
 }
 
 function parseDays(value: string | null): Days | null {
-  return value === "7" ? 7 : value === "30" ? 30 : null;
+  return value === "1" ? 1 : value === "7" ? 7 : value === "30" ? 30 : null;
 }
 
 function normalizeChannel(value: string | null): string | null {

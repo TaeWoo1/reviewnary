@@ -159,6 +159,45 @@ describe("VocItemReplyPrep", () => {
     });
   });
 
+  /**
+   * A review the reply agent handed to a person (2026-11-09, demo_seller_validation_v1 §7.11): the template used to fill
+   * the editor and save itself, and the screen then called it 「직접 쓰거나 고친 답글이에요」 over a safety review no one
+   * had read. Now the editor starts empty, the reason stays in view, and nothing saves until the seller acts.
+   */
+  describe("a review the AI handed to a person", () => {
+    it("keeps the reason in view, leaves the editor empty and saves nothing by itself", async () => {
+      vi.mocked(api.saveReviewReplyDraft).mockResolvedValue({} as ReviewReplyDraft);
+      await renderPanel(prepView({ agentHandoffReason: "CATEGORY_S" }));
+      expect(screen.getByTestId("handoff-no-template").textContent).toContain("안전 관련");
+      expect(screen.getByLabelText("답글 내용")).toHaveValue("");
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 1600));
+      });
+      expect(api.saveReviewReplyDraft).not.toHaveBeenCalled();
+      expect(screen.queryByText("직접 쓰거나 고친 답글이에요.")).toBeNull();
+    });
+
+    it("puts the template in only when the seller asks, and only then saves it", async () => {
+      const user = userEvent.setup();
+      vi.mocked(api.saveReviewReplyDraft).mockResolvedValue({} as ReviewReplyDraft);
+      await renderPanel(prepView({ agentHandoffReason: "UNSURE_AMBIGUOUS" }));
+      await user.click(screen.getByTestId("handoff-load-template"));
+      expect(screen.getByLabelText("답글 내용")).toHaveValue("합성-추천-초안");
+      await user.tab();
+      await waitFor(() =>
+        expect(api.saveReviewReplyDraft).toHaveBeenCalledWith(ACCOUNT, REF, { body: "합성-추천-초안", baseVersion: 0 }),
+      );
+    });
+
+    it("an ordinary review still starts from the template and saves it (the server stamps it the template's)", async () => {
+      vi.mocked(api.saveReviewReplyDraft).mockResolvedValue({} as ReviewReplyDraft);
+      await renderPanel(prepView());
+      expect(screen.queryByTestId("handoff-no-template")).toBeNull();
+      expect(screen.getByLabelText("답글 내용")).toHaveValue("합성-추천-초안");
+      await waitFor(() => expect(api.saveReviewReplyDraft).toHaveBeenCalled(), { timeout: 3000 });
+    });
+  });
+
   it("shows the whole redacted body and seeds the editor from the suggestion", async () => {
     await renderPanel();
     expect(screen.getByText("합성-리뷰-본문: 배송이 너무 늦었어요")).toBeTruthy();

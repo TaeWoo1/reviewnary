@@ -63,7 +63,17 @@ export type WorkStateKey =
    * 처리는 끝났는데 고객에게는 덜 안내했다 — the registered answer was written before the seller recorded 「처리 완료」
    * (`InquiryFollowUpRow.waitingOn` `TOLD_BEHIND`). A check until the seller closes it; nothing is sent.
    */
-  | "TOLD_BEHIND";
+  | "TOLD_BEHIND"
+  /**
+   * 등록 직전에 멈췄다 — the reply was approved and its registration was refused by the check right before it, nothing
+   * was sent, and the seller has not yet fixed or decided (2026-11-14). The seller's work again, not a wait.
+   */
+  | "REGISTRATION_HELD"
+  /**
+   * 확정 전 검사에서 멈췄다 — a draft (review or inquiry) the check before approval held, and the seller has not yet fixed
+   * or decided (2026-11-14 review). 확정 is refused until then, so the row is 판단 필요, not 승인 가능.
+   */
+  | "DRAFT_HELD";
 
 export interface WorkStateWord {
   text: string;
@@ -116,6 +126,8 @@ export const WORK_STATE: Record<WorkStateKey, WorkStateWord> = {
   SELLER_CHECK: { text: "알려주세요", tone: "warn" },
   CHECK_AGAIN: { text: "다시 확인", tone: "warn" },
   TOLD_BEHIND: { text: "안내 확인", tone: "warn" },
+  REGISTRATION_HELD: { text: "등록 멈춤", tone: "warn" },
+  DRAFT_HELD: { text: "확정 보류", tone: "warn" },
 };
 
 /** A lane state from `ReviewWorkView.delegatedStates`, as a work word; anything else is not the lane's to say. */

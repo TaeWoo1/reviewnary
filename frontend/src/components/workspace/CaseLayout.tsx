@@ -169,7 +169,9 @@ export function CaseLayout({
 
   const header = (
     <header className="flex flex-wrap items-start gap-x-4 gap-y-2">
-      <div className="min-w-0 flex-1">
+      {/* Below `sm` the title takes the whole line and the quiet action wraps under it (2026-11-14): at 390 a
+          「이 문의에 대해 물어보기」 beside it left the customer's question and the product ~200px. */}
+      <div className="min-w-0 flex-1 max-sm:basis-full">
         {meta ? <div className="mb-1.5 text-sm text-muted">{meta}</div> : null}
         <Heading
           className={

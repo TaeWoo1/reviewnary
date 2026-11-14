@@ -814,7 +814,7 @@ export function SellerCheckPanel({
             <div className="mt-2">
               <button
                 type="button"
-                className="text-sm font-medium text-ink underline underline-offset-4"
+                className="text-sm font-medium text-ink underline underline-offset-4 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center"
                 onClick={() => setWriting(true)}
                 disabled={busy}
               >
@@ -846,7 +846,7 @@ export function SellerCheckPanel({
           ) : null}
           <button
             type="button"
-            className="text-sm font-medium text-ink underline underline-offset-4"
+            className="text-sm font-medium text-ink underline underline-offset-4 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center"
             onClick={() => setWriting(true)}
             disabled={busy}
           >

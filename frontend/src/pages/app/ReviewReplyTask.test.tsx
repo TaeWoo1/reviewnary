@@ -605,7 +605,7 @@ describe("리뷰 처리 — the decision workspace", () => {
     getReviewReplyPrep.mockResolvedValue(prep());
     renderTask("?from=chat");
     await waitFor(() => expect(screen.getByText("괜찮긴한데 자꾸 떨어져요")).toBeInTheDocument());
-    expect(screen.getByRole("link", { name: "대화로 돌아가기" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "대화로 돌아가기" })).toHaveAttribute("href", "/work");
   });
 
   it("fails closed when the review cannot be read — never an invented review", async () => {

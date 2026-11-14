@@ -13,7 +13,8 @@
  * rewritten from scratch.
  */
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CustomerOperationsHome } from "../../lib/customerOperationsTypes";
@@ -21,6 +22,8 @@ import type { MetricKpi, MetricSeries, OperationsHome, OperationsInsight, Operat
 
 const api = vi.hoisted(() => ({
   getInquiryQueueStrict: vi.fn(),
+  getHomeBoard: vi.fn(),
+  getHomeWork: vi.fn(),
   getReviewWorkStrict: vi.fn(),
   activateCustomerOperations: vi.fn(),
   resumeCustomerOperations: vi.fn(),
@@ -28,6 +31,7 @@ const api = vi.hoisted(() => ({
 vi.mock("../../lib/apiClient", () => ({ api, getToken: () => null }));
 
 import { CustomerOpsHome } from "./CustomerOpsHome";
+import { serveFromReads } from "../../test/homeBoardFake";
 import { ScreenChangesProvider, type ScreenChangesClient } from "../../lib/screenChanges";
 
 const NOW = new Date("2026-09-16T05:30:00Z"); // 14:30 KST
@@ -81,6 +85,7 @@ function ops(): OperationsHome {
  * 오늘 바뀐 것 section says nothing at all then (a failed request is not 「변화 없음」).
  */
 function draw(home = co(), m: OperationsMetrics | null = metrics(), insights: OperationsInsight[] | null = []) {
+  serveFromReads(api as never, () => ({ co: home, ops: ops(), now: NOW }));
   return render(
     <MemoryRouter>
       <CustomerOpsHome co={home} ops={ops()} now={NOW} onChanged={vi.fn()} metrics={m} insights={insights} />
@@ -89,6 +94,8 @@ function draw(home = co(), m: OperationsMetrics | null = metrics(), insights: Op
 }
 
 const summary = () => screen.findByTestId("today-summary");
+/** The smaller line under the band: 진행 중 · 등록 대기 · 미답변 문의 (2026-11-10, mockup v5). */
+const side = () => screen.findByTestId("today-side");
 /** The quiet line under the band: inflow, the 24-hour window, freshness. */
 const context = () => screen.findByTestId("today-context");
 /**
@@ -322,13 +329,25 @@ describe("the band — obligations only", () => {
     });
   };
 
-  it("states 할 일, 실행 대기 and 현재 미답변 — and never inflow or the 24-hour window", async () => {
+  /**
+   * <b>Re-pointed (2026-11-10, mockup v5 — the reviewer: 「이번 시안에서 벗어난 선택」).</b> The band is the three places
+   * the Home's one read puts work — 할 일 · 기다리는 일 · 지난 일 — and 등록 대기 · 미답변 stand, kept, in the smaller line
+   * under it. Neither line ever carries inflow or the 24-hour window.
+   */
+  it("states 할 일, 기다리는 일 and 지난 일, keeps 등록 대기 and 미답변 under it — and never inflow or the 24-hour window", async () => {
     withWork();
     draw(co({ checked: 12, autoResolved: 3, draftsPrepared: 2 }));
     const band = await summary();
     await waitFor(() => expect(band).toHaveTextContent("할 일"));
-    expect(band).toHaveTextContent("등록 대기");
-    expect(band).toHaveTextContent("미답변");
+    expect(band).toHaveTextContent("기다리는 일");
+    expect(band).toHaveTextContent("지난 일");
+    const under = await side();
+    expect(under).toHaveTextContent("등록 대기");
+    expect(under).toHaveTextContent("미답변");
+    for (const line of [band, under]) {
+      expect(line).not.toHaveTextContent("오늘 들어온 것");
+      expect(line).not.toHaveTextContent("최근 24시간");
+    }
     // The two facts that moved. Both are still on the screen — on the quiet line — and neither may be
     // drawn at the weight of an obligation.
     expect(band).not.toHaveTextContent("오늘 들어온 것");
@@ -346,14 +365,16 @@ describe("the band — obligations only", () => {
     expect(band).not.toHaveTextContent("반복 문제");
   });
 
-  it("reads 할 일 → 실행 대기 → 현재 미답변, in that order", async () => {
+  it("reads 할 일 → 기다리는 일 → 지난 일, then 등록 대기 → 미답변 under it", async () => {
     withWork();
     draw(co({ checked: 1 }));
     const band = await summary();
-    await waitFor(() => expect(band).toHaveTextContent("미답변"));
+    await waitFor(() => expect(band).toHaveTextContent("지난 일"));
     const text = band.textContent ?? "";
-    expect(text.indexOf("할 일")).toBeLessThan(text.indexOf("등록 대기"));
-    expect(text.indexOf("등록 대기")).toBeLessThan(text.indexOf("미답변"));
+    expect(text.indexOf("할 일")).toBeLessThan(text.indexOf("기다리는 일"));
+    expect(text.indexOf("기다리는 일")).toBeLessThan(text.indexOf("지난 일"));
+    const under = (await side()).textContent ?? "";
+    expect(under.indexOf("등록 대기")).toBeLessThan(under.indexOf("미답변"));
   });
 
   it("현재 미답변 says it is unknown rather than printing the qualified figure", async () => {
@@ -372,9 +393,9 @@ describe("the band — obligations only", () => {
     */
     withWork();
     draw(co(), metrics({ kpis: [kpi("reviews"), kpi("inquiries"), kpi("unansweredInquiries", { value: 4, freshnessUnproven: true })] }));
-    const band = await summary();
-    await waitFor(() => expect(band).toHaveTextContent("할 일"));
-    const cell = band.querySelector("[data-testid='pulse-unanswered']")!;
+    const under = await side();
+    await waitFor(() => expect(under).toHaveTextContent("미답변"));
+    const cell = under.querySelector("[data-testid='pulse-unanswered']")!;
     expect(cell).toHaveTextContent("미답변");
     // <b>The figure is never floored.</b> 4 is what the qualified population counted, and printing it
     // here would be the `contextStrip` defect again.
@@ -414,9 +435,9 @@ describe("the band — obligations only", () => {
   it("says 현재 미답변 could not be read, and says nothing about the channels", async () => {
     withWork();
     draw(co({ checked: 1 }), null);
-    const band = await summary();
-    await waitFor(() => expect(band).toHaveTextContent("할 일"));
-    const cell = band.querySelector("[data-testid='pulse-unanswered']")!;
+    const under = await side();
+    await waitFor(() => expect(under).toHaveTextContent("미답변"));
+    const cell = under.querySelector("[data-testid='pulse-unanswered']")!;
     // A failed request still does not say zero. What it now also does not do is vanish: the slot stands
     // and names its own cause. <b>And the cause is OURS, not the seller's</b> — 「최근에 가져왔는지 몰라요」 is
     // a claim about their channels and no read supports it here, so a failed request says only that the
@@ -490,15 +511,12 @@ describe("the band — obligations only", () => {
     // NOTHING. The tracks are the target's thirds, so the cells that do have something keep their width
     // and their rule position whatever the read returned.
     withWork();
-    // No metrics: 할 일 and 실행 대기 only.
+    // No metrics: the band still has its three cells, and 미답변 under it says it was not read.
     draw(co({ checked: 1 }), null);
     const band = await summary();
     await waitFor(() => expect(band).toHaveTextContent("할 일"));
     expect(band.querySelectorAll("[data-testid^='pulse-']")).toHaveLength(3);
-    // The third cell stands and says it was not read — see 「says 현재 미답변 could not be read」. What
-    // this test keeps is the rhythm: three tracks, so the two that DO have figures sit where they sit
-    // whatever the overview returned.
-    expect(band.querySelector("[data-testid='pulse-unanswered']")).toHaveTextContent("—");
+    expect((await side()).querySelector("[data-testid='pulse-unanswered']")).toHaveTextContent("—");
     expect(band.className).toContain("grid-cols-3");
   });
 
@@ -528,26 +546,44 @@ describe("the band — obligations only", () => {
     const band = await summary();
     const cells = [...band.querySelectorAll("[data-testid^='pulse-']")] as HTMLElement[];
     expect(cells).toHaveLength(3);
-    // 할 일 is a measured zero here — the list read landed and found nothing — so it alone is a figure.
-    expect(cells[0]).toHaveTextContent("0건");
-    for (const cell of cells.slice(1)) {
-      expect(cell).toHaveTextContent("—");
-      expect(cell.textContent).not.toMatch(/\d/);
+    // 할 일 · 기다리는 일 · 지난 일 are measured zeros here — the board read landed and found nothing.
+    await waitFor(() => expect(cells[0]).toHaveTextContent("0건"));
+    // The two facts under it that cannot be measured each say so, and neither is drawn as a number.
+    const under = await side();
+    for (const id of ["pulse-awaiting", "pulse-unanswered"]) {
+      const fact = under.querySelector(`[data-testid='${id}']`)!;
+      expect(fact).toHaveTextContent("—");
+      expect(fact.textContent).not.toMatch(/\d/);
     }
   });
 
   it("does not claim a 실행 대기 count while the job is not running", async () => {
     withWork();
     draw({ ...co({ checked: 1 }), status: "PAUSED" });
-    const band = await summary();
-    await waitFor(() => expect(band).toHaveTextContent("할 일"));
-    const cell = band.querySelector("[data-testid='pulse-awaiting']")!;
+    const under = await side();
+    await waitFor(() => expect(under).toHaveTextContent("등록 대기"));
+    const cell = under.querySelector("[data-testid='pulse-awaiting']")!;
     // The claim the test has always protected: 실행 대기 is a fact about a job that is LOOKING, and a
     // paused job has not looked. So no number — and now the slot says that instead of leaving the
     // seller to infer it from a gap in the row.
     expect(cell.textContent).not.toMatch(/\d/);
     expect(cell).toHaveTextContent("—");
     expect(cell).toHaveTextContent("자동 확인이 멈춰 있어 확인하지 못했어요");
+  });
+});
+
+describe("the band's 지난 일 when its count is not confirmed (2026-11-10 review)", () => {
+  it("says 「—」 with why, and keeps 「보기」 — an unconfirmed count is exactly when the seller needs to look", async () => {
+    // The reviews were not read whole, so the server vouches for no 지난 일 count — it used to read as 0 and hide the link.
+    api.getReviewWorkStrict.mockRejectedValue(new Error("down"));
+    draw();
+    const band = await summary();
+    const cell = band.querySelector("[data-testid='pulse-past']") as HTMLElement;
+    await waitFor(() => expect(cell).toHaveTextContent("다 확인하지 못했어요"));
+    expect(cell).toHaveTextContent("—");
+    expect(cell.textContent).not.toMatch(/\d/);
+    await userEvent.click(within(cell).getByTestId("past-open"));
+    expect(await screen.findByTestId("home-work-view-head")).toHaveTextContent("지난 일");
   });
 });
 

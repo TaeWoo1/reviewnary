@@ -12,11 +12,11 @@ import {
 import { isNavIconName } from "../components/icons/NavIcon";
 
 describe("nav.v2 — structure", () => {
-  it("declares three destinations and 연결 · 설정 at the foot (product-owner decision, 2026-10-27)", () => {
+  it("declares four destinations and 연결 · 설정 at the foot (2026-10-27; 홈 = CS 현황 added 2026-11-13)", () => {
     // The menu had grown to eleven places and the pipeline could not be seen in it. The groups are quiet: the
     // rail draws no group names, the foot group is pinned to the bottom.
     expect(NAV_GROUPS.map((group) => group.items.map((item) => item.to))).toEqual([
-      ["/", "/reviews", "/knowledge"],
+      ["/", "/work", "/reviews", "/knowledge"],
       ["/connect", "/settings"],
     ]);
     expect(NAV_GROUPS.map((group) => !!group.foot)).toEqual([false, true]);
@@ -24,7 +24,7 @@ describe("nav.v2 — structure", () => {
   });
 
   it("labels every destination in seller language", () => {
-    expect(NAV_ITEMS.map((item) => item.label)).toEqual(["할 일", "리뷰·문의", "상품·정책", "연동", "설정"]);
+    expect(NAV_ITEMS.map((item) => item.label)).toEqual(["홈", "할 일", "리뷰·문의", "상품·정책", "연동", "설정"]);
   });
 
   it("keeps the routes the menu no longer names, owned by the destination that leads to them", () => {
@@ -38,7 +38,9 @@ describe("nav.v2 — structure", () => {
     // Under /settings, but 정책 is 상품·정책's: the longest owned route wins, so exactly one row is lit.
     expect(owner("/settings/policies")).toEqual(["상품·정책"]);
     expect(owner("/settings/alerts")).toEqual(["설정"]);
-    expect(owner("/")).toEqual(["할 일"]);
+    // 홈 is CS 현황 and lit only on itself; 할 일 moved to /work unchanged (2026-11-13).
+    expect(owner("/")).toEqual(["홈"]);
+    expect(owner("/work")).toEqual(["할 일"]);
     // 할 일 is lit on the queue it heads (2026-10-28) — the walk-through found it lit nowhere there.
     expect(owner("/customer-operations/cases")).toEqual(["할 일"]);
     expect(owner("/customer-operations/cases/c1")).toEqual(["할 일"]);
@@ -89,9 +91,9 @@ describe("nav.v2 — the operations agent is not a destination", () => {
 });
 
 describe("nav.v2 — mobile derives from the same model", () => {
-  it("uses the three destinations plus a 더보기 trigger", () => {
-    expect(MOBILE_TAB_ROUTES).toEqual(["/", "/reviews", "/knowledge"]);
-    expect(MOBILE_TABS).toHaveLength(3);
+  it("uses the four destinations plus a 더보기 trigger", () => {
+    expect(MOBILE_TAB_ROUTES).toEqual(["/", "/work", "/reviews", "/knowledge"]);
+    expect(MOBILE_TABS).toHaveLength(4);
   });
 
   it("never re-declares a tab — every tab is the side-nav item itself", () => {
@@ -116,7 +118,8 @@ describe("nav.v2 — mobile derives from the same model", () => {
 
 describe("the browser tab names the screen (2026-10-28)", () => {
   it("says which screen, never the same line everywhere", () => {
-    expect(documentTitleFor("/")).toBe("오늘 · reviewnary");
+    expect(documentTitleFor("/")).toBe("홈 · reviewnary");
+    expect(documentTitleFor("/work")).toBe("할 일 · reviewnary");
     expect(documentTitleFor("/reviews/reply/r1")).toBe("리뷰 답글 · reviewnary");
     expect(documentTitleFor("/inquiries/abc")).toBe("문의 · reviewnary");
     expect(documentTitleFor("/customer-operations/cases")).toBe("할 일 · reviewnary");

@@ -271,3 +271,39 @@ describe("the prepare control names what is already there", () => {
     expect(screen.queryByRole("button", { name: "처리함" })).toBeNull();
   });
 });
+
+/**
+ * <b>No draft is a result, not a crash</b> (2026-11-09 demo §7.10 3A). The reply agent hands a review to a person, holds
+ * it, or is still running, and answers with `draft: null` and its reason. The screen read `view.draft.body`, threw, and
+ * printed 「쓰지 못했어요 · 다시 눌러 주세요」 beside the real reason — two sentences that contradicted each other.
+ */
+describe("a generation that saved no draft", () => {
+  function noDraft(message: string | null): GeneratedReviewDraftView {
+    return { ...grounded(), draft: null, evidence: [], answerBasis: null as unknown as string, unavailableMessage: message };
+  }
+
+  it("shows only the agent's reason, leaves the editor alone, and does not claim a draft exists", async () => {
+    generateReviewReplyDraft.mockResolvedValue(noDraft("안전 관련 리뷰라 AI가 답글을 쓰지 않았어요. 직접 확인해 주세요."));
+    const onDrafted = draw();
+    await userEvent.click(screen.getByTestId("grounded-review-generate"));
+    expect(await screen.findByTestId("grounded-review-unavailable")).toHaveTextContent("안전 관련 리뷰라");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(onDrafted).not.toHaveBeenCalled();
+    expect(screen.getByTestId("grounded-review-generate")).toHaveTextContent("AI 답글 쓰기");
+  });
+
+  it("says plainly that nothing was saved when the server gave no reason", async () => {
+    generateReviewReplyDraft.mockResolvedValue(noDraft(null));
+    draw();
+    await userEvent.click(screen.getByTestId("grounded-review-generate"));
+    expect(await screen.findByTestId("grounded-review-unavailable")).toHaveTextContent("초안을 저장하지 않았어요");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("a screen that stopped waiting does not call the run failed, nor ask for a second press", () => {
+    const said = generateFailureMessage(undefined, "ECONNABORTED");
+    expect(said).toContain("아직 쓰고 있을 수 있어요");
+    expect(said).not.toContain("다시 눌러");
+    expect(generateFailureMessage(undefined, "ERR_NETWORK")).toContain("잠시 뒤 다시 눌러 주세요");
+  });
+});

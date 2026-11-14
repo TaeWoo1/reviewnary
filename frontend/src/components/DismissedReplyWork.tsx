@@ -2,6 +2,7 @@ import { Chevron } from "./ui/Disclosure";
 import { useCallback, useEffect, useState } from "react";
 import { ReplyWorkRow } from "./reviews/ReplyWorkRow";
 import { api } from "../lib/apiClient";
+import { newCommandId } from "../lib/commandId";
 import { attentionUncertaintyCopy } from "../lib/attention";
 import type { AttentionCoverage, OperatorVocItem } from "../lib/types";
 
@@ -67,7 +68,7 @@ export function DismissedReplyWork({
       setRestoring(actionRef);
       try {
         // A fresh idempotency key per intent, like dismissal — a retried click is the same restore.
-        await api.restoreReplyWork(accountId, actionRef, { commandId: crypto.randomUUID() });
+        await api.restoreReplyWork(accountId, actionRef, { commandId: newCommandId() });
         // It is back on the to-do now: drop it here for immediate feedback, and tell the parent to
         // refetch so it reappears in 내 답변 작업 (which also re-signals this list).
         setItems((prev) => prev.filter((i) => i.actionRef !== actionRef));

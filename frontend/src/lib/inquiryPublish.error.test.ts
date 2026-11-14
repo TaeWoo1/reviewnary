@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyPublishError, REPLY_TOO_LONG } from "./inquiryPublish";
+import { classifyPublishError, classifySaveDraftError, REPLY_TOO_LONG } from "./inquiryPublish";
 
 /**
  * A confirm refused for its length is a 409 like a changed draft, and must not read like one (2026-11-02): the draft
@@ -24,5 +24,23 @@ describe("classifyPublishError", () => {
   it("keeps the changed-draft reading for any other 409", () => {
     expect(classifyPublishError(409, { message: "x" }).message).toContain("변경");
     expect(classifyPublishError(409).shouldRefresh).toBe(true);
+  });
+});
+
+/**
+ * A refused 초안 저장 names the save, never a registration (휴대폰 실기기 점검, 2026-11-14), and never asks for the reload
+ * that would seed the editor over what the seller typed.
+ */
+describe("classifySaveDraftError", () => {
+  it.each([409, 404, 403, 500, undefined])("says the save failed and the text is kept — %s", (status) => {
+    const { message } = classifySaveDraftError(status);
+    expect(message.startsWith("초안을 저장하지 못했어요.")).toBe(true);
+    expect(message).toContain("입력한 내용은 그대로 두었어요");
+    expect(message).not.toContain("등록");
+  });
+
+  it("tells a moved draft apart from a passing failure", () => {
+    expect(classifySaveDraftError(409).message).toContain("다른 곳에서 이 초안이 바뀌었어요");
+    expect(classifySaveDraftError(500).message).not.toContain("바뀌었어요");
   });
 });

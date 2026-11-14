@@ -80,8 +80,10 @@ export function ReplyHoldNotice({
         : hold.needs === "EXCEPTION"
           ? "근거를 추가하거나 문장을 고쳐 주세요. 이번 답변에만 그대로 쓰려면 「이번 건만 예외」로 결정해 주세요."
           : "내용을 확인했다면 「확인하고 진행」을 눌러 주세요. 확인한 기록이 남아요.";
+  // 44px on a phone (2026-11-14): measured at 390 these were 32px, the smallest targets on the inquiry's screen and
+  // the ones that decide whether a held answer may go. A computer keeps the compact size.
   const button =
-    "rounded-lg bg-surface px-2.5 py-1 text-sm font-semibold text-ink ring-1 ring-line hover:bg-canvas";
+    "inline-flex items-center rounded-lg bg-surface px-2.5 py-1 text-sm font-semibold text-ink ring-1 ring-line hover:bg-canvas max-sm:min-h-11";
   const words = hold.unbacked.map((w) => `「${w}」`).join(" · ");
 
   return (
@@ -151,7 +153,7 @@ export function ReplyHoldNotice({
               aria-busy={busy}
               aria-disabled={busy}
               onClick={() => void decide("EXCEPTION")}
-              className="rounded-lg bg-ink px-2.5 py-1 text-sm font-semibold text-white hover:bg-ink/80"
+              className="inline-flex items-center rounded-lg bg-ink px-2.5 py-1 text-sm font-semibold text-white hover:bg-ink/80 max-sm:min-h-11"
             >
               이번 건만 예외로 결정
             </button>

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import type { InquiryFollowUpRow, InquiryFollowUps } from "../../lib/types";
 import { channelShort } from "../../lib/copy/customerOps";
 
@@ -43,12 +43,42 @@ function shortDay(day: string): string {
   return `${m}월 ${d}일 (${w})`;
 }
 
+/** The anchor 홈's 「처리 진행 중」 opens (`/work#기다리는-일`): the whole list, scrolled into view. */
+export const WAITING_ANCHOR = "기다리는-일";
+
 export function WaitingWork({ followUps }: { followUps: InquiryFollowUps | null | undefined }) {
-  const [all, setAll] = useState(false);
+  const { hash } = useLocation();
+  const opened = decodeURIComponent(hash.replace(/^#/, "")) === WAITING_ANCHOR;
+  const [all, setAll] = useState(opened);
+  const ref = useRef<HTMLElement | null>(null);
+  const landed = followUps !== undefined;
+  useEffect(() => {
+    if (!opened || !landed) return;
+    setAll(true);
+    // The list above this section is read separately and grows after it lands, pushing the section down. So the jump
+    // is repeated while the page settles, and given up the moment the seller scrolls for themselves.
+    let mine = true;
+    const stop = () => {
+      mine = false;
+    };
+    const jump = () => {
+      if (mine) ref.current?.scrollIntoView?.({ block: "start" });
+    };
+    const timers = [0, 400, 1200, 2500].map((ms) => window.setTimeout(jump, ms));
+    window.addEventListener("wheel", stop, { passive: true });
+    window.addEventListener("touchmove", stop, { passive: true });
+    window.addEventListener("keydown", stop);
+    return () => {
+      timers.forEach((t) => window.clearTimeout(t));
+      window.removeEventListener("wheel", stop);
+      window.removeEventListener("touchmove", stop);
+      window.removeEventListener("keydown", stop);
+    };
+  }, [opened, landed]);
   if (followUps === undefined) return null;
   if (followUps === null) {
     return (
-      <section aria-label="기다리는 일" className="rounded-2xl border border-line bg-surface p-3" data-testid="waiting-work">
+      <section id="기다리는-일" aria-label="기다리는 일" className="rounded-2xl border border-line bg-surface p-3" data-testid="waiting-work">
         <h2 className="text-section font-bold tracking-tight text-ink">기다리는 일</h2>
         <p className="mt-1 break-keep text-sm text-muted">기다리는 일을 불러오지 못했어요. 승인한 문의는 문의 화면에서 열 수 있어요.</p>
       </section>
@@ -59,7 +89,7 @@ export function WaitingWork({ followUps }: { followUps: InquiryFollowUps | null 
   const total = followUps.waitingTotal;
   const shown = all ? rows : rows.slice(0, HOME_WAITING_ROWS);
   return (
-    <section aria-label="기다리는 일" className="rounded-2xl border border-line bg-surface p-3" data-testid="waiting-work">
+    <section ref={ref} id={WAITING_ANCHOR} aria-label="기다리는 일" className="rounded-2xl border border-line bg-surface p-3" data-testid="waiting-work">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <h2 className="text-section font-bold tracking-tight text-ink">기다리는 일</h2>
         <span className="break-keep text-sm tabular-nums text-muted">
@@ -77,7 +107,7 @@ export function WaitingWork({ followUps }: { followUps: InquiryFollowUps | null 
           </button>
         ) : null}
       </div>
-      <p className="mt-1 break-keep text-sm text-muted">지금은 사장님 차례가 아니에요. 정한 날이 되면 할 일로 다시 올라와요.</p>
+      <p className="mt-1 break-keep text-sm text-muted">답변 등록이나 후속 처리가 남은 일이에요. 정한 날이 되면 할 일로 다시 올라와요.</p>
       <ul className="mt-2 divide-y divide-line">
         {shown.map((row) => {
           const state = waitingState(row);

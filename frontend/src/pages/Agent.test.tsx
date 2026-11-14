@@ -157,7 +157,7 @@ describe("운영 에이전트 page", () => {
     expect(screen.queryByRole("form", { name: "에이전트 명령 입력" })).toBeNull();
     expect(await screen.findByRole("button", { name: "미답변 문의 처리" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "리뷰 답변 준비" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "홈 대화" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "할 일 화면의 대화" })).toHaveAttribute("href", "/work");
     expect(await screen.findByText(/외부 발송 없음/)).toBeInTheDocument();
   });
 

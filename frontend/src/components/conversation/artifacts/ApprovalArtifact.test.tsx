@@ -106,7 +106,7 @@ describe("approval artifact — the confirm step is the only way to the one writ
     getInquiryPublishCapability.mockResolvedValue({ executionEnabled: false, replyAdapterChannelCodes: [] });
     render(<MemoryRouter><ApprovalArtifact artifact={ARTIFACT} /></MemoryRouter>);
     expect(await screen.findByRole("button", { name: "초안 복사" })).toBeInTheDocument();
-    expect(screen.getByText(/reviewnary가 답변을 대신 등록하지 않아요/)).toBeInTheDocument();
+    expect(screen.getByText(/현재 이 환경에서는 답변 등록 기능이 꺼져 있어요/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "답변 보내기" })).toBeNull();
     expect(confirmInquiryPublish).not.toHaveBeenCalled();
   });

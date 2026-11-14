@@ -240,6 +240,18 @@ describe("판매자센터에서 확인한 결과", () => {
     expect(screen.queryByTestId("seller-check-not-drafted")).toBeNull();
   });
 
+  /**
+   * 「결과 고치기」 is a line of underlined text, 24px tall — measured on a Galaxy S24 (2026-11-14). On a phone it is a 44px
+   * target; at `sm` and up it stays the text it was. jsdom does not lay out, so the class is what is asserted.
+   */
+  it("결과 고치기 is a 44px target on a phone and unchanged from sm up", async () => {
+    getSellerCheck.mockResolvedValue({ check: RECORD, ask: null });
+    open();
+    const fix = await screen.findByRole("button", { name: "결과 고치기" });
+    expect(fix.className.split(" ")).toEqual(expect.arrayContaining(["max-sm:min-h-11", "max-sm:inline-flex"]));
+    expect(fix.className.split(" ")).not.toContain("min-h-11");
+  });
+
   it("a record corrected on another device is not overwritten: the refusal is shown and the record read again", async () => {
     getSellerCheck
       .mockResolvedValueOnce({ check: RECORD, ask: null })
