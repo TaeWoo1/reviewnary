@@ -1,6 +1,7 @@
 package com.sellerops.review.triage.pilot;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayName;
@@ -19,13 +20,13 @@ class AiTriagePilotFakeRunGuardTest {
     }
 
     @Test
-    @DisplayName("the pilot refuses the eval-only RUNYOUR vendor when on; off, or another vendor, starts")
-    void thePilotRefusesTheEvalOnlyRouter() {
-        assertThatThrownBy(() -> AiTriagePilotProperties.refuseAnEvalOnlyVendor(true, "RUNYOUR"))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("eval-harness only");
-        assertThatThrownBy(() -> AiTriagePilotProperties.refuseAnEvalOnlyVendor(true, " runyour "))
-                .isInstanceOf(IllegalStateException.class);
-        assertThatCode(() -> AiTriagePilotProperties.refuseAnEvalOnlyVendor(false, "RUNYOUR")).doesNotThrowAnyException();
-        assertThatCode(() -> AiTriagePilotProperties.refuseAnEvalOnlyVendor(true, "OPENAI")).doesNotThrowAnyException();
+    @DisplayName("a Runyour pilot can be configured without sending anything, while the org/key gate stays in place")
+    void theRouterUsesTheSameOrgAndKeyGate() {
+        java.util.UUID org = java.util.UUID.randomUUID();
+        AiTriagePilotProperties on = new AiTriagePilotProperties(true, org.toString(), "RUNYOUR", "model", "test-key",
+                true, 300, null, 1);
+        assertThatCode(on::refuseAFakeRun).doesNotThrowAnyException();
+        assertThat(on.isEnabledFor(org)).isTrue();
+        assertThat(on.isEnabledFor(java.util.UUID.randomUUID())).isFalse();
     }
 }

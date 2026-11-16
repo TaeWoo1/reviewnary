@@ -45,9 +45,8 @@ public final class ReviewTriageChannelGate {
      */
     public static ReviewTriageChannelGate forApi(ApiTriageClassifier.Vendor vendor, String modelId,
                                                  String apiKey, ApiTriageClassifier.Tuning tuning) {
-        if (vendor == null || vendor.evalOnly()) {
-            // Fails the start of a pilot configured with it — a refusal at boot, not a review sent and regretted.
-            throw new IllegalStateException("triage vendor " + vendor + " is for the evaluation harness only");
+        if (vendor == null) {
+            throw new IllegalArgumentException("a triage vendor is required");
         }
         return new ReviewTriageChannelGate(
                 new ApiTriageClassifier(new JdkLlmHttpClient(), vendor, modelId, apiKey, tuning));

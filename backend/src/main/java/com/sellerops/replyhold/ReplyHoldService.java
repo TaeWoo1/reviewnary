@@ -91,10 +91,10 @@ public class ReplyHoldService {
     /** Findings no decision goes past: a banned phrase, a promise a policy contradicts, a number now wrong. */
     static final Set<String> FIX_FIRST = Set.of(ReviewDraftRecheck.FORBIDDEN_PHRASE, ReviewDraftRecheck.POLICY_CONFLICT,
             InquiryDraftRecheck.FIGURE_CHANGED, InquiryDraftRecheck.SELLER_CHECK_CHANGED,
-            InquiryDraftRecheck.SELLER_CHECK_COMPLETION);
+            InquiryDraftRecheck.SELLER_CHECK_COMPLETION, ReviewDraftRecheck.UNSETTLED_VALUE);
     /** Findings a plain confirmation goes past once shown — recorded. An unbacked promise is not one of them. */
     static final Set<String> CONFIRMABLE = Set.of(ReviewDraftRecheck.SOURCE_CHANGED, ReviewDraftRecheck.SOURCE_RETIRED,
-            InquiryDraftRecheck.FIGURE_UNVERIFIED);
+            InquiryDraftRecheck.FIGURE_UNVERIFIED, InquiryDraftRecheck.SCHEDULE_EXPIRED);
 
     /** What the seller decided on a hold: 「확인하고 진행」, or 「이번 건만 예외」 for a promise nothing backs. */
     public enum Decision { CONFIRM, EXCEPTION }
@@ -111,7 +111,7 @@ public class ReplyHoldService {
     public record Finding(List<String> codes, List<String> changed, List<String> promises, List<String> phrases,
                           List<String> sentences, List<InquiryDraftRecheck.FigureNote> figures, List<String> conflicts,
                           List<ReviewDraftRecheck.Against> against, InquiryDraftRecheck.SellerCheckNote sellerCheck,
-                          List<String> retired, List<String> withdrawals) {
+                          List<String> retired, List<String> withdrawals, List<String> unsettled) {
         public Finding {
             codes = codes == null ? List.of() : codes;
             changed = changed == null ? List.of() : changed;
@@ -123,6 +123,16 @@ public class ReplyHoldService {
             against = against == null ? List.of() : against;
             retired = retired == null ? List.of() : retired;
             withdrawals = withdrawals == null ? List.of() : withdrawals;
+            unsettled = unsettled == null ? List.of() : unsettled;
+        }
+
+        /** Without unsettled values (2026-11-15): every finding before the material's state was read. */
+        public Finding(List<String> codes, List<String> changed, List<String> promises, List<String> phrases,
+                       List<String> sentences, List<InquiryDraftRecheck.FigureNote> figures, List<String> conflicts,
+                       List<ReviewDraftRecheck.Against> against, InquiryDraftRecheck.SellerCheckNote sellerCheck,
+                       List<String> retired, List<String> withdrawals) {
+            this(codes, changed, promises, phrases, sentences, figures, conflicts, against, sellerCheck, retired,
+                    withdrawals, List.of());
         }
 
         /** Retired titles without their moments (a stored note from before 2026-11-15 reads so). */
@@ -233,9 +243,13 @@ public class ReplyHoldService {
      * the seller already took (bound to the basis) still stands. A change here re-checks every waiting reply once under
      * the new rules. {@code r1} (2026-11-15): an approved reply whose cited document was withdrawn waits for a
      * confirmation (SOURCE_RETIRED) — without this, a reply swept before that rule existed would be found only when a send
-     * was tried.
+     * was tried. {@code r2} (2026-11-15): a reply that states as a fact a value the material does not settle is held
+     * (UNSETTLED_VALUE) — every waiting reply is read once for it. {@code r3} (2026-11-15 review): another document's
+     * other number is set aside only for a figure the material stands behind, and a refusal limited to a case answers
+     * that case only — read once more under both. {@code r4}: read split cost sentences under the preceding remedy's
+     * case too, so a waiting draft cannot keep an exception-only finding for a policy conflict.
      */
-    static final String SWEEP_RULES = "r1:retired";
+    static final String SWEEP_RULES = "r4:retired,unsettled,state-support,case-bound,split-cost";
 
     /** What the last sweep is stored under: the basis, and the rules it was checked by. */
     static String sweptUnder(String basis) {
@@ -244,7 +258,19 @@ public class ReplyHoldService {
 
     /** The basis an org's drafts are checked under now: review knowledge, policy and wording, and the inquiry style. */
     public String basisOf(UUID orgId) {
-        return basis.of(orgId).combined() + "|s" + styles.profileFor(orgId).version() + "|" + SWEEP;
+        // What the seller set about which value is current — 적용일, replacements, schedule lines (2026-11-15) — is part of
+        // what a reply is checked against; appended only when something is set, so every basis before it is unchanged.
+        String set = currency == null ? "" : currency.fingerprint(orgId);
+        return basis.of(orgId).combined() + "|s" + styles.profileFor(orgId).version() + "|" + SWEEP
+                + (set.isEmpty() ? "" : "|" + set);
+    }
+
+    private com.sellerops.knowledge.currency.KnowledgeCurrencyService currency;
+
+    /** What the seller set about current values (2026-11-15). Optional: without it the basis is as it was. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setCurrency(com.sellerops.knowledge.currency.KnowledgeCurrencyService currency) {
+        this.currency = currency;
     }
 
     // ── gates ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -457,14 +483,15 @@ public class ReplyHoldService {
      * the only thing the send drops, and its titles are kept, so this is exact.
      */
     static List<String> beforeApproval(Finding found) {
-        if (found.changed().isEmpty() || found.codes().contains(CITATION_ONLY)) {
+        // An expired schedule is not a changed citation (B180): the send keeps its code, so it alone puts nothing back.
+        if (found.changed().stream().allMatch(InquiryDraftRecheck::isPastLabel) || found.codes().contains(CITATION_ONLY)) {
             return List.of(keyOf(found));
         }
         List<String> codes = new ArrayList<>(found.codes());
         codes.add(CITATION_ONLY);
         Finding shown = new Finding(codes, found.changed(), found.promises(), found.phrases(), found.sentences(),
                 found.figures(), found.conflicts(), found.against(), found.sellerCheck(), found.retired(),
-                found.withdrawals());
+                found.withdrawals(), found.unsettled());
         return List.of(keyOf(found), keyOf(shown));
     }
 
@@ -543,6 +570,15 @@ public class ReplyHoldService {
         return out;
     }
 
+    private boolean registered(ReplyDraftHold hold) {
+        if (hold.getLane() == ReplyDraftHold.Lane.INQUIRY) {
+            return workItems.findById(hold.getSubjectId())
+                    .map(w -> w.getPhase() == InquiryWorkItemPhase.COMPLETED).orElse(false);
+        }
+        return reviews.findById(hold.getSubjectId())
+                .map(r -> ReviewReplyState.ANSWERED.equals(r.getReplyState())).orElse(false);
+    }
+
     private Optional<HoldView> standing(UUID orgId, ReplyDraftHold hold) {
         // An approved hold stands on the approved version, which need not be the head.
         int head = hold.getLane() == ReplyDraftHold.Lane.REVIEW
@@ -551,6 +587,12 @@ public class ReplyHoldService {
                 : inquiryDrafts.findTopByWorkItemIdOrderByVersionDesc(hold.getSubjectId())
                         .map(InquiryReplyDraft::getVersion).orElse(-1);
         if (head != hold.getDraftVersion() && !hold.isApproved()) {
+            return Optional.empty();
+        }
+        // A registration verified done is past every hold (2026-11-15): nothing is left for it to stop, so it is not
+        // shown as standing. Only a verified registration — a send whose result is unknown, or one that failed, still
+        // shows it. The hold row and every decision recorded on it are kept as they were.
+        if (registered(hold)) {
             return Optional.empty();
         }
         Finding found = read(hold.getNote());
@@ -573,7 +615,8 @@ public class ReplyHoldService {
                 // When each was withdrawn: its last save (null — deleted). Turned on and off again is a new withdrawal.
                 result.changed().stream().filter(ReviewDraftRecheck.Changed::removed)
                         .map(c -> c.kind() + ":" + c.title() + "@" + (c.changedAt() == null ? "deleted" : c.changedAt()))
-                        .toList());
+                        .toList(),
+                result.unsettled());
         return record(orgId, ReplyDraftHold.Lane.REVIEW, review.getId(), version.getVersion(), approved, found);
     }
 
@@ -586,9 +629,10 @@ public class ReplyHoldService {
             marked.addAll(result.sellerCheck().completions());
         }
         result.figures().forEach(f -> marked.add(f.figure()));
+        marked.addAll(result.unsettledSaid());
         Finding found = new Finding(result.codes(), result.changed(), result.promises(), result.phrases(),
                 ReviewDraftRecheck.sentencesWith(version.getComments(), marked), result.figures(), result.conflicts(),
-                result.against(), result.sellerCheck(), result.retired(), result.withdrawals());
+                result.against(), result.sellerCheck(), result.retired(), result.withdrawals(), result.unsettled());
         return record(item.getOrgId(), ReplyDraftHold.Lane.INQUIRY, item.getId(), version.getVersion(), approved, found);
     }
 
@@ -598,10 +642,12 @@ public class ReplyHoldService {
         // document the seller turned off or deleted is not 「changed」 for this purpose (owner, 2026-11-14): its own code,
         // SOURCE_RETIRED, is kept, so the send waits for the seller's confirmation. Nothing about the approval or the text
         // is changed — the hold names the document and the reply, and the seller confirms, or fixes and approves again.
+        // A cited schedule whose dates all passed is not a changed citation either (B180): SCHEDULE_EXPIRED is its own code
+        // and is kept, so an answer approved while the date was ahead is not sent after it unasked.
         Finding kept = approved && found.codes().contains(CITATION_ONLY)
                 ? new Finding(found.codes().stream().filter(c -> !CITATION_ONLY.equals(c)).toList(), found.changed(),
                         found.promises(), found.phrases(), found.sentences(), found.figures(), found.conflicts(),
-                        found.against(), found.sellerCheck(), found.retired(), found.withdrawals())
+                        found.against(), found.sellerCheck(), found.retired(), found.withdrawals(), found.unsettled())
                 : found;
         if (kept.passed()) {
             writer.clear(orgId, lane, subjectId);
@@ -656,6 +702,10 @@ public class ReplyHoldService {
             key += "|off:" + String.join(",", found.retired().stream().sorted().toList())
                     + "|at:" + String.join(",", found.withdrawals().stream().sorted().toList());
         }
+        // Appended only when some value is unsettled, so earlier keys are unchanged (2026-11-15).
+        if (!found.unsettled().isEmpty()) {
+            key += "|un:" + String.join(",", found.unsettled().stream().sorted().toList());
+        }
         return sha256(key);
     }
 
@@ -690,7 +740,8 @@ public class ReplyHoldService {
      * that the reply does not stand on what is registered now.
      */
     static String headline(Finding found) {
-        List<String> named = found.changed().stream().filter(t -> t != null && !t.isBlank()).toList();
+        List<String> named = found.changed().stream().filter(t -> t != null && !t.isBlank())
+                .filter(t -> !InquiryDraftRecheck.isPastLabel(t)).toList();
         boolean moved = found.codes().contains(ReviewDraftRecheck.SOURCE_CHANGED)
                 || found.figures().stream().anyMatch(f -> f.was() != null);
         if (found.codes().contains(InquiryDraftRecheck.SELLER_CHECK_COMPLETION)) {
@@ -699,11 +750,23 @@ public class ReplyHoldService {
         if (found.codes().contains(InquiryDraftRecheck.SELLER_CHECK_CHANGED)) {
             return "판매자 확인 기록이 바뀌어 답변을 다시 확인해야 해요.";
         }
+        if (found.codes().contains(ReviewDraftRecheck.UNSETTLED_VALUE)) {
+            boolean plannedOnly = !found.unsettled().isEmpty()
+                    && found.unsettled().stream().allMatch(u -> u.contains("아직 예정인데"));
+            return plannedOnly ? "예정인 일정을 확정된 날짜처럼 안내하고 있어 고쳐야 해요."
+                    : "자료끼리 값이 달라 아직 정해지지 않은 내용을 확정된 것처럼 안내하고 있어 고쳐야 해요.";
+        }
         List<String> off = found.retired().stream().filter(t -> t != null && !t.isBlank()).toList();
         if (found.codes().contains(ReviewDraftRecheck.SOURCE_RETIRED)) {
             return off.isEmpty() ? "답변의 근거였던 자료가 사용 중지되거나 지워져 다시 확인이 필요해요."
                     : "「" + off.get(0) + "」" + (off.size() > 1 ? " 등 " + off.size() + "개 자료가" : "이(가)")
                             + " 사용 중지되거나 지워져 다시 확인이 필요해요.";
+        }
+        if (found.codes().contains(InquiryDraftRecheck.SCHEDULE_EXPIRED)) {
+            List<String> past = expiredOf(found);
+            return past.isEmpty() ? "답변이 인용한 일정의 날짜가 모두 지나 지금 일정으로 안내할 수 있는지 다시 확인이 필요해요."
+                    : "「" + past.get(0) + "」" + (past.size() > 1 ? " 등 " + past.size() + "개 일정" : "")
+                            + "의 날짜가 모두 지나 지금 일정으로 안내할 수 있는지 다시 확인이 필요해요.";
         }
         if (moved && !named.isEmpty()) {
             return "「" + named.get(0) + "」" + (named.size() > 1 ? " 등 " + named.size() + "개 자료가" : "이(가)")
@@ -724,6 +787,13 @@ public class ReplyHoldService {
             return "답변에 연결된 근거로 확인되지 않은 약속이 있어요.";
         }
         return "지금 등록된 정책·자료로 다시 확인이 필요해요.";
+    }
+
+    /** The cited schedules whose dates all passed, by their titles as the seller named them. */
+    static List<String> expiredOf(Finding found) {
+        return found.changed().stream().filter(InquiryDraftRecheck::isPastLabel)
+                .map(t -> t.substring(0, t.length() - InquiryDraftRecheck.PAST_SUFFIX.length()).strip())
+                .filter(t -> !t.isBlank()).toList();
     }
 
     /** The seller's sentences for a finding. Names titles, words and phrases; never the customer's text. */
@@ -752,6 +822,20 @@ public class ReplyHoldService {
                     + (now == null ? "" : now) + "」이에요. 실제로 끝났다면 확인한 결과를 먼저 고쳐 주세요. "
                     + "이 부분은 예외로 넘길 수 없어요.");
         }
+        // A value the material does not settle, in the seller's words: which attribute, the two values and their documents,
+        // what the reply says (2026-11-15). Never past by a decision — the reply is fixed, or the material settled first.
+        if (found.codes().contains(ReviewDraftRecheck.UNSETTLED_VALUE)) {
+            if (found.unsettled().isEmpty()) {
+                out.add("답변이 자료끼리 값이 다른 내용을 확정된 것처럼 적고 있어요. 자료를 정리하거나 그 문장을 고쳐 주세요.");
+            } else {
+                out.addAll(found.unsettled());
+            }
+            // Where it is settled depends on what it is: two documents → the knowledge screen; a planned date → the reply.
+            boolean documents = found.unsettled().isEmpty() || found.unsettled().stream()
+                    .anyMatch(u -> u.contains("자료마다 달라요") || u.contains("바뀌었는데") || u.contains("이전 기준"));
+            out.add(documents ? "이 부분은 확인만으로 넘길 수 없어요. 지식 화면의 「자료끼리 다른 값」에서 현행 자료를 정하거나, 답변에서 그 값을 빼 주세요."
+                    : "이 부분은 확인만으로 넘길 수 없어요. 답변을 고친 뒤 다시 확정해 주세요.");
+        }
         // Withdrawn documents are named on their own line; the changed line keeps only those whose wording moved.
         boolean offLine = found.codes().contains(ReviewDraftRecheck.SOURCE_RETIRED);
         if (offLine) {
@@ -759,8 +843,14 @@ public class ReplyHoldService {
                     : "초안이 인용한 자료(" + quoted(found.retired()) + ")를 그 뒤 사용 중지했거나 지웠어요. "
                             + "이 자료 없이도 답변이 맞는지 확인해 주세요.");
         }
+        if (found.codes().contains(InquiryDraftRecheck.SCHEDULE_EXPIRED)) {
+            List<String> past = expiredOf(found);
+            out.add((past.isEmpty() ? "초안이 인용한 일정" : "초안이 인용한 일정(" + quoted(past) + ")")
+                    + "의 날짜가 모두 지났어요. 지금 일정이 아니므로 최신 일정을 확인해 답변을 고치거나, 그대로 보내도 되는지 확인해 주세요.");
+        }
         if (found.codes().contains(ReviewDraftRecheck.SOURCE_CHANGED)) {
-            List<String> moved = found.changed().stream().filter(t -> !found.retired().contains(t)).toList();
+            List<String> moved = found.changed().stream().filter(t -> !found.retired().contains(t))
+                    .filter(t -> !InquiryDraftRecheck.isPastLabel(t)).toList();
             if (!offLine) {
                 out.add(moved.isEmpty() ? "초안이 인용한 자료가 그 뒤 바뀌었거나 빠졌어요."
                         : "초안이 인용한 자료(" + quoted(moved) + ")가 그 뒤 바뀌었거나 빠졌어요.");

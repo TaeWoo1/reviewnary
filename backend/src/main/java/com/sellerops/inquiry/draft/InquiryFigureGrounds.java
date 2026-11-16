@@ -118,8 +118,26 @@ public class InquiryFigureGrounds {
             case SELLER_CHECK -> sourceId == null || sellerChecks == null ? null : sellerChecks.findById(sourceId)
                     .filter(c -> orgId.equals(c.getOrgId()) && c.getSupersededAt() == null)
                     .map(com.sellerops.inquiry.sellercheck.InquirySellerCheckService::evidenceText).orElse(null);
+            // A schedule line while it is on and still the plan; turned off, deleted or past, the figure is checked again.
+            case SCHEDULE -> sourceId == null || schedules == null ? null : schedules.findByIdAndOrgId(sourceId, orgId)
+                    .filter(s -> com.sellerops.knowledge.schedule.KnowledgeScheduleService.current(s,
+                            com.sellerops.knowledge.currency.KnowledgeCurrencyService.today()))
+                    .map(s -> com.sellerops.knowledge.schedule.KnowledgeScheduleService.evidenceText(s,
+                            scheduleService == null ? null : scheduleService.nameOf(orgId, s.getProductId()), null))
+                    .orElse(null);
             case ORDER, QUESTION, NONE -> null;
         };
+    }
+
+    private com.sellerops.knowledge.schedule.KnowledgeScheduleRepository schedules;
+    private com.sellerops.knowledge.schedule.KnowledgeScheduleService scheduleService;
+
+    /** Schedule lines (2026-11-15); without them a schedule ground reads as nothing, so its figure is checked again. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSchedules(com.sellerops.knowledge.schedule.KnowledgeScheduleRepository schedules,
+                             com.sellerops.knowledge.schedule.KnowledgeScheduleService scheduleService) {
+        this.schedules = schedules;
+        this.scheduleService = scheduleService;
     }
 
     private com.sellerops.inquiry.sellercheck.InquirySellerCheckRepository sellerChecks;

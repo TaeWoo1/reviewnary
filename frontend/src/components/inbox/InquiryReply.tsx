@@ -885,7 +885,19 @@ function AnswerStateCard({
       ) : state.action ? (
         <p className="mt-1.5 break-keep text-base leading-relaxed text-ink">{state.action}</p>
       ) : null}
-      {noBasis ? (
+      {noBasis && state.unsettled ? (
+        // 자료가 없는 것이 아니라 두 자료가 서로 다르다(2026-11-15): 기준을 하나 더 쓰게 하지 않고, 어느 쪽이 현행인지
+        // 정하는 곳으로 보낸다. 직접 쓰는 길은 그대로 아래에 있다.
+        <p className="mt-2 break-keep text-sm leading-relaxed text-muted">
+          <Link
+            to="/knowledge"
+            className="rounded font-semibold text-brand-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+          >
+            자료끼리 다른 값 정하기
+          </Link>
+          {" · 그 값을 빼고 아래에 직접 쓸 수도 있어요."}
+        </p>
+      ) : noBasis ? (
         <p className="mt-2 break-keep text-sm leading-relaxed text-muted">
           근거가 없는 답변은 만들지 않아요. 아래에 직접 작성할 수 있어요.
         </p>
@@ -904,7 +916,7 @@ function AnswerStateCard({
         under. A box with nowhere to save is worse than no box, and the line above already says
         binding a product is the first thing to fix.
       */}
-      {noBasis && state.gapScope ? (
+      {noBasis && state.gapScope && !state.unsettled ? (
         <AnswerBasisQuickAdd
           scope={state.gapScope}
           productId={state.productId}

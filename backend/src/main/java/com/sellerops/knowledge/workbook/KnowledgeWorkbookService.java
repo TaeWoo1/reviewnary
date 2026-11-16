@@ -105,6 +105,8 @@ public class KnowledgeWorkbookService {
     static final String SHEET_STYLE = "말투";
     static final String SHEET_TEMPLATES = "답변 템플릿";
     static final String SHEET_MANUAL = "안내 매뉴얼";
+    /** Inbound · outbound · production schedules as lines with fields (owner decision 4, 2026-11-14). */
+    static final String SHEET_SCHEDULE = "입고·출고 일정";
 
     static final String USE = "사용";
     static final String PENDING = "확인 전";
@@ -120,6 +122,12 @@ public class KnowledgeWorkbookService {
 
     static final List<String> STYLE_HEADERS = List.of("항목", "지금 값", "새 값", "상태", "설명");
     static final List<String> TEMPLATE_HEADERS = List.of("유형", "언제 쓰나요", "지금 문구", "새 문구", "상태", "관리키");
+    static final List<String> SCHEDULE_HEADERS = List.of("관리번호", "상품번호", "상품명", "옵션", "종류", "예정/확정", "날짜",
+            "대상·범위", "마지막 확인일", "상태", "변경 확인");
+    static final String PLANNED = "예정";
+    static final String CONFIRMED = "확정";
+    static final String ALL_PRODUCTS = "(전체 상품)";
+
     static final List<String> MANUAL_HEADERS = List.of("관리번호", "범위", "상품번호", "상품명", "종류", "주제", "안내 문장",
             "고객은 이렇게 말해요", "상태", "같은 문제 리뷰", "메모", "변경 확인");
 
@@ -254,6 +262,9 @@ public class KnowledgeWorkbookService {
             writeStyle(book, look, styles.profileFor(orgId));
             writeTemplates(book, look, orgId);
             writeManual(book, look, orgId);
+            if (schedules != null) {
+                writeSchedules(book, look, orgId);
+            }
             book.write(out);
             return out.toByteArray();
         } catch (IOException e) {
@@ -273,6 +284,9 @@ public class KnowledgeWorkbookService {
                 "5. 「고객은 이렇게 말해요」에는 고객이 그 문제를 말하는 표현을 한 줄에 하나씩 적어요. "
                         + "리뷰에 이 표현이 있으면 그 안내가 답글 초안의 근거로 붙어요. 「안 떨어져요」처럼 부정하는 말은 붙지 않아요.",
                 "6. 새 안내는 맨 아래 빈 줄에 적어요. 관리번호는 비워 두세요. 상품 안내는 상품번호나 상품명이 있어야 해요.",
+                "6-1. 「입고·출고 일정」 시트에는 상품·옵션, 종류(입고 · 출고 · 생산), 예정/확정, 날짜(예: 2026-11-25), 대상·범위, "
+                        + "마지막 확인일을 한 줄에 하나씩 적어요. 「예정」 날짜는 고객에게 확정된 날짜처럼 안내되지 않아요. "
+                        + "확정 입고도 고객 한 분의 주문이 출고됐다는 뜻은 아니에요.",
                 "7. 지식 화면의 「엑셀 올리기」로 올리면, 바뀌는 내용을 먼저 보여 드리고 「적용」을 눌러야 반영돼요.",
                 "",
                 "관리번호 · 관리키 칸은 고치지 마세요. 어느 안내인지 찾는 데 써요."};
@@ -383,6 +397,196 @@ public class KnowledgeWorkbookService {
         sheet.addValidationData(scope);
     }
 
+    /* ═══════════════════════════════════ schedules ═══════════════════════════════════ */
+
+    private com.sellerops.knowledge.schedule.KnowledgeScheduleRepository schedules;
+    private com.sellerops.knowledge.schedule.KnowledgeScheduleService scheduleService;
+
+    /** The schedule sheet (2026-11-15). Optional: without it the workbook has the three sheets it always had. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSchedules(com.sellerops.knowledge.schedule.KnowledgeScheduleRepository schedules,
+                             com.sellerops.knowledge.schedule.KnowledgeScheduleService scheduleService) {
+        this.schedules = schedules;
+        this.scheduleService = scheduleService;
+    }
+
+    private void writeSchedules(Workbook book, Styles look, UUID orgId) {
+        Sheet sheet = header(book, look, SHEET_SCHEDULE, SCHEDULE_HEADERS,
+                new int[] {14, 14, 28, 14, 8, 10, 14, 30, 14, 12, 10});
+        sheet.setColumnHidden(SCHEDULE_HEADERS.indexOf("변경 확인"), true);
+        Map<UUID, Product> owned = new HashMap<>();
+        products.findAllByOrgId(orgId).forEach(p -> owned.put(p.getId(), p));
+        int r = 1;
+        for (com.sellerops.knowledge.schedule.KnowledgeSchedule s : schedules.findAllByOrgIdOrderByCreatedAtAsc(orgId)) {
+            Row row = sheet.createRow(r++);
+            String[] values = {"S-" + s.getId(), refOf(orgId, s.getProductId()),
+                    s.getProductId() == null ? ALL_PRODUCTS : nameOf(owned.get(s.getProductId())), nz(s.getOptionName()),
+                    s.getKind().labelKo(), s.getStatus().labelKo(),
+                    s.getScheduleDate() == null ? "" : s.getScheduleDate().toString(), nz(s.getScopeNote()),
+                    s.getLastCheckedOn() == null ? "" : s.getLastCheckedOn().toString(), s.isActive() ? USE : OFF,
+                    fingerprint(s)};
+            for (int c = 0; c < values.length; c++) {
+                cell(row, c, values[c], c == 0 ? look.note : c == 9 ? look.edit : look.plain);
+            }
+        }
+        for (int i = 0; i < 20; i++) {
+            Row row = sheet.createRow(r++);
+            for (int c = 0; c < SCHEDULE_HEADERS.size(); c++) {
+                cell(row, c, "", c == 9 ? look.edit : look.plain);
+            }
+        }
+        statusList(sheet, 4, 1, r - 1, "입고", "출고", "생산");
+        statusList(sheet, 5, 1, r - 1, PLANNED, CONFIRMED);
+        statusList(sheet, 9, 1, r - 1, USE, OFF);
+    }
+
+    static String fingerprint(com.sellerops.knowledge.schedule.KnowledgeSchedule s) {
+        return digest(String.valueOf(s.getProductId()), s.getOptionName(), s.getKind().name(), s.getStatus().name(),
+                String.valueOf(s.getScheduleDate()), s.getScopeNote(), String.valueOf(s.getLastCheckedOn()),
+                String.valueOf(s.isActive()));
+    }
+
+    private void readSchedules(UUID orgId, Sheet sheet, Plan plan, String actorName) {
+        Map<String, Integer> col = columns(sheet, SCHEDULE_HEADERS);
+        if (col == null || !col.keySet().containsAll(List.of("종류", "예정/확정", "날짜", "상품명"))) {
+            plan.problem(SHEET_SCHEDULE, 1, "머리줄(관리번호 · 상품명 · 종류 · 예정/확정 · 날짜 · 상태 …)이 없어 이 시트를 읽지 않았어요.");
+            return;
+        }
+        Map<UUID, Product> owned = new HashMap<>();
+        products.findAllByOrgId(orgId).forEach(p -> owned.put(p.getId(), p));
+        for (int r = 1; r <= sheet.getLastRowNum(); r++) {
+            Row row = sheet.getRow(r);
+            int at = r + 1;
+            String id = text(row, col.get("관리번호"));
+            String ref = text(row, col.get("상품번호"));
+            String name = text(row, col.get("상품명"));
+            String option = text(row, col.get("옵션"));
+            String kindLabel = text(row, col.get("종류"));
+            String statusLabel = text(row, col.get("예정/확정"));
+            String dateRaw = dateText(row, col.get("날짜"));
+            String scopeNote = text(row, col.get("대상·범위"));
+            String checkedRaw = dateText(row, col.get("마지막 확인일"));
+            String state = text(row, col.get("상태"));
+            if (id.isEmpty() && ref.isEmpty() && name.isEmpty() && option.isEmpty() && kindLabel.isEmpty()
+                    && statusLabel.isEmpty() && dateRaw.isEmpty() && scopeNote.isEmpty()) {
+                continue;
+            }
+            com.sellerops.knowledge.schedule.KnowledgeSchedule.Kind kind = byLabel(
+                    com.sellerops.knowledge.schedule.KnowledgeSchedule.Kind.values(),
+                    com.sellerops.knowledge.schedule.KnowledgeSchedule.Kind::labelKo, kindLabel);
+            com.sellerops.knowledge.schedule.KnowledgeSchedule.Status status = byLabel(
+                    com.sellerops.knowledge.schedule.KnowledgeSchedule.Status.values(),
+                    com.sellerops.knowledge.schedule.KnowledgeSchedule.Status::labelKo, statusLabel);
+            if (kind == null) {
+                plan.problem(SHEET_SCHEDULE, at, "종류는 입고 · 출고 · 생산 중 하나로 적어 주세요.");
+                continue;
+            }
+            if (status == null) {
+                plan.problem(SHEET_SCHEDULE, at, "「예정/확정」은 예정 · 확정 중 하나로 적어 주세요.");
+                continue;
+            }
+            java.time.LocalDate date = parseDate(dateRaw);
+            java.time.LocalDate checked = parseDate(checkedRaw);
+            if (!dateRaw.isEmpty() && date == null || !checkedRaw.isEmpty() && checked == null) {
+                plan.problem(SHEET_SCHEDULE, at, "날짜를 읽지 못했어요. 2026-11-25처럼 적어 주세요.");
+                continue;
+            }
+            if (status == com.sellerops.knowledge.schedule.KnowledgeSchedule.Status.CONFIRMED && date == null) {
+                plan.problem(SHEET_SCHEDULE, at, "확정 일정에는 날짜가 있어야 해요.");
+                continue;
+            }
+            boolean active;
+            if (USE.equals(state) || state.isEmpty() && id.isEmpty()) {
+                active = true;
+            } else if (OFF.equals(state)) {
+                active = false;
+            } else {
+                plan.problem(SHEET_SCHEDULE, at, "상태는 사용 · 사용 안 함 중 하나로 적어 주세요.");
+                continue;
+            }
+            UUID productId = null;
+            if (!(ref.isEmpty() && (name.isEmpty() || ALL_PRODUCTS.equals(name)))) {
+                productId = productOf(orgId, owned, ref, ALL_PRODUCTS.equals(name) ? "" : name);
+                if (productId == null) {
+                    plan.problem(SHEET_SCHEDULE, at, "상품을 찾지 못했어요. 상품번호나 상품명을 확인하시거나, 모든 상품의 일정이라면 "
+                            + "상품명을 「" + ALL_PRODUCTS + "」로 적어 주세요.");
+                    continue;
+                }
+            }
+            String where = productId == null ? ALL_PRODUCTS : nameOf(owned.get(productId))
+                    + (option.isEmpty() ? "" : " · " + option);
+            String after = kind.labelKo() + " " + status.labelKo() + " " + (date == null ? "(날짜 미정)" : date)
+                    + (scopeNote.isEmpty() ? "" : " · " + scopeNote) + (active ? "" : " (사용 안 함)");
+            final UUID product = productId;
+            final java.time.LocalDate day = date;
+            final java.time.LocalDate last = checked;
+            final boolean on = active;
+            final String opt = option;
+            final String note = scopeNote;
+            if (id.isEmpty()) {
+                plan.change(SHEET_SCHEDULE, at, "새 일정 등록", where, null, after, () -> scheduleService.save(orgId, null,
+                        product, opt, kind, status, day, note, last, on, actorName));
+                continue;
+            }
+            UUID existing = id.startsWith("S-") ? uuid(id.substring(2)) : null;
+            com.sellerops.knowledge.schedule.KnowledgeSchedule current = existing == null ? null
+                    : schedules.findByIdAndOrgId(existing, orgId).orElse(null);
+            if (current == null) {
+                plan.problem(SHEET_SCHEDULE, at, "관리번호에 맞는 일정이 없어요. 새 일정이라면 관리번호를 비워 주세요.");
+                continue;
+            }
+            String base = text(row, col.get("변경 확인"));
+            String now = fingerprint(current);
+            String before = current.getKind().labelKo() + " " + current.getStatus().labelKo() + " "
+                    + (current.getScheduleDate() == null ? "(날짜 미정)" : current.getScheduleDate())
+                    + (current.getScopeNote() == null ? "" : " · " + current.getScopeNote())
+                    + (current.isActive() ? "" : " (사용 안 함)");
+            boolean same = java.util.Objects.equals(current.getProductId(), product)
+                    && nz(current.getOptionName()).equals(opt) && current.getKind() == kind
+                    && current.getStatus() == status && java.util.Objects.equals(current.getScheduleDate(), day)
+                    && nz(current.getScopeNote()).equals(note)
+                    && java.util.Objects.equals(current.getLastCheckedOn(), last) && current.isActive() == on;
+            if (same) {
+                continue;
+            }
+            String conflict = base.isEmpty() ? NO_BASE : base.equals(now) ? null : STALE;
+            plan.guarded(conflict, () -> schedules.findByIdAndOrgId(existing, orgId).map(KnowledgeWorkbookService::fingerprint)
+                            .map(now::equals).orElse(false), SHEET_SCHEDULE, at, "일정 고침", where, before, after,
+                    () -> scheduleService.save(orgId, existing, product, opt, kind, status, day, note, last, on,
+                            actorName));
+        }
+    }
+
+    /** A date cell as text: a date Excel stored as a number is read as the day it shows. */
+    private static String dateText(Row row, Integer column) {
+        if (row == null || column == null) {
+            return "";
+        }
+        Cell cell = row.getCell(column);
+        if (cell != null && cell.getCellType() == org.apache.poi.ss.usermodel.CellType.NUMERIC
+                && org.apache.poi.ss.usermodel.DateUtil.isCellDateFormatted(cell)) {
+            return cell.getLocalDateTimeCellValue().toLocalDate().toString();
+        }
+        return text(row, column);
+    }
+
+    private static java.time.LocalDate parseDate(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(\\d{4})[-./](\\d{1,2})[-./](\\d{1,2})\\.?$")
+                .matcher(raw.strip());
+        if (!m.find()) {
+            return null;
+        }
+        try {
+            return java.time.LocalDate.of(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)),
+                    Integer.parseInt(m.group(3)));
+        } catch (java.time.DateTimeException e) {
+            return null;
+        }
+    }
+
     /* ═══════════════════════════════════ upload ═══════════════════════════════════ */
 
     /**
@@ -401,7 +605,8 @@ public class KnowledgeWorkbookService {
             Sheet style = book.getSheet(SHEET_STYLE);
             Sheet templateSheet = book.getSheet(SHEET_TEMPLATES);
             Sheet manual = book.getSheet(SHEET_MANUAL);
-            if (style == null && templateSheet == null && manual == null) {
+            Sheet scheduleSheet = schedules == null ? null : book.getSheet(SHEET_SCHEDULE);
+            if (style == null && templateSheet == null && manual == null && scheduleSheet == null) {
                 throw ApiException.badRequest("「말투」 · 「답변 템플릿」 · 「안내 매뉴얼」 시트가 없어요. 지식 화면에서 내려받은 파일을 써 주세요.");
             }
             if (style != null) {
@@ -412,6 +617,9 @@ public class KnowledgeWorkbookService {
             }
             if (manual != null) {
                 readManual(orgId, manual, plan, actorUserId, actorName);
+            }
+            if (scheduleSheet != null) {
+                readSchedules(orgId, scheduleSheet, plan, actorName);
             }
         } catch (IOException e) {
             throw ApiException.badRequest("엑셀 파일을 읽지 못했어요.");

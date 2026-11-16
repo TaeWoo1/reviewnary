@@ -141,6 +141,14 @@ public class InquiryDraftComposer {
 
     private DraftReviewPendingRepository pending;
 
+    private EvalHoldTrace holdTrace;
+
+    /** The evaluation's refusal trace — off outside a synthetic evaluation, and never the application log. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setHoldTrace(EvalHoldTrace holdTrace) {
+        this.holdTrace = holdTrace;
+    }
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     public void setPending(DraftReviewPendingRepository pending) {
         this.pending = pending;
@@ -417,9 +425,17 @@ public class InquiryDraftComposer {
     ClaimCheck checkClaims(UUID orgId, String body, List<AgentDraftGenerator.Passage> shown, String title,
                            String details, String orderSentence, com.sellerops.agent.quota.AgentUsageActor actor,
                            String specLine, String answerScope, String step) {
+        return checkClaims(orgId, body, shown, title, details, orderSentence, actor, specLine, answerScope, step,
+                List.of());
+    }
+
+    /** As above, a number inside the inquiry product's recorded name not being a figure to verify. */
+    ClaimCheck checkClaims(UUID orgId, String body, List<AgentDraftGenerator.Passage> shown, String title,
+                           String details, String orderSentence, com.sellerops.agent.quota.AgentUsageActor actor,
+                           String specLine, String answerScope, String step, List<String> productNames) {
         String question = String.join(" ", title == null ? "" : title, details == null ? "" : details).strip();
         List<InquiryClaimGuard.FigureClaim> toVerify = InquiryClaimGuard.figuresToVerify(body,
-                shown.stream().map(AgentDraftGenerator.Passage::text).toList(), question, orderSentence);
+                shown.stream().map(AgentDraftGenerator.Passage::text).toList(), question, orderSentence, productNames);
         List<String> asked = toVerify.stream().map(c -> c.index() + ". " + c.value() + (c.unit() == null ? "" : c.unit())
                 + (c.questionOnly() ? " (고객 문의에만 있는 숫자)" : "") + " — 문장: " + c.sentence()).toList();
         // Counted against the actual AI ceiling like every call (owner, 2026-10-29); not a new piece of the seller's work.
@@ -491,6 +507,13 @@ public class InquiryDraftComposer {
     static List<InquiryClaimGuard.Violation> unsupportedClaims(String body, List<AgentDraftGenerator.Passage> shown,
                                                                AnswerStyleProfile style, String title, String details,
                                                                String orderSentence) {
+        return unsupportedClaims(body, shown, style, title, details, orderSentence, List.of());
+    }
+
+    /** As above, a number inside the inquiry product's recorded name not being a figure claim. */
+    static List<InquiryClaimGuard.Violation> unsupportedClaims(String body, List<AgentDraftGenerator.Passage> shown,
+                                                               AnswerStyleProfile style, String title, String details,
+                                                               String orderSentence, List<String> productNames) {
         List<String> voice = new ArrayList<>();
         if (style != null) {
             voice.addAll(style.requiredPhrases());
@@ -500,7 +523,8 @@ public class InquiryDraftComposer {
         }
         return InquiryClaimGuard.unsupportedClaims(body,
                 shown.stream().map(AgentDraftGenerator.Passage::text).toList(), voice,
-                String.join(" ", title == null ? "" : title, details == null ? "" : details), orderSentence);
+                String.join(" ", title == null ? "" : title, details == null ? "" : details), orderSentence,
+                productNames);
     }
 
     /** 2026-11-02 seller-check review: the seller recorded the action as not finished, and the draft said it was. */
@@ -509,6 +533,82 @@ public class InquiryDraftComposer {
 
     static final String UNREQUESTED_ASK = "초안이 판정에 없는 내용을 고객에게 묻고 있어 저장하지 않았어요. 다시 생성해 보시거나 "
             + "직접 작성해 주세요.";
+
+    /**
+     * A sentence about one option's stock or schedule in a reply to a question that asked nothing about stock (2026-11-16
+     * B-plan q13: asked when an order paid at 4 p.m. arrives, the reply added 「그레이 옵션은 일정표상 품절 · 재입고 대기이며
+     * 11월 25일 입고 예정」 — the judge had cited the schedule for the delivery need, and the drafter read the grey row as
+     * the customer's). Which option the customer bought is not known, so the sentence answers a question nobody asked and
+     * may read as theirs. Narrow on purpose (Codex review, the same night): only when the question carries no stock or
+     * restock word at all — a question about an option's stock or schedule is answered as far as the evidence goes, one
+     * option or several, and a partial answer stays a partial answer — and only a sentence that both states stock or a
+     * restock and names an option (a known option name, or 「옵션」 · 「색상」) the customer did not write: a delivery
+     * question about the option they named is answered by that option's stock. A shipping rule, a making time, a
+     * policy are never read here.
+     */
+    static final String UNASKED_SCHEDULE = "초안이 고객이 묻지 않은 옵션의 재고·입고 일정을 안내하고 있어 저장하지 않았어요. 다시 생성해 "
+            + "보시거나 직접 작성해 주세요.";
+
+    /** A question that asks about stock, a restock or making — the option's schedule is then in scope. */
+    static final java.util.regex.Pattern STOCK_ASKED = java.util.regex.Pattern.compile(
+            "입고|재입고|품절|재고|들어오|들어와|입하|생산|제작\\s*(?:언제|시작)|남아\\s*있|구매\\s*가능|살\\s*수\\s*있");
+    /** A sentence stating stock or a restock. */
+    static final java.util.regex.Pattern STOCK_SAID = java.util.regex.Pattern.compile("품절|재입고|입고|재고|입하");
+
+    /** 「그레이 옵션」 · 「민트 색상」 — the label before the word, as the reply names an option. */
+    static final java.util.regex.Pattern OPTION_LABEL = java.util.regex.Pattern.compile(
+            "([가-힣A-Za-z0-9]{1,12})\\s*(?:옵션|색상)");
+    /** Words that stand before 「옵션」 · 「색상」 without naming one. */
+    static final java.util.Set<String> NOT_A_LABEL = java.util.Set.of("상품", "해당", "다른", "전체", "모든", "각", "이",
+            "그", "어느", "선택", "구매", "주문", "기본", "같은", "나머지");
+
+    /**
+     * The reply's sentences about the stock or schedule of an option the customer did not name — empty when in scope.
+     * A sentence about the option the customer named (「민트 색상 오늘 출고되나요?」 → 「민트는 품절이라 11월 25일 입고 예정」)
+     * is the answer to them and stays, whatever the question asked; so does any sentence when the question asks about
+     * stock at all.
+     */
+    static List<String> unaskedSchedule(String draft, String title, String details, List<SpecApplicability.Option> options) {
+        String question = String.join(" ", title == null ? "" : title, details == null ? "" : details);
+        if (draft == null || STOCK_ASKED.matcher(question).find()) {
+            return List.of();
+        }
+        String asked = question.replaceAll("\\s+", "");
+        List<String> out = new ArrayList<>();
+        for (String sentence : draft.split("(?<=[.!?。])\\s+|\\n+")) {
+            if (!STOCK_SAID.matcher(sentence).find()) {
+                continue;
+            }
+            java.util.Set<String> labels = new java.util.LinkedHashSet<>();
+            SpecApplicability.optionsNamed(sentence, options).forEach(o -> labels.add(o.name().strip()));
+            java.util.regex.Matcher m = OPTION_LABEL.matcher(sentence);
+            boolean optionWord = false;
+            while (m.find()) {
+                optionWord = true;
+                String label = m.group(1).replaceAll("(은|는|이|가|의|도)$", "");
+                if (!label.isEmpty() && !NOT_A_LABEL.contains(label)) {
+                    labels.add(label);
+                }
+            }
+            if (labels.isEmpty() && !optionWord) {
+                continue; // about the product or the shop, not one option
+            }
+            boolean theirs = labels.stream().anyMatch(l -> asked.contains(l.replaceAll("\\s+", "")))
+                    || !SpecApplicability.optionsNamed(question, options).isEmpty()
+                            && SpecApplicability.optionsNamed(question, options).stream()
+                                    .anyMatch(o -> labels.contains(o.name().strip()));
+            if (!theirs) {
+                out.add(sentence.strip());
+            }
+        }
+        return List.copyOf(out);
+    }
+
+    static String rewriteUnaskedSchedule(List<String> sentences) {
+        return REWRITE_HEAD + sentences.stream().map(x -> "「" + x + "」").collect(java.util.stream.Collectors.joining(", "))
+                + "처럼 고객이 묻지 않은 옵션의 재고·입고 일정을 썼습니다. 고객은 재고나 입고를 묻지 않았고, 어느 옵션을 샀는지 "
+                + "모릅니다. 그 문장은 빼고, 문의에 답하는 나머지는 그대로 씁니다";
+    }
 
     static String rewriteUnrequestedAsk(List<String> asks) {
         return REWRITE_HEAD + asks.stream().map(x -> "「" + x + "」").collect(java.util.stream.Collectors.joining(", "))
@@ -911,8 +1011,20 @@ public class InquiryDraftComposer {
         // The need list the drafter and the claim check both read, with when the inquiry arrived (2026-11-02): a date the
         // seller's side knows is not a question for the customer.
         // …and the send limit of this inquiry kind (2026-11-02): a draft longer than it is kept but cannot be sent as written.
-        String draftScope = needDecisionEarly == null ? null : withLine(withMoment(needDecisionEarly.answerScope(),
+        // …and which product the inquiry is about (2026-11-16 §7.57: q13's check read 「주문 제작 상품은 이 출고 기준을 따르지
+        // 않습니다」 beside a bedding question it was never told was about bedding, and held the common rule as a dropped
+        // condition). A fact the system recorded, as the received line is.
+        // The name as a customer reads it: a synthetic or demo marker is not part of it (B-plan q09 S4).
+        String recordedName = assessor == null ? null : assessor.displayName(orgId, assessment.productId());
+        String inquiryProduct = SpecApplicability.withoutNonIdentifyingTags(recordedName);
+        List<SpecApplicability.Option> productOptions = assessor == null || assessment.productId() == null ? List.of()
+                : assessor.optionsFor(orgId, assessment.productId());
+        List<String> productNames = recordedName == null ? List.of()
+                : java.util.stream.Stream.of(recordedName, inquiryProduct).filter(java.util.Objects::nonNull).distinct()
+                        .toList();
+        String draftScope = needDecisionEarly == null ? null : withLine(withLine(withMoment(needDecisionEarly.answerScope(),
                 com.sellerops.inquiry.decision.InquiryMoment.of(inquiry.getReceivedAt())),
+                productLine(inquiryProduct)),
                 com.sellerops.inquiry.reply.InquiryReplyLength.draftLine(channelCodeOf(inquiry.getChannelId()),
                         inquiry.getSourceSubtype()));
         List<AgentDraftGenerator.Passage> shownEarly = needDecisionEarly != null ? needDecisionEarly.passages()
@@ -974,6 +1086,11 @@ public class InquiryDraftComposer {
                     boolean rewritten = attempt > 1;
                     String fix = null;
                     String because = null;
+                    // For the evaluation's refusal trace only (EvalHoldTrace, off outside a synthetic evaluation).
+                    String traced = written.isPresent() ? written.get().comments() : null;
+                    String traceStage = null;
+                    List<String> traceCodes = List.of();
+                    List<String> traceMatched = List.of();
                     if (written.isEmpty()) {
                         unavailable = MODEL_FAILED;
                     } else if (com.sellerops.knowledge.KnowledgeBlanks.carries(written.get().comments())) {
@@ -981,12 +1098,23 @@ public class InquiryDraftComposer {
                         unavailable = UNCONFIRMED_TEXT;
                         fix = REWRITE_BLANK;
                         because = "BLANK";
+                        traceStage = "BLANK";
+                    } else if (!unaskedSchedule(written.get().comments(), title, details, productOptions).isEmpty()) {
+                        List<String> unasked = unaskedSchedule(written.get().comments(), title, details, productOptions);
+                        log.info("inquiry_draft_refused orgId={} kinds=[UNASKED_SCHEDULE] attempt={}", orgId, attempt);
+                        written = Optional.empty();
+                        unavailable = UNASKED_SCHEDULE;
+                        fix = rewriteUnaskedSchedule(unasked);
+                        because = "UNASKED_SCHEDULE";
+                        traceStage = "UNASKED_SCHEDULE";
+                        traceMatched = unasked;
                     } else if (!AnswerStyleInstruction
                             .forbiddenPresentIn(written.get().comments(), style).isEmpty()) {
                         // The prompt asked; this checks. A style line is a request to a model, and a
                         // rule the company set is not satisfied by having asked politely.
                         fix = rewriteForbidden(AnswerStyleInstruction.forbiddenPresentIn(written.get().comments(), style));
                         because = "STYLE";
+                        traceStage = "STYLE";
                         written = Optional.empty();
                         unavailable = STYLE_FORBIDDEN_PHRASE;
                     } else if (recorded != null && !com.sellerops.inquiry.sellercheck.SellerCheckGuard
@@ -1000,6 +1128,8 @@ public class InquiryDraftComposer {
                         unavailable = COMPLETION_NOT_RECORDED;
                         fix = rewriteCompletion(finished, recorded.labelKo());
                         because = "COMPLETION";
+                        traceStage = "COMPLETION";
+                        traceMatched = finished;
                     } else if (!CustomerAskGuard.unrequestedAsks(written.get().comments(), needDecision, recorded,
                             specSentence).isEmpty()) {
                         // Asking back is not a claim, but only what the judgement left for the customer may be asked
@@ -1011,8 +1141,10 @@ public class InquiryDraftComposer {
                         unavailable = UNREQUESTED_ASK;
                         fix = rewriteUnrequestedAsk(asks);
                         because = "UNREQUESTED_ASK";
+                        traceStage = "UNREQUESTED_ASK";
+                        traceMatched = asks;
                     } else if (!(claims = unsupportedClaims(written.get().comments(), shown, style, title, details,
-                            retrieved.order().messageKo())).isEmpty()) {
+                            retrieved.order().messageKo(), productNames)).isEmpty()) {
                         // The same relationship, with the evidence: the prompt forbids inventing a follow-up, a request of
                         // the customer, a remedy or a figure; this refuses a reply that did. Refused, never edited — and a
                         // figure the check could not match says so, so the seller knows what to look at. The kinds go to
@@ -1029,6 +1161,9 @@ public class InquiryDraftComposer {
                                 ? DROPPED_CONDITION : UNSUPPORTED_CLAIM;
                         fix = rewriteClaims(claims);
                         because = fix == null ? null : "GUARD";
+                        traceStage = "GUARD";
+                        traceCodes = claims.stream().map(c -> c.kind().name()).distinct().toList();
+                        traceMatched = claims.stream().map(InquiryClaimGuard.Violation::matched).toList();
                     } else {
                         ClaimCheck claimCheck;
                         boolean recheckWaits = false;
@@ -1036,23 +1171,25 @@ public class InquiryDraftComposer {
                             // Held at the second look: the first check already ran and came back incomplete. Only the
                             // one look that is left runs — the count is the calls made, and a resume grants no new one.
                             awaitingRecheck = false;
-                            claimCheck = recheckClaims(orgId, written.get().comments(), shown, title, details,
-                                    retrieved.order().messageKo(), usageActorOf(actor), specSentence, draftScope);
+                            claimCheck = checkClaims(orgId, written.get().comments(), shown, title, details,
+                                    retrieved.order().messageKo(), usageActorOf(actor), specSentence, draftScope,
+                                    RECHECK_STEP, productNames);
                             recheckWaits = REVIEW_PENDING.equals(claimCheck.refusal());
                             log.info("inquiry_claim_recheck orgId={} resumed=true complete={}", orgId,
                                     claimCheck.refusal() == null && coverageAnswered(needDecision, claimCheck.covered()));
                         } else {
                             claimCheck = checkClaims(orgId, written.get().comments(), shown, title, details,
                                     retrieved.order().messageKo(), usageActorOf(actor), specSentence, draftScope,
-                                    rewritten ? REDRAFT_CHECK_STEP : AgentQuotaService.CHECK_STEP);
+                                    rewritten ? REDRAFT_CHECK_STEP : AgentQuotaService.CHECK_STEP, productNames);
                             if (claimCheck.refusal() == null && !claimCheck.statedNothing()
                                     && !coverageAnswered(needDecision, claimCheck.covered())) {
                                 // An incomplete answer and nothing else found (2026-11-05 tenth review, K3): the same
                                 // draft, need list and evidence are checked once more — never rewritten for it. Once per
                                 // text: a finding in the first answer is never re-asked away. Metered like any check; a
                                 // look the ceiling stops is kept for later, not lost (eleventh review).
-                                ClaimCheck second = recheckClaims(orgId, written.get().comments(), shown, title, details,
-                                        retrieved.order().messageKo(), usageActorOf(actor), specSentence, draftScope);
+                                ClaimCheck second = checkClaims(orgId, written.get().comments(), shown, title, details,
+                                        retrieved.order().messageKo(), usageActorOf(actor), specSentence, draftScope,
+                                        RECHECK_STEP, productNames);
                                 recheckWaits = REVIEW_PENDING.equals(second.refusal());
                                 log.info("inquiry_claim_recheck orgId={} resumed=false complete={} waits={}", orgId,
                                         second.refusal() == null && coverageAnswered(needDecision, second.covered()),
@@ -1084,6 +1221,9 @@ public class InquiryDraftComposer {
                             pending.findByOrgIdAndWorkItemId(orgId, workItemId).ifPresent(pending::delete);
                         }
                         if (unchecked != null) {
+                            traceStage = recheckWaits || REVIEW_PENDING.equals(unchecked) ? "HELD_FOR_BUDGET" : "CLAIM_CHECK";
+                            traceCodes = List.of(String.valueOf(unavailableKind(unchecked)));
+                            traceMatched = claimCheck.unsupported() == null ? List.of() : List.of(claimCheck.unsupported());
                             // Whether a figure is about the same thing, and whether a fact, condition or promise the draft
                             // states is what the evidence says, is read by the model; what it does not confirm stays out.
                             written = Optional.empty();
@@ -1097,6 +1237,10 @@ public class InquiryDraftComposer {
                                 because = "UNSUPPORTED_STATEMENT";
                             }
                         }
+                    }
+                    if (traced != null && written.isEmpty() && holdTrace != null) {
+                        holdTrace.record(workItemId, attempt, rewriteBecause, traceStage, traceCodes, traceMatched,
+                                unavailable, traced, shown, draftScope);
                     }
                     if (rewritten) {
                         // Waiting for the check's budget is not a refusal (fifth review): PENDING, and the resume says how
@@ -1282,6 +1426,18 @@ public class InquiryDraftComposer {
         return scope == null || scope.isBlank() ? line : scope + "\n" + line;
     }
 
+    /**
+     * The line naming the inquiry's product — the same text to the drafter and the claim check. None without a name: a
+     * check that does not know the product reads every exception as possibly this product's, which is the safe side.
+     */
+    static String productLine(String productName) {
+        if (productName == null || productName.isBlank()) {
+            return null;
+        }
+        return "- 문의 상품: " + productName.strip() + " → 시스템이 기록한 이 문의의 상품입니다. 근거가 이 상품이 아닌 다른 "
+                + "상품에만 다는 예외는 이 상품의 조건이 아닙니다";
+    }
+
     /** The need list with the received line after it — the same text to the drafter and the claim check. */
     static String withMoment(String scope, String moment) {
         String line = com.sellerops.inquiry.decision.InquiryMoment.scopeLine(moment);
@@ -1436,10 +1592,26 @@ public class InquiryDraftComposer {
                 : basis.actionKo(retrieved.state(), verdict.topicWord(), verdict.applicability(),
                         retrieved.productOutcome(), retrieved.policyOutcome(), asked, retrieved.policyDeclares(asked),
                         verdict.optionsRegistered());
+        // Not 「답변 기준이 필요해요」 when the store wrote it down twice, differently (2026-11-15): what the seller needs is
+        // to say which document is current, and where — never to add a third.
+        List<String> unsettled = gap == null || gap.needs() == null ? List.of() : gap.needs().stream()
+                .filter(n -> com.sellerops.inquiry.decision.NeedResult.Enforcement.UNRESOLVED_CONFLICT_KO
+                        .equals(n.statusKo()) && n.missing() != null)
+                .map(com.sellerops.inquiry.draft.dto.NeedCoverageView::missing).distinct().toList();
+        if (basis == AnswerBasisState.NO_ANSWER_BASIS && !unsettled.isEmpty() && unavailableMessage == null) {
+            return new GeneratedDraftView(null, null, retrieved.state().name(),
+                    retrieved.state().messageKo(retrieved.scopes()), basis.name(), UNSETTLED_NOTE,
+                    String.join(" ", unsettled) + " " + UNSETTLED_ACTION, retrieved.productId(), List.of(), false,
+                    null, gap);
+        }
         return new GeneratedDraftView(null, null, retrieved.state().name(),
                 retrieved.state().messageKo(retrieved.scopes()), basis.name(), basis.messageKo(), action,
                 retrieved.productId(), List.of(), false, unavailableMessage, gap);
     }
+
+    /** The answer-basis line when the material disagrees with itself on what was asked (2026-11-15). */
+    static final String UNSETTLED_NOTE = "자료끼리 값이 달라 답변을 만들지 않았어요.";
+    static final String UNSETTLED_ACTION = "상품·정책 화면의 「자료끼리 다른 값」에서 어느 자료가 현행인지 정하면 다시 만들 수 있어요.";
 
     /**
      * One bounded 상세페이지 read, when this inquiry names a product exactly and that product's
@@ -1570,6 +1742,7 @@ public class InquiryDraftComposer {
                 // The order sentence is looked up as itself, after the seller's material.
                 case ORDER_FACT -> null;
                 case SELLER_CHECK -> InquiryDraftFigure.Ground.SELLER_CHECK;
+                case SCHEDULE -> InquiryDraftFigure.Ground.SCHEDULE;
             };
             out.add(kind == null ? null : new InquiryFigureGrounds.Shown(kind, e.sourceId(), e.productId(), e.text()));
         }
@@ -1677,6 +1850,7 @@ public class InquiryDraftComposer {
             // No source/chunk: this evidence points at no document. What it points at is a moment.
             row.setTitle(KnowledgeScope.ORDER_STATE.labelKo());
             row.setLocator(orderLocator(order));
+            row.setKnowledgeState(orderedMark(order));
             evidence.save(row);
             // No excerpt: an order fact points at a moment, not a document.
             views.add(new DraftEvidenceView(row.getKind(), KnowledgeScope.ORDER_STATE.labelKo(),
@@ -1703,6 +1877,7 @@ public class InquiryDraftComposer {
                 // The seller's record is not a library and not the channel's order state: it is named by its own
                 // evidence row (판매자 확인), never folded into one of these.
                 case SELLER_CHECK -> null;
+                case SCHEDULE -> com.sellerops.knowledge.KnowledgeScope.PRODUCT;
             };
             if (scope != null) {
                 scopes.add(scope);
@@ -1723,6 +1898,7 @@ public class InquiryDraftComposer {
                 case PRODUCT_FACTS, OPTIONS, ADDONS -> InquiryDraftEvidence.KIND_PRODUCT_FACT;
                 case ORDER_FACT -> InquiryDraftEvidence.KIND_ORDER_FACT;
                 case SELLER_CHECK -> InquiryDraftEvidence.KIND_SELLER_CHECK;
+                case SCHEDULE -> InquiryDraftEvidence.KIND_SCHEDULE;
             };
             if (e.kind() == com.sellerops.inquiry.decision.EvidenceCandidate.Kind.ORDER_FACT
                     && (order == null || !order.available())) {
@@ -1737,12 +1913,23 @@ public class InquiryDraftComposer {
             boolean knowledge = e.kind() == com.sellerops.inquiry.decision.EvidenceCandidate.Kind.ORG_KNOWLEDGE
                     || e.kind() == com.sellerops.inquiry.decision.EvidenceCandidate.Kind.PRODUCT_KNOWLEDGE;
             row.setSourceId(knowledge || e.sourceId() != null ? e.sourceId() : e.productId());
+            // What the material said of this passage's values when the draft was written (설계 2절 ⑤) — the record of what
+            // the drafter was shown. The screen and the checks read the state again; they never trust this.
+            if (e.mark() != null && !e.mark().isEmpty()) {
+                String line = e.mark().line();
+                row.setKnowledgeState(line.length() > 500 ? line.substring(0, 500) : line);
+            }
+            if (e.kind() == com.sellerops.inquiry.decision.EvidenceCandidate.Kind.ORDER_FACT) {
+                row.setKnowledgeState(orderedMark(order));
+            }
             row.setChunkId(knowledge ? e.chunkId() : null);
             row.setTitle(e.label());
             row.setLocator(e.kind() == com.sellerops.inquiry.decision.EvidenceCandidate.Kind.ORDER_FACT
                     ? orderLocator(order)
                     : e.kind() == com.sellerops.inquiry.decision.EvidenceCandidate.Kind.SELLER_CHECK
                     ? "seller-check/" + e.factKey()
+                    // A schedule line is cited with what it said: a line edited since reads as a changed citation.
+                    : e.kind() == com.sellerops.inquiry.decision.EvidenceCandidate.Kind.SCHEDULE ? e.factKey()
                     : "need-decision/" + e.kind().name().toLowerCase(java.util.Locale.ROOT)
                             + (e.factKey() == null ? "" : ":" + e.factKey()));
             evidence.save(row);
@@ -1761,6 +1948,18 @@ public class InquiryDraftComposer {
      * claim, and re-checking an order state means re-reading the channel at a date — which this
      * says — not looking the number up in a log.
      */
+    /**
+     * The order date the search measured every 적용일 against, kept on the order's citation (2026-11-15 review: 검색에서
+     * 알고 있던 주문일을 승인 · 등록 재검사도 같은 출처로) — {@code ordered:2026-11-05}, or null when the order named no date.
+     * A fact of the order, not of the material: the checks read the material again, and this date with it.
+     */
+    static String orderedMark(OrderFact order) {
+        return order == null || order.orderedAt() == null ? null : ORDERED + order.orderedAt();
+    }
+
+    /** The prefix of {@link #orderedMark}. */
+    public static final String ORDERED = "ordered:";
+
     private static String orderLocator(OrderFact order) {
         String day = order.asOf() == null ? "미상"
                 : order.asOf().atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate().toString();

@@ -20,6 +20,15 @@ import org.junit.jupiter.api.Test;
  */
 class DevLlmBudgetTest {
 
+    @Test
+    void enablingAnEvaluationRequiresKnownPricesRatherThanAnotherProvidersDefaults() {
+        assertThatThrownBy(() -> new DevLlmBudget(10, "2026-11-15T00:00:00Z", -1, -1, 800, 2400, 4000))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("verified input/output prices");
+        assertThatThrownBy(() -> new DevLlmBudget(10, "2026-11-15T00:00:00Z", Double.NaN, 20, 800, 2400, 4000))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(new DevLlmBudget(0, "", -1, -1, 800, 2400, 4000).enabled()).isFalse();
+    }
+
     private static final UUID ORG = UUID.randomUUID();
 
     private static DevLlmBudget budget(double usd) {

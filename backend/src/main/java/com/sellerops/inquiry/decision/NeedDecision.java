@@ -39,7 +39,10 @@ public record NeedDecision(Outcome outcome, List<NeedResult> needs, AnswerBasisS
         List<String> out = new ArrayList<>();
         for (NeedResult n : unresolved()) {
             // For a need answered in part, what the evidence did not settle; a need nothing answered is the question itself.
-            String missing = n.status() != NeedStatus.PARTIAL || n.missing() == null || n.missing().isBlank() ? ""
+            // …and a need held for a value the material does not settle names the disagreement, whatever its status.
+            boolean named = n.status() == NeedStatus.PARTIAL
+                    || n.enforcement() == NeedResult.Enforcement.UNRESOLVED_CONFLICT;
+            String missing = !named || n.missing() == null || n.missing().isBlank() ? ""
                     : " — " + n.missing().strip();
             out.add(n.need().ask() + missing);
         }
@@ -63,7 +66,10 @@ public record NeedDecision(Outcome outcome, List<NeedResult> needs, AnswerBasisS
     public List<AgentDraftGenerator.Passage> passages() {
         List<AgentDraftGenerator.Passage> out = new ArrayList<>();
         for (EvidenceCandidate e : shownEvidence()) {
-            out.add(new AgentDraftGenerator.Passage(e.kind().scopeLabelKo(), e.label(), e.text()));
+            // What the material says of the passage's values now travels with it: a value 「확인 필요」 or 「대체됨」 is in
+            // front of the drafter only with that said (2026-11-15).
+            String text = e.mark() == null || e.mark().isEmpty() ? e.text() : e.text() + "\n" + e.mark().line();
+            out.add(new AgentDraftGenerator.Passage(e.kind().scopeLabelKo(), e.label(), text));
         }
         return out;
     }
@@ -103,10 +109,21 @@ public record NeedDecision(Outcome outcome, List<NeedResult> needs, AnswerBasisS
             } else if (n.status() == NeedStatus.CONDITIONAL_ON_CUSTOMER) {
                 sb.append(" → 고객에게 확인: ").append(n.askCustomer() == null ? "필요한 정보" : n.askCustomer());
             } else if (n.status() == NeedStatus.PARTIAL && NeedAggregation.answersSomething(n)) {
-                sb.append(" → 근거가 답하는 데까지만 답하세요(일반 기준은 기준으로). 근거에 없는 것")
+                // The judge's 「missing」 often quotes the value the evidence does give to say why it is short (2026-11-15
+                // real eval q04 · q05: 「확정 날짜 (현재 2026-11-25는 예정이라 바뀔 수 있음)」) — inside 「쓰지 마세요」 it took
+                // the planned date out of the reply. What the evidence states stays answerable, in its own state.
+                // What is said ABOUT the missing part is one rule, the system prompt's own (「근거에 그렇게 적혀 있지 않는 한
+                // 판매자의 후속 약속」 is not made): 「확정하기 어렵다」 and 「확정되면 다시 안내」 alike are written only as the
+                // evidence writes them (2026-11-15 review §7.44: an unconditional ban beside an exception read as two rules).
+                // q04 S4's 「재입고 날짜 안내 원칙」 says to say it; S0's material does not, and the reply makes none. Saying it is
+                // not doing it: nothing in the product sends that follow-up (RESULTS §17).
+                sb.append(" → 근거가 답하는 데까지만 답하세요(일반 기준은 기준으로, 예정·미정인 값은 근거에 적힌 대로 예정·미정이라고"
+                                + " 밝혀서). 근거에 없는 것")
                         .append(n.missing() == null || n.missing().isBlank() ? "" : "(" + n.missing().strip() + ")")
-                        .append("은 쓰지 마세요. 확정도, 나중에 안내하겠다는 말도 쓰지 않습니다. 확정하기 어렵다는 말은 근거"
-                                + "(판매자 확인 기록 포함)에 그렇게 적혀 있을 때만 적힌 대로 쓰고, 근거에 없다는 이유로 쓰지 않습니다. "
+                        .append("은 쓰지 마세요. 괄호 안 설명이 근거에 있는 값을 함께 말하더라도, 그 값은 근거에 적힌 상태 그대로 "
+                                + "씁니다. 빠진 부분은 확정하지 않습니다. 빠진 부분에 대해 덧붙이는 말(「확정하기 어렵습니다」 · "
+                                + "「확정되면 다시 안내드리겠습니다」 같은 말)은 근거(판매자 자료와 판매자 확인 기록)에 그렇게 적혀 있을 때만 "
+                                + "적힌 대로 쓰고, 그렇지 않으면 쓰지 않습니다. 근거에 없다는 이유만으로 쓰지 않습니다. "
                                 + "그 부분은 판매자가 초안을 보고 직접 덧붙입니다");
             } else if (!n.status().covered()) {
                 sb.append(" → 이번 답변에서 다루지 않습니다. 답하지 말고, 나중에 안내하겠다는 말도, 답하기 어렵다는 말도 "

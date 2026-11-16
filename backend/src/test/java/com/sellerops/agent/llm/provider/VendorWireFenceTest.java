@@ -27,8 +27,20 @@ import org.junit.jupiter.api.Test;
  */
 class VendorWireFenceTest {
 
+    @Test
+    void theRouterHostCannotBeIntroducedOutsideAProvider(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root)
+            throws IOException {
+        Path source = root.resolve("RouterLeak.java");
+        Files.writeString(source, "class RouterLeak { static String endpoint = \"https://api.runyour.ai/v1/chat/completions\"; }");
+        assertThat(javax.tools.ToolProvider.getSystemJavaCompiler().run(null, null, null, source.toString()))
+                .as("the injected violation is valid Java").isZero();
+        assertThat(offenders(root)).containsExactly("RouterLeak.java names api.runyour.ai");
+        Files.writeString(source, "class RouterLeak { static String endpoint = \"local-only\"; }");
+        assertThat(offenders(root)).isEmpty();
+    }
+
     private static final Path MAIN = Path.of("src", "main", "java", "com", "sellerops");
-    private static final List<String> VENDOR_MARKERS = List.of("api.openai.com", "api.anthropic.com",
+    private static final List<String> VENDOR_MARKERS = List.of("api.openai.com", "api.anthropic.com", "api.runyour.ai",
             "\"anthropic-version\"", "\"x-api-key\"");
     private static final Map<String, String> EXCEPTIONS = Map.of(
             "OutboundGate.java", "the egress allow-list",

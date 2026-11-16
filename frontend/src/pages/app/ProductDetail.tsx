@@ -7,6 +7,7 @@ import { BtnLink } from "../../components/ui/Btn";
 import { AgentLaunch } from "../../components/ui/AgentLaunch";
 import { ProductKnowledgeLibrary } from "../../components/product/ProductKnowledgeLibrary";
 import { ProductOpportunities } from "../../components/opportunity/ProductOpportunities";
+import { ProductAnalysisSection } from "../../components/product/analysis/ProductAnalysisSection";
 import {
   KnowledgeDocumentAdd,
   KnowledgeDocumentList,
@@ -144,7 +145,7 @@ export function ProductDetail() {
       <RelationCounts items={relations} />
 
       <div className="flex flex-col items-start gap-10 lg:flex-row">
-        <div className="min-w-0 flex-1 space-y-7">
+        <div className="w-full min-w-0 flex-1 space-y-7 lg:w-auto">
           {/*
             지금 사람을 기다리는 것 — 이 화면에서 유일하게 시간이 흐르고 있는 목록이라 맨 위에 선다.
             숫자는 서버가 센 미답변 수이고, 행은 그 숫자를 센 것과 같은 술어로 읽은 첫 세 줄이다.
@@ -255,6 +256,9 @@ export function ProductDetail() {
               </RecordRows>
             </section>
           ) : null}
+
+          {/* 강점·약점 분석 (2026-11-16) — 위의 세 목록이 무엇을 말하는지, 기간·분모와 함께. 관찰과 가설을 나눠 적는다. */}
+          <ProductAnalysisSection productId={productId} />
 
           {/* 판매자가 읽는 곳이 아니라 쓰는 곳 — 이 화면에서 유일하게 내용이 늘어나는 섹션. */}
           <section aria-label="상품 지식">

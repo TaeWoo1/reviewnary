@@ -27,6 +27,7 @@ public interface LlmWire {
         return switch (vendor) {
             case OPENAI -> OpenAiChatWire.INSTANCE;
             case ANTHROPIC -> AnthropicMessagesWire.INSTANCE;
+            case RUNYOUR -> RunyourChatWire.INSTANCE;
         };
     }
 

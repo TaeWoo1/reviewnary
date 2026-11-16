@@ -66,7 +66,7 @@ class CoverageJudgeV5Test {
                 thisCase);
         assertThat(asked.basis()).isEqualTo(AnswerBasisState.PARTIAL_ANSWER);
         assertThat(asked.openQuestions()).as("saying 「not yet」 closes nothing").hasSize(1);
-        assertThat(asked.answerScope()).contains("확정하기 어렵다는 말은 근거(판매자 확인 기록 포함)에 그렇게 적혀 있을 때만");
+        assertThat(asked.answerScope()).contains("「확정하기 어렵습니다」").contains("근거(판매자 자료와 판매자 확인 기록)에 그렇게 적혀 있을 때만");
         assertThat(asked.toTakeUp()).extracting(n -> n.need().id()).containsExactly("N1");
 
         InquiryDecisionEngineTest.ScriptedModel whether = new InquiryDecisionEngineTest.ScriptedModel(

@@ -87,6 +87,42 @@ class KnowledgeDocumentTextTest {
     }
 
     @Test
+    @DisplayName("an Excel file is refused with the dedicated workbook path named, not as an unknown format")
+    void anExcelFileNamesTheWorkbookPath() {
+        assertThatThrownBy(() -> KnowledgeDocumentText.extract("재고표.xlsx", "PK".repeat(50).getBytes(StandardCharsets.UTF_8)))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("엑셀로 관리")
+                .hasMessageContaining("CSV");
+    }
+
+    @Test
+    @DisplayName("a PDF that needs a password to open is refused as a password PDF, not as a parser failure")
+    void aPasswordPdfSaysPassword() throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (PDDocument document = new PDDocument()) {
+            PDPage page = new PDPage();
+            document.addPage(page);
+            try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+                content.beginText();
+                content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                content.newLineAtOffset(50, 700);
+                content.showText("Ships the same day when paid before 3 pm on a weekday.");
+                content.endText();
+            }
+            org.apache.pdfbox.pdmodel.encryption.StandardProtectionPolicy policy =
+                    new org.apache.pdfbox.pdmodel.encryption.StandardProtectionPolicy("owner-pw", "user-pw",
+                            new org.apache.pdfbox.pdmodel.encryption.AccessPermission());
+            policy.setEncryptionKeyLength(128);
+            document.protect(policy);
+            document.save(out);
+        }
+        assertThatThrownBy(() -> KnowledgeDocumentText.extract("배송.pdf", out.toByteArray()))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("암호가 걸린 PDF")
+                .satisfies(e -> assertThat(e.getMessage()).doesNotContain("Exception"));
+    }
+
+    @Test
     @DisplayName("a file over the byte bound is refused before anything parses it")
     void tooLargeIsRefused() {
         byte[] big = new byte[KnowledgeDocumentText.MAX_BYTES + 1];

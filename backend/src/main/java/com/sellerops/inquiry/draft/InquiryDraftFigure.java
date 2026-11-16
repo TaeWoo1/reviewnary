@@ -32,7 +32,7 @@ public class InquiryDraftFigure {
 
     /** Where the number came from. */
     /** {@code SELLER_CHECK}: the seller's record for this inquiry (2026-11-02) — it holds while that record is current. */
-    public enum Ground { ORG_POLICY, PRODUCT_KNOWLEDGE, PRODUCT_FACTS, SELLER_GUIDANCE, ORDER, QUESTION, NONE, SELLER_CHECK }
+    public enum Ground { ORG_POLICY, PRODUCT_KNOWLEDGE, PRODUCT_FACTS, SELLER_GUIDANCE, ORDER, QUESTION, NONE, SELLER_CHECK, SCHEDULE }
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

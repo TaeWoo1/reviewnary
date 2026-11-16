@@ -42,6 +42,13 @@ public class ProductController {
     private final ReviewProductLinkBackfill reviewLinks;
     private ReviewProductLink reviewProductLink;
 
+    private com.sellerops.product.analysis.ProductAnalysisService analysis;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setAnalysis(com.sellerops.product.analysis.ProductAnalysisService analysis) {
+        this.analysis = analysis;
+    }
+
     @org.springframework.beans.factory.annotation.Autowired
     public void setReviewProductLink(ReviewProductLink reviewProductLink) {
         this.reviewProductLink = reviewProductLink;
@@ -95,6 +102,60 @@ public class ProductController {
             return signals.signals(principal.orgId(), productId, parseDate(referenceDate));
         } catch (IllegalArgumentException notFound) {
             throw ApiException.notFound(notFound.getMessage());
+        }
+    }
+
+    /**
+     * 상품·브랜드 분석 for one product: strengths, weaknesses, repeated inquiry topics and a SWOT whose
+     * opportunity/threat cells are labelled hypotheses — over {@code days} (30·90·180·365) ending on
+     * {@code referenceDate} (default today, KST). Rule-based; no model call.
+     */
+    @GetMapping("/{productId}/analysis")
+    public com.sellerops.product.analysis.ProductAnalysisView analysis(
+            @AuthenticationPrincipal AuthPrincipal principal, @PathVariable UUID productId,
+            @RequestParam(required = false) Integer days,
+            @RequestParam(required = false) String referenceDate) {
+        int period = periodOf(days);
+        try {
+            return requireAnalysis().analyse(principal.orgId(), productId, period, parseDate(referenceDate));
+        } catch (IllegalArgumentException notFound) {
+            throw ApiException.notFound(notFound.getMessage());
+        }
+    }
+
+    /** The store's products compared on the same axes, period and denominator (reviews). */
+    @GetMapping("/analysis")
+    public com.sellerops.product.analysis.ProductAnalysisView.Comparison compare(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @RequestParam(required = false) Integer days,
+            @RequestParam(required = false) String referenceDate) {
+        return requireAnalysis().compare(principal.orgId(), periodOf(days), parseDate(referenceDate));
+    }
+
+    /**
+     * The whole store (brand) as one subject — one org-scoped read, product-linked and unlinked rows alike, with
+     * channels that had nothing in the period named. Distinct from {@code /analysis}, the product comparison.
+     */
+    @GetMapping("/analysis/store")
+    public com.sellerops.product.analysis.ProductAnalysisView store(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @RequestParam(required = false) Integer days,
+            @RequestParam(required = false) String referenceDate) {
+        return requireAnalysis().analyseStore(principal.orgId(), periodOf(days), parseDate(referenceDate));
+    }
+
+    private com.sellerops.product.analysis.ProductAnalysisService requireAnalysis() {
+        if (analysis == null) {
+            throw ApiException.notFound("분석을 사용할 수 없습니다.");
+        }
+        return analysis;
+    }
+
+    private static int periodOf(Integer days) {
+        try {
+            return com.sellerops.product.analysis.ProductAnalysisService.days(days);
+        } catch (IllegalArgumentException bad) {
+            throw ApiException.badRequest(bad.getMessage());
         }
     }
 

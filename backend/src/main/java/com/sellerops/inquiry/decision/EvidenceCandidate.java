@@ -16,13 +16,25 @@ import java.util.UUID;
  * @param scope     the entity instance it is attributed to (never sent) — Inquiry Decision v2.2
  * @param chunkId   the knowledge passage it is, for the knowledge kinds (never sent) — so a draft written from it can
  *                  cite the passage it was shown (2026-10-31: a draft cited nothing while its decision cited two rules)
+ * @param mark      what the seller's material says of the values in it now ({@code KnowledgeState#markFor}); its lines
+ *                  are sent beside the text, its attributes stay here
  */
 public record EvidenceCandidate(String id, Kind kind, String label, String text, UUID sourceId, UUID productId,
-                                String factKey, EvidenceScope scope, UUID chunkId) {
+                                String factKey, EvidenceScope scope, UUID chunkId,
+                                com.sellerops.knowledge.currency.KnowledgeState.Mark mark) {
+
+    public EvidenceCandidate {
+        mark = mark == null ? com.sellerops.knowledge.currency.KnowledgeState.Mark.NONE : mark;
+    }
+
+    public EvidenceCandidate(String id, Kind kind, String label, String text, UUID sourceId, UUID productId,
+                             String factKey, EvidenceScope scope, UUID chunkId) {
+        this(id, kind, label, text, sourceId, productId, factKey, scope, chunkId, null);
+    }
 
     public EvidenceCandidate(String id, Kind kind, String label, String text, UUID sourceId, UUID productId,
                              String factKey, EvidenceScope scope) {
-        this(id, kind, label, text, sourceId, productId, factKey, scope, null);
+        this(id, kind, label, text, sourceId, productId, factKey, scope, null, null);
     }
 
     /**
@@ -32,7 +44,7 @@ public record EvidenceCandidate(String id, Kind kind, String label, String text,
     public EvidenceCandidate(String id, Kind kind, String label, String text, UUID sourceId, UUID productId,
                              String factKey) {
         this(id, kind, label, text, sourceId, productId, factKey, switch (kind) {
-            case PRODUCT_KNOWLEDGE, PRODUCT_FACTS, OPTIONS, ADDONS -> EvidenceScope.product(productId);
+            case PRODUCT_KNOWLEDGE, PRODUCT_FACTS, OPTIONS, ADDONS, SCHEDULE -> EvidenceScope.product(productId);
             case ORG_KNOWLEDGE -> EvidenceScope.ORG;
             case ORDER_FACT, SELLER_CHECK -> EvidenceScope.order(null);
         });
@@ -45,7 +57,12 @@ public record EvidenceCandidate(String id, Kind kind, String label, String text,
          * never the channel's, and never anything but this inquiry's. Attributed to the order this inquiry is about
          * ({@link EvidenceScope#caseOrderKey}).
          */
-        SELLER_CHECK;
+        SELLER_CHECK,
+        /**
+         * An inbound, outbound or production schedule line (owner decision 4, 2026-11-14) — about the product, never about
+         * this customer's order: attributed to the listing, so an order need is never answered by it.
+         */
+        SCHEDULE;
 
         public String scopeLabelKo() {
             return switch (this) {
@@ -54,19 +71,28 @@ public record EvidenceCandidate(String id, Kind kind, String label, String text,
                 case PRODUCT_FACTS, OPTIONS, ADDONS -> "상품 등록 정보";
                 case ORDER_FACT -> "주문 정보";
                 case SELLER_CHECK -> "판매자 확인";
+                case SCHEDULE -> "입고·출고 일정";
             };
         }
     }
 
     public EvidenceCandidate withScope(EvidenceScope newScope) {
-        return new EvidenceCandidate(id, kind, label, text, sourceId, productId, factKey, newScope, chunkId);
+        return new EvidenceCandidate(id, kind, label, text, sourceId, productId, factKey, newScope, chunkId, mark);
     }
 
     public EvidenceCandidate withId(String newId) {
-        return new EvidenceCandidate(newId, kind, label, text, sourceId, productId, factKey, scope, chunkId);
+        return new EvidenceCandidate(newId, kind, label, text, sourceId, productId, factKey, scope, chunkId, mark);
     }
 
     public EvidenceCandidate withChunk(UUID newChunkId) {
-        return new EvidenceCandidate(id, kind, label, text, sourceId, productId, factKey, scope, newChunkId);
+        return new EvidenceCandidate(id, kind, label, text, sourceId, productId, factKey, scope, newChunkId, mark);
+    }
+
+    /**
+     * The same candidate carrying what the seller's material says of its values now (2026-11-15): not settled, replaced,
+     * or current. Read by the judge and the drafter beside the text, and by code when a need is held to it.
+     */
+    public EvidenceCandidate withMark(com.sellerops.knowledge.currency.KnowledgeState.Mark newMark) {
+        return new EvidenceCandidate(id, kind, label, text, sourceId, productId, factKey, scope, chunkId, newMark);
     }
 }

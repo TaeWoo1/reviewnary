@@ -886,5 +886,6 @@ function storedAnswerState(
     // Same reason: whether this exact ask was already answered is a fact about the inbox, decided at
     // draft time. The stored row does not carry it, so a reload does not claim it.
     previouslyAnswered: false,
+    unsettled: false,
   };
 }

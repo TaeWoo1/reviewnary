@@ -44,20 +44,6 @@ public class AiTriagePilotProperties {
     @jakarta.annotation.PostConstruct
     void refuseAFakeRun() {
         refuseAFakeRun(enabled, fakeLlm);
-        refuseAnEvalOnlyVendor(enabled, vendor);
-    }
-
-    /**
-     * {@code RUNYOUR} (2026-11-06) is wired for the offline eval harness only: a pilot run sends real sellers' review
-     * bodies, and a router in front of the model vendors is a processor the privacy policy and the seller agreement do
-     * not yet name, nor is where it forwards a body (and whether the body leaves Korea) confirmed. So the pilot refuses
-     * to start on it rather than let one property change reroute production traffic (review of 2026-11-06).
-     */
-    static void refuseAnEvalOnlyVendor(boolean pilotEnabled, String vendor) {
-        if (pilotEnabled && vendor != null && vendor.trim().equalsIgnoreCase("RUNYOUR")) {
-            throw new IllegalStateException("sellerops.triage.ai-pilot.vendor=RUNYOUR is eval-harness only: "
-                    + "the pilot sends real review bodies and the router is not yet a disclosed processor");
-        }
     }
 
     static void refuseAFakeRun(boolean pilotEnabled, boolean fakeLlm) {

@@ -25,6 +25,8 @@ import java.util.regex.Pattern;
  */
 public final class FakeAgentLlmTransport implements AgentLlmTransport {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(FakeAgentLlmTransport.class);
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Pattern FIGURE_LINE = Pattern.compile("(?m)^(\\d+)\\. ");
     /** A numbered item of 「이번 답변이 다룰 내용」 — 「N1. …」, or 「S1. …」 for one a seller's correction added. */
@@ -32,6 +34,14 @@ public final class FakeAgentLlmTransport implements AgentLlmTransport {
 
     @Override
     public Response post(URI uri, Map<String, String> headers, String jsonBody) {
+        Response out = answerOf(uri, jsonBody);
+        // The same per-call line as the real transport, so a dry run counts calls exactly as a real one would.
+        log.info("llm_call host=fake status={} {} {}", out.status(), AgentLlmCallMetrics.of(out).toLogFields(),
+                JdkAgentLlmTransport.requestFields(jsonBody));
+        return out;
+    }
+
+    private Response answerOf(URI uri, String jsonBody) {
         try {
             JsonNode req = MAPPER.readTree(jsonBody);
             String system = systemOf(req);
@@ -115,6 +125,13 @@ public final class FakeAgentLlmTransport implements AgentLlmTransport {
             return "{}";
         }
         boolean keyed = system.contains("need id를 키로");
+        // Dev only (this transport never runs against a vendor): what reached the judge, so an offline run can show it.
+        StringBuilder seen = new StringBuilder();
+        for (JsonNode e : in.path("evidence")) {
+            seen.append(e.path("id").asText()).append('=').append(e.path("source").asText()).append('/')
+                    .append(e.path("title").asText()).append(e.has("state") ? "[state]" : "").append("; ");
+        }
+        log.info("fake_judge evidence: {}", seen.toString().strip());
         // coverage-judge/v6 asks for settled_by; the fake names the seller's 처리 완료 record for the scenario's rule.
         boolean settles = system.contains("settled_by");
         boolean scenario = in.path("customer").asText("").contains(POLICY_AND_ACTION);
@@ -133,7 +150,8 @@ public final class FakeAgentLlmTransport implements AgentLlmTransport {
             java.util.List<String> ids = new java.util.ArrayList<>();
             for (JsonNode e : in.path("evidence")) {
                 String source = e.path("source").asText();
-                if (order ? "판매자 확인".equals(source) : "운영 정책".equals(source) || "상품 정보".equals(source)) {
+                if (order ? "판매자 확인".equals(source) : "운영 정책".equals(source) || "상품 정보".equals(source)
+                        || "입고·출고 일정".equals(source)) {
                     ids.add(e.path("id").asText());
                 }
             }

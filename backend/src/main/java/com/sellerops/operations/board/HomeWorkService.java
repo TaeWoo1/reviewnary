@@ -194,6 +194,10 @@ public class HomeWorkService {
             for (InquiryFollowUpService.FollowUpRow f : followRead.beforeReply()) {
                 addDue(byOwner, f);
             }
+            // Held registrations the follow-up read already set apart from waiting (2026-11-15): 할 일 only.
+            for (InquiryFollowUpService.FollowUpRow f : follow.held()) {
+                addHeld(byOwner, f);
+            }
             for (InquiryFollowUpService.FollowUpRow f : follow.waiting()) {
                 if (followRead.isHeld(f)) {
                     addHeld(byOwner, f);

@@ -55,6 +55,23 @@ public final class InquiryDecisionPrompt {
      * need ({@link NeedAggregation#settlingRecord}). Every other line is v5's.
      */
     public static final String JUDGE_V6 = "coverage-judge/v6";
+    /**
+     * <b>v6, and what the seller's material says of a value now</b> (2026-11-15, conflict step 4). A candidate may carry a
+     * {@code state}: 「[확인 필요]」 — two documents state different values and which is current is not settled; 「[대체됨]」 — the
+     * seller replaced the value; 「[현행]」 — the value that is current. v7 adds one rule: a need whose answer IS a value
+     * marked 「확인 필요」 is not answered by either document (NONE, the disagreement in missing), and a 「대체됨」 value is
+     * no evidence. Code enforces the first whatever the judge says ({@link NeedAggregation}); the rule is the first fence,
+     * not the only one. Every other line, and the answer's shape, is v6's.
+     */
+    public static final String JUDGE_V7 = "coverage-judge/v7";
+    /**
+     * <b>v7, and a product's own exception to the common rule</b> (2026-11-15 real eval q06). The judge answered 「단순 변심
+     * 반품은 며칠 안에」 from the store's policy and never cited the listing's 「세탁하거나 사용한 침구는 단순 변심 반품이 되지
+     * 않습니다」, though it was the first candidate — and the drafter sees only what a need cites. v8 adds one rule: a need
+     * answered by a common rule also cites the candidate about this product that says the rule applies otherwise or not at
+     * all here, and that condition does not by itself lower the status. Every other line, and the answer's shape, is v7's.
+     */
+    public static final String JUDGE_V8 = "coverage-judge/v8";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private InquiryDecisionPrompt() {
@@ -91,6 +108,12 @@ public final class InquiryDecisionPrompt {
         }
         if (JUDGE_V6.equals(version)) {
             return judgeSystemV6();
+        }
+        if (JUDGE_V7.equals(version)) {
+            return judgeSystemV7();
+        }
+        if (JUDGE_V8.equals(version)) {
+            return judgeSystemV8();
         }
         return JUDGE_V3.equals(version) ? judgeSystemV3() : judgeSystemV2();
     }
@@ -143,6 +166,31 @@ public final class InquiryDecisionPrompt {
                         + "settled_by는 null입니다.\n")
                 .replace(field, field + "- settled_by: 위 규칙에 해당할 때 그 판매자 확인 기록의 E id. 해당하지 않으면 null.\n")
                 .replace(output, "\"ask_customer\":\"...\",\"precedents\":[\"P1\"],\"settled_by\":null}]}");
+    }
+
+    /** v6 with the material-state rule added (see {@link #JUDGE_V7}). */
+    static String judgeSystemV7() {
+        String v6 = judgeSystemV6();
+        String anchor = "- 확신이 없으면 FULL이 아니라 PARTIAL이나 NONE을 고릅니다.\n";
+        if (!v6.contains(anchor)) {
+            throw new IllegalStateException("coverage-judge/v7 is written against v6's rules, and they changed");
+        }
+        return v6.replace(anchor, anchor + "- 근거 후보에 state가 있으면 그 표시를 따릅니다. 「[확인 필요]」는 두 자료가 같은 항목에 다른 값을 적었고 "
+                + "어느 쪽이 현행인지 정해지지 않았다는 뜻입니다. need의 답이 바로 그 값이면 그 need는 NONE이고, missing에 그 항목이 "
+                + "자료마다 다르다고 씁니다. 그 값과 상관없는 부분은 근거대로 판정합니다. 「[대체됨]」으로 표시된 값은 근거로 쓰지 "
+                + "않습니다.\n");
+    }
+
+    /** v7 with the product-exception rule added (see {@link #JUDGE_V8}). */
+    static String judgeSystemV8() {
+        String v7 = judgeSystemV7();
+        String anchor = "- 확신이 없으면 FULL이 아니라 PARTIAL이나 NONE을 고릅니다.\n";
+        if (!v7.contains(anchor)) {
+            throw new IllegalStateException("coverage-judge/v8 is written against v7's rules, and they changed");
+        }
+        return v7.replace(anchor, anchor + "- 운영 정책 같은 공통 기준으로 need에 답할 때, 근거 후보 중 이 상품에 대한 자료가 그 기준이 이 상품에는 "
+                + "달리 적용되거나 적용되지 않는 경우(예외 · 제한 · 조건)를 적고 있으면 그 E도 evidence에 넣습니다. 그 경우가 이 "
+                + "고객에게 해당하는지 문의에 없다는 이유만으로 status를 낮추지 않습니다. 그 조건은 답의 일부입니다.\n");
     }
 
     /** v2's rules; the answer keyed by need id, one object per need, every need present (see {@link #JUDGE_V3}). */
@@ -243,7 +291,7 @@ public final class InquiryDecisionPrompt {
         }
         props.putObject("ask_customer").putArray("type").add("string").add("null");
         props.set("precedents", idArray(precedentIds));
-        if (JUDGE_V6.equals(version)) {
+        if (JUDGE_V6.equals(version) || JUDGE_V7.equals(version) || JUDGE_V8.equals(version)) {
             props.putObject("settled_by").putArray("type").add("string").add("null");
         }
         props.fieldNames().forEachRemaining(required::add);
@@ -264,7 +312,7 @@ public final class InquiryDecisionPrompt {
         }
         verdicts.put("type", "array").put("minItems", needIds.size()).put("maxItems", needIds.size());
         verdicts.set("items", item);
-        return format(JUDGE_V6.equals(version) ? "coverage_judge_v6" : JUDGE_V4.equals(version) ? "coverage_judge_v4"
+        return format(JUDGE_V8.equals(version) ? "coverage_judge_v8" : JUDGE_V7.equals(version) ? "coverage_judge_v7" : JUDGE_V6.equals(version) ? "coverage_judge_v6" : JUDGE_V4.equals(version) ? "coverage_judge_v4"
                         : v2 ? "coverage_judge_v2" : "coverage_judge_v1",
                 root);
     }
@@ -336,8 +384,12 @@ public final class InquiryDecisionPrompt {
         }
         ArrayNode e = root.putArray("evidence");
         for (EvidenceCandidate c : evidence) {
-            e.addObject().put("id", c.id()).put("source", c.kind().scopeLabelKo()).put("title", c.label())
-                    .put("text", c.text());
+            ObjectNode item = e.addObject().put("id", c.id()).put("source", c.kind().scopeLabelKo())
+                    .put("title", c.label()).put("text", c.text());
+            // Only when the material says something of its values: a request without it is byte-identical to before.
+            if (c.mark() != null && !c.mark().isEmpty()) {
+                item.put("state", c.mark().line());
+            }
         }
         ArrayNode p = root.putArray("precedents");
         for (PrecedentCandidate c : precedents) {

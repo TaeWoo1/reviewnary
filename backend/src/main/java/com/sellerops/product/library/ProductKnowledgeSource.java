@@ -101,6 +101,14 @@ public class ProductKnowledgeSource extends BaseEntity {
     private boolean active = true;
 
     /**
+     * Which revision of the body this is (V190, 2026-11-16). Rises only when the body changes — an upload replaced by a
+     * new file, or a typed edit — and the body it replaces is kept in {@link ProductKnowledgeRevision}. As with the
+     * company corpus, a version is not an audit trail: it says which text a citation stood on.
+     */
+    @Column(nullable = false)
+    private int version = 1;
+
+    /**
      * 「고객은 이렇게 말해요」 — one expression per line, or null (V149). Read through
      * {@link com.sellerops.knowledge.CustomerPhrases}; a review that says one is answered with this.
      */

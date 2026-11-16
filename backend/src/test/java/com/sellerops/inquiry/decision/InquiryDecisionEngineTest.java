@@ -133,15 +133,24 @@ class InquiryDecisionEngineTest {
             assertThat(d.basis()).isEqualTo(AnswerBasisState.PARTIAL_ANSWER);
             assertThat(d.openQuestions()).containsExactly("이 주문이 언제 발송되는지 — 부족한 내용");
             assertThat(d.answerScope()).contains("근거가 답하는 데까지만");
+            // What the evidence does state stays answerable in its own state, even when the judge's 「missing」 quotes it
+            // (2026-11-15 real eval q04 · q05: 「확정 날짜 (현재 11/25는 예정)」 took the planned date out of the reply).
+            assertThat(d.answerScope()).contains("예정·미정인 값은 근거에 적힌 대로 예정·미정이라고 밝혀서")
+                    .contains("괄호 안 설명이 근거에 있는 값을 함께 말하더라도, 그 값은 근거에 적힌 상태 그대로 씁니다");
+            // One rule for what is said ABOUT the missing part (2026-11-15 review §7.44): 「확정하기 어렵다」 and 「확정되면 다시
+            // 안내」 alike, only as the evidence writes them — no unconditional ban beside an exception (q04 S0 vs S4).
+            String rule = "빠진 부분에 대해 덧붙이는 말(「확정하기 어렵습니다」 · 「확정되면 다시 안내드리겠습니다」 같은 말)은 "
+                    + "근거(판매자 자료와 판매자 확인 기록)에 그렇게 적혀 있을 때만 적힌 대로 쓰고, 그렇지 않으면 쓰지 않습니다";
+            assertThat(d.answerScope()).contains(rule).contains("빠진 부분은 확정하지 않습니다")
+                    .doesNotContain("나중에 안내하겠다는 말도 쓰지 않습니다").doesNotContain("다시 안내하겠다는 말도");
             // …and says nothing about the rest: no 「확인 후 안내」, no 「확정해 드리기 어렵습니다」 (case-eval-r10: all four held
             // partial drafts were refused for one). The seller handles the open question before sending.
-            assertThat(d.answerScope()).contains("나중에 안내하겠다는 말도 쓰지 않습니다")
-                    .contains("판매자가 초안을 보고 직접 덧붙입니다");
+            assertThat(d.answerScope()).contains("판매자가 초안을 보고 직접 덧붙입니다");
             // …except what the evidence itself says cannot be settled yet, as written; never 「not in the evidence」 turned
             // into 「cannot be known」 (2026-11-05 re-eval: the seller recorded the arrival day as not yet fixed, and the
             // draft said nothing of it).
-            assertThat(d.answerScope()).contains("확정하기 어렵다는 말은 근거(판매자 확인 기록 포함)에 그렇게 적혀 있을 때만")
-                    .contains("근거에 없다는 이유로 쓰지 않습니다");
+            assertThat(d.answerScope()).contains("근거(판매자 자료와 판매자 확인 기록)에 그렇게 적혀 있을 때만")
+                    .contains("근거에 없다는 이유만으로 쓰지 않습니다");
             assertThat(d.openQuestions()).as("saying so closes nothing").isNotEmpty();
             assertThat(d.needs().get(0).status()).as("an order need is not the listing's — no detail gap applies")
                     .isEqualTo(NeedStatus.PARTIAL);

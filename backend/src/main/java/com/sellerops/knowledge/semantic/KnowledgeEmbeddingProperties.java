@@ -55,6 +55,10 @@ public class KnowledgeEmbeddingProperties implements AgentCapabilityGate {
         // Its own vendor, apart from every chat capability (2026-10-29). Anthropic has no embedding API: refused at boot.
         this.vendor = com.sellerops.agent.llm.provider.LlmVendor.parse(vendor);
         com.sellerops.agent.llm.provider.EmbeddingWire.of(this.vendor);
+        if (enabled && this.vendor == com.sellerops.agent.llm.provider.LlmVendor.RUNYOUR
+                && (model == null || model.isBlank())) {
+            throw new IllegalArgumentException("choose a Runyour embedding model before enabling embeddings");
+        }
         this.enabled = enabled;
         this.allOrgs = enabledOrgIds != null && enabledOrgIds.trim().equals("*");
         this.enabledOrgIds = allOrgs ? List.of() : parseIds(enabledOrgIds);

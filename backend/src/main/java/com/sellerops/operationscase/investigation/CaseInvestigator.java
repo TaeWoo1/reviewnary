@@ -228,9 +228,13 @@ public class CaseInvestigator {
             refs.add(ref);
             text.append('[').append(ref).append("] 지식 충돌: 「").append(conflict.winnerTitle()).append("」(")
                     .append(conflict.winnerAuthority().labelKo()).append(")와 「").append(conflict.loserTitle())
-                    .append("」(").append(conflict.loserAuthority().labelKo()).append(")의 수치(")
-                    .append(conflict.unit()).append(")가 다릅니다. 권한이 높은 「").append(conflict.winnerTitle())
-                    .append("」를 따르고, 판매자 확인이 필요합니다.\n");
+                    .append("」(").append(conflict.loserAuthority().labelKo()).append(")의 ")
+                    .append(conflict.attribute() == null ? "수치(" + conflict.unit() + ")"
+                            : com.sellerops.knowledge.claim.ClaimAttribute.valueOf(conflict.attribute()).labelKo())
+                    .append("이(가) 다릅니다. ");
+            // Unresolved since 2026-11-15 when nothing the seller set decides it: no side is followed, the seller says.
+            text.append(conflict.resolved() ? "현행인 「" + conflict.winnerTitle() + "」를 따르고, 판매자 확인이 필요합니다.\n"
+                    : "어느 쪽이 현행인지 정해지지 않았으니 어느 값도 사실로 쓰지 않고, 판매자 확인이 필요합니다.\n");
         }
         int n = 1;
         UUID reviewId = subject.kind() == OperationsSubjectKind.REVIEW ? subjectCase.getSubjectId() : null;

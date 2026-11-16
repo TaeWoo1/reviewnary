@@ -67,6 +67,17 @@ public class DraftEvidenceSnippets {
         this.orgSources = orgSources;
     }
 
+    private com.sellerops.knowledge.schedule.KnowledgeScheduleRepository schedules;
+    private com.sellerops.knowledge.schedule.KnowledgeScheduleService scheduleService;
+
+    /** Schedule lines (2026-11-15); null where a test wires the reader without them. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSchedules(com.sellerops.knowledge.schedule.KnowledgeScheduleRepository schedules,
+                             com.sellerops.knowledge.schedule.KnowledgeScheduleService scheduleService) {
+        this.schedules = schedules;
+        this.scheduleService = scheduleService;
+    }
+
     /** Every stored row for one draft version, as views carrying their excerpt. */
     public List<DraftEvidenceView> viewsOf(List<InquiryDraftEvidence> rows) {
         return rows.stream().map(this::viewOf).toList();
@@ -95,6 +106,18 @@ public class DraftEvidenceSnippets {
             return new DraftEvidenceView(kind, InquiryDraftEvidence.scopeLabelOf(kind), title, locator,
                     sourceId, chunkId, null, true);
         }
+        if (InquiryDraftEvidence.KIND_SCHEDULE.equals(kind)) {
+            // A schedule line reads back while it is on and says what it said when cited; edited, it is gone from what the
+            // draft stood on, as a re-cut passage is.
+            com.sellerops.knowledge.schedule.KnowledgeSchedule line = schedules == null || sourceId == null ? null
+                    : schedules.findById(sourceId).orElse(null);
+            boolean same = line != null && line.isActive() && java.util.Objects.equals(locator,
+                    com.sellerops.knowledge.schedule.KnowledgeScheduleService.fingerprint(line));
+            String text = !same ? null : com.sellerops.knowledge.schedule.KnowledgeScheduleService.evidenceText(line,
+                    scheduleService == null ? null : scheduleService.nameOf(line.getOrgId(), line.getProductId()), null);
+            return new DraftEvidenceView(kind, InquiryDraftEvidence.scopeLabelOf(kind), title, locator, sourceId,
+                    chunkId, DraftEvidenceView.snippetOf(text), text == null);
+        }
         String text = textOf(kind, sourceId, chunkId);
         return new DraftEvidenceView(kind, InquiryDraftEvidence.scopeLabelOf(kind), title, locator,
                 sourceId, chunkId, DraftEvidenceView.snippetOf(text), text == null && hadPassage(kind, sourceId, chunkId));
@@ -110,6 +133,9 @@ public class DraftEvidenceSnippets {
         }
         if (InquiryDraftEvidence.KIND_ORG_POLICY.equals(kind) && orgSources != null) {
             return orgSources.findById(sourceId).map(s -> !s.isActive()).orElse(false);
+        }
+        if (InquiryDraftEvidence.KIND_SCHEDULE.equals(kind) && schedules != null) {
+            return schedules.findById(sourceId).map(s -> !s.isActive()).orElse(false);
         }
         return false;
     }

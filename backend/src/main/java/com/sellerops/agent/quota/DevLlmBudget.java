@@ -67,6 +67,10 @@ public class DevLlmBudget {
         if (budgetUsd > 0 && this.since == null) {
             throw new IllegalArgumentException("sellerops.dev.llm-budget-since is required with a budget");
         }
+        if (budgetUsd > 0 && (!Double.isFinite(inPerMtok) || !Double.isFinite(outPerMtok)
+                || inPerMtok < 0 || outPerMtok < 0 || inPerMtok + outPerMtok == 0)) {
+            throw new IllegalArgumentException("verified input/output prices are required with an evaluation budget");
+        }
     }
 
     public boolean enabled() {

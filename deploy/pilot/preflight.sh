@@ -158,6 +158,12 @@ for n in SELLEROPS_SEED_ENABLED SELLEROPS_SEED_DEMO_CONTENT SELLEROPS_CONNECTOR_
   [[ "${!n:-false}" == "false" ]] && ok "$n=false" || bad "$n must be false on a pilot host"
 done
 [[ "${SELLEROPS_MAIL_MODE:-off}" != "dev-outbox" ]] && ok "mail mode is not the developer outbox" || bad "SELLEROPS_MAIL_MODE=dev-outbox logs password-reset links"
+if [[ "$(printf '%s' "${SELLEROPS_MAIL_MODE:-off}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" == "smtp" ]]; then
+  [[ -n "${SPRING_MAIL_HOST:-}" ]] && ok "smtp: SPRING_MAIL_HOST set" || bad "SELLEROPS_MAIL_MODE=smtp needs SPRING_MAIL_HOST (an empty host boots and every reset mail fails)"
+  [[ -n "${SELLEROPS_MAIL_FROM:-}" && "${SELLEROPS_MAIL_FROM}" != *@localhost ]] && ok "smtp: sender address set" || bad "SELLEROPS_MAIL_MODE=smtp needs SELLEROPS_MAIL_FROM (not no-reply@localhost)"
+else
+  ok "mail mode ${SELLEROPS_MAIL_MODE:-off}: password reset mail is not sent (SPRING_MAIL_* unused)"
+fi
 
 # ── 5-A. routine collection actually runs (Pilot Readiness v3 §1-3 · blocker B3) ─────────────────
 # Two halves: self-pilot CREATES the schedules, the collect poller EXECUTES them. Only the first and
@@ -278,6 +284,33 @@ note "the off-host copy of SELLEROPS_VAULT_MASTER_KEY is what makes a dump resto
 # What this section does NOT prove: that an upload actually succeeds. That needs one real PutObject
 # against the real bucket with the real credential, and it is a separate package (B5-2) — every check
 # above is an env value or a binary on PATH, which is exactly as far as a read-only preflight reaches.
+
+# ── 6-A. model keys: the key each switched-on capability will actually boot with ─────────────────
+# The same rule deploy.sh refuses on (deploy/pilot/model-keys.sh): a capability's own key, or under
+# SPRING_PROFILES_INCLUDE=runyour the one RUNYOUR_API_KEY, read the way docker-compose.yml hands it over.
+. "$REPO/deploy/pilot/model-keys.sh"
+_mk="$(model_key_problems)"
+if [[ -z "$_mk" ]]; then
+  if runyour_on; then ok "model keys: SPRING_PROFILES_INCLUDE=runyour — every switched-on capability is carried by RUNYOUR_API_KEY"
+  else ok "model keys: every switched-on capability has its own key (direct vendors)"; fi
+else
+  while IFS= read -r _p; do [[ -n "$_p" ]] && bad "$_p"; done <<< "$_mk"
+fi
+# Intake alerts — said, not refused: mock is the shipped posture and the backend records BLOCKED for any
+# incomplete live setting by itself. This only makes the posture visible before the build.
+case "${SELLEROPS_INTAKE_ALERT_MODE:-mock}" in
+  mock) ok "intake alerts: mock — new reviews/inquiries land in the in-service 모의 알림 inbox, nothing is sent" ;;
+  solapi)
+    if [[ "${SELLEROPS_SOLAPI_LIVE_ENABLED:-false}" == "true" ]]; then
+      _miss=(); for n in SELLEROPS_SOLAPI_API_KEY SELLEROPS_SOLAPI_API_SECRET SELLEROPS_SOLAPI_PF_ID SELLEROPS_SOLAPI_TEMPLATE_ID SELLEROPS_VAULT_MASTER_KEY; do set_ "$n" || _miss+=("$n"); done
+      [[ ${#_miss[@]} -eq 0 ]] && note "intake alerts: SOLAPI LIVE — real 알림톡 will be requested (an approved channel/template is required; accepted ≠ delivered)" \
+        || bad "intake alerts: SOLAPI live but blank: ${_miss[*]} — every delivery would be recorded BLOCKED"
+    else
+      note "intake alerts: mode=solapi with SELLEROPS_SOLAPI_LIVE_ENABLED off — deliveries are recorded BLOCKED (LIVE_OFF), nothing is sent"
+    fi ;;
+  *) bad "SELLEROPS_INTAKE_ALERT_MODE must be mock or solapi" ;;
+esac
+set_ SELLEROPS_VAULT_MASTER_KEY || note "SELLEROPS_VAULT_MASTER_KEY is blank — a seller cannot save an intake-alert phone number (it is sealed with the vault key)"
 
 # ── 7. the host can actually build and run this ──────────────────────────────────────────────────
 command -v docker >/dev/null && ok "docker present" || bad "docker not installed (host-bootstrap.sh)"

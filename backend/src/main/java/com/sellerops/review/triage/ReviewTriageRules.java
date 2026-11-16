@@ -57,7 +57,16 @@ public final class ReviewTriageRules {
             "냄새", "늦", "느려", "지연", "누락", "오배송", "빠져", "부족", "다르", "달라", "설명과", "사진과", "안 되", "안되", "안 돼", "안돼", "않",
             "못", "없어", "없네", "없음", "떨어", "약해", "약하", "약간", "조금", "좀", "얇", "비싸", "작아", "작네", "커서", "헐거", "뻑뻑", "빡빡",
             "들뜨", "뜨고", "뜨네", "휘어", "교환", "환불", "반품", "재발송", "ㅠ", "ㅜ", "흠", "ㅡㅡ", "-_-", "씹", "걸리", "빼고", "안좋",
-            "안 좋", "비추", "으나", "하급", "최악", "...", "깨졌", "깨진", "깨지", "데", "던지", "던져", "그럭저럭", "보통", "그냥그", "그냥 그");
+            "안 좋", "비추", "으나", "하급", "최악", "...", "깨졌", "깨진", "깨지", "데", "던지", "던져", "그럭저럭", "보통", "그냥그", "그냥 그",
+            // Surface defects (2026-11-15, owner decision after the manual-draft evaluation's r04 「겉이 벗겨졌어요」 ★3 was
+            // read as praise). Traced as RUBRIC v2 §2.4 records: 갈라 · 크랙 · 실금 · 부서 · 터짐 are the committed problem
+            // vocabulary (IssueVocabulary 균열 · 파손); 벗겨지 · 벗겨졌 · 벗겨져 · 까졌 · 까져 · 변색되/됐/돼 · 녹슬었/녹슬어/녹이 슬 are §3.1
+            // DEFECT_OR_DAMAGE surface forms added on the owner's decision, NOT a DEV label (no DEV row carries one) —
+            // an unmeasured exception, not a measured rule. Verb forms that say the defect happened, only: 「포장을 벗겨
+            // 보니」 · 「벗겨서」 take a wrapper off, and 「변색 없이」 says there is none; neither is marked by these. A
+            // negation that writes 않 · 없어 (「벗겨지지 않아요」) was marked by those older words before and still is.
+            "벗겨지", "벗겨졌", "벗겨져", "까졌", "까져", "변색되", "변색됐", "변색돼", "녹슬었", "녹슬어", "녹이 슬",
+            "갈라", "크랙", "실금", "부서", "터짐");
 
     /**
      * Words that mark a reservation in a review — any one keeps a 3★ in 지켜보기 (RUBRIC v2 §2.4).

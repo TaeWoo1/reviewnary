@@ -60,7 +60,15 @@ export interface AnswerStateView {
    * reasons, and only one of them is 「이미 답하셨습니다」.
    */
   previouslyAnswered: boolean;
+  /**
+   * No draft because two documents in use disagree on what was asked (2026-11-15) — not because nothing was written.
+   * The card then sends the seller to settle which document is current; it offers no box to write a third.
+   */
+  unsettled: boolean;
 }
+
+/** The server's label for a need held on a disagreement (`NeedResult.Enforcement.UNRESOLVED_CONFLICT_KO`). */
+export const UNSETTLED_NEED_KO = "자료끼리 값이 달라 확인 필요";
 
 /**
  * The state of a generate, or null when the MACHINERY is why there is nothing.
@@ -82,6 +90,7 @@ export function answerStateOf(generated: GeneratedDraftView): AnswerStateView | 
     topic,
     candidateId: gap?.candidateId ?? null,
     previouslyAnswered: gap?.previouslyAnswered === true,
+    unsettled: (gap?.needs ?? []).some((n) => n.statusKo === UNSETTLED_NEED_KO),
   };
 }
 

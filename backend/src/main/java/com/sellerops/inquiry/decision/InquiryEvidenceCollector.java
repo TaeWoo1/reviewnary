@@ -111,6 +111,23 @@ public class InquiryEvidenceCollector {
         this.sellerChecks = sellerChecks;
     }
 
+    private com.sellerops.knowledge.currency.KnowledgeCurrencyService currency;
+    private com.sellerops.knowledge.schedule.KnowledgeScheduleRepository scheduleRows;
+    private com.sellerops.knowledge.schedule.KnowledgeScheduleService scheduleService;
+
+    /**
+     * What the seller's material says now, value by value (2026-11-15, conflict steps 2–5). Optional: without it the pool
+     * is collected exactly as before — no document added for the asked attribute, no schedule line, no mark.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setCurrency(com.sellerops.knowledge.currency.KnowledgeCurrencyService currency,
+                            com.sellerops.knowledge.schedule.KnowledgeScheduleRepository scheduleRows,
+                            com.sellerops.knowledge.schedule.KnowledgeScheduleService scheduleService) {
+        this.currency = currency;
+        this.scheduleRows = scheduleRows;
+        this.scheduleService = scheduleService;
+    }
+
     /** Evaluation only: read reuse scopes from human annotations instead of the column (Eval v1's 23). */
     public void setScopeSource(java.util.function.Function<com.sellerops.knowledge.memory.AnswerMemory,
             com.sellerops.knowledge.memory.AnswerMemoryReuseScope> source) {
@@ -132,6 +149,18 @@ public class InquiryEvidenceCollector {
             addLanes(retriever.retrieve(orgId, inquiry, RetrievalQuery.ofText(need.search()), OrderFactLookup.STORED_ONLY,
                     scope), evidence, precedents);
         }
+        // What the seller's material says now (2026-11-15). Every document that states a value the question asks about is
+        // a candidate, whether or not a word of the question matched it — so two documents that disagree on the asked
+        // value are both in front of the judge, with the disagreement (q14: 「교환은 받고 며칠 안에」 found 「7일 이내에
+        // 교환·반품」 and never 「교환은 수령 후 14일 이내」).
+        java.time.LocalDate reference = com.sellerops.knowledge.currency.KnowledgeCurrencyService.dayOf(
+                inquiry == null ? null : inquiry.getReceivedAt());
+        com.sellerops.knowledge.currency.KnowledgeState state = currency == null ? null
+                : currency.stateFor(orgId, productId, reference, orderDateOf(whole));
+        if (state != null) {
+            addStating(orgId, productId, scope, state, askedBy(inquiry, needs), evidence);
+            addSchedules(orgId, productId, inquiry, needs, reference, evidence);
+        }
         addWholeLibraries(orgId, productId, scope, evidence);
         addCatalogue(orgId, productId, catalogue, evidence);
         if (whole != null && whole.order() != null && String.valueOf(whole.order().state()).startsWith("OBSERVED")) {
@@ -140,8 +169,148 @@ public class InquiryEvidenceCollector {
                     whole.order().messageKo(), null, null, null,
                     EvidenceScope.order(EvidenceScope.orderKey(PrecedentReuse.OrderKey.of(inquiry)))));
         }
-        return new InquiryDecisionEngine.Pool(List.copyOf(evidence.values()),
-                admissible(inquiry, precedents.values()));
+        List<EvidenceCandidate> pool = withoutPastSchedules(new ArrayList<>(evidence.values()), inquiry, needs, reference);
+        if (state != null) {
+            // Each passage carries what its values are now — not settled, replaced, or current. Wide reading stays wide;
+            // what it can no longer do is bring back a value the material does not stand behind without saying so.
+            pool.replaceAll(c -> marked(state, c));
+        }
+        return new InquiryDecisionEngine.Pool(List.copyOf(pool), admissible(inquiry, precedents.values()));
+    }
+
+    /**
+     * A document table that is all history is not ground for the current plan (2026-11-16 §7.57,
+     * {@link com.sellerops.knowledge.schedule.ScheduleCurrency}) — the same rule a structured schedule line has always had
+     * here ({@link #addSchedules}). Only for a question about the plan: one about what happened before keeps the old
+     * table, and nothing that is not a dated schedule table is touched.
+     */
+    static List<EvidenceCandidate> withoutPastSchedules(List<EvidenceCandidate> pool, Inquiry inquiry,
+                                                        List<InquiryNeed> needs, java.time.LocalDate reference) {
+        String question = inquiry == null ? "" : (inquiry.getTitle() == null ? "" : inquiry.getTitle()) + " "
+                + (inquiry.getBody() == null ? "" : inquiry.getBody());
+        boolean plan = !com.sellerops.knowledge.schedule.ScheduleCurrency.asksHistory(question)
+                && (com.sellerops.knowledge.schedule.ScheduleCurrency.asksCurrentSchedule(question)
+                || (needs == null ? List.<InquiryNeed>of() : needs).stream().anyMatch(n -> n.type() == NeedType.CATALOGUE_AVAILABILITY
+                        || com.sellerops.knowledge.schedule.ScheduleCurrency.asksCurrentSchedule(n.ask() + " " + n.search())));
+        if (!plan || reference == null) {
+            return pool;
+        }
+        pool.removeIf(c -> (c.kind() == EvidenceCandidate.Kind.ORG_KNOWLEDGE || c.kind() == EvidenceCandidate.Kind.PRODUCT_KNOWLEDGE)
+                && com.sellerops.knowledge.schedule.ScheduleCurrency.pastOnly(c.text(), reference));
+        return pool;
+    }
+
+    /** The attributes of the closed list this inquiry asks about — by the whole message and by each need. */
+    public static java.util.Set<com.sellerops.knowledge.claim.ClaimAttribute> askedBy(Inquiry inquiry,
+                                                                                    List<InquiryNeed> needs) {
+        java.util.Set<com.sellerops.knowledge.claim.ClaimAttribute> asked =
+                java.util.EnumSet.noneOf(com.sellerops.knowledge.claim.ClaimAttribute.class);
+        if (inquiry != null) {
+            asked.addAll(com.sellerops.knowledge.claim.ClaimReader.asked(
+                    (inquiry.getTitle() == null ? "" : inquiry.getTitle()) + " "
+                            + (inquiry.getBody() == null ? "" : inquiry.getBody())));
+        }
+        for (InquiryNeed need : needs == null ? List.<InquiryNeed>of() : needs) {
+            asked.addAll(com.sellerops.knowledge.claim.ClaimReader.asked(need.ask() + " " + need.search()));
+        }
+        return asked;
+    }
+
+    private static java.time.LocalDate orderDateOf(InquiryEvidenceRetriever.InquiryEvidence whole) {
+        return whole == null || whole.order() == null ? null : whole.order().orderedAt();
+    }
+
+    private static EvidenceCandidate marked(com.sellerops.knowledge.currency.KnowledgeState state, EvidenceCandidate c) {
+        if (c.sourceId() == null || c.kind() != EvidenceCandidate.Kind.ORG_KNOWLEDGE
+                && c.kind() != EvidenceCandidate.Kind.PRODUCT_KNOWLEDGE) {
+            return c;
+        }
+        com.sellerops.knowledge.currency.KnowledgeState.Mark mark = state.markFor(c.sourceId(), c.text());
+        return mark.isEmpty() ? c : c.withMark(mark);
+    }
+
+    /** The passages of every document in use that states a current value of an asked attribute. */
+    private void addStating(UUID orgId, UUID productId, KnowledgeVariantScope scope,
+                            com.sellerops.knowledge.currency.KnowledgeState state,
+                            java.util.Set<com.sellerops.knowledge.claim.ClaimAttribute> asked,
+                            Map<String, EvidenceCandidate> evidence) {
+        List<com.sellerops.knowledge.currency.KnowledgeState.Source> stating = state.stating(asked);
+        if (stating.isEmpty()) {
+            return;
+        }
+        List<OrgKnowledgeChunk> orgChunkRows = null;
+        List<ProductKnowledgeChunk> productChunkRows = null;
+        for (com.sellerops.knowledge.currency.KnowledgeState.Source s : stating) {
+            if ("ORG".equals(s.kind())) {
+                if (orgChunkRows == null) {
+                    orgChunkRows = orgChunks.findAllByOrgId(orgId).stream()
+                            .sorted(Comparator.comparing(OrgKnowledgeChunk::getOrdinal)).toList();
+                }
+                for (OrgKnowledgeChunk c : orgChunkRows) {
+                    if (s.id().equals(c.getSourceId()) && states(c.getContent(), asked)) {
+                        put(evidence, new EvidenceCandidate(null, EvidenceCandidate.Kind.ORG_KNOWLEDGE, s.title(),
+                                c.getContent(), s.id(), null, null).withChunk(c.getId()));
+                    }
+                }
+            } else if (productId != null && productId.equals(s.productId())) {
+                ProductKnowledgeSource row = productSources.findById(s.id()).orElse(null);
+                if (row == null || scope != null && !scope.admits(row.getVariantId())) {
+                    continue;
+                }
+                if (productChunkRows == null) {
+                    productChunkRows = productChunks.findAllByOrgIdAndProductId(orgId, productId).stream()
+                            .sorted(Comparator.comparing(ProductKnowledgeChunk::getOrdinal)).toList();
+                }
+                for (ProductKnowledgeChunk c : productChunkRows) {
+                    if (s.id().equals(c.getSourceId()) && states(c.getContent(), asked)) {
+                        put(evidence, new EvidenceCandidate(null, EvidenceCandidate.Kind.PRODUCT_KNOWLEDGE, s.title(),
+                                c.getContent(), s.id(), null, null).withChunk(c.getId()));
+                    }
+                }
+            }
+        }
+    }
+
+    private static boolean states(String text, java.util.Set<com.sellerops.knowledge.claim.ClaimAttribute> asked) {
+        return com.sellerops.knowledge.claim.ClaimReader.read(text).stream()
+                .anyMatch(k -> !k.historical() && asked.contains(k.attribute()));
+    }
+
+    /** Words of a question a product's schedule can answer — one list with the document tables' rule. */
+    private static final java.util.regex.Pattern SCHEDULE_WORDS =
+            com.sellerops.knowledge.schedule.ScheduleCurrency.SCHEDULE_WORDS;
+
+    /**
+     * The product's schedule lines (owner decision 4), for a question about when stock comes in, goes out or is made. A
+     * line whose date has passed is history, not the plan, and is not offered; a 예정 line says it can move; none of them
+     * is about this customer's order.
+     */
+    private void addSchedules(UUID orgId, UUID productId, Inquiry inquiry, List<InquiryNeed> needs,
+                              java.time.LocalDate reference, Map<String, EvidenceCandidate> evidence) {
+        if (scheduleRows == null || productId == null) {
+            return;
+        }
+        String question = (inquiry == null ? "" : (inquiry.getTitle() == null ? "" : inquiry.getTitle()) + " "
+                + (inquiry.getBody() == null ? "" : inquiry.getBody()));
+        boolean asked = SCHEDULE_WORDS.matcher(question).find() || needs.stream().anyMatch(n ->
+                n.type() == NeedType.CATALOGUE_AVAILABILITY || SCHEDULE_WORDS.matcher(n.ask() + " " + n.search()).find());
+        if (!asked) {
+            return;
+        }
+        String productName = scheduleService == null ? null : scheduleService.nameOf(orgId, productId);
+        for (com.sellerops.knowledge.schedule.KnowledgeSchedule s : scheduleRows.findAllByOrgIdOrderByCreatedAtAsc(orgId)) {
+            if (s.getProductId() != null && !s.getProductId().equals(productId)
+                    || !com.sellerops.knowledge.schedule.KnowledgeScheduleService.current(s, reference)) {
+                continue;
+            }
+            String label = "입고·출고 일정 · " + (s.getOptionName() == null || s.getOptionName().isBlank() ? ""
+                    : s.getOptionName().strip() + " ") + s.getKind().labelKo() + " " + s.getStatus().labelKo()
+                    + (s.getScheduleDate() == null ? "" : " " + s.getScheduleDate());
+            put(evidence, new EvidenceCandidate(null, EvidenceCandidate.Kind.SCHEDULE, label,
+                    com.sellerops.knowledge.schedule.KnowledgeScheduleService.evidenceText(s,
+                            s.getProductId() == null ? null : productName, reference),
+                    s.getId(), productId, com.sellerops.knowledge.schedule.KnowledgeScheduleService.fingerprint(s)));
+        }
     }
 
     private void addSellerCheck(UUID orgId, Inquiry inquiry, Map<String, EvidenceCandidate> evidence) {

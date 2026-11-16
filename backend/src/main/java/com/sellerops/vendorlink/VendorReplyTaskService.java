@@ -536,8 +536,8 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         }
         VendorServerClient.BasisNote finding;
         if (recheck != null) {
-            ReviewDraftRecheck.Result result = recheck.check(orgId, review,
-                    VocPreviewSanitizer.redactFullBody(review.getBody()).text(), sent.draftBody());
+            ReviewDraftRecheck.Result result = pcLane(recheck.checkWithoutState(orgId, review,
+                    VocPreviewSanitizer.redactFullBody(review.getBody()).text(), sent.draftBody()), sent.draftBody());
             finding = result.passed() ? null : note(result);
         } else {
             // No knowledge check wired here: the company's bans are still this PC's to enforce.
@@ -750,8 +750,8 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             TaskSnapshot after = null;
             if (review != null && ref != null
                     && ReviewBodyFingerprint.of(review.getBody()).equals(ref.getBodyFingerprint())) {
-                ReviewDraftRecheck.Result result = recheck.check(orgId, review,
-                        VocPreviewSanitizer.redactFullBody(review.getBody()).text(), current.draftBody());
+                ReviewDraftRecheck.Result result = pcLane(recheck.checkWithoutState(orgId, review,
+                        VocPreviewSanitizer.redactFullBody(review.getBody()).text(), current.draftBody()), current.draftBody());
                 try {
                     if (result.passed()) {
                         after = link.client().submitDraft(token, storeId, ref.getVendorReviewId(),
@@ -867,8 +867,8 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
         boolean checked = false;
         if (due && review != null && ref != null
                 && ReviewBodyFingerprint.of(review.getBody()).equals(ref.getBodyFingerprint())) {
-            ReviewDraftRecheck.Result result = recheck.check(orgId, review,
-                    VocPreviewSanitizer.redactFullBody(review.getBody()).text(), current.draftBody());
+            ReviewDraftRecheck.Result result = pcLane(recheck.checkWithoutState(orgId, review,
+                    VocPreviewSanitizer.redactFullBody(review.getBody()).text(), current.draftBody()), current.draftBody());
             try {
                 TaskSnapshot after = link.client().pcRecheck(token, current.id(), current.draftVersion(),
                         result.passed(), pcCodes(result), result.passed() ? null : note(result));
@@ -898,8 +898,8 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
             // The review moved since it was pulled; the next upload invalidates the task or the delegate's check stops it.
             return null;
         }
-        ReviewDraftRecheck.Result result = recheck.check(orgId, review,
-                VocPreviewSanitizer.redactFullBody(review.getBody()).text(), current.draftBody());
+        ReviewDraftRecheck.Result result = pcLane(recheck.checkWithoutState(orgId, review,
+                VocPreviewSanitizer.redactFullBody(review.getBody()).text(), current.draftBody()), current.draftBody());
         if (current.editedOnMobile() && !java.util.Objects.equals(current.pcRecheckVersion(), current.draftVersion())) {
             // A phone version approved before any check, under a basis that has since moved: this is its first check,
             // the one the delegate waits for. Passed frees it; a finding holds it on the server — nothing was seen.
@@ -956,6 +956,24 @@ public class VendorReplyTaskService implements DelegatedReplyLane {
      * between a withdrawn document and a reworded one; the PC lane already reads that from each source's {@code removed}
      * and has no confirmation of its own to answer a new code with, so it is not sent — this lane behaves as before.
      */
+    /**
+     * The web check as this lane has always read it (2026-11-15): {@link ReviewDraftRecheck#UNSETTLED_VALUE} — a value the
+     * seller's material does not settle — is the web hold's, which has a way to show it and to fix it; the PC lane has
+     * neither, and stays out of this change's scope ({@code DESIGN_conflict.md} §7). Removed here, with whether the check
+     * passed read again from what is left, so this lane holds exactly what it held before.
+     */
+    static ReviewDraftRecheck.Result pcLane(ReviewDraftRecheck.Result result, String text) {
+        if (!result.codes().contains(ReviewDraftRecheck.UNSETTLED_VALUE)) {
+            return result;
+        }
+        List<String> codes = result.codes().stream().filter(c -> !ReviewDraftRecheck.UNSETTLED_VALUE.equals(c)).toList();
+        List<String> marked = new java.util.ArrayList<>(result.promises());
+        marked.addAll(result.phrases());
+        return new ReviewDraftRecheck.Result(codes.isEmpty(), codes, result.changed(), result.promises(),
+                ReviewDraftRecheck.sentencesWith(ReviewReplyValidation.normalize(text), marked), result.phrases(),
+                result.conflicts(), result.against());
+    }
+
     private static List<String> pcCodes(ReviewDraftRecheck.Result result) {
         return result.codes().stream().filter(c -> !ReviewDraftRecheck.SOURCE_RETIRED.equals(c)).toList();
     }

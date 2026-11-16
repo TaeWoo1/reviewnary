@@ -98,4 +98,19 @@ class ReplyStepUsageTest {
         assertThat(quota.consumeStep(org, "r-1", "CLASSIFY", "INGEST", AgentUsageActor.RUN).decision().allowed())
                 .as("automatic work is not the seller's count").isTrue();
     }
+
+    @Test
+    @DisplayName("tokens the vendor did not report (-1) are stored as unknown, never summed as a count")
+    void unreportedTokensAreUnknown() {
+        UUID org = UUID.randomUUID();
+        AgentQuotaService quota = quota(100);
+        AgentQuotaService.Charge none = quota.consumeStep(org, "run-u", "DRAFT", "SELLER", AgentUsageActor.USER);
+        quota.recordOutcome(none.usageId(), 900, -1, -1);
+        AgentQuotaService.Charge half = quota.chargeCheck(org, AgentUsageKind.DRAFT, "FIGURE_CHECK", AgentUsageActor.USER);
+        quota.recordOutcome(half.usageId(), 700, 1500, -1);
+        assertThat(usage.findById(none.usageId()).orElseThrow())
+                .extracting(AgentLlmUsage::getInputTokens, AgentLlmUsage::getOutputTokens).containsExactly(null, null);
+        assertThat(usage.findById(half.usageId()).orElseThrow())
+                .extracting(AgentLlmUsage::getInputTokens, AgentLlmUsage::getOutputTokens).containsExactly(1500, null);
+    }
 }

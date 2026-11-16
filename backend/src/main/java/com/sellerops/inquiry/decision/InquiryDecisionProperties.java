@@ -43,7 +43,7 @@ public class InquiryDecisionProperties implements AgentCapabilityGate {
     public InquiryDecisionProperties(boolean enabled, String enabledOrgIds, String model, String apiKey,
                                      int planMaxOutputTokens, int judgeMaxOutputTokens, String reasoningEffort) {
         this(enabled, enabledOrgIds, model, apiKey, planMaxOutputTokens, judgeMaxOutputTokens, reasoningEffort,
-                InquiryDecisionPrompt.JUDGE_V6, "");
+                InquiryDecisionPrompt.JUDGE_V8, "");
     }
 
     public InquiryDecisionProperties(boolean enabled, String enabledOrgIds, String model, String apiKey,
@@ -70,7 +70,7 @@ public class InquiryDecisionProperties implements AgentCapabilityGate {
             @Value("${sellerops.inquiry-decision.plan-max-output-tokens:800}") int planMaxOutputTokens,
             @Value("${sellerops.inquiry-decision.judge-max-output-tokens:2400}") int judgeMaxOutputTokens,
             @Value("${sellerops.inquiry-decision.reasoning-effort:minimal}") String reasoningEffort,
-            @Value("${sellerops.inquiry-decision.judge-prompt:coverage-judge/v6}") String judgePrompt,
+            @Value("${sellerops.inquiry-decision.judge-prompt:coverage-judge/v7}") String judgePrompt,
             @Value("${sellerops.inquiry-decision.judge-reasoning-effort:}") String judgeReasoningEffort,
             @Value("${sellerops.inquiry-decision.output-format:json_schema}") String outputFormat,
             @Value("${sellerops.inquiry-decision.vendor:OPENAI}") String vendor) {
@@ -89,12 +89,14 @@ public class InquiryDecisionProperties implements AgentCapabilityGate {
                 && !InquiryDecisionPrompt.JUDGE_V3.equals(judgePrompt.trim())
                 && !InquiryDecisionPrompt.JUDGE_V4.equals(judgePrompt.trim())
                 && !InquiryDecisionPrompt.JUDGE_V5.equals(judgePrompt.trim())
-                && !InquiryDecisionPrompt.JUDGE_V6.equals(judgePrompt.trim())) {
+                && !InquiryDecisionPrompt.JUDGE_V6.equals(judgePrompt.trim())
+                && !InquiryDecisionPrompt.JUDGE_V7.equals(judgePrompt.trim())
+                && !InquiryDecisionPrompt.JUDGE_V8.equals(judgePrompt.trim())) {
             // An unknown instruction name is a refusal to boot, not a silent fallback: an eval arm label must describe
             // the instruction the process actually sent.
             throw new IllegalArgumentException("sellerops.inquiry-decision.judge-prompt: unknown " + judgePrompt);
         }
-        this.judgePrompt = judgePrompt == null || judgePrompt.isBlank() ? InquiryDecisionPrompt.JUDGE_V6
+        this.judgePrompt = judgePrompt == null || judgePrompt.isBlank() ? InquiryDecisionPrompt.JUDGE_V8
                 : judgePrompt.trim();
         // The judge's effort defaults to the plan's: one knob, unless an evaluation separates them.
         this.judgeReasoningEffort = judgeReasoningEffort == null || judgeReasoningEffort.isBlank()

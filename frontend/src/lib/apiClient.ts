@@ -1,6 +1,14 @@
 import axios, { isAxiosError } from "axios";
+import { loginPathFor } from "./returnTo";
+import type {
+  IntakeAlertDelivery,
+  IntakeAlertDeliveryDetail,
+  IntakeAlertSettings,
+  IntakeAlertSettingsRequest,
+} from "./intakeAlerts";
 import { isWorkWrite, noteWorkWrite } from "./workChanges";
 import type { HomeBoardView, WorkPage, WorkSort, WorkView } from "./homeBoard";
+import type { ProductAnalysisView, ProductComparison } from "./productAnalysis";
 import type {
   OpenQuestionItem,
   OpenQuestionResolution,
@@ -122,6 +130,9 @@ import type {
   KnowledgeCandidateView,
   KnowledgeWorkbookResult,
   KnowledgeDocumentView,
+  KnowledgeCurrencyView,
+  KnowledgeReplacementView,
+  KnowledgeScheduleView,
   KnowledgeSummaryView,
   KnowledgeInventoryView,
   LearnedKnowledgeResponse,
@@ -296,7 +307,9 @@ http.interceptors.response.use(
     if (isSessionExpiry(status, url, getToken() !== null)) {
       clearToken();
       if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
-        window.location.assign(SESSION_EXPIRED_PATH);
+        window.location.assign(
+          loginPathFor(`${window.location.pathname}${window.location.search}`, SESSION_EXPIRED_PATH),
+        );
       }
     }
     // Error monitoring (docs/standing/service_readiness_v1.md §2-1): ≥ 500 / no answer is an incident; a no-op without Sentry.
@@ -1923,6 +1936,19 @@ export const api = {
     return data;
   },
 
+  // 파일 바꾸기 (2026-11-16): the same document from a new file — same id, kind, scope and 사용 여부. A file the server
+  // cannot read changes nothing and comes back as the reader's own sentence.
+  async replaceKnowledgeDocumentFile(sourceId: string, file: File): Promise<KnowledgeDocumentView> {
+    const form = new FormData();
+    form.append("file", file);
+    const { data } = await http.post<KnowledgeDocumentView>(
+      `/api/knowledge/documents/${encodeURIComponent(sourceId)}/file`,
+      form,
+      { timeout: MODEL_TIMEOUT_MS, headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return data;
+  },
+
   // Every document, or one product's. The product screen passes an id so it does not read a
   // three-hundred-product company's material to list one product's two files.
   async getKnowledgeDocuments(productId?: string): Promise<KnowledgeDocumentView[]> {
@@ -1967,6 +1993,44 @@ export const api = {
   async setKnowledgeDocumentActive(sourceId: string, active: boolean): Promise<KnowledgeDocumentView> {
     const { data } = await http.post<KnowledgeDocumentView>(
       `/api/knowledge/documents/${encodeURIComponent(sourceId)}/active?active=${active}`,
+    );
+    return data;
+  },
+
+  /** 자료끼리 다른 값 — disagreements, replacements and 적용일 (2026-11-15). */
+  async getKnowledgeConflicts(): Promise<KnowledgeCurrencyView> {
+    const { data } = await http.get<KnowledgeCurrencyView>("/api/knowledge/conflicts");
+    return data;
+  },
+
+  /** A document's 적용일 (YYYY-MM-DD); null clears it. The document itself is not edited. */
+  async setKnowledgeEffectiveFrom(sourceId: string, effectiveFrom: string | null): Promise<void> {
+    await http.put(`/api/knowledge/sources/${encodeURIComponent(sourceId)}/effective-from`, { effectiveFrom });
+  },
+
+  /** 「newer가 older를 대신함」 for one attribute under one condition. */
+  async supersedeKnowledge(request: {
+    newerSourceId: string;
+    olderSourceId: string;
+    attribute: string;
+    condition: string;
+  }): Promise<KnowledgeReplacementView> {
+    const { data } = await http.post<KnowledgeReplacementView>("/api/knowledge/supersessions", request);
+    return data;
+  },
+
+  async removeKnowledgeSupersession(id: string): Promise<void> {
+    await http.delete(`/api/knowledge/supersessions/${encodeURIComponent(id)}`);
+  },
+
+  async getKnowledgeSchedules(): Promise<KnowledgeScheduleView[]> {
+    const { data } = await http.get<KnowledgeScheduleView[]>("/api/knowledge/schedules");
+    return data;
+  },
+
+  async setKnowledgeScheduleActive(id: string, active: boolean): Promise<KnowledgeScheduleView> {
+    const { data } = await http.post<KnowledgeScheduleView>(
+      `/api/knowledge/schedules/${encodeURIComponent(id)}/active?active=${active}`,
     );
     return data;
   },
@@ -2895,6 +2959,50 @@ export const api = {
     const { data } = await http.get<ProductKnowledgeView>(
       `/api/products/${encodeURIComponent(productId)}/knowledge`,
     );
+    return data;
+  },
+
+  /** 상품·브랜드 분석 for one product over 30·90·180·365 days. Rule-based; no model call. */
+  async getProductAnalysis(productId: string, days: number): Promise<ProductAnalysisView> {
+    const { data } = await http.get<ProductAnalysisView>(
+      `/api/products/${encodeURIComponent(productId)}/analysis`,
+      { params: { days } },
+    );
+    return data;
+  },
+
+  /** The whole store as one subject — linked and unlinked rows, with empty channels named. */
+  async getStoreAnalysis(days: number): Promise<ProductAnalysisView> {
+    const { data } = await http.get<ProductAnalysisView>("/api/products/analysis/store", { params: { days } });
+    return data;
+  },
+
+  /** The signed-in user's KakaoTalk intake-alert settings (own org + user only). */
+  async getIntakeAlertSettings(): Promise<IntakeAlertSettings> {
+    const { data } = await http.get<IntakeAlertSettings>("/api/intake-alerts/settings");
+    return data;
+  },
+
+  async updateIntakeAlertSettings(body: IntakeAlertSettingsRequest): Promise<IntakeAlertSettings> {
+    const { data } = await http.put<IntakeAlertSettings>("/api/intake-alerts/settings", body);
+    return data;
+  },
+
+  /** The mock inbox: messages made for this user, newest first. */
+  async listIntakeAlertDeliveries(limit = 30): Promise<IntakeAlertDelivery[]> {
+    const { data } = await http.get<IntakeAlertDelivery[]>("/api/intake-alerts/deliveries", { params: { limit } });
+    return data;
+  },
+
+  /** One message and the reviews/inquiries in it, read now. 404 for another user's or org's message. */
+  async getIntakeAlertDelivery(id: string): Promise<IntakeAlertDeliveryDetail> {
+    const { data } = await http.get<IntakeAlertDeliveryDetail>(`/api/intake-alerts/deliveries/${encodeURIComponent(id)}`);
+    return data;
+  },
+
+  /** The store's products side by side on the same axes, period and denominator. */
+  async getProductComparison(days: number): Promise<ProductComparison> {
+    const { data } = await http.get<ProductComparison>("/api/products/analysis", { params: { days } });
     return data;
   },
 

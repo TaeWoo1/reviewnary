@@ -86,10 +86,20 @@ public record NeedResult(NeedStatus judged, InquiryNeed need, NeedStatus status,
          * record named — never as an answer, and never for a need about anything else (a cause, a date, an amount, a
          * product fact, the seller's own decision). The one enforcement that widens: by a record, never by the judge alone.
          */
-        SETTLED_BY_ACTION;
+        SETTLED_BY_ACTION,
+        /**
+         * <b>The answer is a value the seller's material does not settle</b> (2026-11-15, owner decision 2): two documents
+         * in use state different values for what the need asks — 교환 신청 기한 7일 and 14일 — and neither the seller's
+         * replacement nor two 적용일 decide which is current. NONE when that value is all the need asks, PARTIAL when it
+         * asks more; the disagreement is the need's {@code missing}. Never moved back by the judge.
+         */
+        UNRESOLVED_CONFLICT;
 
         /** What the seller reads beside a need closed this way. */
         public static final String SETTLED_BY_ACTION_KO = "조치 완료로 판단 불필요";
+
+        /** What the seller reads beside a need held for a value the material does not settle. */
+        public static final String UNRESOLVED_CONFLICT_KO = "자료끼리 값이 달라 확인 필요";
     }
 
     /** Closed because the seller already did what deciding it was for ({@link Enforcement#SETTLED_BY_ACTION}). */

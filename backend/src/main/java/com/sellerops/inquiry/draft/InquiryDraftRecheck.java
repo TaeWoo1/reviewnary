@@ -51,6 +51,8 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>{@value #SELLER_CHECK_COMPLETION} — the reply calls the action finished and the current record does not
  *       ({@link SellerCheckGuard}). A finished fact is not something a decision can make true: the record is fixed
  *       first, or the sentence is.</li>
+ *   <li>{@value #SCHEDULE_EXPIRED} — for a question about the plan, a cited schedule table or line whose dates have all
+ *       passed since (2026-11-16 B180): not an edit, so the send of an approved answer does not drop it.</li>
  * </ol>
  *
  * <p><b>Whoever wrote the version, the same check</b> (2026-11-01 review: an author is not a finding). A version with no
@@ -65,6 +67,15 @@ public class InquiryDraftRecheck {
     public static final String FIGURE_UNVERIFIED = "FIGURE_UNVERIFIED";
     public static final String SELLER_CHECK_CHANGED = "SELLER_CHECK_CHANGED";
     public static final String SELLER_CHECK_COMPLETION = "SELLER_CHECK_COMPLETION";
+    /**
+     * A cited schedule — a document table or a structured line — whose dates have all passed, for a question about the
+     * plan (2026-11-16 B180 · §7.59). Not {@link ReviewDraftRecheck#SOURCE_CHANGED}: nothing in the source was edited, the
+     * plan it stood for is history. Kept apart because the send of an approved answer drops a changed citation alone and
+     * must not drop this — an answer approved while 11/25 was ahead is not sent after 11/25 unasked.
+     */
+    public static final String SCHEDULE_EXPIRED = "SCHEDULE_EXPIRED";
+    /** What {@link #pastLabel} appends to a cited title: the one mark that tells an expired schedule among the changed. */
+    public static final String PAST_SUFFIX = " (날짜가 모두 지난 일정)";
     /** A {@link FigureNote#source}: the figure was checked at generation in a clause the text no longer has. */
     public static final String EDITED = "EDITED";
 
@@ -89,12 +100,23 @@ public class InquiryDraftRecheck {
     /** What the check found; empty lists and no codes when the version still stands. */
     public record Result(List<String> codes, List<String> changed, List<String> promises, List<String> phrases,
                          List<FigureNote> figures, List<String> conflicts, List<ReviewDraftRecheck.Against> against,
-                         SellerCheckNote sellerCheck, List<String> retired, List<String> withdrawals) {
+                         SellerCheckNote sellerCheck, List<String> retired, List<String> withdrawals,
+                         List<String> unsettled, List<String> unsettledSaid) {
         public Result {
             conflicts = conflicts == null ? List.of() : conflicts;
             against = against == null ? List.of() : against;
             retired = retired == null ? List.of() : retired;
             withdrawals = withdrawals == null ? List.of() : withdrawals;
+            unsettled = unsettled == null ? List.of() : unsettled;
+            unsettledSaid = unsettledSaid == null ? List.of() : unsettledSaid;
+        }
+
+        /** Without unsettled values — every caller written before the material's state was read. */
+        public Result(List<String> codes, List<String> changed, List<String> promises, List<String> phrases,
+                      List<FigureNote> figures, List<String> conflicts, List<ReviewDraftRecheck.Against> against,
+                      SellerCheckNote sellerCheck, List<String> retired, List<String> withdrawals) {
+            this(codes, changed, promises, phrases, figures, conflicts, against, sellerCheck, retired, withdrawals,
+                    List.of(), List.of());
         }
 
         /** Retired titles without their moments — a caller that does not bind a decision to one. */
@@ -167,6 +189,20 @@ public class InquiryDraftRecheck {
         this.sellerChecks = sellerChecks;
     }
 
+    private com.sellerops.knowledge.currency.KnowledgeCurrencyService currency;
+    private com.sellerops.knowledge.schedule.KnowledgeScheduleRepository schedules;
+
+    /**
+     * What the seller's material settles now, and the schedule lines (2026-11-15). Optional: without them no value is read
+     * for being unsettled and a cited schedule line is read only through its view.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setCurrency(com.sellerops.knowledge.currency.KnowledgeCurrencyService currency,
+                            com.sellerops.knowledge.schedule.KnowledgeScheduleRepository schedules) {
+        this.currency = currency;
+        this.schedules = schedules;
+    }
+
     @Transactional(readOnly = true)
     public Result check(InquiryWorkItem item, int version, String text) {
         return check(item, version, text, null);
@@ -218,7 +254,17 @@ public class InquiryDraftRecheck {
         // 사용 / 사용 안 함 change bumps.
         Set<String> retired = new LinkedHashSet<>();
         Set<String> withdrawals = new LinkedHashSet<>();
+        // The cited schedules whose dates have all passed — named in changed too, with their own code (B180).
+        Set<String> expired = new LinkedHashSet<>();
         List<String> current = new ArrayList<>();
+        Inquiry inquiry = inquiries.findById(item.getInquiryId()).orElse(null);
+        String asked = inquiry == null ? "" : String.join(" ",
+                inquiry.getTitle() == null ? "" : inquiry.getTitle(), inquiry.getBody() == null ? "" : inquiry.getBody());
+        // A schedule cited for the plan that is all history by now no longer stands for it (2026-11-16 §7.57): a draft
+        // written while 11/25 was ahead is approved or registered after 11/25 — the line or table is unchanged, the date
+        // passed. Read only for a question about the plan, as at generation.
+        java.time.LocalDate today = java.time.LocalDate.now(clock);
+        boolean plan = com.sellerops.knowledge.schedule.ScheduleCurrency.asksCurrentSchedule(asked);
         for (InquiryDraftEvidence row : cited) {
             DraftEvidenceView view = snippets.viewOf(row);
             if (view.gone()) {
@@ -230,6 +276,11 @@ public class InquiryDraftRecheck {
             if (InquiryDraftEvidence.KIND_ORG_POLICY.equals(row.getKind())) {
                 java.util.Optional<OrgKnowledgeSource> source = orgSources.findById(row.getSourceId());
                 if (source.filter(OrgKnowledgeSource::isActive).isPresent()) {
+                    if (plan && com.sellerops.knowledge.schedule.ScheduleCurrency.pastOnly(source.get().getBody(), today)) {
+                        expired.add(pastLabel(row.getTitle()));
+                        changed.add(pastLabel(row.getTitle()));
+                        continue;
+                    }
                     current.add(source.get().getTitle() + "\n" + source.get().getBody());
                 } else {
                     String title = row.getTitle() == null ? "" : row.getTitle();
@@ -237,11 +288,35 @@ public class InquiryDraftRecheck {
                     retired.add(title);
                     withdrawals.add(withdrawal(row.getSourceId(), source.map(OrgKnowledgeSource::getUpdatedAt)));
                 }
+            } else if (InquiryDraftEvidence.KIND_SCHEDULE.equals(row.getKind()) && schedules != null) {
+                // A schedule line turned off or deleted is withdrawn like a document; one edited is changed (its view).
+                java.util.Optional<com.sellerops.knowledge.schedule.KnowledgeSchedule> line =
+                        schedules.findById(row.getSourceId());
+                if (line.filter(com.sellerops.knowledge.schedule.KnowledgeSchedule::isActive).isPresent()) {
+                    if (plan && !com.sellerops.knowledge.schedule.KnowledgeScheduleService.current(line.get(), today)) {
+                        expired.add(pastLabel(row.getTitle()));
+                        changed.add(pastLabel(row.getTitle()));
+                        continue;
+                    }
+                    current.add(com.sellerops.knowledge.schedule.KnowledgeScheduleService.evidenceText(line.get(), null,
+                            null));
+                } else {
+                    String title = row.getTitle() == null ? "" : row.getTitle();
+                    changed.add(title);
+                    retired.add(title);
+                    withdrawals.add(withdrawal(row.getSourceId(),
+                            line.map(com.sellerops.knowledge.schedule.KnowledgeSchedule::getUpdatedAt)));
+                }
             } else if (InquiryDraftEvidence.KIND_PRODUCT_KNOWLEDGE.equals(row.getKind())) {
                 // A product document turned off (사용 안 함) stands for nothing, as a company one does — the review recheck
                 // has read it so all along (2026-11-14 manual eval F3: a draft citing a retired product manual was approved).
                 java.util.Optional<ProductKnowledgeSource> source = productSources.findById(row.getSourceId());
                 if (source.filter(ProductKnowledgeSource::isActive).isPresent()) {
+                    if (plan && com.sellerops.knowledge.schedule.ScheduleCurrency.pastOnly(source.get().getBody(), today)) {
+                        expired.add(pastLabel(row.getTitle()));
+                        changed.add(pastLabel(row.getTitle()));
+                        continue;
+                    }
                     current.add(source.get().getTitle() + "\n" + source.get().getBody());
                 } else {
                     String title = row.getTitle() == null ? "" : row.getTitle();
@@ -264,9 +339,6 @@ public class InquiryDraftRecheck {
         if (style.hasUnknownFallback()) {
             voice.add(style.unknownFallback());
         }
-        Inquiry inquiry = inquiries.findById(item.getInquiryId()).orElse(null);
-        String asked = inquiry == null ? "" : String.join(" ",
-                inquiry.getTitle() == null ? "" : inquiry.getTitle(), inquiry.getBody() == null ? "" : inquiry.getBody());
         // A figure is the figure check's below, which knows what each one was written from.
         List<String> promises = InquiryClaimGuard.unsupportedClaims(text, current, voice, asked).stream()
                 .filter(v -> v.kind() != InquiryClaimGuard.Kind.FIGURE)
@@ -290,10 +362,14 @@ public class InquiryDraftRecheck {
         promises = costs.promises();
         List<String> phrases = AnswerStyleInstruction.forbiddenPresentIn(text, style);
         List<FigureNote> figures = grounds == null ? List.of()
-                : figures(item, version, cites, text, authorKind, !changed.isEmpty());
+                : figures(item, version, cites, text, authorKind, !changed.isEmpty(), productNames(item, inquiry));
         List<String> codes = new ArrayList<>();
-        if (!changed.isEmpty()) {
+        // A changed citation is one whose text moved or went; an expired schedule is its own finding (B180).
+        if (changed.stream().anyMatch(t -> !expired.contains(t))) {
             codes.add(ReviewDraftRecheck.SOURCE_CHANGED);
+        }
+        if (!expired.isEmpty()) {
+            codes.add(SCHEDULE_EXPIRED);
         }
         if (!retired.isEmpty()) {
             codes.add(ReviewDraftRecheck.SOURCE_RETIRED);
@@ -306,6 +382,21 @@ public class InquiryDraftRecheck {
         List<String> conflicts = new ArrayList<>(ReviewDraftRecheck.conflictsAmong(promises, text, everyRule, asked));
         List<ReviewDraftRecheck.Against> against = new ArrayList<>(
                 ReviewDraftRecheck.otherRulesAgainst(text, current, rules, asked));
+        // What the material settles, read now (2026-11-15) — for the customer's order as the search knew it: the order
+        // date its citation kept, or the stored order's. An order with no date stays without one; neither the receipt
+        // day nor today stands in for it (DESIGN_conflict.md §3).
+        com.sellerops.knowledge.currency.KnowledgeState state = currency == null ? null
+                : currency.stateFor(item.getOrgId(), inquiry == null ? null : inquiry.getProductId(),
+                        com.sellerops.knowledge.currency.KnowledgeCurrencyService.today(),
+                        orderDate(item, inquiry, cited));
+        if (state != null) {
+            // Another document's other number is set aside only for a figure the state stands behind — a current value in
+            // use says it and every value that says otherwise lost to one that says it (2026-11-15 review: reading a
+            // number is not checking it). Who pays is never set aside here: its conflicts are added after.
+            java.util.Set<String> settled = state.settledFigures(text);
+            conflicts.removeIf(w -> com.sellerops.knowledge.currency.KnowledgeState.governs(settled, w));
+            against.removeIf(a -> com.sellerops.knowledge.currency.KnowledgeState.governs(settled, a.word()));
+        }
         against.addAll(costs.against());
         List<String> allPromises = new ArrayList<>(promises);
         for (ReviewDraftRecheck.Against a : against) {
@@ -333,9 +424,91 @@ public class InquiryDraftRecheck {
             codes.add(FIGURE_UNVERIFIED);
         }
         codes.addAll(sellerCodes);
+        // What the material does not settle, read now and never from what the draft was written with (2026-11-15): a value
+        // two documents in use disagree on, a value the seller replaced, a planned date said as confirmed.
+        List<com.sellerops.knowledge.currency.KnowledgeState.Unsettled> unsettled = state == null ? List.of()
+                : state.unsettledIn(text);
+        if (!unsettled.isEmpty()) {
+            codes.add(ReviewDraftRecheck.UNSETTLED_VALUE);
+        }
         return new Result(List.copyOf(codes), List.copyOf(changed), promises, List.copyOf(phrases), figures,
                 List.copyOf(conflicts), against, record == null ? null : record.note(), List.copyOf(retired),
-                List.copyOf(withdrawals));
+                List.copyOf(withdrawals),
+                unsettled.stream().map(com.sellerops.knowledge.currency.KnowledgeState.Unsettled::sentenceKo)
+                        .distinct().toList(),
+                unsettled.stream().map(com.sellerops.knowledge.currency.KnowledgeState.Unsettled::said).distinct()
+                        .toList());
+    }
+
+    /**
+     * The customer's order date as the search knew it: the one the version's order citation kept, else the stored order's
+     * (never a live channel read at approval). Null when neither names one — and then it stays unknown.
+     */
+    private java.time.LocalDate orderDate(InquiryWorkItem item, Inquiry inquiry, List<InquiryDraftEvidence> cited) {
+        for (InquiryDraftEvidence row : cited) {
+            String mark = row.getKnowledgeState();
+            if (InquiryDraftEvidence.KIND_ORDER_FACT.equals(row.getKind()) && mark != null
+                    && mark.startsWith(InquiryDraftComposer.ORDERED)) {
+                try {
+                    return java.time.LocalDate.parse(mark.substring(InquiryDraftComposer.ORDERED.length()).strip());
+                } catch (java.time.format.DateTimeParseException ignored) {
+                    // an unreadable mark is no date
+                }
+            }
+        }
+        if (orderFacts == null || inquiry == null) {
+            return null;
+        }
+        com.sellerops.order.fact.OrderFact fact =
+                orderFacts.read(item.getOrgId(), inquiry, com.sellerops.order.fact.OrderFactLookup.STORED_ONLY);
+        return fact == null ? null : fact.orderedAt();
+    }
+
+    private InquiryOrderFactReader orderFacts;
+
+    private com.sellerops.product.ProductRepository products;
+
+    /** The products, for the inquiry product's recorded name (B-plan q09 S4). Optional: without them no name is known. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setProducts(com.sellerops.product.ProductRepository products) {
+        this.products = products;
+    }
+
+    /** The inquiry product's recorded name, as recorded and without its synthetic/demo marker; empty when unknown. */
+    List<String> productNames(InquiryWorkItem item, Inquiry inquiry) {
+        if (products == null || inquiry == null || inquiry.getProductId() == null) {
+            return List.of();
+        }
+        String name = products.findById(inquiry.getProductId()).filter(p -> item.getOrgId().equals(p.getOrgId()))
+                .map(com.sellerops.product.OperatorProductName::displayNameOrNull).orElse(null);
+        if (name == null) {
+            return List.of();
+        }
+        return java.util.stream.Stream.of(name, SpecApplicability.withoutNonIdentifyingTags(name))
+                .filter(java.util.Objects::nonNull).distinct().toList();
+    }
+
+    /** The day a cited schedule is read against (KST). A seam so a test can let a date pass after approval (B180). */
+    private java.time.Clock clock = java.time.Clock.system(java.time.ZoneId.of("Asia/Seoul"));
+
+    public void setClock(java.time.Clock clock) {
+        this.clock = clock == null ? java.time.Clock.system(java.time.ZoneId.of("Asia/Seoul")) : clock;
+    }
+
+    /** The stored order facts (2026-11-15). Optional: without them only the order date a citation kept is read. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setOrderFacts(InquiryOrderFactReader orderFacts) {
+        this.orderFacts = orderFacts;
+    }
+
+    /** A cited schedule whose dates have all passed: shown as changed, with why. */
+    static String pastLabel(String title) {
+        return (title == null ? "" : title) + PAST_SUFFIX;
+    }
+
+    /** A changed title that names an expired schedule ({@link #pastLabel}), not an edited or withdrawn source. */
+    public static boolean isPastLabel(String title) {
+        return title != null && title.endsWith(PAST_SUFFIX);
     }
 
     /** One withdrawal as a decision is bound to it: which document, and when it was turned off (or that it was deleted). */
@@ -392,7 +565,7 @@ public class InquiryDraftRecheck {
      * nothing it cited moved.
      */
     private List<FigureNote> figures(InquiryWorkItem item, int version, int cites, String text, String authorKind,
-                                     boolean citedMoved) {
+                                     boolean citedMoved, List<String> productNames) {
         List<InquiryDraftFigure> kept = grounds.of(item.getId(), version);
         if (kept.isEmpty() && cites != version) {
             kept = grounds.of(item.getId(), cites);
@@ -401,7 +574,12 @@ public class InquiryDraftRecheck {
         String said = squash(text);
         List<FigureNote> out = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
-        for (InquiryClaimGuard.Figure f : InquiryClaimGuard.statedFigures(text)) {
+        // The product's own recorded name is not a figure here either (2026-11-16 B-plan q09 S4, Codex review): the
+        // drafter's check does not ask for its 500 and keeps no ground for it, so read raw it would come back unproven at
+        // approval or send — beside a figure that has a ground, or in the seller's edit. The same exact-name rule as the
+        // guard; the number written anywhere else is read as before.
+        for (InquiryClaimGuard.Figure f : InquiryClaimGuard.statedFigures(
+                InquiryClaimGuard.productNameFigures(text, productNames))) {
             String figure = f.value() + (f.unit() == null ? "" : f.unit());
             if (!seen.add(figure)) {
                 continue;

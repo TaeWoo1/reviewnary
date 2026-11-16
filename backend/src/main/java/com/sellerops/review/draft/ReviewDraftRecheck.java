@@ -66,6 +66,15 @@ public class ReviewDraftRecheck {
     public static final String POLICY_CONFLICT = "POLICY_CONFLICT";
 
     /**
+     * <b>The reply states as a fact a value the seller's material does not settle</b> (2026-11-15, conflict step 4): two
+     * documents in use disagree on it and nothing decides which is current, or the seller replaced it, or it is a planned
+     * schedule date said as if confirmed. Computed from the material at that moment ({@code KnowledgeState#unsettledIn}),
+     * never from what was attached when the draft was written. No decision goes past it: the reply is fixed, or the
+     * material is settled first.
+     */
+    public static final String UNSETTLED_VALUE = "UNSETTLED_VALUE";
+
+    /**
      * The finding, and what the seller is shown about it (owner decision 2026-10-23: a hold names the changed basis,
      * the sentence it touches and what to do). {@code changed}: the cited documents that were edited or taken out of
      * use; {@code promises}: the commitment words that lost their ground; {@code sentences}: the reply's own
@@ -73,11 +82,18 @@ public class ReviewDraftRecheck {
      */
     public record Result(boolean passed, List<String> codes, List<Changed> changed, List<String> promises,
                          List<String> sentences, List<String> phrases, List<String> conflicts,
-                         List<Against> against) {
+                         List<Against> against, List<String> unsettled) {
 
         public Result {
             conflicts = conflicts == null ? List.of() : conflicts;
             against = against == null ? List.of() : against;
+            unsettled = unsettled == null ? List.of() : unsettled;
+        }
+
+        public Result(boolean passed, List<String> codes, List<Changed> changed, List<String> promises,
+                      List<String> sentences, List<String> phrases, List<String> conflicts,
+                      List<Against> against) {
+            this(passed, codes, changed, promises, sentences, phrases, conflicts, against, List.of());
         }
 
         public Result(boolean passed, List<String> codes, List<Changed> changed, List<String> promises,
@@ -91,9 +107,11 @@ public class ReviewDraftRecheck {
         }
 
         static Result of(List<String> codes, List<Changed> changed, List<String> promises, List<String> sentences,
-                         List<String> phrases, List<String> conflicts, List<Against> against) {
+                         List<String> phrases, List<String> conflicts, List<Against> against,
+                         List<String> unsettled) {
             return new Result(codes.isEmpty(), List.copyOf(codes), List.copyOf(changed), List.copyOf(promises),
-                    List.copyOf(sentences), List.copyOf(phrases), List.copyOf(conflicts), List.copyOf(against));
+                    List.copyOf(sentences), List.copyOf(phrases), List.copyOf(conflicts), List.copyOf(against),
+                    List.copyOf(unsettled));
         }
     }
 
@@ -155,6 +173,20 @@ public class ReviewDraftRecheck {
      */
     @Transactional(readOnly = true)
     public Result check(UUID orgId, Review review, String redactedBody, String text) {
+        return check(orgId, review, redactedBody, text, true);
+    }
+
+    /**
+     * The check as it was before the material's state was read (2026-11-15) — for the PC delegation lane, which stays out
+     * of the conflict change ({@code DESIGN_conflict.md} §7): no UNSETTLED_VALUE, and figures judged word by word as before.
+     */
+    @Transactional(readOnly = true)
+    public Result checkWithoutState(UUID orgId, Review review, String redactedBody, String text) {
+        return check(orgId, review, redactedBody, text, false);
+    }
+
+    private Result check(UUID orgId, Review review, String redactedBody, String text, boolean withState) {
+        com.sellerops.knowledge.currency.KnowledgeCurrencyService currency = withState ? this.currency : null;
         List<String> codes = new java.util.ArrayList<>();
         String body = ReviewReplyValidation.normalize(text);
         Optional<ReviewReplyDraft> written = drafts.findTopByReviewIdAndContentFingerprintOrderByVersionDesc(
@@ -178,9 +210,9 @@ public class ReviewDraftRecheck {
         ReviewClaimGuard.unsupportedConditions(body, license, redactedBody).stream()
                 .filter(c -> !promises.contains(c)).forEach(promises::add);
         // And its yes or no: an edit that turns the policy's 「불가」 into 「가능」 keeps every word (2026-10-27 review).
-        ReviewClaimGuard.contradictedPromises(body, license).stream()
+        ReviewClaimGuard.contradictedPromises(body, license, redactedBody).stream()
                 .filter(c -> !promises.contains(c)).forEach(promises::add);
-        ReviewClaimGuard.undecidedPromises(body, license).stream()
+        ReviewClaimGuard.undecidedPromises(body, license, redactedBody).stream()
                 .filter(c -> !promises.contains(c)).forEach(promises::add);
         // Whether the policy may be applied to this case at all (2026-11-01).
         ReviewClaimGuard.lawConflicts(body, license, redactedBody).stream()
@@ -203,6 +235,18 @@ public class ReviewDraftRecheck {
         // …and independently of whether the cited ground found anything (fourth review): a reply that follows the
         // passage it cited can still contradict another document in use — 「교환 가능」 cited, 「교환 불가」 elsewhere.
         List<Against> against = new java.util.ArrayList<>(otherRulesAgainst(body, license, rules, redactedBody));
+        // What the material settles, read at this moment (2026-11-15). A review names no order, so no order date — as the
+        // review's own search had none.
+        com.sellerops.knowledge.currency.KnowledgeState state = currency == null ? null
+                : currency.stateFor(orgId, review.getProductId(),
+                        com.sellerops.knowledge.currency.KnowledgeCurrencyService.today(), null);
+        if (state != null) {
+            // Another document's other number is set aside only for a figure the state stands behind (2026-11-15
+            // review), as on inquiries; who pays is added after and never set aside.
+            java.util.Set<String> settled = state.settledFigures(body);
+            conflicts.removeIf(w -> com.sellerops.knowledge.currency.KnowledgeState.governs(settled, w));
+            against.removeIf(a -> com.sellerops.knowledge.currency.KnowledgeState.governs(settled, a.word()));
+        }
         against.addAll(costs.against());
         for (Against a : against) {
             if (!conflicts.contains(a.word())) {
@@ -222,9 +266,27 @@ public class ReviewDraftRecheck {
         if (!phrases.isEmpty()) {
             codes.add(FORBIDDEN_PHRASE);
         }
+        // What the material does not settle, read at this moment (2026-11-15): a value two documents disagree on, a value
+        // the seller replaced, a planned date said as confirmed.
+        List<com.sellerops.knowledge.currency.KnowledgeState.Unsettled> unsettled = state == null ? List.of()
+                : state.unsettledIn(body);
+        if (!unsettled.isEmpty()) {
+            codes.add(UNSETTLED_VALUE);
+        }
         List<String> marked = new java.util.ArrayList<>(promises);
         marked.addAll(phrases);
-        return Result.of(codes, changed, promises, sentencesWith(body, marked), phrases, conflicts, against);
+        unsettled.forEach(u -> marked.add(u.said()));
+        return Result.of(codes, changed, promises, sentencesWith(body, marked), phrases, conflicts, against,
+                unsettled.stream().map(com.sellerops.knowledge.currency.KnowledgeState.Unsettled::sentenceKo)
+                        .distinct().toList());
+    }
+
+    private com.sellerops.knowledge.currency.KnowledgeCurrencyService currency;
+
+    /** What the material settles (2026-11-15). Optional: without it nothing is read for unsettled values. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setCurrency(com.sellerops.knowledge.currency.KnowledgeCurrencyService currency) {
+        this.currency = currency;
     }
 
     /** What a reply says about who pays, settled against every document in use: its promise words and its conflicts. */
@@ -269,7 +331,8 @@ public class ReviewDraftRecheck {
         if (promises.isEmpty()) {
             return List.of();
         }
-        java.util.Set<String> against = new java.util.LinkedHashSet<>(ReviewClaimGuard.contradictedPromises(body, license));
+        java.util.Set<String> against =
+                new java.util.LinkedHashSet<>(ReviewClaimGuard.contradictedPromises(body, license, asked));
         against.addAll(ReviewClaimGuard.droppedConditions(body, license, asked));
         String grounds = String.join(" ", license == null ? List.of() : license).replace(",", "");
         List<String> out = new java.util.ArrayList<>();
@@ -320,10 +383,14 @@ public class ReviewDraftRecheck {
         if (body == null || body.isBlank() || rules == null) {
             return out;
         }
+        // What backs a reply's own refusal of a case is read across every document in use (2026-11-15 review, q06).
+        List<String> inUse = new java.util.ArrayList<>(license == null ? List.of() : license);
+        rules.forEach(r -> inUse.add(r.text()));
         for (Rule rule : rules) {
             // The body alone: a title (「반품 · 교환 제한」) names a remedy without answering it, and would read as a second answer.
             List<String> one = List.of(rule.text());
-            java.util.Set<String> words = new java.util.LinkedHashSet<>(ReviewClaimGuard.contradictedPromises(body, one));
+            java.util.Set<String> words =
+                    new java.util.LinkedHashSet<>(ReviewClaimGuard.contradictedPromises(body, one, asked, inUse));
             words.addAll(ReviewClaimGuard.droppedConditions(body, one, asked));
             String grounds = String.join(" ", one).replace(",", "");
             ReviewClaimGuard.unsupportedConditions(body, one, asked).stream()
@@ -333,7 +400,7 @@ public class ReviewDraftRecheck {
                     continue;
                 }
                 boolean clash = license != null && !license.isEmpty()
-                        && ReviewClaimGuard.contradictedPromises(body, license).isEmpty()
+                        && ReviewClaimGuard.contradictedPromises(body, license, asked).isEmpty()
                         && !ReviewClaimGuard.unsupportedClaims(body, license, asked).contains(word);
                 if (out.stream().noneMatch(a -> a.word().equals(word) && a.title().equals(rule.title()))) {
                     out.add(new Against(word, rule.title() == null ? "" : rule.title(), clash));

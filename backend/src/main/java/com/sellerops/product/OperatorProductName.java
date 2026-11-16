@@ -65,7 +65,11 @@ public final class OperatorProductName {
         if (product == null) {
             return null;
         }
-        String name = product.getName();
+        return displayNameOrNull(product.getName(), product.getSku());
+    }
+
+    /** The same rule over a name and a sku read without the entity (a projection row). */
+    public static String displayNameOrNull(String name, String sku) {
         if (name == null || name.isBlank()) {
             return null;
         }
@@ -73,7 +77,6 @@ public final class OperatorProductName {
         if (UNSPECIFIED_PRODUCT_NAME.equals(trimmed)) {
             return null;
         }
-        String sku = product.getSku();
         if (sku != null && !sku.isBlank() && trimmed.equals(sku.strip())) {
             return null;
         }

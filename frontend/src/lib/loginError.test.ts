@@ -37,6 +37,22 @@ describe("loginFailure", () => {
     expect(failure.message).not.toMatch(/비밀번호/);
   });
 
+  /**
+   * 2026-11-16: the page opened as `localhost` behind a same-origin proxy, the backend allows `127.0.0.1`, and
+   * Spring answered the login with a real 403 "Invalid CORS request". The form said "check your password".
+   */
+  it("reports a CORS origin rejection as the address, never as a wrong password", () => {
+    for (const data of ["Invalid CORS request", "Invalid CORS request\n"]) {
+      const failure = loginFailure({ response: { status: 403, data } });
+      expect(failure.credentials).toBe(false);
+      expect(failure.message).toBe(LOGIN_FAILURE_COPY.ORIGIN);
+      expect(failure.message).not.toMatch(/비밀번호|CORS|localhost|127\.0\.0\.1|http/i);
+    }
+    // Only that exact body: any other 403 keeps its old meaning.
+    expect(loginFailure({ response: { status: 403, data: { message: "forbidden" } } }).credentials).toBe(true);
+    expect(loginFailure({ response: { status: 401, data: "Invalid CORS request" } }).credentials).toBe(true);
+  });
+
   it("reports a server fault as ours rather than the seller's", () => {
     for (const status of [500, 502, 503]) {
       const failure = loginFailure({ response: { status } });

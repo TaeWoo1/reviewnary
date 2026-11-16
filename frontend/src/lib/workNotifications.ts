@@ -94,7 +94,8 @@ export function planNotices(input: {
       title: ready ? "문의 · 답변 승인 대기" : "문의 · 새 문의",
       body: previewOf(q.productName, ready ? "준비된 답변이 있어요" : "답하지 않은 문의", ready ? "확인하고 승인해 주세요" : "답해 주세요",
         input.hidePreview),
-      href: `/inquiries/${q.workItemId}`,
+      // /inquiries/:itemRef reads an INQUIRY id (CustomerInbox) — a work-item id opened nothing (surveys 2026-11-16).
+      href: `/inquiries/${q.inquiryId}`,
     });
   }
 

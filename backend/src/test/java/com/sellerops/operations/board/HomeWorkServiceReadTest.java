@@ -263,4 +263,34 @@ class HomeWorkServiceReadTest {
         assertThat(b.sources().get(Source.INQUIRIES).read()).isTrue();
         assertThat(HomeBoardController.board(b).todo().total().count()).isNull();
     }
+
+    /**
+     * 2026-11-15: the follow-up read now sets a held registration apart itself — out of its waiting list and total, handed
+     * on as {@code held} — so 「기다리는 일」 (which reads that list directly) and 할 일 agree. The board makes it one 할 일 row
+     * and no waiting row, whether or not its own hold read sees it.
+     */
+    @Test
+    @DisplayName("a registration the follow-up read set apart as held is one 할 일 row and not waiting")
+    void aRegistrationTheFollowUpReadHeldIsWorkNotWaiting() {
+        UUID heldItem = UUID.randomUUID();
+        UUID heldInquiry = UUID.randomUUID();
+        UUID plainItem = UUID.randomUUID();
+        when(followUps.allFollowUps(ORG)).thenReturn(new InquiryFollowUpService.FollowUps(List.of(), 0,
+                List.of(registering(plainItem, UUID.randomUUID())), 1, LocalDate.of(2026, 11, 15),
+                List.of(registering(heldItem, heldInquiry))));
+        com.sellerops.replyhold.ReplyHoldService holds = mock(com.sellerops.replyhold.ReplyHoldService.class);
+        when(holds.list(ORG)).thenReturn(List.of(hold(heldItem, true, false)));
+        service.setHolds(holds);
+
+        HomeWorkService.Board b = service.read(ORG);
+        HomeBoardController.HomeBoardView board = HomeBoardController.board(b);
+
+        assertThat(b.rows()).singleElement().satisfies(r -> {
+            assertThat(r.workItemId()).isEqualTo(heldItem);
+            assertThat(r.state()).isEqualTo("REGISTRATION_HELD");
+        });
+        assertThat(b.waiting()).extracting(HomeWorkService.WaitingRow::workItemId).containsExactly(plainItem);
+        assertThat(board.todo().needsLook().count()).isEqualTo(1);
+        assertThat(board.waiting().registration().count()).isEqualTo(1);
+    }
 }

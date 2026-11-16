@@ -198,6 +198,9 @@ public class AgentDraftService {
                 orgId, written.isPresent(), knowledge == null ? 0 : knowledge.size(),
                 style != null && !style.isBlank(), manner != null && !manner.isBlank(), mood, result.reason(),
                 result.metrics().toLogFields());
+        // Told to the composer's meter as the inquiry drafter's call is (2026-11-15 real eval: four review drafts left
+        // their usage rows without tokens, and the evaluation budget priced each at its worst case).
+        AgentLlmCallCapture.report(result.metrics());
         return written;
     }
 
@@ -239,9 +242,7 @@ public class AgentDraftService {
         if (!access.allows(properties, orgId) || figures == null) {
             return new AgentDraftGenerator.FigureResult(Optional.empty(), "not_called", null);
         }
-        AgentDraftGenerator.Vendor vendor = "ANTHROPIC".equalsIgnoreCase(properties.vendor())
-                ? AgentDraftGenerator.Vendor.ANTHROPIC
-                : AgentDraftGenerator.Vendor.OPENAI;
+        AgentDraftGenerator.Vendor vendor = AgentDraftGenerator.Vendor.of(properties.vendor());
         AgentDraftGenerator.FigureResult result = new AgentDraftGenerator(transport, vendor, properties.checkModel(),
                 properties.apiKey(), properties.checkMaxOutputTokens(), properties.checkReasoningEffort())
                 .checkFigures(new AgentDraftGenerator.FigureInput(question, evidence, orderSentence, draft, figures, specLine,
@@ -267,9 +268,7 @@ public class AgentDraftService {
      * anywhere holds the API key beyond the life of a request.
      */
     private AgentDraftGenerator generator() {
-        AgentDraftGenerator.Vendor vendor = "ANTHROPIC".equalsIgnoreCase(properties.vendor())
-                ? AgentDraftGenerator.Vendor.ANTHROPIC
-                : AgentDraftGenerator.Vendor.OPENAI;
+        AgentDraftGenerator.Vendor vendor = AgentDraftGenerator.Vendor.of(properties.vendor());
         return new AgentDraftGenerator(transport, vendor, properties.model(), properties.apiKey(),
                 properties.maxOutputTokens(), properties.reasoningEffort());
     }

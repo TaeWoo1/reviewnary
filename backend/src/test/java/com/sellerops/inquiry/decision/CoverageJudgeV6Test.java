@@ -79,7 +79,7 @@ class CoverageJudgeV6Test {
         assertThat(schema5.toString()).as("v5's request is unchanged").doesNotContain("settled_by");
         assertThat(InquiryDecisionPrompt.judgeSystem(InquiryDecisionPrompt.JUDGE_V6)).isNotEqualTo(out5);
         assertThat(new InquiryDecisionProperties(true, "", "m", "k", 0, 0, null).judgePrompt())
-                .isEqualTo(InquiryDecisionPrompt.JUDGE_V6);
+                .as("v8 is the default since 2026-11-15").isEqualTo(InquiryDecisionPrompt.JUDGE_V8);
     }
 
     @Test

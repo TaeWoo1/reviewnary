@@ -27,7 +27,8 @@ public final class AgentLlmWireFormat {
     /** Which wire format to speak — the shared model connection's vendor, under the name these callers use. */
     public enum Vendor {
         ANTHROPIC(LlmVendor.ANTHROPIC),
-        OPENAI(LlmVendor.OPENAI);
+        OPENAI(LlmVendor.OPENAI),
+        RUNYOUR(LlmVendor.RUNYOUR);
 
         private final LlmVendor vendor;
 
@@ -48,7 +49,7 @@ public final class AgentLlmWireFormat {
          * which would send a capability's payload to a vendor nobody chose the day a third one is named.
          */
         public static Vendor of(String name) {
-            return LlmVendor.parse(name) == LlmVendor.ANTHROPIC ? ANTHROPIC : OPENAI;
+            return valueOf(LlmVendor.parse(name).name());
         }
     }
 

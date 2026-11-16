@@ -233,8 +233,9 @@ Dockerfile passes no Hackle argument. The consent, identity and withdrawal code 
 
 ## 10. Runyour synthetic connection check — one synthetic call passed (2026-11-08)
 
-Runyour remains evaluation-only; production and pilot factories still refuse it. This does not move the core
-reply models to Runyour. `RunyourSyntheticSmokeIT` is a test-source-only, opt-in connection check with no Spring
+**Historical scope (2026-11-08).** Runyour was evaluation-only and production/pilot factories refused it.
+The owner opened general-provider support on 2026-11-15; **current connection settings are in §11**.
+`RunyourSyntheticSmokeIT` is a test-source-only, opt-in connection check with no Spring
 context, database or marketplace: rating 2 and the fixed synthetic review 「포장이 찌그러져서 왔어요」.
 
 - Default: skipped. Requires `RUN_RUNYOUR_SYNTHETIC_SMOKE=true`, explicit `RUNYOUR_SMOKE_MODEL`, and the existing
@@ -298,3 +299,63 @@ the file was not sourced and no key or raw response was displayed. No database o
   A presumed 4,000-token fallback is not an enforced cost ceiling.
 - Evidence: `backend/build/test-results/test/TEST-com.sellerops.review.triage.llm.RunyourSyntheticSmokeIT.xml`
   (local generated test report; subsequent Gradle test runs can replace it). No commit was made.
+
+## 11. Runyour as a common model provider (2026-11-15)
+
+**Owner decision:** use Runyour across the service, replacing the earlier evaluation-only provider restriction.
+This is connection support in the working tree, not a deployment, paid evaluation, or automatic activation of features.
+The historical §10 prices and one-call result do not establish the price or quality of these other capabilities.
+
+- **Shared connection:** `RunyourChatWire` and `RunyourEmbeddingWire` under the backend's provider package.
+  Chat uses `https://api.runyour.ai/v1/chat/completions`, Bearer auth, `max_tokens`; embeddings use
+  `https://api.runyour.ai/v1/embeddings`. These endpoints and the chat cap follow the
+  [official calling guide](https://runyourai.gitbook.io/userguide/runyour-agent/workspace/api/call).
+- **Coverage:** 16 configured capabilities — 13 text capabilities (triage, drafts/checks, planning/judging,
+  inquiry decisions/goals/signatures, retrieval intent/eligibility, reports/conversation, investigation, reply agent),
+  two image capabilities, and embeddings. The core generators no longer map a Runyour choice silently to OpenAI.
+- **Wire contract:** keep the capability's system prompt, schema and content validation. Do not forward OpenAI-specific
+  `reasoning_effort` to routed models. Truncation, refusal, rate limits and invalid responses remain failures;
+  no automatic switch to another provider. Actual schema/image support and output-limit enforcement need live evaluation.
+- **Triage:** remove the evaluation-only boot/factory refusal. Keep the fake-model refusal, channel and organisation
+  gates. The local-seller outbound allow-list adds exactly `api.runyour.ai`; other destinations and lookalikes stay refused.
+- **Embeddings:** select a separate, verified embedding model. An enabled Runyour embedding capability with no model
+  refuses configuration. Cache keys are prefixed `runyour:` so old OpenAI vectors are not mixed with routed vectors.
+
+### Activate the prepared connection profile
+
+Use `SPRING_PROFILES_INCLUDE=runyour` alongside the existing deployment profile; do not replace `prod` with it.
+`backend/src/main/resources/application-runyour.yml` supplies common connection settings only. All enabled/org switches
+stay independent, and the profile alone turns no capability on.
+
+| Backend environment name | Purpose |
+|---|---|
+| `RUNYOUR_API_KEY` | Private backend credential; never frontend/VITE or source code |
+| `RUNYOUR_MODEL` | Fixed chat model ID; default candidate `anthropic/claude-opus-5-5`, not a quality claim |
+| `RUNYOUR_CHECK_MODEL` | Optional separate check model; otherwise the chat model |
+| `RUNYOUR_VISION_MODEL` | Optional image-capable model; otherwise the chat model, capability unverified live |
+| `RUNYOUR_EMBEDDING_MODEL` | Separate embedding model; required before enabling that capability |
+| `RUNYOUR_INPUT_USD_PER_MTOK`, `RUNYOUR_OUTPUT_USD_PER_MTOK` | Verified USD-equivalent prices for the optional USD evaluation meter |
+
+The base and pilot Compose configurations forward these names to the backend only. Existing running processes,
+private env files, the rehearsal kit and AWS deployments were not changed. The isolated evaluation launcher in
+`holds/manual-draft-eval-20261114/run/backend.sh` now has `PROVIDER=runyour` (2026-11-15): it forwards the profile,
+model and a key read from an owner-made 600 file, and refuses to start without an approval mark, a KRW budget and a
+call cap. No paid call has been made; the run specification is §9 of the eval folder's results file.
+
+### Validation and remaining work
+
+Offline provider/capability regression: 778 tests, 0 failures, 15 skipped, Gradle exit 0; no credentials supplied.
+Final provider/profile/budget run: 23 tests, 0 failures, 0 skipped, exit 0, including the additional profile-price and
+valid-Java boundary-violation checks (overlaps the 778-test regression; do not add the counts as unique tests).
+Base/pilot Compose renders also confirm backend-only key forwarding; no container or cloud resource was started.
+`bootJar` also passed; the local executable contains both router wires and the profile. It was not installed into a
+running service or copied into the preserved rehearsal kit. The document checker has no new broken links, but still
+exits 1 on the existing missing name `reviewnary-operations-dashboard-handoff.md` in demo validation §7.25.
+No migration, endpoint, route or collector command was removed by this connection change.
+Baseline → final: backend mapping annotations 454 → 454; Flyway files 186 → 186; frontend Route declarations
+117 → 117; collector command registrations 17 → 17; source/test files 4,109 → 4,113 (+2 wires, +2 test classes).
+
+Runyour prices/credit rounding must be confirmed for the chosen model before calculating a new evaluation budget;
+the previous direct-provider estimate of $3–5/$10 must not simply be reused. Unknown prices make an enabled USD
+evaluation meter refuse startup. That meter still estimates input size and does not reproduce the credit invoice.
+Actual model quality, real-device execution of the new model path, and application to the demo/AWS remain unverified.

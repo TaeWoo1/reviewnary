@@ -41,7 +41,8 @@ public class ImageFactExtractionGenerator {
     /** Which wire format to speak — the shared model connection's vendor (2026-10-29). Nothing else differs. */
     public enum Vendor {
         ANTHROPIC(LlmVendor.ANTHROPIC),
-        OPENAI(LlmVendor.OPENAI);
+        OPENAI(LlmVendor.OPENAI),
+        RUNYOUR(LlmVendor.RUNYOUR);
 
         private final LlmVendor vendor;
 
@@ -51,7 +52,7 @@ public class ImageFactExtractionGenerator {
 
         /** Blank is OpenAI; an unknown name refuses (2026-10-29) instead of quietly becoming OpenAI. */
         public static Vendor of(String name) {
-            return LlmVendor.parse(name) == LlmVendor.ANTHROPIC ? ANTHROPIC : OPENAI;
+            return valueOf(LlmVendor.parse(name).name());
         }
     }
 

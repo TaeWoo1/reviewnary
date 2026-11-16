@@ -357,6 +357,144 @@ public enum SpecApplicability {
                 : new Verdict(Applicability.VARIANT_NAMED, named.id(), topic, registered);
     }
 
+    /** A table column that lists a product's options, and one that names the product, by their header words. */
+    private static final java.util.Set<String> OPTION_HEADERS = java.util.Set.of("옵션", "옵션명", "색상", "컬러", "규격",
+            "사이즈", "용량");
+    private static final java.util.Set<String> PRODUCT_HEADERS = java.util.Set.of("상품", "상품명", "제품", "제품명");
+    private static final java.util.Set<String> WHOLE_PRODUCT = java.util.Set.of("전체", "공통", "모든옵션", "전옵션", "-");
+
+    /**
+     * An unresolved verdict, read once more against the seller's own table (2026-11-15 final eval q03: 「민트 색상 언제 다시
+     * 들어오나요?」 on a listing with no channel option rows was asked back which product · 규격, though the seller's schedule
+     * table has the row 「스테인리스 텀블러 500ml | 민트 | …」).
+     *
+     * <p>Only when the channel registered no option at all — a registered list is the authority and is never overridden
+     * — and only from a table: a header with an option column (옵션 · 색상 · 규격 …) and a product column, and a row whose
+     * product cell is this product — the same name ({@link #sameProductKey}), never one containing it — and whose option
+     * cell the customer wrote. That row is the seller saying this product
+     * sells that option. A customer who wrote no such cell is still unresolved and still asked; prose is not read.
+     */
+    public static Verdict namedInSellerTable(Verdict verdict, String title, String body, String productName,
+                                             List<String> passages) {
+        return namedInSellerTable(verdict, title, body, () -> productName, () -> true, passages);
+    }
+
+    /**
+     * The same, asking only when the answer can matter (2026-11-16 review B176): {@code productName} is read only once
+     * the verdict is unresolved with no option list and a passage holds a table line, and {@code nameIsUnique} — whether
+     * no other product of the seller shares the name — only when a row would name an option. Any other inquiry reads
+     * neither. A name that is not unique names nothing.
+     */
+    public static Verdict namedInSellerTable(Verdict verdict, String title, String body,
+                                             java.util.function.Supplier<String> productName,
+                                             java.util.function.BooleanSupplier nameIsUnique, List<String> passages) {
+        if (verdict == null || verdict.applicability() != Applicability.VARIANT_UNRESOLVED || verdict.optionsRegistered()
+                || productName == null || nameIsUnique == null || passages == null
+                || passages.stream().noneMatch(p -> p != null && p.contains("|"))) {
+            return verdict;
+        }
+        String productName0 = productName.get();
+        if (productName0 == null) {
+            return verdict;
+        }
+        String question = normalize((title == null ? "" : title) + " " + (body == null ? "" : body)).replaceAll("\\s+", "");
+        String product = sameProductKey(productName0);
+        for (String passage : passages) {
+            int optionCol = -1;
+            int productCol = -1;
+            for (String line : passage == null ? new String[0] : passage.split("\\R")) {
+                if (!line.contains("|")) {
+                    optionCol = -1;
+                    productCol = -1;
+                    continue;
+                }
+                List<String> cells = java.util.Arrays.stream(line.strip().replaceAll("^\\||\\|$", "").split("\\|"))
+                        .map(String::strip).toList();
+                if (optionCol < 0) {
+                    for (int i = 0; i < cells.size(); i++) {
+                        String h = cells.get(i).replace(" ", "");
+                        if (OPTION_HEADERS.contains(h)) {
+                            optionCol = i;
+                        } else if (PRODUCT_HEADERS.contains(h)) {
+                            productCol = i;
+                        }
+                    }
+                    if (optionCol < 0 || productCol < 0) {
+                        optionCol = -1;
+                        productCol = -1;
+                    }
+                    continue;
+                }
+                if (cells.size() <= Math.max(optionCol, productCol) || cells.get(optionCol).matches("[-: ]*")) {
+                    continue;
+                }
+                String rowProduct = sameProductKey(cells.get(productCol));
+                String option = normalize(cells.get(optionCol)).replaceAll("\\s+", "");
+                if (!rowProduct.isEmpty() && rowProduct.equals(product)
+                        && option.length() >= MIN_OPTION_TOKEN && !WHOLE_PRODUCT.contains(option)
+                        && question.contains(option)) {
+                    return nameIsUnique.getAsBoolean()
+                            ? new Verdict(Applicability.VARIANT_NAMED, null, verdict.topicWord(), false)
+                            : verdict;
+                }
+            }
+        }
+        return verdict;
+    }
+
+    /**
+     * What makes two names the same product, and only that (2026-11-16 review B172: a two-way 「contains」 let 「스테인리스
+     * 텀블러 500ml 전용 뚜껑」 — another product — lend its row to the tumbler). A leading bracket tag the seller or the
+     * channel prefixes to a listing is dropped only when it is one of {@link #NON_IDENTIFYING_TAGS} — a marker that says
+     * nothing about which product it is — then spacing and punctuation; nothing else (2026-11-16 review B174: dropping
+     * every leading bracket made 「[500ml] 텀블러」 and 「[350ml] 텀블러」 one product). Any other bracket keeps its content, so
+     * 「[500ml]」 · 「[민트]」 · 「[2개 세트]」 still tell the products apart, and an unknown tag such as 「[무료배송]」 makes the
+     * names differ — the option then stays unresolved, which is the safe side. 전용 · 세트 · 리필 · 부품 words, a 용량, a
+     * 「(퀸)」 stay — they are what tells a part, a set or a size apart, so a name that differs by any of them is another
+     * product, and its row names nothing about this one.
+     */
+    static String sameProductKey(String name) {
+        if (name == null) {
+            return "";
+        }
+        String s = name.strip();
+        while (s.startsWith("[") && s.indexOf(']') > 0) {
+            String tag = normalize(s.substring(1, s.indexOf(']'))).replaceAll("[^\\p{L}\\p{N}]", "");
+            if (!NON_IDENTIFYING_TAGS.contains(tag)) {
+                break;
+            }
+            s = s.substring(s.indexOf(']') + 1).strip();
+        }
+        return normalize(s).replaceAll("[^\\p{L}\\p{N}]", "");
+    }
+
+    /**
+     * Leading bracket tags that mark how a listing was made, not which product it is: the synthetic and demo data markers
+     * SellerOps itself writes (「[합성]」 · 「[데모]」, the only bracket tags in the evaluation and demo material). Closed on
+     * purpose — a channel's promotion tag is not added by guess; an unlisted one simply keeps the names apart.
+     */
+    static final java.util.Set<String> NON_IDENTIFYING_TAGS = java.util.Set.of("합성", "데모");
+
+    /**
+     * The name with its leading {@link #NON_IDENTIFYING_TAGS} dropped, and nothing else changed — the name as a customer
+     * reads it (2026-11-16 B-plan q09 S4: the 「문의 상품」 line carried 「[합성] 스테인리스 텀블러 500ml」 and the drafter
+     * copied the tag into the reply). Any other bracket stays, as in {@link #sameProductKey}.
+     */
+    static String withoutNonIdentifyingTags(String name) {
+        if (name == null) {
+            return null;
+        }
+        String s = name.strip();
+        while (s.startsWith("[") && s.indexOf(']') > 0) {
+            String tag = normalize(s.substring(1, s.indexOf(']'))).replaceAll("[^\\p{L}\\p{N}]", "");
+            if (!NON_IDENTIFYING_TAGS.contains(tag)) {
+                break;
+            }
+            s = s.substring(s.indexOf(']') + 1).strip();
+        }
+        return s;
+    }
+
     /**
      * Did the customer name one of this product's options?
      *
@@ -365,6 +503,24 @@ public enum SpecApplicability {
      * appear for the option to count as named — one shared word ("화이트") is a coincidence, the whole
      * set is a choice.
      */
+    /**
+     * Every option of {@code options} the text names, by the same rule as {@link #namedOption} (every token of the option
+     * name appears). For a draft read against the customer's question: which options the reply speaks about.
+     */
+    static List<Option> optionsNamed(String text, List<Option> options) {
+        if (text == null || options == null) {
+            return List.of();
+        }
+        String normalized = normalize(text);
+        List<Option> out = new java.util.ArrayList<>();
+        for (Option option : options) {
+            if (option != null && namedOption(normalized, List.of(option)) != null) {
+                out.add(option);
+            }
+        }
+        return List.copyOf(out);
+    }
+
     private static Option namedOption(String normalizedText, List<Option> options) {
         if (options == null) {
             return null;

@@ -35,6 +35,68 @@ class CostBearerCheckTest {
     }
 
     @Test
+    void aFollowingCostSentenceKeepsTheRemedyAndCase() {
+        String reply = "단순 변심 반품은 수령 후 7일 안에 신청해 주세요. 왕복 배송비 6,000원은 저희가 부담합니다.";
+        String policy = "단순 변심 반품의 왕복 배송비 6,000원은 고객님이 부담합니다.";
+        assertThat(verdict(reply, policy)).isEqualTo(Verdict.CONFLICT);
+        assertThat(verdict(reply.replace("저희가", "고객님이"), policy)).isEqualTo(Verdict.BACKED);
+        assertThat(verdict(reply)).isEqualTo(Verdict.UNBACKED);
+        assertThat(verdict("파손 교환을 접수해 주세요. 교환 배송비는 고객님이 부담합니다.", SELLER_ON_DEFECT))
+                .isEqualTo(Verdict.CONFLICT);
+    }
+
+    @Test
+    void aPayerNamedAsTheBuyerIsNotANewTopic() {
+        // 「구매자」 · 「주문자」 are who pays, not an order sentence (2026-11-15, r4 review): the case is still carried.
+        for (String payer : List.of("구매자", "주문자")) {
+            assertThat(verdict("불량 반품은 사진을 보내 주세요. 반품 배송비는 " + payer + " 부담입니다.", BY_CASE))
+                    .as(payer).isEqualTo(Verdict.CONFLICT);
+            assertThat(verdict("단순 변심 반품은 7일 안에 신청해 주세요. 반품 배송비는 " + payer + " 부담입니다.", BY_CASE))
+                    .as(payer).isEqualTo(Verdict.BACKED);
+        }
+    }
+
+    @Test
+    void aCostSentenceForOneOfTheNamedRemediesKeepsTheCase() {
+        // The earlier sentence named both; the cost sentence names one of them — the same case still applies.
+        assertThat(verdict("단순 변심 교환·반품은 7일 안에 신청해 주세요. 반품 배송비 6,000원은 저희가 부담합니다.", BY_CASE))
+                .isEqualTo(Verdict.CONFLICT);
+        // The other way round (a narrower sentence, then a wider cost) is not carried.
+        assertThat(verdict("단순 변심 반품은 7일 안에 신청해 주세요. 교환·반품 배송비는 저희가 부담합니다.", BY_CASE))
+                .isEqualTo(Verdict.UNCLEAR_CASE);
+    }
+
+    @Test
+    void aFollowingCostSentenceCanStateItsOwnCase() {
+        assertThat(verdict("단순 변심 교환을 안내해 드립니다. 파손 교환 배송비는 저희가 부담해요.", SELLER_ON_DEFECT))
+                .isEqualTo(Verdict.BACKED);
+        assertThat(verdict("파손 교환을 안내해 드립니다. 단순 변심 교환 배송비는 고객님이 부담해요.", CUSTOMER_ON_CHANGE))
+                .isEqualTo(Verdict.BACKED);
+    }
+
+    @Test
+    void anotherTopicOrParagraphDoesNotBorrowTheEarlierCase() {
+        for (String boundary : List.of("주문은 오늘 출고됩니다. ", "확인 후 안내하겠습니다. ", "\n\n")) {
+            assertThat(verdict("파손 교환을 안내해 드립니다. " + boundary + "교환 배송비는 저희가 부담해요.", SELLER_ON_DEFECT))
+                    .as(boundary).isEqualTo(Verdict.UNCLEAR_CASE);
+        }
+    }
+
+    @Test
+    void anotherRemedyOrMixedCasesDoNotBorrowTheEarlierCase() {
+        assertThat(verdict("파손 교환을 접수해 주세요. 반품 배송비는 저희가 부담해요.",
+                "파손 반품 배송비는 고객이 부담해요.")).isEqualTo(Verdict.UNCLEAR_CASE);
+        assertThat(verdict("파손과 단순 변심 교환을 안내해 드립니다. 교환 배송비는 저희가 부담해요.", SELLER_ON_DEFECT))
+                .isEqualTo(Verdict.UNCLEAR_CASE);
+    }
+
+    @Test
+    void aDocumentsEarlierConditionDoesNotTurnItsGeneralRuleIntoASpecificOne() {
+        String policy = "파손 교환은 사진을 보내 주세요. 교환 배송비는 고객이 부담해요.";
+        assertThat(verdict(SAYS_CUSTOMER_ON_CHANGE, policy)).isEqualTo(Verdict.BACKED);
+    }
+
+    @Test
     void theRehearsalsThreeCases() {
         assertThat(verdict(SAYS_SELLER)).as("no ground").isEqualTo(Verdict.UNBACKED);
         assertThat(verdict(SAYS_SELLER, SELLER_ON_DEFECT)).as("a ground that agrees").isEqualTo(Verdict.BACKED);
@@ -64,6 +126,18 @@ class CostBearerCheckTest {
         // A specific statement of the reply's own case wins over the document's general one.
         assertThat(verdict(SAYS_SELLER, CUSTOMER_ALWAYS + " 단, 포장이 파손된 교환은 교환 배송비를 판매자가 부담해요."))
                 .isEqualTo(Verdict.BACKED);
+    }
+
+    @Test
+    void anOrdersOwnShippingFeeIsNotABearerStatement() {
+        // 2026-11-15 real eval q10: an answer to 「5만원 넘으면 무료배송이죠?」 was held as 「배송비 판매자 부담」 unclear.
+        String policy = "배송비는 3,000원이며, 7만원 이상 구매 시 무료입니다. (2026-11-01부터 적용. 그 전에는 5만원 이상 무료였습니다.)";
+        assertThat(CostBearerCheck.judge("11월 1일부터 7만원 이상 구매하시면 배송비는 무료이고, 그보다 적으면 배송비 3,000원을 "
+                + "고객님이 부담하십니다.", List.of(policy), List.of())).isEmpty();
+        // A reply that speaks of a return still has its cost sentences read — even one that does not name the remedy.
+        List<CostBearerCheck.Finding> inAReturn = CostBearerCheck.judge(
+                "단순 변심 반품은 7일 안에 신청해 주세요. 감사합니다. 배송비는 저희가 부담할게요.", List.of(policy), List.of());
+        assertThat(inAReturn).singleElement().satisfies(f -> assertThat(f.verdict()).isNotEqualTo(Verdict.BACKED));
     }
 
     @Test

@@ -399,4 +399,41 @@ public interface InquiryRepository extends JpaRepository<Inquiry, UUID> {
      */
     @Query("select distinct r.channelId from Inquiry r where r.orgId = :orgId and r.channelId is not null")
     List<UUID> findDistinctChannelIdsByOrgId(@Param("orgId") UUID orgId);
+
+    // ── Product analysis (2026-11-16): see ReviewRepository's block of the same name.
+
+    List<Inquiry> findByOrgIdAndProductIdAndReceivedAtGreaterThanEqualAndReceivedAtLessThanOrderByReceivedAtDesc(
+            UUID orgId, UUID productId, Instant fromInclusive, Instant toExclusive, Pageable pageable);
+
+    long countByOrgIdAndProductIdAndReceivedAtGreaterThanEqualAndReceivedAtLessThan(
+            UUID orgId, UUID productId, Instant fromInclusive, Instant toExclusive);
+
+    long countByOrgIdAndProductIdIsNullAndReceivedAtGreaterThanEqualAndReceivedAtLessThan(
+            UUID orgId, Instant fromInclusive, Instant toExclusive);
+
+    /** {@code [productId, count]} of product-linked inquiries in the period. */
+    @Query("select i.productId, count(i) from Inquiry i where i.orgId = :orgId and i.productId is not null"
+            + " and i.receivedAt >= :from and i.receivedAt < :to group by i.productId")
+    List<Object[]> countByProductInPeriod(@Param("orgId") UUID orgId, @Param("from") Instant fromInclusive,
+                                          @Param("to") Instant toExclusive);
+
+    /** The store-wide analysis read: every inquiry of the org in the period, linked or not, newest first. */
+    List<Inquiry> findByOrgIdAndReceivedAtGreaterThanEqualAndReceivedAtLessThanOrderByReceivedAtDesc(
+            UUID orgId, Instant fromInclusive, Instant toExclusive, org.springframework.data.domain.Pageable pageable);
+
+    long countByOrgIdAndReceivedAtGreaterThanEqualAndReceivedAtLessThan(
+            UUID orgId, Instant fromInclusive, Instant toExclusive);
+
+    /** {@code [channelId, count]} of the org's inquirys in the period — the whole period, not a read sample. */
+    @Query("select i.channelId, count(i) from Inquiry i where i.orgId = :orgId"
+            + " and i.receivedAt >= :from and i.receivedAt < :to group by i.channelId")
+    List<Object[]> countByChannelInPeriod(@Param("orgId") UUID orgId, @Param("from") Instant fromInclusive,
+                                          @Param("to") Instant toExclusive);
+
+    /** As {@link #countByChannelInPeriod}, for one product. */
+    @Query("select i.channelId, count(i) from Inquiry i where i.orgId = :orgId and i.productId = :productId"
+            + " and i.receivedAt >= :from and i.receivedAt < :to group by i.channelId")
+    List<Object[]> countByChannelInPeriodForProduct(@Param("orgId") UUID orgId, @Param("productId") UUID productId,
+                                                    @Param("from") Instant fromInclusive,
+                                                    @Param("to") Instant toExclusive);
 }

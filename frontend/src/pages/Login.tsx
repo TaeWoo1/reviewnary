@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { rememberReturnTo, safeReturnPath } from "../lib/returnTo";
 import { useDemoEntry } from "../hooks/useDemoEntry";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
@@ -45,6 +46,12 @@ export function Login() {
   const socialNotice = SOCIAL_NOTICE[searchParams.get("social") ?? ""] ?? null;
   // `?reset=1` — the seller just set a new password on /reset-password (docs/standing/service_readiness_v1.md §6).
   const passwordReset = searchParams.get("reset") === "1";
+  // `?next=` — where the seller was going (an alert's link). Only an in-service path is kept (lib/returnTo.ts); it is
+  // also remembered for a social sign-in, which leaves this page and comes back through /auth/callback.
+  const returnTo = safeReturnPath(searchParams.get("next"));
+  useEffect(() => {
+    rememberReturnTo(returnTo);
+  }, [returnTo]);
   // The reset entry exists only when a mailed link can reach someone (SMTP or the dev outbox) — a link to a
   // form whose mail is dropped would be a lie. Until the answer arrives, no link (never a flicker of a dead one).
   const [resetAvailable, setResetAvailable] = useState(false);
@@ -85,7 +92,8 @@ export function Login() {
     try {
       await login(email, password);
       analytics.track("login", { method: "email" });
-      navigate("/", { replace: true });
+      rememberReturnTo(null);
+      navigate(returnTo ?? "/", { replace: true });
     } catch (e) {
       // "Check your password" for a request that never reached the backend sends the seller to change something
       // that was never wrong — it cost most of an hour on 2026-07-25. See `loginError.ts`.

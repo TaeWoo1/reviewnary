@@ -14,6 +14,20 @@ import org.junit.jupiter.api.Test;
 class CostBearerHoldTiersTest {
 
     @Test
+    void splitCostConflictMustBeFixedRatherThanExcepted() {
+        String reply = "단순 변심 반품은 7일 안에 신청해 주세요. 왕복 배송비 6,000원은 저희가 부담합니다.";
+        var costs = ReviewDraftRecheck.settleCosts(List.of(), reply, List.of(), List.of(new ReviewDraftRecheck.Rule(
+                "ORG_POLICY", "반품 배송비", "단순 변심 반품의 왕복 배송비 6,000원은 고객님이 부담합니다.")));
+        assertThat(costs.against()).hasSize(1);
+        var found = new ReplyHoldService.Finding(
+                List.of(ReviewDraftRecheck.UNSUPPORTED_PROMISE, ReviewDraftRecheck.POLICY_CONFLICT), List.of(),
+                costs.promises(), List.of(), List.of(), List.of(),
+                costs.against().stream().map(ReviewDraftRecheck.Against::word).toList(), costs.against());
+        assertThat(ReplyHoldService.mustFix(found)).isTrue();
+        assertThat(ReplyHoldService.needsException(found)).isFalse();
+    }
+
+    @Test
     void theHoldTiers() {
         String word = "파손·불량 시 교환 배송비 판매자 부담";
         ReplyHoldService.Finding unbacked = new ReplyHoldService.Finding(

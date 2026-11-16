@@ -33,6 +33,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class InquiryKnowledgeAssessor {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(InquiryKnowledgeAssessor.class);
+
     private final InquiryEvidenceRetriever retriever;
     private final KnowledgeSpineService spine;
     private final ProductVariantRepository variants;
@@ -89,6 +91,17 @@ public class InquiryKnowledgeAssessor {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     public void setCatalogue(CatalogueInvestigator catalogue) {
         this.catalogue = catalogue;
+    }
+
+    private com.sellerops.knowledge.schedule.KnowledgeScheduleRepository schedules;
+
+    /**
+     * The seller's schedule table, for the options it names (2026-11-15 final eval q03). Optional: without it, options
+     * are the channel's variant rows alone, as before.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSchedules(com.sellerops.knowledge.schedule.KnowledgeScheduleRepository schedules) {
+        this.schedules = schedules;
     }
 
     private com.sellerops.inquiry.decision.InquiryDecisionModel decisionModel;
@@ -194,9 +207,16 @@ public class InquiryKnowledgeAssessor {
         // The 규격 is resolved BEFORE the retrieval it scopes (2026-08-27): a document about 2호 is not weak evidence
         // about a customer who said 3호.
         UUID productId = retriever.resolveProductId(orgId, inquiry);
-        SpecApplicability.Verdict verdict = SpecApplicability.classify(title, details, optionsFor(orgId, productId));
+        SpecApplicability.Verdict classified = SpecApplicability.classify(title, details, optionsFor(orgId, productId));
         SpineRetrieval found = spine.retrieveForInquiry(orgId, inquiry, RetrievalQuery.ofCustomer(title, details),
-                lookup, KnowledgeVariantScope.of(verdict.variantId()));
+                lookup, KnowledgeVariantScope.of(classified.variantId()));
+        // With no channel option list, the seller's own table may still name the option the customer wrote (q03).
+        // The name and the shared-name check are read only when the table can decide (B176), never for every inquiry.
+        java.util.function.Supplier<String> name = once(() -> productName(orgId, productId));
+        SpecApplicability.Verdict verdict = SpecApplicability.namedInSellerTable(classified, title, details, name,
+                () -> noOtherProductNamed(orgId, productId, name.get()),
+                found.lanes().passages().stream().filter(p -> p.scope().current())
+                        .map(InquiryEvidenceRetriever.ScopedPassage::text).toList());
         AnswerBasisState basis = AnswerBasisState.of(found.lanes().state(), verdict.applicability(),
                 coversEveryOption(found.lanes(), verdict));
         Set<KnowledgeTopic> named = namedTopics(inquiry);
@@ -213,7 +233,7 @@ public class InquiryKnowledgeAssessor {
         }
         String subject = basis != AnswerBasisState.NO_ANSWER_BASIS ? null
                 : catalogueFinding != null ? catalogueFinding.question().subject()
-                : GapSubject.of(verdict, title, details, productName(orgId, productId), asked,
+                : GapSubject.of(verdict, title, details, name.get(), asked,
                         goalsOf(orgId, inquiry));
         KnowledgeGapView gap = KnowledgeGapView.of(found.lanes(), verdict, asked, named).asking(subject);
         if (basis == AnswerBasisState.NO_ANSWER_BASIS && catalogueFinding != null) {
@@ -289,6 +309,9 @@ public class InquiryKnowledgeAssessor {
                 n.need().id(), n.need().ask(), n.need().type().name(), n.status().name(),
                 // Covered for the seller's work, but never read as answered (2026-11-06 thirteenth review).
                 n.settledByAction() ? com.sellerops.inquiry.decision.NeedResult.Enforcement.SETTLED_BY_ACTION_KO
+                        // Not 「기준 없음」: the store wrote it down twice, differently (2026-11-15).
+                        : n.enforcement() == com.sellerops.inquiry.decision.NeedResult.Enforcement.UNRESOLVED_CONFLICT
+                        ? com.sellerops.inquiry.decision.NeedResult.Enforcement.UNRESOLVED_CONFLICT_KO
                         : n.status().labelKo(),
                 n.evidence().stream().map(e -> e.kind().scopeLabelKo() + " · " + e.label()).distinct().toList(),
                 n.missing(), n.askCustomer(),
@@ -332,18 +355,109 @@ public class InquiryKnowledgeAssessor {
     }
 
 
+    /**
+     * This product's name for matching a seller's table row — or null when another product of this seller has the same
+     * name (2026-11-16 review B172): a table names products by name, so a name two products share identifies neither,
+     * and the option stays unresolved.
+     */
+    String unambiguousName(UUID orgId, UUID productId) {
+        String name = productName(orgId, productId);
+        return name != null && noOtherProductNamed(orgId, productId, name) ? name : null;
+    }
+
+    /**
+     * No other product of this org carries {@code name} under {@link SpecApplicability#sameProductKey} (B172 · B174),
+     * read as name/sku rows only (B176: no entity of the catalogue is loaded). Not knowing is not 「unique」: a failed
+     * read, or no name to compare, answers false, and the option then stays unresolved.
+     */
+    boolean noOtherProductNamed(UUID orgId, UUID productId, String name) {
+        if (name == null || products == null || orgId == null || productId == null) {
+            return false;
+        }
+        String key = SpecApplicability.sameProductKey(name);
+        try {
+            return products.findOtherNamesByOrgId(orgId, productId).stream()
+                    .map(r -> com.sellerops.product.OperatorProductName.displayNameOrNull(r.name(), r.sku()))
+                    .noneMatch(n -> n != null && key.equals(SpecApplicability.sameProductKey(n)));
+        } catch (RuntimeException e) {
+            log.warn("shared_name_check_unread reason={}", e.getClass().getSimpleName());
+            return false;
+        }
+    }
+
+    private static <T> java.util.function.Supplier<T> once(java.util.function.Supplier<T> source) {
+        return new java.util.function.Supplier<>() {
+            private boolean read;
+            private T value;
+
+            @Override
+            public T get() {
+                if (!read) {
+                    value = source.get();
+                    read = true;
+                }
+                return value;
+            }
+        };
+    }
+
+    /** This product's display name in this org, or null (no product, another org's id, a name that is a sku). */
+    public String displayName(UUID orgId, UUID productId) {
+        return productName(orgId, productId);
+    }
+
     private String productName(UUID orgId, UUID productId) {
         return productId == null || products == null ? null : products.findById(productId)
                 .filter(p -> orgId.equals(p.getOrgId()))
                 .map(com.sellerops.product.OperatorProductName::displayNameOrNull).orElse(null);
     }
 
-    private List<SpecApplicability.Option> optionsFor(UUID orgId, UUID productId) {
-        return productId == null ? List.of()
-                : variants.findByOrgIdAndProductId(orgId, productId).stream()
-                        .filter(v -> v.getOptionName() != null && !v.getOptionName().isBlank())
-                        .map(v -> new SpecApplicability.Option(v.getId(), v.getOptionName()))
-                        .toList();
+    /** The options a question is classified against — package-private for its regression. */
+    List<SpecApplicability.Option> optionsFor(UUID orgId, UUID productId) {
+        if (productId == null) {
+            return List.of();
+        }
+        List<SpecApplicability.Option> out = new java.util.ArrayList<>(variants.findByOrgIdAndProductId(orgId, productId)
+                .stream()
+                .filter(v -> v.getOptionName() != null && !v.getOptionName().isBlank())
+                .map(v -> new SpecApplicability.Option(v.getId(), v.getOptionName()))
+                .toList());
+        // The channel's list is the authority (2026-11-16 review B172): the schedule's names stand in only for a
+        // listing that has none, never beside one.
+        if (out.isEmpty()) {
+            out.addAll(scheduledOptions(orgId, productId, out));
+        }
+        return List.copyOf(out);
+    }
+
+    /** What stands for the whole product in a schedule's option column, not for one option of it. */
+    private static final java.util.Set<String> WHOLE_PRODUCT = java.util.Set.of("전체", "공통", "모든옵션", "전옵션", "-");
+
+    /**
+     * The options this product's own schedule rows name (2026-11-15 final eval q03: 「민트 색상 언제 다시 들어오나요?」 on a
+     * listing with no channel variant rows was asked back 「어느 상품 · 규격인지」, though the seller's schedule has a 민트
+     * row for exactly this product). A seller who writes an option into their schedule is saying the product sells it,
+     * so a customer who names it has named an option; one who names none is still unresolved and still asked. No
+     * variant id: retrieval stays unscoped, as for any product-level answer. A name the channel rows already carry is
+     * not added twice, and a row for the whole product (「전체」) names no option.
+     */
+    private List<SpecApplicability.Option> scheduledOptions(UUID orgId, UUID productId,
+                                                            List<SpecApplicability.Option> known) {
+        if (schedules == null) {
+            return List.of();
+        }
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        known.forEach(o -> seen.add(o.name().strip()));
+        List<SpecApplicability.Option> out = new java.util.ArrayList<>();
+        for (com.sellerops.knowledge.schedule.KnowledgeSchedule s : schedules.findAllByOrgIdOrderByCreatedAtAsc(orgId)) {
+            String name = s.getOptionName() == null ? "" : s.getOptionName().strip();
+            if (!productId.equals(s.getProductId()) || !s.isActive() || name.isEmpty()
+                    || WHOLE_PRODUCT.contains(name.replace(" ", "")) || !seen.add(name)) {
+                continue;
+            }
+            out.add(new SpecApplicability.Option(null, name));
+        }
+        return out;
     }
 
     static Set<KnowledgeTopic> namedTopics(Inquiry inquiry) {

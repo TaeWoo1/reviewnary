@@ -366,4 +366,53 @@ class InquiryFollowUpTest {
                 .noneMatch(r -> r.workItemId().equals(behind.getId()));
         assertThat(titles(now.waiting())).contains("진행 중");
     }
+
+    private static com.sellerops.replyhold.ReplyHoldService.HoldView hold(UUID subject, boolean confirmed) {
+        return new com.sellerops.replyhold.ReplyHoldService.HoldView("INQUIRY", subject, 2, true,
+                List.of("SOURCE_RETIRED"), "CONFIRM", confirmed, "자료가 사용 중지되었어요", List.of(), List.of(),
+                List.of(), List.of(), Instant.now(), "check", List.of(), List.of());
+    }
+
+    @SuppressWarnings("unchecked")
+    private void holdsAre(List<com.sellerops.replyhold.ReplyHoldService.HoldView> views) {
+        com.sellerops.replyhold.ReplyHoldService service = mock(com.sellerops.replyhold.ReplyHoldService.class);
+        when(service.list(this.org)).thenReturn(views);
+        ObjectProvider<com.sellerops.replyhold.ReplyHoldService> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(service);
+        followUps.setHolds(provider);
+    }
+
+    /**
+     * 2026-11-15 owner request: a registration a hold stopped, waiting for the seller's decision, is 할 일 only — out of
+     * 「기다리는 일」 and out of its total, not merely hidden on screen. A plain registration wait, a decided hold, an action
+     * in progress stay; a check whose day has come on the held inquiry is still that day's check.
+     */
+    @Test
+    @DisplayName("a registration held for the seller's decision leaves waiting and its total; everything else stays")
+    void aHeldRegistrationIsNotWaiting() {
+        InquiryWorkItem held = item(InquiryWorkItemPhase.ACTION_PENDING, "보류된 등록");
+        InquiryWorkItem plain = item(InquiryWorkItemPhase.ACTION_PENDING, "보통 등록 대기");
+        InquiryWorkItem decided = item(InquiryWorkItemPhase.ACTION_PENDING, "결정한 보류");
+        InquiryWorkItem heldDue = recorded(InquiryWorkItemPhase.ACTION_PENDING, "보류 + 오늘 확인",
+                com.sellerops.inquiry.sellercheck.SellerCheckOutcome.IN_PROGRESS.name(), TODAY);
+        recorded(InquiryWorkItemPhase.COMPLETED, "조치 진행 중", com.sellerops.inquiry.sellercheck.SellerCheckOutcome.IN_PROGRESS.name(), TODAY.plusDays(3));
+        holdsAre(List.of(hold(held.getId(), false), hold(decided.getId(), true), hold(heldDue.getId(), false)));
+
+        InquiryFollowUpService.FollowUps now = followUps.followUps(org, TODAY);
+
+        assertThat(titles(now.waiting())).containsExactlyInAnyOrder("보통 등록 대기", "결정한 보류", "조치 진행 중");
+        assertThat(now.waitingTotal()).as("the total counts what is listed, by the same rule").isEqualTo(3);
+        assertThat(titles(now.held())).containsExactly("보류된 등록");
+        assertThat(titles(now.due())).as("the held inquiry's check due today is kept").containsExactly("보류 + 오늘 확인");
+        assertThat(plain.getId()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("without the hold service every registration waits, as before")
+    void withoutHoldsEveryRegistrationWaits() {
+        item(InquiryWorkItemPhase.ACTION_PENDING, "보류된 등록");
+        InquiryFollowUpService.FollowUps now = followUps.followUps(org, TODAY);
+        assertThat(titles(now.waiting())).containsExactly("보류된 등록");
+        assertThat(now.held()).isEmpty();
+    }
 }

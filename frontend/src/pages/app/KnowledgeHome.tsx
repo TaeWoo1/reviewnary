@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type {
   KnowledgeCandidateView,
+  KnowledgeCurrencyView,
   KnowledgeDocumentView,
+  KnowledgeScheduleView,
   KnowledgeInventoryView,
   KnowledgeSummaryView,
 } from "../../lib/types";
@@ -20,6 +22,7 @@ import { KNOWLEDGE_NOUN, ORG_TOPICS } from "../../lib/knowledgeWords";
 import { KnowledgeInbox } from "../../components/knowledge/KnowledgeInbox";
 import { KnowledgeWorkbook } from "../../components/knowledge/KnowledgeWorkbook";
 import { LearnedKnowledge } from "../../components/knowledge/LearnedKnowledge";
+import { KnowledgeConflicts, KnowledgeSchedules } from "../../components/knowledge/KnowledgeConflicts";
 import { OperatingRuleTable, ProductFactTable, topicsOf } from "../../components/knowledge/KnowledgeInventory";
 import {
   KnowledgeDocumentAdd,
@@ -64,13 +67,15 @@ import {
  * `lib/knowledgeWords.ts`가 판매자가 읽는 말을 전부 쥐고 있고, 이름이 없는 토큰은 아무것도 그리지 않는다.
  */
 /** What this screen fetches, each on its own: one failing leaves the others standing. */
-type Part = "documents" | "candidates" | "inventory" | "summary";
-const PARTS: Part[] = ["candidates", "inventory", "documents", "summary"];
+type Part = "documents" | "candidates" | "inventory" | "summary" | "conflicts" | "schedules";
+const PARTS: Part[] = ["candidates", "conflicts", "inventory", "schedules", "documents", "summary"];
 const PART_NAMES: Record<Part, string> = {
   candidates: KNOWLEDGE_NOUN.needsConfirmation,
   inventory: "가게 기준과 상품 정보",
   documents: COPY.documentsTab,
   summary: "지난 답변",
+  conflicts: "자료끼리 다른 값",
+  schedules: "입고·출고 일정",
 };
 
 export function KnowledgeHome() {
@@ -78,6 +83,8 @@ export function KnowledgeHome() {
   const [candidates, setCandidates] = useState<KnowledgeCandidateView[] | null>(null);
   const [inventory, setInventory] = useState<KnowledgeInventoryView | null>(null);
   const [summary, setSummary] = useState<KnowledgeSummaryView | null>(null);
+  const [currency, setCurrency] = useState<KnowledgeCurrencyView | null>(null);
+  const [schedules, setSchedules] = useState<KnowledgeScheduleView[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -98,16 +105,20 @@ export function KnowledgeHome() {
         lost.push(part);
         return null;
       });
-    const [docs, cands, inv, sum] = await Promise.all([
+    const [docs, cands, inv, sum, cur, plan] = await Promise.all([
       settle("documents", api.getKnowledgeDocuments()),
       settle("candidates", api.getKnowledgeCandidates()),
       settle("inventory", api.getKnowledgeInventory()),
       settle("summary", api.getKnowledgeSummary()),
+      settle("conflicts", api.getKnowledgeConflicts()),
+      settle("schedules", api.getKnowledgeSchedules()),
     ]);
     if (docs) setDocuments(docs);
     if (cands) setCandidates(cands);
     if (inv) setInventory(inv);
     if (sum) setSummary(sum);
+    if (cur) setCurrency(cur);
+    if (plan) setSchedules(plan);
     setFailed(PARTS.filter((part) => lost.includes(part)));
   }, []);
 
@@ -136,7 +147,14 @@ export function KnowledgeHome() {
     candidates: candidates !== null,
     inventory: inventory !== null,
     summary: summary !== null,
+    conflicts: currency !== null,
+    schedules: schedules !== null,
   };
+  // Asked only when two documents disagree, or the seller has settled one (owner decision 1): a block that says
+  // 「없음」 every day would be read as nothing to do, and stop being read.
+  const unresolved = currency?.conflicts.filter((c) => c.status === "UNRESOLVED").length ?? 0;
+  const showConflicts =
+    currency !== null && (currency.conflicts.length > 0 || currency.replacements.length > 0);
   const rules = inventory?.rules ?? [];
   const facts = inventory?.productKnowledge ?? [];
   const writtenTopics = topicsOf(rules).filter((topic) => topic.rules.length > 0).length;
@@ -193,6 +211,15 @@ export function KnowledgeHome() {
           <KnowledgeInbox candidates={candidates} documents={documents} onChanged={load} />
         )}
       </Block>
+
+      {showConflicts && currency ? (
+        <Block
+          title="자료끼리 다른 값"
+          note={unresolved > 0 ? `${unresolved}건은 어느 쪽이 현행인지 정해 주세요` : "모두 정리했어요"}
+        >
+          <KnowledgeConflicts view={currency} onChanged={load} />
+        </Block>
+      ) : null}
 
       <Block
         title="가게 기준"
@@ -255,6 +282,14 @@ export function KnowledgeHome() {
         )}
       </Block>
 
+      <Block title="입고·출고 일정" note="예정·확정과 날짜를 줄마다 — 엑셀의 「입고·출고 일정」 시트로 고쳐요">
+        {schedules === null ? (
+          <Waiting failed={failed.includes("schedules")} />
+        ) : (
+          <KnowledgeSchedules schedules={schedules} onChanged={load} />
+        )}
+      </Block>
+
       {/* <b>원본 자료 — 필요할 때만</b> (2026-10-27, §12-4). 파일, 엑셀, 채널에서 읽어 온 것은 위의 내용이 어디서 왔는지이지
           매일 읽을 것이 아니다. 엑셀은 이미 엑셀로 관리하는 가게를 위한 보조 수단이라 첫 화면에서 내려왔다. 접혀 있을 뿐
           빠진 것은 없다. */}
@@ -277,7 +312,7 @@ export function KnowledgeHome() {
             )}
           </Block>
 
-          <Block title="엑셀로 한 번에 고치기" note="말투, 답변 문구, 안내를 한 파일로">
+          <Block title="엑셀로 한 번에 고치기" note="말투, 답변 문구, 안내, 입고·출고 일정을 한 파일로">
             <KnowledgeWorkbook onChanged={load} />
           </Block>
 

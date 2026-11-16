@@ -79,6 +79,13 @@ public class InquiryDraftEvidence {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /**
+     * What the seller's material said of this passage's values when the draft was written — 「[확인 필요] …」 · 「[대체됨] …」
+     * (2026-11-15, 설계 2절 ⑤). A record only: the screen and the checks compute the state again.
+     */
+    @Column(name = "knowledge_state", length = 500)
+    private String knowledgeState;
+
     /** 판매자가 상품에 대해 쓴 지식. */
     public static final String KIND_PRODUCT_KNOWLEDGE = "PRODUCT_KNOWLEDGE";
 
@@ -121,6 +128,14 @@ public class InquiryDraftEvidence {
     public static final String KIND_CATALOGUE_PRODUCT = "CATALOGUE_PRODUCT";
 
     public static final String LABEL_CATALOGUE_PRODUCT = "판매 중인 다른 상품";
+
+    /**
+     * A schedule line the seller keeps (owner decision 4, 2026-11-14). {@code source_id} is the line; {@code locator} what
+     * it said — status, date and a digest of what it is about — so a line edited since is a changed citation.
+     */
+    public static final String KIND_SCHEDULE = "SCHEDULE";
+
+    public static final String LABEL_SCHEDULE = "입고·출고 일정";
 
     /**
      * The stored kind for a RETRIEVED scope.
@@ -178,6 +193,9 @@ public class InquiryDraftEvidence {
         }
         if (KIND_SELLER_CHECK.equals(kind)) {
             return LABEL_SELLER_CHECK;
+        }
+        if (KIND_SCHEDULE.equals(kind)) {
+            return LABEL_SCHEDULE;
         }
         KnowledgeScope scope = scopeOf(kind);
         return scope == null ? kind : scope.labelKo();

@@ -171,10 +171,10 @@ class CoverageJudgeV2Test {
     // ── the prompt and the switch ───────────────────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("the judge instruction is selectable, v6 by default since 2026-11-06, and an unknown name refuses to boot")
+    @DisplayName("the judge instruction is selectable, v8 by default since 2026-11-15, and an unknown name refuses to boot")
     void judgePromptSelection() {
         InquiryDecisionProperties defaults = new InquiryDecisionProperties(true, "", "m", "k", 1, 1, "minimal");
-        assertThat(defaults.judgePrompt()).isEqualTo(InquiryDecisionPrompt.JUDGE_V6);
+        assertThat(defaults.judgePrompt()).isEqualTo(InquiryDecisionPrompt.JUDGE_V8);
         assertThat(defaults.judgeReasoningEffort()).as("the judge follows the plan's effort unless told").isEqualTo("minimal");
         InquiryDecisionProperties armC = new InquiryDecisionProperties(true, "", "m", "k", 1, 1, "minimal",
                 InquiryDecisionPrompt.JUDGE_V2, "low");

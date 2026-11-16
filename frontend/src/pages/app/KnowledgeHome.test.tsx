@@ -25,6 +25,12 @@ const importKnowledgeDocument = vi.fn();
 const getProductKnowledgeStrict = vi.fn();
 const getLearnedKnowledge = vi.fn();
 const learnFromHistory = vi.fn();
+const getKnowledgeConflicts = vi.fn();
+const getKnowledgeSchedules = vi.fn();
+const supersedeKnowledge = vi.fn();
+const removeKnowledgeSupersession = vi.fn();
+const setKnowledgeEffectiveFrom = vi.fn();
+const setKnowledgeScheduleActive = vi.fn();
 vi.mock("../../lib/apiClient", () => ({
   api: {
     getKnowledgeDocuments: (...a: unknown[]) => getKnowledgeDocuments(...a),
@@ -40,6 +46,12 @@ vi.mock("../../lib/apiClient", () => ({
     getLearnedKnowledge: (...a: unknown[]) => getLearnedKnowledge(...a),
     learnFromHistory: (...a: unknown[]) => learnFromHistory(...a),
     uploadKnowledgeWorkbook: (...a: unknown[]) => uploadKnowledgeWorkbook(...a),
+    getKnowledgeConflicts: (...a: unknown[]) => getKnowledgeConflicts(...a),
+    getKnowledgeSchedules: (...a: unknown[]) => getKnowledgeSchedules(...a),
+    supersedeKnowledge: (...a: unknown[]) => supersedeKnowledge(...a),
+    removeKnowledgeSupersession: (...a: unknown[]) => removeKnowledgeSupersession(...a),
+    setKnowledgeEffectiveFrom: (...a: unknown[]) => setKnowledgeEffectiveFrom(...a),
+    setKnowledgeScheduleActive: (...a: unknown[]) => setKnowledgeScheduleActive(...a),
   },
   getToken: () => null,
 }));
@@ -171,6 +183,12 @@ beforeEach(() => {
   getKnowledgeCandidates.mockReset().mockResolvedValue([CANDIDATE]);
   getKnowledgeSummary.mockReset().mockResolvedValue(SUMMARY);
   getKnowledgeInventory.mockReset().mockResolvedValue(INVENTORY);
+  getKnowledgeConflicts.mockReset().mockResolvedValue({ conflicts: [], replacements: [], effectiveDates: {} });
+  getKnowledgeSchedules.mockReset().mockResolvedValue([]);
+  supersedeKnowledge.mockReset().mockResolvedValue({});
+  removeKnowledgeSupersession.mockReset().mockResolvedValue(undefined);
+  setKnowledgeEffectiveFrom.mockReset().mockResolvedValue(undefined);
+  setKnowledgeScheduleActive.mockReset().mockResolvedValue({});
   getLearnedKnowledge.mockReset().mockResolvedValue({
     learned: { sources: [], channels: [], historyReads: [], canLearnHistory: false },
     lastRun: null,
@@ -711,5 +729,74 @@ describe("지식", () => {
     const { container } = draw();
     await screen.findByLabelText("상품 정보");
     await expectNoAxeViolations(container);
+  });
+});
+
+describe("자료끼리 다른 값 · 적용일 · 일정 (2026-11-15)", () => {
+  const CONFLICT = {
+    attribute: "EXCHANGE_WINDOW",
+    subject: "교환 신청 기한",
+    condition: "GENERAL",
+    status: "UNRESOLVED",
+    reason: "NONE",
+    sentence: "교환 신청 기한이 자료마다 달라요 — 7일(「교환·반품 안내」) · 14일(「옛 공지」).",
+    scope: "ORG",
+    productId: null,
+    current: { sourceId: "s-02", title: "교환·반품 안내", value: "7일", effectiveFrom: null },
+    other: { sourceId: "s-03", title: "옛 공지", value: "14일", effectiveFrom: null },
+    replacementId: null,
+  };
+
+  it("asks nothing while no two documents disagree", async () => {
+    draw();
+    await screen.findByLabelText("상품 정보");
+    expect(screen.queryByTestId("knowledge-conflicts")).not.toBeInTheDocument();
+  });
+
+  it("names both values and settles the one item the seller picks", async () => {
+    getKnowledgeConflicts.mockResolvedValue({ conflicts: [CONFLICT], replacements: [], effectiveDates: {} });
+    draw();
+    const row = await screen.findByTestId("knowledge-conflict");
+    expect(within(row).getByText("교환 신청 기한이(가) 자료마다 달라요")).toBeInTheDocument();
+    expect(within(row).getByText("7일")).toBeInTheDocument();
+    expect(within(row).getByText("14일")).toBeInTheDocument();
+    await userEvent.click(within(row).getAllByRole("button", { name: "이 자료가 현행" })[0]);
+    await waitFor(() => expect(supersedeKnowledge).toHaveBeenCalledWith({
+      newerSourceId: "s-02", olderSourceId: "s-03", attribute: "EXCHANGE_WINDOW", condition: "GENERAL",
+    }));
+  });
+
+  it("keeps a settled item with a way to undo it", async () => {
+    getKnowledgeConflicts.mockResolvedValue({
+      conflicts: [{ ...CONFLICT, status: "RESOLVED", reason: "SUPERSEDED", replacementId: "r-1",
+        sentence: "교환 신청 기한은(는) 「교환·반품 안내」의 7일이(가) 현행이에요." }],
+      replacements: [], effectiveDates: {},
+    });
+    draw();
+    await userEvent.click(await screen.findByRole("button", { name: "정한 것 취소" }));
+    await waitFor(() => expect(removeKnowledgeSupersession).toHaveBeenCalledWith("r-1"));
+  });
+
+  it("saves a document's 적용일 without editing the document", async () => {
+    draw();
+    await screen.findByTestId("knowledge-documents");
+    await userEvent.click(screen.getByRole("button", { name: "적용일 적기" }));
+    const input = screen.getByLabelText(/적용일$/) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "2026-11-01" } });
+    await userEvent.click(screen.getByRole("button", { name: "저장" }));
+    await waitFor(() => expect(setKnowledgeEffectiveFrom).toHaveBeenCalledWith(DOCUMENT.sourceId, "2026-11-01"));
+  });
+
+  it("lists schedule lines with 예정/확정 and turns one off", async () => {
+    getKnowledgeSchedules.mockResolvedValue([{
+      id: "sc-1", productId: "p-1", productName: "면 침구 세트(퀸)", optionName: "그레이", kind: "INBOUND",
+      kindLabel: "입고", status: "PLANNED", statusLabel: "예정", scheduleDate: "2026-11-25", scopeNote: null,
+      lastCheckedOn: "2026-11-10", active: true, past: false, updatedAt: "2026-11-15T00:00:00Z",
+    }]);
+    draw();
+    const list = await screen.findByTestId("knowledge-schedules");
+    expect(within(list).getByText("예정")).toBeInTheDocument();
+    await userEvent.click(within(list).getByRole("button", { name: "쓰지 않기" }));
+    await waitFor(() => expect(setKnowledgeScheduleActive).toHaveBeenCalledWith("sc-1", false));
   });
 });

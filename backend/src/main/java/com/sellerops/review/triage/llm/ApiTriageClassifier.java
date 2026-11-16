@@ -34,9 +34,9 @@ public class ApiTriageClassifier implements ReviewTriageClassifier {
      * forwards to the model named in the request ({@code anthropic/claude-sonnet-5-5}, {@code openai/gpt-6.1-sol},
      * {@code gemini/gemini-3.8-flash} …), so it takes the OpenAI branch everywhere below. The vendor name is part of
      * {@link #version()}, so a Runyour run is never filed under a direct-vendor candidate. Most routed models reject a
-     * pinned temperature with a 400: run it with {@code LLM_TRIAGE_OMIT_TEMPERATURE=true}. Eval harness only: it is
-     * not on {@code OutboundGate}'s LLM allow-list (so not from a seller's PC), and the server-side pilot refuses to
-     * start on it ({@code AiTriagePilotProperties.refuseAnEvalOnlyVendor}). Tests use a fake transport, so whether a
+     * pinned temperature with a 400: run it with {@code LLM_TRIAGE_OMIT_TEMPERATURE=true}. The owner opened Runyour as a
+     * general provider on 2026-11-15; the old eval-only restriction is removed, while channel/org gates remain. Tests use
+     * a fake transport, so whether a
      * routed model accepts {@code response_format} and the token cap is proven only by a live one-row run.
      */
     public enum Vendor {
@@ -50,16 +50,6 @@ public class ApiTriageClassifier implements ReviewTriageClassifier {
             this.endpoint = endpoint;
         }
 
-        /**
-         * True for a vendor that may classify the evaluation corpus and nothing else (2026-11-07). Runyour is a third-party
-         * relay in front of the model vendors: a seller's review sent through it reaches one more company than the
-         * seller agreed to. {@link ReviewTriageChannelGate#forApi} — the only production way to build this classifier
-         * ({@code ClassifierBoundaryTest}) — refuses it, on the web server as well as on a seller's PC, where
-         * {@code OutboundGate} already would.
-         */
-        public boolean evalOnly() {
-            return this == RUNYOUR;
-        }
     }
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

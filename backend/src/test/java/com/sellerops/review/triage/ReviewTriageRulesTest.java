@@ -20,6 +20,35 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 class ReviewTriageRulesTest {
 
+    /**
+     * 2026-11-15 owner decision (RUBRIC v2 §2.4 amendment): a 3★ that says a surface defect HAPPENED stays 지켜보기. An
+     * unmeasured exception — these cases pin the behaviour, they measure nothing.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"식기세척기 돌렸더니 겉이 벗겨졌어요.", "도장이 까졌어요", "한 달 만에 변색됐어요", "색이 변색돼서 아쉽",
+            "손잡이가 녹슬었어요", "나사에 녹이 슬었네요", "뚜껑이 갈라졌어요", "바닥에 크랙이 생겼어요", "모서리가 부서져서 왔어요"})
+    void aSurfaceDefectIsAReservation(String body) {
+        assertThat(ReviewTriageRules.reservationFree(body)).isFalse();
+        assertThat(ReviewTriageRules.tier(3, body)).isEqualTo(ReviewTriageTier.WATCH);
+    }
+
+    /** The contrasts: a wrapper taken off and 「없이」 name no defect; a negation keeps the older words' reading. */
+    @org.junit.jupiter.api.Test
+    void aWrapperTakenOffOrNoDefectIsNotADefect() {
+        for (String body : List.of("포장을 벗겨 보니 색이 예뻐요", "비닐 벗겨서 바로 썼어요 만족합니다", "포장 벗기자마자 향이 좋아요",
+                "변색 없이 깨끗하게 잘 쓰고 있어요")) {
+            assertThat(ReviewTriageRules.reservationFree(body)).as(body).isTrue();
+            assertThat(ReviewTriageRules.tier(3, body)).as(body).isEqualTo(ReviewTriageTier.FYI);
+        }
+        // Marked by words that were there before this amendment (않 · 없어), not by it — and it does not change them.
+        for (String body : List.of("식세기에 돌려도 전혀 벗겨지지 않아요", "녹슬지 않고 좋아요", "변색이 없어요")) {
+            assertThat(ReviewTriageRules.tier(3, body)).as(body).isEqualTo(ReviewTriageTier.WATCH);
+            String older = body.replace("벗겨지", "").replace("녹슬", "").replace("변색", "");
+            assertThat(ReviewTriageRules.reservationFree(older)).as("still marked without the new words: " + older).isFalse();
+        }
+        assertThat(ReviewTriageRules.tier(5, "겉이 벗겨졌어요")).as("only 3★ is read").isEqualTo(ReviewTriageTier.FYI);
+    }
+
     @Test
     void aLowRatingWithSomethingToReadIsTheTopOfTheList() {
         assertThat(ReviewTriageRules.tier(1, "접착력이 약해서 떨어졌어요"))

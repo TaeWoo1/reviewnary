@@ -191,6 +191,17 @@ public final class InquiryClaimGuard {
      */
     public static List<Violation> unsupportedClaims(String body, List<String> evidence, List<String> sellerVoice,
                                                     String asked, String orderSentence) {
+        return unsupportedClaims(body, evidence, sellerVoice, asked, orderSentence, List.of());
+    }
+
+    /**
+     * As above, with the names the system recorded for this inquiry's product ({@link #productNameFigures}): a number the
+     * reply writes as part of that name — 「스테인리스 텀블러 500ml」 — names the product and states nothing, so it is not a
+     * figure claim (2026-11-16 B-plan q09 S4: the draft named the product from the 「문의 상품」 line and was refused for
+     * 500). Every other number, and the same number written anywhere outside the name, is read as before.
+     */
+    public static List<Violation> unsupportedClaims(String body, List<String> evidence, List<String> sellerVoice,
+                                                    String asked, String orderSentence, List<String> productNames) {
         if (body == null || body.isBlank()) {
             return List.of();
         }
@@ -225,11 +236,11 @@ public final class InquiryClaimGuard {
             found.add(new Violation(Kind.REMEDY, remedy));
         }
         // A remedy the evidence names but answers the other way — 「불가」 written up as 「가능」 (2026-10-27 review).
-        for (String remedy : ReviewClaimGuard.contradictedPromises(body, evidence)) {
+        for (String remedy : ReviewClaimGuard.contradictedPromises(body, evidence, asked)) {
             found.add(new Violation(Kind.REMEDY, remedy));
         }
         // …or one it answers both ways, with nothing in the reply saying which case this is.
-        for (String remedy : ReviewClaimGuard.undecidedPromises(body, evidence)) {
+        for (String remedy : ReviewClaimGuard.undecidedPromises(body, evidence, asked)) {
             found.add(new Violation(Kind.REMEDY, remedy));
         }
         // …or the policy applied where the law does not let it apply: a return held to 미개봉, a fault to 단순 변심 (2026-11-01).
@@ -247,7 +258,7 @@ public final class InquiryClaimGuard {
             found.add(new Violation(Kind.COST, cost));
         }
         // Only the certain part is decided here; whether a figure is about the same thing is the model's (below).
-        for (FigureClaim claim : figureClaims(body, evidence, asked, orderSentence)) {
+        for (FigureClaim claim : figureClaims(body, evidence, asked, orderSentence, productNames)) {
             if (claim.unsupported()) {
                 found.add(new Violation(Kind.FIGURE, claim.value()));
             }
@@ -271,13 +282,26 @@ public final class InquiryClaimGuard {
     /** The reply's figures the model must verify — every figure the text cannot settle. Empty when none. */
     public static List<FigureClaim> figuresToVerify(String body, List<String> evidence, String asked,
                                                     String orderSentence) {
-        return figureClaims(body, evidence, asked, orderSentence).stream().filter(c -> !c.unsupported()).toList();
+        return figuresToVerify(body, evidence, asked, orderSentence, List.of());
+    }
+
+    /** As above, a number inside the inquiry product's recorded name not being a claim ({@link #productNameFigures}). */
+    public static List<FigureClaim> figuresToVerify(String body, List<String> evidence, String asked,
+                                                    String orderSentence, List<String> productNames) {
+        return figureClaims(body, evidence, asked, orderSentence, productNames).stream().filter(c -> !c.unsupported())
+                .toList();
     }
 
     static List<FigureClaim> figureClaims(String body, List<String> evidence, String asked, String orderSentence) {
+        return figureClaims(body, evidence, asked, orderSentence, List.of());
+    }
+
+    static List<FigureClaim> figureClaims(String body, List<String> evidence, String asked, String orderSentence,
+                                          List<String> productNames) {
         if (body == null || body.isBlank()) {
             return List.of();
         }
+        body = productNameFigures(body, productNames);
         // Numbers are read from the text as written: squashing 「10 20」 would read one number that nobody wrote.
         List<Figure> sources = figures(ANY_NUMBER, join(evidence) + "\n" + (orderSentence == null ? "" : orderSentence));
         List<Figure> question = figures(ANY_NUMBER, asked == null ? "" : asked);
@@ -296,6 +320,29 @@ public final class InquiryClaimGuard {
     }
 
     private static final Pattern ANY_NUMBER = Pattern.compile("\\d+(?:[.,]\\d+)?");
+
+    /**
+     * The reply with every exact occurrence of the inquiry product's recorded name marked as a name: its ASCII digits are
+     * written as full-width digits, which no figure pattern reads ({@code \\d} is ASCII here), so the clause still reads
+     * the same and the name's number is not a claim. Only a whole name the system recorded, written as recorded — a
+     * number beside it, a near variant (「500 ml 텀블러」) or a name with no digit changes nothing.
+     */
+    static String productNameFigures(String body, List<String> productNames) {
+        if (body == null || productNames == null) {
+            return body;
+        }
+        String out = body;
+        for (String name : productNames) {
+            if (name == null || name.strip().length() < 2 || !name.chars().anyMatch(ch -> ch >= '0' && ch <= '9')) {
+                continue;
+            }
+            String n = name.strip();
+            StringBuilder wide = new StringBuilder(n.length());
+            n.chars().forEach(ch -> wide.append(ch >= '0' && ch <= '9' ? (char) ('\uFF10' + (ch - '0')) : (char) ch));
+            out = out.replace(n, wide.toString());
+        }
+        return out;
+    }
 
     /** The units a figure is written in, normalized so 「10 센티」 and 「10cm」 are the same and 「10mm」 is not. */
     private static final Pattern UNIT = Pattern.compile("^\\s*\\(?\\s*(mm|cm|ml|oz|온스|kg|g|m|L|리터|미터|센티|일|시간|분|"

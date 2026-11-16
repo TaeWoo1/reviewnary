@@ -230,6 +230,27 @@ describe("the three answer states", () => {
     expect(screen.getByLabelText("내용")).toBeInTheDocument();
   });
 
+  it("G2 — two documents disagree on the asked value: say so, send to the knowledge screen, offer no basis box", async () => {
+    generateInquiryDraft.mockResolvedValue({
+      ...NO_BASIS,
+      answerBasisNote: "자료끼리 값이 달라 답변을 만들지 않았어요.",
+      answerBasisAction: "교환 신청 기한이(가) 자료마다 달라요 — 7일(「교환·반품 안내」) · 14일(「옛 공지」).",
+      knowledgeGap: {
+        needs: [{ id: "N1", status: "NONE", statusKo: "자료끼리 값이 달라 확인 필요", missing: "교환 신청 기한이(가) 자료마다 달라요" }],
+      },
+    });
+    const user = userEvent.setup();
+    open();
+    await user.click(await screen.findByRole("button", { name: /초안 만들기/ }));
+    const card = await screen.findByTestId("answer-state");
+    expect(card).toHaveTextContent("자료끼리 값이 달라 답변을 만들지 않았어요.");
+    expect(card).toHaveTextContent("7일(「교환·반품 안내」) · 14일(「옛 공지」)");
+    expect(card).not.toHaveTextContent("근거가 없는 답변은 만들지 않아요");
+    expect(screen.queryByRole("button", { name: "답변 기준 추가" })).toBeNull();
+    expect(screen.getByRole("link", { name: "자료끼리 다른 값 정하기" })).toHaveAttribute("href", "/knowledge");
+    expect(screen.getByLabelText("내용")).toBeInTheDocument();
+  });
+
   it("H — saving an answer basis says what happened, and where the sentence now lives", async () => {
     generateInquiryDraft.mockResolvedValueOnce(NO_BASIS).mockResolvedValueOnce(GROUNDED);
     const user = userEvent.setup();

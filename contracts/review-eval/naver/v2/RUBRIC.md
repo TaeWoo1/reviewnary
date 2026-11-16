@@ -173,6 +173,25 @@ the first time text moves a tier in `ReviewTriageRules`, so its limits are state
 
 On the owner's store (3,555 reviews, 2026-10-27): 92 are 3★; 57 move to `FYI`, 35 stay `WATCH`.
 
+**Amended 2026-11-15 (product-owner decision) — surface-defect words.** A synthetic evaluation review, 「식기세척기
+돌렸더니 겉이 벗겨졌어요」 (3★), named a defect with no marker and was read as praise. Sixteen words were added, with two
+different traces, written down as this section requires:
+
+- `갈라` · `크랙` · `실금` · `부서` · `터짐` — the repository's committed problem vocabulary (`IssueVocabulary` 균열 · 파손),
+  in its own forms.
+- `벗겨지` · `벗겨졌` · `벗겨져` · `까졌` · `까져` · `변색되` · `변색됐` · `변색돼` · `녹슬었` · `녹슬어` · `녹이 슬` — §3.1
+  `DEFECT_OR_DAMAGE` forms added **on the owner's decision, not on a `DEV` label**.
+  - No `DEV`, pilot or synthetic labeled row carries any of them, so no published reading moves. No measurement backs
+    them, and they are not reported as a gain in precision, recall or safety.
+  - §6.3 calls a term added for one unlabeled review threshold-fitting. This set is an owner exception in the safe
+    direction: it can only keep a 3★ in `WATCH`.
+- **Verb forms that say the defect happened, only.** The contrast regressions are in `ReviewTriageRulesTest`:
+  - 「포장을 벗겨 보니」 · 「벗겨서」 · 「벗기자마자」 take a wrapper off and stay unmarked.
+  - 「변색 없이」 says there is none, and no added word marks it.
+  - A negation that writes `않` · `없어` (「벗겨지지 않아요」 · 「변색이 없어요」) was already `WATCH` through those older
+    words. That over-marking is not this amendment's and is not changed by it.
+  - The committed nouns 크랙 · 실금 mark 「크랙 하나 없이」 too (over-marking, the safe way).
+
 ## 3. What else the labeler records
 
 Two fields beyond the tier, both **closed vocabularies**. Neither may influence the tier; both exist

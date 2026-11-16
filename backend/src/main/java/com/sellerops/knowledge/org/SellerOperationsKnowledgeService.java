@@ -76,7 +76,7 @@ public class SellerOperationsKnowledgeService {
     }
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
-    void setRevisions(OrgKnowledgeRevisionRepository revisions) {
+    public void setRevisions(OrgKnowledgeRevisionRepository revisions) {
         this.revisions = revisions;
     }
 
@@ -119,6 +119,28 @@ public class SellerOperationsKnowledgeService {
                 .orElseThrow(() -> ApiException.notFound("운영 정책을 찾을 수 없습니다."));
         OrgKnowledgeRevision before = OrgKnowledgeRevision.of(source, java.time.Instant.now());
         apply(source, request);
+        if (!source.getBody().equals(before.getBody())) {
+            if (revisions != null) {
+                revisions.save(before);
+            }
+            source.setVersion(source.getVersion() + 1);
+        }
+        OrgKnowledgeSource saved = sources.save(source);
+        return view(saved, reindex(saved));
+    }
+
+    /**
+     * Replace the BODY of one uploaded rule with the text of a new file (2026-11-16 — 파일 바꾸기). Everything the seller
+     * decided about the rule stays: its type, title, 사용 여부 and customer phrases. The version and the kept revision move
+     * exactly as {@link #update} moves them, and the passages are re-cut from the new text.
+     */
+    @Transactional
+    public OrgKnowledgeView replaceBody(UUID orgId, UUID sourceId, String body, String documentName) {
+        OrgKnowledgeSource source = sources.findByIdAndOrgId(sourceId, orgId)
+                .orElseThrow(() -> ApiException.notFound("운영 정책을 찾을 수 없습니다."));
+        OrgKnowledgeRevision before = OrgKnowledgeRevision.of(source, java.time.Instant.now());
+        source.setBody(body);
+        source.setDocumentName(documentName);
         if (!source.getBody().equals(before.getBody())) {
             if (revisions != null) {
                 revisions.save(before);

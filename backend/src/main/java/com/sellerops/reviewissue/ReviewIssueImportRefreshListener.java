@@ -35,7 +35,13 @@ public class ReviewIssueImportRefreshListener {
         this.refresh = refresh;
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    /**
+     * {@code fallbackExecution = true} (2026-11-16): the file upload path ({@code FileUploadConnector} via
+     * {@code IngestFollowUp}) publishes this event with no transaction open, and without the fallback Spring drops it
+     * silently — uploaded reviews never reached the issue memory, so 상품 상세 said 「반복 문제 0」 beside a product
+     * analysis counting six 포장 complaints. Inside a transaction it still waits for the commit.
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onSegmentIngested(ReviewSegmentIngestedEvent event) {
         try {

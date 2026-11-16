@@ -4,6 +4,7 @@ import { AppProviders } from "./components/app/AppProviders";
 import { PublicShell } from "./components/public/PublicShell";
 import { useAuth } from "./lib/auth";
 import { getToken } from "./lib/apiClient";
+import { loginPathFor } from "./lib/returnTo";
 import { LEGACY_REDIRECTS, resolveLegacyTarget, type LegacyRedirect } from "./lib/legacyRoutes";
 
 // Public surface
@@ -24,6 +25,7 @@ import { AgentHome } from "./pages/app/AgentHome";
 import { CsHome } from "./pages/app/CsHome";
 import { Products } from "./pages/app/Products";
 import { ProductDetail } from "./pages/app/ProductDetail";
+import { StoreAnalysis } from "./pages/app/StoreAnalysis";
 import { Reviews } from "./pages/app/Reviews";
 import { ReviewReplyTask, ReviewReplyTaskLegacyEntry } from "./pages/app/ReviewReplyTask";
 import { PraiseConfirm } from "./pages/app/PraiseConfirm";
@@ -59,6 +61,8 @@ import { ReviewReplyTemplates } from "./pages/app/ReviewReplyTemplates";
 import { ReviewResponseRule } from "./pages/app/ReviewResponseRule";
 import { AgentUsage } from "./pages/app/AgentUsage";
 import { NotificationSettings } from "./pages/app/NotificationSettings";
+import { KakaoMockInbox } from "./pages/app/KakaoMockInbox";
+import { NoticeLanding } from "./pages/app/NoticeLanding";
 import { CompanyProfile } from "./pages/app/CompanyProfile";
 import { Cafe24Connect } from "./pages/Cafe24Connect";
 import { Cafe24ConnectResult } from "./pages/Cafe24ConnectResult";
@@ -70,8 +74,10 @@ import { Agent } from "./pages/Agent";
 import { NotFound } from "./pages/NotFound";
 
 function Protected({ children }: { children: JSX.Element }) {
+  const location = useLocation();
   if (!getToken()) {
-    return <Navigate to="/login" replace />;
+    // Keep where the seller was going (an alert's /notice/<id>), as an in-service path only (lib/returnTo.ts).
+    return <Navigate to={loginPathFor(`${location.pathname}${location.search}`)} replace />;
   }
   return children;
 }
@@ -136,6 +142,7 @@ export function App() {
         {/* 상품: the catalogue and everything SellerOps knows about one product — the surface the
             backend has served since before the v2 shell and the frontend never had. */}
         <Route path="/products" element={<Products />} />
+        <Route path="/products/analysis" element={<StoreAnalysis />} />
         <Route path="/products/:productId" element={<ProductDetail />} />
         {/* 리뷰: one surface over the per-account review records; the account is a switcher, not a
             destination. `/reviews` alone opens the first review-capable account. */}
@@ -203,6 +210,8 @@ export function App() {
         <Route path="/settings/review-response" element={<ReviewResponseRule />} />
         <Route path="/settings/ai-usage" element={<AgentUsage />} />
         <Route path="/settings/notifications" element={<NotificationSettings />} />
+        <Route path="/settings/notifications/kakao" element={<KakaoMockInbox />} />
+        <Route path="/notice/:deliveryId" element={<NoticeLanding />} />
         <Route path="/settings/company" element={<CompanyProfile />} />
         <Route path="/settings/devices" element={<HelperDevices />} />
         <Route path="/customer-operations" element={<CustomerOperations />} />

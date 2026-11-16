@@ -52,7 +52,11 @@ class AgentFigureCheckPayloadFloorTest {
                 List.of(new AgentDraftGenerator.Passage("상품 정보", "두께", "두께는 8mm입니다.")), null,
                 "두께는 8mm입니다.", List.of("1. 8mm — 문장: 두께는 8mm입니다")));
         assertThat(unscoped).as("no list, no section — the user turn is v9's").doesNotContain("이번 답변이 다룰 내용:");
-        assertThat(AgentDraftPrompt.FIGURE_PROMPT_VERSION).isEqualTo("inquiry-claim-check/v13");
+        assertThat(AgentDraftPrompt.FIGURE_PROMPT_VERSION).isEqualTo("inquiry-claim-check/v15");
+        // v14 (2026-11-15): a use/damage restriction as the evidence states it is SUPPORTED; opening and defect stay refused.
+        assertThat(AgentDraftPrompt.figureSystem()).contains("개봉을 이유로 한 거절이 아니므로 SUPPORTED입니다")
+                .contains("포장을 뜯은 것만으로는 그 경우가 아니고")
+                .contains("반품 · 환불을 미개봉으로 한정하거나 개봉을 이유로 거절한 문장");
         // v13 (2026-11-06 thirteenth review): a question nobody judged necessary is a claim the check refuses.
         assertThat(AgentDraftPrompt.figureSystem()).contains("그 밖의 되묻기는 claims로 골라 NOT_SUPPORTED로 판정합니다");
         // v12 (2026-11-05 re-eval: after a kind correction the check returned N1 and never S1, 3 of 3 and on every

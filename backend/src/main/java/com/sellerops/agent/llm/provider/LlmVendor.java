@@ -12,7 +12,8 @@ import java.util.Locale;
  */
 public enum LlmVendor {
     OPENAI,
-    ANTHROPIC;
+    ANTHROPIC,
+    RUNYOUR;
 
     public static LlmVendor parse(String name) {
         if (name == null || name.isBlank()) {

@@ -341,6 +341,39 @@ class InquiryDraftComposerTest {
     }
 
     @Test
+    @DisplayName("an evaluation trace keeps why a draft was refused — off unless the synthetic board and a directory are both set")
+    void anEvaluationTraceKeepsTheRefusal(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        UUID productId = seedProduct();
+        StubLibrary library = StubLibrary.returning(passage("규격", "상품 폭 10mm, 평일 배송 2일, 제주 배송 7일"));
+        StubModel wrong = StubModel.writing("[답변] 규격", "상품 높이는 10mm입니다.");
+        wrong.figureCheck = figures -> java.util.Optional.of(List.of(
+                new AgentDraftGenerator.FigureVerdict(1, "NOT_SUPPORTED")));
+        InquiryDraftComposer traced = composer(library, wrong);
+        traced.setHoldTrace(new EvalHoldTrace(true, dir.toString()));
+        assertThat(traced.generate(org, seedProposed(productId).getId(), user).draft()).isNull();
+        java.nio.file.Path file = dir.resolve(EvalHoldTrace.FILE);
+        List<String> lines = java.nio.file.Files.readAllLines(file);
+        assertThat(lines).isNotEmpty();
+        com.fasterxml.jackson.databind.JsonNode first = new com.fasterxml.jackson.databind.ObjectMapper().readTree(lines.get(0));
+        assertThat(first.path("stage").asText()).isEqualTo("CLAIM_CHECK");
+        assertThat(first.path("draft").asText()).isEqualTo("상품 높이는 10mm입니다.");
+        assertThat(first.path("checkedAgainst").get(0).path("heading").asText()).isEqualTo("규격");
+        assertThat(lines.get(0)).as("the passage text is not copied").doesNotContain("평일 배송 2일");
+        assertThat(java.nio.file.Files.getPosixFilePermissions(file))
+                .containsExactlyInAnyOrder(java.nio.file.attribute.PosixFilePermission.OWNER_READ,
+                        java.nio.file.attribute.PosixFilePermission.OWNER_WRITE);
+
+        java.nio.file.Path off = dir.resolve("off");
+        StubModel again = StubModel.writing("[답변] 규격", "상품 높이는 10mm입니다.");
+        again.figureCheck = wrong.figureCheck;
+        InquiryDraftComposer untraced = composer(library, again);
+        untraced.setHoldTrace(new EvalHoldTrace(false, off.toString()));
+        untraced.generate(org, seedProposed(productId).getId(), user);
+        assertThat(java.nio.file.Files.exists(off.resolve(EvalHoldTrace.FILE))).as("not the synthetic board: nothing").isFalse();
+        assertThat(new EvalHoldTrace(true, " ").enabled()).as("no directory: nothing").isFalse();
+    }
+
+    @Test
     @DisplayName("evidence that says the value holds for every option is answered without asking back; one value seen "
             + "with no such statement still asks (2026-11-01 ninth review)")
     void everyOptionEvidenceIsAnsweredWithoutAskingBack() {

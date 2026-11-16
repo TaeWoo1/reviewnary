@@ -9,6 +9,9 @@ public interface OrgKnowledgeSourceRepository extends JpaRepository<OrgKnowledge
 
     List<OrgKnowledgeSource> findAllByOrgIdOrderByCreatedAtAsc(UUID orgId);
 
+    /** The one rule of this org with this title — V72's uq_org_knowledge_sources_title keeps it to one. */
+    Optional<OrgKnowledgeSource> findByOrgIdAndTitle(UUID orgId, String title);
+
     /** Org-scoped by id — an operating rule is never reachable across a tenant boundary. */
     Optional<OrgKnowledgeSource> findByIdAndOrgId(UUID id, UUID orgId);
 

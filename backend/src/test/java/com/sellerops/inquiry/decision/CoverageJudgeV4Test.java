@@ -55,12 +55,12 @@ class CoverageJudgeV4Test {
     }
 
     @Test
-    @DisplayName("v6 is the default instruction since 2026-11-06, v4 and v5 stay selectable, and an unknown name refuses to boot")
+    @DisplayName("v8 is the default instruction since 2026-11-15, v4 and v5 stay selectable, and an unknown name refuses to boot")
     void theDefault() {
         assertThat(new InquiryDecisionProperties(true, ORG.toString(), "m", "k", 800, 2400, "low").judgePrompt())
-                .isEqualTo(InquiryDecisionPrompt.JUDGE_V6);
+                .isEqualTo(InquiryDecisionPrompt.JUDGE_V8);
         assertThat(new InquiryDecisionProperties(true, ORG.toString(), "m", "k", 800, 2400, "low", "", "")
-                .judgePrompt()).isEqualTo(InquiryDecisionPrompt.JUDGE_V6);
+                .judgePrompt()).isEqualTo(InquiryDecisionPrompt.JUDGE_V8);
         assertThat(new InquiryDecisionProperties(true, ORG.toString(), "m", "k", 800, 2400, "low",
                 InquiryDecisionPrompt.JUDGE_V5, "").judgePrompt()).isEqualTo(InquiryDecisionPrompt.JUDGE_V5);
         assertThat(new InquiryDecisionProperties(true, ORG.toString(), "m", "k", 800, 2400, "low",

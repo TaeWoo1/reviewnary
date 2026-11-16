@@ -936,13 +936,17 @@ sellerops:
     plan-max-output-tokens: ${SELLEROPS_INQUIRY_DECISION_PLAN_MAX_OUTPUT_TOKENS:800}
     judge-max-output-tokens: ${SELLEROPS_INQUIRY_DECISION_JUDGE_MAX_OUTPUT_TOKENS:2400}
     reasoning-effort: ${SELLEROPS_INQUIRY_DECISION_REASONING_EFFORT:minimal}
-    # CoverageJudge instruction (coverage-judge/v1 | v2 | v3 | v4 | v5 | v6) and the judge's own effort (blank = the plan's).
+    # CoverageJudge instruction (coverage-judge/v1 … v7) and the judge's own effort (blank = the plan's).
     # v4 (2026-11-02) is v2 held to what the customer asked — InquiryDecisionPrompt.JUDGE_V4. v5 (2026-11-05) adds one
     # rule: evidence that says a value is not settled yet is PARTIAL, never FULL — InquiryDecisionPrompt.JUDGE_V5. v6
     # (2026-11-06) adds settled_by: the seller's record of an action already done, for a need asking whether it can be
-    # done — accepted only by code's own conditions (NeedAggregation.settlingRecord). Not yet run on a real model.
+    # done — accepted only by code's own conditions (NeedAggregation.settlingRecord). v7 (2026-11-15) adds the material
+    # state rule: a candidate's 「state」 line ([확인 필요] / [대체됨]) is never stated as fact — InquiryDecisionPrompt.JUDGE_V7.
+    # v8 (2026-11-15) adds one rule: a need answered by a common rule also cites the product's own exception to it —
+    # InquiryDecisionPrompt.JUDGE_V8. v7 ran on a real model on 2026-11-15 (Runyour, 20 rows); v8 not yet.
+    # This default must equal InquiryDecisionProperties' (CoverageJudgeV8Test).
     # Separate knobs so a calibration can change the judge and nothing else (docs/lineage/inquiry_decision_v2_1.md).
-    judge-prompt: ${SELLEROPS_INQUIRY_DECISION_JUDGE_PROMPT:coverage-judge/v6}
+    judge-prompt: ${SELLEROPS_INQUIRY_DECISION_JUDGE_PROMPT:coverage-judge/v8}
     judge-reasoning-effort: ${SELLEROPS_INQUIRY_DECISION_JUDGE_REASONING_EFFORT:}
     # json_schema = Structured Outputs, strict (need ids an enum of the ids sent); json_object = the pre-audit JSON mode.
     output-format: ${SELLEROPS_INQUIRY_DECISION_OUTPUT_FORMAT:json_schema}
@@ -1018,6 +1022,24 @@ sellerops:
   # Service Readiness v1 — docs/standing/service_readiness_v1.md §5. Public origin of the frontend, used to build links
   # that leave the product (password-reset mail). Not a secret.
   public-base-url: ${SELLEROPS_PUBLIC_BASE_URL:http://localhost:5173}
+  # Intake alerts (카카오톡 접수 알림, demo §7.63). mock (default) keeps each message in the in-service mock inbox and
+  # sends nothing; solapi + live-enabled + every key below + an https public-base-url is the only way anything leaves.
+  # Missing or off → every delivery is recorded BLOCKED (never mocked, never sent). Keys are names here, values in env.
+  intake-alert:
+    mode: ${SELLEROPS_INTAKE_ALERT_MODE:mock}
+    worker-enabled: ${SELLEROPS_INTAKE_ALERT_WORKER_ENABLED:true}
+    tick-ms: ${SELLEROPS_INTAKE_ALERT_TICK_MS:30000}
+    per-pass-cap: ${SELLEROPS_INTAKE_ALERT_PER_PASS_CAP:5}
+    recovery-hours: ${SELLEROPS_INTAKE_ALERT_RECOVERY_HOURS:48}
+    old-after-hours: ${SELLEROPS_INTAKE_ALERT_OLD_AFTER_HOURS:72}
+    solapi:
+      live-enabled: ${SELLEROPS_SOLAPI_LIVE_ENABLED:false}
+      base-url: ${SELLEROPS_SOLAPI_BASE_URL:https://api.solapi.com}
+      api-key: ${SELLEROPS_SOLAPI_API_KEY:}
+      api-secret: ${SELLEROPS_SOLAPI_API_SECRET:}
+      pf-id: ${SELLEROPS_SOLAPI_PF_ID:}
+      template-id: ${SELLEROPS_SOLAPI_TEMPLATE_ID:}
+      sender-number: ${SELLEROPS_SOLAPI_SENDER_NUMBER:}
   # Password reset by mailed one-time link (§2-2): SHA-256 at rest, single use, this TTL. Needs a mailer (below).
   password-reset:
     ttl-seconds: ${SELLEROPS_PASSWORD_RESET_TTL_SECONDS:1800}

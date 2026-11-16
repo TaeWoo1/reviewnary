@@ -95,7 +95,14 @@ export function Products() {
             </span>
           ) : undefined
         }
-        action={<AgentLaunch context={{ surface: "products" }} label="상품에 대해 물어보기" />}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <BtnLink to="/products/analysis" variant="ghost">
+              가게 전체 분석
+            </BtnLink>
+            <AgentLaunch context={{ surface: "products" }} label="상품에 대해 물어보기" />
+          </div>
+        }
       />
 
       {/* The list owns its own toolbar — the seller's words, and the order the rows are in — because

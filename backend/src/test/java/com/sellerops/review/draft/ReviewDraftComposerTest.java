@@ -52,6 +52,7 @@ class ReviewDraftComposerTest {
     private static final UUID REVIEW = UUID.fromString("d1e2f3a4-0000-4000-8000-000000000006");
     private static final UUID PRODUCT = UUID.fromString("0811fead-0000-4000-8000-000000000007");
     private static final String BODY = "괜찮긴한데 잘떨어지네요 실리콘으로 붙였네요";
+    private static final UUID USAGE = UUID.fromString("00000000-0000-0000-0000-00000000a11c");
     private static final String TEMPLATE = "저희 제품을 이용해 주셔서 감사합니다. 남겨주신 후기 잘 읽었습니다.";
 
     private InquiryEvidenceRetriever retriever;
@@ -87,7 +88,8 @@ class ReviewDraftComposerTest {
                         "review-reply-v1", Instant.parse("2026-09-03T00:00:00Z")));
         when(model.isEnabledFor(ORG)).thenReturn(true);
         when(model.versionFor(ORG)).thenReturn("test-model");
-        when(quota.consume(eq(ORG), eq(AgentUsageKind.DRAFT), any(), any())).thenReturn(new QuotaDecision(true, null, 1, 200));
+        when(quota.consumeCharge(eq(ORG), eq(AgentUsageKind.DRAFT), any(), any(), anyInt()))
+                .thenReturn(new AgentQuotaService.Charge(new QuotaDecision(true, null, 1, 200), USAGE));
         when(issueEvidence.findByOrgIdAndReviewId(ORG, REVIEW)).thenReturn(List.of());
 
         gapInbox = mock(com.sellerops.knowledge.candidate.KnowledgeCandidateService.class);
@@ -243,6 +245,29 @@ class ReviewDraftComposerTest {
      * drift: a reopen that recomputed it would have to re-run the retrieval, and two of that
      * retrieval's three stages are model calls made afresh on every search.
      */
+    @Test
+    @DisplayName("a 3★ that names a surface defect keeps its facts: not praise, and its complaint is a query (r04 real eval)")
+    void aSurfaceDefectIsNotPraise() {
+        String body = "식기세척기 돌렸더니 겉이 벗겨졌어요.";
+        assertThat(ReviewDraftComposer.praiseOnly(3, body)).isFalse();
+        assertThat(ReviewComplaintClauses.of(body)).containsExactly("식기세척기 돌렸더니 겉이 벗겨졌어요");
+        assertThat(ReviewDraftComposer.praiseOnly(3, "포장을 벗겨 보니 색이 예뻐요")).as("a wrapper taken off").isTrue();
+    }
+
+    @Test
+    @DisplayName("the review drafter's tokens land on the usage row it was charged on (2026-11-15: four rows were empty)")
+    void theReviewDraftersTokensAreMetered() {
+        retrieval(DraftKnowledgeState.GROUNDED, productPassage("실리콘 표면에는 부착되지 않습니다."));
+        when(model.draftReviewReply(eq(ORG), eq(BODY), any(), eq(TEMPLATE), eq(List.of()), eq(AgentDraftGenerator.ReviewMood.UNSTATED), any()))
+                .thenAnswer(call -> {
+                    com.sellerops.agent.llm.AgentLlmCallCapture.report(
+                            new com.sellerops.agent.llm.AgentLlmCallMetrics(1234, 2781, 225, -1));
+                    return Optional.of("실리콘 표면에는 부착되지 않습니다. 확인 부탁드립니다.");
+                });
+        composer.compose(ORG, review(), BODY, "SELLER:u1");
+        verify(quota).recordOutcome(USAGE, 1234, 2781, 225);
+    }
+
     @Test
     @DisplayName("the basis sentence is one rule, so a reopen says what the generation said")
     void theBasisSentenceIsReadBackNotRecomputed() {
@@ -497,8 +522,9 @@ class ReviewDraftComposerTest {
     @DisplayName("a spent budget is an operational fact, never a statement about the seller's knowledge")
     void anExhaustedBudgetFallsBackWithoutBlamingTheLibrary() {
         retrieval(DraftKnowledgeState.GROUNDED, productPassage("표면을 닦아낸 뒤 붙여 주세요."));
-        when(quota.consume(eq(ORG), eq(AgentUsageKind.DRAFT), any(), any()))
-                .thenReturn(new QuotaDecision(false, QuotaDecision.Reason.DAILY_LLM_CALLS, 200, 200));
+        when(quota.consumeCharge(eq(ORG), eq(AgentUsageKind.DRAFT), any(), any(), anyInt()))
+                .thenReturn(new AgentQuotaService.Charge(
+                        new QuotaDecision(false, QuotaDecision.Reason.DAILY_LLM_CALLS, 200, 200), null));
 
         GeneratedReviewDraftView view = composer.compose(ORG, review(), BODY, "SELLER:u1");
 

@@ -56,6 +56,10 @@ public final class KnowledgeDocumentText {
     }
 
     /** The refusal sentence, written once so every caller says the same thing. */
+    static final String EXCEL_REFUSAL = "엑셀 파일은 자료 올리기로 읽지 않습니다. 지식 화면의 「엑셀로 관리」에서 내려받은 "
+            + "「답글 기준.xlsx」에 옮겨 적어 올리거나, 표를 CSV로 저장해 올려 주세요.";
+    static final String PASSWORD_REFUSAL = "암호가 걸린 PDF는 읽을 수 없습니다. 암호를 푼 사본을 저장해 다시 올려 주세요.";
+
     public static String acceptedListKo() {
         return "PDF · DOCX · TXT · MD · CSV 파일을 읽을 수 있습니다.";
     }
@@ -83,6 +87,11 @@ public final class KnowledgeDocumentText {
             throw ApiException.badRequest("파일이 너무 큽니다 (최대 10MB).");
         }
         String extension = extensionOf(filename);
+        if (extension.equals("xlsx") || extension.equals("xls")) {
+            // An Excel file has its own path (integration rehearsal, 2026-11-16): the store's 「답글 기준.xlsx」 is read
+            // sheet by sheet with a preview; any other sheet is a table this reader cannot place. Say where to go.
+            throw ApiException.badRequest(EXCEL_REFUSAL);
+        }
         if (!ACCEPTED.contains(extension)) {
             throw ApiException.badRequest("이 형식은 읽을 수 없습니다. " + acceptedListKo());
         }
@@ -94,7 +103,8 @@ public final class KnowledgeDocumentText {
         String normalized = normalize(text);
         if (normalized.length() < MIN_CHARS) {
             throw ApiException.badRequest(
-                    "이 파일에서 읽을 수 있는 글자가 거의 없습니다. 스캔한 이미지 문서라면 아직 읽지 못합니다.");
+                    "이 파일에서 읽을 수 있는 글자가 거의 없습니다. 스캔한 이미지 문서라면 아직 읽지 못합니다. "
+                            + "글자를 복사할 수 있는 PDF나 DOCX · TXT로 다시 올려 주세요.");
         }
         if (normalized.length() > MAX_CHARS) {
             throw ApiException.badRequest(
@@ -123,13 +133,16 @@ public final class KnowledgeDocumentText {
     private static String fromPdf(byte[] bytes) {
         try (PDDocument document = Loader.loadPDF(bytes)) {
             if (document.isEncrypted()) {
-                throw ApiException.badRequest("암호가 걸린 PDF는 읽을 수 없습니다.");
+                throw ApiException.badRequest(PASSWORD_REFUSAL);
             }
             PDFTextStripper stripper = new PDFTextStripper();
             stripper.setSortByPosition(true);
             return stripper.getText(document);
         } catch (ApiException e) {
             throw e;
+        } catch (org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException e) {
+            // A PDF that needs a password to OPEN fails in the loader, before isEncrypted() can be asked.
+            throw ApiException.badRequest(PASSWORD_REFUSAL);
         } catch (Exception e) {
             // The exception TYPE only. A parser message can quote the document's own bytes.
             throw ApiException.badRequest("PDF를 읽지 못했습니다 (" + e.getClass().getSimpleName() + ").");

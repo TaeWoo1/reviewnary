@@ -30,6 +30,19 @@ services:
     build:
       context: ./backend
     environment:
+      # Optional common model-router profile; backend only, never a frontend build arg.
+      # RUNYOUR_API_KEY is read ONLY under the runyour profile: the backend copies it, in memory, into a routed
+      # capability whose key is blank and whose vendor resolved to RUNYOUR (RunyourRouterKeyPostProcessor).
+      # The SELLEROPS_<capability>_API_KEY lines below stay blank-by-default, so without the profile — or for a
+      # capability left on a direct vendor — the router key goes nowhere and a capability with no key stays off.
+      SPRING_PROFILES_INCLUDE: ${SPRING_PROFILES_INCLUDE:-}
+      RUNYOUR_API_KEY: ${RUNYOUR_API_KEY:-}
+      RUNYOUR_MODEL: ${RUNYOUR_MODEL:-anthropic/claude-opus-5-5}
+      RUNYOUR_CHECK_MODEL: ${RUNYOUR_CHECK_MODEL:-${RUNYOUR_MODEL:-anthropic/claude-opus-5-5}}
+      RUNYOUR_VISION_MODEL: ${RUNYOUR_VISION_MODEL:-${RUNYOUR_MODEL:-anthropic/claude-opus-5-5}}
+      RUNYOUR_EMBEDDING_MODEL: ${RUNYOUR_EMBEDDING_MODEL:-}
+      RUNYOUR_INPUT_USD_PER_MTOK: ${RUNYOUR_INPUT_USD_PER_MTOK:--1}
+      RUNYOUR_OUTPUT_USD_PER_MTOK: ${RUNYOUR_OUTPUT_USD_PER_MTOK:--1}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sellerops}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sellerops}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-sellerops_local_pw}
@@ -68,6 +81,36 @@ services:
       # Password reset delivery. Default off (the link is not sent and not logged). `dev-outbox`
       # writes the whole message to the log and deploy.sh refuses it on a pilot host.
       SELLEROPS_MAIL_MODE: ${SELLEROPS_MAIL_MODE:-off}
+      SELLEROPS_MAIL_FROM: ${SELLEROPS_MAIL_FROM:-no-reply@localhost}
+      # The SMTP server for mode=smtp, under Spring's own spring.mail.* names (MailerConfiguration). Written
+      # WITHOUT a value on purpose: compose passes a name only when the host env file sets it and leaves an
+      # unset name absent. A blank `${X:-}` would put spring.mail.host="" in the container, which still
+      # creates a mail sender — mode=smtp would boot with no server instead of refusing to (FINDINGS B188).
+      SPRING_MAIL_HOST:
+      SPRING_MAIL_PORT:
+      SPRING_MAIL_USERNAME:
+      SPRING_MAIL_PASSWORD:
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:
+      # The public origin every link that leaves the product is built from (password-reset mail, the intake-alert
+      # button). The pilot overlay sets it to https://PILOT_PUBLIC_HOST; the local default is the dev server.
+      SELLEROPS_PUBLIC_BASE_URL: ${SELLEROPS_PUBLIC_BASE_URL:-http://localhost:5173}
+      # Intake alerts (카카오톡 접수 알림, demo §7.63). mock = the in-service mock inbox, nothing leaves. A real
+      # 알림톡 needs mode=solapi AND live-enabled=true AND every SOLAPI value AND an https public base URL —
+      # missing any one records the delivery BLOCKED. Values live only in the host env file.
+      SELLEROPS_INTAKE_ALERT_MODE: ${SELLEROPS_INTAKE_ALERT_MODE:-mock}
+      SELLEROPS_INTAKE_ALERT_WORKER_ENABLED: ${SELLEROPS_INTAKE_ALERT_WORKER_ENABLED:-true}
+      SELLEROPS_INTAKE_ALERT_TICK_MS: ${SELLEROPS_INTAKE_ALERT_TICK_MS:-30000}
+      SELLEROPS_INTAKE_ALERT_PER_PASS_CAP: ${SELLEROPS_INTAKE_ALERT_PER_PASS_CAP:-5}
+      SELLEROPS_INTAKE_ALERT_RECOVERY_HOURS: ${SELLEROPS_INTAKE_ALERT_RECOVERY_HOURS:-48}
+      SELLEROPS_INTAKE_ALERT_OLD_AFTER_HOURS: ${SELLEROPS_INTAKE_ALERT_OLD_AFTER_HOURS:-72}
+      SELLEROPS_SOLAPI_LIVE_ENABLED: ${SELLEROPS_SOLAPI_LIVE_ENABLED:-false}
+      SELLEROPS_SOLAPI_BASE_URL: ${SELLEROPS_SOLAPI_BASE_URL:-https://api.solapi.com}
+      SELLEROPS_SOLAPI_API_KEY: ${SELLEROPS_SOLAPI_API_KEY:-}
+      SELLEROPS_SOLAPI_API_SECRET: ${SELLEROPS_SOLAPI_API_SECRET:-}
+      SELLEROPS_SOLAPI_PF_ID: ${SELLEROPS_SOLAPI_PF_ID:-}
+      SELLEROPS_SOLAPI_TEMPLATE_ID: ${SELLEROPS_SOLAPI_TEMPLATE_ID:-}
+      SELLEROPS_SOLAPI_SENDER_NUMBER: ${SELLEROPS_SOLAPI_SENDER_NUMBER:-}
       SELLEROPS_CONNECTOR_MOCK_ENABLED: ${SELLEROPS_CONNECTOR_MOCK_ENABLED:-false}
       SELLEROPS_CONNECTOR_MOCK_FALLBACK_ENABLED: ${SELLEROPS_CONNECTOR_MOCK_FALLBACK_ENABLED:-false}
       SELLEROPS_CONNECTOR_NAVER_ENABLED: ${SELLEROPS_CONNECTOR_NAVER_ENABLED:-false}

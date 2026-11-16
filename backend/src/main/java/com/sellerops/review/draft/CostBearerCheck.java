@@ -83,25 +83,51 @@ public final class CostBearerCheck {
     private static final Pattern DEFECT = Pattern.compile(
             "파손|불량|하자|오배송|잘못배송|잘못보내|잘못발송|누락|손상|찢어|찢겨|깨져|깨진|결함|판매자사유|판매자귀책|판매자과실|상품문제|제품문제");
     private static final Pattern CHANGE_OF_MIND = Pattern.compile("단순변심|변심|고객사유|고객귀책|마음이바뀌|마음이변");
+    /** An order sentence ends the carried case; 「구매자」 · 「주문자」 name who pays and do not (r4 review, 2026-11-15). */
+    private static final Pattern NEW_TOPIC = Pattern.compile("주문(?!자)|결제|출고|구매(?!자)");
 
     private CostBearerCheck() {
     }
 
-    /** The bearer statements of {@code text}, clause by clause, each with the kinds of its line or the line it falls under. */
+    /**
+     * The reply's bearer statements. A directly following cost sentence may keep the preceding remedy and case;
+     * another remedy, topic, intervening sentence or paragraph ends that context. No value or payer is inherited.
+     */
     public static List<Statement> statements(String text) {
+        return statements(text, true);
+    }
+
+    private static List<Statement> statements(String text, boolean reply) {
         List<Statement> out = new ArrayList<>();
         if (text == null || text.isBlank()) {
             return out;
         }
+        for (String paragraph : reply ? text.split("\\n\\s*\\n") : new String[] {text}) {
+            readParagraph(paragraph, reply, out);
+        }
+        return out;
+    }
+
+    private static void readParagraph(String text, boolean reply, List<Statement> out) {
         Set<Kind> heading = EnumSet.noneOf(Kind.class);
+        Set<Kind> previousKinds = EnumSet.noneOf(Kind.class);
+        Cause previousCause = null;
         for (String sentence : text.split("(?<=[.!?。])\\s+|\\n+")) {
-            Set<Kind> sentenceKinds = kindsOf(squash(sentence));
+            String squashed = squash(sentence);
+            Set<Kind> explicitKinds = kindsOf(squashed);
+            boolean continuation = reply && !previousKinds.isEmpty() && COST.matcher(squashed).find()
+                    && !NEW_TOPIC.matcher(squashed).find() && !mixed(squashed)
+                    && previousKinds.containsAll(explicitKinds); // the same remedy, or one of those just named
+            Set<Kind> sentenceKinds = explicitKinds;
             if (sentenceKinds.isEmpty()) {
                 sentenceKinds = heading;
             } else {
                 heading = sentenceKinds;
             }
-            Cause sentenceCause = causeOf(squash(sentence));
+            Cause sentenceCause = causeOf(squashed);
+            if (sentenceCause == null && continuation) {
+                sentenceCause = previousCause;
+            }
             // Not inside an amount: 「6,000원 고객 부담」 is one clause.
             for (String clause : sentence.split("(?<!\\d),|,(?!\\d)|;|(?<=이고|이며|지만)\\s")) {
                 String s = squash(clause);
@@ -117,8 +143,18 @@ public final class CostBearerCheck {
                 out.add(new Statement(clause.strip(), kinds.isEmpty() ? sentenceKinds : kinds,
                         cause != null ? cause : mixed(squash(sentence)) ? null : sentenceCause, bearer));
             }
+            if (reply) {
+                if ((!explicitKinds.isEmpty() || continuation) && !mixed(squashed)
+                        && !(explicitKinds.isEmpty() && NEW_TOPIC.matcher(squashed).find())) {
+                    previousKinds = sentenceKinds;
+                    previousCause = sentenceCause;
+                } else {
+                    previousKinds = EnumSet.noneOf(Kind.class);
+                    previousCause = null;
+                    heading = EnumSet.noneOf(Kind.class);
+                }
+            }
         }
-        return out;
     }
 
     /**
@@ -133,9 +169,17 @@ public final class CostBearerCheck {
         if (rules != null) {
             sources.addAll(rules);
         }
-        List<List<Statement>> read = sources.stream().map(s -> statements(s.text())).toList();
+        // A policy's earlier conditional instruction does not narrow its following general cost rule.
+        List<List<Statement>> read = sources.stream().map(s -> statements(s.text(), false)).toList();
         List<Finding> out = new ArrayList<>();
+        // A reply that never speaks of an exchange, a return or a refund is about an order's own shipping fee — 「7만원 이상
+        // 구매하시면 배송비는 무료입니다」 — which this reading does not decide (2026-11-15 real eval q10: every answer to the
+        // free-shipping question was held as an unclear 「배송비 판매자 부담」). Its figures stay with the figure check.
+        boolean aboutRemedy = reply != null && !kindsOf(squash(reply)).isEmpty();
         for (Statement said : statements(reply)) {
+            if (said.kinds().isEmpty() && !aboutRemedy) {
+                continue;
+            }
             String against = null;
             boolean same = false;
             boolean unclear = false;

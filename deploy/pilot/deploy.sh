@@ -68,12 +68,12 @@ fi
 case "$ENV_FILE" in "$REPO"/*) fail "$ENV_FILE is inside the repository — keep the pilot env outside the checkout (PILOT_ENV_FILE)";; esac
 case "$PILOT_PUBLIC_HOST" in localhost|127.0.0.1|*.local) fail "PILOT_PUBLIC_HOST is a development name ($PILOT_PUBLIC_HOST)";; esac
 # A model capability that is on but has no key fails the backend's own boot validator; failing here
-# names the variable instead of making an operator read a stack trace.
-for cap in AGENT_PLAN AGENT_DRAFT AGENT_JUDGE AGENT_CONVERSE AGENT_REPORT KNOWLEDGE_EMBEDDING KNOWLEDGE_INTENT KNOWLEDGE_ELIGIBILITY REVIEW_MEDIA_VISION \
-           INQUIRY_GOAL INQUIRY_DECISION INQUIRY_SIGNATURE RESPONSIBILITY_INVESTIGATION; do
-  e="SELLEROPS_${cap}_ENABLED"; k="SELLEROPS_${cap}_API_KEY"
-  if [[ "${!e:-false}" == "true" && -z "${!k:-}" ]]; then fail "$e=true but $k is blank"; fi
-done
+# names the variable instead of making an operator read a stack trace. WHICH key counts depends on the
+# route — each capability's own, or RUNYOUR_API_KEY under SPRING_PROFILES_INCLUDE=runyour — and is read
+# exactly as docker-compose.yml will hand it to the container (deploy/pilot/model-keys.sh, shared with
+# preflight.sh). The reply agent and AI triage key checks below are part of the same rule.
+. "$REPO/deploy/pilot/model-keys.sh"
+while IFS= read -r _problem; do [[ -n "$_problem" ]] && fail "$_problem"; done < <(model_key_problems)
 # The three retrieval capabilities are not widened by SELLEROPS_AGENT_ACCESS_SCOPE: they send the
 # customer's question to a vendor, and a seller does not ask for that by connecting a channel. So an
 # organisation list is not optional for them, and `*` is not a pilot answer. (The backend refuses the
@@ -113,8 +113,7 @@ done
 # The review reply agent borrows the draft capability's key and org list when its own are blank
 # (application.yml, docker-compose.yml), so its check reads both — the same «on with no key» and «*» refusals.
 if [[ "${SELLEROPS_AGENT_REPLY_ENABLED:-false}" == "true" ]]; then
-  [[ -n "${SELLEROPS_AGENT_REPLY_API_KEY:-${SELLEROPS_AGENT_DRAFT_API_KEY:-}}" ]] \
-    || fail "SELLEROPS_AGENT_REPLY_ENABLED=true but neither SELLEROPS_AGENT_REPLY_API_KEY nor SELLEROPS_AGENT_DRAFT_API_KEY is set"
+  # (its key: model_key_problems above)
   [[ "${SELLEROPS_AGENT_REPLY_ORG_IDS:-${SELLEROPS_AGENT_DRAFT_ORG_IDS:-}}" != "*" ]] \
     || fail "SELLEROPS_AGENT_REPLY_ORG_IDS=* would admit every organisation on this host"
 fi
@@ -124,8 +123,7 @@ fi
 # review list shows the rules-only tier, and no screen says why. `*` is its local single-user posture,
 # documented as such in AiTriagePilotProperties, and it is not a pilot answer here either.
 if [[ "${SELLEROPS_AI_TRIAGE_PILOT_ENABLED:-false}" == "true" ]]; then
-  [[ -n "${SELLEROPS_AI_TRIAGE_API_KEY:-}" ]] \
-    || fail "SELLEROPS_AI_TRIAGE_PILOT_ENABLED=true but SELLEROPS_AI_TRIAGE_API_KEY is blank — AI triage would classify nothing and say nothing"
+  # (its key: model_key_problems above)
   [[ -n "${SELLEROPS_AI_TRIAGE_PILOT_ORG_IDS:-}" ]] \
     || fail "SELLEROPS_AI_TRIAGE_PILOT_ENABLED=true but SELLEROPS_AI_TRIAGE_PILOT_ORG_IDS is blank — name the pilot organisation (the UUID exists after the first signup; deploy once with the pilot off, then set both and deploy again)"
   [[ "${SELLEROPS_AI_TRIAGE_PILOT_ORG_IDS}" != "*" ]] \
@@ -169,6 +167,13 @@ esac
 case "${SELLEROPS_MAIL_MODE:-off}" in
   dev-outbox) fail "SELLEROPS_MAIL_MODE=dev-outbox logs full mail bodies (password reset links)" ;;
 esac
+# smtp needs a server. compose passes SPRING_MAIL_* only when this file sets them; a set-but-empty host
+# still creates Spring's mail sender, so the backend would boot and every reset mail would fail later.
+if [[ "$(printf '%s' "${SELLEROPS_MAIL_MODE:-off}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" == "smtp" ]]; then
+  [[ -n "${SPRING_MAIL_HOST:-}" ]] || fail "SELLEROPS_MAIL_MODE=smtp needs SPRING_MAIL_HOST (the SMTP server)"
+  [[ -n "${SELLEROPS_MAIL_FROM:-}" && "${SELLEROPS_MAIL_FROM}" != *@localhost ]] \
+    || fail "SELLEROPS_MAIL_MODE=smtp needs SELLEROPS_MAIL_FROM (a real sender address, not no-reply@localhost)"
+fi
 
 if [[ "${PILOT_GUIDED_HELPER_ENABLED:-false}" == "true" ]]; then
   # The helper runs on the SELLER's machine. A non-loopback bridge URL would point every seller's

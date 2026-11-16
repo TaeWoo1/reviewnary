@@ -64,16 +64,13 @@ class RunyourTriageVendorTest {
     }
 
     @Test
-    @DisplayName("RUNYOUR is for the evaluation harness only: the production gate refuses it, and only it (2026-11-07)")
-    void theProductionGateRefusesTheRelay() {
+    @DisplayName("the owner-approved router is available behind the same production channel gate (2026-11-15)")
+    void theProductionGateAdmitsTheRouter() {
         ApiTriageClassifier.Tuning tuning = new ApiTriageClassifier.Tuning(false, 4000, null);
-        assertThatThrownBy(() -> ReviewTriageChannelGate.forApi(ApiTriageClassifier.Vendor.RUNYOUR, "m", "k", tuning))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("evaluation harness only");
         for (ApiTriageClassifier.Vendor v : ApiTriageClassifier.Vendor.values()) {
-            assertThat(v.evalOnly()).as(v.name()).isEqualTo(v == ApiTriageClassifier.Vendor.RUNYOUR);
-            if (!v.evalOnly()) {
-                assertThat(ReviewTriageChannelGate.forApi(v, "m", "k", tuning).version()).contains(v.name().toLowerCase());
-            }
+            assertThat(ReviewTriageChannelGate.forApi(v, "m", "k", tuning).version()).contains(v.name().toLowerCase());
         }
+        assertThatThrownBy(() -> ReviewTriageChannelGate.forApi(null, "m", "k", tuning))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

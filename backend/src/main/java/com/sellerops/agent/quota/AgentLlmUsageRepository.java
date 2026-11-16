@@ -57,10 +57,11 @@ public interface AgentLlmUsageRepository extends JpaRepository<AgentLlmUsage, UU
 
     /**
      * Input and output tokens of the org's calls since {@code since}, and how many were charged without tokens yet — a
-     * call still running, or one whose meter could not write (DevLlmBudget counts those at their worst case).
+     * call still running, or one whose meter could not write (DevLlmBudget counts those at their worst case). A call with
+     * either count unreported is counted apart as well (2026-11-15): half a usage block is not the call's price.
      */
     @Query("select coalesce(sum(u.inputTokens), 0), coalesce(sum(u.outputTokens), 0), "
-            + "coalesce(sum(case when u.inputTokens is null and u.outputTokens is null then 1 else 0 end), 0) "
+            + "coalesce(sum(case when u.inputTokens is null or u.outputTokens is null then 1 else 0 end), 0) "
             + "from AgentLlmUsage u where u.orgId = :orgId and u.createdAt >= :since")
     java.util.List<Object[]> spentSince(@Param("orgId") UUID orgId, @Param("since") java.time.Instant since);
 }

@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -75,7 +76,10 @@ public class KnowledgeDocumentService {
      * @param sourceType for a PRODUCT document, which kind it is (FAQ / USAGE / POLICY / DESCRIPTION)
      * @param orgType    for an ORG document, which operating topic it states
      * @throws ApiException 400 on a format this cannot read, a file too large, or a document with no
-     *                      readable text; 404 when the product is not this org's
+     *                      readable text; 404 when the product is not this org's; 409 {@link #DOCUMENT_EXISTS} when
+     *                      the title is taken where titles are unique — company-wide per org (V72), a product's per
+     *                      product (V64) — the existing one is left exactly as it was and the seller is sent to its
+     *                      「파일 바꾸기」
      */
     @Transactional
     public KnowledgeDocumentView importDocument(UUID orgId, Scope scope, UUID productId,
@@ -88,6 +92,12 @@ public class KnowledgeDocumentService {
             Product product = products.findById(productId)
                     .filter(p -> p.getOrgId().equals(orgId))
                     .orElseThrow(() -> ApiException.notFound("상품을 찾을 수 없습니다."));
+            // A product's title is unique within that product (V64); the same title on another product is fine.
+            ProductKnowledgeSource sameTitle = productSources
+                    .findByOrgIdAndProductIdAndTitle(orgId, product.getId(), title).orElse(null);
+            if (sameTitle != null) {
+                throw alreadyThere(title, sameTitle.getDocumentName() != null);
+            }
             ProductKnowledgeSource source = new ProductKnowledgeSource();
             source.setOrgId(orgId);
             source.setProductId(product.getId());
@@ -99,9 +109,23 @@ public class KnowledgeDocumentService {
             source.setBody(text);
             source.setAuthorUserId(actorUserId);
             source.setAuthorName(actorName);
-            ProductKnowledgeSource saved = productSources.save(source);
+            ProductKnowledgeSource saved;
+            try {
+                saved = productSources.saveAndFlush(source);
+            } catch (DataIntegrityViolationException raced) {
+                if (!violates(raced, PRODUCT_TITLE_UNIQUE)) {
+                    throw raced;
+                }
+                throw alreadyThere(title, true);
+            }
             int passages = productIndexer.index(saved);
             return view(saved, passages, product);
+        }
+        // A company-wide title is unique per org (V72). Re-uploading a file of the same name is the common way to
+        // reach it while keeping manuals up to date: say so and point at 「파일 바꾸기」 instead of overwriting.
+        OrgKnowledgeSource sameTitle = orgSources.findByOrgIdAndTitle(orgId, title).orElse(null);
+        if (sameTitle != null) {
+            throw alreadyThere(title, sameTitle.getDocumentName() != null);
         }
         OrgKnowledgeSource source = new OrgKnowledgeSource();
         source.setOrgId(orgId);
@@ -112,15 +136,120 @@ public class KnowledgeDocumentService {
         source.setBody(text);
         source.setAuthorUserId(actorUserId);
         source.setAuthorName(actorName);
-        OrgKnowledgeSource saved = orgSources.save(source);
+        OrgKnowledgeSource saved;
+        try {
+            // Flushed here so that two uploads of the same name at once meet the index inside this method.
+            saved = orgSources.saveAndFlush(source);
+        } catch (DataIntegrityViolationException raced) {
+            if (!violates(raced, ORG_TITLE_UNIQUE)) {
+                throw raced;
+            }
+            throw alreadyThere(title, true);
+        }
         int passages = orgKnowledge.index(saved);
         return view(saved, passages);
+    }
+
+    /** The closed name a screen can branch on when an upload meets an existing company-wide title. */
+    public static final String DOCUMENT_EXISTS = "KNOWLEDGE_DOCUMENT_EXISTS";
+
+    static final String ORG_TITLE_UNIQUE = "uq_org_knowledge_sources_title";
+
+    static final String PRODUCT_TITLE_UNIQUE = "uq_pk_sources_title";
+
+    static ApiException alreadyThere(String title, boolean isUploadedFile) {
+        return ApiException.conflict(DOCUMENT_EXISTS, isUploadedFile
+                ? "이미 있는 자료입니다(「" + title + "」). 기존 자료의 「파일 바꾸기」를 이용해 주세요."
+                : "같은 제목의 운영 기준이 이미 있습니다(「" + title + "」). 파일 이름을 바꿔 올리거나 그 기준을 고쳐 주세요.");
+    }
+
+    /** Whether this failure is the named unique index — any other integrity failure stays what it was. */
+    static boolean violates(Throwable failure, String constraint) {
+        for (Throwable t = failure; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            if (t instanceof org.hibernate.exception.ConstraintViolationException c
+                    && constraint.equalsIgnoreCase(c.getConstraintName())) {
+                return true;
+            }
+            if (t.getMessage() != null && t.getMessage().contains(constraint)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private com.sellerops.product.library.ProductKnowledgeRevisionRepository productRevisions;
+
+    /** Where a product document's past body is kept when a new file replaces it (V190). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setProductRevisions(com.sellerops.product.library.ProductKnowledgeRevisionRepository productRevisions) {
+        this.productRevisions = productRevisions;
+    }
+
+    /**
+     * <b>파일 바꾸기</b> (2026-11-16): the same document, from a new file.
+     *
+     * <p>The seller's material changes often — a new price, a new schedule — and uploading the new file beside the old
+     * one leaves two documents to keep straight. This puts the new file's text into the SAME source: the same id (so a
+     * citation, a 적용일 and a conflict decision keep pointing at it), the same kind, the same product or company scope,
+     * and the same 사용 여부 — a document the seller turned off stays off. The version rises and the old text is kept as
+     * a revision when the text changed (V164 · V190), and the passages are re-cut, so a draft that cited the old text is
+     * read as changed by the existing recheck.
+     *
+     * <p><b>All or nothing.</b> The file is read before anything is looked up or written: a format this cannot read, a
+     * scan, an empty file or a document from another company changes nothing at all.
+     *
+     * @throws ApiException 400 when the file cannot be read (the reader's own sentence), 404 when the id is not an
+     *                      uploaded document of this org
+     */
+    @Transactional
+    public KnowledgeDocumentView replaceFile(UUID orgId, UUID sourceId, String filename, byte[] bytes) {
+        String text = KnowledgeDocumentText.extract(filename, bytes);
+        ProductKnowledgeSource product = productSources.findByIdAndOrgId(sourceId, orgId)
+                .filter(s -> s.getDocumentName() != null).orElse(null);
+        if (product != null) {
+            com.sellerops.product.library.ProductKnowledgeRevision before =
+                    com.sellerops.product.library.ProductKnowledgeRevision.of(product, java.time.Instant.now());
+            product.setBody(text);
+            product.setDocumentName(filename);
+            if (!text.equals(before.getBody())) {
+                if (productRevisions != null) {
+                    productRevisions.save(before);
+                }
+                product.setVersion(product.getVersion() + 1);
+            }
+            ProductKnowledgeSource saved = productSources.save(product);
+            int passages = productIndexer.index(saved);
+            return view(saved, passages, products.findById(saved.getProductId()).orElse(null));
+        }
+        OrgKnowledgeSource org = orgSources.findByIdAndOrgId(sourceId, orgId)
+                .filter(s -> s.getDocumentName() != null)
+                .orElseThrow(() -> ApiException.notFound("자료를 찾을 수 없습니다."));
+        orgKnowledge.replaceBody(orgId, org.getId(), text, filename);
+        OrgKnowledgeSource saved = orgSources.findByIdAndOrgId(sourceId, orgId).orElseThrow();
+        return view(saved, orgChunks.countBySourceId(saved.getId()));
     }
 
     /** Every uploaded document this org has, product and org corpora together, newest first. */
     @Transactional(readOnly = true)
     public List<KnowledgeDocumentView> list(UUID orgId) {
-        return everything(orgId);
+        return dated(orgId, everything(orgId));
+    }
+
+    private com.sellerops.knowledge.currency.KnowledgeSourceCurrencyRepository currency;
+
+    /** Where a document's 적용일 is kept (2026-11-15). Optional: without it no 적용일 is shown. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setCurrency(com.sellerops.knowledge.currency.KnowledgeSourceCurrencyRepository currency) {
+        this.currency = currency;
+    }
+
+    private List<KnowledgeDocumentView> dated(UUID orgId, List<KnowledgeDocumentView> views) {
+        if (currency == null) {
+            return views;
+        }
+        java.util.Map<UUID, java.time.LocalDate> from = new java.util.HashMap<>();
+        currency.findAllByOrgId(orgId).forEach(c -> from.put(c.getSourceId(), c.getEffectiveFrom()));
+        return views.stream().map(v -> v.withEffectiveFrom(from.get(v.sourceId()))).toList();
     }
 
     /**
@@ -142,7 +271,7 @@ public class KnowledgeDocumentService {
             out.add(view(source, chunkCountOf(source), product));
         }
         out.sort((a, b) -> b.uploadedAt().compareTo(a.uploadedAt()));
-        return List.copyOf(out);
+        return dated(orgId, List.copyOf(out));
     }
 
     private List<KnowledgeDocumentView> everything(UUID orgId) {
@@ -213,12 +342,14 @@ public class KnowledgeDocumentService {
         return new KnowledgeDocumentView(source.getId(), "PRODUCT", source.getProductId(),
                 product == null ? null : OperatorProductName.displayNameOrNull(product),
                 source.getDocumentName(), source.getTitle(), source.getSourceType().name(),
-                source.isActive(), passages, source.getAuthorName(), source.getCreatedAt());
+                source.isActive(), passages, source.getAuthorName(), source.getCreatedAt(), source.getVersion(),
+                source.getUpdatedAt());
     }
 
     private static KnowledgeDocumentView view(OrgKnowledgeSource source, int passages) {
         return new KnowledgeDocumentView(source.getId(), "ORG", null, null,
                 source.getDocumentName(), source.getTitle(), source.getKnowledgeType().name(),
-                source.isActive(), passages, source.getAuthorName(), source.getCreatedAt());
+                source.isActive(), passages, source.getAuthorName(), source.getCreatedAt(), source.getVersion(),
+                source.getUpdatedAt());
     }
 }

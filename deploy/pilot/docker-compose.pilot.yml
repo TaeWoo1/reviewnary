@@ -30,6 +30,8 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: ${SELLEROPS_JAVA_TOOL_OPTIONS:--Xms256m -Xmx1024m -XX:+UseSerialGC -XX:MaxMetaspaceSize=256m}
       SELLEROPS_CORS_ORIGIN: https://${PILOT_PUBLIC_HOST:?PILOT_PUBLIC_HOST is required}
+      # Links that leave the product (password reset, the intake-alert button) point at the site itself.
+      SELLEROPS_PUBLIC_BASE_URL: https://${PILOT_PUBLIC_HOST}
       SELLEROPS_CONNECTOR_CAFE24_REDIRECT_URI: ${SELLEROPS_CONNECTOR_CAFE24_REDIRECT_URI:-https://${PILOT_PUBLIC_HOST}/api/connect/cafe24/callback}
       SELLEROPS_CONNECTOR_CAFE24_RESULT_URL: ${SELLEROPS_CONNECTOR_CAFE24_RESULT_URL:-https://${PILOT_PUBLIC_HOST}/connect/cafe24/result}
 

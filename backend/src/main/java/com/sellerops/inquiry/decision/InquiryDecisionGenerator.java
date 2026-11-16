@@ -44,11 +44,25 @@ public class InquiryDecisionGenerator {
     private final InquiryDecisionProperties properties;
     /** The vendor's spelling of the call (2026-10-29): the prompts, schemas and parsers below are the capability's own. */
     private final LlmWire wire;
+    /** The evaluation's diagnostics (B178) — off everywhere but a synthetic evaluation that names a directory. */
+    private EvalDecisionTrace trace;
 
     InquiryDecisionGenerator(AgentLlmTransport transport, InquiryDecisionProperties properties) {
         this.transport = transport;
         this.properties = properties;
         this.wire = LlmWire.of(properties.vendor());
+    }
+
+    void setTrace(EvalDecisionTrace trace) {
+        this.trace = trace;
+    }
+
+    private void traced(String phase, String body, Envelope env, String failure, String detail,
+                        AgentLlmCallMetrics metrics) {
+        if (trace != null && trace.enabled()) {
+            trace.record(phase, body, failure, detail, env.finish(), metrics.promptTokens(), metrics.completionTokens(),
+                    env.content() != null ? env.content() : env.said());
+        }
     }
 
     private AgentLlmTransport.Response post(String body) {
@@ -59,11 +73,13 @@ public class InquiryDecisionGenerator {
         AgentLlmTransport.Response response = post(body);
         AgentLlmCallMetrics metrics = AgentLlmCallMetrics.of(response);
         Envelope env = Envelope.of(wire, response);
-        List<InquiryNeed> needs = env.failure() == null ? parsePlan(env.content()) : null;
+        PlanRead read = env.failure() == null ? readPlan(env.content()) : new PlanRead(null, env.failure());
+        List<InquiryNeed> needs = read.needs();
         String failure = env.failure() != null ? env.failure() : needs == null ? "UNPARSEABLE" : null;
-        log.info("inquiry_decision phase=plan orgId={} format={} answered={} failure={} finish={} needs={} {}", orgId,
-                properties.outputFormat(), failure == null, failure, env.finish(), needs == null ? -1 : needs.size(),
-                metrics.toLogFields());
+        log.info("inquiry_decision phase=plan orgId={} format={} answered={} failure={} detail={} finish={} needs={} {}",
+                orgId, properties.outputFormat(), failure == null, failure, read.detail(), env.finish(),
+                needs == null ? -1 : needs.size(), metrics.toLogFields());
+        traced("plan", body, env, failure, read.detail(), metrics);
         return new InquiryDecisionModel.Answer<>(needs, cost(metrics), failure);
     }
 
@@ -79,11 +95,12 @@ public class InquiryDecisionGenerator {
         Judged judged = env.failure() != null ? new Judged(null, env.failure())
                 : InquiryDecisionPrompt.JUDGE_V3.equals(properties.judgePrompt()) ? parseKeyedJudge(env.content(), needIds)
                 : parseJudge(env.content(), needIds);
-        log.info("inquiry_decision phase=judge orgId={} prompt={} effort={} format={} answered={} failure={} finish={}"
-                        + " needs={} evidence={} precedents={} verdicts={} {}", orgId, properties.judgePrompt(),
+        log.info("inquiry_decision phase=judge orgId={} prompt={} effort={} format={} answered={} failure={} detail={}"
+                        + " finish={} needs={} evidence={} precedents={} verdicts={} {}", orgId, properties.judgePrompt(),
                 properties.judgeReasoningEffort(), properties.outputFormat(), judged.failure() == null,
-                judged.failure(), env.finish(), needIds.size(), evidence, precedents,
+                judged.failure(), judged.detail(), env.finish(), needIds.size(), evidence, precedents,
                 judged.verdicts() == null ? -1 : judged.verdicts().size(), metrics.toLogFields());
+        traced("judge", body, env, judged.failure(), judged.detail(), metrics);
         return new InquiryDecisionModel.Answer<>(judged.verdicts(), cost(metrics), judged.failure());
     }
 
@@ -155,8 +172,18 @@ public class InquiryDecisionGenerator {
 
     }
 
-    /** A verdict set, or why there is none. */
-    record Judged(Map<String, NeedVerdict> verdicts, String failure) {
+    /**
+     * A verdict set, or why there is none: {@code failure} is the closed word callers act on (unchanged), {@code detail}
+     * which of the reader's refusals produced it (B178) — for the log line and the evaluation's diagnostics only.
+     */
+    record Judged(Map<String, NeedVerdict> verdicts, String failure, String detail) {
+        Judged(Map<String, NeedVerdict> verdicts, String failure) {
+            this(verdicts, failure, failure);
+        }
+    }
+
+    /** A plan, or which of the reader's refusals there was ({@code detail}); {@code needs} null exactly when refused. */
+    record PlanRead(List<InquiryNeed> needs, String detail) {
     }
 
     private static InquiryDecisionModel.CallCost cost(AgentLlmCallMetrics m) {
@@ -168,20 +195,38 @@ public class InquiryDecisionGenerator {
      * leave a need the judge never saw, and a Case could then be completed without it.
      */
     static List<InquiryNeed> parsePlan(String content) {
+        return readPlan(content).needs();
+    }
+
+    /**
+     * {@link #parsePlan}'s one reading, with which refusal it was (B178): {@code EMPTY} · {@code JSON_SYNTAX} ·
+     * {@code NO_NEEDS_ARRAY} · {@code UNKNOWN_TYPE} · {@code BLANK_ASK} · {@code READ_ERROR}. What is accepted is exactly
+     * what was accepted before — the detail only names the refusal that already happened.
+     */
+    static PlanRead readPlan(String content) {
         try {
             if (content == null || content.isBlank()) {
-                return null;
+                return new PlanRead(null, "EMPTY");
             }
-            JsonNode needs = MAPPER.readTree(content).path("needs");
+            JsonNode root;
+            try {
+                root = MAPPER.readTree(content);
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                return new PlanRead(null, "JSON_SYNTAX");
+            }
+            JsonNode needs = root.path("needs");
             if (!needs.isArray()) {
-                return null;
+                return new PlanRead(null, "NO_NEEDS_ARRAY");
             }
             List<InquiryNeed> out = new ArrayList<>();
             for (JsonNode n : needs) {
                 NeedType type = NeedType.parse(n.path("type").asText(null));
                 String ask = n.path("ask").asText("").strip();
-                if (type == null || ask.isEmpty()) {
-                    return null;
+                if (type == null) {
+                    return new PlanRead(null, "UNKNOWN_TYPE");
+                }
+                if (ask.isEmpty()) {
+                    return new PlanRead(null, "BLANK_ASK");
                 }
                 if (ask.length() > MAX_ASK) {
                     ask = ask.substring(0, MAX_ASK);
@@ -189,9 +234,9 @@ public class InquiryDecisionGenerator {
                 String search = n.path("search").asText("").strip();
                 out.add(new InquiryNeed("N" + (out.size() + 1), ask, type, search.isEmpty() ? ask : search));
             }
-            return List.copyOf(out);
+            return new PlanRead(List.copyOf(out), null);
         } catch (Exception e) {
-            return null;
+            return new PlanRead(null, "READ_ERROR");
         }
     }
 
@@ -211,22 +256,27 @@ public class InquiryDecisionGenerator {
         try {
             verdicts = MAPPER.readTree(content).path("verdicts");
         } catch (Exception e) {
-            return new Judged(null, "UNPARSEABLE");
+            return new Judged(null, "UNPARSEABLE", "JSON_SYNTAX");
         }
         if (!verdicts.isArray()) {
-            return new Judged(null, "UNPARSEABLE");
+            return new Judged(null, "UNPARSEABLE", "NO_VERDICTS_ARRAY");
         }
         Set<String> expected = new HashSet<>(needIds);
         Set<String> seen = new HashSet<>();
         for (JsonNode v : verdicts) {
             String need = v.path("need").asText("");
-            if (!expected.contains(need) || !seen.add(need)
-                    || NeedStatus.parseJudge(v.path("status").asText(null)) == null) {
-                return new Judged(null, "VERDICT_SET");
+            if (!expected.contains(need)) {
+                return new Judged(null, "VERDICT_SET", "UNKNOWN_NEED");
+            }
+            if (!seen.add(need)) {
+                return new Judged(null, "VERDICT_SET", "DUPLICATE_NEED");
+            }
+            if (NeedStatus.parseJudge(v.path("status").asText(null)) == null) {
+                return new Judged(null, "VERDICT_SET", "BAD_STATUS");
             }
         }
         if (!seen.equals(expected)) {
-            return new Judged(null, "VERDICT_SET");
+            return new Judged(null, "VERDICT_SET", "MISSING_NEED");
         }
         return new Judged(parseJudge(content), null);
     }
@@ -249,13 +299,13 @@ public class InquiryDecisionGenerator {
         try {
             verdicts = STRICT.readTree(content).path("verdicts");
         } catch (com.fasterxml.jackson.core.JsonParseException e) {
-            return new Judged(null, e.getOriginalMessage() != null && e.getOriginalMessage().startsWith("Duplicate field")
-                    ? "VERDICT_SET" : "UNPARSEABLE");
+            boolean doubled = e.getOriginalMessage() != null && e.getOriginalMessage().startsWith("Duplicate field");
+            return new Judged(null, doubled ? "VERDICT_SET" : "UNPARSEABLE", doubled ? "DUPLICATE_KEY" : "JSON_SYNTAX");
         } catch (Exception e) {
-            return new Judged(null, "UNPARSEABLE");
+            return new Judged(null, "UNPARSEABLE", "JSON_SYNTAX");
         }
         if (!verdicts.isObject()) {
-            return new Judged(null, "UNPARSEABLE");
+            return new Judged(null, "UNPARSEABLE", "NO_VERDICTS_OBJECT");
         }
         com.fasterxml.jackson.databind.node.ArrayNode list = MAPPER.createArrayNode();
         verdicts.fields().forEachRemaining(e -> {

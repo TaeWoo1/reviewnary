@@ -137,6 +137,24 @@ public class KnowledgeAcquisitionController {
      * <p>Retiring is not deleting: the row stays so every citation that stood on it still resolves, and
      * what changes is that a superseded manual stops grounding new answers.
      */
+    /**
+     * 파일 바꾸기 (2026-11-16): the same document from a new file — same id, kind, scope and 사용 여부; version and history
+     * move, passages are re-cut. A file that cannot be read changes nothing.
+     */
+    @PostMapping(path = "/documents/{sourceId}/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public KnowledgeDocumentView replaceDocumentFile(@AuthenticationPrincipal AuthPrincipal principal,
+                                                     @PathVariable UUID sourceId,
+                                                     @RequestParam("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw ApiException.badRequest("파일이 비어 있습니다.");
+        }
+        try {
+            return documents.replaceFile(principal.orgId(), sourceId, file.getOriginalFilename(), file.getBytes());
+        } catch (IOException e) {
+            throw ApiException.badRequest("파일을 읽지 못했습니다.");
+        }
+    }
+
     @PostMapping("/documents/{sourceId}/active")
     public KnowledgeDocumentView setActive(@AuthenticationPrincipal AuthPrincipal principal,
                                            @PathVariable UUID sourceId,

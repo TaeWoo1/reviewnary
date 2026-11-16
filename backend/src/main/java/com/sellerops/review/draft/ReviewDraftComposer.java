@@ -844,23 +844,35 @@ public class ReviewDraftComposer {
                 : com.sellerops.agent.quota.AgentUsageActor.RUN;
     }
 
+    /** A review drafter's call, its time and tokens on the row charged for it — as the inquiry drafter's are. */
+    private Optional<String> metered(UUID usageId, java.util.function.Supplier<Optional<String>> call) {
+        com.sellerops.agent.llm.AgentLlmCallCapture.Captured<Optional<String>> captured =
+                com.sellerops.agent.llm.AgentLlmCallCapture.capture(call);
+        if (captured.metrics() != null) {
+            quota.recordOutcome(usageId, captured.metrics().elapsedMs(), captured.metrics().promptTokens(),
+                    captured.metrics().completionTokens());
+        }
+        return captured.value();
+    }
+
     private Written writeGrounded(UUID orgId, com.sellerops.agent.quota.AgentUsageActor actor, String reviewBody,
                                   List<ScopedPassage> passages, java.util.Set<UUID> candidates,
                                   String voice, AgentDraftGenerator.ReviewMood mood) {
         if (!model.isEnabledFor(orgId)) {
             return new Written(null, CAPABILITY_OFF);
         }
-        QuotaDecision decision = quota.consume(orgId, AgentUsageKind.DRAFT, null, actor);
-        if (!decision.allowed()) {
-            return new Written(null, decision.messageKo());
+        com.sellerops.agent.quota.AgentQuotaService.Charge charge =
+                quota.consumeCharge(orgId, AgentUsageKind.DRAFT, null, actor, 0);
+        if (!charge.decision().allowed()) {
+            return new Written(null, charge.decision().messageKo());
         }
         // The company's absolute bans go into the request as quoted data (owner decision 2026-10-23); the check after
         // generation still holds, since a request is only a request.
         List<String> banned = styleGuard == null ? List.of() : styleGuard.enforced(orgId);
         // How the seller wants to sound — set in 답변 스타일 (owner, 2026-10-27).
         String manner = styleGuard == null ? null : styleGuard.manner(orgId);
-        Optional<String> written = model.draftReviewReply(orgId, reviewBody, passagesFor(passages, candidates), voice, banned,
-                mood, manner);
+        Optional<String> written = metered(charge.usageId(), () -> model.draftReviewReply(orgId, reviewBody,
+                passagesFor(passages, candidates), voice, banned, mood, manner));
         if (written.isEmpty()) {
             return new Written(null, MODEL_FAILED);
         }
@@ -884,11 +896,13 @@ public class ReviewDraftComposer {
             backing.add(voice);
         }
         List<String> sayings = com.sellerops.inquiry.draft.InquiryClaimGuard.unbackedSayings(candidate, backing);
-        if ((!found.isEmpty() || !sayings.isEmpty()) && quota.consume(orgId, AgentUsageKind.DRAFT, null, actor).allowed()) {
+        com.sellerops.agent.quota.AgentQuotaService.Charge retry = !found.isEmpty() || !sayings.isEmpty()
+                ? quota.consumeCharge(orgId, AgentUsageKind.DRAFT, null, actor, 0) : null;
+        if (retry != null && retry.decision().allowed()) {
             List<String> bans = new ArrayList<>(styleGuard == null ? List.of() : styleGuard.enforced(orgId));
             bans.addAll(sayings);
-            Optional<String> again = model.draftReviewReply(orgId, reviewBody, passagesFor(passages, candidates), voice,
-                    bans, mood, manner);
+            Optional<String> again = metered(retry.usageId(), () -> model.draftReviewReply(orgId, reviewBody,
+                    passagesFor(passages, candidates), voice, bans, mood, manner));
             if (again.isPresent() && refusalOf(again.get(), current, reviewBody) == null
                     && com.sellerops.inquiry.draft.InquiryClaimGuard.unbackedSayings(again.get(), backing).isEmpty()) {
                 candidate = again.get();
@@ -936,10 +950,10 @@ public class ReviewDraftComposer {
                 || !ReviewClaimGuard.unsupportedConditions(candidate, current, reviewBody).isEmpty()) {
             return UNSUPPORTED_CLAIM;
         }
-        if (!ReviewClaimGuard.contradictedPromises(candidate, current).isEmpty()) {
+        if (!ReviewClaimGuard.contradictedPromises(candidate, current, reviewBody).isEmpty()) {
             return CONTRADICTED_CLAIM;
         }
-        if (!ReviewClaimGuard.undecidedPromises(candidate, current).isEmpty()) {
+        if (!ReviewClaimGuard.undecidedPromises(candidate, current, reviewBody).isEmpty()) {
             return UNDECIDED_CLAIM;
         }
         if (!ReviewClaimGuard.droppedConditions(candidate, current, reviewBody).isEmpty()) {

@@ -111,7 +111,7 @@ public final class InquiryDecisionEngine {
             return NeedDecision.failed(NeedDecision.Outcome.JUDGE_FAILED, cost, detail);
         }
         List<NeedResult> results = NeedAggregation.enforce(needs, judged.value(), evidence, precedents, detail,
-                caseScope);
+                caseScope, question);
         if (authority != null) {
             results = com.sellerops.inquiry.authority.AuthorityFence.apply(results, authority);
         }

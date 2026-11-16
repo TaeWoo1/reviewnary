@@ -115,11 +115,30 @@ public class ProductKnowledgeLibraryService {
         return view(saved, count, variantNames(orgId, productId).get(saved.getVariantId()));
     }
 
+    private ProductKnowledgeRevisionRepository revisions;
+
+    /** Where a past body is kept when an edit changes it (V190). Optional, as the company corpus's is. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setRevisions(ProductKnowledgeRevisionRepository revisions) {
+        this.revisions = revisions;
+    }
+
+    /**
+     * Edit one product document. As the company corpus does since V164: the version rises only when the BODY changed, and
+     * the revision it replaces is kept as it stood (V190), so a draft that cited it can be read against what it said.
+     */
     @Transactional
     public KnowledgeSourceView update(UUID orgId, UUID sourceId, KnowledgeSourceRequest request) {
         ProductKnowledgeSource source = sources.findByIdAndOrgId(sourceId, orgId)
                 .orElseThrow(() -> ApiException.notFound("지식 문서를 찾을 수 없습니다."));
+        ProductKnowledgeRevision before = ProductKnowledgeRevision.of(source, java.time.Instant.now());
         apply(source, request, orgId, source.getProductId());
+        if (!source.getBody().equals(before.getBody())) {
+            if (revisions != null) {
+                revisions.save(before);
+            }
+            source.setVersion(source.getVersion() + 1);
+        }
         ProductKnowledgeSource saved = sources.save(source);
         int count = reindex(saved);
         return view(saved, count,

@@ -31,6 +31,7 @@ export function KnowledgeDocumentList({
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   if (documents.length === 0) {
     return (
@@ -43,43 +44,97 @@ export function KnowledgeDocumentList({
   return (
     <>
       {error ? <p className="break-keep pt-2 text-sm text-bad" role="alert">{error}</p> : null}
+      {notice ? (
+        <p className="break-keep pt-2 text-sm text-ink" role="status" data-testid="knowledge-document-replaced">
+          {notice}
+        </p>
+      ) : null}
       {/* 위의 두 표와 같은 문법 — 한 줄에 한 건, 열은 그 자료에 대해 사람이 답할 수 있는 것들.
           aria-hidden: 각 칸이 제 이름을 달고 있어 한 줄이 하나의 객체로 읽힌다. */}
       <div
         aria-hidden="true"
-        className="flex items-center gap-4 pb-1 text-xs text-muted"
+        className="hidden items-center gap-4 pb-1 text-xs text-muted sm:flex"
       >
         <span className="min-w-0 flex-1">자료</span>
         <span className="w-[110px] shrink-0">종류</span>
         <span className="w-[230px] shrink-0">적용 범위</span>
         <span className="w-[150px] shrink-0">올린 사람</span>
         <span className="w-[96px] shrink-0 text-right">올린 날짜</span>
-        <span className="w-[88px] shrink-0 whitespace-nowrap" />
+        <span className="w-[184px] shrink-0 whitespace-nowrap" />
       </div>
       <ul data-testid="knowledge-documents">
         {documents.map((document) => (
-          <li key={document.sourceId} className="flex items-center gap-4 border-t border-line/70 py-2">
-            <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
-              {document.fileName ?? document.title}
-              {document.passages === 0 ? <span className="ml-2 text-xs text-warn">내용 없음</span> : null}
-              {document.active ? null : <span className="ml-2 text-xs text-muted">사용 안 함</span>}
+          <li
+            key={document.sourceId}
+            className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line/70 py-2 sm:flex-nowrap"
+          >
+            {/* 휴대폰에서는 한 줄에 다 들어가지 않는다(열 너비 합이 화면보다 넓다): 이름과 적용일이 첫 줄, 나머지가
+                그 아래 한 줄로 내려간다. 넓은 화면은 지금까지의 표 그대로다. */}
+            <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
+              <span className="block truncate text-sm font-medium text-ink">
+                {document.fileName ?? document.title}
+                {document.passages === 0 ? <span className="ml-2 text-xs text-warn">내용 없음</span> : null}
+                {document.active ? null : <span className="ml-2 text-xs text-muted">사용 안 함</span>}
+              </span>
+              {(document.version ?? 1) > 1 && document.updatedAt ? (
+                <span className="block text-xs text-muted" data-testid="knowledge-document-revision">
+                  {document.version}판 · {kstDate(document.updatedAt)} 파일 바꿈
+                </span>
+              ) : null}
+              <EffectiveFrom document={document} onChanged={onChanged} />
+            </div>
+            {/* 휴대폰: 종류 · 범위 · 날짜는 그 자료를 고르는 근거라 자르지 않고 한 줄을 다 쓰고, 버튼 둘은 다음 줄로 내려간다. */}
+            <span className="min-w-0 basis-full break-keep text-xs text-muted sm:hidden">
+              {[topicLabel(document.kind), scopeLabel(document.scope, document.productName), kstDate(document.uploadedAt)]
+                .filter(Boolean)
+                .join(" · ")}
             </span>
-            <span className="w-[110px] shrink-0 truncate text-xs text-muted">{topicLabel(document.kind) ?? ""}</span>
-            <span className="w-[230px] shrink-0 truncate text-xs text-muted">
+            <span className="hidden w-[110px] shrink-0 truncate text-xs text-muted sm:block">
+              {topicLabel(document.kind) ?? ""}
+            </span>
+            <span className="hidden w-[230px] shrink-0 truncate text-xs text-muted sm:block">
               {scopeLabel(document.scope, document.productName)}
             </span>
-            <span className="w-[150px] shrink-0 truncate text-xs text-muted">{document.uploadedBy ?? ""}</span>
-            <span className="w-[96px] shrink-0 text-right text-xs tabular-nums text-muted">
+            <span className="hidden w-[150px] shrink-0 truncate text-xs text-muted sm:block">{document.uploadedBy ?? ""}</span>
+            <span className="hidden w-[96px] shrink-0 text-right text-xs tabular-nums text-muted sm:block">
               {kstDate(document.uploadedAt)}
             </span>
+            <ReplaceFile
+              document={document}
+              disabled={busy !== null}
+              onStart={() => {
+                setBusy(document.sourceId);
+                setError(null);
+                setNotice(null);
+              }}
+              onFailed={(message) => {
+                setBusy(null);
+                setError(message);
+              }}
+              onReplaced={async (replaced) => {
+                // The file IS replaced (the server said 200). Only the list read that follows can still fail, and that
+                // failure must not read as «not replaced» — re-uploading would make a 3판 nobody meant.
+                setNotice(
+                  `「${document.fileName ?? document.title}」을(를) 「${replaced.fileName ?? replaced.title}」 파일로 바꿨어요 · ${replaced.version ?? 1}판${replaced.active ? "" : " · 사용 안 함 그대로"}`,
+                );
+                try {
+                  await onChanged();
+                } catch {
+                  setError("파일은 바뀌었어요. 목록을 다시 불러오지 못했어요 — 화면을 새로고침해 주세요. 다시 올릴 필요는 없어요.");
+                } finally {
+                  setBusy(null);
+                }
+              }}
+            />
             <Btn
-              className="w-[88px] shrink-0 whitespace-nowrap"
+              className="w-[88px] shrink-0 whitespace-nowrap max-sm:!min-h-11"
               size="sm"
               variant="ghost"
-              disabled={busy === document.sourceId}
+              disabled={busy !== null}
               onClick={async () => {
                 setBusy(document.sourceId);
                 setError(null);
+                setNotice(null);
                 try {
                   await api.setKnowledgeDocumentActive(document.sourceId, !document.active);
                   await onChanged();
@@ -101,6 +156,65 @@ export function KnowledgeDocumentList({
   );
 }
 
+
+/**
+ * <b>파일 바꾸기</b> (2026-11-16) — one button. The seller picks the new file; the document stays the same document (its
+ * kind, where it applies, 사용 여부 and 적용일 are kept) and the screen then shows its new 판. A file that cannot be read
+ * changes nothing, and the reason is the server's own sentence. No folder is watched: a changed file on the seller's
+ * computer reaches the service only through this button.
+ */
+function ReplaceFile({
+  document,
+  disabled,
+  onStart,
+  onFailed,
+  onReplaced,
+}: {
+  document: KnowledgeDocumentView;
+  disabled: boolean;
+  onStart: () => void;
+  /** The server refused or never answered: nothing about the document changed. */
+  onFailed: (message: string) => void;
+  /** The server replaced the file (200). What happens after — refreshing the list — is the caller's. */
+  onReplaced: (replaced: KnowledgeDocumentView) => Promise<void>;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={input}
+        type="file"
+        accept=".pdf,.docx,.txt,.md,.csv"
+        className="hidden"
+        aria-label={`${document.fileName ?? document.title} 새 파일`}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (input.current) input.current.value = "";
+          if (!file) return;
+          onStart();
+          let replaced: KnowledgeDocumentView;
+          try {
+            replaced = await api.replaceKnowledgeDocumentFile(document.sourceId, file);
+          } catch (err) {
+            const message = isAxiosError(err) ? (err.response?.data as { message?: string })?.message : null;
+            onFailed(`${document.fileName ?? document.title}: ${message ?? "파일을 바꾸지 못했어요."} 기존 자료는 그대로예요.`);
+            return;
+          }
+          await onReplaced(replaced);
+        }}
+      />
+      <Btn
+        className="w-[88px] shrink-0 whitespace-nowrap max-sm:ml-auto max-sm:!min-h-11"
+        size="sm"
+        variant="ghost"
+        disabled={disabled}
+        onClick={() => input.current?.click()}
+      >
+        파일 바꾸기
+      </Btn>
+    </>
+  );
+}
 
 /**
  * <b>자료 추가 — the seller hands over a file they already have.</b>
@@ -207,5 +321,69 @@ export function KnowledgeDocumentAdd({
         </Btn>
       </div>
     </div>
+  );
+}
+
+/**
+ * <b>적용일</b> (2026-11-15, owner decision 1): when this document's rules apply from. Optional and read only when two
+ * documents disagree — never the upload date. Saving it does not edit the document, so no answer citing it is held.
+ */
+function EffectiveFrom({
+  document,
+  onChanged,
+}: {
+  document: KnowledgeDocumentView;
+  onChanged: () => void | Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(document.effectiveFrom ?? "");
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
+  async function save(next: string | null) {
+    setSaving(true);
+    setFailed(false);
+    try {
+      await api.setKnowledgeEffectiveFrom(document.sourceId, next);
+      setEditing(false);
+      await onChanged();
+    } catch {
+      setFailed(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        className="rounded text-xs font-normal text-muted underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+        onClick={() => setEditing(true)}
+      >
+        {document.effectiveFrom ? `적용일 ${document.effectiveFrom}` : "적용일 적기"}
+      </button>
+    );
+  }
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1 align-middle">
+      <input
+        type="date"
+        aria-label={`${document.fileName ?? document.title} 적용일`}
+        className="rounded border border-line bg-surface px-1 py-0.5 text-xs text-ink"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+      />
+      <Btn size="sm" variant="outline" disabled={saving || value === ""} onClick={() => void save(value)}>
+        저장
+      </Btn>
+      {document.effectiveFrom ? (
+        <Btn size="sm" variant="ghost" disabled={saving} onClick={() => void save(null)}>
+          지우기
+        </Btn>
+      ) : null}
+      <Btn size="sm" variant="ghost" disabled={saving} onClick={() => setEditing(false)}>
+        닫기
+      </Btn>
+      {failed ? <span className="text-xs text-bad" role="alert">저장하지 못했어요</span> : null}
+    </span>
   );
 }

@@ -219,7 +219,12 @@ class AgentReviewDraftPayloadFloorTest {
         // 2026-11-06 thirteenth review: only what the judgement left for the customer is asked back.
         assertThat(AgentDraftPrompt.system()).contains("고객에게 묻는 것은 「고객에게 확인」이 붙은 항목")
                 .contains("그 밖의 것은 자연스러워 보여도 묻지 마세요").contains("이미 끝난 조치도 다시 묻지 않습니다");
-        assertThat(AgentDraftPrompt.PROMPT_VERSION).isEqualTo("agent-draft-prompt/v25");
+        // v26 (2026-11-15 final eval q06 S1): the listing's own restriction for the case answered comes with the store's
+        // rule; one for another case is not added. 「회사 규정은 [운영 정책]에서만」 stays the rule for everything else.
+        assertThat(AgentDraftPrompt.system()).contains("회사 규정은 [운영 정책]에서만 가져오세요")
+                .contains("그 경우가 답하는 항목의 경우(같은 사유 · 같은 절차)와 같으면 그 제한을 [상품 정보]에서 적힌 대로")
+                .contains("다른 경우의 제한은 덧붙이지 마세요");
+        assertThat(AgentDraftPrompt.PROMPT_VERSION).isEqualTo("agent-draft-prompt/v26");
     }
 
     @Test

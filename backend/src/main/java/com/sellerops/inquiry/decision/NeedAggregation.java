@@ -103,6 +103,27 @@ public final class NeedAggregation {
                                            Map<String, EvidenceCandidate> evidence,
                                            Map<String, PrecedentCandidate> precedents, DetailCapability detail,
                                            EvidenceScope.CaseScope caseScope) {
+        return enforce(needs, verdicts, evidence, precedents, detail, caseScope, null);
+    }
+
+    /**
+     * The same, and <b>a need whose answer is a value the seller's material does not settle</b> (2026-11-15, owner
+     * decision 2): when a candidate in the pool carries 「확인 필요」 on an attribute the need asks about — two documents
+     * state different values and nothing decides which is current — the need is not answered by either. Every attribute
+     * it asks unsettled: NONE, the disagreement is what is missing, and the seller answers it. Only some: PARTIAL — the
+     * settled part is answered, the unsettled one is left out. A disagreement on an attribute the need does not ask about
+     * moves nothing here; the drafter is told beside the passage, and the check at approval refuses a reply that states
+     * it. What a need asks is read from its own words; a single need with none of the list in them is read by the
+     * message ({@code question}) — the planner's wording is not the customer's.
+     */
+    public static List<NeedResult> enforce(List<InquiryNeed> needs, Map<String, NeedVerdict> verdicts,
+                                           Map<String, EvidenceCandidate> evidence,
+                                           Map<String, PrecedentCandidate> precedents, DetailCapability detail,
+                                           EvidenceScope.CaseScope caseScope, String question) {
+        java.util.Map<com.sellerops.knowledge.claim.ClaimAttribute, String> unsettledInPool = new java.util.LinkedHashMap<>();
+        for (EvidenceCandidate c : evidence.values()) {
+            c.mark().unresolved().forEach(unsettledInPool::putIfAbsent);
+        }
         EvidenceScope.CaseScope scope = caseScope == null ? EvidenceScope.CaseScope.NONE : caseScope;
         List<NeedResult> out = new ArrayList<>(needs.size());
         // What a need would be without the settlement, by position — restored when no action of this inquiry was done.
@@ -150,9 +171,37 @@ public final class NeedAggregation {
                 status = NeedStatus.CONDITIONAL_ON_CUSTOMER;
                 why = NeedResult.Enforcement.DECLARED_CUSTOMER_INPUT;
             }
+            String missing = v == null ? null : v.missing();
+            if (!unsettledInPool.isEmpty()) {
+                java.util.Set<com.sellerops.knowledge.claim.ClaimAttribute> asks =
+                        com.sellerops.knowledge.claim.ClaimReader.asked(need.ask() + " " + need.search());
+                if (asks.isEmpty() && needs.size() == 1) {
+                    asks = com.sellerops.knowledge.claim.ClaimReader.asked(question);
+                }
+                List<String> open = new ArrayList<>();
+                for (com.sellerops.knowledge.claim.ClaimAttribute a : asks) {
+                    if (unsettledInPool.containsKey(a)) {
+                        open.add(unsettledInPool.get(a));
+                    }
+                }
+                if (!open.isEmpty()) {
+                    boolean whole = open.size() == asks.size();
+                    if (whole && status != NeedStatus.NONE) {
+                        status = NeedStatus.NONE;
+                        why = NeedResult.Enforcement.UNRESOLVED_CONFLICT;
+                    } else if (!whole && status.covered()) {
+                        status = NeedStatus.PARTIAL;
+                        why = NeedResult.Enforcement.UNRESOLVED_CONFLICT;
+                    }
+                    String said = missing == null || missing.isBlank() ? "" : " " + missing.strip();
+                    missing = String.join(" ", open) + said;
+                }
+            }
             // Settled, not answered (2026-11-06 thirteenth review): the judge says the seller's record of an action already
-            // carried out made this need's open part moot; code accepts that only under its own conditions.
-            EvidenceCandidate settling = status.covered() ? null : settlingRecord(need, v, evidence, scope);
+            // carried out made this need's open part moot; code accepts that only under its own conditions. Never over a
+            // value the material does not settle.
+            EvidenceCandidate settling = status.covered() || why == NeedResult.Enforcement.UNRESOLVED_CONFLICT ? null
+                    : settlingRecord(need, v, evidence, scope);
             NeedStatus beforeSettling = status;
             NeedResult.Enforcement whyBefore = why;
             List<EvidenceCandidate> citedBefore = List.copyOf(cited);
@@ -187,10 +236,10 @@ public final class NeedAggregation {
                         : v.customerInput().isEmpty() ? null : String.join(" · ", v.customerInput());
             }
             out.add(new NeedResult(judged, need, status, List.copyOf(cited), List.copyOf(offered),
-                    v == null ? null : v.missing(), askCustomer, acquirable, status == judged ? null : why));
+                    missing, askCustomer, acquirable, status == judged ? null : why));
             if (settling != null) {
                 unsettled.put(out.size() - 1, new NeedResult(judged, need, beforeSettling, citedBefore,
-                        List.copyOf(offered), v == null ? null : v.missing(), null, acquirable,
+                        List.copyOf(offered), missing, null, acquirable,
                         beforeSettling == judged ? null : whyBefore));
             }
         }

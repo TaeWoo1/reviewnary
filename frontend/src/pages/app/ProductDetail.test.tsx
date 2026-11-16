@@ -38,6 +38,9 @@ vi.mock("../../lib/apiClient", () => ({
     getInquiryRowsStrict: (p: unknown) => getInquiryRowsStrict(p),
     getProductReviews: (id: string, o: unknown) => getProductReviews(id, o),
     getReviewIssueDetailStrict: (id: string) => getReviewIssueDetailStrict(id),
+    // 강점·약점 분석 (2026-11-16) has its own test; here it only must not break the record page.
+    getProductAnalysis: () => Promise.reject(new Error("not under test")),
+    getProductComparison: () => Promise.reject(new Error("not under test")),
   },
   getToken: () => "token",
 }));

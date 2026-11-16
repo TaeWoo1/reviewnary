@@ -251,8 +251,20 @@ final class QueryWords {
      * before an ending is scaffolding (되나요), and {@link #isFunctionWord} already dropped it.
      */
     static boolean isEndingTail(String tail) {
-        return ENDINGS.contains(tail);
+        return ENDINGS.contains(tail) || NARRATIVE_ENDINGS.contains(tail);
     }
+
+    /**
+     * Past and connective endings a customer TELLS with rather than asks with — 세탁+했더니, 줄어들+었어요, 벗겨+졌어요
+     * (2026-11-15 real eval r01 · r04: a review saying 「세탁했더니 줄어들었어요」 met none of 「세탁 … 줄어들 수 있습니다」, the
+     * absence gate read 0.06, and the reply was written with no ground). Consulted only where {@link #isEndingTail} is — a
+     * partial match whose stem is two or more characters — and never by {@link #isFunctionWord} or
+     * {@link #isPredicateForm}, so no token is dropped from a question and no gap is named differently because of it.
+     */
+    private static final Set<String> NARRATIVE_ENDINGS = Set.of(
+            "었어요", "았어요", "였어요", "했어요", "졌어요", "됐어요", "었어", "았어", "했어", "졌어", "됐어",
+            "었는데", "았는데", "했는데", "졌는데", "됐는데", "었더니", "았더니", "했더니", "졌더니", "더니",
+            "었고", "았고", "했고", "졌고", "었다", "았다", "했다", "졌다", "됐다", "해서", "져서", "어서", "아서");
 
     /**
      * The question, as words.

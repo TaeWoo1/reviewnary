@@ -98,7 +98,16 @@ public class InquiryFollowUpService {
      * @param today   the seller's day the split was made on
      */
     public record FollowUps(List<FollowUpRow> due, int dueTotal, List<FollowUpRow> waiting, int waitingTotal,
-                            LocalDate today) {
+                            LocalDate today, List<FollowUpRow> held) {
+        public FollowUps {
+            held = held == null ? List.of() : held;
+        }
+
+        /** No registration held — every caller written before {@code held} existed. */
+        public FollowUps(List<FollowUpRow> due, int dueTotal, List<FollowUpRow> waiting, int waitingTotal,
+                         LocalDate today) {
+            this(due, dueTotal, waiting, waitingTotal, today, List.of());
+        }
     }
 
     /** What one work item is still waiting on, or empty when nothing is open after its reply. */
@@ -121,6 +130,31 @@ public class InquiryFollowUpService {
         this.sellerChecks = sellerChecks;
         this.inquiries = inquiries;
         this.channels = channels;
+    }
+
+    /**
+     * The holds on approved answers (2026-11-15 owner request: 「담당자 결정이 필요한 등록 보류 문의는 「할 일」에만」). Absent: no
+     * registration is read as held.
+     */
+    private org.springframework.beans.factory.ObjectProvider<com.sellerops.replyhold.ReplyHoldService> holds;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setHolds(org.springframework.beans.factory.ObjectProvider<com.sellerops.replyhold.ReplyHoldService> holds) {
+        this.holds = holds;
+    }
+
+    /**
+     * Approved answers whose registration a hold stopped and the seller has not decided yet — the same reading the Home's
+     * 할 일 makes ({@code HomeWorkService.heldIndex}): a decided hold is a plain wait again.
+     */
+    private java.util.Set<UUID> heldRegistrations(UUID orgId) {
+        com.sellerops.replyhold.ReplyHoldService service = holds == null ? null : holds.getIfAvailable();
+        if (service == null) {
+            return java.util.Set.of();
+        }
+        return service.list(orgId).stream().filter(h -> "INQUIRY".equals(h.lane()) && h.approved() && !h.confirmed())
+                .map(com.sellerops.replyhold.ReplyHoldService.HoldView::subjectId)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     /** What each registered answer told the customer, for {@link #TOLD_BEHIND}. */
@@ -249,6 +283,11 @@ public class InquiryFollowUpService {
 
         List<FollowUpRow> due = new ArrayList<>();
         List<FollowUpRow> waiting = new ArrayList<>();
+        // A registration a hold stopped is the seller's decision, not something to wait for (2026-11-15): it leaves the
+        // waiting list AND its total, and is handed on as held for 할 일. Only its waiting row: a check whose day has come
+        // on the same inquiry is still that day's check, and is kept.
+        List<FollowUpRow> held = new ArrayList<>();
+        java.util.Set<UUID> stopped = items.isEmpty() ? java.util.Set.of() : heldRegistrations(orgId);
         com.sellerops.inquiry.publish.InquiryApprovalWithdrawalService told = answers == null ? null
                 : answers.getIfAvailable();
         java.util.Set<UUID> behind = new java.util.HashSet<>();
@@ -298,6 +337,10 @@ public class InquiryFollowUpService {
                     state.get().waitingOn(), state.get().due(), c == null ? null : c.getOutcome(),
                     c == null ? null : c.outcomeValue().labelKo(), c == null ? null : c.getNote(),
                     c == null ? null : c.getNextCheckOn(), w.getPhase().name(), since, "/inquiries/" + w.getInquiryId());
+            if (!row.due() && REGISTRATION.equals(row.waitingOn()) && stopped.contains(w.getId())) {
+                held.add(row);
+                continue;
+            }
             (row.due() ? due : waiting).add(row);
         }
         due.sort(Comparator.comparing(FollowUpRow::nextCheckOn, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -306,6 +349,6 @@ public class InquiryFollowUpService {
                 .thenComparing(FollowUpRow::nextCheckOn, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(FollowUpRow::since, Comparator.nullsLast(Comparator.naturalOrder())));
         return new FollowUps(due.stream().limit(limit).toList(), due.size(),
-                waiting.stream().limit(limit).toList(), waiting.size(), today);
+                waiting.stream().limit(limit).toList(), waiting.size(), today, List.copyOf(held));
     }
 }

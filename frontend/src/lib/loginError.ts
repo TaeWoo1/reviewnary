@@ -30,6 +30,20 @@ export interface LoginFailure {
 const CREDENTIALS = "이메일 또는 비밀번호를 확인해 주세요.";
 const UNREACHABLE = "reviewnary 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.";
 const SERVER = "reviewnary 서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.";
+const ORIGIN = "지금 연 주소로는 로그인할 수 없어요. 안내받은 접속 주소로 다시 열어 주세요.";
+
+/**
+ * Spring's CORS processor answers a disallowed origin with a real 403 whose body is exactly this sentence. Behind a
+ * same-origin proxy the browser sees that response, so the status alone said "wrong password" (2026-11-16: the
+ * page opened as `localhost` while the backend allows `127.0.0.1`). Login itself never answers 403 — a wrong
+ * password is 401 — so this body is the only 403 the form can mistake.
+ */
+const CORS_REJECTION = "Invalid CORS request";
+
+function isOriginRejection(error: unknown): boolean {
+  const response = (error as { response?: { data?: unknown } } | null)?.response;
+  return typeof response?.data === "string" && response.data.trim() === CORS_REJECTION;
+}
 
 /** The HTTP status an error carries, or null when nothing answered. Shape-based: axios is not imported here. */
 function statusOf(error: unknown): number | null {
@@ -44,10 +58,12 @@ export function loginFailure(error: unknown): LoginFailure {
   const status = statusOf(error);
   // Nothing answered. Blaming the password here is the bug this function exists to fix.
   if (status === null) return { message: UNREACHABLE, credentials: false };
+  // The server answered, but about the address the page was opened from — not about the password.
+  if (status === 403 && isOriginRejection(error)) return { message: ORIGIN, credentials: false };
   if (status === 401 || status === 403) return { message: CREDENTIALS, credentials: true };
   // The server answered with something else — a 500, a 502, a validation error. Still not the seller's password.
   if (status >= 500) return { message: SERVER, credentials: false };
   return { message: CREDENTIALS, credentials: true };
 }
 
-export const LOGIN_FAILURE_COPY = { CREDENTIALS, UNREACHABLE, SERVER } as const;
+export const LOGIN_FAILURE_COPY = { CREDENTIALS, UNREACHABLE, SERVER, ORIGIN } as const;

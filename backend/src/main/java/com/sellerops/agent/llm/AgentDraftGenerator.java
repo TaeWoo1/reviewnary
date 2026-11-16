@@ -37,12 +37,17 @@ public class AgentDraftGenerator {
     /** Which wire format to speak — the shared model connection's vendor (2026-10-29). Nothing else differs. */
     public enum Vendor {
         ANTHROPIC(LlmVendor.ANTHROPIC),
-        OPENAI(LlmVendor.OPENAI);
+        OPENAI(LlmVendor.OPENAI),
+        RUNYOUR(LlmVendor.RUNYOUR);
 
         private final LlmVendor vendor;
 
         Vendor(LlmVendor vendor) {
             this.vendor = vendor;
+        }
+
+        public static Vendor of(String name) {
+            return valueOf(LlmVendor.parse(name).name());
         }
     }
 

@@ -53,6 +53,11 @@ public final class OutboundGate {
          * seller's PC it runs on the same machine: loopback only, no outside host.
          */
         AGENT_RUNTIME,
+        /**
+         * The KakaoTalk 알림톡 provider (SOLAPI) behind intake alerts (2026-11-16, unit ③). A server-side send: refused on
+         * a seller's PC (an armed gate), like the channels outside the visible set — loopback only for a local stand-in.
+         */
+        ALIMTALK,
         /** Channels outside the seller-visible set (NAVER/Coupang/Cafe24) — refused on a seller's PC. */
         ESM,
         ELEVENST,
@@ -62,7 +67,7 @@ public final class OutboundGate {
     private static final Set<String> NAVER_HOSTS = Set.of("api.commerce.naver.com");
     private static final Set<String> COUPANG_HOSTS = Set.of("api-gateway.coupang.com");
     private static final String CAFE24_SUFFIX = ".cafe24api.com";
-    private static final Set<String> LLM_HOSTS = Set.of("api.anthropic.com", "api.openai.com");
+    private static final Set<String> LLM_HOSTS = Set.of("api.anthropic.com", "api.openai.com", "api.runyour.ai");
     /**
      * The vendor server's one host name (scope lock v1.14 ⑧-4 (c), contract §7): a sub-domain with an A record
      * (3.39.210.89) and no AAAA, so a PC that reaches it does so over IPv4 and {@code /v1/ip} answers the address
@@ -116,7 +121,7 @@ public final class OutboundGate {
             case LLM -> LLM_HOSTS.contains(host);
             case PRODUCT_IMAGE -> true;
             case VENDOR -> VENDOR_HOSTS.contains(host);
-            case AGENT_RUNTIME, ESM, ELEVENST, SSG -> false;
+            case AGENT_RUNTIME, ALIMTALK, ESM, ELEVENST, SSG -> false;
         };
     }
 

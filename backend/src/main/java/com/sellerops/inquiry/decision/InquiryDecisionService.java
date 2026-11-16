@@ -63,6 +63,14 @@ public class InquiryDecisionService implements InquiryDecisionModel {
         this.quota = quota;
     }
 
+    /** The evaluation's decision diagnostics (B178): writes only on a synthetic board with a named directory. */
+    @Autowired(required = false)
+    public void setDecisionTrace(EvalDecisionTrace trace) {
+        if (generator != null) {
+            generator.setTrace(trace);
+        }
+    }
+
     /** A capability that is not present — what a unit test and a context without it get. */
     public static InquiryDecisionService disabled() {
         return new InquiryDecisionService(null, null, null);

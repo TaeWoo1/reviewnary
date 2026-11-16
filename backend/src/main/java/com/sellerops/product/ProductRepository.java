@@ -14,6 +14,30 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     List<Product> findAllByOrgId(UUID orgId);
 
     /**
+     * Every OTHER product's name and sku in one org, as {@link ProductNameRow}s — for the one question 「does another product of this seller have
+     * the same name?」 (2026-11-16 review B176). A projection, so no {@link Product} entity is hydrated or kept in the
+     * persistence context, and the same org scope and real-data filter as {@link #findAllByOrgId} apply (a JPQL query on
+     * the entity). It still reads one short row per product of the org: the comparison key ({@code sameProductKey}) is
+     * computed in Java, so the database cannot narrow it. Callers ask only when the answer can change a verdict.
+     */
+    @Query("select new com.sellerops.product.ProductNameRow(p.name, p.sku) from Product p"
+            + " where p.orgId = :orgId and p.id <> :productId")
+    List<ProductNameRow> findOtherNamesByOrgId(@Param("orgId") UUID orgId, @Param("productId") UUID productId);
+
+    /** Ids of this org's products carrying exactly {@code name} — the analysis asks for ingest's (미지정 상품) bucket. */
+    @Query("select p.id from Product p where p.orgId = :orgId and p.name = :name")
+    List<UUID> findIdsByOrgIdAndName(@Param("orgId") UUID orgId, @Param("name") String name);
+
+    /**
+     * Id and name of a set of this org's products, as a projection — the store comparison labels the products it
+     * counted and needs nothing else, so no {@link Product} entity is hydrated (B176/B177's rule). Same org scope and
+     * real-data filter as the entity reads (a JPQL query on the entity).
+     */
+    @Query("select new com.sellerops.product.ProductIdNameRow(p.id, p.name) from Product p"
+            + " where p.orgId = :orgId and p.id in :ids")
+    List<ProductIdNameRow> findIdNamesByOrgIdAndIdIn(@Param("orgId") UUID orgId, @Param("ids") Collection<UUID> ids);
+
+    /**
      * Resolve a bounded set of products within one org — the batch primitive behind a
      * read that needs display names for a page of rows it already holds.
      *

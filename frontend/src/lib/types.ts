@@ -1562,6 +1562,77 @@ export interface KnowledgeDocumentView {
   passages: number;
   uploadedBy: string | null;
   uploadedAt: string;
+  /** 적용일 the seller set (YYYY-MM-DD), or null. Used only when two documents disagree; never the upload time. */
+  effectiveFrom?: string | null;
+  /** Which revision of the text this is — rises when 파일 바꾸기 (or an edit) changed it (2026-11-16). */
+  version?: number;
+  /** The document's last save: a replaced file, 사용 여부, 적용일. */
+  updatedAt?: string | null;
+}
+
+/** One document on one side of a disagreement — 「자료끼리 다른 값」 (2026-11-15). */
+export interface KnowledgeConflictSideView {
+  sourceId: string;
+  title: string;
+  value: string;
+  effectiveFrom: string | null;
+}
+
+/**
+ * Two documents that state different values for the same attribute under the same condition. RESOLVED: `current` is the
+ * one in force; UNRESOLVED: nothing the seller set decides it, and no reply may state either value as fact.
+ */
+export interface KnowledgeConflictView {
+  attribute: string;
+  subject: string;
+  condition: string;
+  status: "UNRESOLVED" | "RESOLVED" | string;
+  reason: string;
+  sentence: string;
+  scope: "ORG" | "PRODUCT" | string | null;
+  productId: string | null;
+  current: KnowledgeConflictSideView;
+  other: KnowledgeConflictSideView;
+  replacementId: string | null;
+}
+
+/** 「이 자료가 저 자료를 대신함」 for one attribute. */
+export interface KnowledgeReplacementView {
+  id: string;
+  newerSourceId: string;
+  newerTitle: string | null;
+  olderSourceId: string;
+  olderTitle: string | null;
+  attribute: string;
+  subject: string;
+  condition: string;
+  createdByName: string | null;
+  createdAt: string;
+}
+
+export interface KnowledgeCurrencyView {
+  conflicts: KnowledgeConflictView[];
+  replacements: KnowledgeReplacementView[];
+  effectiveDates: Record<string, string>;
+}
+
+/** One inbound · outbound · production schedule line. */
+export interface KnowledgeScheduleView {
+  id: string;
+  productId: string | null;
+  productName: string | null;
+  optionName: string | null;
+  kind: string;
+  kindLabel: string;
+  status: "PLANNED" | "CONFIRMED" | string;
+  statusLabel: string;
+  scheduleDate: string | null;
+  scopeNote: string | null;
+  lastCheckedOn: string | null;
+  active: boolean;
+  /** The date has passed: history, not the plan — never offered as a ground. */
+  past: boolean;
+  updatedAt: string;
 }
 
 /**
@@ -2357,6 +2428,12 @@ export interface InquiryKnowledgeGapView {
    * work did not happen. Identity only — never resemblance.
    */
   previouslyAnswered?: boolean;
+  /**
+   * The needs as the decision judged them (Inquiry Decision v2), when it ran. Read here only for one thing: a need held
+   * because two documents disagree on the asked value (statusKo {@link UNSETTLED_NEED_KO}) — then the seller is asked to
+   * say which document is current, never to add a basis.
+   */
+  needs?: { id: string; status: string; statusKo: string; missing: string | null }[];
 }
 
 /**

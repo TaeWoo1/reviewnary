@@ -129,8 +129,13 @@ class InquiryQualitySetTest {
      * about are still GROUNDED because an unrelated rule shares a word with them (Q20 항균 · Q21 해외 · Q22 대량).
      * Both are admissions by the lexical lane, the failure the semantic lane exists to close; this set records them
      * rather than tuning thresholds under a package that was not about recall.
+     *
+     * <p>{@code 2} since 2026-11-15: 「불량이면 배송비 안 내도 되나요」 (Q35) also reaches the shipping policy on 「배송비」. It
+     * used to be dropped by a false conflict — the old figure check read the shipping policy's 3,000원 against the
+     * exchange policy's 6,000원 as one disagreement and left one side out (manual eval F2). With values compared only
+     * when they are about the same thing, nothing drops it, and the lexical admission it always had is now counted.
      */
-    static final int MAX_WRONG_POLICY = 1;
+    static final int MAX_WRONG_POLICY = 2;
     static final int MAX_FALSE_GROUNDING = 3;
 
     @Autowired EntityManager em;

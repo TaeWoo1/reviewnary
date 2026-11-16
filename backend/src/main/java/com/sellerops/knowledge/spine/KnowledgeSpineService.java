@@ -150,7 +150,8 @@ public class KnowledgeSpineService {
     public SpineRetrieval retrieveForInquiry(UUID orgId, Inquiry inquiry, RetrievalQuery question,
                                              OrderFactLookup lookup, KnowledgeVariantScope scope) {
         InquiryEvidenceRetriever.InquiryEvidence lanes = retriever.retrieve(orgId, inquiry, question, lookup, scope);
-        return assemble(orgId, lanes, question);
+        return assemble(orgId, lanes, question, inquiry == null ? null
+                : com.sellerops.knowledge.currency.KnowledgeCurrencyService.dayOf(inquiry.getReceivedAt()));
     }
 
     /** The retrieval for a question about a product that is not an inquiry — a review, or a seller's search. */
@@ -158,7 +159,7 @@ public class KnowledgeSpineService {
     public SpineRetrieval retrieveForProduct(UUID orgId, UUID productId, RetrievalQuery question,
                                              KnowledgeVariantScope scope) {
         InquiryEvidenceRetriever.InquiryEvidence lanes = retriever.retrieveFor(orgId, productId, question, scope);
-        return assemble(orgId, lanes, question);
+        return assemble(orgId, lanes, question, null);
     }
 
     /** The same retrieval, with the past answers this caller may use narrowed first. */
@@ -168,11 +169,22 @@ public class KnowledgeSpineService {
                                              java.util.function.Predicate<com.sellerops.knowledge.memory.AnswerMemory> memoryAdmits) {
         InquiryEvidenceRetriever.InquiryEvidence lanes =
                 retriever.retrieveFor(orgId, productId, question, scope, memoryAdmits);
-        return assemble(orgId, lanes, question);
+        return assemble(orgId, lanes, question, null);
+    }
+
+    private com.sellerops.knowledge.currency.KnowledgeCurrencyService currency;
+
+    /**
+     * What the seller set about which value is current (2026-11-15). Optional: without it conflicts are read from the
+     * found entries alone, and only a difference in authority resolves one.
+     */
+    @Autowired(required = false)
+    public void setCurrency(com.sellerops.knowledge.currency.KnowledgeCurrencyService currency) {
+        this.currency = currency;
     }
 
     private SpineRetrieval assemble(UUID orgId, InquiryEvidenceRetriever.InquiryEvidence lanes,
-                                    RetrievalQuery question) {
+                                    RetrievalQuery question, java.time.LocalDate reference) {
         UUID productId = lanes.productId();
         List<KnowledgeSourceAdapter.Indexed> corpus = corpus(orgId, productId);
         Map<String, KnowledgeEntry> byUnit = new LinkedHashMap<>();
@@ -198,9 +210,15 @@ public class KnowledgeSpineService {
 
         List<KnowledgeEntry> all = new ArrayList<>(evidence.values());
         all.addAll(context);
-        List<KnowledgeConflict> conflicts = KnowledgeConflict.detect(all);
-        Set<String> losers = new java.util.HashSet<>();
-        conflicts.forEach(c -> losers.add(c.loserEntryId()));
+        // Value by value, against what the seller set (2026-11-15): the question's own attributes decide which conflicts
+        // are its; a resolved one leaves out only an entry whose every value lost, and an unresolved one leaves both.
+        java.util.Set<com.sellerops.knowledge.claim.ClaimAttribute> asked =
+                com.sellerops.knowledge.claim.ClaimReader.asked(question.full());
+        com.sellerops.knowledge.currency.KnowledgeState state = currency == null ? KnowledgeConflict.stateOf(all)
+                : currency.stateFor(orgId, productId, reference,
+                        lanes.order() == null ? null : lanes.order().orderedAt(), KnowledgeConflict.undocumented(all));
+        List<KnowledgeConflict> conflicts = KnowledgeConflict.of(all, state, asked);
+        Set<String> losers = KnowledgeConflict.replacedEntries(all, state);
 
         List<InquiryEvidenceRetriever.ScopedPassage> kept = new ArrayList<>();
         for (Map.Entry<InquiryEvidenceRetriever.ScopedPassage, KnowledgeEntry> e : evidence.entrySet()) {

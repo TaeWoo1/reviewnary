@@ -104,6 +104,18 @@ describe("in-session expiry (401 → /login?expired=1)", () => {
     await expect(onRejected({ response: { status: 401 }, config: { url: "/api/inbox" } })).rejects.toBeDefined();
 
     expect(localStorage.getItem("sellerops_token")).toBeNull();
+    // Where the seller was is kept (lib/returnTo.ts, unit ③), so signing in again returns there.
+    expect(assign).toHaveBeenCalledWith(`${mod.SESSION_EXPIRED_PATH}&next=%2Freviews`);
+    vi.unstubAllGlobals();
+  });
+
+  it("an expiry on the home screen keeps nothing extra", async () => {
+    const mod = await import("./apiClient");
+    localStorage.setItem("sellerops_token", "stale");
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, pathname: "/", search: "", assign });
+    const onRejected = await rejectionHandler();
+    await expect(onRejected({ response: { status: 401 }, config: { url: "/api/inbox" } })).rejects.toBeDefined();
     expect(assign).toHaveBeenCalledWith(mod.SESSION_EXPIRED_PATH);
     vi.unstubAllGlobals();
   });

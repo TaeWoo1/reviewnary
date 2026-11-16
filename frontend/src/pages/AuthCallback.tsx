@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { takeReturnTo } from "../lib/returnTo";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/apiClient";
 import { useAuth } from "../lib/auth";
@@ -46,7 +47,7 @@ export function AuthCallback() {
           acceptSession({ token: res.token, user: res.user });
           const method = authMethodOf(res.provider);
           if (method) analytics.track("login", { method });
-          navigate("/", { replace: true });
+          navigate(takeReturnTo() ?? "/", { replace: true });
           return;
         }
         savePendingOnboarding({

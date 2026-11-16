@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PageHead } from "../../components/ui/PageHead";
 import { Btn } from "../../components/ui/Btn";
+import { KakaoAlertSettings } from "../../components/notify/KakaoAlertSettings";
 import { readNoticeSettings, writeNoticeSettings, type NoticeSettings } from "../../lib/workNotifications";
 
 type Permission = NotificationPermission | "unsupported";
@@ -34,9 +35,12 @@ export function NotificationSettings() {
   return (
     <>
       <PageHead
-        title="PC 알림"
-        description="확인할 일이 생기면 이 컴퓨터에 알려요. 안전 관련은 하나씩, 나머지는 묶어서 알려요."
+        title="알림"
+        description="새 리뷰·문의를 카카오톡으로 받거나, 이 컴퓨터에서 알림으로 받아요."
       />
+      <KakaoAlertSettings />
+      <h2 className="mb-3 mt-10 text-lg font-semibold text-ink">PC 알림</h2>
+      <p className="mb-4 break-keep text-sm text-muted">확인할 일이 생기면 이 컴퓨터에 알려요. 안전 관련은 하나씩, 나머지는 묶어서 알려요.</p>
       <div className="space-y-4">
         <ul aria-label="PC 알림" className="divide-y divide-line/70 overflow-hidden rounded-2xl border border-line bg-surface">
           <li className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4">
@@ -53,9 +57,9 @@ export function NotificationSettings() {
               </p>
             </div>
             {on ? (
-              <Btn onClick={() => save({ ...settings, enabled: false })}>알림 끄기</Btn>
+              <Btn className="!min-h-11" onClick={() => save({ ...settings, enabled: false })}>알림 끄기</Btn>
             ) : (
-              <Btn onClick={() => void turnOn()} disabled={permission === "unsupported" || permission === "denied"}>
+              <Btn className="!min-h-11" onClick={() => void turnOn()} disabled={permission === "unsupported" || permission === "denied"}>
                 알림 켜기
               </Btn>
             )}

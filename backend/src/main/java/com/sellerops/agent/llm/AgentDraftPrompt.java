@@ -25,7 +25,7 @@ import java.util.List;
 public final class AgentDraftPrompt {
 
     /** Bump on every wording change. It is stamped into the provenance the run records. */
-    public static final String PROMPT_VERSION = "agent-draft-prompt/v25";
+    public static final String PROMPT_VERSION = "agent-draft-prompt/v26";
 
     /**
      * The closed set of reply categories, in the rule drafter's own order.
@@ -97,7 +97,11 @@ public final class AgentDraftPrompt {
                - 문의 경로(고객센터 · 1:1 문의 · 문의하기 · 톡톡 · 전화 · 메일)는 근거나 판매자 문구에 적힌 경로만 쓰세요. \
                적힌 경로가 없으면 경로를 새로 안내하지 마세요.
                - 근거는 [상품 정보] [운영 정책] [과거 답변]로 구분되어 있습니다. 상품의 사양은 [상품 정보]에서만, \
-               배송·취소·교환·증빙 같은 회사 규정은 [운영 정책]에서만 가져오세요. [과거 답변]은 이 판매자가 전에 한 \
+               배송·취소·교환·증빙 같은 회사 규정은 [운영 정책]에서만 가져오세요. 다만 [상품 정보]가 이 상품에만 \
+               적용되는 교환 · 반품 · 배송의 예외나 제한(이 상품은 어떤 경우에 안 되는지)을 적고 있고, 그 경우가 답하는 \
+               항목의 경우(같은 사유 · 같은 절차)와 같으면 그 제한을 [상품 정보]에서 적힌 대로 가져와 회사 규정과 함께 \
+               쓰세요. 상품의 제한이 회사 규정보다 구체적이면 그것이 이 상품의 답입니다. 다른 경우의 제한은 덧붙이지 \
+               마세요. [과거 답변]은 이 판매자가 전에 한 \
                답변이며, 지금 이 고객의 사실이 아닙니다 -- 표현을 맞추는 데 쓰고 사실의 출처로 쓰지 마세요. \
                특히 [과거 답변]에 있는 "오늘 출고", "내일 도착" 같은 문장은 그때 그 주문의 사정이지 \
                이 주문의 사정도, 회사의 기준도 아닙니다.
@@ -326,7 +330,20 @@ public final class AgentDraftPrompt {
      * is not a control.
      */
     /** Bump on every wording change of the claim check below. */
-    public static final String FIGURE_PROMPT_VERSION = "inquiry-claim-check/v13";
+    /**
+     * v14 (2026-11-15 final eval q14 S1): a restriction for value lost to the customer's use or damage, stated as the
+     * evidence states it, is the restriction the law allows (전자상거래법 제17조 제2항 제1호 · 제2호), not a refusal for
+     * opening — the opening and defect rules beside it are unchanged.
+     */
+    /**
+     * v15 (2026-11-16 §7.57, final eval q13 · q06 S1): an exception the evidence gives only to another product is not a
+     * dropped condition when the recorded inquiry product is not that product; a condition the draft states elsewhere in the
+     * same reply is not dropped; a value the evidence gives a whole case (교환 · 반품) holds for a case inside it (단순 변심
+     * 반품), never the other way; saying which stated rule the customer's own time falls under is not settling the order.
+     * Every refusal before stays: a missing condition, another product's or case's value, a changed number, an order's
+     * shipping or arrival settled from policy alone.
+     */
+    public static final String FIGURE_PROMPT_VERSION = "inquiry-claim-check/v15";
 
     /**
      * <b>The claim check</b> (owner, 2026-10-28: meaning is read by a model, not by neighbouring words; second outside
@@ -369,7 +386,10 @@ public final class AgentDraftPrompt {
 
                 운영 정책의 일반 기준을 기준으로 안내한 말(「평일 오후 2시 전 결제는 당일 출고가 기준입니다」)과 이 주문의 출고 · \
                 도착을 확정한 말(「고객님 주문은 오늘 출고됩니다」)은 다른 주장이다. 뒤의 것은 주문 정보가 그렇게 말할 때만 \
-                SUPPORTED이고, 정책만으로는 NOT_SUPPORTED다(2026-11-01).
+                SUPPORTED이고, 정책만으로는 NOT_SUPPORTED다(2026-11-01). 고객이 쓴 시각 · 상태가 근거의 어느 기준에 해당하는지만 \
+                말한 것(「오후 4시에 결제하셨다면 오후 3시 이후 결제 기준에 해당합니다」)은 기준을 안내한 말이라 그 기준이 근거에 \
+                있으면 SUPPORTED다. 거기서 더 나아가 그 주문이 어느 날 출고된다 · 됐다 · 도착한다고 말하면 위와 같이 \
+                NOT_SUPPORTED다(2026-11-16).
 
                 3) 빠진 조건: 근거가 기한 · 상태 · 대상 · 비용 조건을 붙여 허용한 것(「미개봉 상품에 한해 7일 이내 반품 가능」)을 \
                 초안이 그 조건 없이 된다고 말하면(「7일 이내 반품 가능합니다」) 초안 문장이 근거 안의 말뿐이어도 NOT_SUPPORTED \
@@ -377,7 +397,19 @@ public final class AgentDraftPrompt {
                 빼도 SUPPORTED입니다. 거꾸로 고객이 이미 개봉 · 사용했다고 밝혔는데 초안이 그 조건이 붙은 교환 · 반품을 \
                 된다고 말하면, 조건을 옆에 적었더라도 NOT_SUPPORTED입니다. 근거에 그 경우에 맞는 다른 사유가 있을 때만 \
                 SUPPORTED입니다. 반품 · 환불을 미개봉으로 한정하거나 개봉을 이유로 거절한 문장, 불량 · 오배송을 말한 고객에게 \
-                미개봉 · 단순 변심 조건을 붙인 문장은 근거에 그렇게 적혀 있어도 NOT_SUPPORTED입니다(법정 청약철회 기준).
+                미개봉 · 단순 변심 조건을 붙인 문장은 근거에 그렇게 적혀 있어도 NOT_SUPPORTED입니다(법정 청약철회 기준). \
+                조건은 문장 하나가 아니라 초안 전체에서 봅니다. 초안이 같은 답변의 다른 문장에 그 조건을 적었으면(「다만 세탁하거나 \
+                사용한 침구는 …」) 조건을 뺀 것이 아닙니다. 근거가 다른 상품에만 다는 예외(「주문 제작 상품(원목 접이식 테이블)은 \
+                이 기준을 따르지 않습니다」)는 「이번 답변이 다룰 내용」의 「문의 상품」이 그 상품이 아니라고 근거와 그 줄로 알 수 \
+                있을 때 이 문의의 조건이 아니므로, 초안이 그 예외를 옮기지 않아도 빠진 조건이 아닙니다. 「문의 상품」이 그 예외의 \
+                상품이거나, 「문의 상품」 줄이 없거나, 예외가 이 상품에 해당하는지 알 수 없으면 예외를 빼고 일반 기준만 말한 문장은 \
+                위와 같이 NOT_SUPPORTED입니다. 근거가 넓은 경우 전체(「교환 · 반품」)에 준 기한 · 비용을 초안이 그 안의 한 경우 \
+                (「단순 변심 반품」)에 대해 말하면 같은 조건의 같은 값이라 SUPPORTED입니다. 거꾸로 한 경우의 값을 전체로 넓히거나 \
+                다른 경우로 옮기면(교환 기한을 반품 기한으로) NOT_SUPPORTED입니다(2026-11-16). \
+                반면 근거가 소비자의 사용 · 훼손으로 상품 가치가 줄어든 경우(「사용 흔적이 있거나 상품 가치가 훼손된 경우」)를 들어 \
+                단순 변심 교환 · 반품을 제한하고 초안이 그 경우를 그대로 옮겨 제한하면, 개봉을 이유로 한 거절이 아니므로 \
+                SUPPORTED입니다(같은 법이 허용하는 제한). 포장을 뜯은 것만으로는 그 경우가 아니고, 불량 · 오배송을 말한 고객에게 \
+                그 제한을 붙인 문장은 위와 같이 NOT_SUPPORTED입니다.
 
                 4) 숫자마다 무엇을 보고 판정했는지 적습니다. 나중에 근거가 바뀌면 이 연결로 다시 확인합니다.
                 - source: SUPPORTED이면 그 판정을 뒷받침한 근거 줄의 이름(「근거 2」) 또는 「주문」. SAID_BACK이면 「문의」. \

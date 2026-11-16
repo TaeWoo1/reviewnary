@@ -4,6 +4,11 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { NotificationSettings } from "./NotificationSettings";
 import { readNoticeSettings } from "../../lib/workNotifications";
 
+// The page also carries the server-side KakaoTalk section; here it stays unloaded so only the PC controls exist.
+vi.mock("../../lib/apiClient", () => ({
+  api: { getIntakeAlertSettings: vi.fn(() => new Promise(() => undefined)) },
+}));
+
 describe("PC 알림 설정", () => {
   beforeEach(() => {
     localStorage.clear();

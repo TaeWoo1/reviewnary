@@ -11,6 +11,7 @@
 | 알고 싶은 것 | 먼저 읽을 정본 / 절 | 읽을 때 구분할 것 |
 |---|---|---|
 | 구상 중인 아이템 전체·시뮬레이션으로 평가할 가치와 맹점 | `docs/sellerops_canonical_reference.md` 맨 앞 「현재 아이템 기준」 | 아이템 설명의 단일 갱신처. 회차별 피치는 평가 입력, 미래 확장은 인터뷰 후보이며 현재 개발 범위가 아님 |
+| 기업 데모 이후 요구·다음 큰 기능의 범위 | `docs/sellerops_canonical_reference.md` 「현재 아이템 기준」 §7 (2026-11-16) | 기업 인터뷰 원문 취지·미확인 사항·큰 기능 제안·Claude 인계 방식. 톡톡·일괄 상품 변경은 아직 조사·범위 확인 단계 |
 | 지금 만들고 운영하는 제품의 범위 | `docs/product-scope-v1.md` v1.15 → `docs/reviewnary_product_architecture_proposal_v1.md` §19 | 서버 중심 웹 서비스. 이전 PC 설치형 기본 구조는 전환 이력 |
 | 이미 합의한 목표·아직 열린 결정 | `docs/reviewnary_implementation_goals_draft_v1.md` 질문 76-80 및 각 질문의 날짜 → 제품 구조 §12·§19 | 인터뷰의 확인된 방향과 미정 수치 구분. 목표 합의 ≠ 구현·실행 승인 |
 | 운영 기록을 잇는 중기 방향 | `docs/standing/operational_knowledge_direction_v1.md` → 위 질문 76-80 | 출처·적용 범위·최신성, 업무별 위임. 독립된 약속 이행 추적·외부 AI 쓰기 권한은 완료로 간주하지 않음 |

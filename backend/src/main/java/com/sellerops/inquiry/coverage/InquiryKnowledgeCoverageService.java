@@ -144,7 +144,30 @@ public class InquiryKnowledgeCoverageService {
     public record EvidencePreview(InquiryKnowledgeNeed need, String knowledgeState, UUID productId,
                                   List<String> scopes, List<PreviewPassage> passages,
                                   String orderFactState, boolean orderReferencePresent,
-                                  int supersededMemories) {
+                                  int supersededMemories, List<String> conflicts) {
+
+        public EvidencePreview {
+            conflicts = conflicts == null ? List.of() : List.copyOf(conflicts);
+        }
+
+        public EvidencePreview(InquiryKnowledgeNeed need, String knowledgeState, UUID productId, List<String> scopes,
+                               List<PreviewPassage> passages, String orderFactState, boolean orderReferencePresent,
+                               int supersededMemories) {
+            this(need, knowledgeState, productId, scopes, passages, orderFactState, orderReferencePresent,
+                    supersededMemories, List.of());
+        }
+    }
+
+    private com.sellerops.knowledge.currency.KnowledgeCurrencyService currency;
+
+    /**
+     * What the seller's material settles (2026-11-15). Optional: without it the preview names no disagreement. With it,
+     * the preview says, in the seller's words, every disagreement on what the question asks — the same state the judge,
+     * the drafter and the checks read (설계 2절 ①).
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setCurrency(com.sellerops.knowledge.currency.KnowledgeCurrencyService currency) {
+        this.currency = currency;
     }
 
     /** One would-be citation. */
@@ -198,7 +221,21 @@ public class InquiryKnowledgeCoverageService {
                         .toList(),
                 evidence.order().state().name(),
                 inquiry.getSourceOrderRef() != null,
-                evidence.supersededMemories());
+                evidence.supersededMemories(),
+                conflictsFor(orgId, inquiry, evidence));
+    }
+
+    private List<String> conflictsFor(UUID orgId, Inquiry inquiry, InquiryEvidenceRetriever.InquiryEvidence evidence) {
+        if (currency == null) {
+            return List.of();
+        }
+        java.util.Set<com.sellerops.knowledge.claim.ClaimAttribute> asked = com.sellerops.knowledge.claim.ClaimReader
+                .asked(MarkupText.toPlainText(inquiry.getTitle()) + " " + MarkupText.toPlainText(inquiry.getBody()));
+        com.sellerops.knowledge.currency.KnowledgeState state = currency.stateFor(orgId, evidence.productId(),
+                com.sellerops.knowledge.currency.KnowledgeCurrencyService.dayOf(inquiry.getReceivedAt()),
+                evidence.order() == null ? null : evidence.order().orderedAt());
+        return state.conflicts().stream().filter(c -> asked.contains(c.attribute()))
+                .map(com.sellerops.knowledge.currency.KnowledgeState.Conflict::sentenceKo).distinct().toList();
     }
 
     /**

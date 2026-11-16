@@ -48,12 +48,13 @@ class DevLlmBudgetQueryTest {
         row(org, 1000, 100);
         row(org, 2000, 200);
         row(org, null, null);
+        row(org, 500, null); // half a usage block: its input is summed and the call is still counted at its worst case
         row(otherOrg, 9999, 9999);
 
         Object[] t = usage.spentSince(org, start).get(0);
-        assertThat(((Number) t[0]).longValue()).isEqualTo(3000);
+        assertThat(((Number) t[0]).longValue()).isEqualTo(3500);
         assertThat(((Number) t[1]).longValue()).isEqualTo(300);
-        assertThat(((Number) t[2]).longValue()).isEqualTo(1);
+        assertThat(((Number) t[2]).longValue()).isEqualTo(2);
         // Nothing since the start — the first call of an evaluation (2026-11-05: a null third column failed it).
         Object[] later = usage.spentSince(org, Instant.now().plusSeconds(60)).get(0);
         assertThat(((Number) later[0]).longValue()).as("nothing after the start").isZero();

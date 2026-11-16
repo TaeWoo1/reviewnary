@@ -49,6 +49,11 @@ class OutboundGateTest {
     void modelCallsReachOnlyTheNamedProviders() {
         assertThat(allows("https://api.anthropic.com/v1/messages", Destination.LLM)).isTrue();
         assertThat(allows("https://api.openai.com/v1/chat/completions", Destination.LLM)).isTrue();
+        assertThat(allows("https://api.runyour.ai/v1/chat/completions", Destination.LLM)).isTrue();
+        assertThat(allows("https://api.runyour.ai/v1/embeddings", Destination.LLM)).isTrue();
+        assertThat(allows("https://api.runyour.ai.evil.example/v1/chat/completions", Destination.LLM)).isFalse();
+        assertThat(allows("http://api.runyour.ai/v1/chat/completions", Destination.LLM)).isFalse();
+        assertThat(allows("https://api.runyour.ai/v1/chat/completions", Destination.NAVER_COMMERCE)).isFalse();
         assertThat(allows("https://llm-proxy.example.com/v1/messages", Destination.LLM)).isFalse();
     }
 
@@ -58,6 +63,7 @@ class OutboundGateTest {
         assertThat(allows("http://shop-phinf.pstatic.net/a.jpg", Destination.PRODUCT_IMAGE)).isFalse();
         assertThat(allows("https://sa2.esmplus.com/x", Destination.ESM)).isFalse();
         assertThat(allows("https://api.11st.co.kr/x", Destination.ELEVENST)).isFalse();
+        assertThat(allows("https://api.solapi.com/messages/v4/send-many/detail", Destination.ALIMTALK)).isFalse();
         assertThat(allows("https://x.ssg.com/x", Destination.SSG)).isFalse();
     }
 

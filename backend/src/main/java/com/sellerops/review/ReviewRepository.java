@@ -193,6 +193,22 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
                     and locate('보통', r.body) = 0
                     and locate('그냥그', r.body) = 0
                     and locate('그냥 그', r.body) = 0
+                    and locate('벗겨지', r.body) = 0
+                    and locate('벗겨졌', r.body) = 0
+                    and locate('벗겨져', r.body) = 0
+                    and locate('까졌', r.body) = 0
+                    and locate('까져', r.body) = 0
+                    and locate('변색되', r.body) = 0
+                    and locate('변색됐', r.body) = 0
+                    and locate('변색돼', r.body) = 0
+                    and locate('녹슬었', r.body) = 0
+                    and locate('녹슬어', r.body) = 0
+                    and locate('녹이 슬', r.body) = 0
+                    and locate('갈라', r.body) = 0
+                    and locate('크랙', r.body) = 0
+                    and locate('실금', r.body) = 0
+                    and locate('부서', r.body) = 0
+                    and locate('터짐', r.body) = 0
                     and locate('감전', r.body) = 0
                     and locate('고발', r.body) = 0
                     and locate('고소', r.body) = 0
@@ -1684,4 +1700,38 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
      */
     @Query("select distinct r.channelId from Review r where r.orgId = :orgId and r.channelId is not null")
     List<UUID> findDistinctChannelIdsByOrgId(@Param("orgId") UUID orgId);
+
+    // ── Product analysis (2026-11-16): one product's or the store's reviews in a half-open period, newest
+    // first, bounded by the caller's page — the caller reports the bound. Entity reads, so the realDataOnly
+    // filter applies exactly as it does to the counts beside them.
+
+    List<Review> findByOrgIdAndProductIdAndReceivedAtGreaterThanEqualAndReceivedAtLessThanOrderByReceivedAtDesc(
+            UUID orgId, UUID productId, Instant fromInclusive, Instant toExclusive,
+            org.springframework.data.domain.Pageable pageable);
+
+    List<Review> findByOrgIdAndProductIdIsNotNullAndReceivedAtGreaterThanEqualAndReceivedAtLessThanOrderByReceivedAtDesc(
+            UUID orgId, Instant fromInclusive, Instant toExclusive, org.springframework.data.domain.Pageable pageable);
+
+    long countByOrgIdAndProductIdIsNotNullAndReceivedAtGreaterThanEqualAndReceivedAtLessThan(
+            UUID orgId, Instant fromInclusive, Instant toExclusive);
+
+    long countByOrgIdAndProductIdIsNullAndReceivedAtGreaterThanEqualAndReceivedAtLessThan(
+            UUID orgId, Instant fromInclusive, Instant toExclusive);
+
+    /** The store-wide analysis read: every review of the org in the period, linked or not, newest first. */
+    List<Review> findByOrgIdAndReceivedAtGreaterThanEqualAndReceivedAtLessThanOrderByReceivedAtDesc(
+            UUID orgId, Instant fromInclusive, Instant toExclusive, org.springframework.data.domain.Pageable pageable);
+
+    /** {@code [channelId, count]} of the org's reviews in the period — the whole period, not a read sample. */
+    @Query("select r.channelId, count(r) from Review r where r.orgId = :orgId"
+            + " and r.receivedAt >= :from and r.receivedAt < :to group by r.channelId")
+    List<Object[]> countByChannelInPeriod(@Param("orgId") UUID orgId, @Param("from") Instant fromInclusive,
+                                          @Param("to") Instant toExclusive);
+
+    /** As {@link #countByChannelInPeriod}, for one product. */
+    @Query("select r.channelId, count(r) from Review r where r.orgId = :orgId and r.productId = :productId"
+            + " and r.receivedAt >= :from and r.receivedAt < :to group by r.channelId")
+    List<Object[]> countByChannelInPeriodForProduct(@Param("orgId") UUID orgId, @Param("productId") UUID productId,
+                                                    @Param("from") Instant fromInclusive,
+                                                    @Param("to") Instant toExclusive);
 }

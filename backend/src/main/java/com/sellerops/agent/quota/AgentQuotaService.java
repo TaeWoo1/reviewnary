@@ -299,10 +299,16 @@ public class AgentQuotaService {
         }
         usage.findById(usageId).ifPresent(row -> {
             row.setElapsedMs((int) Math.min(Integer.MAX_VALUE, Math.max(0, elapsedMs)));
-            row.setInputTokens(inputTokens);
-            row.setOutputTokens(outputTokens);
+            // 「Not reported」 (-1, AgentLlmCallMetrics.UNREPORTED) is stored as unknown, never as a count (2026-11-15): summed,
+            // a -1 made an unreported call cheaper than free, and DevLlmBudget prices an unknown at the call's worst case.
+            row.setInputTokens(reported(inputTokens));
+            row.setOutputTokens(reported(outputTokens));
             usage.save(row);
         });
+    }
+
+    static Integer reported(Integer tokens) {
+        return tokens == null || tokens < 0 ? null : tokens;
     }
 
     /** Today's calls by reply-agent runs no seller started — counted with the seller's when drafting ahead measures its share. */

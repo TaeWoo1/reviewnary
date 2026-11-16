@@ -116,7 +116,34 @@ public final class ReviewClaimGuard {
      * Which way of reading a promise this is — a change to how a clause is matched changes what waiting drafts are
      * held to, so it is part of {@code ReviewDraftBasis}' policy fingerprint like the word lists are.
      */
-    static final String READING = "clauses-v6:cases,no-overlap,kept-states,said-back,left-states,return-law,cost-bearer";
+    static final String READING =
+            "clauses-v8:cases,no-overlap,kept-states,said-back,left-states,return-law,cost-bearer,case-bound,courtesy-tail";
+
+    /**
+     * The cases a remedy clause can be limited to — what was done to the item, or what kind of item it is (2026-11-15
+     * review, q06). Matched with whitespace removed.
+     */
+    static final List<String> CASE_STEMS = List.of(
+            "세탁", "사용", "착용", "개봉", "훼손", "흔적", "오염", "각인", "주문제작", "맞춤제작", "수선", "설치", "조립", "세척");
+
+    /** A grant that says it holds in every case — 「어떤 경우든 반품 가능」 — is about every case a refusal is limited to. */
+    static final List<String> EVERY_CASE = List.of(
+            "무조건", "어떤경우", "어떠한경우", "상관없이", "관계없이", "무관하게", "모든상품", "전상품", "전제품", "제한없이",
+            "언제든");
+
+    /** How a customer says theirs is in a case — 「세탁했는데」, 「빨았어요」 — beside {@link #LEFT_STATES}. */
+    private static final java.util.Map<String, List<String>> IN_CASE = java.util.Map.of(
+            "세탁", List.of("세탁했", "세탁한", "세탁후", "세탁하고", "세탁해", "빨았", "빨래했", "빨고", "빨아"),
+            "세척", List.of("세척했", "세척한", "세척후", "세척하고"),
+            "훼손", List.of("훼손했", "훼손됐", "훼손된", "훼손시"),
+            "흔적", List.of("흔적이", "흔적있"),
+            "오염", List.of("오염됐", "오염된", "묻었", "묻은"),
+            "각인", List.of("각인"),
+            "주문제작", List.of("주문제작"),
+            "맞춤제작", List.of("맞춤제작"));
+    /** The ways a customer says theirs is NOT in a case — taken out before {@link #IN_CASE} is read. */
+    private static final List<String> NOT_IN_CASE = List.of(
+            "세탁하지않", "세탁안", "안세탁", "세탁전", "빨지않", "안빨", "세척하지않", "세척전");
 
     /**
      * The states a grant can be limited to, each with the ways it is written — by the seller (「미개봉 상품에 한해」) or by a
@@ -150,8 +177,25 @@ public final class ReviewClaimGuard {
     /** How much of a clause's end is its predicate. */
     static final int ENDING = 8;
 
+    /**
+     * A courtesy tail after the predicate — 「…반품이 어려운 <b>점 참고 부탁드립니다</b>」, 「…교환이 되지 않는 <b>점 양해 바랍니다</b>」
+     * (2026-11-16 B-plan q06 S1 · q14 S1: every first draft that refused the 세탁·사용 case this way was read as a grant,
+     * because the last {@value #ENDING} characters were the courtesy words, and contradicted the policy's own refusal). The
+     * yes or no is the word before 「점」, so the tail is set aside before the ending is read. Only this shape — 「점」 then a
+     * request to note or excuse it — and only at the very end of the clause; whitespace removed.
+     */
+    static final java.util.regex.Pattern COURTESY_TAIL = java.util.regex.Pattern.compile(
+            "점(?:을|은|도)?(?:꼭|미리|널리|너그러이|넓은마음으로)?(?:참고|양해|이해|유의|감안|확인)(?:해|하여|하셔서|해서)?"
+                    + "(?:부탁|주시|주세요|주십|바랍|바래|드립|드려|하시기|해주|해)[^.!?]{0,12}$");
+
     /** A clause boundary inside a sentence: a Korean connective that can join a yes to a no. */
-    private static final Pattern CLAUSE = Pattern.compile("(?<=며|지만|으나|하고)[,\\s]+|(?<=나,)\\s*");
+    /**
+     * Where a sentence turns to its next clause. 「…어렵고, 불량이면 무상으로 교환해 드립니다」 is two clauses (2026-11-15 final
+     * eval q14 S1): read as one, the refusal's case (사용 흔적) and the grant's ending (교환해 드립니다) met in a single clause
+     * and were reported as the policy's opposite. Only a connective 고 FOLLOWED BY A COMMA — 「…하고 」 without one is the
+     * older rule, and 「고객」 · 「최고」 inside a clause are never cut.
+     */
+    private static final Pattern CLAUSE = Pattern.compile("(?<=며|지만|으나|하고)[,\\s]+|(?<=나,)\\s*|(?<=고),\\s*");
 
     private ReviewClaimGuard() {
     }
@@ -172,7 +216,25 @@ public final class ReviewClaimGuard {
      * @param evidence the passage texts that may authorize a promise — the same ones {@link #unsupportedClaims} reads
      */
     public static List<String> contradictedPromises(String body, List<String> evidence) {
-        return judged(body, evidence).contradicted();
+        return judged(body, evidence, null, evidence).contradicted();
+    }
+
+    /**
+     * The same, knowing the customer's own words: a customer who said theirs is in the case a refusal is limited to
+     * (「세탁했는데 반품되나요?」) is answered by that refusal, whatever the grant says.
+     */
+    public static List<String> contradictedPromises(String body, List<String> evidence, String asked) {
+        return judged(body, evidence, asked, evidence).contradicted();
+    }
+
+    /**
+     * The same, with {@code inUse} — every document in use — for what backs a reply's own refusal of a case: one document
+     * read on its own (an old notice stating only the return fee) does not answer 「세탁하거나 사용한 침구는 반품이 되지
+     * 않아요」 when another document in use refuses exactly that case.
+     */
+    public static List<String> contradictedPromises(String body, List<String> evidence, String asked,
+                                                    List<String> inUse) {
+        return judged(body, evidence, asked, inUse).contradicted();
     }
 
     /**
@@ -181,25 +243,55 @@ public final class ReviewClaimGuard {
      * the guard can prove, and not a promise it can pass: a reply that needs the seller's eyes.
      */
     public static List<String> undecidedPromises(String body, List<String> evidence) {
-        return judged(body, evidence).undecided();
+        return judged(body, evidence, null, evidence).undecided();
+    }
+
+    /** {@link #undecidedPromises}, knowing the customer's own words. */
+    public static List<String> undecidedPromises(String body, List<String> evidence, String asked) {
+        return judged(body, evidence, asked, evidence).undecided();
     }
 
     private record Judged(List<String> contradicted, List<String> undecided) {
     }
 
-    private static Judged judged(String body, List<String> evidence) {
+    /**
+     * <b>A refusal limited to a case answers that case only</b> (2026-11-15 review, q06). 「세탁하거나 사용한 침구는 단순 변심
+     * 교환 · 반품이 되지 않습니다」 and 「주문 제작 · 각인 상품은 …되지 않습니다」 refuse those items, not a return in general:
+     * against 「단순 변심 반품은 받으신 뒤 7일 안에 신청해 주세요」 they say nothing either way, and a reply that also says 「세탁하거나
+     * 사용한 침구는 반품이 되지 않아요」 is the policy read back, not its opposite. A refusal still answers a grant that is about its
+     * case (「세탁하셨어도 반품 가능」), a grant that says it holds in every case ({@link #EVERY_CASE}), and a grant to a customer
+     * who said theirs is in it. A reply's own refusal limited to a case the material refuses too is not answered by a
+     * grant that is not about that case. Whatever is left out of a grant (미개봉 …) is {@link #droppedConditions}', as before.
+     */
+    private static Judged judged(String body, List<String> evidence, String asked, List<String> inUse) {
         if (body == null || body.isBlank() || evidence == null || evidence.isEmpty()) {
             return new Judged(List.of(), List.of());
         }
         List<Clause> grounds = new ArrayList<>();
+        List<List<Clause>> passages = new ArrayList<>();
         for (String passage : evidence) {
-            grounds.addAll(clausesOf(passage));
+            List<Clause> own = clausesOf(passage);
+            passages.add(own);
+            grounds.addAll(own);
         }
+        List<Clause> backing = new ArrayList<>(grounds);
+        if (inUse != null && inUse != evidence) {
+            for (String passage : inUse) {
+                if (passage != null) {
+                    backing.addAll(clausesOf(passage));
+                }
+            }
+        }
+        String customer = normalize(asked == null ? "" : asked);
         Set<String> contradicted = new LinkedHashSet<>();
         Set<String> undecided = new LinkedHashSet<>();
         for (Clause said : clausesOf(body)) {
+            Set<String> saidCases = casesOf(said.text());
+            boolean everyCase = EVERY_CASE.stream().anyMatch(said.text()::contains);
             List<Clause> about = grounds.stream()
-                    .filter(g -> g.remedies().stream().anyMatch(said.remedies()::contains)).toList();
+                    .filter(g -> g.remedies().stream().anyMatch(said.remedies()::contains))
+                    .filter(g -> !caseApart(said, saidCases, everyCase, g, passageOf(g, passages), backing, customer))
+                    .toList();
             boolean yes = about.stream().anyMatch(g -> g.refusal() == said.refusal());
             boolean no = about.stream().anyMatch(g -> g.refusal() != said.refusal());
             if (!no) {
@@ -246,6 +338,102 @@ public final class ReviewClaimGuard {
     }
 
     /**
+     * Whether {@code g} answers a case {@code said} is not about — and so says nothing of it. Only an opposite answer can
+     * be set apart; a clause answering the same way always stays.
+     */
+    private static boolean caseApart(Clause said, Set<String> saidCases, boolean everyCase, Clause g,
+                                     List<Clause> ownPassage, List<Clause> grounds, String customer) {
+        if (g.refusal() == said.refusal()) {
+            return false;
+        }
+        if (g.refusal()) {
+            Set<String> limited = casesOf(g.text());
+            return !limited.isEmpty() && !everyCase && limited.stream().noneMatch(saidCases::contains)
+                    && !customerIn(customer, limited);
+        }
+        // The reply refuses a case; a grant that is not about it is set apart when the material refuses that case too —
+        // and only when the grant is not a plain yes of its own (the fifth review, 2026-11-01: a product document is not
+        // the store's exception because of where it is kept). A clause that only states terms (「반품 배송비는 편도
+        // 3,000원입니다」) answers no case; a plain 「가능」 is set apart only where its own document already limits that
+        // remedy by case (「사용 흔적이 있거나 … 어렵습니다」). A plain yes with no case refused beside it disagrees with the
+        // refusal, and which applies stays the seller's.
+        if (saidCases.isEmpty() || casesOf(g.text()).stream().anyMatch(saidCases::contains)) {
+            return false;
+        }
+        boolean backed = grounds.stream().anyMatch(h -> h.refusal()
+                && h.remedies().stream().anyMatch(said.remedies()::contains) && casesOf(h.text()).containsAll(saidCases));
+        if (!backed) {
+            return false;
+        }
+        if (!plainYes(g)) {
+            return true;
+        }
+        return ownPassage.stream().anyMatch(h -> h != g && h.refusal() && !casesOf(h.text()).isEmpty()
+                && h.remedies().stream().anyMatch(g.remedies()::contains));
+    }
+
+    /** Words that make a remedy clause say yes — as opposed to stating its terms (a fee, a period, a document). */
+    private static final List<String> YES = List.of("가능", "수있", "드립니다", "드려요", "드리겠", "해드", "신청", "됩니다", "돼요",
+            "받아드", "진행", "처리");
+
+    private static boolean plainYes(Clause g) {
+        return YES.stream().anyMatch(g.text()::contains);
+    }
+
+    /** The clauses of the passage {@code g} was read from. */
+    private static List<Clause> passageOf(Clause g, List<List<Clause>> passages) {
+        for (List<Clause> p : passages) {
+            for (Clause c : p) {
+                if (c == g) {
+                    return p;
+                }
+            }
+        }
+        return List.of();
+    }
+
+    /** The {@link #CASE_STEMS} a squashed clause names. */
+    static Set<String> casesOf(String squashed) {
+        Set<String> out = new LinkedHashSet<>();
+        for (String stem : CASE_STEMS) {
+            if (squashed.contains(stem)) {
+                out.add(stem);
+            }
+        }
+        return out;
+    }
+
+    /** Whether the customer said theirs is in one of {@code cases}. */
+    static boolean customerIn(String squashedCustomer, Set<String> cases) {
+        if (squashedCustomer.isEmpty()) {
+            return false;
+        }
+        String rest = squashedCustomer;
+        for (String form : NOT_IN_CASE) {
+            rest = rest.replace(form, "|");
+        }
+        for (List<String> kept : KEPT_STATES.values()) {
+            for (String form : kept) {
+                rest = rest.replace(form, "|");
+            }
+        }
+        for (String stem : cases) {
+            List<String> forms = switch (stem) {
+                case "사용" -> LEFT_STATES.get("미사용");
+                case "착용" -> LEFT_STATES.get("미착용");
+                case "개봉" -> LEFT_STATES.get("미개봉");
+                default -> IN_CASE.getOrDefault(stem, List.of(stem + "했", stem + "한"));
+            };
+            for (String f : forms) {
+                if (rest.contains(f)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * The two-letter pieces of how a yes or a no is said — 「가능합니다」, 「불가하며」, 「드리겠습니다」. They tell the two
      * answers apart and nothing about which case a clause is about, so case matching never counts them.
      */
@@ -285,6 +473,7 @@ public final class ReviewClaimGuard {
                 }
                 // The predicate: the clause's ending, after the last noun it names — 「불가 품목은 교환」 ends on a grant.
                 String plain = normalize(part.replaceAll("\\([^)]*\\)", "")).replaceAll("[.!?。,~…]+$", "");
+                plain = COURTESY_TAIL.matcher(plain).replaceFirst("");
                 int from = lastRemedyEnd(plain);
                 String ending = plain.substring(Math.max(Math.max(from, 0), plain.length() - ENDING));
                 String bare = plain;
