@@ -12,10 +12,11 @@
 |---|---|---|
 | 구상 중인 아이템 전체·시뮬레이션으로 평가할 가치와 맹점 | `docs/sellerops_canonical_reference.md` 맨 앞 「현재 아이템 기준」 | 아이템 설명의 단일 갱신처. 회차별 피치는 평가 입력, 미래 확장은 인터뷰 후보이며 현재 개발 범위가 아님 |
 | 톡톡 상담 레인의 현재 동작 · 자동 안내 예외 · 실연동 전 조건 | `docs/inquiry/talktalk_chat_lane_v1.md` §6 · §9 | 합성 시험 통과 ≠ 실제 톡톡 연동. §4.1 표의 TALKTALK 칸은 커머스 API 기준 그대로 |
-| 기업 데모 이후 요구·다음 큰 기능의 범위 | `docs/sellerops_canonical_reference.md` 「현재 아이템 기준」 §7 (2026-11-16) | 기업 인터뷰 원문 취지·미확인 사항·큰 기능 제안·Claude 인계 방식. 톡톡·일괄 상품 변경은 아직 조사·범위 확인 단계 |
+| 기업 데모 이후 요구·다음 큰 기능의 범위 | `docs/sellerops_canonical_reference.md` 「현재 아이템 기준」 §7 (2026-11-16) | 기업 인터뷰 원문 취지·미확인 사항·큰 기능 제안·개발 순서·Claude 인계 방식. 데모 목표는 톡톡까지(구현·합성 시험 완료, 실연동 미검증). 지마켓·배너/옵션 점검과 「검수 범위」·「핵심 장면」은 데모 다음 단계 |
 | 지금 만들고 운영하는 제품의 범위 | `docs/product-scope-v1.md` v1.15 → `docs/reviewnary_product_architecture_proposal_v1.md` §19 | 서버 중심 웹 서비스. 이전 PC 설치형 기본 구조는 전환 이력 |
 | 이미 합의한 목표·아직 열린 결정 | `docs/reviewnary_implementation_goals_draft_v1.md` 질문 76-80 및 각 질문의 날짜 → 제품 구조 §12·§19 | 인터뷰의 확인된 방향과 미정 수치 구분. 목표 합의 ≠ 구현·실행 승인 |
 | 운영 기록을 잇는 중기 방향 | `docs/standing/operational_knowledge_direction_v1.md` → 위 질문 76-80 | 출처·적용 범위·최신성, 업무별 위임. 독립된 약속 이행 추적·외부 AI 쓰기 권한은 완료로 간주하지 않음 |
+| **데모 기능별 목표·현황·판매자에게 보여 줄 때 주의할 점** | `docs/pilot/demo_seller_validation_v1.md` **§7.0** (단일 갱신처) | 개발 순서는 정본 「현재 아이템 기준」 §7. §7.1 이후는 날짜순 작업 기록이고 그 안의 표는 당시 시점 |
 | 이번 데모의 준비와 잔여 과제 | `docs/pilot/demo_seller_validation_v1.md` §7 | §1-6의 과거 계획과 최신 후보 구분. 합성 시연 ≠ 실제 채널·AI·기기 검증 |
 | 효율 KPI와 관찰 방법 | `docs/pilot/pilot_usage_loop_v1.md` §9 (특히 §9.5) | 같은 품질의 직접 작업시간, 대기, 운영자 대행 노동을 분리 |
 | 현재 홈·FE 디자인 | `docs/frontend/reviewnary_design.md` → 데모 검증 §7의 해당 QA | A7 고정은 과거 기준. 이후 오너 승인 변경과 아직 검수 중인 시안을 구분 |
