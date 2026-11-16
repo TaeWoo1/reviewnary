@@ -236,6 +236,8 @@ export function KnowledgeHome() {
                 않으므로 판매자가 다른 어디에서도 볼 수 없다. 어떤 기준이었는지는 말하지 않는다:
                 evidence의 locator에서 이름을 되찾는 것은 외래 키가 받쳐 주지 않는 주장이다. */}
             <Foot>
+              매뉴얼이 없으면 <Link to="/knowledge/defaults" className="font-semibold text-brand-700 underline underline-offset-4">기본 설정</Link>에서
+              자주 묻는 질문에 답하고 확정해 두세요.{" "}
               적어 두지 않은 기준은 답변에 쓰이지 않아요.
               {inventory.orphanRuleCitations > 0 ? (
                 <>
@@ -305,6 +307,11 @@ export function KnowledgeHome() {
             note="여기서 읽은 내용이 위의 기준과 상품 정보가 돼요"
             action={<KnowledgeDocumentAdd scope="ORG" onImported={load} label={COPY.addDocument} />}
           >
+            <p className="break-keep pb-2 text-sm text-muted">
+              매뉴얼을 PC 폴더에 모아 두었다면{" "}
+              <Link to="/knowledge/folder" className="font-semibold text-brand-700 underline underline-offset-4">자료 폴더 동기화</Link>로
+              연결해 두세요. 바뀐 파일이 알아서 새 판으로 올라가요.
+            </p>
             {documents === null ? (
               <Waiting failed={failed.includes("documents")} />
             ) : (

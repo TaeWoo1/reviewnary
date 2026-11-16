@@ -89,6 +89,8 @@ public class ProductAnalysisService {
     private final ChannelRepository channels;
     private final ProductSignalsService signals;
     private final ReviewOpinionReader reader;
+    /** The AI reading of reviews and the written outlook (2026-11-17); absent in a bare test, which reads by rules. */
+    private ReviewAspectOverlay overlay;
 
     public ProductAnalysisService(ProductQueryService productQuery, ProductRepository products,
                                   com.sellerops.review.ReviewRepository reviews, InquiryRepository inquiries,
@@ -104,6 +106,22 @@ public class ProductAnalysisService {
         this.reader = reader;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setOverlay(ReviewAspectOverlay overlay) {
+        this.overlay = overlay;
+    }
+
+    /**
+     * The reviews one product's analysis reads for this period — the same query and cap {@link #analyse} uses, so the
+     * AI reading covers exactly what the screen counts.
+     */
+    @Transactional(readOnly = true)
+    public List<Review> reviewsInWindow(UUID orgId, UUID productId, int days, LocalDate referenceDate) {
+        Period period = Period.of(days, referenceDate);
+        return reviews.findByOrgIdAndProductIdAndReceivedAtGreaterThanEqualAndReceivedAtLessThanOrderByReceivedAtDesc(
+                orgId, productId, period.fromAt(), period.toAt(), PageRequest.of(0, PRODUCT_READ_CAP));
+    }
+
     /** The period's days, defaulting and refusing anything but the offered choices. */
     public static int days(Integer requested) {
         if (requested == null) {
@@ -116,8 +134,23 @@ public class ProductAnalysisService {
     }
 
     public Method method() {
-        return new Method("RULE_BASED", reader.extractorProvenance(), PraiseVocabulary.VERSION,
-                "item-analysis:category");
+        return method(0, 0);
+    }
+
+    /**
+     * How the reviews were read: all by the AI reading, some (the rest by rules), or none. The AI reading is used for a
+     * review only when one exists for its exact words under the current reader version.
+     */
+    Method method(long aiRead, long reviewsRead) {
+        String kind = aiRead == 0 ? "RULE_BASED" : aiRead >= reviewsRead ? "AI_READ" : "MIXED";
+        return new Method(kind, reader.extractorProvenance(), PraiseVocabulary.VERSION, "item-analysis:category",
+                aiRead == 0 || overlay == null ? null : overlay.readerVersion(), aiRead, reviewsRead);
+    }
+
+    /** Each review's opinions: the AI reading where one exists, the rule reader otherwise. */
+    private List<ReviewOpinionReader.Opinion> opinionsOf(Review r, Map<UUID, List<ReviewOpinionReader.Opinion>> ai) {
+        List<ReviewOpinionReader.Opinion> read = ai.get(r.getId());
+        return read != null ? read : reader.read(r.getBody());
     }
 
     @Transactional(readOnly = true)
@@ -181,9 +214,11 @@ public class ProductAnalysisService {
 
         // ── reviews → aspects
         Map<String, AspectTally> byAspect = new LinkedHashMap<>();
-        for (String a : IssueVocabulary.aspects()) {
+        // The AI reading's aspects are a superset of the rule reader's; rows nobody mentioned are dropped below.
+        for (String a : com.sellerops.agent.llm.reviewaspect.ReviewAspectPrompt.ASPECTS) {
             byAspect.put(a, new AspectTally());
         }
+        Map<UUID, List<ReviewOpinionReader.Opinion>> ai = overlay == null ? Map.of() : overlay.readingsFor(orgId, read);
         long[] stars = new long[5];
         long rated = 0;
         long unattributedPraise = 0;
@@ -199,7 +234,7 @@ public class ProductAnalysisService {
             Set<String> praised = new HashSet<>();
             Set<String> complained = new HashSet<>();
             boolean praiseWithoutAspect = false;
-            for (ReviewOpinionReader.Opinion o : reader.read(r.getBody())) {
+            for (ReviewOpinionReader.Opinion o : opinionsOf(r, ai)) {
                 if (o.praise() && o.aspect() == null) {
                     praiseWithoutAspect = true;
                     continue;
@@ -311,10 +346,13 @@ public class ProductAnalysisService {
                 unattributedPraise,
                 MIN_REVIEWS, enough);
         List<Long> starList = List.of(stars[0], stars[1], stars[2], stars[3], stars[4]);
-        return new ProductAnalysisView(productId, name, scope, method(),
-                new RatingSpread(rated, starList), aspects, topics,
-                swot(aspects, topics, new Sample(reviewsRead, reviewsCapped), new Sample(inquiriesRead, inquiriesCapped),
-                        enough));
+        Swot swot = swot(aspects, topics, new Sample(reviewsRead, reviewsCapped),
+                new Sample(inquiriesRead, inquiriesCapped), enough);
+        if (overlay != null && productId != null && RANGE_PRODUCT.equals(range)) {
+            swot = overlay.withWrittenOutlook(orgId, productId, swot, aspects, topics);
+        }
+        return new ProductAnalysisView(productId, name, scope, method(ai.size(), reviewsRead),
+                new RatingSpread(rated, starList), aspects, topics, swot);
     }
 
     /** The store's products on the same axes, period and denominator. */
@@ -331,15 +369,17 @@ public class ProductAnalysisService {
                 .findByOrgIdAndProductIdIsNotNullAndReceivedAtGreaterThanEqualAndReceivedAtLessThanOrderByReceivedAtDesc(
                         orgId, fromAt, toAt, PageRequest.of(0, STORE_READ_CAP));
         Map<UUID, long[]> tally = new LinkedHashMap<>();
+        Map<UUID, List<ReviewOpinionReader.Opinion>> ai = overlay == null ? Map.of() : overlay.readingsFor(orgId, read);
         for (Review r : read) {
             long[] t = tally.computeIfAbsent(r.getProductId(), k -> new long[3]);
             t[0]++;
             boolean praise = false;
             boolean complaint = false;
-            for (ReviewOpinionReader.Opinion o : reader.read(r.getBody())) {
+            for (ReviewOpinionReader.Opinion o : opinionsOf(r, ai)) {
                 if (o.praise() && o.aspect() != null) {
                     praise = true;
-                } else if (!o.praise()) {
+                } else if (!o.praise() && o.aspect() != null) {
+                    // A complaint about the product as a whole (AI 「전반」) names no aspect, as no rule complaint does.
                     complaint = true;
                 }
             }
@@ -384,7 +424,7 @@ public class ProductAnalysisService {
         return new Comparison(from, to, days, read.size(), linked > read.size(),
                 reviews.countByOrgIdAndProductIdIsNullAndReceivedAtGreaterThanEqualAndReceivedAtLessThan(orgId, fromAt, toAt),
                 inquiries.countByOrgIdAndProductIdIsNullAndReceivedAtGreaterThanEqualAndReceivedAtLessThan(orgId, fromAt, toAt),
-                bucketReviews, bucketInquiries, MIN_REVIEWS, method(), points);
+                bucketReviews, bucketInquiries, MIN_REVIEWS, method(ai.size(), read.size()), points);
     }
 
     // ── SWOT
@@ -416,7 +456,9 @@ public class ProductAnalysisService {
                             rv.label("리뷰") + " 중 " + a.complaintReviews() + "건이 " + a.aspect() + " 문제를 말했어요",
                             a.complaintReviews(), reviews, List.of(), null));
                     boolean severe = a.problems().stream()
-                            .anyMatch(p -> IssueVocabulary.severityOf(p) == IssueSeverity.HIGH);
+                            // An AI-read complaint may carry no listed problem (「기타」); only listed ones have a severity.
+                            .anyMatch(p -> com.sellerops.agent.llm.reviewaspect.ReviewAspectPrompt.PROBLEMS.contains(p)
+                                    && IssueVocabulary.severityOf(p) == IssueSeverity.HIGH);
                     if (severe) {
                         t.add(new Cell("T:" + a.aspect() + ":severe", "HYPOTHESIS", "REVIEW",
                                 a.aspect() + " 문제가 반품·낮은 별점으로 이어질 위험",

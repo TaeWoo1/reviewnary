@@ -41,7 +41,12 @@ public record ProductAnalysisView(UUID productId, String productName, Scope scop
     }
 
     /** How the reading was made — rule-based, said in so many words. */
-    public record Method(String kind, String complaintRules, String praiseRules, String inquiryRules) {
+    /**
+     * How the reviews were read. {@code kind}: RULE_BASED, AI_READ (every review read by the review-aspect model) or
+     * MIXED ({@code aiReadReviews} of {@code reviewsRead} by the model, the rest by the word lists).
+     */
+    public record Method(String kind, String complaintRules, String praiseRules, String inquiryRules, String aiReader,
+                         long aiReadReviews, long reviewsRead) {
     }
 
     /** 1★..5★ counts. Context only: no strength or weakness is derived from it. */

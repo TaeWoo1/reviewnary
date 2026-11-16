@@ -197,11 +197,11 @@ public final class TalkTalkGuidanceRules {
         return part + "시" + (t.getMinute() == 0 ? "" : " " + t.getMinute() + "분");
     }
 
-    static String dayLabel(LocalDate d) {
+    public static String dayLabel(LocalDate d) {
         return d.getMonthValue() + "월 " + d.getDayOfMonth() + "일(" + weekdayKo(d.getDayOfWeek()) + ")";
     }
 
-    static String daysLabel(Set<DayOfWeek> days) {
+    public static String daysLabel(Set<DayOfWeek> days) {
         EnumSet<DayOfWeek> weekdays = EnumSet.range(DayOfWeek.MONDAY, DayOfWeek.FRIDAY);
         if (days.equals(weekdays)) {
             return "평일(월~금)";

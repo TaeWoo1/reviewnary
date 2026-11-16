@@ -9,5 +9,8 @@ package com.sellerops.agent.quota;
  *
  * <p>{@code RETRIEVE} joined them on 2026-10-31 ({@code docs/standing/reply_agent_v1.md} §8 ②): the search helpers —
  * question intent, evidence eligibility, embeddings — reached a vendor on every search and left no row.
+ *
+ * <p>{@code ANALYZE} joined them on 2026-11-17: reading reviews into aspects and writing a product's opportunities and
+ * threats from them (review-aspect capability), pressed by the seller on the analysis screen.
  */
-public enum AgentUsageKind { PLAN, JUDGE, DRAFT, CONVERSE, INVESTIGATE, INTERPRET, REPLY, TRIAGE, RETRIEVE }
+public enum AgentUsageKind { PLAN, JUDGE, DRAFT, CONVERSE, INVESTIGATE, INTERPRET, REPLY, TRIAGE, RETRIEVE, ANALYZE }

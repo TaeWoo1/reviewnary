@@ -318,7 +318,7 @@ public class KnowledgeDocumentService {
      * <p>The filename with its extension removed — the seller named the file, and a title we composed
      * would be a second name for the same thing. Bounded to the column, and never empty.
      */
-    static String titleFor(String filename) {
+    public static String titleFor(String filename) {
         String name = filename == null ? "" : filename.strip();
         int slash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
         if (slash >= 0) {

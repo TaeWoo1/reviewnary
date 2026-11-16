@@ -54,6 +54,9 @@ sellerops.inquiry-decision.api-key: ${RUNYOUR_API_KEY:}
 sellerops.review.media-vision.vendor: RUNYOUR
 sellerops.review.media-vision.model: ${RUNYOUR_VISION_MODEL:${RUNYOUR_MODEL:anthropic/claude-opus-5-5}}
 sellerops.review.media-vision.api-key: ${RUNYOUR_API_KEY:}
+sellerops.review.aspect.vendor: RUNYOUR
+sellerops.review.aspect.model: ${RUNYOUR_MODEL:anthropic/claude-opus-5-5}
+sellerops.review.aspect.api-key: ${RUNYOUR_API_KEY:}
 # Unknown Runyour prices must never silently inherit direct Anthropic/OpenAI dollar estimates.
 # The USD evaluation meter is optional. When enabled it requires verified USD-equivalent prices.
 # Credit rounding and exchange rates must be included separately in the approved evaluation estimate.

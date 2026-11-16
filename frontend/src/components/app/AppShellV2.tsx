@@ -2,6 +2,7 @@ import { documentTitleFor } from "../../lib/nav.v2";
 import { useEffect, useState } from "react";
 import { MotionConfig } from "motion/react";
 import { Outlet, useLocation } from "react-router-dom";
+import { FolderSyncRunner } from "../knowledge/FolderSyncRunner";
 import { AppTopBar } from "./AppTopBar";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { MoreDrawer } from "./MoreDrawer";
@@ -77,6 +78,8 @@ export function AppShellV2() {
       <DemoRibbon />
       {/* One bar across the top on every width (2026-11-12): the desktop rail is gone, the page has the full width. */}
       <AppTopBar />
+      {/* 자료 폴더 동기화 (2026-11-17): looks at a held folder while the window is open; one line only when a file stopped. */}
+      <FolderSyncRunner />
 
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">

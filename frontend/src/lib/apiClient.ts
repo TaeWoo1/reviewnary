@@ -15,9 +15,11 @@ import type {
   TalkTalkStatus,
   TalkTalkSummary,
 } from "./talktalk";
+import type { DefaultPolicyAnswer, DefaultPolicyOverview } from "./defaultPolicy";
+import type { FolderEntry, FolderScanResult, FolderStatus, FolderUploadResult } from "./folderSync";
 import { isWorkWrite, noteWorkWrite } from "./workChanges";
 import type { HomeBoardView, WorkPage, WorkSort, WorkView } from "./homeBoard";
-import type { ProductAnalysisView, ProductComparison } from "./productAnalysis";
+import type { AspectReadSummary, ProductAnalysisView, ProductComparison } from "./productAnalysis";
 import type {
   OpenQuestionItem,
   OpenQuestionResolution,
@@ -2972,6 +2974,18 @@ export const api = {
   },
 
   /** 상품·브랜드 분석 for one product over 30·90·180·365 days. Rule-based; no model call. */
+  async getAspectReadAvailable(): Promise<{ enabled: boolean }> {
+    const { data } = await http.get<{ enabled: boolean }>("/api/products/analysis/ai-read");
+    return data;
+  },
+  async readProductAnalysisWithAi(productId: string, days: number): Promise<AspectReadSummary> {
+    const { data } = await http.post<AspectReadSummary>(
+      `/api/products/${encodeURIComponent(productId)}/analysis/ai-read`,
+      null,
+      { params: { days }, timeout: 300_000 },
+    );
+    return data;
+  },
   async getProductAnalysis(productId: string, days: number): Promise<ProductAnalysisView> {
     const { data } = await http.get<ProductAnalysisView>(
       `/api/products/${encodeURIComponent(productId)}/analysis`,
@@ -3016,6 +3030,55 @@ export const api = {
     const { data } = await http.post<TalkTalkStatus>(`/api/talktalk/guidance/${encodeURIComponent(id)}/confirm`, {
       expectedFingerprint,
     });
+    return data;
+  },
+  async getKnowledgeFolder(): Promise<FolderStatus> {
+    const { data } = await http.get<FolderStatus>("/api/knowledge/folder");
+    return data;
+  },
+  async scanKnowledgeFolder(body: {
+    folderName: string;
+    mode: "WATCH" | "UPLOAD";
+    complete: boolean;
+    replaceFolder: boolean;
+    files: FolderEntry[];
+  }): Promise<FolderScanResult> {
+    const { data } = await http.post<FolderScanResult>("/api/knowledge/folder/scan", body, { timeout: MODEL_TIMEOUT_MS });
+    return data;
+  },
+  async uploadKnowledgeFolderFile(path: string, sha256: string | null, file: File): Promise<FolderUploadResult> {
+    const form = new FormData();
+    form.append("path", path);
+    if (sha256) form.append("sha256", sha256);
+    form.append("file", file);
+    const { data } = await http.post<FolderUploadResult>("/api/knowledge/folder/file", form, {
+      timeout: MODEL_TIMEOUT_MS,
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return data;
+  },
+  async useKnowledgeFolderCopy(fileId: string): Promise<FolderStatus> {
+    const { data } = await http.post<FolderStatus>(`/api/knowledge/folder/files/${encodeURIComponent(fileId)}/use-folder`);
+    return data;
+  },
+  async unlinkKnowledgeFolder(): Promise<FolderStatus> {
+    const { data } = await http.delete<FolderStatus>("/api/knowledge/folder");
+    return data;
+  },
+  async getDefaultPolicy(): Promise<DefaultPolicyOverview> {
+    const { data } = await http.get<DefaultPolicyOverview>("/api/knowledge/defaults");
+    return data;
+  },
+  async saveDefaultPolicyDraft(key: string, body: DefaultPolicyAnswer): Promise<DefaultPolicyOverview> {
+    const { data } = await http.put<DefaultPolicyOverview>(`/api/knowledge/defaults/${encodeURIComponent(key)}/draft`, body);
+    return data;
+  },
+  async confirmDefaultPolicy(key: string, body: DefaultPolicyAnswer): Promise<DefaultPolicyOverview> {
+    const { data } = await http.post<DefaultPolicyOverview>(`/api/knowledge/defaults/${encodeURIComponent(key)}/confirm`, body);
+    return data;
+  },
+  async unconfirmDefaultPolicy(key: string): Promise<DefaultPolicyOverview> {
+    const { data } = await http.post<DefaultPolicyOverview>(`/api/knowledge/defaults/${encodeURIComponent(key)}/unconfirm`);
     return data;
   },
   async retireTalkTalkGuidance(id: string): Promise<TalkTalkStatus> {

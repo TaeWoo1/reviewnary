@@ -57,6 +57,8 @@ import { OperationsHome } from "./pages/OperationsHome";
 import { Operations } from "./pages/Operations";
 import { AlertSettings } from "./pages/AlertSettings";
 import { KnowledgeHome } from "./pages/app/KnowledgeHome";
+import { DefaultPolicySetup } from "./pages/app/DefaultPolicySetup";
+import { KnowledgeFolder } from "./pages/app/KnowledgeFolder";
 import { OperationsPolicies } from "./pages/app/OperationsPolicies";
 import { AnswerStyle } from "./pages/app/AnswerStyle";
 import { ReviewReplyTemplates } from "./pages/app/ReviewReplyTemplates";
@@ -208,6 +210,8 @@ export function App() {
         <Route path="/settings/alerts" element={<AlertSettings />} />
         <Route path="/settings/talktalk" element={<TalkTalkSettings />} />
         <Route path="/knowledge" element={<KnowledgeHome />} />
+        <Route path="/knowledge/defaults" element={<DefaultPolicySetup />} />
+        <Route path="/knowledge/folder" element={<KnowledgeFolder />} />
         <Route path="/start" element={<StartPrep />} />
         <Route path="/settings/policies" element={<OperationsPolicies />} />
         <Route path="/settings/style" element={<AnswerStyle />} />

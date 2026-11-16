@@ -91,6 +91,9 @@ class AgentDraftBoundaryTest {
             // photo, with that review's rating and words. Its own door, flag, key and model.
             new String[] {"ReviewMediaVisionGenerator", "ReviewMediaInspector.java",
                     "ReviewMediaVisionGenerator.java"},
+            // The review-aspect reader (2026-11-17, canonical §7 goal A): many reviews' words and stars by position
+            // leave on a seller's press, read into aspect opinions; the same door writes the outlook from them.
+            new String[] {"ReviewAspectGenerator", "ReviewAspectReader.java", "ReviewAspectGenerator.java"},
             // The thirteenth (Inquiry Decision v2, 2026-09-19): the customer's inquiry, the seller's candidate evidence
             // and past answers, by position, on the assessment path — planning and judging needs. Its own door, flag,
             // key and org list, because it is the only capability whose output decides whether a Case may be
@@ -118,7 +121,7 @@ class AgentDraftBoundaryTest {
             "KnowledgeEligibilityGenerator.java", "AgentReportNarrativeGenerator.java",
             "AgentConverseGenerator.java", "CaseInvestigationGenerator.java", "ReviewMediaVisionGenerator.java",
             "InquiryDecisionGenerator.java",
-            "InquiryGoalGenerator.java", "ReplyAgentGenerator.java",
+            "InquiryGoalGenerator.java", "ReplyAgentGenerator.java", "ReviewAspectGenerator.java",
             "JdkAgentLlmTransport.java", "AgentLlmConfiguration.java");
 
     /** Either way into the transport — {@code postProductImages} is a {@code .post} too (LlmSendGate). */
@@ -138,7 +141,11 @@ class AgentDraftBoundaryTest {
                     if (name.equals(capability[1]) || name.equals(capability[2])) {
                         continue;
                     }
-                    if (code.contains("new " + generator + "(") || code.contains(generator + "::new")) {
+                    // A fully qualified name (`new com.sellerops….Generator(`) is the same construction; matching only the
+                    // simple name let it through (B203, 2026-11-17).
+                    java.util.regex.Pattern constructs = java.util.regex.Pattern.compile(
+                            "new\\s+(?:[\\w$]+\\.)*" + generator + "\\s*\\(|(?:[\\w$]+\\.)*" + generator + "::new");
+                    if (constructs.matcher(code).find()) {
                         offenders.add(name + " (constructs " + generator + ")");
                     }
                 }
@@ -185,6 +192,7 @@ class AgentDraftBoundaryTest {
                 new String[] {"sellerops.agent.report.", "AgentReportProperties.java"},
                 new String[] {"sellerops.responsibility.investigation.", "CaseInvestigationProperties.java"},
                 new String[] {"sellerops.review.media-vision.", "ReviewMediaVisionProperties.java"},
+                new String[] {"sellerops.review.aspect.", "ReviewAspectProperties.java"},
                 new String[] {"sellerops.inquiry-decision.", "InquiryDecisionProperties.java"},
                 new String[] {"sellerops.inquiry-goal.", "InquiryGoalProperties.java"},
                 new String[] {"sellerops.reply-agent.", "ReplyAgentProperties.java"});

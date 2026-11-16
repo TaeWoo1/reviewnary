@@ -59,10 +59,26 @@ export interface AnalysisScope {
 }
 
 export interface AnalysisMethod {
+  /** RULE_BASED · AI_READ (every review read by the review-aspect model) · MIXED (some, the rest by word rules). */
   kind: string;
   complaintRules: string;
   praiseRules: string;
   inquiryRules: string;
+  aiReader?: string | null;
+  aiReadReviews?: number;
+  reviewsRead?: number;
+}
+
+/** What one 「AI로 읽기」 press did (backend `ProductAspectReadingService.ReadSummary`). */
+export interface AspectReadSummary {
+  calls: number;
+  textsRead: number;
+  remaining: number;
+  failedBatches: number;
+  /** QUOTA — today's AI ceiling or the evaluation budget; CALLS — this press's bound. */
+  stopped: "QUOTA" | "CALLS" | null;
+  outlookWritten: boolean;
+  analysis: ProductAnalysisView;
 }
 
 export interface AnalysisQuote {
@@ -102,7 +118,8 @@ export interface AnalysisInquiryTopic {
 export interface SwotCell {
   key: string;
   kind: "OBSERVED" | "HYPOTHESIS";
-  source: "REVIEW" | "INQUIRY";
+  /** AI: an opportunity/threat the review-aspect model wrote from the observed cells it names. */
+  source: "REVIEW" | "INQUIRY" | "AI";
   title: string;
   basis: string;
   count: number;

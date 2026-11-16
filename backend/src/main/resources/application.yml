@@ -1128,6 +1128,21 @@ sellerops:
       api-key: ${SELLEROPS_REVIEW_MEDIA_VISION_API_KEY:}
       max-output-tokens: ${SELLEROPS_REVIEW_MEDIA_VISION_MAX_OUTPUT_TOKENS:600}
       reasoning-effort: ${SELLEROPS_REVIEW_MEDIA_VISION_REASONING_EFFORT:none}
+    # Review aspect reading (owner decision 2026-11-17, canonical §7 goal A): many reviews' words and stars, by position
+    # — no ids, names or orders — read into aspect · evaluation · evidence for the strengths/weaknesses analysis, and a
+    # product's opportunities/threats written from that evidence. OFF by default and org-scoped; only a seller's press
+    # on the analysis screen calls it, bounded per press.
+    aspect:
+      enabled: ${SELLEROPS_REVIEW_ASPECT_ENABLED:false}
+      enabled-org-ids: ${SELLEROPS_REVIEW_ASPECT_ORG_IDS:}
+      vendor: ${SELLEROPS_REVIEW_ASPECT_VENDOR:OPENAI}
+      model: ${SELLEROPS_REVIEW_ASPECT_MODEL:gpt-5-2025-08-07}
+      api-key: ${SELLEROPS_REVIEW_ASPECT_API_KEY:}
+      max-output-tokens: ${SELLEROPS_REVIEW_ASPECT_MAX_OUTPUT_TOKENS:8000}
+      reasoning-effort: ${SELLEROPS_REVIEW_ASPECT_REASONING_EFFORT:low}
+      max-text-chars: ${SELLEROPS_REVIEW_ASPECT_MAX_TEXT_CHARS:500}
+      batch-size: ${SELLEROPS_REVIEW_ASPECT_BATCH_SIZE:40}
+      max-calls-per-request: ${SELLEROPS_REVIEW_ASPECT_MAX_CALLS_PER_REQUEST:8}
     publish:
       # The review-reply API lane (Agentic Operating Workspace v2 §A2) — reviewnary posting an APPROVED
       # reply as a Cafe24 board comment. Off by default and absent from every deployment that has not

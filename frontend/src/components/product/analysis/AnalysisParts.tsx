@@ -58,6 +58,20 @@ export function PeriodSwitch({
   );
 }
 
+/** How the reviews were read, in one sentence. */
+export function methodLine(view: ProductAnalysisView): string {
+  const m = view.method;
+  const read = m.aiReadReviews ?? 0;
+  const total = m.reviewsRead ?? 0;
+  if (m.kind === "AI_READ") {
+    return `읽는 방법: AI가 리뷰 ${count(total)}건을 모두 측면·평가로 읽었고, 근거는 리뷰 원문 그대로예요 (정확도 측정 중).`;
+  }
+  if (m.kind === "MIXED") {
+    return `읽는 방법: 리뷰 ${count(total)}건 중 ${count(read)}건은 AI가, 나머지는 단어 규칙으로 읽었어요 (정확도 측정 중).`;
+  }
+  return "읽는 방법: 고객 문장의 단어 규칙 (모델 분석 아님 · 정확도 측정 전).";
+}
+
 /** What was read: period, sample, channels, read cap, unlinked rows, empty channels and the method. */
 export function ScopeLines({ view }: { view: ProductAnalysisView }) {
   const s: AnalysisScope = view.scope;
@@ -69,6 +83,11 @@ export function ScopeLines({ view }: { view: ProductAnalysisView }) {
         <span className="font-semibold">{periodLabel(s.from, s.to)}</span> (
         {s.days}일) · 리뷰 {count(s.reviews)}건 · 문의 {count(s.inquiries)}건
       </p>
+      {view.method.kind !== "RULE_BASED" ? (
+        <p className="text-ink" data-testid="analysis-ai-read">
+          AI가 읽은 리뷰 {count(view.method.aiReadReviews ?? 0)}건 / {count(view.method.reviewsRead ?? 0)}건
+        </p>
+      ) : null}
       {s.reviewsCapped ? (
         <p className="text-warn">
           리뷰가 많아 최근 {count(s.reviewsRead)}건만 읽었어요. 아래 리뷰 수는
@@ -135,8 +154,7 @@ export function ScopeLines({ view }: { view: ProductAnalysisView }) {
             </p>
           ) : null}
           <p>
-            읽는 방법: 고객 문장의 단어 규칙 (모델 분석 아님 · 정확도 측정 전).
-            경쟁사·시장 자료는 없어 비교하지 않았어요.
+            {methodLine(view)} 경쟁사·시장 자료는 없어 비교하지 않았어요.
           </p>
         </div>
       </Disclosure>
@@ -242,7 +260,7 @@ export function SwotGrid({
                           c.title
                         )}{" "}
                         <span className="text-xs font-normal text-muted">
-                          {c.source === "INQUIRY" ? "문의" : "리뷰"}
+                          {c.source === "INQUIRY" ? "문의" : c.source === "AI" ? "AI가 근거로 쓴 가설" : "리뷰"}
                         </span>
                       </p>
                       <p className="text-sm text-muted">{c.basis}</p>

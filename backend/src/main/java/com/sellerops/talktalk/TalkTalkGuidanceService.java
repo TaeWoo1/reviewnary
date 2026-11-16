@@ -28,6 +28,8 @@ public class TalkTalkGuidanceService {
     private final TalkTalkAccess access;
     private final TalkTalkClock clock;
     private final TalkTalkConnectionRepository connections;
+    /** Who else writes the confirmed 출고 마감·휴무 somewhere (the 기본 설정 shipping document); empty in a bare test. */
+    private List<TalkTalkGuidanceListener> listeners = List.of();
 
     public TalkTalkGuidanceService(TalkTalkGuidanceRepository guidance, TalkTalkDelegationRepository delegations,
                                    TalkTalkOutboundRepository outbound, TalkTalkAccess access, TalkTalkClock clock,
@@ -38,6 +40,11 @@ public class TalkTalkGuidanceService {
         this.outbound = outbound;
         this.access = access;
         this.clock = clock;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setListeners(List<TalkTalkGuidanceListener> listeners) {
+        this.listeners = listeners == null ? List.of() : List.copyOf(listeners);
     }
 
     public record Input(Integer cutoffHour, Integer cutoffMinute, List<String> dispatchDays,
@@ -96,8 +103,9 @@ public class TalkTalkGuidanceService {
         g.setStatus(TalkTalkGuidance.Status.CONFIRMED);
         g.setConfirmedBy(userId);
         g.setConfirmedAt(now);
-        TalkTalkGuidance saved = guidance.save(g);
+        TalkTalkGuidance saved = guidance.saveAndFlush(g);
         outbound.cancelQueuedAutoForOrg(orgId, "GUIDANCE_CHANGED", now);
+        listeners.forEach(l -> l.guidanceChanged(orgId));
         return saved;
     }
 
@@ -113,7 +121,9 @@ public class TalkTalkGuidanceService {
         g.setStatus(TalkTalkGuidance.Status.RETIRED);
         g.setRetiredAt(clock.now());
         outbound.cancelQueuedAutoForOrg(orgId, "GUIDANCE_RETIRED", clock.now());
-        return guidance.save(g);
+        TalkTalkGuidance saved = guidance.saveAndFlush(g);
+        listeners.forEach(l -> l.guidanceChanged(orgId));
+        return saved;
     }
 
     @Transactional(readOnly = true)

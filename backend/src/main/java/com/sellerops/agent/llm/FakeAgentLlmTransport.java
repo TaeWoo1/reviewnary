@@ -186,12 +186,89 @@ public final class FakeAgentLlmTransport implements AgentLlmTransport {
         return root.toString();
     }
 
+    private static final Pattern ASPECT_LINE = Pattern.compile("(?m)^(\\d+)\\. (?:\\(★(\\d)\\) )?(.*)$");
+    private static final Pattern OUTLOOK_KEY = Pattern.compile("(?m)^- key=([^ ]+) ");
+
+    /**
+     * Review-aspect reading, by rule (2026-11-17): 「배송」 in a review is a 배송 opinion signed by its stars; otherwise
+     * 4–5★ is overall praise and 1–2★ an overall complaint, the whole review as evidence. Not a quality model.
+     */
+    static String reviewAspects(String user) {
+        ObjectNode root = MAPPER.createObjectNode();
+        var reviews = root.putArray("reviews");
+        Matcher m = ASPECT_LINE.matcher(user);
+        while (m.find()) {
+            ObjectNode r = reviews.addObject();
+            r.put("i", Integer.parseInt(m.group(1)));
+            var opinions = r.putArray("opinions");
+            int stars = m.group(2) == null ? 3 : Integer.parseInt(m.group(2));
+            String text = m.group(3).strip();
+            if (text.contains("배송")) {
+                ObjectNode o = opinions.addObject();
+                o.put("aspect", "배송");
+                o.put("polarity", stars >= 4 ? "POSITIVE" : "NEGATIVE");
+                if (stars >= 4) {
+                    o.putNull("problem");
+                } else {
+                    o.put("problem", "지연");
+                }
+                o.put("evidence", "배송");
+            } else if (stars != 3 && !text.isEmpty()) {
+                ObjectNode o = opinions.addObject();
+                o.put("aspect", "전반");
+                o.put("polarity", stars >= 4 ? "POSITIVE" : "NEGATIVE");
+                o.putNull("problem");
+                o.put("evidence", text);
+            }
+        }
+        return root.toString();
+    }
+
+    /** One opportunity from the first strength and one threat from the first weakness given, citing them. */
+    static String reviewOutlook(String user) {
+        String strength = null;
+        String weakness = null;
+        Matcher m = OUTLOOK_KEY.matcher(user);
+        while (m.find()) {
+            String key = m.group(1);
+            if (strength == null && key.startsWith("S:")) {
+                strength = key;
+            } else if (weakness == null && key.startsWith("W:")) {
+                weakness = key;
+            }
+        }
+        ObjectNode root = MAPPER.createObjectNode();
+        var o = root.putArray("opportunities");
+        var t = root.putArray("threats");
+        if (strength != null) {
+            ObjectNode c = o.addObject();
+            c.put("title", "[가짜 모델] 강점을 상세페이지에");
+            c.put("basis", "[가짜 모델] 칭찬이 반복된 측면을 앞세워 볼 수 있어요");
+            c.put("check", "문구를 바꾼 뒤 같은 기간을 비교해 보세요");
+            c.putArray("derivedFrom").add(strength);
+        }
+        if (weakness != null) {
+            ObjectNode c = t.addObject();
+            c.put("title", "[가짜 모델] 반복 불만 확인");
+            c.put("basis", "[가짜 모델] 같은 불만이 이어지면 별점에 영향을 줄 수 있어요");
+            c.put("check", "다음 기간에도 같은 불만이 나오는지 보세요");
+            c.putArray("derivedFrom").add(weakness);
+        }
+        return root.toString();
+    }
+
     static String answer(String system, String user) {
         if (system.contains(PLAN_MARK)) {
             return plan(user);
         }
         if (system.contains(JUDGE_MARK) || system.contains(JUDGE_MARK_V1)) {
             return judge(system, user);
+        }
+        if (system.contains(com.sellerops.agent.llm.reviewaspect.ReviewAspectPrompt.READ_MARK)) {
+            return reviewAspects(user);
+        }
+        if (system.contains(com.sellerops.agent.llm.reviewaspect.ReviewAspectPrompt.OUTLOOK_MARK)) {
+            return reviewOutlook(user);
         }
         String review = between(user, "고객 리뷰:\n", "\n\n");
         if (system.contains("고객 응대 분류 담당")) {

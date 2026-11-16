@@ -56,9 +56,9 @@ public final class KnowledgeDocumentText {
     }
 
     /** The refusal sentence, written once so every caller says the same thing. */
-    static final String EXCEL_REFUSAL = "엑셀 파일은 자료 올리기로 읽지 않습니다. 지식 화면의 「엑셀로 관리」에서 내려받은 "
+    public static final String EXCEL_REFUSAL = "엑셀 파일은 자료 올리기로 읽지 않습니다. 지식 화면의 「엑셀로 관리」에서 내려받은 "
             + "「답글 기준.xlsx」에 옮겨 적어 올리거나, 표를 CSV로 저장해 올려 주세요.";
-    static final String PASSWORD_REFUSAL = "암호가 걸린 PDF는 읽을 수 없습니다. 암호를 푼 사본을 저장해 다시 올려 주세요.";
+    public static final String PASSWORD_REFUSAL = "암호가 걸린 PDF는 읽을 수 없습니다. 암호를 푼 사본을 저장해 다시 올려 주세요.";
 
     public static String acceptedListKo() {
         return "PDF · DOCX · TXT · MD · CSV 파일을 읽을 수 있습니다.";
