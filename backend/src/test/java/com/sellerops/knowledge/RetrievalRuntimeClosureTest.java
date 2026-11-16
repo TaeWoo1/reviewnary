@@ -73,9 +73,14 @@ class RetrievalRuntimeClosureTest {
      * <p>Two of them WRITE a draft version (the inquiry assessment the composer reads, and the review composer); the
      * third is the case investigation, which reads the SAME assessment the inquiry draft reads rather than searching
      * on its own — the defect this package closed.
+     *
+     * <p>TalkTalk (2026-11-17) adds a fourth: the chat lane's model draft is its own work unit (a TalkTalk
+     * conversation is not an inquiry, so it has no inquiry assessment to share). It asks the Spine once per draft
+     * version it writes, and nothing else in the lane re-runs that retrieval (TalkTalk Chat Lane v1 §5).
      */
     private static final List<String> MAY_ASK_THE_SPINE = List.of(
-            "InquiryKnowledgeAssessor.java", "ReviewDraftComposer.java", "CaseInvestigationTools.java");
+            "InquiryKnowledgeAssessor.java", "ReviewDraftComposer.java", "CaseInvestigationTools.java",
+            "TalkTalkDraftService.java");
 
     @Test
     @DisplayName("one retrieval: the Spine runs the lanes, and only a work unit asks the Spine")

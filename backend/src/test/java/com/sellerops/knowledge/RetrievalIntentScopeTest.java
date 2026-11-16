@@ -60,8 +60,10 @@ class RetrievalIntentScopeTest {
         // convenience, the shared inquiry assessment the draft and the investigation both read, the review draft,
         // and the investigation of a review. Each of the four is holding the customer's own words; a planner's need
         // sentence, a seller's search box and the knowledge library screen are still deliberately not on this list.
+        // TalkTalk (2026-11-17): the chat lane's model draft is a fifth work unit holding a customer's own message —
+        // one retrieval per draft version, scoped to the conversation's product (TalkTalk Chat Lane v1 §5).
         assertThat(callers).containsExactlyInAnyOrder(
                 "InquiryEvidenceRetriever.java", "InquiryKnowledgeAssessor.java", "ReviewDraftComposer.java",
-                "CaseInvestigationTools.java");
+                "CaseInvestigationTools.java", "TalkTalkDraftService.java");
     }
 }
