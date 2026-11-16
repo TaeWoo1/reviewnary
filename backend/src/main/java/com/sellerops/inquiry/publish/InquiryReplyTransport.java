@@ -41,7 +41,9 @@ public enum InquiryReplyTransport {
 
     /**
      * The channel offers no path at all — not an API, not a seller-completable surface SellerOps could
-     * validate. NAVER TalkTalk is this: the Commerce API's 문의 domain has no TalkTalk endpoint.
+     * validate. NAVER TalkTalk is this <i>for the Commerce API</i>: its 문의 domain has no TalkTalk endpoint. TalkTalk's
+     * separate chatbot API (webhook + send) is its own lane, not an inquiry transport —
+     * {@code docs/inquiry/talktalk_chat_lane_v1.md}, synthetic tests only.
      *
      * <p>Reserved for a limitation that belongs to the channel. Where the refusal is SellerOps' own,
      * the answer is {@link #PLATFORM_SUPPORTED_NOT_IMPLEMENTED}, and where nobody has looked it is

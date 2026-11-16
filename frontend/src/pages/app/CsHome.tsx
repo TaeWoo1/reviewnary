@@ -1,3 +1,4 @@
+import { TalkTalkHomeLine } from "../../components/talktalk/TalkTalkHomeLine";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Btn, BtnLink } from "../../components/ui/Btn";
@@ -61,7 +62,9 @@ export function CsHome({ now = new Date() }: { now?: Date }) {
     [channels, coverage.data, accounts.data, gaps, now],
   );
 
-  if (firstUse?.kind === "NO_CHANNEL") return <AgentHome now={now} />;
+  // No marketplace connected → the first-use home. TalkTalk is not a marketplace channel, so a TalkTalk-only store
+  // lands here too, and its waiting conversations go under that screen's title (the line hides itself otherwise).
+  if (firstUse?.kind === "NO_CHANNEL") return <AgentHome now={now} notice={<TalkTalkHomeLine refresh={tick} />} />;
 
   const kpi = (key: string) => kpiTally(metrics?.kpis.find((k) => k.key === key));
   const inquiries = kpi("inquiries");
@@ -144,6 +147,8 @@ export function CsHome({ now = new Date() }: { now?: Date }) {
       >
         {notesOpen ? "숫자 설명 접기" : "숫자 설명 보기"}
       </button>
+
+      <TalkTalkHomeLine refresh={tick} />
 
       <section aria-labelledby="cs-channels-h" className="rounded-xl border border-line bg-surface" data-testid="cs-channels">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 pt-3">

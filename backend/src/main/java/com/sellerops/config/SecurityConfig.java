@@ -92,6 +92,10 @@ public class SecurityConfig {
                         // cafe24.com carries no JWT — identity is recovered from the single-use,
                         // tenant-bound state inside the handler. The /start endpoint stays authed.
                         .requestMatchers(HttpMethod.GET, "/api/connect/cafe24/callback").permitAll()
+                        // NAVER TalkTalk chatbot webhook (docs/inquiry/talktalk_chat_lane_v1.md §3): TalkTalk's
+                        // servers carry no JWT and the protocol documents no signature; the handler checks the
+                        // path token, the connection and (when enforced) the documented source ranges. POST only.
+                        .requestMatchers(HttpMethod.POST, "/api/talktalk/webhook/*").permitAll()
                         .anyRequest().authenticated())
                 // Return 401 (not the default 403) when no valid token is present.
                 .exceptionHandling(e -> e.authenticationEntryPoint(

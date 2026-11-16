@@ -7,7 +7,7 @@ import { Link } from "react-router-dom";
  * that names /reviews or /inquiries still opens what it named. Coral draws a choice of two to four as a groove
  * pressed into the paper with a card riding in the chosen stop — links, not tabs: each side is a page.
  */
-export function ReviewInquirySwitch({ current }: { current: "reviews" | "inquiries" }) {
+export function ReviewInquirySwitch({ current }: { current: "reviews" | "inquiries" | "talktalk" }) {
   const item = (to: string, label: string, on: boolean) => (
     <Link
       to={to}
@@ -23,6 +23,8 @@ export function ReviewInquirySwitch({ current }: { current: "reviews" | "inquiri
     <nav aria-label="리뷰·문의" className="inline-flex gap-0.5 rounded-xl bg-well p-0.5 shadow-[var(--press-groove)]">
       {item("/reviews", "리뷰", current === "reviews")}
       {item("/inquiries", "문의", current === "inquiries")}
+      {/* 톡톡 상담 — a NAVER surface, not a channel (docs/inquiry/talktalk_chat_lane_v1.md §7). */}
+      {item("/talktalk", "톡톡", current === "talktalk")}
     </nav>
   );
 }

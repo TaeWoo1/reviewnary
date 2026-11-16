@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { BtnLink } from "../../components/ui/Btn";
 import { Dot } from "../../components/ui/ObjectRow";
@@ -48,7 +48,12 @@ import type { InquiryQueueResponse, MetricKpi, OperationsHome, OverviewResponse,
  * labels answers locally with an object the page already has; every other sentence goes to the
  * runtime, where the planner plans it or the turn fails.
  */
-export function AgentHome({ now = new Date() }: { now?: Date }) {
+/**
+ * `notice` — one line under the title of the before-first-connection home. CsHome passes the TalkTalk line here: a
+ * store whose only CS channel is TalkTalk has no marketplace connected, so it lands on this screen, and the screen
+ * must still say TalkTalk conversations are waiting (TalkTalk lane, review item 8).
+ */
+export function AgentHome({ now = new Date(), notice }: { now?: Date; notice?: ReactNode }) {
   useAgentSurface({ surface: "home", label: "오늘의 운영" });
   const conversation = useConversation();
   const panel = useAgentPanel();
@@ -222,6 +227,7 @@ export function AgentHome({ now = new Date() }: { now?: Date }) {
           greeting or a first-use headline, and neither names the screen. The other branch's title is the
           same word at the same size, which is the point: both are 오늘. */}
       <h1 className="break-keep text-title font-bold leading-tight tracking-tight text-ink">{COPY.homeTitle}</h1>
+      {notice}
       {beforeFirstConnection && firstUse ? (
         // §2 — nothing is connected. What is missing is not a briefing: it is the one thing that can be
         // done, plus what doing it hands over. The sentence names the data types the channels on this

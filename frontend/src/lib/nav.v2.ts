@@ -73,7 +73,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // doorway. 할 일 — the list and the item beside it — moved from 「/」 to 「/work」 unchanged.
       { to: "/", label: "홈", short: "홈", icon: "home", end: true },
       { to: "/work", label: "할 일", short: "할 일", icon: "inbox", match: ["/customer-operations/cases"], badge: "work" },
-      { to: "/reviews", label: "리뷰·문의", short: "리뷰·문의", icon: "review", match: ["/inquiries", "/inbox"] },
+      { to: "/reviews", label: "리뷰·문의", short: "리뷰·문의", icon: "review", match: ["/inquiries", "/inbox", "/talktalk"] },
       {
         to: "/knowledge",
         label: "상품·정책",

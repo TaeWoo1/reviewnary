@@ -1040,6 +1040,22 @@ sellerops:
       pf-id: ${SELLEROPS_SOLAPI_PF_ID:}
       template-id: ${SELLEROPS_SOLAPI_TEMPLATE_ID:}
       sender-number: ${SELLEROPS_SOLAPI_SENDER_NUMBER:}
+  # NAVER TalkTalk chatbot-API lane (docs/inquiry/talktalk_chat_lane_v1.md). fake (default) keeps every send in memory
+  # and records FAKE_RECORDED — nothing leaves. live without live-send-enabled records BLOCKED. Even live + enabled sends
+  # only when the whole readiness checklist holds (HTTPS public URL, source allowlist enforced, an ingress observed).
+  # The send endpoint is pinned in code (HttpTalkTalkTransport.ENDPOINT); there is no URL property on purpose.
+  talktalk:
+    transport: ${SELLEROPS_TALKTALK_TRANSPORT:fake}
+    live-send-enabled: ${SELLEROPS_TALKTALK_LIVE_SEND_ENABLED:false}
+    worker-enabled: ${SELLEROPS_TALKTALK_WORKER_ENABLED:true}
+    tick-ms: ${SELLEROPS_TALKTALK_TICK_MS:15000}
+    retention-days: ${SELLEROPS_TALKTALK_RETENTION_DAYS:90}
+    max-body-bytes: 65536
+    ingress:
+      # The README's documented ACL ranges. Not request authentication — the protocol has none.
+      source-allowlist-enforced: ${SELLEROPS_TALKTALK_SOURCE_ALLOWLIST_ENFORCED:false}
+      # Proxies whose X-Forwarded-For is believed (CIDRs, comma-separated). Empty: the peer address is the source.
+      trusted-proxy-cidrs: ${SELLEROPS_TALKTALK_TRUSTED_PROXY_CIDRS:}
   # Password reset by mailed one-time link (§2-2): SHA-256 at rest, single use, this TTL. Needs a mailer (below).
   password-reset:
     ttl-seconds: ${SELLEROPS_PASSWORD_RESET_TTL_SECONDS:1800}

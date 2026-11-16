@@ -6,6 +6,15 @@ import type {
   IntakeAlertSettings,
   IntakeAlertSettingsRequest,
 } from "./intakeAlerts";
+import type {
+  ConnectResponse as TalkTalkConnectResponse,
+  ConversationDetail as TalkTalkConversationDetail,
+  ConversationRow as TalkTalkConversationRow,
+  GuidanceRequest as TalkTalkGuidanceRequest,
+  GuidanceView as TalkTalkGuidanceView,
+  TalkTalkStatus,
+  TalkTalkSummary,
+} from "./talktalk";
 import { isWorkWrite, noteWorkWrite } from "./workChanges";
 import type { HomeBoardView, WorkPage, WorkSort, WorkView } from "./homeBoard";
 import type { ProductAnalysisView, ProductComparison } from "./productAnalysis";
@@ -2974,6 +2983,98 @@ export const api = {
   /** The whole store as one subject — linked and unlinked rows, with empty channels named. */
   async getStoreAnalysis(days: number): Promise<ProductAnalysisView> {
     const { data } = await http.get<ProductAnalysisView>("/api/products/analysis/store", { params: { days } });
+    return data;
+  },
+
+  // ── NAVER TalkTalk chatbot-API lane (docs/inquiry/talktalk_chat_lane_v1.md) ──
+  async getTalkTalkStatus(): Promise<TalkTalkStatus> {
+    const { data } = await http.get<TalkTalkStatus>("/api/talktalk/status");
+    return data;
+  },
+  async getTalkTalkSummary(): Promise<TalkTalkSummary> {
+    const { data } = await http.get<TalkTalkSummary>("/api/talktalk/summary");
+    return data;
+  },
+  /** The send key goes up once and never comes back; the webhook URL comes back once. */
+  async connectTalkTalk(partnerId: string, sendKey: string): Promise<TalkTalkConnectResponse> {
+    const { data } = await http.post<TalkTalkConnectResponse>("/api/talktalk/connection", { partnerId, sendKey });
+    return data;
+  },
+  async rotateTalkTalkWebhook(): Promise<TalkTalkConnectResponse> {
+    const { data } = await http.post<TalkTalkConnectResponse>("/api/talktalk/connection/rotate-webhook");
+    return data;
+  },
+  async disconnectTalkTalk(): Promise<TalkTalkStatus> {
+    const { data } = await http.delete<TalkTalkStatus>("/api/talktalk/connection");
+    return data;
+  },
+  async saveTalkTalkGuidance(body: TalkTalkGuidanceRequest): Promise<TalkTalkGuidanceView> {
+    const { data } = await http.put<TalkTalkGuidanceView>("/api/talktalk/guidance/draft", body);
+    return data;
+  },
+  async confirmTalkTalkGuidance(id: string, expectedFingerprint: string): Promise<TalkTalkStatus> {
+    const { data } = await http.post<TalkTalkStatus>(`/api/talktalk/guidance/${encodeURIComponent(id)}/confirm`, {
+      expectedFingerprint,
+    });
+    return data;
+  },
+  async retireTalkTalkGuidance(id: string): Promise<TalkTalkStatus> {
+    const { data } = await http.post<TalkTalkStatus>(`/api/talktalk/guidance/${encodeURIComponent(id)}/retire`);
+    return data;
+  },
+  async setTalkTalkDelegation(body: {
+    enabled: boolean;
+    guidanceId: string | null;
+    guidanceFingerprint: string | null;
+    previewFingerprint: string | null;
+  }): Promise<TalkTalkStatus> {
+    const { data } = await http.post<TalkTalkStatus>("/api/talktalk/delegation", body);
+    return data;
+  },
+  async listTalkTalkConversations(): Promise<TalkTalkConversationRow[]> {
+    const { data } = await http.get<TalkTalkConversationRow[]>("/api/talktalk/conversations");
+    return data;
+  },
+  async getTalkTalkConversation(id: string): Promise<TalkTalkConversationDetail> {
+    const { data } = await http.get<TalkTalkConversationDetail>(`/api/talktalk/conversations/${encodeURIComponent(id)}`);
+    return data;
+  },
+  async prepareTalkTalkDraft(id: string, mode: "GUIDANCE" | "MODEL"): Promise<TalkTalkConversationDetail> {
+    const { data } = await http.post<TalkTalkConversationDetail>(
+      `/api/talktalk/conversations/${encodeURIComponent(id)}/draft`,
+      { mode },
+      { timeout: 60000 },
+    );
+    return data;
+  },
+  async editTalkTalkDraft(id: string, text: string, baseVersion: number | null): Promise<TalkTalkConversationDetail> {
+    const { data } = await http.post<TalkTalkConversationDetail>(
+      `/api/talktalk/conversations/${encodeURIComponent(id)}/draft/edit`,
+      { text, baseVersion },
+    );
+    return data;
+  },
+  async sendTalkTalkReply(
+    id: string,
+    body: {
+      commandId: string;
+      draftVersion: number;
+      expectedFingerprint: string;
+      acknowledgeUnknownOf: string | null;
+      confirmHolds: boolean;
+    },
+  ): Promise<TalkTalkConversationDetail> {
+    const { data } = await http.post<TalkTalkConversationDetail>(
+      `/api/talktalk/conversations/${encodeURIComponent(id)}/send`,
+      body,
+    );
+    return data;
+  },
+  async handOverTalkTalk(id: string, commandId: string, direction: "PASS" | "TAKE"): Promise<TalkTalkConversationDetail> {
+    const { data } = await http.post<TalkTalkConversationDetail>(
+      `/api/talktalk/conversations/${encodeURIComponent(id)}/handover`,
+      { commandId, direction },
+    );
     return data;
   },
 

@@ -59,7 +59,9 @@ capabilities:
       - 이 행은 세 문의 종류를 묶어 말한 요약입니다. 실제 사실은 subtype 이 정합니다 —
         상품 문의와 고객 문의는 가져오고 톡톡은 가져오지 않으므로, 이 채널의 문의 전체를
         "가져옵니다"라고 말할 수 없습니다.
-      - 톡톡 문의는 네이버가 공식 API를 제공하지 않아 가져오지 않습니다. 0건과 같은 뜻이 아닙니다.
+      - 톡톡 문의는 네이버 커머스 API에 조회 계약이 없어 이 경로로 가져오지 않습니다. 0건과 같은 뜻이 아닙니다.
+      - 톡톡 챗봇 API(Webhook·보내기)는 별도의 톡톡 상담 연동이며(docs/inquiry/talktalk_chat_lane_v1.md), 합성 시험만
+        했고 실제 톡톡 계정으로는 연결·전송을 확인하지 않았습니다. 이 표의 칸을 바꾸지 않습니다.
       - 2026-06-01 이전 구간은 관측된 적이 없습니다.
       - 라이브에서 관측된 18건이 전부 답변 완료였으므로, 미답변 문의가 큐에 올라오는 경로는
         아직 실제로 확인되지 않았습니다.
@@ -90,9 +92,11 @@ capabilities:
         mode: NONE
         evidence: DECLARED
         evidenceRef: >-
-          네이버 커머스 API에 판매자용 톡톡 조회 계약이 없음 (감사 결과, 우회 경로도 만들지 않음)
+          네이버 커머스 API에 판매자용 톡톡 조회 계약이 없음 (감사 결과, 우회 경로도 만들지 않음). 톡톡 챗봇 API 레인은
+          별도이며 합성 시험만 (docs/inquiry/talktalk_chat_lane_v1.md)
         sellerFacingNotes:
-          - 톡톡 문의는 가져오지 않습니다. 톡톡에 온 문의가 0건이라는 뜻이 아닙니다.
+          - 커머스 API로는 톡톡 문의를 가져오지 않습니다. 톡톡에 온 문의가 0건이라는 뜻이 아닙니다.
+          - 톡톡 상담 연동은 따로 있지만 실제 톡톡 계정으로는 아직 확인하지 않았습니다.
     sourceRefs:
       - docs/multi-channel-connector-roadmap.md §4.1 (NAVER INQUIRY 두 행)
       - com.sellerops.connector.naver.NaverProductQnaClient
@@ -216,7 +220,7 @@ capabilities:
         확인합니다.
     limitations:
       - 이 행은 세 문의 종류를 묶어 말한 요약입니다. 실제 사실은 subtype 이 정합니다 —
-        답변 계약이 종류마다 다르고 톡톡에는 답변 경로가 없습니다.
+        답변 계약이 종류마다 다르고 커머스 API로는 톡톡에 답할 수 없습니다(톡톡 챗봇 API 레인은 별도·실연동 미검증).
       - 고객 문의(네이버페이) 답변 경로는 구현돼 있지만 실제 스토어에서 실행된 적이 없습니다.
       - 상품 문의는 같은 문의에 다시 보내면 등록이 아니라 수정으로 동작합니다. 그래서 대상의
         현재 상태를 증명하지 못하면 전송을 경고가 아니라 거절로 막습니다.
@@ -261,7 +265,7 @@ capabilities:
         status: NOT_SUPPORTED
         mode: NONE
         evidence: DECLARED
-        evidenceRef: 톡톡 답변 계약 없음 · 수집 경로도 없음
+        evidenceRef: 커머스 API에 톡톡 답변 계약 없음 · 챗봇 보내기 API 경로는 합성 시험만 (docs/inquiry/talktalk_chat_lane_v1.md)
         sellerFacingNotes:
           - 톡톡 문의에는 답변을 등록하지 않습니다.
     sourceRefs:

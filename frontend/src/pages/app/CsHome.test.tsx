@@ -23,10 +23,18 @@ const board = boardFrom([], {
 });
 
 // Per-test switches the mocked reads look at (hoisted with the mock).
-const sw = vi.hoisted(() => ({ overviewFails: false, workSources: [] as Array<{ name: string; read: boolean; complete: boolean }>, workCount: 8 as number | null }));
+const sw = vi.hoisted(() => ({
+  overviewFails: false, workSources: [] as Array<{ name: string; read: boolean; complete: boolean }>, workCount: 8 as number | null,
+  noChannel: false, talkWaiting: 0,
+}));
+
+// The first-use home is its own screen with its own reads; here it only shows what CsHome hands it.
+vi.mock("./AgentHome", () => ({ AgentHome: ({ notice }: { notice?: unknown }) => <div data-testid="agent-home">{notice as never}</div> }));
 
 vi.mock("../../lib/apiClient", () => ({
   api: {
+    // TalkTalk is a separate count (its own line); here: not connected, nothing waiting — the line stays hidden.
+    getTalkTalkSummary: async () => ({ connected: sw.talkWaiting > 0, fake: true, needsHumanConversations: sw.talkWaiting, unknownSends: 0, queuedSends: 0, notice: "" }),
     getOverviewStrict: async () => {
       if (sw.overviewFails) throw new Error("down");
       return {
@@ -37,10 +45,12 @@ vi.mock("../../lib/apiClient", () => ({
           { key: "reviews", label: "리뷰", value: 6, unit: "건", previousValue: 0, deltaPercent: null, comparable: true, excludedChannels: 1, freshnessUnproven: false },
         ],
         series: [],
-        channels: [
-          metricsChannel("NAVER", "네이버 스마트스토어"),
-          metricsChannel("COUPANG", "쿠팡", { reviewState: "NOT_SUPPORTED", reviews: 0, countedInReviews: false }),
-        ],
+        channels: sw.noChannel
+          ? [metricsChannel("NAVER", "네이버 스마트스토어", { connected: false, inquiries: 0, unansweredInquiries: 0, reviews: 0 })]
+          : [
+              metricsChannel("NAVER", "네이버 스마트스토어"),
+              metricsChannel("COUPANG", "쿠팡", { reviewState: "NOT_SUPPORTED", reviews: 0, countedInReviews: false }),
+            ],
         exclusions: [],
       },
     };
@@ -68,6 +78,28 @@ afterEach(() => {
   sw.overviewFails = false;
   sw.workSources = [];
   sw.workCount = 8;
+  sw.noChannel = false;
+  sw.talkWaiting = 0;
+});
+
+describe("홈 — 톡톡만 쓰는 가게", () => {
+  it("with no marketplace connected the first-use home still shows the waiting TalkTalk conversations", async () => {
+    sw.noChannel = true;
+    sw.talkWaiting = 3;
+    renderHome();
+    const home = await screen.findByTestId("agent-home");
+    const line = await within(home).findByTestId("cs-talktalk");
+    expect(line).toHaveTextContent("사람 확인 대기 대화 3개");
+    expect(within(line).getByRole("link", { name: "톡톡 상담" })).toHaveAttribute("href", "/talktalk");
+  });
+
+  it("nothing connected and nothing waiting — the first-use home carries no TalkTalk line", async () => {
+    sw.noChannel = true;
+    renderHome();
+    const home = await screen.findByTestId("agent-home");
+    await new Promise((r) => setTimeout(r, 30));
+    expect(within(home).queryByTestId("cs-talktalk")).toBeNull();
+  });
 });
 
 describe("홈 — CS 현황", () => {

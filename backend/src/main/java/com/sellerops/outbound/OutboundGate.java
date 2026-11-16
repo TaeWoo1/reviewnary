@@ -58,6 +58,11 @@ public final class OutboundGate {
          * a seller's PC (an armed gate), like the channels outside the visible set — loopback only for a local stand-in.
          */
         ALIMTALK,
+        /**
+         * NAVER TalkTalk's chatbot send API (2026-11-16, docs/inquiry/talktalk_chat_lane_v1.md). A server-side send whose
+         * host is pinned in {@code HttpTalkTalkTransport}; refused on a seller's PC (an armed gate) like ALIMTALK.
+         */
+        TALKTALK,
         /** Channels outside the seller-visible set (NAVER/Coupang/Cafe24) — refused on a seller's PC. */
         ESM,
         ELEVENST,
@@ -121,7 +126,7 @@ public final class OutboundGate {
             case LLM -> LLM_HOSTS.contains(host);
             case PRODUCT_IMAGE -> true;
             case VENDOR -> VENDOR_HOSTS.contains(host);
-            case AGENT_RUNTIME, ALIMTALK, ESM, ELEVENST, SSG -> false;
+            case AGENT_RUNTIME, ALIMTALK, TALKTALK, ESM, ELEVENST, SSG -> false;
         };
     }
 

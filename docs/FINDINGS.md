@@ -2917,3 +2917,38 @@
 - **사실** — CLI는 원본이 실행 중이라 사본을 만들었다고 알렸고, 사본은 입력 대기였다. 원본 전사에도 후속 요청이 없어 전달 완료가 아니었다. 미사용 사본만 종료하고 원본에 attach했다. 제품 코드·DB·외부 계정은 변경하지 않았다.
 - **다음에** — 기존 세션의 실행/입력 대기 상태를 먼저 확인하고, 실행 중인 원본은 attach로 조작한다. 명령 성공만으로 인계를 완료 처리하지 말고 대상 전사의 새 사용자 요청을 확인한다.
 - **출처** — 2026-11-16 기업 도입 요구 정리, Claude `8412adc2`; CLI의 사본 생성·입력 대기 출력과 원본 전사 확인.
+
+### B196. 잠그기 전에 읽은 엔터티는 잠근 뒤에도 옛 값이다 — 톡톡 수신이 주소 재발급을 되돌렸다
+
+- **무엇을 했나** — webhook 수신이 토큰으로 연결 엔터티를 읽은 뒤 `lockByOrgId`(PESSIMISTIC_WRITE)로 「다시 읽고」 `lastEventAt`을 저장했다.
+- **사실** — 같은 트랜잭션의 영속성 컨텍스트가 처음 읽은 인스턴스를 돌려줘 잠금 뒤에도 옛 세대 · 옛 토큰 해시였고, 저장이 동시에 커밋된 재발급(세대 2)을 세대 1로 덮었다. 순차 시험은 통과했고 20건 수신 ‖ 재발급 동시 시험에서만 드러났다.
+- **다음에** — 잠글 행은 그 트랜잭션에서 **처음 읽는 것이 잠금 조회**여야 한다. 키만 필요하면 projection(`orgIdByTokenHash`, `outbound.orgIdOf`)으로 먼저 찾는다. 잠금 순서(연결 → 대화)를 문서에 적고 모든 경로가 따르게 한다.
+- **출처** — 2026-11-16 톡톡 레인, `TalkTalkLaneTest.intakeRacesRotation`(실패 → 수정 후 통과), `docs/inquiry/talktalk_chat_lane_v1.md` §3.
+
+### B197. PostgreSQL 증명 시험에 Hibernate `validate`를 켜면 무관한 기존 테이블에서 멈춘다
+
+- **무엇을 했나** — 톡톡 V191을 증명하려고 격리 PostgreSQL 시험에 `ddl-auto=validate`를 켰다.
+- **사실** — 컨텍스트가 `knowledge_embedding.content_sha256`(char vs varchar) 불일치로 뜨지 않아 41건이 전부 실패했다. V191과 무관한 기존 상태다.
+- **다음에** — 증명 시험은 `ddl-auto=none` + 실제 Flyway로 돌리고, 새 테이블의 열은 상속한 시험이 JPA로 쓰고 읽어 확인한다. 기존 불일치는 별도 항목이다(이번 단위에서 고치지 않음).
+- **출처** — 2026-11-16 `TalkTalkPostgresProofIT`, 실패 로그의 `Schema-validation: wrong column type ... knowledge_embedding`.
+
+### B198. worktree에 node_modules를 symlink하면 Hackle SDK 시험 4건이 「파일 없음」으로 실패한다
+
+- **무엇을 했나** — 격리 worktree의 frontend에 원래 repo의 `node_modules`를 symlink하고 전체 vitest를 돌렸다.
+- **사실** — vite가 symlink 너머 절대 경로로 `@hackler/javascript-sdk`를 풀지 못해 `hackleSink.realSdk` · `hackleSdkPayload` 4건이 실패했다. SDK 파일은 원래 위치에 있다. 제품 · 시험 문제가 아니다.
+- **다음에** — symlink 환경의 이 4건 실패는 증거로 쓰지 않는다. 전체 FE 판정은 원래 repo에서 다시 돌린다.
+- **출처** — 2026-11-16 톡톡 레인 FE 전체 실행, `Failed to load url .../node_modules/@hackler/javascript-sdk/lib/index.browser.es.js`.
+
+### B199. fake timer로 「빠른 poll」을 시험하면 React passive effect가 시간 이동 뒤에 돈다
+
+- **무엇을 했나** — QUEUED일 때 2초 poll을 시험하려고 화면이 뜬 직후 `vi.advanceTimersByTime(2100)`을 했다.
+- **사실** — 간격을 2초로 다시 거는 effect가 시간 이동 뒤에 실행돼 poll이 오지 않았고, 6초로 늘리면 통과해 「빠른 poll」을 증명하지 못했다. 제품 코드는 맞았다.
+- **다음에** — 시간을 움직이기 전에 `act` 안에서 한 번 양보해 effect를 흘린다. 통과한 값이 그 주장(2초 < 6초)을 실제로 가르는지 확인한다.
+- **출처** — 2026-11-16 `TalkTalkWorkspace.test.tsx` 「shows a queued send's result without a reload」.
+
+### B200. 마켓 채널이 없는 가게의 홈은 다른 화면이라, 톡톡 대기 줄이 그 화면에 없었다
+
+- **무엇을 했나** — 톡톡 대기 대화 줄을 CS 현황 홈(`CsHome`)에 넣고 단위 시험으로 확인했다. 격리 합성 가게(톡톡만 연결)로 브라우저 검수를 했다.
+- **사실** — 마켓 채널이 하나도 연결되지 않으면 `CsHome`이 첫 사용 홈(`AgentHome`)을 대신 그려서, 톡톡 대기 4개가 있는데도 홈에 아무 표시가 없었다. 단위 시험은 채널이 연결된 홈만 보았다.
+- **다음에** — 홈에 새 줄을 넣을 때는 홈의 갈래(채널 없음 · 데이터 없음 · 일하는 중)마다 그 줄이 보이는지 본다. 톡톡은 마켓 채널이 아니므로 「채널 없음」 갈래가 톡톡만 쓰는 가게의 실제 홈이다.
+- **출처** — 2026-11-16 톡톡 레인 브라우저 검수(5197), 수정 `CsHome.tsx` · `AgentHome.tsx`(`notice`), 시험 `CsHome.test.tsx` 「홈 — 톡톡만 쓰는 가게」.

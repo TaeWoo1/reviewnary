@@ -88,6 +88,10 @@ const ON_THE_SYSTEM = [
   // 리뷰 사진, since review photos (2026-10-13): the one thumbnail and enlarged view the case screen and the
   // review screens share, brought onto the palette when it moved out of the case screen.
   "components/reviews/ReviewPhotos.tsx",
+  // 톡톡 상담 (2026-11-16, docs/inquiry/talktalk_chat_lane_v1.md §7): born on the system.
+  "pages/app/TalkTalkWorkspace.tsx",
+  "pages/app/TalkTalkSettings.tsx",
+  "components/talktalk/TalkTalkHomeLine.tsx",
 ];
 
 /** One file with its comments removed — the ban is on USING these values, not on explaining them. */

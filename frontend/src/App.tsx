@@ -1,3 +1,5 @@
+import { TalkTalkSettings } from "./pages/app/TalkTalkSettings";
+import { TalkTalkWorkspace } from "./pages/app/TalkTalkWorkspace";
 import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { AppShellV2 } from "./components/app/AppShellV2";
 import { AppProviders } from "./components/app/AppProviders";
@@ -159,6 +161,8 @@ export function App() {
         {/* 문의: the customer inbox scoped to inquiries. */}
         <Route path="/inquiries" element={<CustomerInbox />} />
         <Route path="/inquiries/:itemRef" element={<CustomerInbox />} />
+        <Route path="/talktalk" element={<TalkTalkWorkspace />} />
+        <Route path="/talktalk/:conversationId" element={<TalkTalkWorkspace />} />
         {/* The mixed 문의+리뷰 queue is absorbed (A2): reviews are on 리뷰, inquiries on 문의. The
             bare path lands on 문의; an item deep link (memory evidence, reports, bookmarks) is
             resolved to the surface that owns the row. */}
@@ -202,6 +206,7 @@ export function App() {
 
         <Route path="/settings" element={<SettingsHome />} />
         <Route path="/settings/alerts" element={<AlertSettings />} />
+        <Route path="/settings/talktalk" element={<TalkTalkSettings />} />
         <Route path="/knowledge" element={<KnowledgeHome />} />
         <Route path="/start" element={<StartPrep />} />
         <Route path="/settings/policies" element={<OperationsPolicies />} />
