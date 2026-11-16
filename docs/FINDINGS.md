@@ -2959,3 +2959,31 @@
 - **사실** — 자료 검색을 부를 수 있는 곳을 묶은 울타리 `RetrievalIntentScopeTest` · `RetrievalRuntimeClosureTest`는 이름이 `...Test`라 그 묶음에 없었다. 새 `TalkTalkDraftService`가 Spine을 부르면서 두 시험이 실패한 채로 커밋됐다. 다음 날 전체 실행(6,875건 중 2건 실패)에서 드러났다. 동작 결함이 아니라 허용 목록 미갱신이었고, 톡톡 초안을 한 건 단위 작업으로 등재해 고쳤다.
 - **다음에** — 큰 기능을 커밋하기 전에는 백엔드 · 프런트 전체 시험을 그 커밋 내용 위에서 한 번 돌린다. 이름 필터로 고른 시험 묶음은 전체 실행을 대신하지 않는다. 기본 Java가 8이면 Gradle이 15초 만에 설정 단계에서 끝나고 예전 결과 XML이 남아 있으므로, `JAVA_HOME`을 17 이상으로 두고 XML 수정 시각까지 확인한다.
 - **출처** — 2026-11-17 `./gradlew cleanTest test`(JDK 17), 실패 메시지 「the investigator and the draft read one assessment; a second asker is a second answer」. 수정: 두 시험의 허용 목록.
+
+### B202. jsdom의 `File`에는 `arrayBuffer`가 없고, 다른 창의 버퍼는 Node의 `crypto.subtle`이 거절한다
+
+- **무엇을 했나** — 자료 폴더 동기화(2026-11-17)의 지문 계산을 `file.arrayBuffer()` → `crypto.subtle.digest`로 쓰고 화면 시험(jsdom)을 돌렸다.
+- **사실** — jsdom 25의 `File`에는 `arrayBuffer`가 없어 「폴더를 읽지 못했어요」로 끝났다. FileReader로 읽어도 그 결과는 jsdom 쪽 `ArrayBuffer`라 Node `webcrypto.subtle.digest`가 「not instance of ArrayBuffer」로 거절했다. 실제 크롬 · 엣지에서는 둘 다 문제없다(격리 화면에서 OPFS 폴더로 확인).
+- **다음에** — 파일 바이트는 `readBytes`(있으면 `arrayBuffer`, 없으면 FileReader)로 읽고, 해시에는 그 자리에서 만든 `new Uint8Array(buffer)`를 넘긴다. 시험의 「알 수 없는 오류」 문구는 먼저 잡힌 예외를 찍어 본다 — 같은 화면 문구 뒤에 원인이 둘 숨어 있었다.
+- **출처** — `frontend/src/lib/folderSync.ts`(`readBytes`, `sha256Hex`), `KnowledgeFolder.test.tsx`, 2026-11-17.
+
+### B203. 「한 문만」 울타리가 전체 경로로 쓴 생성(`new com.….Generator(`)을 못 봤다
+
+- **무엇을 했나** — 리뷰 측면 읽기(16번째 AI 기능, 2026-11-17)를 `AgentDraftBoundaryTest`에 등재한 뒤, 일부러 다른 파일에 `new com.sellerops.agent.llm.reviewaspect.ReviewAspectGenerator(…)`를 넣어 울타리가 무는지 봤다.
+- **사실** — 통과했다. 울타리는 `code.contains("new " + 생성기이름 + "(")`만 봐서, 패키지 경로를 붙여 쓴 생성은 16개 기능 모두에서 빠져나갔다. 지금까지 그렇게 쓴 곳은 없었다(고친 뒤 전체가 통과).
+- **다음에** — 이름으로 찾는 울타리는 `new\s+(?:[\w$]+\.)*이름\s*\(`처럼 경로 접두를 허용하는 정규식으로 쓴다. 새 기능을 등재하면 전체 경로 · 짧은 이름 두 가지로 깨뜨려 본다.
+- **출처** — `backend/src/test/java/com/sellerops/agent/llm/AgentDraftBoundaryTest.java` `theServiceIsTheOnlyDoor`, 2026-11-17. 깨뜨림 → 실패(「constructs ReviewAspectGenerator」), 되돌림 → 통과, 깨뜨린 상태의 컴파일 오류 0.
+
+### B204. 같은 시각에 받은 리뷰가 많으면 예시 문장이 조회마다 바뀌어, 문장으로 만든 지문이 맞지 않았다
+
+- **무엇을 했나** — AI가 쓴 기회 · 위협을 「그 글이 근거로 삼은 관찰」 지문으로 찾게 했다. 처음에는 지문에 강점 · 약점의 예시 문장 3개까지 넣었다.
+- **사실** — 나누리에서 리뷰가 가장 많은 상품은 90일 리뷰 252건의 받은 시각이 79개뿐이라, `ORDER BY received_at DESC`로 뽑는 예시 문장이 조회마다 달랐다. 써 둔 글 8개 항목을 다시 찾지 못하고 기회 · 위협이 빈 칸으로 보였다(유료 호출 1회분 낭비).
+- **다음에** — 다시 찾는 열쇠는 순서가 정해지지 않은 값(같은 시각 정렬, 예시 문장)으로 만들지 않는다. 지문은 항목 key와 건수 · 분모만으로 만든다. 예시 문장 순서 자체가 화면마다 흔들리는 것은 남은 한계다.
+- **출처** — `ReviewAspectOverlay.fingerprint`, `ProductAspectReadingServiceTest.fingerprintIgnoresWhichQuotesWereShown`, 2026-11-17 나누리 격리 사본.
+
+### B205. AI가 쓴 기회 · 위협의 따옴표 인용 12개가 모두 고객 원문이 아니었다
+
+- **무엇을 했나** — 실제 모델이 리뷰가 가장 많은 나누리 상품에 쓴 기회 · 위협의 따옴표 안 말을 그 상품 리뷰 원문과 대조했다.
+- **사실** — 12개 중 12개가 원문에 없었다(원문의 말투 · 어미를 바꿔 고객 말처럼 따옴표를 붙인 것). 따옴표로 보이면 판매자는 고객이 그렇게 말했다고 읽는다.
+- **다음에** — 모델이 쓴 글의 인용은 「주어진 근거 문장에 글자 그대로 있는가」로 검사하고, 아니면 따옴표를 떼어 모델의 말로 둔다(`ReviewAspectGenerator.unquoteUnlessVerbatim`, 저장된 글은 보여 줄 때 같은 검사). 고친 뒤 8개 상품 44칸의 인용 57개가 모두 원문과 일치했다.
+- **출처** — `ReviewAspectGeneratorTest.quotesOnlyAroundRealWords`(깨뜨려 실패 · 되돌려 통과), 2026-11-17.
