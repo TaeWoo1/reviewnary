@@ -6,6 +6,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sellerops.agent.llm.AgentDraftGenerator;
 import com.sellerops.agent.llm.AgentDraftResponseParser;
 import com.sellerops.agent.llm.AgentDraftService;
+import com.sellerops.agent.llm.AgentLlmCallCapture;
+import com.sellerops.agent.quota.AgentQuotaService;
+import com.sellerops.agent.quota.AgentUsageActor;
+import com.sellerops.agent.quota.AgentUsageKind;
 import com.sellerops.common.ApiException;
 import com.sellerops.common.DataOrigin;
 import com.sellerops.inquiry.draft.InquiryClaimGuard;
@@ -121,6 +125,17 @@ public class TalkTalkDraftService {
         this.currency = currency;
     }
 
+    private AgentQuotaService quota;
+
+    /**
+     * The daily ceiling and the money budget every other draft door passes (B208). Optional only so the lane tests that
+     * never draft with a model can build the service; without it the model draft is refused, never made unmetered.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setQuota(AgentQuotaService quota) {
+        this.quota = quota;
+    }
+
     @Transactional
     public TalkTalkDraft prepare(UUID orgId, UUID userId, UUID conversationId, String mode) {
         access.member(orgId, userId);
@@ -218,9 +233,23 @@ public class TalkTalkDraftService {
             return save(orgId, userId, conv, trigger, TalkTalkDraft.AuthorKind.MODEL, null,
                     TalkTalkDraft.Basis.NEEDS_HUMAN, holds, evidence, null);
         }
+        // The same gate as every draft door (B208): a TalkTalk draft is a seller's press, counted against the day's
+        // ceiling and the budget, and refused — never made unmetered — when either says no.
+        if (quota == null) {
+            throw ApiException.conflict("QUOTA_UNAVAILABLE", "AI 사용량을 확인할 수 없어 지금은 AI 답변을 준비하지 않아요.");
+        }
+        AgentQuotaService.Charge charge = quota.consumeCharge(orgId, AgentUsageKind.DRAFT, null, AgentUsageActor.USER, 0);
+        if (!charge.decision().allowed()) {
+            throw ApiException.conflict("QUOTA", charge.decision().messageKo());
+        }
         // §8: the latest customer message only — no TalkTalk user value, partner id, history or product URL.
-        Optional<AgentDraftResponseParser.ParsedDraft> parsed = drafter.draft(orgId, null, asked, passages,
-                ORDER_STATE, null, null, null, null);
+        AgentLlmCallCapture.Captured<Optional<AgentDraftResponseParser.ParsedDraft>> call = AgentLlmCallCapture.capture(
+                () -> drafter.draft(orgId, null, asked, passages, ORDER_STATE, null, null, null, null));
+        if (call.metrics() != null) {
+            quota.recordOutcome(charge.usageId(), call.metrics().elapsedMs(), call.metrics().promptTokens(),
+                    call.metrics().completionTokens());
+        }
+        Optional<AgentDraftResponseParser.ParsedDraft> parsed = call.value();
         String body = parsed.map(AgentDraftResponseParser.ParsedDraft::comments).map(String::strip)
                 .filter(s -> !s.isEmpty()).orElse(null);
         if (body == null) {

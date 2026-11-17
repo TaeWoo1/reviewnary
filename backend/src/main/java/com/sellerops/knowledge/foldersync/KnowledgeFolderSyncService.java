@@ -356,8 +356,8 @@ public class KnowledgeFolderSyncService {
             return new Target(KnowledgeFolderFile.Scope.PRODUCT, named.get(0).getId(), null);
         }
         String why = named.isEmpty()
-                ? "상품 확인 필요: 「" + folder + "」와 이름이 똑같은 상품이 없어요. 폴더 이름을 상품 이름과 똑같이 바꿔 주세요."
-                : "상품 확인 필요: 「" + folder + "」라는 상품이 " + named.size() + "개예요. 어느 상품인지 이름을 구분해 주세요.";
+                ? "상품 확인 필요: 「" + folder + "」 폴더와 이름이 똑같은 상품이 없어요. 폴더 이름을 상품 이름과 똑같이 바꿔 주세요."
+                : "상품 확인 필요: 「" + folder + "」 이름의 상품이 " + named.size() + "개예요. 어느 상품인지 이름을 구분해 주세요.";
         return new Target(KnowledgeFolderFile.Scope.PRODUCT, null, why);
     }
 

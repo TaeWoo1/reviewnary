@@ -2987,3 +2987,31 @@
 - **사실** — 12개 중 12개가 원문에 없었다(원문의 말투 · 어미를 바꿔 고객 말처럼 따옴표를 붙인 것). 따옴표로 보이면 판매자는 고객이 그렇게 말했다고 읽는다.
 - **다음에** — 모델이 쓴 글의 인용은 「주어진 근거 문장에 글자 그대로 있는가」로 검사하고, 아니면 따옴표를 떼어 모델의 말로 둔다(`ReviewAspectGenerator.unquoteUnlessVerbatim`, 저장된 글은 보여 줄 때 같은 검사). 고친 뒤 8개 상품 44칸의 인용 57개가 모두 원문과 일치했다.
 - **출처** — `ReviewAspectGeneratorTest.quotesOnlyAroundRealWords`(깨뜨려 실패 · 되돌려 통과), 2026-11-17.
+
+### B206. Runyour 공통 키를 나눠 주는 목록에 리뷰 측면 읽기가 빠져, 켜는 순간 서버가 서지 않았다
+
+- **무엇을 했나** — 배포 전 리허설(2026-11-17)에서 서버용 compose 형태로 띄우고, 합성 가게에 `review.aspect`를 runyour 프로필로 켰다.
+- **사실** — 기동 점검이 「SELLEROPS_REVIEW_ASPECT_API_KEY — 키가 없습니다」로 서버를 세웠다. `application-runyour.yml`은 17개 기능을 RUNYOUR로 보내는데, 공통 키를 빈 키에 채우는 `RunyourRouterKeyPostProcessor.ROUTED`는 손으로 적은 16개 목록이라 새 기능이 빠졌다. 기존 시험은 그 목록 자체를 돌며 검사해서 빠진 항목을 볼 수 없었다(격리 평가는 키를 직접 넘겨서 못 봤다).
+- **다음에** — 손으로 적은 목록은 원본 설정에 묶는다. `theRoutedListIsExactlyWhatTheProfileRoutes`가 프로필 파일의 `vendor: RUNYOUR` 줄과 목록이 같은지 본다. 새 AI 기능 등재 체크리스트에 이 목록을 넣는다. 격리 평가가 통과해도 배포 형태(compose + 프로필)로 한 번 띄워 본다.
+- **출처** — `RunyourRouterKeyPostProcessor`, `RunyourRouterKeyPostProcessorTest`(깨뜨림 → 새 시험만 실패, 컴파일 오류 0 / 되돌림 → 통과), 2026-11-17 리허설.
+
+### B207. 엑셀로만 리뷰를 올린 판매자는 판매 계정이 없어 답 초안을 쓸 수 없었다
+
+- **무엇을 했나** — 리허설에서 새 합성 가게로 가입해 리뷰 엑셀을 「자료 업로드」로 올리고 ★1 리뷰를 열었다.
+- **사실** — 「이 채널에 연결된 판매 계정이 없어 답변 초안은 준비할 수 없어요」가 나왔다. 답 초안은 그 채널의 판매 계정 하나에 묶이는데, 파일 채널 계정을 만드는 API(`/api/seller-accounts/file-channel`)를 부르는 화면이 없었다. 나누리처럼 API 연결 없이 엑셀로 시작하는 가게는 데모의 첫 기능부터 막힌다. 11-11 나누리 시험은 시드 데모 계정(판매 계정 있음)을 써서 보이지 않았다.
+- **다음에** — 리뷰 · 문의 업로드는 그 채널에 계정이 하나도 없을 때만 파일 계정을 만든다(`SellerAccountService.ensureAccountForUpload`). 이미 계정이 있으면 두지 않는다 — 계정이 둘이면 답할 계정이 정해지지 않는다(`SellerAccount.answering`). 시험은 시드 계정이 아니라 새로 가입한 가게로 한 번 걷는다. 남은 한계: 파일 계정이 있는 채널에 나중에 API 계정을 연결하면 계정이 둘이 된다(기존 규칙 그대로).
+- **출처** — `UploadController`, `SellerAccountServiceTest`, `UploadControllerContractTest`(깨뜨림 → 실패 · 되돌림 → 통과), 2026-11-17 리허설.
+
+### B208. 톡톡 AI 초안만 하루 한도 · 예산 관문을 거치지 않았다
+
+- **무엇을 했나** — 리허설에서 톡톡 대화 두 건에 「참고 자료로 AI 답변 준비」를 누르고 사용량 표를 봤다.
+- **사실** — 서버 기록에는 실제 모델 호출 2회가 있었는데 `agent_llm_usage`에는 없었다. 리뷰 답 · 문의 · AI 읽기는 모두 호출 전 확인 → 호출 뒤 기록을 거치는데, `TalkTalkDraftService.model`은 모델 문을 바로 불렀다. 데모 서버에서 하루 한도와 원 단위 예산이 톡톡에만 걸리지 않았을 것이다(리허설에서 기록되지 않은 2회 약 79원).
+- **다음에** — 모델을 부르는 새 경로는 같은 변경에서 `consumeCharge` · `recordOutcome`을 거친다. 계량기가 없으면 호출하지 않는다(계량 없이 부르지 않는다). 유료 리허설에서는 서버 기록의 `llm_call` 수와 사용량 표의 행 수를 맞춰 본다.
+- **출처** — `TalkTalkDraftService`, `TalkTalkLaneTest.modelDraftIsMetered` · `refusedModelDraftNeverCalls`(깨뜨림 → 2개 실패 · 되돌림 → 통과), 2026-11-17 리허설.
+
+### B209. 서버용 compose가 비용 상한 · 톡톡 설정을 백엔드에 넘기지 않았다
+
+- **무엇을 했나** — 리허설 env 파일에 하루 호출 한도 · 원 단위 예산을 적고 compose로 띄우려다 `docker-compose.yml`의 backend 환경 목록을 읽었다.
+- **사실** — `SELLEROPS_AGENT_QUOTA_DAILY_*` · `SELLEROPS_DEV_LLM_BUDGET_*` · `SELLEROPS_TALKTALK_*`가 목록에 없었다. `--env-file`은 `${…}` 치환에만 쓰이므로 컨테이너는 값을 받지 못하고, 파일에 무엇을 적어도 앱 기본값(가게당 하루 1,000회, 금액 상한 없음, 톡톡 fake)이 쓰였을 것이다.
+- **다음에** — 배포에서 바꿀 값은 compose 환경 목록과 `pilot.env.example`에 같이 넣고, 띄운 컨테이너 안에서 `printenv`로 값이 들어갔는지 본다(값 출력 없이 이름 · 켜짐만).
+- **출처** — `docker-compose.yml`, `deploy/pilot/pilot.env.example`, 2026-11-17 리허설(컨테이너 안에서 6개 값 확인).

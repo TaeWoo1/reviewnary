@@ -189,6 +189,20 @@ services:
       SELLEROPS_REVIEW_ASPECT_API_KEY: ${SELLEROPS_REVIEW_ASPECT_API_KEY:-}
       SELLEROPS_REVIEW_ASPECT_ORG_IDS: ${SELLEROPS_REVIEW_ASPECT_ORG_IDS:-}
       SELLEROPS_KNOWLEDGE_BOOTSTRAP_AUTO_ENABLED: ${SELLEROPS_KNOWLEDGE_BOOTSTRAP_AUTO_ENABLED:-false}
+      # ── Spend ceilings (2026-11-17) ─────────────────────────────────────────────────────────
+      # Without these lines the container never saw them: the env file only fills ${…} here, so a
+      # pilot had the application defaults (1,000 calls per org a day, no money ceiling) whatever the
+      # file said. The budget is in the unit of the RUNYOUR_*_PER_MTOK prices above (원 in this pilot);
+      # 0 = no money ceiling, and a budget needs its SINCE (DevLlmBudget refuses to boot otherwise).
+      SELLEROPS_AGENT_QUOTA_DAILY_LLM_CALLS_PER_ORG: ${SELLEROPS_AGENT_QUOTA_DAILY_LLM_CALLS_PER_ORG:-1000}
+      SELLEROPS_AGENT_QUOTA_DAILY_SELLER_RESERVE_CALLS: ${SELLEROPS_AGENT_QUOTA_DAILY_SELLER_RESERVE_CALLS:-300}
+      SELLEROPS_DEV_LLM_BUDGET_USD: ${SELLEROPS_DEV_LLM_BUDGET_USD:-0}
+      SELLEROPS_DEV_LLM_BUDGET_SINCE: ${SELLEROPS_DEV_LLM_BUDGET_SINCE:-}
+      # ── TalkTalk chatbot lane: fake until the store's partner centre is connected ────────────
+      SELLEROPS_TALKTALK_TRANSPORT: ${SELLEROPS_TALKTALK_TRANSPORT:-fake}
+      SELLEROPS_TALKTALK_LIVE_SEND_ENABLED: ${SELLEROPS_TALKTALK_LIVE_SEND_ENABLED:-false}
+      SELLEROPS_TALKTALK_SOURCE_ALLOWLIST_ENFORCED: ${SELLEROPS_TALKTALK_SOURCE_ALLOWLIST_ENFORCED:-false}
+      SELLEROPS_TALKTALK_TRUSTED_PROXY_CIDRS: ${SELLEROPS_TALKTALK_TRUSTED_PROXY_CIDRS:-}
       # ── Inquiry AI capabilities: the same omission, three more times ────────────────────────
       # These three are AgentCapabilityGate beans exactly like the five above — PilotConfigValidator
       # iterates over them and refuses a boot that turned one on without a key — and not one of their

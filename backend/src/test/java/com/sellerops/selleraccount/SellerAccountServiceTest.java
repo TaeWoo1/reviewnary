@@ -126,4 +126,34 @@ class SellerAccountServiceTest {
         assertThat(apiRow.isFileUpload()).isFalse();
         assertThat(accounts.findAllByOrgId(org)).hasSize(2);
     }
+
+    /** B207: an Excel-only seller had no account, so no review could be drafted. The first upload makes the file one. */
+    @Test
+    void aFirstUploadGivesAChannelWithNoAccountItsFileAccount() {
+        SellerAccountService svc = service();
+        Channel naver = seedNaverChannel();
+
+        svc.ensureAccountForUpload(org, naver.getId());
+        svc.ensureAccountForUpload(org, naver.getId()); // a second upload adds nothing
+
+        var held = accounts.findAllByOrgIdAndChannelId(org, naver.getId());
+        assertThat(held).hasSize(1);
+        assertThat(held.get(0).isFileUpload()).isTrue();
+        assertThat(held.get(0).getConnectionStatus()).isEqualTo(ChannelStatus.CONNECTED);
+        assertThat(SellerAccount.answering(held)).isNotNull();
+    }
+
+    /** A channel with an API account keeps exactly that one: a second account would leave no answering account. */
+    @Test
+    void anUploadNeverAddsASecondAccountBesideAnApiOne() {
+        SellerAccountService svc = service();
+        Channel naver = seedNaverChannel();
+        svc.registerApiChannel(org, new ApiChannelRequest(naver.getId(), null));
+
+        svc.ensureAccountForUpload(org, naver.getId());
+
+        var held = accounts.findAllByOrgIdAndChannelId(org, naver.getId());
+        assertThat(held).hasSize(1);
+        assertThat(held.get(0).isFileUpload()).isFalse();
+    }
 }

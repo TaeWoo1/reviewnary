@@ -66,6 +66,7 @@ class UploadControllerContractTest {
 
     @Autowired MockMvc mockMvc;
     @MockBean FileUploadConnector connector;
+    @MockBean com.sellerops.selleraccount.SellerAccountService sellerAccounts;
     @MockBean JwtTokenProvider tokenProvider;
     /**
      * The token's organization has to exist for the request to be authenticated at all: `JwtAuthFilter` checks,
@@ -154,6 +155,22 @@ class UploadControllerContractTest {
                 anyString(), any(InputStream.class), eq(null));
     }
 
+    /** B207: reviews and inquiries are answered as an account, so an upload of either gives its channel one. */
+    @Test
+    void aReviewOrInquiryUploadMakesSureTheChannelHasAnAccountAndAnOrderUploadDoesNot() throws Exception {
+        when(connector.ingest(any(), any(), any(), anyString(), any(), any()))
+                .thenReturn(new IngestResult(syncJobId, UploadType.REVIEW, "SUCCESS", 1, 1, 0, 0, null, List.of()));
+        for (String type : List.of("REVIEW", "INQUIRY", "ORDER_SUMMARY")) {
+            mockMvc.perform(multipart("/api/uploads")
+                            .file(xlsxPart("file"))
+                            .param("channelId", channelId.toString())
+                            .param("uploadType", type)
+                            .header("Authorization", "Bearer " + TOKEN))
+                    .andExpect(status().isOk());
+        }
+        verify(sellerAccounts, org.mockito.Mockito.times(2)).ensureAccountForUpload(orgId, channelId);
+    }
+
     @Test
     void unauthenticatedUploadIsRejectedWith401AndNeverReachesTheConnector() throws Exception {
         mockMvc.perform(multipart("/api/uploads")
@@ -167,7 +184,7 @@ class UploadControllerContractTest {
                 // matcher the status alone cannot tell the two apart.
                 .andExpect(header().doesNotExist("WWW-Authenticate"));
 
-        verifyNoInteractions(connector);
+        verifyNoInteractions(connector, sellerAccounts);
     }
 
     /**
@@ -190,7 +207,7 @@ class UploadControllerContractTest {
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("필수 요청 파라미터가 없습니다: channelId"));
 
-        verifyNoInteractions(connector);
+        verifyNoInteractions(connector, sellerAccounts);
     }
 
     @Test
@@ -207,7 +224,7 @@ class UploadControllerContractTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().doesNotExist("WWW-Authenticate"));
 
-        verifyNoInteractions(connector);
+        verifyNoInteractions(connector, sellerAccounts);
     }
 
     @Test
@@ -239,7 +256,7 @@ class UploadControllerContractTest {
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("필수 파일 항목이 없습니다: file"));
 
-        verifyNoInteractions(connector);
+        verifyNoInteractions(connector, sellerAccounts);
     }
 
     @Test
@@ -251,7 +268,7 @@ class UploadControllerContractTest {
                         .header("Authorization", "Bearer " + TOKEN))
                 .andExpect(status().isBadRequest());
 
-        verifyNoInteractions(connector);
+        verifyNoInteractions(connector, sellerAccounts);
     }
 
     /** A synthetic xlsx part — bytes are a PK stub only; the connector is mocked, nothing parses them. */

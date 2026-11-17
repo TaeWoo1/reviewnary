@@ -2,6 +2,11 @@ package com.sellerops.talktalk;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.sellerops.agent.llm.AgentDraftService;
 import com.sellerops.common.ApiException;
@@ -134,6 +139,9 @@ class TalkTalkLaneTest {
         final TalkTalkDraftService drafts;
         final TalkTalkSendService sends;
         final TalkTalkQueryService query;
+        final DefaultListableBeanFactory bf = new DefaultListableBeanFactory();
+        ObjectProvider<KnowledgeCurrencyService> currency;
+        ObjectProvider<com.sellerops.knowledge.style.AnswerStyleService> styles;
 
         Lane(TalkTalkSettings settings, TalkTalkConnection.Mode mode) {
             this.settings = settings;
@@ -142,10 +150,9 @@ class TalkTalkLaneTest {
             new java.security.SecureRandom().nextBytes(key);
             this.sealer = new LocalSecretSealer(new VaultKeyRing(Base64.getEncoder().encodeToString(key), "t-1", ""));
             clock.set(MONDAY_10);
-            DefaultListableBeanFactory bf = new DefaultListableBeanFactory();
             bf.registerSingleton("currency", new KnowledgeCurrencyService(orgSources, productSources, currencyRepo,
                     supersessions, schedules, products));
-            ObjectProvider<KnowledgeCurrencyService> currency = bf.getBeanProvider(KnowledgeCurrencyService.class);
+            this.currency = bf.getBeanProvider(KnowledgeCurrencyService.class);
             ObjectProvider<AgentDraftService> noModel = bf.getBeanProvider(AgentDraftService.class);
             ObjectProvider<KnowledgeSpineService> noSpine = bf.getBeanProvider(KnowledgeSpineService.class);
             bf.registerSingleton("styles", new com.sellerops.knowledge.style.AnswerStyleService(null) {
@@ -155,8 +162,7 @@ class TalkTalkLaneTest {
                             List.of(), List.copyOf(forbidden), null, 1);
                 }
             });
-            ObjectProvider<com.sellerops.knowledge.style.AnswerStyleService> styles =
-                    bf.getBeanProvider(com.sellerops.knowledge.style.AnswerStyleService.class);
+            this.styles = bf.getBeanProvider(com.sellerops.knowledge.style.AnswerStyleService.class);
             this.facts = new TalkTalkFactCheck(currency);
             this.guidance = tx(new TalkTalkGuidanceService(guidanceRepo, delegations, outbound, access, clock,
                     connections));
@@ -174,6 +180,23 @@ class TalkTalkLaneTest {
                     access, clock, e -> { }));
             this.query = tx(new TalkTalkQueryService(connection, guidance, conversations, messages, draftRepo,
                     outbound, access, clock));
+        }
+
+        /** The same draft service with a model, a search that finds nothing and the given meter (B208). */
+        TalkTalkDraftService draftsWith(AgentDraftService model, com.sellerops.agent.quota.AgentQuotaService quota) {
+            DefaultListableBeanFactory more = new DefaultListableBeanFactory();
+            more.registerSingleton("model", model);
+            KnowledgeSpineService spine = mock(KnowledgeSpineService.class);
+            when(spine.retrieveForProduct(any(),
+                    any(), any(),
+                    any())).thenReturn(
+                    new com.sellerops.knowledge.spine.SpineRetrieval(null, List.of(), List.of(), List.of()));
+            more.registerSingleton("spine", spine);
+            TalkTalkDraftService d = new TalkTalkDraftService(conversations, messages, draftRepo, guidance, facts,
+                    access, clock, products, more.getBeanProvider(AgentDraftService.class),
+                    more.getBeanProvider(KnowledgeSpineService.class), currency, orgSources, productSources, styles);
+            d.setQuota(quota);
+            return tx(d);
         }
 
         void run() {
@@ -357,6 +380,67 @@ class TalkTalkLaneTest {
         lane.run();
         assertThat(lane.transport.calls.get()).isEqualTo(1);
         assertThat(onlyConversation().getHumanReason()).isEqualTo("RECENT_AUTO");
+    }
+
+    // ── model draft meter (B208) ─────────────────────────────────────────────────────────────────────────────────
+
+    private static final String MODEL_REPLY = """
+            {"content":[{"type":"text","text":"{\\"category\\":\\"general_reply\\",\\"title\\":\\"답변\\",\\"comments\\":\\"안녕하세요. 문의 주셔서 감사합니다.\\"}"}],
+             "stop_reason":"end_turn","usage":{"input_tokens":4613,"output_tokens":158}}
+            """;
+
+    AgentDraftService fakeModel(AtomicInteger calls) {
+        com.sellerops.agent.llm.AgentDraftProperties p = new com.sellerops.agent.llm.AgentDraftProperties(true,
+                org.toString(), "ANTHROPIC", "test-model", "sk-test", 4000, "low");
+        return new AgentDraftService(p, (uri, headers, body) -> {
+            calls.incrementAndGet();
+            return new com.sellerops.agent.llm.AgentLlmTransport.Response(200, MODEL_REPLY, 2535L);
+        }, new com.sellerops.agent.access.AgentCapabilityAccess("ALLOW_LIST", null));
+    }
+
+    @Test
+    @DisplayName("a TalkTalk model draft is charged to the day's meter before the call and its tokens are recorded after")
+    void modelDraftIsMetered() {
+        confirmGuidance(lane, org, owner, 14, 0);
+        say("u1", "포장은 어떻게 오나요?");
+        lane.run();
+        AtomicInteger calls = new AtomicInteger();
+        com.sellerops.agent.quota.AgentQuotaService quota =
+                mock(com.sellerops.agent.quota.AgentQuotaService.class);
+        UUID usage = UUID.randomUUID();
+        when(quota.consumeCharge(org, com.sellerops.agent.quota.AgentUsageKind.DRAFT, null,
+                com.sellerops.agent.quota.AgentUsageActor.USER, 0)).thenReturn(new com.sellerops.agent.quota.AgentQuotaService
+                .Charge(new com.sellerops.agent.quota.QuotaDecision(true, null, 0, 0), usage));
+
+        TalkTalkDraft draft = lane.draftsWith(fakeModel(calls), quota).prepare(org, owner, onlyConversation().getId(), "MODEL");
+
+        assertThat(draft.getTextContent()).contains("감사합니다");
+        assertThat(calls.get()).isEqualTo(1);
+        verify(quota).recordOutcome(usage, 2535L, 4613, 158);
+    }
+
+    @Test
+    @DisplayName("a TalkTalk model draft refused by the ceiling or budget never reaches the model")
+    void refusedModelDraftNeverCalls() {
+        confirmGuidance(lane, org, owner, 14, 0);
+        say("u1", "포장은 어떻게 오나요?");
+        lane.run();
+        AtomicInteger calls = new AtomicInteger();
+        com.sellerops.agent.quota.AgentQuotaService quota =
+                mock(com.sellerops.agent.quota.AgentQuotaService.class);
+        when(quota.consumeCharge(any(), any(),
+                any(), any(), anyInt()))
+                .thenReturn(new com.sellerops.agent.quota.AgentQuotaService.Charge(new com.sellerops.agent.quota.QuotaDecision(
+                        false, com.sellerops.agent.quota.QuotaDecision.Reason.DAILY_LLM_CALLS, 30, 30), null));
+        UUID conv = onlyConversation().getId();
+
+        assertThatThrownBy(() -> lane.draftsWith(fakeModel(calls), quota).prepare(org, owner, conv, "MODEL"))
+                .isInstanceOf(ApiException.class);
+        assertThat(calls.get()).isZero();
+        // And with no meter at all the model is not reached either.
+        assertThatThrownBy(() -> lane.draftsWith(fakeModel(calls), null).prepare(org, owner, conv, "MODEL"))
+                .isInstanceOf(ApiException.class);
+        assertThat(calls.get()).isZero();
     }
 
     @Test

@@ -17,7 +17,8 @@ class RunyourProfileTest {
     private static final List<String> CAPABILITIES = List.of(
             "reply-agent", "triage.ai-pilot", "agent.draft", "agent.report", "agent.plan", "agent.judge", "agent.converse",
             "inquiry.signature", "inquiry-goal", "product.image-knowledge", "knowledge.embedding", "knowledge.intent",
-            "knowledge.eligibility", "responsibility.investigation", "inquiry-decision", "review.media-vision");
+            "knowledge.eligibility", "responsibility.investigation", "inquiry-decision", "review.media-vision",
+            "review.aspect");
 
     private ApplicationContextRunner context() {
         return new ApplicationContextRunner().withInitializer(new ConfigDataApplicationContextInitializer())

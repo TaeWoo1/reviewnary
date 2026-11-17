@@ -26,7 +26,7 @@ function status(over: Partial<FolderStatus> = {}): FolderStatus {
 
 const HELD = {
   id: "f-1", path: "보온병/세척.txt", scope: "PRODUCT" as const, productName: null, state: "HELD" as const,
-  reason: "PRODUCT_UNMATCHED", message: "상품 확인 필요: 「보온병」와 이름이 똑같은 상품이 없어요.", sourceId: null,
+  reason: "PRODUCT_UNMATCHED", message: "상품 확인 필요: 「보온병」 폴더와 이름이 똑같은 상품이 없어요.", sourceId: null,
   canUseFolder: false, updatedAt: null,
 };
 const EDITED = { ...HELD, id: "f-2", path: "배송 안내.txt", scope: "ORG" as const, reason: "CONFLICT_EDITED", message: "웹에서 이 자료가 따로 바뀌었어요.", canUseFolder: true };

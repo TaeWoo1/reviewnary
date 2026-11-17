@@ -2,7 +2,13 @@ package com.sellerops.agent.llm.provider;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -32,7 +38,8 @@ class RunyourRouterKeyPostProcessorTest {
         Map<String, Object> env = new HashMap<>();
         for (String cap : List.of("AGENT_PLAN", "AGENT_DRAFT", "AGENT_JUDGE", "AGENT_CONVERSE", "AGENT_REPORT",
                 "KNOWLEDGE_EMBEDDING", "KNOWLEDGE_INTENT", "KNOWLEDGE_ELIGIBILITY", "REVIEW_MEDIA_VISION", "INQUIRY_GOAL",
-                "INQUIRY_DECISION", "INQUIRY_SIGNATURE", "RESPONSIBILITY_INVESTIGATION", "AGENT_REPLY", "AI_TRIAGE")) {
+                "INQUIRY_DECISION", "INQUIRY_SIGNATURE", "RESPONSIBILITY_INVESTIGATION", "AGENT_REPLY", "AI_TRIAGE",
+                "REVIEW_ASPECT")) {
             env.put("SELLEROPS_" + cap + "_API_KEY", "");
         }
         env.put("SELLEROPS_RESPONSIBILITY_INVESTIGATION_VENDOR", "OPENAI");
@@ -117,5 +124,24 @@ class RunyourRouterKeyPostProcessorTest {
         ConfigurableEnvironment env = boot(os);
         assertThat(key(env, "agent.draft")).isEmpty();
         assertThat(env.getPropertySources().contains(RunyourRouterKeyPostProcessor.SOURCE_NAME)).isFalse();
+    }
+
+    /**
+     * The list is written by hand, and a capability added to the profile but not to the list boots a pilot that refuses
+     * to start («키가 없습니다») the moment it is switched on — measured 2026-11-17 with review.aspect (B206). So the list is
+     * held to the profile file itself: every capability the profile routes to RUNYOUR is in it, and nothing else is.
+     */
+    @Test
+    void theRoutedListIsExactlyWhatTheProfileRoutes() throws Exception {
+        Pattern vendor = Pattern.compile("^sellerops\\.([\\w.-]+)\\.vendor:\\s*RUNYOUR\\s*$");
+        Set<String> routedByProfile = new TreeSet<>();
+        for (String line : Files.readAllLines(Path.of("src/main/resources/application-runyour.yml"))) {
+            Matcher m = vendor.matcher(line);
+            if (m.matches()) {
+                routedByProfile.add(m.group(1));
+            }
+        }
+        assertThat(routedByProfile).isNotEmpty().contains("agent.draft", "review.aspect");
+        assertThat(new TreeSet<>(RunyourRouterKeyPostProcessor.ROUTED)).isEqualTo(routedByProfile);
     }
 }

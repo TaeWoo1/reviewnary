@@ -66,6 +66,22 @@ public class SellerAccountService {
     }
 
     /**
+     * An upload of reviews or inquiries is the seller saying they sell on that channel. With no account on it a review
+     * has no one to answer as: the reply screen said 「이 채널에 연결된 판매 계정이 없어」 and nothing on screen made one
+     * (pre-demo rehearsal 2026-11-17, B207). So the first upload to a channel with NO account registers the same
+     * file-upload account {@link #registerFileChannel} makes — no credential, no provider call. A channel that already
+     * has any account, API or file, is left exactly as it is: a second one would make the answering account ambiguous
+     * ({@link SellerAccount#answering}) and silence the drafts this exists to enable.
+     */
+    @Transactional
+    public void ensureAccountForUpload(UUID orgId, UUID channelId) {
+        if (!accounts.findAllByOrgIdAndChannelId(orgId, channelId).isEmpty()) {
+            return;
+        }
+        registerFileChannel(orgId, new FileChannelRequest(channelId, null));
+    }
+
+    /**
      * Start (or resume) an official-API channel connection: find-or-create the single API-mode seller
      * account for this (org, channel). The guided-connection wizard calls this before it can register
      * credentials, so a first-time seller is no longer stranded with no account to attach to.

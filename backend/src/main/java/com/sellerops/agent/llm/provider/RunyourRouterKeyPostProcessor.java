@@ -37,7 +37,8 @@ public class RunyourRouterKeyPostProcessor implements EnvironmentPostProcessor, 
     static final List<String> ROUTED = List.of(
             "reply-agent", "triage.ai-pilot", "agent.draft", "agent.report", "agent.plan", "agent.judge", "agent.converse",
             "inquiry.signature", "inquiry-goal", "product.image-knowledge", "knowledge.embedding", "knowledge.intent",
-            "knowledge.eligibility", "responsibility.investigation", "inquiry-decision", "review.media-vision");
+            "knowledge.eligibility", "responsibility.investigation", "inquiry-decision", "review.media-vision",
+            "review.aspect");
 
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
