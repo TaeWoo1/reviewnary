@@ -132,17 +132,14 @@ for s in postgres backend agent-runtime frontend edge; do
 done
 # Startup validator: a refused boot never reaches healthy, so healthy == validator green.
 [[ "$("${COMPOSE[@]}" ps --format '{{.Service}} {{.Health}}' | awk '$1=="backend"{print $2}')" == "healthy" ]] && ok "backend validator green (healthy)" || bad "backend not healthy"
-# The guided lanes are a BUILD fact, not a runtime one: the bundle's CSP either names the seller's
-# helper origin or the browser refuses it. This is the one check that catches a pilot.env that says
-# guided-on against an image that was built before it did.
+# The seller's helper origin is in the served CSP ALWAYS (frontend/src/lib/security/csp.ts, since 2026-10-09):
+# gating it on the guided flag made the shipped app unable to reach the seller's own helper at all. So the
+# check is that the CSP names it — on or off — and a bundle without it is the defect. (It used to fail a
+# guided-OFF host for naming it, which contradicted that rule — 2026-11-17 demo deploy, B210.)
 csp="$(curl -sS --max-time 15 "https://$H/" | tr -d '\n' | grep -o "Content-Security-Policy[^>]*" || true)"
-if [[ "${PILOT_GUIDED_HELPER_ENABLED:-false}" == "true" ]]; then
-  [[ "$csp" == *"${PILOT_HELPER_BRIDGE_URL:-http://127.0.0.1:47615}"* ]] \
-    && ok "guided helper: CSP names the helper origin" \
-    || bad "guided helper ON but the served bundle's CSP does not name it — rebuild the frontend image"
-else
-  [[ "$csp" != *"47615"* ]] && ok "guided helper OFF and the CSP does not name it" || bad "guided helper OFF but the bundle names the helper origin"
-fi
+[[ "$csp" == *"${PILOT_HELPER_BRIDGE_URL:-http://127.0.0.1:47615}"* ]] \
+  && ok "CSP names the seller's helper origin" \
+  || bad "the served bundle's CSP does not name the helper origin — the seller's helper would be blocked; rebuild the frontend image"
 # Runtime topology, read off the served page. The agent-runtime URL is BAKED INTO THE BUNDLE, so an
 # image built without the pilot overlay carries the code default http://127.0.0.1:8787 — which on a
 # remote host is the SELLER'S OWN MACHINE, and the /agent lane fails for everybody with no clue why

@@ -3015,3 +3015,10 @@
 - **사실** — `SELLEROPS_AGENT_QUOTA_DAILY_*` · `SELLEROPS_DEV_LLM_BUDGET_*` · `SELLEROPS_TALKTALK_*`가 목록에 없었다. `--env-file`은 `${…}` 치환에만 쓰이므로 컨테이너는 값을 받지 못하고, 파일에 무엇을 적어도 앱 기본값(가게당 하루 1,000회, 금액 상한 없음, 톡톡 fake)이 쓰였을 것이다.
 - **다음에** — 배포에서 바꿀 값은 compose 환경 목록과 `pilot.env.example`에 같이 넣고, 띄운 컨테이너 안에서 `printenv`로 값이 들어갔는지 본다(값 출력 없이 이름 · 켜짐만).
 - **출처** — `docker-compose.yml`, `deploy/pilot/pilot.env.example`, 2026-11-17 리허설(컨테이너 안에서 6개 값 확인).
+
+### B210. 배포 스모크가 「도우미를 끈 서버의 CSP에 도우미 주소가 있으면 실패」로 남아 있었다
+
+- **무엇을 했나** — 2026-11-17 데모 배포(demo.reviewnary.kr, `f131b093`)에서 `deploy.sh`가 스모크 37개 중 1개 실패로 끝났다(스택은 모두 healthy).
+- **사실** — `frontend/src/lib/security/csp.ts`는 2026-10-09부터 판매자 도우미 주소를 CSP에 **항상** 넣는다(플래그로 막으면 실제 도우미 연결이 끊겼기 때문). `smoke.sh`는 그 전 규칙대로 「꺼져 있으면 없어야 한다」를 검사해, 제품 규칙을 지킨 번들을 실패로 찍었다.
+- **다음에** — 제품 규칙을 바꾸면 그 규칙을 읽는 배포 검사(smoke · guard)를 같은 변경에서 찾는다(`grep` 대상: 규칙이 다루는 값 — 여기서는 `47615`). 스모크는 이제 「CSP가 도우미 주소를 담는다」를 켜짐 · 꺼짐과 무관하게 본다.
+- **출처** — `deploy/pilot/smoke.sh`, `smoke-harness-guard.test.sh` 12/12, 2026-11-17 배포 기록.
