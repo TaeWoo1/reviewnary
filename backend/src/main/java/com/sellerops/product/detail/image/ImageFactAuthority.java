@@ -22,7 +22,10 @@ import java.util.Set;
  *   <li><b>A — no 규격 name: REFUSED.</b> A value with nothing governing it is the shape of the
  *       original defect — a strand count floating free, true of one option and stated of all.</li>
  *   <li><b>B — no exact stored variant: UNRESOLVED.</b> Kept, counted, never quoted. The picture may
- *       well be right; SellerOps just cannot say which 규격 it is right about.</li>
+ *       well be right; SellerOps just cannot say which 규격 it is right about. Since 2026-11-19 a label equal to
+ *       one axis value ({@code 2호} of {@code 색상: 그레이 / 사이즈: 2호}) names every option with that value
+ *       ({@link ImageFactAssociation#matchGroup}); the facts that still name none are product-wide statements the
+ *       seller confirms once.</li>
  *   <li><b>C — same 규격 + same attribute, different values: ALL of them refused.</b> Not "pick the
  *       most common", not "pick the newest": we do not know which table is current, and a majority
  *       vote among printed tables is a guess wearing arithmetic.</li>
@@ -87,8 +90,10 @@ public final class ImageFactAuthority {
     public static Finalized decide(List<ImageFacts> images, List<String> optionNames) {
         List<Judged> staged = new ArrayList<>();
         // Rule C is decided across the whole product, so the conflict map is built before any triple
-        // is accepted. Key: the matched variant plus the attribute, both normalized.
+        // is accepted. Key: each stored option the triple applies to, plus the attribute, both normalized — per
+        // OPTION, not per label, so a value printed for 「2호」 and another printed for 「그레이 / 2호」 still meet.
         Map<String, Set<String>> valuesPerSpecAttribute = new LinkedHashMap<>();
+        Map<Judged, List<String>> appliesTo = new java.util.IdentityHashMap<>();
 
         for (ImageFacts image : images) {
             for (ExtractedImageFacts.Fact fact : image.facts().facts()) {
@@ -96,16 +101,21 @@ public final class ImageFactAuthority {
                     staged.add(new Judged(image.imageSha256(), fact, Verdict.REFUSED_NO_SPEC_LABEL, null));
                     continue;
                 }
-                Optional<String> matched = ImageFactAssociation.match(fact.specLabel(), optionNames);
+                Optional<ImageFactAssociation.Group> matched =
+                        ImageFactAssociation.matchGroup(fact.specLabel(), optionNames);
                 if (matched.isEmpty()) {
                     staged.add(new Judged(image.imageSha256(), fact,
                             Verdict.UNRESOLVED_NO_EXACT_VARIANT, null));
                     continue;
                 }
-                staged.add(new Judged(image.imageSha256(), fact, Verdict.ACCEPTED, matched.get()));
-                valuesPerSpecAttribute
-                        .computeIfAbsent(key(matched.get(), fact.attribute()), k -> new LinkedHashSet<>())
-                        .add(ImageFactAssociation.normalize(fact.value()));
+                Judged accepted = new Judged(image.imageSha256(), fact, Verdict.ACCEPTED, matched.get().key());
+                staged.add(accepted);
+                appliesTo.put(accepted, matched.get().options());
+                for (String option : matched.get().options()) {
+                    valuesPerSpecAttribute
+                            .computeIfAbsent(key(option, fact.attribute()), k -> new LinkedHashSet<>())
+                            .add(ImageFactAssociation.normalize(fact.value()));
+                }
             }
         }
 
@@ -115,9 +125,10 @@ public final class ImageFactAuthority {
                 out.add(judged);
                 continue;
             }
-            Set<String> values = valuesPerSpecAttribute
-                    .get(key(judged.matchedOptionName(), judged.fact().attribute()));
-            out.add(values != null && values.size() > 1
+            boolean contradicted = appliesTo.getOrDefault(judged, List.of()).stream()
+                    .map(option -> valuesPerSpecAttribute.get(key(option, judged.fact().attribute())))
+                    .anyMatch(values -> values != null && values.size() > 1);
+            out.add(contradicted
                     // Both sides of the contradiction are refused. Keeping one would mean choosing,
                     // and there is nothing here to choose with.
                     ? new Judged(judged.imageSha256(), judged.fact(), Verdict.REFUSED_CONFLICTING_VALUE,

@@ -55,10 +55,59 @@ class ImageFactAuthorityTest {
         assertThat(ImageFactAssociation.match("22", List.of("22mm"))).isEmpty();
     }
 
+    /** The NAVER option shape of the 2026-11-19 live run: 4 colours × 1~5호, each axis named. */
+    private static final List<String> NAVER_AXES = List.of(
+            "색상: 그레이 / 사이즈: 1호", "색상: 그레이 / 사이즈: 2호",
+            "색상: 블랙 / 사이즈: 1호", "색상: 블랙 / 사이즈: 2호",
+            "색상: 우드 / 사이즈: 2호", "색상: 화이트 / 사이즈: 2호");
+
     @Test
-    @DisplayName("an ambiguous label names no 규격 at all")
-    void ambiguityRefuses() {
-        assertThat(ImageFactAssociation.match("공통", List.of("공통 / 화이트", "공통 / 블랙"))).isEmpty();
+    @DisplayName("one axis value names every option carrying it (owner, 2026-11-19) — the 사이즈 table of the live run")
+    void axisValueNamesEveryOptionWithIt() {
+        ImageFactAssociation.Group group = ImageFactAssociation.matchGroup("2호", NAVER_AXES).orElseThrow();
+        assertThat(group.key()).isEqualTo("사이즈: 2호");
+        assertThat(group.options()).containsExactly("색상: 그레이 / 사이즈: 2호", "색상: 블랙 / 사이즈: 2호",
+                "색상: 우드 / 사이즈: 2호", "색상: 화이트 / 사이즈: 2호");
+        // The axis written out is the same value, and an unnamed axis is identified by its position.
+        assertThat(ImageFactAssociation.match("사이즈: 2호", NAVER_AXES)).contains("사이즈: 2호");
+        assertThat(ImageFactAssociation.matchGroup("공통", List.of("공통 / 화이트", "공통 / 블랙")).orElseThrow()
+                .options()).containsExactly("공통 / 화이트", "공통 / 블랙");
+    }
+
+    @Test
+    @DisplayName("a label that is a value on two different axes still names nothing")
+    void twoAxesRefuse() {
+        assertThat(ImageFactAssociation.match("블랙", List.of("색상: 블랙 / 커버: 화이트", "색상: 화이트 / 커버: 블랙")))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("axis parsing drops nothing: 2호 is not 2호(10개), and a fragment of a value is not the value")
+    void axisParsingIsExact() {
+        assertThat(ImageFactAssociation.match("2호", List.of("그레이 / 2호(10개)", "화이트 / 2호(10개)"))).isEmpty();
+        assertThat(ImageFactAssociation.match("2", NAVER_AXES)).isEmpty();
+        assertThat(ImageFactAssociation.match("사이즈", NAVER_AXES)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("rule C per option: a value for 「2호」 and another for 「그레이 / 2호」 refuse each other")
+    void groupAndSingleOptionContradictionRefusesBoth() {
+        ImageFactAuthority.Finalized out = ImageFactAuthority.decide(List.of(
+                new ImageFactAuthority.ImageFacts("a", facts(fact("2호", "D 내경 높이", "10"))),
+                new ImageFactAuthority.ImageFacts("b",
+                        facts(fact("색상: 그레이 / 사이즈: 2호", "D 내경 높이", "11")))), NAVER_AXES);
+        assertThat(out.accepted()).isEmpty();
+        assertThat(out.countOf(ImageFactAuthority.Verdict.REFUSED_CONFLICTING_VALUE)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("the live table is accepted under its axis, once per row")
+    void liveTableIsAcceptedUnderItsAxis() {
+        ImageFactAuthority.Finalized out = ImageFactAuthority.decide(List.of(
+                new ImageFactAuthority.ImageFacts("t", facts(fact("1호", "D 내경 높이", "9"),
+                        fact("2호", "D 내경 높이", "10")))), NAVER_AXES);
+        assertThat(out.accepted()).extracting(ImageFactAuthority.Judged::matchedOptionName)
+                .containsExactly("사이즈: 1호", "사이즈: 2호");
     }
 
     @Test
