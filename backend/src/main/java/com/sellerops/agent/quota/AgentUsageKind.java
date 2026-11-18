@@ -12,5 +12,8 @@ package com.sellerops.agent.quota;
  *
  * <p>{@code ANALYZE} joined them on 2026-11-17: reading reviews into aspects and writing a product's opportunities and
  * threats from them (review-aspect capability), pressed by the seller on the analysis screen.
+ *
+ * <p>{@code IMAGE} joined them on 2026-11-19: reading one 상세페이지 picture for 규격 (image-knowledge capability). It
+ * reached a vendor 25 times in its first pilot run and left no row (FINDINGS B215).
  */
-public enum AgentUsageKind { PLAN, JUDGE, DRAFT, CONVERSE, INVESTIGATE, INTERPRET, REPLY, TRIAGE, RETRIEVE, ANALYZE }
+public enum AgentUsageKind { PLAN, JUDGE, DRAFT, CONVERSE, INVESTIGATE, INTERPRET, REPLY, TRIAGE, RETRIEVE, ANALYZE, IMAGE }

@@ -94,6 +94,26 @@ class ProductDetailImageKnowledgeTest {
     }
 
     @Test
+    @DisplayName("the meter has no room: the run stops at that picture, undoes its receipt, and publishes nothing")
+    void quotaStopsTheRunAndPublishesNothing() {
+        picture(0, "sha-a");
+        picture(1, "sha-b");
+        when(extraction.read(eq(org), any(), any()))
+                .thenReturn(answering("1호", "2가닥"))
+                .thenReturn(ImageFactExtractionGenerator.Result.failed(ImageFactExtractionService.QUOTA_REFUSED));
+
+        ProductDetailImageKnowledge.Result result = lane.read(org, productId, "NAVER|13250364547",
+                List.of("https://cdn.test/0.jpg", "https://cdn.test/1.jpg"));
+
+        assertThat(result.outcome()).isEqualTo(ProductDetailImageKnowledge.Outcome.QUOTA_REACHED);
+        assertThat(result.modelCalls()).as("a refused read reached no vendor").isEqualTo(1);
+        assertThat(result.publishedDocuments()).isZero();
+        verify(sources, never()).save(any(ProductKnowledgeSource.class));
+        // The refused picture's fresh receipt is removed, so nothing reads as 「확인 중」 for a picture no one reads.
+        verify(receipts).delete(any(ProductDetailImageReceipt.class));
+    }
+
+    @Test
     @DisplayName("one picture, one call — and only an exactly-matched 규격 becomes a document")
     void readsAndPublishes() {
         picture(0, "sha-a");

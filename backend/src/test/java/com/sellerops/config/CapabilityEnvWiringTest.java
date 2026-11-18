@@ -50,7 +50,7 @@ class CapabilityEnvWiringTest {
             "SELLEROPS_AGENT_PLAN", "SELLEROPS_AGENT_DRAFT", "SELLEROPS_AGENT_JUDGE",
             "SELLEROPS_AGENT_CONVERSE", "SELLEROPS_AGENT_REPORT",
             "SELLEROPS_KNOWLEDGE_EMBEDDING", "SELLEROPS_KNOWLEDGE_INTENT", "SELLEROPS_KNOWLEDGE_ELIGIBILITY",
-            "SELLEROPS_REVIEW_MEDIA_VISION", "SELLEROPS_REVIEW_ASPECT",
+            "SELLEROPS_REVIEW_MEDIA_VISION", "SELLEROPS_REVIEW_ASPECT", "SELLEROPS_IMAGE_KNOWLEDGE",
             // The three the audit found unplumbed. Each is an AgentCapabilityGate bean exactly like
             // the five above, and PilotConfigValidator already iterates over them — so a host could
             // not turn one on, and could not be told why.
@@ -147,7 +147,7 @@ class CapabilityEnvWiringTest {
         // The ones below decline that widening (or, for REPORT and SIGNATURE, were already listed), so
         // the name has to be there for the step that follows the first signup.
         for (String cap : List.of("SELLEROPS_KNOWLEDGE_EMBEDDING", "SELLEROPS_KNOWLEDGE_INTENT",
-                "SELLEROPS_KNOWLEDGE_ELIGIBILITY", "SELLEROPS_REVIEW_MEDIA_VISION", "SELLEROPS_REVIEW_ASPECT",
+                "SELLEROPS_KNOWLEDGE_ELIGIBILITY", "SELLEROPS_REVIEW_MEDIA_VISION", "SELLEROPS_REVIEW_ASPECT", "SELLEROPS_IMAGE_KNOWLEDGE",
                 "SELLEROPS_INQUIRY_GOAL", "SELLEROPS_INQUIRY_DECISION",
                 "SELLEROPS_AGENT_REPORT", "SELLEROPS_INQUIRY_SIGNATURE",
                 "SELLEROPS_RESPONSIBILITY_INVESTIGATION")) {

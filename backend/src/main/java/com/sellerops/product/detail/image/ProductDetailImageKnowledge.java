@@ -93,7 +93,13 @@ public class ProductDetailImageKnowledge {
          */
         NO_VARIANTS,
         /** Every picture was read (or reused) and finalization ran. */
-        READ
+        READ,
+        /**
+         * The day's ceiling or the money budget had no room for the next picture (2026-11-19, FINDINGS B215). What was
+         * read is kept on its receipts and reused next time; nothing is finalized or published, because a table decided
+         * from part of a page could miss the contradiction an unread picture holds.
+         */
+        QUOTA_REACHED
     }
 
     /** What the run did, in numbers a manifest can be checked against. */
@@ -162,6 +168,7 @@ public class ProductDetailImageKnowledge {
         ImageFactExtractionGenerator.Usage usage = ImageFactExtractionGenerator.Usage.NONE;
         List<ImageFactAuthority.ImageFacts> perImage = new ArrayList<>();
         Map<String, ProductDetailImageReceipt> receiptBySha = new LinkedHashMap<>();
+        boolean quotaReached = false;
 
         for (int i = 0; i < considered; i++) {
             DetailImageFetcher.Loaded loaded = fetcher.loadOne(imageUrls.get(i), i);
@@ -184,6 +191,8 @@ public class ProductDetailImageKnowledge {
             }
 
             ProductDetailImageReceipt receipt = existing.orElseGet(ProductDetailImageReceipt::new);
+            ProductDetailImageReceipt.Status priorStatus = receipt.getStatus();
+            Instant priorStarted = receipt.getStartedAt();
             Instant now = Instant.now();
             receipt.setOrgId(orgId);
             receipt.setProductId(productId);
@@ -199,6 +208,19 @@ public class ProductDetailImageKnowledge {
 
             ImageFactExtractionGenerator.Result read =
                     extraction.read(orgId, loaded.bytes(), loaded.meta().contentType());
+            if (ImageFactExtractionService.QUOTA_REFUSED.equals(read.reason())) {
+                // No vendor was reached: the receipt goes back to what it was, so nothing says 「확인 중」 for a
+                // picture no one is reading, and the next run starts here.
+                if (existing.isEmpty()) {
+                    receipts.delete(receipt);
+                } else {
+                    receipt.setStatus(priorStatus);
+                    receipt.setStartedAt(priorStarted);
+                    receipts.save(receipt);
+                }
+                quotaReached = true;
+                break;
+            }
             modelCalls++;
             usage = usage.plus(read.usage());
             receipt.setCompletedAt(Instant.now());
@@ -217,6 +239,14 @@ public class ProductDetailImageKnowledge {
                 failed++;
             }
             receiptBySha.put(sha, receipts.save(receipt));
+        }
+
+        if (quotaReached) {
+            int withFacts = (int) perImage.stream().filter(image -> !image.facts().isEmpty()).count();
+            log.info("image-knowledge org={} outcome=QUOTA_REACHED considered={} fetched={} model_calls={} reused={}",
+                    orgId, considered, fetched, modelCalls, reused);
+            return new Result(Outcome.QUOTA_REACHED, considered, fetched, modelCalls, reused, withFacts,
+                    perImage.size() - withFacts, failed, 0, 0, 0, 0, usage, List.of());
         }
 
         ImageFactAuthority.Finalized finalized = ImageFactAuthority.decide(perImage, optionNames);

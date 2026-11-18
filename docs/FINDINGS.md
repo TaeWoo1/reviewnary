@@ -3050,3 +3050,10 @@
 - **사실** — 모델은 2번(계획 · 판단) 불렸고(약 38원), 「답할 근거 없음」으로 초안을 저장하지 않았다. 나누리 계정에는 상품 · 상세 · 지식 원천이 모두 0건이었다. 연결 직후 지난 기록을 읽는 자동 경로(`SELLEROPS_KNOWLEDGE_BOOTSTRAP_AUTO_ENABLED`)와 그 안의 상세페이지 읽기(`SELLEROPS_PRODUCT_DETAIL_ENRICHMENT_ENABLED`)가 둘 다 기본 꺼짐이었다. 게다가 상세 스위치는 `application.yml`은 읽지만 `docker-compose.yml`이 컨테이너에 넘기지 않아, 서버 env 파일에 써도 꺼진 채였을 것이다. 같은 결함의 네 번째 사례다(`CapabilityEnvWiringTest` 머리말).
 - **다음에** — 오너 결정(2026-11-18): 처음 연결할 때 상세페이지까지 읽는다. 서버에서 두 스위치를 켠다. `CapabilityEnvWiringTest`가 두 이름을 compose와 `pilot.env.example`에서 요구한다(빼면 fail, 넣으면 pass 확인). 실제 모델을 켜기 전에 그 계정의 지식 원천 수부터 센다.
 - **출처** — `ProductDetailEnrichmentTrigger.java:99`, `KnowledgeBootstrapReconciler.java`, 데모 서버 `agent_llm_usage`(NEED_PLAN 1 · NEED_JUDGE 1), 2026-11-18.
+
+### B215. 상세페이지 그림 읽기는 하루 상한과 누적 예산 밖에서 돈을 썼고, 비용 예상도 빗나갔다
+
+- **무엇을 했나** — 2026-11-19 나누리 몰드 상품 1개의 상세 그림을 실제 모델로 읽었다(오너 승인, 일회용 컨테이너).
+- **사실** — (1) 모델을 25번 불렀는데 `agent_llm_usage`에 한 줄도 남지 않았다. 이 lane(`ImageFactExtractionService`)은 `AgentQuotaService`를 거치지 않아, 서버에 건 하루 80회 · 누적 20,000원 상한이 이 호출을 막지도 세지도 못한다. 막은 것은 러너의 상품당 그림 26장 상수뿐이다. (2) 「그림 6~10장, 약 200원」이라고 했지만, 실제 페이지에는 그림이 37장이었고 25장을 읽어 약 358원이 들었다. 그림 수를 세는 로그(`images=`)는 갤러리 수였고, 상세 본문 그림 수가 아니었다.
+- **다음에** — 그림 읽기를 제품 경로에 넣기 전에, 호출마다 `AgentQuotaService`와 `DevLlmBudget`을 거치게 한다. 비용 예상은 본문 그림 수(`img_tags`)로 계산하고, 상한(26)을 곱한 값을 최대치로 말한다.
+- **출처** — 일회용 러너 로그 `[naver-image-knowledge] RUN images_considered=26 model_calls=25`, `agent_llm_usage` 0행, `docs/evidence/INDEX.md` 2026-11-19, 2026-11-19.
