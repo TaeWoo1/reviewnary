@@ -29,6 +29,8 @@ export type Cafe24ResultStatus = "connected" | "reconnect_required" | "invalid" 
 export interface Cafe24Result {
   status: Cafe24ResultStatus;
   accountId: string | null;
+  /** The account already had a connection and the seller restored it — not a first connection (B213). */
+  reconnected: boolean;
 }
 
 /**
@@ -42,7 +44,11 @@ export function parseCafe24Result(params: URLSearchParams): Cafe24Result {
   const status: Cafe24ResultStatus =
     raw === "connected" || raw === "reconnect_required" || raw === "invalid" ? raw : "unknown";
   const accountId = params.get("accountId");
-  return { status, accountId: accountId && accountId.length > 0 ? accountId : null };
+  return {
+    status,
+    accountId: accountId && accountId.length > 0 ? accountId : null,
+    reconnected: params.get("reconnected") === "1",
+  };
 }
 
 /**

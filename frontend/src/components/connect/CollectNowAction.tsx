@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Link, useInRouterContext } from "react-router-dom";
 import { api } from "../../lib/apiClient";
 import { useApiData } from "../../lib/useApiData";
 import type { CollectNowPath, LocalAgentRunState, ScreenReadView } from "../../lib/types";
@@ -362,6 +363,15 @@ export function CollectNowAction({
   onSettled?: () => void;
 }) {
   const [syncing, setSyncing] = useState(false);
+  // <b>결과는 누른 버튼 옆에 남는다</b> (B211, 2026-11-18). 지금까지 결과 문장은 페이지 맨 위 알림으로만 갔고,
+  // 수집 설정까지 내려와 버튼을 누른 판매자에게는 보이지 않았다 — 문의 4건을 가져온 수집을 「안 된다」고 읽었다.
+  // 위 알림은 그대로 두고(다른 화면이 그것을 듣는다), 같은 문장을 버튼 옆에도 두고, 가져온 것이 보이는 곳으로
+  // 가는 길을 붙인다.
+  const [result, setResult] = useState<{ text: string; isError: boolean } | null>(null);
+  function report(text: string, isError: boolean) {
+    setResult({ text, isError });
+    onReport(text, isError);
+  }
   /**
    * 이 탭에서 방금 확인한 로그인. <b>이 탭에서만, 지금만</b> 유효하다 — 서버에 저장하지 않고 freshness로도
    * 쓰지 않는다(제품 결정 2026-10-08). 새로고침하면 사라지고 화면은 다시 「최근 수집 시 로그인이
@@ -438,7 +448,7 @@ export function CollectNowAction({
         resumed = null;
       }
       if (!live.current || !resumed) return;
-      onReport("로그인 확인됨. 멈췄던 확인을 이어서 진행해요.", false);
+      report("로그인 확인됨. 멈췄던 확인을 이어서 진행해요.", false);
       await watchResumed(resumed);
     }
 
@@ -485,7 +495,7 @@ export function CollectNowAction({
       const watched = await watchSignIn(channelCode, (round, rounds) => {
         if (!live.current) return;
         // <b>몇 분을 기다리게 하면서 아무 말도 하지 않으면 멈춘 것으로 읽힌다.</b> 2026-10-09에 그렇게 읽혔다.
-        onReport(round === 1
+        report(round === 1
           ? "판매자센터 로그인 창을 열었어요. 그 창에서 로그인해 주세요."
           : `아직 기다리고 있어요. 로그인 창을 다시 앞으로 가져왔어요. (${round}/${rounds})`, false);
       }, SIGN_IN_ROUNDS, startSignIn, awaitSignIn);
@@ -493,7 +503,7 @@ export function CollectNowAction({
       if (!watched.ok) {
         // 시작하지 못했으면 기다리던 수집도 버린다 — 승인을 들고 있을 이유가 없다.
         pendingCollect.current = false;
-        onReport(signInStartMessage(watched.reason), true);
+        report(signInStartMessage(watched.reason), true);
         return;
       }
       const settled = watched.state;
@@ -514,7 +524,7 @@ export function CollectNowAction({
       if (settled !== "SIGNED_IN") {
         const message = signInMessage(settled);
         if (message) {
-          onReport(message.text, message.isError);
+          report(message.text, message.isError);
         }
         return;
       }
@@ -529,12 +539,12 @@ export function CollectNowAction({
       if (!resumed) {
         const message = signInMessage(settled);
         if (message) {
-          onReport(message.text, message.isError);
+          report(message.text, message.isError);
         }
         onChanged?.();
         return;
       }
-      onReport("로그인 확인됨. 멈췄던 확인을 이어서 진행해요.", false);
+      report("로그인 확인됨. 멈췄던 확인을 이어서 진행해요.", false);
       await watchResumed(resumed);
     } finally {
       if (live.current) setSigningIn(false);
@@ -554,7 +564,7 @@ export function CollectNowAction({
       const read = await awaitScreenRead(first);
       pendingCollect.current = read.state === "AUTH_REQUIRED";
       const message = screenReadMessage(label, read);
-      onReport(message.text, message.isError);
+      report(message.text, message.isError);
       onChanged();
     } finally {
       setSyncing(false);
@@ -573,15 +583,15 @@ export function CollectNowAction({
         // 수집을 로그인했다고 되살릴 이유도 없다.
         pendingCollect.current = read.state === "AUTH_REQUIRED";
         const message = screenReadMessage(label, read);
-        onReport(message.text, message.isError);
+        report(message.text, message.isError);
       } else if (started.run) {
         const run = started.run;
-        onReport(
+        report(
           `${label} 수집 완료: 저장 ${run.successRows} · 건너뜀 ${run.skippedRows} · 실패 ${run.failedRows}`,
           run.status === "FAILED",
         );
       } else {
-        onReport(`${label} 수집을 시작했어요.`, false);
+        report(`${label} 수집을 시작했어요.`, false);
       }
       onChanged();
     } catch (e) {
@@ -589,11 +599,11 @@ export function CollectNowAction({
       // 한다 — 한국어 문장을 맞춰보는 화면은 누군가 문장을 고치는 순간 판매자에게 엉뚱한 안내를 한다.
       const code = backendCode(e);
       if (code === "HELPER_NOT_LINKED") {
-        onReport("이 컴퓨터의 도우미가 아직 연결되지 않았어요. 도우미 카드에서 [이 기기 연결]을 한 번 눌러 주세요.", true);
+        report("이 컴퓨터의 도우미가 아직 연결되지 않았어요. 도우미 카드에서 [이 기기 연결]을 한 번 눌러 주세요.", true);
       } else if (code === "HELPER_BUSY") {
-        onReport("이미 수집이 진행 중이에요. 끝난 뒤 다시 눌러 주세요.", true);
+        report("이미 수집이 진행 중이에요. 끝난 뒤 다시 눌러 주세요.", true);
       } else {
-        onReport(backendMessage(e) ?? "수집 실행에 실패했어요. 잠시 후 다시 시도해 주세요.", true);
+        report(backendMessage(e) ?? "수집 실행에 실패했어요. 잠시 후 다시 시도해 주세요.", true);
       }
     } finally {
       setSyncing(false);
@@ -659,7 +669,48 @@ export function CollectNowAction({
       >
         {syncing ? "수집 중…" : signedInHere ? "다시 수집하기" : "지금 수집하기"}
       </button>
+      {result ? (
+        <p
+          role="status"
+          data-testid={`collect-result-${dataType}`}
+          className={`break-keep text-sm ${result.isError ? "text-bad" : "text-ink"}`}
+        >
+          {result.text}
+          {!result.isError && resultPath(dataType) ? (
+            <>
+              {" "}
+              <ResultLink to={resultPath(dataType)!} label={resultLinkLabel(dataType)} />
+            </>
+          ) : null}
+        </p>
+      ) : null}
       {recovery && needsRecovery(desk) ? recovery : null}
     </div>
   );
+}
+
+/** Where what this collection brought in can be seen — the one place a seller would go to check. */
+export function resultPath(dataType: string): string | null {
+  if (dataType === "INQUIRY") return "/inquiries";
+  if (dataType === "REVIEW") return "/reviews";
+  return null;
+}
+
+/** A router link inside the app; a plain link where this control is drawn without a router (isolated renders). */
+function ResultLink({ to, label }: { to: string; label: string }) {
+  const routed = useInRouterContext();
+  const cls = "font-semibold text-brand-700 underline";
+  return routed ? (
+    <Link to={to} className={cls}>
+      {label}
+    </Link>
+  ) : (
+    <a href={to} className={cls}>
+      {label}
+    </a>
+  );
+}
+
+function resultLinkLabel(dataType: string): string {
+  return dataType === "INQUIRY" ? "문의 보러 가기" : "리뷰 보러 가기";
 }

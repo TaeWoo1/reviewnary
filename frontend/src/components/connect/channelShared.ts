@@ -150,7 +150,37 @@ export const NEXT_ACTION: Record<string, NextAction> = {
   },
 };
 
-export function nextActionFor(status: ConnectionStatusView): NextAction {
+/**
+ * A connection stays «CONNECTED» in storage until a collection fails, so a channel nobody has collected from for
+ * weeks still reads as connected — and a lapsed Cafe24 consent (its refresh token lives two weeks) is only found by
+ * the next press (B212, 2026-11-18: 「정상 수집 중이에요」 twenty days after the last read). Past this age the screen
+ * stops calling it normal.
+ */
+export const STALE_CONNECTED_DAYS = 3;
+
+/** Whole days since the last successful collection, when the state says CONNECTED and it is older than the limit. */
+export function staleConnectedDays(status: ConnectionStatusView, now: number = Date.now()): number | null {
+  if (status.state !== "CONNECTED" || !status.lastSuccessAt) {
+    return null;
+  }
+  const at = new Date(status.lastSuccessAt).getTime();
+  if (Number.isNaN(at)) {
+    return null;
+  }
+  const days = Math.floor((now - at) / 86_400_000);
+  return days >= STALE_CONNECTED_DAYS ? days : null;
+}
+
+export function nextActionFor(status: ConnectionStatusView, now: number = Date.now()): NextAction {
+  const stale = staleConnectedDays(status, now);
+  if (stale !== null) {
+    return {
+      tone: "warn",
+      title: "한동안 수집하지 않았어요",
+      guidance: `마지막으로 가져온 게 ${stale}일 전이에요. 「지금 수집하기」를 누르면 연결이 살아 있는지 바로 확인돼요. 오래 쉬면 다시 연결해야 할 수도 있어요.`,
+      cta: { label: "지금 수집하기", target: "collect" },
+    };
+  }
   const base: NextAction = NEXT_ACTION[status.state] ?? {
     tone: "muted",
     title: "연결 상태를 확인해 주세요",

@@ -180,6 +180,7 @@ class Cafe24OnboardingServiceTest {
         CompletionResult result = service.complete(raw, "the-auth-code", null, null);
 
         assertThat(result.status()).isEqualTo(CompletionStatus.CONNECTED);
+        assertThat(result.reconnected()).as("a first connection is not a reconnect").isFalse();
         assertThat(statusOf(result.sellerAccountId())).isEqualTo(ChannelStatus.CONNECTED);
 
         Map<String, String> secrets = vault.open(org, result.sellerAccountId()).secrets();
@@ -323,6 +324,25 @@ class Cafe24OnboardingServiceTest {
         assertThat(statusOf(accountId)).isEqualTo(ChannelStatus.CONNECTED);
         assertThat(refreshTokenOf(accountId)).isEqualTo("refresh-2"); // atomically replaced
         assertThat(credentials.findAll()).hasSize(1); // one row — replaced, not duplicated
+    }
+
+    @Test
+    void aReconnectAfterTheConsentLapsedIsReportedAsAReconnect() {
+        // B213: the refresh token expired, a collection marked the account RECONNECT_REQUIRED, and the seller
+        // consented again. The account was no longer CONNECTED, but it held a credential, so the result must say
+        // "reconnected" — otherwise the screen walks the seller through a first connection they already made.
+        UUID accountId = connect("refresh-1");
+        SellerAccount account = accounts.findById(accountId).orElseThrow();
+        account.setConnectionStatus(ChannelStatus.RECONNECT_REQUIRED);
+        accounts.save(account);
+
+        String raw = startAndGetRawState();
+        http.respondWith(200, RecordingCafe24HttpClient.tokenBody("access-2", "refresh-2"));
+        CompletionResult result = service.complete(raw, "the-auth-code", null, null);
+
+        assertThat(result.status()).isEqualTo(CompletionStatus.CONNECTED);
+        assertThat(result.sellerAccountId()).isEqualTo(accountId);
+        assertThat(result.reconnected()).isTrue();
     }
 
     @Test

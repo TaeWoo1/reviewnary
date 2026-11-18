@@ -12,8 +12,11 @@ const HEALTH_MAP: Record<string, { label: string; cls: string }> = {
   NOT_COLLECTED: { label: "수집 이력 없음", cls: "bg-ink/5 text-muted" },
 };
 
-export function HealthBadge({ state }: { state: string }) {
-  const { label, cls } = HEALTH_MAP[state] ?? { label: state, cls: "bg-ink/5 text-muted" };
+/** `stale`: the state reads CONNECTED but nothing has been collected for days (B212) — not «정상 수집 중». */
+export function HealthBadge({ state, stale = false }: { state: string; stale?: boolean }) {
+  const { label, cls } = stale
+    ? { label: "한동안 수집 없음", cls: "bg-warn/10 text-warn" }
+    : HEALTH_MAP[state] ?? { label: state, cls: "bg-ink/5 text-muted" };
   return (
     <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${cls}`}>
       {label}

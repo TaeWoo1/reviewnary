@@ -90,6 +90,9 @@ public class Cafe24ConnectController {
         if (result.sellerAccountId() != null) {
             location.queryParam("accountId", result.sellerAccountId());
         }
+        if (result.reconnected()) {
+            location.queryParam("reconnected", "1");
+        }
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(URI.create(location.toUriString()))
                 .build();

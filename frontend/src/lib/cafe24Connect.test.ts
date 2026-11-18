@@ -53,11 +53,17 @@ describe("parseCafe24Result", () => {
     expect(parse("status=connected&accountId=").accountId).toBeNull();
   });
 
+  it("reads the reconnect marker only as an exact 1", () => {
+    expect(parse("status=connected&accountId=a&reconnected=1").reconnected).toBe(true);
+    expect(parse("status=connected&accountId=a").reconnected).toBe(false);
+    expect(parse("status=connected&accountId=a&reconnected=true").reconnected).toBe(false);
+  });
+
   it("never surfaces code/state/token query values", () => {
     const result = parse(
       "status=connected&code=SECRETCODE&state=RAWSTATE&access_token=ATOKEN&refresh_token=RTOKEN",
     );
-    expect(Object.keys(result).sort()).toEqual(["accountId", "status"]);
+    expect(Object.keys(result).sort()).toEqual(["accountId", "reconnected", "status"]);
     const serialized = JSON.stringify(result);
     for (const secret of ["SECRETCODE", "RAWSTATE", "ATOKEN", "RTOKEN"]) {
       expect(serialized).not.toContain(secret);

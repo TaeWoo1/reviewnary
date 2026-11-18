@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { PageHead } from "../../components/ui/PageHead";
 import { Empty } from "../../components/ui/Empty";
 import { Disclosure } from "../../components/ui/Disclosure";
@@ -18,7 +18,7 @@ import { CollectionSettingsSection } from "../../components/connect/CollectionSe
 import { CollectionHistorySection } from "../../components/connect/CollectionHistorySection";
 import { CoupangChannelView } from "../../components/connect/coupang/CoupangChannelView";
 import { ReviewRecordPanel } from "../../components/connect/ReviewRecordPanel";
-import { nextActionFor, type ScrollTarget } from "../../components/connect/channelShared";
+import { nextActionFor, staleConnectedDays, type ScrollTarget } from "../../components/connect/channelShared";
 import { api } from "../../lib/apiClient";
 import { hasReviewRecord } from "../../lib/reviewRecord";
 import type {
@@ -78,7 +78,21 @@ export function ChannelWorkspace() {
   // "connected" or "no history yet".
   const [loadingCollection, setLoadingCollection] = useState(true);
   const [collectionError, setCollectionError] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Arrived from a restored connection (Cafe24 reconsent, B213): say so once, and point at the one thing that
+  // brings in what piled up while it was down. The marker is dropped so a refresh does not repeat it.
+  const [notice, setNotice] = useState<string | null>(() =>
+    searchParams.get("reconnected") === "1"
+      ? "다시 연결했어요. 연결이 끊겨 있던 동안의 리뷰 · 문의는 아래 「지금 수집하기」를 누르면 가져와요."
+      : null,
+  );
+  useEffect(() => {
+    if (searchParams.get("reconnected") === "1") {
+      const next = new URLSearchParams(searchParams);
+      next.delete("reconnected");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -280,7 +294,7 @@ export function ChannelWorkspace() {
     <div className="space-y-6">
       <PageHead
         title={account?.alias ?? account?.channelNameKo ?? "채널"}
-        meta={status ? <HealthBadge state={status.state} /> : undefined}
+        meta={status ? <HealthBadge state={status.state} stale={staleConnectedDays(status) !== null} /> : undefined}
         action={
           <BtnLink to="/connect" size="sm" variant="ghost">
             채널 목록

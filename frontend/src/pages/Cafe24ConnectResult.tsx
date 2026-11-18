@@ -44,13 +44,19 @@ const TONE_CLASS: Record<"good" | "warn" | "bad", string> = {
 export function Cafe24ConnectResult() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { status, accountId } = parseCafe24Result(params);
+  const { status, accountId, reconnected } = parseCafe24Result(params);
 
   // On a successful callback, hand off to the first-connection tutorial so verification +
   // the first read-only sync resume automatically. Only the sanitized status/accountId are
   // forwarded — never an OAuth code/state/token. Non-success results stay on this card.
   useEffect(() => {
     if (status !== "connected") {
+      return;
+    }
+    // A seller who restored a connection they already had goes back to that channel, where its collection
+    // controls are — not into the first-connection walk (B213: 2026-11-18, a lapsed consent restored).
+    if (reconnected && accountId) {
+      navigate(`/connect/channels/${encodeURIComponent(accountId)}?reconnected=1`, { replace: true });
       return;
     }
     // Growth funnel: Cafe24 connected (status only — never the account id).
@@ -60,7 +66,7 @@ export function Cafe24ConnectResult() {
       query.set("accountId", accountId);
     }
     navigate(`/connect/cafe24/tutorial?${query.toString()}`, { replace: true });
-  }, [status, accountId, navigate]);
+  }, [status, accountId, reconnected, navigate]);
 
   const copy = COPY[status];
 

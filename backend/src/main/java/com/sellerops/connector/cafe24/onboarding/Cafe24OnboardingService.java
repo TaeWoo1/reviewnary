@@ -55,7 +55,15 @@ public class Cafe24OnboardingService {
                               ChannelStatus connectionStatus) {
     }
 
-    public record CompletionResult(CompletionStatus status, UUID sellerAccountId) {
+    /**
+     * @param reconnected the account already held a credential before this exchange, so the seller restored an
+     *                    existing connection rather than making a first one. The result screen uses it to send
+     *                    the seller back to that channel instead of into the first-connection walk (B213).
+     */
+    public record CompletionResult(CompletionStatus status, UUID sellerAccountId, boolean reconnected) {
+        public CompletionResult(CompletionStatus status, UUID sellerAccountId) {
+            this(status, sellerAccountId, false);
+        }
     }
 
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -300,6 +308,7 @@ public class Cafe24OnboardingService {
                         state.getMallId(), clientId, clientSecret, code, state.getRedirectUri());
                 // Seller-connection values only — the app client id/secret are config,
                 // never persisted per seller.
+                boolean hadCredential = vault.hasCredential(state.getOrgId(), account.getId());
                 Map<String, String> secrets = new LinkedHashMap<>();
                 secrets.put("mall_id", state.getMallId());
                 secrets.put("refresh_token", tokens.refreshToken());
@@ -315,7 +324,7 @@ public class Cafe24OnboardingService {
                 account.setConnectionStatus(ChannelStatus.CONNECTED);
                 accounts.save(account);
                 connectedOrg[0] = state.getOrgId();
-                return new CompletionResult(CompletionStatus.CONNECTED, account.getId());
+                return new CompletionResult(CompletionStatus.CONNECTED, account.getId(), hadCredential || wasConnected);
             } catch (RuntimeException e) {
                 // Code exchange or encrypted persistence failed — no credential written.
                 return failAttempt(account, wasConnected);
