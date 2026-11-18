@@ -84,6 +84,16 @@ class CapabilityEnvWiringTest {
             "SELLEROPS_REVIEW_IMPORT_UNATTENDED_ORG_IDS",
             "SELLEROPS_REVIEW_IMPORT_UNATTENDED_DEVICE_IDS");
 
+    /**
+     * Onboarding knowledge: what a newly connected seller's replies can stand on — the history read on connect and the
+     * 상세페이지 text it includes. No vendor and no organisation list (connecting a channel is the instruction), so
+     * only the switches. The detail switch was bound in application.yml and missing here until 2026-11-18: the pilot
+     * connected 나누리 and read no product detail, and its first real draft had nothing to stand on (FINDINGS B214).
+     */
+    private static final List<String> ONBOARDING_KNOWLEDGE = List.of(
+            "SELLEROPS_KNOWLEDGE_BOOTSTRAP_AUTO_ENABLED",
+            "SELLEROPS_PRODUCT_DETAIL_ENRICHMENT_ENABLED");
+
     private static List<String> requiredNames() {
         List<String> names = new ArrayList<>();
         for (String cap : CAPABILITY_TRIPLES) {
@@ -93,6 +103,7 @@ class CapabilityEnvWiringTest {
         }
         names.addAll(AI_TRIAGE);
         names.addAll(UNATTENDED_REVIEW_EXPORT);
+        names.addAll(ONBOARDING_KNOWLEDGE);
         return names;
     }
 
@@ -124,6 +135,9 @@ class CapabilityEnvWiringTest {
             assertThat(env).as("pilot.env.example names %s", name).containsPattern("(?m)^" + name + "=");
         }
         for (String name : UNATTENDED_REVIEW_EXPORT) {
+            assertThat(env).as("pilot.env.example names %s", name).containsPattern("(?m)^" + name + "=");
+        }
+        for (String name : ONBOARDING_KNOWLEDGE) {
             assertThat(env).as("pilot.env.example names %s", name).containsPattern("(?m)^" + name + "=");
         }
         // The organisation list is required of the template only where the capability REQUIRES one:

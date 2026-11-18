@@ -189,6 +189,8 @@ services:
       SELLEROPS_REVIEW_ASPECT_API_KEY: ${SELLEROPS_REVIEW_ASPECT_API_KEY:-}
       SELLEROPS_REVIEW_ASPECT_ORG_IDS: ${SELLEROPS_REVIEW_ASPECT_ORG_IDS:-}
       SELLEROPS_KNOWLEDGE_BOOTSTRAP_AUTO_ENABLED: ${SELLEROPS_KNOWLEDGE_BOOTSTRAP_AUTO_ENABLED:-false}
+      # The 상세페이지 text lane the history read includes. Bound in application.yml, missing here until 2026-11-18.
+      SELLEROPS_PRODUCT_DETAIL_ENRICHMENT_ENABLED: ${SELLEROPS_PRODUCT_DETAIL_ENRICHMENT_ENABLED:-false}
       # ── Spend ceilings (2026-11-17) ─────────────────────────────────────────────────────────
       # Without these lines the container never saw them: the env file only fills ${…} here, so a
       # pilot had the application defaults (1,000 calls per org a day, no money ceiling) whatever the

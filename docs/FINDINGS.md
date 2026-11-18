@@ -3043,3 +3043,10 @@
 - **사실** — (1) 카페24에서 돌아오면 결과 화면이 상태 `connected`만 보고 첫 연결 튜토리얼로 보냈다. 두 달 쓰던 계정을 되살렸다는 사실을 서버가 알려 주지 않았기 때문이다(`CompletionResult`에 그 정보가 없었다). (2) `SellerAccountReauthService.onReconnected`는 꺼져 있으면서 `paused_reason`이 적힌 예약을 「시스템이 멈춘 것」으로 보고 다시 켠다(`next_run_at=now`). 라이브 전에 예약을 끄면서 이유를 적어 두었더니, 다시 동의하는 순간 카페24 예약 3개가 켜질 수 있었다. 수집 스케줄러가 꺼져 있었고, 동의 전에 이유 칸을 비워 막았다.
 - **다음에** — (1) 동의 결과에 `reconnected`(교환 전에 자격 정보가 있었음)를 싣고, 화면은 그 채널로 돌아가 「다시 연결했어요」라고 말한다(이번 변경). (2) 라이브 전에 예약을 멈출 때는 `paused_reason`을 비워 「사람이 끈 예약」으로 둔다. 이유와 목록은 예약 행이 아니라 별도 파일에 적는다. 다시 연결은 이유가 적힌 예약을 켜는 트리거다(`sellerops_live_approval_contract.md` §6b).
 - **출처** — `Cafe24OnboardingService.complete`, `Cafe24ConnectResult.tsx`, `SellerAccountReauthService.java:135`, 데모 서버 `/etc/sellerops/nanuri-paused-schedules-20261117.txt`, 2026-11-18.
+
+### B214. 연결한 판매자의 상세페이지를 읽지 않아, 첫 실제 초안이 근거 없이 멈췄다
+
+- **무엇을 했나** — 2026-11-18 데모 서버에서 나누리 계정에 실제 모델을 켜고, 문의 하나에 「AI 답변 초안 만들기」를 눌렀다(오너).
+- **사실** — 모델은 2번(계획 · 판단) 불렸고(약 38원), 「답할 근거 없음」으로 초안을 저장하지 않았다. 나누리 계정에는 상품 · 상세 · 지식 원천이 모두 0건이었다. 연결 직후 지난 기록을 읽는 자동 경로(`SELLEROPS_KNOWLEDGE_BOOTSTRAP_AUTO_ENABLED`)와 그 안의 상세페이지 읽기(`SELLEROPS_PRODUCT_DETAIL_ENRICHMENT_ENABLED`)가 둘 다 기본 꺼짐이었다. 게다가 상세 스위치는 `application.yml`은 읽지만 `docker-compose.yml`이 컨테이너에 넘기지 않아, 서버 env 파일에 써도 꺼진 채였을 것이다. 같은 결함의 네 번째 사례다(`CapabilityEnvWiringTest` 머리말).
+- **다음에** — 오너 결정(2026-11-18): 처음 연결할 때 상세페이지까지 읽는다. 서버에서 두 스위치를 켠다. `CapabilityEnvWiringTest`가 두 이름을 compose와 `pilot.env.example`에서 요구한다(빼면 fail, 넣으면 pass 확인). 실제 모델을 켜기 전에 그 계정의 지식 원천 수부터 센다.
+- **출처** — `ProductDetailEnrichmentTrigger.java:99`, `KnowledgeBootstrapReconciler.java`, 데모 서버 `agent_llm_usage`(NEED_PLAN 1 · NEED_JUDGE 1), 2026-11-18.
